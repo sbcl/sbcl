@@ -1,11 +1,21 @@
 /*
- * The x86 Linux incarnation of arch-dependent OS-dependent routines.
- * See also linux-os.c
+ * This is the x86 Linux incarnation of arch-dependent OS-dependent
+ * routines. See also "linux-os.c".
  */
 
+/*
+ * This software is part of the SBCL system. See the README file for
+ * more information.
+ *
+ * This software is derived from the CMU CL system, which was
+ * written at Carnegie Mellon University and released into the
+ * public domain. The software is in the public domain and is
+ * provided with absolutely no warranty. See the COPYING and CREDITS
+ * files for more information.
+ */
 
-/* header files lifted wholesale from linux-os.c, some may be redundant */
-
+/* These header files were lifted wholesale from linux-os.c, some may
+ * be redundant. -- Dan Barlow ca. 2001-05-01 */
 #include <stdio.h>
 #include <sys/param.h>
 #include <sys/file.h>

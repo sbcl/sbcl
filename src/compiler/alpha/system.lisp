@@ -10,9 +10,8 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
-
 
-;;;; Type frobbing VOPs
+;;;; type frobbing VOPs
 
 (define-vop (get-lowtag)
   (:translate get-lowtag)
@@ -157,7 +156,7 @@
        (inst bis res temp res)))))
 
 
-;;;; Allocation
+;;;; allocation
 
 (define-vop (dynamic-space-free-pointer)
   (:results (int :scs (sap-reg)))
@@ -184,7 +183,7 @@
     (move csp-tn int)))
 
 
-;;;; Code object frobbing.
+;;;; code object frobbing
 
 (define-vop (code-instructions)
   (:translate code-instructions)
@@ -213,10 +212,8 @@
     (inst addq ndescr offset ndescr)
     (inst subq ndescr (- other-pointer-type function-pointer-type) ndescr)
     (inst addq code ndescr func)))
-
 
-;;;; Other random VOPs.
-
+;;;; other random VOPs.
 
 (defknown sb!unix::do-pending-interrupt () (values))
 (define-vop (sb!unix::do-pending-interrupt)
@@ -229,9 +226,8 @@
 (define-vop (halt)
   (:generator 1
     (inst gentrap halt-trap)))
-
 
-;;;; Dynamic vop count collection support
+;;;; dynamic vop count collection support
 
 (define-vop (count-me)
   (:args (count-vector :scs (descriptor-reg)))

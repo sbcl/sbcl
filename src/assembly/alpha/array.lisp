@@ -1,17 +1,14 @@
-;;; -*- Package: ALPHA -*-
-;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;;    This file contains the support routines for arrays and vectors.
-;;;
-;;; Written by William Lott.
-;;; Conversion by Sean Hallgren
-;;; 
+;;;; support routines for arrays and vectors
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
 
@@ -41,9 +38,8 @@
     (inst addq alloc-tn words alloc-tn)
     (storew ndescr result 0 other-pointer-type)
     (storew length result vector-length-slot other-pointer-type)))
-
 
-;;;; Hash primitives
+;;;; hash primitives
 #|
 (define-assembly-routine (sxhash-simple-string
 			  (:translate %sxhash-simple-string)

@@ -1,41 +1,29 @@
-;;; -*- Package: VM; Log: C.Log -*-
-;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
+;;;; the Alpha VM definition of SAP operations
 
-;;;
-;;; **********************************************************************
-;;;
-;;;    This file contains the Alpha VM definition of SAP operations.
-;;;
-;;; Written by William Lott.
-;;; Alpha conversion by Sean Hallgren.
-;;;
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
-
-
 
-;;;; Moves and coercions:
+;;;; moves and coercions
 
 ;;; Move a tagged SAP to an untagged representation.
-;;;
-
 (define-vop (move-to-sap)
   (:args (x :scs (descriptor-reg)))
   (:results (y :scs (sap-reg)))
   (:note "system area pointer indirection")
   (:generator 1
     (loadq y x sap-pointer-slot other-pointer-type)))
-
-;;;
 (define-move-vop move-to-sap :move
   (descriptor-reg) (sap-reg))
 
-
 ;;; Move an untagged SAP to a tagged representation.
-;;;
 (define-vop (move-from-sap)
   (:args (x :scs (sap-reg) :target sap))
   (:temporary (:scs (sap-reg) :from (:argument 0)) sap)
@@ -46,13 +34,10 @@
     (move x sap)
     (with-fixed-allocation (y ndescr sap-type sap-size)
       (storeq sap y sap-pointer-slot other-pointer-type))))
-;;;
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))
 
-
-;;; Move untagged sap values.
-;;;
+;;; Move untagged SAP values.
 (define-vop (sap-move)
   (:args (x :target y
 	    :scs (sap-reg)
@@ -63,13 +48,10 @@
   (:affected)
   (:generator 0
     (move x y)))
-;;;
 (define-move-vop sap-move :move
   (sap-reg) (sap-reg))
 
-
-;;; Move untagged sap arguments/return-values.
-;;;
+;;; Move untagged SAP arguments/return-values.
 (define-vop (move-sap-argument)
   (:args (x :target y
 	    :scs (sap-reg))
@@ -82,18 +64,13 @@
        (move x y))
       (sap-stack
        (storeq x fp (tn-offset y))))))
-;;;
 (define-move-vop move-sap-argument :move-argument
   (descriptor-reg sap-reg) (sap-reg))
 
-
 ;;; Use standard MOVE-ARGUMENT + coercion to move an untagged sap to a
 ;;; descriptor passing location.
-;;;
 (define-move-vop move-argument :move-argument
   (sap-reg) (descriptor-reg))
-
-
 
 ;;;; SAP-INT and INT-SAP
 
@@ -116,8 +93,6 @@
   (:policy :fast-safe)
   (:generator 1
     (move int sap)))
-
-
 
 ;;;; POINTER+ and POINTER-
 
@@ -146,7 +121,6 @@
   (:result-types signed-num)
   (:generator 1
     (inst subq ptr1 ptr2 res)))
-
 
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 
@@ -366,9 +340,8 @@
     single-reg single-float :single)
   (def-system-ref-and-set sap-ref-double %set-sap-ref-double
     double-reg double-float :double))
-
 
-;;; Noise to convert normal lisp data objects into SAPs.
+;;; noise to convert normal Lisp data objects into SAPs
 
 (define-vop (vector-sap)
   (:translate vector-sap)

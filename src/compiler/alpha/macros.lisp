@@ -1,34 +1,26 @@
-;;; -*- Package: ALPHA; Log: C.Log -*-
-;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
+;;;; various useful macros for generating Alpha code
 
-;;;
-;;; **********************************************************************
-;;;
-;;;    This file contains various useful macros for generating Alpha code.
-;;;
-;;; Written by William Lott and Christopher Hoover.
-;;; Alpha conversion by Sean Hallgren.
-;;; 
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
 
-
-;;; Handy macro for defining top-level forms that depend on the compile
-;;; environment.
-
+;;; a handy macro for defining top-level forms that depend on the
+;;; compile environment
 (defmacro expand (expr)
   (let ((gensym (gensym)))
     `(macrolet
 	 ((,gensym ()
 	    ,expr))
        (,gensym))))
-
 
-;;; Instruction-like macros.
+;;; instruction-like macros
 
 ;;; c.f. x86 backend:
 ;;(defmacro move (dst src)
@@ -38,7 +30,6 @@
 ;;              (n-src src))
 ;;    `(unless (location= ,n-dst ,n-src)
 ;;       (inst mov ,n-dst ,n-src))))
-
 
 (defmacro move (src dst)
   "Move SRC into DST unless they are location=."
@@ -90,8 +81,8 @@
 	(inst ldl ,n-target ,n-offset ,n-source)
 	(inst and ,n-target #xff ,n-target))))
 
-;;; Macros to handle the fact that we cannot use the machine native call and
-;;; return instructions. 
+;;; macros to handle the fact that we cannot use the machine native
+;;; call and return instructions
 
 (defmacro lisp-jump (function lip)
   "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
@@ -123,12 +114,9 @@
 
 
 
-;;;; Stack TN's
+;;;; stack TN's
 
-;;; Load-Stack-TN, Store-Stack-TN  --  Interface
-;;;
 ;;;    Move a stack TN to a register and vice-versa.
-;;;
 (defmacro load-stack-tn (reg stack)
   `(let ((reg ,reg)
 	 (stack ,stack))
@@ -136,7 +124,6 @@
        (sc-case stack
 	 ((control-stack)
 	  (loadw reg cfp-tn offset))))))
-
 (defmacro store-stack-tn (stack reg)
   `(let ((stack ,stack)
 	 (reg ,reg))
@@ -145,11 +132,8 @@
 	 ((control-stack)
 	  (storew reg cfp-tn offset))))))
 
-
-;;; MAYBE-LOAD-STACK-TN  --  Interface
-;;;
+;;; Move the TN Reg-Or-Stack into Reg if it isn't already there.
 (defmacro maybe-load-stack-tn (reg reg-or-stack)
-  "Move the TN Reg-Or-Stack into Reg if it isn't already there."
   (once-only ((n-reg reg)
 	      (n-stack reg-or-stack))
     `(sc-case ,n-reg
@@ -160,10 +144,8 @@
 	  ((control-stack)
 	   (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
 
-;;; MAYBE-LOAD-STACK-NFP-TN -- Interface
-;;;
+;;; Move the TN Reg-Or-Stack into Reg if it isn't already there.
 (defmacro maybe-load-stack-nfp-tn (reg reg-or-stack temp)
-  "Move the TN Reg-Or-Stack into Reg if it isn't already there."
   (once-only ((n-reg reg)
 	      (n-stack reg-or-stack))
      `(when ,reg
@@ -176,18 +158,17 @@
 	    (loadw ,n-reg cfp-tn (tn-offset ,n-stack))
 	    (inst mskll nsp-tn 0 ,temp)
 	    (inst bis ,temp ,n-reg ,n-reg))))))))
-
-
 
-;;;; Storage allocation:
+;;;; storage allocation
 
+;;; Do stuff to allocate an other-pointer object of fixed Size with a
+;;; single word header having the specified Type-Code. The result is
+;;; placed in Result-TN, Flag-Tn must be wired to NL3-OFFSET, and
+;;; Temp-TN is a non- descriptor temp (which may be randomly used by
+;;; the body.) The body is placed inside the PSEUDO-ATOMIC, and
+;;; presumably initializes the object.
 (defmacro with-fixed-allocation ((result-tn temp-tn type-code size)
 				 &body body)
-  "Do stuff to allocate an other-pointer object of fixed Size with a single
-   word header having the specified Type-Code.  The result is placed in
-   Result-TN, Flag-Tn must be wired to NL3-OFFSET, and Temp-TN is a non-
-   descriptor temp (which may be randomly used by the body.)  The body is
-   placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
   `(pseudo-atomic (:extra (pad-data-block ,size))
      (inst bis alloc-tn other-pointer-type ,result-tn)
      (inst li (logior (ash (1- ,size) type-bits) ,type-code) ,temp-tn)

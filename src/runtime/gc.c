@@ -1,11 +1,17 @@
 /*
- * Stop and Copy GC based on Cheney's algorithm.
- *
- * $Header$
- * 
- * Written by Christopher Hoover.
+ * stop and copy GC based on Cheney's algorithm
  */
 
+/*
+ * This software is part of the SBCL system. See the README file for
+ * more information.
+ *
+ * This software is derived from the CMU CL system, which was
+ * written at Carnegie Mellon University and released into the
+ * public domain. The software is in the public domain and is
+ * provided with absolutely no warranty. See the COPYING and CREDITS
+ * files for more information.
+ */
 
 #include <stdio.h>
 #include <sys/time.h>
@@ -20,6 +26,8 @@
 #include "validate.h"
 #include "lispregs.h"
 #include "interr.h"
+
+/* So you need to debug? */
 #if 0
 #define PRINTNOISE
 #define DEBUG_SPACE_PREDICATES

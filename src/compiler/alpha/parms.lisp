@@ -1,3 +1,11 @@
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
 
@@ -86,7 +94,7 @@
   (defconstant static-space-start    #x28000000)
   (defconstant static-space-end      #x2c000000)
 
-  ;; this is used in purify as part of a sloppy check to see if a pointer
+  ;; this is used in PURIFY as part of a sloppy check to see if a pointer
   ;; is in dynamic space.  Chocolate brownie for the first person to fix it
   ;; -dan 20010502
   (defconstant dynamic-space-start   #x30000000)
@@ -123,10 +131,8 @@
 ;;; the X86 port defines *nil-value* as (+ *target-static-space-start* #xB)
 ;;; here, but it seems to be the only port that needs to know the
 ;;; location of NIL from lisp.
-
-
 
-;;;; Other random constants.
+;;;; other miscellaneous constants
 
 (defenum (:suffix -trap :start 8)
   halt
@@ -142,10 +148,8 @@
   call-site
   function-prologue
   function-epilogue)
-
-
 
-;;;; Static symbols.
+;;;; static symbols
 
 ;;; These symbols are loaded into static space directly after NIL so
 ;;; that the system can compute their address by adding a constant
@@ -172,21 +176,20 @@
     sb!di::handle-function-end-breakpoint
     sb!impl::fdefinition-object
 
-    ;; Free Pointers.
+    ;; free Pointers
     *read-only-space-free-pointer*
     *static-space-free-pointer*
     *initial-dynamic-space-free-pointer*
 
-    ;; Things needed for non-local-exit.
+    ;; things needed for non-local exit
     sb!impl::*current-catch-block*
     sb!impl::*current-unwind-protect-block*
     sb!c::*eval-stack-top*
 
-    ;; Interrupt Handling
+    ;; interrupt handling
     sb!impl::*free-interrupt-context-index*
     sb!unix::*interrupts-enabled*
-    sb!unix::*interrupt-pending*
-    ))
+    sb!unix::*interrupt-pending*))
 
 (defparameter *static-functions*
   '(length
@@ -197,8 +200,12 @@
     sb!kernel:two-arg-<
     sb!kernel:two-arg->
     sb!kernel:two-arg-=
-    ;; Probably need the following as they are defined in arith.lisp
-    ;; two-arg-<= two-arg->= two-arg-/= 
+    ;; FIXME: Is this
+    ;;     probably need the following as they are defined in 
+    ;;     arith.lisp: two-arg-<= two-arg->= two-arg-/= 
+    ;; a comment from old CMU CL or old old CMU CL or
+    ;; the SBCL alpha port or what? Do we need to worry about it,
+    ;; or can we delete it?
     eql
     sb!kernel:%negate
     sb!kernel:two-arg-and

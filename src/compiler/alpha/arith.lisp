@@ -1,27 +1,17 @@
-;;; -*- Package: ALPHA; Log: C.Log -*-
-;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
+;;;; the VM definition arithmetic VOPs for the Alpha
 
-;;;
-;;; **********************************************************************
-;;;
-;;; $Header$
-;;;
-;;;    This file contains the VM definition arithmetic VOPs for the MIPS.
-;;;
-;;; Written by Rob MacLachlan
-;;; Converted by Sean Hallgren
-;;; 
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
-
-
-
 
-;;;; Unary operations.
+;;;; unary operations
 
 (define-vop (fixnum-unop)
   (:args (x :scs (any-reg)))
@@ -58,10 +48,8 @@
   (:translate lognot)
   (:generator 1
     (inst not x res)))
-
-
 
-;;;; Binary fixnum operations.
+;;;; binary fixnum operations
 
 ;;; Assume that any constant operand is the second arg...
 
@@ -165,10 +153,8 @@
 (define-binop lognor 1 3 ornot (unsigned-byte 6) (unsigned-byte 8))
 (define-binop logand 1 3 and (unsigned-byte 6) (unsigned-byte 8))
 (define-binop logxor 1 3 xor (unsigned-byte 6) (unsigned-byte 8))
-
-
-;;; Shifting
-
+
+;;;; shifting
 
 (define-vop (fast-ash)
   (:note "inline ASH")
@@ -278,9 +264,8 @@
     (inst and num mask num)
     (inst and temp mask temp)
     (inst addq num temp res)))
-
-
-;;; Multiply
+
+;;;; multiplying
 
 (define-vop (fast-*/fixnum=>fixnum fast-fixnum-binop)
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -298,10 +283,8 @@
   (:translate *)
   (:generator 3
     (inst mulq x y r)))
-
-
 
-;;;; Binary conditional VOPs:
+;;;; binary conditional VOPs
 
 (define-vop (fast-conditional)
   (:conditional)
@@ -407,8 +390,8 @@
 	     (inst beq temp target)
 	     (inst bne temp target)))))
 
-;;; EQL/FIXNUM is funny because the first arg can be of any type, not just a
-;;; known fixnum.
+;;; EQL/FIXNUM is funny because the first arg can be of any type, not
+;;; just a known fixnum.
 
 (define-conditional-vop eql
   (declare (ignore signed))
@@ -420,12 +403,11 @@
       (inst beq temp target)
       (inst bne temp target)))
 
-;;; These versions specify a fixnum restriction on their first arg.  We have
-;;; also generic-eql/fixnum VOPs which are the same, but have no restriction on
-;;; the first arg and a higher cost.  The reason for doing this is to prevent
-;;; fixnum specific operations from being used on word integers, spuriously
-;;; consing the argument.
-;;;
+;;; These versions specify a fixnum restriction on their first arg. We
+;;; have also generic-eql/fixnum VOPs which are the same, but have no
+;;; restriction on the first arg and a higher cost. The reason for
+;;; doing this is to prevent fixnum specific operations from being
+;;; used on word integers, spuriously consing the argument.
 (define-vop (fast-eql/fixnum fast-conditional)
   (:args (x :scs (any-reg))
 	 (y :scs (any-reg)))
@@ -575,10 +557,8 @@
   (:generator 1
     (inst and amount #x1f temp)
     (inst sll num temp r)))
-
-
 
-;;;; Bignum stuff.
+;;;; bignum stuff
 
 (define-vop (bignum-length get-header-data)
   (:translate sb!bignum::%bignum-length)
@@ -781,9 +761,8 @@
   (:translate sb!bignum::%ashl)
   (:generator 1
     (inst sll digit count result)))
-
 
-;;;; Static functions.
+;;;; static functions
 
 (define-static-function two-arg-gcd (x y) :translate gcd)
 (define-static-function two-arg-lcm (x y) :translate lcm)

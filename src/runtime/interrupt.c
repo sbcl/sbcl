@@ -242,7 +242,6 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 
     if (internal_errors_enabled) {
         SHOW("in interrupt_internal_error");
-#define QSHOW 1
 #if QSHOW
 	/* Display some rudimentary debugging information about the
 	 * error, so that even if the Lisp error handler gets badly

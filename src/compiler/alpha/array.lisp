@@ -1,24 +1,17 @@
-;;; -*- Package: ALPHA -*-
-;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
+;;;; the Alpha definitions for array operations
 
-;;;
-;;; **********************************************************************
-;;;
-;;;    This file contains the Alpha definitions for array operations.
-;;;
-;;; Written by William Lott
-;;; Conversion by Sean Hallgren
-;;; Complex-float support by Douglas Crosher 1998.
-;;;
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
-
-
 
-;;;; Allocator for the array header.
+;;;; allocator for the array header
 
 (define-vop (make-array-header)
   (:policy :fast-safe)
@@ -46,7 +39,7 @@
 
 
 
-;;;; Additional accessors and setters for the array header.
+;;;; additional accessors and setters for the array header
 
 (defknown sb!impl::%array-dimension (t index) index
   (flushable))
@@ -78,8 +71,7 @@
 
 
 
-;;;; Bounds checking routine.
-
+;;;; bounds checking routine
 
 (define-vop (check-bound)
   (:translate %check-bound)
@@ -97,33 +89,36 @@
       (inst cmpult index bound temp)
       (inst beq temp error)
       (move index result))))
-
-
 
-;;;; Accessors/Setters
+;;;; accessors/setters
 
-;;; Variants built on top of word-index-ref, etc.  I.e. those vectors whos
-;;; elements are represented in integer registers and are built out of
-;;; 8, 16, or 32 bit elements.
-
+;;; Variants built on top of word-index-ref, etc. I.e. those vectors
+;;; whose elements are represented in integer registers and are built
+;;; out of 8, 16, or 32 bit elements.
 (macrolet ((def-full-data-vector-frobs (type element-type &rest scs)
              `(progn
-                (define-full-reffer ,(symbolicate "DATA-VECTOR-REF/" type) ,type
+                (define-full-reffer ,(symbolicate "DATA-VECTOR-REF/" type)
+		  ,type
                   vector-data-offset other-pointer-type
                   ,(remove-if #'(lambda (x) (member x '(null zero))) scs)
                   ,element-type
                   data-vector-ref)
-                (define-full-setter ,(symbolicate "DATA-VECTOR-SET/" type) ,type
+                (define-full-setter ,(symbolicate "DATA-VECTOR-SET/" type)
+		  ,type
                   vector-data-offset other-pointer-type ,scs ,element-type
-                  data-vector-set #+gengc ,(if (member 'descriptor-reg scs) t nil))))
+                  data-vector-set #+gengc ,(if (member 'descriptor-reg scs)
+					       t
+					       nil))))
 
            (def-partial-data-vector-frobs
              (type element-type size signed &rest scs)
              `(progn
-                (define-partial-reffer ,(symbolicate "DATA-VECTOR-REF/" type) ,type
+                (define-partial-reffer ,(symbolicate "DATA-VECTOR-REF/" type)
+		  ,type
                   ,size ,signed vector-data-offset other-pointer-type ,scs
                   ,element-type data-vector-ref)
-                (define-partial-setter ,(symbolicate "DATA-VECTOR-SET/" type) ,type
+                (define-partial-setter ,(symbolicate "DATA-VECTOR-SET/" type)
+		  ,type
                   ,size vector-data-offset other-pointer-type ,scs
                   ,element-type data-vector-set)))
            (def-small-data-vector-frobs (type bits)
@@ -140,7 +135,8 @@
                     (:results (value :scs (any-reg)))
                     (:result-types positive-fixnum)
                     (:temporary (:scs (interior-reg)) lip)
-                    (:temporary (:scs (non-descriptor-reg) :to (:result 0)) temp result)
+                    (:temporary (:scs (non-descriptor-reg) :to (:result 0))
+				temp result)
                     (:generator 20
                                 (inst srl index ,bit-shift temp)
                                 (inst sll temp 2 temp)
@@ -151,7 +147,8 @@
                                       lip)
                                 (inst and index ,(1- elements-per-word) temp)
                                 ,@(unless (= bits 1)
-                                    `((inst sll temp ,(1- (integer-length bits)) temp)))
+                                    `((inst sll temp
+					    ,(1- (integer-length bits)) temp)))
                                 (inst srl result temp result)
                                 (inst and result ,(1- (ash 1 bits)) result)
                                 (inst sll result 2 value)))
@@ -171,26 +168,31 @@
                     (:results (result :scs (unsigned-reg)))
                     (:result-types positive-fixnum)
                     (:generator 15
-                                (multiple-value-bind (word extra) (floor index ,elements-per-word)
-                                  (loadw result object (+ word vector-data-offset) 
+                                (multiple-value-bind (word extra)
+				    (floor index ,elements-per-word)
+                                  (loadw result object (+ word
+							  vector-data-offset) 
                                          other-pointer-type)
                                   (unless (zerop extra)
                                     (inst srl result (* extra ,bits) result))
                                   (unless (= extra ,(1- elements-per-word))
-                                    (inst and result ,(1- (ash 1 bits)) result)))))
+                                    (inst and result ,(1- (ash 1 bits))
+					  result)))))
                   (define-vop (,(symbolicate 'data-vector-set/ type))
                     (:note "inline array store")
                     (:translate data-vector-set)
                     (:policy :fast-safe)
                     (:args (object :scs (descriptor-reg))
                            (index :scs (unsigned-reg) :target shift)
-                           (value :scs (unsigned-reg zero immediate) :target result))
+                           (value :scs (unsigned-reg zero immediate)
+				  :target result))
                     (:arg-types ,type positive-fixnum positive-fixnum)
                     (:results (result :scs (unsigned-reg)))
                     (:result-types positive-fixnum)
                     (:temporary (:scs (interior-reg)) lip)
                     (:temporary (:scs (non-descriptor-reg)) temp old)
-                    (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
+                    (:temporary (:scs (non-descriptor-reg)
+				      :from (:argument 1)) shift)
                     (:generator 25
                                 (inst srl index ,bit-shift temp)
                                 (inst sll temp 2 temp)
@@ -201,9 +203,12 @@
                                       lip)
                                 (inst and index ,(1- elements-per-word) shift)
                                 ,@(unless (= bits 1)
-                                    `((inst sll shift ,(1- (integer-length bits)) shift)))
+                                    `((inst sll shift ,(1- (integer-length
+							    bits))
+					    shift)))
                                 (unless (and (sc-is value immediate)
-                                             (= (tn-value value) ,(1- (ash 1 bits))))
+                                             (= (tn-value value)
+						,(1- (ash 1 bits))))
                                   (inst li ,(1- (ash 1 bits)) temp)
                                   (inst sll temp shift temp)
                                   (inst not temp temp)
@@ -211,9 +216,14 @@
                                 (unless (sc-is value zero)
                                   (sc-case value
                                            (immediate
-                                            (inst li (logand (tn-value value) ,(1- (ash 1 bits))) temp))
+                                            (inst li
+						  (logand (tn-value value)
+							  ,(1- (ash 1 bits)))
+						  temp))
                                            (unsigned-reg
-                                            (inst and value ,(1- (ash 1 bits)) temp)))
+                                            (inst and value
+						  ,(1- (ash 1 bits))
+						  temp)))
                                   (inst sll temp shift temp)
                                   (inst bis old temp old))
                                 (inst stl old
@@ -231,7 +241,8 @@
                     (:translate data-vector-set)
                     (:policy :fast-safe)
                     (:args (object :scs (descriptor-reg))
-                           (value :scs (unsigned-reg zero immediate) :target result))
+                           (value :scs (unsigned-reg zero immediate)
+				  :target result))
                     (:arg-types ,type
                                 (:constant
                                  (integer 0
@@ -246,36 +257,48 @@
                     (:result-types positive-fixnum)
                     (:temporary (:scs (non-descriptor-reg)) temp old)
                     (:generator 20
-                                (multiple-value-bind (word extra) (floor index ,elements-per-word)
+                                (multiple-value-bind (word extra)
+				    (floor index ,elements-per-word)
                                   (inst ldl object
-                                        (- (* (+ word vector-data-offset) word-bytes)
+                                        (- (* (+ word vector-data-offset)
+					      word-bytes)
                                            other-pointer-type)
                                         old)
                                   (unless (and (sc-is value immediate)
-                                               (= (tn-value value) ,(1- (ash 1 bits))))
+                                               (= (tn-value value)
+						  ,(1- (ash 1 bits))))
                                     (cond ((= extra ,(1- elements-per-word))
                                            (inst sll old ,bits old)
                                            (inst srl old ,bits old))
                                           (t
                                            (inst li
-                                                 (lognot (ash ,(1- (ash 1 bits)) (* extra ,bits)))
+                                                 (lognot (ash ,(1- (ash 1
+									bits))
+							      (* extra ,bits)))
                                                  temp)
                                            (inst and old temp old))))
                                   (sc-case value
                                            (zero)
                                            (immediate
-                                            (let ((value (ash (logand (tn-value value) ,(1- (ash 1 bits)))
-                                                              (* extra ,bits))))
+                                            (let ((value
+						   (ash (logand (tn-value
+								 value)
+								,(1- (ash 1
+									  bits)))
+                                                              (* extra
+								 ,bits))))
                                               (cond ((< value #x10000)
                                                      (inst bis old value old))
                                                     (t
                                                      (inst li value temp)
                                                      (inst bis old temp old)))))
                                            (unsigned-reg
-                                            (inst sll value (* extra ,bits) temp)
+                                            (inst sll value (* extra ,bits)
+						  temp)
                                             (inst bis old temp old)))
                                   (inst stl old
-                                        (- (* (+ word vector-data-offset) word-bytes)
+                                        (- (* (+ word vector-data-offset)
+					      word-bytes)
                                            other-pointer-type)
                                         object)
                                   (sc-case value
@@ -308,19 +331,16 @@
   
   (def-full-data-vector-frobs simple-array-signed-byte-30 tagged-num any-reg)
   
-  (def-full-data-vector-frobs simple-array-signed-byte-32 signed-num signed-reg)
+  (def-full-data-vector-frobs simple-array-signed-byte-32 signed-num
+    signed-reg)
   
-  ;; Integer vectors whos elements are smaller than a byte.  I.e. bit, 2-bit,
-  ;; and 4-bit vectors.
-  ;;
-
+  ;; Integer vectors whos elements are smaller than a byte. I.e. bit,
+  ;; 2-bit, and 4-bit vectors.
   (def-small-data-vector-frobs simple-bit-vector 1)
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
-  
 
-;;; And the float variants.
-;;; 
+;;; and the float variants..
 
 (define-vop (data-vector-ref/simple-array-single-float)
   (:note "inline array access")
@@ -396,9 +416,8 @@
 	     other-pointer-type) lip)
     (unless (location= result value)
       (inst fmove value result))))
-
 
-;;; Complex float arrays.
+;;; complex float arrays
 
 (define-vop (data-vector-ref/simple-array-complex-single-float)
   (:note "inline array access")
@@ -509,8 +528,8 @@
 	(inst fmove value-imag result-imag)))))
 
 
-;;; These VOPs are used for implementing float slots in structures (whose raw
-;;; data is an unsigned-32 vector.
+;;; These VOPs are used for implementing float slots in structures
+;;; (whose raw data is an unsigned-32 vector).
 ;;;
 (define-vop (raw-ref-single data-vector-ref/simple-array-single-float)
   (:translate %raw-ref-single)
@@ -550,19 +569,16 @@
   (:arg-types simple-array-unsigned-byte-32 positive-fixnum
 	      complex-double-float))
 
-
 ;;; These vops are useful for accessing the bits of a vector irrespective of
 ;;; what type of vector it is.
-;;; 
-
+;;;
 (define-full-reffer raw-bits * 0 other-pointer-type (unsigned-reg) unsigned-num
   %raw-bits)
 (define-full-setter set-raw-bits * 0 other-pointer-type (unsigned-reg)
   unsigned-num %set-raw-bits #+gengc nil)
 
-
 
-;;;; Misc. Array VOPs.
+;;;; misc. array VOPs
 
 (define-vop (get-vector-subtype get-header-data))
 (define-vop (set-vector-subtype set-header-data))

@@ -160,7 +160,8 @@ rewritten by Bill Chiles.
 The CMU CL garbage collector was credited to "Christopher Hoover,
 Rob MacLachlan, Dave McDonald, et al." in the CMU CL code/gc.lisp file,
 with some extra code for the MIPS port credited to Christopher Hoover
-alone.
+alone. The credits on the original "gc.c", "Stop and Copy GC based
+on Cheney's algorithm", said "written by Christopher Hoover".
 
 Guy Steele wrote the original character functions
 	code/char.lisp
@@ -242,7 +243,8 @@ Also, Christopher Hoover and William Lott wrote compiler/generic/vm-macs.lisp
 to centralize information about machine-dependent macros and constants.
 
 Sean Hallgren is credited with most of the Alpha backend.  Julian
-Dolby created the CMU CL Alpha/linux port.
+Dolby created the CMU CL Alpha/linux port. Douglas Crosher added
+complex-float support.
 
 The CMU CL machine-independent disassembler (compiler/disassem.lisp)
 was written by Miles Bader.

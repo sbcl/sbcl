@@ -1,4 +1,4 @@
-;;;; miscellaneous VM definition noise for the x86
+;;;; miscellaneous VM definition noise for the Alpha
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -10,10 +10,8 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
-
-
 
-;;;; Define the registers
+;;;; defining the registers
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *register-names* (make-array 32 :initial-element nil)))
@@ -92,9 +90,9 @@
 (define-storage-base constant :non-packed)
 (define-storage-base immediate-constant :non-packed)
 
+;;; a handy macro so we don't have to keep changing all the numbers
+;;; whenever we insert a new storage class.
 ;;;
-;;; Handy macro so we don't have to keep changing all the numbers whenever
-;;; we insert a new storage class.
 ;;; FIXME: This macro is not needed in the runtime target.
 
 (defmacro define-storage-classes (&rest classes)
@@ -107,7 +105,13 @@
 		(list* `(define-storage-class ,sc-name ,index
 			  ,@(cdr class))
 		       `(defconstant ,constant-name ,index)
-		       `(export ',constant-name)
+		       ;; (The CMU CL version of this macro did
+		       ;;   `(EXPORT ',CONSTANT-NAME)
+		       ;; here, but in SBCL we try to have package
+		       ;; structure described statically in one
+		       ;; master source file, instead of building it
+		       ;; dynamically by letting all the system code
+		       ;; modify it as the system boots.)
 		       forms)))
        (index 0 (1+ index))
        (classes classes (cdr classes)))
@@ -118,7 +122,6 @@
 ;;; vm:catch-block-size in a cmucl that I happened to have around
 ;;; and seems to be working so far    -dan
 (defconstant sb!vm::kludge-nondeterministic-catch-block-size 7)
-
 
 (define-storage-classes
 
@@ -242,10 +245,8 @@
   ;; A catch or unwind block.
   (catch-block control-stack
                :element-size sb!vm::kludge-nondeterministic-catch-block-size))
-
 
-;;;; Make some random tns for important registers.
-
+;;; Make some random tns for important registers.
 (macrolet ((defregtn (name sc)
              (let ((offset-sym (symbolicate name "-OFFSET"))
                    (tn-sym (symbolicate name "-TN")))
@@ -271,7 +272,7 @@
   (defregtn ocfp any-reg)
   (defregtn lip interior-reg))
 
-;; And some floating point values.
+;; and some floating point values..
 (defparameter fp-single-zero-tn
   (make-random-tn :kind :normal
 		  :sc (sc-or-lose 'single-reg)
@@ -280,13 +281,9 @@
   (make-random-tn :kind :normal
 		  :sc (sc-or-lose 'double-reg)
 		  :offset 31))
-
 
-;;; Immediate-Constant-SC  --  Interface
-;;;
-;;; If value can be represented as an immediate constant, then return the
-;;; appropriate SC number, otherwise return NIL.
-;;;
+;;; If value can be represented as an immediate constant, then return
+;;; the appropriate SC number, otherwise return NIL.
 (!def-vm-support-routine immediate-constant-sc (value)
   (typecase value
     ((integer 0 0)
@@ -308,34 +305,29 @@
 	 (sc-number-or-lose 'fp-double-zero )
 	 nil))))
 
-;;;; Function Call Parameters
+;;;; function call parameters
 
-;;; The SC numbers for register and stack arguments/return values.
-;;;
+;;; the SC numbers for register and stack arguments/return values
 (defconstant register-arg-scn (meta-sc-number-or-lose 'descriptor-reg))
 (defconstant immediate-arg-scn (meta-sc-number-or-lose 'any-reg))
 (defconstant control-stack-arg-scn (meta-sc-number-or-lose 'control-stack))
 
 (eval-when  (:compile-toplevel :load-toplevel :execute)
 
-;;; Offsets of special stack frame locations
+;;; offsets of special stack frame locations
 (defconstant ocfp-save-offset 0)
 (defconstant lra-save-offset 1)
 (defconstant nfp-save-offset 2)
 
-;;; The number of arguments/return values passed in registers.
-;;;
+;;; the number of arguments/return values passed in registers
 (defconstant register-arg-count 6)
 
-;;; Names to use for the argument registers.
-;;; 
+;;; (Names to use for the argument registers would go here, but there
+;;; are none.)
 
+); EVAL-WHEN
 
-); Eval-When (Compile Load Eval)
-
-
-;;; A list of TN's describing the register arguments.
-;;;
+;;; a list of TN's describing the register arguments
 (defparameter *register-arg-tns*
   (mapcar #'(lambda (n)
 	      (make-random-tn :kind :normal
@@ -343,19 +335,12 @@
 			      :offset n))
 	  *register-arg-offsets*))
 
-;;; SINGLE-VALUE-RETURN-BYTE-OFFSET
-;;;
 ;;; This is used by the debugger.
-;;;
-(export 'single-value-return-byte-offset)
 (defconstant single-value-return-byte-offset 4)
-
 
-;;; LOCATION-PRINT-NAME  --  Interface
-;;;
-;;;    This function is called by debug output routines that want a pretty name
-;;; for a TN's location.  It returns a thing that can be printed with PRINC.
-;;;
+;;; This function is called by debug output routines that want a
+;;; pretty name for a TN's location. It returns a thing that can be
+;;; printed with PRINC.
 (!def-vm-support-routine location-print-name (tn)
 ;  (declare (type tn tn))
   (let ((sb (sb-name (sc-sb (tn-sc tn))))

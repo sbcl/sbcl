@@ -1,23 +1,15 @@
-;;; -*- Package: ALPHA -*-
-;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
+;;;; VOPs and macro magic for calling static functions
 
-;;;
-;;; **********************************************************************
-;;;
-;;; This file contains the VOPs and macro magic necessary to call static
-;;; functions.
-;;;
-;;; Written by William Lott.
-;;; Converted by Sean Hallgren.
-;;;
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
-
-
-
 
 (define-vop (static-function-template)
   (:save-p t)
@@ -32,14 +24,11 @@
   (:temporary (:sc any-reg :offset ocfp-offset) ocfp)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save))
 
-
 (eval-when  (:compile-toplevel :load-toplevel :execute)
-
 
 (defun static-function-template-name (num-args num-results)
   (intern (format nil "~:@(~R-arg-~R-result-static-function~)"
 		  num-args num-results)))
-
 
 (defun moves (src dst)
   (collect ((moves))
@@ -116,16 +105,13 @@
 	       (maybe-load-stack-nfp-tn cur-nfp nfp-save temp))
 	     ,@(moves (temp-names) (result-names))))))))
 
-
-) ; eval-when (compile load eval)
-
+) ; EVAL-WHEN
 
 (expand
  (collect ((templates (list 'progn)))
    (dotimes (i register-arg-count)
      (templates (static-function-template-vop i 1)))
    (templates)))
-
 
 (defmacro define-static-function (name args &key (results '(x)) translate
 				       policy cost arg-types result-types)

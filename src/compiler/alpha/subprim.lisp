@@ -1,24 +1,17 @@
-;;; -*- Package: ALPHA; Log: C.Log -*-
-;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
+;;;; linkage information for standard static functions, and random vops
 
-;;;
-;;; **********************************************************************
-;;;
-;;;    Linkage information for standard static functions, and random vops.
-;;;
-;;; Written by William Lott.
-;;; Converted by Sean Hallgren.
-;;; 
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
-
-
-
 
-;;;; Length
+;;;; LENGTH
 
 (define-vop (length/list)
   (:translate length)
@@ -55,8 +48,4 @@
     DONE
     (move count result)))
        
-
 (define-static-function length (object) :translate length)
-
-
-

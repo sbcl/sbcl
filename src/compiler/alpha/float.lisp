@@ -1,10 +1,17 @@
-;;;    This file contains floating point support for the Alpha.
+;;;; floating point support for the Alpha
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
-
-
 
-;;;; Move functions:
+;;;; float move functions
 
 (define-move-function (load-fp-zero 1) (vop x y)
   ((fp-single-zero) (single-reg)
@@ -31,10 +38,8 @@
   (let ((nfp (current-nfp-tn vop))
 	(offset (* (tn-offset y) word-bytes)))
     (inst stt x offset nfp)))
-
-
 
-;;;; Move VOPs:
+;;;; float move VOPs
 
 (macrolet ((frob (vop sc)
 	     `(progn
@@ -118,9 +123,8 @@
 		  (,sc descriptor-reg) (,sc)))))
   (frob move-single-float-argument single-reg single-stack nil)
   (frob move-double-float-argument double-reg double-stack t))
-
 
-;;;; Complex float move functions
+;;;; complex float move functions
 
 (defun complex-single-reg-real-tn (x)
   (make-random-tn :kind :normal :sc (sc-or-lose 'single-reg )
@@ -175,7 +179,7 @@
       (inst stt imag-tn (+ offset (* 2 sb!vm:word-bytes)) nfp))))
 
 ;;;
-;;; Complex float register to register moves.
+;;; complex float register to register moves.
 ;;;
 (define-vop (complex-single-move)
   (:args (x :scs (complex-single-reg) :target y
@@ -264,7 +268,7 @@
   (complex-double-reg) (descriptor-reg))
 
 ;;;
-;;; Move from a descriptor to a complex float register
+;;; Move from a descriptor to a complex float register.
 ;;;
 (define-vop (move-to-complex-single)
   (:args (x :scs (descriptor-reg)))
@@ -299,7 +303,7 @@
   (descriptor-reg) (complex-double-reg))
 
 ;;;
-;;; Complex float move-argument vop
+;;; complex float move-argument vop
 ;;;
 (define-vop (move-complex-single-float-argument)
   (:args (x :scs (complex-single-reg) :target y)
@@ -355,7 +359,7 @@
   (descriptor-reg))
 
 
-;;;; Arithmetic VOPs:
+;;;; float arithmetic VOPs
 
 (define-vop (float-op)
   (:args (x) (y))
@@ -365,10 +369,10 @@
   (:vop-var vop)
   (:save-p :compute-only))
 
-;;; Need to insure that ops that can cause traps do not clobber an
-;;; argument register with invalid results. This so the software
-;;; trap handler can re-execute the instruction and produce correct
-;;; IEEE result. The :from :load hopefully does that.
+;;; We need to insure that ops that can cause traps do not clobber an
+;;; argument register with invalid results. This so the software trap
+;;; handler can re-execute the instruction and produce correct IEEE
+;;; result. The :from :load hopefully does that.
 (macrolet ((frob (name sc ptype)
 	     `(define-vop (,name float-op)
 		(:args (x :scs (,sc))
@@ -423,7 +427,7 @@
   (frob %negate/double-float fneg %negate double-reg double-float))
 
 
-;;;; Comparison:
+;;;; float comparison
 
 (define-vop (float-compare)
   (:args (x) (y))
@@ -468,7 +472,7 @@
   (frob = nil =/single-float =/double-float t))
 
 
-;;;; Conversion:
+;;;; float conversion
 
 (macrolet
     ((frob (name translate inst ld-inst to-sc to-type &optional single)
@@ -721,7 +725,7 @@
     (inst mskll lo-bits 4 lo-bits)))
 
 
-;;;; Float mode hackery:
+;;;; float mode hackery
 
 (sb!xc:deftype float-modes () '(unsigned-byte 32)) ;actually 24 -dan
 (defknown floating-point-modes () float-modes (flushable))
@@ -768,7 +772,7 @@
       (move res new))))
 
 
-;;;; Complex float VOPs
+;;;; complex float VOPs
 
 (define-vop (make-complex-single-float)
   (:translate complex)

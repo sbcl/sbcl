@@ -2,6 +2,17 @@
  * Unix - that is, it forces stuff into the low 2Gb where 32-bit pointers
  * can find it */
 
+/*
+ * This software is part of the SBCL system. See the README file for
+ * more information.
+ *
+ * This software is derived from the CMU CL system, which was
+ * written at Carnegie Mellon University and released into the
+ * public domain. The software is in the public domain and is
+ * provided with absolutely no warranty. See the COPYING and CREDITS
+ * files for more information.
+ */
+
 OUTPUT_FORMAT("elf64-alpha", "elf64-alpha",
 	      "elf64-alpha")
 OUTPUT_ARCH(alpha)

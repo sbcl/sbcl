@@ -1,29 +1,19 @@
-;;; -*- Package: C; Log: C.Log -*-
-;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
+;;;; the Alpha VM definition of character operations
 
-;;;
-;;; **********************************************************************
-;;;
-;;; $Header$
-;;; 
-;;; This file contains the RT VM definition of character operations.
-;;;
-;;; Written by Rob MacLachlan
-;;; Converted for the Alpha by Sean Hallgren.
-;;;
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
-
-
-
 
-;;;; Moves and coercions:
+;;;; moves and coercions
 
 ;;; Move a tagged char to an untagged representation.
-;;;
 (define-vop (move-to-base-char)
   (:args (x :scs (any-reg descriptor-reg)))
   (:results (y :scs (base-char-reg)))
@@ -33,9 +23,7 @@
 (define-move-vop move-to-base-char :move
   (any-reg descriptor-reg) (base-char-reg))
 
-
 ;;; Move an untagged char to a tagged representation.
-;;;
 (define-vop (move-from-base-char)
   (:args (x :scs (base-char-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
@@ -47,7 +35,6 @@
   (base-char-reg) (any-reg descriptor-reg))
 
 ;;; Move untagged base-char values.
-;;;
 (define-vop (base-char-move)
   (:args (x :target y
 	    :scs (base-char-reg)
@@ -64,7 +51,6 @@
 
 
 ;;; Move untagged base-char arguments/return-values.
-;;;
 (define-vop (move-base-char-argument)
   (:args (x :target y
 	    :scs (base-char-reg))
@@ -87,10 +73,8 @@
 ;;;
 (define-move-vop move-argument :move-argument
   (base-char-reg) (any-reg descriptor-reg))
-
-
 
-;;;; Other operations:
+;;;; other operations
 
 (define-vop (char-code)
   (:translate char-code)
@@ -111,10 +95,9 @@
   (:result-types base-char)
   (:generator 1
     (inst srl code 2 res)))
-
 
-;;; Comparison of base-chars.
-;;;
+;;;; comparison of BASE-CHARs
+
 (define-vop (base-char-compare)
   (:args (x :scs (base-char-reg))
 	 (y :scs (base-char-reg)))

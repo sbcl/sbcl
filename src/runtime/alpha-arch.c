@@ -9,11 +9,9 @@
  * files for more information.
  */
 
-/* note that although superficially it appears that we use
+/* Note that although superficially it appears that we use
  * os_context_t like we ought to, we actually just assume its a
  * ucontext in places.  Naughty */
-
-
 
 #include <stdio.h>
 #include <string.h>

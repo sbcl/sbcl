@@ -1,26 +1,18 @@
-;;; -*- Package: ALPHA; Log: C.Log -*-
-;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
+;;;; the VM definition of various primitive memory access VOPs for the
+;;;; Alpha
 
-;;;
-;;; **********************************************************************
-;;;
-;;;    This file contains the VM definition of various primitive memory access
-;;; VOPs for the Alpha.
-;;;
-;;; Written by Rob MacLachlan
-;;;
-;;; Converted by Sean Hallgren
-;;; 
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
-
-
 
-;;;; Data object ref/set stuff.
+;;;; data object ref/set stuff
 
 (define-vop (slot)
   (:args (object :scs (descriptor-reg)))
@@ -43,17 +35,14 @@
 	(storew value object offset lowtag))
     #-gengc
     (storew value object offset lowtag)))
-
 
-;;;; Symbol hacking VOPs:
+;;;; symbol hacking VOPs
 
 ;;; The compiler likes to be able to directly SET symbols.
-;;;
 (define-vop (set cell-set)
   (:variant symbol-value-slot other-pointer-type))
 
 ;;; Do a cell ref with an error check for being unbound.
-;;;
 (define-vop (checked-cell-ref)
   (:args (object :scs (descriptor-reg) :target obj-temp))
   (:results (value :scs (descriptor-reg any-reg)))
@@ -63,9 +52,8 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp))
 
-;;; With Symbol-Value, we check that the value isn't the trap object.  So
-;;; Symbol-Value of NIL is NIL.
-;;;
+;;; With SYMBOL-VALUE, we check that the value isn't the trap object.
+;;; So SYMBOL-VALUE of NIL is NIL.
 (define-vop (symbol-value checked-cell-ref)
   (:translate symbol-value)
   (:generator 9
@@ -75,7 +63,8 @@
       (inst xor value unbound-marker-type temp)
       (inst beq temp err-lab))))
 
-;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell is bound.
+;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell
+;;; is bound.
 (define-vop (boundp-frob)
   (:args (object :scs (descriptor-reg)))
   (:conditional)
@@ -100,7 +89,7 @@
 
 
 
-;;;; Fdefinition (fdefn) objects.
+;;;; FDEFINITION (fdefn) objects
 
 (define-vop (fdefn-function cell-ref)
   (:variant fdefn-function-slot other-pointer-type))
@@ -153,15 +142,11 @@
     (inst li (make-fixup "undefined_tramp" :foreign) temp)
     (move fdefn result)
     (storew temp fdefn fdefn-raw-addr-slot other-pointer-type)))
-
-
 
-;;;; Binding and Unbinding.
+;;;; binding and Unbinding
 
-;;; BIND -- Establish VAL as a binding for SYMBOL.  Save the old value and
-;;; the symbol on the binding stack and stuff the new value into the
-;;; symbol.
-
+;;; Establish VAL as a binding for SYMBOL. Save the old value and the
+;;; symbol on the binding stack and stuff the new value into the symbol.
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
 	 (symbol :scs (descriptor-reg)))
@@ -213,10 +198,8 @@
       (inst beq temp loop)
 
       (emit-label done))))
-
-
 
-;;;; Closure indexing.
+;;;; closure indexing
 
 (define-full-reffer closure-index-ref *
   closure-info-offset function-pointer-type
@@ -238,19 +221,16 @@
 
 (define-vop (closure-init slot-set)
   (:variant closure-info-offset function-pointer-type))
-
 
-;;;; Value Cell hackery.
+;;;; value cell hackery
 
 (define-vop (value-cell-ref cell-ref)
   (:variant value-cell-value-slot other-pointer-type))
 
 (define-vop (value-cell-set cell-set)
   (:variant value-cell-value-slot other-pointer-type))
-
-
 
-;;;; Instance hackery:
+;;;; instance hackery
 
 (define-vop (instance-length)
   (:policy :fast-safe)
@@ -279,22 +259,28 @@
 
 (define-full-setter instance-index-set * instance-slots-offset
   instance-pointer-type (descriptor-reg any-reg null zero) * %instance-set)
-
-
 
-;;;; Code object frobbing.
+;;;; code object frobbing
 
 (define-full-reffer code-header-ref * 0 other-pointer-type
   (descriptor-reg any-reg) * code-header-ref)
 
 (define-full-setter code-header-set * 0 other-pointer-type
   (descriptor-reg any-reg null zero) * code-header-set)
-
-
 
-;;;; Mutator accessing.
+;;;; mutator accessing
 
-#+gengc (progn
+#+gengc
+(progn
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; SBCL has never had GENGC. Now that we have Alpha support, it
+  ;; would probably be nice to restore GENGC support so that the Alpha
+  ;; doesn't have to crawl along with stop'n'copy. When we do, the CMU
+  ;; CL code below will need updating to the SBCL way of looking at
+  ;; things, e.g. at least using "SB-KERNEL" or "SB!KERNEL" instead of
+  ;; :KERNEL. -- WHN 2001-05-08
+  (error "This code is stale as of sbcl-0.6.12."))
 
 (define-vop (mutator-ub32-ref)
   (:policy :fast-safe)
@@ -349,11 +335,17 @@
                    (lisp-type ref-vop set-vop)
                    (ecase type
                      (:des
-                      (values t 'mutator-descriptor-ref 'mutator-descriptor-set))
+                      (values t
+			      'mutator-descriptor-ref
+			      'mutator-descriptor-set))
                      (:ub32
-                      (values '(unsigned-byte 32) 'mutator-ub32-ref 'mutator-ub32-set))
+                      (values '(unsigned-byte 32)
+			      'mutator-ub32-ref
+			      'mutator-ub32-set))
                      (:sap
-                      (values 'system-area-pointer 'mutator-sap-ref 'mutator-sap-set)))
+                      (values 'system-area-pointer
+			      'mutator-sap-ref
+			      'mutator-sap-set)))
                  `(progn
                     (export ',fn :kernel)
                     (defknown ,fn () ,lisp-type (flushable))
@@ -361,7 +353,8 @@
                       (:translate ,fn)
                       (:variant ,offset))
                     ,@(when writable
-                        `((defknown ((setf ,fn)) (,lisp-type) ,lisp-type (unsafe))
+                        `((defknown ((setf ,fn)) (,lisp-type) ,lisp-type
+			    (unsafe))
                           (define-vop (,set ,set-vop)
                             (:translate (setf ,fn))
                             (:variant ,offset)))))))))

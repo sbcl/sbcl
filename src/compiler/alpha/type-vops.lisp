@@ -10,10 +10,8 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
-
-
 
-;;;; Test generation utilities.
+;;;; test generation utilities
 
 (eval-when (:compile-toplevel :execute)
 

@@ -1,20 +1,15 @@
-;;; -*- Package: ALPHA -*-
-;;;
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
+;;; the instruction set definition for the Alpha
 
-;;;
-;;; **********************************************************************
-;;;
-;;; This file contains the instruction set definition for the Alpha.
-;;;
-;;; Written by Sean Hallgren.
-;;;
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
-
 
 ;;;(def-assembler-params
 ;;;  :scheduler-p nil)
@@ -22,9 +17,8 @@
 ;;; ../x86/insts contains the invocation
 ;;; (setf sb!disassem:*disassem-inst-alignment-bytes* 1)
 ;;; which apparently was another use of def-assembler-params
-
 
-;;;; Utility functions.
+;;;; utility functions
 
 (defun reg-tn-encoding (tn)
   (declare (type tn tn)
@@ -45,9 +39,8 @@
      (unless (eq (sb-name (sc-sb (tn-sc tn))) 'float-registers)
        (error "~S isn't a floating-point register." tn))
      (tn-offset tn))))
-
 
-;;;; Initial disassembler setup.
+;;;; initial disassembler setup
 
 ;; XXX find out what this was supposed to do
 ;; (sb!disassem:set-disassem-params :instruction-alignment 32)
@@ -97,7 +90,8 @@
 
 
 
-;;;; Define-instruction-formats for disassembler.
+;;;; DEFINE-INSTRUCTION-FORMATs for the disassembler
+
 (sb!disassem:define-instruction-format
     (memory 32 :default-printer '(:name :tab ra "," disp "(" rb ")"))
   (op   :field (byte 6 26))
@@ -152,7 +146,8 @@
   (palcode :field (byte 26 0)))
 
 
-;;;; Emitters.
+;;;; emitters
+
 (define-bitfield-emitter emit-word 16
   (byte 16 0))
 
@@ -180,9 +175,9 @@
 
 (define-bitfield-emitter emit-pal 32
   (byte 6 26) (byte 26 0))
-
 
-;;;; Macros for instructions.
+;;;; macros for instructions
+
 (macrolet ((define-memory (name op &optional fixup float)
              `(define-instruction ,name (segment ra disp rb ,@(if fixup
                                                                   '(&optional type)))

@@ -215,8 +215,8 @@
 (setf (deref (context-register-addr context index))
       new))
 
-;;; Like CONTEXT-REGISTER, but returns the value of a float register.
-;;; FORMAT is the type of float to return.
+;;; This is like CONTEXT-REGISTER, but returns the value of a float
+;;; register. FORMAT is the type of float to return.
 ;;;
 ;;; As of sbcl-0.6.7, there is no working code which calls this code,
 ;;; so it's stubbed out. Someday, in order to make the debugger work

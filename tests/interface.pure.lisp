@@ -16,7 +16,7 @@
 ;;; with byte compilation, since at least in sbcl-0.6.12 the byte
 ;;; compiler can't record argument list information.)
 (defvar *public-package-names*
-  '("SB-ALIEN" "SB-C-CALL" "SB-DEBUG" "SB-EXT" "SB-EXT""SB-GRAY" "SB-MP"
+  '("SB-ALIEN" "SB-C-CALL" "SB-DEBUG" "SB-EXT" "SB-GRAY" "SB-MP"
     "SB-PROFILE" "SB-PCL" "COMMON-LISP"))
 (defun has-arglist-info-p (function)
   (and (not (typep function 'sb-c::byte-function))
@@ -32,3 +32,4 @@
 (dolist (public-package *public-package-names*)
   (when (find-package public-package)
     (check-ext-symbols-arglist public-package)))
+(terpri)

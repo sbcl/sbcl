@@ -735,25 +735,29 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
   internal representation of (OR ..) types to accommodate the new
   support for (AND ..) types, among other things)
 
+changes in sbcl-0.6.13 relative to sbcl-0.6.12:
+* The system has now been ported to the Alpha CPU, thanks to Dan Barlow.
+
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
   as you get deeper into recursive calls to the debugger command loop,
   instead of the old "5]", "5]]", "5]]]" sequence. (I was motivated
-  to do this when ILISP and SBCL got into arguments which left me
-  deeply nested in the debugger.)
-* When the profiling interface settles down, it might impact TRACE.
-  They both encapsulate functions, and it's not clear yet how
-  e.g. UNPROFILE will interact with TRACE and UNTRACE. (This shouldn't
-  matter, though, unless you are using profiling. If you never 
-  profile anything, TRACE should continue to behave as before.)
+  to do this when squabbles between ILISP and SBCL left me
+  very deeply nested in the debugger.)
 * The fasl file extension may change, perhaps to ".fasl".
 * The default output representation for unprintable ASCII characters 
   which, unlike e.g. #\Newline, don't have names defined in the 
   ANSI Common Lisp standard, may change to their ASCII symbolic
   names: #\Nul, #\Soh, #\Stx, etc.
 * INTERNAL-TIME-UNITS-PER-SECOND might increase, e.g. to 1000.
+* FASL file extensions change to ".fasl", instead of the various
+  CPU-dependent values (".x86f", ".axpf", etc.) inherited from CMU CL.
 * MAYBE-INLINE will probably go away at some point, maybe 0.7.x,
   maybe later, in favor of the ANSI-recommended idiom for making
   a function optionally inline.
-* FASL file extensions change to ".fasl", instead of the various
-  CPU-dependent values (".x86f" etc.) inherited from CMU CL.
+* When the profiling interface settles down, maybe in 0.7.x, maybe
+  later, it might impact TRACE. They both encapsulate functions, and
+  it's not clear yet how e.g. UNPROFILE will interact with TRACE
+  and UNTRACE. (This shouldn't matter, though, unless you are
+  using profiling. If you never profile anything, TRACE should
+  continue to behave as before.)

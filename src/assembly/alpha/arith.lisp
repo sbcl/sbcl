@@ -1,19 +1,15 @@
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-;;; Stuff to handle simple cases for generic arithmetic.
-;;;
-;;; Written by William Lott.
-;;; Conversion by Sean Hallgren
-;;;
+;;;; Stuff to handle simple cases for generic arithmetic.
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
-
-
 
 (define-assembly-routine (generic-+
 			  (:cost 10)
@@ -39,14 +35,14 @@
   (inst bne temp DO-STATIC-FUN)
   (inst addq x y res)
   
-  ; Check to see if we need a bignum
+  ; Check whether we need a bignum.
   (inst sra res 31 temp)
   (inst beq temp DONE)
   (inst not temp temp)
   (inst beq temp DONE)
   (inst sra res 2 temp3)
   
-  ; From move-from-signed
+  ; from move-from-signed
   (inst li 2 temp2)
   (inst sra temp3 31 temp)
   (inst cmoveq temp 1 temp2)
@@ -96,14 +92,14 @@
   (inst bne temp DO-STATIC-FUN)
   (inst subq x y res)
   
-  ; Check to see if we need a bignum
+  ; Check whether we need a bignum.
   (inst sra res 31 temp)
   (inst beq temp DONE)
   (inst not temp temp)
   (inst beq temp DONE)
   (inst sra res 2 temp3)
   
-  ; From move-from-signed
+  ; from move-from-signed
   (inst li 2 temp2)
   (inst sra temp3 31 temp)
   (inst cmoveq temp 1 temp2)
@@ -154,20 +150,20 @@
   (inst and y 3 temp)
   (inst bne temp DO-STATIC-FUN)
 
-  ;; Remove the tag from one arg so that the result will have the correct
-  ;; fixnum tag.
+  ;; Remove the tag from one arg so that the result will have the
+  ;; correct fixnum tag.
   (inst sra x 2 temp)
   (inst mulq temp y lo)
   (inst sra lo 32 hi)
   (inst sll lo 32 res)
   (inst sra res 32 res)
-  ;; Check to see if the result will fit in a fixnum.  (I.e. the high word
-  ;; is just 32 copies of the sign bit of the low word).
+  ;; Check to see if the result will fit in a fixnum. (I.e. the high
+  ;; word is just 32 copies of the sign bit of the low word).
   (inst sra res 31 temp)
   (inst xor hi temp temp)
   (inst beq temp DONE)
-  ;; Shift the double word hi:res down two bits into hi:low to get rid of the
-  ;; fixnum tag.
+  ;; Shift the double word hi:res down two bits into hi:low to get rid
+  ;; of the fixnum tag.
   (inst sra lo 2 lo)
   (inst sra lo 32 hi)
 
@@ -196,7 +192,7 @@
   ;; Store two words.
   (storew lo res bignum-digits-offset other-pointer-type)
   (storew hi res (1+ bignum-digits-offset) other-pointer-type)
-  ;; Out of here
+  ;; out of here
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN
@@ -209,7 +205,7 @@
   DONE)
 
 
-;;;; Division.
+;;;; division
 
 (define-assembly-routine (signed-truncate
 			  (:note "(signed-byte 32) truncate")
@@ -271,7 +267,7 @@
     (emit-label label)))
 
 
-;;;; Comparison routines.
+;;;; comparison routines
 
 (macrolet
     ((define-cond-assem-rtn (name translate static-fn cmp not-p)

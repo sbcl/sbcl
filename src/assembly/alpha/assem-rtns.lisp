@@ -1,16 +1,17 @@
-;;; **********************************************************************
-;;; This code was written as part of the CMU Common Lisp project at
-;;; Carnegie Mellon University, and has been placed in the public domain.
-;;;
-;;;
-;;; **********************************************************************
-;;;
-(in-package "SB!VM")
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
+(in-package "SB!VM")
 
 ;;;; Return-multiple with other than one value
 
-#+sb-assembling ;; we don't want a vop for this one.
+#+sb-assembling ;; We don't want a vop for this one.
 (define-assembly-routine
     (return-multiple
      (:return-style :none))
@@ -89,11 +90,10 @@
   
   ;; Return.
   (lisp-return lra lip))
-
 
-;;;; tail-call-variable.
+;;;; tail-call-variable
 
-#+sb-assembling ;; no vop for this one either.
+#+sb-assembling ;; no vop for this one either
 (define-assembly-routine
     (tail-call-variable
      (:return-style :none))
@@ -157,7 +157,7 @@
     (lisp-jump temp lip)))
 
 
-;;;; Non-local exit noise.
+;;;; non-local exit noise
 
 (define-assembly-routine
     (unwind
@@ -197,7 +197,6 @@
   (loadw next-uwp cur-uwp sb!vm:unwind-block-current-uwp-slot)
   (store-symbol-value next-uwp sb!impl::*current-unwind-protect-block*)
   (inst br zero-tn do-exit))
-
 
 (define-assembly-routine
     throw

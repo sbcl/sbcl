@@ -37,8 +37,8 @@
   ;; false, then the function is not in the cache (or is in the process of
   ;; being removed.)
   (definition nil :type (or sb!c::clambda null))
-  ;; The number of consequtive GCs that this function has been unused. This is
-  ;; used to control cache replacement.
+  ;; The number of consecutive GCs that this function has been unused.
+  ;; This is used to control cache replacement.
   (gcs 0 :type sb!c::index)
   ;; True if Lambda has been converted at least once, and thus warnings should
   ;; be suppressed on additional conversions.
