@@ -77,7 +77,12 @@
 		     (string-trim-whitespace (subseq line first-space-pos))
 		     "")))
 	   (if (numberp (read-from-string cmd-string))
-	       (get-history (read-from-string cmd-string))
+	       (let ((cmd (get-history (read-from-string cmd-string))))
+		 (when cmd
+		   (make-user-cmd :func (user-cmd-func cmd)
+				  :input (user-cmd-input cmd)
+				  :args (user-cmd-args cmd)
+				  :hnum *cmd-number*)))
 	       (let ((cmd-entry (find-cmd cmd-string)))
 		 (if cmd-entry
 		     (make-user-cmd :func (cmd-table-entry-func cmd-entry)
@@ -159,7 +164,7 @@
     (if cmd
 	cmd
 	(progn
-	  (format t "Input numbered %d is not on the history list.." n)
+	  (format t "Input numbered ~A is not on the history list.." n)
 	  *null-cmd*))))
 
 (defun get-cmd-doc-list (&optional (group :cmd))
@@ -302,6 +307,7 @@
     (t
      (format t "~13A ~a~%" "Command" "Description")
      (format t "------------- -------------~%")
+     (format t "~13A ~A~%" "n" "(for any number n) recall nth command from history list")
      (dolist (doc-entry (get-cmd-doc-list :cmd))
        (format t "~13A ~A~%" (car doc-entry) (cadr doc-entry)))))
   (values))

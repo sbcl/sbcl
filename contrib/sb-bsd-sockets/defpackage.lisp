@@ -122,3 +122,14 @@ than "network-endian integers".  See the section on <a href="#internet"
 
 
 |#
+
+(in-package :sb-bsd-sockets)
+
+(defmethod asdf:hyperdocumentation
+    ((package (eql #.*package*)) symbol kind)
+  (declare (ignore kind))
+  (format nil "file://~A#~A"
+	  #.(namestring
+	     (merge-pathnames "index.html"
+			      (or *load-pathname* *compile-file-pathname*)))
+	  symbol))

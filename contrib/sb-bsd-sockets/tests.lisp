@@ -128,13 +128,11 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
 	(> (length data) 0))))
   t)
 
-#||
-<h2>Local-domain sockets</h2>
+;;; A fairly rudimentary test that connects to the syslog socket and
+;;; sends a message.  Priority 7 is kern.debug; you'll probably want
+;;; to look at /etc/syslog.conf or local equivalent to find out where
+;;; the message ended up
 
-A fairly rudimentary test that connects to the syslog socket and sends a 
-message.  Priority 7 is kern.debug; you'll probably want to look at
-/etc/syslog.conf or local equivalent to find out where the message ended up
-||#
 #-sunos
 (deftest simple-local-client
     (let ((s (make-instance 'local-socket :type :datagram)))
