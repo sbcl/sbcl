@@ -220,8 +220,20 @@
 ;;; *SHEBANG-FEATURES* instead of *FEATURES*, and use the #!+ and #!-
 ;;; readmacros instead of the ordinary #+ and #- readmacros.
 (setf *shebang-features*
-      (append (read-from-file "base-target-features.lisp-expr")
-	      (read-from-file "local-target-features.lisp-expr")))
+      (let* ((default-features
+	       (append (read-from-file "base-target-features.lisp-expr")
+		       (read-from-file "local-target-features.lisp-expr")))
+	     (customizer-file-name "customize-target-features.lisp")
+	     (customizer (if (probe-file customizer-file-name)
+			     (compile nil 
+				      (read-from-file customizer-file-name))
+			     #'identity)))
+	(funcall customizer default-features)))
+(let ((*print-length* nil)
+      (*print-level* nil))
+  (format t
+	  "target features *SHEBANG-FEATURES*=~@<~S~:>~%"
+	  *shebang-features*))
 
 ;;;; cold-init-related PACKAGE and SYMBOL tools
 

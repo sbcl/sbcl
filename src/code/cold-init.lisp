@@ -85,7 +85,7 @@
   (/show0 "entering !COLD-INIT")
 
   ;; FIXME: It'd probably be cleaner to have most of the stuff here
-  ;; handled by calls a la !GC-COLD-INIT, !ERROR-COLD-INIT, and
+  ;; handled by calls like !GC-COLD-INIT, !ERROR-COLD-INIT, and
   ;; !UNIX-COLD-INIT. And *TYPE-SYSTEM-INITIALIZED* could be changed to
   ;; *TYPE-SYSTEM-INITIALIZED-WHEN-BOUND* so that it doesn't need to
   ;; be explicitly set in order to be meaningful.

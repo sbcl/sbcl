@@ -32,9 +32,10 @@
 		      (,int-fun (sap-int x) (sap-int y)))))
 	       '((sap< <) (sap<= <=) (sap= =) (sap>= >=) (sap> >) (sap- -))))
 
-;;; dummies, defined so that we can declare they never return and thereby
-;;; eliminate a thundering herd of optimization notes a la "can't optimize this
-;;; expression because we don't know the return type of SAP-REF-8"
+;;; dummies, defined so that we can declare they never return and
+;;; thereby eliminate a thundering herd of optimization notes along
+;;; the lines of "can't optimize this expression because we don't know
+;;; the return type of SAP-REF-8"
 (defun sap-ref-stub (name)
   (error "~S doesn't make sense on cross-compilation host." name))
 #.`(progn

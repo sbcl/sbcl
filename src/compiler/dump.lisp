@@ -333,7 +333,7 @@
 	      ;; FIXME: The comment at the head of DUMP-NON-IMMEDIATE-OBJECT
 	      ;; says it's for objects which we want to save, instead of
 	      ;; repeatedly dumping them. But then we dump arrays here without
-	      ;; doing anything a la EQUAL-SAVE-OBJECT. What gives?
+	      ;; doing anything like EQUAL-SAVE-OBJECT. What gives?
 	      (dump-array x file))
 	     (number
 	      (unless (equal-check-table x file)

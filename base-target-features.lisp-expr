@@ -187,7 +187,7 @@
  ; :propagate-float-type
 
  ;; According to cmu-user.tex, this enables the compiler to infer result
- ;; types for mathematical functions a la SQRT, EXPT, and LOG, allowing
+ ;; types for mathematical functions like SQRT, EXPT, and LOG, allowing
  ;; it to e.g. eliminate the possibility that a complex result will be
  ;; generated.
  ;;

@@ -16,7 +16,7 @@
   (string-trim " 	" (read-line *query-io*)))
 
 ;;; FIXME: The ANSI documentation for these says that they
-;;; prompt with strings a la "(Y or N)" or "(Yes or No)", but
+;;; prompt with strings like "(Y or N)" or "(Yes or No)", but
 ;;; these implementations don't.
 
 (defun y-or-n-p (&optional format-string &rest arguments)

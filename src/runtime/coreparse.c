@@ -94,7 +94,7 @@ lispobj load_core_file(char *file)
 
     /* KLUDGE: This kind of conditionalization everywhere that 32-bit
      * ints are used is really nasty. It would be much nicer to define
-     * a typedef a la addr_as_int once and for all in each
+     * a typedef like addr_as_int once and for all in each
      * architecture file, then use that everywhere. -- WHN 19990904 */
 #ifndef alpha
     long header[CORE_PAGESIZE / sizeof(long)], val, len, *ptr;

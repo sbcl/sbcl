@@ -189,8 +189,7 @@
   breakpoint
   function-end-breakpoint
   single-step-breakpoint)
-;;; FIXME: It'd be nice to replace all the DEFENUMs with something
-;;; a la
+;;; FIXME: It'd be nice to replace all the DEFENUMs with something like
 ;;;   (WITH-DEF-ENUM (:START 8)
 ;;;     (DEF-ENUM HALT-TRAP)
 ;;;     (DEF-ENUM PENDING-INTERRUPT-TRAP)

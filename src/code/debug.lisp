@@ -64,9 +64,9 @@
 "The prompt is right square brackets, the number indicating how many
   recursive command loops you are in. 
 Any command may be uniquely abbreviated.
-The debugger rebinds various special variables for controlling i/o,
-  sometimes to defaults (a la WITH-STANDARD-IO-SYNTAX) and sometimes to 
-  its own values, e.g. SB-DEBUG:*DEBUG-PRINT-LEVEL*.
+The debugger rebinds various special variables for controlling i/o, sometimes
+  to defaults (much like WITH-STANDARD-IO-SYNTAX does) and sometimes to 
+  its own special values, e.g. SB-DEBUG:*DEBUG-PRINT-LEVEL*.
 Debug commands do not affect * and friends, but evaluation in the debug loop
   do affect these variables.
 SB-DEBUG:*FLUSH-DEBUG-ERRORS* controls whether errors at the debug prompt

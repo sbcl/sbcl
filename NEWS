@@ -529,6 +529,13 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
 * The debugger now handles errors which arise when trying to print
   *DEBUG-CONDITION*, so that it's less likely to fall into infinite
   regress.
+* The build system now uses an additional file, customize-target-features.lisp,
+  to allow local modifications to the target *FEATURES* list. (The point of
+  this is that now I can set up a custom configuration, e.g. with :SB-SHOW
+  debugging features enabled, without having to worry about propagating it
+  into everyone's system when I do a "cvs update".) When no
+  customize-target-features.lisp file exists, the target *FEATURES* list
+  should be constructed the same way as before.
 ?? signal handling reliability
 ?? fixed some bugs mentioned in the man page:
   ?? DEFUN-vs.-DECLAIM

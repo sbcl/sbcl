@@ -277,7 +277,7 @@
 ;;; FIXME: This doesn't seem to be needed in the target Lisp, only
 ;;; at build-the-system time.
 ;;;
-;;; KLUDGE: This expands into code a la
+;;; KLUDGE: This expands into code like
 ;;; (IF (ZEROP (LOGAND BYTE 16))
 ;;;     (IF (ZEROP (LOGAND BYTE 8))
 ;;;	 (IF (ZEROP (LOGAND BYTE 4))

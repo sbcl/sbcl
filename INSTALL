@@ -100,10 +100,18 @@ To build the system binaries:
   2. If the GNU make command is not available under the name "gmake",
      then define the environment variable GNUMAKE to a name where it can
      be found.
-  3. If you like, you can edit the base-target-features.lisp-expr file
-     to customize the resulting Lisp system. By enabling or disabling
-     features in this file, you can create a smaller system, or one
-     with extra code for debugging output or error-checking or other things.
+  3. If you like, you can tweak the *FEATURES* set for the resulting
+     Lisp system, enabling or disabling features like documentation
+     strings or extra debugging code. The preferred way to do this is
+     by creating a file "customize-target-features.lisp", containing
+     a lambda expression which is applied to the default *FEATURES*
+     set and which returns the new *FEATURES* set, e.g.
+	(LAMBDA (LIST)
+	  (ADJOIN :SB-SHOW
+		  (REMOVE :SB-DOC
+			  LIST)))
+     (This is the preferred way because it lets local changes interact
+     cleanly with CVS changes to the main, global source tree.)
   4. Run "sh make.sh" in the same directory where you unpacked the 
      tarball. If you don't already have a SBCL binary installed
      as "sbcl" in your path, you'll need to tell make.sh what Lisp

@@ -1115,8 +1115,8 @@
 ;;;
 ;;; Otherwise, we bind *CONSTANTS-BEING-CREATED* and
 ;;; *CONSTANTS-CREATED-SINCE- LAST-INIT* and compile the creation form
-;;; a la LOAD-TIME-VALUE. When this finishes, we tell the dumper to
-;;; use that result instead whenever it sees this constant.
+;;; much the way LOAD-TIME-VALUE does. When this finishes, we tell the
+;;; dumper to use that result instead whenever it sees this constant.
 ;;;
 ;;; Now we try to compile the init form. We bind
 ;;; *CONSTANTS-CREATED-SINCE- LAST-INIT* to NIL and compile the init

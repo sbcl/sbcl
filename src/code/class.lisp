@@ -339,7 +339,7 @@
     (unless name
       (compiler-error "can't dump anonymous LAYOUT: ~S" layout))
     ;; Since LAYOUT refers to a class which refers back to the LAYOUT,
-    ;; we have to do this in two stages, a la the TREE-WITH-PARENT
+    ;; we have to do this in two stages, like the TREE-WITH-PARENT
     ;; example in the MAKE-LOAD-FORM entry in the ANSI spec.
     (values
      ;; "creation" form (which actually doesn't create a new LAYOUT if

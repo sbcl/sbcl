@@ -79,7 +79,7 @@
 			 (>= significand (expt 2 23))
 			 (assert (< 0 significand (expt 2 24)))
 			 ;; Exponent 0 is reserved for denormalized numbers,
-			 ;; and 255 is reserved for specials a la NaN.
+			 ;; and 255 is reserved for specials like NaN.
 			 (assert (< 0 exponent 255))
 			 (return (logior (ash exponent 23)
 					 (logand significand
@@ -124,7 +124,7 @@
 			 (>= significand (expt 2 52))
 			 (assert (< 0 significand (expt 2 53)))
 			 ;; Exponent 0 is reserved for denormalized numbers,
-			 ;; and 2047 is reserved for specials a la NaN.
+			 ;; and 2047 is reserved for specials like NaN.
 			 (assert (< 0 exponent 2047))
 			 (return (logior (ash exponent 52)
 					 (logand significand
@@ -171,7 +171,7 @@
 ;;; cross-compilation host Lisps are likely to have exactly the same
 ;;; floating point precision as the target Lisp. If it turns out to be
 ;;; a problem, there are possible workarounds involving portable
-;;; representations for target floating point numbers, a la
+;;; representations for target floating point numbers, like
 ;;;   (DEFSTRUCT TARGET-SINGLE-FLOAT
 ;;;     (SIGN (REQUIRED-ARGUMENT) :TYPE BIT)
 ;;;     (EXPONENT (REQUIRED-ARGUMENT) :TYPE UNSIGNED-BYTE)
