@@ -53,7 +53,7 @@
        (return)))))
 
 ;;; Entomotomy PEEK-CHAR-WRONGLY-ECHOS-TO-ECHO-STREAM bug, fixed by
-;;; by MRD patch sbcl-devel 2002-11-02 merged ca. sbcl-0.7.9.32
+;;; by MRD patch sbcl-devel 2002-11-02 merged ca. sbcl-0.7.9.32...
 (assert (string=
 	 (with-output-to-string (out)
 	   (peek-char #\]
@@ -61,3 +61,15 @@
 		       (make-string-input-stream "ab cd e df s]") out)))
 	 ;; (Before the fix, the result had a trailing #\] in it.)
 	 "ab cd e df s"))
+;;; ...and a missing wrinkle in the original patch, dealing with
+;;; PEEK-CHAR/UNREAD-CHAR on ECHO-STREAMs, fixed by MRD patch
+;;; sbcl-devel 2002-11-18, merged ca. sbcl-0.7.9.66
+(assert (string=
+	 (let* ((in-stream (make-string-input-stream "abc"))
+		(out-stream (make-string-output-stream))
+		(echo-stream (make-echo-stream in-stream out-stream)))  
+	   (unread-char (read-char echo-stream) echo-stream)  
+	   (peek-char #\a echo-stream)
+	   (get-output-stream-string out-stream))
+	 ;; (Before the fix, the LET* expression just signalled an error.)
+	 "a"))

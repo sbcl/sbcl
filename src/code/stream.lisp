@@ -992,7 +992,6 @@
   (in-fun echo-bin read-byte ansi-stream-bout stream-write-byte
 	  eof-error-p eof-value))
 
-
 (defun echo-misc (stream operation &optional arg1 arg2)
   (let* ((in (two-way-stream-input-stream stream))
 	 (out (two-way-stream-output-stream stream)))
@@ -1014,18 +1013,39 @@
        (set-closed-flame stream))
       (:peek-char
        ;; For the special case of peeking into an echo-stream
-       ;; arg1 is peek-type, arg2 is (eof-error-p eof-value)
+       ;; arg1 is PEEK-TYPE, arg2 is (EOF-ERROR-P EOF-VALUE)
        ;; returns peeked-char, eof-value, or errors end-of-file
-       (flet ((outfn (c)
-		(if (ansi-stream-p out)
-		    (funcall (ansi-stream-out out) out c)
-		    ;; gray-stream
-		    (stream-write-char out c))))
-	 (generalized-peeking-mechanism
-	  arg1 (second arg2) char
-	  (read-char in (first arg2) (second arg2))
-	  (unread-char char in)
-	  (outfn char))))
+       ;;
+       ;; Note: This code could be moved into PEEK-CHAR if desired.
+       ;; I am unsure whether this belongs with echo-streams because it is
+       ;; echo-stream specific, or PEEK-CHAR because it is peeking code.
+       ;; -- mrd 2002-11-18
+       ;;
+       ;; UNREAD-CHAR-P indicates whether the current character was one
+       ;; that was previously unread.  In that case, we need to ensure that
+       ;; the semantics for UNREAD-CHAR are held; the character should
+       ;; not be echoed again.
+       (let ((unread-char-p nil))
+	 (flet ((outfn (c)
+		  (unless unread-char-p
+		    (if (ansi-stream-p out)
+			(funcall (ansi-stream-out out) out c)
+			;; gray-stream
+			(stream-write-char out c))))
+		(infn ()
+		  ;; Obtain input from unread buffer or input stream,
+		  ;; and set the flag appropriately.
+		  (cond ((not (null (echo-stream-unread-stuff stream)))
+			 (setf unread-char-p t)
+			 (pop (echo-stream-unread-stuff stream)))
+			(t
+			 (setf unread-char-p nil)
+			 (read-char in (first arg2) (second arg2))))))
+	   (generalized-peeking-mechanism
+	    arg1 (second arg2) char
+	    (infn)
+	    (unread-char char in)
+	    (outfn char)))))
       (t
        (or (if (ansi-stream-p in)
 	       (funcall (ansi-stream-misc in) in operation arg1 arg2)
@@ -1033,16 +1053,16 @@
 	   (if (ansi-stream-p out)
 	       (funcall (ansi-stream-misc out) out operation arg1 arg2)
 	       (stream-misc-dispatch out operation arg1 arg2)))))))
-
 
-;;;; string streams
+;;;; base STRING-STREAM stuff
+
 (defstruct (string-stream
              (:include ansi-stream)
              (:constructor nil)
              (:copier nil))
   (string nil :type string))
-
-;;;; string input streams
+
+;;;; STRING-INPUT-STREAM stuff
 
 (defstruct (string-input-stream
 	     (:include string-stream
@@ -1134,7 +1154,7 @@
   (internal-make-string-input-stream (coerce string 'simple-string)
 				     start end))
 
-;;;; string output streams
+;;;; STRING-OUTPUT-STREAM stuff
 
 (defstruct (string-output-stream
 	    (:include string-stream
