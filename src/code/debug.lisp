@@ -703,6 +703,25 @@ Other commands:
 	   (*package* original-package)
 	   (*print-pretty* original-print-pretty)
 	   (*print-readably* nil)
+	   ;; Clear the circularity machinery to try to to reduce the
+	   ;; pain from sharing the circularity table across all
+	   ;; streams; if these are not rebound here, then setting
+	   ;; *PRINT-CIRCLE* within the debugger when debugging in a
+	   ;; state where something circular was being printed (e.g.,
+	   ;; because the debugger was entered on an error in a
+	   ;; PRINT-OBJECT method) makes a hopeless mess. Binding them
+	   ;; here does seem somewhat ugly because it makes it more
+	   ;; difficult to debug the printing-of-circularities code
+	   ;; itself; however, as far as I (WHN, 2004-05-29) can see,
+	   ;; that's almost entirely academic as long as there's one
+	   ;; shared *C-H-T* for all streams (i.e., it's already
+	   ;; unreasonably difficult to debug print-circle machinery
+	   ;; given the buggy crosstalk between the debugger streams
+	   ;; and the stream you're trying to watch), and any fix for
+	   ;; that buggy arrangement will likely let this hack go away
+	   ;; naturally.
+	   (sb!impl::*circularity-hash-table* . nil)
+	   (sb!impl::*circularity-counter* . nil)
 	   ;; These rebindings are now (as of early 2004) deprecated,
 	   ;; with the new *PRINT-VAR-ALIST* mechanism preferred.
 	   (*print-length* *debug-print-length*)
@@ -710,11 +729,12 @@ Other commands:
 	   (*readtable* *debug-readtable*))
        (progv
 	   ;; (Why NREVERSE? PROGV makes the later entries have
-	   ;; precedence over the earlier entries. *PRINT-VAR-ALIST*
-	   ;; is called an alist, so it's expected that its earlier
-	   ;; entries have precedence. And the earlier-has-precedence
-	   ;; behavior is mostly more convenient, so that programmers
-	   ;; can use PUSH or LIST* to customize *PRINT-VAR-ALIST*.)
+	   ;; precedence over the earlier entries.
+	   ;; *DEBUG-PRINT-VARIABLE-ALIST* is called an alist, so it's
+	   ;; expected that its earlier entries have precedence. And
+	   ;; the earlier-has-precedence behavior is mostly more
+	   ;; convenient, so that programmers can use PUSH or LIST* to
+	   ;; customize *DEBUG-PRINT-VARIABLE-ALIST*.)
 	   (nreverse (mapcar #'car *debug-print-variable-alist*))
 	   (nreverse (mapcar #'cdr *debug-print-variable-alist*))
 	 (apply fun rest))))))
