@@ -344,16 +344,17 @@
 	   ((and (not (eq spec u))
 		 (info :type :builtin spec)))
 	   ((eq (info :type :kind spec) :instance)
-	    (sb!xc:find-class spec))
-	   ((typep spec 'class)
+	    (find-classoid spec))
+	   ((typep spec 'classoid)
 	    ;; There doesn't seem to be any way to translate
 	    ;; (TYPEP SPEC 'BUILT-IN-CLASS) into something which can be
 	    ;; executed on the host Common Lisp at cross-compilation time.
 	    #+sb-xc-host (error
 			  "stub: (TYPEP SPEC 'BUILT-IN-CLASS) on xc host")
-	    (if (typep spec 'built-in-class)
-		(or (built-in-class-translation spec) spec)
+	    (if (typep spec 'built-in-classoid)
+		(or (built-in-classoid-translation spec) spec)
 		spec))
+	   ;; FIXME: CL:CLASS objects are type specifiers.
 	   (t
 	    (let* (;; FIXME: This automatic promotion of FOO-style
 		   ;; specs to (FOO)-style specs violates the ANSI

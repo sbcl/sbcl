@@ -221,7 +221,7 @@
       (let* ((typespec (second typespec-form))
 	     (ctype (specifier-type typespec)))
 	(aver (= 2 (length typespec-form)))
-	(cond ((structure-class-p ctype)
+	(cond ((structure-classoid-p ctype)
 	       `(structure-object-typecheckfun ,typespec-form))
 	      ((ctype-needs-to-be-interpreted-p ctype)
 	       whole) ; i.e. give up compiler macro

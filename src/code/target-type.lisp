@@ -33,15 +33,15 @@
 	 named-type
 	 member-type
 	 array-type
-	 sb!xc:built-in-class
+	 built-in-classoid
 	 cons-type)
      (values (%typep obj type) t))
-    (sb!xc:class
+    (classoid
      (if (if (csubtypep type (specifier-type 'funcallable-instance))
 	     (funcallable-instance-p obj)
 	     (typep obj 'instance))
-	 (if (eq (class-layout type)
-		 (info :type :compiler-layout (sb!xc:class-name type)))
+	 (if (eq (classoid-layout type)
+		 (info :type :compiler-layout (classoid-name type)))
 	     (values (sb!xc:typep obj type) t)
 	     (values nil nil))
 	 (values nil t)))
@@ -129,16 +129,16 @@
 	   ;; KLUDGE: In order to really make this run at run time
 	   ;; (instead of doing some weird broken thing at cold load
 	   ;; time), we need to suppress a DEFTRANSFORM.. -- WHN 19991004
-	   (declare (notinline sb!xc:find-class))
-	   (class-layout (sb!xc:find-class 'null))))
+	   (declare (notinline find-classoid))
+	   (classoid-layout (find-classoid 'null))))
 	(t (svref *built-in-class-codes* (widetag-of x)))))
 
-#!-sb-fluid (declaim (inline sb!xc:class-of))
-(defun sb!xc:class-of (object)
+#!-sb-fluid (declaim (inline classoid-of))
+(defun classoid-of (object)
   #!+sb-doc
   "Return the class of the supplied object, which may be any Lisp object, not
    just a CLOS STANDARD-OBJECT."
-  (layout-class (layout-of object)))
+  (layout-classoid (layout-of object)))
 
 ;;; Pull the type specifier out of a function object.
 (defun extract-fun-type (fun)
@@ -173,7 +173,7 @@
   (typecase x
     (function
      (if (funcallable-instance-p x)
-	 (sb!xc:class-of x)
+	 (classoid-of x)
 	 (extract-fun-type x)))
     (symbol
      (make-member-type :members (list x)))
@@ -188,7 +188,7 @@
     (cons
      (make-cons-type *universal-type* *universal-type*))
     (t
-     (sb!xc:class-of x))))
+     (classoid-of x))))
 
 ;;; Clear this cache on GC so that we don't hold onto too much garbage.
 (pushnew 'ctype-of-cache-clear *before-gc-hooks*)

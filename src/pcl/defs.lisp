@@ -148,9 +148,10 @@
 					 :object (coerce-to-class (car args))))
 	       (class-eq (class-eq-specializer (coerce-to-class (car args))))
 	       (eql      (intern-eql-specializer (car args))))))
-	((and (null args) (typep type 'cl:class))
-	 (or (sb-kernel:class-pcl-class type)
-	     (find-structure-class (cl:class-name type))))
+	;; FIXME: do we still need this?
+	((and (null args) (typep type 'sb-kernel:classoid))
+	 (or (sb-kernel:classoid-pcl-class type)
+	     (find-structure-class (sb-kernel:classoid-name type))))
 	((specializerp type) type)))
 
 ;;; interface
@@ -216,7 +217,7 @@
     ((not and or) `(,(car type) ,@(mapcar #'convert-to-system-type
 					  (cdr type))))
     ((class class-eq) ; class-eq is impossible to do right
-     (sb-kernel:layout-class (class-wrapper (cadr type))))
+     (sb-kernel:layout-classoid (class-wrapper (cadr type))))
     (eql type)
     (t (if (null (cdr type))
 	   (car type)
@@ -358,16 +359,16 @@
 (defvar *built-in-classes*
   (labels ((direct-supers (class)
 	     (/noshow "entering DIRECT-SUPERS" (sb-kernel::class-name class))
-	     (if (typep class 'cl:built-in-class)
-		 (sb-kernel:built-in-class-direct-superclasses class)
+	     (if (typep class 'sb-kernel:built-in-classoid)
+		 (sb-kernel:built-in-classoid-direct-superclasses class)
 		 (let ((inherits (sb-kernel:layout-inherits
-				  (sb-kernel:class-layout class))))
+				  (sb-kernel:classoid-layout class))))
 		   (/noshow inherits)
 		   (list (svref inherits (1- (length inherits)))))))
 	   (direct-subs (class)
 	     (/noshow "entering DIRECT-SUBS" (sb-kernel::class-name class))
 	     (collect ((res))
-	       (let ((subs (sb-kernel:class-subclasses class)))
+	       (let ((subs (sb-kernel:classoid-subclasses class)))
 		 (/noshow subs)
 		 (when subs
 		   (dohash (sub v subs)
@@ -402,17 +403,18 @@
     (mapcar (lambda (kernel-bic-entry)
 	      (/noshow "setting up" kernel-bic-entry)
 	      (let* ((name (car kernel-bic-entry))
-		     (class (cl:find-class name)))
+		     (class (sb-kernel:find-classoid name)))
 		(/noshow name class)
 		`(,name
-		  ,(mapcar #'cl:class-name (direct-supers class))
-		  ,(mapcar #'cl:class-name (direct-subs class))
+		  ,(mapcar #'sb-kernel:classoid-name (direct-supers class))
+		  ,(mapcar #'sb-kernel:classoid-name (direct-subs class))
 		  ,(map 'list
 			(lambda (x)
-			  (cl:class-name (sb-kernel:layout-class x)))
+			  (sb-kernel:classoid-name
+			   (sb-kernel:layout-classoid x)))
 			(reverse
 			 (sb-kernel:layout-inherits
-			  (sb-kernel:class-layout class))))
+			  (sb-kernel:classoid-layout class))))
 		  ,(prototype name))))
 	    (remove-if (lambda (kernel-bic-entry)
 			 (member (first kernel-bic-entry)

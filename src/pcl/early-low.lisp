@@ -53,9 +53,10 @@
 ;;; it needs a more mnemonic name. -- WHN 19991204
 (defun structure-type-p (type)
   (and (symbolp type)
-       (let ((class  (cl:find-class type nil)))
-	 (and class
-	      (typep (sb-kernel:layout-info (sb-kernel:class-layout class))
+       (let ((classoid (sb-kernel:find-classoid type nil)))
+	 (and classoid
+	      (typep (sb-kernel:layout-info
+		      (sb-kernel:classoid-layout classoid))
 		     'sb-kernel:defstruct-description)))))
 
 (/show "finished with early-low.lisp")

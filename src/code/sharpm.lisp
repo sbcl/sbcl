@@ -119,13 +119,13 @@
       (%reader-error stream "non-list following #S: ~S" body))
     (unless (symbolp (car body))
       (%reader-error stream "Structure type is not a symbol: ~S" (car body)))
-    (let ((class (sb!xc:find-class (car body) nil)))
-      (unless (typep class 'sb!xc:structure-class)
+    (let ((classoid (find-classoid (car body) nil)))
+      (unless (typep classoid 'structure-classoid)
 	(%reader-error stream "~S is not a defined structure type."
 		       (car body)))
       (let ((def-con (dd-default-constructor
 		      (layout-info
-		       (class-layout class)))))
+		       (classoid-layout classoid)))))
 	(unless def-con
 	  (%reader-error
 	   stream "The ~S structure does not have a default constructor."

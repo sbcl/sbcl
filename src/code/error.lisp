@@ -23,7 +23,7 @@
 	:format-control format-control
 	:format-arguments format-arguments))
 
-(define-condition sb!kernel:layout-invalid (type-error)
+(define-condition layout-invalid (type-error)
   ()
   (:report
    (lambda (condition stream)
@@ -31,7 +31,7 @@
 	     "~@<invalid structure layout: ~
               ~2I~_A test for class ~4I~_~S ~
               ~2I~_was passed the obsolete instance ~4I~_~S~:>"
-	     (sb!kernel:class-proper-name (type-error-expected-type condition))
+	     (classoid-proper-name (type-error-expected-type condition))
 	     (type-error-datum condition)))))
 
 (define-condition case-failure (type-error)

@@ -77,15 +77,16 @@
       (values
        ;; FIXME: This old CMU CL code probably deserves a comment
        ;; explaining to us mere mortals how it works...
-       (and (sb!xc:typep type2 'sb!xc:class)
+       (and (sb!xc:typep type2 'classoid)
 	    (dolist (x info nil)
 	      (when (or (not (cdr x))
 			(csubtypep type1 (specifier-type (cdr x))))
 		(return
 		 (or (eq type2 (car x))
-		     (let ((inherits (layout-inherits (class-layout (car x)))))
+		     (let ((inherits (layout-inherits
+				      (classoid-layout (car x)))))
 		       (dotimes (i (length inherits) nil)
-			 (when (eq type2 (layout-class (svref inherits i)))
+			 (when (eq type2 (layout-classoid (svref inherits i)))
 			   (return t)))))))))
        t)))
 
@@ -110,7 +111,7 @@
 			      (destructuring-bind
 				  (super &optional guard)
 				  spec
-				(cons (sb!xc:find-class super) guard)))
+				(cons (find-classoid super) guard)))
 			    ',specs)))
 	 (setf (type-class-complex-subtypep-arg1 ,type-class)
 	       (lambda (type1 type2)
@@ -2828,8 +2829,8 @@
 (defun defined-ftype-matches-declared-ftype-p (defined-ftype declared-ftype)
   (declare (type ctype defined-ftype declared-ftype))
   (flet ((is-built-in-class-function-p (ctype)
-	   (and (built-in-class-p ctype)
-		(eq (built-in-class-%name ctype) 'function))))
+	   (and (built-in-classoid-p ctype)
+		(eq (built-in-classoid-name ctype) 'function))))
     (cond (;; DECLARED-FTYPE could certainly be #<BUILT-IN-CLASS FUNCTION>;
 	   ;; that's what happens when we (DECLAIM (FTYPE FUNCTION FOO)).
 	   (is-built-in-class-function-p declared-ftype)

@@ -96,8 +96,8 @@
   :slot-names (function-name class-name class initargs)
   :boa-constructor %make-ctor
   :superclass-name pcl-funcallable-instance
-  :metaclass-name sb-kernel:random-pcl-class
-  :metaclass-constructor sb-kernel:make-random-pcl-class
+  :metaclass-name sb-kernel:random-pcl-classoid
+  :metaclass-constructor sb-kernel:make-random-pcl-classoid
   :dd-type sb-kernel:funcallable-structure
   :runtime-type-checks-p nil)
 

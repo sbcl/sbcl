@@ -146,7 +146,7 @@
 			(built-in-class built-in-class-wrapper)
 			(structure-class structure-class-wrapper)))
 	     (class (or (find-class name nil)
-			(allocate-standard-instance wrapper))))	
+			(allocate-standard-instance wrapper))))
 	(setf (find-class name) class)))
     (dolist (definition *early-class-definitions*)
       (let ((name (ecd-class-name definition))
@@ -493,11 +493,11 @@
     (dolist (e *built-in-classes*)
       (destructuring-bind (name supers subs cpl prototype) e
 	(let* ((class (find-class name))
-	       (lclass (cl:find-class name))
-	       (wrapper (sb-kernel:class-layout lclass)))
+	       (lclass (sb-kernel:find-classoid name))
+	       (wrapper (sb-kernel:classoid-layout lclass)))
 	  (set (get-built-in-class-symbol name) class)
 	  (set (get-built-in-wrapper-symbol name) wrapper)
-	  (setf (sb-kernel:class-pcl-class lclass) class)
+	  (setf (sb-kernel:classoid-pcl-class lclass) class)
 
 	  (!bootstrap-initialize-class 'built-in-class class
 				       name class-eq-wrapper nil
@@ -544,9 +544,9 @@
 			:metaclass 'structure-class
 			:name symbol
 			:direct-superclasses
-                        (mapcar #'cl:class-name
-                                (sb-kernel:class-direct-superclasses
-                                 (cl:find-class symbol)))
+                        (mapcar #'sb-kernel:classoid-name
+                                (sb-kernel:classoid-direct-superclasses
+                                 (sb-kernel:find-classoid symbol)))
 			:direct-slots
 			(mapcar #'slot-initargs-from-structure-slotd
 				(structure-type-slot-description-list
@@ -589,8 +589,8 @@
 ;;; Set the inherits from CPL, and register the layout. This actually
 ;;; installs the class in the Lisp type system.
 (defun update-lisp-class-layout (class layout)
-  (let ((lclass (sb-kernel:layout-class layout)))
-    (unless (eq (sb-kernel:class-layout lclass) layout)
+  (let ((lclass (sb-kernel:layout-classoid layout)))
+    (unless (eq (sb-kernel:classoid-layout lclass) layout)
       (setf (sb-kernel:layout-inherits layout)
               (sb-kernel:order-layout-inherits
                (map 'simple-vector #'class-wrapper
@@ -601,15 +601,26 @@
       ;; unknown to CL:FIND-CLASS and also anonymous. This
       ;; functionality moved here from (SETF FIND-CLASS).
       (let ((name (class-name class)))
-	(setf (cl:find-class name) lclass
-	      ;; FIXME: It's nasty to use double colons. Perhaps the
-	      ;; best way to fix this is not to export CLASS-%NAME
-	      ;; from SB-KERNEL, but instead to move the whole
-	      ;; UPDATE-LISP-CLASS-LAYOUT function to SB-KERNEL, and
-	      ;; export it. (since it's also nasty for us to be
-	      ;; reaching into %KERNEL implementation details my
-	      ;; messing with raw CLASS-%NAME)
-	      (sb-kernel::class-%name lclass) name)))))
+	(setf (sb-kernel:find-classoid name) lclass
+	      (sb-kernel:classoid-name lclass) name)))))
+
+(defun set-class-type-translation (class name)
+  (let ((classoid (sb-kernel:find-classoid name nil)))
+    (etypecase classoid
+      (null)
+      (sb-kernel:built-in-classoid
+       (let ((translation (sb-kernel::built-in-classoid-translation classoid)))
+	 (cond
+	   (translation
+	    (aver (sb-kernel:ctype-p translation))
+	    (setf (info :type :translator class)
+		  (lambda (spec) (declare (ignore spec)) translation)))
+	   (t
+	    (setf (info :type :translator class)
+		  (lambda (spec) (declare (ignore spec)) classoid))))))
+      (sb-kernel:classoid
+       (setf (info :type :translator class)
+	     (lambda (spec) (declare (ignore spec)) classoid))))))
 
 (clrhash *find-class*)
 (!bootstrap-meta-braid)
@@ -622,19 +633,21 @@
 (dohash (name x *find-class*)
 	(let* ((class (find-class-from-cell name x))
 	       (layout (class-wrapper class))
-	       (lclass (sb-kernel:layout-class layout))
-	       (lclass-pcl-class (sb-kernel:class-pcl-class lclass))
-	       (olclass (cl:find-class name nil)))
+	       (lclass (sb-kernel:layout-classoid layout))
+	       (lclass-pcl-class (sb-kernel:classoid-pcl-class lclass))
+	       (olclass (sb-kernel:find-classoid name nil)))
 	  (if lclass-pcl-class
 	      (aver (eq class lclass-pcl-class))
-	      (setf (sb-kernel:class-pcl-class lclass) class))
+	      (setf (sb-kernel:classoid-pcl-class lclass) class))
 
 	  (update-lisp-class-layout class layout)
 
 	  (cond (olclass
 		 (aver (eq lclass olclass)))
 		(t
-		 (setf (cl:find-class name) lclass)))))
+		 (setf (sb-kernel:find-classoid name) lclass)))
+
+	  (set-class-type-translation class name)))
 
 (setq *boot-state* 'braid)
 

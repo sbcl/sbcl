@@ -289,7 +289,7 @@
 	;; class names which creates fast but non-cold-loadable,
 	;; non-compact code. In this context, we'd rather have
 	;; compact, cold-loadable code. -- WHN 19990928
-	(declare (notinline sb!xc:find-class))
+	(declare (notinline find-classoid))
 	,@(let ((pf (dd-print-function defstruct))
 		(po (dd-print-object defstruct))
 		(x (gensym))
@@ -318,16 +318,16 @@
 		    (t nil))))
 	,@(let ((pure (dd-pure defstruct)))
 	    (cond ((eq pure t)
-		   `((setf (layout-pure (class-layout
-					 (sb!xc:find-class ',name)))
+		   `((setf (layout-pure (classoid-layout
+					 (find-classoid ',name)))
 			   t)))
 		  ((eq pure :substructure)
-		   `((setf (layout-pure (class-layout
-					 (sb!xc:find-class ',name)))
+		   `((setf (layout-pure (classoid-layout
+					 (find-classoid ',name)))
 			   0)))))
 	,@(let ((def-con (dd-default-constructor defstruct)))
 	    (when (and def-con (not (dd-alternate-metaclass defstruct)))
-	      `((setf (structure-class-constructor (sb!xc:find-class ',name))
+	      `((setf (structure-classoid-constructor (find-classoid ',name))
 		      #',def-con))))))))
 
 ;;; shared logic for CL:DEFSTRUCT and SB!XC:DEFSTRUCT
@@ -764,12 +764,12 @@
 			  (specifier-type (dd-element-type dd))))
 	(error ":TYPE option mismatch between structures ~S and ~S"
 	       (dd-name dd) included-name))
-      (let ((included-class (sb!xc:find-class included-name nil)))
-	(when included-class
+      (let ((included-classoid (find-classoid included-name nil)))
+	(when included-classoid
 	  ;; It's not particularly well-defined to :INCLUDE any of the
 	  ;; CMU CL INSTANCE weirdosities like CONDITION or
 	  ;; GENERIC-FUNCTION, and it's certainly not ANSI-compliant.
-	  (let* ((included-layout (class-layout included-class))
+	  (let* ((included-layout (classoid-layout included-classoid))
 		 (included-dd (layout-info included-layout)))
 	    (when (and (dd-alternate-metaclass included-dd)
 		       ;; As of sbcl-0.pre7.73, anyway, STRUCTURE-OBJECT
@@ -827,15 +827,15 @@
 	 (super
 	  (if include
 	      (compiler-layout-or-lose (first include))
-	      (class-layout (sb!xc:find-class
-			     (or (first superclass-opt)
-				 'structure-object))))))
+	      (classoid-layout (find-classoid
+				(or (first superclass-opt)
+				    'structure-object))))))
     (if (eq (dd-name info) 'ansi-stream)
 	;; a hack to add the CL:STREAM class as a mixin for ANSI-STREAMs
 	(concatenate 'simple-vector
 		     (layout-inherits super)
 		     (vector super
-			     (class-layout (sb!xc:find-class 'stream))))
+			     (classoid-layout (find-classoid 'stream))))
 	(concatenate 'simple-vector
 		     (layout-inherits super)
 		     (vector super)))))
@@ -849,10 +849,10 @@
   (declare (type defstruct-description dd))
 
   ;; We set up LAYOUTs even in the cross-compilation host.
-  (multiple-value-bind (class layout old-layout)
+  (multiple-value-bind (classoid layout old-layout)
       (ensure-structure-class dd inherits "current" "new")
     (cond ((not old-layout)
-	   (unless (eq (class-layout class) layout)
+	   (unless (eq (classoid-layout classoid) layout)
 	     (register-layout layout)))
 	  (t
 	   (let ((old-dd (layout-info old-layout)))
@@ -861,9 +861,9 @@
 		 (fmakunbound (dsd-accessor-name slot))
 		 (unless (dsd-read-only slot)
 		   (fmakunbound `(setf ,(dsd-accessor-name slot)))))))
-	   (%redefine-defstruct class old-layout layout)
-	   (setq layout (class-layout class))))
-    (setf (sb!xc:find-class (dd-name dd)) class)
+	   (%redefine-defstruct classoid old-layout layout)
+	   (setq layout (classoid-layout classoid))))
+    (setf (find-classoid (dd-name dd)) classoid)
 
     ;; Various other operations only make sense on the target SBCL.
     #-sb-xc-host
@@ -928,7 +928,7 @@
 				(inherits (vector (find-layout t)
 						  (find-layout 'instance))))
 
-  (multiple-value-bind (class layout old-layout)
+  (multiple-value-bind (classoid layout old-layout)
       (multiple-value-bind (clayout clayout-p)
 	  (info :type :compiler-layout (dd-name dd))
 	(ensure-structure-class dd
@@ -937,27 +937,27 @@
 				"compiled"
 				:compiler-layout clayout))
     (cond (old-layout
-	   (undefine-structure (layout-class old-layout))
-	   (when (and (class-subclasses class)
+	   (undefine-structure (layout-classoid old-layout))
+	   (when (and (classoid-subclasses classoid)
 		      (not (eq layout old-layout)))
 	     (collect ((subs))
-		      (dohash (class layout (class-subclasses class))
+		      (dohash (classoid layout (classoid-subclasses classoid))
 			(declare (ignore layout))
-			(undefine-structure class)
-			(subs (class-proper-name class)))
+			(undefine-structure classoid)
+			(subs (classoid-proper-name classoid)))
 		      (when (subs)
 			(warn "removing old subclasses of ~S:~%  ~S"
-			      (sb!xc:class-name class)
+			      (classoid-name classoid)
 			      (subs))))))
 	  (t
-	   (unless (eq (class-layout class) layout)
+	   (unless (eq (classoid-layout classoid) layout)
 	     (register-layout layout :invalidate nil))
-	   (setf (sb!xc:find-class (dd-name dd)) class)))
+	   (setf (find-classoid (dd-name dd)) classoid)))
 
     ;; At this point the class should be set up in the INFO database.
     ;; But the logic that enforces this is a little tangled and
     ;; scattered, so it's not obvious, so let's check.
-    (aver (sb!xc:find-class (dd-name dd) nil))
+    (aver (find-classoid (dd-name dd) nil))
 
     (setf (info :type :compiler-layout (dd-name dd)) layout))
 
@@ -1062,10 +1062,10 @@
 
 ;;; If we are redefining a structure with different slots than in the
 ;;; currently loaded version, give a warning and return true.
-(defun redefine-structure-warning (class old new)
+(defun redefine-structure-warning (classoid old new)
   (declare (type defstruct-description old new)
-	   (type sb!xc:class class)
-	   (ignore class))
+	   (type classoid classoid)
+	   (ignore classoid))
   (let ((name (dd-name new)))
     (multiple-value-bind (moved retyped deleted) (compare-slots old new)
       (when (or moved retyped deleted)
@@ -1082,9 +1082,10 @@
 ;;; structure CLASS to have the specified NEW-LAYOUT. We signal an
 ;;; error with some proceed options and return the layout that should
 ;;; be used.
-(defun %redefine-defstruct (class old-layout new-layout)
-  (declare (type sb!xc:class class) (type layout old-layout new-layout))
-  (let ((name (class-proper-name class)))
+(defun %redefine-defstruct (classoid old-layout new-layout)
+  (declare (type classoid classoid)
+	   (type layout old-layout new-layout))
+  (let ((name (classoid-proper-name classoid)))
     (restart-case
 	(error "~@<attempt to redefine the ~S class ~S incompatibly with the current definition~:@>"
 	       'structure-object
@@ -1131,24 +1132,25 @@
       (destructuring-bind
 	  (&optional
 	   name
-	   (class 'sb!xc:structure-class)
-	   (constructor 'make-structure-class))
+	   (class 'structure-classoid)
+	   (constructor 'make-structure-classoid))
 	  (dd-alternate-metaclass info)
 	(declare (ignore name))
-	(insured-find-class (dd-name info)
-			    (if (eq class 'sb!xc:structure-class)
-			      (lambda (x)
-				(typep x 'sb!xc:structure-class))
-			      (lambda (x)
-				(sb!xc:typep x (sb!xc:find-class class))))
-			    (fdefinition constructor)))
-    (setf (class-direct-superclasses class)
+	(insured-find-classoid (dd-name info)
+			       (if (eq class 'structure-classoid)
+				   (lambda (x)
+				     (sb!xc:typep x 'structure-classoid))
+				   (lambda (x)
+				     (sb!xc:typep x (find-classoid class))))
+			       (fdefinition constructor)))
+    (setf (classoid-direct-superclasses class)
 	  (if (eq (dd-name info) 'ansi-stream)
 	      ;; a hack to add CL:STREAM as a superclass mixin to ANSI-STREAMs
-	      (list (layout-class (svref inherits (1- (length inherits))))
-		    (layout-class (svref inherits (- (length inherits) 2))))
-	      (list (layout-class (svref inherits (1- (length inherits)))))))
-    (let ((new-layout (make-layout :class class
+	      (list (layout-classoid (svref inherits (1- (length inherits))))
+		    (layout-classoid (svref inherits (- (length inherits) 2))))
+	      (list (layout-classoid
+		     (svref inherits (1- (length inherits)))))))
+    (let ((new-layout (make-layout :classoid class
 				   :inherits inherits
 				   :depthoid (length inherits)
 				   :length (dd-length info)
@@ -1160,7 +1162,7 @@
        (;; This clause corresponds to an assertion in REDEFINE-LAYOUT-WARNING
 	;; of classic CMU CL. I moved it out to here because it was only
 	;; exercised in this code path anyway. -- WHN 19990510
-	(not (eq (layout-class new-layout) (layout-class old-layout)))
+	(not (eq (layout-classoid new-layout) (layout-classoid old-layout)))
 	(error "shouldn't happen: weird state of OLD-LAYOUT?"))
        ((not *type-system-initialized*)
 	(setf (layout-info old-layout) info)
@@ -1193,7 +1195,7 @@
 ;;; over this type, clearing the compiler structure type info, and
 ;;; undefining all the associated functions.
 (defun undefine-structure (class)
-  (let ((info (layout-info (class-layout class))))
+  (let ((info (layout-info (classoid-layout class))))
     (when (defstruct-description-p info)
       (let ((type (dd-name info)))
 	(remhash type *typecheckfuns*)

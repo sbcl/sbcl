@@ -1,0 +1,29 @@
+** CONDITION-CLASS
+
+(find-class 'warning) gives an object of type STRUCTURE-CLASS.
+However, a WARNING is not a STRUCTURE-OBJECT, but a CONDITION-OBJECT,
+which contradicts the requirement that instances of STRUCTURE-CLASS be
+STRUCTURE-OBJECTs.  Fix this, probably by teaching PCL about
+CONDITION-CLASS analogously to STRUCTURE-CLASS.
+
+** CLASS-PROTOTYPE
+
+(sb-pcl:class-prototype (find-class 'null)) yields something decidedly
+weird -- it has allocated a NULL thingy.  This is easy to solve
+[&optional (proto nil protop)]; probably harder are the issues for
+e.g. BIGNUM, some strange array classes, and so on, particularly in
+their interaction with the cross-compiler dumper, should PCL ever be
+moved to the main build.
+
+** SB-KERNEL
+
+Now that CL:CLASS has turned into SB-KERNEL:CLASSOID, SB-PCL can
+use-package SB-KERNEL.  This should have the pleasant effect of
+ridding us of a fair amount of package prefix noise.
+
+** SB-MOP
+
+Now that a CL:CLASS is a real CLOS class, it might be worth giving
+SB-PCL the SB-MOP nickname, since it now is in the region of
+conforming to AMOP.
+

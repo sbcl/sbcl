@@ -147,7 +147,8 @@
 		(if (typep x 'structure-object)
 		    (logxor 422371266
 			    (sxhash ; through DEFTRANSFORM
-			     (class-name (layout-class (%instance-layout x)))))
+			     (classoid-name
+			      (layout-classoid (%instance-layout x)))))
 		    (sxhash-instance x)))
 	       (symbol (sxhash x)) ; through DEFTRANSFORM
 	       (array
@@ -247,8 +248,8 @@
   (declare (type (integer 0 #.+max-hash-depthoid+) depthoid))
   (let* ((layout (%instance-layout key)) ; i.e. slot #0
 	 (length (layout-length layout))
-	 (class (layout-class layout))
-	 (name (class-name class))
+	 (classoid (layout-classoid layout))
+	 (name (classoid-name classoid))
 	 (result (mix (sxhash name) (the fixnum 79867))))
     (declare (type fixnum result))
     (dotimes (i (min depthoid (1- length)))

@@ -25,9 +25,9 @@
 ;;; Readers for Class Metaobjects (pp. 212--214 of AMOP)
 (defclass red-herring (forward-ref) ())
 
-(assert (null (sb-pcl:class-direct-slots (sb-pcl:find-class 'forward-ref))))
+(assert (null (sb-pcl:class-direct-slots (find-class 'forward-ref))))
 (assert (null (sb-pcl:class-direct-default-initargs
-	       (sb-pcl:find-class 'forward-ref))))
+	       (find-class 'forward-ref))))
 
 ;;; Readers for Generic Function Metaobjects (pp. 216--218 of AMOP)
 (defgeneric fn-with-odd-arg-precedence (a b c)
@@ -73,7 +73,7 @@
 
 ;;; Class Finalization Protocol (see section 5.5.2 of AMOP)
 (let ((finalized-count 0))
-  (defmethod sb-pcl:finalize-inheritance :after ((x sb-pcl::standard-class))
+  (defmethod sb-pcl:finalize-inheritance :after ((x standard-class))
     (incf finalized-count))
   (defun get-count () finalized-count))
 (defclass finalization-test-1 () ())
@@ -99,10 +99,10 @@
 ;;; relationships.  These aren't necessarily true, but are probably
 ;;; not going to change often.
 (dolist (x '(number array sequence character symbol))
-  (assert (eq (car (sb-pcl:class-direct-superclasses (sb-pcl:find-class x)))
-	      (sb-pcl:find-class t)))
-  (assert (member (sb-pcl:find-class x)
-		  (sb-pcl:class-direct-subclasses (sb-pcl:find-class t)))))
+  (assert (eq (car (sb-pcl:class-direct-superclasses (find-class x)))
+	      (find-class t)))
+  (assert (member (find-class x)
+		  (sb-pcl:class-direct-subclasses (find-class t)))))
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

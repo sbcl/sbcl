@@ -68,27 +68,11 @@
 ;;; other code which does low-level hacking of packages.. -- WHN 19991203
 
 ;;; types, classes, and structure names
-(defmethod documentation ((x cl:structure-class) (doc-type (eql 't)))
-  (values (info :type :documentation (cl:class-name x))))
-
 (defmethod documentation ((x structure-class) (doc-type (eql 't)))
   (values (info :type :documentation (class-name x))))
 
-(defmethod documentation ((x cl:standard-class) (doc-type (eql 't)))
-  (or (values (info :type :documentation (cl:class-name x)))
-      (let ((pcl-class (sb-kernel:class-pcl-class x)))
-	(and pcl-class (plist-value pcl-class 'documentation)))))
-
-(defmethod documentation ((x cl:structure-class) (doc-type (eql 'type)))
-  (values (info :type :documentation (cl:class-name x))))
-
 (defmethod documentation ((x structure-class) (doc-type (eql 'type)))
   (values (info :type :documentation (class-name x))))
-
-(defmethod documentation ((x cl:standard-class) (doc-type (eql 'type)))
-  (or (values (info :type :documentation (cl:class-name x)))
-      (let ((pcl-class (sb-kernel:class-pcl-class x)))
-	(and pcl-class (plist-value pcl-class 'documentation)))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'type)))
   (or (values (info :type :documentation x))
@@ -101,19 +85,9 @@
     (values (info :type :documentation x))))
 
 (defmethod (setf documentation) (new-value
-				 (x cl:structure-class)
-				 (doc-type (eql 't)))
-  (setf (info :type :documentation (cl:class-name x)) new-value))
-
-(defmethod (setf documentation) (new-value
 				 (x structure-class)
 				 (doc-type (eql 't)))
   (setf (info :type :documentation (class-name x)) new-value))
-
-(defmethod (setf documentation) (new-value
-				 (x cl:structure-class)
-				 (doc-type (eql 'type)))
-  (setf (info :type :documentation (cl:class-name x)) new-value))
 
 (defmethod (setf documentation) (new-value
 				 (x structure-class)

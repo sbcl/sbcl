@@ -322,11 +322,7 @@
 		    :definition-source `((defclass ,name)
 					 ,*load-pathname*)
 		    other)))
-    ;; Defclass of a class with a forward-referenced superclass does not
-    ;; have a wrapper. RES is the incomplete PCL class. The Lisp class
-    ;; does not yet exist. Maybe should return NIL in that case as RES
-    ;; is not useful to the user?
-    (and (class-wrapper res) (sb-kernel:layout-class (class-wrapper res)))))
+    res))
 
 (setf (gdefinition 'load-defclass) #'real-load-defclass)
 
@@ -336,8 +332,10 @@
 (defmethod ensure-class-using-class (name (class null) &rest args &key)
   (multiple-value-bind (meta initargs)
       (ensure-class-values class args)
+    (set-class-type-translation (class-prototype meta) name)
     (setf class (apply #'make-instance meta :name name initargs)
 	  (find-class name) class)
+    (set-class-type-translation class name)
     class))
 
 (defmethod ensure-class-using-class (name (class pcl-class) &rest args &key)
@@ -346,6 +344,7 @@
     (unless (eq (class-of class) meta) (change-class class meta))
     (apply #'reinitialize-instance class initargs)
     (setf (find-class name) class)
+    (set-class-type-translation class name)
     class))
 
 (defmethod class-predicate-name ((class t))
@@ -641,9 +640,9 @@
     (setf (slot-value class 'class-precedence-list)
             (compute-class-precedence-list class))
     (setf (slot-value class 'slots) (compute-slots class))
-    (let ((lclass (cl:find-class (class-name class))))
-      (setf (sb-kernel:class-pcl-class lclass) class)
-      (setf (slot-value class 'wrapper) (sb-kernel:class-layout lclass)))
+    (let ((lclass (sb-kernel:find-classoid (class-name class))))
+      (setf (sb-kernel:classoid-pcl-class lclass) class)
+      (setf (slot-value class 'wrapper) (sb-kernel:classoid-layout lclass)))
     (update-pv-table-cache-info class)
     (setq predicate-name (if predicate-name-p
 			   (setf (slot-value class 'predicate-name)

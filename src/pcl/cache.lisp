@@ -257,7 +257,7 @@
   (setq *the-class-t* nil))
 
 (defmacro wrapper-class (wrapper)
-  `(sb-kernel:class-pcl-class (sb-kernel:layout-class ,wrapper)))
+  `(sb-kernel:classoid-pcl-class (sb-kernel:layout-classoid ,wrapper)))
 (defmacro wrapper-no-of-instance-slots (wrapper)
   `(sb-kernel:layout-length ,wrapper))
 
@@ -271,19 +271,20 @@
 ;;; whose slots are not initialized yet, and which may be built-in
 ;;; classes. We pass in the class name in addition to the class.
 (defun boot-make-wrapper (length name &optional class)
-  (let ((found (cl:find-class name nil)))
+  (let ((found (sb-kernel:find-classoid name nil)))
     (cond
      (found
-      (unless (sb-kernel:class-pcl-class found)
-	(setf (sb-kernel:class-pcl-class found) class))
-      (aver (eq (sb-kernel:class-pcl-class found) class))
-      (let ((layout (sb-kernel:class-layout found)))
+      (unless (sb-kernel:classoid-pcl-class found)
+	(setf (sb-kernel:classoid-pcl-class found) class))
+      (aver (eq (sb-kernel:classoid-pcl-class found) class))
+      (let ((layout (sb-kernel:classoid-layout found)))
 	(aver layout)
 	layout))
      (t
       (make-wrapper-internal
        :length length
-       :class (sb-kernel:make-standard-class :name name :pcl-class class))))))
+       :classoid (sb-kernel:make-standard-classoid
+		  :name name :pcl-class class))))))
 
 ;;; The following variable may be set to a STANDARD-CLASS that has
 ;;; already been created by the lisp code and which is to be redefined
@@ -294,35 +295,36 @@
 ;;; In SBCL, as in CMU CL, the layouts (a.k.a wrappers) for built-in
 ;;; and structure classes already exist when PCL is initialized, so we
 ;;; don't necessarily always make a wrapper. Also, we help maintain
-;;; the mapping between CL:CLASS and PCL::CLASS objects.
+;;; the mapping between CL:CLASS and SB-KERNEL:CLASSOID objects.
 (defun make-wrapper (length class)
   (cond
    ((typep class 'std-class)
     (make-wrapper-internal
      :length length
-     :class
+     :classoid
      (let ((owrap (class-wrapper class)))
        (cond (owrap
-	      (sb-kernel:layout-class owrap))
+	      (sb-kernel:layout-classoid owrap))
 	     ((*subtypep (class-of class)
 			 *the-class-standard-class*)
 	      (cond ((and *pcl-class-boot*
 			  (eq (slot-value class 'name) *pcl-class-boot*))
-		     (let ((found (cl:find-class (slot-value class 'name))))
-		       (unless (sb-kernel:class-pcl-class found)
-			 (setf (sb-kernel:class-pcl-class found) class))
-		       (aver (eq (sb-kernel:class-pcl-class found) class))
+		     (let ((found (sb-kernel:find-classoid
+				   (slot-value class 'name))))
+		       (unless (sb-kernel:classoid-pcl-class found)
+			 (setf (sb-kernel:classoid-pcl-class found) class))
+		       (aver (eq (sb-kernel:classoid-pcl-class found) class))
 		       found))
 		    (t
-		     (sb-kernel:make-standard-class :pcl-class class))))
+		     (sb-kernel:make-standard-classoid :pcl-class class))))
 	     (t
-	      (sb-kernel:make-random-pcl-class :pcl-class class))))))
+	      (sb-kernel:make-random-pcl-classoid :pcl-class class))))))
    (t
-    (let* ((found (cl:find-class (slot-value class 'name)))
-	   (layout (sb-kernel:class-layout found)))
-      (unless (sb-kernel:class-pcl-class found)
-	(setf (sb-kernel:class-pcl-class found) class))
-      (aver (eq (sb-kernel:class-pcl-class found) class))
+    (let* ((found (sb-kernel:find-classoid (slot-value class 'name)))
+	   (layout (sb-kernel:classoid-layout found)))
+      (unless (sb-kernel:classoid-pcl-class found)
+	(setf (sb-kernel:classoid-pcl-class found) class))
+      (aver (eq (sb-kernel:classoid-pcl-class found) class))
       (aver layout)
       layout))))
 
@@ -356,7 +358,7 @@
 (defun wrapper-class* (wrapper)
   (or (wrapper-class wrapper)
       (find-structure-class
-       (cl:class-name (sb-kernel:layout-class wrapper)))))
+       (sb-kernel:classoid-name (sb-kernel:layout-classoid wrapper)))))
 
 ;;; The wrapper cache machinery provides general mechanism for
 ;;; trapping on the next access to any instance of a given class. This

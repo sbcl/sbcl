@@ -390,7 +390,7 @@
 
 (defun %default-structure-pretty-print (structure stream)
   (let* ((layout (%instance-layout structure))
-	 (name (class-name (layout-class layout)))
+	 (name (classoid-name (layout-classoid layout)))
 	 (dd (layout-info layout)))
     (pprint-logical-block (stream nil :prefix "#S(" :suffix ")")
       (prin1 name stream)
@@ -416,7 +416,7 @@
 	     (pprint-newline :linear stream))))))))
 (defun %default-structure-ugly-print (structure stream)
   (let* ((layout (%instance-layout structure))
-	 (name (class-name (layout-class layout)))
+	 (name (classoid-name (layout-classoid layout)))
 	 (dd (layout-info layout)))
     (descend-into (stream)
       (write-string "#S(" stream)
@@ -490,7 +490,7 @@
 	       ((layout-invalid obj-layout)
 		(/noshow0 "LAYOUT-INVALID case")
 		(error 'layout-invalid
-		       :expected-type (layout-class obj-layout)
+		       :expected-type (layout-classoid obj-layout)
 		       :datum obj))
 	       (t
 		(let ((depthoid (layout-depthoid layout)))
@@ -552,7 +552,7 @@
   (unless (typep-to-layout x layout)
     (error 'type-error
 	   :datum x
-	   :expected-type (class-name (layout-class layout))))
+	   :expected-type (classoid-name (layout-classoid layout))))
   (values))
 
 (/show0 "target-defstruct.lisp end of file")

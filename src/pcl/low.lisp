@@ -83,8 +83,8 @@
   :slot-names (clos-slots name hash-code)
   :boa-constructor %make-pcl-funcallable-instance
   :superclass-name sb-kernel:funcallable-instance
-  :metaclass-name sb-kernel:random-pcl-class
-  :metaclass-constructor sb-kernel:make-random-pcl-class
+  :metaclass-name sb-kernel:random-pcl-classoid
+  :metaclass-constructor sb-kernel:make-random-pcl-classoid
   :dd-type sb-kernel:funcallable-structure
   ;; Only internal implementation code will access these, and these
   ;; accesses (slot readers in particular) could easily be a
@@ -257,8 +257,8 @@
   :slot-names (slots hash-code)
   :boa-constructor %make-standard-instance
   :superclass-name sb-kernel:instance
-  :metaclass-name cl:standard-class
-  :metaclass-constructor sb-kernel:make-standard-class
+  :metaclass-name sb-kernel:standard-classoid
+  :metaclass-constructor sb-kernel:make-standard-classoid
   :dd-type structure
   :runtime-type-checks-p nil)
 
@@ -328,7 +328,8 @@
 ;;; The definition of STRUCTURE-TYPE-P was moved to early-low.lisp.
 
 (defun get-structure-dd (type)
-  (sb-kernel:layout-info (sb-kernel:class-layout (cl:find-class type))))
+  (sb-kernel:layout-info (sb-kernel:classoid-layout
+			  (sb-kernel:find-classoid type))))
 
 (defun structure-type-included-type-name (type)
   (let ((include (sb-kernel::dd-include (get-structure-dd type))))

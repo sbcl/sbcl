@@ -21,8 +21,8 @@
 
 (/show0 "condition.lisp 24")
 
-(def!struct (condition-class (:include slot-class)
-			     (:constructor bare-make-condition-class))
+(def!struct (condition-classoid (:include slot-classoid)
+				(:constructor make-condition-classoid))
   ;; list of CONDITION-SLOT structures for the direct slots of this
   ;; class
   (slots nil :type list)
@@ -44,20 +44,14 @@
 
 (/show0 "condition.lisp 49")
 
-(defun make-condition-class (&rest rest)
-  (apply #'bare-make-condition-class
-	 (rename-key-args '((:name :%name)) rest)))
-
-(/show0 "condition.lisp 53")
-
 ) ; EVAL-WHEN
 
 (!defstruct-with-alternate-metaclass condition
   :slot-names (actual-initargs assigned-slots)
   :boa-constructor %make-condition-object
   :superclass-name instance
-  :metaclass-name condition-class
-  :metaclass-constructor make-condition-class
+  :metaclass-name condition-classoid
+  :metaclass-constructor make-condition-classoid
   :dd-type structure)
 
 (defun make-condition-object (actual-initargs)
@@ -88,25 +82,29 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (/show0 "condition.lisp 103")
   (let ((condition-class (locally
-			   ;; KLUDGE: There's a DEFTRANSFORM FIND-CLASS for
-			   ;; constant class names which creates fast but
-			   ;; non-cold-loadable, non-compact code. In this
-			   ;; context, we'd rather have compact, cold-loadable
-			   ;; code. -- WHN 19990928
-			   (declare (notinline sb!xc:find-class))
-			   (sb!xc:find-class 'condition))))
-    (setf (condition-class-cpl condition-class)
+			   ;; KLUDGE: There's a DEFTRANSFORM
+			   ;; FIND-CLASSOID for constant class names
+			   ;; which creates fast but
+			   ;; non-cold-loadable, non-compact code. In
+			   ;; this context, we'd rather have compact,
+			   ;; cold-loadable code. -- WHN 19990928
+			   (declare (notinline find-classoid))
+			   (find-classoid 'condition))))
+    (setf (condition-classoid-cpl condition-class)
 	  (list condition-class)))
   (/show0 "condition.lisp 103"))
 
-(setf (condition-class-report (locally
-				;; KLUDGE: There's a DEFTRANSFORM FIND-CLASS 
-				;; for constant class names which creates fast
-				;; but non-cold-loadable, non-compact code. In
-				;; this context, we'd rather have compact,
-				;; cold-loadable code. -- WHN 19990928
-				(declare (notinline sb!xc:find-class))
-				(find-class 'condition)))
+(setf (condition-classoid-report (locally
+				   ;; KLUDGE: There's a DEFTRANSFORM
+				   ;; FIND-CLASSOID for constant class
+				   ;; names which creates fast but
+				   ;; non-cold-loadable, non-compact
+				   ;; code. In this context, we'd
+				   ;; rather have compact,
+				   ;; cold-loadable code. -- WHN
+				   ;; 19990928
+				   (declare (notinline find-classoid))
+				   (find-classoid 'condition)))
       (lambda (cond stream)
 	(format stream "Condition ~S was signalled." (type-of cond))))
 
@@ -117,8 +115,8 @@
 	       (reverse
 		(reduce #'append
 			(mapcar (lambda (x)
-				  (condition-class-cpl
-				   (sb!xc:find-class x)))
+				  (condition-classoid-cpl
+				   (find-classoid x)))
 				parent-types)))))
 	 (cond-layout (info :type :compiler-layout 'condition))
 	 (olayout (info :type :compiler-layout name))
@@ -130,11 +128,11 @@
 	 (new-inherits
 	  (order-layout-inherits (concatenate 'simple-vector
 					      (layout-inherits cond-layout)
-					      (mapcar #'class-layout cpl)))))
+					      (mapcar #'classoid-layout cpl)))))
     (if (and olayout
 	     (not (mismatch (layout-inherits olayout) new-inherits)))
 	olayout
-	(make-layout :class (make-undefined-class name)
+	(make-layout :classoid (make-undefined-classoid name)
 		     :inherits new-inherits
 		     :depthoid -1
 		     :length (layout-length cond-layout)))))
@@ -155,9 +153,9 @@
       ;; KLUDGE: A comment from CMU CL here said
       ;;   7/13/98 BUG? CPL is not sorted and results here depend on order of
       ;;   superclasses in define-condition call!
-      (dolist (class (condition-class-cpl (sb!xc:class-of x))
+      (dolist (class (condition-classoid-cpl (classoid-of x))
 		     (error "no REPORT? shouldn't happen!"))
-	(let ((report (condition-class-report class)))
+	(let ((report (condition-classoid-report class)))
 	  (when report
 	    (return (funcall report x stream)))))))
 
@@ -167,9 +165,9 @@
 
 (defun find-slot-default (class slot)
   (let ((initargs (condition-slot-initargs slot))
-	(cpl (condition-class-cpl class)))
+	(cpl (condition-classoid-cpl class)))
     (dolist (class cpl)
-      (let ((default-initargs (condition-class-default-initargs class)))
+      (let ((default-initargs (condition-classoid-default-initargs class)))
 	(dolist (initarg initargs)
 	  (let ((val (getf default-initargs initarg *empty-condition-slot*)))
 	    (unless (eq val *empty-condition-slot*)
@@ -187,24 +185,24 @@
 
 (defun find-condition-class-slot (condition-class slot-name)
   (dolist (sclass
-	   (condition-class-cpl condition-class)
+	   (condition-classoid-cpl condition-class)
 	   (error "There is no slot named ~S in ~S."
 		  slot-name condition-class))
-    (dolist (slot (condition-class-slots sclass))
+    (dolist (slot (condition-classoid-slots sclass))
       (when (eq (condition-slot-name slot) slot-name)
 	(return-from find-condition-class-slot slot)))))
 
 (defun condition-writer-function (condition new-value name)
-  (dolist (cslot (condition-class-class-slots
-		  (layout-class (%instance-layout condition)))
+  (dolist (cslot (condition-classoid-class-slots
+		  (layout-classoid (%instance-layout condition)))
 		 (setf (getf (condition-assigned-slots condition) name)
 		       new-value))
     (when (eq (condition-slot-name cslot) name)
       (return (setf (car (condition-slot-cell cslot)) new-value)))))
 
 (defun condition-reader-function (condition name)
-  (let ((class (layout-class (%instance-layout condition))))
-    (dolist (cslot (condition-class-class-slots class))
+  (let ((class (layout-classoid (%instance-layout condition))))
+    (dolist (cslot (condition-classoid-class-slots class))
       (when (eq (condition-slot-name cslot) name)
 	(return-from condition-reader-function
 		     (car (condition-slot-cell cslot)))))
@@ -237,11 +235,11 @@
   ;; Note: ANSI specifies no exceptional situations in this function.
   ;; signalling simple-type-error would not be wrong.
   (let* ((thing (if (symbolp thing)
-		    (sb!xc:find-class thing)
+		    (find-classoid thing)
 		    thing))
 	 (class (typecase thing
-		  (condition-class thing)
-		  (class
+		  (condition-classoid thing)
+		  (classoid
 		   (error 'simple-type-error
 			  :datum thing
 			  :expected-type 'condition-class
@@ -254,15 +252,15 @@
 			  :format-control "bad thing for class argument:~%  ~S"
 			  :format-arguments (list thing)))))
 	 (res (make-condition-object args)))
-    (setf (%instance-layout res) (class-layout class))
+    (setf (%instance-layout res) (classoid-layout class))
     ;; Set any class slots with initargs present in this call.
-    (dolist (cslot (condition-class-class-slots class))
+    (dolist (cslot (condition-classoid-class-slots class))
       (dolist (initarg (condition-slot-initargs cslot))
 	(let ((val (getf args initarg *empty-condition-slot*)))
 	  (unless (eq val *empty-condition-slot*)
 	    (setf (car (condition-slot-cell cslot)) val)))))
     ;; Default any slots with non-constant defaults now.
-    (dolist (hslot (condition-class-hairy-slots class))
+    (dolist (hslot (condition-classoid-hairy-slots class))
       (when (dolist (initarg (condition-slot-initargs hslot) t)
 	      (unless (eq (getf args initarg *empty-condition-slot*)
 			  *empty-condition-slot*)
@@ -277,16 +275,18 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun %compiler-define-condition (name direct-supers layout)
   (multiple-value-bind (class old-layout)
-      (insured-find-class name #'condition-class-p #'make-condition-class)
-    (setf (layout-class layout) class)
-    (setf (class-direct-superclasses class)
-	  (mapcar #'sb!xc:find-class direct-supers))
+      (insured-find-classoid name
+			     #'condition-classoid-p
+			     #'make-condition-classoid)
+    (setf (layout-classoid layout) class)
+    (setf (classoid-direct-superclasses class)
+	  (mapcar #'find-classoid direct-supers))
     (cond ((not old-layout)
 	   (register-layout layout))
 	  ((not *type-system-initialized*)
-	   (setf (layout-class old-layout) class)
+	   (setf (layout-classoid old-layout) class)
 	   (setq layout old-layout)
-	   (unless (eq (class-layout class) layout)
+	   (unless (eq (classoid-layout class) layout)
 	     (register-layout layout)))
 	  ((redefine-layout-warning "current"
 				    old-layout
@@ -295,7 +295,7 @@
 				    (layout-inherits layout)
 				    (layout-depthoid layout))
 	   (register-layout layout :invalidate t))
-	  ((not (class-layout class))
+	  ((not (classoid-layout class))
 	   (register-layout layout)))
 
     (setf (layout-info layout)
@@ -304,14 +304,14 @@
 	    ;; names which creates fast but non-cold-loadable, non-compact
 	    ;; code. In this context, we'd rather have compact, cold-loadable
 	    ;; code. -- WHN 19990928
-	    (declare (notinline sb!xc:find-class))
-	    (layout-info (class-layout (sb!xc:find-class 'condition)))))
+	    (declare (notinline find-classoid))
+	    (layout-info (classoid-layout (find-classoid 'condition)))))
 
-    (setf (sb!xc:find-class name) class)
+    (setf (find-classoid name) class)
 
     ;; Initialize CPL slot.
-    (setf (condition-class-cpl class)
-	  (remove-if-not #'condition-class-p 
+    (setf (condition-classoid-cpl class)
+	  (remove-if-not #'condition-classoid-p 
 			 (std-compute-class-precedence-list class))))
   (values))
 
@@ -326,9 +326,9 @@
 ;;; and documenting it here would be good. (Or, if this is not in fact
 ;;; ANSI-compliant, fixing it would also be good.:-)
 (defun compute-effective-slots (class)
-  (collect ((res (copy-list (condition-class-slots class))))
-    (dolist (sclass (condition-class-cpl class))
-      (dolist (sslot (condition-class-slots sclass))
+  (collect ((res (copy-list (condition-classoid-slots class))))
+    (dolist (sclass (condition-classoid-cpl class))
+      (dolist (sslot (condition-classoid-slots sclass))
 	(let ((found (find (condition-slot-name sslot) (res))))
 	  (cond (found
 		 (setf (condition-slot-initargs found)
@@ -347,10 +347,10 @@
     (res)))
 
 (defun %define-condition (name slots documentation report default-initargs)
-  (let ((class (sb!xc:find-class name)))
-    (setf (condition-class-slots class) slots)
-    (setf (condition-class-report class) report)
-    (setf (condition-class-default-initargs class) default-initargs)
+  (let ((class (find-classoid name)))
+    (setf (condition-classoid-slots class) slots)
+    (setf (condition-classoid-report class) report)
+    (setf (condition-classoid-default-initargs class) default-initargs)
     (setf (fdocumentation name 'type) documentation)
 
     (dolist (slot slots)
@@ -371,8 +371,8 @@
     (let ((eslots (compute-effective-slots class))
 	  (e-def-initargs
 	   (reduce #'append
-		   (mapcar #'condition-class-default-initargs
-			   (condition-class-cpl class)))))
+		   (mapcar #'condition-classoid-default-initargs
+			   (condition-classoid-cpl class)))))
       (dolist (slot eslots)
 	(ecase (condition-slot-allocation slot)
 	  (:class
@@ -384,14 +384,14 @@
 				   (funcall initform)
 				   initform))
 			     *empty-condition-slot*))))
-	   (push slot (condition-class-class-slots class)))
+	   (push slot (condition-classoid-class-slots class)))
 	  ((:instance nil)
 	   (setf (condition-slot-allocation slot) :instance)
 	   (when (or (functionp (condition-slot-initform slot))
 		     (dolist (initarg (condition-slot-initargs slot) nil)
 		       (when (functionp (getf e-def-initargs initarg))
 			 (return t))))
-	     (push slot (condition-class-hairy-slots class))))))))
+	     (push slot (condition-classoid-hairy-slots class))))))))
   name)
 
 (defmacro define-condition (name (&rest parent-types) (&rest slot-specs)

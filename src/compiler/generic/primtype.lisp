@@ -366,11 +366,11 @@
 	 (ecase (named-type-name type)
 	   ((t *) (values *backend-t-primitive-type* t))
 	   ((nil) (any))))
-	(sb!xc:built-in-class
-	 (case (sb!xc:class-name type)
+	(built-in-classoid
+	 (case (classoid-name type)
 	   ((complex function instance
 	     system-area-pointer weak-pointer)
-	    (values (primitive-type-or-lose (sb!xc:class-name type)) t))
+	    (values (primitive-type-or-lose (classoid-name type)) t))
 	   (funcallable-instance
 	    (part-of function))
 	   (base-char
@@ -381,7 +381,7 @@
 	    (any))))
 	(fun-type
 	 (exactly function))
-	(sb!xc:class
+	(classoid
 	 (if (csubtypep type (specifier-type 'function))
 	     (part-of function)
 	     (part-of instance)))

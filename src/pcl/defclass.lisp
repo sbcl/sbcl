@@ -72,11 +72,7 @@
 	      (error "The value of the :metaclass option (~S) is not a~%~
 		      legal class name."
 		     (cadr option)))
-	    (setq metaclass
-                    (case (cadr option)
-                      (cl:standard-class 'standard-class)
-                      (cl:structure-class 'structure-class)
-                      (t (cadr option))))
+	    (setq metaclass (cadr option))
 	    (setf options (remove option options))
 	    (return t))))
 
