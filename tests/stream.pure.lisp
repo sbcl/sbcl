@@ -91,17 +91,133 @@
 ;;; Ideas?
 #+nil (assert (eq (interactive-stream-p *terminal-io*) t))
 
-;;; FILE-POSITION on string-input-streams should work, even with
-;;; :START or :END new positions.
-(let ((stream (make-string-input-stream "abc")))
+;;; MAKE-STRING-INPUT-STREAM
+;;;
+;;; * Observe FILE-POSITION :START and :END, and allow setting of
+;;;   FILE-POSITION beyond the end of string, signalling END-OF-FILE only
+;;;   on read.
+(let* ((string (copy-seq "abc"))
+       (stream (make-string-input-stream string)))
   (assert (char= (read-char stream) #\a))
-  (assert (= (file-position stream) 1))
-  (assert (file-position stream 0))
-  (assert (char= (read-char stream) #\a))
+  (assert (= 1 (file-position stream)))
   (assert (file-position stream :start))
-  (assert (char= (read-char stream) #\a))
+  (assert (= 0 (file-position stream)))
   (assert (file-position stream :end))
-  (assert (eq (read-char stream nil 'foo) 'foo)))
+  (assert (= (length string) (file-position stream)))
+  (assert (file-position stream (1- (file-position stream))))
+  (assert (char= (read-char stream) #\c))
+  (assert (file-position stream (1- (file-position stream))))
+  (assert (char= (read-char stream) #\c))
+  (assert (file-position stream :end))
+  (let ((eof (cons nil nil)))
+    (assert (eq (read-char stream nil eof) eof)))
+  (assert (file-position stream 10))
+  (multiple-value-bind (val cond) (ignore-errors (file-position stream -1))
+    (assert (null val))
+    (assert (typep cond 'error)))
+  (multiple-value-bind (val cond) (ignore-errors (read-char stream))
+    (assert (null val))
+    (assert (typep cond 'end-of-file))))
+
+;;; MAKE-STRING-OUTPUT-STREAM
+;;;
+;;; * Observe FILE-POSITION :START and :END, and allow setting of
+;;;   FILE-POSITION to an arbitrary index. 
+;;;
+;;; * END will always refer to the farthest position of stream so-far
+;;;   seen, and setting FILE-POSITION beyond the current END will extend
+;;;   the string/stream with uninitialized elements. 
+;;;
+;;; * Rewinding the stream works with overwriting semantics.
+;;;
+(let ((stream (make-string-output-stream)))
+  (princ "abcd" stream)
+  (assert (= 4 (file-position stream)))
+  (assert (file-position stream :start))
+  (assert (= 0 (file-position stream)))
+  (princ "0" stream)
+  (assert (= 1 (file-position stream)))
+  (file-position stream 2)
+  (assert (= 2 (file-position stream)))
+  (princ "2" stream)
+  (assert (file-position stream :end))
+  (assert (= 4 (file-position stream)))
+  (assert (file-position stream 6))
+  (assert (file-position stream 4))
+  (assert (file-position stream :end))
+  (assert (= 6 (file-position stream)))
+  (assert (file-position stream 4))
+  (multiple-value-bind (val cond) (ignore-errors (file-position stream -1))
+    (assert (null val))
+    (assert (typep cond 'error)))
+  (princ "!!" stream)
+  (assert (equal "0b2d!!" (get-output-stream-string stream))))
+
+;;; WITH-OUTPUT-TO-STRING (when provided with a string argument)
+;;;
+;;; * Observe FILE-POSITION :START and :END, and allow setting of
+;;; FILE-POSITION to an arbitrary index. If the new position is beyond
+;;; the end of string and the string is adjustable the string will be
+;;; implicitly extended, otherwise an error will be signalled. The
+;;; latter case is provided for in the code, but not currently
+;;; excercised since SBCL fill-pointer arrays are always (currently) adjustable.
+;;;
+;;; * END will refer to the ARRAY-TOTAL-SIZE of string, not
+;;; FILL-POINTER, since by definition the FILE-POSITION will always be
+;;; a FILL-POINTER, so that would be of limited use.
+;;;
+;;; * Rewinding the stream works with owerwriting semantics.
+;;;
+#+nil (let ((str (make-array 0
+		       :element-type 'character
+		       :adjustable nil
+		       :fill-pointer t)))
+  (with-output-to-string (stream str)
+    (princ "abcd" stream)
+    (assert (= 4 (file-position stream)))
+    (assert (file-position stream :start))
+    (assert (= 0 (file-position stream)))
+    (princ "0" stream)
+    (assert (= 1 (file-position stream)))
+    (file-position stream 2)
+    (assert (= 2 (file-position stream)))
+    (princ "2" stream)
+    (assert (file-position stream :end))
+    (assert (= 4 (file-position stream)))
+    (multiple-value-bind (val cond) (ignore-errors (file-position stream -1))
+      (assert (null val))
+      (assert (typep cond 'error)))
+    (multiple-value-bind (val cond) (ignore-errors (file-position stream 6))
+      (assert (null val))
+      (assert (typep cond 'error)))
+    (assert (equal "0b2d" str))))
+
+(let ((str (make-array 0
+		       :element-type 'character
+		       :adjustable nil
+		       :fill-pointer t)))
+  (with-output-to-string (stream str)
+    (princ "abcd" stream)
+    (assert (= 4 (file-position stream)))
+    (assert (file-position stream :start))
+    (assert (= 0 (file-position stream)))
+    (princ "0" stream)
+    (assert (= 1 (file-position stream)))
+    (file-position stream 2)
+    (assert (= 2 (file-position stream)))
+    (princ "2" stream)
+    (assert (file-position stream :end))
+    (assert (= 4 (file-position stream)))
+    (assert (file-position stream 6))
+    (assert (file-position stream 4))
+    (assert (file-position stream :end))
+    (assert (= 6 (file-position stream)))
+    (assert (file-position stream 4))
+    (multiple-value-bind (val cond) (ignore-errors (file-position stream -1))
+      (assert (null val))
+      (assert (typep cond 'error)))
+    (princ "!!" stream)
+    (assert (equal "0b2d!!" str))))
 
 ;;; MAKE-STRING-OUTPUT-STREAM and WITH-OUTPUT-TO-STRING take an
 ;;; :ELEMENT-TYPE keyword argument

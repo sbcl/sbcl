@@ -1088,35 +1088,32 @@
 		       (bin #'string-binch)
 		       (n-bin #'string-stream-read-n-bytes)
 		       (misc #'string-in-misc)
-                       (string (missing-arg)
-			       :type (simple-array character (*))))
+                       (string (missing-arg) :type simple-string))
 	     (:constructor internal-make-string-input-stream
 			   (string current end))
 	     (:copier nil))
-  (current nil :type index)
-  (end nil :type index))
+  (current (missing-arg) :type index)
+  (end (missing-arg) :type index))
 
 (defun string-inch (stream eof-error-p eof-value)
+  (declare (type string-input-stream stream))
   (let ((string (string-input-stream-string stream))
 	(index (string-input-stream-current stream)))
-    (declare (type (simple-array character (*)) string)
-	     (type fixnum index))
-    (cond ((= index (the index (string-input-stream-end stream)))
+    (cond ((>= index (the index (string-input-stream-end stream)))
 	   (eof-or-lose stream eof-error-p eof-value))
 	  (t
 	   (setf (string-input-stream-current stream) (1+ index))
-	   (aref string index)))))
+	   (char string index)))))
 
 (defun string-binch (stream eof-error-p eof-value)
+  (declare (type string-input-stream stream))
   (let ((string (string-input-stream-string stream))
 	(index (string-input-stream-current stream)))
-    (declare (type (simple-array character (*)) string)
-	     (type index index))
-    (cond ((= index (the index (string-input-stream-end stream)))
+    (cond ((>= index (the index (string-input-stream-end stream)))
 	   (eof-or-lose stream eof-error-p eof-value))
 	  (t
 	   (setf (string-input-stream-current stream) (1+ index))
-	   (char-code (aref string index))))))
+	   (char-code (char string index))))))
 
 (defun string-stream-read-n-bytes (stream buffer start requested eof-error-p)
   (declare (type string-input-stream stream)
@@ -1125,8 +1122,7 @@
 	 (index (string-input-stream-current stream))
 	 (available (- (string-input-stream-end stream) index))
 	 (copy (min available requested)))
-    (declare (type (simple-array character (*)) string)
-	     (type index index available copy))
+    (declare (type simple-string string))
     (when (plusp copy)
       (setf (string-input-stream-current stream)
 	    (truly-the index (+ index copy)))
@@ -1143,7 +1139,8 @@
 	copy)))
 
 (defun string-in-misc (stream operation &optional arg1 arg2)
-  (declare (ignore arg2))
+  (declare (type string-input-stream stream)
+	   (ignore arg2))
   (case operation
     (:file-position
      (if arg1
@@ -1151,28 +1148,34 @@
 	       (case arg1
 		 (:start 0)
 		 (:end (string-input-stream-end stream))
+		 ;; We allow moving position beyond EOF. Errors happen
+		 ;; on read, not move -- or the user may extend the
+		 ;; input string.
 		 (t arg1)))
 	 (string-input-stream-current stream)))
-    (:file-length (length (string-input-stream-string stream)))
+    ;; According to ANSI: "Should signal an error of type type-error
+    ;; if stream is not a stream associated with a file."
+    ;; This is checked by FILE-LENGTH, so no need to do it here either.
+    ;; (:file-length (length (string-input-stream-string stream)))
     (:unread (decf (string-input-stream-current stream)))
-    (:listen (or (/= (the fixnum (string-input-stream-current stream))
-		     (the fixnum (string-input-stream-end stream)))
+    (:listen (or (/= (the index (string-input-stream-current stream))
+		     (the index (string-input-stream-end stream)))
 		 :eof))
-    (:element-type 'base-char)))
+    (:element-type (array-element-type (string-input-stream-string stream)))))
 
-(defun make-string-input-stream (string &optional
-					(start 0) end)
+(defun make-string-input-stream (string &optional (start 0) end)
   #!+sb-doc
   "Return an input stream which will supply the characters of STRING between
   START and END in order."
   (declare (type string string)
 	   (type index start)
 	   (type (or index null) end))
-  
-  (internal-make-string-input-stream
-   (coerce string 'simple-string)
-   start
-   (%check-vector-sequence-bounds string start end)))
+  (let ((end (%check-vector-sequence-bounds string start end)))
+    (with-array-data ((string string) (start start) (end end))
+      (internal-make-string-input-stream
+       string ;; now simple
+       start
+       end))))
 
 ;;;; STRING-OUTPUT-STREAM stuff
 
@@ -1190,6 +1193,8 @@
 	    (:copier nil))
   ;; Index of the next location to use.
   (index 0 :type fixnum)
+  ;; Index cache for string-output-stream-last-index
+  (index-cache 0 :type fixnum)
   ;; Requested element type
   (element-type 'character))
 
@@ -1197,6 +1202,10 @@
 (setf (fdocumentation 'make-string-output-stream 'function)
   "Return an output stream which will accumulate all output given it for
    the benefit of the function GET-OUTPUT-STREAM-STRING.")
+
+(defun string-output-stream-last-index (stream)
+  (max (string-output-stream-index stream)
+       (string-output-stream-index-cache stream)))
 
 (defun string-ouch (stream character)
   (let ((current (string-output-stream-index stream))
@@ -1206,17 +1215,15 @@
     (if (= current (the fixnum (length workspace)))
 	(let ((new-workspace (make-string (* current 2))))
 	  (replace new-workspace workspace)
-	  (setf (aref new-workspace current) character)
-	  (setf (string-output-stream-string stream) new-workspace))
+	  (setf (aref new-workspace current) character
+		(string-output-stream-string stream) new-workspace))
 	(setf (aref workspace current) character))
     (setf (string-output-stream-index stream) (1+ current))))
 
 (defun string-sout (stream string start end)
   (declare (type simple-string string)
 	   (type fixnum start end))
-  (let* ((string (if (typep string '(simple-array character (*)))
-		     string
-		     (coerce string '(simple-array character (*)))))
+  (let* ((string (coerce string '(simple-array character (*))))
 	 (current (string-output-stream-index stream))
 	 (length (- end start))
 	 (dst-end (+ length current))
@@ -1239,7 +1246,25 @@
   (declare (ignore arg2))
   (case operation
     (:file-position
-     (if (null arg1)
+     (if arg1
+	 (let ((end (string-output-stream-last-index stream)))
+	   (setf (string-output-stream-index-cache stream) end
+		 (string-output-stream-index stream)
+		 (case arg1
+		   (:start 0)
+		   (:end end)
+		   (t
+		    ;; We allow moving beyond the end of stream,
+		    ;; implicitly extending the output stream.
+		    (let ((buffer (string-output-stream-string stream)))
+		      (when (> arg1 (length buffer))
+			(setf (string-output-stream-string stream)
+			      (make-string
+			       arg1 :element-type (array-element-type buffer))
+			      (subseq (string-output-stream-string stream)
+				      0 end)
+			      (subseq buffer 0 end))))
+		      arg1))))
 	 (string-output-stream-index stream)))
     (:charpos
      (do ((index (1- (the fixnum (string-output-stream-index stream)))
@@ -1251,13 +1276,13 @@
 		(type fixnum index count))
        (if (char= (schar string index) #\newline)
 	   (return count))))
-    (:element-type 'base-char)))
+    (:element-type (array-element-type (string-output-stream-string stream)))))
 
 ;;; Return a string of all the characters sent to a stream made by
 ;;; MAKE-STRING-OUTPUT-STREAM since the last call to this function.
 (defun get-output-stream-string (stream)
   (declare (type string-output-stream stream))
-  (let* ((length (string-output-stream-index stream))
+  (let* ((length (string-output-stream-last-index stream))
 	 (element-type (string-output-stream-element-type stream))
 	 (result 
 	  (case element-type
@@ -1271,7 +1296,8 @@
        (replace result (string-output-stream-string stream)))
       ((simple-array nil (*))
        (replace result (string-output-stream-string stream))))
-    (setf (string-output-stream-index stream) 0)
+    (setf (string-output-stream-index stream) 0
+	  (string-output-stream-index-cache stream) 0)
     result))
 
 ;;; Dump the characters buffer up in IN-STREAM to OUT-STREAM as
@@ -1280,8 +1306,9 @@
   (%write-string (string-output-stream-string in-stream)
 		 out-stream
 		 0
-		 (string-output-stream-index in-stream))
-  (setf (string-output-stream-index in-stream) 0))
+		 (string-output-stream-last-index in-stream))
+  (setf (string-output-stream-index in-stream) 0
+	(string-output-stream-index-cache in-stream) 0))
 
 ;;;; fill-pointer streams
 
@@ -1300,7 +1327,7 @@
 		      (misc #'fill-pointer-misc)
                       ;; a string with a fill pointer where we stuff
                       ;; the stuff we write
-                      (string (error "missing argument")
+                      (string (missing-arg)
                               :type string-with-fill-pointer
                               :read-only t))
 	    (:constructor make-fill-pointer-output-stream (string))
@@ -1321,8 +1348,8 @@
 	      (declare (simple-string new-workspace))
 	      (%byte-blt workspace start
 			 new-workspace 0 current)
-	      (setf workspace new-workspace)
-	      (setf offset-current current)
+	      (setf workspace new-workspace
+		    offset-current current)
 	      (set-array-header buffer workspace new-length
 				current+1 0 new-length nil))
 	    (setf (fill-pointer buffer) current+1))
@@ -1368,6 +1395,25 @@
 (defun fill-pointer-misc (stream operation &optional arg1 arg2)
   (declare (ignore arg1 arg2))
   (case operation
+    (:file-position
+     (let ((buffer (fill-pointer-output-stream-string stream)))
+       (if arg1
+	   (setf (fill-pointer buffer)
+		 (case arg1
+		   (:start 0)
+		   ;; Fill-pointer is always at fill-pointer we will
+		   ;; make :END move to the end of the actual string.
+		   (:end (array-total-size buffer))
+		   ;; We allow moving beyond the end of string if the
+		   ;; string is adjustable.
+		   (t (when (>= arg1 (array-total-size buffer))
+			(if (adjustable-array-p buffer)
+			    (adjust-array buffer arg1)
+			    (error "Cannot move FILE-POSITION beyond the end ~
+                                    of WITH-OUTPUT-TO-STRING stream ~
+                                    constructed with non-adjustable string.")))
+		      arg1)))
+	   (fill-pointer buffer))))
     (:charpos
      (let* ((buffer (fill-pointer-output-stream-string stream))
 	    (current (fill-pointer buffer)))
@@ -1378,7 +1424,8 @@
 	   (if found
 	       (- end (the fixnum found))
 	       current)))))
-     (:element-type 'base-char)))
+     (:element-type (array-element-type
+		     (fill-pointer-output-stream-string stream)))))
 
 ;;;; indenting streams
 

@@ -2058,6 +2058,8 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     argument now works properly on the Alpha platform.
   * bug fix: floating point exception treatment on the Alpha platform
     is improved.
+  * bug fix: FILE-POSITION works much better on string input and output
+    streams.  (thanks to Nikodemus Siivola)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the RETURN clause in LOOP is now equivalent to DO (RETURN ...).
     ** ROUND and FROUND now give the right answer when given very
