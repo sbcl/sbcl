@@ -26,6 +26,9 @@ changes in sbcl-0.8.15 relative to sbcl-0.8.14:
   * on x86 compiler supports stack allocation of results of LIST and
     LIST*, bound to variables, declared DYNAMIC-EXTENT. (based on
     CMUCL implementation by Gerd Moellmann)
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** FORMAT strings with both the ~<~:;~> form of the justification
+       directive and pretty-printing directives cause an error.
 
 changes in sbcl-0.8.14 relative to sbcl-0.8.13:
   * incompatible change: the internal functions

@@ -251,5 +251,20 @@
 ;;; iteration, even if one argument is just a one-element list.
 (assert (string= (format nil "~:{~A~^~}" '((A) (C D))) "AC"))
 
+;;; errors should be raised if pprint and justification are mixed
+;;; injudiciously...
+(dolist (x (list "~<~:;~>~_" "~<~:;~>~I" "~<~:;~>~W"
+                 "~<~:;~>~:T" "~<~:;~>~<~:>" "~_~<~:;~>"
+                 "~I~<~:;~>" "~W~<~:;~>" "~:T~<~:;~>" "~<~:>~<~:;~>"))
+  (assert (raises-error? (format nil x nil)))
+  (assert (raises-error? (format nil (eval `(formatter ,x)) nil))))
+;;; ...but not in judicious cases.
+(dolist (x (list "~<~;~>~_" "~<~;~>~I" "~<~;~>~W"
+                 "~<~;~>~:T" "~<~;~>~<~>" "~_~<~;~>"
+                 "~I~<~;~>" "~W~<~;~>" "~:T~<~;~>" "~<~>~<~;~>"
+                 "~<~:;~>~T" "~T~<~:;~>"))
+  (assert (format nil x nil))
+  (assert (format nil (eval `(formatter ,x)) nil)))
+
 ;;; success
 (quit :unix-status 104)

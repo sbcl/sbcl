@@ -17,19 +17,22 @@
 		   :initform *default-format-error-control-string*)
    (offset :reader format-error-offset :initarg :offset
 	   :initform *default-format-error-offset*)
+   (second-relative :reader format-error-second-relative
+                    :initarg :second-relative :initform nil)
    (print-banner :reader format-error-print-banner :initarg :print-banner
 		 :initform t))
   (:report %print-format-error))
 
 (defun %print-format-error (condition stream)
   (format stream
-	  "~:[~;error in format: ~]~
-		 ~?~@[~%  ~A~%  ~V@T^~]"
+	  "~:[~*~;error in ~S: ~]~?~@[~%  ~A~%  ~V@T^~@[~V@T^~]~]"
 	  (format-error-print-banner condition)
+          'format
 	  (format-error-complaint condition)
 	  (format-error-args condition)
 	  (format-error-control-string condition)
-	  (format-error-offset condition)))
+	  (format-error-offset condition)
+          (format-error-second-relative condition)))
 
 (def!struct format-directive
   (string (missing-arg) :type simple-string)
@@ -52,16 +55,58 @@
   (declare (simple-string string))
   (let ((index 0)
 	(end (length string))
-	(result nil))
+	(result nil)
+        ;; FIXME: consider rewriting this 22.3.5.2-related processing
+        ;; using specials to maintain state and doing the logic inside
+        ;; the directive expanders themselves.
+        (block)
+        (pprint)
+        (semicolon)
+        (justification-semicolon))
     (loop
       (let ((next-directive (or (position #\~ string :start index) end)))
 	(when (> next-directive index)
 	  (push (subseq string index next-directive) result))
 	(when (= next-directive end)
 	  (return))
-	(let ((directive (parse-directive string next-directive)))
+	(let* ((directive (parse-directive string next-directive))
+               (char (format-directive-character directive)))
+          ;; this processing is required by CLHS 22.3.5.2
+          (cond
+            ((char= char #\<) (push directive block))
+            ((and block (char= char #\;) (format-directive-colonp directive))
+             (setf semicolon directive))
+            ((char= char #\>)
+             (aver block)
+             (cond
+               ((format-directive-colonp directive)
+                (unless pprint
+                  (setf pprint (car block)))
+                (setf semicolon nil))
+               (semicolon
+                (unless justification-semicolon
+                  (setf justification-semicolon semicolon))))
+             (pop block))
+            ;; block cases are handled by the #\< expander/interpreter
+            ((not block)
+             (case char
+               ((#\W #\I #\_) (unless pprint (setf pprint directive)))
+               (#\T (when (and (format-directive-colonp directive)
+                               (not pprint))
+                      (setf pprint directive))))))
 	  (push directive result)
 	  (setf index (format-directive-end directive)))))
+    (when (and pprint justification-semicolon)
+      (let ((pprint-offset (1- (format-directive-end pprint)))
+            (justification-offset
+             (1- (format-directive-end justification-semicolon))))
+        (error 'format-error
+               :complaint "misuse of justification and pprint directives"
+               :control-string string
+               :offset (min pprint-offset justification-offset)
+               :second-relative (- (max pprint-offset justification-offset)
+                                   (min pprint-offset justification-offset)
+                                   1))))
     (nreverse result)))
 
 (defun parse-directive (string start)
@@ -70,7 +115,7 @@
     (flet ((get-char ()
 	     (if (= posn end)
 		 (error 'format-error
-			:complaint "String ended before directive was found."
+			:complaint "string ended before directive was found"
 			:control-string string
 			:offset start)
 		 (schar string posn)))
