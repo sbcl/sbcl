@@ -416,6 +416,12 @@
 
 ;;; FIXME: should probably do the same tests on DEFSTRUCT :TYPE
 
+;;; As noted by Paul Dietz for CMUCL, :CONC-NAME handling was a little
+;;; too fragile:
+(defstruct (conc-name-syntax :conc-name) a-conc-name-slot)
+(assert (eq (a-conc-name-slot (make-conc-name-syntax :a-conc-name-slot 'y))
+	    'y))
+
 ;;; success
 (format t "~&/returning success~%")
 (quit :unix-status 104)

@@ -485,7 +485,7 @@
 	(name (dd-name dd)))
     (case (first option)
       (:conc-name
-       (destructuring-bind (conc-name) args
+       (destructuring-bind (&optional conc-name) args
 	 (setf (dd-conc-name dd)
 	       (if (symbolp conc-name)
 		   conc-name

@@ -1454,6 +1454,8 @@ changes in sbcl-0.7.11 relative to sbcl-0.7.10:
     ** IT is only a special loop symbol within the first clause of a
        conditional loop clause;
     ** FILE-STREAM now names the class previously known as FD-STREAM;
+    ** in DEFSTRUCT, a bare :CONC-NAME (or a :CONC-NAME with no
+       argument) no longer signals an error;
   * incremented fasl file version number, because of the incompatible
     change to the DEFSTRUCT-DESCRIPTION structure, and again because
     of the new implementation of DEFINE-COMPILER-MACRO.
