@@ -327,24 +327,29 @@ The commands are:
     (unless (or *skip-address-display*
 		(eq object *inspect-unbound-object-marker*)
 		(characterp object) (typep object 'fixnum))
-      (format stream " at #x~X" (logand
-				 (sb-kernel:get-lisp-obj-address object)
-				 (lognot sb-vm:lowtag-mask)))) 
+      (write-string " at #x" stream)
+      (format stream (n-word-bits-hex-format)
+	      (logand (sb-kernel:get-lisp-obj-address object)
+		      (lognot sb-vm:lowtag-mask))))
     (dotimes (i count)
       (fresh-line stream)
       (display-labeled-element (elt elements i) (elt labels i) stream))))
   
-(defun hex32-label-p (label)
-  (and (consp label) (eq (cdr label) :hex32)))
-
 (defun array-label-p (label)
   (and (consp label)
        (stringp (cdr label))
        (char= (char (cdr label) 0) #\[)))
 
 (defun named-or-array-label-p (label)
+  (and (consp label) (not (hex-label-p label))))
+
+(defun hex-label-p (label &optional width)
   (and (consp label)
-       (not (hex32-label-p label))))
+       (case width
+	     (32 (eq (cdr label) :hex32))
+	     (64 (eq (cdr label) :hex64))
+	     (t (or (eq (cdr label) :hex32)
+		    (eq (cdr label) :hex64))))))
 
 (defun display-labeled-element (element label stream)
   (cond
@@ -360,8 +365,10 @@ The commands are:
 	     (car label)
 	     (format nil "~A " (cdr label))
 	     (inspected-description element)))
-    ((hex32-label-p label)
+    ((hex-label-p label 32)
      (format stream "~4,' D-> #x~8,'0X" (car label) element))
+    ((hex-label-p label 64)
+     (format stream "~4,' D-> #x~16,'0X" (car label) element))
     (t
      (format stream "~4,' D-> ~A" label (inspected-description element)))))
 
@@ -521,7 +528,9 @@ position with the label if the label is a string."
       ((stringp id)
        (cons position id))
       ((eq (parts-seq-type parts) :bignum)
-       (cons position :hex32))
+       (cons position (case sb-vm::n-word-bits 
+			    (32 :hex32)
+			    (64 :hex64))))
       (t
 	id))))
 
@@ -618,6 +627,12 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 	      ((:dotted :cyclic) "+tail")
 	      (:normal "")))))
 
+(defun n-word-bits-hex-format ()
+  (case sb-vm::n-word-bits
+    (64 "~16,'0X")
+    (32 "~8,'0X")
+    (t  "~X")))
+
 (defun ref32-hexstr (obj &optional (offset 0))
   (format nil "~8,'0X" (ref32 obj offset)))
 
@@ -636,20 +651,22 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 		     base " " (apply #'format nil internal-fmt args)))))
 	      
 (defmethod inspected-description ((object double-float))
-  (description-maybe-internals "double-float ~W" (list object)
-			       "[#~A ~A]"
-			       (ref32-hexstr object 12)
-			       (ref32-hexstr object 8)))
+  (let ((start (round (* 2 sb-vm::n-word-bits) 8)))
+    (description-maybe-internals "double-float ~W" (list object)
+				 "[#~A ~A]"
+				 (ref32-hexstr object (+ start 4))
+				 (ref32-hexstr object start))))
 
 (defmethod inspected-description ((object single-float))
   (description-maybe-internals "single-float ~W" (list object)
 			       "[#x~A]"
-			       (ref32-hexstr object 4)))
+			       (ref32-hexstr object (round sb-vm::n-word-bits 8))))
 
 (defmethod inspected-description ((object fixnum))
-  (description-maybe-internals "fixnum ~W" (list object)
-			       "[#x~8,'0X]"
-			       (ash object (1- sb-vm:n-lowtag-bits))))
+  (description-maybe-internals
+   "fixnum ~W" (list object)
+   (concatenate 'string "[#x" (n-word-bits-hex-format) "]")
+   (ash object (1- sb-vm:n-lowtag-bits))))
 
 (defmethod inspected-description ((object complex))
   (format nil "complex number ~W" object))
@@ -658,19 +675,24 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
   (format nil "a simple-string (~W) ~W" (length object) object))
 
 (defun bignum-words (bignum)
-  "Return the number of 32-bit words in a bignum"
+  "Return the number of words in a bignum"
   (ash
-   (logand (ref32 bignum)
-	   (lognot sb-vm:widetag-mask))
+   (logand (ref32 bignum) (lognot sb-vm:widetag-mask))
    (- sb-vm:n-widetag-bits))) 
 
 (defun bignum-component-at (bignum offset)
-  "Return the 32-bit word at 32-bit wide offset"
-  (ref32 bignum (* 4 (1+ offset))))
+  "Return the word at offset"
+  (case sb-vm::n-word-bits
+	(32
+	 (ref32 bignum (* 4 (1+ offset))))
+	(64
+	 (let ((start (* 8 (1+ offset))))
+	   (+ (ref32 bignum start)
+	      (ash (ref32 bignum (+ 4 start)) 32))))))
 
 (defmethod inspected-description ((object bignum))
-  (format nil  "bignum ~W with ~D 32-bit word~:*~P" object
-	  (bignum-words object)))
+  (format nil  "bignum ~W with ~D ~A-bit word~P" object
+	  (bignum-words object)	sb-vm::n-word-bits (bignum-words object)))
 
 (defmethod inspected-description ((object ratio))
   (format nil "ratio ~W" object))
@@ -678,12 +700,12 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 (defmethod inspected-description ((object character))
   ;; FIXME: This will need to change as and when we get more characters
   ;; than just the 256 we have today.
-  (description-maybe-internals "character ~W char-code #x~2,'0X"
-			       (list object (char-code object))
-			       "[#x~8,'0X]"
-			       (logior sb-vm:character-widetag 
-				       (ash (char-code object)
-					    sb-vm:n-widetag-bits))))
+  (description-maybe-internals
+   "character ~W char-code #x~2,'0X"
+   (list object (char-code object))
+   "[#x~8,'0X]"
+   (logior sb-vm:character-widetag (ash (char-code object)
+					sb-vm:n-widetag-bits))))
 
 (defmethod inspected-description ((object t))
   (format nil "a generic object ~W" object))
