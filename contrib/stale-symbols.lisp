@@ -8,6 +8,44 @@
 ;;; * output is not necessarily terribly clear;
 ;;; * takes a long time (several hours on CSR's 300MHz x86 desktop) to
 ;;;   run.
+;;;
+;;; Comment from Eric Marsden:
+;;;
+;;; This file contains code that attempts to identify symbols in a
+;;; CMUCL image that are stale. For example, the package descriptions
+;;; in src/code/package.lisp can get out of sync with the source code,
+;;; leading to symbols that are exported without being used anywhere.
+;;;
+;;; The routines work by walking all the objects allocated in a heap
+;;; image (using the function VM::MAP-ALLOCATED-OBJECTS). For each
+;;; object of type symbol, it scans the entire heap for objects that
+;;; reference that symbol. If it finds no references, or if there is
+;;; only one reference that looks like it is likely from the internals
+;;; of a package-related datastructure, the name of the symbol and its
+;;; package is displayed.
+;;; The "references to that symbol" are found using the function
+;;; VM::LIST-REFERENCING-OBJECTS. Consider for example a function that
+;;; uses the value of a symbol. The code-object for that function
+;;; contains a reference to the symbol, so that a call to SYMBOL-VALUE
+;;; can be made at runtime. The data structures corresponding to a
+;;; package must maintain a list of its exported an imported symbols.
+;;; They contain a hashtable, which contains a vector, which contains
+;;; symbols. So all exported symbols will have at least one referencing
+;;; object: a vector related to some package.
+;;;
+;;; Limitations: these routines will provide a number of false
+;;; positives (symbols that are not actually stale). Throw/catch tags
+;;; are displayed, but are not stale. It displays the names of
+;;; restarts. Worse, it displays the names of CMUCL-internal constants.
+;;; These symbols that name constants are not referenced from anywhere
+;;; expect the package datastructures because the compiler can
+;;; substitute their value wherever they're used in the CMUCL source
+;;; code, without keeping a reference to the symbol hanging around.
+;;; There are also a number of PCL-related symbols that are displayed,
+;;; but probably used internally by PCL.
+;;;
+;;; Moral: the output of these routines must be checked carefully
+;;; before going on a code deletion spree.
 
 (defun print-stale-reference (obj stream)
   (cond ((vectorp obj)
