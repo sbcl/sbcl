@@ -277,13 +277,6 @@ WORKAROUND:
 
 47:
   DEFCLASS bugs reported by Peter Van Eynde July 25, 2000:
-	a: (DEFCLASS FOO () (A B A)) should signal a PROGRAM-ERROR, and
-	   doesn't.
-	b: (DEFCLASS FOO () (A B A) (:DEFAULT-INITARGS X A X B)) should
-	   signal a PROGRAM-ERROR, and doesn't.
-	c: (DEFCLASS FOO07 NIL ((A :ALLOCATION :CLASS :ALLOCATION :CLASS))),
-	   and other DEFCLASS forms with duplicate specifications in their
-	   slots, should signal a PROGRAM-ERROR, and doesn't.
 	d: (DEFGENERIC IF (X)) should signal a PROGRAM-ERROR, but instead
 	   causes a COMPILER-ERROR.
 
@@ -1040,11 +1033,6 @@ WORKAROUND:
     This is probably a bug in SBCL itself. [...]
   Since this is a reasonable user error, it shouldn't be reported as 
   an SBCL bug. 
-
-171:
-  (reported by Pierre Mai while investigating bug 47):
-    (DEFCLASS FOO () ((A :SILLY T))) 
-  signals a SIMPLE-ERROR, not a PROGRAM-ERROR.
 
 172:
   sbcl's treatment of at least macro lambda lists is too permissive;

@@ -59,11 +59,6 @@
     (nil nil (class class) t)))
 ) ; EVAL-WHEN
 
-(defmacro make-checking-or-caching-function-list ()
-  `(list ,@(mapcar (lambda (key)
-		     `(cons ',key (emit-checking-or-caching-macro ,@key)))
-		   *checking-or-caching-list*)))
-
 ;;; Rather than compiling the constructors here, just tickle the range
 ;;; of shapes defined above, leaving the generation of the
 ;;; constructors to precompile-dfun-constructors.

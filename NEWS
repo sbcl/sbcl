@@ -1266,6 +1266,8 @@ changes in sbcl-0.7.8 relative to sbcl-0.7.7:
   * fixed several bugs in compiler checking of type declarations, i.e.
     violations of the Python "declarations are assertions" principle
     (thanks to Alexey Dejneka)
+  * fixed several bugs in PCL's error checking (thanks to Gerd
+    Moellmann)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

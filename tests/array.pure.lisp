@@ -62,3 +62,12 @@
 							 (aref x 12))))))
 	  (error "error not thrown in COMPILED-DECLARED-AREF ~S" form))))))
 
+;;; On the SPARC, until sbcl-0.7.7.20, there was a bug in array references 
+;;; for small vector elements (spotted by Raymond Toy).
+(assert (= (funcall 
+            (lambda (rmdr) 
+              (declare (type (simple-array bit (*)) rmdr)
+                       (optimize (speed 3) (safety 0)))
+              (aref rmdr 0))
+            #*00000000000000000000000000000001000000000)
+           0))

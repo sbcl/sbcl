@@ -375,6 +375,40 @@
 		  *the-class-standard-class*)
 		 (t
 		  (class-of class)))))
+    ;; KLUDGE: It seemed to me initially that there ought to be a way
+    ;; of collecting all the erroneous problems in one go, rather than
+    ;; this way of solving the problem of signalling the errors that
+    ;; we are required to, which stops at the first bogus input.
+    ;; However, after playing around a little, I couldn't find that
+    ;; way, so I've left it as is, but if someone does come up with a
+    ;; better way... -- CSR, 2002-09-08
+    (loop for (slot . more) on (getf initargs :direct-slots)
+	  for slot-name = (getf slot :name)
+	  if (some (lambda (s) (eq slot-name (getf s :name))) more) 
+	  ;; FIXME: It's quite possible that we ought to define an
+	  ;; SB-INT:PROGRAM-ERROR function to signal these and other
+	  ;; errors throughout the code base that are required to be
+	  ;; of type PROGRAM-ERROR.
+	  do (error 'simple-program-error 
+		    :format-control "More than one direct slot with name ~S."
+		    :format-arguments (list slot-name))
+	  else 
+	  do (loop for (option value . more) on slot by #'cddr
+		   when (and (member option 
+				     '(:allocation :type 
+				       :initform :documentation))
+			     (not (eq unsupplied
+				      (getf more option unsupplied)))) 
+		   do (error 'simple-program-error 
+			     :format-control "Duplicate slot option ~S for slot ~S."
+			     :format-arguments (list option slot-name))))
+    (loop for (initarg . more) on (getf initargs :direct-default-initargs)
+	  for name = (car initarg) 
+	  when (some (lambda (a) (eq (car a) name)) more) 
+	  do (error 'simple-program-error 
+		    :format-control "Duplicate initialization argument ~
+                                     name ~S in :default-initargs of class ~A."
+		    :format-arguments (list name class)))
     (loop (unless (remf initargs :metaclass) (return)))
     (loop (unless (remf initargs :direct-superclasses) (return)))
     (loop (unless (remf initargs :direct-slots) (return)))

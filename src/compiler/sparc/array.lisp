@@ -189,7 +189,8 @@
 	 (:result-types positive-fixnum)
 	 (:temporary (:scs (non-descriptor-reg)) temp)
 	 (:generator 15
-	   (multiple-value-bind (word extra) (floor index ,elements-per-word)
+	   (multiple-value-bind (word extra) 
+               (floor index ,elements-per-word)
 	     (setf extra (logxor extra (1- ,elements-per-word)))
 	     (let ((offset (- (* (+ word vector-data-offset) n-word-bytes)
 			      other-pointer-lowtag)))
@@ -199,8 +200,7 @@
 		      (inst li temp offset)
 		      (inst ld result object temp))))
 	     (unless (zerop extra)
-	       (inst srl result
-		     (logxor (* extra ,bits) ,(1- elements-per-word))))
+	       (inst srl result (* extra ,bits)))
 	     (unless (= extra ,(1- elements-per-word))
 	       (inst and result ,(1- (ash 1 bits)))))))
        (define-vop (,(symbolicate 'data-vector-set/ type))

@@ -277,6 +277,22 @@
 (defmethod gf (obj)
   obj)
 
+;;; Until sbcl-0.7.7.20, some conditions weren't being signalled, and
+;;; some others were of the wrong type:
+(macrolet ((assert-program-error (form)
+	     `(multiple-value-bind (value error)
+	          (ignore-errors ,form)
+	        (assert (null value))
+	        (assert (typep error 'program-error)))))
+  (assert-program-error (defclass foo001 () (a b a)))
+  (assert-program-error (defclass foo002 () 
+			  (a b) 
+			  (:default-initargs x 'a x 'b)))
+  (assert-program-error (defclass foo003 ()
+			  ((a :allocation :class :allocation :class))))
+  (assert-program-error (defclass foo004 ()
+			  ((a :silly t)))))
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)
