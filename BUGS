@@ -43,11 +43,38 @@ KNOWN BUGS OF NO SPECIAL CLASS:
   SBCL to wager that this (undefined in ANSI) operation would be safe.
 
 3:
-  It should cause a STYLE-WARNING, not a full WARNING, when a structure
-  slot default value does not match the declared structure slot type.
-  (The current behavior is consistent with SBCL's behavior elsewhere,
-  and would not be a problem, except that the other behavior is 
-  specifically required by the ANSI spec.)
+  ANSI specifies that a type mismatch in a structure slot
+  initialization value should not cause a warning.
+WORKAROUND:
+  This one might not be fixed for a while because while we're big
+  believers in ANSI compatibility and all, (1) there's no obvious
+  simple way to do it (short of disabling all warnings for type
+  mismatches everywhere), and (2) there's a good portable
+  workaround. ANSI justifies this specification by saying 
+    The restriction against issuing a warning for type mismatches
+    between a slot-initform and the corresponding slot's :TYPE
+    option is necessary because a slot-initform must be specified
+    in order to specify slot options; in some cases, no suitable
+    default may exist.
+  In SBCL, as in CMU CL (or, for that matter, any compiler which
+  really understands Common Lisp types) a suitable default does
+  exist, in all cases, because the compiler understands the concept
+  of functions which never return (i.e. has return type NIL, e.g.
+  ERROR). Thus, as a portable workaround, you can use a call to
+  some known-never-to-return function as the default. E.g.
+    (DEFSTRUCT FOO
+      (BAR (ERROR "missing :BAR argument")
+           :TYPE SOME-TYPE-TOO-HAIRY-TO-CONSTRUCT-AN-INSTANCE-OF))
+  or 
+    (DECLAIM (FTYPE () NIL) MISSING-ARG) 
+    (DEFUN REQUIRED-ARG () ; workaround for SBCL non-ANSI slot init typing
+      (ERROR "missing required argument")) 
+    (DEFSTRUCT FOO
+      (BAR (REQUIRED-ARG) :TYPE TRICKY-TYPE-OF-SOME-SORT)
+      (BLETCH (REQUIRED-ARG) :TYPE TRICKY-TYPE-OF-SOME-SORT)
+      (N-REFS-SO-FAR 0 :TYPE (INTEGER 0)))
+  Such code will compile without complaint and work correctly either
+  on SBCL or on a completely compliant Common Lisp system.
 
 4:
   It should cause a note, not a WARNING, when the system ignores

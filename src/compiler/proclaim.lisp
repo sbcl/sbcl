@@ -167,8 +167,24 @@
 	     (error "not a function type: ~S" (first args)))
 	   (dolist (name (rest args))
 	     (cond ((info :function :accessor-for name)
-		    (warn "ignoring FTYPE proclamation for slot accessor:~%  ~S"
-			  name))
+		    ;; FIXME: This used to be a WARNING, which was
+		    ;; clearly wrong, since it would cause warnings to
+		    ;; be issued for conforming code, which is really
+		    ;; annoying for people who use Lisp code to build
+		    ;; Lisp systems (and check the return values from
+		    ;; COMPILE and COMPILE-FILE). Changing it to a
+		    ;; compiler note is somewhat better, since it's
+		    ;; after all news about a limitation of the
+		    ;; compiler, not a problem in the code. But even
+		    ;; better would be to handle FTYPE proclamations
+		    ;; for slot accessors, and since in the long run
+		    ;; slot accessors should become more like other
+		    ;; functions, this should eventually become
+		    ;; straightforward.
+		    (maybe-compiler-note
+		     "~@<ignoring FTYPE proclamation for ~
+                      slot accessor (currently unsupported): ~2I~_~S~:>"
+		     name))
 		   (t
 
 		    ;; KLUDGE: Something like the commented-out TYPE/=

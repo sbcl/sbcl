@@ -1644,6 +1644,18 @@
 			    format-args))
   (values))
 
+;;; Issue a note when we might or might not be in the compiler.
+(defun maybe-compiler-note (&rest rest)
+  (if (boundp '*lexenv*) ; if we're in the compiler
+      (apply #'compiler-note rest)
+      (let ((stream *error-output*))
+	(pprint-logical-block (stream nil :per-line-prefix ";")
+	  
+	  (format stream " note: ~3I~_")
+	  (pprint-logical-block (stream nil)
+	    (apply #'format stream rest)))
+	(fresh-line stream)))) ; (outside logical block, no per-line-prefix)
+
 ;;; The politically correct way to print out progress messages and
 ;;; such like. We clear the current error context so that we know that
 ;;; it needs to be reprinted, and we also Force-Output so that the

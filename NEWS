@@ -568,8 +568,6 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
   ** The TOP debugger command is also gone, since it's redundant with the
      FRAME 0 command, and since it interfered with abbreviations for the
      TOPLEVEL restart.
-* removed bug 21 from BUGS, since Martin Atzmueller points out that 
-  it doesn't seem to affect SBCL after all
 * The system now recovers better from non-PACKAGE values of the *PACKAGE*
   variable.
 * The system now understands compound CONS types (e.g. (CONS FIXNUM T))
@@ -598,6 +596,11 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
      files, thanks to a patch originally from Douglas Crosher.
 * Martin Atzmueller also fixed ROOM, so that it no longer fails with an
   undefined function error.
+* gave up on fixing bug 3 (forbidden-by-ANSI warning for type mismatch
+  in structure slot initforms) for now, wrote workaround instead:-|
+* fixed bug 4 (no WARNING for DECLAIM FTYPE of slot accessor function)
+* removed bug 21 from BUGS, since Martin Atzmueller points out that 
+  it doesn't seem to affect SBCL after all
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
