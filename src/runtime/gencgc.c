@@ -577,7 +577,7 @@ gc_alloc_new_region(int nbytes, int unboxed, struct alloc_region *alloc_region)
 		       (lispobj)(((char *)heap_base) + last_free_page*4096),
 		       0);
     }
-    free_pages_lock=0;
+    release_spinlock(&free_pages_lock);
     
     /* we can do this after releasing free_pages_lock */
     if (gencgc_zero_check) {
@@ -823,7 +823,7 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 	page_table[next_page].allocated = FREE_PAGE;
 	next_page++;
     }
-    free_pages_lock=0;
+    release_spinlock(&free_pages_lock);
     /* alloc_region is per-thread, we're ok to do this unlocked */
     gc_set_region_empty(alloc_region);
 }
@@ -966,7 +966,7 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
 	SetSymbolValue(ALLOCATION_POINTER,
 		       (lispobj)(((char *)heap_base) + last_free_page*4096),0);
     }
-    free_pages_lock=0;
+    release_spinlock(&free_pages_lock);
 
     return((void *)(page_address(first_page)+orig_first_page_bytes_used));
 }

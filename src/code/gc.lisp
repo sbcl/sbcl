@@ -225,7 +225,8 @@ and submit it as a patch."
 
 ;;; SUB-GC does a garbage collection.  This is called from three places:
 ;;; (1) The C runtime will call here when it detects that we've consed 
-;;;     enough to exceed the gc trigger threshold
+;;;     enough to exceed the gc trigger threshold.  This is done in
+;;;     alloc() for gencgc or interrupt_maybe_gc() for cheneygc
 ;;; (2) The user may request a collection using GC, below
 ;;; (3) At the end of a WITHOUT-GCING section, we are called if
 ;;;     *NEED-TO-COLLECT-GARBAGE* is true
@@ -238,21 +239,24 @@ and submit it as a patch."
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
 (defvar *already-in-gc* nil "System is running SUB-GC")
+(defvar *gc-mutex* (sb!thread:make-mutex :name "GC Mutex"))
 
 (defun sub-gc (&key (gen 0) &aux (pre-gc-dynamic-usage (dynamic-usage)))
   (when *already-in-gc* (return-from sub-gc nil))
   (setf *need-to-collect-garbage* t)
   (when (zerop *gc-inhibit*)
-    (let ((*already-in-gc* t))
-      (gc-stop-the-world)
-      ;; XXX run before-gc-hooks
-      (without-interrupts (collect-garbage gen))
-      (incf *n-bytes-freed-or-purified*
-	    (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
-      (setf *need-to-collect-garbage* nil)
-      ;; XXX run after-gc-hooks
-      (gc-start-the-world))
-    (scrub-control-stack))
+    (sb!thread:with-recursive-lock (*gc-mutex*)
+      (let ((*already-in-gc* t))
+	(without-interrupts
+	 (gc-stop-the-world)
+	 ;; XXX run before-gc-hooks
+	 (collect-garbage gen)
+	 (incf *n-bytes-freed-or-purified*
+	       (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
+	 (setf *need-to-collect-garbage* nil)
+	 ;; XXX run after-gc-hooks
+	 (gc-start-the-world)))
+      (scrub-control-stack)))
   (values))
        
 

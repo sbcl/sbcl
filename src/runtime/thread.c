@@ -212,7 +212,7 @@ pid_t create_thread(lispobj initial_function) {
      * to ensure that we don't have >1 thread with pid=0 on the list at once
      */
     protect_control_stack_guard_page(th->pid,1);
-    all_threads_lock=0;
+    release_spinlock(&all_threads_lock);
     th->pid=kid_pid;		/* child will not start until this is set */
 #ifndef LISP_FEATURE_SB_THREAD
     new_thread_trampoline(all_threads);	/*  call_into_lisp */
