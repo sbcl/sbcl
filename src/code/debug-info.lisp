@@ -189,12 +189,12 @@
 ;;; debug-info format can represent any function at level 0, and any fixed-arg
 ;;; function at level 1.
 ;;;
-;;; In the minimal format, the debug functions and function map are packed into
-;;; a single byte-vector which is placed in the
-;;; COMPILED-DEBUG-INFO-FUNCTION-MAP. Because of this, all functions in a
-;;; component must be representable in minimal format for any function to
-;;; actually be dumped in minimal format. The vector is a sequence of records
-;;; in this format:
+;;; In the minimal format, the debug functions and function map are
+;;; packed into a single byte-vector which is placed in the
+;;; COMPILED-DEBUG-INFO-FUN-MAP. Because of this, all functions in a
+;;; component must be representable in minimal format for any function
+;;; to actually be dumped in minimal format. The vector is a sequence
+;;; of records in this format:
 ;;;    name representation + kind + return convention (single byte)
 ;;;    bit flags (single byte)
 ;;;	setf, nfp, variables
@@ -225,38 +225,13 @@
 ;;;	from the previous function's elsewhere code start. (i.e. the
 ;;;	encoding is the same as for code-start-pc.)
 
-#|
-### For functions with XEPs, name could be represented more simply and
-compactly as some sort of info about with how to find the function-entry that
-this is a function for. Actually, you really hardly need any info. You can
-just chain through the functions in the component until you find the right one.
-Well, I guess you need to at least know which function is an XEP for the real
-function (which would be useful info anyway).
-|#
-
-;;; The following are definitions of bit-fields in the first byte of
-;;; the minimal debug function:
-(defconstant minimal-debug-fun-name-symbol 0)
-(defconstant minimal-debug-fun-name-packaged 1)
-(defconstant minimal-debug-fun-name-uninterned 2)
-(defconstant minimal-debug-fun-name-component 3)
-(defconstant-eqx minimal-debug-fun-name-style-byte (byte 2 0) #'equalp)
-(defconstant-eqx minimal-debug-fun-kind-byte (byte 3 2) #'equalp)
-(defparameter *minimal-debug-fun-kinds*
-  #(nil :optional :external :top-level :cleanup))
-(defconstant minimal-debug-fun-returns-standard 0)
-(defconstant minimal-debug-fun-returns-specified 1)
-(defconstant minimal-debug-fun-returns-fixed 2)
-(defconstant-eqx minimal-debug-fun-returns-byte (byte 2 5) #'equalp)
-
-;;; The following are bit-flags in the second byte of the minimal debug
-;;; function:
-;;;   * If true, wrap (SETF ...) around the name.
-(defconstant minimal-debug-fun-setf-bit (ash 1 0))
-;;;   * If true, there is a NFP.
-(defconstant minimal-debug-fun-nfp-bit (ash 1 1))
-;;;   * If true, variables (hence arguments) have been dumped.
-(defconstant minimal-debug-fun-variables-bit (ash 1 2))
+;;; ### For functions with XEPs, name could be represented more simply
+;;; and compactly as some sort of info about with how to find the
+;;; FUNCTION-ENTRY that this is a function for. Actually, you really
+;;; hardly need any info. You can just chain through the functions in
+;;; the component until you find the right one. Well, I guess you need
+;;; to at least know which function is an XEP for the real function
+;;; (which would be useful info anyway).
 
 ;;;; debug source
 
@@ -314,4 +289,4 @@ function (which would be useful info anyway).
   ;; always careful to put our code in low memory. Is that how it
   ;; works? Would this break if we used a more general memory map? --
   ;; WHN 20000120
-  (function-map (required-argument) :type simple-vector :read-only t))
+  (fun-map (required-argument) :type simple-vector :read-only t))

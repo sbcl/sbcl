@@ -1068,9 +1068,9 @@
 
 ;;;; stuff to use debugging-info to augment the disassembly
 
-(defun code-function-map (code)
+(defun code-fun-map (code)
   (declare (type sb!kernel:code-component code))
-  (sb!di::get-debug-info-function-map (sb!kernel:%code-debug-info code)))
+  (sb!di::get-debug-info-fun-map (sb!kernel:%code-debug-info code)))
 
 (defstruct (location-group (:copier nil))
   (locations #() :type (vector (or list fixnum))))
@@ -1311,7 +1311,7 @@
 (defun get-function-segments (function)
   (declare (type compiled-function function))
   (let* ((code (fun-code function))
-	 (function-map (code-function-map code))
+	 (fun-map (code-fun-map code))
 	 (fname (sb!kernel:%function-name function))
 	 (sfcache (make-source-form-cache)))
     (let ((first-block-seen-p nil)
@@ -1325,8 +1325,8 @@
 					  :debug-fun df
 					  :source-form-cache sfcache)
 		       segments))))
-	(dotimes (fmap-index (length function-map))
-	  (let ((fmap-entry (aref function-map fmap-index)))
+	(dotimes (fmap-index (length fun-map))
+	  (let ((fmap-entry (aref fun-map fmap-index)))
 	    (etypecase fmap-entry
 	      (integer
 	       (when first-block-seen-p
@@ -1380,7 +1380,7 @@
 	   (type length length))
   (let ((segments nil))
     (when code
-      (let ((function-map (code-function-map code))
+      (let ((fun-map (code-fun-map code))
 	    (sfcache (make-source-form-cache)))
 	(let ((last-offset 0)
 	      (last-debug-fun nil))
@@ -1398,18 +1398,18 @@
 						:debug-fun df
 						:source-form-cache sfcache)
 			     segments)))))
-	    (dotimes (fmap-index (length function-map))
-	      (let ((fmap-entry (aref function-map fmap-index)))
-		(etypecase fmap-entry
+	    (dotimes (fun-map-index (length fun-map))
+	      (let ((fun-map-entry (aref fun-map fun-map-index)))
+		(etypecase fun-map-entry
 		  (integer
-		   (add-seg last-offset (- fmap-entry last-offset)
+		   (add-seg last-offset (- fun-map-entry last-offset)
 			    last-debug-fun)
 		   (setf last-debug-fun nil)
-		   (setf last-offset fmap-entry))
+		   (setf last-offset fun-map-entry))
 		  (sb!c::compiled-debug-fun
 		   (setf last-debug-fun
-			 (sb!di::make-compiled-debug-fun fmap-entry
-							      code))))))
+			 (sb!di::make-compiled-debug-fun fun-map-entry
+							 code))))))
 	    (when last-debug-fun
 	      (add-seg last-offset
 		       (- (code-inst-area-length code) last-offset)

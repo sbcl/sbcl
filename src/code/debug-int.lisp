@@ -984,10 +984,10 @@
 
 ;;;; frame utilities
 
-;;; This returns a COMPILED-DEBUG-FUN for code and pc. We fetch
-;;; the SB!C::DEBUG-INFO and run down its function-map to get a
-;;; SB!C::COMPILED-DEBUG-FUN from the pc. The result only needs
-;;; to reference the component, for function constants, and the
+;;; This returns a COMPILED-DEBUG-FUN for code and pc. We fetch the
+;;; SB!C::DEBUG-INFO and run down its FUN-MAP to get a
+;;; SB!C::COMPILED-DEBUG-FUN from the pc. The result only needs to
+;;; reference the component, for function constants, and the
 ;;; SB!C::COMPILED-DEBUG-FUN.
 (defun debug-fun-from-pc (component pc)
   (let ((info (%code-debug-info component)))
@@ -997,24 +997,24 @@
      ((eq info :bogus-lra)
       (make-bogus-debug-fun "function end breakpoint"))
      (t
-      (let* ((function-map (get-debug-info-function-map info))
-	     (len (length function-map)))
-	(declare (simple-vector function-map))
+      (let* ((fun-map (get-debug-info-fun-map info))
+	     (len (length fun-map)))
+	(declare (type simple-vector fun-map))
 	(if (= len 1)
-	    (make-compiled-debug-fun (svref function-map 0) component)
+	    (make-compiled-debug-fun (svref fun-map 0) component)
 	    (let ((i 1)
 		  (elsewhere-p
 		   (>= pc (sb!c::compiled-debug-fun-elsewhere-pc
-			   (svref function-map 0)))))
+			   (svref fun-map 0)))))
 	      (declare (type sb!int:index i))
 	      (loop
 		(when (or (= i len)
 			  (< pc (if elsewhere-p
 				    (sb!c::compiled-debug-fun-elsewhere-pc
-				     (svref function-map (1+ i)))
-				    (svref function-map i))))
+				     (svref fun-map (1+ i)))
+				    (svref fun-map i))))
 		  (return (make-compiled-debug-fun
-			   (svref function-map (1- i))
+			   (svref fun-map (1- i))
 			   component)))
 		(incf i 2)))))))))
 
@@ -1183,7 +1183,7 @@
 		     (and (sb!c::compiled-debug-fun-p x)
 			  (eq (sb!c::compiled-debug-fun-name x) name)
 			  (eq (sb!c::compiled-debug-fun-kind x) nil)))
-		   (get-debug-info-function-map
+		   (get-debug-info-fun-map
 		    (%code-debug-info component)))))
 	(if res
 	    (make-compiled-debug-fun res component)
@@ -1303,8 +1303,7 @@
     (compiled-debug-fun (compiled-debug-fun-lambda-list debug-fun))
     (bogus-debug-fun nil)))
 
-;;; Note: If this has to compute the lambda list, it caches it in
-;;; DEBUG-FUN.
+;;; Note: If this has to compute the lambda list, it caches it in DEBUG-FUN.
 (defun compiled-debug-fun-lambda-list (debug-fun)
   (let ((lambda-list (debug-fun-%lambda-list debug-fun)))
     (cond ((eq lambda-list :unparsed)
@@ -1416,7 +1415,7 @@
   (make-array 20 :adjustable t :fill-pointer t))
 (defvar *other-parsing-buffer*
   (make-array 20 :adjustable t :fill-pointer t))
-;;; PARSE-DEBUG-BLOCKS, PARSE-DEBUG-VARS and UNCOMPACT-FUNCTION-MAP
+;;; PARSE-DEBUG-BLOCKS and PARSE-DEBUG-VARS
 ;;; use this to unpack binary encoded information. It returns the
 ;;; values returned by the last form in body.
 ;;;
@@ -1625,111 +1624,15 @@
 
 ;;;; unpacking minimal debug functions
 
-(eval-when (:compile-toplevel :execute)
-
-;;; sleazoid "macro" to keep our indentation sane in UNCOMPACT-FUNCTION-MAP
-(sb!xc:defmacro make-uncompacted-debug-fun ()
-  '(sb!c::make-compiled-debug-fun
-    :name
-    (let ((base (ecase (ldb sb!c::minimal-debug-fun-name-style-byte
-			    options)
-		  (#.sb!c::minimal-debug-fun-name-symbol
-		   (intern (sb!c::read-var-string map i)
-			   (sb!c::compiled-debug-info-package info)))
-		  (#.sb!c::minimal-debug-fun-name-packaged
-		   (let ((pkg (sb!c::read-var-string map i)))
-		     (intern (sb!c::read-var-string map i) pkg)))
-		  (#.sb!c::minimal-debug-fun-name-uninterned
-		   (make-symbol (sb!c::read-var-string map i)))
-		  (#.sb!c::minimal-debug-fun-name-component
-		   (sb!c::compiled-debug-info-name info)))))
-      (if (logtest flags sb!c::minimal-debug-fun-setf-bit)
-	  `(setf ,base)
-	  base))
-    :kind (svref sb!c::*minimal-debug-fun-kinds*
-		 (ldb sb!c::minimal-debug-fun-kind-byte options))
-    :variables
-    (when vars-p
-      (let ((len (sb!c::read-var-integer map i)))
-	(prog1 (subseq map i (+ i len))
-	  (incf i len))))
-    :arguments (when vars-p :minimal)
-    :returns
-    (ecase (ldb sb!c::minimal-debug-fun-returns-byte options)
-      (#.sb!c::minimal-debug-fun-returns-standard
-       :standard)
-      (#.sb!c::minimal-debug-fun-returns-fixed
-       :fixed)
-      (#.sb!c::minimal-debug-fun-returns-specified
-       (with-parsing-buffer (buf)
-	 (dotimes (idx (sb!c::read-var-integer map i))
-	   (vector-push-extend (sb!c::read-var-integer map i) buf))
-	 (result buf))))
-    :return-pc (sb!c::read-var-integer map i)
-    :old-fp (sb!c::read-var-integer map i)
-    :nfp (when (logtest flags sb!c::minimal-debug-fun-nfp-bit)
-	   (sb!c::read-var-integer map i))
-    :start-pc
-    (progn
-      (setq code-start-pc (+ code-start-pc (sb!c::read-var-integer map i)))
-      (+ code-start-pc (sb!c::read-var-integer map i)))
-    :elsewhere-pc
-    (setq elsewhere-pc (+ elsewhere-pc (sb!c::read-var-integer map i)))))
-
-) ; EVAL-WHEN
-
-;;; Return a normal function map derived from a minimal debug info
-;;; function map. This involves looping parsing MINIMAL-DEBUG-FUNs and
-;;; then building a vector out of them.
-;;;
-;;; FIXME: This and its helper macro just above become dead code now
-;;; that we no longer use compacted function maps.
-(defun uncompact-function-map (info)
+;;; Return a FUN-MAP for a given COMPILED-DEBUG-INFO object.
+(defun get-debug-info-fun-map (info)
   (declare (type sb!c::compiled-debug-info info))
-
-  ;; (This is stubified until we solve the problem of representing
-  ;; debug information in a way which plays nicely with package renaming.)
-  (error "FIXME: dead code UNCOMPACT-FUNCTION-MAP (was stub)")
-
-  (let* ((map (sb!c::compiled-debug-info-function-map info))
-	 (i 0)
-	 (len (length map))
-	 (code-start-pc 0)
-	 (elsewhere-pc 0))
-    (declare (type (simple-array (unsigned-byte 8) (*)) map))
-    (sb!int:collect ((res))
-      (loop
-	(when (= i len) (return))
-	(let* ((options (prog1 (aref map i) (incf i)))
-	       (flags (prog1 (aref map i) (incf i)))
-	       (vars-p (logtest flags
-				sb!c::minimal-debug-fun-variables-bit))
-	       (dfun (make-uncompacted-debug-fun)))
-	  (res code-start-pc)
-	  (res dfun)))
-
-      (coerce (cdr (res)) 'simple-vector))))
-
-;;; a map from minimal DEBUG-INFO function maps to unpacked
-;;; versions thereof
-(defvar *uncompacted-function-maps* (make-hash-table :test 'eq))
-
-;;; Return a FUNCTION-MAP for a given COMPILED-DEBUG-info object. If
-;;; the info is minimal, and has not been parsed, then parse it.
-;;;
-;;; FIXME: Now that we no longer use the MINIMAL-DEBUG-FUN
-;;; representation, calls to this function can be replaced by calls to
-;;; the bare COMPILED-DEBUG-INFO-FUNCTION-MAP slot accessor function,
-;;; and this function and everything it calls become dead code which
-;;; can be deleted.
-(defun get-debug-info-function-map (info)
-  (declare (type sb!c::compiled-debug-info info))
-  (let ((map (sb!c::compiled-debug-info-function-map info)))
-    (if (simple-vector-p map)
-	map
-	(or (gethash map *uncompacted-function-maps*)
-	    (setf (gethash map *uncompacted-function-maps*)
-		  (uncompact-function-map info))))))
+  (let ((map (sb!c::compiled-debug-info-fun-map info)))
+    ;; The old CMU CL had various hairy possibilities here, but in
+    ;; SBCL we only use this one, right? 
+    (aver (simple-vector-p map))
+    ;; So it's easy..
+    map))
 
 ;;;; CODE-LOCATIONs
 
