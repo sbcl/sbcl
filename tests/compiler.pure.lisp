@@ -1171,3 +1171,5 @@
 		   (declare (notinline identity))
 		   (1+ (identity x))))
   (compiler-note () (error "IDENTITY derive-type not applied.")))
+
+(assert (null (funcall (compile nil '(lambda (x) (funcall #'cddr x))) nil)))

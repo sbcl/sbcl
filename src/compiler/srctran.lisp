@@ -65,10 +65,14 @@
 (defun source-transform-cxr (form)
   (if (/= (length form) 2)
       (values nil t)
-      (let ((name (symbol-name (car form))))
-	(do ((i (- (length name) 2) (1- i))
+      (let* ((name (car form))
+	     (string (symbol-name
+		      (etypecase name
+			(symbol name)
+			(leaf (leaf-source-name name))))))
+	(do ((i (- (length string) 2) (1- i))
 	     (res (cadr form)
-		  `(,(ecase (char name i)
+		  `(,(ecase (char string i)
 		       (#\A 'car)
 		       (#\D 'cdr))
 		    ,res)))

@@ -215,7 +215,7 @@ void create_initial_thread(lispobj initial_function) {
     } else lose("can't create initial thread");
 }
 
-#ifdef LISP_FEATURE_LINUX
+#ifdef LISP_FEATURE_SB_THREAD
 pid_t create_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
     pid_t kid_pid=clone(new_thread_trampoline,

@@ -444,29 +444,20 @@
 (define-good-modular-fun logior)
 ;;; FIXME: XOR? ANDC1, ANDC2?  -- CSR, 2003-09-16
 
-#!-alpha
-(progn
-  (defknown #1=sb!vm::ash-left-mod32 (integer (integer 0)) (unsigned-byte 32)
-            (foldable flushable movable))
-  (define-modular-fun-optimizer ash ((integer count) :width width)
-    (when (and (<= width 32)
-               (constant-lvar-p count)  ; ?
-               (plusp (lvar-value count)))
-      (cut-to-width integer width)
-      '#1#))
-  (setf (gethash '#1# *modular-versions*) '(ash 32)))
-#!+alpha
-(progn
-  (defknown #1=sb!vm::ash-left-mod64 (integer (integer 0)) (unsigned-byte 64)
-            (foldable flushable movable))
-  (define-modular-fun-optimizer ash ((integer count) :width width)
-    (when (and (<= width 64)
-               (constant-lvar-p count)  ; ?
-               (plusp (lvar-value count)))
-      (cut-to-width integer width)
-      '#1#))
-  (setf (gethash '#1# *modular-versions*) '(ash 64)))
-
+(macrolet
+    ((def (name width)
+	 `(progn
+	    (defknown ,name (integer (integer 0)) (unsigned-byte ,width)
+		      (foldable flushable movable))
+	    (define-modular-fun-optimizer ash ((integer count) :width width)
+	      (when (and (<= width 32)
+			 (constant-lvar-p count) ;?
+			 (plusp (lvar-value count)))
+		(cut-to-width integer width)
+		',name))
+	    (setf (gethash ',name *modular-versions*) `(ash ,',width)))))
+  #!-alpha (def sb!vm::ash-left-mod32 32)
+  #!+alpha (def sb!vm::ash-left-mod64 64))
 
 ;;; There are two different ways the multiplier can be recoded. The
 ;;; more obvious is to shift X by the correct amount for each bit set
