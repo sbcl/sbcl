@@ -237,48 +237,21 @@
 ;;; structure for each object file which contains code referring to
 ;;; the value, plus perhaps one more copy bound to the SYMBOL-VALUE of
 ;;; the constant. If you don't want that to happen, you should
-;;; probably use DEFPARAMETER instead.
+;;; probably use DEFPARAMETER instead; or if you truly desperately
+;;; need to avoid runtime indirection through a symbol, you might be
+;;; able to do something with LOAD-TIME-VALUE or MAKE-LOAD-FORM.
 (defmacro defconstant-eqx (symbol expr eqx &optional doc)
-  (let ((expr-tmp (gensym "EXPR-TMP-")))
-    `(progn
-       ;; When we're building the cross-compiler, and in most
-       ;; situations even when we're running the cross-compiler,
-       ;; all we need is a nice portable definition in terms of the
-       ;; ANSI Common Lisp operations.
-       (eval-when (:compile-toplevel :load-toplevel :execute)
-	 (let ((,expr-tmp ,expr))
-	   (cond ((boundp ',symbol)
-		  (unless (and (constantp ',symbol)
-			       (funcall ,eqx
-					(symbol-value ',symbol)
-					,expr-tmp))
-		    (error "already bound differently: ~S")))
-		 (t
-		  (defconstant ,symbol
-                    ;; KLUDGE: This is a very ugly hack, to be able to
-                    ;; build SBCL with CMU CL (2.4.19), because there
-                    ;; seems to be some confusion in CMU CL about
-                    ;; ,EXPR-TEMP at EVAL-WHEN time ... -- MNA 2000-02-23
-                    #-cmu ,expr-tmp
-                    #+cmu ,expr
-                    ,@(when doc `(,doc)))))))
-       ;; The #+SB-XC :COMPILE-TOPLEVEL situation is special, since we
-       ;; want to define the symbol not just in the cross-compilation
-       ;; host Lisp (which was handled above) but also in the
-       ;; cross-compiler (which we will handle now).
-       ;;
-       ;; KLUDGE: It would probably be possible to do this fairly
-       ;; cleanly, in a way parallel to the code above, if we had
-       ;; SB!XC:FOO versions of all the primitives CL:FOO used above
-       ;; (e.g. SB!XC:BOUNDP, SB!XC:SYMBOL-VALUE, and
-       ;; SB!XC:DEFCONSTANT), and took care to call them. But right
-       ;; now we just hack around in the guts of the cross-compiler
-       ;; instead. -- WHN 2000-11-03
-       #+sb-xc
-       (eval-when (:compile-toplevel)
-	 (let ((,expr-tmp ,symbol))
-	   (unless (and (eql (info :variable :kind ',symbol) :constant)
-			(funcall ,eqx
-				 (info :variable :constant-value ',symbol)
-				 ,expr-tmp))
-	     (sb!c::%defconstant ',symbol ,expr-tmp ,doc)))))))
+  `(defconstant ,symbol
+     (%defconstant-eqx-value ',symbol ,expr ,eqx)
+     ,@(when doc (list doc))))
+(defun %defconstant-eqx-value (symbol expr eqx)
+  (flet ((bummer (explanation)
+	   (error "~@<bad DEFCONSTANT-EQX ~S: ~2I~_~A~:>" symbol explanation)))
+    (cond ((not (boundp symbol))
+	   expr)
+	  ((not (constantp symbol))
+	   (bummer "already bound as a non-constant"))
+	  ((not (funcall eqx (symbol-value symbol) expr))
+	   (bummer "already bound as a different constant value"))
+	  (t
+	   (symbol-value symbol)))))

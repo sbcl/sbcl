@@ -35,15 +35,13 @@
   (error "can't use CLISP -- no (FUNCTION (SETF SYMBOL-FUNCTION))")
   )
 
-;;; CMU CL, at least as of 18b, doesn't support PRINT-OBJECT. In particular, it
-;;; refuses to compile :PRINT-OBJECT options to DEFSTRUCT, so we need to
-;;; conditionalize such options on the :NO-ANSI-PRINT-OBJECT feature in order
-;;; to get the code to compile. (It also fails to do anything useful with
-;;; DEFMETHOD PRINT-OBJECT, but that doesn't matter much, since it doesn't stop
-;;; the cross-compiler from working.)
-;;;
-;;; FIXME: SBCL 0.5.0 doesn't support PRINT-OBJECT either. SBCL 0.6.0 will,
-;;; at which time this conditional should go away.
+;;; CMU CL, at least as of 18b, doesn't support PRINT-OBJECT. In
+;;; particular, it refuses to compile :PRINT-OBJECT options to
+;;; DEFSTRUCT, so we need to conditionalize such options on the
+;;; :NO-ANSI-PRINT-OBJECT feature in order to get the code to compile.
+;;; (It also fails to do anything useful with DEFMETHOD PRINT-OBJECT,
+;;; but that doesn't matter much, since it doesn't stop the
+;;; cross-compiler from working.)
 #+cmu
 (progn
   (warn "CMU CL doesn't support the :PRINT-OBJECT option to DEFSTRUCT.~%")
@@ -60,16 +58,16 @@
 ;;; /(READ-SEQUENCE *BUFFER* S :START 0 :END 3000)=3000
 ;;; /(READ-SEQUENCE *BUFFER* S :START 0 :END 15000)=1096
 ;;; /(READ-SEQUENCE *BUFFER* S :START 0 :END 15000)=0
-#+cmu ; FIXME: Remove SBCL once we've patched READ-SEQUENCE.
+#+cmu
 (progn
   (warn "CMU CL has a broken implementation of READ-SEQUENCE.")
   (pushnew :no-ansi-read-sequence *features*))
 
-;;; Do the exports of COMMON-LISP conform to the standard? If not, try to make
-;;; them conform. (Of course, ANSI says that bashing symbols in the COMMON-LISP
-;;; package like this is undefined, but then if the host Common Lisp were ANSI,
-;;; we wouldn't be doing this, now would we? "One dirty unportable hack
-;;; deserves another.":-)
+;;; Do the exports of COMMON-LISP conform to the standard? If not, try
+;;; to make them conform. (Of course, ANSI says that bashing symbols
+;;; in the COMMON-LISP package like this is undefined, but then if the
+;;; host Common Lisp were ANSI, we wouldn't be doing this, now would
+;;; we? "One dirty unportable hack deserves another.":-)
 (let ((standard-ht (make-hash-table :test 'equal))
       (host-ht     (make-hash-table :test 'equal))
       (cl	  (find-package "COMMON-LISP")))

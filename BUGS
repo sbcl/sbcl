@@ -1098,6 +1098,21 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   your pre-0.7.0 state of grace with
     #+sbcl (declaim (notinline find position find-if position-if)) ; bug 117..
 
+118:
+   as reported by Eric Marsden on cmucl-imp@cons.org 2001-08-14:
+     (= (FLOAT 1 DOUBLE-FLOAT-EPSILON)
+        (+ (FLOAT 1 DOUBLE-FLOAT-EPSILON) DOUBLE-FLOAT-EPSILON)) => T
+   when of course it should be NIL. (He says it only fails for X86,
+   not SPARC; dunno about Alpha.)
+
+   Also, "the same problem exists for LONG-FLOAT-EPSILON,
+   DOUBLE-FLOAT-NEGATIVE-EPSILON, LONG-FLOAT-NEGATIVE-EPSILON (though
+   for the -negative- the + is replaced by a - in the test)."
+
+   Raymond Toy comments that this is tricky on the X86 since its FPU
+   uses 80-bit precision internally.
+
+
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 (Note: At some point, the pure interpreter (actually a semi-pure
