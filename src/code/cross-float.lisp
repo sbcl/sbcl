@@ -77,7 +77,13 @@
 		(if (plusp exponent)	; if not obviously denormalized
 		    (do ()
 			(nil)
-		      (cond (;; ordinary termination case
+		      (cond (;; special termination case, denormalized
+			     ;; float number
+			     (zerop exponent)
+			     ;; Denormalized numbers have exponent one
+			     ;; greater than the exponent field.
+			     (return (ash significand -1)))
+			    (;; ordinary termination case
 			     (>= significand (expt 2 23))
 			     (assert (< 0 significand (expt 2 24)))
 			     ;; Exponent 0 is reserved for
@@ -87,12 +93,7 @@
 			     (return (logior (ash exponent 23)
 					     (logand significand
 						     (1- (ash 1 23))))))
-			    (;; special termination case, denormalized
-			     ;; float number
-			     (zerop exponent)
-			     ;; Denormalized numbers have exponent one
-			     ;; greater than the exponent field.
-			     (return (ash significand -1)))
+
 			    (t
 			     ;; Shift as necessary to set bit 24 of
 			     ;; significand.
@@ -111,6 +112,7 @@
 	  (ecase lisp-sign
 	    (1 unsigned-result)
 	    (-1 (logior unsigned-result (- (expt 2 31)))))))))
+
 (defun double-float-bits (x)
   (declare (type double-float x))
   (assert (= (float-radix x) 2))
@@ -126,7 +128,13 @@
 		(if (plusp exponent)	; if not obviously denormalized
 		    (do ()
 			(nil)
-		      (cond (;; ordinary termination case
+		      (cond (;; special termination case, denormalized
+			     ;; float number
+			     (zerop exponent)
+			     ;; Denormalized numbers have exponent one
+			     ;; greater than the exponent field.
+			     (return (ash significand -1)))
+			    (;; ordinary termination case
 			     (>= significand (expt 2 52))
 			     (assert (< 0 significand (expt 2 53)))
 			     ;; Exponent 0 is reserved for
@@ -136,12 +144,6 @@
 			     (return (logior (ash exponent 52)
 					     (logand significand
 						     (1- (ash 1 52))))))
-			    (;; special termination case, denormalized
-			     ;; float number
-			     (zerop exponent)
-			     ;; Denormalized numbers have exponent one
-			     ;; greater than the exponent field.
-			     (return (ash significand -1)))
 			    (t
 			     ;; Shift as necessary to set bit 53 of
 			     ;; significand.
@@ -160,6 +162,7 @@
 	  (ecase lisp-sign
 	    (1 unsigned-result)
 	    (-1 (logior unsigned-result (- (expt 2 63)))))))))
+
 (defun double-float-low-bits (x)
   (declare (type double-float x))
   (if (zerop x)
@@ -170,6 +173,7 @@
       ;; would be nice to make the family of functions have a more
       ;; consistent return convention.
       (logand #xffffffff (double-float-bits x))))
+
 (defun double-float-high-bits (x)
   (declare (type double-float x))
   (if (zerop x)
@@ -217,6 +221,7 @@
 			     (ash 1 23))
 		     (expt 0.5 23))))
 	(* sign (kludge-opaque-expt 2.0 expt) mant))))
+
 (defun make-double-float (hi lo)
   (if (and (zerop hi) (zerop lo)) ; IEEE float special case
       0.0d0

@@ -1129,8 +1129,9 @@ changes in sbcl-0.7.4 relative to sbcl-0.7.3:
 changes in sbcl-0.7.5 relative to sbcl-0.7.4:
   * SBCL now runs on the Tru64 (aka OSF/1) operating system on the
     Alpha architecture.
-  * More progress has been made toward bootstrapping under CLISP and
-    OpenMCL.
+  * SBCL now builds with OpenMCL (version 0.11+patches) as the
+    cross-compilation host; also, more progress has been made toward
+    bootstrapping under CLISP.
   * bug 140 fixed: redefinition of classes with different supertypes
     is now reflected in the type hierarchy. (thanks to Pierre Mai)
   * bug 158 fixed: the compiler can now deal with integer loop
