@@ -109,15 +109,32 @@ time sh make-target-contrib.sh || exit 1
 
 # Sometimes people used to see the "No tests failed." output from the last
 # DEFTEST in contrib self-tests and think that's all that is. So...
+FLAG=false
+for dir in contrib/*
+do
+  if [ -d "$dir" -a -e "$dir/Makefile" -a ! -e "$dir/test-passed" ]; then
+      $FLAG || (echo "Failed contribs:" && FLAG=true)
+      echo "  `basename $dir`"
+  fi
+done
+
 NCONTRIBS=`find contrib -name Makefile -print | wc -l`
 NPASSED=`find contrib -name test-passed -print | wc -l`
 
 echo
-echo "The build seems to have finished successfully, including $NPASSED"
-echo "(out of $NCONTRIBS) contributed modules.  If you would like to run" 
-echo "more extensive tests on the new SBCL, you can try"
+echo "The build seems to have finished successfully, including $NPASSED (out of $NCONTRIBS)"
+echo "contributed modules. If you would like to run more extensive tests (but" 
+echo "expect some failures on non-x86 platforms) on the new SBCL, you can try:"
+echo
 echo "  cd tests && sh ./run-tests.sh"
-echo "(but expect some failures on non-x86 platforms)."
+echo
+echo "To build documentation:"
+echo
+echo "  cd doc/manual && make"
+echo
+echo "To install SBCL (more information in INSTALL):"
+echo
+echo "  sh install.sh" 
 
 build_finished=`date`
 echo

@@ -1517,9 +1517,6 @@ WORKAROUND:
   method is applicable, and yet matches neither of the method group
   qualifier patterns.
 
-340: SETF of VALUES using too many values
-  (fixed in sbcl-0.8.12.10)
-
 341: PPRINT-LOGICAL-BLOCK / PPRINT-FILL / PPRINT-LINEAR sharing detection.
   (from Paul Dietz' test suite)
 
@@ -1591,3 +1588,11 @@ WORKAROUND:
 346: alpha backtrace
   In sbcl-0.8.13, all backtraces from errors caused by internal errors
   on the alpha seem to have a "bogus stack frame".
+
+347: FUNCALL forms and compiler-macros
+  (reported by Johan Bockgård on #lisp)
+  The example
+    (funcall (compiler-macro-function 'square) '(funcall #'square x) nil) 
+    => (EXPT X 2)
+  from CLHS entry for DEFINE-COMPILER-MACRO fails in 0.8.13.41 with an
+  error. Fixed in CMUCL 19a.
