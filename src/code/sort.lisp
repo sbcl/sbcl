@@ -235,7 +235,7 @@
 		     drag))))	   ;   and return pointer to last element.
     (cond ((apply-pred (car list-2) (car list-1) pred key)
 	   (rplacd p list-2)	   ; Append the lesser list to last cell of
-	   (setq p (cdr p))	    ;   result. Note: test must bo done for
+	   (setq p (cdr p))	    ;   result. Note: test must be done for
 	   (pop list-2))	       ;   LIST-2 < LIST-1 so merge will be
 	  (T (rplacd p list-1)	 ;   stable for LIST-1.
 	     (setq p (cdr p))
@@ -425,10 +425,29 @@
   (let ((type (specifier-type result-type)))
     (cond
       ((csubtypep type (specifier-type 'list))
-       (let ((result (merge-lists* (coerce sequence1 'list)
-				   (coerce sequence2 'list)
-				   predicate key)))
-	 result))
+       ;; the VECTOR clause, below, goes through MAKE-SEQUENCE, so
+       ;; benefits from the error checking there. Short of
+       ;; reimplementing everything, we can't do the same for the LIST
+       ;; case, so do relevant length checking here:
+       (let ((s1 (coerce sequence1 'list))
+	     (s2 (coerce sequence2 'list)))
+	 (when (type= type (specifier-type 'list))
+	   (return-from merge (values (merge-lists* s1 s2 predicate key))))
+	 (when (eq type *empty-type*)
+	   (bad-sequence-type-error nil))
+	 (when (type= type (specifier-type 'null))
+	   (if (and (null s1) (null s2))
+	       (return-from merge 'nil)
+	       ;; FIXME: This will break on circular lists (as,
+	       ;; indeed, will the whole MERGE function).
+	       (sequence-type-length-mismatch-error type
+						    (+ (length s1)
+						       (length s2)))))
+	 (if (csubtypep (specifier-type '(cons nil t)) type)
+	     (if (and (null s1) (null s2))
+		 (sequence-type-length-mismatch-error type 0)
+		 (values (merge-lists* s1 s2 predicate key)))
+	     (sequence-type-too-hairy result-type))))
       ((csubtypep type (specifier-type 'vector))
        (let* ((vector-1 (coerce sequence1 'vector))
 	      (vector-2 (coerce sequence2 'vector))

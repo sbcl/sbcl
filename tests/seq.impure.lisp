@@ -300,7 +300,19 @@
     (assert (= (length (make-sequence 'cons 3)) 3))
     ;; and NIL is not a valid type for MAKE-SEQUENCE
     (assert-type-error (make-sequence 'nil 0))
-    ;; tests for MAP/MERGE/CONCATENATE/COERCE to come.
+    ;; COERCE
+    (assert-type-error (coerce #(1) 'null))
+    (assert-type-error (coerce #() 'cons))
+    (assert (null (coerce #() 'null)))
+    (assert (= (length (coerce #(1) 'cons)) 1))
+    (assert-type-error (coerce #() 'nil))
+    ;; MERGE
+    (assert-type-error (merge 'null '(1 3) '(2 4) '<))
+    (assert-type-error (merge 'cons () () '<))
+    (assert (null (merge 'null () () '<)))
+    (assert (= (length (merge 'cons '(1 3) '(2 4) '<)) 4))
+    (assert-type-error (merge 'nil () () '<))
+    ;; tests for MAP/CONCATENATE to come.
     ))
 
 	     

@@ -192,10 +192,23 @@
 	   res))
 	((csubtypep type (specifier-type 'list))
 	 (if (vectorp object)
-	     (vector-to-list* object)
+	     (cond ((type= type (specifier-type 'list))
+		    (vector-to-list* object))
+		   ((type= type (specifier-type 'null))
+		    (if (= (length object) 0)
+			'nil
+			(sequence-type-length-mismatch-error type
+							     (length object))))
+		   ((csubtypep (specifier-type '(cons nil t)) type)
+		    (if (> (length object) 0)
+			(vector-to-list* object)
+			(sequence-type-length-mismatch-error type 0)))
+		   (t (sequence-type-too-hairy (type-specifier type))))
 	     (coerce-error)))
 	((csubtypep type (specifier-type 'vector))
 	 (typecase object
+	   ;; FOO-TO-VECTOR* go through MAKE-SEQUENCE, so length
+	   ;; errors are caught there. -- CSR, 2002-10-18
 	   (list (list-to-vector* object output-type-spec))
 	   (vector (vector-to-vector* object output-type-spec))
 	   (t
