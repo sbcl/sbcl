@@ -376,11 +376,6 @@
 
 ;;;; OUTPUT-OBJECT -- the main entry point
 
-;;; the current pretty printer. This should be either a function that
-;;; takes two arguments (the object and the stream) or NIL to indicate
-;;; that there is no pretty printer installed.
-(defvar *pretty-printer* nil)
-
 ;;; Objects whose print representation identifies them EQLly don't
 ;;; need to be checked for circularity.
 (defun uniquely-identified-by-print-p (x)
@@ -393,10 +388,7 @@
 (defun output-object (object stream)
   (labels ((print-it (stream)
 	     (if *print-pretty*
-		 (if *pretty-printer*
-		     (funcall *pretty-printer* object stream)
-		     (let ((*print-pretty* nil))
-		       (output-ugly-object object stream)))
+		 (sb!pretty:output-pretty-object object stream)
 		 (output-ugly-object object stream)))
 	   (check-it (stream)
              (multiple-value-bind (marker initiate)

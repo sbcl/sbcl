@@ -646,10 +646,16 @@ Other commands:
     (when old-hook
       (let ((*debugger-hook* nil))
 	(funcall old-hook condition old-hook))))
-  ;; FIXME: No-one seems to know what this is for. Nothing is noticeably
-  ;; broken on sunos...
-  #!-sunos (sb!unix:unix-sigsetmask 0)
 
+  ;; Note: CMU CL had (SB-UNIX:UNIX-SIGSETMASK 0) here. I deleted it
+  ;; around sbcl-0.7.8.5 (by which time it had mutated to have a
+  ;; #!-SUNOS prefix and a FIXME note observing that it wasn't needed
+  ;; on SunOS and no one knew why it was needed anywhere else either).
+  ;; So if something mysteriously breaks that has worked since the CMU
+  ;; CL days, that might be why. -- WHN 2002-09-28
+
+  ;; We definitely want *PACKAGE* to be of valid type.
+  ;;
   ;; Elsewhere in the system, we use the SANE-PACKAGE function for
   ;; this, but here causing an exception just as we're trying to handle
   ;; an exception would be confusing, so instead we use a special hack.
@@ -660,37 +666,46 @@ Other commands:
 	    "The value of ~S was not an undeleted PACKAGE. It has been
 reset to ~S."
 	    '*package* *package*))
-  (let (;; Save *PACKAGE* to protect it from WITH-STANDARD-IO-SYNTAX.
-	(original-package *package*))
+
+  ;; Try to force the other special variables into a useful state.
+  (let (;; Protect from WITH-STANDARD-IO-SYNTAX some variables where
+	;; any default we might use is less useful than just reusing
+	;; the global values.
+	(original-package *package*)
+	(original-print-pretty *print-pretty*))
     (with-standard-io-syntax
-     (let* ((*debug-condition* condition)
-	    (*debug-restarts* (compute-restarts condition))
-	    ;; We want the i/o subsystem to be in a known, useful
-	    ;; state, regardless of where the debugger was invoked in
-	    ;; the program. WITH-STANDARD-IO-SYNTAX does some of that,
-	    ;; but
-	    ;;   1. It doesn't affect our internal special variables 
-	    ;;      like *CURRENT-LEVEL-IN-PRINT*.
-	    ;;   2. It isn't customizable.
-	    ;;   3. It doesn't set *PRINT-READABLY* or *PRINT-PRETTY* 
-	    ;;      to the same value as the toplevel default.
-	    ;;   4. It sets *PACKAGE* to COMMON-LISP-USER, which is not
-	    ;;      helpful behavior for a debugger.
-	    ;; We try to remedy all these problems with explicit 
-	    ;; rebindings here.
-	    (sb!kernel:*current-level-in-print* 0)
-	    (*print-length* *debug-print-length*)
-	    (*print-level* *debug-print-level*)
-	    (*readtable* *debug-readtable*)
-	    (*print-readably* nil)
-	    (*print-pretty* t)
-	    (*package* original-package)
-	    (*nested-debug-condition* nil))
+     (let ((*debug-condition* condition)
+	   (*debug-restarts* (compute-restarts condition))
+	   (*nested-debug-condition* nil)
+	   ;; We want the printer and reader to be in a useful state,
+	   ;; regardless of where the debugger was invoked in the
+	   ;; program. WITH-STANDARD-IO-SYNTAX did much of what we
+	   ;; want, but
+	   ;;   * It doesn't affect our internal special variables 
+	   ;;     like *CURRENT-LEVEL-IN-PRINT*.
+	   ;;   * It isn't customizable.
+	   ;;   * It doesn't set *PRINT-READABLY* to the same value
+	   ;;     as the toplevel default.
+	   ;;   * It sets *PACKAGE* to COMMON-LISP-USER, which is not
+	   ;;     helpful behavior for a debugger.
+	   ;;   * There's no particularly good debugger default for
+	   ;;     *PRINT-PRETTY*, since T is usually what you want
+	   ;;     -- except absolutely not what you want when you're
+	   ;;     debugging failures in PRINT-OBJECT logic.
+	   ;; We try to address all these issues with explicit
+	   ;; rebindings here.
+	   (sb!kernel:*current-level-in-print* 0)
+	   (*print-length* *debug-print-length*)
+	   (*print-level* *debug-print-level*)
+	   (*readtable* *debug-readtable*)
+	   (*print-readably* nil)
+	   (*package* original-package)
+	   (*print-pretty* original-print-pretty))
 
        ;; Before we start our own output, finish any pending output.
-       ;; Otherwise, if the user tried to track the progress of
-       ;; his program using PRINT statements, he'd tend to lose
-       ;; the last line of output or so, and get confused.
+       ;; Otherwise, if the user tried to track the progress of his
+       ;; program using PRINT statements, he'd tend to lose the last
+       ;; line of output or so, which'd be confusing.
        (flush-standard-output-streams)
 
        ;; (The initial output here goes to *ERROR-OUTPUT*, because the

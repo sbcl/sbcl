@@ -1364,5 +1364,4 @@
     (/show0 "leaving !PPRINT-COLD-INIT"))
 
   (setf *print-pprint-dispatch* (copy-pprint-dispatch nil))
-  (setf *pretty-printer* #'output-pretty-object)
   (setf *print-pretty* t))

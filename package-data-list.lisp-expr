@@ -963,7 +963,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "*CURRENT-LEVEL-IN-PRINT*" "*EMPTY-TYPE*"
              "*GC-INHIBIT*"
              "*NEED-TO-COLLECT-GARBAGE*"
-             "*PRETTY-PRINTER*" "*CONTROL-STACK-EXHAUSTION-SAP*"
+             "*CONTROL-STACK-EXHAUSTION-SAP*"
 	     "*UNIVERSAL-TYPE*" "*UNIVERSAL-FUN-TYPE*"
              "*UNPARSE-FUN-TYPE-SIMPLIFY*" "*WILD-TYPE*"
              "32BIT-LOGICAL-AND" "32BIT-LOGICAL-ANDC1"
@@ -1466,7 +1466,9 @@ definitely not guaranteed to be present in later versions of SBCL."
     :name "SB!PRETTY"
     :doc "private: implementation of pretty-printing"
     :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
-    :export ("PRETTY-STREAM" "PRETTY-STREAM-P" "!PPRINT-COLD-INIT"))
+    :export ("OUTPUT-PRETTY-OBJECT"
+	     "PRETTY-STREAM" "PRETTY-STREAM-P"
+	     "!PPRINT-COLD-INIT"))
 
  #s(sb-cold:package-data
     :name "SB!PROFILE"
