@@ -2569,6 +2569,13 @@
 ;;;
 ;;; and similar for other arguments.
 
+(defun modular-fun-derive-type (node prototype class width)
+  (binding* ((info (info :function :info prototype) :exit-if-null)
+             (fun (fun-info-derive-type info) :exit-if-null)
+             (res (funcall fun node) :exit-if-null))
+    (if (eq class :unsigned)
+        (logand-derive-type-aux res (specifier-type `(unsigned-byte* ,width))))))
+
 ;;; Try to recursively cut all uses of LVAR to WIDTH bits.
 ;;;
 ;;; For good functions, we just recursively cut arguments; their

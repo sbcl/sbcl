@@ -1194,23 +1194,26 @@
 
 (macrolet ((def (name -c-p)
              (let ((fun32 (intern (format nil "~S-MOD32" name)))
-                   (vop32 (intern (format nil "FAST-~S-MOD32/UNSIGNED=>UNSIGNED" name)))
-                   (vop (intern (format nil "FAST-~S/UNSIGNED=>UNSIGNED" name)))
-                   (vop32c (intern (format nil "FAST-~S-MOD32-C/UNSIGNED=>UNSIGNED" name)))
-                   (vopc (intern (format nil "FAST-~S-C/UNSIGNED=>UNSIGNED" name)))
+                   (vopu (intern (format nil "FAST-~S/UNSIGNED=>UNSIGNED" name)))
+                   (vopcu (intern (format nil "FAST-~S-C/UNSIGNED=>UNSIGNED" name)))
+                   (vopf (intern (format nil "FAST-~S/FIXNUM=>FIXNUM" name)))
+                   (vopcf (intern (format nil "FAST-~S-C/FIXNUM=>FIXNUM" name)))
+                   (vop32u (intern (format nil "FAST-~S-MOD32/UNSIGNED=>UNSIGNED" name)))
+                   (vop32f (intern (format nil "FAST-~S-MOD32/FIXNUM=>FIXNUM" name)))
+                   (vop32cu (intern (format nil "FAST-~S-MOD32-C/UNSIGNED=>UNSIGNED" name)))
+                   (vop32cf (intern (format nil "FAST-~S-MOD32-C/FIXNUM=>FIXNUM" name)))
                    (sfun30 (intern (format nil "~S-SMOD30" name)))
-                   (svop30 (intern (format nil "FAST-~S-SMOD30/FIXNUM=>FIXNUM" name)))
-                   (svop (intern (format nil "FAST-~S/FIXNUM=>FIXNUM" name)))
-                   (svop30c (intern (format nil "FAST-~S-SMOD30-C/FIXNUM=>FIXNUM" name)))
-                   (svopc (intern (format nil "FAST-~S-C/FIXNUM=>FIXNUM" name))))
-             `(progn
-                (define-modular-fun ,fun32 (x y) ,name :unsigned 32)
-                (define-modular-fun ,sfun30 (x y) ,name :signed 30)
-                (define-vop (,vop32 ,vop) (:translate ,fun32))
-                (define-vop (,svop30 ,svop) (:translate ,sfun30))
-                ,@(when -c-p
-                    `((define-vop (,vop32c ,vopc) (:translate ,fun32))
-                      (define-vop (,svop30c ,svopc) (:translate ,sfun30))))))))
+                   (svop30f (intern (format nil "FAST-~S-SMOD30/FIXNUM=>FIXNUM" name)))
+                   (svop30cf (intern (format nil "FAST-~S-SMOD30-C/FIXNUM=>FIXNUM" name))))
+               `(progn
+                  (define-modular-fun ,fun32 (x y) ,name :unsigned 32)
+                  (define-modular-fun ,sfun30 (x y) ,name :signed 30)
+                  (define-vop (,vop32u ,vopu) (:translate ,fun32))
+                  (define-vop (,vop32f ,vopf) (:translate ,fun32))
+                  (define-vop (,svop30f ,vopf) (:translate ,sfun30))
+                  ,@(when -c-p
+                      `((define-vop (,vop32cu ,vopcu) (:translate ,fun32))
+                        (define-vop (,svop30cf ,vopcf) (:translate ,sfun30))))))))
   (def + t)
   (def - t)
   ;; (no -C variant as x86 MUL instruction doesn't take an immediate)
@@ -1320,6 +1323,12 @@
   (:translate logxor-mod32))
 (define-vop (fast-logxor-mod32-c/unsigned=>unsigned
              fast-logxor-c/unsigned=>unsigned)
+  (:translate logxor-mod32))
+(define-vop (fast-logxor-mod32/fixnum=>fixnum
+             fast-logxor/fixnum=>fixnum)
+  (:translate logxor-mod32))
+(define-vop (fast-logxor-mod32-c/fixnum=>fixnum
+             fast-logxor-c/fixnum=>fixnum)
   (:translate logxor-mod32))
 
 (define-source-transform logeqv (&rest args)
