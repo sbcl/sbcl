@@ -957,36 +957,6 @@
 	(declare (integer result)))
       -1))
 
-(defun lognand (integer1 integer2)
-  #!+sb-doc
-  "Return the complement of the logical AND of integer1 and integer2."
-  (lognand integer1 integer2))
-
-(defun lognor (integer1 integer2)
-  #!+sb-doc
-  "Return the complement of the logical OR of integer1 and integer2."
-  (lognor integer1 integer2))
-
-(defun logandc1 (integer1 integer2)
-  #!+sb-doc
-  "Return the logical AND of (LOGNOT integer1) and integer2."
-  (logandc1 integer1 integer2))
-
-(defun logandc2 (integer1 integer2)
-  #!+sb-doc
-  "Return the logical AND of integer1 and (LOGNOT integer2)."
-  (logandc2 integer1 integer2))
-
-(defun logorc1 (integer1 integer2)
-  #!+sb-doc
-  "Return the logical OR of (LOGNOT integer1) and integer2."
-  (logorc1 integer1 integer2))
-
-(defun logorc2 (integer1 integer2)
-  #!+sb-doc
-  "Return the logical OR of integer1 and (LOGNOT integer2)."
-  (logorc2 integer1 integer2))
-
 (defun lognot (number)
   #!+sb-doc
   "Return the bit-wise logical not of integer."
@@ -994,13 +964,39 @@
     (fixnum (lognot (truly-the fixnum number)))
     (bignum (bignum-logical-not number))))
 
-(macrolet ((def (name op big-op)
-	     `(defun ,name (x y)
-	       (number-dispatch ((x integer) (y integer))
-		 (bignum-cross-fixnum ,op ,big-op)))))
+(macrolet ((def (name op big-op &optional doc)
+	     `(defun ,name (integer1 integer2)
+		,@(when doc
+		    (list doc))
+		(let ((x integer1)
+		      (y integer2))
+		  (number-dispatch ((x integer) (y integer))
+		    (bignum-cross-fixnum ,op ,big-op))))))
   (def two-arg-and logand bignum-logical-and)
   (def two-arg-ior logior bignum-logical-ior)
-  (def two-arg-xor logxor bignum-logical-xor))
+  (def two-arg-xor logxor bignum-logical-xor)
+  ;; BIGNUM-LOGICAL-{AND,IOR,XOR} need not return a bignum, so must
+  ;; call the generic LOGNOT...
+  (def two-arg-eqv logeqv (lambda (x y) (lognot (bignum-logical-xor x y))))
+  (def lognand lognand 
+       (lambda (x y) (lognot (bignum-logical-and x y))) 
+       #!+sb-doc "Complement the logical AND of INTEGER1 and INTEGER2.")
+  (def lognor lognor
+       (lambda (x y) (lognot (bignum-logical-ior x y)))
+       #!+sb-doc "Complement the logical AND of INTEGER1 and INTEGER2.")
+  ;; ... but BIGNUM-LOGICAL-NOT on a bignum will always return a bignum
+  (def logandc1 logandc1
+       (lambda (x y) (bignum-logical-and (bignum-logical-not x) y))
+       #!+sb-doc "Bitwise AND (LOGNOT INTEGER1) with INTEGER2.")
+  (def logandc2 logandc2
+       (lambda (x y) (bignum-logical-and x (bignum-logical-not y)))
+       #!+sb-doc "Bitwise AND INTEGER1 with (LOGNOT INTEGER2).")
+  (def logorc1 logorc1
+       (lambda (x y) (bignum-logical-ior (bignum-logical-not x) y))
+       #!+sb-doc "Bitwise OR (LOGNOT INTEGER1) with INTEGER2.")
+  (def logorc2 logorc2
+       (lambda (x y) (bignum-logical-ior x (bignum-logical-not y)))
+       #!+sb-doc "Bitwise OR INTEGER1 with (LOGNOT INTEGER2)."))
 
 (defun logcount (integer)
   #!+sb-doc
