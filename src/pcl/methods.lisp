@@ -291,7 +291,7 @@
 (define-condition find-method-length-mismatch
     (reference-condition simple-error)
   ()
-  (:default-initargs :references '(:ansi-cl :function find-method)))
+  (:default-initargs :references (list '(:ansi-cl :function find-method))))
 
 (defun real-get-method (generic-function qualifiers specializers
 			&optional (errorp t) 
@@ -299,7 +299,8 @@
   (let ((lspec (length specializers))
 	(methods (generic-function-methods generic-function)))
     (when (or methods always-check-specializers)
-      (let ((nreq (length (arg-info-metatypes (gf-arg-info generic-function)))))
+      (let ((nreq (length (arg-info-metatypes (gf-arg-info
+					       generic-function)))))
 	;; Since we internally bypass FIND-METHOD by using GET-METHOD
 	;; instead we need to to this here or users may get hit by a
 	;; failed AVER instead of a sensible error message.
@@ -712,7 +713,8 @@
   (loop (when (atom x) (return (eq x y)))
 	(when (atom y) (return nil))
 	(unless (eq (car x) (car y)) (return nil))
-	(setq x (cdr x)  y (cdr y))))
+	(setq x (cdr x)
+	      y (cdr y))))
 
 (defvar *std-cam-methods* nil)
 
