@@ -482,7 +482,7 @@
 ;; Some special cases where we know we want a left shift.  Just do the
 ;; shift, instead of checking for the sign of the shift.
 (macrolet
-    ((frob (name sc-type type result-type cost)
+    ((def (name sc-type type result-type cost)
        `(define-vop (,name)
 	 (:note "inline ASH")
 	 (:translate ash)
@@ -503,9 +503,9 @@
 	    (let ((amount (tn-value amount)))
 	      (aver (>= amount 0))
 	      (inst sll result number amount))))))))
-  (frob fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
-  (frob fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)
-  (frob fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
+  (def fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
+  (def fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)
+  (def fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
 
 
 (define-vop (signed-byte-32-len)
@@ -689,6 +689,14 @@
 (define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
 	     fast-ash-c/unsigned=>unsigned)
   (:translate ash-left-mod32))
+
+(define-vop (fast-ash-left-mod32/unsigned=>unsigned
+             fast-ash-left/unsigned=>unsigned))
+(deftransform ash-left-mod32 ((integer count)
+			      ((unsigned-byte 32) (unsigned-byte 5)))
+  (when (sb!c::constant-lvar-p count)
+    (sb!c::give-up-ir1-transform))
+  '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
 
 ;;;; Binary conditional VOPs:
 

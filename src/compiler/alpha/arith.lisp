@@ -271,6 +271,28 @@
       ((> count 0) (inst sll number (min 63 count) result))
       (t (bug "identity ASH not transformed away")))))
 
+(macrolet ((def (name sc-type type result-type cost)
+             `(define-vop (,name)
+                (:note "inline ASH")
+                (:translate ash)
+                (:args (number :scs (,sc-type))
+                       (amount :scs (signed-reg unsigned-reg immediate)))
+                (:arg-types ,type positive-fixnum)
+                (:results (result :scs (,result-type)))
+                (:result-types ,type)
+                (:policy :fast-safe)
+                (:generator ,cost
+                   (sc-case amount
+                     ((signed-reg unsigned-reg)
+                      (inst sll number amount result))
+                     (immediate
+                      (let ((amount (tn-value amount)))
+                        (aver (> amount 0))
+                        (inst sll number amount result))))))))
+  (def fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)
+  (def fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
+  (def fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
+
 (define-vop (signed-byte-64-len)
   (:translate integer-length)
   (:note "inline (signed-byte 64) integer-length")
@@ -381,6 +403,13 @@
 (define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
 	     fast-ash-c/unsigned=>unsigned)
   (:translate ash-left-mod64))
+(define-vop (fast-ash-left-mod64/unsigned=>unsigned
+             fast-ash-left/unsigned=>unsigned))
+(deftransform ash-left-mod64 ((integer count)
+			      ((unsigned-byte 64) (unsigned-byte 6)))
+  (when (sb!c::constant-lvar-p count)
+    (sb!c::give-up-ir1-transform))
+  '(%primitive fast-ash-left-mod64/unsigned=>unsigned integer count))
 
 (macrolet
     ((define-modular-backend (fun &optional constantp)

@@ -295,6 +295,9 @@
 	   ;; Count=0?  Shouldn't happen, but it's easy:
 	   (move number result)))))
 
+;;; FIXME: implement FAST-ASH-LEFT/UNSIGNED=>UNSIGNED and friends, for
+;;; use in modular ASH (and because they're useful anyway).  -- CSR,
+;;; 2004-08-16
 
 (define-vop (signed-byte-32-len)
   (:translate integer-length)
@@ -591,6 +594,15 @@
 (define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
 	     fast-ash-c/unsigned=>unsigned)
   (:translate ash-left-mod32))
+(define-vop (fast-ash-left-mod32/unsigned=>unsigned
+	     ;; FIXME: when FAST-ASH-LEFT/UNSIGNED=>UNSIGNED is
+	     ;; implemented, use it here.  -- CSR, 2004-08-16
+             fast-ash/unsigned=>unsigned))
+(deftransform ash-left-mod32 ((integer count)
+			      ((unsigned-byte 32) (unsigned-byte 5)))
+  (when (sb!c::constant-lvar-p count)
+    (sb!c::give-up-ir1-transform))
+  '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
 
 (define-modular-fun lognot-mod32 (x) lognot 32)
 (define-vop (lognot-mod32/unsigned=>unsigned)

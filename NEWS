@@ -35,6 +35,9 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
     applying the more sophisticated binary GCD.  (thanks to Juho
     Snellman)
   * optimization: COUNT on bitvectors now operates word-at-a-time.
+  * optimization: ASH with a positive, but not necessarily constant,
+    (leftwards) shift, when in a modular context, is compiled to a
+    hardware shift.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** FORMAT variable parameters ("~V<char>") are defaulted properly
        if the corresponding argument is NIL.

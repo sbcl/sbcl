@@ -1431,3 +1431,12 @@
 		   (declare (type (integer 3 6) y)
 			    (type (integer -6 -3) x))
 		   (+ (logxor x y) most-positive-fixnum)))))
+
+;;; check that modular ash gives the right answer, to protect against
+;;; possible misunderstandings about the hardware shift instruction.
+(assert (zerop (funcall
+		(compile nil '(lambda (x y)
+			       (declare (optimize speed)
+			                (type (unsigned-byte 32) x y))
+			       (logand #xffffffff (ash x y))))
+		1 257)))

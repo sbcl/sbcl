@@ -490,11 +490,14 @@
     ((def (name width)
 	 `(progn
 	    (defknown ,name (integer (integer 0)) (unsigned-byte ,width)
-		      (foldable flushable movable))
+		      (foldable flushable movable))	   
 	    (define-modular-fun-optimizer ash ((integer count) :width width)
 	      (when (and (<= width ,width)
-			 (constant-lvar-p count) ;?
-			 (plusp (lvar-value count)))
+			 (or (and (constant-lvar-p count)
+				  (plusp (lvar-value count)))
+			     (csubtypep (lvar-type count)
+					(specifier-type '(and unsigned-byte
+							  fixnum)))))
 		(cut-to-width integer width)
 		',name))
 	    (setf (gethash ',name *modular-versions*) `(ash ,',width)))))
