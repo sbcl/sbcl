@@ -23,10 +23,10 @@
 
 (defstruct (restart (:copier nil) (:predicate nil))
   (name (missing-arg) :type symbol :read-only t)
-  function
-  report-function
-  interactive-function
-  (test-fun (lambda (cond) (declare (ignore cond)) t)))
+  (function (missing-arg) :type function)
+  (report-function nil :type (or null function))
+  (interactive-function nil :type (or null function))
+  (test-function (lambda (cond) (declare (ignore cond)) t) :type function))
 (def!method print-object ((restart restart) stream)
   (if *print-escape*
       (print-unreadable-object (restart stream :type t :identity t)
@@ -51,7 +51,8 @@
 	  (when (and (or (not condition)
 			 (member restart associated)
 			 (not (member restart other)))
-		     (funcall (restart-test-fun restart) condition))
+		     (funcall (restart-test-function restart)
+                              condition))
 	    (res restart))))
       (res))))
 
@@ -208,7 +209,7 @@
 				   :interactive-function
 				   result)))
 	     (when test
-	       (setq result (list* `#',test :test-fun result)))
+	       (setq result (list* `#',test :test-function result)))
 	     (nreverse result)))
 	 (parse-keyword-pairs (list keys)
 	   (do ((l list (cddr l))

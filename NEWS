@@ -1520,6 +1520,8 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
     the lexical environment.
   * fixed a bug in DEFCLASS: classes named by symbols with no or
     unprintable packages can now be defined.
+  * fixed a bug in RESTART-BIND: The :TEST-FUNCTION option had been
+    carelessly renamed to :TEST-FUN. (thanks to Robert E. Brown)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** ARRAY-IN-BOUNDS-P now allows arbitrary integers as arguments,
        not just nonnegative fixnums;
