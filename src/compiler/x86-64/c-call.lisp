@@ -81,12 +81,15 @@
     (setf (result-state-num-results state) (1+ num-results))
     (multiple-value-bind (ptype reg-sc)
 	(if (alien-integer-type-signed type)
-	    (values (if (= (sb!alien::alien-integer-type-bits type) 32)
-			'signed-byte-32
-			'signed-byte-64)
-		    'signed-reg)
+	    (values 'signed-byte-64 'signed-reg)
 	    (values 'unsigned-byte-64 'unsigned-reg))
       (my-make-wired-tn ptype reg-sc (result-reg-offset num-results)))))
+
+(define-alien-type-method (integer :naturalize-gen) (type alien)
+  (if (and (alien-integer-type-signed type)
+	   (<= (alien-type-bits type) 32))
+      `(sign-extend ,alien)
+      alien))
 
 (define-alien-type-method (system-area-pointer :result-tn) (type state)
   (declare (ignore type))
@@ -184,8 +187,28 @@
                                     ,@(new-args))))))
         (sb!c::give-up-ir1-transform))))
 
+;;; The ABI specifies that signed short/int's are returned as 32-bit
+;;; values. Negative values need to be sign-extended to 64-bits (done
+;;; in a :NATURALIZE-GEN alien-type-method).
+(defknown sign-extend (fixnum) fixnum (foldable flushable movable))  	  
 
+(define-vop (sign-extend)
+  (:translate sign-extend)
+  (:policy :fast-safe)
+  (:args (val :scs (any-reg)))
+  (:arg-types fixnum)
+  (:results (res :scs (any-reg)))
+  (:result-types fixnum)
+  (:generator 1
+   (inst movsxd res
+	 (make-random-tn :kind :normal
+			 :sc (sc-or-lose 'dword-reg)
+			 :offset (tn-offset val)))))
 
+(defun sign-extend (x)
+  (if (logbitp 31 x)
+      (dpb x (byte 32 0) -1)
+      (ldb (byte 32 0) x)))
 
 (define-vop (foreign-symbol-address)
   (:translate foreign-symbol-address)
@@ -217,6 +240,7 @@
   (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
   (:temporary (:sc unsigned-reg :offset rcx-offset
 		   :from :eval :to :result) rcx)
+  (:ignore results)
   (:vop-var vop)
   (:save-p t)
   (:generator 0
@@ -230,16 +254,6 @@
     (inst call function)
     ;; To give the debugger a clue. XX not really internal-error?
     (note-this-location vop :internal-error)
-    ;; Sign-extend s-b-32 return values.
-    (dolist (res (if (listp results)
-		     results
-		     (list results)))
-      (let ((tn (tn-ref-tn res)))	       
-	(when (eq (sb!c::tn-primitive-type tn)
-		  (primitive-type-or-lose 'signed-byte-32))
-	  (inst movsxd tn (make-random-tn :kind :normal
-					  :sc (sc-or-lose 'dword-reg)
-					  :offset (tn-offset tn))))))
     ;; FLOAT15 needs to contain FP zero in Lispland
     (inst xor rcx rcx)
     (inst movd (make-random-tn :kind :normal 

@@ -37,6 +37,9 @@ build_so() {
 echo 'int summish(int x, int y) { return 1 + x + y; }' > $testfilestem.c
 echo 'int numberish = 42;' >> $testfilestem.c
 echo 'int nummish(int x) { return numberish + x; }' >> $testfilestem.c
+echo 'short negative_short() { return -1; }' >> $testfilestem.c
+echo 'int negative_int()     { return -2; }' >> $testfilestem.c
+echo 'long negative_long()   { return -3; }' >> $testfilestem.c
 build_so $testfilestem
 
 echo 'int foo = 13;' > $testfilestem-b.c
@@ -72,6 +75,10 @@ cat > $testfilestem.def.lisp <<EOF
   (define-alien-variable "foo" int)
   (define-alien-routine "bar" int)
 
+  (define-alien-routine "negative_short" short)
+  (define-alien-routine "negative_int" int)
+  (define-alien-routine "negative_long" long)
+
   ;; Test that loading an object file didn't screw up our records
   ;; of variables visible in runtime. (This was a bug until 
   ;; Nikodemus Siivola's patch in sbcl-0.8.5.50.)
@@ -99,6 +106,10 @@ cat > $testfilestem.test.lisp <<EOF
   (setf numberish 13)
   (assert (= 13 numberish))
   (assert (= 14 (nummish 1)))
+
+  (assert (= -1 (negative-short)))
+  (assert (= -2 (negative-int)))
+  (assert (= -3 (negative-long)))
 
   (print :stage-1)
 

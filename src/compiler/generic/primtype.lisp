@@ -41,8 +41,7 @@
   :type (unsigned-byte 64))
 (!def-primitive-type fixnum (any-reg signed-reg)
   :type (signed-byte #.(1+ sb!vm:n-positive-fixnum-bits)))
-;; x86-64 needs a signed-byte-32 for proper handling of c-call return values.
-#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 32) '(and) '(or x86-64))
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 32) '(and) '(or))
 (!def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
   :type (signed-byte 32))
 #!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
