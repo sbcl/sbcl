@@ -634,7 +634,8 @@ about function addresses and register values.")
 
 (defun cond-move-condition (condition-reg)
   (or (position condition-reg cond-move-condition-registers)
-      (error "Unknown conditional move condition register:  ~S~%")))
+      (error "Unknown conditional move condition register:  ~S~%"
+             condition-reg)))
 
 (defconstant-eqx cond-move-printer
   `(:name cond :tab
@@ -697,7 +698,7 @@ about function addresses and register values.")
 
 (defun register-condition (rcond)
   (or (position rcond cond-move-integer-conditions)
-      (error "Unknown register condition:  ~S~%")))
+      (error "Unknown register condition:  ~S~%" rcond)))
 
 (sb!disassem:define-instruction-format
     (format-4-cond-move-integer 32 :default-printer cond-move-integer-printer)
