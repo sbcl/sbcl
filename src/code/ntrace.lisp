@@ -35,12 +35,12 @@
 
 ;;;; internal state
 
-;;; a hash table that maps each traced function to the TRACE-INFO. The entry
-;;; for a closure is the shared function-entry object.
+;;; a hash table that maps each traced function to the TRACE-INFO. The
+;;; entry for a closure is the shared function-entry object.
 (defvar *traced-functions* (make-hash-table :test 'eq))
 
-;;; A TRACE-INFO object represents all the information we need to trace a
-;;; given function.
+;;; A TRACE-INFO object represents all the information we need to
+;;; trace a given function.
 (def!struct (trace-info
 	     (:make-load-form-fun sb-kernel:just-dump-it-normally)
 	     (:print-object (lambda (x stream)
@@ -61,13 +61,14 @@
   ;; the list of function names for WHEREIN, or NIL if unspecified
   (wherein nil :type list)
 
-  ;; The following slots represent the forms that we are supposed to evaluate
-  ;; on each iteration. Each form is represented by a cons (Form . Function),
-  ;; where the Function is the cached result of coercing Form to a function.
-  ;; Forms which use the current environment are converted with
-  ;; PREPROCESS-FOR-EVAL, which gives us a one-arg function.
-  ;; Null environment forms also have one-arg functions, but the argument is
-  ;; ignored. NIL means unspecified (the default.)
+  ;; The following slots represent the forms that we are supposed to
+  ;; evaluate on each iteration. Each form is represented by a cons
+  ;; (Form . Function), where the Function is the cached result of
+  ;; coercing Form to a function. Forms which use the current
+  ;; environment are converted with PREPROCESS-FOR-EVAL, which gives
+  ;; us a one-arg function. Null environment forms also have one-arg
+  ;; functions, but the argument is ignored. NIL means unspecified
+  ;; (the default.)
 
   ;; current environment forms
   (condition nil)
@@ -101,19 +102,19 @@
 (defvar *traced-entries* ())
 (declaim (list *traced-entries*))
 
-;;; This variable is used to discourage infinite recursions when some trace
-;;; action invokes a function that is itself traced. In this case, we quietly
-;;; ignore the inner tracing.
+;;; This variable is used to discourage infinite recursions when some
+;;; trace action invokes a function that is itself traced. In this
+;;; case, we quietly ignore the inner tracing.
 (defvar *in-trace* nil)
 
 ;;;; utilities
 
-;;;    Given a function name, a function or a macro name, return the raw
-;;; definition and some information. "Raw"  means that if the result is a
-;;; closure, we strip off the closure and return the bare code. The second
-;;; value is T if the argument was a function name. The third value is one of
-;;; :COMPILED, :COMPILED-CLOSURE, :INTERPRETED, :INTERPRETED-CLOSURE and
-;;; :FUNCALLABLE-INSTANCE.
+;;; Given a function name, a function or a macro name, return the raw
+;;; definition and some information. "Raw" means that if the result is
+;;; a closure, we strip off the closure and return the bare code. The
+;;; second value is T if the argument was a function name. The third
+;;; value is one of :COMPILED, :COMPILED-CLOSURE, :INTERPRETED,
+;;; :INTERPRETED-CLOSURE and :FUNCALLABLE-INSTANCE.
 (defun trace-fdefinition (x)
   (multiple-value-bind (res named-p)
       (typecase x
@@ -137,8 +138,8 @@
 	   (values res named-p :funcallable-instance))
 	  (t (values res named-p :compiled))))))
 
-;;; When a function name is redefined, and we were tracing that name, then
-;;; untrace the old definition and trace the new one.
+;;; When a function name is redefined, and we were tracing that name,
+;;; then untrace the old definition and trace the new one.
 (defun trace-redefined-update (fname new-value)
   (when (fboundp fname)
     (let* ((fun (trace-fdefinition fname))
@@ -148,10 +149,10 @@
 	(trace-1 fname info new-value)))))
 (push #'trace-redefined-update sb-int:*setf-fdefinition-hook*)
 
-;;; Annotate some forms to evaluate with pre-converted functions. Each form
-;;; is really a cons (exp . function). Loc is the code location to use for
-;;; the lexical environment. If Loc is NIL, evaluate in the null environment.
-;;; If Form is NIL, just return NIL.
+;;; Annotate some forms to evaluate with pre-converted functions. Each
+;;; form is really a cons (exp . function). Loc is the code location
+;;; to use for the lexical environment. If Loc is NIL, evaluate in the
+;;; null environment. If Form is NIL, just return NIL.
 (defun coerce-form (form loc)
   (when form
     (let ((exp (car form)))
@@ -218,8 +219,8 @@
 	     (trace-info-what info)))))
 
 ;;; This function discards any invalid cookies on our simulated stack.
-;;; Encapsulated entries are always valid, since we bind *traced-entries* in
-;;; the encapsulation.
+;;; Encapsulated entries are always valid, since we bind
+;;; *TRACED-ENTRIES* in the encapsulation.
 (defun discard-invalid-entries (frame)
   (loop
     (when (or (null *traced-entries*)
@@ -231,10 +232,10 @@
 
 ;;;; hook functions
 
-;;; Return a closure that can be used for a function start breakpoint hook
-;;; function and a closure that can be used as the FUNCTION-END-COOKIE
-;;; function. The first communicates the sense of the Condition to the second
-;;; via a closure variable.
+;;; Return a closure that can be used for a function start breakpoint
+;;; hook function and a closure that can be used as the
+;;; FUNCTION-END-COOKIE function. The first communicates the sense of
+;;; the Condition to the second via a closure variable.
 (defun trace-start-breakpoint-fun (info)
   (let (conditionp)
     (values
@@ -322,11 +323,11 @@
 	  (values-list vals))))))
 
 ;;; Trace one function according to the specified options. We copy the
-;;; trace info (it was a quoted constant), fill in the functions, and then
-;;; install the breakpoints or encapsulation.
+;;; trace info (it was a quoted constant), fill in the functions, and
+;;; then install the breakpoints or encapsulation.
 ;;;
-;;; If non-null, Definition is the new definition of a function that we are
-;;; automatically retracing.
+;;; If non-null, DEFINITION is the new definition of a function that
+;;; we are automatically retracing.
 (defun trace-1 (function-or-name info &optional definition)
   (multiple-value-bind (fun named kind)
       (if definition
@@ -392,11 +393,12 @@
 		      :function-end-cookie cookie-fun)))
 	    (setf (trace-info-start-breakpoint info) start)
 	    (setf (trace-info-end-breakpoint info) end)
-	    ;; The next two forms must be in the order in which they appear,
-	    ;; since the start breakpoint must run before the function-end
-	    ;; breakpoint's start helper (which calls the cookie function.)
-	    ;; One reason is that cookie function requires that the CONDITIONP
-	    ;; shared closure variable be initialized.
+	    ;; The next two forms must be in the order in which they
+	    ;; appear, since the start breakpoint must run before the
+	    ;; function-end breakpoint's start helper (which calls the
+	    ;; cookie function.) One reason is that cookie function
+	    ;; requires that the CONDITIONP shared closure variable be
+	    ;; initialized.
 	    (sb-di:activate-breakpoint start)
 	    (sb-di:activate-breakpoint end)))))
 
@@ -406,9 +408,9 @@
 
 ;;;; the TRACE macro
 
-;;; Parse leading trace options off of SPECS, modifying INFO accordingly. The
-;;; remaining portion of the list is returned when we encounter a plausible
-;;; function name.
+;;; Parse leading trace options off of SPECS, modifying INFO
+;;; accordingly. The remaining portion of the list is returned when we
+;;; encounter a plausible function name.
 (defun parse-trace-options (specs info)
   (let ((current specs))
     (loop
@@ -453,8 +455,8 @@
     current))
 
 ;;; Compute the expansion of TRACE in the non-trivial case (arguments
-;;; specified.)  If there are no :FUNCTION specs, then don't use a LET. This
-;;; allows TRACE to be used without the full interpreter.
+;;; specified.) If there are no :FUNCTION specs, then don't use a LET.
+;;; This allows TRACE to be used without the full interpreter.
 (defun expand-trace (specs)
   (collect ((binds)
 	    (forms))

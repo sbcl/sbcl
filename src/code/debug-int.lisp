@@ -3510,6 +3510,7 @@
 ;;; debugging-tool break instruction. This does NOT handle all breaks;
 ;;; for example, it does not handle breaks for internal errors.
 (defun handle-breakpoint (offset component signal-context)
+  (/show0 "entering HANDLE-BREAKPOINT")
   (let ((data (breakpoint-data component offset nil)))
     (unless data
       (error "unknown breakpoint in ~S at offset ~S"
@@ -3533,6 +3534,7 @@
 ;;; This handles code-location and debug-function :FUNCTION-START
 ;;; breakpoints.
 (defun handle-breakpoint-aux (breakpoints data offset component signal-context)
+  (/show0 "entering HANDLE-BREAKPOINT-AUX")
   (unless breakpoints
     (error "internal error: breakpoint that nobody wants"))
   (unless (member data *executing-breakpoint-hooks*)
@@ -3575,6 +3577,7 @@
 		   bpt)))))
 
 (defun handle-function-end-breakpoint (offset component context)
+  (/show0 "entering HANDLE-FUNCTION-END-BREAKPOINT")
   (let ((data (breakpoint-data component offset nil)))
     (unless data
       (error "unknown breakpoint in ~S at offset ~S"
@@ -3589,6 +3592,7 @@
 ;;; [old C code] or HANDLE-FUNCTION-END-BREAKPOINT calls this directly
 ;;; [new C code].
 (defun handle-function-end-breakpoint-aux (breakpoints data signal-context)
+  (/show0 "entering HANDLE-FUNCTION-END-BREAKPOINT-AUX")
   (delete-breakpoint-data data)
   (let* ((scp
 	  (locally

@@ -144,8 +144,8 @@ arch_remove_breakpoint(void *pc, unsigned long orig_inst)
 
 /* When single stepping, single_stepping holds the original instruction
  * PC location. */
-unsigned int *single_stepping=NULL;
-#ifndef __linux__
+unsigned int *single_stepping = NULL;
+#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
 unsigned int  single_step_save1;
 unsigned int  single_step_save2;
 unsigned int  single_step_save3;
@@ -160,9 +160,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned long orig_inst)
     *((char *)pc) = orig_inst & 0xff;
     *((char *)pc + 1) = (orig_inst & 0xff00) >> 8;
 
-#ifdef __linux__
-    *context_eflags_addr(context) |= 0x100;
-#else
+#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
     /* Install helper instructions for the single step:
      * pushf; or [esp],0x100; popf. */
     single_step_save1 = *(pc-3);
@@ -171,11 +169,13 @@ arch_do_displaced_inst(os_context_t *context, unsigned long orig_inst)
     *(pc-3) = 0x9c909090;
     *(pc-2) = 0x00240c81;
     *(pc-1) = 0x9d000001;
+#else
+    *context_eflags_addr(context) |= 0x100;
 #endif
 
     single_stepping = (unsigned int*)pc;
 
-#ifndef __linux__
+#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
     *os_context_pc_addr(context) = (char *)pc - 9;
 #endif
 }
@@ -191,7 +191,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     {
 	/* fprintf(stderr,"* single step trap %x\n", single_stepping); */
 
-#ifndef __linux__
+#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
 	/* Un-install single step helper instructions. */
 	*(single_stepping-3) = single_step_save1;
 	*(single_stepping-2) = single_step_save2;

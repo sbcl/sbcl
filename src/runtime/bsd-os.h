@@ -28,6 +28,15 @@ typedef int os_vm_prot_t;
  * original FreeBSD port of SBCL, that's wrong, it's actually a
  * ucontext_t. */
 typedef ucontext_t os_context_t;
+/* KLUDGE: A hack inherited from CMU CL used to be conditional on
+ * !defined(__linux__), and has now been made conditional on
+ * CANNOT_GET_TO_SINGLE_STEP_FLAG: if the OS won't let us flip the
+ * single-step flag bit in the state stored in a signal context, then
+ * we need to mess around with overwriting preceding code with
+ * bit-flipping code. This isn't needed in Linux or OpenBSD; I haven't
+ * been able to test whether it's still needed in FreeBSD, so for
+ * conservatism it's left in. -- WHN 2000-10-24 */
+#define CANNOT_GET_TO_SINGLE_STEP_FLAG
 #elif defined __OpenBSD__
 typedef struct sigcontext os_context_t;
 #else
