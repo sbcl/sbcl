@@ -723,6 +723,8 @@
 ;;;; setup of CONDITION machinery, only because that makes it easier to
 ;;;; get cold init to work.
 
+(define-condition simple-style-warning (simple-condition style-warning) ())
+
 (define-condition values-type-error (type-error)
   ()
   (:report
@@ -988,6 +990,17 @@
 (define-condition local-argument-mismatch (reference-condition simple-warning)
   ()
   (:default-initargs :references (list '(:ansi-cl :section (3 2 2 3)))))
+
+(define-condition format-args-mismatch (reference-condition)
+  ()
+  (:default-initargs :references (list '(:ansi-cl :section (22 3 10 2)))))
+
+(define-condition format-too-few-args-warning 
+    (format-args-mismatch simple-warning)
+  ())
+(define-condition format-too-many-args-warning
+    (format-args-mismatch simple-style-warning)
+  ())
 
 ;;;; restart definitions
 

@@ -3301,12 +3301,6 @@
 
 ;;; for compile-time argument count checking.
 ;;;
-;;; FIXME I: this is currently called from DEFTRANSFORMs, the vast
-;;; majority of which are not going to transform the code, but instead
-;;; are going to GIVE-UP-IR1-TRANSFORM unconditionally.  It would be
-;;; nice to make this explicit, maybe by implementing a new
-;;; "optimizer" (say, DEFOPTIMIZER CONSISTENCY-CHECK).
-;;;
 ;;; FIXME II: In some cases, type information could be correlated; for
 ;;; instance, ~{ ... ~} requires a list argument, so if the lvar-type
 ;;; of a corresponding argument is known and does not intersect the
@@ -3323,18 +3317,15 @@
       (let ((nargs (length args)))
 	(cond
 	  ((< nargs min)
-	   (compiler-warn "Too few arguments (~D) to ~S ~S: ~
-                           requires at least ~D."
-			  nargs fun string min))
+	   (warn 'format-too-few-args-warning
+		 :format-control
+		 "Too few arguments (~D) to ~S ~S: requires at least ~D."
+		 :format-arguments (list nargs fun string min)))
 	  ((> nargs max)
-	   (;; to get warned about probably bogus code at
-	    ;; cross-compile time.
-	    #+sb-xc-host compiler-warn
-	    ;; ANSI saith that too many arguments doesn't cause a
-	    ;; run-time error.
-	    #-sb-xc-host compiler-style-warn
-	    "Too many arguments (~D) to ~S ~S: uses at most ~D."
-	    nargs fun string max)))))))
+	   (warn 'format-too-many-args-warning
+		 :format-control
+		 "Too many arguments (~D) to ~S ~S: uses at most ~D."
+		 :format-arguments (list nargs fun string max))))))))
 
 (defoptimizer (format optimizer) ((dest control &rest args))
   (when (constant-lvar-p control)
@@ -3407,18 +3398,19 @@
 		(let ((nargs (length args)))
 		  (cond
 		    ((< nargs (min min1 min2))
-		     (compiler-warn "Too few arguments (~D) to ~S ~S ~S: ~
-                                     requires at least ~D."
-				    nargs 'cerror y x (min min1 min2)))
+		     (warn 'format-too-few-args-warning
+			   :format-control
+			   "Too few arguments (~D) to ~S ~S ~S: ~
+                            requires at least ~D."
+			   :format-arguments
+			   (list nargs 'cerror y x (min min1 min2))))
 		    ((> nargs (max max1 max2))
-		     (;; to get warned about probably bogus code at
-		      ;; cross-compile time.
-		      #+sb-xc-host compiler-warn
-		      ;; ANSI saith that too many arguments doesn't cause a
-		      ;; run-time error.
-		      #-sb-xc-host compiler-style-warn
-		      "Too many arguments (~D) to ~S ~S ~S: uses at most ~D."
-		      nargs 'cerror y x (max max1 max2)))))))))))))
+		     (warn 'format-too-many-args-warning
+			   :format-control
+			   "Too many arguments (~D) to ~S ~S ~S: ~
+                            uses at most ~D."
+			   :format-arguments
+			   (list nargs 'cerror y x (max max1 max2))))))))))))))
 
 (defoptimizer (coerce derive-type) ((value type))
   (cond

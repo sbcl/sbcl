@@ -13,8 +13,6 @@
 
 (in-package "SB!KERNEL")
 
-(define-condition simple-style-warning (simple-condition style-warning) ())
-
 ;;; not sure this is the right place, but where else?
 (defun style-warn (format-control &rest format-arguments)
   (/show0 "entering STYLE-WARN")
