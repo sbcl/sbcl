@@ -532,9 +532,9 @@
 		"~@<Reduce debugger level (leaving debugger, returning to toplevel).~@:>")
 	     (catch 'toplevel-catcher
 	       (sb!unix::reset-signal-mask)
-	       ;; in the event of a control-stack-exhausted-error, we
+	       ;; In the event of a control-stack-exhausted-error, we
 	       ;; should have unwound enough stack by the time we get
-	       ;; here that this is now possible
+	       ;; here that this is now possible.
 	       (sb!kernel::protect-control-stack-guard-page 1)
 	       (funcall repl-fun noprint)
 	       (critically-unreachable "after REPL")))))))))

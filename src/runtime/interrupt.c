@@ -544,19 +544,26 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     struct thread *thread=arch_os_get_current_thread();
     struct interrupt_data *data=thread->interrupt_data;
-
+    sigset_t ss;
+    int i;
     
     if(maybe_defer_handler(sig_stop_for_gc_handler,data,
-			   signal,info,context)){
+			   signal,info,context)) {
 	return;
     }
     /* need the context stored so it can have registers scavenged */
     fake_foreign_function_call(context); 
 
+    sigemptyset(&ss);
+    for(i=1;i<NSIG;i++) sigaddset(&ss,i); /* Block everything. */
+    sigprocmask(SIG_BLOCK,&ss,0);
+
     get_spinlock(&all_threads_lock,thread->pid);
     thread->state=STATE_STOPPED;
     release_spinlock(&all_threads_lock);
-    kill(thread->pid,SIGSTOP);
+
+    sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
+    sigwaitinfo(&ss,0);
 
     undo_fake_foreign_function_call(context);
 }

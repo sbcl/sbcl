@@ -2752,7 +2752,7 @@ scavenge_newspace_generation_one_scan(int generation)
 	   "/starting one full scan of newspace generation %d\n",
 	   generation));
     for (i = 0; i < last_free_page; i++) {
-	/* note that this skips over open regions when it encounters them */
+	/* Note that this skips over open regions when it encounters them. */
 	if ((page_table[i].allocated & BOXED_PAGE)
 	    && (page_table[i].bytes_used != 0)
 	    && (page_table[i].gen == generation)

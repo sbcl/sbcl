@@ -36,6 +36,28 @@
 	(size (primitive-object-size obj)))
     (cond
      ((not lowtag))
+     (;; KLUDGE described in dan_b message "Another one for the
+      ;; collection [bug 108]" (sbcl-devel 2004-01-22)
+      ;;
+      ;; In a freshly started SBCL 0.8.7.20ish, (TIME (ROOM T))  causes
+      ;;   debugger invoked on a SB-INT:BUG in thread 5911:
+      ;;     failed AVER: "(SAP= CURRENT END)"
+      ;; [WHN: Similar things happened on one but not the other of my
+      ;; machines when I just run ROOM a lot in a loop.]
+      ;;
+      ;; This appears to be due to my [DB] abuse of the primitive
+      ;; object macros to define a thread object that shares a lowtag
+      ;; with fixnums and has no widetag: it looks like the code that
+      ;; generates *META-ROOM-INFO* infers from this that even fixnums
+      ;; are thread-sized - probably undesirable.
+      ;;
+      ;; This [the fix; the EQL NAME 'THREAD clause here] is more in the
+      ;; nature of a workaround than a really good fix. I'm not sure
+      ;; what a really good fix is: I /think/ it's probably to remove
+      ;; the :LOWTAG option in DEFINE-PRIMITIVE-OBJECT THREAD, then teach
+      ;; genesis to generate the necessary OBJECT_SLOT_OFFSET macros
+      ;; for assembly source in the runtime/genesis/*.h files.
+      (eql name 'thread))
      ((not widetag)
       (let ((info (make-room-info :name name
 				  :kind :lowtag))

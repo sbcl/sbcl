@@ -347,7 +347,7 @@ void gc_start_the_world()
     for(p=all_threads;p;p=p->next) {
 	if(p==th) continue;
 	p->state=STATE_RUNNING;
-	kill(p->pid,SIGCONT);
+	kill(p->pid,SIG_STOP_FOR_GC);
     }
     release_spinlock(&all_threads_lock);
 }
