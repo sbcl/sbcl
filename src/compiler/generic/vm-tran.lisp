@@ -329,7 +329,7 @@
 				     (:big-endian
 				      '(- sb!vm:n-word-bits extra))))
 			     (%raw-bits y i))))
-		      (declare (type (integer 0 #.(1- sb!vm:n-word-bits))
+		      (declare (type (mod #.sb!vm:n-word-bits)
                                      extra)
 			       (type sb!vm:word mask numx numy))
 		      (= numx numy)))
@@ -340,7 +340,7 @@
 		  (unless (= numx numy)
 		    (return nil))))))))
 
-(deftransform count ((sequence item) (simple-bit-vector bit) *
+(deftransform count ((item sequence) (bit simple-bit-vector) *
                      :policy (>= speed space))
   `(let ((length (length sequence)))
     (if (zerop length)
@@ -359,7 +359,7 @@
 					       (:big-endian
 						'(- sb!vm:n-word-bits extra))))
 				  (%raw-bits sequence index))))
-               (declare (type (mod #.(1- sb!vm:n-word-bits)) extra))
+               (declare (type (mod #.sb!vm:n-word-bits)) extra)
                (declare (type sb!vm:word mask bits))
                ;; could consider LOGNOT for the zero case instead of
                ;; doing the subtraction...
@@ -411,7 +411,7 @@
 		   (let* ((char (lvar-value item))
 			  (code (sb!xc:char-code char))
                           (accum 0))
-                     (dotimes (i sb!vm:n-word-bytes)
+                     (dotimes (i sb!vm:n-word-bytes accum)
                        (setf accum (logior accum (ash code (* 8 i))))))
 		   `(let ((code (sb!xc:char-code item)))
                      (logior ,@(loop for i from 0 upto sb!vm:n-word-bytes
