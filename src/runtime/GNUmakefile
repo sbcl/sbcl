@@ -57,6 +57,8 @@ sbcl: ${OBJS}
 clean:
 	-rm -f depend *.o sbcl sbcl.nm core *.tmp
 
+TAGS: $(SRCS)
+	etags $(SRCS)
 
 depend: ${C_SRCS} sbcl.h
 	$(CC) ${DEPEND_FLAGS} ${CFLAGS} ${CPPFLAGS}  ${C_SRCS} > depend.tmp

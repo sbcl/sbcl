@@ -1,60 +1,19 @@
 * stuff that needs to happen before it will run
 
-14) allocation and gc needs fairly serious attention.  There is only
-    one ALLOCATION-POINTER, access to which is not locked (other than
-    by PA).
+14) allocation/gc still needs locking.
 
-ok, how are going to do allocation
-
-a) we should make some kind of token effort to keep allocation-pointer
-current, but as long as it overreads it's not a big deal.  Suggestion:
-when creating a new region, set it to the end of that region (unless
-it's already higher than that)
-
-b) how do we indicate to the gc that now is not a good time to collect stuff
-because we have non-roots in our region?
-
-we need some lind of locking:
-1) lots of threads can allocate at once, if allocation happens
+a) lots of threads can allocate at once, if allocation happens
  within an open region
-2) creating a new region should probably be a one-at-a-time operation
-3) if any thread is allocating, no thread is allowed to gc
+b) but creating a new region must be a one-at-a-time operation
+c) if any thread is allocating, no thread is allowed to gc
 
-Note that this means gc cannot be called from within the allocator:
-the check for need-to-gc must happen in such a way that the allocator
-lock is free before gc is triggered.  Ideally, the allocation attempt
-should then be repeated after the gc has finished.
+Note that this means we have to be careful about calling gc from
+within the allocator: the check for need-to-gc must happen in such a
+way that the allocator lock is free before gc is triggered.  Ideally,
+the allocation attempt should then be repeated after the gc has
+finished.
 
-there is 
-
-c) can we give each thread an open region of its own so it doesn't
-have to lock against other threads for allocation?
-
-alloc() is wired to use current_region_free_pointer, which is assigned
-from boxed_region.free_pointer (similar dependency exists between 
-current_region_end_addr, boxed_region.end_addr;
-
-eventually we call gc_general_alloc which uses my_region internally
-    struct alloc_region *my_region = 
-      unboxed_p ? &unboxed_region : &boxed_region;
-
-update_page_write_prot(int page) looks in the currently open regions.
-A whole bunch of places close all (both) open regions, and would need
-updating to loop through threads and make sure everything is shut.
-
-The unboxed region support is used for copying bignums and stuff like
-that: there's no way to allocate directly into it, but gc knows how to
-get to it for appropriate kinds of object.  That means we only need
-one of it
-
-Is the boxed_region set to something funny during gc?  Yes, but that's
-not our problem
-
-d) do we do a further bout of gencgc refactoring first? 
-
-19) should we put our new static symbols in early-impl.lisp ?
-
-20) how come genesis apparently works?  perhaps it doesn't
+20) read genesis again and convince ourselves it does actually work
 
 21) add a lisp interface to init_thread
 
@@ -76,8 +35,13 @@ d) do we do a further bout of gencgc refactoring first?
     complicated needs doing, unless we can find a register to use for
     the tls base that C promises not to overwrite.  
 
-17) code in target-thread.lisp has brittle dependency on thread.h
+17) code in target-thread.lisp, thread.c, x86/system.lisp (interrupt
+contexts) has brittle dependency on thread.h
 
 18) do we need per-thread alien stack anyway? remembering that alien
     code runs on the control stack, there seem to be only a few palces
     this area gets used at all
+
+22) allocate-on-same-page stuff in gc_find_freeish_pages needs
+    re-enabling to avoid massive heap fragmentation
+

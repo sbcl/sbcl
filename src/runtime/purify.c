@@ -1301,6 +1301,9 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf("[doing purification:");
     fflush(stdout);
 #endif
+#ifdef LISP_FEATURE_GENCGC
+    gc_alloc_update_all_page_tables();
+#endif
     for_each_thread(thread)
 	if (fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)) != 0) {
 	    /* FIXME: 1. What does this mean? 2. It shouldn't be reporting
@@ -1367,11 +1370,18 @@ purify(lispobj static_roots, lispobj read_only_roots)
 	  (lispobj *)current_binding_stack_pointer - (lispobj *)BINDING_STACK_START,
 	  0);
 #else
-    for_each_thread(thread)
+    for_each_thread(thread) {
 	pscav( (lispobj *)thread->binding_stack_start,
 	       (lispobj *)SymbolValue(BINDING_STACK_POINTER,thread) -
 	       (lispobj *)thread->binding_stack_start,
 	       0);
+	pscav( (lispobj *) (thread+1),
+	       fixnum_value(SymbolValue(FREE_TLS_INDEX,0)) -
+	       (sizeof (struct thread))/(sizeof (lispobj)),
+	       0);
+    }
+
+
 #endif
 
     /* The original CMU CL code had scavenge-read-only-space code

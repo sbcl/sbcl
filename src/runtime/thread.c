@@ -75,9 +75,6 @@ struct thread *init_thread(lispobj initial_function) {
     th->tls_cookie=os_set_tls_pointer(th);
     if(th->tls_cookie<0) goto cleanup;
 #if defined(LISP_FEATURE_X86) && defined (LISP_FEATURE_LINUX)
-    /* what's this line for? I think it's the obsolete tls-pointer-at */
-    /* end-of-stack stuff */
-    *(th->binding_stack_start-1) = LOW_WORD(th);
     th->pid=
 	clone(funcall0,th->binding_stack_start-2,
 	      ((getpid()!=parent_pid)?CLONE_PARENT:0)
