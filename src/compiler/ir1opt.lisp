@@ -1251,18 +1251,74 @@
                 (reoptimize-continuation cont))))))
       (values))))
 
+;;; Iteration variable: exactly one SETQ of the form:
+;;;
+;;; (let ((var initial))
+;;;   ...
+;;;   (setq var (+ var step))
+;;;   ...)
+(defun maybe-infer-iteration-var-type (var initial-type)
+  (binding* ((sets (lambda-var-sets var) :exit-if-null)
+             (set (first sets))
+             (() (null (rest sets)) :exit-if-null)
+             (set-use (principal-continuation-use (set-value set)))
+             (() (and (combination-p set-use)
+                      (fun-info-p (combination-kind set-use))
+                      (eq (combination-fun-source-name set-use) '+))
+               :exit-if-null)
+             (+-args (basic-combination-args set-use))
+             (() (and (proper-list-of-length-p +-args 2 2)
+                      (let ((first (principal-continuation-use
+                                    (first +-args))))
+                        (and (ref-p first)
+                             (eq (ref-leaf first) var))))
+               :exit-if-null)
+             (step-type (continuation-type (second +-args))))
+    (when (and (numeric-type-p initial-type)
+               (numeric-type-p step-type)
+               (eq (numeric-type-class initial-type)
+                   (numeric-type-class step-type))
+               (eq (numeric-type-format initial-type)
+                   (numeric-type-format step-type))
+               (eq (numeric-type-complexp initial-type)
+                   (numeric-type-complexp step-type)))
+      (multiple-value-bind (low high)
+          (cond ((csubtypep step-type (specifier-type '(real 0 *)))
+                 (values (numeric-type-low initial-type) nil))
+                ((csubtypep step-type (specifier-type '(real * 0)))
+                 (values nil (numeric-type-high initial-type)))
+                (t
+                 (values nil nil)))
+        (modified-numeric-type initial-type
+                               :low low
+                               :high high
+                               :enumerable nil)))))
+(deftransform + ((x y) * * :result result)
+  "check for iteration variable reoptimization"
+  (let ((dest (principal-continuation-end result))
+        (use (principal-continuation-use x)))
+    (when (and (ref-p use)
+               (set-p dest)
+               (eq (ref-leaf use)
+                   (set-var dest)))
+      (reoptimize-continuation (set-value dest))))
+  (give-up-ir1-transform))
+
 ;;; Figure out the type of a LET variable that has sets. We compute
-;;; the union of the initial value TYPE and the types of all the set
+;;; the union of the INITIAL-TYPE and the types of all the set
 ;;; values and to a PROPAGATE-TO-REFS with this type.
-(defun propagate-from-sets (var type)
-  (collect ((res type type-union))
+(defun propagate-from-sets (var initial-type)
+  (collect ((res initial-type type-union))
     (dolist (set (basic-var-sets var))
       (let ((type (continuation-type (set-value set))))
         (res type)
         (when (node-reoptimize set)
           (derive-node-type set (make-single-value-type type))
           (setf (node-reoptimize set) nil))))
-    (propagate-to-refs var (res)))
+    (let ((res (res)))
+      (awhen (maybe-infer-iteration-var-type var initial-type)
+        (setq res (type-intersection res it)))
+      (propagate-to-refs var res)))
   (values))
 
 ;;; If a LET variable, find the initial value's type and do
@@ -1274,9 +1330,10 @@
     (when (and (lambda-var-p var) (leaf-refs var))
       (let ((home (lambda-var-home var)))
 	(when (eq (functional-kind home) :let)
-	  (let ((iv (let-var-initial-value var)))
-	    (setf (continuation-reoptimize iv) nil)
-	    (propagate-from-sets var (continuation-type iv)))))))
+	  (let* ((initial-value (let-var-initial-value var))
+                 (initial-type (continuation-type initial-value)))
+	    (setf (continuation-reoptimize initial-value) nil)
+            (propagate-from-sets var initial-type))))))
 
   (derive-node-type node (make-single-value-type
                           (continuation-type (set-value node))))

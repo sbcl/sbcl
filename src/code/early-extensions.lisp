@@ -1097,6 +1097,33 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
                (let ((it ,test)) (declare (ignorable it)),@body)
                (acond ,@rest))))))
 
+;;; (binding* ({(name initial-value [flag])}*) body)
+;;; FLAG may be NIL or :EXIT-IF-NULL
+;;;
+;;; This form unites LET*, MULTIPLE-VALUE-BIND and AWHEN.
+(defmacro binding* ((&rest bindings) &body body)
+  (let ((bindings (reverse bindings)))
+    (loop with form = `(progn ,@body)
+          for binding in bindings
+          do (destructuring-bind (names initial-value &optional flag)
+                 binding
+               (multiple-value-bind (names declarations)
+                   (etypecase names
+                     (null
+                      (let ((name (gensym)))
+                        (values (list name) `((declare (ignorable ,name))))))
+                     (symbol
+                      (values (list names) nil))
+                     (list
+                      (values names nil)))
+                 (setq form `(multiple-value-bind ,names
+                                 ,initial-value
+                               ,@declarations
+                               ,(ecase flag
+                                       ((nil) form)
+                                       ((:exit-if-null)
+                                        `(when ,(first names) ,form)))))))
+          finally (return form))))
 
 ;;; Delayed evaluation
 (defmacro delay (form)

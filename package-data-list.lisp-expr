@@ -772,6 +772,7 @@ retained, possibly temporariliy, because it might be used internally."
              "DEFPRINTER"
              "AVER" "ENFORCE-TYPE"
              "AWHEN" "ACOND" "IT"
+             "BINDING*"
 	     "!DEF-BOOLEAN-ATTRIBUTE"
 
 	     ;; ..and CONDITIONs..

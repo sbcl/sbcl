@@ -2886,8 +2886,8 @@
 ;;; change.
 (defun same-leaf-ref-p (x y)
   (declare (type continuation x y))
-  (let ((x-use (continuation-use x))
-	(y-use (continuation-use y)))
+  (let ((x-use (principal-continuation-use x))
+	(y-use (principal-continuation-use y)))
     (and (ref-p x-use)
 	 (ref-p y-use)
 	 (eq (ref-leaf x-use) (ref-leaf y-use))

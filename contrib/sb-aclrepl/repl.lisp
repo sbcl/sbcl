@@ -488,7 +488,7 @@
 
 (defun pushd-cmd (string-arg)
   (push string-arg *dir-stack*)
-  (cd-cmd *output* string-arg)
+  (cd-cmd string-arg)
   (values))
 
 (defun popd-cmd ()
