@@ -715,50 +715,64 @@
 	res
 	(error "class not yet defined:~%  ~S" name))))
 (defun (setf find-classoid) (new-value name)
-  #-sb-xc (declare (type classoid new-value))
-  (ecase (info :type :kind name)
-    ((nil))
-    (:forthcoming-defclass-type
-     ;; XXX Currently, nothing needs to be done in this case. Later, when
-     ;; PCL is integrated tighter into SBCL, this might need more work.
-     nil)
-    (:instance
-     ;; KLUDGE: The reason these clauses aren't directly parallel is
-     ;; that we need to use the internal CLASSOID structure ourselves,
-     ;; because we don't have CLASSes to work with until PCL is built.
-     ;; In the host, CLASSes have an approximately one-to-one
-     ;; correspondence with the target CLASSOIDs (as well as with the
-     ;; target CLASSes, modulo potential differences with respect to
-     ;; conditions).
-     #+sb-xc-host
-     (let ((old (class-of (find-classoid name)))
-	   (new (class-of new-value)))
-       (unless (eq old new)
-	 (bug "trying to change the metaclass of ~S from ~S to ~S in the ~
-               cross-compiler."
-	      name (class-name old) (class-name new))))
-     #-sb-xc-host
-     (let ((old (classoid-of (find-classoid name)))
-	   (new (classoid-of new-value)))
-       (unless (eq old new)
-	 (warn "changing meta-class of ~S from ~S to ~S"
-	       name (classoid-name old) (classoid-name new)))))
-    (:primitive
-     (error "illegal to redefine standard type ~S" name))
-    (:defined
-     (warn "redefining DEFTYPE type to be a class: ~S" name)
-     (setf (info :type :expander name) nil)))
+  #-sb-xc (declare (type (or null classoid) new-value))
+  (cond
+    ((null new-value)
+     (ecase (info :type :kind name)
+       ((nil))
+       (:defined)
+       (:primitive
+	(error "attempt to redefine :PRIMITIVE type: ~S" name))
+       ((:forthcoming-defclass-type :instance)
+	(setf (info :type :kind name) nil
+	      (info :type :classoid name) nil
+	      (info :type :documentation name) nil
+	      (info :type :compiler-layout name) nil))))
+    (t
+     (ecase (info :type :kind name)
+       ((nil))
+       (:forthcoming-defclass-type
+	;; XXX Currently, nothing needs to be done in this
+	;; case. Later, when PCL is integrated tighter into SBCL, this
+	;; might need more work.
+	nil)
+       (:instance
+	;; KLUDGE: The reason these clauses aren't directly parallel
+	;; is that we need to use the internal CLASSOID structure
+	;; ourselves, because we don't have CLASSes to work with until
+	;; PCL is built.  In the host, CLASSes have an approximately
+	;; one-to-one correspondence with the target CLASSOIDs (as
+	;; well as with the target CLASSes, modulo potential
+	;; differences with respect to conditions).
+	#+sb-xc-host
+	(let ((old (class-of (find-classoid name)))
+	      (new (class-of new-value)))
+	  (unless (eq old new)
+	    (bug "trying to change the metaclass of ~S from ~S to ~S in the ~
+                  cross-compiler."
+		 name (class-name old) (class-name new))))
+	#-sb-xc-host
+	(let ((old (classoid-of (find-classoid name)))
+	      (new (classoid-of new-value)))
+	  (unless (eq old new)
+	    (warn "changing meta-class of ~S from ~S to ~S"
+		  name (classoid-name old) (classoid-name new)))))
+       (:primitive
+	(error "illegal to redefine standard type ~S" name))
+       (:defined
+	   (warn "redefining DEFTYPE type to be a class: ~S" name)
+	   (setf (info :type :expander name) nil)))
 
-  (remhash name *forward-referenced-layouts*)
-  (%note-type-defined name)
-  (setf (info :type :kind name) :instance)
-  (setf (classoid-cell-classoid (find-classoid-cell name)) new-value)
-  (unless (eq (info :type :compiler-layout name)
-	      (classoid-layout new-value))
-    (setf (info :type :compiler-layout name) (classoid-layout new-value)))
+     (remhash name *forward-referenced-layouts*)
+     (%note-type-defined name)
+     (setf (info :type :kind name) :instance)
+     (setf (classoid-cell-classoid (find-classoid-cell name)) new-value)
+     (unless (eq (info :type :compiler-layout name)
+		 (classoid-layout new-value))
+       (setf (info :type :compiler-layout name) (classoid-layout new-value)))))
   new-value)
 ) ; EVAL-WHEN
-
+  
 ;;; Called when we are about to define NAME as a class meeting some
 ;;; predicate (such as a meta-class type test.) The first result is
 ;;; always of the desired class. The second result is any existing

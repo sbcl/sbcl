@@ -199,19 +199,6 @@ WORKAROUND:
   (Also, verify that the compiler handles declared function
   return types as assertions.)
 
-41:
-  TYPEP of VALUES types is sometimes implemented very inefficiently, e.g. in 
-	(DEFTYPE INDEXOID () '(INTEGER 0 1000))
-	(DEFUN FOO (X)
-	  (DECLARE (TYPE INDEXOID X))
-	  (THE (VALUES INDEXOID)
-	    (VALUES X)))
-  where the implementation of the type check in function FOO 
-  includes a full call to %TYPEP. There are also some fundamental problems
-  with the interpretation of VALUES types (inherited from CMU CL, and
-  from the ANSI CL standard) as discussed on the cmucl-imp@cons.org
-  mailing list, e.g. in Robert Maclachlan's post of 21 Jun 2000.
-
 42:
   The definitions of SIGCONTEXT-FLOAT-REGISTER and
   %SET-SIGCONTEXT-FLOAT-REGISTER in x86-vm.lisp say they're not
@@ -926,15 +913,6 @@ WORKAROUND:
   to redo MIX using a lookup into a 256-entry s-box containing
   29-bit pseudorandom numbers?
 
-208: "package confusion in PCL handling of structure slot handlers"
-  In sbcl-0.7.8 compiling and loading
-	(in-package :cl)
-	(defstruct foo (slot (error "missing")) :type list :read-only t)
-	(defmethod print-object ((foo foo) stream) (print nil stream))
-  causes CERROR "attempting to modify a symbol in the COMMON-LISP
-  package: FOO-SLOT". (This is fairly bad code, but still it's hard
-  to see that it should cause symbols to be interned in the CL package.)
-
 211: "keywords processing"
   a. :ALLOW-OTHER-KEYS T should allow a function to receive an odd
      number of keyword arguments.
@@ -1046,12 +1024,6 @@ WORKAROUND:
   produce invalid code, but type checking is not accurate. Similar
   problems exist with VALUES-TYPE-INTERSECTION.)
 
-218: "VALUES type specifier semantics"
-  (THE (VALUES ...) ...) in safe code discards extra values.
-
-  (defun test (x y) (the (values integer) (truncate x y)))
-  (test 10 4) => 2
-
 220:
   Sbcl 0.7.9 fails to compile
 
@@ -1065,9 +1037,6 @@ WORKAROUND:
   type checking was disabled for M-V-Cs in 0.7.9.13. A better solution
   would be to put the check between evaluation of arguments, but it
   could be tricky to check result types of PROG1, IF etc.
-
-229:
-  (subtypep 'function '(function)) => nil, t.
 
 233: bugs in constraint propagation
   a.

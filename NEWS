@@ -1793,6 +1793,10 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain
        circumstances in LOOP for-as-arithmetic clauses.
+    ** multiple class redefinitions before slot access no longer
+       causes a type error.
+    ** (SETF FIND-CLASS) now accepts NIL as an argument to remove the
+       association between the name and a class.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
