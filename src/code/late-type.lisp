@@ -213,46 +213,52 @@
 	    (type-specifier
 	     (fun-type-returns type)))))
 
-(!define-type-method (function :simple-subtypep) (type1 type2)
-   (flet ((fun-type-simple-p (type)
-            (not (or (fun-type-rest type)
-                     (fun-type-keyp type))))
-          (every-csubtypep (types1 types2)
-            (loop
-               for a1 in types1
-               for a2 in types2
-               do (multiple-value-bind (res sure-p)
-                      (csubtypep a1 a2)
-                    (unless res (return (values res sure-p))))
-               finally (return (values t t)))))
-     (macrolet ((3and (x y)
-                  `(multiple-value-bind (val1 win1)
-                       ,x
-                     (if (and (not val1) win1)
-                         (values nil t)
-                         (multiple-value-bind (val2 win2)
-                             ,y
-                           (if (and val1 val2)
-                               (values t t)
-                               (values nil (or win1 win2))))))))
-       (3and (values-subtypep (fun-type-returns type1)
-			      (fun-type-returns type2))
-             (cond ((fun-type-wild-args type2)
-                    (values t t))
-                   ((fun-type-wild-args type1)
-                    (values nil t))
-                   ((not (or (fun-type-simple-p type1)
-                             (fun-type-simple-p type2)))
-                    (values nil nil))
-                   ((not (and (= (length (fun-type-required type1))
-                                 (length (fun-type-required type2)))
-                              (= (length (fun-type-optional type1))
-                                 (length (fun-type-optional type2)))))
-                    (values nil t))
-                   (t (3and (every-csubtypep (fun-type-required type1)
-                                             (fun-type-required type2))
-                            (every-csubtypep (fun-type-optional type1)
-                                             (fun-type-optional type2)))))))))
+;;; Since all function types are equivalent to FUNCTION, they are all
+;;; subtypes of each other.
+(!define-type-method
+ (function :simple-subtypep) (type1 type2)
+ (flet ((fun-type-simple-p (type)
+          (not (or (fun-type-rest type)
+                   (fun-type-keyp type))))
+        (every-csubtypep (types1 types2)
+          (loop
+             for a1 in types1
+             for a2 in types2
+             do (multiple-value-bind (res sure-p)
+                    (csubtypep a1 a2)
+                  (unless res (return (values res sure-p))))
+             finally (return (values t t)))))
+   (macrolet ((3and (x y)
+                `(multiple-value-bind (val1 win1) ,x
+                   (if (and (not val1) win1)
+                       (values nil t)
+                       (multiple-value-bind (val2 win2) ,y
+                         (if (and val1 val2)
+                             (values t t)
+                             (values nil (or win1 win2))))))))
+     (3and (values-subtypep (fun-type-returns type1)
+                            (fun-type-returns type2))
+           (cond ((fun-type-wild-args type2) (values t t))
+                 ((fun-type-wild-args type1) (values nil t))
+                 ((not (or (fun-type-simple-p type1)
+                           (fun-type-simple-p type2)))
+                  (values nil nil))
+                 (t (multiple-value-bind (min1 max1) (fun-type-nargs type1)
+                      (multiple-value-bind (min2 max2) (fun-type-nargs type2)
+                        (cond ((or (> max1 max2) (< min1 min2))
+                               (values nil t))
+                              ((and (= min1 min2) (= max1 max2))
+                               (3and (every-csubtypep (fun-type-required type1)
+                                                      (fun-type-required type2))
+                                     (every-csubtypep (fun-type-optional type1)
+                                                      (fun-type-optional type2))))
+                              (t (every-csubtypep
+                                  (concatenate 'list
+                                               (fun-type-required type1)
+                                               (fun-type-optional type1))
+                                  (concatenate 'list
+                                               (fun-type-required type2)
+                                               (fun-type-optional type2)))))))))))))
 
 (!define-superclasses function ((function)) !cold-init-forms)
 

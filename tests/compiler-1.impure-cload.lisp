@@ -115,5 +115,11 @@
                  nil)
                '(13 nil)))
 
+;;; bug 221: sbcl 0.7.9.13 failed to compile the following function
+(declaim (ftype (function (fixnum) (values package boolean)) bug221-f1))
+(declaim (ftype (function (t) (values package boolean)) bug221-f2))
+(defun bug221 (b x)
+  (funcall (if b #'bug221-f1 #'bug221-f2) x))
+
 (sb-ext:quit :unix-status 104) ; success
 

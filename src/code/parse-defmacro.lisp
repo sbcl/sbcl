@@ -204,24 +204,25 @@
 	  ;; there actually is a maximum number of arguments
 	  ;; (expecting MAXIMUM=NIL when there is no maximum)
 	  (explicit-maximum (and (not restp) maximum)))
-      (push `(unless ,(if restp
-			  ;; (If RESTP, then the argument list might be
-			  ;; dotted, in which case ordinary LENGTH won't
-			  ;; work.)
-			  `(list-of-length-at-least-p ,path-0 ,minimum)
-			  `(proper-list-of-length-p ,path-0 ,minimum ,maximum))
-	       ,(if (eq error-fun 'error)
-		    `(arg-count-error ',error-kind ',name ,path-0
-				      ',lambda-list ,minimum
-				      ,explicit-maximum)
-		    `(,error-fun 'arg-count-error
-				 :kind ',error-kind
-				 ,@(when name `(:name ',name))
-				 :args ,path-0
-				 :lambda-list ',lambda-list
-				 :minimum ,minimum
-				 :maximum ,explicit-maximum)))
-	    *arg-tests*)
+      (unless (and restp (zerop minimum))
+        (push `(unless ,(if restp
+                            ;; (If RESTP, then the argument list might be
+                            ;; dotted, in which case ordinary LENGTH won't
+                            ;; work.)
+                            `(list-of-length-at-least-p ,path-0 ,minimum)
+                            `(proper-list-of-length-p ,path-0 ,minimum ,maximum))
+                 ,(if (eq error-fun 'error)
+                      `(arg-count-error ',error-kind ',name ,path-0
+                                        ',lambda-list ,minimum
+                                        ,explicit-maximum)
+                      `(,error-fun 'arg-count-error
+                                   :kind ',error-kind
+                                   ,@(when name `(:name ',name))
+                                   :args ,path-0
+                                   :lambda-list ',lambda-list
+                                   :minimum ,minimum
+                                   :maximum ,explicit-maximum)))
+              *arg-tests*))
       (when keys
 	(let ((problem (gensym "KEY-PROBLEM-"))
 	      (info (gensym "INFO-")))
