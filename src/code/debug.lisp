@@ -747,7 +747,8 @@ reset to ~S."
     (/noshow "done with EVAL in DEBUG-EVAL-PRINT")
     (dolist (value values)
       (fresh-line *debug-io*)
-      (prin1 value))))
+      (prin1 value *debug-io*)))
+  (force-output *debug-io*))
 
 ;;;; debug loop functions
 
