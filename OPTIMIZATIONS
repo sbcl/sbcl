@@ -128,7 +128,7 @@ The initial binding is effectless, and without it X is of type
 DOUBLE-FLOAT. Unhopefully, IR1 does not optimize away effectless
 SETs/bindings, and IR2 does not perform type inference.
 --------------------------------------------------------------------------------
-#9
+#9 "Multi-path constant folding"
 (defun foo (x)
   (if (= (cond ((irgh x) 0)
                ((buh x) 1)
@@ -144,8 +144,17 @@ This code could be optimized to
         ((buh x) :no)
         (t :no)))
 --------------------------------------------------------------------------------
-#10
-Reported by Robert E. Brown on sbcl-devel 2003-01-21:
+#11
+(inverted variant of #9)
 
-(this is really a bug, fixed in 0.pre8.26)
+(lambda (x)
+  (let ((y (sap-alien x c-string)))
+    (list (alien-sap y)
+          (alien-sap y))))
+
+It could be optimized to
+
+(lambda (x) (list x x))
+
+(if Y were used only once, the current compiler would optimize it)
 --------------------------------------------------------------------------------
