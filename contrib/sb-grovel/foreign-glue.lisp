@@ -65,8 +65,8 @@
 	       ;; unfortunately; and it will only accept unquoted type
 	       ;; forms.
 	       `(sb-alien:array ,elt-type ,(or array-size
-				  (/ size (eval `(sb-alien:alien-size ,elt-type :bytes))))))
-	     `(vector t))))
+					       (/ size (eval `(sb-alien:alien-size ,elt-type :bytes))))))
+	     t)))
 
 (defun retrieve-type-for (type size table)
   (multiple-value-bind (type-fn found)
@@ -97,13 +97,13 @@
 		 :type `(array char ,len)
 		 :offset offset
 		 :size len
-		 :name (gensym "PADDING")))
+		 :name (gentemp "PADDING")))
 (defun mk-struct (offset &rest children)
-  (make-instance 'struct :name (gensym "STRUCT")
+  (make-instance 'struct :name (gentemp "STRUCT")
 		 :children (remove nil children)
 		 :offset offset))
 (defun mk-union (offset &rest children)
-  (make-instance 'union :name (gensym "UNION")
+  (make-instance 'union :name (gentemp "UNION")
 		 :children (remove nil children)
 		 :offset offset))
 (defun mk-val (name type h-type offset size)
@@ -255,7 +255,7 @@ deeply nested structures."
 
 (defgeneric accessor-modifier-for (element-type accessor-type))
 
-(defun identity-1 (thing &rest ignored)
+(defmacro identity-1 (thing &rest ignored)
   (declare (ignore ignored))
   thing)
 (defun (setf identity-1) (new-thing place &rest ignored)
@@ -271,9 +271,6 @@ deeply nested structures."
   nil)
 (defmethod accessor-modifier-for ((element-type (eql 'C-STRING))
 				  (accessor-type (eql :setter)))
-  'c-string->lisp-string)
-(defmethod accessor-modifier-for ((element-type (eql 'C-STRING))
-				  (accessor-type (eql :getter)))
   'c-string->lisp-string)
 
 (defun c-string->lisp-string (string &optional limit)
@@ -302,14 +299,16 @@ deeply nested structures."
 			       (symbol-name (name root)))))
     (labels ((accessor (root rpath)
 	       (apply #'sane-slot 'struct (mapcar 'name (append (rest rpath) (list root))))))
-      `((defun ,(intern accessor-name) (struct)
-	  (declare (cl:type (alien ,struct-name) struct)
+      `((declaim (inline ,(intern accessor-name)
+		         (setf ,(intern accessor-name))))
+	(defun ,(intern accessor-name) (struct)
+	  (declare (cl:type (alien (* ,struct-name)) struct)
 		   (optimize (speed 3)))
 	  (,(accessor-modifier-for (reintern (type root) (find-package :sb-grovel))
 				   :getter)
 	    ,(accessor root rpath) ,(size root)))
 	(defun (setf ,(intern accessor-name)) (new-val struct)
-	  (declare (cl:type (alien ,struct-name) struct)
+	  (declare (cl:type (alien (* ,struct-name)) struct)
 		   (cl:type ,(lisp-type-for (type root) (size root)) new-val)
 		   (optimize (speed 3)))
 	  ,(let* ((accessor-modifier (accessor-modifier-for (reintern (type root)
@@ -358,8 +357,7 @@ deeply nested structures."
 				  (size root)))))
 	(generate-struct-definition name root nil))
     `(progn
-       (eval-when (:compile-toplevel :load-toplevel :execute)
-	 (sb-alien:define-alien-type ,@(first struct-elements)))
+       (sb-alien:define-alien-type ,@(first struct-elements))
        ,@accessors
        (defmacro ,(intern (format nil "WITH-~A" name)) (var (&rest field-values) &body body)
 	 (labels ((field-name (x)

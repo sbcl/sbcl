@@ -27,6 +27,29 @@ eventually, so that we can do DNS lookups in parallel with other things
 ;(define-condition no-recovery-error (socket-error)) ; name server error
 ;(define-condition try-again-error (socket-error)) ; temporary
 
+(defun make-host-ent (h)
+  (if (sb-grovel::foreign-nullp h) (name-service-error "gethostbyname"))
+  (let* ((length (sockint::hostent-length h))
+	 (aliases (loop for i = 0 then (1+ i)
+			for al = (sb-alien:deref (sockint::hostent-aliases h) i)
+			while al
+			collect al))
+	 (addresses 
+	  (loop for i = 0 then (1+ i)
+		for ad = (sb-alien:deref (sockint::hostent-addresses h) i)
+		until (sb-alien:null-alien ad)
+		collect (ecase (sockint::hostent-type h)
+			  (#.sockint::af-inet
+			   (loop for i from 0 below length
+				 collect (sb-alien:deref ad i)))
+			  (#.sockint::af-local
+			   (sb-alien:cast ad sb-alien:c-string))))))
+    (make-instance 'host-ent
+                   :name (sockint::hostent-name h)
+		   :type (sockint::hostent-type h)
+                   :aliases aliases
+                   :addresses addresses)))
+
 (defun get-host-by-name (host-name)
   "Returns a HOST-ENT instance for HOST-NAME or throws some kind of condition.
 HOST-NAME may also be an IP address in dotted quad notation or some other
@@ -45,30 +68,6 @@ grisly details."
       (make-host-ent (sockint::gethostbyaddr packed-addr
 					     4
 					     sockint::af-inet)))))
-
-(defun make-host-ent (h)
-  (if (sb-grovel::foreign-nullp h) (name-service-error "gethostbyname"))
-  (let* ((length (sockint::hostent-length h))
-	 (aliases (loop for i = 0 then (1+ i)
-			for al = (sb-alien:deref (sockint::hostent-aliases h) i)
-			while al
-			collect al))
-	 (address0 (sockint::hostent-addresses h))
-	 (addresses 
-	  (loop for i = 0 then (1+ i)
-		for ad = (sb-alien:deref address0 i)
-		until (sb-alien:null-alien ad)
-		collect (ecase (sockint::hostent-type h)
-			  (#.sockint::af-inet
-			   (loop for i from 0 below length
-				 collect (sb-alien:deref ad i)))
-			  (#.sockint::af-local
-			   (sb-alien:cast ad sb-alien:c-string))))))
-    (make-instance 'host-ent
-                   :name (sockint::hostent-name h)
-		   :type (sockint::hostent-type h)
-                   :aliases aliases
-                   :addresses addresses)))
 
 ;;; The remainder is my fault - gw
 

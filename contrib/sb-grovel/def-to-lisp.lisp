@@ -120,6 +120,15 @@ code:
 (defclass grovel-constants-file (asdf:cl-source-file)
   ((package :accessor constants-package :initarg :package)))
 
+(define-condition c-compile-failed (compile-failed) ()
+  (:report (lambda (c s)
+	     (format s "~@<C compiler failed when performing ~A on ~A.~@:>"
+		     (error-operation c) (error-component c)))))
+(define-condition a-dot-out-failed (compile-failed) ()
+  (:report (lambda (c s)
+	     (format s "~@<a.out failed when performing ~A on ~A.~@:>"
+		     (error-operation c) (error-component c)))))
+
 (defmethod asdf:perform ((op asdf:compile-op)
 			 (component grovel-constants-file))
   ;; we want to generate all our temporary files in the fasl directory
@@ -140,14 +149,45 @@ code:
     (terpri)
     (funcall (intern "C-CONSTANTS-EXTRACT" (find-package "SB-GROVEL"))
 	     filename tmp-c-source (constants-package component))
-    (and		
-     (= (run-shell-command "gcc ~A -o ~S ~S"
-			   (if (sb-ext:posix-getenv "EXTRA_CFLAGS")
-			       (sb-ext:posix-getenv "EXTRA_CFLAGS")
-				"")
-			   (namestring tmp-a-dot-out)
-			   (namestring tmp-c-source)) 0)
-     (= (run-shell-command "~A >~A"
-			   (namestring tmp-a-dot-out)
-			   (namestring tmp-constants)) 0)
-     (compile-file tmp-constants :output-file output-file))))
+    (let ((code (run-shell-command "gcc ~A -o ~S ~S"
+				   (if (sb-ext:posix-getenv "EXTRA_CFLAGS")
+				       (sb-ext:posix-getenv "EXTRA_CFLAGS")
+				       "")
+				   (namestring tmp-a-dot-out)
+				   (namestring tmp-c-source))))
+      (unless (= code 0)
+	(case (operation-on-failure op)
+	  (:warn (warn "~@<C compiler failure when performing ~A on ~A.~@:>"
+		       op component))
+	  (:error
+	   (error 'c-compile-failed :operation op :component component)))))
+    (let ((code (run-shell-command "~A >~A"
+				   (namestring tmp-a-dot-out)
+				   (namestring tmp-constants))))
+      (unless (= code 0)
+	(case (operation-on-failure op)
+	  (:warn (warn "~@<a.out failure when performing ~A on ~A.~@:>"
+		       op component))
+	  (:error
+	   (error 'a-dot-out-failed :operation op :component component)))))
+    (multiple-value-bind (output warnings-p failure-p)
+	(compile-file tmp-constants :output-file output-file)
+      (when warnings-p
+	(case (operation-on-warnings op)
+	  (:warn (warn
+		  (formatter "~@<COMPILE-FILE warned while ~
+                              performing ~A on ~A.~@:>")
+		  op component))
+	  (:error (error 'compile-warned :component component :operation op))
+	  (:ignore nil)))
+      (when failure-p
+	(case (operation-on-failure op)
+	  (:warn (warn
+		  (formatter "~@<COMPILE-FILE failed while ~
+                              performing ~A on ~A.~@:>")
+		  op component))
+	  (:error (error 'compile-failed :component component :operation op))
+	  (:ignore nil)))
+      (unless output
+	(error 'compile-error :component component :operation op)))))
+

@@ -89,6 +89,7 @@
 	   #:*asdf-revision*
 	   
 	   #:operation-error #:compile-failed #:compile-warned #:compile-error
+	   #:error-component #:error-operation
 	   #:system-definition-error 
 	   #:missing-component
 	   #:missing-dependency

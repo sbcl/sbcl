@@ -108,7 +108,7 @@
                        (c-string-pointer name "char *" "p_name")
                        ((* (* t)) aliases "char **" "p_aliases")
 		       (integer proto "int" "p_proto")))
- (:function getprotobyname ("getprotobyname" (* t)
+ (:function getprotobyname ("getprotobyname" (* protoent)
 					     (name c-string)))
  (:integer inaddr-any "INADDR_ANY")
  (:structure in-addr ("struct in_addr"
