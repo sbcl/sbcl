@@ -30,6 +30,11 @@ and the deficiency on the Alpha will eventually be rectified.
 (sb-sprof:report)
 @end lisp
 
+The profiler hooks into the disassembler such that instructions which
+have been sampled are annotated with their relative frequency of
+sampling.  This information is not stored across different sampling
+runs. @c FIXME: maybe it should be?
+
 @subsection Functions
 
 @include fun-sb-sprof-report.texinfo
@@ -52,5 +57,5 @@ and the deficiency on the Alpha will eventually be rectified.
    
 @subsection Credits
 
-@code{sb-sprof} is an SBCL port of Gerd Moellmann's statistical profiler
-for CMUCL.
+@code{sb-sprof} is an SBCL port, with enhancements, of Gerd
+Moellmann's statistical profiler for CMUCL.

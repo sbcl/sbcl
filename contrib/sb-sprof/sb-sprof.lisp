@@ -84,9 +84,6 @@
 ;;;
 ;;; Random ideas for implementation: 
 ;;;
-;;; * Show a disassembly of a function annotated with sampling
-;;; information.
-;;;
 ;;; * Space profiler.  Sample when new pages are allocated instead of
 ;;; at SIGPROF.
 ;;;
@@ -1122,6 +1119,26 @@
        (print-graph graph :stream stream :max max :min-percent min-percent))
       ((nil)))
     graph))
+
+;;; Interface to DISASSEMBLE
+
+(defun add-disassembly-profile-note (chunk stream dstate)
+  (declare (ignore chunk stream))
+  (unless (zerop *samples-index*)
+    (let* ((location
+	    (+ (sb-disassem::seg-virtual-location
+		(sb-disassem:dstate-segment dstate))
+	       (sb-disassem::dstate-cur-offs dstate)))
+	   (samples (loop for x from 0 below *samples-index* by +sample-size+
+			  summing (if (= (aref *samples* x) location)
+				      1
+				      0))))
+      (unless (zerop samples)
+	(sb-disassem::note (format nil "~A/~A samples"
+				   samples (/ *samples-index* +sample-size+))
+			   dstate)))))
+
+(pushnew 'add-disassembly-profile-note sb-disassem::*default-dstate-hooks*)
 
 ;;; silly examples
 

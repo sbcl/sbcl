@@ -549,7 +549,9 @@ Paul Dietz:
   analysis phase in the compiler.
 
 Brian Downing:
-  He fixed the linker problems for building SBCL on Mac OS X.
+  He fixed the linker problems for building SBCL on Mac OS X.  He
+  found and fixed the cause of backtraces failing for undefined
+  functions and assembly routines.
 
 Miles Egan:
   He creates binary packages of SBCL releases for Red Hat and other
@@ -673,7 +675,9 @@ Nikodemus Siivola:
 
 Juho Snellman:
   He provided several performance enhancements, including a better hash
-  function on strings, and removal of unneccessary bounds checks.
+  function on strings, and removal of unneccessary bounds checks.  He
+  ported and enhanced the statistical profiler written by Gerd
+  Moellmann for CMU CL.
 
 Brian Spilsbury:
   He wrote Unicode-capable versions of SBCL's character, string, and
