@@ -225,6 +225,21 @@
 ;;;; numeric-type has everything we want to know. Reason 2 wins for
 ;;;; now.
 
+;;; Support operations that mimic real arithmetic comparison
+;;; operators, but imposing a total order on the floating points such
+;;; that negative zeros are strictly less than positive zeros.
+(macrolet ((def (name op)
+	     `(defun ,name (x y)
+	        (declare (real x y))
+	        (if (and (floatp x) (floatp y) (zerop x) (zerop y))
+		    (,op (float-sign x) (float-sign y))
+		    (,op x y)))))
+  (def signed-zero->= >=)
+  (def signed-zero-> >)
+  (def signed-zero-= =)
+  (def signed-zero-< <)
+  (def signed-zero-<= <=))
+
 ;;; The basic interval type. It can handle open and closed intervals.
 ;;; A bound is open if it is a list containing a number, just like
 ;;; Lisp says. NIL means unbounded.
@@ -324,16 +339,8 @@
   (make-interval :low (type-bound-number (interval-low x))
 		 :high (type-bound-number (interval-high x))))
 
-(defun signed-zero->= (x y)
-  (declare (real x y))
-  (or (> x y)
-      (and (= x y)
-	   (>= (float-sign (float x))
-	       (float-sign (float y))))))
-
 ;;; For an interval X, if X >= POINT, return '+. If X <= POINT, return
 ;;; '-. Otherwise return NIL.
-#+nil
 (defun interval-range-info (x &optional (point 0))
   (declare (type interval x))
   (let ((lo (interval-low x))
@@ -344,20 +351,6 @@
 	   '-)
 	  (t
 	   nil))))
-(defun interval-range-info (x &optional (point 0))
-  (declare (type interval x))
-  (labels ((signed->= (x y)
-	     (if (and (zerop x) (zerop y) (floatp x) (floatp y))
-		 (>= (float-sign x) (float-sign y))
-		 (>= x y))))
-    (let ((lo (interval-low x))
-	  (hi (interval-high x)))
-      (cond ((and lo (signed->= (type-bound-number lo) point))
-	     '+)
-	    ((and hi (signed->= point (type-bound-number hi)))
-	     '-)
-	    (t
-	     nil)))))
 
 ;;; Test to see whether the interval X is bounded. HOW determines the
 ;;; test, and should be either ABOVE, BELOW, or BOTH.
@@ -370,32 +363,6 @@
      (interval-low x))
     (both
      (and (interval-low x) (interval-high x)))))
-
-;;; signed zero comparison functions. Use these functions if we need
-;;; to distinguish between signed zeroes.
-(defun signed-zero-< (x y)
-  (declare (real x y))
-  (or (< x y)
-      (and (= x y)
-	   (< (float-sign (float x))
-	      (float-sign (float y))))))
-(defun signed-zero-> (x y)
-  (declare (real x y))
-  (or (> x y)
-      (and (= x y)
-	   (> (float-sign (float x))
-	      (float-sign (float y))))))
-(defun signed-zero-= (x y)
-  (declare (real x y))
-  (and (= x y)
-       (= (float-sign (float x))
-	  (float-sign (float y)))))
-(defun signed-zero-<= (x y)
-  (declare (real x y))
-  (or (< x y)
-      (and (= x y)
-	   (<= (float-sign (float x))
-	       (float-sign (float y))))))
 
 ;;; See whether the interval X contains the number P, taking into
 ;;; account that the interval might not be closed.

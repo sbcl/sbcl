@@ -83,6 +83,19 @@
         (signum (logior c b)))
     (logior a -1))))
 
+(defun #:foo (b c)
+  (declare (type (integer -23228343 2) b)
+	   (type (integer -115581022 512244512) c)
+	   (optimize (speed 3) (safety 1) (debug 1)))
+  (* (* (logorc2 3 (deposit-field 4667947 (byte 14 26) b))
+	(deposit-field b (byte 25 27) -30424886))
+     (dpb b (byte 23 29) c)))
+
+(defun #:foo (x y)
+  (declare (type (integer -1 1000000000000000000000000) x y)
+	   (optimize speed))
+  (* x (* y x)))
+
 ;;; bug 282
 ;;;
 ;;; Verify type checking policy in full calls: the callee is supposed
