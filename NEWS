@@ -23,6 +23,9 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
   * bug fix: improve the detection and resolution of MOP metacycles
     (where effective method computation depends on the generic function
     having its effective method computed).  (reported by Bruno Haible)
+  * bug fix: pass the right initargs to :BEFORE or :AFTER methods on
+    SHARED-INITIALIZE or INITIALIZE-INSTANCE in optimized
+    MAKE-INSTANCE constructors.  (reported by Axel Schairer for cmucl)
   * optimization: in taking the GCD of bignums, reduce the two bignums
     to approximately the same size (using Euclid's algorithm) before
     applying the more sophisticated binary GCD.  (thanks to Juho

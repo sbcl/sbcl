@@ -62,6 +62,14 @@
 ;;; Utilities  *******
 ;;; ******************
 
+(defun quote-plist-keys (plist)
+  (loop for (key . more) on plist by #'cddr
+	if (null more) do
+	  (error "Not a property list: ~S" plist)
+	else
+	  collect `(quote ,key)
+	  and collect (car more)))
+
 (defun plist-keys (plist &key test)
   (loop for (key . more) on plist by #'cddr
 	if (null more) do
@@ -406,9 +414,11 @@
 	    (slot-inits (slot-init-forms ctor (or ii-before si-before))))
 	(values
 	 `(let (,@(when (or ii-before ii-after)
-	           `((.ii-args. (list .instance. ,@initargs))))
+	           `((.ii-args.
+		      (list .instance. ,@(quote-plist-keys initargs)))))
 	        ,@(when (or si-before si-after)
-		   `((.si-args. (list .instance. t ,@initargs)))))
+		   `((.si-args.
+		      (list .instance. t ,@(quote-plist-keys initargs))))))
 	    ,@(loop for method in ii-before
 		    collect `(invoke-method ,method .ii-args.))
 	    ,@(loop for method in si-before

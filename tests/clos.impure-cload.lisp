@@ -119,5 +119,21 @@
 	    (declare (ignore x)) (setq y 'foo)))
   (style-warning (c) (error c)))
 
+;;; from Axel Schairer on cmucl-imp 2004-08-05
+(defclass class-with-symbol-initarg ()
+  ((slot :initarg slot)))
+(defmethod initialize-instance :after
+    ((x class-with-symbol-initarg) &rest initargs &key &allow-other-keys)
+  (unless (or (null initargs)
+	      (eql (getf initargs 'slot)
+		   (slot-value x 'slot)))
+    (error "bad bad bad")))
+(defun make-thing (arg)
+  (make-instance 'class-with-symbol-initarg 'slot arg))
+(defun make-other-thing (slot arg)
+  (make-instance 'class-with-symbol-initarg slot arg))
+(assert (eql (slot-value (make-thing 1) 'slot) 1))
+(assert (eql (slot-value (make-other-thing 'slot 2) 'slot) 2))
+
 ;;; success
 (sb-ext:quit :unix-status 104)
