@@ -404,7 +404,7 @@
   (variant () :type list)
   (variant-vars () :type list)
   ;; variables bound to the VOP and Vop-Node when in the generator body
-  (vop-var (gensym) :type symbol)
+  (vop-var '.vop. :type symbol)
   (node-var nil :type (or symbol null))
   ;; a list of the names of the codegen-info arguments to this VOP
   (info-args () :type list)
@@ -465,10 +465,7 @@
   ;; This is only meaningful in :ARGUMENT and :TEMPORARY operands.
   (target nil :type (or symbol null))
   ;; TEMP is a temporary that holds the TN-REF for this operand.
-  ;; TEMP-TEMP holds the write reference that begins a temporary's
-  ;; lifetime.
-  (temp (gensym) :type symbol)
-  (temp-temp nil :type (or symbol null))
+  (temp (make-operand-parse-temp) :type symbol)
   ;; the time that this operand is first live and the time at which it
   ;; becomes dead again. These are TIME-SPECs, as returned by
   ;; PARSE-TIME-SPEC.
@@ -479,7 +476,7 @@
   (scs nil :type list)
   ;; Variable that is bound to the load TN allocated for this operand, or to
   ;; NIL if no load-TN was allocated.
-  (load-tn (gensym) :type symbol)
+  (load-tn (make-operand-parse-load-tn) :type symbol)
   ;; an expression that tests whether to do automatic operand loading
   (load t)
   ;; In a wired or restricted temporary this is the SC the TN is to be
@@ -527,8 +524,8 @@
 
 ;;; Return a list of LET-forms to parse a TN-REF list into the temps
 ;;; specified by the operand-parse structures. MORE-OPERAND is the
-;;; Operand-Parse describing any more operand, or NIL if none. REFS is
-;;; an expression that evaluates into the first tn-ref.
+;;; OPERAND-PARSE describing any more operand, or NIL if none. REFS is
+;;; an expression that evaluates into the first TN-REF.
 (defun access-operands (operands more-operand refs)
   (declare (list operands))
   (collect ((res))
@@ -544,7 +541,7 @@
 
 ;;; This is used with ACCESS-OPERANDS to prevent warnings for TN-REF
 ;;; temps not used by some particular function. It returns the name of
-;;; the last operand, or NIL if Operands is NIL.
+;;; the last operand, or NIL if OPERANDS is NIL.
 (defun ignore-unreferenced-temps (operands)
   (when operands
     (operand-parse-temp (car (last operands)))))
@@ -784,7 +781,7 @@
     (if funs
 	(let* ((tn `(tn-ref-tn ,(operand-parse-temp op)))
 	       (n-vop (or (vop-parse-vop-var parse)
-			  (setf (vop-parse-vop-var parse) (gensym))))
+			  (setf (vop-parse-vop-var parse) '.vop.)))
 	       (form (if (rest funs)
 			 `(sc-case ,tn
 			    ,@(mapcar (lambda (x)
@@ -884,6 +881,16 @@
 			      ,@(vop-parse-body parse))
 	   ,@(saves))))))
 
+(defvar *parse-vop-operand-count*)
+(defun make-operand-parse-temp ()
+  ;; FIXME: potentially causes breakage in contribs from locked
+  ;; packages.
+  (intern (format nil "OPERAND-PARSE-TEMP-~D" *parse-vop-operand-count*)
+	  (symbol-package '*parse-vop-operand-count*)))
+(defun make-operand-parse-load-tn ()
+  (intern (format nil "OPERAND-PARSE-LOAD-TN-~D" *parse-vop-operand-count*)
+	  (symbol-package '*parse-vop-operand-count*)))
+
 ;;; Given a list of operand specifications as given to DEFINE-VOP,
 ;;; return a list of OPERAND-PARSE structures describing the fixed
 ;;; operands, and a single OPERAND-PARSE describing any more operand.
@@ -900,6 +907,7 @@
 	  (error "malformed operand specifier: ~S" spec))
 	(when more
 	  (error "The MORE operand isn't the last operand: ~S" specs))
+	(incf *parse-vop-operand-count*)
 	(let* ((name (first spec))
 	       (old (if (vop-parse-inherits parse)
 			(find-operand name
@@ -988,9 +996,9 @@
     (dolist (name (cddr spec))
       (unless (symbolp name)
 	(error "bad temporary name: ~S" name))
+      (incf *parse-vop-operand-count*)
       (let ((res (make-operand-parse :name name
 				     :kind :temporary
-				     :temp-temp (gensym)
 				     :born (parse-time-spec :load)
 				     :dies (parse-time-spec :save))))
 	(do ((opt (second spec) (cddr opt)))
@@ -1039,83 +1047,87 @@
 ;;; specified options.
 (defun parse-define-vop (parse specs)
   (declare (type vop-parse parse) (list specs))
-  (dolist (spec specs)
-    (unless (consp spec)
-      (error "malformed option specification: ~S" spec))
-    (case (first spec)
-      (:args
-       (multiple-value-bind (fixed more)
-	   (!parse-vop-operands parse (rest spec) :argument)
-	 (setf (vop-parse-args parse) fixed)
-	 (setf (vop-parse-more-args parse) more)))
-      (:results
-       (multiple-value-bind (fixed more)
-	   (!parse-vop-operands parse (rest spec) :result)
-	 (setf (vop-parse-results parse) fixed)
-	 (setf (vop-parse-more-results parse) more))
-       (setf (vop-parse-conditional-p parse) nil))
-      (:conditional
-       (setf (vop-parse-result-types parse) ())
-       (setf (vop-parse-results parse) ())
-       (setf (vop-parse-more-results parse) nil)
-       (setf (vop-parse-conditional-p parse) t))
-      (:temporary
-       (parse-temporary spec parse))
-      (:generator
-       (setf (vop-parse-cost parse)
-	     (vop-spec-arg spec 'unsigned-byte 1 nil))
-       (setf (vop-parse-body parse) (cddr spec)))
-      (:effects
-       (setf (vop-parse-effects parse) (rest spec)))
-      (:affected
-       (setf (vop-parse-affected parse) (rest spec)))
-      (:info
-       (setf (vop-parse-info-args parse) (rest spec)))
-      (:ignore
-       (setf (vop-parse-ignores parse) (rest spec)))
-      (:variant
-       (setf (vop-parse-variant parse) (rest spec)))
-      (:variant-vars
-       (let ((vars (rest spec)))
-	 (setf (vop-parse-variant-vars parse) vars)
-	 (setf (vop-parse-variant parse)
-	       (make-list (length vars) :initial-element nil))))
-      (:variant-cost
-       (setf (vop-parse-cost parse) (vop-spec-arg spec 'unsigned-byte)))
-      (:vop-var
-       (setf (vop-parse-vop-var parse) (vop-spec-arg spec 'symbol)))
-      (:move-args
-       (setf (vop-parse-move-args parse)
-	     (vop-spec-arg spec '(member nil :local-call :full-call
-					 :known-return))))
-      (:node-var
-       (setf (vop-parse-node-var parse) (vop-spec-arg spec 'symbol)))
-      (:note
-       (setf (vop-parse-note parse) (vop-spec-arg spec '(or string null))))
-      (:arg-types
-       (setf (vop-parse-arg-types parse)
-	     (!parse-vop-operand-types (rest spec) t)))
-      (:result-types
-       (setf (vop-parse-result-types parse)
-	     (!parse-vop-operand-types (rest spec) nil)))
-      (:translate
-       (setf (vop-parse-translate parse) (rest spec)))
-      (:guard
-       (setf (vop-parse-guard parse) (vop-spec-arg spec t)))
-      ;; FIXME: :LTN-POLICY would be a better name for this. It would
-      ;; probably be good to leave it unchanged for a while, though,
-      ;; at least until the first port to some other architecture,
-      ;; since the renaming would be a change to the interface between
-      (:policy
-       (setf (vop-parse-ltn-policy parse)
-	     (vop-spec-arg spec 'ltn-policy)))
-      (:save-p
-       (setf (vop-parse-save-p parse)
-	     (vop-spec-arg spec
-			   '(member t nil :compute-only :force-to-stack))))
-      (t
-       (error "unknown option specifier: ~S" (first spec)))))
-  (values))
+  (let ((*parse-vop-operand-count* (1- (+ (length (vop-parse-args parse))
+					  (length (vop-parse-results parse))
+					  (length (vop-parse-temps parse))))))
+    (dolist (spec specs)
+      (unless (consp spec)
+	(error "malformed option specification: ~S" spec))
+      (case (first spec)
+	(:args
+	 (multiple-value-bind (fixed more)
+	     (!parse-vop-operands parse (rest spec) :argument)
+	   (setf (vop-parse-args parse) fixed)
+	   (setf (vop-parse-more-args parse) more)))
+	(:results
+	 (multiple-value-bind (fixed more)
+	     (!parse-vop-operands parse (rest spec) :result)
+	   (setf (vop-parse-results parse) fixed)
+	   (setf (vop-parse-more-results parse) more))
+	 (setf (vop-parse-conditional-p parse) nil))
+	(:conditional
+	 (setf (vop-parse-result-types parse) ())
+	 (setf (vop-parse-results parse) ())
+	 (setf (vop-parse-more-results parse) nil)
+	 (setf (vop-parse-conditional-p parse) t))
+	(:temporary
+	 (parse-temporary spec parse))
+	(:generator
+	    (setf (vop-parse-cost parse)
+		  (vop-spec-arg spec 'unsigned-byte 1 nil))
+	  (setf (vop-parse-body parse) (cddr spec)))
+	(:effects
+	 (setf (vop-parse-effects parse) (rest spec)))
+	(:affected
+	 (setf (vop-parse-affected parse) (rest spec)))
+	(:info
+	 (setf (vop-parse-info-args parse) (rest spec)))
+	(:ignore
+	 (setf (vop-parse-ignores parse) (rest spec)))
+	(:variant
+	 (setf (vop-parse-variant parse) (rest spec)))
+	(:variant-vars
+	 (let ((vars (rest spec)))
+	   (setf (vop-parse-variant-vars parse) vars)
+	   (setf (vop-parse-variant parse)
+		 (make-list (length vars) :initial-element nil))))
+	(:variant-cost
+	 (setf (vop-parse-cost parse) (vop-spec-arg spec 'unsigned-byte)))
+	(:vop-var
+	 (setf (vop-parse-vop-var parse) (vop-spec-arg spec 'symbol)))
+	(:move-args
+	 (setf (vop-parse-move-args parse)
+	       (vop-spec-arg spec '(member nil :local-call :full-call
+				    :known-return))))
+	(:node-var
+	 (setf (vop-parse-node-var parse) (vop-spec-arg spec 'symbol)))
+	(:note
+	 (setf (vop-parse-note parse) (vop-spec-arg spec '(or string null))))
+	(:arg-types
+	 (setf (vop-parse-arg-types parse)
+	       (!parse-vop-operand-types (rest spec) t)))
+	(:result-types
+	 (setf (vop-parse-result-types parse)
+	       (!parse-vop-operand-types (rest spec) nil)))
+	(:translate
+	 (setf (vop-parse-translate parse) (rest spec)))
+	(:guard
+	 (setf (vop-parse-guard parse) (vop-spec-arg spec t)))
+	;; FIXME: :LTN-POLICY would be a better name for this. It
+	;; would probably be good to leave it unchanged for a while,
+	;; though, at least until the first port to some other
+	;; architecture, since the renaming would be a change to the
+	;; interface between
+	(:policy
+	 (setf (vop-parse-ltn-policy parse)
+	       (vop-spec-arg spec 'ltn-policy)))
+	(:save-p
+	 (setf (vop-parse-save-p parse)
+	       (vop-spec-arg spec
+			     '(member t nil :compute-only :force-to-stack))))
+	(t
+	 (error "unknown option specifier: ~S" (first spec)))))
+    (values)))
 
 ;;;; making costs and restrictions
 
