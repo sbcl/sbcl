@@ -328,9 +328,9 @@ about function addresses and register values.")
 		 (maybe-add-notes value dstate))))
 
 (defparameter float-reg-symbols
-  (coerce 
-   (loop for n from 0 to 63 collect (make-symbol (format nil "%F~d" n)))
-   'vector))
+  #.(coerce 
+     (loop for n from 0 to 63 collect (make-symbol (format nil "%F~d" n)))
+     'vector))
 
 (sb!disassem:define-arg-type fp-reg
   :printer (lambda (value stream dstate)
