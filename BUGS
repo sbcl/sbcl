@@ -1092,6 +1092,12 @@ WORKAROUND:
 
   (fixed in 0.8.1.37)
 
+265:
+  SB-EXT:RUN-PROGRAM is currently non-functional on Linux/PPC;
+  attempting to use it leads to segmentation violations.  This is
+  probably because of a bogus implementation of
+  os_restore_fp_control().
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

@@ -69,16 +69,36 @@
 		 (t (make-symbol (concatenate 'string "$" name)))))
        *register-names*))
 
+(defun maybe-add-notes (regno dstate)
+  (let* ((inst (sb!disassem::sap-ref-int
+		(sb!disassem::dstate-segment-sap dstate)
+		(sb!disassem::dstate-cur-offs dstate)
+		n-word-bytes
+		(sb!disassem::dstate-byte-order dstate)))
+	 (op (ldb (byte 6 26) inst)))
+    (case op
+      ;; lwz
+      (32
+       (when (= regno (ldb (byte 5 16) inst)) ; only for the second 
+	 (case (ldb (byte 5 16) inst)
+	   ;; reg_CODE
+	   (19
+	    (sb!disassem:note-code-constant (ldb (byte 16 0) inst) dstate)))))
+      ;; addi
+      (14
+       (when (= regno null-offset)
+	 (sb!disassem:maybe-note-nil-indexed-object
+	  (ldb (byte 16 0) inst) dstate))))))
+
 (sb!disassem:define-arg-type reg
-  :printer #'(lambda (value stream dstate)
-	       (declare (type stream stream) (fixnum value))
-	       (let ((regname (aref reg-symbols value)))
-		 (princ regname stream)
-		 (sb!disassem:maybe-note-associated-storage-ref
-		  value
-		  'registers
-		  regname
-		  dstate))))
+  :printer 
+  (lambda (value stream dstate)
+    (declare (type stream stream) (fixnum value))
+    (let ((regname (aref reg-symbols value)))
+      (princ regname stream)
+      (sb!disassem:maybe-note-associated-storage-ref
+       value 'registers regname dstate)
+      (maybe-add-notes value dstate))))
 
 (defparameter float-reg-symbols
   #.(coerce 
