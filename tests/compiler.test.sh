@@ -286,6 +286,12 @@ cat > $tmpfilename <<EOF
 EOF
 expect_failed_compile $tmpfilename
 
+# This should be clean
+cat > $tmpfilename <<EOF
+(defvar *string* (make-string 10 :element-type 'base-char))
+EOF
+expect_clean_compile $tmpfilename
+
 rm $tmpfilename
 rm $compiled_tmpfilename
 

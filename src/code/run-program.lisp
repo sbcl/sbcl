@@ -617,7 +617,7 @@
 ;;; stream.
 (defun copy-descriptor-to-stream (descriptor stream cookie)
   (incf (car cookie))
-  (let ((string (make-string 256))
+  (let ((string (make-string 256 :element-type 'base-char))
 	handler)
     (setf handler
 	  (sb-sys:add-fd-handler

@@ -1745,7 +1745,7 @@
          (typecase data
 	   ((or (simple-array (unsigned-byte 8) (*))
 		(simple-array (signed-byte 8) (*))
-		simple-string)
+		simple-base-string)
 	    (let* ((numbytes (- end start))
 		   (bytes-read (read-n-bytes stream data offset-start
 					     numbytes nil)))
