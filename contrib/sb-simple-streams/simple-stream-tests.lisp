@@ -28,6 +28,15 @@
         collect val into result
         finally (return (nconc result rest))))
 
+(defun create-test-file (&key (filename *test-file*) (content *dumb-string*))
+  (with-open-file (s filename :direction :output
+                     :if-does-not-exist :create
+                     :if-exists :supersede)
+    (write-sequence content s)))
+
+(defun remove-test-file (&key (filename *test-file*))
+  (delete-file filename))
+
 (defmacro with-test-file ((stream file &rest open-arguments
                                   &key (delete-afterwards t)
                                   initial-content
@@ -50,7 +59,6 @@
             (with-open-file (,stream ,file ,@open-arguments)
               (progn ,@body))
          ,(when delete-afterwards `(ignore-errors (delete-file ,file))))))
-
 
 (deftest create-file-1
     ;; Create a file-simple-stream, write data.
@@ -115,6 +123,7 @@
                                           :direction :io))
 	(string= (prog1 (write-line "Got it!" s) (finish-output s))
 		 (read-line s)))
+    ;; Fail gracefully if echo isn't activated on the system
     (sb-bsd-sockets::connection-refused-error () t))
   t)
 
@@ -187,6 +196,7 @@
      (with-open-stream (s stream)
        (string= (prog1 (write-line content s) (finish-output s))
                 (read-line s))))
+    ;; Fail gracefully if echo isn't activated on the system
    (sb-bsd-sockets::connection-refused-error () t))
   t)
 
@@ -308,3 +318,31 @@
   "XooX"
   T)
 
+(deftest write-read-mixed-sc-1
+    ;; Test read/write-sequence of types string and (unsigned-byte 8)
+    (let ((uvector (make-array '(10) :element-type '(unsigned-byte 8)
+                               :initial-element 64))
+          (svector (make-array '(10) :element-type '(signed-byte 8)
+                               :initial-element -1))
+          (result-uvector (make-array '(10) :element-type '(unsigned-byte 8)
+                              :initial-element 0))
+          (result-svector (make-array '(10) :element-type '(signed-byte 8)
+                              :initial-element 0))
+          (result-string (make-string (length *dumb-string*)
+                                      :initial-element #\Space)))
+      (with-test-file (s *test-file* :class 'file-simple-stream :direction :io
+                         :if-exists :overwrite :if-does-not-exist :create
+                         :delete-afterwards nil)
+        (write-sequence svector s)
+        (write-sequence uvector s)
+        (write-sequence *dumb-string* s))
+      (with-test-file (s *test-file* :class 'file-simple-stream
+                         :direction :input :if-does-not-exist :error
+                         :delete-afterwards nil)
+        (read-sequence result-svector s)
+        (read-sequence result-uvector s)
+        (read-sequence result-string s))
+      (and (string= *dumb-string* result-string)
+           (equalp uvector result-uvector)
+           (equalp svector result-svector)))
+  T)

@@ -475,38 +475,46 @@
 (defun %read-sequence (stream seq start end partial-fill)
   (declare (type simple-stream stream)
 	   (type sequence seq)
-	   (type sb-int:index start)
-	   (type (or null sb-int:index) end)
+	   (type sb-int:index start end)
 	   (type boolean partial-fill))
   (with-stream-class (simple-stream stream)
     (%check stream :input)
     (when (any-stream-instance-flags stream :eof)
       (return-from %read-sequence 0))
+    (when (and (not (any-stream-instance-flags stream :dual :string))
+               (sc-dirty-p stream))
+      (flush-buffer stream t))
     (etypecase seq
       (string
        (funcall-stm-handler j-read-chars (sm melded-stream stream) seq nil
-			    start (or end (length seq))
+			    start end
 			    (if partial-fill :bnb t)))
       ((or (simple-array (unsigned-byte 8) (*))
 	   (simple-array (signed-byte 8) (*)))
+       (when (any-stream-instance-flags stream :string)
+         (error "Can't read into byte sequence from a string stream."))       
        ;; "read-vector" equivalent, but blocking if partial-fill is NIL
-       (error "implement me")
-       )
+       ;; FIXME: this could be implemented faster via buffer-copy
+       (loop with encap = (sm melded-stream stream)
+            for index from start below end
+            for byte = (read-byte-internal encap nil nil t)
+              then (read-byte-internal encap nil nil partial-fill)
+            while byte
+            do (setf (bref seq index) byte)
+            finally (return index)))
       ;; extend to work on other sequences: repeated read-byte
       )))
-
 
 (defun %write-sequence (stream seq start end)
   (declare (type simple-stream stream)
 	   (type sequence seq)
-	   (type sb-int:index start)
-	   (type (or null sb-int:index) end))
+	   (type sb-int:index start end))
   (with-stream-class (simple-stream stream)
     (%check stream :output)
     (etypecase seq
       (string
        (funcall-stm-handler-2 j-write-chars seq (sm melded-stream stream)
-			      start (or end (length seq))))
+			      start end))
       ((or (simple-array (unsigned-byte 8) (*))
 	   (simple-array (signed-byte 8) (*)))
        ;; "write-vector" equivalent
@@ -514,31 +522,43 @@
        (etypecase stream
          (single-channel-simple-stream
           (with-stream-class (single-channel-simple-stream stream)
-            (loop with max-ptr = (sm buf-len stream)
-                  with real-end = (or end (length seq))
-                  for src-pos = start then (+ src-pos count)
-                  for src-rest = (- real-end src-pos)
+            (loop with max-ptr fixnum = (sm buf-len stream)
+                  for src-pos fixnum = start then (+ src-pos count)
+                  for src-rest fixnum = (- end src-pos)
                   while (> src-rest 0) ; FIXME: this is non-ANSI
-                  for ptr = (let ((ptr (sm buffpos stream)))
-                              (if (>= ptr max-ptr)
-                                  (flush-buffer stream t)
-                                  ptr))
-                  for buf-rest = (- max-ptr ptr)
-                  for count = (min buf-rest src-rest)
+                  for ptr fixnum = (let ((ptr (sm buffpos stream)))
+                                     (if (>= ptr max-ptr)
+                                         (flush-buffer stream t)
+                                         ptr))
+                  for buf-rest fixnum = (- max-ptr ptr)
+                  for count fixnum = (min buf-rest src-rest)
                   do (progn (setf (sm mode stream) 1)
                             (setf (sm buffpos stream) (+ ptr count))
                             (buffer-copy seq src-pos (sm buffer stream) ptr count)))))
          (dual-channel-simple-stream
-          (error "Implement me"))
+          (with-stream-class (dual-channel-simple-stream stream)
+            (loop with max-ptr fixnum = (sm max-out-pos stream)
+                  for src-pos fixnum = start then (+ src-pos count)
+                  for src-rest fixnum = (- end src-pos)
+                  while (> src-rest 0) ; FIXME: this is non-ANSI
+                  for ptr fixnum = (let ((ptr (sm outpos stream)))
+                                     (if (>= ptr max-ptr)
+                                         (flush-out-buffer stream t)
+                                         ptr))
+                  for buf-rest fixnum = (- max-ptr ptr)
+                  for count fixnum = (min buf-rest src-rest)
+                  do (progn (setf (sm outpos stream) (+ ptr count))
+                            (buffer-copy seq src-pos (sm out-buffer stream) ptr count)))))
          (string-simple-stream
           (error 'simple-type-error
                  :datum stream
                  :expected-type 'stream
-                 :format-control "Can't write-byte on string streams."
+                 :format-control "Can't write a byte sequence to a string stream."
                  :format-arguments '())))
        )
       ;; extend to work on other sequences: repeated write-byte
-      )))
+      ))
+  seq)
 
 
 (defun read-vector (vector stream &key (start 0) end (endian-swap :byte-8))
@@ -549,27 +569,27 @@
   (etypecase stream
     (simple-stream
      (with-stream-class (simple-stream stream)
-       (if (stringp vector)
-	   (let* ((start (or start 0))
-		  (end (or end (length vector)))
-		  (encap (sm melded-stream stream))
-		  (char (funcall-stm-handler j-read-char encap nil nil t)))
-	     (when char
-	       (setf (schar vector start) char)
-	       (incf start)
-	       (+ start (funcall-stm-handler j-read-chars encap vector nil
-					     start end nil))))
-	   (do* ((j-read-byte (if (any-stream-instance-flags stream :string)
-				  (error "Can't READ-BYTE on string streams.")
-				  #'read-byte-internal))
-		 (encap (sm melded-stream stream))
-		 (index (or start 0) (1+ index))
-		 (end (or end (* (length vector) (vector-elt-width vector))))
-		 (endian-swap (endian-swap-value vector endian-swap))
-		 (byte (funcall j-read-byte encap nil nil t)
-		       (funcall j-read-byte encap nil nil nil)))
-		((or (null byte) (>= index end)) index)
-	     (setf (bref vector (logxor index endian-swap)) byte)))))
+       (cond ((stringp vector)
+              (let* ((start (or start 0))
+                     (end (or end (length vector)))
+                     (encap (sm melded-stream stream))
+                     (char (funcall-stm-handler j-read-char encap nil nil t)))
+                (when char
+                  (setf (schar vector start) char)
+                  (incf start)
+                  (+ start (funcall-stm-handler j-read-chars encap vector nil
+                                                start end nil)))))
+             ((any-stream-instance-flags stream :string)
+              (error "Can't READ-BYTE on string streams."))
+             (t
+              (do* ((encap (sm melded-stream stream))
+                    (index (or start 0) (1+ index))
+                    (end (or end (* (length vector) (vector-elt-width vector))))
+                    (endian-swap (endian-swap-value vector endian-swap))
+                    (byte (read-byte-internal encap nil nil t)
+                          (read-byte-internal encap nil nil nil)))
+                   ((or (null byte) (>= index end)) index)
+                (setf (bref vector (logxor index endian-swap)) byte))))))
     ((or ansi-stream fundamental-stream)
      (unless (typep vector '(or string
 			     (simple-array (signed-byte 8) (*))

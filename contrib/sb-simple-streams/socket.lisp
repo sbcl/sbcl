@@ -20,6 +20,20 @@
    (socket :initform nil :type (or sb-bsd-sockets:socket null)
            :initarg :socket)))
 
+(defmethod print-object ((object socket-simple-stream) stream)
+  (print-unreadable-object (object stream :type nil :identity nil)
+    (with-stream-class (socket-simple-stream object)
+      (cond ((not (any-stream-instance-flags object :simple))
+             (princ "Invalid " stream))
+            ((not (any-stream-instance-flags object :input :output))
+             (princ "Closed " stream)))
+      (format stream "~:(~A~)"
+	      (type-of object))
+      (when (any-stream-instance-flags object :input :output)
+        (multiple-value-bind (host port)
+            (sb-bsd-sockets:socket-peername (sm socket object))
+          (format stream " connected to host ~S, port ~S" host port))))))
+
 (def-stream-class socket-base-simple-stream (dual-channel-simple-stream)
   ())
 
@@ -29,7 +43,7 @@
          (socket (make-instance 'sb-bsd-sockets:inet-socket
                                 :type :stream :protocol :tcp)))
     (unless (and remote-host remote-port)
-      (error "~S requires :remote-host and :remote-port arguments"
+      (error "device-open on ~S requires :remote-host and :remote-port arguments"
              'socket-simple-stream))
     (with-stream-class (socket-simple-stream stream)
       (ecase (getf options :direction :input)
