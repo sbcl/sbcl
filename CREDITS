@@ -675,10 +675,12 @@ Raymond Wiker:
 
 INITIALS GLOSSARY (helpful when reading comments, CVS commit logs, etc.)
 
+VJA  Vincent Arkesteijn
 MNA  Martin Atzmueller
 DB   Daniel Barlow (also "dan")
 DTC  Douglas Crosher
 APD  Alexey Dejneka
+PFD  Paul F. Dietz
 NJF  Nathan Froyd
 AL   Arthur Lemmens
 RAM  Robert MacLachlan
@@ -687,4 +689,3 @@ WHN  William ("Bill") Newman
 CSR  Christophe Rhodes
 PVE  Peter Van Eynde
 PW   Paul Werkowski
-PFD  Paul F. Dietz

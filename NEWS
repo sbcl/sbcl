@@ -2259,6 +2259,8 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
     recursive manner.
   * bug fix: arrays specialized on (UNSIGNED-BYTE 15) are now
     recognized as being TYPEP their class.
+  * bug fix: the PUSHNEW documentation string has been corrected.
+    (thanks to Vincent Arkesteijn)
   * optimization: implemented multiplication as a modular
     (UNSIGNED-BYTE 32) operation on the x86 backend.
   * optimization: SEARCH on simple-base-strings can now be open-coded.

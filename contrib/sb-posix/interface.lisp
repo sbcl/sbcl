@@ -197,3 +197,41 @@
     (when (minusp r)
       (syscall-error)))
   (values (aref filedes2 0) (aref filedes2 1)))
+
+(export 'sb-posix::tcsetattr :sb-posix)
+(declaim (inline sb-posix::tcsetattr))
+(defun sb-posix::tcsetattr (fd actions termios)
+  (let ((fd (sb-posix::file-descriptor fd)))
+    (let* ((s (sb-sys:int-sap
+	       ;; FIXME: WILL NOT WORK ON 64-BIT LISP.  VECTOR-SAP would
+	       ;; be better if the STAT object were guaranteed to be a
+	       ;; vector, but it's not (and may well turn into an alien
+	       ;; soon).
+	       (+ 8 (logandc2 (sb-kernel:get-lisp-obj-address termios) 7))))
+	   (r (alien-funcall
+	       ;; it's the old (* T) problem again :-(
+	       (extern-alien "tcsetattr" (function int int int (* t)))
+	       fd actions s)))
+      (when (minusp r)
+	(syscall-error)))
+    (values)))
+(export 'sb-posix::tcgetattr :sb-posix)
+(declaim (inline sb-posix::tcgetattr))
+(defun sb-posix::tcgetattr (fd &optional termios)
+  (unless termios
+    (setq termios (sb-posix::allocate-termios)))
+  	;; FIXME: Hmm.  WITH-PINNED-OBJECTS/WITHOUT-GCING or something
+	;; is probably needed round here.
+  (let* ((s (sb-sys:int-sap
+	     ;; FIXME: WILL NOT WORK ON 64-BIT LISP.  VECTOR-SAP would
+	     ;; be better if the STAT object were guaranteed to be a
+	     ;; vector, but it's not (and may well turn into an alien
+	     ;; soon).
+	     (+ 8 (logandc2 (sb-kernel:get-lisp-obj-address termios) 7))))
+	 (r (alien-funcall
+	     (extern-alien "tcgetattr" (function int int (* t)))
+	     (sb-posix::file-descriptor fd)
+	     s)))
+    (when (minusp r)
+      (syscall-error)))
+  termios)

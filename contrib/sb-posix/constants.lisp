@@ -11,7 +11,9 @@
  "sys/socket.h" "sys/un.h" "netinet/in.h" "netinet/in_systm.h"
  "netinet/ip.h" "net/if.h" "netdb.h" "errno.h" "netinet/tcp.h"
  "fcntl.h" "sys/mman.h"
- "dirent.h" "signal.h")
+ "dirent.h" "signal.h"
+
+ "termios.h")
 
 ;;; then the stuff we're looking for
 ((:integer af-inet "AF_INET" "IP Protocol family")
@@ -268,7 +270,7 @@
  (:integer o-directory "O_DIRECTORY")
  (:integer o-direct "O_DIRECT")
  (:integer o-async "O_ASYNC")
- (:integer o-largefile "O_LARGEFILE") ; hmm...
+ (:integer o-largefile "O_LARGEFILE")	; hmm...
  (:integer o-dsync "O_DSYNC")
  (:integer o-rsync "O_RSYNC")
 
@@ -288,5 +290,128 @@
  (:integer f-setlkw "F_SETLKW")
  (:integer f-getown "F_GETOWN")
  (:integer f-setown "F_SETOWN")
+
+ ;; tcgetattr(), tcsetattr()
+ (:type cc-t "cc_t")
+ (:type speed-t "speed_t")
+ (:type tcflag-t "tcflag_t")
+ (:integer nccs "NCCS")
+ 
+ (:structure termios
+	     ("struct termios"
+	      (tcflag-t iflag "tcflag_t" "c_iflag")
+	      (tcflag-t oflag "tcflag_t" "c_oflag")
+	      (tcflag-t cflag "tcflag_t" "c_cflag")
+	      (tcflag-t lflag "tcflag_t" "c_lflag")
+	      ;; Uh, so what's the point of grovelling CC-T if I can't
+	      ;; use it here?  the c_cc field is an array of NCCS
+	      ;; elements of type cc_t.  FIXME
+	      ((array (unsigned 8)) cc "cc_t" "c_cc")))
+ 
+ (:integer veof "VEOF")
+ (:integer veol "VEOL")
+ (:integer verase "VERASE")
+ (:integer vintr "VINTR")
+ (:integer vkill "VKILL")
+ (:integer vmin "VMIN")
+ (:integer vquit "VQUIT")
+ (:integer vstart "VSTART")
+ (:integer vstop "VSTOP")
+ (:integer vsusp "VSUSP")
+ (:integer vtime "VTIME")
+
+ (:integer brkint "BRKINT")
+ (:integer icrnl "ICRNL")
+ (:integer ignbrk "IGNBRK")
+ (:integer igncr "IGNCR")
+ (:integer ignpar "IGNPAR")
+ (:integer inlcr "INLCR")
+ (:integer inpck "INPCK")
+ (:integer istrip "ISTRIP")
+ #+xsi				     ; FIXME: an extension, apparently
+ (:integer ixany "IXANY")
+ (:integer ixoff "IXOFF")
+ (:integer ixon "IXON")
+ (:integer parmrk "PARMRK")
+
+ (:integer opost "OPOST")
+ #+xsi
+ (:integer onlcr "ONLCR")
+ (:integer ocrnl "OCRNL")
+ (:integer onlret "ONLRET")
+ (:integer ofill "OFILL")
+ (:integer nldly "NLDLY")
+ (:integer nl0 "NL0")
+ (:integer nl1 "NL1")
+ (:integer crdly "CRDLY")
+ (:integer cr0 "CR0")
+ (:integer cr1 "CR1")
+ (:integer cr2 "CR2")
+ (:integer cr3 "CR3")
+ (:integer tabdly "TABDLY")
+ (:integer tab0 "TAB0")
+ (:integer tab1 "TAB1")
+ (:integer tab2 "TAB2")
+ (:integer tab3 "TAB3")
+ (:integer bsdly "BSDLY")
+ (:integer bs0 "BS0")
+ (:integer bs1 "BS1")
+ (:integer vtdly "VTDLY")
+ (:integer vt0 "VT0")
+ (:integer vt1 "VT1")
+ (:integer ffdly "FFDLY")
+ (:integer ff0 "FF0")
+ (:integer ff1 "FF1")
+
+ (:integer b0 "B0")
+ (:integer b50 "B50")
+ (:integer b75 "B75")
+ (:integer b110 "B110")
+ (:integer b134 "B134")
+ (:integer b150 "B150")
+ (:integer b200 "B200")
+ (:integer b300 "B300")
+ (:integer b600 "B600")
+ (:integer b1200 "B1200")
+ (:integer b1800 "B1800")
+ (:integer b2400 "B2400")
+ (:integer b4800 "B4800")
+ (:integer b9600 "B9600")
+ (:integer b19200 "B19200")
+ (:integer b38400 "B38400")
+
+ (:integer csize "CSIZE")
+ (:integer cs5 "CS5")
+ (:integer cs6 "CS6")
+ (:integer cs7 "CS7")
+ (:integer cs8 "CS8")
+ (:integer cstopb "CSTOPB")
+ (:integer cread "CREAD")
+ (:integer parenb "PARENB")
+ (:integer parodd "PARODD")
+ (:integer hupcl "HUPCL")
+ (:integer clocal "CLOCAL")
+
+ (:integer echo "ECHO")
+ (:integer echoe "ECHOE")
+ (:integer echok "ECHOK")
+ (:integer echonl "ECHONL")
+ (:integer icanon "ICANON")
+ (:integer iexten "IEXTEN")
+ (:integer isig "ISIG")
+ (:integer noflsh "NOFLSH")
+ (:integer tostop "TOSTOP")
+
+ (:integer tcsanow "TCSANOW")
+ (:integer tcsadrain "TCSADRAIN")
+ (:integer tcsaflush "TCSAFLUSH")
+
+ (:integer tciflush "TCIFLUSH")
+ (:integer tcioflush "TCIOFLUSH")
+ (:integer tcoflush "TCOFLUSH")
+ (:integer tcioff "TCIOFF")
+ (:integer tcion "TCION")
+ (:integer tcooff "TCOOFF")
+ (:integer tcoon "TCOON")
  
  )
