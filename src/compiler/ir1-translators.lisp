@@ -610,11 +610,13 @@
 							"LABELS placeholder ~S"
 							name)))
 				       names))
+	     ;; (like PAIRLIS but guaranteed to preserve ordering:)
+	     (placeholder-fenv (mapcar #'cons names placeholder-funs))
              ;; the real LABELS functions, compiled in a LEXENV which
              ;; includes the dummy LABELS functions
 	     (real-funs
 	      (let ((*lexenv* (make-lexenv
-			       :functions (pairlis names placeholder-funs))))
+			       :functions placeholder-fenv)))
 		(mapcar (lambda (name def)
 			  (ir1-convert-lambda def
 					      :source-name name
@@ -624,8 +626,10 @@
 
         ;; Modify all the references to the dummy function leaves so
         ;; that they point to the real function leaves.
-	(loop for real-fun in real-funs and placeholder-fun in placeholder-funs
-	      do (substitute-leaf real-fun placeholder-fun))
+	(loop for real-fun in real-funs and
+	      placeholder-cons in placeholder-fenv do
+	      (substitute-leaf real-fun (cdr placeholder-cons))
+	      (setf (cdr placeholder-cons) real-fun))
 
         ;; Voila.
 	(let ((*lexenv* (make-lexenv
