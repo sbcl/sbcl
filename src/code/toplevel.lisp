@@ -461,44 +461,44 @@
 	(+ nil) (++ nil) (+++ nil)
 	(/// nil) (// nil) (/ nil)
 	(eof-marker (cons :eof nil)))
-    (loop
-      (/show0 "at head of outer LOOP in TOPLEVEL-REPL")
-      ;; There should only be one TOPLEVEL restart, and it's here, so
-      ;; restarting at TOPLEVEL always bounces you all the way out here.
-      (with-simple-restart (toplevel
-			    "Restart at toplevel READ/EVAL/PRINT loop.")
-	;; We add a new ABORT restart for every debugger level, so 
-	;; restarting at ABORT in a nested debugger gets you out to the
-        ;; innermost enclosing debugger, and only when you're in the
-        ;; outermost, unnested debugger level does restarting at ABORT 
-	;; get you out to here.
-        (with-simple-restart (abort
-			      "Reduce debugger level (leaving debugger).")
-	  (catch 'toplevel-catcher
-	    (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
-	    (/show0 "about to enter inner LOOP in TOPLEVEL-REPL")
-	    (loop ; FIXME: Do we need this inner LOOP?
-	     ;; FIXME: It seems bad to have GC behavior depend on scrubbing
-	     ;; the control stack before each interactive command. Isn't
-	     ;; there some way we can convince the GC to just ignore
-	     ;; dead areas of the control stack, so that we don't need to
-	     ;; rely on this half-measure?
-	     (scrub-control-stack)
-	     (unless noprint
+    (/show0 "about to set up restarts in TOPLEVEL-REPL")
+    ;; There should only be one TOPLEVEL restart, and it's here, so
+    ;; restarting at TOPLEVEL always bounces you all the way out here.
+    (with-simple-restart (toplevel
+			  "Restart at toplevel READ/EVAL/PRINT loop.")
+      ;; We add a new ABORT restart for every debugger level, so 
+      ;; restarting at ABORT in a nested debugger gets you out to the
+      ;; innermost enclosing debugger, and only when you're in the
+      ;; outermost, unnested debugger level does restarting at ABORT 
+      ;; get you out to here.
+      (with-simple-restart (abort "Reduce debugger level (leaving debugger).")
+	(catch 'toplevel-catcher
+	  (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
+	  (repl noprint))))))
+
+(defun repl (noprint)
+  (/show0 "entering REPL")
+  (loop
+   ;; FIXME: It seems bad to have GC behavior depend on scrubbing the
+   ;; control stack before each interactive command. Isn't there some
+   ;; way we can convince the GC to just ignore dead areas of the
+   ;; control stack, so that we don't need to rely on this
+   ;; half-measure?
+   (scrub-control-stack)
+   (unless noprint
+     (fresh-line)
+     (princ (if (functionp *prompt*)
+		(funcall *prompt*)
+		*prompt*))
+     (flush-standard-output-streams))
+   (let ((form (read *standard-input* nil eof-marker)))
+     (if (eq form eof-marker)
+	 (quit)
+	 (let ((results (multiple-value-list (interactive-eval form))))
+	   (unless noprint
+	     (dolist (result results)
 	       (fresh-line)
-	       (princ (if (functionp *prompt*)
-			  (funcall *prompt*)
-			  *prompt*))
-	       (flush-standard-output-streams))
-	     (let ((form (read *standard-input* nil eof-marker)))
-	       (if (eq form eof-marker)
-		   (quit)
-		   (let ((results
-			  (multiple-value-list (interactive-eval form))))
-		     (unless noprint
-		       (dolist (result results)
-			 (fresh-line)
-			 (prin1 result)))))))))))))
+	       (prin1 result))))))))
 
 (defun noprogrammer-debugger-hook-fun (condition old-debugger-hook)
   (declare (ignore old-debugger-hook))

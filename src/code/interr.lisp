@@ -438,6 +438,8 @@
 
 ;;;; INTERNAL-ERROR signal handler
 
+(defvar *internal-error-arguments*)
+
 (defun internal-error (context continuable)
   (declare (type system-area-pointer context))
   (declare (ignore continuable))
@@ -453,8 +455,11 @@
 	 (sb!vm:internal-error-arguments alien-context)
        (/show0 "back from INTERNAL-ERROR-ARGUMENTS, ERROR-NUMBER=..")
        (/hexstr error-number)
-       (/show0 "ARGUMENTS=..")
+       (/show0 "cold/low ARGUMENTS=..")
        (/hexstr arguments)
+       (/show (mapcar #'type-of arguments))
+       (dolist (argument arguments)
+	 (/show argument))
        (multiple-value-bind (name sb!debug:*stack-top-hint*)
 	   (find-interrupted-name)
 	 (/show0 "back from FIND-INTERRUPTED-NAME")
