@@ -2027,6 +2027,8 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     ** the RETURN clause in LOOP is now equivalent to DO (RETURN ...).
     ** ROUND and FROUND now give the right answer when given very
        small float arguments.
+    ** (FLOAT X) for X of type DOUBLE-FLOAT now returns X in all
+       circumstances.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -18,11 +18,16 @@
 (defknown %single-float (real) single-float (movable foldable flushable))
 (defknown %double-float (real) double-float (movable foldable flushable))
 
-(deftransform float ((n &optional f) (* &optional single-float) *)
+(deftransform float ((n f) (* single-float) *)
   '(%single-float n))
 
 (deftransform float ((n f) (* double-float) *)
   '(%double-float n))
+
+(deftransform float ((n) *)
+  '(if (floatp n)
+       n
+       (%single-float n)))
 
 (deftransform %single-float ((n) (single-float) *)
   'n)

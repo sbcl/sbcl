@@ -393,7 +393,8 @@
   (movable foldable flushable))
 (defknown deposit-field (integer byte-specifier integer) integer
   (movable foldable flushable))
-(defknown random ((real (0)) &optional random-state) (real 0) ())
+(defknown random ((or (float (0.0)) (integer 1)) &optional random-state)
+  (or (float 0.0) (integer 0)) ())
 (defknown make-random-state (&optional (or (member nil t) random-state))
   random-state (flushable))
 (defknown random-state-p (t) boolean (movable foldable flushable))

@@ -259,7 +259,7 @@
 
 (defun random (arg &optional (state *random-state*))
   (declare (inline %random-single-float %random-double-float
-		   #!+long-float %long-float))
+		   #!+long-float %random-long-float))
   (cond
     ((and (fixnump arg) (<= arg random-fixnum-max) (> arg 0))
      (rem (random-chunk state) arg))
