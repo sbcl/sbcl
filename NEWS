@@ -1,4 +1,8 @@
 changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
+  * incompatible change: the top level REPL now has only an ABORT
+    restart associated with it, not TOPLEVEL and ABORT as it used to.
+    TOP and TOPLEVEL are now available as debugger commands for 
+    returning to the top level.
   * incompatible change: forms evaluated in the REPL now use the
     global optimization policy.
   * incompatible change: user- and system-initialization files are

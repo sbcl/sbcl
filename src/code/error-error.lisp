@@ -23,7 +23,7 @@
       (/show0 "*ERROR-THROW-UP-COUNT* too big, trying HALT")
       (%primitive sb!c:halt)
       (/show0 "*ERROR-THROW-UP-COUNT* too big, trying THROW")
-      (throw 'sb!impl::toplevel-catcher nil))
+      (throw 'toplevel-catcher nil))
     (case *error-error-depth*
       (1)
       (2
@@ -31,12 +31,12 @@
       (3
        (incf *error-throw-up-count*)
        (/show0 "*ERROR-ERROR-DEPTH* too big, trying THROW")
-       (throw 'sb!impl::toplevel-catcher nil))
+       (throw 'toplevel-catcher nil))
       (t
        (/show0 "*ERROR-ERROR-DEPTH* too big, trying HALT")
        (%primitive sb!c:halt)
        (/show0 "*ERROR-ERROR-DEPTH* too big, trying THROW")
-       (throw 'sb!impl::toplevel-catcher nil)))
+       (throw 'toplevel-catcher nil)))
 
     (with-standard-io-syntax
       (let ((*print-readably* nil))

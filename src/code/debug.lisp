@@ -101,11 +101,13 @@ SB-DEBUG:*FLUSH-DEBUG-ERRORS* controls whether errors at the debug prompt
   to debugger.
 
 Getting in and out of the debugger:
-  RESTART  invokes restart numbered as shown (prompt if not given).
-  ERROR    prints the error condition and restart cases.
+  TOPLEVEL, TOP  exits debugger and returns to top level REPL
+  RESTART        invokes restart numbered as shown (prompt if not given).
+  ERROR          prints the error condition and restart cases.
+
   The number of any restart, or its name, or a unique abbreviation for its
-    name, is a valid command, and is the same as using RESTART to invoke
-    that restart.
+   name, is a valid command, and is the same as using RESTART to invoke
+   that restart.
 
 Changing frames:
   UP     up frame         DOWN     down frame
@@ -560,7 +562,7 @@ reset to ~S."
 	     (unless (typep condition 'step-condition)
 	       (when *debug-beginner-help-p*
 		 (format *debug-io*
-			 "~%~@<You can type HELP for debugger help, or ~
+			 "~%~@<Type HELP for debugger help, or ~
                                (SB-EXT:QUIT) to exit from SBCL.~:@>~2%"))
 	       (show-restarts *debug-restarts* *debug-io*))
 	     (internal-debug))
@@ -661,6 +663,10 @@ reset to ~S."
 	     (incf max-name-len 3))
 	   (dolist (restart restarts)
 	     (let ((name (restart-name restart)))
+	       ;; FIXME: maybe it would be better to display later names
+	       ;; in parens instead of brakets, not just omit them fully.
+	       ;; Call BREAK, call BREAK in the debugger, and tell me
+	       ;; it's not confusing looking. --NS 20050310
 	       (cond ((member name names-used)
 		      (format s "~& ~2D: ~V@T~A~%" count max-name-len restart))
 		     (t
@@ -705,7 +711,7 @@ reset to ~S."
 		      (princ condition *debug-io*)
 		      (/show0 "handling d-c by THROWing DEBUG-LOOP-CATCHER")
 		      (throw 'debug-loop-catcher nil))))
-      (fresh-line *debug-io*)
+      (terpri *debug-io*)
       (print-frame-call *current-frame* *debug-io* :verbosity 2)
       (loop
 	(catch 'debug-loop-catcher
@@ -1027,16 +1033,6 @@ reset to ~S."
 
 (!def-debug-command-alias "D" "DOWN")
 
-;;; CMU CL had this command, but SBCL doesn't, since it's redundant
-;;; with "FRAME 0", and it interferes with abbreviations for the
-;;; TOPLEVEL restart.
-;;;(!def-debug-command "TOP" ()
-;;;  (do ((prev *current-frame* lead)
-;;;       (lead (sb!di:frame-up *current-frame*) (sb!di:frame-up lead)))
-;;;      ((null lead)
-;;;       (setf *current-frame* prev)
-;;;       (print-frame-call prev *debug-io*))))
-
 (!def-debug-command "BOTTOM" ()
   (do ((prev *current-frame* lead)
        (lead (sb!di:frame-down *current-frame*) (sb!di:frame-down lead)))
@@ -1070,21 +1066,11 @@ reset to ~S."
 
 ;;;; commands for entering and leaving the debugger
 
-;;; CMU CL supported this QUIT debug command, but SBCL provides this
-;;; functionality with a restart instead. (The QUIT debug command was
-;;; removed because it's confusing to have "quit" mean two different
-;;; things in the system, "restart the top level REPL" in the debugger
-;;; and "terminate the Lisp system" as the SB-EXT:QUIT function.)
-;;;
-;;;(!def-debug-command "QUIT" ()
-;;;  (throw 'sb!impl::toplevel-catcher nil))
+(!def-debug-command "TOPLEVEL" ()
+  (throw 'toplevel-catcher nil))
 
-;;; CMU CL supported this GO debug command, but SBCL doesn't -- in
-;;; SBCL you just type the CONTINUE restart name instead (or "C" or
-;;; "RESTART CONTINUE", that's OK too).
-;;;(!def-debug-command "GO" ()
-;;;  (continue *debug-condition*)
-;;;  (error "There is no restart named CONTINUE."))
+;;; make T safe
+(!def-debug-command-alias "TOP" "TOPLEVEL")
 
 (!def-debug-command "RESTART" ()
   (/show0 "doing RESTART debug-command")

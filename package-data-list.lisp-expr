@@ -1040,6 +1040,9 @@ retained, possibly temporariliy, because it might be used internally."
 	       "COLD-FSET"
 	       "!DEFUN-FROM-COLLECTED-COLD-INIT-FORMS"
 
+	       ;; catch tags
+	       "TOPLEVEL-CATCHER"
+
 	       ;; hooks for contrib/ stuff we're insufficiently sure
 	       ;; about to add to SB!EXT
 	       "*REPL-PROMPT-FUN*"

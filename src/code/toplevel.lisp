@@ -481,31 +481,34 @@ steppers to maintain contextual information.")
 				  (init-file-name (posix-getenv "HOME")
 						  ".sbclrc"))))
 
-          ;; We wrap all the pre-REPL user/system customized startup code 
-          ;; in a restart.
-          ;;
-          ;; (Why not wrap everything, even the stuff above, in this
-          ;; restart? Errors above here are basically command line or
-          ;; Unix environment errors, e.g. a missing file or a typo on
-          ;; the Unix command line, and you don't need to get into Lisp
-          ;; to debug them, you should just start over and do it right
-          ;; at the Unix level. Errors below here are generally errors
-          ;; in user Lisp code, and it might be helpful to let the user
-          ;; reach the REPL in order to help figure out what's going
-          ;; on.)
-          (restart-case
-              (progn
-		(process-init-file sysinit-truename)
-		(process-init-file userinit-truename)
-		(process-eval-options (reverse reversed-evals)))
-            (toplevel ()
-              :report "Skip to toplevel READ/EVAL/PRINT loop."
-              (/show0 "CONTINUEing from pre-REPL RESTART-CASE")
-              (values))                 ; (no-op, just fall through)
-            (quit ()
-              :report "Quit SBCL (calling #'QUIT, killing the process)."
-              (/show0 "falling through to QUIT from pre-REPL RESTART-CASE")
-              (quit))))
+	  ;; This CATCH is needed for the debugger command TOPLEVEL to
+	  ;; work.
+	  (catch 'toplevel-catcher
+	    ;; We wrap all the pre-REPL user/system customized startup
+	    ;; code in a restart.
+	    ;;
+	    ;; (Why not wrap everything, even the stuff above, in this
+	    ;; restart? Errors above here are basically command line
+	    ;; or Unix environment errors, e.g. a missing file or a
+	    ;; typo on the Unix command line, and you don't need to
+	    ;; get into Lisp to debug them, you should just start over
+	    ;; and do it right at the Unix level. Errors below here
+	    ;; are generally errors in user Lisp code, and it might be
+	    ;; helpful to let the user reach the REPL in order to help
+	    ;; figure out what's going on.)
+	    (restart-case
+		(progn
+		  (process-init-file sysinit-truename)
+		  (process-init-file userinit-truename)
+		  (process-eval-options (reverse reversed-evals)))
+	      (abort ()
+		:report "Skip to toplevel READ/EVAL/PRINT loop."
+		(/show0 "CONTINUEing from pre-REPL RESTART-CASE")
+		(values))                 ; (no-op, just fall through)
+	      (quit ()
+		:report "Quit SBCL (calling #'QUIT, killing the process)."
+		(/show0 "falling through to QUIT from pre-REPL RESTART-CASE")
+		(quit)))))
 
         ;; one more time for good measure, in case we fell out of the
         ;; RESTART-CASE above before one of the flushes in the ordinary
@@ -549,28 +552,13 @@ steppers to maintain contextual information.")
 	  (handler-bind ((step-condition 'invoke-stepper))
 	    (let ((*stepping* nil)
 		  (*step* nil))
-	      ;; WITH-SIMPLE-RESTART doesn't actually restart its body as
-	      ;; some (like WHN for an embarrassingly long time
-	      ;; ca. 2001-12-07) might think, but instead drops control back
-	      ;; out at the end. So when a TOPLEVEL or outermost-ABORT
-	      ;; restart happens, we need this outer LOOP wrapper to grab
-	      ;; control and start over again. (And it also wraps CATCH
-	      ;; 'TOPLEVEL-CATCHER for similar reasons.)
 	      (loop
 	       (/show0 "about to set up restarts in TOPLEVEL-REPL")
-	       ;; There should only be one TOPLEVEL restart, and it's here,
-	       ;; so restarting at TOPLEVEL always bounces you all the way
-	       ;; out here.
-	       (with-simple-restart (toplevel
-				     "Restart at toplevel READ/EVAL/PRINT loop.")
-		 ;; We add a new ABORT restart for every debugger level, so
-		 ;; restarting at ABORT in a nested debugger gets you out to
-		 ;; the innermost enclosing debugger, and only when you're
-		 ;; in the outermost, unnested debugger level does
-		 ;; restarting at ABORT get you out to here.
+		 ;; CLHS recommends that there should always be an
+		 ;; ABORT restart; we have this one here, and one per
+		 ;; debugger level.
 		 (with-simple-restart
-		     (abort "~@<Reduce debugger level (leaving debugger, ~
-                            returning to toplevel).~@:>")
+		     (abort "~@<Exit debugger, returning to top level.~@:>")
 		   (catch 'toplevel-catcher
 		     (sb!unix::reset-signal-mask)
 		     ;; In the event of a control-stack-exhausted-error, we
@@ -578,7 +566,7 @@ steppers to maintain contextual information.")
 		     ;; here that this is now possible.
 		     (sb!kernel::protect-control-stack-guard-page 1)
 		     (funcall repl-fun noprint)
-		     (critically-unreachable "after REPL")))))))))))
+		     (critically-unreachable "after REPL"))))))))))
 
 ;;; Our default REPL prompt is the minimal traditional one.
 (defun repl-prompt-fun (stream)
