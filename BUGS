@@ -84,7 +84,9 @@ WORKAROUND:
      an error may be signalled at read time and it would be good if
      SBCL did it.
 
-  c: Reading of not initialized slot sometimes causes SEGV.
+  c: Reading of not initialized slot sometimes causes SEGV (for inline
+     accessors it is fixed, but out-of-line still do not perform type
+     check).
 
   d:
     (declaim (optimize (safety 3) (speed 1) (space 1)))
@@ -877,65 +879,6 @@ WORKAROUND:
   c. the examples in CLHS 7.6.5.1 (regarding generic function lambda
      lists and &KEY arguments) do not signal errors when they should.
 
-192: "Python treats free type declarations as promises."
-  b. What seemed like the same fundamental problem as bug 192a, but
-     was not fixed by the same (APD "more strict type checking
-     sbcl-devel 2002-08-97) patch:
-     (DOTIMES (I ...) (DOTIMES (J ...) (DECLARE ...) ...)):
-       (declaim (optimize (speed 1) (safety 3)))
-       (defun trust-assertion (i)
-         (dotimes (j i)
-           (declare (type (mod 4) i)) ; when commented out, behavior changes!
-           (unless (< i 5)
-             (print j))))
-       (trust-assertion 6) ; prints nothing unless DECLARE is commented out
-
-     (see bug 203)
-
-  c. (defun foo (x y)
-       (locally (declare (type fixnum x y))
-         (+ x (* 2 y))))
-     (foo 1.1 2) => 5.1
-
-194: "no error from (THE REAL '(1 2 3)) in some cases"
-  fixed parts:
-    a. In sbcl-0.7.7.9, 
-         (multiple-value-prog1 (progn (the real '(1 2 3))))
-       returns (1 2 3) instead of signalling an error. This was fixed by 
-       APD's "more strict type checking patch", but although the fixed
-       code (in sbcl-0.7.7.19) works (signals TYPE-ERROR) interactively,
-       it's difficult to write a regression test for it, because
-       (IGNORE-ERRORS (MULTIPLE-VALUE-PROG1 (PROGN (THE REAL '(1 2 3)))))
-       still returns (1 2 3).
-  still-broken parts:
-    b. (IGNORE-ERRORS (MULTIPLE-VALUE-PROG1 (PROGN (THE REAL '(1 2 3)))))
-       returns (1 2 3). (As above, this shows up when writing regression
-       tests for fixed-ness of part a.)
-    c. Also in sbcl-0.7.7.9, (IGNORE-ERRORS (THE REAL '(1 2 3))) => (1 2 3).
-    d. At the REPL,
-         (null (ignore-errors
-           (let ((arg1 1)
-                 (arg2 (identity (the real #(1 2 3)))))
-             (if (< arg1 arg2) arg1 arg2))))
-           => T
-      but putting the same expression inside (DEFUN FOO () ...),
-      (FOO) => NIL.
-  notes:
-    * Actually this entry is probably multiple bugs, as
-      Alexey Dejneka commented on sbcl-devel 2002-09-03:)
-	I don't think that placing these two bugs in one entry is
-	a good idea: they have different explanations. The second
-	(min 1 nil) is caused by flushing of unused code--IDENTITY
-	can do nothing with it. So it is really bug 122. The first
-	(min nil) is due to M-V-PROG1: substituting a continuation
-	for the result, it forgets about type assertion. The purpose
-	of IDENTITY is to save the restricted continuation from
-	inaccurate transformations.
-    * Alexey Dejneka pointed out that
-	(IGNORE-ERRORS (IDENTITY (THE REAL '(1 2 3))))
-      and
-	(IGNORE-ERRORS (VALUES (THE REAL '(1 2 3))))
-      work as they should.
 
 201: "Incautious type inference from compound CONS types"
   (reported by APD sbcl-devel 2002-09-17)
@@ -950,14 +893,6 @@ WORKAROUND:
                 Y)))
 
     (FOO ' (1 . 2)) => "NIL IS INTEGER, Y = 1"
-
-203:
-  Compiler does not check THEs on unused values, e.g. in
-
-    (progn (the real (list 1)) t)
-
-  This situation may appear during optimizing away degenerate cases of
-  certain functions: see bug 192b.
 
 205: "environment issues in cross compiler"
   (These bugs have no impact on user code, but should be fixed or
@@ -1183,23 +1118,6 @@ WORKAROUND:
   Without (DECLARE (NOTINLINE MAPCAR)), Python cannot derive that Z is
   LIST.
 
-236: "THE semantics is broken"
-
-  (defun foo (a f)
-    (declare (optimize (speed 2) (safety 0)))
-    (+ 1d0
-       (the double-float
-         (multiple-value-prog1
-             (svref a 0)
-           (unless f (return-from foo 0))))))
-
-  (foo #(4) nil) => SEGV
-
-  VOP selection thinks that in unsafe code result type assertions
-  should be valid immediately. (See also bug 233a.)
-
-  The similar problem exists for TRULY-THE.
-
 237: "Environment arguments to type functions"
   a. Functions SUBTYPEP, TYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, and 
      UPGRADED-COMPLEX-PART-TYPE now have an optional environment
@@ -1293,6 +1211,26 @@ WORKAROUND:
 248: "reporting errors in type specifier syntax"
   (TYPEP 1 '(SYMBOL NIL)) says something about "unknown type
   specifier".
+
+249:
+  Local functions do not check types of unused arguments:
+    (defun foo (x)
+      (flet ((bar (y)
+               (declare (fixnum y))
+               (incf x)))
+        (list (bar x) (bar x) (bar x))))
+    (foo 1.0) => (2.0 3.0 4.0)
+
+250:
+  (make-array nil :initial-element 11) causes a warning.
+
+251:
+  (defun foo (&key (a :x))
+    (declare (fixnum a))
+    a)
+
+  does not cause a warning. (BTW: old SBCL issued a warning, but for a
+  function, which was never called!)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

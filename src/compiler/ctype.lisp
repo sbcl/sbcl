@@ -103,11 +103,10 @@
 ;;; combination node so that COMPILER-WARNING and related functions
 ;;; will do the right thing if they are supplied.
 (defun valid-fun-use (call type &key
-			   ((:argument-test *ctype-test-fun*) #'csubtypep)
-			   (result-test #'values-subtypep)
-			   (strict-result nil)
-			   ((:lossage-fun *lossage-fun*))
-			   ((:unwinnage-fun *unwinnage-fun*)))
+                      ((:argument-test *ctype-test-fun*) #'csubtypep)
+                      (result-test #'values-subtypep)
+                      ((:lossage-fun *lossage-fun*))
+                      ((:unwinnage-fun *unwinnage-fun*)))
   (declare (type function result-test) (type combination call)
 	   ;; FIXME: Could TYPE here actually be something like
 	   ;; (AND GENERIC-FUNCTION (FUNCTION (T) T))?  How
@@ -116,68 +115,61 @@
   (let* ((*lossage-detected* nil)
 	 (*unwinnage-detected* nil)
 	 (*compiler-error-context* call)
-	 (args (combination-args call))
-	 (nargs (length args)))
+         (args (combination-args call)))
     (if (fun-type-p type)
-	(let* ((required (fun-type-required type))
-	       (min-args (length required))
-	       (optional (fun-type-optional type))
-	       (max-args (+ min-args (length optional)))
-	       (rest (fun-type-rest type))
-	       (keyp (fun-type-keyp type)))
-	  (cond
-	    ((fun-type-wild-args type)
-	     (do ((i 1 (1+ i))
-		  (arg args (cdr arg)))
-		 ((null arg))
-	       (check-arg-type (car arg) *wild-type* i)))
-	    ((not (or optional keyp rest))
-	     (if (/= nargs min-args)
-		 (note-lossage
-		  "The function was called with ~R argument~:P, but wants exactly ~R."
-		  nargs min-args)
-		 (check-fixed-and-rest args required nil)))
-	    ((< nargs min-args)
-	     (note-lossage
-	      "The function was called with ~R argument~:P, but wants at least ~R."
-	      nargs min-args))
-	    ((<= nargs max-args)
-	     (check-fixed-and-rest args (append required optional) rest))
-	    ((not (or keyp rest))
-	     (note-lossage
-	      "The function was called with ~R argument~:P, but wants at most ~R."
-	      nargs max-args))
-	    ((and keyp (oddp (- nargs max-args)))
-	     (note-lossage
-	      "The function has an odd number of arguments in the keyword portion."))
-	    (t
-	     (check-fixed-and-rest args (append required optional) rest)
-	     (when keyp
-	       (check-key-args args max-args type))))
+        (let* ((nargs (length args))
+               (required (fun-type-required type))
+               (min-args (length required))
+               (optional (fun-type-optional type))
+               (max-args (+ min-args (length optional)))
+               (rest (fun-type-rest type))
+               (keyp (fun-type-keyp type)))
+          (cond
+            ((fun-type-wild-args type)
+             (loop for arg in args
+                   and i from 1
+                   do (check-arg-type arg *universal-type* i)))
+            ((not (or optional keyp rest))
+             (if (/= nargs min-args)
+                 (note-lossage
+                  "The function was called with ~R argument~:P, but wants exactly ~R."
+                  nargs min-args)
+                 (check-fixed-and-rest args required nil)))
+            ((< nargs min-args)
+             (note-lossage
+              "The function was called with ~R argument~:P, but wants at least ~R."
+              nargs min-args))
+            ((<= nargs max-args)
+             (check-fixed-and-rest args (append required optional) rest))
+            ((not (or keyp rest))
+             (note-lossage
+              "The function was called with ~R argument~:P, but wants at most ~R."
+              nargs max-args))
+            ((and keyp (oddp (- nargs max-args)))
+             (note-lossage
+              "The function has an odd number of arguments in the keyword portion."))
+            (t
+             (check-fixed-and-rest args (append required optional) rest)
+             (when keyp
+               (check-key-args args max-args type))))
 
-	  (let* ((dtype (node-derived-type call))
-		 (return-type (fun-type-returns type))
-		 (cont (node-cont call))
-		 (out-type
-		  (if (or (not (continuation-type-check cont))
-			  (and strict-result (policy call (/= safety 0))))
-		      dtype
-		      (values-type-intersection (continuation-asserted-type cont)
-						dtype))))
-	    (multiple-value-bind (int win) (funcall result-test out-type return-type)
-	      (cond ((not win)
-		     (note-unwinnage "can't tell whether the result is a ~S"
-				     (type-specifier return-type)))
-		    ((not int)
-		     (note-lossage "The result is a ~S, not a ~S."
-				   (type-specifier out-type)
-				   (type-specifier return-type)))))))
-	(loop for arg in args
+          (let* ((dtype (node-derived-type call))
+                 (return-type (fun-type-returns type))
+                 (out-type dtype))
+            (multiple-value-bind (int win) (funcall result-test out-type return-type)
+              (cond ((not win)
+                     (note-unwinnage "can't tell whether the result is a ~S"
+                                     (type-specifier return-type)))
+                    ((not int)
+                     (note-lossage "The result is a ~S, not a ~S."
+                                   (type-specifier out-type)
+                                   (type-specifier return-type)))))))
+        (loop for arg in args
               and i from 1
               do (check-arg-type arg *wild-type* i)))
     (cond (*lossage-detected* (values nil t))
-	  (*unwinnage-detected* (values nil nil))
-	  (t (values t t)))))
+          (*unwinnage-detected* (values nil nil))
+          (t (values t t)))))
 
 ;;; Check that the derived type of the continuation CONT is compatible
 ;;; with TYPE. N is the arg number, for error message purposes. We
@@ -415,7 +407,7 @@
 				:types (list val-type))))))))))))
     type))
 
-;;; This is similar to VALID-FUNCTION-USE, but checks an
+;;; This is similar to VALID-FUN-USE, but checks an
 ;;; APPROXIMATE-FUN-TYPE against a real function type.
 (declaim (ftype (function (approximate-fun-type fun-type
 			   &optional function function function)
@@ -564,7 +556,7 @@
 	  vars types)
     (values vars (res))))
 
-;;; Check that the optional-dispatch OD conforms to Type. We return
+;;; Check that the optional-dispatch OD conforms to TYPE. We return
 ;;; the values of TRY-TYPE-INTERSECTIONS if there are no syntax
 ;;; problems, otherwise NIL, NIL.
 ;;;
@@ -734,7 +726,8 @@
       (let* ((type-returns (fun-type-returns type))
 	     (return (lambda-return (main-entry functional)))
 	     (atype (when return
-		      (continuation-asserted-type (return-result return)))))
+                      nil
+		      #+nil(continuation-derived-type (return-result return))))) ; !!
 	(cond
 	 ((and atype (not (values-types-equal-or-intersect atype
 							   type-returns)))
@@ -763,7 +756,7 @@
 		  (t
 		   (setf (leaf-type var) type)
 		   (dolist (ref (leaf-refs var))
-		     (derive-node-type ref type)))))
+		     (derive-node-type ref (make-single-value-type type))))))
 	  t))))))
 
 (defun assert-global-function-definition-type (name fun)
@@ -786,3 +779,23 @@
                             use EQ comparison)~@:>"
 			   (continuation-source tag)
 			   (type-specifier (continuation-type tag))))))
+
+(defun %compile-time-type-error (values atype dtype)
+  (declare (ignore dtype))
+  (error 'values-type-error :datum values :expected-type atype))
+
+(defoptimizer (%compile-time-type-error ir2-convert)
+    ((objects atype dtype) node block)
+  (let ((*compiler-error-context* node))
+    (setf (node-source-path node)
+          (cdr (node-source-path node)))
+    (destructuring-bind (values atype dtype)
+        (basic-combination-args node)
+      (declare (ignore values))
+      (let ((atype (continuation-value atype))
+            (dtype (continuation-value dtype)))
+      (unless (eq atype nil)
+        (compiler-warn
+         "Asserted type ~S conflicts with derived type ~S."
+         atype dtype))))
+    (ir2-convert-full-call node block)))

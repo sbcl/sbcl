@@ -500,7 +500,7 @@
   ;; the arg/result type restrictions. We compute this from the
   ;; PRIMITIVE-TYPE restrictions to make life easier for IR1 phases
   ;; that need to anticipate LTN's template selection.
-  (type (missing-arg) :type fun-type)
+  (type (missing-arg) :type ctype)
   ;; lists of restrictions on the argument and result types. A
   ;; restriction may take several forms:
   ;; -- The restriction * is no restriction at all.

@@ -22,25 +22,42 @@
 ;;; constant leaf.
 (defun constant-continuation-p (thing)
   (and (continuation-p thing)
-       (let ((use (continuation-use thing)))
-	 (and (ref-p use)
-	      (constant-p (ref-leaf use))))))
+       (let ((use (principal-continuation-use thing)))
+         (and (ref-p use) (constant-p (ref-leaf use))))))
 
 ;;; Return the constant value for a continuation whose only use is a
 ;;; constant node.
 (declaim (ftype (function (continuation) t) continuation-value))
 (defun continuation-value (cont)
-  (aver (constant-continuation-p cont))
-  (constant-value (ref-leaf (continuation-use cont))))
+  (let ((use (principal-continuation-use cont)))
+    (constant-value (ref-leaf use))))
 
 ;;;; interface for obtaining results of type inference
 
-;;; Return a (possibly values) type that describes what we have proven
-;;; about the type of Cont without taking any type assertions into
-;;; consideration. This is just the union of the NODE-DERIVED-TYPE of
-;;; all the uses. Most often people use CONTINUATION-DERIVED-TYPE or
-;;; CONTINUATION-TYPE instead of using this function directly.
-(defun continuation-proven-type (cont)
+;;; Our best guess for the type of this continuation's value. Note
+;;; that this may be VALUES or FUNCTION type, which cannot be passed
+;;; as an argument to the normal type operations. See
+;;; CONTINUATION-TYPE. This may be called on deleted continuations,
+;;; always returning *.
+;;;
+;;; What we do is call CONTINUATION-PROVEN-TYPE and check whether the
+;;; result is a subtype of the assertion. If so, return the proven
+;;; type and set TYPE-CHECK to NIL. Otherwise, return the intersection
+;;; of the asserted and proven types, and set TYPE-CHECK T. If
+;;; TYPE-CHECK already has a non-null value, then preserve it. Only in
+;;; the somewhat unusual circumstance of a newly discovered assertion
+;;; will we change TYPE-CHECK from NIL to T.
+;;;
+;;; The result value is cached in the CONTINUATION-%DERIVED-TYPE slot.
+;;; If the slot is true, just return that value, otherwise recompute
+;;; and stash the value there.
+#!-sb-fluid (declaim (inline continuation-derived-type))
+(defun continuation-derived-type (cont)
+  (declare (type continuation cont))
+  (or (continuation-%derived-type cont)
+      (setf (continuation-%derived-type cont)
+            (%continuation-derived-type cont))))
+(defun %continuation-derived-type (cont)
   (declare (type continuation cont))
   (ecase (continuation-kind cont)
     ((:block-start :deleted-block-start)
@@ -55,67 +72,9 @@
     (:inside-block
      (node-derived-type (continuation-use cont)))))
 
-;;; Our best guess for the type of this continuation's value. Note
-;;; that this may be VALUES or FUNCTION type, which cannot be passed
-;;; as an argument to the normal type operations. See
-;;; CONTINUATION-TYPE. This may be called on deleted continuations,
-;;; always returning *.
-;;;
-;;; What we do is call CONTINUATION-PROVEN-TYPE and check whether the
-;;; result is a subtype of the assertion. If so, return the proven
-;;; type and set TYPE-CHECK to nil. Otherwise, return the intersection
-;;; of the asserted and proven types, and set TYPE-CHECK T. If
-;;; TYPE-CHECK already has a non-null value, then preserve it. Only in
-;;; the somewhat unusual circumstance of a newly discovered assertion
-;;; will we change TYPE-CHECK from NIL to T.
-;;;
-;;; The result value is cached in the CONTINUATION-%DERIVED-TYPE slot.
-;;; If the slot is true, just return that value, otherwise recompute
-;;; and stash the value there.
-#!-sb-fluid (declaim (inline continuation-derived-type))
-(defun continuation-derived-type (cont)
-  (declare (type continuation cont))
-  (or (continuation-%derived-type cont)
-      (%continuation-derived-type cont)))
-(defun %continuation-derived-type (cont)
-  (declare (type continuation cont))
-  (let ((proven (continuation-proven-type cont))
-	(asserted (continuation-asserted-type cont)))
-    (cond ((values-subtypep proven asserted)
-	   (setf (continuation-%type-check cont) nil)
-	   (setf (continuation-%derived-type cont) proven))
-          ((and (values-subtypep proven (specifier-type 'function))
-                (values-subtypep asserted (specifier-type 'function)))
-	   ;; It's physically impossible for a runtime type check to
-	   ;; distinguish between the various subtypes of FUNCTION, so
-	   ;; it'd be pointless to do more type checks here.
-           (setf (continuation-%type-check cont) nil)
-           (setf (continuation-%derived-type cont)
-		 ;; FIXME: This should depend on optimization
-		 ;; policy. This is for SPEED > SAFETY:
-                 #+nil (values-type-intersection asserted proven)
-                 ;; and this is for SAFETY >= SPEED:
-                 #-nil proven))
-	  (t
-	   (unless (or (continuation-%type-check cont)
-		       (not (continuation-dest cont))
-		       (eq asserted *universal-type*))
-	     (setf (continuation-%type-check cont) t))
-
-	   (setf (continuation-%derived-type cont)
-		 (values-type-intersection asserted proven))))))
-
-;;; Call CONTINUATION-DERIVED-TYPE to make sure the slot is up to
-;;; date, then return it.
-#!-sb-fluid (declaim (inline continuation-type-check))
-(defun continuation-type-check (cont)
-  (declare (type continuation cont))
-  (continuation-derived-type cont)
-  (continuation-%type-check cont))
-
 ;;; Return the derived type for CONT's first value. This is guaranteed
 ;;; not to be a VALUES or FUNCTION type.
-(declaim (ftype (function (continuation) ctype) continuation-type))
+(declaim (ftype (sfunction (continuation) ctype) continuation-type))
 (defun continuation-type (cont)
   (single-value-type (continuation-derived-type cont)))
 
@@ -154,8 +113,12 @@
                      and type of-type ctype in arg-types
                      do (when arg
                           (setf (continuation-%externally-checkable-type arg)
-                                type)))
+                                (coerce-to-values type))))
                   (continuation-%externally-checkable-type cont)))))))
+(declaim (inline flush-continuation-externally-checkable-type))
+(defun flush-continuation-externally-checkable-type (cont)
+  (declare (type continuation cont))
+  (setf (continuation-%externally-checkable-type cont) nil))
 
 ;;;; interface routines used by optimizers
 
@@ -172,8 +135,8 @@
 ;;; careful not to fly into space when the DEST's PREV is missing.
 (defun reoptimize-continuation (cont)
   (declare (type continuation cont))
+  (setf (continuation-%derived-type cont) nil)
   (unless (member (continuation-kind cont) '(:deleted :unused))
-    (setf (continuation-%derived-type cont) nil)
     (let ((dest (continuation-dest cont)))
       (when dest
 	(setf (continuation-reoptimize cont) t)
@@ -190,6 +153,13 @@
       (setf (block-type-check (node-block node)) t)))
   (values))
 
+(defun reoptimize-continuation-uses (cont)
+  (declare (type continuation cont))
+  (dolist (use (find-uses cont))
+    (setf (node-reoptimize use) t)
+    (setf (block-reoptimize (node-block use)) t)
+    (setf (component-reoptimize (node-component use)) t)))
+
 ;;; Annotate NODE to indicate that its result has been proven to be
 ;;; TYPEP to RTYPE. After IR1 conversion has happened, this is the
 ;;; only correct way to supply information discovered about a node's
@@ -203,7 +173,8 @@
   (declare (type node node) (type ctype rtype))
   (let ((node-type (node-derived-type node)))
     (unless (eq node-type rtype)
-      (let ((int (values-type-intersection node-type rtype)))
+      (let ((int (values-type-intersection node-type rtype))
+            (cont (node-cont node)))
 	(when (type/= node-type int)
 	  (when (and *check-consistency*
 		     (eq int *empty-type*)
@@ -215,41 +186,37 @@
 	       (type-specifier rtype) (type-specifier node-type))))
 	  (setf (node-derived-type node) int)
           (when (and (ref-p node)
-                     (member-type-p int)
-                     (null (rest (member-type-members int)))
                      (lambda-var-p (ref-leaf node)))
-            (change-ref-leaf node (find-constant (first (member-type-members int)))))
-	  (reoptimize-continuation (node-cont node))))))
-  (values))
-
-(defun set-continuation-type-assertion (cont atype ctype)
-  (declare (type continuation cont) (type ctype atype ctype))
-  (when (eq atype *wild-type*)
-    (return-from set-continuation-type-assertion))
-  (let* ((old-atype (continuation-asserted-type cont))
-         (old-ctype (continuation-type-to-check cont))
-         (new-atype (values-type-intersection old-atype atype))
-         (new-ctype (values-type-intersection old-ctype ctype)))
-    (when (or (type/= old-atype new-atype)
-              (type/= old-ctype new-ctype))
-      (setf (continuation-asserted-type cont) new-atype)
-      (setf (continuation-type-to-check cont) new-ctype)
-      (do-uses (node cont)
-        (setf (block-attributep (block-flags (node-block node))
-                                type-check type-asserted)
-              t))
-      (reoptimize-continuation cont)))
+            (let ((type (single-value-type int)))
+              (when (and (member-type-p type)
+                         (null (rest (member-type-members type))))
+                (change-ref-leaf node (find-constant
+                                       (first (member-type-members type)))))))
+	  (reoptimize-continuation cont)))))
   (values))
 
 ;;; This is similar to DERIVE-NODE-TYPE, but asserts that it is an
-;;; error for CONT's value not to be TYPEP to TYPE. If we improve the
-;;; assertion, we set TYPE-CHECK and TYPE-ASSERTED to guarantee that
-;;; the new assertion will be checked.
+;;; error for CONT's value not to be TYPEP to TYPE. We implement it
+;;; moving uses behind a new CAST node. If we improve the assertion,
+;;; we set TYPE-CHECK and TYPE-ASSERTED to guarantee that the new
+;;; assertion will be checked.
 (defun assert-continuation-type (cont type policy)
   (declare (type continuation cont) (type ctype type))
-  (when (eq type *wild-type*)
+  (when (values-subtypep (continuation-derived-type cont) type)
     (return-from assert-continuation-type))
-  (set-continuation-type-assertion cont type (maybe-weaken-check type policy)))
+  (let* ((dest (continuation-dest cont))
+         (prev-cont (node-prev dest)))
+    (aver dest)
+    (with-ir1-environment-from-node dest
+      (let* ((cast (make-cast cont type policy))
+             (checked-value (make-continuation)))
+        (setf (continuation-next prev-cont) cast
+              (node-prev cast) prev-cont)
+        (use-continuation cast checked-value)
+        (link-node-to-previous-continuation dest checked-value)
+        (substitute-continuation checked-value cont)
+        (setf (continuation-dest cont) cast)
+        (reoptimize-continuation cont)))))
 
 ;;; Assert that CALL is to a function of the specified TYPE. It is
 ;;; assumed that the call is legal and has only constants in the
@@ -311,21 +278,15 @@
       (t
        (loop
           (let ((succ (block-succ block)))
-            (unless (and succ (null (rest succ)))
+            (unless (singleton-p succ)
               (return)))
 
           (let ((last (block-last block)))
             (typecase last
               (cif
-               (if (memq (continuation-type-check (if-test last))
-                         '(nil :deleted))
-                   ;; FIXME: Remove the test above when the bug 203
-                   ;; will be fixed.
-                   (progn
-                     (flush-dest (if-test last))
-                     (when (unlink-node last)
-                       (return)))
-                   (return)))
+               (flush-dest (if-test last))
+               (when (unlink-node last)
+                 (return)))
               (exit
                (when (maybe-delete-exit last)
                  (return)))))
@@ -337,7 +298,7 @@
          (aver (not (block-delete-p block)))
          (ir1-optimize-block block))
 
-       (cond ((block-delete-p block)
+       (cond ((and (block-delete-p block) (block-component block))
               (delete-block block))
              ((and (block-flush-p block) (block-component block))
               (flush-dead-code block))))))
@@ -389,7 +350,9 @@
 	   (when value
 	     (derive-node-type node (continuation-derived-type value)))))
 	(cset
-	 (ir1-optimize-set node)))))
+	 (ir1-optimize-set node))
+        (cast
+         (ir1-optimize-cast node)))))
 
   (values))
 
@@ -398,7 +361,7 @@
 (defun join-successor-if-possible (block)
   (declare (type cblock block))
   (let ((next (first (block-succ block))))
-    (when (block-start next)
+    (when (block-start next) ; NEXT is not an END-OF-COMPONENT marker
       (let* ((last (block-last block))
 	     (last-cont (node-cont last))
 	     (next-cont (block-start next)))
@@ -407,6 +370,7 @@
 		;; The successor has more than one predecessor.
 		(rest (block-pred next))
 		;; The last node's CONT is also used somewhere else.
+                ;; (as in (IF <cond> (M-V-PROG1 ...) (M-V-PROG1 ...)))
 		(not (eq (continuation-use last-cont) last))
 		;; The successor is the current block (infinite loop).
 		(eq next block)
@@ -421,13 +385,13 @@
 			 (block-home-lambda next))))
 	       nil)
 	      ;; Joining is easy when the successor's START
-	      ;; continuation is the same from our LAST's CONT. 
+	      ;; continuation is the same from our LAST's CONT.
 	      ((eq last-cont next-cont)
 	       (join-blocks block next)
 	       t)
 	      ;; If they differ, then we can still join when the last
 	      ;; continuation has no next and the next continuation
-	      ;; has no uses. 
+	      ;; has no uses.
 	      ((and (null (block-start-uses next))
 		    (eq (continuation-kind last-cont) :inside-block))
 	       ;; In this case, we replace the next
@@ -444,6 +408,17 @@
 		 (setf (block-start next) last-cont)
 		 (join-blocks block next))
 	       t)
+              ((and (null (block-start-uses next))
+                    (not (exit-p (continuation-dest last-cont)))
+                    (null (continuation-lexenv-uses last-cont)))
+               (assert (null (find-uses next-cont)))
+               (when (continuation-dest last-cont)
+                 (substitute-continuation next-cont last-cont))
+               (delete-continuation-use last)
+               (add-continuation-use last next-cont)
+               (setf (continuation-%derived-type next-cont) nil)
+               (join-blocks block next)
+               t)
 	      (t
 	       nil))))))
 
@@ -505,20 +480,7 @@
 			  ;; functional args to determine if they have
 			  ;; any side effects.
                           (if (policy node (= safety 3))
-                              (and (ir1-attributep attr flushable)
-                                   (every (lambda (arg)
-                                            ;; FIXME: when bug 203
-                                            ;; will be fixed, remove
-                                            ;; this check
-                                            (member (continuation-type-check arg)
-                                                    '(nil :deleted)))
-                                          (basic-combination-args node))
-                                   (valid-fun-use node
-                                                  (info :function :type
-                                                        (leaf-source-name (ref-leaf (continuation-use (basic-combination-fun node)))))
-                                                  :result-test #'always-subtypep
-                                                  :lossage-fun nil
-                                                  :unwinnage-fun nil))
+                              (ir1-attributep attr flushable)
                               (ir1-attributep attr unsafely-flushable)))
                  (flush-combination node))))))
 	(mv-combination
@@ -542,7 +504,11 @@
 	     (flush-dest (set-value node))
 	     (setf (basic-var-sets var)
 		   (delete node (basic-var-sets var)))
-	     (unlink-node node)))))))
+	     (unlink-node node))))
+        (cast
+         (unless (cast-type-check node)
+           (flush-dest (cast-value node))
+           (unlink-node node))))))
 
   (setf (block-flush-p block) nil)
   (values))
@@ -578,9 +544,12 @@
 		   (return-from find-result-type (values)))))
 	      (t
 	       (use-union (node-derived-type use)))))
-      (let ((int (values-type-intersection
-		  (continuation-asserted-type result)
-		  (use-union))))
+      (let ((int
+             ;; (values-type-intersection
+             ;; (continuation-asserted-type result) ; FIXME -- APD, 2002-01-26
+             (use-union)
+              ;; )
+            ))
 	(setf (return-result-type node) int))))
   (values))
 
@@ -636,25 +605,22 @@
 	  (convert-if-if use node)
 	  (when (continuation-use test) (return)))))
 
-    (when (memq (continuation-type-check test)
-                '(nil :deleted))
-      ;; FIXME: Remove the test above when the bug 203 will be fixed.
-      (let* ((type (continuation-type test))
-             (victim
-              (cond ((constant-continuation-p test)
-                     (if (continuation-value test)
-                         (if-alternative node)
-                         (if-consequent node)))
-                    ((not (types-equal-or-intersect type (specifier-type 'null)))
-                     (if-alternative node))
-                    ((type= type (specifier-type 'null))
-                     (if-consequent node)))))
-        (when victim
-          (flush-dest test)
-          (when (rest (block-succ block))
-            (unlink-blocks block victim))
-          (setf (component-reanalyze (node-component node)) t)
-          (unlink-node node)))))
+    (let* ((type (continuation-type test))
+           (victim
+            (cond ((constant-continuation-p test)
+                   (if (continuation-value test)
+                       (if-alternative node)
+                       (if-consequent node)))
+                  ((not (types-equal-or-intersect type (specifier-type 'null)))
+                   (if-alternative node))
+                  ((type= type (specifier-type 'null))
+                   (if-consequent node)))))
+      (when victim
+        (flush-dest test)
+        (when (rest (block-succ block))
+          (unlink-blocks block victim))
+        (setf (component-reanalyze (node-component node)) t)
+        (unlink-node node))))
   (values))
 
 ;;; Create a new copy of an IF node that tests the value of the node
@@ -687,7 +653,7 @@
 	   (new-block (continuation-starts-block new-cont)))
       (link-node-to-previous-continuation new-node new-cont)
       (setf (continuation-dest new-cont) new-node)
-      (setf (continuation-%externally-checkable-type new-cont) nil)
+      (flush-continuation-externally-checkable-type new-cont)
       (add-continuation-use new-node dummy-cont)
       (setf (block-last new-block) new-node)
 
@@ -729,22 +695,14 @@
   (declare (type exit node))
   (let ((value (exit-value node))
 	(entry (exit-entry node))
-	(cont (node-cont node)))
+        (cont (node-cont node)))
     (when (and entry
 	       (eq (node-home-lambda node) (node-home-lambda entry)))
       (setf (entry-exits entry) (delete node (entry-exits entry)))
-      (prog1
-	  (unlink-node node)
-	(when value
-	  (collect ((merges))
-	    (when (return-p (continuation-dest cont))
-	      (do-uses (use value)
-		(when (and (basic-combination-p use)
-			   (eq (basic-combination-kind use) :local))
-		  (merges use))))
-	    (substitute-continuation-uses cont value)
-	    (dolist (merge (merges))
-	      (merge-tail-sets merge))))))))
+      (if value
+          (delete-filter node cont value)
+          (unlink-node node)))))
+
 
 ;;;; combination IR1 optimization
 
@@ -800,13 +758,13 @@
 	 (when fun
 	   (let ((res (funcall fun node)))
 	     (when res
-	       (derive-node-type node res)
+	       (derive-node-type node (coerce-to-values res))
 	       (maybe-terminate-block node nil)))))
 
        (let ((fun (fun-info-optimizer kind)))
 	 (unless (and fun (funcall fun node))
 	   (dolist (x (fun-info-transforms kind))
-	     #!+sb-show 
+	     #!+sb-show
 	     (when *show-transforms-p*
 	       (let* ((cont (basic-combination-fun node))
 		      (fname (continuation-fun-name cont t)))
@@ -819,54 +777,54 @@
 
   (values))
 
-;;; If CALL is to a function that doesn't return (i.e. return type is
-;;; NIL), then terminate the block there, and link it to the component
-;;; tail. We also change the call's CONT to be a dummy continuation to
-;;; prevent the use from confusing things.
+;;; If NODE doesn't return (i.e. return type is NIL), then terminate
+;;; the block there, and link it to the component tail. We also change
+;;; the NODE's CONT to be a dummy continuation to prevent the use from
+;;; confusing things.
 ;;;
 ;;; Except when called during IR1 [FIXME: What does this mean? Except
 ;;; during IR1 conversion? What about IR1 optimization?], we delete
 ;;; the continuation if it has no other uses. (If it does have other
 ;;; uses, we reoptimize.)
 ;;;
-;;; Termination on the basis of a continuation type assertion is
+;;; Termination on the basis of a continuation type is
 ;;; inhibited when:
 ;;; -- The continuation is deleted (hence the assertion is spurious), or
 ;;; -- We are in IR1 conversion (where THE assertions are subject to
 ;;;    weakening.)
-(defun maybe-terminate-block (call ir1-converting-not-optimizing-p)
-  (declare (type basic-combination call))
-  (let* ((block (node-block call))
-	 (cont (node-cont call))
+(defun maybe-terminate-block (node ir1-converting-not-optimizing-p)
+  (declare (type (or basic-combination cast) node))
+  (let* ((block (node-block node))
+	 (cont (node-cont node))
 	 (tail (component-tail (block-component block)))
 	 (succ (first (block-succ block))))
-    (unless (or (and (eq call (block-last block)) (eq succ tail))
+    (unless (or (and (eq node (block-last block)) (eq succ tail))
 		(block-delete-p block))
-      (when (or (and (eq (continuation-asserted-type cont) *empty-type*)
-		     (not (or ir1-converting-not-optimizing-p
-			      (eq (continuation-kind cont) :deleted))))
-		(eq (node-derived-type call) *empty-type*))
+      (when (or (and (not (or ir1-converting-not-optimizing-p
+			      (eq (continuation-kind cont) :deleted)))
+		     (eq (continuation-derived-type cont) *empty-type*))
+		(eq (node-derived-type node) *empty-type*))
 	(cond (ir1-converting-not-optimizing-p
-	       (delete-continuation-use call)
+	       (delete-continuation-use node)
 	       (cond
 		((block-last block)
-		 (aver (and (eq (block-last block) call)
+		 (aver (and (eq (block-last block) node)
 			    (eq (continuation-kind cont) :block-start))))
 		(t
-		 (setf (block-last block) call)
+		 (setf (block-last block) node)
 		 (link-blocks block (continuation-starts-block cont)))))
 	      (t
-	       (node-ends-block call)
-	       (delete-continuation-use call)
+	       (node-ends-block node)
+	       (delete-continuation-use node)
 	       (if (eq (continuation-kind cont) :unused)
 		   (delete-continuation cont)
 		   (reoptimize-continuation cont))))
-	
+
 	(unlink-blocks block (first (block-succ block)))
 	(setf (component-reanalyze (block-component block)) t)
 	(aver (not (block-succ block)))
 	(link-blocks block tail)
-	(add-continuation-use call (make-continuation))
+	(add-continuation-use node (make-continuation))
 	t))))
 
 ;;; This is called both by IR1 conversion and IR1 optimization when
@@ -1015,24 +973,16 @@
                                               predicate)
                               (let ((dest (continuation-dest (node-cont call))))
                                 (and dest (not (if-p dest)))))))
-                ;; FIXME: This SYMBOLP is part of a literal
-                ;; translation of a test in the old CMU CL
-                ;; source, and it's not quite clear what
-                ;; the old source meant. Did it mean "has a
-                ;; valid name"? Or did it mean "is an
-                ;; ordinary function name, not a SETF
-                ;; function"? Either way, the old CMU CL
-                ;; code probably didn't deal with SETF
-                ;; functions correctly, and neither does
-                ;; this new SBCL code, and that should be fixed.
-		(when (symbolp (leaf-source-name leaf))
-                  (let ((dummies (make-gensym-list
-                                  (length (combination-args call)))))
-                    (transform-call call
-                                    `(lambda ,dummies
-                                      (,(leaf-source-name leaf)
-                                       ,@dummies))
-                                    (leaf-source-name leaf))))))))))
+		(let ((name (leaf-source-name leaf))
+                      (dummies (make-gensym-list
+                                (length (combination-args call)))))
+                  (transform-call call
+                                  `(lambda ,dummies
+                                     (,@(if (symbolp name)
+                                            `(,name)
+                                            `(funcall #',name))
+                                        ,@dummies))
+                                  (leaf-source-name leaf)))))))))
   (values))
 
 ;;;; known function optimization
@@ -1068,7 +1018,7 @@
 		    (policy node (> speed inhibit-warnings))))
 	 (*compiler-error-context* node))
     (cond ((or (not constrained)
-	       (valid-fun-use node type :strict-result t))
+	       (valid-fun-use node type))
 	   (multiple-value-bind (severity args)
 	       (catch 'give-up-ir1-transform
 		 (transform-call node
@@ -1294,7 +1244,12 @@
 	(when (type/= int var-type)
 	  (setf (leaf-type leaf) int)
 	  (dolist (ref (leaf-refs leaf))
-	    (derive-node-type ref int))))
+	    (derive-node-type ref (make-single-value-type int))
+            (let* ((cont (node-cont ref))
+                   (dest (continuation-dest cont)))
+              ;; KLUDGE: LET var substitution
+              (when (combination-p dest)
+                (reoptimize-continuation cont))))))
       (values))))
 
 ;;; Figure out the type of a LET variable that has sets. We compute
@@ -1306,7 +1261,7 @@
       (let ((type (continuation-type (set-value set))))
         (res type)
         (when (node-reoptimize set)
-          (derive-node-type set type)
+          (derive-node-type set (make-single-value-type type))
           (setf (node-reoptimize set) nil))))
     (propagate-to-refs var (res)))
   (values))
@@ -1324,7 +1279,8 @@
 	    (setf (continuation-reoptimize iv) nil)
 	    (propagate-from-sets var (continuation-type iv)))))))
 
-  (derive-node-type node (continuation-type (set-value node)))
+  (derive-node-type node (make-single-value-type
+                          (continuation-type (set-value node))))
   (values))
 
 ;;; Return true if the value of REF will always be the same (and is
@@ -1351,12 +1307,10 @@
 ;;; replace the variable reference's CONT with the arg continuation.
 ;;; This is inhibited when:
 ;;; -- CONT has other uses, or
-;;; -- CONT receives multiple values, or
 ;;; -- the reference is in a different environment from the variable, or
-;;; -- either continuation has a funky TYPE-CHECK annotation.
-;;; -- the continuations have incompatible assertions, so the new asserted type
-;;;    would be NIL.
-;;; -- the VAR's DEST has a different policy than the ARG's (think safety).
+;;; -- CONT carries unknown number of values, or
+;;; -- DEST is return or exit, or
+;;; -- DEST is sensitive to the number of values and ARG return non-one value.
 ;;;
 ;;; We change the REF to be a reference to NIL with unused value, and
 ;;; let it be flushed as dead code. A side effect of this substitution
@@ -1365,25 +1319,29 @@
   (declare (type continuation arg) (type lambda-var var))
   (let* ((ref (first (leaf-refs var)))
 	 (cont (node-cont ref))
-	 (cont-atype (continuation-asserted-type cont))
-         (cont-ctype (continuation-type-to-check cont))
 	 (dest (continuation-dest cont)))
     (when (and (eq (continuation-use cont) ref)
 	       dest
-	       (continuation-single-value-p cont)
+               (typecase dest
+                 (cast
+                  (and (type-single-value-p (continuation-derived-type arg))
+                       (multiple-value-bind (pdest pprev)
+                           (principal-continuation-end cont)
+                         (declare (ignore pdest))
+                         (continuation-single-value-p pprev))))
+                 (mv-combination
+                  (or (eq (basic-combination-fun dest) cont)
+                      (and (eq (basic-combination-kind dest) :local)
+                           (type-single-value-p (continuation-derived-type arg)))))
+                 ((or creturn exit)
+                  nil)
+                 (t
+                  ;; (AVER (CONTINUATION-SINGLE-VALUE-P CONT))
+                  t))
 	       (eq (node-home-lambda ref)
-		   (lambda-home (lambda-var-home var)))
-	       (member (continuation-type-check arg) '(t nil))
-	       (member (continuation-type-check cont) '(t nil))
-	       (not (eq (values-type-intersection
-			 cont-atype
-			 (continuation-asserted-type arg))
-			*empty-type*))
-	       (eq (lexenv-policy (node-lexenv dest))
-		   (lexenv-policy (node-lexenv (continuation-dest arg)))))
+		   (lambda-home (lambda-var-home var))))
       (aver (member (continuation-kind arg)
 		    '(:block-start :deleted-block-start :inside-block)))
-      (set-continuation-type-assertion arg cont-atype cont-ctype)
       (setf (node-derived-type ref) *wild-type*)
       (change-ref-leaf ref (find-constant nil))
       (substitute-continuation arg cont)
@@ -1412,9 +1370,9 @@
 ;;; derived-type information for the arg to all the VAR's refs.
 ;;;
 ;;; Substitution is inhibited when the arg leaf's derived type isn't a
-;;; subtype of the argument's asserted type. This prevents type
-;;; checking from being defeated, and also ensures that the best
-;;; representation for the variable can be used.
+;;; subtype of the argument's leaf type. This prevents type checking
+;;; from being defeated, and also ensures that the best representation
+;;; for the variable can be used.
 ;;;
 ;;; Substitution of individual references is inhibited if the
 ;;; reference is in a different component from the home. This can only
@@ -1440,8 +1398,10 @@
 	  (when (ref-p use)
 	    (let ((leaf (ref-leaf use)))
 	      (when (and (constant-reference-p use)
-			 (values-subtypep (leaf-type leaf)
-					  (continuation-asserted-type arg)))
+                         (csubtypep (leaf-type leaf)
+                                    ;; (NODE-DERIVED-TYPE USE) would
+                                    ;; be better -- APD, 2003-05-15
+                                    (leaf-type var)))
 		(propagate-to-refs var (continuation-type arg))
 		(let ((use-component (node-component use)))
 		  (substitute-leaf-if
@@ -1454,11 +1414,11 @@
 		   leaf var))
 		t)))))
        ((and (null (rest (leaf-refs var)))
-	     (substitute-single-use-continuation arg var)))
+             (substitute-single-use-continuation arg var)))
        (t
 	(propagate-to-refs var (continuation-type arg))))))
 
-  (when (every #'null (combination-args call))
+  (when (every #'not (combination-args call))
     (delete-let fun))
 
   (values))
@@ -1574,9 +1534,9 @@
 		    (propagate-from-sets var type)
 		    (propagate-to-refs var type)))
 	      vars
-		(append types
-			(make-list (max (- (length vars) nvals) 0)
-				   :initial-element (specifier-type 'null))))))
+              (adjust-list types
+                           (length vars)
+                           (specifier-type 'null)))))
     (setf (continuation-reoptimize arg) nil))
   (values))
 
@@ -1614,7 +1574,7 @@
 	(args (basic-combination-args node)))
 
     (unless (and (ref-p ref) (constant-reference-p ref)
-		 args (null (rest args)))
+		 (singleton-p args))
       (return-from ir1-optimize-mv-call))
 
     (multiple-value-bind (min max)
@@ -1709,7 +1669,7 @@
 	(let ((fun-cont (basic-combination-fun call)))
 	  (setf (continuation-dest fun-cont) use)
           (setf (combination-fun use) fun-cont)
-	  (setf (continuation-%externally-checkable-type fun-cont) nil))
+	  (flush-continuation-externally-checkable-type fun-cont))
 	(setf (combination-kind use) :local)
 	(setf (functional-kind fun) :let)
 	(flush-dest (first (basic-combination-args call)))
@@ -1745,7 +1705,7 @@
       (let ((args (combination-args use)))
 	(dolist (arg args)
 	  (setf (continuation-dest arg) node)
-          (setf (continuation-%externally-checkable-type arg) nil))
+          (flush-continuation-externally-checkable-type arg))
 	(setf (combination-args use) nil)
 	(flush-dest list)
 	(setf (combination-args node) args))
@@ -1764,3 +1724,60 @@
 	   (declare (ignore ,@dummies))
 	   val))
       nil))
+
+;;; TODO:
+;;; - CAST chains;
+(defun ir1-optimize-cast (cast &optional do-not-optimize)
+  (declare (type cast cast))
+  (let* ((value (cast-value cast))
+         (value-type (continuation-derived-type value))
+         (atype (cast-asserted-type cast))
+         (int (values-type-intersection value-type atype)))
+    (derive-node-type cast int)
+    (when (eq int *empty-type*)
+      (unless (eq value-type *empty-type*)
+
+        ;; FIXME: Do it in one step.
+        (filter-continuation
+         value
+         `(multiple-value-call #'list 'dummy))
+        (filter-continuation
+         value
+         ;; FIXME: Derived type.
+         `(%compile-time-type-error 'dummy
+                                    ',(type-specifier (coerce-to-values atype))
+                                    ',(type-specifier value-type)))
+        ;; KLUDGE: FILTER-CONTINUATION does not work for
+        ;; non-returning functions, so we declare the return type of
+        ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type
+        ;; here.
+        (derive-node-type (continuation-use value) *empty-type*)
+        (maybe-terminate-block (continuation-use value) nil)
+        ;; FIXME: Is it necessary?
+        (aver (null (block-pred (node-block cast))))
+        (setf (block-delete-p (node-block cast)) t)
+        (return-from ir1-optimize-cast)))
+    (when (eq (node-derived-type cast) *empty-type*)
+      (maybe-terminate-block cast nil))
+
+    (flet ((delete-cast ()
+             (let ((cont (node-cont cast)))
+               (delete-filter cast cont value)
+               (reoptimize-continuation cont)
+               (when (continuation-single-value-p cont)
+                 (note-single-valuified-continuation cont))
+               (when (not (continuation-dest cont))
+                 (reoptimize-continuation-uses cont)))))
+      (cond
+        ((and (not do-not-optimize)
+              (values-subtypep value-type
+                               (cast-asserted-type cast)))
+         (delete-cast)
+         (return-from ir1-optimize-cast t))
+        ((and (cast-%type-check cast)
+              (values-subtypep value-type
+                               (cast-type-to-check cast)))
+         (setf (cast-%type-check cast) nil)))))
+
+  (unless do-not-optimize
+    (setf (node-reoptimize cast) nil)))

@@ -163,12 +163,12 @@
        (declare (optimize (safety 0)))
        (and ,@(when low
 		(if (consp low)
-		    `((> (the ,base ,n-object) ,(car low)))
-		    `((>= (the ,base ,n-object) ,low))))
+		    `((> (truly-the ,base ,n-object) ,(car low)))
+		    `((>= (truly-the ,base ,n-object) ,low))))
 	    ,@(when high
 		(if (consp high)
-		    `((< (the ,base ,n-object) ,(car high)))
-		    `((<= (the ,base ,n-object) ,high))))))))
+		    `((< (truly-the ,base ,n-object) ,(car high)))
+		    `((<= (truly-the ,base ,n-object) ,high))))))))
 
 ;;; Do source transformation of a test of a known numeric type. We can
 ;;; assume that the type doesn't have a corresponding predicate, since
@@ -200,8 +200,8 @@
 	       ,(transform-numeric-bound-test n-object type base)))
 	(:complex
 	 `(and (complexp ,n-object)
-	       ,(once-only ((n-real `(realpart (the complex ,n-object)))
-			    (n-imag `(imagpart (the complex ,n-object))))
+	       ,(once-only ((n-real `(realpart (truly-the complex ,n-object)))
+			    (n-imag `(imagpart (truly-the complex ,n-object))))
 		  `(progn
 		     ,n-imag ; ignorable
 		     (and (typep ,n-real ',base)

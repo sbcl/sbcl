@@ -3373,7 +3373,7 @@
                        (error "can't understand type ~S~%" element-type))))))
       (cond ((array-type-p array-type)
 	     (get-element-type array-type))
-	    ((union-type-p array-type)             
+	    ((union-type-p array-type)
              (apply #'type-union
                     (mapcar #'get-element-type (union-type-types array-type))))
 	    (t

@@ -1465,7 +1465,7 @@
 	 (input-pathname (verify-source-file input-file))
 	 (source-info (make-file-source-info input-pathname))
 	 (*compiler-trace-output* nil)) ; might be modified below
-				
+
     (unwind-protect
 	(progn
 	  (when output-file

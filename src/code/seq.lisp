@@ -285,8 +285,9 @@
 	       ;; (OR STRING BIT-VECTOR)]
 	       (progn
 		 (aver (= (length (array-type-dimensions type)) 1))
-		 (let ((etype (type-specifier
-			       (array-type-specialized-element-type type)))
+		 (let* ((etype (type-specifier
+                                (array-type-specialized-element-type type)))
+                        (etype (if (eq etype '*) t etype))
 		       (type-length (car (array-type-dimensions type))))
 		   (unless (or (eq type-length '*)
 			       (= type-length length))

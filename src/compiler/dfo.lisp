@@ -32,7 +32,7 @@
 	  (setf (block-number block) (incf num))
 	  (setf (block-delete-p block) t)))
     (do-blocks (block component)
-      (unless (block-flag block)
+      (when (block-delete-p block)
 	(delete-block block))))
   (values))
 

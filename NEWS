@@ -1768,6 +1768,13 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
   * bug fix: make.sh and friends are now more consistent in the way that
     they for GNU "make".
 
+changes in sbcl-0.8.1 relative to sbcl-0.8.0:
+  * changes in type checking closed the following bugs:
+    ** type checking of unused values (192b, 194d, 203);
+    ** template selection based on unsafe type assertions (192c, 236);
+    ** type checking in branches (194bc).
+  * VALUES declaration is disabled.
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and

@@ -173,10 +173,7 @@
 (!define-type-method (values :simple-=) (type1 type2)
   (let ((rest1 (args-type-rest type1))
 	(rest2 (args-type-rest type2)))
-    (cond ((or (args-type-keyp type1) (args-type-keyp type2)
-	       (args-type-allowp type1) (args-type-allowp type2))
-	   (values nil nil))
-	  ((and rest1 rest2 (type/= rest1 rest2))
+    (cond ((and rest1 rest2 (type/= rest1 rest2))
 	   (type= rest1 rest2))
 	  ((or rest1 rest2)
 	   (values nil t))
@@ -322,7 +319,8 @@
     (result)))
 
 (!def-type-translator function (&optional (args '*) (result '*))
-  (make-fun-type :args args :returns (values-specifier-type result)))
+  (make-fun-type :args args
+                 :returns (coerce-to-values (values-specifier-type result))))
 
 (!def-type-translator values (&rest values)
   (make-values-type :args values))
@@ -332,23 +330,28 @@
 ;;;; We provide a few special operations that can be meaningfully used
 ;;;; on VALUES types (as well as on any other type).
 
+(defun type-single-value-p (type)
+  (and (values-type-p type)
+       (not (values-type-rest type))
+       (null (values-type-optional type))
+       (singleton-p (values-type-required type))))
+
 ;;; Return the type of the first value indicated by TYPE. This is used
 ;;; by people who don't want to have to deal with VALUES types.
 #!-sb-fluid (declaim (freeze-type values-type))
 ; (inline single-value-type))
 (defun single-value-type (type)
   (declare (type ctype type))
-  (cond ((values-type-p type)
-	 (or (car (args-type-required type))
-             (if (args-type-optional type)
-                 (type-union (car (args-type-optional type))
-			     (specifier-type 'null)))
-	     (args-type-rest type)
-             (specifier-type 'null)))
-	((eq type *wild-type*)
-	 *universal-type*)
-	(t
-	 type)))
+  (cond ((eq type *wild-type*)
+         *universal-type*)
+        ((eq type *empty-type*)
+         *empty-type*)
+        ((not (values-type-p type))
+         type)
+        (t (or (car (args-type-required type))
+               (car (args-type-optional type))
+               (args-type-rest type)
+               (specifier-type 'null)))))
 
 ;;; Return the minimum number of arguments that a function can be
 ;;; called with, and the maximum number or NIL. If not a function
@@ -370,31 +373,45 @@
 ;;; not fixed, then return NIL and :UNKNOWN.
 (defun values-types (type)
   (declare (type ctype type))
-  (cond ((eq type *wild-type*)
+  (cond ((or (eq type *wild-type*) (eq type *empty-type*))
 	 (values nil :unknown))
-	((not (values-type-p type))
-	 (values (list type) 1))
 	((or (args-type-optional type)
-	     (args-type-rest type)
-	     (args-type-keyp type)
-	     (args-type-allowp type))
+	     (args-type-rest type))
 	 (values nil :unknown))
 	(t
 	 (let ((req (args-type-required type)))
-	   (values (mapcar #'single-value-type req) (length req))))))
+	   (values req (length req))))))
 
 ;;; Return two values:
 ;;; 1. A list of all the positional (fixed and optional) types.
-;;; 2. The &REST type (if any). If keywords allowed, *UNIVERSAL-TYPE*.
-;;;    If no keywords or &REST, then the DEFAULT-TYPE.
+;;; 2. The &REST type (if any). If no &REST, then the DEFAULT-TYPE.
 (defun values-type-types (type &optional (default-type *empty-type*))
-  (declare (type values-type type))
-  (values (append (args-type-required type)
-		  (args-type-optional type))
-	  (cond ((args-type-keyp type) *universal-type*)
-		((args-type-rest type))
-		(t
-		 default-type))))
+  (declare (type ctype type))
+  (if (eq type *wild-type*)
+      (values nil *universal-type*)
+      (values (append (args-type-required type)
+                      (args-type-optional type))
+              (cond ((args-type-rest type))
+                    (t default-type)))))
+
+;;; If COUNT values are supplied, which types should they have?
+(defun values-type-start (type count)
+  (declare (ctype type) (unsigned-byte count))
+  (if (eq type *wild-type*)
+      (make-list count :initial-element *universal-type*)
+      (collect ((res))
+        (flet ((process-types (types)
+                 (loop for type in types
+                       while (plusp count)
+                       do (decf count)
+                       do (res type))))
+          (process-types (values-type-required type))
+          (process-types (values-type-optional type))
+          (when (plusp count)
+            (loop with rest = (the ctype (values-type-rest type))
+                  repeat count
+                  do (res rest))))
+        (res))))
 
 ;;; Return a list of OPERATION applied to the types in TYPES1 and
 ;;; TYPES2, padding with REST2 as needed. TYPES1 must not be shorter
@@ -415,13 +432,47 @@
 				       :initial-element rest2)))
 	    exact)))
 
-;;; If TYPE isn't a values type, then make it into one:
-;;;    <type>  ==>  (values type &rest t)
+;;; If TYPE isn't a values type, then make it into one.
+(defun-cached (%coerce-to-values
+               :hash-bits 8
+               :hash-function (lambda (type)
+                                (logand (type-hash-value type)
+                                        #xff)))
+    ((type eq))
+  (cond ((multiple-value-bind (res sure)
+             (csubtypep (specifier-type 'null) type)
+           (and (not res) sure))
+         ;; FIXME: What should we do with (NOT SURE)?
+         (make-values-type :required (list type) :rest *universal-type*))
+        (t
+         (make-values-type :optional (list type) :rest *universal-type*))))
+
 (defun coerce-to-values (type)
   (declare (type ctype type))
-  (if (values-type-p type)
-      type
-      (make-values-type :required (list type) :rest *universal-type*)))
+  (cond ((or (eq type *universal-type*)
+             (eq type *wild-type*))
+         *wild-type*)
+        ((values-type-p type)
+         type)
+        (t (%coerce-to-values type))))
+
+;;; Return type, corresponding to ANSI short form of VALUES type
+;;; specifier.
+(defun make-short-values-type (types)
+  (declare (list types))
+  (let ((last-required (position-if
+                        (lambda (type)
+                          (not/type (csubtypep (specifier-type 'null) type)))
+                        types
+                        :from-end t)))
+    (if last-required
+        (make-values-type :required (subseq types 0 (1+ last-required))
+                          :optional (subseq types (1+ last-required))
+                          :rest *universal-type*)
+        (make-values-type :optional types :rest *universal-type*))))
+
+(defun make-single-value-type (type)
+  (make-values-type :required (list type)))
 
 ;;; Do the specified OPERATION on TYPE1 and TYPE2, which may be any
 ;;; type, including VALUES types. With VALUES types such as:
@@ -446,41 +497,31 @@
 ;;; OPERATION returned true as its second value each time we called
 ;;; it. Since we approximate the intersection of VALUES types, the
 ;;; second value being true doesn't mean the result is exact.
-(defun args-type-op (type1 type2 operation nreq default-type)
-  (declare (type ctype type1 type2 default-type)
+(defun args-type-op (type1 type2 operation nreq)
+  (declare (type ctype type1 type2)
  	   (type function operation nreq))
   (when (eq type1 type2)
     (values type1 t))
-  (if (or (values-type-p type1) (values-type-p type2))
-      (let ((type1 (coerce-to-values type1))
-	    (type2 (coerce-to-values type2)))
-	(multiple-value-bind (types1 rest1)
-            (values-type-types type1 default-type)
-	  (multiple-value-bind (types2 rest2)
-              (values-type-types type2 default-type)
-	    (multiple-value-bind (rest rest-exact)
-		(funcall operation rest1 rest2)
-	      (multiple-value-bind (res res-exact)
-		  (if (< (length types1) (length types2))
-		      (fixed-values-op types2 types1 rest1 operation)
-		      (fixed-values-op types1 types2 rest2 operation))
-		(let* ((req (funcall nreq
-				     (length (args-type-required type1))
-				     (length (args-type-required type2))))
-		       (required (subseq res 0 req))
-		       (opt (subseq res req))
-		       (opt-last (position rest opt :test-not #'type=
-					   :from-end t)))
-		  (if (find *empty-type* required :test #'type=)
-		      (values *empty-type* t)
-		      (values (make-values-type
-			       :required required
-			       :optional (if opt-last
-					     (subseq opt 0 (1+ opt-last))
-					     ())
-			       :rest (if (eq rest default-type) nil rest))
-			      (and rest-exact res-exact)))))))))
-      (funcall operation type1 type2)))
+  (multiple-value-bind (types1 rest1)
+      (values-type-types type1)
+    (multiple-value-bind (types2 rest2)
+        (values-type-types type2)
+      (multiple-value-bind (rest rest-exact)
+          (funcall operation rest1 rest2)
+        (multiple-value-bind (res res-exact)
+            (if (< (length types1) (length types2))
+                (fixed-values-op types2 types1 rest1 operation)
+                (fixed-values-op types1 types2 rest2 operation))
+          (let* ((req (funcall nreq
+                               (length (args-type-required type1))
+                               (length (args-type-required type2))))
+                 (required (subseq res 0 req))
+                 (opt (subseq res req)))
+            (values (make-values-type
+                     :required required
+                     :optional opt
+                     :rest rest)
+                    (and rest-exact res-exact))))))))
 
 ;;; Do a union or intersection operation on types that might be values
 ;;; types. The result is optimized for utility rather than exactness,
@@ -493,27 +534,38 @@
 				 :hash-bits 8
 				 :default nil
 				 :init-wrapper !cold-init-forms)
-	      ((type1 eq) (type2 eq))
+    ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
   (cond ((or (eq type1 *wild-type*) (eq type2 *wild-type*)) *wild-type*)
-	((eq type1 *empty-type*) type2)
-	((eq type2 *empty-type*) type1)
-	(t
-	 (values (args-type-op type1 type2 #'type-union #'min *empty-type*)))))
+        ((eq type1 *empty-type*) type2)
+        ((eq type2 *empty-type*) type1)
+        (t
+         (values (args-type-op type1 type2 #'type-union #'min)))))
+
 (defun-cached (values-type-intersection :hash-function type-cache-hash
 					:hash-bits 8
 					:values 2
 					:default (values nil :empty)
 					:init-wrapper !cold-init-forms)
-	      ((type1 eq) (type2 eq))
+    ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
-  (cond ((eq type1 *wild-type*) (values type2 t))
-	((eq type2 *wild-type*) (values type1 t))
-	(t
-	 (args-type-op type1 type2
-		       #'type-intersection
-		       #'max
-		       (specifier-type 'null)))))
+  (cond ((eq type1 *wild-type*) (values (coerce-to-values type2) t))
+        ((or (eq type2 *wild-type*) (eq type2 *universal-type*))
+         (values type1 t))
+        ((or (eq type1 *empty-type*) (eq type2 *empty-type*))
+         *empty-type*)
+        ((and (not (values-type-p type2))
+              (values-type-required type1))
+         (let ((req1 (values-type-required type1)))
+         (make-values-type :required (cons (type-intersection (first req1) type2)
+                                           (rest req1))
+                           :optional (values-type-optional type1)
+                           :rest (values-type-rest type1)
+                           :allowp (values-type-allowp type1))))
+        (t
+         (args-type-op type1 (coerce-to-values type2)
+                       #'type-intersection
+                       #'max))))
 
 ;;; This is like TYPES-EQUAL-OR-INTERSECT, except that it sort of
 ;;; works on VALUES types. Note that due to the semantics of
@@ -522,12 +574,12 @@
 (defun values-types-equal-or-intersect (type1 type2)
   (cond ((or (eq type1 *empty-type*) (eq type2 *empty-type*))
 	 (values t t))
-	((or (values-type-p type1) (values-type-p type2))
+        ((or (eq type1 *wild-type*) (eq type2 *wild-type*))
+         (values t t))
+	(t
 	 (multiple-value-bind (res win) (values-type-intersection type1 type2)
 	   (values (not (eq res *empty-type*))
-		   win)))
-	(t
-	 (types-equal-or-intersect type1 type2))))
+		   win)))))
 
 ;;; a SUBTYPEP-like operation that can be used on any types, including
 ;;; VALUES types
@@ -536,39 +588,39 @@
 			       :values 2
 			       :default (values nil :empty)
 			       :init-wrapper !cold-init-forms)
-	      ((type1 eq) (type2 eq))
+    ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
-  (cond ((eq type2 *wild-type*) (values t t))
-	((eq type1 *wild-type*)
-	 (values (eq type2 *universal-type*) t))
-	((not (values-types-equal-or-intersect type1 type2))
-	 (values nil t))
-	(t
-	 (if (or (values-type-p type1) (values-type-p type2))
-	     (let ((type1 (coerce-to-values type1))
-		   (type2 (coerce-to-values type2)))
-	       (multiple-value-bind (types1 rest1) (values-type-types type1)
-		 (multiple-value-bind (types2 rest2) (values-type-types type2)
-		   (cond ((< (length (values-type-required type1))
-			     (length (values-type-required type2)))
-			  (values nil t))
-			 ((< (length types1) (length types2))
-			  (values nil nil))
-			 ((or (values-type-keyp type1)
-			      (values-type-keyp type2))
-			  (values nil nil))
-			 (t
-			  (do ((t1 types1 (rest t1))
-			       (t2 types2 (rest t2)))
-			      ((null t2)
-			       (csubtypep rest1 rest2))
-			    (multiple-value-bind (res win-p)
-				(csubtypep (first t1) (first t2))
-			      (unless win-p
-				(return (values nil nil)))
-			      (unless res
-				(return (values nil t))))))))))
-	     (csubtypep type1 type2)))))
+  (cond ((or (eq type2 *wild-type*) (eq type2 *universal-type*)
+             (eq type1 *empty-type*))
+         (values t t))
+        ((eq type1 *wild-type*)
+         (values (eq type2 *wild-type*) t))
+        ((or (eq type2 *empty-type*)
+             (not (values-types-equal-or-intersect type1 type2)))
+         (values nil t))
+        ((and (not (values-type-p type2))
+              (values-type-required type1))
+         (csubtypep (first (values-type-required type1))
+                    type2))
+        (t (setq type2 (coerce-to-values type2))
+           (multiple-value-bind (types1 rest1) (values-type-types type1)
+             (multiple-value-bind (types2 rest2) (values-type-types type2)
+               (cond ((< (length (values-type-required type1))
+                         (length (values-type-required type2)))
+                      (values nil t))
+                     ((< (length types1) (length types2))
+                      (values nil nil))
+                     (t
+                      (do ((t1 types1 (rest t1))
+                           (t2 types2 (rest t2)))
+                          ((null t2)
+                           (csubtypep rest1 rest2))
+                        (multiple-value-bind (res win-p)
+                            (csubtypep (first t1) (first t2))
+                          (unless win-p
+                            (return (values nil nil)))
+                          (unless res
+                            (return (values nil t))))))))))))
 
 ;;;; type method interfaces
 
@@ -582,9 +634,10 @@
   (declare (type ctype type1 type2))
   (cond ((or (eq type1 type2)
 	     (eq type1 *empty-type*)
-	     (eq type2 *wild-type*))
+	     (eq type2 *universal-type*))
 	 (values t t))
-	((eq type1 *wild-type*)
+        #+nil
+	((eq type1 *universal-type*)
 	 (values nil t))
 	(t
 	 (!invoke-type-method :simple-subtypep :complex-subtypep-arg2
@@ -791,66 +844,40 @@
 ;;;; These are fully general operations on CTYPEs: they'll always
 ;;;; return a CTYPE representing the result.
 
-;;; shared logic for unions and intersections: Stuff TYPE into the
-;;; vector TYPES, finding pairs of types which can be simplified by
-;;; SIMPLIFY2 (TYPE-UNION2 or TYPE-INTERSECTION2) and replacing them
-;;; by their simplified forms.
-(defun accumulate1-compound-type (type types %compound-type-p simplify2)
-  (declare (type ctype type))
-  (declare (type (vector ctype) types))
-  (declare (type function %compound-type-p simplify2))
-  ;; Any input object satisfying %COMPOUND-TYPE-P should've been
-  ;; broken into components before it reached us.
-  (aver (not (funcall %compound-type-p type)))
-  (dotimes (i (length types) (vector-push-extend type types))
-    (let ((simplified2 (funcall simplify2 type (aref types i))))
-      (when simplified2
-	;; Discard the old (AREF TYPES I).
-	(setf (aref types i) (vector-pop types))
-	;; Merge the new SIMPLIFIED2 into TYPES, by tail recursing.
-	;; (Note that the tail recursion is indirect: we go through
-	;; ACCUMULATE, not ACCUMULATE1, so that if SIMPLIFIED2 is
-	;; handled properly if it satisfies %COMPOUND-TYPE-P.)
-	(return (accumulate-compound-type simplified2
-					  types
-					  %compound-type-p
-					  simplify2)))))
-  ;; Voila.
-  (values))
-
-;;; shared logic for unions and intersections: Use
-;;; ACCUMULATE1-COMPOUND-TYPE to merge TYPE into TYPES, either
-;;; all in one step or, if %COMPOUND-TYPE-P is satisfied,
-;;; component by component.
-(defun accumulate-compound-type (type types %compound-type-p simplify2)
-  (declare (type function %compound-type-p simplify2))
-  (flet ((accumulate1 (x)
-	   (accumulate1-compound-type x types %compound-type-p simplify2)))
-    (declare (inline accumulate1))
-    (if (funcall %compound-type-p type)
-	(map nil #'accumulate1 (compound-type-types type))
-	(accumulate1 type)))
-  (values))
-
 ;;; shared logic for unions and intersections: Return a vector of
-;;; types representing the same types as INPUT-TYPES, but with 
+;;; types representing the same types as INPUT-TYPES, but with
 ;;; COMPOUND-TYPEs satisfying %COMPOUND-TYPE-P broken up into their
 ;;; component types, and with any SIMPLY2 simplifications applied.
+(declaim (inline simplified-compound-types))
 (defun simplified-compound-types (input-types %compound-type-p simplify2)
-  (let ((simplified-types (make-array (length input-types)
-				      :fill-pointer 0
-				      :adjustable t
-				      :element-type 'ctype
-				      ;; (This INITIAL-ELEMENT shouldn't
-				      ;; matter, but helps avoid type
-				      ;; warnings at compile time.)
-				      :initial-element *empty-type*)))
-    (dolist (input-type input-types)
-      (accumulate-compound-type input-type
-				simplified-types
-				%compound-type-p
-				simplify2))
-    simplified-types))
+  (declare (function %compound-type-p simplify2))
+  (let ((types (make-array (length input-types)
+                           :fill-pointer 0
+                           :adjustable t
+                           :element-type 'ctype)))
+    (labels ((accumulate-compound-type (type)
+               (if (funcall %compound-type-p type)
+                   (dolist (type (compound-type-types type))
+                     (accumulate1-compound-type type))
+                   (accumulate1-compound-type type)))
+             (accumulate1-compound-type (type)
+               (declare (type ctype type))
+               ;; Any input object satisfying %COMPOUND-TYPE-P should've been
+               ;; broken into components before it reached us.
+               (aver (not (funcall %compound-type-p type)))
+               (dotimes (i (length types) (vector-push-extend type types))
+                 (let ((simplified2 (funcall simplify2 type (aref types i))))
+                   (when simplified2
+                     ;; Discard the old (AREF TYPES I).
+                     (setf (aref types i) (vector-pop types))
+                     ;; Merge the new SIMPLIFIED2 into TYPES, by tail recursing.
+                     ;; (Note that the tail recursion is indirect: we go through
+                     ;; ACCUMULATE, not ACCUMULATE1, so that if SIMPLIFIED2 is
+                     ;; handled properly if it satisfies %COMPOUND-TYPE-P.)
+                     (return (accumulate-compound-type simplified2)))))))
+      (dolist (input-type input-types)
+        (accumulate-compound-type input-type)))
+    types))
 
 ;;; shared logic for unions and intersections: Make a COMPOUND-TYPE
 ;;; object whose components are the types in TYPES, or skip to special
@@ -955,9 +982,7 @@
    ;; KLUDGE: In ANSI, * isn't really the name of a type, it's just a
    ;; special symbol which can be stuck in some places where an
    ;; ordinary type can go, e.g. (ARRAY * 1) instead of (ARRAY T 1).
-   ;; At some point, in order to become more standard, we should
-   ;; convert all the classic CMU CL legacy *s and *WILD-TYPE*s into
-   ;; Ts and *UNIVERSAL-TYPE*s.
+   ;; In SBCL it also used to denote universal VALUES type.
    (frob * *wild-type*)
    (frob nil *empty-type*)
    (frob t *universal-type*))
@@ -966,9 +991,6 @@
 		      :returns *wild-type*)))
 
 (!define-type-method (named :simple-=) (type1 type2)
-  ;; FIXME: BUG 85: This assertion failed when I added it in
-  ;; sbcl-0.6.11.13. It probably shouldn't fail; but for now it's
-  ;; just commented out.
   ;;(aver (not (eq type1 *wild-type*))) ; * isn't really a type.
   (values (eq type1 type2) t))
 
@@ -1019,7 +1041,7 @@
 	 (values nil nil))
 	(t
 	 ;; By elimination, TYPE1 is the universal type.
-	 (aver (or (eq type1 *wild-type*) (eq type1 *universal-type*)))
+	 (aver (eq type1 *universal-type*))
 	 ;; This case would have been picked off by the SIMPLE-SUBTYPEP
 	 ;; method, and so shouldn't appear here.
 	 (aver (not (eq type2 *universal-type*)))
@@ -1060,7 +1082,7 @@
 
 (!define-type-method (hairy :unparse) (x)
   (hairy-type-specifier x))
-    
+
 (!define-type-method (hairy :simple-subtypep) (type1 type2)
   (let ((hairy-spec1 (hairy-type-specifier type1))
 	(hairy-spec2 (hairy-type-specifier type2)))
@@ -1152,7 +1174,7 @@
     (let ((complement-type1 (negation-type-type type1)))
       ;; Do the special cases first, in order to give us a chance if
       ;; subtype/supertype relationships are hairy.
-      (multiple-value-bind (equal certain) 
+      (multiple-value-bind (equal certain)
 	  (type= complement-type1 type2)
 	;; If a = b, ~a is not a subtype of b (unless b=T, which was
 	;; excluded above).
@@ -1641,7 +1663,7 @@
 					(numeric-type-high type2)
 					>= > t)))
 	     (t nil))))))
-	      
+
 
 (!cold-init-forms
   (setf (info :type :kind 'number)
@@ -2466,7 +2488,7 @@
 		     (return nil)))
 	       (setf accumulator
 		     (type-intersection accumulator union))))))))
-	 
+
 (!def-type-translator and (&whole whole &rest type-specifiers)
   (apply #'type-intersection
 	 (mapcar #'specifier-type

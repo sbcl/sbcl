@@ -61,7 +61,7 @@
 ;;;; interface to enabling and disabling signal handlers
 
 (defun enable-interrupt (signal-designator handler)
-  (declare (type (or function (member :default :ignore)) handler))
+  (declare (type (or function fixnum (member :default :ignore)) handler))
   (without-gcing
    (let ((result (install-handler (unix-signal-number signal-designator)
 				  (case handler
@@ -72,7 +72,7 @@
 				      handler))))))
      (cond ((= result sig_dfl) :default)
 	   ((= result sig_ign) :ignore)
-	   (t (the function (sb!kernel:make-lisp-obj result)))))))
+	   (t (the (or function fixnum) (sb!kernel:make-lisp-obj result)))))))
 
 (defun default-interrupt (signal)
   (enable-interrupt signal :default))

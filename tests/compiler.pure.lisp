@@ -232,7 +232,7 @@
     (ignore-errors (ecase 1 (t 0) (1 2)))
   (assert (eql result 2))
   (assert (null error)))
-	  
+
 ;;; FTYPE should accept any functional type specifier
 (compile nil '(lambda (x) (declare (ftype function f)) (f x)))
 
@@ -341,6 +341,16 @@
 ;;; Bug reported by Paul Dietz on cmucl-imp and fixed by Gerd
 ;;; Moellmann: CONVERT-MORE-CALL failed on the following call
 (assert (eq (eval '((lambda (&key) 'u) :allow-other-keys nil)) 'u))
+
+(raises-error? (multiple-value-bind (a b c)
+                   (eval '(truncate 3 4))
+                 (declare (integer c))
+                 (list a b c))
+               type-error)
+
+(assert (equal (multiple-value-list (the (values &rest integer)
+                                      (eval '(values 3))))
+               '(3)))
 
 ;;; Bug relating to confused representation for the wild function
 ;;; type:

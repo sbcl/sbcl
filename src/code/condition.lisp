@@ -672,6 +672,15 @@
 ;;;; setup of CONDITION machinery, only because that makes it easier to
 ;;;; get cold init to work.
 
+(define-condition values-type-error (type-error)
+  ()
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "~@<The values set ~2I~:_[~{~S~^ ~}] ~I~_is not of type ~2I~_~S.~:>"
+	     (type-error-datum condition)
+	     (type-error-expected-type condition)))))
+
 ;;; KLUDGE: a condition for floating point errors when we can't or
 ;;; won't figure out what type they are. (In FreeBSD and OpenBSD we
 ;;; don't know how, at least as of sbcl-0.6.7; in Linux we probably

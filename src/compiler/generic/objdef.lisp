@@ -96,6 +96,8 @@
 
 (define-primitive-object (array :lowtag other-pointer-lowtag
 				:widetag t)
+  ;; FILL-POINTER of an ARRAY is in the same place as LENGTH of a
+  ;; VECTOR -- see SHRINK-VECTOR.
   (fill-pointer :type index
 		:ref-trans %array-fill-pointer
 		:ref-known (flushable foldable)
@@ -131,6 +133,8 @@
 (define-primitive-object (vector :type vector
 				 :lowtag other-pointer-lowtag
 				 :widetag t)
+  ;; FILL-POINTER of an ARRAY is in the same place as LENGTH of a
+  ;; VECTOR -- see SHRINK-VECTOR.
   (length :ref-trans sb!c::vector-length
 	  :type index)
   (data :rest-p t :c-type #!-alpha "unsigned long" #!+alpha "u32"))

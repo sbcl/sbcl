@@ -1325,6 +1325,11 @@
 (defknown %%primitive (t t &rest t) *)
 (defknown %pop-values (t) t)
 (defknown %type-check-error (t t) nil)
+
+;; FIXME: This function does not return, but due to the implementation
+;; of FILTER-CONTINUATION we cannot write it here.
+(defknown %compile-time-type-error (t t t) *)
+
 (defknown %odd-key-args-error () nil)
 (defknown %unknown-key-arg-error (t) nil)
 (defknown (%ldb %mask-field) (bit-index bit-index integer) unsigned-byte

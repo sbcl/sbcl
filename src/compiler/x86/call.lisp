@@ -385,8 +385,11 @@
 	(done (gen-label)))
     (inst jmp-short variable-values)
 
-    (inst mov start esp-tn)
-    (inst push (first *register-arg-tns*))
+    (cond ((location= start (first *register-arg-tns*))
+           (inst push (first *register-arg-tns*))
+           (inst lea start (make-ea :dword :base esp-tn :disp 4)))
+          (t (inst mov start esp-tn)
+             (inst push (first *register-arg-tns*))))
     (inst mov count (fixnumize 1))
     (inst jmp done)
 

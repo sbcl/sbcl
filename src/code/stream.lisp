@@ -191,7 +191,10 @@
 
 ;;; like FILE-POSITION, only using :FILE-LENGTH
 (defun file-length (stream)
-  (declare (type (or file-stream synonym-stream) stream))
+  ;; FIXME: The following declaration uses yet undefined types, which
+  ;; cause cross-compiler hangup.
+  ;;
+  ;; (declare (type (or file-stream synonym-stream) stream))
   (stream-must-be-associated-with-file stream)
   (funcall (ansi-stream-misc stream) stream :file-length))
 

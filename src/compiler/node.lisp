@@ -79,8 +79,6 @@
   ;; and will be null in a :INSIDE-BLOCK continuation when this is the
   ;; CONT of the LAST.
   (next nil :type (or node null))
-  ;; an assertion on the type of this continuation's value
-  (asserted-type *wild-type* :type ctype)
   ;; cached type of this continuation's value. If NIL, then this must
   ;; be recomputed: see CONTINUATION-DERIVED-TYPE.
   (%derived-type nil :type (or ctype null))
@@ -102,33 +100,6 @@
   ;; the optimizer for this node type doesn't care, it can elect not
   ;; to clear this flag.
   (reoptimize t :type boolean)
-  ;; an indication of what we have proven about how this contination's
-  ;; type assertion is satisfied:
-  ;;
-  ;; NIL
-  ;;    No type check is necessary (proven type is a subtype of the assertion.)
-  ;;
-  ;; T
-  ;;    A type check is needed.
-  ;;
-  ;; :DELETED
-  ;;    Don't do a type check, but believe (intersect) the assertion.
-  ;;    A T check can be changed to :DELETED if we somehow prove the
-  ;;    check is unnecessary, or if we eliminate it through a policy
-  ;;    decision.
-  ;;
-  ;; :NO-CHECK
-  ;;    Type check generation sets the slot to this if a check is
-  ;;    called for, but it believes it has proven that the check won't
-  ;;    be done for policy reasons or because a safe implementation
-  ;;    will be used. In the latter case, LTN must ensure that a safe
-  ;;    implementation *is* used.
-  ;;
-  ;; This is computed lazily by CONTINUATION-DERIVED-TYPE, so use
-  ;; CONTINUATION-TYPE-CHECK instead of the %'ed slot accessor.
-  (%type-check t :type (member t nil :deleted :no-check))
-  ;; Asserted type, weakend according to policies
-  (type-to-check *wild-type* :type ctype)
   ;; Cached type which is checked by DEST. If NIL, then this must be
   ;; recomputed: see CONTINUATION-EXTERNALLY-CHECKABLE-TYPE.
   (%externally-checkable-type nil :type (or null ctype))
@@ -140,14 +111,14 @@
   (lexenv-uses nil :type list))
 
 (def!method print-object ((x continuation) stream)
-  (print-unreadable-object (x stream :type t :identity t)))
+  (print-unreadable-object (x stream :type t :identity t)
+    (format stream " #~D" (cont-num x))))
 
 (defstruct (node (:constructor nil)
 		 (:copier nil))
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
-  ;; the bottom-up derived type for this node. This does not take into
-  ;; consideration output type assertions on this node (actually on its CONT).
+  ;; the bottom-up derived type for this node.
   (derived-type *wild-type* :type ctype)
   ;; True if this node needs to be optimized. This is set to true
   ;; whenever something changes about the value of a continuation
@@ -157,7 +128,7 @@
   ;; indicates what we do controlwise after evaluating this node. This
   ;; may be null during IR1 conversion.
   (cont nil :type (or continuation null))
-  ;; the continuation that this node is the next of. This is null
+  ;; the continuation that this node is the NEXT of. This is null
   ;; during IR1 conversion when we haven't linked the node in yet or
   ;; in nodes that have been deleted from the IR1 by UNLINK-NODE.
   (prev nil :type (or continuation null))
@@ -854,7 +825,7 @@
   ;; KIND was :TOPLEVEL. Now it must be set explicitly, both for
   ;; :TOPLEVEL functions and for any other kind of functions that we
   ;; want to dump or return from #'CL:COMPILE or whatever.
-  (has-external-references-p nil) 
+  (has-external-references-p nil)
   ;; In a normal function, this is the external entry point (XEP)
   ;; lambda for this function, if any. Each function that is used
   ;; other than in a local call has an XEP, and all of the
@@ -913,7 +884,7 @@
       ;; anonymous. In SBCL (as opposed to CMU CL) we make all
       ;; FUNCTIONALs have debug names. The CMU CL code didn't bother
       ;; in many FUNCTIONALs, especially those which were likely to be
-      ;; optimized away before the user saw them. However, getting 
+      ;; optimized away before the user saw them. However, getting
       ;; that right requires a global understanding of the code,
       ;; which seems bad, so we just require names for everything.
       (leaf-source-name functional)))
@@ -1134,7 +1105,11 @@
 ;;; initially (and forever) NIL, since REFs don't receive any values
 ;;; and don't have any IR1 optimizer.
 (defstruct (ref (:include node (reoptimize nil))
-		(:constructor make-ref (derived-type leaf))
+		(:constructor make-ref
+                              (leaf
+                               &aux (leaf-type (leaf-type leaf))
+                                    (derived-type
+                                     (make-single-value-type leaf-type))))
 		(:copier nil))
   ;; The leaf referenced.
   (leaf nil :type leaf))
@@ -1162,7 +1137,8 @@
   alternative)
 
 (defstruct (cset (:include node
-			   (derived-type *universal-type*))
+			   (derived-type (make-single-value-type
+                                          *universal-type*)))
 		 (:conc-name set-)
 		 (:predicate set-p)
 		 (:constructor make-set)
@@ -1259,6 +1235,30 @@
 (defprinter (creturn :conc-name return- :identity t)
   lambda
   result-type)
+
+;;; The CAST node represents type assertions. The check for
+;;; TYPE-TO-CHECK is performed and then the VALUE is declared to be of
+;;; type ASSERTED-TYPE.
+(defstruct (cast (:include node)
+                 (:constructor %make-cast))
+  (asserted-type (missing-arg) :type ctype)
+  (type-to-check (missing-arg) :type ctype)
+  ;; an indication of what we have proven about how this type
+  ;; assertion is satisfied:
+  ;;
+  ;; NIL
+  ;;    No type check is necessary (VALUE type is a subtype of the TYPE-TO-CHECK.)
+  ;;
+  ;; T
+  ;;    A type check is needed.
+  (%type-check t :type (member t nil))
+  ;; the continuations which is checked
+  (value (missing-arg) :type continuation))
+(defprinter (cast :identity t)
+  %type-check
+  value
+  asserted-type
+  type-to-check)
 
 ;;;; non-local exit support
 ;;;;

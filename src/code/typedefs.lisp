@@ -76,7 +76,7 @@
   (enumerable nil :read-only t)
   ;; an arbitrary hash code used in EQ-style hashing of identity
   ;; (since EQ hashing can't be done portably)
-  (hash-value (random (1+ most-positive-fixnum))
+  (hash-value (random #.(ash 1 20))
 	      :type (and fixnum unsigned-byte)
 	      :read-only t)
   ;; Can this object contain other types? A global property of our
@@ -127,6 +127,15 @@
 (defun type-cache-hash (type1 type2)
   (logand (logxor (ash (type-hash-value type1) -3)
 		  (type-hash-value type2))
+	  #xFF))
+#!-sb-fluid (declaim (inline type-list-cache-hash))
+(declaim (ftype (function (list) (unsigned-byte 8)) type-list-cache-hash))
+(defun type-list-cache-hash (types)
+  (logand (loop with res = 0
+             for type in types
+             for hash = (type-hash-value type)
+             do (setq res (logxor res hash))
+             finally (return res))
 	  #xFF))
 
 ;;;; cold loading initializations

@@ -100,30 +100,24 @@
 ;;; If the desirability of the transformation depends on the current
 ;;; OPTIMIZE parameters, then the POLICY macro should be used to
 ;;; determine when to pass.
-(defmacro define-source-transform (name lambda-list &body body)
-  (let ((fn-name
-	 (if (listp name)
-	     (collect ((pieces))
-	       (dolist (piece name)
-		 (pieces "-")
-		 (pieces piece))
-	       (apply #'symbolicate "SOURCE-TRANSFORM" (pieces)))
-	     (symbolicate "SOURCE-TRANSFORM-" name)))
-	(n-form (gensym))
-	(n-env (gensym)))
+(defmacro source-transform-lambda (lambda-list &body body)
+  (let ((n-form (gensym))
+	(n-env (gensym))
+	(name (gensym)))
     (multiple-value-bind (body decls)
-	(parse-defmacro lambda-list n-form body name "form"
+	(parse-defmacro lambda-list n-form body "source transform" "form"
 			:environment n-env
 			:error-fun `(lambda (&rest stuff)
 				      (declare (ignore stuff))
-				      (return-from ,fn-name
+				      (return-from ,name
 					(values nil t))))
-      `(progn
-	 (defun ,fn-name (,n-form)
-	   (let ((,n-env *lexenv*))
-	     ,@decls
-	     ,body))
-	 (setf (info :function :source-transform ',name) #',fn-name)))))
+      `(lambda (,n-form &aux (,n-env *lexenv*))
+         ,@decls
+         (block ,name
+           ,body)))))
+(defmacro define-source-transform (name lambda-list &body body)
+  `(setf (info :function :source-transform ',name)
+         (source-transform-lambda ,lambda-list ,@body)))
 
 ;;;; boolean attribute utilities
 ;;;;
@@ -160,8 +154,8 @@
 ;;;
 ;;;    NAME-attributes attribute-name*
 ;;;      Return a set of the named attributes.
-#+sb-xc-host
-(progn 
+#-sb-xc
+(progn
   (def!macro !def-boolean-attribute (name &rest attribute-names)
 
     (let ((translations-name (symbolicate "*" name "-ATTRIBUTE-TRANSLATIONS*"))
@@ -462,13 +456,13 @@
 ;;; keywords specify the initial values for various optimizers that
 ;;; the function might have.
 (defmacro defknown (name arg-types result-type &optional (attributes '(any))
-			 &rest keys)
+                    &rest keys)
   (when (and (intersection attributes '(any call unwind))
 	     (intersection attributes '(movable)))
     (error "function cannot have both good and bad attributes: ~S" attributes))
 
   (when (member 'any attributes)
-    (setf attributes (union '(call unsafe unwind) attributes)))
+    (setq attributes (union '(call unsafe unwind) attributes)))
   (when (member 'flushable attributes)
     (pushnew 'unsafely-flushable attributes))
 
@@ -476,7 +470,7 @@
 			 (not (legal-fun-name-p name)))
 		    name
 		    (list name))
-	      '(function ,arg-types ,result-type)
+	      '(sfunction ,arg-types ,result-type)
 	      (ir1-attributes ,@attributes)
 	      ,@keys))
 
@@ -619,6 +613,7 @@
 			     `(continuation-next ,cont-var)))
 	     (,cont-var (node-cont ,node-var) (node-cont ,node-var)))
 	    (())
+         (declare (type node ,node-var))
 	 ,@body
 	 (when ,(if restart-p
 		    `(eq ,node-var (block-last ,n-block))
@@ -682,11 +677,6 @@
     `(if ,n-res
 	 (values (cdr ,n-res) t)
 	 (values nil nil))))
-
-;;;
-(defmacro with-continuation-type-assertion ((cont ctype context) &body body)
-  `(let ((*lexenv* (ir1ize-the-or-values ,ctype ,cont *lexenv* ,context)))
-     ,@body))
 
 (defmacro with-component-last-block ((component block) &body body)
   (with-unique-names (old-last-block)

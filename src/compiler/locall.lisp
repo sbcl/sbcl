@@ -112,9 +112,9 @@
 ;;;
 ;;; If there is a &MORE arg, then there are a couple of optimizations
 ;;; that we make (more for space than anything else):
-;;; -- If MIN-ARGS is 0, then we make the more entry a T clause, since 
+;;; -- If MIN-ARGS is 0, then we make the more entry a T clause, since
 ;;;    no argument count error is possible.
-;;; -- We can omit the = clause for the last entry-point, allowing the 
+;;; -- We can omit the = clause for the last entry-point, allowing the
 ;;;    case of 0 more args to fall through to the more entry.
 ;;;
 ;;; We don't bother to policy conditionalize wrong arg errors in
@@ -442,8 +442,7 @@
 
       (assert-continuation-type
        (first (basic-combination-args call))
-       (make-values-type :optional (mapcar #'leaf-type (lambda-vars ep))
-			 :rest *universal-type*)
+       (make-short-values-type (mapcar #'leaf-type (lambda-vars ep)))
        (lexenv-policy (node-lexenv call)))))
   (values))
 
@@ -708,7 +707,7 @@
 	(join-components component clambda-component)))
     (let ((*current-component* component))
       (node-ends-block call))
-    ;; FIXME: Use DESTRUCTURING-BIND here, and grep for other 
+    ;; FIXME: Use DESTRUCTURING-BIND here, and grep for other
     ;; uses of '=.*length' which could also be converted to use
     ;; DESTRUCTURING-BIND or PROPER-LIST-OF-LENGTH-P.
     (aver (= (length (block-succ call-block)) 1))
@@ -832,15 +831,6 @@
 ;;; node, and change the control flow to transfer to NEXT-BLOCK
 ;;; instead. Move all the uses of the result continuation to CALL's
 ;;; CONT.
-;;;
-;;; If the actual continuation is only used by the LET call, then we
-;;; intersect the type assertion on the dummy continuation with the
-;;; assertion for the actual continuation; in all other cases
-;;; assertions on the dummy continuation are lost.
-;;;
-;;; We also intersect the derived type of the CALL with the derived
-;;; type of all the dummy continuation's uses. This serves mainly to
-;;; propagate TRULY-THE through LETs.
 (defun move-return-uses (fun call next-block)
   (declare (type clambda fun) (type basic-combination call)
 	   (type cblock next-block))
@@ -854,13 +844,9 @@
     (let ((result (return-result return))
 	  (cont (node-cont call))
 	  (call-type (node-derived-type call)))
-      (when (eq (continuation-use cont) call)
-        (set-continuation-type-assertion
-         cont
-         (continuation-asserted-type result)
-         (continuation-type-to-check result)))
       (unless (eq call-type *wild-type*)
-	(do-uses (use result)
+        ;; FIXME: Replace the call with unsafe CAST. -- APD, 2002-01-26
+        (do-uses (use result)
 	  (derive-node-type use call-type)))
       (substitute-continuation-uses cont result)))
   (values))
@@ -953,7 +939,11 @@
                (delete-continuation-use call)
                (add-continuation-use call (return-result call-return)))
 	     (move-return-uses fun call
-			       (or next-block (node-block call-return)))))
+			       (or next-block
+                                   (let ((block (node-block call-return)))
+                                     (when (block-delete-p block)
+                                       (setf (block-delete-p block) nil))
+                                     block)))))
 	  (t
 	   (aver (node-tail-p call))
 	   (setf (lambda-return call-fun) return)

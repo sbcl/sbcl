@@ -134,8 +134,16 @@
     ;; (Note that the following test on INFO catches KEYWORDs as well as
     ;; explicitly DEFCONSTANT symbols.)
     (symbol (eq (info :variable :kind object) :constant))
-    (list (eq (car object) 'quote))
+    (list (and (eq (car object) 'quote)
+               (consp (cdr object))))
     (t t)))
+
+(defun constant-form-value (form)
+  (typecase form
+    (symbol (info :variable :constant-value form))
+    ((cons (eql quote) cons)
+     (second form))
+    (t form)))
 
 (declaim (ftype (function (symbol &optional (or null sb!c::lexenv))) sb!xc:macro-function))
 (defun sb!xc:macro-function (symbol &optional env)

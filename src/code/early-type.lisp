@@ -68,14 +68,21 @@
   (allowp nil :type boolean))
 
 (defun canonicalize-args-type-args (required optional rest)
-  (when rest
-    (let ((last-distinct-optional (position rest optional
-					    :from-end t
-					    :test-not #'type=)))
-      (setf optional
-	    (when last-distinct-optional
-	      (subseq optional 0 (1+ last-distinct-optional))))))
-  (values required optional rest))
+  (when (eq rest *empty-type*)
+    ;; or vice-versa?
+    (setq rest nil))
+  (loop with last-not-rest = nil
+        for i from 0
+        for opt in optional
+        do (cond ((eq opt *empty-type*)
+                  (return (values required (subseq optional i) rest)))
+                 ((neq opt rest)
+                  (setq last-not-rest i)))
+        finally (return (values required
+                                (if last-not-rest
+                                    (subseq optional 0 (1+ last-not-rest))
+                                    nil)
+                                rest))))
 
 (defun args-types (lambda-list-like-thing)
   (multiple-value-bind
@@ -104,39 +111,67 @@
       (multiple-value-bind (required optional rest)
 	  (canonicalize-args-type-args required optional rest)
 	(values required optional rest keyp keywords allowp)))))
-		    
+
 (defstruct (values-type
 	    (:include args-type
 		      (class-info (type-class-or-lose 'values)))
             (:constructor %make-values-type)
 	    (:copier nil)))
 
-(defun make-values-type (&rest initargs
-			 &key (args nil argsp) &allow-other-keys)
+(defun-cached (make-values-type-cached
+               :hash-bits 8
+               :hash-function (lambda (req opt rest allowp)
+                                (logand (logxor
+                                         (type-list-cache-hash req)
+                                         (type-list-cache-hash opt)
+                                         (if rest
+                                             (type-hash-value rest)
+                                             42)
+                                         (sxhash allowp))
+                                        #xFF)))
+    ((required equal-but-no-car-recursion)
+     (optional equal-but-no-car-recursion)
+     (rest eq)
+     (allowp eq))
+  (%make-values-type :required required
+                     :optional optional
+                     :rest rest
+                     :allowp allowp))
+
+;;; FIXME: ANSI VALUES has a short form (without lambda list
+;;; keywords), which should be translated into a long one.
+(defun make-values-type (&key (args nil argsp)
+                         required optional rest allowp)
   (if argsp
       (if (eq args '*)
 	  *wild-type*
 	  (multiple-value-bind (required optional rest keyp keywords allowp)
 	      (args-types args)
-	    (if (and (null required)
-		     (null optional)
-		     (eq rest *universal-type*)
-		     (not keyp))
-		*wild-type*
-		(%make-values-type :required required
-				   :optional optional
-				   :rest rest
-				   :keyp keyp
-				   :keywords keywords
-				   :allowp allowp))))
-      (apply #'%make-values-type initargs)))
+            (declare (ignore keywords))
+            (when keyp
+              (error "&KEY appeared in a VALUES type specifier ~S."
+                     `(values ,@args)))
+            (make-values-type :required required
+                              :optional optional
+                              :rest rest
+                              :allowp allowp)))
+      (multiple-value-bind (required optional rest)
+          (canonicalize-args-type-args required optional rest)
+        (cond ((and (null required)
+                    (null optional)
+                    (eq rest *universal-type*))
+               *wild-type*)
+              ((memq *empty-type* required)
+               *empty-type*)
+              (t (make-values-type-cached required optional
+                                          rest allowp))))))
 
 (!define-type-class values)
 
 ;;; (SPECIFIER-TYPE 'FUNCTION) and its subtypes
 (defstruct (fun-type (:include args-type
 			       (class-info (type-class-or-lose 'function)))
-		     (:constructor %make-fun-type))
+                     (:constructor %make-fun-type))
   ;; true if the arguments are unrestrictive, i.e. *
   (wild-args nil :type boolean)
   ;; type describing the return values. This is a values type

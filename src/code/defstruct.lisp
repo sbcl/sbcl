@@ -888,26 +888,29 @@
 	    `(,raw-slot-accessor (,ref ,instance-name ,(dd-raw-index dd))
 				 ,scaled-dsd-index))))))
 
-;;; Return inline expansion designators (i.e. values suitable for
-;;; (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR ..)) for the reader
-;;; and writer functions of the slot described by DSD.
-(defun slot-accessor-inline-expansion-designators (dd dsd)
-  (let ((instance-type-decl `(declare (type ,(dd-name dd) instance)))
-        (accessor-place-form (%accessor-place-form dd dsd 'instance))
+;;; Return source transforms for the reader and writer functions of
+;;; the slot described by DSD. They should be inline expanded, but
+;;; source transforms work faster.
+(defun slot-accessor-transforms (dd dsd)
+  (let ((accessor-place-form (%accessor-place-form dd dsd
+                                                   `(the ,(dd-name dd) instance)))
         (dsd-type (dsd-type dsd))
         (value-the (if (dsd-safe-p dsd) 'truly-the 'the)))
-    (values (lambda () `(lambda (instance)
-                          ,instance-type-decl
-                          (,value-the ,dsd-type ,accessor-place-form)))
-	    (lambda () `(lambda (new-value instance)
-                          (declare (type ,dsd-type new-value))
-                          ,instance-type-decl
-                          (setf ,accessor-place-form new-value))))))
+    (values (sb!c:source-transform-lambda (instance)
+              `(,value-the ,dsd-type ,(subst instance 'instance
+                                             accessor-place-form)))
+            (sb!c:source-transform-lambda (new-value instance)
+               (destructuring-bind (accessor-name &rest accessor-args)
+                   accessor-place-form
+                 `(,(info :setf :inverse accessor-name)
+                    ,@(subst instance 'instance accessor-args)
+                    (the ,dsd-type ,new-value)))))))
 
 ;;; Return a LAMBDA form which can be used to set a slot.
 (defun slot-setter-lambda-form (dd dsd)
-  (funcall (nth-value 1
-		      (slot-accessor-inline-expansion-designators dd dsd))))
+  `(lambda (new-value instance)
+     ,(funcall (nth-value 1 (slot-accessor-transforms dd dsd))
+               '(dummy new-value instance))))
 
 ;;; core compile-time setup of any class with a LAYOUT, used even by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS weirdosities
@@ -968,15 +971,15 @@
 
     (let ((copier-name (dd-copier-name dd)))
       (when copier-name
-	(sb!xc:proclaim `(ftype (function (,dtype) ,dtype) ,copier-name))))
+	(sb!xc:proclaim `(ftype (sfunction (,dtype) ,dtype) ,copier-name))))
 
     (let ((predicate-name (dd-predicate-name dd)))
       (when predicate-name
-	(sb!xc:proclaim `(ftype (function (t) t) ,predicate-name))
+	(sb!xc:proclaim `(ftype (sfunction (t) t) ,predicate-name))
 	;; Provide inline expansion (or not).
 	(ecase (dd-type dd)
 	  ((structure funcallable-structure)
-	   ;; Let the predicate be inlined. 
+	   ;; Let the predicate be inlined.
 	   (setf (info :function :inline-expansion-designator predicate-name)
 		 (lambda ()
 		   `(lambda (x)
@@ -1002,25 +1005,18 @@
 	    (cond
 	      ((not inherited)
 	       (multiple-value-bind (reader-designator writer-designator)
-		   (slot-accessor-inline-expansion-designators dd dsd)
-		 (sb!xc:proclaim `(ftype (function (,dtype) ,dsd-type)
+		   (slot-accessor-transforms dd dsd)
+		 (sb!xc:proclaim `(ftype (sfunction (,dtype) ,dsd-type)
 				   ,accessor-name))
-		 (setf (info :function :inline-expansion-designator
-			     accessor-name)
-		       reader-designator
-		       (info :function :inlinep accessor-name)
-		       :inline)
+		 (setf (info :function :source-transform accessor-name)
+		       reader-designator)
 		 (unless (dsd-read-only dsd)
 		   (let ((setf-accessor-name `(setf ,accessor-name)))
 		     (sb!xc:proclaim
-		      `(ftype (function (,dsd-type ,dtype) ,dsd-type)
+		      `(ftype (sfunction (,dsd-type ,dtype) ,dsd-type)
 			,setf-accessor-name))
-		     (setf (info :function
-				 :inline-expansion-designator
-				 setf-accessor-name)
-			   writer-designator
-			   (info :function :inlinep setf-accessor-name)
-			   :inline)))))
+		     (setf (info :function :source-transform setf-accessor-name)
+			   writer-designator)))))
 	      ((not (= (cdr inherited) (dsd-index dsd)))
 	       (style-warn "~@<Non-overwritten accessor ~S does not access ~
                             slot with name ~S (accessing an inherited slot ~

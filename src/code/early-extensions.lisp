@@ -65,6 +65,20 @@
 			  (* max-offset sb!vm:n-word-bytes))
 		       scale)))
 
+;;; Similar to FUNCTION, but the result type is "exactly" specified:
+;;; if it is an object type, then the function returns exactly one
+;;; value, if it is a short form of VALUES, then this short form
+;;; specifies the exact number of values.
+(def!type sfunction (args &optional result)
+  (let ((result (cond ((eq result '*) '*)
+                      ((or (atom result)
+                           (not (eq (car result) 'values)))
+                       `(values ,result &optional))
+                      ((intersection (cdr result) lambda-list-keywords)
+                       result)
+                      (t `(values ,@(cdr result) &optional)))))
+    `(function ,args ,result)))
+
 ;;; the default value used for initializing character data. The ANSI
 ;;; spec says this is arbitrary, so we use the value that falls
 ;;; through when we just let the low-level consing code initialize
@@ -122,6 +136,11 @@
   (or (zerop n) ; since anything can be considered an improper list of length 0
       (and (consp x)
 	   (list-of-length-at-least-p (cdr x) (1- n)))))
+
+(declaim (inline singleton-p))
+(defun singleton-p (list)
+  (and (consp list)
+       (null (rest list))))
 
 ;;; Is X is a positive prime integer? 
 (defun positive-primep (x)
@@ -300,10 +319,19 @@
 (declaim (ftype (function (list index) t) nth-but-with-sane-arg-order))
 (defun nth-but-with-sane-arg-order (list index)
   (nth index list))
+
+(defun adjust-list (list length initial-element)
+  (let ((old-length (length list)))
+    (cond ((< old-length length)
+           (append list (make-list (- length old-length)
+                                   :initial-element initial-element)))
+          ((> old-length length)
+           (subseq list 0 length))
+          (t list))))
 
 ;;;; miscellaneous iteration extensions
 
-;;; "the ultimate iteration macro" 
+;;; "the ultimate iteration macro"
 ;;;
 ;;; note for Schemers: This seems to be identical to Scheme's "named LET".
 (defmacro named-let (name binds &body body)
@@ -891,6 +919,15 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
 	  (t (error "unsupported element type ~S" etype))))))
 
 ;;;; utilities for two-VALUES predicates
+
+(defmacro not/type (x)
+  (let ((val (gensym "VAL"))
+        (win (gensym "WIN")))
+    `(multiple-value-bind (,val ,win)
+         ,x
+       (if ,win
+           (values (not ,val) t)
+           (values nil nil)))))
 
 (defmacro and/type (x y)
   `(multiple-value-bind (val1 win1) ,x
