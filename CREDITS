@@ -577,6 +577,10 @@ Matthias Hoelzl:
 Espen S Johnsen:
   He provided an ANSI-compliant version of CHANGE-CLASS for PCL.
 
+Teemu Kalvas:
+  He worked on Unicode support for SBCL, including parsing the Unicode
+  character database.
+
 Frederik Kuivinen:
   He showed how to implement the DEBUG-RETURN functionality.
 
