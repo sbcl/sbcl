@@ -115,12 +115,18 @@
           :message ,(princ-to-string condition)
           :source ,(princ-to-string source)))
 
+;;; Fatal compiler errors. We export FATAL-COMPILER-ERROR as an
+;;; interface for errors that kill the compiler dead
+;;;
+;;; These are not a COMPILER-ERRORs, since we don't try to recover
+;;; from them and keep chugging along, but instead immediately bail
+;;; out of the entire COMPILE-FILE.
+
+(define-condition fatal-compiler-error (encapsulated-condition)
+  ())
+
 ;;; the condition of COMPILE-FILE being unable to READ from the
 ;;; source file
-;;;
-;;; This is not a COMPILER-ERROR, since we don't try to recover from
-;;; it and keep chugging along, but instead immediately bail out of
-;;; the entire COMPILE-FILE.
 ;;;
 ;;; (The old CMU CL code did try to recover from this condition, but
 ;;; the code for doing that was messy and didn't always work right.
@@ -130,11 +136,8 @@
 ;;; deeply confused, so we violate what'd otherwise be good compiler
 ;;; practice by not trying to recover from this error and bailing out
 ;;; instead.)
-(define-condition input-error-in-compile-file (error)
-  (;; the original error which was trapped to produce this condition
-   (error :reader input-error-in-compile-file-error
-	  :initarg :error)
-   ;; the position where the bad READ began, or NIL if unavailable,
+(define-condition input-error-in-compile-file (fatal-compiler-error)
+  (;; the position where the bad READ began, or NIL if unavailable,
    ;; redundant, or irrelevant
    (position :reader input-error-in-compile-file-position
 	     :initarg :position
@@ -146,4 +149,4 @@
 	     'read
 	     'compile-file
 	     (input-error-in-compile-file-position condition)
-	     (input-error-in-compile-file-error condition)))))
+	     (encapsulated-condition condition)))))

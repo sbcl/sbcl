@@ -727,7 +727,7 @@
   (handler-case (read stream nil stream)
     (reader-error (condition)
      (error 'input-error-in-compile-file
-	    :error condition
+	    :condition condition
 	    ;; We don't need to supply :POSITION here because
 	    ;; READER-ERRORs already know their position in the file.
 	    ))
@@ -736,7 +736,7 @@
     ;; file in the middle of something it's trying to read.
     (end-of-file (condition)
      (error 'input-error-in-compile-file
-	    :error condition
+	    :condition condition
 	    ;; We need to supply :POSITION here because the END-OF-FILE
 	    ;; condition doesn't carry the position that the user
 	    ;; probably cares about, where the failed READ began.
@@ -1438,9 +1438,10 @@
       ;; Some errors are sufficiently bewildering that we just fail
       ;; immediately, without trying to recover and compile more of
       ;; the input file.
-      (input-error-in-compile-file (condition)
+      (fatal-compiler-error (condition)
+       (signal condition)
        (format *error-output*
-	       "~@<compilation aborted because of input error: ~2I~_~A~:>"
+	       "~@<compilation aborted because of fatal error: ~2I~_~A~:>"
 	       condition)
        (values nil t t)))))
 
