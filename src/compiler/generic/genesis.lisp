@@ -60,6 +60,140 @@
   "Round NUMBER up to be an integral multiple of SIZE."
   (* size (ceiling number size)))
 
+;;;; implementing the concept of "vector" in (almost) portable
+;;;; Common Lisp
+;;;;
+;;;; "If you only need to do such simple things, it doesn't really
+;;;; matter which language you use." -- _ANSI Common Lisp_, p. 1, Paul
+;;;; Graham (evidently not considering the abstraction "vector" to be
+;;;; such a simple thing:-)
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +smallvec-length+
+    (expt 2 16)))
+
+;;; an element of a BIGVEC -- a vector small enough that we have
+;;; a good chance of it being portable to other Common Lisps
+(deftype smallvec ()
+  `(simple-array (unsigned-byte 8) (,+smallvec-length+)))
+
+(defun make-smallvec ()
+  (make-array +smallvec-length+ :element-type '(unsigned-byte 8)))
+
+;;; a big vector, implemented as a vector of SMALLVECs
+;;;
+;;; KLUDGE: This implementation seems portable enough for our
+;;; purposes, since realistically every modern implementation is
+;;; likely to support vectors of at least 2^16 elements. But if you're
+;;; masochistic enough to read this far into the contortions imposed
+;;; on us by ANSI and the Lisp community, for daring to use the
+;;; abstraction of a large linearly addressable memory space, which is
+;;; after all only directly supported by the underlying hardware of at
+;;; least 99% of the general-purpose computers in use today, then you
+;;; may be titillated to hear that in fact this code isn't really
+;;; portable, because as of sbcl-0.7.4 we need somewhat more than
+;;; 16Mbytes to represent a core, and ANSI only guarantees that
+;;; ARRAY-DIMENSION-LIMIT is not less than 1024. -- WHN 2002-06-13
+(defstruct bigvec
+  (outer-vector (vector (make-smallvec)) :type (vector smallvec)))
+
+;;; analogous to SVREF, but into a BIGVEC
+(defun bvref (bigvec index)
+  (multiple-value-bind (outer-index inner-index)
+      (floor index +smallvec-length+)
+    (aref (the smallvec
+	    (svref (bigvec-outer-vector bigvec) outer-index))
+	  inner-index)))
+(defun (setf bvref) (new-value bigvec index)
+  (multiple-value-bind (outer-index inner-index)
+      (floor index +smallvec-length+)
+    (setf (aref (the smallvec
+		  (svref (bigvec-outer-vector bigvec) outer-index))
+		inner-index)
+	  new-value)))
+
+;;; analogous to LENGTH, but for a BIGVEC
+;;;
+;;; the length of BIGVEC, measured in the number of BVREFable bytes it
+;;; can hold
+(defun bvlength (bigvec)
+  (* (length (bigvec-outer-vector bigvec))
+     +smallvec-length+))
+
+;;; analogous to WRITE-SEQUENCE, but for a BIGVEC
+(defun write-bigvec-as-sequence (bigvec stream &key (start 0) end)
+  (loop for i of-type index from start below (or end (bvlength bigvec)) do
+	(write-byte (bvref bigvec i)
+		    stream)))
+
+;;; analogous to READ-SEQUENCE-OR-DIE, but for a BIGVEC
+(defun read-bigvec-as-sequence-or-die (bigvec stream &key (start 0) end)
+  (loop for i of-type index from start below (or end (bvlength bigvec)) do
+	(setf (bvref bigvec i)
+	      (read-byte stream))))
+
+;;; Grow BIGVEC (exponentially, so that large increases in size have
+;;; asymptotic logarithmic cost per byte).
+(defun expand-bigvec (bigvec)
+  (let* ((old-outer-vector (bigvec-outer-vector bigvec))
+	 (length-old-outer-vector (length old-outer-vector))
+	 (new-outer-vector (make-array (* 2 length-old-outer-vector))))
+    (dotimes (i length-old-outer-vector)
+      (setf (svref new-outer-vector i)
+	    (svref old-outer-vector i)))
+    (loop for i from length-old-outer-vector below (length new-outer-vector) do
+	  (setf (svref new-outer-vector i)
+		(make-smallvec)))
+    (setf (bigvec-outer-vector bigvec)
+	  new-outer-vector))
+  bigvec)
+
+;;;; looking up bytes and multi-byte values in a BIGVEC (considering
+;;;; it as an image of machine memory)
+
+;;; BVREF-32 and friends. These are like SAP-REF-n, except that
+;;; instead of a SAP we use a BIGVEC.
+(macrolet ((make-bvref-n
+            (n)
+            (let* ((name (intern (format nil "BVREF-~A" n)))
+                   (number-octets (/ n 8))
+                   (ash-list-le
+                    (loop for i from 0 to (1- number-octets)
+                          collect `(ash (bvref bigvec (+ byte-index ,i))
+                                        ,(* i 8))))
+		   (ash-list-be
+		    (loop for i from 0 to (1- number-octets)
+			  collect `(ash (bvref bigvec
+					       (+ byte-index
+						  ,(- number-octets 1 i)))
+				        ,(* i 8))))
+                   (setf-list-le
+                    (loop for i from 0 to (1- number-octets)
+                          append
+                          `((bvref bigvec (+ byte-index ,i))
+                            (ldb (byte 8 ,(* i 8)) new-value))))
+		   (setf-list-be
+		    (loop for i from 0 to (1- number-octets)
+                          append
+			  `((bvref bigvec (+ byte-index ,i))
+			    (ldb (byte 8 ,(- n 8 (* i 8))) new-value)))))
+              `(progn
+                 (defun ,name (bigvec byte-index)
+		   (aver (= sb!vm:n-word-bits 32))
+		   (aver (= sb!vm:n-byte-bits 8))
+		   (logior ,@(ecase sb!c:*backend-byte-order*
+			       (:little-endian ash-list-le)
+			       (:big-endian ash-list-be))))
+		 (defun (setf ,name) (new-value bigvec byte-index)
+		   (aver (= sb!vm:n-word-bits 32))
+		   (aver (= sb!vm:n-byte-bits 8))
+		   (setf ,@(ecase sb!c:*backend-byte-order*
+			     (:little-endian setf-list-le)
+			     (:big-endian setf-list-be))))))))
+  (make-bvref-n 8)
+  (make-bvref-n 16)
+  (make-bvref-n 32))
+
 ;;;; representation of spaces in the core
 
 ;;; If there is more than one dynamic space in memory (i.e., if a
@@ -89,10 +223,12 @@
   (identifier (missing-arg) :type fixnum :read-only t)
   ;; the word address where the data will be loaded
   (word-address (missing-arg) :type unsigned-byte :read-only t)
-  ;; the data themselves. (Note that in CMU CL this was a pair
-  ;; of fields SAP and WORDS-ALLOCATED, but that wasn't very portable.)
-  (bytes (make-array target-space-alignment :element-type '(unsigned-byte 8))
-	 :type (simple-array (unsigned-byte 8) 1))
+  ;; the data themselves. (Note that in CMU CL this was a pair of
+  ;; fields SAP and WORDS-ALLOCATED, but that wasn't very portable.)
+  ;; (And then in SBCL this was a VECTOR, but turned out to be
+  ;; unportable too, since ANSI doesn't think that arrays longer than
+  ;; 1024 (!) should needed by portable CL code...)
+  (bytes (make-bigvec) :read-only t)
   ;; the index of the next unwritten word (i.e. chunk of
   ;; SB!VM:N-WORD-BYTES bytes) in BYTES, or equivalently the number of
   ;; words actually written in BYTES. In order to convert to an actual
@@ -114,20 +250,6 @@
   (%make-gspace :name name
 		:identifier identifier
 		:word-address (ash byte-address (- sb!vm:word-shift))))
-
-;;; KLUDGE: Doing it this way seems to partly replicate the
-;;; functionality of Common Lisp adjustable arrays. Is there any way
-;;; to do this stuff in one line of code by using standard Common Lisp
-;;; stuff? -- WHN 19990816
-(defun expand-gspace-bytes (gspace)
-  (let* ((old-bytes (gspace-bytes gspace))
-	 (old-length (length old-bytes))
-	 (new-length (* 2 old-length))
-	 (new-bytes (make-array new-length :element-type '(unsigned-byte 8))))
-    (replace new-bytes old-bytes :end1 old-length)
-    (setf (gspace-bytes gspace)
-	  new-bytes))
-  (values))
 
 ;;;; representation of descriptors
 
@@ -193,9 +315,9 @@
     ;; Grow GSPACE as necessary until it's big enough to handle
     ;; NEW-FREE-WORD-INDEX.
     (do ()
-	((>= (length (gspace-bytes gspace))
+	((>= (bvlength (gspace-bytes gspace))
 	     (* new-free-word-index sb!vm:n-word-bytes)))
-      (expand-gspace-bytes gspace))
+      (expand-bigvec (gspace-bytes gspace)))
     ;; Now that GSPACE is big enough, we can meaningfully grab a chunk of it.
     (setf (gspace-free-word-index gspace) new-free-word-index)
     (let ((ptr (+ (gspace-word-address gspace) old-free-word-index)))
@@ -353,49 +475,6 @@
   "Push THING onto the given cold-load LIST."
   `(setq ,list (cold-cons ,thing ,list)))
 
-;;; BYTE-VECTOR-REF-32 and friends.  These are like SAP-REF-n, except
-;;; that instead of a SAP we use a byte vector
-(macrolet ((make-byte-vector-ref-n
-            (n)
-            (let* ((name (intern (format nil "BYTE-VECTOR-REF-~A" n)))
-                   (number-octets (/ n 8))
-                   (ash-list-le
-                    (loop for i from 0 to (1- number-octets)
-                          collect `(ash (aref byte-vector (+ byte-index ,i))
-                                        ,(* i 8))))
-		   (ash-list-be
-		    (loop for i from 0 to (1- number-octets)
-			  collect `(ash (aref byte-vector
-					      (+ byte-index
-						 ,(- number-octets 1 i)))
-				        ,(* i 8))))
-                   (setf-list-le
-                    (loop for i from 0 to (1- number-octets)
-                          append
-                          `((aref byte-vector (+ byte-index ,i))
-                            (ldb (byte 8 ,(* i 8)) new-value))))
-		   (setf-list-be
-		    (loop for i from 0 to (1- number-octets)
-                          append
-			  `((aref byte-vector (+ byte-index ,i))
-			    (ldb (byte 8 ,(- n 8 (* i 8))) new-value)))))
-              `(progn
-                 (defun ,name (byte-vector byte-index)
-		   (aver (= sb!vm:n-word-bits 32))
-		   (aver (= sb!vm:n-byte-bits 8))
-		   (logior ,@(ecase sb!c:*backend-byte-order*
-			       (:little-endian ash-list-le)
-			       (:big-endian ash-list-be))))
-		 (defun (setf ,name) (new-value byte-vector byte-index)
-		   (aver (= sb!vm:n-word-bits 32))
-		   (aver (= sb!vm:n-byte-bits 8))
-		   (setf ,@(ecase sb!c:*backend-byte-order*
-			     (:little-endian setf-list-le)
-			     (:big-endian setf-list-be))))))))
-  (make-byte-vector-ref-n 8)
-  (make-byte-vector-ref-n 16)
-  (make-byte-vector-ref-n 32))
-
 (declaim (ftype (function (descriptor sb!vm:word) descriptor) read-wordindexed))
 (defun read-wordindexed (address index)
   #!+sb-doc
@@ -404,7 +483,7 @@
 	 (bytes (gspace-bytes gspace))
 	 (byte-index (ash (+ index (descriptor-word-offset address))
 			  sb!vm:word-shift))
-	 (value (byte-vector-ref-32 bytes byte-index)))
+	 (value (bvref-32 bytes byte-index)))
     (make-random-descriptor value)))
 
 (declaim (ftype (function (descriptor) descriptor) read-memory))
@@ -447,7 +526,7 @@
     (let* ((bytes (gspace-bytes (descriptor-intuit-gspace address)))
 	   (byte-index (ash (+ index (descriptor-word-offset address))
 			       sb!vm:word-shift)))
-      (setf (byte-vector-ref-32 bytes byte-index)
+      (setf (bvref-32 bytes byte-index)
 	    (descriptor-bits value)))))
 
 (declaim (ftype (function (descriptor descriptor)) write-memory))
@@ -520,7 +599,7 @@
 		       sb!vm:vector-length-slot
 		       (make-fixnum-descriptor length))
     (dotimes (i length)
-      (setf (aref bytes (+ offset i))
+      (setf (bvref bytes (+ offset i))
 	    ;; KLUDGE: There's no guarantee that the character
 	    ;; encoding here will be the same as the character
 	    ;; encoding on the target machine, so using CHAR-CODE as
@@ -529,7 +608,7 @@
 	    ;; indices into the sequence which is used to test whether
 	    ;; a character is a STANDARD-CHAR?) -- WHN 19990817
 	    (char-code (aref string i))))
-    (setf (aref bytes (+ offset length))
+    (setf (bvref bytes (+ offset length))
 	  0) ; null string-termination character for C
     des))
 
@@ -1609,58 +1688,58 @@
 	  (let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
 		 (value (if (logbitp 31 value) (+ value (ash 1 32)) value))
 		 (value (if (logbitp 47 value) (+ value (ash 1 48)) value)))
-	    (setf (byte-vector-ref-8 gspace-bytes gspace-byte-offset)
+	    (setf (bvref-8 gspace-bytes gspace-byte-offset)
                   (ldb (byte 8 48) value)
-                  (byte-vector-ref-8 gspace-bytes (1+ gspace-byte-offset))
+                  (bvref-8 gspace-bytes (1+ gspace-byte-offset))
                   (ldb (byte 8 56) value))))
 	 (:bits-47-32
 	  (let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
 		 (value (if (logbitp 31 value) (+ value (ash 1 32)) value)))
-	    (setf (byte-vector-ref-8 gspace-bytes gspace-byte-offset)
+	    (setf (bvref-8 gspace-bytes gspace-byte-offset)
                   (ldb (byte 8 32) value)
-                  (byte-vector-ref-8 gspace-bytes (1+ gspace-byte-offset))
+                  (bvref-8 gspace-bytes (1+ gspace-byte-offset))
                   (ldb (byte 8 40) value))))
 	 (:ldah
 	  (let ((value (if (logbitp 15 value) (+ value (ash 1 16)) value)))
-	    (setf (byte-vector-ref-8 gspace-bytes gspace-byte-offset)
+	    (setf (bvref-8 gspace-bytes gspace-byte-offset)
                   (ldb (byte 8 16) value)
-                  (byte-vector-ref-8 gspace-bytes (1+ gspace-byte-offset))
+                  (bvref-8 gspace-bytes (1+ gspace-byte-offset))
                   (ldb (byte 8 24) value))))
 	 (:lda
-	  (setf (byte-vector-ref-8 gspace-bytes gspace-byte-offset)
+	  (setf (bvref-8 gspace-bytes gspace-byte-offset)
                 (ldb (byte 8 0) value)
-                (byte-vector-ref-8 gspace-bytes (1+ gspace-byte-offset))
+                (bvref-8 gspace-bytes (1+ gspace-byte-offset))
                 (ldb (byte 8 8) value)))))
       (:ppc
        (ecase kind
          (:ba
-          (setf (byte-vector-ref-32 gspace-bytes gspace-byte-offset)
+          (setf (bvref-32 gspace-bytes gspace-byte-offset)
                 (dpb (ash value -2) (byte 24 2) 
-                     (byte-vector-ref-32 gspace-bytes gspace-byte-offset))))
+                     (bvref-32 gspace-bytes gspace-byte-offset))))
          (:ha
           (let* ((h (ldb (byte 16 16) value))
                  (l (ldb (byte 16 0) value)))
-            (setf (byte-vector-ref-16 gspace-bytes (+ gspace-byte-offset 2))
+            (setf (bvref-16 gspace-bytes (+ gspace-byte-offset 2))
                   (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
          (:l
-          (setf (byte-vector-ref-16 gspace-bytes (+ gspace-byte-offset 2))
+          (setf (bvref-16 gspace-bytes (+ gspace-byte-offset 2))
                 (ldb (byte 16 0) value)))))     
       (:sparc
        (ecase kind
 	 (:call
-	  (error "Can't deal with call fixups yet."))
+	  (error "can't deal with call fixups yet"))
 	 (:sethi
-	  (setf (byte-vector-ref-32 gspace-bytes gspace-byte-offset)
+	  (setf (bvref-32 gspace-bytes gspace-byte-offset)
 		(dpb (ldb (byte 22 10) value)
 		     (byte 22 0)
-		     (byte-vector-ref-32 gspace-bytes gspace-byte-offset))))
+		     (bvref-32 gspace-bytes gspace-byte-offset))))
 	 (:add
-	  (setf (byte-vector-ref-32 gspace-bytes gspace-byte-offset)
+	  (setf (bvref-32 gspace-bytes gspace-byte-offset)
 		(dpb (ldb (byte 10 0) value)
 		     (byte 10 0)
-		     (byte-vector-ref-32 gspace-bytes gspace-byte-offset))))))
+		     (bvref-32 gspace-bytes gspace-byte-offset))))))
       (:x86
-       (let* ((un-fixed-up (byte-vector-ref-32 gspace-bytes
+       (let* ((un-fixed-up (bvref-32 gspace-bytes
 					       gspace-byte-offset))
 	      (code-object-start-addr (logandc2 (descriptor-bits code-object)
 						sb!vm:lowtag-mask)))
@@ -1670,7 +1749,7 @@
 	 (ecase kind
 	   (:absolute
 	    (let ((fixed-up (+ value un-fixed-up)))
-	      (setf (byte-vector-ref-32 gspace-bytes gspace-byte-offset)
+	      (setf (bvref-32 gspace-bytes gspace-byte-offset)
 		    fixed-up)
 	      ;; comment from CMU CL sources:
 	      ;;
@@ -1691,7 +1770,7 @@
 			       gspace-byte-address
 			       gspace-byte-offset
 			       sb!vm:n-word-bytes))) ; length of CALL argument
-	      (setf (byte-vector-ref-32 gspace-bytes gspace-byte-offset)
+	      (setf (bvref-32 gspace-bytes gspace-byte-offset)
 		    fixed-up)
 	      ;; Note relative fixups that point outside the code
 	      ;; object, which is to say all relative fixups, since
@@ -2003,10 +2082,10 @@
 	 (end (+ start
 		 (ceiling (* len sizebits)
 			  sb!vm:n-byte-bits))))
-    (read-sequence-or-die (descriptor-bytes result)
-			  *fasl-input-stream*
-			  :start start
-			  :end end)
+    (read-bigvec-as-sequence-or-die (descriptor-bytes result)
+				    *fasl-input-stream*
+				    :start start
+				    :end end)
     result))
 
 (define-cold-fop (fop-single-float-vector)
@@ -2019,10 +2098,10 @@
 	 (start (+ (descriptor-byte-offset result)
 		   (ash sb!vm:vector-data-offset sb!vm:word-shift)))
 	 (end (+ start (* len sb!vm:n-word-bytes))))
-    (read-sequence-or-die (descriptor-bytes result)
-			  *fasl-input-stream*
-			  :start start
-			  :end end)
+    (read-bigvec-as-sequence-or-die (descriptor-bytes result)
+				    *fasl-input-stream*
+				    :start start
+				    :end end)
     result))
 
 (not-cold-fop fop-double-float-vector)
@@ -2346,10 +2425,10 @@
        (let* ((start (+ (descriptor-byte-offset des)
 			(ash header-n-words sb!vm:word-shift)))
 	      (end (+ start code-size)))
-	 (read-sequence-or-die (descriptor-bytes des)
-			       *fasl-input-stream*
-			       :start start
-			       :end end)
+	 (read-bigvec-as-sequence-or-die (descriptor-bytes des)
+					 *fasl-input-stream*
+					 :start start
+					 :end end)
 	 #!+sb-show
 	 (when *show-pre-fixup-code-p*
 	   (format *trace-output*
@@ -2361,7 +2440,7 @@
 	     (format *trace-output*
 		     "/#X~8,'0x: #X~8,'0x~%"
 		     (+ i (gspace-byte-address (descriptor-gspace des)))
-		     (byte-vector-ref-32 (descriptor-bytes des) i)))))
+		     (bvref-32 (descriptor-bytes des) i)))))
        des)))
 
 (define-cold-code-fop fop-code (read-arg 4) (read-arg 4))
@@ -2471,10 +2550,10 @@
     (let* ((start (+ (descriptor-byte-offset des)
 		     (ash header-n-words sb!vm:word-shift)))
 	   (end (+ start length)))
-      (read-sequence-or-die (descriptor-bytes des)
-			    *fasl-input-stream*
-			    :start start
-			    :end end))
+      (read-bigvec-as-sequence-or-die (descriptor-bytes des)
+				      *fasl-input-stream*
+				      :start start
+				      :end end))
     des))
 
 (define-cold-fop (fop-assembler-routine)
@@ -2839,7 +2918,9 @@ initially undefined function references:~2%")
     ;; be zero-filled. This will always be true under Mach on machines
     ;; where the page size is equal. (RT is 4K, PMAX is 4K, Sun 3 is
     ;; 8K).
-    (write-sequence (gspace-bytes gspace) *core-file* :end total-bytes)
+    (write-bigvec-as-sequence (gspace-bytes gspace)
+			      *core-file*
+			      :end total-bytes)
     (force-output *core-file*)
     (file-position *core-file* posn)
 
