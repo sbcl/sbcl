@@ -438,24 +438,9 @@ the usual naming convention (names like *FOO*) for special variables"
   #!+sb-doc
   "DECLAIM Declaration*
   Do a declaration or declarations for the global environment."
-  #-sb-xc-host
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     ,@(mapcar #'(lambda (x)
-		   `(sb!xc:proclaim ',x))
-	       specs))
-  ;; KLUDGE: The definition above doesn't work in the cross-compiler,
-  ;; because UNCROSS translates SB!XC:PROCLAIM into CL:PROCLAIM before
-  ;; the form gets executed. Instead, we have to explicitly do the
-  ;; proclamation at macroexpansion time. -- WHN ca. 19990810
-  ;;
-  ;; FIXME: Maybe we don't need this special treatment any more now
-  ;; that we're using DEFMACRO-MUNDANELY instead of DEFMACRO?
-  #+sb-xc-host (progn
-		 (mapcar #'sb!xc:proclaim specs)
-		 `(progn
-		    ,@(mapcar #'(lambda (x)
-				  `(sb!xc:proclaim ',x))
-			      specs))))
+     ,@(mapcar (lambda (spec) `(sb!xc:proclaim ',spec))
+	       specs)))
 
 (defmacro-mundanely print-unreadable-object ((object stream &key type identity)
 					     &body body)

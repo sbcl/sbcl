@@ -42,7 +42,8 @@
   (call-next-method)
   (when (and (legal-function-name-p x)
 	     (fboundp x))
-    (format s "Its FDEFINITION is ~S.~@:_" (fdefinition x))
+    (%describe-function (fdefinition x) s :function x)
+    ;;was: (format s "~@:_Its FDEFINITION is ~S.~@:_" (fdefinition x))
     ;; TO DO: should check for SETF documentation.
     ;; TO DO: should make it clear whether the definition is a
     ;; DEFUN (SETF FOO) or DEFSETF FOO or what.

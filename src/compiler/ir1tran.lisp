@@ -82,8 +82,9 @@
   (let* ((info (layout-info
 		(or (info :type :compiler-layout (sb!xc:class-name class))
 		    (class-layout class))))
-	 (accessor (if (listp name) (cadr name) name))
-	 (slot (find accessor (dd-slots info) :key #'sb!kernel:dsd-accessor))
+	 (accessor-name (if (listp name) (cadr name) name))
+	 (slot (find accessor-name (dd-slots info)
+		     :key #'sb!kernel:dsd-accessor-name))
 	 (type (dd-name info))
 	 (slot-type (dsd-type slot)))
     (unless slot
@@ -2252,11 +2253,11 @@
   (let* ((info (eval info)))
     (%%compiler-defstruct info)
     (dolist (slot (dd-slots info))
-      (let ((fun (dsd-accessor slot)))
-	(remhash fun *free-functions*)
+      (let ((accessor-name (dsd-accessor-name slot)))
+	(remhash accessor-name *free-functions*)
 	(unless (dsd-read-only slot)
-	  (remhash `(setf ,fun) *free-functions*))))
-    (remhash (dd-predicate info) *free-functions*)
+	  (remhash `(setf ,accessor-name) *free-functions*))))
+    (remhash (dd-predicate-name info) *free-functions*)
     (remhash (dd-copier info) *free-functions*)
     (ir1-convert start cont `(%%compiler-defstruct ',info))))
 

@@ -221,9 +221,11 @@
        (setq *policy* (process-optimize-decl form *policy*)))
       ((inline notinline maybe-inline)
        (dolist (name args)
-	 (proclaim-as-function-name name)
+	 ;; (CMU CL did (PROCLAIM-AS-FUNCTION-NAME NAME) here, but that
+	 ;; seems more likely to surprise the user than to help him, so
+	 ;; we don't do it.)
 	 (setf (info :function :inlinep name)
-	       (case kind
+	       (ecase kind
 		 (inline :inline)
 		 (notinline :notinline)
 		 (maybe-inline :maybe-inline)))))

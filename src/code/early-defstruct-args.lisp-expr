@@ -13,8 +13,10 @@
  ;; INSTANCE. This has to be handled early because the design of the
  ;; DEFSTRUCT system, dating back to pre-1999 CMU CL, requires that
  ;; STRUCTURE-OBJECT be the first DEFSTRUCT executed.
- ((structure-object (:alternate-metaclass sb!kernel:instance)
-		    (:copier nil))
+ ;;
+ ;; (The #|DEF|# here is to help find this definition with lexical search.)
+ (#|def|# (structure-object (:alternate-metaclass sb!kernel:instance)
+			    (:copier nil))
   ;; (There are no slots.)
   )
 
@@ -26,6 +28,8 @@
  ;; somewhere before this definition, to define SB!ALIEN:ALIEN-TYPE? That
  ;; way, any tests for SB!ALIEN:ALIEN-TYPE in the slot accessor functions
  ;; could be implemented more efficiently.
- ((sb!alien-internals:alien-value)
+ ;;
+ ;; (The #|DEF|# here is to help find this definition with lexical search.)
+ (#|def|# (sb!alien-internals:alien-value)
   (sap (required-argument) :type sb!sys:system-area-pointer)
   (type (required-argument) :type sb!alien::alien-type)))

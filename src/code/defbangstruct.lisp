@@ -156,9 +156,9 @@
 	  layout
 	  (let* ((dd (layout-info layout))
 		 (dsd (elt (dd-slots dd) (1- index)))
-		 (accessor (dsd-accessor dsd)))
-	    (declare (type symbol accessor))
-	    (funcall accessor instance)))))
+		 (accessor-name (dsd-accessor-name dsd)))
+	    (declare (type symbol accessor-name))
+	    (funcall accessor-name instance)))))
   (defun %instance-set (instance index new-value)
     (aver (typep instance 'structure!object))
     (let* ((class (sb!xc:find-class (type-of instance)))
@@ -167,9 +167,11 @@
 	  (error "can't set %INSTANCE-REF FOO 0 in cross-compilation host")
 	  (let* ((dd (layout-info layout))
 		 (dsd (elt (dd-slots dd) (1- index)))
-		 (accessor (dsd-accessor dsd)))
-	    (declare (type symbol accessor))
-	    (funcall (fdefinition `(setf ,accessor)) new-value instance))))))
+		 (accessor-name (dsd-accessor-name dsd)))
+	    (declare (type symbol accessor-name))
+	    (funcall (fdefinition `(setf ,accessor-name))
+		     new-value
+		     instance))))))
 
 ;;; a helper function for DEF!STRUCT in the #+SB-XC-HOST case: Return
 ;;; DEFSTRUCT-style arguments with any class names in the SB!XC

@@ -297,14 +297,14 @@
   (sb-kernel:dsd-name slotd))
 
 (defun structure-slotd-accessor-symbol (slotd)
-  (sb-kernel:dsd-accessor slotd))
+  (sb-kernel:dsd-accessor-name slotd))
 
 (defun structure-slotd-reader-function (slotd)
-  (fdefinition (sb-kernel:dsd-accessor slotd)))
+  (fdefinition (sb-kernel:dsd-accessor-name slotd)))
 
 (defun structure-slotd-writer-function (slotd)
   (unless (sb-kernel:dsd-read-only slotd)
-    (fdefinition `(setf ,(sb-kernel:dsd-accessor slotd)))))
+    (fdefinition `(setf ,(sb-kernel:dsd-accessor-name slotd)))))
 
 (defun structure-slotd-type (slotd)
   (sb-kernel:dsd-type slotd))

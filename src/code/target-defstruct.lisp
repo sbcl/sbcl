@@ -197,9 +197,10 @@
 		      (output-symbol-name (dsd-%name slot) stream)
 		      (write-char #\space stream)
 		      (pprint-newline :miser stream)
-		      (output-object (funcall (fdefinition (dsd-accessor slot))
-					      structure)
-				     stream)
+		      (output-object
+		       (funcall (fdefinition (dsd-accessor-name slot))
+				structure)
+		       stream)
 		      (when (null slots)
 			(return))
 		      (write-char #\space stream)
@@ -222,9 +223,10 @@
 		(let ((slot (first slots)))
 		  (output-symbol-name (dsd-%name slot) stream)
 		  (write-char #\space stream)
-		  (output-object (funcall (fdefinition (dsd-accessor slot))
-					  structure)
-				 stream))))))))
+		  (output-object
+		   (funcall (fdefinition (dsd-accessor-name slot))
+			    structure)
+		   stream))))))))
 (def!method print-object ((x structure-object) stream)
   (default-structure-print x stream *current-level*))
 
@@ -307,7 +309,7 @@
 		       :format-control
 		       "Structure for accessor ~S is not a ~S:~% ~S"
 		       :format-arguments
-		       (list (dsd-accessor dsd)
+		       (list (dsd-accessor-name dsd)
 			     (sb!xc:class-name (layout-class layout))
 			     structure))))
 	    (%instance-ref structure (dsd-index dsd)))
@@ -320,7 +322,7 @@
 		     :format-control
 		     "The structure for accessor ~S is not a ~S:~% ~S"
 		     :format-arguments
-		     (list (dsd-accessor dsd) class
+		     (list (dsd-accessor-name dsd) class
 			   structure)))
 	    (%instance-ref structure (dsd-index dsd))))))
 (defun structure-slot-setter (layout dsd)
@@ -339,7 +341,7 @@
 		       :format-control
 		       "The structure for setter ~S is not a ~S:~% ~S"
 		       :format-arguments
-		       (list `(setf ,(dsd-accessor dsd))
+		       (list `(setf ,(dsd-accessor-name dsd))
 			     (sb!xc:class-name (layout-class layout))
 			     structure)))
 	      (unless  (typep-test new-value)
@@ -349,7 +351,7 @@
 		       :format-control
 		       "The new value for setter ~S is not a ~S:~% ~S"
 		       :format-arguments
-		       (list `(setf ,(dsd-accessor dsd))
+		       (list `(setf ,(dsd-accessor-name dsd))
 			      (dsd-type dsd)
 			      new-value))))
 	    (setf (%instance-ref structure (dsd-index dsd)) new-value))
@@ -366,7 +368,7 @@
 		       :format-control
 		       "The structure for setter ~S is not a ~S:~% ~S"
 		       :format-arguments
-		       (list `(setf ,(dsd-accessor dsd))
+		       (list `(setf ,(dsd-accessor-name dsd))
 			     (sb!xc:class-name class)
 			     structure)))
 	      (unless  (typep-test new-value)
@@ -376,7 +378,7 @@
 		       :format-control
 		       "The new value for setter ~S is not a ~S:~% ~S"
 		       :format-arguments
-		       (list `(setf ,(dsd-accessor dsd))
+		       (list `(setf ,(dsd-accessor-name dsd))
 			     (dsd-type dsd)
 			     new-value))))
 	    (setf (%instance-ref structure (dsd-index dsd)) new-value)))))

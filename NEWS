@@ -825,14 +825,6 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   it will issue WARNINGs about the type mismatches. It's not clear
   how to make the compiler smart enough to fix this in general, but
   a workaround is given in the entry for 117 in the BUGS file.
-* The doc/cmucl/ directory, containing old CMU CL documentation,
-  is no longer part of the base system. The files which used to 
-  be in the doc/cmucl/ directory are now available as
-    <ftp://sbcl.sourceforge.net/pub/sbcl/cmucl-docs.tar.bz2>.
-* The default value of *BYTES-CONSED-BETWEEN-GCS* has been 
-  doubled, to 4 million. (If your application spends a lot of time
-  GCing and you have a lot of RAM, you might want to experiment with
-  increasing it even more.)
 * The EVAL and EVAL-WHEN code has been largely rewritten, and the
   old CMU CL "IR1 interpreter" has gone away. The new interpreter
   is probably slower and harder to debug than the old one, but
@@ -845,8 +837,16 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   fixes:-). But hopefully any remaining bugs will be simpler, less
   fundamental, and more fixable then the bugs in the old IR1
   interpreter code.
+* DEFSTRUCT and DEFCLASS have been substantially updated to take
+  advantage of the new EVAL-WHEN stuff and to clean them up in 
+  general, and are now more ANSI-compliant in a number of ways. Martin
+  Atzmueller is responsible for a lot of this.
 * A bug in LOOP operations on hash tables has been fixed, thanks
   to a bug report and patch from Alexey Dejneka.
+* The default value of *BYTES-CONSED-BETWEEN-GCS* has been 
+  doubled, to 4 million. (If your application spends a lot of time
+  GCing and you have a lot of RAM, you might want to experiment with
+  increasing it even more.)
 * PPRINT-LOGICAL-BLOCK now copies the *PRINT-LINES* value on entry
   and uses that copy, rather than the current dynamic value, when
   it's trying to decide whether to truncate output . Thus e.g.
@@ -861,6 +861,10 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   :SB-PROPAGATE-FUN-TYPE are no longer considered to be optional
   features. Instead, the code that they used to control is always
   built into the system.
+* The doc/cmucl/ directory, containing old CMU CL documentation,
+  is no longer part of the base system. The files which used to 
+  be in the doc/cmucl/ directory are now available as
+    <ftp://sbcl.sourceforge.net/pub/sbcl/cmucl-docs.tar.bz2>.
 * lots of tidying up internally: renaming things so that names are
   more systematic and consistent, converting C macros to inline
   functions, systematizing indentation, making symbol packaging

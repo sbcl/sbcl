@@ -165,7 +165,7 @@ evaluated expressions.
     (when (sb-kernel::defstruct-description-p info)
       (dolist (dd-slot (dd-slots info) (nreverse parts-list))
         (push (cons (dsd-%name dd-slot)
-                    (funcall (dsd-accessor dd-slot) object))
+                    (funcall (dsd-accessor-name dd-slot) object))
               parts-list)))))
 
 (defmethod inspected-parts ((object structure-object))

@@ -17,12 +17,7 @@
 
 (in-package "SB!C")
 
-;;; Check the legality of a function name that is being introduced.
-;;; -- If it names a macro, then give a warning and blast the macro
-;;;    information.
-;;; -- If it is a structure slot accessor, give a warning and blast 
-;;;    the structure.
-;;; -- Check for conflicting setf macros.
+;;; Record a new function definition, and check its legality.
 (declaim (ftype (function ((or symbol cons)) t) proclaim-as-function-name))
 (defun proclaim-as-function-name (name)
   (check-function-name name)
@@ -30,30 +25,25 @@
     (:function
      (let ((accessor-for (info :function :accessor-for name)))
        (when accessor-for
-	 (compiler-warning
-	  "Undefining structure type:~%  ~S~@
-	   so that this slot accessor can be redefined:~%  ~S"
-	  (sb!xc:class-name accessor-for) name)
-	 ;; FIXME: This is such weird, unfriendly behavior.. (What if
-	 ;; the user didn't want his structure blasted?) It probably
-	 ;; violates ANSI, too. (Check this.) Perhaps instead of
-	 ;; undefining the structure, we should attach the lost
-	 ;; accessor function to SB-EXT:LOST-STRUCTURE-ACCESSORS on
-	 ;; the property list of the symbol which names the structure?
-	 (undefine-structure accessor-for)
-	 (setf (info :function :kind name) :function))))
+	 (compiler-style-warning
+	  "~@<The function ~
+           ~2I~_~S ~
+           ~I~_was previously defined as a slot accessor for ~
+           ~2I~_~S.~:>"
+	  name
+	  accessor-for)
+	 (clear-info :function :accessor-for name))))
     (:macro
-     (compiler-style-warning "~S previously defined as a macro." name)
-     (setf (info :function :kind name) :function)
+     (compiler-style-warning "~S was previously defined as a macro." name)
      (setf (info :function :where-from name) :assumed)
      (clear-info :function :macro-function name))
-    ((nil)
-     (setf (info :function :kind name) :function)))
+    ((nil)))
+  (setf (info :function :kind name) :function)
   (note-if-setf-function-and-macro name)
   name)
 
-;;; Make NAME no longer be a function name: clear everything back to the
-;;; default.
+;;; Make NAME no longer be a function name: clear everything back to
+;;; the default.
 (defun undefine-function-name (name)
   (when name
     (macrolet ((frob (type &optional val)
@@ -70,8 +60,8 @@
       (frob :assumed-type)))
   (values))
 
-;;; part of what happens with DEFUN, also with some PCL stuff:
-;;; Make NAME known to be a function definition.
+;;; part of what happens with DEFUN, also with some PCL stuff: Make
+;;; NAME known to be a function definition.
 (defun become-defined-function-name (name)
   (proclaim-as-function-name name)
   (when (eq (info :function :where-from name) :assumed)
@@ -89,7 +79,7 @@
   ;; FIXME: Should STRUCTURE-OBJECT and/or STANDARD-OBJECT be here?
   ;; They eval to themselves..
   ;;
-  ;; KLUDGE: Someday it might be nice to make the code recognize foldable
+  ;; FIXME: Someday it would be nice to make the code recognize foldable
   ;; functions and call itself recursively on their arguments, so that
   ;; more of the examples in the ANSI CL definition are recognized.
   ;; (e.g. (+ 3 2), (SQRT PI), and (LENGTH '(A B C)))

@@ -62,7 +62,7 @@
   ;; name of copying function
   (copier (symbolicate "COPY-" name) :type (or symbol null))
   ;; name of type predicate
-  (predicate (symbolicate name "-P") :type (or symbol null))
+  (predicate-name (symbolicate name "-P") :type (or symbol null))
   ;; the arguments to the :INCLUDE option, or NIL if no included
   ;; structure
   (include nil :type list)
@@ -127,7 +127,7 @@
   ;; the same name as an inherited accessor (which we don't want to
   ;; shadow)") but that behavior doesn't seem to be specified by (or
   ;; even particularly consistent with) ANSI, so it's gone in SBCL.)
-  (accessor nil)
+  (accessor-name nil)
   default			; default value expression
   (type t)			; declared type specifier
   ;; If this object does not describe a raw slot, this value is T.
@@ -154,8 +154,8 @@
 ;;; string to avoid creating lots of worthless symbols at load time.
 (defun dsd-name (dsd)
   (intern (string (dsd-%name dsd))
-	  (if (dsd-accessor dsd)
-	      (symbol-package (dsd-accessor dsd))
+	  (if (dsd-accessor-name dsd)
+	      (symbol-package (dsd-accessor-name dsd))
 	      (sane-package))))
 
 ;;;; typed (non-class) structures
@@ -336,32 +336,33 @@
     (collect ((res))
       (dolist (slot (dd-slots dd))
 	(let ((stype (dsd-type slot))
-	      (accname (dsd-accessor slot))
+	      (accessor-name (dsd-accessor-name slot))
 	      (argname (gensym "ARG"))
 	      (nvname (gensym "NEW-VALUE-")))
 	  (multiple-value-bind (accessor offset data)
 	      (slot-accessor-form dd slot argname)
 	    ;; When accessor exists and is raw
-	    (when (and accname (not (eq accessor '%instance-ref)))
-	      (res `(declaim (inline ,accname)))
-	      (res `(declaim (ftype (function (,name) ,stype) ,accname)))
-	      (res `(defun ,accname (,argname)
+	    (when (and accessor-name
+		       (not (eq accessor-name '%instance-ref)))
+	      (res `(declaim (inline ,accessor-name)))
+	      (res `(declaim (ftype (function (,name) ,stype) ,accessor-name)))
+	      (res `(defun ,accessor-name (,argname)
 		      (truly-the ,stype (,accessor ,data ,offset))))
 	      (unless (dsd-read-only slot)
-		(res `(declaim (inline (setf ,accname))))
+		(res `(declaim (inline (setf ,accessor-name))))
 		(res `(declaim (ftype (function (,stype ,name) ,stype)
-				      (setf ,accname))))
+				      (setf ,accessor-name))))
 		;; FIXME: I rewrote this somewhat from the CMU CL definition.
 		;; Do some basic tests to make sure that reading and writing
 		;; raw slots still works correctly.
-		(res `(defun (setf ,accname) (,nvname ,argname)
+		(res `(defun (setf ,accessor-name) (,nvname ,argname)
 			(setf (,accessor ,data ,offset) ,nvname)
 			,nvname)))))))
       (res))))
 
 ;;; Return a list of forms which create a predicate for an untyped DEFSTRUCT.
 (defun predicate-definitions (dd)
-  (let ((pred (dd-predicate dd))
+  (let ((pred (dd-predicate-name dd))
 	(argname (gensym)))
     (when pred
       (if (eq (dd-type dd) 'funcallable-structure)
@@ -382,11 +383,11 @@
 ;;; DEFSTRUCT.
 (defun typed-predicate-definitions (defstruct)
   (let ((name (dd-name defstruct))
-	(pred (dd-predicate defstruct))
+	(predicate-name (dd-predicate-name defstruct))
 	(argname (gensym)))
-    (when (and pred (dd-named defstruct))
+    (when (and predicate-name (dd-named defstruct))
       (let ((ltype (dd-lisp-type defstruct)))
-	`((defun ,pred (,argname)
+	`((defun ,predicate-name (,argname)
 	    (and (typep ,argname ',ltype)
 		 (eq (elt (the ,ltype ,argname)
 			  ,(cdr (car (last (find-name-indices defstruct)))))
@@ -474,8 +475,9 @@
 	   args
 	 (setf (dd-copier defstruct) copier)))
       (:predicate
-       (destructuring-bind (&optional (pred (symbolicate name "-P"))) args
-	 (setf (dd-predicate defstruct) pred)))
+       (destructuring-bind (&optional (predicate-name (symbolicate name "-P")))
+	   args
+	 (setf (dd-predicate-name defstruct) predicate-name)))
       (:include
        (when (dd-include defstruct)
 	 (error "more than one :INCLUDE option"))
@@ -560,8 +562,8 @@
 					  name-and-options))))
     (when (stringp (car slot-descriptions))
       (setf (dd-doc result) (pop slot-descriptions)))
-    (dolist (slot slot-descriptions)
-      (allocate-1-slot result (parse-1-dsd result slot)))
+    (dolist (slot-description slot-descriptions)
+      (allocate-1-slot result (parse-1-dsd result slot-description)))
     result))
 
 ) ; EVAL-WHEN
@@ -569,13 +571,13 @@
 ;;;; stuff to parse slot descriptions
 
 ;;; Parse a slot description for DEFSTRUCT, add it to the description
-;;; and return it. If supplied, ISLOT is a pre-initialized DSD that we
-;;; modify to get the new slot. This is supplied when handling
+;;; and return it. If supplied, SLOT is a pre-initialized DSD
+;;; that we modify to get the new slot. This is supplied when handling
 ;;; included slots.
 (defun parse-1-dsd (defstruct spec &optional
-		     (islot (make-defstruct-slot-description :%name ""
-							     :index 0
-							     :type t)))
+		    (slot (make-defstruct-slot-description :%name ""
+							   :index 0
+							   :type t)))
   (multiple-value-bind (name default default-p type type-p read-only ro-p)
       (cond
        ((listp spec)
@@ -599,12 +601,12 @@
       (error 'simple-program-error
 	     :format-control "duplicate slot name ~S"
 	     :format-arguments (list name)))
-    (setf (dsd-%name islot) (string name))
-    (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list islot)))
+    (setf (dsd-%name slot) (string name))
+    (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list slot)))
 
     (let ((accessor-name (symbolicate (or (dd-conc-name defstruct) "") name))
-	  (predicate-name (dd-predicate defstruct)))
-      (setf (dsd-accessor islot) accessor-name)
+	  (predicate-name (dd-predicate-name defstruct)))
+      (setf (dsd-accessor-name slot) accessor-name)
       (when (eql accessor-name predicate-name)
 	;; Some adventurous soul has named a slot so that its accessor
 	;; collides with the structure type predicate. ANSI doesn't
@@ -619,23 +621,23 @@
           this case; this implementation chooses to overwrite the type ~
           predicate with the slot accessor.~@:>"
 	 accessor-name)
-	(setf (dd-predicate defstruct) nil)))
+	(setf (dd-predicate-name defstruct) nil)))
 
     (when default-p
-      (setf (dsd-default islot) default))
+      (setf (dsd-default slot) default))
     (when type-p
-      (setf (dsd-type islot)
-	    (if (eq (dsd-type islot) t)
+      (setf (dsd-type slot)
+	    (if (eq (dsd-type slot) t)
 		type
-		`(and ,(dsd-type islot) ,type))))
+		`(and ,(dsd-type slot) ,type))))
     (when ro-p
       (if read-only
-	  (setf (dsd-read-only islot) t)
-	  (when (dsd-read-only islot)
+	  (setf (dsd-read-only slot) t)
+	  (when (dsd-read-only slot)
 	    (error "Slot ~S is :READ-ONLY in parent and must be :READ-ONLY in subtype ~S."
 		   name
-		   (dsd-name islot)))))
-    islot))
+		   (dsd-name slot)))))
+    slot))
 
 ;;; When a value of type TYPE is stored in a structure, should it be
 ;;; stored in a raw slot? Return (VALUES RAW? RAW-TYPE WORDS), where
@@ -735,13 +737,15 @@
 	(setf (dd-raw-index defstruct) (dd-raw-index included-structure))
 	(setf (dd-raw-length defstruct) (dd-raw-length included-structure)))
 
-      (dolist (islot (dd-slots included-structure))
-	(let* ((iname (dsd-name islot))
-	       (modified (or (find iname modified-slots
+      (dolist (included-slot (dd-slots included-structure))
+	(let* ((included-name (dsd-name included-slot))
+	       (modified (or (find included-name modified-slots
 				   :key #'(lambda (x) (if (atom x) x (car x)))
 				   :test #'string=)
-			     `(,iname))))
-	  (parse-1-dsd defstruct modified (copy-structure islot)))))))
+			     `(,included-name))))
+	  (parse-1-dsd defstruct
+		       modified
+		       (copy-structure included-slot)))))))
 
 ;;; This function is called at macroexpand time to compute the INHERITS
 ;;; vector for a structure type definition.
@@ -781,9 +785,9 @@
 	   (let ((old-info (layout-info old-layout)))
 	     (when (defstruct-description-p old-info)
 	       (dolist (slot (dd-slots old-info))
-		 (fmakunbound (dsd-accessor slot))
+		 (fmakunbound (dsd-accessor-name slot))
 		 (unless (dsd-read-only slot)
-		   (fmakunbound `(setf ,(dsd-accessor slot)))))))
+		   (fmakunbound `(setf ,(dsd-accessor-name slot)))))))
 	   (%redefine-defstruct class old-layout layout)
 	   (setq layout (class-layout class))))
 
@@ -796,13 +800,13 @@
 
       (dolist (slot (dd-slots info))
 	(let ((dsd slot))
-	  (when (and (dsd-accessor slot)
+	  (when (and (dsd-accessor-name slot)
 		     (eq (dsd-raw-type slot) t))
-	    (protect-cl (dsd-accessor slot))
-	    (setf (symbol-function (dsd-accessor slot))
+	    (protect-cl (dsd-accessor-name slot))
+	    (setf (symbol-function (dsd-accessor-name slot))
 		  (structure-slot-getter layout dsd))
 	    (unless (dsd-read-only slot)
-	      (setf (fdefinition `(setf ,(dsd-accessor slot)))
+	      (setf (fdefinition `(setf ,(dsd-accessor-name slot)))
 		    (structure-slot-setter layout dsd))))))
 
       ;; FIXME: See comment on corresponding code in %%COMPILER-DEFSTRUCT.
@@ -924,16 +928,16 @@
     ;; GENESIS understands DEFUN but doesn't understand a
     ;; (SETF SYMBOL-FUNCTION) call inside %DEFSTRUCT.)
     #|
-    (let ((pred (dd-predicate info)))
-      (when pred
-	(proclaim-as-defstruct-function-name pred)
+    (let ((predicate-name (dd-predicate-name info)))
+      (when predicate-name
+	(proclaim-as-defstruct-function-name predicate-name)
 	(setf (info :function :inlinep pred) :inline)
-	(setf (info :function :inline-expansion pred)
+	(setf (info :function :inline-expansion predicate-name)
 	      `(lambda (x) (typep x ',name)))))
     |#
 
     (dolist (slot (dd-slots info))
-      (let* ((fun (dsd-accessor slot))
+      (let* ((fun (dsd-accessor-name slot))
 	     (setf-fun `(setf ,fun)))
 	(when (and fun (eq (dsd-raw-type slot) t))
 	  (proclaim-as-defstruct-function-name fun)
@@ -1095,9 +1099,9 @@
       (let ((type (dd-name info)))
 	(setf (info :type :compiler-layout type) nil)
 	(undefine-function-name (dd-copier info))
-	(undefine-function-name (dd-predicate info))
+	(undefine-function-name (dd-predicate-name info))
 	(dolist (slot (dd-slots info))
-	  (let ((fun (dsd-accessor slot)))
+	  (let ((fun (dsd-accessor-name slot)))
 	    (undefine-function-name fun)
 	    (unless (dsd-read-only slot)
 	      (undefine-function-name `(setf ,fun))))))
@@ -1399,7 +1403,7 @@
 
 ;;;; compiler stuff
 
-;;; Like PROCLAIM-AS-FUNCTION-NAME, but we also set the kind to
+;;; This is like PROCLAIM-AS-FUNCTION-NAME, but we also set the kind to
 ;;; :DECLARED and blow away any ASSUMED-TYPE. Also, if the thing is a
 ;;; slot accessor currently, quietly unaccessorize it. And if there
 ;;; are any undefined warnings, we nuke them.
