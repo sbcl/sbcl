@@ -1433,3 +1433,77 @@ WORKAROUND:
     (defstruct (bar (:include foo)))
     (sb-mop:class-direct-subclasses (find-class 'foo))
   returns NIL, rather than a singleton list containing the BAR class.
+
+332: "fasl stack inconsistency in structure redefinition"
+  (reported by Tim Daly Jr sbcl-devel 2004-05-06)
+  Even though structure redefinition is undefined by the standard, the
+  following behaviour is suboptimal: running
+    (defun stimulate-sbcl ()
+      (let ((filename (format nil "/tmp/~A.lisp" (gensym))))
+        ;;create a file which redefines a structure incompatibly
+        (with-open-file (f filename :direction :output :if-exists :supersede)
+          (print '(defstruct astruct foo) f)
+          (print '(defstruct astruct foo bar) f))
+        ;;compile and load the file, then invoke the continue restart on
+        ;;the structure redefinition error
+        (handler-bind ((error (lambda (c) (continue c))))
+          (load (compile-file filename)))))
+    (stimulate-sbcl)
+  and choosing the CONTINUE restart yields the message
+    debugger invoked on a SB-INT:BUG in thread 27726:
+      fasl stack not empty when it should be
+
+333: "CHECK-TYPE TYPE-ERROR-DATUM place"
+  (reported by Tony Martinez sbcl-devel 2004-05-23)
+  When CHECK-TYPE signals a TYPE-ERROR, the TYPE-ERROR-DATUM holds the
+  lisp symbolic place in question rather than the place's value.  This
+  seems wrong.
+
+334: "COMPUTE-SLOTS used to add slots to classes"
+  (reported by Bruno Haible sbcl-devel 2004-06-01)
+  a. Adding a local slot does not work:
+    (use-package "SB-PCL")
+    (defclass b (a) ())
+    (defmethod compute-slots ((class (eql (find-class 'b))))
+      (append (call-next-method)
+              (list (make-instance 'standard-effective-slot-definition
+                      :name 'y
+                      :allocation :instance))))
+    (defclass a () ((x :allocation :class)))
+    ;; A should now have a shared slot, X, and a local slot, Y.
+    (mapcar #'slot-definition-location (class-slots (find-class 'b)))
+  yields
+    There is no applicable method for the generic function
+      #<STANDARD-GENERIC-FUNCTION CLASS-SLOTS (3)>
+    when called with arguments
+      (NIL).
+
+  b. Adding a class slot does not work:
+    (use-package "SB-PCL")
+    (defclass b (a) ())
+    (defmethod compute-slots ((class (eql (find-class 'b))))
+      (append (call-next-method)
+              (list (make-instance 'standard-effective-slot-definition
+                      :name 'y
+                      :allocation :class))))
+    (defclass a () ((x :allocation :class)))
+    ;; A should now have two shared slots, X and Y.
+    (mapcar #'slot-definition-location (class-slots (find-class 'b)))
+  yields
+    There is no applicable method for the generic function
+      #<STANDARD-GENERIC-FUNCTION SB-PCL::CLASS-SLOT-CELLS (1)>
+    when called with arguments
+      (NIL).
+   
+335: "ATANH completely broken"
+  a. (reported by Peter Graves sbcl-devel 2004-06-01)
+    (atanh #c(1 2)), and more generally atanh of any complex with real
+    part 1, computes entirely the wrong answer.
+  b. (discovered by CSR when investigating a.)
+    (atanh most-positive-double-float), and more generally atanh of any
+    number with magnitude larger than
+    sqrt(most-positive-double-float), computes a number whose real
+    part is the imaginary part of the correct answer, and whose
+    imaginary part is the real part of the correct answer.
+  (fixes for both of these were sent CSR sbcl-devel 2004-06-02, to be merged
+   post-0.8.11)
