@@ -22,7 +22,7 @@
 	 (res (type-specifier
 	       (single-value-type
 		(values-specifier-type (third type)))))
-	 (arglist (loop repeat (1+ (length args)) collect (gensym))))
+	 (arglist (make-gensym-list (1+ (length args)))))
     (cond
      ((null (intersection args lambda-list-keywords))
       `(defun (setf ,name) ,arglist

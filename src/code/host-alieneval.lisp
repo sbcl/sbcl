@@ -863,10 +863,10 @@
 
 (def-alien-type-translator array (ele-type &rest dims &environment env)
   (when dims
-    (unless (typep (first dims) '(or sb!kernel:index null))
+    (unless (typep (first dims) '(or index null))
       (error "The first dimension is not a non-negative fixnum or NIL: ~S"
 	     (first dims)))
-    (let ((loser (find-if-not #'(lambda (x) (typep x 'sb!kernel:index))
+    (let ((loser (find-if-not #'(lambda (x) (typep x 'index))
 			      (rest dims))))
       (when loser
 	(error "A dimension is not a non-negative fixnum: ~S" loser))))

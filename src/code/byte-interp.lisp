@@ -312,10 +312,7 @@
 			    (inline-function-info-type info)))
 		     (arg-types (second spec))
 		     (result-type (third spec))
-		     (args (mapcar #'(lambda (x)
-				       (declare (ignore x))
-				       (gensym))
-				   arg-types))
+		     (args (make-gensym-list (length arg-types)))
 		     (func
 		      `(the ,result-type
 			    (,(inline-function-info-interpreter-function info)
@@ -326,11 +323,8 @@
 				      arg-types args))
 		   ,(if (and (consp result-type)
 			     (eq (car result-type) 'values))
-			(let ((results
-			       (mapcar #'(lambda (x)
-					   (declare (ignore x))
-					   (gensym))
-				       (cdr result-type))))
+			(let ((results (make-gensym-list
+					(length (cdr result-type)))))
 			  `(multiple-value-bind ,results ,func
 			     ,@(mapcar #'(lambda (res)
 					   `(push-eval-stack ,res))

@@ -25,23 +25,16 @@
 
 (eval-when (:compile-toplevel)
 
-;;; Seq-Dispatch does an efficient type-dispatch on the given Sequence.
-
-;;; FIXME: It might be worth making three cases here, LIST, SIMPLE-VECTOR,
-;;; and VECTOR, instead of the current LIST and VECTOR. It tend to make code
-;;; run faster but be bigger; some benchmarking is needed to decide.
+;;; SEQ-DISPATCH does an efficient type-dispatch on the given SEQUENCE.
+;;;
+;;; FIXME: It might be worth making three cases here, LIST,
+;;; SIMPLE-VECTOR, and VECTOR, instead of the current LIST and VECTOR.
+;;; It tend to make code run faster but be bigger; some benchmarking
+;;; is needed to decide.
 (sb!xc:defmacro seq-dispatch (sequence list-form array-form)
   `(if (listp ,sequence)
        ,list-form
        ,array-form))
-
-;;; FIXME: Implementations of MAPFOO which use this are O(N*N) when users
-;;; could reasonably expect them to be O(N). This should be fixed.
-(sb!xc:defmacro elt-slice (sequences n)
-  #!+sb-doc
-  "Returns a list of the Nth element of each of the sequences. Used by MAP
-   and friends."
-  `(mapcar #'(lambda (seq) (elt seq ,n)) ,sequences))
 
 (sb!xc:defmacro make-sequence-like (sequence length)
   #!+sb-doc
@@ -53,6 +46,31 @@
   `(if (atom ,type) ,type (car ,type)))
 
 ) ; EVAL-WHEN
+
+;;; It's possible with some sequence operations to declare the length
+;;; of a result vector, and to be safe, we really ought to verify that
+;;; the actual result has the declared length.
+(defun vector-of-checked-length-given-length (vector declared-length)
+  (declare (type vector vector))
+  (declare (type index declared-length))
+  (let ((actual-length (length vector)))
+    (unless (= actual-length declared-length)
+      (error 'simple-type-error
+	     :datum vector
+	     :expected-type `(vector ,declared-length)
+	     :format-control
+	     "Vector length (~D) doesn't match declared length (~D)."
+	     :format-arguments (list actual-length declared-length))))
+  vector)
+(defun sequence-of-checked-length-given-type (sequence result-type)
+  (let ((ctype (specifier-type result-type)))
+    (if (not (array-type-p ctype))
+	sequence
+	(let ((declared-length (first (array-type-dimensions ctype))))
+	  (if (eq declared-length '*)
+	      sequence
+	      (vector-of-checked-length-given-length sequence
+						     declared-length))))))
 
 ;;; Given an arbitrary type specifier, return a sane sequence type
 ;;; specifier that we can directly match.
@@ -83,7 +101,7 @@
 
 (defun signal-index-too-large-error (sequence index)
   (let* ((length (length sequence))
-	 (max-index (and (plusp length)(1- length))))
+	 (max-index (and (plusp length) (1- length))))
     (error 'index-too-large-error
 	   :datum index
 	   :expected-type (if max-index
@@ -609,9 +627,9 @@
 (defun concat-to-simple* (type &rest sequences)
   (concatenate-to-mumble type sequences))
 
-;;;; MAP
+;;;; MAP and MAP-INTO
 
-;;; helper functions to handle the common consing subcases of MAP
+;;; helper functions to handle arity-1 subcases of MAP
 (declaim (ftype (function (function sequence) list) %map-list-arity-1))
 (declaim (ftype (function (function sequence) simple-vector)
 		%map-simple-vector-arity-1))
@@ -622,167 +640,182 @@
 		  (simple-vector (dovector (,i sequence) ,@body))
 		  (vector (dovector (,i sequence) ,@body))))))
   (defun %map-to-list-arity-1 (fun sequence)
-    (declare (type function fun))
-    (let ((really-fun (if (functionp fun) fun (%coerce-name-to-function fun)))
-	  (reversed-result nil))
+    (let ((reversed-result nil)
+	  (really-fun (%coerce-callable-to-function fun)))
       (dosequence (element sequence)
 	(push (funcall really-fun element)
 	      reversed-result))
       (nreverse reversed-result)))
   (defun %map-to-simple-vector-arity-1 (fun sequence)
-    (declare (type function fun))
-    (let ((really-fun (if (functionp fun) fun (%coerce-name-to-function fun)))
-	  (result (make-array (length sequence)))
-	  (index 0))
+    (let ((result (make-array (length sequence)))
+	  (index 0)
+	  (really-fun (%coerce-callable-to-function fun)))
       (declare (type index index))
       (dosequence (element sequence)
         (setf (aref result index)
 	      (funcall really-fun element))
 	(incf index))
-      result)))
+      result))
+  (defun %map-for-effect-arity-1 (fun sequence)
+    (let ((really-fun (%coerce-callable-to-function fun)))
+      (dosequence (element sequence)
+	(funcall really-fun element)))
+    nil))
 
-(eval-when (:compile-toplevel :execute)
+;;; helper functions to handle arity-N subcases of MAP
+;;;
+;;; KLUDGE: This is hairier, and larger, than need be, because we
+;;; don't have DYNAMIC-EXTENT. With DYNAMIC-EXTENT, we could define
+;;; %MAP-FOR-EFFECT, and then implement the
+;;; other %MAP-TO-FOO functions reasonably efficiently by passing closures to
+;;; %MAP-FOR-EFFECT. (DYNAMIC-EXTENT would help a little by avoiding
+;;; consing each closure, and would help a lot by allowing us to define
+;;; a closure (LAMBDA (&REST REST) <do something with (APPLY FUN REST)>)
+;;; with the REST list allocated with DYNAMIC-EXTENT. -- WHN 20000920
+(macrolet (;; Execute BODY in a context where the machinery for
+	   ;; UPDATED-MAP-APPLY-ARGS has been set up.
+	   (with-map-state (sequences &body body)
+             `(let* ((%sequences ,sequences)
+		     (%iters (mapcar (lambda (sequence)
+				       (etypecase sequence
+					 (list sequence)
+					 (vector 0)))
+				     %sequences))
+		     (%apply-args (make-list (length %sequences))))
+		(declare (type list %sequences %iters %apply-args))
+		,@body))
+	   ;; Return a list of args to pass to APPLY for the next
+	   ;; function call in the mapping, or NIL if no more function
+	   ;; calls should be made (because we've reached the end of a
+	   ;; sequence arg).
+	   (updated-map-apply-args ()
+	     '(do ((in-sequences  %sequences  (cdr in-sequences))
+		   (in-iters      %iters      (cdr in-iters))
+		   (in-apply-args %apply-args (cdr in-apply-args)))
+		  ((null in-sequences)
+		   %apply-args)
+		(declare (type list in-sequences in-iters in-apply-args))
+		(let ((i (car in-iters)))
+		  (declare (type (or list index) i))
+		  (if (listp i)
+		      (if (null i)	; if end of this sequence
+			  (return nil)
+			  (setf (car in-apply-args) (car i)
+				(car in-iters) (cdr i)))
+		      (let ((v (the vector (car in-sequences))))
+			(if (>= i (length v)) ; if end of this sequence
+			    (return nil)
+			    (setf (car in-apply-args) (aref v i)
+				  (car in-iters) (1+ i)))))))))
+  (defun %map-to-list (func sequences)
+    (declare (type function func))
+    (declare (type list sequences))
+    (with-map-state sequences
+      (loop with updated-map-apply-args 
+	    while (setf updated-map-apply-args (updated-map-apply-args))
+	    collect (apply func updated-map-apply-args))))
+  (defun %map-to-vector (output-type-spec func sequences)
+    (declare (type function func))
+    (declare (type list sequences))
+    (let ((min-len (with-map-state sequences
+		     (do ((counter 0 (1+ counter)))
+			 ;; Note: Doing everything in
+			 ;; UPDATED-MAP-APPLY-ARGS here is somewhat
+			 ;; wasteful; we even do some extra consing.
+			 ;; And stepping over every element of
+			 ;; VECTORs, instead of just grabbing their
+			 ;; LENGTH, is also wasteful. But it's easy
+			 ;; and safe. (If you do rewrite it, please
+			 ;; try to make sure that
+			 ;;   (MAP NIL #'F SOME-CIRCULAR-LIST #(1))
+			 ;; does the right thing.)
+			 ((not (updated-map-apply-args))
+			  counter)
+		       (declare (type index counter))))))
+      (declare (type index min-len))
+      (with-map-state sequences
+	(let ((result (make-sequence-of-type output-type-spec min-len))
+	      (index 0))
+	  (declare (type index index))
+	  (loop with updated-map-apply-args
+		while (setf updated-map-apply-args (updated-map-apply-args))
+		do
+		(setf (aref result index)
+		      (apply func updated-map-apply-args))
+		(incf index))
+	  result))))
+  (defun %map-for-effect (func sequences)
+    (declare (type function func))
+    (declare (type list sequences))
+    (with-map-state sequences
+      (loop with updated-map-apply-args
+	    while (setf updated-map-apply-args (updated-map-apply-args))
+	    do
+	    (apply func updated-map-apply-args))
+      nil)))
 
-(sb!xc:defmacro map-to-list (function sequences)
-  `(do ((seqs more-sequences (cdr seqs))
-	(min-length (length first-sequence)))
-       ((null seqs)
-	(let ((result (list nil)))
-	  (do ((index 0 (1+ index))
-	       (splice result))
-	      ((= index min-length) (cdr result))
-	    (declare (fixnum index))
-	    (setq splice
-		  (cdr (rplacd splice
-			       (list (apply ,function (elt-slice ,sequences
-								 index)))))))))
-     (declare (fixnum min-length))
-     (let ((length (length (car seqs))))
-       (declare (fixnum length))
-       (if (< length min-length)
-	   (setq min-length length)))))
+  "FUNCTION must take as many arguments as there are sequences provided.  
+  The result is a sequence of type OUTPUT-TYPE-SPEC such that element I 
+  is the result of applying FUNCTION to element I of each of the argument
+  sequences."
 
-(sb!xc:defmacro map-to-simple (output-type-spec function sequences)
-  `(do ((seqs more-sequences (cdr seqs))
-	(min-length (length first-sequence)))
-       ((null seqs)
-	(do ((index 0 (1+ index))
-	     (result (make-sequence-of-type ,output-type-spec min-length)))
-	    ((= index min-length) result)
-	  (declare (fixnum index))
-	  (setf (aref result index)
-		(apply ,function (elt-slice ,sequences index)))))
-     (declare (fixnum min-length))
-     (let ((length (length (car seqs))))
-       (declare (fixnum length))
-       (if (< length min-length)
-	   (setq min-length length)))))
+;;; %MAP is just MAP without the final just-to-be-sure check that
+;;; length of the output sequence matches any length specified
+;;; in RESULT-TYPE.
+(defun %map (result-type function first-sequence &rest more-sequences)
+  (let ((really-function (%coerce-callable-to-function function)))
+    ;; Handle one-argument MAP NIL specially, using ETYPECASE to turn
+    ;; it into something which can be DEFTRANSFORMed away. (It's
+    ;; fairly important to handle this case efficiently, since
+    ;; quantifiers like SOME are transformed into this case, and since
+    ;; there's no consing overhead to dwarf our inefficiency.)
+    (if (and (null more-sequences)
+	     (null result-type))
+	(%map-for-effect-arity-1 really-function first-sequence)
+	;; Otherwise, use the industrial-strength full-generality
+	;; approach, consing O(N-ARGS) temporary storage (which can have
+	;; DYNAMIC-EXTENT), then using O(N-ARGS * RESULT-LENGTH) time.
+	(let ((sequences (cons first-sequence more-sequences)))
+	  (case (type-specifier-atom result-type)
+	    ((nil) (%map-for-effect really-function sequences))
+	    (list (%map-to-list really-function sequences))
+	    ((simple-vector simple-string vector string array simple-array
+	      bit-vector simple-bit-vector base-string simple-base-string)
+	     (%map-to-vector result-type really-function sequences))
+	    (t
+	     (apply #'map
+		    (result-type-or-lose result-type t)
+		    really-function
+		    sequences)))))))
 
-(sb!xc:defmacro map-for-effect (function sequences)
-  `(do ((seqs more-sequences (cdr seqs))
-	(min-length (length first-sequence)))
-       ((null seqs)
-	(do ((index 0 (1+ index)))
-	    ((= index min-length) nil)
-	  (apply ,function (elt-slice ,sequences index))))
-     (declare (fixnum min-length))
-     (let ((length (length (car seqs))))
-       (declare (fixnum length))
-       (if (< length min-length)
-	   (setq min-length length)))))
+(defun map (result-type function first-sequence &rest more-sequences)
+  (sequence-of-checked-length-given-type (apply #'%map
+						result-type
+						function
+						first-sequence
+						more-sequences)
+					 ;; (The RESULT-TYPE isn't
+					 ;; strictly the type of the
+					 ;; result, because when
+					 ;; RESULT-TYPE=NIL, the result
+					 ;; actually has NULL type. But
+					 ;; that special case doesn't
+					 ;; matter here, since we only
+					 ;; look closely at vector
+					 ;; types; so we can just pass
+					 ;; RESULT-TYPE straight through
+					 ;; as a type specifier.)
+					 result-type))
 
-) ; EVAL-WHEN
-
-#!+high-security-support
-(defun get-minimum-length-sequences (sequences)
-  #!+sb-doc "Gets the minimum length of the sequences. This is
-needed to check whether the supplied type is appropriate."
-    (let ((min nil))
-      (dolist (i sequences)
-	(when (or (listp i) (vectorp i))
-	  (let ((l (length i)))
-	    (when (or (null min)
-		      (> min l)))
-	    (setf min l))))
-      min))
-
-(defun map (output-type-spec function first-sequence &rest more-sequences)
-  #!+sb-doc
-  "FUNCTION must take as many arguments as there are sequences provided. The
-   result is a sequence such that element i is the result of applying FUNCTION
-   to element i of each of the argument sequences."
-  (let ((really-function (if (functionp function)
-			     function
-			     (%coerce-name-to-function function))))
-    ;; Pick off the easy non-consing arity-1 special case and handle
-    ;; it without consing, since the user probably didn't expect us to
-    ;; cons here. (Notably, the super duper users who wrote PCL in
-    ;; terms of quantifiers without declaring the types of their
-    ;; sequence arguments didn't expect to end up consing when SBCL
-    ;; transforms the quantifiers into calls to MAP NIL.)
-    (when (and (null more-sequences)
-	       (null output-type-spec))
-      (macrolet ((frob () '(return-from map
-			     (map nil really-function first-sequence))))
-	(etypecase first-sequence
-	  (simple-vector (frob))
-	  (list (frob))
-	  (vector (frob)))))
-    ;; Otherwise, if the user didn't give us enough information to
-    ;; simplify at compile time, we cons and cons and cons..
-    (let ((sequences (cons first-sequence more-sequences)))
-      (case (type-specifier-atom output-type-spec)
-	((nil) (map-for-effect really-function sequences))
-	(list (map-to-list really-function sequences))
-	((simple-vector simple-string vector string array simple-array
-			bit-vector simple-bit-vector base-string simple-base-string)
-	 #!+high-security
-	 (let ((min-length-sequences (get-minimum-length-sequences
-				      sequences))
-	       (dimensions (array-type-dimensions (specifier-type
-						   output-type-spec))))
-	   (when (or (/= (length dimensions) 1)
-		     (and (not (eq (car dimensions) '*))
-			  (/= (car dimensions) min-length-sequences)))
-	     (error 'simple-type-error
-		    :datum output-type-spec
-		    :expected-type
-		    (ecase (type-specifier-atom output-type-spec)
-		      ((simple-vector bit-vector simple-bit-vector string simple-string base-string)
-		       `(,(type-specifier-atom output-type-spec) ,min-length-sequences))
-		      ((array vector simple-array)   `(,(type-specifier-atom output-type-spec) * ,min-length-sequences)))
-		    :format-control "Minimum length of sequences is ~S, this is not compatible with the type ~S."
-		    :format-arguments
-		    (list min-length-sequences output-type-spec))))
-	 (let ((result (map-to-simple output-type-spec
-				      really-function
-				      sequences)))
-	   #!+high-security
-	   (check-type-var result output-type-spec)
-	   result))
-	(t
-	 (apply #'map (result-type-or-lose output-type-spec t)
-		really-function sequences))))))
-
-#!+high-security-support
-(defun map-without-errorchecking
-    (output-type-spec function first-sequence &rest more-sequences)
-  #!+sb-doc
-  "FUNCTION must take as many arguments as there are sequences provided. The
-   result is a sequence such that element i is the result of applying FUNCTION
-   to element I of each of the argument sequences. This version has no
-   error-checking, to pass cold-load."
-  (let ((sequences (cons first-sequence more-sequences)))
-    (case (type-specifier-atom output-type-spec)
-      ((nil) (map-for-effect function sequences))
-      (list (map-to-list function sequences))
-      ((simple-vector simple-string vector string array simple-array
-	bit-vector simple-bit-vector base-string simple-base-string)
-       (map-to-simple output-type-spec function sequences))
-      (t
-       (apply #'map (result-type-or-lose output-type-spec t)
-	      function sequences)))))
-
+;;; KLUDGE: MAP has been rewritten substantially since the fork from
+;;; CMU CL in order to give reasonable performance, but this
+;;; implementation of MAP-INTO still has the same problems as the old
+;;; MAP code. Ideally, MAP-INTO should be rewritten to be efficient in
+;;; the same way that the corresponding cases of MAP have been
+;;; rewritten. Instead of doing it now, though, it's easier to wait
+;;; until we have DYNAMIC-EXTENT, at which time it should become
+;;; extremely easy to define a reasonably efficient MAP-INTO in terms
+;;; of (MAP NIL ..). -- WHN 20000920
 (defun map-into (result-sequence function &rest sequences)
   (let* ((fp-result
 	  (and (arrayp result-sequence)
@@ -796,11 +829,12 @@ needed to check whether the supplied type is appropriate."
     (when fp-result
       (setf (fill-pointer result-sequence) len))
 
-    (dotimes (index len)
-      (setf (elt result-sequence index)
-	    (apply function
-		   (mapcar #'(lambda (seq) (elt seq index))
-			   sequences)))))
+    (let ((really-fun (%coerce-callable-to-function function)))
+      (dotimes (index len)
+	(setf (elt result-sequence index)
+	      (apply really-fun
+		     (mapcar #'(lambda (seq) (elt seq index))
+			     sequences))))))
   result-sequence)
 
 ;;;; quantifiers
@@ -849,10 +883,7 @@ needed to check whether the supplied type is appropriate."
 		;; enough that we can use an inline function instead
 		;; of a compiler macro (as above). -- WHN 20000410
 		(define-compiler-macro ,name (pred first-seq &rest more-seqs)
-		  (let ((elements (mapcar (lambda (x)
-					    (declare (ignore x))
-					    (gensym "ARG"))
-					  (cons first-seq more-seqs)))
+		  (let ((elements (make-gensym-list (1+ (length more-seqs))))
 			(blockname (gensym "BLOCK")))
 		    (once-only ((pred pred))
 		      `(block ,blockname

@@ -230,7 +230,7 @@
   ;; State: :active or :inactive.
   (state :inactive :type (member :active :inactive))
   ;; The control stack; an index into *control-stacks*.
-  (control-stack-id nil :type (or sb!kernel:index null))
+  (control-stack-id nil :type (or sb!int:index null))
   ;; Binding stack.
   (binding-stack nil :type (or (simple-array t (*)) null))
   ;; Twice the number of bindings.
@@ -343,7 +343,7 @@
 	    (len (length eval-stack)))
 	(do ((i eval-stack-top (1+ i)))
 	    ((= i len))
-	  (declare (type sb!kernel:index i))
+	  (declare (type sb!int:index i))
 	  (setf (svref eval-stack i) nil))))))
 
 ;;; Generate the initial bindings for a newly created stack-group.
@@ -1069,7 +1069,7 @@
   (let ((destroyed-processes nil))
     (do ((cnt 0 (1+ cnt)))
 	((> cnt 10))
-      (declare (type sb!kernel:index cnt))
+      (declare (type sb!int:index cnt))
       (dolist (process *all-processes*)
 	(when (and (not (eq process *current-process*))
 		   (process-active-p process)
@@ -1376,7 +1376,7 @@
   "Wait until FD is usable for DIRECTION and return True. DIRECTION should be
   either :INPUT or :OUTPUT. TIMEOUT, if supplied, is the number of seconds to
   wait before giving up and returning NIL."
-  (declare (type sb!kernel:index fd)
+  (declare (type sb!int:index fd)
 	   (type (or real null) timeout)
 	   (optimize (speed 3)))
   (if (or (eq *current-process* *initial-process*)

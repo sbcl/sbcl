@@ -1204,7 +1204,7 @@ Function and macro commands:
 ;;; We also cache the last top-level form that we printed a source for so that
 ;;; we don't have to do repeated reads and calls to FORM-NUMBER-TRANSLATIONS.
 (defvar *cached-top-level-form-offset* nil)
-(declaim (type (or sb!kernel:index null) *cached-top-level-form-offset*))
+(declaim (type (or index null) *cached-top-level-form-offset*))
 (defvar *cached-top-level-form*)
 (defvar *cached-form-number-translations*)
 

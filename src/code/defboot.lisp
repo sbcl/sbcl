@@ -59,9 +59,7 @@
 	   `(multiple-value-bind (,g) ,value-form
 	      ,g)))
 	((list-of-symbols-p vars)
-	 (let ((temps (mapcar #'(lambda (x)
-				  (declare (ignore x))
-				  (gensym)) vars)))
+	 (let ((temps (make-gensym-list (length vars))))
 	   `(multiple-value-bind ,temps ,value-form
 	      ,@(mapcar #'(lambda (var temp)
 			    `(setq ,var ,temp))

@@ -245,9 +245,9 @@
 ;;; system area pointer to it.
 #!-sb-fluid (declaim (inline %make-alien))
 (defun %make-alien (bits)
-  (declare (type sb!kernel:index bits) (optimize-interface (safety 2)))
+  (declare (type index bits) (optimize-interface (safety 2)))
   (alien-funcall (extern-alien "malloc" (function system-area-pointer unsigned))
-		 (ash (the sb!kernel:index (+ bits 7)) -3)))
+		 (ash (the index (+ bits 7)) -3)))
 
 #!-sb-fluid (declaim (inline free-alien))
 (defun free-alien (alien)
@@ -562,7 +562,7 @@
 	 (unless stub
 	   (setf stub
 		 (let ((fun (gensym))
-		       (parms (loop repeat (length args) collect (gensym))))
+		       (parms (make-gensym-list (length args))))
 		   (compile nil
 			    `(lambda (,fun ,@parms)
 			       (declare (type (alien ,type) ,fun))
@@ -643,10 +643,9 @@
 			  :extern ,alien-name)
 	      ,@(alien-vars))
 	     ,(if (alien-values-type-p result-type)
-		  (let ((temps (loop
-				 repeat (length (alien-values-type-values
-						 result-type))
-				 collect (gensym))))
+		  (let ((temps (make-gensym-list
+				(length
+				 (alien-values-type-values result-type)))))
 		    `(multiple-value-bind ,temps
 			 (alien-funcall ,lisp-name ,@(alien-args))
 		       (values ,@temps ,@(results))))

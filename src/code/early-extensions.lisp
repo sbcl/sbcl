@@ -21,6 +21,20 @@
 (file-comment
   "$Header$")
 
+;;; a type used for indexing into arrays, and for related quantities
+;;; like lengths of lists
+;;;
+;;; It's intentionally limited to one less than the
+;;; ARRAY-DIMENSION-LIMIT for efficiency reasons, because in SBCL
+;;; ARRAY-DIMENSION-LIMIT is MOST-POSITIVE-FIXNUM, and staying below
+;;; that lets the system know it can increment a value of this type
+;;; without having to worry about using a bignum to represent the
+;;; result.
+;;;
+;;; (It should be safe to use ARRAY-DIMENSION-LIMIT as an exclusive
+;;; bound because ANSI specifies it as an exclusive bound.)
+(def!type index () `(integer 0 (,sb!xc:array-dimension-limit)))
+
 ;;; the default value used for initializing character data. The ANSI
 ;;; spec says this is arbitrary. CMU CL used #\NULL, which we avoid
 ;;; because it's not in the ANSI table of portable characters.
@@ -335,11 +349,17 @@
 	 (error "not legal as a function name: ~S" function-name))))
 
 ;;; Is X a (possibly-improper) list of at least N elements?
+(declaim (ftype (function (t index)) list-of-length-at-least-p))
 (defun list-of-length-at-least-p (x n)
-  (declare (type (and unsigned-byte fixnum) n))
   (or (zerop n) ; since anything can be considered an improper list of length 0
       (and (consp x)
 	   (list-of-length-at-least-p (cdr x) (1- n)))))
+
+;;; Return a list of N gensyms. (This is a common suboperation in
+;;; macros and other code-manipulating code.)
+(declaim (ftype (function (index) list) make-gensym-list))
+(defun make-gensym-list (n)
+  (loop repeat n collect (gensym)))
 
 #|
 ;;; REMOVEME when done testing byte cross-compiler

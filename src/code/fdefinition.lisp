@@ -120,25 +120,28 @@
 ;;;      back to the symbol which was used to indirect into the function,
 ;;;      so the undefined function handler can base its complaint on that.
 ;;;
-;;; Another problem with doing the simple thing: people will want to indirect
-;;; through something in order to get to SETF functions, in order to be able to
-;;; redefine them. What will they indirect through? This could be done with a
-;;; hack, making an anonymous symbol and linking it to the main symbol's
-;;; SB!KERNEL:SETF-FUNCTION property. The anonymous symbol could even point
-;;; back to the symbol it's the SETF function for, so that if the SETF function
-;;; was undefined at the time a call was made, the debugger could say which
-;;; function caused the problem. It'd probably be cleaner, though, to use a new
-;;; type of primitive object (SYMBOLOID?) instead. It could probably be like
-;;; symbol except that its name could be any object and its value points back
-;;; to the symbol which owns it. Then the setf functions for FOO could be on
-;;; the list (GET FOO 'SB!KERNEL:SYMBOLOIDS)
+;;; Another problem with doing the simple thing: people will want to
+;;; indirect through something in order to get to SETF functions, in
+;;; order to be able to redefine them. What will they indirect
+;;; through? This could be done with a hack, making an anonymous
+;;; symbol and linking it to the main symbol's SB!KERNEL:SETF-FUNCTION
+;;; property. The anonymous symbol could even point back to the symbol
+;;; it's the SETF function for, so that if the SETF function was
+;;; undefined at the time a call was made, the debugger could say
+;;; which function caused the problem. It'd probably be cleaner,
+;;; though, to use a new type of primitive object (SYMBOLOID?)
+;;; instead. It could probably be like symbol except that its name
+;;; could be any object and its value points back to the symbol which
+;;; owns it. Then the setf functions for FOO could be on the list (GET
+;;; FOO 'SB!KERNEL:SYMBOLOIDS)
 ;;;
-;;; FIXME: Oh, my. Now that I've started thinking about it, I appreciate more
-;;; fully how weird and twisted FDEFNs might be. Look at the calling sequence
-;;; for full calls. It goes and reads the address of a function object from its
-;;; own table of immediate values, then jumps into that. Consider how weird
-;;; that is. Not only is it not doing indirection through a symbol (which I'd
-;;; already realized) but it's not doing indirection through
+;;; FIXME: Oh, my. Now that I've started thinking about it, I
+;;; appreciate more fully how weird and twisted FDEFNs might be. Look
+;;; at the calling sequence for full calls. It goes and reads the
+;;; address of a function object from its own table of immediate
+;;; values, then jumps into that. Consider how weird that is. Not only
+;;; is it not doing indirection through a symbol (which I'd already
+;;; realized) but it's not doing indirection through
 
 ;;; The compiler emits calls to this when someone tries to funcall a symbol.
 (defun %coerce-name-to-function (name)
@@ -148,6 +151,11 @@
   (let ((fdefn (fdefinition-object name nil)))
     (or (and fdefn (fdefn-function fdefn))
 	(error 'undefined-function :name name))))
+
+(defun %coerce-callable-to-function (callable)
+  (if (functionp callable)
+      callable
+      (%coerce-name-to-function callable)))
 
 ;;; This is just another name for %COERCE-NAME-TO-FUNCTION.
 #!-sb-fluid (declaim (inline raw-definition))

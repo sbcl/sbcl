@@ -218,19 +218,21 @@
 	 tree)
 	(t tree)))
 
-;;; Sharp-equal works as follows. When a label is assigned (ie when #= is
-;;; called) we GENSYM a symbol is which is used as an unforgeable tag.
-;;; *SHARP-SHARP-ALIST* maps the integer tag to this gensym.
+;;; Sharp-equal works as follows. When a label is assigned (i.e. when
+;;; #= is called) we GENSYM a symbol is which is used as an
+;;; unforgeable tag. *SHARP-SHARP-ALIST* maps the integer tag to this
+;;; gensym.
 ;;;
-;;; When SHARP-SHARP encounters a reference to a label, it returns the symbol
-;;; assoc'd with the label. Resolution of the reference is deferred until the
-;;; read done by #= finishes. Any already resolved tags (in
-;;; *SHARP-EQUAL-ALIST*) are simply returned.
+;;; When SHARP-SHARP encounters a reference to a label, it returns the
+;;; symbol assoc'd with the label. Resolution of the reference is
+;;; deferred until the read done by #= finishes. Any already resolved
+;;; tags (in *SHARP-EQUAL-ALIST*) are simply returned.
 ;;;
 ;;; After reading of the #= form is completed, we add an entry to
-;;; *SHARP-EQUAL-ALIST* that maps the gensym tag to the resolved object. Then
-;;; for each entry in the *SHARP-SHARP-ALIST, the current object is searched
-;;; and any uses of the gensysm token are replaced with the actual value.
+;;; *SHARP-EQUAL-ALIST* that maps the gensym tag to the resolved
+;;; object. Then for each entry in the *SHARP-SHARP-ALIST, the current
+;;; object is searched and any uses of the gensysm token are replaced
+;;; with the actual value.
 (defvar *sharp-sharp-alist* ())
 
 (defun sharp-equal (stream ignore label)

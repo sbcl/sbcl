@@ -293,13 +293,12 @@
 
 ;;; list copying functions
 
-;;; The list is copied correctly even if the list is not terminated by ()
-;;; The new list is built by cdr'ing splice which is always at the tail
-;;; of the new list
-
 (defun copy-list (list)
   #!+sb-doc
-  "Returns a new list EQUAL but not EQ to list"
+  "Returns a new list which is EQUAL to LIST."
+  ;; The list is copied correctly even if the list is not terminated
+  ;; by NIL. The new list is built by CDR'ing SPLICE which is always
+  ;; at the tail of the new list.
   (if (atom list)
       list
       (let ((result (list (car list))))
@@ -313,7 +312,7 @@
 
 (defun copy-alist (alist)
   #!+sb-doc
-  "Returns a new association list equal to alist, constructed in space"
+  "Returns a new association list which is EQUAL to ALIST."
   (if (atom alist)
       alist
       (let ((result
@@ -351,16 +350,17 @@
        (result y (cons (car top) result)))
       ((endp top) result)))
 
-;;; NCONC finds the first non-null list, so it can make splice point to a cons.
-;;; After finding the first cons element, it holds it in a result variable
-;;; while running down successive elements tacking them together. While
-;;; tacking lists together, if we encounter a null list, we set the previous
-;;; list's last cdr to nil just in case it wasn't already nil, and it could
-;;; have been dotted while the null list was the last argument to NCONC. The
-;;; manipulation of splice (that is starting it out on a first cons, setting
-;;; LAST of splice, and setting splice to ele) inherently handles (nconc x x),
-;;; and it avoids running down the last argument to NCONC which allows the last
-;;; argument to be circular.
+;;; NCONC finds the first non-null list, so it can make splice point
+;;; to a cons. After finding the first cons element, it holds it in a
+;;; result variable while running down successive elements tacking
+;;; them together. While tacking lists together, if we encounter a
+;;; null list, we set the previous list's last cdr to nil just in case
+;;; it wasn't already nil, and it could have been dotted while the
+;;; null list was the last argument to NCONC. The manipulation of
+;;; splice (that is starting it out on a first cons, setting LAST of
+;;; splice, and setting splice to ele) inherently handles (nconc x x),
+;;; and it avoids running down the last argument to NCONC which allows
+;;; the last argument to be circular.
 (defun nconc (&rest lists)
   #!+sb-doc
   "Concatenates the lists given as arguments (by changing them)"
@@ -399,40 +399,35 @@
       ((atom 2nd) 3rd)
     (rplacd 2nd 3rd)))
 
-(defun butlast (list &optional (n 1))
-  #!+sb-doc
-  "Return a new list the same as LIST without the last N conses.
-   List must not be circular."
-  (declare (list list) (type index n))
-  (let ((length (do ((list list (cdr list))
-		     (i 0 (1+ i)))
-		    ((atom list) (1- i)))))
-    (declare (type index length))
-    (unless (< length n)
-      (do* ((top (cdr list) (cdr top))
-	    (result (list (car list)))
-	    (splice result)
-	    (count length (1- count)))
-	   ((= count n) result)
-	(declare (type index count))
-	(setq splice (cdr (rplacd splice (list (car top)))))))))
-
-(defun nbutlast (list &optional (n 1))
-  #!+sb-doc
-  "Modifies List to remove the last N conses. List must not be circular."
-  (declare (list list) (type index n))
-  (let ((length (do ((list list (cdr list))
-		     (i 0 (1+ i)))
-		    ((atom list) (1- i)))))
-    (declare (type index length))
-    (unless (< length n)
-      (do ((1st (cdr list) (cdr 1st))
-	   (2nd list 1st)
-	   (count length (1- count)))
-	  ((= count n)
-	   (rplacd 2nd ())
-	   list)
-	(declare (type index count))))))
+(flet (;; Return the number of conses at the head of the
+       ;; possibly-improper list LIST. (Or if LIST is circular, you
+       ;; lose.)
+       (count-conses (list)
+	 (do ((in-list list (cdr in-list))
+	      (result 0 (1+ result)))
+	     ((atom in-list)
+	      result)
+	   (declare (type index result)))))
+  (declare (ftype (function (t) index) count-conses))
+  (defun butlast (list &optional (n 1))
+    (let* ((n-conses-in-list (count-conses list))
+	   (n-remaining-to-copy (- n-conses-in-list n)))
+      (declare (type fixnum n-remaining-to-copy))
+      (when (plusp n-remaining-to-copy)
+	(do* ((result (list (first list)))
+	      (rest (rest list) (rest rest))
+	      (splice result))
+	    ((zerop (decf n-remaining-to-copy))
+	     result)
+	  (setf splice
+		(setf (cdr splice)
+		      (list (first rest))))))))
+  (defun nbutlast (list &optional (n 1))
+    (let ((n-conses-in-list (count-conses list)))
+      (unless (< n-conses-in-list n)
+	(setf (cdr (nthcdr (- n-conses-in-list n 1) list))
+	      nil)
+	list))))
 
 (defun ldiff (list object)
   "Returns a new list, whose elements are those of List that appear before
@@ -449,7 +444,7 @@
 	(return (cdr result))
 	(setq splice (cdr (rplacd splice (list (car list))))))))
 
-;;; Functions to alter list structure
+;;;; functions to alter list structure
 
 (defun rplaca (x y)
   #!+sb-doc
@@ -529,7 +524,7 @@
 	     (declare (optimize-interface (speed 3) (safety 0)))
 	     value))))
 
-;;;; macros for (&key (key #'identity) (test #'eql testp) (test-not nil notp)).
+;;;; macros for (&KEY (KEY #'IDENTITY) (TEST #'EQL TESTP) (TEST-NOT NIL NOTP))
 
 ;;; Use these with the following keyword args:
 (defmacro with-set-keys (funcall)
