@@ -944,7 +944,9 @@
 ;;; declarations that constrain the type of lexically apparent
 ;;; functions.
 (defun process-ftype-decl (spec res names fvars)
-  (declare (list spec names fvars) (type lexenv res))
+  (declare (type type-specifier spec)
+           (type list names fvars)
+           (type lexenv res))
   (let ((type (compiler-specifier-type spec)))
     (collect ((res nil cons))
       (dolist (name names)

@@ -221,3 +221,6 @@
                                 s))))
   (assert (null result))
   (assert (typep error 'program-error)))
+
+;;; FTYPE should accept any functional type specifier
+(compile nil '(lambda (x) (declare (ftype function f)) (f x)))
