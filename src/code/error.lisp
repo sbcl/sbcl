@@ -55,3 +55,10 @@
 (define-condition parse-unknown-type (condition)
   ((specifier :reader parse-unknown-type-specifier :initarg :specifier)))
 
+(define-condition control-stack-exhausted (storage-condition)
+  ()
+  (:report
+    (lambda (condition stream)
+      (format stream
+             "Control stack exhausted (no more space for function call frames).  This is probably due to heavily nested or infinitely recursive function calls, or a tail call that SBCL cannot or has not optimized away."))))
+

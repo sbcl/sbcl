@@ -1199,6 +1199,13 @@ changes in sbcl-0.7.7 relative to sbcl-0.7.6:
   * More fixes have been made to treatment of floating point exception
     treatment and other Unix signals.  In particular, floating point
     exceptions no longer cause Bus errors on the SPARC/Linux platform.
+  * The detection and handling of control stack exhaustion (infinite
+    or very deeply nested recursion) has changed.  Stack exhaustion
+    detection is now done by write-protecting pages at the OS level
+    and applies at all optimization settings; when found, a
+    SB-KERNEL:CONTROL-STACK_EXHAUSTED condition (subclass of
+    STORAGE-CONDITION) is signalled, so stack exhaustion can no longer
+    be caught using IGNORE-ERRORS
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

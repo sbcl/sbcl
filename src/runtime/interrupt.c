@@ -539,9 +539,11 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 	build_fake_control_stack_frames(context);
 	/* signal handler will "return" to this error-causing function */
 	*os_context_pc_addr(context) = function;
-#ifndef LISP_FEATURE_X86
+#ifdef LISP_FEATURE_X86
 	/* this much of the calling convention is common to all
 	   non-x86 ports */
+	*os_context_register_addr(context,reg_ECX) = 0; 
+#else
 	*os_context_register_addr(context,reg_NARGS) = 0; 
 	*os_context_register_addr(context,reg_LIP) = function;
 	*os_context_register_addr(context,reg_CFP) = 

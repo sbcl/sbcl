@@ -14,13 +14,19 @@
 (cl:in-package :cl-user)
 
 ;;; Prior to sbcl-0.7.1.38, doing something like (RECURSE), even in
-;;; safe code, would crash the entire Lisp process. Now it should
-;;; signal an error in a context where the soft stack limit has been
-;;; relaxed enough that the error can be handled.
+;;; safe code, would crash the entire Lisp process. Then the soft
+;;; stack checking was introduced, which checked (in safe code) for
+;;; stack exhaustion at each lambda.
+
+;;; Post 0.7.6.1, this was rewritten to use mprotect()-based stack
+;;; protection which does not require lisp code to check anything,
+;;; and works at all optimization settings.  However, it now signals a
+;;; STORAGE-CONDITION instead of an ERROR, so this test needs revising
 (locally
-  (declare (optimize safety))
   (defun recurse () (recurse) (recurse))
-  (ignore-errors (recurse)))
+  (handler-case
+    (recurse)
+    (storage-condition (c) (declare (ignore c)) (quit :unix-status 104))))
 
-;;; success
-(quit :unix-status 104)
+;;; oops
+(quit :unix-status 1)
