@@ -491,3 +491,18 @@
 			(setf (aref x 4) 'b)
 			x))))
 		  #(a a a a b a a a a a))))
+
+;;; this is not a check for a bug, but rather a test of compiler
+;;; quality
+(dolist (type '((integer 0 *)           ; upper bound
+                (real (-1) *)
+                float                   ; class
+                (real * (-10))          ; lower bound
+                ))
+  (assert (nth-value
+           1 (compile nil
+                      `(lambda (n)
+                         (declare (optimize (speed 3) (compilation-speed 0)))
+                         (loop for i from 1 to (the (integer -17 10) n) by 2
+                               collect (when (> (random 10) 5)
+                                         (the ,type (- i 11)))))))))

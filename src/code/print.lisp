@@ -1402,7 +1402,9 @@
       (declare (ignore sig))
       (if (= x 0.0e0)
 	  (values (float 0.0e0 original-x) 1)
-	  (let* ((ex (round (* exponent (log 2e0 10))))
+	  (let* ((ex (locally (declare (optimize (safety 0)))
+                       (the fixnum
+                         (round (* exponent (log 2e0 10))))))
 		 (x (if (minusp ex)
 			(if (float-denormalized-p x)
 			    #!-long-float
@@ -1419,7 +1421,9 @@
 		      (z y (* y m))
 		      (ex ex (1- ex)))
 		     ((>= z 0.1e0)
-		      (values (float z original-x) ex))))))))))
+		      (values (float z original-x) ex))
+                   (declare (long-float m) (integer ex))))
+              (declare (long-float d))))))))
 (eval-when (:compile-toplevel :execute)
   (setf *read-default-float-format* 'single-float))
 

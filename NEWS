@@ -2001,6 +2001,9 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
     new array subtypes UNSIGNED-BYTE 7, 15, 29, and 31 mandated by 
     obscure ANSI requirements
 
+changes in sbcl-0.8.4 relative to sbcl-0.8.3:
+  * fixed compiler performance when processing loops with a step >1;
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and

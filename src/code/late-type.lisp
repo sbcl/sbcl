@@ -1503,11 +1503,15 @@
 
 (!define-type-class number)
 
+(declaim (inline numeric-type-equal))
+(defun numeric-type-equal (type1 type2)
+  (and (eq (numeric-type-class type1) (numeric-type-class type2))
+       (eq (numeric-type-format type1) (numeric-type-format type2))
+       (eq (numeric-type-complexp type1) (numeric-type-complexp type2))))
+
 (!define-type-method (number :simple-=) (type1 type2)
   (values
-   (and (eq (numeric-type-class type1) (numeric-type-class type2))
-	(eq (numeric-type-format type1) (numeric-type-format type2))
-	(eq (numeric-type-complexp type1) (numeric-type-complexp type2))
+   (and (numeric-type-equal type1 type2)
 	(equalp (numeric-type-low type1) (numeric-type-low type2))
 	(equalp (numeric-type-high type1) (numeric-type-high type2)))
    t))

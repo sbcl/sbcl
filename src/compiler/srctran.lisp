@@ -3677,5 +3677,5 @@
       (format t "/(CONTINUATION-VALUE X)=~S~%" (continuation-value x)))
     (format t "/MESSAGE=~S~%" (continuation-value message))
     (give-up-ir1-transform "not a real transform"))
-  (defun /report-continuation (&rest rest)
-    (declare (ignore rest))))
+  (defun /report-continuation (x message)
+    (declare (ignore x message))))

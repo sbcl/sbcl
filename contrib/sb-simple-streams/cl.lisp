@@ -350,7 +350,7 @@
       ;; single-channel-simple-stream
       (with-stream-class (single-channel-simple-stream stream)
 	(let ((ptr (sm buffpos stream)))
-	  (when (>= ptr (sm buffer-ptr stream))
+	  (when (>= ptr (sm buf-len stream))
 	    (setf ptr (sc-flush-buffer stream t)))
           (add-stream-instance-flags stream :dirty)
 	  (setf (sm buffpos stream) (1+ ptr))
@@ -397,7 +397,31 @@
       ((or (simple-array (unsigned-byte 8) (*))
 	   (simple-array (signed-byte 8) (*)))
        ;; "write-vector" equivalent
-       (error "implement me")
+       (simple-stream-dispatch stream
+         ;; single-channel-simple-stream
+         (with-stream-class (single-channel-simple-stream stream)
+           (loop with max-ptr = (sm buf-len stream)
+                 with real-end = (or end (length seq))
+                 for src-pos = start then (+ src-pos count)
+                 for src-rest = (- real-end src-pos)
+                 while (> src-rest 0) ; FIXME: this is non-ANSI
+                 for ptr = (let ((ptr (sm buffpos stream)))
+                             (if (>= ptr max-ptr)
+                                 (sc-flush-buffer stream t)
+                                 ptr))
+                 for buf-rest = (- max-ptr ptr)
+                 for count = (min buf-rest src-rest)
+                 do (progn (add-stream-instance-flags stream :dirty)
+                           (setf (sm buffpos stream) (+ ptr count))
+                           (buffer-copy seq src-pos (sm buffer stream) ptr count))))
+         ;; dual-channel-simple-stream
+         (error "Implement me")
+         ;; string-simple-stream
+         (error 'simple-type-error
+                :datum stream
+                :expected-type 'stream
+                :format-control "Can't write-byte on string streams."
+                :format-arguments '()))
        ))))
 
 

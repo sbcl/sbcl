@@ -16,13 +16,21 @@
 
 (eval-when (:load-toplevel) (ensure-directories-exist *test-path*))
 
+;;; Non-destructive functional analog of REMF
+(defun remove-key (key list)
+  (loop for (current-key val . rest) on list by #'cddr
+        until (eql current-key key)
+        collect current-key into result
+        collect val into result
+        finally (return (nconc result rest))))
+
 (defmacro with-test-file ((stream file &rest open-arguments
                                   &key (delete-afterwards t)
                                   initial-content
                                   &allow-other-keys)
                           &body body)
-  (remf open-arguments :delete-afterwards)
-  (remf open-arguments :initial-content)
+  (setq open-arguments (remove-key :delete-afterwards open-arguments))
+  (setq open-arguments (remove-key :initial-content open-arguments))
   (if initial-content
       (let ((create-file-stream (gensym)))
         `(progn
@@ -125,6 +133,48 @@
       (string= content (read-line s))))
   t)
 
+(deftest write-read-large-sc-2
+  (let* ((file (merge-pathnames #p"test-data.txt" *test-path*))
+         (stream (make-instance 'file-simple-stream
+                                :filename file :direction :output
+                                :if-exists :overwrite
+                                :if-does-not-exist :create))
+         (length (1+ (* 3 (device-buffer-length stream))))
+         (content (make-string length)))
+    (dotimes (i (length content))
+      (setf (aref content i) (code-char (random 256))))
+    (with-open-stream (s stream)
+      (write-string content s))
+    (with-test-file (s file :class 'file-simple-stream
+                       :direction :input :if-does-not-exist :error)
+      (let ((seq (make-string length)))
+        #+nil (read-sequence seq s)
+        #-nil (dotimes (i length)
+                (setf (char seq i) (read-char s)))
+        (string= content seq))))
+  t)
+
+(deftest write-read-large-sc-3
+  (let* ((file (merge-pathnames #p"test-data.txt" *test-path*))
+         (stream (make-instance 'file-simple-stream
+                                :filename file :direction :output
+                                :if-exists :overwrite
+                                :if-does-not-exist :create))
+         (length (1+ (* 3 (device-buffer-length stream))))
+         (content (make-array length :element-type '(unsigned-byte 8))))
+    (dotimes (i (length content))
+      (setf (aref content i) (random 256)))
+    (with-open-stream (s stream)
+      (write-sequence content s))
+    (with-test-file (s file :class 'file-simple-stream
+                       :direction :input :if-does-not-exist :error)
+      (let ((seq (make-array length :element-type '(unsigned-byte 8))))
+        #+nil (read-sequence seq s)
+        #-nil (dotimes (i length)
+                (setf (aref seq i) (read-byte s)))
+        (equalp content seq))))
+  t)
+
 (deftest write-read-large-dc-1
   ;; Do write and read with more data than the buffer will hold
   ;; (dual-channel simple-stream; we only have socket streams atm)
@@ -152,7 +202,6 @@
 ;;; file-position-2 fails ONLY when called with
 ;;; (asdf:oos 'asdf:test-op :sb-simple-streams)
 ;;; TODO: Find out why
-#+nil
 (deftest file-position-2
   ;; Test reading of file-position
   (let* ((file (merge-pathnames #p"test-data.txt" *test-path*)))
@@ -254,7 +303,3 @@
         (read-line s)))
   "XooX"
   T)
-
-
-
-

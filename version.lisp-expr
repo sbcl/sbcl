@@ -16,4 +16,4 @@
 ;;; with something arbitrary in the fourth field, is used for CVS
 ;;; checkins which aren't released. (And occasionally for internal
 ;;; versions, especially for internal versions off the main CVS
-"0.8.3.1"
+"0.8.3.2"

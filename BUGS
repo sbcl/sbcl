@@ -1106,6 +1106,16 @@ WORKAROUND:
   IGNORE/IGNORABLE declarations should be acceptable for symbol
   macros.
 
+278:
+  a.
+    (defun foo ()
+      (declare (optimize speed))
+      (loop for i of-type (integer 0) from 0 by 2 below 10
+            collect i))
+
+  uses generic arithmetic.
+
+  b. For the example above, the compiler does not issue a note.
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

@@ -63,12 +63,10 @@
   ;; algorithms, but we're not pushing them hard enough here for them
   ;; to be cryptographically strong.)
   (let* ((xy (+ (* x 3) y)))
-    (declare (type (unsigned-byte 32) xy))
-    (the (and fixnum unsigned-byte)
-	 (logand most-positive-fixnum
-		 (logxor 441516657
-			 xy
-			 (the fixnum (ash xy -5)))))))
+    (logand most-positive-fixnum
+            (logxor 441516657
+                    xy
+                    (ash xy -5)))))
 
 ;;;; hashing strings
 ;;;;
