@@ -395,7 +395,7 @@
 
     res))
 
-;;; default PRINT-OBJECT and MAKE-LOAD-FORM methods
+;;; default PRINT-OBJECT method
 
 (defun %default-structure-pretty-print (structure stream)
   (let* ((layout (%instance-layout structure))
@@ -468,12 +468,6 @@
 	 (%default-structure-ugly-print structure stream))))
 (def!method print-object ((x structure-object) stream)
   (default-structure-print x stream *current-level-in-print*))
-
-(defun make-load-form-saving-slots (object &key slot-names environment)
-  (declare (ignore object environment))
-  (if slot-names
-      (error "stub: MAKE-LOAD-FORM-SAVING-SLOTS :SLOT-NAMES not implemented") ; KLUDGE
-      :sb-just-dump-it-normally))
 
 ;;;; testing structure types
 

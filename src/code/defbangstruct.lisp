@@ -75,9 +75,19 @@
 ;;; objects
 (defun just-dump-it-normally (object &optional (env nil env-p))
   (declare (type structure!object object))
+  (declare (ignorable env env-p))
+  ;; KLUDGE: we require essentially three different behaviours of
+  ;; JUST-DUMP-IT-NORMALLY, two of which (host compiler's
+  ;; MAKE-LOAD-FORM, cross-compiler's MAKE-LOAD-FORM) are handled by
+  ;; the #+SB-XC-HOST clause.  The #-SB-XC-HOST clause is the
+  ;; behaviour required by the target, before the CLOS-based
+  ;; MAKE-LOAD-FORM-SAVING-SLOTS is implemented.
+  #+sb-xc-host
   (if env-p
       (sb!xc:make-load-form-saving-slots object :environment env)
-      (sb!xc:make-load-form-saving-slots object)))
+      (sb!xc:make-load-form-saving-slots object))
+  #-sb-xc-host
+  :sb-just-dump-it-normally)
 
 ;;; a MAKE-LOAD-FORM function for objects which don't use the load
 ;;; form system. This is used for LAYOUT objects because the special

@@ -337,6 +337,7 @@
 		     (find-class 'simple-condition))
 		    (mapcar #'find-class '(simple-condition
 					   condition
+					   sb-pcl::slot-object
 					   sb-kernel:instance
 					   t))))
 

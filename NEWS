@@ -1751,6 +1751,10 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
        STRUCTURE-CLASS).
     ** SLOT-EXISTS-P now works on conditions, as well as structures
        and CLOS instances.
+    ** MAKE-LOAD-FORM now has the required methods on
+       STRUCTURE-OBJECT, CONDITION and STANDARD-OBJECT.
+    ** MAKE-LOAD-FORM-SAVING-SLOTS no longer returns a special
+       keyword, and now implements the SLOT-NAMES argument.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

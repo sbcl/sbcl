@@ -132,3 +132,33 @@
 	     (layout-classoid object)))
     `(classoid-layout (find-classoid ',pname))))
 
+(defmethod make-load-form ((object structure-object) &optional env)
+  (declare (ignore env))
+  (error "~@<don't know how to dump ~S (default ~S method called).~@>"
+	 object 'make-load-form))
+
+(defmethod make-load-form ((object standard-object) &optional env)
+  (declare (ignore env))
+  (error "~@<don't know how to dump ~S (default ~S method called).~@>"
+	 object 'make-load-form))
+
+(defmethod make-load-form ((object condition) &optional env)
+  (declare (ignore env))
+  (error "~@<don't know how to dump ~S (default ~S method called).~@>"
+	 object 'make-load-form))
+
+(defun make-load-form-saving-slots (object &key slot-names environment)
+  (declare (ignore environment))
+  (let ((class (class-of object)))
+    (collect ((inits))
+      (dolist (slot (class-slots class))
+        (let ((slot-name (slot-definition-name slot)))
+          (when (or (memq slot-name slot-names)
+                    (and (null slot-names)
+                         (eq :instance (slot-definition-allocation slot))))
+            (if (slot-boundp-using-class class object slot)
+                (let ((value (slot-value-using-class class object slot)))
+                  (inits `(setf (slot-value ,object ',slot-name) ',value)))
+                (inits `(slot-makunbound ,object ',slot-name))))))
+      (values `(allocate-instance (find-class ',(class-name class)))
+              `(progn ,@(inits))))))
