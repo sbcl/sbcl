@@ -248,10 +248,12 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 
 void sigcont_handler(int signal, siginfo_t *info, void *void_context)
 {
-    /* we need to have a handler installed for this signal so that
-     * sigwaitinfo() for it actually returns at the appropriate time
-     */
-    fprintf(stderr, "Thread %d received stray SIGCONT\n", getpid());
+    /* We need to have a handler installed for this signal so that
+     * sigwaitinfo() for it actually returns at the appropriate time.
+     * We don't need it to actually do anything.  This mkes it
+     * possibly the only signal handler in SBCL that doesn't depend on
+     * not-guaranteed-by-POSIX features 
+     */    
 }
 
 void
