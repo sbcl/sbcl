@@ -294,13 +294,13 @@
   (:translate logcount)
   (:note "inline (unsigned-byte 64) logcount")
   (:policy :fast-safe)
-  (:args (arg :scs (unsigned-reg) :target num))
+  (:args (arg :scs (unsigned-reg)))
   (:arg-types unsigned-num)
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:guard (member :cix *backend-subfeatures*))
   (:generator 1
-    (inst ctpop zero arg res)))
+    (inst ctpop zero-tn arg res)))
 
 (define-vop (unsigned-byte-64-count)
   (:translate logcount)

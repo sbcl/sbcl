@@ -257,9 +257,7 @@ start_of_tramps:
  */
         .text
 	.globl	start_of_tramps
-	.globl	closure_tramp
 	.globl	undefined_tramp
-	.globl	closure_tramp_offset
 	.globl	undefined_tramp_offset
         .ent    undefined_tramp_offset
 undefined_tramp_offset:
@@ -284,9 +282,10 @@ undefined_tramp= call_into_lisp_LRA_page+0x140
 /* The closure trampoline. */
         .text
         .globl  closure_tramp
+        .globl  closure_tramp_offset
         .ent    closure_tramp_offset
-closure_tramp= call_into_lisp_LRA_page+0x150
 closure_tramp_offset:
+closure_tramp= call_into_lisp_LRA_page+0x150
         ldl     reg_LEXENV, FDEFN_FUN_OFFSET(reg_FDEFN)
         ldl     reg_L0, CLOSURE_FUN_OFFSET(reg_LEXENV)
         addl    reg_L0, SIMPLE_FUN_CODE_OFFSET, reg_LIP

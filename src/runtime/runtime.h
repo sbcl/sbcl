@@ -103,11 +103,6 @@ native_pointer(lispobj obj)
 /* Too bad ANSI C doesn't define "bool" as C++ does.. */
 typedef int boolean;
 
-/* FIXME: There seems to be no reason that SymbolFunction can't be
- * defined as (possibly inline) functions instead of macros. */
-
-static inline lispobj SymbolValue(u32 sym, void *thread);
-static inline void SetSymbolValue(u32 sym, lispobj val, void *thread);
 /* This only works for static symbols. */
 /* FIXME: should be called StaticSymbolFunction, right? */
 #define SymbolFunction(sym) \
