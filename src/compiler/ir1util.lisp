@@ -80,7 +80,7 @@
 ;;; Just delete NODE from its LVAR uses; LVAR is preserved so it may
 ;;; be given a new use.
 (defun %delete-lvar-use (node)
-  (let* ((lvar (node-lvar node)))
+  (let ((lvar (node-lvar node)))
     (when lvar
       (if (listp (lvar-uses lvar))
           (let ((new-uses (delq node (lvar-uses lvar))))
@@ -169,12 +169,11 @@
   (declare (type lvar old)
            (type (or lvar null) new))
 
-  (do-uses (node old)
-    (%delete-lvar-use node)
-    (when new
-      (add-lvar-use node new)))
-
-  (when new (reoptimize-lvar new))
+  (cond (new (do-uses (node old)
+               (%delete-lvar-use node)
+               (add-lvar-use node new))
+             (reoptimize-lvar new))
+        (t (flush-dest old)))
   (values))
 
 ;;;; block starting/creation
