@@ -78,7 +78,7 @@ do not survive intact on all platforms: in this case a WARNING is
 signalled when saving the core. If no warning is signalled, then the
 foreign symbol references will remain intact. Platforms where this is
 currently the case are x86/FreeBSD, x86/Linux, x86/NetBSD,
-sparc/Linux, and sparc/SunOS.
+sparc/Linux, sparc/SunOS, and ppc/Darwin.
 
 This implementation is not as polished and painless as you might like:
   * It corrupts the current Lisp image enough that the current process

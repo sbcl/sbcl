@@ -266,3 +266,95 @@ ppc_flush_icache(os_vm_address_t address, os_vm_size_t length)
     address += 32;
   }
 }
+
+#ifdef LISP_FEATURE_LINKAGE_TABLE
+
+/* Linkage tables for PowerPC
+ *
+ * Linkage entry size is 16, because we need at least 4 instructions to
+ * implement a jump.
+ */
+
+/*
+ * Define the registers to use in the linkage jump table. Can be the
+ * same. Some care must be exercised when choosing these. It has to be
+ * a register that is not otherwise being used. reg_NFP is a good
+ * choice. call_into_c trashes reg_NFP without preserving it, so we can
+ * trash it in the linkage jump table.
+ */
+#define LINKAGE_TEMP_REG        reg_NFP
+#define LINKAGE_ADDR_REG        reg_NFP
+
+/*
+ * Insert the necessary jump instructions at the given address.
+ */
+void
+arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
+{
+  /*
+   * Make JMP to function entry.
+   *
+   * The instruction sequence is:
+   *
+   *        addis 13, 0, (hi part of addr)
+   *        ori   13, 13, (low part of addr)
+   *        mtctr 13
+   *        bctr
+   *        
+   */
+  int* inst_ptr;
+  unsigned long hi;                   /* Top 16 bits of address */
+  unsigned long lo;                   /* Low 16 bits of address */
+  unsigned int inst;
+
+  inst_ptr = (int*) reloc_addr;
+
+  /*
+   * Split the target address into hi and lo parts for the sethi
+   * instruction.  hi is the top 22 bits.  lo is the low 10 bits.
+   */
+  hi = (unsigned long) target_addr;
+  lo = hi & 0xffff;
+  hi >>= 16;
+
+  /*
+   * addis 13, 0, (hi part)
+   */
+      
+  inst = (15 << 26) | (LINKAGE_TEMP_REG << 21) | (0 << 16) | hi;
+  *inst_ptr++ = inst;
+
+  /*
+   * ori 13, 13, (lo part)
+   */
+
+  inst = (24 << 26) | (LINKAGE_TEMP_REG << 21) | (LINKAGE_TEMP_REG << 16) | lo;
+  *inst_ptr++ = inst;
+  
+  /*
+   * mtctr 13
+   */
+
+  inst = (31 << 26) | (LINKAGE_TEMP_REG << 21) | (9 << 16) | (467 << 1);
+  *inst_ptr++ = inst;
+
+  /*
+   * bctr
+   */
+
+  inst = (19 << 26) | (20 << 21) | (528 << 1);
+  *inst_ptr++ = inst;
+
+
+  *inst_ptr++ = inst;
+  
+  os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - (char*) reloc_addr);
+}
+
+void 
+arch_write_linkage_table_ref(void * reloc_addr, void *target_addr)
+{
+    *(unsigned long *)reloc_addr = (unsigned long)target_addr;
+}
+
+#endif

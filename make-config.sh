@@ -206,7 +206,7 @@ elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
     tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h
 elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
     # We provide a dlopen shim, so a little lie won't hurt
-    printf " :os-provides-dlopen" >> $ltf
+    printf " :os-provides-dlopen :linkage-table" >> $ltf
     # The default stack ulimit under darwin is too small to run PURIFY.
     # Best we can do is complain and exit at this stage
     if [ "`ulimit -s`" = "512" ]; then
