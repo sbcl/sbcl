@@ -1,22 +1,35 @@
-@include package-locks-basic.texinfo
+@node Package Locks
+@comment  node-name,  next,  previous,  up
+@chapter Package Locks
 
-None of the following sections apply to SBCL built
-without package locks.
+None of the following sections apply to SBCL built without package
+locksing support.
 
-The interface described here is experimental: incompatible changes
-in future SBCL releases are possible, even expected.
+The interface described here is experimental: incompatible changes in
+future SBCL releases are possible, even expected: most notably the
+consept of implementation packages and the associated operators may be
+renamed.
 
 @menu
-* Package Locking Overview::                    
-* Implementation Packages::     
-* Package Locked Errors::       
-* Package Locks in Compiled Code::               
-* Package Lock Violations::     
+* Package Lock Concepts::
 * Package Lock Dictionary::
 @end menu
 
-@node Package Locking Overview
-@section Package Locking Overview
+@node Package Lock Concepts
+@section Package Lock Concepts
+
+@menu
+* Package Lock Overview::                    
+* Implementation Packages::     
+* Package Lock Violations::
+* Package Locks in Compiled Code::               
+* Operations Violating Package Locks::
+@end menu
+
+@node Package Lock Overview
+@comment  node-name,  next,  previous,  up
+@subsection Package Locking Overview
+
 Package locks protect against unintentional modifications of a
 package: they provide similar protection to user packages as is
 mandated to @code{common-lisp} package by the ANSI specification. They
@@ -33,7 +46,7 @@ ensure that various libraries don't pollute it without asking,
 but this is not currently done by default.
 
 @node Implementation Packages
-@section Implementation Packages
+@subsection Implementation Packages
 
 Each package has a list of associated implementation packages. A
 locked package, and the symbols whose home package it is, can be
@@ -45,8 +58,8 @@ Unless explicitly altered by @code{defpackage},
 @code{sb-ext:remove-implementation-package} each package is its own
 (only) implementation package.
 
-@node Package Locked Errors
-@section Package Locked Errors
+@node Package Lock Violations
+@subsection Package Lock Violations
 
 If an operation violates a package lock, a continuable error that is
 of a subtype of @code{sb-ext:package-lock-violation} (subtype of
@@ -61,9 +74,9 @@ violation: operations on packages signal errors of type
 errors of type @code{sb-ext:symbol-package-locked-error}.
 
 @node Package Locks in Compiled Code
-@section Package Locks in Compiled Code
+@subsection Package Locks in Compiled Code
 
-@subsection Lexical bindings and declarations
+@subsubsection Lexical bindings and declarations
 
 Compiling lexical binding constructs or lexical declarations that
 violate package locks package cause a compile-time package-lock
@@ -91,13 +104,13 @@ Example:
        ,@@body)))
 @end lisp
 
-@subsection Interned symbols
+@subsubsection Interned symbols
 
 If compiled code contains interned symbols, then loading that code
 into an image without the said symbols will not cause a package lock
 violation even if the packages in question are locked.
 
-@subsection Other limitations on compiled code
+@subsubsection Other limitations on compiled code
 
 With the exception of the aforementioned contructs, and interned
 symbols, behaviour is unspecified if package locks affecting compiled
@@ -112,10 +125,10 @@ unlocked.
 In practise all this means that package-locks have a neglible
 performance penalty in compiled code as long as they are not violated.
 
-@node Package Lock Violations
-@section Package Lock Violations
+@node Operations Violating Package Locks
+@subsection Operations Violating Package Locks
 
-@heading Operations on Packages
+@subsubsection Operations on Packages
 
 Following actions cause a package lock violation if the package
 operated on is locked, and @code{*package*} is not an implementation
@@ -151,7 +164,7 @@ Deleting a package.
 
 @end enumerate
 
-@heading Operations on Symbols
+@subsubsection Operations on Symbols
 
 Following actions cause a package lock violation if the home package
 of the symbol operated on is locked, and @code{*package*} is not an

@@ -18,11 +18,13 @@ sbclsystem=`pwd`/../../src/runtime/sbcl
 sbclcore=`pwd`/../../output/sbcl.core
 if [ -e $sbclsystem ] && [ -e $sbclcore ] 
 then
-    SBCL="${1:-$sbclsystem --core $sbclcore}"
+    SBCLRUNTIME="${1:-$sbclsystem --core $sbclcore}"
     export SBCL_HOME=`pwd`/../../contrib
 else
-    SBCL="${1:-`which sbcl`}"
+    SBCLRUNTIME="${1:-`which sbcl`}"
 fi
+
+SBCL=$SBCLRUNTIME --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger
 
 # Output directory.  This has to end with a slash (it's interpreted by
 # Lisp's `pathname' function) or you lose.  This is normally set from
@@ -37,14 +39,14 @@ DOCSTRINGDIR="${DOCSTRINGDIR:-docstrings/}"
 # is normally set from Makefile.
 #PACKAGES="${PACKAGES:-:COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD}"
 
-echo /creating docstring snippets from SBCL=\'$SBCL\' for packages \'$PACKAGES\'
-echo "(progn (load \"docstrings.lisp\") (dolist (module (quote ($MODULES))) (require module)) (docstrings-to-texinfo \"$DOCSTRINGDIR\" $PACKAGES) (sb-ext:quit))" | $SBCL --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger
+echo /creating docstring snippets from SBCL=\'$SBCLRUNTIME\' for packages \'$PACKAGES\'
+echo "(progn (load \"docstrings.lisp\") (dolist (module (quote ($MODULES))) (require module)) (docstrings-to-texinfo \"$DOCSTRINGDIR\" $PACKAGES) (sb-ext:quit))" | $SBCL
 
 echo /creating contrib-docs.texi-temp
-echo "(load \"create-contrib-doc-list.lisp\")" | $SBCL --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger
+echo "(load \"create-contrib-doc-list.lisp\")" | $SBCL
 
 echo /creating package-locks.texi-temp
-if $SBCL --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger --eval '(quit :unix-status #+sb-package-locks 0 #-sb-package-locks 1)'
+if $SBCL --eval "(let ((plp (find-symbol \"PACKAGE-LOCKED-P\" :sb-exit))) (quit :unix-status (if (and plp (fboundp plp)) 0 1)))";
 then
     cp package-locks-extended.texinfo package-locks.texi-temp
 else

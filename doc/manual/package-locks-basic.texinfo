@@ -1,7 +1,13 @@
 @node Package Locks
+@comment  node-name,  next,  previous,  up
 @chapter Package Locks
 
-SBCL does not currently include package locking support by default. To
-build SBCL with package locking enabled add @code{:sb-package-locks}
-to target @code{*features*} as per instructions in the file
+SBCL can be built with support for package locks to protect against
+unintentional modifications of packages. The full documentation for
+package locks is only built if package locks are enabled in the image
+the documentation was built from,
+
+Package locking support is currently not built by default. To build
+SBCL with package locking enabled add @code{:sb-package-locks} to
+target @code{*features*} as per instructions in the file
 @file{INSTALL}.
