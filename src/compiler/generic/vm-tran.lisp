@@ -264,6 +264,42 @@
 		     (type index index end-1))
 	    (setf (%raw-bits result-bit-array index)
 		  (32bit-logical-not (%raw-bits bit-array index))))))))
+
+(deftransform bit-vector-= ((x y) (simple-bit-vector simple-bit-vector))
+  `(and (= (length x) (length y))
+        (let ((length (length x)))
+	  (or (= length 0)
+	      (do* ((i sb!vm:vector-data-offset (+ i 1))
+		    (end-1 (+ sb!vm:vector-data-offset
+			      (floor (1- length) sb!vm:n-word-bits))))
+		   ((= i end-1)
+		    (let* ((extra (mod length sb!vm:n-word-bits))
+			   (mask (1- (ash 1 extra)))
+			   (numx
+			    (logand
+			     (ash mask
+				  ,(ecase sb!c:*backend-byte-order*
+				     (:little-endian 0)
+				     (:big-endian
+				      '(- sb!vm:n-word-bits extra))))
+			     (%raw-bits x i)))
+			   (numy
+			    (logand
+			     (ash mask
+				  ,(ecase sb!c:*backend-byte-order*
+				     (:little-endian 0)
+				     (:big-endian
+				      '(- sb!vm:n-word-bits extra))))
+			     (%raw-bits y i))))
+		      (declare (type (integer 0 31) extra)
+			       (type (unsigned-byte 32) mask numx numy))
+		      (= numx numy)))
+		(declare (type index i end-1))
+		(let ((numx (%raw-bits x i))
+		      (numy (%raw-bits y i)))
+		  (declare (type (unsigned-byte 32) numx numy))
+		  (unless (= numx numy)
+		    (return nil))))))))
 
 ;;;; %BYTE-BLT
 

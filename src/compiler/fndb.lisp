@@ -829,6 +829,9 @@
   (foldable)
   #|:derive-type #'result-type-last-arg|#)
 
+(defknown bit-vector-= (bit-vector bit-vector) boolean
+  (movable foldable flushable))
+
 (defknown array-has-fill-pointer-p (array) boolean
   (movable foldable flushable))
 (defknown fill-pointer (vector) index (foldable unsafely-flushable))

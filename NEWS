@@ -1584,9 +1584,10 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
     DEFSTRUCT-SLOT-DESCRIPTION structure.
 
 changes in sbcl-0.7.14 relative to sbcl-0.7.13:
-  * a better implementation of SXHASH on bit vectors, measured both in
-    execution speed and in distribution of results over the positive
-    fixnums, has been installed.
+  * a better implementation of SXHASH on (simple) bit vectors,
+    measured both in execution speed and in distribution of results
+    over the positive fixnums, has been installed.  Likewise, a better
+    implementation of EQUAL for simple bit vectors is now available.
   * fixed CEILING optimization for a divisor of form 2^k.
   * fixed bug 240 (emitting extra style warnings "using the lexical
     binding of the symbol *XXX*" for &OPTIONAL arguments).  (reported
