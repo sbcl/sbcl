@@ -29,6 +29,7 @@
 #include "interr.h"
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
+#include "thread.h"
 
 /* So you need to debug? */
 #if 0
@@ -47,6 +48,7 @@ lispobj *new_space_free_pointer;
 
 static void scavenge_newspace(void);
 static void scavenge_interrupt_contexts(void);
+extern struct interrupt_data * global_interrupt_data;
 
 
 /* collecting garbage */
@@ -120,6 +122,10 @@ collect_garbage(unsigned ignore)
     unsigned long static_space_size; 
     unsigned long control_stack_size, binding_stack_size; 
     sigset_t tmp, old;
+    struct thread *th=arch_os_get_current_thread();
+    struct interrupt_data *data=
+	th ? th->interrupt_data : global_interrupt_data;
+
 
 #ifdef PRINTNOISE
     printf("[Collecting garbage ... \n");
@@ -134,7 +140,7 @@ collect_garbage(unsigned ignore)
 
     current_static_space_free_pointer =
 	(lispobj *) ((unsigned long)
-		     SymbolValue(STATIC_SPACE_FREE_POINTER));
+		     SymbolValue(STATIC_SPACE_FREE_POINTER,0));
 
 
     /* Set up from space and new space pointers. */
@@ -169,30 +175,30 @@ collect_garbage(unsigned ignore)
     printf("Scavenging interrupt handlers (%d bytes) ...\n",
 	   (int)sizeof(interrupt_handlers));
 #endif
-    scavenge((lispobj *) interrupt_handlers,
-	     sizeof(interrupt_handlers) / sizeof(lispobj));
+    scavenge((lispobj *) data->interrupt_handlers,
+	     sizeof(data->interrupt_handlers) / sizeof(lispobj));
 	
     /* _size quantities are in units of sizeof(lispobj) - i.e. 4 */
     control_stack_size = 
 	current_control_stack_pointer-
-	(lispobj *)CONTROL_STACK_START;
+	(lispobj *)th->control_stack_start;
 #ifdef PRINTNOISE
     printf("Scavenging the control stack at %p (%ld words) ...\n",
-	   ((lispobj *)CONTROL_STACK_START), 
+	   ((lispobj *)th->control_stack_start), 
 	   control_stack_size);
 #endif
-    scavenge(((lispobj *)CONTROL_STACK_START), control_stack_size);
+    scavenge(((lispobj *)th->control_stack_start), control_stack_size);
 		 
 
     binding_stack_size = 
 	current_binding_stack_pointer - 
-	(lispobj *)BINDING_STACK_START;
+	(lispobj *)th->binding_stack_start;
 #ifdef PRINTNOISE
     printf("Scavenging the binding stack %x - %x (%d words) ...\n",
-	   BINDING_STACK_START,current_binding_stack_pointer,
+	   th->binding_stack_start,current_binding_stack_pointer,
 	   (int)(binding_stack_size));
 #endif
-    scavenge(((lispobj *)BINDING_STACK_START), binding_stack_size);
+    scavenge(((lispobj *)th->binding_stack_start), binding_stack_size);
 		 
     static_space_size = 
 	current_static_space_free_pointer - (lispobj *) STATIC_SPACE_START;
@@ -414,13 +420,18 @@ void scavenge_interrupt_contexts(void)
     int i, index;
     os_context_t *context;
 
-    index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX));
+    struct thread *th=arch_os_get_current_thread();
+    struct interrupt_data *data=
+	th ? th->interrupt_data : global_interrupt_data;
+
+    index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,0));
+
 
 #ifdef DEBUG_SCAVENGE_VERBOSE
     fprintf(stderr, "%d interrupt contexts to scan\n",index);
 #endif
     for (i = 0; i < index; i++) {
-	context = lisp_interrupt_contexts[i];
+	context = th->interrupt_contexts[i];
 	scavenge_interrupt_context(context); 
     }
 }

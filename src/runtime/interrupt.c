@@ -571,6 +571,9 @@ boolean
 interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context=(os_context_t *) void_context;
+    struct thread *th=arch_os_get_current_thread();
+    struct interrupt_data *data=
+	th ? th->interrupt_data : global_interrupt_data;
 
     if (!foreign_function_call_active
 #ifndef LISP_FEATURE_GENCGC 
@@ -589,11 +592,11 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 	     * will detect pending_signal==0 and know to do a GC with the
 	     * signal context instead of calling a Lisp-level handler */
 	    maybe_gc_pending = 1;
-	    if (pending_signal == 0) {
+	    if (data->pending_signal == 0) {
 		/* FIXME: This copy-pending_mask-then-sigaddset_blockable
 		 * idiom occurs over and over. It should be factored out
 		 * into a function with a descriptive name. */
-		memcpy(&pending_mask,
+		memcpy(&(data->pending_mask),
 		       os_context_sigmask_addr(context),
 		       sizeof(sigset_t));
 		sigaddset_blockable(os_context_sigmask_addr(context));

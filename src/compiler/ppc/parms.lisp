@@ -93,12 +93,6 @@
 (def!constant read-only-space-start #x01000000)
 (def!constant read-only-space-end   #x04ff8000)
 
-(def!constant binding-stack-start   #x06000000)
-(def!constant binding-stack-end     #x06ff0000)
-
-(def!constant control-stack-start   #x07000000)
-(def!constant control-stack-end     #x07ff0000)
-
 (def!constant static-space-start    #x08000000)
 (def!constant static-space-end      #x097fff00)
 
@@ -173,12 +167,16 @@
     *current-catch-block*
     *current-unwind-protect-block*
 
+    *binding-stack-start*
+    *control-stack-start*
+    *control-stack-end*
+
     ;; interrupt handling
     *free-interrupt-context-index*
     sb!unix::*interrupts-enabled*
     sb!unix::*interrupt-pending*
 
-    #|sb!kernel::*current-thread*|#
+
     ))
 
 (defparameter *static-funs*

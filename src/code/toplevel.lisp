@@ -174,7 +174,7 @@
   (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
 	 (initial-offset (logand csp (1- bytes-per-scrub-unit)))
 	 (end-of-stack
-	  (- sb!vm:control-stack-end sb!c:*backend-page-size*)))
+	  (- sb!vm::*control-stack-end* sb!c:*backend-page-size*)))
     (labels
 	((scrub (ptr offset count)
 	   (declare (type system-area-pointer ptr)

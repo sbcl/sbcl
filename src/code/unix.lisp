@@ -391,6 +391,10 @@
   (declare (type unix-fd fd))
   (void-syscall ("fsync" int) fd))
 
+
+(defun unix-setsid ()
+  (int-syscall ("setsid")))
+
 ;;;; sys/ioctl.h
 
 ;;; UNIX-IOCTL performs a variety of operations on open i/o

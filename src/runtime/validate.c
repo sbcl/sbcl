@@ -87,8 +87,10 @@ validate(void)
 
 void protect_control_stack_guard_page(pid_t t_id, int protect_p) {
     struct thread *th= find_thread_by_pid(t_id);
+#if 0
     os_protect(CONTROL_STACK_GUARD_PAGE(th),
 	       os_vm_page_size,protect_p ?
 	       (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
+#endif
 }
 

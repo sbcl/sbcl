@@ -26,6 +26,7 @@
 #endif
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
+#include "thread.h"
 
 #ifndef __i386__
 
@@ -95,7 +96,8 @@ code_pointer(lispobj object)
 static boolean
 cs_valid_pointer_p(struct call_frame *pointer)
 {
-    return (((char *) CONTROL_STACK_START <= (char *) pointer) &&
+    struct thread *thread=arch_os_get_current_thread();
+    return (((char *) thread->control_stack_start <= (char *) pointer) &&
 	    ((char *) pointer < (char *) current_control_stack_pointer));
 }
 

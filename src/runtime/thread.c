@@ -55,10 +55,10 @@ new_thread_trampoline(struct thread *th)
 
     if(arch_os_thread_init(th)==0) 
 	return 1;		/* failure.  no, really */
-#ifdef LISP_FEATURE_SB_THREAD
-    return call_into_lisp(function,args,0);
-#else
+#if !defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_X86)
     return call_into_lisp_first_time(function,args,0);
+#else
+    return funcall0(function);
 #endif
 }
 
@@ -95,6 +95,7 @@ pid_t create_thread(lispobj initial_function) {
 	memcpy(per_thread,arch_os_get_current_thread(),
 	       dynamic_values_bytes);
     } else {
+#ifdef LISP_FEATURE_SB_THREAD
 	int i;
 	for(i=0;i<(dynamic_values_bytes/sizeof(lispobj));i++)
 	    per_thread->dynamic_values[i]=UNBOUND_MARKER_WIDETAG;
@@ -104,7 +105,6 @@ pid_t create_thread(lispobj initial_function) {
 		 make_fixnum(MAX_INTERRUPTS+
 			     sizeof(struct thread)/sizeof(lispobj)),
 		 0);
-#ifdef LISP_FEATURE_SB_THREAD
 #define STATIC_TLS_INIT(sym,field) \
   ((struct symbol *)(sym-OTHER_POINTER_LOWTAG))->tls_index= \
   make_fixnum(THREAD_SLOT_OFFSET_WORDS(field))
@@ -139,7 +139,9 @@ pid_t create_thread(lispobj initial_function) {
     /* runtime.c used to set PSEUDO_ATOMIC_ATOMIC =1 globally.  I'm not
      * sure why, but it appears to help */
     th->pseudo_atomic_atomic=make_fixnum(1);
+#ifdef LISP_FEATURE_GENCGC
     gc_set_region_empty(&th->alloc_region);
+#endif
 
 #ifndef LISP_FEATURE_SB_THREAD
     /* the tls-points-into-struct-thread trick is only good for threaded
@@ -149,13 +151,18 @@ pid_t create_thread(lispobj initial_function) {
      * variable quantities from the C runtime.  It's not quite OAOOM,
      * it just feels like it */
     SetSymbolValue(BINDING_STACK_START,th->binding_stack_start,th);
-    SetSymbolValue(BINDING_STACK_POINTER,th->binding_stack_pointer,th);
     SetSymbolValue(CONTROL_STACK_START,th->control_stack_start,th);
+    SetSymbolValue(CONTROL_STACK_END,th->control_stack_end,th);
+#ifdef LISP_FEATURE_X86
+    SetSymbolValue(BINDING_STACK_POINTER,th->binding_stack_pointer,th);
     SetSymbolValue(ALIEN_STACK,th->alien_stack_pointer,th);
     SetSymbolValue(PSEUDO_ATOMIC_ATOMIC,th->pseudo_atomic_atomic,th);
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th->pseudo_atomic_interrupted,th);
+#else
+    current_binding_stack_pointer=th->binding_stack_pointer;
+    current_control_stack_pointer=th->control_stack_start;
 #endif
-    
+#endif    
     bind_variable(CURRENT_CATCH_BLOCK,make_fixnum(0),th);
     bind_variable(CURRENT_UNWIND_PROTECT_BLOCK,make_fixnum(0),th); 
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,make_fixnum(0),th);
@@ -164,7 +171,8 @@ pid_t create_thread(lispobj initial_function) {
 
     th->interrupt_data=malloc(sizeof (struct interrupt_data));
     if(all_threads) 
-	memcpy(th->interrupt_data,arch_os_get_current_thread()->interrupt_data,
+	memcpy(th->interrupt_data,
+	       arch_os_get_current_thread()->interrupt_data,
 	       sizeof (struct interrupt_data));
     else 
 	memcpy(th->interrupt_data,global_interrupt_data,
@@ -213,7 +221,9 @@ void destroy_thread (struct thread *th)
 {
     /* precondition: the unix task has already been killed and exited.
      * This is called by the parent */
+#ifdef LISP_FEATURE_GENCGC
     gc_alloc_update_page_tables(0, &th->alloc_region);
+#endif
     get_spinlock(&all_threads_lock,th->pid);
     if(th==all_threads) 
 	all_threads=th->next;
@@ -240,16 +250,6 @@ struct thread *find_thread_by_pid(pid_t pid)
 }
 
 
-void get_spinlock(lispobj *word,int value)
-{
-    u32 eax=0;
-    do {
-	asm ("xor %0,%0;cmpxchg %1,%2" 
-	     : "=a" (eax)
-	     : "r" (value), "m" (*word)
-	     : "memory", "cc");
-    } while(eax!=0);
-}
 
 void block_sigcont(void)
 {

@@ -11,7 +11,7 @@
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-alloc-region.h"
 #else
-#error "threading doesn't work with cheney gc yet"
+struct alloc_region { };
 #endif
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"

@@ -1339,11 +1339,12 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 
-#if 0
-    /* can't do this unless the threads in question are suspended with
-     * ptrace
-     */
 #if (defined(LISP_FEATURE_GENCGC) && defined(LISP_FEATURE_X86))
+#if 0
+    /* This is what we should do, but can't unless the threads in
+     * question are suspended with ptrace.  That's right, purify is not
+     * threadsafe
+     */
     for_each_thread(thread) {
 	void **ptr;
 	struct user_regs_struct regs;
@@ -1354,11 +1355,11 @@ purify(lispobj static_roots, lispobj read_only_roots)
 	setup_i386_stack_scav(regs.ebp,
 			      ((void *)thread->control_stack_end));
     }
-#endif
-#endif
+#endif /* 0 */
+    /* stopgap until we can set things up as in preceding comment */
     setup_i386_stack_scav(((&static_roots)-2),
 			  ((void *)all_threads->control_stack_end));
-
+#endif
 
     pscav(&static_roots, 1, 0);
     pscav(&read_only_roots, 1, 1);
@@ -1377,8 +1378,9 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 #ifndef __i386__
-    pscav((lispobj *)CONTROL_STACK_START,
-	  current_control_stack_pointer - (lispobj *)CONTROL_STACK_START,
+    pscav((lispobj *)all_threads->control_stack_start,
+	  current_control_stack_pointer - 
+	  all_threads->control_stack_start,
 	  0);
 #else
 #ifdef LISP_FEATURE_GENCGC
@@ -1391,8 +1393,9 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 #if !defined(__i386__)
-    pscav( (lispobj *)BINDING_STACK_START,
-	  (lispobj *)current_binding_stack_pointer - (lispobj *)BINDING_STACK_START,
+    pscav( (lispobj *)all_threads->binding_stack_start,
+	  (lispobj *)current_binding_stack_pointer -
+	   all_threads->binding_stack_start,
 	  0);
 #else
     for_each_thread(thread) {
@@ -1471,10 +1474,10 @@ purify(lispobj static_roots, lispobj read_only_roots)
      * calling SCRUB-CONTROL-STACK - this zeros the stack on the x86. */
 #ifndef __i386__
     os_zero((os_vm_address_t) current_control_stack_pointer,
-            (os_vm_size_t) (CONTROL_STACK_SIZE -
+            (os_vm_size_t) (THREAD_CONTROL_STACK_SIZE -
                             ((current_control_stack_pointer -
-			      (lispobj *)CONTROL_STACK_START) *
-                             sizeof(lispobj))));
+			      all_threads->control_stack_start)
+			     * sizeof(lispobj))));
 #endif
 
     /* It helps to update the heap free pointers so that free_heap can

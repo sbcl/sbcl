@@ -38,6 +38,16 @@
 #include "validate.h"
 size_t os_vm_page_size;
 
+struct thread *arch_os_get_current_thread() {
+    return all_threads;
+}
+struct thread *arch_os_thread_init() {
+    return 1;			/* success */
+}
+struct thread *arch_os_thread_cleanup() {
+    return 1;			/* success */
+}
+
 os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
 {

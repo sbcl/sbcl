@@ -28,7 +28,7 @@
 
 
 ;;;; Hash primitives
-
+#|
 #+sb-assembling
 (defparameter sxhash-simple-substring-entry (gen-label))
 
@@ -95,3 +95,4 @@
 
   (inst slwi result accum 5)
   (inst srwi result result 3))
+|#

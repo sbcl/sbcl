@@ -1,4 +1,4 @@
-for late 0.7.x:
+for early 0.8.x:
 
 * test file reworking
 	** non-x86 ports now pass irrat.pure.lisp
@@ -39,8 +39,7 @@ for late 0.7.x:
 	* belated renaming:
 		** renamed %PRIMITIVE to %VOP
 		** A few hundred things named FN and FCN should be
-			named FUN (but maybe not while dan_b is 
-			working on a threads branch and drichards is
+			named FUN (but maybe not while drichards is
 			working on a Windows port).
 	* These days ANSI C has inline functions, so..
 		** redid many cpp macros as inline functions: 
@@ -119,6 +118,10 @@ other priorities, no particular time:
 	personal itch): I don't want socket-level stuff so much as I
 	want RPC-level or higher (CORBA?) interfaces and (possibly
 	through RPC or CORBA) GUI support
+* Especially when ldb is not compiled in, the default "assertion failed"
+	behaviour in many parts of the runtime is unfriendly.  It may
+	be appropriate to look at some of these and see if they can be 
+	handled in some less abrupt way than aborting
 =======================================================================
 important but out of scope (for WHN, anyway: Patches from other people
 are still welcome!) until after 1.0:

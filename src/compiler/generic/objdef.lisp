@@ -376,6 +376,7 @@
   (control-stack-end :c-type "lispobj *")
   (alien-stack-start :c-type "lispobj *")
   (alien-stack-pointer :c-type "lispobj *")
+  #!+gencgc
   (alloc-region :c-type "struct alloc_region" :length 5)
   (pid :c-type "pid_t")
   (tls-cookie)				;  on x86, the LDT index 
