@@ -591,3 +591,17 @@
   ;; provoke an exception
   (arithmetic-error ()))
 (compile nil '(lambda (x y) (declare (type (double-float 0.0d0) x y)) (/ x y)))
+
+;;; bug reported by Paul Dietz: component last block does not have
+;;; start ctran
+(compile nil
+         '(lambda ()
+           (declare (notinline + logand)
+            (optimize (speed 0)))
+           (LOGAND
+            (BLOCK B5
+              (FLET ((%F1 ()
+                       (RETURN-FROM B5 -220)))
+                (LET ((V7 (%F1)))
+                  (+ 359749 35728422))))
+            -24076)))

@@ -332,82 +332,60 @@
 
   (let* ((fun (block-home-lambda block))
 	 (fun-deleted (eq (functional-kind fun) :deleted))
-	 (this-cont (block-start block))
+	 (this-ctran (block-start block))
 	 (last (block-last block)))
     (unless fun-deleted
       (check-fun-reached fun block))
-    (when (not this-cont)
+    (when (not this-ctran)
       (barf "~S has no START." block))
     (when (not last)
       (barf "~S has no LAST." block))
-    (unless (eq (continuation-kind this-cont) :block-start)
+    (unless (eq (ctran-kind this-ctran) :block-start)
       (barf "The START of ~S has the wrong kind." block))
 
-    (let ((use (continuation-use this-cont))
-	  (uses (block-start-uses block)))
-      (when (and (null use) (= (length uses) 1))
-	(barf "~S has a unique use, but no USE." this-cont))
-      (dolist (node uses)
-	(unless (eq (node-cont node) this-cont)
-	  (barf "The USE ~S for START in ~S has wrong CONT." node block))
-	(check-node-reached node)))
+    (when (ctran-use this-ctran)
+      (barf "The ctran ~S is used." this-ctran))
 
-    (let* ((last-cont (node-cont last))
-	   (cont-block (continuation-block last-cont))
-	   (dest (continuation-dest last-cont)))
-      (ecase (continuation-kind last-cont)
-	(:deleted)
-	(:deleted-block-start
-	 (let ((dest (continuation-dest last-cont)))
-	   (when dest
-	     (check-node-reached dest)))
-	 (unless (member last (block-start-uses cont-block))
-	   (barf "LAST in ~S is missing from uses of its Cont." block)))
-	(:block-start
-	 (check-node-reached (continuation-next last-cont))
-	 (unless (member last (block-start-uses cont-block))
-	   (barf "LAST in ~S is missing from uses of its Cont." block)))
-	(:inside-block
-	 (unless (eq cont-block block)
-	   (barf "CONT of LAST in ~S is in a different BLOCK." block))
-	 (unless (eq (continuation-use last-cont) last)
-	   (barf "USE is not LAST in CONT of LAST in ~S." block))
-	 (when (continuation-next last-cont)
-	   (barf "CONT of LAST has a NEXT in ~S." block))))
-
-      (when dest
-	(check-node-reached dest)))
+    (when (node-next last)
+      (barf "Last node ~S of ~S has next ctran." last block))
 
     (loop
-      (unless (eq (continuation-block this-cont) block)
-	(barf "BLOCK in ~S should be ~S." this-cont block))
+      (unless (eq (ctran-block this-ctran) block)
+	(barf "BLOCK of ~S should be ~S." this-ctran block))
 
-      (let ((dest (continuation-dest this-cont)))
-	(when dest
-	  (check-node-reached dest)))
-
-      (let ((node (continuation-next this-cont)))
+      (let ((node (ctran-next this-ctran)))
 	(unless (node-p node)
-	  (barf "~S has strange NEXT." this-cont))
-	(unless (eq (node-prev node) this-cont)
-	  (barf "PREV in ~S should be ~S." node this-cont))
+	  (barf "~S has strange NEXT." this-ctran))
+	(unless (eq (node-prev node) this-ctran)
+	  (barf "PREV in ~S should be ~S." node this-ctran))
 
+        (when (valued-node-p node)
+          (binding* ((lvar (node-lvar node) :exit-if-null))
+            (unless (memq node (find-uses lvar))
+              (barf "~S is not used by its LVAR ~S." node lvar))
+            (when (singleton-p (lvar-uses lvar))
+              (barf "~S has exactly 1 use, but LVAR-USES is a list."
+                    lvar))
+            (unless (lvar-dest lvar)
+              (barf "~S does not have dest." lvar))))
+
+        (check-node-reached node)
 	(unless fun-deleted
 	  (check-node-consistency node))
 
-	(let ((cont (node-cont node)))
-	  (when (not cont)
-	    (barf "~S has no CONT." node))
+	(let ((next (node-next node)))
+	  (when (and (not next) (not (eq node last)))
+	    (barf "~S has no NEXT." node))
 	  (when (eq node last) (return))
-	  (unless (eq (continuation-kind cont) :inside-block)
-	    (barf "The interior continuation ~S in ~S has the wrong kind."
-		  cont
+	  (unless (eq (ctran-kind next) :inside-block)
+	    (barf "The interior ctran ~S in ~S has the wrong kind."
+		  next
 		  block))
-	  (unless (continuation-next cont)
-	    (barf "~S has no NEXT." cont))
-	  (unless (eq (continuation-use cont) node)
-	    (barf "USE in ~S should be ~S." cont node))
-	  (setq this-cont cont))))
+	  (unless (ctran-next next)
+	    (barf "~S has no NEXT." next))
+	  (unless (eq (ctran-use next) node)
+	    (barf "USE in ~S should be ~S." next node))
+	  (setq this-ctran next))))
 
     (check-block-successors block))
   (values))
@@ -458,27 +436,18 @@
 
 ;;;; node consistency checking
 
-;;; Check that the DEST for CONT is the specified NODE. We also mark
-;;; the block CONT is in as SEEN.
-#+nil(declaim (ftype (function (continuation node) (values)) check-dest))
-(defun check-dest (cont node)
-  (let ((kind (continuation-kind cont)))
-    (ecase kind
-      (:deleted
-       (unless (block-delete-p (node-block node))
-	 (barf "DEST ~S of deleted continuation ~S is not DELETE-P."
-	       cont node)))
-      (:deleted-block-start
-       (unless (eq (continuation-dest cont) node)
-	 (barf "DEST for ~S should be ~S." cont node)))
-      ((:inside-block :block-start)
-       (unless (gethash (continuation-block cont) *seen-blocks*)
-	 (barf "~S receives ~S, which is in an unknown block." node cont))
-       (unless (eq (continuation-dest cont) node)
-	 (barf "DEST for ~S should be ~S." cont node))
-       (unless (find-uses cont)
-         (barf "Continuation ~S has a destinatin, but no uses."
-               cont)))))
+;;; Check that the DEST for LVAR is the specified NODE. We also mark
+;;; the block LVAR is in as SEEN.
+#+nil(declaim (ftype (function (lvar node) (values)) check-dest))
+(defun check-dest (lvar node)
+  (do-uses (use lvar)
+    (unless (gethash (node-block use) *seen-blocks*)
+      (barf "Node ~S using ~S is in an unknown block." use lvar)))
+  (unless (eq (lvar-dest lvar) node)
+    (barf "DEST for ~S should be ~S." lvar node))
+  (unless (find-uses lvar)
+    (barf "Lvar ~S has a destinatin, but no uses."
+          lvar))
   (values))
 
 ;;; This function deals with checking for consistency of the
@@ -512,13 +481,14 @@
               ;; possibility that control will flow through the
               ;; NIL-returning branch. So we punt here. -- WHN 2001-04-15
               (declare (notinline position))
-            (let ((fun (ref-leaf (continuation-use
+            (let ((fun (ref-leaf (lvar-use
                                   (basic-combination-fun node))))
                   (pos (position arg (basic-combination-args node))))
               (declare (type index pos))
               (when (leaf-refs (elt (lambda-vars fun) pos))
                 (barf "flushed arg for referenced var in ~S" node)))))))
-     (let ((dest (continuation-dest (node-cont node))))
+     (let* ((lvar (node-lvar node))
+            (dest (and lvar (lvar-dest lvar))))
        (when (and (return-p dest)
 		  (eq (basic-combination-kind node) :local)
 		  (not (eq (lambda-tail-set (combination-lambda node))

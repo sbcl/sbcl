@@ -131,12 +131,11 @@
 (defun immediately-used-p (lvar node)
   (declare (type lvar lvar) (type node node))
   (aver (eq (node-lvar node) lvar))
-  (and (eq (lvar-dest lvar)
-           (acond ((node-next node)
-                   (ctran-next it))
-                  (t (let* ((block (node-block node))
-                            (next-block (first (block-succ block))))
-                       (block-start-node next-block)))))))
+  (let ((dest (lvar-dest lvar)))
+    (acond ((node-next node)
+            (eq (ctran-next it) dest))
+           (t (eq (block-start (first (block-succ (node-block node))))
+                  (node-prev dest))))))
 
 ;;;; lvar substitution
 
