@@ -575,3 +575,26 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
 * The system now understands compound CONS types (e.g. (CONS FIXNUM T))
   as required by ANSI. (thanks to Douglas Crosher's CMU CL patches, with
   some porting work by Martin Atzmueller)
+* Martin Atzmueller reviewed the CMU CL mailing lists and came back
+  with a boatload of other patches for SBCL, which he ported to 
+  SBCL. Now that those have been applied,
+  ** The system tries to make sure that its low-priority messages
+     are prefixed by semicolons, to help people who like to use
+     syntax highlighting in their ILISP buffer. (This patch
+     was originally due to Raymond Toy.)
+  ** The system now optimizes INTEGER-LENGTH better, thanks to more
+     patches originally written by Raymond Toy.
+  ** The compiler understands coercion between single-value and 
+     multiple-VALUES type expressions better, getting rid of some very
+     weird behavior, thanks to patches originally by Robert MacLachlan
+     and Douglas Crosher.
+  ** The system understands ANSI-style non-KEYWORD &KEY arguments in 
+     lambda lists, thanks to a patch originally by Pierre Mai.
+  ** The system no longer bogusly warns about "abbreviated type
+     declarations".
+  ** The compiler gets less confused by inlining and RETURN-FROM,
+     thanks to some patches originally by Tim Moore.
+  ** The system no longer hangs when dumping circular lists to fasl
+     files, thanks to a patch originally from Douglas Crosher.
+* Martin Atzmueller also fixed ROOM, so that it no longer fails with an
+  undefined function error.
