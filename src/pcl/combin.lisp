@@ -60,7 +60,7 @@
       (make-effective-method-function-simple generic-function form)
       ;; We have some sort of `real' effective method. Go off and get a
       ;; compiled function for it. Most of the real hair here is done by
-      ;; the GET-FUNCTION mechanism.
+      ;; the GET-FUN mechanism.
       (make-effective-method-function-internal generic-function form
 					       method-alist-p wrappers-p)))
 
@@ -266,16 +266,16 @@
 	   (effective-method-lambda (expand-effective-method-function
 				     generic-function effective-method)))
       (multiple-value-bind (cfunction constants)
-	  (get-function1 effective-method-lambda
-			 (lambda (form)
-			   (memf-test-converter form generic-function
-						method-alist-p wrappers-p))
-			 (lambda (form)
-			   (memf-code-converter form generic-function
-						metatypes applyp
-						method-alist-p wrappers-p))
-			 (lambda (form)
-			   (memf-constant-converter form generic-function)))
+	  (get-fun1 effective-method-lambda
+		    (lambda (form)
+		      (memf-test-converter form generic-function
+					   method-alist-p wrappers-p))
+		    (lambda (form)
+		      (memf-code-converter form generic-function
+					   metatypes applyp
+					   method-alist-p wrappers-p))
+		    (lambda (form)
+		      (memf-constant-converter form generic-function)))
 	(lambda (method-alist wrappers)
 	  (let* ((constants
 		  (mapcar (lambda (constant)

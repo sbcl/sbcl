@@ -85,7 +85,7 @@
          ;; these are not in the params because they only exist at compile time
          (defparameter ,(format-table-name) (make-hash-table))
          (defparameter ,(arg-type-table-name) nil)
-         (defparameter ,(function-cache-name) (make-function-cache)))
+         (defparameter ,(fun-cache-name) (make-fun-cache)))
        (let ((params
               (or sb!c:*backend-disassem-params*
                   (setf sb!c:*backend-disassem-params* (make-params)))))
@@ -102,14 +102,18 @@
 |#
 
 ;;;; cached functions
+;;;;
+;;;; FIXME: Is it important to cache these? For performance? Or why?
+;;;; If performance: *Really*? How fast does disassembly need to be??
+;;;; So: Could we just punt this?
 
-(defstruct (function-cache (:copier nil))
+(defstruct (fun-cache (:copier nil))
   (printers nil :type list)
   (labellers nil :type list)
   (prefilters nil :type list))
 
-(defvar *disassem-function-cache* (make-function-cache))
-(declaim (type function-cache *disassem-function-cache*))
+(defvar *disassem-fun-cache* (make-fun-cache))
+(declaim (type fun-cache *disassem-fun-cache*))
 
 ;;;; A DCHUNK contains the bits we look at to decode an
 ;;;; instruction.
@@ -292,7 +296,7 @@
 
 (defvar *disassem-inst-formats* (make-hash-table))
 (defvar *disassem-arg-types* nil)
-(defvar *disassem-function-cache* (make-function-cache))
+(defvar *disassem-fun-cache* (make-fun-cache))
 
 (defstruct (argument (:conc-name arg-)
 		     (:copier nil))
@@ -479,7 +483,7 @@
       `(let* ((*current-instruction-flavor* ',(cons base-name format-name))
               (,format-var (format-or-lose ',format-name))
               (args ,(gen-args-def-form field-defs format-var evalp))
-              (funcache *disassem-function-cache*))
+              (funcache *disassem-fun-cache*))
          (multiple-value-bind (printer-fun printer-defun)
              (find-printer-fun ',uniquified-name
 			       ',format-name
@@ -1035,7 +1039,7 @@
       (values nil nil)
       (let ((printer-source (preprocess-printer printer-source args)))
 	(!with-cached-function
-	   (name funstate cache function-cache-printers args
+	   (name funstate cache fun-cache-printers args
 		 :constraint printer-source
 		 :stem (concatenate 'string
 				    (string %name)
@@ -1408,7 +1412,7 @@
     (if (null labelled-fields)
         (values nil nil)
         (!with-cached-function
-            (name funstate cache function-cache-labellers args
+            (name funstate cache fun-cache-labellers args
              :stem (concatenate 'string "LABELLER-" (string %name))
              :constraint labelled-fields)
           (let ((labels-form 'labels))
@@ -1446,7 +1450,7 @@
     (if (null filtered-args)
         (values nil nil)
         (!with-cached-function
-            (name funstate cache function-cache-prefilters args
+            (name funstate cache fun-cache-prefilters args
              :stem (concatenate 'string
 				(string %name)
 				"-"

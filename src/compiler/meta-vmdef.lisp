@@ -205,9 +205,9 @@
 ;;; of this move operation. The function is called with three
 ;;; arguments: the VOP (for context), and the source and destination
 ;;; TNs. An ASSEMBLE form is wrapped around the body. All uses of
-;;; DEFINE-MOVE-FUNCTION should be compiled before any uses of
+;;; DEFINE-MOVE-FUN should be compiled before any uses of
 ;;; DEFINE-VOP.
-(defmacro define-move-function ((name cost) lambda-list scs &body body)
+(defmacro define-move-fun ((name cost) lambda-list scs &body body)
   (declare (type index cost))
   (when (or (oddp (length scs)) (null scs))
     (error "malformed SCs spec: ~S" scs))
@@ -216,7 +216,7 @@
        (do-sc-pairs (from-sc to-sc ',scs)
 	 (unless (eq from-sc to-sc)
 	   (let ((num (sc-number from-sc)))
-	     (setf (svref (sc-move-functions to-sc) num) ',name)
+	     (setf (svref (sc-move-funs to-sc) num) ',name)
 	     (setf (svref (sc-load-costs to-sc) num) ',cost)))))
 
      (defun ,name ,lambda-list
@@ -721,7 +721,7 @@
 ;;; from to the move function used for loading those SCs. We quietly
 ;;; ignore restrictions to :non-packed (constant) and :unbounded SCs,
 ;;; since we don't load into those SCs.
-(defun find-move-functions (op load-p)
+(defun find-move-funs (op load-p)
   (collect ((funs))
     (dolist (sc-name (operand-parse-scs op))
       (let* ((sc (meta-sc-or-lose sc-name))
@@ -735,8 +735,8 @@
 	    (unless (member (sc-name alt) (operand-parse-scs op) :test #'eq)
 	      (let* ((altn (sc-number alt))
 		     (name (if load-p
-			       (svref (sc-move-functions sc) altn)
-			       (svref (sc-move-functions alt) scn)))
+			       (svref (sc-move-funs sc) altn)
+			       (svref (sc-move-funs alt) scn)))
 		     (found (or (assoc alt (funs) :test #'member)
 				(rassoc name (funs)))))
 		(unless name
@@ -765,8 +765,8 @@
 ;;; move function, then we just call that when there is a load TN. If
 ;;; there are multiple possible move functions, then we dispatch off
 ;;; of the operand TN's type to see which move function to use.
-(defun call-move-function (parse op load-p)
-  (let ((funs (find-move-functions op load-p))
+(defun call-move-fun (parse op load-p)
+  (let ((funs (find-move-funs op load-p))
 	(load-tn (operand-parse-load-tn op)))
     (if funs
 	(let* ((tn `(tn-ref-tn ,(operand-parse-temp op)))
@@ -836,8 +836,8 @@
 			     (tn-ref-load-tn ,temp)))
 		    (binds `(,name ,(decide-to-load parse op)))
 		    (if (eq (operand-parse-kind op) :argument)
-			(loads (call-move-function parse op t))
-			(saves (call-move-function parse op nil))))
+			(loads (call-move-fun parse op t))
+			(saves (call-move-fun parse op nil))))
 		   (t
 		    (binds `(,name (tn-ref-tn ,temp)))))))
 	  (:temporary

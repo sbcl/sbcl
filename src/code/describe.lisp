@@ -38,7 +38,7 @@
   (call-next-method)
   (when (and (legal-fun-name-p x)
 	     (fboundp x))
-    (%describe-function (fdefinition x) s :function x)
+    (%describe-fun (fdefinition x) s :function x)
     ;;was: (format s "~@:_Its FDEFINITION is ~S.~@:_" (fdefinition x))
     ;; TO DO: should check for SETF documentation.
     ;; TO DO: should make it clear whether the definition is a
@@ -156,7 +156,7 @@
 
 ;;; Describe a compiled function. The closure case calls us to print
 ;;; the guts.
-(defun %describe-function-compiled (x s kind name)
+(defun %describe-fun-compiled (x s kind name)
   (declare (type stream s))
   ;; FIXME: The lowercaseness of %SIMPLE-FUN-ARGLIST results, and the
   ;; non-sentenceness of the "Arguments" label, makes awkward output.
@@ -185,7 +185,7 @@
 ;;; Describe a function with the specified kind and name. The latter
 ;;; arguments provide some information about where the function came
 ;;; from. KIND=NIL means not from a name.
-(defun %describe-function (x s &optional (kind nil) name)
+(defun %describe-fun (x s &optional (kind nil) name)
   (declare (type function x))
   (declare (type stream s))
   (declare (type (member :macro :function nil) kind))
@@ -199,14 +199,14 @@
 	  (%fun-name x))
   (case (widetag-of x)
     (#.sb-vm:closure-header-widetag
-     (%describe-function-compiled (%closure-fun x) s kind name)
+     (%describe-fun-compiled (%closure-fun x) s kind name)
      (format s "~@:_Its closure environment is:")
      (pprint-logical-block (s nil)
        (pprint-indent :current 8)
        (dotimes (i (- (get-closure-length x) (1- sb-vm:closure-info-offset)))
 	 (format s "~@:_~S: ~S" i (%closure-index-ref x i)))))
     ((#.sb-vm:simple-fun-header-widetag #.sb-vm:closure-fun-header-widetag)
-     (%describe-function-compiled x s kind name))
+     (%describe-fun-compiled x s kind name))
     (#.sb-vm:funcallable-instance-header-widetag
      (typecase x
        (standard-generic-function
@@ -219,7 +219,7 @@
      (format s "~@:_It is an unknown type of function."))))
 
 (defmethod describe-object ((x function) s)
-  (%describe-function x s))
+  (%describe-fun x s))
   
 (defmethod describe-object ((x symbol) s)
   (declare (type stream s))
@@ -270,11 +270,11 @@
 
   ;; Describe the function cell.
   (cond ((macro-function x)
-	 (%describe-function (macro-function x) s :macro x))
+	 (%describe-fun (macro-function x) s :macro x))
 	((special-operator-p x)
 	 (%describe-doc x s 'function "Special form"))
 	((fboundp x)
-	 (%describe-function (fdefinition x) s :function x)))
+	 (%describe-fun (fdefinition x) s :function x)))
 
   ;; FIXME: Print out other stuff from the INFO database:
   ;;   * Does it name a type?

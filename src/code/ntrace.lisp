@@ -37,7 +37,7 @@
 
 ;;; a hash table that maps each traced function to the TRACE-INFO. The
 ;;; entry for a closure is the shared function-entry object.
-(defvar *traced-functions* (make-hash-table :test 'eq))
+(defvar *traced-funs* (make-hash-table :test 'eq))
 
 ;;; A TRACE-INFO object represents all the information we need to
 ;;; trace a given function.
@@ -139,7 +139,7 @@
 (defun trace-redefined-update (fname new-value)
   (when (fboundp fname)
     (let* ((fun (trace-fdefinition fname))
-	   (info (gethash fun *traced-functions*)))
+	   (info (gethash fun *traced-funs*)))
       (when (and info (trace-info-named info))
 	(untrace-1 fname)
 	(trace-1 fname info new-value)))))
@@ -330,7 +330,7 @@
 	  (values definition t
 		  (nth-value 2 (trace-fdefinition definition)))
 	  (trace-fdefinition function-or-name))
-    (when (gethash fun *traced-functions*)
+    (when (gethash fun *traced-funs*)
       (warn "~S is already TRACE'd, untracing it." function-or-name)
       (untrace-1 fun))
 
@@ -397,7 +397,7 @@
 	    (sb-di:activate-breakpoint start)
 	    (sb-di:activate-breakpoint end)))))
 
-      (setf (gethash fun *traced-functions*) info)))
+      (setf (gethash fun *traced-funs*) info)))
 
   function-or-name)
 
@@ -477,8 +477,8 @@
 	`(let ,(binds) (list ,@(forms)))
 	`(list ,@(forms)))))
 
-(defun %list-traced-functions ()
-  (loop for x being each hash-value in *traced-functions*
+(defun %list-traced-funs ()
+  (loop for x being each hash-value in *traced-funs*
 	collect (trace-info-what x)))
 
 (defmacro trace (&rest specs)
@@ -559,14 +559,14 @@
    -AFTER and -ALL forms are evaluated in the null environment."
   (if specs
       (expand-trace specs)
-      '(%list-traced-functions)))
+      '(%list-traced-funs)))
 
 ;;;; untracing
 
 ;;; Untrace one function.
 (defun untrace-1 (function-or-name)
   (let* ((fun (trace-fdefinition function-or-name))
-	 (info (gethash fun *traced-functions*)))
+	 (info (gethash fun *traced-funs*)))
     (cond
      ((not info)
       (warn "Function is not TRACEd: ~S" function-or-name))
@@ -578,11 +578,11 @@
 	(sb-di:delete-breakpoint (trace-info-start-breakpoint info))
 	(sb-di:delete-breakpoint (trace-info-end-breakpoint info))))
       (setf (trace-info-untraced info) t)
-      (remhash fun *traced-functions*)))))
+      (remhash fun *traced-funs*)))))
 
 ;;; Untrace all traced functions.
 (defun untrace-all ()
-  (dolist (fun (%list-traced-functions))
+  (dolist (fun (%list-traced-funs))
     (untrace-1 fun))
   t)
 

@@ -24,7 +24,7 @@
 ;;;
 ;;; We special-case NULL, since it does have a source tranform and is
 ;;; interesting to us.
-(defun function-cost (name)
+(defun fun-guessed-cost (name)
   (declare (symbol name))
   (let ((info (info :function :info name))
 	(call-cost (template-cost (template-or-lose 'call-named))))
@@ -49,29 +49,29 @@
 	    (let ((found (cdr (assoc type *backend-type-predicates*
 				     :test #'type=))))
 	      (if found
-		  (+ (function-cost found) (function-cost 'eq))
+		  (+ (fun-guessed-cost found) (fun-guessed-cost 'eq))
 		  nil))))
       (typecase type
 	(compound-type
 	 (reduce #'+ (compound-type-types type) :key 'type-test-cost))
 	(member-type
 	 (* (length (member-type-members type))
-	    (function-cost 'eq)))
+	    (fun-guessed-cost 'eq)))
 	(numeric-type
 	 (* (if (numeric-type-complexp type) 2 1)
-	    (function-cost
+	    (fun-guessed-cost
 	     (if (csubtypep type (specifier-type 'fixnum)) 'fixnump 'numberp))
 	    (+ 1
 	       (if (numeric-type-low type) 1 0)
 	       (if (numeric-type-high type) 1 0))))
 	(cons-type
 	 (+ (type-test-cost (specifier-type 'cons))
-	    (function-cost 'car)
+	    (fun-guessed-cost 'car)
 	    (type-test-cost (cons-type-car-type type))
-	    (function-cost 'cdr)
+	    (fun-guessed-cost 'cdr)
 	    (type-test-cost (cons-type-cdr-type type))))
 	(t
-	 (function-cost 'typep)))))
+	 (fun-guessed-cost 'typep)))))
 
 ;;;; checking strategy determination
 
@@ -109,8 +109,9 @@
 	       min-type
 	       *universal-type*)))))
 
-;;; Like VALUES-TYPES, only mash any complex function types to FUNCTION.
-(defun no-function-values-types (type)
+;;; This is like VALUES-TYPES, only we mash any complex function types
+;;; to FUNCTION.
+(defun no-fun-values-types (type)
   (declare (type ctype type))
   (multiple-value-bind (res count) (values-types type)
     (values (mapcar (lambda (type)
@@ -145,7 +146,7 @@
 (defun maybe-negate-check (cont types force-hairy)
   (declare (type continuation cont) (list types))
   (multiple-value-bind (ptypes count)
-      (no-function-values-types (continuation-proven-type cont))
+      (no-fun-values-types (continuation-proven-type cont))
     (if (eq count :unknown)
 	(if (and (every #'type-check-template types) (not force-hairy))
 	    (values :simple types)
@@ -215,7 +216,7 @@
   (let ((type (continuation-asserted-type cont))
 	(dest (continuation-dest cont)))
     (aver (not (eq type *wild-type*)))
-    (multiple-value-bind (types count) (no-function-values-types type)
+    (multiple-value-bind (types count) (no-fun-values-types type)
       (cond ((not (eq count :unknown))
 	     (if (or (exit-p dest)
 		     (and (return-p dest)
@@ -421,10 +422,10 @@
 						  pos)))))))
     (cond ((eq dtype *empty-type*))
 	  ((and (ref-p node) (constant-p (ref-leaf node)))
-	   (compiler-warning "~:[This~;~:*~A~] is not a ~<~%~9T~:;~S:~>~%  ~S"
-			     what atype-spec (constant-value (ref-leaf node))))
+	   (compiler-warn "~:[This~;~:*~A~] is not a ~<~%~9T~:;~S:~>~%  ~S"
+			  what atype-spec (constant-value (ref-leaf node))))
 	  (t
-	   (compiler-warning
+	   (compiler-warn
 	    "~:[Result~;~:*~A~] is a ~S, ~<~%~9T~:;not a ~S.~>"
 	    what (type-specifier dtype) atype-spec))))
   (values))

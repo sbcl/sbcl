@@ -132,9 +132,9 @@
     (let ((check-qualifiers    (legal-qualifiers-p method qualifiers))
 	  (check-lambda-list   (legal-lambda-list-p method lambda-list))
 	  (check-specializers  (legal-specializers-p method specializers))
-	  (check-function      (legal-method-function-p method
-							(or function
-							    fast-function)))
+	  (check-fun (legal-method-function-p method
+					      (or function
+						  fast-function)))
 	  (check-documentation (legal-documentation-p method documentation)))
       (unless (eq check-qualifiers t)
 	(lose :qualifiers qualifiers check-qualifiers))
@@ -142,8 +142,8 @@
 	(lose :lambda-list lambda-list check-lambda-list))
       (unless (eq check-specializers t)
 	(lose :specializers specializers check-specializers))
-      (unless (eq check-function t)
-	(lose :function function check-function))
+      (unless (eq check-fun t)
+	(lose :function function check-fun))
       (unless (eq check-documentation t)
 	(lose :documentation documentation check-documentation)))))
 
@@ -1052,7 +1052,7 @@
 	    `(and ,new-type ,@so-far)))))
 
 (defun generate-discrimination-net-internal
-    (gf methods types methods-function test-function type-function)
+    (gf methods types methods-function test-fun type-function)
   (let* ((arg-info (gf-arg-info gf))
 	 (precedence (arg-info-precedence arg-info))
 	 (nreq (arg-info-number-required arg-info))
@@ -1109,7 +1109,7 @@
 				    known-types))))
 			 (cond ((determined-to-be nil) (do-if nil t))
 			       ((determined-to-be t)   (do-if t   t))
-			       (t (funcall test-function position type
+			       (t (funcall test-fun position type
 					   (do-if t) (do-if nil))))))))))
       (do-column precedence methods ()))))
 
@@ -1258,20 +1258,20 @@
 			(make-dfun-lambda-list metatypes applyp)
 			(make-fast-method-call-lambda-list metatypes applyp))))
       (multiple-value-bind (cfunction constants)
-	  (get-function1 `(,(if function-p
-				      'sb-kernel:instance-lambda
-				      'lambda)
-			   ,arglist
-				 ,@(unless function-p
-				     `((declare (ignore .pv-cell.
-							.next-method-call.))))
-				 (locally (declare #.*optimize-speed*)
-				   (let ((emf ,net))
-				     ,(make-emf-call metatypes applyp 'emf))))
-			 #'net-test-converter
-			 #'net-code-converter
-			 (lambda (form)
-			   (net-constant-converter form generic-function)))
+	  (get-fun1 `(,(if function-p
+			   'sb-kernel:instance-lambda
+			   'lambda)
+		      ,arglist
+		      ,@(unless function-p
+			  `((declare (ignore .pv-cell.
+					     .next-method-call.))))
+		      (locally (declare #.*optimize-speed*)
+			       (let ((emf ,net))
+				 ,(make-emf-call metatypes applyp 'emf))))
+		    #'net-test-converter
+		    #'net-code-converter
+		    (lambda (form)
+		      (net-constant-converter form generic-function)))
 	(lambda (method-alist wrappers)
 	  (let* ((alist (list nil))
 		 (alist-tail alist))

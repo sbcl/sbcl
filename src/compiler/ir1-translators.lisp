@@ -248,7 +248,7 @@
   (declare (type list definitions))
   (unless (= (length definitions)
              (length (remove-duplicates definitions :key #'first)))
-    (compiler-style-warning "duplicate definitions in ~S" definitions))
+    (compiler-style-warn "duplicate definitions in ~S" definitions))
   (let* ((processed-definitions (mapcar definitionize-fun definitions))
          (*lexenv* (make-lexenv definitionize-keyword processed-definitions)))
     (funcall fun)))
@@ -735,8 +735,9 @@
     (when (and (not intersects)
 	       (not (policy *lexenv*
 			    (= inhibit-warnings 3)))) ;FIXME: really OK to suppress?
-      (compiler-warning
-       "The type ~S in ~S declaration conflicts with an enclosing assertion:~%   ~S"
+      (compiler-warn
+       "The type ~S in ~S declaration conflicts with an ~
+        enclosing assertion:~%   ~S"
        (type-specifier ctype)
        name
        (type-specifier old-type)))
@@ -795,7 +796,7 @@
 	       (when (lambda-var-ignorep leaf)
 		 ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
 		 ;; requires that this be a STYLE-WARNING, not a full warning.
-		 (compiler-style-warning
+		 (compiler-style-warn
 		  "~S is being set even though it was declared to be ignored."
 		  name)))
 	     (set-variable start cont leaf (second things)))
@@ -1079,7 +1080,7 @@
       (:function
        (remhash name *free-functions*)
        (undefine-fun-name name)
-       (compiler-warning
+       (compiler-warn
 	"~S is being redefined as a macro when it was ~
          previously ~(~A~) to be a function."
 	name

@@ -23,40 +23,41 @@
 
 (in-package "SB-PCL")
 
-;;; GET-FUNCTION is the main user interface to this code. It is like
+;;; GET-FUN is the main user interface to this code. It is like
 ;;; COMPILE, only more efficient. It achieves this efficiency by
 ;;; reducing the number of times that the compiler needs to be called.
-;;; Calls to GET-FUNCTION in which the lambda forms differ only by constants
-;;; can use the same piece of compiled code. (For example, dispatch dfuns and
-;;; combined method functions can often be shared, if they differ only
-;;; by referring to different methods.)
+;;; Calls to GET-FUN in which the lambda forms differ only by
+;;; constants can use the same piece of compiled code. (For example,
+;;; dispatch dfuns and combined method functions can often be shared,
+;;; if they differ only by referring to different methods.)
 ;;;
-;;; If GET-FUNCTION is called with a lambda expression only, it will return
+;;; If GET-FUN is called with a lambda expression only, it will return
 ;;; a corresponding function. The optional constant-converter argument
 ;;; can be a function which will be called to convert each constant appearing
 ;;; in the lambda to whatever value should appear in the function.
 ;;;
 ;;; There are three internal functions which operate on the lambda argument
-;;; to GET-FUNCTION:
-;;;   compute-test converts the lambda into a key to be used for lookup,
-;;;   compute-code is used by get-new-fun-generator-internal to
+;;; to GET-FUN:
+;;;   COMPUTE-TEST converts the lambda into a key to be used for lookup,
+;;;   COMPUTE-CODE is used by get-new-fun-generator-internal to
 ;;;		generate the actual lambda to be compiled, and
-;;;   compute-constants is used to generate the argument list that is
+;;;   COMPUTE-CONSTANTS is used to generate the argument list that is
 ;;;		to be passed to the compiled function.
 ;;;
-(defun get-function (lambda
-		      &optional (test-converter     #'default-test-converter)
-				(code-converter     #'default-code-converter)
-				(constant-converter #'default-constant-converter))
-  (function-apply (get-function-generator lambda test-converter code-converter)
+(defun get-fun (lambda &optional
+		 (test-converter #'default-test-converter)
+		 (code-converter #'default-code-converter)
+		 (constant-converter #'default-constant-converter))
+  (function-apply (get-fun-generator lambda test-converter code-converter)
 		  (compute-constants      lambda constant-converter)))
 
-(defun get-function1 (lambda
-		      &optional (test-converter     #'default-test-converter)
-				(code-converter     #'default-code-converter)
-				(constant-converter #'default-constant-converter))
-  (values (the function (get-function-generator lambda test-converter code-converter))
-	  (compute-constants      lambda constant-converter)))
+(defun get-fun1 (lambda &optional
+		  (test-converter #'default-test-converter)
+		  (code-converter #'default-code-converter)
+		  (constant-converter #'default-constant-converter))
+  (values (the function
+	    (get-fun-generator lambda test-converter code-converter))
+	  (compute-constants lambda constant-converter)))
 
 (defun default-constantp (form)
   (and (constantp form)
@@ -108,7 +109,7 @@
 (defun fgen-generator-lambda (fgen) (svref fgen 3))
 (defun fgen-system	     (fgen) (svref fgen 4))
 
-(defun get-function-generator (lambda test-converter code-converter)
+(defun get-fun-generator (lambda test-converter code-converter)
   (let* ((test (compute-test lambda test-converter))
 	 (fgen (lookup-fgen test)))
     (if fgen

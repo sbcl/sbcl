@@ -108,7 +108,7 @@
 |#
     ))
 
-  (check-function-consistency components)
+  (check-fun-consistency components)
 
   (dolist (c components)
     (do ((block (block-next (component-head c)) (block-next block)))
@@ -160,7 +160,7 @@
     (setf (gethash x *seen-functions*) t)))
 
 ;;; Check that the specified function has been seen.
-(defun check-function-reached (fun where)
+(defun check-fun-reached (fun where)
   (declare (type functional fun))
   (unless (gethash fun *seen-functions*)
     (barf "unseen function ~S in ~S" fun where)))
@@ -168,17 +168,17 @@
 ;;; In a CLAMBDA, check that the associated nodes are in seen blocks.
 ;;; In an OPTIONAL-DISPATCH, check that the entry points were seen. If
 ;;; the function is deleted, ignore it.
-(defun check-function-stuff (functional)
+(defun check-fun-stuff (functional)
   (ecase (functional-kind functional)
     (:external
      (let ((fun (functional-entry-fun functional)))
-       (check-function-reached fun functional)
+       (check-fun-reached fun functional)
        (when (functional-kind fun)
 	 (barf "The function for XEP ~S has kind." functional))
        (unless (eq (functional-entry-fun fun) functional)
 	 (barf "bad back-pointer in function for XEP ~S" functional))))
     ((:let :mv-let :assignment)
-     (check-function-reached (lambda-home functional) functional)
+     (check-fun-reached (lambda-home functional) functional)
      (when (functional-entry-fun functional)
        (barf "The LET ~S has entry function." functional))
      (unless (member functional (lambda-lets (lambda-home functional)))
@@ -192,7 +192,7 @@
      (when (functional-entry-fun functional)
        (barf ":OPTIONAL ~S has an ENTRY-FUN." functional))
      (let ((ef (lambda-optional-dispatch functional)))
-       (check-function-reached ef functional)
+       (check-fun-reached ef functional)
        (unless (or (member functional (optional-dispatch-entry-points ef))
 		   (eq functional (optional-dispatch-more-entry ef))
 		   (eq functional (optional-dispatch-main-entry ef)))
@@ -204,11 +204,11 @@
     ((nil :escape :cleanup)
      (let ((ef (functional-entry-fun functional)))
        (when ef
-	 (check-function-reached ef functional)
+	 (check-fun-reached ef functional)
 	 (unless (eq (functional-kind ef) :external)
 	   (barf "The ENTRY-FUN in ~S isn't an XEP: ~S." functional ef)))))
     (:deleted
-     (return-from check-function-stuff)))
+     (return-from check-fun-stuff)))
 
   (case (functional-kind functional)
     ((nil :optional :external :toplevel :escape :cleanup)
@@ -216,7 +216,7 @@
        (dolist (fun (lambda-lets functional))
 	 (unless (eq (lambda-home fun) functional)
 	   (barf "The home in ~S is not ~S." fun functional))
-	 (check-function-reached fun functional))
+	 (check-fun-reached fun functional))
        (unless (eq (lambda-home functional) functional)
 	 (barf "home not self-pointer in ~S" functional)))))
 
@@ -236,13 +236,13 @@
 	 (barf "HOME in ~S should be ~S." var functional))))
     (optional-dispatch
      (dolist (ep (optional-dispatch-entry-points functional))
-       (check-function-reached ep functional))
+       (check-fun-reached ep functional))
      (let ((more (optional-dispatch-more-entry functional)))
-       (when more (check-function-reached more functional)))
-     (check-function-reached (optional-dispatch-main-entry functional)
-			     functional))))
+       (when more (check-fun-reached more functional)))
+     (check-fun-reached (optional-dispatch-main-entry functional)
+			functional))))
 
-(defun check-function-consistency (components)
+(defun check-fun-consistency (components)
   (dolist (c components)
     (dolist (new-fun (component-new-funs c))
       (observe-functional new-fun))
@@ -257,13 +257,13 @@
 
   (dolist (c components)
     (dolist (new-fun (component-new-funs c))
-      (check-function-stuff new-fun))
+      (check-fun-stuff new-fun))
     (dolist (fun (component-lambdas c))
       (when (eq (functional-kind fun) :deleted)
 	(barf "deleted lambda ~S in Lambdas for ~S" fun c))
-      (check-function-stuff fun)
+      (check-fun-stuff fun)
       (dolist (let (lambda-lets fun))
-	(check-function-stuff let)))))
+	(check-fun-stuff let)))))
 
 ;;;; loop consistency checking
 
@@ -333,7 +333,7 @@
 	 (this-cont (block-start block))
 	 (last (block-last block)))
     (unless fun-deleted
-      (check-function-reached fun block))
+      (check-fun-reached fun block))
     (when (not this-cont)
       (barf "~S has no START." block))
     (when (not last)
@@ -489,7 +489,7 @@
 			 :toplevel)
 	       (barf ":TOPLEVEL-XEP ref in non-top-level component: ~S"
 		     node))
-	     (check-function-reached leaf node)))))
+	     (check-fun-reached leaf node)))))
     (basic-combination
      (check-dest (basic-combination-fun node) node)
      (dolist (arg (basic-combination-args node))
@@ -527,9 +527,9 @@
     (cset
      (check-dest (set-value node) node))
     (bind
-     (check-function-reached (bind-lambda node) node))
+     (check-fun-reached (bind-lambda node) node))
     (creturn
-     (check-function-reached (return-lambda node) node)
+     (check-fun-reached (return-lambda node) node)
      (check-dest (return-result node) node)
      (unless (eq (block-last (node-block node)) node)
        (barf "RETURN not at block end: ~S" node)))

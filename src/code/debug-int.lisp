@@ -394,15 +394,15 @@
 	    (breakpoint-data-offset obj))))
 
 (defstruct (breakpoint (:constructor %make-breakpoint
-				     (hook-function what kind %info))
+				     (hook-fun what kind %info))
 		       (:copier nil))
   ;; This is the function invoked when execution encounters the
   ;; breakpoint. It takes a frame, the breakpoint, and optionally a
-  ;; list of values. Values are supplied for :FUN-END breakpoints
-  ;; as values to return for the function containing the breakpoint.
-  ;; :FUN-END breakpoint hook-functions also take a cookie
-  ;; argument. See COOKIE-FUN slot.
-  (hook-function nil :type function)
+  ;; list of values. Values are supplied for :FUN-END breakpoints as
+  ;; values to return for the function containing the breakpoint.
+  ;; :FUN-END breakpoint hook functions also take a cookie argument.
+  ;; See the COOKIE-FUN slot.
+  (hook-fun (required-arg) :type function)
   ;; CODE-LOCATION or DEBUG-FUN
   (what nil :type (or code-location debug-fun))
   ;; :CODE-LOCATION, :FUN-START, or :FUN-END for that kind
@@ -431,7 +431,7 @@
   ;; for identifying :FUN-END breakpoint executions. That is, if
   ;; there is one :FUN-END breakpoint, but there may be multiple
   ;; pending calls of its function on the stack. This function takes
-  ;; the cookie, and the hook-function takes the cookie too.
+  ;; the cookie, and the hook function takes the cookie too.
   (cookie-fun nil :type (or null function))
   ;; This slot users can set with whatever information they find useful.
   %info)
@@ -2712,20 +2712,19 @@
 ;;;; user-visible interface
 
 ;;; Create and return a breakpoint. When program execution encounters
-;;; the breakpoint, the system calls HOOK-FUNCTION. HOOK-FUNCTION takes the
-;;; current frame for the function in which the program is running and the
-;;; breakpoint object.
+;;; the breakpoint, the system calls HOOK-FUN. HOOK-FUN takes the
+;;; current frame for the function in which the program is running and
+;;; the breakpoint object.
 ;;;
 ;;; WHAT and KIND determine where in a function the system invokes
-;;; HOOK-FUNCTION. WHAT is either a code-location or a DEBUG-FUN.
-;;; KIND is one of :CODE-LOCATION, :FUN-START, or :FUN-END.
-;;; Since the starts and ends of functions may not have code-locations
-;;; representing them, designate these places by supplying WHAT as a
-;;; DEBUG-FUN and KIND indicating the :FUN-START or
-;;; :FUN-END. When WHAT is a DEBUG-FUN and kind is
-;;; :FUN-END, then hook-function must take two additional
-;;; arguments, a list of values returned by the function and a
-;;; FUN-END-COOKIE.
+;;; HOOK-FUN. WHAT is either a code-location or a DEBUG-FUN. KIND is
+;;; one of :CODE-LOCATION, :FUN-START, or :FUN-END. Since the starts
+;;; and ends of functions may not have code-locations representing
+;;; them, designate these places by supplying WHAT as a DEBUG-FUN and
+;;; KIND indicating the :FUN-START or :FUN-END. When WHAT is a
+;;; DEBUG-FUN and kind is :FUN-END, then HOOK-FUN must take two
+;;; additional arguments, a list of values returned by the function
+;;; and a FUN-END-COOKIE.
 ;;;
 ;;; INFO is information supplied by and used by the user.
 ;;;
@@ -2740,7 +2739,7 @@
 ;;; function.
 ;;;
 ;;; Signal an error if WHAT is an unknown code-location.
-(defun make-breakpoint (hook-function what
+(defun make-breakpoint (hook-fun what
 			&key (kind :code-location) info fun-end-cookie)
   (etypecase what
     (code-location
@@ -2748,12 +2747,12 @@
        (error "cannot make a breakpoint at an unknown code location: ~S"
 	      what))
      (aver (eq kind :code-location))
-     (let ((bpt (%make-breakpoint hook-function what kind info)))
+     (let ((bpt (%make-breakpoint hook-fun what kind info)))
        (etypecase what
 	 (compiled-code-location
 	  ;; This slot is filled in due to calling CODE-LOCATION-UNKNOWN-P.
 	  (when (eq (compiled-code-location-kind what) :unknown-return)
-	    (let ((other-bpt (%make-breakpoint hook-function what
+	    (let ((other-bpt (%make-breakpoint hook-fun what
 					       :unknown-return-partner
 					       info)))
 	      (setf (breakpoint-unknown-return-partner bpt) other-bpt)
@@ -2766,7 +2765,7 @@
     (compiled-debug-fun
      (ecase kind
        (:fun-start
-	(%make-breakpoint hook-function what kind info))
+	(%make-breakpoint hook-fun what kind info))
        (:fun-end
 	(unless (eq (sb!c::compiled-debug-fun-returns
 		     (compiled-debug-fun-compiler-debug-fun what))
@@ -2774,11 +2773,11 @@
 	  (error ":FUN-END breakpoints are currently unsupported ~
 		  for the known return convention."))
 
-	(let* ((bpt (%make-breakpoint hook-function what kind info))
+	(let* ((bpt (%make-breakpoint hook-fun what kind info))
 	       (starter (compiled-debug-fun-end-starter what)))
 	  (unless starter
 	    (setf starter (%make-breakpoint #'list what :fun-start nil))
-	    (setf (breakpoint-hook-function starter)
+	    (setf (breakpoint-hook-fun starter)
 		  (fun-end-starter-hook starter what))
 	    (setf (compiled-debug-fun-end-starter what) starter))
 	  (setf (breakpoint-start-helper bpt) starter)
@@ -2867,7 +2866,7 @@
 
 ;;;; ACTIVATE-BREAKPOINT
 
-;;; Cause the system to invoke the breakpoint's hook-function until
+;;; Cause the system to invoke the breakpoint's hook function until
 ;;; the next call to DEACTIVATE-BREAKPOINT or DELETE-BREAKPOINT. The
 ;;; system invokes breakpoint hook functions in the opposite order
 ;;; that you activate them.
@@ -2950,7 +2949,7 @@
 
 ;;;; DEACTIVATE-BREAKPOINT
 
-;;; Stop the system from invoking the breakpoint's hook-function.
+;;; Stop the system from invoking the breakpoint's hook function.
 (defun deactivate-breakpoint (breakpoint)
   (when (eq (breakpoint-status breakpoint) :active)
     (without-interrupts
@@ -3148,7 +3147,7 @@
 	 (frame (do ((f (top-frame) (frame-down f)))
 		    ((eq debug-fun (frame-debug-fun f)) f))))
     (dolist (bpt breakpoints)
-      (funcall (breakpoint-hook-function bpt)
+      (funcall (breakpoint-hook-fun bpt)
 	       frame
 	       ;; If this is an :UNKNOWN-RETURN-PARTNER, then pass the
 	       ;; hook function the original breakpoint, so that users
@@ -3186,7 +3185,7 @@
 	 (cookie (gethash component *fun-end-cookies*)))
     (remhash component *fun-end-cookies*)
     (dolist (bpt breakpoints)
-      (funcall (breakpoint-hook-function bpt)
+      (funcall (breakpoint-hook-fun bpt)
 	       frame bpt
 	       (get-fun-end-breakpoint-values scp)
 	       cookie))))

@@ -458,7 +458,7 @@
 		      res))
 		   (t
 		    (let ((*compiler-error-context* (block-last block)))
-		      (compiler-warning
+		      (compiler-warn
 		       "unreachable code in constraint ~
 			propagation -- apparent compiler bug"))
 		    (make-sset))))

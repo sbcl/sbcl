@@ -11,7 +11,7 @@
 
 (in-package "SB!VM")
 
-(define-move-function (load-immediate 1) (vop x y)
+(define-move-fun (load-immediate 1) (vop x y)
   ((null zero immediate)
    (any-reg descriptor-reg))
   (let ((val (tn-value x)))
@@ -26,56 +26,56 @@
        (inst li (logior (ash (char-code val) n-widetag-bits) base-char-widetag)
 	     y)))))
 
-(define-move-function (load-number 1) (vop x y)
+(define-move-fun (load-number 1) (vop x y)
   ((zero immediate)
    (signed-reg unsigned-reg))
   (inst li (tn-value x) y))
 
-(define-move-function (load-base-char 1) (vop x y)
+(define-move-fun (load-base-char 1) (vop x y)
   ((immediate) (base-char-reg))
   (inst li (char-code (tn-value x)) y))
 
-(define-move-function (load-system-area-pointer 1) (vop x y)
+(define-move-fun (load-system-area-pointer 1) (vop x y)
   ((immediate) (sap-reg))
   (inst li (sap-int (tn-value x)) y))
 
-(define-move-function (load-constant 5) (vop x y)
+(define-move-fun (load-constant 5) (vop x y)
   ((constant) (descriptor-reg any-reg))
   (loadw y code-tn (tn-offset x) other-pointer-lowtag))
 
-(define-move-function (load-stack 5) (vop x y)
+(define-move-fun (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg))
   (load-stack-tn y x))
 
-(define-move-function (load-number-stack 5) (vop x y)
+(define-move-fun (load-number-stack 5) (vop x y)
   ((base-char-stack) (base-char-reg))
   (let ((nfp (current-nfp-tn vop)))
     (loadw y nfp (tn-offset x))))
 
-(define-move-function (load-number-stack-64 5) (vop x y)
+(define-move-fun (load-number-stack-64 5) (vop x y)
   ((sap-stack) (sap-reg)
    (signed-stack) (signed-reg)
    (unsigned-stack) (unsigned-reg))
   (let ((nfp (current-nfp-tn vop)))
     (loadq y nfp (tn-offset x))))
 
-(define-move-function (store-stack 5) (vop x y)
+(define-move-fun (store-stack 5) (vop x y)
   ((any-reg descriptor-reg null zero) (control-stack))
   (store-stack-tn y x))
 
-(define-move-function (store-number-stack 5) (vop x y)
+(define-move-fun (store-number-stack 5) (vop x y)
   ((base-char-reg) (base-char-stack))
   (let ((nfp (current-nfp-tn vop)))
     (storew x nfp (tn-offset y))))
 
-(define-move-function (store-number-stack-64 5) (vop x y)
+(define-move-fun (store-number-stack-64 5) (vop x y)
   ((sap-reg) (sap-stack)
    (signed-reg) (signed-stack)
    (unsigned-reg) (unsigned-stack))
   (let ((nfp (current-nfp-tn vop)))
     (storeq x nfp (tn-offset y))))
 
-;;;; The Move VOP
+;;;; the MOVE VOP
 
 (define-vop (move)
   (:args (x :target y

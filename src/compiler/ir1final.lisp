@@ -33,12 +33,12 @@
 				:argument-test #'types-equal-or-intersect
 				:result-test #'values-types-equal-or-intersect)
 	    (collect ((messages))
-	      (flet ((frob (string &rest stuff)
+	      (flet ((give-grief (string &rest stuff)
 		       (messages string)
 		       (messages stuff)))
 		(valid-function-use node what
-				    :warning-function #'frob
-				    :error-function #'frob))
+				    :unwinnage-fun #'give-grief
+				    :lossage-fun #'give-grief))
 	      (compiler-note "~@<unable to ~
                               ~2I~_~A ~
                               ~I~_due to type uncertainty: ~
@@ -105,7 +105,7 @@
 	  (when (and (eq (node-component ref) component)
 		     (combination-p dest)
 		     (eq (continuation-use (basic-combination-fun dest)) ref))
-	    (setq atype (note-function-use dest atype)))))
+	    (setq atype (note-fun-use dest atype)))))
       (setf (info :function :assumed-type name) atype))))
 
 ;;; Do miscellaneous things that we want to do once all optimization

@@ -31,7 +31,7 @@
       (setf (%simple-fun-arglist res) (entry-info-arguments entry))
       (setf (%simple-fun-type res) (entry-info-type entry))
 
-      (note-function entry res object))))
+      (note-fun entry res object))))
 
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.

@@ -154,8 +154,8 @@
     initargs-form-list
     new-keys
     default-initargs-function
-    shared-initialize-t-function
-    shared-initialize-nil-function
+    shared-initialize-t-fun
+    shared-initialize-nil-fun
     constants
     combined-initialize-function ; allocate-instance + shared-initialize
     make-instance-function ; nil means use gf
@@ -288,7 +288,7 @@
       ((default-initargs-function)
        (let ((initargs-form-list (initialize-info-initargs-form-list info)))
 	 (setf (initialize-info-cached-default-initargs-function info)
-	       (initialize-instance-simple-function
+	       (initialize-instance-simple-fun
 		'default-initargs-function info
 		class initargs-form-list))))
       ((valid-p ri-valid-p)
@@ -310,21 +310,21 @@
 		 (compute-valid-p
 		  (list (list* 'reinitialize-instance proto nil)
 			(list* 'shared-initialize proto nil nil)))))))
-      ((shared-initialize-t-function)
+      ((shared-initialize-t-fun)
        (multiple-value-bind (initialize-form-list ignore)
 	   (make-shared-initialize-form-list class keys t nil)
 	 (declare (ignore ignore))
-	 (setf (initialize-info-cached-shared-initialize-t-function info)
-	       (initialize-instance-simple-function
-		'shared-initialize-t-function info
+	 (setf (initialize-info-cached-shared-initialize-t-fun info)
+	       (initialize-instance-simple-fun
+		'shared-initialize-t-fun info
 		class initialize-form-list))))
-      ((shared-initialize-nil-function)
+      ((shared-initialize-nil-fun)
        (multiple-value-bind (initialize-form-list ignore)
 	   (make-shared-initialize-form-list class keys nil nil)
 	 (declare (ignore ignore))
-	 (setf (initialize-info-cached-shared-initialize-nil-function info)
-	       (initialize-instance-simple-function
-		'shared-initialize-nil-function info
+	 (setf (initialize-info-cached-shared-initialize-nil-fun info)
+	       (initialize-instance-simple-fun
+		'shared-initialize-nil-fun info
 		class initialize-form-list))))
       ((constants combined-initialize-function)
        (let ((initargs-form-list (initialize-info-initargs-form-list info))
@@ -333,7 +333,7 @@
 	     (make-shared-initialize-form-list class new-keys t t)
 	   (setf (initialize-info-cached-constants info) constants)
 	   (setf (initialize-info-cached-combined-initialize-function info)
-		 (initialize-instance-simple-function
+		 (initialize-instance-simple-fun
 		  'combined-initialize-function info
 		  class (append initargs-form-list initialize-form-list))))))
       ((make-instance-function-symbol)
@@ -562,9 +562,9 @@
 				     info)))
     (if separate-p
 	(values default-initargs-function
-		(initialize-info-shared-initialize-t-function info))
+		(initialize-info-shared-initialize-t-fun info))
 	(values default-initargs-function
-		(initialize-info-shared-initialize-t-function
+		(initialize-info-shared-initialize-t-fun
 		 (initialize-info class (initialize-info-new-keys info)
 				  nil allow-other-keys-arg))))))
 
@@ -688,21 +688,21 @@
 (defvar *initialize-instance-simple-alist* nil)
 (defvar *note-iis-entry-p* nil)
 
-(defvar *compiled-initialize-instance-simple-functions*
+(defvar *compiled-initialize-instance-simple-funs*
   (make-hash-table :test 'equal))
 
-(defun initialize-instance-simple-function (use info class form-list)
+(defun initialize-instance-simple-fun (use info class form-list)
   (let* ((pv-cell (get-pv-cell-for-class class))
 	 (key (initialize-info-key info))
 	 (sf-key (list* use (class-name (car key)) (cdr key))))
     (if (or *compile-make-instance-functions-p*
-	    (gethash sf-key *compiled-initialize-instance-simple-functions*))
+	    (gethash sf-key *compiled-initialize-instance-simple-funs*))
 	(multiple-value-bind (form args)
 	    (form-list-to-lisp pv-cell form-list)
 	  (let ((entry (assoc form *initialize-instance-simple-alist*
 			      :test #'equal)))
 	    (setf (gethash sf-key
-			   *compiled-initialize-instance-simple-functions*)
+			   *compiled-initialize-instance-simple-funs*)
 		  t)
 	    (if entry
 		(setf (cdddr entry) (union (list sf-key) (cdddr entry)
@@ -734,7 +734,7 @@
     (setf (cadr entry) function)
     (setf (caddr entry) system)
     (dolist (use uses)
-      (setf (gethash use *compiled-initialize-instance-simple-functions*) t))
+      (setf (gethash use *compiled-initialize-instance-simple-funs*) t))
     (setf (cdddr entry) (union uses (cdddr entry)
 			       :test #'equal))))
 

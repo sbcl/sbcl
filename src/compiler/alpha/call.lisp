@@ -1218,4 +1218,4 @@ default-value-8
     sb!c::%odd-key-arguments-error)
   (frob unknown-key-argument-error unknown-key-argument-error
     sb!c::%unknown-key-argument-error key)
-  (frob nil-function-returned-error nil-function-returned-error nil fun))
+  (frob nil-fun-returned-error nil-fun-returned-error nil fun))

@@ -477,7 +477,7 @@
 	   ;; wrong. And we're in locall.lisp here, so it's probably
 	   ;; (haven't checked this..) a call to something in the same
 	   ;; file. So maybe it deserves a full warning anyway.
-	   (compiler-warning
+	   (compiler-warn
 	    "function called with ~R argument~:P, but wants exactly ~R"
 	    call-args nargs)
 	   (setf (basic-combination-kind call) :error)))))
@@ -498,7 +498,7 @@
     (cond ((< call-args min-args)
 	   ;; FIXME: See FIXME note at the previous
 	   ;; wrong-number-of-arguments warnings in this file.
-	   (compiler-warning
+	   (compiler-warn
 	    "function called with ~R argument~:P, but wants at least ~R"
 	    call-args min-args)
 	   (setf (basic-combination-kind call) :error))
@@ -511,7 +511,7 @@
 	  (t
 	   ;; FIXME: See FIXME note at the previous
 	   ;; wrong-number-of-arguments warnings in this file.
-	   (compiler-warning
+	   (compiler-warn
 	    "function called with ~R argument~:P, but wants at most ~R"
 	    call-args max-args)
 	   (setf (basic-combination-kind call) :error))))
@@ -582,14 +582,14 @@
 	       (key-vars var))
 	      ((:rest :optional))
 	      ((:more-context :more-count)
-	       (compiler-warning "can't local-call functions with &MORE args")
+	       (compiler-warn "can't local-call functions with &MORE args")
 	       (setf (basic-combination-kind call) :error)
 	       (return-from convert-more-call))))))
 
       (when (optional-dispatch-keyp fun)
 	(when (oddp (length more))
-	  (compiler-warning "function called with odd number of ~
-			     arguments in keyword portion")
+	  (compiler-warn "function called with odd number of ~
+  		          arguments in keyword portion")
 
 	  (setf (basic-combination-kind call) :error)
 	  (return-from convert-more-call))
@@ -618,8 +618,8 @@
 		    (return)))))))
 
 	(when (and loser (not (optional-dispatch-allowp fun)))
-	  (compiler-warning "function called with unknown argument keyword ~S"
-			    loser)
+	  (compiler-warn "function called with unknown argument keyword ~S"
+			 loser)
 	  (setf (basic-combination-kind call) :error)
 	  (return-from convert-more-call)))
 

@@ -26,7 +26,7 @@
   function
   report-function
   interactive-function
-  (test-function (lambda (cond) (declare (ignore cond)) t)))
+  (test-fun (lambda (cond) (declare (ignore cond)) t)))
 (def!method print-object ((restart restart) stream)
   (if *print-escape*
       (print-unreadable-object (restart stream :type t :identity t)
@@ -36,8 +36,8 @@
 (defun compute-restarts (&optional condition)
   #!+sb-doc
   "Return a list of all the currently active restarts ordered from most
-   recently established to less recently established. If Condition is
-   specified, then only restarts associated with Condition (or with no
+   recently established to less recently established. If CONDITION is
+   specified, then only restarts associated with CONDITION (or with no
    condition) will be returned."
   (let ((associated ())
 	(other ()))
@@ -51,7 +51,7 @@
 	  (when (and (or (not condition)
 			 (member restart associated)
 			 (not (member restart other)))
-		     (funcall (restart-test-function restart) condition))
+		     (funcall (restart-test-fun restart) condition))
 	    (res restart))))
       (res))))
 
@@ -206,9 +206,7 @@
 				   :interactive-function
 				   result)))
 	     (when test
-	       (setq result (list* `#',test
-				   :test-function
-				   result)))
+	       (setq result (list* `#',test :test-fun result)))
 	     (nreverse result)))
 	 (parse-keyword-pairs (list keys)
 	   (do ((l list (cddr l))

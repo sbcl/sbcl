@@ -132,13 +132,13 @@
   (when (eq slot-names t)
     (return-from shared-initialize
       (call-initialize-function
-       (initialize-info-shared-initialize-t-function
+       (initialize-info-shared-initialize-t-fun
 	(initialize-info (class-of instance) initargs))
        instance initargs)))
   (when (eq slot-names nil)
     (return-from shared-initialize
       (call-initialize-function
-       (initialize-info-shared-initialize-nil-function
+       (initialize-info-shared-initialize-nil-fun
 	(initialize-info (class-of instance) initargs))
        instance initargs)))
   ;; Initialize the instance's slots in a two step process:

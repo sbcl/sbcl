@@ -476,7 +476,7 @@
     (function
      (unless (and (funcallable-instance-p object)
 		  (printed-as-funcallable-standard-class object stream))
-       (output-function object stream)))
+       (output-fun object stream)))
     (symbol
      (output-symbol object stream))
     (number
@@ -519,12 +519,12 @@
 
 ;;; This variable contains the current definition of one of three
 ;;; symbol printers. SETUP-PRINTER-STATE sets this variable.
-(defvar *internal-symbol-output-function* nil)
+(defvar *internal-symbol-output-fun* nil)
 
 ;;; This function sets the internal global symbol
-;;; *INTERNAL-SYMBOL-OUTPUT-FUNCTION* to the right function depending
-;;; on the value of *PRINT-CASE*. See the manual for details. The
-;;; print buffer stream is also reset.
+;;; *INTERNAL-SYMBOL-OUTPUT-FUN* to the right function depending on
+;;; the value of *PRINT-CASE*. See the manual for details. The print
+;;; buffer stream is also reset.
 (defun setup-printer-state ()
   (unless (and (eq *print-case* *previous-case*)
 	       (eq (readtable-case *readtable*) *previous-readtable-case*))
@@ -538,7 +538,7 @@
       (setf (readtable-case *readtable*) :upcase)
       (error "invalid READTABLE-CASE value: ~S" *previous-readtable-case*))
 
-    (setq *internal-symbol-output-function*
+    (setq *internal-symbol-output-fun*
 	  (case *previous-readtable-case*
 	    (:upcase
 	     (case *print-case*
@@ -606,7 +606,7 @@
   (setup-printer-state)
   (if (and maybe-quote (symbol-quotep name))
       (output-quoted-symbol-name name stream)
-      (funcall *internal-symbol-output-function* name stream)))
+      (funcall *internal-symbol-output-fun* name stream)))
 
 ;;;; escaping symbols
 
@@ -839,10 +839,10 @@
       (when (test letter) (advance OTHER nil))
       (go DIGIT))))
 
-;;;; *INTERNAL-SYMBOL-OUTPUT-FUNCTION*
+;;;; *INTERNAL-SYMBOL-OUTPUT-FUN*
 ;;;;
-;;;; Case hackery. These functions are stored in
-;;;; *INTERNAL-SYMBOL-OUTPUT-FUNCTION* according to the values of
+;;;; case hackery: These functions are stored in
+;;;; *INTERNAL-SYMBOL-OUTPUT-FUN* according to the values of
 ;;;; *PRINT-CASE* and READTABLE-CASE.
 
 ;;; called when:
@@ -1570,7 +1570,7 @@
   (declare (ignore object stream))
   nil)
 
-(defun output-function (object stream)
+(defun output-fun (object stream)
   (let* ((*print-length* 3) ; in case we have to..
 	 (*print-level* 3)  ; ..print an interpreted function definition
 	 ;; FIXME: This find-the-function-name idiom ought to be

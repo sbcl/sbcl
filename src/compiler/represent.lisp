@@ -186,11 +186,11 @@
 ;;;; load time.
 
 ;;; FIXME: should probably be conditional on #!+SB-SHOW
-(defun check-move-function-consistency ()
+(defun check-move-fun-consistency ()
   (dotimes (i sc-number-limit)
     (let ((sc (svref *backend-sc-numbers* i)))
       (when sc
-	(let ((moves (sc-move-functions sc)))
+	(let ((moves (sc-move-funs sc)))
 	  (dolist (const (sc-constant-scs sc))
 	    (unless (svref moves (sc-number const))
 	      (warn "no move function defined to load SC ~S from constant ~
@@ -202,7 +202,7 @@
 	      (warn "no move function defined to load SC ~S from alternate ~
 		     SC ~S"
 		    (sc-name sc) (sc-name alt)))
-	    (unless (svref (sc-move-functions alt) i)
+	    (unless (svref (sc-move-funs alt) i)
 	      (warn "no move function defined to save SC ~S to alternate ~
 		     SC ~S"
 		    (sc-name sc) (sc-name alt)))))))))

@@ -11,7 +11,7 @@
 
 (in-package "SB!VM")
 
-(define-move-function (load-immediate 1) (vop x y)
+(define-move-fun (load-immediate 1) (vop x y)
   ((immediate)
    (any-reg descriptor-reg))
   (let ((val (tn-value x)))
@@ -26,23 +26,23 @@
        (inst mov y (logior (ash (char-code val) n-widetag-bits)
 			   base-char-widetag))))))
 
-(define-move-function (load-number 1) (vop x y)
+(define-move-fun (load-number 1) (vop x y)
   ((immediate) (signed-reg unsigned-reg))
   (inst mov y (tn-value x)))
 
-(define-move-function (load-base-char 1) (vop x y)
+(define-move-fun (load-base-char 1) (vop x y)
   ((immediate) (base-char-reg))
   (inst mov y (char-code (tn-value x))))
 
-(define-move-function (load-system-area-pointer 1) (vop x y)
+(define-move-fun (load-system-area-pointer 1) (vop x y)
   ((immediate) (sap-reg))
   (inst mov y (sap-int (tn-value x))))
 
-(define-move-function (load-constant 5) (vop x y)
+(define-move-fun (load-constant 5) (vop x y)
   ((constant) (descriptor-reg any-reg))
   (inst mov y x))
 
-(define-move-function (load-stack 5) (vop x y)
+(define-move-fun (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg)
    (base-char-stack) (base-char-reg)
    (sap-stack) (sap-reg)
@@ -50,7 +50,7 @@
    (unsigned-stack) (unsigned-reg))
   (inst mov y x))
 
-(define-move-function (store-stack 5) (vop x y)
+(define-move-fun (store-stack 5) (vop x y)
   ((any-reg descriptor-reg) (control-stack)
    (base-char-reg) (base-char-stack)
    (sap-reg) (sap-stack)

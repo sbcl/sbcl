@@ -323,8 +323,8 @@
 (def-simple-type-vops fixnump check-fixnum fixnum object-not-fixnum-error
   even-fixnum-lowtag odd-fixnum-lowtag)
 
-(def-type-vops functionp check-function function
-  object-not-function-error fun-pointer-lowtag)
+(def-type-vops functionp check-fun function
+  object-not-fun-error fun-pointer-lowtag)
 
 (def-type-vops listp check-list list object-not-list-error
   list-pointer-lowtag)

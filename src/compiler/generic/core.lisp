@@ -31,7 +31,7 @@
   (debug-info () :type list))
 
 ;;; Note the existence of FUNCTION.
-(defun note-function (info function object)
+(defun note-fun (info function object)
   (declare (type function function)
 	   (type core-object object))
   (let ((patch-table (core-object-patch-table object)))

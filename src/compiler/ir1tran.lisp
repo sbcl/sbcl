@@ -585,7 +585,7 @@
 	 (when (lambda-var-ignorep var)
 	   ;; (ANSI's specification for the IGNORE declaration requires
 	   ;; that this be a STYLE-WARNING, not a full WARNING.)
-	   (compiler-style-warning "reading an ignored variable: ~S" name)))
+	   (compiler-style-warn "reading an ignored variable: ~S" name)))
        (reference-leaf start cont var))
       (cons
        (aver (eq (car var) 'MACRO))
@@ -889,7 +889,7 @@
 			     (type-approx-intersection2 old-type type))))
 	       (cond ((eq int *empty-type*)
 		      (unless (policy *lexenv* (= inhibit-warnings 3))
-			(compiler-warning
+			(compiler-warn
 			 "The type declarations ~S and ~S for ~S conflict."
 			 (type-specifier old-type) (type-specifier type)
 			 var-name)))
@@ -929,7 +929,7 @@
 	   (found
 	    (setf (leaf-type found) type)
 	    (assert-definition-type found type
-				    :warning-function #'compiler-note
+				    :unwinnage-fun #'compiler-note
 				    :where "FTYPE declaration"))
 	   (t
 	    (res (cons (find-lexically-apparent-function
@@ -957,7 +957,7 @@
 	   (when (lambda-var-ignorep var)
 	     ;; ANSI's definition for "Declaration IGNORE, IGNORABLE"
 	     ;; requires that this be a STYLE-WARNING, not a full WARNING.
-	     (compiler-style-warning
+	     (compiler-style-warn
 	      "The ignored variable ~S is being declared special."
 	      name))
 	   (setf (lambda-var-specvar var)
@@ -1033,8 +1033,8 @@
        ((not var)
 	;; ANSI's definition for "Declaration IGNORE, IGNORABLE"
 	;; requires that this be a STYLE-WARNING, not a full WARNING.
-	(compiler-style-warning "declaring unknown variable ~S to be ignored"
-				name))
+	(compiler-style-warn "declaring unknown variable ~S to be ignored"
+			     name))
        ;; FIXME: This special case looks like non-ANSI weirdness.
        ((and (consp var) (consp (cdr var)) (eq (cadr var) 'macro))
 	;; Just ignore the IGNORE decl.
@@ -1044,8 +1044,8 @@
        ((lambda-var-specvar var)
 	;; ANSI's definition for "Declaration IGNORE, IGNORABLE"
 	;; requires that this be a STYLE-WARNING, not a full WARNING.
-	(compiler-style-warning "declaring special variable ~S to be ignored"
-				name))
+	(compiler-style-warn "declaring special variable ~S to be ignored"
+			     name))
        ((eq (first spec) 'ignorable)
 	(setf (leaf-ever-used var) t))
        (t
@@ -1094,12 +1094,12 @@
       (dynamic-extent
        (when (policy *lexenv* (> speed inhibit-warnings))
 	 (compiler-note
-	  "compiler limitation:~
-           ~%  There's no special support for DYNAMIC-EXTENT (so it's ignored)."))
+	  "compiler limitation: ~
+        ~%  There's no special support for DYNAMIC-EXTENT (so it's ignored)."))
        res)
       (t
        (unless (info :declaration :recognized (first spec))
-	 (compiler-warning "unrecognized declaration ~S" raw-spec))
+	 (compiler-warn "unrecognized declaration ~S" raw-spec))
        res))))
 
 ;;; Use a list of DECLARE forms to annotate the lists of LAMBDA-VAR
@@ -2018,10 +2018,10 @@
      ;; 3.2.2.3 of the spec) but at least as of sbcl-0.6.11, we don't
      ;; keep track of whether the mismatched data came from the same
      ;; compilation unit, so we can't do that. -- WHN 2001-02-11
-     :error-function #'compiler-style-warning
-     :warning-function (cond (info #'compiler-style-warning)
-			     (for-real #'compiler-note)
-			     (t nil))
+     :lossage-fun #'compiler-style-warn
+     :unwinnage-fun (cond (info #'compiler-style-warn)
+			  (for-real #'compiler-note)
+			  (t nil))
      :really-assert
      (and for-real
 	  (not (and info

@@ -177,7 +177,7 @@
 	    'sb!c:check-unsigned-byte-32)
 	   (t nil)))
     (fun-type
-     'sb!c:check-function)
+     'sb!c:check-fun)
     (t
      nil)))
 

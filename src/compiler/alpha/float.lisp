@@ -13,27 +13,26 @@
 
 ;;;; float move functions
 
-(define-move-function (load-fp-zero 1) (vop x y)
+(define-move-fun (load-fp-zero 1) (vop x y)
   ((fp-single-zero) (single-reg)
    (fp-double-zero) (double-reg))
   (inst fmove x y))
 
-(define-move-function (load-single 1) (vop x y)
+(define-move-fun (load-single 1) (vop x y)
   ((single-stack) (single-reg))
   (inst lds y (* (tn-offset x) n-word-bytes) (current-nfp-tn vop)))
 
-(define-move-function (store-single 1) (vop x y)
+(define-move-fun (store-single 1) (vop x y)
   ((single-reg) (single-stack))
   (inst sts x (* (tn-offset y) n-word-bytes) (current-nfp-tn vop)))
 
-
-(define-move-function (load-double 2) (vop x y)
+(define-move-fun (load-double 2) (vop x y)
   ((double-stack) (double-reg))
   (let ((nfp (current-nfp-tn vop))
 	(offset (* (tn-offset x) n-word-bytes)))
     (inst ldt y offset nfp)))
 
-(define-move-function (store-double 2) (vop x y)
+(define-move-fun (store-double 2) (vop x y)
   ((double-reg) (double-stack))
   (let ((nfp (current-nfp-tn vop))
 	(offset (* (tn-offset y) n-word-bytes)))
@@ -141,7 +140,7 @@
 		  :offset (1+ (tn-offset x))))
 
 
-(define-move-function (load-complex-single 2) (vop x y)
+(define-move-fun (load-complex-single 2) (vop x y)
   ((complex-single-stack) (complex-single-reg))
   (let ((nfp (current-nfp-tn vop))
 	(offset (* (tn-offset x) n-word-bytes)))
@@ -150,7 +149,7 @@
     (let ((imag-tn (complex-single-reg-imag-tn y)))
       (inst lds imag-tn (+ offset n-word-bytes) nfp))))
 
-(define-move-function (store-complex-single 2) (vop x y)
+(define-move-fun (store-complex-single 2) (vop x y)
   ((complex-single-reg) (complex-single-stack))
   (let ((nfp (current-nfp-tn vop))
 	(offset (* (tn-offset y) n-word-bytes)))
@@ -160,7 +159,7 @@
       (inst sts imag-tn (+ offset n-word-bytes) nfp))))
 
 
-(define-move-function (load-complex-double 4) (vop x y)
+(define-move-fun (load-complex-double 4) (vop x y)
   ((complex-double-stack) (complex-double-reg))
   (let ((nfp (current-nfp-tn vop))
 	(offset (* (tn-offset x) n-word-bytes)))
@@ -169,7 +168,7 @@
     (let ((imag-tn (complex-double-reg-imag-tn y)))
       (inst ldt imag-tn (+ offset (* 2 n-word-bytes)) nfp))))
 
-(define-move-function (store-complex-double 4) (vop x y)
+(define-move-fun (store-complex-double 4) (vop x y)
   ((complex-double-reg) (complex-double-stack))
   (let ((nfp (current-nfp-tn vop))
 	(offset (* (tn-offset y) n-word-bytes)))

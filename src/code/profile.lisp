@@ -217,7 +217,7 @@
 
 ;;; A symbol or (SETF FOO) list names a function, a string names all
 ;;; the functions named by symbols in the named package.
-(defun mapc-on-named-functions (function names)
+(defun mapc-on-named-funs (function names)
   (dolist (name names)
     (etypecase name
       (symbol (funcall function name))
@@ -239,7 +239,7 @@
 
 ;;; Profile the named function, which should exist and not be profiled
 ;;; already.
-(defun profile-1-unprofiled-function (name)
+(defun profile-1-unprofiled-fun (name)
   (let ((encapsulated-fun (fdefinition name)))
     (multiple-value-bind (encapsulation-fun read-stats-fun clear-stats-fun)
 	(profile-encapsulation-lambdas encapsulated-fun)
@@ -254,18 +254,18 @@
       (values))))
 
 ;;; Profile the named function. If already profiled, unprofile first.
-(defun profile-1-function (name)
+(defun profile-1-fun (name)
   (cond ((fboundp name)
 	 (when (gethash name *profiled-fun-name->info*)
 	   (warn "~S is already profiled, so unprofiling it first." name)
-	   (unprofile-1-function name))
-	 (profile-1-unprofiled-function name))
+	   (unprofile-1-fun name))
+	 (profile-1-unprofiled-fun name))
 	(t
 	 (warn "ignoring undefined function ~S" name)))
   (values))
 
 ;;; Unprofile the named function, if it is profiled.
-(defun unprofile-1-function (name)
+(defun unprofile-1-fun (name)
   (let ((pinfo (gethash name *profiled-fun-name->info*)))
     (cond (pinfo
 	   (remhash name *profiled-fun-name->info*)
@@ -293,7 +293,7 @@
   (if (null names)
       `(loop for k being each hash-key in *profiled-fun-name->info*
 	     collecting k)
-      `(mapc-on-named-functions #'profile-1-function ',names)))
+      `(mapc-on-named-funs #'profile-1-fun ',names)))
 
 (defmacro unprofile (&rest names)
   #+sb-doc
@@ -303,13 +303,13 @@
   named package. NAMES defaults to the list of names of all currently 
   profiled functions."
   (if names
-      `(mapc-on-named-functions #'unprofile-1-function ',names)
+      `(mapc-on-named-funs #'unprofile-1-fun ',names)
       `(unprofile-all)))
 
 (defun unprofile-all ()
   (dohash (name profile-info *profiled-fun-name->info*)
     (declare (ignore profile-info))
-    (unprofile-1-function name)))
+    (unprofile-1-fun name)))
 
 (defun reset ()
   "Reset the counters for all profiled functions."

@@ -1243,7 +1243,7 @@
     (pprint-fill stream (pprint-pop))
     (pprint-tagbody-guts stream)))
 
-(defun pprint-function-call (stream list &rest noise)
+(defun pprint-fun-call (stream list &rest noise)
   (declare (ignore noise))
   (funcall (formatter "~:<~^~W~^ ~:_~:I~@{~W~^ ~_~}~:>")
 	   stream
@@ -1266,7 +1266,7 @@
     (/show0 "doing SET-PPRINT-DISPATCH for regular types")
     (set-pprint-dispatch 'array #'pprint-array)
     (set-pprint-dispatch '(cons (and symbol (satisfies fboundp)))
-			 #'pprint-function-call -1)
+			 #'pprint-fun-call -1)
     (set-pprint-dispatch 'cons #'pprint-fill -2)
     ;; cons cells with interesting things for the car
     (/show0 "doing SET-PPRINT-DISPATCH for CONS with interesting CAR")

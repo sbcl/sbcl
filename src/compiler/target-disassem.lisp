@@ -519,7 +519,7 @@
 			 (not (offs-hook-before-address next-hook))))
 	    (return))
 	  (unless (< hook-offs cur-offs)
-	    (funcall (offs-hook-function next-hook) stream dstate))
+	    (funcall (offs-hook-fun next-hook) stream dstate))
 	  (pop (dstate-cur-offs-hooks dstate))
 	  (unless (= (dstate-next-offs dstate) cur-offs)
 	    (return)))))))
@@ -1317,7 +1317,7 @@
 
 ;;; Return a list of the segments of memory containing machine code
 ;;; instructions for FUNCTION.
-(defun get-function-segments (function)
+(defun get-fun-segments (function)
   (declare (type compiled-function function))
   (let* ((code (fun-code function))
 	 (fun-map (code-fun-map code))
@@ -1504,18 +1504,20 @@
 ;;;; top level functions
 
 ;;; Disassemble the machine code instructions for FUNCTION.
-(defun disassemble-function (function &key
-				      (stream *standard-output*)
-				      (use-labels t))
-  (declare (type compiled-function function)
+(defun disassemble-fun (fun &key
+			    (stream *standard-output*)
+			    (use-labels t))
+  (declare (type compiled-function fun)
 	   (type stream stream)
 	   (type (member t nil) use-labels))
   (let* ((dstate (make-dstate))
-	 (segments (get-function-segments function)))
+	 (segments (get-fun-segments fun)))
     (when use-labels
       (label-segments segments dstate))
     (disassemble-segments segments stream dstate)))
 
+;;; FIXME: We probably don't need this any more now that there are
+;;; no interpreted functions, only compiled ones.
 (defun compile-function-lambda-expr (function)
   (declare (type function function))
   (multiple-value-bind (lambda closurep name)
@@ -1525,11 +1527,11 @@
       (error "can't compile a lexical closure"))
     (compile nil lambda)))
 
-(defun compiled-function-or-lose (thing &optional (name thing))
+(defun compiled-fun-or-lose (thing &optional (name thing))
   (cond ((or (symbolp thing)
 	     (and (listp thing)
 		  (eq (car thing) 'setf)))
-	 (compiled-function-or-lose (fdefinition thing) thing))
+	 (compiled-fun-or-lose (fdefinition thing) thing))
 	((functionp thing)
 	 thing)
 	((and (listp thing)
@@ -1550,9 +1552,9 @@
 	   (type (or (member t) stream) stream)
 	   (type (member t nil) use-labels))
   (pprint-logical-block (*standard-output* nil :per-line-prefix "; ")
-    (disassemble-function (compiled-function-or-lose object)
-			  :stream stream
-			  :use-labels use-labels)
+    (disassemble-fun (compiled-fun-or-lose object)
+		     :stream stream
+		     :use-labels use-labels)
     nil))
 
 ;;; Disassembles the given area of memory starting at ADDRESS and

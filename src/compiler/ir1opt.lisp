@@ -159,9 +159,9 @@
 		     (eq int *empty-type*)
 		     (not (eq rtype *empty-type*)))
 	    (let ((*compiler-error-context* node))
-	      (compiler-warning
+	      (compiler-warn
 	       "New inferred type ~S conflicts with old type:~
-		~%  ~S~%*** Bug?"
+		~%  ~S~%*** possible internal error? Please report this."
 	       (type-specifier rtype) (type-specifier node-type))))
 	  (setf (node-derived-type node) int)
 	  (reoptimize-continuation (node-cont node))))))
@@ -880,8 +880,8 @@
 			     ;; FIXME: Actually, I think we could
 			     ;; issue a full WARNING if the call
 			     ;; violates a DECLAIM FTYPE.
-			     :error-function #'compiler-style-warning
-			     :warning-function #'compiler-note)
+			     :lossage-fun #'compiler-style-warn
+			     :unwinnage-fun #'compiler-note)
 	 (assert-call-type call type)
 	 (maybe-terminate-block call ir1-converting-not-optimizing-p)
 	 (recognize-known-call call ir1-converting-not-optimizing-p))
@@ -999,7 +999,7 @@
 	       (:aborted
 		(setf (combination-kind node) :error)
 		(when args
-		  (apply #'compiler-warning args))
+		  (apply #'compiler-warn args))
 		(remhash node table)
 		nil)
 	       (:failure
@@ -1471,14 +1471,14 @@
 
 	(when total-nvals
 	  (when (and min (< total-nvals min))
-	    (compiler-warning
+	    (compiler-warn
 	     "MULTIPLE-VALUE-CALL with ~R values when the function expects ~
 	     at least ~R."
 	     total-nvals min)
 	    (setf (basic-combination-kind node) :error)
 	    (return-from ir1-optimize-mv-call))
 	  (when (and max (> total-nvals max))
-	    (compiler-warning
+	    (compiler-warn
 	     "MULTIPLE-VALUE-CALL with ~R values when the function expects ~
 	     at most ~R."
 	     total-nvals max)

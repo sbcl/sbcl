@@ -102,7 +102,7 @@
 		      #-cmu nil
 		      #+cmu (cl::*gc-trigger*
 			     cl::inch-ptr
-			     cl::*internal-symbol-output-function*
+			     cl::*internal-symbol-output-fun*
 			     cl::ouch-ptr
 			     cl::*previous-case*
 			     cl::read-buffer

@@ -273,7 +273,7 @@ comments from CMU CL:
     ("Simple type predicate" "STRUCTUREP" "LISTP" "FIXNUMP")
     ("Simple type check" "CHECK-LIST" "CHECK-FIXNUM" "CHECK-STRUCTURE")
     ("Array bounds check" "CHECK-BOUND")
-    ("Complex type check" "$CHECK-" "COERCE-TO-FUNCTION")
+    ("Complex type check" "$CHECK-" "COERCE-TO-FUN")
     ("Special read" "SYMBOL-VALUE")
     ("Special bind" "BIND$")
     ("Tagging" "MOVE-FROM")

@@ -305,12 +305,12 @@ Function and macro commands:
        (format t "~&~S: FUN-END in ~S" bp-number
 	       (sb!di:debug-fun-name place))))))
 
-;;;; MAIN-HOOK-FUNCTION for steps and breakpoints
+;;;; MAIN-HOOK-FUN for steps and breakpoints
 
 ;;; This must be passed as the hook function. It keeps track of where
 ;;; STEP breakpoints are.
-(defun main-hook-function (current-frame breakpoint &optional return-vals
-					 fun-end-cookie)
+(defun main-hook-fun (current-frame breakpoint &optional return-vals
+				    fun-end-cookie)
   (setf *default-breakpoint-debug-fun*
 	(sb!di:frame-debug-fun current-frame))
   (dolist (step-info *step-breakpoints*)
@@ -377,7 +377,7 @@ Function and macro commands:
 		 (break string)
 		 (format t "~A" string)))
 	    (t
-	     (break "error in main-hook-function: unknown breakpoint"))))))
+	     (break "unknown breakpoint"))))))
 
 ;;; Set breakpoints at the next possible code-locations. After calling
 ;;; this, either (CONTINUE) if in the debugger or just let program flow
@@ -399,14 +399,14 @@ Function and macro commands:
 	    (when bp-info
 	      (sb!di:deactivate-breakpoint (breakpoint-info-breakpoint
 					    bp-info))))
-	  (let ((bp (sb!di:make-breakpoint #'main-hook-function code-location
+	  (let ((bp (sb!di:make-breakpoint #'main-hook-fun code-location
 					   :kind :code-location)))
 	    (sb!di:activate-breakpoint bp)
 	    (push (create-breakpoint-info code-location bp 0)
 		  *step-breakpoints*))))
        (t
 	(let* ((debug-fun (sb!di:frame-debug-fun *current-frame*))
-	       (bp (sb!di:make-breakpoint #'main-hook-function debug-fun
+	       (bp (sb!di:make-breakpoint #'main-hook-fun debug-fun
 					  :kind :fun-end)))
 	  (sb!di:activate-breakpoint bp)
 	  (push (create-breakpoint-info debug-fun bp 0)
@@ -1473,7 +1473,7 @@ argument")
 			 *default-breakpoint-debug-fun*))))))
 	   (setup-fun-start ()
 	     (let ((code-loc (sb!di:debug-fun-start-location place)))
-	       (setf bp (sb!di:make-breakpoint #'main-hook-function
+	       (setf bp (sb!di:make-breakpoint #'main-hook-fun
 					       place
 					       :kind :fun-start))
 	       (setf break (sb!di:preprocess-for-eval break code-loc))
@@ -1483,7 +1483,7 @@ argument")
 		       print-functions))))
 	   (setup-fun-end ()
 	     (setf bp
-		   (sb!di:make-breakpoint #'main-hook-function
+		   (sb!di:make-breakpoint #'main-hook-fun
 					  place
 					  :kind :fun-end))
 	     (setf break
@@ -1504,8 +1504,7 @@ argument")
 		     print-functions)))
 	   (setup-code-location ()
 	     (setf place (nth index *possible-breakpoints*))
-	     (setf bp (sb!di:make-breakpoint #'main-hook-function
-					     place
+	     (setf bp (sb!di:make-breakpoint #'main-hook-fun place
 					     :kind :code-location))
 	     (dolist (form print)
 	       (push (cons

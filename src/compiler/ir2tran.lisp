@@ -1606,7 +1606,7 @@
 		   (unless (or (node-tail-p last)
 			       (info :function :info name)
 			       (policy last (zerop safety)))
-		     (vop nil-function-returned-error last 2block
+		     (vop nil-fun-returned-error last 2block
 			  (if name
 			      (emit-constant name)
 			      (multiple-value-bind (tn named)

@@ -507,8 +507,8 @@
 	      (member-type
 	       `(member ,object ',(member-type-members type)))
 	      (args-type
-	       (compiler-warning "illegal type specifier for TYPEP: ~S"
-				 (cadr spec))
+	       (compiler-warn "illegal type specifier for TYPEP: ~S"
+			      (cadr spec))
 	       `(%typep ,object ,spec))
 	      (t nil))
 	    (typecase type

@@ -27,9 +27,9 @@
 (defvar *ignorable-vars*)
 (declaim (type list *ignorable-vars*))
 
-;;; Return, as multiple-values, a body, possibly a declare form to put where
-;;; this code is inserted, the documentation for the parsed body, and bounds
-;;; on the number of arguments.
+;;; Return, as multiple values, a body, possibly a declare form to put
+;;; where this code is inserted, the documentation for the parsed
+;;; body, and bounds on the number of arguments.
 (defun parse-defmacro (lambda-list arg-list-name body name error-kind
 				   &key
 				   (anonymousp nil)

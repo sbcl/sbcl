@@ -49,7 +49,7 @@
       (:function) ; happy case
       ((nil)) ; another happy case
       (:macro ; maybe-not-so-good case
-       (compiler-style-warning "~S was previously defined as a macro." name)
+       (compiler-style-warn "~S was previously defined as a macro." name)
        (setf (info :function :where-from name) :assumed)
        (clear-info :function :macro-function name))))
 
@@ -79,7 +79,7 @@
   (when (consp name)
     (when (or (info :setf :inverse name)
 	      (info :setf :expander name))
-      (compiler-style-warning
+      (compiler-style-warn
        "defining as a SETF function a name that already has a SETF macro:~
        ~%  ~S"
        name)))

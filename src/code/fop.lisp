@@ -37,7 +37,7 @@
       (error "multiple codes for fop name ~S: ~D and ~D" name code ocode)))
   (setf (svref *fop-names* code) name
 	(get name 'fop-code) code
-	(svref *fop-functions* code) (symbol-function name))
+	(svref *fop-funs* code) (symbol-function name))
   (values))
 
 ;;; Define a pair of fops which are identical except that one reads
@@ -637,9 +637,9 @@ bug.~:@>")
     (setf (code-header-ref code (clone-arg)) value)
     (values)))
 
-(define-fop (fop-function-entry 142)
+(define-fop (fop-fun-entry 142)
   #+sb-xc-host ; since xc host doesn't know how to compile %PRIMITIVE
-  (error "FOP-FUNCTION-ENTRY can't be defined without %PRIMITIVE.")
+  (error "FOP-FUN-ENTRY can't be defined without %PRIMITIVE.")
   #-sb-xc-host
   (let ((type (pop-stack))
 	(arglist (pop-stack))

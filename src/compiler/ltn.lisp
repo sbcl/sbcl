@@ -801,31 +801,31 @@
     (when (losers)
       (collect ((messages)
 		(count 0 +))
-	(flet ((frob (string &rest stuff)
+	(flet ((lose1 (string &rest stuff)
 		 (messages string)
 		 (messages stuff)))
 	  (dolist (loser (losers))
 	    (when (and *efficiency-note-limit*
 		       (>= (count) *efficiency-note-limit*))
-	      (frob "etc.")
+	      (lose1 "etc.")
 	      (return))
 	    (let* ((type (template-type loser))
 		   (valid (valid-function-use call type))
 		   (strict-valid (valid-function-use call type
 						     :strict-result t)))
-	      (frob "unable to do ~A (cost ~W) because:"
-		    (or (template-note loser) (template-name loser))
-		    (template-cost loser))
+	      (lose1 "unable to do ~A (cost ~W) because:"
+		     (or (template-note loser) (template-name loser))
+		     (template-cost loser))
 	      (cond
 	       ((and valid strict-valid)
-		(strange-template-failure loser call ltn-policy #'frob))
+		(strange-template-failure loser call ltn-policy #'lose1))
 	       ((not valid)
 		(aver (not (valid-function-use call type
-					       :error-function #'frob
-					       :warning-function #'frob))))
+					       :lossage-fun #'lose1
+					       :unwinnage-fun #'lose1))))
 	       (t
 		(aver (ltn-policy-safe-p ltn-policy))
-		(frob "can't trust output type assertion under safe policy")))
+		(lose1 "can't trust output type assertion under safe policy")))
 	      (count 1))))
 
 	(let ((*compiler-error-context* call))
@@ -904,13 +904,12 @@
 				(ir1-attributep (function-info-attributes info)
 						recursive))))))
 	  (let ((*compiler-error-context* call))
-	    (compiler-warning "~@<recursion in known function definition~2I ~
-                               ~_policy=~S ~_arg types=~S~:>"
-			      (lexenv-policy (node-lexenv call))
-			      (mapcar (lambda (arg)
-					(type-specifier (continuation-type
-							 arg)))
-				      args))))
+	    (compiler-warn "~@<recursion in known function definition~2I ~
+                            ~_policy=~S ~_arg types=~S~:>"
+			   (lexenv-policy (node-lexenv call))
+			   (mapcar (lambda (arg)
+				     (type-specifier (continuation-type arg)))
+				   args))))
 	(ltn-default-call call ltn-policy)
 	(return-from ltn-analyze-known-call (values)))
       (setf (basic-combination-info call) template)

@@ -1354,7 +1354,7 @@
       (inst jmp :ne err-lab))))
 
 ;;; Various other error signallers.
-(macrolet ((frob (name error translate &rest args)
+(macrolet ((def (name error translate &rest args)
 	     `(define-vop (,name)
 		,@(when translate
 		    `((:policy :fast-safe)
@@ -1366,14 +1366,14 @@
 		(:save-p :compute-only)
 		(:generator 1000
 		  (error-call vop ,error ,@args)))))
-  (frob argument-count-error invalid-argument-count-error
+  (def argument-count-error invalid-argument-count-error
     sb!c::%argument-count-error nargs)
-  (frob type-check-error object-not-type-error sb!c::%type-check-error
+  (def type-check-error object-not-type-error sb!c::%type-check-error
     object type)
-  (frob layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error
+  (def layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error
     object layout)
-  (frob odd-key-arguments-error odd-key-arguments-error
+  (def odd-key-arguments-error odd-key-arguments-error
     sb!c::%odd-key-arguments-error)
-  (frob unknown-key-argument-error unknown-key-argument-error
+  (def unknown-key-argument-error unknown-key-argument-error
     sb!c::%unknown-key-argument-error key)
-  (frob nil-function-returned-error nil-function-returned-error nil fun))
+  (def nil-fun-returned-error nil-fun-returned-error nil fun))

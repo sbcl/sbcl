@@ -948,8 +948,8 @@
 	(unless (policy *compiler-error-context* (= inhibit-warnings 3))
 	  ;; ANSI section "3.2.5 Exceptional Situations in the Compiler"
 	  ;; requires this to be no more than a STYLE-WARNING.
-	  (compiler-style-warning "The variable ~S is defined but never used."
-				  (leaf-debug-name var)))
+	  (compiler-style-warn "The variable ~S is defined but never used."
+			       (leaf-debug-name var)))
 	(setf (leaf-ever-used var) t)))) ; to avoid repeated warnings? -- WHN
   (values))
 
@@ -1357,7 +1357,7 @@
     (handler-case (apply function args)
       (error (condition)
 	(let ((*compiler-error-context* node))
-	  (compiler-warning "Lisp error during ~A:~%~A" context condition)
+	  (compiler-warn "Lisp error during ~A:~%~A" context condition)
 	  (return-from careful-call (values nil nil))))))
    t))
 

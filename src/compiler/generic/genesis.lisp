@@ -1691,21 +1691,21 @@
 ;;;; general machinery for cold-loading FASL files
 
 ;;; FOP functions for cold loading
-(defvar *cold-fop-functions*
-  ;; We start out with a copy of the ordinary *FOP-FUNCTIONS*. The
-  ;; ones which aren't appropriate for cold load will be destructively
+(defvar *cold-fop-funs*
+  ;; We start out with a copy of the ordinary *FOP-FUNS*. The ones
+  ;; which aren't appropriate for cold load will be destructively
   ;; modified.
-  (copy-seq *fop-functions*))
+  (copy-seq *fop-funs*))
 
-(defvar *normal-fop-functions*)
+(defvar *normal-fop-funs*)
 
 ;;; Cause a fop to have a special definition for cold load.
 ;;; 
 ;;; This is similar to DEFINE-FOP, but unlike DEFINE-FOP, this version
 ;;;   (1) looks up the code for this name (created by a previous
 ;;        DEFINE-FOP) instead of creating a code, and
-;;;   (2) stores its definition in the *COLD-FOP-FUNCTIONS* vector,
-;;;       instead of storing in the *FOP-FUNCTIONS* vector.
+;;;   (2) stores its definition in the *COLD-FOP-FUNS* vector,
+;;;       instead of storing in the *FOP-FUNS* vector.
 (defmacro define-cold-fop ((name &optional (pushp t)) &rest forms)
   (aver (member pushp '(nil t :nope)))
   (let ((code (get name 'fop-code))
@@ -1717,7 +1717,7 @@
 	 ,@(if (eq pushp :nope)
 	     forms
 	     `((with-fop-stack ,pushp ,@forms))))
-       (setf (svref *cold-fop-functions* ,code) #',fname))))
+       (setf (svref *cold-fop-funs* ,code) #',fname))))
 
 (defmacro clone-cold-fop ((name &optional (pushp t)) (small-name) &rest forms)
   (aver (member pushp '(nil t :nope)))
@@ -1738,8 +1738,8 @@
 (defun cold-load (filename)
   #!+sb-doc
   "Load the file named by FILENAME into the cold load image being built."
-  (let* ((*normal-fop-functions* *fop-functions*)
-	 (*fop-functions* *cold-fop-functions*)
+  (let* ((*normal-fop-funs* *fop-funs*)
+	 (*fop-funs* *cold-fop-funs*)
 	 (*cold-load-filename* (etypecase filename
 				 (string filename)
 				 (pathname (namestring filename)))))
@@ -1759,11 +1759,11 @@
 (define-cold-fop (fop-truth) (cold-intern t))
 
 (define-cold-fop (fop-normal-load :nope)
-  (setq *fop-functions* *normal-fop-functions*))
+  (setq *fop-funs* *normal-fop-funs*))
 
 (define-fop (fop-maybe-cold-load 82 :nope)
   (when *cold-load-filename*
-    (setq *fop-functions* *cold-fop-functions*)))
+    (setq *fop-funs* *cold-fop-funs*)))
 
 (define-cold-fop (fop-maybe-cold-load :nope))
 
@@ -2330,7 +2330,7 @@
 	(code (pop-stack)))
     (write-wordindexed code slot value)))
 
-(define-cold-fop (fop-function-entry)
+(define-cold-fop (fop-fun-entry)
   (let* ((type (pop-stack))
 	 (arglist (pop-stack))
 	 (name (pop-stack))

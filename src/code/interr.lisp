@@ -62,7 +62,7 @@
 (deferr unknown-error (&rest args)
   (error "unknown error:~{ ~S~})" args))
 
-(deferr object-not-function-error (object)
+(deferr object-not-fun-error (object)
   (error 'type-error
 	 :datum object
 	 :expected-type 'function))
@@ -179,10 +179,10 @@
 		 (symbol fdefn-or-symbol)
 		 (fdefn (fdefn-name fdefn-or-symbol)))))
 
-(deferr object-not-coerceable-to-function-error (object)
+(deferr object-not-coerceable-to-fun-error (object)
   (error 'type-error
 	 :datum object
-	 :expected-type 'coerceable-to-function))
+	 :expected-type 'coerceable-to-fun))
 
 (deferr invalid-argument-count-error (nargs)
   (error 'simple-program-error
@@ -221,7 +221,7 @@
 	 :format-control "attempt to THROW to a tag that does not exist: ~S"
 	 :format-arguments (list tag)))
 
-(deferr nil-function-returned-error (function)
+(deferr nil-fun-returned-error (function)
   (error 'simple-control-error
 	 :format-control
 	 "A function with declared result type NIL returned:~%  ~S"

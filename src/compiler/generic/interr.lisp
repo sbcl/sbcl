@@ -38,7 +38,7 @@
 (define-internal-errors
   (unknown
    "unknown system lossage")
-  (object-not-function
+  (object-not-fun
    "Object is not of type FUNCTION.")
   (object-not-list
    "Object is not of type LIST.")
@@ -87,7 +87,7 @@
    ;; FIXME: Isn't this used for calls to unbound (SETF FOO) too? If so, revise
    ;; the name.
    "An attempt was made to use an undefined FDEFINITION.")
-  (object-not-coerceable-to-function
+  (object-not-coerceable-to-fun
    "Object is not coerceable to type FUNCTION.")
   (invalid-argument-count
    "invalid argument count")
@@ -175,7 +175,7 @@
    "Object is not a INSTANCE.")
   (object-not-base-char
    "Object is not of type BASE-CHAR.")
-  (nil-function-returned
+  (nil-fun-returned
    "A function with declared result type NIL returned.")
   (layout-invalid
    "Object layout is invalid. (indicates obsolete instance)")

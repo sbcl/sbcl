@@ -50,10 +50,10 @@
   ;; FIXME: It might be nice to define a BUG or OOPS function for "shouldn't
   ;; happen" cases like this.
   (error "internal error, control returned from *COMPILER-ERROR-BAILOUT*"))
-(defun compiler-warning (format-string &rest format-args)
+(defun compiler-warn (format-string &rest format-args)
   (apply #'warn format-string format-args)
   (values))
-(defun compiler-style-warning (format-string &rest format-args)
+(defun compiler-style-warn (format-string &rest format-args)
   (apply #'style-warn format-string format-args)
   (values))
 

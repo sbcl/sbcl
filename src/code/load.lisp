@@ -297,7 +297,7 @@
 			(svref *fop-names* byte)
 			byte
 			(1- (file-position stream))
-			(svref *fop-functions* byte))))
+			(svref *fop-funs* byte))))
 
 	    ;; Actually execute the fop.
 	    (if (eql byte 3)
@@ -317,7 +317,7 @@
 		(setq *fop-stack-pointer* index)
 		(setf (svref *fop-stack* index)
 		      (svref *current-fop-table* (read-byte stream))))
-	      (funcall (the function (svref *fop-functions* byte))))))))))
+	      (funcall (the function (svref *fop-funs* byte))))))))))
 
 (defun load-as-fasl (stream verbose print)
   ;; KLUDGE: ANSI says it's good to do something with the :PRINT

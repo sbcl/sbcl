@@ -18,35 +18,30 @@
 
 (in-package "SB!C")
 
+(declaim (type (or function null) *lossage-fun* *unwinnage-fun* *ctype-test-fun*))
+
 ;;; These are the functions that are to be called when a problem is
 ;;; detected. They are passed format arguments. If null, we don't do
-;;; anything. The error function is called when something is
-;;; definitely incorrect. The warning function is called when it is
-;;; somehow impossible to tell whether the call is correct.
-;;;
-;;; FIXME: *ERROR-FUNCTION* and *WARNING-FUNCTION* are now misnomers.
-;;; As per the KLUDGE note below, what the Python compiler
-;;; considered a "definite incompatibility" could easily be conforming
-;;; ANSI Common Lisp (if the incompatibility is across a compilation
-;;; unit boundary, and we don't keep track of whether it is..), so we
-;;; have to just report STYLE-WARNINGs instead of ERRORs or full
-;;; WARNINGs; and unlike CMU CL, we don't use the condition system
-;;; at all when we're reporting notes.
-(defvar *error-function*)
-(defvar *warning-function*)
+;;; anything. The LOSSAGE function is called when something is
+;;; definitely incorrect. The UNWINNAGE function is called when it is
+;;; somehow impossible to tell whether the call is correct. (Thus,
+;;; they should correspond fairly closely to the FAILURE-P and WARNINGS-P
+;;; return values of CL:COMPILE and CL:COMPILE-FILE. However, see the
+;;; KLUDGE note below for *LOSSAGE-DETECTED*.)
+(defvar *lossage-fun*)
+(defvar *unwinnage-fun*)
 
-;;; The function that we use for type checking. The derived type is
-;;; the first argument and the type we are testing against is the
+;;; the function that we use for type checking. The derived type is
+;;; its first argument and the type we are testing against is its
 ;;; second argument. The function should return values like CSUBTYPEP.
-(defvar *test-function*)
+(defvar *ctype-test-fun*)
 ;;; FIXME: Why is this a variable? Explain.
 
-(declaim (type (or function null) *error-function* *warning-function
-	       *test-function*))
-
 ;;; *LOSSAGE-DETECTED* is set when a "definite incompatibility" is
-;;; detected. *SLIME-DETECTED* is set when we can't tell whether the
-;;; call is compatible or not.
+;;; detected. *UNWINNAGE-DETECTED* is set when we can't tell whether the
+;;; call is compatible or not. Thus, they should correspond very closely
+;;; to the FAILURE-P and WARNINGS-P return values of CL:COMPILE and
+;;; CL:COMPILE-FILE.) However...
 ;;;
 ;;; KLUDGE: Common Lisp is a dynamic language, even if CMU CL was not.
 ;;; As far as I can see, none of the "definite incompatibilities"
@@ -58,21 +53,19 @@
 ;;; upgrade the code to keep track of that, we have to handle all
 ;;; these as STYLE-WARNINGs. -- WHN 2001-02-10
 (defvar *lossage-detected*)
-(defvar *slime-detected*)
-;;; FIXME: "SLIME" is vivid and concise, but "DEFINITE-CALL-LOSSAGE" and
-;;; "POSSIBLE-CALL-LOSSAGE" would be more mnemonic.
+(defvar *unwinnage-detected*)
 
-;;; Signal a warning if appropriate and set *LOSSAGE-DETECTED*.
-(declaim (ftype (function (string &rest t) (values)) note-lossage note-slime))
+;;; Signal a warning if appropriate and set *FOO-DETECTED*.
+(declaim (ftype (function (string &rest t) (values)) note-lossage note-unwinnage))
 (defun note-lossage (format-string &rest format-args)
   (setq *lossage-detected* t)
-  (when *error-function*
-    (apply *error-function* format-string format-args))
+  (when *lossage-fun*
+    (apply *lossage-fun* format-string format-args))
   (values))
-(defun note-slime (format-string &rest format-args)
-  (setq *slime-detected* t)
-  (when *warning-function*
-    (apply *warning-function* format-string format-args))
+(defun note-unwinnage (format-string &rest format-args)
+  (setq *unwinnage-detected* t)
+  (when *unwinnage-fun*
+    (apply *unwinnage-fun* format-string format-args))
   (values))
 
 (declaim (special *compiler-error-context*))
@@ -110,15 +103,15 @@
 ;;; combination node so that COMPILER-WARNING and related functions
 ;;; will do the right thing if they are supplied.
 (defun valid-function-use (call type &key
-				((:argument-test *test-function*) #'csubtypep)
+				((:argument-test *ctype-test-fun*) #'csubtypep)
 				(result-test #'values-subtypep)
 				(strict-result nil)
-				((:error-function *error-function*))
-				((:warning-function *warning-function*)))
+				((:lossage-fun *lossage-fun*))
+				((:unwinnage-fun *unwinnage-fun*)))
   (declare (type function result-test) (type combination call)
 	   (type fun-type type))
   (let* ((*lossage-detected* nil)
-	 (*slime-detected* nil)
+	 (*unwinnage-detected* nil)
 	 (*compiler-error-context* call)
 	 (args (combination-args call))
 	 (nargs (length args))
@@ -170,15 +163,15 @@
 					  dtype))))
       (multiple-value-bind (int win) (funcall result-test out-type return-type)
 	(cond ((not win)
-	       (note-slime "can't tell whether the result is a ~S"
-			   (type-specifier return-type)))
+	       (note-unwinnage "can't tell whether the result is a ~S"
+			       (type-specifier return-type)))
 	      ((not int)
 	       (note-lossage "The result is a ~S, not a ~S."
 			     (type-specifier out-type)
 			     (type-specifier return-type))))))
 
     (cond (*lossage-detected* (values nil t))
-	  (*slime-detected* (values nil nil))
+	  (*unwinnage-detected* (values nil nil))
 	  (t (values t t)))))
 
 ;;; Check that the derived type of the continuation CONT is compatible
@@ -193,30 +186,30 @@
   (cond
    ((not (constant-type-p type))
     (let ((ctype (continuation-type cont)))
-      (multiple-value-bind (int win) (funcall *test-function* ctype type)
+      (multiple-value-bind (int win) (funcall *ctype-test-fun* ctype type)
 	(cond ((not win)
-	       (note-slime "can't tell whether the ~:R argument is a ~S"
-			   n (type-specifier type))
+	       (note-unwinnage "can't tell whether the ~:R argument is a ~S"
+			       n (type-specifier type))
 	       nil)
 	      ((not int)
 	       (note-lossage "The ~:R argument is a ~S, not a ~S."
 			     n (type-specifier ctype) (type-specifier type))
 	       nil)
 	      ((eq ctype *empty-type*)
-	       (note-slime "The ~:R argument never returns a value." n)
+	       (note-unwinnage "The ~:R argument never returns a value." n)
 	       nil)
 	      (t t)))))
     ((not (constant-continuation-p cont))
-     (note-slime "The ~:R argument is not a constant." n)
+     (note-unwinnage "The ~:R argument is not a constant." n)
      nil)
     (t
      (let ((val (continuation-value cont))
 	   (type (constant-type-type type)))
        (multiple-value-bind (res win) (ctypep val type)
 	 (cond ((not win)
-		(note-slime "can't tell whether the ~:R argument is a ~
-			     constant ~S:~%  ~S"
-			    n (type-specifier type) val)
+		(note-unwinnage "can't tell whether the ~:R argument is a ~
+			        constant ~S:~%  ~S"
+				n (type-specifier type) val)
 		nil)
 	       ((not res)
 		(note-lossage "The ~:R argument is not a constant ~S:~%  ~S"
@@ -226,7 +219,7 @@
 
 ;;; Check that each of the type of each supplied argument intersects
 ;;; with the type specified for that argument. If we can't tell, then
-;;; we complain about the slime.
+;;; we can complain about the absence of manifest winnage.
 (declaim (ftype (function (list list (or ctype null)) (values)) check-fixed-and-rest))
 (defun check-fixed-and-rest (args types rest)
   (do ((arg args (cdr arg))
@@ -243,8 +236,8 @@
 
 ;;; Check that the &KEY args are of the correct type. Each key should
 ;;; be known and the corresponding argument should be of the correct
-;;; type. If the key isn't a constant, then we can't tell, so we note
-;;; slime.
+;;; type. If the key isn't a constant, then we can't tell, so we can
+;;; complain about absence of manifest winnage.
 (declaim (ftype (function (list fixnum fun-type) (values)) check-key-args))
 (defun check-key-args (args pre-key type)
   (do ((key (nthcdr pre-key args) (cddr key))
@@ -255,8 +248,9 @@
       (cond
        ((not (check-arg-type k (specifier-type 'symbol) n)))
        ((not (constant-continuation-p k))
-	(note-slime "The ~:R argument (in keyword position) is not a constant."
-		    n))
+	(note-unwinnage "The ~:R argument (in keyword position) is not a ~
+                        constant."
+			n))
        (t
 	(let* ((name (continuation-value k))
 	       (info (find name (fun-type-keywords type)
@@ -356,8 +350,8 @@
 (declaim (ftype (function (combination
 			   &optional (or approximate-fun-type null))
 			  approximate-fun-type)
-		note-function-use))
-(defun note-function-use (call &optional type)
+		note-fun-use))
+(defun note-fun-use (call &optional type)
   (let* ((type (or type (make-approximate-fun-type)))
 	 (types (approximate-fun-type-types type))
 	 (args (combination-args call))
@@ -423,13 +417,13 @@
 			  (values boolean boolean))
 		valid-approximate-type))
 (defun valid-approximate-type (call-type type &optional
-					 (*test-function*
+					 (*ctype-test-fun*
 					  #'types-equal-or-intersect)
-					 (*error-function*
-					  #'compiler-style-warning)
-					 (*warning-function* #'compiler-note))
+					 (*lossage-fun*
+					  #'compiler-style-warn)
+					 (*unwinnage-fun* #'compiler-note))
   (let* ((*lossage-detected* nil)
-	 (*slime-detected* nil)
+	 (*unwinnage-detected* nil)
 	 (required (fun-type-required type))
 	 (min-args (length required))
 	 (optional (fun-type-optional type))
@@ -466,7 +460,7 @@
 				      rest)
 
     (cond (*lossage-detected* (values nil t))
-	  (*slime-detected* (values nil nil))
+	  (*unwinnage-detected* (values nil nil))
 	  (t (values t t)))))
 
 ;;; Check that each of the types used at each arg position is
@@ -491,11 +485,15 @@
 (defun check-approximate-arg-type (call-types decl-type context &rest args)
   (let ((losers *empty-type*))
     (dolist (ctype call-types)
-      (multiple-value-bind (int win) (funcall *test-function* ctype decl-type)
+      (multiple-value-bind (int win) (funcall *ctype-test-fun* ctype decl-type)
 	(cond
 	 ((not win)
-	  (note-slime "can't tell whether previous ~? argument type ~S is a ~S"
-		      context args (type-specifier ctype) (type-specifier decl-type)))
+	  (note-unwinnage "can't tell whether previous ~? ~
+                           argument type ~S is a ~S"
+			  context
+			  args
+			  (type-specifier ctype)
+			  (type-specifier decl-type)))
 	 ((not int)
 	  (setq losers (type-union ctype losers))))))
 
@@ -703,19 +701,19 @@
 ;;; from the FUN-TYPE.
 ;;;
 ;;; If there is a syntactic or type problem, then we call
-;;; ERROR-FUNCTION with an error message using WHERE as context
+;;; LOSSAGE-FUN with an error message using WHERE as context
 ;;; describing where FUN-TYPE came from.
 ;;;
 ;;; If there is no problem, we return T (even if REALLY-ASSERT was
 ;;; false). If there was a problem, we return NIL.
 (defun assert-definition-type
        (functional type &key (really-assert t)
-		   ((:error-function *error-function*)
-		    #'compiler-style-warning)
-		   warning-function
+		   ((:lossage-fun *lossage-fun*)
+		    #'compiler-style-warn)
+		   unwinnage-fun
 		   (where "previous declaration"))
   (declare (type functional functional)
-	   (type function *error-function*)
+	   (type function *lossage-fun*)
 	   (string where))
   (unless (fun-type-p type)
     (return-from assert-definition-type t))
@@ -747,9 +745,9 @@
 	    (assert-continuation-type (return-result return) atype))
 	  (loop for var in vars and type in types do
 	    (cond ((basic-var-sets var)
-		   (when (and warning-function
+		   (when (and unwinnage-fun
 			      (not (csubtypep (leaf-type var) type)))
-		     (funcall warning-function
+		     (funcall unwinnage-fun
 			      "Assignment to argument: ~S~%  ~
 			       prevents use of assertion from function ~
 			       type ~A:~%  ~S~%"

@@ -280,7 +280,7 @@
 
 ;;; Give someone a hard time because there isn't any load function
 ;;; defined to move from SRC to DEST.
-(defun no-load-function-error (src dest)
+(defun no-load-fun-error (src dest)
   (let* ((src-sc (tn-sc src))
 	 (src-name (sc-name src-sc))
 	 (dest-sc (tn-sc dest))
@@ -466,9 +466,9 @@
   (emit-load-template node block
 		      (template-or-lose 'move-operand)
 		      src dest
-		      (list (or (svref (sc-move-functions (tn-sc dest))
+		      (list (or (svref (sc-move-funs (tn-sc dest))
 				       (sc-number (tn-sc src)))
-				(no-load-function-error src dest)))
+				(no-load-fun-error src dest)))
 		      before)
   (values))
 
@@ -1448,7 +1448,7 @@
     (do-ir2-blocks (block component)
       (do ((vop (ir2-block-start-vop block) (vop-next vop)))
 	  ((null vop))
-	(let ((target-fun (vop-info-target-function (vop-info vop))))
+	(let ((target-fun (vop-info-target-fun (vop-info vop))))
 	  (when target-fun
 	    (funcall target-fun vop)))))
 

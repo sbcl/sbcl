@@ -110,14 +110,14 @@
 
 ;;;; the FOP database
 
-(declaim (simple-vector *fop-names* *fop-functions*))
+(declaim (simple-vector *fop-names* *fop-funs*))
 
 ;;; a vector indexed by a FaslOP that yields the FOP's name
 (defvar *fop-names* (make-array 256 :initial-element nil))
 
 ;;; a vector indexed by a FaslOP that yields a function of 0 arguments
 ;;; which will perform the operation
-(defvar *fop-functions*
+(defvar *fop-funs*
   (make-array 256
 	      :initial-element (lambda ()
 				 (error "corrupt fasl file: losing FOP"))))

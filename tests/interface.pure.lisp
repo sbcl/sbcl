@@ -32,7 +32,7 @@
       (sb-kernel:%simple-fun-arglist fun))
     (#.sb-vm:closure-header-widetag (has-arglist-info-p
 				     (sb-kernel:%closure-fun fun)))
-    ;; In code/describe.lisp, ll. 227 (%describe-function), we use a scheme
+    ;; In code/describe.lisp, ll. 227 (%describe-fun), we use a scheme
     ;; like above, and it seems to work. -- MNA 2001-06-12
     ;;
     ;; (There might be other cases with arglist info also.

@@ -631,7 +631,7 @@
   ;; if true, a function that is called with the VOP to do operand
   ;; targeting. This is done by modifying the TN-REF-TARGET slots in
   ;; the TN-REFS so that they point to other TN-REFS in the same VOP.
-  (target-function nil :type (or null function))
+  (target-fun nil :type (or null function))
   ;; a function that emits assembly code for a use of this VOP when it
   ;; is called with the VOP structure. This is null if this VOP has no
   ;; specified generator (i.e. if it exists only to be inherited by
@@ -760,13 +760,13 @@
   ;; true if the values in this SC needs to be saved across calls
   (save-p nil :type boolean)
   ;; vectors mapping from SC numbers to information about how to load
-  ;; from the index SC to this one. Move-Functions holds the names of
-  ;; the functions used to do loading, and Load-Costs holds the cost
-  ;; of the corresponding Move-Functions. If loading is impossible,
-  ;; then the entries are NIL. Load-Costs is initialized to have a 0
+  ;; from the index SC to this one. MOVE-FUNS holds the names of
+  ;; the functions used to do loading, and LOAD-COSTS holds the cost
+  ;; of the corresponding move functions. If loading is impossible,
+  ;; then the entries are NIL. LOAD-COSTS is initialized to have a 0
   ;; for this SC.
-  (move-functions (make-array sc-number-limit :initial-element nil)
-		  :type sc-vector)
+  (move-funs (make-array sc-number-limit :initial-element nil)
+	     :type sc-vector)
   (load-costs (make-array sc-number-limit :initial-element nil)
 	      :type sc-vector)
   ;; a vector mapping from SC numbers to possibly

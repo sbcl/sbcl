@@ -174,11 +174,11 @@
 		(warnings (undefined-warning-warnings undef))
 		(undefined-warning-count (undefined-warning-count undef)))
 	    (dolist (*compiler-error-context* warnings)
-	      (compiler-style-warning "undefined ~(~A~): ~S" kind name))
+	      (compiler-style-warn "undefined ~(~A~): ~S" kind name))
 	    (let ((warn-count (length warnings)))
 	      (when (and warnings (> undefined-warning-count warn-count))
 		(let ((more (- undefined-warning-count warn-count)))
-		  (compiler-style-warning
+		  (compiler-style-warn
 		   "~W more use~:P of undefined ~(~A~) ~S"
 		   more kind name))))))
 	
@@ -187,7 +187,7 @@
 				 (remove kind undefs :test-not #'eq
 					 :key #'undefined-warning-kind))))
 	    (when summary
-	      (compiler-style-warning
+	      (compiler-style-warn
 	       "~:[This ~(~A~) is~;These ~(~A~)s are~] undefined:~
 		~%  ~{~<~%  ~1:;~S~>~^ ~}"
 	       (cdr summary) kind summary)))))))

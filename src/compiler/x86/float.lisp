@@ -123,13 +123,13 @@
 
 ;;;; move functions
 
-;;; x is source, y is destination
-(define-move-function (load-single 2) (vop x y)
+;;; X is source, Y is destination.
+(define-move-fun (load-single 2) (vop x y)
   ((single-stack) (single-reg))
   (with-empty-tn@fp-top(y)
      (inst fld (ea-for-sf-stack x))))
 
-(define-move-function (store-single 2) (vop x y)
+(define-move-fun (store-single 2) (vop x y)
   ((single-reg) (single-stack))
   (cond ((zerop (tn-offset x))
 	 (inst fst (ea-for-sf-stack y)))
@@ -139,12 +139,12 @@
 	 ;; This may not be necessary as ST0 is likely invalid now.
 	 (inst fxch x))))
 
-(define-move-function (load-double 2) (vop x y)
+(define-move-fun (load-double 2) (vop x y)
   ((double-stack) (double-reg))
   (with-empty-tn@fp-top(y)
      (inst fldd (ea-for-df-stack x))))
 
-(define-move-function (store-double 2) (vop x y)
+(define-move-fun (store-double 2) (vop x y)
   ((double-reg) (double-stack))
   (cond ((zerop (tn-offset x))
 	 (inst fstd (ea-for-df-stack y)))
@@ -155,13 +155,13 @@
 	 (inst fxch x))))
 
 #!+long-float
-(define-move-function (load-long 2) (vop x y)
+(define-move-fun (load-long 2) (vop x y)
   ((long-stack) (long-reg))
   (with-empty-tn@fp-top(y)
      (inst fldl (ea-for-lf-stack x))))
 
 #!+long-float
-(define-move-function (store-long 2) (vop x y)
+(define-move-fun (store-long 2) (vop x y)
   ((long-reg) (long-stack))
   (cond ((zerop (tn-offset x))
 	 (store-long-float (ea-for-lf-stack y)))
@@ -177,7 +177,7 @@
 ;;; stored in a more precise form on chip. Anyhow, might as well use
 ;;; the feature. It can be turned off by hacking the
 ;;; "immediate-constant-sc" in vm.lisp.
-(define-move-function (load-fp-constant 2) (vop x y)
+(define-move-fun (load-fp-constant 2) (vop x y)
   ((fp-constant) (single-reg double-reg #!+long-float long-reg))
   (let ((value (sb!c::constant-value (sb!c::tn-leaf x))))
     (with-empty-tn@fp-top(y)
@@ -223,8 +223,8 @@
   (make-random-tn :kind :normal :sc (sc-or-lose 'long-reg)
 		  :offset (1+ (tn-offset x))))
 
-;;; x is source, y is destination.
-(define-move-function (load-complex-single 2) (vop x y)
+;;; X is source, Y is destination.
+(define-move-fun (load-complex-single 2) (vop x y)
   ((complex-single-stack) (complex-single-reg))
   (let ((real-tn (complex-single-reg-real-tn y)))
     (with-empty-tn@fp-top (real-tn)
@@ -233,7 +233,7 @@
     (with-empty-tn@fp-top (imag-tn)
       (inst fld (ea-for-csf-imag-stack x)))))
 
-(define-move-function (store-complex-single 2) (vop x y)
+(define-move-fun (store-complex-single 2) (vop x y)
   ((complex-single-reg) (complex-single-stack))
   (let ((real-tn (complex-single-reg-real-tn x)))
     (cond ((zerop (tn-offset real-tn))
@@ -247,7 +247,7 @@
     (inst fst (ea-for-csf-imag-stack y))
     (inst fxch imag-tn)))
 
-(define-move-function (load-complex-double 2) (vop x y)
+(define-move-fun (load-complex-double 2) (vop x y)
   ((complex-double-stack) (complex-double-reg))
   (let ((real-tn (complex-double-reg-real-tn y)))
     (with-empty-tn@fp-top(real-tn)
@@ -256,7 +256,7 @@
     (with-empty-tn@fp-top(imag-tn)
       (inst fldd (ea-for-cdf-imag-stack x)))))
 
-(define-move-function (store-complex-double 2) (vop x y)
+(define-move-fun (store-complex-double 2) (vop x y)
   ((complex-double-reg) (complex-double-stack))
   (let ((real-tn (complex-double-reg-real-tn x)))
     (cond ((zerop (tn-offset real-tn))
@@ -271,7 +271,7 @@
     (inst fxch imag-tn)))
 
 #!+long-float
-(define-move-function (load-complex-long 2) (vop x y)
+(define-move-fun (load-complex-long 2) (vop x y)
   ((complex-long-stack) (complex-long-reg))
   (let ((real-tn (complex-long-reg-real-tn y)))
     (with-empty-tn@fp-top(real-tn)
@@ -281,7 +281,7 @@
       (inst fldl (ea-for-clf-imag-stack x)))))
 
 #!+long-float
-(define-move-function (store-complex-long 2) (vop x y)
+(define-move-fun (store-complex-long 2) (vop x y)
   ((complex-long-reg) (complex-long-stack))
   (let ((real-tn (complex-long-reg-real-tn x)))
     (cond ((zerop (tn-offset real-tn))

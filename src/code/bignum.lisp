@@ -208,12 +208,12 @@
   (logand x (1- (ash 1 digit-size))))
 
 #!-32x16-divide
-;;; This takes three digits and returns the FLOOR'ed result of dividing the
-;;; first two as a 64-bit integer by the third.
+;;; This takes three digits and returns the FLOOR'ed result of
+;;; dividing the first two as a 64-bit integer by the third.
 ;;;
-;;; DO WEIRD let AND setq STUFF TO SLIME THE COMPILER INTO ALLOWING THE %FLOOR
-;;; TRANSFORM TO EXPAND INTO PSEUDO-ASSEMBLER FOR WHICH THE COMPILER CAN LATER
-;;; CORRECTLY ALLOCATE REGISTERS.
+;;; Do weird LET and SETQ stuff to bamboozle the compiler into allowing
+;;; the %FLOOR transform to expand into pseudo-assembler for which the
+;;; compiler can later correctly allocate registers.
 (defun %floor (a b c)
   (let ((a a) (b b) (c c))
     (declare (type bignum-element-type a b c))

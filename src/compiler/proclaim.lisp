@@ -45,12 +45,12 @@
 	      (destructuring-bind (quality raw-value) q-and-v-or-just-q
 		(values quality raw-value)))
 	(cond ((not (policy-quality-name-p quality))
-	       (compiler-warning "ignoring unknown optimization quality ~
-                                 ~S in ~S"
-				 quality spec))
+	       (compiler-warn "ignoring unknown optimization quality ~
+                               ~S in ~S"
+			       quality spec))
 	      ((not (and (typep raw-value 'real) (<= 0 raw-value 3)))
-	       (compiler-warning "ignoring bad optimization value ~S in ~S"
-				 raw-value spec))
+	       (compiler-warn "ignoring bad optimization value ~S in ~S"
+			      raw-value spec))
 	      (t
 	       (push (cons quality (rational raw-value))
 		     result)))))
@@ -192,6 +192,6 @@
 	 (setf (info :declaration :recognized decl) t)))
       (t
        (unless (info :declaration :recognized kind)
-	 (compiler-warning "unrecognized declaration ~S" raw-form)))))
+	 (compiler-warn "unrecognized declaration ~S" raw-form)))))
   #+sb-xc (/show0 "returning from PROCLAIM")
   (values))

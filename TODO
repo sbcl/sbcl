@@ -4,19 +4,14 @@ for 0.7.0:
 	protruding rusty nails and snipped off the trailing razor wire,
 	leaving some filing for later:-) from the monster
 	EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
-	** made inlining DEFUN inside MACROLET work again
-	** bug 138 
 * more renaming in global external names:
 	** reserved DO-FOO-style names for iteration macros
 	** finished s/FUNCTION/FUN/
 	** s/VARIABLE/VAR/
 	** perhaps s/DEF-FROB/DEF/ or s/DEF-FROB/DEFINE/
 * Perhaps rename "cold" stuff (e.g. SB-COLD and src/cold/) to "boot".
-* global style systematization:
-	** s/#'(lambda/(lambda/
 * pending patches and bug reports that go in (or else get handled
 	somehow, rejected/logged/whatever) before 0.7.0:
-	** DIRECTORY problems (bug 139, CR patch sbcl-devel 2001-12-31)
 =======================================================================
 for early 0.7.x:
 
@@ -30,7 +25,8 @@ for early 0.7.x:
 	of them. Since I have other motivations for this rearrangement
 	besides CLISPiosyncrasies, I'm reasonably motivated to do it.
 * urgent EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
-	** fixed bug 137
+	** made inlining DEFUN inside MACROLET work again
+	** fixed bug 137 (more)
 * faster bootstrapping (both make.sh and slam.sh)
 	** added mechanisms for automatically finding dead code, and
 		used them to remove dead code

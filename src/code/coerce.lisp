@@ -81,7 +81,7 @@
 ;;; DEFTRANSFORMs, though.
 (declaim (inline coerce-to-list))
 (declaim (inline coerce-to-simple-string coerce-to-bit-vector coerce-to-vector))
-(defun coerce-to-function (object)
+(defun coerce-to-fun (object)
   ;; (Unlike the other COERCE-TO-FOOs, this one isn't inline, because
   ;; it's so big and because optimizing away the outer ETYPECASE
   ;; doesn't seem to buy us that much anyway.)
@@ -270,7 +270,7 @@
 	((csubtypep type (specifier-type 'character))
 	 (character object))
 	((csubtypep type (specifier-type 'function))
-	 (coerce-to-function object))
+	 (coerce-to-fun object))
 	((numberp object)
 	 (let ((res
 		(cond
