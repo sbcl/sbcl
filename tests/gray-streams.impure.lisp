@@ -1,8 +1,4 @@
-;;;; This file is for compiler tests which have side effects (e.g.
-;;;; executing DEFUN) but which don't need any special side-effecting
-;;;; environmental stuff (e.g. DECLAIM of particular optimization
-;;;; settings). Similar tests which *do* expect special settings may
-;;;; be in files compiler-1.impure.lisp, compiler-2.impure.lisp, etc.
+;;;; tests related to Gray streams 
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -259,7 +255,7 @@
 
 (let ((test-string (format nil
                            "~% This is a test.~& This is the second line.~
-                             ~% This should be the third and last line.~%")))
+                            ~% This should be the third and last line.~%")))
   (with-input-from-string (foo test-string)
     (assert (equal
              (with-output-to-string (bar)
