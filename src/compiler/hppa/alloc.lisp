@@ -157,7 +157,8 @@
   (:info name words type lowtag)
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
-  (:temporary (:scs (any-reg)) bytes header)
+  (:temporary (:scs (any-reg)) bytes)
+  (:temporary (:scs (non-descriptor-reg)) header)
   (:generator 6
     (inst addi (* (1+ words) n-word-bytes) extra bytes)
     (inst sll bytes (- n-widetag-bits 2) header)

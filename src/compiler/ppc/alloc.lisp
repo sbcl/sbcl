@@ -170,7 +170,8 @@
   (:info name words type lowtag)
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
-  (:temporary (:scs (any-reg)) bytes header)
+  (:temporary (:scs (any-reg)) bytes)
+  (:temporary (:scs (non-descriptor-reg)) header)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:generator 6
     (inst addi bytes extra (* (1+ words) n-word-bytes))
