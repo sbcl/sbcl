@@ -953,11 +953,13 @@
 ;;; new references to it.
 (defun let-convert (fun call)
   (declare (type clambda fun) (type basic-combination call))
-  (let ((next-block (if (node-tail-p call)
-			nil
-			(insert-let-body fun call))))
+  (let* ((next-block (insert-let-body fun call))
+         (next-block (if (node-tail-p call)
+                         nil
+                         next-block)))
     (move-return-stuff fun call next-block)
-    (merge-lets fun call)))
+    (merge-lets fun call)
+    (setf (node-tail-p call) nil)))
 
 ;;; Reoptimize all of CALL's args and its result.
 (defun reoptimize-call (call)

@@ -846,3 +846,25 @@
                              a)))
               0)
              -20343))
+
+;;; MISC.165
+(assert (eql (funcall
+              (compile
+               nil
+               '(lambda (a b c)
+                 (block b3
+                   (flet ((%f15
+                              (f15-1 f15-2 f15-3
+                                     &optional
+                                     (f15-4
+                                      (flet ((%f17
+                                                 (f17-1 f17-2 f17-3
+                                                        &optional (f17-4 185155520) (f17-5 c)
+                                                        (f17-6 37))
+                                               c))
+                                        (%f17 -1046 a 1115306 (%f17 b -146330 422) -337817)))
+                                     (f15-5 a) (f15-6 -40))
+                            (return-from b3 -16)))
+                     (multiple-value-call #'%f15 (values -519354 a 121 c -1905))))))
+              0 0 -5)
+             -16))
