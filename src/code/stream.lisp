@@ -1028,7 +1028,7 @@
 	     (:include string-stream
 		       (in #'string-inch)
 		       (bin #'ill-bin)
-		       (n-bin #'string-stream-read-n-bytes)
+		       (n-bin #'ill-bin)
 		       (misc #'string-in-misc)
                        (string (missing-arg) :type simple-string))
 	     (:constructor internal-make-string-input-stream
@@ -1070,12 +1070,12 @@
 	    (truly-the index (+ index copy)))
       (sb!sys:without-gcing
        (system-area-copy (vector-sap string)
-			 (* index sb!vm:n-word-bits)
+			 (* index sb!vm:n-byte-bits)
 			 (if (typep buffer 'system-area-pointer)
 			     buffer
 			     (vector-sap buffer))
-			 (* start sb!vm:n-word-bits)
-			 (* copy sb!vm:n-word-bits))))
+			 (* start sb!vm:n-byte-bits)
+			 (* copy sb!vm:n-byte-bits))))
     (if (and (> requested copy) eof-error-p)
 	(error 'end-of-file :stream stream)
 	copy)))
@@ -1744,8 +1744,7 @@
        (with-array-data ((data seq) (offset-start start) (offset-end end))
          (typecase data
 	   ((or (simple-array (unsigned-byte 8) (*))
-		(simple-array (signed-byte 8) (*))
-		simple-base-string)
+		(simple-array (signed-byte 8) (*)))
 	    (let* ((numbytes (- end start))
 		   (bytes-read (read-n-bytes stream data offset-start
 					     numbytes nil)))
