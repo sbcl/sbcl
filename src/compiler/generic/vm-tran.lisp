@@ -505,7 +505,7 @@
 ;;; generate efficient code.
 
 (define-source-transform word-logical-not (x)
-  `(logand (lognot (the sb!vm:word ,x) #.(1- (ash 1 sb!vm:n-word-bits)))))
+  `(logand (lognot (the sb!vm:word ,x)) #.(1- (ash 1 sb!vm:n-word-bits))))
 
 (deftransform word-logical-and ((x y))
   '(logand x y))
