@@ -1373,3 +1373,178 @@
     (inst mov tmp y)
     (inst shr tmp 18)
     (inst xor y tmp)))
+
+(in-package "SB!C")
+
+(defknown %lea ((or (signed-byte 32) (unsigned-byte 32))
+		(or (signed-byte 32) (unsigned-byte 32))
+		(member 1 2 4 8) (signed-byte 32))
+  (or (signed-byte 32) (unsigned-byte 32))
+  (foldable flushable))
+
+(defoptimizer (%lea derive-type) ((base index scale disp))
+  (when (and (constant-continuation-p scale)
+	     (constant-continuation-p disp))
+    (let ((scale (continuation-value scale))
+	  (disp (continuation-value disp))
+	  (base-type (continuation-type base))
+	  (index-type (continuation-type index)))
+      (when (and (numeric-type-p base-type)
+		 (numeric-type-p index-type))
+	(let ((base-lo (numeric-type-low base-type))
+	      (base-hi (numeric-type-high base-type))
+	      (index-lo (numeric-type-low index-type))
+	      (index-hi (numeric-type-high index-type)))
+	  (make-numeric-type :class 'integer
+			     :complexp :real
+			     :low (when (and base-lo index-lo)
+				    (+ base-lo (* index-lo scale) disp))
+			     :high (when (and base-hi index-hi)
+				     (+ base-hi (* index-hi scale) disp))))))))
+
+(defun %lea (base index scale disp)
+  (+ base (* index scale) disp))
+
+(in-package "SB!VM")
+
+(define-vop (%lea/unsigned=>unsigned)
+  (:translate %lea)
+  (:policy :fast-safe)
+  (:args (base :scs (unsigned-reg))
+	 (index :scs (unsigned-reg)))
+  (:info scale disp)
+  (:arg-types unsigned-num unsigned-num
+	      (:constant (member 1 2 4 8))
+	      (:constant (signed-byte 32)))
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 5
+    (inst lea r (make-ea :dword :base base :index index
+			 :scale scale :disp disp))))
+
+(define-vop (%lea/signed=>signed)
+  (:translate %lea)
+  (:policy :fast-safe)
+  (:args (base :scs (signed-reg))
+	 (index :scs (signed-reg)))
+  (:info scale disp)
+  (:arg-types signed-num signed-num
+	      (:constant (member 1 2 4 8))
+	      (:constant (signed-byte 32)))
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 4
+    (inst lea r (make-ea :dword :base base :index index
+			 :scale scale :disp disp))))
+
+(define-vop (%lea/fixnum=>fixnum)
+  (:translate %lea)
+  (:policy :fast-safe)
+  (:args (base :scs (any-reg))
+	 (index :scs (any-reg)))
+  (:info scale disp)
+  (:arg-types tagged-num tagged-num
+	      (:constant (member 1 2 4 8))
+	      (:constant (signed-byte 32)))
+  (:results (r :scs (any-reg)))
+  (:result-types tagged-num)
+  (:generator 3
+    (inst lea r (make-ea :dword :base base :index index
+			 :scale scale :disp disp))))
+
+(in-package "SB!C")
+
+;;; This is essentially a straight implementation of the algorithm in
+;;; "Strength Reduction of Multiplications by Integer Constants",
+;;; Youfeng Wu, ACM SIGPLAN Notices, Vol. 30, No.2, February 1995.
+(defun basic-decompose-multiplication (arg num n-bits condensed)
+  (case (aref condensed 0)
+    (0
+     (let ((tmp (min 3 (aref condensed 1))))
+       (decf (aref condensed 1) tmp)
+       `(truly-the (unsigned-byte 32)
+	 (%lea ,arg
+	       ,(decompose-multiplication
+		 arg (ash (1- num) (- tmp)) (1- n-bits) (subseq condensed 1))
+	       ,(ash 1 tmp) 0))))
+    ((1 2 3)
+     (let ((r0 (aref condensed 0)))
+       (incf (aref condensed 1) r0)
+       `(truly-the (unsigned-byte 32)
+	 (%lea ,(decompose-multiplication
+		 arg (- num (ash 1 r0)) (1- n-bits) (subseq condensed 1))
+	       ,arg
+	       ,(ash 1 r0) 0))))
+    (t (let ((r0 (aref condensed 0)))
+	 (setf (aref condensed 0) 0)
+	 `(truly-the (unsigned-byte 32)
+	   (ash ,(decompose-multiplication
+		  arg (ash num (- r0)) n-bits condensed)
+	        ,r0))))))
+
+(defun decompose-multiplication (arg num n-bits condensed)
+  (cond
+    ((= n-bits 0) 0)
+    ((= num 1) arg)
+    ((= n-bits 1)
+     `(truly-the (unsigned-byte 32) (ash ,arg ,(1- (integer-length num)))))
+    ((let ((max 0) (end 0))
+       (loop for i from 2 to (length condensed)
+	     for j = (reduce #'+ (subseq condensed 0 i))
+	     when (and (> (- (* 2 i) 3 j) max)
+		       (< (+ (ash 1 (1+ j))
+			     (ash (ldb (byte (- 32 (1+ j)) (1+ j)) num)
+				  (1+ j)))
+			  (ash 1 32)))
+	       do (setq max (- (* 2 i) 3 j)
+			end i))
+       (when (> max 0)
+	 (let ((j (reduce #'+ (subseq condensed 0 end))))
+	   (let ((n2 (+ (ash 1 (1+ j))
+			(ash (ldb (byte (- 32 (1+ j)) (1+ j)) num) (1+ j))))
+		 (n1 (1+ (ldb (byte (1+ j) 0) (lognot num)))))
+	   `(truly-the (unsigned-byte 32)
+	     (- ,(optimize-multiply arg n2) ,(optimize-multiply arg n1))))))))
+    ((dolist (i '(9 5 3))
+       (when (integerp (/ num i))
+	 (when (< (logcount (/ num i)) (logcount num))
+	   (let ((x (gensym)))
+	     (return `(let ((,x ,(optimize-multiply arg (/ num i))))
+		       (truly-the (unsigned-byte 32)
+			(%lea ,x ,x (1- ,i) 0)))))))))
+    (t (basic-decompose-multiplication arg num n-bits condensed))))
+	   
+(defun optimize-multiply (arg x)
+  (let* ((n-bits (logcount x))
+	 (condensed (make-array n-bits)))
+    (let ((count 0) (bit 0))
+      (dotimes (i 32)
+	(cond ((logbitp i x)
+	       (setf (aref condensed bit) count)
+	       (setf count 1)
+	       (incf bit))
+	      (t (incf count)))))
+    (decompose-multiplication arg x n-bits condensed)))
+
+(deftransform * ((x y)
+		 ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
+		 (unsigned-byte 32))
+  "recode as leas, shifts and adds"
+  (let ((y (continuation-value y)))
+    (cond
+      ((= y (ash 1 (integer-length y)))
+       ;; there's a generic transform for y = 2^k
+       (give-up-ir1-transform))
+      ((member y '(3 5 9))
+       ;; we can do these multiplications directly using LEA
+       `(%lea x x ,(1- y) 0))
+      ((member :pentium4 *backend-subfeatures*)
+       ;; the pentium4's multiply unit is reportedly very good
+       (give-up-ir1-transform))
+      ;; FIXME: should make this more fine-grained.  If nothing else,
+      ;; there should probably be a cutoff of about 9 instructions on
+      ;; pentium-class machines.
+      (t (optimize-multiply 'x y)))))
+
+;;; FIXME: we should also be able to write an optimizer or two to
+;;; convert (+ (* x 2) 17), (- (* x 9) 5) to a %LEA.

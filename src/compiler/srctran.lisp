@@ -2573,54 +2573,6 @@
 	`(- (ash x ,len))
 	`(ash x ,len))))
 
-;;; If both arguments and the result are (UNSIGNED-BYTE 32), try to
-;;; come up with a ``better'' multiplication using multiplier
-;;; recoding. There are two different ways the multiplier can be
-;;; recoded. The more obvious is to shift X by the correct amount for
-;;; each bit set in Y and to sum the results. But if there is a string
-;;; of bits that are all set, you can add X shifted by one more then
-;;; the bit position of the first set bit and subtract X shifted by
-;;; the bit position of the last set bit. We can't use this second
-;;; method when the high order bit is bit 31 because shifting by 32
-;;; doesn't work too well.
-(deftransform * ((x y)
-		 ((unsigned-byte 32) (unsigned-byte 32))
-		 (unsigned-byte 32))
-  "recode as shift and add"
-  (unless (constant-continuation-p y)
-    (give-up-ir1-transform))
-  (let ((y (continuation-value y))
-	(result nil)
-	(first-one nil))
-    (labels ((tub32 (x) `(truly-the (unsigned-byte 32) ,x))
-	     (add (next-factor)
-	       (setf result
-		     (tub32
-		      (if result
-			  `(+ ,result ,(tub32 next-factor))
-			  next-factor)))))
-      (declare (inline add))
-      (dotimes (bitpos 32)
-	(if first-one
-	    (when (not (logbitp bitpos y))
-	      (add (if (= (1+ first-one) bitpos)
-		       ;; There is only a single bit in the string.
-		       `(ash x ,first-one)
-		       ;; There are at least two.
-		       `(- ,(tub32 `(ash x ,bitpos))
-			   ,(tub32 `(ash x ,first-one)))))
-	      (setf first-one nil))
-	    (when (logbitp bitpos y)
-	      (setf first-one bitpos))))
-      (when first-one
-	(cond ((= first-one 31))
-	      ((= first-one 30)
-	       (add '(ash x 30)))
-	      (t
-	       (add `(- ,(tub32 '(ash x 31)) ,(tub32 `(ash x ,first-one))))))
-	(add '(ash x 31))))
-    (or result 0)))
-
 ;;; If arg is a constant power of two, turn FLOOR into a shift and
 ;;; mask. If CEILING, add in (1- (ABS Y)), do FLOOR and correct a
 ;;; remainder.

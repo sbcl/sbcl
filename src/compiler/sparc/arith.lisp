@@ -591,6 +591,21 @@
     (inst sra temp y n-fixnum-tag-bits)
     (inst smul r x temp)))
 
+(define-vop (fast-v8-*-c/fixnum=>fixnum fast-safe-arith-op)
+  (:args (x :target r :scs (any-reg zero)))
+  (:info y)
+  (:arg-types tagged-num
+	      (:constant (and (signed-byte 13) (not (integer 0 0)))))
+  (:results (r :scs (any-reg)))
+  (:result-types tagged-num)
+  (:note "inline fixnum arithmetic")
+  (:translate *)
+  (:guard (or (member :sparc-v8 *backend-subfeatures*)
+	      (and (member :sparc-v9 *backend-subfeatures*)
+		   (not (member :sparc-64 *backend-subfeatures*)))))
+  (:generator 1
+    (inst smul r x y)))
+
 (define-vop (fast-v8-*/signed=>signed fast-signed-binop)
   (:translate *)
   (:guard (or (member :sparc-v8 *backend-subfeatures*)
@@ -599,12 +614,28 @@
   (:generator 3
     (inst smul r x y)))
 
+(define-vop (fast-v8-*-c/signed=>signed fast-signed-binop-c)
+  (:translate *)
+  (:guard (or (member :sparc-v8 *backend-subfeatures*)
+	      (and (member :sparc-v9 *backend-subfeatures*)
+		   (not (member :sparc-64 *backend-subfeatures*)))))
+  (:generator 2
+    (inst smul r x y)))
+	  
 (define-vop (fast-v8-*/unsigned=>unsigned fast-unsigned-binop)
   (:translate *)
   (:guard (or (member :sparc-v8 *backend-subfeatures*)
 	      (and (member :sparc-v9 *backend-subfeatures*)
 		   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 3
+    (inst umul r x y)))
+
+(define-vop (fast-v8-*-c/unsigned=>unsigned fast-unsigned-binop-c)
+  (:translate *)
+  (:guard (or (member :sparc-v8 *backend-subfeatures*)
+	      (and (member :sparc-v9 *backend-subfeatures*)
+		   (not (member :sparc-64 *backend-subfeatures*)))))
+  (:generator 2
     (inst umul r x y)))
 
 ;; The smul and umul instructions are deprecated on the Sparc V9.  Use
@@ -1212,11 +1243,76 @@
   (defun ash-right-unsigned (num shuft)
     (ash-right-unsigned num shift)))
 
+(in-package "SB!C")
+
+;;; If both arguments and the result are (UNSIGNED-BYTE 32), try to
+;;; come up with a ``better'' multiplication using multiplier
+;;; recoding. There are two different ways the multiplier can be
+;;; recoded. The more obvious is to shift X by the correct amount for
+;;; each bit set in Y and to sum the results. But if there is a string
+;;; of bits that are all set, you can add X shifted by one more then
+;;; the bit position of the first set bit and subtract X shifted by
+;;; the bit position of the last set bit. We can't use this second
+;;; method when the high order bit is bit 31 because shifting by 32
+;;; doesn't work too well.
+(deftransform * ((x y)
+		 ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
+		 (unsigned-byte 32))
+  "recode as shifts and adds"
+  (let ((y (continuation-value y))
+	(adds 0)
+	(shifts 0)
+	(result nil)
+	(first-one nil))
+    (labels ((tub32 (x) `(truly-the (unsigned-byte 32) ,x))
+	     (add (next-factor)
+	       (setf result
+		     (tub32
+		      (if result
+			  (progn (incf adds) `(+ ,result ,(tub32 next-factor)))
+			  next-factor)))))
+      (declare (inline add))
+      (dotimes (bitpos 32)
+	(if first-one
+	    (when (not (logbitp bitpos y))
+	      (add (if (= (1+ first-one) bitpos)
+		       ;; There is only a single bit in the string.
+		       (progn (incf shifts) `(ash x ,first-one))
+		       ;; There are at least two.
+		       (progn
+			 (incf adds)
+			 (incf shifts 2)
+			 `(- ,(tub32 `(ash x ,bitpos))
+			     ,(tub32 `(ash x ,first-one))))))
+	      (setf first-one nil))
+	    (when (logbitp bitpos y)
+	      (setf first-one bitpos))))
+      (when first-one
+	(cond ((= first-one 31))
+	      ((= first-one 30) (incf shifts) (add '(ash x 30)))
+	      (t
+	       (incf shifts 2)
+	       (incf adds)
+	       (add `(- ,(tub32 '(ash x 31)) ,(tub32 `(ash x ,first-one))))))
+	(incf shifts)
+	(add '(ash x 31))))
+
+    (cond
+      ;; we assume, perhaps foolishly, that good SPARCs don't have an
+      ;; issue with multiplications.  (Remember that there's a
+      ;; different transform for converting x*2^k to a shift).
+      ((member :sparc-64 *backend-subfeatures*) (give-up-ir1-transform))
+      ((or (member :sparc-v9 *backend-subfeatures*)
+	   (member :sparc-v8 *backend-subfeatures*))
+       ;; breakeven point as measured by Raymond Toy
+       (when (> (+ adds shifts) 9)
+	 (give-up-ir1-transform))))
+    
+    (or result 0)))
+
 ;; If we can prove that we have a right shift, just do the right shift
 ;; instead of calling the inline ASH which has to check for the
 ;; direction of the shift at run-time.
-(in-package "SB!C")
-
 (deftransform ash ((num shift) (integer integer))
   (let ((num-type (continuation-type num))
 	(shift-type (continuation-type shift)))

@@ -81,5 +81,24 @@
               (assert (<= exact-q q))
               (assert (< q (1+ exact-q))))))
 
-;; CEILING had a corner case, spotted by Paul Dietz
+;;; CEILING had a corner case, spotted by Paul Dietz
 (assert (= (ceiling most-negative-fixnum (1+ most-positive-fixnum)) -1))
+
+;;; give any optimizers of constant multiplication a light testing.
+;;; 100 may seem low, but (a) it caught CSR's initial errors, and (b)
+;;; before checking in, CSR tested with 10000.  So one hundred
+;;; checkins later, we'll have doubled the coverage.
+(dotimes (i 100)
+  (let* ((x (random most-positive-fixnum))
+	 (x2 (* x 2))
+	 (x3 (* x 3)))
+    (let ((fn (handler-bind ((sb-ext:compiler-note #'error))
+		(compile nil
+			 `(lambda (y)
+			    (declare (optimize speed) (type (integer 0 3) y))
+			    (* y ,x))))))
+      (unless (and (= (funcall fn 0) 0)
+		   (= (funcall fn 1) x)
+		   (= (funcall fn 2) x2)
+		   (= (funcall fn 3) x3))
+	(error "bad results for ~D" x)))))
