@@ -65,16 +65,17 @@
     (barf "~S was not reached." node))
   (values))
 
-;;; Check everything that we can think of for consistency. When a definite
-;;; inconsistency is detected, we BARF. Possible problems just cause us to
-;;; BURP. Our argument is a list of components, but we also look at the
-;;; *FREE-VARIABLES*, *FREE-FUNCTIONS* and *CONSTANTS*.
+;;; Check everything that we can think of for consistency. When a
+;;; definite inconsistency is detected, we BARF. Possible problems
+;;; just cause us to BURP. Our argument is a list of components, but
+;;; we also look at the *FREE-VARIABLES*, *FREE-FUNCTIONS* and
+;;; *CONSTANTS*.
 ;;;
-;;; First we do a pre-pass which finds all the blocks and lambdas, testing
-;;; that they are linked together properly and entering them in hashtables.
-;;; Next, we iterate over the blocks again, looking at the actual code and
-;;; control flow. Finally, we scan the global leaf hashtables, looking for
-;;; lossage.
+;;; First we do a pre-pass which finds all the CBLOCKs and CLAMBDAs,
+;;; testing that they are linked together properly and entering them
+;;; in hashtables. Next, we iterate over the blocks again, looking at
+;;; the actual code and control flow. Finally, we scan the global leaf
+;;; hashtables, looking for lossage.
 (declaim (ftype (function (list) (values)) check-ir1-consistency))
 (defun check-ir1-consistency (components)
   (clrhash *seen-blocks*)
@@ -409,7 +410,7 @@
     (check-block-successors block))
   (values))
 
-;;; Check that Block is properly terminated. Each successor must be
+;;; Check that BLOCK is properly terminated. Each successor must be
 ;;; accounted for by the type of the last node.
 (declaim (ftype (function (cblock) (values)) check-block-successors))
 (defun check-block-successors (block)
@@ -455,8 +456,8 @@
 
 ;;;; node consistency checking
 
-;;; Check that the Dest for Cont is the specified Node. We also mark the
-;;; block Cont is in as Seen.
+;;; Check that the DEST for CONT is the specified NODE. We also mark
+;;; the block CONT is in as SEEN.
 (declaim (ftype (function (continuation node) (values)) check-dest))
 (defun check-dest (cont node)
   (let ((kind (continuation-kind cont)))
@@ -475,8 +476,8 @@
 	 (barf "DEST for ~S should be ~S." cont node)))))
   (values))
 
-;;; This function deals with checking for consistency the type-dependent
-;;; information in a node.
+;;; This function deals with checking for consistency of the
+;;; type-dependent information in a node.
 (defun check-node-consistency (node)
   (declare (type node node))
   (etypecase node

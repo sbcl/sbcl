@@ -96,7 +96,7 @@
 		  (closure (physenv-closure
 			    (lambda-physenv (main-entry ef)))))
 	     (dolist (ref (leaf-refs lambda))
-	       (let ((ref-component (block-component (node-block ref))))
+	       (let ((ref-component (node-component ref)))
 		 (cond ((eq ref-component component))
 		       ((or (not (component-toplevelish-p ref-component))
 			    closure)

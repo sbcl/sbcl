@@ -102,7 +102,7 @@
     (let ((atype (info :function :assumed-type name)))
       (dolist (ref (leaf-refs var))
 	(let ((dest (continuation-dest (node-cont ref))))
-	  (when (and (eq (block-component (node-block ref)) component)
+	  (when (and (eq (node-component ref) component)
 		     (combination-p dest)
 		     (eq (continuation-use (basic-combination-fun dest)) ref))
 	    (setq atype (note-function-use dest atype)))))

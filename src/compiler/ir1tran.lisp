@@ -485,12 +485,21 @@
        (use-continuation res cont)))
     (values)))
 
-;;; Add FUN to the COMPONENT-REANALYZE-FUNS. FUN is returned.
+;;; Add FUN to the COMPONENT-REANALYZE-FUNS, unless it's some
+;;; trivial type for which reanalysis is a trivial no-op. FUN is returned.
 (defun maybe-reanalyze-fun (fun)
   (declare (type functional fun))
+
   (aver-live-component *current-component*)
+  (when (lambda-p fun) ; when it's easy to ask FUN its COMPONENT
+    ;; general sanity check, specifically related to bug 138
+    (aver (eql (lambda-component fun) *current-component*)))
+
+  ;; I *think* this means "unless FUN is of some type for which
+  ;; reanalysis is a no-op". -- WHN 2001-01-06
   (when (typep fun '(or optional-dispatch clambda))
     (pushnew fun (component-reanalyze-funs *current-component*)))
+
   fun)
 
 ;;; Generate a REF node for LEAF, frobbing the LEAF structure as

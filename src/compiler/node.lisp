@@ -208,7 +208,7 @@
 ;;;    checking blocks we have already checked.
 ;;; -- DELETE-P is true when this block is used to indicate that this block
 ;;;    has been determined to be unreachable and should be deleted. IR1
-;;;    phases should not attempt to  examine or modify blocks with DELETE-P
+;;;    phases should not attempt to examine or modify blocks with DELETE-P
 ;;;    set, since they may:
 ;;;     - be in the process of being deleted, or
 ;;;     - have no successors, or
@@ -222,6 +222,8 @@
 (def-boolean-attribute block
   reoptimize flush-p type-check delete-p type-asserted test-modified)
 
+;;; FIXME: Tweak so that definitions of e.g. BLOCK-DELETE-P is
+;;; findable by grep for 'def.*block-delete-p'.
 (macrolet ((frob (slot)
 	     `(defmacro ,(symbolicate "BLOCK-" slot) (block)
 		`(block-attributep (block-flags ,block) ,',slot))))

@@ -685,7 +685,7 @@
       #'closure-needing-ir1-environment-from-node)))
 (defun %with-ir1-environment-from-node (node fun)
   (declare (type node node) (type function fun))
-  (let ((*current-component* (block-component (node-block node)))
+  (let ((*current-component* (node-component node))
 	(*lexenv* (node-lexenv node))
 	(*current-path* (node-source-path node)))
     (aver-live-component *current-component*)

@@ -203,7 +203,7 @@
   (dolist (ele forms)
     (fresh-line)
     (print-trace-indentation)
-    (format t "~S = ~S" (car ele) (funcall (cdr ele) frame))))
+    (format t "~@<~S ~_= ~S~:>" (car ele) (funcall (cdr ele) frame))))
 
 ;;; Test a BREAK option, and break if true.
 (defun trace-maybe-break (info break where frame)

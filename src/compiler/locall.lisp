@@ -190,7 +190,8 @@
 	    (component-reanalyze *current-component*) t
 	    (component-reoptimize *current-component*) t)
       (etypecase fun
-	(clambda (locall-analyze-fun-1 fun))
+	(clambda
+	 (locall-analyze-fun-1 fun))
 	(optional-dispatch
 	 (dolist (ep (optional-dispatch-entry-points fun))
 	   (locall-analyze-fun-1 ep))
@@ -284,6 +285,12 @@
 		      ;; FUN becomes part of COMPONENT-LAMBDAS now.
 		      (aver (not (member fun (component-lambdas component))))
 		      (push fun (component-lambdas component)))
+		     ;; FIXME: Maybe we don't need this clause?
+		     ;; The only time I really thought I needed it
+		     ;; was bug 138, and adding this clause didn't
+		     ;; fix bug 138 but instead caused all sorts
+		     ;; of other things to fail downstream...
+		     #|
 		     ((eql (lambda-inlinep fun) :inline)
 		      ;; FUNs marked :INLINE are sometimes in
 		      ;; COMPONENT-LAMBDAS and sometimes not. I (WHN
@@ -297,6 +304,7 @@
 		      ;; expansions of local functions might in
 		      ;; COMPONENT-LAMBDAS?)
 		      (values))
+                     |#
 		     (t ; FUN is old.
 		      ;; FUN should be in COMPONENT-LAMBDAS already.
 		      (aver (member fun (component-lambdas component)))))
@@ -760,7 +768,7 @@
 
   (declare (type clambda clambda) (type basic-combination call))
 
-  (let ((component (block-component (node-block call))))
+  (let ((component (node-component call)))
     (unlink-blocks (component-head component) (lambda-block clambda))
     (setf (component-lambdas component)
 	  (delete clambda (component-lambdas component)))

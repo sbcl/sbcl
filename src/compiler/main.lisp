@@ -327,21 +327,20 @@
 	(constraint-propagate component))
       (when (retry-delayed-ir1-transforms :constraint)
         (maybe-mumble "Rtran "))
-      ;; Delay the generation of type checks until the type
-      ;; constraints have had time to propagate, else the compiler can
-      ;; confuse itself.
-      (unless (and (or (component-reoptimize component)
-		       (component-reanalyze component)
-		       (component-new-funs component)
-		       (component-reanalyze-funs component))
-		   (< loop-count (- *reoptimize-after-type-check-max* 4)))
-        (maybe-mumble "type ")
-	(generate-type-checks component)
-	(unless (or (component-reoptimize component)
-		    (component-reanalyze component)
-		    (component-new-funs component)
-		    (component-reanalyze-funs component))
-	  (return)))
+      (flet ((want-reoptimization-p ()
+	       (or (component-reoptimize component)
+		   (component-reanalyze component)
+		   (component-new-funs component)
+		   (component-reanalyze-funs component))))
+	(unless (and (want-reoptimization-p)
+		     ;; We delay the generation of type checks until
+		     ;; the type constraints have had time to
+		     ;; propagate, else the compiler can confuse itself.
+		     (< loop-count (- *reoptimize-after-type-check-max* 4)))
+	  (maybe-mumble "type ")
+	  (generate-type-checks component)
+	  (unless (want-reoptimization-p)
+	    (return))))
       (when (>= loop-count *reoptimize-after-type-check-max*)
 	(maybe-mumble "[reoptimize limit]")
 	(event reoptimize-maxed-out)
@@ -457,13 +456,27 @@
       (:toplevel (return))
       (:external
        (unless (every (lambda (ref)
-			(eq (block-component (node-block ref))
-			    component))
+			(eq (node-component ref) component))
 		      (leaf-refs fun))
 	 (return))))))
 
 (defun compile-component (component)
+
+  ;; miscellaneous sanity checks
+  ;;
+  ;; FIXME: These are basically pretty wimpy compared to the checks done
+  ;; by the old CHECK-IR1-CONSISTENCY code. It would be really nice to
+  ;; make those internal consistency checks work again and use them.
   (aver-live-component component)
+  (do-blocks (block component)
+    (aver (eql (block-component block) component)))
+  (dolist (lambda (component-lambdas component))
+    ;; sanity check to prevent weirdness from propagating insidiously as
+    ;; far from its root cause as it did in bug 138: Make sure that
+    ;; thing-to-COMPONENT links are consistent.
+    (aver (eql (lambda-component lambda) component))
+    (aver (eql (node-component (lambda-bind lambda)) component)))
+
   (let* ((*component-being-compiled* component))
     (when sb!xc:*compile-print*
       (compiler-mumble "~&; compiling ~A: " (component-name component)))
@@ -527,7 +540,7 @@
 				    (delete-if #'here-p (basic-var-sets v))))))
 		      x))
 	   (here-p (x)
-	     (eq (block-component (node-block x)) component)))
+	     (eq (node-component x) component)))
     (blast *free-variables*)
     (blast *free-functions*)
     (blast *constants*))
@@ -1218,9 +1231,7 @@
     (flet ((loser (start)
 	     (or (position-if (lambda (x)
 				(not (eq (component-kind
-					  (block-component
-					   (node-block
-					    (lambda-bind x))))
+					  (node-component (lambda-bind x)))
 					 :toplevel)))
 			      lambdas
 			      :start start)

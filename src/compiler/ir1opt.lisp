@@ -347,7 +347,7 @@
 		 ;; If next-cont does have a dest, it must be
 		 ;; unreachable, since there are no uses.
 		 ;; DELETE-CONTINUATION will mark the dest block as
-		 ;; delete-p [and also this block, unless it is no
+		 ;; DELETE-P [and also this block, unless it is no
 		 ;; longer backward reachable from the dest block.]
 		 (delete-continuation next-cont)
 		 (setf (node-prev next-node) last-cont)
@@ -548,13 +548,13 @@
 	(flush-dest test)
 	(when (rest (block-succ block))
 	  (unlink-blocks block victim))
-	(setf (component-reanalyze (block-component (node-block node))) t)
+	(setf (component-reanalyze (node-component node)) t)
 	(unlink-node node))))
   (values))
 
-;;; Create a new copy of an IF Node that tests the value of the node
-;;; Use. The test must have >1 use, and must be immediately used by
-;;; Use. Node must be the only node in its block (implying that
+;;; Create a new copy of an IF node that tests the value of the node
+;;; USE. The test must have >1 use, and must be immediately used by
+;;; USE. NODE must be the only node in its block (implying that
 ;;; block-start = if-test).
 ;;;
 ;;; This optimization has an effect semantically similar to the
@@ -1276,11 +1276,10 @@
 			 (values-subtypep (leaf-type leaf)
 					  (continuation-asserted-type arg)))
 		(propagate-to-refs var (continuation-type arg))
-		(let ((this-comp (block-component (node-block use))))
+		(let ((use-component (node-component use)))
 		  (substitute-leaf-if
 		   #'(lambda (ref)
-		       (cond ((eq (block-component (node-block ref))
-				  this-comp)
+		       (cond ((eq (node-component ref) use-component)
 			      t)
 			     (t
 			      (aver (lambda-toplevelish-p (lambda-home fun)))
