@@ -160,8 +160,8 @@
     ;;         (FOO 14)))
     ;; and then we happen to compile bar.lisp before foo.lisp.
   (when (looks-like-name-of-special-var-p symbol)
-      ;; FIXME: should be COMPILER-STYLE-WARNING?
-      (style-warn "using the lexical binding of the symbol ~S, not the~@
+    ;; FIXME: should be COMPILER-STYLE-WARNING?
+    (style-warn "using the lexical binding of the symbol ~S, not the~@
 dynamic binding, even though the symbol name follows the usual naming~@
 convention (names like *FOO*) for special variables" symbol))
   (values))

@@ -46,6 +46,11 @@
 	      (case-failure-possibilities condition)))))
 
 (define-condition simple-control-error (simple-condition control-error) ())
+;;; OpenMCL 0.11 can't compile this, so just skip it, since it
+;;; shouldn't be needed on the happy path anyway. FIXME: CSR says
+;;; that 0.12 should be able to compile this, so this #- should
+;;; be removable real soon now.
+#-(and openmcl sb-xc-host)
 (define-condition simple-file-error    (simple-condition file-error)    ())
 (define-condition simple-program-error (simple-condition program-error) ())
 (define-condition simple-stream-error  (simple-condition stream-error)  ())
