@@ -210,9 +210,9 @@ symbols exported from PACKAGE"
 		    finally (read-char s t nil t))
 	      'string)))
 	   (funcall *standard-sharpsign-reader* s c n))))
-    (dolist (c (cclan:all-components 'db-sockets))
+    (dolist (c (cclan:all-components 'sb-bsd-sockets))
       (when (and (typep c 'cl-source-file)
-		 (not (typep c 'db-sockets-system::constants-file)))
+		 (not (typep c 'sb-bsd-sockets-system::constants-file)))
 	(with-open-file (in (component-pathname c) :direction :input)
 	    (do-file in *standard-output*))))))
 

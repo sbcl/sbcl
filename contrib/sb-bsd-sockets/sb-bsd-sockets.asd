@@ -120,7 +120,7 @@
 		 (:file "tests" :depends-on ("inet" "sockopt" "rt"))
 
 		 (:static-file "NEWS")
-		 (:static-file "INSTALL")
+		 ;; (:static-file "INSTALL")
 		 (:static-file "README")
 		 (:static-file "index" :pathname "index.html")
 		 (:static-file "doc" :pathname "doc.lisp")

@@ -1,0 +1,188 @@
+<html><head><title>SBCL BSD-Sockets API Reference</title></head><body>
+<h1>Package SB-BSD-SOCKETS</h1>
+
+<P>
+A thinly-disguised BSD socket API for SBCL.  Ideas stolen from the BSD
+socket API for C and Graham Barr's IO::Socket classes for Perl.
+<P>
+We represent sockets as CLOS objects, and rename a lot of methods and
+arguments to fit Lisp style more closely.
+<P>
+
+<P>
+<h2>Contents</h2>
+<P>
+<ol>
+<li> General concepts
+<li> Methods applicable to all <a href="#socket">sockets</a>
+<li> <a href="#sockopt">Socket Options</a>
+<li> Methods applicable to a particular subclass
+<ol>
+<li> <a href="#internet">INET-SOCKET</a> - Internet Protocol (TCP, UDP, raw) sockets
+<li> Methods on <a href="#UNIX-SOCKET">UNIX-SOCKET</a> - Unix-domain sockets 
+</ol>
+<li> <a href="#name-service">Name resolution</a> (DNS, /etc/hosts, &amp;c)
+</ol>
+<P>
+<h2>General concepts</h2>
+<P>
+<p>Most of the functions are modelled on the BSD socket API.  BSD sockets
+are widely supported, portably <i>("portable" by Unix standards, at least)</i>
+available on a variety of systems, and documented.  There are some
+differences in approach where we have taken advantage of some of the more useful features of Common Lisp - briefly
+<P>
+<ul>
+<li> Where the C API would typically return -1 and set errno, bsd-sockets
+signals an error.  All the errors are subclasses of SOCKET-CONDITION
+and generally correspond one for one with possible <tt>errno</tt> values
+<P>
+<li> We use multiple return values in many places where the C API would use p[ass-by-reference values
+<P>
+<li> We can often avoid supplying an explicit <i>length</i> argument to
+functions because we already know how long the argument is.
+<P>
+<li> IP addresses and ports are represented in slightly friendlier fashion
+than "network-endian integers".  See the section on <a href="#internet"
+>Internet domain</a> sockets for details.
+</ul>
+<P>
+<P>
+<hr> <h2>SOCKETs</h2>
+<P>
+<p><a name="SOCKET"><i>Class: </i><b>SOCKET</b></a>
+<p><b>Slots:</b><ul><li>FILE-DESCRIPTOR : </li>
+<li>FAMILY : </li>
+<li>PROTOCOL : </li>
+<li>TYPE : </li>
+<li>STREAM : </li>
+</ul><p><a name="SOCKET-BIND"><table width="100%"><tr><td width="80%">(socket-bind <i> socket &rest address</i>)</td><td align=right>Generic Function</td></tr></table>
+<p><a name="SOCKET-ACCEPT"><table width="100%"><tr><td width="80%">(socket-accept <i> (socket <a href="#socket">socket</a>)</i>)</td><td align=right>Method</td></tr></table>
+<blockquote>Perform the accept(2) call, returning a newly-created connected socket
+and the peer address as multiple values</blockquote>
+<p><a name="SOCKET-CONNECT"><table width="100%"><tr><td width="80%">(socket-connect <i> socket &rest address</i>)</td><td align=right>Generic Function</td></tr></table>
+<p><a name="SOCKET-PEERNAME"><table width="100%"><tr><td width="80%">(socket-peername <i> (socket <a href="#socket">socket</a>)</i>)</td><td align=right>Method</td></tr></table>
+<blockquote>Return the socket's peer; depending on the address family this may return multiple values</blockquote>
+<p><a name="SOCKET-NAME"><table width="100%"><tr><td width="80%">(socket-name <i> (socket <a href="#socket">socket</a>)</i>)</td><td align=right>Method</td></tr></table>
+<blockquote>Return the address (as vector of bytes) and port that the socket is bound to, as multiple values</blockquote>
+<p><a name="SOCKET-RECEIVE"><table width="100%"><tr><td width="80%">(socket-receive <i> (socket <a href="#socket">socket</a>) buffer length &key oob peek waitall (element-type
+                                                                            'character)</i>)</td><td align=right>Method</td></tr></table>
+<blockquote>Read LENGTH octets from <a href="#SOCKET">SOCKET</a> into BUFFER (or a freshly-consed buffer if
+NIL), using recvfrom(2).  If LENGTH is NIL, the length of BUFFER is
+used, so at least one of these two arguments must be non-NIL.  If
+BUFFER is supplied, it had better be of an element type one octet wide.
+Returns the buffer, its length, and the address of the peer
+that sent it, as multiple values.  On datagram sockets, sets MSG_TRUNC
+so that the actual packet length is returned even if the buffer was too
+small</blockquote>
+<p><a name="SOCKET-LISTEN"><table width="100%"><tr><td width="80%">(socket-listen <i> (socket <a href="#socket">socket</a>) backlog</i>)</td><td align=right>Method</td></tr></table>
+<blockquote>Mark <a href="#SOCKET">SOCKET</a> as willing to accept incoming connections.  BACKLOG
+defines the maximum length that the queue of pending connections may
+grow to before new connection attempts are refused.  See also listen(2)</blockquote>
+<p><a name="SOCKET-CLOSE"><table width="100%"><tr><td width="80%">(socket-close <i> (socket <a href="#socket">socket</a>)</i>)</td><td align=right>Method</td></tr></table>
+<blockquote>Close <a href="#SOCKET">SOCKET</a>.  May throw any kind of error that write(2) would have
+thrown.  If <a href="#SOCKET-MAKE-STREAM">SOCKET-MAKE-STREAM</a> has been called, calls CLOSE on that
+stream instead</blockquote>
+<p><a name="SOCKET-MAKE-STREAM"><table width="100%"><tr><td width="80%">(socket-make-stream <i> (socket <a href="#socket">socket</a>) &rest args</i>)</td><td align=right>Method</td></tr></table>
+<blockquote>Find or create a STREAM that can be used for IO on <a href="#SOCKET">SOCKET</a> (which
+must be connected).  ARGS are passed onto SB-SYS:MAKE-FD-STREAM.</blockquote>
+<hr>
+<H2> Socket Options </h2>
+<a name="sockopt"> </a>
+<p> A subset of socket options are supported, using a fairly
+general framework which should make it simple to add more as required 
+- see sockopt.lisp for details.  The name mapping from C is fairly
+straightforward: <tt>SO_RCVLOWAT</tt> becomes
+<tt>sockopt-receive-low-water</tt> and <tt>(setf
+sockopt-receive-low-water)</tt>.
+|<p><a name="SOCKOPT-REUSE-ADDRESS"><table width="100%"><tr><td width="80%">(sockopt-reuse-address <i> (socket <a href="#socket">socket</a>) argument</i>)</td><td align=right>Accessor</td></tr></table>
+<blockquote>Return the value of the SO-REUSEADDR socket option for <a href="#SOCKET">SOCKET</a>.  This can also be updated with SETF.</blockquote>
+<p><a name="SOCKOPT-KEEP-ALIVE"><table width="100%"><tr><td width="80%">(sockopt-keep-alive <i> (socket <a href="#socket">socket</a>) argument</i>)</td><td align=right>Accessor</td></tr></table>
+<blockquote>Return the value of the SO-KEEPALIVE socket option for <a href="#SOCKET">SOCKET</a>.  This can also be updated with SETF.</blockquote>
+<p><a name="SOCKOPT-OOB-INLINE"><table width="100%"><tr><td width="80%">(sockopt-oob-inline <i> (socket <a href="#socket">socket</a>) argument</i>)</td><td align=right>Accessor</td></tr></table>
+<blockquote>Return the value of the SO-OOBINLINE socket option for <a href="#SOCKET">SOCKET</a>.  This can also be updated with SETF.</blockquote>
+<p><a name="SOCKOPT-BSD-COMPATIBLE"><table width="100%"><tr><td width="80%">(sockopt-bsd-compatible <i> (socket <a href="#socket">socket</a>) argument</i>)</td><td align=right>Accessor</td></tr></table>
+<blockquote>Return the value of the SO-BSDCOMPAT socket option for <a href="#SOCKET">SOCKET</a>.  This can also be updated with SETF.</blockquote>
+<p><a name="SOCKOPT-PASS-CREDENTIALS"><table width="100%"><tr><td width="80%">(sockopt-pass-credentials <i> (socket <a href="#socket">socket</a>) argument</i>)</td><td align=right>Accessor</td></tr></table>
+<blockquote>Return the value of the SO-PASSCRED socket option for <a href="#SOCKET">SOCKET</a>.  This can also be updated with SETF.</blockquote>
+<p><a name="SOCKOPT-DEBUG"><table width="100%"><tr><td width="80%">(sockopt-debug <i> (socket <a href="#socket">socket</a>) argument</i>)</td><td align=right>Accessor</td></tr></table>
+<blockquote>Return the value of the SO-DEBUG socket option for <a href="#SOCKET">SOCKET</a>.  This can also be updated with SETF.</blockquote>
+<p><a name="SOCKOPT-DONT-ROUTE"><table width="100%"><tr><td width="80%">(sockopt-dont-route <i> (socket <a href="#socket">socket</a>) argument</i>)</td><td align=right>Accessor</td></tr></table>
+<blockquote>Return the value of the SO-DONTROUTE socket option for <a href="#SOCKET">SOCKET</a>.  This can also be updated with SETF.</blockquote>
+<p><a name="SOCKOPT-BROADCAST"><table width="100%"><tr><td width="80%">(sockopt-broadcast <i> (socket <a href="#socket">socket</a>) argument</i>)</td><td align=right>Accessor</td></tr></table>
+<blockquote>Return the value of the SO-BROADCAST socket option for <a href="#SOCKET">SOCKET</a>.  This can also be updated with SETF.</blockquote>
+<p><a name="SOCKOPT-TCP-NODELAY"><table width="100%"><tr><td width="80%">(sockopt-tcp-nodelay <i> (socket <a href="#socket">socket</a>) argument</i>)</td><td align=right>Accessor</td></tr></table>
+<blockquote>Return the value of the TCP-NODELAY socket option for <a href="#SOCKET">SOCKET</a>.  This can also be updated with SETF.</blockquote>
+<hr> <h2>INET-domain sockets</h2>
+<P>
+<p>The TCP and UDP sockets that you know and love.  Some representation issues:
+<ul>
+<li>These functions do not accept hostnames directly: see <a href="#name-service">name resolution</a>
+<li>Internet <b>addresses</b> are represented by vectors of <tt>(unsigned-byte 8)</tt> - viz. <tt>#(127 0 0 1)</tt>.  <b>Ports</b> are just integers: <tt>6010</tt>.  No conversion between network- and host-order data is needed from the user of this package.
+<li><b><i>socket addresses</i></b> are represented by the two values for <b>address</b> and <b>port</b>, so for example, <tt>(<a href="#SOCKET-CONNECT">socket-connect</a> s #(192.168.1.1) 80)</tt>
+</ul>
+<P>
+<p><a name="INET-SOCKET"><i>Class: </i><b>INET-SOCKET</b></a>
+<p><b>Slots:</b><ul><li>FAMILY : </li>
+</ul><p><a name="MAKE-INET-ADDRESS"><table width="100%"><tr><td width="80%">(make-inet-address <i> dotted-quads</i>)</td><td align=right>Function</td></tr></table>
+<blockquote>Return a vector of octets given a string DOTTED-QUADS in the format
+"127.0.0.1"</blockquote>
+<p><a name="GET-PROTOCOL-BY-NAME"><table width="100%"><tr><td width="80%">(get-protocol-by-name <i> name</i>)</td><td align=right>Function</td></tr></table>
+<blockquote>Returns the network protocol number associated with the string NAME,
+using getprotobyname(2) which typically looks in NIS or /etc/protocols</blockquote>
+<p><a name="MAKE-INET-SOCKET"><table width="100%"><tr><td width="80%">(make-inet-socket <i> type protocol</i>)</td><td align=right>Function</td></tr></table>
+<blockquote>Make an INET socket.  Deprecated in favour of make-instance</blockquote>
+<hr> <h2>File-domain sockets</h2>
+<P>
+File-domain (AF_FILE) sockets are also known as Unix-domain sockets, but were
+renamed by POSIX presumably on the basis that they may be
+available on other systems too.  
+<P>
+A file-domain socket address is a string, which is used to create a node
+in the local filesystem.  This means of course that they cannot be used across
+a network.
+<P>
+|<p><a name="UNIX-SOCKET"><i>Class: </i><b>UNIX-SOCKET</b></a>
+<p><b>Slots:</b><ul><li>FAMILY : </li>
+</ul><hr> <a name="name-service"><h2>Name Service</h2></a>
+<P>
+<p>Presently name service is implemented by calling whatever
+gethostbyname(2) uses.  This may be any or all of /etc/hosts, NIS, DNS,
+or something completely different.  Typically it's controlled by
+/etc/nsswitch.conf
+<P>
+<p> Direct links to the asynchronous resolver(3) routines would be nice to have
+eventually, so that we can do DNS lookups in parallel with other things
+<p><a name="HOST-ENT"><i>Class: </i><b>HOST-ENT</b></a>
+<p><b>Slots:</b><ul><li>NAME : </li>
+<li>ALIASES : </li>
+<li>ADDRESS-TYPE : </li>
+<li>ADDRESSES : </li>
+</ul><p><a name="HOST-ENT-ADDRESS"><table width="100%"><tr><td width="80%">(host-ent-address <i> (host-ent <a href="#host-ent">host-ent</a>)</i>)</td><td align=right>Method</td></tr></table>
+<p><a name="GET-HOST-BY-NAME"><table width="100%"><tr><td width="80%">(get-host-by-name <i> host-name</i>)</td><td align=right>Function</td></tr></table>
+<blockquote>Returns a <a href="#HOST-ENT">HOST-ENT</a> instance for HOST-NAME or throws some kind of condition.
+HOST-NAME may also be an IP address in dotted quad notation or some other
+weird stuff - see gethostbyname(3) for grisly details.</blockquote>
+<p><a name="GET-HOST-BY-ADDRESS"><table width="100%"><tr><td width="80%">(get-host-by-address <i> address</i>)</td><td align=right>Function</td></tr></table>
+<blockquote>Returns a <a href="#HOST-ENT">HOST-ENT</a> instance for ADDRESS, which should be a vector of
+(integer 0 255), or throws some kind of error.  See gethostbyaddr(3) for
+grisly details.</blockquote>
+<p><a name="NAME-SERVICE-ERROR"><table width="100%"><tr><td width="80%">(name-service-error <i> where</i>)</td><td align=right>Function</td></tr></table>
+<hr><p><a name="NON-BLOCKING-MODE"><table width="100%"><tr><td width="80%">(non-blocking-mode <i> (socket <a href="#socket">socket</a>)</i>)</td><td align=right>Method</td></tr></table>
+<blockquote>Is <a href="#SOCKET">SOCKET</a> in non-blocking mode?</blockquote>
+<hr>
+<P>
+<H1>Tests</h1>
+<P>
+There should be at least one test for pretty much everything you can do
+with the package.  In some places I've been more diligent than others; more
+tests gratefully accepted.
+<P>
+Tests are in the file <tt>tests.lisp</tt> and also make good examples.
+<P>
+|
+<h2>Unix-domain sockets</h2>
+<P>
+A fairly rudimentary test that connects to the syslog socket and sends a 
+message.  Priority 7 is kern.debug; you'll probably want to look at
+/etc/syslog.conf or local equivalent to find out where the message ended up
+|
