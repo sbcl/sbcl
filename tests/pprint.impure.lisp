@@ -103,5 +103,38 @@
 	   (write '`(,  ?foo) :stream s :pretty t :readably t))
 	 "`(,?FOO)"))
 
+;;; bug reported by Paul Dietz on sbcl-devel: unquoted lambda lists
+;;; were leaking the SB-IMPL::BACKQ-COMMA implementation.
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '`(foo ,x) :stream s :pretty t :readably t))
+	 "`(FOO ,X)"))
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '`(foo ,@x) :stream s :pretty t :readably t))
+	 "`(FOO ,@X)"))
+#+nil ; '`(foo ,.x) => '`(foo ,@x) apparently. 
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '`(foo ,.x) :stream s :pretty t :readably t))
+	 "`(FOO ,.X)"))
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '`(lambda ,x) :stream s :pretty t :readably t))
+	 "`(LAMBDA ,X)"))
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '`(lambda ,@x) :stream s :pretty t :readably t))
+	 "`(LAMBDA ,@X)"))
+#+nil ; see above
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '`(lambda ,.x) :stream s :pretty t :readably t))
+	 "`(LAMBDA ,.X)"))
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '`(lambda (,x)) :stream s :pretty t :readably t))
+	 "`(LAMBDA (,X))"))
+
 ;;; success
 (quit :unix-status 104)

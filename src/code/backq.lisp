@@ -244,4 +244,9 @@
   (set-macro-character #\, #'comma-macro))
 #+sb-xc-host (!backq-cold-init)
 
+;;; The pretty-printer needs to know about our special tokens
+(defvar *backq-tokens*
+  '(backq-comma backq-comma-at backq-comma-dot backq-list
+    backq-list* backq-append backq-nconc backq-cons backq-vector))
+
 (/show0 "done with backq.lisp")

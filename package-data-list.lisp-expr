@@ -932,6 +932,10 @@ retained, possibly temporariliy, because it might be used internally."
              "PREPARE-FOR-FAST-READ-BYTE"
              "PREPARE-FOR-FAST-READ-CHAR"
 
+	     ;; reflection of our backquote implementation that the
+	     ;; pprinter needs
+	     "*BACKQ-TOKENS*"
+	     
 	     ;; hackery to help set up for cold init
              "!BEGIN-COLLECTING-COLD-INIT-FORMS"
 	     "!COLD-INIT-FORMS"

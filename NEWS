@@ -2202,6 +2202,9 @@ changes in sbcl-0.8.7 relative to sbcl-0.8.6:
   * bug fix: buffered :DIRECTION :IO streams are less likely to become
     confused about their position.  (thanks to Adam Warner and Gerd 
     Moellmann)
+  * bug fix: Pretty printing backquoted forms with unquotations in the
+    argument list position of various code constructs such as LAMBDA
+    now works correctly.  (reported by Paul Dietz)
   * optimization: performance of string output streams is now less
     poor for multiple small sequence writes.
   * ASDF-INSTALL bug fix: now parses *PROXY* properly.  (thanks to

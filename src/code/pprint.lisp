@@ -1020,6 +1020,15 @@
 
 (defun pprint-lambda-list (stream lambda-list &rest noise)
   (declare (ignore noise))
+  (when (and (consp lambda-list)
+	     (member (car lambda-list) *backq-tokens*))
+    ;; if this thing looks like a backquoty thing, then we don't want
+    ;; to destructure it, we want to output it straight away.  [ this
+    ;; is the exception to the normal processing: if we did this
+    ;; generally we would find lambda lists such as (FUNCTION FOO)
+    ;; being printed as #'FOO ]  -- CSR, 2003-12-07
+    (output-object lambda-list stream)
+    (return-from pprint-lambda-list nil))
   (pprint-logical-block (stream lambda-list :prefix "(" :suffix ")")
     (let ((state :required)
 	  (first t))
