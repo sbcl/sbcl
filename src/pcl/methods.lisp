@@ -758,6 +758,22 @@
 			   *standard-method-combination*))
 	      type)))))
 
+
+;;; CMUCL (Gerd's PCL, 2002-04-25) comment:
+;;;
+;;; Return two values.  First value is a function to be stored in
+;;; effective slot definition SLOTD for reading it with
+;;; SLOT-VALUE-USING-CLASS, setting it with (SETF
+;;; SLOT-VALUE-USING-CLASS) or testing it with
+;;; SLOT-BOUNDP-USING-CLASS.  GF is one of these generic functions,
+;;; TYPE is one of the symbols READER, WRITER, BOUNDP.  CLASS is
+;;; SLOTD's class.
+;;;
+;;; Second value is true if the function returned is one of the
+;;; optimized standard functions for the purpose, which are used
+;;; when only standard methods are applicable.
+;;;
+;;; FIXME: Change all these wacky function names to something sane.
 (defun get-accessor-method-function (gf type class slotd)
   (let* ((std-method (standard-svuc-method type))
 	 (str-method (structure-svuc-method type))
@@ -768,27 +784,25 @@
     (values
      (if std-p
 	 (get-optimized-std-accessor-method-function class slotd type)
-	 (get-accessor-from-svuc-method-function
-	  class slotd
-	  (get-secondary-dispatch-function
-	   gf methods types
-	   `((,(car (or (member std-method methods)
-			(member str-method methods)
-			(error "error in get-accessor-method-function")))
-	      ,(get-optimized-std-slot-value-using-class-method-function
-		class slotd type)))
-	   (unless (and (eq type 'writer)
-			(dolist (method methods t)
-			  (unless (eq (car (method-specializers method))
-				      *the-class-t*)
-			    (return nil))))
-	     (let ((wrappers (list (wrapper-of class)
-				   (class-wrapper class)
-				   (wrapper-of slotd))))
-	       (if (eq type 'writer)
-		   (cons (class-wrapper *the-class-t*) wrappers)
-		   wrappers))))
-	  type))
+	 (let* ((optimized-std-fun
+		 (get-optimized-std-slot-value-using-class-method-function
+		  class slotd type))
+		(method-alist
+		 `((,(car (or (member std-method methods)
+			      (member str-method methods)
+			      (bug "error in ~S"
+				   'get-accessor-method-function)))
+		    ,optimized-std-fun)))
+		(wrappers
+		 (let ((wrappers (list (wrapper-of class)
+				       (class-wrapper class)
+				       (wrapper-of slotd))))
+		   (if (eq type 'writer)
+		       (cons (class-wrapper *the-class-t*) wrappers)
+		       wrappers)))
+		(sdfun (get-secondary-dispatch-function 
+			gf methods types method-alist wrappers)))
+	   (get-accessor-from-svuc-method-function class slotd sdfun type)))
      std-p)))
 
 ;;; used by OPTIMIZE-SLOT-VALUE-BY-CLASS-P (vector.lisp)

@@ -86,6 +86,20 @@
 	(compute-slot-accessor-info slotd type gf)))
     (initialize-internal-slot-gfs name)))
 
+;;; CMUCL (Gerd PCL 2003-04-25) comment:
+;;;
+;;; Compute an effective method for SLOT-VALUE-USING-CLASS, (SETF
+;;; SLOT-VALUE-USING-CLASS) or SLOT-BOUNDP-USING-CLASS for reading/
+;;; writing/testing effective slot SLOTD.
+;;;
+;;; TYPE is one of the symbols READER, WRITER or BOUNDP, depending on
+;;; GF.  Store the effective method in the effective slot definition
+;;; object itself; these GFs have special dispatch functions calling
+;;; effective methods directly retrieved from effective slot
+;;; definition objects, as an optimization.
+;;;
+;;; FIXME: Change the function name to COMPUTE-SVUC-SLOTD-FUNCTION,
+;;; or some such.
 (defmethod compute-slot-accessor-info ((slotd effective-slot-definition)
 				       type gf)
   (let* ((name (slot-value slotd 'name))
@@ -916,18 +930,9 @@
   (setf (plist-value class 'default-initargs) inits))
 
 (defmethod compute-default-initargs ((class slot-class))
-  (let ((cpl (class-precedence-list class))
-	(direct (class-direct-default-initargs class)))
-    (labels ((walk (tail)
-	       (if (null tail)
-		   nil
-		   (let ((c (pop tail)))
-		     (append (if (eq c class)
-				 direct
-				 (class-direct-default-initargs c))
-			     (walk tail))))))
-      (let ((initargs (walk cpl)))
-	(delete-duplicates initargs :test #'eq :key #'car :from-end t)))))
+  (let ((initargs (loop for c in (class-precedence-list class)
+			append (class-direct-default-initargs c))))
+    (delete-duplicates initargs :test #'eq :key #'car :from-end t)))
 
 ;;;; protocols for constructing direct and effective slot definitions
 
