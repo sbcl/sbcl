@@ -1,0 +1,66 @@
+** turn the VM definition of BASE-CHAR-REG, BASE-CHAR-SC-NUMBER,
+etc. into CHARACTER-REG, CHARACTER-REG-SC-NUMBER.  (Rationale: we're
+never going to want to distinguish the CHARACTERness vs BASE-CHARness
+of characters by their widetags, because we can do it based on their
+CHAR-CODE; thus, calling the primitive type and storage classes
+BASE-CHAR is unneccesarily confusing.)
+  -- done for x86;
+  -- TODO: sparc, mips, hppa, alpha, ppc.
+
+** implement a CHARACTER-SET-TYPE representation for sets of
+characters in the CL type system.  (Rationale: we are going to need to
+describe possibly-large sets of not-necessarily-contiguous characters,
+for use in external formats and describing the BASE-CHAR type.)
+  -- done, implementing the representation of the range as a list of
+     (low . high) pairs.  Note: two alternative representations were
+     considered and found wanting: a CHARACTER-RANGE-TYPE which could
+     then be placed in TYPE-UNION for non-contiguous sets has the
+     disadvantage that (MEMBER #\a #\c #\e) unparses as
+     (OR (MEMBER #\a) (MEMBER #\c) (MEMBER #\e)); a BIT-VECTOR
+     representation works well for arbitrarily discontinuous sets, but
+     is extremely space-inefficient for typical character sets over a
+     character space of 2^21 characters.
+
+** set BASE-CHAR to be (CHARACTER-SET 0 127), implementing a new
+low-level representation of CHARACTER-STRING for (SIMPLE-ARRAY
+CHARACTER (*)) (which is now distinct from SIMPLE-BASE-STRING).
+  -- mostly done for x86;
+     >> cold init runs;
+     >> warm load runs to completion;
+     >> all contribs build and pass self-tests;
+     >> (not yet done: check against sh ./run-tests.sh);
+     >> (not yet done: check against Paul Dietz' gcl/ansi-tests);
+  -- TODO: sparc, mips, hppa, alpha, ppc.
+
+** fix genesis to dump BASE-STRINGs always, and to use SB!XC:CHAR-CODE
+(which should error on non-STANDARD-CHAR).  (Rationale: SBCL aspires
+to portability, so should not use any non-STANDARD-CHAR in its source
+code.  By definition, therefore, all strings and stringlike objects
+are dumpable as BASE-STRING, which allows for identical cores to be
+generated from lisps with different BASE-CHAR/CHARACTER distinctions.)
+
+** define (CHARACTER-SET 128 255) to be the corresponding Latin1 (and
+Unicode) characters at those codepoints.  (Rationale: attempting to
+support locale-dependent character points will generate extreme
+confusion, probably.  If there is long-term demand for a purely 8-bit
+character SBCL, this decision might be revised, but this simplifying
+decision allows for infrastructural progress).  This requires
+modification of the various CHAR-UPCASE/STRING-DOWNCASE/GRAPHIC-CHAR-P
+etc. functions.
+
+** implement :UTF-8, :ISO-8859-1 and :POSIX external formats, and make
+:DEFAULT an alias for the approprate one based on nl_langinfo(CHARSET)
+information.  (Rationale: this is the absolute minimum needed to get
+e-acute printed to my terminal, which would be a major milestone.)
+Eventually other :ISO-8859-<N> external formats should be supported,
+even in 8-bit lisps, but attempts to print characters which are not
+representable in those formats should probably error, so it might not
+be terribly useful.
+
+** implement an SB-ALIEN:UTF8-STRING parallel to SB-ALIEN:C-STRING.
+(Rationale: for calling out to Pango or similar.)
+
+** increase CHAR-CODE-LIMIT to something larger than 256.  (Rationale:
+support people other than simply those living in non-Eurozone Western
+Europe or the United States of America.)  This requires at minimum
+adjusting the dumper/fop code and the low-level memory accessors.
