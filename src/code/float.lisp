@@ -51,9 +51,9 @@
 ;;;; float parameters
 
 (defconstant least-positive-single-float (single-from-bits 0 0 1))
-(defconstant least-positive-short-float least-positive-single-float)
+(defconstant least-positive-short-float (single-from-bits 0 0 1))
 (defconstant least-negative-single-float (single-from-bits 1 0 1))
-(defconstant least-negative-short-float least-negative-single-float)
+(defconstant least-negative-short-float (single-from-bits 1 0 1))
 (defconstant least-positive-double-float (double-from-bits 0 0 1))
 #!-long-float
 (defconstant least-positive-long-float (double-from-bits 0 0 1))

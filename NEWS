@@ -2168,6 +2168,12 @@ changes in sbcl-0.8.5 relative to sbcl-0.8.4:
     ** intersection of CONS types now canonicalizes properly, fixing
        inconsistencies in SUBTYPEP.
 
+changes in sbcl-0.8.6 relative to sbcl-0.8.5:
+  * fixed a bootstrapping bug: the build process no longer assumes
+    that the various BOOLE-related constants have the same value in
+    host and target lisps.  (noted by Paul Dietz' test suite on an
+    SBCL binary built from CLISP)
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and

@@ -90,6 +90,11 @@
 
 		    ;; everything else which needs a separate
                     ;; existence in xc and target
+		    "BOOLE"
+		    "BOOLE-CLR" "BOOLE-SET" "BOOLE-1" "BOOLE-2"
+		    "BOOLE-C1" "BOOLE-C2" "BOOLE-AND" "BOOLE-IOR"
+		    "BOOLE-XOR" "BOOLE-EQV" "BOOLE-NAND" "BOOLE-NOR"
+		    "BOOLE-ANDC1" "BOOLE-ANDC2" "BOOLE-ORC1" "BOOLE-ORC2"
 		    "BUILT-IN-CLASS"
 		    "BYTE" "BYTE-POSITION" "BYTE-SIZE"
 		    "CHAR-CODE"
@@ -129,36 +134,20 @@
 		    "WITH-COMPILATION-UNIT"))
       (export (intern name package-name) package-name)))
   ;; don't watch:
-  (dolist (package-name '("SB!ALIEN"
-			  "SB!ALIEN-INTERNALS"
-			  "SB!ASSEM"
-			  "SB!BIGNUM"
-			  "SB!C"
-			  "SB!DEBUG"
-			  "SB!DI"
-			  "SB!DISASSEM"
-			  #!+sb-dyncount "SB!DYNCOUNT"
-			  "SB!FASL"
-			  "SB!IMPL"
-			  "SB!EXT"
-			  "SB!FORMAT"
-			  "SB!GRAY"
-			  "SB!INT"
-			  "SB!KERNEL"
-			  "SB!LOOP"
-			  "SB!PCL"
-			  "SB!PRETTY"
-			  "SB!PROFILE"
-			  "SB!SYS"
-			  "SB!THREAD"
-			  "SB!UNIX"
-			  "SB!VM"
-			  "SB!WALKER"))
-    (shadowing-import (mapcar (lambda (name) (find-symbol name "SB-XC"))
-			      '("BYTE" "BYTE-POSITION" "BYTE-SIZE"
-				"DPB" "LDB" "LDB-TEST"
-				"DEPOSIT-FIELD" "MASK-FIELD"))
-		      package-name))
+  (dolist (package (list-all-packages))
+    (when (= (mismatch (package-name package) "SB!") 3)
+      (shadowing-import
+       (mapcar (lambda (name) (find-symbol name "SB-XC"))
+	       '("BYTE" "BYTE-POSITION" "BYTE-SIZE"
+		 "DPB" "LDB" "LDB-TEST"
+		 "DEPOSIT-FIELD" "MASK-FIELD"
+		 
+		 "BOOLE"
+		 "BOOLE-CLR" "BOOLE-SET" "BOOLE-1" "BOOLE-2"
+		 "BOOLE-C1" "BOOLE-C2" "BOOLE-AND" "BOOLE-IOR"
+		 "BOOLE-XOR" "BOOLE-EQV" "BOOLE-NAND" "BOOLE-NOR"
+		 "BOOLE-ANDC1" "BOOLE-ANDC2" "BOOLE-ORC1" "BOOLE-ORC2"))
+       package)))
 
   ;; Build a version of Python to run in the host Common Lisp, to be
   ;; used only in cross-compilation.
