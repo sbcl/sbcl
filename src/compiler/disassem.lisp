@@ -18,7 +18,7 @@
 (deftype text-width () '(integer 0 1000))
 (deftype alignment () '(integer 0 64))
 (deftype offset () '(signed-byte 24))
-(deftype address () '(unsigned-byte 32))
+(deftype address () '(unsigned-byte #.sb!vm:n-word-bits))
 (deftype disassem-length () '(unsigned-byte 24))
 (deftype column () '(integer 0 1000))
 
@@ -131,7 +131,7 @@
                  dchunk=
                  dchunk-count-bits))
 
-(def!constant dchunk-bits 32)
+(def!constant dchunk-bits #.sb!vm:n-word-bits)
 
 (deftype dchunk ()
   `(unsigned-byte ,dchunk-bits))
@@ -139,7 +139,7 @@
   `(integer 0 ,dchunk-bits))
 
 (def!constant dchunk-zero 0)
-(def!constant dchunk-one #xFFFFFFFF)
+(def!constant dchunk-one #.(1- (expt 2 sb!vm:n-word-bits)))
 
 (defun dchunk-extract (from pos)
   (declare (type dchunk from))

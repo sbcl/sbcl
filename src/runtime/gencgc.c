@@ -154,6 +154,11 @@ struct page page_table[NUM_PAGES];
  * is needed. */
 static void *heap_base = NULL;
 
+#if N_WORD_BITS == 32
+ #define SIMPLE_ARRAY_WORD_WIDETAG SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG
+#elif N_WORD_BITS == 64
+ #define SIMPLE_ARRAY_WORD_WIDETAG SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
+#endif
 
 /* Calculate the start address for the given page number. */
 inline void *
@@ -1628,8 +1633,7 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 
     /*SHOW("got fixups");*/
 
-    if (widetag_of(fixups_vector->header) ==
-	SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG) {
+    if (widetag_of(fixups_vector->header) == SIMPLE_ARRAY_WORD_WIDETAG) {
 	/* Got the fixups for the code block. Now work through the vector,
 	   and apply a fixup at each address. */
 	int length = fixnum_value(fixups_vector->length);
@@ -1654,6 +1658,8 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 		*(unsigned *)((unsigned)code_start_addr + offset) =
 		    old_value - displacement;
 	}
+    } else {
+        fprintf(stderr, "widetag of fixup vector is %d\n", widetag_of(fixups_vector->header));
     }
 
     /* Check for possible errors. */
@@ -1779,10 +1785,10 @@ scav_vector(lispobj *where, lispobj object)
 
 	if (is_lisp_pointer(index_vector_obj) &&
 	    (widetag_of(*(lispobj *)native_pointer(index_vector_obj)) ==
-	     SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG)) {
-	    index_vector = ((unsigned int *)native_pointer(index_vector_obj)) + 2;
+		 SIMPLE_ARRAY_WORD_WIDETAG)) {
+	    index_vector = ((lispobj *)native_pointer(index_vector_obj)) + 2;
 	    /*FSHOW((stderr, "/index_vector = %x\n",index_vector));*/
-	    length = fixnum_value(((unsigned int *)native_pointer(index_vector_obj))[1]);
+	    length = fixnum_value(((lispobj *)native_pointer(index_vector_obj))[1]);
 	    /*FSHOW((stderr, "/length = %d\n", length));*/
 	} else {
 	    lose("invalid index_vector %x", index_vector_obj);
@@ -1795,10 +1801,10 @@ scav_vector(lispobj *where, lispobj object)
 
 	if (is_lisp_pointer(next_vector_obj) &&
 	    (widetag_of(*(lispobj *)native_pointer(next_vector_obj)) ==
-	     SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG)) {
-	    next_vector = ((unsigned int *)native_pointer(next_vector_obj)) + 2;
+	     SIMPLE_ARRAY_WORD_WIDETAG)) {
+	    next_vector = ((lispobj *)native_pointer(next_vector_obj)) + 2;
 	    /*FSHOW((stderr, "/next_vector = %x\n", next_vector));*/
-	    next_vector_length = fixnum_value(((unsigned int *)native_pointer(next_vector_obj))[1]);
+	    next_vector_length = fixnum_value(((lispobj *)native_pointer(next_vector_obj))[1]);
 	    /*FSHOW((stderr, "/next_vector_length = %d\n", next_vector_length));*/
 	} else {
 	    lose("invalid next_vector %x", next_vector_obj);
@@ -1814,11 +1820,11 @@ scav_vector(lispobj *where, lispobj object)
 	lispobj hash_vector_obj = hash_table[15];
 
 	if (is_lisp_pointer(hash_vector_obj) &&
-	    (widetag_of(*(lispobj *)native_pointer(hash_vector_obj))
-	     == SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG)) {
-	    hash_vector = ((unsigned int *)native_pointer(hash_vector_obj)) + 2;
+	    (widetag_of(*(lispobj *)native_pointer(hash_vector_obj)) ==
+	     SIMPLE_ARRAY_WORD_WIDETAG)){
+	    hash_vector = ((lispobj *)native_pointer(hash_vector_obj)) + 2;
 	    /*FSHOW((stderr, "/hash_vector = %x\n", hash_vector));*/
-	    gc_assert(fixnum_value(((unsigned int *)native_pointer(hash_vector_obj))[1])
+	    gc_assert(fixnum_value(((lispobj *)native_pointer(hash_vector_obj))[1])
 		      == next_vector_length);
 	} else {
 	    hash_vector = NULL;
@@ -1838,7 +1844,12 @@ scav_vector(lispobj *where, lispobj object)
 	int i;
 	for (i = 1; i < next_vector_length; i++) {
 	    lispobj old_key = kv_vector[2*i];
-	    unsigned int  old_index = (old_key & 0x1fffffff)%length;
+
+#if N_WORD_BITS == 32
+	    unsigned int old_index = (old_key & 0x1fffffff)%length;
+#elif N_WORD_BITS == 64
+	    unsigned long old_index = (old_key & 0x1fffffffffffffff)%length;
+#endif
 
 	    /* Scavenge the key and value. */
 	    scavenge(&kv_vector[2*i],2);
@@ -1846,7 +1857,11 @@ scav_vector(lispobj *where, lispobj object)
 	    /* Check whether the key has moved and is EQ based. */
 	    {
 		lispobj new_key = kv_vector[2*i];
+#if N_WORD_BITS == 32
 		unsigned int new_index = (new_key & 0x1fffffff)%length;
+#elif N_WORD_BITS == 64
+		unsigned long new_index = (new_key & 0x1fffffffffffffff)%length;
+#endif
 
 		if ((old_index != new_index) &&
 		    ((!hash_vector) || (hash_vector[i] == 0x80000000)) &&

@@ -353,7 +353,8 @@
 	 ;; Note: As on the mips port, space for a two word bignum is
 	 ;; always allocated and the header size is set to either one
 	 ;; or two words as appropriate.
-	 (inst jmp :ns one-word-bignum)
+	 (inst cmp y 63)
+	 (inst jmp :l one-word-bignum)
 	 ;; two word bignum
 	 (inst mov y (logior (ash (1- (+ bignum-digits-offset 2))
 				  n-widetag-bits)
