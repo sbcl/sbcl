@@ -33,7 +33,6 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	(load "src/cold/shared.lisp")
 	(in-package "SB-COLD")
 	(setf *host-obj-prefix* "obj/from-host/")
-	(load "src/cold/shared.lisp")
 	(load "src/cold/set-up-cold-packages.lisp")
 	(load "src/cold/defun-load-or-cload-xcompiler.lisp")
 	(load-or-cload-xcompiler #'host-cload-stem)

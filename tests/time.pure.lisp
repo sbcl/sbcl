@@ -13,18 +13,18 @@
 
 ;;; Test for monotonicity of GET-INTERNAL-RUN-TIME.
 (funcall (compile nil
-		  (lambda (n-seconds)
-		    (declare (type fixnum n-seconds))
-		    (let* ((n-internal-time-units
-			    (* n-seconds
-			       internal-time-units-per-second))
-			   (time0 (get-internal-run-time))
-			   (time1 (+ time0 n-internal-time-units)))
-		      (loop
-		       (let ((time (get-internal-run-time)))
-			 (assert (>= time time0))
-			 (when (>= time time1)
-			   (return)))))))
+		  '(lambda (n-seconds)
+		     (declare (type fixnum n-seconds))
+		     (let* ((n-internal-time-units
+			     (* n-seconds
+				internal-time-units-per-second))
+			    (time0 (get-internal-run-time))
+			    (time1 (+ time0 n-internal-time-units)))
+		       (loop
+			(let ((time (get-internal-run-time)))
+			  (assert (>= time time0))
+			  (when (>= time time1)
+			    (return)))))))
 	 3)
 
 (locally

@@ -1902,8 +1902,8 @@
 						  from-end start end key)))
       (frobs))))
 
-;;; the user interface to FIND and POSITION: Get all our ducks in a row,
-;;; then call %FIND-POSITION
+;;; the user interface to FIND and POSITION: Get all our ducks in a
+;;; row, then call %FIND-POSITION.
 (declaim (inline find position))
 (macrolet ((def-find-position (fun-name values-index)
 	     `(defun ,fun-name (item

@@ -169,7 +169,7 @@
 	(info (make-function-info :attributes attributes
 				  :derive-type derive-type
 				  :optimizer optimizer))
-	(target-env (or *backend-info-environment* *info-environment*)))
+	(target-env *info-environment*))
     (dolist (name names)
       (let ((old-function-info (info :function :info name)))
 	(when old-function-info
@@ -198,8 +198,12 @@
 ;;; through here.
 (declaim (ftype (function (t) function-info) function-info-or-lose))
 (defun function-info-or-lose (name)
-  (let ((*info-environment* (or *backend-info-environment*
-				*info-environment*)))
+  (let (;; FIXME: Do we need this rebinding here? It's a literal
+	;; translation of the old CMU CL rebinding to
+	;; (OR *BACKEND-INFO-ENVIRONMENT* *INFO-ENVIRONMENT*),
+	;; and it's not obvious whether the rebinding to itself is
+	;; needed that SBCL doesn't need *BACKEND-INFO-ENVIRONMENT*.
+	(*info-environment* *info-environment*))
     (let ((old (info :function :info name)))
       (unless old (error "~S is not a known function." name))
       (setf (info :function :info name) (copy-function-info old)))))

@@ -29,12 +29,14 @@ echo //doing warm init
 --core output/cold-sbcl.core \
 --sysinit /dev/null --userinit /dev/null <<-'EOF' || exit 1
 
-        (sb!int:/show "hello, world!")
+	;; Now that we use the byte compiler for macros,
+	;; interpreted /SHOW doesn't work until later in init.
+        #+sb-show (print "/hello, world!")
 
         ;; Do warm init.
 	(let ((*print-length* 10)
-	      (*print-level* 10))
-          (sb!int:/show "about to LOAD warm.lisp")
+	      (*print-level* 5))
+          #+sb-show (print "/about to LOAD warm.lisp")
 	  (load "src/cold/warm.lisp"))
 
         ;; Unintern no-longer-needed stuff before the possible PURIFY

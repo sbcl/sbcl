@@ -203,10 +203,11 @@ and submit it as a patch."
 
 (defun default-gc-notify-before (notify-stream bytes-in-use)
   (declare (type stream notify-stream))
-  (format notify-stream
-	  "~&; GC is beginning with ~:D bytes in use at internal runtime ~:D.~%"
-	  bytes-in-use
-	  (get-internal-run-time))
+  (format
+   notify-stream
+   "~&; GC is beginning with ~:D bytes in use at internal runtime ~:D.~%"
+   bytes-in-use
+   (get-internal-run-time))
   (finish-output notify-stream))
 (defparameter *gc-notify-before* #'default-gc-notify-before
   #!+sb-doc
@@ -230,11 +231,11 @@ and submit it as a patch."
   (finish-output notify-stream))
 (defparameter *gc-notify-after* #'default-gc-notify-after
   #!+sb-doc
-  "The function bound to this variable is invoked after GC'ing with
-the value of *GC-NOTIFY-STREAM*, the amount of dynamic usage (in
-bytes) now free, the number of bytes freed by the GC, and the new GC
-trigger threshold. The function should notify the user that the system
-has finished GC'ing.")
+  "The function bound to this variable is invoked after GC'ing with the
+value of *GC-NOTIFY-STREAM*, the amount of dynamic usage (in bytes) now
+free, the number of bytes freed by the GC, and the new GC trigger
+threshold; or if *GC-NOTIFY-STREAM* is NIL, it's not invoked. The
+function should notify the user that the system has finished GC'ing.")
 
 ;;;; internal GC
 
@@ -253,7 +254,7 @@ has finished GC'ing.")
 
 ;;;; SUB-GC
 
-;;; Used to carefully invoke hooks.
+;;; This is used to carefully invoke hooks.
 (eval-when (:compile-toplevel :execute)
   (sb!xc:defmacro carefully-funcall (function &rest args)
     `(handler-case (funcall ,function ,@args)

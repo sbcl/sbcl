@@ -338,10 +338,6 @@
     (check-type type (or symbol cons))
     (cross-typep obj type)))
 
-(defparameter *universal-function-type*
-  (make-function-type :wild-args t
-		      :returns *wild-type*))
-
 (defun ctype-of (x)
   (typecase x
     (function

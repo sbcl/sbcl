@@ -64,25 +64,6 @@
  ;; the executable I'm running.
  :sb-doc
 
- ;; When this is set, EVAL is implemented as an "IR1 interpreter": 
- ;; code is compiled into the compiler's first internal representation,
- ;; then the IR1 is interpreted. When this is not set, EVAL is implemented
- ;; as a little bit of hackery wrapped around a call to COMPILE, i.e.
- ;; the system becomes a "compiler-only implementation" of Common Lisp.
- ;; As of sbcl-0.6.7, the compiler-only implementation is prototype code,
- ;; and much less mature than the old IR1 interpreter. Thus, the safe
- ;; thing is to leave :SB-INTERPRETER set. However, the compiler-only
- ;; system is noticeably smaller, so you might want to omit
- ;; :SB-INTERPRETER if you have a small machine.
- ;;
- ;; Probably, the compiler-only implementation will become more
- ;; stable someday, and support for the IR1 interpreter will then be
- ;; dropped. This will make the system smaller and easier to maintain
- ;; not only because we no longer need to support the interpreter,
- ;; but because code elsewhere in the system (the dumper, the debugger,
- ;; etc.) no longer needs special cases for interpreted code.
- :sb-interpreter
-
  ;; Do regression and other tests when building the system. You
  ;; might or might not want this if you're not a developer,
  ;; depending on how paranoid you are. You probably do want it if

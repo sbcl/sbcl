@@ -153,11 +153,24 @@ Form: 'INNER   Context: EVAL
   (FOO 1))"))
 
 
-;;; A slightly more complex MACROLET case. In the body of the macro X
-;;; should not be lexically bound. In the body of the macrolet form itself
-;;; X should be bound. Note that THIS CASE WILL CAUSE AN ERROR when it
-;;; tries to macroexpand the call to FOO.
-
+;;; The original PCL documentation for this test said
+;;;   A slightly more complex MACROLET case. In the body of the macro
+;;;   X should not be lexically bound. In the body of the macrolet
+;;;   form itself X should be bound. Note that THIS CASE WILL CAUSE AN
+;;;   ERROR when it tries to macroexpand the call to FOO.
+;;;
+;;; This test is commented out in SBCL because ANSI says, in the
+;;; definition of the special operator MACROLET,
+;;;    The macro-expansion functions defined by MACROLET are defined
+;;;    in the lexical environment in which the MACROLET form appears.
+;;;    Declarations and MACROLET and SYMBOL-MACROLET definitions affect
+;;;    the local macro definitions in a MACROLET, but the consequences
+;;;    are undefined if the local macro definitions reference any
+;;;    local variable or function bindings that are visible in that
+;;;    lexical environment. 
+;;; Since the behavior is undefined, anything we do conforms.:-|
+;;; This is of course less than ideal; see bug 124.
+#+nil
 (multiple-value-bind (res cond)
     (ignore-errors
       (take-it-out-for-a-test-walk

@@ -307,10 +307,11 @@
     (sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set))
 			  (write-fds (sb!alien:struct sb!unix:fd-set)))
       (let ((count (calc-masks)))
-	(multiple-value-bind (value err) (sb!unix:unix-fast-select
-	     count
-	     (sb!alien:addr read-fds) (sb!alien:addr write-fds)
-	     nil to-sec to-usec)
+	(multiple-value-bind (value err)
+	    (sb!unix:unix-fast-select count
+				      (sb!alien:addr read-fds)
+				      (sb!alien:addr write-fds)
+				      nil to-sec to-usec)
 	
 	  ;; Now see what it was (if anything)
 	  (cond (value

@@ -1,9 +1,16 @@
-;;;; the specifications of SBCL-specific packages, except..
+;;;; -*- Lisp -*-
+
+;;;; the specifications of target packages, except for a few things
+;;;; which are handled elsewhere by other mechanisms:
 ;;;;   * the creation of the trivial SB-SLOT-ACCESSOR-NAME package
 ;;;;   * any SHADOWing hackery
-;;;; The standard, non-SBCL-specific packages COMMON-LISP,
-;;;; COMMON-LISP-USER, and KEYWORD are also handled through other
-;;;; mechanisms.
+;;;;   * the standard, non-SBCL-specific packages COMMON-LISP,
+;;;;     COMMON-LISP-USER, and KEYWORD
+;;;;
+;;;; The packages are named SB!FOO here and elsewhere in
+;;;; cross-compilation, in order to avoid collision with corresponding
+;;;; SB-FOO packages in the cross-compilation host. They're renamed to
+;;;; SB-FOO later, after the danger of collision has passed.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -152,7 +159,6 @@
               "%UNWIND-PROTECT-BREAKUP"
 
               "*BACKEND-BYTE-ORDER*" "*BACKEND-DISASSEM-PARAMS*"
-              "*BACKEND-INFO-ENVIRONMENT*"
               "*BACKEND-INSTRUCTION-FLAVORS*" "*BACKEND-INSTRUCTION-FORMATS*"
               "*BACKEND-INTERNAL-ERRORS*" "*BACKEND-PAGE-SIZE*"
               "*BACKEND-REGISTER-SAVE-PENALTY*"
@@ -953,6 +959,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "*EVAL-STACK-TOP*" "*GC-INHIBIT*"
              "*NEED-TO-COLLECT-GARBAGE*"
              "*PRETTY-PRINTER*" "*UNIVERSAL-TYPE*"
+             "*UNIVERSAL-FUNCTION-TYPE*"
              "*UNPARSE-FUNCTION-TYPE-SIMPLIFY*" "*WILD-TYPE*"
              "32BIT-LOGICAL-AND" "32BIT-LOGICAL-ANDC1"
              "32BIT-LOGICAL-ANDC2"
@@ -1595,10 +1602,10 @@ no guarantees of interface stability."
              "WS-YPIXEL" "W_OK" "X_OK" "SIGSYS" "TCSETPGRP" "FD-ZERO"
              "SIGQUIT" "SIGCHLD" "SIGSEGV" "FD-CLR" "SIGUSR2"
              "EALREADY" "SIGPIPE" "CHECK" "SIGXCPU" "EOPNOTSUPP"
-             "SIGFPE" "SIGHUP" "ENOTSOCK" "SIGMASK" "EINTR"
+             "SIGFPE" "SIGHUP" "ENOTSOCK" "EINTR"
              "SIGCONT" "UNIX-RESOLVE-LINKS" "SIGKILL" "EMSGSIZE" "ERANGE"
              "EPROTOTYPE" "UNIX-SIGNAL-NUMBER" "EPFNOSUPPORT" "SIGILL"
-             "EDOM" "UNIX-SIGPAUSE" "EDQUOT" "FD-SETSIZE" "SIGTSTP"
+             "EDOM" "EDQUOT" "FD-SETSIZE" "SIGTSTP"
              "EAFNOSUPPORT" "TCGETPGRP" "EMFILE" "ECONNRESET"
              "EADDRNOTAVAIL" "SIGALRM" "ENETDOWN" "EVICEOP"
              "UNIX-FAST-GETRUSAGE" "EPERM" "SIGINT" "EXDEV" "EDEADLK"
@@ -1606,14 +1613,14 @@ no guarantees of interface stability."
              "EUSERS" "SIGVTALRM" "ENOTCONN" "ESUCCESS" "EPIPE"
              "UNIX-SIMPLIFY-PATHNAME" "EISCONN" "FD-ISSET"
              "ESHUTDOWN" "EBUSY" "SIGTERM" "ENAMETOOLONG" "EMLINK"
-             "EADDRINUSE" "SIGBUS" "ERESTART" "TTY-PROCESS-GROUP"
+             "EADDRINUSE" "SIGBUS" "ERESTART" 
              "UNIX-SIGNAL-NAME" "ETIMEDOUT" "ECHILD" "EFBIG" "SIGTRAP"
              "UNIX-KILLPG" "ENOTBLK" "SIGIOT" "SIGUSR1" "ECONNABORTED"
              "EHOSTUNREACH" "EBADF" "EINVAL" "FD-SET" "EISDIR"
              "SIGTTIN" "UNIX-KILL" "EHOSTDOWN" "E2BIG" "ESPIPE"
              "UNIX-FAST-SELECT" "ENXIO" "ENOTTY" "ELOOP" "LTCHARS"
              "SIGXFSZ" "EINPROGRESS" "ENOENT"
-             "EPROTONOSUPPORT" "UNIX-SIGBLOCK" "SIGIO" "ENOMEM" "SIGEMT"
+             "EPROTONOSUPPORT" "SIGIO" "ENOMEM" "SIGEMT"
              "EFAULT" "ENODEV" "EIO" "EVICEERR" "ETXTBSY" "EWOULDBLOCK"
              "EAGAIN" "EDESTADDRREQ" "ENOEXEC" "ENETUNREACH" "ENOTEMPTY"
              "ENFILE"

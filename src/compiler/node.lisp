@@ -70,9 +70,9 @@
   ;;	A continuation that is the CONT of some node in BLOCK.
   (kind :unused :type (member :unused :deleted :inside-block :block-start
 			      :deleted-block-start))
-  ;; The node which receives this value, if any. In a deleted continuation,
-  ;; this is null even though the node that receives this continuation may not
-  ;; yet be deleted.
+  ;; The node which receives this value, if any. In a deleted
+  ;; continuation, this is null even though the node that receives
+  ;; this continuation may not yet be deleted.
   (dest nil :type (or node null))
   ;; If this is a NODE, then it is the node which is to be evaluated
   ;; next. This is always null in :DELETED and :UNUSED continuations,

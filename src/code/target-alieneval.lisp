@@ -97,12 +97,16 @@
      :EXTERN
        No alien is allocated, but VAR is established as a local name for
        the external alien given by EXTERNAL-NAME."
+  (/show "entering WITH-ALIEN" bindings)
   (with-auxiliary-alien-types env
     (dolist (binding (reverse bindings))
+      (/show binding)
       (destructuring-bind
 	  (symbol type &optional (opt1 nil opt1p) (opt2 nil opt2p))
 	  binding
+	(/show symbol type opt1 opt2)
 	(let ((alien-type (parse-alien-type type env)))
+	  (/show alien-type)
 	  (multiple-value-bind (allocation initial-value)
 	      (if opt2p
 		  (values opt1 opt2)
@@ -113,6 +117,7 @@
 		     (values opt1 nil))
 		    (t
 		     (values :local opt1))))
+	    (/show allocation initial-value)
 	    (setf body
 		  (ecase allocation
 		    #+nil
@@ -128,6 +133,7 @@
 				`((setq ,symbol ,initial-value)))
 			    ,@body)))))
 		    (:extern
+		     (/show ":EXTERN case")
 		     (let ((info (make-heap-alien-info
 				  :type alien-type
 				  :sap-form `(foreign-symbol-address
@@ -136,9 +142,11 @@
 			  ((,symbol (%heap-alien ',info)))
 			  ,@body))))
 		    (:local
+		     (/show ":LOCAL case")
 		     (let ((var (gensym))
 			   (initval (if initial-value (gensym)))
 			   (info (make-local-alien-info :type alien-type)))
+		       (/show var initval info)
 		       `((let ((,var (make-local-alien ',info))
 			       ,@(when initial-value
 				   `((,initval ,initial-value))))
@@ -150,7 +158,9 @@
 				    `((setq ,symbol ,initval)))
 				,@body)
 			       (dispose-local-alien ',info ,var))))))))))))
+    (/show "revised" body)
     (verify-local-auxiliaries-okay)
+    (/show "back from VERIFY-LOCAL-AUXILIARIES-OK, returning")
     `(symbol-macrolet ((&auxiliary-type-definitions&
 			,(append *new-auxiliary-types*
 				 (auxiliary-type-definitions env))))

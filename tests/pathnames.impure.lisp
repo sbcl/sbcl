@@ -79,7 +79,6 @@
 ;;; FIXME: currently SBCL throws NAMESTRING-PARSE-ERROR: should this be
 ;;; a TYPE-ERROR?
 
-;; error: directory-component not valid
 (assert (not (ignore-errors
                (make-pathname :host "FOO" :directory "!bla" :name "bar"))))
 

@@ -135,8 +135,6 @@ ldso_stub__ ## fct: ;                           \
  LDSO_STUBIFY(send)
  LDSO_STUBIFY(setitimer)
  LDSO_STUBIFY(setpgrp)
- LDSO_STUBIFY(sigblock)
- LDSO_STUBIFY(sigpause)
  LDSO_STUBIFY(sigsetmask)
  LDSO_STUBIFY(sinh)
  LDSO_STUBIFY(socket)

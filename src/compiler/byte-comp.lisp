@@ -143,7 +143,8 @@
     (def-system-constant 14 '(%fdefinition-marker% . %negate))
     (def-system-constant 15 '(%fdefinition-marker% . %%defun))
     (def-system-constant 16 '(%fdefinition-marker% . %%defmacro))
-    (def-system-constant 17 '(%fdefinition-marker% . %%defconstant))
+    ;; no longer used as of sbcl-0.pre7:
+    #+nil (def-system-constant 17 '(%fdefinition-marker% . %%defconstant))
     (def-system-constant 18 '(%fdefinition-marker% . length))
     (def-system-constant 19 '(%fdefinition-marker% . equal))
     (def-system-constant 20 '(%fdefinition-marker% . append))
@@ -634,8 +635,8 @@
 		(ecase (cleanup-kind (nlx-info-cleanup nlx-info))
 		  ((:catch :unwind-protect)
 		   (consume :nlx-entry))
-		  ;; If for a lexical exit, we will see a breakup later, so
-		  ;; don't consume :NLX-ENTRY now.
+		  ;; If for a lexical exit, we will see a breakup
+		  ;; later, so don't consume :NLX-ENTRY now.
 		  (:tagbody)
 		  (:block
 		   (let ((cont (nlx-info-continuation nlx-info)))
@@ -1210,7 +1211,8 @@
 	    (output-push-fdefinition
 	     segment
 	     (if (and found
-		      (= (length (combination-args (continuation-dest cont)))
+		      (= (length (basic-combination-args
+				  (continuation-dest cont)))
 			 2))
 		 found
 		 name))))
@@ -1860,9 +1862,9 @@
   ;; Process all of the lambdas in component, and assign stack frame
   ;; locations for all the locals.
   (dolist (lambda (component-lambdas component))
-    ;; We don't generate any code for :external lambdas, so we don't need
-    ;; to allocate stack space. Also, we don't use the ``more'' entry,
-    ;; so we don't need code for it.
+    ;; We don't generate any code for :EXTERNAL lambdas, so we don't
+    ;; need to allocate stack space. Also, we don't use the ``more''
+    ;; entry, so we don't need code for it.
     (cond
      ((or (eq (lambda-kind lambda) :external)
 	  (and (eq (lambda-kind lambda) :optional)
@@ -1926,12 +1928,12 @@
   ;; stay in the argument area and which need to be moved into locals.
   (assign-locals component)
 
-  ;; Annotate every continuation with information about how we want the
-  ;; values.
+  ;; Annotate every continuation with information about how we want
+  ;; the values.
   (annotate-ir1 component)
 
-  ;; Determine what stack values are dead, and emit cleanup code to pop
-  ;; them.
+  ;; Determine what stack values are dead, and emit cleanup code to
+  ;; pop them.
   (byte-stack-analyze component)
 
   ;; Make sure any newly added blocks have a block-number.

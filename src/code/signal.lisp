@@ -233,12 +233,4 @@
 #!+svr4
 (!def-unix-signal :SIGWAITING 32) ; Process's LWPs are blocked.
 
-(sb!xc:defmacro sigmask (&rest signals)
-  #!+sb-doc
-  "Returns a mask given a set of signals."
-  (apply #'logior
-	 (mapcar (lambda (signal)
-		   (ash 1 (1- (unix-signal-number signal))))
-		 signals)))
-
 (/show0 "done with signal.lisp")

@@ -31,10 +31,10 @@
 ;;; and there's also the noted-below problem that the C-level code
 ;;; contains implicit assumptions about this marker.
 ;;;
-;;; KLUDGE: Note that as of version 0.6.6 there's a dependence in the
+;;; KLUDGE: Note that as of version 0.pre7 there's a dependence in the
 ;;; gencgc.c code on this value being a symbol. (This is only one of
-;;; many nasty dependencies between that code and this, alas.)
-;;; -- WHN 2001-02-28
+;;; several nasty dependencies between that code and this, alas.)
+;;; -- WHN 2001-08-17
 ;;;
 ;;; FIXME: We end up doing two DEFCONSTANT forms because (1) LispWorks
 ;;; needs EVAL-WHEN wrapped around DEFCONSTANT, and (2) SBCL's

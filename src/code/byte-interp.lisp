@@ -92,9 +92,9 @@
 	(setf sb!eval::*eval-stack* new-stack)))
     (setf *eval-stack-top* new-sp)
     (let ((stack sb!eval::*eval-stack*))
-      (do ((i sp (1+ i))) ; FIXME: DOTIMES? or just :INITIAL-ELEMENT in MAKE-ARRAY?
+      (do ((i sp (1+ i))) ; FIXME: Use CL:FILL.
 	  ((= i new-sp))
-	(setf (svref stack i) '#:uninitialized))))
+	(setf (svref stack i) '#:uninitialized-eval-stack-element))))
   (values))
 
 (defun pop-eval-stack ()
@@ -615,9 +615,9 @@
 	   (type pc pc))
   pc)
 
-;;; This is exactly like THROW, except that the tag is the last thing on
-;;; the stack instead of the first. This is used for RETURN-FROM (hence the
-;;; name).
+;;; This is exactly like THROW, except that the tag is the last thing
+;;; on the stack instead of the first. This is used for RETURN-FROM
+;;; (hence the name).
 (define-xop return-from (component old-pc pc fp)
   (declare (type code-component component)
 	   (type pc old-pc)

@@ -423,8 +423,8 @@
 				`(block ,skip
 				   (catch 'ir1-error-abort
 				     (let ((*compiler-error-bailout*
-					    #'(lambda ()
-						(throw 'ir1-error-abort nil))))
+					    (lambda ()
+					      (throw 'ir1-error-abort nil))))
 				       ,@body
 				       (return-from ,skip nil)))
 				   (ir1-convert ,start ,cont ,proxy)))))
@@ -585,7 +585,8 @@
   (muffle-warning)
   (error "internal error -- no MUFFLE-WARNING restart"))
 
-;;; Trap errors during the macroexpansion.
+;;; Expand FORM using the macro whose MACRO-FUNCTION is FUN, trapping
+;;; errors which occur during the macroexpansion.
 (defun careful-expand-macro (fun form)
   (handler-bind (;; When cross-compiling, we can get style warnings
 		 ;; about e.g. undefined functions. An unhandled
@@ -1980,11 +1981,11 @@
       (conts cont)
 
       (let ((*lexenv* (make-lexenv :cleanup cleanup :tags (tags))))
-	(mapc #'(lambda (segment start cont)
-		  (ir1-convert-progn-body start cont (rest segment)))
+	(mapc (lambda (segment start cont)
+		(ir1-convert-progn-body start cont (rest segment)))
 	      segments (starts) (conts))))))
 
-;;; Emit an Exit node without any value.
+;;; Emit an EXIT node without any value.
 (def-ir1-translator go ((tag) start cont)
   #!+sb-doc
   "Go Tag
@@ -2001,138 +2002,64 @@
 
 ;;;; translators for compiler-magic special forms
 
-;;; Do stuff to do an EVAL-WHEN. This is split off from the IR1
-;;; convert method so that it can be shared by the special-case
-;;; top-level form processing code. We play with the dynamic
-;;; environment and eval stuff, then call Fun with a list of forms to
-;;; be processed at load time.
+;;; This handles EVAL-WHEN in non-top-level forms. (EVAL-WHENs in
+;;; top-level forms are picked off and handled by PROCESS-TOP-LEVEL-FORM,
+;;; so they're never seen at this level.)
 ;;;
-;;; Note: the EVAL situation is always ignored: this is conceptually a
-;;; compile-only implementation.
-;;;
-;;; We have to interact with the interpreter to ensure that the forms
-;;; get EVAL'ed exactly once. We bind *ALREADY-EVALED-THIS* to true to
-;;; inhibit evaluation of any enclosed EVAL-WHENs, either by IR1
-;;; conversion done by EVAL, or by conversion of the body for
-;;; load-time processing. If *ALREADY-EVALED-THIS* is true then we *do
-;;; not* EVAL since some enclosing EVAL-WHEN already did.
-;;;
-;;; We know we are EVAL'ing for LOAD since we wouldn't get called
-;;; otherwise. If LOAD is a situation we call FUN on body. If we
-;;; aren't evaluating for LOAD, then we call FUN on NIL for the result
-;;; of the EVAL-WHEN.
-(defun do-eval-when-stuff (situations body fun)
-
-  (when (or (not (listp situations))
-	    (set-difference situations
-			    '(compile load eval
-			      :compile-toplevel :load-toplevel :execute)))
-    (compiler-error "bad EVAL-WHEN situation list: ~S" situations))
-
-  (let ((deprecated-names (intersection situations '(compile load eval))))
-    (when deprecated-names
-      (style-warn "using deprecated EVAL-WHEN situation names ~S"
-		  deprecated-names)))
-
-  (let* ((do-eval (and (intersection '(compile :compile-toplevel) situations)
-		       #!+sb-interpreter (not sb!eval::*already-evaled-this*)))
-	 #!+sb-interpreter
-	 (sb!eval::*already-evaled-this* t))
-    (when do-eval
-
-      ;; This is the natural way to do it.
-      #-(and sb-xc-host (or sbcl cmu))
-      (eval `(progn ,@body))
-
-      ;; This is a disgusting hack to work around bug IR1-3 when using
-      ;; SBCL (or CMU CL, for that matter) as a cross-compilation
-      ;; host. When we go from the cross-compiler (where we bound
-      ;; SB!EVAL::*ALREADY-EVALED-THIS*) to the host compiler (which
-      ;; has a separate SB-EVAL::*ALREADY-EVALED-THIS* variable), EVAL
-      ;; would go and execute nested EVAL-WHENs even when they're not
-      ;; toplevel forms. Using EVAL-WHEN instead of bare EVAL causes
-      ;; the cross-compilation host to bind its own
-      ;; *ALREADY-EVALED-THIS* variable, so that the problem is
-      ;; suppressed.
-      ;;
-      ;; FIXME: Once bug IR1-3 is fixed, this hack can go away. (Or if
-      ;; CMU CL doesn't fix the bug, then this hack can be made
-      ;; conditional on #+CMU.)
-      #+(and sb-xc-host (or sbcl cmu))
-      (let (#+sbcl (sb-eval::*already-evaled-this* t)
-	    #+cmu (common-lisp::*already-evaled-this* t))
-	(eval `(eval-when (:compile-toplevel :load-toplevel :execute)
-		 ,@body))))
-
-    (if (or (intersection '(:load-toplevel load) situations)
-	    (and *converting-for-interpreter*
-		 (intersection '(:execute eval) situations)))
-	(funcall fun body)
-	(funcall fun '(nil)))))
-
-(def-ir1-translator eval-when ((situations &rest body) start cont)
+;;; ANSI "3.2.3.1 Processing of Top Level Forms" says that processing
+;;; of non-top-level EVAL-WHENs is very simple:
+;;;   EVAL-WHEN forms cause compile-time evaluation only at top level.
+;;;   Both :COMPILE-TOPLEVEL and :LOAD-TOPLEVEL situation specifications
+;;;   are ignored for non-top-level forms. For non-top-level forms, an
+;;;   eval-when specifying the :EXECUTE situation is treated as an
+;;;   implicit PROGN including the forms in the body of the EVAL-WHEN
+;;;   form; otherwise, the forms in the body are ignored. 
+(def-ir1-translator eval-when ((situations &rest forms) start cont)
   #!+sb-doc
   "EVAL-WHEN (Situation*) Form*
-  Evaluate the Forms in the specified Situations, any of COMPILE, LOAD, EVAL.
-  This is conceptually a compile-only implementation, so EVAL is a no-op."
+  Evaluate the Forms in the specified Situations (any of :COMPILE-TOPLEVEL,
+  :LOAD-TOPLEVEL, or :EXECUTE, or (deprecated) COMPILE, LOAD, or EVAL)."
+  (multiple-value-bind (ct lt e) (parse-eval-when-situations situations)
+    (declare (ignore ct lt))
+    (when e
+      (ir1-convert-progn-body start cont forms)))
+  (values))
 
-  ;; It's difficult to handle EVAL-WHENs completely correctly in the
-  ;; cross-compiler. (Common Lisp is not a cross-compiler-friendly
-  ;; language..) Since we, the system implementors, control not only
-  ;; the cross-compiler but also the code that it processes, we can
-  ;; handle this either by making the cross-compiler smarter about
-  ;; handling EVAL-WHENs (hard) or by avoiding the use of difficult
-  ;; EVAL-WHEN constructs (relatively easy). However, since EVAL-WHENs
-  ;; can be generated by many macro expansions, it's not always easy
-  ;; to detect problems by skimming the source code, so we'll try to
-  ;; add some code here to help out.
-  ;;
-  ;; Nested EVAL-WHENs are tricky.
-  #+sb-xc-host
-  (labels ((contains-toplevel-eval-when-p (body-part)
-	     (and (consp body-part)
-		  (or (eq (first body-part) 'eval-when)
-		      (and (member (first body-part)
-				   '(locally macrolet progn symbol-macrolet))
-			   (some #'contains-toplevel-eval-when-p
-				 (rest body-part)))))))
-    (/show "testing for nested EVAL-WHENs" body)
-    (when (some #'contains-toplevel-eval-when-p body)
-      (compiler-style-warning "nested EVAL-WHENs in cross-compilation")))
-
-  (do-eval-when-stuff situations
-		      body
-		      (lambda (forms)
-			(ir1-convert-progn-body start cont forms))))
-
-;;; Like DO-EVAL-WHEN-STUFF, only do a MACROLET. FUN is not passed any
-;;; arguments.
-(defun do-macrolet-stuff (definitions fun)
-  (declare (list definitions) (type function fun))
-  (let ((whole (gensym "WHOLE"))
-	(environment (gensym "ENVIRONMENT")))
-    (collect ((new-fenv))
-      (dolist (def definitions)
-	(let ((name (first def))
-	      (arglist (second def))
-	      (body (cddr def)))
-	  (unless (symbolp name)
-	    (compiler-error "The local macro name ~S is not a symbol." name))
-	  (when (< (length def) 2)
-	    (compiler-error
-	     "The list ~S is too short to be a legal local macro definition."
-	     name))
-	  (multiple-value-bind (body local-decs)
-	      (parse-defmacro arglist whole body name 'macrolet
-			      :environment environment)
-	    (new-fenv `(,(first def) macro .
-			,(coerce `(lambda (,whole ,environment)
-				    ,@local-decs (block ,name ,body))
-				 'function))))))
-
-      (let ((*lexenv* (make-lexenv :functions (new-fenv))))
-	(funcall fun))))
-
+;;; Tweak *LEXENV* to include the DEFINITIONS from a MACROLET, then
+;;; call FUN (with no arguments).
+;;;
+;;; This is split off from the IR1 convert method so that it can be
+;;; shared by the special-case top-level MACROLET processing code.
+(defun funcall-in-macrolet-lexenv (definitions fun)
+  (declare (type list definitions) (type function fun))
+  (let* ((whole (gensym "WHOLE"))
+	 (environment (gensym "ENVIRONMENT"))
+	 (processed-definitions
+	  (mapcar (lambda (definition)
+		    (unless (list-of-length-at-least-p definition 2)
+		      (compiler-error
+		       "The list ~S is too short to be a legal ~
+                       local macro definition."
+		       definition))
+		    (destructuring-bind (name arglist &body body) definition
+		      (unless (symbolp name)
+			(compiler-error
+			 "The local macro name ~S is not a symbol." name))
+		      (multiple-value-bind (body local-decls)
+			  (parse-defmacro arglist whole body name 'macrolet
+					  :environment environment)
+			`(,name macro .
+				,(compile nil
+					  `(lambda (,whole ,environment)
+					     ,@local-decls
+					     (block ,name ,body)))))))
+		  definitions))
+	 (*lexenv* (make-lexenv :functions processed-definitions)))
+    (unless (= (length definitions)
+	       (length (remove-duplicates definitions :key #'first)))
+      (compiler-style-warning
+       "duplicate macro names in MACROLET ~S" definitions))
+    (funcall fun))
   (values))
 
 (def-ir1-translator macrolet ((definitions &rest body) start cont)
@@ -2142,9 +2069,46 @@
   defined. Name is the local macro name, Lambda-List is the DEFMACRO style
   destructuring lambda list, and the Forms evaluate to the expansion. The
   Forms are evaluated in the null environment."
-  (do-macrolet-stuff definitions
-		     #'(lambda ()
-			 (ir1-convert-progn-body start cont body))))
+  (funcall-in-macrolet-lexenv definitions
+			      (lambda ()
+				(ir1-translate-locally body start cont))))
+
+;;; Tweak *LEXENV* to include the MACROBINDINGS from a SYMBOL-MACROLET,
+;;; then call FUN (with no arguments).
+;;;
+;;; This is split off from the IR1 convert method so that it can be
+;;; shared by the special-case top-level SYMBOL-MACROLET processing code.
+(defun funcall-in-symbol-macrolet-lexenv (macrobindings fun)
+  (declare (type list macrobindings) (type function fun))
+  (let ((processed-macrobindings
+	 (mapcar (lambda (macrobinding)
+		   (unless (proper-list-of-length-p macrobinding 2)
+		     (compiler-error "malformed symbol/expansion pair: ~S"
+				     macrobinding))
+		   (destructuring-bind (name expansion) macrobinding
+		     (unless (symbolp name)
+		       (compiler-error
+			"The local symbol macro name ~S is not a symbol."
+			name))
+		     `(,name . (MACRO . ,expansion))))
+		 macrobindings)))
+    (unless (= (length macrobindings)
+	       (length (remove-duplicates macrobindings :key #'first)))
+      (compiler-style-warning
+       "duplicate symbol macro names in SYMBOL-MACROLET ~S" macrobindings))
+    (let ((*lexenv* (make-lexenv :variables processed-macrobindings)))
+      (funcall fun)))
+  (values))
+  
+(def-ir1-translator symbol-macrolet ((macrobindings &body body) start cont)
+  #!+sb-doc
+  "SYMBOL-MACROLET ({(Name Expansion)}*) Decl* Form*
+  Define the Names as symbol macros with the given Expansions. Within the
+  body, references to a Name will effectively be replaced with the Expansion."
+  (funcall-in-symbol-macrolet-lexenv
+   macrobindings
+   (lambda ()
+     (ir1-translate-locally body start cont))))
 
 ;;; not really a special form, but..
 (def-ir1-translator declare ((&rest stuff) start cont)
@@ -2293,32 +2257,6 @@
   "optimize away possible call to FDEFINITION at runtime"
   'thing)
 
-;;;; symbol macros
-
-(def-ir1-translator symbol-macrolet ((specs &body body) start cont)
-  #!+sb-doc
-  "SYMBOL-MACROLET ({(Name Expansion)}*) Decl* Form*
-  Define the Names as symbol macros with the given Expansions. Within the
-  body, references to a Name will effectively be replaced with the Expansion."
-  (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
-    (collect ((res))
-      (dolist (spec specs)
-	(unless (proper-list-of-length-p spec 2)
-	  (compiler-error "The symbol macro binding ~S is malformed." spec))
-	(let ((name (first spec))
-	      (def (second spec)))
-	  (unless (symbolp name)
-	    (compiler-error "The symbol macro name ~S is not a symbol." name))
-	  (when (assoc name (res) :test #'eq)
-	    (compiler-style-warning
-	     "The name ~S occurs more than once in SYMBOL-MACROLET."
-	     name))
-	  (res `(,name . (MACRO . ,def)))))
-
-      (let* ((*lexenv* (make-lexenv :variables (res)))
-	     (*lexenv* (process-decls decls (res) nil cont)))
-	(ir1-convert-progn-body start cont forms)))))
-
 ;;; This is a frob that DEFSTRUCT expands into to establish the compiler
 ;;; semantics. The other code in the expansion and %%COMPILER-DEFSTRUCT do
 ;;; most of the work, we just clear all of the functions out of
@@ -2419,29 +2357,34 @@
       (let ((*lexenv* (process-decls decls vars nil cont)))
 	(ir1-convert-aux-bindings start cont forms vars values)))))
 
-;;; This is a lot like a LET* with no bindings. Unlike LET*, LOCALLY
-;;; has to preserves top-level-formness, but we don't need to worry
-;;; about that here, because special logic in the compiler main loop
-;;; grabs top-level LOCALLYs and takes care of them before this
-;;; transform ever sees them.
-(def-ir1-translator locally ((&body body)
-			     start cont)
+;;; logic shared between IR1 translators for LOCALLY, MACROLET,
+;;; and SYMBOL-MACROLET
+;;;
+;;; Note that all these things need to preserve top-level-formness,
+;;; but we don't need to worry about that within an IR1 translator,
+;;; since top-level-formness is picked off by PROCESS-TOP-LEVEL-FOO
+;;; forms before we hit the IR1 transform level.
+(defun ir1-translate-locally (body start cont)
+  (declare (type list body) (type continuation start cont))
+  (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
+    (let ((*lexenv* (process-decls decls nil nil cont)))
+      (ir1-convert-aux-bindings start cont forms nil nil))))
+
+(def-ir1-translator locally ((&body body) start cont)
   #!+sb-doc
   "LOCALLY Declaration* Form*
   Sequentially evaluate the Forms in a lexical environment where the
   the Declarations have effect. If LOCALLY is a top-level form, then
   the Forms are also processed as top-level forms."
-  (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
-    (let ((*lexenv* (process-decls decls nil nil cont)))
-      (ir1-convert-aux-bindings start cont forms nil nil))))
+  (ir1-translate-locally body start cont))
 
 ;;;; FLET and LABELS
 
 ;;; Given a list of local function specifications in the style of
-;;; Flet, return lists of the function names and of the lambdas which
+;;; FLET, return lists of the function names and of the lambdas which
 ;;; are their definitions.
 ;;;
-;;; The function names are checked for legality. Context is the name
+;;; The function names are checked for legality. CONTEXT is the name
 ;;; of the form, for error reporting.
 (declaim (ftype (function (list symbol) (values list list))
 		extract-flet-variables))
@@ -2889,6 +2832,8 @@
 	       (aver (proper-list-of-length-p qdef 2))
 	       (second qdef))))
 
+    (/show "doing IR1 translator for %DEFMACRO" name)
+
     (unless (symbolp name)
       (compiler-error "The macro name ~S is not a symbol." name))
 
@@ -2898,7 +2843,8 @@
        (remhash name *free-functions*)
        (undefine-function-name name)
        (compiler-warning
-	"~S is being redefined as a macro when it was previously ~(~A~) to be a function."
+	"~S is being redefined as a macro when it was ~
+         previously ~(~A~) to be a function."
 	name
 	(info :function :where-from name)))
       (:macro)
@@ -2980,9 +2926,9 @@
 					     (make-null-lexenv))
 		     :variables (copy-list symbol-macros)
 		     :functions
-		     (mapcar #'(lambda (x)
-				 `(,(car x) .
-				   (macro . ,(coerce (cdr x) 'function))))
+		     (mapcar (lambda (x)
+			       `(,(car x) .
+				 (macro . ,(coerce (cdr x) 'function))))
 			     macros)
 		     :policy (lexenv-policy *lexenv*))))
       (ir1-convert-lambda `(lambda ,@body) name))))

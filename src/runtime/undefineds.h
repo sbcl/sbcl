@@ -129,15 +129,11 @@ F(setrlimit)
 F(setsockopt)
 F(settimeofday)
 F(shutdown)
-#ifndef SVR4
-F(sigblock)
-#endif
-F(sigpause)
 #if !defined(hpux) && !defined(SVR4) && !defined(__i386__)
 F(sigreturn)
 #endif
-#if !defined(SVR4) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
 F(sigsetmask)
+#if !defined(SVR4) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
 F(sigstack)
 F(sigvec)
 #endif

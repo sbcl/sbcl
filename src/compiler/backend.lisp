@@ -115,10 +115,6 @@
 (defvar *backend-parsed-vops* (make-hash-table :test 'eq))
 (declaim (type hash-table *backend-parsed-vops*))
 
-;;; the backend-specific aspects of the info environment
-(defvar *backend-info-environment* nil)
-(declaim (type list *backend-info-environment*))
-
 ;;; support for the assembler
 (defvar *backend-instruction-formats* (make-hash-table :test 'eq))
 (defvar *backend-instruction-flavors* (make-hash-table :test 'equal))

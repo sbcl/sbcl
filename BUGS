@@ -1112,6 +1112,132 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
    Raymond Toy comments that this is tricky on the X86 since its FPU
    uses 80-bit precision internally.
 
+119:
+   a bug in the byte compiler and/or interpreter: Compile
+	(IN-PACKAGE :CL-USER)
+	(DECLAIM (OPTIMIZE (SPEED 0) (SAFETY 1) (DEBUG 1)))
+	(DEFUN BAR (&REST DIMS)
+	  (IF (EVERY #'INTEGERP DIMS)
+	      1
+	      2))
+   then execute (BAR '(1 2 3 4)). In sbcl-0.pre7.14.flaky4.8
+   this gives a TYPE-ERROR,
+     The value #:UNINITIALIZED-EVAL-STACK-ELEMENT is not
+	of type (MOD 536870911).
+   The same error will probably occur in earlier versions as well, 
+   although the name of the uninitialized-element placeholder will
+   be shorter.
+
+   The same thing happens if the compiler macro expansion of 
+   EVERY into MAP is hand-expanded:
+	(defun bar2 (dims)
+	  (if (block blockname
+		(map nil
+		     (lambda (dim)
+		       (let ((pred-value (funcall #'integerp dim)))
+			 (unless pred-value
+			   (return-from blockname
+			     nil))))
+		     dims)	
+		t)
+	      1
+	      2))
+   CMU CL doesn't have this compiler macro expansion, so it was 
+   immune to the original bug in BAR, but once we hand-expand it
+   into BAR2, CMU CL 18c has the same bug. (Run (BAR '(NIL NIL)).)
+
+   The native compiler handles it fine, both in SBCL and in CMU CL.
+
+120a:
+   The compiler incorrectly figures the return type of 
+	(DEFUN FOO (FRAME UP-FRAME)
+	  (IF (OR (NOT FRAME)
+		  T)
+	      FRAME
+	      "BAR"))
+   as NIL.
+
+   This problem exists in CMU CL 18c too. When I reported it on
+   cmucl-imp@cons.org, Raymond Toy replied 23 Aug 2001 with 
+   a partial explanation, but no fix has been found yet.
+
+120b:
+   Even in sbcl-0.pre7.x, which is supposed to be free of the old
+   non-ANSI behavior of treating the function return type inferred
+   from the current function definition as a declaration of the
+   return type from any function of that name, the return type of NIL
+   is attached to FOO in 120a above, and used to optimize code which
+   calls FOO. 
+
+122:
+   There was some sort of screwup in handling of
+   (IF (NOT (IGNORE-ERRORS ..))). E.g.
+	(defun foo1i ()
+	  (if (not (ignore-errors
+		     (make-pathname :host "foo" :directory "!bla" :name "bar")))
+	      (print "ok")
+	      (error "notunlessnot")))
+   The (NOT (IGNORE-ERRORS ..)) form evaluates to T, so this should be
+   printing "ok", but instead it's going to the ERROR. This problem
+   seems to've been introduced by MNA's HANDLER-CASE patch (sbcl-devel
+   2001-07-17) and as a workaround (put in sbcl-0.pre7.14.flaky4.12)
+   I reverted back to the old weird HANDLER-CASE code. However, I
+   think the problem looks like a compiler bug in handling RETURN-FROM,
+   so I left the MNA-patched code in HANDLER-CASE (suppressed with
+   #+NIL) and I'd like to go back to see whether this really is
+   a compiler bug before I delete this BUGS entry.
+
+123:
+   The *USE-IMPLEMENTATION-TYPES* hack causes bugs, particularly
+     (IN-PACKAGE :SB-KERNEL)
+     (TYPE= (SPECIFIER-TYPE '(VECTOR T))
+	    (SPECIFIER-TYPE '(VECTOR UNDEFTYPE)))
+   Then because of this, the compiler bogusly optimizes
+	(TYPEP #(11) '(SIMPLE-ARRAY UNDEF-TYPE 1))
+   to T. Unfortunately, just setting *USE-IMPLEMENTATION-TYPES* to 
+   NIL around sbcl-0.pre7.14.flaky4.12 didn't work: the compiler complained
+   about type mismatches (probably harmlessly, another instance of bug 117);
+   and then cold init died with a segmentation fault.
+
+124:
+   As of version 0.pre7.14, SBCL's implementation of MACROLET makes
+   the entire lexical environment at the point of MACROLET available
+   in the bodies of the macroexpander functions. In particular, it 
+   allows the function bodies (which run at compile time) to try to 
+   access lexical variables (which are only defined at runtime).
+   It doesn't even issue a warning, which is bad.
+  
+   The SBCL behavior arguably conforms to the ANSI spec (since the
+   spec says that the behavior is undefined, ergo anything conforms).
+   However, it would be better to issue a compile-time error.
+   Unfortunately I (WHN) don't see any simple way to detect this
+   condition in order to issue such an error, so for the meantime
+   SBCL just does this weird broken "conforming" thing.
+
+   The ANSI standard says, in the definition of the special operator
+   MACROLET,
+       The macro-expansion functions defined by MACROLET are defined
+       in the lexical environment in which the MACROLET form appears.
+       Declarations and MACROLET and SYMBOL-MACROLET definitions affect
+       the local macro definitions in a MACROLET, but the consequences
+       are undefined if the local macro definitions reference any
+       local variable or function bindings that are visible in that
+       lexical environment. 
+   Then it seems to contradict itself by giving the example
+	(defun foo (x flag)
+	   (macrolet ((fudge (z)
+	                 ;The parameters x and flag are not accessible
+	                 ; at this point; a reference to flag would be to
+	                 ; the global variable of that name.
+	                 ` (if flag (* ,z ,z) ,z)))
+	    ;The parameters x and flag are accessible here.
+	     (+ x
+	        (fudge x)
+	        (fudge (+ x 1)))))
+   The comment "a reference to flag would be to the global variable
+   of the same name" sounds like good behavior for the system to have.
+   but actual specification quoted above says that the actual behavior
+   is undefined.
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
@@ -1185,14 +1311,6 @@ IR1-4:
   EVAL-WHEN is rewritten, which won't happen until after the IR1
   interpreter is gone, the system's notion of what's a top-level form
   and what's not will remain too confused to fix this problem.]
-
-IR1-5:
-  (not really a bug, just a wishlist thing which might be easy
-  when EVAL-WHEN is rewritten..) It might be good for the cross-compiler
-  to warn about nested EVAL-WHENs. (In ordinary compilation, they're
-  quite likely to be OK, but in cross-compiled code EVAL-WHENs
-  are a great source of confusion, so a style warning about anything
-  unusual could be helpful.)
 
 IR1-6:
   (another wishlist thing..) Reimplement DEFMACRO to be basically

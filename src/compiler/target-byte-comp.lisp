@@ -95,8 +95,8 @@
 		 (hairy-byte-function-entry-points xep)))
 	    #'<)))))
 
-;;; Given a byte-compiled component, disassemble it to standard output.
-;;; EPS is a list of the entry points.
+;;; Given a byte-compiled component, disassemble it to standard
+;;; output. EPS is a list of the entry points.
 (defun disassem-byte-component (component &optional (eps '(0)))
   (let* ((bytes (* (code-header-ref component sb!vm:code-code-size-slot)
 		   sb!vm:word-bytes))
@@ -115,6 +115,7 @@
 (defun disassem-byte-sap (sap bytes constants eps)
   (declare (optimize (inhibit-warnings 3)))
   (let ((index 0))
+    (declare (type index index))
     (labels ((newline ()
 	       (format t "~&~4D:" index))
 	     (next-byte ()
@@ -149,7 +150,7 @@
 			 (+ index disp)))
 		   (extract-24-bits)))
 	     (note (string &rest noise)
-	       (format t "~12T~?" string noise))
+	       (format t " ~14T~?" string noise))
 	     (get-constant (index)
 	       (if (< -1 index (length constants))
 		   (aref constants index)
@@ -168,16 +169,20 @@
 		       (logior (ash (next-byte) 16)
 			       (ash (next-byte) 8)
 			       (next-byte))))))
-	    (note "Entry point, frame-size=~D~%" frame-size)))
+	    (note "entry point, frame-size=~D~%" frame-size)))
 
 	(newline)
 	(let ((byte (next-byte)))
 	  (macrolet ((dispatch (&rest clauses)
-		       `(cond ,@(mapcar #'(lambda (clause)
-					    `((= (logand byte ,(caar clause))
-						 ,(cadar clause))
-					      ,@(cdr clause)))
-					clauses))))
+		       `(cond ,@(mapcar (lambda (clause)
+					  (destructuring-bind
+					      ((mask match) &body body)
+					      clause
+					    `((= (logand byte ,mask) ,match)
+					      ,@body)))
+					clauses)
+			      (t (error "disassembly failure for bytecode ~X"
+					byte)))))
 	    (dispatch
 	     ((#b11110000 #b00000000)
 	      (let ((op (extract-4-bit-op byte)))
@@ -186,6 +191,9 @@
 	      (let ((op (extract-4-bit-op byte)))
 		(note "push-arg ~D" op)))
 	     ((#b11110000 #b00100000)
+	      ;; FIXME: could use WITH-PRINT-RESTRICTIONS here and in
+	      ;; next clause (or just in LABELS NOTE) instead of
+	      ;; hand-rolling values in each case here
 	      (let ((*print-level* 3)
 		    (*print-lines* 2))
 		(note "push-const ~S" (get-constant (extract-4-bit-op byte)))))

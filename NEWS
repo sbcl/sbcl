@@ -831,9 +831,27 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   doubled, to 4 million. (If your application spends a lot of time
   GCing and you have a lot of RAM, you might want to experiment with
   increasing it even more.)
+?? The system's handling of top-level forms and EVAL-WHEN is now
+  more ANSI-compliant, fixing bugs
+    ?? IR1-3 and
+    ?? IR1-3a.
+  It's also done by much newer code, so there might be some new bugs,
+  but hopefully if so they'll be less fundamental and more fixable.
+* PPRINT-LOGICAL-BLOCK now copies the *PRINT-LINES* value on entry
+  and uses that copy, rather than the current dynamic value, when
+  it's trying to decide whether to truncate output . Thus e.g.
+     (let ((*print-lines* 50))
+       (pprint-logical-block (stream nil)
+         (dotimes (i 10)
+           (let ((*print-lines* 8))
+             (print (aref possiblybigthings i) stream)))))
+  should truncate the logical block only at 50 lines, instead of 
+  often truncating it at 8 lines.
 ?? lots of tidying up internally: renaming things so that names are
   more systematic and consistent, converting C macros to inline
   functions, systematizing indentation
+* The fasl file version number changed again, for any number of
+  good reasons.
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.

@@ -22,11 +22,10 @@
   (pid sb!c-call:int)
   (signal sb!c-call:int))
 
+;;; Send the signal SIGNAL to the process with process id PID. SIGNAL
+;;; should be a valid signal number or a keyword of the standard UNIX
+;;; signal name.
 (defun unix-kill (pid signal)
-  #!+sb-doc
-  "Unix-kill sends the signal signal to the process with process
-   id pid. Signal should be a valid signal number or a keyword of the
-   standard UNIX signal name."
   (real-unix-kill pid (unix-signal-number signal)))
 
 #!-sb-fluid (declaim (inline real-unix-killpg))
@@ -34,34 +33,22 @@
   (pgrp sb!c-call:int)
   (signal sb!c-call:int))
 
+;;; Send the signal SIGNAL to the all the process in process group
+;;; PGRP. SIGNAL should be a valid signal number or a keyword of the
+;;; standard UNIX signal name.
 (defun unix-killpg (pgrp signal)
-  #!+sb-doc
-  "Unix-killpg sends the signal signal to the all the process in process
-  group PGRP. Signal should be a valid signal number or a keyword of
-  the standard UNIX signal name."
   (real-unix-killpg pgrp (unix-signal-number signal)))
 
-(sb!alien:def-alien-routine ("sigblock" unix-sigblock) sb!c-call:unsigned-long
-  #!+sb-doc
-  "Unix-sigblock cause the signals specified in mask to be
-   added to the set of signals currently being blocked from
-   delivery. The macro sigmask is provided to create masks."
-  (mask sb!c-call:unsigned-long))
-
-(sb!alien:def-alien-routine ("sigpause" unix-sigpause) sb!c-call:void
-  #!+sb-doc
-  "Unix-sigpause sets the set of masked signals to its argument
-   and then waits for a signal to arrive, restoring the previous
-   mask upon its return."
-  (mask sb!c-call:unsigned-long))
-
+;;; Set the current set of masked signals (those being blocked from
+;;; delivery).
+;;;
+;;; (Note: CMU CL had a SIGMASK operator to create masks, but since
+;;; SBCL only uses 0, we no longer support it. If you need it, you
+;;; can pull it out of the CMU CL sources, or the old SBCL sources;
+;;; but you might also consider doing things the SBCL way and moving
+;;; this kind of C-level work down to C wrapper functions.)
 (sb!alien:def-alien-routine ("sigsetmask" unix-sigsetmask)
 			    sb!c-call:unsigned-long
-  #!+sb-doc
-  "Unix-sigsetmask sets the current set of masked signals (those
-   begin blocked from delivery) to the argument. The macro sigmask
-   can be used to create the mask. The previous value of the signal
-   mask is returned."
   (mask sb!c-call:unsigned-long))
 
 ;;;; C routines that actually do all the work of establishing signal handlers

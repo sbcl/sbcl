@@ -38,7 +38,7 @@
 
 ;;; This value should be incremented when the system changes in such
 ;;; a way that it will no longer work reliably with old fasl files.
-(defconstant +fasl-file-version+ 15)
+(defconstant +fasl-file-version+ 16)
 ;;; 2 = sbcl-0.6.4 uses COMPILE-OR-LOAD-DEFGENERIC.
 ;;; 3 = sbcl-0.6.6 uses private symbol, not :EMPTY, for empty HASH-TABLE slot.
 ;;; 4 = sbcl-0.6.7 uses HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
@@ -65,6 +65,7 @@
 ;;; 13 = sbcl-0.6.12.28 removed some elements from *STATIC-SYMBOLS* 
 ;;; 14 = sbcl-0.6.12.29 removed more elements from *STATIC-SYMBOLS* 
 ;;; 15 = sbcl-0.6.12.33 changed the layout of STREAM
+;;; 16 = sbcl-0.pre7.15 changed the layout of PRETTY-STREAM
 
 ;;; the conventional file extension for fasl files on this
 ;;; architecture, e.g. "x86f"

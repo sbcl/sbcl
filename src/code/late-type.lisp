@@ -31,9 +31,9 @@
 ;;;
 ;;; RATIO and BIGNUM are not recognized as numeric types.
 
-;;; FIXME: It seems to me that this should be set to NIL by default,
-;;; and perhaps not even optionally set to T.
-(defvar *use-implementation-types* t
+;;; FIXME: This really should go away. Alas, it doesn't seem to be so
+;;; simple to make it go away.. (See bug 123 in BUGS file.)
+(defvar *use-implementation-types* t ; actually initialized in cold init
   #!+sb-doc
   "*USE-IMPLEMENTATION-TYPES* is a semi-public flag which determines how
    restrictive we are in determining type membership. If two types are the
@@ -41,7 +41,6 @@
    this switch is on. When it is off, we try to be as restrictive as the
    language allows, allowing us to detect more errors. Currently, this only
    affects array types.")
-
 (!cold-init-forms (setq *use-implementation-types* t))
 
 ;;; These functions are used as method for types which need a complex
@@ -876,7 +875,7 @@
 (defvar *wild-type*)
 (defvar *empty-type*)
 (defvar *universal-type*)
-
+(defvar *universal-function-type*)
 (!cold-init-forms
  (macrolet ((frob (name var)
 	      `(progn
@@ -891,7 +890,10 @@
    ;; Ts and *UNIVERSAL-TYPE*s.
    (frob * *wild-type*)
    (frob nil *empty-type*)
-   (frob t *universal-type*)))
+   (frob t *universal-type*))
+ (setf *universal-function-type*
+       (make-function-type :wild-args t
+			   :returns *wild-type*)))
 
 (!define-type-method (named :simple-=) (type1 type2)
   ;; FIXME: BUG 85: This assertion failed when I added it in
