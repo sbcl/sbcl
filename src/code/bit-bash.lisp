@@ -132,7 +132,7 @@
   (let* ((bytes-per-word (/ n-word-bits bitsize))
          (byte-offset `(integer 0 (,bytes-per-word)))
          (byte-count `(integer 1 (,bytes-per-word)))
-         (max-bytes (ash most-positive-fixnum
+         (max-bytes (ash sb!xc:most-positive-fixnum
                          ;; FIXME: this reflects code contained in the
                          ;; original bit-bash.lisp, but seems very
                          ;; nonsensical.  Why shouldn't we be able to
