@@ -2207,6 +2207,9 @@ changes in sbcl-0.8.7 relative to sbcl-0.8.6:
     now works correctly.  (reported by Paul Dietz)
   * optimization: performance of string output streams is now less
     poor for multiple small sequence writes.
+  * optimization: performance of CSUBTYPEP in the presence of complex
+    expressions involving CONS and NOT many times has been improved.
+    (reported by Paul Dietz)
   * ASDF-INSTALL bug fix: now parses *PROXY* properly.  (thanks to
     Sean Ross)
   * SB-SIMPLE-STREAMS enhancement: simple-streams can now be used as

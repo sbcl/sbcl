@@ -26,6 +26,9 @@
 
 (!define-type-class alien)
 
+(!define-type-method (alien :negate) (type)
+  (make-negation-type :type type))
+
 (!define-type-method (alien :unparse) (type)
   `(alien ,(unparse-alien-type (alien-type-type-alien-type type))))
 

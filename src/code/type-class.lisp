@@ -85,6 +85,8 @@
   (complex-intersection2 nil :type (or function null))
   (simple-= #'must-supply-this :type function)
   (complex-= nil :type (or function null))
+  ;; monadic functions
+  (negate #'must-supply-this :type function)
   ;; a function which returns a Common Lisp type specifier
   ;; representing this type
   (unparse #'must-supply-this :type function)
@@ -120,6 +122,7 @@
       (:complex-intersection2 . type-class-complex-intersection2)
       (:simple-= . type-class-simple-=)
       (:complex-= . type-class-complex-=)
+      (:negate . type-class-negate)
       (:unparse . type-class-unparse))))
 
 (declaim (ftype (function (type-class) type-class) copy-type-class-coldly))

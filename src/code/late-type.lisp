@@ -154,6 +154,9 @@
   (declare (ignore type1))
   (error "SUBTYPEP is illegal on this type:~%  ~S" (type-specifier type2)))
 
+(!define-type-method (values :negate) (type)
+  (error "NOT VALUES too confusing on ~S" (type-specifier type)))
+
 (!define-type-method (values :unparse) (type)
   (cons 'values
         (let ((unparsed (unparse-args-types type)))
@@ -191,6 +194,9 @@
 ;;; can pass to TYPEP.
 (defvar *unparse-fun-type-simplify*)
 (!cold-init-forms (setq *unparse-fun-type-simplify* nil))
+
+(!define-type-method (function :negate) (type)
+  (error "NOT FUNCTION too confusing on ~S" (type-specifier type)))
 
 (!define-type-method (function :unparse) (type)
   (if *unparse-fun-type-simplify*
@@ -317,6 +323,9 @@
                     (t (type=-args type1 type2))))))
 
 (!define-type-class constant :inherits values)
+
+(!define-type-method (constant :negate) (type)
+  (error "NOT CONSTANT too confusing on ~S" (type-specifier type)))
 
 (!define-type-method (constant :unparse) (type)
   `(constant-arg ,(type-specifier (constant-type-type type))))
@@ -898,6 +907,17 @@
   (declare (type ctype type))
   (funcall (type-class-unparse (type-class-info type)) type))
 
+(defun-cached (type-negation :hash-function (lambda (type)
+					      (logand (type-hash-value type)
+						      #xff))
+			     :hash-bits 8
+			     :values 1
+			     :default nil
+			     :init-wrapper !cold-init-forms)
+              ((type eq))
+  (declare (type ctype type))
+  (funcall (type-class-negate (type-class-info type)) type))
+
 ;;; (VALUES-SPECIFIER-TYPE and SPECIFIER-TYPE moved from here to
 ;;; early-type.lisp by WHN ca. 19990201.)
 
@@ -1119,10 +1139,20 @@
   ;;(aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (hierarchical-union2 type1 type2))
 
+(!define-type-method (named :negate) (x)
+  (aver (not (eq x *wild-type*)))
+  (cond
+    ((eq x *universal-type*) *empty-type*)
+    ((eq x *empty-type*) *universal-type*)
+    (t (bug "NAMED type not universal, wild or empty: ~S" x))))
+
 (!define-type-method (named :unparse) (x)
   (named-type-name x))
 
 ;;;; hairy and unknown types
+
+(!define-type-method (hairy :negate) (x)
+  (make-negation-type :type x))
 
 (!define-type-method (hairy :unparse) (x)
   (hairy-type-specifier x))
@@ -1188,6 +1218,9 @@
   (make-hairy-type :specifier whole))
 
 ;;;; negation types
+
+(!define-type-method (negation :negate) (x)
+  (negation-type-type x))
 
 (!define-type-method (negation :unparse) (x)
   `(not ,(type-specifier (negation-type-type x))))
@@ -1341,123 +1374,7 @@
   (type= (negation-type-type type1) (negation-type-type type2)))
 
 (!def-type-translator not (typespec)
-  (let* ((not-type (specifier-type typespec))
-	 (spec (type-specifier not-type)))
-    (cond
-      ;; canonicalize (NOT (NOT FOO))
-      ((and (listp spec) (eq (car spec) 'not))
-       (specifier-type (cadr spec)))
-      ;; canonicalize (NOT NIL) and (NOT T)
-      ((eq not-type *empty-type*) *universal-type*)
-      ((eq not-type *universal-type*) *empty-type*)
-      ((and (numeric-type-p not-type)
-	    (null (numeric-type-low not-type))
-	    (null (numeric-type-high not-type)))
-       (make-negation-type :type not-type))
-      ((numeric-type-p not-type)
-       (type-union
-	(make-negation-type
-	 :type (modified-numeric-type not-type :low nil :high nil))
-	(cond
-	  ((null (numeric-type-low not-type))
-	   (modified-numeric-type
-	    not-type
-	    :low (let ((h (numeric-type-high not-type)))
-		   (if (consp h) (car h) (list h)))
-	    :high nil))
-	  ((null (numeric-type-high not-type))
-	   (modified-numeric-type
-	    not-type
-	    :low nil
-	    :high (let ((l (numeric-type-low not-type)))
-		    (if (consp l) (car l) (list l)))))
-	  (t (type-union
-	      (modified-numeric-type
-	       not-type
-	       :low nil
-	       :high (let ((l (numeric-type-low not-type)))
-		       (if (consp l) (car l) (list l))))
-	      (modified-numeric-type
-	       not-type
-	       :low (let ((h (numeric-type-high not-type)))
-		      (if (consp h) (car h) (list h)))
-	       :high nil))))))
-      ((intersection-type-p not-type)
-       (apply #'type-union
-	      (mapcar #'(lambda (x)
-			  (specifier-type `(not ,(type-specifier x))))
-		      (intersection-type-types not-type))))
-      ((union-type-p not-type)
-       (apply #'type-intersection
-	      (mapcar #'(lambda (x)
-			  (specifier-type `(not ,(type-specifier x))))
-		      (union-type-types not-type))))
-      ((member-type-p not-type)
-       (let ((members (member-type-members not-type)))
-	 (if (some #'floatp members)
-	     (let (floats)
-	       (dolist (pair `((0.0f0 . ,(load-time-value (make-unportable-float :single-float-negative-zero)))
-			       (0.0d0 . ,(load-time-value (make-unportable-float :double-float-negative-zero)))
-			       #!+long-float
-			       (0.0l0 . ,(load-time-value (make-unportable-float :long-float-negative-zero)))))
-		 (when (member (car pair) members)
-		   (aver (not (member (cdr pair) members)))
-		   (push (cdr pair) floats)
-		   (setf members (remove (car pair) members)))
-		 (when (member (cdr pair) members)
-		   (aver (not (member (car pair) members)))
-		   (push (car pair) floats)
-		   (setf members (remove (cdr pair) members))))
-	       (apply #'type-intersection
-		      (if (null members)
-			  *universal-type*
-			  (make-negation-type
-			   :type (make-member-type :members members)))
-		      (mapcar
-		       (lambda (x)
-			 (let ((type (ctype-of x)))
-			   (type-union
-			    (make-negation-type
-			     :type (modified-numeric-type type
-							  :low nil :high nil))
-			    (modified-numeric-type type
-						   :low nil :high (list x))
-			    (make-member-type :members (list x))
-			    (modified-numeric-type type
-						   :low (list x) :high nil))))
-		       floats)))
-	     (make-negation-type :type not-type))))
-      ((and (cons-type-p not-type)
-	    (eq (cons-type-car-type not-type) *universal-type*)
-	    (eq (cons-type-cdr-type not-type) *universal-type*))
-       (make-negation-type :type not-type))
-      ((cons-type-p not-type)
-       (type-union
-	(make-negation-type :type (specifier-type 'cons))
-	(cond
-	  ((and (not (eq (cons-type-car-type not-type) *universal-type*))
-		(not (eq (cons-type-cdr-type not-type) *universal-type*)))
-	   (type-union
-	    (make-cons-type
-	     (specifier-type `(not ,(type-specifier
-				     (cons-type-car-type not-type))))
-	     *universal-type*)
-	    (make-cons-type
-	     *universal-type*
-	     (specifier-type `(not ,(type-specifier
-				     (cons-type-cdr-type not-type)))))))
-	  ((not (eq (cons-type-car-type not-type) *universal-type*))
-	   (make-cons-type
-	    (specifier-type `(not ,(type-specifier
-				    (cons-type-car-type not-type))))
-	    *universal-type*))
-	  ((not (eq (cons-type-cdr-type not-type) *universal-type*))
-	   (make-cons-type
-	    *universal-type*
-	    (specifier-type `(not ,(type-specifier
-				    (cons-type-cdr-type not-type))))))
-	  (t (bug "Weird CONS type ~S" not-type)))))
-      (t (make-negation-type :type not-type)))))
+  (type-negation (specifier-type typespec)))
 
 ;;;; numeric types
 
@@ -1475,6 +1392,37 @@
 	(equalp (numeric-type-low type1) (numeric-type-low type2))
 	(equalp (numeric-type-high type1) (numeric-type-high type2)))
    t))
+
+(!define-type-method (number :negate) (type)
+  (if (and (null (numeric-type-low type)) (null (numeric-type-high type)))
+      (make-negation-type :type type)
+      (type-union
+       (make-negation-type
+	:type (modified-numeric-type type :low nil :high nil))
+       (cond
+	 ((null (numeric-type-low type))
+	  (modified-numeric-type
+	   type
+	   :low (let ((h (numeric-type-high type)))
+		  (if (consp h) (car h) (list h)))
+	   :high nil))
+	 ((null (numeric-type-high type))
+	  (modified-numeric-type
+	   type
+	   :low nil
+	   :high (let ((l (numeric-type-low type)))
+		   (if (consp l) (car l) (list l)))))
+	 (t (type-union
+	     (modified-numeric-type
+	      type
+	      :low nil
+	      :high (let ((l (numeric-type-low type)))
+		      (if (consp l) (car l) (list l))))
+	     (modified-numeric-type
+	      type
+	      :low (let ((h (numeric-type-high type)))
+		     (if (consp h) (car h) (list h)))
+	      :high nil)))))))
 
 (!define-type-method (number :unparse) (type)
   (let* ((complexp (numeric-type-complexp type))
@@ -2157,6 +2105,12 @@
 			  (specialized-element-type-maybe type2)))
 	      t)))
 
+(!define-type-method (array :negate) (type)
+  ;; FIXME (and hint to PFD): we're vulnerable here to attacks of the
+  ;; form "are (AND ARRAY (NOT (ARRAY T))) and (OR (ARRAY BIT) (ARRAY
+  ;; NIL) (ARRAY CHAR) ...) equivalent?  -- CSR, 2003-12-10
+  (make-negation-type :type type))
+
 (!define-type-method (array :unparse) (type)
   (let ((dims (array-type-dimensions type))
 	(eltype (type-specifier (array-type-element-type type)))
@@ -2338,6 +2292,42 @@
 
 (!define-type-class member)
 
+(!define-type-method (member :negate) (type)
+  (let ((members (member-type-members type)))
+    (if (some #'floatp members)
+	(let (floats)
+	  (dolist (pair `((0.0f0 . ,(load-time-value (make-unportable-float :single-float-negative-zero)))
+			  (0.0d0 . ,(load-time-value (make-unportable-float :double-float-negative-zero)))
+			  #!+long-float
+			  (0.0l0 . ,(load-time-value (make-unportable-float :long-float-negative-zero)))))
+	    (when (member (car pair) members)
+	      (aver (not (member (cdr pair) members)))
+	      (push (cdr pair) floats)
+	      (setf members (remove (car pair) members)))
+	    (when (member (cdr pair) members)
+	      (aver (not (member (car pair) members)))
+	      (push (car pair) floats)
+	      (setf members (remove (cdr pair) members))))
+	  (apply #'type-intersection
+		 (if (null members)
+		     *universal-type*
+		     (make-negation-type
+		      :type (make-member-type :members members)))
+		 (mapcar
+		  (lambda (x)
+		    (let ((type (ctype-of x)))
+		      (type-union
+		       (make-negation-type
+			:type (modified-numeric-type type
+						     :low nil :high nil))
+		       (modified-numeric-type type
+					      :low nil :high (list x))
+		       (make-member-type :members (list x))
+		       (modified-numeric-type type
+					      :low (list x) :high nil))))
+		  floats)))
+	(make-negation-type :type type))))
+
 (!define-type-method (member :unparse) (type)
   (let ((members (member-type-members type)))
     (cond
@@ -2451,6 +2441,10 @@
 ;;;; involving AND.
 
 (!define-type-class intersection)
+
+(!define-type-method (intersection :negate) (type)
+  (apply #'type-union
+	 (mapcar #'type-negation (intersection-type-types type))))
 
 ;;; A few intersection types have special names. The others just get
 ;;; mechanically unparsed.
@@ -2572,12 +2566,16 @@
 
 (!def-type-translator and (&whole whole &rest type-specifiers)
   (apply #'type-intersection
-	 (mapcar #'specifier-type
-		 type-specifiers)))
+	 (mapcar #'specifier-type type-specifiers)))
 
 ;;;; union types
 
 (!define-type-class union)
+
+(!define-type-method (union :negate) (type)
+  (declare (type ctype type))
+  (apply #'type-intersection
+	 (mapcar #'type-negation (union-type-types type))))
 
 ;;; The LIST, FLOAT and REAL types have special names.  Other union
 ;;; types just get mechanically unparsed.
@@ -2747,7 +2745,33 @@
   (let ((car-type (single-value-specifier-type car-type-spec))
 	(cdr-type (single-value-specifier-type cdr-type-spec)))
     (make-cons-type car-type cdr-type)))
- 
+
+(!define-type-method (cons :negate) (type)
+  (if (and (eq (cons-type-car-type type) *universal-type*)
+	   (eq (cons-type-cdr-type type) *universal-type*))
+      (make-negation-type :type type)
+      (type-union
+       (make-negation-type :type (specifier-type 'cons))
+       (cond
+	 ((and (not (eq (cons-type-car-type type) *universal-type*))
+	       (not (eq (cons-type-cdr-type type) *universal-type*)))
+	  (type-union
+	   (make-cons-type
+	    (type-negation (cons-type-car-type type))
+	    *universal-type*)
+	   (make-cons-type
+	    *universal-type*
+	    (type-negation (cons-type-cdr-type type)))))
+	 ((not (eq (cons-type-car-type type) *universal-type*))
+	  (make-cons-type
+	   (type-negation (cons-type-car-type type))
+	   *universal-type*))
+	 ((not (eq (cons-type-cdr-type type) *universal-type*))
+	  (make-cons-type
+	   *universal-type*
+	   (type-negation (cons-type-cdr-type type))))
+	 (t (bug "Weird CONS type ~S" type))))))
+
 (!define-type-method (cons :unparse) (type)
   (let ((car-eltype (type-specifier (cons-type-car-type type)))
 	(cdr-eltype (type-specifier (cons-type-cdr-type type))))
@@ -2790,8 +2814,7 @@
 		    (type-intersection ,car2
 		     ,(if not1p
 			  not1
-			  `(specifier-type
-			    `(not ,(type-specifier ,car1)))))
+			  `(type-negation ,car1)))
 		    ,cdr2))))
       (cond ((type= car-type1 car-type2)
 	     (make-cons-type car-type1
@@ -2805,13 +2828,11 @@
 	     (frob-car car-type2 car-type1 cdr-type2 cdr-type1))
 	    ;; more general case of the above, but harder to compute
 	    ((progn
-	       (setf car-not1 (specifier-type
-			       `(not ,(type-specifier car-type1))))
+	       (setf car-not1 (type-negation car-type1))
 	       (not (csubtypep car-type2 car-not1)))
 	     (frob-car car-type1 car-type2 cdr-type1 cdr-type2 car-not1))
 	    ((progn
-	       (setf car-not2 (specifier-type
-			       `(not ,(type-specifier car-type2))))
+	       (setf car-not2 (type-negation car-type2))
 	       (not (csubtypep car-type1 car-not2)))
 	     (frob-car car-type2 car-type1 cdr-type2 cdr-type1 car-not2))
 	    ;; Don't put these in -- consider the effect of taking the
