@@ -15,3 +15,7 @@
 			:pathname #.(make-pathname :directory '(:relative))
 			:if-component-dep-fails :ignore)
 	       (:file "rotate-byte" :depends-on ("compiler"))))
+
+(defmethod perform ((o test-op) (c (eql (find-system :sb-rotate-byte))))
+  (or (load (compile-file "rotate-byte-tests.lisp"))
+      (error "test-op failed")))
