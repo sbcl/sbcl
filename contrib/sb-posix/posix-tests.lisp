@@ -96,10 +96,22 @@
   #.sb-posix::eexist)
 
 (deftest mkdir.error.3
-  (handler-case
-      (sb-posix:mkdir "/almost-certainly-does-not-exist" 0)
-    (sb-posix:syscall-error (c)
-      (sb-posix:syscall-errno c)))
+  (let* ((dir (merge-pathnames
+	       (make-pathname :directory '(:relative "mkdir.error.3"))
+	       *test-directory*))
+	 (dir2 (merge-pathnames
+		(make-pathname :directory '(:relative "does-not-exist"))
+		dir)))
+    (sb-posix:mkdir dir 0)
+    (handler-case
+	(sb-posix:mkdir dir2 0)
+      (sb-posix:syscall-error (c)
+	(sb-posix:rmdir dir)
+	(sb-posix:syscall-errno c))
+      (:no-error (result)
+	(sb-posix:rmdir dir2)
+	(sb-posix:rmdir dir)
+	result)))
   #.sb-posix::eacces)
 
 (deftest rmdir.1
@@ -129,7 +141,6 @@
       (sb-posix:syscall-errno c)))
   #.sb-posix::enotdir)
 
-#-sunos ; Apparently gives EINVAL on SunOS 8, which doesn't make sense
 (deftest rmdir.error.3
   (handler-case
       (sb-posix:rmdir "/")
@@ -171,7 +182,11 @@
 	(sb-posix:chmod dir (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
 	(sb-posix:rmdir dir2)
 	(sb-posix:rmdir dir)
-	(sb-posix:syscall-errno c))))
+	(sb-posix:syscall-errno c))
+      (:no-error (result)
+	(sb-posix:chmod dir (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
+	(sb-posix:rmdir dir)
+	result)))
   #.sb-posix::eacces)
 
 (deftest stat.1
@@ -200,7 +215,7 @@
     (< (- atime unix-now) 10))
   t)
 
-(deftest stat.2
+(deftest stat.4
   (let* ((stat (sb-posix:stat (make-pathname :directory '(:absolute :up))))
 	 (mode (sb-posix::stat-mode stat)))
     ;; it's logically possible for / to be writeable by others... but
@@ -235,7 +250,12 @@
 	(sb-posix:chmod dir (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
 	(sb-posix:unlink file)
 	(sb-posix:rmdir dir)
-	(sb-posix:syscall-errno c))))
+	(sb-posix:syscall-errno c))
+      (:no-error (result)
+	(sb-posix:chmod dir (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
+	(sb-posix:unlink file)
+	(sb-posix:rmdir dir)
+	result)))
   #.sb-posix::eacces)
 
 ;;; stat-mode tests
