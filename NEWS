@@ -1,6 +1,10 @@
 changes in sbcl-0.8.14 relative to sbcl-0.8.13:
   * bug fix: backtraces involving undefined functions or assembly
     routines are more informative.  (thanks to Brian Downing)
+  * bug fix: mutually referent alien structures now work correctly.
+    (reported by Rick Taube)
+  * bug fix: structures defined by WITH-ALIEN can be referred to
+    within other definitions in the same WITH-ALIEN.
 
 changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * new feature: SB-PACKAGE-LOCKS. See the "Package Locks" section of

@@ -288,6 +288,15 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun %def-auxiliary-alien-types (types)
     (dolist (info types)
+      ;; Clear up the type we're about to define from the toplevel
+      ;; *new-auxiliary-types* (local scopes take care of themselves).
+      ;; Unless this is done we never actually get back the full type
+      ;; from INFO, since the *new-auxiliary-types* have precendence.
+      (setf *new-auxiliary-types*
+	    (remove info *new-auxiliary-types*
+		    :test (lambda (a b)
+			    (and (eq (first a) (first b))
+				 (eq (second a) (second b))))))
       (destructuring-bind (kind name defn) info
 	(macrolet ((frob (kind)
 			 `(let ((old (info :alien-type ,kind name)))
@@ -910,32 +919,36 @@
 (define-alien-type-translator union (name &rest fields &environment env)
   (parse-alien-record-type :union name fields env))
 
+;;; FIXME: This is really pretty horrible: we avoid creating new
+;;; ALIEN-RECORD-TYPE objects when a live one is flitting around the
+;;; system already. This way forwrd-references sans fields get get
+;;; "updated" for free to contain the field info. Maybe rename
+;;; MAKE-ALIEN-RECORD-TYPE to %MAKE-ALIEN-RECORD-TYPE and use
+;;; ENSURE-ALIEN-RECORD-TYPE instead. --NS 20040729
 (defun parse-alien-record-type (kind name fields env)
   (declare (type (or sb!kernel:lexenv null) env))
   (cond (fields
 	 (let* ((old (and name (auxiliary-alien-type kind name env)))
 		(old-fields (and old (alien-record-type-fields old))))
-	   (cond (old-fields
-		  ;; KLUDGE: We can't easily compare the new fields
-		  ;; against the old fields, since the old fields have
-		  ;; already been parsed into an internal
-		  ;; representation, so we just punt, assuming that
-		  ;; they're consistent. -- WHN 200000505
-		  #|
-		  (unless (equal fields old-fields)
-		    ;; FIXME: Perhaps this should be a warning, and we
-		    ;; should overwrite the old definition and proceed?
-		    (error "mismatch in fields for ~S~%  old ~S~%  new ~S"
-			   name old-fields fields))
-                  |#
-		  old)
-		 (t
-		  (let ((new (make-alien-record-type :name name
-						     :kind kind)))
-		    (when name
-		      (setf (auxiliary-alien-type kind name env) new))
-		    (parse-alien-record-fields new fields env)
-		    new)))))
+	   ;; KLUDGE: We can't easily compare the new fields
+	   ;; against the old fields, since the old fields have
+	   ;; already been parsed into an internal
+	   ;; representation, so we just punt, assuming that
+	   ;; they're consistent. -- WHN 200000505
+	   #|
+	     (unless (equal fields old-fields)
+	       ;; FIXME: Perhaps this should be a warning, and we
+	       ;; should overwrite the old definition and proceed?
+	       (error "mismatch in fields for ~S~%  old ~S~%  new ~S"
+	              name old-fields fields))
+	   |#
+	   (if old-fields
+	       old
+	       (let ((type (or old (make-alien-record-type :name name :kind kind))))
+		 (when (and name (not old))
+		   (setf (auxiliary-alien-type kind name env) type))
+		 (parse-alien-record-fields type fields env)
+		 type))))
 	(name
 	 (or (auxiliary-alien-type kind name env)
 	     (setf (auxiliary-alien-type kind name env)

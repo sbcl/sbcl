@@ -46,5 +46,27 @@
     (compile nil '(lambda () (ftype-correctness "FOO" "BAR")))
   (assert warningsp))
 
+;;; This used to break due to too eager auxiliary type twiddling in
+;;; parse-alien-record-type.
+(defparameter *maybe* nil)
+(defun with-alien-test-for-struct-plus-funcall () 
+  (with-alien ((x (struct bar (x unsigned) (y unsigned)))
+	       ;; bogus definition, but we just need the symbol
+	       (f (function int (* (struct bar))) :extern "printf"))
+    (when *maybe*
+      (alien-funcall f (addr x)))))
+
+;;; Mutually referent structures
+(define-alien-type struct.1 (struct struct.1 (x (* (struct struct.2))) (y int)))
+(define-alien-type struct.2 (struct struct.2 (x (* (struct struct.1))) (y int)))
+(let ((s1 (make-alien struct.1))
+      (s2 (make-alien struct.2)))
+  (setf (slot s1 'x) s2
+	(slot s2 'x) s1
+	(slot (slot s1 'x) 'y) 1
+	(slot (slot s2 'x) 'y) 2)
+  (assert (= 1 (slot (slot s1 'x) 'y)))
+  (assert (= 2 (slot (slot s2 'x) 'y))))
+
 ;;; success
 (quit :unix-status 104)
