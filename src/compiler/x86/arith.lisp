@@ -633,21 +633,20 @@
     ;; The result-type ensures us that this shift will not overflow.
     (inst shl result :cl)))
 
-(define-vop (fast-ash-c)
+(define-vop (fast-ash-c/signed=>signed)
   (:translate ash)
   (:policy :fast-safe)
-  (:args (number :scs (signed-reg unsigned-reg) :target result
-		 :load-if (not (and (sc-is number signed-stack unsigned-stack)
-				    (sc-is result signed-stack unsigned-stack)
+  (:args (number :scs (signed-reg) :target result
+		 :load-if (not (and (sc-is number signed-stack)
+				    (sc-is result signed-stack)
 				    (location= number result)))))
   (:info amount)
-  (:arg-types (:or signed-num unsigned-num) (:constant integer))
-  (:results (result :scs (signed-reg unsigned-reg)
-		    :load-if (not
-			      (and (sc-is number signed-stack unsigned-stack)
-				   (sc-is result signed-stack unsigned-stack)
-				   (location= number result)))))
-  (:result-types (:or signed-num unsigned-num))
+  (:arg-types signed-num (:constant integer))
+  (:results (result :scs (signed-reg)
+		    :load-if (not (and (sc-is number signed-stack)
+				       (sc-is result signed-stack)
+				       (location= number result)))))
+  (:result-types signed-num)
   (:note "inline ASH")
   (:generator 3
     (cond ((and (= amount 1) (not (location= number result)))
@@ -658,54 +657,92 @@
 	   (inst lea result (make-ea :dword :index number :scale 8)))
 	  (t
 	   (move result number)
-	   (cond ((plusp amount)
-		  ;; We don't have to worry about overflow because of the
-		  ;; result type restriction.
-		  (inst shl result amount))
-		 ((sc-is number signed-reg signed-stack)
-		  ;; If the amount is greater than 31, only shift by 31. We
-		  ;; have to do this because the shift instructions only look
-		  ;; at the low five bits of the result.
-		  (inst sar result (min 31 (- amount))))
-		 (t
-		  (inst shr result (min 31 (- amount)))))))))
+	   (cond ((plusp amount) (inst shl result amount))
+		 (t (inst sar result (min 31 (- amount)))))))))
 
-(define-vop (fast-ash-left)
+(define-vop (fast-ash-c/unsigned=>unsigned)
   (:translate ash)
-  (:args (number :scs (signed-reg unsigned-reg) :target result
-		 :load-if (not (and (sc-is number signed-stack unsigned-stack)
-				    (sc-is result signed-stack unsigned-stack)
+  (:policy :fast-safe)
+  (:args (number :scs (unsigned-reg) :target result
+		 :load-if (not (and (sc-is number unsigned-stack)
+				    (sc-is result unsigned-stack)
+				    (location= number result)))))
+  (:info amount)
+  (:arg-types unsigned-num (:constant integer))
+  (:results (result :scs (unsigned-reg)
+		    :load-if (not (and (sc-is number unsigned-stack)
+				       (sc-is result unsigned-stack)
+				       (location= number result)))))
+  (:result-types unsigned-num)
+  (:note "inline ASH")
+  (:generator 3
+    (cond ((and (= amount 1) (not (location= number result)))
+	   (inst lea result (make-ea :dword :index number :scale 2)))
+	  ((and (= amount 2) (not (location= number result)))
+	   (inst lea result (make-ea :dword :index number :scale 4)))
+	  ((and (= amount 3) (not (location= number result)))
+	   (inst lea result (make-ea :dword :index number :scale 8)))
+	  (t
+	   (move result number)
+	   (cond ((plusp amount) (inst shl result amount))
+		 ((< amount -31) (inst xor result result))
+		 (t (inst shr result (- amount))))))))
+
+(define-vop (fast-ash-left/signed)
+  (:translate ash)
+  (:args (number :scs (signed-reg) :target result
+		 :load-if (not (and (sc-is number signed-stack)
+				    (sc-is result signed-stack)
 				    (location= number result))))
 	 (amount :scs (unsigned-reg) :target ecx))
-  (:arg-types (:or signed-num unsigned-num) positive-fixnum)
+  (:arg-types signed-num positive-fixnum)
   (:temporary (:sc unsigned-reg :offset ecx-offset :from (:argument 1)) ecx)
-  (:results (result :scs (signed-reg unsigned-reg) :from (:argument 0)
-		    :load-if (not
-			      (and (sc-is number signed-stack unsigned-stack)
-				   (sc-is result signed-stack unsigned-stack)
-				   (location= number result)))))
-  (:result-types (:or signed-num unsigned-num))
+  (:results (result :scs (signed-reg) :from (:argument 0)
+		    :load-if (not (and (sc-is number signed-stack)
+				       (sc-is result signed-stack)
+				       (location= number result)))))
+  (:result-types signed-num)
   (:policy :fast-safe)
   (:note "inline ASH")
   (:generator 4
     (move result number)
     (move ecx amount)
-    ;; The result-type ensures us that this shift will not overflow.
     (inst shl result :cl)))
 
-(define-vop (fast-ash)
+(define-vop (fast-ash-left/unsigned)
+  (:translate ash)
+  (:args (number :scs (unsigned-reg) :target result
+		 :load-if (not (and (sc-is number unsigned-stack)
+				    (sc-is result unsigned-stack)
+				    (location= number result))))
+	 (amount :scs (unsigned-reg) :target ecx))
+  (:arg-types unsigned-num positive-fixnum)
+  (:temporary (:sc unsigned-reg :offset ecx-offset :from (:argument 1)) ecx)
+  (:results (result :scs (unsigned-reg) :from (:argument 0)
+		    :load-if (not (and (sc-is number unsigned-stack)
+				       (sc-is result unsigned-stack)
+				       (location= number result)))))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:note "inline ASH")
+  (:generator 4
+    (move result number)
+    (move ecx amount)
+    (inst shl result :cl)))
+
+(define-vop (fast-ash/signed=>signed)
   (:translate ash)
   (:policy :fast-safe)
-  (:args (number :scs (signed-reg unsigned-reg) :target result)
+  (:args (number :scs (signed-reg) :target result)
 	 (amount :scs (signed-reg) :target ecx))
-  (:arg-types (:or signed-num unsigned-num) signed-num)
-  (:results (result :scs (signed-reg unsigned-reg) :from (:argument 0)))
-  (:result-types (:or signed-num unsigned-num))
+  (:arg-types signed-num signed-num)
+  (:results (result :scs (signed-reg) :from (:argument 0)))
+  (:result-types signed-num)
   (:temporary (:sc signed-reg :offset ecx-offset :from (:argument 1)) ecx)
   (:note "inline ASH")
   (:generator 5
     (move result number)
-     (move ecx amount)
+    (move ecx amount)
     (inst or ecx ecx)
     (inst jmp :ns positive)
     (inst neg ecx)
@@ -713,9 +750,37 @@
     (inst jmp :be okay)
     (inst mov ecx 31)
     OKAY
-    (sc-case number
-      (signed-reg (inst sar result :cl))
-      (unsigned-reg (inst shr result :cl)))
+    (inst sar result :cl)
+    (inst jmp done)
+
+    POSITIVE
+    ;; The result-type ensures us that this shift will not overflow.
+    (inst shl result :cl)
+
+    DONE))
+
+(define-vop (fast-ash/unsigned=>unsigned)
+  (:translate ash)
+  (:policy :fast-safe)
+  (:args (number :scs (unsigned-reg) :target result)
+	 (amount :scs (signed-reg) :target ecx))
+  (:arg-types unsigned-num signed-num)
+  (:results (result :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:temporary (:sc signed-reg :offset ecx-offset :from (:argument 1)) ecx)
+  (:note "inline ASH")
+  (:generator 5
+    (move result number)
+    (move ecx amount)
+    (inst or ecx ecx)
+    (inst jmp :ns positive)
+    (inst neg ecx)
+    (inst cmp ecx 31)
+    (inst jmp :be okay)
+    (inst xor result result)
+    (inst jmp done)
+    OKAY
+    (inst shr result :cl)
     (inst jmp done)
 
     POSITIVE
