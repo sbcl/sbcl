@@ -2223,6 +2223,7 @@ changes in sbcl-0.8.7 relative to sbcl-0.8.6:
   * SB-SIMPLE-STREAMS enhancement: simple-streams can now be used as
     streams for the REPL, for the debugger, and so on.  (thanks to
     David Licteblau)
+  * DEFINE-CODITION is more efficient.  (thanks to Brian Mastenbrook)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the value of the :REHASH-THRESHOLD argument to MAKE-HASH-TABLE
        is ignored if it is too small, rather than propagating through
@@ -2230,7 +2231,7 @@ changes in sbcl-0.8.7 relative to sbcl-0.8.6:
     ** extremely complex negations of CONS types were not being
        sufficiently canonicalized, leading to inconsistencies in
        SUBTYPEP.
-    ** VALUES tranformer lost derive type.
+    ** VALUES tranformer lost derived type.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
