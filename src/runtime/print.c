@@ -27,7 +27,6 @@
 /* This file can be skipped if we're not supporting LDB. */
 #if defined(LISP_FEATURE_SB_LDB)
 
-#include "sbcl.h"
 #include "monitor.h"
 #include "vars.h"
 #include "os.h"
@@ -44,11 +43,11 @@ static void print_obj(char *prefix, lispobj obj);
 
 char *lowtag_Names[] = {
     "even fixnum",
-    "function pointer",
+    "instance pointer",
     "other immediate [0]",
     "list pointer",
     "odd fixnum",
-    "instance pointer",
+    "function pointer",
     "other immediate [1]",
     "other pointer"
 };
@@ -416,7 +415,8 @@ static char *symbol_slots[] = {"value: ", "unused: ",
 static char *ratio_slots[] = {"numer: ", "denom: ", NULL};
 static char *complex_slots[] = {"real: ", "imag: ", NULL};
 static char *code_slots[] = {"words: ", "entry: ", "debug: ", NULL};
-static char *fn_slots[] = {"self: ", "next: ", "name: ", "arglist: ", "type: ", NULL};
+static char *fn_slots[] = {
+    "self: ", "next: ", "name: ", "arglist: ", "type: ", NULL};
 static char *closure_slots[] = {"fn: ", NULL};
 static char *funcallable_instance_slots[] = {"fn: ", "lexenv: ", "layout: ", NULL};
 static char *weak_pointer_slots[] = {"value: ", NULL};
@@ -652,11 +652,11 @@ static void print_otherptr(lispobj obj)
 static void print_obj(char *prefix, lispobj obj)
 {
     static void (*verbose_fns[])(lispobj obj)
-	= {print_fixnum, print_otherptr, print_otherimm, print_list,
-	   print_fixnum, print_struct, print_otherimm, print_otherptr};
+	= {print_fixnum, print_struct, print_otherimm, print_list,
+	   print_fixnum, print_otherptr, print_otherimm, print_otherptr};
     static void (*brief_fns[])(lispobj obj)
-	= {brief_fixnum, brief_otherptr, brief_otherimm, brief_list,
-	   brief_fixnum, brief_struct, brief_otherimm, brief_otherptr};
+	= {brief_fixnum, brief_struct, brief_otherimm, brief_list,
+	   brief_fixnum, brief_otherptr, brief_otherimm, brief_otherptr};
     int type = lowtag_of(obj);
     struct var *var = lookup_by_obj(obj);
     char buffer[256];

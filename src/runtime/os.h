@@ -36,15 +36,21 @@
  *   the type used to represent context in a POSIX sigaction SA_SIGACTION
  *   handler, i.e. the actual type of the thing pointed to by the
  *   void* third argument of a handler */
-#if defined __FreeBSD__
-#include "bsd-os.h"
-#elif defined __OpenBSD__
-#include "bsd-os.h"
-#elif defined __linux__
-#include "linux-os.h"
-#else
-#error unsupported OS
-#endif
+
+/*
+ #if defined __FreeBSD__
+ #include "bsd-os.h"
+ #elif defined __OpenBSD__
+ #include "bsd-os.h"
+ #elif defined __linux__
+ #include "linux-os.h"
+ #else
+ #error unsupported OS
+ #endif
+*/
+
+#include "target-os.h"
+
 
 #define OS_VM_PROT_ALL \
   (OS_VM_PROT_READ | OS_VM_PROT_WRITE | OS_VM_PROT_EXECUTE)
@@ -108,19 +114,33 @@ extern boolean is_valid_lisp_addr(os_vm_address_t test);
  * register, of the specified offset, for that context. The offset is
  * defined in the storage class (SC) defined in the Lisp virtual
  * machine (i.e. the file "vm.lisp" for the appropriate architecture). */
-register_t *os_context_register_addr(os_context_t *context, int offset);
+os_context_register_t *
+os_context_register_addr(os_context_t *context, int offset);
+
+/* FIXME: Pending investigation, this #ifdef stays as alpha. If it
+ * turns out that the alpha truly requires this, it can change to
+ * ARCH_HAS_FLOAT_REGISTERS (currently #defined in alpha-arch.h -- CSR
+ * 2002-02-04 */
 #ifdef alpha
-register_t *os_context_fpregister_addr(os_context_t *context, int offset);
+os_context_register_t *
+os_context_float_register_addr(os_context_t *context, int offset);
 #endif
 
 /* Given a signal context, return the address for storage of the
  * program counter for that context. */
-register_t *os_context_pc_addr(os_context_t *context);
+os_context_register_t *os_context_pc_addr(os_context_t *context);
+#ifdef ARCH_HAS_NPC_REGISTER
+os_context_register_t *os_context_npc_addr(os_context_t *context);
+#endif
+#ifdef ARCH_HAS_LINK_REGISTER
+os_context_register_t *os_context_lr_addr(os_context_t *context);
+#endif
 
 /* Given a signal context, return the address for storage of the
  * system stack pointer for that context. */
-register_t *os_context_sp_addr(os_context_t *context);
-
+#ifdef ARCH_HAS_STACK_POINTER
+os_context_register_t *os_context_sp_addr(os_context_t *context);
+#endif
 /* Given a signal context, return the address for storage of the
  * signal mask for that context. */
 sigset_t *os_context_sigmask_addr(os_context_t *context);

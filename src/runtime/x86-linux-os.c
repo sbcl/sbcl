@@ -47,7 +47,7 @@ size_t os_vm_page_size;
  * gregs[], but it's conditional on __USE_GNU and not defined, so
  * we need to do this nasty absolute index magic number thing
  * instead. */
-register_t *
+os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
 {
     switch(offset) {
@@ -63,12 +63,14 @@ os_context_register_addr(os_context_t *context, int offset)
     }
     return &context->uc_mcontext.gregs[offset];
 }
-register_t *
+
+os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
     return &context->uc_mcontext.gregs[14];
 }
-register_t *
+
+os_context_register_t *
 os_context_sp_addr(os_context_t *context)
 {
     return &context->uc_mcontext.gregs[17];

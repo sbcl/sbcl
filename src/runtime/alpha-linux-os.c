@@ -43,28 +43,22 @@ size_t os_vm_page_size;
 #include "gencgc.h"
 #endif
 
-sigcontext_register_t   *
+os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
 {
     return &context->uc_mcontext.sc_regs[offset];
 }
 
-sigcontext_register_t *
-os_context_fpregister_addr(os_context_t *context, int offset)
+os_context_register_t *
+os_context_float_register_addr(os_context_t *context, int offset)
 {
     return &context->uc_mcontext.sc_fpregs[offset];
 }
 
-sigcontext_register_t *
+os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
     return &((context->uc_mcontext).sc_pc);
-}
-sigcontext_register_t *
-os_context_sp_addr(os_context_t *context)
-{
-    lose("This was supposed to be an x86-only operation");
-    return 0;
 }
 
 sigset_t *

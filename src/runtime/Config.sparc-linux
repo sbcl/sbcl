@@ -1,0 +1,27 @@
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+# -mcpu=pca56 makes _my_ alpha go fast, I'm told.  Yours may do something 
+# else.
+CFLAGS = -g -Wall -Dsparc
+ASFLAGS = -g -Wall -Dsparc
+LD = ld 
+LINKFLAGS = -v -g 
+NM = nm -p
+
+ASSEM_SRC = sparc-assem.S 
+ARCH_SRC = sparc-arch.c undefineds.c 
+#ARCH_SRC = sparc-arch.c ldso-stubs.S
+
+OS_SRC = linux-os.c  sparc-linux-os.c os-common.c 
+LINKFLAGS+=-static 
+#LINKFLAGS+=-rdynamic
+OS_LIBS= -ldl
+
+GC_SRC= gc.c

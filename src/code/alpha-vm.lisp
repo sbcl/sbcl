@@ -102,7 +102,7 @@
 
 ;;; FIXME: Whether COERCE actually knows how to make a float out of a
 ;;; long is another question. This stuff still needs testing.
-(define-alien-routine ("os_context_fpregister_addr"
+(define-alien-routine ("os_context_float_register_addr"
 		       context-float-register-addr)
   (* long)
   (context (* os-context-t))

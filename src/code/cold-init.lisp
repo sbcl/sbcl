@@ -210,7 +210,7 @@
   ;; Barlow's Alpha patches suppress it for Alpha. Why the difference?
   #!+alpha
   (set-floating-point-modes :traps '(:overflow
-				     #!-x86 :underflow
+				     #!+alpha :underflow
 				     :invalid
 				     :divide-by-zero))
 
@@ -289,7 +289,7 @@ instead (which is another name for the same thing)."))
 				  ;; disabled by default. Joe User can
 				  ;; explicitly enable them if
 				  ;; desired.
-				  #!-x86 :underflow))
+				  #!+alpha :underflow))
       ;; Clear pseudo atomic in case this core wasn't compiled with
       ;; support.
       ;;

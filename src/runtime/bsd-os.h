@@ -21,6 +21,7 @@ typedef caddr_t os_vm_address_t;
 typedef vm_size_t os_vm_size_t;
 typedef off_t os_vm_offset_t;
 typedef int os_vm_prot_t;
+typedef int os_context_register_t;
 
 #if defined __FreeBSD__
 /* Note: The man page for sigaction(2) in FreeBSD 4.0 says that this
@@ -38,6 +39,9 @@ typedef struct sigcontext os_context_t;
 #else
 #error unsupported BSD variant
 #endif
+
+#include "target-arch-os.h"
+#include "target-arch.h"
 
 #define OS_VM_PROT_READ PROT_READ
 #define OS_VM_PROT_WRITE PROT_WRITE

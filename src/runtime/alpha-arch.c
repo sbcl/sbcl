@@ -38,11 +38,11 @@ extern size_t os_vm_page_size;
 void
 arch_init(void)
 {
-    /* This must be called _after_ os_init, so we know what the page
-     * size is. */
-    if(mmap((os_vm_address_t) call_into_lisp_LRA_page,os_vm_page_size,
-	    OS_VM_PROT_ALL,MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED,-1,0)
-       == (os_vm_address_t) -1)
+    /* This must be called _after_ os_init(), so that we know what the
+     * page size is. */
+    if (mmap((os_vm_address_t) call_into_lisp_LRA_page,os_vm_page_size,
+	     OS_VM_PROT_ALL,MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED,-1,0)
+	== (os_vm_address_t) -1)
 	perror("mmap");
     
     /* call_into_lisp_LRA is a collection of trampolines written in asm -
@@ -67,21 +67,21 @@ arch_get_bad_addr (int sig, siginfo_t *code, os_context_t *context)
 	sig, code, context); */
     pc= (unsigned int *)(*os_context_pc_addr(context));
 
-    if(((unsigned long)pc) & 3) {
+    if (((unsigned long)pc) & 3) {
 	return NULL;		/* In what case would pc be unaligned?? */
     }
 
-    if( (pc < READ_ONLY_SPACE_START ||
-	 pc >= READ_ONLY_SPACE_START+READ_ONLY_SPACE_SIZE) && 
-	(pc < current_dynamic_space ||
-	 pc >= current_dynamic_space + DYNAMIC_SPACE_SIZE))
+    if ( (pc < READ_ONLY_SPACE_START ||
+	  pc >= READ_ONLY_SPACE_START+READ_ONLY_SPACE_SIZE) && 
+	 (pc < current_dynamic_space ||
+	  pc >= current_dynamic_space + DYNAMIC_SPACE_SIZE))
 	return NULL;
 
     badinst = *pc;
 
-    if(((badinst>>27)!=0x16)      /* STL or STQ */
-       && ((badinst>>27)!=0x13))  /* STS or STT */
-	return NULL;                /* Otherwise forget about address. */
+    if (((badinst>>27)!=0x16)	/* STL or STQ */
+	&& ((badinst>>27)!=0x13)) /* STS or STT */
+	return NULL;		/* Otherwise forget about address. */
   
     return (os_vm_address_t)
 	(*os_context_register_addr(context,((badinst>>16)&0x1f))
@@ -182,50 +182,50 @@ emulate_branch(os_context_t *context,unsigned long orig_inst)
 	branch = 1;
 	break;
     case 0x31: /* fbeq */
-	if(*(os_context_fpregister_addr(context,reg_a))==0) branch = 1;
+	if (*(os_context_float_register_addr(context,reg_a))==0) branch = 1;
 	break;
     case 0x32: /* fblt */
-	if(*os_context_fpregister_addr(context,reg_a)<0) branch = 1;
+	if (*os_context_float_register_addr(context,reg_a)<0) branch = 1;
 	break;
     case 0x33: /* fble */
-	if(*os_context_fpregister_addr(context,reg_a)<=0) branch = 1;
+	if (*os_context_float_register_addr(context,reg_a)<=0) branch = 1;
 	break;
     case 0x34: /* bsr */
 	*os_context_register_addr(context,reg_a)=*os_context_pc_addr(context);
 	branch = 1;
 	break;
     case 0x35: /* fbne */
-	if(*os_context_register_addr(context,reg_a)!=0) branch = 1;
+	if (*os_context_register_addr(context,reg_a)!=0) branch = 1;
 	break;
     case 0x36: /* fbge */
-	if(*os_context_fpregister_addr(context,reg_a)>=0) branch = 1;
+	if (*os_context_float_register_addr(context,reg_a)>=0) branch = 1;
 	break;
     case 0x37: /* fbgt */
-	if(*os_context_fpregister_addr(context,reg_a)>0) branch = 1;
+	if (*os_context_float_register_addr(context,reg_a)>0) branch = 1;
 	break;
     case 0x38: /* blbc */
-	if((*os_context_register_addr(context,reg_a)&1) == 0) branch = 1;
+	if ((*os_context_register_addr(context,reg_a)&1) == 0) branch = 1;
 	break;
     case 0x39: /* beq */
-	if(*os_context_register_addr(context,reg_a)==0) branch = 1;
+	if (*os_context_register_addr(context,reg_a)==0) branch = 1;
 	break;
     case 0x3a: /* blt */
-	if(*os_context_register_addr(context,reg_a)<0) branch = 1;
+	if (*os_context_register_addr(context,reg_a)<0) branch = 1;
 	break;
     case 0x3b: /* ble */
-	if(*os_context_register_addr(context,reg_a)<=0) branch = 1;
+	if (*os_context_register_addr(context,reg_a)<=0) branch = 1;
 	break;
     case 0x3c: /* blbs */
-	if((*os_context_register_addr(context,reg_a)&1)!=0) branch = 1;
+	if ((*os_context_register_addr(context,reg_a)&1)!=0) branch = 1;
 	break;
     case 0x3d: /* bne */
-	if(*os_context_register_addr(context,reg_a)!=0) branch = 1;
+	if (*os_context_register_addr(context,reg_a)!=0) branch = 1;
 	break;
     case 0x3e: /* bge */
-	if(*os_context_register_addr(context,reg_a)>=0) branch = 1;
+	if (*os_context_register_addr(context,reg_a)>=0) branch = 1;
 	break;
     case 0x3f: /* bgt */
-	if(*os_context_register_addr(context,reg_a)>0) branch = 1;
+	if (*os_context_register_addr(context,reg_a)>0) branch = 1;
 	break;
     }
     if (branch)
@@ -278,7 +278,7 @@ void arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
 
     /* Figure out where we will end up after running the displaced 
      * instruction */
-    if(op == 0x1a || (op&0xf) == 0x30) /* a branch */
+    if (op == 0x1a || (op&0xf) == 0x30) /* a branch */
 	/* The cast to long is just to shut gcc up. */
 	next_pc = (unsigned int *)((long)emulate_branch(context,orig_inst));
     else
@@ -308,8 +308,8 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
      * different opcode so we can test whether we're dealing with a
      * breakpoint or a "system service" */
 
-    if((*(unsigned int*)(*os_context_pc_addr(context)-4))== BREAKPOINT_INST) {
-	if(after_breakpoint) {
+    if ((*(unsigned int*)(*os_context_pc_addr(context)-4))==BREAKPOINT_INST) {
+	if (after_breakpoint) {
 	    /* see comments above arch_do_displaced_inst.  This is where
 	     * we reinsert the breakpoint that we removed earlier */
 

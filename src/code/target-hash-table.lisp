@@ -140,7 +140,18 @@
 	   ;; boxing.
 	   (rehash-threshold (float rehash-threshold 1.0))
 	   (size+1 (1+ size))		; The first element is not usable.
-	   (scaled-size (round (/ (float size+1) rehash-threshold)))
+           ;; KLUDGE: The most natural way of expressing the below is
+           ;; (round (/ (float size+1) rehash-threshold)), and indeed
+           ;; it was expressed like that until 0.7.0. However,
+           ;; MAKE-HASH-TABLE is called very early in cold-init, and
+           ;; the SPARC has no primitive instructions for rounding,
+           ;; but only for truncating; therefore, we fudge this issue
+           ;; a little. The other uses of truncate, below, similarly
+           ;; used to be round. -- CSR, 2002-10-01
+	   ;;
+	   ;; Note that this has not yet been audited for
+	   ;; correctness. It just seems to work. -- CSR, 2002-11-02
+	   (scaled-size (truncate (/ (float size+1) rehash-threshold)))
 	   (length (almost-primify (max scaled-size
 					(1+ +min-hash-table-size+))))
 	   (index-vector (make-array length
@@ -224,7 +235,7 @@
 	      (fixnum
 	       (+ rehash-size old-size))
 	      (float
-	       (the index (round (* rehash-size old-size)))))))
+	       (the index (truncate (* rehash-size old-size)))))))
 	 (new-kv-vector (make-array (* 2 new-size)
 				    :initial-element +empty-ht-slot+))
 	 (new-next-vector (make-array new-size
@@ -236,7 +247,7 @@
 					:initial-element #x80000000)))
 	 (old-index-vector (hash-table-index-vector table))
 	 (new-length (almost-primify
-		      (round (/ (float new-size)
+		      (truncate (/ (float new-size)
 				(hash-table-rehash-threshold table)))))
 	 (new-index-vector (make-array new-length
 				       :element-type '(unsigned-byte 32)

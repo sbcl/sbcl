@@ -97,11 +97,9 @@ static boolean
 dynamic_pointer_p(lispobj ptr)
 {
 #ifndef __i386__
-    /* KLUDGE: This has an implicit dependence on the ordering of
-     * address spaces, and is therefore basically wrong. I'd fix it,
-     * but I don't have a non-386 port to test it on. Porters are
-     * encouraged to fix it. -- WHN 2000-10-17 */
-    return (ptr >= (lispobj)DYNAMIC_SPACE_START);
+    return (ptr >= (lispobj)current_dynamic_space
+	    &&
+	    ptr < (lispobj)dynamic_space_free_pointer);
 #else
     /* Be more conservative, and remember, this is a maybe. */
     return (ptr >= (lispobj)DYNAMIC_SPACE_START
@@ -181,7 +179,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    return 0;
 	}
 	/* Is it plausible cons? */
-	if((is_lisp_pointer(start_addr[0])
+	if ((is_lisp_pointer(start_addr[0])
 	    || ((start_addr[0] & 3) == 0) /* fixnum */
 	    || (widetag_of(start_addr[0]) == BASE_CHAR_WIDETAG)
 	    || (widetag_of(start_addr[0]) == UNBOUND_MARKER_WIDETAG))
@@ -221,8 +219,8 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    }
 	    return 0;
 	}
-	/* Is it plausible?  Not a cons. X should check the headers. */
-	if(is_lisp_pointer(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
+	/* Is it plausible? Not a cons. XXX should check the headers. */
+	if (is_lisp_pointer(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
 	    if (pointer_filter_verbose) {
 		fprintf(stderr,"*Wo2: %x %x %x\n", (unsigned int) pointer, 
 			(unsigned int) start_addr, *start_addr);
@@ -728,7 +726,7 @@ ptrans_code(lispobj thing)
     /* Arrange to scavenge the debug info later. */
     pscav_later(&new->debug_info, 1);
 
-    if(new->trace_table_offset & 0x3)
+    if (new->trace_table_offset & 0x3)
 #if 0
       pscav(&new->trace_table_offset, 1, 0);
 #else

@@ -22,6 +22,8 @@
 #include <sys/syscall.h>
 #include <asm/unistd.h>
 #include <linux/version.h>
+#include "target-arch-os.h"
+#include "target-arch.h"
 
 #define linuxversion(a, b, c) (((a)<<16)+((b)<<8)+(c))
 
@@ -30,7 +32,7 @@ typedef size_t os_vm_size_t;
 typedef off_t os_vm_offset_t;
 typedef int os_vm_prot_t;
 
-typedef struct ucontext os_context_t;
+/* typedef struct ucontext os_context_t;*/
 
 #define OS_VM_PROT_READ    PROT_READ
 #define OS_VM_PROT_WRITE   PROT_WRITE
@@ -39,4 +41,4 @@ typedef struct ucontext os_context_t;
 #define SET_FPU_CONTROL_WORD(cw) asm("fldcw %0" : : "m" (cw))
 
 /* /usr/include/asm/sigcontext.h  */
-typedef long sigcontext_register_t ;
+typedef long os_context_register_t ;

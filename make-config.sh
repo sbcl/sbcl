@@ -32,6 +32,8 @@ echo //guessing default target CPU architecture from host architecture
 case `uname -m` in 
     *86) guessed_sbcl_arch=x86 ;; 
     [Aa]lpha) guessed_sbcl_arch=alpha ;;
+    sparc*) guessed_sbcl_arch=sparc ;;
+    ppc) guessed_sbcl_arch=ppc ;;
     *)
         # If we're not building on a supported target architecture, we
 	# we have no guess, but it's not an error yet, since maybe
@@ -70,14 +72,23 @@ done
 echo //setting up OS-dependent information
 original_dir=`pwd`
 cd src/runtime/
-rm -f Config
+rm -f Config target-arch-os.h target-arch.h target-os.h target-lispregs.h
+# KLUDGE: these two logically belong in the previous section
+# ("architecture-dependent"); it seems silly to enforce this in terms
+# of the shell script, though. -- CSR, 2002-02-03
+ln -s $sbcl_arch-arch.h target-arch.h
+ln -s $sbcl_arch-lispregs.h target-lispregs.h
 case `uname` in 
     Linux)
 	echo -n ' :linux' >> $ltf
 	ln -s Config.$sbcl_arch-linux Config
+	ln -s $sbcl_arch-linux-os.h target-arch-os.h
+	ln -s linux-os.h target-os.h
 	;;
     *BSD)
 	echo -n ' :bsd' >> $ltf
+	ln -s $sbcl_arch-bsd-os.h target-arch-os.h
+	ln -s bsd-os.h target-os.h
 	case `uname` in
 	    FreeBSD)
 		echo -n ' :freebsd' >> $ltf

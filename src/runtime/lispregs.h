@@ -9,25 +9,7 @@
  * files for more information.
  */
 
-#if defined(mips) || defined(irix)
-#include "mips-lispregs.h"
-#endif
-
-#ifdef sparc
-#include "sparc-lispregs.h"
-#endif
-
-#ifdef __i386__
-#include "x86-lispregs.h"
-#endif
-
-#ifdef parisc
-#include "hppa-lispregs.h"
-#endif
-
-#ifdef alpha
-#include "alpha-lispregs.h"
-#endif
+#include "target-lispregs.h"
 
 #ifndef LANGUAGE_ASSEMBLY
 extern char *lisp_register_names[];

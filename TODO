@@ -1,11 +1,6 @@
 for early 0.7.x:
 
-* building with CLISP (or explaining why not). This will likely involve
-	a rearrangement of the build system so that it never renames
-	the output from COMPILE-FILE, because CLISP's COMPILE-FILE
-	outputs two (!) files and as far as I can tell LOAD uses both
-	of them. Since I have other motivations for this rearrangement
-	besides CLISPiosyncrasies, I'm reasonably motivated to do it.
+* building with CLISP (or explaining why not)
 * urgent EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
 	** made inlining DEFUN inside MACROLET work again
 	** (also, while working on INLINE anyway, it might be easy

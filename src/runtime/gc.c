@@ -28,8 +28,9 @@
 #include "interr.h"
 
 /* So you need to debug? */
-#if 0
 #define PRINTNOISE
+#define DEBUG_SPACE_PREDICATES
+#if 0
 #define DEBUG_SPACE_PREDICATES
 #define DEBUG_SCAVENGE_VERBOSE
 #define DEBUG_COPY_VERBOSE
@@ -244,7 +245,23 @@ struct timeval start_tv, stop_tv;
 	    lose("GC lossage.  Current dynamic space is bogus!\n");
 	}
 	new_space_free_pointer = new_space;
+#if 0
+	/* at one time we had the bright idea of using mprotect() to
+	 * hide the semispace that we're not using at the moment, so
+	 * we'd see immediately if anyone had a pointer to it.
+	 * Unfortunately, if we gc during a call to an assembler
+	 * routine with a "raw" return style, at least on PPC we are
+	 * expected to return into oldspace because we can't easily
+	 * update the link register - it's not tagged, and we can't do
+	 * it as an offset of reg_CODE because the calling routine
+	 * might be nowhere near our code vector.  We hope that we
+	 * don't run very far in oldspace before it catapults us into
+	 * newspace by either calling something else or returning
+	 */
 
+	/* write-enable */
+	os_protect(new_space,DYNAMIC_SPACE_SIZE,OS_VM_PROT_ALL);
+#endif
 
 	/* Initialize the weak pointer list. */
 	weak_pointers = (struct weak_pointer *) NULL;
@@ -365,8 +382,20 @@ struct timeval start_tv, stop_tv;
 #endif        
 
 	gc_rate = ((float) size_retained / (float) (1<<20)) / real_time;
-
+	
 	printf("%10.2f M bytes/sec collected.\n", gc_rate);
+#endif
+	/* os_flush_icache((os_vm_address_t) 0, sizeof(unsigned long)); */
+
+#if 0
+	/* see comment above about mprotecting oldspace */
+
+	/* zero the from space now, to make it easier to find stale
+	   pointers to it */
+
+	/* pray that both dynamic spaces are the same size ... */
+	memset(from_space,(DYNAMIC_0_SPACE_END-DYNAMIC_0_SPACE_START-1),0);
+	os_protect(from_space,DYNAMIC_SPACE_SIZE,0); /* write-protect */
 #endif
 }
 
@@ -413,7 +442,7 @@ scavenge(lispobj *start, u32 nwords)
                         words_scavenged = 1;
                     }
                 }
-		else if(nwords==1) {
+		else if (nwords==1) {
 		    /* there are some situations where an
 		       other-immediate may end up in a descriptor
 		       register.  I'm not sure whether this is
@@ -424,7 +453,7 @@ scavenge(lispobj *start, u32 nwords)
 		       other than a pointer, just hush it up */
 
 		    words_scavenged=1;
-		    if((scavtab[type]==scav_lose) ||
+		    if ((scavtab[type]==scav_lose) ||
 		       (((scavtab[type])(start,object))>1)) {
 			fprintf(stderr,"warning: attempted to scavenge non-descriptor value %x at %p.  If you can\nreproduce this warning, send a test case to sbcl-devel@lists.sourceforge.net\n",
 				object,start);
@@ -476,10 +505,13 @@ scavenge_interrupt_context(os_context_t *context)
 	int lip_register_pair;
 #endif
 	unsigned long pc_code_offset;
-#ifdef SC_NPC
+#ifdef ARCH_HAS_LINK_REGISTER
+	unsigned long lr_code_offset;
+#endif
+#ifdef ARCH_HAS_NPC_REGISTER
 	unsigned long npc_code_offset;
 #endif
-
+	fprintf(stderr, "Scavenging interrupt context at 0x%x\n",context);
 	/* Find the LIP's register pair and calculate its offset */
 	/* before we scavenge the context. */
 #ifdef reg_LIP
@@ -507,13 +539,21 @@ scavenge_interrupt_context(os_context_t *context)
 
 	/* Compute the PC's offset from the start of the CODE */
 	/* register. */
-	pc_code_offset = *os_context_pc_addr(context) - 
+	pc_code_offset =
+	    *os_context_pc_addr(context) - 
 	    *os_context_register_addr(context, reg_CODE);
-#ifdef SC_NPC
-	npc_code_offset = SC_NPC(context) - SC_REG(context, reg_CODE);
-#endif SC_NPC
+#ifdef ARCH_HAS_NPC_REGISTER
+        npc_code_offset =
+	    *os_context_npc_addr(context) - 
+	    *os_context_register_addr(context, reg_CODE);
+#endif 
+#ifdef ARCH_HAS_LINK_REGISTER
+	lr_code_offset =
+	    *os_context_lr_addr(context) - 
+	    *os_context_register_addr(context, reg_CODE);
+#endif
 	       
-	/* Scanvenge all boxed registers in the context. */
+	/* Scavenge all boxed registers in the context. */
 	for (i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
 		int index;
 	        lispobj foo;
@@ -540,10 +580,20 @@ scavenge_interrupt_context(os_context_t *context)
 	if (from_space_p(*os_context_pc_addr(context)))
 	    *os_context_pc_addr(context) = 
 		*os_context_register_addr(context, reg_CODE) + pc_code_offset;
-#ifdef SC_NPC
-	if (from_space_p(SC_NPC(context)))
-		SC_NPC(context) = SC_REG(context, reg_CODE) + npc_code_offset;
-#endif SC_NPC
+#ifdef ARCH_HAS_LINK_REGISTER
+	/* Fix the LR ditto; important if we're being called from 
+	* an assembly routine that expects to return using blr, otherwise
+	* harmless */
+	if (from_space_p(*os_context_lr_addr(context)))
+	    *os_context_lr_addr(context) = 
+		*os_context_register_addr(context, reg_CODE) + lr_code_offset;
+#endif
+
+#ifdef ARCH_HAS_NPC_REGISTER
+	if (from_space_p(*os_context_npc_addr(context)))
+	    *os_context_npc_addr(context) = 
+	        *os_context_register_addr(context, reg_CODE) + npc_code_offset;
+#endif
 }
 
 void scavenge_interrupt_contexts(void)
@@ -553,6 +603,7 @@ void scavenge_interrupt_contexts(void)
 
     index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX));
 
+    fprintf(stderr, "%d interrupt contexts to scan\n",index);
     for (i = 0; i < index; i++) {
 	context = lisp_interrupt_contexts[i];
 	scavenge_interrupt_context(context); 
@@ -850,7 +901,7 @@ trans_return_pc_header(lispobj object)
     printf("trans_return_pc_header object=%x, code=%lx\n",object,code);
 #endif
     ncode = trans_code(code);
-    if(object==0x304748d7) {
+    if (object==0x304748d7) {
 	/* monitor_or_something(); */
     }
     ret= ((lispobj) LOW_WORD(ncode) + offset) | OTHER_POINTER_LOWTAG;
@@ -2204,7 +2255,7 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
     long length =
 	DYNAMIC_SPACE_SIZE + (os_vm_address_t)current_dynamic_space - addr;
 
-    if(addr < (os_vm_address_t)dynamic_space_free_pointer) {
+    if (addr < (os_vm_address_t)dynamic_space_free_pointer) {
 	fprintf(stderr,
 	   "set_auto_gc_trigger: tried to set gc trigger too low! (%d < %p)\n",
 		(unsigned int)dynamic_usage,
@@ -2233,7 +2284,7 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
 
 void clear_auto_gc_trigger(void)
 {
-    if(current_auto_gc_trigger!=NULL){
+    if (current_auto_gc_trigger!=NULL){
 #if defined(SUNOS) || defined(SOLARIS)/* don't want to force whole space into swapping mode... */
 	os_vm_address_t addr=(os_vm_address_t)current_auto_gc_trigger;
 	os_vm_size_t length=

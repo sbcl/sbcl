@@ -17,11 +17,6 @@
 #include <stdlib.h>
 
 #include <signal.h>
-#ifdef mach /* KLUDGE: #ifdef on lowercase symbols? Ick. -- WHN 19990904 */
-#ifdef mips
-#include <mips/cpu.h>
-#endif
-#endif
 
 #include "runtime.h"
 #include "arch.h"
@@ -295,6 +290,7 @@ interrupt_handle_pending(os_context_t *context)
 	{
 	    undo_fake_foreign_function_call(context);
         }
+	fprintf(stderr,"interrupt-handle-pending: back from MAYBE_GC\n");
     }
 
     /* FIXME: This isn't very clear. It would be good to reverse
@@ -321,7 +317,10 @@ interrupt_handle_pending(os_context_t *context)
      * anyway. Why we still need to copy the pending_mask into the
      * context given that we're now done with the context anyway, I
      * couldn't say. */
-    memcpy(os_context_sigmask_addr(context), &pending_mask, sizeof(sigset_t));
+#if 0
+    memcpy(os_context_sigmask_addr(context), &pending_mask, 
+	   4 /* sizeof(sigset_t) */ );
+#endif
     sigemptyset(&pending_mask);
     if (pending_signal) {
 	int signal = pending_signal;
@@ -369,7 +368,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
     if (ARE_SAME_HANDLER(handler.c, SIG_IGN)) {
 	return;
     }
-
+    
 #ifndef __i386__
     were_in_lisp = !foreign_function_call_active;
     if (were_in_lisp)

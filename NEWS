@@ -1010,6 +1010,9 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
     (> SPEED DEBUG). (This is an incompatible change because there are
     programs which relied on the old CMU-CL-style behavior to optimize
     away their unbounded recursion which will now die of stack overflow.)
+  * SBCL runs on SPARC systems now. (thanks to Christophe Rhodes' port
+    of CMU CL's support for SPARC, and various endianness and other 
+    SBCL portability fixes due to Christophe Rhodes and Dan Barlow)
   * new syntactic sugar for the Unix command line: --load foo.bar is now
     an alternate notation for --eval '(load "foo.bar")'.
   * bug fixes:

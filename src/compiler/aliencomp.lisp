@@ -68,7 +68,6 @@
 
 (defknown alien-funcall (alien-value &rest *) *
   (any recursive))
-(defknown %alien-funcall (system-area-pointer alien-type &rest *) *)
 
 ;;;; cosmetic transforms
 

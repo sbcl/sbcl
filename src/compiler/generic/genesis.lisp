@@ -405,32 +405,38 @@
             (n)
             (let* ((name (intern (format nil "BYTE-VECTOR-REF-~A" n)))
                    (number-octets (/ n 8))
-                   (ash-list
+                   (ash-list-le
                     (loop for i from 0 to (1- number-octets)
                           collect `(ash (aref byte-vector (+ byte-index ,i))
                                         ,(* i 8))))
-                   (setf-list
+		   (ash-list-be
+		    (loop for i from 0 to (1- number-octets)
+			  collect `(ash (aref byte-vector (+ byte-index
+							   ,(- number-octets 1 i)))
+				        ,(* i 8))))
+                   (setf-list-le
                     (loop for i from 0 to (1- number-octets)
                           append
                           `((aref byte-vector (+ byte-index ,i))
-                            (ldb (byte 8 ,(* i 8)) new-value)))))
+                            (ldb (byte 8 ,(* i 8)) new-value))))
+		   (setf-list-be
+		    (loop for i from 0 to (1- number-octets)
+                          append
+			  `((aref byte-vector (+ byte-index ,i))
+			    (ldb (byte 8 ,(- n 8 (* i 8))) new-value)))))
               `(progn
                  (defun ,name (byte-vector byte-index)
-  (aver (= sb!vm:n-word-bits 32))
-  (aver (= sb!vm:n-byte-bits 8))
-  (ecase sb!c:*backend-byte-order*
-    (:little-endian
-                      (logior ,@ash-list))
-    (:big-endian
-     (error "stub: no big-endian ports of SBCL (yet?)"))))
-                 (defun (setf ,name) (new-value byte-vector byte-index)
-  (aver (= sb!vm:n-word-bits 32))
-  (aver (= sb!vm:n-byte-bits 8))
-  (ecase sb!c:*backend-byte-order*
-    (:little-endian
-                      (setf ,@setf-list))
-    (:big-endian
-                      (error "stub: no big-endian ports of SBCL (yet?)"))))))))
+		   (aver (= sb!vm:n-word-bits 32))
+		   (aver (= sb!vm:n-byte-bits 8))
+		   (logior ,@(ecase sb!c:*backend-byte-order*
+				    (:little-endian ash-list-le)
+				    (:big-endian ash-list-be))))
+		(defun (setf ,name) (new-value byte-vector byte-index)
+		  (aver (= sb!vm:n-word-bits 32))
+		  (aver (= sb!vm:n-byte-bits 8))
+		  (setf ,@(ecase sb!c:*backend-byte-order*
+				 (:little-endian setf-list-le)
+				 (:big-endian setf-list-be))))))))
   (make-byte-vector-ref-n 8)
   (make-byte-vector-ref-n 16)
   (make-byte-vector-ref-n 32))
@@ -1636,6 +1642,20 @@
                 (ldb (byte 8 0) value)
                 (byte-vector-ref-8 gspace-bytes (1+ gspace-byte-offset))
                 (ldb (byte 8 8) value)))))
+      (:sparc
+       (ecase kind
+	 (:call
+	  (error "Can't deal with call fixups yet."))
+	 (:sethi
+	  (setf (byte-vector-ref-32 gspace-bytes gspace-byte-offset)
+		(dpb (ldb (byte 22 10) value)
+		     (byte 22 0)
+		     (byte-vector-ref-32 gspace-bytes gspace-byte-offset))))
+	 (:add
+	  (setf (byte-vector-ref-32 gspace-bytes gspace-byte-offset)
+		(dpb (ldb (byte 10 0) value)
+		     (byte 10 0)
+		     (byte-vector-ref-32 gspace-bytes gspace-byte-offset))))))
       (:x86
        (let* ((un-fixed-up (byte-vector-ref-32 gspace-bytes
 					       gspace-byte-offset))
@@ -2970,7 +2990,8 @@ initially undefined function references:~2%")
 				     sb!vm:static-space-start))
 	   (*dynamic*   (make-gspace :dynamic
 				     dynamic-space-id
-				     sb!vm:dynamic-space-start))
+				     #!+gencgc sb!vm:dynamic-space-start
+				     #!-gencgc sb!vm:dynamic-0-space-start))
 	   (*nil-descriptor* (make-nil-descriptor))
 	   (*current-reversed-cold-toplevels* *nil-descriptor*)
 	   (*unbound-marker* (make-other-immediate-descriptor

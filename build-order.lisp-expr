@@ -190,6 +190,12 @@
  #!+bsd   ("src/code/bsd-os"   :not-host)
  #!+linux ("src/code/linux-os" :not-host)
 
+ ;; sparc-vm and ppc-vm need sc-offset defined to get at internal
+ ;; error args. This file contains stuff previously in
+ ;; debug-info.lisp.  Should it therefore be :not-host?  -- CSR,
+ ;; 2002-02-05
+ ("src/code/sc-offset")
+ 
  ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
  ;; instead of a bunch of reader macros. -- WHN 19990308
  #!+pmax ("src/code/pmax-vm" :not-host)
@@ -198,6 +204,7 @@
  #!+rt    ("src/code/rt-vm"    :not-host)
  #!+hppa  ("src/code/hppa-vm"  :not-host)
  #!+x86   ("src/code/x86-vm"   :not-host)
+ #!+ppc   ("src/code/ppc-vm"   :not-host)
  #!+alpha ("src/code/alpha-vm" :not-host)
  #!+sgi   ("src/code/sgi-vm"   :not-host)
 
@@ -483,10 +490,17 @@
  ("src/compiler/target/char")
  ("src/compiler/target/memory")
  ("src/compiler/target/static-fn")
- ("src/compiler/target/arith")
+ ("src/compiler/target/arith"
+  ;; KLUDGE: for ppc and sparc this appears to be necessary -- see the
+  ;; comment below regarding src/compiler/target/array -- CSR,
+  ;; 2002-05-05
+  :ignore-failure-p) 
  ("src/compiler/target/subprim")
 
  ("src/compiler/target/debug")
+ ;; src/compiler/sparc/c-call contains a deftransform for
+ ;; %ALIEN-FUNCALL -- CSR
+ ("src/compiler/early-aliencomp")
  ("src/compiler/target/c-call")
  ("src/compiler/target/cell")
  ("src/compiler/target/values")

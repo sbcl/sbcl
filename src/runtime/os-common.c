@@ -47,7 +47,7 @@ os_zero(os_vm_address_t addr, os_vm_size_t length)
 	os_invalidate(block_start, block_size);
 	addr = os_validate(block_start, block_size);
 
-	if(addr == NULL || addr != block_start)
+	if (addr == NULL || addr != block_start)
 	    lose("os_zero: block moved! 0x%08x ==> 0x%08x",
 		 block_start,
 		 addr);
@@ -82,15 +82,15 @@ os_reallocate(os_vm_address_t addr, os_vm_size_t old_len, os_vm_size_t len)
     len=os_round_up_size_to_page(len);
     old_len=os_round_up_size_to_page(old_len);
 
-    if(addr==NULL)
+    if (addr==NULL)
 	return os_allocate(len);
     else{
 	long len_diff=len-old_len;
 
-	if(len_diff<0)
+	if (len_diff<0)
 	    os_invalidate(addr+len,-len_diff);
 	else{
-	    if(len_diff!=0){
+	    if (len_diff!=0) {
 	      os_vm_address_t new=os_allocate(len);
 
 	      if(new!=NULL){

@@ -753,6 +753,20 @@
 	    (t
 	     (sub-dump-object obj file))))))
 
+;;; In the grand scheme of things I don't pretend to understand any
+;;; more how this works, or indeed whether.  But to write out specialized
+;;; vectors in the same format as fop-int-vector expects to read them
+;;; we need to be target-endian.  dump-integer-as-n-bytes always writes
+;;; little-endian (which is correct for all other integers) so for a bigendian
+;;; target we need to swap octets -- CSR, after DB
+
+(defun octet-swap (word bits)
+  "BITS must be a multiple of 8"
+  (do ((input word (ash input -8))
+       (output 0 (logior (ash output 8) (logand input #xff)))
+       (bits bits (- bits 8)))
+      ((<= bits 0) output)))
+
 (defun dump-i-vector (vec file &key data-only)
   (declare (type (simple-array * (*)) vec))
   (let ((len (length vec)))
@@ -772,7 +786,11 @@
 		      (multiple-value-bind (floor rem) (floor size 8)
 			(aver (zerop rem))
 			(dovector (i vec)
-			  (dump-integer-as-n-bytes i floor file))))
+			  (dump-integer-as-n-bytes
+			   (ecase sb!c:*backend-byte-order*
+			     (:little-endian i)
+			     (:big-endian (octet-swap i size)))
+			   floor file))))
 		     (t ; harder cases, not supported in cross-compiler
 		      (dump-raw-bytes vec bytes file))))
 	     (dump-signed-vector (size bytes)

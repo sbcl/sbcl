@@ -48,6 +48,10 @@ size_t os_vm_page_size;
 #include "gencgc.h"
 #endif
 
+
+#ifdef sparc
+int early_kernel = 0;
+#endif
 void os_init(void)
 {
     /* Early versions of Linux don't support the mmap(..) functionality
@@ -55,12 +59,24 @@ void os_init(void)
     {
         struct utsname name;
 	int major_version;
+#ifdef sparc
+	int minor_version;
+#endif
 	uname(&name);
 	major_version = atoi(name.release);
 	if (major_version < 2) {
 	    lose("linux major version=%d (can't run in version < 2.0.0)",
 		 major_version);
 	}
+#ifdef sparc
+	/* KLUDGE: This will break if Linux moves to a uname() version number
+	 * that has more than one digit initially -- CSR, 2002-02-12 */
+	minor_version = atoi(name.release+2);
+	if (minor_version < 4) {
+	    fprintf(stderr,"linux minor version=%d;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", minor_version);
+	    early_kernel = 1;
+	}
+#endif
     }
 
     os_vm_page_size = getpagesize();
@@ -182,7 +198,7 @@ os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 		MAP_PRIVATE | MAP_FILE | MAP_FIXED,
 		fd, (off_t) offset);
 
-    if(addr == MAP_FAILED) {
+    if (addr == MAP_FAILED) {
 	perror("mmap");
 	lose("unexpected mmap(..) failure");
     }
@@ -234,7 +250,7 @@ is_valid_lisp_addr(os_vm_address_t addr)
 void
 sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 {
-    os_context_t *context = (os_context_t*)void_context;
+    os_context_t *context = arch_os_get_context(&void_context);
     void* fault_addr = (void*)context->uc_mcontext.cr2;
     if (!gencgc_handle_wp_violation(fault_addr)) {
 	interrupt_handle_now(signal, info, void_context);
@@ -246,7 +262,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 static void
 sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 {
-    os_context_t *context = (os_context_t*)void_context;
+    os_context_t *context = arch_os_get_context(&void_context);
     os_vm_address_t addr;
 
 #ifdef __i386__
@@ -256,7 +272,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     
     addr = arch_get_bad_addr(signal,info,context);
 
-    if(addr != NULL && 
+    if (addr != NULL && 
        *os_context_register_addr(context,reg_ALLOC) & (1L<<63)){
 	/* This is the end of a pseudo-atomic section during which
 	 * a signal was received.  We must deal with the pending interrupt
