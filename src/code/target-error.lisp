@@ -82,21 +82,21 @@
                    (eq (restart-name x) name)))
              restarts)))
 
-(defun find-restart-or-lose (restart-designator)
-  (let ((real-restart (find-restart restart-designator)))
-    (unless real-restart
+;;; helper for the various functions which are ANSI-spec'ed to do
+;;; something with a restart or signal CONTROL-ERROR if there is none
+(defun find-restart-or-control-error (identifier &optional condition)
+  (or (find-restart identifier condition)
       (error 'simple-control-error
-	     :format-control "Restart ~S is not active."
-	     :format-arguments (list restart-designator)))
-    real-restart))
+	     :format-control "No restart ~S is active ~{for ~S~}."
+	     :format-arguments (list identifier condition))))
 
 (defun invoke-restart (restart &rest values)
   #!+sb-doc
   "Calls the function associated with the given restart, passing any given
    arguments. If the argument restart is not a restart or a currently active
-   non-nil restart name, then a control-error is signalled."
+   non-nil restart name, then a CONTROL-ERROR is signalled."
   (/show "entering INVOKE-RESTART" restart)
-  (let ((real-restart (find-restart-or-lose restart)))
+  (let ((real-restart (find-restart-or-control-error restart)))
     (apply (restart-function real-restart) values)))
 
 (defun interactive-restart-arguments (real-restart)
@@ -109,8 +109,8 @@
   #!+sb-doc
   "Calls the function associated with the given restart, prompting for any
    necessary arguments. If the argument restart is not a restart or a
-   currently active non-nil restart name, then a control-error is signalled."
-  (let* ((real-restart (find-restart-or-lose restart))
+   currently active non-NIL restart name, then a CONTROL-ERROR is signalled."
+  (let* ((real-restart (find-restart-or-control-error restart))
 	 (args (interactive-restart-arguments real-restart)))
     (apply (restart-function real-restart) args)))
 

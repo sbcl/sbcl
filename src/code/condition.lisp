@@ -875,7 +875,7 @@
   #!+sb-doc
   "Transfer control to a restart named ABORT, signalling a CONTROL-ERROR if
    none exists."
-  (invoke-restart (find-restart 'abort condition))
+  (invoke-restart (find-restart-or-control-error 'abort condition))
   ;; ABORT signals an error in case there was a restart named ABORT
   ;; that did not transfer control dynamically. This could happen with
   ;; RESTART-BIND.
@@ -885,7 +885,7 @@
   #!+sb-doc
   "Transfer control to a restart named MUFFLE-WARNING, signalling a
    CONTROL-ERROR if none exists."
-  (invoke-restart (find-restart 'muffle-warning condition)))
+  (invoke-restart (find-restart-or-control-error 'muffle-warning condition)))
 
 (macrolet ((define-nil-returning-restart (name args doc)
 	     #!-sb-doc (declare (ignore doc))
