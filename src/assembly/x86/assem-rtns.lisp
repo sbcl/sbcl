@@ -213,7 +213,7 @@
 
   EXIT
 
-  ;; Hear EAX points to catch block containing symbol pointed to by EDX.
+  ;; Here EAX points to catch block containing symbol pointed to by EDX.
   (inst jmp (make-fixup 'unwind :assembly-routine)))
 
 ;;;; non-local exit noise
@@ -234,7 +234,8 @@
 
   (load-symbol-value uwp *current-unwind-protect-block*)
 
-  ;; Does *cuwpb* match value stored in argument cuwp slot?
+  ;; Does *CURRENT-UNWIND-PROTECT-BLOCK* match the value stored in
+  ;; argument's CURRENT-UWP-SLOT?
   (inst cmp uwp
 	(make-ea-for-object-slot block unwind-block-current-uwp-slot 0))
   ;; If a match, return to context in arg block.
@@ -253,8 +254,8 @@
   (loadw ebp-tn block unwind-block-current-cont-slot)
 
   ;; Uwp-entry expects some things in known locations so that they can
-  ;; be saved on the stack: the block in edx-tn; start in ebx-tn; and
-  ;; count in ecx-tn
+  ;; be saved on the stack: the block in edx-tn, start in ebx-tn, and
+  ;; count in ecx-tn.
 
   (inst jmp (make-ea :byte :base block
 		     :disp (* unwind-block-entry-pc-slot n-word-bytes))))

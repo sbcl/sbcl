@@ -25,7 +25,6 @@
 	   (unless (block-flag ep)
 	     (find-dfo-aux ep head component)
 	     (return nil))))))
-
   (let ((num 0))
     (declare (fixnum num))
     (do-blocks-backwards (block component :both)
@@ -89,12 +88,10 @@
 (defun find-dfo-aux (block head component)
   (unless (eq (block-component block) component)
     (join-components component (block-component block)))
-	
   (unless (block-flag block)
     (setf (block-flag block) t)
     (dolist (succ (block-succ block))
       (find-dfo-aux succ head component))
-
     (remove-from-dfo block)
     (add-to-dfo block head))
   (values))
@@ -103,7 +100,7 @@
 ;;; before it walks the successors. It looks at the home CLAMBDA's
 ;;; BIND block to see whether that block is in some other component:
 ;;; -- If the block is in the initial component, then do
-;;;    DFO-WALK-CALL-GRAPH on the home function to move it
+;;;    DFO-WALK-DEPENDENCY-GRAPH on the home function to move it
 ;;;    into COMPONENT.
 ;;; -- If the block is in some other component, join COMPONENT into
 ;;;    it and return that component.
@@ -116,14 +113,14 @@
 ;;; the same component, even when they might not seem reachable from
 ;;; the environment entry. Consider the case of code that is only
 ;;; reachable from a non-local exit.
-(defun walk-home-call-graph (block component)
+(defun scavenge-home-dependency-graph (block component)
   (declare (type cblock block) (type component component))
   (let ((home-lambda (block-home-lambda block)))
     (if (eq (functional-kind home-lambda) :deleted)
 	component
 	(let ((home-component (lambda-component home-lambda)))
 	  (cond ((eq (component-kind home-component) :initial)
-		 (dfo-scavenge-call-graph home-lambda component))
+		 (dfo-scavenge-dependency-graph home-lambda component))
 		((eq home-component component)
 		 component)
 		(t
@@ -154,10 +151,9 @@
      ((block-flag block) component)
      (t
       (setf (block-flag block) t)
-      (let ((current (walk-home-call-graph block component)))
+      (let ((current (scavenge-home-dependency-graph block component)))
 	(dolist (succ (block-succ block))
 	  (setq current (find-initial-dfo-aux succ current)))
-	
 	(remove-from-dfo block)
 	(add-to-dfo block (component-head current))
 	current)))))
@@ -190,9 +186,12 @@
 	  (res home))))
     (res)))
 
-;;; Move the code for FUN and all functions called by it into
-;;; COMPONENT. If FUN is already in COMPONENT, then we just return
-;;; that component.
+;;; If FUN is not already in COMPONENT, just return that component.
+;;; Otherwise, move the code for FUN and all functions it physically
+;;; depends on (either because of calls or because of closure
+;;; relationships) into COMPONENT, or possibly into another COMPONENT
+;;; that we find to be related. Return whatever COMPONENT we actually
+;;; merged into.
 ;;;
 ;;; If the function is in an initial component, then we move its head
 ;;; and tail to COMPONENT and add it to COMPONENT's lambdas. It is
@@ -218,7 +217,7 @@
 ;;; ensures that conversion of a full call to a local call won't
 ;;; result in a need to join components, since the components will
 ;;; already be one.
-(defun dfo-scavenge-call-graph (fun component)
+(defun dfo-scavenge-dependency-graph (fun component)
   (declare (type clambda fun) (type component component))
   (let* ((bind-block (node-block (lambda-bind fun)))
 	 (old-lambda-component (block-component bind-block))
@@ -241,13 +240,12 @@
 	(let ((return-block (node-block return)))
 	  (link-blocks return-block (component-tail component))
 	  (unlink-blocks return-block (component-tail old-lambda-component))))
-
       (let ((calls (if (eq (functional-kind fun) :external)
 		       (append (find-reference-funs fun)
 			       (lambda-calls fun))
 		       (lambda-calls fun))))
 	(do ((res (find-initial-dfo-aux bind-block component)
-		  (dfo-scavenge-call-graph (first remaining-calls) res))
+		  (dfo-scavenge-dependency-graph (first remaining-calls) res))
 	     (remaining-calls calls (rest remaining-calls)))
 	    ((null remaining-calls)
 	     res)
@@ -359,7 +357,8 @@
 		  ;; seem a better name than just "<unknown>".
 		  (component-name-from-functional-debug-name
 		   component-lambda)))
-	  (let ((res (dfo-scavenge-call-graph component-lambda new-component)))
+	  (let ((res (dfo-scavenge-dependency-graph component-lambda
+						    new-component)))
 	    (when (eq res new-component)
 	      (aver (not (position new-component (components))))
 	      (components new-component)
