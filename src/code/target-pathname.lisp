@@ -1399,6 +1399,7 @@ a host-structure or string."
 
 (defun unparse-logical-piece (thing)
   (etypecase thing
+    ((member :wild) "*")
     (simple-string thing)
     (pattern
      (collect ((strings))
