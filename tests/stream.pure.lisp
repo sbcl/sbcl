@@ -14,7 +14,7 @@
 (in-package :cl-user)
 
 ;;; Until sbcl-0.6.11.31, we didn't have an N-BIN method for
-;;; CONCATENATED-STRING, so stuff like this would fail.
+;;; CONCATENATED-STREAM, so stuff like this would fail.
 (let ((stream (make-concatenated-stream (make-string-input-stream "Demo")))
       (buffer (make-string 4)))
   (read-sequence buffer stream))
@@ -51,3 +51,13 @@
      (unless (= n-actually-read-1 n-to-read)
        (assert (< n-actually-read-1 n-to-read))
        (return)))))
+
+;;; Entomotomy PEEK-CHAR-WRONGLY-ECHOS-TO-ECHO-STREAM bug, fixed by
+;;; by MRD patch sbcl-devel 2002-11-02 merged ca. sbcl-0.7.9.32
+(assert (string=
+	 (with-output-to-string (out)
+	   (peek-char #\]
+		      (make-echo-stream  
+		       (make-string-input-stream "ab cd e df s]") out)))
+	 ;; (Before the fix, the result had a trailing #\] in it.)
+	 "ab cd e df s"))
