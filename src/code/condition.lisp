@@ -13,6 +13,24 @@
 
 (in-package "SB!KERNEL")
 
+;;;; miscellaneous support utilities
+
+;;; Signalling an error when trying to print an error condition is
+;;; generally a PITA, so whatever the failure encountered when
+;;; wondering about FILE-POSITION within a condition printer, 'tis
+;;; better silently to give up than to try to complain. 
+(defun file-position-or-nil-for-error (stream)
+  ;; Arguably FILE-POSITION shouldn't be signalling errors at all; but
+  ;; "NIL if this cannot be determined" in the ANSI spec doesn't seem
+  ;; absolutely unambiguously to prohibit errors when, e.g., STREAM
+  ;; has been closed so that FILE-POSITION is a nonsense question. So
+  ;; my (WHN) impression is that the conservative approach is to
+  ;; IGNORE-ERRORS. (I encountered this failure from within a homebrew
+  ;; defsystemish operation where the ERROR-STREAM had been CL:CLOSEd,
+  ;; I think by nonlocally exiting through a WITH-OPEN-FILE, by the
+  ;; time an error was reported.)
+  (ignore-errors (file-position stream)))
+
 ;;;; the CONDITION class
 
 (/show0 "condition.lisp 20")
@@ -689,7 +707,7 @@
   (:report
    (lambda (condition stream)
      (let* ((error-stream (stream-error-stream condition))
-	    (pos (file-position error-stream)))
+	    (pos (file-position-or-nil-for-error error-stream)))
        (let (lineno colno)
 	 (when (and pos
 		    (< pos sb!xc:array-dimension-limit)
@@ -707,13 +725,14 @@
 		    (file-position error-stream :start))
 	   (let ((string
 		  (make-string pos
-			       :element-type (stream-element-type error-stream))))
+			       :element-type (stream-element-type
+					      error-stream))))
 	     (when (= pos (read-sequence string error-stream))
 	       (setq lineno (1+ (count #\Newline string))
 		     colno (- pos
 			      (or (position #\Newline string :from-end t) -1)
 			      1))))
-	   (file-position error-stream pos))
+	   (file-position-or-nil-for-error error-stream pos))
 	 (format stream
 		 "READER-ERROR ~@[at ~W ~]~
                   ~@[(line ~W~]~@[, column ~W) ~]~
@@ -1075,7 +1094,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
    (lambda (condition stream)
      (let ((error-stream (stream-error-stream condition)))
        (format stream "READER-ERROR ~@[at ~W ~]on ~S:~%~?~%Original error: ~A"
-	       (file-position error-stream) error-stream
+	       (file-position-or-nil-for-error error-stream) error-stream
 	       (reader-error-format-control condition)
 	       (reader-error-format-arguments condition)
 	       (reader-impossible-number-error-error condition))))))
