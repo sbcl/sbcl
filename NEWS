@@ -1593,11 +1593,11 @@ changes in sbcl-0.7.14 relative to sbcl-0.7.13:
     binding of the symbol *XXX*" for &OPTIONAL arguments).  (reported
     by Antonio Martinez)
   * fixed SXHASH, giving different results for NIL depending on type
-    declarations (SYMBOL or LIST). (thanks to Gerd Moellmann)
+    declarations (SYMBOL or LIST).  (thanks to Gerd Moellmann)
   * fixed bug in DEFPARAMETER and DEFVAR: they could assign a lexical
-    variable. (found by Rolf Wester)
+    variable.  (found by Rolf Wester)
   * SBCL does not ignore type declarations for special
-    variables. (reported by rif on c.l.l 2003-03-05)
+    variables.  (reported by rif on c.l.l 2003-03-05)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** a bug in the CONS type specifier, whereby the CAR and CDR
        types got intertwined, has been fixed;
@@ -1606,7 +1606,7 @@ changes in sbcl-0.7.14 relative to sbcl-0.7.13:
     ** APPEND, [N]REVERSE and NRECONC check that those their
        arguments, which must be proper lists, are really so;
     ** An array specialized to be unable to hold elements has been
-       implemented (as required -- yes, really) by ANSI;
+       implemented, as required -- yes, really -- by ANSI;
     ** GETF and GET-PROPERTIES throw a TYPE-ERROR, not a SIMPLE-ERROR,
        on malformed property lists;
 

@@ -54,7 +54,7 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	EOF
 
 echo //testing for consistency of first and second GENESIS passes
-if diff -qr src/runtime/genesis output/genesis-2; then
+if diff -r src/runtime/genesis output/genesis-2; then
     echo //header files match between first and second GENESIS -- good
 else
     echo error: header files do not match between first and second GENESIS
