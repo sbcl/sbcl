@@ -1028,7 +1028,8 @@
 ;;;    <external-symbols>
 ;;;    <imported-internal-symbols>
 ;;;    <imported-external-symbols>
-;;;    <shadowing-symbols>)
+;;;    <shadowing-symbols>
+;;;    <package-documentation>)
 ;;;
 ;;; KLUDGE: It would be nice to implement the sublists as instances of
 ;;; a DEFSTRUCT (:TYPE LIST). (They'd still be lists, but at least we'd be
@@ -1271,6 +1272,7 @@
       (let* ((cold-package (car cold-package-symbols-entry))
 	     (symbols (cdr cold-package-symbols-entry))
 	     (shadows (package-shadowing-symbols cold-package))
+	     (documentation (string-to-core (documentation cold-package t)))
 	     (internal *nil-descriptor*)
 	     (external *nil-descriptor*)
 	     (imported-internal *nil-descriptor*)
@@ -1317,6 +1319,7 @@
 			       (cold-push handle imported-external)
 			       (cold-push handle external)))))))
 	(let ((r *nil-descriptor*))
+	  (cold-push documentation r)
 	  (cold-push shadowing r)
 	  (cold-push imported-external r)
 	  (cold-push imported-internal r)

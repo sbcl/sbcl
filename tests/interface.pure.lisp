@@ -41,3 +41,6 @@
 (subtypep 'fixnum 'integer nil)
 (upgraded-array-element-type '(mod 5) nil)
 (upgraded-complex-part-type '(single-float 0.0 1.0) nil)
+
+;;; We should have documentation for our extension package:
+(assert (documentation (find-package "SB-EXT") t))

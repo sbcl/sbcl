@@ -633,8 +633,7 @@
   (cond ((symbolp fun-name)
 	 fun-name)
 	((and (consp fun-name)
-	      (= (length fun-name) 2)
-	      (eq (first fun-name) 'setf))
+	      (legal-fun-name-p fun-name))
 	 (second fun-name))
 	(t
 	 (error "not legal as a function name: ~S" fun-name))))

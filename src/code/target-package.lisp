@@ -938,7 +938,9 @@
 	(add-symbol external symbol))
 
       ;; Put shadowing symbols in the shadowing symbols list.
-      (setf (package-%shadowing-symbols pkg) (sixth spec))))
+      (setf (package-%shadowing-symbols pkg) (sixth spec))
+      ;; Set the package documentation
+      (setf (package-doc-string pkg) (seventh spec))))
 
   ;; FIXME: These assignments are also done at toplevel in
   ;; boot-extensions.lisp. They should probably only be done once.
