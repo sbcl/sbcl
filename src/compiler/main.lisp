@@ -648,24 +648,26 @@
 ;;;; Source-Info structure. The bookkeeping is done as a side-effect
 ;;;; of getting the next source form.
 
-;;; The File-Info structure holds all the source information for a
+;;; A FILE-INFO structure holds all the source information for a
 ;;; given file.
 (defstruct file-info
-  ;; If a file, the truename of the corresponding source file. If from a Lisp
-  ;; form, :LISP, if from a stream, :STREAM.
+  ;; If a file, the truename of the corresponding source file. If from
+  ;; a Lisp form, :LISP. If from a stream, :STREAM.
   (name (required-argument) :type (or pathname (member :lisp :stream)))
-  ;; The defaulted, but not necessarily absolute file name (i.e. prior to
-  ;; TRUENAME call.)  Null if not a file. This is used to set
-  ;; *COMPILE-FILE-PATHNAME*, and if absolute, is dumped in the debug-info.
+  ;; the defaulted, but not necessarily absolute file name (i.e. prior
+  ;; to TRUENAME call.) Null if not a file. This is used to set
+  ;; *COMPILE-FILE-PATHNAME*, and if absolute, is dumped in the
+  ;; debug-info.
   (untruename nil :type (or pathname null))
-  ;; The file's write date (if relevant.)
+  ;; the file's write date (if relevant)
   (write-date nil :type (or unsigned-byte null))
-  ;; The source path root number of the first form in this file (i.e. the
-  ;; total number of forms converted previously in this compilation.)
+  ;; the source path root number of the first form in this file (i.e.
+  ;; the total number of forms converted previously in this
+  ;; compilation)
   (source-root 0 :type unsigned-byte)
-  ;; Parallel vectors containing the forms read out of the file and the file
-  ;; positions that reading of each form started at (i.e. the end of the
-  ;; previous form.)
+  ;; parallel vectors containing the forms read out of the file and
+  ;; the file positions that reading of each form started at (i.e. the
+  ;; end of the previous form)
   (forms (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t))
   (positions (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t)))
 
@@ -1545,10 +1547,11 @@
 ;;; default to the appropriate implementation-defined default type for
 ;;; compiled files.
 (defun cfp-output-file-default (input-file)
-  (let* ((output-type (make-pathname :type *backend-fasl-file-type*))
-	 (merge1 (merge-pathnames output-type input-file))
-	 (merge2 (merge-pathnames merge1 *default-pathname-defaults*)))
-    merge2))
+  (let* ((defaults (merge-pathnames input-file
+				    *default-pathname-defaults*))
+	 (retyped (make-pathname :type *backend-fasl-file-type*
+				 :defaults defaults)))
+    retyped))
 	
 ;;; KLUDGE: Part of the ANSI spec for this seems contradictory:
 ;;;   If INPUT-FILE is a logical pathname and OUTPUT-FILE is unsupplied,

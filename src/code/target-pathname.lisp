@@ -593,8 +593,7 @@ a host-structure or string."
 
 ;;; Handle the case where PARSE-NAMESTRING is actually parsing a
 ;;; namestring. We pick off the :JUNK-ALLOWED case then find a host to
-;;; use for parsing, call the parser, then check whether the host
-;;; matches.
+;;; use for parsing, call the parser, then check whether the host matches.
 (defun %parse-namestring (namestr host defaults start end junk-allowed)
   (declare (type (or host null) host)
 	   (type string namestr)
@@ -642,7 +641,7 @@ a host-structure or string."
 			 (defaults *default-pathname-defaults*)
 			 &key (start 0) end junk-allowed)
   (declare (type pathname-designator thing)
-	   (type (or null host string list (member :unspecific)) host)
+	   (type (or list host string (member :unspecific)) host)
 	   (type pathname defaults)
 	   (type index start)
 	   (type (or index null) end)
@@ -685,10 +684,18 @@ a host-structure or string."
 		       ;; implementation-defined behavior. We
 		       ;; just turn it into NIL.
 		       nil)
+		      (list
+		       ;; ANSI also allows LISTs to designate hosts,
+		       ;; but leaves its interpretation
+		       ;; implementation-defined. Our interpretation
+		       ;; is that it's unsupported.:-|
+		       (error "A LIST representing a pathname host is not ~
+                              supported in this implementation:~%  ~S"
+			      host))
 		      (host
 		       host))))
     (declare (type (or null host) found-host))
-    (typecase thing
+    (etypecase thing
       (simple-string
        (%parse-namestring thing found-host defaults start end junk-allowed))
       (string
@@ -707,7 +714,7 @@ a host-structure or string."
 	 (unless name
 	   (error "can't figure out the file associated with stream:~%  ~S"
 		  thing))
-	 name)))))
+	 (values name nil))))))
 
 (defun namestring (pathname)
   #!+sb-doc
@@ -1502,22 +1509,18 @@ a host-structure or string."
 ;;;; logical pathname translations
 
 ;;; Verify that the list of translations consists of lists and prepare
-;;; canonical translations (parse pathnames and expand out wildcards into
-;;; patterns).
-(defun canonicalize-logical-pathname-translations (transl-list host)
-  (declare (type list transl-list) (type host host)
+;;; canonical translations. (Parse pathnames and expand out wildcards
+;;; into patterns.)
+(defun canonicalize-logical-pathname-translations (translation-list host)
+  (declare (type list translation-list) (type host host)
 	   (values list))
-  (collect ((res))
-    (dolist (tr transl-list)
-      (unless (and (consp tr) (= (length tr) 2))
-	(error "This logical pathname translation is not a two-list:~%  ~S"
-	       tr))
-      (let ((from (first tr)))
-	(res (list (if (typep from 'logical-pathname)
-		       from
-		       (parse-namestring from host))
-		   (pathname (second tr))))))
-    (res)))
+  (mapcar (lambda (translation)
+	    (destructuring-bind (from to) translation
+	      (list (if (typep from 'logical-pathname)
+			from
+			(parse-namestring from host))
+		    (pathname to)))) 
+	  translation-list))
 
 (defun logical-pathname-translations (host)
   #!+sb-doc
@@ -1533,7 +1536,6 @@ a host-structure or string."
   (declare (type (or string logical-host) host)
 	   (type list translations)
 	   (values list))
-
   (let ((host (intern-logical-host host)))
     (setf (logical-host-canon-transls host)
 	  (canonicalize-logical-pathname-translations translations host))

@@ -120,9 +120,11 @@
 ;;; a thing legal in places where we want the name of a file
 (sb!xc:deftype filename () '(or string pathname))
 
-;;; a legal arg to pathname functions
+;;; legal args to pathname functions
 (sb!xc:deftype pathname-designator ()
   '(or string pathname stream))
+(sb!xc:deftype logical-host-designator ()
+  '(or host string))
 
 ;;; a thing returned by the irrational functions. We assume that they
 ;;; never compute a rational result.

@@ -177,35 +177,6 @@ WORKAROUND:
   The ANSI spec says that CONS can be a compound type spec, e.g.
   (CONS FIXNUM REAL). SBCL doesn't support this.
 
-17:
-  from Paolo Amoroso on the CMU CL mailing list 27 Feb 2000:
-I use CMU CL 18b under Linux. When COMPILE-FILE is supplied a physical
-pathname, the type of the corresponding compiled file is X86F:
-	* (compile-file "/home/paolo/lisp/tools/foo")
-	Python version 1.0, VM version Intel x86 on 27 FEB 0 06:00:46 pm.
-	Compiling: /home/paolo/lisp/tools/foo.lisp 27 FEB 0 05:57:42 pm
-	Converted SQUARE.
-	Compiling DEFUN SQUARE:
-	Byte Compiling Top-Level Form:
-	/home/paolo/lisp/tools/foo.x86f written.
-	Compilation finished in 0:00:00.
-	#p"/home/paolo/lisp/tools/foo.x86f"
-	NIL
-	NIL
-But when the function is called with a logical pathname, the file type
-becomes FASL:
-	* (compile-file "tools:foo")
-	Python version 1.0, VM version Intel x86 on 27 FEB 0 06:01:04 pm.
-	Compiling: /home/paolo/lisp/tools/foo.lisp 27 FEB 0 05:57:42 pm
-	Converted SQUARE.
-	Compiling DEFUN SQUARE:
-	Byte Compiling Top-Level Form:
-	TOOLS:FOO.FASL written.
-	Compilation finished in 0:00:00.
-	#p"/home/paolo/lisp/tools/foo.fasl"
-	NIL
-	NIL
-
 18:
   from DTC on the CMU CL mailing list 25 Feb 2000:
 ;;; Compiler fails when this file is compiled.
@@ -905,6 +876,12 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
        The assertion (EQ (SB-C::LAMBDA-TAIL-SET SB-C::CALLER)
                          (SB-C::LAMBDA-TAIL-SET
                           (SB-C::LAMBDA-HOME SB-C::CALLEE))) failed.
+
+71: 
+  (DECLAIM (OPTIMIZE ..)) doesn't work. E.g. even after 
+  (DECLAIM (OPTIMIZE (SPEED 3))), things are still optimized with
+  the previous SPEED policy. This bug will probably get fixed in
+  0.6.9.x in a general cleanup of optimization policy.
 
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER

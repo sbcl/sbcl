@@ -1,31 +1,41 @@
 #!/bin/sh
 
-# FIXME: MNA wrote the tests below to work with the new
-# lp-test-file.lisp file in place. It'd be good to replace them either
-# with code which uses an existing distribution file instead, or with
-# code which creates a new file in $TMPDIR and uses that. Meanwhile,
-# we just return success immediately instead of doing anything.
-exit 104
+# LOADing and COMPILEing files with logical pathnames
+testdir=`pwd`"/side-effectful-pathnames-test-$$"
+testfilestem="load-test"
+StudlyCapsStem="Load-Test"
+testfilename="$testdir/$testfilestem.lisp"
+mkdir $testdir
+cat >$testfilename <<EOF
+  (in-package :cl-user)
+  (defparameter *loaded* :yes)
+EOF
+sbcl --noinform --noprint --sysinit /dev/null --userinit /dev/null <<EOF
+  (in-package :cl-user)
+  (setf (logical-pathname-translations "TEST")
+        (list (list "**;*.*.*" "$testdir/**/*.*")))
+  (format t "/translations=~S~%" (logical-pathname-translations "TEST"))
+  (let* ((untranslated "test:$StudlyCapsStem.lisp")
+         (ignore-me (format t "untranslated=~S~%" untranslated))
+         (translation (namestring (translate-logical-pathname untranslated)))
+         (expected-translation "$testdir/$testfilestem.lisp"))
+    (format t "translation=~S~%" translation)
+    (format t "expected-translation=~S~%" expected-translation)
+    (assert (string= translation expected-translation)))
+  (load "TEST:$StudlyCapsStem")
+  (assert (eq *loaded* :yes))
+  (let ((compiled-file-name (namestring (compile-file "TEST:$StudlyCapsStem")))
+        (expected-file-name "$testdir/$testfilestem.x86f"))
+    (format t "compiled-file-name=~S~%" compiled-file-name)
+    (format t "expected-file-name=~S~%" expected-file-name)
+    (assert (string= compiled-file-name expected-file-name)))
+  (sb-ext:quit :unix-status 52)
+EOF
+if [ $? ~= 52 ]; then
+    echo test failed: $?
+    exit 1
+fi
+rm -r $testdir
 
-;;; loading files w/ logical pathnames
-(setf (logical-pathname-translations "TEST")
-        '(("**;*.*.*"
-           #.(concatenate 'string
-              (namestring (sb-int:default-directory))
-              "**/*.*"))
-          ("**;*.*.*"
-           #.(concatenate 'string
-              (namestring (sb-int:default-directory))
-              "**/*.*.*"))))
-(assert (equal (namestring (translate-logical-pathname
-                            "test:lp-test-file.lisp"))
-               #.(concatenate 'string
-                              (namestring (sb-int:default-directory))
-                              "lp-test-file.lisp")))
-(load "TEST:LP-TEST-FILE")
-(let ((compiled-file-name (namestring (compile-file "TEST:LP-TEST-FILE")))
-      (should-be-file-name
-        #.(concatenate 'string
-                       (namestring (sb-int:default-directory))
-                       "lp-test-file.x86f")))
-  (assert (equal compiled-file-name should-be-file-name)))
+# success
+exit 104

@@ -1028,21 +1028,17 @@
   pathname
   (flushable))
 
-;;; FIXME: What about logical pathname stuff?
-;;;   LOGICAL-PATHNAME
-;;;   TRANSLATE-LOGICAL-PATHNAME
-;;;   LOAD-LOGICAL-PATHNAME-TRANSLATIONS
-;;;   LOGICAL-PATHNAME-TRANSLATIONS
+(defknown logical-pathname (pathname-designator) logical-pathname ())
+(defknown translate-logical-pathname (pathname-designator &key) pathname ())
+(defknown load-logical-pathname-translations (string) t ())
+(defknown logical-pathname-translations (logical-host-designator) list ())
 
 (defknown pathname (pathname-designator) pathname (flushable))
 (defknown truename (pathname-designator) pathname ())
 
 (defknown parse-namestring
   (pathname-designator &optional
-		       ;; ANSI also allows LIST here, but leaves its
-		       ;; interpretation implementation-defined. Our
-		       ;; interpretation is that it's unsupported.:-|
-                       (or pathname-host string (member :unspecific))
+                       (or list host string (member :unspecific))
                        pathname-designator
 		       &key
 		       (:start index)
