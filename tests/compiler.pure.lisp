@@ -1598,3 +1598,10 @@
 		   (compilation-speed 0) (speed 1)))
 	(if (logbitp 0 (ash (1- a) (min 11 a))) 0 0)))
    805)))
+
+;;; bug #302
+(assert (compile
+         nil
+         '(lambda (s ei x y)
+           (declare (type (simple-array function (2)) s) (type ei ei))
+           (funcall (aref s ei) x y))))

@@ -283,12 +283,35 @@
 		       (primitive-type type)
 		     (unless ptype-exact (setq exact nil))
 		     (unless (eq ptype res)
-		       (let ((new-ptype
-			      (or (maybe-numeric-type-union res ptype)
+		       (let ((new-ptype 
+                              (or (maybe-numeric-type-union res ptype)
 				  (maybe-numeric-type-union ptype res))))
 			 (if new-ptype
 			     (setq res new-ptype)
 			     (return (any)))))))))))
+        (intersection-type
+         (let ((types (intersection-type-types type))
+               (res (any))
+               (exact nil))
+           (dolist (type types (values res exact))
+             (when (eq type (specifier-type 'function))
+               ;; KLUDGE: Deal with (and function instance), both of which
+               ;; have an exact primitive type.
+               (return (part-of function)))
+             (multiple-value-bind (ptype ptype-exact)
+                   (primitive-type type)
+                 (when ptype-exact
+                   ;; Apart from the previous kludge exact primitive
+                   ;; types should match, if indeed there are any. It
+                   ;; may be that this assumption isn't really safe,
+                   ;; but at least we'll see what breaks. -- NS 20041104
+                   (aver (or (not exact) (eq ptype res)))
+                   (setq exact t))
+                 (when (or ptype-exact (and (not exact) (eq res (any))))
+                   ;; Try to find a narrower representation then
+                   ;; (any). Takes care of undecidable types in
+                   ;; intersections with decidable ones.
+                   (setq res ptype))))))
 	(member-type
 	 (let* ((members (member-type-members type))
 		(res (primitive-type-of (first members))))
@@ -311,26 +334,26 @@
                    (= (cdar pairs) (1- sb!xc:char-code-limit)))
               (exactly character)
               (part-of character))))
-	(built-in-classoid
-	 (case (classoid-name type)
-	   ((complex function instance
-	     system-area-pointer weak-pointer)
-	    (values (primitive-type-or-lose (classoid-name type)) t))
-	   (funcallable-instance
-	    (part-of function))
-	   (cons-type
-	    (part-of list))
-	   (t
-	    (any))))
-	(fun-type
-	 (exactly function))
-	(classoid
-	 (if (csubtypep type (specifier-type 'function))
-	     (part-of function)
-	     (part-of instance)))
-	(ctype
-         (if (csubtypep type (specifier-type 'function))
-	     (part-of function)
-             (any)))))))
+       (built-in-classoid
+        (case (classoid-name type)
+          ((complex function instance
+                    system-area-pointer weak-pointer)
+           (values (primitive-type-or-lose (classoid-name type)) t))
+          (funcallable-instance
+           (part-of function))
+          (cons-type
+           (part-of list))
+          (t
+           (any))))
+       (fun-type
+        (exactly function))
+       (classoid
+        (if (csubtypep type (specifier-type 'function))
+            (part-of function)
+            (part-of instance)))
+       (ctype
+        (if (csubtypep type (specifier-type 'function))
+            (part-of function)
+            (any)))))))
 
 (/show0 "primtype.lisp end of file")
