@@ -1321,6 +1321,26 @@ WORKAROUND:
   (localy (declare (optimize (safety 3)))
           (ignore-errors (progn (values-list (car (list '(1 . 2)))) t)))
 
+ 226: "AVER failure in COMPILE-FILE of clocc-ansi-test/tests.lisp"
+  (APD points out that this seems to be another symptom of bug #115.)
+  sbcl-0.7.9.43 dies with failed AVER "(EQ (TN-PHYSENV TN) TN-ENV)" when
+  trying to compile clocc-ansi-test/tests.lisp. sbcl-0.7.9.31 was able to
+  to compile it. A smaller test case exhibiting the same problem is
+   (declaim (optimize (speed 0) (safety 3) (debug 3)))
+   (defun c-a-p ()
+     (flet ((safe-format (stream string &rest r)
+              (unless (ignore-errors (progn
+                                       (apply #'format stream string r)
+                                       t))
+	        (format stream "~&foo ~S" string))))
+       (cond
+        ((eq my-result :ERROR)
+         (cond
+          ((ignore-errors (typep condition result))
+           (safe-format t "~&bar ~S" result))
+          (t
+           (safe-format t "~&baz ~S (~A) ~S" condition condition result)))))))
+
 227: "compiler bewilderment with adjustable vectors and COPY-SEQ"
   In sbcl-0.7.9.54 on x86,
     (let ((v (make-array 0 :fill-pointer 0)))
