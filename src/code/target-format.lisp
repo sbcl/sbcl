@@ -265,7 +265,7 @@
 			     (t commaed))))
 	  ;; colinc = 1, minpad = 0, padleft = t
 	  (format-write-field stream signed mincol 1 0 padchar t))
-	(princ number))))
+	(princ number stream))))
 
 (defun format-add-commas (string commachar commainterval)
   (let ((length (length string)))

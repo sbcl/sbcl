@@ -39,5 +39,8 @@
       do
       (assert (string= "#*101" (format nil "~S" #*101))))
 
+;;; bug in sbcl-0.7.1.25, reported by DB sbcl-devel 2002-02-25
+(assert (string= "0.5" (format nil "~2D" 0.5)))
+
 ;;; success
 (quit :unix-status 104)
