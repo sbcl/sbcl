@@ -178,7 +178,6 @@
 (sb!xc:deftype package-designator () '(or stringable sb!xc:package))
 (sb!xc:deftype symbols () '(or list symbol))
 
-;;; Should allow a package name, I think, tho CLtL II doesn't say so...
 (defknown gentemp (&optional string package-designator) symbol)
 
 (defknown make-package (stringable &key

@@ -114,7 +114,9 @@
 	       (compiler-error "found garbage in lambda list when expecting ~
 				a keyword: ~S"
 			       arg)))))
-
+      (when (eq state :rest)
+	(compiler-error "&REST without rest variable"))
+      
       (values (required) (optional) restp rest keyp (keys) allowp (aux)
 	      morep more-context more-count))))
 

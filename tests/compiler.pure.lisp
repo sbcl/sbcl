@@ -136,3 +136,7 @@
 ;;; confusion in the assault on 0.7.0, so this expression used to
 ;;; signal TYPE-ERROR when it found NIL instead of a DEBUG-SOURCE.
 (eval '(function-lambda-expression #'(lambda (x) x)))
+
+;;; bug caught and fixed by Raymond Toy cmucl-imp 2002-07-10: &REST
+;;; variable is not optional.
+(assert (null (ignore-errors (eval '(funcall (lambda (&rest) 12))))))
