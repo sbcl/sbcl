@@ -25,6 +25,10 @@
 (eval-when (:compile-toplevel :execute)
   (def!macro define-internal-errors (&rest errors)
 	     (let ((info (mapcar (lambda (x)
+                                   ;; FIXME: We shouldn't need placeholder
+                                   ;; NIL entries any more now that we
+                                   ;; pass our magic numbers cleanly
+                                   ;; through sbcl.h.
 				   (if x
 				       (cons (symbolicate (first x) "-ERROR")
 					     (second x))
@@ -83,21 +87,16 @@
    "Object is not of type CONS.")
   (object-not-symbol
    "Object is not of type SYMBOL.")
-  (undefined-symbol
+  (undefined-fun
    ;; FIXME: Isn't this used for calls to unbound (SETF FOO) too? If so, revise
    ;; the name.
    "An attempt was made to use an undefined FDEFINITION.")
-  (object-not-coerceable-to-fun
-   "Object is not coerceable to type FUNCTION.")
   (invalid-arg-count
    "invalid argument count")
   (bogus-arg-to-values-list
    "bogus argument to VALUES-LIST")
   (unbound-symbol
    "An attempt was made to use an undefined SYMBOL-VALUE.")
-  ;; FIXME: We shouldn't need these placeholder NIL entries any more
-  ;; now that we pass our magic numbers cleanly through sbcl.h.
-  nil 
   (object-not-sap
    "Object is not a System Area Pointer (SAP).")
   (invalid-unwind
@@ -112,8 +111,6 @@
    "odd number of &KEY arguments")
   (unknown-key-arg
    "unknown &KEY argument")
-  nil
-  nil
   (invalid-array-index
    "invalid array index")
   (wrong-number-of-indices

@@ -262,11 +262,7 @@ GNAME(undefined_tramp):
 	int3
 	.byte	trap_Error
         .byte   2
-#ifdef LONG_FLOAT_WIDETAG
-        .byte   24
-#else
-        .byte   23
-#endif
+        .byte   UNDEFINED_FUN_ERROR
         .byte   sc_DescriptorReg # eax in the Descriptor-reg SC
 	ret
 	.size	GNAME(undefined_tramp), .-GNAME(undefined_tramp)

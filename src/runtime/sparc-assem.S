@@ -216,11 +216,7 @@ undefined_tramp = . + 1
 	b	1f
         unimp   trap_Cerror
 	.byte	4
-#ifdef type_LongFloat
-        .byte   24
-#else
-	.byte	23
-#endif
+        .byte   UNDEFINED_FUN_ERROR
 	.byte	254, sc_DescriptorReg, 3
 	.align	4
 1:

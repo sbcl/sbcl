@@ -173,16 +173,11 @@
 	 :datum object
 	 :expected-type 'symbol))
 
-(deferr undefined-symbol-error (fdefn-or-symbol)
+(deferr undefined-fun-error (fdefn-or-symbol)
   (error 'undefined-function
 	 :name (etypecase fdefn-or-symbol
 		 (symbol fdefn-or-symbol)
 		 (fdefn (fdefn-name fdefn-or-symbol)))))
-
-(deferr object-not-coerceable-to-fun-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type 'coerceable-to-fun))
 
 (deferr invalid-arg-count-error (nargs)
   (error 'simple-program-error

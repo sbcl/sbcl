@@ -139,10 +139,7 @@
   (:generator 10
     (loadw value object fdefn-fun-slot other-pointer-lowtag)
     (inst cmp value nil-value)
-    ;; FIXME: UNDEFINED-SYMBOL-ERROR seems to actually be for symbols with no
-    ;; function value, not, as the name might suggest, symbols with no ordinary
-    ;; value. Perhaps the name could be made more mnemonic?
-    (let ((err-lab (generate-error-code vop undefined-symbol-error object)))
+    (let ((err-lab (generate-error-code vop undefined-fun-error object)))
       (inst jmp :e err-lab))))
 
 (define-vop (set-fdefn-fun)

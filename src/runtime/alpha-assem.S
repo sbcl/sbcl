@@ -260,7 +260,7 @@ undefined_tramp_offset:
 	call_pal PAL_bugchk
 	.long    trap_Error
         .byte    4                         /* what are these numbers? */
-        .byte    23
+        .byte    UNDEFINED_FUN_ERROR
         .byte    254
         .byte    (0xe0 + sc_DescriptorReg)
         .byte    2

@@ -104,7 +104,7 @@
   (:generator 10
     (move object obj-temp)
     (loadw value obj-temp fdefn-fun-slot other-pointer-lowtag)
-    (let ((err-lab (generate-error-code vop undefined-symbol-error obj-temp)))
+    (let ((err-lab (generate-error-code vop undefined-fun-error obj-temp)))
       (inst cmpeq value null-tn temp)
       (inst bne temp err-lab))))
 

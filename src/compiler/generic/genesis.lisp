@@ -2642,12 +2642,16 @@
 	  (format t " /* 0x~X */~@[  /* ~A */~]~%" value doc))))
     (terpri))
 
-  ;; writing codes/strings for internal errors
-  (format t "#define ERRORS { \\~%")
+  ;; writing information about internal errors
   (let ((internal-errors sb!c:*backend-internal-errors*))
     (dotimes (i (length internal-errors))
-      (format t "    ~S, /*~D*/ \\~%" (cdr (aref internal-errors i)) i)))
-  (format t "    NULL \\~%}~%")
+      (let ((current-error (aref internal-errors i)))
+        ;; FIXME: this UNLESS should go away (see also FIXME in
+        ;; interr.lisp) -- APD, 2002-03-05
+        (unless (eq nil (car current-error))
+          (format t "#define ~A ~D~%"
+                  (substitute #\_ #\- (symbol-name (car current-error)))
+                  i)))))
   (terpri)
 
   ;; writing primitive object layouts

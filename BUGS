@@ -1275,12 +1275,6 @@ WORKAROUND:
   Instead, in sbcl-0.7.1.17 it returns
     #<FUNCTION "top level local call SB!IMPL::DISPATCH-CHAR-ERROR">
 
-152:
-  Undefined functions are supposed to be reported as UNDEFINED-FUNCTION
-  conditions, inheriting from CELL-ERROR. Instead sbcl-0.7.1.19 reports
-  them as TYPE-ERRORs (reporting the problem as something not being
-  coerceable to a function).
-
 153:
   (essentially the same problem as a CMU CL bug reported by Martin
   Cracauer on cmucl-imp 2002-02-19)
