@@ -675,3 +675,18 @@
                    (wum #'bbfn "hc3" (list)))
                  r3533)))
 (compile nil '(lambda () (flet ((%f () (unwind-protect nil))) nil)))
+
+;;; the strength reduction of constant multiplication used (before
+;;; sbcl-0.8.4.x) to lie to the compiler.  This meant that, under
+;;; certain circumstances, the compiler would derive that a perfectly
+;;; reasonable multiplication never returned, causing chaos.  Fixed by
+;;; explicitly doing modular arithmetic, and relying on the backends
+;;; being smart.
+(assert (= (funcall 
+	    (compile nil 
+		     '(lambda (x)
+			(declare (type (integer 178956970 178956970) x)
+				 (optimize speed)) 
+			(* x 24)))
+	    178956970)
+	   4294967280))

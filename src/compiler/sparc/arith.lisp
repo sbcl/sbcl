@@ -387,7 +387,7 @@
 (define-vop (fast-ash/signed=>signed)
   (:note "inline ASH")
   (:args (number :scs (signed-reg) :to :save)
-	 (amount :scs (signed-reg immediate) :to :save))
+	 (amount :scs (signed-reg) :to :save))
   (:arg-types signed-num signed-num)
   (:results (result :scs (signed-reg)))
   (:result-types signed-num)
@@ -395,32 +395,43 @@
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) ndesc)
   (:generator 5
-    (sc-case amount
-      (signed-reg
-       (let ((done (gen-label)))
-	 (inst cmp amount)
-	 (inst b :ge done)
-	 ;; The result-type assures us that this shift will not
-	 ;; overflow.
-	 (inst sll result number amount)
-	 (inst neg ndesc amount)
-	 (inst cmp ndesc 31)
-	 (if (member :sparc-v9 *backend-subfeatures*)
-	     (progn
-	       (inst cmove :ge ndesc 31)
-	       (inst sra result number ndesc))
-	     (progn
-	       (inst b :le done)
-	       (inst sra result number ndesc)
-	       (inst sra result number 31)))
-	 (emit-label done)))
-      (immediate
-       (bug "IMMEDIATE case in ASH VOP; should have been transformed")))))
+    (let ((done (gen-label)))
+      (inst cmp amount)
+      (inst b :ge done)
+      ;; The result-type assures us that this shift will not
+      ;; overflow.
+      (inst sll result number amount)
+      (inst neg ndesc amount)
+      (inst cmp ndesc 31)
+      (if (member :sparc-v9 *backend-subfeatures*)
+	  (progn
+	    (inst cmove :ge ndesc 31)
+	    (inst sra result number ndesc))
+	  (progn
+	    (inst b :le done)
+	    (inst sra result number ndesc)
+	    (inst sra result number 31)))
+      (emit-label done))))
+
+(define-vop (fast-ash-c/signed=>signed)
+  (:note "inline constant ASH")
+  (:args (number :scs (signed-reg)))
+  (:info count)
+  (:arg-types signed-num (:constant integer))
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
+  (:translate ash)
+  (:policy :fast-safe)
+  (:generator 4
+    (cond
+      ((< count 0) (inst sra result number (min (- count) 31)))
+      ((> count 0) (inst sll result number (min count 31)))
+      (t (bug "identity ASH not transformed away")))))
 
 (define-vop (fast-ash/unsigned=>unsigned)
   (:note "inline ASH")
   (:args (number :scs (unsigned-reg) :to :save)
-	 (amount :scs (signed-reg immediate) :to :save))
+	 (amount :scs (signed-reg) :to :save))
   (:arg-types unsigned-num signed-num)
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
@@ -428,27 +439,39 @@
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) ndesc)
   (:generator 5
-    (sc-case amount
-      (signed-reg
-       (let ((done (gen-label)))
-	 (inst cmp amount)
-	 (inst b :ge done)
-	 ;; The result-type assures us that this shift will not
-	 ;; overflow.
-	 (inst sll result number amount)
-	 (inst neg ndesc amount)
-	 (inst cmp ndesc 32)
-	 (if (member :sparc-v9 *backend-subfeatures*)
-	     (progn
-	       (inst srl result number ndesc)
-	       (inst cmove :ge result zero-tn))
-	     (progn
-	       (inst b :lt done)
-	       (inst srl result number ndesc)
-	       (move result zero-tn)))
-	 (emit-label done)))
-      (immediate
-       (bug "IMMEDIATE case in ASH VOP; should have been transformed")))))
+    (let ((done (gen-label)))
+      (inst cmp amount)
+      (inst b :ge done)
+      ;; The result-type assures us that this shift will not
+      ;; overflow.
+      (inst sll result number amount)
+      (inst neg ndesc amount)
+      (inst cmp ndesc 32)
+      (if (member :sparc-v9 *backend-subfeatures*)
+	  (progn
+	    (inst srl result number ndesc)
+	    (inst cmove :ge result zero-tn))
+	  (progn
+	    (inst b :lt done)
+	    (inst srl result number ndesc)
+	    (move result zero-tn)))
+      (emit-label done))))
+
+(define-vop (fast-ash-c/unsigned=>unsigned)
+  (:note "inline constant ASH")
+  (:args (number :scs (unsigned-reg)))
+  (:info count)
+  (:arg-types unsigned-num (:constant integer))
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:translate ash)
+  (:policy :fast-safe)
+  (:generator 4
+    (cond
+      ((< count -31) (move result zero-tn))
+      ((< count 0) (inst srl result number (min (- count) 31)))
+      ((> count 0) (inst sll result number (min count 31)))
+      (t (bug "identity ASH not transformed away")))))
 
 ;; Some special cases where we know we want a left shift.  Just do the
 ;; shift, instead of checking for the sign of the shift.
@@ -472,69 +495,11 @@
 	    (inst sll result number amount))
 	   (immediate
 	    (let ((amount (tn-value amount)))
-	      (assert (>= amount 0))
+	      (aver (>= amount 0))
 	      (inst sll result number amount))))))))
   (frob fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
   (frob fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)
   (frob fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
-
-(defknown ash-right-signed ((signed-byte #.sb!vm:n-word-bits)
-			    (and fixnum unsigned-byte))
-  (signed-byte #.sb!vm:n-word-bits)
-  (movable foldable flushable))
-
-(defknown ash-right-unsigned ((unsigned-byte #.sb!vm:n-word-bits)
-			      (and fixnum unsigned-byte))
-  (unsigned-byte #.sb!vm:n-word-bits)
-  (movable foldable flushable))
-
-;; Some special cases where we want a right shift.  Just do the shift.
-;; (Needs appropriate deftransforms to call these, though.)
-
-(macrolet
-    ((frob (trans name sc-type type shift-inst cost)
-       `(define-vop (,name)
-	 (:note "inline right ASH")
-	 (:translate ,trans)
-	 (:args (number :scs (,sc-type))
-	        (amount :scs (signed-reg unsigned-reg immediate)))
-	 (:arg-types ,type positive-fixnum)
-	 (:results (result :scs (,sc-type)))
-	 (:result-types ,type)
-	 (:policy :fast-safe)
-	 (:generator ,cost
-	    (sc-case amount
-	     ((signed-reg unsigned-reg)
-		(inst ,shift-inst result number amount))
-	     (immediate
-	      (let ((amt (tn-value amount)))
-		(inst ,shift-inst result number amt))))))))
-  (frob ash-right-signed fast-ash-right/signed=>signed
-	signed-reg signed-num sra 3)
-  (frob ash-right-unsigned fast-ash-right/unsigned=>unsigned
-	unsigned-reg unsigned-num srl 3))
-
-(define-vop (fast-ash-right/fixnum=>fixnum)
-    (:note "inline right ASH")
-  (:translate ash-right-signed)
-  (:args (number :scs (any-reg))
-	 (amount :scs (signed-reg unsigned-reg immediate)))
-  (:arg-types tagged-num positive-fixnum)
-  (:results (result :scs (any-reg)))
-  (:result-types tagged-num)
-  (:temporary (:sc non-descriptor-reg :target result) temp)
-  (:policy :fast-safe)
-  (:generator 2
-    ;; Shift the fixnum right by the desired amount.  Then zap out the
-    ;; 2 LSBs to make it a fixnum again.  (Those bits are junk.)
-    (sc-case amount
-      ((signed-reg unsigned-reg)
-       (inst sra temp number amount))
-      (immediate
-       (inst sra temp number (tn-value amount))))
-    (inst andn result temp fixnum-tag-mask)))
-    
-
 
 
 (define-vop (signed-byte-32-len)
@@ -691,7 +656,7 @@
     ((define-modular-backend (fun &optional constantp)
        (let ((mfun-name (symbolicate fun '-mod32))
              (modvop (symbolicate 'fast- fun '-mod32/unsigned=>unsigned))
-             (modcvop (symbolicate 'fast- fun 'mod32-c/unsigned=>unsigned))
+             (modcvop (symbolicate 'fast- fun '-mod32-c/unsigned=>unsigned))
              (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
              (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
          `(progn
@@ -702,6 +667,7 @@
 		`((define-vop (,modcvop ,cvop)
 		    (:translate ,mfun-name))))))))
   (define-modular-backend + t)
+  (define-modular-backend - t)
   (define-modular-backend logxor t)
   (define-modular-backend logeqv t)
   (define-modular-backend logandc1)
@@ -713,6 +679,12 @@
   `(lognot (logand ,x ,y)))
 (define-source-transform lognor (x y)
   `(lognot (logior ,x ,y)))
+
+(defknown ash-left-constant-mod32 (integer (integer 0)) (unsigned-byte 32)
+  (foldable flushable movable))
+(define-vop (fast-ash-left-constant-mod32/unsigned=>unsigned
+	     fast-ash-c/unsigned=>unsigned)
+  (:translate ash-left-constant-mod32))
 
 ;;;; Binary conditional VOPs:
 
@@ -827,7 +799,6 @@
 
 
 ;;;; 32-bit logical operations
-
 (define-vop (merge-bits)
   (:translate merge-bits)
   (:args (shift :scs (signed-reg unsigned-reg))
@@ -904,7 +875,6 @@
     (inst srl r num amount)))
 
 ;;;; Bignum stuff.
-
 (define-vop (bignum-length get-header-data)
   (:translate sb!bignum::%bignum-length)
   (:policy :fast-safe))
@@ -970,7 +940,6 @@
     (load-symbol temp t)
     (inst movr result null-tn digit :lz)
     (inst movr result temp digit :gez)))
-
 
 (define-vop (add-w/carry)
   (:translate sb!bignum::%add-with-carry)
@@ -1202,7 +1171,6 @@
       (signed-reg
        (move res digit)))))
 
-
 (define-vop (digit-ashr)
   (:translate sb!bignum::%ashr)
   (:policy :fast-safe)
@@ -1250,17 +1218,6 @@
 (define-static-fun two-arg-eqv (x y) :translate logeqv)
 
 
-;; Need these so constant folding works with the deftransform.
-
-;; FIXME KLUDGE ew yuk.
-#-sb-xc-host
-(progn
-  (defun ash-right-signed (num shift)
-    (ash-right-signed num shift))
-
-  (defun ash-right-unsigned (num shuft)
-    (ash-right-unsigned num shift)))
-
 (in-package "SB!C")
 
 (deftransform * ((x y)
@@ -1281,36 +1238,3 @@
 	 (when (> (+ adds shifts) 9)
 	   (give-up-ir1-transform))))
       (or result 0))))
-
-;; If we can prove that we have a right shift, just do the right shift
-;; instead of calling the inline ASH which has to check for the
-;; direction of the shift at run-time.
-(deftransform ash ((num shift) (integer integer))
-  (let ((num-type (lvar-type num))
-	(shift-type (lvar-type shift)))
-    ;; Can only handle right shifts
-    (unless (csubtypep shift-type (specifier-type '(integer * 0)))
-      (give-up-ir1-transform))
-
-    ;; If we can prove the shift is so large that all bits are shifted
-    ;; out, return the appropriate constant.  If the shift is small
-    ;; enough, call the VOP.  Otherwise, check for the shift size and
-    ;; do the appropriate thing.  (Hmm, could we just leave the IF
-    ;; s-expr and depend on other parts of the compiler to delete the
-    ;; unreachable parts, if any?)
-    (cond ((csubtypep num-type (specifier-type '(signed-byte #.sb!vm:n-word-bits)))
-	   ;; A right shift by 31 is the same as a right shift by
-	   ;; larger amount.  We get just the sign.
-	   (if (csubtypep shift-type (specifier-type '(integer #.(- 1 sb!vm:n-word-bits) 0)))
-	       ;; FIXME: ash-right-{un,}signed package problems
-	       `(sb!vm::ash-right-signed num (- shift))
-	       `(sb!vm::ash-right-signed num (min (- shift) #.(1- sb!vm:n-word-bits)))))
-	  ((csubtypep num-type (specifier-type '(unsigned-byte #.sb!vm:n-word-bits)))
-	   (if (csubtypep shift-type (specifier-type '(integer #.(- 1 sb!vm:n-word-bits) 0)))
-	       `(sb!vm::ash-right-unsigned num (- shift))
-	       `(if (<= shift #.(- sb!vm:n-word-bits))
-		 0
-		 (sb!vm::ash-right-unsigned num (- shift)))))
-	  (t
-	   (give-up-ir1-transform)))))
-

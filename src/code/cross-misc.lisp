@@ -145,9 +145,9 @@
   (assert (typep array '(simple-array * (*))))
   (values array start end 0))
 
-#!+sparc
-(progn
-  (defun sb!vm::ash-right-signed (num shift)
-    (ash num (- shift)))
-  (defun sb!vm::ash-right-unsigned (num shift)
-    (ash num (- shift))))
+#!-alpha
+(defun sb!vm::ash-left-constant-mod32 (integer amount)
+  (ldb (byte 32 0) (ash integer amount)))
+#!+alpha
+(defun sb!vm::ash-left-constant-mod64 (integer amount)
+  (ldb (byte 64 0) (ash integer amount)))

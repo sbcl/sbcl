@@ -333,38 +333,45 @@
 (define-vop (fast-ash/unsigned=>unsigned)
   (:note "inline ASH")
   (:args (number :scs (unsigned-reg) :to :save)
-	 (amount :scs (signed-reg immediate)))
+	 (amount :scs (signed-reg)))
   (:arg-types (:or unsigned-num) signed-num)
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:translate ash)
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) ndesc)
-  (:generator 3
-    (sc-case amount
-      (signed-reg
-       (let ((positive (gen-label))
-	     (done (gen-label)))
-	 (inst cmpwi amount 0)
-	 (inst neg ndesc amount)
-	 (inst bge positive)
-	 (inst cmpwi ndesc 31)
-	 (inst srw result number ndesc)
-	 (inst ble done)
-	 (move result zero-tn)
-	 (inst b done)
+  (:generator 5
+    (let ((positive (gen-label))
+	  (done (gen-label)))
+      (inst cmpwi amount 0)
+      (inst neg ndesc amount)
+      (inst bge positive)
+      (inst cmpwi ndesc 31)
+      (inst srw result number ndesc)
+      (inst ble done)
+      (move result zero-tn)
+      (inst b done)
+      
+      (emit-label positive)
+      ;; The result-type assures us that this shift will not overflow.
+      (inst slw result number amount)
+      
+      (emit-label done))))
 
-	 (emit-label positive)
-	 ;; The result-type assures us that this shift will not overflow.
-	 (inst slw result number amount)
-
-	 (emit-label done)))
-      (immediate
-       (let ((amount (tn-value amount)))
-	 (cond
-	  ((and (minusp amount) (< amount -31)) (move result zero-tn))
-	  ((minusp amount) (inst srwi result number (- amount)))
-	  (t (inst slwi result number amount))))))))
+(define-vop (fast-ash-c/unsigned=>unsigned)
+  (:note "inline constant ASH")
+  (:args (number :scs (unsigned-reg)))
+  (:info amount)
+  (:arg-types unsigned-num (:constant integer))
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:translate ash)
+  (:policy :fast-safe)
+  (:generator 4
+    (cond
+      ((and (minusp amount) (< amount -31)) (move result zero-tn))
+      ((minusp amount) (inst srwi result number (- amount)))
+      (t (inst slwi result number amount)))))
 
 (define-vop (fast-ash/signed=>signed)
   (:note "inline ASH")
@@ -462,6 +469,12 @@
   (:generator 1
     (inst not res x)))
 
+(defknown ash-left-constant-mod32 (integer (integer 0)) (unsigned-byte 32)
+  (foldable flushable movable))
+(define-vop (fast-ash-left-constant-mod32/unsigned=>unsigned
+	     fast-ash-c/unsigned=>unsigned)
+  (:translate ash-left-constant-mod32))
+
 (macrolet 
     ((define-modular-backend (fun &optional constantp)
        (let ((mfun-name (symbolicate fun '-mod32))
@@ -477,6 +490,7 @@
 		`((define-vop (,modcvop ,cvop)
 		    (:translate ,mfun-name))))))))
   (define-modular-backend + t)
+  (define-modular-backend - t)
   (define-modular-backend logxor t)
   (define-modular-backend logeqv)
   (define-modular-backend lognand)

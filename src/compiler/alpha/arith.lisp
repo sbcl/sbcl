@@ -364,11 +364,17 @@
   (:generator 1
     (inst not x res)))
 
+(defknown ash-left-constant-mod64 (integer (integer 0)) (unsigned-byte 64)
+  (foldable flushable movable))
+(define-vop (fast-ash-left-constant-mod64/unsigned=>unsigned
+	     fast-ash-c/unsigned=>unsigned)
+  (:translate ash-left-constant-mod64))
+
 (macrolet
     ((define-modular-backend (fun &optional constantp)
        (let ((mfun-name (symbolicate fun '-mod64))
              (modvop (symbolicate 'fast- fun '-mod64/unsigned=>unsigned))
-             (modcvop (symbolicate 'fast- fun 'mod64-c/unsigned=>unsigned))
+             (modcvop (symbolicate 'fast- fun '-mod64-c/unsigned=>unsigned))
              (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
              (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
          `(progn
@@ -379,6 +385,7 @@
                 `((define-vop (,modcvop ,cvop)
                     (:translate ,mfun-name))))))))
   (define-modular-backend + t)
+  (define-modular-backend - t)
   (define-modular-backend logxor t)
   (define-modular-backend logeqv t)
   (define-modular-backend logandc1)

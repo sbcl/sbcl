@@ -456,7 +456,7 @@
   (declare (type (unsigned-byte 32) num))
   (let ((adds 0) (shifts 0)
 	(result nil) first-one)
-    (labels ((tub32 (x) `(truly-the (unsigned-byte 32) ,x))
+    (labels ((tub32 (x) `(logand ,x #xffffffff)) ; uses modular arithmetic
 	     (add (next-factor)
 	       (setf result
 		     (tub32

@@ -2539,23 +2539,52 @@
                       (modular-fun (find-modular-version fun-name width))
                       (name (and (modular-fun-info-p modular-fun)
                                  (modular-fun-info-name modular-fun))))
-                 (when (and modular-fun
-                            (not (and (eq name 'logand)
-                                      (csubtypep
-                                       (single-value-type (node-derived-type node))
-                                       (specifier-type `(unsigned-byte ,width))))))
-                   (unless (eq modular-fun :good)
-                     (setq did-something t)
-                     (change-ref-leaf
-                        fun-ref
-                        (find-free-fun name "in a strange place"))
-                       (setf (combination-kind node) :full))
-                   (dolist (arg (basic-combination-args node))
-                     (when (cut-lvar arg)
-                       (setq did-something t)))
-                   (when did-something
-                     (reoptimize-node node fun-name))
-                   did-something))))
+		 (cond
+		   ((and modular-fun
+			 (not (and (eq name 'logand)
+				   (csubtypep
+				    (single-value-type (node-derived-type node))
+				    (specifier-type `(unsigned-byte ,width))))))
+		    (unless (eq modular-fun :good)
+		      (setq did-something t)
+		      (change-ref-leaf
+		       fun-ref
+		       (find-free-fun name "in a strange place"))
+		      (setf (combination-kind node) :full))
+		    (dolist (arg (basic-combination-args node))
+		      (when (cut-lvar arg)
+			(setq did-something t)))
+		    (when did-something
+		      (reoptimize-node node fun-name))
+		    did-something)
+		   ;; FIXME: This clause is a workaround for a fairly
+		   ;; critical bug.  Prior to this, strength reduction
+		   ;; of constant (unsigned-byte 32) multiplication
+		   ;; achieved modular arithmetic by lying to the
+		   ;; compiler with TRULY-THE.  Since we now have an
+		   ;; understanding of modular arithmetic, we can stop
+		   ;; lying to the compiler, at the cost of
+		   ;; uglification of this code.  Probably we want to
+		   ;; generalize the modular arithmetic mechanism to
+		   ;; be able to deal with more complex operands (ASH,
+		   ;; EXPT, ...?)  -- CSR, 2003-10-09
+		   ((and 
+		     (eq fun-name 'ash)
+		     ;; FIXME: only constants for now, but this
+		     ;; complicates implementation of the out of line
+		     ;; version of modular ASH.  -- CSR, 2003-10-09
+		     (constant-lvar-p (second (basic-combination-args node)))
+		     (> (lvar-value (second (basic-combination-args node))) 0))
+		    (setq did-something t)
+		    (change-ref-leaf
+		     fun-ref
+		     (find-free-fun 
+		      #!-alpha 'sb!vm::ash-left-constant-mod32
+		      #!+alpha 'sb!vm::ash-left-constant-mod64
+		      "in a strange place"))
+		    (setf (combination-kind node) :full)
+		    (cut-lvar (first (basic-combination-args node)))
+		    (reoptimize-node node 'ash))))))
            (cut-lvar (lvar &aux did-something)
              (do-uses (node lvar)
                (when (cut-node node)

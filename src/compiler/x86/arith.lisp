@@ -687,7 +687,7 @@
 		 ((< amount -31) (inst xor result result))
 		 (t (inst shr result (- amount))))))))
 
-(define-vop (fast-ash-left/signed)
+(define-vop (fast-ash-left/signed=>signed)
   (:translate ash)
   (:args (number :scs (signed-reg) :target result
 		 :load-if (not (and (sc-is number signed-stack)
@@ -708,7 +708,7 @@
     (move ecx amount)
     (inst shl result :cl)))
 
-(define-vop (fast-ash-left/unsigned)
+(define-vop (fast-ash-left/unsigned=>unsigned)
   (:translate ash)
   (:args (number :scs (unsigned-reg) :target result
 		 :load-if (not (and (sc-is number unsigned-stack)
@@ -1142,6 +1142,17 @@
   (:translate +-mod32))
 (define-vop (fast-+-mod32-c/unsigned=>unsigned fast-+-c/unsigned=>unsigned)
   (:translate +-mod32))
+(define-modular-fun --mod32 (x y) - 32)
+(define-vop (fast---mod32/unsigned=>unsigned fast--/unsigned=>unsigned)
+  (:translate --mod32))
+(define-vop (fast---mod32-c/unsigned=>unsigned fast---c/unsigned=>unsigned)
+  (:translate --mod32))
+
+(defknown ash-left-constant-mod32 (integer (integer 0)) (unsigned-byte 32)
+  (foldable flushable movable))
+(define-vop (fast-ash-left-constant-mod32/unsigned=>unsigned
+	     fast-ash-c/unsigned=>unsigned)
+  (:translate ash-left-constant-mod32))
 
 ;;; logical operations
 (define-modular-fun lognot-mod32 (x) lognot 32)
@@ -1577,7 +1588,7 @@
     (0
      (let ((tmp (min 3 (aref condensed 1))))
        (decf (aref condensed 1) tmp)
-       `(truly-the (unsigned-byte 32)
+       `(logand #xffffffff
 	 (%lea ,arg
 	       ,(decompose-multiplication
 		 arg (ash (1- num) (- tmp)) (1- n-bits) (subseq condensed 1))
@@ -1585,14 +1596,14 @@
     ((1 2 3)
      (let ((r0 (aref condensed 0)))
        (incf (aref condensed 1) r0)
-       `(truly-the (unsigned-byte 32)
+       `(logand #xffffffff
 	 (%lea ,(decompose-multiplication
 		 arg (- num (ash 1 r0)) (1- n-bits) (subseq condensed 1))
 	       ,arg
 	       ,(ash 1 r0) 0))))
     (t (let ((r0 (aref condensed 0)))
 	 (setf (aref condensed 0) 0)
-	 `(truly-the (unsigned-byte 32)
+	 `(logand #xffffffff
 	   (ash ,(decompose-multiplication
 		  arg (ash num (- r0)) n-bits condensed)
 	        ,r0))))))
@@ -1602,7 +1613,7 @@
     ((= n-bits 0) 0)
     ((= num 1) arg)
     ((= n-bits 1)
-     `(truly-the (unsigned-byte 32) (ash ,arg ,(1- (integer-length num)))))
+     `(logand #xffffffff (ash ,arg ,(1- (integer-length num)))))
     ((let ((max 0) (end 0))
        (loop for i from 2 to (length condensed)
 	     for j = (reduce #'+ (subseq condensed 0 i))
@@ -1618,14 +1629,14 @@
 	   (let ((n2 (+ (ash 1 (1+ j))
 			(ash (ldb (byte (- 32 (1+ j)) (1+ j)) num) (1+ j))))
 		 (n1 (1+ (ldb (byte (1+ j) 0) (lognot num)))))
-	   `(truly-the (unsigned-byte 32)
+	   `(logand #xffffffff
 	     (- ,(optimize-multiply arg n2) ,(optimize-multiply arg n1))))))))
     ((dolist (i '(9 5 3))
        (when (integerp (/ num i))
 	 (when (< (logcount (/ num i)) (logcount num))
 	   (let ((x (gensym)))
 	     (return `(let ((,x ,(optimize-multiply arg (/ num i))))
-		       (truly-the (unsigned-byte 32)
+		       (logand #xffffffff
 			(%lea ,x ,x (1- ,i) 0)))))))))
     (t (basic-decompose-multiplication arg num n-bits condensed))))
 	   
