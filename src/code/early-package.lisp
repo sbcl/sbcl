@@ -69,11 +69,8 @@
 (defmacro without-package-locks (&body body)
   #!+sb-doc
   "Ignores all runtime package lock violations during the execution of
-body. Body can begin with declarations."
-  #!-sb-package-locks
-  `(progn ,@body)
-  #!+sb-package-locks
-  `(let ((*ignored-package-locks* t))
+body. Body can begin with declarations."  
+  `(let (#!+sb-package-locks (*ignored-package-locks* t))
     ,@body))
 
 (!defun-from-collected-cold-init-forms !early-package-cold-init)

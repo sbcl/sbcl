@@ -100,20 +100,18 @@
           (let ((defclass-form
 		    `(progn
 		      (let ,(mapcar #'cdr *initfunctions-for-this-defclass*)
-			(with-single-package-locked-error
-			    (:symbol ',name "defining ~A as a class")
-			  (%compiler-defclass ',name
-					      ',*readers-for-this-defclass*
-					      ',*writers-for-this-defclass*
-					      ',*slot-names-for-this-defclass*)
-			  (load-defclass ',name
-					 ',metaclass
-					 ',supers
-					 (list ,@canonical-slots)
-					 (list ,@(apply #'append
-							(when defstruct-p
-							  '(:from-defclass-p t))
-							other-initargs))))))))
+			(%compiler-defclass ',name
+					    ',*readers-for-this-defclass*
+					    ',*writers-for-this-defclass*
+					    ',*slot-names-for-this-defclass*)
+			(load-defclass ',name
+				       ',metaclass
+				       ',supers
+				       (list ,@canonical-slots)
+				       (list ,@(apply #'append
+						      (when defstruct-p
+							'(:from-defclass-p t))
+						      other-initargs)))))))
             (if defstruct-p
 		(progn
 		  ;; FIXME: (YUK!) Why do we do this? Because in order
