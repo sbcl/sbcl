@@ -301,7 +301,8 @@ initialization file does the trick:
 @lisp
 ;;; If the first user-processable command-line argument is a filename,
 ;;; disable the debugger, load the file handling shebang-line and quit.
-(let ((script (probe-file (second sb-ext:*posix-argv*))))
+(let ((script (and (second sb-ext:*posix-argv*)
+                   (probe-file (second sb-ext:*posix-argv*)))))
   (when script
     ;; Handle the possible shebang-line
     (set-dispatch-macro-character #\# #\!
