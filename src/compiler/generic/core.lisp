@@ -64,7 +64,7 @@
 		    (:foreign-dataref
 		     (aver (stringp name))
 		     (foreign-symbol-address-as-integer name t))
-		    #!+x86
+		    #!+(or x86 x86-64)
 		    (:code-object
 		     (aver (null name))
 		     (values (get-lisp-obj-address code) t)))))

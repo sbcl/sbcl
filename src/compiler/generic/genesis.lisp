@@ -2455,12 +2455,12 @@
 		       ;; itself.) Ask on the mailing list whether
 		       ;; this is documented somewhere, and if not,
 		       ;; try to reverse engineer some documentation.
-		       #!-x86
+		       #!-(or x86 x86-64)
 		       ;; a pointer back to the function object, as
 		       ;; described in CMU CL
 		       ;; src/docs/internals/object.tex
 		       fn
-		       #!+x86
+		       #!+(or x86 x86-64)
 		       ;; KLUDGE: a pointer to the actual code of the
 		       ;; object, as described nowhere that I can find
 		       ;; -- WHN 19990907
@@ -3106,7 +3106,7 @@ initially undefined function references:~2%")
 			      sb!vm:unbound-marker-widetag))
 	   *cold-assembler-fixups*
 	   *cold-assembler-routines*
-	   #!+x86 *load-time-code-fixups*)
+	   #!+(or x86 x86-64) *load-time-code-fixups*)
 
       ;; Prepare for cold load.
       (initialize-non-nil-symbols)
@@ -3174,7 +3174,7 @@ initially undefined function references:~2%")
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
       (resolve-assembler-fixups)
-      #!+x86 (output-load-time-code-fixups)
+      #!+(or x86 x86-64) (output-load-time-code-fixups)
       (foreign-symbols-to-core)
       (finish-symbols)
       (/show "back from FINISH-SYMBOLS")

@@ -184,7 +184,7 @@
 ;;; (What a KLUDGE! Anyone who wants to come in and clean up this mess
 ;;; has my gratitude.) (FIXME: Maybe this should be me..)
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (def!constant kludge-nondeterministic-catch-block-size 7))
+  (def!constant kludge-nondeterministic-catch-block-size 6))
 
 (!define-storage-classes
 
@@ -460,3 +460,6 @@
   (let* ((lo (logand value (1- (ash 1 32))))
 	 (hi (ash (- value lo) -32)))
     (values lo hi)))
+
+(def!constant cfp-offset rbp-offset) ; pfw - needed by stuff in /code
+

@@ -550,9 +550,9 @@
   (make-lisp-obj (logior (sap-int component-ptr)
 			 sb!vm:other-pointer-lowtag)))
 
-;;;; X86 support
+;;;; (OR X86 X86-64) support
 
-#!+x86
+#!+(or x86 x86-64)
 (progn
 
 (defun compute-lra-data-from-pc (pc)
@@ -712,10 +712,10 @@
 		  (bogus-debug-fun
 		   (let ((fp (frame-pointer frame)))
 		     (when (control-stack-pointer-valid-p fp)
-		       #!+x86
+		       #!+(or x86 x86-64)
 			(multiple-value-bind (ra ofp) (x86-call-context fp)
 			 (and ra (compute-calling-frame ofp ra frame)))
-			#!-x86
+			#!-(or x86 x86-64)
 		       (compute-calling-frame
 			#!-alpha
 			(sap-ref-sap fp (* ocfp-save-offset
@@ -733,7 +733,7 @@
 ;;; Get the old FP or return PC out of FRAME. STACK-SLOT is the
 ;;; standard save location offset on the stack. LOC is the saved
 ;;; SC-OFFSET describing the main location.
-#!-x86
+#!-(or x86 x86-64)
 (defun get-context-value (frame stack-slot loc)
   (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
 	   (type sb!c:sc-offset loc))
@@ -742,7 +742,7 @@
     (if escaped
 	(sub-access-debug-var-slot pointer loc escaped)
 	(stack-ref pointer stack-slot))))
-#!+x86
+#!+(or x86 x86-64)
 (defun get-context-value (frame stack-slot loc)
   (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
 	   (type sb!c:sc-offset loc))
@@ -756,7 +756,7 @@
 	  (#.lra-save-offset
 	   (sap-ref-sap pointer (- (* (1+ stack-slot) 4))))))))
 
-#!-x86
+#!-(or x86 x86-64)
 (defun (setf get-context-value) (value frame stack-slot loc)
   (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
 	   (type sb!c:sc-offset loc))
@@ -766,7 +766,7 @@
 	(sub-set-debug-var-slot pointer loc value escaped)
 	(setf (stack-ref pointer stack-slot) value))))
 
-#!+x86
+#!+(or x86 x86-64)
 (defun (setf get-context-value) (value frame stack-slot loc)
   (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
 	   (type sb!c:sc-offset loc))
@@ -800,7 +800,7 @@
 ;;; Note: Sometimes LRA is actually a fixnum. This happens when lisp
 ;;; calls into C. In this case, the code object is stored on the stack
 ;;; after the LRA, and the LRA is the word offset.
-#!-x86
+#!-(or x86 x86-64)
 (defun compute-calling-frame (caller lra up-frame)
   (declare (type system-area-pointer caller))
   (when (control-stack-pointer-valid-p caller)
@@ -844,7 +844,7 @@
 							escaped)
 				 (if up-frame (1+ (frame-number up-frame)) 0)
 				 escaped))))))
-#!+x86
+#!+(or x86 x86-64)
 (defun compute-calling-frame (caller ra up-frame)
   (declare (type system-area-pointer caller ra))
   (/noshow0 "entering COMPUTE-CALLING-FRAME")
@@ -899,7 +899,7 @@
 		       (+ sb!vm::thread-interrupt-contexts-offset n))
 		      (* os-context-t)))
 
-#!+x86
+#!+(or x86 x86-64)
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
   (/noshow0 "entering FIND-ESCAPED-FRAME")
@@ -939,7 +939,7 @@
 	       (return
 	       (values code pc-offset context)))))))))
 
-#!-x86
+#!-(or x86 x86-64)
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
   (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
@@ -999,7 +999,7 @@
 			     nil))
 		   (values code pc-offset scp))))))))))
 
-#!-x86
+#!-(or x86 x86-64)
 (defun find-pc-from-assembly-fun (code scp)
   "Finds the PC for the return from an assembly routine properly.
 For some architectures (such as PPC) this will not be the $LRA
@@ -1105,31 +1105,31 @@ register."
 		       (sap-ref-32 catch
 				   (* sb!vm:catch-block-current-cont-slot
 				      sb!vm:n-word-bytes))))
-	    (let* (#!-x86
+	    (let* (#!-(or x86 x86-64)
 		   (lra (stack-ref catch sb!vm:catch-block-entry-pc-slot))
-		   #!+x86
+		   #!+(or x86 x86-64)
 		   (ra (sap-ref-sap
 			catch (* sb!vm:catch-block-entry-pc-slot
 				 sb!vm:n-word-bytes)))
-		   #!-x86
+		   #!-(or x86 x86-64)
 		   (component
 		    (stack-ref catch sb!vm:catch-block-current-code-slot))
-		   #!+x86
+		   #!+(or x86 x86-64)
 		   (component (component-from-component-ptr
 			       (component-ptr-from-pc ra)))
 		   (offset
-		    #!-x86
+		    #!-(or x86 x86-64)
 		    (* (- (1+ (get-header-data lra))
 			  (get-header-data component))
 		       sb!vm:n-word-bytes)
-		    #!+x86
+		    #!+(or x86 x86-64)
 		    (- (sap-int ra)
 		       (- (get-lisp-obj-address component)
 			  sb!vm:other-pointer-lowtag)
 		       (* (get-header-data component) sb!vm:n-word-bytes))))
-	      (push (cons #!-x86
+	      (push (cons #!-(or x86 x86-64)
 			  (stack-ref catch sb!vm:catch-block-tag-slot)
-			  #!+x86
+			  #!+(or x86 x86-64)
 			  (make-lisp-obj
 			   (sap-ref-32 catch (* sb!vm:catch-block-tag-slot
 						sb!vm:n-word-bytes)))
@@ -2019,7 +2019,7 @@ register."
       (make-lisp-obj val)
       :invalid-object))
 
-#!-x86
+#!-(or x86 x86-64)
 (defun sub-access-debug-var-slot (fp sc-offset &optional escaped)
   (macrolet ((with-escaped-value ((var) &body forms)
                `(if escaped
@@ -2162,7 +2162,7 @@ register."
          (sb!sys:sap-ref-sap nfp (* (sb!c:sc-offset-offset sc-offset)
                                     sb!vm:n-word-bytes)))))))
 
-#!+x86
+#!+(or x86 x86-64)
 (defun sub-access-debug-var-slot (fp sc-offset &optional escaped)
   (declare (type system-area-pointer fp))
   (macrolet ((with-escaped-value ((var) &body forms)
@@ -2291,7 +2291,7 @@ register."
 	     (compiled-debug-var-sc-offset debug-var))
 	 value))))
 
-#!-x86
+#!-(or x86 x86-64)
 (defun sub-set-debug-var-slot (fp sc-offset value &optional escaped)
   (macrolet ((set-escaped-value (val)
 	       `(if escaped
@@ -2450,7 +2450,7 @@ register."
 				   sb!vm:n-word-bytes))
 	       (the system-area-pointer value)))))))
 
-#!+x86
+#!+(or x86 x86-64)
 (defun sub-set-debug-var-slot (fp sc-offset value &optional escaped)
   (macrolet ((set-escaped-value (val)
 	       `(if escaped
@@ -2904,7 +2904,7 @@ register."
     (do ((frame frame (frame-down frame)))
 	((not frame) nil)
       (when (and (compiled-frame-p frame)
-                 (#!-x86 eq #!+x86 sap=
+                 (#!-(or x86 x86-64) eq #!+(or x86 x86-64) sap=
 		  lra
 		  (get-context-value frame lra-save-offset lra-sc-offset)))
 	(return t)))))
@@ -3238,8 +3238,8 @@ register."
 (defun get-fun-end-breakpoint-values (scp)
   (let ((ocfp (int-sap (sb!vm:context-register
 			scp
-			#!-x86 sb!vm::ocfp-offset
-			#!+x86 sb!vm::ebx-offset)))
+			#!-(or x86 x86-64) sb!vm::ocfp-offset
+			#!+(or x86 x86-64) sb!vm::ebx-offset)))
 	(nargs (make-lisp-obj
 		(sb!vm:context-register scp sb!vm::nargs-offset)))
  	(reg-arg-offsets '#.sb!vm::*register-arg-offsets*)
@@ -3256,9 +3256,9 @@ register."
 ;;;; MAKE-BOGUS-LRA (used for :FUN-END breakpoints)
 
 (defconstant bogus-lra-constants
-  #!-x86 2 #!+x86 3)
+  #!-(or x86 x86-64) 2 #!+(or x86 x86-64) 3)
 (defconstant known-return-p-slot
-  (+ sb!vm:code-constants-offset #!-x86 1 #!+x86 2))
+  (+ sb!vm:code-constants-offset #!-(or x86 x86-64) 1 #!+(or x86 x86-64) 2))
 
 ;;; Make a bogus LRA object that signals a breakpoint trap when
 ;;; returned to. If the breakpoint trap handler returns, REAL-LRA is
@@ -3283,9 +3283,9 @@ register."
      (setf (%code-debug-info code-object) :bogus-lra)
      (setf (code-header-ref code-object sb!vm:code-trace-table-offset-slot)
 	   length)
-     #!-x86
+     #!-(or x86 x86-64)
      (setf (code-header-ref code-object real-lra-slot) real-lra)
-     #!+x86
+     #!+(or x86 x86-64)
      (multiple-value-bind (offset code) (compute-lra-data-from-pc real-lra)
        (setf (code-header-ref code-object real-lra-slot) code)
        (setf (code-header-ref code-object (1+ real-lra-slot)) offset))
@@ -3293,9 +3293,9 @@ register."
 	   known-return-p)
      (system-area-copy src-start 0 dst-start 0 (* length sb!vm:n-byte-bits))
      (sb!vm:sanctify-for-execution code-object)
-     #!+x86
+     #!+(or x86 x86-64)
      (values dst-start code-object (sap- trap-loc src-start))
-     #!-x86
+     #!-(or x86 x86-64)
      (let ((new-lra (make-lisp-obj (+ (sap-int dst-start)
 				      sb!vm:other-pointer-lowtag))))
        (set-header-data

@@ -675,10 +675,10 @@
 	       (:generator 5
 		 (sc-case y
 			  (signed-stack
-			   (inst ,inst temp-reg)
+			   (inst ,inst temp-reg x)
 			   (move y temp-reg))
 			  (signed-reg
-			   (inst ,inst y)
+			   (inst ,inst y x)
 			   ))))))
   (frob %unary-truncate cvttss2si single-reg single-float nil)
   (frob %unary-truncate cvttsd2si double-reg double-float nil)
@@ -738,7 +738,7 @@
 				      (sc-is res single-stack)
 				      (location= bits res))))))
   (:results (res :scs (single-reg single-stack)))
-  (:temporary (:sc signed-stack) stack-temp)
+ ; (:temporary (:sc signed-stack) stack-temp)
   (:arg-types signed-num)
   (:result-types single-float)
   (:translate make-single-float)

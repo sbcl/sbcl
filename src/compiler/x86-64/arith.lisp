@@ -609,8 +609,7 @@
 		 (t 
 		  ;; shift too far then back again, to zero tag bits
 		  (inst sar result (- 3 amount))
-		  (inst lea result
-			(make-ea :qword :index result :scale 8))))))))
+		  (inst shl result 3)))))))
 
 
 (define-vop (fast-ash-left/fixnum=>fixnum)

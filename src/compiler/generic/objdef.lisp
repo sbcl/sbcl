@@ -170,9 +170,9 @@
 (define-primitive-object (simple-fun :type function
 				     :lowtag fun-pointer-lowtag
 				     :widetag simple-fun-header-widetag)
-  #!-x86 (self :ref-trans %simple-fun-self
+  #!-(or x86 x86-64) (self :ref-trans %simple-fun-self
 	       :set-trans (setf %simple-fun-self))
-  #!+x86 (self
+  #!+(or x86 x86-64) (self
 	  ;; KLUDGE: There's no :SET-KNOWN, :SET-TRANS, :REF-KNOWN, or
 	  ;; :REF-TRANS here in this case. Instead, there's separate
 	  ;; DEFKNOWN/DEFINE-VOP/DEFTRANSFORM stuff in
@@ -295,13 +295,13 @@
 (define-primitive-object (unwind-block)
   (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
   (current-cont :c-type #!-alpha "lispobj *" #!+alpha "u32")
-  #!-x86 current-code
+  #!-(or x86 x86-64) current-code
   entry-pc)
 
 (define-primitive-object (catch-block)
   (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
   (current-cont :c-type #!-alpha "lispobj *" #!+alpha "u32")
-  #!-x86 current-code
+  #!-(or x86 x86-64) current-code
   entry-pc
   tag
   (previous-catch :c-type #!-alpha "struct catch_block *" #!+alpha "u32")
