@@ -1057,7 +1057,7 @@
 	 (invoke-complex-subtypep-arg1-method type1 type2))
 	(t
 	 ;; FIXME: This seems to rely on there only being 2 or 3
-	 ;; HAIRY-TYPE values, and the exclusion of various
+	 ;; NAMED-TYPE values, and the exclusion of various
 	 ;; possibilities above. It would be good to explain it and/or
 	 ;; rewrite it so that it's clearer.
 	 (values (not (eq type2 *empty-type*)) t))))
@@ -1218,6 +1218,23 @@
 	    nil)
 	nil)))
 	
+(!define-type-method (hairy :simple-union2) 
+		     (type1 type2)
+  (if (type= type1 type2)
+      type1
+      nil))
+
+(!define-type-method (hairy :complex-union2)
+		     (type1 type2)
+  (aver (hairy-type-p type2))
+  (let ((hairy-type-spec (type-specifier type2)))
+    (if (and (consp hairy-type-spec)
+	     (eq (car hairy-type-spec) 'not))
+	(if (csubtypep (specifier-type (cadr hairy-type-spec)) type1)
+	    *universal-type*
+	    nil)
+	nil)))
+
 (!define-type-method (hairy :simple-=) (type1 type2)
   (if (equal (hairy-type-specifier type1)
 	     (hairy-type-specifier type2))
@@ -1229,11 +1246,58 @@
   ;; Check legality of arguments.
   (destructuring-bind (not typespec) whole
     (declare (ignore not))
-    (let ((spec (type-specifier (specifier-type typespec)))) ; must be legal typespec
-      (if (and (listp spec) (eq (car spec) 'not))
-	  ;; canonicalize (not (not foo))
-	  (specifier-type (cadr spec))
-	  (make-hairy-type :specifier whole)))))
+    ;; must be legal typespec
+    (let* ((not-type (specifier-type typespec))
+	   (spec (type-specifier not-type)))
+      (cond
+	;; canonicalize (not (not foo))
+	((and (listp spec) (eq (car spec) 'not))
+	 (specifier-type (cadr spec)))
+	((eq not-type *empty-type*) *universal-type*)
+	((eq not-type *universal-type*) *empty-type*)
+	((and (numeric-type-p not-type)
+	      (null (numeric-type-low not-type))
+	      (null (numeric-type-high not-type)))
+	 (make-hairy-type :specifier whole))
+	;; FIXME: this is insufficiently general.  We need to
+	;; canonicalize over intersections and unions, too.  However,
+	;; this will probably suffice to get BIGNUM right, and more
+	;; code will be written when someone (probably Paul Dietz)
+	;; comes up with a test case that demonstrates a failure,
+	;; because right now I can't construct one.
+	((numeric-type-p not-type)
+	 (type-union
+	  ;; FIXME: so much effort for parsing?  This seems overly
+	  ;; compute-heavy.
+	  (specifier-type `(not ,(type-specifier
+				  (modified-numeric-type not-type
+							 :low nil
+							 :high nil))))
+	  (cond
+	    ((null (numeric-type-low not-type))
+	     (modified-numeric-type
+	      not-type
+	      :low (let ((h (numeric-type-high not-type)))
+		     (if (consp h) h (list h)))
+	      :high nil))
+	    ((null (numeric-type-high not-type))
+	     (modified-numeric-type
+	      not-type
+	      :low nil
+	      :high (let ((l (numeric-type-low not-type)))
+		      (if (consp l) l (list l)))))
+	    (t (type-union
+		(modified-numeric-type
+		 not-type
+		 :low nil
+		 :high (let ((l (numeric-type-low not-type)))
+			 (if (consp l) l (list l))))
+		(modified-numeric-type
+		 not-type
+		 :low (let ((h (numeric-type-high not-type)))
+			(if (consp h) h (list h)))
+		 :high nil))))))
+	(t (make-hairy-type :specifier whole))))))
 
 (!def-type-translator satisfies (&whole whole fun)
   (declare (ignore fun))
@@ -2180,8 +2244,17 @@
 
 (!def-type-translator member (&rest members)
   (if members
-    (make-member-type :members (remove-duplicates members))
-    *empty-type*))
+      (let (ms numbers)
+	(dolist (m (remove-duplicates members))
+	  (typecase m
+	    (number (push (ctype-of m) numbers))
+	    (t (push m ms))))
+	(apply #'type-union
+	       (if ms
+		   (make-member-type :members ms)
+		   *empty-type*)
+	       (nreverse numbers)))
+      *empty-type*))
 
 ;;;; intersection types
 ;;;;
@@ -2208,7 +2281,7 @@
 ;;; mechanically unparsed.
 (!define-type-method (intersection :unparse) (type)
   (declare (type ctype type))
-  (or (find type '(ratio bignum keyword) :key #'specifier-type :test #'type=)
+  (or (find type '(ratio keyword) :key #'specifier-type :test #'type=)
       `(and ,@(mapcar #'type-specifier (intersection-type-types type)))))
 
 ;;; shared machinery for type equality: true if every type in the set
@@ -2240,17 +2313,66 @@
 	    type2
 	    (intersection-type-types type1)))
 
-(!define-type-method (intersection :simple-subtypep) (type1 type2)
+(defun %intersection-simple-subtypep (type1 type2)
   (every/type #'%intersection-complex-subtypep-arg1
 	      type1
 	      (intersection-type-types type2)))
 
+(!define-type-method (intersection :simple-subtypep) (type1 type2)
+  (%intersection-simple-subtypep type1 type2))
+  
 (!define-type-method (intersection :complex-subtypep-arg1) (type1 type2)
   (%intersection-complex-subtypep-arg1 type1 type2))
 
-(!define-type-method (intersection :complex-subtypep-arg2) (type1 type2)
+(defun %intersection-complex-subtypep-arg2 (type1 type2)
   (every/type #'csubtypep type1 (intersection-type-types type2)))
 
+(!define-type-method (intersection :complex-subtypep-arg2) (type1 type2)
+  (%intersection-complex-subtypep-arg2 type1 type2))
+
+;;; FIXME: This will look eeriely familiar to readers of the UNION
+;;; :SIMPLE-INTERSECTION2 :COMPLEX-INTERSECTION2 method.  That's
+;;; because it was generated by cut'n'paste methods.  Given that
+;;; intersections and unions have all sorts of symmetries known to
+;;; mathematics, it shouldn't be beyond the ken of some programmers to
+;;; reflect those symmetries in code in a way that ties them together
+;;; more strongly than having two independent near-copies :-/
+(!define-type-method (intersection :simple-union2 :complex-union2)
+ 		     (type1 type2)
+  ;; Within this method, type2 is guaranteed to be an intersection
+  ;; type:
+  (aver (intersection-type-p type2))
+  ;; Make sure to call only the applicable methods...
+  (cond ((and (intersection-type-p type1)
+	      (%intersection-simple-subtypep type1 type2)) type2)
+	((and (intersection-type-p type1)
+	      (%intersection-simple-subtypep type2 type1)) type1)
+	((and (not (intersection-type-p type1))
+	      (%intersection-complex-subtypep-arg2 type1 type2))
+	 type2)
+	((and (not (intersection-type-p type1))
+	      (%intersection-complex-subtypep-arg1 type2 type1))
+	 type1)
+	(t
+	 (let ((accumulator *universal-type*))
+	   (dolist (t2 (intersection-type-types type2) accumulator)
+	     (let ((union (type-union type1 t2)))
+	       (when (union-type-p union)
+		 ;; we give up here -- there are all sorts of ordering
+		 ;; worries, but it's better than before.  Doing
+		 ;; exactly the same as in the UNION
+		 ;; :SIMPLE/:COMPLEX-INTERSECTION2 method causes stack
+		 ;; overflow with the mutual recursion never bottoming
+		 ;; out.
+		 (return nil))
+	       (setf accumulator
+		     (type-intersection2 accumulator union))
+	       ;; When our result isn't simple any more (because
+	       ;; TYPE-INTERSECTION2 was unable to give us a simple
+	       ;; result)
+	       (unless accumulator
+		 (return nil))))))))
+	 
 (!def-type-translator and (&whole whole &rest type-specifiers)
   (apply #'type-intersection
 	 (mapcar #'specifier-type
@@ -2269,6 +2391,7 @@
     ((type= type (specifier-type 'float)) 'float)
     ((type= type (specifier-type 'real)) 'real)
     ((type= type (specifier-type 'sequence)) 'sequence)
+    ((type= type (specifier-type 'bignum)) 'bignum)
     (t `(or ,@(mapcar #'type-specifier (union-type-types type))))))
 
 ;;; Two union types are equal if they are each subtypes of each

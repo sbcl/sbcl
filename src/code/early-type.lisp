@@ -314,7 +314,7 @@
                                 (logand (sxhash x) #x3FF))
 	       :hash-bits 10
 	       :init-wrapper !cold-init-forms)
-	      ((orig equal))
+	      ((orig equal-but-no-car-recursion))
   (let ((u (uncross orig)))
     (or (info :type :builtin u)
 	(let ((spec (type-expand u)))

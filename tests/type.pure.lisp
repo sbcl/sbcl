@@ -172,3 +172,12 @@
 #+nil
 (assert (and (subtypep 'function '(function))
              (subtypep '(function) 'function)))
+
+;;; Absent any exciting generalizations of |R, the type RATIONAL is
+;;; partitioned by RATIO and INTEGER.  Ensure that the type system
+;;; knows about this.  [ the type system is permitted to return NIL,
+;;; NIL for these, so if future maintenance breaks these tests that
+;;; way, that's fine.  What the SUBTYPEP calls are _not_ allowed to
+;;; return is NIL, T, because that's completely wrong. ]
+(assert (subtypep '(or integer ratio) 'rational))
+(assert (subtypep 'rational '(or integer ratio)))

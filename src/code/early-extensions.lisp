@@ -573,6 +573,27 @@
        (defun ,name (&rest args)
          (,cached-name args)))))
 
+;;; FIXME: maybe not the best place
+;;;
+;;; FIXME: think of a better name -- not only does this not have the
+;;; CAR recursion of EQUAL, it also doesn't have the special treatment
+;;; of pathnames, bit-vectors and strings.
+;;;
+;;; KLUDGE: This means that we will no longer cache specifiers of the
+;;; form '(INTEGER (0) 4).  This is probably not a disaster.
+;;;
+;;; A helper function for the type system, which is the main user of
+;;; these caches: we must be more conservative than EQUAL for some of
+;;; our equality tests, because MEMBER and friends refer to EQLity.
+;;; So:
+(defun equal-but-no-car-recursion (x y)
+  (cond
+    ((eql x y) t)
+    ((consp x)
+     (and (consp y)
+	  (eql (car x) (car y))
+	  (equal-but-no-car-recursion (cdr x) (cdr y))))
+    (t nil)))
 
 ;;;; package idioms
 
