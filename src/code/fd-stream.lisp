@@ -1225,7 +1225,7 @@
 		      (open-error "~@<The path ~2I~_~S ~I~_does not exist.~:>"
 				  pathname))
 		     (t nil)))
-		  ((and (eql errno sb!unix:eexist) if-exists)
+		  ((and (eql errno sb!unix:eexist) (null if-exists))
 		   nil)
 		  (t
 		   (vanilla-open-error)))))))))

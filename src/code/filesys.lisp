@@ -829,9 +829,16 @@
         (merged-pathname (merge-pathnames pathname)))
     (!enumerate-matches (match merged-pathname)
       (let* ((*ignore-wildcards* t)
-	     (truename (truename match)))
-        (setf (gethash (namestring truename) truenames)
-	      truename)))
+	     ;; FIXME: Why not TRUENAME?  As reported by Milan Zamazal
+	     ;; sbcl-devel 2003-10-05, using TRUENAME causes a race
+	     ;; condition whereby removal of a file during the
+	     ;; directory operation causes an error.  It's not clear
+	     ;; what the right thing to do is, though.  -- CSR,
+	     ;; 2003-10-13
+	     (truename (probe-file match)))
+	(when truename
+	  (setf (gethash (namestring truename) truenames)
+		truename))))
     (mapcar #'cdr
 	    ;; Sorting isn't required by the ANSI spec, but sorting
 	    ;; into some canonical order seems good just on the

@@ -2122,6 +2122,8 @@ changes in sbcl-0.8.5 relative to sbcl-0.8.4:
   * bug fix: obviously wrong type specifiers such as (FIXNUM 1) or
     (CHARACTER 10) are now reported as errors, rather than propagated
     as unknown types.  (reported by piso on #lisp)
+  * bug fix: the :IF-EXISTS argument to OPEN now behaves correctly
+    with values NIL and :ERROR.  (thanks to Milan Zamazal)
   * compiler enhancement: SIGNUM is now better able to derive the type
     of its result.
   * fixed some bugs revealed by Paul Dietz' test suite:

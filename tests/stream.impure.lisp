@@ -66,5 +66,15 @@
     (assert (= (read-byte s) -1)))
   (delete-file p))
 
+;;; :IF-EXISTS got :ERROR and NIL the wrong way round (reported by
+;;; Milan Zamazal)
+(let* ((p "this-file-will-exist")
+       (stream (open p :direction :output :if-exists :error)))
+  (assert (null (with-open-file (s p :direction :output :if-exists nil) s)))
+  (assert (raises-error?
+	   (with-open-file (s p :direction :output :if-exists :error))))
+  (close stream)
+  (delete-file p))
+
 ;;; success
 (quit :unix-status 104)
