@@ -1541,7 +1541,11 @@ This package only tries to implement what happens to be
 needed by the current implementation of SBCL, and makes
 no guarantees of interface stability."
     :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!EXT" "SB!INT" "SB!SYS")
-    :export ("D-INO" "D-NAME" "D-NAMLEN" "D-OFF" "D-RECLEN"
+    :export (;; wrappers around Unix stuff to give just what Lisp needs
+	     "UID-USERNAME"
+
+	     ;; stuff with a one-to-one mapping to Unix constructs
+	     "D-INO" "D-NAME" "D-NAMLEN" "D-OFF" "D-RECLEN"
              "DEV-T" "DIRECT" "EXECGRP" "EXECOTH" "EXECOWN" "F-DUPFD"
              "F-GETFD" "F-GETFL" "F-GETOWN" "F-SETFD" "F-SETFL" "F-SETOWN"
              "FAPPEND" "FASYNC" "FCREAT" "FEXCL" "FIONREAD" "FNDELAY" "FTRUNC"

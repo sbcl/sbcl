@@ -875,7 +875,7 @@
 
 (defun file-author (file)
   #!+sb-doc
-  "Return the file author as a string, or nil if the author cannot be
+  "Return the file author as a string, or NIL if the author cannot be
  determined. Signal an error of type FILE-ERROR if FILE doesn't exist,
  or FILE is a wild pathname."
   (if (wild-pathname-p file)
@@ -891,7 +891,7 @@
 	(multiple-value-bind (winp dev ino mode nlink uid)
 	    (sb!unix:unix-stat name)
 	  (declare (ignore dev ino mode nlink))
-	  (if winp (lookup-login-name uid))))))
+	  (and winp (sb!unix:uid-username uid))))))
 
 ;;;; DIRECTORY
 
@@ -931,71 +931,6 @@
                         collect (cons name truename))
                   #'string<
 		  :key #'car))))
-
-;;;; translating Unix uid's
-;;;;
-;;;; FIXME: should probably move into unix.lisp
-
-(defvar *uid-hash-table* (make-hash-table)
-  #!+sb-doc
-  "hash table for keeping track of uid's and login names")
-
-(/show0 "filesys.lisp 844")
-
-;;; LOOKUP-LOGIN-NAME translates a user id into a login name. Previous
-;;; lookups are cached in a hash table since groveling the passwd(s)
-;;; files is somewhat expensive. The table may hold NIL for id's that
-;;; cannot be looked up since this keeps the files from having to be
-;;; searched in their entirety each time this id is translated.
-(defun lookup-login-name (uid)
-  (multiple-value-bind (login-name foundp) (gethash uid *uid-hash-table*)
-    (if foundp
-	login-name
-	(setf (gethash uid *uid-hash-table*)
-	      (get-group-or-user-name :user uid)))))
-
-;;; GET-GROUP-OR-USER-NAME first tries "/etc/passwd" ("/etc/group")
-;;; since it is a much smaller file, contains all the local id's, and
-;;; most uses probably involve id's on machines one would login into.
-;;; Then if necessary, we look in "/etc/passwds" ("/etc/groups") which
-;;; is really long and has to be fetched over the net.
-;;;
-;;; The result is a SIMPLE-STRING or NIL.
-;;; 
-;;; FIXME: Now that we no longer have lookup-group-name, we no longer need
-;;; the GROUP-OR-USER argument.
-(defun get-group-or-user-name (group-or-user id)
-  (declare (type (member :group :user) group-or-user))
-  (declare (type index id))
-  (let ((id-string (let ((*print-base* 10)) (prin1-to-string id))))
-    (declare (simple-string id-string))
-    (multiple-value-bind (file1 file2)
-	(ecase group-or-user
-	  (:group (values "/etc/group" "/etc/groups"))
-	  (:user (values "/etc/passwd" "/etc/passwd")))
-      (or (get-group-or-user-name-aux id-string file1)
-	  (get-group-or-user-name-aux id-string file2)))))
-
-;;; FIXME: Isn't there now a POSIX routine to parse the passwd file?
-;;; getpwent? getpwuid?
-(defun get-group-or-user-name-aux (id-string passwd-file)
-  (with-open-file (stream passwd-file)
-    (loop
-      (let ((entry (read-line stream nil)))
-	(unless entry (return nil))
-	(let ((name-end (position #\: (the simple-string entry)
-				  :test #'char=)))
-	  (when name-end
-	    (let ((id-start (position #\: (the simple-string entry)
-				      :start (1+ name-end) :test #'char=)))
-	      (when id-start
-		(incf id-start)
-		(let ((id-end (position #\: (the simple-string entry)
-					:start id-start :test #'char=)))
-		  (when (and id-end
-			     (string= id-string entry
-				      :start2 id-start :end2 id-end))
-		    (return (subseq entry 0 name-end))))))))))))
 
 (/show0 "filesys.lisp 899")
 

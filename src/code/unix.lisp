@@ -264,6 +264,16 @@
 	   (type unix-file-mode mode))
   (void-syscall ("mkdir" c-string int) name mode))
 
+;;; Given a C char* pointer allocated by malloc(), free it and return a
+;;; corresponding Lisp string (or return NIL if the pointer is a C NULL).
+(defun newcharstar-string (newcharstar)
+  (declare (type (alien (* char)) newcharstar))
+  (if (null-alien newcharstar)
+      nil
+      (prog1
+	  (cast newcharstar c-string)
+	(free-alien newcharstar))))
+
 ;;; Return the Unix current directory as a SIMPLE-STRING, in the
 ;;; style returned by getcwd() (no trailing slash character). 
 (defun posix-getcwd ()
@@ -272,15 +282,12 @@
   ;; pointer is used. On a system which doesn't support that
   ;; extension, it'll have to be rewritten somehow.
   #!-(or linux openbsd freebsd) (,stub,)
-  (let* ((raw-char-ptr (alien-funcall (extern-alien "getcwd"
-						    (function (* char)
-							      (* char) size-t))
-				      nil 0)))
-    (if (null-alien raw-char-ptr)
-	(simple-perror "getcwd")
-	(prog1
-	    (cast raw-char-ptr c-string)
-	  (free-alien raw-char-ptr)))))
+  (or (newcharstar-string (alien-funcall (extern-alien "getcwd"
+						       (function (* char)
+								 (* char)
+								 size-t))
+					 nil 0))
+      (simple-perror "getcwd")))
 
 ;;; Return the Unix current directory as a SIMPLE-STRING terminated
 ;;; by a slash character.
@@ -320,8 +327,15 @@
 ;;; Return the process id of the current process.
 (define-alien-routine ("getpid" unix-getpid) int)
 
-;;; Return the real user-id associated with the current process.
+;;; Return the real user id associated with the current process.
 (define-alien-routine ("getuid" unix-getuid) int)
+
+;;; Translate a user id into a login name.
+(defun uid-username (uid)
+  (or (newcharstar-string (alien-funcall (extern-alien "uid_username"
+						       (function (* char) int))
+					 uid))
+      (error "found no match for Unix uid=~S" uid)))
 
 ;;; Invoke readlink(2) on the file name specified by PATH. Return
 ;;; (VALUES LINKSTRING NIL) on success, or (VALUES NIL ERRNO) on

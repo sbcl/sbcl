@@ -29,6 +29,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pwd.h>
+
 
 #include "runtime.h"
 #include "sbcl.h"
@@ -223,4 +225,28 @@ fstat_wrapper(int filedes, struct stat_wrapper *buf)
     if ((ret = fstat(filedes,&real_buf)) >= 0)
 	copy_to_stat_wrapper(buf, &real_buf); 
     return ret;
+}
+
+/*
+ * getpwuid() stuff
+ */
+
+/* Return a newly-allocated string holding the username for "uid", or
+ * NULL if there's no such user.
+ *
+ * KLUDGE: We also return NULL if malloc() runs out of memory
+ * (returning strdup() result) since it's not clear how to handle that
+ * error better. -- WHN 2001-12-28 */
+char *
+uid_username(int uid)
+{
+    struct passwd *p = getpwuid(uid);
+    if (p) {
+	/* The object *p is a static struct which'll be overwritten by
+	 * the next call to getpwuid(), so it'd be unsafe to return
+	 * p->pw_name without copying. */
+	return strdup(p->pw_name);
+    } else {
+	return 0;
+    }
 }
