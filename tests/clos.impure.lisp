@@ -821,5 +821,14 @@
   x)
 (assert (= (fum 3) 3/2))
 
+;;; Bug reported by Zach Beane; incorrect return of (function
+;;; ',fun-name) in defgeneric
+(assert
+ (typep (funcall (compile nil
+                          '(lambda () (flet ((nonsense () nil))
+                                        (defgeneric nonsense ())))))
+        'generic-function))
+
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

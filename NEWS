@@ -1,3 +1,7 @@
+changes in sbcl-0.8.15 relative to sbcl-0.8.14:
+  * bug fix: incorrect expansion of defgeneric that caused
+    a style warning. (thanks for Zach Beane)
+
 changes in sbcl-0.8.14 relative to sbcl-0.8.13:
   * incompatible change: the internal functions
     SB-KERNEL:32BIT-LOGICAL-FOO, intended for providing efficient

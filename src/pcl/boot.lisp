@@ -239,7 +239,7 @@ bootstrapping.
 	   (compile-or-load-defgeneric ',fun-name))
          (load-defgeneric ',fun-name ',lambda-list ,@initargs)
         ,@(mapcar #'expand-method-definition methods)
-	 #',fun-name))))
+        (fdefinition ',fun-name)))))
 
 (defun compile-or-load-defgeneric (fun-name)
   (proclaim-as-fun-name fun-name)
