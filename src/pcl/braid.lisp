@@ -564,7 +564,7 @@
 		 `(:internal-reader-function
 		   ,(structure-slotd-reader-function slotd)
 		   :internal-writer-function
-		   ,(structure-slotd-writer-function slotd)))
+		   ,(structure-slotd-writer-function name slotd)))
 	     :type ,(or (structure-slotd-type slotd) t)
 	     :initform ,(structure-slotd-init-form slotd)
 	     :initfunction ,(eval-form (structure-slotd-init-form slotd)))))

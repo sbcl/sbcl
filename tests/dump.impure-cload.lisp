@@ -71,5 +71,23 @@
 (defparameter *numbers*
   '(-1s0 -1f0 -1d0 -1l0
     #c(-1s0 -1s0) #c(-1f0 -1f0) #c(-1d0 -1d0) #c(-1l0 -1l0)))
-
+
+;;; tests for MAKE-LOAD-FORM-SAVING-SLOTS
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defstruct savable-structure
+    (a nil :type symbol)
+    (b nil :type symbol :read-only t)
+    (c nil :read-only t)
+    (d 0 :type fixnum)
+    (e 17 :type (unsigned-byte 32) :read-only t))
+  (defmethod make-load-form ((s savable-structure) &optional env)
+    (make-load-form-saving-slots s :environment env)))
+(defparameter *savable-structure*
+  #.(make-savable-structure :a t :b 'frob :c 1 :d 39 :e 19))
+(assert (eql (savable-structure-a *savable-structure*) t))
+(assert (eql (savable-structure-b *savable-structure*) 'frob))
+(assert (eql (savable-structure-c *savable-structure*) 1))
+(assert (eql (savable-structure-d *savable-structure*) 39))
+(assert (eql (savable-structure-e *savable-structure*) 19))
+
 (sb-ext:quit :unix-status 104) ; success
