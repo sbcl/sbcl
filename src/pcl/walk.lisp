@@ -1,4 +1,4 @@
-;;;; a simple code walker for PCL
+;;;; a simple code walker
 ;;;;
 ;;;; The code which implements the macroexpansion environment
 ;;;; manipulation mechanisms is in the first part of the file, the
@@ -27,7 +27,11 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(in-package "SB-WALKER")
+(in-package "SB!WALKER")
+
+;;;; forward references
+
+(defvar *key-to-walker-environment*)
 
 ;;;; environment hacking stuff, necessarily SBCL-specific
 
@@ -76,7 +80,7 @@
 ;;; In SBCL, as in CMU CL before it, the environment is represented
 ;;; with a structure that holds alists for the functional things,
 ;;; variables, blocks, etc. Except for SYMBOL-MACROLET, only the
-;;; SB-C::LEXENV-FUNS slot is relevant. It holds: Alist (Name . What),
+;;; SB!C::LEXENV-FUNS slot is relevant. It holds: Alist (Name . What),
 ;;; where What is either a functional (a local function) or a list
 ;;; (MACRO . <function>) (a local macro, with the specifier expander.)
 ;;; Note that Name may be a (SETF <name>) function. Accessors are
@@ -84,7 +88,7 @@
 ;;;
 ;;; If WITH-AUGMENTED-ENVIRONMENT is called from WALKER-ENVIRONMENT-BIND
 ;;; this code hides the WALKER version of an environment
-;;; inside the SB-C::LEXENV structure.
+;;; inside the SB!C::LEXENV structure.
 ;;;
 ;;; In CMUCL (and former SBCL), This used to be a list of lists of form
 ;;; (<gensym-name> MACRO . #<interpreted-function>) in the :functions slot
@@ -96,12 +100,12 @@
 ;;; Instead this list was COERCEd to a #<FUNCTION ...>!
 ;;;
 ;;; Instead, we now use a special sort of "function"-type for that
-;;; information, because the functions slot in SB-C::LEXENV is
+;;; information, because the functions slot in SB!C::LEXENV is
 ;;; supposed to have a list of <Name MACRO . #<function> elements.
 ;;; So, now we hide our bits of interest in the walker-info slot in
 ;;; our new BOGO-FUN.
 ;;;
-;;; MACROEXPAND-1 and SB-INT:EVAL-IN-LEXENV are the only SBCL
+;;; MACROEXPAND-1 and SB!INT:EVAL-IN-LEXENV are the only SBCL
 ;;; functions that get called with the constructed environment
 ;;; argument.
 
@@ -146,34 +150,34 @@
   ;; environment. So we just blow it off, 'cause anything real we do
   ;; would be wrong. But we still have to make an entry so we can tell
   ;; functions from macros.
-  (let ((lexenv (sb-kernel::coerce-to-lexenv env)))
-    (sb-c::make-lexenv
-      :default lexenv
-      :funs (append (mapcar (lambda (f)
-			      (cons (car f)
-				    (sb-c::make-functional :lexenv lexenv)))
-			    funs)
-		    (mapcar (lambda (m)
-			      (list* (car m)
-				     'sb-c::macro
-				     (if (eq (car m)
-					     *key-to-walker-environment*)
-					 (walker-info-to-bogo-fun (cadr m))
-					 (coerce (cadr m) 'function))))
-			    macros)))))
+  (let ((lexenv (sb!kernel::coerce-to-lexenv env)))
+    (sb!c::make-lexenv
+     :default lexenv
+     :funs (append (mapcar (lambda (f)
+			     (cons (car f)
+				   (sb!c::make-functional :lexenv lexenv)))
+			   funs)
+		   (mapcar (lambda (m)
+			     (list* (car m)
+				    'sb!c::macro
+				    (if (eq (car m)
+					    *key-to-walker-environment*)
+					(walker-info-to-bogo-fun (cadr m))
+					(coerce (cadr m) 'function))))
+			   macros)))))
 
 (defun environment-function (env fn)
   (when env
-    (let ((entry (assoc fn (sb-c::lexenv-funs env) :test #'equal)))
+    (let ((entry (assoc fn (sb!c::lexenv-funs env) :test #'equal)))
       (and entry
-	   (sb-c::functional-p (cdr entry))
+	   (sb!c::functional-p (cdr entry))
 	   (cdr entry)))))
 
 (defun environment-macro (env macro)
   (when env
-    (let ((entry (assoc macro (sb-c::lexenv-funs env) :test #'eq)))
+    (let ((entry (assoc macro (sb!c::lexenv-funs env) :test #'eq)))
       (and entry
-	   (eq (cadr entry) 'sb-c::macro)
+	   (eq (cadr entry) 'sb!c::macro)
            (if (eq macro *key-to-walker-environment*)
 	       (values (bogo-fun-to-walker-info (cddr entry)))
 	       (values (function-lambda-expression (cddr entry))))))))
@@ -206,7 +210,7 @@
 (defun convert-macro-to-lambda (llist body env &optional (name "dummy macro"))
   (let ((gensym (make-symbol name)))
     (eval-in-lexenv `(defmacro ,gensym ,llist ,@body)
-		    (sb-c::make-restricted-lexenv env))
+		    (sb!c::make-restricted-lexenv env))
     (macro-function gensym)))
 
 ;;;; the actual walker
@@ -237,7 +241,7 @@
     (list
       (list *key-to-walker-environment*
 	    (list (if wfnp walk-function     (car lock))
-		  (if wfop walk-form	 (cadr lock))
+		  (if wfop walk-form         (cadr lock))
 		  (if decp declarations      (caddr lock))
 		  (if lexp lexical-variables (cadddr lock)))))))
 
@@ -266,7 +270,7 @@
 
 (defun variable-symbol-macro-p (var env)
   (let ((entry (member var (env-lexical-variables env) :key #'car)))
-    (when (eq (cadar entry) 'sb-sys:macro)
+    (when (eq (cadar entry) 'sb!sys:macro)
       entry)))
 
 (defvar *var-declarations* '(special))
@@ -316,7 +320,7 @@
 ;;;	 - Is a common lisp special form (not likely)
 ;;;	 - Is not a common lisp special form (on the 3600 IF --> COND).
 ;;;
-;;;     * We can safe ourselves from this case (second subcase really)
+;;;     * We can save ourselves from this case (second subcase really)
 ;;;       by checking to see whether there is a template defined for 
 ;;;       something before we check to see whether we can macroexpand it.
 ;;;
@@ -392,7 +396,7 @@
 (define-walker-template unwind-protect       (nil return repeat (eval)))
 
 ;;; SBCL-only special forms
-(define-walker-template sb-ext:truly-the     (nil quote eval))
+(define-walker-template sb!ext:truly-the     (nil quote eval))
 
 (defvar *walk-form-expand-macros-p* nil)
 
@@ -450,7 +454,7 @@
 		(multiple-value-bind (newnewform macrop)
 		    (walker-environment-bind
 			(new-env env :walk-form newform)
-		      (macroexpand-1 newform new-env))
+		      (sb-xc:macroexpand-1 newform new-env))
 		  (cond
 		   (macrop
 		    (let ((newnewnewform (walk-form-internal newnewform
@@ -466,7 +470,7 @@
 		    ;; maintained as part of SBCL, so it should know
 		    ;; about all the special forms that SBCL knows
 		    ;; about.
-		    (error "unexpected special form ~S" fn))
+		    (bug "unexpected special form ~S" fn))
 		   (t
 		    ;; Otherwise, walk the form as if it's just a
 		    ;; standard function call using a template for
@@ -619,7 +623,7 @@
 	      (null (get-walker-template (car form)))
 	      (progn
 		(multiple-value-setq (new-form macrop)
-				     (macroexpand-1 form env))
+				     (sb-xc:macroexpand-1 form env))
 		macrop))
 	 ;; This form was a call to a macro. Maybe it expanded
 	 ;; into a declare?  Recurse to find out.
@@ -847,7 +851,7 @@
 		 :lexical-variables
 		 (append (mapcar (lambda (binding)
 				   `(,(car binding)
-				     sb-sys:macro . ,(cadr binding)))
+				     sb!sys:macro . ,(cadr binding)))
 				 bindings)
 			 (env-lexical-variables old-env)))
       (relist* form 'symbol-macrolet bindings

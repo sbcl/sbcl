@@ -645,11 +645,17 @@
  ("src/code/late-setf")
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
  ;; other target-code-building stuff which can't be processed until
  ;; machinery like SB!XC:DEFMACRO exists
 
  ("src/code/late-format") ; needs SB!XC:DEFMACRO
  ("src/code/sxhash") ; needs SB!XC:DEFINE-MODIFY-MACRO
  ("src/code/signal")
- ("src/code/late-defbangmethod"))
+ ("src/code/late-defbangmethod")
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;; PCL-related stuff, which shouldn't need to be done earlier than
+ ;; anything else in cold build because after all it used to be
+ ;; postponed 'til warm init with no problems.
+
+ ("src/pcl/walk"))

@@ -129,7 +129,7 @@
 		;; (arbitrary) linearization of the declared build
 		;; order dependencies from the old PCL defsys.lisp
 		;; dependency database.
-		"src/pcl/walk"
+		#+nil "src/pcl/walk" ; #+NIL = moved to build-order.lisp-expr
 		"src/pcl/early-low"
 		"src/pcl/macros"
                 "src/pcl/compiler-support"
