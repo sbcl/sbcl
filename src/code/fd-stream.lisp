@@ -949,7 +949,7 @@
       (when (null count)
         (simple-stream-perror "couldn't read from ~S" stream err))
       (setf (fd-stream-listen stream) nil
-            (fd-stream-ibuf-head stream) new-head
+            (fd-stream-ibuf-head stream) 0
             (fd-stream-ibuf-tail stream) (+ count new-head))
       count)))
 

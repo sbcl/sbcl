@@ -2038,3 +2038,12 @@ WORKAROUND:
            (let ((i (sb-c::values-type-intersection x y)))
              (assert (sb-c::type= i (sb-c::values-type-intersection i x)))
              (assert (sb-c::type= i (sb-c::values-type-intersection i y)))))))
+
+370: reader misbehaviour on large-exponent floats
+    (read-from-string "1.0s1000000000000000000000000000000000000000")
+  causes the reader to attempt to create a very large bignum (which it
+  will then attempt to coerce to a rational).  While this isn't
+  completely wrong, it is probably not ideal -- checking the floating
+  point control word state and then returning the relevant float
+  (most-positive-short-float or short-float-infinity) or signalling an
+  error immediately would seem to make more sense.
