@@ -979,7 +979,7 @@
 ;;; list.
 (defvar *always-optimized-away*
   '(;; This should always be DEFTRANSFORMed away, but wasn't in a bug
-    ;; reported to cmucl-imp@cons.org 2000-06-20.
+    ;; reported to cmucl-imp 2000-06-20.
     %instance-ref
     ;; These should always turn into VOPs, but wasn't in a bug which
     ;; appeared when LTN-POLICY stuff was being tweaked in

@@ -1207,7 +1207,7 @@
 				  (#\D 'double-float)
 				  (#\L 'long-float)))
 		  num)
-	     ;; toy@rtp.ericsson.se: We need to watch out if the
+	     ;; Raymond Toy writes: We need to watch out if the
 	     ;; exponent is too small or too large. We add enough to
 	     ;; EXPONENT to make it within range and scale NUMBER
 	     ;; appropriately. This should avoid any unnecessary

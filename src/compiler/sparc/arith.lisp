@@ -172,8 +172,7 @@
 ;;; Special case fixnum + and - that trap on overflow.  Useful when we
 ;;; don't know that the output type is a fixnum.
 
-;;; I (toy@rtp.ericsson.se) took these out.  They don't seem to be
-;;; used anywhere at all.
+;;; I (Raymond Toy) took these out. They don't seem to be used anywhere at all.
 #+nil
 (progn
 (define-vop (+/fixnum fast-+/fixnum=>fixnum)

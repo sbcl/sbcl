@@ -596,7 +596,7 @@
 ;;;;
 ;;;; The original CMU CL code requested:
 ;;;;   Please send any bug reports, comments, or improvements to
-;;;;   Raymond Toy at toy@rtp.ericsson.se.
+;;;;   Raymond Toy at <email address deleted during 2002 spam avalanche>.
 
 ;;; FIXME: In SBCL, the floating point infinity constants like
 ;;; SB!EXT:DOUBLE-FLOAT-POSITIVE-INFINITY aren't available as

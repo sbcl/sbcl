@@ -479,11 +479,11 @@ a host-structure or string."
 	 (default-host (if defaults
 			   (%pathname-host defaults)
 			   (pathname-host *default-pathname-defaults*)))
-	 ;; toy@rtp.ericsson.se: CLHS says make-pathname can take a
+	 ;; Raymond Toy writes: CLHS says make-pathname can take a
 	 ;; string (as a logical-host) for the host part. We map that
 	 ;; string into the corresponding logical host structure.
 	 ;;
-	 ;; pw@snoopy.mv.com:
+	 ;; Paul Werkowski writes:
 	 ;; HyperSpec says for the arg to MAKE-PATHNAME;
 	 ;; "host---a valid physical pathname host. ..."
 	 ;; where it probably means -- a valid pathname host.

@@ -1273,7 +1273,7 @@
       ;; The desired FP mode data is in the least significant 32
       ;; bits, which is stored at the next higher word in memory.
       (loadw res nfp (+ offset 4))
-      ;; Is this nop needed? (toy@rtp.ericsson.se)
+      ;; Is this nop needed? -- rtoy
       (inst nop))))
 
 (define-vop (set-floating-point-modes)

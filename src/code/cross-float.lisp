@@ -185,10 +185,9 @@
 ;;; when trying to optimize the EXPT forms in the MAKE-FOO-FLOAT
 ;;; functions below. See the message
 ;;;   Subject: Re: Compiler bug?
-;;;   From: Raymond Toy <toy@rtp.ericsson.se>
+;;;   From: Raymond Toy
 ;;;   Date: 28 Mar 2001 08:19:59 -0500
-;;;   Message-ID: <4nvgou3u9s.fsf@rtp.ericsson.se>
-;;; on the cmucl-imp@cons.org mailing list. Once the CMU CL folks
+;;; on the cmucl-imp mailing list. Once the CMU CL folks
 ;;; make a bug-fix release, we can get rid of this and go back to
 ;;; calling EXPT directly. -- WHN 2001-04-05
 (defun kludge-opaque-expt (x y)

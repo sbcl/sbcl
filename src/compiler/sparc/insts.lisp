@@ -1675,8 +1675,8 @@ about function addresses and register values.")
   (define-unary-fp-inst fxtoq #b010001100 :reads :fsr :extended t)	; v9
 
 
-  ;; I (toy@rtp.ericsson.se) don't think these f{sd}toir instructions
-  ;; exist on any Ultrasparc, but I only have a V9 manual.  The code in
+  ;; I (Raymond Toy) don't think these f{sd}toir instructions exist on
+  ;; any Ultrasparc, but I only have a V9 manual. The code in
   ;; float.lisp seems to indicate that they only existed on non-sun4
   ;; machines (sun3 68K machines?).
   (define-unary-fp-inst fstoir #b011000001 :reads :fsr)

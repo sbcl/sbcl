@@ -1456,6 +1456,18 @@ WORKAROUND:
            (INTEGER 1296 1296)
            ...)>)[:EXTERNAL]
 
+189: "ignored NOTINLINE for functions defined by FLET or LABELS"
+  According to the ANSI definition of the NOTINLINE declaration, 
+    NOTINLINE specifies that it is undesirable to compile the functions
+    named by FUNCTION-NAMES in-line. A compiler is not free to ignore
+    this declaration; calls to the specified functions must be implemented
+    as out-of-line subroutine calls. 
+  However, as of sbcl-0.7.5.22, Python ignores this declaration for 
+  functions defined by LABELS and FLET, and merrily optimizes away the
+  LAMBDAs. (This is an annoyance not just for language lawyers, but for
+  people who want a useful BACKTRACE for functions which, for whatever
+  reason, are constrained to be implemented as LABELS or LET.)
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
