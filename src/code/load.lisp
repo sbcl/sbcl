@@ -268,9 +268,21 @@
 		       stream
 		       implementation
 		       +backend-fasl-file-implementation+))))
-	;; TO DO: Check for *FEATURES* which affect binary compatibility.
-	;; (And don't forget to return T.:-)
-	))))
+	;; Read and validate *FEATURES* which affect binary compatibility.
+	(let ((faff-in-this-file (string-from-stream)))
+	  (unless (string= faff-in-this-file *features-affecting-fasl-format*)
+	    (error
+	     "~@<incompatible ~S in fasl file ~S: ~2I~_~
+              Of features affecting binary compatibility, ~4I~_~S~2I~_~
+              this runtime has ~4I~_~A,~2I~_~
+              while the fasl expects ~4I~_~A.~:>"
+	     '*features* 
+	     stream
+	     *features-potentially-affecting-fasl-format*
+	     *features-affecting-fasl-format*
+	     faff-in-this-file)))
+	;; success
+	t))))
 
 ;; Setting this variable gives you a trace of fops as they are loaded and
 ;; executed.

@@ -293,13 +293,15 @@
      stream)
     (dump-byte +fasl-header-string-stop-char-code+ res)
 
-    ;; Finish the header by outputting fasl file implementation and
-    ;; version in machine-readable form.
-    (let ((implementation +backend-fasl-file-implementation+))
-      (dump-unsigned-32 (length (symbol-name implementation)) res)
-      (dotimes (i (length (symbol-name implementation)))
-	(dump-byte (char-code (aref (symbol-name implementation) i)) res)))
-    (dump-unsigned-32 +fasl-file-version+ res)
+    ;; Finish the header by outputting fasl file implementation,
+    ;; version, and key *FEATURES*.
+    (flet ((dump-counted-string (string)
+	     (dump-unsigned-32 (length string) res)
+	     (dotimes (i (length string))
+	       (dump-byte (char-code (aref string i)) res))))
+      (dump-counted-string (symbol-name +backend-fasl-file-implementation+))
+      (dump-unsigned-32 +fasl-file-version+ res)      
+      (dump-counted-string *features-affecting-fasl-format*))
 
     res))
 

@@ -33,52 +33,57 @@
 ;;;   against.
 (defparameter *fasl-header-string-start-string* "# FASL")
 
+(macrolet ((define-fasl-format-features ()
+             (let (;; master value for *F-P-A-F-F*
+		   (fpaff '(:sb-thread)))
+	       `(progn
+		  ;; a list of *(SHEBANG-)FEATURES* flags which affect
+		  ;; binary compatibility, i.e. which must be the same
+		  ;; between the SBCL which compiles the code and the
+		  ;; SBCL which executes the code
+		  ;;
+		  ;; This is a property of SBCL executables in the
+		  ;; abstract, not of this particular SBCL executable, 
+		  ;; so any flag in this list may or may not be present
+		  ;; in the *FEATURES* list of this particular build.
+		  (defparameter *features-potentially-affecting-fasl-format*
+		    ',fpaff)
+		  ;; a string representing flags of *F-P-A-F-F* which
+		  ;; are in this particular build
+		  ;;
+		  ;; (A list is the natural logical representation for
+		  ;; this, but we represent it as a string because
+		  ;; that's physically convenient for writing to and
+		  ;; reading from fasl files, and because we don't
+		  ;; need to do anything sophisticated with its
+		  ;; logical structure, just test it for equality.)
+		  (defparameter *features-affecting-fasl-format*
+		    ,(let ((*print-pretty* nil))
+		       (prin1-to-string
+			(sort
+			 (copy-seq
+			  (intersection sb-cold:*shebang-features* fpaff))
+			 #'string<
+			 :key #'symbol-name))))))))
+  (define-fasl-format-features))
+	   
 ;;; the code for a character which terminates a fasl file header
 (def!constant +fasl-header-string-stop-char-code+ 255)
 
 ;;; This value should be incremented when the system changes in such a
 ;;; way that it will no longer work reliably with old fasl files. In
-;;; practice, I (WHN) fairly often forget to increment it for CVS
+;;; practice, I (WHN) have often forgotten to increment it for CVS
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 40)
-;;; (record of versions before 0.7.0 deleted in 0.7.1.41)
-;;; 23 = sbcl-0.7.0.1 deleted no-longer-used EVAL-STACK stuff,
-;;;      causing changes in *STATIC-SYMBOLS*.
-;;; 24 = sbcl-0.7.1.19 changed PCL service routines which might be
-;;;      called from macroexpanded code
-;;; 25 = sbcl-0.7.1.41 (and immediately preceding versions, actually)
-;;;      introduced new functions to check for control stack exhaustion
-;;; 26 = sbcl-0.7.2.4 or so added :VARIABLE :MACRO-EXPANSION to INFO codes
-;;; 27: (2002-04-08) added MIGHT-CONTAIN-OTHER-TYPES? slot to CTYPE
-;;; 28: (2002-05-08) new convention for foreign symbols to support
-;;;     dynamic loading in OpenBSD
-;;; 29: (2002-06-24) removed *!INITIAL-FDEFN-OBJECTS* from static symbols
-;;; 30: (2002-07-26) deleted all references to %DETECT-STACK-EXHAUSTION, 
-;;;     which was introduced in version 25, since now control stack
-;;;     is checked using mmap() page protection
-;;; 31: (2002-08-14) changed encoding of PCL internal MAKE-INSTANCE
-;;;     function names so they're insensitive to whether the class name
-;;;     is currently external to its package
-;;; 32: (2002-09-21) changes in implementation of sequence functions,
-;;;     causing old utility functions like COERCE-TO-SIMPLE-VECTOR to go away
-;;; 33: (2002-10-02) (again) changes in implementation of sequence functions,
-;;;     causing old utility functions like COERCE-TO-SIMPLE-VECTOR to go away
-;;; 34: (2002-10-05) changed implementation of DEFMACRO, so %%DEFMACRO
-;;;      was deleted
-;;; 35: (2002-11-27) (incremented version before 0.7.10 release,
-;;;     reflecting changes from a week or more ago) changed layout of
-;;;     CLOS objects to support SXHASH returning values other than 42
-;;;     for STANDARD-OBJECT
-;;; 36: (2002-12-04) DEFSTRUCT-DESCRIPTION layout changed to accommodate
-;;;     correct behaviour of colliding accessors
-;;; 37: (2002-12-09) changed implementation of DEFINE-COMPILER-MACRO,
-;;;     deleting %%DEFINE-COMPILER-MACRO
+(def!constant +fasl-file-version+ 41)
+;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
 ;;;     DEFSTRUCT-SLOT-DESCRIPTION
 ;;; 40: (2003-03-11) changed value of (SXHASH NIL)
+;;; 41: (2003-04-26) enforced binary incompatibility between +SB-THREAD
+;;;     and -SB-THREAD builds
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

@@ -157,7 +157,7 @@
  ;; As of SBCL 0.8,  this is only supposed to work in x86 Linux, on which
  ;; system it's implemented using clone(2) and the %fs segment register.
  ;; Note that no consistent effort to audit the SBCL library code for
- ;; thread safety has been performed, so caveat executor
+ ;; thread safety has been performed, so caveat executor.
  ; :sb-thread
  
  ;; This affects the definition of a lot of things in bignum.lisp. It
@@ -198,6 +198,10 @@
  ;; miscellaneous notes on other things which could have special significance
  ;; in the *FEATURES* list
  ;;
+
+ ;; Any target feature which affects binary compatibility of fasl files
+ ;; needs to be recorded in *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
+ ;; (elsewhere).
 
  ;; notes on the :NIL and :IGNORE features:
  ;;
