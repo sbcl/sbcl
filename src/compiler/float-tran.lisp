@@ -561,34 +561,27 @@
     (when (and arg-lo (floatp arg-lo-val) (zerop arg-lo-val) (consp arg-lo)
 	       (minusp (float-sign arg-lo-val)))
       (compiler-notify "float zero bound ~S not correctly canonicalized?" arg-lo)
-      (setq arg-lo '(0e0) arg-lo-val 0e0))
+      (setq arg-lo 0e0 arg-lo-val arg-lo))
     (when (and arg-hi (zerop arg-hi-val) (floatp arg-hi-val) (consp arg-hi)
 	       (plusp (float-sign arg-hi-val)))
       (compiler-notify "float zero bound ~S not correctly canonicalized?" arg-hi)
-      (setq arg-hi `(,(ecase *read-default-float-format*
-			(double-float (load-time-value (make-unportable-float :double-float-negative-zero)))
-			#!+long-float
-			(long-float (load-time-value (make-unportable-float :long-float-negative-zero)))))
-	    arg-hi-val (ecase *read-default-float-format*
-			 (double-float (load-time-value (make-unportable-float :double-float-negative-zero)))
-			 #!+long-float
-			 (long-float (load-time-value (make-unportable-float :long-float-negative-zero))))))
-    (and (or (null domain-low)
-	     (and arg-lo (>= arg-lo-val domain-low)
-		  (not (and (zerop domain-low) (floatp domain-low)
-			    (plusp (float-sign domain-low))
-			    (zerop arg-lo-val) (floatp arg-lo-val)
-			    (if (consp arg-lo)
-				(plusp (float-sign arg-lo-val))
-				(minusp (float-sign arg-lo-val)))))))
-	 (or (null domain-high)
-	     (and arg-hi (<= arg-hi-val domain-high)
-		  (not (and (zerop domain-high) (floatp domain-high)
-			    (minusp (float-sign domain-high))
-			    (zerop arg-hi-val) (floatp arg-hi-val)
-			    (if (consp arg-hi)
-				(minusp (float-sign arg-hi-val))
-				(plusp (float-sign arg-hi-val))))))))))
+      (setq arg-hi (ecase *read-default-float-format*
+                     (double-float (load-time-value (make-unportable-float :double-float-negative-zero)))
+                     #!+long-float
+                     (long-float (load-time-value (make-unportable-float :long-float-negative-zero))))
+	    arg-hi-val arg-hi))
+    (flet ((fp-neg-zero-p (f)           ; Is F -0.0?
+	     (and (floatp f) (zerop f) (minusp (float-sign f))))
+	   (fp-pos-zero-p (f)           ; Is F +0.0?
+	     (and (floatp f) (zerop f) (plusp (float-sign f)))))
+      (and (or (null domain-low)
+               (and arg-lo (>= arg-lo-val domain-low)
+                    (not (and (fp-pos-zero-p domain-low)
+			      (fp-neg-zero-p arg-lo)))))
+           (or (null domain-high)
+               (and arg-hi (<= arg-hi-val domain-high)
+                    (not (and (fp-neg-zero-p domain-high)
+			      (fp-pos-zero-p arg-hi)))))))))
 (eval-when (:compile-toplevel :execute)
   (setf *read-default-float-format* 'single-float))
 

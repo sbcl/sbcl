@@ -182,20 +182,7 @@
 	(return (values nil t))))))
 
 (!define-type-method (values :simple-=) (type1 type2)
-  (let ((rest1 (args-type-rest type1))
-	(rest2 (args-type-rest type2)))
-    (cond ((and rest1 rest2 (type/= rest1 rest2))
-	   (type= rest1 rest2))
-	  ((or rest1 rest2)
-	   (values nil t))
-	  (t
-	   (multiple-value-bind (req-val req-win)
-	       (type=-list (values-type-required type1)
-			   (values-type-required type2))
-	     (multiple-value-bind (opt-val opt-win)
-		 (type=-list (values-type-optional type1)
-			     (values-type-optional type2))
-	       (values (and req-val opt-val) (and req-win opt-win))))))))
+  (type=-args type1 type2))
 
 (!define-type-class function)
 
@@ -327,32 +314,7 @@
                      (values nil t))
                     ((eq (fun-type-wild-args type1) t)
                      (values t t))
-                    (t (and/type
-                        (cond ((null (fun-type-rest type1))
-                               (values (null (fun-type-rest type2)) t))
-                              ((null (fun-type-rest type2))
-                               (values nil t))
-                              (t
-                               (compare type= rest)))
-                        (labels ((type-list-= (l1 l2)
-                                   (cond ((null l1)
-                                          (values (null l2) t))
-                                         ((null l2)
-                                          (values nil t))
-                                         (t (multiple-value-bind (res winp)
-                                                (type= (first l1) (first l2))
-                                              (cond ((not winp)
-                                                     (values nil nil))
-                                                    ((not res)
-                                                     (values nil t))
-                                                    (t
-                                                     (type-list-= (rest l1)
-                                                                  (rest l2)))))))))
-                          (and/type (and/type (compare type-list-= required)
-                                              (compare type-list-= optional))
-                              (if (or (fun-type-keyp type1) (fun-type-keyp type2))
-                                  (values nil nil)
-                                  (values t t))))))))))
+                    (t (type=-args type1 type2))))))
 
 (!define-type-class constant :inherits values)
 
@@ -626,6 +588,23 @@
                               :optional optional
                               :rest rest)
             exactp)))
+
+(defun type=-args (type1 type2)
+  (macrolet ((compare (comparator field)
+               (let ((reader (symbolicate '#:args-type- field)))
+                 `(,comparator (,reader type1) (,reader type2)))))
+    (and/type
+     (cond ((null (args-type-rest type1))
+            (values (null (args-type-rest type2)) t))
+           ((null (args-type-rest type2))
+            (values nil t))
+           (t
+            (compare type= rest)))
+     (and/type (and/type (compare type=-list required)
+                         (compare type=-list optional))
+               (if (or (args-type-keyp type1) (args-type-keyp type2))
+                   (values nil nil)
+                   (values t t))))))
 
 ;;; Do a union or intersection operation on types that might be values
 ;;; types. The result is optimized for utility rather than exactness,

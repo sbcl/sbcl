@@ -159,7 +159,8 @@
 		   values-subtypep-cache-clear
 		   csubtypep-cache-clear
 		   type-intersection2-cache-clear
-		   values-type-intersection-cache-clear))
+		   values-type-intersection-cache-clear
+                   type=-cache-clear))
       (funcall (the function (symbol-function sym)))))
   (values))
 
