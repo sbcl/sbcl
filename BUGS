@@ -1368,6 +1368,14 @@ WORKAROUND:
   * (/ 1 (/ 3 2) 0)
   1/0
 
+185: "top-level forms at the REPL"
+  * (locally (defstruct foo (a 0 :type fixnum)))
+  gives an error:
+  ; caught ERROR:
+  ;   (in macroexpansion of (SB-KERNEL::%DELAYED-GET-COMPILER-LAYOUT BAR))
+  however, compiling and loading the same expression in a file works
+  as expected.
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

@@ -330,7 +330,7 @@
 
 (defun hairy-data-vector-set (array index new-value)
   (with-array-data ((vector array) (index index) (end))
-    (declare (ignore end) (optimize))
+    (declare (ignore end))
     (etypecase vector .
 	       #.(mapcar (lambda (type)
 			   (let ((atype `(simple-array ,type (*))))
@@ -338,7 +338,13 @@
 			       (data-vector-set (the ,atype vector)
 						index
 						(the ,type
-						  new-value)))))
+						  new-value))
+			       ;; For specialized arrays, the return
+			       ;; from data-vector-set would have to
+			       ;; be reboxed to be a (Lisp) return
+			       ;; value; instead, we use the
+			       ;; already-boxed value as the return.
+			       new-value)))
 			 *specialized-array-element-types*))))
 
 (defun %array-row-major-index (array subscripts
