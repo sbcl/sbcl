@@ -16,7 +16,6 @@
 ;;; listed here and then listed separately (and by now, 2001-06-06,
 ;;; slightly differently) elsewhere.
 (declaim (special *posix-argv*
-		  *!initial-fdefn-objects*
 		  *read-only-space-free-pointer*
 		  sb!vm:*static-space-free-pointer*
 		  sb!vm:*initial-dynamic-space-free-pointer*
@@ -37,7 +36,6 @@
 		  *free-interrupt-context-index*
 		  sb!vm::*allocation-pointer*
 		  sb!vm::*binding-stack-pointer*
-		  sb!vm::*internal-gc-trigger*
 		  sb!vm::*fp-constant-0d0*
 		  sb!vm::*fp-constant-1d0*
 		  sb!vm::*fp-constant-0f0*

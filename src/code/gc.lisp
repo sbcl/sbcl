@@ -190,12 +190,6 @@ and submit it as a patch."
 
 (declaim (type (or index null) *gc-trigger*))
 
-;;; On the X86, we store the GC trigger in a ``static'' symbol instead
-;;; of letting magic C code handle it. It gets initialized by the
-;;; startup code.
-#!+x86
-(defvar sb!vm::*internal-gc-trigger*)
-
 ;;;; The following specials are used to control when garbage collection
 ;;;; occurs.
 

@@ -156,25 +156,23 @@
 
     ;; The C startup code must fill these in.
     *posix-argv*
-    sb!impl::*initial-fdefn-objects*
 
-    ;; Functions that the C code needs to call
-    ;; sb!impl::%initial-fun
+    ;; functions that the C code needs to call
     sb!impl::maybe-gc
     sb!kernel::internal-error
     sb!di::handle-breakpoint
     sb!impl::fdefinition-object
 
-    ;; Free Pointers.
+    ;; free pointers
     *read-only-space-free-pointer*
     *static-space-free-pointer*
     *initial-dynamic-space-free-pointer*
 
-    ;; Things needed for non-local-exit.
+    ;; things needed for non-local exit
     *current-catch-block*
     *current-unwind-protect-block*
 
-    ;; Interrupt Handling
+    ;; interrupt handling
     *free-interrupt-context-index*
     sb!unix::*interrupts-enabled*
     sb!unix::*interrupt-pending*

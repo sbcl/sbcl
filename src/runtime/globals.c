@@ -37,7 +37,7 @@ lispobj *current_binding_stack_pointer;
 lispobj *dynamic_space_free_pointer;
 #endif
 
-#ifndef INTERNAL_GC_TRIGGER
+#ifndef GENCGC /* since GENCGC has its own way to record trigger */
 lispobj *current_auto_gc_trigger;
 #endif
 
@@ -51,7 +51,7 @@ void globals_init(void)
     /* Space, stack, and free pointer vars are initialized by
      * validate() and coreparse(). */
 
-#ifndef INTERNAL_GC_TRIGGER
+#ifndef GENCGC /* since GENCGC has its own way to record trigger */
     /* no GC trigger yet */
     current_auto_gc_trigger = NULL;
 #endif

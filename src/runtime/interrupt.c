@@ -497,7 +497,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
  * stuff to detect and handle hitting the GC trigger
  */
 
-#ifndef INTERNAL_GC_TRIGGER
+#ifndef GENCGC /* since GENCGC has its own way to record trigger */
 static boolean
 gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
 {
@@ -525,11 +525,11 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
     os_context_t *context=(os_context_t *) void_context;
 
     if (!foreign_function_call_active
-#ifndef INTERNAL_GC_TRIGGER
+#ifndef GENCGC /* since GENCGC has its own way to record trigger */
 	&& gc_trigger_hit(signal, info, context)
 #endif
 	) {
-#ifndef INTERNAL_GC_TRIGGER
+#ifndef GENCGC /* since GENCGC has its own way to record trigger */
 	clear_auto_gc_trigger();
 #endif
 

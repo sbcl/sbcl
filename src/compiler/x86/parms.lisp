@@ -222,15 +222,13 @@
 (defvar *allocation-pointer*)
 (defvar *binding-stack-pointer*)
 
-;;; FIXME: *!INITIAL-FDEFN-OBJECTS* and !COLD-INIT probably don't need
-;;; to be in the static symbols table any more. Also, if
-;;; *INTERNAL-GC-TRIGGER* really is not used, we can punt it.
+;;; FIXME: !COLD-INIT probably doesn't need
+;;; to be in the static symbols table any more.
 (defparameter *static-symbols*
   '(t
 
     ;; The C startup code must fill these in.
     *posix-argv*
-    sb!impl::*!initial-fdefn-objects*
 
     ;; functions that the C code needs to call
     maybe-gc
@@ -262,7 +260,6 @@
 
     *allocation-pointer*
     *binding-stack-pointer*
-    *internal-gc-trigger*   ; Not used.
 
     ;; the floating point constants
     *fp-constant-0d0*

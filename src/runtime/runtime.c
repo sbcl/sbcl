@@ -276,9 +276,6 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
 #ifdef BINDING_STACK_POINTER
     SetSymbolValue(BINDING_STACK_POINTER, BINDING_STACK_START);
 #endif
-#if defined INTERNAL_GC_TRIGGER && !defined __i386__
-    SetSymbolValue(INTERNAL_GC_TRIGGER, make_fixnum(-1));
-#endif
 
     interrupt_init();
 

@@ -49,7 +49,7 @@ static int ldb_in_fd = -1;
 
 typedef void cmd(char **ptr);
 
-static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
+static cmd dump_cmd, print_cmd, quit_cmd, help_cmd;
 static cmd flush_cmd, search_cmd, regs_cmd, exit_cmd;
 static cmd print_context_cmd;
 static cmd backtrace_cmd, purify_cmd, catchers_cmd;
@@ -63,7 +63,6 @@ static struct cmd {
     {"help", "Display this help information.", help_cmd},
     {"?", "(an alias for help)", help_cmd},
     {"backtrace", "Backtrace up to N frames.", backtrace_cmd},
-    {"call", "Call FUNCTION with ARG1, ARG2, ...", call_cmd},
     {"catchers", "Print a list of all the active catchers.", catchers_cmd},
     {"context", "Print interrupt context number I.", print_context_cmd},
     {"dump", "Dump memory starting at ADDRESS for COUNT words.", dump_cmd},
@@ -184,8 +183,6 @@ regs_cmd(char **ptr)
 #if defined(__i386__)
     printf("ALLOC\t=\t0x%08lx\n",
 	   (unsigned long)SymbolValue(ALLOCATION_POINTER));
-    printf("TRIGGER\t=\t0x%08lx\n",
-	   (unsigned long)SymbolValue(INTERNAL_GC_TRIGGER));
 #else
     printf("ALLOC\t=\t0x%08X\n",
 	   (unsigned long)dynamic_space_free_pointer);
@@ -262,77 +259,10 @@ search_cmd(char **ptr)
     }
 }
 
-static void
-call_cmd(char **ptr)
-{
-    lispobj thing = parse_lispobj(ptr), function, result = 0, cons, args[3];
-    int numargs;
-
-    if (lowtag_of(thing) == OTHER_POINTER_LOWTAG) {
-	switch (widetag_of(*(lispobj *)(thing-OTHER_POINTER_LOWTAG))) {
-	  case SYMBOL_HEADER_WIDETAG:
-	    for (cons = SymbolValue(INITIAL_FDEFN_OBJECTS);
-		 cons != NIL;
-		 cons = CONS(cons)->cdr) {
-		if (FDEFN(CONS(cons)->car)->name == thing) {
-		    thing = CONS(cons)->car;
-		    goto fdefn;
-		}
-	    }
-	    printf("Symbol 0x%08lx is undefined.\n", (long unsigned)thing);
-	    return;
-
-	  case FDEFN_WIDETAG:
-	  fdefn:
-	    function = FDEFN(thing)->fun;
-	    if (function == NIL) {
-		printf("Fdefn 0x%08lx is undefined.\n", (long unsigned)thing);
-		return;
-	    }
-	    break;
-	  default:
-	    printf("0x%08lx is not a function pointer, symbol, "
-		   "or fdefn object.\n",
-		   (long unsigned)thing);
-	    return;
-	}
-    }
-    else if (lowtag_of(thing) != FUN_POINTER_LOWTAG) {
-        printf("0x%08lx is not a function pointer, symbol, or fdefn object.\n",
-	       (long unsigned)thing);
-        return;
-    }
-    else
-	function = thing;
-
-    numargs = 0;
-    while (more_p(ptr)) {
-	if (numargs >= 3) {
-	    printf("too many arguments (no more than 3 supported)\n");
-	    return;
-	}
-	args[numargs++] = parse_lispobj(ptr);
-    }
-
-    switch (numargs) {
-    case 0:
-	result = funcall0(function);
-	break;
-    case 1:
-	result = funcall1(function, args[0]);
-	break;
-    case 2:
-	result = funcall2(function, args[0], args[1]);
-	break;
-    case 3:
-	result = funcall3(function, args[0], args[1], args[2]);
-	break;
-    default:
-	lose("unsupported arg count made it past validity check?!");
-    }
-
-    print(result);
-}
+/* (There used to be call_cmd() here, to call known-at-cold-init-time
+ * Lisp functions from ldb, but it bitrotted and was deleted in
+ * sbcl-0.7.5.1. See older CVS versions if you want to resuscitate
+ * it.) */
 
 static void
 flush_cmd(char **ptr)
