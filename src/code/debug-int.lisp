@@ -38,24 +38,24 @@
   ()
   #!+sb-doc
   (:documentation
-   "All debug-conditions inherit from this type. These are serious conditions
+   "All DEBUG-CONDITIONs inherit from this type. These are serious conditions
     that must be handled, but they are not programmer errors."))
 
 (define-condition no-debug-info (debug-condition)
   ()
   #!+sb-doc
-  (:documentation "There is absolutely no debugging information available.")
+  (:documentation "There is no usable debugging information available.")
   (:report (lambda (condition stream)
 	     (declare (ignore condition))
 	     (fresh-line stream)
-	     (write-line "No debugging information available." stream))))
+	     (write-line "no debugging information available" stream))))
 
 (define-condition no-debug-function-returns (debug-condition)
   ((debug-function :reader no-debug-function-returns-debug-function
 		   :initarg :debug-function))
   #!+sb-doc
   (:documentation
-   "The system could not return values from a frame with debug-function since
+   "The system could not return values from a frame with DEBUG-FUNCTION since
     it lacked information about returning values.")
   (:report (lambda (condition stream)
 	     (let ((fun (debug-function-function
@@ -3629,7 +3629,7 @@
 	     results)))
     (nreverse results)))
 
-;;;; MAKE-BOGUS-LRA (used for :function-end breakpoints)
+;;;; MAKE-BOGUS-LRA (used for :FUNCTION-END breakpoints)
 
 (defconstant
   bogus-lra-constants

@@ -374,7 +374,7 @@
       (incf *gc-run-time* (- (get-internal-run-time)
 			     start-time))))
   ;; FIXME: should probably return (VALUES), here and in RETURN-FROM
-  (/show "returning from tail of SUB-GC")
+  (/show0 "returning from tail of SUB-GC")
   nil)
 
 ;;; This routine is called by the allocation miscops to decide whether
