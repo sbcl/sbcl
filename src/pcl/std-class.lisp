@@ -587,7 +587,8 @@
 				     &key direct-slots direct-superclasses)
   (declare (ignore slot-names))
   (let ((classoid (find-classoid (class-name class))))
-    (with-slots (wrapper class-precedence-list prototype predicate-name
+    (with-slots (wrapper class-precedence-list cpl-available-p
+                         prototype predicate-name
 			 (direct-supers direct-superclasses))
 	class
       (setf (slot-value class 'direct-slots)
@@ -598,6 +599,7 @@
       (setq direct-supers direct-superclasses)
       (setq wrapper (classoid-layout classoid))
       (setq class-precedence-list (compute-class-precedence-list class))
+      (setq cpl-available-p t)
       (add-direct-subclasses class direct-superclasses)
       (setq predicate-name (make-class-predicate-name (class-name class)))
       (make-class-predicate class predicate-name)
@@ -727,12 +729,12 @@
 	instance))))
 
 (defmethod shared-initialize :after
-      ((class structure-class)
-       slot-names
-       &key (direct-superclasses nil direct-superclasses-p)
-	    (direct-slots nil direct-slots-p)
-	    direct-default-initargs
-	    (predicate-name nil predicate-name-p))
+    ((class structure-class)
+     slot-names
+     &key (direct-superclasses nil direct-superclasses-p)
+     (direct-slots nil direct-slots-p)
+     direct-default-initargs
+     (predicate-name nil predicate-name-p))
   (declare (ignore slot-names direct-default-initargs))
   (if direct-superclasses-p
       (setf (slot-value class 'direct-superclasses)
@@ -779,7 +781,8 @@
 	      (make-defstruct-allocation-function class)))
     (add-direct-subclasses class direct-superclasses)
     (setf (slot-value class 'class-precedence-list)
-            (compute-class-precedence-list class))
+          (compute-class-precedence-list class))
+    (setf (slot-value class 'cpl-available-p) t)
     (setf (slot-value class 'slots) (compute-slots class))
     (let ((lclass (find-classoid (class-name class))))
       (setf (classoid-pcl-class lclass) class)
@@ -882,7 +885,7 @@
      (update-cpl class (compute-class-precedence-list class))
      ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
      ;; class.  The hoops above are to ensure that FINALIZE-INHERITANCE
-    ;; is called at finalization, so that MOP programmers can hook
+     ;; is called at finalization, so that MOP programmers can hook
      ;; into the system as described in "Class Finalization Protocol"
      ;; (section 5.5.2 of AMOP).
      (update-slots class (compute-slots class))
@@ -903,8 +906,11 @@
 	;;   Need to have the cpl setup before update-lisp-class-layout
 	;;   is called on CMU CL.
 	(setf (slot-value class 'class-precedence-list) cpl)
+        (setf (slot-value class 'cpl-available-p) t)
 	(force-cache-flushes class))
-      (setf (slot-value class 'class-precedence-list) cpl))
+      (progn
+        (setf (slot-value class 'class-precedence-list) cpl)
+        (setf (slot-value class 'cpl-available-p) t)))
   (update-class-can-precede-p cpl))
 
 (defun update-class-can-precede-p (cpl)

@@ -209,11 +209,11 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 			 (funcallable-standard-instance-access object location)
 			 (standard-instance-access object location))))
 	  (when (eq +slot-unbound+ value)
-	    (error "~@<slot ~s of class ~s is unbound in object ~s~@:>"
+	    (error "~@<slot ~S of class ~S is unbound in object ~S~@:>"
 		   slot-name class object))
 	  value)
-	(error "~@<cannot get standard value of slot ~s of class ~s ~
-                in object ~s~@:>"
+	(error "~@<cannot get standard value of slot ~S of class ~S ~
+                in object ~S~@:>"
 	       slot-name class object))))
 
 (defun standard-slot-value/gf (gf slot-name)
@@ -1501,7 +1501,20 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (defun cpl-or-nil (class)
   (if (eq *boot-state* 'complete)
-      (when (class-finalized-p class)
+      ;; KLUDGE: why not use (slot-boundp class
+      ;; 'class-precedence-list)?  Well, unfortunately, CPL-OR-NIL is
+      ;; used within COMPUTE-APPLICABLE-METHODS, including for
+      ;; SLOT-BOUNDP-USING-CLASS... and the available mechanism for
+      ;; breaking such nasty cycles in effective method computation
+      ;; only works for readers and writers, not boundps.  It might
+      ;; not be too hard to make it work for BOUNDP accessors, but in
+      ;; the meantime we use an extra slot for exactly the result of
+      ;; the SLOT-BOUNDP that we want.  (We cannot use
+      ;; CLASS-FINALIZED-P, because in the process of class
+      ;; finalization we need to use the CPL which has been computed
+      ;; to cache effective methods for slot accessors.) -- CSR,
+      ;; 2004-09-19.
+      (when (cpl-available-p class)
         (class-precedence-list class))
       (early-class-precedence-list class)))
 

@@ -10,12 +10,12 @@ changes in sbcl-0.8.15 relative to sbcl-0.8.14:
     Timothy Moore's work for CMUCL)
   * bug fix: DEFTYPE lambda-list parsing now binds unsupplied keyword
     parameters to * instead of NIL if no initform is supplied.
-    (reported by Johan Bockgård)
+    (reported by Johan Bockgaard)
   * bug fix: DEFINE-COMPILER-MACRO lambda-list parsing now binds
     correctly when FUNCALL appears as the car of the form. Note:
     despite this FUNCALL forms are not currently subject to
     compiler-macro expansion. (port of Raymond Toy's fix for the
-    same from CMUCL, reported by Johan Bockgård)
+    same from CMUCL, reported by Johan Bockgaard)
   * bug fix: FOR ... ON ... -clauses in LOOP now work on dotted lists
     (thanks for Teemu Kalvas)
   * bug fix: in FORMAT ~^ inside ~:{ now correctly steps to the next
@@ -23,6 +23,9 @@ changes in sbcl-0.8.15 relative to sbcl-0.8.14:
     Squires, Sean Champ and Raymond Toy)
   * bug fix: incorrect expansion of defgeneric that caused a style
     warning. (thanks for Zach Beane)
+  * bug fix: slot accessor effective method computation works properly
+    for classes with multiple non-standard applicable methods on
+    SB-MOP:SLOT-VALUE-USING-CLASS.  (reported by Ralf Mattes)
   * on x86 compiler supports stack allocation of results of LIST and
     LIST*, bound to variables, declared DYNAMIC-EXTENT. (based on
     CMUCL implementation by Gerd Moellmann)

@@ -285,6 +285,7 @@
 				     class)
 		spec))
     (set-slot 'class-precedence-list (classes cpl))
+    (set-slot 'cpl-available-p t)
     (set-slot 'can-precede-list (classes (cdr cpl)))
     (set-slot 'incompatible-superclass-list nil)
     (set-slot 'direct-superclasses (classes direct-supers))

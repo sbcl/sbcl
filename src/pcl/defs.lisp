@@ -420,6 +420,10 @@
 (defclass pcl-class (class)
   ((class-precedence-list
     :reader class-precedence-list)
+   ;; KLUDGE: see note in CPL-OR-NIL
+   (cpl-available-p
+    :reader cpl-available-p
+    :initform nil)
    (can-precede-list
     :initform ()
     :reader class-can-precede-list)
