@@ -502,8 +502,7 @@
 		(:args (x :scs (,from-sc) :target temp))
 		(:temporary (:from (:argument 0) :sc single-reg) temp)
 		(:temporary (:scs (double-stack)) stack-temp)
-		(:results (y :scs (signed-reg)
-			     :load-if (not (sc-is y signed-stack))))
+		(:results (y :scs (signed-reg)))
 		(:arg-types ,from-type)
 		(:result-types signed-num)
 		(:translate ,trans)
@@ -514,21 +513,14 @@
 		(:generator 5
 		  (note-this-location vop :internal-error)
 		  (inst ,inst temp x)
-		  (sc-case y
-		    (signed-stack
-		     (inst stfd temp (current-nfp-tn vop)
-			   (* (tn-offset y) sb!vm:n-word-bytes)))
-		    (signed-reg
-		     (inst stfd temp (current-nfp-tn vop)
-			   (* (tn-offset stack-temp) sb!vm:n-word-bytes))
-		     (inst lwz y (current-nfp-tn vop)
-			   (+ 4 (* (tn-offset stack-temp) sb!vm:n-word-bytes)))))))))
+		  (inst stfd temp (current-nfp-tn vop)
+			(* (tn-offset stack-temp) sb!vm:n-word-bytes))
+		  (inst lwz y (current-nfp-tn vop)
+			(+ 4 (* (tn-offset stack-temp) sb!vm:n-word-bytes)))))))
   (frob %unary-truncate single-reg single-float fctiwz)
   (frob %unary-truncate double-reg double-float fctiwz)
   (frob %unary-round single-reg single-float fctiw)
   (frob %unary-round double-reg double-float fctiw))
-
-
 
 (define-vop (make-single-float)
   (:args (bits :scs (signed-reg) :target res
@@ -624,69 +616,50 @@
 (define-vop (double-float-high-bits)
   (:args (float :scs (double-reg descriptor-reg)
 		:load-if (not (sc-is float double-stack))))
-  (:results (hi-bits :scs (signed-reg)
-		     :load-if (or (sc-is float descriptor-reg double-stack)
-				  (not (sc-is hi-bits signed-stack)))))
-  (:temporary (:scs (signed-stack)) stack-temp)
+  (:results (hi-bits :scs (signed-reg)))
+  (:temporary (:scs (double-stack)) stack-temp)
   (:arg-types double-float)
   (:result-types signed-num)
   (:translate double-float-high-bits)
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 5
-    (sc-case hi-bits
-      (signed-reg
-       (sc-case float
-	 (double-reg
-	  (inst stfd float (current-nfp-tn vop)
-		(* (tn-offset stack-temp) sb!vm:n-word-bytes))
-	  (inst lwz hi-bits (current-nfp-tn vop)
-		(* (tn-offset stack-temp) sb!vm:n-word-bytes)))
-	 (double-stack
-	  (inst lwz hi-bits (current-nfp-tn vop)
-		(* (tn-offset float) sb!vm:n-word-bytes)))
-	 (descriptor-reg
-	  (loadw hi-bits float sb!vm:double-float-value-slot
-		 sb!vm:other-pointer-lowtag))))
-      (signed-stack
-       (sc-case float
-	 (double-reg
-	  (inst stfd float (current-nfp-tn vop)
-		(* (tn-offset hi-bits) sb!vm:n-word-bytes))))))))
+    (sc-case float
+      (double-reg
+	(inst stfd float (current-nfp-tn vop)
+	      (* (tn-offset stack-temp) sb!vm:n-word-bytes))
+	(inst lwz hi-bits (current-nfp-tn vop)
+	      (* (tn-offset stack-temp) sb!vm:n-word-bytes)))
+      (double-stack
+	(inst lwz hi-bits (current-nfp-tn vop)
+	      (* (tn-offset float) sb!vm:n-word-bytes)))
+      (descriptor-reg
+	(loadw hi-bits float sb!vm:double-float-value-slot
+	       sb!vm:other-pointer-lowtag)))))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg descriptor-reg)
 		:load-if (not (sc-is float double-stack))))
-  (:results (lo-bits :scs (unsigned-reg)
-		     :load-if (or (sc-is float descriptor-reg double-stack)
-				  (not (sc-is lo-bits unsigned-stack)))))
-  (:temporary (:scs (unsigned-stack)) stack-temp)
+  (:results (lo-bits :scs (unsigned-reg)))
+  (:temporary (:scs (double-stack)) stack-temp)
   (:arg-types double-float)
   (:result-types unsigned-num)
   (:translate double-float-low-bits)
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 5
-    (sc-case lo-bits
-      (unsigned-reg
-       (sc-case float
-	 (double-reg
-	  (inst stfd float (current-nfp-tn vop)
-		(* (tn-offset stack-temp) sb!vm:n-word-bytes))
-	  (inst lwz lo-bits (current-nfp-tn vop)
-		(* (1+ (tn-offset stack-temp)) sb!vm:n-word-bytes)))
-	 (double-stack
-	  (inst lwz lo-bits (current-nfp-tn vop)
-		(* (1+ (tn-offset float)) sb!vm:n-word-bytes)))
-	 (descriptor-reg
-	  (loadw lo-bits float (1+ sb!vm:double-float-value-slot)
-		 sb!vm:other-pointer-lowtag))))
-      (unsigned-stack
-       (sc-case float
-	 (double-reg
-	  (inst stfd float (current-nfp-tn vop)
-		(* (tn-offset lo-bits) sb!vm:n-word-bytes))))))))
-
+    (sc-case float
+      (double-reg
+        (inst stfd float (current-nfp-tn vop)
+	      (* (tn-offset stack-temp) sb!vm:n-word-bytes))
+	(inst lwz lo-bits (current-nfp-tn vop)
+	      (* (1+ (tn-offset stack-temp)) sb!vm:n-word-bytes)))
+      (double-stack
+        (inst lwz lo-bits (current-nfp-tn vop)
+	      (* (1+ (tn-offset float)) sb!vm:n-word-bytes)))
+      (descriptor-reg
+        (loadw lo-bits float (1+ sb!vm:double-float-value-slot)
+	       sb!vm:other-pointer-lowtag)))))
 
 ;;;; Float mode hackery:
 

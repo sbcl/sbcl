@@ -2013,6 +2013,9 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     combination.  (reported by Andreas Fuchs)
   * bug fix: RUN-PROGRAM now does not fail if some element in $PATH
     names a non-existent directory.  (thanks to Andreas Fuchs)
+  * bug fix: ROUND and TRUNCATE could, under certain circumstances on
+    the PPC platform, lead to stack corruption; this has been fixed.
+    (reported by Rainer Joswig)
   * optimization: restored some effective method precomputation in
     CLOS (turned off by an ANSI fix in sbcl-0.8.3); the amount of
     precomputation is now tunable.

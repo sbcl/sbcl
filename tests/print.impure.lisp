@@ -129,5 +129,10 @@
 ;;; expanders.
 (funcall (formatter "~@<~A~:*~A~:>") nil 3)
 
+;;; the PPC floating point backend was at one point sufficiently
+;;; broken that this looped infinitely or caused segmentation
+;;; violations through stack corruption.
+(print 0.0001)
+
 ;;; success
 (quit :unix-status 104)
