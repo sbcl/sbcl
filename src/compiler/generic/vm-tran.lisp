@@ -191,36 +191,19 @@
 ;;;; function call overhead or on the overhead of runtime type
 ;;;; dispatch in AREF.
 
-(deftransform subseq ((string start &optional (end nil))
-		      (simple-string t &optional t))
-  `(let* ((length (- (or end (length string))
-		     start))
-	  (result (make-string length)))
-     (declare (optimize (safety 0)))
-     (bit-bash-copy string
-		    (the index
-			 (+ (the index (* start sb!vm:byte-bits))
-			    ,vector-data-bit-offset))
-		    result
-		    ,vector-data-bit-offset
-		    (the index (* length sb!vm:byte-bits)))
-     result))
-
-(deftransform copy-seq ((seq) (simple-string))
-  `(let* ((length (length seq))
-	  (res (make-string length)))
-     (declare (optimize (safety 0)))
-     (bit-bash-copy seq
-		    ,vector-data-bit-offset
-		    res
-		    ,vector-data-bit-offset
-		    (the index (* length sb!vm:byte-bits)))
-     res))
-
+;;; FIXME: Shouldn't we be testing for legality of
+;;;   * START1, START2, END1, and END2 indices?
+;;;   * size of copied string relative to destination string?
+;;; (Either there should be tests conditional on SAFETY>=SPEED, or
+;;; the transform should be conditional on SPEED>SAFETY.)
+;;;
+;;; FIXME: Also, the transform should probably be dependent on
+;;; SPEED>SPACE.
 (deftransform replace ((string1 string2 &key (start1 0) (start2 0)
 				end1 end2)
 		       (simple-string simple-string &rest t))
-  `(locally (declare (optimize (safety 0)))
+  `(locally
+     (declare (optimize (safety 0)))
      (bit-bash-copy string2
 		    (the index
 			 (+ (the index (* start2 sb!vm:byte-bits))
@@ -236,34 +219,6 @@
 					       start2)))
 			    sb!vm:byte-bits)))
      string1))
-
-(deftransform concatenate ((rtype &rest sequences)
-			   (t &rest simple-string)
-			   simple-string)
-  (collect ((lets)
-	    (forms)
-	    (all-lengths)
-	    (args))
-    (dolist (seq sequences)
-      (declare (ignore seq))
-      (let ((n-seq (gensym))
-	    (n-length (gensym)))
-	(args n-seq)
-	(lets `(,n-length (the index (* (length ,n-seq) sb!vm:byte-bits))))
-	(all-lengths n-length)
-	(forms `(bit-bash-copy ,n-seq ,vector-data-bit-offset
-			       res start
-			       ,n-length))
-	(forms `(setq start (+ start ,n-length)))))
-    `(lambda (rtype ,@(args))
-       (declare (ignore rtype))
-       (let* (,@(lets)
-	      (res (make-string (truncate (the index (+ ,@(all-lengths)))
-					  sb!vm:byte-bits)))
-	      (start ,vector-data-bit-offset))
-	 (declare (type index start ,@(all-lengths)))
-	 ,@(forms)
-	 res))))
 
 ;;;; bit vector hackery
 

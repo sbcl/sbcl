@@ -3,10 +3,10 @@
 # Run the regression tests in this directory.
 
 # how we invoke SBCL
-sbcl=${1:-sbcl --noinform --noprint --noprogrammer}
+sbcl=${1:-../src/runtime/sbcl --core ../output/sbcl.core --noinform --noprint --noprogrammer}
 
 # "Ten four" is the closest numerical slang I can find to "OK", so
-# it's the return value we expect from a successful test.
+# it's the return value that we expect from a successful test.
 tenfour () {
     if [ $? = 104 ]; then
 	echo ok
