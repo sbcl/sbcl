@@ -385,12 +385,41 @@
 ;;; Transforms for various array properties. If the property is know
 ;;; at compile time because of a type spec, use that constant value.
 
+;;; Most of this logic may end up belonging in code/late-type.lisp;
+;;; however, here we also need the -OR-GIVE-UP for the transforms, and
+;;; maybe this is just too sloppy for actual type logic.  -- CSR,
+;;; 2004-02-18
+(defun array-type-dimensions-or-give-up (type)
+  (typecase type
+    (array-type (array-type-dimensions type))
+    (union-type
+     (let ((types (union-type-types type)))
+       ;; there are at least two types, right?
+       (aver (> (length types) 1))
+       (let ((result (array-type-dimensions-or-give-up (car types))))
+	 (dolist (type (cdr types) result)
+	   (unless (equal (array-type-dimensions-or-give-up type) result)
+	     (give-up-ir1-transform))))))
+    ;; FIXME: intersection type [e.g. (and (array * (*)) (satisfies foo)) ]
+    (t (give-up-ir1-transform))))
+
+(defun conservative-array-type-complexp (type)
+  (typecase type
+    (array-type (array-type-complexp type))
+    (union-type
+     (let ((types (union-type-types type)))
+       (aver (> (length types) 1))
+       (let ((result (conservative-array-type-complexp (car types))))
+	 (dolist (type (cdr types) result)
+	   (unless (eq (conservative-array-type-complexp type) result)
+	     (return-from conservative-array-type-complexp :maybe))))))
+    ;; FIXME: intersection type
+    (t :maybe)))
+
 ;;; If we can tell the rank from the type info, use it instead.
 (deftransform array-rank ((array))
   (let ((array-type (lvar-type array)))
-    (unless (array-type-p array-type)
-      (give-up-ir1-transform))
-    (let ((dims (array-type-dimensions array-type)))
+    (let ((dims (array-type-dimensions-or-give-up array-type)))
       (if (not (listp dims))
 	  (give-up-ir1-transform
 	   "The array rank is not known at compile time: ~S"
@@ -407,9 +436,7 @@
     (give-up-ir1-transform "The axis is not constant."))
   (let ((array-type (lvar-type array))
 	(axis (lvar-value axis)))
-    (unless (array-type-p array-type)
-      (give-up-ir1-transform))
-    (let ((dims (array-type-dimensions array-type)))
+    (let ((dims (array-type-dimensions-or-give-up array-type)))
       (unless (listp dims)
 	(give-up-ir1-transform
 	 "The array dimensions are unknown; must call ARRAY-DIMENSION at runtime."))
@@ -421,7 +448,7 @@
 	(cond ((integerp dim)
 	       dim)
 	      ((= (length dims) 1)
-	       (ecase (array-type-complexp array-type)
+	       (ecase (conservative-array-type-complexp array-type)
 		 ((t)
 		  '(%array-dimension array 0))
 		 ((nil)
@@ -436,9 +463,7 @@
 (deftransform length ((vector)
 		      ((simple-array * (*))))
   (let ((type (lvar-type vector)))
-    (unless (array-type-p type)
-      (give-up-ir1-transform))
-    (let ((dims (array-type-dimensions type)))
+    (let ((dims (array-type-dimensions-or-give-up type)))
       (unless (and (listp dims) (integerp (car dims)))
 	(give-up-ir1-transform
 	 "Vector length is unknown, must call LENGTH at runtime."))
@@ -455,12 +480,12 @@
 ;;; compile-time constant.
 (deftransform vector-length ((vector))
   (let ((vtype (lvar-type vector)))
-    (if (and (array-type-p vtype)
-	     (not (array-type-complexp vtype)))
-	(let ((dim (first (array-type-dimensions vtype))))
-	  (when (eq dim '*) (give-up-ir1-transform))
-	  dim)
-	(give-up-ir1-transform))))
+    (let ((dim (first (array-type-dimensions-or-give-up vtype))))
+      (when (eq dim '*)
+	(give-up-ir1-transform))
+      (when (conservative-array-type-complexp vtype)
+	(give-up-ir1-transform))
+      dim)))
 
 ;;; Again, if we can tell the results from the type, just use it.
 ;;; Otherwise, if we know the rank, convert into a computation based
@@ -470,9 +495,7 @@
 (deftransform array-total-size ((array)
 				(array))
   (let ((array-type (lvar-type array)))
-    (unless (array-type-p array-type)
-      (give-up-ir1-transform))
-    (let ((dims (array-type-dimensions array-type)))
+    (let ((dims (array-type-dimensions-or-give-up array-type)))
       (unless (listp dims)
 	(give-up-ir1-transform "can't tell the rank at compile time"))
       (if (member '* dims)
@@ -485,12 +508,10 @@
 ;;; Only complex vectors have fill pointers.
 (deftransform array-has-fill-pointer-p ((array))
   (let ((array-type (lvar-type array)))
-    (unless (array-type-p array-type)
-      (give-up-ir1-transform))
-    (let ((dims (array-type-dimensions array-type)))
+    (let ((dims (array-type-dimensions-or-give-up array-type)))
       (if (and (listp dims) (not (= (length dims) 1)))
 	  nil
-	  (ecase (array-type-complexp array-type)
+	  (ecase (conservative-array-type-complexp array-type)
 	    ((t)
 	     t)
 	    ((nil)
@@ -758,6 +779,7 @@
 (defoptimizer (array-header-p derive-type) ((array))
   (let ((type (lvar-type array)))
     (cond ((not (array-type-p type))
+	   ;; FIXME: use analogue of ARRAY-TYPE-DIMENSIONS-OR-GIVE-UP
            nil)
           (t
            (let ((dims (array-type-dimensions type)))
