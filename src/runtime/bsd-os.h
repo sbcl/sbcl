@@ -37,6 +37,7 @@ typedef struct sigaltstack stack_t;
  * original FreeBSD port of SBCL, that's wrong, it's actually a
  * ucontext_t. */
 
+#include <sys/ucontext.h>
 typedef ucontext_t os_context_t;
 /* As the sbcl-devel message from Raymond Wiker 2000-12-01, FreeBSD
  * (unlike Linux and OpenBSD) doesn't let us tweak the CPU's single
