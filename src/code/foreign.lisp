@@ -52,8 +52,7 @@
       ;; If the address is from linkage-table and refers to data
       ;; we need to do a bit of juggling.
       (if (and sharedp datap)
-          ;; FIXME: 64bit badness here
-          (int-sap (sap-ref-32 (int-sap addr) 0))
+          (int-sap (sap-ref-word (int-sap addr) 0))
           (int-sap addr)))))
 
 #-sb-xc-host
@@ -66,17 +65,17 @@
 ;;; Cleanups before saving a core
 #-sb-xc-host
 (defun foreign-deinit ()
-  ;; KLUDGE: Giving this warning only when non-static foreign symbols
-  ;; are used would be much nicer, but actually pretty hard: we can
-  ;; get dynamic symbols thru the runtime as well, so cheking the
-  ;; list of *shared-objects* is not enough. Eugh & blech.
   #!+(and os-provides-dlopen (not linkage-table))
-  (warn "~@<Saving cores with alien definitions referring to non-static
-            foreign symbols is unsupported on this platform: references to
-            such foreign symbols from the restarted core will not work. You
-            may be able to work around this limitation by reloading all
-            foreign definitions and code using them in the restarted core,
-            but no guarantees.~%~:@>")
+  (let ((shared (remove-if #'null (mapcar #'sb!alien::shared-object-file
+					  *shared-objects*))))
+    (when shared
+      (warn "~@<Saving cores with shared objects loaded is unsupported on ~
+            this platform: calls to foreign functions in shared objects ~
+            from the restarted core will not work. You may be able to ~
+            work around this limitation by reloading all foreign definitions ~
+            and code using them in the restarted core, but no guarantees.~%~%~
+            Shared objects in this image:~% ~{~A~^, ~}~:@>"
+	    shared)))
   #!+os-provides-dlopen
   (close-shared-objects))
 

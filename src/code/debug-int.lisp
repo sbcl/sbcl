@@ -1136,8 +1136,8 @@ register."
 			  (stack-ref catch sb!vm:catch-block-tag-slot)
 			  #!+(or x86 x86-64)
 			  (make-lisp-obj
-			   (sap-ref-32 catch (* sb!vm:catch-block-tag-slot
-						sb!vm:n-word-bytes)))
+			   (sap-ref-word catch (* sb!vm:catch-block-tag-slot
+						  sb!vm:n-word-bytes)))
 			  (make-compiled-code-location
 			   offset (frame-debug-fun frame)))
 		    reversed-result)))
@@ -2256,14 +2256,14 @@ register."
        (stack-ref fp (sb!c:sc-offset-offset sc-offset)))
       (#.sb!vm:base-char-stack-sc-number
        (code-char
-	(sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-			     sb!vm:n-word-bytes)))))
+	(sap-ref-word fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
+			       sb!vm:n-word-bytes)))))
       (#.sb!vm:unsigned-stack-sc-number
-       (sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-			    sb!vm:n-word-bytes))))
+       (sap-ref-word fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
+			      sb!vm:n-word-bytes))))
       (#.sb!vm:signed-stack-sc-number
-       (signed-sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-				   sb!vm:n-word-bytes))))
+       (signed-sap-ref-word fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
+				     sb!vm:n-word-bytes))))
       (#.sb!vm:sap-stack-sc-number
        (sap-ref-sap fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
 			     sb!vm:n-word-bytes)))))))
@@ -2534,18 +2534,18 @@ register."
       (#.sb!vm:control-stack-sc-number
        (setf (stack-ref fp (sb!c:sc-offset-offset sc-offset)) value))
       (#.sb!vm:base-char-stack-sc-number
-       (setf (sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-					 sb!vm:n-word-bytes)))
+       (setf (sap-ref-word fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
+				    sb!vm:n-word-bytes)))
 	     (char-code (the character value))))
       (#.sb!vm:unsigned-stack-sc-number
-       (setf (sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-					 sb!vm:n-word-bytes)))
-	     (the (unsigned-byte 32) value)))
+       (setf (sap-ref-word fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
+				    sb!vm:n-word-bytes)))
+	     (the sb!vm::word value)))
       (#.sb!vm:signed-stack-sc-number
-       (setf (signed-sap-ref-32
+       (setf (signed-sap-ref-word
 	      fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
 		       sb!vm:n-word-bytes)))
-	     (the (signed-byte 32) value)))
+	     (the (signed-byte #.sb!vm::n-word-bits) value)))
       (#.sb!vm:sap-stack-sc-number
        (setf (sap-ref-sap fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
 					  sb!vm:n-word-bytes)))

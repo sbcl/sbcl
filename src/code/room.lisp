@@ -206,7 +206,7 @@
 	    #+nil
 	    (prev nil))
 	(loop
-	  (let* ((header (sap-ref-32 current 0))
+	  (let* ((header (sap-ref-word current 0))
 		 (header-widetag (logand header #xFF))
 		 (info (svref *room-info* header-widetag)))
 	    (cond
@@ -434,7 +434,7 @@
 			       (%primitive code-instructions obj))))
 	   (incf code-words words)
 	   (dotimes (i words)
-	     (when (zerop (sap-ref-32 sap (* i n-word-bytes)))
+	     (when (zerop (sap-ref-word sap (* i n-word-bytes)))
 	       (incf no-ops))))))
      space)
 

@@ -117,10 +117,12 @@
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic"))
 
+;; 31 not 64 because it's hard work loading 64 bit constants, and since
+;; sign-extension of immediates causes problems with 32.
 (define-vop (fast-unsigned-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (unsigned-reg unsigned-stack)))
   (:info y)
-  (:arg-types unsigned-num (:constant (unsigned-byte 32)))
+  (:arg-types unsigned-num (:constant (unsigned-byte 31)))
   (:results (r :scs (unsigned-reg)
 	       :load-if (not (location= x r))))
   (:result-types unsigned-num)

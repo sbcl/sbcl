@@ -54,9 +54,13 @@
 	       '(sap-ref-8
 		 sap-ref-16
 		 sap-ref-32
+		 sap-ref-64
 		 sap-ref-sap
+		 sap-ref-word
 		 sap-ref-single
 		 sap-ref-double
 		 signed-sap-ref-8
 		 signed-sap-ref-16
-		 signed-sap-ref-32)))
+		 signed-sap-ref-32
+		 signed-sap-ref-64
+		 signed-sap-ref-word)))

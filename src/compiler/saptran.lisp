@@ -80,6 +80,14 @@
   (unsigned-byte 64)
   ())
 
+(defknown sap-ref-word (system-area-pointer fixnum)
+  (unsigned-byte #.sb!vm::n-machine-word-bits)
+  (flushable))
+(defknown %set-sap-ref-word
+    (system-area-pointer fixnum (unsigned-byte #.sb!vm::n-machine-word-bits))
+  (unsigned-byte #.sb!vm::n-machine-word-bits)
+  ())
+
 (defknown signed-sap-ref-8 (system-area-pointer fixnum) (signed-byte 8)
   (flushable))
 (defknown %set-signed-sap-ref-8 (system-area-pointer fixnum (signed-byte 8))
@@ -102,6 +110,14 @@
   (flushable))
 (defknown %set-signed-sap-ref-64 (system-area-pointer fixnum (signed-byte 64))
   (signed-byte 64)
+  ())
+
+(defknown signed-sap-ref-word (system-area-pointer fixnum)
+  (signed-byte #.sb!vm::n-machine-word-bits)
+  (flushable))
+(defknown %set-signed-sap-ref-word
+    (system-area-pointer fixnum (signed-byte #.sb!vm::n-machine-word-bits))
+  (signed-byte #.sb!vm::n-machine-word-bits)
   ())
 
 (defknown sap-ref-sap (system-area-pointer fixnum) system-area-pointer
@@ -184,3 +200,15 @@
   ;; redundancy.  --njf 2002-01-08
   #!+long-float (def sap-ref-long)
   #!+long-float (def %set-sap-ref-long))
+
+(macrolet ((def (fun args 32-bit 64-bit)
+	       `(deftransform ,fun (,args)
+		  (ecase sb!vm::n-word-bits
+		    (32 '(,32-bit ,@args))
+		    (64 '(,64-bit ,@args))))))
+  (def sap-ref-word (sap offset) sap-ref-32 sap-ref-64)
+  (def signed-sap-ref-word (sap offset) signed-sap-ref-32 signed-sap-ref-64)
+  (def %set-sap-ref-word (sap offset value)
+    %set-sap-ref-32 %set-sap-ref-64)
+  (def %set-signed-sap-ref-word (sap offset value)
+    %set-signed-sap-ref-32 %set-signed-sap-ref-64))

@@ -116,6 +116,8 @@
 (defsetf signed-sap-ref-32 %set-signed-sap-ref-32)
 (defsetf sap-ref-64 %set-sap-ref-64)
 (defsetf signed-sap-ref-64 %set-signed-sap-ref-64)
+(defsetf sap-ref-word %set-sap-ref-word)
+(defsetf signed-sap-ref-word %set-signed-sap-ref-word)
 (defsetf sap-ref-sap %set-sap-ref-sap)
 (defsetf sap-ref-single %set-sap-ref-single)
 (defsetf sap-ref-double %set-sap-ref-double)

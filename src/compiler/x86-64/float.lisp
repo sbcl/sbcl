@@ -500,6 +500,7 @@
 	(inst andpd y xmm))
   (frob (abs/single-float abs  single-reg single-float)
 	(inst mov hex8 -1)
+	(inst shr hex8 33)
 	(inst movd xmm hex8)
 	(inst andps y xmm)))
 

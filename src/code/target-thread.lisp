@@ -374,7 +374,8 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
   (let ((thread (thread-sap-from-id thread-id)))
     (when thread
       (let* ((index (sb!vm::symbol-tls-index symbol))
-	     (tl-val (sb!sys:sap-ref-32 thread (* sb!vm:n-word-bytes index))))
+	     (tl-val (sb!sys:sap-ref-word thread
+					  (* sb!vm:n-word-bytes index))))
 	(if (eql tl-val sb!vm::unbound-marker-widetag)
 	    (sb!vm::symbol-global-value symbol)
 	    (sb!kernel:make-lisp-obj tl-val))))))

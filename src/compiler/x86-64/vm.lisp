@@ -51,7 +51,8 @@
   ;; EAX) overlap AL and AH instead of AL and CL.
   ;;
   ;; High-byte are registers disabled on AMD64, since they can't be
-  ;; encoded for an op that has a REX-prefix. The overlap doesn't
+  ;; encoded for an op that has a REX-prefix and we don't want to
+  ;; add special cases into the code generation. The overlap doesn't
   ;; therefore exist anymore, but the numbering hasn't been changed
   ;; to reflect this.
   (defreg al    0 :byte)

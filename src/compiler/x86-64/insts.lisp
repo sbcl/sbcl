@@ -851,10 +851,13 @@
   ;; ea only has space for three bits of register number: regs r8
   ;; and up are selected by a REX prefix byte which caller is responsible
   ;; for having emitted where necessary already
-  (let ((offset (mod (tn-offset tn) 16)))
-    (logior (ash (logand offset 1) 2)
-	    (ash offset -1))))
-
+  (cond ((fp-reg-tn-p tn)
+	 (mod (tn-offset tn) 8))
+	(t
+	 (let ((offset (mod (tn-offset tn) 16)))
+	   (logior (ash (logand offset 1) 2)
+		   (ash offset -1))))))
+  
 (defstruct (ea (:constructor make-ea (size &key base index scale disp))
 	       (:copier nil))
   ;; note that we can represent an EA qith a QWORD size, but EMIT-EA
@@ -1028,7 +1031,6 @@
      (and (member (sc-name (tn-sc thing)) *qword-sc-names*) t))
     (t nil)))
 
-
 (defun register-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'registers)))
@@ -1036,6 +1038,7 @@
 (defun accumulator-p (thing)
   (and (register-p thing)
        (= (tn-offset thing) 0)))
+
 
 ;;;; utilities
 
@@ -1048,8 +1051,14 @@
     (emit-byte segment +operand-size-prefix-byte+)))
 
 (defun maybe-emit-rex-prefix (segment operand-size r x b)
-  (labels ((if-hi (r)	     ;; offset of r8 is 16
-	     (if (and r (> (tn-offset r) 15)) 1 0)))
+  (labels ((if-hi (r)
+	     (if (and r (> (tn-offset r)
+			   ;; offset of r8 is 16, offset of xmm8 is 8
+			   (if (fp-reg-tn-p r)
+			       7
+			       15)))
+		 1
+		 0)))
     (let ((rex-w (if (eq operand-size :qword) 1 0))
 	  (rex-r (if-hi r))
 	  (rex-x (if-hi x))
@@ -1215,12 +1224,14 @@
        (ecase src-size
 	 (:byte
 	  (maybe-emit-operand-size-prefix segment :dword)
-	  (maybe-emit-rex-for-ea segment src dst)
+	  (maybe-emit-rex-for-ea segment src dst
+				 :operand-size (operand-size dst))
 	  (emit-byte segment #b00001111)
 	  (emit-byte segment opcode)
 	  (emit-ea segment src (reg-tn-encoding dst)))
 	 (:word
-	  (maybe-emit-rex-for-ea segment src dst)
+ 	  (maybe-emit-rex-for-ea segment src dst
+				 :operand-size (operand-size dst))
 	  (emit-byte segment #b00001111)
 	  (emit-byte segment (logior opcode 1))
 	  (emit-ea segment src (reg-tn-encoding dst)))
