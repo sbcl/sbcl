@@ -95,6 +95,7 @@ ldso_stub__ ## fct: ; \
  LDSO_STUBIFY(lseek)
  LDSO_STUBIFY(lstat)
  LDSO_STUBIFY(malloc)
+ LDSO_STUBIFY(memmove)
  LDSO_STUBIFY(mkdir)
  LDSO_STUBIFY(open)
  LDSO_STUBIFY(opendir)
@@ -515,7 +516,6 @@ ldso_stub__ ## fct: ; \
 /*  LDSO_STUBIFY(memcpy) */
 /*  LDSO_STUBIFY(memfrob) */
 /*  LDSO_STUBIFY(memmem) */
-/*  LDSO_STUBIFY(memmove) */
 /*  LDSO_STUBIFY(memset) */
 /*  LDSO_STUBIFY(mkdir) */
 /*  LDSO_STUBIFY(mkfifo) */

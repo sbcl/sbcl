@@ -186,6 +186,12 @@
 #!-sb-fluid (declaim (inline do-unary-bit-bash))
 (defun do-unary-bit-bash (src src-offset dst dst-offset length
 			      dst-ref-fn dst-set-fn src-ref-fn)
+  ;; FIXME: Declaring these bit indices to be of type OFFSET, then
+  ;; using the inline expansion in SPEED 3 SAFETY 0 functions, is not
+  ;; a good thing. At the very least, we should make sure that the
+  ;; type (overflow) checks get done. Better would be to avoid
+  ;; using bit indices, and to use 32-bit unsigneds instead, and/or
+  ;; to call out to things like memmove(3) for big moves.
   (declare (type offset src-offset dst-offset length)
 	   (type function dst-ref-fn dst-set-fn src-ref-fn))
   (multiple-value-bind (dst-word-offset dst-bit-offset)

@@ -247,6 +247,33 @@
 ;;;; primitive translator for BYTE-BLT
 
 (def-primitive-translator byte-blt (src src-start dst dst-start dst-end)
+
+  ;; new version
+  ;;
+  ;; FIXME: CMU CL had a hairier implementation of this. It had the
+  ;; small problem that it didn't work for large (>16M) values of
+  ;; SRC-START or DST-START. However, it might have been more
+  ;; efficient. In particular, I haven't checked how much the foreign
+  ;; function call costs us here. My guess is that if the overhead is
+  ;; acceptable for SQRT and COS, it's acceptable here, but this
+  ;; should probably be checked. -- WHN
+  (once-only ((dst-start dst-start))
+    `(flet ((sap (thing)
+	      (etypecase thing
+		(system-area-pointer thing)
+		((simple-unboxed-array (*)) (vector-sap thing)))))
+	 (declare (inline sap))
+	 (without-gcing
+	  (memmove (sap+ (sap ,dst) ,dst-start)
+		   (sap+ (sap ,src) ,src-start)
+		   (- ,dst-end ,dst-start)))))
+
+  ;; REMOVEME when new version works
+  ;;
+  ;; old version, had overflow problems because it converts byte
+  ;; indices to bit indices, which is not good when GENESIS is trying
+  ;; to read into a byte vector which represents the cold image (>16M bytes)
+  #+nil
   `(let ((src ,src)
 	 (src-start (* ,src-start sb!vm:byte-bits))
 	 (dst ,dst)

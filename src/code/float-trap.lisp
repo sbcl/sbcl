@@ -131,7 +131,7 @@
   (declare (type system-area-pointer context))
   ;; FIXME: The find-the-detailed-problem code below went stale with
   ;; the big switchover to POSIX signal handling and signal contexts
-  ;; which are opaque at the Lisp level ca plod-0.6.7. It needs to be
+  ;; which are opaque at the Lisp level ca. sbcl-0.6.7. It needs to be
   ;; revived, which will require writing a C-level os-dependent
   ;; function to extract floating point modes, and a Lisp-level
   ;; DEF-ALIEN-ROUTINE to get to the C-level os-dependent function.

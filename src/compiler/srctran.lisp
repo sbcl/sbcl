@@ -3318,7 +3318,7 @@
 ;;;; N-arg arithmetic and logic functions are associated into two-arg
 ;;;; versions, and degenerate cases are flushed.
 
-;;; Left-associate First-Arg and More-Args using Function.
+;;; Left-associate FIRST-ARG and MORE-ARGS using FUNCTION.
 (declaim (ftype (function (symbol t list) list) associate-arguments))
 (defun associate-arguments (function first-arg more-args)
   (let ((next (rest more-args))

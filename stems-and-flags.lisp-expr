@@ -172,6 +172,8 @@
  ("code/target-c-call"    :not-host)
  ("code/target-allocate"  :not-host)
 
+ ("code/misc-aliens" :not-host) ; needs DEF-ALIEN-ROUTINE from target-alieneval
+
  ("code/array"         :not-host)
  ("code/target-sxhash" :not-host)
 

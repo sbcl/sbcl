@@ -16,7 +16,7 @@
 ;;; The HOST structure holds the functions that both parse the
 ;;; pathname information into structure slot entries, and after
 ;;; translation the inverse (unparse) functions.
-(sb!xc:defstruct (host (:constructor nil))
+(def!struct (host (:constructor nil))
   (parse (required-argument) :type function)
   (unparse (required-argument) :type function)
   (unparse-host (required-argument) :type function)
@@ -25,7 +25,7 @@
   (unparse-enough (required-argument) :type function)
   (customary-case (required-argument) :type (member :upper :lower)))
 
-(sb!xc:defstruct (logical-host
+(def!struct (logical-host
 		  (:include host
 			    (:parse #'parse-logical-namestring)
 			    (:unparse #'unparse-logical-namestring)
@@ -49,7 +49,7 @@
 
 ;;; the various magic tokens that are allowed to appear in pretty much
 ;;; all pathname components
-(sb!xc:deftype component-tokens () ; FIXME: rename to PATHNAME-COMPONENT-TOKENS
+(sb!xc:deftype pathname-component-tokens ()
   '(member nil :unspecific :wild))
 
 (sb!xc:defstruct (pathname (:conc-name %pathname-)
@@ -63,16 +63,16 @@
   ;; the host (at present either a UNIX or logical host)
   (host nil :type (or host null))
   ;; the name of a logical or physical device holding files
-  (device nil :type (or simple-string component-tokens))
+  (device nil :type (or simple-string pathname-component-tokens))
   ;; a list of strings that are the component subdirectory components
   (directory nil :type list)
   ;; the filename
-  (name nil :type (or simple-string pattern component-tokens))
+  (name nil :type (or simple-string pattern pathname-component-tokens))
   ;; the type extension of the file
-  (type nil :type (or simple-string pattern component-tokens))
+  (type nil :type (or simple-string pattern pathname-component-tokens))
   ;; the version number of the file, a positive integer (not supported
   ;; on standard Unix filesystems)
-  (version nil :type (or integer component-tokens (member :newest))))
+  (version nil :type (or integer pathname-component-tokens (member :newest))))
 
 ;;; Logical pathnames have the following format:
 ;;;

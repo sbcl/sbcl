@@ -413,12 +413,13 @@
 ;;; Read NUMBYTES bytes into BUFFER beginning at START, and return the
 ;;; number of bytes read.
 ;;;
-;;; Note: CMU CL's version of this had a special interpretation of EOF-ERROR-P
-;;; which SBCL does not have. (In the EOF-ERROR-P=NIL case, CMU CL's version
-;;; would return as soon as any data became available.) This could be useful
-;;; behavior for things like pipes in some cases, but it wasn't being used in
-;;; SBCL, so it was dropped. If we ever need it, it could be added later as a
-;;; new variant N-BIN method (perhaps N-BIN-ASAP?) or something.
+;;; Note: CMU CL's version of this had a special interpretation of
+;;; EOF-ERROR-P which SBCL does not have. (In the EOF-ERROR-P=NIL
+;;; case, CMU CL's version would return as soon as any data became
+;;; available.) This could be useful behavior for things like pipes in
+;;; some cases, but it wasn't being used in SBCL, so it was dropped.
+;;; If we ever need it, it could be added later as a new variant N-BIN
+;;; method (perhaps N-BIN-ASAP?) or something.
 (defun read-n-bytes (stream buffer start numbytes &optional (eof-error-p t))
   (declare (type lisp-stream stream)
 	   (type index numbytes start)
