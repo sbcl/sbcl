@@ -28,7 +28,7 @@
 		  #!+sb-show *compiler-trace-output*
 		  *last-source-context* *last-original-source*
 		  *last-source-form* *last-format-string* *last-format-args*
-		  *last-message-count* *lexenv*))
+		  *last-message-count* *lexenv* *fun-names-in-this-file*))
 
 ;;; Whether call of a function which cannot be defined causes a full
 ;;; warning.
@@ -139,9 +139,6 @@
 	     (multiple-value-prog1 (funcall fn) (setf succeeded-p t))
 	  (unless succeeded-p
 	    (incf *aborted-compilation-unit-count*)))
-	;; FIXME: Now *COMPILER-FOO-COUNT* stuff is bound in more than
-	;; one place. If we can get rid of the IR1 interpreter, this
-	;; should be easier to clean up.
 	(let ((*aborted-compilation-unit-count* 0)
 	      (*compiler-error-count* 0)
 	      (*compiler-warning-count* 0)
@@ -1329,6 +1326,7 @@
 	 (sb!xc:*compile-file-pathname* nil)
 	 (sb!xc:*compile-file-truename* nil)
 	 (*toplevel-lambdas* ())
+	 (*fun-names-in-this-file* ())
 	 (*compiler-error-bailout*
 	  (lambda ()
 	    (compiler-mumble "~2&; fatal error, aborting compilation~%")

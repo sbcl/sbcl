@@ -59,7 +59,8 @@
   (let* ((leaf (functional-entry-fun fun))
 	 (defined-ftype (definition-type leaf)))
     (setf (leaf-type leaf) defined-ftype)
-    (when (leaf-has-source-name-p leaf)
+    (when (and (leaf-has-source-name-p leaf)
+	       (eq (leaf-source-name leaf) (functional-debug-name leaf)))
       (let ((source-name (leaf-source-name leaf)))
 	(let* ((where (info :function :where-from source-name))
 	       (*compiler-error-context* (lambda-bind (main-entry leaf)))
@@ -86,7 +87,13 @@
                   (type-specifier declared-ftype)
                   (type-specifier defined-ftype)))))
 	    (:defined
-	     (setf (info :function :type source-name) defined-ftype)))))))
+	     (setf (info :function :type source-name) defined-ftype)))
+	  (when (fasl-output-p *compile-object*)
+	    (if (member source-name *fun-names-in-this-file* :test #'equal)
+		(compiler-warn "~@<Duplicate definition for ~S found in ~
+                                one static unit (usually a file).~@:>"
+			       source-name)
+		(push source-name *fun-names-in-this-file*)))))))
   (values))
 
 ;;; Find all calls in COMPONENT to assumed functions and update the

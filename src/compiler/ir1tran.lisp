@@ -49,12 +49,21 @@
   gives non-ANSI, early-CMU-CL behavior. It can be useful for improving
   the efficiency of stable code.")
 
+(defvar *fun-names-in-this-file* nil)
+
 ;;; *ALLOW-DEBUG-CATCH-TAG* controls whether we should allow the
 ;;; insertion a (CATCH ...) around code to allow the debugger RETURN
 ;;; command to function.
 (defvar *allow-debug-catch-tag* t)
 
 ;;;; namespace management utilities
+
+(defun fun-lexically-notinline-p (name)
+  (let ((fun (lexenv-find name funs :test #'equal)))
+    ;; a declaration will trump a proclamation
+    (if (and fun (defined-fun-p fun))
+	(eq (defined-fun-inlinep fun) :notinline)
+	(eq (info :function :inlinep name) :notinline))))
 
 ;;; Return a GLOBAL-VAR structure usable for referencing the global
 ;;; function NAME.
@@ -72,13 +81,16 @@
 	       ;; definedness at runtime, which is what matters.
 	       #-sb-xc-host (not (fboundp name)))
       (note-undefined-reference name :function))
-    (make-global-var :kind :global-function
-		     :%source-name name
-		     :type (if (or *derive-function-types*
-				   (eq where :declared))
-			       (info :function :type name)
-			       (specifier-type 'function))
-		     :where-from where)))
+    (make-global-var
+     :kind :global-function
+     :%source-name name
+     :type (if (or *derive-function-types*
+		   (eq where :declared)
+		   (and (member name *fun-names-in-this-file* :test #'equal)
+			(not (fun-lexically-notinline-p name))))
+	       (info :function :type name)
+	       (specifier-type 'function))
+     :where-from where)))
 
 ;;; Has the *FREE-FUNS* entry FREE-FUN become invalid?
 ;;;
@@ -154,7 +166,9 @@
 		      :inline-expansion expansion
 		      :inlinep inlinep
 		      :where-from (info :function :where-from name)
-		      :type (info :function :type name))
+		      :type (if (eq inlinep :notinline)
+				(specifier-type 'function)
+				(info :function :type name)))
 		     (find-free-really-fun name))))))))
 
 ;;; Return the LEAF structure for the lexically apparent function
@@ -996,13 +1010,16 @@
 	(make-lexenv :default res :vars (new-venv))
 	res)))
 
-;;; Return a DEFINED-FUN which copies a GLOBAL-VAR but for its INLINEP.
+;;; Return a DEFINED-FUN which copies a GLOBAL-VAR but for its INLINEP
+;;; (and TYPE if notinline).
 (defun make-new-inlinep (var inlinep)
   (declare (type global-var var) (type inlinep inlinep))
   (let ((res (make-defined-fun
 	      :%source-name (leaf-source-name var)
 	      :where-from (leaf-where-from var)
-	      :type (leaf-type var)
+	      :type (if (eq inlinep :notinline)
+			(specifier-type 'function)
+			(leaf-type var))
 	      :inlinep inlinep)))
     (when (defined-fun-p var)
       (setf (defined-fun-inline-expansion res)

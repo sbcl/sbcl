@@ -52,13 +52,7 @@
 ;;; On any OS where we don't support foreign object file loading, any
 ;;; query of a foreign symbol value is answered with "no definition
 ;;; known", i.e. NIL.
-;;;
-;;; (On any OS which *does* support foreign object file loading, this
-;;; placeholder implementation is overwritten by a subsequent real
-;;; implementation.)
-;;;
-;;; You may want to use SB-SYS:FOREIGN-SYMBOL-ADDRESS instead of
-;;; calling this directly; see code/target-load.lisp.
+#-(or linux sunos FreeBSD OpenBSD)
 (defun get-dynamic-foreign-symbol-address (symbol)
   (declare (type simple-string symbol) (ignore symbol))
   nil)

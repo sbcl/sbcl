@@ -614,7 +614,7 @@
      nil)))
 
 (defun (setf interactive-stream-p) (flag stream)
-  (etypecase stream
+  (typecase stream
     (simple-stream
      (if flag
          (add-stream-instance-flags stream :interactive)
@@ -1057,18 +1057,6 @@
     (ansi-stream
      (progn (sb-impl::stream-must-be-associated-with-file stream)
             (funcall (sb-kernel:ansi-stream-misc stream) stream :file-length)))))
-
-(defun line-length (&optional (stream *standard-output*))
-  "Returns the number of characters that will fit on a line of output on the
-  given Stream, or Nil if that information is not available."
-  (let ((stream (sb-impl::out-synonym-of stream)))
-    (etypecase stream
-      (simple-stream
-       (%simple-stream-line-length stream))
-      (ansi-stream
-       (funcall (sb-kernel:ansi-stream-misc stream) stream :line-length))
-      (fundamental-stream
-       (sb-gray:stream-line-length stream)))))
 
 (defun charpos (&optional (stream *standard-output*))
   "Returns the number of characters on the current line of output of the given

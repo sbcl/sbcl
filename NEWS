@@ -1776,6 +1776,10 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     variables in the COMMON-LISP package, and will signal errors for
     most violations of these type constraints (where previously they
     were silently accepted).
+  * minor incompatible change: COMPILE-FILE now uses the freedom
+    afforded (ANSI 3.2.2.3) to use derived function types for
+    functions defined in the same file.  This also permits the system
+    to warn on static type mismatches and function redefinition.
   * changes in type checking closed the following bugs:
     ** type checking of unused values (192b, 194d, 203);
     ** template selection based on unsafe type assertions (192c, 236);

@@ -1075,8 +1075,9 @@
 			      req-args)))
       `(list*
 	:fast-function
-	(named-lambda
-	 ,(or (body-method-name body) '.method.) ; function name
+	(,(if (body-method-name body) 'named-lambda 'lambda)
+	 ,@(when (body-method-name body)
+	     (list (body-method-name body))) ; function name
 	 (.pv-cell. .next-method-call. ,@args+rest-arg) ; function args
 	 ;; body of the function
 	 (declare (ignorable .pv-cell. .next-method-call.))
