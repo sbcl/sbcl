@@ -801,32 +801,12 @@ reset to ~S."
 				 (t
 				  (funcall cmd-fun)))))))))))))))
 
-;;; FIXME: As far as I know, the CMU CL X86 codebase has never
-;;; supported access to the environment of the debugged function. It
-;;; would be really, really nice to make that work! (Until then,
-;;; non-NIL *AUTO-EVAL-IN-FRAME* seems to be useless, and as of
-;;; sbcl-0.6.10 it even seemed to be actively harmful, since the
-;;; debugger gets confused when trying to unwind the frames which
-;;; arise in SIGINT interrupts. So it's set to NIL.)
-(defvar *auto-eval-in-frame* nil
-  #!+sb-doc
-  "When set, evaluations in the debugger's command loop occur relative
-   to the current frame's environment without the need of debugger
-   forms that explicitly control this kind of evaluation. In an ideal
-   world, the default would be T, but since unfortunately the X86
-   debugger support isn't good enough to make this useful, the
-   default is NIL instead.")
-
 ;;; FIXME: We could probably use INTERACTIVE-EVAL for much of this logic.
 (defun debug-eval-print (expr)
   (/noshow "entering DEBUG-EVAL-PRINT" expr)
   (/noshow (fboundp 'compile))
-  (/noshow (and (fboundp 'compile) *auto-eval-in-frame*))
   (setq +++ ++ ++ + + - - expr)
-  (let* ((values (multiple-value-list
-		  (if (and (fboundp 'compile) *auto-eval-in-frame*)
-		      (sb!di:eval-in-frame *current-frame* -)
-		      (eval -))))
+  (let* ((values (multiple-value-list (eval -)))
 	 (*standard-output* *debug-io*))
     (/noshow "done with EVAL in DEBUG-EVAL-PRINT")
     (fresh-line)

@@ -286,7 +286,6 @@
   (if (and (policy call
 		   (and (>= speed space) (>= speed compilation-speed)))
 	   (not (eq (functional-kind (node-home-lambda call)) :external))
-	   (not *converting-for-interpreter*)
 	   (inline-expansion-ok call))
       (with-ir1-environment call
 	(let* ((*lexenv* (functional-lexenv fun))

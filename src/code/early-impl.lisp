@@ -22,7 +22,6 @@
 		  sb!vm:*initial-dynamic-space-free-pointer*
 		  *current-catch-block*
 		  *current-unwind-protect-block*
-		  *eval-stack-top*
 		  sb!vm::*alien-stack*
 		  ;; FIXME: The pseudo-atomic variable stuff should be
 		  ;; conditional on :SB-PSEUDO-ATOMIC-SYMBOLS, which

@@ -28,14 +28,19 @@
     :reexport ("ARRAY" "BOOLEAN" "DOUBLE-FLOAT" "LONG-FLOAT" "FUNCTION"
                "INTEGER" "SINGLE-FLOAT" "UNION"  "SYSTEM-AREA-POINTER"
                "VALUES" "*")
-    :export ("ADDR" "ALIEN" "ALIEN-FUNCALL" "ALIEN-SAP"
-             "ALIEN-SIZE" "ALIEN-BOOLEAN" "CAST" "DEF-ALIEN-ROUTINE"
-             "DEF-ALIEN-TYPE" "DEF-ALIEN-VARIABLE" "DEF-BUILTIN-ALIEN-TYPE"
-             "DEREF" "ENUM" "EXTERN-ALIEN"
+    :export ("ADDR" "ALIEN" "ALIEN-FUNCALL" "ALIEN-SAP" "ALIEN-SIZE" 
+	     "CAST"
+	     "DEF-ALIEN-ROUTINE" "DEF-ALIEN-TYPE"
+	     "DEF-ALIEN-VARIABLE" "DEF-BUILTIN-ALIEN-TYPE"
+             "DEREF"
+	     "ENUM" "EXTERN-ALIEN"
+	     "FREE-ALIEN" 
+             "LOAD-FOREIGN" "LOAD-1-FOREIGN"
+	     "MAKE-ALIEN"
+	     "NULL-ALIEN"
              "SAP-ALIEN" "SIGNED" "SLOT" "STRUCT"
-             "UNSIGNED" "WITH-ALIEN" "FREE-ALIEN" "NULL-ALIEN"
-             "MAKE-ALIEN"
-             "LOAD-FOREIGN" "LOAD-1-FOREIGN"))
+             "UNSIGNED"
+	     "WITH-ALIEN"))
 
  #s(sb-cold:package-data
     :name "SB!ALIEN-INTERNALS"
@@ -168,7 +173,6 @@
               "*BACKEND-T-PRIMITIVE-TYPE*"
 
               "*CODE-SEGMENT*" 
-              "*CONVERTING-FOR-INTERPRETER*"
               "*COUNT-VOP-USAGES*" "*ELSEWHERE*"
               "*SETF-ASSUMED-FBOUNDP*"
               "*SUPPRESS-VALUES-DECLARATION*"
@@ -186,7 +190,7 @@
               "CHECK-SIGNED-BYTE-32" "CHECK-SYMBOL" "CHECK-UNSIGNED-BYTE-32"
               "CLOSURE-INIT" "CLOSURE-REF"
               "CODE-CONSTANT-REF" "CODE-CONSTANT-SET" 
-              "COMPILE-FOR-EVAL" "COMPILER-ERROR"
+              "COMPILER-ERROR"
               "COMPONENT" "COMPONENT-HEADER-LENGTH"
               "COMPONENT-INFO" "COMPONENT-LIVE-TN" "COMPUTE-FUNCTION"
               "COMPUTE-OLD-NFP" "COPY-MORE-ARG" 
@@ -208,9 +212,7 @@
               "HALT" "IF-EQ" "INSTANCE-REF" "INSTANCE-SET"
               "IR2-COMPONENT-CONSTANTS" "IR2-CONVERT"
               "IR2-ENVIRONMENT-NUMBER-STACK-P" "KNOWN-CALL-LOCAL"
-              "KNOWN-RETURN" "LAMBDA-EVAL-INFO-ARGS-PASSED"
-              "LAMBDA-EVAL-INFO-ENTRIES" "LAMBDA-EVAL-INFO-FRAME-SIZE"
-              "LAMBDA-EVAL-INFO-FUNCTION" "LOCATION=" "LTN-ANNOTATE"
+              "KNOWN-RETURN" "LOCATION=" "LTN-ANNOTATE"
               "MAKE-ALIAS-TN" "MAKE-CATCH-BLOCK"
               "MAKE-CLOSURE" "MAKE-CONSTANT-TN" "MAKE-FIXNUM"
               "MAKE-LOAD-TIME-CONSTANT-TN" "MAKE-N-TNS" "MAKE-NORMAL-TN"
@@ -368,7 +370,7 @@
 debugger interface mixed with various low-level implementation stuff
 like *STACK-TOP-HINT*"
     :use ("CL" "SB!EXT" "SB!INT" "SB!SYS")
-    :export ("*AUTO-EVAL-IN-FRAME*" "*DEBUG-BEGINNER-HELP-P*"
+    :export ("*DEBUG-BEGINNER-HELP-P*"
              "*DEBUG-CONDITION*"
              "*DEBUG-PRINT-LENGTH*" "*DEBUG-PRINT-LEVEL*"
              "*DEBUG-READTABLE*" "*DEBUG-HELP-STRING*"
@@ -395,7 +397,7 @@ like *STACK-TOP-HINT*"
                "DEBUG-SOURCE-CREATED" "DEBUG-SOURCE-COMPILED"
                "DEBUG-SOURCE-START-POSITIONS" "DEBUG-SOURCE"
                "DEBUG-SOURCE-P")
-    :export ("*DEBUGGING-INTERPRETER*" "ACTIVATE-BREAKPOINT"
+    :export ("ACTIVATE-BREAKPOINT"
              "AMBIGUOUS-DEBUG-VARS" "AMBIGUOUS-VARIABLE-NAME" "BREAKPOINT"
              "BREAKPOINT-ACTIVE-P" "BREAKPOINT-HOOK-FUNCTION" "BREAKPOINT-INFO"
              "BREAKPOINT-KIND" "BREAKPOINT-P" "BREAKPOINT-WHAT" "CODE-LOCATION"
@@ -416,7 +418,7 @@ like *STACK-TOP-HINT*"
              "DEBUG-VAR-VALIDITY" "DEBUG-VAR-VALUE"
              "DELETE-BREAKPOINT" "DO-BLOCKS"
              "DO-DEBUG-BLOCK-LOCATIONS" "DO-DEBUG-FUNCTION-BLOCKS"
-             "DO-DEBUG-FUNCTION-VARIABLES" "EVAL-IN-FRAME"
+             "DO-DEBUG-FUNCTION-VARIABLES"
              "FORM-NUMBER-TRANSLATIONS" "FRAME" "FRAME-CATCHES"
              "FRAME-CODE-LOCATION" "FRAME-DEBUG-FUNCTION" "FRAME-DOWN"
              "FRAME-FUNCTION-MISMATCH" "FRAME-NUMBER" "FRAME-P" "FRAME-UP"
@@ -552,10 +554,10 @@ like *STACK-TOP-HINT*"
              ;; are assertions" default
              "TRULY-THE"
 
-             ;; This is something which must exist inside any Common Lisp
-             ;; implementation, and which someone writing a customized toplevel
-             ;; might well want. It seems perverse to hide it from
-             ;; them..
+             ;; This is something which must exist inside any Common
+             ;; Lisp implementation, and which someone writing a
+             ;; customized toplevel might well want. It seems perverse
+             ;; to hide it from them..
              "INTERACTIVE-EVAL"
 
              ;; weak pointers and finalization
@@ -939,7 +941,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "%WITH-ARRAY-DATA" "%WITH-ARRAY-DATA-MACRO" 
              "*ALREADY-MAYBE-GCING*"
              "*CURRENT-LEVEL*" "*EMPTY-TYPE*"
-             "*EVAL-STACK-TOP*" "*GC-INHIBIT*"
+             "*EVAL-STACK*" "*EVAL-STACK-TOP*" "*GC-INHIBIT*"
              "*NEED-TO-COLLECT-GARBAGE*"
              "*PRETTY-PRINTER*" "*UNIVERSAL-TYPE*"
              "*UNIVERSAL-FUNCTION-TYPE*"
@@ -1264,7 +1266,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "%RANDOM-DOUBLE-FLOAT" "%RANDOM-LONG-FLOAT"
              "%RANDOM-SINGLE-FLOAT"
              "RANDOM-PCL-CLASS" "BASIC-STRUCTURE-CLASS-PRINT-FUNCTION"
-             "%FUNCALLABLE-INSTANCE-INFO" "*EVAL-STACK*" "RANDOM-CHUNK"
+             "%FUNCALLABLE-INSTANCE-INFO" "RANDOM-CHUNK"
              "MAKE-FUNCALLABLE-STRUCTURE-CLASS" "LAYOUT-CLOS-HASH-MAX"
              "CLASS-CELL-NAME" "BUILT-IN-CLASS-DIRECT-SUPERCLASSES"
              "INITIALIZE-BYTE-COMPILED-FUNCTION"

@@ -460,12 +460,10 @@
     (values nil
 	    nil
 	    (list value)
-	    (if sb!c:*converting-for-interpreter*
-		`(%set-local-alien ',info ,alien ,value)
-		`(if (%local-alien-forced-to-memory-p ',info)
-		     (%set-local-alien ',info ,alien ,value)
-		     (setf ,alien
-			   (deport ,value ',(local-alien-info-type info)))))
+	    `(if (%local-alien-forced-to-memory-p ',info)
+		 (%set-local-alien ',info ,alien ,value)
+		 (setf ,alien
+		       (deport ,value ',(local-alien-info-type info))))
 	    whole)))
 
 (defun %local-alien-forced-to-memory-p (info)

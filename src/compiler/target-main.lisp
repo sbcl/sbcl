@@ -57,7 +57,6 @@
 	     (form `#',(get-lambda-to-compile definition))
 	     (*source-info* (make-lisp-source-info form))
 	     (*top-level-lambdas* ())
-	     (*converting-for-interpreter* nil)
 	     (*block-compile* nil)
 	     (*compiler-error-bailout*
 	      #'(lambda ()

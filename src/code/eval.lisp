@@ -11,8 +11,9 @@
 
 (in-package "SB!BYTECODE")
 
-;;; This needs to be initialized in the cold load, since the top-level
-;;; catcher will always restore the initial value.
+;;; Note: This is defined here, but it's visible in SB-KERNEL, since
+;;; various magical things need to happen to it, e.g. initialization
+;;; early in cold load, and save/restore in nonlocal exit logic.
 (defvar *eval-stack-top* 0)
 
 ;;; general case of EVAL (except in that it can't handle toplevel

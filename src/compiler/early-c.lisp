@@ -90,7 +90,6 @@
 (defvar *compiler-note-count*)
 (defvar *compiler-trace-output*)
 (defvar *constraint-number*)
-(defvar *converting-for-interpreter*)
 (defvar *count-vop-usages*)
 (defvar *current-path*)
 (defvar *current-component*)

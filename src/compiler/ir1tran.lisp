@@ -42,12 +42,6 @@
 (declaim (list *current-path*))
 (defvar *current-path* nil)
 
-;;; *CONVERTING-FOR-INTERPRETER* is true when we are creating IR1 to
-;;; be interpreted rather than compiled. This inhibits source
-;;; tranformations and stuff.
-(defvar *converting-for-interpreter* nil)
-;;; FIXME: Rename to *IR1-FOR-INTERPRETER-NOT-COMPILER-P*.
-
 (defvar *derive-function-types* nil
   "Should the compiler assume that function types will never change,
   so that it can use type information inferred from current definitions
@@ -555,8 +549,9 @@
 	 (translator (info :function :ir1-convert fun))
 	 (cmacro (info :function :compiler-macro-function fun)))
     (cond (translator (funcall translator start cont form))
-	  ((and cmacro (not *converting-for-interpreter*)
-		(not (eq (info :function :inlinep fun) :notinline)))
+	  ((and cmacro
+		(not (eq (info :function :inlinep fun)
+			 :notinline)))
 	   (let ((res (careful-expand-macro cmacro form)))
 	     (if (eq res form)
 		 (ir1-convert-global-functoid-no-cmacro start cont form fun)
@@ -702,32 +697,26 @@
 
 ;;; Convert a call to a global function. If not :NOTINLINE, then we do
 ;;; source transforms and try out any inline expansion. If there is no
-;;; expansion, but is :INLINE, then give an efficiency note (unless a known
-;;; function which will quite possibly be open-coded.)   Next, we go to
-;;; ok-combination conversion.
+;;; expansion, but is :INLINE, then give an efficiency note (unless a
+;;; known function which will quite possibly be open-coded.) Next, we
+;;; go to ok-combination conversion.
 (defun ir1-convert-srctran (start cont var form)
   (declare (type continuation start cont) (type global-var var))
   (let ((inlinep (when (defined-function-p var)
 		   (defined-function-inlinep var))))
-    (cond
-     ((eq inlinep :notinline)
-      (ir1-convert-combination start cont form var))
-     (*converting-for-interpreter*
-      (ir1-convert-combination-checking-type start cont form var))
-     (t
-      (let ((transform (info :function :source-transform (leaf-name var))))
-	(cond
-	 (transform
-	  (multiple-value-bind (result pass) (funcall transform form)
-	    (if pass
-		(ir1-convert-maybe-predicate start cont form var)
-		(ir1-convert start cont result))))
-	 (t
-	  (ir1-convert-maybe-predicate start cont form var))))))))
+    (if (eq inlinep :notinline)
+	(ir1-convert-combination start cont form var)
+	(let ((transform (info :function :source-transform (leaf-name var))))
+	  (if transform
+	      (multiple-value-bind (result pass) (funcall transform form)
+		(if pass
+		    (ir1-convert-maybe-predicate start cont form var)
+		    (ir1-convert start cont result)))
+	      (ir1-convert-maybe-predicate start cont form var))))))
 
-;;; If the function has the Predicate attribute, and the CONT's DEST isn't
-;;; an IF, then we convert (IF <form> T NIL), ensuring that a predicate always
-;;; appears in a conditional context.
+;;; If the function has the PREDICATE attribute, and the CONT's DEST
+;;; isn't an IF, then we convert (IF <form> T NIL), ensuring that a
+;;; predicate always appears in a conditional context.
 ;;;
 ;;; If the function isn't a predicate, then we call
 ;;; IR1-CONVERT-COMBINATION-CHECKING-TYPE.
@@ -1778,7 +1767,7 @@
 
     res))
 
-;;; Convert a Lambda into a Lambda or Optional-Dispatch leaf.
+;;; Convert a LAMBDA form into a LAMBDA leaf or an OPTIONAL-DISPATCH leaf.
 (defun ir1-convert-lambda (form &optional name)
   (unless (consp form)
     (compiler-error "A ~S was found when expecting a lambda expression:~%  ~S"

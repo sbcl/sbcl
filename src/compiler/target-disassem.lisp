@@ -1516,7 +1516,6 @@
       (error "can't compile a lexical closure"))
     (compile nil lambda)))
 
-;;; FIXME: Couldn't we just use COMPILE for this?
 (defun compiled-function-or-lose (thing &optional (name thing))
   (cond ((or (symbolp thing)
 	     (and (listp thing)
@@ -1525,7 +1524,7 @@
 	((functionp thing)
 	 thing)
 	((and (listp thing)
-	      (eq (car thing) 'sb!impl::lambda))
+	      (eq (car thing) 'lambda))
 	 (compile nil thing))
 	(t
 	 (error "can't make a compiled function from ~S" name))))

@@ -249,8 +249,7 @@
       (dolist (exit (entry-exits entry))
 	(let ((target-env (node-environment entry)))
 	  (if (eq (node-environment exit) target-env)
-	      (unless *converting-for-interpreter*
-		(maybe-delete-exit exit))
+	      (maybe-delete-exit exit)
 	      (note-non-local-exit target-env exit))))))
 
   (values))

@@ -2834,7 +2834,7 @@
 ;;; at BASIC-CODE-LOCATION:
 ;;;   :VALID    The value is known to be available.
 ;;;   :INVALID  The value is known to be unavailable.
-;;;   :UNKNOWN  The value's availability is unknown."
+;;;   :UNKNOWN  The value's availability is unknown.
 ;;;
 ;;; If the variable is always alive, then it is valid. If the
 ;;; code-location is unknown, then the variable's validity is
@@ -2974,7 +2974,7 @@
 			      (cons res (nthcdr (1+ n) form))))))))
       (frob form path context))))
 
-;;;; PREPROCESS-FOR-EVAL and EVAL-IN-FRAME
+;;;; PREPROCESS-FOR-EVAL
 
 ;;; Return a function of one argument that evaluates form in the
 ;;; lexical context of the BASIC-CODE-LOCATION LOC, or signal a
@@ -3026,12 +3026,6 @@
 	      (debug-signal 'frame-function-mismatch
 			    :code-location loc :form form :frame frame))
 	    (funcall res frame))))))
-
-;;; Evaluate FORM in the lexical context of FRAME's current code
-;;; location, returning the results of the evaluation.
-(defun eval-in-frame (frame form)
-  (declare (type frame frame))
-  (funcall (preprocess-for-eval form (frame-code-location frame)) frame))
 
 ;;;; breakpoints
 

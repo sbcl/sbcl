@@ -80,11 +80,10 @@
 
 (defmacro-mundanely defconstant (name value &optional documentation)
   #!+sb-doc
-  "For defining global constants. DEFCONSTANT says that the value is
-  constant and may be compiled into code. If the variable already has
-  a value, and this is not EQL to the init, the code is not portable
-  (undefined behavior). The third argument is an optional documentation
-  string for the variable."
+  "Define a global constant, saying that the value is constant and may be
+  compiled into code. If the variable already has a value, and this is not
+  EQL to the new value, the code is not portable (undefined behavior). The
+  third argument is an optional documentation string for the variable."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (sb!c::%defconstant ',name ,value ',documentation)))
 

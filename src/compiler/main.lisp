@@ -191,21 +191,19 @@
 				     (if (symbolp x)
 					 (symbol-name x)
 					 (prin1-to-string x)))))))
-	(unless *converting-for-interpreter*
-	  (dolist (undef undefs)
-	    (let ((name (undefined-warning-name undef))
-		  (kind (undefined-warning-kind undef))
-		  (warnings (undefined-warning-warnings undef))
-		  (undefined-warning-count (undefined-warning-count undef)))
-	      (dolist (*compiler-error-context* warnings)
-		(compiler-style-warning "undefined ~(~A~): ~S" kind name))
-
-	      (let ((warn-count (length warnings)))
-		(when (and warnings (> undefined-warning-count warn-count))
-		  (let ((more (- undefined-warning-count warn-count)))
-		    (compiler-style-warning
-		     "~D more use~:P of undefined ~(~A~) ~S"
-		     more kind name)))))))
+	(dolist (undef undefs)
+	  (let ((name (undefined-warning-name undef))
+		(kind (undefined-warning-kind undef))
+		(warnings (undefined-warning-warnings undef))
+		(undefined-warning-count (undefined-warning-count undef)))
+	    (dolist (*compiler-error-context* warnings)
+	      (compiler-style-warning "undefined ~(~A~): ~S" kind name))
+	    (let ((warn-count (length warnings)))
+	      (when (and warnings (> undefined-warning-count warn-count))
+		(let ((more (- undefined-warning-count warn-count)))
+		  (compiler-style-warning
+		   "~D more use~:P of undefined ~(~A~) ~S"
+		   more kind name))))))
 	
 	(dolist (kind '(:variable :function :type))
 	  (let ((summary (mapcar #'undefined-warning-name
@@ -217,13 +215,12 @@
 		~%  ~{~<~%  ~1:;~S~>~^ ~}"
 	       (cdr summary) kind summary)))))))
 
-  (unless (or *converting-for-interpreter*
-	      (and (not abort-p)
-		   (zerop *aborted-compilation-unit-count*)
-		   (zerop *compiler-error-count*)
-		   (zerop *compiler-warning-count*)
-		   (zerop *compiler-style-warning-count*)
-		   (zerop *compiler-note-count*)))
+  (unless (and (not abort-p)
+	       (zerop *aborted-compilation-unit-count*)
+	       (zerop *compiler-error-count*)
+	       (zerop *compiler-warning-count*)
+	       (zerop *compiler-style-warning-count*)
+	       (zerop *compiler-note-count*))
     (format *error-output* "~&")
     (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
       (compiler-mumble "compilation unit ~:[finished~;aborted~]~
@@ -1021,11 +1018,10 @@
 ;;;;
 ;;;; (See EMIT-MAKE-LOAD-FORM.)
 
-;;; Returns T if we are currently producing a fasl file and hence
+;;; Return T if we are currently producing a fasl file and hence
 ;;; constants need to be dumped carefully.
 (defun producing-fasl-file ()
-  (unless *converting-for-interpreter*
-    (fasl-output-p *compile-object*)))
+  (fasl-output-p *compile-object*))
 
 ;;; Compile FORM and arrange for it to be called at load-time. Return
 ;;; the dumper handle and our best guess at the type of the object.
@@ -1243,7 +1239,6 @@
 	 (*package* (sane-package))
 	 (*policy* *policy*)
 	 (*lexenv* (make-null-lexenv))
-	 (*converting-for-interpreter* nil)
 	 (*source-info* info)
 	 (sb!xc:*compile-file-pathname* nil)
 	 (sb!xc:*compile-file-truename* nil)

@@ -1252,14 +1252,14 @@
 (defoptimizer (%special-unbind ir2-convert) ((var) node block)
   (vop unbind node block))
 
-;;; ### Not clear that this really belongs in this file, or should
-;;; really be done this way, but this is the least violation of
+;;; ### It's not clear that this really belongs in this file, or
+;;; should really be done this way, but this is the least violation of
 ;;; abstraction in the current setup. We don't want to wire
 ;;; shallow-binding assumptions into IR1tran.
 (def-ir1-translator progv ((vars vals &body body) start cont)
   (ir1-convert
    start cont
-   (if (or *converting-for-interpreter* (byte-compiling))
+   (if (byte-compiling)
        `(%progv ,vars ,vals #'(lambda () ,@body))
        (once-only ((n-save-bs '(%primitive current-binding-pointer)))
 	 `(unwind-protect
