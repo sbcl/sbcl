@@ -2147,7 +2147,8 @@ search_dynamic_space(lispobj *pointer)
 
 /* Is there any possibility that pointer is a valid Lisp object
  * reference, and/or something else (e.g. subroutine call return
- * address) which should prevent us from moving the referred-to thing? */
+ * address) which should prevent us from moving the referred-to thing?
+ * This is called from preserve_pointers() */
 static int
 possibly_valid_dynamic_space_pointer(lispobj *pointer)
 {
@@ -2174,23 +2175,6 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 
     /* Check that the object pointed to is consistent with the pointer
      * low tag.
-     *
-     * FIXME: It's not safe to rely on the result from this check
-     * before an object is initialized. Thus, if we were interrupted
-     * just as an object had been allocated but not initialized, the
-     * GC relying on this result could bogusly reclaim the memory.
-     * However, we can't really afford to do without this check. So
-     * we should make it safe somehow. 
-     *   (1) Perhaps just review the code to make sure
-     *       that WITHOUT-GCING or WITHOUT-INTERRUPTS or some such
-     *       thing is wrapped around critical sections where allocated
-     *       memory type bits haven't been set.
-     *   (2) Perhaps find some other hack to protect against this, e.g.
-     *       recording the result of the last call to allocate-lisp-memory,
-     *       and returning true from this function when *pointer is
-     *       a reference to that result. 
-     *
-     * (surely pseudo-atomic is supposed to be used for exactly this?)
      */
     switch (lowtag_of((lispobj)pointer)) {
     case FUN_POINTER_LOWTAG:
@@ -2588,7 +2572,7 @@ preserve_pointer(void *addr)
      * (or, as a special case which also requires dont_move, a return
      * address referring to something in a CodeObject). This is
      * expensive but important, since it vastly reduces the
-     * probability that random garbage will be bogusly interpreter as
+     * probability that random garbage will be bogusly interpreted as
      * a pointer which prevents a page from moving. */
     if (!(possibly_valid_dynamic_space_pointer(addr)))
 	return;
