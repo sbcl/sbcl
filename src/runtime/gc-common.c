@@ -233,7 +233,6 @@ scav_fun_pointer(lispobj *where, lispobj object)
 
     switch (widetag_of(*first_pointer)) {
     case SIMPLE_FUN_HEADER_WIDETAG:
-    case CLOSURE_FUN_HEADER_WIDETAG:
 	copy = trans_fun_header(object);
 	break;
     default:
@@ -1590,7 +1589,6 @@ gc_init_tables(void)
     scavtab[CODE_HEADER_WIDETAG] = scav_code_header;
 #ifndef LISP_FEATURE_GENCGC	/* FIXME ..._X86 ? */
     scavtab[SIMPLE_FUN_HEADER_WIDETAG] = scav_fun_header;
-    scavtab[CLOSURE_FUN_HEADER_WIDETAG] = scav_fun_header;
     scavtab[RETURN_PC_HEADER_WIDETAG] = scav_return_pc_header;
 #endif
 #ifdef LISP_FEATURE_X86
@@ -1698,7 +1696,6 @@ gc_init_tables(void)
     transother[COMPLEX_ARRAY_WIDETAG] = trans_boxed;
     transother[CODE_HEADER_WIDETAG] = trans_code_header;
     transother[SIMPLE_FUN_HEADER_WIDETAG] = trans_fun_header;
-    transother[CLOSURE_FUN_HEADER_WIDETAG] = trans_fun_header;
     transother[RETURN_PC_HEADER_WIDETAG] = trans_return_pc_header;
     transother[CLOSURE_HEADER_WIDETAG] = trans_boxed;
     transother[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = trans_boxed;
@@ -1805,7 +1802,6 @@ gc_init_tables(void)
 #if 0
     /* We shouldn't see these, so just lose if it happens. */
     sizetab[SIMPLE_FUN_HEADER_WIDETAG] = size_function_header;
-    sizetab[CLOSURE_FUN_HEADER_WIDETAG] = size_function_header;
     sizetab[RETURN_PC_HEADER_WIDETAG] = size_return_pc_header;
 #endif
     sizetab[CLOSURE_HEADER_WIDETAG] = size_boxed;

@@ -168,8 +168,7 @@
                              lambda-list
 			     (%simple-fun-name (%closure-fun definition))
 			     debug-name))
-                      ((#.sb!vm:simple-fun-header-widetag
-                        #.sb!vm:closure-fun-header-widetag)
+                      (#.sb!vm:simple-fun-header-widetag
                        (setf (%simple-fun-arglist definition) lambda-list
 			     (%simple-fun-name definition) debug-name))))
 	     name))))

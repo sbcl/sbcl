@@ -105,7 +105,7 @@
   simple-fun-header
   closure-header
   funcallable-instance-header
-  closure-fun-header
+  nil ; this was closure-fun-header; remove when +FASL-FILE-VERSION+ will increase
 
   return-pc-header
   value-cell-header

@@ -787,8 +787,7 @@ ptrans_func(lispobj thing, lispobj header)
      * Otherwise we have to do something strange, 'cause it is buried
      * inside a code object. */
 
-    if (widetag_of(header) == SIMPLE_FUN_HEADER_WIDETAG ||
-        widetag_of(header) == CLOSURE_FUN_HEADER_WIDETAG) {
+    if (widetag_of(header) == SIMPLE_FUN_HEADER_WIDETAG) {
 
 	/* We can only end up here if the code object has not been
          * scavenged, because if it had been scavenged, forwarding pointers
@@ -1268,7 +1267,6 @@ pscav(lispobj *addr, int nwords, boolean constant)
                 break;
 
               case SIMPLE_FUN_HEADER_WIDETAG:
-              case CLOSURE_FUN_HEADER_WIDETAG:
               case RETURN_PC_HEADER_WIDETAG:
                 /* We should never hit any of these, 'cause they occur
                  * buried in the middle of code objects. */

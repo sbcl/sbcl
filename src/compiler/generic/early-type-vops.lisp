@@ -16,7 +16,6 @@
 (defparameter *fun-header-widetags*
   (list funcallable-instance-header-widetag
 	simple-fun-header-widetag
-	closure-fun-header-widetag
 	closure-header-widetag))
 
 (defun canonicalize-headers (headers)

@@ -1190,8 +1190,7 @@
      (fun-debug-fun (%closure-fun fun)))
     (#.sb!vm:funcallable-instance-header-widetag
      (fun-debug-fun (funcallable-instance-fun fun)))
-    ((#.sb!vm:simple-fun-header-widetag
-      #.sb!vm:closure-fun-header-widetag)
+    (#.sb!vm:simple-fun-header-widetag
       (let* ((name (%simple-fun-name fun))
 	     (component (fun-code-header fun))
 	     (res (find-if

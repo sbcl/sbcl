@@ -54,8 +54,7 @@
   (case (widetag-of fun)
     (#.sb!vm:closure-header-widetag
      (%simple-fun-name (%closure-fun fun)))
-    ((#.sb!vm:simple-fun-header-widetag
-      #.sb!vm:closure-fun-header-widetag)
+    (#.sb!vm:simple-fun-header-widetag
      ;; KLUDGE: The pun that %SIMPLE-FUN-NAME is used for closure
      ;; functions is left over from CMU CL (modulo various renaming
      ;; that's gone on since the fork).
@@ -68,8 +67,7 @@
   (aver nil) ; since this is unsafe 'til bug 137 is fixed
   (let ((widetag (widetag-of fun)))
     (case widetag
-      ((#.sb!vm:simple-fun-header-widetag
-	#.sb!vm:closure-fun-header-widetag)
+      (#.sb!vm:simple-fun-header-widetag
        ;; KLUDGE: The pun that %SIMPLE-FUN-NAME is used for closure
        ;; functions is left over from CMU CL (modulo various renaming
        ;; that's gone on since the fork).

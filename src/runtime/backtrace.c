@@ -79,7 +79,6 @@ code_pointer(lispobj object)
             break;
         case RETURN_PC_HEADER_WIDETAG:
         case SIMPLE_FUN_HEADER_WIDETAG:
-        case CLOSURE_FUN_HEADER_WIDETAG:
             len = HEADER_LENGTH(header);
             if (len == 0)
                 headerp = NULL;

@@ -219,7 +219,7 @@
 	 (pprint-indent :current 8)
 	 (dotimes (i (- (get-closure-length x) (1- sb-vm:closure-info-offset)))
 	   (format s "~@:_~S: ~S" i (%closure-index-ref x i)))))
-      ((#.sb-vm:simple-fun-header-widetag #.sb-vm:closure-fun-header-widetag)
+      (#.sb-vm:simple-fun-header-widetag
        (%describe-fun-compiled x s kind name))
       (#.sb-vm:funcallable-instance-header-widetag
        ;; Only STANDARD-GENERIC-FUNCTION would be handled here, but

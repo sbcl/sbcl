@@ -610,7 +610,6 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case SIMPLE_FUN_HEADER_WIDETAG:
-            case CLOSURE_FUN_HEADER_WIDETAG:
                 print_slots(fn_slots, 5, ptr);
                 break;
 
