@@ -11,10 +11,11 @@
 
 (in-package "SB-COLD")
 
-;;;; definition of #!+ and #!- as a mechanism analogous to #+/#-,
-;;;; but redirectable to any list of features. (This is handy when
-;;;; cross-compiling for making a distinction between features of the
-;;;; host Common Lisp and features of the target SBCL.)
+;;;; definition of #!+ and #!- as a mechanism analogous to #+/#-, but
+;;;; for *SHEBANG-FEATURES* instead of CL:*FEATURES*. (This is handy
+;;;; when cross-compiling, so that we can make a distinction between
+;;;; features of the host Common Lisp and features of the target
+;;;; SBCL.)
 
 ;;; the feature list for the target system
 (export '*shebang-features*)
@@ -39,7 +40,7 @@
 (defun shebang-reader (stream sub-character infix-parameter)
   (declare (ignore sub-character))
   (when infix-parameter
-    (error "illegal read syntax: #~DT" infix-parameter))
+    (error "illegal read syntax: #~D!" infix-parameter))
   (let ((next-char (read-char stream)))
     (unless (find next-char "+-")
       (error "illegal read syntax: #!~C" next-char))

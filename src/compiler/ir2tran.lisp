@@ -146,6 +146,7 @@
 ;;; top-level variables, where optimization of the closure deleted the
 ;;; variable. Since we committed to the closure format when we
 ;;; pre-analyzed the top-level code, we just leave an empty slot.
+#!-gengc
 (defun ir2-convert-closure (node block leaf res)
   (declare (type ref node) (type ir2-block block)
 	   (type functional leaf) (type tn res))

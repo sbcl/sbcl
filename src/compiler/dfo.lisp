@@ -172,8 +172,9 @@
 ;;; to XEP lambdas. We can ignore references to XEPs that appear in
 ;;; :TOP-LEVEL components, since environment analysis goes to special
 ;;; effort to allow closing over of values from a separate top-level
-;;; component. All other references must cause components to be
-;;; joined.
+;;; component. (And now that HAS-EXTERNAL-REFERENCES-P-ness
+;;; generalizes :TOP-LEVEL-ness, we ignore those too.) All other
+;;; references must cause components to be joined.
 ;;;
 ;;; References in deleted functions are also ignored, since this code
 ;;; will be deleted eventually.
@@ -181,8 +182,11 @@
   (collect ((res))
     (dolist (ref (leaf-refs fun))
       (let* ((home (node-home-lambda ref))
-	     (home-kind (functional-kind home)))
-	(unless (or (and (eq home-kind :top-level)
+	     (home-kind (functional-kind home))
+	     (home-externally-visible-p
+	      (or (eq home-kind :top-level)
+		  (functional-has-external-references-p home))))
+	(unless (or (and home-externally-visible-p
 			 (eq (functional-kind fun) :external))
 		    (eq home-kind :deleted))
 	  (res home))))
@@ -193,20 +197,20 @@
 ;;; that component.
 ;;;
 ;;; If the function is in an initial component, then we move its head
-;;; and tail to Component and add it to Component's lambdas. It is
+;;; and tail to COMPONENT and add it to COMPONENT's lambdas. It is
 ;;; harmless to move the tail (even though the return might be
 ;;; unreachable) because if the return is unreachable it (and its
 ;;; successor link) will be deleted in the post-deletion pass.
 ;;;
-;;; We then do a Find-DFO-Aux starting at the head of Fun. If this
+;;; We then do a FIND-DFO-AUX starting at the head of FUN. If this
 ;;; flow-graph walk encounters another component (which can only
 ;;; happen due to a non-local exit), then we move code into that
 ;;; component instead. We then recurse on all functions called from
-;;; Fun, moving code into whichever component the preceding call
+;;; FUN, moving code into whichever component the preceding call
 ;;; returned.
 ;;;
-;;; If FUN is in the initial component, but the Block-Flag is set in
-;;; the bind block, then we just return Component, since we must have
+;;; If FUN is in the initial component, but the BLOCK-FLAG is set in
+;;; the bind block, then we just return COMPONENT, since we must have
 ;;; already reached this function in the current walk (or the
 ;;; component would have been changed).
 ;;;
