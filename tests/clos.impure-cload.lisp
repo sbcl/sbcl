@@ -71,7 +71,7 @@
 ;;; etc., but we should be able to define it).
 
 ;;; the ctor MAKE-INSTANCE optimizer used not to handle duplicate
-;;; initargs.
+;;; initargs...
 (defclass dinitargs-class1 ()
   ((a :initarg :a)))
 (assert (= (slot-value (make-instance 'dinitargs-class1 :a 1 :a 2) 'a) 1))
@@ -79,6 +79,14 @@
 (defclass dinitargs-class2 ()
   ((b :initarg :b1 :initarg :b2)))
 (assert (= (slot-value (make-instance 'dinitargs-class2 :b2 3 :b1 4) 'b) 3))
+;;; ... or default-initargs when the location was already initialized
+(defvar *definitargs-counter* 0)
+(defclass definitargs-class ()
+  ((a :initarg :a :initarg :a2))
+  (:default-initargs :a2 (incf *definitargs-counter*)))
+(assert (= (slot-value (make-instance 'definitargs-class) 'a) 1))
+(assert (= (slot-value (make-instance 'definitargs-class :a 0) 'a) 0))
+(assert (= *definitargs-counter* 2))
 
 ;;; success
 (sb-ext:quit :unix-status 104)
