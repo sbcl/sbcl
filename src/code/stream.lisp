@@ -1224,7 +1224,9 @@
 (defun string-sout (stream string start end)
   (declare (type simple-string string)
 	   (type fixnum start end))
-  (let* ((string (coerce string '(simple-array character (*))))
+  (let* ((string (if (typep string '(simple-array character (*)))
+		     string
+		     (coerce string '(simple-array character (*)))))
 	 (current (string-output-stream-index stream))
 	 (length (- end start))
 	 (dst-end (+ length current))

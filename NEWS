@@ -2202,6 +2202,8 @@ changes in sbcl-0.8.7 relative to sbcl-0.8.6:
   * bug fix: buffered :DIRECTION :IO streams are less likely to become
     confused about their position.  (thanks to Adam Warner and Gerd 
     Moellmann)
+  * optimization: performance of string output streams is now less
+    poor for multiple small sequence writes.
   * ASDF-INSTALL bug fix: now parses *PROXY* properly.  (thanks to
     Sean Ross)
   * SB-SIMPLE-STREAMS enhancement: simple-streams can now be used as
