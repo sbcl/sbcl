@@ -52,7 +52,7 @@
 	   (write-string "[doing purification: " notify-stream)
 	   (force-output notify-stream)))
 	(*internal-gc*
-	 (lambda ()
+	 (lambda (ignored-generation-arg)
 	   (%purify (get-lisp-obj-address root-structures)
 		    (get-lisp-obj-address nil))))
 	(*gc-notify-after*

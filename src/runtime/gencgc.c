@@ -26,6 +26,9 @@
 
 #include <stdio.h>
 #include <signal.h>
+#include <sys/ptrace.h>
+#include <linux/user.h>
+#include <errno.h>
 #include "runtime.h"
 #include "sbcl.h"
 #include "os.h"
@@ -3585,7 +3588,7 @@ garbage_collect_generation(int generation, int raise)
     unsigned long bytes_freed;
     unsigned long i;
     unsigned long static_space_size;
-
+    struct thread *th;
     gc_assert(generation <= (NUM_GENERATIONS-1));
 
     /* The oldest generation can't be raised. */
@@ -3627,17 +3630,32 @@ garbage_collect_generation(int generation, int raise)
      * be un-protected anyway before unmapping later. */
     unprotect_oldspace();
 
-    /* Scavenge the stack's conservative roots. */
-    {
-	/* XXXX this really is not going to work as soon as we have >1
-	 * thread
-	 */
+    /* Scavenge the stacks' conservative roots. */
+    for_each_thread(th) {
 	void **ptr;
+	struct user_regs_struct regs;
+	if(ptrace(PTRACE_GETREGS,th->pid,0,&regs)){
+	    fprintf(stderr,"child pid %d, %s\n",th->pid,strerror(errno));
+	    lose("PTRACE_GETREGS");
+	}
+	preserve_pointer(regs.ebx);
+	preserve_pointer(regs.ecx);
+	preserve_pointer(regs.edx);
+	preserve_pointer(regs.esi);
+	preserve_pointer(regs.edi);
+	preserve_pointer(regs.ebp);
+	preserve_pointer(regs.eax);
+	fprintf(stderr,"conservatively scanning stack from 0x%x to 0x%x\n",
+		((void **)
+		 ((void *)th->control_stack_start
+		  + THREAD_CONTROL_STACK_SIZE)
+		 -1),
+		regs.esp);
 	for (ptr = ((void **)
-		    ((void *)all_threads->control_stack_start
+		    ((void *)th->control_stack_start
 		     + THREAD_CONTROL_STACK_SIZE)
 		    -1);
-	     ptr > (void **)&raise;
+	     ptr > regs.esp;
 	     ptr--) {
 	    preserve_pointer(*ptr);
 	}
@@ -4142,20 +4160,7 @@ alloc(int nbytes)
     gc_assert((((unsigned)region->free_pointer & 0x7) == 0)
 	      && ((nbytes & 0x7) == 0));
 
-    if (!(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th))) {
-	lose("alloc() called non-atomically");
-	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
-	SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);
-	new_obj=alloc(nbytes);
-
-	SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
-	if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th)) {
-	    do_pending_interrupt();
-	}
-	return new_obj;
-    }
-
-    /* ok, now we're in a pseudo atomic */
+    gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th));
 
     /* maybe we can do this quickly ... */
     new_free_pointer = region->free_pointer + nbytes;
@@ -4171,14 +4176,7 @@ alloc(int nbytes)
     if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
 	auto_gc_trigger *= 2;
 	/* set things up so that GC happens when we finish the PA
-	 * section.  Note the interesting conditions that obtain when
-	 * we were originally called from outside a PA section: the GC
-	 * will happen from just up there in alloc() and as there are
-	 * unlikely to be any references to the new object from
-	 * elsewhere, we rely on preserve_pointers' control-stack
-	 * checking to lock down the page(s) pointed to by new_obj
-	 * XXX how does it know how _big_ the object is?
-	 */
+	 * section.  */
 	maybe_gc_pending=1;
 	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),th);
     }

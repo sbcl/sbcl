@@ -18,5 +18,5 @@
 ;;; versions, especially for internal versions off the main CVS
 ;;; branch, it gets hairier, e.g. "0.pre7.14.flaky4.13".)
 
-"0.7.9.54.thread.14"
+"0.7.9.54.thread.15"
 

@@ -60,7 +60,7 @@
        (let ((do-update '(when (eql old-value
 				(sb!vm::%instance-set-conditional
 				 lock 2 old-value new-value))
-			  (return t)))
+			  (return (values t old-value))))
 	     (vars `((timeout (and timeout (+ (get-internal-real-time) timeout)))
 		     old-value
 		     new-value

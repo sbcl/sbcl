@@ -330,13 +330,12 @@
 (defmacro pseudo-atomic (&rest forms)
   (let ((label (gensym "LABEL-")))
     `(let ((,label (gen-label)))
-      ;; FIXME: The MAKE-EA noise should become a MACROLET macro or
-      ;; something. (perhaps SVLB, for static variable low byte)
       (inst gs-segment-prefix)
       (inst mov (make-ea :byte :disp (* 4 23)) 1) ;FIXME EVIL HARDCODED NUMBER
       (inst gs-segment-prefix)
-      (inst mov (make-ea :byte :disp (* 4 24)) 0) ;(23 and 24 are the slot offsets
-      ,@forms				;for *p-a-a* and *p-a-i* in struct thread)
+      (inst mov (make-ea :byte :disp (* 4 24)) 0) 
+					;(23 and 24 are the slot offsets
+      ,@forms		    ;for *p-a-a* and *p-a-i* in struct thread)
       (inst gs-segment-prefix)
       (inst mov (make-ea :byte :disp (* 4 23)) 0)
       (inst gs-segment-prefix)
