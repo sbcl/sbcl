@@ -1192,6 +1192,11 @@ WORKAROUND:
 
   (fixed in 0.8.0.27)
 
+253: "type checking is embedded THEs"
+  Compiler cannot perform type checking in
+
+    (let () (list (the fixnum (the unsigned-byte (eval -1)))))
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

@@ -515,6 +515,10 @@
       (mv-combination
        (eq (basic-combination-fun dest) cont))
       (cast
+       nil
+       ;; The following property means that the cast chain allows
+       ;; changing number of values, produced by the USE of CONT, but
+       ;; derived types of the casts must be updated (TODO: how?).
        #+nil
        (locally
            (declare (notinline continuation-single-value-p))
