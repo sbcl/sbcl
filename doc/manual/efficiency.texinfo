@@ -1,4 +1,4 @@
-@node Efficiency, Beyond The ANSI Standard, The Debugger, Top
+@node Efficiency
 @comment  node-name,  next,  previous,  up
 @chapter Efficiency
 
@@ -122,7 +122,7 @@ examples (some straightforward, some less so).
 * Modular arithmetic::          
 @end menu
 
-@node  Dynamic-extent allocation, Modular arithmetic, Efficiency, Efficiency
+@node  Dynamic-extent allocation
 @comment  node-name,  next,  previous,  up
 @section Dynamic-extent allocation
 @cindex Dynamic-extent declaration
@@ -197,7 +197,7 @@ closure, even when the closure is not declared @code{dynamic-extent}.
 
 @end itemize
 
-@node  Modular arithmetic,  , Dynamic-extent allocation, Efficiency
+@node  Modular arithmetic
 @comment  node-name,  next,  previous,  up
 @section Modular arithmetic
 @cindex Modular arithmetic

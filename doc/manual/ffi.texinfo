@@ -1,4 +1,4 @@
-@node    The Foreign Function Interface, Function Index, Beyond The ANSI Standard, Top
+@node    The Foreign Function Interface
 @comment  node-name,  next,  previous,  up
 @chapter The Foreign Function Interface
 
@@ -29,7 +29,7 @@ notably in the name of the @code{SB-ALIEN} package.
 * Step-By-Step Example of the Foreign Function Interface::  
 @end menu
 
-@node  Introduction to the Foreign Function Interface, Foreign Types, The Foreign Function Interface, The Foreign Function Interface
+@node  Introduction to the Foreign Function Interface
 @comment  node-name,  next,  previous,  up
 @section Introduction to the Foreign Function Interface
 @c AKA "Introduction to Aliens" in the CMU CL manual
@@ -79,7 +79,7 @@ raw pointer to the foreign data within an @code{alien-value} object.
 The type language and operations on foreign types are
 intentionally similar to those of the C language.
 
-@node  Foreign Types, Operations On Foreign Values, Introduction to the Foreign Function Interface, The Foreign Function Interface
+@node  Foreign Types
 @comment  node-name,  next,  previous,  up
 @section Foreign Types
 @c AKA "Alien Types" in the CMU CL manual
@@ -109,7 +109,7 @@ has the corresponding SBCL @acronym{FFI} type
 * Foreign Type Specifiers::     
 @end menu
 
-@node  Defining Foreign Types, Foreign Types and Lisp Types, Foreign Types, Foreign Types
+@node  Defining Foreign Types
 @comment  node-name,  next,  previous,  up
 @subsection Defining Foreign Types
 
@@ -127,7 +127,7 @@ An anonymous structure or union type is specified by using the name
 inherently named, but can be given named abbreviations using the
 @code{define-alien-type} macro.
 
-@node  Foreign Types and Lisp Types, Foreign Type Specifiers, Defining Foreign Types, Foreign Types
+@node  Foreign Types and Lisp Types
 @comment  node-name,  next,  previous,  up
 @subsection Foreign Types and Lisp Types
 
@@ -153,7 +153,7 @@ to Lisp floats.  When @code{type-of} is called on an alien value that
 is not automatically converted to a Lisp value, then it will return an
 @code{alien} type specifier.
 
-@node  Foreign Type Specifiers,  , Foreign Types and Lisp Types, Foreign Types
+@node  Foreign Type Specifiers
 @comment  node-name,  next,  previous,  up
 @subsection Foreign Type Specifiers
 
@@ -323,7 +323,7 @@ specifiers as foreign type specifiers: @code{sb-alien:char},
 
 @end itemize
 
-@node  Operations On Foreign Values, Foreign Variables, Foreign Types, The Foreign Function Interface
+@node  Operations On Foreign Values
 @comment  node-name,  next,  previous,  up
 @section Operations On Foreign Values
 @c AKA "Alien Operations" in the CMU CL manual
@@ -338,11 +338,12 @@ to dynamically allocate and free foreign variables.
 * Foreign Dynamic Allocation::  
 @end menu
 
-@node  Accessing Foreign Values, Coercing Foreign Values, Operations On Foreign Values, Operations On Foreign Values
+@node  Accessing Foreign Values
 @comment  node-name,  next,  previous,  up
 @subsection Accessing Foreign Values
 
 @defun sb-alien:deref @var{pointer-or-array} &rest @var{indices}
+@findex deref
 
 The @code{sb-alien:deref} function returns the value pointed to by a
 foreign pointer, or the value of a foreign array element. When
@@ -352,11 +353,11 @@ the size of the type pointed to. When dereferencing an array, the
 number of indices must be the same as the number of dimensions in the
 array type. @code{deref} can be set with @code{setf} to assign a new
 value.
-
 @end defun
 
 @defun sb-alien:slot @var{struct-or-union} &rest @var{slot-names}
-  
+@findex slot
+
 The @code{sb-alien:slot} function extracts the value of the slot named
 @var{slot-name} from a foreign @code{struct} or @code{union}. If
 @var{struct-or-union} is a pointer to a structure or union, then it is
@@ -378,12 +379,14 @@ used with caution; corrupting the Lisp heap or other memory with
 @acronym{SAP}s is trivial.
 
 @defun sb-sys:int-sap @var{machine-address}
+@findex int-sap
 
 Creates a @acronym{SAP} pointing at the virtual address
 @var{machine-address}.
 @end defun
 
 @defun sb-sys:sap-ref-32 @var{sap} @var{offset}
+@findex sap-ref-32
 
 Access the value of the memory location at @var{offset} bytes from
 @var{sap}.  This form may also be used with @code{setf} to alter the
@@ -391,6 +394,7 @@ memory at that location.
 @end defun
 
 @defun sb-sys:sap= @var{sap1} @var{sap2}
+@findex sap=
 
 Compare @var{sap1} and @var{sap2} for equality.
 @end defun
@@ -404,12 +408,13 @@ use @code{apropos} and @code{describe} for more details
 @end lisp
 
 
-@node  Coercing Foreign Values, Foreign Dynamic Allocation, Accessing Foreign Values, Operations On Foreign Values
+@node  Coercing Foreign Values
 @comment  node-name,  next,  previous,  up
 @subsection Coercing Foreign Values
 
 @defun sb-alien:addr @var{alien-expr}
-  
+@findex addr
+
 The @code{sb-alien:addr} macro returns a pointer to the location
 specified by @var{alien-expr}, which must be either a foreign
 variable, a use of @code{sb-alien:deref}, a use of
@@ -417,7 +422,8 @@ variable, a use of @code{sb-alien:deref}, a use of
 @end defun
 
 @defun sb-alien:cast @var{foreign-value} @var{new-type}
-  
+@findex cast
+
 The @code{sb-alien:cast} macro converts @var{foreign-value} to a new
 foreign value with the specified @var{new-type}. Both types, old and
 new, must be foreign pointer, array or function types.  Note that the
@@ -426,7 +432,8 @@ argument, but it does refer to the same foreign data bits.
 @end defun
 
 @defun sb-alien:sap-alien @var{sap} @var{type}
-  
+@findex sap-alien
+
 The @code{sb-alien:sap-alien} function converts @var{sap} (a system
 area pointer) to a foreign value with the specified
 @var{type}. @var{type} is not evaluated.  </para>
@@ -435,6 +442,7 @@ The @var{type} must be some foreign pointer, array, or record type.
 @end defun
 
 @defun sb-alien:alien-sap @var{foreign-value} @var{type}
+@findex alien-sap
 
 The @code{sb-alien:alien-sap} function returns the @acronym{SAP} which
 points to @var{alien-value}'s data.
@@ -444,7 +452,7 @@ record type.
 @end defun
 
 
-@node  Foreign Dynamic Allocation,  , Coercing Foreign Values, Operations On Foreign Values
+@node  Foreign Dynamic Allocation
 @comment  node-name,  next,  previous,  up
 @subsection Foreign Dynamic Allocation
 
@@ -457,7 +465,8 @@ Lisp @code{sb-alien:make-alien}, or for Lisp code to call
 code.
 
 @defmac sb-alien:make-alien @var{type} @var{size}
-  
+@findex make-alien
+
 The @code{sb-alien:make-alien} macro
 returns a dynamically allocated foreign value of the specified
 @var{type} (which is not evaluated.)  The allocated memory is not
@@ -494,6 +503,7 @@ result pointing to the first one.
 @end defmac
 
 @defun sb-alien:free-alien @var{foreign-value}
+@findex free-alien
 
 The @code{sb-alien:free-alien} function
 frees the storage for @var{foreign-value}, 
@@ -504,7 +514,7 @@ See also the @code{sb-alien:with-alien} macro, which allocates foreign
 values on the stack.
 @end defun
 
-@node  Foreign Variables, Foreign Data Structure Examples, Operations On Foreign Values, The Foreign Function Interface
+@node  Foreign Variables
 @comment  node-name,  next,  previous,  up
 @section Foreign Variables
 @c AKA "Alien Variables" in the CMU CL manual
@@ -517,11 +527,12 @@ are supported.
 * External Foreign Variables::  
 @end menu
 
-@node  Local Foreign Variables, External Foreign Variables, Foreign Variables, Foreign Variables
+@node  Local Foreign Variables
 @comment  node-name,  next,  previous,  up
 @subsection Local Foreign Variables
 
 @defmac sb-alien:with-alien @var{var-definitions} &body @var{body}
+@findex with-alien
 
 The @code{with-alien} macro establishes local foreign variables with
 the specified alien types and names.  This form is analogous to
@@ -549,7 +560,7 @@ defined foreign structure type @var{foo} can be referenced by its name
 using @code{(struct @var{foo})}.
 @end defmac
 
-@node  External Foreign Variables,  , Local Foreign Variables, Foreign Variables
+@node  External Foreign Variables
 @comment  node-name,  next,  previous,  up
 @subsection External Foreign Variables
 
@@ -580,6 +591,7 @@ specified by using a list of the form
 @end itemize
 
 @defmac sb-alien:define-alien-variable @var{name} @var{type}
+@findex define-alien-variable
 
 The @code{define-alien-variable} macro defines @var{name} as an
 external foreign variable of the specified foreign @code{type}.
@@ -606,6 +618,7 @@ For example, to access a C-level counter @var{foo}, one could write
 @end defmac
 
 @defun sb-alien:get-errno
+@findex get-errno
 
 Since in modern C libraries, the @code{errno} ``variable'' is typically
 no longer a variable, but some bizarre artificial construct
@@ -616,6 +629,7 @@ the operator @code{sb-alien:get-errno} to allow Lisp code to read it.
 @end defun
 
 @defmac sb-alien:extern-alien @var{name} @var{type}
+@findex extern-alien
 
 The @code{extern-alien} macro returns an alien with the specified
 @var{type} which points to an externally defined value.  @var{name} is
@@ -623,7 +637,7 @@ not evaluated, and may be either a string or a symbol.  @var{type} is
 an unevaluated alien type specifier.
 @end defmac
 
-@node  Foreign Data Structure Examples, Loading Unix Object Files, Foreign Variables, The Foreign Function Interface
+@node  Foreign Data Structure Examples
 @comment  node-name,  next,  previous,  up
 @section Foreign Data Structure Examples
 @c AKA "Alien Data Structure Example" in the CMU CL manual
@@ -697,7 +711,7 @@ which can be manipulated in Lisp like this:
 (setq my-struct (slot my-struct 'n))
 @end lisp
 
-@node  Loading Unix Object Files, Foreign Function Calls, Foreign Data Structure Examples, The Foreign Function Interface
+@node  Loading Unix Object Files
 @comment  node-name,  next,  previous,  up
 @section Loading Unix Object Files
 
@@ -732,7 +746,7 @@ is loaded.
 @end quotation
 
 
-@node  Foreign Function Calls, Step-By-Step Example of the Foreign Function Interface, Loading Unix Object Files, The Foreign Function Interface
+@node  Foreign Function Calls
 @comment  node-name,  next,  previous,  up
 @section Foreign Function Calls
 
@@ -759,11 +773,12 @@ the only documentation.  Users of a Lisp built with the
 * Calling Lisp From C::         
 @end menu
 
-@node  The alien-funcall Primitive, The define-alien-routine Macro, Foreign Function Calls, Foreign Function Calls
+@node  The alien-funcall Primitive
 @comment  node-name,  next,  previous,  up
 @subsection The @code{alien-funcall} Primitive
 
 @defun sb-alien:alien-funcall @var{alien-function} &rest @var{arguments}
+@findex alien-funcall
 
 The @code{alien-funcall} function is the foreign function call
 primitive: @var{alien-function} is called with the supplied
@@ -812,11 +827,12 @@ the @code{(* (struct foo))} objects filled in by the foreign call:
       result)))
 @end lisp
 
-@node  The define-alien-routine Macro, define-alien-routine Example, The alien-funcall Primitive, Foreign Function Calls
+@node  The define-alien-routine Macro
 @comment  node-name,  next,  previous,  up
 @subsection The @code{define-alien-routine} Macro
 
 @defmac sb-alien:define-alien-routine @var{name} @var{result-type} &rest @var{arg-specifiers}
+@findex define-alien-routine
 
 The @code{define-alien-routine} macro is a convenience for
 automatically generating Lisp interfaces to simple foreign functions.
@@ -890,7 +906,7 @@ representations, avoiding consing.)
 
 @end defmac
 
-@node  define-alien-routine Example, Calling Lisp From C, The define-alien-routine Macro, Foreign Function Calls
+@node  define-alien-routine Example
 @comment  node-name,  next,  previous,  up
 @subsection @code{define-alien-routine} Example
 
@@ -921,7 +937,7 @@ This can be described by the following call to
 The Lisp function @code{cfoo} will have two arguments (@var{str} and
 @var{a}) and two return values (@var{a} and @var{i}).
 
-@node  Calling Lisp From C,  , define-alien-routine Example, Foreign Function Calls
+@node  Calling Lisp From C
 @comment  node-name,  next,  previous,  up
 @subsection Calling Lisp From C
 
@@ -1099,7 +1115,7 @@ call.
 @c -->
 
 
-@node  Step-By-Step Example of the Foreign Function Interface,  , Foreign Function Calls, The Foreign Function Interface
+@node  Step-By-Step Example of the Foreign Function Interface
 @comment  node-name,  next,  previous,  up
 @section Step-By-Step Example of the Foreign Function Interface
 

@@ -1,9 +1,16 @@
 ;;;; -*- lisp -*-
 
-;;;; (c) 2004 Rudi Schlatte <rudi@constantly.at>
-;;;; Use it as you wish, send changes back to me if you like.
+;;;; A docstring extractor for the sbcl manual.  Creates
+;;;; @include-ready documentation from the docstrings of exported
+;;;; symbols of specified packages.
 
-#+sbcl
+;;;; This software is part of the SBCL software system. SBCL is in the
+;;;; public domain and is provided with absolutely no warranty. See
+;;;; the COPYING file for more information.
+
+;;;; Written by Rudi Schlatte <rudi@constantly.at>
+
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (require 'sb-introspect))
 
@@ -109,7 +116,7 @@
              (package "package")
              (setf "setf-expander")
              (structure "struct")
-             (type (let ((class (find-class symbol)))
+             (type (let ((class (ignore-errors (find-class symbol))))
 		     (etypecase class
 		       (structure-class "struct")
 		       (standard-class "class")
@@ -125,14 +132,14 @@
   (ecase kind
     (compiler-macro "@deffn {Compiler Macro}")
     (function (cond
-		((macro-function symbol) "@defmac")
-		((special-operator-p symbol) "@defspec")
-		(t "@defun")))
+		((macro-function symbol) "@deffn Macro")
+		((special-operator-p symbol) "@deffn {Special Operator}")
+		(t "@deffn Function")))
     (method-combination "@deffn {Method Combination}")
-    (package "@deffn Package")
+    (package "@defvr Package")
     (setf "@deffn {Setf Expander}")
     (structure "@deftp Structure")
-    (type (let ((class (find-class symbol)))
+    (type (let ((class (ignore-errors (find-class symbol))))
 	    (etypecase class
 	      (structure-class "@deftp Structure")
 	      (standard-class "@deftp Class")
@@ -140,7 +147,16 @@
 	      ((or built-in-class null) "@deftp Type"))))
     (variable (if (constantp symbol)
                   "@defvr Constant"
-                  "@defvar"))))
+                  "@defvr Variable"))))
+
+(defun def-index (symbol kind)
+  (case kind
+    ((compiler-macro function method-combination)
+     (format nil "@findex ~A" (texinfoify symbol)))
+    ((structure type)
+     (format nil "@tindex ~A" (texinfoify symbol)))
+    (variable
+     (format nil "@vindex ~A" (texinfoify symbol)))))
 
 (defparameter *arglist-keywords*
   '(&allow-other-keys &aux &body &environment &key &optional &rest &whole))
@@ -157,26 +173,19 @@
       (list
        (format s "(~{~A~^ ~})" (mapcar #'texinfoify-arglist-part part))))))
 
-(defun def-rest (symbol kind)
+(defun def-arglist (symbol kind)
   (case kind
     (function
      (format nil "~{~A~^ ~}" (mapcar #'texinfoify-arglist-part
                                      (argument-list symbol))))))
 
 (defun def-end (symbol kind)
+  (declare (ignore symbol))
   (ecase kind
-    (compiler-macro "@end deffn")
-    (function (cond
-		((macro-function symbol) "@end defmac")
-		((special-operator-p symbol) "@end defspec")
-		(t "@end defun")))
-    (method-combination "@end deffn")
-    (package "@end deffn")
-    (setf "@end deffn")
-    (type "@end deftp")
-    (variable (if (constantp symbol)
-                  "@end defvr"
-                  "@defvar"))))
+    ((compiler-macro function method-combination setf) "@end deffn")
+    ((package variable) "@end defvr")
+    ((structure type) "@end deftp"))
+  )
 
 (defun make-info-file (package &optional filename)
   "Create a file containing all available documentation for the
@@ -195,12 +204,14 @@
     (with-open-file (out filename :direction :output
                          :if-does-not-exist :create :if-exists :supersede)
       (loop for (symbol kind docstring) in docs
-           do (format out "~&@anchor{~A}~%~A ~A~@[ ~A~]~%~A~%~A~%~%"
+           do (format out "~&@anchor{~A}~%~A ~A:~A~@[ ~A~]~%~A~&~A~%~A~%~%"
                       (unique-name symbol package kind)
                       (def-begin symbol kind)
+                      (texinfoify (package-name package))
                       (texinfoify symbol)
-                      (def-rest symbol kind)
-                      docstring
+                      (def-arglist symbol kind)
+                      (def-index symbol kind)
+                      (texinfoify docstring)
                       (def-end symbol kind))))
     filename))
 
@@ -226,11 +237,13 @@
                               directory)
                              :direction :output
                              :if-does-not-exist :create :if-exists :supersede)
-              (format out "~&@anchor{~A}~%~A ~A~@[ ~A~]~%~A~%~A~%~%"
+              (format out "~&@anchor{~A}~%~A ~A:~A~@[ ~A~]~%~A~&~A~%~A~%~%"
                       (unique-name symbol package kind)
                       (def-begin symbol kind)
+                      (texinfoify (package-name package))
                       (texinfoify symbol)
-                      (def-rest symbol kind)
-                      docstring
+                      (def-arglist symbol kind)
+                      (def-index symbol kind)
+                      (texinfoify docstring)
                       (def-end symbol kind)))))
     directory))

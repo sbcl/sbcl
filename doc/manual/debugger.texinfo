@@ -1,4 +1,4 @@
-@node  The Debugger, Efficiency, The Compiler, Top
+@node  The Debugger
 @comment  node-name,  next,  previous,  up
 @chapter The Debugger
 @cindex Debugger
@@ -37,7 +37,7 @@ indistinguishable from interpreted code debugging.
 * Function Tracing::            
 @end menu
 
-@node  Starting the Debugger, The Debugger Command Loop, The Debugger, The Debugger
+@node  Starting the Debugger
 @comment  node-name,  next,  previous,  up
 @section Starting the Debugger
 
@@ -79,7 +79,7 @@ top-level.  After printing its banner, the debugger prints the current
 frame and the debugger prompt.
 
 
-@node  The Debugger Command Loop, Controlling Printing in the Debugger, Starting the Debugger, The Debugger
+@node  The Debugger Command Loop
 @comment  node-name,  next,  previous,  up
 @section The Debugger Command Loop
 @cindex Evaluation, in the debugger
@@ -117,7 +117,7 @@ current frame.  For more information on debugger variable access, see
 @ref{Variable Access}.
 
 
-@node Controlling Printing in the Debugger, Stack Frames, The Debugger Command Loop, The Debugger
+@node Controlling Printing in the Debugger
 @comment  node-name,  next,  previous,  up
 @section Controlling Printing in the Debugger
 
@@ -140,7 +140,7 @@ initially.
 
 @end defvr
 
-@node  Stack Frames, Variable Access, Controlling Printing in the Debugger, The Debugger
+@node  Stack Frames
 @comment  node-name,  next,  previous,  up
 @section Stack Frames
 @cindex Stack frames
@@ -176,7 +176,7 @@ another function, or because of an interrupt or error.
 * Unknown Locations and Interrupts::  
 @end menu
 
-@node  Stack Motion, How Arguments are Printed, Stack Frames, Stack Frames
+@node  Stack Motion
 @comment  node-name,  next,  previous,  up
 @subsection Stack Motion
 
@@ -209,7 +209,7 @@ was entered.
 @end deffn
 
 
-@node  How Arguments are Printed, Function Names, Stack Motion, Stack Frames
+@node  How Arguments are Printed
 @comment  node-name,  next,  previous,  up
 @subsection How Arguments are Printed
 
@@ -293,7 +293,7 @@ Printing of argument values is controlled by
 the Debugger}.
 
 
-@node  Function Names, Funny Frames, How Arguments are Printed, Stack Frames
+@node  Function Names
 @comment  node-name,  next,  previous,  up
 @subsection Function Names
 
@@ -320,7 +320,7 @@ that encloses or expanded into the lambda, or the outermost enclosing
 form if there is no @code{def@var{mumble}}.
 
 
-@node  Funny Frames, Debug Tail Recursion, Function Names, Stack Frames
+@node  Funny Frames
 @comment  node-name,  next,  previous,  up
 @subsection Funny Frames
 @cindex External entry points
@@ -385,7 +385,7 @@ are present in the debugger, see @ref{Debugger Policy Control}.
 @c @ref{open-coding}
 
 
-@node  Debug Tail Recursion, Unknown Locations and Interrupts, Funny Frames, Stack Frames
+@node  Debug Tail Recursion
 @comment  node-name,  next,  previous,  up
 @subsection Debug Tail Recursion
 @cindex Tail recursion
@@ -435,7 +435,7 @@ optimization quality is greater than @code{2}.
 @c For a more thorough discussion of tail recursion, @ref{tail-recursion}.
 
 
-@node Unknown Locations and Interrupts,  , Debug Tail Recursion, Stack Frames
+@node Unknown Locations and Interrupts
 @comment  node-name,  next,  previous,  up
 @subsection Unknown Locations and Interrupts
 @cindex Unknown code locations
@@ -483,7 +483,7 @@ when the real problem is that the current stack frame can't be
 located.  If this happens, return from the interrupt and try again.
 
 
-@node Variable Access, Source Location Printing, Stack Frames, The Debugger
+@node Variable Access
 @comment  node-name,  next,  previous,  up
 @section Variable Access
 @cindex Debug variables
@@ -545,7 +545,7 @@ that must unambiguously complete to the name of a valid variable.
 * Note On Lexical Variable Access::  
 @end menu
 
-@node Variable Value Availability, Note On Lexical Variable Access, Variable Access, Variable Access
+@node Variable Value Availability
 @comment  node-name,  next,  previous,  up
 @subsection Variable Value Availability
 @cindex Availability of debug variables
@@ -628,7 +628,7 @@ values to be available, and even then, values are only available at
 known locations.
 
 
-@node  Note On Lexical Variable Access,  , Variable Value Availability, Variable Access
+@node  Note On Lexical Variable Access
 @comment  node-name,  next,  previous,  up
 @subsection Note On Lexical Variable Access
 
@@ -647,7 +647,7 @@ proved the variable could never take on.  This may result in bad
 things happening.
 
 
-@node Source Location Printing, Debugger Policy Control, Variable Access, The Debugger
+@node Source Location Printing
 @comment  node-name,  next,  previous,  up
 @section Source Location Printing
 @cindex Source location printing, debugger
@@ -726,7 +726,7 @@ print:
 * Source Location Availability::  
 @end menu
 
-@node  How the Source is Found, Source Location Availability, Source Location Printing, Source Location Printing
+@node  How the Source is Found
 @comment  node-name,  next,  previous,  up
 @subsection How the Source is Found
 
@@ -783,7 +783,7 @@ into something different, or if a read-macro ever returns the same
 @code{##} in perverted ways, you don't need to worry about this.
 
 
-@node  Source Location Availability,  , How the Source is Found, Source Location Printing
+@node  Source Location Availability
 @comment  node-name,  next,  previous,  up
 @subsection Source Location Availability
 @cindex Debug optimization quality
@@ -835,7 +835,7 @@ next conditional (but watch out because the compiler may have changed the
 program on you.)
 
 
-@node Debugger Policy Control, Exiting Commands, Source Location Printing, The Debugger
+@node Debugger Policy Control
 @comment  node-name,  next,  previous,  up
 @section Debugger Policy Control
 @cindex Policy, debugger
@@ -923,7 +923,7 @@ but the call is to an optimized local version of the function, not to
 the original function.
 
 
-@node  Exiting Commands, Information Commands, Debugger Policy Control, The Debugger
+@node  Exiting Commands
 @comment  node-name,  next,  previous,  up
 @section Exiting Commands
 
@@ -958,7 +958,7 @@ is of the same type as SBCL expects the stack frame to return.
 @end deffn
 
 
-@node  Information Commands, Function Tracing, Exiting Commands, The Debugger
+@node  Information Commands
 @comment  node-name,  next,  previous,  up
 @section Information Commands
 
@@ -1137,7 +1137,7 @@ Displays all the frames from the current to the bottom.  Only shows
 @c @end example
 
 
-@node  Function Tracing,  , Information Commands, The Debugger
+@node  Function Tracing
 @comment  node-name,  next,  previous,  up
 @section Function Tracing
 @cindex Tracing
@@ -1148,16 +1148,17 @@ their results whenever they are called.  Options allow conditional
 printing of the trace information and conditional breakpoints on
 function entry or exit.
 
-@comment rudi 2004-03-26: The docstring for `trace' is quite comprehensive,
-@comment so refer to it (see also ``OAOO'')
-The docstrings for @code{trace} and @code{untrace} explain SBCL's
-tracing facility.
+@include macro-common-lisp-trace.texinfo
 
-@comment FIXME rudi 2004-03-26: revive the documentation of variables
-@comment describing trace behaviour: *trace-encapsulate-default*,
-@comment *max-trace-indentation* and friends.  Some of these are
-@comment mentioned (perhaps under different names) in the cmucl
-@comment manual.
+@include macro-common-lisp-untrace.texinfo
+
+@include var-sb-debug-star-trace-indentation-step-star.texinfo
+
+@include var-sb-debug-star-max-trace-indentation-star.texinfo
+
+@include var-sb-debug-star-trace-encapsulate-default-star.texinfo
+
+@include var-sb-debug-star-trace-values-star.texinfo
 
 @comment FIXME rudi 2004-03-26: encapsulate is (per TODO file as of
 @comment 0.8.9) in a state of flux.  When it's sorted out, revive the

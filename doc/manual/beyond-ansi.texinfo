@@ -1,4 +1,4 @@
-@node  Beyond The ANSI Standard, The Foreign Function Interface, Efficiency, Top
+@node  Beyond The ANSI Standard
 @comment  node-name,  next,  previous,  up
 @chapter Beyond The ANSI Standard
 
@@ -14,7 +14,7 @@ violates the standard.
 * Extensions::                  
 @end menu
 
-@node Non-Conformance With The ANSI Standard, Idiosyncrasies, Beyond The ANSI Standard, Beyond The ANSI Standard
+@node Non-Conformance With The ANSI Standard
 @comment  node-name,  next,  previous,  up
 @section Non-Conformance With The ANSI Standard
 
@@ -27,7 +27,7 @@ through the sbcl-help or sbcl-devel mailings lists.  For mailing list
 addresses, @ref{More SBCL Information}.
 
 
-@node Idiosyncrasies, Extensions, Non-Conformance With The ANSI Standard, Beyond The ANSI Standard
+@node Idiosyncrasies
 @comment  node-name,  next,  previous,  up
 @section Idiosyncrasies
 
@@ -107,7 +107,7 @@ wrapped in @code{eval-when}, and ideally should be suppressed in that
 case, but still isn't as of SBCL 0.7.6.)
 
 
-@node  Extensions,  , Idiosyncrasies, Beyond The ANSI Standard
+@node  Extensions
 @comment  node-name,  next,  previous,  up
 @section Extensions
 
@@ -126,7 +126,7 @@ it still has quite a few.
 * Efficiency Hacks::            
 @end menu
 
-@node  Things Which Might Be In The Next ANSI Standard, Threading, Extensions, Extensions
+@node  Things Which Might Be In The Next ANSI Standard
 @comment  node-name,  next,  previous,  up
 @subsection Things Which Might Be In The Next ANSI Standard
 
@@ -171,7 +171,7 @@ requested order from a user-supplied primary method.
 @end itemize
 
 
-@node  Threading, Support For Unix, Things Which Might Be In The Next ANSI Standard, Extensions
+@node  Threading
 @comment  node-name,  next,  previous,  up
 @subsection Threading (a.k.a Multiprocessing)
 
@@ -286,7 +286,7 @@ Lisp session makes a new POSIX session, so that pressing
 this has been found to be embarrassing.
 
 
-@node  Support For Unix, Customization Hooks for Users, Threading, Extensions
+@node  Support For Unix
 @comment  node-name,  next,  previous,  up
 @subsection Support For Unix
 
@@ -304,44 +304,39 @@ file on input is also supported.
 
 @include fun-sb-ext-quit.texinfo
 
-@node  Customization Hooks for Users, Tools To Help Developers, Support For Unix, Extensions
+@node  Customization Hooks for Users
 @comment  node-name,  next,  previous,  up
 @subsection Customization Hooks for Users
-
-The behaviour of @code{require} when called with only one argument is
-implementation-defined.  In SBCL it calls functions on the
-user-settable list @code{sb-ext:*module-provider-functions*} - see the
-@code{require} documentation string for details.
 
 The toplevel repl prompt may be customized, and the function
 that reads user input may be replaced completely.
 @c <!-- FIXME but I don't currently remember how -->
 
+The behaviour of @code{require} when called with only one argument is
+implementation-defined.  In SBCL, @code{require} behaves in the
+following way:
 
-@node  Tools To Help Developers, Interface To Low-Level SBCL Implementation, Customization Hooks for Users, Extensions
+@include fun-common-lisp-require.texinfo
+
+@include var-sb-ext-star-module-provider-functions-star.texinfo
+
+
+@node  Tools To Help Developers
 @comment  node-name,  next,  previous,  up
 @subsection Tools To Help Developers
 
-SBCL provides a profiler and other extensions to the ANSI
-@code{trace} facility. See the online function documentation for
-@code{trace} for more information.
+SBCL provides a profiler and other extensions to the ANSI @code{trace}
+facility.  For more information, see @ref{macro-common-lisp-trace}.
 
 The debugger supports a number of options. Its documentation is
-accessed by typing @kbd{help} at the debugger prompt.
-@c <!-- FIXME:
-@c      A true debugger section in the manual would be good. Start
-@c      with CMU CL's debugger section, but remember:
-@c      * no QUIT command (TOPLEVEL restart instead)
-@c      * no GO command (CONTINUE restart instead)
-@c      * Limitations of the x86 port of the debugger should be 
-@c      documented or fixed where possible.
-@c      * Discuss TRACE and its unification with PROFILE. -->
+accessed by typing @kbd{help} at the debugger prompt.  @xref{The
+Debugger}.
 
 Documentation for @code{inspect} is accessed by typing @kbd{help} at
 the @code{inspect} prompt.
 
 
-@node  Interface To Low-Level SBCL Implementation, Efficiency Hacks, Tools To Help Developers, Extensions
+@node  Interface To Low-Level SBCL Implementation
 @comment  node-name,  next,  previous,  up
 @subsection Interface To Low-Level SBCL Implementation
 
@@ -373,7 +368,7 @@ list.
 @end quotation
 
 
-@node  Efficiency Hacks,  , Interface To Low-Level SBCL Implementation, Extensions
+@node  Efficiency Hacks
 @comment  node-name,  next,  previous,  up
 @subsection Efficiency Hacks
 

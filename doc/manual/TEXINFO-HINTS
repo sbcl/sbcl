@@ -1,0 +1,14 @@
+-*- text -*-
+
+Some hints for editing the manual files.  Feel free to add anything
+that will save the next person some time.  Thanks!
+
+
+- There's no need for Next, Prev, etc. pointers in @node lines:
+  makeinfo will deduce these automatically when the line after @node
+  contains a sectioning command like @section, @subsection.  Hence,
+  texinfo-multiple-files-update should not be used either.
+
+- Don't create or update Menus by hand; use C-c C-u C-a
+  (texinfo-all-menus-update) instead.  (Doesn't work in sbcl.texinfo,
+  but this file is only changed when an entire chapter is added.)

@@ -1,16 +1,22 @@
-@node Function Index, Concept Index, The Foreign Function Interface, Top
-@comment  node-name,  next,  previous,  up
-@appendix Function Index
-     
-@printindex fn
-
-@node Concept Index, Colophon, Function Index, Top
+@node Concept Index
 @comment  node-name,  next,  previous,  up
 @appendix Concept Index
 
 @printindex cp
 
-@node Colophon,  , Concept Index, Top
+@node Function Index
+@comment  node-name,  next,  previous,  up
+@appendix Function Index
+     
+@printindex fn
+
+@node Variable Index
+@comment  node-name,  next,  previous,  up
+@appendix Variable Index
+     
+@printindex vr
+
+@node Colophon
 @comment  node-name,  next,  previous,  up
 @unnumbered Colophon
 

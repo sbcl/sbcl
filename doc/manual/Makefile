@@ -8,9 +8,12 @@ PDFFILE=sbcl.pdf
 DVIFILE=sbcl.dvi
 INFOFILE=sbcl.info
 HTMLDIR=$(basename $(ROOTFILE))
-# The value of DOCSTRINGDIR has to end with a slash or you lose (it's
-# passed to Lisp's `pathname' function).
+# Place where generated documentation ends up. The value of
+# DOCSTRINGDIR has to end with a slash or you lose (it's passed to
+# Lisp's `pathname' function).
 DOCSTRINGDIR="docstrings/"
+# List of package names that documentation will be created for.
+PACKAGES=":COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD"
 
 
 ifeq ($(MAKEINFO),)
@@ -78,7 +81,7 @@ docstrings-stamp:
 
 .PHONY: clean
 clean: 
-	rm -f *~ *.bak *.orig \#*\# .\#* texput.log
+	rm -f *~ *.bak *.orig \#*\# .\#* texput.log *.fasl
 	rm -rf $(HTMLDIR) $(DOCSTRINGDIR)
 	rm -f $(PSFILE) $(PDFFILE) $(DVIFILE) html-stamp docstrings-stamp
 	rm -f $(TMPFILES)

@@ -1,4 +1,4 @@
-@node Introduction, The Compiler, Top, Top
+@node Introduction
 @comment  node-name,  next,  previous,  up
 @chapter Introduction
 
@@ -13,7 +13,7 @@ Lisp.
 * Overview::                    
 @end menu
 
-@node More Common Lisp Information, More SBCL Information, Introduction, Introduction
+@node More Common Lisp Information
 @comment  node-name,  next,  previous,  up
 @section Where To Go For More Information about Common Lisp in General
 
@@ -56,7 +56,7 @@ culture shock.
 @end itemize
 
 
-@node More SBCL Information, Overview, More Common Lisp Information, Introduction
+@node More SBCL Information
 @comment  node-name,  next,  previous,  up
 @section Where To Go For More Information About SBCL
 
@@ -111,7 +111,7 @@ distribution.
 @end itemize
   
 
-@node Overview,  , More SBCL Information, Introduction
+@node Overview
 @comment  node-name,  next,  previous,  up
 @section Overview Of SBCL, How It Works And Where It Came From
 

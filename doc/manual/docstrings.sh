@@ -22,13 +22,14 @@ else
 SBCL="${1:-`which sbcl`}"
 fi
 
-# List of package names that documentation will be created for.
-PACKAGES=":SB-ALIEN :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD"
-
 # Output directory.  This has to end with a slash (it's interpreted by
-# Lisp's `pathname' function) or you lose.
+# Lisp's `pathname' function) or you lose.  This is normally set from
+# Makefile.
 DOCSTRINGDIR="${DOCSTRINGDIR:-docstrings/}"
 
+# List of package names that documentation will be created for.  This
+# is normally set from Makefile.
+PACKAGES="${PACKAGES:-:COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD}"
 
 echo /creating docstring snippets from SBCL=\'$SBCL\' for packages \'$PACKAGES\'
 echo "(progn (load \"docstrings.lisp\") (docstrings-to-texinfo \"$DOCSTRINGDIR\" $PACKAGES) (sb-ext:quit))" | $SBCL --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger

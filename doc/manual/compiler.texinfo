@@ -1,4 +1,4 @@
-@node  The Compiler, The Debugger, Introduction, Top
+@node  The Compiler
 @comment  node-name,  next,  previous,  up
 @chapter The Compiler
 
@@ -17,7 +17,7 @@ separate that they have their own chapter, @ref{Efficiency}.
 * Open Coding and Inline Expansion::  
 @end menu
 
-@node  Error Messages, Handling of Types, The Compiler, The Compiler
+@node  Error Messages
 @comment  node-name,  next,  previous,  up
 @section Error Messages
 @cindex Error messages, Compiler
@@ -50,7 +50,7 @@ The main problem with this program is that it is trying to add
 * Read Errors::                 
 @end menu
 
-@node  The Parts of the Error Message, The Original and Actual Source, Error Messages, Error Messages
+@node  The Parts of the Error Message
 @comment  node-name,  next,  previous,  up
 @subsection The Parts of the Error Message
 
@@ -189,7 +189,7 @@ intervene between the original source and the actual source, then the
 processing path will also be omitted.
 
 
-@node  The Original and Actual Source, Error Severity, The Parts of the Error Message, Error Messages
+@node  The Original and Actual Source
 @comment  node-name,  next,  previous,  up
 @subsection The Original and Actual Source
 
@@ -289,7 +289,7 @@ was applied. The innermost actual source form was the symbol
 explanation, so the compiler backed out one level.
 
 
-@node  Error Severity, Errors During Macroexpansion, The Original and Actual Source, Error Messages
+@node  Error Severity
 @comment  node-name,  next,  previous,  up
 @subsection Error Severity
 @cindex Severity of compiler errors
@@ -307,7 +307,7 @@ condition classes, typically hints about how efficiency might be
 improved.
 
 
-@node  Errors During Macroexpansion, Read Errors, Error Severity, Error Messages
+@node  Errors During Macroexpansion
 @comment  node-name,  next,  previous,  up
 @subsection Errors During Macroexpansion
 @cindex Macroexpansion, errors during
@@ -336,7 +336,7 @@ DO step variable is not a symbol: (ATOM CURRENT)
 @end example
 
 
-@node  Read Errors,  , Errors During Macroexpansion, Error Messages
+@node  Read Errors
 @comment  node-name,  next,  previous,  up
 @subsection Read Errors
 @cindex Read errors, compiler
@@ -394,7 +394,7 @@ offending character position and gives up on the entire source file.
 @c      _ -->
 
 
-@node  Handling of Types, Compiler Policy, Error Messages, The Compiler
+@node  Handling of Types
 @comment  node-name,  next,  previous,  up
 @section The Compiler's Handling of Types
 
@@ -434,7 +434,7 @@ types.
 @end menu
 
 
-@node  Type Errors at Compile Time, Precise Type Checking, Handling of Types, Handling of Types
+@node  Type Errors at Compile Time
 @comment  node-name,  next,  previous,  up
 @subsection Type Errors at Compile Time
 @cindex Compile time type errors
@@ -491,7 +491,7 @@ can be used in a local declaration to inhibit type warnings in a code
 fragment that has spurious warnings.
 
 
-@node  Precise Type Checking, Weakened Type Checking, Type Errors at Compile Time, Handling of Types
+@node  Precise Type Checking
 @comment  node-name,  next,  previous,  up
 @subsection Precise Type Checking
 @cindex Precise type checking
@@ -539,7 +539,7 @@ precisely as possible. This often involves the use of @code{or},
 @code{member}, and other list-style type specifiers.
 
 
-@node Weakened Type Checking, Getting Existing Programs to Run, Precise Type Checking, Handling of Types
+@node Weakened Type Checking
 @comment  node-name,  next,  previous,  up
 @subsection Weakened Type Checking
 @cindex Weakened type checking
@@ -558,7 +558,7 @@ option believe any or all type declarations with either partial or
 nonexistent runtime checking.
 
 
-@node  Getting Existing Programs to Run, Implementation Limitations, Weakened Type Checking, Handling of Types
+@node  Getting Existing Programs to Run
 @comment  node-name,  next,  previous,  up
 @subsection Getting Existing Programs to Run
 @cindex Existing programs, to run
@@ -704,7 +704,7 @@ variable in the loop body.
 @c <!-- FIXME: <xref>ND-variables, once we crib the text from the 
 @c      CMU CL manual. -->
 
-@node  Implementation Limitations,  , Getting Existing Programs to Run, Handling of Types
+@node  Implementation Limitations
 @comment  node-name,  next,  previous,  up
 @subsection Implementation Limitations
 
@@ -740,7 +740,7 @@ These are important bugs, but are not necessarily easy to fix, so they
 may, alas, remain in the system for a while.
 
 
-@node Compiler Policy, Open Coding and Inline Expansion, Handling of Types, The Compiler
+@node Compiler Policy
 @comment  node-name,  next,  previous,  up
 @section Compiler Policy
 
@@ -942,7 +942,7 @@ is to slow the program by causing cache misses or swapping.
 @c      _-->
 
 
-@node  Open Coding and Inline Expansion,  , Compiler Policy, The Compiler
+@node  Open Coding and Inline Expansion
 @comment  node-name,  next,  previous,  up
 @section Open Coding and Inline Expansion
 @cindex Open-coding
