@@ -2476,6 +2476,9 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
   * fixed bug 321: define-method-combination argument lambda lists do
     not cause invalid code to be generated when &optional or &aux
     variables have default values.  (reported by Bruno Haible)
+  * fixed bug 327: system subclasses of STRUCTURE-OBJECT or CONDITION
+    have CLOS classes; this appears also to have fixed reported
+    instability in stack exhaustion detection.
   * optimization: rearranged the expansion of various defining macros
     so that each expands into only one top-level form in a
     :LOAD-TOPLEVEL context; this appears to decrease fasl sizes by

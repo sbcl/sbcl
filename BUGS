@@ -1417,17 +1417,4 @@ WORKAROUND:
   introduced. 
 
 327: "Lazy construction of CLOS classes from system classoids"
-  In a fresh SBCL,
-    (sb-mop:class-direct-subclasses (find-class 'pathname))
-  returns NIL, despite the LOGICAL-PATHNAME class existing.  However,
-  if we then do (find-class 'logical-pathname) and repeat the request
-  for direct subclasses, a list of the logical pathname class is
-  returned.  (Though this particular example revealed the problem to
-  CSR, others have found that this gave consistent results for
-  PATHNAME, but not for SIMPLE-CONDITION.)
-
-  Presumably the CLOS bootstrap process needs to iterate over
-  classoids (both structure- and condition-) to create CLOS classes
-  for them, so that this internal inconsistency does not arise?  How
-  does this interact with the classoid hierarchy not perfectly
-  mirroring the class hierarchy?  (e.g. INSTANCE?)
+  (fixed in sbcl-0.8.10.69)

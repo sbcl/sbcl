@@ -25,6 +25,9 @@
 
 (!fix-early-generic-functions)
 (compute-standard-slot-locations)
+(dolist (s '(condition structure-object))
+  (dohash (k v (classoid-subclasses (find-classoid s)))
+    (find-class (classoid-name k))))
 (setq *boot-state* 'complete)
 
 (defun print-std-instance (instance stream depth)

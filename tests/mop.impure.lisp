@@ -170,5 +170,10 @@
 (assert (= (substandard-defgeneric 1 2) 3))
 (assert (string= (substandard-defgeneric "1" "2") "12"))
 
+(let* ((x (find-class 'pathname))
+       (xs (class-direct-subclasses x)))
+  (assert (>= (length xs) 1))
+  (assert (member (find-class 'logical-pathname) xs)))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
