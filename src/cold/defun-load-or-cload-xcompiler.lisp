@@ -92,7 +92,9 @@
                     ;; existence in xc and target
 		    "BUILT-IN-CLASS"
 		    "BYTE" "BYTE-POSITION" "BYTE-SIZE"
+		    "CHAR-CODE"
 		    "CLASS" "CLASS-NAME" "CLASS-OF"
+		    "CODE-CHAR"
 		    "COMPILE-FILE"
 		    "COMPILE-FILE-PATHNAME"
 		    "*COMPILE-FILE-PATHNAME*"

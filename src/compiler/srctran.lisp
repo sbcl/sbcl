@@ -2956,6 +2956,24 @@
 #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (deftransform > ((x y) (float float) *)
   (ir1-transform-< y x x y '<))
+
+(defun ir1-transform-char< (x y first second inverse)
+  (cond
+    ((same-leaf-ref-p x y) nil)
+    ;; If we had interval representation of character types, as we
+    ;; might eventually have to to support 2^21 characters, then here
+    ;; we could do some compile-time computation as in IR1-TRANSFORM-<
+    ;; above.  -- CSR, 2003-07-01
+    ((and (constant-continuation-p first)
+	  (not (constant-continuation-p second)))
+     `(,inverse y x))
+    (t (give-up-ir1-transform))))
+
+(deftransform char< ((x y) (character character) *)
+  (ir1-transform-char< x y x y 'char>))
+
+(deftransform char> ((x y) (character character) *)
+  (ir1-transform-char< y x x y 'char<))
 
 ;;;; converting N-arg comparisons
 ;;;;
