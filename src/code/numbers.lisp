@@ -211,25 +211,6 @@
 
 ;;;; COMPLEXes
 
-(defun upgraded-complex-part-type (spec &optional environment)
-  #!+sb-doc
-  "Return the element type of the most specialized COMPLEX number type that
-   can hold parts of type SPEC."
-  (declare (ignore environment))
-  (cond ((unknown-type-p (specifier-type spec))
-	 (error "undefined type: ~S" spec))
-	((subtypep spec 'single-float)
-	 'single-float)
-	((subtypep spec 'double-float)
-	 'double-float)
-	#!+long-float
-	((subtypep spec 'long-float)
-	 'long-float)
-	((subtypep spec 'rational)
-	 'rational)
-	(t
-	 'real)))
-
 (defun complex (realpart &optional (imagpart 0))
   #!+sb-doc
   "Return a complex number with the specified real and imaginary components."

@@ -1465,9 +1465,8 @@
 	(:real
 	 base+bounds)
 	(:complex
-	 (if (eq base+bounds 'real)
-	     'complex
-	     `(complex ,base+bounds)))
+	 (aver (neq base+bounds 'real))
+	 `(complex ,base+bounds))
 	((nil)
 	 (aver (eq base+bounds 'real))
 	 'number)))))
@@ -1703,68 +1702,40 @@
 
 (!def-type-translator complex (&optional (typespec '*))
   (if (eq typespec '*)
-      (make-numeric-type :complexp :complex)
+      (specifier-type '(complex real))
       (labels ((not-numeric ()
 		 (error "The component type for COMPLEX is not numeric: ~S"
 			typespec))
 	       (not-real ()
-	         (error "The component type for COMPLEX is not real: ~S"
+	         (error "The component type for COMPLEX is not a subtype of REAL: ~S"
 			typespec))
 	       (complex1 (component-type)
 	         (unless (numeric-type-p component-type)
 		   (not-numeric))
 		 (when (eq (numeric-type-complexp component-type) :complex)
 		   (not-real))
-		 (modified-numeric-type component-type :complexp :complex))
-	       (complex-union (component)
-		 (unless (numberp component)
-		   (not-numeric))
-		 ;; KLUDGE: This TYPECASE more or less does
-		 ;; (UPGRADED-COMPLEX-PART-TYPE (TYPE-OF COMPONENT)),
-		 ;; (plus a small hack to treat (EQL COMPONENT 0) specially)
-		 ;; but uses logic cut and pasted from the DEFUN of
-		 ;; UPGRADED-COMPLEX-PART-TYPE. That's fragile, because
-		 ;; changing the definition of UPGRADED-COMPLEX-PART-TYPE
-		 ;; would tend to break the code here. Unfortunately,
-		 ;; though, reusing UPGRADED-COMPLEX-PART-TYPE here
-		 ;; would cause another kind of fragility, because
-		 ;; ANSI's definition of TYPE-OF is so weak that e.g.
-		 ;; (UPGRADED-COMPLEX-PART-TYPE (TYPE-OF 1/2)) could
-		 ;; end up being (UPGRADED-COMPLEX-PART-TYPE 'REAL)
-		 ;; instead of (UPGRADED-COMPLEX-PART-TYPE 'RATIONAL).
-		 ;; So using TYPE-OF would mean that ANSI-conforming
-		 ;; maintenance changes in TYPE-OF could break the code here.
-		 ;; It's not clear how best to fix this. -- WHN 2002-01-21,
-		 ;; trying to summarize CSR's concerns in his patch
-		 (typecase component
-		   (complex (error "The component type for COMPLEX (EQL X) ~
-                                    is complex: ~S"
-				   component))
-		   ((eql 0) (specifier-type nil)) ; as required by ANSI
-		   (single-float (specifier-type '(complex single-float)))
-		   (double-float (specifier-type '(complex double-float)))
-		   #!+long-float
-		   (long-float (specifier-type '(complex long-float)))
-		   (rational (specifier-type '(complex rational)))
-		   (t (specifier-type '(complex real))))))
+		 (if (csubtypep component-type (specifier-type '(eql 0)))
+		     *empty-type*
+		     (modified-numeric-type component-type
+					    :complexp :complex))))
 	(let ((ctype (specifier-type typespec)))
-	  (typecase ctype
-	    (numeric-type (complex1 ctype))
-	    (union-type (apply #'type-union
-			       ;; FIXME: This code could suffer from
-			       ;; (admittedly very obscure) cases of
-			       ;; bug 145 e.g. when TYPE is
-			       ;;   (OR (AND INTEGER (SATISFIES ODDP))
-			       ;;       (AND FLOAT (SATISFIES FOO))
-			       ;; and not even report the problem very well.
-			       (mapcar #'complex1
-				       (union-type-types ctype))))
-	    ;; MEMBER-TYPE is almost the same as UNION-TYPE, but
-	    ;; there's a gotcha: (COMPLEX (EQL 0)) is, according to
-	    ;; ANSI, equal to type NIL, the empty set.
-	    (member-type (apply #'type-union
-				(mapcar #'complex-union
-					(member-type-members ctype))))
+	  (cond
+	    ((eq ctype *empty-type*) *empty-type*)
+	    ((eq ctype *universal-type*) (not-real))
+	    ((typep ctype 'numeric-type) (complex1 ctype))
+	    ((typep ctype 'union-type)
+	     (apply #'type-union
+		    ;; FIXME: This code could suffer from (admittedly
+		    ;; very obscure) cases of bug 145 e.g. when TYPE
+		    ;; is
+		    ;;   (OR (AND INTEGER (SATISFIES ODDP))
+		    ;;       (AND FLOAT (SATISFIES FOO))
+		    ;; and not even report the problem very well.
+		    (mapcar #'complex1 (union-type-types ctype))))
+	    ((typep ctype 'member-type)
+	     (apply #'type-union
+		    (mapcar (lambda (x) (complex1 (ctype-of x)))
+			    (member-type-members ctype))))
 	    (t
 	     (multiple-value-bind (subtypep certainly)
 		 (csubtypep ctype (specifier-type 'real))
@@ -2413,7 +2384,7 @@
 	    (float (if (zerop m)
 		       (push m ms)
 		       (push (ctype-of m) numbers)))
-	    (number (push (ctype-of m) numbers))
+	    (real (push (ctype-of m) numbers))
 	    (t (push m ms))))
 	(apply #'type-union
 	       (if ms
@@ -2590,6 +2561,7 @@
     ((type= type (specifier-type 'bignum)) 'bignum)
     ((type= type (specifier-type 'simple-string)) 'simple-string)
     ((type= type (specifier-type 'string)) 'string)
+    ((type= type (specifier-type 'complex)) 'complex)
     (t `(or ,@(mapcar #'type-specifier (union-type-types type))))))
 
 ;;; Two union types are equal if they are each subtypes of each

@@ -2410,6 +2410,10 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     to diagnose and fix failures.  (thanks to Nikodemus Siivola)
   * fixed bug reported by PFD in lisppaste #747 (and Bruno Haible from
     CLISP test suite): WRITE-TO-STRING is not constant-foldable.
+  * fixed bugs in COMPLEX type specifier: UPGRADED-COMPLEX-PART-TYPE
+    is now consistent with (COMPLEX <x>); bugs in treatment of COMPLEX
+    MEMBER and UNION types have likewise been fixed.  (thanks to Bruno
+    Haible)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

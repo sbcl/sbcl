@@ -131,6 +131,7 @@
 		    "SUBTYPEP"
 		    "TYPE-OF" "TYPEP"
 		    "UPGRADED-ARRAY-ELEMENT-TYPE"
+		    "UPGRADED-COMPLEX-PART-TYPE"
 		    "WITH-COMPILATION-UNIT"))
       (export (intern name package-name) package-name)))
   ;; don't watch:
