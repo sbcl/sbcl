@@ -499,6 +499,7 @@ a host-structure or string."
 	 ;; It seems an error message is appropriate.
 	 (host (typecase host
 		 (host host) 		; A valid host, use it.
+		 ((string 0) *unix-host*) ; "" cannot be a logical host
 		 (string (find-logical-host host t)) ; logical-host or lose.
 		 (t default-host)))	; unix-host
 	 (diddle-args (and (eq (host-customary-case host) :lower)
@@ -758,6 +759,12 @@ a host-structure or string."
   ;; A logical host is an object of implementation-dependent nature. In
   ;; SBCL, it's a member of the HOST class (a subclass of STRUCTURE-OBJECT).
   (let ((found-host (etypecase host
+		      ((string 0)
+		       ;; This is a special host. It's not valid as a
+		       ;; logical host, so it is a sensible thing to
+		       ;; designate the physical Unix host object. So
+		       ;; we do that.
+		       *unix-host*)
 		      (string
 		       ;; In general ANSI-compliant Common Lisps, a
 		       ;; string might also be a physical pathname host,
@@ -1140,6 +1147,12 @@ a host-structure or string."
 ;;; contains only legal characters.
 (defun logical-word-or-lose (word)
   (declare (string word))
+  (when (string= word "")
+    (error 'namestring-parse-error
+	   :complaint "Attempted to treat invalid logical hostname ~
+                       as a logical host:~%  ~S"
+	   :args (list word)
+	   :namestring word :offset 0))
   (let ((word (string-upcase word)))
     (dotimes (i (length word))
       (let ((ch (schar word i)))

@@ -85,5 +85,11 @@
 (assert (string= (format nil "~/cl-user:print-foo:print-foo/" 2) "2"))
 (assert (string= (format nil "~/cl-user::print-foo:print-foo/" 2) "2"))
 
+;;; Check for error detection of illegal directives in a~<..~> justify
+;;; block (see ANSI section 22.3.5.2)
+(assert (raises-error? (format nil "~<~W~>" 'foo)))
+(assert (raises-error? (format nil "~<~<~A~:>~>" '(foo))))
+(assert (string= (format nil "~<~<~A~>~>" 'foo) "FOO"))
+
 ;;; success
 (quit :unix-status 104)

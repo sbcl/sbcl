@@ -177,8 +177,13 @@
 ;;;; or failure in these tests doesn't tell you anything about
 ;;;; ANSI-compliance unless your PARSE-NAMESTRING works like ours.
 
-(setf (logical-pathname-translations "scratch")
-      '(("**;*.*.*" "/usr/local/doc/**/*")))
+;;; Needs to be done at compile time, so that the #p"" read-macro
+;;; correctly parses things as logical pathnames. This is not a
+;;; problem as was, as this is an impure file and so gets loaded in,
+;;; but just for future proofing...
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (logical-pathname-translations "scratch")
+        '(("**;*.*.*" "/usr/local/doc/**/*"))))
 
 (loop for (expected-result . params) in
       `(;; trivial merge
@@ -194,7 +199,7 @@
         ;; as a name)
         (#p"/dir/name.supplied-type"
          ,(make-pathname :type "supplied-type")
-	 #p"/dir/name.type")
+         #p"/dir/name.type")
         ;; If (pathname-directory pathname) is a list whose car is
         ;; :relative, and (pathname-directory default-pathname) is a
         ;; list, then the merged directory is [...]
@@ -205,18 +210,26 @@
         (#P"/aaa/bbb/ccc/blah/eee"
          ;; "../" in a namestring is parsed as :up not :back, so make-pathname
          ,(make-pathname :directory '(:relative :back "blah"))
-	 #p"/aaa/bbb/ccc/ddd/eee")
+         #p"/aaa/bbb/ccc/ddd/eee")
         ;; If (pathname-directory default-pathname) is not a list or
         ;; (pathname-directory pathname) is not a list whose car is
         ;; :relative, the merged directory is (or (pathname-directory
         ;; pathname) (pathname-directory default-pathname))
         (#P"/absolute/path/name.type"
          #p"/absolute/path/name"
-	 #p"/dir/default-name.type")
+         #p"/dir/default-name.type")
         ;; === logical pathnames ===
         ;; recognizes a logical pathname namestring when
         ;; default-pathname is a logical pathname
-	;; FIXME: 0.6.12.23 fails this one.
+        ;; FIXME: 0.6.12.23 fails this one.
+	;;
+	;; And, as it happens, it's right to fail it. Because
+	;; #p"name1" is read in with the ambient *d-p-d* value, which
+	;; has a physical (Unix) host; therefore, the host of the
+	;; default-pathname argument to merge-pathnames is
+	;; irrelevant. The result is (correctly) different if
+	;; '#p"name1"' is replaced by "name1", below, though it's
+	;; still not what one might expect... -- CSR, 2002-05-09
         #+nil (#P"scratch:foo;name1" #p"name1" #p"scratch:foo;")
         ;; or when the namestring begins with the name of a defined
         ;; logical host followed by a colon [I assume that refers to pathname
@@ -250,6 +263,17 @@
         )
       do (assert (string= (namestring (apply #'merge-pathnames params))
                           (namestring expected-result))))
+
+;;; host-namestring testing
+(assert (string=
+	 (namestring (parse-namestring "/foo" (host-namestring #p"/bar")))
+	 "/foo"))
+(assert (string=
+	 (namestring (parse-namestring "FOO" (host-namestring #p"SCRATCH:BAR")))
+	 "SCRATCH:FOO"))
+(assert (raises-error?
+	 (setf (logical-pathname-translations "")
+	       (list '("**;*.*.*" "/**/*.*")))))
 
 ;;;; success
 (quit :unix-status 104)

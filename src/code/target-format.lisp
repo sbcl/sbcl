@@ -1067,9 +1067,16 @@
 		(interpret-format-logical-block stream orig-args args
 						prefix per-line-p insides
 						suffix atsignp))
-	      (interpret-format-justification stream orig-args args
-					      segments colonp atsignp
-					      first-semi params)))
+	      (let ((count (apply #'+ (mapcar (lambda (x) (count-if #'illegal-inside-justification-p x)) segments))))
+		(when (> count 0)
+		  ;; ANSI specifies that "an error is signalled" in this
+		  ;; situation.
+		  (error 'format-error
+			 :complaint "~D illegal directive~:P found inside justification block"
+			 :args (list count)))
+		(interpret-format-justification stream orig-args args
+						segments colonp atsignp
+						first-semi params))))
     remaining))
 
 (defun interpret-format-justification

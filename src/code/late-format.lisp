@@ -948,6 +948,23 @@
 
 ;;;; format directives and support functions for justification
 
+(defparameter *illegal-inside-justification*
+  (mapcar (lambda (x) (parse-directive x 0))
+	  '("~W" "~:W" "~@W" "~:@W"
+	    "~_" "~:_" "~@_" "~:@_"
+	    "~:>" "~:@>"
+	    "~I" "~:I" "~@I" "~:@I"
+	    "~:T" "~:@T")))
+
+(defun illegal-inside-justification-p (directive)
+  (member directive *illegal-inside-justification*
+	  :test (lambda (x y)
+		  (and (format-directive-p x)
+		       (format-directive-p y)
+		       (eql (format-directive-character x) (format-directive-character y))
+		       (eql (format-directive-colonp x) (format-directive-colonp y))
+		       (eql (format-directive-atsignp x) (format-directive-atsignp y))))))
+
 (def-complex-format-directive #\< (colonp atsignp params string end directives)
   (multiple-value-bind (segments first-semi close remaining)
       (parse-format-justification directives)
@@ -958,8 +975,15 @@
 					 close params string end)
 	   (expand-format-logical-block prefix per-line-p insides
 					suffix atsignp))
-	 (expand-format-justification segments colonp atsignp
-				      first-semi params))
+	 (let ((count (apply #'+ (mapcar (lambda (x) (count-if #'illegal-inside-justification-p x)) segments))))
+	   (when (> count 0)
+	     ;; ANSI specifies that "an error is signalled" in this
+	     ;; situation.
+	     (error 'format-error
+		    :complaint "~D illegal directive~:P found inside justification block"
+		    :args (list count)))
+	   (expand-format-justification segments colonp atsignp
+				      first-semi params)))
      remaining)))
 
 (def-complex-format-directive #\> ()

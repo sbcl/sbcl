@@ -142,15 +142,6 @@ WORKAROUND:
   DTC's recommended workaround from the mailing list 3 Mar 2000:
 	(setf (pcl::find-class 'ccc1) (pcl::find-class 'ccc))
 
-22:
-  The ANSI spec, in section "22.3.5.2 Tilde Less-Than-Sign: Logical Block",
-  says that an error is signalled if ~W, ~_, ~<...~:>, ~I, or ~:T is used
-  inside "~<..~>" (without the colon modifier on the closing syntax).
-  However, SBCL doesn't do this:
-	* (FORMAT T "~<munge~wegnum~>" 12)
-	munge12egnum
-	NIL
-
 27:
   Sometimes (SB-EXT:QUIT) fails with 
 	Argh! maximum interrupt nesting depth (4096) exceeded, exiting
@@ -269,8 +260,6 @@ WORKAROUND:
 	   MERGE also have the same problem.
 	c: (COERCE 'AND 'FUNCTION) returns something related to
 	   (MACRO-FUNCTION 'AND), but ANSI says it should raise an error.
-	f: (FLOAT-RADIX 2/3) should signal an error instead of 
-	   returning 2.
 	g: (LOAD "*.lsp") should signal FILE-ERROR.
 	h: (MAKE-CONCATENATED-STREAM (MAKE-STRING-OUTPUT-STREAM))
 	   should signal TYPE-ERROR.
@@ -279,10 +268,6 @@ WORKAROUND:
 	   TYPE-ERROR when handed e.g. the results of
 	   MAKE-STRING-INPUT-STREAM or MAKE-STRING-OUTPUT-STREAM in
 	   the inappropriate positions, but doesn't.
-	j: (PARSE-NAMESTRING (COERCE (LIST #\f #\o #\o (CODE-CHAR 0) #\4 #\8)
-			    (QUOTE STRING)))
-	   should probably signal an error instead of making a pathname with
-	   a null byte in it.
 	k: READ-BYTE is supposed to signal TYPE-ERROR when its argument is 
 	   not a binary input stream, but instead cheerfully reads from
 	   character streams, e.g. (MAKE-STRING-INPUT-STREAM "abc").
@@ -667,7 +652,7 @@ WORKAROUND:
   but SBCL doesn't do this. (Also as reported by AL in the same
   message, SBCL depended on this nonconforming behavior to build
   itself, because of the way that **CURRENT-SEGMENT** was implemented.
-  As of sbcl-0.6.12.x, this dependence on the nonconforming behavior
+  As of sbcl-0.7.3.x, this dependence on the nonconforming behavior
   has been fixed, but the nonconforming behavior remains.)
 
 104:
@@ -1219,11 +1204,6 @@ WORKAROUND:
   (Christophe Rhodes reports that this doesn't occur on the SPARC, which
   isn't too surprising since there are many differences in stack
   implementation and GC conservatism between the X86 and other ports.)
-
-163:
-  HOST-NAMESTRING on a Unix pathname returns "Unix", which isn't
-  treated as a valid host by anything else in the system. (Reported by
-  Erik Naggum on comp.lang.lisp 2002-04-18)
 
 164:
   The type system still can't quite deal with all useful identities;

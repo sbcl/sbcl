@@ -272,7 +272,11 @@
 (defun unparse-unix-host (pathname)
   (declare (type pathname pathname)
 	   (ignore pathname))
-  "Unix")
+  ;; this host designator needs to be recognized as a physical host in
+  ;; PARSE-NAMESTRING. Until sbcl-0.7.3.x, we had "Unix" here, but
+  ;; that's a valid Logical Hostname, so that's a bad choice. -- CSR,
+  ;; 2002-05-09
+  "")
 
 (defun unparse-unix-piece (thing)
   (etypecase thing
