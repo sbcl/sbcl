@@ -277,6 +277,7 @@
  ;;              particular version of BSD we're intended to run under.)
  ;;   :freebsd = We're intended to run under FreeBSD.
  ;;   :openbsd = We're intended to run under OpenBSD.
+ ;;   :netbsd  = We're intended to run under NetBSD.
  ;;   :sunos   = We're intended to run under Solaris user environment
  ;;              with the SunOS kernel.
  ;;   :osf1    = We're intended to run under Tru64 (aka Digital Unix

@@ -26,6 +26,10 @@ system, please send mail to one of the mailing lists:
 
 SYSTEM-SPECIFIC HINTS
 
+for NetBSD:
+  NetBSD 2.0 and above are required because of the lack of needed
+  signal APIs in NetBSD 1.6 and earlier.
+
 for OpenBSD:
   OpenBSD 3.0 has stricter ulimit values, and/or enforces them more
   strictly, than its predecessors. Therefore SBCL's initial mmap()

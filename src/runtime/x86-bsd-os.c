@@ -12,7 +12,8 @@
  * flavour, with the cross-architecture complications that this
  * entails; unfortunately, currently the situation is worse, not
  * better, than in the above paragraph. */
-   
+
+#if defined(__FreeBSD__) || defined(__OpenBSD__)   
 int *
 os_context_register_addr(os_context_t *context, int offset)
 {
@@ -43,6 +44,43 @@ os_context_sp_addr(os_context_t *context)
 {
     return CONTEXT_ADDR_FROM_STEM(esp);
 }
+
+#endif /* __FreeBSD__ || __OpenBSD__ */
+
+#ifdef __NetBSD__
+int *
+os_context_register_addr(os_context_t *context, int offset)
+{
+    switch(offset) {
+    case  0:
+	return CONTEXT_ADDR_FROM_STEM(EAX);
+    case  2:
+	return CONTEXT_ADDR_FROM_STEM(ECX);
+    case  4:
+	return CONTEXT_ADDR_FROM_STEM(EDX);
+    case  6:
+	return CONTEXT_ADDR_FROM_STEM(EBX);
+    case  8:
+	return CONTEXT_ADDR_FROM_STEM(ESP);
+    case 10:
+	return CONTEXT_ADDR_FROM_STEM(EBP);
+    case 12:
+	return CONTEXT_ADDR_FROM_STEM(ESI);
+    case 14:
+	return CONTEXT_ADDR_FROM_STEM(EDI);
+    default:
+	return 0;
+    }
+}
+
+int *
+os_context_sp_addr(os_context_t *context)
+{
+    return &(_UC_MACHINE_SP(context));
+}
+
+#endif  /* __NetBSD__ */
+
 
 
 /* FIXME: If this can be a no-op on BSD/x86, then it 

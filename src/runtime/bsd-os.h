@@ -18,7 +18,11 @@
 #include <sys/signal.h>
 
 typedef caddr_t os_vm_address_t;
+#ifdef __NetBSD__
+typedef vsize_t os_vm_size_t;
+#else
 typedef vm_size_t os_vm_size_t;
+#endif
 typedef off_t os_vm_offset_t;
 typedef int os_vm_prot_t;
 typedef int os_context_register_t;
@@ -28,7 +32,7 @@ typedef int os_context_register_t;
  * Linux sigaltstack(2) */
 typedef struct sigaltstack stack_t;
 #elif defined __FreeBSD__
-/* FreeBSD 4.6 already has stack_t defined. */
+/* FreeBSD 4.6 and NetBSD 1.6 already have stack_t defined. */
 #endif
 
 #if defined __FreeBSD__
@@ -45,9 +49,18 @@ typedef ucontext_t os_context_t;
  * so we need to implement single stepping in a more roundabout way. */
 #define CANNOT_GET_TO_SINGLE_STEP_FLAG
 #define SIG_MEMORY_FAULT SIGBUS
+
 #elif defined __OpenBSD__
+
 typedef struct sigcontext os_context_t;
 #define SIG_MEMORY_FAULT SIGSEGV
+
+#elif defined __NetBSD__
+
+#include <ucontext.h>
+typedef ucontext_t os_context_t;
+#define SIG_MEMORY_FAULT SIGSEGV
+
 #elif defined LISP_FEATURE_DARWIN
   /* man pages claim that the third argument is a sigcontext struct,
      but ucontext_t is defined, matches sigcontext where sensible,
@@ -59,6 +72,7 @@ typedef struct sigcontext os_context_t;
 #include <ucontext.h>
 typedef ucontext_t os_context_t;
 #define SIG_MEMORY_FAULT SIGBUS
+
 #else
 #error unsupported BSD variant
 #endif

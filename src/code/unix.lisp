@@ -293,14 +293,14 @@
   ;; a constant. Going the grovel_headers route doesn't seem to be
   ;; helpful, either, as Solaris doesn't export PATH_MAX from
   ;; unistd.h.
-  #!-(or linux openbsd freebsd sunos osf1 darwin) (,stub,)
-  #!+(or linux openbsd freebsd sunos osf1 darwin)
+  #!-(or linux openbsd freebsd netbsd sunos osf1 darwin) (,stub,)
+  #!+(or linux openbsd freebsd netbsd sunos osf1 darwin)
   (or (newcharstar-string (alien-funcall (extern-alien "getcwd"
 						       (function (* char)
 								 (* char)
 								 size-t))
 					 nil 
-					 #!+(or linux openbsd freebsd darwin) 0
+					 #!+(or linux openbsd freebsd netbsd darwin) 0
 					 #!+(or sunos osf1) 1025))
       (simple-perror "getcwd")))
 

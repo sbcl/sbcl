@@ -21,6 +21,8 @@
 #include <stdio.h>
 #include <sys/param.h>
 #include <sys/file.h>
+#include <unistd.h>
+#include <assert.h>
 #include "sbcl.h"
 #include "./signal.h"
 #include "os.h"
@@ -37,11 +39,22 @@
 #include "validate.h"
 
 
-vm_size_t os_vm_page_size;
+os_vm_size_t os_vm_page_size;
 
+#ifdef __NetBSD__
+#include <sys/resource.h>
+#include <string.h>
+
+static void netbsd_init();
+#endif /* __NetBSD__ */
+ 
 void os_init(void)
 {
     os_vm_page_size = getpagesize();
+
+#ifdef __NetBSD__
+    netbsd_init();
+#endif /* __NetBSD__ */
 }
 
 int *os_context_pc_addr(os_context_t *context)
@@ -50,6 +63,8 @@ int *os_context_pc_addr(os_context_t *context)
     return CONTEXT_ADDR_FROM_STEM(eip);
 #elif defined __OpenBSD__
     return CONTEXT_ADDR_FROM_STEM(pc);
+#elif defined __NetBSD__
+    return CONTEXT_ADDR_FROM_STEM(EIP);
 #elif defined LISP_FEATURE_DARWIN
     return &context->uc_mcontext->ss.srr0;
 #else
@@ -63,7 +78,7 @@ os_context_sigmask_addr(os_context_t *context)
     /* (Unlike most of the other context fields that we access, the
      * signal mask field is a field of the basic, outermost context
      * struct itself both in FreeBSD 4.0 and in OpenBSD 2.6.) */
-#if defined __FreeBSD__ || defined LISP_FEATURE_DARWIN
+#if defined __FreeBSD__  || __NetBSD__ || defined LISP_FEATURE_DARWIN
     return &context->uc_sigmask;
 #elif defined __OpenBSD__
     return &context->sc_mask;
@@ -162,15 +177,14 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
     /* The way that we extract low level information like the fault
      * address is not specified by POSIX. */
-#if defined __FreeBSD__
-    void *fault_addr = siginfo->si_addr;
-#elif defined __OpenBSD__
+#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
     void *fault_addr = siginfo->si_addr;
 #elif defined LISP_FEATURE_DARWIN
     void *fault_addr = siginfo->si_addr;
 #else
 #error unsupported BSD variant
 #endif
+
     os_context_t *context = arch_os_get_context(&void_context);
     if (!gencgc_handle_wp_violation(fault_addr)) 
         if(!handle_control_stack_guard_triggered(context,fault_addr))
@@ -213,6 +227,29 @@ os_install_interrupt_handlers(void)
 }
 
 #endif /* defined GENCGC */
+
+#ifdef __NetBSD__
+static void netbsd_init()
+{
+    struct rlimit rl;
+    
+    /* NetBSD counts mmap()ed space against the process's data size limit,
+     * so yank it up. This might be a nasty thing to do? */
+    getrlimit (RLIMIT_DATA, &rl);
+    /* Amazingly for such a new port, the provenance and meaning of
+       this number are unknown.  It might just mean REALLY_BIG_LIMIT,
+       or possibly it should be calculated from dynamic space size.
+       -- CSR, 2004-04-08 */
+    rl.rlim_cur = 1073741824;
+    if (setrlimit (RLIMIT_DATA, &rl) < 0) {
+	fprintf (stderr, 
+		 "RUNTIME WARNING: unable to raise process data size limit:\n\
+  %s.\n\
+The system may fail to start.\n",
+		 strerror(errno));
+    }
+}
+#endif /* __NetBSD__ */
 
 /* threads */
 

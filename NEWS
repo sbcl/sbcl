@@ -2364,11 +2364,14 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
        the readtable currently in effect.
 
 changes in sbcl-0.8.10 relative to sbcl-0.8.9:
+  * Support for the forthcoming 2.0 version of the NetBSD kernel
+    running on x86 hardware has been added.  (thanks to Perry
+    E. Metzger most immediately, and others for their past work)
   * [placeholder for DX summary]
     ** user code with &REST lists declared dynamic-extent, under high
        speed or space and low safety and debug optimization policy.
   * The manual has been converted to Texinfo format and the debugger
-    chapter from the cmucl manual has been added
+    chapter from the cmucl manual has been added.
   * A facility has been added to extract documentation strings from
     sbcl and store them as Texinfo-formatted snippets for inclusion in
     the manual (via Texinfo's @include directive)
@@ -2377,7 +2380,7 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
   * bug fix: multidimensional simple arrays loaded from FASLs had fill
     pointers.  (reported by Sean Ross)
   * bug fix: PROFILE output is printed nicely even for large numerical
-	values. (thanks to Zach Beane)
+    values.  (thanks to Zach Beane)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

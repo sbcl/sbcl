@@ -69,7 +69,7 @@ boolean interrupt_maybe_gc_int(int, siginfo_t *, void *);
 boolean enable_page_protection = 1;
 
 /* Should we unmap a page and re-mmap it to have it zero filled? */
-#if defined(__FreeBSD__) || defined(__OpenBSD__)
+#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
 /* comment from cmucl-2.4.8: This can waste a lot of swap on FreeBSD
  * so don't unmap there.
  *

@@ -730,7 +730,7 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr){
 }
 
 #ifndef LISP_FEATURE_GENCGC
-/* This function gets called from the SIGSEGV (for e.g. Linux or
+/* This function gets called from the SIGSEGV (for e.g. Linux, NetBSD, &
  * OpenBSD) or SIGBUS (for e.g. FreeBSD) handler. Here we check
  * whether the signal was due to treading on the mprotect()ed zone -
  * and if so, arrange for a GC to happen. */
