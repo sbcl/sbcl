@@ -78,15 +78,12 @@ code:
 	      (format nil "sizeof(~A)" type)))
     (printf ")")
     (dolist (def definitions)
-      (destructuring-bind (type lispname cname &optional doc dont-export) def
+      (destructuring-bind (type lispname cname &optional doc export) def
 	(case type
 	  (:integer
 	   (as-c "#ifdef" cname)
 	   (printf "(cl:defconstant ~A %d \"~A\")" lispname doc
 		   cname)
-	   ;; XXX: do this?
-	   (unless dont-export
-	     (printf "(cl:export '~A)" lispname))
 	   (as-c "#else")
 	   (printf "(sb-int:style-warn \"Couldn't grovel for ~A (unknown to the C compiler).\")" cname)
 	   (as-c "#endif"))
@@ -103,11 +100,13 @@ code:
 	     (printf "(sb-grovel::define-foreign-routine (\"~A\" ~A)" f-cname lispname)
 	     (printf "~{  ~W~^\\n~})" definition)))
 	  (:structure
+	   ;; FIXME: structure slots should be auto-exportable as well.
 	   (c-for-structure lispname cname))
 	  (otherwise
 	   ;; should we really not sprechen espagnol, monsieurs?
-	   (error "Unknown grovel keyword encountered: ~A" type))
-	)))
+	   (error "Unknown grovel keyword encountered: ~A" type)))
+	(when export
+	  (printf "(cl:export '~A)" lispname))))
     (as-c "return 0;")
     (as-c "}")))
 
