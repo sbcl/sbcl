@@ -174,7 +174,7 @@ ANSI C. A null alien pointer can be detected with the
 @code{sb-alien:null-alien} function.
 
 @item
-The foreign type specifier @code{(array @var{foo} &optional
+The foreign type specifier @code{(array @var{foo} &rest
 dimensions)} describes array of the specified @code{dimensions},
 holding elements of type @var{foo}. Note that (unlike in C) @code{(*
 @var{foo})} and @code{(array @var{foo})} are considered to be
@@ -727,7 +727,7 @@ defined symbols are referenced.
 
 @quotation
 Note: As of SBCL 0.7.5, all foreign code (code loaded with
-@code{load-1-function} or @code{load-function}) is lost when a Lisp
+@code{load-shared-object}) is lost when a Lisp
 core is saved with @code{sb-ext:save-lisp-and-die}, and no attempt is
 made to restore it when the core is loaded. Historically this has been
 an annoyance both for SBCL users and for CMUCL users.  It's hard to

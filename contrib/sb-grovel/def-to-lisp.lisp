@@ -100,7 +100,6 @@ code:
 	     (printf "(sb-grovel::define-foreign-routine (\"~A\" ~A)" f-cname lispname)
 	     (printf "~{  ~W~^\\n~})" definition)))
 	  (:structure
-	   ;; FIXME: structure slots should be auto-exportable as well.
 	   (c-for-structure lispname cname))
 	  (otherwise
 	   ;; should we really not sprechen espagnol, monsieurs?

@@ -41,7 +41,7 @@ Add it as a component in your system. e.g.
   (require :sb-grovel))
 
 (defpackage :example-package.system
-            (:use :cl :asdf :sb-grovel))
+            (:use :cl :asdf :sb-grovel :sb-alien))
 
 (in-package :example-package.system)
             
@@ -105,7 +105,7 @@ Here's how to use the grovel clauses:
 @item
 @code{:integer} - constant expressions in C. Used in this form:
 @lisp
- (:integer lisp-variable-name "C expression")
+ (:integer lisp-variable-name "C expression" &optional doc export)
 @end lisp
 
 @code{"C expression"} will be typically be the name of a constant. But

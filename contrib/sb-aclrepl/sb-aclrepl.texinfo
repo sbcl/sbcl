@@ -6,7 +6,7 @@
 @c FIXME: I wanted to use @registeredsymbol{}, but that's 
 @c only available in Texinfo 4.7.  sigh.
 The @code{sb-aclrepl} module offers an Allegro CL-style
-Read-Eval-Print Loop for SBCL, with integrated inspector.  Adding an
+Read-Eval-Print Loop for SBCL, with integrated inspector.  Adding a
 debugger interface is planned.
 
 @subsection Usage
