@@ -260,6 +260,8 @@
       (let ((delta (logandc2 (+ amount 3) 3)))
 	(inst add esp-tn delta)))
     (when (policy node (= sb!c::float-accuracy 3))
+      (inst fnstcw (make-ea :word :base esp-tn))
+      (inst wait)
       (inst and (make-ea :word :base esp-tn) #xfeff)
       (inst fldcw (make-ea :word :base esp-tn))
       (inst wait)
