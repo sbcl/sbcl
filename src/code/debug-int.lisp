@@ -41,17 +41,6 @@
    "All DEBUG-CONDITIONs inherit from this type. These are serious conditions
     that must be handled, but they are not programmer errors."))
 
-(define-condition no-debug-info (debug-condition)
-  ((code-component :reader no-debug-info-code-component
-		   :initarg :code-component))
-  #!+sb-doc
-  (:documentation "There is no usable debugging information available.")
-  (:report (lambda (condition stream)
-	     (fresh-line stream)
-	     (format stream
-		     "no debug information available for ~S~%"
-		     (no-debug-info-code-component condition)))))
-
 (define-condition no-debug-fun-returns (debug-condition)
   ((debug-fun :reader no-debug-fun-returns-debug-fun
 	      :initarg :debug-fun))
@@ -854,7 +843,6 @@
     (multiple-value-bind (code pc-offset escaped) (find-escaped-frame caller)
       (/noshow0 "at COND")
       (cond (code
-	     (/noshow0 "in CODE clause")
 	     ;; If it's escaped it may be a function end breakpoint trap.
 	     (when (and (code-component-p code)
 			(eq (%code-debug-info code) :bogus-lra))
@@ -863,16 +851,12 @@
 				code (1+ real-lra-slot)))
 	       (setq code (code-header-ref code real-lra-slot))
 	       (aver code)))
-	    (t
-	     (/noshow0 "in T clause")
-	     ;; not escaped
+	    ((not escaped)
 	     (multiple-value-setq (pc-offset code)
 	       (compute-lra-data-from-pc ra))
 	     (unless code
 	       (setf code :foreign-function
-		     pc-offset 0
-		     escaped nil))))
-
+		     pc-offset 0))))
       (let ((d-fun (case code
 		     (:undefined-function
 		      (make-bogus-debug-fun
@@ -1041,8 +1025,11 @@ register."
 (defun debug-fun-from-pc (component pc)
   (let ((info (%code-debug-info component)))
     (cond
-     ((not info)
-      (debug-signal 'no-debug-info :code-component component))
+      ((not info)
+       ;; FIXME: It seems that most of these (at least on x86) are
+       ;; actually assembler routines, and could be named by looking
+       ;; at the sb-fasl:*assembler-routines*.
+       (make-bogus-debug-fun "no debug information for frame"))
      ((eq info :bogus-lra)
       (make-bogus-debug-fun "function end breakpoint"))
      (t

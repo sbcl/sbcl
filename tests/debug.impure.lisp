@@ -74,20 +74,22 @@
                       (let ((backtrace (ignore-errors
                                          (sb-debug:backtrace-as-list))))
                         ;; Make sure we find what we're looking for.
-                        (when (member frame-name backtrace
-                                      :key key :test test)
-                          (setf result (list :error condition)))
+                        (if (member frame-name backtrace :key key :test test)
+                            (setf result (list :error condition))
+                            (print (list :failed :frame frame-name :backtrace backtrace)))
                         ;; Make sure there's no bogus stack frames
                         ;; unless they're explicitly allowed.
                         (when (and (not allow-bogus-frames)
                                    (member "bogus stack frame" backtrace
                                            :key #'first :test #'equal))
+                          (print 'verify-backtrace-bogus)
                           (setf result nil))
                         ;; Make sure the backtrace isn't stunted in
                         ;; any way.  (Depends on running in the main
                         ;; thread.)
                         (unless (member 'sb-impl::toplevel-init backtrace
                                         :key #'first :test #'equal)
+                          (print 'verify-backtrace-stunted)
                           (setf result nil)))
                       (return-from outer-handler))))
         (funcall test-function)))
@@ -97,19 +99,27 @@
 ;;; Try it with and without tail call elimination, since they can have
 ;;; different effects.  (Specifically, if undefined_tramp is incorrect
 ;;; a stunted stack can result from the tail call variant.)
-#-(or alpha x86) ; bug 345
-(progn
-  (flet ((test-function ()
-	   (declare (optimize (speed 2) (debug 1))) ; tail call elimination
-	   (#:undefined-function 42)))
-    (assert (verify-backtrace #'test-function "undefined function"
-			      :test #'equal)))
-  
-  (flet ((test-function ()
-	   (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
-	   (#:undefined-function 42)))
-    (assert (verify-backtrace #'test-function "undefined function"
-			      :test #'equal))))
+#-(or alpha) ; bug 346
+(flet ((optimized ()
+         (declare (optimize (speed 2) (debug 1))) ; tail call elimination
+         (#:undefined-function 42))
+       (not-optimized ()
+         (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
+         (#:undefined-function 42))
+       (test (fun)
+         (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
+         (funcall fun)))
+  (dolist (frame '(#-x86 "undefined function" ; bug 353
+                   "FLET COMMON-LISP-USER::TEST"))
+    (assert (verify-backtrace (lambda () (test #'optimized)) frame
+                              :test #'equal
+                              :allow-bogus-frames (or #+x86 t))))
+  (dolist (frame '(#-x86 "undefined function" ; bug 353
+                   "FLET COMMON-LISP-USER::NOT-OPTIMIZED"
+                   "FLET COMMON-LISP-USER::TEST"))
+    (assert (verify-backtrace (lambda () (test #'not-optimized)) frame
+                              :test #'equal
+                              :allow-bogus-frames (or #+x86 t)))))
 
 ;;; Division by zero was a common error on PPC.  It depended on the
 ;;; return function either being before INTEGER-/-INTEGER in memory,
@@ -135,11 +145,14 @@
 	   (/ 42 0)))
     (assert (verify-backtrace #'test-function '/))))
 
-#-(or x86 alpha) ; bug 61
+#-(or alpha) ; bug 61
 (progn
   (defun throw-test ()
     (throw 'no-such-tag t))
-  (assert (verify-backtrace #'throw-test 'throw-test)))
+  (assert (verify-backtrace #'throw-test 
+                            #-(or x86 sparc) 'throw-test
+                            #+(or x86 sparc) "XEP for COMMON-LISP-USER::THROW-TEST" ; bug 354
+                            :test #'equal)))
 
 ;;; success
 (quit :unix-status 104)

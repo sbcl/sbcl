@@ -286,6 +286,7 @@ GNAME(fpu_restore):
 	.align	align_4byte,0x90
 	.global GNAME(undefined_tramp)
 	.type	GNAME(undefined_tramp),@function
+        .byte   0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
 GNAME(undefined_tramp):
 	int3
 	.byte	trap_Error
@@ -302,6 +303,7 @@ GNAME(undefined_tramp):
 	.align	align_4byte,0x90
 	.global GNAME(closure_tramp)
 	.type	GNAME(closure_tramp),@function
+        .byte   0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
 GNAME(closure_tramp):
 	movl	FDEFN_FUN_OFFSET(%eax),%eax
 	/* FIXME: The '*' after "jmp" in the next line is from PVE's
