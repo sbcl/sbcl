@@ -144,7 +144,7 @@
 			 (sxhash-recurse (cdr x) (1- depthoid)))
 		    261835505))
 	       (instance
-		(if (typep x 'structure-object)
+		(if (or (typep x 'structure-object) (typep x 'condition))
 		    (logxor 422371266
 			    (sxhash ; through DEFTRANSFORM
 			     (classoid-name

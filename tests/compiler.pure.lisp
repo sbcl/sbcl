@@ -377,3 +377,7 @@
                                        (bar))))
                        (error (c)
                          (values nil t t))))))
+
+(assert (typep (eval `(the arithmetic-error
+		           ',(make-condition 'arithmetic-error)))
+	       'arithmetic-error))

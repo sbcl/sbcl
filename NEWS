@@ -1721,7 +1721,7 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
     ** the GENERIC-FUNCTION type is no longer disjoint from FUNCTION
        types.
     ** &ENVIRONMENT parameter in macro lambda list is bound first.
-
+    ** SXHASH on condition objects no longer returns NIL.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
