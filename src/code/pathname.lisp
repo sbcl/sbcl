@@ -31,15 +31,15 @@
 (def!struct (logical-host
 	     (:make-load-form-fun make-logical-host-load-form-fun)
 	     (:include host
-		       (:parse #'parse-logical-namestring)
-		       (:unparse #'unparse-logical-namestring)
-		       (:unparse-host
+		       (parse #'parse-logical-namestring)
+		       (unparse #'unparse-logical-namestring)
+		       (unparse-host
 			(lambda (x)
 			  (logical-host-name (%pathname-host x))))
-		       (:unparse-directory #'unparse-logical-directory)
-		       (:unparse-file #'unparse-unix-file)
-		       (:unparse-enough #'unparse-enough-namestring)
-		       (:customary-case :upper)))
+		       (unparse-directory #'unparse-logical-directory)
+		       (unparse-file #'unparse-unix-file)
+		       (unparse-enough #'unparse-enough-namestring)
+		       (customary-case :upper)))
   (name "" :type simple-base-string)
   (translations nil :type list)
   (canon-transls nil :type list))

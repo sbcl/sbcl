@@ -83,9 +83,9 @@
        (/show0 "finished with DEFINE-STORAGE-BASE expansion")
        ',name)))
 
-;;; Define a storage class Name that uses the named Storage-Base. Number is a 
-;;; small, non-negative integer that is used as an alias. The following
-;;; keywords are defined:
+;;; Define a storage class NAME that uses the named Storage-Base.
+;;; NUMBER is a small, non-negative integer that is used as an alias.
+;;; The following keywords are defined:
 ;;;
 ;;; :ELEMENT-SIZE Size
 ;;;   The size of objects in this SC in whatever units the SB uses.

@@ -1272,8 +1272,33 @@ WORKAROUND:
     (defun bar (x)
       (typep x 'foo))
 
+150:
+  In sbcl-0.7.1.15, compiling this code 
+    (let* ()
+      (flet ((wufn () (glorp table1 4.9)))
+        (gleep *uustk* #'wufn "#1" (list)))
+      (if (eql (lo foomax 3.2))
+          (values)
+          (error "not ~S" '(eql (lo foomax 3.2))))
+      (values))
+  causes a failure in SB-C::ADD-TEST-CONSTRAINTS:
+    The value NIL is not of type SB-C::CONTINUATION.
+  other notes:
+    * The problem appears to be tied to the way that EQL is given only
+      one argument, and goes away when we give EQL a second argument.
+    * CMU CL 18c has this problem too, exercised by 
+	(compile nil
+	         '(lambda ()
+                    (let* ()
+		      (flet ((wufn () (glorp table1 4.9)))
+		        (gleep *uustk* #'wufn "#1" (list)))
+		      (if (eql (lo foomax 3.2))
+		          (values)
+		          (error "not ~S" '(eql (lo foomax 3.2))))
+		      (values))))
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
-    These numbers were used for bugs related to the old IR1
+    These labels were used for bugs related to the old IR1
     interpreter. The # values reached 6 before the category
     was closed down.

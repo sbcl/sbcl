@@ -545,6 +545,10 @@ Robert MacLachlan:
   problems, has been invaluable to the CMU CL project and, by
   porting, invaluable to the SBCL project as well.
 
+Dave McDonald:
+  He made a lot of progress toward getting SBCL to be bootstrappable
+  under CLISP.
+
 William ("Bill") Newman:
   He continued to maintain SBCL after the fork, increasing ANSI
   compliance, fixing bugs, regularizing the internals of the

@@ -275,7 +275,7 @@
       type))
 
 ;;; A CONS-TYPE is used to represent a CONS type.
-(defstruct (cons-type (:include ctype (:class-info (type-class-or-lose 'cons)))
+(defstruct (cons-type (:include ctype (class-info (type-class-or-lose 'cons)))
 		      (:constructor
 		       ;; ANSI says that for CAR and CDR subtype
 		       ;; specifiers '* is equivalent to T. In order

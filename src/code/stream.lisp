@@ -1359,7 +1359,7 @@
 
 (defstruct (case-frob-stream
 	    (:include ansi-stream
-		      (:misc #'case-frob-misc))
+		      (misc #'case-frob-misc))
 	    (:constructor %make-case-frob-stream (target out sout))
 	    (:copier nil))
   (target (missing-arg) :type stream))

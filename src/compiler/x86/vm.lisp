@@ -163,7 +163,8 @@
 ;;;
 ;;; (What a KLUDGE! Anyone who wants to come in and clean up this mess
 ;;; has my gratitude.) (FIXME: Maybe this should be me..)
-(defconstant kludge-nondeterministic-catch-block-size 6)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant kludge-nondeterministic-catch-block-size 6))
 
 (define-storage-classes
 

@@ -107,7 +107,7 @@
 	   (create-alien-type-class-if-necessary ',name ',(or include 'root)))
 	 (def!struct (,defstruct-name
 			(:include ,include-defstruct
-				  (:class ',name)
+				  (class ',name)
 				  ,@overrides)
 			(:constructor
 			 ,(symbolicate "MAKE-" defstruct-name)
@@ -593,7 +593,7 @@
 
 ;;;; the ENUM type
 
-(define-alien-type-class (enum :include (integer (:bits 32))
+(define-alien-type-class (enum :include (integer (bits 32))
 			       :include-args (signed))
   name		; name of this enum (if any)
   from		; alist from keywords to integers.
@@ -738,7 +738,7 @@
   (declare (ignore type))
   value)
 
-(define-alien-type-class (single-float :include (float (:bits 32))
+(define-alien-type-class (single-float :include (float (bits 32))
 				       :include-args (type)))
 
 (define-alien-type-translator single-float ()
@@ -748,7 +748,7 @@
   (declare (ignore type))
   `(sap-ref-single ,sap (/ ,offset sb!vm:n-byte-bits)))
 
-(define-alien-type-class (double-float :include (float (:bits 64))
+(define-alien-type-class (double-float :include (float (bits 64))
 				       :include-args (type)))
 
 (define-alien-type-translator double-float ()
@@ -759,7 +759,7 @@
   `(sap-ref-double ,sap (/ ,offset sb!vm:n-byte-bits)))
 
 #!+long-float
-(define-alien-type-class (long-float :include (float (:bits #!+x86 96
+(define-alien-type-class (long-float :include (float (bits #!+x86 96
 							    #!+sparc 128))
 				     :include-args (type)))
 
@@ -774,7 +774,7 @@
 
 ;;;; the POINTER type
 
-(define-alien-type-class (pointer :include (alien-value (:bits
+(define-alien-type-class (pointer :include (alien-value (bits
 							 #!-alpha
 							 sb!vm:n-word-bits
 							 #!+alpha 64)))

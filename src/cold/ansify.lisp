@@ -96,13 +96,18 @@
 	     (declare (ignore value))
 	     (unless (gethash key standard-ht)
 	       (warn "removing non-ANSI export from package CL: ~S" key)
-	       (unexport (intern key cl) cl)))
+	       #+CLISP (ext:without-package-lock ("CL")
+						 (unexport (intern key cl) cl))
+	       #-CLISP (unexport (intern key cl) cl)))
 	   host-ht)
   (maphash (lambda (key value)
 	     (declare (ignore value))
 	     (unless (gethash key host-ht)
 	       (warn "adding required-by-ANSI export to package CL: ~S" key)
-	       (export (intern key cl) cl))
+	       #+CLISP (ext:without-package-lock ("CL")
+						 (export (intern key cl) cl))
+	       #-CLISP (export (intern key cl) cl))
+	     
 	     ;; FIXME: My righteous indignation below was misplaced. ANSI sez
 	     ;; (in 11.1.2.1, "The COMMON-LISP Package") that it's OK for
 	     ;; COMMON-LISP things to have their home packages elsewhere.

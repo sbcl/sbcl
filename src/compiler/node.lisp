@@ -1132,7 +1132,7 @@
 ;;; A REF represents a reference to a LEAF. REF-REOPTIMIZE is
 ;;; initially (and forever) NIL, since REFs don't receive any values
 ;;; and don't have any IR1 optimizer.
-(defstruct (ref (:include node (:reoptimize nil))
+(defstruct (ref (:include node (reoptimize nil))
 		(:constructor make-ref (derived-type leaf))
 		(:copier nil))
   ;; The leaf referenced.

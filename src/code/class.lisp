@@ -29,7 +29,7 @@
 	     #+sb-xc cl:class
 	     (:make-load-form-fun class-make-load-form-fun)
 	     (:include ctype
-		       (:class-info (type-class-or-lose #-sb-xc 'sb!xc:class
+		       (class-info (type-class-or-lose #-sb-xc 'sb!xc:class
 							#+sb-xc 'cl:class)))
 	     (:constructor nil)
 	     #-no-ansi-print-object

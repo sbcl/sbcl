@@ -99,7 +99,8 @@
 
 ;;; At run time, we represent the type of info that we want by a small
 ;;; non-negative integer.
-(defconstant type-number-bits 6)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant type-number-bits 6))
 (deftype type-number () `(unsigned-byte ,type-number-bits))
 
 ;;; Why do we suppress the :COMPILE-TOPLEVEL situation here when we're

@@ -29,9 +29,9 @@
 (defconstant default-line-length 80)
 
 (defstruct (pretty-stream (:include sb!kernel:ansi-stream
-				    (:out #'pretty-out)
-				    (:sout #'pretty-sout)
-				    (:misc #'pretty-misc))
+				    (out #'pretty-out)
+				    (sout #'pretty-sout)
+				    (misc #'pretty-misc))
 			  (:constructor make-pretty-stream (target))
 			  (:copier nil))
   ;; Where the output is going to finally go.

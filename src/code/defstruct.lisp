@@ -50,21 +50,25 @@
 	     (:conc-name dd-)
 	     (:make-load-form-fun just-dump-it-normally)
 	     #-sb-xc-host (:pure t)
-	     (:constructor make-defstruct-description (name)))
+	     (:constructor make-defstruct-description
+			   (name &aux
+				 (conc-name (symbolicate name "-"))
+				 (copier-name (symbolicate "COPY-" name))
+				 (predicate-name (symbolicate name "-P")))))
   ;; name of the structure
   (name (missing-arg) :type symbol :read-only t)
   ;; documentation on the structure
   (doc nil :type (or string null))
   ;; prefix for slot names. If NIL, none.
-  (conc-name (symbolicate name "-") :type (or symbol null))
+  (conc-name nil :type (or symbol null))
   ;; the name of the primary standard keyword constructor, or NIL if none
   (default-constructor nil :type (or symbol null))
   ;; all the explicit :CONSTRUCTOR specs, with name defaulted
   (constructors () :type list)
   ;; name of copying function
-  (copier-name (symbolicate "COPY-" name) :type (or symbol null))
+  (copier-name nil :type (or symbol null))
   ;; name of type predicate
-  (predicate-name (symbolicate name "-P") :type (or symbol null))
+  (predicate-name nil :type (or symbol null))
   ;; the arguments to the :INCLUDE option, or NIL if no included
   ;; structure
   (include nil :type list)
