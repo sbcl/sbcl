@@ -385,13 +385,12 @@ static void /* noreturn */ parent_loop(void)
 
     sigemptyset(&sigset);
 
-    sigaddset(&sigset, SIGALRM);
     sigaddset(&sigset, SIGCHLD);
+    sigaddset(&sigset, SIG_THREAD_EXIT);
     sigprocmask(SIG_UNBLOCK,&sigset,0);
     sa.sa_handler=parent_sighandler;
     sa.sa_mask=sigset;
     sa.sa_flags=SA_SIGINFO;
-    sigaction(SIGALRM, &sa, 0);
     sigaction(SIGCHLD, &sa, 0);
 
     sigemptyset(&sigset);
@@ -399,6 +398,7 @@ static void /* noreturn */ parent_loop(void)
     sa.sa_mask=sigset;
     sa.sa_flags=0;
     sigaction(SIGINT, &sa, 0);
+    sigaction(SIG_THREAD_EXIT, &sa, 0);
 
     while(!all_threads) {
 	sched_yield();

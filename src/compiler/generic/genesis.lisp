@@ -1257,7 +1257,8 @@
     (frob internal-error)
     (frob sb!kernel::control-stack-exhausted-error)
     (frob sb!di::handle-breakpoint)
-    (frob sb!di::handle-fun-end-breakpoint))
+    (frob sb!di::handle-fun-end-breakpoint)
+    (frob sb!thread::handle-thread-exit))
 
   (cold-set '*current-catch-block*          (make-fixnum-descriptor 0))
   (cold-set '*current-unwind-protect-block* (make-fixnum-descriptor 0))

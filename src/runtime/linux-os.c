@@ -280,6 +280,8 @@ os_install_interrupt_handlers(void)
 						 interrupt_thread_handler);
     undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
 						 sig_stop_for_gc_handler);
+    undoably_install_low_level_interrupt_handler(SIG_THREAD_EXIT,
+						 thread_exit_handler);
     if(!linux_supports_futex)
 	undoably_install_low_level_interrupt_handler(SIG_DEQUEUE,
 						     sigcont_handler);

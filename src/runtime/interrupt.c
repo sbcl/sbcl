@@ -45,6 +45,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include "runtime.h"
 #include "arch.h"
@@ -61,6 +63,8 @@
 #include "interr.h"
 #include "genesis/fdefn.h"
 #include "genesis/simple-fun.h"
+
+
 
 void run_deferred_handler(struct interrupt_data *data, void *v_context) ;
 static void store_signal_data_for_later (struct interrupt_data *data, 
@@ -105,6 +109,7 @@ void sigaddset_blockable(sigset_t *s)
 #ifdef LISP_FEATURE_SB_THREAD
     sigaddset(s, SIG_STOP_FOR_GC);
     sigaddset(s, SIG_INTERRUPT_THREAD);
+    sigaddset(s, SIG_THREAD_EXIT);
 #endif
 }
 
@@ -665,6 +670,29 @@ void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 	return ;
     }
     arrange_return_to_lisp_function(context,info->si_value.sival_int);
+}
+
+void thread_exit_handler(int num, siginfo_t *info, void *v_context)
+{   /* called when a child thread exits */
+    os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
+    struct thread *th=arch_os_get_current_thread();
+    pid_t kid;
+    int *status;
+    struct interrupt_data *data=
+	th ? th->interrupt_data : global_interrupt_data;
+    if(maybe_defer_handler(thread_exit_handler,data,num,info,context)){
+	return ;
+    }
+    while(1) {
+	kid=waitpid(-1,&status,__WALL|WNOHANG);
+	if(kid<1) break;
+	if(WIFEXITED(status) || WIFSIGNALED(status)) {
+	    struct thread *th=find_thread_by_pid(kid);
+	    if(!th) continue;
+	    funcall1(SymbolFunction(HANDLE_THREAD_EXIT),make_fixnum(kid));
+	    destroy_thread(th);
+	}
+    }
 }
 #endif
 

@@ -226,6 +226,7 @@
     sb!kernel::control-stack-exhausted-error
     sb!di::handle-breakpoint
     fdefinition-object
+    #!+sb-thread sb!thread::handle-thread-exit
 
     ;; free pointers
     ;; 
@@ -250,7 +251,6 @@
     *free-interrupt-context-index*
 
     *free-tls-index*
-    sb!thread::*foreground-thread-stack*
     
     *allocation-pointer*
     *binding-stack-pointer*

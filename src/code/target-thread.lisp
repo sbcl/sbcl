@@ -10,87 +10,9 @@
 
 (sb!alien::define-alien-routine "signal_thread_to_dequeue"
     sb!alien:unsigned-int
-  (thread-pid sb!alien:unsigned-long))
+  (thread-id sb!alien:unsigned-long))
 
 (defvar *session* nil)
-
-(defun make-thread (function)
-  (let* ((real-function (coerce function 'function))
-	 (tid
-	  (%create-thread
-	   (sb!kernel:get-lisp-obj-address
-	    (lambda ()
-	      ;; in time we'll move some of the binding presently done in C
-	      ;; here too
-	      (let ((sb!kernel::*restart-clusters* nil)
-		    (sb!impl::*descriptor-handlers* nil) ; serve-event
-		    (sb!impl::*available-buffers* nil)) ;for fd-stream
-		;; can't use handling-end-of-the-world, because that flushes
-		;; output streams, and we don't necessarily have any (or we
-		;; could be sharing them)
-		(sb!sys:enable-interrupt sb!unix:sigint :ignore)
-		(sb!unix:unix-exit
-		 (catch 'sb!impl::%end-of-the-world 
-		   (with-simple-restart 
-		       (destroy-thread
-			(format nil "~~@<Destroy this thread (~A)~~@:>"
-				(current-thread-id)))
-		     (funcall real-function))
-		   0))))))))
-    (with-mutex ((session-lock *session*))
-      (pushnew tid (session-threads *session*)))
-    tid))
-
-;;; Really, you don't want to use these: they'll get into trouble with
-;;; garbage collection.  Use a lock or a waitqueue instead
-(defun suspend-thread (thread-id)
-  (sb!unix:unix-kill thread-id sb!unix:sigstop))
-(defun resume-thread (thread-id)
-  (sb!unix:unix-kill thread-id sb!unix:sigcont))
-;;; Note warning about cleanup forms
-(defun destroy-thread (thread-id)
-  "Destroy the thread identified by THREAD-ID abruptly, without running cleanup forms"
-  (sb!unix:unix-kill thread-id sb!unix:sigterm)
-  ;; may have been stopped for some reason, so now wake it up to
-  ;; deliver the TERM
-  (sb!unix:unix-kill thread-id sb!unix:sigcont))
-
-
-;;; a moderate degree of care is expected for use of interrupt-thread,
-;;; due to its nature: if you interrupt a thread that was holding
-;;; important locks then do something that turns out to need those
-;;; locks, you probably won't like the effect.  Used with thought
-;;; though, it's a good deal gentler than the last-resort functions above
-
-(defun interrupt-thread (thread function)
-  "Interrupt THREAD and make it run FUNCTION.  "
-  (sb!unix::syscall* ("interrupt_thread"
-		      sb!alien:unsigned-long  sb!alien:unsigned-long)
-		     thread
-		     thread (sb!kernel:get-lisp-obj-address
-			     (coerce function 'function))))
-(defun terminate-thread (thread-id)
-  "Terminate the thread identified by THREAD-ID, by causing it to run
-SB-EXT:QUIT - the usual cleanup forms will be evaluated"
-  (interrupt-thread thread-id 'sb!ext:quit))
-
-(declaim (inline current-thread-id))
-(defun current-thread-id ()
-  (logand 
-   (sb!sys:sap-int
-    (sb!vm::current-thread-offset-sap sb!vm::thread-pid-slot))
-   ;; KLUDGE pids are 16 bit really.  Avoid boxing the return value
-   (1- (ash 1 16))))
-
-;;;; iterate over the in-memory threads
-
-(defun mapcar-threads (function)
-  "Call FUNCTION once for each known thread, giving it the thread structure as argument"
-  (let ((function (coerce function 'function)))
-    (loop for thread = (alien-sap (extern-alien "all_threads" (* t)))
-	  then  (sb!sys:sap-ref-sap thread (* 4 sb!vm::thread-next-slot))
-	  until (sb!sys:sap= thread (sb!sys:int-sap 0))
-	  collect (funcall function thread))))
 
 ;;;; queues, locks 
 
@@ -157,6 +79,7 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 #!+sb-futex
 (sb!alien:define-alien-routine
     "futex_wake" int (word unsigned-long) (n unsigned-long))
+
 
 ;;; this should only be called while holding the queue spinlock.
 ;;; it releases the spinlock before sleeping
@@ -325,6 +248,86 @@ time we reacquire LOCK and return to the caller."
 	  (fdefinition 'condition-notify) #'condition-notify/futex)
     t))
 
+(defun make-thread (function)
+  (let* ((real-function (coerce function 'function))
+	 (tid
+	  (%create-thread
+	   (sb!kernel:get-lisp-obj-address
+	    (lambda ()
+	      ;; in time we'll move some of the binding presently done in C
+	      ;; here too
+	      (let ((sb!kernel::*restart-clusters* nil)
+		    (sb!impl::*descriptor-handlers* nil) ; serve-event
+		    (sb!impl::*available-buffers* nil)) ;for fd-stream
+		;; can't use handling-end-of-the-world, because that flushes
+		;; output streams, and we don't necessarily have any (or we
+		;; could be sharing them)
+		(sb!sys:enable-interrupt sb!unix:sigint :ignore)
+		(sb!unix:unix-exit
+		 (catch 'sb!impl::%end-of-the-world 
+		   (with-simple-restart 
+		       (destroy-thread
+			(format nil "~~@<Destroy this thread (~A)~~@:>"
+				(current-thread-id)))
+		     (funcall real-function))
+		   0))))))))
+    (with-mutex ((session-lock *session*))
+      (pushnew tid (session-threads *session*)))
+    tid))
+
+;;; Really, you don't want to use these: they'll get into trouble with
+;;; garbage collection.  Use a lock or a waitqueue instead
+(defun suspend-thread (thread-id)
+  (sb!unix:unix-kill thread-id sb!unix:sigstop))
+(defun resume-thread (thread-id)
+  (sb!unix:unix-kill thread-id sb!unix:sigcont))
+;;; Note warning about cleanup forms
+(defun destroy-thread (thread-id)
+  "Destroy the thread identified by THREAD-ID abruptly, without running cleanup forms"
+  (sb!unix:unix-kill thread-id sb!unix:sigterm)
+  ;; may have been stopped for some reason, so now wake it up to
+  ;; deliver the TERM
+  (sb!unix:unix-kill thread-id sb!unix:sigcont))
+
+     
+     
+
+;;; a moderate degree of care is expected for use of interrupt-thread,
+;;; due to its nature: if you interrupt a thread that was holding
+;;; important locks then do something that turns out to need those
+;;; locks, you probably won't like the effect.  Used with thought
+;;; though, it's a good deal gentler than the last-resort functions above
+
+(defun interrupt-thread (thread function)
+  "Interrupt THREAD and make it run FUNCTION.  "
+  (sb!unix::syscall* ("interrupt_thread"
+		      sb!alien:unsigned-long  sb!alien:unsigned-long)
+		     thread
+		     thread (sb!kernel:get-lisp-obj-address
+			     (coerce function 'function))))
+(defun terminate-thread (thread-id)
+  "Terminate the thread identified by THREAD-ID, by causing it to run
+SB-EXT:QUIT - the usual cleanup forms will be evaluated"
+  (interrupt-thread thread-id 'sb!ext:quit))
+
+(declaim (inline current-thread-id))
+(defun current-thread-id ()
+  (logand 
+   (sb!sys:sap-int
+    (sb!vm::current-thread-offset-sap sb!vm::thread-pid-slot))
+   ;; KLUDGE pids are 16 bit really.  Avoid boxing the return value
+   (1- (ash 1 16))))
+
+;;;; iterate over the in-memory threads
+
+(defun mapcar-threads (function)
+  "Call FUNCTION once for each known thread, giving it the thread structure as argument"
+  (let ((function (coerce function 'function)))
+    (loop for thread = (alien-sap (extern-alien "all_threads" (* t)))
+	  then  (sb!sys:sap-ref-sap thread (* 4 sb!vm::thread-next-slot))
+	  until (sb!sys:sap= thread (sb!sys:int-sap 0))
+	  collect (funcall function thread))))
+
 ;;;; job control, independent listeners
 
 (defstruct session 
@@ -341,15 +344,16 @@ time we reacquire LOCK and return to the caller."
 (defun init-job-control ()
   (setf *session* (new-session)))
 
+(defun %delete-thread-from-session (tid)
+  (with-mutex ((session-lock *session*))
+    (setf (session-threads *session*)
+	  (delete tid (session-threads *session*))
+	  (session-interactive-threads *session*)
+	  (delete tid (session-interactive-threads *session*)))))
+
 (defun call-with-new-session (fn)
-  (let ((tid (current-thread-id)))
-    (with-mutex ((session-lock *session*))
-      (setf (session-threads *session*)
-	    (delete tid (session-threads *session*))
-	    (session-interactive-threads *session*)
-	    (delete tid (session-interactive-threads *session*))))
-    (let ((*session* (new-session)))
-      (funcall fn))))
+  (%delete-thread-from-session (current-thread-id))
+  (let ((*session* (new-session)))  (funcall fn)))
 
 (defmacro with-new-session (args &body forms)
   (declare (ignore args))		;for extensibility
@@ -357,6 +361,11 @@ time we reacquire LOCK and return to the caller."
     `(labels ((,fb-name () ,@forms))
       (call-with-new-session (function ,fb-name)))))
 
+;;; this is called from a C signal handler: some signals may be masked
+(defun handle-thread-exit (tid)
+  "Remove thread id TID from the session, if it's there"
+  (%delete-thread-from-session tid))
+  
 (defun terminate-session ()
   "Kill all threads in session exept for this one.  Does nothing if current
 thread is not the foreground thread"
@@ -390,12 +399,13 @@ interactive."
 (defun get-foreground ()
   (loop
    (with-mutex ((session-lock *session*))
-     (let ((tid (current-thread-id)))
-       (when (eql (car (session-interactive-threads *session*)) tid)
+     (let ((tid (current-thread-id))
+	   (int-t (session-interactive-threads *session*)))
+       (when (eql (car int-t) tid)
 	 (sb!sys:enable-interrupt sb!unix:sigint #'sb!unix::sigint-handler)
 	 (return-from get-foreground t))
-       (unless (member tid *interactive-threads*)
-	 (setf (cdr (last (session-interactive-threads *session*)))
+       (unless (member tid int-t)
+	 (setf (cdr (last int-t))
 	       (list tid)))
        (condition-wait
 	(session-interactive-threads-queue *session*)
@@ -406,7 +416,7 @@ interactive."
   (with-mutex ((session-lock *session*))
     (let ((tid (current-thread-id)))
       (setf (session-interactive-threads *session*)
-	    (delete tid *interactive-threads*))
+	    (delete tid (session-interactive-threads *session*)))
       (sb!sys:enable-interrupt sb!unix:sigint :ignore)
       (when next 
 	(setf (session-interactive-threads *session*)

@@ -17,25 +17,19 @@
 
 ;;;; system calls that deal with signals
 
-#!-sb-fluid (declaim (inline real-unix-kill))
-(sb!alien:define-alien-routine ("kill" real-unix-kill) sb!alien:int
-  (pid sb!alien:int)
-  (signal sb!alien:int))
-
 ;;; Send the signal SIGNAL to the process with process id PID. SIGNAL
 ;;; should be a valid signal number
-(defun unix-kill (pid signal)
-  (real-unix-kill pid signal))
-
-#!-sb-fluid (declaim (inline real-unix-killpg))
-(sb!alien:define-alien-routine ("killpg" real-unix-killpg) sb!alien:int
-  (pgrp sb!alien:int)
+#!-sb-fluid (declaim (inline real-unix-kill))
+(sb!alien:define-alien-routine ("kill" unix-kill) sb!alien:int
+  (pid sb!alien:int)
   (signal sb!alien:int))
 
 ;;; Send the signal SIGNAL to the all the process in process group
 ;;; PGRP. SIGNAL should be a valid signal number
-(defun unix-killpg (pgrp signal)
-  (real-unix-killpg pgrp signal))
+#!-sb-fluid (declaim (inline real-unix-killpg))
+(sb!alien:define-alien-routine ("killpg" unix-killpg) sb!alien:int
+  (pgrp sb!alien:int)
+  (signal sb!alien:int))
 
 ;;; Reset the current set of masked signals (those being blocked from
 ;;; delivery).

@@ -4,9 +4,6 @@
 #include <signal.h>
 #include <stddef.h>
 #include <errno.h>
-#ifndef CLONE_PARENT		/* lameass glibc 2.2  doesn't define this */
-#define CLONE_PARENT 0x00008000	/* even though the manpage documents it */
-#endif
 #include "runtime.h"
 #include "sbcl.h"
 #include "validate.h"		/* for CONTROL_STACK_SIZE etc */
@@ -193,8 +190,7 @@ pid_t create_thread(lispobj initial_function) {
     kid_pid=
 	clone(new_thread_trampoline,
 	      (((void*)th->control_stack_start)+THREAD_CONTROL_STACK_SIZE-4),
-	      (((getpid()!=parent_pid)?(CLONE_PARENT):0)
-	       |CLONE_FILES|SIGALRM|CLONE_VM),th);
+	      CLONE_FILES|SIG_THREAD_EXIT|CLONE_VM,th);
     if(kid_pid<=0) 
 	goto cleanup;
 #else
