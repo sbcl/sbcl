@@ -498,9 +498,12 @@
 		(cut-to-width integer width)
 		',name))
 	    (setf (gethash ',name *modular-versions*) `(ash ,',width)))))
-  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+  ;; This should really be dependent on SB!VM:N-WORD-BITS, but since we
+  ;; don't have a true Alpha64 port yet, we'll have to stick to
+  ;; SB!VM:N-MACHINE-WORD-BITS for the time being.  --njf, 2004-08-14
+  #!+#.(cl:if (cl:= 32 sb!vm:n-machine-word-bits) '(and) '(or))
   (def sb!vm::ash-left-mod32 32)
-  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  #!+#.(cl:if (cl:= 64 sb!vm:n-machine-word-bits) '(and) '(or))
   (def sb!vm::ash-left-mod64 64))
 
 
