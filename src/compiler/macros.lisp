@@ -532,9 +532,9 @@
 
 ;;; Create a function which parses combination args according to WHAT
 ;;; and LAMBDA-LIST, where WHAT is either a function name or a list
-;;; (FUNCTION-NAME KIND) and does some KIND of optimization.
+;;; (FUN-NAME KIND) and does some KIND of optimization.
 ;;;
-;;; The FUNCTION-NAME must name a known function. LAMBDA-LIST is used
+;;; The FUN-NAME must name a known function. LAMBDA-LIST is used
 ;;; to parse the arguments to the combination as in DEFTRANSFORM. If
 ;;; the argument syntax is invalid or there are non-constant keys,
 ;;; then we simply return NIL.

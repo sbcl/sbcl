@@ -270,10 +270,10 @@
 ;;; rational arithmetic, or different float types, and fix it up. If
 ;;; we don't, he won't even get so much as an efficiency note.
 (deftransform float-contagion-arg1 ((x y) * * :defun-only t :node node)
-  `(,(continuation-function-name (basic-combination-fun node))
+  `(,(continuation-fun-name (basic-combination-fun node))
     (float x y) y))
 (deftransform float-contagion-arg2 ((x y) * * :defun-only t :node node)
-  `(,(continuation-function-name (basic-combination-fun node))
+  `(,(continuation-fun-name (basic-combination-fun node))
     x (float y x)))
 
 (dolist (x '(+ * / -))

@@ -36,7 +36,7 @@
 
 (defmethod describe-object ((x cons) s)
   (call-next-method)
-  (when (and (legal-function-name-p x)
+  (when (and (legal-fun-name-p x)
 	     (fboundp x))
     (%describe-function (fdefinition x) s :function x)
     ;;was: (format s "~@:_Its FDEFINITION is ~S.~@:_" (fdefinition x))
@@ -110,8 +110,8 @@
 ;;; up as a name. (In the case of anonymous closures and other
 ;;; things, it might not be.) TYPE-SPEC is the function type specifier
 ;;; extracted from the definition, or NIL if none.
-(declaim (ftype (function (t stream t)) %describe-function-name))
-(defun %describe-function-name (name s type-spec) 
+(declaim (ftype (function (t stream t)) %describe-fun-name))
+(defun %describe-fun-name (name s type-spec) 
   (when (and name (typep name '(or symbol cons)))
     (multiple-value-bind (type where)
 	(if (or (symbolp name) (and (listp name) (eq (car name) 'setf)))
@@ -127,7 +127,7 @@
 	(format s
 		"~@:_It is currently declared ~(~A~);~
 		 ~:[no~;~] expansion is available."
-		inlinep (info :function :inline-expansion name))))))
+		inlinep (info :function :inline-expansion-designator name))))))
 
 ;;; Print information from the debug-info about where CODE-OBJ was
 ;;; compiled from.
@@ -179,7 +179,7 @@
   (let ((name (or name (%simple-fun-name x))))
     (%describe-doc name s 'function kind)
     (unless (eq kind :macro)
-      (%describe-function-name name s (%simple-fun-type x))))
+      (%describe-fun-name name s (%simple-fun-type x))))
   (%describe-compiled-from (sb-kernel:fun-code-header x) s))
 
 ;;; Describe a function with the specified kind and name. The latter

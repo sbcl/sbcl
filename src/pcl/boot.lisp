@@ -109,7 +109,7 @@ bootstrapping.
   (let ((name (car fns))
 	(early-name (cadr fns)))
     (setf (gdefinition name)
-            (set-function-name
+            (set-fun-name
              (lambda (&rest args)
 	       (apply (fdefinition early-name) args))
              name))))
@@ -131,12 +131,12 @@ bootstrapping.
       (standard-generic-function t t)
       real-get-method))
     (ensure-generic-function-using-class
-     ((generic-function function-name
+     ((generic-function fun-name
 			&key generic-function-class environment
 			&allow-other-keys)
       (generic-function t)
       real-ensure-gf-using-class--generic-function)
-     ((generic-function function-name
+     ((generic-function fun-name
 			&key generic-function-class environment
 			&allow-other-keys)
       (null t)
@@ -156,7 +156,7 @@ bootstrapping.
       (generic-function standard-method-combination t)
       standard-compute-effective-method))))
 
-(defmacro defgeneric (function-name lambda-list &body options)
+(defmacro defgeneric (fun-name lambda-list &body options)
   (let ((initargs ())
 	(methods ()))
     (flet ((duplicate-option (name)
@@ -168,7 +168,7 @@ bootstrapping.
 		    (arglist (elt qab arglist-pos))
 		    (qualifiers (subseq qab 0 arglist-pos))
 		    (body (nthcdr (1+ arglist-pos) qab)))
-	       `(defmethod ,function-name ,@qualifiers ,arglist ,@body))))
+	       `(defmethod ,fun-name ,@qualifiers ,arglist ,@body))))
       (macrolet ((initarg (key) `(getf initargs ,key)))
 	(dolist (option options)
 	  (let ((car-option (car option)))
@@ -200,27 +200,26 @@ bootstrapping.
 		`',(initarg :declarations))))
       `(progn
 	 (eval-when (:compile-toplevel :load-toplevel :execute)
-	   (compile-or-load-defgeneric ',function-name))
-         (load-defgeneric ',function-name ',lambda-list ,@initargs)
+	   (compile-or-load-defgeneric ',fun-name))
+         (load-defgeneric ',fun-name ',lambda-list ,@initargs)
 	 ,@(mapcar #'expand-method-definition methods)
-	 `,(function ,function-name)))))
+	 `,(function ,fun-name)))))
 
-(defun compile-or-load-defgeneric (function-name)
-  (sb-kernel:proclaim-as-function-name function-name)
-  (sb-kernel:note-name-defined function-name :function)
-  (unless (eq (info :function :where-from function-name) :declared)
-    (setf (info :function :where-from function-name) :defined)
-    (setf (info :function :type function-name)
+(defun compile-or-load-defgeneric (fun-name)
+  (sb-kernel:proclaim-as-fun-name fun-name)
+  (sb-kernel:note-name-defined fun-name :function)
+  (unless (eq (info :function :where-from fun-name) :declared)
+    (setf (info :function :where-from fun-name) :defined)
+    (setf (info :function :type fun-name)
 	  (sb-kernel:specifier-type 'function))))
 
-(defun load-defgeneric (function-name lambda-list &rest initargs)
-  (when (fboundp function-name)
-    (sb-kernel::style-warn "redefining ~S in DEFGENERIC" function-name))
+(defun load-defgeneric (fun-name lambda-list &rest initargs)
+  (when (fboundp fun-name)
+    (sb-kernel::style-warn "redefining ~S in DEFGENERIC" fun-name))
   (apply #'ensure-generic-function
-	 function-name
+	 fun-name
 	 :lambda-list lambda-list
-	 :definition-source `((defgeneric ,function-name)
-			      ,*load-truename*)
+	 :definition-source `((defgeneric ,fun-name) ,*load-truename*)
 	 initargs))
 
 (defmacro defmethod (&rest args &environment env)
@@ -340,7 +339,7 @@ bootstrapping.
 				 initargs-form &optional pv-table-symbol)
   (let (fn
 	fn-lambda)
-    (if (and (interned-symbol-p (function-name-block-name name))
+    (if (and (interned-symbol-p (fun-name-block-name name))
 	     (every #'interned-symbol-p qualifiers)
 	     (every #'(lambda (s)
 			(if (consp s)
@@ -585,8 +584,7 @@ bootstrapping.
 		   (declare (ignorable ,@required-parameters))
 		   ,class-declarations
 		   ,@declarations
-		   (block ,(function-name-block-name
-			    generic-function-name)
+		   (block ,(fun-name-block-name generic-function-name)
 		     ,@real-body)))
 	       (constant-value-p (and (null (cdr real-body))
 				      (constantp (car real-body))))
@@ -1101,8 +1099,9 @@ bootstrapping.
 		   ((and (memq (car form)
                                '(slot-value set-slot-value slot-boundp))
 			 (constantp (caddr form)))
-                     (let ((parameter
-                            (can-optimize-access form required-parameters env)))
+                     (let ((parameter (can-optimize-access form
+							   required-parameters
+							   env)))
                       (let ((fun (ecase (car form)
                                    (slot-value #'optimize-slot-value)
                                    (set-slot-value #'optimize-set-slot-value)
@@ -1133,7 +1132,7 @@ bootstrapping.
 		next-method-p-p)))))
 
 (defun generic-function-name-p (name)
-  (and (legal-function-name-p name)
+  (and (legal-fun-name-p name)
        (gboundp name)
        (if (eq *boot-state* 'complete)
 	   (standard-generic-function-p (gdefinition name))
@@ -1254,7 +1253,7 @@ bootstrapping.
 	       (setf (method-function-get mff p) v))))
       (when method-spec
 	(when mf
-	  (setq mf (set-function-name mf method-spec)))
+	  (setq mf (set-fun-name mf method-spec)))
 	(when mff
 	  (let ((name `(,(or (get (car method-spec) 'fast-sym)
 			     (setf (get (car method-spec) 'fast-sym)
@@ -1270,7 +1269,7 @@ bootstrapping.
 						   (car method-spec))
 					   *pcl-package*)))
 			 ,@(cdr method-spec))))
-	    (set-function-name mff name)
+	    (set-fun-name mff name)
 	    (unless mf
 	      (set-mf-property :name name)))))
       (when plist
@@ -1366,31 +1365,31 @@ bootstrapping.
 
 (defun defgeneric-declaration (spec lambda-list)
   (when (consp spec)
-    (setq spec (get-setf-function-name (cadr spec))))
+    (setq spec (get-setf-fun-name (cadr spec))))
   `(ftype ,(ftype-declaration-from-lambda-list lambda-list spec) ,spec))
 
 ;;;; early generic function support
 
 (defvar *!early-generic-functions* ())
 
-(defun ensure-generic-function (function-name
+(defun ensure-generic-function (fun-name
 				&rest all-keys
 				&key environment
 				&allow-other-keys)
   (declare (ignore environment))
-  (let ((existing (and (gboundp function-name)
-		       (gdefinition function-name))))
+  (let ((existing (and (gboundp fun-name)
+		       (gdefinition fun-name))))
     (if (and existing
 	     (eq *boot-state* 'complete)
 	     (null (generic-function-p existing)))
-	(generic-clobbers-function function-name)
+	(generic-clobbers-function fun-name)
 	(apply #'ensure-generic-function-using-class
-	       existing function-name all-keys))))
+	       existing fun-name all-keys))))
 
-(defun generic-clobbers-function (function-name)
+(defun generic-clobbers-function (fun-name)
   (error 'simple-program-error
 	 :format-control "~S already names an ordinary function or a macro."
-	 :format-arguments (list function-name)))
+	 :format-arguments (list fun-name)))
 
 (defvar *sgf-wrapper*
   (boot-make-wrapper (early-class-size 'standard-generic-function)
@@ -1672,7 +1671,7 @@ bootstrapping.
 			 fin
 			 'source
 			 *load-truename*)
-    (set-function-name fin spec)
+    (set-fun-name fin spec)
     (let ((arg-info (make-arg-info)))
       (setf (early-gf-arg-info fin) arg-info)
       (when lambda-list-p
@@ -1760,7 +1759,7 @@ bootstrapping.
 
 (defun real-ensure-gf-using-class--generic-function
        (existing
-	function-name
+	fun-name
 	&rest all-keys
 	&key environment (lambda-list nil lambda-list-p)
 	     (generic-function-class 'standard-generic-function gf-class-p)
@@ -1772,11 +1771,11 @@ bootstrapping.
   (prog1
       (apply #'reinitialize-instance existing all-keys)
     (when lambda-list-p
-      (proclaim (defgeneric-declaration function-name lambda-list)))))
+      (proclaim (defgeneric-declaration fun-name lambda-list)))))
 
 (defun real-ensure-gf-using-class--null
        (existing
-	function-name
+	fun-name
 	&rest all-keys
 	&key environment (lambda-list nil lambda-list-p)
 	     (generic-function-class 'standard-generic-function)
@@ -1784,11 +1783,11 @@ bootstrapping.
   (declare (ignore existing))
   (real-ensure-gf-internal generic-function-class all-keys environment)
   (prog1
-      (setf (gdefinition function-name)
+      (setf (gdefinition fun-name)
 	    (apply #'make-instance generic-function-class
-		   :name function-name all-keys))
+		   :name fun-name all-keys))
     (when lambda-list-p
-      (proclaim (defgeneric-declaration function-name lambda-list)))))
+      (proclaim (defgeneric-declaration fun-name lambda-list)))))
 
 (defun get-generic-function-info (gf)
   ;; values   nreq applyp metatypes nkeys arg-info
@@ -2033,7 +2032,7 @@ bootstrapping.
 					 (fn (fdefinition fn-name))
 					 (initargs
 					  (list :function
-						(set-function-name
+						(set-fun-name
 						 #'(lambda (args next-methods)
 						     (declare (ignore
 							       next-methods))
@@ -2104,7 +2103,7 @@ bootstrapping.
 	      gf (method-generic-function method)
 	      temp (and gf (generic-function-name gf))
 	      name (if temp
-		       (intern-function-name
+		       (intern-fun-name
 			 (make-method-spec temp
 					   (method-qualifiers method)
 					   (unparse-specializers
@@ -2122,9 +2121,9 @@ bootstrapping.
 		 (and
 		   (setq method (get-method gf quals specls errorp))
 		   (setq name
-			 (intern-function-name (make-method-spec gf-spec
-								 quals
-								 specls))))))))
+			 (intern-fun-name (make-method-spec gf-spec
+							    quals
+							    specls))))))))
     (values gf method name)))
 
 (defun extract-parameters (specialized-lambda-list)

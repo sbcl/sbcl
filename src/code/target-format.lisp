@@ -1158,7 +1158,7 @@
 ;;;; format interpreter and support functions for user-defined method
 
 (def-format-interpreter #\/ (string start end colonp atsignp params)
-  (let ((symbol (extract-user-function-name string start end)))
+  (let ((symbol (extract-user-fun-name string start end)))
     (collect ((args))
       (dolist (param-and-offset params)
 	(let ((param (cdr param-and-offset)))

@@ -1731,7 +1731,7 @@
 
 ;;; routines to find things in the Lisp environment
 
-;;; an alist of (SYMBOL-SLOT-OFFSET . ACCESS-FUNCTION-NAME) for slots
+;;; an alist of (SYMBOL-SLOT-OFFSET . ACCESS-FUN-NAME) for slots
 ;;; in a symbol object that we know about
 (defparameter *grokked-symbol-slots*
   (sort `((,sb!vm:symbol-value-slot . symbol-value)

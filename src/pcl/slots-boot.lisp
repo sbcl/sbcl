@@ -129,7 +129,7 @@
 
 (defun make-optimized-std-reader-method-function (fsc-p slot-name index)
   (declare #.*optimize-speed*)
-  (set-function-name
+  (set-fun-name
    (etypecase index
      (fixnum (if fsc-p
 		 (lambda (instance)
@@ -153,7 +153,7 @@
 
 (defun make-optimized-std-writer-method-function (fsc-p slot-name index)
   (declare #.*optimize-speed*)
-  (set-function-name
+  (set-fun-name
    (etypecase index
      (fixnum (if fsc-p
 		 (lambda (nv instance)
@@ -169,7 +169,7 @@
 
 (defun make-optimized-std-boundp-method-function (fsc-p slot-name index)
   (declare #.*optimize-speed*)
-  (set-function-name
+  (set-fun-name
    (etypecase index
      (fixnum (if fsc-p
 		 #'(lambda (instance)
@@ -299,7 +299,7 @@
 (defun get-accessor-from-svuc-method-function (class slotd sdfun name)
   (macrolet ((emf-funcall (emf &rest args)
 	       `(invoke-effective-method-function ,emf nil ,@args)))
-    (set-function-name
+    (set-fun-name
      (case name
        (reader (lambda (instance)
 		 (emf-funcall sdfun class instance slotd)))

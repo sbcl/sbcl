@@ -33,7 +33,7 @@
 ;;; top-level lambda for the compilation. A REF for the real function
 ;;; is the only thing in the top-level lambda other than the bind and
 ;;; return, so it isn't too hard to find.
-(defun compile-fix-function-name (lambda name)
+(defun compile-fix-fun-name (lambda name)
   (declare (type clambda lambda) (type (or symbol cons) name))
   (when name
     (let ((fun (ref-leaf

@@ -177,7 +177,7 @@
                 ((stringp name)
                  (values nil t name))
                 (t
-                 (let ((exp (info :function :inline-expansion name)))
+                 (let ((exp (fun-name-inline-expansion name)))
                    (if exp
                        (values exp nil name)
                        (values nil t name))))))

@@ -126,7 +126,7 @@
      (add-complement-constraints if 'typep (ok-ref-lambda-var use)
 				 (specifier-type 'null) t))
     (combination
-     (let ((name (continuation-function-name
+     (let ((name (continuation-fun-name
 		  (basic-combination-fun use)))
 	   (args (basic-combination-args use)))
        (case name

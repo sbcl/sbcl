@@ -555,7 +555,7 @@
 ;;;; various operations on names
 
 ;;; Is NAME a legal function name?
-(defun legal-function-name-p (name)
+(defun legal-fun-name-p (name)
   (or (symbolp name)
       (and (consp name)
            (eq (car name) 'setf)
@@ -565,16 +565,16 @@
 
 ;;; Given a function name, return the name for the BLOCK which
 ;;; encloses its body (e.g. in DEFUN, DEFINE-COMPILER-MACRO, or FLET).
-(declaim (ftype (function ((or symbol cons)) symbol) function-name-block-name))
-(defun function-name-block-name (function-name)
-  (cond ((symbolp function-name)
-	 function-name)
-	((and (consp function-name)
-	      (= (length function-name) 2)
-	      (eq (first function-name) 'setf))
-	 (second function-name))
+(declaim (ftype (function ((or symbol cons)) symbol) fun-name-block-name))
+(defun fun-name-block-name (fun-name)
+  (cond ((symbolp fun-name)
+	 fun-name)
+	((and (consp fun-name)
+	      (= (length fun-name) 2)
+	      (eq (first fun-name) 'setf))
+	 (second fun-name))
 	(t
-	 (error "not legal as a function name: ~S" function-name))))
+	 (error "not legal as a function name: ~S" fun-name))))
 
 (defun looks-like-name-of-special-var-p (x)
   (and (symbolp x)
@@ -583,26 +583,37 @@
 	      (char= #\* (aref name 0))
 	      (char= #\* (aref name (1- (length name))))))))
 
-;;; ANSI guarantees that some symbols are self-evaluating. This
-;;; function is to be called just before a change which would affect
-;;; that. (We don't absolutely have to call this function before such
-;;; changes, since such changes are given as undefined behavior. In
-;;; particular, we don't if the runtime cost would be annoying. But
-;;; otherwise it's nice to do so.)
-(defun about-to-modify (symbol)
+;;; Some symbols are defined by ANSI to be self-evaluating. Return
+;;; non-NIL for such symbols (and make the non-NIL value a traditional
+;;; message, for use in contexts where the user asks us to change such
+;;; a symbol).
+(defun symbol-self-evaluating-p (symbol)
   (declare (type symbol symbol))
   (cond ((eq symbol t)
-	 (error "Veritas aeterna. (can't change T)"))
+	 "Veritas aeterna. (can't change T)")
 	((eq symbol nil)
-	 (error "Nihil ex nihil. (can't change NIL)"))
+	 "Nihil ex nihil. (can't change NIL)")
 	((keywordp symbol)
-	 (error "Keyword values can't be changed."))
-	;; (Just because a value is CONSTANTP is not a good enough
-	;; reason to complain here, because we want DEFCONSTANT to
-	;; be able to use this function, and it's legal to DEFCONSTANT
-	;; a constant as long as the new value is EQL to the old
-	;; value.)
-	))
+	 "Keyword values can't be changed.")
+	(t
+	 nil)))
+
+;;; This function is to be called just before a change which would
+;;; affect that. (We don't absolutely have to call this function
+;;; before such changes, since such changes are given as undefined
+;;; behavior. In particular, we don't if the runtime cost would be
+;;; annoying. But otherwise it's nice to do so.)
+(defun about-to-modify (symbol)
+  (declare (type symbol symbol))
+  (let ((reason (symbol-self-evaluating-p symbol)))
+    (when reason
+      (error reason)))
+  ;; (Note: Just because a value is CONSTANTP is not a good enough
+  ;; reason to complain here, because we want DEFCONSTANT to be able
+  ;; to use this function, and it's legal to DEFCONSTANT a constant as
+  ;; long as the new value is EQL to the old value.)
+  (values))
+
 
 ;;; If COLD-FSET occurs not at top level, just treat it as an ordinary
 ;;; assignment. That way things like

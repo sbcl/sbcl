@@ -727,7 +727,7 @@
   `(instance-write-internal .pv. ,(slot-vector-symbol position)
     ,pv-offset ,new-value
     (,(if (consp gf-name)
-	  (get-setf-function-name gf-name)
+	  (get-setf-fun-name gf-name)
 	  gf-name)
      (instance-accessor-parameter ,parameter)
      ,new-value)
@@ -1088,7 +1088,7 @@
 				    (intern (subseq str 5) *pcl-package*)
 				    (car fname)))))
 		    ,@(cdr fname))))
-      (set-function-name method-function name))
+      (set-fun-name method-function name))
     (setf (method-function-get method-function :fast-function) fmf)
     method-function))
 

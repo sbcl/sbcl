@@ -43,7 +43,7 @@
 ;;; COERCE-TO-CONDITION is used in SIGNAL, ERROR, CERROR, WARN, and
 ;;; INVOKE-DEBUGGER for parsing the hairy argument conventions into a
 ;;; single argument that's directly usable by all the other routines.
-(defun coerce-to-condition (datum arguments default-type function-name)
+(defun coerce-to-condition (datum arguments default-type fun-name)
   (cond ((typep datum 'condition)
 	 (if arguments
 	     (cerror "Ignore the additional arguments."
@@ -52,7 +52,7 @@
 		     :expected-type 'null
 		     :format-control "You may not supply additional arguments ~
 				     when giving ~S to ~S."
-		     :format-arguments (list datum function-name)))
+		     :format-arguments (list datum fun-name)))
 	 datum)
 	((symbolp datum) ; roughly, (SUBTYPEP DATUM 'CONDITION)
 	 (apply #'make-condition datum arguments))
@@ -65,7 +65,7 @@
 		:datum datum
 		:expected-type '(or symbol string)
 		:format-control "bad argument to ~S: ~S"
-		:format-arguments (list function-name datum)))))
+		:format-arguments (list fun-name datum)))))
 
 ;;; a shared idiom in ERROR, CERROR, and BREAK: The user probably
 ;;; doesn't want to hear that the error "occurred in" one of these

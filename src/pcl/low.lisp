@@ -145,23 +145,23 @@
 ;;; NEW-NAME. Note that NEW-NAME is sometimes a list. Some lisps
 ;;; get the upset in the tummy when they start thinking about
 ;;; functions which have lists as names. To deal with that there is
-;;; SET-FUNCTION-NAME-INTERN which takes a list spec for a function
+;;; SET-FUN-NAME-INTERN which takes a list spec for a function
 ;;; name and turns it into a symbol if need be.
 ;;;
-;;; When given a funcallable instance, SET-FUNCTION-NAME *must*
+;;; When given a funcallable instance, SET-FUN-NAME *must*
 ;;; side-effect that FIN to give it the name. When given any other
-;;; kind of function SET-FUNCTION-NAME is allowed to return a new
+;;; kind of function SET-FUN-NAME is allowed to return a new
 ;;; function which is "the same" except that it has the name.
 ;;;
-;;; In all cases, SET-FUNCTION-NAME must return the new (or same)
+;;; In all cases, SET-FUN-NAME must return the new (or same)
 ;;; function. (Unlike other functions to set stuff, it does not return
 ;;; the new value.)
-(defun set-function-name (fcn new-name)
+(defun set-fun-name (fcn new-name)
   #+sb-doc
   "Set the name of a compiled function object. Return the function."
   (declare (special *boot-state* *the-class-standard-generic-function*))
   (cond ((symbolp fcn)
-	 (set-function-name (symbol-function fcn) new-name))
+	 (set-fun-name (symbol-function fcn) new-name))
 	((funcallable-instance-p fcn)
 	 (if (if (eq *boot-state* 'complete)
 		 (typep fcn 'generic-function)
@@ -195,7 +195,7 @@
 	 ;; XXX Maybe add better scheme here someday.
 	 fcn)))
 
-(defun intern-function-name (name)
+(defun intern-fun-name (name)
   (cond ((symbolp name) name)
 	((listp name)
 	 (intern (let ((*package* *pcl-package*)

@@ -144,7 +144,7 @@
 ;;;; DEFUN
 
 ;;; Should we save the inline expansion of the function named NAME?
-(defun inline-function-name-p (name)
+(defun inline-fun-name-p (name)
   (or
    ;; the normal reason for saving the inline expansion
    (info :function :inlinep name)
@@ -157,26 +157,27 @@
    ;;   (DEFUN FOO ..)
    ;; without a preceding
    ;;   (DECLAIM (INLINE FOO))
-   ;; what should we do with the old inline expansion? Overwriting it
-   ;; with the new definition seems like the only unsurprising choice.
-   (info :function :inline-expansion name)))
+   ;; what should we do with the old inline expansion when we see the
+   ;; new DEFUN? Overwriting it with the new definition seems like
+   ;; the only unsurprising choice.
+   (info :function :inline-expansion-designator name)))
 
 ;;; Now that we have the definition of MULTIPLE-VALUE-BIND, we can
 ;;; make a reasonably readable definition of DEFUN.
 (defmacro-mundanely defun (&environment env name args &body body)
   "Define a function at top level."
   #+sb-xc-host
-  (unless (symbol-package (function-name-block-name name))
+  (unless (symbol-package (fun-name-block-name name))
     (warn "DEFUN of uninterned symbol ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body)
     (let* ((lambda `(lambda ,args
 		      ,@decls
-		      (block ,(function-name-block-name name)
+		      (block ,(fun-name-block-name name)
 			,@forms)))
 	   (want-to-inline )
 	   (inline-lambda
 	    (cond (;; Does the user not even want to inline?
-		   (not (inline-function-name-p name))
+		   (not (inline-fun-name-p name))
 		   nil)
 		  (;; Does inlining look too hairy to handle?
 		   (not (sb!c:lambda-independent-of-lexenv-p lambda env))
@@ -221,8 +222,8 @@
   (declare (type function def))
   (declare (type (or null simple-string doc)))
   (/show0 "entering %DEFUN, name (or block name) = ..")
-  (/primitive-print (symbol-name (function-name-block-name name)))
-  (aver (legal-function-name-p name))
+  (/primitive-print (symbol-name (fun-name-block-name name)))
+  (aver (legal-fun-name-p name))
   (when (fboundp name)
     (/show0 "redefining NAME")
     (style-warn "redefining ~S in DEFUN" name))

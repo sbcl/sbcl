@@ -274,7 +274,7 @@
   `(apply (the function ,form) ,@args))
 
 
-(defun get-setf-function-name (name)
+(defun get-setf-fun-name (name)
   `(setf ,name))
 
 (defsetf slot-value set-slot-value)

@@ -207,7 +207,7 @@
 ;;; should always be used to set them both at the same time.
 (defun set-constructor-code (constructor code type)
   (set-funcallable-instance-fun constructor code)
-  (set-function-name constructor (constructor-name constructor))
+  (set-fun-name constructor (constructor-name constructor))
   (setf (constructor-code-type constructor) type))
 
 (defmethod describe-object ((constructor constructor) stream)

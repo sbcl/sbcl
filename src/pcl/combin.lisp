@@ -289,7 +289,7 @@
 				      (t constant))
 				    constant))
 			    constants))
-		   (function (set-function-name
+		   (function (set-fun-name
 			      (apply cfunction constants)
 			      `(combined-method ,name))))
 	      (make-fast-method-call :function function

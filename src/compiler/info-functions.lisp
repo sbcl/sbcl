@@ -21,7 +21,7 @@
 ;;; OK, and signalling an error if not. In addition to checking for
 ;;; basic well-formedness, we also check that symbol names are not NIL
 ;;; or the name of a special form.
-(defun check-function-name (name)
+(defun check-fun-name (name)
   (typecase name
     (list
      (unless (and (consp name) (consp (cdr name))
@@ -36,9 +36,9 @@
   name)
 
 ;;; Record a new function definition, and check its legality.
-(declaim (ftype (function ((or symbol cons)) t) proclaim-as-function-name))
-(defun proclaim-as-function-name (name)
-  (check-function-name name)
+(declaim (ftype (function ((or symbol cons)) t) proclaim-as-fun-name))
+(defun proclaim-as-fun-name (name)
+  (check-fun-name name)
   (when (fboundp name)
     (ecase (info :function :kind name)
       (:function
@@ -79,7 +79,7 @@
 
 ;;; Make NAME no longer be a function name: clear everything back to
 ;;; the default.
-(defun undefine-function-name (name)
+(defun undefine-fun-name (name)
   (when name
     (macrolet ((frob (type &optional val)
 		 `(unless (eq (info :function ,type name) ,val)
@@ -90,15 +90,15 @@
       (frob :inlinep)
       (frob :kind)
       (frob :accessor-for)
-      (frob :inline-expansion)
+      (frob :inline-expansion-designator)
       (frob :source-transform)
       (frob :assumed-type)))
   (values))
 
 ;;; part of what happens with DEFUN, also with some PCL stuff: Make
 ;;; NAME known to be a function definition.
-(defun become-defined-function-name (name)
-  (proclaim-as-function-name name)
+(defun become-defined-fun-name (name)
+  (proclaim-as-fun-name name)
   (when (eq (info :function :where-from name) :assumed)
     (setf (info :function :where-from name) :defined)
     (if (info :function :assumed-type name)
@@ -225,13 +225,13 @@
       (function
        (cond ((functionp x)
 	      (function-doc x))
-	     ((legal-function-name-p x)
+	     ((legal-fun-name-p x)
 	      ;; FIXME: Is it really right to make
 	      ;; (DOCUMENTATION '(SETF FOO) 'FUNCTION) equivalent to
 	      ;; (DOCUMENTATION 'FOO 'FUNCTION)? That's what CMU CL
 	      ;; did, so we do it, but I'm not sure it's what ANSI wants.
 	      (values (info :function :documentation
-			    (function-name-block-name x))))))
+			    (fun-name-block-name x))))))
       (structure
        (typecase x
 	 (symbol (when (eq (info :type :kind x) :instance)

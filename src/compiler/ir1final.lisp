@@ -60,7 +60,7 @@
 	 (name (leaf-name leaf))
 	 (defined-ftype (definition-type leaf)))
     (setf (leaf-type leaf) defined-ftype)
-    (when (legal-function-name-p name)
+    (when (legal-fun-name-p name)
       (let* ((where (info :function :where-from name))
 	     (*compiler-error-context* (lambda-bind (main-entry leaf)))
 	     (global-def (gethash name *free-functions*))

@@ -472,7 +472,7 @@
 				      &key &allow-other-keys))
 
 (defgeneric ensure-generic-function-using-class (generic-function
-						 function-name
+						 fun-name
 						 &key &allow-other-keys))
 
 (defgeneric initialize-instance (gf &key &allow-other-keys))

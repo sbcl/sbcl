@@ -349,7 +349,7 @@
   (elsewhere-p nil :type boolean))
 (def!method print-object ((obj debug-block) str)
   (print-unreadable-object (obj str :type t)
-    (prin1 (debug-block-function-name obj) str)))
+    (prin1 (debug-block-fun-name obj) str)))
 
 #!+sb-doc
 (setf (fdocumentation 'debug-block-successors 'function)
@@ -1889,7 +1889,7 @@
 
 ;;; Return the name of the function represented by DEBUG-FUN.
 ;;; This may be a string or a cons; do not assume it is a symbol.
-(defun debug-block-function-name (debug-block)
+(defun debug-block-fun-name (debug-block)
   (etypecase debug-block
     (compiled-debug-block
      (let ((code-locs (compiled-debug-block-code-locations debug-block)))

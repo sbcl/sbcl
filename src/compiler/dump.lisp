@@ -1166,7 +1166,7 @@
 #+sb-xc-host
 (defun fasl-dump-cold-fset (fun-name fun-dump-handle fasl-output)
   (declare (type fixnum fun-dump-handle))
-  (aver (legal-function-name-p fun-name))
+  (aver (legal-fun-name-p fun-name))
   (dump-non-immediate-object fun-name fasl-output)
   (dump-push fun-dump-handle fasl-output)
   (dump-fop 'fop-fset fasl-output)

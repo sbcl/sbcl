@@ -82,7 +82,7 @@
 				 funcallable-structure))
 
   ;; The next three slots are for :TYPE'd structures (which aren't
-  ;; classes, CLASS-STRUCTURE-P = NIL)
+  ;; classes, DD-CLASS-P = NIL)
   ;;
   ;; vector element type
   (element-type t)
@@ -104,7 +104,7 @@
   (raw-index nil :type (or index null))
   (raw-length 0 :type index)
   ;; the value of the :PURE option, or :UNSPECIFIED. This is only
-  ;; meaningful if CLASS-STRUCTURE-P = T.
+  ;; meaningful if DD-CLASS-P = T.
   (pure :unspecified :type (member t nil :substructure :unspecified)))
 (def!method print-object ((x defstruct-description) stream)
   (print-unreadable-object (x stream :type t)
@@ -147,7 +147,7 @@
     (prin1 (dsd-name x) stream)))
 
 ;;; Is DEFSTRUCT a structure with a class?
-(defun class-structure-p (defstruct)
+(defun dd-class-p (defstruct)
   (member (dd-type defstruct) '(structure funcallable-structure)))
 
 ;;; Return the name of a defstruct slot as a symbol. We store it as a
@@ -193,8 +193,8 @@
 	    (flet (;; Given an arg from a :PRINT-OBJECT or :PRINT-FUNCTION
 		   ;; option, return the value to pass as an arg to FUNCTION.
 		   (farg (oarg)
-		     (destructuring-bind (function-name) oarg
-		       function-name)))
+		     (destructuring-bind (fun-name) oarg
+		       fun-name)))
 	      (cond ((not (eql pf 0))
 		     `((def!method print-object ((,x ,name) ,s)
 			 (funcall #',(farg pf) ,x ,s *current-level*))))
@@ -232,7 +232,7 @@
 		 name-and-options
 		 slot-descriptions))
 	    (name (dd-name dd)))
-       (if (class-structure-p dd)
+       (if (dd-class-p dd)
 	   (let ((inherits (inherits-for-structure dd)))
 	     `(progn
 		(eval-when (:compile-toplevel :load-toplevel :execute)
@@ -437,7 +437,7 @@
 (defun require-no-print-options-so-far (defstruct)
   (unless (and (eql (dd-print-function defstruct) 0)
 	       (eql (dd-print-object defstruct) 0))
-    (error "no more than one of the following options may be specified:
+    (error "No more than one of the following options may be specified:
   :PRINT-FUNCTION, :PRINT-OBJECT, :TYPE")))
 
 ;;; Parse a single DEFSTRUCT option and store the results in DD.
@@ -700,17 +700,17 @@
   (destructuring-bind (included-name &rest modified-slots) (dd-include dd)
     (let* ((type (dd-type dd))
 	   (included-structure
-	    (if (class-structure-p dd)
+	    (if (dd-class-p dd)
 		(layout-info (compiler-layout-or-lose included-name))
 		(typed-structure-info-or-lose included-name))))
       (unless (and (eq type (dd-type included-structure))
 		   (type= (specifier-type (dd-element-type included-structure))
 			  (specifier-type (dd-element-type dd))))
-	(error ":TYPE option mismatch between structures ~S and ~S."
+	(error ":TYPE option mismatch between structures ~S and ~S"
 	       (dd-name dd) included-name))
 
       (incf (dd-length dd) (dd-length included-structure))
-      (when (class-structure-p dd)
+      (when (dd-class-p dd)
 	(let ((mc (rest (dd-alternate-metaclass included-structure))))
 	  (when (and mc (not (dd-alternate-metaclass dd)))
 	    (setf (dd-alternate-metaclass dd)
@@ -875,10 +875,10 @@
 	 (let* ((fun (dsd-accessor-name slot))
 		(setf-fun `(setf ,fun)))
 	   (when (and fun (eq (dsd-raw-type slot) t))
-	     (proclaim-as-defstruct-function-name fun)
+	     (proclaim-as-defstruct-fun-name fun)
 	     (setf (info :function :accessor-for fun) class)
 	     (unless (dsd-read-only slot)
-	       (proclaim-as-defstruct-function-name setf-fun)
+	       (proclaim-as-defstruct-fun-name setf-fun)
 	       (setf (info :function :accessor-for setf-fun) class)))))
 
        ;; FIXME: Couldn't this logic be merged into
@@ -1040,13 +1040,13 @@
     (when (defstruct-description-p info)
       (let ((type (dd-name info)))
 	(setf (info :type :compiler-layout type) nil)
-	(undefine-function-name (dd-copier info))
-	(undefine-function-name (dd-predicate-name info))
+	(undefine-fun-name (dd-copier info))
+	(undefine-fun-name (dd-predicate-name info))
 	(dolist (slot (dd-slots info))
 	  (let ((fun (dsd-accessor-name slot)))
-	    (undefine-function-name fun)
+	    (undefine-fun-name fun)
 	    (unless (dsd-read-only slot)
-	      (undefine-function-name `(setf ,fun))))))
+	      (undefine-fun-name `(setf ,fun))))))
       ;; Clear out the SPECIFIER-TYPE cache so that subsequent
       ;; references are unknown types.
       (values-specifier-type-cache-clear)))
@@ -1345,15 +1345,15 @@
 
 ;;;; compiler stuff
 
-;;; This is like PROCLAIM-AS-FUNCTION-NAME, but we also set the kind to
+;;; This is like PROCLAIM-AS-FUN-NAME, but we also set the kind to
 ;;; :DECLARED and blow away any ASSUMED-TYPE. Also, if the thing is a
 ;;; slot accessor currently, quietly unaccessorize it. And if there
 ;;; are any undefined warnings, we nuke them.
-(defun proclaim-as-defstruct-function-name (name)
+(defun proclaim-as-defstruct-fun-name (name)
   (when name
     (when (info :function :accessor-for name)
       (setf (info :function :accessor-for name) nil))
-    (proclaim-as-function-name name)
+    (proclaim-as-fun-name name)
     (note-name-defined name :function)
     (setf (info :function :where-from name) :declared)
     (when (info :function :assumed-type name)

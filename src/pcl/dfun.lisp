@@ -1506,7 +1506,7 @@ And so, we are saved.
 		    (or dfun (make-initial-dfun generic-function))
 		    (compute-discriminating-function generic-function))))
       (set-funcallable-instance-fun generic-function dfun)
-      (set-function-name generic-function gf-name)
+      (set-fun-name generic-function gf-name)
       (when (and ocache (not (eq ocache cache))) (free-cache ocache))
       dfun)))
 

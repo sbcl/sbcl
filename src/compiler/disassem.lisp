@@ -1044,10 +1044,10 @@
 				    "-PRINTER"))
 	 (make-printer-defun printer-source funstate name)))))
 
-(defun make-printer-defun (source funstate function-name)
+(defun make-printer-defun (source funstate fun-name)
   (let ((printer-form (compile-printer-list source funstate))
         (bindings (make-arg-temp-bindings funstate)))
-    `(defun ,function-name (chunk inst stream dstate)
+    `(defun ,fun-name (chunk inst stream dstate)
        (declare (type dchunk chunk)
                 (type instruction inst)
                 (type stream stream)

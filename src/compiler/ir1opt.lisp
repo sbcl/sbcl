@@ -705,7 +705,7 @@
 	     #!+sb-show 
 	     (when *show-transforms-p*
 	       (let* ((cont (basic-combination-fun node))
-		      (fname (continuation-function-name cont t)))
+		      (fname (continuation-fun-name cont t)))
 		 (/show "trying transform" x (transform-function x) "for" fname)))
 	     (unless (ir1-transform node x)
 	       #!+sb-show
@@ -1372,7 +1372,7 @@
 	     (when (eq (basic-combination-kind node) :local)
 	       (maybe-let-convert (ref-leaf use))))))
        (unless (or (eq (basic-combination-kind node) :local)
-		   (eq (continuation-function-name fun) '%throw))
+		   (eq (continuation-fun-name fun) '%throw))
 	 (ir1-optimize-mv-call node))
        (dolist (arg args)
 	 (setf (continuation-reoptimize arg) nil))))
@@ -1499,7 +1499,7 @@
   (let* ((arg (first (basic-combination-args call)))
 	 (use (continuation-use arg)))
     (when (and (combination-p use)
-	       (eq (continuation-function-name (combination-fun use))
+	       (eq (continuation-fun-name (combination-fun use))
 		   'values))
       (let* ((fun (combination-lambda call))
 	     (vars (lambda-vars fun))
@@ -1549,7 +1549,7 @@
 (defoptimizer (values-list optimizer) ((list) node)
   (let ((use (continuation-use list)))
     (when (and (combination-p use)
-	       (eq (continuation-function-name (combination-fun use))
+	       (eq (continuation-fun-name (combination-fun use))
 		   'list))
       (change-ref-leaf (continuation-use (combination-fun node))
 		       (find-free-function 'values "in a strange place"))

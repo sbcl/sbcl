@@ -2484,7 +2484,7 @@
 (deftransform commutative-arg-swap ((x y) * * :defun-only t :node node)
   (if (and (constant-continuation-p x)
 	   (not (constant-continuation-p y)))
-      `(,(continuation-function-name (basic-combination-fun node))
+      `(,(continuation-fun-name (basic-combination-fun node))
 	y
 	,(continuation-value x))
       (give-up-ir1-transform)))

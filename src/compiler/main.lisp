@@ -886,7 +886,7 @@
 		  ;; real source path (as in e.g. inside CL:COMPILE).
 		  '(original-source-start 0 0)))
   (/show "entering %COMPILE" name)
-  (unless (or (null name) (legal-function-name-p name))
+  (unless (or (null name) (legal-fun-name-p name))
     (error "not a legal function name: ~S" name))
   (let* ((*lexenv* (make-lexenv :policy *policy*))
          (fun (make-functional-from-top-level-lambda lambda-expression
@@ -938,7 +938,7 @@
   (/show "entering PROCESS-TOP-LEVEL-COLD-FSET" name)
   (unless (producing-fasl-file)
     (error "can't COLD-FSET except in a fasl file"))
-  (unless (legal-function-name-p name)
+  (unless (legal-fun-name-p name)
     (error "not a legal function name: ~S" name))
   (fasl-dump-cold-fset name
                        (%compile lambda-expression

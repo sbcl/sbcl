@@ -47,7 +47,7 @@
 ;;; We associate a PROFILE-INFO structure with each profiled function
 ;;; name. This holds the functions that we call to manipulate the
 ;;; closure which implements the encapsulation.
-(defvar *profiled-function-name->info* (make-hash-table))
+(defvar *profiled-fun-name->info* (make-hash-table))
 (defstruct (profile-info (:copier nil))
   (name              (required-argument) :read-only t)
   (encapsulated-fun  (required-argument) :type function :read-only t)
@@ -224,7 +224,7 @@
       (list
        ;; We call this just for the side effect of checking that
        ;; NAME is a legal function name:
-       (function-name-block-name name)
+       (fun-name-block-name name)
        ;; Then we map onto it.
        (funcall function name))
       (string (let ((package (find-undeleted-package-or-lose name)))
@@ -245,7 +245,7 @@
 	(profile-encapsulation-lambdas encapsulated-fun)
       (setf (fdefinition name)
 	    encapsulation-fun)
-      (setf (gethash name *profiled-function-name->info*)
+      (setf (gethash name *profiled-fun-name->info*)
 	    (make-profile-info :name name
 			       :encapsulated-fun encapsulated-fun
 			       :encapsulation-fun encapsulation-fun
@@ -256,7 +256,7 @@
 ;;; Profile the named function. If already profiled, unprofile first.
 (defun profile-1-function (name)
   (cond ((fboundp name)
-	 (when (gethash name *profiled-function-name->info*)
+	 (when (gethash name *profiled-fun-name->info*)
 	   (warn "~S is already profiled, so unprofiling it first." name)
 	   (unprofile-1-function name))
 	 (profile-1-unprofiled-function name))
@@ -266,9 +266,9 @@
 
 ;;; Unprofile the named function, if it is profiled.
 (defun unprofile-1-function (name)
-  (let ((pinfo (gethash name *profiled-function-name->info*)))
+  (let ((pinfo (gethash name *profiled-fun-name->info*)))
     (cond (pinfo
-	   (remhash name *profiled-function-name->info*)
+	   (remhash name *profiled-fun-name->info*)
 	   (if (eq (fdefinition name) (profile-info-encapsulation-fun pinfo))
 	       (setf (fdefinition name) (profile-info-encapsulated-fun pinfo))
 	       (warn "preserving current definition of redefined function ~S"
@@ -291,7 +291,7 @@
    undefined, then we give a warning and ignore it. See also
    UNPROFILE, REPORT and RESET."
   (if (null names)
-      `(loop for k being each hash-key in *profiled-function-name->info*
+      `(loop for k being each hash-key in *profiled-fun-name->info*
 	     collecting k)
       `(mapc-on-named-functions #'profile-1-function ',names)))
 
@@ -307,13 +307,13 @@
       `(unprofile-all)))
 
 (defun unprofile-all ()
-  (dohash (name profile-info *profiled-function-name->info*)
+  (dohash (name profile-info *profiled-fun-name->info*)
     (declare (ignore profile-info))
     (unprofile-1-function name)))
 
 (defun reset ()
   "Reset the counters for all profiled functions."
-  (dohash (name profile-info *profiled-function-name->info*)
+  (dohash (name profile-info *profiled-fun-name->info*)
     (declare (ignore name))
     (funcall (profile-info-clear-stats-fun profile-info))))
 
@@ -356,7 +356,7 @@ Lisp process."
 	  (compute-overhead)))
   (let ((time-info-list ())
 	(no-call-name-list ()))
-    (dohash (name pinfo *profiled-function-name->info*)
+    (dohash (name pinfo *profiled-fun-name->info*)
       (unless (eq (fdefinition name)
 		  (profile-info-encapsulation-fun pinfo))
 	(warn "Function ~S has been redefined, so times may be inaccurate.~@
@@ -416,7 +416,7 @@ Lisp process."
 	      "~%These functions were not called:~%~{~<~%~:; ~S~>~}~%"
 	      (sort no-call-name-list #'string<
 		    :key (lambda (name)
-			   (symbol-name (function-name-block-name name))))))
+			   (symbol-name (fun-name-block-name name))))))
 
     (values)))
 
@@ -459,7 +459,7 @@ Lisp process."
 	    (setf total-overhead
 		  (- (frob) call-overhead)))
 	(let* ((pinfo (gethash 'compute-overhead-aux
-			       *profiled-function-name->info*))
+			       *profiled-fun-name->info*))
 	       (read-stats-fun (profile-info-read-stats-fun pinfo))
 	       (time (nth-value 1 (funcall read-stats-fun))))
 	  (setf internal-overhead

@@ -554,12 +554,12 @@
       (when (or (atom def) (< (length def) 2))
 	(compiler-error "The ~S definition spec ~S is malformed." context def))
 
-      (let ((name (check-function-name (first def))))
+      (let ((name (check-fun-name (first def))))
 	(names name)
 	(multiple-value-bind (forms decls) (sb!sys:parse-body (cddr def))
 	  (defs `(lambda ,(second def)
 		   ,@decls
-		   (block ,(function-name-block-name name)
+		   (block ,(fun-name-block-name name)
 		     . ,forms))))))
     (values (names) (defs))))
 
@@ -1002,7 +1002,7 @@
       ((nil))
       (:function
        (remhash name *free-functions*)
-       (undefine-function-name name)
+       (undefine-fun-name name)
        (compiler-warning
 	"~S is being redefined as a macro when it was ~
          previously ~(~A~) to be a function."

@@ -117,9 +117,9 @@
 			 name
 			 context))
 	((:function nil)
-	 (check-function-name name)
+	 (check-fun-name name)
 	 (note-if-setf-function-and-macro name)
-	 (let ((expansion (info :function :inline-expansion name))
+	 (let ((expansion (fun-name-inline-expansion name))
 	       (inlinep (info :function :inlinep name)))
 	   (setf (gethash name *free-functions*)
 		 (if (or expansion inlinep)
@@ -172,21 +172,21 @@
 	    (where-from (info :variable :where-from name)))
 	(when (and (eq where-from :assumed) (eq kind :global))
 	  (note-undefined-reference name :variable))
-
 	(setf (gethash name *free-variables*)
-	      (if (eq kind :alien)
-		  (info :variable :alien-info name)
-		  (multiple-value-bind (val valp)
-		      (info :variable :constant-value name)
-		    (if (and (eq kind :constant) valp)
-			(make-constant :value val
-				       :name name
-				       :type (ctype-of val)
-				       :where-from where-from)
-			(make-global-var :kind kind
-					 :name name
-					 :type type
-					 :where-from where-from))))))))
+	      (case kind
+		(:alien
+		 (info :variable :alien-info name))
+		(:constant
+		 (let ((value (info :variable :constant-value name)))
+		   (make-constant :value value
+				  :name name
+				  :type (ctype-of value)
+				  :where-from where-from)))
+		(t
+		 (make-global-var :kind kind
+				  :name name
+				  :type type
+				  :where-from where-from)))))))
 
 ;;; Grovel over CONSTANT checking for any sub-parts that need to be
 ;;; processed with MAKE-LOAD-FORM. We have to be careful, because
@@ -1836,7 +1836,7 @@
 ;;; define. If the function has been forward referenced, then
 ;;; substitute for the previous references.
 (defun get-defined-function (name)
-  (let* ((name (proclaim-as-function-name name))
+  (let* ((name (proclaim-as-fun-name name))
 	 (found (find-free-function name "Eh?")))
     (note-name-defined name :function)
     (cond ((not (defined-function-p found))
@@ -1849,8 +1849,8 @@
 			:type (leaf-type found))))
 	     (substitute-leaf res found)
 	     (setf (gethash name *free-functions*) res)))
-	  ;; If *FREE-FUNCTIONS* has a previously converted definition for this
-	  ;; name, then blow it away and try again.
+	  ;; If *FREE-FUNCTIONS* has a previously converted definition
+	  ;; for this name, then blow it away and try again.
 	  ((defined-function-functional found)
 	   (remhash name *free-functions*)
 	   (get-defined-function name))
@@ -1938,15 +1938,16 @@
       (remhash name *free-functions*)
       (setf defined-function (get-defined-function name)))
 
-    (become-defined-function-name name)
+    (become-defined-fun-name name)
 
     (cond (lambda-with-lexenv
-	   (setf (info :function :inline-expansion name) lambda-with-lexenv)
+	   (setf (info :function :inline-expansion-designator name)
+		 lambda-with-lexenv)
 	   (when defined-function 
 	     (setf (defined-function-inline-expansion defined-function)
 		   lambda-with-lexenv)))
 	  (t
-	   (clear-info :function :inline-expansion name)))
+	   (clear-info :function :inline-expansion-designator name)))
 
     ;; old CMU CL comment:
     ;;   If there is a type from a previous definition, blast it,
@@ -1973,5 +1974,5 @@
   ;; non-stub version might use either macro-level LOAD-TIME-VALUE
   ;; hackery or customized IR1-transform level magic to actually put
   ;; the name in place.
-  (aver (legal-function-name-p name))
+  (aver (legal-fun-name-p name))
   `(lambda ,args ,@body))

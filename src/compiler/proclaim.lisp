@@ -155,7 +155,7 @@
 	     ;; function name was already declared as a structure
 	     ;; accessor, then that was already been taken care of.)
 	     (unless (info :function :accessor-for name)
-	       (proclaim-as-function-name name)
+	       (proclaim-as-fun-name name)
 	       (note-name-defined name :function))
 
 	     ;; the actual type declaration
@@ -175,7 +175,7 @@
        (setq *policy* (process-optimize-decl form *policy*)))
       ((inline notinline maybe-inline)
        (dolist (name args)
-	 ;; (CMU CL did (PROCLAIM-AS-FUNCTION-NAME NAME) here, but that
+	 ;; (CMU CL did (PROCLAIM-AS-FUN-NAME NAME) here, but that
 	 ;; seems more likely to surprise the user than to help him, so
 	 ;; we don't do it.)
 	 (setf (info :function :inlinep name)

@@ -264,6 +264,13 @@
 ;;; cold load time.
 (defparameter *reversed-type-info-init-forms* nil)
 
+;;; Define a new type of global information for CLASS. TYPE is the
+;;; name of the type, DEFAULT is the value for that type when it
+;;; hasn't been set, and TYPE-SPEC is a type specifier which values of
+;;; the type must satisfy. The default expression is evaluated each
+;;; time the information is needed, with NAME bound to the name for
+;;; which the information is being looked up. 
+;;;
 ;;; The main thing we do is determine the type's number. We need to do
 ;;; this at macroexpansion time, since both the COMPILE and LOAD time
 ;;; calls to %DEFINE-INFO-TYPE must use the same type number.
@@ -273,15 +280,6 @@
 			   (type (required-argument))
 			   (type-spec (required-argument))
 			   default)
-  #!+sb-doc
-  "Define-Info-Type Class Type default Type-Spec
-  Define a new type of global information for Class. Type is the name
-  of the type, Default is the value for that type when it hasn't been set, and
-  Type-Spec is a type-specifier which values of the type must satisfy. The
-  default expression is evaluated each time the information is needed, with
-  Name bound to the name for which the information is being looked up. If the
-  default evaluates to something with the second value true, then the second
-  value of Info will also be true."
   (declare (type keyword class type))
   `(progn
      (eval-when (:compile-toplevel :execute)
@@ -511,18 +509,19 @@
   ;; a vector contining in contiguous ranges the values of for all the
   ;; types of info for each name.
   (entries (required-argument) :type simple-vector)
-  ;; Vector parallel to ENTRIES, indicating the type number for the value
-  ;; stored in that location and whether this location is the last type of info
-  ;; stored for this name. The type number is in the low TYPE-NUMBER-BITS
-  ;; bits, and the next bit is set if this is the last entry.
+  ;; a vector parallel to ENTRIES, indicating the type number for the
+  ;; value stored in that location and whether this location is the
+  ;; last type of info stored for this name. The type number is in the
+  ;; low TYPE-NUMBER-BITS bits, and the next bit is set if this is the
+  ;; last entry.
   (entries-info (required-argument)
 		:type (simple-array compact-info-entry (*))))
 
 (defconstant compact-info-entry-type-mask (ldb (byte type-number-bits 0) -1))
 (defconstant compact-info-entry-last (ash 1 type-number-bits))
 
-;;; Return the value of the type corresponding to Number for the currently
-;;; cached name in Env.
+;;; Return the value of the type corresponding to NUMBER for the
+;;; currently cached name in ENV.
 #!-sb-fluid (declaim (inline compact-info-cache-hit))
 (defun compact-info-cache-hit (env number)
   (declare (type compact-info-env env) (type type-number number))
@@ -540,8 +539,8 @@
 	      (return (values nil nil)))))
 	(values nil nil))))
 
-;;; Encache Name in the compact environment Env. Hash is the
-;;; GLOBALDB-SXHASHOID of Name.
+;;; Encache NAME in the compact environment ENV. HASH is the
+;;; GLOBALDB-SXHASHOID of NAME.
 (defun compact-info-lookup (env name hash)
   (declare (type compact-info-env env) (type index hash))
   (let* ((table (compact-info-env-table env))
@@ -553,7 +552,7 @@
 		 `(do ((probe (rem hash len)
 			      (let ((new (+ probe hash2)))
 				(declare (type index new))
-				;; same as (mod new len), but faster.
+				;; same as (MOD NEW LEN), but faster.
 				(if (>= new len)
 				    (the index (- new len))
 				    new))))
@@ -819,13 +818,17 @@
 (define-compiler-macro info
   (&whole whole class type name &optional (env-list nil env-list-p))
   ;; Constant CLASS and TYPE is an overwhelmingly common special case,
-  ;; and we can resolve it much more efficiently than the general case.
+  ;; and we can implement it much more efficiently than the general case.
   (if (and (constantp class) (constantp type))
-      (let ((info (type-info-or-lose class type)))
-	`(the ,(type-info-type info)
-	   (get-info-value ,name
-			   ,(type-info-number info)
-			   ,@(when env-list-p `(,env-list)))))
+      (let ((info (type-info-or-lose class type))
+	    (value (gensym "VALUE"))
+	    (foundp (gensym "FOUNDP")))
+	`(multiple-value-bind (,value ,foundp)
+	     (get-info-value ,name
+			     ,(type-info-number info)
+			     ,@(when env-list-p `(,env-list))) 
+	   (values (the ,(type-info-type info) ,value)
+		   ,foundp)))
       whole))
 (defun (setf info) (new-value
 		    class
@@ -1055,11 +1058,39 @@
   #+sb-xc-host :assumed
   #-sb-xc-host (if (fboundp name) :defined :assumed))
 
-;;; lambda used for inline expansion of this function
+;;; something which can be decoded into the inline expansion of the
+;;; function, or NIL if there is none
+;;;
+;;; To inline a function, we want a lambda expression, e.g.
+;;; '(LAMBDA (X) (+ X 1)). That can be encoded here in one of two
+;;; ways.
+;;;   * The value in INFO can be the lambda expression itself, e.g. 
+;;;       (SETF (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR 'FOO)
+;;;             '(LAMBDA (X) (+ X 1)))
+;;;     This is the ordinary way, the natural way of representing e.g.
+;;;       (DECLAIM (INLINE FOO))
+;;;       (DEFUN FOO (X) (+ X 1))
+;;;   * The value in INFO can be a closure which returns the lambda
+;;;     expression, e.g.
+;;;       (SETF (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR 'BAR-LEFT-CHILD)
+;;;             (LAMBDA ()
+;;;               '(LAMBDA (BAR) (BAR-REF BAR 3))))
+;;;     This twisty way of storing values is supported in order to
+;;;     allow structure slot accessors, and perhaps later other
+;;;     stereotyped functions, to be represented compactly.
 (define-info-type
   :class :function
-  :type :inline-expansion
-  :type-spec list)
+  :type :inline-expansion-designator
+  :type-spec (or list function)
+  :default nil)
+;;; Decode any raw (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR FUN-NAME)
+;;; value into a lambda expression, or return NIL if there is none.
+(declaim (ftype (function ((or symbol cons)) list) fun-name-inline-expansion))
+(defun fun-name-inline-expansion (fun-name)
+  (let ((info (info :function :inline-expansion-designator fun-name)))
+    (if (functionp info)
+	(funcall info)
+	info)))
 
 ;;; This specifies whether this function may be expanded inline. If
 ;;; null, we don't care.
@@ -1142,10 +1173,9 @@
   :class :variable
   :type :kind
   :type-spec (member :special :constant :global :alien)
-  :default (if (or (eq (symbol-package name) *keyword-package*)
-		   (member name '(t nil)))
-	     :constant
-	     :global))
+  :default (if (symbol-self-evaluating-p name)
+	       :constant
+	       :global))
 
 ;;; the declared type for this variable
 (define-info-type
@@ -1166,9 +1196,17 @@
   :class :variable
   :type :constant-value
   :type-spec t
-  :default (if (boundp name)
-	     (values (symbol-value name) t)
-	     (values nil nil)))
+  ;; CMU CL used to return two values for (INFO :VARIABLE :CONSTANT-VALUE ..).
+  ;; Now we don't: it was the last remaining multiple-value return from
+  ;; the INFO system, and bringing it down to one value lets us simplify
+  ;; things, especially simplifying the declaration of return types.
+  ;; Software which used to check the second value (for "is it defined
+  ;; as a constant?") should check (EQL (INFO :VARIABLE :KIND ..) :CONSTANT)
+  ;; instead.
+  :default (if (symbol-self-evaluating-p name)
+	       name
+	       (error "internal error: constant lookup of nonconstant ~S"
+		      name)))
 
 (define-info-type
   :class :variable

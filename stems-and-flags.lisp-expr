@@ -365,7 +365,7 @@
 
  ;; This needs not just the SB!XC:DEFSTRUCT machinery, but also
  ;; the TYPE= stuff defined in late-type.lisp, and the
- ;; CHECK-FUNCTION-NAME defined in proclaim.lisp.
+ ;; CHECK-FUN-NAME defined in proclaim.lisp.
  ("src/code/force-delayed-defbangstructs")
 
  ("src/code/typep")

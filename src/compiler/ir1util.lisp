@@ -1087,7 +1087,7 @@
     (unless (combination-p inside)
       (give-up-ir1-transform))
     (let ((inside-fun (combination-fun inside)))
-      (unless (eq (continuation-function-name inside-fun) fun)
+      (unless (eq (continuation-fun-name inside-fun) fun)
 	(give-up-ir1-transform))
       (let ((inside-args (combination-args inside)))
 	(unless (= (length inside-args) num-args)
@@ -1206,7 +1206,7 @@
 ;;; If CONT's only use is a non-notinline global function reference,
 ;;; then return the referenced symbol, otherwise NIL. If NOTINLINE-OK
 ;;; is true, then we don't care if the leaf is NOTINLINE.
-(defun continuation-function-name (cont &optional notinline-ok)
+(defun continuation-fun-name (cont &optional notinline-ok)
   (declare (type continuation cont))
   (let ((use (continuation-use cont)))
     (if (ref-p use)

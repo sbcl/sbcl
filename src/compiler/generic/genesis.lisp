@@ -1352,7 +1352,7 @@
 		    (warm-symbol cadr-des))))
 	   (#.sb!vm:other-pointer-lowtag
 	    (warm-symbol des)))))
-    (unless (legal-function-name-p result)
+    (unless (legal-fun-name-p result)
       (error "not a legal function name: ~S" result))
     result))
 
@@ -2705,7 +2705,7 @@ that they were called before the out-of-line definition is installed,
 as is fairly common for structure accessors.)
 initially undefined function references:~2%")
 
-      (setf undefs (sort undefs #'string< :key #'function-name-block-name))
+      (setf undefs (sort undefs #'string< :key #'fun-name-block-name))
       (dolist (name undefs)
         (format t "~S" name)
 	;; FIXME: This ACCESSOR-FOR stuff should go away when the

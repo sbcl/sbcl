@@ -176,8 +176,8 @@ the usual naming convention (names like *FOO*) for special variables"
 		   ;; 2001-03-24
 		   (eval `(defconstant ,name ',value))))
 
-  (setf (info :variable :kind name) :constant)
-  (setf (info :variable :constant-value name) value)
+  (setf (info :variable :kind name) :constant
+	(info :variable :constant-value name) value)
   name)
 
 ;;;; DEFINE-COMPILER-MACRO
@@ -198,7 +198,7 @@ the usual naming convention (names like *FOO*) for special variables"
 			:environment environment)
       (let ((def `(lambda (,whole ,environment)
 		    ,@local-decs
-		    (block ,(function-name-block-name name)
+		    (block ,(fun-name-block-name name)
 		      ,body))))
 	`(sb!c::%define-compiler-macro ',name #',def ',lambda-list ,doc)))))
 (defun sb!c::%define-compiler-macro (name definition lambda-list doc)

@@ -1116,7 +1116,7 @@
 ;;;; format directive and support function for user-defined method
 
 (def-format-directive #\/ (string start end colonp atsignp params)
-  (let ((symbol (extract-user-function-name string start end)))
+  (let ((symbol (extract-user-fun-name string start end)))
     (collect ((param-names) (bindings))
       (dolist (param-and-offset params)
 	(let ((param (cdr param-and-offset)))
@@ -1131,7 +1131,7 @@
 	 (,symbol stream ,(expand-next-arg) ,colonp ,atsignp
 		  ,@(param-names))))))
 
-(defun extract-user-function-name (string start end)
+(defun extract-user-fun-name (string start end)
   (let ((slash (position #\/ string :start start :end (1- end)
 			 :from-end t)))
     (unless slash

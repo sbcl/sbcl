@@ -55,7 +55,7 @@
   "Return the fdefn object for NAME. If it doesn't already exist and CREATE
    is non-NIL, create a new (unbound) one."
   (declare (values (or fdefn null)))
-  (unless (legal-function-name-p name)
+  (unless (legal-fun-name-p name)
     (error 'simple-type-error
 	   :datum name
 	   :expected-type '(or symbol list)
@@ -285,12 +285,13 @@
 ;;;   (TRACE FOO)
 ;;;   (FUNCALL 'FOO)
 ;;;   (FUNCALL (FDEFINITION 'FOO))
-;;; What to do? ANSI says TRACE "Might change the definitions of the functions
-;;; named by function-names." Might it be OK to just get punt all this
-;;; encapsulation stuff and go back to a simple but correct implementation of
-;;; TRACE? We'd lose the ability to redefine a TRACEd function and keep the
-;;; trace in place, but that seems tolerable to me. (Is the wrapper stuff
-;;; needed for anything else besides TRACE?)
+;;; What to do? ANSI says TRACE "Might change the definitions of the
+;;; functions named by function-names." Might it be OK to just get
+;;; punt all this encapsulation stuff and go back to a simple but
+;;; correct implementation of TRACE? We'd lose the ability to redefine
+;;; a TRACEd function and keep the trace in place, but that seems
+;;; tolerable to me. (Is the wrapper stuff needed for anything else
+;;; besides TRACE?)
 ;;;
 ;;; The only problem I can see with not having a wrapper: If tracing
 ;;; EQ, EQL, EQUAL, or EQUALP causes its function address to change,

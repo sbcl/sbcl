@@ -224,12 +224,51 @@
 ;;; the VM support routines
 (defvar *backend-support-routines* (make-vm-support-routines))
 (declaim (type vm-support-routines *backend-support-routines*))
+
+;;;; This is a prototype interface to support Christophe Rhodes' new
+;;;; (sbcl-0.pre7.57) VOP :GUARD clauses for implementations which
+;;;; depend on CPU variants, e.g. the differences between I486,
+;;;; Pentium, and Pentium Pro, or the differences between different
+;;;; SPARC versions.
 
-;;; This is a prototype interface to support Christophe Rhodes' new
-;;; (sbcl-0.pre7.57) VOP :GUARD clauses for implementations which
-;;; depend on CPU variants, e.g. the differences between I486,
-;;; Pentium, and Pentium Pro, or the differences between different
-;;; SPARC versions.
-;;;
+;;;; Christophe Rhodes' longer explanation (cut and pasted
+;;;; from CLiki SBCL internals site 2001-10-12):
+#|
+In CMUCL, the :guard argument to VOPs provided a way of disallowing
+the use of a particular VOP in compiled code. As an example, from the
+SPARC code in CMUCL,
+
+(DEFINE-VOP? (FAST-V8-TRUNCATE/SIGNED=>SIGNED? FAST-SAFE-ARITH-OP?)
+  (:TRANSLATE TRUNCATE?)
+  ...
+  (:GUARD (OR (BACKEND-FEATUREP :SPARC-V8)
+              (AND (BACKEND-FEATUREP :SPARC-V9)
+                   (NOT (BACKEND-FEATUREP :SPARC-64)))))
+  ...)
+
+and at the IR2 translation stage, the function #'`(LAMBDA () ,GUARD) would be called. 
+
+Until SBCL-0.7pre57, this is translated as 
+  (:GUARD #!+(OR :SPARC-V8 (AND :SPARC-V9 (NOT :SPARC-64))) T
+          #!-(OR :SPARC-V8 (AND :SPARC-V9 (NOT :SPARC-64))) NIL)
+which means that whether this VOP will ever be used is determined at
+compiler compile-time depending on the contents of
+*SHEBANG-FEATURES*?.
+
+As of SBCL-0.7pre57, a new special variable,
+SB-C:*BACKEND-SUBFEATURES*?, is introduced. As of that version, only
+VOPs translating %log1p? query it, and :PENTIUM-STYLE-FYL2XP1 is the
+only useful value to be pushed onto that list, for x86. This is not
+yet an ideal interface, but it does allow for compile-time
+conditionalization.
+|#
+
 ;;; The default value of NIL means use only unguarded VOPs.
 (defvar *backend-subfeatures* nil)
+
+;;; possible *BACKEND-SUBFEATURES* values:
+;;;
+;;; :PENTIUM-STYLE-FYL2XP1 is a useful value for x86 SBCLs to have on
+;;; SB-C:*BACKEND-SUBFEATURES*?; it enables the use of the
+;;; %flog1p-pentium? VOP rather than the %flog1p? VOP, which is a few
+;;; instructions longer.

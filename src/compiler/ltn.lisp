@@ -152,7 +152,7 @@
 			 (continuation-proven-type cont)))))
 	 (info (make-ir2-continuation ptype)))
     (setf (continuation-info cont) info)
-    (let ((name (continuation-function-name cont t)))
+    (let ((name (continuation-fun-name cont t)))
       (if (and delay name)
 	  (setf (ir2-continuation-kind info) :delayed)
 	  (setf (ir2-continuation-locs info)
@@ -382,7 +382,7 @@
   (declare (type mv-combination call) (type ltn-policy ltn-policy))
   (let ((fun (basic-combination-fun call))
 	(args (basic-combination-args call)))
-    (cond ((eq (continuation-function-name fun) '%throw)
+    (cond ((eq (continuation-fun-name fun) '%throw)
 	   (setf (basic-combination-info call) :funny)
 	   (annotate-ordinary-continuation (first args) ltn-policy)
 	   (annotate-unknown-values-continuation (second args) ltn-policy)
@@ -895,7 +895,7 @@
       ;; to implement an out-of-line version in terms of inline
       ;; transforms or VOPs or whatever.
       (unless template
-	(when (and (eq (continuation-function-name (combination-fun call))
+	(when (and (eq (continuation-fun-name (combination-fun call))
 		       (leaf-name
 			(physenv-function
 			 (node-physenv call))))

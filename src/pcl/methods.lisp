@@ -205,7 +205,7 @@
 		   lambda-list lambda-list-p))
 
   (when namep
-    (set-function-name generic-function name))
+    (set-fun-name generic-function name))
 
   (flet ((initarg-error (initarg value string)
 	   (error "when initializing the generic function ~S:~%~
@@ -1289,8 +1289,7 @@
 		(if function-p
 		    function
 		    (make-fast-method-call
-		     :function (set-function-name function
-						  `(sdfun-method ,name))
+		     :function (set-fun-name function `(sdfun-method ,name))
 		     :arg-info fmc-arg-info))))))))))
 
 (defvar *show-make-unordered-methods-emf-calls* nil)

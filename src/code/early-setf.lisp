@@ -343,7 +343,7 @@ GET-SETF-EXPANSION directly."
 	   (warn "defining SETF macro for DEFSTRUCT slot ~
 		 accessor; redefining as a normal function: ~S"
 		 name)
-	   (proclaim-as-function-name name))
+	   (proclaim-as-fun-name name))
 	  ((not (eq (symbol-package name) (symbol-package 'aref)))
 	   (style-warn "defining setf macro for ~S when ~S is fbound"
 		       name `(setf ,name))))

@@ -521,7 +521,7 @@
 	 (count-low-order-zeros (continuation-value thing))
 	 (count-low-order-zeros (continuation-use thing))))
     (combination
-     (case (continuation-function-name (combination-fun thing))
+     (case (continuation-fun-name (combination-fun thing))
        ((+ -)
 	(let ((min most-positive-fixnum)
 	      (itype (specifier-type 'integer)))
@@ -572,7 +572,7 @@
 (deftransform ash ((value amount))
   (let ((value-node (continuation-use value)))
     (unless (and (combination-p value-node)
-		 (eq (continuation-function-name (combination-fun value-node))
+		 (eq (continuation-fun-name (combination-fun value-node))
 		     'ash))
       (give-up-ir1-transform))
     (let ((inside-args (combination-args value-node)))

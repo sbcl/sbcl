@@ -784,16 +784,17 @@
 
 ;;;; full call
 
-;;; Given a function continuation Fun, return as values a TN holding
+;;; Given a function continuation FUN, return as values a TN holding
 ;;; the thing that we call and true if the thing is named (false if it
 ;;; is a function). There are two interesting non-named cases:
-;;; -- Known to be a function, no check needed: return the continuation loc.
-;;; -- Not known what it is.
+;;;   -- Known to be a function, no check needed: return the
+;;;      continuation loc.
+;;;   -- Not known what it is.
 (defun function-continuation-tn (node block cont)
   (declare (type continuation cont))
   (let ((2cont (continuation-info cont)))
     (if (eq (ir2-continuation-kind 2cont) :delayed)
-	(let ((name (continuation-function-name cont t)))
+	(let ((name (continuation-fun-name cont t)))
 	  (aver name)
 	  (values (make-load-time-constant-tn :fdefinition name) t))
 	(let* ((locs (ir2-continuation-locs 2cont))
@@ -956,7 +957,7 @@
 ;;;     a DEFSETF or some such thing elsewhere in the program?
 (defun check-full-call (node)
   (let* ((cont (basic-combination-fun node))
-	 (fname (continuation-function-name cont t)))
+	 (fname (continuation-fun-name cont t)))
     (declare (type (or symbol cons) fname))
 
     #!+sb-show (unless (gethash fname *full-called-fnames*)
@@ -1530,7 +1531,7 @@
 		(unless (or (and (bind-p first-node)
 				 (external-entry-point-p
 				  (bind-lambda first-node)))
-			    (eq (continuation-function-name
+			    (eq (continuation-fun-name
 				 (node-cont first-node))
 				'%nlx-entry))
 		  (vop count-me
@@ -1617,7 +1618,7 @@
 	 (cond
 	  ((eq (basic-combination-kind node) :local)
 	   (ir2-convert-mv-bind node 2block))
-	  ((eq (continuation-function-name (basic-combination-fun node))
+	  ((eq (continuation-fun-name (basic-combination-fun node))
 	       '%throw)
 	   (ir2-convert-throw node 2block))
 	  (t
