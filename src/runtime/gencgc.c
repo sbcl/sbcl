@@ -2077,10 +2077,16 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	if ((is_lisp_pointer(start_addr[0])
 	    || (fixnump(start_addr[0]))
 	    || (widetag_of(start_addr[0]) == CHARACTER_WIDETAG)
+#if N_WORD_BITS == 64
+	    || (widetag_of(start_addr[0]) == SINGLE_FLOAT_WIDETAG)
+#endif
 	    || (widetag_of(start_addr[0]) == UNBOUND_MARKER_WIDETAG))
 	   && (is_lisp_pointer(start_addr[1])
 	       || (fixnump(start_addr[1]))
 	       || (widetag_of(start_addr[1]) == CHARACTER_WIDETAG)
+#if N_WORD_BITS == 64
+	       || (widetag_of(start_addr[1]) == SINGLE_FLOAT_WIDETAG)
+#endif
 	       || (widetag_of(start_addr[1]) == UNBOUND_MARKER_WIDETAG)))
 	    break;
 	else {
@@ -2127,6 +2133,9 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	switch (widetag_of(start_addr[0])) {
 	case UNBOUND_MARKER_WIDETAG:
 	case CHARACTER_WIDETAG:
+#if N_WORD_BITS == 64
+	case SINGLE_FLOAT_WIDETAG:
+#endif
 	    if (gencgc_verbose)
 		FSHOW((stderr,
 		       "*Wo3: %x %x %x\n",
@@ -2176,7 +2185,9 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	case FDEFN_WIDETAG:
 	case CODE_HEADER_WIDETAG:
 	case BIGNUM_WIDETAG:
+#if N_WORD_BITS != 64
 	case SINGLE_FLOAT_WIDETAG:
+#endif
 	case DOUBLE_FLOAT_WIDETAG:
 #ifdef LONG_FLOAT_WIDETAG
 	case LONG_FLOAT_WIDETAG:
@@ -3186,6 +3197,9 @@ verify_space(lispobj *start, size_t words)
 		case VALUE_CELL_HEADER_WIDETAG:
 		case SYMBOL_HEADER_WIDETAG:
 		case CHARACTER_WIDETAG:
+#if N_WORD_BITS == 64
+		case SINGLE_FLOAT_WIDETAG:
+#endif
 		case UNBOUND_MARKER_WIDETAG:
 		case INSTANCE_HEADER_WIDETAG:
 		case FDEFN_WIDETAG:
@@ -3248,7 +3262,9 @@ verify_space(lispobj *start, size_t words)
 	
 		    /* unboxed objects */
 		case BIGNUM_WIDETAG:
+#if N_WORD_BITS != 64
 		case SINGLE_FLOAT_WIDETAG:
+#endif
 		case DOUBLE_FLOAT_WIDETAG:
 #ifdef COMPLEX_LONG_FLOAT_WIDETAG
 		case LONG_FLOAT_WIDETAG:

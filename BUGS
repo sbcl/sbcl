@@ -2097,3 +2097,8 @@ WORKAROUND:
   arrange such that arguments can be passed to the function called from
   arrange_return_to_lisp_function(), but this looked hard to do in
   general without suffering from memory leaks.
+
+378: floating-point exceptions not signalled on x86-64
+  Floating point traps are currently not enabled on the x86-64 port.
+  This is true for at least overflow detection (as tested in
+  float.pure.lisp) and divide-by-zero.

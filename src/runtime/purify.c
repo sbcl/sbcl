@@ -208,7 +208,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    || ((start_addr[0] & FIXNUM_TAG_MASK) == 0) /* fixnum */
 	    || (widetag_of(start_addr[0]) == CHARACTER_WIDETAG)
 #if N_WORD_BITS == 64
-	    || (widetag_of(start_addr[1]) == SINGLE_FLOAT_WIDETAG)
+	    || (widetag_of(start_addr[0]) == SINGLE_FLOAT_WIDETAG)
 #endif
 	    || (widetag_of(start_addr[0]) == UNBOUND_MARKER_WIDETAG))
 	   && (is_lisp_pointer(start_addr[1])
