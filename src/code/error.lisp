@@ -21,8 +21,6 @@
 	:format-control format-control
 	:format-arguments format-arguments))
 
-(define-condition simple-type-error (simple-condition type-error) ())
-
 (define-condition sb!kernel:layout-invalid (type-error)
   ()
   (:report

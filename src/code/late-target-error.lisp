@@ -547,8 +547,6 @@
 
 (define-condition simple-warning (simple-condition warning) ())
 
-;;; This is the condition type used by ERROR and CERROR when
-;;; a format-control string is supplied as the first argument.
 (define-condition simple-error (simple-condition error) ())
 
 (define-condition storage-condition (serious-condition) ())
@@ -562,6 +560,8 @@
 	     "~@<The value ~2I~:_~S ~I~_is not of type ~2I~_~S.~:>"
 	     (type-error-datum condition)
 	     (type-error-expected-type condition)))))
+
+(define-condition simple-type-error (simple-condition type-error) ())
 
 (define-condition program-error (error) ())
 (define-condition parse-error   (error) ())

@@ -124,7 +124,7 @@
 		       ,num-results)))
 	 ,@(moves (result-names) (temp-names)))))))
 
-) ; eval-when (compile load eval)
+) ; EVAL-WHEN
 
 (macrolet ((frob (num-args num-res)
 	     (static-function-template-vop (eval num-args) (eval num-res))))

@@ -37,10 +37,6 @@
 ;;; are lost in the noise when compared with the cost of delivering
 ;;; the signal in the first place.
 
-;;; Magically converted by the compiler into a break instruction.
-(defun do-pending-interrupt ()
-  (do-pending-interrupt))
-
 #!-gengc (progn
 
 (defvar *interrupts-enabled* t)

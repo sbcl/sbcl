@@ -35,7 +35,19 @@
 ;;; gencgc.c code on this value being a symbol. (This is only one of
 ;;; many nasty dependencies between that code and this, alas.)
 ;;; -- WHN 2001-02-28
-(defconstant +empty-ht-slot+ '%empty-ht-slot%)
+;;;
+;;; FIXME: We end up doing two DEFCONSTANT forms because (1) LispWorks
+;;; needs EVAL-WHEN wrapped around DEFCONSTANT, and (2) SBCL's
+;;; DEFCONSTANT expansion doesn't seem to behave properly inside
+;;; EVAL-WHEN, so that without this, the +EMPTY-HT-SLOT+ references in
+;;; e.g. DOHASH macroexpansions don't end up being replaced by
+;;; constant values, so that the system dies at cold init because
+;;; '+EMPTY-HT-SLOT+ isn't bound yet. It's hard to fix this properly
+;;; until SBCL's EVAL-WHEN is fixed, which is waiting for the IR1
+;;; interpreter to go away, which is waiting for sbcl-0.7.x..
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +empty-ht-slot+ '%empty-ht-slot%))
+(defconstant +empty-ht-slot+ '#.+empty-ht-slot+) ; egads.. See FIXME above.
 ;;; KLUDGE: Using a private symbol still leaves us vulnerable to users
 ;;; getting nonconforming behavior by messing around with
 ;;; DO-ALL-SYMBOLS. That seems like a fairly obscure problem, so for

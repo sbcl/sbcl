@@ -151,6 +151,13 @@
   (enable-interrupt :sigalrm #'sigalrm-handler)
   (values))
 
+;;;; etc.
+
+;;; CMU CL comment:
+;;;   Magically converted by the compiler into a break instruction.
+(defun do-pending-interrupt ()
+  (do-pending-interrupt))
+
 ;;; stale code which I'm insufficiently motivated to test -- WHN 19990714
 #|
 ;;;; WITH-ENABLED-INTERRUPTS

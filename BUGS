@@ -940,6 +940,22 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
     Structure for accessor FOO-X is not a FOO:
     301988783
 
+102:
+  As reported by Arthur Lemmens sbcl-devel 2001-05-05, ANSI
+  requires that SYMBOL-MACROLET refuse to rebind special variables,
+  but SBCL doesn't do this. (Also as reported by AL in the same
+  message, SBCL depended on this nonconforming behavior to build
+  itself, because of the way that **CURRENT-SEGMENT** was implemented.
+  As of sbcl-0.6.12.x, this dependence on the nonconforming behavior
+  has been fixed, but the nonconforming behavior remains.)
+
+103:
+  As reported by Arthur Lemmens sbcl-devel 2001-05-05, ANSI's
+  definition of (LOOP .. DO ..) requires that the terms following
+  DO all be compound forms. SBCL's implementation of LOOP allows
+  non-compound forms (like the bare symbol COUNT, in his example)
+  here.
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

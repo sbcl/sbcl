@@ -802,8 +802,8 @@
   ;; inner loops.
   (let ((info (type-info-or-lose class type)))
     (if env-list-p
-      (get-info-value name (type-info-number info) env-list)
-      (get-info-value name (type-info-number info)))))
+	(get-info-value name (type-info-number info) env-list)
+	(get-info-value name (type-info-number info)))))
 #!-sb-fluid
 (define-compiler-macro info
   (&whole whole class type name &optional (env-list nil env-list-p))

@@ -254,7 +254,7 @@
 	    for tn-ref = (tn-ref-across 2nd-tn-ref)
 	    then (tn-ref-across tn-ref)
 	    for count from 2 below register-arg-count
-	    do count (inst mov (tn-ref-tn tn-ref) 2nd-tn))))
+	    do (inst mov (tn-ref-tn tn-ref) 2nd-tn))))
       (inst mov ebx-tn esp-tn)
       (emit-label regs-defaulted)
       (inst mov esp-tn ebx-tn)))
