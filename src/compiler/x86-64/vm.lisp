@@ -22,7 +22,7 @@
   (defvar *word-register-names* (make-array 16 :initial-element nil))
   (defvar *dword-register-names* (make-array 16 :initial-element nil))
   (defvar *qword-register-names* (make-array 32 :initial-element nil))
-  (defvar *xmm-register-names* (make-array 16 :initial-element nil)))
+  (defvar *float-register-names* (make-array 16 :initial-element nil)))
 
 (macrolet ((defreg (name offset size)
 	     (let ((offset-sym (symbolicate name "-OFFSET"))
@@ -101,26 +101,6 @@
   (defregset *qword-regs* rax rcx rdx rbx rsi rdi 
 	     r8 r9 r10 r11 #+nil r12 #+nil r13 r14 r15)
 
-  ;; floating point registers
-  (defreg xmm0 0 :float)
-  (defreg xmm1 1 :float)
-  (defreg xmm2 2 :float)
-  (defreg xmm3 3 :float)
-  (defreg xmm4 4 :float)
-  (defreg xmm5 5 :float)
-  (defreg xmm6 6 :float)
-  (defreg xmm7 7 :float)
-  (defreg xmm8 8 :float)
-  (defreg xmm9 9 :float)
-  (defreg xmm10 10 :float)
-  (defreg xmm11 11 :float)
-  (defreg xmm12 12 :float)
-  (defreg xmm13 13 :float)
-  (defreg xmm14 14 :float)
-  (defreg xmm15 15 :float)
-  (defregset *xmm-regs* xmm0 xmm1 xmm2 xmm3 xmm4 xmm5 xmm6 xmm7
-	     xmm8 xmm9 xmm10 xmm11 xmm12 xmm13 xmm14 xmm15)
-
   ;; registers used to pass arguments
   ;;
   ;; the number of arguments/return values passed in registers
@@ -140,7 +120,7 @@
 ;;; words in a dword register.
 (define-storage-base registers :finite :size 32)
 
-(define-storage-base xmm-registers :finite :size 16)
+(define-storage-base xmm-registers :finite :size 16) ; for floats/doubles
 
 (define-storage-base stack :unbounded :size 8)
 (define-storage-base constant :non-packed)
@@ -295,14 +275,14 @@
   ;; non-descriptor SINGLE-FLOATs
   (single-reg xmm-registers
 	      :locations #.(loop for i from 0 to 15 collect i)
-	      :constant-scs (fp-constant)
+	      :constant-scs ()
 	      :save-p t
 	      :alternate-scs (single-stack))
 
   ;; non-descriptor DOUBLE-FLOATs
   (double-reg xmm-registers
 	      :locations #.(loop for i from 0 to 15 collect i)
-	      :constant-scs (fp-constant)
+	      :constant-scs ()
 	      :save-p t
 	      :alternate-scs (double-stack))
 
@@ -360,6 +340,7 @@
   (def-misc-reg-tns dword-reg eax ebx ecx edx ebp esp edi esi)
   (def-misc-reg-tns word-reg ax bx cx dx bp sp di si)
   (def-misc-reg-tns byte-reg al ah bl bh cl ch dl dh)
+  #+nil
   (def-misc-reg-tns single-reg 
       xmm0 xmm1 xmm2 xmm3 xmm4 xmm5 xmm6 xmm7
       xmm8 xmm9 xmm10 xmm11 xmm12 xmm13 xmm14 xmm15))
@@ -436,7 +417,7 @@
 		  (svref name-vec offset))
 	     ;; FIXME: Shouldn't this be an ERROR?
 	     (format nil "<unknown reg: off=~W, sc=~A>" offset sc-name))))
-      (float-registers (format nil "FR~D" offset))
+      (xmm-registers (format nil "Xmm~D" offset))
       (stack (format nil "S~D" offset))
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed")

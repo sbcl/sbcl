@@ -73,7 +73,7 @@
 (define-primitive-object (double-float :lowtag other-pointer-lowtag
 				       :widetag double-float-widetag)
     #!-x86-64  (filler)
-    (value :c-type "double" :length #!+x96-64 1 #!-x86-64 2))
+    (value :c-type "double" :length #!+x86-64 1 #!-x86-64 2))
 
 (define-primitive-object (complex :type complex
 				  :lowtag other-pointer-lowtag
