@@ -798,7 +798,7 @@
       '(cerror "Skip this form."
 	       "compile-time read error"))))
 
-;;; If Stream is present, return it, otherwise open a stream to the
+;;; If STREAM is present, return it, otherwise open a stream to the
 ;;; current file. There must be a current file. When we open a new
 ;;; file, we also reset *PACKAGE* and policy. This gives the effect of
 ;;; rebinding around each file.
@@ -921,6 +921,9 @@
 ;;; *DEFAULT-COOKIE* as the policy. The need for this hack is due to
 ;;; the quirk that there is no way to represent in a cookie that an
 ;;; optimize quality came from the default.
+;;; FIXME: Ideally, something should be done so that DECLAIM inside LOCALLY
+;;; works OK. Failing that, at least we could issue a warning instead
+;;; of silently screwing up.
 (defun process-top-level-locally (form path)
   (declare (list path))
   (multiple-value-bind (forms decls) (sb!sys:parse-body (cdr form) nil)

@@ -94,7 +94,7 @@
   (setf *gc-notify-stream* nil)
   (setf *before-gc-hooks* nil)
   (setf *after-gc-hooks* nil)
-  #!+gengc (setf sb!conditions::*handler-clusters* nil)
+  #!+gengc (setf *handler-clusters* nil)
   #!-gengc (setf *already-maybe-gcing* t
 		 *gc-inhibit* t
 		 *need-to-collect-garbage* nil

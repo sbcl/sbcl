@@ -292,9 +292,9 @@
   (declare (list path) (inline member))
   (cadr (member 'original-source-start path :test #'eq)))
 
-;;; Return a list of all the enclosing forms not in the original source that
-;;; converted to get to this form, with the immediate source for node at the
-;;; start of the list.
+;;; Return a list of all the enclosing forms not in the original
+;;; source that converted to get to this form, with the immediate
+;;; source for node at the start of the list.
 (defun source-path-forms (path)
   (subseq path 0 (position 'original-source-start path)))
 
@@ -307,17 +307,17 @@
 	(first forms)
 	(values (find-original-source path)))))
 
-;;; Return NODE-SOURCE-FORM, T if continuation has a single use, otherwise
-;;; NIL, NIL.
+;;; Return NODE-SOURCE-FORM, T if continuation has a single use,
+;;; otherwise NIL, NIL.
 (defun continuation-source (cont)
   (let ((use (continuation-use cont)))
     (if use
 	(values (node-source-form use) t)
 	(values nil nil))))
 
-;;; Return a new LEXENV just like Default except for the specified slot
-;;; values. Values for the alist slots are NCONC'ed to the beginning of the
-;;; current value, rather than replacing it entirely.
+;;; Return a new LEXENV just like DEFAULT except for the specified
+;;; slot values. Values for the alist slots are NCONCed to the
+;;; beginning of the current value, rather than replacing it entirely.
 (defun make-lexenv (&key (default *lexenv*)
 			 functions variables blocks tags type-restrictions
 			 options
@@ -339,8 +339,8 @@
      lambda cleanup cookie interface-cookie
      (frob options lexenv-options))))
 
-;;; Return a cookie that defaults any unsupplied optimize qualities in the
-;;; Interface-Cookie with the corresponding ones from the Cookie.
+;;; Return a cookie that defaults any unsupplied optimize qualities in
+;;; the Interface-Cookie with the corresponding ones from the Cookie.
 (defun make-interface-cookie (lexenv)
   (declare (type lexenv lexenv))
   (let ((icookie (lexenv-interface-cookie lexenv))

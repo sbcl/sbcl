@@ -1278,15 +1278,15 @@
 
 	(values (vars) keyp allowp (aux-vars) (aux-vals))))))
 
-;;; Similar to IR1-Convert-Progn-Body except that we sequentially bind each
-;;; Aux-Var to the corresponding Aux-Val before converting the body. If there
-;;; are no bindings, just convert the body, otherwise do one binding and
-;;; recurse on the rest.
+;;; This is similar to IR1-CONVERT-PROGN-BODY except that we
+;;; sequentially bind each AUX-VAR to the corresponding AUX-VAL before
+;;; converting the body. If there are no bindings, just convert the
+;;; body, otherwise do one binding and recurse on the rest.
 ;;;
-;;;    If Interface is true, then we convert bindings with the interface
-;;; policy. For real &aux bindings, and implicit aux bindings introduced by
-;;; keyword bindings, this is always true. It is only false when LET* directly
-;;; calls this function.
+;;; If INTERFACE is true, then we convert bindings with the interface
+;;; policy. For real &AUX bindings, and implicit aux bindings
+;;; introduced by keyword bindings, this is always true. It is only
+;;; false when LET* directly calls this function.
 (defun ir1-convert-aux-bindings (start cont body aux-vars aux-vals interface)
   (declare (type continuation start cont) (list body aux-vars aux-vals))
   (if (null aux-vars)
@@ -1304,15 +1304,17 @@
 					(list (first aux-vals))))))
   (values))
 
-;;; Similar to IR1-Convert-Progn-Body except that code to bind the Specvar
-;;; for each Svar to the value of the variable is wrapped around the body. If
-;;; there are no special bindings, we just convert the body, otherwise we do
-;;; one special binding and recurse on the rest.
+;;; This is similar to IR1-CONVERT-PROGN-BODY except that code to bind
+;;; the SPECVAR for each SVAR to the value of the variable is wrapped
+;;; around the body. If there are no special bindings, we just convert
+;;; the body, otherwise we do one special binding and recurse on the
+;;; rest.
 ;;;
-;;; We make a cleanup and introduce it into the lexical environment. If
-;;; there are multiple special bindings, the cleanup for the blocks will end up
-;;; being the innermost one. We force Cont to start a block outside of this
-;;; cleanup, causing cleanup code to be emitted when the scope is exited.
+;;; We make a cleanup and introduce it into the lexical environment.
+;;; If there are multiple special bindings, the cleanup for the blocks
+;;; will end up being the innermost one. We force CONT to start a
+;;; block outside of this cleanup, causing cleanup code to be emitted
+;;; when the scope is exited.
 (defun ir1-convert-special-bindings (start cont body aux-vars aux-vals
 					   interface svars)
   (declare (type continuation start cont)
@@ -1407,12 +1409,12 @@
     lambda))
 
 ;;; Create the actual entry-point function for an optional entry
-;;; point. The lambda binds copies of each of the Vars, then calls Fun
-;;; with the argument Vals and the Defaults. Presumably the Vals refer
-;;; to the Vars by name. The Vals are passed in in reverse order.
+;;; point. The lambda binds copies of each of the VARS, then calls FUN
+;;; with the argument VALS and the DEFAULTS. Presumably the VALS refer
+;;; to the VARS by name. The VALS are passed in in reverse order.
 ;;;
 ;;; If any of the copies of the vars are referenced more than once,
-;;; then we mark the corresponding var as Ever-Used to inhibit
+;;; then we mark the corresponding var as EVER-USED to inhibit
 ;;; "defined but not read" warnings for arguments that are only used
 ;;; by default forms.
 ;;;
@@ -1442,7 +1444,7 @@
 
 ;;; This function deals with supplied-p vars in optional arguments. If
 ;;; the there is no supplied-p arg, then we just call
-;;; IR1-Convert-Hairy-Args on the remaining arguments, and generate a
+;;; IR1-CONVERT-HAIRY-ARGS on the remaining arguments, and generate a
 ;;; optional entry that calls the result. If there is a supplied-p
 ;;; var, then we add it into the default vars and throw a T into the
 ;;; entry values. The resulting entry point function is returned.

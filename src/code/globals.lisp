@@ -20,8 +20,8 @@
 		  *standard-readtable*
 		  sb!debug:*in-the-debugger*
 		  sb!debug:*stack-top-hint*
-		  sb!conditions::*handler-clusters*
-		  sb!conditions::*restart-clusters*
+		  *handler-clusters*
+		  *restart-clusters*
 		  *gc-inhibit* *need-to-collect-garbage*
 		  *software-interrupt-vector* *load-verbose*
 		  *load-print-stuff* *in-compilation-unit*

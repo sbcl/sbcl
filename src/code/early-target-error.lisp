@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!CONDITIONS")
+(in-package "SB!KERNEL")
 
 ;;;; restarts
 
@@ -389,7 +389,7 @@
 
 (defun assert-error (assertion places datum &rest arguments)
   (let ((cond (if datum
-		(sb!conditions::coerce-to-condition datum
+		(coerce-to-condition datum
 						    arguments
 						    'simple-error
 						    'error)
@@ -443,7 +443,7 @@
 
 (defun case-body-error (name keyform keyform-value expected-type keys)
   (restart-case
-      (error 'sb!conditions::case-failure
+      (error 'case-failure
 	     :name name
 	     :datum keyform-value
 	     :expected-type expected-type

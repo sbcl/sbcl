@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!CONDITIONS")
+(in-package "SB!KERNEL")
 
 (defvar *break-on-signals* nil
   #!+sb-doc

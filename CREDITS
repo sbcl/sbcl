@@ -477,9 +477,12 @@ whenever I got stuck.
 
 CREDITS SINCE THE RELEASE OF SBCL
 
+(Some more details are available in the NEWS file and in the 
+project's CVS change logs.)
+
 Martin Atzmueller:
-  He reported many bugs in SBCL, helped clean up various stale
-  bug data in SBCL, and ported many patches from CMU CL.
+  He reported many bugs, fixed many bugs, ported various fixes
+  from CMU CL, and helped clean up various stale bug data.
 
 Daniel Barlow:
   He contributed sblisp.lisp, a set of patches to make SBCL
@@ -506,6 +509,13 @@ Robert MacLachlan:
   the CMU CL project. Some of these fixes, especially for compiler
   problems, has been invaluable to the CMU CL project and, by
   porting, invaluable to the SBCL project as well.
+
+William Newman:
+  He continued to work on the project after the fork, increasing
+  ANSI compliance, fixing bugs, regularizing the internals of the
+  system, deleting unused extensions, improving performance in 
+  some areas (especially sequence functions and non-simple vectors),
+  and updating documentation.
 
 Peter Van Eynde:
   He wrestled the CLISP test suite into a portable test suite which 

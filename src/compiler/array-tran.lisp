@@ -79,8 +79,8 @@
 (defoptimizer (hairy-data-vector-set derive-type) ((array index new-value))
   (assert-new-value-type new-value array))
 
-;;; Figure out the type of the data vector if we know the argument element
-;;; type.
+;;; Figure out the type of the data vector if we know the argument
+;;; element type.
 (defoptimizer (%with-array-data derive-type) ((array start end))
   (let ((atype (continuation-type array)))
     (when (array-type-p atype)

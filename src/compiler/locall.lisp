@@ -163,15 +163,15 @@
 	     (t
 	      (%argument-count-error ,n-supplied)))))))))
 
-;;; Make an external entry point (XEP) for Fun and return it. We
-;;; convert the result of Make-XEP-Lambda in the correct environment,
-;;; then associate this lambda with Fun as its XEP. After the
+;;; Make an external entry point (XEP) for FUN and return it. We
+;;; convert the result of MAKE-XEP-LAMBDA in the correct environment,
+;;; then associate this lambda with FUN as its XEP. After the
 ;;; conversion, we iterate over the function's associated lambdas,
 ;;; redoing local call analysis so that the XEP calls will get
 ;;; converted. We also bind *LEXENV* to change the compilation policy
 ;;; over to the interface policy.
 ;;;
-;;; We set Reanalyze and Reoptimize in the component, just in case we
+;;; We set REANALYZE and REOPTIMIZE in the component, just in case we
 ;;; discover an XEP after the initial local call analyze pass.
 (defun make-external-entry-point (fun)
   (declare (type functional fun))

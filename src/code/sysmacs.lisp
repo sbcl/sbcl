@@ -13,19 +13,20 @@
 
 ;;; This checks to see whether the array is simple and the start and
 ;;; end are in bounds. If so, it proceeds with those values.
-;;; Otherwise, it calls %WITH-ARRAY-DATA. Note that there is a
-;;; DERIVE-TYPE method for %WITH-ARRAY-DATA.
+;;; Otherwise, it calls %WITH-ARRAY-DATA. Note that %WITH-ARRAY-DATA
+;;; may be further optimized.
+;;;
+;;; Given any ARRAY, bind DATA-VAR to the array's data vector and
+;;; START-VAR and END-VAR to the start and end of the designated
+;;; portion of the data vector. SVALUE and EVALUE are any start and
+;;; end specified to the original operation, and are factored into the
+;;; bindings of START-VAR and END-VAR. OFFSET-VAR is the cumulative
+;;; offset of all displacements encountered, and does not include
+;;; SVALUE.
 (defmacro with-array-data (((data-var array &key (offset-var (gensym)))
 			    (start-var &optional (svalue 0))
 			    (end-var &optional (evalue nil)))
 			   &body forms)
-  #!+sb-doc
-  "Given any Array, binds Data-Var to the array's data vector and Start-Var and
-  End-Var to the start and end of the designated portion of the data vector.
-  Svalue and Evalue are any start and end specified to the original operation,
-  and are factored into the bindings of Start-Var and End-Var. Offset-Var is
-  the cumulative offset of all displacements encountered, and does not
-  include Svalue."
   (once-only ((n-array array)
 	      (n-svalue `(the index ,svalue))
 	      (n-evalue `(the (or index null) ,evalue)))

@@ -42,21 +42,20 @@
 	  (res (find-used-parameters arg))))))
 ) ; EVAL-WHEN
 
-;;; This macro provides some syntactic sugar for querying the settings of
-;;; the compiler policy parameters.
+;;; This macro provides some syntactic sugar for querying the settings
+;;; of the compiler policy parameters.
+;;;
+;;; Test whether some conditions apply to the current compiler policy
+;;; for Node. Each condition is a predicate form which accesses the
+;;; policy values by referring to them as the variables SPEED, SPACE,
+;;; SAFETY, CSPEED, BREVITY and DEBUG. The results of all the
+;;; conditions are combined with AND and returned as the result.
+;;;
+;;; NODE is a form which is evaluated to obtain the node which the
+;;; policy is for. If NODE is NIL, then we use the current policy as
+;;; defined by *DEFAULT-COOKIE* and *CURRENT-COOKIE*. This option is
+;;; only well defined during IR1 conversion.
 (defmacro policy (node &rest conditions)
-  #!+sb-doc
-  "Policy Node Condition*
-  Test whether some conditions apply to the current compiler policy for Node.
-  Each condition is a predicate form which accesses the policy values by
-  referring to them as the variables SPEED, SPACE, SAFETY, CSPEED, BREVITY and
-  DEBUG. The results of all the conditions are combined with AND and returned
-  as the result.
-
-  Node is a form which is evaluated to obtain the node which the policy is for.
-  If Node is NIL, then we use the current policy as defined by *DEFAULT-COOKIE*
-  and *CURRENT-COOKIE*. This option is only well defined during IR1
-  conversion."
   (let* ((form `(and ,@conditions))
 	 (n-cookie (gensym))
 	 (binds (mapcar
@@ -73,8 +72,8 @@
 
 ;;;; source-hacking defining forms
 
-;;; Passed to PARSE-DEFMACRO when we want compiler errors instead of real
-;;; errors.
+;;; to be passed to PARSE-DEFMACRO when we want compiler errors
+;;; instead of real errors
 #!-sb-fluid (declaim (inline convert-condition-into-compiler-error))
 (defun convert-condition-into-compiler-error (datum &rest stuff)
   (if (stringp datum)
@@ -84,20 +83,17 @@
 			  (apply #'make-condition datum stuff)
 			  datum))))
 
-;;; Parse DEFMACRO-style lambda-list, setting things up so that a
+;;; Parse a DEFMACRO-style lambda-list, setting things up so that a
 ;;; compiler error happens if the syntax is invalid.
+;;;
+;;; Define a function that converts a special form or other magical
+;;; thing into IR1. LAMBDA-LIST is a defmacro style lambda list.
+;;; START-VAR and CONT-VAR are bound to the start and result
+;;; continuations for the resulting IR1. KIND is the function kind to
+;;; associate with NAME.
 (defmacro def-ir1-translator (name (lambda-list start-var cont-var
 						&key (kind :special-form))
 				   &body body)
-  #!+sb-doc
-  "Def-IR1-Translator Name (Lambda-List Start-Var Cont-Var {Key Value}*)
-		      [Doc-String] Form*
-  Define a function that converts a Special-Form or other magical thing into
-  IR1. Lambda-List is a defmacro style lambda list. Start-Var and Cont-Var
-  are bound to the start and result continuations for the resulting IR1.
-  This keyword is defined:
-      Kind
-	  The function kind to associate with Name (default :special-form)."
   (let ((fn-name (symbolicate "IR1-CONVERT-" name))
 	(n-form (gensym))
 	(n-env (gensym)))
@@ -131,24 +127,26 @@
 		       (error "can't FUNCALL the SYMBOL-FUNCTION of ~
 			       special forms")))))))))
 
-;;; Similar to DEF-IR1-TRANSLATOR, except that we pass if the syntax is
-;;; invalid.
+;;; (This is similar to DEF-IR1-TRANSLATOR, except that we pass if the
+;;; syntax is invalid.)
+;;;
+;;; Define a macro-like source-to-source transformation for the
+;;; function NAME. A source transform may "pass" by returning a
+;;; non-nil second value. If the transform passes, then the form is
+;;; converted as a normal function call. If the supplied arguments are
+;;; not compatible with the specified LAMBDA-LIST, then the transform
+;;; automatically passes.
+;;;
+;;; Source transforms may only be defined for functions. Source
+;;; transformation is not attempted if the function is declared
+;;; NOTINLINE. Source transforms should not examine their arguments.
+;;; If it matters how the function is used, then DEFTRANSFORM should
+;;; be used to define an IR1 transformation.
+;;;
+;;; If the desirability of the transformation depends on the current
+;;; OPTIMIZE parameters, then the POLICY macro should be used to
+;;; determine when to pass.
 (defmacro def-source-transform (name lambda-list &body body)
-  #!+sb-doc
-  "Def-Source-Transform Name Lambda-List Form*
-  Define a macro-like source-to-source transformation for the function Name.
-  A source transform may \"pass\" by returning a non-nil second value. If the
-  transform passes, then the form is converted as a normal function call. If
-  the supplied arguments are not compatible with the specified lambda-list,
-  then the transform automatically passes.
-
-  Source-Transforms may only be defined for functions. Source transformation
-  is not attempted if the function is declared Notinline. Source transforms
-  should not examine their arguments. If it matters how the function is used,
-  then Deftransform should be used to define an IR1 transformation.
-
-  If the desirability of the transformation depends on the current Optimize
-  parameters, then the Policy macro should be used to determine when to pass."
   (let ((fn-name
 	 (if (listp name)
 	     (collect ((pieces))
@@ -173,11 +171,9 @@
 	     ,body))
 	 (setf (info :function :source-transform ',name) #',fn-name)))))
 
+;;; Define a function that converts a use of (%PRIMITIVE NAME ..)
+;;; into Lisp code. LAMBDA-LIST is a DEFMACRO-style lambda list.
 (defmacro def-primitive-translator (name lambda-list &body body)
-  #!+sb-doc
-  "DEF-PRIMITIVE-TRANSLATOR Name Lambda-List Form*
-  Define a function that converts a use of (%PRIMITIVE Name ...) into Lisp
-  code. Lambda-List is a DEFMACRO-style lambda list."
   (let ((fn-name (symbolicate "PRIMITIVE-TRANSLATE-" name))
 	(n-form (gensym))
 	(n-env (gensym)))

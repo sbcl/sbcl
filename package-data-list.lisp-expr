@@ -329,10 +329,10 @@
 
  ;; FIXME: It seems to me that this could go away, with its contents moved
  ;; into SB!KERNEL, like the implementation of the rest of the class system.
- #s(sb-cold:package-data
-    :name "SB!CONDITIONS"
-    :doc "private: the implementation of the condition system"
-    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL"))
+;; #s(sb-cold:package-data
+;;    :name "SB!CONDITIONS"
+;;    :doc "private: the implementation of the condition system"
+;;    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL"))
 
  #s(sb-cold:package-data
     :name "SB!DEBUG"
@@ -1183,6 +1183,12 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "SIMPLE-CONTROL-ERROR" "SIMPLE-FILE-ERROR"
              "SIMPLE-PROGRAM-ERROR" "SIMPLE-STYLE-WARNING" "STYLE-WARN"
 
+             ;; newly exported from former SB!CONDITIONS
+             "*HANDLER-CLUSTERS*" "*RESTART-CLUSTERS*"
+             "SHOW-CONDITION" "CASE-FAILURE"
+             "NAMESTRING-PARSE-ERROR"
+             "DESCRIBE-CONDITION"
+             
 	     "!COLD-INIT"
              "!GLOBALDB-COLD-INIT" "!FDEFN-COLD-INIT"
              "!TYPE-CLASS-COLD-INIT" "!TYPEDEFS-COLD-INIT"

@@ -1065,7 +1065,7 @@
      (format stream
 	     "obsolete structure error in ~S:~@
 	      for a structure of type: ~S"
-	     (sb-conditions::condition-function-name condition)
+	     (sb-kernel::condition-function-name condition)
 	     (type-of (obsolete-structure-datum condition))))))
 
 (defun obsolete-instance-trap (owrapper nwrapper instance)

@@ -648,7 +648,7 @@ reset to ~S."
        ;; and when people redirect *ERROR-OUTPUT*, they could
        ;; reasonably expect to see error messages logged there,
        ;; regardless of what the debugger does afterwards.
-       #!+sb-show (sb!conditions::show-condition *debug-condition*
+       #!+sb-show (sb!kernel:show-condition *debug-condition*
 						 *error-output*)
        (format *error-output*
 	       "~2&debugger invoked on condition of type ~S:~%  "
@@ -716,7 +716,7 @@ reset to ~S."
 
 ;;; This calls DEBUG-LOOP, performing some simple initializations
 ;;; before doing so. INVOKE-DEBUGGER calls this to actually get into
-;;; the debugger. SB!CONDITIONS::ERROR-ERROR calls this in emergencies
+;;; the debugger. SB!KERNEL::ERROR-ERROR calls this in emergencies
 ;;; to get into a debug prompt as quickly as possible with as little
 ;;; risk as possible for stepping on whatever is causing recursive
 ;;; errors.

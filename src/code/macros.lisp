@@ -259,7 +259,7 @@
 	 (cond
 	  ,@(nreverse clauses)
 	  ,@(if errorp
-		`((t (error 'sb!conditions::case-failure
+		`((t (error 'case-failure
 			    :name ',name
 			    :datum ,keyform-value
 			    :expected-type ',expected-type
