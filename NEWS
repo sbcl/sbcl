@@ -1332,6 +1332,10 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
   * fixed reading of (COMPLEX DOUBLE-FLOAT) literals from fasl files
   * fixed bug: :COUNT argument to sequence functions may be negative
   * fixed bug: body of DO-SYMBOLS may contain declarations
+  * fixed bug: PUSHNEW now evaluates its arguments from left to right
+    (reported by Paul F. Dietz, fixed by Gerd Moellman)
+  * fixed bug: PUSH, PUSHNEW and POP now evaluate a place given by a
+    symbol macro only once
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

@@ -55,3 +55,20 @@
 ;;; reported by Paul Dietz on cmucl-imp: LDIFF does not check type of
 ;;; its first argument
 (assert (not (ignore-errors (ldiff 1 2))))
+
+;;; evaluation order in PUSH, PUSHNEW
+(let ((a (map 'vector #'list '(a b c))))
+  (let ((i 0))
+    (pushnew (incf i) (aref a (incf i)))
+    (assert (equalp a #((a) (b) (1 c))))))
+
+(symbol-macrolet ((s (aref a (incf i))))
+    (let ((a (map 'vector #'list '(a b c))))
+      (let ((i 0))
+        (push t s)
+        (assert (equalp a #((a) (t b) (c))))
+        (pushnew 1 s)
+        (assert (equalp a #((a) (t b) (1 c))))
+        (setq i 0)
+        (assert (eql (pop s) 't))
+        (assert (equalp a #((a) (b) (1 c)))))))

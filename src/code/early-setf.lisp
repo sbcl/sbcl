@@ -186,54 +186,43 @@ GET-SETF-EXPANSION directly."
   #!+sb-doc
   "Takes an object and a location holding a list. Conses the object onto
   the list, returning the modified list. OBJ is evaluated before PLACE."
-  (if (symbolp place)
-      `(setq ,place (cons ,obj ,place))
-      (multiple-value-bind
-	  (dummies vals newval setter getter)
-	  (get-setf-method place env)
-	(let ((g (gensym)))
-	  `(let* ((,g ,obj)
-		  ,@(mapcar #'list dummies vals)
-		  (,(car newval) (cons ,g ,getter)))
-	    ,setter)))))
+  (multiple-value-bind (dummies vals newval setter getter)
+      (get-setf-method place env)
+    (let ((g (gensym)))
+      `(let* ((,g ,obj)
+              ,@(mapcar #'list dummies vals)
+              (,(car newval) (cons ,g ,getter)))
+         ,setter))))
 
 (defmacro-mundanely pushnew (obj place &rest keys &environment env)
   #!+sb-doc
   "Takes an object and a location holding a list. If the object is already
   in the list, does nothing. Else, conses the object onto the list. Returns
   NIL. If there is a :TEST keyword, this is used for the comparison."
-  (if (symbolp place)
-      `(setq ,place (adjoin ,obj ,place ,@keys))
-      (multiple-value-bind (dummies vals newval setter getter)
-	  (get-setf-method place env)
-	(do* ((d dummies (cdr d))
-	      (v vals (cdr v))
-	      (let-list nil))
-	     ((null d)
-	      (push (list (car newval) `(adjoin ,obj ,getter ,@keys))
-		    let-list)
-	      `(let* ,(nreverse let-list)
-		 ,setter))
-	  (push (list (car d) (car v)) let-list)))))
+  (multiple-value-bind (dummies vals newval setter getter)
+      (get-setf-method place env)
+    (let ((g (gensym)))
+      `(let* ((,g ,obj)
+              ,@(mapcar #'list dummies vals)
+              (,(car newval) (adjoin ,g ,getter ,@keys)))
+         ,setter))))
 
 (defmacro-mundanely pop (place &environment env)
   #!+sb-doc
   "The argument is a location holding a list. Pops one item off the front
   of the list and returns it."
-  (if (symbolp place)
-      `(prog1 (car ,place) (setq ,place (cdr ,place)))
-      (multiple-value-bind (dummies vals newval setter getter)
-	  (get-setf-method place env)
-	(do* ((d dummies (cdr d))
-	      (v vals (cdr v))
-	      (let-list nil))
-	     ((null d)
-	      (push (list (car newval) getter) let-list)
-	      `(let* ,(nreverse let-list)
-		 (prog1 (car ,(car newval))
-			(setq ,(car newval) (cdr ,(car newval)))
-			,setter)))
-	  (push (list (car d) (car v)) let-list)))))
+  (multiple-value-bind (dummies vals newval setter getter)
+      (get-setf-method place env)
+    (do* ((d dummies (cdr d))
+          (v vals (cdr v))
+          (let-list nil))
+         ((null d)
+          (push (list (car newval) getter) let-list)
+          `(let* ,(nreverse let-list)
+             (prog1 (car ,(car newval))
+               (setq ,(car newval) (cdr ,(car newval)))
+               ,setter)))
+      (push (list (car d) (car v)) let-list))))
 
 (defmacro-mundanely remf (place indicator &environment env)
   #!+sb-doc

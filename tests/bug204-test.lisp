@@ -2,8 +2,8 @@
 (cl:in-package :cl-user)
 
 (macrolet ((def (x)
-             (push `(:expanded ,x) *bug204-test-status*)
-             `(push `(:called ,',x) *bug204-test-status*)))
+             (pushnew `(:expanded ,x) *bug204-test-status* :test #'equalp)
+             `(pushnew `(:called ,',x) *bug204-test-status* :test #'equalp)))
   (eval-when (:compile-toplevel)
     (def :compile-toplevel))
   (eval-when (:load-toplevel)
