@@ -1192,7 +1192,8 @@
 					   :rename-and-delete :overwrite
 					   :append :supersede nil))
 		       (:if-does-not-exist (member :error :create nil))
-		       (:external-format (member :default)))
+		       (:external-format (member :default
+						 :utf-8)))
   (or stream null))
 
 (defknown rename-file (pathname-designator filename)
