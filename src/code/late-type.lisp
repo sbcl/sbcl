@@ -1307,24 +1307,24 @@
 	   (modified-numeric-type
 	    not-type
 	    :low (let ((h (numeric-type-high not-type)))
-		   (if (consp h) h (list h)))
+		   (if (consp h) (car h) (list h)))
 	    :high nil))
 	  ((null (numeric-type-high not-type))
 	   (modified-numeric-type
 	    not-type
 	    :low nil
 	    :high (let ((l (numeric-type-low not-type)))
-		    (if (consp l) l (list l)))))
+		    (if (consp l) (car l) (list l)))))
 	  (t (type-union
 	      (modified-numeric-type
 	       not-type
 	       :low nil
 	       :high (let ((l (numeric-type-low not-type)))
-		       (if (consp l) l (list l))))
+		       (if (consp l) (car l) (list l))))
 	      (modified-numeric-type
 	       not-type
 	       :low (let ((h (numeric-type-high not-type)))
-		      (if (consp h) h (list h)))
+		      (if (consp h) (car h) (list h)))
 	       :high nil))))))
       ((intersection-type-p not-type)
        (apply #'type-union
