@@ -5868,7 +5868,7 @@ collect_garbage(unsigned last_gen)
 
 	if (gencgc_verbose > 1) {
 	    FSHOW((stderr,
-		   "Starting GC of generation %d with raise=%d alloc=%d trig=%d GCs=%d\n",
+		   "starting GC of generation %d with raise=%d alloc=%d trig=%d GCs=%d\n",
 		   gen,
 		   raise,
 		   generations[gen].bytes_allocated,
@@ -5876,8 +5876,8 @@ collect_garbage(unsigned last_gen)
 		   generations[gen].num_gc));
 	}
 
-	/* If an older generation is being filled then update its memory
-	 * age. */
+	/* If an older generation is being filled, then update its
+	 * memory age. */
 	if (raise == 1) {
 	    generations[gen+1].cum_sum_bytes_allocated +=
 		generations[gen+1].bytes_allocated;
@@ -6361,6 +6361,10 @@ gencgc_handle_wp_violation(void* fault_addr)
     /* Check whether the fault is within the dynamic space. */
     if (page_index == (-1)) {
 
+	/* It can be helpful to be able to put a breakpoint on this
+	 * case to help diagnose low-level problems. */
+	unhandled_sigmemoryfault();
+
 	/* not within the dynamic space -- not our responsibility */
 	return 0;
 
@@ -6381,3 +6385,11 @@ gencgc_handle_wp_violation(void* fault_addr)
 	return 1;
     }
 }
+
+/* This is to be called when we catch a SIGSEGV/SIGBUS, determine that
+ * it's not just a case of the program hitting the write barrier, and
+ * are about to let Lisp deal with it. It's basically just a
+ * convenient place to set a gdb breakpoint. */
+void
+unhandled_sigmemoryfault()
+{}

@@ -264,7 +264,7 @@
 	   (type symbol slot))
   (or (find slot (alien-record-type-fields type)
 	    :key #'alien-record-field-name)
-      (error "There is no slot named ~S in ~S" slot type)))
+      (error "There is no slot named ~S in ~S." slot type)))
 
 ;;; Extract the value from the named slot from the record ALIEN. If
 ;;; ALIEN is actually a pointer, then DEREF it first.
