@@ -1213,29 +1213,28 @@
 	     ;; appropriately. This should avoid any unnecessary
 	     ;; underflow or overflow problems.
 	     (multiple-value-bind (min-expo max-expo)
-		 ;; FIXME: These #. forms are broken w.r.t.
-		 ;; cross-compilation portability. Maybe expressions
-		 ;; like
-		 ;;   (LOG SB!XC:MOST-POSITIVE-SHORT-FLOAT 10s0)
-		 ;; could be used instead? Or perhaps some sort of
-		 ;; load-time-form magic?
+		 ;; FIXME: These forms are broken w.r.t.
+		 ;; cross-compilation portability, as the
+		 ;; cross-compiler will call the host's LOG function
+		 ;; while attempting to constant-fold. Maybe some sort
+		 ;; of load-time-form magic could be used instead?
 		 (case float-format
 		   (short-float
 		    (values
-		     #.(log least-positive-normalized-short-float 10s0)
-		     #.(log most-positive-short-float 10s0)))
+		     (log sb!xc:least-positive-normalized-short-float 10s0)
+		     (log sb!xc:most-positive-short-float 10s0)))
 		   (single-float
 		    (values
-		     #.(log least-positive-normalized-single-float 10f0)
-		     #.(log most-positive-single-float 10f0)))
+		     (log sb!xc:least-positive-normalized-single-float 10f0)
+		     (log sb!xc:most-positive-single-float 10f0)))
 		   (double-float
 		    (values
-		     #.(log least-positive-normalized-double-float 10d0)
-		     #.(log most-positive-double-float 10d0)))
+		     (log sb!xc:least-positive-normalized-double-float 10d0)
+		     (log sb!xc:most-positive-double-float 10d0)))
 		   (long-float
 		    (values
-		     #.(log least-positive-normalized-long-float 10L0)
-		     #.(log most-positive-long-float 10L0))))
+		     (log sb!xc:least-positive-normalized-long-float 10L0)
+		     (log sb!xc:most-positive-long-float 10L0))))
 	       (let ((correction (cond ((<= exponent min-expo)
 					(ceiling (- min-expo exponent)))
 				       ((>= exponent max-expo)
