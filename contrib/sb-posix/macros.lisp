@@ -31,7 +31,7 @@
   (string filename))
 
 (define-designator file-descriptor (integer 32)
-  (sb-impl::file-stream (sb-impl::fd-stream-fd file-descriptor))
+  (file-stream (sb-sys:fd-stream-fd file-descriptor))
   (fixnum file-descriptor))
 
 (define-designator sap-or-nil sb-sys:system-area-pointer
@@ -43,7 +43,8 @@
 
 (defmacro define-call (name return-type error-predicate &rest arguments)
   (let ((lisp-name (lisp-for-c-symbol name)))
-    (if (sb-fasl::foreign-symbol-address-as-integer-or-nil name)
+    (if (sb-fasl::foreign-symbol-address-as-integer-or-nil
+	 (sb-vm:extern-alien-name name))
 	`(progn
 	  (export ',lisp-name :sb-posix)
 	  (declaim (inline ,lisp-name))

@@ -152,13 +152,13 @@
 
 
 ;;; mode flags
-(define-call "s_isreg" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
-(define-call "s_isdir" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
-(define-call "s_ischr" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
-(define-call "s_isblk" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
-(define-call "s_isfifo" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
-(define-call "s_islnk" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
-(define-call "s_issock" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
+(define-call "s_isreg" boolean never-fails (mode sb-posix::mode-t))
+(define-call "s_isdir" boolean never-fails (mode sb-posix::mode-t))
+(define-call "s_ischr" boolean never-fails (mode sb-posix::mode-t))
+(define-call "s_isblk" boolean never-fails (mode sb-posix::mode-t))
+(define-call "s_isfifo" boolean never-fails (mode sb-posix::mode-t))
+(define-call "s_islnk" boolean never-fails (mode sb-posix::mode-t))
+(define-call "s_issock" boolean never-fails (mode sb-posix::mode-t))
 
 (export 'sb-posix::pipe :sb-posix)
 (declaim (inline sb-posix::pipe))
@@ -173,5 +173,3 @@
     (when (minusp r)
       (syscall-error)))
   (values (aref filedes2 0) (aref filedes2 1)))
-  
-(define-call "frobozz" int minusp)

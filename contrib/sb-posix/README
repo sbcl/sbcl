@@ -191,7 +191,12 @@ of the error number]
 
 We do not automatically translate the returned value into "Lispy"
 objects - for example, SB-POSIX:OPEN returns a small integer, not a
-stream.
+stream.  Exception: boolean-returning functions (or, more commonly,
+macros) do not return a C integer, but instead a lisp boolean [ or
+maybe "true"/"false" in CLtS parlance ]; the rationale behind this
+exception is that there is nothing that can be meaningfully done with
+the boolean except test for truth or falsity -- it cannot be passed
+meaningfully to other POSIX functions.
 
 [ Rationale: This is an interface to POSIX, not a high-level interface
 that uses POSIX, and many people using it will actually want to mess

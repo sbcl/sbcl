@@ -165,8 +165,11 @@
   #.(logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
 
 (deftest stat.2
-  (let* ((stat (sb-posix:stat "/root"))
+  (let* ((stat (sb-posix:stat "/"))
 	 (mode (sb-posix::stat-mode stat)))
+    ;; it's logically possible for / to be writeable by others... but
+    ;; if it is, either someone is playing with strange security
+    ;; modules or they want to know about it anyway.
     (logand mode sb-posix::s-iwoth))
   0)
     
@@ -225,32 +228,32 @@
 (deftest stat-mode.1
   (with-stat-mode (mode *test-directory*)
     (sb-posix:s-isreg mode))
-  0)
+  nil)
 
 (deftest stat-mode.2
   (with-stat-mode (mode *test-directory*)
-    (zerop (sb-posix:s-isdir mode)))
-  nil)
+    (sb-posix:s-isdir mode))
+  t)
 
 (deftest stat-mode.3
   (with-stat-mode (mode *test-directory*)
     (sb-posix:s-ischr mode))
-  0)
+  nil)
 
 (deftest stat-mode.4
   (with-stat-mode (mode *test-directory*)
     (sb-posix:s-isblk mode))
-  0)
+  nil)
 
 (deftest stat-mode.5
   (with-stat-mode (mode *test-directory*)
     (sb-posix:s-isfifo mode))
-  0)
+  nil)
 
 (deftest stat-mode.6
   (with-stat-mode (mode *test-directory*)
     (sb-posix:s-issock mode))
-  0)
+  nil)
 
 (deftest stat-mode.7
   (let ((link-pathname (make-pathname :name "stat-mode.7"
@@ -259,9 +262,9 @@
          (progn
            (sb-posix:symlink *test-directory* link-pathname)
            (with-lstat-mode (mode link-pathname)
-             (zerop (sb-posix:s-islnk mode))))
+             (sb-posix:s-islnk mode)))
       (ignore-errors (sb-posix:unlink link-pathname))))
-  nil)
+  t)
 
 (deftest stat-mode.8
   (let ((pathname (make-pathname :name "stat-mode.8"
@@ -271,9 +274,9 @@
            (with-open-file (out pathname :direction :output)
              (write-line "test" out))
            (with-stat-mode (mode pathname)
-             (zerop (sb-posix:s-isreg mode))))
+             (sb-posix:s-isreg mode)))
       (ignore-errors (delete-file pathname))))
-  nil)
+  t)
 
 ;;; see comment in filename's designator definition, in macros.lisp
 (deftest filename-designator.1

@@ -135,10 +135,14 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
 
 (deftest simple-local-client
     (progn
-      ;; SunOS (Solaris) and Darwin systems don't have a socket at 
-      ;; /dev/log.  We might also be building in a chroot or something, 
-      ;; so don't fail this test just because the file is unavailable
-      (when (probe-file "/dev/log")
+      ;; SunOS (Solaris) and Darwin systems don't have a socket at
+      ;; /dev/log.  We might also be building in a chroot or
+      ;; something, so don't fail this test just because the file is
+      ;; unavailable, or if it's a symlink to some weird character
+      ;; device.
+      (when (and (probe-file "/dev/log")
+		 (sb-posix:s-issock
+		  (sb-posix::stat-mode (sb-posix:stat "/dev/log"))))
 	(let ((s (make-instance 'local-socket :type :datagram)))
 	  (format t "Connecting ~A... " s)
 	  (finish-output)

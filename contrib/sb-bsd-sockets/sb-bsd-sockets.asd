@@ -110,7 +110,7 @@
   (operate 'test-op 'sb-bsd-sockets-tests))
 
 (defsystem sb-bsd-sockets-tests
-  :depends-on (sb-rt sb-bsd-sockets)
+  :depends-on (sb-rt sb-bsd-sockets sb-posix)
   :components ((:file "tests")))
 
 (defmethod perform ((o test-op) (c (eql (find-system :sb-bsd-sockets-tests))))
