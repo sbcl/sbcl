@@ -182,8 +182,12 @@
     (move rax-tn value)
     (inst test rax-tn 7)
     (inst jmp :ne (if not-p target not-target))
-    (inst sar rax-tn (+ 32 3 -1))    
-    (inst jmp (if not-p :nz :z) target)
+    (inst sar rax-tn (+ 32 3 -1))
+    (if not-p
+	(progn
+	  (inst jmp :nz target)
+	  (inst jmp not-target))
+	(inst jmp :z target))
     (inst cmp rax-tn -1)
     (inst jmp (if not-p :ne :eq) target)
     NOT-TARGET))
