@@ -327,12 +327,13 @@
 
 ;;; Return forms to test that OBJ has the rank and dimensions
 ;;; specified by TYPE, where STYPE is the type we have checked against
-;;; (which is the same but for dimensions.)
+;;; (which is the same but for dimensions and element type).
 (defun test-array-dimensions (obj type stype)
   (declare (type array-type type stype))
   (let ((obj `(truly-the ,(type-specifier stype) ,obj))
 	(dims (array-type-dimensions type)))
-    (unless (eq dims '*)
+    (unless (or (eq dims '*)
+		(equal dims (array-type-dimensions stype)))
       (collect ((res))
 	(when (eq (array-type-dimensions stype) '*)
 	  (res `(= (array-rank ,obj) ,(length dims))))
@@ -344,6 +345,24 @@
 	      (res `(= (array-dimension ,obj ,i) ,dim)))))
 	(res)))))
 
+;;; Return forms to test that OBJ has the element-type specified by
+;;; type specified by TYPE, where STYPE is the type we have checked
+;;; against (which is the same but for dimensions and element type).
+(defun test-array-element-type (obj type stype)
+  (declare (type array-type type stype))
+  (let ((obj `(truly-the ,(type-specifier stype) ,obj))
+	(eltype (array-type-specialized-element-type type)))
+    (unless (type= eltype (array-type-specialized-element-type stype))
+      (with-unique-names (data)
+	`((do ((,data ,obj (%array-data-vector ,data)))
+	      ((not (array-header-p ,data))
+	       ;; KLUDGE: this isn't in fact maximally efficient,
+	       ;; because though we know that DATA is a (SIMPLE-ARRAY *
+	       ;; (*)), we will still check to see if the lowtag is
+	       ;; appropriate.
+	       (typep ,data
+		      '(simple-array ,(type-specifier eltype) (*))))))))))
+
 ;;; If we can find a type predicate that tests for the type without
 ;;; dimensions, then use that predicate and test for dimensions.
 ;;; Otherwise, just do %TYPEP.
@@ -354,12 +373,11 @@
 	     ;; not safe to assume here that it will eventually
 	     ;; have (UPGRADED-ARRAY-ELEMENT-TYPE type)=T, so punt.)
 	     (not (unknown-type-p (array-type-element-type type)))
-	     (type= (array-type-specialized-element-type stype)
-		    (array-type-specialized-element-type type))
 	     (eq (array-type-complexp stype) (array-type-complexp type)))
 	(once-only ((n-obj obj))
 	  `(and (,pred ,n-obj)
-		,@(test-array-dimensions n-obj type stype)))
+	        ,@(test-array-dimensions n-obj type stype)
+	        ,@(test-array-element-type n-obj type stype)))
 	`(%typep ,obj ',(type-specifier type)))))
 
 ;;; Transform a type test against some instance type. The type test is

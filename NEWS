@@ -27,6 +27,7 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
   * increased the maximimum compact environment size to allow
     purify on images with large amounts of functions. (thanks to Cyrus Harmon)
   * improvements to the x86-64 disassembler. (thanks to Lutz Euler)
+  * optimization: type testing for non-vector arrays should be faster.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.549 and similar: late transformation of unsafe type
        assertions into derived types caused unexpected code
