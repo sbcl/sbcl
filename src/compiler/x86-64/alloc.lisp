@@ -105,7 +105,7 @@
     (with-fixed-allocation (result fdefn-widetag fdefn-size node)
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
-      (storew (make-fixup (extern-alien-name "undefined_tramp") :foreign)
+      (storew (make-fixup "undefined_tramp" :foreign)
 	      result fdefn-raw-addr-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
@@ -202,10 +202,10 @@
       ;; we might as well add in the object address here, too. (Adding entropy
       ;; is good, even if ANSI doesn't understand that.)
       (inst imul temp
-	    (make-fixup (extern-alien-name "fast_random_state") :foreign)
+	    (make-fixup "fast_random_state" :foreign)
 	    1103515245)
       (inst add temp 12345)
-      (inst mov (make-fixup (extern-alien-name "fast_random_state") :foreign)
+      (inst mov (make-fixup "fast_random_state" :foreign)
 	    temp)
       ;; We want a positive fixnum for the hash value, so discard the LS bits.
       ;;

@@ -308,7 +308,7 @@
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-    (inst lr res  (make-fixup (extern-alien-name foreign-symbol) :foreign))))
+    (inst lr res  (make-fixup foreign-symbol :foreign))))
 
 #!+linkage-table
 (define-vop (foreign-symbol-dataref-address)
@@ -321,8 +321,7 @@
   (:result-types system-area-pointer)
   (:temporary (:scs (non-descriptor-reg)) addr)
   (:generator 2
-    (inst lr addr (make-fixup (extern-alien-name foreign-symbol)
-                              :foreign-dataref))
+    (inst lr addr (make-fixup foreign-symbol :foreign-dataref))
     (loadw res addr)))
 
 (define-vop (call-out)
@@ -340,7 +339,7 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
 	(store-stack-tn nfp-save cur-nfp))
-      (inst lr temp (make-fixup (extern-alien-name "call_into_c") :foreign))
+      (inst lr temp (make-fixup "call_into_c" :foreign))
       (inst mtctr temp)
       (move cfunc function)
       (inst bctrl)

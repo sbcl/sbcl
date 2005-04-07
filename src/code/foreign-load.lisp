@@ -145,14 +145,17 @@ SB-EXT:SAVE-LISP-AND-DIE for details."
     (dlerror)				; clear old errors
     (unless *runtime-dlhandle*
       (bug "Cannot resolve foreign symbol: lost *runtime-dlhandle*"))
-    (let* ((result (sap-int (dlsym *runtime-dlhandle* symbol)))
+    ;; On real ELF & dlsym platforms the EXTERN-ALIEN-NAME is a no-op,
+    ;; but on platforms where dlsym is simulated we use the mangled name.
+    (let* ((extern (extern-alien-name symbol))
+	   (result (sap-int (dlsym *runtime-dlhandle* extern)))
            (err (dlerror))
            (addr (if (or (not (zerop result)) (not err))
                      result
                      (dolist (obj *shared-objects*)
                        (let ((sap (shared-object-sap obj)))
                          (when sap
-                           (setf result (sap-int (dlsym sap symbol))
+                           (setf result (sap-int (dlsym sap extern))
                                  err (dlerror))
                            (when (or (not (zerop result)) (not err))
                              (return result))))))))
@@ -163,7 +166,7 @@ SB-EXT:SAVE-LISP-AND-DIE for details."
 	      (if datap
 		  undefined-alien-address
 		  (foreign-symbol-address-as-integer 
-		   (sb!vm:extern-alien-name "undefined_alien_function"))))
+		   "undefined_alien_function")))
              (addr
               (pushnew symbol symbols :test #'equal)
               (remove symbol undefineds :test #'equal)

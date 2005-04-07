@@ -466,21 +466,6 @@
       (noise (symbol-name (sc-name sc))))))
 ;;; FIXME: Could this, and everything that uses it, be made #!+SB-SHOW?
 
-
-;;; The loader uses this to convert alien names to the form they need in
-;;; the symbol table (for example, prepending an underscore).
-
-;;; The loader uses this to convert alien names to the form they need in
-;;; the symbol table (for example, prepending an underscore).
-(defun extern-alien-name (name)
-  (declare (type string name))
-  ;; ELF ports currently don't need any prefix
-  (typecase name
-    (simple-base-string name)
-    (base-string (coerce name 'simple-base-string))
-    (t (handler-case (coerce name 'simple-base-string)
-	 (type-error () (error "invalid external alien name: ~S" name))))))
-
 (defun dwords-for-quad (value)
   (let* ((lo (logand value (1- (ash 1 32))))
 	 (hi (ash value -32)))

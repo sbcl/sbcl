@@ -95,13 +95,14 @@ ln -s $sbcl_arch-arch.h target-arch.h
 ln -s $sbcl_arch-lispregs.h target-lispregs.h
 case `uname` in 
     Linux)
+	printf ' :elf' >> $ltf
 	printf ' :linux' >> $ltf
 	sbcl_os="linux"
-       if [ $sbcl_arch = "x86-64" ]; then
-           ln -s Config.x86_64-linux Config                                    
-       else                                                                    
-           ln -s Config.$sbcl_arch-linux Config                                
-       fi 
+	if [ $sbcl_arch = "x86-64" ]; then
+            ln -s Config.x86_64-linux Config                                    
+	else                                                                    
+            ln -s Config.$sbcl_arch-linux Config                                
+	fi 
 	ln -s $sbcl_arch-linux-os.h target-arch-os.h
 	ln -s linux-os.h target-os.h
 	;;
@@ -109,6 +110,7 @@ case `uname` in
         # it's changed name twice since it was called OSF/1: clearly
         # the marketers forgot to tell the engineers about Digital Unix
         # _or_ OSF/1 ...
+	printf ' :elf' >> $ltf
 	printf ' :osf1' >> $ltf
 	sbcl_os="osf1"
         ln -s Config.$sbcl_arch-osf1 Config
@@ -121,17 +123,20 @@ case `uname` in
 	ln -s bsd-os.h target-os.h
 	case `uname` in
 	    FreeBSD)
+		printf ' :elf' >> $ltf
 		printf ' :freebsd' >> $ltf
 		sbcl_os="freebsd"
 		ln -s Config.$sbcl_arch-freebsd Config
 		;;
 	    OpenBSD)
+		printf ' :elf' >> $ltf
 		printf ' :openbsd' >> $ltf
 		sbcl_os="openbsd"
 		ln -s Config.$sbcl_arch-openbsd Config
 		;;
 	    NetBSD)
                 printf ' :netbsd' >> $ltf
+		printf ' :elf' >> $ltf
 		sbcl_os="netbsd"
 		ln -s Config.$sbcl_arch-netbsd Config
 		;;
@@ -142,6 +147,7 @@ case `uname` in
 	esac
 	;;
     Darwin)
+	printf ' :mach-o' >> $ltf
 	printf ' :bsd' >> $ltf
 	sbcl_os="darwin"
 	ln -s $sbcl_arch-darwin-os.h target-arch-os.h
@@ -150,6 +156,7 @@ case `uname` in
 	ln -s Config.$sbcl_arch-darwin Config
 	;;
     SunOS)
+	printf ' :elf' >> $ltf
         printf ' :sunos' >> $ltf
 	sbcl_os="sunos"
 	ln -s Config.$sbcl_arch-sunos Config

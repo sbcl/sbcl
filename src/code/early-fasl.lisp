@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 54)
+(def!constant +fasl-file-version+ 55)
 ;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
@@ -117,6 +117,8 @@
 ;;; 54: (2005-03-22) At least "0.8.20.6: Make FILE-STREAM and STRING-STREAM
 ;;;     potential mixins in CLOS" and "0.8.20.21: Add immediate single-floats
 ;;;     on x86-64."
+;;; 55: (2005-04-06) EXTERN-ALIEN-NAME logic moved from fixups to
+;;;     FIND-FOREIGN-SYMBOL-IN-TABLE &co.
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

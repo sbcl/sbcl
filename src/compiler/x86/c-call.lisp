@@ -190,7 +190,7 @@
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-   (inst lea res (make-fixup (extern-alien-name foreign-symbol) :foreign))))
+   (inst lea res (make-fixup foreign-symbol :foreign))))
 
 #!+linkage-table
 (define-vop (foreign-symbol-dataref-address)
@@ -202,7 +202,7 @@
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-   (inst mov res (make-fixup (extern-alien-name foreign-symbol) :foreign-dataref))))
+   (inst mov res (make-fixup foreign-symbol :foreign-dataref))))
 
 (define-vop (call-out)
   (:args (function :scs (sap-reg))
@@ -221,7 +221,7 @@
   (:generator 0
     (cond ((policy node (> space speed))
 	   (move eax function)
-	   (inst call (make-fixup (extern-alien-name "call_into_c") :foreign)))
+	   (inst call (make-fixup "call_into_c" :foreign)))
 	  (t
 	   ;; Setup the NPX for C; all the FP registers need to be
 	   ;; empty; pop them all.

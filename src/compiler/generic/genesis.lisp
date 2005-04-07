@@ -1474,7 +1474,7 @@ core and return a descriptor to it."
 			       sb!vm:fdefn-raw-addr-slot
 			       (make-random-descriptor
 				(cold-foreign-symbol-address-as-integer
-				 (sb!vm:extern-alien-name "undefined_tramp")))))
+				 "undefined_tramp"))))
 	  fdefn))))
 
 ;;; Handle the at-cold-init-time, fset-for-static-linkage operation
@@ -1501,7 +1501,7 @@ core and return a descriptor to it."
 			  (/show0 "/static-fset (closure)")
 			  (make-random-descriptor
 			   (cold-foreign-symbol-address-as-integer
-			    (sb!vm:extern-alien-name "closure_tramp"))))))
+			    "closure_tramp")))))
     fdefn))
 
 (defun initialize-static-fns ()

@@ -350,15 +350,5 @@
       (non-descriptor-stack (format nil "NS~D" offset))
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed"))))
-
-;;; The loader uses this to convert alien names to the form they
-;;; occure in the symbol table (for example, prepending an
-;;; underscore). 
-(defun extern-alien-name (name)
-  (declare (type string name))
-  ;; ELF ports currently don't need any prefix
-  (typecase name
-    (simple-base-string name)
-    (base-string (coerce name 'simple-base-string))
-    (t (handler-case (coerce name 'simple-base-string)
-	 (type-error () (error "invalid external alien name: ~S" name))))))
+
+

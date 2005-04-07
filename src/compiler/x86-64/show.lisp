@@ -27,11 +27,10 @@
   (:save-p t)
   (:generator 100
     (inst push object)
-    (inst lea rax (make-fixup (extern-alien-name "debug_print") :foreign))
+    (inst lea rax (make-fixup "debug_print" :foreign))
     (inst lea call-target
 	  (make-ea :qword
-		   :disp (make-fixup (extern-alien-name "call_into_c")
-				     :foreign)))
+		   :disp (make-fixup "call_into_c" :foreign)))
     (inst call call-target)
     (inst add rsp-tn n-word-bytes)
     (move result rax)))

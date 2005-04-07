@@ -26,8 +26,8 @@
       (when cur-nfp
 	(store-stack-tn nfp-save cur-nfp))
       (move nl0 object)
-      (inst li cfunc (make-fixup (extern-alien-name "debug_print") :foreign))
-      (inst li temp (make-fixup (extern-alien-name "call_into_c") :foreign))
+      (inst li cfunc (make-fixup "debug_print" :foreign))
+      (inst li temp (make-fixup "call_into_c" :foreign))
       (inst jal lip temp)
       (inst nop)
       (when cur-nfp

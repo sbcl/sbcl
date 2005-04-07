@@ -31,7 +31,6 @@
 (assert (typep (in-package :cl-user) 'package))
 
 ;;; PROFILE should run without obvious breakage
-#-darwin
 (progn
   (defun profiled-fun ()
     (random 1d0))

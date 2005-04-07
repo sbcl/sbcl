@@ -110,7 +110,7 @@
     (with-fixed-allocation (result fdefn-widetag fdefn-size node)
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
-      (storew (make-fixup (extern-alien-name "undefined_tramp") :foreign)
+      (storew (make-fixup "undefined_tramp" :foreign)
 	      result fdefn-raw-addr-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)

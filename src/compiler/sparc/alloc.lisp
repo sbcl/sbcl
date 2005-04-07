@@ -107,7 +107,7 @@
   (:translate make-fdefn)
   (:generator 37
     (with-fixed-allocation (result temp fdefn-widetag fdefn-size)
-      (inst li temp (make-fixup (extern-alien-name "undefined_tramp") :foreign))
+      (inst li temp (make-fixup "undefined_tramp" :foreign))
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
       (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))

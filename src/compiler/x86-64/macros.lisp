@@ -156,8 +156,7 @@
   (declare (ignore ignored))
   (inst push size)
   (inst lea r13-tn (make-ea :qword
-			    :disp (make-fixup (extern-alien-name "alloc_tramp")
-					      :foreign)))
+			    :disp (make-fixup "alloc_tramp" :foreign)))
   (inst call r13-tn)
   (inst pop alloc-tn)
   (values))
@@ -171,14 +170,12 @@
 	(free-pointer
 	 (make-ea :qword :disp 
 		  #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
-		  #!-sb-thread (make-fixup (extern-alien-name "boxed_region")
-					   :foreign)
+		  #!-sb-thread (make-fixup "boxed_region" :foreign)
 		  :scale 1))		; thread->alloc_region.free_pointer
 	(end-addr 
 	 (make-ea :qword :disp
 		  #!+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
-		  #!-sb-thread (make-fixup (extern-alien-name "boxed_region")
-					   :foreign 8)
+		  #!-sb-thread (make-fixup "boxed_region" :foreign 8)
 		  :scale 1)))		; thread->alloc_region.end_addr
     (cond (in-elsewhere
 	   (allocation-tramp alloc-tn size))
@@ -208,8 +205,7 @@
   (declare (ignore ignored))
   (inst push size)
   (inst lea r13-tn (make-ea :qword
-			    :disp (make-fixup (extern-alien-name "alloc_tramp")
-					      :foreign)))
+			    :disp (make-fixup "alloc_tramp" :foreign)))
   (inst call r13-tn)
   (inst pop alloc-tn)
   (values))

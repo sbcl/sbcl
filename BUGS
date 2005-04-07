@@ -2042,18 +2042,6 @@ WORKAROUND:
  #.SB-EXT:SINGLE/DOUBLE-FLOAT-POSITIVE-INFINITY. These tests have been
  disabled on Darwin for now.
 
-373: profiling issues on ppc/darwin
- The following bit from smoke.impure.lisp fails on ppc/darwin:
-    (progn
-      (defun profiled-fun ()
-        (random 1d0))
-      (profile profiled-fun)
-      (loop repeat 100000 do (profiled-fun))
-      (report))
- dropping into the debugger with a TYPE-ERROR:
-    The value -1073741382 is not of type UNSIGNED-BYTE.
- The test has been disabled on Darwin till the bug is fixed.
-
 374: BIT-AND problem on ppc/darwin:
   The BIT-AND test in bit-vector.impure-cload.lisp results in
     fatal error encountered in SBCL pid 8356:

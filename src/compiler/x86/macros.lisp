@@ -174,10 +174,9 @@
     (unless (or (eql size 8) (eql size 16))
       (unless (and (tn-p size) (location= alloc-tn size))
 	(inst mov alloc-tn size)))
-    (inst call (make-fixup (extern-alien-name 
-			    (concatenate 'string
+    (inst call (make-fixup (concatenate 'string
 					 "alloc_" size-text
-					 "to_" tn-text))
+					 "to_" tn-text)
 			   :foreign))))
 
 (defun allocation-inline (alloc-tn size)
@@ -185,14 +184,12 @@
 	(free-pointer
 	 (make-ea :dword :disp 
 		  #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
-		  #!-sb-thread (make-fixup (extern-alien-name "boxed_region")
-					    :foreign)
+		  #!-sb-thread (make-fixup "boxed_region" :foreign)
 		  :scale 1)) ; thread->alloc_region.free_pointer
 	(end-addr 
 	 (make-ea :dword :disp
 		  #!+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
-		  #!-sb-thread (make-fixup (extern-alien-name "boxed_region")
-					   :foreign 4)
+		  #!-sb-thread (make-fixup "boxed_region" :foreign 4)
 		  :scale 1)))	; thread->alloc_region.end_addr
     (unless (and (tn-p size) (location= alloc-tn size))
       (inst mov alloc-tn size))
@@ -208,7 +205,7 @@
 		 (#.ebx-offset "alloc_overflow_ebx")
 		 (#.esi-offset "alloc_overflow_esi")
 		 (#.edi-offset "alloc_overflow_edi"))))
-      (inst call (make-fixup (extern-alien-name dst) :foreign)))
+      (inst call (make-fixup dst :foreign)))
     (emit-label ok)
     #!+sb-thread (inst fs-segment-prefix)
     (inst xchg free-pointer alloc-tn))

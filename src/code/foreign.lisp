@@ -11,6 +11,16 @@
 
 (in-package "SB!IMPL")
 
+#!-(or elf mach-o)
+(error "Not an ELF or Mach-O platform?")
+
+(defun extern-alien-name (name)
+  (handler-case
+      #!+elf (coerce name 'base-string)
+      #!+mach-o (concatenate 'base-string "_" name)
+    (error ()
+      (error "invalid external alien name: ~S" name))))
+
 ;;; *STATIC-FOREIGN-SYMBOLS* are static as opposed to "dynamic" (not
 ;;; as opposed to C's "extern"). The table contains symbols known at
 ;;; the time that the program was built, but not symbols defined in
@@ -19,9 +29,9 @@
 (defvar *static-foreign-symbols* (make-hash-table :test 'equal))
 
 (defun find-foreign-symbol-in-table (name table)
-  (some (lambda (prefix)
-	  (gethash (concatenate 'string prefix name) table))
-	#("" "ldso_stub__")))
+  (let ((extern (extern-alien-name name)))
+    (or (gethash extern table)
+	(gethash (concatenate 'base-string "ldso_stub__" extern) table))))
 
 (defun foreign-symbol-address-as-integer-or-nil (name &optional datap)
   (declare (ignorable datap))
@@ -41,19 +51,18 @@
 
 (defun foreign-symbol-address (symbol &optional datap)
   (declare (ignorable datap))
-  (let ((name (sb!vm:extern-alien-name symbol)))
-    #!-linkage-table
-    (int-sap (foreign-symbol-address-as-integer name))
-    #!+linkage-table
-    (multiple-value-bind (addr sharedp)
-        (foreign-symbol-address-as-integer name datap)
-      #+sb-xc-host
-      (aver (not sharedp))
-      ;; If the address is from linkage-table and refers to data
-      ;; we need to do a bit of juggling.
-      (if (and sharedp datap)
-          (int-sap (sap-ref-word (int-sap addr) 0))
-          (int-sap addr)))))
+  #!-linkage-table
+  (int-sap (foreign-symbol-address-as-integer symbol))
+  #!+linkage-table
+  (multiple-value-bind (addr sharedp)
+      (foreign-symbol-address-as-integer symbol datap)
+    #+sb-xc-host
+    (aver (not sharedp))
+    ;; If the address is from linkage-table and refers to data
+    ;; we need to do a bit of juggling.
+    (if (and sharedp datap)
+	(int-sap (sap-ref-word (int-sap addr) 0))
+	(int-sap addr))))
 
 #-sb-xc-host
 (defun foreign-reinit ()
