@@ -249,13 +249,14 @@
                              ~[~:;~:*~&  caught ~W ERROR condition~:P~]~
                              ~[~:;~:*~&  caught ~W WARNING condition~:P~]~
                              ~[~:;~:*~&  caught ~W STYLE-WARNING condition~:P~]~
-                             ~[~:;~:*~&  printed ~W note~:P~]~%"
+                             ~[~:;~:*~&  printed ~W note~:P~]"
 	      abort-p
 	      *aborted-compilation-unit-count*
 	      *compiler-error-count*
 	      *compiler-warning-count*
 	      *compiler-style-warning-count*
 	      *compiler-note-count*))
+    (terpri *error-output*)
     (force-output *error-output*)))
 
 ;;; Evaluate BODY, then return (VALUES BODY-VALUE WARNINGS-P
