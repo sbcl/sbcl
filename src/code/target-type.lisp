@@ -196,8 +196,5 @@
      (specifier-type 'character))
     (t
      (classoid-of x))))
-
-;;; Clear this cache on GC so that we don't hold onto too much garbage.
-(pushnew 'ctype-of-cache-clear *before-gc-hooks*)
 
 (!defun-from-collected-cold-init-forms !target-type-cold-init)

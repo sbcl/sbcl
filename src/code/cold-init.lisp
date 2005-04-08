@@ -92,8 +92,7 @@
   ;; !UNIX-COLD-INIT. And *TYPE-SYSTEM-INITIALIZED* could be changed to
   ;; *TYPE-SYSTEM-INITIALIZED-WHEN-BOUND* so that it doesn't need to
   ;; be explicitly set in order to be meaningful.
-  (setf *before-gc-hooks* nil
-        *after-gc-hooks* nil
+  (setf *after-gc-hooks* nil
 	*gc-inhibit* 1
 	*need-to-collect-garbage* nil
 	sb!unix::*interrupts-enabled* t

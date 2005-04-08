@@ -139,17 +139,9 @@ and submit it as a patch."
 
 ;;;; GC hooks
 
-(defvar *before-gc-hooks* nil ; actually initialized in cold init
-  #!+sb-doc
-  "A list of functions that are called before garbage collection occurs.
-  The functions are run with interrupts disabled and all other threads
-  paused.  They should take no arguments.")
-
-(defvar *after-gc-hooks* nil ; actually initialized in cold init
-  #!+sb-doc
-  "A list of functions that are called after garbage collection occurs.
-  The functions are run with interrupts disabled and all other threads
-  paused.  They should take no arguments.")
+(defvar *after-gc-hooks* nil
+  "Called after each garbage collection. In a multithreaded
+environment these hooks may run in any thread.")
 
 ;;;; The following specials are used to control when garbage
 ;;;; collection occurs.
@@ -200,14 +192,6 @@ and submit it as a patch."
 
 ;;;; SUB-GC
 
-;;; This is used to carefully invoke hooks.
-(eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro carefully-funcall (function &rest args)
-    `(handler-case (funcall ,function ,@args)
-       (error (cond)
-	      (warn "(FUNCALL ~S~{ ~S~}) lost:~%~A" ',function ',args cond)
-	      nil))))
-
 ;;; SUB-GC does a garbage collection.  This is called from three places:
 ;;; (1) The C runtime will call here when it detects that we've consed 
 ;;;     enough to exceed the gc trigger threshold.  This is done in
@@ -226,25 +210,40 @@ and submit it as a patch."
 (defvar *already-in-gc* 
   (sb!thread:make-mutex :name "GC lock") "ID of thread running SUB-GC")
 
-(defun sub-gc (&key (gen 0) &aux (pre-gc-dynamic-usage (dynamic-usage)))
-  (let ((me (sb!thread:current-thread-id)))
-    (when (eql (sb!thread::mutex-value *already-in-gc*) me) 
-      (return-from sub-gc nil))
+(defun sub-gc (&key (gen 0))
+  (unless (eql (sb!thread:current-thread-id)
+	       (sb!thread::mutex-value *already-in-gc*))
     (setf *need-to-collect-garbage* t)
     (when (zerop *gc-inhibit*)
-      (loop
-       (sb!thread:with-mutex (*already-in-gc*)
-	 (unless *need-to-collect-garbage* (return-from sub-gc nil))
-	 (without-interrupts
-	  (gc-stop-the-world)
-	  (collect-garbage gen)
-	  (incf *n-bytes-freed-or-purified*
-		(max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
-	  (scrub-control-stack)
-	  (setf *need-to-collect-garbage* nil)
-	  (dolist (h *after-gc-hooks*) (carefully-funcall h))
-	  (gc-start-the-world))
-	 (sb!thread::reap-dead-threads))))))
+      (sb!thread:with-mutex (*already-in-gc*)
+	(let ((old-usage (dynamic-usage))
+	      (new-usage 0))
+	  (unsafe-clear-roots)
+	  ;; We need to disable interrupts for GC, but we also want
+	  ;; to run as little as possible without them.
+	  (without-interrupts
+	    (gc-stop-the-world)	      
+	    (collect-garbage gen)
+	    (setf *need-to-collect-garbage* nil
+		  new-usage (dynamic-usage))
+	    (gc-start-the-world))
+	  ;; Interrupts re-enabled, but still inside the mutex.
+	  ;; In a multithreaded environment the other threads will
+	  ;; see *n-b-f-o-p* change a little late, but that's OK.
+	  (let ((freed (- old-usage new-usage)))
+	    ;; GENCGC occasionally reports negative here, but the
+	    ;; current belief is that it is part of the normal order
+	    ;; of things and not a bug.
+	    (when (plusp freed)
+	      (incf *n-bytes-freed-or-purified* freed)))
+	  (sb!thread::reap-dead-threads)))
+      ;; Outside the mutex, these may cause another GC.
+      (run-pending-finalizers)
+      (dolist (hook *after-gc-hooks*)
+	(handler-case
+	    (funcall hook)
+	  (error (c)
+	    (warn "Error calling after GC hook ~S:~%  ~S" hook c)))))))
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)
@@ -255,6 +254,15 @@ and submit it as a patch."
   "Initiate a garbage collection. GEN may be provided for compatibility with
   generational garbage collectors, but is ignored in this implementation."
   (sub-gc :gen (if full 6 gen)))
+
+(defun unsafe-clear-roots ()
+  ;; KLUDGE: Do things in an attempt to get rid of extra roots. Unsafe
+  ;; as having these cons more then we have space left leads to huge
+  ;; badness.
+  (scrub-control-stack)
+  ;; FIXME: CTYPE-OF-CACHE-CLEAR isn't thread-safe.
+  #!-sb-thread
+  (ctype-of-cache-clear))
 
 
 ;;;; auxiliary functions
@@ -272,6 +280,9 @@ and submit it as a patch."
 			       (sb!alien:unsigned 32))
 	val))
 
+;;; FIXME: Aren't these utterly wrong if called inside WITHOUT-GCING?
+;;; Unless something that works there too can be deviced this fact
+;;; should be documented.
 (defun gc-on ()
   #!+sb-doc
   "Enable the garbage collector."

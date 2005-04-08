@@ -31,15 +31,6 @@
 (defmacro without-interrupts (&rest forms)
   `(progn ,@forms))
 
-;;; When we're running as a cross-compiler in an arbitrary host ANSI
-;;; Lisp, we shouldn't be doing anything which is sensitive to GC.
-;;; KLUDGE: I (WHN 19990131) think the proper long-term solution would
-;;; be to remove any operations from cross-compiler source files
-;;; (putting them in target-only source files) if they refer to these
-;;; hooks. This is a short-term hack.
-(defvar *before-gc-hooks* nil)
-(defvar *after-gc-hooks* nil)
-
 ;;; The GENESIS function works with fasl code which would, in the
 ;;; target SBCL, work on ANSI-STREAMs (streams which aren't extended
 ;;; Gray streams). In ANSI Common Lisp, an ANSI-STREAM is just a
