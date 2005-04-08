@@ -27,14 +27,17 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
     fixed.  (thanks to Bruno Haible)
   * improvements to the MIPS runtime code for increased stability.
     (thanks to Thiemo Seufer)
+  * increased the maximimum compact environment size to allow
+    purify on images with large amounts of functions. (thanks to Cyrus Harmon)
+  * partial workaround for bug 135: don't name the function we're
+    calling for hairy cases of EVAL, so as not to accumulate one environment
+    entry per call to EVAL.  (reported by Kevin Reid)
+  * improvements to the x86-64 disassembler. (thanks to Lutz Euler)
+  * optimization: type testing for non-vector arrays should be faster.
   * fixed some bugs related to Unicode integration:
     ** the restarts for recovering from input and output encoding
        errors only appear when there is in fact such an error to
        handle.
-  * increased the maximimum compact environment size to allow
-    purify on images with large amounts of functions. (thanks to Cyrus Harmon)
-  * improvements to the x86-64 disassembler. (thanks to Lutz Euler)
-  * optimization: type testing for non-vector arrays should be faster.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.549 and similar: late transformation of unsafe type
        assertions into derived types caused unexpected code

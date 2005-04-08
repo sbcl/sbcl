@@ -20,7 +20,7 @@
   ;; to be careful about not muffling warnings arising from inner
   ;; evaluations/compilations, though [e.g. the ignored variable in
   ;; (DEFUN FOO (X) 1)].  -- CSR, 2003-05-13
-  (let ((fun (sb!c:compile-in-lexenv (gensym "EVAL-TMPFUN-")
+  (let ((fun (sb!c:compile-in-lexenv nil
 				     `(lambda () ,expr)
 				     lexenv)))
     (funcall fun)))
