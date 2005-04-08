@@ -164,7 +164,7 @@
 			  (mixf result (sxhash-number (realpart x)))
 			  (mixf result (sxhash-number (imagpart x)))
 			  result))))
-	   (sxhash-recurse (x &optional (depthoid +max-hash-depthoid+))
+	   (sxhash-recurse (x depthoid)
 	     (declare (type index depthoid))
 	     (typecase x
 	       ;; we test for LIST here, rather than CONS, because the
@@ -209,7 +209,7 @@
 	       (number (sxhash-number x))
 	       (generic-function (sxhash-instance x))
 	       (t 42))))
-    (sxhash-recurse x)))
+    (sxhash-recurse x +max-hash-depthoid+)))
 
 ;;;; the PSXHASH function
 
