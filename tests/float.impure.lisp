@@ -68,5 +68,32 @@
 (compile 'single-float-ppc)
 (assert (= (single-float-ppc -30) -30f0))
 
+;;; constant-folding irrational functions
+(declaim (inline df))
+(defun df (x)
+  ;; do not remove the ECASE here: the bug this checks for indeed
+  ;; depended on this configuration
+  (ecase x (1 least-positive-double-float)))
+(macrolet ((test (fun)
+             (let ((name (intern (format nil "TEST-CONSTANT-~A" fun))))
+               `(progn
+                  (defun ,name () (,fun (df 1)))
+                  (,name)))))
+  (test sqrt)
+  (test log)
+  (test sin)
+  (test cos)
+  (test tan)
+  (test asin)
+  (test acos)
+  (test atan)
+  (test sinh)
+  (test cosh)
+  (test tanh)
+  (test asinh)
+  (test acosh)
+  (test atanh)
+  (test exp))
+
 ;;; success
 (quit :unix-status 104)

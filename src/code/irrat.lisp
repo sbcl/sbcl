@@ -41,6 +41,18 @@
 
 ) ; EVAL-WHEN
 
+#!+x86 ;; for constant folding
+(macrolet ((def (name ll)
+	     `(defun ,name ,ll (,name ,@ll))))
+  (def %atan2 (x y))
+  (def %atan (x))
+  (def %tan-quick (x))
+  (def %cos-quick (x))
+  (def %sin-quick (x))
+  (def %sqrt (x))
+  (def %log (x))
+  (def %exp (x)))
+
 ;;;; stubs for the Unix math library
 ;;;;
 ;;;; Many of these are unnecessary on the X86 because they're built
@@ -54,9 +66,6 @@
 (def-math-rtn "acos" 1)
 #!-x86 (def-math-rtn "atan" 1)
 #!-x86 (def-math-rtn "atan2" 2)
-#!+x86 ;; for constant folding
-(defun %atan2 (x y)
-  (%atan2 x y))
 (def-math-rtn "sinh" 1)
 (def-math-rtn "cosh" 1)
 (def-math-rtn "tanh" 1)
