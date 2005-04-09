@@ -203,7 +203,7 @@ GNAME(fpu_restore):
  * the undefined-function trampoline
  */
 	.text
-	.align	align_4byte,0x90
+	.align	align_8byte,0x90
 	.global GNAME(undefined_tramp)
 	.type	GNAME(undefined_tramp),@function
 GNAME(undefined_tramp):
@@ -217,9 +217,9 @@ GNAME(undefined_tramp):
 
 
 	.text
-	.align	align_4byte,0x90
+	.align	align_8byte,0x90
 	.global GNAME(alloc_tramp)
-	.type	GNAME(alooc_tramp),@function
+	.type	GNAME(alloc_tramp),@function
 GNAME(alloc_tramp):
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
@@ -253,7 +253,7 @@ GNAME(alloc_tramp):
  * the closure trampoline
  */
 	.text
-	.align	align_4byte,0x90
+	.align	align_8byte,0x90
 	.global GNAME(closure_tramp)
 	.type	GNAME(closure_tramp),@function
 GNAME(closure_tramp):
@@ -272,16 +272,20 @@ GNAME(closure_tramp):
  */
 	.text
 	.global	GNAME(fun_end_breakpoint_guts)
-	.align	align_4byte
+	.align	align_8byte
 GNAME(fun_end_breakpoint_guts):
 	/* Multiple Value return */
 	jmp	multiple_value_return
+	/* the above jmp is only 2 bytes long, we need to add a nop for 
+	 * padding since the single value return convention jumps to original
+	 * return address + 3 bytes */
+	nop
 	/* Single value return: The eventual return will now use the
 	   multiple values return convention but with a return values
 	   count of one. */
 	mov	%rsp,%rbx	# Setup ebx - the ofp.
-	sub	$4,%rsp		# Allocate one stack slot for the return value
-	mov	$4,%rcx		# Setup ecx for one return value.
+	sub	$8,%rsp		# Allocate one stack slot for the return value
+	mov	$8,%rcx		# Setup ecx for one return value.
 	mov	$NIL,%rdi	# default second value
 	mov	$NIL,%rsi	# default third value
 		
@@ -299,7 +303,7 @@ GNAME(fun_end_breakpoint_end):
 
 	.global	GNAME(do_pending_interrupt)
 	.type	GNAME(do_pending_interrupt),@function
-	.align	align_4byte,0x90
+	.align	align_8byte,0x90
 GNAME(do_pending_interrupt):
 	int3
 	.byte 	trap_PendingInterrupt
@@ -308,12 +312,11 @@ GNAME(do_pending_interrupt):
 
 	.globl	GNAME(post_signal_tramp)
 	.type	GNAME(post_signal_tramp),@function
-	.align	align_4byte,0x90
+	.align	align_8byte,0x90
 GNAME(post_signal_tramp):
 	/* this is notionally the second half of a function whose first half
  	 * doesn't exist.  This is where call_into_lisp returns when called 
 	 * using return_to_lisp_function */
-	addq $24,%rsp  	/* clear call_into_lisp args from stack */
 	popq %r15
 	popq %r14
 	popq %r13
@@ -324,7 +327,7 @@ GNAME(post_signal_tramp):
 	popq %r8
 	popq %rdi
 	popq %rsi
-	popq %rbp
+	addq $8, %rsp
 	popq %rsp
 	popq %rdx
 	popq %rbx

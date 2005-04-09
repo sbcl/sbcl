@@ -53,7 +53,7 @@ context_eflags_addr(os_context_t *context)
      * gregs[], but it's conditional on __USE_GNU and not defined, so
      * we need to do this nasty absolute index magic number thing
      * instead. */
-    return &context->uc_mcontext.gregs[16];
+    return &context->uc_mcontext.gregs[17];
 #elif defined __FreeBSD__
     return &context->uc_mcontext.mc_eflags;
 #elif defined __OpenBSD__
@@ -271,7 +271,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     case trap_FunEndBreakpoint:
 	(char*)(*os_context_pc_addr(context)) -= 1;
 	*os_context_pc_addr(context) =
-	    (int)handle_fun_end_breakpoint(signal, info, context);
+	    (unsigned long)handle_fun_end_breakpoint(signal, info, context);
 	break;
 
     default:

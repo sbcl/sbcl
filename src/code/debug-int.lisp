@@ -371,7 +371,7 @@
   ;; This is the byte offset into the component.
   (offset nil :type index)
   ;; The original instruction replaced by the breakpoint.
-  (instruction nil :type (or null (unsigned-byte 32)))
+  (instruction nil :type (or null sb!vm::word))
   ;; A list of user breakpoints at this location.
   (breakpoints nil :type list))
 (def!method print-object ((obj breakpoint-data) str)

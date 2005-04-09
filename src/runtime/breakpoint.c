@@ -26,7 +26,7 @@
 #include "genesis/fdefn.h"
 
 #define REAL_LRA_SLOT 0
-#ifndef LISP_FEATURE_X86
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 #define KNOWN_RETURN_P_SLOT 1
 #define BOGUS_LRA_CONSTANTS 2
 #else
@@ -71,7 +71,7 @@ void breakpoint_do_displaced_inst(os_context_t* context,
     arch_do_displaced_inst(context, orig_inst);
 }
 
-#ifndef LISP_FEATURE_X86
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 static lispobj find_code(os_context_t *context)
 {
 #ifdef reg_CODE
@@ -91,9 +91,7 @@ static lispobj find_code(os_context_t *context)
     return NIL;
 #endif
 }
-#endif
-
-#ifdef LISP_FEATURE_X86
+#else
 static lispobj find_code(os_context_t *context)
 {
     lispobj codeptr =
@@ -107,7 +105,7 @@ static lispobj find_code(os_context_t *context)
 }
 #endif
 
-static int compute_offset(os_context_t *context, lispobj code)
+static long compute_offset(os_context_t *context, lispobj code)
 {
     if (code == NIL)
 	return 0;
@@ -125,7 +123,7 @@ static int compute_offset(os_context_t *context, lispobj code)
 	if (pc < code_start)
 	    return 0;
 	else {
-	    int offset = pc - code_start;
+	    long offset = pc - code_start;
 	    if (offset >= codeptr->code_size)
 		return 0;
 	    else
@@ -137,7 +135,7 @@ static int compute_offset(os_context_t *context, lispobj code)
  * tried.  The sigprocmask() call would work just as well on alpha as it
  * presumably does on x86   -dan 2001.08.10
  */
-#ifndef LISP_FEATURE_X86
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 void handle_breakpoint(int signal, siginfo_t *info, os_context_t *context)
 {
     lispobj code;
@@ -176,7 +174,7 @@ void handle_breakpoint(int signal, siginfo_t* info, os_context_t *context)
 }
 #endif
 
-#ifndef LISP_FEATURE_X86
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
 				os_context_t *context)
 {

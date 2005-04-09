@@ -266,7 +266,7 @@
 	       (locally
 		 (declare (special basic-definition arg-list))
 		 (prin1 `(,(trace-info-what info) ,@arg-list)))
-	       (print-frame-call frame))
+	       (print-frame-call frame *standard-output*))
 	   (terpri)
 	   (trace-print frame (trace-info-print info))
 	   (write-sequence (get-output-stream-string *standard-output*)

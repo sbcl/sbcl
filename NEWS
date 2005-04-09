@@ -34,6 +34,8 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
     entry per call to EVAL.  (reported by Kevin Reid)
   * improvements to the x86-64 disassembler. (thanks to Lutz Euler)
   * optimization: type testing for non-vector arrays should be faster.
+  * fixed TRACE :ENCAPSULATE NIL, added support for :ENCAPSULATE NIL
+    on x86-64
   * fixed some bugs related to Unicode integration:
     ** the restarts for recovering from input and output encoding
        errors only appear when there is in fact such an error to
