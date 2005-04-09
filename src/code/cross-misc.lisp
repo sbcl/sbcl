@@ -136,18 +136,6 @@
   (assert (typep array '(simple-array * (*))))
   (values array start end 0))
 
-#!-(or alpha x86-64)
-(progn
-  (defun sb!vm::ash-left-mod32 (integer amount)
-    (ldb (byte 32 0) (ash integer amount)))
-  (defun sb!vm::logxor-mod32 (x y)
-    (ldb (byte 32 0) (logxor x y)))
-  (defun sb!vm::lognot-mod32 (x)
-    (ldb (byte 32 0) (lognot x))))
-#!+(or alpha x86-64)
-(defun sb!vm::ash-left-mod64 (integer amount)
-  (ldb (byte 64 0) (ash integer amount)))
-
 ;;; package locking nops for the cross-compiler
 
 (defmacro without-package-locks (&body body)

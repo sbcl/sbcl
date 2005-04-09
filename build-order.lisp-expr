@@ -546,6 +546,7 @@
   ;; x pressing problems. Someday, though, it would be nice to figure out
   ;; x what the problem is and fix it.
   #!+(or ppc sparc) :ignore-failure-p)
+ ("src/code/cross-modular"  :not-target)
  ("src/compiler/target/subprim")
 
  ("src/compiler/target/debug")

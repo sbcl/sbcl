@@ -681,21 +681,7 @@
 		    ;; function arguments. -- WHN 19990918
 		    (not (ir1-attributep attr call))
 		    (every #'constant-lvar-p args)
-		    (node-lvar node)
-		    ;; Even if the function is foldable in principle,
-		    ;; it might be one of our low-level
-		    ;; implementation-specific functions. Such
-		    ;; functions don't necessarily exist at runtime on
-		    ;; a plain vanilla ANSI Common Lisp
-		    ;; cross-compilation host, in which case the
-		    ;; cross-compiler can't fold it because the
-		    ;; cross-compiler doesn't know how to evaluate it.
-		    #+sb-xc-host
-		    (or (fboundp (combination-fun-source-name node))
-                        (progn (format t ";;; !!! Unbound fun: (~S~{ ~S~})~%"
-                                       (combination-fun-source-name node)
-                                       (mapcar #'lvar-value args))
-                               nil)))
+		    (node-lvar node))
 	   (constant-fold-call node)
 	   (return-from ir1-optimize-combination)))
 

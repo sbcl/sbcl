@@ -824,7 +824,7 @@
   (when (and (cast-type-check cast)
              (not (node-lvar cast)))
     ;; FIXME
-    (bug "IR2 type checking of unused values in not implemented.")
+    (bug "IR2 type checking of unused values is not implemented.")
     )
   (values))
 

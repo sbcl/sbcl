@@ -286,7 +286,7 @@
      (sc-number-or-lose 'zero))
     (null
      (sc-number-or-lose 'null ))
-    ((or (integer sb!xc:most-negative-fixnum sb!xc:most-positive-fixnum)
+    ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
 	 system-area-pointer character)
      (sc-number-or-lose 'immediate ))
     (symbol
