@@ -102,6 +102,9 @@ you deserve to lose.")
 	(t
 	 (cons (car list) (flatten (cdr list))))))
 
+(defun whitespacep (char)
+  (find char #(#\tab #\space #\page)))
+
 (defun setf-name-p (name)
   (or (symbolp name)
       (and (listp name) (= 2 (length name)) (eq (car name) 'setf))))
@@ -437,13 +440,13 @@ variables if the symbol in question is contained in symbols
 ;;; lisp sections
 
 (defun lisp-section-p (line line-number lines)
-  "Returns T if the given LINE looks like start of lisp code -- ie. if
-it starts with whitespace followed by a paren, and the previous line
-is empty"
+  "Returns T if the given LINE looks like start of lisp code --
+ie. if it starts with whitespace followed by a paren or
+semicolon, and the previous line is empty"
   (let ((offset (indentation line)))
     (and offset
 	 (plusp offset)
-	 (eql #\( (find-if-not (lambda (c) (eql #\Space c)) line))
+	 (find (find-if-not #'whitespacep line) "(;")
 	 (empty-p (1- line-number) lines))))
 
 (defun collect-lisp-section (lines line-number)

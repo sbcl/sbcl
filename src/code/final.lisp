@@ -32,10 +32,9 @@ signalled in whichever thread the FUNCTION was called in.
 
 Examples:
 
-  ;;; good
+  ;;; good (assumes RELEASE-HANDLE is re-entrant)
   (let* ((handle (get-handle))
          (object (make-object handle)))
-   ;; assumes RELEASE-HANDLE is re-entrant
    (finalize object (lambda () (release-handle handle)))
    object)
 
