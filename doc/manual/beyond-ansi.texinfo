@@ -7,36 +7,38 @@ ANSI standard. SBCL doesn't support as many extensions as CMUCL, but
 it still has quite a few.  @xref{Contributed Modules}.
 
 @menu
-* Things Which Might Be In The Next ANSI Standard::  
+* Garbage Collection::          
+* Metaobject Protocol::         
 * Support For Unix::            
 * Customization Hooks for Users::  
 * Tools To Help Developers::    
-* Resolution of Name Conflicts::
+* Resolution of Name Conflicts::  
 * Stale Extensions::            
 * Efficiency Hacks::            
 @end menu
 
-@node  Things Which Might Be In The Next ANSI Standard
+@node  Garbage Collection
 @comment  node-name,  next,  previous,  up
-@section Things Which Might Be In The Next ANSI Standard
-
-SBCL provides extensive support for calling external C code,
-@ref{Foreign Function Interface}.
+@section Garbage Collection
 
 SBCL provides additional garbage collection functionality not
 specified by ANSI. Weak pointers allow references to objects to be
-maintained without keeping them from being GCed (garbage
-collected). And ``finalization'' hooks are available to cause code to
-be executed when an object has been GCed.
-@c <!-- FIXME: Actually documenting these would be good.:-| -->
+maintained without keeping them from being garbage collected, and
+``finalization'' hooks are available to cause code to be executed when
+an object has been garbage collected. Additionally users can specify
+their own cleanup actions to be executed with garbage collection.
 
-SBCL supports @dfn{Gray streams}, user-overloadable CLOS classes whose
-instances can be used as Lisp streams (e.g. passed as the first
-argument to @code{format}).  Additionally, the bundled contrib module
-@dfn{sb-simple-streams} implements a subset of the Franz Allegro
-simple-streams proposal.
+@include fun-sb-ext-finalize.texinfo
+@include fun-sb-ext-cancel-finalization.texinfo
+@include fun-sb-ext-make-weak-pointer.texinfo
+@include fun-sb-ext-weak-pointer-value.texinfo
+@include var-sb-ext-star-after-gc-hooks-star.texinfo
 
-SBCL supports a MetaObject Protocol which is intended to be compatible
+@node Metaobject Protocol
+@comment  node-name,  next,  previous,  up
+@section Metaobject Protocol
+
+SBCL supports a metaobject protocol which is intended to be compatible
 with AMOP; present exceptions to this (as distinct from current bugs)
 are:
 

@@ -19,11 +19,49 @@
 (defun finalize (object function)
   #!+sb-doc 
   "Arrange for the designated FUNCTION to be called when there
-are no more references to OBJECT. In a multithreaded environment
-the finalizer may run in any thread."
-  (sb!thread:with-mutex (*finalizer-store-lock*)
-    (push (cons (make-weak-pointer object) function)
-	  *finalizer-store*))
+are no more references to OBJECT, including references in
+FUNCTION itself.
+
+In a multithreaded environment FUNCTION may be called in any
+thread. In both single and multithreaded environments FUNCTION
+may be called in any dynamic scope: consequences are unspecified
+if FUNCTION is not fully re-entrant.
+
+Errors from FUNCTION are handled and cause a WARNING to be
+signalled in whichever thread the FUNCTION was called in.
+
+Examples:
+
+  ;;; good
+  (let* ((handle (get-handle))
+         (object (make-object handle)))
+   ;; assumes RELEASE-HANDLE is re-entrant
+   (finalize object (lambda () (release-handle handle)))
+   object)
+
+  ;;; bad, finalizer refers to object being finalized, causing
+  ;;; it to be retained indefinitely
+  (let* ((handle (get-handle))
+         (object (make-object handle)))
+    (finalize object (lambda () (release-handle (object-handle object)))))
+
+  ;;; bad, not re-entrant
+  (defvar *rec* nil)
+
+  (defun oops ()
+   (when *rec* 
+     (error \"recursive OOPS\"))
+   (let ((*rec* t))
+     (gc))) ; or just cons enough to cause one
+
+  (progn 
+    (finalize \"oops\" #'oops)
+    (oops)) ; causes GC and re-entry to #'oops due to the finalizer
+            ; -> ERROR, caught, WARNING signalled"
+  (sb!sys:without-gcing
+      (sb!thread:with-mutex (*finalizer-store-lock*)
+	(push (cons (make-weak-pointer object) function)
+	      *finalizer-store*)))
   object)
 
 (defun cancel-finalization (object)
@@ -32,22 +70,24 @@ the finalizer may run in any thread."
   ;; Check for NIL to avoid deleting finalizers that are waiting to be
   ;; run.
   (when object
-    (sb!thread:with-mutex (*finalizer-store-lock*)
-      (setf *finalizer-store*
-	    (delete object *finalizer-store*
-		    :key (lambda (pair) 
-			   (weak-pointer-value (car pair))))))
+    (sb!sys:without-gcing
+	(sb!thread:with-mutex (*finalizer-store-lock*)
+	  (setf *finalizer-store*
+		(delete object *finalizer-store*
+			:key (lambda (pair) 
+			       (weak-pointer-value (car pair)))))))
     object))
 
 (defun run-pending-finalizers ()
   (let (pending)
-    (sb!thread:with-mutex (*finalizer-store-lock*)
-      (setf *finalizer-store*
-	    (delete-if  (lambda (pair)
-			  (when (null (weak-pointer-value (car pair)))
-			    (push (cdr pair) pending)
-			    t))
-		      *finalizer-store*)))
+    (sb!sys:without-gcing
+	(sb!thread:with-mutex (*finalizer-store-lock*)
+	  (setf *finalizer-store*
+		(delete-if  (lambda (pair)
+			      (when (null (weak-pointer-value (car pair)))
+				(push (cdr pair) pending)
+				t))
+			    *finalizer-store*))))
     ;; We want to run the finalizer bodies outside the lock in case
     ;; finalization of X causes finalization to be added for Y.
     (dolist (fun pending)
