@@ -42,14 +42,14 @@ C_SRCS = alloc.c backtrace.c breakpoint.c coreparse.c \
 
 SRCS = $(C_SRCS) ${ARCH_SRC} ${ASSEM_SRC} ${OS_SRC} ${GC_SRC}
 
-OBJS = $(patsubst %.c,%.o,$(patsubst %.S,%.o,$(patsubst %.s,%.o,$(SRCS))))
+OBJS = $(patsubst %.c,%.o,$(patsubst %.S,%.o,$(patsubst %.s,%.o,$(SRCS)))) ${OS_OBJS}
 
 sbcl.nm: sbcl
 	$(NM) sbcl | grep -v " F \| U " > ,$@
 	mv -f ,$@ $@
 
 sbcl: ${OBJS} 
-	$(CC) ${LINKFLAGS} ${OS_LINK_FLAGS} -o $@ ${OBJS} ${OS_LIBS} -lm
+	$(CC) ${LINKFLAGS} ${OS_LINK_FLAGS} -o $@ ${OBJS} ${OS_OBJS} ${OS_LIBS} -lm
 
 
 .PHONY: clean all
