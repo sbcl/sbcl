@@ -262,16 +262,18 @@
           ((lvar-single-value-p lvar)
            ;; exactly one value is consumed
            (principal-lvar-single-valuify lvar)
-           (let ((creq (car (args-type-required ctype))))
-             (multiple-value-setq (ctype atype)
-               (if creq
-                   (values creq (car (args-type-required atype)))
-                   (values (car (args-type-optional ctype))
-                           (car (args-type-optional atype)))))
-             (maybe-negate-check value
-                                 (list ctype) (list atype)
-                                 force-hairy
-                                 n-required)))
+           (flet ((get-type (type)
+                    (acond ((args-type-required type)
+                            (car it))
+                           ((args-type-optional type)
+                            (car it))
+                           (t (bug "type ~S is too hairy" type)))))
+             (multiple-value-bind (ctype atype)
+                 (values (get-type ctype) (get-type atype))
+               (maybe-negate-check value
+                                   (list ctype) (list atype)
+                                   force-hairy
+                                   n-required))))
           ((and (mv-combination-p dest)
                 (eq (mv-combination-kind dest) :local))
            ;; we know the number of consumed values

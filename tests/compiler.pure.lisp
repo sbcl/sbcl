@@ -1678,19 +1678,24 @@
 
 ;;; Bug reported by Timmy Douglas: overflow in bit vector setter with
 ;;; constant index and value.
-(let* ((n (* 2 sb-vm::n-word-bits))
-       (array1 (make-array n :element-type 'bit))
-       (array2 (make-array n :element-type 'bit)))
-  (dotimes (i n)
-    (dotimes (v 2)
-      (let ((f (compile nil `(lambda (a)
-                               (declare (type (simple-array bit (,n)) a))
-                               (setf (bit a ,i) ,v)))))
-        (fill array1 (- 1 v))
-        (fill array2 (- 1 v))
-        (funcall f array1)
-        (setf (aref array2 i) v)
-        (assert (equal array1 array2))))))
+(loop for n-bits = 1 then (* n-bits 2)
+      for type = `(unsigned-byte ,n-bits)
+      and v-max = (1- (ash 1 n-bits))
+      while (<= n-bits sb-vm:n-word-bits)
+      do
+      (let* ((n (* 2 (1+ (- sb-vm::n-word-bits n-bits))))
+             (array1 (make-array n :element-type type))
+             (array2 (make-array n :element-type type)))
+        (dotimes (i n)
+          (dolist (v (list 0 v-max))
+            (let ((f (compile nil `(lambda (a)
+                                     (declare (type (simple-array ,type (,n)) a))
+                                     (setf (aref a ,i) ,v)))))
+              (fill array1 (- v-max v))
+              (fill array2 (- v-max v))
+              (funcall f array1)
+              (setf (aref array2 i) v)
+              (assert (every #'= array1 array2)))))))
 
 (let ((fn (compile nil '(lambda (x)
 			  (declare (type bit x))
@@ -1752,3 +1757,14 @@
      (or p1 (the (eql t) p2))))
    nil t)
   t))
+
+;;; MISC.548: type check weakening converts required type into
+;;; optional
+(assert (eql t
+  (funcall
+   (compile
+    nil
+    '(lambda (p1)
+      (declare (optimize (speed 2) (safety 1) (debug 3) (space 2)))
+      (atom (the (member f assoc-if write-line t w) p1))))
+   t)))

@@ -36,6 +36,8 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
   * optimization: type testing for non-vector arrays should be faster.
   * fixed TRACE :ENCAPSULATE NIL, added support for :ENCAPSULATE NIL
     on x86-64
+  * bug fix: setting 31st element of a bit vector to zero did not work
+    on Alpha-32.
   * fixed some bugs related to Unicode integration:
     ** the restarts for recovering from input and output encoding
        errors only appear when there is in fact such an error to
@@ -55,6 +57,8 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
     ** accessing double-floats stored on the stack now works on x86-64.
     ** debugger internals could sometimes create invalid lispobjs, 
        resulting in GC crashes.
+    ** MISC.548: type check weakening can convert required type into
+       optional.
 
 changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
   * incompatible change: thread support for non-NPTL systems has

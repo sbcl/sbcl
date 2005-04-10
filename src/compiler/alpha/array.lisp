@@ -252,7 +252,10 @@
                                   (unless (and (sc-is value immediate)
                                                (= (tn-value value)
 						  ,(1- (ash 1 bits))))
-                                    (cond ((= extra ,(1- elements-per-word))
+                                    (cond #+#.(cl:if
+                                             (cl:= sb-vm:n-word-bits sb-vm:n-machine-word-bits)
+                                             '(and) '(or))
+                                          ((= extra ,(1- elements-per-word))
                                            (inst sll old ,bits old)
                                            (inst srl old ,bits old))
                                           (t
