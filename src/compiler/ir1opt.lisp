@@ -1126,7 +1126,15 @@
 		      ;; COMPILER-WARNING (and thus return FAILURE-P=T
 		      ;; from COMPILE-FILE) for legal code, so we we
 		      ;; use a wimpier COMPILE-STYLE-WARNING instead.
-		      #'compiler-style-warn
+		      #-sb-xc-host #'compiler-style-warn
+		      ;; On the other hand, for code we control, we
+		      ;; should be able to work around any bug
+		      ;; 173-related problems, and in particular we
+		      ;; want to be alerted to calls to our own
+		      ;; functions which aren't being folded away; a
+		      ;; COMPILER-WARNING is butch enough to stop the
+		      ;; SBCL build itself in its tracks.
+		      #+sb-xc-host #'compiler-warn
 		      "constant folding")
       (cond ((not win)
              (setf (combination-kind call) :error))
