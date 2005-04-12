@@ -34,4 +34,7 @@
     (inst srwi ndescr type sb!vm:word-shift)
     (storew ndescr vector 0 sb!vm:other-pointer-lowtag)
     (storew length vector sb!vm:vector-length-slot sb!vm:other-pointer-lowtag))
+  ;; This makes sure the zero byte at the end of a string is paged in so
+  ;; the kernel doesn't bitch if we pass it the string.
+  (storew zero-tn alloc-tn 0)
   (move result vector))
