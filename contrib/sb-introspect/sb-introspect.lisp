@@ -50,7 +50,7 @@
   "Structure containing all the debug information related to a function.
 Function objects reference debug-infos which in turn reference
 debug-sources and so on."
-  'sb-c::compiled-debug-info)
+  'sb-c::compiler-debug-info)
 
 (deftype debug-source ()
   "Debug sources describe where to find source code.
@@ -60,7 +60,7 @@ include the pathname of the file and the position of the definition."
 
 (deftype debug-function ()
   "Debug function represent static compile-time information about a function."
-  'sb-c::compiled-debug-fun)
+  'sb-c::compiler-debug-fun)
 
 (declaim (ftype (function (function) debug-info) function-debug-info))
 (defun function-debug-info (function)
@@ -75,8 +75,8 @@ include the pathname of the file and the position of the definition."
 (declaim (ftype (function (debug-info) debug-source) debug-info-source))
 (defun debug-info-source (debug-info)
   (destructuring-bind (debug-source &rest other-debug-sources)
-      (sb-c::compiled-debug-info-source debug-info)
-    ;; COMPILED-DEBUG-INFO-SOURCES can return a list but we expect
+      (sb-c::compiler-debug-info-source debug-info)
+    ;; COMPILER-DEBUG-INFO-SOURCES can return a list but we expect
     ;; this to always contain exactly one element in SBCL. The list
     ;; interface is inherited from CMUCL. -luke (12/Mar/2005)
     (assert (null other-debug-sources))
@@ -84,7 +84,7 @@ include the pathname of the file and the position of the definition."
 
 (declaim (ftype (function (debug-info) debug-function) debug-info-debug-function))
 (defun debug-info-debug-function (debug-info)
-  (elt (sb-c::compiled-debug-info-fun-map debug-info) 0))
+  (elt (sb-c::compiler-debug-info-fun-map debug-info) 0))
 
 (defun valid-function-name-p (name)
   "True if NAME denotes a function name that can be passed to MACRO-FUNCTION or FDEFINITION "
@@ -133,7 +133,7 @@ include the pathname of the file and the position of the definition."
   (let* ((debug-info (function-debug-info function))
          (debug-source (debug-info-source debug-info))
          (debug-fun (debug-info-debug-function debug-info))
-         (tlf (if debug-fun (sb-c::compiled-debug-fun-tlf-number debug-fun))))
+         (tlf (if debug-fun (sb-c::compiler-debug-fun-tlf-number debug-fun))))
     (make-definition-source
      :pathname
      (if (eql (sb-c::debug-source-from debug-source) :file)

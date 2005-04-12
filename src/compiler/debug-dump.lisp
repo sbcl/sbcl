@@ -95,8 +95,8 @@
 	   (type hash-table var-locs) (type (or vop null) vop))
 
   (vector-push-extend
-   (dpb (position-or-lose kind *compiled-code-location-kinds*)
-	compiled-code-location-kind-byte
+   (dpb (position-or-lose kind *code-location-kinds*)
+	code-location-kind-byte
 	0)
    *byte-buffer*)
 
@@ -185,7 +185,7 @@
 	      ()
 	      succ)))
     (vector-push-extend
-     (dpb (length valid-succ) compiled-debug-block-nsucc-byte 0)
+     (dpb (length valid-succ) compiler-debug-block-nsucc-byte 0)
      *byte-buffer*)
     (let ((base (block-number
 		 (node-block
@@ -230,7 +230,7 @@
       (dump-block-locations prev-block prev-locs tlf-num var-locs)
 
       (when (elsewhere)
-	(vector-push-extend compiled-debug-block-elsewhere-p *byte-buffer*)
+	(vector-push-extend compiler-debug-block-elsewhere-p *byte-buffer*)
 	(write-var-integer (length (elsewhere)) *byte-buffer*)
 	(dolist (loc (elsewhere))
 	  (dump-location-from-info loc tlf-num var-locs))))
@@ -346,20 +346,20 @@
 	 (flags 0))
     (declare (type index flags))
     (when minimal
-      (setq flags (logior flags compiled-debug-var-minimal-p))
+      (setq flags (logior flags compiler-debug-var-minimal-p))
       (unless tn
-	(setq flags (logior flags compiled-debug-var-deleted-p))))
+	(setq flags (logior flags compiler-debug-var-deleted-p))))
     (when (and (or (eq kind :environment)
 		   (and (eq kind :debug-environment)
 			(null (basic-var-sets var))))
 	       (not (gethash tn (ir2-component-spilled-tns
 				 (component-info *component-being-compiled*))))
 	       (eq (lambda-var-home var) fun))
-      (setq flags (logior flags compiled-debug-var-environment-live)))
+      (setq flags (logior flags compiler-debug-var-environment-live)))
     (when save-tn
-      (setq flags (logior flags compiled-debug-var-save-loc-p)))
+      (setq flags (logior flags compiler-debug-var-save-loc-p)))
     (unless (or (zerop id) minimal)
-      (setq flags (logior flags compiled-debug-var-id-p)))
+      (setq flags (logior flags compiler-debug-var-id-p)))
     (vector-push-extend flags buffer)
     (unless minimal
       (vector-push-extend name buffer)
@@ -432,16 +432,15 @@
 ;;; from the VAR-LOCS hashtable).  If VAR is deleted, then return DELETED.
 (defun debug-location-for (var var-locs)
   (declare (type lambda-var var) (type hash-table var-locs))
-  (let ((res (gethash var var-locs)))
-    (cond (res)
-	  (t
-	   (aver (or (null (leaf-refs var))
-		     (not (tn-offset (leaf-info var)))))
-	   'deleted))))
+  (or (gethash var var-locs)
+      (progn
+	(aver (or (null (leaf-refs var)) 
+		  (not (tn-offset (leaf-info var)))))
+	'deleted)))
 
 ;;;; arguments/returns
 
-;;; Return a vector to be used as the COMPILED-DEBUG-FUN-ARGS for FUN.
+;;; Return a vector to be used as the COMPILER-DEBUG-FUN-ARGS for FUN.
 ;;; If FUN is the MAIN-ENTRY for an optional dispatch, then look at
 ;;; the ARGLIST to determine the syntax, otherwise pretend all
 ;;; arguments are fixed.
@@ -453,8 +452,7 @@
   (collect ((res))
     (let ((od (lambda-optional-dispatch fun)))
       (if (and od (eq (optional-dispatch-main-entry od) fun))
-	  (let ((actual-vars (lambda-vars fun))
-		(saw-optional nil))
+	  (let ((actual-vars (lambda-vars fun)))
 	    (dolist (arg (optional-dispatch-arglist od))
 	      (let ((info (lambda-var-arg-info arg))
 		    (actual (pop actual-vars)))
@@ -463,17 +461,10 @@
 			 (:keyword
 			  (res (arg-info-key info)))
 			 (:rest
-			  (res 'rest-arg))
-			 (:more-context
-			  (res 'more-arg))
-			 (:optional
-			  (unless saw-optional
-			    (res 'optional-args)
-			    (setq saw-optional t))))
+			  (res 'rest-arg)))
 		       (res (debug-location-for actual var-locs))
 		       (when (arg-info-supplied-p info)
-			 (res 'supplied-p)
-			 (res (debug-location-for (pop actual-vars) var-locs))))
+			 (pop actual-vars))) ; just skip
 		      (t
 		       (res (debug-location-for actual var-locs)))))))
 	  (dolist (var (lambda-vars fun))
@@ -498,7 +489,7 @@
 	 (dispatch (lambda-optional-dispatch fun))
 	 (main-p (and dispatch
 		      (eq fun (optional-dispatch-main-entry dispatch)))))
-    (make-compiled-debug-fun
+    (make-compiler-debug-fun
      :name (leaf-debug-name fun)
      :kind (if main-p nil (functional-kind fun))
      :return-pc (tn-sc-offset (ir2-physenv-return-pc 2env))
@@ -522,31 +513,31 @@
 		(let ((od (lambda-optional-dispatch fun)))
 		  (or (not od)
 		      (not (eq (optional-dispatch-main-entry od) fun)))))
-	   (setf (compiled-debug-fun-vars dfun)
+	   (setf (compiler-debug-fun-vars dfun)
 		 (compute-minimal-vars fun))
-	   (setf (compiled-debug-fun-arguments dfun) :minimal))
+	   (setf (compiler-debug-fun-arguments dfun) :minimal))
 	  (t
-	   (setf (compiled-debug-fun-vars dfun)
+	   (setf (compiler-debug-fun-vars dfun)
 		 (compute-vars fun level var-locs))
-	   (setf (compiled-debug-fun-arguments dfun)
+	   (setf (compiler-debug-fun-arguments dfun)
 		 (compute-args fun var-locs))))
 
     (if (>= level 2)
 	(multiple-value-bind (blocks tlf-num)
 	    (compute-debug-blocks fun var-locs)
-	  (setf (compiled-debug-fun-tlf-number dfun) tlf-num)
-	  (setf (compiled-debug-fun-blocks dfun) blocks))
-	(setf (compiled-debug-fun-tlf-number dfun) (find-tlf-number fun)))
+	  (setf (compiler-debug-fun-tlf-number dfun) tlf-num)
+	  (setf (compiler-debug-fun-blocks dfun) blocks))
+	(setf (compiler-debug-fun-tlf-number dfun) (find-tlf-number fun)))
 
     (if (xep-p fun)
-	(setf (compiled-debug-fun-returns dfun) :standard)
+	(setf (compiler-debug-fun-returns dfun) :standard)
 	(let ((info (tail-set-info (lambda-tail-set fun))))
 	  (when info
 	    (cond ((eq (return-info-kind info) :unknown)
-		   (setf (compiled-debug-fun-returns dfun)
+		   (setf (compiler-debug-fun-returns dfun)
 			 :standard))
 		  ((/= level 0)
-		   (setf (compiled-debug-fun-returns dfun)
+		   (setf (compiler-debug-fun-returns dfun)
 			 (compute-debug-returns fun)))))))
     dfun))
 
@@ -584,7 +575,7 @@
 	    dfuns))
     (let* ((sorted (sort dfuns #'< :key #'car))
 	   (fun-map (compute-debug-fun-map sorted)))
-      (make-compiled-debug-info :name (component-name component)
+      (make-compiler-debug-info :name (component-name component)
 				:fun-map fun-map))))
 
 ;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of

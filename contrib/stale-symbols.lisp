@@ -41,9 +41,9 @@
 (defun print-stale-reference (obj stream)
   (cond ((vectorp obj)
          (format stream "vector (probable package internals)"))
-        ((sb-c::compiled-debug-fun-p obj)
-         (format stream "#<compiled-debug-fun ~A>"
-                 (sb-c::compiled-debug-fun-name obj)))
+        ((sb-c::compiler-debug-fun-p obj)
+         (format stream "#<compiler-debug-fun ~A>"
+                 (sb-c::compiler-debug-fun-name obj)))
 	((sb-kernel:code-component-p obj)
 	 (format stream "#<code ~A>"
 		 (let ((dinfo (sb-kernel:%code-debug-info obj)))

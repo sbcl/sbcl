@@ -1047,7 +1047,7 @@
 
 (defun code-fun-map (code)
   (declare (type sb!kernel:code-component code))
-  (sb!c::compiled-debug-info-fun-map (sb!kernel:%code-debug-info code)))
+  (sb!c::compiler-debug-info-fun-map (sb!kernel:%code-debug-info code)))
 
 (defstruct (location-group (:copier nil))
   (locations #() :type (vector (or list fixnum))))
@@ -1137,7 +1137,7 @@
 	     #+nil
 	     (format t ";;; At offset ~W: ~S~%" debug-var-offset debug-var)
 	     (let* ((sc-offset
-		     (sb!di::compiled-debug-var-sc-offset debug-var))
+		     (sb!di::debug-var-sc-offset debug-var))
 		    (sb-name
 		     (sb!c:sb-name
 		      (sb!c:sc-sb (aref sc-vec
@@ -1209,7 +1209,7 @@
 	  (sb!di:do-debug-fun-blocks (block debug-fun)
 	    (let ((first-location-in-block-p t))
 	      (sb!di:do-debug-block-locations (loc block)
-		(let ((pc (sb!di::compiled-code-location-pc loc)))
+		(let ((pc (sb!di::code-location-pc loc)))
 
 		  ;; Put blank lines in at block boundaries
 		  (when (and first-location-in-block-p
@@ -1245,8 +1245,7 @@
 
 		  ;; Keep track of variable live-ness as best we can.
 		  (let ((live-set
-			 (copy-seq (sb!di::compiled-code-location-live-set
-				    loc))))
+			 (copy-seq (sb!di::code-location-live-set loc))))
 		    (add-hook
 		     pc
 		     (lambda (stream dstate)
@@ -1312,14 +1311,14 @@
 			  last-debug-fun)
 		 (setf last-debug-fun nil))
 	       (setf last-offset fmap-entry))
-	      (sb!c::compiled-debug-fun
-	       (let ((name (sb!c::compiled-debug-fun-name fmap-entry))
-		     (kind (sb!c::compiled-debug-fun-kind fmap-entry)))
+	      (sb!c::compiler-debug-fun
+	       (let ((name (sb!c::compiler-debug-fun-name fmap-entry))
+		     (kind (sb!c::compiler-debug-fun-kind fmap-entry)))
 		 #+nil
 		 (format t ";;; SAW ~S ~S ~S,~S ~W,~W~%"
 			 name kind first-block-seen-p nil-block-seen-p
 			 last-offset
-			 (sb!c::compiled-debug-fun-start-pc fmap-entry))
+			 (sb!c::compiler-debug-fun-start-pc fmap-entry))
 		 (cond (#+nil (eq last-offset fun-offset)
 			      (and (equal name fname) (not first-block-seen-p))
 			      (setf first-block-seen-p t))
@@ -1383,7 +1382,7 @@
 			    last-debug-fun)
 		   (setf last-debug-fun nil)
 		   (setf last-offset fun-map-entry))
-		  (sb!c::compiled-debug-fun
+		  (sb!c::compiler-debug-fun
 		   (setf last-debug-fun
 			 (sb!di::make-compiled-debug-fun fun-map-entry
 							 code))))))

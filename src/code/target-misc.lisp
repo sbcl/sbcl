@@ -29,7 +29,7 @@
 	   (code (sb!di::fun-code-header fun))
 	   (info (sb!kernel:%code-debug-info code)))
       (if info
-        (let ((source (first (sb!c::compiled-debug-info-source info))))
+        (let ((source (first (sb!c::compiler-debug-info-source info))))
           (cond ((and (eq (sb!c::debug-source-from source) :lisp)
                       (eq (sb!c::debug-source-info source) fun))
                  (values (svref (sb!c::debug-source-name source) 0)

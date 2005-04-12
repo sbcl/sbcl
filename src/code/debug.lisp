@@ -190,23 +190,19 @@ is how many frames to show."
 
 ;;;; frame printing
 
-(eval-when (:compile-toplevel :execute)
-
 ;;; This is a convenient way to express what to do for each type of
 ;;; lambda-list element.
 (sb!xc:defmacro lambda-list-element-dispatch (element
 					      &key
-					      required
-					      optional
+					      simple
 					      rest
 					      keyword
 					      deleted)
   `(etypecase ,element
      (sb!di:debug-var
-      ,@required)
+      ,@simple)
      (cons
       (ecase (car ,element)
-	(:optional ,@optional)
 	(:rest ,@rest)
 	(:keyword ,@keyword)))
      (symbol
@@ -220,8 +216,6 @@ is how many frames to show."
 	     ((eq (sb!di:debug-var-validity ,var ,location) :valid)
 	      ,valid)
 	     (t ,other)))))
-
-) ; EVAL-WHEN
 
 ;;; This is used in constructing arg lists for debugger printing when
 ;;; the arg list is unavailable, some arg is unavailable or unused, etc.
@@ -243,9 +237,7 @@ is how many frames to show."
 	(progn
 	  (dolist (ele (sb!di:debug-fun-lambda-list debug-fun))
 	    (lambda-list-element-dispatch ele
-	     :required ((push (frame-call-arg ele loc frame) reversed-result))
-	     :optional ((push (frame-call-arg (second ele) loc frame)
-			      reversed-result))
+	     :simple ((push (frame-call-arg ele loc frame) reversed-result))
 	     :keyword ((push (second ele) reversed-result)
 		       (push (frame-call-arg (third ele) loc frame)
 			     reversed-result))
@@ -267,7 +259,7 @@ is how many frames to show."
       (sb!di:lambda-list-unavailable
        ()
        (make-unprintable-object "unavailable lambda list")))))
-(legal-fun-name-p '(lambda ()))
+
 (defvar *show-entry-point-details* nil)
 
 (defun clean-xep (name args)
@@ -317,10 +309,29 @@ is how many frames to show."
     (let ((debug-fun (sb!di:frame-debug-fun frame)))
       (multiple-value-bind (name args)
           (clean-name-and-args (sb!di:debug-fun-name debug-fun)
-                                (frame-args-as-list frame))
+			       (frame-args-as-list frame))
         (values name args
                 (when *show-entry-point-details*
                   (sb!di:debug-fun-kind debug-fun)))))))
+
+(defun frame-vars (frame)
+  (labels ((clean-vars-by-name (name vars)
+	     (if (and (consp name) (not *show-entry-point-details*))
+		 (case (first name)
+		   ((sb!c::xep sb!c::tl-xep)
+		    (nth-value 1 (clean-xep name vars)))
+		   ((sb!c::hairy-arg-processor 
+		     sb!c::varargs-entry sb!c::&optional-processor)
+		    (clean-vars-by-name (second name) vars))
+		   (t
+		    vars))
+		 vars)))
+    (let* ((dfun (sb!di:frame-debug-fun frame))
+	   (loc (sb!di:frame-code-location frame))
+	   (vars (loop for var across (sb!di::debug-fun-debug-vars dfun)
+		    when (eq :valid (sb!di:debug-var-validity var loc))
+		    collect var)))
+      (clean-vars-by-name (sb!di:debug-fun-name dfun) vars))))
 
 (defun ensure-printable-object (object)
   (handler-case
@@ -900,8 +911,7 @@ reset to ~S."
     (dolist (ele args (error "The argument specification ~S is out of range."
 			     n))
       (lambda-list-element-dispatch ele
-	:required ((if (zerop n) (return (values ele t))))
-	:optional ((if (zerop n) (return (values (second ele) t))))
+	:simple ((if (zerop n) (return (values ele t))))
 	:keyword ((cond ((zerop n)
 			 (return (values (second ele) nil)))
 			((zerop (decf n))
@@ -1158,7 +1168,6 @@ reset to ~S."
 		      (zerop (sb!di:debug-var-id v))
 		      (sb!di:debug-var-id v)
 		      (sb!di:debug-var-value v *current-frame*))))
-
 	  (cond
 	   ((not any-p)
 	    (format *debug-io* 

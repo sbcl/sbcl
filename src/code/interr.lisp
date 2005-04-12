@@ -375,8 +375,8 @@
 		 (/show0 "null frame")
 		 (values "<error finding interrupted name -- null frame>" nil))
 	      (/show0 "at head of DO loop")
-	      (when (and (sb!di::compiled-frame-p frame)
-			 (sb!di::compiled-frame-escaped frame))
+	      (when (and (sb!di::frame-p frame)
+			 (sb!di::frame-escaped frame))
 		(sb!di:flush-frames-above frame)
 		(/show0 "returning from within DO loop")
 		(return (values (sb!di:debug-fun-name

@@ -33,13 +33,13 @@
 ;;;    [If has save SC, SC-OFFSET of save location (as var-length integer)]
 
 ;;; FIXME: The first two are no longer used in SBCL.
-;;;(defconstant compiled-debug-var-uninterned		#b00000001)
-;;;(defconstant compiled-debug-var-packaged		#b00000010)
-(def!constant compiled-debug-var-environment-live	#b00000100)
-(def!constant compiled-debug-var-save-loc-p		#b00001000)
-(def!constant compiled-debug-var-id-p			#b00010000)
-(def!constant compiled-debug-var-minimal-p		#b00100000)
-(def!constant compiled-debug-var-deleted-p		#b01000000)
+;;;(defconstant compiler-debug-var-uninterned		#b00000001)
+;;;(defconstant compiler-debug-var-packaged		#b00000010)
+(def!constant compiler-debug-var-environment-live	#b00000100)
+(def!constant compiler-debug-var-save-loc-p		#b00001000)
+(def!constant compiler-debug-var-id-p			#b00010000)
+(def!constant compiler-debug-var-minimal-p		#b00100000)
+(def!constant compiler-debug-var-deleted-p		#b01000000)
 
 ;;;; compiled debug blocks
 ;;;;
@@ -57,11 +57,11 @@
 ;;;;    ...more <kind, delta, top level form offset, form-number, live-set>
 ;;;;       tuples...
 
-(defconstant-eqx compiled-debug-block-nsucc-byte (byte 2 0) #'equalp)
-(def!constant compiled-debug-block-elsewhere-p #b00000100)
+(defconstant-eqx compiler-debug-block-nsucc-byte (byte 2 0) #'equalp)
+(def!constant compiler-debug-block-elsewhere-p #b00000100)
 
-(defconstant-eqx compiled-code-location-kind-byte (byte 3 0) #'equalp)
-(defparameter *compiled-code-location-kinds*
+(defconstant-eqx code-location-kind-byte (byte 3 0) #'equalp)
+(defparameter *code-location-kinds*
   #(:unknown-return :known-return :internal-error :non-local-exit
     :block-start :call-site :single-value-return :non-local-entry))
 
@@ -69,7 +69,7 @@
 
 (def!struct (debug-fun (:constructor nil)))
 
-(def!struct (compiled-debug-fun (:include debug-fun)
+(def!struct (compiler-debug-fun (:include debug-fun)
 				#-sb-xc-host (:pure t))
   ;; KLUDGE: Courtesy of more than a decade of, ah, organic growth in
   ;; CMU CL, there are two distinct -- but coupled -- mechanisms to
@@ -96,7 +96,7 @@
   ;;
   ;; Each entry is:
   ;;   * a FLAGS value, which is a FIXNUM with various
-  ;;     COMPILED-DEBUG-FUN-FOO bits set
+  ;;     COMPILER-DEBUG-FUN-FOO bits set
   ;;   * the symbol which names this variable, unless debug info
   ;;     is minimal
   ;;   * the variable ID, when it has one
@@ -104,7 +104,7 @@
   ;;   * SC-offset of save location, if it has one
   (vars nil :type (or simple-vector null))
   ;; a vector of the packed binary representation of the
-  ;; COMPILED-DEBUG-BLOCKs in this function, in the order that the
+  ;; COMPILER-DEBUG-BLOCKs in this function, in the order that the
   ;; blocks were emitted. The first block is the start of the
   ;; function. This slot may be NIL to save space.
   ;;
@@ -190,7 +190,7 @@
 ;;;
 ;;; In the minimal format, the debug functions and function map are
 ;;; packed into a single byte-vector which is placed in the
-;;; COMPILED-DEBUG-INFO-FUN-MAP. Because of this, all functions in a
+;;; COMPILER-DEBUG-INFO-FUN-MAP. Because of this, all functions in a
 ;;; component must be representable in minimal format for any function
 ;;; to actually be dumped in minimal format. The vector is a sequence
 ;;; of records in this format:
@@ -273,7 +273,7 @@
   ;;   *** is complete.
   (source nil :type list))
 
-(def!struct (compiled-debug-info
+(def!struct (compiler-debug-info
 	     (:include debug-info)
 	     #-sb-xc-host (:pure t))
   ;; a SIMPLE-VECTOR of alternating DEBUG-FUN objects and fixnum

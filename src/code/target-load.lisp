@@ -260,9 +260,9 @@
 	      (format t "stuff: ~S~%" stuff)
 	      (format t
 		      "   : ~S ~S ~S ~S~%"
-		      (sb!c::compiled-debug-info-p dbi)
+		      (sb!c::compiler-debug-info-p dbi)
 		      (sb!c::debug-info-p dbi)
-		      (sb!c::compiled-debug-info-name dbi)
+		      (sb!c::compiler-debug-info-name dbi)
 		      tto)
               (format t "   loading to the dynamic space~%"))
 

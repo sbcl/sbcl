@@ -641,7 +641,7 @@
 		    (let ((dinfo (%code-debug-info obj)))
 		      (format stream "~&Code object: ~S~%"
 			      (if dinfo
-				  (sb!c::compiled-debug-info-name dinfo)
+				  (sb!c::compiler-debug-info-name dinfo)
 				  "No debug info."))))
 		   (#.symbol-header-widetag
 		    (format stream "~&~S~%" obj))

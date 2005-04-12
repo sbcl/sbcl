@@ -101,6 +101,6 @@
     (dolist (sinfo res)
       (setf (debug-source-info sinfo) source-info))
     (dolist (info (core-object-debug-info object))
-      (setf (compiled-debug-info-source info) res))
+      (setf (compiler-debug-info-source info) res))
     (setf (core-object-debug-info object) ()))
   (values))

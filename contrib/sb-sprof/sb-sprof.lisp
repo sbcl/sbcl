@@ -811,8 +811,8 @@
     (sb-di::compiled-debug-fun
      (let* ((name (sb-di::debug-fun-name info))
 	    (cdf (sb-di::compiled-debug-fun-compiler-debug-fun info))
-	    (start-offset (sb-c::compiled-debug-fun-start-pc cdf))
-	    (end-offset (sb-c::compiled-debug-fun-elsewhere-pc cdf))
+	    (start-offset (sb-c::compiler-debug-fun-start-pc cdf))
+	    (end-offset (sb-c::compiler-debug-fun-elsewhere-pc cdf))
 	    (component (sb-di::compiled-debug-fun-component info))
 	    (start-pc (code-start component)))
        (%make-node :name name
