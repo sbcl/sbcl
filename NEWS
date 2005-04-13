@@ -23,6 +23,8 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
     *ERROR-OUTPUT*, not *STANDARD-OUTPUT*.
   * fixed inference of the upper bound of an iteration variable.
     (reported by Rajat Datta).
+  * fixed bug 305: INLINE/NOTINLINE declaration no longer causes local
+    ftype declaration to be disregarded. (reported by Dave Roberts)
   * fixed bug 373: caused by erronous compilation of references to alien
     variables in the runtime on ppc/darwin.
   * fixed bug 376: CONJUGATE type deriver.

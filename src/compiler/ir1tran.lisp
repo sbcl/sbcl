@@ -66,7 +66,6 @@
   (unless (info :function :kind name)
     (setf (info :function :kind name) :function)
     (setf (info :function :where-from name) :assumed))
-
   (let ((where (info :function :where-from name)))
     (when (and (eq where :assumed)
 	       ;; In the ordinary target Lisp, it's silly to report
@@ -988,11 +987,9 @@
     (collect ((res nil cons))
       (dolist (name names)
 	(when (fboundp name)
-	  (compiler-assert-symbol-home-package-unlocked name
-                                                        "declaring the ftype of ~A"))
-	(let ((found (find name fvars
-			   :key #'leaf-source-name
-			   :test #'equal)))
+	  (compiler-assert-symbol-home-package-unlocked 
+	   name "declaring the ftype of ~A"))
+	(let ((found (find name fvars :key #'leaf-source-name :test #'equal)))
 	  (cond
 	   (found
 	    (setf (leaf-type found) type)
@@ -1039,17 +1036,20 @@
 	res)))
 
 ;;; Return a DEFINED-FUN which copies a GLOBAL-VAR but for its INLINEP
-;;; (and TYPE if notinline).
-(defun make-new-inlinep (var inlinep)
+;;; (and TYPE if notinline), plus type-restrictions from the lexenv.
+(defun make-new-inlinep (var inlinep local-type)
   (declare (type global-var var) (type inlinep inlinep))
-  (let ((res (make-defined-fun
-	      :%source-name (leaf-source-name var)
-	      :where-from (leaf-where-from var)
-	      :type (if (and (eq inlinep :notinline)
-			     (not (eq (leaf-where-from var) :declared)))
-			(specifier-type 'function)
-			(leaf-type var))
-	      :inlinep inlinep)))
+  (let* ((type (if (and (eq inlinep :notinline)
+			(not (eq (leaf-where-from var) :declared)))
+		   (specifier-type 'function)
+		   (leaf-type var)))
+	 (res (make-defined-fun
+	       :%source-name (leaf-source-name var)
+	       :where-from (leaf-where-from var)
+	       :type (if local-type 
+			 (type-intersection local-type type)
+			 type)
+	       :inlinep inlinep)))
     (when (defined-fun-p var)
       (setf (defined-fun-inline-expansion res)
 	    (defined-fun-inline-expansion var))
@@ -1063,14 +1063,11 @@
   (let ((sense (cdr (assoc (first spec) *inlinep-translations* :test #'eq)))
 	(new-fenv ()))
     (dolist (name (rest spec))
-      (let ((fvar (find name fvars
-			:key #'leaf-source-name
-			:test #'equal)))
+      (let ((fvar (find name fvars :key #'leaf-source-name :test #'equal)))
 	(if fvar
 	    (setf (functional-inlinep fvar) sense)
-	    (let ((found
-		   (find-lexically-apparent-fun
-		    name "in an inline or notinline declaration")))
+	    (let ((found (find-lexically-apparent-fun
+			  name "in an inline or notinline declaration")))
 	      (etypecase found
 		(functional
 		 (when (policy *lexenv* (>= speed inhibit-warnings))
@@ -1078,9 +1075,10 @@
                                      definition of local function:~%  ~S"
 				    sense name)))
 		(global-var
-		 (push (cons name (make-new-inlinep found sense))
-		       new-fenv)))))))
-
+		 (let ((type 
+			(cdr (assoc found (lexenv-type-restrictions res)))))
+		   (push (cons name (make-new-inlinep found sense type))
+			 new-fenv))))))))
     (if new-fenv
 	(make-lexenv :default res :funs new-fenv)
 	res)))

@@ -998,5 +998,36 @@
   (print output)
   (assert (zerop (length output))))
 
+;;;; bug 305: INLINE/NOTINLINE causing local ftype to be lost
+
+(define-condition optimization-error (error) ())
+
+(labels ((compile-lambda (type sense)
+	   (handler-bind ((compiler-note (lambda (_)
+					   (declare (ignore _))
+					   (error 'optimization-error))))
+	     (values
+	      (compile 
+	       nil
+	       `(lambda ()
+		  (declare 
+		   ,@(when type '((ftype (function () (integer 0 10)) bug-305)))
+		   (,sense bug-305)
+		   (optimize speed))
+		  (1+ (bug-305))))
+	      nil)))
+	 (expect-error (sense)
+	   (multiple-value-bind (f e)  (ignore-errors (compile-lambda nil sense))
+	     (assert (not f))
+	     (assert (typep e 'optimization-error))))
+	 (expect-pass (sense)
+	   (multiple-value-bind (f e)  (ignore-errors (compile-lambda t sense))
+	     (assert f)
+	     (assert (not e)))))
+  (expect-error 'inline)
+  (expect-error 'notinline)
+  (expect-pass 'inline)
+  (expect-pass 'notinline))
+
 ;;; success
 (quit :unix-status 104)

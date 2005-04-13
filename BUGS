@@ -1073,17 +1073,6 @@ WORKAROUND:
 
   The problem is that both EVALs sequentially write to the same LVAR.
 
-305:
-  (Reported by Dave Roberts.)
-  Local INLINE/NOTINLINE declaration removes local FTYPE declaration:
-
-    (defun quux (x)
-      (declare (ftype (function () (integer 0 10)) fee)
-               (inline fee))
-      (1+ (fee)))
-
-  uses generic arithmetic with INLINE and fixnum without.
-
 306: "Imprecise unions of array types"
   a.(defun foo (x)
       (declare (optimize speed)
