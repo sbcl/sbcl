@@ -2085,3 +2085,6 @@ WORKAROUND:
   Floating point traps are currently not enabled on the x86-64 port.
   This is true for at least overflow detection (as tested in
   float.pure.lisp) and divide-by-zero.
+
+379: TRACE :ENCAPSULATE NIL broken on ppc/darwin
+  See commented-out test-case in debug.impure.lisp.

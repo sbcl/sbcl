@@ -324,5 +324,26 @@
     (assert (verify-backtrace #'bt.5.3
                               '((bt.5.3 &rest))))))
 
+;;;; test TRACE
+
+(defun trace-this ()
+  'ok)
+
+(let ((out (with-output-to-string (*trace-output*)
+	     (trace trace-this)
+	     (assert (eq 'ok (trace-this)))
+	     (untrace))))
+  (assert (search "TRACE-THIS" out))
+  (assert (search "returned OK" out)))
+
+#-(and ppc darwin)
+;;; bug 379
+(let ((out (with-output-to-string (*trace-output*)
+	     (trace trace-this :encapsulate nil)
+	     (assert (eq 'ok (trace-this)))
+	     (untrace))))
+  (assert (search "TRACE-THIS" out))
+  (assert (search "returned OK" out)))
+
 ;;; success
 (quit :unix-status 104)
