@@ -1331,7 +1331,7 @@
 			(when first-block-seen-p
 			  (setf nil-block-seen-p t))))
 		 (setf last-debug-fun
-		       (sb!di::make-compiled-debug-fun fmap-entry code)))))))
+		       (sb!di::make-debug-fun fmap-entry code)))))))
 	(let ((max-offset (code-inst-area-length code)))
 	  (when (and first-block-seen-p last-debug-fun)
 	    (add-seg last-offset
@@ -1384,8 +1384,7 @@
 		   (setf last-offset fun-map-entry))
 		  (sb!c::compiler-debug-fun
 		   (setf last-debug-fun
-			 (sb!di::make-compiled-debug-fun fun-map-entry
-							 code))))))
+			 (sb!di::make-debug-fun fun-map-entry code))))))
 	    (when last-debug-fun
 	      (add-seg last-offset
 		       (- (code-inst-area-length code) last-offset)

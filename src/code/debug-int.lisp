@@ -219,11 +219,6 @@
 	     (:copier nil))
   ;; the next frame up, or NIL when top frame
   (up nil :type (or frame null))
-  ;; the previous frame down, or NIL when the bottom frame. Before
-  ;; computing the next frame down, this slot holds the frame pointer
-  ;; to the control stack for the given frame. This lets us get the
-  ;; next frame down and the return-pc for that frame.
-  (%down :unparsed :type (or frame (member nil :unparsed)))
   ;; the DEBUG-FUN for the function whose call this frame represents
   (debug-fun nil :type debug-fun)
   ;; the CODE-LOCATION where the frame's DEBUG-FUN will continue
@@ -252,31 +247,56 @@
 
 ;;;; DEBUG-FUNs
 
-(defstruct (debug-fun (:constructor nil)
-		      (:copier nil)))
-
-(def!method print-object ((obj debug-fun) stream)
-  (print-unreadable-object (obj stream :type t)
-    (prin1 (debug-fun-name obj) stream)))
-
-(defstruct (compiled-debug-fun
-	    (:include debug-fun)
-	    (:constructor make-compiled-debug-fun
-			  (compiler-debug-fun component))
-	    (:copier nil))
+(defstruct (debug-fun
+	     (:constructor make-debug-fun (compiler-debug-fun component))
+	     (:constructor make-bogus-debug-fun (bogus-name))
+	     (:copier nil))
+  ;; marks an bogus debug fun and represent the fake name
+  bogus-name
   ;; compiler's dumped DEBUG-FUN information (unexported)
-  (compiler-debug-fun nil :type sb!c::compiler-debug-fun)
+  (compiler-debug-fun nil :type (or sb!c::compiler-debug-fun null))
   ;; code object (unexported).
   component
   ;; the :FUN-START breakpoint (if any) used to facilitate
   ;; function end breakpoints
   (end-starter nil :type (or null breakpoint)))
 
-(defstruct (bogus-debug-fun
-	    (:include debug-fun)
-	    (:constructor make-bogus-debug-fun (%name))
-	    (:copier nil))
-  %name)
+(def!method print-object ((obj debug-fun) stream)
+  (print-unreadable-object (obj stream :type t)
+    (prin1 (debug-fun-name obj) stream)))
+
+;;; Return the name of the function represented by DEBUG-FUN. This may
+;;; be a string or a cons; do not assume it is a symbol.
+(defun debug-fun-name (debug-fun)
+  (declare (type debug-fun debug-fun))
+  (or (debug-fun-bogus-name debug-fun)
+      (sb!c::compiler-debug-fun-name
+       (debug-fun-compiler-debug-fun debug-fun))))
+
+(defun debug-fun-start-pc (debug-fun)
+  (sb!c::compiler-debug-fun-start-pc (debug-fun-compiler-debug-fun debug-fun)))
+
+;;; Return the object of type FUNCTION associated with the DEBUG-FUN,
+;;; or NIL if the function is unavailable or is non-existent as a user
+;;; callable function object.
+(defun debug-fun-fun (debug-fun)
+  (unless (debug-fun-bogus-name debug-fun)
+    (let ((component (debug-fun-component debug-fun))
+	  (start-pc (debug-fun-start-pc debug-fun)))
+      (do ((entry (%code-entry-points component)
+		  (%simple-fun-next entry)))
+	  ((null entry) nil)
+	(when (= start-pc (debug-fun-start-pc (fun-debug-fun entry)))
+	  (return entry))))))
+
+;;; Return the kind of the function, which is one of :OPTIONAL,
+;;; :EXTERNAL, :TOPLEVEL, :CLEANUP, or NIL.
+(defun debug-fun-kind (debug-fun)
+  ;; FIXME: This "is one of" information should become part of the function
+  ;; declamation, not just a doc string
+  (unless (debug-fun-bogus-name debug-fun)
+    (sb!c::compiler-debug-fun-kind
+     (debug-fun-compiler-debug-fun debug-fun))))
 
 ;;;; DEBUG-BLOCKs
 
@@ -619,11 +639,9 @@
 ;;; Flush all of the frames above FRAME, and renumber all the frames
 ;;; below FRAME.
 (defun flush-frames-above (frame)
-  (setf (frame-up frame) nil)
-  (do ((number 0 (1+ number))
-       (frame frame (frame-%down frame)))
-      ((not (frame-p frame)))
-    (setf (frame-number frame) number)))
+  (setf (frame-up frame) nil
+	(frame-number frame) 0)
+  nil)
 
 ;;; Return the frame immediately below FRAME on the stack; or when
 ;;; FRAME is the bottom of the stack, return NIL.
@@ -631,49 +649,34 @@
   (/noshow0 "entering FRAME-DOWN")
   ;; We have to access the old-fp and return-pc out of frame and pass
   ;; them to COMPUTE-CALLING-FRAME.
-  (let ((down (frame-%down frame)))
-    (if (eq down :unparsed)
-	(let ((debug-fun (frame-debug-fun frame)))
-	  (/noshow0 "in DOWN :UNPARSED case")
-	  (setf (frame-%down frame)
-		(etypecase debug-fun
-		  (compiled-debug-fun
-		   (let ((c-d-f (compiled-debug-fun-compiler-debug-fun
-				 debug-fun)))
-		     (compute-calling-frame
-		      (descriptor-sap
-		       (get-context-value
-			frame ocfp-save-offset
-			(sb!c::compiler-debug-fun-old-fp c-d-f)))
-		      (get-context-value
-		       frame lra-save-offset
-		       (sb!c::compiler-debug-fun-return-pc c-d-f))
-		      frame)))
-		  (bogus-debug-fun
-		   (let ((fp (frame-pointer frame)))
-		     (when (control-stack-pointer-valid-p fp)
-		       #!+(or x86 x86-64)
-			(multiple-value-bind (ra ofp) (x86-call-context fp)
-			 (and ra (compute-calling-frame ofp ra frame)))
-			#!-(or x86 x86-64)
-		       (compute-calling-frame
-			#!-alpha
-			(sap-ref-sap fp (* ocfp-save-offset
-					   sb!vm:n-word-bytes))
-			#!+alpha
-			(int-sap
-			 (sap-ref-32 fp (* ocfp-save-offset
-					   sb!vm:n-word-bytes)))
-
-			(stack-ref fp lra-save-offset)
-
-			frame)))))))
-	down)))
+  (let ((debug-fun (frame-debug-fun frame)))
+    (if (debug-fun-bogus-name debug-fun)
+	(let ((fp (frame-pointer frame)))
+	  (when (control-stack-pointer-valid-p fp)
+	    #!+(or x86 x86-64)
+	    (multiple-value-bind (ra ofp) (x86-call-context fp)
+	      (and ra (compute-calling-frame ofp ra frame)))
+	    #!-(or x86 x86-64)
+	    (compute-calling-frame
+	     #!-alpha
+	     (sap-ref-sap fp (* ocfp-save-offset sb!vm:n-word-bytes))
+	     #!+alpha
+	     (int-sap
+	      (sap-ref-32 fp (* ocfp-save-offset sb!vm:n-word-bytes)))
+	     (stack-ref fp lra-save-offset)
+	     frame)))
+	(let ((c-d-f (debug-fun-compiler-debug-fun debug-fun)))
+	  (compute-calling-frame
+	   (descriptor-sap
+	    (get-context-value frame ocfp-save-offset
+			       (sb!c::compiler-debug-fun-old-fp c-d-f)))
+	   (get-context-value frame lra-save-offset
+			      (sb!c::compiler-debug-fun-return-pc c-d-f))
+	   frame)))))
 
 ;;; Get the old FP or return PC out of FRAME. STACK-SLOT is the
 ;;; standard save location offset on the stack. LOC is the saved
 ;;; SC-OFFSET describing the main location.
-#!-(or x86 x86-64)
 (defun get-context-value (frame stack-slot loc)
   (declare (type frame frame) (type unsigned-byte stack-slot)
 	   (type sb!c:sc-offset loc))
@@ -681,15 +684,9 @@
 	(escaped (frame-escaped frame)))
     (if escaped
 	(sub-access-debug-var-slot pointer loc escaped)
-	(stack-ref pointer stack-slot))))
-#!+(or x86 x86-64)
-(defun get-context-value (frame stack-slot loc)
-  (declare (type frame frame) (type unsigned-byte stack-slot)
-	   (type sb!c:sc-offset loc))
-  (let ((pointer (frame-pointer frame))
-	(escaped (frame-escaped frame)))
-    (if escaped
-	(sub-access-debug-var-slot pointer loc escaped)
+	#!-(or x86 x86-64)
+	(stack-ref pointer stack-slot)
+	#!+(or x86 x86-64)
 	(ecase stack-slot
 	  (#.ocfp-save-offset
 	   (stack-ref pointer stack-slot))
@@ -697,7 +694,6 @@
 	   (sap-ref-sap pointer (- (* (1+ stack-slot)
 				      sb!vm::n-word-bytes))))))))
 
-#!-(or x86 x86-64)
 (defun (setf get-context-value) (value frame stack-slot loc)
   (declare (type frame frame) (type unsigned-byte stack-slot)
 	   (type sb!c:sc-offset loc))
@@ -705,16 +701,9 @@
 	(escaped (frame-escaped frame)))
     (if escaped
 	(sub-set-debug-var-slot pointer loc value escaped)
-	(setf (stack-ref pointer stack-slot) value))))
-
-#!+(or x86 x86-64)
-(defun (setf get-context-value) (value frame stack-slot loc)
-  (declare (type frame frame) (type unsigned-byte stack-slot)
-	   (type sb!c:sc-offset loc))
-  (let ((pointer (frame-pointer frame))
-	(escaped (frame-escaped frame)))
-    (if escaped
-	(sub-set-debug-var-slot pointer loc value escaped)
+	#!-(or x86 x86-64)
+	(setf (stack-ref pointer stack-slot) value)
+	#!+(or x86 x86-64)
 	(ecase stack-slot
 	  (#.ocfp-save-offset
 	   (setf (stack-ref pointer stack-slot) value))
@@ -770,15 +759,13 @@
 	    (compute-calling-frame caller real-lra up-frame))
 	  (let ((d-fun (case code
 			 (:undefined-function
-			  (make-bogus-debug-fun
-			   "undefined function"))
+			  (make-bogus-debug-fun "undefined function"))
 			 (:foreign-function
 			  (make-bogus-debug-fun
 			   (foreign-function-backtrace-name
 			    (int-sap (get-lisp-obj-address lra)))))
 			 ((nil)
-			  (make-bogus-debug-fun
-			   "bogus stack frame"))
+			  (make-bogus-debug-fun "bogus stack frame"))
 			 (t
 			  (debug-fun-from-pc code pc-offset)))))
 	    (make-frame caller up-frame d-fun
@@ -812,14 +799,12 @@
 		     pc-offset 0))))
       (let ((d-fun (case code
 		     (:undefined-function
-		      (make-bogus-debug-fun
-		       "undefined function"))
+		      (make-bogus-debug-fun "undefined function"))
 		     (:foreign-function
 		      (make-bogus-debug-fun
 		       (foreign-function-backtrace-name ra)))
 		     ((nil)
-		      (make-bogus-debug-fun
-		       "bogus stack frame"))
+		      (make-bogus-debug-fun "bogus stack frame"))
 		     (t
 		      (debug-fun-from-pc code pc-offset)))))
 	(/noshow0 "returning MAKE-FRAME from COMPUTE-CALLING-FRAME")
@@ -970,7 +955,7 @@ register."
 
 ;;;; frame utilities
 
-;;; This returns a COMPILED-DEBUG-FUN for COMPONENT and PC. We fetch the
+;;; This returns a DEBUG-FUN for COMPONENT and PC. We fetch the
 ;;; SB!C::DEBUG-INFO and run down its FUN-MAP to get a
 ;;; SB!C::COMPILER-DEBUG-FUN from the PC. The result only needs to
 ;;; reference the COMPONENT, for function constants, and the
@@ -990,7 +975,7 @@ register."
 	     (len (length fun-map)))
 	(declare (type simple-vector fun-map))
 	(if (= len 1)
-	    (make-compiled-debug-fun (svref fun-map 0) component)
+	    (make-debug-fun (svref fun-map 0) component)
 	    (let ((i 1)
 		  (elsewhere-p
 		   (>= pc (sb!c::compiler-debug-fun-elsewhere-pc
@@ -1002,22 +987,19 @@ register."
 				    (sb!c::compiler-debug-fun-elsewhere-pc
 				     (svref fun-map (1+ i)))
 				    (svref fun-map i))))
-		  (return (make-compiled-debug-fun
-			   (svref fun-map (1- i))
-			   component)))
+		  (return (make-debug-fun (svref fun-map (1- i)) component)))
 		(incf i 2)))))))))
 
-;;; This returns a code-location for the COMPILED-DEBUG-FUN,
-;;; DEBUG-FUN, and the pc into its code vector. If we stopped at a
-;;; breakpoint, find the CODE-LOCATION for that breakpoint. Otherwise,
-;;; make an :UNSURE code location, so it can be filled in when we
-;;; figure out what is going on.
+;;; This returns a code-location for the DEBUG-FUN, and the pc into
+;;; its code vector. If we stopped at a breakpoint, find the
+;;; CODE-LOCATION for that breakpoint. Otherwise, make an :UNSURE code
+;;; location, so it can be filled in when we figure out what is going
+;;; on.
 (defun code-location-from-pc (debug-fun pc escaped)
-  (or (and (compiled-debug-fun-p debug-fun)
+  (or (and (not (debug-fun-bogus-name debug-fun))
 	   escaped
-	   (let ((data (breakpoint-data
-			(compiled-debug-fun-component debug-fun)
-			pc nil)))
+	   (let ((data (breakpoint-data	(debug-fun-component debug-fun)
+					pc nil)))
 	     (when (and data (breakpoint-data-breakpoints data))
 	       (let ((what (breakpoint-what
 			    (first (breakpoint-data-breakpoints data)))))
@@ -1121,38 +1103,6 @@ register."
 	       ,@body))
 	   ,result))))
 
-;;; Return the object of type FUNCTION associated with the DEBUG-FUN,
-;;; or NIL if the function is unavailable or is non-existent as a user
-;;; callable function object.
-(defun debug-fun-fun (debug-fun)
-  (etypecase debug-fun
-    (compiled-debug-fun
-     (let ((component
-	    (compiled-debug-fun-component debug-fun))
-	   (start-pc
-	    (sb!c::compiler-debug-fun-start-pc
-	     (compiled-debug-fun-compiler-debug-fun debug-fun))))
-       (do ((entry (%code-entry-points component)
-		   (%simple-fun-next entry)))
-	   ((null entry) nil)
-	 (when (= start-pc
-		  (sb!c::compiler-debug-fun-start-pc
-		   (compiled-debug-fun-compiler-debug-fun
-		    (fun-debug-fun entry))))
-	   (return entry)))))
-    (bogus-debug-fun nil)))
-
-;;; Return the name of the function represented by DEBUG-FUN. This may
-;;; be a string or a cons; do not assume it is a symbol.
-(defun debug-fun-name (debug-fun)
-  (declare (type debug-fun debug-fun))
-  (etypecase debug-fun
-    (compiled-debug-fun
-     (sb!c::compiler-debug-fun-name
-      (compiled-debug-fun-compiler-debug-fun debug-fun)))
-    (bogus-debug-fun
-     (bogus-debug-fun-%name debug-fun))))
-
 ;;; Return a DEBUG-FUN that represents debug information for FUN.
 (defun fun-debug-fun (fun)
   (declare (type function fun))
@@ -1172,7 +1122,7 @@ register."
 		   (sb!c::compiler-debug-info-fun-map
 		    (%code-debug-info component)))))
 	(if res
-	    (make-compiled-debug-fun res component)
+	    (make-debug-fun res component)
 	    ;; KLUDGE: comment from CMU CL:
 	    ;;   This used to be the non-interpreted branch, but
 	    ;;   William wrote it to return the debug-fun of fun's XEP
@@ -1185,18 +1135,6 @@ register."
 			       (* (- (fun-word-offset fun)
 				     (get-header-data component))
 				  sb!vm:n-word-bytes)))))))
-
-;;; Return the kind of the function, which is one of :OPTIONAL,
-;;; :EXTERNAL, :TOPLEVEL, :CLEANUP, or NIL.
-(defun debug-fun-kind (debug-fun)
-  ;; FIXME: This "is one of" information should become part of the function
-  ;; declamation, not just a doc string
-  (etypecase debug-fun
-    (compiled-debug-fun
-     (sb!c::compiler-debug-fun-kind
-      (compiled-debug-fun-compiler-debug-fun debug-fun)))
-    (bogus-debug-fun
-     nil)))
 
 ;;; Is there any variable information for DEBUG-FUN?
 (defun debug-var-info-available (debug-fun)
@@ -1282,9 +1220,9 @@ register."
 ;;; LAMBDA-LIST-UNAVAILABLE condition when there is no argument list
 ;;; information.
 (defun debug-fun-lambda-list (debug-fun)
-  (unless (bogus-debug-fun-p debug-fun)
+  (unless (debug-fun-bogus-name debug-fun)
     (let ((args (sb!c::compiler-debug-fun-arguments
-		 (compiled-debug-fun-compiler-debug-fun debug-fun)))
+		 (debug-fun-compiler-debug-fun debug-fun)))
 	  (vars (debug-fun-debug-vars debug-fun)))
       (cond ((not args)
 	     (debug-signal 'lambda-list-unavailable :debug-fun debug-fun))
@@ -1320,8 +1258,8 @@ register."
 		    (incf i))
 		 (nreverse res))))))))
 
-(defun compiled-debug-fun-debug-info (debug-fun)
-  (%code-debug-info (compiled-debug-fun-component debug-fun)))
+(defun debug-fun-debug-info (debug-fun)
+  (%code-debug-info (debug-fun-component debug-fun)))
 
 ;;;; unpacking variable and basic block data
 
@@ -1372,10 +1310,10 @@ register."
 ;;; them yet. It signals a NO-DEBUG-BLOCKS condition if it can't
 ;;; return the blocks.
 (defun debug-fun-debug-blocks (debug-fun)
-  (when (bogus-debug-fun-p debug-fun)
+  (when (debug-fun-bogus-name debug-fun)
     (debug-signal 'no-debug-blocks :debug-fun debug-fun))
   (let* ((var-count (length (debug-fun-debug-vars debug-fun)))
-	 (compiler-debug-fun (compiled-debug-fun-compiler-debug-fun debug-fun))
+	 (compiler-debug-fun (debug-fun-compiler-debug-fun debug-fun))
 	 (blocks (sb!c::compiler-debug-fun-blocks compiler-debug-fun))
 	 ;; KLUDGE: 8 is a hard-wired constant in the compiler for the
 	 ;; element size of the packed binary representation of the
@@ -1440,8 +1378,8 @@ register."
 ;;; it returns a SIMPLE-VECTOR of DEBUG-VARs, parsing it from
 ;;; the SB!C::COMPILER-DEBUG-FUN.
 (defun debug-fun-debug-vars (debug-fun)
-  (unless (bogus-debug-fun-p debug-fun)
-    (let* ((cdebug-fun (compiled-debug-fun-compiler-debug-fun debug-fun))
+  (unless (debug-fun-bogus-name debug-fun)
+    (let* ((cdebug-fun (debug-fun-compiler-debug-fun debug-fun))
 	   (packed-vars (sb!c::compiler-debug-fun-vars cdebug-fun))
 	   (args-minimal (eq (sb!c::compiler-debug-fun-arguments cdebug-fun)
 			     :minimal)))
@@ -1560,8 +1498,7 @@ register."
 		      ((debug-block-elsewhere-p last)
 		       (if (< pc
 			      (sb!c::compiler-debug-fun-elsewhere-pc
-			       (compiled-debug-fun-compiler-debug-fun
-				debug-fun)))
+			       (debug-fun-compiler-debug-fun debug-fun)))
 			   (svref blocks (1- end))
 			   last))
 		      ((< pc
@@ -1580,8 +1517,7 @@ register."
 
 ;;; Return the CODE-LOCATION's DEBUG-SOURCE.
 (defun code-location-debug-source (code-location)
-  (let* ((info (compiled-debug-fun-debug-info
-		(code-location-debug-fun code-location)))
+  (let* ((info (debug-fun-debug-info (code-location-debug-fun code-location)))
 	 (sources (sb!c::compiler-debug-info-source info))
 	 (len (length sources)))
     (declare (list sources))
@@ -2348,8 +2284,7 @@ register."
   (cond ((debug-var-alive-p debug-var)
 	 (let ((debug-fun (code-location-debug-fun basic-code-location)))
 	   (if (>= (code-location-pc basic-code-location)
-		   (sb!c::compiler-debug-fun-start-pc
-		    (compiled-debug-fun-compiler-debug-fun debug-fun)))
+		   (debug-fun-start-pc debug-fun))
 	       :valid
 	       :invalid)))
 	((code-location-unknown-p basic-code-location) :unknown)
@@ -2571,24 +2506,26 @@ register."
 	   (setf (breakpoint-unknown-return-partner bpt) other-bpt)
 	   (setf (breakpoint-unknown-return-partner other-bpt) bpt)))
        bpt))
-    (compiled-debug-fun
+    (debug-fun
+     (when (debug-fun-bogus-name what)
+       (error "Tried to set a breakpoint on a bogus debug-fun."))
      (ecase kind
        (:fun-start
 	(%make-breakpoint hook-fun what kind info))
        (:fun-end
 	(unless (eq (sb!c::compiler-debug-fun-returns
-		     (compiled-debug-fun-compiler-debug-fun what))
+		     (debug-fun-compiler-debug-fun what))
 		    :standard)
 	  (error ":FUN-END breakpoints are currently unsupported ~
                   for the known return convention."))
 
 	(let* ((bpt (%make-breakpoint hook-fun what kind info))
-	       (starter (compiled-debug-fun-end-starter what)))
+	       (starter (debug-fun-end-starter what)))
 	  (unless starter
 	    (setf starter (%make-breakpoint #'list what :fun-start nil))
 	    (setf (breakpoint-hook-fun starter)
 		  (fun-end-starter-hook starter what))
-	    (setf (compiled-debug-fun-end-starter what) starter))
+	    (setf (debug-fun-end-starter what) starter))
 	  (setf (breakpoint-start-helper bpt) starter)
 	  (push bpt (breakpoint-%info starter))
 	  (setf (breakpoint-cookie-fun bpt) fun-end-cookie)
@@ -2623,13 +2560,13 @@ register."
 ;;; function, we must establish breakpoint-data about FUN-END-BPT.
 (defun fun-end-starter-hook (starter-bpt debug-fun)
   (declare (type breakpoint starter-bpt)
-	   (type compiled-debug-fun debug-fun))
+	   (type debug-fun debug-fun))
   (lambda (frame breakpoint)
     (declare (ignore breakpoint)
 	     (type frame frame))
     (let ((lra-sc-offset
 	   (sb!c::compiler-debug-fun-return-pc
-	    (compiled-debug-fun-compiler-debug-fun debug-fun))))
+	    (debug-fun-compiler-debug-fun debug-fun))))
       (multiple-value-bind (lra component offset)
 	  (make-bogus-lra
 	   (get-context-value frame
@@ -2663,7 +2600,7 @@ register."
 (defun fun-end-cookie-valid-p (frame cookie)
   (let ((lra (fun-end-cookie-bogus-lra cookie))
 	(lra-sc-offset (sb!c::compiler-debug-fun-return-pc
-			(compiled-debug-fun-compiler-debug-fun
+			(debug-fun-compiler-debug-fun
 			 (fun-end-cookie-debug-fun cookie)))))
     (do ((frame frame (frame-down frame)))
 	((not frame) nil)
@@ -2690,23 +2627,13 @@ register."
 	 (when other
 	   (activate-code-location-breakpoint other))))
       (:fun-start
-       (etypecase (breakpoint-what breakpoint)
-	 (compiled-debug-fun
-	  (activate-compiled-fun-start-breakpoint breakpoint))
-	 ;; (There used to be more cases back before sbcl-0.7.0, when
-	 ;; we did special tricks to debug the IR1 interpreter.)
-	 ))
+       (activate-fun-start-breakpoint breakpoint))
       (:fun-end
-       (etypecase (breakpoint-what breakpoint)
-	 (compiled-debug-fun
-	  (let ((starter (breakpoint-start-helper breakpoint)))
-	    (unless (eq (breakpoint-status starter) :active)
-	      ;; may already be active by some other :FUN-END breakpoint
-	      (activate-compiled-fun-start-breakpoint starter)))
-	  (setf (breakpoint-status breakpoint) :active))
-	 ;; (There used to be more cases back before sbcl-0.7.0, when
-	 ;; we did special tricks to debug the IR1 interpreter.)
-	 ))))
+       (let ((starter (breakpoint-start-helper breakpoint)))
+	 (unless (eq (breakpoint-status starter) :active)
+	   ;; may already be active by some other :FUN-END breakpoint
+	   (activate-fun-start-breakpoint starter)))
+       (setf (breakpoint-status breakpoint) :active))))
   breakpoint)
 
 (defun activate-code-location-breakpoint (breakpoint)
@@ -2715,8 +2642,7 @@ register."
     (declare (type code-location loc))
     (sub-activate-breakpoint
      breakpoint
-     (breakpoint-data (compiled-debug-fun-component
-		       (code-location-debug-fun loc))
+     (breakpoint-data (debug-fun-component (code-location-debug-fun loc))
 		      (+ (code-location-pc loc)
 			 (if (or (eq (breakpoint-kind breakpoint)
 				     :unknown-return-partner)
@@ -2725,15 +2651,13 @@ register."
 			     sb!vm:single-value-return-byte-offset
 			     0))))))
 
-(defun activate-compiled-fun-start-breakpoint (breakpoint)
+(defun activate-fun-start-breakpoint (breakpoint)
   (declare (type breakpoint breakpoint))
   (let ((debug-fun (breakpoint-what breakpoint)))
     (sub-activate-breakpoint
      breakpoint
-     (breakpoint-data (compiled-debug-fun-component debug-fun)
-		      (sb!c::compiler-debug-fun-start-pc
-		       (compiled-debug-fun-compiler-debug-fun
-			debug-fun))))))
+     (breakpoint-data (debug-fun-component debug-fun)
+		      (debug-fun-start-pc debug-fun)))))
 
 (defun sub-activate-breakpoint (breakpoint data)
   (declare (type breakpoint breakpoint)
@@ -2756,26 +2680,20 @@ register."
 (defun deactivate-breakpoint (breakpoint)
   (when (eq (breakpoint-status breakpoint) :active)
     (without-interrupts
-     (let ((loc (breakpoint-what breakpoint)))
-       (etypecase loc
-	 ((or code-location compiled-debug-fun)
-	  (deactivate-compiled-breakpoint breakpoint)
-	  (let ((other (breakpoint-unknown-return-partner breakpoint)))
-	    (when other
-	      (deactivate-compiled-breakpoint other))))
-	 ;; (There used to be more cases back before sbcl-0.7.0, when
-	 ;; we did special tricks to debug the IR1 interpreter.)
-	 ))))
+      (sub-deactivate-breakpoint breakpoint)
+      (let ((other (breakpoint-unknown-return-partner breakpoint)))
+	(when other
+	  (sub-deactivate-breakpoint other)))))
   breakpoint)
 
-(defun deactivate-compiled-breakpoint (breakpoint)
+(defun sub-deactivate-breakpoint (breakpoint)
   (if (eq (breakpoint-kind breakpoint) :fun-end)
       (let ((starter (breakpoint-start-helper breakpoint)))
 	(unless (find-if (lambda (bpt)
 			   (and (not (eq bpt breakpoint))
 				(eq (breakpoint-status bpt) :active)))
 			 (breakpoint-%info starter))
-	  (deactivate-compiled-breakpoint starter)))
+	  (sub-deactivate-breakpoint starter)))
       (let* ((data (breakpoint-internal-data breakpoint))
 	     (bpts (delete breakpoint (breakpoint-data-breakpoints data))))
 	(setf (breakpoint-internal-data breakpoint) nil)
@@ -2828,11 +2746,9 @@ register."
 	  (setf (breakpoint-info starter) breakpoints)
 	  (unless breakpoints
 	    (delete-breakpoint starter)
-	    (setf (compiled-debug-fun-end-starter
-		   (breakpoint-what breakpoint))
-		  nil))))))
+	    (setf (debug-fun-end-starter (breakpoint-what breakpoint)) nil))))))
   breakpoint)
-
+
 ;;;; C call out stubs
 
 ;;; This actually installs the break instruction in the component. It
@@ -3073,9 +2989,5 @@ register."
 ;;; the arguments are in place; or if that location can't be
 ;;; determined due to a lack of debug information, return NIL.
 (defun debug-fun-start-location (debug-fun)
-  (code-location-from-pc debug-fun
-			 (sb!c::compiler-debug-fun-start-pc
-			  (compiled-debug-fun-compiler-debug-fun
-			   debug-fun))
-			 nil))
+  (code-location-from-pc debug-fun (debug-fun-start-pc debug-fun) nil))
 

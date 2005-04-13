@@ -808,18 +808,18 @@
        (%make-node :name (or (sb-disassem::find-assembler-routine start)
 			     (format nil "~a" info))
 		   :start-pc start :end-pc end)))
-    (sb-di::compiled-debug-fun
-     (let* ((name (sb-di::debug-fun-name info))
-	    (cdf (sb-di::compiled-debug-fun-compiler-debug-fun info))
-	    (start-offset (sb-c::compiler-debug-fun-start-pc cdf))
-	    (end-offset (sb-c::compiler-debug-fun-elsewhere-pc cdf))
-	    (component (sb-di::compiled-debug-fun-component info))
-	    (start-pc (code-start component)))
-       (%make-node :name name
-		   :start-pc (+ start-pc start-offset)
-		   :end-pc (+ start-pc end-offset))))
     (sb-di::debug-fun
-     (%make-node :name (sb-di::debug-fun-name info)))
+     (if (sb-di::debug-fun-bogus-name info)
+	 (%make-node :name (sb-di::debug-fun-name info))
+	 (let* ((name (sb-di::debug-fun-name info))
+		(cdf (sb-di::debug-fun-compiler-debug-fun info))
+		(start-offset (sb-c::compiler-debug-fun-start-pc cdf))
+		(end-offset (sb-c::compiler-debug-fun-elsewhere-pc cdf))
+		(component (sb-di::debug-fun-component info))
+		(start-pc (code-start component)))
+	   (%make-node :name name
+		       :start-pc (+ start-pc start-offset)
+		       :end-pc (+ start-pc end-offset)))))
     (t 
      (%make-node :name (coerce info 'string)))))
 
@@ -848,11 +848,11 @@
 		 code))))))
 	     
 
-;;; One function can have more than one COMPILED-DEBUG-FUNCTION with
-;;; the same name.  Reduce the number of calls to Debug-Info by first
-;;; looking for a given PC in a red-black tree.  If not found in the
-;;; tree, get debug info, and look for a node in a hash-table by
-;;; function name.  If not found in the hash-table, make a new node.
+;;; One function can have more than one DEBUG-FUNCTION with the same
+;;; name. Reduce the number of calls to Debug-Info by first looking
+;;; for a given PC in a red-black tree. If not found in the tree, get
+;;; debug info, and look for a node in a hash-table by function name.
+;;; If not found in the hash-table, make a new node.
 
 (defvar *node-tree*)
 (defvar *name->node*)
