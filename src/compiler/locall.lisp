@@ -648,7 +648,6 @@
 	    (let ((name (lvar-value lvar))
 		  (dummy (first temp))
 		  (val (second temp)))
-              ;; FIXME: check whether KEY was supplied earlier
               (when (and (eq name :allow-other-keys) (not allow-found))
                 (let ((val (second key)))
                   (cond ((constant-lvar-p val)
@@ -665,9 +664,11 @@
                                (setq loser (list name)))))
 		(let ((info (lambda-var-arg-info var)))
 		  (when (eq (arg-info-key info) name)
-		    (ignores dummy)
-		    (supplied (cons var val))
-		    (return)))))))
+		      (ignores dummy)
+		      (if (member var (supplied) :key #'car)
+			  (ignores val)
+			  (supplied (cons var val)))
+		      (return)))))))
 
 	(when (and loser (not (optional-dispatch-allowp fun)) (not allowp))
 	  (compiler-warn "function called with unknown argument keyword ~S"

@@ -585,18 +585,6 @@ WORKAROUND:
 211: "keywords processing"
   a. :ALLOW-OTHER-KEYS T should allow a function to receive an odd
      number of keyword arguments.
-  e. Compiling
-
-      (flet ((foo (&key y) (list y)))
-        (list (foo :y 1 :y 2)))
-
-     issues confusing message
-
-       ; in: LAMBDA NIL
-       ;     (FOO :Y 1 :Y 2)
-       ;
-       ; caught STYLE-WARNING:
-       ;   The variable #:G15 is defined but never used.
 
 212: "Sequence functions and circular arguments"
   COERCE, MERGE and CONCATENATE go into an infinite loop when given

@@ -1029,5 +1029,12 @@
   (expect-pass 'inline)
   (expect-pass 'notinline))
 
+;;; bug 211e: bogus style warning from duplicated keyword argument to
+;;; a local function.
+(handler-bind ((style-warning #'error))
+  (let ((f (compile nil '(lambda () (flet ((foo (&key y) (list y)))
+				      (list (foo :y 1 :y 2)))))))
+    (assert (equal '((1)) (funcall f)))))
+
 ;;; success
 (quit :unix-status 104)
