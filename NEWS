@@ -13,6 +13,8 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
   * optimization: REPLACE on declared (UNSIGNED-BYTE 8) vectors, as well
     as other specialized array types, is much faster.  SUBSEQ and
     COPY-SEQ on such arrays have also been sped up.
+  * optimization: EQL is now more efficient when at least other argument 
+    is known to be of type (OR FIXNUM (NOT NUMBER)).
   * fixed bug: the runtime is now less vulnerable to changes in the
     size of the SBCL object on OS X, and virtual memory is reserved for
     all spaces that need to be at a fixed address.

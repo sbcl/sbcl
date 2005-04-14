@@ -3071,37 +3071,35 @@
 ;;; -- If both args are characters, convert to CHAR=. This is better than
 ;;;    just converting to EQ, since CHAR= may have special compilation
 ;;;    strategies for non-standard representations, etc.
-;;; -- If either arg is definitely not a number, then we can compare
-;;;    with EQ.
+;;; -- If either arg is definitely not a number, or a fixnum, then we
+;;;    can compare with EQ.
 ;;; -- Otherwise, we try to put the arg we know more about second. If X
 ;;;    is constant then we put it second. If X is a subtype of Y, we put
 ;;;    it second. These rules make it easier for the back end to match
 ;;;    these interesting cases.
-;;; -- If Y is a fixnum, then we quietly pass because the back end can
-;;;    handle that case, otherwise give an efficiency note.
 (deftransform eql ((x y) * *)
   "convert to simpler equality predicate"
   (let ((x-type (lvar-type x))
 	(y-type (lvar-type y))
-	(char-type (specifier-type 'character))
-	(number-type (specifier-type 'number)))
-    (cond
-      ((same-leaf-ref-p x y) t)
-	  ((not (types-equal-or-intersect x-type y-type))
-	   nil)
-	  ((and (csubtypep x-type char-type)
-		(csubtypep y-type char-type))
-	   '(char= x y))
-	  ((or (not (types-equal-or-intersect x-type number-type))
-	       (not (types-equal-or-intersect y-type number-type)))
-	   '(eq x y))
-	  ((and (not (constant-lvar-p y))
-		(or (constant-lvar-p x)
-		    (and (csubtypep x-type y-type)
-			 (not (csubtypep y-type x-type)))))
-	   '(eql y x))
-	  (t
-	   (give-up-ir1-transform)))))
+	(char-type (specifier-type 'character)))
+    (flet ((simple-type-p (type)
+	     (csubtypep type (specifier-type '(or fixnum (not number))))))
+      (cond
+	((same-leaf-ref-p x y) t)
+	((not (types-equal-or-intersect x-type y-type))
+	 nil)
+	((and (csubtypep x-type char-type)
+	      (csubtypep y-type char-type))
+	 '(char= x y))
+	((or (simple-type-p x-type) (simple-type-p y-type))
+	 '(eq x y))
+	((and (not (constant-lvar-p y))
+	      (or (constant-lvar-p x)
+		  (and (csubtypep x-type y-type)
+		       (not (csubtypep y-type x-type)))))
+	 '(eql y x))
+	(t
+	 (give-up-ir1-transform))))))
 
 ;;; similarly to the EQL transform above, we attempt to constant-fold
 ;;; or convert to a simpler predicate: mostly we have to be careful

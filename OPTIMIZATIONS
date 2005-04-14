@@ -204,20 +204,6 @@ a. Iterations on &REST lists, returning them as VALUES could be
    rewritten with &MORE vectors.
 b. Implement local unknown-values mv-call (useful for fast type checking).
 --------------------------------------------------------------------------------
-#25
-EQL is implemented generically in situations where this isn't necessary.
-
-(defun f (x y)
-  (declare (type (or symbol fixnum) x)
-	   (optimize speed (safety 0) (debug 0)))
-  (eql x y))
-
-SUBTYPEP is smart enough to determine that this type is a subtype
-of (and (or (not number) fixnum) (not character))
-
-This sitation where the type is (OR NULL FIXNUM) comes up
-in cl-bench, for example in the value returned by POSITION.
---------------------------------------------------------------------------------
 #26
 SBCL cannot derive upper bound for I and uses generic arithmetic here:
 
