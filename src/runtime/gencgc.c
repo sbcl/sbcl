@@ -3584,7 +3584,7 @@ garbage_collect_generation(int generation, int raise)
 	    free=fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
 	    for(i=free-1;i>=0;i--) {
 		os_context_t *c=th->interrupt_contexts[i];
-		esp1 = (void **) *os_context_register_addr(c,reg_ESP);
+		esp1 = (void **) *os_context_register_addr(c,reg_SP);
 		if(esp1>=th->control_stack_start&& esp1<th->control_stack_end){
 		    if(esp1<esp) esp=esp1;
 		    for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {

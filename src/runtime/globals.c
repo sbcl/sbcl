@@ -42,7 +42,6 @@ lispobj *current_auto_gc_trigger;
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
-pid_t parent_pid;
 boolean stop_the_world=0;
 #endif
 
@@ -64,7 +63,4 @@ void globals_init(void)
 
     /* Set foreign function call active. */
     foreign_function_call_active = 1;
-#ifdef LISP_FEATURE_SB_THREAD
-    parent_pid=getpid();
-#endif
 }

@@ -239,7 +239,7 @@ pid_t create_thread(lispobj initial_function) {
     if(th==0) return 0;
     kid_pid=clone(new_thread_trampoline,
 		  (((void*)th->control_stack_start)+
-		   THREAD_CONTROL_STACK_SIZE-4),
+		   THREAD_CONTROL_STACK_SIZE-16),
 		  CLONE_FILES|SIG_THREAD_EXIT|CLONE_VM,th);
     
     if(kid_pid>0) {
@@ -255,32 +255,6 @@ pid_t create_thread(lispobj initial_function) {
     }
 }
 #endif
-
-/* unused */
-void destroy_thread (struct thread *th)
-{
-    /* precondition: the unix task has already been killed and exited.
-     * This is called by the parent or some other thread */
-#ifdef LISP_FEATURE_GENCGC
-    gc_alloc_update_page_tables(0, &th->alloc_region);
-#endif
-    get_spinlock(&all_threads_lock,th->pid);
-    th->unbound_marker=0;	/* for debugging */
-    if(th==all_threads) 
-	all_threads=th->next;
-    else {
-	struct thread *th1=all_threads;
-	while(th1 && th1->next!=th) th1=th1->next;
-	if(th1)	th1->next=th->next;	/* unlink */
-    }
-    release_spinlock(&all_threads_lock);
-    if(th && th->tls_cookie>=0) arch_os_thread_cleanup(th); 
-    os_invalidate((os_vm_address_t) th->control_stack_start,
-		  ((sizeof (lispobj))
-		   * (th->control_stack_end-th->control_stack_start)) +
-		  BINDING_STACK_SIZE+ALIEN_STACK_SIZE+dynamic_values_bytes+
-		  32*SIGSTKSZ);
-}
 
 struct thread *find_thread_by_pid(pid_t pid) 
 {

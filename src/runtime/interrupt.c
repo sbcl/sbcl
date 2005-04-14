@@ -124,32 +124,12 @@ struct interrupt_data * global_interrupt_data;
  * mask ought to be clear anyway most of the time, but may be non-zero
  * if we were interrupted e.g. while waiting for a queue.  */
 
-#if 1
 void reset_signal_mask () 
 {
     sigset_t new;
     sigemptyset(&new);
     sigprocmask(SIG_SETMASK,&new,0);
 }
-#else
-void reset_signal_mask () 
-{
-    sigset_t new,old;
-    int i;
-    int wrong=0;
-    sigemptyset(&new);
-    sigprocmask(SIG_SETMASK,&new,&old);
-    for(i=1; i<NSIG; i++) {
-	if(sigismember(&old,i)) {
-	    fprintf(stderr,
-		    "Warning: signal %d is masked: this is unexpected\n",i);
-	    wrong=1;
-	}
-    }
-    if(wrong) 
-	fprintf(stderr,"If this version of SBCL is less than three months old, please report this.\nOtherwise, please try a newer version first\n.  Reset signal mask.\n");
-}
-#endif
 
 
 
@@ -615,7 +595,7 @@ extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 extern void post_signal_tramp(void);
 void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 {
-#ifndef LISP_FEATURE_X86
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     void * fun=native_pointer(function);
     void *code = &(((struct simple_fun *) fun)->code);
 #endif    

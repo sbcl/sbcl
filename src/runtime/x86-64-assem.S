@@ -97,7 +97,7 @@ GNAME(call_into_lisp_first_time):
 	mov    THREAD_CONTROL_STACK_START_OFFSET(%rax) ,%rsp
 	/* don't think too hard about what happens if we get interrupted
 	* here */
-	add 	$THREAD_CONTROL_STACK_SIZE-8,%rsp
+	add 	$THREAD_CONTROL_STACK_SIZE-16,%rsp
 	jmp     Lstack
 
 	.text	
@@ -174,8 +174,9 @@ Lcall:
 	pop	%rbx
 
 /* FIXME Restore the NPX state. */
-	pop	%rbp		# c-sp
+
 	/* return value is already in rax where lisp expects it */
+	leave
 	ret
 	.size	GNAME(call_into_lisp), . - GNAME(call_into_lisp)
 

@@ -2,8 +2,8 @@
  * reserved for the system libraries? If so, it would be tidy to
  * rename flags like _X86_ARCH_H so their names are in a part of the
  * namespace that we control. */
-#ifndef _X86_ARCH_H
-#define _X86_ARCH_H
+#ifndef _X86_64_ARCH_H
+#define _X86_64_ARCH_H
 
 #define ARCH_HAS_STACK_POINTER
 
@@ -15,15 +15,15 @@
 static inline void 
 get_spinlock(lispobj *word,long value)
 {
-#if 0
-    u32 eax=0;
+#ifdef LISP_FEATURE_SB_THREAD
+    u64 rax=0;
     do {
 	asm ("xor %0,%0\n\
               lock cmpxchg %1,%2" 
-	     : "=a" (eax)
+	     : "=a" (rax)
 	     : "r" (value), "m" (*word)
 	     : "memory", "cc");
-    } while(eax!=0);
+    } while(rax!=0);
 #else
     *word=value;
 #endif
@@ -35,4 +35,4 @@ release_spinlock(lispobj *word)
     *word=0;
 }
 
-#endif /* _X86_ARCH_H */
+#endif /* _X86_64_ARCH_H */
