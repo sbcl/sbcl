@@ -130,6 +130,7 @@
 		     (src-prefix "")
 		     (src-suffix ".lisp")
 		     (compile-file #'compile-file)
+		     trace-file
 		     ignore-failure-p)
 
   (declare (type function compile-file))
@@ -184,7 +185,7 @@
     ;; recognizeably a fasl file), so
     (when (probe-file tmp-obj)
       (delete-file tmp-obj))
-
+    
     ;; Try to use the compiler to generate a new temporary object file.
     (flet ((report-recompile-restart (stream)
              (format stream "Recompile file ~S" src))
@@ -193,7 +194,10 @@
       (tagbody
        retry-compile-file
          (multiple-value-bind (output-truename warnings-p failure-p)
-             (funcall compile-file src :output-file tmp-obj)
+            (if trace-file
+                (funcall compile-file src :output-file tmp-obj
+                         :trace-file t)
+                (funcall compile-file src :output-file tmp-obj ))
            (declare (ignore warnings-p))
            (cond ((not output-truename)
                   (error "couldn't compile ~S" src))
@@ -301,6 +305,12 @@
     ;; SBCL. ("not target code" -- but still presumably host code,
     ;; used to support the cross-compilation process)
     :not-target
+    ;; meaning: The #'COMPILE-STEM argument :TRACE-FILE should be T.
+    ;; When the compiler is SBCL's COMPILE-FILE or something like it,
+    ;; compiling "foo.lisp" will generate "foo.trace" which contains lots
+    ;; of exciting low-level information about representation selection,
+    ;; VOPs used by the compiler, and bits of assembly.
+    :trace-file
     ;; meaning: This file is to be processed with the SBCL assembler,
     ;; not COMPILE-FILE. (Note that this doesn't make sense unless
     ;; :NOT-HOST is also set, since the SBCL assembler doesn't exist
@@ -381,12 +391,13 @@
 
 ;;; Run the cross-compiler on a file in the source directory tree to
 ;;; produce a corresponding file in the target object directory tree.
-(defun target-compile-stem (stem &key assem-p ignore-failure-p)
+(defun target-compile-stem (stem &key assem-p ignore-failure-p trace-file)
   (funcall *in-target-compilation-mode-fn*
 	   (lambda ()
 	     (compile-stem stem
 			   :obj-prefix *target-obj-prefix*
 			   :obj-suffix *target-obj-suffix*
+                          :trace-file trace-file
 			   :ignore-failure-p ignore-failure-p
 			   :compile-file (if assem-p
 					     *target-assemble-file*
