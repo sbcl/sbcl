@@ -911,5 +911,14 @@
 (load "package-ctor-bug.lisp")
 (assert (= (package-ctor-bug:test) 3))
 
+(deftype defined-type () 'integer)
+(assert (raises-error?
+         (defmethod method-on-defined-type ((x defined-type)) x)))
+(deftype defined-type-and-class () 'integer)
+(setf (find-class 'defined-type-and-class) (find-class 'integer))
+(defmethod method-on-defined-type-and-class ((x defined-type-and-class))
+  (1+ x))
+(assert (= (method-on-defined-type-and-class 3) 4))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
