@@ -1768,3 +1768,14 @@
       (declare (optimize (speed 2) (safety 1) (debug 3) (space 2)))
       (atom (the (member f assoc-if write-line t w) p1))))
    t)))
+
+;;; Free special bindings only apply to the body of the binding form, not
+;;; the initialization forms.
+(assert (eq :good
+	    (funcall (compile 'nil
+			      (lambda ()
+				(let ((x :bad))
+				  (declare (special x))
+				  (let ((x :good))
+				    ((lambda (&optional (y x))
+				       (declare (special x)) y)))))))))

@@ -50,6 +50,8 @@
   the efficiency of stable code.")
 
 (defvar *fun-names-in-this-file* nil)
+
+(defvar *post-binding-variable-lexenv* nil)
 
 ;;;; namespace management utilities
 
@@ -1006,8 +1008,9 @@
 
 ;;; Process a special declaration, returning a new LEXENV. A non-bound
 ;;; special declaration is instantiated by throwing a special variable
-;;; into the variables.
-(defun process-special-decl (spec res vars)
+;;; into the variables if BINDING-FORM-P is NIL, or otherwise into
+;;; *POST-BINDING-VARIABLE-LEXENV*. 
+(defun process-special-decl (spec res vars binding-form-p)
   (declare (list spec vars) (type lexenv res))
   (collect ((new-venv nil cons))
     (dolist (name (cdr spec))
@@ -1029,11 +1032,16 @@
 	   (setf (lambda-var-specvar var)
 		 (specvar-for-binding name)))
 	  (null
-	   (unless (assoc name (new-venv) :test #'eq)
+	   (unless (or (assoc name (new-venv) :test #'eq))
 	     (new-venv (cons name (specvar-for-binding name))))))))
-    (if (new-venv)
-	(make-lexenv :default res :vars (new-venv))
-	res)))
+    (cond (binding-form-p
+	   (setf *post-binding-variable-lexenv*
+		 (append (new-venv) *post-binding-variable-lexenv*))
+	   res)
+	  ((new-venv)
+	   (make-lexenv :default res :vars (new-venv)))
+	  (t
+	   res))))
 
 ;;; Return a DEFINED-FUN which copies a GLOBAL-VAR but for its INLINEP
 ;;; (and TYPE if notinline), plus type-restrictions from the lexenv.
@@ -1181,14 +1189,14 @@
 ;;; Process a single declaration spec, augmenting the specified LEXENV
 ;;; RES. Return RES and result type. VARS and FVARS are as described
 ;;; PROCESS-DECLS.
-(defun process-1-decl (raw-spec res vars fvars)
+(defun process-1-decl (raw-spec res vars fvars binding-form-p)
   (declare (type list raw-spec vars fvars))
   (declare (type lexenv res))
   (let ((spec (canonized-decl-spec raw-spec))
         (result-type *wild-type*))
     (values
      (case (first spec)
-       (special (process-special-decl spec res vars))
+       (special (process-special-decl spec res vars binding-form-p))
        (ftype
         (unless (cdr spec)
           (compiler-error "no type specified in FTYPE declaration: ~S" spec))
@@ -1242,45 +1250,56 @@
 ;;; filling in slots in the leaf structures, we return a new LEXENV,
 ;;; which reflects pervasive special and function type declarations,
 ;;; (NOT)INLINE declarations and OPTIMIZE declarations, and type of
-;;; VALUES declarations.
+;;; VALUES declarations. If BINDING-FORM-P is true, the third return
+;;; value is a list of VARs that should not apply to the lexenv of the
+;;; initialization forms for the bindings, but should apply to the body.
 ;;;
 ;;; This is also called in main.lisp when PROCESS-FORM handles a use
 ;;; of LOCALLY.
-(defun process-decls (decls vars fvars &optional (env *lexenv*))
+(defun process-decls (decls vars fvars &key (lexenv *lexenv*)
+		                            (binding-form-p nil))
   (declare (list decls vars fvars))
-  (let ((result-type *wild-type*))
+  (let ((result-type *wild-type*)
+	(*post-binding-variable-lexenv* nil))
     (dolist (decl decls)
       (dolist (spec (rest decl))
         (unless (consp spec)
           (compiler-error "malformed declaration specifier ~S in ~S" spec decl))
         (multiple-value-bind (new-env new-result-type)
-            (process-1-decl spec env vars fvars)
-          (setq env new-env)
+            (process-1-decl spec lexenv vars fvars binding-form-p)
+          (setq lexenv new-env)
           (unless (eq new-result-type *wild-type*)
             (setq result-type
                   (values-type-intersection result-type new-result-type))))))
-    (values env result-type)))
+    (values lexenv result-type *post-binding-variable-lexenv*)))
 
-(defun %processing-decls (decls vars fvars ctran lvar fun)
-  (multiple-value-bind (*lexenv* result-type)
-      (process-decls decls vars fvars)
+(defun %processing-decls (decls vars fvars ctran lvar binding-form-p fun)
+  (multiple-value-bind (*lexenv* result-type post-binding-lexenv)
+      (process-decls decls vars fvars :binding-form-p binding-form-p)
     (cond ((eq result-type *wild-type*)
-           (funcall fun ctran lvar))
+           (funcall fun ctran lvar post-binding-lexenv))
           (t
            (let ((value-ctran (make-ctran))
                  (value-lvar (make-lvar)))
              (multiple-value-prog1
-                 (funcall fun value-ctran value-lvar)
+                 (funcall fun value-ctran value-lvar post-binding-lexenv)
                (let ((cast (make-cast value-lvar result-type
                                       (lexenv-policy *lexenv*))))
                  (link-node-to-previous-ctran cast value-ctran)
                  (setf (lvar-dest value-lvar) cast)
                  (use-continuation cast ctran lvar))))))))
-(defmacro processing-decls ((decls vars fvars ctran lvar) &body forms)
+(defmacro processing-decls ((decls vars fvars ctran lvar
+				   &optional post-binding-lexenv)
+			    &body forms)
   (check-type ctran symbol)
   (check-type lvar symbol)
-  `(%processing-decls ,decls ,vars ,fvars ,ctran ,lvar
-                      (lambda (,ctran ,lvar) ,@forms)))
+  (let ((post-binding-lexenv-p (not (null post-binding-lexenv)))
+	(post-binding-lexenv (or post-binding-lexenv (gensym))))
+    `(%processing-decls ,decls ,vars ,fvars ,ctran ,lvar
+			,post-binding-lexenv-p
+			(lambda (,ctran ,lvar ,post-binding-lexenv)
+			  (declare (ignorable ,post-binding-lexenv))
+			  ,@forms))))
 
 ;;; Return the SPECVAR for NAME to use when we see a local SPECIAL
 ;;; declaration. If there is a global variable of that name, then

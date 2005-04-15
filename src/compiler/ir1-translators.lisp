@@ -586,10 +586,12 @@
              (binding* ((ctran (make-ctran))
                         (fun-lvar (make-lvar))
                         ((next result)
-                         (processing-decls (decls vars nil next result)
+                         (processing-decls (decls vars nil next result
+						  post-binding-lexenv)
                            (let ((fun (ir1-convert-lambda-body
                                        forms
                                        vars
+				       :post-binding-lexenv post-binding-lexenv
                                        :debug-name (debug-name 'let bindings))))
                              (reference-leaf start ctran fun-lvar fun))
                            (values next result))))
@@ -607,13 +609,14 @@
       (multiple-value-bind (forms decls)
           (parse-body body :doc-string-allowed nil)
         (multiple-value-bind (vars values) (extract-let-vars bindings 'let*)
-          (processing-decls (decls vars nil start next)
+          (processing-decls (decls vars nil start next post-binding-lexenv)
             (ir1-convert-aux-bindings start
                                       next
                                       result
                                       forms
                                       vars
-                                      values))))
+                                      values
+				      post-binding-lexenv))))
       (compiler-error "Malformed LET* bindings: ~S." bindings)))
 
 ;;; logic shared between IR1 translators for LOCALLY, MACROLET,

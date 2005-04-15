@@ -202,17 +202,20 @@
 ;;; FIXME: This could and probably should be converted to use
 ;;; SOURCE-NAME and DEBUG-NAME. But I (WHN) don't use &AUX bindings,
 ;;; so I'm not motivated. Patches will be accepted...
-(defun ir1-convert-aux-bindings (start next result body aux-vars aux-vals)
+(defun ir1-convert-aux-bindings (start next result body aux-vars aux-vals
+				 post-binding-lexenv)
   (declare (type ctran start next) (type (or lvar null) result)
            (list body aux-vars aux-vals))
   (if (null aux-vars)
-      (ir1-convert-progn-body start next result body)
+      (let ((*lexenv* (make-lexenv :vars (copy-list post-binding-lexenv))))
+	(ir1-convert-progn-body start next result body))
       (let ((ctran (make-ctran))
             (fun-lvar (make-lvar))
 	    (fun (ir1-convert-lambda-body body
  					  (list (first aux-vars))
  					  :aux-vars (rest aux-vars)
  					  :aux-vals (rest aux-vals)
+					  :post-binding-lexenv post-binding-lexenv
  					  :debug-name (debug-name 
                                                        '&aux-bindings 
                                                        aux-vars))))
@@ -233,12 +236,13 @@
 ;;; to start a block outside of this cleanup, causing cleanup code to
 ;;; be emitted when the scope is exited.
 (defun ir1-convert-special-bindings
-    (start next result body aux-vars aux-vals svars)
+    (start next result body aux-vars aux-vals svars post-binding-lexenv)
   (declare (type ctran start next) (type (or lvar null) result)
 	   (list body aux-vars aux-vals svars))
   (cond
    ((null svars)
-    (ir1-convert-aux-bindings start next result body aux-vars aux-vals))
+    (ir1-convert-aux-bindings start next result body aux-vars aux-vals
+			      post-binding-lexenv))
    (t
     (ctran-starts-block next)
     (let ((cleanup (make-cleanup :kind :special-bind))
@@ -252,7 +256,8 @@
 	(ir1-convert bind-ctran cleanup-ctran nil '(%cleanup-point))
 	(ir1-convert-special-bindings cleanup-ctran next result
                                       body aux-vars aux-vals
-				      (rest svars))))))
+				      (rest svars)
+				      post-binding-lexenv)))))
   (values))
 
 ;;; Create a lambda node out of some code, returning the result. The
@@ -279,7 +284,8 @@
 				aux-vals
 				(source-name '.anonymous.)
 				debug-name
-                                (note-lexical-bindings t))
+                                (note-lexical-bindings t)
+				post-binding-lexenv)
   (declare (list body vars aux-vars aux-vals))
 
   ;; We're about to try to put new blocks into *CURRENT-COMPONENT*.
@@ -348,7 +354,8 @@
             (use-ctran bind postbind-ctran)
 	    (ir1-convert-special-bindings postbind-ctran result-ctran
                                           result-lvar body
-                                          aux-vars aux-vals (svars))))))
+                                          aux-vars aux-vals (svars)
+					  post-binding-lexenv)))))
 
     (link-blocks (component-head *current-component*) (node-block bind))
     (push lambda (component-new-functionals *current-component*))
@@ -421,7 +428,7 @@
                                         vars supplied-p-p body
                                         aux-vars aux-vals
                                         source-name debug-name
-                                        force)
+                                        force post-binding-lexenv)
   (declare (type optional-dispatch res)
 	   (list default-vars default-vals entry-vars entry-vals vars body
 		 aux-vars aux-vals))
@@ -441,7 +448,7 @@
 		  (list* t arg-name entry-vals)
 		  (rest vars) t body aux-vars aux-vals
 		  source-name debug-name
-                  force)
+                  force post-binding-lexenv)
 		 (ir1-convert-hairy-args
 		  res
 		  (cons arg default-vars)
@@ -450,7 +457,7 @@
 		  (cons arg-name entry-vals)
 		  (rest vars) supplied-p-p body aux-vars aux-vals
 		  source-name debug-name
-                  force))))
+                  force post-binding-lexenv))))
 
     ;; We want to delay converting the entry, but there exist
     ;; problems: hidden references should not be established to
@@ -470,7 +477,7 @@
             (convert-optional-entry (force ep)
                                     default-vars default-vals
                                     defaults
-                                    name)            
+                                    name)
             res))))))
 
 ;;; Create the MORE-ENTRY function for the OPTIONAL-DISPATCH RES.
@@ -624,7 +631,7 @@
 (defun ir1-convert-more (res default-vars default-vals entry-vars entry-vals
 			     rest more-context more-count keys supplied-p-p
 			     body aux-vars aux-vals
-			     source-name debug-name)
+			     source-name debug-name post-binding-lexenv)
   (declare (type optional-dispatch res)
 	   (list default-vars default-vals entry-vars entry-vals keys body
 		 aux-vars aux-vals))
@@ -684,6 +691,7 @@
 			body (main-vars)
 			:aux-vars (append (bind-vars) aux-vars)
 			:aux-vals (append (bind-vals) aux-vals)
+			:post-binding-lexenv post-binding-lexenv
 			:debug-name (debug-name 'varargs-entry name)))
 	   (last-entry (convert-optional-entry main-entry default-vars
 					       (main-vals) () name)))
@@ -738,7 +746,7 @@
                                vars supplied-p-p body aux-vars
                                aux-vals
                                source-name debug-name
-                               force)
+                               force post-binding-lexenv)
   (declare (type optional-dispatch res)
            (list default-vars default-vals entry-vars entry-vals vars body
                  aux-vars aux-vals))
@@ -748,12 +756,14 @@
              (ir1-convert-more res default-vars default-vals
                                entry-vars entry-vals
                                nil nil nil vars supplied-p-p body aux-vars
-                               aux-vals source-name debug-name)
+                               aux-vals source-name debug-name
+			       post-binding-lexenv)
              (let* ((name (or debug-name source-name))
                     (fun (ir1-convert-lambda-body
 			 body (reverse default-vars)
 			 :aux-vars aux-vars
 			 :aux-vals aux-vals
+			 :post-binding-lexenv post-binding-lexenv
 			 :debug-name (debug-name 'hairy-arg-processor name))))
 
                (setf (optional-dispatch-main-entry res) fun)
@@ -773,7 +783,7 @@
            (ir1-convert-hairy-args res nvars nvals nvars nvals
                                    (rest vars) nil body aux-vars aux-vals
 				   source-name debug-name
-                                   nil)))
+                                   nil post-binding-lexenv)))
         (t
          (let* ((arg (first vars))
                 (info (lambda-var-arg-info arg))
@@ -785,7 +795,7 @@
                          entry-vars entry-vals vars supplied-p-p body
                          aux-vars aux-vals
 			 source-name debug-name
-                         force)))
+                         force post-binding-lexenv)))
                 ;; See GENERATE-OPTIONAL-DEFAULT-ENTRY.
                 (push (if (lambda-p ep)
                           (register-entry-point
@@ -804,18 +814,21 @@
                                 entry-vars entry-vals
                                 arg nil nil (rest vars) supplied-p-p body
                                 aux-vars aux-vals
-				source-name debug-name))
+				source-name debug-name
+				post-binding-lexenv))
              (:more-context
               (ir1-convert-more res default-vars default-vals
                                 entry-vars entry-vals
                                 nil arg (second vars) (cddr vars) supplied-p-p
                                 body aux-vars aux-vals
-				source-name debug-name))
+				source-name debug-name
+				post-binding-lexenv))
              (:keyword
               (ir1-convert-more res default-vars default-vals
                                 entry-vars entry-vals
                                 nil nil nil vars supplied-p-p body aux-vars
-                                aux-vals source-name debug-name)))))))
+                                aux-vals source-name debug-name
+				post-binding-lexenv)))))))
 
 ;;; This function deals with the case where we have to make an
 ;;; OPTIONAL-DISPATCH to represent a LAMBDA. We cons up the result and
@@ -823,6 +836,7 @@
 ;;; figure out the MIN-ARGS and MAX-ARGS.
 (defun ir1-convert-hairy-lambda (body vars keyp allowp aux-vars aux-vals
 				      &key
+				      post-binding-lexenv
 				      (source-name '.anonymous.)
 				      (debug-name 
                                        (debug-name '&optional-dispatch vars)))
@@ -839,7 +853,7 @@
     (aver-live-component *current-component*)
     (push res (component-new-functionals *current-component*))
     (ir1-convert-hairy-args res () () () () vars nil body aux-vars aux-vals
-			    source-name debug-name nil)
+			    source-name debug-name nil post-binding-lexenv)
     (setf (optional-dispatch-min-args res) min)
     (setf (optional-dispatch-max-args res)
 	  (+ (1- (length (optional-dispatch-entry-points res))) min))
@@ -866,8 +880,9 @@
   (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
       (make-lambda-vars (cadr form))
     (multiple-value-bind (forms decls) (parse-body (cddr form))
-      (binding* (((*lexenv* result-type)
-                  (process-decls decls (append aux-vars vars) nil))
+      (binding* (((*lexenv* result-type post-binding-lexenv)
+                  (process-decls decls (append aux-vars vars) nil
+				 :binding-form-p t))
                  (forms (if (and *allow-instrumenting*
                                  (policy *lexenv* (>= insert-debug-catch 2)))
                             `((catch (locally 
@@ -882,11 +897,13 @@
                           (ir1-convert-hairy-lambda forms vars keyp
                                                     allow-other-keys
                                                     aux-vars aux-vals
+						    :post-binding-lexenv post-binding-lexenv						    
                                                     :source-name source-name
                                                     :debug-name debug-name)
                           (ir1-convert-lambda-body forms vars
                                                    :aux-vars aux-vars
                                                    :aux-vals aux-vals
+						   :post-binding-lexenv post-binding-lexenv
                                                    :source-name source-name
                                                    :debug-name debug-name))))
         (setf (functional-inline-expansion res) form)
@@ -946,7 +963,7 @@
 			  `(() () () . ,(cdr fun)))
     (let ((*lexenv* (make-lexenv
 		     :default (process-decls decls nil nil
-					     (make-null-lexenv))
+					     :lexenv (make-null-lexenv))
 		     :vars (copy-list symbol-macros)
 		     :funs (mapcar (lambda (x)
 				     `(,(car x) .

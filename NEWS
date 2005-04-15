@@ -71,6 +71,8 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
        resulting in GC crashes.
     ** MISC.548: type check weakening can convert required type into
        optional.
+    ** initialization forms for bindings are not in scope of free special
+       declarations.
 
 changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
   * incompatible change: thread support for non-NPTL systems has

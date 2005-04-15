@@ -70,7 +70,7 @@
              (sb!c::process-decls decls
                                   vars
                                   nil
-                                  lexenv))))
+                                  :lexenv lexenv))))
       (eval-progn-body body lexenv))))
 
 (defun eval (original-exp)
