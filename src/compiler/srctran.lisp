@@ -3071,7 +3071,9 @@
 ;;; -- If both args are characters, convert to CHAR=. This is better than
 ;;;    just converting to EQ, since CHAR= may have special compilation
 ;;;    strategies for non-standard representations, etc.
-;;; -- If either arg is definitely not a number, or a fixnum, then we
+;;; -- If either arg is definitely a fixnum we punt and let the backend
+;;;    deal with it.
+;;; -- If either arg is definitely not a number or a fixnum, then we
 ;;;    can compare with EQ.
 ;;; -- Otherwise, we try to put the arg we know more about second. If X
 ;;;    is constant then we put it second. If X is a subtype of Y, we put
@@ -3083,16 +3085,20 @@
 	(y-type (lvar-type y))
 	(char-type (specifier-type 'character)))
     (flet ((simple-type-p (type)
-	     (csubtypep type (specifier-type '(or fixnum (not number))))))
+             (csubtypep type (specifier-type '(or fixnum (not number)))))
+           (fixnum-type-p (type)
+             (csubtypep type (specifier-type 'fixnum))))
       (cond
-	((same-leaf-ref-p x y) t)
-	((not (types-equal-or-intersect x-type y-type))
-	 nil)
-	((and (csubtypep x-type char-type)
-	      (csubtypep y-type char-type))
+        ((same-leaf-ref-p x y) t)
+        ((not (types-equal-or-intersect x-type y-type))
+         nil)
+        ((and (csubtypep x-type char-type)
+              (csubtypep y-type char-type))
 	 '(char= x y))
-	((or (simple-type-p x-type) (simple-type-p y-type))
-	 '(eq x y))
+        ((or (fixnum-type-p x-type) (fixnum-type-p y-type))
+         (give-up-ir1-transform))
+        ((or (simple-type-p x-type) (simple-type-p y-type))
+         '(eq x y))
 	((and (not (constant-lvar-p y))
 	      (or (constant-lvar-p x)
 		  (and (csubtypep x-type y-type)
