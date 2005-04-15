@@ -50,6 +50,9 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
     on x86-64
   * bug fix: setting 31st element of a bit vector to zero did not work
     on Alpha-32.
+  * bug fix: redefining a class definition which failed due to a
+    previous accessor / function clash now works (but see BUGS entry
+    #380 for more problems in this area).  (thanks to Zach Beane)
   * fixed some bugs related to Unicode integration:
     ** the restarts for recovering from input and output encoding
        errors only appear when there is in fact such an error to

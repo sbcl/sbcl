@@ -905,6 +905,23 @@
 		     (method-for-defined-classes #\3))
 		   "3")))
 
+
+
+;;; When class definition does not complete due to a bad accessor
+;;; name, do not cause an error when a new accessor name is provided
+;;; during class redefinition
+
+(defun existing-name (object)
+  (list object))
+
+(assert (raises-error? (defclass redefinition-of-accessor-class ()
+                         ((slot :accessor existing-name)))))
+
+(defclass redefinition-of-accessor-class ()
+  ((slot :accessor new-name)))
+
+
+
 (load "package-ctor-bug.lisp")
 (assert (= (package-ctor-bug:test) 3))
 (delete-package "PACKAGE-CTOR-BUG")

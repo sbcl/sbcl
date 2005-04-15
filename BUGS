@@ -2065,3 +2065,16 @@ WORKAROUND:
 
 379: TRACE :ENCAPSULATE NIL broken on ppc/darwin
   See commented-out test-case in debug.impure.lisp.
+
+380: Accessor redefinition fails because of old accessor name
+  When redefining an accessor, SB-PCL::FIX-SLOT-ACCESSORS may try to
+  find the generic function named by the old accessor name using
+  ENSURE-GENERIC-FUNCTION and then remove the old accessor's method in
+  the GF. If the old name does not name a function, or if the old name
+  does not name a generic function, no attempt to find the GF or remove
+  any methods is made.
+
+  However, if an unrelated GF with an incompatible lambda list exists,
+  the class redefinition will fail when SB-PCL::REMOVE-READER-METHOD
+  tries to find and remove a method with an incompatible lambda list
+  from the unrelated generic function.

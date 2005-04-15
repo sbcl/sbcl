@@ -744,20 +744,26 @@
 
 (defun fix-slot-accessors (class dslotds add/remove)
   (flet ((fix (gfspec name r/w)
-           (let ((gf (if (fboundp gfspec)
-                         (without-package-locks 
-                           (ensure-generic-function gfspec))
-                         (ensure-generic-function 
-                          gfspec :lambda-list (case r/w 
-                                                (r '(object)) 
-                                                (w '(new-value object)))))))
-             (case r/w
-               (r (if (eq add/remove 'add)
-                      (add-reader-method class gf name)
-                      (remove-reader-method class gf)))
-               (w (if (eq add/remove 'add)
-                      (add-writer-method class gf name)
-                      (remove-writer-method class gf)))))))
+           (let ((gf (cond ((eq add/remove 'add)
+                            (if (fboundp gfspec)
+                                (without-package-locks 
+                                  (ensure-generic-function gfspec))
+                                (ensure-generic-function 
+                                 gfspec :lambda-list (case r/w
+                                                       (r '(object))
+                                                       (w '(new-value object))))))
+                           ((generic-function-p (and (fboundp gfspec)
+                                                     (fdefinition gfspec)))
+                            (without-package-locks
+                              (ensure-generic-function gfspec))))))
+             (when gf
+               (case r/w
+                 (r (if (eq add/remove 'add)
+                        (add-reader-method class gf name)
+                        (remove-reader-method class gf)))
+                 (w (if (eq add/remove 'add)
+                        (add-writer-method class gf name)
+                        (remove-writer-method class gf))))))))
     (dolist (dslotd dslotds)
       (let ((slot-name (slot-definition-name dslotd)))
         (dolist (r (slot-definition-readers dslotd)) 
