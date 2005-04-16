@@ -193,6 +193,15 @@ or
 @end lisp
 
 @item
+Stack allocation of simple forms of @code{make-array}, whose result is
+bound to a variable, declared @code{dynamic-extent}. The resulting
+array should be one-dimensional, the only allowed keyword argument is
+@code{:element-type}.
+
+Notice, that stack space is limited, so allocation of a large vector
+may cause stack overflow and abnormal termination of the SBCL process.
+
+@item
 Stack allocation of closures, defined with @code{flet} or
 @code{labels} with a bound declaration @code{dynamic-extent}.
 Closed-over variables, which are assigned (either inside or outside

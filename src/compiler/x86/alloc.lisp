@@ -72,6 +72,33 @@
   (:variant t))
 
 ;;;; special-purpose inline allocators
+(defoptimizer (allocate-vector stack-allocate-result) ((type length words))
+  t)
+
+(define-vop (allocate-vector)
+  (:args (type :scs (unsigned-reg))
+         (length :scs (any-reg))
+         (words :scs (any-reg)))
+  (:results (result :scs (descriptor-reg) :from :load))
+  (:arg-types positive-fixnum
+              positive-fixnum
+              positive-fixnum)
+  (:translate allocate-vector)
+  (:policy :fast-safe)
+  (:node-var node)
+  (:generator 100
+    (inst lea result (make-ea :byte :base words :disp
+                              (+ (1- (ash 1 n-lowtag-bits))
+                                 (* vector-data-offset n-word-bytes))))
+    (inst and result (lognot lowtag-mask))
+    (let ((stack-allocate-p (awhen (sb!c::node-lvar node)
+                              (sb!c::lvar-dynamic-extent it))))
+      (maybe-pseudo-atomic stack-allocate-p
+        ;; FIXME: It would be good to check for stack overflow here.
+        (allocation result result node stack-allocate-p)
+        (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
+        (storew type result 0 other-pointer-lowtag)
+        (storew length result vector-length-slot other-pointer-lowtag)))))
 
 (define-vop (allocate-code-object)
   (:args (boxed-arg :scs (any-reg) :target boxed)
