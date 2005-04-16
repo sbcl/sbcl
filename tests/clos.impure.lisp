@@ -434,6 +434,120 @@
 		    form)))
 	    'dmc-test-return))
 
+;;; DEFINE-METHOD-COMBINATION should, according to the description in 7.7,
+;;; allow you to do everything in the body forms yourself if you specify  
+;;; exactly one method group whose qualifier-pattern is *
+;;;
+;;; The specific language is:
+;;; "The use of method group specifiers provides a convenient syntax to select 
+;;; methods, to divide them among the possible roles, and to perform the 
+;;; necessary error checking. It is possible to perform further filtering of 
+;;; methods in the body forms by using normal list-processing operations and 
+;;; the functions method-qualifiers and invalid-method-error. It is permissible
+;;; to use setq on the variables named in the method group specifiers and to 
+;;; bind additional variables. It is also possible to bypass the method group
+;;; specifier mechanism and do everything in the body forms. This is 
+;;; accomplished by writing a single method group with * as its only 
+;;; qualifier-pattern; the variable is then bound to a list of all of the 
+;;; applicable methods, in most-specific-first order."
+(define-method-combination wam-test-method-combination-a ()
+  ((all-methods *))
+  (do ((methods all-methods (rest methods))
+       (primary nil)
+       (around nil))
+      ((null methods)
+       (let ((primary (nreverse primary))
+	     (around (nreverse around)))
+	 (if primary
+	      (let ((form (if (rest primary)
+			     `(call-method ,(first primary) ,(rest primary))
+			     `(call-method ,(first primary)))))
+		(if around
+		    `(call-method ,(first around) (,@(rest around)
+						   (make-method ,form)))
+		    form))
+	      `(make-method (error "No primary methods")))))
+    (let* ((method (first methods))
+	   (qualifier (first (method-qualifiers method))))
+      (cond
+	((equal :around qualifier)
+	 (push method around))
+	((null qualifier)
+	 (push method primary))))))
+
+(defgeneric wam-test-mc-a (val)
+  (:method-combination wam-test-method-combination-a))
+(assert (raises-error? (wam-test-mc-a 13)))
+(defmethod wam-test-mc-a ((val number))
+  (+ val (if (next-method-p) (call-next-method) 0)))
+(assert (= (wam-test-mc-a 13) 13))
+(defmethod wam-test-mc-a :around ((val number))
+  (+ val (if (next-method-p) (call-next-method) 0)))
+(assert (= (wam-test-mc-a 13) 26))
+
+;;; DEFINE-METHOD-COMBINATION 
+;;; When two methods are in the same method group and have the same 
+;;; specializers, their sort order within the group may be ambiguous. Therefore,
+;;; we should throw an error when we have two methods in the same group with
+;;; the same specializers /as long as/ we have more than one method group
+;;; or our single method group qualifier-pattern is not *. This resolves the
+;;; apparent conflict with the above 'It is also possible to bypass' language.
+;;;
+;;; The language specifying this behavior is:
+;;; "Note that two methods with identical specializers, but with different 
+;;; qualifiers, are not ordered by the algorithm described in Step 2 of the 
+;;; method selection and combination process described in Section 7.6.6 
+;;; (Method Selection and Combination). Normally the two methods play different
+;;; roles in the effective method because they have different qualifiers, and 
+;;; no matter how they are ordered in the result of Step 2, the effective 
+;;; method is the same. If the two methods play the same role and their order 
+;;; matters, an error is signaled. This happens as part of the qualifier 
+;;; pattern matching in define-method-combination."
+;;;
+;;; Note that the spec pretty much equates 'method group' and 'role'.
+;; First we ensure that it fails correctly when there is more than one
+;; method group
+(define-method-combination wam-test-method-combination-b ()
+  ((around (:around))
+   (primary * :required t))
+  (let ((form (if (rest primary)
+		  `(call-method ,(first primary) ,(rest primary))
+		  `(call-method ,(first primary)))))
+    (if around
+	`(call-method ,(first around) (,@(rest around)
+				       (make-method ,form)))
+	form)))
+
+(defgeneric wam-test-mc-b (val)
+  (:method-combination wam-test-method-combination-b))
+(defmethod wam-test-mc-b ((val number))
+  (+ val (if (next-method-p) (call-next-method) 0)))
+(assert (= (wam-test-mc-b 13) 13))
+(defmethod wam-test-mc-b :around ((val number))
+  (+ val (if (next-method-p) (call-next-method) 0)))
+(assert (= (wam-test-mc-b 13) 26))
+(defmethod wam-test-mc-b :somethingelse ((val number)) 
+  (+ val (if (next-method-p) (call-next-method) 0)))
+(assert (raises-error? (wam-test-mc-b 13)))
+
+;;; now, ensure that it fails with a single group with a qualifier-pattern
+;;; that is not *
+(define-method-combination wam-test-method-combination-c ()
+  ((methods listp :required t))
+  (if (rest methods)
+      `(call-method ,(first methods) ,(rest methods))
+      `(call-method ,(first methods))))
+
+(defgeneric wam-test-mc-c (val)
+  (:method-combination wam-test-method-combination-c))
+(assert (raises-error? (wam-test-mc-c 13)))
+(defmethod wam-test-mc-c :foo ((val number))
+  (+ val (if (next-method-p) (call-next-method) 0)))
+(assert (= (wam-test-mc-c 13) 13))
+(defmethod wam-test-mc-c :bar ((val number))
+  (+ val (if (next-method-p) (call-next-method) 0)))
+(assert (raises-error? (wam-test-mc-c 13)))
+
 ;;; DEFMETHOD should signal an ERROR if an incompatible lambda list is
 ;;; given:
 (defmethod incompatible-ll-test-1 (x) x)

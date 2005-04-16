@@ -53,6 +53,9 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
   * bug fix: redefining a class definition which failed due to a
     previous accessor / function clash now works (but see BUGS entry
     #380 for more problems in this area).  (thanks to Zach Beane)
+  * the long form of DEFINE-METHOD-COMBINATION disables method group
+    checking when given a single method group with pattern *.  (thanks
+    to Wendall Marvel)
   * on x86 compiler supports stack allocation of results of simple
     calls of MAKE-ARRAY, bound to variables, declared DYNAMIC-EXTENT.
   * fixed some bugs related to Unicode integration:

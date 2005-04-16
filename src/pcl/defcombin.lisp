@@ -299,68 +299,82 @@
 		     .method-combination. .applicable-methods.))
 	   (block .long-method-combination-function. ,wrapped-body))))))
 
-;; parse-method-group-specifiers parse the method-group-specifiers
-
 (define-condition long-method-combination-error 
     (reference-condition simple-error)
   ()
   (:default-initargs 
       :references (list '(:ansi-cl :macro define-method-combination))))
 
+;;; NOTE:
+;;;
+;;; The semantics of long form method combination in the presence of
+;;; multiple methods with the same specializers in the same method
+;;; group are unclear by the spec: a portion of the standard implies
+;;; that an error should be signalled, and another is more lenient.
+;;;
+;;; It is reasonable to allow a single method group of * to bypass all
+;;; rules, as this is explicitly stated in the standard.
+
+(defun group-cond-clause (name tests specializer-cache star-only)
+  (let ((maybe-error-clause
+	 (if star-only
+	     `(setq ,specializer-cache .specializers.)
+	     `(if (and (equal ,specializer-cache .specializers.)
+                       (not (null .specializers.)))
+                  (return-from .long-method-combination-function.
+                    '(error 'long-method-combination-error
+		      :format-control "More than one method of type ~S ~
+				       with the same specializers."
+		      :format-arguments (list ',name)))
+                  (setq ,specializer-cache .specializers.)))))
+    `((or ,@tests)
+      ,maybe-error-clause
+      (push .method. ,name))))
+
 (defun wrap-method-group-specifier-bindings
-       (method-group-specifiers declarations real-body)
-  (let (names
-        specializer-caches
-        cond-clauses
-        required-checks
-        order-cleanups)
+    (method-group-specifiers declarations real-body)
+  (let (names specializer-caches cond-clauses required-checks order-cleanups)
+    (let ((nspecifiers (length method-group-specifiers)))
       (dolist (method-group-specifier method-group-specifiers)
-	(multiple-value-bind (name tests description order required)
-	    (parse-method-group-specifier method-group-specifier)
-	  (declare (ignore description))
-	  (let ((specializer-cache (gensym)))
-	    (push name names)
-	    (push specializer-cache specializer-caches)
-	    (push `((or ,@tests)
-		    (if (and (equal ,specializer-cache .specializers.)
-			     (not (null .specializers.)))
-			(return-from .long-method-combination-function.
-			  '(error 'long-method-combination-error
-			    :format-control "More than one method of type ~S ~
-				             with the same specializers."
-			    :format-arguments (list ',name)))
-			(setq ,specializer-cache .specializers.))
-		    (push .method. ,name))
-		  cond-clauses)
-	    (when required
-	      (push `(when (null ,name)
-			 (return-from .long-method-combination-function.
-			   '(error 'long-method-combination-error
-			     :format-control "No ~S methods." 
-			     :format-arguments (list ',name))))
-		      required-checks))
-	    (loop (unless (and (constantp order)
-			       (neq order (setq order (eval order))))
-		    (return t)))
-	    (push (cond ((eq order :most-specific-first)
-			   `(setq ,name (nreverse ,name)))
-			  ((eq order :most-specific-last) ())
-			  (t
-			   `(ecase ,order
-			      (:most-specific-first
-				(setq ,name (nreverse ,name)))
-			      (:most-specific-last))))
-		    order-cleanups))))
-   `(let (,@(nreverse names) ,@(nreverse specializer-caches))
-      ,@declarations
-      (dolist (.method. .applicable-methods.)
-	(let ((.qualifiers. (method-qualifiers .method.))
-	      (.specializers. (method-specializers .method.)))
-	  (declare (ignorable .qualifiers. .specializers.))
-	  (cond ,@(nreverse cond-clauses))))
-      ,@(nreverse required-checks)
-      ,@(nreverse order-cleanups)
-      ,@real-body)))
+        (multiple-value-bind (name tests description order required)
+            (parse-method-group-specifier method-group-specifier)
+          (declare (ignore description))
+          (let ((specializer-cache (gensym)))
+            (push name names)
+            (push specializer-cache specializer-caches)
+            (push (group-cond-clause name tests specializer-cache
+                                     (and (eq (cadr method-group-specifier) '*)
+                                          (= nspecifiers 1)))
+                  cond-clauses)
+            (when required
+              (push `(when (null ,name)
+                      (return-from .long-method-combination-function.
+                        '(error 'long-method-combination-error
+                          :format-control "No ~S methods." 
+                          :format-arguments (list ',name))))
+                    required-checks))
+            (loop (unless (and (constantp order)
+                               (neq order (setq order (eval order))))
+                    (return t)))
+            (push (cond ((eq order :most-specific-first)
+                         `(setq ,name (nreverse ,name)))
+                        ((eq order :most-specific-last) ())
+                        (t
+                         `(ecase ,order
+                           (:most-specific-first
+                            (setq ,name (nreverse ,name)))
+                           (:most-specific-last))))
+                  order-cleanups))))
+      `(let (,@(nreverse names) ,@(nreverse specializer-caches))
+        ,@declarations
+        (dolist (.method. .applicable-methods.)
+          (let ((.qualifiers. (method-qualifiers .method.))
+                (.specializers. (method-specializers .method.)))
+            (declare (ignorable .qualifiers. .specializers.))
+            (cond ,@(nreverse cond-clauses))))
+        ,@(nreverse required-checks)
+        ,@(nreverse order-cleanups)
+        ,@real-body))))
 
 (defun parse-method-group-specifier (method-group-specifier)
   ;;(declare (values name tests description order required))
