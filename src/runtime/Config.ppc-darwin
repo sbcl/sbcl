@@ -1,5 +1,5 @@
 # -*- makefile -*-
-CFLAGS = -Dppc -g -Wall -O2 -no-cpp-precomp
+CFLAGS = -Dppc -g -Wall -O2 -no-cpp-precomp -fdollars-in-identifiers
 OS_SRC = bsd-os.c os-common.c ppc-darwin-os.c ppc-darwin-dlshim.c ppc-darwin-langinfo.c
 OS_LIBS = -lSystem -lc -lm
 OS_OBJS = ppc-darwin-rospace.o
@@ -16,7 +16,7 @@ CPP = cpp -no-cpp-precomp
 # place a zero-fill-on-demand segment in the same place and size as
 # read-only-space, which is the only thing capable of keeping malloc
 # out of this range.
-OS_LINK_FLAGS = -dynamic `cat ppc-darwin-link-flags`
+OS_LINK_FLAGS = -dynamic `cat ppc-darwin-link-flags` -twolevel_namespace -bind_at_load
 
 GC_SRC= cheneygc.c
 

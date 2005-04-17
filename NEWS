@@ -1,4 +1,4 @@
-changes in sbcl-0.8.22 relative to sbcl-0.8.21:
+changes in sbcl-0.9.0 relative to sbcl-0.8.21:
   * incompatible change: the --noprogrammer option, deprecated since
     version 0.7.5, has been removed.  Please use the equivalent
     --disable-debugger option instead.
@@ -58,6 +58,8 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
     to Wendall Marvel)
   * on x86 compiler supports stack allocation of results of simple
     calls of MAKE-ARRAY, bound to variables, declared DYNAMIC-EXTENT.
+  * support for building and running on Mac OS X 10.4 "Tiger" has been added
+    ** Binaries built on Tiger will not run on 10.2 "Jaguar" currently
   * fixed some bugs related to Unicode integration:
     ** the restarts for recovering from input and output encoding
        errors only appear when there is in fact such an error to

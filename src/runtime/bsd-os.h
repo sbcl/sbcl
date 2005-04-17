@@ -17,6 +17,10 @@
 #include <sys/mman.h>
 #include <sys/signal.h>
 
+#ifdef LISP_FEATURE_DARWIN
+#include <mach/mach_types.h>
+#endif
+
 typedef caddr_t os_vm_address_t;
 #if defined __NetBSD__
 typedef vsize_t os_vm_size_t;

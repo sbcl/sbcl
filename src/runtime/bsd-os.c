@@ -220,7 +220,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 	if(!handle_guard_page_triggered(context,addr))
 	    interrupt_handle_now(signal, info, context);
     /* Work around G5 bug; fix courtesy gbyers */
-    sigreturn(void_context);
+    DARWIN_FIX_CONTEXT(context);
 }
 
 void

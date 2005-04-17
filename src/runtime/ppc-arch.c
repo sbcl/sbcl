@@ -59,7 +59,9 @@ arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 void 
 arch_skip_instruction(os_context_t *context)
 {
-    ((char*)*os_context_pc_addr(context)) +=4; 
+    char** pcptr;
+    pcptr = (char**) os_context_pc_addr(context);
+    *pcptr += 4;
 }
 
 unsigned char *
@@ -186,14 +188,14 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 	    break;
 	}
 #ifdef LISP_FEATURE_DARWIN
-	sigreturn(context);
+	DARWIN_FIX_CONTEXT(context);
 #endif
 	return;
     }
     if (((code >> 26) == 3) && (((code >> 21) & 31) == 24)) {
 	interrupt_internal_error(signal, code, context, 0);
 #ifdef LISP_FEATURE_DARWIN
-	sigreturn(context);
+	DARWIN_FIX_CONTEXT(context);
 #endif
 	return;
     }
@@ -201,7 +203,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     interrupt_handle_now(signal, code, context);
 #ifdef LISP_FEATURE_DARWIN
     /* Work around G5 bug */
-    sigreturn(context);
+    DARWIN_FIX_CONTEXT(context);
 #endif
 }
 

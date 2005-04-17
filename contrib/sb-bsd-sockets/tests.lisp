@@ -181,7 +181,7 @@
 
 (deftest get-host-by-name-wrong
   (handler-case
-   (get-host-by-name "foo.tninkpad.telent.net")
+   (get-host-by-name "foo.tninkpad.telent.net.")
    (NAME-SERVICE-ERROR () t)
    (:no-error nil))
   t)
