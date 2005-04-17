@@ -125,5 +125,6 @@
                   :values-documentation ',documentation)))
        (if acons
            (setf (cdr acons) item)
-           (push `(,',name . ,item) *policy-dependent-qualities*)))
+           (setf *policy-dependent-qualities*
+                 (nconc *policy-dependent-qualities* (list `(,',name . ,item))))))
      ',name))

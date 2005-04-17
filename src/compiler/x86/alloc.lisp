@@ -72,8 +72,18 @@
   (:variant t))
 
 ;;;; special-purpose inline allocators
-(defoptimizer (allocate-vector stack-allocate-result) ((type length words))
-  t)
+(defoptimizer (allocate-vector stack-allocate-result)
+    ((type length words) node)
+  (ecase (policy node sb!c::stack-allocate-vector)
+    (0 nil)
+    ((1 2)
+     ;; a vector object should fit in one page
+     (values-subtypep (sb!c::lvar-derived-type words)
+                      (load-time-value
+                       (specifier-type `(integer 0 ,(- (/ *backend-page-size*
+                                                          n-word-bytes)
+                                                       vector-data-offset))))))
+    (3 t)))
 
 (define-vop (allocate-vector)
   (:args (type :scs (unsigned-reg))

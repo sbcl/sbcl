@@ -61,6 +61,12 @@
 	0)
   ("no" "maybe" "yes" "yes"))
 
+(define-optimization-quality stack-allocate-vector
+    (cond ((= stack-allocate-dynamic-extent 0) 0)
+          ((= safety 0) 3)
+          (t 2))
+  ("no" "maybe" "one page" "yes"))
+
 (define-optimization-quality float-accuracy
     3
   ("degraded" "full" "full" "full"))
