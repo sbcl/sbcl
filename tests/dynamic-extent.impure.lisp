@@ -145,5 +145,13 @@
               ((1 1 1) (1 1 1) (1 1 1))))
          4))
 
+;;; bug reported by Brian Downing: stack-allocated arrays were not
+;;; filled with zeroes.
+(defun-with-dx bdowning-2005-iv-16 ()
+  (let ((a (make-array 11 :initial-element 0)))
+    (declare (dynamic-extent a))
+    (assert (every (lambda (x) (eql x 0)) a))))
+(bdowning-2005-iv-16)
+
 
 (sb-ext:quit :unix-status 104)

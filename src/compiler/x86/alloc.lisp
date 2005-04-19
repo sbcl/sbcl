@@ -72,23 +72,35 @@
   (:variant t))
 
 ;;;; special-purpose inline allocators
-(defoptimizer (allocate-vector stack-allocate-result)
-    ((type length words) node)
-  (ecase (policy node sb!c::stack-allocate-vector)
-    (0 nil)
-    ((1 2)
-     ;; a vector object should fit in one page
-     (values-subtypep (sb!c::lvar-derived-type words)
-                      (load-time-value
-                       (specifier-type `(integer 0 ,(- (/ *backend-page-size*
-                                                          n-word-bytes)
-                                                       vector-data-offset))))))
-    (3 t)))
 
-(define-vop (allocate-vector)
+;;; ALLOCATE-VECTOR
+(define-vop (allocate-vector-on-heap)
   (:args (type :scs (unsigned-reg))
          (length :scs (any-reg))
          (words :scs (any-reg)))
+  (:results (result :scs (descriptor-reg) :from :load))
+  (:arg-types positive-fixnum
+              positive-fixnum
+              positive-fixnum)
+  (:policy :fast-safe)
+  (:generator 100
+    (inst lea result (make-ea :byte :base words :disp
+                              (+ (1- (ash 1 n-lowtag-bits))
+                                 (* vector-data-offset n-word-bytes))))
+    (inst and result (lognot lowtag-mask))
+    (pseudo-atomic
+      (allocation result result)
+      (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
+      (storew type result 0 other-pointer-lowtag)
+      (storew length result vector-length-slot other-pointer-lowtag))))
+
+(define-vop (allocate-vector-on-stack)
+  (:args (type :scs (unsigned-reg))
+         (length :scs (any-reg))
+         (words :scs (any-reg) :target ecx))
+  (:temporary (:sc any-reg :offset ecx-offset :from (:argument 2)) ecx)
+  (:temporary (:sc any-reg :offset eax-offset :from (:argument 2)) zero)
+  (:temporary (:sc any-reg :offset edi-offset :from (:argument 0)) res)
   (:results (result :scs (descriptor-reg) :from :load))
   (:arg-types positive-fixnum
               positive-fixnum
@@ -101,15 +113,54 @@
                               (+ (1- (ash 1 n-lowtag-bits))
                                  (* vector-data-offset n-word-bytes))))
     (inst and result (lognot lowtag-mask))
-    (let ((stack-allocate-p (awhen (sb!c::node-lvar node)
-                              (sb!c::lvar-dynamic-extent it))))
-      (maybe-pseudo-atomic stack-allocate-p
-        ;; FIXME: It would be good to check for stack overflow here.
-        (allocation result result node stack-allocate-p)
-        (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
-        (storew type result 0 other-pointer-lowtag)
-        (storew length result vector-length-slot other-pointer-lowtag)))))
+    ;; FIXME: It would be good to check for stack overflow here.
+    (move ecx words)
+    (inst shr ecx n-fixnum-tag-bits)
+    (allocation result result node t)
+    (inst cld)
+    (inst lea res
+          (make-ea :byte :base result :disp (* vector-data-offset n-word-bytes)))
+    (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
+    (storew type result 0 other-pointer-lowtag)
+    (storew length result vector-length-slot other-pointer-lowtag)
+    (inst xor zero zero)
+    (inst rep)
+    (inst stos zero)))
 
+(in-package :sb!c)
+(defoptimizer (allocate-vector stack-allocate-result)
+    ((type length words) node)
+  (ecase (policy node stack-allocate-vector)
+    (0 nil)
+    ((1 2)
+     ;; a vector object should fit in one page
+     (values-subtypep (lvar-derived-type words)
+                      (load-time-value
+                       (specifier-type `(integer 0 ,(- (/ sb!vm::*backend-page-size*
+                                                          sb!vm:n-word-bytes)
+                                                       sb!vm:vector-data-offset))))))
+    (3 t)))
+
+(defoptimizer (allocate-vector ltn-annotate) ((type length words) call ltn-policy)
+  (let ((args (basic-combination-args call))
+        (template (template-or-lose (if (awhen (node-lvar call)
+                                          (lvar-dynamic-extent it))
+                                        'sb!vm::allocate-vector-on-stack
+                                        'sb!vm::allocate-vector-on-heap))))
+    (dolist (arg args)
+      (setf (lvar-info arg)
+	    (make-ir2-lvar (primitive-type (lvar-type arg)))))
+    (unless (is-ok-template-use template call (ltn-policy-safe-p ltn-policy))
+      (ltn-default-call call)
+      (return-from allocate-vector-ltn-annotate-optimizer (values)))
+    (setf (basic-combination-info call) template)
+    (setf (node-tail-p call) nil)
+
+    (dolist (arg args)
+      (annotate-1-value-lvar arg))))
+(in-package :sb!vm)
+
+;;;
 (define-vop (allocate-code-object)
   (:args (boxed-arg :scs (any-reg) :target boxed)
 	 (unboxed-arg :scs (any-reg) :target unboxed))
