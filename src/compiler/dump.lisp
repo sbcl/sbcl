@@ -277,9 +277,7 @@
 
 ;;; Open a fasl file, write its header, and return a FASL-OUTPUT
 ;;; object for dumping to it. Some human-readable information about
-;;; the source code is given by the string WHERE. If BYTE-P is true,
-;;; this file will contain no native code, and is thus largely
-;;; implementation independent.
+;;; the source code is given by the string WHERE. 
 (defun open-fasl-output (name where)
   (declare (type pathname name))
   (let* ((stream (open name
@@ -512,13 +510,11 @@
 
 ;;;; number dumping
 
-;;; Dump a ratio.
 (defun dump-ratio (x file)
   (sub-dump-object (numerator x) file)
   (sub-dump-object (denominator x) file)
   (dump-fop 'fop-ratio file))
 
-;;; Dump an integer.
 (defun dump-integer (n file)
   (typecase n
     ((signed-byte 8)

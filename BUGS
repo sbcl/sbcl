@@ -2078,3 +2078,15 @@ WORKAROUND:
   the class redefinition will fail when SB-PCL::REMOVE-READER-METHOD
   tries to find and remove a method with an incompatible lambda list
   from the unrelated generic function.
+
+381: incautious calls to EQUAL in fasl dumping
+  Compiling 
+    (frob #(#1=(a #1#)))
+    (frob #(#1=(b #1#)))
+    (frob #(#1=(a #1#)))
+  in sbcl-0.9.0 causes CONTROL-STACK-EXHAUSTED. My (WHN) impression 
+  is that this follows from the use of (MAKE-HASH-TABLE :TEST 'EQUAL)
+  to detect sharing, in which case fixing it might require either 
+  getting less ambitious about detecting shared list structure, or 
+  implementing the moral equivalent of EQUAL hash tables in a 
+  cycle-tolerant way.
