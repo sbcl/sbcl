@@ -54,18 +54,19 @@
 ;;; aren't used too early in cold boot for SXHASH to run).
 #!-sb-fluid (declaim (inline globaldb-sxhashoid))
 (defun globaldb-sxhashoid (x)
-  (cond	((symbolp x) (sxhash x))
-	((and (listp x)
-	      (eq (first x) 'setf)
-	      (let ((rest (rest x)))
-		(and (symbolp (car rest))
-		     (null (cdr rest)))))
-	 ;; We need to declare the type of the value we're feeding to
-	 ;; SXHASH so that the DEFTRANSFORM on symbols kicks in.
-	 (let ((symbol (second x)))
-	   (declare (symbol symbol))
-	   (logxor (sxhash symbol) 110680597)))
-	(t (sxhash x))))
+  (logand sb!xc:most-positive-fixnum
+	  (cond	((symbolp x) (sxhash x))
+		((and (listp x)
+		      (eq (first x) 'setf)
+		      (let ((rest (rest x)))
+			(and (symbolp (car rest))
+			     (null (cdr rest)))))
+		 ;; We need to declare the type of the value we're feeding to
+		 ;; SXHASH so that the DEFTRANSFORM on symbols kicks in.
+		 (let ((symbol (second x)))
+		   (declare (symbol symbol))
+		   (logxor (sxhash symbol) 110680597)))
+		(t (sxhash x)))))
 
 ;;; Given any non-negative integer, return a prime number >= to it.
 ;;;
@@ -550,18 +551,6 @@
 ;;; GLOBALDB-SXHASHOID of NAME.
 (defun compact-info-lookup (env name hash)
   (declare (type compact-info-env env)
-	   ;; FIXME: this used to read (TYPE INDEX HASH), but that was
-	   ;; wrong, because HASH was a positive fixnum, not a (MOD
-	   ;; MOST-POSITIVE-FIXNUM).
-	   ;;
-	   ;; However, this, its replacement, is also wrong.  In the
-	   ;; cross-compiler, GLOBALDB-SXHASHOID is essentially
-	   ;; SXHASH.  But our host compiler could have any value at
-	   ;; all as its MOST-POSITIVE-FIXNUM, and so could in
-	   ;; principle return a value exceeding our target positive
-	   ;; fixnum range.
-	   ;;
-	   ;; My brain hurts.  -- CSR, 2003-08-28
 	   (type (integer 0 #.sb!xc:most-positive-fixnum) hash))
   (let* ((table (compact-info-env-table env))
 	 (len (length table))
@@ -725,7 +714,6 @@
 ;;; Just like COMPACT-INFO-LOOKUP, only do it on a volatile environment.
 (defun volatile-info-lookup (env name hash)
   (declare (type volatile-info-env env)
-	   ;; FIXME: see comment in COMPACT-INFO-LOOKUP
 	   (type (integer 0 #.sb!xc:most-positive-fixnum) hash))
   (let ((table (volatile-info-env-table env)))
     (macrolet ((lookup (test)
