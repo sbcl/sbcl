@@ -456,7 +456,7 @@
   ;; on INFERIORS to find all the blocks.
   (blocks nil :type (or null cblock)))
 
-(defprinter (cloop :conc-name LOOP-)
+(defprinter (cloop :conc-name loop-)
   kind
   head
   tail

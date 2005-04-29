@@ -513,7 +513,7 @@
 ;;; they are ready for reading and writing. See the UNIX Programmer's
 ;;; Manual for more information.
 (defun unix-select (nfds rdfds wrfds xpfds to-secs &optional (to-usecs 0))
-  (declare (type (integer 0 #.FD-SETSIZE) nfds)
+  (declare (type (integer 0 #.fd-setsize) nfds)
 	   (type unsigned-byte rdfds wrfds xpfds)
 	   (type (or (unsigned-byte 31) null) to-secs)
 	   (type (unsigned-byte 31) to-usecs)
@@ -663,7 +663,7 @@
                (rem (struct timespec)))
     (setf (slot req 'tv-sec) secs)
     (setf (slot req 'tv-nsec) nsecs)
-    (loop while (eql sb!unix:EINTR
+    (loop while (eql sb!unix:eintr
                      (nth-value 1
                                 (int-syscall ("nanosleep" (* (struct timespec))
                                                           (* (struct timespec)))
@@ -694,7 +694,7 @@
 	       (tz (struct timezone)))
     (syscall* ("gettimeofday" (* (struct timeval))
 			      (* (struct timezone)))
-	      (values T
+	      (values t
 		      (slot tv 'tv-sec)
 		      (slot tv 'tv-usec)
 		      (slot tz 'tz-minuteswest)
@@ -710,11 +710,11 @@
     (it-interval (struct timeval))	; timer interval
     (it-value (struct timeval))))	; current value
 
-(defconstant ITIMER-REAL 0)
-(defconstant ITIMER-VIRTUAL 1)
-(defconstant ITIMER-PROF 2)
+(defconstant itimer-real 0)
+(defconstant itimer-virtual 1)
+(defconstant itimer-prof 2)
 
-(defun unix-getitimer(which)
+(defun unix-getitimer (which)
   "Unix-getitimer returns the INTERVAL and VALUE slots of one of
    three system timers (:real :virtual or :profile). On success,
    unix-getitimer returns 5 values,
@@ -724,12 +724,12 @@
 		   (unsigned-byte 29) (mod 1000000)
 		   (unsigned-byte 29) (mod 1000000)))
   (let ((which (ecase which
-		 (:real ITIMER-REAL)
-		 (:virtual ITIMER-VIRTUAL)
-		 (:profile ITIMER-PROF))))
+		 (:real itimer-real)
+		 (:virtual itimer-virtual)
+		 (:profile itimer-prof))))
     (with-alien ((itv (struct itimerval)))
       (syscall* ("getitimer" int (* (struct itimerval)))
-		(values T
+		(values t
 			(slot (slot itv 'it-interval) 'tv-sec)
 			(slot (slot itv 'it-interval) 'tv-usec)
 			(slot (slot itv 'it-value) 'tv-sec)
@@ -752,9 +752,9 @@
 		   (unsigned-byte 29) (mod 1000000)
 		   (unsigned-byte 29) (mod 1000000)))
   (let ((which (ecase which
-		 (:real ITIMER-REAL)
-		 (:virtual ITIMER-VIRTUAL)
-		 (:profile ITIMER-PROF))))
+		 (:real itimer-real)
+		 (:virtual itimer-virtual)
+		 (:profile itimer-prof))))
     (with-alien ((itvn (struct itimerval))
 		 (itvo (struct itimerval)))
       (setf (slot (slot itvn 'it-interval) 'tv-sec ) int-secs
@@ -762,7 +762,7 @@
 	    (slot (slot itvn 'it-value   ) 'tv-sec ) val-secs
 	    (slot (slot itvn 'it-value   ) 'tv-usec) val-usec)
       (syscall* ("setitimer" int (* (struct timeval))(* (struct timeval)))
-		(values T
+		(values t
 			(slot (slot itvo 'it-interval) 'tv-sec)
 			(slot (slot itvo 'it-interval) 'tv-usec)
 			(slot (slot itvo 'it-value) 'tv-sec)

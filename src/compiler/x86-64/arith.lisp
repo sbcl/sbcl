@@ -753,14 +753,14 @@
     (move result number)
     (move ecx amount)
     (inst or ecx ecx)
-    (inst jmp :ns positive)
+    (inst jmp :ns POSITIVE)
     (inst neg ecx)
     (inst cmp ecx 63)
-    (inst jmp :be okay)
+    (inst jmp :be OKAY)
     (inst mov ecx 63)
     OKAY
     (inst sar result :cl)
-    (inst jmp done)
+    (inst jmp DONE)
 
     POSITIVE
     ;; The result-type ensures us that this shift will not overflow.
@@ -782,15 +782,15 @@
     (move result number)
     (move ecx amount)
     (inst or ecx ecx)
-    (inst jmp :ns positive)
+    (inst jmp :ns POSITIVE)
     (inst neg ecx)
     (inst cmp ecx 63)
-    (inst jmp :be okay)
+    (inst jmp :be OKAY)
     (inst xor result result)
-    (inst jmp done)
+    (inst jmp DONE)
     OKAY
     (inst shr result :cl)
-    (inst jmp done)
+    (inst jmp DONE)
 
     POSITIVE
     ;; The result-type ensures us that this shift will not overflow.
@@ -894,13 +894,13 @@
     (move result number)
     (move ecx amount)
     (inst or ecx ecx)
-    (inst jmp :ns positive)
+    (inst jmp :ns POSITIVE)
     (inst neg ecx)
     (inst xor zero zero)
     (inst shr result :cl)
     (inst cmp ecx 63)
     (inst cmov :nbe result zero)
-    (inst jmp done)
+    (inst jmp DONE)
     
     POSITIVE
     ;; The result-type ensures us that this shift will not overflow.
@@ -923,9 +923,9 @@
     (inst not res)
     POS
     (inst bsr res res)
-    (inst jmp :z zero)
+    (inst jmp :z ZERO)
     (inst inc res)
-    (inst jmp done)
+    (inst jmp DONE)
     ZERO
     (inst xor res res)
     DONE))
@@ -940,9 +940,9 @@
   (:result-types unsigned-num)
   (:generator 26
     (inst bsr res arg)
-    (inst jmp :z zero)
+    (inst jmp :z ZERO)
     (inst inc res)
-    (inst jmp done)
+    (inst jmp DONE)
     ZERO
     (inst xor res res)
     DONE))

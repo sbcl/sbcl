@@ -581,7 +581,7 @@
 
 (defmacro define-cached-synonym
     (name &optional (original (symbolicate "%" name)))
-  (let ((cached-name (symbolicate "%%" name "-cached")))
+  (let ((cached-name (symbolicate "%%" name "-CACHED")))
     `(progn
        (defun-cached (,cached-name :hash-bits 8
                                    :hash-function (lambda (x)

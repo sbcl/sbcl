@@ -49,8 +49,15 @@ defconstant(char* lisp_name, long unix_number)
 	   lisp_name, unix_number, unix_number);
 }
 
-#define DEFERRNO(name) defconstant(#name, name)
-#define DEFSIGNAL(name) defconstant(#name, name)
+void deferrno(char* lisp_name, long unix_number)
+{
+    defconstant(lisp_name, unix_number);
+}
+
+void defsignal(char* lisp_name, long unix_number)
+{
+    defconstant(lisp_name, unix_number);
+}
 
 int
 main(int argc, char *argv[])
@@ -125,12 +132,12 @@ main(int argc, char *argv[])
     printf("\n");
 
     printf(";;; error numbers\n");
-    DEFERRNO(ENOENT);
-    DEFERRNO(EINTR);
-    DEFERRNO(EIO);
-    DEFERRNO(EEXIST);
-    DEFERRNO(ESPIPE);
-    DEFERRNO(EWOULDBLOCK);
+    deferrno("enoent", ENOENT);
+    deferrno("eintr", EINTR);
+    deferrno("eio", EIO);
+    deferrno("eexist", EEXIST);
+    deferrno("espipe", ESPIPE);
+    deferrno("ewouldblock", EWOULDBLOCK);
     printf("\n");
 
     printf(";;; for wait3(2) in run-program.lisp\n");
@@ -174,47 +181,47 @@ main(int argc, char *argv[])
     printf("\n");
 
     printf(";;; signals\n");
-    DEFSIGNAL(SIGALRM);
-    DEFSIGNAL(SIGBUS);
-    DEFSIGNAL(SIGCHLD);
-    DEFSIGNAL(SIGCONT);
+    defsignal("sigalrm", SIGALRM);
+    defsignal("sigbus", SIGBUS);
+    defsignal("sigchld", SIGCHLD);
+    defsignal("sigcont", SIGCONT);
 #ifdef SIGEMT
-    DEFSIGNAL(SIGEMT);
+    defsignal("sigemt", SIGEMT);
 #endif
-    DEFSIGNAL(SIGFPE);
-    DEFSIGNAL(SIGHUP);
-    DEFSIGNAL(SIGILL);
-    DEFSIGNAL(SIGINT);
-    DEFSIGNAL(SIGIO);
-    DEFSIGNAL(SIGIOT);
-    DEFSIGNAL(SIGKILL);
-    DEFSIGNAL(SIGPIPE);
-    DEFSIGNAL(SIGPROF);
-    DEFSIGNAL(SIGQUIT);
-    DEFSIGNAL(SIGSEGV);
+    defsignal("sigfpe", SIGFPE);
+    defsignal("sighup", SIGHUP);
+    defsignal("sigill", SIGILL);
+    defsignal("sigint", SIGINT);
+    defsignal("sigio", SIGIO);
+    defsignal("sigiot", SIGIOT);
+    defsignal("sigkill", SIGKILL);
+    defsignal("sigpipe", SIGPIPE);
+    defsignal("sigprof", SIGPROF);
+    defsignal("sigquit", SIGQUIT);
+    defsignal("sigsegv", SIGSEGV);
 #if ((defined LISP_FEATURE_LINUX) && (defined LISP_FEATURE_X86))
-    DEFSIGNAL(SIGSTKFLT);
+    defsignal("sigstkflt", SIGSTKFLT);
 #endif
-    DEFSIGNAL(SIGSTOP);
+    defsignal("sigstop", SIGSTOP);
 #if (!((defined LISP_FEATURE_LINUX) && (defined LISP_FEATURE_X86))) 
-    DEFSIGNAL(SIGSYS);
+    defsignal("sigsys", SIGSYS);
 #endif
-    DEFSIGNAL(SIGTERM);
-    DEFSIGNAL(SIGTRAP);
-    DEFSIGNAL(SIGTSTP);
-    DEFSIGNAL(SIGTTIN);
-    DEFSIGNAL(SIGTTOU);
-    DEFSIGNAL(SIGURG);
-    DEFSIGNAL(SIGUSR1);
-    DEFSIGNAL(SIGUSR2);
-    DEFSIGNAL(SIGVTALRM);
+    defsignal("sigterm", SIGTERM);
+    defsignal("sigtrap", SIGTRAP);
+    defsignal("sigtstp", SIGTSTP);
+    defsignal("sigttin", SIGTTIN);
+    defsignal("sigttou", SIGTTOU);
+    defsignal("sigurg", SIGURG);
+    defsignal("sigusr1", SIGUSR1);
+    defsignal("sigusr2", SIGUSR2);
+    defsignal("sigvtalrm", SIGVTALRM);
 #ifdef LISP_FEATURE_SUNOS
-    DEFSIGNAL(SIGWAITING);
+    defsignal("sigwaiting", SIGWAITING);
 #endif
-    DEFSIGNAL(SIGWINCH);
+    defsignal("sigwinch", SIGWINCH);
 #ifndef LISP_FEATURE_HPUX
-    DEFSIGNAL(SIGXCPU);
-    DEFSIGNAL(SIGXFSZ);
+    defsignal("sigxcpu", SIGXCPU);
+    defsignal("sigxfsz", SIGXFSZ);
 #endif
     return 0;
 }

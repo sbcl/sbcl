@@ -154,7 +154,7 @@
   (let* ((fenv (when env (sb!c::lexenv-funs env)))
 	 (local-def (cdr (assoc symbol fenv))))
     (cond (local-def
-	   (if (and (consp local-def) (eq (car local-def) 'MACRO))
+	   (if (and (consp local-def) (eq (car local-def) 'macro))
 	       (cdr local-def)
 	       nil))
 	  ((eq (info :function :kind symbol) :macro)

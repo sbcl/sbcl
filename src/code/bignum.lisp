@@ -535,7 +535,7 @@
     (if nil
 	`(assert ,@args)))
   ;; We'll be doing a lot of modular arithmetic.
-  (sb!xc:defmacro M (form)
+  (sb!xc:defmacro modularly (form)
     `(logand all-ones-digit ,form)))
 
 ;;; I'm not sure why I need this FTYPE declaration.  Compiled by the
@@ -606,10 +606,10 @@
     (dotimes (i digit-size)
       (setf umask (logior umask imask))
       (unless (zerop (logand ud umask))
-	(setf ud (M (- ud vd)))
-	(setf m (M (logior m imask))))
-      (setf imask (M (ash imask 1)))
-      (setf vd (M (ash vd 1))))
+	(setf ud (modularly (- ud vd)))
+	(setf m (modularly (logior m imask))))
+      (setf imask (modularly (ash imask 1)))
+      (setf vd (modularly (ash vd 1))))
     m))
 
 (defun dmod (u u-len v v-len tmp1)
@@ -654,16 +654,16 @@
   (let* ((c (bmod x y))
 	 (n1 c)
 	 (d1 1)
-	 (n2 (M (1+ (M (lognot n1)))))
-	 (d2 (M -1)))
+	 (n2 (modularly (1+ (modularly (lognot n1)))))
+	 (d2 (modularly -1)))
     (declare (type (unsigned-byte #.sb!vm:n-word-bits) n1 d1 n2 d2))
     (loop while (> n2 (expt 2 (truncate digit-size 2))) do
 	  (loop for i of-type (mod #.sb!vm:n-word-bits)
 		downfrom (- (integer-length n1) (integer-length n2))
 		while (>= n1 n2) do
-		(when (>= n1 (M (ash n2 i)))
-		  (psetf n1 (M (- n1 (M (ash n2 i))))
-			 d1 (M (- d1 (M (ash d2 i)))))))
+		(when (>= n1 (modularly (ash n2 i)))
+		  (psetf n1 (modularly (- n1 (modularly (ash n2 i))))
+			 d1 (modularly (- d1 (modularly (ash d2 i)))))))
 	  (psetf n1 n2
 		 d1 d2
 		 n2 n1
@@ -781,7 +781,7 @@
 				 (- (copy-bignum tmp1 tmp1-len)
 				    (copy-bignum tmp2 tmp2-len)))))
 	      (bignum-abs-buffer u u-len)
-	      (gcd-assert (zerop (M u)))))
+	      (gcd-assert (zerop (modularly u)))))
 	(setf u-len (make-gcd-bignum-odd u u-len))
 	(rotatef u v)	
 	(rotatef u-len v-len))

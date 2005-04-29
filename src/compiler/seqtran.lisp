@@ -349,7 +349,7 @@
 	    (if (null splice)
 		(setq list (cdr x))
 		(rplacd splice (cdr x))))
-	   (T (setq splice x)))))
+	   (t (setq splice x)))))
 
 (deftransform fill ((seq item &key (start 0) (end (length seq)))
 		    (vector t &key (:start t) (:end index))

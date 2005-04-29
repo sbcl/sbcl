@@ -163,8 +163,8 @@
 
 (defun allocation (alloc-tn size &optional ignored)
   (declare (ignore ignored))
-  (let ((not-inline (gen-label))
-	(done (gen-label))
+  (let ((NOT-INLINE (gen-label))
+	(DONE (gen-label))
 	;; Yuck.
 	(in-elsewhere (eq *elsewhere* sb!assem::**current-segment**))
 	(free-pointer

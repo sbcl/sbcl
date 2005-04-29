@@ -1567,7 +1567,7 @@
 	   (push (eval `(list (multiple-value-list
 			       ,(sb!disassem:gen-printer-def-forms-def-form
 				 name
-				 (format nil "~A[~A]" name args)
+				 (format nil "~@:(~A[~A]~)" name args)
 				 (cdr option-spec)))))
 		 pdefs))
 	  (:printer-list
@@ -1580,7 +1580,7 @@
 				  `(multiple-value-list
 				    ,(sb!disassem:gen-printer-def-forms-def-form
 				      ',name
-				      (format nil "~A[~A]" ',name printer)
+				      (format nil "~@:(~A[~A]~)" ',name printer)
 				      printer
 				      nil)))
 				,(cadr option-spec)))))

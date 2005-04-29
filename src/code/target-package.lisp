@@ -649,8 +649,8 @@ error if any of PACKAGES is not a valid package designator."
   ;; We just simple-stringify the name and call INTERN*, where the real
   ;; logic is.
   (let ((name (if (simple-string-p name)
-		name
-		(coerce name 'simple-string)))
+		  name
+		  (coerce name 'simple-string)))
 	(package (find-undeleted-package-or-lose package)))
     (declare (simple-string name))
       (intern* name

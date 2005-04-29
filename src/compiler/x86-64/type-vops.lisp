@@ -199,12 +199,12 @@
     ;; (and (fixnum) (or (no bits set >31) (all bits set >31))
     (move rax-tn value)
     (inst test rax-tn 7)
-    (inst jmp :ne (if not-p target not-target))
+    (inst jmp :ne (if not-p target NOT-TARGET))
     (inst sar rax-tn (+ 32 3 -1))
     (if not-p
 	(progn
-	  (inst jmp :nz maybe)
-	  (inst jmp not-target))
+	  (inst jmp :nz MAYBE)
+	  (inst jmp NOT-TARGET))
 	(inst jmp :z target))
     MAYBE
     (inst cmp rax-tn -1)
@@ -224,7 +224,7 @@
       (inst jmp :z ok)
       (inst cmp rax-tn -1)
       (inst jmp :ne nope)
-      (emit-label OK)
+      (emit-label ok)
       (move result value))))
 
 
@@ -234,7 +234,7 @@
     ;; (and (fixnum) (no bits set >31))
     (move rax-tn value)
     (inst test rax-tn 7)
-    (inst jmp :ne (if not-p target not-target))
+    (inst jmp :ne (if not-p target NOT-TARGET))
     (inst shr rax-tn (+ 32 sb!vm::n-fixnum-tag-bits))
     (inst jmp (if not-p :nz :z) target)
     NOT-TARGET))
@@ -350,7 +350,7 @@
 (define-vop (symbolp type-predicate)
   (:translate symbolp)
   (:generator 12
-    (let ((is-symbol-label (if not-p drop-thru target)))
+    (let ((is-symbol-label (if not-p DROP-THRU target)))
       (inst cmp value nil-value)
       (inst jmp :e is-symbol-label)
       (test-type value target not-p (symbol-header-widetag)))
@@ -360,7 +360,7 @@
   (:generator 12
     (let ((error (generate-error-code vop object-not-symbol-error value)))
       (inst cmp value nil-value)
-      (inst jmp :e drop-thru)
+      (inst jmp :e DROP-THRU)
       (test-type value error t (symbol-header-widetag)))
     DROP-THRU
     (move result value)))
@@ -368,7 +368,7 @@
 (define-vop (consp type-predicate)
   (:translate consp)
   (:generator 8
-    (let ((is-not-cons-label (if not-p target drop-thru)))
+    (let ((is-not-cons-label (if not-p target DROP-THRU)))
       (inst cmp value nil-value)
       (inst jmp :e is-not-cons-label)
       (test-type value target not-p (list-pointer-lowtag)))

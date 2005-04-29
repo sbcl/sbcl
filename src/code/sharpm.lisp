@@ -172,20 +172,20 @@
 
 (defun sharp-B (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
-  (sharp-r stream sub-char 2))
+  (sharp-R stream sub-char 2))
 
 (defun sharp-C (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
   ;; The next thing had better be a list of two numbers.
   (let ((cnum (read stream t nil t)))
-    (when *read-suppress* (return-from sharp-c nil))
+    (when *read-suppress* (return-from sharp-C nil))
     (if (and (listp cnum) (= (length cnum) 2))
 	(complex (car cnum) (cadr cnum))
 	(%reader-error stream "illegal complex number format: #C~S" cnum))))
 
 (defun sharp-O (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
-  (sharp-r stream sub-char 8))
+  (sharp-R stream sub-char 8))
 
 (defun sharp-R (stream sub-char radix)
   (cond (*read-suppress*
@@ -208,7 +208,7 @@
 
 (defun sharp-X (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
-  (sharp-r stream sub-char 16))
+  (sharp-R stream sub-char 16))
 
 ;;;; reading circular data: the #= and ## readmacros
 
@@ -450,8 +450,8 @@
   (set-dispatch-macro-character #\# #\C #'sharp-C)
   (set-dispatch-macro-character #\# #\c #'sharp-C)
   (set-dispatch-macro-character #\# #\| #'sharp-vertical-bar)
-  (set-dispatch-macro-character #\# #\p #'sharp-p)
-  (set-dispatch-macro-character #\# #\P #'sharp-p)
+  (set-dispatch-macro-character #\# #\p #'sharp-P)
+  (set-dispatch-macro-character #\# #\P #'sharp-P)
   (set-dispatch-macro-character #\# #\) #'sharp-illegal)
   (set-dispatch-macro-character #\# #\< #'sharp-illegal)
   (set-dispatch-macro-character #\# #\Space #'sharp-illegal)

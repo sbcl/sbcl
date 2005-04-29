@@ -342,7 +342,7 @@
             (fail "Attempt to bind a ~(~A~) variable with SYMBOL-MACROLET: ~S"
                   kind name)))
 	;; A magical cons that MACROEXPAND-1 understands.
-        `(,name . (MACRO . ,expansion))))))
+        `(,name . (macro . ,expansion))))))
 
 (defun funcall-in-symbol-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv
@@ -836,7 +836,7 @@
 		  name)))
 	     (setq-var start next result leaf (second things)))
 	    (cons
-	     (aver (eq (car leaf) 'MACRO))
+	     (aver (eq (car leaf) 'macro))
              ;; FIXME: [Free] type declaration. -- APD, 2002-01-26
 	     (ir1-convert start next result
                           `(setf ,(cdr leaf) ,(second things))))

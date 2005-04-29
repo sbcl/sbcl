@@ -207,7 +207,7 @@
                 (:macro
                  (let ((expansion (info :variable :macro-expansion name))
                        (type (type-specifier (info :variable :type name))))
-                   `(MACRO . (the ,type ,expansion))))
+                   `(macro . (the ,type ,expansion))))
 		(:constant
 		 (let ((value (info :variable :constant-value name)))
 		   (make-constant :value value
@@ -630,7 +630,7 @@
 	   (warn "reading an ignored variable: ~S" name)))
        (reference-leaf start next result var))
       (cons
-       (aver (eq (car var) 'MACRO))
+       (aver (eq (car var) 'macro))
        ;; FIXME: [Free] type declarations. -- APD, 2002-01-26
        (ir1-convert start next result (cdr var)))
       (heap-alien-info
@@ -963,8 +963,8 @@
                       (process-var it nil))))
 	    (cons
 	     ;; FIXME: non-ANSI weirdness
-	     (aver (eq (car var) 'MACRO))
-	     (new-vars `(,var-name . (MACRO . (the ,(first decl)
+	     (aver (eq (car var) 'macro))
+	     (new-vars `(,var-name . (macro . (the ,(first decl)
                                                 ,(cdr var))))))
 	    (heap-alien-info
 	     (compiler-error
@@ -1018,7 +1018,7 @@
       (let ((var (find-in-bindings vars name)))
 	(etypecase var
 	  (cons
-	   (aver (eq (car var) 'MACRO))
+	   (aver (eq (car var) 'macro))
 	   (compiler-error
 	    "~S is a symbol-macro and thus can't be declared special."
 	    name))

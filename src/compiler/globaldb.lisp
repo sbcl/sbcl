@@ -372,7 +372,7 @@
 		(n-info-types '*info-types*))
       `(dotimes (,n-index (length ,n-table))
 	 (declare (type index ,n-index))
-	 (block ,PUNT
+	 (block ,punt
 	   (let ((,name-var (svref ,n-table ,n-index)))
 	     (unless (eql ,name-var 0)
 	       (do-anonymous ((,n-type (aref ,n-entries-index ,n-index)
@@ -394,7 +394,7 @@
 			     ,@body
 			     (unless (zerop (logand ,n-info
 						    compact-info-entry-last))
-			       (return-from ,PUNT))))))))))))))
+			       (return-from ,punt))))))))))))))
 
 ;;; Return code to iterate over a volatile info environment.
 (defun do-volatile-info (name-var class-var type-var type-number-var value-var

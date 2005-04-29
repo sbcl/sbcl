@@ -77,7 +77,7 @@
   (enumerable nil :read-only t)
   ;; an arbitrary hash code used in EQ-style hashing of identity
   ;; (since EQ hashing can't be done portably)
-  (hash-value (random #.(ash 1 20))
+  (hash-value (random #.(ash 1 15))
 	      :type (and fixnum unsigned-byte)
 	      :read-only t)
   ;; Can this object contain other types? A global property of our

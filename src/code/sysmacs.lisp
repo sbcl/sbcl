@@ -50,7 +50,7 @@
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-input*)
 	     ((eq ,svar t) *terminal-io*)
-	     (T ,@(when check-type `((enforce-type ,svar ,check-type)))
+	     (t ,@(when check-type `((enforce-type ,svar ,check-type)))	;
 		#!+high-security
 		(unless (input-stream-p ,svar)
 		  (error 'simple-type-error
@@ -64,7 +64,7 @@
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-output*)
 	     ((eq ,svar t) *terminal-io*)
-	     (T ,@(when check-type `((check-type ,svar ,check-type)))
+	     (t ,@(when check-type `((check-type ,svar ,check-type)))
 		#!+high-security
 		(unless (output-stream-p ,svar)
 		  (error 'simple-type-error

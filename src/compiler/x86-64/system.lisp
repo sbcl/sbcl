@@ -35,25 +35,25 @@
     (inst mov rax object)
     (inst and al-tn lowtag-mask)
     (inst cmp al-tn other-pointer-lowtag)
-    (inst jmp :e other-ptr)
+    (inst jmp :e OTHER-PTR)
     (inst cmp al-tn fun-pointer-lowtag)
-    (inst jmp :e function-ptr)
+    (inst jmp :e FUNCTION-PTR)
 
     ;; Pick off structures and list pointers.
     (inst test al-tn 1)
-    (inst jmp :ne done)
+    (inst jmp :ne DONE)
 
     ;; Pick off fixnums.
     (inst and al-tn 7)
-    (inst jmp :e done)
+    (inst jmp :e DONE)
 
     ;; must be an other immediate
     (inst mov rax object)
-    (inst jmp done)
+    (inst jmp DONE)
 
     FUNCTION-PTR
     (load-type al-tn object (- fun-pointer-lowtag))
-    (inst jmp done)
+    (inst jmp DONE)
 
     OTHER-PTR
     (load-type al-tn object (- other-pointer-lowtag))

@@ -207,7 +207,7 @@
     (move num rcx)
     (inst shr rcx word-shift)		; word count for <rep movs>
     ;; If we got zero, we be done.
-    (inst jecxz done)
+    (inst jecxz DONE)
     ;; Copy them down.
     (inst std)
     (inst rep)

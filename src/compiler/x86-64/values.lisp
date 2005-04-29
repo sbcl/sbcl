@@ -32,12 +32,12 @@
     (inst sub rsi n-word-bytes)
     (inst sub rdi n-word-bytes)
     (inst cmp rsp-tn rsi)
-    (inst jmp :a done)
+    (inst jmp :a DONE)
     (inst std)
     LOOP
     (inst movs :qword)
     (inst cmp rsp-tn rsi)
-    (inst jmp :be loop)
+    (inst jmp :be LOOP)
     DONE
     (inst lea rsp-tn (make-ea :qword :base rdi :disp n-word-bytes))
     (inst sub rdi rsi)
@@ -85,13 +85,13 @@
 
     LOOP
     (inst cmp list nil-temp)
-    (inst jmp :e done)
+    (inst jmp :e DONE)
     (pushw list cons-car-slot list-pointer-lowtag)
     (loadw list list cons-cdr-slot list-pointer-lowtag)
     (inst mov rax list)
     (inst and al-tn lowtag-mask)
     (inst cmp al-tn list-pointer-lowtag)
-    (inst jmp :e loop)
+    (inst jmp :e LOOP)
     (error-call vop bogus-arg-to-values-list-error list)
 
     DONE
@@ -137,7 +137,7 @@
 
     (move temp1 count)
     (inst mov start rsp-tn)
-    (inst jecxz done)  ; check for 0 count?
+    (inst jecxz DONE)  ; check for 0 count?
 
     (inst shr temp1 word-shift) ; convert the fixnum to a count.
 
@@ -145,7 +145,7 @@
     LOOP
     (inst lods temp)
     (inst push temp)
-    (inst loop loop)
+    (inst loop LOOP)
 
     DONE))
 

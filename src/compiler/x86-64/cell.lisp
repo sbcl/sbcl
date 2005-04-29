@@ -261,9 +261,9 @@
 		   :disp (- (* simple-fun-code-offset n-word-bytes)
 			    fun-pointer-lowtag)))
     (inst cmp type simple-fun-header-widetag)
-    (inst jmp :e normal-fn)
+    (inst jmp :e NORMAL-FUN)
     (inst lea raw (make-fixup "closure_tramp" :foreign))
-    NORMAL-FN
+    NORMAL-FUN
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
     (storew raw fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result function)))
@@ -365,12 +365,12 @@
   (:generator 0
     (load-tl-symbol-value bsp *binding-stack-pointer*)
     (inst cmp where bsp)
-    (inst jmp :e done)
+    (inst jmp :e DONE)
 
     LOOP
     (loadw symbol bsp (- binding-symbol-slot binding-size))
     (inst or symbol symbol)
-    (inst jmp :z skip)
+    (inst jmp :z SKIP)
     (loadw value bsp (- binding-value-slot binding-size))
     #!-sb-thread (storew value symbol symbol-value-slot other-pointer-lowtag)
 
@@ -383,7 +383,7 @@
     SKIP
     (inst sub bsp (* binding-size n-word-bytes))
     (inst cmp where bsp)
-    (inst jmp :ne loop)
+    (inst jmp :ne LOOP)
     ;; we're done with value, so can use it as a temporary
     (store-tl-symbol-value bsp *binding-stack-pointer* value)
 

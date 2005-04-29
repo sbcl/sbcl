@@ -469,10 +469,10 @@
 	((sap-stack)
 	 #+nil (format t "*call-local: ret-tn on stack; offset=~S~%"
 		       (tn-offset ret-tn))
-	 (inst lea return-label (make-fixup nil :code-object return))
+	 (inst lea return-label (make-fixup nil :code-object RETURN))
 	 (storew return-label rbp-tn (- (1+ (tn-offset ret-tn)))))
 	((sap-reg)
-	 (inst lea ret-tn (make-fixup nil :code-object return)))))
+	 (inst lea ret-tn (make-fixup nil :code-object RETURN)))))
 
     (note-this-location vop :call-site)
     (inst jmp target)
@@ -509,11 +509,11 @@
 	 #+nil (format t "*multiple-call-local: ret-tn on stack; offset=~S~%"
 		       (tn-offset ret-tn))
 	 ;; Stack
-	 (inst lea return-label (make-fixup nil :code-object return))
+	 (inst lea return-label (make-fixup nil :code-object RETURN))
 	 (storew return-label rbp-tn (- (1+ (tn-offset ret-tn)))))
 	((sap-reg)
 	 ;; Register
-	 (inst lea ret-tn (make-fixup nil :code-object return)))))
+	 (inst lea ret-tn (make-fixup nil :code-object RETURN)))))
 
     (note-this-location vop :call-site)
     (inst jmp target)
@@ -558,11 +558,11 @@
 	 #+nil (format t "*known-call-local: ret-tn on stack; offset=~S~%"
 		       (tn-offset ret-tn))
 	 ;; Stack
-	 (inst lea return-label (make-fixup nil :code-object return))
+	 (inst lea return-label (make-fixup nil :code-object RETURN))
 	 (storew return-label rbp-tn (- (1+ (tn-offset ret-tn)))))
 	((sap-reg)
 	 ;; Register
-	 (inst lea ret-tn (make-fixup nil :code-object return)))))
+	 (inst lea ret-tn (make-fixup nil :code-object RETURN)))))
 
     (note-this-location vop :call-site)
     (inst jmp target)
@@ -1126,10 +1126,10 @@
   (:generator 20
     ;; Avoid the copy if there are no more args.
     (cond ((zerop fixed)
-	   (inst jecxz just-alloc-frame))
+	   (inst jecxz JUST-ALLOC-FRAME))
 	  (t
 	   (inst cmp rcx-tn (fixnumize fixed))
-	   (inst jmp :be just-alloc-frame)))
+	   (inst jmp :be JUST-ALLOC-FRAME)))
 
     ;; Allocate the space on the stack.
     ;; stack = rbp - (max 3 frame-size) - (nargs - fixed)
@@ -1152,7 +1152,7 @@
 	   ;; Number to copy = nargs-3
 	   (inst sub rcx-tn (fixnumize register-arg-count))
 	   ;; Everything of interest in registers.
-	   (inst jmp :be do-regs))
+	   (inst jmp :be DO-REGS))
 	  (t
 	   ;; Number to copy = nargs-fixed
 	   (inst sub rcx-tn (fixnumize fixed))))
@@ -1207,9 +1207,9 @@
 	      (if (zerop i)
 		  (inst test rcx-tn rcx-tn)
 		(inst cmp rcx-tn (fixnumize i)))
-	      (inst jmp :eq done)))
+	      (inst jmp :eq DONE)))
 
-    (inst jmp done)
+    (inst jmp DONE)
 
     JUST-ALLOC-FRAME
     (inst lea rsp-tn

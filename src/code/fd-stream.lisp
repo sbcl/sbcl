@@ -299,8 +299,7 @@
 	(mapcar
 	    (lambda (buffering)
 	      (let ((function
-		     (intern (let ((*print-case* :upcase))
-			       (format nil name-fmt (car buffering))))))
+		     (intern (format nil name-fmt (string (car buffering))))))
 		`(progn
 		   (defun ,function (stream byte)
 		     (output-wrapper/variable-width (stream ,size ,buffering ,restart)
@@ -326,8 +325,7 @@
 	(mapcar
 	    (lambda (buffering)
 	      (let ((function
-		     (intern (let ((*print-case* :upcase))
-			       (format nil name-fmt (car buffering))))))
+		     (intern (format nil name-fmt (string (car buffering))))))
 		`(progn
 		   (defun ,function (stream byte)
 		     (output-wrapper (stream ,size ,buffering ,restart)
@@ -979,14 +977,10 @@
 (defmacro define-external-format (external-format size output-restart
                                   out-expr in-expr)
   (let* ((name (first external-format))
-         (out-function (intern (let ((*print-case* :upcase))
-                                 (format nil "OUTPUT-BYTES/~A" name))))
-         (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" name))
-         (in-function (intern (let ((*print-case* :upcase))
-                                (format nil "FD-STREAM-READ-N-CHARACTERS/~A"
-                                        name))))
-         (in-char-function (intern (let ((*print-case* :upcase))
-                                     (format nil "INPUT-CHAR/~A" name)))))
+         (out-function (symbolicate "OUTPUT-BYTES/" name))
+         (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" (string name)))
+         (in-function (symbolicate "FD-STREAM-READ-N-CHARACTERS/" name))
+         (in-char-function (symbolicate "INPUT-CHAR/" name)))
     `(progn
       (defun ,out-function (stream string flush-p start end)
 	(let ((start (or start 0))
@@ -1076,8 +1070,7 @@
       (setf *external-formats*
        (cons '(,external-format ,in-function ,in-char-function ,out-function
 	       ,@(mapcar #'(lambda (buffering)
-			     (intern (let ((*print-case* :upcase))
-				       (format nil format buffering))))
+			     (intern (format nil format (string buffering))))
 			 '(:none :line :full)))
 	*external-formats*)))))
 
@@ -1085,16 +1078,11 @@
     (external-format output-restart out-size-expr
      out-expr in-size-expr in-expr)
   (let* ((name (first external-format))
-	 (out-function (intern (let ((*print-case* :upcase))
-				 (format nil "OUTPUT-BYTES/~A" name))))
-	 (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" name))
-	 (in-function (intern (let ((*print-case* :upcase))
-				(format nil "FD-STREAM-READ-N-CHARACTERS/~A"
-					name))))
-	 (in-char-function (intern (let ((*print-case* :upcase))
-				     (format nil "INPUT-CHAR/~A" name))))
-	 (resync-function (intern (let ((*print-case* :upcase))
-				    (format nil "RESYNC/~A" name)))))
+	 (out-function (symbolicate "OUTPUT-BYTES/" name))
+	 (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" (string name)))
+	 (in-function (symbolicate "FD-STREAM-READ-N-CHARACTERS/" name))
+	 (in-char-function (symbolicate "INPUT-CHAR/" name))
+	 (resync-function (symbolicate "RESYNC/" name)))
     `(progn
       (defun ,out-function (fd-stream string flush-p start end)
 	(let ((start (or start 0))
@@ -1221,8 +1209,7 @@
       (setf *external-formats*
        (cons '(,external-format ,in-function ,in-char-function ,out-function
 	       ,@(mapcar #'(lambda (buffering)
-			     (intern (let ((*print-case* :upcase))
-				       (format nil format buffering))))
+			     (intern (format nil format (string buffering))))
 			 '(:none :line :full))
 	       ,resync-function)
 	*external-formats*)))))

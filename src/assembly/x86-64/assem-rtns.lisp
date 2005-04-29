@@ -31,13 +31,13 @@
      (:temp edi unsigned-reg rdi-offset))
 
   ;; Pick off the cases where everything fits in register args.
-  (inst jecxz zero-values)
+  (inst jecxz ZERO-VALUES)
   (inst cmp ecx (fixnumize 1))
-  (inst jmp :e one-value)
+  (inst jmp :e ONE-VALUE)
   (inst cmp ecx (fixnumize 2))
-  (inst jmp :e two-values)
+  (inst jmp :e TWO-VALUES)
   (inst cmp ecx (fixnumize 3))
-  (inst jmp :e three-values)
+  (inst jmp :e THREE-VALUES)
 
   ;; Save the count, because the loop is going to destroy it.
   (inst mov edx ecx)
@@ -206,10 +206,10 @@
     (inst jmp :z error))
 
   (inst cmp target (make-ea-for-object-slot catch catch-block-tag-slot 0))
-  (inst jmp :e exit)
+  (inst jmp :e EXIT)
 
   (loadw catch catch catch-block-previous-catch-slot)
-  (inst jmp loop)
+  (inst jmp LOOP)
 
   EXIT
 
@@ -239,7 +239,7 @@
   (inst cmp uwp
 	(make-ea-for-object-slot block unwind-block-current-uwp-slot 0))
   ;; If a match, return to context in arg block.
-  (inst jmp :e do-exit)
+  (inst jmp :e DO-EXIT)
 
   ;; Not a match - return to *CURRENT-UNWIND-PROTECT-BLOCK* context.
   ;; Important! Must save (and return) the arg 'block' for later use!!

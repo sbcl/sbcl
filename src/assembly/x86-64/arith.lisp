@@ -93,7 +93,7 @@
     (move rax x)	           ; must use eax for 64-bit result
     (inst sar rax 3)		   ; remove *4 fixnum bias
     (inst imul y)		   ; result in edx:eax
-    (inst jmp :no okay)		   ; still fixnum
+    (inst jmp :no OKAY)		   ; still fixnum
 
     ;; zzz jrd changed edx to ebx in here, as edx isn't listed as a temp, above
     ;;     pfw says that loses big -- edx is target for arg x and result res

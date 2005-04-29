@@ -21,7 +21,7 @@
   "If true, all objects will printed readably. If readable printing is
   impossible, an error will be signalled. This overrides the value of
   *PRINT-ESCAPE*.")
-(defvar *print-escape* T
+(defvar *print-escape* t
   #!+sb-doc
   "Should we print in a reasonably machine-readable way? (possibly
   overridden by *PRINT-READABLY*)")

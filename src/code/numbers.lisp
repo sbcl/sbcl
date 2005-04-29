@@ -388,7 +388,7 @@
 		(cond ((eql t1 0) 0)
 		      ((eql g2 1)
 		       (%make-ratio t1 (* t2 dy)))
-		      (T (let* ((nn (truncate t1 g2))
+		      (t (let* ((nn (truncate t1 g2))
 				(t3 (truncate dy g2))
 				(nd (if (eql t2 1) t3 (* t2 t3))))
 			   (if (eql nd 1) nn (%make-ratio nn nd))))))))))))
@@ -744,7 +744,7 @@
   "Return T if all of its arguments are numerically equal, NIL otherwise."
   (the number number)
   (do ((nlist more-numbers (cdr nlist)))
-      ((atom nlist) T)
+      ((atom nlist) t)
      (declare (list nlist))
      (if (not (= (car nlist) number)) (return nil))))
 
@@ -756,7 +756,7 @@
        ((atom nlist) t)
      (declare (list nlist))
      (unless (do* ((nl nlist (cdr nl)))
-		  ((atom nl) T)
+		  ((atom nl) t)
 	       (declare (list nl))
 	       (if (= head (car nl)) (return nil)))
        (return nil))))

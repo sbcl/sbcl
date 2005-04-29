@@ -22,11 +22,11 @@
      (:temp ebx unsigned-reg ebx-offset))
   (inst mov ebx eax)
   (inst shl ebx 1)
-  (inst jmp :o bignum)
+  (inst jmp :o BIGNUM)
   (inst shl ebx 1)
-  (inst jmp :o bignum)
+  (inst jmp :o BIGNUM)
   (inst shl ebx 1)
-  (inst jmp :o bignum)
+  (inst jmp :o BIGNUM)
   (inst ret)
   BIGNUM
 

@@ -236,9 +236,9 @@
   (:generator 4
     (move eax x)
     (inst test al-tn 7)			; a symbolic constant for this 
-    (inst jmp :z fixnum)		; would be nice
+    (inst jmp :z FIXNUM)		; would be nice
     (loadw y eax bignum-digits-offset other-pointer-lowtag)
-    (inst jmp done)
+    (inst jmp DONE)
     FIXNUM
     (inst sar eax (1- n-lowtag-bits))
     (move y eax)

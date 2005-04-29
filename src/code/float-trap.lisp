@@ -171,7 +171,7 @@
 	   (error 'floating-point-underflow))
 	  ((not (zerop (logand float-inexact-trap-bit traps)))
 	   (error 'floating-point-inexact))
-	  #!+FreeBSD
+	  #!+freebsd
 	  ((zerop (ldb float-exceptions-byte modes))
 	   ;; I can't tell what caused the exception!!
 	   (error 'floating-point-exception
