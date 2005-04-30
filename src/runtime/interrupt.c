@@ -199,7 +199,7 @@ fake_foreign_function_call(os_context_t *context)
 #ifdef reg_ALLOC
     dynamic_space_free_pointer =
 	(lispobj *)(*os_context_register_addr(context, reg_ALLOC));
-#ifdef alpha
+#if defined(LISP_FEATURE_ALPHA)
     if ((long)dynamic_space_free_pointer & 1) {
 	lose("dead in fake_foreign_function_call, context = %x", context);
     }

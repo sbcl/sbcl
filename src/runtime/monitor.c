@@ -132,13 +132,13 @@ dump_cmd(char **ptr)
     }
 
     while (count-- > 0) {
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
         printf("0x%08lX: ", (unsigned long) addr);
 #else
         printf("0x%08X: ", (u32) addr);
 #endif
         if (is_valid_lisp_addr((os_vm_address_t)addr)) {
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
             unsigned long *lptr = (unsigned long *)addr;
 #else
             u32 *lptr = (u32 *)addr;
@@ -199,9 +199,6 @@ regs_cmd(char **ptr)
     printf("RDONLY\t=\t0x%08lx\n",
 	   (unsigned long)SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
 #endif /* 0 */
-#ifdef MIPS
-    printf("FLAGS\t=\t0x%08x\n", current_flags_register);
-#endif
 }
 
 static void

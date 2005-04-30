@@ -237,7 +237,10 @@ collect_garbage(unsigned ignore)
     printf("Flipping spaces ...\n");
 #endif
 
-    os_zero((os_vm_address_t) current_dynamic_space,
+    /* Maybe FIXME: it's possible that we could significantly reduce 
+     * RSS by zeroing the from_space or madvise(MADV_DONTNEED) or 
+     * similar os-dependent tricks here */
+    os_zero((os_vm_address_t) from_space,
 	    (os_vm_size_t) DYNAMIC_SPACE_SIZE);
 
     current_dynamic_space = new_space;
@@ -247,6 +250,8 @@ collect_garbage(unsigned ignore)
     size_discarded = (from_space_free_pointer - from_space) * sizeof(lispobj);
 #endif
     size_retained = (new_space_free_pointer - new_space) * sizeof(lispobj);
+
+    os_flush_icache((os_vm_address_t)new_space, size_retained);
 
     /* Zero stack. */
 #ifdef PRINTNOISE
@@ -280,10 +285,6 @@ collect_garbage(unsigned ignore)
 	
     printf("%10.2f M bytes/sec collected.\n", gc_rate);
 #endif
-    /* os_flush_icache((os_vm_address_t) 0, sizeof(unsigned long)); */
-    /* Maybe FIXME: it's possible that we could significantly reduce 
-     * RSS by zeroing the from_space or madvise(MADV_DONTNEED) or 
-     * similar os-dependent tricks here */
 }
 
 
@@ -419,8 +420,6 @@ void scavenge_interrupt_contexts(void)
     os_context_t *context;
 
     struct thread *th=arch_os_get_current_thread();
-    struct interrupt_data *data=
-	th ? th->interrupt_data : global_interrupt_data;
 
     index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,0));
 

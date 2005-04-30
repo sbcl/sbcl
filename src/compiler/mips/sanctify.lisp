@@ -14,7 +14,6 @@
 
 (in-package :sb!vm)
 
-;;; FIXME: Is this right?
 (defun sanctify-for-execution (component)
   (without-gcing
    (alien-funcall (extern-alien "os_flush_icache"

@@ -34,7 +34,10 @@ int
 initial_thread_trampoline(struct thread *th)
 {
     lispobj function;
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     lispobj *args = NULL;
+#endif
+
     function = th->unbound_marker;
     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) return 1;
@@ -89,16 +92,15 @@ struct thread * create_thread_struct(lispobj initial_function) {
 		       BINDING_STACK_SIZE+
 		       ALIEN_STACK_SIZE+
 		       dynamic_values_bytes+
-		       32*SIGSTKSZ
-		       );
-    if(!spaces) goto cleanup;
+		       32*SIGSTKSZ);
+    if(!spaces)
+	 return NULL;
     per_thread=(union per_thread_data *)
 	(spaces+
 	 THREAD_CONTROL_STACK_SIZE+
 	 BINDING_STACK_SIZE+
 	 ALIEN_STACK_SIZE);
 
-    th=&per_thread->thread;
     if(all_threads) {
 	memcpy(per_thread,arch_os_get_current_thread(),
 	       dynamic_values_bytes);
@@ -130,6 +132,7 @@ struct thread * create_thread_struct(lispobj initial_function) {
 #endif
     }
 
+    th=&per_thread->thread;
     th->control_stack_start = spaces;
     th->binding_stack_start=
 	(lispobj*)((void*)th->control_stack_start+THREAD_CONTROL_STACK_SIZE);
@@ -192,12 +195,6 @@ struct thread * create_thread_struct(lispobj initial_function) {
 
     th->unbound_marker=initial_function;
     return th;
- cleanup:
-    /* if(th && th->tls_cookie>=0) os_free_tls_pointer(th); */
-    if(spaces) os_invalidate(spaces,
-			     THREAD_CONTROL_STACK_SIZE+BINDING_STACK_SIZE+
-			     ALIEN_STACK_SIZE+dynamic_values_bytes);
-    return 0;
 }
 
 void link_thread(struct thread *th,pid_t kid_pid)

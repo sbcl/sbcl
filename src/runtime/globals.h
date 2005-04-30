@@ -41,7 +41,7 @@ extern void globals_init(void);
 
 #else /* LANGUAGE_ASSEMBLY */
 
-#ifdef mips
+#ifdef LISP_FEATURE_MIPS
 #ifdef __linux__
 #define EXTERN(name,bytes) .globl name 
 #else
@@ -49,7 +49,7 @@ extern void globals_init(void);
 #endif
 #endif
 /**/
-#ifdef sparc
+#ifdef LISP_FEATURE_SPARC
 #ifdef SVR4
 #define EXTERN(name,bytes) .global name
 #else
@@ -57,12 +57,12 @@ extern void globals_init(void);
 #endif
 #endif
 /**/
-#ifdef alpha
+#ifdef LISP_FEATURE_ALPHA
 #ifdef __linux__
 #define EXTERN(name,bytes) .globl name 
 #endif
 #endif
-#ifdef ppc
+#ifdef LISP_FEATURE_PPC
 #ifdef LISP_FEATURE_DARWIN
 #define EXTERN(name,bytes) .globl _/**/name
 #else
@@ -91,10 +91,6 @@ EXTERN(current_control_frame_pointer, 4)
 EXTERN(current_binding_stack_pointer, 4)
 EXTERN(dynamic_space_free_pointer, 4)
 EXTERN(current_dynamic_space, 4)
-
-#ifdef mips
-EXTERN(current_flags_register, 4)
-#endif
 
 #endif /* LANGUAGE_ASSEMBLY */
 

@@ -382,7 +382,7 @@ size_code_header(lispobj *where)
     return nwords;
 }
 
-#ifndef LISP_FEATURE_X86 || LISP_FEATURE_X86_64
+#if !defined(LISP_FEATURE_X86) && ! defined(LISP_FEATURE_X86_64)
 static long
 scav_return_pc_header(lispobj *where, lispobj object)
 {

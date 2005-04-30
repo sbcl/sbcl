@@ -75,11 +75,14 @@ _syscall4(int,sys_futex,
 int linux_sparc_siginfo_bug = 0;
 int linux_no_threads_p = 0;
 
-void os_init(void)
+void
+os_init(void)
 {
     /* Conduct various version checks: do we have enough mmap(), is
      * this a sparc running 2.2, can we do threads? */
+#ifdef LISP_FEATURE_SB_THREAD
     int *futex=0;
+#endif
     struct utsname name;
     int major_version;
     int minor_version;
@@ -158,17 +161,16 @@ os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 os_vm_address_t
 os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 {
-    addr = mmap(addr, len,
-		OS_VM_PROT_ALL,
-		MAP_PRIVATE | MAP_FILE | MAP_FIXED,
-		fd, (off_t) offset);
+    os_vm_address_t actual;
 
-    if (addr == MAP_FAILED) {
+    actual = mmap(addr, len, OS_VM_PROT_ALL, MAP_PRIVATE | MAP_FIXED,
+		  fd, (off_t) offset);
+    if (actual == MAP_FAILED || (addr && (addr != actual))) {
 	perror("mmap");
 	lose("unexpected mmap(..) failure");
     }
 
-    return addr;
+    return actual;
 }
 
 void
@@ -179,30 +181,28 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
     }
 }
 
-/* FIXME: Now that FOO_END, rather than FOO_SIZE, is the fundamental
- * description of a space, we could probably punt this and just do
- * (FOO_START <= x && x < FOO_END) everywhere it's called. */
-static boolean
-in_range_p(os_vm_address_t a, lispobj sbeg, size_t slen)
-{
-    char* beg = (char*)((long)sbeg);
-    char* end = (char*)((long)sbeg) + slen;
-    char* adr = (char*)a;
-    return (adr >= beg && adr < end);
-}
-
 boolean
 is_valid_lisp_addr(os_vm_address_t addr)
 {
     struct thread *th;
-    if(in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
-       in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE) ||
-       in_range_p(addr, DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE))
+    size_t ad = (size_t) addr;
+ 
+    if ((READ_ONLY_SPACE_START <= ad && ad < READ_ONLY_SPACE_END)
+	|| (STATIC_SPACE_START <= ad && ad < STATIC_SPACE_END)
+#if defined LISP_FEATURE_GENCGC
+	|| (DYNAMIC_SPACE_START <= ad && ad < DYNAMIC_SPACE_END)
+#else
+	|| (DYNAMIC_0_SPACE_START <= ad && ad < DYNAMIC_SPACE_END)
+	|| (DYNAMIC_1_SPACE_START <= ad && ad < DYNAMIC_SPACE_END)
+#endif
+	)
 	return 1;
     for_each_thread(th) {
-	if((th->control_stack_start <= addr) && (addr < th->control_stack_end))
+	if((size_t)(th->control_stack_start) <= ad
+	   && ad < (size_t)(th->control_stack_end))
 	    return 1;
-	if(in_range_p(addr, th->binding_stack_start, BINDING_STACK_SIZE))
+	if((size_t)(th->binding_stack_start) <= ad
+	   && ad < (size_t)(th->binding_stack_start + BINDING_STACK_SIZE))
 	    return 1;
     }
     return 0;
@@ -219,7 +219,7 @@ is_valid_lisp_addr(os_vm_address_t addr)
  * The GENCGC needs to be hooked into whatever signal is raised for
  * page fault on this OS.
  */
-void
+static void
 sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
@@ -239,41 +239,29 @@ static void
 sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    os_vm_address_t addr;
+    os_vm_address_t addr = arch_get_bad_addr(signal,info,context);
 
-    addr = arch_get_bad_addr(signal,info,context);
+#ifdef LISP_FEATURE_ALPHA
+    /* Alpha stuff: This is the end of a pseudo-atomic section during
+       which a signal was received.  We must deal with the pending
+       interrupt (see also interrupt.c, ../code/interrupt.lisp)
+
+       (how we got here: when interrupting, we set bit 63 in reg_ALLOC.
+       At the end of the atomic section we tried to write to reg_ALLOC,
+       got a SIGSEGV (there's nothing mapped there) so ended up here. */
     if (addr != NULL && 
 	*os_context_register_addr(context,reg_ALLOC) & (1L<<63)){
-	
-	/* Alpha stuff: This is the end of a pseudo-atomic section
-	 * during which a signal was received.  We must deal with the
-	 * pending interrupt (see also interrupt.c,
-	 * ../code/interrupt.lisp)
-	 */
-	/* (how we got here: when interrupting, we set bit 63 in
-	 * reg_Alloc.  At the end of the atomic section we tried to
-	 * write to reg_ALLOC, got a SIGSEGV (there's nothing mapped
-	 * there) so ended up here
-	 */
 	*os_context_register_addr(context,reg_ALLOC) -= (1L<<63);
 	interrupt_handle_pending(context);
-    } else {
-	if(!interrupt_maybe_gc(signal, info, context))
-	    if(!handle_guard_page_triggered(context,addr))
-		interrupt_handle_now(signal, info, context);
+	return;
     }
-}
 #endif
 
-void sigcont_handler(int signal, siginfo_t *info, void *void_context)
-{
-    /* We need to have a handler installed for this signal so that
-     * sigwaitinfo() for it actually returns at the appropriate time.
-     * We don't need it to actually do anything.  This mkes it
-     * possibly the only signal handler in SBCL that doesn't depend on
-     * not-guaranteed-by-POSIX features 
-     */    
+    if(!interrupt_maybe_gc(signal, info, context))
+	if(!handle_guard_page_triggered(context,addr))
+	    interrupt_handle_now(signal, info, context);
 }
+#endif
 
 void
 os_install_interrupt_handlers(void)
@@ -291,11 +279,16 @@ os_install_interrupt_handlers(void)
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
-int futex_wait(int *lock_word, int oldval) {
+int
+futex_wait(int *lock_word, int oldval)
+{
     int t= sys_futex(lock_word,FUTEX_WAIT,oldval, 0);
     return t;
 }
-int futex_wake(int *lock_word, int n){
+
+int
+futex_wake(int *lock_word, int n)
+{
     return sys_futex(lock_word,FUTEX_WAKE,n,0);
 }
 #endif
