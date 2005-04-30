@@ -107,6 +107,7 @@
 (define-call "sync" void never-fails)
 (define-call "truncate" int minusp (pathname filename) (length sb-posix::off-t))
 (define-call "unlink" int minusp (pathname filename))
+(define-call "mkstemp" int minusp (template c-string))
 
 (define-call-internally ioctl-without-arg "ioctl" int minusp (fd file-descriptor) (cmd int))
 (define-call-internally ioctl-with-int-arg "ioctl" int minusp (fd file-descriptor) (cmd int) (arg int))
