@@ -1599,6 +1599,10 @@ purify(lispobj static_roots, lispobj read_only_roots)
 #endif
 #endif
 
+    /* Blast away instruction cache */
+    os_flush_icache((os_vm_address_t)READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
+    os_flush_icache((os_vm_address_t)STATIC_SPACE_START, STATIC_SPACE_SIZE);
+
 #ifdef PRINTNOISE
     printf(" done]\n");
     fflush(stdout);
