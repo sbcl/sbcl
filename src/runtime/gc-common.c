@@ -2007,3 +2007,40 @@ component_ptr_from_pc(lispobj *pc)
 
     return (NULL);
 }
+
+/* Scan an area looking for an object which encloses the given pointer.
+ * Return the object start on success or NULL on failure. */
+lispobj *
+gc_search_space(lispobj *start, size_t words, lispobj *pointer)
+{
+    while (words > 0) {
+	size_t count = 1;
+	lispobj thing = *start;
+
+	/* If thing is an immediate then this is a cons. */
+	if (is_lisp_pointer(thing)
+	    || (fixnump(thing))
+	    || (widetag_of(thing) == CHARACTER_WIDETAG)
+#if N_WORD_BITS == 64
+	    || (widetag_of(thing) == SINGLE_FLOAT_WIDETAG)
+#endif
+	    || (widetag_of(thing) == UNBOUND_MARKER_WIDETAG))
+	    count = 2;
+	else
+	    count = (sizetab[widetag_of(thing)])(start);
+
+	/* Check whether the pointer is within this object. */
+	if ((pointer >= start) && (pointer < (start+count))) {
+	    /* found it! */
+	    /*FSHOW((stderr,"/found %x in %x %x\n", pointer, start, thing));*/
+	    return(start);
+	}
+
+	/* Round up the count. */
+	count = CEILING(count,2);
+
+	start += count;
+	words -= count;
+    }
+    return (NULL);
+}

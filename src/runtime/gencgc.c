@@ -1970,9 +1970,9 @@ search_read_only_space(void *pointer)
     lispobj *end = (lispobj *) SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
     if ((pointer < (void *)start) || (pointer >= (void *)end))
 	return NULL;
-    return (search_space(start, 
-			 (((lispobj *)pointer)+2)-start, 
-			 (lispobj *) pointer));
+    return (gc_search_space(start,
+			    (((lispobj *)pointer)+2)-start,
+			    (lispobj *) pointer));
 }
 
 lispobj *
@@ -1982,9 +1982,9 @@ search_static_space(void *pointer)
     lispobj *end = (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
     if ((pointer < (void *)start) || (pointer >= (void *)end))
 	return NULL;
-    return (search_space(start, 
-			 (((lispobj *)pointer)+2)-start, 
-			 (lispobj *) pointer));
+    return (gc_search_space(start, 
+			    (((lispobj *)pointer)+2)-start, 
+			    (lispobj *) pointer));
 }
 
 /* a faster version for searching the dynamic space. This will work even
@@ -2001,9 +2001,9 @@ search_dynamic_space(void *pointer)
 	return NULL;
     start = (lispobj *)((void *)page_address(page_index)
 			+ page_table[page_index].first_object_offset);
-    return (search_space(start, 
-			 (((lispobj *)pointer)+2)-start, 
-			 (lispobj *)pointer));
+    return (gc_search_space(start, 
+			    (((lispobj *)pointer)+2)-start, 
+			    (lispobj *)pointer));
 }
 
 /* Is there any possibility that pointer is a valid Lisp object
@@ -4060,7 +4060,7 @@ gencgc_pickup_dynamic(void)
 	page_table[page].bytes_used = PAGE_BYTES;
 	page_table[page].large_object = 0;
 
-	first=search_space(prev,(ptr+2)-prev,ptr);
+	first=gc_search_space(prev,(ptr+2)-prev,ptr);
 	if(ptr == first)  prev=ptr; 
 	page_table[page].first_object_offset =
 	    (void *)prev - page_address(page);
