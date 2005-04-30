@@ -1,2 +1,2 @@
 #!/bin/sh
-nm -p "$@" | grep -v " [FUtdb?] "
+nm -p "$@" | grep -v " [AabcdgIiNnrstUuvw?-] "

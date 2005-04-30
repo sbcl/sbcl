@@ -34,52 +34,54 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "validate.h"
 /* for cacheflush() */
-#include <asm/cachectl.h>
+#include <sys/cachectl.h>
 
-/* FIXME: For CAUSEF_BD */
-#include <asm/mipsregs.h>
+#include "validate.h"
+
 size_t os_vm_page_size;
 
+int
+arch_os_thread_init(struct thread *thread)
+{
 #ifdef LISP_FEATURE_SB_THREAD
-#error "Define threading support functions"
-#else
-int arch_os_thread_init(struct thread *thread) {
-    return 1;                  /* success */
-}
-int arch_os_thread_cleanup(struct thread *thread) {
-    return 1;                  /* success */
-}
+#warning "Check threading support functions"
 #endif
+    return 1;                  /* success */
+}
+
+int
+arch_os_thread_cleanup(struct thread *thread)
+{
+#ifdef LISP_FEATURE_SB_THREAD
+#warning "Check threading support functions"
+#endif
+    return 1;                  /* success */
+}
 
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
 {
-    if (offset == 0) {
-	/* KLUDGE: I'm not sure, but it's possible that Linux puts the
-           contents of the Processor Status Word in the (wired-zero)
-           slot in the mcontext. In any case, the following is
-           unlikely to do any harm: */
-	static unsigned long long zero;
-	zero = 0;
-	return &zero;
-    } else {
-	return &(((struct sigcontext *) &(context->uc_mcontext))->sc_regs[offset]);
-    }
+    return &(((struct sigcontext *)&(context->uc_mcontext))->sc_regs[offset]);
 }
 
 os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
     /* Why do I get all the silly ports? -- CSR, 2002-08-11 */
-    return &(((struct sigcontext *) &(context->uc_mcontext))->sc_pc);
+    return &(((struct sigcontext *)&(context->uc_mcontext))->sc_pc);
 }
 
 sigset_t *
 os_context_sigmask_addr(os_context_t *context)
 {
     return &(context->uc_sigmask);
+}
+
+unsigned int
+os_context_fp_control(os_context_t *context)
+{
+    /* FIXME: Probably do something. */
 }
 
 void 
@@ -98,6 +100,8 @@ os_context_bd_cause(os_context_t *context)
        to compile sbcl with sbcl-0.7.7.7 lead to an "infinite SIGTRAP
        loop" where a (BREAK 16) not in a branch delay slot would have
        CAUSEF_BD filled. So, we comment
+
+	#include <asm/mipsregs.h>
 
         return (((struct sigcontext *) &(context->uc_mcontext))->sc_cause 
 	        & CAUSEF_BD);

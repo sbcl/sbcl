@@ -286,7 +286,8 @@
      (if (static-symbol-p value)
 	 (sc-number-or-lose 'immediate)
 	 nil))
-    ((integer #.sb!xc:most-negative-fixnum sb!xc:most-positive-fixnum)
+    ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
+	 system-area-pointer character)
      (sc-number-or-lose 'immediate))
     (system-area-pointer
      (sc-number-or-lose 'immediate))

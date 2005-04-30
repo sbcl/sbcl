@@ -40,6 +40,16 @@
 #define ra $31
 
 /*
+ * LEAF - declare leaf routine
+ */
+#define	LEAF(symbol)                                    \
+		.globl	symbol;                         \
+		.align	2;                              \
+		.type	symbol,@function;               \
+		.ent	symbol,0;                       \
+symbol:		.frame	sp,0,ra
+
+/*
  * NESTED - declare nested routine entry point
  */
 #define	NESTED(symbol, framesize, rpc)                  \
@@ -56,6 +66,21 @@ symbol:		.frame	sp, framesize, rpc
 		.end	function;		        \
 		.size	function,.-function
 
+/*
+ * EXPORT - export definition of symbol
+ */
+#define EXPORT(symbol)					\
+		.globl	symbol;                         \
+symbol:
+
+/*
+ * FEXPORT - export definition of a function symbol
+ */
+#define FEXPORT(symbol)					\
+		.globl	symbol;				\
+		.type	symbol,@function;		\
+symbol:
+
 
 	.text
 	
@@ -64,51 +89,44 @@ symbol:		.frame	sp, framesize, rpc
  */
 #define framesize 16*4
 	NESTED(call_into_lisp, framesize, ra)
+	.set	noreorder
+	.cpload t9
+	.set	reorder
 	subu	sp, framesize
-	/* Save all the C regs. */
-	.mask	0xd0ff0000, -4
-	sw	ra, framesize(sp)
-	sw	s8, framesize-4(sp)
-	sw	gp, framesize-8(sp)
-	sw	s7, framesize-12(sp)
-	sw	s6, framesize-16(sp)
-	sw	s5, framesize-20(sp)
-	sw	s4, framesize-24(sp)
-	sw	s3, framesize-28(sp)
-	sw	s2, framesize-32(sp)
-	sw	s1, framesize-36(sp)
-	sw	s0, framesize-40(sp)
 
-	/* Clear descriptor regs */
-	move	t0, zero
-	move	t1, zero
-	move	t2, zero
-	move	t3, zero
-	move	t4, zero
-	move	t5, zero
-	move	t6, zero
-	move	t7, zero
-	move	t8, zero
-	move	s0, zero
-	move	s1, zero
-	move	s2, zero
-	move	s3, zero
-	move	ra, zero
+	/* Save all the C regs. */
+	.mask	0xc0ff0000, -8
+	sw	ra, framesize-8(sp)
+	sw	s8, framesize-12(sp)
+	/* No .cprestore, we don't want automatic gp restauration. */
+	sw	gp, framesize-16(sp)
+	sw	s7, framesize-20(sp)
+	sw	s6, framesize-24(sp)
+	sw	s5, framesize-28(sp)
+	sw	s4, framesize-32(sp)
+	sw	s3, framesize-36(sp)
+	sw	s2, framesize-40(sp)
+	sw	s1, framesize-44(sp)
+	sw	s0, framesize-48(sp)
 
 	li	reg_NIL, NIL
 
-	/* Start pseudo-atomic. */
+	/* Clear unsaved boxed descriptor regs */
+	li	reg_FDEFN, 0		# t6
+	li	reg_L1, 0		# t8
+
+	/* Turn on pseudo-atomic. */
 	.set	noreorder
 	li	reg_NL4, 0
 	li	reg_ALLOC, 1
         .set    reorder
 
-	/* No longer in foreign call. */
+	/* Mark us as in Lisp land. */
 	sw	zero, foreign_function_call_active
 
 	/* Load the allocation pointer, preserving the low-bit of alloc */
 	lw	reg_BSP, dynamic_space_free_pointer
-	add	reg_ALLOC, reg_BSP
+	addu	reg_ALLOC, reg_BSP
 
 	/* Load the rest of the LISP state. */
 	lw	reg_BSP, current_binding_stack_pointer
@@ -117,12 +135,10 @@ symbol:		.frame	sp, framesize, rpc
 
 	/* Check for interrupt */
         .set    noreorder
-	bgez	reg_NL4, pa1
-	nop
+	bgez	reg_NL4, 1f
+	 subu	reg_ALLOC, 1
 	break	0x10
-pa1:
-	subu	reg_ALLOC, 1
-	.set	reorder
+1:	.set	reorder
 
 	/* Pass in args */
 	move	reg_LEXENV, a0
@@ -158,51 +174,51 @@ mipsmungelra:
 lra:
 	.word	RETURN_PC_HEADER_WIDETAG
 
-	/* Multiple value return spot, clear stack */
+	/* Multiple value return spot, clear stack. */
 	move	reg_CSP, reg_OCFP
-	nop
+	 nop
 
-	/* Set pseudo-atomic flag. */
+	/* Single value return spot. */
+
+	/* Pass one return value back to C land. */ 
+	move	v0, reg_A0	# reg_CFUNC
+
+	/* Nested lisp -> C calls may have clobbered gp. */
+	lw	gp, framesize-16(sp)
+
+	/* Set the pseudo-atomic flag. */
 	li	reg_NL4, 0
 	addu	reg_ALLOC, 1
 	.set	reorder
 
-	/* Save LISP registers. */
+	/* Save LISP state. */
 	subu	reg_NL0, reg_ALLOC, 1
 	sw	reg_NL0, dynamic_space_free_pointer
 	sw	reg_BSP, current_binding_stack_pointer
 	sw	reg_CSP, current_control_stack_pointer
 	sw	reg_CFP, current_control_frame_pointer
 
-	/* Pass one return value back to C land. */ 
-	/* v0 is reg_ALLOC in this new world, so do this after saving
-           reg_ALLOC in dynamic_space_free_pointer */
-	move	v0, reg_A0
-
-	/* Back in foreign function call */
-	sw	reg_CFP, foreign_function_call_active
+	/* Mark us as in C land. */
+	sw	reg_CSP, foreign_function_call_active
 
 	/* Check for interrupt */
 	.set	noreorder
-	bgez	reg_NL4, pa2
-	nop
+	bgez	reg_NL4, 1f
+	 subu	reg_ALLOC, 1
 	break	0x10
-pa2:
-	subu	reg_ALLOC, 1
-	.set	reorder
+1:	.set	reorder
 
 	/* Restore C regs */
-	lw	ra, framesize(sp)
-	lw	s8, framesize-4(sp)
-	lw	gp, framesize-8(sp)
-	lw	s7, framesize-12(sp)
-	lw	s6, framesize-16(sp)
-	lw	s5, framesize-20(sp)
-	lw	s4, framesize-24(sp)
-	lw	s3, framesize-28(sp)
-	lw	s2, framesize-32(sp)
-	lw	s1, framesize-36(sp)
-	lw	s0, framesize-40(sp)
+	lw	ra, framesize-8(sp)
+	lw	s8, framesize-12(sp)
+	lw	s7, framesize-20(sp)
+	lw	s6, framesize-24(sp)
+	lw	s5, framesize-28(sp)
+	lw	s4, framesize-32(sp)
+	lw	s3, framesize-36(sp)
+	lw	s2, framesize-40(sp)
+	lw	s1, framesize-44(sp)
+	lw	s0, framesize-48(sp)
 
 	/* Restore C stack. */
 	addu	sp, framesize
@@ -215,23 +231,28 @@ pa2:
 /*
  * Transfering control from Lisp into C
  */
-	.globl	call_into_c
-	.align	2
-	.type	call_into_c,@function
-	.ent	call_into_c,0
-call_into_c:
-	/* Set up a stack frame. */
+ 	NESTED(call_into_c, 0, ra)
+	/* The stack frame was already set up from lisp. We have
+	   to fake the correct gp value for this function, though. */
+	.set	noreorder
+	.set	noat
+	lui	gp, %hi(_gp_disp)
+	addiu	gp, %lo(_gp_disp)
+	lui	reg_NL3, %hi(call_into_c)
+	addiu	reg_NL3, %lo(call_into_c)
+	addu	gp, reg_NL3
+	.set	at
+	.set	reorder
+
 	move	reg_OCFP, reg_CFP
 	move	reg_CFP, reg_CSP
 	addu	reg_CSP, reg_CFP, 32
-	sw	reg_OCFP, 0(reg_CFP)
-	subu	reg_NL4, reg_LIP, reg_CODE
-	addu	reg_NL4, OTHER_POINTER_LOWTAG
-	sw	reg_NL4, 4(reg_CFP)
-	sw	reg_CODE, 8(reg_CFP)
-        sw      gp, 12(reg_CFP)
 
-	/* Note: the C stack is already set up. */
+	subu	reg_LIP, reg_CODE
+	addu	reg_LIP, OTHER_POINTER_LOWTAG
+	sw	reg_LIP, (reg_CFP)
+	sw	reg_CODE, 4(reg_CFP)
+	sw	gp, 8(reg_CFP)
 
 	/* Set the pseudo-atomic flag. */
 	.set	noreorder
@@ -239,9 +260,9 @@ call_into_c:
 	addu	reg_ALLOC, 1
 	.set	reorder
 
-	/* Save lisp state. */
-	subu	t0, reg_ALLOC, 1
-	sw	t0, dynamic_space_free_pointer
+	/* Save LISP state. */
+	subu	reg_A0, reg_ALLOC, 1
+	sw	reg_A0, dynamic_space_free_pointer
 	sw	reg_BSP, current_binding_stack_pointer
 	sw	reg_CSP, current_control_stack_pointer
 	sw	reg_CFP, current_control_frame_pointer
@@ -249,36 +270,31 @@ call_into_c:
 	/* Mark us as in C land. */
 	sw	reg_CSP, foreign_function_call_active
 
-	/* Were we interrupted? */
+	/* Check for interrupt */
 	.set	noreorder
-	bgez	reg_NL4, pa3
-	nop
+	bgez	reg_NL4, 1f
+	 subu	reg_ALLOC, 1
 	break	0x10
-pa3:
-	subu	reg_ALLOC, 1
-	.set	reorder
+1:	.set	reorder
 
 	/* Into C land we go. */
 	move    t9, reg_CFUNC
 	jalr	t9
-	nop
 
-	lw      gp, 12(reg_CFP)
+	lw      gp, 8(reg_CFP)
 	
-	/* Clear unsaved descriptor regs */
-	move	t0, zero
-	move	t1, zero
-	move	t2, zero
-	move	t3, zero
-	move	t4, zero
-	move	t5, zero
-	move	t6, zero
-	move	t7, zero
-	move	t8, zero
-	move	s0, zero
-	move	s2, zero
-	move	s3, zero
-	move	ra, zero
+	li	reg_NIL, NIL
+
+	/* Clear unsaved boxed descriptor regs */
+	li	reg_A0, 0		# t0
+	li	reg_A1, 0		# t1
+	li	reg_A2, 0		# t2
+	li	reg_A3, 0		# t3
+	li	reg_A4, 0		# t4
+	li	reg_A5, 0		# t5
+	li	reg_FDEFN, 0		# t6
+	li	reg_LEXENV, 0		# t7
+	li	reg_L1, 0		# t8
 
 	/* Turn on pseudo-atomic. */
 	.set	noreorder
@@ -286,27 +302,27 @@ pa3:
 	li	reg_ALLOC, 1
 	.set	reorder
 
-	/* Mark us at in Lisp land. */
+	/* Mark us as in Lisp land. */
 	sw	zero, foreign_function_call_active
 
-	/* Restore ALLOC, preserving pseudo-atomic-atomic */
-	lw	a0, dynamic_space_free_pointer
-	addu	reg_ALLOC, a0
+	/* Load the allocation pointer, preserving the low-bit of alloc */
+	lw	reg_BSP, dynamic_space_free_pointer
+	addu	reg_ALLOC, reg_BSP
+
+	lw	reg_BSP, current_binding_stack_pointer
+
+	/* Restore LRA & CODE */
+	lw	reg_LIP, (reg_CFP)
+	lw	reg_CODE, 4(reg_CFP)
+	subu	reg_LIP, OTHER_POINTER_LOWTAG
+	addu	reg_LIP, reg_CODE
 
 	/* Check for interrupt */
 	.set	noreorder
-	bgez	reg_NL4, pa4
-	nop
+	bgez	reg_NL4, 1f
+	 subu	reg_ALLOC, 1
 	break	0x10
-pa4:
-	subu	reg_ALLOC, 1
-	.set	reorder
-
-	/* Restore LRA & CODE (they may have been GC'ed) */
-	lw	reg_CODE, 8(reg_CFP)
-	lw	a0, 4(reg_CFP)
-	subu	a0, OTHER_POINTER_LOWTAG
-	addu	reg_LIP, reg_CODE, a0
+1:	.set	reorder
 
 	/* Reset the lisp stack. */
 	/* Note: OCFP and CFP are in saved regs. */
@@ -314,56 +330,47 @@ pa4:
 	move	reg_CFP, reg_OCFP
 
 	/* Return to LISP. */
-	j	reg_LIP
-
+	jr	reg_LIP
 	END(call_into_c)
 
-	.globl	start_of_tramps
-start_of_tramps:
+	EXPORT(start_of_tramps)
 
 /*
  * The undefined-function trampoline.
  */
-        .globl  undefined_tramp
-        .ent    undefined_tramp
-undefined_tramp:
-        break   10
-        .byte    4
-        .byte    UNDEFINED_FUN_ERROR
-        .byte    254
-        .byte    (0xc0 + sc_DescriptorReg)
-        .byte    1
-        .align 2
-        .end    undefined_tramp
+	LEAF(undefined_tramp)
+        break	10
+        .byte	4
+        .byte	UNDEFINED_FUN_ERROR
+        .byte	254
+        .byte	(0xc0 + sc_DescriptorReg)
+        .byte	1
+	.align	2
+	END(undefined_tramp)
 
 /*
  * The closure trampoline.
  */
-        .globl  closure_tramp
-        .ent    closure_tramp
-closure_tramp:
-        lw      reg_LEXENV, FDEFN_FUN_OFFSET(reg_FDEFN)
-        lw      reg_L0, CLOSURE_FUN_OFFSET(reg_LEXENV)
-        addu    reg_LIP, reg_L0, SIMPLE_FUN_CODE_OFFSET
-        j       reg_LIP
-        .end    closure_tramp
+	LEAF(closure_tramp)
+        lw	reg_LEXENV, FDEFN_FUN_OFFSET(reg_FDEFN)
+        lw	reg_L0, CLOSURE_FUN_OFFSET(reg_LEXENV)
+        addu	reg_LIP, reg_L0, SIMPLE_FUN_CODE_OFFSET
+        jr	reg_LIP
+	END(closure_tramp)
 
-	.globl	end_of_tramps
-end_of_tramps:
-
+	EXPORT(end_of_tramps)
 
 /*
  * Function-end breakpoint magic.
  */
-
-	.align	2
+	LEAF(fun_end_breakpoint_guts)
 	.set	noreorder
-	.globl	function_end_breakpoint_guts
-fun_end_breakpoint_guts:
+	.align	3
 	.word	RETURN_PC_HEADER_WIDETAG
 	
-	beq	zero, zero, 1f
-	nop
+	b	multiple_value_return
+	 nop
+
 	move	reg_OCFP, reg_CSP
 	addu	reg_CSP, 4
 	li	reg_NARGS, 4
@@ -372,14 +379,14 @@ fun_end_breakpoint_guts:
 	move	reg_A3, reg_NIL
 	move	reg_A4, reg_NIL
 	move	reg_A5, reg_NIL
-1:
 
-	.globl	fun_end_breakpoint_trap
-fun_end_breakpoint_trap:
+multiple_value_return:
+
+	FEXPORT(fun_end_breakpoint_trap)
 	break	trap_FunEndBreakpoint
-	beq	zero, zero, 1b
-	nop
+1:	b	1b
+	 nop
 
-	.globl	fun_end_breakpoint_end
-fun_end_breakpoint_end:
+	EXPORT(fun_end_breakpoint_end)
 	.set	reorder
+	END(fun_end_breakpoint_guts)

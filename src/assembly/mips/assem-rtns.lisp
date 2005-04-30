@@ -17,7 +17,7 @@
      ;; These are just needed to facilitate the transfer
      (:temp lip interior-reg lip-offset)
      (:temp count any-reg nl2-offset)
-     (:temp dst any-reg nl4-offset)
+     (:temp dst any-reg nl3-offset)
      (:temp temp descriptor-reg l0-offset)
 
      ;; These are needed so we can get at the register args.

@@ -46,7 +46,9 @@ ldso_stub__~A: ;                                \\
 /* This is an automatically generated file, please do not hand-edit it.
  * See the program tools-for-build/ldso-stubs.lisp. */
 
+#ifndef LANGUAGE_ASSEMBLY
 #define LANGUAGE_ASSEMBLY
+#endif
 #include \"sbcl.h\""
 
 #!+sparc "
@@ -123,17 +125,19 @@ ldso_stub__ ## fct ## $lazy_ptr:		@\\
 	.type	ldso_stub__ ## fct,@function ; \\
 	.ent	ldso_stub__ ## fct ;           \\
 ldso_stub__ ## fct: ;                  \\
+	.set noat ;                    \\
 	addiu $29,-48 ;                \\
 	sw $28,40($29) ;               \\
 	sw $31,44($29) ;               \\
 	lw $25,64($29) ;               \\
+	lw  $1,68($29) ;               \\
 	sw $25,16($29) ;               \\
-	lw $25,68($29) ;               \\
-	sw $25,20($29) ;               \\
+	sw  $1,20($29) ;               \\
 	lw $25,72($29) ;               \\
+	lw  $1,76($29) ;               \\
 	sw $25,24($29) ;               \\
-	lw $25,76($29) ;               \\
-	sw $25,28($29) ;               \\
+	sw  $1,28($29) ;               \\
+	.set at ;                      \\
 	la $25,	fct ;                  \\
 	jalr $25 ;                     \\
 	lw $31,44($29) ;               \\

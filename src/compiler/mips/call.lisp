@@ -1041,7 +1041,7 @@ default-value-8
   (:temporary (:sc any-reg :offset nl0-offset) result)
   (:temporary (:sc any-reg :offset nl1-offset) count)
   (:temporary (:sc any-reg :offset nl2-offset) src)
-  (:temporary (:sc any-reg :offset nl4-offset) dst)
+  (:temporary (:sc any-reg :offset nl3-offset) dst)
   (:temporary (:sc descriptor-reg :offset l0-offset) temp)
   (:info fixed)
   (:generator 20
