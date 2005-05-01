@@ -404,12 +404,12 @@
   (:args (x :scs (unsigned-reg) :target eax)
 	 (y :scs (unsigned-reg unsigned-stack)))
   (:arg-types unsigned-num unsigned-num)
-  (:temporary (:sc unsigned-reg :offset eax-offset :target result
+  (:temporary (:sc unsigned-reg :offset eax-offset :target r
 		   :from (:argument 0) :to :result) eax)
   (:temporary (:sc unsigned-reg :offset edx-offset
 		   :from :eval :to :result) edx)
   (:ignore edx)
-  (:results (result :scs (unsigned-reg)))
+  (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic")
   (:vop-var vop)
@@ -417,7 +417,7 @@
   (:generator 6
     (move eax x)
     (inst mul eax y)
-    (move result eax)))
+    (move r eax)))
 
 
 (define-vop (fast-truncate/fixnum=>fixnum fast-safe-arith-op)
@@ -1190,6 +1190,46 @@
     (inst shl r :cl)))
 
 ;;;; Modular functions
+(defmacro define-mod-binop ((name prototype) function)
+  `(define-vop (,name ,prototype)
+       (:args (x :target r :scs (unsigned-reg signed-reg)
+                 :load-if (not (and (or (sc-is x unsigned-stack)
+                                        (sc-is x signed-stack))
+                                    (or (sc-is y unsigned-reg)
+                                        (sc-is y signed-reg))
+                                    (or (sc-is r unsigned-stack)
+                                        (sc-is r signed-stack))
+                                    (location= x r))))
+              (y :scs (unsigned-reg signed-reg unsigned-stack signed-stack)))
+     (:arg-types untagged-num untagged-num)
+     (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)
+                  :load-if (not (and (or (sc-is x unsigned-stack)
+                                         (sc-is x signed-stack))
+                                     (or (sc-is y unsigned-reg)
+                                         (sc-is y unsigned-reg))
+                                     (or (sc-is r unsigned-stack)
+                                         (sc-is r unsigned-stack))
+                                     (location= x r)))))
+     (:result-types unsigned-num)
+     (:translate ,function)))
+(defmacro define-mod-binop-c ((name prototype) function)
+  `(define-vop (,name ,prototype)
+       (:args (x :target r :scs (unsigned-reg signed-reg)
+                 :load-if (not (and (or (sc-is x unsigned-stack)
+                                        (sc-is x signed-stack))
+                                    (or (sc-is r unsigned-stack)
+                                        (sc-is r signed-stack))
+                                    (location= x r)))))
+     (:info y)
+     (:arg-types untagged-num (:constant (or (unsigned-byte 32) (signed-byte 32))))
+     (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)
+                  :load-if (not (and (or (sc-is x unsigned-stack)
+                                         (sc-is x signed-stack))
+                                     (or (sc-is r unsigned-stack)
+                                         (sc-is r unsigned-stack))
+                                     (location= x r)))))
+     (:result-types unsigned-num)
+     (:translate ,function)))
 
 (macrolet ((def (name -c-p)
              (let ((fun32 (intern (format nil "~S-MOD32" name)))
@@ -1197,9 +1237,9 @@
                    (vopcu (intern (format nil "FAST-~S-C/UNSIGNED=>UNSIGNED" name)))
                    (vopf (intern (format nil "FAST-~S/FIXNUM=>FIXNUM" name)))
                    (vopcf (intern (format nil "FAST-~S-C/FIXNUM=>FIXNUM" name)))
-                   (vop32u (intern (format nil "FAST-~S-MOD32/UNSIGNED=>UNSIGNED" name)))
+                   (vop32u (intern (format nil "FAST-~S-MOD32/WORD=>UNSIGNED" name)))
                    (vop32f (intern (format nil "FAST-~S-MOD32/FIXNUM=>FIXNUM" name)))
-                   (vop32cu (intern (format nil "FAST-~S-MOD32-C/UNSIGNED=>UNSIGNED" name)))
+                   (vop32cu (intern (format nil "FAST-~S-MOD32-C/WORD=>UNSIGNED" name)))
                    (vop32cf (intern (format nil "FAST-~S-MOD32-C/FIXNUM=>FIXNUM" name)))
                    (sfun30 (intern (format nil "~S-SMOD30" name)))
                    (svop30f (intern (format nil "FAST-~S-SMOD30/FIXNUM=>FIXNUM" name)))
@@ -1207,11 +1247,11 @@
                `(progn
                   (define-modular-fun ,fun32 (x y) ,name :unsigned 32)
                   (define-modular-fun ,sfun30 (x y) ,name :signed 30)
-                  (define-vop (,vop32u ,vopu) (:translate ,fun32))
+                  (define-mod-binop (,vop32u ,vopu) ,fun32)
                   (define-vop (,vop32f ,vopf) (:translate ,fun32))
                   (define-vop (,svop30f ,vopf) (:translate ,sfun30))
                   ,@(when -c-p
-                      `((define-vop (,vop32cu ,vopcu) (:translate ,fun32))
+                      `((define-mod-binop-c (,vop32cu ,vopcu) ,fun32)
                         (define-vop (,svop30cf ,vopcf) (:translate ,sfun30))))))))
   (def + t)
   (def - t)
@@ -1299,15 +1339,20 @@
 
 ;;; logical operations
 (define-modular-fun lognot-mod32 (x) lognot :unsigned 32)
-(define-vop (lognot-mod32/unsigned=>unsigned)
+(define-vop (lognot-mod32/word=>unsigned)
   (:translate lognot-mod32)
-  (:args (x :scs (unsigned-reg unsigned-stack) :target r
-	    :load-if (not (and (sc-is x unsigned-stack)
-			       (sc-is r unsigned-stack)
+  (:args (x :scs (unsigned-reg signed-reg unsigned-stack signed-stack) :target r
+	    :load-if (not (and (or (sc-is x unsigned-stack)
+                                   (sc-is x signed-stack))
+			       (or (sc-is r unsigned-stack)
+                                   (sc-is r signed-stack))
 			       (location= x r)))))
   (:arg-types unsigned-num)
   (:results (r :scs (unsigned-reg)
-	       :load-if (not (and (sc-is x unsigned-stack)
+	       :load-if (not (and (or (sc-is x unsigned-stack)
+                                      (sc-is x signed-stack))
+                                  (or (sc-is r unsigned-stack)
+                                      (sc-is r signed-stack))
 				  (sc-is r unsigned-stack)
 				  (location= x r)))))
   (:result-types unsigned-num)
@@ -1317,12 +1362,12 @@
     (inst not r)))
 
 (define-modular-fun logxor-mod32 (x y) logxor :unsigned 32)
-(define-vop (fast-logxor-mod32/unsigned=>unsigned
-             fast-logxor/unsigned=>unsigned)
-  (:translate logxor-mod32))
-(define-vop (fast-logxor-mod32-c/unsigned=>unsigned
-             fast-logxor-c/unsigned=>unsigned)
-  (:translate logxor-mod32))
+(define-mod-binop (fast-logxor-mod32/word=>unsigned
+                   fast-logxor/unsigned=>unsigned)
+    logxor-mod32)
+(define-mod-binop-c (fast-logxor-mod32-c/word=>unsigned
+                     fast-logxor-c/unsigned=>unsigned)
+    logxor-mod32)
 (define-vop (fast-logxor-mod32/fixnum=>fixnum
              fast-logxor/fixnum=>fixnum)
   (:translate logxor-mod32))
@@ -1486,7 +1531,7 @@
     (move hi edx)
     (move lo eax)))
 
-(define-vop (bignum-lognot lognot-mod32/unsigned=>unsigned)
+(define-vop (bignum-lognot lognot-mod32/word=>unsigned)
   (:translate sb!bignum:%lognot))
 
 (define-vop (fixnum-to-digit)

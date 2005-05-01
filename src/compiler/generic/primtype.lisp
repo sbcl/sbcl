@@ -52,16 +52,19 @@
 
 (/show0 "primtype.lisp 53")
 (!def-primitive-type-alias tagged-num (:or positive-fixnum fixnum))
-(!def-primitive-type-alias unsigned-num 
-  #!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
-  (:or unsigned-byte-64 unsigned-byte-63 positive-fixnum)
-  #!-#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
-  (:or unsigned-byte-32 unsigned-byte-31 positive-fixnum))
-(!def-primitive-type-alias signed-num 
-  #!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
-  (:or signed-byte-64 fixnum unsigned-byte-63 positive-fixnum)
-  #!-#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
-  (:or signed-byte-32 fixnum unsigned-byte-31 positive-fixnum))
+(progn
+  (!def-primitive-type-alias unsigned-num #1=
+    #!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
+    (:or unsigned-byte-64 unsigned-byte-63 positive-fixnum)
+    #!-#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
+    (:or unsigned-byte-32 unsigned-byte-31 positive-fixnum))
+  (!def-primitive-type-alias signed-num #2=
+    #!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
+    (:or signed-byte-64 fixnum unsigned-byte-63 positive-fixnum)
+    #!-#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
+    (:or signed-byte-32 fixnum unsigned-byte-31 positive-fixnum))
+  (!def-primitive-type-alias untagged-num
+    (:or . #.(print (union (cdr '#1#) (cdr '#2#))))))
 
 ;;; other primitive immediate types
 (/show0 "primtype.lisp 68")
