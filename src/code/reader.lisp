@@ -832,7 +832,7 @@
 	(#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
-	(#.+char-attr-invalid+ (%reader-error "invalid constituent"))
+	(#.+char-attr-invalid+ (%reader-error stream "invalid constituent"))
 	;; can't have eof, whitespace, or terminating macro as first char!
 	(t (go SYMBOL)))
      SIGN ; saw "sign"

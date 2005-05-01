@@ -370,8 +370,8 @@ tail-recursively, as in this example:
 @end lisp
 
 Usually the elimination of tail-recursive frames makes debugging more
-pleasant, since theses frames are mostly uninformative.  If there is
-any doubt about how one function called another, it can usually be
+pleasant, since these frames are mostly uninformative.  If there is any
+doubt about how one function called another, it can usually be
 eliminated by finding the source location in the calling frame.
 @xref{Source Location Printing}.
 

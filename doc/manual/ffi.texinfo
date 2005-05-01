@@ -282,12 +282,14 @@ return zero values.
 
 @item
 The foreign type specifier @code{sb-alien:c-string} is similar to
-@code{(* char)}, but is interpreted as a null-terminated string, and
-is automatically converted into a Lisp string when accessed; or if the
+@code{(* char)}, but is interpreted as a null-terminated string, and is
+automatically converted into a Lisp string when accessed; or if the
 pointer is C @code{NULL} or @code{0}, then accessing it gives Lisp
-@code{nil}.  Lisp strings are stored with a trailing NUL
-termination, so no copying (either by the user or the implementation)
-is necessary when passing them to foreign code.
+@code{nil}.  Lisp strings of type @code{base-string} are stored with a
+trailing NUL termination, so no copying (either by the user or the
+implementation) is necessary when passing them to foreign code; strings
+of type @code{(simple-array character (*))} are copied by the
+implementation as required.
 
 Assigning a Lisp string to a @code{c-string} structure field or
 variable stores the contents of the string to the memory already
@@ -1182,8 +1184,8 @@ routine, e.g.: @samp{cc -c test.c && ld -shared -o test.so test.o} (In
 order to enable incremental loading with some linkers, you may need to
 say @samp{cc -G 0 -c test.c})
 
-Once the C code has been compiled, you can start up Lisp and load it
-in: @samp{sbcl} Lisp should start up with its normal prompt.
+Once the C code has been compiled, you can start up Lisp and load it in:
+@samp{sbcl}.  Lisp should start up with its normal prompt.
 
 Within Lisp, compile the Lisp file. (This step can be done
 separately. You don't have to recompile every time.)

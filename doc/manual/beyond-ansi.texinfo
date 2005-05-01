@@ -146,15 +146,15 @@ list.
 @section Efficiency Hacks
 
 The @code{sb-ext:purify} function causes SBCL first to collect all
-garbage, then to mark all uncollected objects as permanent, never
-again attempting to collect them as garbage. This can cause a large
-increase in efficiency when using a primitive garbage collector, or a
-more moderate increase in efficiency when using a more sophisticated
-garbage collector which is well suited to the program's memory usage
-pattern. It also allows permanent code to be frozen at fixed
-addresses, a precondition for using copy-on-write to share code
-between multiple Lisp processes. it is less important with modern
-generational garbage collectors.
+garbage, then to mark all uncollected objects as permanent, never again
+attempting to collect them as garbage. This can cause a large increase
+in efficiency when using a primitive garbage collector, or a more
+moderate increase in efficiency when using a more sophisticated garbage
+collector which is well suited to the program's memory usage pattern. It
+also allows permanent code to be frozen at fixed addresses, a
+precondition for using copy-on-write to share code between multiple Lisp
+processes.  This is less important with modern generational garbage
+collectors, but not all SBCL platforms use such a garbage collector.
 
 @include fun-sb-ext-purify.texinfo
 
