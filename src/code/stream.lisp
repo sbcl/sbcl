@@ -189,6 +189,7 @@
 	   ;; EXPECTED-TYPE? This SATISFIES type (with a nonstandard
 	   ;; private predicate function..) is ugly and confusing, but
 	   ;; I can't see any other way. -- WHN 2001-04-14
+	   :datum stream
 	   :expected-type '(satisfies stream-associated-with-file-p)
 	   :format-control
 	   "~@<The stream ~2I~_~S ~I~_isn't associated with a file.~:>"
