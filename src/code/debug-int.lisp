@@ -1993,6 +1993,9 @@ register."
   (if (or
        ;; fixnum
        (zerop (logand val sb!vm:fixnum-tag-mask))
+       ;; immediate single float, 64-bit only
+       #!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
+       (= (logand val #xff) sb!vm:single-float-widetag)
        ;; character
        (and (zerop (logandc2 val #x1fffffff)) ; Top bits zero
 	    (= (logand val #xff) sb!vm:character-widetag)) ; char tag

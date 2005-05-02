@@ -71,15 +71,10 @@
     OKAY)
 
   (define-generic-arith-routine (- 10)
-    ;; FIXME: This is screwed up.
-      ;;; I can't figure out the flags on subtract. Overflow never gets
-      ;;; set and carry always does. (- 0 most-negative-fixnum) can't be
-      ;;; easily detected so just let the upper level stuff do it.
-    (inst jmp DO-STATIC-FUN)
-
     (move res x)
     (inst sub res y)
     (inst jmp :no OKAY)
+    (inst cmc)                        ; carry has correct sign now
     (inst rcr res 1)
     (inst sar res 1)		      ; remove type bits
 

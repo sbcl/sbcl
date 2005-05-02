@@ -265,35 +265,35 @@
 	      (values target not-target))
 	;; Is it a fixnum?
 	(generate-fixnum-test value)
-	(move eax-tn value)
+	(move rax-tn value)
 	(inst jmp :e fixnum)
 
 	;; If not, is it an other pointer?
-	(inst and eax-tn lowtag-mask)
-	(inst cmp eax-tn other-pointer-lowtag)
+	(inst and rax-tn lowtag-mask)
+	(inst cmp rax-tn other-pointer-lowtag)
 	(inst jmp :ne nope)
 	;; Get the header.
-	(loadw eax-tn value 0 other-pointer-lowtag)
+	(loadw rax-tn value 0 other-pointer-lowtag)
 	;; Is it one?
-	(inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+	(inst cmp rax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
 	(inst jmp :e single-word)
 	;; If it's other than two, we can't be an (unsigned-byte 64)
-	(inst cmp eax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
+	(inst cmp rax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
 	(inst jmp :ne nope)
 	;; Get the second digit.
-	(loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
+	(loadw rax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
 	;; All zeros, its an (unsigned-byte 64).
-	(inst or eax-tn eax-tn)
+	(inst or rax-tn rax-tn)
 	(inst jmp :z yep)
 	(inst jmp nope)
 	
 	(emit-label single-word)
 	;; Get the single digit.
-	(loadw eax-tn value bignum-digits-offset other-pointer-lowtag)
+	(loadw rax-tn value bignum-digits-offset other-pointer-lowtag)
 
 	;; positive implies (unsigned-byte 64).
 	(emit-label fixnum)
-	(inst or eax-tn eax-tn)
+	(inst or rax-tn rax-tn)
 	(inst jmp (if not-p :s :ns) target)
 
 	(emit-label not-target)))))
@@ -308,35 +308,35 @@
 
       ;; Is it a fixnum?
       (generate-fixnum-test value)
-      (move eax-tn value)
+      (move rax-tn value)
       (inst jmp :e fixnum)
 
       ;; If not, is it an other pointer?
-      (inst and eax-tn lowtag-mask)
-      (inst cmp eax-tn other-pointer-lowtag)
+      (inst and rax-tn lowtag-mask)
+      (inst cmp rax-tn other-pointer-lowtag)
       (inst jmp :ne nope)
       ;; Get the header.
-      (loadw eax-tn value 0 other-pointer-lowtag)
+      (loadw rax-tn value 0 other-pointer-lowtag)
       ;; Is it one?
-      (inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+      (inst cmp rax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
       (inst jmp :e single-word)
       ;; If it's other than two, we can't be an (unsigned-byte 64)
-      (inst cmp eax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
+      (inst cmp rax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
       (inst jmp :ne nope)
       ;; Get the second digit.
-      (loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
+      (loadw rax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
       ;; All zeros, its an (unsigned-byte 64).
-      (inst or eax-tn eax-tn)
+      (inst or rax-tn rax-tn)
       (inst jmp :z yep)
       (inst jmp nope)
 	
       (emit-label single-word)
       ;; Get the single digit.
-      (loadw eax-tn value bignum-digits-offset other-pointer-lowtag)
+      (loadw rax-tn value bignum-digits-offset other-pointer-lowtag)
 
       ;; positive implies (unsigned-byte 64).
       (emit-label fixnum)
-      (inst or eax-tn eax-tn)
+      (inst or rax-tn rax-tn)
       (inst jmp :s nope)
 
       (emit-label yep)

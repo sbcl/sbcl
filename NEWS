@@ -2,10 +2,14 @@ changes in sbcl-0.9.1 relative to sbcl-0.9.0:
   * fixed cross-compiler leakages that prevented building a 32-bit
     target with a 64-bit host compiler.
   * contrib improvement: implement SB-POSIX:MKSTEMP (Yannick Gingras)
+  * optimization: There's now a fast-path for fixnum arguments in the
+    generic subtraction routines on x86/x86-64. (Thanks to Lutz Euler)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the type-error signalled from WARN has a filled-in DATUM slot.
     ** the type-error required when a stream is not associated with
        a file has the stream as its datum.
+    ** type-errors on single-floats on x86-64 no longer have 
+       :INVALID-OBJECT as the datum
 
 changes in sbcl-0.9.0 relative to sbcl-0.8.21:
   * incompatible change: the --noprogrammer option, deprecated since
