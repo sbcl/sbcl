@@ -818,8 +818,10 @@
        (%failed-enforce-type ,value ',type))))
 
 (defun %failed-enforce-type (value type)
-  (error 'simple-type-error ; maybe should be TYPE-BUG, subclass of BUG?
-	 :value value
+  ;; maybe should be TYPE-BUG, subclass of BUG?  If it is changed,
+  ;; check uses of it in user-facing code (e.g. WARN)
+  (error 'simple-type-error 
+	 :datum value
 	 :expected-type type
 	 :format-control "~@<~S ~_is not a ~_~S~:>"
 	 :format-arguments (list value type)))
