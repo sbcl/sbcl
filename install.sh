@@ -14,6 +14,7 @@ MAN_DIR=${MAN_DIR-$INSTALL_ROOT/share/man}
 INFO_DIR=${INFO_DIR-$INSTALL_ROOT/share/info}
 DOC_DIR=${DOC_DIR-$INSTALL_ROOT/share/doc/sbcl}
 
+# Does the environment look sane?
 SBCL_SOURCE=`pwd`
 if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
    echo SBCL_HOME environment variable is set, and conflicts with INSTALL_ROOT.
@@ -22,6 +23,20 @@ if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
    echo SBCL_HOME="$SBCL_HOME"
    exit 1
 fi
+
+# Before doing anything else, make sure we have an SBCL to install
+if [ -f src/runtime/sbcl ]; then
+    if [ -f output/sbcl.core ]; then
+	true
+    else
+	echo "output/sbcl.core not found, aborting installation."
+	exit 1
+    fi
+else
+    echo "src/runtime/sbcl not found, aborting installation."
+    exit 1
+fi
+
 SBCL_HOME=$INSTALL_ROOT/lib/sbcl
 export SBCL_HOME INSTALL_ROOT
 ensure_dirs $BUILD_ROOT$INSTALL_ROOT $BUILD_ROOT$INSTALL_ROOT/bin \

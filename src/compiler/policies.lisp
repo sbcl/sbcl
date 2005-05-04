@@ -72,7 +72,7 @@
   ("degraded" "full" "full" "full"))
 
 (define-optimization-quality insert-step-conditions
-    (if (> debug (max speed space))
+    (if (> debug (max speed space compilation-speed))
         debug
         0)
   ("no" "no" "partial" "full"))

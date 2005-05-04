@@ -850,9 +850,13 @@ If @code{debug} is greater than both @code{speed} and @code{space},
 the command @command{return} can be used to continue execution by
 returning a value from the current stack frame.
 
-If @code{debug} is also at least 2, then  the code is @emph{partially
+@item > (max 1 speed space compilation-speed)
+If @code{debug} is also at least 2, then the code is @emph{partially
 steppable}. If @code{debug} is 3, the code is @emph{fully steppable}.
-@xref{Single Stepping}, for details.
+@xref{Single Stepping}, for details. Fully steppable code take
+exponentially longer to compile in some cases, and is significantly
+larger and slower; for partially steppable code the speed and space
+penalties are signigicantly smaller.
 
 @end table
 
