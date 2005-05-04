@@ -23,7 +23,7 @@
 			 (%primitive sb!c::code-instructions code))))
      (ecase kind
        (:jump
-	(assert (zerop (ash value -28)))
+	(aver (zerop (ash value -28)))
 	(setf (ldb (byte 26 0) (sap-ref-32 sap offset))
 	      (ash value -2)))
        (:lui

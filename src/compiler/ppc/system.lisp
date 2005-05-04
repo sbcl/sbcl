@@ -230,7 +230,7 @@
   (:generator 1
     (let ((offset
 	   (- (* (+ index vector-data-offset) n-word-bytes) other-pointer-lowtag)))
-      (assert (typep offset '(signed-byte 16)))
+      (aver (typep offset '(signed-byte 16)))
       (inst lwz count count-vector offset)
       (inst addi count count 1)
       (inst stw count count-vector offset))))

@@ -28,7 +28,7 @@
 		      (logand inst #xffffc000)))
 	     (:load-short
 	      (let ((low-bits (ldb (byte 11 0) value)))
-		(assert (<= 0 low-bits (1- (ash 1 4))))
+		(aver (<= 0 low-bits (1- (ash 1 4))))
 		(logior (ash low-bits 17)
 			(logand inst #xffe0ffff))))
 	     (:hi
@@ -40,7 +40,7 @@
 		      (logand inst #xffe00000)))
 	     (:branch
 	      (let ((bits (ldb (byte 9 2) value)))
-		(assert (zerop (ldb (byte 2 0) value)))
+		(aver (zerop (ldb (byte 2 0) value)))
 		(logior (ash bits 3)
 			(logand inst #xffe0e002)))))))))
 

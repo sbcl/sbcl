@@ -71,7 +71,7 @@
 (define-alien-type-method (values :result-tn) (type)
   (let ((values (alien-values-type-values type)))
     (when values
-      (assert (null (cdr values)))
+      (aver (null (cdr values)))
       (invoke-alien-type-method :result-tn (car values)))))
 
 (defun make-arg-tns (type)

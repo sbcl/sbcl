@@ -592,7 +592,7 @@ default-value-8
 ;;; more arg, but there is no new-FP, since the arguments have been set up in
 ;;; the current frame.
 (defmacro define-full-call (name named return variable)
-  (assert (not (and variable (eq return :tail))))
+  (aver (not (and variable (eq return :tail))))
   `(define-vop (,name
 		,@(when (eq return :unknown)
 		    '(unknown-values-receiver)))

@@ -22,7 +22,7 @@
     (null null-offset)
     (zero zero-offset)
     (t
-     (assert (eq (sb-name (sc-sb (tn-sc tn))) 'registers))
+     (aver (eq (sb-name (sc-sb (tn-sc tn))) 'registers))
      (tn-offset tn))))
 
 (defun fp-reg-tn-encoding (tn)
@@ -501,7 +501,7 @@
   (declare (type (or fixup (signed-byte 14))))
   (cond ((fixup-p disp)
 	 (note-fixup segment :load disp)
-	 (assert (or (null (fixup-offset disp)) (zerop (fixup-offset disp))))
+	 (aver (or (null (fixup-offset disp)) (zerop (fixup-offset disp))))
 	 0)
 	(t
 	 (dpb (ldb (byte 13 0) disp)
@@ -565,7 +565,7 @@
   (declare (type (or fixup (signed-byte 5)) disp))
   (cond ((fixup-p disp)
 	 (note-fixup segment :load-short disp)
-	 (assert (or (null (fixup-offset disp)) (zerop (fixup-offset disp))))
+	 (aver (or (null (fixup-offset disp)) (zerop (fixup-offset disp))))
 	 0)
 	(t
 	 (dpb (ldb (byte 4 0) disp)
@@ -647,7 +647,7 @@
   (declare (type (or fixup (signed-byte 21) (unsigned-byte 21)) value))
   (cond ((fixup-p value)
 	 (note-fixup segment :hi value)
-	 (assert (or (null (fixup-offset value)) (zerop (fixup-offset value))))
+	 (aver (or (null (fixup-offset value)) (zerop (fixup-offset value))))
 	 0)
 	(t
 	 (logior (ash (ldb (byte 5 2) value) 16)
@@ -690,7 +690,7 @@
   (declare (type (or fixup (signed-byte 17)) disp))
   (cond ((fixup-p disp)
 	 (note-fixup segment :branch disp)
-	 (assert (or (null (fixup-offset disp)) (zerop (fixup-offset disp))))
+	 (aver (or (null (fixup-offset disp)) (zerop (fixup-offset disp))))
 	 (values 0 0 0))
 	(t
 	 (values (ldb (byte 5 11) disp)
@@ -708,7 +708,7 @@
   (emit-back-patch segment 4
     #'(lambda (segment posn)
 	(let ((disp (label-relative-displacement target posn)))
-	  (assert (<= (- (ash 1 16)) disp (1- (ash 1 16))))
+	  (aver (<= (- (ash 1 16)) disp (1- (ash 1 16))))
 	  (multiple-value-bind
 	      (w1 w2 w)
 	      (decompose-branch-disp segment disp)
@@ -776,7 +776,7 @@
   (emit-back-patch segment 4
     #'(lambda (segment posn)
 	(let ((disp (label-relative-displacement target posn)))
-	  (assert (<= (- (ash 1 11)) disp (1- (ash 1 11))))
+	  (aver (<= (- (ash 1 11)) disp (1- (ash 1 11))))
 	  (let ((w1 (logior (ash (ldb (byte 10 0) disp) 1)
 			    (ldb (byte 1 10) disp)))
 		(w (ldb (byte 1 11) disp)))
@@ -1123,7 +1123,7 @@
        (result-encoding double-p)
        (fp-reg-tn-encoding result)
      (when side
-       (assert double-p)
+       (aver double-p)
        (setf double-p nil))
      (emit-fp-load/store segment (if double-p #x0B #x09) (reg-tn-encoding base)
 			 (reg-tn-encoding index) 0 (if scale 1 0) 0 0 0
@@ -1142,7 +1142,7 @@
        (value-encoding double-p)
        (fp-reg-tn-encoding value)
      (when side
-       (assert double-p)
+       (aver double-p)
        (setf double-p nil))
      (emit-fp-load/store segment (if double-p #x0B #x09) (reg-tn-encoding base)
 			 (reg-tn-encoding index) 0 (if scale 1 0) 0 0 1
@@ -1162,7 +1162,7 @@
        (result-encoding double-p)
        (fp-reg-tn-encoding result)
      (when side
-       (assert double-p)
+       (aver double-p)
        (setf double-p nil))
      (emit-fp-load/store segment (if double-p #x0B #x09) (reg-tn-encoding base)
 			 (short-disp-encoding segment disp) 0
@@ -1183,7 +1183,7 @@
        (value-encoding double-p)
        (fp-reg-tn-encoding value)
      (when side
-       (assert double-p)
+       (aver double-p)
        (setf double-p nil))
      (emit-fp-load/store segment (if double-p #x0B #x09) (reg-tn-encoding base)
 			 (short-disp-encoding segment disp) 0
@@ -1226,7 +1226,7 @@
      (multiple-value-bind
 	 (to-encoding to-double-p)
 	 (fp-reg-tn-encoding to)
-       (assert (eq from-double-p to-double-p))
+       (aver (eq from-double-p to-double-p))
        (emit-fp-class-0-inst segment #x0C from-encoding 0
 			     (+ 2 (or (position op funops)
 				      (error "Bogus FUNOP: ~S" op)))
@@ -1265,7 +1265,7 @@
      (multiple-value-bind
 	 (r2-encoding r2-double-p)
 	 (fp-reg-tn-encoding r2)
-       (assert (eq r1-double-p r2-double-p))
+       (aver (eq r1-double-p r2-double-p))
        (emit-fp-class-0-inst segment #x0C r1-encoding r2-encoding 0
 			     (if r1-double-p 1 0) 2 0 0 cond)))))
 
@@ -1298,11 +1298,11 @@
      (multiple-value-bind
 	 (r2-encoding r2-double-p)
 	 (fp-reg-tn-encoding r2)
-       (assert (eq r1-double-p r2-double-p))
+       (aver (eq r1-double-p r2-double-p))
        (multiple-value-bind
 	   (result-encoding result-double-p)
 	   (fp-reg-tn-encoding result)
-	 (assert (eq r1-double-p result-double-p))
+	 (aver (eq r1-double-p result-double-p))
 	 (emit-fp-class-0-inst segment #x0C r1-encoding r2-encoding
 			       (or (position op fbinops)
 				   (error "Bogus FBINOP: ~S" op))

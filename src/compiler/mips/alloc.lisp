@@ -51,7 +51,7 @@
 		       (t
 			(storew null-tn ptr
 				cons-cdr-slot list-pointer-lowtag)))
-		 (assert (null (tn-ref-across things)))
+		 (aver (null (tn-ref-across things)))
 		 (move result res))))))))
 
 (define-vop (list list-or-list*)

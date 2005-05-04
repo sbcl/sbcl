@@ -32,7 +32,7 @@
 			 (%primitive code-instructions code))))
      (ecase kind
        (:jmp-hint
-	(assert (zerop (ldb (byte 2 0) value)))
+	(aver (zerop (ldb (byte 2 0) value)))
 	#+nil
 	(setf (sap-ref-16 sap offset)
 	      (logior (sap-ref-16 sap offset)

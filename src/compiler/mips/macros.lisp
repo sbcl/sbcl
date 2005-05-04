@@ -139,7 +139,7 @@
 				 &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
    word header having the specified Type-Code.  The result is placed in
-   Result-TN, Flag-Tn must be wired to NL3-OFFSET, and Temp-TN is a non-
+   Result-TN, Flag-Tn must be wired to NL4-OFFSET, and Temp-TN is a non-
    descriptor temp (which may be randomly used by the body.)  The body is
    placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
   `(pseudo-atomic (,flag-tn :extra (pad-data-block ,size))

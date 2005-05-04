@@ -241,7 +241,7 @@
     (let ((offset
 	   (- (* (+ index vector-data-offset) n-word-bytes)
 	      other-pointer-lowtag)))
-      (assert (typep offset '(signed-byte 13)))
+      (aver (typep offset '(signed-byte 13)))
       (inst ld count count-vector offset)
       (inst add count 1)
       (inst st count count-vector offset))))

@@ -102,11 +102,11 @@
 	       (make-result-state))))))
 
 (deftransform %alien-funcall ((function type &rest args))
-  (assert (sb!c::constant-lvar-p type))
+  (aver (sb!c::constant-lvar-p type))
   (let* ((type (sb!c::lvar-value type))
 	 (arg-types (alien-fun-type-arg-types type))
 	 (result-type (alien-fun-type-result-type type)))
-    (assert (= (length arg-types) (length args)))
+    (aver (= (length arg-types) (length args)))
     ;; We need to do something special for the following argument
     ;; types: single-float, double-float, and 64-bit integers.  For
     ;; results, we need something special for 64-bit integer results.

@@ -32,9 +32,9 @@
     (error "~S isn't a floating-point register." tn))
   (let ((offset (tn-offset tn)))
     (cond ((> offset 31)
-	   (assert (member :sparc-v9 *backend-subfeatures*))
+	   (aver (member :sparc-v9 *backend-subfeatures*))
 	   ;; No single register encoding greater than reg 31.
-	   (assert (zerop (mod offset 2)))
+	   (aver (zerop (mod offset 2)))
 	   ;; Upper bit of the register number is encoded in the low bit.
 	   (1+ (- offset 32)))
 	  (t
@@ -64,12 +64,12 @@ Otherwise, use the Sparc register names")
 	   (+ (tn-offset loc) 32))
 	  (double-reg
 	   (let ((offset (tn-offset loc)))
-	     (assert (zerop (mod offset 2)))
+	     (aver (zerop (mod offset 2)))
 	     (values (+ offset 32) 2)))
 	  #!+long-float
 	  (long-reg
 	   (let ((offset (tn-offset loc)))
-	     (assert (zerop (mod offset 4)))
+	     (aver (zerop (mod offset 4)))
 	     (values (+ offset 32) 4)))))
        (control-registers
 	96)
@@ -1258,7 +1258,7 @@ about function addresses and register values.")
 
 (defun emit-relative-branch-integer (segment a op2 cond-or-target target &optional (cc :icc) (pred :pt))
   (declare (type integer-condition-register cc))
-  (assert (member :sparc-v9 *backend-subfeatures*))
+  (aver (member :sparc-v9 *backend-subfeatures*))
   (emit-back-patch segment 4
     (lambda (segment posn)
 	(unless target
@@ -1276,7 +1276,7 @@ about function addresses and register values.")
 	    offset)))))
 
 (defun emit-relative-branch-fp (segment a op2 cond-or-target target &optional (cc :fcc0) (pred :pt))
-  (assert (member :sparc-v9 *backend-subfeatures*))
+  (aver (member :sparc-v9 *backend-subfeatures*))
   (emit-back-patch segment 4
     (lambda (segment posn)
 	(unless target
@@ -1391,7 +1391,7 @@ about function addresses and register values.")
 			  (integer-condition cc)
 			  target))
      (t
-      (assert (null cc))
+      (aver (null cc))
       (emit-format-3-immed segment #b10 (branch-condition condition)
 			   #b111010 0 1 target)))))
 
@@ -1438,7 +1438,7 @@ about function addresses and register values.")
       (destructuring-bind (&optional fcc pred) args
 	(emit-relative-branch-fp segment 0 #b101 condition target (or fcc :fcc0) (or pred :pt))))
      (t 
-      (assert (null args))
+      (aver (null args))
       (emit-relative-branch segment 0 #b110 condition target t)))))
 
 (define-instruction fbp (segment condition target &optional fcc pred)

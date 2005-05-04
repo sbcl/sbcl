@@ -27,7 +27,7 @@
     (zero zero-offset)
     (null null-offset)
     (t
-     (assert (eq (sb-name (sc-sb (tn-sc tn))) 'registers))
+     (aver (eq (sb-name (sc-sb (tn-sc tn))) 'registers))
      (tn-offset tn))))
 
 (defun fp-reg-tn-encoding (tn)
