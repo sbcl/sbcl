@@ -1,6 +1,8 @@
 changes in sbcl-0.9.1 relative to sbcl-0.9.0:
   * fixed cross-compiler leakages that prevented building a 32-bit
     target with a 64-bit host compiler.
+  * fixed a bug in CLOSE :ABORT T: no longer attempts to remove files
+    opened with :IF-EXISTS :OVERWRITE
   * compiled code is not steppable if COMPILATION-SPEED >= DEBUG.
   * contrib improvement: implement SB-POSIX:MKSTEMP (Yannick Gingras)
   * optimization: There's now a fast-path for fixnum arguments in the

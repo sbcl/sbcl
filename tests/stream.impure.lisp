@@ -141,6 +141,7 @@
 	   (with-open-file (f test :direction :output)
 	     (write-line "test" f))
 	   (test-mode :append)
+	   (test-mode :overwrite)
 	   ;; FIXME: We really should recover supersede files as well, according to
 	   ;; CLOSE in CLHS, but at the moment we don't.
 	   ;; (test-mode :supersede)

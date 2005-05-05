@@ -1875,7 +1875,7 @@
       (let ((original (case if-exists
 			((:rename :rename-and-delete)
 			 (pick-backup-name namestring))
-			((:append)
+			((:append :overwrite)
 			 ;; KLUDGE: Provent CLOSE from deleting
 			 ;; appending streams when called with :ABORT T
 			 namestring)))
