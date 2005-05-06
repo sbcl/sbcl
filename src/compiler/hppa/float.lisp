@@ -64,8 +64,8 @@
   (:variant-vars size type data)
   (:note "float to pointer coercion")
   (:generator 13
-    (with-fixed-allocation (y ndescr type size))
-    (inst fsts x (- (* data n-word-bytes) other-pointer-lowtag) y)))
+    (with-fixed-allocation (y ndescr type size)
+      (inst fsts x (- (* data n-word-bytes) other-pointer-lowtag) y))))
 
 (macrolet ((frob (name sc &rest args)
 	     `(progn
@@ -211,15 +211,15 @@
   (:note "complex single float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y ndescr complex-single-float-widetag
-			       complex-single-float-size))
-     (let ((real-tn (complex-single-reg-real-tn x)))
-       (inst fsts real-tn (- (* complex-single-float-real-slot n-word-bytes)
-			     other-pointer-lowtag)
-	     y))
-     (let ((imag-tn (complex-single-reg-imag-tn x)))
-       (inst fsts imag-tn (- (* complex-single-float-imag-slot n-word-bytes)
-			     other-pointer-lowtag)
-	     y))))
+			       complex-single-float-size)
+       (let ((real-tn (complex-single-reg-real-tn x)))
+         (inst fsts real-tn (- (* complex-single-float-real-slot n-word-bytes)
+                               other-pointer-lowtag)
+               y))
+       (let ((imag-tn (complex-single-reg-imag-tn x)))
+         (inst fsts imag-tn (- (* complex-single-float-imag-slot n-word-bytes)
+                               other-pointer-lowtag)
+               y)))))
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
 
@@ -230,15 +230,15 @@
   (:note "complex double float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y ndescr complex-double-float-widetag
-			       complex-double-float-size))
-     (let ((real-tn (complex-double-reg-real-tn x)))
-       (inst fsts real-tn (- (* complex-double-float-real-slot n-word-bytes)
-			     other-pointer-lowtag)
-	     y))
-     (let ((imag-tn (complex-double-reg-imag-tn x)))
-       (inst fsts imag-tn (- (* complex-double-float-imag-slot n-word-bytes)
-			     other-pointer-lowtag)
-	     y))))
+			       complex-double-float-size)
+       (let ((real-tn (complex-double-reg-real-tn x)))
+         (inst fsts real-tn (- (* complex-double-float-real-slot n-word-bytes)
+                               other-pointer-lowtag)
+               y))
+       (let ((imag-tn (complex-double-reg-imag-tn x)))
+         (inst fsts imag-tn (- (* complex-double-float-imag-slot n-word-bytes)
+                               other-pointer-lowtag)
+               y)))))
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))
 
