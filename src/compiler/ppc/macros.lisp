@@ -139,6 +139,8 @@
   Result-TN, and Temp-TN is a non-descriptor temp (which may be randomly used
   by the body.)  The body is placed inside the PSEUDO-ATOMIC, and presumably
   initializes the object."
+  (unless body
+    (bug "empty &body in WITH-FIXED-ALLOCATION"))
   (once-only ((result-tn result-tn) (temp-tn temp-tn) (flag-tn flag-tn)
 	      (type-code type-code) (size size))
     `(pseudo-atomic (,flag-tn :extra (pad-data-block ,size))

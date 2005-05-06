@@ -142,12 +142,14 @@
    Result-TN, Flag-Tn must be wired to NL4-OFFSET, and Temp-TN is a non-
    descriptor temp (which may be randomly used by the body.)  The body is
    placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
-  `(pseudo-atomic (,flag-tn :extra (pad-data-block ,size))
-     (inst or ,result-tn alloc-tn other-pointer-lowtag)
-     (inst li ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
-     (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)
-     ,@body))
-
+  (unless body
+    (bug "empty &body in WITH-FIXED-ALLOCATION"))
+  (once-only ((result-tn result-tn) (temp-tn temp-tn) (size size))
+    `(pseudo-atomic (,flag-tn :extra (pad-data-block ,size))
+       (inst or ,result-tn alloc-tn other-pointer-lowtag)
+       (inst li ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
+       (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)
+       ,@body)))
 
 
 ;;;; Three Way Comparison

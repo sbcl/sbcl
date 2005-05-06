@@ -214,14 +214,17 @@
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.
 (defmacro with-fixed-allocation ((result-tn widetag size &optional inline)
-				 &rest forms)
-  `(pseudo-atomic
-    (allocation ,result-tn (pad-data-block ,size) ,inline)
-    (storew (logior (ash (1- ,size) n-widetag-bits) ,widetag)
-	    ,result-tn)
-    (inst lea ,result-tn
-	  (make-ea :qword :base ,result-tn :disp other-pointer-lowtag))
-    ,@forms))
+				 &body forms)
+  (unless forms
+    (bug "empty &body in WITH-FIXED-ALLOCATION"))
+  (once-only ((result-tn result-tn) (size size))
+    `(pseudo-atomic
+      (allocation ,result-tn (pad-data-block ,size) ,inline)
+      (storew (logior (ash (1- ,size) n-widetag-bits) ,widetag)
+	      ,result-tn)
+      (inst lea ,result-tn
+	    (make-ea :qword :base ,result-tn :disp other-pointer-lowtag))
+      ,@forms)))
 
 ;;;; error code
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)

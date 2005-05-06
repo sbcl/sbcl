@@ -129,9 +129,8 @@
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
-    (with-fixed-allocation
-	(result pa-flag temp value-cell-header-widetag value-cell-size))
-    (storew value result value-cell-value-slot other-pointer-lowtag)))
+    (with-fixed-allocation (result pa-flag temp value-cell-header-widetag value-cell-size)
+      (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 
 ;;;; Automatic allocators for primitive objects.
