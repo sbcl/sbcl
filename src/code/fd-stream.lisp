@@ -489,15 +489,15 @@
 					   :end end))))
 	  (if (and (typep thing 'base-string)
 		   (eq (fd-stream-external-format stream) :latin-1))
-	  (ecase (fd-stream-buffering stream)
-	    (:full
-	     (output-raw-bytes stream thing start end))
-	    (:line
-	     (output-raw-bytes stream thing start end)
-	     (when last-newline
-	       (flush-output-buffer stream)))
-	    (:none
-	     (frob-output stream thing start end nil)))
+              (ecase (fd-stream-buffering stream)
+                (:full
+                 (output-raw-bytes stream thing start end))
+                (:line
+                 (output-raw-bytes stream thing start end)
+                 (when last-newline
+                   (flush-output-buffer stream)))
+                (:none
+                 (frob-output stream thing start end nil)))
 	      (ecase (fd-stream-buffering stream)
 		(:full (funcall (fd-stream-output-bytes stream)
 				stream thing nil start end))
@@ -606,10 +606,10 @@
 ;;; per element.
 (defvar *input-routines* ())
 
-;;; Fill the input buffer, and return the first character. Throw to
-;;; EOF-INPUT-CATCHER if the eof was reached. Drop into SYSTEM:SERVER
-;;; if necessary.
-(defun frob-input (stream)
+;;; Fill the input buffer, and return the number of bytes read. Throw
+;;; to EOF-INPUT-CATCHER if the eof was reached. Drop into
+;;; SYSTEM:SERVER if necessary.
+(defun refill-buffer/fd (stream)
   (let ((fd (fd-stream-fd stream))
 	(ibuf-sap (fd-stream-ibuf-sap stream))
 	(buflen (fd-stream-ibuf-length stream))
@@ -666,17 +666,18 @@
 		   (unless (sb!sys:wait-until-fd-usable
 			    fd :input (fd-stream-timeout stream))
 		     (error 'io-timeout :stream stream :direction :read))
-		   (frob-input stream))
+		   (refill-buffer/fd stream))
 		 (simple-stream-perror "couldn't read from ~S" stream errno)))
 	    ((zerop count)
 	     (setf (fd-stream-listen stream) :eof)
 	     (/show0 "THROWing EOF-INPUT-CATCHER")
 	     (throw 'eof-input-catcher nil))
 	    (t
-	     (incf (fd-stream-ibuf-tail stream) count))))))
+	     (incf (fd-stream-ibuf-tail stream) count)
+             count)))))
 			
 ;;; Make sure there are at least BYTES number of bytes in the input
-;;; buffer. Keep calling FROB-INPUT until that condition is met.
+;;; buffer. Keep calling REFILL-BUFFER/FD until that condition is met.
 (defmacro input-at-least (stream bytes)
   (let ((stream-var (gensym))
 	(bytes-var (gensym)))
@@ -687,7 +688,7 @@
 		      (fd-stream-ibuf-head ,stream-var))
 		   ,bytes-var)
 	   (return))
-	 (frob-input ,stream-var)))))
+	 (refill-buffer/fd ,stream-var)))))
 
 (defmacro input-wrapper/variable-width ((stream bytes eof-error eof-value)
 					&body read-forms)
@@ -935,38 +936,13 @@
 	     (= total-copied requested)
 	     (return total-copied))
 	    (;; If EOF, we're done in another way.
-	     (zerop (refill-fd-stream-buffer stream))
+             (null (catch 'eof-input-catcher (refill-buffer/fd stream)))
 	     (if eof-error-p
 		 (error 'end-of-file :stream stream)
 		 (return total-copied)))
 	    ;; Otherwise we refilled the stream buffer, so fall
 	    ;; through into another pass of the loop.
 	    ))))
-
-;;; Try to refill the stream buffer. Return the number of bytes read.
-;;; (For EOF, the return value will be zero, otherwise positive.)
-(defun refill-fd-stream-buffer (stream)
-  ;; We don't have any logic to preserve leftover bytes in the buffer,
-  ;; so we should only be called when the buffer is empty.
-  ;; FIXME: can have three bytes in buffer because of UTF-8
-  (let ((new-head 0)
-        (sap (fd-stream-ibuf-sap stream)))
-    (do ((head (fd-stream-ibuf-head stream) (1+ head))
-         (tail (fd-stream-ibuf-tail stream)))
-        ((= head tail))
-      (setf (sap-ref-8 sap new-head) (sap-ref-8 sap head))
-      (incf new-head))
-    (multiple-value-bind (count err)
-        (sb!unix:unix-read (fd-stream-fd stream)
-                           (sap+ sap new-head)
-                           (- (fd-stream-ibuf-length stream) new-head))
-      (declare (type (or index null) count))
-      (when (null count)
-        (simple-stream-perror "couldn't read from ~S" stream err))
-      (setf (fd-stream-listen stream) nil
-            (fd-stream-ibuf-head stream) 0
-            (fd-stream-ibuf-tail stream) (+ count new-head))
-      count)))
 
 (defun fd-stream-resync (stream)
   (dolist (entry *external-formats*)
@@ -1057,7 +1033,7 @@
 		   (= total-copied requested)
 		   (return total-copied))
 		  ( ;; If EOF, we're done in another way.
-		   (zerop (refill-fd-stream-buffer stream))
+                   (null (catch 'eof-input-catcher (refill-buffer/fd stream)))
 		   (if eof-error-p
 		       (error 'end-of-file :stream stream)
 		       (return total-copied)))
@@ -1182,7 +1158,8 @@
 		   (return total-copied))
 		  ( ;; If EOF, we're done in another way.
 		   (or (eq decode-break-reason 'eof)
-		       (zerop (refill-fd-stream-buffer stream)))
+                       (null (catch 'eof-input-catcher 
+                               (refill-buffer/fd stream))))
 		   (if eof-error-p
 		       (error 'end-of-file :stream stream)
 		       (return total-copied)))
@@ -1585,7 +1562,7 @@
 						 0
 						 0))))
 	  (cond ((eql count 1)
-		 (frob-input fd-stream)
+		 (refill-buffer/fd fd-stream)
 		 (setf (fd-stream-ibuf-head fd-stream) 0)
 		 (setf (fd-stream-ibuf-tail fd-stream) 0))
 		(t
