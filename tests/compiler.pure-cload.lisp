@@ -157,3 +157,8 @@
                  (funcall test-pred func func)
                  (delete func (list func))))))
   (assert (equal '(t t nil) (funcall (eval #'test-case) #'eq 3))))
+
+;;; compiler failure reported by Alan Shields:
+;;; MAYBE-INFER-ITERATION-VAR-TYPE did not deal with types (REAL * (n)).
+(let ((s (loop for x from (- pi) below (floor (* 2 pi)) by (/ pi 75) count t)))
+  (assert (= s 219)))
