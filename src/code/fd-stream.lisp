@@ -1348,16 +1348,16 @@
 				       (function c-string int))
 			 sb!unix:codeset)
 			"LATIN-1")
-		    "KEYWORD")))
-    (dolist (entry *external-formats*
-             (restart-case
-                 (error "Invalid external-format ~A" 
-                        (fd-stream-external-format fd-stream))
-               (use-default ()
-                 :report "Set external format to LATIN-1"
-                 (setf (fd-stream-external-format fd-stream) :latin-1))))
-      (when (member (fd-stream-external-format fd-stream) (first entry))
-	(return)))
+		    "KEYWORD"))
+      (dolist (entry *external-formats*
+		     (restart-case
+		      (error "Invalid external-format ~A" 
+			     (fd-stream-external-format fd-stream))
+		      (use-default ()
+				   :report "Set external format to LATIN-1"
+				   (setf (fd-stream-external-format fd-stream) :latin-1))))
+	(when (member (fd-stream-external-format fd-stream) (first entry))
+	  (return))))
 
     (when input-p
       (multiple-value-bind (routine type size read-n-characters
