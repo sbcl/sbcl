@@ -15,6 +15,9 @@
 
 echo //entering make-target-1.sh
 
+LANG=C
+export LANG
+
 # Build the runtime system and symbol table (.nm) file.
 #
 # (This C build has to come after the first genesis in order to get

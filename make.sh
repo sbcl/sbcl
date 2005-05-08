@@ -52,6 +52,9 @@
 # whether the cross-compilation host returns suitable values from 
 # UPGRADED-ARRAY-ELEMENT-TYPE?)
 
+LANG=C
+export LANG
+
 build_started=`date`
 echo "//starting build: $build_started"
 

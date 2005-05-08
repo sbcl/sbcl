@@ -15,6 +15,9 @@
 
 echo //entering make-host-2.sh
 
+LANG=C
+export LANG
+
 # In some cases, a debugging build of the system will creates a core
 # file output/after-xc.core in the next step. In cases where it
 # doesn't, it's confusing and basically useless to have any old copies

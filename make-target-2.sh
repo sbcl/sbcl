@@ -15,6 +15,9 @@
 
 echo //entering make-target-2.sh
 
+LANG=C
+export LANG
+
 # Do warm init stuff, e.g. building and loading CLOS, and stuff which
 # can't be done until CLOS is running.
 #

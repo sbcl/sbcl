@@ -15,6 +15,9 @@
 
 echo //entering make-host-1.sh
 
+LANG=C
+export LANG
+
 # Compile and load the cross-compiler. (We load it here not because we're
 # about to use it, but because it's written under the assumption that each
 # file will be loaded before the following file is compiled.)

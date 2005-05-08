@@ -13,6 +13,9 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+LANG=C
+export LANG
+
 . ./find-gnumake.sh
 find_gnumake
 
