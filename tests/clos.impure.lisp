@@ -1051,5 +1051,17 @@
   (1+ x))
 (assert (= (method-on-defined-type-and-class 3) 4))
 
+;; bug 281
+(let ((sb-pcl::*max-emf-precomputation-methods* 0))
+  (eval '(defgeneric bug-281 (x)
+	  (:method-combination +)
+	  (:method ((x symbol)) 1)
+	  (:method + ((x number)) x)))
+  (assert (= 1 (bug-281 1)))
+  (assert (= 4.2 (bug-281 4.2)))
+  (multiple-value-bind (val err) (ignore-errors (bug-281 'symbol))
+    (assert (not val))
+    (assert (typep err 'error))))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

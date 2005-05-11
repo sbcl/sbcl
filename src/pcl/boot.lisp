@@ -1641,13 +1641,6 @@ bootstrapping.
 (defun arg-info-nkeys (arg-info)
   (count-if (lambda (x) (neq x t)) (arg-info-metatypes arg-info)))
 
-;;; Keep pages clean by not setting if the value is already the same.
-(defmacro esetf (pos val)
-  (with-unique-names (valsym)
-    `(let ((,valsym ,val))
-       (unless (equal ,pos ,valsym)
-	 (setf ,pos ,valsym)))))
-
 (defun create-gf-lambda-list (lambda-list)
   ;;; Create a gf lambda list from a method lambda list
   (loop for x in lambda-list
@@ -1681,22 +1674,21 @@ bootstrapping.
 	      (error "The lambda-list ~S is incompatible with ~
 		     existing methods of ~S."
 		     lambda-list gf))))
-        (esetf (arg-info-lambda-list arg-info)
-               (if lambda-list-p
-                   lambda-list
+        (setf (arg-info-lambda-list arg-info)
+	      (if lambda-list-p
+		  lambda-list
                    (create-gf-lambda-list lambda-list)))
 	(when (or lambda-list-p argument-precedence-order
 		  (null (arg-info-precedence arg-info)))
-	  (esetf (arg-info-precedence arg-info)
-		 (compute-precedence lambda-list nreq
-				     argument-precedence-order)))
-	(esetf (arg-info-metatypes arg-info) (make-list nreq))
-	(esetf (arg-info-number-optional arg-info) nopt)
-	(esetf (arg-info-key/rest-p arg-info) (not (null (or keysp restp))))
-	(esetf (arg-info-keys arg-info)
-	       (if lambda-list-p
-		   (if allow-other-keys-p t keywords)
-		   (arg-info-key/rest-p arg-info)))))
+	  (setf (arg-info-precedence arg-info)
+		(compute-precedence lambda-list nreq argument-precedence-order)))
+	(setf (arg-info-metatypes arg-info) (make-list nreq))
+	(setf (arg-info-number-optional arg-info) nopt)
+	(setf (arg-info-key/rest-p arg-info) (not (null (or keysp restp))))
+	(setf (arg-info-keys arg-info)
+	      (if lambda-list-p
+		  (if allow-other-keys-p t keywords)
+		  (arg-info-key/rest-p arg-info)))))
     (when new-method
       (check-method-arg-info gf arg-info new-method))
     (set-arg-info1 gf arg-info new-method methods was-valid-p first-p)
@@ -1771,52 +1763,52 @@ bootstrapping.
 	  (setq type (cond ((null type) new-type)
 			   ((eq type new-type) type)
 			   (t nil)))))
-      (esetf (arg-info-metatypes arg-info) metatypes)
-      (esetf (gf-info-simple-accessor-type arg-info) type)))
+      (setf (arg-info-metatypes arg-info) metatypes)
+      (setf (gf-info-simple-accessor-type arg-info) type)))
   (when (or (not was-valid-p) first-p)
     (multiple-value-bind (c-a-m-emf std-p)
 	(if (early-gf-p gf)
 	    (values t t)
 	    (compute-applicable-methods-emf gf))
-      (esetf (gf-info-static-c-a-m-emf arg-info) c-a-m-emf)
-      (esetf (gf-info-c-a-m-emf-std-p arg-info) std-p)
+      (setf (gf-info-static-c-a-m-emf arg-info) c-a-m-emf)
+      (setf (gf-info-c-a-m-emf-std-p arg-info) std-p)
       (unless (gf-info-c-a-m-emf-std-p arg-info)
-	(esetf (gf-info-simple-accessor-type arg-info) t))))
+	(setf (gf-info-simple-accessor-type arg-info) t))))
   (unless was-valid-p
     (let ((name (if (eq *boot-state* 'complete)
 		    (generic-function-name gf)
 		    (!early-gf-name gf))))
-      (esetf (gf-precompute-dfun-and-emf-p arg-info)
-	     (cond
-	       ((and (consp name)
-		     (member (car name)
-			     *internal-pcl-generalized-fun-name-symbols*))
+      (setf (gf-precompute-dfun-and-emf-p arg-info)
+	    (cond
+	      ((and (consp name)
+		    (member (car name)
+			    *internal-pcl-generalized-fun-name-symbols*))
 		nil)
-	       (t (let* ((symbol (fun-name-block-name name))
-			 (package (symbol-package symbol)))
-		    (and (or (eq package *pcl-package*)
-			     (memq package (package-use-list *pcl-package*)))
-			 ;; FIXME: this test will eventually be
-			 ;; superseded by the *internal-pcl...* test,
-			 ;; above.  While we are in a process of
-			 ;; transition, however, it should probably
-			 ;; remain.
-			 (not (find #\Space (symbol-name symbol))))))))))
-  (esetf (gf-info-fast-mf-p arg-info)
-	 (or (not (eq *boot-state* 'complete))
-	     (let* ((method-class (generic-function-method-class gf))
-		    (methods (compute-applicable-methods
-			      #'make-method-lambda
-			      (list gf (class-prototype method-class)
-				    '(lambda) nil))))
-	       (and methods (null (cdr methods))
-		    (let ((specls (method-specializers (car methods))))
-		      (and (classp (car specls))
-			   (eq 'standard-generic-function
-			       (class-name (car specls)))
-			   (classp (cadr specls))
-			   (eq 'standard-method
-			       (class-name (cadr specls)))))))))
+	      (t (let* ((symbol (fun-name-block-name name))
+			(package (symbol-package symbol)))
+		   (and (or (eq package *pcl-package*)
+			    (memq package (package-use-list *pcl-package*)))
+			;; FIXME: this test will eventually be
+			;; superseded by the *internal-pcl...* test,
+			;; above.  While we are in a process of
+			;; transition, however, it should probably
+			;; remain.
+			(not (find #\Space (symbol-name symbol))))))))))
+  (setf (gf-info-fast-mf-p arg-info)
+	(or (not (eq *boot-state* 'complete))
+	    (let* ((method-class (generic-function-method-class gf))
+		   (methods (compute-applicable-methods
+			     #'make-method-lambda
+			     (list gf (class-prototype method-class)
+				   '(lambda) nil))))
+	      (and methods (null (cdr methods))
+		   (let ((specls (method-specializers (car methods))))
+		     (and (classp (car specls))
+			  (eq 'standard-generic-function
+			      (class-name (car specls)))
+			  (classp (cadr specls))
+			  (eq 'standard-method
+			      (class-name (cadr specls)))))))))
   arg-info)
 
 ;;; This is the early definition of ENSURE-GENERIC-FUNCTION-USING-CLASS.

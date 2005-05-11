@@ -133,10 +133,8 @@
 	(around ())
 	(primary ()))
     (flet ((invalid (gf combin m)
-	     (if *in-precompute-effective-methods-p*
-		 (return-from compute-effective-method
-		   `(%invalid-qualifiers ',gf ',combin ',m))
-		 (invalid-qualifiers gf combin m))))
+	     (return-from compute-effective-method
+	       `(%invalid-qualifiers ',gf ',combin ',m))))
       (dolist (m applicable-methods)
 	(let ((qualifiers (method-qualifiers m)))
 	  (cond ((null qualifiers) (invalid generic-function combin m))

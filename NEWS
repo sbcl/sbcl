@@ -3,6 +3,8 @@ changes in sbcl-0.9.1 relative to sbcl-0.9.0:
     target with a 64-bit host compiler.
   * fixed a bug in CLOSE :ABORT T: no longer attempts to remove files
     opened with :IF-EXISTS :OVERWRITE.
+  * fixed bug 281: error for an invalid qualifier in a short-form method
+    combination method is not signalled until the faulty method is called.
   * bug fix: iteration variable type inferrer failed to deal with open
     intervals. (reported by Alan Shields)
   * compiled code is not steppable if COMPILATION-SPEED >= DEBUG.

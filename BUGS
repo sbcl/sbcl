@@ -919,24 +919,6 @@ WORKAROUND:
 
  (see also bug 117)
 
-281: COMPUTE-EFFECTIVE-METHOD error signalling.
-  (slightly obscured by a non-0 default value for
-   SB-PCL::*MAX-EMF-PRECOMPUTE-METHODS*)
-  It would be natural for COMPUTE-EFFECTIVE-METHOD to signal errors
-  when it finds a method with invalid qualifiers.  However, it
-  shouldn't signal errors when any such methods are not applicable to
-  the particular call being evaluated, and certainly it shouldn't when
-  simply precomputing effective methods that may never be called.
-  (setf sb-pcl::*max-emf-precompute-methods* 0)
-  (defgeneric foo (x)
-    (:method-combination +)
-    (:method ((x symbol)) 1)
-    (:method + ((x number)) x))
-  (foo 1) -> ERROR, but should simply return 1
-
-  The issue seems to be that construction of a discriminating function
-  calls COMPUTE-EFFECTIVE-METHOD with methods that are not all applicable.
-
 283: Thread safety: libc functions
   There are places that we call unsafe-for-threading libc functions
   that we should find alternatives for, or put locks around.  Known or
