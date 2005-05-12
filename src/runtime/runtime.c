@@ -183,6 +183,7 @@ main(int argc, char *argv[], char *envp[])
     /* the name of the core file we're to execute. Note that this is
      * a malloc'ed string which should be freed eventually. */
     char *core = 0;
+    char **sbcl_argv = 0;
 
     /* other command line options */
     boolean noinform = 0;
@@ -248,6 +249,10 @@ main(int argc, char *argv[], char *envp[])
 	{
 	    char *argi0 = argv[argi];
 	    int argj = 1;
+	    /* (argc - argi) for the arguments, one for the binary,
+	       and one for the terminating NULL. */
+	    sbcl_argv = successful_malloc((2 + argc - argi) * sizeof(char *));
+	    sbcl_argv[0] = argv[0];
 	    while (argi < argc) {
 		char *arg = argv[argi++];
 		/* If we encounter --end-runtime-options for the first
@@ -259,10 +264,9 @@ main(int argc, char *argv[], char *envp[])
 		    0 == strcmp(arg, "--end-runtime-options")) {
 		    lose("bad runtime option \"%s\"", argi0);
 		}
-		argv[argj++] = arg;
+		sbcl_argv[argj++] = arg;
 	    }
-	    argv[argj] = 0;
-	    argc = argj;
+	    sbcl_argv[argj] = 0;
 	}
     }
 
@@ -330,7 +334,8 @@ main(int argc, char *argv[], char *envp[])
 
     /* Convert remaining argv values to something that Lisp can grok. */
     SHOW("setting POSIX-ARGV symbol value");
-    SetSymbolValue(POSIX_ARGV, alloc_base_string_list(argv),0);
+    SetSymbolValue(POSIX_ARGV, alloc_base_string_list(sbcl_argv),0);
+    free(sbcl_argv);
 
     /* Install a handler to pick off SIGINT until the Lisp system gets
      * far enough along to install its own handler. */
