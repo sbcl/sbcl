@@ -622,7 +622,7 @@
   (values))
 
 (defun reset-cmd ()
-  (invoke-restart-interactively (find-restart 'sb-impl::toplevel)))
+  (throw 'sb-impl::toplevel-catcher nil))
 
 (defun dirs-cmd ()
   (dolist (dir *dir-stack*)
