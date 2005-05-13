@@ -26,6 +26,7 @@
 			  (:temp vector descriptor-reg a3-offset))
   (pseudo-atomic ()
     (inst or vector alloc-tn other-pointer-lowtag)
+    ;; boxed words == unboxed bytes
     (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
     (inst andn ndescr 7)
     (inst add alloc-tn ndescr)

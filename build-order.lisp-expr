@@ -635,6 +635,7 @@
  ("src/code/save"              :not-host) ; uses the definition of PATHNAME
                                           ;   from "code/pathname"
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
+ ("src/code/alloc"             :not-host)
 
  #!+sb-thread
  ("src/code/target-thread"     :not-host)

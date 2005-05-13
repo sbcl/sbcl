@@ -790,10 +790,10 @@ retained, possibly temporariliy, because it might be used internally."
 	       ;; error-reporting facilities
 	       "ENCAPSULATED-CONDITION" "COMPILED-PROGRAM-ERROR"
 	       "SIMPLE-CONTROL-ERROR" "SIMPLE-FILE-ERROR"
-	       "SIMPLE-PARSE-ERROR"
-	       "SIMPLE-PROGRAM-ERROR" "SIMPLE-STREAM-ERROR"
-
+	       "SIMPLE-PARSE-ERROR" "SIMPLE-PROGRAM-ERROR" 
+	       "SIMPLE-STREAM-ERROR" "SIMPLE-STORAGE-CONDITION"
 	       "SIMPLE-STYLE-WARNING"
+
 	       "SPECIAL-FORM-FUNCTION"
 	       "STYLE-WARN" "SIMPLE-COMPILER-NOTE"
 
@@ -966,6 +966,9 @@ retained, possibly temporariliy, because it might be used internally."
 	       ;; need it:
 	       "*EOF-OBJECT*"
 
+	       ;; allocation to static space
+	       "MAKE-STATIC-VECTOR"
+
 	       ;; alien interface utilities
 	       "C-STRINGS->STRING-LIST"
 
@@ -1131,7 +1134,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "WORD-LOGICAL-OR" "WORD-LOGICAL-ORC1" "WORD-LOGICAL-ORC2"
                "WORD-LOGICAL-XOR" "ALIEN-TYPE-TYPE"
                "ALIEN-TYPE-TYPE-ALIEN-TYPE" "ALIEN-TYPE-TYPE-P"
-               "ALLOCATE-VECTOR" "ASSERT-SYMBOL-HOME-PACKAGE-UNLOCKED"
+               "ALLOCATE-VECTOR" "ALLOCATE-STATIC-VECTOR"
+	       "ASSERT-SYMBOL-HOME-PACKAGE-UNLOCKED"
                "COMPILER-ASSERT-SYMBOL-HOME-PACKAGE-UNLOCKED"
                "DISABLED-PACKAGE-LOCKS"
                "WITH-SINGLE-PACKAGE-LOCKED-ERROR"

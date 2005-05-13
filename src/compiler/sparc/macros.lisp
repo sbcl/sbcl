@@ -21,11 +21,11 @@
        (inst move ,n-dst ,n-src))))
 
 (macrolet
-    ((frob (op inst shift)
+    ((def (op inst shift)
        `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
 	  `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag)))))
-  (frob loadw ld word-shift)
-  (frob storew st word-shift))
+  (def loadw ld word-shift)
+  (def storew st word-shift))
 
 (defmacro load-symbol (reg symbol)
   `(inst add ,reg null-tn (static-symbol-offset ,symbol)))

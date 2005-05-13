@@ -23,7 +23,7 @@
 (declaim (type index *gc-inhibit*))
 (defvar *gc-inhibit*) ; initialized in cold init
 
-(defmacro without-gcing (&rest body)
+(defmacro without-gcing (&body body)
   #!+sb-doc
   "Executes the forms in the body without doing a garbage collection."
   `(unwind-protect

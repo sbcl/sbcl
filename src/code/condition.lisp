@@ -775,6 +775,8 @@
               <http://sbcl.sourceforge.net/>.~:@>"
 	     '((fmakunbound 'compile))))))
 
+(define-condition simple-storage-condition (storage-condition simple-condition) ())
+
 ;;; a condition for use in stubs for operations which aren't supported
 ;;; on some platforms
 ;;;

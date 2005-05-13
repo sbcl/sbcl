@@ -21,11 +21,11 @@
        (inst mr ,n-dst ,n-src))))
 
 (macrolet
-    ((frob (op inst shift)
+    ((def (op inst shift)
        `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
 	  `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag)))))
-  (frob loadw lwz word-shift)
-  (frob storew stw word-shift))
+  (def loadw lwz word-shift)
+  (def storew stw word-shift))
 
 (defmacro load-symbol (reg symbol)
   `(inst addi ,reg null-tn (static-symbol-offset ,symbol)))
@@ -218,7 +218,7 @@
 ;;; aligns ALLOC-TN again and (b) makes ALLOC-TN go negative. We then
 ;;; trap if ALLOC-TN's negative (handling the deferred interrupt) and
 ;;; using FLAG-TN - minus the large constant - to correct ALLOC-TN.
-(defmacro pseudo-atomic ((flag-tn &key (extra 0)) &rest forms)
+(defmacro pseudo-atomic ((flag-tn &key (extra 0)) &body forms)
   (let ((n-extra (gensym)))
     `(let ((,n-extra ,extra))
        (without-scheduling ()

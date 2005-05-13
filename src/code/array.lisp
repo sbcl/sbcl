@@ -160,7 +160,7 @@
 			 type
 			 length
 			 (ceiling
-                          (* (if (or (= type sb!vm:simple-base-string-widetag)
+			  (* (if (or (= type sb!vm:simple-base-string-widetag)
                                      #!+sb-unicode
                                      (= type
                                         sb!vm:simple-character-string-widetag))
@@ -234,6 +234,51 @@
 	      (setf (%array-dimension array axis) dim)
 	      (incf axis)))
 	  array))))
+
+(defun make-static-vector (length &key 
+			   (element-type '(unsigned-byte 8))
+			   (initial-contents nil initial-contents-p)
+			   (initial-element nil initial-element-p))
+  "Allocate vector of LENGTH elements in static space. Only allocation
+of specialized arrays is supported."
+  ;; STEP 1: check inputs fully
+  ;;
+  ;; This way of doing explicit checks before the vector is allocated
+  ;; is expensive, but probably worth the trouble as once we've allocated
+  ;; the vector we have no way to get rid of it anymore... 
+  (when (eq t (upgraded-array-element-type element-type))
+    (error "Static arrays of type ~S not supported." 
+	   element-type))
+  (when initial-contents-p
+    (when initial-element-p
+      (error "can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
+    (unless (= length (length initial-contents))
+      (error "There are ~W elements in the :INITIAL-CONTENTS, but the ~
+              vector length is ~W."
+	     (length initial-contents)
+	     length))
+    (unless (every (lambda (x) (typep x element-type)) initial-contents)
+      (error ":INITIAL-CONTENTS contains elements not of type ~S."
+	     element-type)))
+  (when initial-element-p
+    (unless (typep initial-element element-type)
+      (error ":INITIAL-ELEMENT ~S is not of type ~S." 
+	     initial-element element-type)))
+  ;; STEP 2
+  ;;
+  ;; Allocate and possibly initialize the vector.
+  (multiple-value-bind (type n-bits)
+      (sb!impl::%vector-widetag-and-n-bits element-type)
+    (let ((vector 
+	   (allocate-static-vector type length
+				   (ceiling (* length n-bits) 
+					    sb!vm:n-word-bits))))
+      (cond (initial-element-p
+	     (fill vector initial-element))
+	    (initial-contents-p
+	     (replace vector initial-contents))
+	    (t
+	     vector)))))
 
 ;;; DATA-VECTOR-FROM-INITS returns a simple vector that has the
 ;;; specified array characteristics. Dimensions is only used to pass
