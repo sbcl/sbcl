@@ -135,10 +135,9 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
-    (with-fixed-allocation
-	(result temp value-cell-header-widetag value-cell-size))
-    (storew value result value-cell-value-slot other-pointer-lowtag)))
-
+    (with-fixed-allocation 
+        (result temp value-cell-header-widetag value-cell-size)
+      (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 
 ;;;; Automatic allocators for primitive objects.

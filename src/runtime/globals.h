@@ -9,88 +9,89 @@
  * files for more information.
  */
 
-#if !defined(_INCLUDE_GLOBALS_H_)
+#ifndef _INCLUDED_GLOBALS_H_
 #define _INCLUDED_GLOBALS_H_
 
 #ifndef LANGUAGE_ASSEMBLY
+# include <sys/types.h>
+# include <unistd.h>
+# include "runtime.h"
+#endif
 
-#include <sys/types.h>
-#include <unistd.h>
 #include "sbcl.h"
-#include "runtime.h"
 
+#ifndef LANGUAGE_ASSEMBLY
 extern int foreign_function_call_active;
 extern boolean stop_the_world;
 
 extern lispobj *current_control_stack_pointer;
 extern lispobj *current_control_frame_pointer;
-#if !defined(LISP_FEATURE_X86)
+# if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
 extern lispobj *current_binding_stack_pointer;
-#endif
+# endif
 
-#if !defined(LISP_FEATURE_X86)
-/* FIXME: Why doesn't the x86 need this? */
+# ifndef LISP_FEATURE_GENCGC
+/* Beware! gencgc has also a (non-global) dynamic_space_free_pointer. */
 extern lispobj *dynamic_space_free_pointer;
 extern lispobj *current_auto_gc_trigger;
-#endif
+# endif
 
 extern lispobj *current_dynamic_space;
-extern boolean stop_the_world;
 
 extern void globals_init(void);
 
 #else /* LANGUAGE_ASSEMBLY */
 
-#ifdef LISP_FEATURE_MIPS
-#ifdef __linux__
-#define EXTERN(name,bytes) .globl name 
-#else
-#define EXTERN(name,bytes) .extern name bytes
-#endif
-#endif
+# ifdef LISP_FEATURE_MIPS
+#  ifdef __linux__
+#   define EXTERN(name,bytes) .globl name 
+#  else
+#   define EXTERN(name,bytes) .extern name bytes
+#  endif
+# endif
 /**/
-#ifdef LISP_FEATURE_SPARC
-#ifdef SVR4
-#define EXTERN(name,bytes) .global name
-#else
-#define EXTERN(name,bytes) .global _ ## name
-#endif
-#endif
+# ifdef LISP_FEATURE_SPARC
+#  ifdef SVR4
+#   define EXTERN(name,bytes) .global name
+#  else
+#   define EXTERN(name,bytes) .global _ ## name
+#  endif
+# endif
 /**/
-#ifdef LISP_FEATURE_ALPHA
-#ifdef __linux__
-#define EXTERN(name,bytes) .globl name 
-#endif
-#endif
-#ifdef LISP_FEATURE_PPC
-#ifdef LISP_FEATURE_DARWIN
-#define EXTERN(name,bytes) .globl _/**/name
-#else
-#define EXTERN(name,bytes) .globl name 
-#endif
-#endif
-#ifdef LISP_FEATURE_X86
-#ifdef __linux__
-/* I'm very dubious about this.  Linux hasn't used _ on external names
- * since ELF became prevalent - i.e. about 1996, on x86    -dan 20010125 */
-#define EXTERN(name,bytes) .globl _/**/name
-#else
-#define EXTERN(name,bytes) .global _ ## name
-#endif
-#endif
+# ifdef LISP_FEATURE_ALPHA
+#  ifdef __linux__
+#   define EXTERN(name,bytes) .globl name 
+#  endif
+# endif
+/**/
+# ifdef LISP_FEATURE_PPC
+#  ifdef LISP_FEATURE_DARWIN
+#   define EXTERN(name,bytes) .globl _/**/name
+#  else
+#   define EXTERN(name,bytes) .globl name 
+#  endif
+# endif
+/**/
+# if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#  define EXTERN(name,bytes) .global name
+# endif
 
-/* FIXME : these sizes are, incidentally, bogus on Alpha.  But the
- * EXTERN macro doesn't use its second arg anyway, so no immediate harm
- * done   -dan 2002.05.07
- */
+# if defined(LISP_FEATURE_ALPHA) || defined(LISP_FEATURE_X86_64)
+#  define POINTERSIZE 8
+# else
+#  define POINTERSIZE 4
+# endif
 
 EXTERN(foreign_function_call_active, 4)
 
-EXTERN(current_control_stack_pointer, 4)
-EXTERN(current_control_frame_pointer, 4)
-EXTERN(current_binding_stack_pointer, 4)
-EXTERN(dynamic_space_free_pointer, 4)
-EXTERN(current_dynamic_space, 4)
+EXTERN(current_control_stack_pointer, POINTERSIZE)
+EXTERN(current_control_frame_pointer, POINTERSIZE)
+# if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+EXTERN(current_binding_stack_pointer, POINTERSIZE)
+# endif
+# ifndef LISP_FEATURE_GENCGC
+EXTERN(dynamic_space_free_pointer, POINTERSIZE)
+# endif
 
 #endif /* LANGUAGE_ASSEMBLY */
 
