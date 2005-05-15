@@ -268,6 +268,7 @@ SB-SYS:MAKE-FD-STREAM."))
       (setf stream (apply #'sb-sys:make-fd-stream
 			  (socket-file-descriptor socket)
 			  :name "a constant string"
+			  :dual-channel-p t
 			  args))
       (setf (slot-value socket 'stream) stream)
       (sb-ext:cancel-finalization socket))

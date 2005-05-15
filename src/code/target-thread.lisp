@@ -392,13 +392,13 @@ interactive."
     (labels ((thread-repl () 
 	       (sb!unix::unix-setsid)
 	       (let* ((sb!impl::*stdin* 
-		       (sb!sys:make-fd-stream in :input t :buffering :line))
+		       (sb!sys:make-fd-stream in :input t :buffering :line :dual-channel-p t))
 		      (sb!impl::*stdout* 
-		       (sb!sys:make-fd-stream out :output t :buffering :line))
+		       (sb!sys:make-fd-stream out :output t :buffering :line :dual-channel-p t))
 		      (sb!impl::*stderr* 
-		       (sb!sys:make-fd-stream err :output t :buffering :line))
+		       (sb!sys:make-fd-stream err :output t :buffering :line :dual-channel-p t))
 		      (sb!impl::*tty* 
-		       (sb!sys:make-fd-stream err :input t :output t :buffering :line))
+		       (sb!sys:make-fd-stream err :input t :output t :buffering :line :dual-channel-p t))
 		      (sb!impl::*descriptor-handlers* nil))
 		 (with-new-session ()
 		   (sb!sys:enable-interrupt sb!unix:sigint #'sb!unix::sigint-handler)

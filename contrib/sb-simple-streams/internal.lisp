@@ -638,6 +638,7 @@
                                   :original original
                                   :delete-original delete-original
                                   :pathname pathname
+				  :dual-channel-p nil
                                   :input-buffer-p t
                                   :auto-close t))
           (:probe

@@ -57,6 +57,11 @@
   (fd -1 :type fixnum)	      
   ;; controls when the output buffer is flushed
   (buffering :full :type (member :full :line :none))
+  ;; controls whether the input buffer must be cleared before output
+  ;; (must be done for files, not for sockets, pipes and other data
+  ;; sources where input and output aren't related).  non-NIL means
+  ;; don't clear input buffer.
+  (dual-channel-p nil)
   ;; character position (if known)
   (char-pos nil :type (or index null))
   ;; T if input is waiting on FD. :EOF if we hit EOF.
@@ -244,8 +249,9 @@
 		       size))
             (flush-output-buffer ,stream-var)))
       ,(unless (eq (car buffering) :none)
-	 `(when (> (fd-stream-ibuf-tail ,stream-var)
-		   (fd-stream-ibuf-head ,stream-var))
+	 `(when (and (not (fd-stream-dual-channel-p ,stream-var))
+		     (> (fd-stream-ibuf-tail ,stream-var)
+			(fd-stream-ibuf-head ,stream-var)))
             (file-position ,stream-var (file-position ,stream-var))))
       ,(if restart
            `(catch 'output-nothing
@@ -272,8 +278,9 @@
 		       ,size))
             (flush-output-buffer ,stream-var)))
       ,(unless (eq (car buffering) :none)
-	 `(when (> (fd-stream-ibuf-tail ,stream-var)
-		   (fd-stream-ibuf-head ,stream-var))
+	 `(when (and (not (fd-stream-dual-channel-p ,stream-var))
+		     (> (fd-stream-ibuf-tail ,stream-var)
+			(fd-stream-ibuf-head ,stream-var)))
             (file-position ,stream-var (file-position ,stream-var))))
       ,(if restart
 	   `(catch 'output-nothing
@@ -419,8 +426,9 @@
   (let ((start (or start 0))
 	(end (or end (length (the (simple-array * (*)) thing)))))
     (declare (type index start end))
-    (when (> (fd-stream-ibuf-tail fd-stream)
-	     (fd-stream-ibuf-head fd-stream))
+    (when (and (not (fd-stream-dual-channel-p fd-stream))
+	       (> (fd-stream-ibuf-tail fd-stream)
+		  (fd-stream-ibuf-head fd-stream)))
       (file-position fd-stream (file-position fd-stream)))
     (let* ((len (fd-stream-obuf-length fd-stream))
 	   (tail (fd-stream-obuf-tail fd-stream))
@@ -963,8 +971,9 @@
 	(let ((start (or start 0))
 	      (end (or end (length string))))
 	  (declare (type index start end))
-	  (when (> (fd-stream-ibuf-tail stream)
-		   (fd-stream-ibuf-head stream))
+	  (when (and (not (fd-stream-dual-channel-p stream))
+		     (> (fd-stream-ibuf-tail stream)
+			(fd-stream-ibuf-head stream)))
 	    (file-position stream (file-position stream)))
 	  (when (< end start)
 	    (error ":END before :START!"))
@@ -1065,8 +1074,9 @@
 	(let ((start (or start 0))
 	      (end (or end (length string))))
 	  (declare (type index start end))
-	  (when (> (fd-stream-ibuf-tail fd-stream)
-		   (fd-stream-ibuf-head fd-stream))
+	  (when (and (not (fd-stream-dual-channel-p fd-stream))
+		     (> (fd-stream-ibuf-tail fd-stream)
+			(fd-stream-ibuf-head fd-stream)))
 	    (file-position fd-stream (file-position fd-stream)))
 	  (when (< end start)
 	    (error ":END before :START!"))
@@ -1726,6 +1736,7 @@
 		       delete-original
 		       pathname
 		       input-buffer-p
+		       dual-channel-p
 		       (name (if file
 				 (format nil "file ~S" file)
 				 (format nil "descriptor ~W" fd)))
@@ -1743,6 +1754,7 @@
 				 :delete-original delete-original
 				 :pathname pathname
 				 :buffering buffering
+				 :dual-channel-p dual-channel-p
 				 :external-format external-format
 				 :timeout timeout)))
     (set-fd-stream-routines stream element-type input output input-buffer-p)
@@ -1936,6 +1948,7 @@
 				      :original original
 				      :delete-original delete-original
 				      :pathname pathname
+				      :dual-channel-p nil
 				      :input-buffer-p t
 				      :auto-close t))
 		     (:probe

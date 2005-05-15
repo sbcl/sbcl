@@ -320,7 +320,8 @@
 	  (push new-fd *close-on-error*)
 	  (copy-descriptor-to-stream new-fd pty cookie)))
       (values name
-	      (sb-sys:make-fd-stream master :input t :output t)))))
+	      (sb-sys:make-fd-stream master :input t :output t 
+				     :dual-channel-p t)))))
 
 (defmacro round-bytes-to-words (n)
   `(logand (the fixnum (+ (the fixnum ,n) 3)) (lognot 3)))
