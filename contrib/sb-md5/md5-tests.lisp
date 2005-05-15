@@ -114,3 +114,8 @@
     (string= (format nil "~(~{~2,'0X~}~)" (coerce (md5sum-file "/dev/null") 'list))
 	     "d41d8cd98f00b204e9800998ecf8427e")
   t)
+
+(deftest sb-md5.md5sum-sequence.error.0
+    (handler-case (md5sum-sequence "foo")
+      (type-error () :good))
+  :good)

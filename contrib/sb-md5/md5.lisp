@@ -506,33 +506,37 @@ The resulting MD5 message-digest is returned as an array of sixteen
   "Calculate the MD5 message-digest of data bounded by START and END
 in SEQUENCE , which must be a vector with element-type (UNSIGNED-BYTE
 8)."
-  (declare (optimize (speed 3) (space 0) (debug 0))
-	   (type vector sequence) (type fixnum start))
-  (let ((state (make-md5-state)))
-    (declare (type md5-state state))
-    #+cmu
-    (lisp::with-array-data ((data sequence) (real-start start) (real-end end))
-      (update-md5-state state data :start real-start :end real-end))
-    #+sbcl
-    (sb-kernel:with-array-data ((data sequence) (real-start start) (real-end end))
-      (update-md5-state state data :start real-start :end real-end))
-    #-(or cmu sbcl)
-    (let ((real-end (or end (length sequence))))
-      (declare (type fixnum real-end))
-      (update-md5-state state sequence :start start :end real-end))
-    (finalize-md5-state state)))
+  (declare (optimize (speed 3) (safety 3) (space 0) (debug 1))
+	   (type (vector (unsigned-byte 8)) sequence) (type fixnum start))
+  (locally
+    (declare (optimize (safety 1) (debug 0)))
+    (let ((state (make-md5-state)))
+      (declare (type md5-state state))
+      #+cmu
+      (lisp::with-array-data ((data sequence) (real-start start) (real-end end))
+	(update-md5-state state data :start real-start :end real-end))
+      #+sbcl
+      (sb-kernel:with-array-data ((data sequence) (real-start start) (real-end end))
+	(update-md5-state state data :start real-start :end real-end))
+      #-(or cmu sbcl)
+      (let ((real-end (or end (length sequence))))
+	(declare (type fixnum real-end))
+	(update-md5-state state sequence :start start :end real-end))
+      (finalize-md5-state state))))
 
 (defun md5sum-string (string &key (external-format :default) (start 0) end)
   "Calculate the MD5 message-digest of the binary representation
 of STRING (as octets) in EXTERNAL-FORMAT. The boundaries START
 and END refer to character positions in the string, not to octets
 in the resulting binary representation."
-  (declare (optimize (speed 3) (space 0) (debug 0))
-           (type string string))
-  (md5sum-sequence
-   (sb-ext:string-to-octets string
-                            :external-format external-format
-                            :start start :end end)))
+  (declare (optimize (speed 3) (safety 3) (space 0) (debug 1))
+           (type string string) (type fixnum start))
+  (locally
+    (declare (optimize (safety 1) (debug 0)))
+    (md5sum-sequence
+     (sb-ext:string-to-octets string
+			      :external-format external-format
+			      :start start :end end))))
 
 (defconstant +buffer-size+ (* 128 1024)
   "Size of internal buffer to use for md5sum-stream and md5sum-file
@@ -543,37 +547,44 @@ operations.  This should be a multiple of 64, the MD5 block size.")
 (defun md5sum-stream (stream)
   "Calculate an MD5 message-digest of the contents of STREAM, whose
 element-type has to be (UNSIGNED-BYTE 8)."
-  (declare (optimize (speed 3) (space 0) (debug 0)))
-  (let ((state (make-md5-state)))
-    (declare (type md5-state state))
-    (cond
-      ((equal (stream-element-type stream) '(unsigned-byte 8))
-       (let ((buffer (make-array +buffer-size+
-				 :element-type '(unsigned-byte 8))))
-	 (declare (type (simple-array (unsigned-byte 8) (#.+buffer-size+))
-			buffer))
-	 (loop for bytes of-type buffer-index = (read-sequence buffer stream)
-	       do (update-md5-state state buffer :end bytes)
-	       until (< bytes +buffer-size+)
-	       finally
-	       (return (finalize-md5-state state)))))
-      ((equal (stream-element-type stream) 'character)
-       (let ((buffer (make-string +buffer-size+)))
-	 (declare (type (simple-string #.+buffer-size+) buffer))
-	 (loop for bytes of-type buffer-index = (read-sequence buffer stream)
-	       do (update-md5-state state buffer :end bytes)
-	       until (< bytes +buffer-size+)
-	       finally
-	       (return (finalize-md5-state state)))))
-      (t
-       (error "Unsupported stream element-type ~S for stream ~S."
-	      (stream-element-type stream) stream)))))
+  (declare (optimize (speed 3) (safety 3) (space 0) (debug 1)))
+  (declare (type stream stream))
+  (locally
+    (declare (optimize (safety 1) (debug 0)))
+    (let ((state (make-md5-state)))
+      (declare (type md5-state state))
+      (cond
+	((equal (stream-element-type stream) '(unsigned-byte 8))
+	 (let ((buffer (make-array +buffer-size+
+				   :element-type '(unsigned-byte 8))))
+	   (declare (type (simple-array (unsigned-byte 8) (#.+buffer-size+))
+			  buffer))
+	   (loop for bytes of-type buffer-index = (read-sequence buffer stream)
+		 do (update-md5-state state buffer :end bytes)
+		 until (< bytes +buffer-size+)
+		 finally
+		 (return (finalize-md5-state state)))))
+	#+(or)
+	((equal (stream-element-type stream) 'character)
+	 (let ((buffer (make-string +buffer-size+)))
+	   (declare (type (simple-string #.+buffer-size+) buffer))
+	   (loop for bytes of-type buffer-index = (read-sequence buffer stream)
+		 do (update-md5-state state buffer :end bytes)
+		 until (< bytes +buffer-size+)
+		 finally
+		 (return (finalize-md5-state state)))))
+	(t
+	 (error "Unsupported stream element-type ~S for stream ~S."
+		(stream-element-type stream) stream))))))
 
 (defun md5sum-file (pathname)
-  "Calculate the MD5 message-digest of the file specified by pathname."
-  (declare (optimize (speed 3) (space 0) (debug 0)))
-  (with-open-file (stream pathname :element-type '(unsigned-byte 8))
-    (md5sum-stream stream)))
+  "Calculate the MD5 message-digest of the file designated by
+pathname."
+  (declare (optimize (speed 3) (safety 3) (space 0) (debug 1)))
+  (locally
+    (declare (optimize (safety 1) (debug 0)))
+    (with-open-file (stream pathname :element-type '(unsigned-byte 8))
+      (md5sum-stream stream))))
 
 #+cmu
 (eval-when (:compile-toplevel :execute)
