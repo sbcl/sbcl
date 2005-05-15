@@ -637,8 +637,9 @@ one-past-the-end"
 	      "LATIN-1")
 	  "KEYWORD"))
 
+;;; FIXME: OAOOM here vrt. DEFINE-EXTERNAL-FORMAT in fd-stream.lisp
 (defparameter *external-format-functions*
-  '(((:ascii :us-ascii :ansi_x3.4-1968)
+  '(((:ascii :us-ascii :ansi_x3.4-1968 :iso-646 :iso-646-us :|646|)
      ascii->string-aref string->ascii)
     ((:latin1 :latin-1 :iso-8859-1)
      latin1->string-aref string->latin1)

@@ -950,6 +950,7 @@
       (return-from fd-stream-resync
 	(funcall (symbol-function (eighth entry)) stream)))))
 
+;;; FIXME: OAOOM here vrt. *EXTERNAL-FORMAT-FUNCTIONS* in fd-stream.lisp
 (defmacro define-external-format (external-format size output-restart
                                   out-expr in-expr)
   (let* ((name (first external-format))
@@ -1198,7 +1199,8 @@
       (setf (sap-ref-8 sap tail) bits))
   (code-char byte))
 
-(define-external-format (:ascii :us-ascii :ansi_x3.4-1968)
+(define-external-format (:ascii :us-ascii :ansi_x3.4-1968 
+                         :iso-646 :iso-646-us :|646|)
     1 t
   (if (>= bits 128)
       (stream-encoding-error-and-handle stream bits)
@@ -1342,23 +1344,29 @@
 
     (when (and character-stream-p
 	       (eq (fd-stream-external-format fd-stream) :default))
+      (/show0 "/getting default external format")
       (setf (fd-stream-external-format fd-stream)
-	    (intern (or (alien-funcall
-			 (extern-alien "nl_langinfo"
-				       (function c-string int))
-			 sb!unix:codeset)
-			"LATIN-1")
-		    "KEYWORD"))
+            (default-external-format))
+      (/show0 "cold-printing defaulted external-format:")
+      #!+sb-show
+      (cold-print (fd-stream-external-format fd-stream))
+      (/show0 "matching to known aliases")
       (dolist (entry *external-formats*
 		     (restart-case
-		      (error "Invalid external-format ~A" 
-			     (fd-stream-external-format fd-stream))
+                         (error "Invalid external-format ~A" 
+                                (fd-stream-external-format fd-stream))
 		      (use-default ()
-				   :report "Set external format to LATIN-1"
-				   (setf (fd-stream-external-format fd-stream) :latin-1))))
+                        :report "Set external format to LATIN-1"
+                        (setf (fd-stream-external-format fd-stream) :latin-1))))
+        (/show0 "cold printing known aliases:")
+        #!+sb-show
+        (dolist (alias (first entry)) (cold-print alias))
+        (/show0 "done cold-printing known aliases")
 	(when (member (fd-stream-external-format fd-stream) (first entry))
-	  (return))))
-
+          (/show0 "matched")
+	  (return)))
+      (/show0 "/default external format ok"))
+    
     (when input-p
       (multiple-value-bind (routine type size read-n-characters
                                     normalized-external-format)
