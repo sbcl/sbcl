@@ -1795,20 +1795,32 @@
 		  (ansi-stream-bout stream))))
 	 (do ((rem (nthcdr start seq) (rest rem))
 	      (i start (1+ i)))
-	     ((or (endp rem) (>= i end)) seq)
+	     ((or (endp rem) (>= i end)))
 	   (declare (type list rem)
 		    (type index i))
 	   (funcall write-function stream (first rem)))))
       (string
        (%write-string seq stream start end))
       (vector
-       (let ((write-function
-	      (if (subtypep (stream-element-type stream) 'character)
-		  (ansi-stream-out stream)
-		  (ansi-stream-bout stream))))
-	 (do ((i start (1+ i)))
-	     ((>= i end) seq)
-	   (declare (type index i))
-	   (funcall write-function stream (aref seq i))))))))
+       (with-array-data ((data seq) (offset-start start) (offset-end end))
+	 (labels
+	     ((output-seq-in-loop ()
+		(let ((write-function
+		       (if (subtypep (stream-element-type stream) 'character)
+			   (ansi-stream-out stream)
+			   (ansi-stream-bout stream))))
+		  (do ((i offset-start (1+ i)))
+		      ((>= i offset-end))
+		    (declare (type index i))
+		    (funcall write-function stream (aref data i))))))
+	   (typecase data
+	     ((or (simple-array (unsigned-byte 8) (*))
+		  (simple-array (signed-byte 8) (*)))
+	      (if (fd-stream-p stream)
+		  (output-raw-bytes stream data offset-start offset-end)
+		  (output-seq-in-loop)))
+	     (t
+	      (output-seq-in-loop))))))))
+  seq)
 
 ;;;; etc.

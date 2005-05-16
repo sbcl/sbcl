@@ -730,6 +730,11 @@ WORKAROUND:
   (UNSIGNED-BYTE 8) will write to the stream one byte at a time,
   rather than writing the sequence in one go, leading to severe
   performance degradation.
+  As of sbcl-0.9.0.36, this is solved for fd-streams, so is less of a
+  problem in practice.  (Fully fixing this would require adding a
+  ansi-stream-n-bout slot and associated methods to write a byte
+  sequence to ansi-stream, similar to the existing ansi-stream-sout
+  slot/functions.)
 
 243: "STYLE-WARNING overenthusiasm for unused variables"
   (observed from clx compilation)
