@@ -1791,30 +1791,24 @@
       (list
        (let ((write-function
 	      (if (subtypep (stream-element-type stream) 'character)
-                  ;; FIXME (rudi 2004-08-09): since we know we're an
-                  ;; ansi stream here, we could replace these
-                  ;; functions with ansi-stream-specific constructs
-		  #'write-char
-		  #'write-byte)))
+		  (ansi-stream-out stream)
+		  (ansi-stream-bout stream))))
 	 (do ((rem (nthcdr start seq) (rest rem))
 	      (i start (1+ i)))
 	     ((or (endp rem) (>= i end)) seq)
 	   (declare (type list rem)
 		    (type index i))
-	   (funcall write-function (first rem) stream))))
+	   (funcall write-function stream (first rem)))))
       (string
        (%write-string seq stream start end))
       (vector
        (let ((write-function
 	      (if (subtypep (stream-element-type stream) 'character)
-                  ;; FIXME (rudi 2004-08-09): since we know we're an
-                  ;; ansi stream here, we could replace these
-                  ;; functions with ansi-specific constructs
-		  #'write-char
-		  #'write-byte)))
+		  (ansi-stream-out stream)
+		  (ansi-stream-bout stream))))
 	 (do ((i start (1+ i)))
 	     ((>= i end) seq)
 	   (declare (type index i))
-	   (funcall write-function (aref seq i) stream)))))))
+	   (funcall write-function stream (aref seq i))))))))
 
 ;;;; etc.
