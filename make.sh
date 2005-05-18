@@ -58,7 +58,7 @@ export LANG
 build_started=`date`
 echo "//starting build: $build_started"
 
-SBCL_XC_HOST="${1:-sbcl --disable-debugger}"
+SBCL_XC_HOST="${1:-sbcl --disable-debugger --userinit /dev/null --sysinit /dev/null}"
 export SBCL_XC_HOST
 echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
 

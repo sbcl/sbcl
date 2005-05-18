@@ -187,6 +187,10 @@ INSTALLING SBCL
 
     * Check that the host lisp you're building with is known to work
       as an SBCL build host, and the your OS is supported.
+      
+    * Try to do a build without loading any initialization files
+      for the cross-compilation host (for example
+      "sh make.sh 'sbcl --userinit /dev/null --sysinit /dev/null'").
 
     * Some GCC versions are known to have bugs that affect SBCL
       compilation: if the error you're encountering seems related to

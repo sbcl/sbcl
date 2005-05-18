@@ -43,6 +43,8 @@
 
 (defparameter *byte-reg-names*
   #(al cl dl bl spl bpl sil dil r8b r9b r10b r11b r12b r13b r14b r15b))
+(defparameter *high-byte-reg-names*
+  #(ah ch dh bh))
 (defparameter *word-reg-names*
   #(ax cx dx bx sp bp si di r8w r9w r10w r11w r12w r13w r14w r15w))
 (defparameter *dword-reg-names*
@@ -88,16 +90,24 @@
       :word
       :qword))
 
+;;; Print to STREAM the name of the general purpose register encoded by
+;;; VALUE and of size WIDTH. For robustness, the high byte registers
+;;; (AH, BH, CH, DH) are correctly detected, too, although the compiler
+;;; does not use them.
 (defun print-reg-with-width (value width stream dstate)
   (declare (type full-reg value)
 	   (type stream stream)
-           (ignore dstate))
-  (princ (aref (ecase width
-		 (:byte *byte-reg-names*)
-		 (:word *word-reg-names*)
-		 (:dword *dword-reg-names*)
-		 (:qword *qword-reg-names*))
-	       value)
+           (type sb!disassem:disassem-state dstate))
+  (princ (if (and (eq width :byte)
+                  (<= 4 value 7)
+                  (not (sb!disassem:dstate-get-inst-prop dstate 'rex)))
+             (aref *high-byte-reg-names* (- value 4))
+             (aref (ecase width
+                     (:byte *byte-reg-names*)
+                     (:word *word-reg-names*)
+                     (:dword *dword-reg-names*)
+                     (:qword *qword-reg-names*))
+                   value))
 	 stream)
   ;; XXX plus should do some source-var notes
   )
@@ -1005,7 +1015,7 @@
   
 (defstruct (ea (:constructor make-ea (size &key base index scale disp))
 	       (:copier nil))
-  ;; note that we can represent an EA qith a QWORD size, but EMIT-EA
+  ;; note that we can represent an EA with a QWORD size, but EMIT-EA
   ;; can't actually emit it on its own: caller also needs to emit REX
   ;; prefix
   (size nil :type (member :byte :word :dword :qword))
@@ -1236,7 +1246,37 @@
 	      (eq size +default-operand-size+))
     (emit-byte segment +operand-size-prefix-byte+)))
 
+;;; A REX prefix must be emitted if at least one of the following
+;;; conditions is true:
+;;  1. The operand size is :QWORD and the default operand size of the
+;;     instruction is not :QWORD.
+;;; 2. The instruction references an extended register.
+;;; 3. The instruction references one of the byte registers SIL, DIL,
+;;;    SPL or BPL.
+
+;;; Emit a REX prefix if necessary. OPERAND-SIZE is used to determine
+;;; whether to set REX.W. Callers pass it explicitly as :DO-NOT-SET if
+;;; this should not happen, for example because the instruction's
+;;; default operand size is qword. R, X and B are NIL or TNs specifying
+;;; registers the encodings of which are extended with the REX.R, REX.X
+;;; and REX.B bit, respectively. To determine whether one of the byte
+;;; registers is used that can only be accessed using a REX prefix, we
+;;; need only to test R and B, because X is only used for the index
+;;; register of an effective address and therefore never byte-sized.
+;;; For R we can avoid to calculate the size of the TN because it is
+;;; always OPERAND-SIZE. The size of B must be calculated here because
+;;; B can be address-sized (if it is the base register of an effective
+;;; address), of OPERAND-SIZE (if the instruction operates on two
+;;; registers) or of some different size (in the instructions that
+;;; combine arguments of different sizes: MOVZX, MOVSX, MOVSXD).
+;;; We don't distinguish between general purpose and floating point
+;;; registers for this cause because only general purpose registers can
+;;; be byte-sized at all.
 (defun maybe-emit-rex-prefix (segment operand-size r x b)
+  (declare (type (member nil :byte :word :dword :qword :float :double
+                         :do-not-set)
+                 operand-size)
+           (type (or null tn) r x b))
   (labels ((if-hi (r)
 	     (if (and r (> (tn-offset r)
 			   ;; offset of r8 is 16, offset of xmm8 is 8
@@ -1244,26 +1284,55 @@
 			       7
 			       15)))
 		 1
-		 0)))
+		 0))
+           (reg-4-7-p (r)
+             ;; Assuming R is a TN describing a general purpose
+             ;; register, return true if it references register
+             ;; 4 upto 7.
+             (<= 8 (tn-offset r) 15)))
     (let ((rex-w (if (eq operand-size :qword) 1 0))
 	  (rex-r (if-hi r))
 	  (rex-x (if-hi x))
 	  (rex-b (if-hi b)))
-      (when (or (eq operand-size :byte) ;; REX needed to access SIL/DIL
-		(not (zerop (logior rex-w rex-r rex-x rex-b))))
+      (when (or (not (zerop (logior rex-w rex-r rex-x rex-b)))
+                (and r
+                     (eq operand-size :byte)
+                     (reg-4-7-p r))
+                (and b
+                     (eq (operand-size b) :byte)
+                     (reg-4-7-p b)))
 	(emit-rex-byte segment #b0100 rex-w rex-r rex-x rex-b)))))
 
-(defun maybe-emit-rex-for-ea (segment ea reg &key operand-size)
-  (let ((ea-p (ea-p ea)))		;emit-ea can also be called with a tn
+;;; Emit a REX prefix if necessary. The operand size is determined from
+;;; THING or can be overwritten by OPERAND-SIZE. This and REG are always
+;;; passed to MAYBE-EMIT-REX-PREFIX. Additionally, if THING is an EA we
+;;; pass its index and base registers, if it is a register TN, we pass
+;;; only itself.
+;;; In contrast to EMIT-EA above, neither stack TNs nor fixups need to
+;;; be treated specially here: If THING is a stack TN, neither it nor
+;;; any of its components are passed to MAYBE-EMIT-REX-PREFIX which
+;;; works correctly because stack references always use RBP as the base
+;;; register and never use an index register so no extended registers
+;;; need to be accessed. Fixups are assembled using an addressing mode
+;;; of displacement-only or RIP-plus-displacement (see EMIT-EA), so may
+;;; not reference an extended register. The displacement-only addressing
+;;; mode requires that REX.X is 0, which is ensured here.
+(defun maybe-emit-rex-for-ea (segment thing reg &key operand-size)
+  (declare (type (or ea tn fixup) thing)
+           (type (or null tn) reg)
+           (type (member nil :byte :word :dword :qword :float :double
+                         :do-not-set)
+                 operand-size))
+  (let ((ea-p (ea-p thing)))
     (maybe-emit-rex-prefix segment
-			   (or operand-size (operand-size ea))
+			   (or operand-size (operand-size thing))
 			   reg
-			   (and ea-p (ea-index ea))
-			   (cond (ea-p (ea-base ea))
-				 ((and (tn-p ea)
-				       (member (sb-name (sc-sb (tn-sc ea))) 
+			   (and ea-p (ea-index thing))
+			   (cond (ea-p (ea-base thing))
+				 ((and (tn-p thing)
+				       (member (sb-name (sc-sb (tn-sc thing)))
 					       '(float-registers registers)))
-				  ea)
+				  thing)
 				 (t nil)))))
 
 (defun operand-size (thing)
@@ -1407,21 +1476,20 @@
       (:word
        (aver (eq src-size :byte))
        (maybe-emit-operand-size-prefix segment :word)
+       ;; REX prefix is needed if SRC is SIL, DIL, SPL or BPL.
+       (maybe-emit-rex-for-ea segment src dst :operand-size :word)
        (emit-byte segment #b00001111)
        (emit-byte segment opcode)
        (emit-ea segment src (reg-tn-encoding dst)))
       ((:dword :qword)
        (ecase src-size
 	 (:byte
-	  (maybe-emit-operand-size-prefix segment :dword)
-	  (maybe-emit-rex-for-ea segment src dst
-				 :operand-size (operand-size dst))
+	  (maybe-emit-rex-for-ea segment src dst :operand-size dst-size)
 	  (emit-byte segment #b00001111)
 	  (emit-byte segment opcode)
 	  (emit-ea segment src (reg-tn-encoding dst)))
 	 (:word
- 	  (maybe-emit-rex-for-ea segment src dst
-				 :operand-size (operand-size dst))
+ 	  (maybe-emit-rex-for-ea segment src dst :operand-size dst-size)
 	  (emit-byte segment #b00001111)
 	  (emit-byte segment (logior opcode 1))
 	  (emit-ea segment src (reg-tn-encoding dst)))
@@ -1498,15 +1566,16 @@
 		 (emit-byte segment #b01101010)
 		 (emit-byte segment src))
 		(t
-		 ;; AMD64 manual says no REX needed but is unclear
-		 ;; whether it expects 32 or 64 bit immediate here
+		 ;; A REX-prefix is not needed because the operand size
+		 ;; defaults to 64 bits. The size of the immediate is 32
+		 ;; bits and it is sign-extended.
 		 (emit-byte segment #b01101000)
 		 (emit-dword segment src))))
 	 (t
 	  (let ((size (operand-size src)))
 	    (aver (not (eq size :byte)))
 	    (maybe-emit-operand-size-prefix segment size)
-	    (maybe-emit-rex-for-ea segment src nil)
+	    (maybe-emit-rex-for-ea segment src nil :operand-size :do-not-set)
 	    (cond ((register-p src)
 		   (emit-byte-with-reg segment #b01010 (reg-tn-encoding src)))
 		  (t
@@ -1522,7 +1591,7 @@
    (let ((size (operand-size dst)))
      (aver (not (eq size :byte)))
      (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment dst nil)     
+     (maybe-emit-rex-for-ea segment dst nil :operand-size :do-not-set)
      (cond ((register-p dst)
 	    (emit-byte-with-reg segment #b01011 (reg-tn-encoding dst)))
 	   (t
@@ -2267,7 +2336,6 @@
   (:emitter
    (typecase where
      (label
-      (maybe-emit-rex-for-ea segment where nil)
       (emit-byte segment #b11101000) ; 32 bit relative
       (emit-back-patch segment
 		       4
@@ -2276,11 +2344,10 @@
 				     (- (label-position where)
 					(+ posn 4))))))
      (fixup
-      (maybe-emit-rex-for-ea segment where nil)
       (emit-byte segment #b11101000)
       (emit-relative-fixup segment where))
      (t
-      (maybe-emit-rex-for-ea segment where nil)
+      (maybe-emit-rex-for-ea segment where nil :operand-size :do-not-set)
       (emit-byte segment #b11111111)
       (emit-ea segment where #b010)))))
 
@@ -2345,7 +2412,7 @@
 		  (error "don't know what to do with ~A" where))
 	  ;; near jump defaults to 64 bit
 	  ;; w-bit in rex prefix is unnecessary 
-	  (maybe-emit-rex-for-ea segment where nil :operand-size :dword)
+	  (maybe-emit-rex-for-ea segment where nil :operand-size :do-not-set)
 	  (emit-byte segment #b11111111)
 	  (emit-ea segment where #b100)))))
 

@@ -129,12 +129,8 @@ os_context_fp_addr(os_context_t *context)
 unsigned long
 os_context_fp_control(os_context_t *context)
 {
-#if 0
-    return ((((context->uc_mcontext.fpregs->cw) & 0xffff) ^ 0x3f) |
-	    (((context->uc_mcontext.fpregs->sw) & 0xffff) << 16));
-#else
-    return 0;
-#endif
+    int mxcsr = context->uc_mcontext.fpregs->mxcsr;
+    return ((mxcsr & 0x3F) << 16 | ((mxcsr >> 7) & 0x3F)) ^ 0x3F;
 }
 
 sigset_t *
@@ -146,9 +142,7 @@ os_context_sigmask_addr(os_context_t *context)
 void
 os_restore_fp_control(os_context_t *context)
 {
-#if 0
-    asm ("fldcw %0" : : "m" (context->uc_mcontext.fpregs->cw));
-#endif
+    asm ("ldmxcsr %0" : : "m" (context->uc_mcontext.fpregs->mxcsr));
 }
 
 void

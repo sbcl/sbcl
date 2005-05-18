@@ -261,10 +261,15 @@
 
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
+#!-linux
 (defun context-floating-point-modes (context)
   (declare (ignore context)) ; stub!
   (warn "stub CONTEXT-FLOATING-POINT-MODES")
   0)
+#!+linux
+(define-alien-routine ("os_context_fp_control" context-floating-point-modes)
+    (sb!alien:unsigned 32)
+  (context (* os-context-t)))
 
 
 ;;;; INTERNAL-ERROR-ARGS
@@ -302,38 +307,6 @@
 	     (sc-offsets sc-offset)))
 	  (values error-number (sc-offsets)))))))
 
-;;; This is used in error.lisp to insure that floating-point exceptions
-;;; are properly trapped. The compiler translates this to a VOP.
-(defun float-wait ()
-  (float-wait))
-
-;;; float constants
-;;;
-;;; These are used by the FP MOVE-FROM-{SINGLE|DOUBLE} VOPs rather
-;;; than the i387 load constant instructions to avoid consing in some
-;;; cases. Note these are initialized by GENESIS as they are needed
-;;; early.
-(defvar *fp-constant-0f0*)
-(defvar *fp-constant-1f0*)
-(defvar *fp-constant-0d0*)
-(defvar *fp-constant-1d0*)
-;;; the long-float constants
-(defvar *fp-constant-0l0*)
-(defvar *fp-constant-1l0*)
-(defvar *fp-constant-pi*)
-(defvar *fp-constant-l2t*)
-(defvar *fp-constant-l2e*)
-(defvar *fp-constant-lg2*)
-(defvar *fp-constant-ln2*)
 
 ;;; the current alien stack pointer; saved/restored for non-local exits
 (defvar *alien-stack*)
-
-;;; Support for the MT19937 random number generator. The update
-;;; function is implemented as an assembly routine. This definition is
-;;; transformed to a call to the assembly routine allowing its use in
-;;; interpreted code.
-#+nil
-(defun random-mt19937 (state)
-  (declare (type (simple-array (unsigned-byte 32) (627)) state))
-  (random-mt19937 state))

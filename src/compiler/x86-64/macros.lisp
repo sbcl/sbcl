@@ -11,31 +11,6 @@
 
 (in-package "SB!VM")
 
-;;; We can load/store into fp registers through the top of stack
-;;; %st(0) (fr0 here). Loads imply a push to an empty register which
-;;; then changes all the reg numbers. These macros help manage that.
-
-;;; Use this when we don't have to load anything. It preserves old tos
-;;; value, but probably destroys tn with operation.
-(defmacro with-tn@fp-top((tn) &body body)
-  `(progn
-    (unless (zerop (tn-offset ,tn))
-      (inst fxch ,tn))
-    ,@body
-    (unless (zerop (tn-offset ,tn))
-      (inst fxch ,tn))))
-
-;;; Use this to prepare for load of new value from memory. This
-;;; changes the register numbering so the next instruction had better
-;;; be a FP load from memory; a register load from another register
-;;; will probably be loading the wrong register!
-(defmacro with-empty-tn@fp-top((tn) &body body)
-  `(progn
-    (inst fstp ,tn)
-    ,@body
-    (unless (zerop (tn-offset ,tn))
-      (inst fxch ,tn))))		; save into new dest and restore st(0)
-
 ;;;; instruction-like macros
 
 (defmacro move (dst src)

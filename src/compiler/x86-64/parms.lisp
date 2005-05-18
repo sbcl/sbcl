@@ -217,14 +217,6 @@
     *fp-constant-1d0*
     *fp-constant-0f0*
     *fp-constant-1f0*
-    ;; The following are all long-floats.
-    *fp-constant-0l0*
-    *fp-constant-1l0*
-    *fp-constant-pi*
-    *fp-constant-l2t*
-    *fp-constant-l2e*
-    *fp-constant-lg2*
-    *fp-constant-ln2*
 
     ;; The ..SLOT-UNBOUND.. symbol is static in order to optimise the
     ;; common slot unbound check.
@@ -250,9 +242,3 @@
     sb!kernel:two-arg-xor
     sb!kernel:two-arg-gcd
     sb!kernel:two-arg-lcm))
-
-;;;; stuff added by jrd
-
-;;; FIXME: Is this used? Delete it or document it.
-;;; cf the sparc PARMS.LISP
-(defparameter *assembly-unit-length* 8)

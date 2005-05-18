@@ -12,8 +12,12 @@ changes in sbcl-0.9.1 relative to sbcl-0.9.0:
     or more runtime options were provided to the sbcl binary.
   * compiled code is not steppable if COMPILATION-SPEED >= DEBUG.
   * contrib improvement: implement SB-POSIX:MKSTEMP (Yannick Gingras)
-  * optimization: There's now a fast-path for fixnum arguments in the
+  * optimization: there's now a fast-path for fixnum arguments in the
     generic subtraction routines on x86/x86-64. (Thanks to Lutz Euler)
+  * optimization: the code generated on x86-64 is more compact thanks
+    to not outputting unneccessary prefix bytes. (Thanks to Lutz Euler)
+  * bug fix: floating-point exception handling now works on x86-64. 
+    (Thanks to James Knight)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the type-error signalled from WARN has a filled-in DATUM slot.
     ** the type-error required when a stream is not associated with

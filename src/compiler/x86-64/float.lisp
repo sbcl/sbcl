@@ -39,22 +39,6 @@
   (defun ea-for-df-stack (tn)
     (ea-for-xf-stack tn :double)))
 
-;;; Telling the FPU to wait is required in order to make signals occur
-;;; at the expected place, but naturally slows things down.
-;;;
-;;; NODE is the node whose compilation policy controls the decision
-;;; whether to just blast through carelessly or carefully emit wait
-;;; instructions and whatnot.
-;;;
-;;; NOTE-NEXT-INSTRUCTION, if supplied, is to be passed to
-;;; #'NOTE-NEXT-INSTRUCTION.
-(defun maybe-fp-wait (node &optional note-next-instruction)
-  (when (policy node (or (= debug 3) (> safety speed))))
-    (when note-next-instruction
-      (note-next-instruction note-next-instruction :internal-error))
-    #+nil
-    (inst wait))
-
 ;;; complex float stack EAs
 (macrolet ((ea-for-cxf-stack (tn kind slot &optional base)
 	     (declare (ignore kind))
@@ -227,20 +211,6 @@
        (inst movsd (ea-for-df-desc y) x))))
 (define-move-vop move-from-double :move
   (double-reg) (descriptor-reg))
-
-#+nil
-(define-vop (move-from-fp-constant)
-  (:args (x :scs (fp-constant)))
-  (:results (y :scs (descriptor-reg)))
-  (:generator 2
-     (ecase (sb!c::constant-value (sb!c::tn-leaf x))
-       (0f0 (load-symbol-value y *fp-constant-0f0*))
-       (1f0 (load-symbol-value y *fp-constant-1f0*))
-       (0d0 (load-symbol-value y *fp-constant-0d0*))
-       (1d0 (load-symbol-value y *fp-constant-1d0*)))))
-#+nil
-(define-move-vop move-from-fp-constant :move
-  (fp-constant) (descriptor-reg))
 
 ;;; Move from a descriptor to a float register.
 (define-vop (move-to-single)
@@ -629,23 +599,6 @@
   (frob %single-float/signed %single-float cvtsi2ss single-reg single-float)
   (frob %double-float/signed %double-float cvtsi2sd double-reg double-float))
 
-#+nil
-(macrolet ((frob (name translate inst to-sc to-type)
-	     `(define-vop (,name)
-		(:args (x :scs (unsigned-reg)))
-		(:results (y :scs (,to-sc)))
-		(:arg-types unsigned-num)
-		(:result-types ,to-type)
-		(:policy :fast-safe)
-		(:note "inline float coercion")
-		(:translate ,translate)
-		(:vop-var vop)
-		(:save-p :compute-only)
-		(:generator 6
-		  (inst ,inst y x)))))
-  (frob %single-float/unsigned %single-float cvtsi2ss single-reg single-float)
-  (frob %double-float/unsigned %double-float cvtsi2sd double-reg double-float))
-
 (macrolet ((frob (name translate inst from-sc from-type to-sc to-type)
 	     `(define-vop (,name)
 	       (:args (x :scs (,from-sc) :target y))
@@ -693,50 +646,6 @@
   (frob %unary-round cvtss2si single-reg single-float t)
   (frob %unary-round cvtsd2si double-reg double-float t))
 
-#+nil ;; will we need this?
-(macrolet ((frob (trans from-sc from-type round-p)
-	     `(define-vop (,(symbolicate trans "/" from-type "=>UNSIGNED"))
-	       (:args (x :scs (,from-sc) :target fr0))
-	       (:temporary (:sc double-reg :offset fr0-offset
-			    :from :argument :to :result) fr0)
-	       ,@(unless round-p
-		  '((:temporary (:sc unsigned-stack) stack-temp)
-		    (:temporary (:sc unsigned-stack) scw)
-		    (:temporary (:sc any-reg) rcw)))
-	       (:results (y :scs (unsigned-reg)))
-	       (:arg-types ,from-type)
-	       (:result-types unsigned-num)
-	       (:translate ,trans)
-	       (:policy :fast-safe)
-	       (:note "inline float truncate")
-	       (:vop-var vop)
-	       (:save-p :compute-only)
-	       (:generator 5
-		,@(unless round-p
-		   '((note-this-location vop :internal-error)
-		     ;; Catch any pending FPE exceptions.
-		     (inst wait)))
-		;; Normal mode (for now) is "round to best".
-		(unless (zerop (tn-offset x))
-		  (copy-fp-reg-to-fr0 x))
-		,@(unless round-p
-		   '((inst fnstcw scw)	; save current control word
-		     (move rcw scw)	; into 16-bit register
-		     (inst or rcw (ash #b11 10)) ; CHOP
-		     (move stack-temp rcw)
-		     (inst fldcw stack-temp)))
-		(inst sub rsp-tn 8)
-		(inst fistpl (make-ea :dword :base rsp-tn))
-		(inst pop y)
-		(inst fld fr0) ; copy fr0 to at least restore stack.
-		(inst add rsp-tn 8)
-		,@(unless round-p
-		   '((inst fldcw scw)))))))
-  (frob %unary-truncate single-reg single-float nil)
-  (frob %unary-truncate double-reg double-float nil)
-  (frob %unary-round single-reg single-float t)
-  (frob %unary-round double-reg double-float t))
-
 (define-vop (make-single-float)
   (:args (bits :scs (signed-reg) :target res
 	       :load-if (not (or (and (sc-is bits signed-stack)
@@ -745,7 +654,6 @@
 				      (sc-is res single-stack)
 				      (location= bits res))))))
   (:results (res :scs (single-reg single-stack)))
- ; (:temporary (:sc signed-stack) stack-temp)
   (:arg-types signed-num)
   (:result-types single-float)
   (:translate make-single-float)
