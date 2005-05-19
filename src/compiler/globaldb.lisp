@@ -1278,6 +1278,11 @@
   :type :info
   :type-spec t
   :default nil)
+(define-info-type
+  :class :typed-structure 
+  :type :documentation
+  :type-spec (or string null)
+  :default nil)
 
 (define-info-class :declaration)
 (define-info-type

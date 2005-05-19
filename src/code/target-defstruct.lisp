@@ -237,7 +237,7 @@
 	     #'listp))))
 
   (when (dd-doc dd)
-    (setf (fdocumentation (dd-name dd) 'type)
+    (setf (fdocumentation (dd-name dd) 'structure)
 	  (dd-doc dd)))
 
   ;; the BOUNDP test here is to get past cold-init.

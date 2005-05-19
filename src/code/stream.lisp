@@ -115,6 +115,9 @@
 (defun stream-element-type (stream)
   (ansi-stream-element-type stream))
 
+(defun stream-external-format (stream)
+  (funcall (ansi-stream-misc stream) stream :external-format))
+
 (defun interactive-stream-p (stream)
   (declare (type stream stream))
   (funcall (ansi-stream-misc stream) stream :interactive-p))
@@ -201,8 +204,18 @@
   ;; cause cross-compiler hangup.
   ;;
   ;; (declare (type (or file-stream synonym-stream) stream))
-  (stream-must-be-associated-with-file stream)
+  ;; 
+  ;; The description for FILE-LENGTH says that an error must be raised
+  ;; for streams not associated with files (which broadcast streams
+  ;; aren't according to the glossary). However, the behaviour of
+  ;; FILE-LENGTH for broadcast streams is explicitly described in the
+  ;; BROADCAST-STREAM entry.
+  (unless (typep stream 'broadcast-stream)	      
+    (stream-must-be-associated-with-file stream))
   (funcall (ansi-stream-misc stream) stream :file-length))
+
+(defun file-string-length (stream object)
+  (funcall (ansi-stream-misc stream) stream :file-string-length object))
 
 ;;;; input functions
 
@@ -618,6 +631,8 @@
      (finish-output stream))
     (:element-type
      (stream-element-type stream))
+    (:stream-external-format
+     (stream-external-format stream))
     (:interactive-p
      (interactive-stream-p stream))
     (:line-length
@@ -626,6 +641,8 @@
      (charpos stream))
     (:file-length
      (file-length stream))
+    (:file-string-length
+     (file-string-length stream arg1))
     (:file-position
      (file-position stream arg1))))
 
@@ -693,6 +710,15 @@
 	     ((null streams) res)
 	   (when (null (cdr streams))
 	     (setq res (stream-element-type (car streams)))))))
+      (:external-format
+       (let ((res :default))
+	 (dolist (stream streams res)
+	   (setq res (stream-external-format stream)))))
+      (:file-length
+       (let ((last (last streams)))
+	 (if last	     
+	     (file-length (car last))
+	     0)))
       (:file-position
        (if arg1
 	   (let ((res (or (eql arg1 :start) (eql arg1 0))))
@@ -701,6 +727,10 @@
 	   (let ((res 0))
 	     (dolist (stream streams res)
 	       (setq res (file-position stream))))))
+      (:file-string-length
+       (let ((res 1))
+	 (dolist (stream streams res)
+	   (setq res (file-string-length stream arg1)))))
       (:close
        (set-closed-flame stream))
       (t

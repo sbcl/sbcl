@@ -24,6 +24,14 @@ changes in sbcl-0.9.1 relative to sbcl-0.9.0:
        a file has the stream as its datum.
     ** type-errors on single-floats on x86-64 no longer have 
        :INVALID-OBJECT as the datum
+    ** the type-errors signalled for invalid function names now have
+       a correct expected type
+    ** (SETF (DOCUMENTATION ... 'STRUCTURE)) no longer signals an error
+       for structures defined with a :TYPE. Documentation strings for
+       typed structures are no longer immediately discarded
+    ** FILE-STRING-LENGTH and STREAM-EXTERNAL-FORMAT now work on 
+       broadcast streams and synonym streams. FILE-LENGTH now also works
+       on broadcast streams.
 
 changes in sbcl-0.9.0 relative to sbcl-0.8.21:
   * incompatible change: the --noprogrammer option, deprecated since

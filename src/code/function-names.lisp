@@ -44,7 +44,8 @@ use as a BLOCK name in the function in question."
     (otherwise nil)))
 
 (define-function-name-syntax setf (name)
-  (when (cdr name)
+  (when (and (cdr name)
+	     (consp (cdr name)))
     (destructuring-bind (fun &rest rest) (cdr name)
       (when (null rest)
 	(typecase fun

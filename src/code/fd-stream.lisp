@@ -1599,6 +1599,8 @@
        (sb!sys:serve-all-events)))
     (:element-type
      (fd-stream-element-type fd-stream))
+    (:external-format
+     (fd-stream-external-format fd-stream))
     (:interactive-p
      (= 1 (the (member 0 1)
             (sb!unix:unix-isatty (fd-stream-fd fd-stream)))))
@@ -1627,6 +1629,12 @@
        (if (zerop mode)
 	   nil
 	   (truncate size (fd-stream-element-size fd-stream)))))
+    ;; FIXME: I doubt this is correct in the presence of Unicode,
+    ;; since fd-stream FILE-POSITION is measured in bytes. 
+    (:file-string-length
+     (etypecase arg1
+       (character 1)
+       (string (length arg1))))
     (:file-position
      (fd-stream-file-position fd-stream arg1))))
 
@@ -2040,29 +2048,3 @@
 	     t)
 	    (t
 	     (fd-stream-pathname stream)))))
-
-;;;; international character support (which is trivial for our simple
-;;;; character sets)
-
-;;;; (Those who do Lisp only in English might not remember that ANSI
-;;;; requires these functions to be exported from package
-;;;; COMMON-LISP.)
-
-(defun file-string-length (stream object)
-  (declare (type (or string character) object) (type fd-stream stream))
-  #!+sb-doc
-  "Return the delta in STREAM's FILE-POSITION that would be caused by writing
-   OBJECT to STREAM. Non-trivial only in implementations that support
-   international character sets."
-  (declare (ignore stream))
-  (etypecase object
-    (character 1)
-    (string (length object))))
-
-(defun stream-external-format (stream)
-  (declare (type fd-stream stream))
-  #!+sb-doc
-  "Return the actual external format for fd-streams, otherwise :DEFAULT."
-  (if (typep stream 'fd-stream)
-      (fd-stream-external-format stream)
-      :default))

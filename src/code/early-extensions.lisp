@@ -650,7 +650,7 @@
   (unless (legal-fun-name-p name)
     (error 'simple-type-error
 	   :datum name
-	   :expected-type '(or symbol list)
+	   :expected-type '(or symbol (cons (member setf) (cons symbol null)))
 	   :format-control "invalid function name: ~S"
 	   :format-arguments (list name))))
 

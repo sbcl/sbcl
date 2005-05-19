@@ -144,8 +144,12 @@
 	  (slot-value class 'documentation)))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'structure)))
-  (when (eq (info :type :kind x) :instance)
-    (values (info :type :documentation x))))
+  (cond ((eq (info :type :kind x) :instance)
+	 (values (info :type :documentation x)))
+	((info :typed-structure :info x)
+	 (values (info :typed-structure :documentation x)))
+	(t
+	 (error "~S is not the name of a structure type." x))))
 
 (defmethod (setf documentation) (new-value
 				 (x structure-class)
@@ -178,9 +182,13 @@
 (defmethod (setf documentation) (new-value
 				 (x symbol)
 				 (doc-type (eql 'structure)))
-  (unless (eq (info :type :kind x) :instance)
-    (error "~S is not the name of a structure type." x))
-  (setf (info :type :documentation x) new-value))
+  (cond ((eq (info :type :kind x) :instance)
+	 (setf (info :type :documentation x) new-value))
+	((info :typed-structure :info x)
+	 (setf (info :typed-structure :documentation x) new-value))
+	(t
+	 (error "~S is not the name of a structure type." x))))
+  
 
 ;;; variables
 (defmethod documentation ((x symbol) (doc-type (eql 'variable)))

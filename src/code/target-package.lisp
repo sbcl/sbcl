@@ -237,9 +237,11 @@ error if any of PACKAGES is not a valid package designator."
   #!+sb-package-locks
   (let* ((symbol (etypecase name
 		   (symbol name)
-		   (list (if (eq 'setf (first name))
+		   (list (if (and (consp (cdr name))
+				  (eq 'setf (first name)))
 			     (second name)
-			     ;; Skip (class-predicate foo), etc.
+			     ;; Skip lists of length 1, single conses and
+			     ;; (class-predicate foo), etc.
 			     ;; FIXME: MOP and package-lock
 			     ;; interaction needs to be thought about.
 			     (return-from 
