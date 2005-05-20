@@ -18,21 +18,22 @@
 ;;;
 ;;; All arguments are forms which will be used for a specific purpose
 ;;; PEEK-TYPE - the current peek-type as defined by ANSI CL
-;;; EOF-VALUE - the eof-value argument to peek-char
+;;; EOF-RESULT - the eof-value argument to peek-char
 ;;; CHAR-VAR - the variable which will be used to store the current character
 ;;; READ-FORM - the form which will be used to read a character
+;;; EOF-VALUE - the result returned from READ-FORM when hitting eof
 ;;; UNREAD-FORM - ditto for unread-char
 ;;; SKIPPED-CHAR-FORM - the form to execute when skipping a character
 ;;; EOF-DETECTED-FORM - the form to execute when EOF has been detected
-;;;                     (this will default to CHAR-VAR)
+;;;                     (this will default to EOF-RESULT)
 (sb!xc:defmacro generalized-peeking-mechanism
-    (peek-type eof-value char-var read-form unread-form
+    (peek-type eof-result char-var read-form eof-value unread-form
      &optional (skipped-char-form nil) (eof-detected-form nil))
   `(let ((,char-var ,read-form))
-    (cond ((eql ,char-var ,eof-value) 
+    (cond ((eql ,char-var ,eof-value)
            ,(if eof-detected-form
                 eof-detected-form
-                char-var))
+                eof-result))
           ((characterp ,peek-type)
            (do ((,char-var ,char-var ,read-form))
                ((or (eql ,char-var ,eof-value) 
@@ -40,7 +41,7 @@
                 (cond ((eql ,char-var ,eof-value)
                        ,(if eof-detected-form
                             eof-detected-form
-                            char-var))
+                            eof-result))
                       (t ,unread-form
                          ,char-var)))
              ,skipped-char-form))
@@ -51,7 +52,7 @@
                 (cond ((eql ,char-var ,eof-value)
                        ,(if eof-detected-form
                             eof-detected-form
-                            char-var))
+                            eof-result))
                       (t ,unread-form
                          ,char-var)))
              ,skipped-char-form))
@@ -76,7 +77,8 @@
         (t
          (generalized-peeking-mechanism
           peek-type eof-value char
-          (ansi-stream-read-char stream eof-error-p eof-value recursive-p)
+          (ansi-stream-read-char stream eof-error-p :eof recursive-p)
+	  :eof
           (ansi-stream-unread-char char stream)))))
 
 (defun peek-char (&optional (peek-type nil)
@@ -95,6 +97,7 @@
          (if (null peek-type)
              (stream-peek-char stream)
              (stream-read-char stream))
+	 :eof
          (if (null peek-type)
              ()
              (stream-unread-char stream char))
@@ -149,10 +152,11 @@
 			 (pop (echo-stream-unread-stuff stream)))
 			(t
 			 (setf unread-char-p nil)
-			 (read-char in (first arg2) (second arg2))))))
+			 (read-char in (first arg2) :eof)))))
 	   (generalized-peeking-mechanism
 	    arg1 (second arg2) char
 	    (infn)
+	    :eof
 	    (unread-char char in)
 	    (outfn char)))))
       (t

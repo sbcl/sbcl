@@ -74,6 +74,27 @@
 	 ;; (Before the fix, the LET* expression just signalled an error.)
 	 "a"))
 
+;;; Reported by Fredrik Sandstrom to sbcl-devel 2005-05-17 ("Bug in
+;;; peek-char"):
+;;; Description: In (peek-char nil s nil foo), if foo happens to be
+;;; the same character that peek-char returns, the character is
+;;; removed from the input stream, as if read by read-char.
+(assert (equal (with-input-from-string (s "123")
+		 (list (peek-char nil s nil #\1) (read-char s) (read-char s)))
+	       '(#\1 #\1 #\2)))
+
+;;; ... and verify that the fix does not break echo streams
+(assert (string= (let ((out (make-string-output-stream)))
+		   (with-open-stream (s (make-echo-stream
+					 (make-string-input-stream "123")
+					 out))
+		     (format s "=>~{~A~}"
+			     (list (peek-char nil s nil #\1)
+				   (read-char s)
+				   (read-char s)))
+		     (get-output-stream-string out)))
+		 "12=>112"))
+
 ;;; 0.7.12 doesn't advance current stream in concatenated streams
 ;;; correctly when searching a stream for a char to read.
 (with-input-from-string (p "")
