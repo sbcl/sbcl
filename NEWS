@@ -16,8 +16,11 @@ changes in sbcl-0.9.1 relative to sbcl-0.9.0:
     generic subtraction routines on x86/x86-64. (Thanks to Lutz Euler)
   * optimization: the code generated on x86-64 is more compact thanks
     to not outputting unneccessary prefix bytes. (Thanks to Lutz Euler)
-  * bug fix: floating-point exception handling now works on x86-64. 
-    (Thanks to James Knight)
+  * bug fix: floating-point exception handling now partly works on
+    x86-64.  (Thanks to James Knight)
+  * improvement to the MIPS backend from Thiemo Seufer: C-style
+    64-bit long long arguments and return values to alien functions
+    are now supported.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the type-error signalled from WARN has a filled-in DATUM slot.
     ** the type-error required when a stream is not associated with

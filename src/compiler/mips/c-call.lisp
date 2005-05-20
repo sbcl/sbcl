@@ -90,28 +90,25 @@
 (defstruct result-state
   (num-results 0))
 
-(defun offset-for-result (n)
-  (+ n 2)
-  #+nil
-  (if (= n 0)
-      cfunc-offset
-      (+ n 2)))
+(defun result-reg-offset (slot)
+  (ecase slot
+    (0 nl0-offset)
+    (1 nl1-offset)))
 
 (define-alien-type-method (integer :result-tn) (type state)
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
-    (multiple-value-bind
-	(ptype reg-sc)
+    (multiple-value-bind (ptype reg-sc)
 	(if (alien-integer-type-signed type)
 	    (values 'signed-byte-32 'signed-reg)
 	    (values 'unsigned-byte-32 'unsigned-reg))
-      (my-make-wired-tn ptype reg-sc (offset-for-result num-results)))))
+      (my-make-wired-tn ptype reg-sc (result-reg-offset num-results)))))
 
 (define-alien-type-method (system-area-pointer :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
-    (my-make-wired-tn 'system-area-pointer 'sap-reg (offset-for-result num-results))))
+    (my-make-wired-tn 'system-area-pointer 'sap-reg (result-reg-offset num-results))))
 
 ;;; FIXME: do these still work? -- CSR, 2002-08-28
 (define-alien-type-method (double-float :result-tn) (type state)
@@ -127,9 +124,12 @@
     (my-make-wired-tn 'single-float 'single-reg (* num-results 2))))
 
 (define-alien-type-method (values :result-tn) (type state)
-  (mapcar #'(lambda (type)
-	      (invoke-alien-type-method :result-tn type state))
-	  (alien-values-type-values type)))
+  (let ((values (alien-values-type-values type)))
+    (when (> (length values) 2)
+      (error "Too many result values from c-call."))
+    (mapcar #'(lambda (type)
+		(invoke-alien-type-method :result-tn type state))
+	    values)))
 
 (!def-vm-support-routine make-call-out-tns (type)
   (let ((arg-state (make-arg-state)))
@@ -142,6 +142,88 @@
 	      (invoke-alien-type-method :result-tn
 					(alien-fun-type-result-type type)
 					(make-result-state))))))
+
+(deftransform %alien-funcall ((function type &rest args))
+  (aver (sb!c::constant-lvar-p type))
+  (let* ((type (sb!c::lvar-value type))
+	 (env (sb!kernel:make-null-lexenv))
+	 (arg-types (alien-fun-type-arg-types type))
+	 (result-type (alien-fun-type-result-type type)))
+    (aver (= (length arg-types) (length args)))
+    ;; We need to do something special for 64-bit integer arguments
+    ;; and results.
+    (if (or (some #'(lambda (type)
+		      (and (alien-integer-type-p type)
+			   (> (sb!alien::alien-integer-type-bits type) 32)))
+		  arg-types)
+	    (and (alien-integer-type-p result-type)
+		 (> (sb!alien::alien-integer-type-bits result-type) 32)))
+	(collect ((new-args) (lambda-vars) (new-arg-types))
+		 (dolist (type arg-types)
+		   (let ((arg (gensym)))
+		     (lambda-vars arg)
+		     (cond ((and (alien-integer-type-p type)
+				 (> (sb!alien::alien-integer-type-bits type) 32))
+			    ;; 64-bit long long types are stored in
+			    ;; consecutive locations, endian word order,
+			    ;; aligned to 8 bytes.
+			    (if (oddp (length (new-args)))
+				    (new-args nil))
+			    #!-little-endian
+			    (progn (new-args `(ash ,arg -32))
+				   (new-args `(logand ,arg #xffffffff))
+				   (if (oddp (length (new-arg-types)))
+				       (new-arg-types (parse-alien-type '(unsigned 32) env)))
+				   (if (alien-integer-type-signed type)
+				       (new-arg-types (parse-alien-type '(signed 32) env))
+				       (new-arg-types (parse-alien-type '(unsigned 32) env)))
+				   (new-arg-types (parse-alien-type '(unsigned 32) env)))
+			    #!+little-endian
+			    (progn (new-args `(logand ,arg #xffffffff))
+				   (new-args `(ash ,arg -32))
+				   (if (oddp (length (new-arg-types)))
+				       (new-arg-types (parse-alien-type '(unsigned 32) env)))
+				   (new-arg-types (parse-alien-type '(unsigned 32) env))
+				   (if (alien-integer-type-signed type)
+				       (new-arg-types (parse-alien-type '(signed 32) env))
+				       (new-arg-types (parse-alien-type '(unsigned 32) env)))))
+			   (t
+			    (new-args arg)
+			    (new-arg-types type)))))
+		 (cond ((and (alien-integer-type-p result-type)
+			     (> (sb!alien::alien-integer-type-bits result-type) 32))
+			(let ((new-result-type
+			       (let ((sb!alien::*values-type-okay* t))
+				 (parse-alien-type
+				  (if (alien-integer-type-signed result-type)
+				      #!-little-endian
+				      '(values (signed 32) (unsigned 32))
+				      #!+little-endian
+				      '(values (unsigned 32) (signed 32))
+				      '(values (unsigned 32) (unsigned 32)))
+				  env))))
+			  `(lambda (function type ,@(lambda-vars))
+			    (declare (ignore type))
+			     (multiple-value-bind
+			       #!-little-endian
+			       (high low)
+			       #!+little-endian
+			       (low high)
+			       (%alien-funcall function
+				  ',(make-alien-fun-type
+				       :arg-types (new-arg-types)
+				       :result-type new-result-type)
+				  ,@(new-args))
+			       (logior low (ash high 32))))))
+		       (t
+			`(lambda (function type ,@(lambda-vars))
+			  (declare (ignore type))
+			  (%alien-funcall function
+			   ',(make-alien-fun-type
+			      :arg-types (new-arg-types)
+			      :result-type result-type)
+			   ,@(new-args))))))
+	(sb!c::give-up-ir1-transform))))
 
 (define-vop (foreign-symbol-address)
   (:translate foreign-symbol-address)

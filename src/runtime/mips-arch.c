@@ -44,30 +44,43 @@ emulate_branch(os_context_t *context, unsigned int inst)
     unsigned int opcode = inst >> 26;
     unsigned int r1 = (inst >> 21) & 0x1f;
     unsigned int r2 = (inst >> 16) & 0x1f;
-    unsigned int bdisp = ((inst&(1<<15)) ? inst | (-1 << 16) : inst&0x7fff) << 2;
-    unsigned int jdisp = (inst&0x3ffffff) << 2;
-    unsigned int disp = 0;
+    unsigned int r3 = (inst >> 11) & 0x1f;
+    unsigned int disp = ((inst&(1<<15)) ? inst | (-1 << 16) : inst&0x7fff) << 2;
+    unsigned int jtgt = (*os_context_pc_addr(context) & ~0x0fffffff) | (inst&0x3ffffff) << 2;
+    unsigned int tgt = *os_context_pc_addr(context);
 
     switch(opcode) {
+    case 0x0: /* jr, jalr */
+	switch(inst & 0x3f) {
+	case 0x08: /* jr */
+	    tgt = *os_context_register_addr(context, r1);
+	    break;
+	case 0x09: /* jalr */
+	    tgt = *os_context_register_addr(context, r1);
+	    *os_context_register_addr(context, r3)
+		= *os_context_pc_addr(context) + 4;
+	    break;
+	}
+	break;
     case 0x1: /* bltz, bgez, bltzal, bgezal */
 	switch((inst >> 16) & 0x1f) {
 	case 0x00: /* bltz */
 	    if(*os_context_register_addr(context, r1) < 0)
-		disp = bdisp;
+		tgt += disp;
 	    break;
 	case 0x01: /* bgez */
 	    if(*os_context_register_addr(context, r1) >= 0)
-		disp = bdisp;
+		tgt += disp;
 	    break;
 	case 0x10: /* bltzal */
 	    if(*os_context_register_addr(context, r1) < 0)
-		disp = bdisp;
+		tgt += disp;
 	    *os_context_register_addr(context, 31)
 		= *os_context_pc_addr(context) + 4;
 	    break;
 	case 0x11: /* bgezal */
 	    if(*os_context_register_addr(context, r1) >= 0)
-		disp = bdisp;
+		tgt += disp;
 	    *os_context_register_addr(context, 31)
 		= *os_context_pc_addr(context) + 4;
 	    break;
@@ -76,33 +89,33 @@ emulate_branch(os_context_t *context, unsigned int inst)
     case 0x4: /* beq */
 	if(*os_context_register_addr(context, r1)
 	   == *os_context_register_addr(context, r2))
-	    disp = bdisp;
+	    tgt += disp;
 	break;
     case 0x5: /* bne */
 	if(*os_context_register_addr(context, r1) 
 	   != *os_context_register_addr(context, r2))
-	    disp = bdisp;
+	    tgt += disp;
 	break;
     case 0x6: /* blez */
 	if(*os_context_register_addr(context, r1)
 	   <= *os_context_register_addr(context, r2))
-	    disp = bdisp;
+	    tgt += disp;
 	break;
     case 0x7: /* bgtz */
 	if(*os_context_register_addr(context, r1)
 	   > *os_context_register_addr(context, r2))
-	    disp = bdisp;
+	    tgt += disp;
 	break;
     case 0x2: /* j */
-	disp = jdisp;
+	tgt = jtgt;
 	break;
     case 0x3: /* jal */
-	disp = jdisp;
+	tgt = jtgt;
 	*os_context_register_addr(context, 31)
 	    = *os_context_pc_addr(context) + 4;
 	break;
     }
-    return *os_context_pc_addr(context) + disp;
+    return tgt;
 }
 
 void
@@ -121,9 +134,6 @@ arch_skip_instruction(os_context_t *context)
 	    = emulate_branch(context, *os_context_pc_addr(context));
     } else
         *os_context_pc_addr(context) += 4;
-
-    os_flush_icache((os_vm_address_t)*os_context_pc_addr(context),
-		    sizeof(unsigned int));
 }
 
 unsigned char *

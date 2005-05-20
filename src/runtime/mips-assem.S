@@ -176,12 +176,9 @@ lra:
 
 	/* Multiple value return spot, clear stack. */
 	move	reg_CSP, reg_OCFP
-	 nop
+	nop
 
 	/* Single value return spot. */
-
-	/* Pass one return value back to C land. */ 
-	move	v0, reg_A0	# reg_CFUNC
 
 	/* Nested lisp -> C calls may have clobbered gp. */
 	lw	gp, framesize-16(sp)
@@ -207,6 +204,11 @@ lra:
 	 subu	reg_ALLOC, 1
 	break	0x10
 1:	.set	reorder
+
+	/* Pass one return value back to C land. For a 64bit value, we may
+	   need to clobber v1 aka reg_NL4. */
+	move	v0, reg_A0	# reg_CFUNC
+	move	v1, reg_A1	# reg_NL4
 
 	/* Restore C regs */
 	lw	ra, framesize-8(sp)
@@ -283,6 +285,10 @@ lra:
 
 	lw      gp, 8(reg_CFP)
 	
+	/* Pass 64bit return value to lisp land. */ 
+	move	reg_NL0, v0		# reg_CFUNC
+	move	reg_NL1, v1		# reg_NL4
+
 	li	reg_NIL, NIL
 
 	/* Clear unsaved boxed descriptor regs */
@@ -339,7 +345,7 @@ lra:
  * The undefined-function trampoline.
  */
 	LEAF(undefined_tramp)
-        break	10
+        break	trap_Error
         .byte	4
         .byte	UNDEFINED_FUN_ERROR
         .byte	254
@@ -363,13 +369,14 @@ lra:
 /*
  * Function-end breakpoint magic.
  */
+	.align	3
 	LEAF(fun_end_breakpoint_guts)
 	.set	noreorder
-	.align	3
 	.word	RETURN_PC_HEADER_WIDETAG
-	
+
 	b	multiple_value_return
 	 nop
+	.set	reorder
 
 	move	reg_OCFP, reg_CSP
 	addu	reg_CSP, 4
@@ -384,9 +391,6 @@ multiple_value_return:
 
 	FEXPORT(fun_end_breakpoint_trap)
 	break	trap_FunEndBreakpoint
-1:	b	1b
-	 nop
-
+	b	multiple_value_return
 	EXPORT(fun_end_breakpoint_end)
-	.set	reorder
 	END(fun_end_breakpoint_guts)
