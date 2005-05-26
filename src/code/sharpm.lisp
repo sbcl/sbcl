@@ -21,7 +21,12 @@
 (defun sharp-left-paren (stream ignore length)
   (declare (ignore ignore) (special *backquote-count*))
   (let* ((list (read-list stream nil))
-	 (listlength (length list)))
+	 (listlength (handler-case (length list)
+		       (type-error
+			(error)
+			(declare (ignore error))
+			(%reader-error stream "improper list in #(): ~S"
+				       list)))))
     (declare (list list)
 	     (fixnum listlength))
     (cond (*read-suppress* nil)

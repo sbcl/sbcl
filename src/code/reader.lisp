@@ -554,9 +554,10 @@
 	    (let ((nextchar (read-char stream t)))
 	      (cond ((token-delimiterp nextchar)
 		     (cond ((eq listtail thelist)
-			    (%reader-error
-			     stream
-			     "Nothing appears before . in list."))
+			    (unless *read-suppress*
+			      (%reader-error
+			       stream
+			       "Nothing appears before . in list.")))
 			   ((whitespacep nextchar)
 			    (setq nextchar (flush-whitespace stream))))
 		     (rplacd listtail
@@ -577,7 +578,9 @@
   (let ((lastobj ()))
     (do ((char firstchar (flush-whitespace stream)))
 	((char= char #\) )
-	 (%reader-error stream "Nothing appears after . in list."))
+	 (if *read-suppress*
+	     (return-from read-after-dot nil)
+	     (%reader-error stream "Nothing appears after . in list.")))
       ;; See whether there's something there.
       (setq lastobj (read-maybe-nothing stream char))
       (when lastobj (return t)))
@@ -587,7 +590,8 @@
 		   (flush-whitespace stream)))
 	((char= lastchar #\) ) lastobj)	;success!
       ;; Try reading virtual whitespace.
-      (if (read-maybe-nothing stream lastchar)
+      (if (and (read-maybe-nothing stream lastchar)
+	       (not *read-suppress*))
 	  (%reader-error stream "More than one object follows . in list.")))))
 
 (defun read-string (stream closech)

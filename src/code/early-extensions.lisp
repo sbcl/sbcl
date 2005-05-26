@@ -645,12 +645,14 @@
 (defun legal-fun-name-p (name)
   (values (valid-function-name-p name)))
 
+(deftype function-name () '(satisfies legal-fun-name-p))
+
 ;;; Signal an error unless NAME is a legal function name.
 (defun legal-fun-name-or-type-error (name)
   (unless (legal-fun-name-p name)
     (error 'simple-type-error
 	   :datum name
-	   :expected-type '(or symbol (cons (member setf) (cons symbol null)))
+	   :expected-type 'function-name
 	   :format-control "invalid function name: ~S"
 	   :format-arguments (list name))))
 
