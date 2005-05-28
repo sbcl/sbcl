@@ -105,15 +105,15 @@ time sh make-target-contrib.sh || exit 1
 
 # Sometimes people used to see the "No tests failed." output from the last
 # DEFTEST in contrib self-tests and think that's all that is. So...
-FLAG=true
+HEADER_HAS_BEEN_PRINTED=false
 for dir in contrib/*
 do
-  if [ -d "$dir" -a -e "$dir/Makefile" -a ! -e "$dir/test-passed" ]; then
-      if $FLAG; then
+  if [ -d "$dir" -a -f "$dir/Makefile" -a ! -f "$dir/test-passed" ]; then
+      if $HEADER_HAS_BEEN_PRINTED; then
 	  echo > /dev/null
       else
 	  echo "Failed contribs:"
-	  FLAG=false
+	  HEADER_HAS_BEEN_PRINTED=true
       fi
       echo "  `basename $dir`"
   fi

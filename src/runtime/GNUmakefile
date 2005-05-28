@@ -52,7 +52,7 @@ sbcl: ${OBJS}
 	$(CC) ${LINKFLAGS} ${OS_LINK_FLAGS} -o $@ ${OBJS} ${OS_OBJS} ${OS_LIBS} -lm
 
 
-.PHONY: clean all
+.PHONY: clean
 clean:
 	-rm -f depend *.o sbcl sbcl.nm core *.tmp $(CLEAN_FILES)
 

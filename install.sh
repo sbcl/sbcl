@@ -98,8 +98,8 @@ cp doc/sbcl.1 $BUILD_ROOT$MAN_DIR/man1/ && echo " man $BUILD_ROOT$MAN_DIR/man1/s
 for info in doc/manual/*.info
 do
   cp $info $BUILD_ROOT$INFO_DIR/ \
-      && echo -n " info $BUILD_ROOT$INFO_DIR/`basename $info`" \
-      && ( install-info $BUILD_ROOT$INFO_DIR/`basename $info` > /dev/null 2>&1 \
+      && echo -n " info $BUILD_ROOT$INFO_DIR/`basename $info` $BUILD_ROOT$INFO_DIR/dir" \
+      && ( install-info $BUILD_ROOT$INFO_DIR/`basename $info` $BUILD_ROOT$INFO_DIR/dir > /dev/null 2>&1 \
            || echo -n " (could not add to system catalog)" ) \
       && echo
 done
