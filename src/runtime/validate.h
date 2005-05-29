@@ -12,13 +12,21 @@
 #if !defined(_INCLUDE_VALIDATE_H_)
 #define _INCLUDE_VALIDATE_H_
 
-/* constants derived from the fundamental constants in passed by GENESIS */
-#define   BINDING_STACK_SIZE (1024*1024) /* chosen at random */
-#define   DYNAMIC_SPACE_SIZE (  DYNAMIC_SPACE_END -   DYNAMIC_SPACE_START)
-#define READ_ONLY_SPACE_SIZE (READ_ONLY_SPACE_END - READ_ONLY_SPACE_START)
-#define    STATIC_SPACE_SIZE (   STATIC_SPACE_END -    STATIC_SPACE_START)
-#define THREAD_CONTROL_STACK_SIZE (2*1024*1024)	/* eventually this'll be choosable per-thread */
+#ifndef LISP_FEATURE_GENCGC
+#define DYNAMIC_SPACE_START current_dynamic_space
+#endif
 
+#define        BINDING_STACK_SIZE (1024*1024)   /* chosen at random */
+#define THREAD_CONTROL_STACK_SIZE (2*1024*1024) /* eventually choosable per-thread */
+
+/* constants derived from the fundamental constants in passed by GENESIS */
+#ifdef LISP_FEATURE_GENCGC
+#define       DYNAMIC_SPACE_SIZE       (DYNAMIC_SPACE_END -       DYNAMIC_SPACE_START)
+#else
+#define       DYNAMIC_SPACE_SIZE     (DYNAMIC_0_SPACE_END -     DYNAMIC_0_SPACE_START)
+#endif
+#define     READ_ONLY_SPACE_SIZE     (READ_ONLY_SPACE_END -     READ_ONLY_SPACE_START)
+#define        STATIC_SPACE_SIZE        (STATIC_SPACE_END -        STATIC_SPACE_START)
 #ifdef LISP_FEATURE_LINKAGE_TABLE
 #define LINKAGE_TABLE_SPACE_SIZE (LINKAGE_TABLE_SPACE_END - LINKAGE_TABLE_SPACE_START)
 #endif

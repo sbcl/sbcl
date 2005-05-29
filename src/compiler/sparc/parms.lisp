@@ -101,13 +101,6 @@
   (def!constant static-space-start        #x28000000)
   (def!constant static-space-end          #x2c000000)
 
-  ;; From alpha/parms.lisp:
-  ;; this is used in PURIFY as part of a sloppy check to see if a pointer
-  ;; is in dynamic space.  Chocolate brownie for the first person to fix it
-  ;; -dan 20010502
-  (def!constant dynamic-space-start   #x30000000)
-  (def!constant dynamic-space-end     #x38000000)
-
   (def!constant dynamic-0-space-start #x30000000)
   (def!constant dynamic-0-space-end   #x38000000)
   
@@ -124,9 +117,6 @@
   
   (def!constant static-space-start        #x28000000)
   (def!constant static-space-end          #x2c000000)
-
-  (def!constant dynamic-space-start       #x30000000)
-  (def!constant dynamic-space-end         #x38000000)
 
   (def!constant dynamic-0-space-start     #x30000000)
   (def!constant dynamic-0-space-end       #x38000000)

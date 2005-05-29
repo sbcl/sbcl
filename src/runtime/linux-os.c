@@ -192,8 +192,8 @@ is_valid_lisp_addr(os_vm_address_t addr)
 #if defined LISP_FEATURE_GENCGC
 	|| (DYNAMIC_SPACE_START <= ad && ad < DYNAMIC_SPACE_END)
 #else
-	|| (DYNAMIC_0_SPACE_START <= ad && ad < DYNAMIC_SPACE_END)
-	|| (DYNAMIC_1_SPACE_START <= ad && ad < DYNAMIC_SPACE_END)
+	|| (DYNAMIC_0_SPACE_START <= ad && ad < DYNAMIC_0_SPACE_END)
+	|| (DYNAMIC_1_SPACE_START <= ad && ad < DYNAMIC_1_SPACE_END)
 #endif
 	)
 	return 1;

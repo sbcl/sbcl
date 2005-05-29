@@ -171,8 +171,7 @@
      (values (int-sap read-only-space-start)
 	     (int-sap (* *read-only-space-free-pointer* n-word-bytes))))
     (:dynamic
-     (values (int-sap #!+gencgc dynamic-space-start 
-		      #!-gencgc (current-dynamic-space-start))
+     (values (int-sap (current-dynamic-space-start))
 	     (dynamic-space-free-pointer)))))
 
 ;;; Return the total number of bytes used in SPACE.

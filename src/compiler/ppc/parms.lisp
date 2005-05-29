@@ -90,22 +90,16 @@
 (def!constant static-space-start    #x08000000)
 (def!constant static-space-end      #x097fff00)
 
-;;; FIXME: this is a gross violation of OAOO, done purely to support
-;;; the #define of DYNAMIC_SPACE_SIZE in validate.c -- CSR, 2002-02-25
-;;; (these numbers should match dynamic-0-*)
-(def!constant dynamic-space-start   #x40000000)
-(def!constant dynamic-space-end     #x47fff000)
-
 ;;; nothing _seems_ to be using these addresses 
-(def!constant dynamic-0-space-start #x40000000)
-(def!constant dynamic-0-space-end   #x47fff000)
-(def!constant dynamic-1-space-start #x48000000)
-(def!constant dynamic-1-space-end   #x4ffff000)
+(def!constant dynamic-0-space-start #x10000000)
+(def!constant dynamic-0-space-end   #x3ffff000)
+(def!constant dynamic-1-space-start #x40000000)
+(def!constant dynamic-1-space-end   #x6ffff000)
 
 #!+darwin
 (progn
-  (def!constant linkage-table-space-start #x50000000)
-  (def!constant linkage-table-space-end   #x51000000)
+  (def!constant linkage-table-space-start #x0a000000)
+  (def!constant linkage-table-space-end   #x0b000000)
   (def!constant linkage-table-entry-size 16))
 
 ;;;; Other miscellaneous constants.

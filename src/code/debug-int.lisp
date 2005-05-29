@@ -2012,7 +2012,7 @@ register."
 		(< sb!vm:static-space-start val
 		   (* sb!vm:*static-space-free-pointer*
 		      sb!vm:n-word-bytes))
-		(< sb!vm:dynamic-space-start val
+		(< (current-dynamic-space-start) val
 		   (sap-int (dynamic-space-free-pointer))))))
       (make-lisp-obj val)
       :invalid-object))

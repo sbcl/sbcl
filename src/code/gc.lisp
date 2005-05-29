@@ -17,24 +17,21 @@
 		  sb!vm:*static-space-free-pointer*))
 
 (eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro def-c-var-frob (lisp-fun c-var-name)
-    `(progn
-       #!-sb-fluid (declaim (inline ,lisp-fun))
-       (defun ,lisp-fun ()
-	 (sb!alien:extern-alien ,c-var-name (sb!alien:unsigned 32))))))
-
-#!-gencgc
-(progn
-  ;; This is called once per PROFILEd function call, so it's worth a
-  ;; little possible space cost to reduce its time cost.
-  #!-sb-fluid
-  (declaim (inline current-dynamic-space-start))
-  (def-c-var-frob current-dynamic-space-start "current_dynamic_space"))
+  (sb!xc:defmacro def-c-var-fun (lisp-fun c-var-name)
+    `(defun ,lisp-fun ()
+       (sb!alien:extern-alien ,c-var-name (sb!alien:unsigned 32)))))
 
 #!-sb-fluid
-(declaim (inline dynamic-usage)) ; to reduce PROFILEd call overhead
+(declaim (inline current-dynamic-space-start))
 #!+gencgc
-(def-c-var-frob dynamic-usage "bytes_allocated")
+(defun current-dynamic-space-spart () sb!vm:dynamic-space-start)
+#!-gencgc
+(def-c-var-fun current-dynamic-space-start "current_dynamic_space")
+
+#!-sb-fluid
+(declaim (inline dynamic-usage))
+#!+gencgc
+(def-c-var-fun dynamic-usage "bytes_allocated")
 #!-gencgc
 (defun dynamic-usage ()
   (the (unsigned-byte 32)

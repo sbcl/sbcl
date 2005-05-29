@@ -68,9 +68,6 @@
 (def!constant static-space-start    #x28000000)
 (def!constant static-space-end      #x2a000000)
 
-(def!constant dynamic-space-start   #x30000000)
-(def!constant dynamic-space-end     #x37fff000)
-
 (def!constant dynamic-0-space-start   #x30000000)
 (def!constant dynamic-0-space-end     #x37fff000)
 (def!constant dynamic-1-space-start   #x38000000)
