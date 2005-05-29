@@ -396,7 +396,15 @@
                            (:metaclass option-class))))
   (assert (not result))
   (assert error))
-                         
+
+;;; class as :metaclass                         
+(assert (typep
+	 (sb-mop:ensure-class-using-class 
+	  nil 'class-as-metaclass-test
+	  :metaclass (find-class 'standard-class)
+	  :name 'class-as-metaclass-test
+	  :direct-superclasses (list (find-class 'standard-object)))
+	 'class))
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

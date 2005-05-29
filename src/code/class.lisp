@@ -173,9 +173,9 @@
   ;;     and PCL has made it invalid and made a note to itself about it
   (invalid :uninitialized :type (or cons (member nil t :uninitialized)))
   ;; the layouts for all classes we inherit. If hierarchical, i.e. if
-  ;; DEPTHOID >= 0, then these are ordered by ORDER-LAYOUT-INHERITS,
-  ;; so that each inherited layout appears at its expected depth,
-  ;; i.e. at its LAYOUT-DEPTHOID value.
+  ;; DEPTHOID >= 0, then these are ordered by ORDER-LAYOUT-INHERITS
+  ;; (least to most specific), so that each inherited layout appears
+  ;; at its expected depth, i.e. at its LAYOUT-DEPTHOID value.
   ;;
   ;; Remaining elements are filled by the non-hierarchical layouts or,
   ;; if they would otherwise be empty, by copies of succeeding layouts.

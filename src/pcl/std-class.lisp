@@ -349,15 +349,17 @@
 (defun ensure-class-values (class initargs)
   (let (metaclass metaclassp reversed-plist)
     (doplist (key val) initargs
-        (cond ((eq key :metaclass)
-               (setf metaclass val
-                     metaclassp key))
-              (t
-               (when (eq key :direct-superclasses)
-                 (setf val (mapcar #'fix-super val)))
-               (setf reversed-plist (list* val key reversed-plist)))))
+      (cond ((eq key :metaclass)
+	     (setf metaclass val
+		   metaclassp key))
+	    (t
+	     (when (eq key :direct-superclasses)
+	       (setf val (mapcar #'fix-super val)))
+	     (setf reversed-plist (list* val key reversed-plist)))))
     (values (cond (metaclassp
-                   (find-class metaclass))
+		   (if (classp metaclass)
+		       metaclass
+		       (find-class metaclass)))
                   ((or (null class) (forward-referenced-class-p class))
                    *the-class-standard-class*)
                   (t
