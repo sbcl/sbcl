@@ -81,9 +81,6 @@
    (+ (sb!kernel:get-lisp-obj-address lock)
       (- (* 5 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag))))
 
-(sb!alien:define-alien-routine "block_sigcont"  void)
-(sb!alien:define-alien-routine "unblock_sigcont_and_sleep"  void)
-
 (declaim (inline futex-wait futex-wake))
 (sb!alien:define-alien-routine
     "futex_wait" int (word unsigned-long) (old-value unsigned-long))

@@ -27,6 +27,7 @@
 int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
 struct thread *all_threads;
 volatile lispobj all_threads_lock;
+volatile lispobj thread_start_lock;
 extern struct interrupt_data * global_interrupt_data;
 extern int linux_no_threads_p;
 
@@ -142,7 +143,7 @@ struct thread * create_thread_struct(lispobj initial_function) {
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
     th->pid=0;
-    th->state=STATE_STOPPED;
+    th->state=STATE_STARTING;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
 			     + ALIEN_STACK_SIZE-N_WORD_BYTES);
@@ -211,10 +212,10 @@ void link_thread(struct thread *th,pid_t kid_pid)
      * to ensure that we don't have >1 thread with pid=0 on the list at once
      */
     protect_control_stack_guard_page(th->pid,1);
+    th->pid=kid_pid;		/* child will not start until this is set */
     release_spinlock(&all_threads_lock);
 
     sigprocmask(SIG_SETMASK,&oldset,0);
-    th->pid=kid_pid;		/* child will not start until this is set */
 }
 
 void create_initial_thread(lispobj initial_function) {
@@ -234,6 +235,13 @@ pid_t create_thread(lispobj initial_function) {
     if(linux_no_threads_p) return 0;
     th=create_thread_struct(initial_function);
     if(th==0) return 0;
+#ifdef QSHOW_SIGNALS
+    SHOW("create_thread:waiting on lock");
+#endif
+    get_spinlock(&thread_start_lock,arch_os_get_current_thread()->pid);
+#ifdef QSHOW_SIGNALS
+    SHOW("create_thread:got lock");
+#endif
     kid_pid=clone(new_thread_trampoline,
 		  (((void*)th->control_stack_start)+
 		   THREAD_CONTROL_STACK_SIZE-16),
@@ -241,8 +249,19 @@ pid_t create_thread(lispobj initial_function) {
     
     if(kid_pid>0) {
 	link_thread(th,kid_pid);
+        /* wait here until our thread is started: see new_thread_trampoline */
+        while(th->state==STATE_STARTING) sched_yield();
+        /* it's started and initialized, it's safe to gc */
+        release_spinlock(&thread_start_lock);
+#ifdef QSHOW_SIGNALS
+        SHOW("create_thread:released lock");
+#endif
 	return th->pid;
     } else {
+        release_spinlock(&thread_start_lock);
+#ifdef QSHOW_SIGNALS
+        SHOW("create_thread:released lock(failure)");
+#endif
 	os_invalidate((os_vm_address_t) th->control_stack_start,
 		      ((sizeof (lispobj))
 		       * (th->control_stack_end-th->control_stack_start)) +
@@ -306,32 +325,6 @@ void reap_dead_threads()
     }
 }
 
-/* These are not needed unless #+SB-THREAD, and since sigwaitinfo()
- * doesn't seem to be easily available everywhere (OpenBSD...) it's
- * more trouble than it's worth to compile it when not needed. */
-void block_sigcont(void)
-{
-    /* don't allow ourselves to receive SIGCONT while we're in the
-     * "ambiguous" state of being on the queue but not actually stopped.
-     */
-    sigset_t newset;
-    sigemptyset(&newset);
-    sigaddset(&newset,SIG_DEQUEUE);
-    sigprocmask(SIG_BLOCK, &newset, 0); 
-}
-
-void unblock_sigcont_and_sleep(void)
-{
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set,SIG_DEQUEUE);
-    do {
-	errno=0;
-	sigwaitinfo(&set,0);
-    }while(errno==EINTR);
-    sigprocmask(SIG_UNBLOCK,&set,0);
-}
-
 int interrupt_thread(pid_t pid, lispobj function)
 {
     union sigval sigval;
@@ -352,50 +345,80 @@ int signal_thread_to_dequeue (pid_t pid)
 /* stopping the world is a two-stage process.  From this thread we signal 
  * all the others with SIG_STOP_FOR_GC.  The handler for this signal does
  * the usual pseudo-atomic checks (we don't want to stop a thread while 
- * it's in the middle of allocation) then kills _itself_ with SIGSTOP.
+ * it's in the middle of allocation) then waits for another SIG_STOP_FOR_GC.
  */
 
 void gc_stop_the_world()
 {
-    /* stop all other threads by sending them SIG_STOP_FOR_GC */
+#ifdef QSHOW_SIGNALS
+    SHOW("gc_stop_the_world:begin");
+#endif
     struct thread *p,*th=arch_os_get_current_thread();
-    pid_t old_pid;
-    int finished;
-    do {
-	finished=1;
-	for(p=all_threads,old_pid=p->pid; p; p=p->next) {
-	    if(p==th) continue;
-	    if(p->state==STATE_RUNNING) {
-		p->state=STATE_STOPPING;
-		if(kill(p->pid,SIG_STOP_FOR_GC)==-1) {
-		    /* we can't kill the process; assume because it
-		     * died already (and its parent is dead so never
-		     * saw the SIGCHLD) */
-		    p->state=STATE_DEAD;
-		}
-	    }
-	    if((p->state!=STATE_STOPPED) &&
-	       (p->state!=STATE_DEAD)) {
-		finished=0;
-	    }
-	}
-	if(old_pid!=all_threads->pid) {
-	    finished=0;
-	}
-    } while(!finished);
+    /* keep threads from starting while the world is stopped. */
+    get_spinlock(&thread_start_lock,th->pid);
+#ifdef QSHOW_SIGNALS
+    SHOW("gc_stop_the_world:locked");
+#endif
+    /* stop all other threads by sending them SIG_STOP_FOR_GC */
+    for(p=all_threads; p; p=p->next) {
+        if((p!=th) && (p->pid!=0) && (p->state==STATE_RUNNING)) {
+            p->state=STATE_STOPPING;
+            if(kill(p->pid,SIG_STOP_FOR_GC)==-1) {
+                /* we can't kill the process; assume because it
+                 * died already (and its parent is dead so never
+                 * saw the SIGCHLD) */
+                p->state=STATE_DEAD;
+            }
+        }
+    }
+#ifdef QSHOW_SIGNALS
+    SHOW("gc_stop_the_world:signals sent");
+#endif
+    /* wait for the running threads to stop */
+    for(p=all_threads;p;) {
+        if((p==th) || (p->pid==0) || (p->state==STATE_STARTING) ||
+           (p->state==STATE_DEAD) || (p->state==STATE_STOPPED)) {
+            p=p->next;
+        }
+    }
+#ifdef QSHOW_SIGNALS
+    SHOW("gc_stop_the_world:end");
+#endif
 }
 
 void gc_start_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
     /* if a resumed thread creates a new thread before we're done with
-     * this loop, the new thread will get consed on the front of *
-     * all_threads_lock, but it won't have been stopped so won't need
-     * restarting */
+     * this loop, the new thread will get consed on the front of
+     * all_threads, but it won't have been stopped so won't need
+     * restarting; there can be threads just starting from before
+     * gc_stop_the_world, though */
+#ifdef QSHOW_SIGNALS
+    SHOW("gc_start_the_world:begin");
+#endif
     for(p=all_threads;p;p=p->next) {
-	if((p==th) || (p->state==STATE_DEAD)) continue;
-	p->state=STATE_RUNNING;
-	kill(p->pid,SIG_STOP_FOR_GC);
+	if((p!=th) && (p->pid!=0) && (p->state!=STATE_STARTING) &&
+           (p->state!=STATE_DEAD)) {
+            if(p->state!=STATE_STOPPED) {
+                lose("gc_start_the_world: wrong thread state is %ld\n",
+                     fixnum_value(p->state));
+            }
+            kill(p->pid,SIG_STOP_FOR_GC);
+        }
     }
+    /* we must wait for all threads to leave stopped state else we
+     * risk signal accumulation and lose any meaning of
+     * thread->state */
+    for(p=all_threads;p;) {
+        gc_assert(p->state!=STATE_STOPPING);
+        if((p==th) || (p->pid==0) || (p->state!=STATE_STOPPED)) {
+            p=p->next;
+        }
+    }
+    release_spinlock(&thread_start_lock);
+#ifdef QSHOW_SIGNALS
+    SHOW("gc_start_the_world:end");
+#endif
 }
 #endif

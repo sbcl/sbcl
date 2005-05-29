@@ -547,11 +547,19 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
      * awful state, to stop them from being waited for indefinitely.
      * Userland reaping is done later when GC is finished  */
     mark_dead_threads();
-
+    if(thread->state!=STATE_STOPPING) {
+      lose("sig_stop_for_gc_handler: wrong thread state: %ld\n",
+           fixnum_value(thread->state));
+    }
     thread->state=STATE_STOPPED;
 
     sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
     sigwaitinfo(&ss,0);
+    if(thread->state!=STATE_STOPPED) {
+      lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",
+           fixnum_value(thread->state));
+    }
+    thread->state=STATE_RUNNING;
 
     undo_fake_foreign_function_call(context);
 }

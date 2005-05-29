@@ -202,6 +202,31 @@
   (loop
    (when (and a-done b-done) (return))
    (sleep 1)))
+
+(defun waste (&optional (n 100000))
+  (loop repeat n do (make-string 16384)))
+
+(loop for i below 100 do
+      (format t "LOOP:~A~%" i)
+      (force-output)
+      (sb-thread:make-thread
+       #'(lambda ()
+           (waste)))
+      (waste)
+      (sb-ext:gc))
+
+(defparameter *aaa* nil)
+(loop for i below 100 do
+      (format t "LOOP:~A~%" i)
+      (force-output)
+      (sb-thread:make-thread
+       #'(lambda ()
+           (let ((*aaa* (waste)))
+             (waste))))
+      (let ((*aaa* (waste)))
+        (waste))
+      (sb-ext:gc))
+
 (format t "~&gc test done~%")
 
 #|  ;; a cll post from eric marsden
