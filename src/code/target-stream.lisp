@@ -27,32 +27,32 @@
 ;;; EOF-DETECTED-FORM - the form to execute when EOF has been detected
 ;;;                     (this will default to EOF-RESULT)
 (sb!xc:defmacro generalized-peeking-mechanism
-    (peek-type eof-result char-var read-form eof-value unread-form
+    (peek-type eof-value char-var read-form read-eof unread-form
      &optional (skipped-char-form nil) (eof-detected-form nil))
   `(let ((,char-var ,read-form))
-    (cond ((eql ,char-var ,eof-value)
+    (cond ((eql ,char-var ,read-eof)
            ,(if eof-detected-form
                 eof-detected-form
-                eof-result))
+                eof-value))
           ((characterp ,peek-type)
            (do ((,char-var ,char-var ,read-form))
-               ((or (eql ,char-var ,eof-value) 
+               ((or (eql ,char-var ,read-eof) 
                     (char= ,char-var ,peek-type))
-                (cond ((eql ,char-var ,eof-value)
+                (cond ((eql ,char-var ,read-eof)
                        ,(if eof-detected-form
                             eof-detected-form
-                            eof-result))
+                            eof-value))
                       (t ,unread-form
                          ,char-var)))
              ,skipped-char-form))
           ((eql ,peek-type t)
            (do ((,char-var ,char-var ,read-form))
-               ((or (eql ,char-var ,eof-value)
+               ((or (eql ,char-var ,read-eof)
                     (not (whitespacep ,char-var)))
-                (cond ((eql ,char-var ,eof-value)
+                (cond ((eql ,char-var ,read-eof)
                        ,(if eof-detected-form
                             eof-detected-form
-                            eof-result))
+                            eof-value))
                       (t ,unread-form
                          ,char-var)))
              ,skipped-char-form))

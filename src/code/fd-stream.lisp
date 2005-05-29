@@ -1345,10 +1345,11 @@
 	(output-size nil)
 	(character-stream-p (subtypep type 'character)))
 
-    (when (fd-stream-obuf-sap fd-stream)
+    ;; drop buffers when direction changes
+    (when (and (fd-stream-obuf-sap fd-stream) (not output-p))
       (push (fd-stream-obuf-sap fd-stream) *available-buffers*)
       (setf (fd-stream-obuf-sap fd-stream) nil))
-    (when (fd-stream-ibuf-sap fd-stream)
+    (when (and (fd-stream-ibuf-sap fd-stream) (not input-p))
       (push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
       (setf (fd-stream-ibuf-sap fd-stream) nil))
 
@@ -1387,9 +1388,6 @@
                 normalized-external-format))
 	(unless routine
 	  (error "could not find any input routine for ~S" target-type))
-	(setf (fd-stream-ibuf-sap fd-stream) (next-available-buffer))
-	(setf (fd-stream-ibuf-length fd-stream) bytes-per-buffer)
-	(setf (fd-stream-ibuf-tail fd-stream) 0)
 	(if character-stream-p
 	    (setf (fd-stream-in fd-stream) routine
 		  (fd-stream-bin fd-stream) #'ill-bin)
@@ -1434,9 +1432,6 @@
 	  (error "could not find any output routine for ~S buffered ~S"
 		 (fd-stream-buffering fd-stream)
 		 target-type))
-	(setf (fd-stream-obuf-sap fd-stream) (next-available-buffer))
-	(setf (fd-stream-obuf-length fd-stream) bytes-per-buffer)
-	(setf (fd-stream-obuf-tail fd-stream) 0)
 	(when character-stream-p
 	  (setf (fd-stream-output-bytes fd-stream) output-bytes))
 	(if character-stream-p
@@ -1450,7 +1445,6 @@
 		(fd-stream-bout fd-stream) routine))
 	(setf (fd-stream-sout fd-stream)
 	      (if (eql size 1) #'fd-sout #'ill-out))
-	(setf (fd-stream-char-pos fd-stream) 0)
 	(setf output-size size)
 	(setf output-type type)))
 
@@ -1765,6 +1759,15 @@
 				 :dual-channel-p dual-channel-p
 				 :external-format external-format
 				 :timeout timeout)))
+    (when input
+      (setf (fd-stream-ibuf-sap stream) (next-available-buffer))
+      (setf (fd-stream-ibuf-length stream) bytes-per-buffer)
+      (setf (fd-stream-ibuf-tail stream) 0))
+    (when output
+      (setf (fd-stream-obuf-sap stream) (next-available-buffer))
+      (setf (fd-stream-obuf-length stream) bytes-per-buffer)
+      (setf (fd-stream-obuf-tail stream) 0)
+      (setf (fd-stream-char-pos stream) 0))
     (set-fd-stream-routines stream element-type input output input-buffer-p)
     (when (and auto-close (fboundp 'finalize))
       (finalize stream
