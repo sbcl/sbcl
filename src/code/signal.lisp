@@ -47,13 +47,20 @@
     `(flet ((,name () ,@body))
        (if *interrupts-enabled*
 	   (unwind-protect
-	       (let ((*interrupts-enabled* nil))
-		 (,name))
+		(let ((*interrupts-enabled* nil))
+		  (,name))
 	     ;; FIXME: Does it matter that an interrupt coming in here
 	     ;; could be executed before any of the pending interrupts?
 	     ;; Or do incoming interrupts have the good grace to check
 	     ;; whether interrupts are pending before executing themselves
 	     ;; immediately?
+	     ;;
+	     ;; FIXME: from the kernel's POV we've already handled the
+	     ;; signal the moment we return from the handler having
+	     ;; decided to defer it, meaning that the kernel is free
+	     ;; to deliver _more_ signals to us... of which we save,
+	     ;; and subsequently handle here, only the last one.
+	     ;; PSEUDO-ATOMIC has the same issue. -- NS 2005-05-19
 	     (when *interrupt-pending*
 	       (receive-pending-interrupt)))
 	   (,name)))))

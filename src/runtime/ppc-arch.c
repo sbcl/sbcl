@@ -158,7 +158,8 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 	    break;
 	    
 	case trap_PendingInterrupt:
-	  /* when do we run this branch instead of the twlti code above? */
+	    /* This is supposed run after WITHOUT-INTERRUPTS if there
+	     * were pending signals. */
 	    arch_skip_instruction(context);
 	    interrupt_handle_pending(context);
 	    break;

@@ -305,8 +305,9 @@ interrupt_handle_pending(os_context_t *context)
 
     thread=arch_os_get_current_thread();
     data=thread->interrupt_data;
-    /* FIXME I'm not altogether sure this is appropriate if we're
-     * here as the result of a pseudo-atomic */
+
+    /* FIXME: This is almost certainly wrong if we're here as the
+     * result of a pseudo-atomic as opposed to WITHOUT-INTERRUPTS. */
     SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
 
     /* restore the saved signal mask from the original signal (the
@@ -816,6 +817,53 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 
 #endif
 
+void
+kludge_sigset_for_gc(sigset_t * set)
+{
+#ifndef LISP_FEATURE_GENCGC
+    /* FIXME: It is not sure if GENCGC is really right here: maybe this
+     * really affects eg. only Sparc and PPC. And the following KLUDGE
+     * could really use real fixing as well.
+     *
+     * KLUDGE: block some async signals that seem to have the ability
+     * to hang us in an uninterruptible state during GC -- at least
+     * part of the time. The main beneficiary of this is SB-SPROF, as
+     * SIGPROF was almost certain to be eventually triggered at a bad
+     * moment, rendering it virtually useless. SIGINT and SIGIO from
+     * user or eg. Slime also seemed to occasionally do this.
+     *
+     * The problem this papers over appears to be something going awry
+     * in SB-UNIX:RECEIVE-PENDING-SIGNALS at the end of the
+     * WITHOUT-INTERRUPTS in SUB-GC: adding debugging output shows us
+     * leaving the body of W-I, but never entering sigtrap_handler.
+     *
+     * Empirically, it seems that the problem is only triggered if the
+     * GC was triggered/deferred during a PA section, but this is not
+     * a sufficient condition: some collections triggered in such a
+     * manner seem to be able to receive and defer a signal during the
+     * GC without issues. Likewise empirically, it seems that the
+     * problem arises more often with floating point code then not. Eg
+     * (LOOP (* (RANDOM 1.0) (RANDOM 1.0))) will eventually hang if
+     * run with SB-SPROF on, but (LOOP (FOO (MAKE-LIST 24))) will not.
+     * All this makes some badnesss in the interaction between PA and
+     * W-I seem likely, possibly in the form of one or more bad VOPs.
+     * 
+     * For additional entertainment on the affected platforms we
+     * currently use an actual illegal instruction to receive pending
+     * interrupts instead of a trap: whether this has any bearing on
+     * the matter is unknown.
+     * 
+     * Apparently CMUCL blocks everything but SIGILL for GC on Sparc,
+     * possibly for this very reason.
+     *
+     * -- NS 2005-05-20
+     */
+    sigdelset(set, SIGPROF);
+    sigdelset(set, SIGIO);
+    sigdelset(set, SIGINT);
+#endif
+}
+
 /* this is also used by gencgc, in alloc() */
 boolean
 interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
@@ -823,16 +871,24 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
     sigset_t new;
     os_context_t *context=(os_context_t *) void_context;
     fake_foreign_function_call(context);
+
     /* SUB-GC may return without GCing if *GC-INHIBIT* is set, in
      * which case we will be running with no gc trigger barrier
      * thing for a while.  But it shouldn't be long until the end
-     * of WITHOUT-GCING. */
+     * of WITHOUT-GCING. 
+     *
+     * FIXME: It would be good to protect the end of dynamic space
+     * and signal a storage condition from there.
+     */
 
+    /* enable some signals before calling into Lisp */
     sigemptyset(&new);
     sigaddset_blockable(&new);
-    /* enable signals before calling into Lisp */
+    kludge_sigset_for_gc(&new);
     sigprocmask(SIG_UNBLOCK,&new,0);
+
     funcall0(SymbolFunction(SUB_GC));
+
     undo_fake_foreign_function_call(context);
     return 1;
 }
