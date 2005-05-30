@@ -129,8 +129,11 @@ os_context_fp_addr(os_context_t *context)
 unsigned long
 os_context_fp_control(os_context_t *context)
 {
-    int mxcsr = context->uc_mcontext.fpregs->mxcsr;
-    return ((mxcsr & 0x3F) << 16 | ((mxcsr >> 7) & 0x3F)) ^ 0x3F;
+    /* return the x87 exception flags ored in with the sse2 
+     * control+status flags */
+    unsigned int result = (context->uc_mcontext.fpregs->swd & 0x3F) | context->uc_mcontext.fpregs->mxcsr;
+    /* flip exception mask bits */
+    return result ^ (0x3F << 7);
 }
 
 sigset_t *
@@ -142,7 +145,11 @@ os_context_sigmask_addr(os_context_t *context)
 void
 os_restore_fp_control(os_context_t *context)
 {
-    asm ("ldmxcsr %0" : : "m" (context->uc_mcontext.fpregs->mxcsr));
+    /* reset exception flags and restore control flags on SSE2 FPU */
+    unsigned int temp = (context->uc_mcontext.fpregs->mxcsr) & ~0x3F;
+    asm ("ldmxcsr %0" : : "m" (temp));
+    /* same for x87 FPU. */
+    asm ("fldcw %0" : : "m" (context->uc_mcontext.fpregs->cwd));
 }
 
 void

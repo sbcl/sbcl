@@ -377,32 +377,6 @@
   (:generator 4
     (inst movss (make-ea :dword :base sap :disp offset) value)
     (move result value)))
-
-;;;; SAP-REF-LONG
-#+nil
-(define-vop (sap-ref-long)
-  (:translate sap-ref-long)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg))
-	 (offset :scs (signed-reg)))
-  (:arg-types system-area-pointer signed-num)
-  (:results (result :scs (#!+long-float long-reg #!-long-float double-reg)))
-  (:result-types #!+long-float long-float #!-long-float double-float)
-  (:generator 5
-     (with-empty-tn@fp-top(result)
-	(inst fldl (make-ea :qword :base sap :index offset)))))
-#+nil
-(define-vop (sap-ref-long-c)
-  (:translate sap-ref-long)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg)))
-  (:arg-types system-area-pointer (:constant (signed-byte 64)))
-  (:info offset)
-  (:results (result :scs (#!+long-float long-reg #!-long-float double-reg)))
-  (:result-types #!+long-float long-float #!-long-float double-float)
-  (:generator 4
-     (with-empty-tn@fp-top(result)
-	(inst fldl (make-ea :qword :base sap :disp offset)))))
 
 
 ;;; noise to convert normal lisp data objects into SAPs

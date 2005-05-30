@@ -85,7 +85,7 @@ void arch_skip_instruction(os_context_t *context)
 	    vlen = *(char*)(*os_context_pc_addr(context))++;
 	    /* Skip Lisp error arg data bytes. */
 	    while (vlen-- > 0) {
-		( (char*)(*os_context_pc_addr(context)) )++;
+		++*os_context_pc_addr(context);
 	    }
 	    break;
 
@@ -265,12 +265,12 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 	break;
 
     case trap_Breakpoint:
-	(char*)(*os_context_pc_addr(context)) -= 1;
+	--*os_context_pc_addr(context);
 	handle_breakpoint(signal, info, context);
 	break;
 
     case trap_FunEndBreakpoint:
-	(char*)(*os_context_pc_addr(context)) -= 1;
+	--*os_context_pc_addr(context);
 	*os_context_pc_addr(context) =
 	    (int)handle_fun_end_breakpoint(signal, info, context);
 	break;

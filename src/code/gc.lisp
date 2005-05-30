@@ -24,7 +24,7 @@
 #!-sb-fluid
 (declaim (inline current-dynamic-space-start))
 #!+gencgc
-(defun current-dynamic-space-spart () sb!vm:dynamic-space-start)
+(defun current-dynamic-space-start () sb!vm:dynamic-space-start)
 #!-gencgc
 (def-c-var-fun current-dynamic-space-start "current_dynamic_space")
 

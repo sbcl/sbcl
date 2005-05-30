@@ -60,24 +60,13 @@
 (def!constant double-float-hidden-bit (ash 1 20))
 (def!constant double-float-trapping-nan-bit (ash 1 19))
 
-(def!constant long-float-bias 16382)
-(defconstant-eqx long-float-exponent-byte    (byte 15 0) #'equalp)
-(defconstant-eqx long-float-significand-byte (byte 31 0) #'equalp)
-(def!constant long-float-normal-exponent-min 1)
-(def!constant long-float-normal-exponent-max #x7FFE)
-(def!constant long-float-hidden-bit (ash 1 31))		; actually not hidden
-(def!constant long-float-trapping-nan-bit (ash 1 30))
-
 (def!constant single-float-digits
   (+ (byte-size single-float-significand-byte) 1))
 
 (def!constant double-float-digits
   (+ (byte-size double-float-significand-byte) 32 1))
 
-(def!constant long-float-digits
-  (+ (byte-size long-float-significand-byte) 32 1))
-
-;;; pfw -- from i486 microprocessor programmer's reference manual
+;;; from AMD64 Architecture manual
 (def!constant float-invalid-trap-bit	   (ash 1 0))
 (def!constant float-denormal-trap-bit       (ash 1 1))
 (def!constant float-divide-by-zero-trap-bit (ash 1 2))
@@ -90,12 +79,11 @@
 (def!constant float-round-to-positive 2)
 (def!constant float-round-to-zero     3)
 
-(defconstant-eqx float-rounding-mode     (byte 2 10) #'equalp)
-(defconstant-eqx float-sticky-bits       (byte 6 16) #'equalp)
-(defconstant-eqx float-traps-byte        (byte 6  0) #'equalp)
-(defconstant-eqx float-exceptions-byte   (byte 6 16) #'equalp)
-(defconstant-eqx float-precision-control (byte 2  8) #'equalp)
-(def!constant float-fast-bit 0) ; no fast mode on x86
+(defconstant-eqx float-rounding-mode     (byte 2 13) #'equalp)
+(defconstant-eqx float-sticky-bits       (byte 6  0) #'equalp)
+(defconstant-eqx float-traps-byte        (byte 6  7) #'equalp)
+(defconstant-eqx float-exceptions-byte   (byte 6  0) #'equalp)
+(def!constant float-fast-bit 0) ; no fast mode on x86-64
 
 ;;;; description of the target address space
 

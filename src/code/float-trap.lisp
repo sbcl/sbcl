@@ -48,7 +48,7 @@
 ;;; interpreter stubs for floating point modes get/setters for the
 ;;; alpha have been removed to alpha-vm.lisp, as they are implemented
 ;;; in C rather than as VOPs.
-#!-alpha
+#!-(or alpha x86-64)
 (progn
   (defun floating-point-modes () 
     (floating-point-modes))

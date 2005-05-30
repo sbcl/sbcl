@@ -271,6 +271,14 @@
     (sb!alien:unsigned 32)
   (context (* os-context-t)))
 
+(define-alien-routine
+    ("arch_get_fp_modes" floating-point-modes) (sb!alien:unsigned 32))
+
+(define-alien-routine
+    ("arch_set_fp_modes" %floating-point-modes-setter) void (fp (sb!alien:unsigned 32)))
+
+(defun (setf floating-point-modes) (val) (%floating-point-modes-setter val))
+
 
 ;;;; INTERNAL-ERROR-ARGS
 

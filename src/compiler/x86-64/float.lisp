@@ -329,10 +329,9 @@
 							    (:single 1)
 							    (:double 2) ))
 						  n-word-bytes)))))
-			     (with-tn@fp-top(x)
-			       ,@(ecase format
-				    (:single '((inst movss ea x)))
-				    (:double '((inst movsd ea x)))))))))))
+			     ,@(ecase format
+				 (:single '((inst movss ea x)))
+				 (:double '((inst movsd ea x))))))))))
 		(define-move-vop ,name :move-arg
 		  (,sc descriptor-reg) (,sc)))))
   (frob move-single-float-arg single-reg single-stack :single)
@@ -765,61 +764,6 @@
      (inst shl lo-bits 32)
      (inst shr lo-bits 32)))
 
-
-;;;; float mode hackery
-
-(sb!xc:deftype float-modes () '(unsigned-byte 64)) ; really only 16
-(defknown floating-point-modes () float-modes (flushable))
-(defknown ((setf floating-point-modes)) (float-modes)
-  float-modes)
-
-(define-vop (floating-point-modes)
-  (:results (res :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:translate floating-point-modes)
-  (:policy :fast-safe)
-  (:temporary (:sc unsigned-stack :from :argument :to :result) temp)
-  (:generator 8
-   (inst stmxcsr temp)
-   (move res temp)
-   ;; Extract status from bytes 0-5 to bytes 16-21
-   (inst and temp (1- (expt 2 6)))
-   (inst shl temp 16)
-   ;; Extract mask from bytes 7-12 to bytes 0-5
-   (inst shr res 7)
-   (inst and res (1- (expt 2 6)))
-   ;; Flip the bits to convert from "1 means exception masked" to 
-   ;; "1 means exception enabled".
-   (inst xor res (1- (expt 2 6)))
-   (inst or res temp)))
-
-(define-vop (set-floating-point-modes)
-  (:args (new :scs (unsigned-reg) :to :result :target res))
-  (:results (res :scs (unsigned-reg)))
-  (:arg-types unsigned-num)
-  (:result-types unsigned-num)
-  (:translate (setf floating-point-modes))
-  (:policy :fast-safe)
-  (:temporary (:sc unsigned-reg :from :argument :to :result) temp1)
-  (:temporary (:sc unsigned-stack :from :argument :to :result) temp2)
-  (:generator 3
-   (move res new)	      
-   (inst stmxcsr temp2)
-   ;; Clear status + masks
-   (inst and temp2 (lognot (logior (1- (expt 2 6))
-				   (ash (1- (expt 2 6)) 7))))
-   ;; Replace current status
-   (move temp1 new)
-   (inst shr temp1 16)
-   (inst and temp1 (1- (expt 2 6)))
-   (inst or temp2 temp1)
-   ;; Replace exception masks
-   (move temp1 new)
-   (inst and temp1 (1- (expt 2 6)))
-   (inst xor temp1 (1- (expt 2 6)))
-   (inst shl temp1 7)
-   (inst or temp2 temp1)
-   (inst ldmxcsr temp2)))
 
 
 ;;;; complex float VOPs

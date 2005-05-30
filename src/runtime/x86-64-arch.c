@@ -84,7 +84,7 @@ void arch_skip_instruction(os_context_t *context)
 	    vlen = *(char*)(*os_context_pc_addr(context))++;
 	    /* Skip Lisp error arg data bytes. */
 	    while (vlen-- > 0) {
-		( (char*)(*os_context_pc_addr(context)) )++;
+		++*os_context_pc_addr(context);
 	    }
 	    break;
 
@@ -264,12 +264,12 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 	break;
 
     case trap_Breakpoint:
-	(char*)(*os_context_pc_addr(context)) -= 1;
+	--*os_context_pc_addr(context);
 	handle_breakpoint(signal, info, context);
 	break;
 
     case trap_FunEndBreakpoint:
-	(char*)(*os_context_pc_addr(context)) -= 1;
+	--*os_context_pc_addr(context);
 	*os_context_pc_addr(context) =
 	    (unsigned long)handle_fun_end_breakpoint(signal, info, context);
 	break;
@@ -391,3 +391,57 @@ arch_write_linkage_table_ref(void * reloc, void * data)
 }
 
 #endif
+
+/* These setup and check *both* the sse2 and x87 FPUs. While lisp code
+   only uses the sse2 FPU, other code (such as libc) may use the x87 FPU.
+ */
+ 
+unsigned int
+arch_get_fp_modes()
+{
+    unsigned int temp;
+    unsigned int result;
+    /* return the x87 exception flags ored in with the sse2 
+     * control+status flags */
+    asm ("fnstsw %0" : "=m" (temp));
+    result = temp;
+    result &= 0x3F;
+    asm ("stmxcsr %0" : "=m" (temp));
+    result |= temp;
+    /* flip exception mask bits */
+    return result ^ (0x3F << 7);
+}
+
+struct fpenv
+{
+    unsigned short cw;
+    unsigned short unused1;
+    unsigned short sw;
+    unsigned short unused2;
+    unsigned int other_regs[5];
+};
+
+void
+arch_set_fp_modes(unsigned int mxcsr)
+{
+    struct fpenv f_env;
+    unsigned int temp;
+
+    /* turn trap enable bits into exception mask */
+    mxcsr ^= 0x3F << 7;
+    
+    /* set x87 modes */
+    asm ("fnstenv %0" : "=m" (f_env));
+    /* set control word: always long double precision
+     * get traps and rounding from mxcsr word */
+    f_env.cw = 0x300 | ((mxcsr >> 7) & 0x3F) | (((mxcsr >> 13) & 0x3) << 10);
+    /* set status word: only override exception flags, from mxcsr */
+    f_env.sw &= ~0x3F;
+    f_env.sw |= (mxcsr & 0x3F);
+    
+    asm ("fldenv %0" : : "m" (f_env));
+    
+    /* now, simply, load up the mxcsr register */
+    temp = mxcsr;
+    asm ("ldmxcsr %0" : : "m" (temp));
+}
