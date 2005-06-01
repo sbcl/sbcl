@@ -68,16 +68,6 @@ bootstrapping.
 
 |#
 
-;;; FIXME: As of sbcl-0.6.9.10, PCL still uses this nonstandard type
-;;; of declaration internally. It would be good to figure out how to
-;;; get rid of it, or failing that, (1) document why it's needed and
-;;; (2) use a private symbol with a forbidding name which suggests
-;;; it's not to be messed with by the user (e.g. SB-PCL:%CLASS)
-;;; instead of the too-inviting CLASS. (I tried just deleting the
-;;; declarations in MAKE-METHOD-LAMBDA-INTERNAL ca. sbcl-0.6.9.10, but
-;;; then things break.)
-(declaim (declaration class))
-
 (declaim (notinline make-a-method
 		    add-named-method
 		    ensure-generic-function-using-class

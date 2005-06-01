@@ -1119,6 +1119,13 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 
 (define-condition timeout (serious-condition) ())
 
+(define-condition declaration-type-conflict-error (reference-condition
+						   simple-error)
+  ()
+  (:default-initargs
+      :format-control "symbol ~S cannot be both the name of a type and the name of a declaration"
+    :references (list '(:ansi-cl :section (3 8 21)))))
+
 ;;; Single stepping conditions
 
 (define-condition step-condition ()

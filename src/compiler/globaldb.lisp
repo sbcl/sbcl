@@ -162,9 +162,11 @@
   ;; a number that uniquely identifies this type (and implicitly its class)
   (number (missing-arg) :type type-number)
   ;; a type specifier which info of this type must satisfy
-  (type nil :type t)
+  (type nil :type t)  
   ;; a function called when there is no information of this type
-  (default (lambda () (error "type not defined yet")) :type function))
+  (default (lambda () (error "type not defined yet")) :type function)
+  ;; called by (SETF INFO) before calling SET-INFO-VALUE
+  (validate-function nil :type (or function null)))
 
 ;;; a map from class names to CLASS-INFO structures
 ;;;
@@ -277,6 +279,7 @@
     define-info-type (&key (class (missing-arg))
 			   (type (missing-arg))
 			   (type-spec (missing-arg))
+			   (validate-function)
 			   default)
   (declare (type keyword class type))
   `(progn
@@ -304,6 +307,8 @@
        ;; values differ in the use of SB!XC symbols instead of CL
        ;; symbols.)
        (push `(let ((type-info (type-info-or-lose ,',class ,',type)))
+	        (setf (type-info-validate-function type-info)
+		      ,',validate-function)
 		(setf (type-info-default type-info)
 		       ;; FIXME: This code is sort of nasty. It would
 		       ;; be cleaner if DEFAULT accepted a real
@@ -845,6 +850,8 @@
 		    &optional (env-list nil env-list-p))
   (let* ((info (type-info-or-lose class type))
 	 (tin (type-info-number info)))
+    (when (type-info-validate-function info)
+      (funcall (type-info-validate-function info) name new-value))
     (if env-list-p
 	(set-info-value name
 			tin
@@ -1220,7 +1227,13 @@
   :type :kind
   :type-spec (member :primitive :defined :instance
 		     :forthcoming-defclass-type nil)
-  :default nil)
+  :default nil
+  :validate-function (lambda (name new-value)
+		       (declare (ignore new-value)
+				(notinline info))
+		       (when (info :declaration :recognized name)
+			 (error 'declaration-type-conflict-error
+				:format-arguments (list name)))))
 
 ;;; the expander function for a defined type
 (define-info-type
@@ -1288,7 +1301,13 @@
 (define-info-type
   :class :declaration
   :type :recognized
-  :type-spec boolean)
+  :type-spec boolean
+  :validate-function (lambda (name new-value)
+		       (declare (ignore new-value)
+				(notinline info))
+		       (when (info :type :kind name)
+			 (error 'declaration-type-conflict-error
+				:format-arguments (list name)))))
 
 (define-info-class :alien-type)
 (define-info-type
