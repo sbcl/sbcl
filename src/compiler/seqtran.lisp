@@ -683,6 +683,10 @@
 (defun valid-bit-bash-saetp-p (saetp)
   ;; BIT-BASHing isn't allowed on simple vectors that contain pointers
   (and (not (eq t (sb!vm:saetp-specifier saetp)))
+       ;; Disallowing (VECTOR NIL) also means that we won't transform
+       ;; sequence functions into bit-bashing code and we let the
+       ;; generic sequence functions signal errors if necessary.
+       (not (zerop (sb!vm:saetp-n-bits saetp)))
        ;; Due to limitations with the current BIT-BASHing code, we can't
        ;; BIT-BASH reliably on arrays whose element types are larger
        ;; than the word size.
