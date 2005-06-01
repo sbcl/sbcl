@@ -2233,7 +2233,7 @@
     (loop for m = (ash 1 (1- length)) then (ash m -1)
           until (zerop m) do
           (cond
-            ((not (zerop (logand (logand (lognot a mask))
+            ((not (zerop (logand (logand (lognot a) mask)
                                  c
                                  m)))
              (let ((temp (logand (logior a m) (logand (- m) mask))))
@@ -2241,7 +2241,7 @@
                  (setf a temp)
                  (loop-finish))))
             ((not (zerop (logand a
-                                 (logand (lognot c mask))
+                                 (logand (lognot c) mask)
                                  m)))
              (let ((temp (logand (logior c m) (logand (- m) mask))))
                (when (<= temp d)
