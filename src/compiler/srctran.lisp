@@ -2177,7 +2177,7 @@
             ((not (zerop (logand (logand (lognot b) mask)
                                  d
                                  m)))
-             (let ((temp (logior (logand d (lognot b) mask)
+             (let ((temp (logior (logand d (lognot m) mask)
                                  (- m 1))))
                (when (>= temp c)
                  (setf d temp)

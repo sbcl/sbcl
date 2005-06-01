@@ -98,6 +98,12 @@
   (assert (raises-error? (scale-float 1.0d0 (1+ most-positive-fixnum))
 			 floating-point-overflow)))
 
+;;; bug found by jsnell when nfroyd tried to implement better LOGAND
+;;; type derivation.
+(assert (= (integer-decode-float (coerce -1756510900000000000
+                                         'single-float))
+           12780299))
+
 ;;; MISC.564: no out-of-line %ATAN2 for constant folding
 (assert (typep
   (funcall
