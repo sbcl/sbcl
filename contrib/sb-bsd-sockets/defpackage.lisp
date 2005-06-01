@@ -35,8 +35,8 @@
            socket-send socket-receive socket-recv
            socket-name socket-peername socket-listen
            socket-close socket-file-descriptor
-	   socket-family socket-protocol socket-type
-	   socket-make-stream get-protocol-by-name
+	   socket-family socket-protocol socket-open-p
+	   socket-type socket-make-stream get-protocol-by-name
 
            get-host-by-name get-host-by-address
            host-ent

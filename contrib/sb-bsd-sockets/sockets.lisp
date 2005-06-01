@@ -221,10 +221,20 @@ grow to before new connection attempts are refused.  See also listen(2)"))
     (if (= r -1)
         (socket-error "listen"))))
 
+(defgeneric socket-open-p (socket)
+  (:documentation "Return true if SOCKET is open; otherwise, return false.")
+  (:method ((socket t)) (error 'type-error
+			       :datum socket :expected-type 'socket)))
+
+(defmethod socket-open-p ((socket socket))
+  (if (slot-boundp socket 'stream)
+      (open-stream-p (slot-value socket 'stream))
+      (/= -1 (socket-file-descriptor socket))))
+
 (defgeneric socket-close (socket)
-  (:documentation "Close SOCKET.  May throw any kind of error that write(2) would have
-thrown.  If SOCKET-MAKE-STREAM has been called, calls CLOSE on that
-stream instead"))
+  (:documentation "Close SOCKET.  May throw any kind of error that
+write(2) would have thrown.  If SOCKET-MAKE-STREAM has been called,
+calls CLOSE on that stream instead"))
 
 (defmethod socket-close ((socket socket))
   ;; the close(2) manual page has all kinds of warning about not
@@ -244,9 +254,9 @@ stream instead"))
     (cond ((eql fd -1) ; already closed
 	   nil)
 	  ((slot-boundp socket 'stream)
-	   (close (slot-value socket 'stream)) ;; closes fd
-	   (setf (slot-value socket 'file-descriptor) -1)
-	   (slot-makunbound socket 'stream))
+	   (unwind-protect (close (slot-value socket 'stream)) ;; closes fd
+	     (setf (slot-value socket 'file-descriptor) -1)
+	     (slot-makunbound socket 'stream)))
 	  (t
 	   (sb-ext:cancel-finalization socket)
 	   (handler-case
@@ -259,12 +269,12 @@ stream instead"))
                nil))))))
 
     
-(defgeneric socket-make-stream (socket  &rest args)
-    (:documentation "Find or create a STREAM that can be used for IO
-on SOCKET (which must be connected).  ARGS are passed onto
+(defgeneric socket-make-stream (socket &rest args)
+  (:documentation "Find or create a STREAM that can be used for IO on
+SOCKET (which must be connected).  ARGS are passed onto
 SB-SYS:MAKE-FD-STREAM."))
 
-(defmethod socket-make-stream ((socket socket)  &rest args)
+(defmethod socket-make-stream ((socket socket) &rest args)
   (let ((stream
 	 (and (slot-boundp socket 'stream) (slot-value socket 'stream))))
     (unless stream

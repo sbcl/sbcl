@@ -225,6 +225,23 @@
       (network-unreachable-error () 'network-unreachable))
   t)
 
+(deftest socket-open-p-true.1
+    (socket-open-p (make-instance 'inet-socket :type :stream :protocol :tcp))
+  t)
+#+internet-available
+(deftest socket-open-p-true.2
+    (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
+      (unwind-protect 
+	   (progn
+	     (socket-connect s #(127 0 0 1) 7)
+	     (socket-open-p s))
+	(socket-close s)))
+  t)
+(deftest socket-open-p-false
+    (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
+      (socket-close s)
+      (socket-open-p s))
+  nil)
 
 ;;; we don't have an automatic test for some of this yet.  There's no
 ;;; simple way to run servers and have something automatically connect

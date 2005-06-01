@@ -69,6 +69,8 @@ than "network-endian integers".
 
 @include fun-sb-bsd-sockets-socket-listen.texinfo
 
+@include fun-sb-bsd-sockets-socket-open-p.texinfo
+
 @include fun-sb-bsd-sockets-socket-close.texinfo
 
 @include fun-sb-bsd-sockets-socket-make-stream.texinfo
