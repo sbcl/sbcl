@@ -253,7 +253,10 @@ stream instead"))
 	       (if (= (sockint::close fd) -1)
 		   (socket-error "close"))
 	     (bad-file-descriptor-error (c) (declare (ignore c)) nil)
-	     (:no-error (c)  (declare (ignore c)) nil))))))
+	     (:no-error (c)
+               (declare (ignore c))
+               (setf (slot-value socket 'file-descriptor) -1)
+               nil))))))
 
     
 (defgeneric socket-make-stream (socket  &rest args)
