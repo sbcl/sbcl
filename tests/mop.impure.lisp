@@ -406,5 +406,28 @@
 	  :direct-superclasses (list (find-class 'standard-object)))
 	 'class))
 
+;;; COMPUTE-DEFAULT-INITARGS protocol mismatch reported by Bruno
+;;; Haible
+(defparameter *extra-initarg-value* 'extra)
+(defclass custom-default-initargs-class (standard-class)
+  ())
+(defmethod compute-default-initargs ((class custom-default-initargs-class))
+  (let ((original-default-initargs
+	 (remove-duplicates
+	  (reduce #'append
+		  (mapcar #'class-direct-default-initargs
+			  (class-precedence-list class)))
+	  :key #'car
+	  :from-end t)))
+    (cons (list ':extra '*extra-initarg-value* #'(lambda () *extra-initarg-value*))
+	  (remove ':extra original-default-initargs :key #'car))))
+(defmethod validate-superclass ((c1 custom-default-initargs-class)
+				(c2 standard-class))
+  t)
+(defclass extra-initarg ()
+  ((slot :initarg :extra))
+  (:metaclass custom-default-initargs-class))
+(assert (eq (slot-value (make-instance 'extra-initarg) 'slot) 'extra))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

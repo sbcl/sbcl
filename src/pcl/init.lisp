@@ -52,9 +52,9 @@
 (defmethod default-initargs ((class slot-class)
 			     supplied-initargs
 			     class-default-initargs)
-  (loop for (key fn) in class-default-initargs
+  (loop for (key nil fun) in class-default-initargs
         when (eq (getf supplied-initargs key '.not-there.) '.not-there.)
-	  append (list key (funcall fn)) into default-initargs
+	  append (list key (funcall fun)) into default-initargs
         finally
 	  (return (append supplied-initargs default-initargs))))
 

@@ -148,7 +148,7 @@
                                            DEFCLASS ~S.~:>" 
                         :format-arguments (list key class-name)))
                (push key arg-names)
-               (push ``(,',key ,,(make-initfunction val) ,',val) initargs))
+               (push ``(,',key ,',val ,,(make-initfunction val)) initargs))
              (setf default-initargs t)
              (push `(:direct-default-initargs (list ,@(nreverse initargs))) 
                    canonized-options)))

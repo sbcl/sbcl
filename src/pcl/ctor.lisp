@@ -93,7 +93,7 @@
 ;;; somewhat akin to DEFAULT-INITARGS (SLOT-CLASS T T), but just
 ;;; collecting the defaulted initargs for the call.
 (defun ctor-default-initkeys (supplied-initargs class-default-initargs)
-  (loop for (key nil) in class-default-initargs
+  (loop for (key) in class-default-initargs
         when (eq (getf supplied-initargs key '.not-there.) '.not-there.)
         collect key))
 
@@ -516,7 +516,7 @@
       ;; initargs are treated as if they were appended to supplied
       ;; initargs, that is, their values must be evaluated even
       ;; if not actually used for initializing a slot.
-      (loop for (key initfn initform) in default-initargs and i from 0
+      (loop for (key initform initfn) in default-initargs and i from 0
 	    unless (member key initkeys :test #'eq) do
 	    (let* ((type (if (constantp initform) 'constant 'var))
 		   (init (if (eq type 'var) initfn initform)))
