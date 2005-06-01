@@ -2131,6 +2131,59 @@
 		(or (null min) (minusp min))))
       (values nil t t)))
 
+;;; See _Hacker's Delight_, Henry S. Warren, Jr. pp 58-63 for an
+;;; explanation of {LOGAND,LOGIOR}-DERIVE-UNSIGNED-{LOW,HIGH}-BOUND.
+
+(defun logand-derive-unsigned-low-bound (x y length)
+  (let ((mask (1- (ash 1 length)))
+        (a (numeric-type-low x))
+        (b (numeric-type-high x))
+        (c (numeric-type-low y))
+        (d (numeric-type-high y)))
+    (loop for m = (ash 1 (1- length)) then (ash m -1)
+          until (zerop m) do
+          (unless (zerop (logand (logand (lognot a) mask)
+                                 (logand (lognot c) mask)
+                                 m))
+            (let ((temp (logand (logior a m)
+                                (logand (- m) mask))))
+              (when (<= temp b)
+                (setf a temp)
+                (loop-finish))
+              (setf temp (logand (logior c m)
+                                 (logand (- m) mask)))
+              (when (<= temp d)
+                (setf c temp)
+                (loop-finish))))
+          finally (return (logand a c)))))
+
+(defun logand-derive-unsigned-high-bound (x y length)
+  (let ((mask (1- (ash 1 length)))
+        (a (numeric-type-low x))
+        (b (numeric-type-high x))
+        (c (numeric-type-low y))
+        (d (numeric-type-high y)))
+    (loop for m = (ash 1 (1- length)) then (ash m -1)
+          until (zerop m) do
+          (cond
+            ((not (zerop (logand b
+                                 (logand (lognot d) mask)
+                                 m)))
+             (let ((temp (logior (logand b (lognot m) mask)
+                                 (- m 1))))
+               (when (>= temp a)
+                 (setf b temp)
+                 (loop-finish))))
+            ((not (zerop (logand (logand (lognot b) mask)
+                                 d
+                                 m)))
+             (let ((temp (logior (logand d (lognot b) mask)
+                                 (- m 1))))
+               (when (>= temp c)
+                 (setf d temp)
+                 (loop-finish)))))
+          finally (return (logand b d)))))
+
 (defun logand-derive-type-aux (x y &optional same-leaf)
   (when same-leaf
     (return-from logand-derive-type-aux x))
@@ -2149,7 +2202,10 @@
 		    ((null y-len)
 		     (specifier-type `(unsigned-byte* ,x-len)))
 		    (t
-		     (specifier-type `(unsigned-byte* ,(min x-len y-len)))))
+                     (let* ((length (max x-len y-len))
+                            (low (logand-derive-unsigned-low-bound x y length))
+                            (high (logand-derive-unsigned-high-bound x y length)))
+                       (specifier-type `(integer ,low ,high)))))
 	      ;; X is positive, but Y might be negative.
 	      (cond ((null x-len)
 		     (specifier-type 'unsigned-byte))
@@ -2168,6 +2224,52 @@
 		  ;; We can't tell squat about the result.
 		  (specifier-type 'integer)))))))
 
+(defun logior-derive-unsigned-low-bound (x y length)
+  (let ((mask (1- (ash 1 length)))
+        (a (numeric-type-low x))
+        (b (numeric-type-high x))
+        (c (numeric-type-low y))
+        (d (numeric-type-high y)))
+    (loop for m = (ash 1 (1- length)) then (ash m -1)
+          until (zerop m) do
+          (cond
+            ((not (zerop (logand (logand (lognot a mask))
+                                 c
+                                 m)))
+             (let ((temp (logand (logior a m) (logand (- m) mask))))
+               (when (<= temp b)
+                 (setf a temp)
+                 (loop-finish))))
+            ((not (zerop (logand a
+                                 (logand (lognot c mask))
+                                 m)))
+             (let ((temp (logand (logior c m) (logand (- m) mask))))
+               (when (<= temp d)
+                 (setf c temp)
+                 (loop-finish)))))
+          finally (return (logior a c)))))
+
+(defun logior-derive-unsigned-high-bound (x y length)
+  (let ((mask (1- (ash 1 length)))
+        (a (numeric-type-low x))
+        (b (numeric-type-high x))
+        (c (numeric-type-low y))
+        (d (numeric-type-high y)))
+    (loop for m = (ash 1 (1- length)) then (ash m -1)
+          until (zerop m) do
+          (unless (zerop (logand b d m))
+            (let ((temp (logior (logand (- b m) mask)
+                                (logand (1- m) mask))))
+              (when (>= temp a)
+                (setf b temp)
+                (loop-finish))
+              (setf temp (logior (logand (- d m) mask)
+                                 (logand (1- m) mask)))
+              (when (>= temp c)
+                (setf d temp)
+                (loop-finish))))
+          finally (return (logior b d)))))
+
 (defun logior-derive-type-aux (x y &optional same-leaf)
   (when same-leaf
     (return-from logior-derive-type-aux x))
@@ -2176,9 +2278,12 @@
       (cond
        ((and (not x-neg) (not y-neg))
 	;; Both are positive.
-	(specifier-type `(unsigned-byte* ,(if (and x-len y-len)
-					      (max x-len y-len)
-					      '*))))
+        (if (and x-len y-len)
+            (let* ((length (max x-len y-len))
+                   (low (logior-derive-unsigned-low-bound x y length))
+                   (high (logior-derive-unsigned-high-bound x y length)))
+              (specifier-type `(integer ,low ,high)))
+            (specifier-type `(unsigned-byte* *))))
        ((not x-pos)
 	;; X must be negative.
 	(if (not y-pos)
@@ -2575,7 +2680,8 @@
              (fun (fun-info-derive-type info) :exit-if-null)
              (mask-type (specifier-type
                          (ecase class
-                             (:unsigned `(unsigned-byte* ,width))
+                             (:unsigned (let ((mask (1- (ash 1 width))))
+                                          `(integer ,mask ,mask)))
                              (:signed `(signed-byte ,width))))))
     (lambda (call)
       (let ((res (funcall fun call)))
@@ -2589,7 +2695,8 @@
                (res (funcall fun call) :exit-if-null)
                (mask-type (specifier-type
                            (ecase class
-                             (:unsigned `(unsigned-byte* ,width))
+                             (:unsigned (let ((mask (1- (ash 1 width))))
+                                          `(integer ,mask ,mask)))
                              (:signed `(signed-byte ,width))))))
       (if (eq class :unsigned)
           (logand-derive-type-aux res mask-type)))))
