@@ -1,4 +1,4 @@
-# makefile for the C-level run-time support for SBCL
+# -*- makefile -*- for the C-level run-time support for SBCL
 
 # This software is part of the SBCL system. See the README file for
 # more information.
@@ -9,64 +9,80 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+.PHONY: all clean TAGS tags
+
 all: sbcl sbcl.nm
-.PHONY: all
 
-# defaults which might be overridden or modified by values in the
-# Config file
-CFLAGS =  -g -Wall -O3
-ASFLAGS = $(CFLAGS)
-CPPFLAGS = -I.
-
-# Some of these things might be Config-dependent in future versions,
-# but they're the same on most systems right now.  If you need to
-# override one of these, do it in Config
-CPP = cpp
+# Defaults which might be overridden or modified by values in the
+# Config file. Most of them are same on most systems right now.
+# If you need to override one of these, do it in Config.
 LD = ld
 LINKFLAGS = -g
 NM = nm -gp
-DEPEND_FLAGS=-M
+DEPEND_FLAGS = -MM
+
+CFLAGS = -g -Wall -O3
+ASFLAGS = $(CFLAGS)
+CPPFLAGS = -I.
 
 # The Config file is the preferred place for tweaking options which
-# are appropriate for particular setups (OS, CPU, whatever). Make a
+# are appropriate for particular setups (OS, ARCH, whatever). Make a
 # Config-foo file for setup foo, then arrange for Config to be a
 # symlink to Config-foo.
+# Commonly used variables in Config are: ARCH_SRC, ASSEM_SRC, GC_SRC,
+# OS_SRC, OS_LIBS, OS_OBJS, OS_CLEAN_FILES
 include Config
 
 
-C_SRCS = alloc.c backtrace.c breakpoint.c coreparse.c \
+COMMON_SRC = alloc.c backtrace.c breakpoint.c coreparse.c \
 	dynbind.c gc-common.c globals.c interr.c interrupt.c \
-	monitor.c parse.c print.c purify.c \
+	monitor.c os-common.c parse.c print.c purify.c \
 	regnames.c run-program.c runtime.c save.c search.c \
-	thread.c time.c util.c validate.c vars.c wrap.c 
+	thread.c time.c util.c validate.c vars.c wrap.c
 
-SRCS = $(C_SRCS) ${ARCH_SRC} ${ASSEM_SRC} ${OS_SRC} ${GC_SRC}
+C_SRC = $(COMMON_SRC) ${ARCH_SRC} ${OS_SRC} ${GC_SRC}
 
-OBJS = $(patsubst %.c,%.o,$(patsubst %.S,%.o,$(patsubst %.s,%.o,$(SRCS)))) ${OS_OBJS}
+SRCS = $(C_SRC) ${ASSEM_SRC}
+
+OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o) ${OS_OBJS}
+
+LIBS = ${OS_LIBS} -lm
+
+sbcl: $(OBJS) $(LIBS)
+	$(CC) ${LINKFLAGS} -o $@ $^
 
 sbcl.nm: sbcl
 	$(NM) sbcl | grep -v " F \| U " > ,$@
 	mv -f ,$@ $@
 
-sbcl: ${OBJS} 
-	$(CC) ${LINKFLAGS} ${OS_LINK_FLAGS} -o $@ ${OBJS} ${OS_OBJS} ${OS_LIBS} -lm
-
-
-.PHONY: clean
-clean:
-	-rm -f depend *.o sbcl sbcl.nm core *.tmp $(CLEAN_FILES)
-
-TAGS: $(SRCS)
-	etags $(SRCS)
-
-sbcl.h: genesis/*.h
+sbcl.h: $(wildcard genesis/*.h)
 	echo '#include "genesis/config.h"' >sbcl.h
 	echo '#include "genesis/constants.h"' >>sbcl.h
 
-depend: ${C_SRCS} sbcl.h
-	$(CC) ${DEPEND_FLAGS} ${CFLAGS} ${CPPFLAGS}  ${C_SRCS} > depend.tmp
-	mv -f depend.tmp depend
+TAGS tags: $(SRCS)
+	etags $(SRCS)
 
-# By including this file, we cause GNU make to automatically "make depend"
-# if it can't find it or it is out of date.
-include depend
+clean:
+	-rm -f *.[do] sbcl sbcl.nm sbcl.h core *.tmp $(OS_CLEAN_FILES)
+	# the depend file is obsolete
+	-rm -f depend
+
+# depend target for backward compatibility
+.PHONY: depend
+depend:
+
+%.d: %.c sbcl.h
+	@$(CC) $(DEPEND_FLAGS) $(CPPFLAGS) $< > $@.tmp; \
+	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.tmp > $@; \
+	rm -f $@.tmp
+
+%.d: %.S sbcl.h
+	@$(CC) $(DEPEND_FLAGS) $(CPPFLAGS) $< > $@.tmp; \
+	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.tmp > $@; \
+	rm -f $@.tmp
+
+# By including those files, we cause GNU make to automatically re-make
+# all dependencies of the .c file if necessary.
+ifneq ($(MAKECMDGOALS),clean)
+-include $(C_SRC:.c=.d) $(ASSEM_SRC:.S=.d)
+endif

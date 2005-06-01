@@ -65,7 +65,7 @@ void breakpoint_do_displaced_inst(os_context_t* context,
      *
      * -dan 2001.08.09 */
 
-#if (defined(sparc) && defined (solaris))
+#if (defined(LISP_FEATURE_SPARC) && defined (solaris))
     undo_fake_foreign_function_call(context);
 #endif
     arch_do_displaced_inst(context, orig_inst);

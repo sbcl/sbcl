@@ -90,7 +90,7 @@ static long later_count = 0;
 /* FIXME: Shouldn't this be defined in sbcl.h?  See also notes in
  * cheneygc.c */
 
-#ifdef sparc
+#ifdef LISP_FEATURE_SPARC
 #define FUN_RAW_ADDR_OFFSET 0
 #else
 #define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - FUN_POINTER_LOWTAG)
@@ -1054,7 +1054,7 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 #ifdef LISP_FEATURE_X86
         return ptrans_vector(thing, 96, 0, 0, constant);
 #endif
-#ifdef sparc
+#ifdef LISP_FEATURE_SPARC
         return ptrans_vector(thing, 128, 0, 0, constant);
 #endif
 #endif
@@ -1074,7 +1074,7 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 #ifdef LISP_FEATURE_X86
         return ptrans_vector(thing, 192, 0, 0, constant);
 #endif
-#ifdef sparc
+#ifdef LISP_FEATURE_SPARC
         return ptrans_vector(thing, 256, 0, 0, constant);
 #endif
 #endif
@@ -1323,7 +1323,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
 #ifdef LISP_FEATURE_X86
                 count = fixnum_value(vector->length)*3+2;
 #endif
-#ifdef sparc
+#ifdef LISP_FEATURE_SPARC
                 count = fixnum_value(vector->length)*4+2;
 #endif
                 break;
@@ -1343,7 +1343,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
 #ifdef LISP_FEATURE_X86
                 count = fixnum_value(vector->length)*6+2;
 #endif
-#ifdef sparc
+#ifdef LISP_FEATURE_SPARC
                 count = fixnum_value(vector->length)*8+2;
 #endif
                 break;

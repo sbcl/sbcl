@@ -1,3 +1,5 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
 # This software is part of the SBCL system. See the README file for
 # more information.
 #
@@ -7,10 +9,12 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+NM = ./linux-nm
+
 ASSEM_SRC = x86-64-assem.S ldso-stubs.S
 ARCH_SRC = x86-64-arch.c
+OS_SRC = linux-os.c x86-64-linux-os.c
 
-OS_SRC = linux-os.c x86-64-linux-os.c os-common.c
 # The "--Wl,--export-dynamic" flags are here to help people
 # experimenting with callbacks from C to SBCL, by allowing linkage to
 # SBCL src/runtime/*.c symbols from C. Work on this is good, but it's
@@ -23,9 +27,9 @@ OS_SRC = linux-os.c x86-64-linux-os.c os-common.c
 # (You *are* encouraged to design and implement a coherent stable
 # interface, though.:-| As far as I (WHN 2002-05-19) know, no one is
 # working on one and it would be a nice thing to have.)
-OS_LINK_FLAGS = -Wl,--export-dynamic
+LINKFLAGS += -Wl,--export-dynamic
 OS_LIBS = -ldl
-CFLAGS =  -g -Wall -O3 -fno-omit-frame-pointer
+
+CFLAGS += -fno-omit-frame-pointer
 
 GC_SRC = gencgc.c
-

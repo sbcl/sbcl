@@ -1,7 +1,7 @@
 SBCLTEXI:=sbcl.texinfo
 ASDFTEXI:=asdf.texinfo
 DOCFILES:=*.texinfo $(ASDFTEXI)
-TMPTYPES:=aux cps fns ky log pg toc tps vrs
+TMPTYPES:=aux cp cps fn fns ky log pg toc tp tps vr vrs
 TMPFILES:=$(foreach target,asdf sbcl,$(foreach type,$(TMPTYPES),$(target).$(type)))
 PSFILES=sbcl.ps asdf.ps
 PDFFILES=sbcl.pdf asdf.pdf
@@ -96,9 +96,9 @@ clean:
 	rm -rf $(HTMLDIRS) $(DOCSTRINGDIR)
 	rm -f contrib-docs.texi-temp
 	rm -f package-locks.texi-temp
-	rm -f $(PSFILE) $(PDFFILE) $(DVIFILE) html-stamp tempfiles-stamp
-	rm -f $(TMPFILES)
-	rm -f sbcl.info sbcl.info-*
+	rm -f $(PSFILES) $(PDFFILES) html-stamp tempfiles-stamp
+	rm -f $(TMPFILES) $(INDEXFILES)
+	rm -f sbcl.info sbcl.info-* asdf.info
 
 .PHONY: distclean
 distclean: clean

@@ -1,3 +1,4 @@
+*.d
 depend
 genesis
 ldso-stubs.S

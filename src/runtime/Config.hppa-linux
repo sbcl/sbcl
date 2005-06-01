@@ -1,3 +1,5 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
 # This software is part of the SBCL system. See the README file for
 # more information.
 #
@@ -7,16 +9,13 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS += -g -Dhppa
-LD = ld 
-LINKFLAGS = -v -g 
-NM = nm -p
+LINKFLAGS += -v -static
+NM = ./linux-nm
 
 ASSEM_SRC = hppa-assem.S #hppa-linux-stubs.S
 ARCH_SRC = hppa-arch.c undefineds.c
 
-OS_SRC = linux-os.c  hppa-linux-os.c os-common.c 
-LINKFLAGS+=-static
-OS_LIBS= -ldl
+OS_SRC = linux-os.c hppa-linux-os.c
+OS_LIBS = -ldl
 
-GC_SRC= cheneygc.c
+GC_SRC = cheneygc.c

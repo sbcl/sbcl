@@ -1,3 +1,14 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
 include Config.x86-bsd
 
 # KLUDGE: It might seem as though dynamic libraries should work the
@@ -7,4 +18,4 @@ include Config.x86-bsd
 # have never found documentation for the "-export-dynamic" option),
 # so I've just punted and left link flags for OpenBSD in their
 # pre-dynamic-library-support state. -- WHN 2000-10-02
-OS_LINK_FLAGS = -static
+LINKFLAGS += -static

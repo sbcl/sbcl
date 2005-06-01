@@ -1,3 +1,5 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
 # This software is part of the SBCL system. See the README file for
 # more information.
 #
@@ -7,9 +9,9 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS += -Dalpha -Dosf1 -O0 -g -D_XOPEN_SOURCE=500 -D_OSF_SOURCE=500
+CFLAGS += -Dosf1 -O0 -g -D_XOPEN_SOURCE=500 -D_OSF_SOURCE=500
 CFLAGS += -msg_disable newlocale
-ASFLAGS += -Dalpha -Dosf1 #-ULANGUAGE_ASSEMBLY
+ASFLAGS += -Dosf1 #-ULANGUAGE_ASSEMBLY
 LD = ld -xtaso
 LINKFLAGS = -non_shared # dynamic -v -g  -Wl,-T  -Wl,ld-script.alpha-linux
 # Digital^WCompaq^WHP's cc declares `static inline' functions to exist
@@ -30,7 +32,10 @@ ARCH_SRC = alpha-arch.c undefineds.c
 %.s:%.S
 	cp $^ $@
 
-OS_SRC = osf1-os.c  alpha-osf1-os.c os-common.c 
-OS_LIBS= #-ldl
+# ... and let the main makefile clean the .s properly.
+OS_CLEAN_FILES += $(ASSEM_SRC)
 
-GC_SRC= cheneygc.c
+OS_SRC = osf1-os.c alpha-osf1-os.c
+OS_LIBS = #-ldl
+
+GC_SRC = cheneygc.c

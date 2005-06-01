@@ -16,7 +16,7 @@
 #include "runtime.h"
 
 struct ndir_entry {
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
     long identifier;
     long nwords;
     long data_page;

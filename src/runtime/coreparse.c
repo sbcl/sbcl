@@ -209,7 +209,7 @@ load_core_file(char *file)
 	    SHOW("NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE case");
 	    process_directory(fd,
 			      ptr,
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
 			      remaining_len / (sizeof(struct ndir_entry) /
 					       sizeof(long))
 #else

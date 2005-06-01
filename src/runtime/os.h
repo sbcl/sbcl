@@ -112,7 +112,7 @@ os_context_register_addr(os_context_t *context, int offset);
  * turns out that the alpha truly requires this, it can change to
  * ARCH_HAS_FLOAT_REGISTERS (currently #defined in alpha-arch.h -- CSR
  * 2002-02-04 */
-#ifdef alpha
+#ifdef LISP_FEATURE_ALPHA
 os_context_register_t *
 os_context_float_register_addr(os_context_t *context, int offset);
 #endif

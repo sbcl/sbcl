@@ -1,3 +1,5 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
 # This software is part of the SBCL system. See the README file for
 # more information.
 #
@@ -7,16 +9,14 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS = -g -Dppc
-LD = ld 
-LINKFLAGS = -v -g 
-NM = nm -p
+CFLAGS = -g
+LINKFLAGS += -v -rdynamic
+NM = ./linux-nm
 
 ASSEM_SRC = ppc-assem.S ldso-stubs.S
 ARCH_SRC = ppc-arch.c
 
-OS_SRC = linux-os.c  ppc-linux-os.c os-common.c 
-LINKFLAGS+=-rdynamic 
-OS_LIBS= -ldl
+OS_SRC = linux-os.c ppc-linux-os.c
+OS_LIBS = -ldl
 
-GC_SRC= cheneygc.c
+GC_SRC = cheneygc.c

@@ -195,7 +195,7 @@ static void newline(char *label)
 
 static void brief_fixnum(lispobj obj)
 {
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
     printf("%ld", ((long)obj)>>2);
 #else
     printf("%d", ((s32)obj)>>2);
@@ -204,7 +204,7 @@ static void brief_fixnum(lispobj obj)
 
 static void print_fixnum(lispobj obj)
 {
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
     printf(": %ld", ((long)obj)>>2);
 #else
     printf(": %d", ((s32)obj)>>2);
@@ -439,7 +439,7 @@ static void print_otherptr(lispobj obj)
     if (!is_valid_lisp_addr((os_vm_address_t)obj)) {
 	printf("(invalid address)");
     } else {
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
         lispobj *ptr;
         unsigned long header;
         unsigned long length;
@@ -638,7 +638,7 @@ static void print_otherptr(lispobj obj)
 
             case SAP_WIDETAG:
                 NEWLINE_OR_RETURN;
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
                 printf("0x%08lx", (unsigned long) *ptr);
 #else
                 printf("0x%016lx", *(lispobj*)(ptr+1));

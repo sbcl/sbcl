@@ -34,7 +34,7 @@
  * better not change. */
 
 struct call_frame {
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
 	struct call_frame *old_cont;
 #else
         u32 old_cont;
@@ -45,13 +45,13 @@ struct call_frame {
 };
 
 struct call_info {
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
     struct call_frame *frame;
 #else
     u32 frame;
 #endif
     int interrupted;
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
     struct code *code;
 #else
     u32 code;
@@ -139,7 +139,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
     }
     if (info->code != NULL)
         info->pc = pc - (unsigned long) info->code -
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
             (HEADER_LENGTH(info->code->header) * sizeof(lispobj));
 #else
             (HEADER_LENGTH(((struct code *)info->code)->header) * sizeof(lispobj));
@@ -187,7 +187,7 @@ previous_info(struct call_info *info)
         if (info->code != NULL)
             info->pc = (unsigned long)native_pointer(info->lra) -
                 (unsigned long)info->code -
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
                 (HEADER_LENGTH(info->code->header) * sizeof(lispobj));
 #else
                 (HEADER_LENGTH(((struct code *)info->code)->header) * sizeof(lispobj));
@@ -215,7 +215,7 @@ backtrace(int nframes)
 
             printf("CODE: 0x%08lX, ", (unsigned long) info.code | OTHER_POINTER_LOWTAG);
 
-#ifndef alpha
+#ifndef LISP_FEATURE_ALPHA
             function = info.code->entry_points;
 #else
             function = ((struct code *)info.code)->entry_points;
