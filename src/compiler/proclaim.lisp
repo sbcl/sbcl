@@ -135,10 +135,16 @@
 ;;; implements that by converting (FOO X Y) to (TYPE FOO X Y).
 (defun canonized-decl-spec (decl-spec)
   (let ((id (first decl-spec)))
-    (unless (symbolp id)
-      (error "The declaration identifier is not a symbol: ~S" id))
-    (let ((id-is-type (info :type :kind id))
+    (let ((id-is-type (if (symbolp id)
+			  (info :type :kind id)
+			  ;; A cons might not be a valid type specifier,
+			  ;; but it can't be a declaration either. 
+			  (or (consp id)
+			      (typep id 'class))))
 	  (id-is-declared-decl (info :declaration :recognized id)))
+      ;; FIXME: Checking ID-IS-DECLARED is probably useless these days,
+      ;; since we refuse to use the same symbol as both a type name and
+      ;; recognized declaration name. 
       (cond ((and id-is-type id-is-declared-decl)
 	     (compiler-error
 	      "ambiguous declaration ~S:~%  ~

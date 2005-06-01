@@ -48,8 +48,8 @@ OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o) ${OS_OBJS}
 
 LIBS = ${OS_LIBS} -lm
 
-sbcl: $(OBJS) $(LIBS)
-	$(CC) ${LINKFLAGS} -o $@ $^
+sbcl: $(OBJS)
+	$(CC) ${LINKFLAGS} -o $@ $^ $(LIBS)
 
 sbcl.nm: sbcl
 	$(NM) sbcl | grep -v " F \| U " > ,$@
