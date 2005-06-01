@@ -325,7 +325,7 @@ SB-SYS:MAKE-FD-STREAM."))
 (define-socket-condition sockint::EPROTONOSUPPORT protocol-not-supported-error)
 (define-socket-condition sockint::ESOCKTNOSUPPORT socket-type-not-supported-error)
 (define-socket-condition sockint::ENETUNREACH network-unreachable-error)
-
+(define-socket-condition sockint::ENOTCONN not-connected-error)
 
 (defun condition-for-errno (err)
   (or (cdr (assoc err *conditions-for-errno* :test #'eql)) 'socket-error))
