@@ -45,20 +45,37 @@ are:
 @itemize
   
 @item
+@tindex metaobject
 the abstract @code{metaobject} class is not present in the class
 hierarchy;
   
 @item
+@tindex standard-object
+@tindex funcallable-standard-object
 the @code{standard-object} and @code{funcallable-standard-object}
 classes are disjoint;
   
 @item
+@findex compute-effective-method
+@findex sb-mop:compute-effective-method
 @code{compute-effective-method} only returns one value, not two;
   
 @item
+@findex compute-slots
+@findex sb-mop:compute-slots
+@tindex funcallable-standard-class 
 the system-supplied @code{:around} method for @code{compute-slots}
 specialized on @code{funcallable-standard-class} does not respect the
 requested order from a user-supplied primary method.
+
+@item
+@findex ensure-generic-function
+@findex generic-function-declarations
+@findex sb-mop:generic-function-declarations
+the arguments @code{:declare} and @code{:declarations} to
+@code{ensure-generic-function} are both accepted, with the leftmost
+argument defining the declarations to be stored and returned by
+@code{generic-function-declarations}.
 
 @end itemize
 

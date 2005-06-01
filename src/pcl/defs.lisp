@@ -700,7 +700,11 @@
     :initarg :method-combination
     :accessor generic-function-method-combination)
    (declarations
+    ;; KLUDGE: AMOP specifies :DECLARATIONS, while ANSI specifies
+    ;; :DECLARE.  Allow either (but FIXME: maybe a note or a warning
+    ;; might be appropriate).
     :initarg :declarations
+    :initarg :declare
     :initform ()
     :accessor generic-function-declarations)
    (arg-info
