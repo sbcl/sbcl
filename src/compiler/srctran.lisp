@@ -2341,7 +2341,7 @@
              (let ((low (logxor-derive-unsigned-low-bound x y))
                    (high (logxor-derive-unsigned-high-bound x y)))
                (specifier-type `(integer ,low ,high)))
-             (specifer-type '(unsigned-byte* *))))
+             (specifier-type '(unsigned-byte* *))))
         ((and (not x-pos) (not y-pos))
          ;; Both are negative.  The result will be positive, and as long
          ;; as the longer.
