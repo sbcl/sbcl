@@ -233,3 +233,36 @@
        (type (type-of x)))
   (assert (subtypep type '(complex rational)))
   (assert (typep x type)))
+
+;;; Test derivation of LOG{AND,IOR,XOR} bounds for unsigned arguments.
+;;;
+;;; Fear the Loop of Doom!
+(let* ((bits 5)
+       (size (ash 1 bits)))
+  (flet ((brute-force (a b c d op minimize)
+           (loop with extreme = (if minimize (ash 1 bits) 0)
+                 with collector = (if minimize #'min #'max)
+                 for i from a upto b do
+                 (loop for j from c upto d do
+                       (setf extreme (funcall collector
+                                              extreme
+                                              (funcall op i j))))
+                 finally (return extreme))))
+    (dolist (op '(logand logior logxor))
+      (dolist (minimize '(t nil))
+        (let ((deriver (intern (format nil "~A-DERIVE-UNSIGNED-~:[HIGH~;LOW~]-BOUND"
+                                       op minimize)
+                               (find-package :sb-c))))
+          (loop for a from 0 below size do
+                (loop for b from a below size do
+                      (loop for c from 0 below size do
+                            (loop for d from c below size do
+                                  (let* ((brute (brute-force a b c d op minimize))
+                                         (x-type (sb-c::specifier-type `(integer ,a ,b)))
+                                         (y-type (sb-c::specifier-type `(integer ,c ,d)))
+                                         (derived (funcall deriver x-type y-type)))
+                                    (unless (= brute derived)
+                                      (format t "FAIL: ~A [~D,~D] [~D,~D] ~A~%
+ACTUAL ~D DERIVED ~D~%"
+                                              op a b c d minimize brute derived)
+                                      (assert (= brute derived)))))))))))))
