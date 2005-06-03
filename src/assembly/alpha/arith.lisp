@@ -408,7 +408,7 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FN
-  (inst ldl lip (static-fun-offset 'two-arg-=) null-tn)
+  (inst ldl lip (static-fun-offset 'two-arg-/=) null-tn)
   (inst li (fixnumize 2) nargs)
   (inst move cfp-tn ocfp)
   (inst move csp-tn cfp-tn)

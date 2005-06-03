@@ -552,7 +552,7 @@
   (lisp-return lra :offset 2)
 
   DO-STATIC-FN
-  (inst ld code-tn null-tn (static-fun-offset 'two-arg-=))
+  (inst ld code-tn null-tn (static-fun-offset 'two-arg-/=))
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn

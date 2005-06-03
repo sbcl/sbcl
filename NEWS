@@ -14,6 +14,8 @@ changes in sbcl-0.9.2 relative to sbcl-0.9.1:
     Sascha Wilde)
   * bug fix: more cleanups to the floating point exception handling on
     x86-64 (thanks to James Knight)
+  * optimization: improved the MIPS versions of generic (in the
+    generic sense) arithmetic routines.  (thanks to Thiemo Seufer)
   * contrib improvement: it's harder to cause SOCKET-CLOSE to close()
     the wrong file descriptor; implementation of SOCKET-OPEN-P.
     (thanks to Tony Martinez)
