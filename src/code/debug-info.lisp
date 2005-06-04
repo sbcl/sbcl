@@ -232,8 +232,10 @@
 ;;; to at least know which function is an XEP for the real function
 ;;; (which would be useful info anyway).
 
-;;;; debug source
+;;;; DEBUG SOURCE
 
+;;; There is one per compiled file and one per function compiled at
+;;; toplevel or loaded from source.
 (def!struct (debug-source #-sb-xc-host (:pure t))
   ;; This slot indicates where the definition came from:
   ;;    :FILE - from a file (i.e. COMPILE-FILE)
@@ -257,7 +259,9 @@
   ;; :DEBUG-SOURCE-FORM is :LISP.
   (start-positions nil :type (or (simple-array * (*)) null))
   ;; If from :LISP, this is the function whose source is form 0.
-  (info nil))
+  (function nil)
+  ;; Additional information from (WITH-COMPILATION-UNIT (:SOURCE-PLIST ...))
+  (plist *source-plist*))
 
 ;;;; DEBUG-INFO structures
 
@@ -271,7 +275,7 @@
   ;;   *** NOTE: the offset of this slot is wired into the fasl dumper 
   ;;   *** so that it can backpatch the source info when compilation
   ;;   *** is complete.
-  (source nil :type list))
+  (source nil))
 
 (def!struct (compiled-debug-info
 	     (:include debug-info)

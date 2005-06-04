@@ -153,24 +153,20 @@
   (declare (type stream s))
   (let ((info (sb-kernel:%code-debug-info code-obj)))
     (when info
-      (let ((sources (sb-c::debug-info-source info)))
-	(when sources
+      (let ((source (sb-c::debug-info-source info)))
+	(when source
 	  (format s "~&On ~A it was compiled from:"
 		  ;; FIXME: The FORMAT-UNIVERSAL-TIME calls in the system
 		  ;; should become more consistent, probably not using
 		  ;; any nondefault options.
-		  (format-universal-time nil
-					 (sb-c::debug-source-compiled
-					  (first sources))
+		  (format-universal-time nil (sb-c::debug-source-compiled source)
 					 :style :abbreviated))
-	  (dolist (source sources)
-	    (let ((name (sb-c::debug-source-name source)))
-	      (ecase (sb-c::debug-source-from source)
-		(:file
-		 (format s "~&~A~@:_  Created: " (namestring name))
-		 (format-universal-time s (sb-c::debug-source-created
-					   source)))
-		(:lisp (format s "~&~S" name))))))))))
+	  (let ((name (sb-c::debug-source-name source)))
+	    (ecase (sb-c::debug-source-from source)
+	      (:file
+	       (format s "~&~A~@:_  Created: " (namestring name))
+	       (format-universal-time s (sb-c::debug-source-created source)))
+	      (:lisp (format s "~&~S" name)))))))))
 
 ;;; Describe a compiled function. The closure case calls us to print
 ;;; the guts.

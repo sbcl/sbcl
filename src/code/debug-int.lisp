@@ -1750,27 +1750,11 @@ register."
 
 ;;; Return the CODE-LOCATION's DEBUG-SOURCE.
 (defun code-location-debug-source (code-location)
-  (etypecase code-location
-    (compiled-code-location
-     (let* ((info (compiled-debug-fun-debug-info
-		   (code-location-debug-fun code-location)))
-	    (sources (sb!c::compiled-debug-info-source info))
-	    (len (length sources)))
-       (declare (list sources))
-       (when (zerop len)
-	 (debug-signal 'no-debug-blocks :debug-fun
-		       (code-location-debug-fun code-location)))
-       (if (= len 1)
-	   (car sources)
-	   (do ((prev sources src)
-		(src (cdr sources) (cdr src))
-		(offset (code-location-toplevel-form-offset code-location)))
-	       ((null src) (car prev))
-	     (when (< offset (sb!c::debug-source-source-root (car src)))
-	       (return (car prev)))))))
-    ;; (There used to be more cases back before sbcl-0.7.0, when we
-    ;; did special tricks to debug the IR1 interpreter.)
-    ))
+  (let ((info (compiled-debug-fun-debug-info
+	       (code-location-debug-fun code-location))))
+    (or (sb!c::debug-info-source info)
+	(debug-signal 'no-debug-blocks :debug-fun
+		      (code-location-debug-fun code-location)))))
 
 ;;; Returns the number of top level forms before the one containing
 ;;; CODE-LOCATION as seen by the compiler in some compilation unit. (A

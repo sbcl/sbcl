@@ -237,10 +237,8 @@
 
     (values (copy-seq *byte-buffer*) tlf-num)))
 
-;;; Return a list of DEBUG-SOURCE structures containing information
-;;; derived from INFO. Unless :BYTE-COMPILE T was specified, we always
-;;; dump the START-POSITIONS, since it is too hard figure out whether
-;;; we need them or not.
+;;; Return DEBUG-SOURCE structure containing information derived from
+;;; INFO. 
 (defun debug-source-for-info (info)
   (declare (type source-info info))
   (let* ((file-info (source-info-file-info info))
@@ -254,9 +252,8 @@
 	 (name (file-info-name file-info)))
     (etypecase name
       ((member :lisp)
-       (setf (debug-source-from res) name)
-       (setf (debug-source-name res)
-	     (coerce (file-info-forms file-info) 'simple-vector)))
+       (setf (debug-source-from res) name
+	     (debug-source-name res) (file-info-forms file-info)))
       (pathname
        (let* ((untruename (file-info-untruename file-info))
 	      (dir (pathname-directory untruename)))
@@ -273,7 +270,7 @@
 		(if (and dir (eq (first dir) :absolute))
 		    untruename
 		    name))))))
-    (list res)))
+    res))
 
 ;;; Given an arbitrary sequence, coerce it to an unsigned vector if
 ;;; possible. Ordinarily we coerce it to the smallest specialized

@@ -3,6 +3,9 @@ changes in sbcl-0.9.2 relative to sbcl-0.9.1:
     initargs, making them be a list of (INITARG INITFORM INITFUNCTION)
     as per the MOP, rather than the historical (INITARG INITFUNCTION
     INITFORM).  (reported by Bruno Haible)
+  * new feature: WITH-COMPILATION-UNIT now accepts a non-standard
+    :SOURCE-PLIST option. See (DOCUMENTATION #'WITH-COMPILATION-UNIT T)
+    for more information.
   * SB-SPROF now works (more) reliably on non-GENCGC platforms.
   * fixed some lockups due to gc/thread interaction
   * dynamic space size on PPC has been increased to 768Mb. (thanks to

@@ -28,16 +28,19 @@
 
 (defpackage :sb-introspect
   (:use "CL")
-  (:export "FUNCTION-ARGLIST" "VALID-FUNCTION-NAME-P"
+  (:export "FUNCTION-ARGLIST"
+	   "VALID-FUNCTION-NAME-P"
 	   "FIND-DEFINITION-SOURCE"
-	   "DEFINITION-SOURCE" "DEFINITION-SOURCE-PATHNAME"
-	   "DEFINITION-NOT-FOUND" "DEFINITION-NAME"
+	   "DEFINITION-SOURCE"
+	   "DEFINITION-SOURCE-PATHNAME"
 	   "DEFINITION-SOURCE-FORM-PATH"
 	   "DEFINITION-SOURCE-CHARACTER-OFFSET"
 	   "DEFINITION-SOURCE-FILE-WRITE-DATE"
+	   "DEFINITION-SOURCE-PLIST"
+	   "DEFINITION-NOT-FOUND" "DEFINITION-NAME"
 	   "FIND-FUNCTION-CALLEES"
-	   "FIND-FUNCTION-CALLERS"
-	   ))
+	   "FIND-FUNCTION-CALLERS"))
+
 (in-package :sb-introspect)
 
 ;;;; Internal interface for SBCL debug info
@@ -74,13 +77,7 @@ include the pathname of the file and the position of the definition."
 
 (declaim (ftype (function (debug-info) debug-source) debug-info-source))
 (defun debug-info-source (debug-info)
-  (destructuring-bind (debug-source &rest other-debug-sources)
-      (sb-c::compiled-debug-info-source debug-info)
-    ;; COMPILED-DEBUG-INFO-SOURCES can return a list but we expect
-    ;; this to always contain exactly one element in SBCL. The list
-    ;; interface is inherited from CMUCL. -luke (12/Mar/2005)
-    (assert (null other-debug-sources))
-    debug-source))
+  (sb-c::debug-info-source debug-info))
 
 (declaim (ftype (function (debug-info) debug-function) debug-info-debug-function))
 (defun debug-info-debug-function (debug-info)
@@ -105,7 +102,9 @@ include the pathname of the file and the position of the definition."
   (character-offset nil :type (or null integer))
   ;; File-write-date of the source file when compiled.
   ;; Null if not compiled from a file.
-  (file-write-date nil :type (or null integer)))
+  (file-write-date nil :type (or null integer))
+  ;; plist from WITH-COMPILATION-UNIT
+  (plist nil))
 
 (defun find-definition-source (object)
   (etypecase object
@@ -145,7 +144,8 @@ include the pathname of the file and the position of the definition."
      ;; debug-source. FIXME: We could use sb-di:code-locations to get
      ;; a full source path. -luke (12/Mar/2005)
      :form-path (if tlf (list tlf))
-     :file-write-date (sb-c::debug-source-created debug-source))))
+     :file-write-date (sb-c::debug-source-created debug-source)
+     :plist (sb-c::debug-source-plist debug-source))))
 
 ;;; This is kludgey.  We expect these functions (the underlying functions,
 ;;; not the closures) to be in static space and so not move ever.

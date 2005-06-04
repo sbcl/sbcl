@@ -10,5 +10,5 @@
 
 (defstruct three four five)
 
-
-	    
+(with-compilation-unit (:source-plist (list :test-inner "IN"))
+  (eval '(defun four () 4)))

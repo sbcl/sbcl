@@ -123,18 +123,31 @@
   This form affects compilations that take place within its dynamic extent. It
   is intended to be wrapped around the compilation of all files in the same
   system. These keywords are defined:
+
     :OVERRIDE Boolean-Form
         One of the effects of this form is to delay undefined warnings
         until the end of the form, instead of giving them at the end of each
         compilation. If OVERRIDE is NIL (the default), then the outermost
         WITH-COMPILATION-UNIT form grabs the undefined warnings. Specifying
         OVERRIDE true causes that form to grab any enclosed warnings, even if
-        it is enclosed by another WITH-COMPILATION-UNIT."
+        it is enclosed by another WITH-COMPILATION-UNIT.
+
+    :SOURCE-PLIST Plist-Form
+        Attaches the value returned by the Plist-Form to internal debug-source
+        information of functions compiled in within the dynamic contour.
+        Primarily for use by development environments, in order to eg. associate
+        function definitions with editor-buffers. Can be accessed as
+        SB-INTROSPECT:DEFINITION-SOURCE-PLIST. If multiple, nested 
+        WITH-COMPILATION-UNITs provide :SOURCE-PLISTs, they are appended
+        togather, innermost left. If  Unaffected by :OVERRIDE."
   `(%with-compilation-unit (lambda () ,@body) ,@options))
 
-(defun %with-compilation-unit (fn &key override)
+(defvar *source-plist* nil)
+
+(defun %with-compilation-unit (fn &key override source-plist)
   (declare (type function fn))
-  (let ((succeeded-p nil))
+  (let ((succeeded-p nil)
+	(*source-plist* (append source-plist *source-plist*)))
     (if (and *in-compilation-unit* (not override))
 	;; Inside another WITH-COMPILATION-UNIT, a WITH-COMPILATION-UNIT is
 	;; ordinarily (unless OVERRIDE) basically a no-op.

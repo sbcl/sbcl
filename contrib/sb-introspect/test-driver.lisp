@@ -4,15 +4,23 @@
   (:use "SB-INTROSPECT" "CL"))
 (in-package :sb-introspect-test)
 
-(load (compile-file (merge-pathnames "test.lisp" *load-pathname*)))
+(with-compilation-unit (:source-plist (list :test-outer "OUT"))
+  (load (compile-file (merge-pathnames "test.lisp" *load-pathname*))))
 
 (assert (equal (function-arglist 'cl-user::one)
 	       '(cl-user::a cl-user::b cl-user::c)))
 (assert (equal (function-arglist 'the)
 	       '(type sb-c::value)))
-(assert (= (definition-source-file-write-date
-               (find-definition-source 'cl-user::one))
-           (file-write-date (merge-pathnames "test.lisp" *load-pathname*))))
+
+(let ((source (find-definition-source 'cl-user::one)))
+  (assert (= (definition-source-file-write-date source)
+	     (file-write-date (merge-pathnames "test.lisp" *load-pathname*))))
+  (assert (equal (getf (definition-source-plist source) :test-outer)
+		 "OUT")))
+
+(let ((plist (definition-source-plist (find-definition-source 'cl-user::four))))
+  (assert (equal (getf plist :test-outer) "OUT"))
+  (assert (equal (getf plist :test-inner) "IN")))
 
 (defun matchp (object form-number)
   (let ((ds (sb-introspect:find-definition-source object)))

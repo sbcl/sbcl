@@ -92,15 +92,15 @@
 	       (error "Unresolved forward reference."))))
 
 ;;; Backpatch all the DEBUG-INFOs dumped so far with the specified
-;;; SOURCE-INFO list. We also check that there are no outstanding forward
-;;; references to functions.
-(defun fix-core-source-info (info object &optional source-info)
-  (declare (type source-info info) (type core-object object))
+;;; SOURCE-INFO list. We also check that there are no outstanding
+;;; forward references to functions.
+(defun fix-core-source-info (info object &optional function)
+  (declare (type core-object object)
+	   (type (or null function) function))
   (aver (zerop (hash-table-count (core-object-patch-table object))))
-  (let ((res (debug-source-for-info info)))
-    (dolist (sinfo res)
-      (setf (debug-source-info sinfo) source-info))
+  (let ((source (debug-source-for-info info)))
+    (setf (debug-source-function source) function)
     (dolist (info (core-object-debug-info object))
-      (setf (compiled-debug-info-source info) res))
-    (setf (core-object-debug-info object) ()))
+      (setf (debug-info-source info) source)))
+  (setf (core-object-debug-info object) nil)
   (values))
