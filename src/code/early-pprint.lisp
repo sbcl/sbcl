@@ -112,7 +112,9 @@
 				`((when (and ,object-var
 					     (plusp ,count-name)
 					     (check-for-circularity
-					      ,object-var))
+					      ,object-var
+                                              nil
+					      :logical-block))
 				    (write-string ". " ,stream-var)
 				    (output-object ,object-var ,stream-var)
 				    (return-from ,block-name nil))))
@@ -140,7 +142,8 @@
 	(setf body
 	      `(let ((,object-var ,object))
 		 (if (listp ,object-var)
-		     ,body
+		     (with-circularity-detection (,object-var ,stream-var)
+		       ,body)
 		     (output-object ,object-var ,stream-var)))))
       `(with-pretty-stream (,stream-var ,stream-expression)
 	 ,body))))

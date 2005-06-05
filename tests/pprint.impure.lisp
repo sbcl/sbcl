@@ -28,6 +28,12 @@
   (prog1 nil
     (setf (cdr *circ-list*) *circ-list*)))
 
+;;; I think this test is bogus. PPRINT-LOGICAL-BLOCK needs to print
+;;; the #1= and mark *CIRC-LIST* as having been printed for the first
+;;; time. After that any attempt to print *CIRC-LIST* must result in
+;;; in a #1# being printed. Thus the right output is (for once)
+;;; #1=#1#. -- JES, 2005-06-05
+#+nil
 ;;; circular lists are still being printed correctly?
 (assert (equal
          (with-output-to-string (*standard-output*)
@@ -163,6 +169,37 @@
 (let ((s (with-output-to-string (s)
 	   (pprint '(frob a b) s))))
   (assert (position #\3 s)))
+
+;; Test that circularity detection works with pprint-logical-block 
+;; (including when called through pprint-dispatch).
+(let ((*print-pretty* t)
+      (*print-circle* t)
+      (*print-pprint-dispatch* (copy-pprint-dispatch)))
+  (labels ((pprint-a (stream form &rest rest)
+	     (declare (ignore rest))
+	     (pprint-logical-block (stream form :prefix "<" :suffix ">")
+	       (pprint-exit-if-list-exhausted)
+	       (loop 
+		  (write (pprint-pop) :stream stream)
+		  (pprint-exit-if-list-exhausted)
+		  (write-char #\space stream)))))
+    (set-pprint-dispatch '(cons (eql a)) #'pprint-a)
+    (assert (string= "<A 1 2 3>"
+	     	     (with-output-to-string (s)
+		       (write '(a 1 2 3) :stream s))))
+    (assert (string= "#1=<A 1 #1# #2=#(2) #2#>"
+	     	     (with-output-to-string (s)
+		       (write '#2=(a 1 #2# #5=#(2) #5#) :stream s))))
+    (assert (string= "#1=(B #2=<A 1 #1# 2 3> #2#)"
+	     	     (with-output-to-string (s)
+		       (write '#3=(b #4=(a 1 #3# 2 3) #4#) :stream s))))))
+
+;; Test that a circular improper list inside a logical block works.
+(let ((*print-circle* t)
+      (*print-pretty* t))
+  (assert (string= "#1=(#2=(#2# . #3=(#1# . #3#)))"
+                   (with-output-to-string (s)
+                     (write '#1=(#2=(#2# . #3=(#1# . #3#))) :stream s)))))
 
 ;;; success
 (quit :unix-status 104)

@@ -1423,7 +1423,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "VALUES-TYPES-EQUAL-OR-INTERSECT" "VECTOR-T-P"
                "VECTOR-NIL-P" "VECTOR-TO-VECTOR*"
                "VECTOR-OF-CHECKED-LENGTH-GIVEN-LENGTH" "WITH-ARRAY-DATA"
-               "WRONG-NUMBER-OF-INDICES-ERROR"
+               "WITH-CIRCULARITY-DETECTION" "WRONG-NUMBER-OF-INDICES-ERROR"
 
                ;; bit bash fillers (FIXME: 32/64-bit issues)
                "UB1-BASH-FILL" "SYSTEM-AREA-UB1-FILL"
