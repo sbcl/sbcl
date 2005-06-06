@@ -831,10 +831,16 @@ previous timer after the body has finished executing"
 (defun unix-resolve-links (pathname)
   (declare (type simple-base-string pathname))
   (aver (not (relative-unix-pathname? pathname)))
+  ;; KLUDGE: readlink and lstat are unreliable if given symlinks
+  ;; ending in slashes -- fix the issue here instead of waiting for
+  ;; libc to change...
+  (let ((len (length pathname)))
+    (when (and (plusp len) (eql #\/ (schar pathname (1- len))))
+      (setf pathname (subseq pathname 0 (1- len)))))
   (/noshow "entering UNIX-RESOLVE-LINKS")
   (loop with previous-pathnames = nil do
-	(/noshow pathname previous-pathnames)
-	(let ((link (unix-readlink pathname)))
+       (/noshow pathname previous-pathnames)
+       (let ((link (unix-readlink pathname)))
 	  (/noshow link)
 	  ;; Unlike the old CMU CL code, we handle a broken symlink by
 	  ;; returning the link itself. That way, CL:TRUENAME on a

@@ -18,6 +18,7 @@ echo this is a test > $testdir/test-1.tmp
 echo this is a test > $testdir/test-2.tmp
 echo this is a test > $testdir/wild\?test.tmp
 cd $testdir
+ln -s $testdir dirlinktest
 ln -s test-1.tmp link-1
 ln -s `pwd`/test-2.tmp link-2
 ln -s i-do-not-exist link-3
@@ -25,7 +26,8 @@ ln -s link-4 link-4
 ln -s link-5 link-6
 ln -s `pwd`/link-6 link-5
 expected_truenames=\
-"'(#p\"$testdir/link-3\"\
+"'(#p\"$testdir/\"\
+   #p\"$testdir/link-3\"\
    #p\"$testdir/link-4\"\
    #p\"$testdir/link-5\"\
    #p\"$testdir/link-6\"\
@@ -39,6 +41,8 @@ $SBCL <<EOF
     (format t "~&TRUENAMES=~S~%" truenames)
     (finish-output)
     (assert (equal truenames $expected_truenames)))
+  (assert (equal (truename "dirlinktest") #p"$testdir/"))
+  (assert (equal (truename "dirlinktest/") #p"$testdir/"))
   (assert (equal (truename "test-1.tmp") #p"$testdir/test-1.tmp"))
   (assert (equal (truename "link-1")     #p"$testdir/test-1.tmp"))
   (assert (equal (truename "link-2")     #p"$testdir/test-2.tmp"))
