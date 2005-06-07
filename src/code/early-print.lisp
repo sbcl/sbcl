@@ -189,22 +189,25 @@
 	      t))))))
 
 (defmacro with-circularity-detection ((object stream) &body body)
-  (let ((marker (gensym "WITH-CIRCULARITY-DETECTION-")))
-    `(cond ((not *print-circle*)
-	    ,@body)
-	   (*circularity-hash-table*
-	    (let ((,marker (check-for-circularity ,object t :logical-block)))
-	      (if ,marker
-		  (when (handle-circularity ,marker ,stream)
-		    ,@body)
-		  ,@body)))
-	   (t
-	    (let ((*circularity-hash-table* (make-hash-table :test 'eq)))
-	      (output-object ,object (make-broadcast-stream))
-	      (let ((*circularity-counter* 0))
-		(let ((,marker (check-for-circularity ,object t
-						      :logical-block)))
-		  (when ,marker
-		    (handle-circularity ,marker ,stream)))
-		,@body))))))
+  (let ((marker (gensym "WITH-CIRCULARITY-DETECTION-"))
+        (body-name (gensym "WITH-CIRCULARITY-DETECTION-BODY-")))
+    `(labels ((,body-name ()
+               ,@body))
+      (cond ((not *print-circle*)
+            (,body-name))
+            (*circularity-hash-table*
+             (let ((,marker (check-for-circularity ,object t :logical-block)))
+               (if ,marker
+                   (when (handle-circularity ,marker ,stream)
+                    (,body-name))
+                  (,body-name))))
+            (t
+             (let ((*circularity-hash-table* (make-hash-table :test 'eq)))
+               (output-object ,object (make-broadcast-stream))
+               (let ((*circularity-counter* 0))
+                 (let ((,marker (check-for-circularity ,object t
+                                                       :logical-block)))
+                   (when ,marker
+                     (handle-circularity ,marker ,stream)))
+                (,body-name))))))))
 	    

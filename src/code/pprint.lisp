@@ -1099,7 +1099,9 @@
 
 (defun pprint-flet (stream list &rest noise)
   (declare (ignore noise))
-  (if (cddr list)
+  (if (and (consp list)
+	   (consp (cdr list))
+           (cddr list))
       (funcall (formatter
                 "~:<~^~W~^ ~@_~:<~@{~:<~^~W~^~3I ~:_~/SB!PRETTY:PPRINT-LAMBDA-LIST/~1I~:@_~@{~W~^ ~_~}~:>~^ ~_~}~:>~1I~@:_~@{~W~^ ~_~}~:>")
                stream

@@ -32,6 +32,9 @@ changes in sbcl-0.9.2 relative to sbcl-0.9.1:
     ** allow using the (declare (typespec var*)) abbreviation for 
        (declare (type typespec var*)) with all type specifiers
     ** circularity detection works properly with PPRINT-LOGICAL-BLOCK
+    ** always return NIL from PPRINT-POP when OBJECT is NIL
+    ** don't signal errors when pretty-printing malformed LABELS, 
+       FLET or MACROLET forms
 
 changes in sbcl-0.9.1 relative to sbcl-0.9.0:
   * fixed cross-compiler leakages that prevented building a 32-bit

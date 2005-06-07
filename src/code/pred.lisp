@@ -110,7 +110,8 @@
   #!+long-float (def-type-predicate-wrapper simple-array-long-float-p)
   (def-type-predicate-wrapper simple-array-complex-single-float-p)
   (def-type-predicate-wrapper simple-array-complex-double-float-p)
-  #!+long-float (def-type-predicate-wrapper simple-array-complex-long-float-p))
+  #!+long-float (def-type-predicate-wrapper simple-array-complex-long-float-p)
+  (def-type-predicate-wrapper vector-nil-p))
 
 ;;; Return the specifier for the type of object. This is not simply
 ;;; (TYPE-SPECIFIER (CTYPE-OF OBJECT)) because CTYPE-OF has different

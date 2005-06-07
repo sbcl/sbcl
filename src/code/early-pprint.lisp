@@ -119,8 +119,9 @@
 				    (output-object ,object-var ,stream-var)
 				    (return-from ,block-name nil))))
 			    (incf ,count-name)
-			    ,@(when object
-				`((pop ,object-var)))))
+			    ,@(if object
+                                  `((pop ,object-var))
+                                  `(nil))))
                      (declare (ignorable (function ,pp-pop-name)))
 		     (locally
 			 (declare (disable-package-locks 
