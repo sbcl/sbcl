@@ -326,7 +326,8 @@
        (inst mov (make-ea :byte
                           :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
        (inst fs-segment-prefix)
-       (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 1)
+       (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot))
+            (fixnumize 1))
        ,@forms
        (inst fs-segment-prefix)
        (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 0)

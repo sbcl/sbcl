@@ -75,17 +75,6 @@ boolean interrupt_maybe_gc_int(int signal, siginfo_t *info, void *v_context);
 
 extern volatile lispobj all_threads_lock;
 
-/*
- * This is a workaround for some slightly silly Linux/GNU Libc
- * behaviour: glibc defines sigset_t to support 1024 signals, which is
- * more than the kernel.  This is usually not a problem, but becomes
- * one when we want to save a signal mask from a ucontext, and restore
- * it later into another ucontext: the ucontext is allocated on the
- * stack by the kernel, so copying a libc-sized sigset_t into it will
- * overflow and cause other data on the stack to be corrupted */
-
-#define REAL_SIGSET_SIZE_BYTES ((NSIG/8))
-
 void sigaddset_blockable(sigset_t *s)
 {
     sigaddset(s, SIGHUP);
@@ -109,6 +98,34 @@ void sigaddset_blockable(sigset_t *s)
     sigaddset(s, SIG_STOP_FOR_GC);
     sigaddset(s, SIG_INTERRUPT_THREAD);
 #endif
+}
+
+static sigset_t blockable_sigset;
+
+inline static void check_blockables_blocked_or_lose()
+{
+    /* Get the current sigmask, by blocking the empty set. */
+    sigset_t empty,current;
+    sigemptyset(&empty);
+    sigprocmask(SIG_BLOCK, &empty, &current);
+    int i;
+    for(i=0;i<NSIG;i++) {
+        if (sigismember(&blockable_sigset, i) && !sigismember(&current, i))
+            lose("blockable signal %d not blocked",i);
+    }
+}
+
+inline static void check_interrupts_enabled_or_lose(os_context_t *context)
+{
+    struct thread *thread=arch_os_get_current_thread();
+    if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL)
+        lose("interrupts not enabled");
+    if (
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+	(!foreign_function_call_active) &&
+#endif
+	arch_pseudo_atomic_atomic(context))
+        lose ("in pseudo atomic section");
 }
 
 /* When we catch an internal error, should we pass it back to Lisp to
@@ -195,6 +212,9 @@ fake_foreign_function_call(os_context_t *context)
     int context_index;
     struct thread *thread=arch_os_get_current_thread();
 
+    /* context_index incrementing must not be interrupted */
+    check_blockables_blocked_or_lose();
+
     /* Get current Lisp state from context. */
 #ifdef reg_ALLOC
     dynamic_space_free_pointer =
@@ -265,6 +285,7 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 {
     lispobj context_sap = 0;
 
+    check_blockables_blocked_or_lose();
     fake_foreign_function_call(context);
 
     /* Allocate the SAP object while the interrupts are still
@@ -303,26 +324,36 @@ interrupt_handle_pending(os_context_t *context)
     struct thread *thread;
     struct interrupt_data *data;
 
+    check_blockables_blocked_or_lose();
+    check_interrupts_enabled_or_lose(context);
+
     thread=arch_os_get_current_thread();
     data=thread->interrupt_data;
 
-    /* FIXME: This is almost certainly wrong if we're here as the
-     * result of a pseudo-atomic as opposed to WITHOUT-INTERRUPTS. */
-    SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
+    /* Pseudo atomic may trigger several times for a single interrupt,
+     * and while without-interrupts should not, a false trigger by
+     * pseudo-atomic may eat a pending handler even from
+     * without-interrupts. */
+    if (data->pending_handler) {
 
-    /* restore the saved signal mask from the original signal (the
-     * one that interrupted us during the critical section) into the
-     * os_context for the signal we're currently in the handler for.
-     * This should ensure that when we return from the handler the
-     * blocked signals are unblocked */
+        /* If we're here as the result of a pseudo-atomic as opposed
+         * to WITHOUT-INTERRUPTS, then INTERRUPT_PENDING is already
+         * NIL, because maybe_defer_handler sets
+         * PSEUDO_ATOMIC_INTERRUPTED only if interrupts are enabled.*/
+        SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
 
-    memcpy(os_context_sigmask_addr(context), &data->pending_mask, 
-	   REAL_SIGSET_SIZE_BYTES);
+        /* restore the saved signal mask from the original signal (the
+         * one that interrupted us during the critical section) into the
+         * os_context for the signal we're currently in the handler for.
+         * This should ensure that when we return from the handler the
+         * blocked signals are unblocked */
+        sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
 
-    sigemptyset(&data->pending_mask);
-    /* This will break on sparc linux: the deferred handler really wants
-     * to be called with a void_context */
-    run_deferred_handler(data,(void *)context);	
+        sigemptyset(&data->pending_mask);
+        /* This will break on sparc linux: the deferred handler really wants
+         * to be called with a void_context */
+        run_deferred_handler(data,(void *)context);
+    }
 }
 
 /*
@@ -349,6 +380,8 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
     boolean were_in_lisp;
 #endif
     union interrupt_handler handler;
+    check_blockables_blocked_or_lose();
+    check_interrupts_enabled_or_lose(context);
 
 #ifdef LISP_FEATURE_LINUX
     /* Under Linux on some architectures, we appear to have to restore
@@ -443,9 +476,14 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 
 void
 run_deferred_handler(struct interrupt_data *data, void *v_context) {
-    (*(data->pending_handler))
-	(data->pending_signal,&(data->pending_info), v_context);
+    /* The pending_handler may enable interrupts (see
+     * interrupt_maybe_gc_int) and then another interrupt may hit,
+     * overwrite interrupt_data, so reset the pending handler before
+     * calling it. Trust the handler to finish with the siginfo before
+     * enabling interrupts. */
+    void (*pending_handler) (int, siginfo_t*, void*)=data->pending_handler;
     data->pending_handler=0;
+    (*pending_handler)(data->pending_signal,&(data->pending_info), v_context);
 }
 
 boolean
@@ -453,9 +491,23 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
 		    int signal, siginfo_t *info, os_context_t *context)
 {
     struct thread *thread=arch_os_get_current_thread();
+
+    check_blockables_blocked_or_lose();
+
+    if (SymbolValue(INTERRUPT_PENDING,thread) != NIL)
+        lose("interrupt already pending");
+    /* If interrupts are disabled then INTERRUPT_PENDING is set and
+     * not PSEDUO_ATOMIC_INTERRUPTED. This is important for a pseudo
+     * atomic section inside a without-interrupts.
+     */
     if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) {
 	store_signal_data_for_later(data,handler,signal,info,context);
         SetSymbolValue(INTERRUPT_PENDING, T,thread);
+#ifdef QSHOW_SIGNALS
+        FSHOW((stderr,
+               "/maybe_defer_handler(%x,%d),thread=%d: deferred\n",
+               (unsigned int)handler,signal,thread->pid));
+#endif
 	return 1;
     } 
     /* a slightly confusing test.  arch_pseudo_atomic_atomic() doesn't
@@ -468,15 +520,31 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
 	arch_pseudo_atomic_atomic(context)) {
 	store_signal_data_for_later(data,handler,signal,info,context);
 	arch_set_pseudo_atomic_interrupted(context);
+#ifdef QSHOW_SIGNALS
+        FSHOW((stderr,
+               "/maybe_defer_handler(%x,%d),thread=%d: deferred(PA)\n",
+               (unsigned int)handler,signal,thread->pid));
+#endif
 	return 1;
     }
+#ifdef QSHOW_SIGNALS
+        FSHOW((stderr,
+               "/maybe_defer_handler(%x,%d),thread=%d: not deferred\n",
+               (unsigned int)handler,signal,thread->pid));
+#endif
     return 0;
 }
+
 static void
 store_signal_data_for_later (struct interrupt_data *data, void *handler,
 			     int signal, 
 			     siginfo_t *info, os_context_t *context)
 {
+    if (data->pending_handler)
+        lose("tried to overwrite pending interrupt handler %x with %x\n",
+             data->pending_handler, handler);
+    if (!handler)
+        lose("tried to defer null interrupt handler\n");
     data->pending_handler = handler;
     data->pending_signal = signal;
     if(info)
@@ -487,21 +555,10 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
 	 * run_deferred_handler happens.  Then the usually-blocked
 	 * signals are added to the mask in the context so that we are
 	 * running with blocked signals when the handler returns */
-	sigemptyset(&(data->pending_mask));
-	memcpy(&(data->pending_mask),
-	       os_context_sigmask_addr(context),
-	       REAL_SIGSET_SIZE_BYTES);
+	sigcopyset(&(data->pending_mask),os_context_sigmask_addr(context));
 	sigaddset_blockable(os_context_sigmask_addr(context));
-    } else {
-	/* this is also called from gencgc alloc(), in which case
-	 * there has been no signal and is therefore no context. */
-	sigset_t new;
-	sigemptyset(&new);
-	sigaddset_blockable(&new);
-	sigprocmask(SIG_BLOCK,&new,&(data->pending_mask));
     }
 }
-
 
 static void
 maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
@@ -522,20 +579,53 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 #endif
 }
 
+static void
+low_level_interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
+{
+    os_context_t *context = (os_context_t*)void_context;
+    struct thread *thread=arch_os_get_current_thread();
+
+#ifdef LISP_FEATURE_LINUX
+    os_restore_fp_control(context);
+#endif
+    check_blockables_blocked_or_lose();
+    check_interrupts_enabled_or_lose(context);
+    (*thread->interrupt_data->interrupt_low_level_handlers[signal])
+        (signal, info, void_context);
+#ifdef LISP_FEATURE_DARWIN
+    /* Work around G5 bug */
+    DARWIN_FIX_CONTEXT(context);
+#endif
+}
+
+static void
+low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
+{
+    os_context_t *context = arch_os_get_context(&void_context);
+    struct thread *thread=arch_os_get_current_thread();
+    struct interrupt_data *data=thread->interrupt_data;
+#ifdef LISP_FEATURE_LINUX
+    os_restore_fp_control(context);
+#endif 
+    if(maybe_defer_handler(low_level_interrupt_handle_now,data,
+			   signal,info,context))
+	return;
+    low_level_interrupt_handle_now(signal, info, context);
+#ifdef LISP_FEATURE_DARWIN
+    /* Work around G5 bug */
+    DARWIN_FIX_CONTEXT(context);
+#endif
+}
+
 #ifdef LISP_FEATURE_SB_THREAD
 void
 sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     struct thread *thread=arch_os_get_current_thread();
-    struct interrupt_data *data=thread->interrupt_data;
     sigset_t ss;
     int i;
     
-    if(maybe_defer_handler(sig_stop_for_gc_handler,data,
-			   signal,info,context)) {
-	return;
-    }
     /* need the context stored so it can have registers scavenged */
     fake_foreign_function_call(context); 
 
@@ -600,6 +690,10 @@ gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
  * previously
  */
 
+#if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
+int *context_eflags_addr(os_context_t *context);
+#endif
+
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 extern void post_signal_tramp(void);
 void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
@@ -611,6 +705,8 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 
     /* Build a stack frame showing `interrupted' so that the
      * user's backtrace makes (as much) sense (as usual) */
+
+    /* FIXME: what about restoring fp state? */
 #ifdef LISP_FEATURE_X86
     /* Suppose the existence of some function that saved all
      * registers, called call_into_lisp, then restored GP registers and
@@ -641,44 +737,47 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 
     u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
 
-    *(sp-14) = post_signal_tramp; /* return address for call_into_lisp */
-    *(sp-13) = function;        /* args for call_into_lisp : function*/
-    *(sp-12) = 0;		/*                           arg array */
-    *(sp-11) = 0;		/*                           no. args */
+    *(sp-15) = post_signal_tramp; /* return address for call_into_lisp */
+    *(sp-14) = function;        /* args for call_into_lisp : function*/
+    *(sp-13) = 0;		/*                           arg array */
+    *(sp-12) = 0;		/*                           no. args */
     /* this order matches that used in POPAD */
-    *(sp-10)=*os_context_register_addr(context,reg_EDI);
-    *(sp-9)=*os_context_register_addr(context,reg_ESI);
+    *(sp-11)=*os_context_register_addr(context,reg_EDI);
+    *(sp-10)=*os_context_register_addr(context,reg_ESI);
 
-    *(sp-8)=*os_context_register_addr(context,reg_ESP)-8;
-    *(sp-7)=0;
-    *(sp-6)=*os_context_register_addr(context,reg_EBX);
+    *(sp-9)=*os_context_register_addr(context,reg_ESP)-8;
+    /* POPAD ignores the value of ESP:  */
+    *(sp-8)=0;
+    *(sp-7)=*os_context_register_addr(context,reg_EBX);
 
-    *(sp-5)=*os_context_register_addr(context,reg_EDX);
-    *(sp-4)=*os_context_register_addr(context,reg_ECX);
-    *(sp-3)=*os_context_register_addr(context,reg_EAX);
+    *(sp-6)=*os_context_register_addr(context,reg_EDX);
+    *(sp-5)=*os_context_register_addr(context,reg_ECX);
+    *(sp-4)=*os_context_register_addr(context,reg_EAX);
+    *(sp-3)=*context_eflags_addr(context);
     *(sp-2)=*os_context_register_addr(context,reg_EBP);
     *(sp-1)=*os_context_pc_addr(context);
 
 #elif defined(LISP_FEATURE_X86_64)
     u64 *sp=(u64 *)*os_context_register_addr(context,reg_RSP);
-    *(sp-19) = post_signal_tramp;  /* return address for call_into_lisp */
+    *(sp-20) = post_signal_tramp;  /* return address for call_into_lisp */
 
-    *(sp-18)=*os_context_register_addr(context,reg_R15);
-    *(sp-17)=*os_context_register_addr(context,reg_R14);
-    *(sp-16)=*os_context_register_addr(context,reg_R13);
-    *(sp-15)=*os_context_register_addr(context,reg_R12);
-    *(sp-14)=*os_context_register_addr(context,reg_R11);
-    *(sp-13)=*os_context_register_addr(context,reg_R10);
-    *(sp-12)=*os_context_register_addr(context,reg_R9);
-    *(sp-11)=*os_context_register_addr(context,reg_R8);
-    *(sp-10)=*os_context_register_addr(context,reg_RDI);
-    *(sp-9)=*os_context_register_addr(context,reg_RSI);
-    *(sp-8)=*os_context_register_addr(context,reg_RSP)-16;
-    *(sp-7)=0;
-    *(sp-6)=*os_context_register_addr(context,reg_RBX);
-    *(sp-5)=*os_context_register_addr(context,reg_RDX);
-    *(sp-4)=*os_context_register_addr(context,reg_RCX);
-    *(sp-3)=*os_context_register_addr(context,reg_RAX);
+    *(sp-19)=*os_context_register_addr(context,reg_R15);
+    *(sp-18)=*os_context_register_addr(context,reg_R14);
+    *(sp-17)=*os_context_register_addr(context,reg_R13);
+    *(sp-16)=*os_context_register_addr(context,reg_R12);
+    *(sp-15)=*os_context_register_addr(context,reg_R11);
+    *(sp-14)=*os_context_register_addr(context,reg_R10);
+    *(sp-13)=*os_context_register_addr(context,reg_R9);
+    *(sp-12)=*os_context_register_addr(context,reg_R8);
+    *(sp-11)=*os_context_register_addr(context,reg_RDI);
+    *(sp-10)=*os_context_register_addr(context,reg_RSI);
+    *(sp-9)=*os_context_register_addr(context,reg_RSP)-16;
+    *(sp-8)=0;
+    *(sp-7)=*os_context_register_addr(context,reg_RBX);
+    *(sp-6)=*os_context_register_addr(context,reg_RDX);
+    *(sp-5)=*os_context_register_addr(context,reg_RCX);
+    *(sp-4)=*os_context_register_addr(context,reg_RAX);
+    *(sp-3)=*context_eflags_addr(context);
     *(sp-2)=*os_context_register_addr(context,reg_RBP);
     *(sp-1)=*os_context_pc_addr(context);
 
@@ -695,15 +794,15 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *os_context_register_addr(context,reg_ECX) = 0; 
     *os_context_register_addr(context,reg_EBP) = sp-2;
 #ifdef __NetBSD__ 
-    *os_context_register_addr(context,reg_UESP) = sp-14;
+    *os_context_register_addr(context,reg_UESP) = sp-15;
 #else
-    *os_context_register_addr(context,reg_ESP) = sp-14;
+    *os_context_register_addr(context,reg_ESP) = sp-15;
 #endif
 #elif defined(LISP_FEATURE_X86_64)
     *os_context_pc_addr(context) = call_into_lisp;
     *os_context_register_addr(context,reg_RCX) = 0; 
     *os_context_register_addr(context,reg_RBP) = sp-2;
-    *os_context_register_addr(context,reg_RSP) = sp-19;
+    *os_context_register_addr(context,reg_RSP) = sp-20;
 #else
     /* this much of the calling convention is common to all
        non-x86 ports */
@@ -727,12 +826,6 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 {
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
-    struct thread *th=arch_os_get_current_thread();
-    struct interrupt_data *data=
-	th ? th->interrupt_data : global_interrupt_data;
-    if(maybe_defer_handler(interrupt_thread_handler,data,num,info,context)){
-	return ;
-    }
     arrange_return_to_lisp_function(context,info->si_value.sival_int);
 }
 
@@ -805,71 +898,26 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
     struct interrupt_data *data=
 	th ? th->interrupt_data : global_interrupt_data;
 
-    if(!foreign_function_call_active && gc_trigger_hit(signal, info, context)){
-	clear_auto_gc_trigger();
-	if(!maybe_defer_handler
-	   (interrupt_maybe_gc_int,data,signal,info,void_context))
-	    interrupt_maybe_gc_int(signal,info,void_context);
-	return 1;
+    if(!data->pending_handler && !foreign_function_call_active &&
+       gc_trigger_hit(signal, info, context)){
+        clear_auto_gc_trigger();
+        if(!maybe_defer_handler(interrupt_maybe_gc_int,
+                                data,signal,info,void_context))
+            interrupt_maybe_gc_int(signal,info,void_context);
+        return 1;
     }
     return 0;
 }
 
 #endif
 
-void
-kludge_sigset_for_gc(sigset_t * set)
-{
-#ifndef LISP_FEATURE_GENCGC
-    /* FIXME: It is not sure if GENCGC is really right here: maybe this
-     * really affects eg. only Sparc and PPC. And the following KLUDGE
-     * could really use real fixing as well.
-     *
-     * KLUDGE: block some async signals that seem to have the ability
-     * to hang us in an uninterruptible state during GC -- at least
-     * part of the time. The main beneficiary of this is SB-SPROF, as
-     * SIGPROF was almost certain to be eventually triggered at a bad
-     * moment, rendering it virtually useless. SIGINT and SIGIO from
-     * user or eg. Slime also seemed to occasionally do this.
-     *
-     * The problem this papers over appears to be something going awry
-     * in SB-UNIX:RECEIVE-PENDING-SIGNALS at the end of the
-     * WITHOUT-INTERRUPTS in SUB-GC: adding debugging output shows us
-     * leaving the body of W-I, but never entering sigtrap_handler.
-     *
-     * Empirically, it seems that the problem is only triggered if the
-     * GC was triggered/deferred during a PA section, but this is not
-     * a sufficient condition: some collections triggered in such a
-     * manner seem to be able to receive and defer a signal during the
-     * GC without issues. Likewise empirically, it seems that the
-     * problem arises more often with floating point code then not. Eg
-     * (LOOP (* (RANDOM 1.0) (RANDOM 1.0))) will eventually hang if
-     * run with SB-SPROF on, but (LOOP (FOO (MAKE-LIST 24))) will not.
-     * All this makes some badnesss in the interaction between PA and
-     * W-I seem likely, possibly in the form of one or more bad VOPs.
-     * 
-     * For additional entertainment on the affected platforms we
-     * currently use an actual illegal instruction to receive pending
-     * interrupts instead of a trap: whether this has any bearing on
-     * the matter is unknown.
-     * 
-     * Apparently CMUCL blocks everything but SIGILL for GC on Sparc,
-     * possibly for this very reason.
-     *
-     * -- NS 2005-05-20
-     */
-    sigdelset(set, SIGPROF);
-    sigdelset(set, SIGIO);
-    sigdelset(set, SIGINT);
-#endif
-}
-
 /* this is also used by gencgc, in alloc() */
 boolean
 interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
 {
-    sigset_t new;
     os_context_t *context=(os_context_t *) void_context;
+
+    check_blockables_blocked_or_lose();
     fake_foreign_function_call(context);
 
     /* SUB-GC may return without GCing if *GC-INHIBIT* is set, in
@@ -881,11 +929,10 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
      * and signal a storage condition from there.
      */
 
-    /* enable some signals before calling into Lisp */
-    sigemptyset(&new);
-    sigaddset_blockable(&new);
-    kludge_sigset_for_gc(&new);
-    sigprocmask(SIG_UNBLOCK,&new,0);
+    /* restore the signal mask from the interrupted context before
+     * calling into Lisp */
+    if (context)
+        sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
     funcall0(SymbolFunction(SUB_GC));
 
@@ -913,7 +960,11 @@ undoably_install_low_level_interrupt_handler (int signal,
 	lose("bad signal number %d", signal);
     }
 
-    sa.sa_sigaction = handler;
+    if (sigismember(&blockable_sigset,signal))
+        sa.sa_sigaction = low_level_maybe_now_maybe_later;
+    else
+        sa.sa_sigaction = handler;
+
     sigemptyset(&sa.sa_mask);
     sigaddset_blockable(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
@@ -951,8 +1002,8 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     sigemptyset(&new);
     sigaddset_blockable(&new);
 
-    FSHOW((stderr, "/data->interrupt_low_level_handlers[signal]=%d\n",
-	   data->interrupt_low_level_handlers[signal]));
+    FSHOW((stderr, "/data->interrupt_low_level_handlers[signal]=%x\n",
+	   (unsigned int)data->interrupt_low_level_handlers[signal]));
     if (data->interrupt_low_level_handlers[signal]==0) {
 	if (ARE_SAME_HANDLER(handler, SIG_DFL) ||
 	    ARE_SAME_HANDLER(handler, SIG_IGN)) {
@@ -984,6 +1035,9 @@ interrupt_init()
 {
     int i;
     SHOW("entering interrupt_init()");
+    sigemptyset(&blockable_sigset);
+    sigaddset_blockable(&blockable_sigset);
+    
     global_interrupt_data=calloc(sizeof(struct interrupt_data), 1);
 
     /* Set up high level handler information. */

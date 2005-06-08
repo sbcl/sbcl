@@ -229,14 +229,8 @@ static void
 sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    sigset_t *mask;
     unsigned int code;
-    sigset_t ss;
 
-    /* Don't disallow recursive breakpoint traps.  Otherwise, we can't
-       use debugger breakpoints anywhere in here. */
-    mask = os_context_sigmask_addr(context);
-    sigprocmask(SIG_SETMASK, mask, NULL);
     code = ((*(int *) (*os_context_pc_addr(context))) >> 16) & 0x1f;
 
     switch (code) {
@@ -246,9 +240,6 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 
     case trap_PendingInterrupt:
 	arch_skip_instruction(context);
-	sigemptyset(&ss);
-	sigaddset(&ss,SIGTRAP);
-	sigprocmask(SIG_UNBLOCK,&ss,0);
 	interrupt_handle_pending(context);
 	break;
 

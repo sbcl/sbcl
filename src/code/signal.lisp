@@ -45,25 +45,23 @@
   "Execute BODY in a context impervious to interrupts."
   (let ((name (gensym "WITHOUT-INTERRUPTS-BODY-")))
     `(flet ((,name () ,@body))
-       (if *interrupts-enabled*
-	   (unwind-protect
-		(let ((*interrupts-enabled* nil))
-		  (,name))
-	     ;; FIXME: Does it matter that an interrupt coming in here
-	     ;; could be executed before any of the pending interrupts?
-	     ;; Or do incoming interrupts have the good grace to check
-	     ;; whether interrupts are pending before executing themselves
-	     ;; immediately?
-	     ;;
-	     ;; FIXME: from the kernel's POV we've already handled the
-	     ;; signal the moment we return from the handler having
-	     ;; decided to defer it, meaning that the kernel is free
-	     ;; to deliver _more_ signals to us... of which we save,
-	     ;; and subsequently handle here, only the last one.
-	     ;; PSEUDO-ATOMIC has the same issue. -- NS 2005-05-19
-	     (when *interrupt-pending*
-	       (receive-pending-interrupt)))
-	   (,name)))))
+      (if *interrupts-enabled*
+          (unwind-protect
+               (let ((*interrupts-enabled* nil))
+                 (,name))
+            ;; If we were interrupted in the protected section, then
+            ;; the interrupts are still blocked and it remains so
+            ;; until the pending interrupt is handled.
+            ;;
+            ;; If we were not interrupted in the protected section,
+            ;; but here, then even if the interrupt handler enters
+            ;; another WITHOUT-INTERRUPTS, the pending interrupt will
+            ;; be handled immediately upon exit from said
+            ;; WITHOUT-INTERRUPTS, so it is as if nothing has
+            ;; happened.
+            (when *interrupt-pending*
+              (receive-pending-interrupt)))
+          (,name)))))
 
 (sb!xc:defmacro with-interrupts (&body body)
   #!+sb-doc

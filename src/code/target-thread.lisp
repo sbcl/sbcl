@@ -222,6 +222,8 @@ time we reacquire LOCK and return to the caller."
 (defun interrupt-thread (thread function)
   "Interrupt THREAD and make it run FUNCTION."
   (let ((function (coerce function 'function)))
+    ;; FIXME: FUNCTION is pinned only for the signalling of the
+    ;; SIG_INTERRUPT_THREAD signal.
     (sb!sys:with-pinned-objects 
      (function)
      (multiple-value-bind (res err)

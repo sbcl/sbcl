@@ -187,6 +187,35 @@
 			(assert (zerop SB-KERNEL:*PSEUDO-ATOMIC-ATOMIC*)))))
   (terminate-thread c))
 
+(defparameter *interrupt-count* 0)
+
+(declaim (notinline check-interrupt-count))
+(defun check-interrupt-count (i)
+  (declare (optimize (debug 1) (speed 1)))
+  ;; This used to lose if eflags were not restored after an interrupt.
+  (unless (typep i 'fixnum)
+    (error "!!!!!!!!!!!")))
+
+(let ((c (make-thread
+          (lambda ()
+            (handler-bind ((error #'(lambda (cond)
+                                      (princ cond)
+                                      (sb-debug:backtrace
+                                       most-positive-fixnum))))
+              (loop (check-interrupt-count *interrupt-count*)))))))
+  (let ((func (lambda ()
+                (princ ".")
+                (force-output)
+                (sb-impl::atomic-incf/symbol *interrupt-count*))))
+    (sb-sys:with-pinned-objects (func)
+      (setq *interrupt-count* 0)
+      (dotimes (i 100)
+        (sleep (random 1d0))
+        (interrupt-thread c func))
+      (sleep 1)
+      (assert (= 100 *interrupt-count*))
+      (terminate-thread c))))
+
 (format t "~&interrupt test done~%")
 
 (let (a-done b-done)

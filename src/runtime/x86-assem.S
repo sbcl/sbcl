@@ -802,7 +802,8 @@ GNAME(post_signal_tramp):
  	 * doesn't exist.  This is where call_into_lisp returns when called 
 	 * using return_to_lisp_function */
 	addl $12,%esp  	/* clear call_into_lisp args from stack */
-	popa            /* restore registers */
+	popal           /* restore registers */
+        popfl
 	leave
 	ret
 	.size GNAME(post_signal_tramp),.-GNAME(post_signal_tramp)

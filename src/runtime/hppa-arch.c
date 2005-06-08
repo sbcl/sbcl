@@ -181,7 +181,6 @@ static void sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     unsigned long bad_inst;
 
-    sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 #if 0
     printf("sigtrap_handler, pc=0x%08x, alloc=0x%08x\n", scp->sc_pcoqh,
 	   SC_REG(scp,reg_ALLOC));

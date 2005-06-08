@@ -131,28 +131,7 @@ static long compute_offset(os_context_t *context, lispobj code)
 	}
     }
 }
-/* FIXME: I can see no really good reason these couldn't be merged, but haven't
- * tried.  The sigprocmask() call would work just as well on alpha as it
- * presumably does on x86   -dan 2001.08.10
- */
-#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-void handle_breakpoint(int signal, siginfo_t *info, os_context_t *context)
-{
-    lispobj code;
 
-    fake_foreign_function_call(context);
-
-    code = find_code(context);
-    /* FIXME we're calling into Lisp with signals masked here.  Is this
-     * the right thing to do? */
-    funcall3(SymbolFunction(HANDLE_BREAKPOINT),
-	     compute_offset(context, code),
-	     code,
-	     alloc_sap(context));
-
-    undo_fake_foreign_function_call(context);
-}
-#else
 void handle_breakpoint(int signal, siginfo_t* info, os_context_t *context)
 {
     lispobj code, context_sap = alloc_sap(context);
@@ -172,7 +151,6 @@ void handle_breakpoint(int signal, siginfo_t* info, os_context_t *context)
 
     undo_fake_foreign_function_call(context);
 }
-#endif
 
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
@@ -186,8 +164,10 @@ void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
     code = find_code(context);
     codeptr = (struct code *)native_pointer(code);
 
-    /* FIXME again, calling into Lisp with signals masked.  Is this
-     * sensible? */
+    /* Don't disallow recursive breakpoint traps. Otherwise, we can't
+     * use debugger breakpoints anywhere in here. */
+    sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+
     funcall3(SymbolFunction(HANDLE_BREAKPOINT),
 	     compute_offset(context, code),
 	     code,
