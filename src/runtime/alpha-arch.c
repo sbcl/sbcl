@@ -279,15 +279,9 @@ static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
     unsigned int code;
-    sigset_t *mask;
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif
-
-    /* Don't disallow recursive breakpoint traps.  Otherwise, we can't */
-    /* use debugger breakpoints anywhere in here. */
-    mask=(os_context_sigmask_addr(context));
-    sigsetmask(mask); 
 
     /* this is different from how CMUCL does it.  CMUCL used "call_pal
      * PAL_gentrap", which doesn't do anything on Linux (unless NL0
