@@ -334,7 +334,7 @@ GNAME(post_signal_tramp):
 	popq %rbx
 	popq %rcx
 	popq %rax
-        popfl
+        popfq
 	leave
 	ret
 	.size GNAME(post_signal_tramp),.-GNAME(post_signal_tramp)

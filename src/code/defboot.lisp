@@ -314,6 +314,16 @@
                 (declare (type unsigned-byte ,var))
                 ,@body)))))
 
+(defun filter-dolist-declarations (decls)
+  (mapcar (lambda (decl)
+            `(declare ,@(remove-if
+                         (lambda (clause)
+                           (and (consp clause)
+                                (or (eq (car clause) 'type)
+                                    (eq (car clause) 'ignore))))
+                         (cdr decl))))
+          decls))
+    
 (defmacro-mundanely dolist ((var list &optional (result nil)) &body body)
   ;; We repeatedly bind the var instead of setting it so that we never
   ;; have to give the var an arbitrary value such as NIL (which might
@@ -338,6 +348,11 @@
                 (go ,start))))
          ,(if result
               `(let ((,var nil))
+                 ;; Filter out TYPE declarations (VAR gets bound to NIL,
+                 ;; and might have a conflicting type declaration) and
+                 ;; IGNORE (VAR might be ignored in the loop body, but
+                 ;; it's used in the result form).
+                 ,@(filter-dolist-declarations decls)
                  ,var
                  ,result)
                nil)))))

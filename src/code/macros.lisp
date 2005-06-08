@@ -382,11 +382,17 @@
   (multiple-value-bind (forms decls)
       (parse-body forms-decls :doc-string-allowed nil)
     (if string
-      `(let ((,var (make-fill-pointer-output-stream ,string)))
-  	 ,@decls
-  	 (unwind-protect
-	     (progn ,@forms)
-  	   (close ,var)))
+        (let ((element-type-var (gensym)))
+          `(let ((,var (make-fill-pointer-output-stream ,string))
+                 ;; ELEMENT-TYPE isn't currently used for anything
+                 ;; (see FILL-POINTER-OUTPUT-STREAM FIXME in stream.lisp),
+                 ;; but it still has to be evaluated for side-effects.
+                 (,element-type-var ,element-type))
+            (declare (ignore ,element-type-var))
+            ,@decls        
+            (unwind-protect
+                 (progn ,@forms)
+              (close ,var))))
       `(let ((,var (make-string-output-stream :element-type ,element-type)))
   	 ,@decls
   	 (unwind-protect

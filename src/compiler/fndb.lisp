@@ -1257,11 +1257,11 @@
   (values (or function symbol cons) boolean boolean))
 
 (defknown compile-file
-  (filename
+  (pathname-designator
    &key
 
    ;; ANSI options
-   (:output-file (or filename
+   (:output-file (or pathname-designator
 		     null
 		     ;; FIXME: This last case is a non-ANSI hack.
 		     (member t)))
