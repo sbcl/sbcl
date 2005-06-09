@@ -106,9 +106,9 @@ inline static void check_blockables_blocked_or_lose()
 {
     /* Get the current sigmask, by blocking the empty set. */
     sigset_t empty,current;
+    int i;
     sigemptyset(&empty);
     sigprocmask(SIG_BLOCK, &empty, &current);
-    int i;
     for(i=0;i<NSIG;i++) {
         if (sigismember(&blockable_sigset, i) && !sigismember(&current, i))
             lose("blockable signal %d not blocked",i);

@@ -210,6 +210,9 @@ environment these hooks may run in any thread.")
 (defun sub-gc (&key (gen 0))
   (unless (eql (sb!thread:current-thread-id)
 	       (sb!thread::mutex-value *already-in-gc*))
+    ;; With gencgc, unless *NEED-TO-COLLECT-GARBAGE* every allocation
+    ;; in this function triggers another gc, potentially exceeding
+    ;; maximum interrupt nesting.
     (setf *need-to-collect-garbage* t)
     (when (zerop *gc-inhibit*)
       (sb!thread:with-mutex (*already-in-gc*)
@@ -234,7 +237,9 @@ environment these hooks may run in any thread.")
 	    (when (plusp freed)
 	      (incf *n-bytes-freed-or-purified* freed)))
 	  (sb!thread::reap-dead-threads)))
-      ;; Outside the mutex, these may cause another GC.
+      ;; Outside the mutex, these may cause another GC. FIXME: it can
+      ;; potentially exceed maximum interrupt nesting by triggering
+      ;; GCs.
       (run-pending-finalizers)
       (dolist (hook *after-gc-hooks*)
 	(handler-case

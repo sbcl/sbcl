@@ -200,6 +200,8 @@
     *control-stack-start*
     *control-stack-end*
 
+    *need-to-collect-garbage*
+
     ;; the floating point constants
     *fp-constant-0d0*
     *fp-constant-1d0*
