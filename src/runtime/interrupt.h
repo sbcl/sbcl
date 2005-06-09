@@ -68,6 +68,15 @@ extern void interrupt_internal_error(int, siginfo_t*, os_context_t*,
 				     boolean continuable);
 extern boolean handle_guard_page_triggered(os_context_t *,void *);
 extern boolean interrupt_maybe_gc(int, siginfo_t*, void*);
+extern boolean interrupt_maybe_gc_int(int, siginfo_t *, void *);
+extern boolean maybe_defer_handler(void *handler, struct interrupt_data *data,
+                                   int signal, siginfo_t *info,
+                                   os_context_t *context);
+#if defined LISP_FEATURE_GENCGC
+/* assembly language stub that executes trap_PendingInterrupt */
+extern void do_pending_interrupt(void);
+#endif
+
 #ifdef LISP_FEATURE_SB_THREAD
 extern void interrupt_thread_handler(int, siginfo_t*, void*);
 extern void sig_stop_for_gc_handler(int, siginfo_t*, void*);

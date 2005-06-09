@@ -45,13 +45,9 @@
 #include "genesis/weak-pointer.h"
 #include "genesis/simple-fun.h"
 
-/* assembly language stub that executes trap_PendingInterrupt */
-void do_pending_interrupt(void);
-
 /* forward declarations */
 long gc_find_freeish_pages(long *restart_page_ptr, long nbytes, int unboxed);
 static void  gencgc_pickup_dynamic(void);
-boolean interrupt_maybe_gc_int(int, siginfo_t *, void *);
 
 
 /*
@@ -401,7 +397,7 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
 	gc_assert(generations[i].bytes_allocated
 		  == count_generation_bytes_allocated(i));
 	fprintf(stderr,
-		"   %1d: %5d %5d %5d %5d %5d %8d %5d %8d %4d %3d %7.4f\n",
+		"   %1d: %5d %5d %5d %5d %5d %8ld %5ld %8ld %4ld %3d %7.4f\n",
 		i,
 		boxed_cnt, unboxed_cnt, large_boxed_cnt, large_unboxed_cnt,
 		pinned_cnt,
@@ -985,7 +981,7 @@ gc_find_freeish_pages(long *restart_page_ptr, long nbytes, int unboxed)
 	
 	if (first_page >= NUM_PAGES) {
 	    fprintf(stderr,
-		    "Argh! gc_find_free_space failed (first_page), nbytes=%d.\n",
+		    "Argh! gc_find_free_space failed (first_page), nbytes=%ld.\n",
 		    nbytes);
 	    print_generation_stats(1);
 	    lose(NULL);
@@ -1016,7 +1012,7 @@ gc_find_freeish_pages(long *restart_page_ptr, long nbytes, int unboxed)
     /* Check for a failure */
     if ((restart_page >= NUM_PAGES) && (bytes_found < nbytes)) {
 	fprintf(stderr,
-		"Argh! gc_find_freeish_pages failed (restart_page), nbytes=%d.\n",
+		"Argh! gc_find_freeish_pages failed (restart_page), nbytes=%ld.\n",
 		nbytes);
 	print_generation_stats(1);
 	lose(NULL);
@@ -2204,18 +2200,18 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
-#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
+#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
 #endif
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
-#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
+#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
 #endif
-#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
+#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
 #endif
-#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
+#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
@@ -4153,12 +4149,12 @@ alloc(long nbytes)
              * GC, the next allocation will get us back to this point
              * anyway, so no harm done
              */
+            struct interrupt_data *data=th->interrupt_data;
             sigset_t new_mask,old_mask;
             sigemptyset(&new_mask);
             sigaddset_blockable(&new_mask);
             sigprocmask(SIG_BLOCK,&new_mask,&old_mask);
 
-            struct interrupt_data *data=th->interrupt_data;
             if((!data->pending_handler) &&
                maybe_defer_handler(interrupt_maybe_gc_int,data,0,0,0)) {
                 /* Leave the signals blocked just as if it was
