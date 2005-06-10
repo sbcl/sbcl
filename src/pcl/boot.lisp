@@ -1009,15 +1009,21 @@ bootstrapping.
 	   (cond ((null args)
 		  (if (eql nreq 0)
 		      (invoke-fast-method-call emf)
-		      (error "wrong number of args")))
+		      (error 'simple-program-error
+			     :format-control "invalid number of arguments: 0"
+			     :format-arguments nil)))
 		 ((null (cdr args))
 		  (if (eql nreq 1)
 		      (invoke-fast-method-call emf (car args))
-		      (error "wrong number of args")))
+		      (error 'simple-program-error
+			     :format-control "invalid number of arguments: 1"
+			     :format-arguments nil)))
 		 ((null (cddr args))
 		  (if (eql nreq 2)
 		      (invoke-fast-method-call emf (car args) (cadr args))
-		      (error "wrong number of args")))
+		      (error 'simple-program-error
+			     :format-control "invalid number of arguments: 2"
+			     :format-arguments nil)))
 		 (t
 		  (apply (fast-method-call-function emf)
 			 (fast-method-call-pv-cell emf)
@@ -1028,7 +1034,10 @@ bootstrapping.
 	    args
 	    (method-call-call-method-args emf)))
     (fixnum
-     (cond ((null args) (error "1 or 2 args were expected."))
+     (cond ((null args)
+	    (error 'simple-program-error
+		   :format-control "invalid number of arguments: 0"
+		   :format-arguments nil))
 	   ((null (cdr args))
 	    (let* ((slots (get-slots (car args)))
                    (value (clos-slots-ref slots emf)))
@@ -1036,16 +1045,19 @@ bootstrapping.
 		  (slot-unbound-internal (car args) emf)
 		  value)))
 	   ((null (cddr args))
-             (setf (clos-slots-ref (get-slots (cadr args)) emf)
-		   (car args)))
-	   (t (error "1 or 2 args were expected."))))
+	    (setf (clos-slots-ref (get-slots (cadr args)) emf)
+		  (car args)))
+	   (t (error 'simple-program-error
+		     :format-control "invalid number of arguments"
+		     :format-arguments nil))))
     (fast-instance-boundp
      (if (or (null args) (cdr args))
-	 (error "1 arg was expected.")
-       (let ((slots (get-slots (car args))))
-	 (not (eq (clos-slots-ref slots
-				  (fast-instance-boundp-index emf))
-		  +slot-unbound+)))))
+	 (error 'simple-program-error
+		:format-control "invalid number of arguments"
+		:format-arguments nil)
+	 (let ((slots (get-slots (car args))))
+	   (not (eq (clos-slots-ref slots (fast-instance-boundp-index emf))
+		    +slot-unbound+)))))
     (function
      (apply emf args))))
 
