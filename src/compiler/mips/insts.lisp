@@ -601,19 +601,58 @@
 ;;;; Branch/Jump instructions.
 
 (defun emit-relative-branch (segment opcode r1 r2 target)
-  (emit-back-patch segment 4
-		   #'(lambda (segment posn)
-		       (emit-immediate-inst segment
-					    opcode
-					    (if (fixnump r1)
-						r1
-						(reg-tn-encoding r1))
-					    (if (fixnump r2)
-						r2
-						(reg-tn-encoding r2))
-					    (ash (- (label-position target)
-						    (+ posn 4))
-						 -2)))))
+  (emit-chooser
+   segment 20 2
+      #'(lambda (segment posn magic-value)
+	  (declare (ignore magic-value))
+          (let ((delta (ash (- (label-position target) (+ posn 4)) -2)))
+	    (when (typep delta '(signed-byte 16))
+	      (emit-back-patch segment 4
+		#'(lambda (segment posn)
+		    (emit-immediate-inst segment
+					 opcode
+					 (if (fixnump r1)
+					     r1
+					     (reg-tn-encoding r1))
+					 (if (fixnump r2)
+					     r2
+					     (reg-tn-encoding r2))
+					 (ash (- (label-position target)
+						 (+ posn 4))
+					      -2))))
+	      t)))
+      #'(lambda (segment posn)
+	  (declare (ignore posn))
+	  (let ((linked))
+	    ;; invert branch condition
+	    (if (or (= opcode bcond-op) (= opcode cop1-op))
+		(setf r2 (logxor r2 #b00001))
+		(setf opcode (logxor opcode #b00001)))
+	    ;; check link flag
+	    (if (= opcode bcond-op)
+		(if (logand r2 #b10000)
+		    (progn (setf r2 (logand r2 #b01111))
+			   (setf linked t))))
+	    (emit-immediate-inst segment
+				 opcode
+				 (if (fixnump r1) r1 (reg-tn-encoding r1))
+				 (if (fixnump r2) r2 (reg-tn-encoding r2))
+				 4)
+	    (emit-nop segment)
+	    (emit-back-patch segment 8
+	      #'(lambda (segment posn)
+		  (declare (ignore posn))
+		  (emit-immediate-inst segment #b001111 0
+				       (reg-tn-encoding lip-tn)
+				       (ldb (byte 16 16)
+					    (label-position target)))
+		  (emit-immediate-inst segment #b001101 0
+				       (reg-tn-encoding lip-tn)
+				       (ldb (byte 16 0)
+					    (label-position target)))))
+	    (emit-register-inst segment special-op (reg-tn-encoding lip-tn)
+				0 (if linked 31 0) 0
+				(if linked #b001001 #b001000))))))
 
 (define-instruction b (segment target)
   (:declare (type label target))
@@ -631,10 +670,10 @@
 		       (immediate nil :type 'relative-label))
 	    '(:name :tab immediate))
   (:attributes branch)
+  (:dependencies (writes :r31))
   (:delay 1)
   (:emitter
    (emit-relative-branch segment bcond-op 0 #b10001 target)))
-
 
 (define-instruction beq (segment r1 r2-or-target &optional target)
   (:declare (type tn r1)
@@ -642,7 +681,7 @@
 	    (type (or label null) target))
   (:printer immediate ((op #b000100) (immediate nil :type 'relative-label)))
   (:attributes branch)
-  (:dependencies (reads r1) (reads r2-or-target))
+  (:dependencies (reads r1) (if target (reads r2-or-target)))
   (:delay 1)
   (:emitter
    (unless target
@@ -656,7 +695,7 @@
 	    (type (or label null) target))
   (:printer immediate ((op #b000101) (immediate nil :type 'relative-label)))
   (:attributes branch)
-  (:dependencies (reads r1) (reads r2-or-target))
+  (:dependencies (reads r1) (if target (reads r2-or-target)))
   (:delay 1)
   (:emitter
    (unless target
