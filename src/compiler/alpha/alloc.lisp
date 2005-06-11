@@ -128,16 +128,14 @@
       (storew function result closure-fun-slot fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
-;;; 
 (define-vop (make-value-cell)
   (:args (value :to :save :scs (descriptor-reg any-reg null zero)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (with-fixed-allocation
-	(result temp value-cell-header-widetag value-cell-size))
-    (storew value result value-cell-value-slot other-pointer-lowtag)))
-
+	(result temp value-cell-header-widetag value-cell-size)
+      (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; automatic allocators for primitive objects
 
