@@ -378,6 +378,15 @@
                 (ash -1 (1+ sb!vm:n-positive-fixnum-bits)))
         (ash bits (- 1 sb!vm:n-lowtag-bits)))))
 
+(defun descriptor-word-sized-integer (des)
+  ;; Extract an (unsigned-byte 32), from either its fixnum or bignum
+  ;; representation.
+  (let ((lowtag (descriptor-lowtag des)))
+    (if (or (= lowtag sb!vm:even-fixnum-lowtag)
+	    (= lowtag sb!vm:odd-fixnum-lowtag))
+	(make-random-descriptor (descriptor-fixnum des))
+	(read-wordindexed des 1))))
+
 ;;; common idioms
 (defun descriptor-bytes (des)
   (gspace-bytes (descriptor-intuit-gspace des)))
@@ -844,7 +853,7 @@ core and return a descriptor to it."
 ;;; FIXME: This information should probably be pulled out of the
 ;;; cross-compiler's tables at genesis time instead of inserted by
 ;;; hand here as a bare numeric constant.
-(defconstant target-layout-length 16)
+(defconstant target-layout-length 17)
 
 ;;; Return a list of names created from the cold layout INHERITS data
 ;;; in X.
@@ -862,9 +871,10 @@ core and return a descriptor to it."
 		   (descriptor-bits des)))))
       (res))))
 
-(declaim (ftype (function (symbol descriptor descriptor descriptor) descriptor)
+(declaim (ftype (function (symbol descriptor descriptor descriptor descriptor)
+			  descriptor)
 		make-cold-layout))
-(defun make-cold-layout (name length inherits depthoid)
+(defun make-cold-layout (name length inherits depthoid nuntagged)
   (let ((result (allocate-boxed-object *dynamic*
 				       ;; KLUDGE: Why 1+? -- WHN 19990901
 				       (1+ target-layout-length)
@@ -944,14 +954,16 @@ core and return a descriptor to it."
       (write-wordindexed result (+ base 3) depthoid)
       (write-wordindexed result (+ base 4) length)
       (write-wordindexed result (+ base 5) *nil-descriptor*) ; info
-      (write-wordindexed result (+ base 6) *nil-descriptor*)) ; pure
+      (write-wordindexed result (+ base 6) *nil-descriptor*) ; pure
+      (write-wordindexed result (+ base 7) nuntagged))
 
     (setf (gethash name *cold-layouts*)
 	  (list result
 		name
 		(descriptor-fixnum length)
 		(listify-cold-inherits inherits)
-		(descriptor-fixnum depthoid)))
+		(descriptor-fixnum depthoid)
+		(descriptor-fixnum nuntagged)))
     (setf (gethash (descriptor-bits result) *cold-layout-names*) name)
 
     result))
@@ -968,7 +980,9 @@ core and return a descriptor to it."
 			  (number-to-core target-layout-length)
 			  (vector-in-core)
 			  ;; FIXME: hard-coded LAYOUT-DEPTHOID of LAYOUT..
-			  (number-to-core 4)))
+			  (number-to-core 4)
+			  ;; no raw slots in LAYOUT:
+			  (number-to-core 0)))
   (write-wordindexed *layout-layout*
 		     sb!vm:instance-slots-offset
 		     *layout-layout*)
@@ -982,22 +996,26 @@ core and return a descriptor to it."
 	  (make-cold-layout 't
 			    (number-to-core 0)
 			    (vector-in-core)
+			    (number-to-core 0)
 			    (number-to-core 0)))
 	 (i-layout
 	  (make-cold-layout 'instance
 			    (number-to-core 0)
 			    (vector-in-core t-layout)
-			    (number-to-core 1)))
+			    (number-to-core 1)
+			    (number-to-core 0)))
 	 (so-layout
 	  (make-cold-layout 'structure-object
 			    (number-to-core 1)
 			    (vector-in-core t-layout i-layout)
-			    (number-to-core 2)))
+			    (number-to-core 2)
+			    (number-to-core 0)))
 	 (bso-layout
 	  (make-cold-layout 'structure!object
 			    (number-to-core 1)
 			    (vector-in-core t-layout i-layout so-layout)
-			    (number-to-core 3)))
+			    (number-to-core 3)
+			    (number-to-core 0)))
 	 (layout-inherits (vector-in-core t-layout
 					  i-layout
 					  so-layout
@@ -1944,19 +1962,28 @@ core and return a descriptor to it."
   (let* ((size (clone-arg))
 	 (result (allocate-boxed-object *dynamic*
 					(1+ size)
-					sb!vm:instance-pointer-lowtag)))
+					sb!vm:instance-pointer-lowtag))
+	 (layout (pop-stack))
+	 (nuntagged
+	  (descriptor-fixnum
+	   (read-wordindexed layout (+ sb!vm:instance-slots-offset 16))))
+	 (ntagged (- size nuntagged)))
     (write-memory result (make-other-immediate-descriptor
 			  size sb!vm:instance-header-widetag))
-    (do ((index (1- size) (1- index)))
-	((minusp index))
+    (write-wordindexed result sb!vm:instance-slots-offset layout)
+    (do ((index 1 (1+ index)))
+	((eql index size))
       (declare (fixnum index))
       (write-wordindexed result
 			 (+ index sb!vm:instance-slots-offset)
-			 (pop-stack)))
+			 (if (>= index ntagged)
+			     (descriptor-word-sized-integer (pop-stack))
+			     (pop-stack))))
     result))
 
 (define-cold-fop (fop-layout)
-  (let* ((length-des (pop-stack))
+  (let* ((nuntagged-des (pop-stack))
+	 (length-des (pop-stack))
 	 (depthoid-des (pop-stack))
 	 (cold-inherits (pop-stack))
 	 (name (pop-stack))
@@ -1974,16 +2001,18 @@ core and return a descriptor to it."
 	   old-name
 	   old-length
 	   old-inherits-list
-	   old-depthoid)
+	   old-depthoid
+	   old-nuntagged)
 	  old
 	(declare (type descriptor old-layout-descriptor))
-	(declare (type index old-length))
+	(declare (type index old-length old-nuntagged))
 	(declare (type fixnum old-depthoid))
 	(declare (type list old-inherits-list))
 	(aver (eq name old-name))
 	(let ((length (descriptor-fixnum length-des))
 	      (inherits-list (listify-cold-inherits cold-inherits))
-	      (depthoid (descriptor-fixnum depthoid-des)))
+	      (depthoid (descriptor-fixnum depthoid-des))
+	      (nuntagged (descriptor-fixnum nuntagged-des)))
 	  (unless (= length old-length)
 	    (error "cold loading a reference to class ~S when the compile~%~
                     time length was ~S and current length is ~S"
@@ -2003,10 +2032,17 @@ core and return a descriptor to it."
                     depthoid is ~S"
 		   name
 		   depthoid
-		   old-depthoid)))
+		   old-depthoid))
+	  (unless (= nuntagged old-nuntagged)
+	    (error "cold loading a reference to class ~S when the compile~%~
+                    time number of untagged slots was ~S and is currently ~S"
+		   name
+		   nuntagged
+		   old-nuntagged)))
 	old-layout-descriptor)
       ;; Make a new definition from scratch.
-      (make-cold-layout name length-des cold-inherits depthoid-des))))
+      (make-cold-layout name length-des cold-inherits depthoid-des
+			nuntagged-des))))
 
 ;;;; cold fops for loading symbols
 
@@ -2777,6 +2813,23 @@ core and return a descriptor to it."
       (terpri)))
     (format t "#endif /* LANGUAGE_ASSEMBLY */~2%"))
 
+(defun write-structure-object (dd)
+  (flet ((cstring (designator)
+	   (substitute #\_ #\- (string-downcase (string designator)))))
+    (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
+    (format t "struct ~A {~%" (cstring (dd-name dd)))
+    (format t "    lispobj header;~%")
+    (format t "    lispobj layout;~%")
+    (dolist (slot (dd-slots dd))
+      (when (eq t (dsd-raw-type slot))
+	(format t "    lispobj ~A;~%" (cstring (dsd-name slot)))))
+    (unless (oddp (+ (dd-length dd) (dd-raw-length dd)))
+      (format t "    long raw_slot_padding;~%"))
+    (dotimes (n (dd-raw-length dd))
+      (format t "    long raw~D;~%" (- (dd-raw-length dd) n 1)))
+    (format t "};~2%")
+    (format t "#endif /* LANGUAGE_ASSEMBLY */~2%")))
+
 (defun write-static-symbols ()
   (dolist (symbol (cons nil sb!vm:*static-symbols*))
     ;; FIXME: It would be nice to use longer names than NIL and
@@ -3230,6 +3283,11 @@ initially undefined function references:~2%")
 		    (format t "~&#include \"~A.h\"~%"
 			    (string-downcase 
 			     (string (sb!vm:primitive-object-name obj)))))))
+	(dolist (class '(hash-table layout))
+	  (out-to
+	   (string-downcase (string class))
+	   (write-structure-object
+	    (sb!kernel:layout-info (sb!kernel:find-layout class)))))
 	(out-to "static-symbols" (write-static-symbols))
 	
       (when core-file-name

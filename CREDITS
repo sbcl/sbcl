@@ -596,7 +596,11 @@ Frederik Kuivinen:
 
 Arthur Lemmens:
   He found and fixed a number of SBCL bugs while partially porting
-  SBCL to bootstrap under Lispworks for Windows
+  SBCL to bootstrap under Lispworks for Windows.
+
+David Lichteblau:
+  He came up with a more memory-efficient representation for
+  structures with raw slots.
 
 Robert MacLachlan:
   He has continued to answer questions about, and contribute fixes to, 
@@ -687,6 +691,10 @@ Rudi Schlatte:
   string extractor that keeps function documentation in the manual
   current.
 
+Thiemo Seufer:
+  He modernized the MIPS backend, fixing many bugs, and assisted in
+  cleaning up the C runtime code.
+
 Julian Squires:
   He worked on Unicode support for the PowerPC platform.
 
@@ -750,10 +758,12 @@ APD  Alexey Dejneka
 PFD  Paul F. Dietz
 NJF  Nathan Froyd
 AL   Arthur Lemmens
+DFL  David Lichteblau
 RAM  Robert MacLachlan
 PRM  Pierre Mai
 WHN  William ("Bill") Newman
 CSR  Christophe Rhodes
+THS  Thiemo Seufer
 NS   Nikodemus Siivola
 PVE  Peter Van Eynde
 PW   Paul Werkowski

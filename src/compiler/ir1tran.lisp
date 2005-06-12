@@ -288,7 +288,10 @@
 		    #+sb-xc-host structure!object
 		    #-sb-xc-host instance
 		    (when (emit-make-load-form value)
-		      (dotimes (i (%instance-length value))
+		      (dotimes (i (- (%instance-length value)
+				     #+sb-xc-host 0
+				     #-sb-xc-host (layout-n-untagged-slots
+						   (%instance-ref value 0))))
 			(grovel (%instance-ref value i)))))
 		   (t
 		    (compiler-error

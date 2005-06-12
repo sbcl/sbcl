@@ -31,6 +31,48 @@
 (defun %instance-set (instance index new-value)
   (setf (%instance-ref instance index) new-value))
 
+#!-hppa
+(progn
+  (defun %raw-instance-ref/word (instance index)
+    (declare (type index index))
+    (%raw-instance-ref/word instance index))
+  (defun %raw-instance-set/word (instance index new-value)
+    (declare (type index index)
+             (type sb!vm:word new-value))
+    (%raw-instance-set/word instance index new-value))
+
+  (defun %raw-instance-ref/single (instance index)
+    (declare (type index index))
+    (%raw-instance-ref/single instance index))
+  (defun %raw-instance-set/single (instance index new-value)
+    (declare (type index index)
+             (type single-float new-value))
+    (%raw-instance-set/single instance index new-value))
+
+  (defun %raw-instance-ref/double (instance index)
+    (declare (type index index))
+    (%raw-instance-ref/double instance index))
+  (defun %raw-instance-set/double (instance index new-value)
+    (declare (type index index)
+             (type double-float new-value))
+    (%raw-instance-set/double instance index new-value))
+
+  (defun %raw-instance-ref/complex-single (instance index)
+    (declare (type index index))
+    (%raw-instance-ref/complex-single instance index))
+  (defun %raw-instance-set/complex-single (instance index new-value)
+    (declare (type index index)
+             (type (complex single-float) new-value))
+    (%raw-instance-set/complex-single instance index new-value))
+
+  (defun %raw-instance-ref/complex-double (instance index)
+    (declare (type index index))
+    (%raw-instance-ref/complex-double instance index))
+  (defun %raw-instance-set/complex-double (instance index new-value)
+    (declare (type index index)
+             (type (complex double-float) new-value))
+    (%raw-instance-set/complex-double instance index new-value)))
+
 (defun %raw-ref-single (vec index)
   (declare (type index index))
   (%raw-ref-single vec index))
@@ -136,7 +178,14 @@
 
 ;;; service function for structure constructors
 (defun %make-instance-with-layout (layout)
-  (let ((result (%make-instance (layout-length layout))))
+  ;; Make sure the object ends at a two-word boundary.  Note that this does
+  ;; not affect the amount of memory used, since the allocator would add the
+  ;; same padding anyway.  However, raw slots are indexed from the length of
+  ;; the object as indicated in the header, so the pad word needs to be
+  ;; included in that length to guarantee proper alignment of raw double float
+  ;; slots, necessary for (at least) the SPARC backend.
+  (let* ((length (layout-length layout))
+         (result (%make-instance (+ length (mod (1+ length) 2)))))
     (setf (%instance-layout result) layout)
     result))
 
@@ -255,6 +304,9 @@
 ;;; of expansion of DEFSTRUCT. (For now we're just doing the simpler
 ;;; thing, putting in the type checks unconditionally.)
 
+;;; KLUDGE: Why use this closure approach at all?  The macrology in
+;;; SLOT-ACCESSOR-FUNS seems to be half stub, half OAOOM to me.  --DFL
+
 ;;; Return (VALUES SLOT-READER-FUN SLOT-WRITER-FUN).
 (defun slot-accessor-funs (dd dsd)
 
@@ -292,21 +344,12 @@
 		     ,@(mapcar (lambda (rtd)
 				 (let ((raw-type (raw-slot-data-raw-type rtd))
 				       (accessor-name
-					(raw-slot-data-accessor-name rtd))
-				       (n-words (raw-slot-data-n-words rtd)))
+					(raw-slot-data-accessor-name rtd)))
 				   `((equal dsd-raw-type ',raw-type)
 				     #+sb-xc (/show0 "in raw slot case")
-				     (let ((raw-index (dd-raw-index dd)))
-				       (multiple-value-bind (scaled-dsd-index
-							     misalignment)
-					   (floor dsd-index ,n-words)
-					 (aver (zerop misalignment))
-					 (%slotplace-accessor-funs
-					  (,accessor-name (,dd-ref-fun-name
-							   instance
-							   raw-index)
-							  scaled-dsd-index)
-					  ,instance-type-check-form))))))
+				     (%slotplace-accessor-funs
+				      (,accessor-name instance dsd-index)
+				      ,instance-type-check-form))))
 			       *raw-slot-data-list*)
 		     ;; oops
 		     (t
@@ -378,28 +421,24 @@
   (declare (type structure-object structure))
   (let* ((len (%instance-length structure))
 	 (res (%make-instance len))
-	 (layout (%instance-layout structure)))
+	 (layout (%instance-layout structure))
+	 (nuntagged (layout-n-untagged-slots layout)))
 
     (declare (type index len))
     (when (layout-invalid layout)
       (error "attempt to copy an obsolete structure:~%  ~S" structure))
 
     ;; Copy ordinary slots.
-    (dotimes (i len)
+    (dotimes (i (- len nuntagged))
       (declare (type index i))
       (setf (%instance-ref res i)
 	    (%instance-ref structure i)))
 
     ;; Copy raw slots.
-    (let ((raw-index (dd-raw-index (layout-info layout))))
-      (when raw-index
-	(let* ((data (%instance-ref structure raw-index))
-	       (raw-len (length data))
-	       (new (make-array raw-len :element-type 'sb!vm::word)))
-	  (declare (type (simple-array sb!vm::word (*)) data))
-	  (setf (%instance-ref res raw-index) new)
-	  (dotimes (i raw-len)
-	    (setf (aref new i) (aref data i))))))
+    (dotimes (i nuntagged)
+      (declare (type index i))
+      (setf (%raw-instance-ref/word res i)
+	    (%raw-instance-ref/word structure i)))
 
     res))
 

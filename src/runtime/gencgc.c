@@ -44,6 +44,7 @@
 #include "genesis/vector.h"
 #include "genesis/weak-pointer.h"
 #include "genesis/simple-fun.h"
+#include "genesis/hash-table.h"
 
 /* forward declarations */
 long gc_find_freeish_pages(long *restart_page_ptr, long nbytes, int unboxed);
@@ -1712,7 +1713,7 @@ scav_vector(lispobj *where, lispobj object)
     unsigned long kv_length;
     lispobj *kv_vector;
     unsigned long length = 0; /* (0 = dummy to stop GCC warning) */
-    lispobj *hash_table;
+    struct hash_table *hash_table;
     lispobj empty_symbol;
     unsigned long *index_vector = NULL; /* (NULL = dummy to stop GCC warning) */
     unsigned long *next_vector = NULL; /* (NULL = dummy to stop GCC warning) */
@@ -1745,8 +1746,10 @@ scav_vector(lispobj *where, lispobj object)
     }
     hash_table = (lispobj *)native_pointer(where[2]);
     /*FSHOW((stderr,"/hash_table = %x\n", hash_table));*/
-    if (widetag_of(hash_table[0]) != INSTANCE_HEADER_WIDETAG) {
-	lose("hash table not instance (%x at %x)", hash_table[0], hash_table);
+    if (widetag_of(hash_table->header) != INSTANCE_HEADER_WIDETAG) {
+	lose("hash table not instance (%x at %x)",
+	     hash_table->header,
+	     hash_table);
     }
 
     /* Scavenge element 1, which should be some internal symbol that
@@ -1765,19 +1768,19 @@ scav_vector(lispobj *where, lispobj object)
 
     /* Scavenge hash table, which will fix the positions of the other
      * needed objects. */
-    scavenge(hash_table, 16);
+    scavenge(hash_table, sizeof(struct hash_table) / sizeof(lispobj));
 
     /* Cross-check the kv_vector. */
-    if (where != (lispobj *)native_pointer(hash_table[9])) {
-	lose("hash_table table!=this table %x", hash_table[9]);
+    if (where != (lispobj *)native_pointer(hash_table->table)) {
+	lose("hash_table table!=this table %x", hash_table->table);
     }
 
     /* WEAK-P */
-    weak_p_obj = hash_table[10];
+    weak_p_obj = hash_table->weak_p;
 
     /* index vector */
     {
-	lispobj index_vector_obj = hash_table[13];
+	lispobj index_vector_obj = hash_table->index_vector;
 
 	if (is_lisp_pointer(index_vector_obj) &&
 	    (widetag_of(*(lispobj *)native_pointer(index_vector_obj)) ==
@@ -1793,7 +1796,7 @@ scav_vector(lispobj *where, lispobj object)
 
     /* next vector */
     {
-	lispobj next_vector_obj = hash_table[14];
+	lispobj next_vector_obj = hash_table->next_vector;
 
 	if (is_lisp_pointer(next_vector_obj) &&
 	    (widetag_of(*(lispobj *)native_pointer(next_vector_obj)) ==
@@ -1809,11 +1812,7 @@ scav_vector(lispobj *where, lispobj object)
 
     /* maybe hash vector */
     {
-	/* FIXME: This bare "15" offset should become a symbolic
-	 * expression of some sort. And all the other bare offsets
-	 * too. And the bare "16" in scavenge(hash_table, 16). And
-	 * probably other stuff too. Ugh.. */
-	lispobj hash_vector_obj = hash_table[15];
+	lispobj hash_vector_obj = hash_table->hash_vector;
 
 	if (is_lisp_pointer(hash_vector_obj) &&
 	    (widetag_of(*(lispobj *)native_pointer(hash_vector_obj)) ==
@@ -1876,8 +1875,8 @@ scav_vector(lispobj *where, lispobj object)
 			    /*FSHOW((stderr, "/P2a %d\n", next_vector[i]));*/
 			    index_vector[old_index] = next_vector[i];
 			    /* Link it into the needing rehash chain. */
-			    next_vector[i] = fixnum_value(hash_table[11]);
-			    hash_table[11] = make_fixnum(i);
+			    next_vector[i] = fixnum_value(hash_table->needing_rehash);
+			    hash_table->needing_rehash = make_fixnum(i);
 			    /*SHOW("P2");*/
 			} else {
 			    unsigned prior = index_vector[old_index];
@@ -1893,8 +1892,8 @@ scav_vector(lispobj *where, lispobj object)
 				    /* Link it into the needing rehash
 				     * chain. */
 				    next_vector[next] =
-					fixnum_value(hash_table[11]);
-				    hash_table[11] = make_fixnum(next);
+					fixnum_value(hash_table->needing_rehash);
+				    hash_table->needing_rehash = make_fixnum(next);
 				    /*SHOW("/P3");*/
 				    break;
 				}

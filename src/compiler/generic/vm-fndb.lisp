@@ -121,6 +121,32 @@
   (unsafe))
 (defknown %layout-invalid-error (t layout) nil)
 
+(defknown %raw-instance-ref/word (instance index) sb!vm:word
+  (flushable))
+(defknown %raw-instance-set/word (instance index sb!vm:word) sb!vm:word
+  (unsafe))
+(defknown %raw-instance-ref/single (instance index) single-float
+  (flushable))
+(defknown %raw-instance-set/single (instance index single-float) single-float
+  (unsafe))
+(defknown %raw-instance-ref/double (instance index) double-float
+  (flushable))
+(defknown %raw-instance-set/double (instance index double-float) double-float
+  (unsafe))
+(defknown %raw-instance-ref/complex-single (instance index)
+  (complex single-float)
+  (flushable))
+(defknown %raw-instance-set/complex-single
+    (instance index (complex single-float))
+  (complex single-float)
+  (unsafe))
+(defknown %raw-instance-ref/complex-double (instance index)
+  (complex double-float)
+  (flushable))
+(defknown %raw-instance-set/complex-double
+    (instance index (complex double-float))
+  (complex double-float)
+  (unsafe))
 
 (sb!xc:deftype raw-vector () '(simple-array sb!vm:word (*)))
 

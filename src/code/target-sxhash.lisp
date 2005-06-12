@@ -289,13 +289,16 @@
 	 (name (classoid-name classoid))
 	 (result (mix (sxhash name) (the fixnum 79867))))
     (declare (type fixnum result))
-    (dotimes (i (min depthoid (1- length)))
+    (dotimes (i (min depthoid (- length 1 (layout-n-untagged-slots layout))))
       (declare (type fixnum i))
       (let ((j (1+ i))) ; skipping slot #0, which is for LAYOUT
 	(declare (type fixnum j))
 	(mixf result
 	      (psxhash (%instance-ref key j)
 		       (1- depthoid)))))
+    ;; KLUDGE: Should hash untagged slots, too.  (Although +max-hash-depthoid+
+    ;; is pretty low currently, so they might not make it into the hash
+    ;; value anyway.)
     result))
 
 (defun list-psxhash (key depthoid)

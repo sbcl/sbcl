@@ -108,7 +108,8 @@
   (slots () :type list)
   ;; a list of (NAME . INDEX) pairs for accessors of included structures
   (inherited-accessor-alist () :type list)
-  ;; number of elements we've allocated (See also RAW-LENGTH.)
+  ;; number of elements we've allocated (See also RAW-LENGTH, which is not
+  ;; included in LENGTH.)
   (length 0 :type index)
   ;; General kind of implementation.
   (type 'structure :type (member structure vector list
@@ -132,11 +133,7 @@
   ;; option was given with no argument, or 0 if no PRINT-OBJECT option
   ;; was given
   (print-object 0 :type (or cons symbol (member 0)))
-  ;; the index of the raw data vector and the number of words in it,
-  ;; or NIL and 0 if not allocated (either because this structure
-  ;; has no raw slots, or because we're still parsing it and haven't
-  ;; run across any raw slots yet)
-  (raw-index nil :type (or index null))
+  ;; The number of untagged slots at the end.
   (raw-length 0 :type index)
   ;; the value of the :PURE option, or :UNSPECIFIED. This is only
   ;; meaningful if DD-CLASS-P = T.
@@ -192,14 +189,12 @@
   ;; If this object does not describe a raw slot, this value is T.
   ;;
   ;; If this object describes a raw slot, this value is the type of the
-  ;; value that the raw slot holds. Mostly. (KLUDGE: If the raw slot has
-  ;; type (UNSIGNED-BYTE 32), the value here is UNSIGNED-BYTE, not
-  ;; (UNSIGNED-BYTE 32).)
+  ;; value that the raw slot holds.
   (raw-type t :type (member t single-float double-float
 			    #!+long-float long-float
 			    complex-single-float complex-double-float
 			    #!+long-float complex-long-float
-			    unsigned-byte))
+			    sb!vm:word))
   (read-only nil :type (member t nil)))
 (def!method print-object ((x defstruct-slot-description) stream)
   (print-unreadable-object (x stream :type t)
@@ -215,59 +210,75 @@
 
 ;;;; shared machinery for inline and out-of-line slot accessor functions
 
+;;; Classic comment preserved for entertainment value:
+;;;
+;;; "A lie can travel halfway round the world while the truth is
+;;; putting on its shoes." -- Mark Twain
+
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
   ;; information about how a slot of a given DSD-RAW-TYPE is to be accessed
   (defstruct raw-slot-data
     ;; the raw slot type, or T for a non-raw slot
     ;;
-    ;; (Raw slots are allocated in the raw slots array in a vector which
-    ;; the GC doesn't need to scavenge. Non-raw slots are in the
-    ;; ordinary place you'd expect, directly indexed off the instance
-    ;; pointer.)
+    ;; (Non-raw slots are in the ordinary place you'd expect, directly
+    ;; indexed off the instance pointer.  Raw slots are indexed from the end
+    ;; of the instance and skipped by GC.)
     (raw-type (missing-arg) :type (or symbol cons) :read-only t)
-    ;; What operator is used (on the raw data vector) to access a slot
-    ;; of this type?
+    ;; What operator is used to access a slot of this type?
     (accessor-name (missing-arg) :type symbol :read-only t)
-    ;; How many words are each value of this type? (This is used to
-    ;; rescale the offset into the raw data vector.)
-    (n-words (missing-arg) :type (and index (integer 1)) :read-only t))
+    ;; How many words are each value of this type?
+    (n-words (missing-arg) :type (and index (integer 1)) :read-only t)
+    ;; Necessary alignment in units of words.  Note that instances
+    ;; themselves are aligned by exactly two words, so specifying more
+    ;; than two words here would not work.
+    (alignment 1 :type (integer 1 2) :read-only t))
 
   (defvar *raw-slot-data-list*
-    (list
-     ;; The compiler thinks that the raw data vector is a vector of
-     ;; word-sized unsigned bytes, so if the slot we want to access
-     ;; actually *is* an unsigned byte, it'll access the slot for us
-     ;; even if we don't lie to it at all, just let it use normal AREF.
-     (make-raw-slot-data :raw-type 'unsigned-byte
-			 :accessor-name 'aref
-			 :n-words 1)
-     ;; In the other cases, we lie to the compiler, making it use
-     ;; some low-level AREFish access in order to pun the hapless
-     ;; bits into some other-than-unsigned-byte meaning.
-     ;;
-     ;; "A lie can travel halfway round the world while the truth is
-     ;; putting on its shoes." -- Mark Twain
-     (make-raw-slot-data :raw-type 'single-float
-			 :accessor-name '%raw-ref-single
-			 :n-words 1)
-     (make-raw-slot-data :raw-type 'double-float
-			 :accessor-name '%raw-ref-double
-			 :n-words 2)
-     (make-raw-slot-data :raw-type 'complex-single-float
-			 :accessor-name '%raw-ref-complex-single
-			 :n-words 2)
-     (make-raw-slot-data :raw-type 'complex-double-float
-			 :accessor-name '%raw-ref-complex-double
-			 :n-words 4)
-     #!+long-float
-     (make-raw-slot-data :raw-type long-float
-			 :accessor-name '%raw-ref-long
-			 :n-words #!+x86 3 #!+sparc 4)
-     #!+long-float
-     (make-raw-slot-data :raw-type complex-long-float
-			 :accessor-name '%raw-ref-complex-long
-			 :n-words #!+x86 6 #!+sparc 8))))
+    #!+hppa
+    nil
+    #!-hppa
+    (let ((double-float-alignment
+	   ;; white list of architectures that can load unaligned doubles:
+	   #!+(or x86 x86-64 ppc) 1
+	   ;; at least sparc, mips and alpha can't:
+	   #!-(or x86 x86-64 ppc) 2))
+      (list
+       (make-raw-slot-data :raw-type 'sb!vm:word
+			   :accessor-name '%raw-instance-ref/word
+			   :n-words 1)
+       (make-raw-slot-data :raw-type 'single-float
+			   :accessor-name '%raw-instance-ref/single
+			   ;; KLUDGE: On 64 bit architectures, we
+			   ;; could pack two SINGLE-FLOATs into the
+			   ;; same word if raw slots were indexed
+			   ;; using bytes instead of words.  However,
+			   ;; I don't personally find optimizing
+			   ;; SINGLE-FLOAT memory usage worthwile
+			   ;; enough.  And the other datatype that
+			   ;; would really benefit is (UNSIGNED-BYTE
+			   ;; 32), but that is a subtype of FIXNUM, so
+			   ;; we store it unraw anyway.  :-( -- DFL
+			   :n-words 1)
+       (make-raw-slot-data :raw-type 'double-float
+			   :accessor-name '%raw-instance-ref/double
+			   :alignment double-float-alignment
+			   :n-words (/ 8 sb!vm:n-word-bytes))
+       (make-raw-slot-data :raw-type 'complex-single-float
+			   :accessor-name '%raw-instance-ref/complex-single
+			   :n-words (/ 8 sb!vm:n-word-bytes))
+       (make-raw-slot-data :raw-type 'complex-double-float
+			   :accessor-name '%raw-instance-ref/complex-double
+			   :alignment double-float-alignment
+			   :n-words (/ 16 sb!vm:n-word-bytes))
+       #!+long-float
+       (make-raw-slot-data :raw-type long-float
+			   :accessor-name '%raw-instance-ref/long
+			   :n-words #!+x86 3 #!+sparc 4)
+       #!+long-float
+       (make-raw-slot-data :raw-type complex-long-float
+			   :accessor-name '%raw-instance-ref/complex-long
+			   :n-words #!+x86 6 #!+sparc 8)))))
 
 ;;;; the legendary DEFSTRUCT macro itself (both CL:DEFSTRUCT and its
 ;;;; close personal friend SB!XC:DEFSTRUCT)
@@ -691,63 +702,42 @@
     slot))
 
 ;;; When a value of type TYPE is stored in a structure, should it be
-;;; stored in a raw slot? Return (VALUES RAW? RAW-TYPE WORDS), where
-;;;   RAW? is true if TYPE should be stored in a raw slot.
-;;;   RAW-TYPE is the raw slot type, or NIL if no raw slot.
-;;;   WORDS is the number of words in the raw slot, or NIL if no raw slot.
-;;;
-;;; FIXME: This should use the data in *RAW-SLOT-DATA-LIST*.
-(defun structure-raw-slot-type-and-size (type)
-  (cond ((and (sb!xc:subtypep type 'sb!vm:word)
-	      (multiple-value-bind (fixnum? fixnum-certain?)
-		  (sb!xc:subtypep type 'fixnum)
-		;; (The extra test for FIXNUM-CERTAIN? here is
-		;; intended for bootstrapping the system. In
-		;; particular, in sbcl-0.6.2, we set up LAYOUT before
-		;; FIXNUM is defined, and so could bogusly end up
-		;; putting INDEX-typed values into raw slots if we
-		;; didn't test FIXNUM-CERTAIN?.)
-		(and (not fixnum?) fixnum-certain?)))
-	 (values t 'unsigned-byte 1))
-	((sb!xc:subtypep type 'single-float)
-	 (values t 'single-float 1))
-	((sb!xc:subtypep type 'double-float)
-	 (values t 'double-float 2))
-	#!+long-float
-	((sb!xc:subtypep type 'long-float)
-	 (values t 'long-float #!+x86 3 #!+sparc 4))
-	((sb!xc:subtypep type '(complex single-float))
-	 (values t 'complex-single-float 2))
-	((sb!xc:subtypep type '(complex double-float))
-	 (values t 'complex-double-float 4))
-	#!+long-float
-	((sb!xc:subtypep type '(complex long-float))
-	 (values t 'complex-long-float #!+x86 6 #!+sparc 8))
-	(t
-	 (values nil nil nil))))
+;;; stored in a raw slot?  Return the matching RAW-SLOT-DATA structure
+;; if TYPE should be stored in a raw slot, or NIL if not.
+(defun structure-raw-slot-data (type)
+  (multiple-value-bind (fixnum? fixnum-certain?)
+      (sb!xc:subtypep type 'fixnum)
+    ;; (The extra test for FIXNUM-CERTAIN? here is intended for
+    ;; bootstrapping the system. In particular, in sbcl-0.6.2, we set up
+    ;; LAYOUT before FIXNUM is defined, and so could bogusly end up
+    ;; putting INDEX-typed values into raw slots if we didn't test
+    ;; FIXNUM-CERTAIN?.)
+    (if (or fixnum? (not fixnum-certain?))
+	nil
+	(dolist (data *raw-slot-data-list*)
+	  (when (sb!xc:subtypep type (raw-slot-data-raw-type data))
+	    (return data))))))
 
 ;;; Allocate storage for a DSD in DD. This is where we decide whether
-;;; a slot is raw or not. If raw, and we haven't allocated a raw-index
-;;; yet for the raw data vector, then do it. Raw objects are aligned
-;;; on the unit of their size.
+;;; a slot is raw or not. Raw objects are aligned on the unit of their size.
 (defun allocate-1-slot (dd dsd)
-  (multiple-value-bind (raw? raw-type words)
-      (if (eq (dd-type dd) 'structure)
-	  (structure-raw-slot-type-and-size (dsd-type dsd))
-	  (values nil nil nil))
-    (cond ((not raw?)
-	   (setf (dsd-index dsd) (dd-length dd))
-	   (incf (dd-length dd)))
-	  (t
-	   (unless (dd-raw-index dd)
-	     (setf (dd-raw-index dd) (dd-length dd))
-	     (incf (dd-length dd)))
-	   (let ((off (rem (dd-raw-length dd) words)))
-	     (unless (zerop off)
-	       (incf (dd-raw-length dd) (- words off))))
-	   (setf (dsd-raw-type dsd) raw-type)
-	   (setf (dsd-index dsd) (dd-raw-length dd))
-	   (incf (dd-raw-length dd) words))))
+  (let ((rsd
+	 (if (eq (dd-type dd) 'structure)
+	     (structure-raw-slot-data (dsd-type dsd))
+	     nil)))
+    (cond
+      ((null rsd)
+	(setf (dsd-index dsd) (dd-length dd))
+	(incf (dd-length dd)))
+      (t
+	(let* ((words (raw-slot-data-n-words rsd))
+	       (alignment (raw-slot-data-alignment rsd))
+	       (off (rem (dd-raw-length dd) alignment)))
+	  (unless (zerop off)
+	    (incf (dd-raw-length dd) (- alignment off)))
+	  (setf (dsd-raw-type dsd) (raw-slot-data-raw-type rsd))
+	  (setf (dsd-index dsd) (dd-raw-length dd))
+	  (incf (dd-raw-length dd) words))))) 
   (values))
 
 (defun typed-structure-info-or-lose (name)
@@ -795,7 +785,6 @@
 		  (cons included-name mc))))
 	(when (eq (dd-pure dd) :unspecified)
 	  (setf (dd-pure dd) (dd-pure included-structure)))
-	(setf (dd-raw-index dd) (dd-raw-index included-structure))
 	(setf (dd-raw-length dd) (dd-raw-length included-structure)))
 
       (setf (dd-inherited-accessor-alist dd)
@@ -898,8 +887,7 @@
 ;;; Return a form describing the writable place used for this slot
 ;;; in the instance named INSTANCE-NAME.
 (defun %accessor-place-form (dd dsd instance-name)
-  (let (;; the operator that we'll use to access a typed slot or, in
-	;; the case of a raw slot, to read the vector of raw slots
+  (let (;; the operator that we'll use to access a typed slot
 	(ref (ecase (dd-type dd)
 	       (structure '%instance-ref)
 	       (list 'nth-but-with-sane-arg-order)
@@ -910,26 +898,8 @@
 	(let* ((raw-slot-data (find raw-type *raw-slot-data-list*
 				    :key #'raw-slot-data-raw-type
 				    :test #'equal))
-	       (raw-slot-accessor (raw-slot-data-accessor-name raw-slot-data))
-	       (raw-n-words (raw-slot-data-n-words raw-slot-data)))
-	  (multiple-value-bind (scaled-dsd-index misalignment)
-	      (floor (dsd-index dsd) raw-n-words)
-	    (aver (zerop misalignment))
-	    (let* ((raw-vector-bare-form
-		    `(,ref ,instance-name ,(dd-raw-index dd)))
-		   (raw-vector-form
-		    (if (eq raw-type 'unsigned-byte)
-			(progn
-			  (aver (= raw-n-words 1))
-			  (aver (eq raw-slot-accessor 'aref))
-			  ;; FIXME: when the 64-bit world rolls
-			  ;; around, this will need to be reviewed,
-			  ;; along with the whole RAW-SLOT thing.
-			  `(truly-the
-			    (simple-array sb!vm:word (*))
-			    ,raw-vector-bare-form))
-			raw-vector-bare-form)))
-	      `(,raw-slot-accessor ,raw-vector-form ,scaled-dsd-index)))))))
+	       (raw-slot-accessor (raw-slot-data-accessor-name raw-slot-data)))
+	  `(,raw-slot-accessor ,instance-name ,(dsd-index dsd))))))
 
 ;;; Return source transforms for the reader and writer functions of
 ;;; the slot described by DSD. They should be inline expanded, but
@@ -1192,7 +1162,9 @@
     (let ((new-layout (make-layout :classoid class
 				   :inherits inherits
 				   :depthoid (length inherits)
-				   :length (dd-length info)
+				   :length (+ (dd-length info)
+					      (dd-raw-length info))
+				   :n-untagged-slots (dd-raw-length info)
 				   :info info))
 	  (old-layout (or compiler-layout old-layout)))
       (cond
@@ -1211,7 +1183,8 @@
 				 new-context
 				 (layout-length new-layout)
 				 (layout-inherits new-layout)
-				 (layout-depthoid new-layout))
+				 (layout-depthoid new-layout)
+				 (layout-n-untagged-slots new-layout))
 	(values class new-layout old-layout))
        (t
 	(let ((old-info (layout-info old-layout)))
@@ -1319,18 +1292,13 @@
        (declare ,@(mapcar (lambda (var type) `(type ,type ,var)) vars types))
        (list ,@vals))))
 (defun create-structure-constructor (dd cons-name arglist vars types values)
-  (let* ((instance (gensym "INSTANCE"))
-	 (raw-index (dd-raw-index dd)))
+  (let* ((instance (gensym "INSTANCE")))
     `(defun ,cons-name ,arglist
        (declare ,@(mapcar (lambda (var type) `(type ,type ,var))
 			  vars types))
        (let ((,instance (truly-the ,(dd-name dd)
 			  (%make-instance-with-layout
 			   (%delayed-get-compiler-layout ,(dd-name dd))))))
-	 ,@(when raw-index
-	     `((setf (%instance-ref ,instance ,raw-index)
-		     (make-array ,(dd-raw-length dd)
-				 :element-type 'sb!vm:word))))
 	 ,@(mapcar (lambda (dsd value)
 		     ;; (Note that we can't in general use the
 		     ;; ordinary named slot setter function here

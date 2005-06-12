@@ -224,3 +224,11 @@ Initialization of stack-allocated arrays is inefficient: we always
 fill the vector with zeroes, even when it is not needed (as for
 platforms with conservative GC or for arrays of unboxed objectes) and
 is performed later explicitely.
+--------------------------------------------------------------------------------
+#28
+a. Accessing raw slots in structure instances is more inefficient than
+it could be; if we placed raw slots before the header word, we would
+not need to do arithmetic at runtime to access them.  (But beware:
+this would complicate handling of the interior pointer).
+
+b. (Also note that raw slots are currently disabled on HPPA)

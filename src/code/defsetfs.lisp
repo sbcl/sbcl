@@ -39,6 +39,11 @@
 ;;; from defstruct.lisp
 (in-package "SB!KERNEL")
 (defsetf %instance-ref %instance-set)
+(defsetf %raw-instance-ref/word %raw-instance-set/word)
+(defsetf %raw-instance-ref/single %raw-instance-set/single)
+(defsetf %raw-instance-ref/double %raw-instance-set/double)
+(defsetf %raw-instance-ref/complex-single %raw-instance-set/complex-single)
+(defsetf %raw-instance-ref/complex-double %raw-instance-set/complex-double)
 (defsetf %raw-ref-single %raw-set-single)
 (defsetf %raw-ref-double %raw-set-double)
 

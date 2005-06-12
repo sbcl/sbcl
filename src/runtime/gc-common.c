@@ -41,6 +41,7 @@
 #include "gc.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
+#include "genesis/layout.h"
 #include "gc-internal.h"
 
 #ifdef LISP_FEATURE_SPARC
@@ -641,6 +642,24 @@ static long
 scav_boxed(lispobj *where, lispobj object)
 {
     return 1;
+}
+
+static long
+scav_instance(lispobj *where, lispobj object)
+{
+    lispobj nuntagged;
+    long ntotal = HeaderValue(object);
+    lispobj layout = ((struct instance *)native_pointer(where))->slots[0];
+
+    if (!layout)
+	return 1;
+    if (forwarding_pointer_p(native_pointer(layout)))
+        layout = (lispobj) forwarding_pointer_value(native_pointer(layout));
+
+    nuntagged = ((struct layout *)native_pointer(layout))->n_untagged_slots;
+    scavenge(where + 1, ntotal - fixnum_value(nuntagged));
+
+    return ntotal + 1;
 }
 
 static lispobj
@@ -1708,7 +1727,7 @@ gc_init_tables(void)
     scavtab[CHARACTER_WIDETAG] = scav_immediate;
     scavtab[SAP_WIDETAG] = scav_unboxed;
     scavtab[UNBOUND_MARKER_WIDETAG] = scav_immediate;
-    scavtab[INSTANCE_HEADER_WIDETAG] = scav_boxed;
+    scavtab[INSTANCE_HEADER_WIDETAG] = scav_instance;
 #ifdef LISP_FEATURE_SPARC
     scavtab[FDEFN_WIDETAG] = scav_boxed;
 #else

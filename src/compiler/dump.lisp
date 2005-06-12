@@ -1315,14 +1315,20 @@
       (error "attempt to dump invalid structure:~%  ~S~%How did this happen?"
 	     struct)))
   (note-potential-circularity struct file)
-  (do ((index 0 (1+ index))
-       (length (%instance-length struct))
-       (circ (fasl-output-circularity-table file)))
-      ((= index length)
+  (aver (%instance-ref struct 0))
+  (do* ((length (%instance-length struct))
+	(ntagged (- length (layout-n-untagged-slots (%instance-ref struct 0))))
+	(circ (fasl-output-circularity-table file))
+	;; last slot first on the stack, so that the layout is on top:
+	(index (1- length) (1- index)))
+      ((minusp index)
        (dump-fop* length fop-small-struct fop-struct file))
-    (let* ((obj (%instance-ref struct index))
+    (let* ((obj (if (>= index ntagged)
+		    (%raw-instance-ref/word struct (- length index 1))
+		    (%instance-ref struct index)))
 	   (ref (gethash obj circ)))
       (cond (ref
+	     (aver (not (zerop index)))
 	     (push (make-circularity :type :struct-set
 				     :object struct
 				     :index index
@@ -1347,4 +1353,5 @@
   (sub-dump-object (layout-inherits obj) file)
   (sub-dump-object (layout-depthoid obj) file)
   (sub-dump-object (layout-length obj) file)
+  (sub-dump-object (layout-n-untagged-slots obj) file)
   (dump-fop 'fop-layout file))

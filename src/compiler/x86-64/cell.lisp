@@ -486,3 +486,282 @@
 
 (define-full-setter code-header-set * 0 other-pointer-lowtag
   (any-reg descriptor-reg) * code-header-set)
+
+
+
+;;;; raw instance slot accessors
+
+(define-vop (raw-instance-ref/word)
+  (:translate %raw-instance-ref/word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)) (index :scs (any-reg)))
+  (:arg-types * tagged-num)
+  (:temporary (:sc unsigned-reg) tmp)
+  (:results (value :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 5
+    (loadw tmp object 0 instance-pointer-lowtag)
+    (inst shr tmp n-widetag-bits)
+    (inst shl tmp 3)
+    (inst sub tmp index)
+    (inst mov
+	  value
+	  (make-ea :qword
+		   :base object
+		   :index tmp
+		   :disp (- (* (1- instance-slots-offset) n-word-bytes)
+			    instance-pointer-lowtag)))))
+
+(define-vop (raw-instance-set/word)
+  (:translate %raw-instance-set/word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg))
+	 (value :scs (unsigned-reg) :target result))
+  (:arg-types * tagged-num unsigned-num)
+  (:temporary (:sc unsigned-reg) tmp)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 5
+    (loadw tmp object 0 instance-pointer-lowtag)
+    (inst shr tmp n-widetag-bits)
+    (inst shl tmp 3)
+    (inst sub tmp index)
+    (inst mov
+	  (make-ea :qword
+		   :base object
+		   :index tmp
+		   :disp (- (* (1- instance-slots-offset) n-word-bytes)
+			    instance-pointer-lowtag))
+	  value)
+    (move result value)))
+
+(define-vop (raw-instance-ref/single)
+  (:translate %raw-instance-ref/single)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg)))
+  (:arg-types * positive-fixnum)
+  (:temporary (:sc unsigned-reg) tmp)
+  (:results (value :scs (single-reg)))
+  (:result-types single-float)
+  (:generator 5
+    (loadw tmp object 0 instance-pointer-lowtag)
+    (inst shr tmp n-widetag-bits)
+    (inst shl tmp 3)
+    (inst sub tmp index)
+    (inst movss
+          value
+          (make-ea :dword
+                   :base object
+                   :index tmp
+                   :disp (- (* (1- instance-slots-offset) n-word-bytes)
+                            instance-pointer-lowtag)))))
+
+(define-vop (raw-instance-set/single)
+  (:translate %raw-instance-set/single)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg))
+	 (value :scs (single-reg) :target result))
+  (:arg-types * positive-fixnum single-float)
+  (:temporary (:sc unsigned-reg) tmp)
+  (:results (result :scs (single-reg)))
+  (:result-types single-float)
+  (:generator 5
+    (loadw tmp object 0 instance-pointer-lowtag)
+    (inst shr tmp n-widetag-bits)
+    (inst shl tmp 3)
+    (inst sub tmp index)
+    (inst movss
+          (make-ea :dword
+                   :base object
+                   :index tmp
+                   :disp (- (* (1- instance-slots-offset) n-word-bytes)
+			    instance-pointer-lowtag))
+          value)
+   (unless (location= result value)
+     (inst movss result value))))
+
+(define-vop (raw-instance-ref/double)
+  (:translate %raw-instance-ref/double)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg)))
+  (:arg-types * positive-fixnum)
+  (:temporary (:sc unsigned-reg) tmp)
+  (:results (value :scs (double-reg)))
+  (:result-types double-float)
+  (:generator 5
+    (loadw tmp object 0 instance-pointer-lowtag)
+    (inst shr tmp n-widetag-bits)
+    (inst shl tmp 3)
+    (inst sub tmp index)
+    (inst movsd
+          value
+          (make-ea :dword
+                   :base object
+                   :index tmp
+                   :disp (- (* (1- instance-slots-offset) n-word-bytes)
+                            instance-pointer-lowtag)))))
+
+(define-vop (raw-instance-set/double)
+  (:translate %raw-instance-set/double)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg))
+	 (value :scs (double-reg) :target result))
+  (:arg-types * positive-fixnum double-float)
+  (:temporary (:sc unsigned-reg) tmp)
+  (:results (result :scs (double-reg)))
+  (:result-types double-float)
+  (:generator 5
+    (loadw tmp object 0 instance-pointer-lowtag)
+    (inst shr tmp n-widetag-bits)
+    (inst shl tmp 3)
+    (inst sub tmp index)
+    (inst movsd
+          (make-ea :dword
+                   :base object
+                   :index tmp
+                   :disp (- (* (1- instance-slots-offset) n-word-bytes)
+			    instance-pointer-lowtag))
+          value)
+   (unless (location= result value)
+     (inst movsd result value))))
+
+(define-vop (raw-instance-ref/complex-single)
+  (:translate %raw-instance-ref/complex-single)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg)))
+  (:arg-types * positive-fixnum)
+  (:temporary (:sc unsigned-reg) tmp)
+  (:results (value :scs (complex-single-reg)))
+  (:result-types complex-single-float)
+  (:generator 5
+    (loadw tmp object 0 instance-pointer-lowtag)
+    (inst shr tmp n-widetag-bits)
+    (inst shl tmp 3)
+    (inst sub tmp index)
+    (let ((real-tn (complex-single-reg-real-tn value)))
+      (inst movss
+            real-tn
+            (make-ea :dword
+                     :base object
+                     :index tmp
+                     :disp (- (* (1- instance-slots-offset) n-word-bytes)
+                              instance-pointer-lowtag))))
+    (let ((imag-tn (complex-single-reg-imag-tn value)))
+      (inst movss
+            imag-tn
+            (make-ea :dword
+                     :base object
+                     :index tmp
+                     :disp (+ (* (1- instance-slots-offset) n-word-bytes)
+                              4
+                              (- instance-pointer-lowtag)))))))
+
+(define-vop (raw-instance-set/complex-single)
+  (:translate %raw-instance-set/complex-single)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg))
+	 (value :scs (complex-single-reg) :target result))
+  (:arg-types * positive-fixnum complex-single-float)
+  (:temporary (:sc unsigned-reg) tmp)
+  (:results (result :scs (complex-single-reg)))
+  (:result-types complex-single-float)
+  (:generator 5
+    (loadw tmp object 0 instance-pointer-lowtag)
+    (inst shr tmp n-widetag-bits)
+    (inst shl tmp 3)
+    (inst sub tmp index)
+    (let ((value-real (complex-single-reg-real-tn value))
+	  (result-real (complex-single-reg-real-tn result)))
+      (inst movss (make-ea :dword
+                           :base object
+                           :index tmp
+                           :disp (- (* (1- instance-slots-offset) n-word-bytes)
+                                    instance-pointer-lowtag))
+	    value-real)
+      (unless (location= value-real result-real)
+	(inst movss result-real value-real)))
+    (let ((value-imag (complex-single-reg-imag-tn value))
+	  (result-imag (complex-single-reg-imag-tn result)))
+      (inst movss (make-ea :dword
+                           :base object
+                           :index tmp
+                           :disp (+ (* (1- instance-slots-offset) n-word-bytes)
+                                    4
+                                    (- instance-pointer-lowtag)))
+	    value-imag)
+      (unless (location= value-imag result-imag)
+	(inst movss result-imag value-imag)))))
+
+(define-vop (raw-instance-ref/complex-double)
+  (:translate %raw-instance-ref/complex-double)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg)))
+  (:arg-types * positive-fixnum)
+  (:temporary (:sc unsigned-reg) tmp)
+  (:results (value :scs (complex-double-reg)))
+  (:result-types complex-double-float)
+  (:generator 5
+    (loadw tmp object 0 instance-pointer-lowtag)
+    (inst shr tmp n-widetag-bits)
+    (inst shl tmp 3)
+    (inst sub tmp index)
+    (let ((real-tn (complex-double-reg-real-tn value)))
+      (inst movsd
+            real-tn
+            (make-ea :dword
+                     :base object
+                     :index tmp
+                     :disp (- (* (- instance-slots-offset 2) n-word-bytes)
+                              instance-pointer-lowtag))))
+    (let ((imag-tn (complex-double-reg-imag-tn value)))
+      (inst movsd
+            imag-tn
+            (make-ea :dword
+                     :base object
+                     :index tmp
+                     :disp (- (* (1- instance-slots-offset) n-word-bytes)
+                              instance-pointer-lowtag))))))
+
+(define-vop (raw-instance-set/complex-double)
+  (:translate %raw-instance-set/complex-double)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg))
+	 (value :scs (complex-double-reg) :target result))
+  (:arg-types * positive-fixnum complex-double-float)
+  (:temporary (:sc unsigned-reg) tmp)
+  (:results (result :scs (complex-double-reg)))
+  (:result-types complex-double-float)
+  (:generator 5
+    (loadw tmp object 0 instance-pointer-lowtag)
+    (inst shr tmp n-widetag-bits)
+    (inst shl tmp 3)
+    (inst sub tmp index)
+    (let ((value-real (complex-double-reg-real-tn value))
+	  (result-real (complex-double-reg-real-tn result)))
+      (inst movsd (make-ea :dword
+                           :base object
+                           :index tmp
+                           :disp (- (* (- instance-slots-offset 2) n-word-bytes)
+                                    instance-pointer-lowtag))
+	    value-real)
+      (unless (location= value-real result-real)
+	(inst movsd result-real value-real)))
+    (let ((value-imag (complex-double-reg-imag-tn value))
+	  (result-imag (complex-double-reg-imag-tn result)))
+      (inst movsd (make-ea :dword
+                           :base object
+                           :index tmp
+                           :disp (- (* (1- instance-slots-offset) n-word-bytes)
+                                    instance-pointer-lowtag))
+	    value-imag)
+      (unless (location= value-imag result-imag)
+	(inst movsd result-imag value-imag)))))

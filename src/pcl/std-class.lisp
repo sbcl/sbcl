@@ -650,15 +650,8 @@
 (defun make-defstruct-allocation-function (class)
   (let ((dd (get-structure-dd (class-name class))))
     (lambda ()
-      (let ((instance (%make-instance (dd-length dd)))
-	    (raw-index (dd-raw-index dd)))
-	(setf (%instance-layout instance)
-	      (sb-kernel::compiler-layout-or-lose (dd-name dd)))
-	(when raw-index
-	  (setf (%instance-ref instance raw-index)
-		(make-array (dd-raw-length dd)
-			    :element-type '(unsigned-byte 32))))
-	instance))))
+      (sb-kernel::%make-instance-with-layout
+       (sb-kernel::compiler-layout-or-lose (dd-name dd))))))
 
 (defmethod shared-initialize :after
     ((class structure-class)

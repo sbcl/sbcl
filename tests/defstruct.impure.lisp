@@ -349,13 +349,13 @@
 ;;;; some other raw slot).
 
 (defstruct manyraw
-  (a (expt 2 30) :type (unsigned-byte 32))
+  (a (expt 2 30) :type (unsigned-byte #.sb-vm:n-word-bits))
   (b 0.1 :type single-float)
   (c 0.2d0 :type double-float)
   (d #c(0.3 0.3) :type (complex single-float))
   unraw-slot-just-for-variety
   (e #c(0.4d0 0.4d0) :type (complex double-float))
-  (aa (expt 2 30) :type (unsigned-byte 32))
+  (aa (expt 2 30) :type (unsigned-byte #.sb-vm:n-word-bits))
   (bb 0.1 :type single-float)
   (cc 0.2d0 :type double-float)
   (dd #c(0.3 0.3) :type (complex single-float))
@@ -391,6 +391,94 @@
   (assert (eql (manyraw-cc copy) 0.22d0))
   (assert (eql (manyraw-dd copy) #c(0.33 0.33)))
   (assert (eql (manyraw-ee copy) #c(0.44d0 0.44d0))))
+
+
+;;;; Since GC treats raw slots specially now, let's try this with more objects
+;;;; and random values as a stress test.
+
+(setf *manyraw* nil)
+
+(defconstant +n-manyraw+ 10)
+(defconstant +m-manyraw+ 1000)
+
+(defun check-manyraws (manyraws)
+  (assert (eql (length manyraws) (* +n-manyraw+ +m-manyraw+)))
+  (loop
+      for m in (reverse manyraws)
+      for i from 0
+      do
+	;; Compare the tagged reference values with raw reffer results.
+	(destructuring-bind (j a b c d e)
+	    (manyraw-unraw-slot-just-for-variety m)
+	  (assert (eql i j))
+	  (assert (= (manyraw-a m) a))
+	  (assert (= (manyraw-b m) b))
+	  (assert (= (manyraw-c m) c))
+	  (assert (= (manyraw-d m) d))
+	  (assert (= (manyraw-e m) e)))
+	;; Test the funny out-of-line OAOOM-style closures, too.
+	(mapcar (lambda (fn value)
+		  (assert (= (funcall fn m) value)))
+		(list #'manyraw-a
+		      #'manyraw-b
+		      #'manyraw-c
+		      #'manyraw-d
+		      #'manyraw-e)
+		(cdr (manyraw-unraw-slot-just-for-variety m)))))
+
+(defstruct (manyraw-subclass (:include manyraw))
+  (stolperstein 0 :type (unsigned-byte 32)))
+
+;;; create lots of manyraw objects, triggering GC every now and then
+(dotimes (y +n-manyraw+)
+  (dotimes (x +m-manyraw+)
+    (let ((a (random (expt 2 32)))
+	  (b (random most-positive-single-float))
+	  (c (random most-positive-double-float))
+	  (d (complex
+	      (random most-positive-single-float)
+	      (random most-positive-single-float)))
+	  (e (complex
+	      (random most-positive-double-float)
+	      (random most-positive-double-float))))
+      (push (funcall (if (zerop (mod x 3))
+			 #'make-manyraw-subclass
+			 #'make-manyraw)
+		     :unraw-slot-just-for-variety
+		     (list (+ x (* y +m-manyraw+)) a b c d e)
+		     :a a
+		     :b b
+		     :c c
+		     :d d
+		     :e e)
+	    *manyraw*)))
+  (room)
+  (sb-ext:gc))
+(check-manyraws *manyraw*)
+
+;;; try a full GC, too
+(sb-ext:gc :full t)
+(check-manyraws *manyraw*)
+
+;;; fasl dumper and loader also have special handling of raw slots, so
+;;; dump all of them into a fasl
+(defmethod make-load-form ((self manyraw) &optional env)
+  self env
+  :sb-just-dump-it-normally)
+(with-open-file (s "tmp-defstruct.manyraw.lisp"
+		 :direction :output
+		 :if-exists :supersede)
+  (write-string "(defun dumped-manyraws () '#.*manyraw*)" s))
+(compile-file "tmp-defstruct.manyraw.lisp")
+
+;;; nuke the objects and try another GC just to be extra careful
+(setf *manyraw* nil)
+(sb-ext:gc :full t)
+
+;;; re-read the dumped structures and check them
+(load "tmp-defstruct.manyraw.fasl")
+(check-manyraws (dumped-manyraws))
+
 
 ;;;; miscellaneous old bugs
 

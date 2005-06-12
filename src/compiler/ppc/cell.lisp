@@ -292,3 +292,250 @@
   (:policy :fast-safe)
   (:variant 0 other-pointer-lowtag))
 
+
+
+;;;; raw instance slot accessors
+
+(define-vop (raw-instance-ref/word)
+  (:translate %raw-instance-ref/word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg)))
+  (:arg-types * positive-fixnum)
+  (:results (value :scs (unsigned-reg)))
+  (:temporary (:scs (non-descriptor-reg)) offset)
+  (:result-types unsigned-num)
+  (:generator 5
+    (loadw offset object 0 instance-pointer-lowtag)
+    (inst srwi offset offset n-widetag-bits)
+    (inst slwi offset offset 2)
+    (inst subf offset index offset)
+    (inst addi
+          offset
+          offset
+          (- (* (1- instance-slots-offset) n-word-bytes)
+             instance-pointer-lowtag))
+    (inst lwzx value object offset)))
+
+(define-vop (raw-instance-set/word)
+  (:translate %raw-instance-set/word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg))
+         (value :scs (unsigned-reg)))
+  (:arg-types * positive-fixnum unsigned-num)
+  (:results (result :scs (unsigned-reg)))
+  (:temporary (:scs (non-descriptor-reg)) offset)
+  (:result-types unsigned-num)
+  (:generator 5
+    (loadw offset object 0 instance-pointer-lowtag)
+    (inst srwi offset offset n-widetag-bits)
+    (inst slwi offset offset 2)
+    (inst subf offset index offset)
+    (inst addi
+          offset
+          offset
+          (- (* (1- instance-slots-offset) n-word-bytes)
+             instance-pointer-lowtag))
+    (inst stwx value object offset)
+    (move result value)))
+
+(define-vop (raw-instance-ref/single)
+  (:translate %raw-instance-ref/single)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg)))
+  (:arg-types * positive-fixnum)
+  (:results (value :scs (single-reg)))
+  (:temporary (:scs (non-descriptor-reg)) offset)
+  (:result-types single-float)
+  (:generator 5
+    (loadw offset object 0 instance-pointer-lowtag)
+    (inst srwi offset offset n-widetag-bits)
+    (inst slwi offset offset 2)
+    (inst subf offset index offset)
+    (inst addi
+          offset
+          offset
+          (- (* (1- instance-slots-offset) n-word-bytes)
+             instance-pointer-lowtag))
+    (inst lfsx value object offset)))
+
+(define-vop (raw-instance-set/single)
+  (:translate %raw-instance-set/single)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg))
+	 (value :scs (single-reg) :target result))
+  (:arg-types * positive-fixnum single-float)
+  (:results (result :scs (single-reg)))
+  (:result-types single-float)
+  (:temporary (:scs (non-descriptor-reg)) offset)
+  (:generator 5
+    (loadw offset object 0 instance-pointer-lowtag)
+    (inst srwi offset offset n-widetag-bits)
+    (inst slwi offset offset 2)
+    (inst subf offset index offset)
+    (inst addi
+          offset
+          offset
+          (- (* (1- instance-slots-offset) n-word-bytes)
+             instance-pointer-lowtag))
+    (inst stfsx value object offset)
+    (unless (location= result value)
+      (inst frsp result value))))
+
+(define-vop (raw-instance-ref/double)
+  (:translate %raw-instance-ref/double)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg)))
+  (:arg-types * positive-fixnum)
+  (:results (value :scs (double-reg)))
+  (:temporary (:scs (non-descriptor-reg)) offset)
+  (:result-types double-float)
+  (:generator 5
+    (loadw offset object 0 instance-pointer-lowtag)
+    (inst srwi offset offset n-widetag-bits)
+    (inst slwi offset offset 2)
+    (inst subf offset index offset)
+    (inst addi
+          offset
+          offset
+          (- (* (- instance-slots-offset 2) n-word-bytes)
+             instance-pointer-lowtag))
+    (inst lfdx value object offset)))
+
+(define-vop (raw-instance-set/double)
+  (:translate %raw-instance-set/double)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg))
+	 (value :scs (double-reg) :target result))
+  (:arg-types * positive-fixnum double-float)
+  (:results (result :scs (double-reg)))
+  (:result-types double-float)
+  (:temporary (:scs (non-descriptor-reg)) offset)
+  (:generator 5
+    (loadw offset object 0 instance-pointer-lowtag)
+    (inst srwi offset offset n-widetag-bits)
+    (inst slwi offset offset 2)
+    (inst subf offset index offset)
+    (inst addi
+          offset
+          offset
+          (- (* (- instance-slots-offset 2) n-word-bytes)
+             instance-pointer-lowtag))
+    (inst stfdx value object offset)
+    (unless (location= result value)
+      (inst fmr result value))))
+
+(define-vop (raw-instance-ref/complex-single)
+  (:translate %raw-instance-ref/complex-single)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg)))
+  (:arg-types * positive-fixnum)
+  (:results (value :scs (complex-single-reg)))
+  (:temporary (:scs (non-descriptor-reg)) offset)
+  (:result-types complex-single-float)
+  (:generator 5
+    (loadw offset object 0 instance-pointer-lowtag)
+    (inst srwi offset offset n-widetag-bits)
+    (inst slwi offset offset 2)
+    (inst subf offset index offset)
+    (inst addi
+          offset
+          offset
+          (- (* (- instance-slots-offset 2) n-word-bytes)
+             instance-pointer-lowtag))
+    (inst lfsx (complex-single-reg-real-tn value) object offset)
+    (inst addi offset offset n-word-bytes)
+    (inst lfsx (complex-single-reg-imag-tn value) object offset)))
+
+(define-vop (raw-instance-set/complex-single)
+  (:translate %raw-instance-set/complex-single)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg))
+	 (value :scs (complex-single-reg) :target result))
+  (:arg-types * positive-fixnum complex-single-float)
+  (:results (result :scs (complex-single-reg)))
+  (:result-types complex-single-float)
+  (:temporary (:scs (non-descriptor-reg)) offset)
+  (:generator 5
+    (loadw offset object 0 instance-pointer-lowtag)
+    (inst srwi offset offset n-widetag-bits)
+    (inst slwi offset offset 2)
+    (inst subf offset index offset)
+    (inst addi
+          offset
+          offset
+          (- (* (- instance-slots-offset 2) n-word-bytes)
+             instance-pointer-lowtag))
+    (let ((value-real (complex-single-reg-real-tn value))
+	  (result-real (complex-single-reg-real-tn result)))
+      (inst stfsx value-real object offset)
+      (unless (location= result-real value-real)
+        (inst frsp result-real value-real)))
+    (inst addi offset offset n-word-bytes)
+    (let ((value-imag (complex-single-reg-imag-tn value))
+	  (result-imag (complex-single-reg-imag-tn result)))
+      (inst stfsx value-imag object offset)
+      (unless (location= result-imag value-imag)
+        (inst frsp result-imag value-imag)))))
+
+(define-vop (raw-instance-ref/complex-double)
+  (:translate %raw-instance-ref/complex-double)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg)))
+  (:arg-types * positive-fixnum)
+  (:results (value :scs (complex-double-reg)))
+  (:temporary (:scs (non-descriptor-reg)) offset)
+  (:result-types complex-double-float)
+  (:generator 5
+    (loadw offset object 0 instance-pointer-lowtag)
+    (inst srwi offset offset n-widetag-bits)
+    (inst slwi offset offset 2)
+    (inst subf offset index offset)
+    (inst addi
+          offset
+          offset
+          (- (* (- instance-slots-offset 4) n-word-bytes)
+             instance-pointer-lowtag))
+    (inst lfdx (complex-double-reg-real-tn value) object offset)
+    (inst addi offset offset (* 2 n-word-bytes))
+    (inst lfdx (complex-double-reg-imag-tn value) object offset)))
+
+(define-vop (raw-instance-set/complex-double)
+  (:translate %raw-instance-set/complex-double)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg))
+	 (value :scs (complex-double-reg) :target result))
+  (:arg-types * positive-fixnum complex-double-float)
+  (:results (result :scs (complex-double-reg)))
+  (:result-types complex-double-float)
+  (:temporary (:scs (non-descriptor-reg)) offset)
+  (:generator 5
+    (loadw offset object 0 instance-pointer-lowtag)
+    (inst srwi offset offset n-widetag-bits)
+    (inst slwi offset offset 2)
+    (inst subf offset index offset)
+    (inst addi
+          offset
+          offset
+          (- (* (- instance-slots-offset 4) n-word-bytes)
+             instance-pointer-lowtag))
+    (let ((value-real (complex-double-reg-real-tn value))
+	  (result-real (complex-double-reg-real-tn result)))
+      (inst stfdx value-real object offset)
+      (unless (location= result-real value-real)
+        (inst fmr result-real value-real)))
+    (inst addi offset offset (* 2 n-word-bytes))
+    (let ((value-imag (complex-double-reg-imag-tn value))
+	  (result-imag (complex-double-reg-imag-tn result)))
+      (inst stfdx value-imag object offset)
+      (unless (location= result-imag value-imag)
+        (inst fmr result-imag value-imag)))))

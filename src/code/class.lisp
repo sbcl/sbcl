@@ -113,12 +113,6 @@
 ;;; type checking and garbage collection. Whenever a class is
 ;;; incompatibly redefined, a new layout is allocated. If two object's
 ;;; layouts are EQ, then they are exactly the same type.
-;;;
-;;; KLUDGE: The genesis code has raw offsets of slots in this
-;;; structure hardwired into it. It would be good to rewrite that code
-;;; so that it looks up those offsets in the compiler's tables, but
-;;; for now if you change this structure, lucky you, you get to grovel
-;;; over the genesis code by hand.:-( -- WHN 19990820
 (def!struct (layout
 	     ;; KLUDGE: A special hack keeps this from being
 	     ;; called when building code for the
@@ -201,8 +195,11 @@
   ;; substructure (and hence can be copied into read-only space by
   ;; PURIFY).
   ;;
-  ;; KLUDGE: This slot is known to the C runtime support code.
-  (pure nil :type (member t nil 0)))
+  ;; This slot is known to the C runtime support code.
+  (pure nil :type (member t nil 0))
+  ;; Number of raw words at the end.
+  ;; This slot is known to the C runtime support code.
+  (n-untagged-slots 0 :type index))
 
 (def!method print-object ((layout layout) stream)
   (print-unreadable-object (layout stream :type t :identity t)
@@ -278,16 +275,19 @@
 ;;; preexisting class slot value is OK, and if it's not initialized,
 ;;; its class slot value is set to an UNDEFINED-CLASS. -- FIXME: This
 ;;; is no longer true, :UNINITIALIZED used instead.
-(declaim (ftype (function (layout classoid index simple-vector layout-depthoid)
+(declaim (ftype (function (layout classoid index simple-vector layout-depthoid
+				  index)
 			  layout)
 		init-or-check-layout))
-(defun init-or-check-layout (layout classoid length inherits depthoid)
+(defun init-or-check-layout
+    (layout classoid length inherits depthoid nuntagged)
   (cond ((eq (layout-invalid layout) :uninitialized)
 	 ;; There was no layout before, we just created one which
 	 ;; we'll now initialize with our information.
 	 (setf (layout-length layout) length
 	       (layout-inherits layout) inherits
 	       (layout-depthoid layout) depthoid
+	       (layout-n-untagged-slots layout) nuntagged
 	       (layout-classoid layout) classoid
 	       (layout-invalid layout) nil))
 	;; FIXME: Now that LAYOUTs are born :UNINITIALIZED, maybe this
@@ -299,7 +299,7 @@
 	 ;; information, and we'll now check that old information
 	 ;; which was known with certainty is consistent with current
 	 ;; information which is known with certainty.
-	 (check-layout layout classoid length inherits depthoid)))
+	 (check-layout layout classoid length inherits depthoid nuntagged)))
   layout)
 
 ;;; In code for the target Lisp, we don't use dump LAYOUTs using the
@@ -338,7 +338,8 @@
 			    ',(layout-classoid layout)
 			    ',(layout-length layout)
 			    ',(layout-inherits layout)
-			    ',(layout-depthoid layout)))))
+			    ',(layout-depthoid layout)
+			    ',(layout-n-untagged-slots layout)))))
 
 ;;; If LAYOUT's slot values differ from the specified slot values in
 ;;; any interesting way, then give a warning and return T.
@@ -347,10 +348,11 @@
 			   simple-string
 			   index
 			   simple-vector
-			   layout-depthoid))
+			   layout-depthoid
+			   index))
 		redefine-layout-warning))
 (defun redefine-layout-warning (old-context old-layout
-				context length inherits depthoid)
+				context length inherits depthoid nuntagged)
   (declare (type layout old-layout) (type simple-string old-context context))
   (let ((name (layout-proper-name old-layout)))
     (or (let ((old-inherits (layout-inherits old-layout)))
@@ -386,6 +388,15 @@
 		  old-context old-length
 		  context length)
 	    t))
+	(let ((old-nuntagged (layout-n-untagged-slots old-layout)))
+	  (unless (= old-nuntagged nuntagged)
+	    (warn "change in instance layout of class ~S:~%  ~
+                   ~A untagged slots: ~W~%  ~
+                   ~A untagged slots: ~W"
+		  name
+		  old-context old-nuntagged
+		  context nuntagged)
+	    t))
 	(unless (= (layout-depthoid old-layout) depthoid)
 	  (warn "change in the inheritance structure of class ~S~%  ~
                  between the ~A definition and the ~A definition"
@@ -395,12 +406,13 @@
 ;;; Require that LAYOUT data be consistent with CLASS, LENGTH,
 ;;; INHERITS, and DEPTHOID.
 (declaim (ftype (function
-		 (layout classoid index simple-vector layout-depthoid))
+		 (layout classoid index simple-vector layout-depthoid index))
 		check-layout))
-(defun check-layout (layout classoid length inherits depthoid)
+(defun check-layout (layout classoid length inherits depthoid nuntagged)
   (aver (eq (layout-classoid layout) classoid))
   (when (redefine-layout-warning "current" layout
-				 "compile time" length inherits depthoid)
+				 "compile time" length inherits depthoid 
+				 nuntagged)
     ;; Classic CMU CL had more options here. There are several reasons
     ;; why they might want more options which are less appropriate for
     ;; us: (1) It's hard to fit the classic CMU CL flexible approach
@@ -425,16 +437,18 @@
 ;;; Used by the loader to forward-reference layouts for classes whose
 ;;; definitions may not have been loaded yet. This allows type tests
 ;;; to be loaded when the type definition hasn't been loaded yet.
-(declaim (ftype (function (symbol index simple-vector layout-depthoid) layout)
+(declaim (ftype (function (symbol index simple-vector layout-depthoid index)
+			  layout)
 		find-and-init-or-check-layout))
-(defun find-and-init-or-check-layout (name length inherits depthoid)
+(defun find-and-init-or-check-layout (name length inherits depthoid nuntagged)
   (let ((layout (find-layout name)))
     (init-or-check-layout layout
 			  (or (find-classoid name nil)
 			      (layout-classoid layout))
 			  length
 			  inherits
-			  depthoid)))
+			  depthoid
+			  nuntagged)))
 
 ;;; Record LAYOUT as the layout for its class, adding it as a subtype
 ;;; of all superclasses. This is the operation that "installs" a
@@ -480,6 +494,7 @@
 	      (layout-inherits destruct-layout) (layout-inherits layout)
 	      (layout-depthoid destruct-layout)(layout-depthoid layout)
 	      (layout-length destruct-layout) (layout-length layout)
+	      (layout-n-untagged-slots destruct-layout) (layout-n-untagged-slots layout)
 	      (layout-info destruct-layout) (layout-info layout)
 	      (classoid-layout classoid) destruct-layout)
 	(setf (layout-invalid layout) nil
@@ -1335,7 +1350,8 @@ NIL is returned when no such class exists."
 	   (find-and-init-or-check-layout name
 					  0
 					  inherits-vector
-					  depthoid)
+					  depthoid
+					  0)
 	   :invalidate nil)))))
   (/show0 "done with loop over *BUILT-IN-CLASSES*"))
 
@@ -1379,7 +1395,7 @@ NIL is returned when no such class exists."
 			     (classoid-layout (find-classoid x)))
 			   inherits-list)))
 	#-sb-xc-host (/show0 "INHERITS=..") #-sb-xc-host (/hexstr inherits)
-	(register-layout (find-and-init-or-check-layout name 0 inherits -1)
+	(register-layout (find-and-init-or-check-layout name 0 inherits -1 0)
 			 :invalidate nil))))
   (/show0 "done defining temporary STANDARD-CLASSes"))
 

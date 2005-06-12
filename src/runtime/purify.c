@@ -33,6 +33,7 @@
 #include "thread.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
+#include "genesis/layout.h"
 
 #define PRINTNOISE
 
@@ -1390,6 +1391,18 @@ pscav(lispobj *addr, long nwords, boolean constant)
 		/* We have to handle fdefn objects specially, so we
 		 * can fix up the raw function address. */
 		count = pscav_fdefn((struct fdefn *)addr);
+		break;
+
+	      case INSTANCE_HEADER_WIDETAG:
+		{
+		    struct instance *instance = (struct instance *) addr;
+		    struct layout *layout
+			= (struct layout *) native_pointer(instance->slots[0]);
+		    long nuntagged = fixnum_value(layout->n_untagged_slots);
+		    long nslots = HeaderValue(*addr);
+		    pscav(addr + 1, nslots - nuntagged, constant);
+		    count = CEILING(1 + nslots, 2);
+		}
 		break;
 
               default:
