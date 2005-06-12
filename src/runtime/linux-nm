@@ -1,2 +1,7 @@
 #!/bin/sh
-nm -p "$@" | grep -v " [AabcdgIiNnrstUuvw?-] "
+
+# " A " used to be in the set of removed symbols, but it turns out
+# that the alpha implementation of closure_tramp and undefined_tramp
+# is as an A.  Whatever that is.  CSR, 2005-06-12.
+
+nm -p "$@" | grep -v " [abcdgIiNnrstUuvw?-] "
