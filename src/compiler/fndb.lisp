@@ -811,12 +811,12 @@
 		   bit-orc1 bit-orc2)
   ((array bit) (array bit) &optional (or (array bit) (member t nil)))
   (array bit)
-  (foldable)
+  ()
   #|:derive-type #'result-type-last-arg|#)
 
 (defknown bit-not ((array bit) &optional (or (array bit) (member t nil)))
   (array bit)
-  (foldable)
+  ()
   #|:derive-type #'result-type-last-arg|#)
 
 (defknown bit-vector-= (bit-vector bit-vector) boolean

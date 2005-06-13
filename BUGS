@@ -2072,3 +2072,14 @@ WORKAROUND:
   getting less ambitious about detecting shared list structure, or 
   implementing the moral equivalent of EQUAL hash tables in a 
   cycle-tolerant way.
+
+382: externalization unexpectedly changes array simplicity
+  COMPILE-FILE and LOAD
+    (defun foo ()
+      (let ((x #.(make-array 4 :fill-pointer 0)))
+        (values (eval `(typep ',x 'simple-array))
+                (typep x 'simple-array))))
+  then (FOO) => T, NIL.
+
+  Similar problems exist with SIMPLE-ARRAY-P, ARRAY-HEADER accessors
+  and all array dimension functions.

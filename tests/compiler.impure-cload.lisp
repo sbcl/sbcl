@@ -420,5 +420,27 @@
   (incf (aref x 0))
   (assert (equalp x #(2 11))))
 
+;;; and BIT-* too (reported by Paul F. Dietz)
+(loop with v1 = #*0011
+      and  v2 = #*0101
+      for f in '(bit-and bit-andc1 bit-andc2 bit-eqv
+                 bit-ior bit-nand bit-nor bit-not
+                 bit-orc1 bit-orc2 bit-xor
+                 )
+      for form = `(lambda ()
+                    (let ((v (,f ,v1 ,v2)))
+                      (setf (aref v 0) (- 1 (aref v 0)))
+                      (aref v 0)))
+      for compiled-res = (funcall (compile nil form))
+      for real-res = (- 1 (aref (funcall f v1 v2) 0))
+      do (assert (equal compiled-res real-res)))
+(let* ((v #*0011)
+       (form `(lambda ()
+                (let ((v (bit-not ,v)))
+                  (setf (aref v 0) (- 1 (aref v 0)))
+                  (aref v 0))))
+       (compiled-res (funcall (compile nil form)))
+       (real-res (- 1 (aref (funcall (eval #'bit-not) v) 0))))
+  (assert (equal compiled-res real-res)))
 
 (sb-ext:quit :unix-status 104)
