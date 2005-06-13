@@ -53,7 +53,9 @@
 # UPGRADED-ARRAY-ELEMENT-TYPE?)
 
 LANG=C
+LC_ALL=C
 export LANG
+export LC_ALL
 
 build_started=`date`
 echo "//starting build: $build_started"

@@ -35,6 +35,11 @@ SBCL_ALLOWING_CORE=${1:-$sbclstem}
 export SBCL_ALLOWING_CORE
 echo /with SBCL_ALLOWING_CORE=\'$SBCL_ALLOWING_CORE\'
 
+LANG=C
+LC_ALL=C
+export LANG
+export LC_ALL
+
 # "Ten four" is the closest numerical slang I can find to "OK", so
 # it's the Unix status value that we expect from a successful test.
 # (Of course, zero is the usual success value, but we don't want to

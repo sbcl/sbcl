@@ -408,5 +408,17 @@
 
 (assert (= (isieve 46349) 4792))
 
+;;; COERCE should not be constant-folded (reported by Nikodemus
+;;; Siivola)
+(let ((f (gensym)))
+  (setf (fdefinition f) (lambda (x) x))
+  (let ((g (compile nil `(lambda () (coerce ',f 'function)))))
+    (setf (fdefinition f) (lambda (x) (1+ x)))
+    (assert (eq (funcall g) (fdefinition f)))))
+
+(let ((x (coerce '(1 11) 'vector)))
+  (incf (aref x 0))
+  (assert (equalp x #(2 11))))
+
 
 (sb-ext:quit :unix-status 104)

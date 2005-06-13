@@ -537,6 +537,16 @@
 
 ;;;; coercion
 
+;;; Constant-folding.
+;;;
+#-sb-xc-host
+(defoptimizer (coerce optimizer) ((x type) node)
+  (when (and (constant-lvar-p x) (constant-lvar-p type))
+    (let ((value (lvar-value x)))
+      (when (or (numberp value) (characterp value))
+        (constant-fold-call node)
+        t))))
+
 (deftransform coerce ((x type) (* *) * :node node)
   (unless (constant-lvar-p type)
     (give-up-ir1-transform))

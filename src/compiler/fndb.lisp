@@ -17,24 +17,8 @@
 
 (defknown coerce (t type-specifier) t
   ;; Note:
-  ;; (1) This is not FLUSHABLE because it's defined to signal errors.
-  ;; (2) It's not worth trying to make this FOLDABLE in the
-  ;;     cross-compiler,because
-  ;;       (a) it would probably be really hard to make all the 
-  ;;           tricky issues (e.g. which specialized array types are
-  ;;           supported) match between cross-compiler and target
-  ;;           compiler, and besides
-  ;;       (b) leaving it not FOLDABLE lets us use the idiom
-  ;;	           (COERCE FOO 'SOME-SPECIALIZED-ARRAY-TYPE-OR-ANOTHER)
-  ;;	       as a way of delaying the generation of specialized
-  ;;	       array types until runtime, which helps us keep the
-  ;;	       cross-compiler's dumper relatively simple and which
-  ;;	       lets us preserve distinctions which might not even exist
-  ;;           on the cross-compilation host (because ANSI doesn't
-  ;;	       guarantee that specialized array types exist there).
-  ;; FIXME: It's actually not clear that COERCE on non-NUMBER types
-  ;; is FOLDABLE at all. Check this.
-  (movable #-sb-xc-host foldable)
+  ;; This is not FLUSHABLE because it's defined to signal errors.
+  (movable)
   ;; :DERIVE-TYPE RESULT-TYPE-SPEC-NTH-ARG 2 ? Nope... (COERCE 1 'COMPLEX)
   ;; returns REAL/INTEGER, not COMPLEX.
   )
