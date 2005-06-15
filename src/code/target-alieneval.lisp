@@ -767,16 +767,31 @@
 (defparameter *alien-callback-wrappers* (make-hash-table :test #'equal)
   "Maps SPECIFIER to lisp wrappers.")
 
+;;; FIXME: This involves a call to both the compiler and assembler, so
+;;; should either be macroized to do more of the work at compile-time,
+;;; or perhaps named COMPILE-ALIEN, or somesuch.
+;;;
+;;; FIXME: It is also probably worth our while to optimize cases like
+;;; (alien-funcall spec 'symbol).
 (defun alien-callback (specifier function &optional env)
-  "Returns an SAP to an alien callback corresponding to the function and
-alien-ftype-specifier."
+  "Returns an alien-value with of alien type SPECIFIER, that can be passed to an
+alien function as a pointer to the FUNCTION."
   (multiple-value-bind (result-type argument-types) (parse-alien-ftype specifier env)
     (let ((key (cons specifier function)))
       (or (gethash key *alien-callbacks*)
 	  (setf (gethash key *alien-callbacks*)
 		(let* ((index (fill-pointer *alien-callback-trampolines*))
+		       ;;; Aside from the INDEX this is known at
+		       ;;; compile-time, which could be utilized by
+		       ;;; having the two-stage assembler tramp &
+		       ;;; wrapper mentioned in [1] above: only the
+		       ;;; per-function tramp would need assembler at
+		       ;;; runtime. Possibly we could even pregenerate
+		       ;;; the code and just patch the index in later.
 		       (assembler-wrapper (alien-callback-assembler-wrapper
 					   index result-type argument-types))
+		       ;;; For normal use-cases this at least could be
+		       ;;; done at compile-time.
 		       (lisp-wrapper (alien-callback-lisp-wrapper 
 				      specifier result-type argument-types env)))
 		  (vector-push-extend 
@@ -785,6 +800,31 @@ alien-ftype-specifier."
 		   *alien-callback-trampolines*)
 		  (%sap-alien (vector-sap assembler-wrapper)
 			      (parse-alien-type specifier env))))))))
+
+(defun parse-callback-specification (result-type lambda-list)
+  (values
+   `(function ,result-type ,@(mapcar #'second lambda-list))
+   (mapcar #'first lambda-list)))
+
+;;; FIXME: This calls compiler every single time, which really sucks.
+;;;
+;;; The problem is that we need to return a pointer to the right closure,
+;;; even though the underlying function gets shared. What to do?
+;;;
+;;; 
+(defmacro alien-lambda (result-type typed-lambda-list &body forms)
+  (multiple-value-bind (specifier lambda-list)
+      (parse-callback-specification result-type typed-lambda-list)
+    `(alien-callback ',specifier (lambda ,lambda-list ,@forms))))
+
+(defmacro define-alien-callback (name result-type typed-lambda-list &body forms)
+  "Defines #'NAME as a function with the given body and lambda-list, and NAME as
+the alien callback for that function with the given alien type."
+  (multiple-value-bind (specifier lambda-list)
+      (parse-callback-specification result-type typed-lambda-list)
+    `(progn
+       (defun ,name ,lambda-list ,@forms)
+       (defparameter ,name (alien-callback ',specifier #',name)))))
 
 (defun alien-callback-lisp-wrapper (specifier result-type argument-types env)
   (or (gethash specifier *alien-callback-wrappers*)
