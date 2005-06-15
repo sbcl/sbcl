@@ -1971,17 +1971,10 @@
 
 (define-instruction-macro bula (target)
   `(inst bcla :bo-u 0 ,target))
-
+|#
 
 (define-instruction-macro blrl ()
   `(inst bclrl :bo-u 0))
-
-
-
-|#
-
-
-
 
 
 ;;; Some more macros 

@@ -382,3 +382,131 @@
 	       (inst addi nsp-tn nsp-tn delta))
 	      (t
 	       (inst lwz nsp-tn nsp-tn 0)))))))
+
+#-sb-xc-host
+(progn
+  (defun alien-callback-accessor-form (type sap offset)
+    ;; Unaligned access is slower, but possible, so this is nice and simple.
+    `(deref (sap-alien (sap+ ,sap ,offset) (* ,type))))
+
+  ;;; The "Mach-O Runtime Conventions" document for OS X almost specifies
+  ;;; the calling convention (it neglects to mention that the linkage
+  ;;; area is 24 bytes).
+  (defconstant n-foreign-linkage-area-bytes 24)
+
+  ;;; Returns a vector in static space containing machine code for the
+  ;;; callback wrapper
+  (defun alien-callback-assembler-wrapper (index result-type argument-types)
+    (flet ((make-gpr (n)
+	     (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset n))
+	   (make-fpr (n)
+	     (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg) :offset n)))
+      (let* ((segment (make-segment)))
+	(assemble (segment)
+	  ;; To save our arguments, we follow the algorithm sketched in the
+	  ;; "PowerPC Calling Conventions" section of that document.
+	  (let ((words-processed 0)
+		(gprs (mapcar #'make-gpr '(3 4 5 6 7 8 9 10)))
+		(fprs (mapcar #'make-fpr '(1 2 3 4 5 6 7 8 9 10 11 12 13)))
+		(stack-pointer (make-gpr 1)))
+	    (labels ((out-of-registers-error ()
+		       (error "Too many arguments in callback"))
+		     (save-arg (type words)
+		       (let ((integerp (not (alien-float-type-p type)))
+			     (offset (+ (* words-processed n-word-bytes)
+					n-foreign-linkage-area-bytes)))
+			 (cond (integerp
+				(loop repeat words
+				   for gpr = (pop gprs)
+				   do 
+				     (if gpr
+					 (inst stw gpr stack-pointer offset)
+					 (out-of-registers-error))
+				     (incf words-processed)))
+			     ;; The handling of floats is a little ugly
+			     ;; because we hard-code the number of words
+			       ;; for single- and double-floats.
+			       ((alien-single-float-type-p type)
+				(pop gprs)
+				(let ((fpr (pop fprs)))
+				  (if fpr
+				      (inst stfs fpr stack-pointer offset)
+				      (out-of-registers-error)))
+				(incf words-processed))
+			       ((alien-double-float-type-p type)
+				(setf gprs (cddr gprs))
+				(let ((fpr (pop fprs)))
+				  (if fpr
+				      (inst stfd fpr stack-pointer offset)
+				      (out-of-registers-error)))
+				(incf words-processed 2))
+			       (t
+				(bug "Unknown alien floating point type: ~S" type))))))
+	      (mapc #'save-arg
+		    argument-types
+		    (mapcar (lambda (arg) 
+			      (ceiling (alien-type-bits arg) n-word-bits))
+			    argument-types))))
+	  ;; Set aside room for the return area just below sp, then
+	  ;; actually call funcall3: funcall3 (call-alien-function,
+	  ;; index, args, return-area)
+	  ;;
+	  ;; INDEX is fixnumized, ARGS and RETURN-AREA don't need to be
+	  ;; because they're word-aligned. Kinda gross, but hey ...
+	  (let* ((n-return-area-words 
+		  (ceiling (or (alien-type-bits result-type) 0) n-word-bits))
+		 (n-return-area-bytes (* n-return-area-words n-word-bytes))
+		 ;; FIXME: magic constant, and probably n-args-bytes
+		 (args-size (* 3 n-word-bytes)) 
+		 ;; FIXME: n-frame-bytes?
+		 (frame-size 
+		  (+ n-foreign-linkage-area-bytes n-return-area-bytes args-size)))
+	    (destructuring-bind (sp r0 arg1 arg2 arg3 arg4)
+		(mapcar #'make-gpr '(1 0 3 4 5 6))
+	      (flet ((load-address-into (reg addr)
+		       (let ((high (ldb (byte 16 16) addr))
+			     (low (ldb (byte 16 0) addr)))
+			 (inst li reg high)
+			 (inst slwi reg reg 16)
+			 (inst ori reg reg low))))
+		;; Setup the args
+		(load-address-into 
+		 arg1 (get-lisp-obj-address #'enter-alien-callback))
+		(inst li arg2 (fixnumize index))
+		(inst addi arg3 sp n-foreign-linkage-area-bytes)
+		;; FIXME: This was (- (* RETURN-AREA-SIZE N-WORD-BYTES)), while
+		;; RETURN-AREA-SIZE was (* N-RETURN-AREA-WORDS N-WORD-BYTES):
+		;; I assume the intention was (- N-RETURN-AREA-BYTES), but who knows?
+		;; --NS 2005-06-11
+		(inst addi arg4 sp (- n-return-area-bytes))
+		;; FIXME! FIXME FIXME: What does this FIXME refer to?
+		;; Save sp, setup the frame
+		(inst mflr r0)
+		(inst stw r0 sp (* 2 n-word-bytes)) ; FIXME: magic constant
+		(inst stwu sp sp (- frame-size))
+		;; Make the call
+		(load-address-into r0 (foreign-symbol-address-as-integer "funcall3"))
+		(inst mtlr r0)
+		(inst blrl))
+	      ;; We're back!  Restore sp and lr, load the return value from just
+	      ;; under sp, and return.
+	      (inst lwz sp sp 0)
+	      (inst lwz r0 sp (* 2 n-word-bytes))
+	      (inst mtlr r0)
+	      (loop with gprs = (mapcar #'make-gpr '(3 4))
+		 repeat n-return-area-words
+		 for gpr = (pop gprs)
+		 for offset downfrom (- n-word-bytes) by n-word-bytes
+		 do
+		   (unless gpr
+		     (bug "Out of return registers in alien-callback trampoline."))
+		   (inst lwz gpr sp offset))
+	      (inst blr))))
+	(finalize-segment segment)
+	;; Now that the segment is done, convert it to a static
+	;; vector we can point foreign code to.
+	(let ((buffer (sb!assem::segment-buffer segment)))
+	  (make-static-vector (length buffer)
+			      :element-type '(unsigned-byte 8)
+			      :initial-contents buffer))))))
+  

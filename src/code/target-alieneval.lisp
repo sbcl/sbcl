@@ -723,3 +723,132 @@
 	(typep object lisp-rep-type)
 	(and (alien-value-p object)
 	     (alien-subtype-p (alien-value-type object) type)))))
+
+;;;; ALIEN-CALLBACKS
+;;;;
+;;;; An alien callback has 4 parts / stages:
+;;;;
+;;;; * ASSEMBLER WRAPPER that saves the arguments from the C-call
+;;;;   according to the alien-fun-type of the callback, and calls
+;;;;   #'ENTER-ALIEN-CALLBACK with the index indentifying the
+;;;;   callback, a pointer to the arguments copied on the stack and a
+;;;;   pointer to return value storage. When control returns to the
+;;;;   wrapper it returns the value to C. There is one assembler
+;;;;   wrapper per callback.[1] The SAP to the wrapper code vector 
+;;;;   is what is passed to foreign code as a callback.
+;;;;
+;;;; * #'ENTER-ALIEN-CALLBACK pulls the LISP TRAMPOLINE for the given
+;;;;   index, and calls it with the argument and result pointers.
+;;;; 
+;;;; * LISP TRAMPOLINE that calls the LISP WRAPPER with the argument
+;;;;   and result pointers, and the function designator for the
+;;;;   callback. There is one lisp trampoline per callback.
+;;;;
+;;;; * LISP WRAPPER parses the arguments from stack, calls the actual
+;;;;   callback with the arguments, and saves the return value at the
+;;;;   result pointer. The lisp wrapper is shared between all the
+;;;;   callbacks having the same same alien-fun-type.
+;;;;
+;;;; [1] As assembler wrappers need to be allocated in static
+;;;; addresses and are (in the current scheme of things) never
+;;;; released it might be worth it to split it into two parts:
+;;;; per-callback trampoline that pushes the index of the lisp
+;;;; trampoline on the stack, and jumps to the appropriate assembler
+;;;; wrapper. The assembler wrapper could then be shared between all
+;;;; the callbacks with the same alien-fun-type. This would amortize
+;;;; most of the static allocation costs between multiple callbacks.
+
+(defvar *alien-callbacks* (make-hash-table :test #'equal)
+  "Maps (SPECIFIER . FUNCTION) to callbacks.")
+
+(defvar *alien-callback-trampolines* (make-array 32 :fill-pointer 0 :adjustable t)
+  "Maps alien callback indexes to lisp trampolines.")
+
+(defparameter *alien-callback-wrappers* (make-hash-table :test #'equal)
+  "Maps SPECIFIER to lisp wrappers.")
+
+(defun alien-callback (specifier function &optional env)
+  "Returns an SAP to an alien callback corresponding to the function and
+alien-ftype-specifier."
+  (multiple-value-bind (result-type argument-types) (parse-alien-ftype specifier env)
+    (let ((key (cons specifier function)))
+      (or (gethash key *alien-callbacks*)
+	  (setf (gethash key *alien-callbacks*)
+		(let* ((index (fill-pointer *alien-callback-trampolines*))
+		       (assembler-wrapper (alien-callback-assembler-wrapper
+					   index result-type argument-types))
+		       (lisp-wrapper (alien-callback-lisp-wrapper 
+				      specifier result-type argument-types env)))
+		  (vector-push-extend 
+		   (lambda (args-pointer result-pointer)
+		     (funcall lisp-wrapper args-pointer result-pointer function))
+		   *alien-callback-trampolines*)
+		  (%sap-alien (vector-sap assembler-wrapper)
+			      (parse-alien-type specifier env))))))))
+
+(defun alien-callback-lisp-wrapper (specifier result-type argument-types env)
+  (or (gethash specifier *alien-callback-wrappers*)
+      (setf (gethash specifier *alien-callback-wrappers*)
+	    (compile 
+	     nil
+	     (let* ((arguments (make-gensym-list (length argument-types)))
+		    (argument-names arguments)
+		    (argument-specs (cddr specifier)))
+	       `(lambda (args-pointer result-pointer function)
+		  (let ((args-sap (int-sap 
+				   (sb!kernel:get-lisp-obj-address args-pointer)))
+			(res-sap (int-sap 
+				  (sb!kernel:get-lisp-obj-address result-pointer))))
+		    (with-alien
+			,(loop 
+			    for spec in argument-specs
+			    for offset = 0 ; FIXME: Should this not be AND OFFSET ...?
+			        then (+ offset (alien-callback-argument-bytes spec env))
+			    collect `(,(pop argument-names) ,spec
+				       :local ,(alien-callback-accessor-form
+						spec 'args-sap offset)))
+		      ,(flet ((store (spec)
+			        (if spec
+				    `(setf (deref (sap-alien res-sap (* ,spec)))
+					   (funcall function ,@arguments))
+				    `(funcall function ,@arguments))))
+		         (cond ((alien-void-type-p result-type)
+				(store nil))
+			       ((alien-integer-type-p result-type)
+				(if (alien-integer-type-signed result-type)
+				    (store `(signed
+					     ,(alien-type-word-aligned-bits result-type)))
+				    (store 
+				     `(unsigned
+				       ,(alien-type-word-aligned-bits result-type)))))
+			       (t
+				(store (unparse-alien-type result-type)))))))
+		  (values)))))))
+
+(defun parse-alien-ftype (specifier env)
+  (destructuring-bind (function result-type &rest argument-types)
+      specifier
+    (aver (eq 'function function))
+    (values (parse-alien-type result-type env) 
+	    (mapcar (lambda (spec)
+		      (parse-alien-type spec env))
+		    argument-types))))
+
+(defun alien-void-type-p (type)
+  (and (alien-values-type-p type) (not (alien-values-type-values type))))
+
+(defun alien-type-word-aligned-bits (type)
+  (align-offset (alien-type-bits type) sb!vm:n-word-bits))
+
+(defun alien-callback-argument-bytes (spec env)
+  (let ((type (parse-alien-type spec env)))
+    (if (or (alien-integer-type-p type)
+	    (alien-float-type-p type)
+	    (alien-pointer-type-p type))
+	(ceiling (alien-type-word-aligned-bits type) sb!vm:n-byte-bits)
+	(error "Unsupported callback argument type: ~A" type))))
+
+(defun enter-alien-callback (index return arguments)
+  (funcall (aref *alien-callback-trampolines* index)
+	   return
+	   arguments))
