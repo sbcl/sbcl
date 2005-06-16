@@ -222,7 +222,9 @@
 
 (defmacro call-method (&rest args)
   (declare (ignore args))
-  `(error "~S outside of a effective method form" 'call-method))
+  ;; the PROGN is here to defend against premature macroexpansion by
+  ;; RESTART-CASE.
+  `(progn (error "~S outside of a effective method form" 'call-method)))
 
 (defun make-effective-method-list-fun-type
     (generic-function form method-alist-p wrappers-p)

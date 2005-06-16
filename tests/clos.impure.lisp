@@ -1062,6 +1062,112 @@
   (multiple-value-bind (val err) (ignore-errors (bug-281 'symbol))
     (assert (not val))
     (assert (typep err 'error))))
+
+;;; RESTART-CASE and CALL-METHOD
+
+;;; from Bruno Haible
+
+(defun rc-cm/prompt-for-new-values ()
+  (format *debug-io* "~&New values: ")
+  (finish-output *debug-io*)
+  (list (read *debug-io*)))
+
+(defun rc-cm/add-method-restarts (form method)
+  (let ((block (gensym))
+	(tag (gensym)))
+    `(block ,block
+      (tagbody
+	 ,tag
+	 (return-from ,block
+	   (restart-case ,form
+	     (method-redo ()
+	       :report (lambda (stream)
+			 (format stream "Try calling ~S again." ,method))
+	       (go ,tag))
+	     (method-return (l)
+	       :report (lambda (stream)
+			 (format stream "Specify return values for ~S call."
+				 ,method))
+	       :interactive (lambda () (rc-cm/prompt-for-new-values))
+	       (return-from ,block (values-list l)))))))))
+
+(defun rc-cm/convert-effective-method (efm)
+  (if (consp efm)
+      (if (eq (car efm) 'call-method)
+	  (let ((method-list (third efm)))
+	    (if (or (typep (first method-list) 'method) (rest method-list))
+		;; Reduce the case of multiple methods to a single one.
+		;; Make the call to the next-method explicit.
+		(rc-cm/convert-effective-method
+		 `(call-method ,(second efm)
+		   ((make-method
+		     (call-method ,(first method-list) ,(rest method-list))))))
+		;; Now the case of at most one method.
+		(if (typep (second efm) 'method)
+		    ;; Wrap the method call in a RESTART-CASE.
+		    (rc-cm/add-method-restarts
+		     (cons (rc-cm/convert-effective-method (car efm))
+			   (rc-cm/convert-effective-method (cdr efm)))
+		     (second efm))
+		    ;; Normal recursive processing.
+		    (cons (rc-cm/convert-effective-method (car efm))
+			  (rc-cm/convert-effective-method (cdr efm))))))
+	  (cons (rc-cm/convert-effective-method (car efm))
+		(rc-cm/convert-effective-method (cdr efm))))
+      efm))
+
+(define-method-combination standard-with-restarts ()
+  ((around (:around))
+   (before (:before))
+   (primary () :required t)
+   (after (:after)))
+  (flet ((call-methods-sequentially (methods)
+	   (mapcar #'(lambda (method)
+		       `(call-method ,method))
+		   methods)))
+    (let ((form (if (or before after (rest primary))
+                    `(multiple-value-prog1
+                       (progn
+                         ,@(call-methods-sequentially before)
+                         (call-method ,(first primary) ,(rest primary)))
+		      ,@(call-methods-sequentially (reverse after)))
+                    `(call-method ,(first primary)))))
+      (when around
+	(setq form
+	      `(call-method ,(first around)
+		(,@(rest around) (make-method ,form)))))
+      (rc-cm/convert-effective-method form))))
+
+(defgeneric rc-cm/testgf16 (x)
+  (:method-combination standard-with-restarts))
+(defclass rc-cm/testclass16a () ())
+(defclass rc-cm/testclass16b (rc-cm/testclass16a) ())
+(defclass rc-cm/testclass16c (rc-cm/testclass16a) ())
+(defclass rc-cm/testclass16d (rc-cm/testclass16b rc-cm/testclass16c) ())
+(defmethod rc-cm/testgf16 ((x rc-cm/testclass16a))
+  (list 'a
+        (not (null (find-restart 'method-redo)))
+        (not (null (find-restart 'method-return)))))
+(defmethod rc-cm/testgf16 ((x rc-cm/testclass16b))
+  (cons 'b (call-next-method)))
+(defmethod rc-cm/testgf16 ((x rc-cm/testclass16c))
+  (cons 'c (call-next-method)))
+(defmethod rc-cm/testgf16 ((x rc-cm/testclass16d))
+  (cons 'd (call-next-method)))
+(assert (equal (rc-cm/testgf16 (make-instance 'rc-cm/testclass16d))
+	       '(d b c a t t)))
+
+;;; test case from Gerd Moellmann
+(define-method-combination r-c/c-m-1 ()
+  ((primary () :required t))
+  `(restart-case (call-method ,(first primary))
+     ()))
+
+(defgeneric r-c/c-m-1-gf ()
+  (:method-combination r-c/c-m-1)
+  (:method () nil))
+
+(assert (null (r-c/c-m-1-gf)))
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

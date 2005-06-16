@@ -15,8 +15,10 @@ changes in sbcl-0.9.2 relative to sbcl-0.9.1:
   * dynamic space size on PPC has been increased to 768Mb. (thanks to
     Cyrus Harmon)
   * SB-MOP:ENSURE-CLASS-USING-CLASS now accepts a class as the
-    :METACLASS argument in addition to a class name. (reported by
-    Bruno Haible for CMUCL, patch for CMUCL by Gerd Moellman)
+    :METACLASS argument in addition to a class name.  (reported by
+    Bruno Haible for CMUCL, patch for CMUCL by Gerd Moellmann)
+  * RESTART-CASE can now be wrapped around CALL-METHOD forms.
+    (reported by Bruno Haible; patch from Gerd Moellmann)
   * bug fix: sbcl runtime can now be compiled with gcc4 (thanks to 
     Sascha Wilde)
   * bug fix: more cleanups to the floating point exception handling on
