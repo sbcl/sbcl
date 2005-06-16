@@ -653,6 +653,8 @@
  ("src/code/debug" :not-host)
 
  ("src/code/octets" :not-host)
+ #!+sb-unicode
+ ("src/code/eucjp" :not-host)
 
  ;; The code here can't be compiled until CONDITION and
  ;; DEFINE-CONDITION are defined and SB!DEBUG:*STACK-TOP-HINT* is

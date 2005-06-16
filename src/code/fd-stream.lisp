@@ -1070,22 +1070,22 @@
 	 (in-char-function (symbolicate "INPUT-CHAR/" name))
 	 (resync-function (symbolicate "RESYNC/" name)))
     `(progn
-      (defun ,out-function (fd-stream string flush-p start end)
+      (defun ,out-function (stream string flush-p start end)
 	(let ((start (or start 0))
 	      (end (or end (length string))))
 	  (declare (type index start end))
-	  (when (and (not (fd-stream-dual-channel-p fd-stream))
-		     (> (fd-stream-ibuf-tail fd-stream)
-			(fd-stream-ibuf-head fd-stream)))
-	    (file-position fd-stream (file-position fd-stream)))
+	  (when (and (not (fd-stream-dual-channel-p stream))
+		     (> (fd-stream-ibuf-tail stream)
+			(fd-stream-ibuf-head stream)))
+	    (file-position stream (file-position stream)))
 	  (when (< end start)
 	    (error ":END before :START!"))
 	  (do ()
 	      ((= end start))
-	    (setf (fd-stream-obuf-tail fd-stream)
-		  (do* ((len (fd-stream-obuf-length fd-stream))
-			(sap (fd-stream-obuf-sap fd-stream))
-			(tail (fd-stream-obuf-tail fd-stream)))
+	    (setf (fd-stream-obuf-tail stream)
+		  (do* ((len (fd-stream-obuf-length stream))
+			(sap (fd-stream-obuf-sap stream))
+			(tail (fd-stream-obuf-tail stream)))
 		       ((or (= start end) (< (- len tail) 4)) tail)
 		    ,(if output-restart
 			 `(catch 'output-nothing
@@ -1093,8 +1093,7 @@
 				   (bits (char-code byte))
 				   (size ,out-size-expr))
 			      ,out-expr
-			      (incf tail size)
-			      (incf start)))
+			      (incf tail size)))
 			 `(let* ((byte (aref string start))
 				 (bits (char-code byte))
 				 (size ,out-size-expr))
@@ -1102,9 +1101,9 @@
 			    (incf tail size)))
 		    (incf start)))
 	    (when (< start end)
-	      (flush-output-buffer fd-stream)))
+	      (flush-output-buffer stream)))
 	  (when flush-p
-	    (flush-output-buffer fd-stream))))
+	    (flush-output-buffer stream))))
       (def-output-routines/variable-width (,format
 					   ,out-size-expr
                                            ,output-restart
