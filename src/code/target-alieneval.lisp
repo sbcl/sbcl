@@ -724,9 +724,9 @@
 	(and (alien-value-p object)
 	     (alien-subtype-p (alien-value-type object) type)))))
 
-;;;; ALIEN-CALLBACKS
+;;;; ALIEN CALLBACKS
 ;;;;
-;;;; An alien callback has 4 parts / stages:
+;;;; An alien callback sequence has 4 parts / stages / bounces:
 ;;;;
 ;;;; * ASSEMBLER WRAPPER that saves the arguments from the C-call
 ;;;;   according to the alien-fun-type of the callback, and calls
@@ -758,112 +758,111 @@
 ;;;; the callbacks with the same alien-fun-type. This would amortize
 ;;;; most of the static allocation costs between multiple callbacks.
 
+(defvar *alien-callback-info* nil
+  "Maps SAPs to corresponding CALLBACK-INFO structures: contains all the
+information we need to manipulate callbacks after their creation. Used for
+changing the lisp-side function they point to, invalidation, etc.")
+
+(defstruct callback-info
+  specifier
+  function ; NULL if invalid
+  wrapper
+  index)
+
+(defun callback-info-key (info)
+  (cons (callback-info-specifier info) (callback-info-function info)))
+
+(defun alien-callback-info (alien)
+  (cdr (assoc (alien-sap alien) *alien-callback-info* :test #'sap=)))
+
 (defvar *alien-callbacks* (make-hash-table :test #'equal)
-  "Maps (SPECIFIER . FUNCTION) to callbacks.")
+  "Cache of existing callback SAPs, indexed with (SPECIFER . FUNCTION). Used for
+memoization: we don't create new callbacks if one pointing to the correct
+function with the same specifier already exists.")
+
+(defvar *alien-callback-wrappers* (make-hash-table :test #'equal)
+  "Cache of existing lisp weappers, indexed with SPECIFER. Used for memoization:
+we don't create new wrappers if one for the same specifier already exists.")
 
 (defvar *alien-callback-trampolines* (make-array 32 :fill-pointer 0 :adjustable t)
-  "Maps alien callback indexes to lisp trampolines.")
+  "Lisp trampoline store: assembler wrappers contain indexes to this, and
+ENTER-ALIEN-CALLBACK pulls the corresponsing trampoline out and calls it.")
 
-(defparameter *alien-callback-wrappers* (make-hash-table :test #'equal)
-  "Maps SPECIFIER to lisp wrappers.")
+(defun %alien-callback-sap (specifier result-type argument-types function wrapper)
+  (let ((key (cons specifier function)))
+    (or (gethash key *alien-callbacks*)
+	(setf (gethash key *alien-callbacks*)
+	      (let* ((index (fill-pointer *alien-callback-trampolines*))
+		     ;; Aside from the INDEX this is known at
+		     ;; compile-time, which could be utilized by
+		     ;; having the two-stage assembler tramp &
+		     ;; wrapper mentioned in [1] above: only the
+		     ;; per-function tramp would need assembler at
+		     ;; runtime. Possibly we could even pregenerate
+		     ;; the code and just patch the index in later.
+		     (assembler-wrapper (alien-callback-assembler-wrapper
+					 index result-type argument-types)))
+		(vector-push-extend
+		 (alien-callback-lisp-trampoline wrapper function)
+		 *alien-callback-trampolines*)
+		(let ((sap (vector-sap assembler-wrapper)))
+		  (push (cons sap (make-callback-info :specifier specifier
+						      :function function
+						      :wrapper wrapper
+						      :index index))
+			*alien-callback-info*)
+		  sap))))))
 
-;;; FIXME: This involves a call to both the compiler and assembler, so
-;;; should either be macroized to do more of the work at compile-time,
-;;; or perhaps named COMPILE-ALIEN, or somesuch.
-;;;
-;;; FIXME: It is also probably worth our while to optimize cases like
-;;; (alien-funcall spec 'symbol).
-(defun alien-callback (specifier function &optional env)
-  "Returns an alien-value with of alien type SPECIFIER, that can be passed to an
-alien function as a pointer to the FUNCTION."
-  (multiple-value-bind (result-type argument-types) (parse-alien-ftype specifier env)
-    (let ((key (cons specifier function)))
-      (or (gethash key *alien-callbacks*)
-	  (setf (gethash key *alien-callbacks*)
-		(let* ((index (fill-pointer *alien-callback-trampolines*))
-		       ;;; Aside from the INDEX this is known at
-		       ;;; compile-time, which could be utilized by
-		       ;;; having the two-stage assembler tramp &
-		       ;;; wrapper mentioned in [1] above: only the
-		       ;;; per-function tramp would need assembler at
-		       ;;; runtime. Possibly we could even pregenerate
-		       ;;; the code and just patch the index in later.
-		       (assembler-wrapper (alien-callback-assembler-wrapper
-					   index result-type argument-types))
-		       ;;; For normal use-cases this at least could be
-		       ;;; done at compile-time.
-		       (lisp-wrapper (alien-callback-lisp-wrapper 
-				      specifier result-type argument-types env)))
-		  (vector-push-extend 
-		   (lambda (args-pointer result-pointer)
-		     (funcall lisp-wrapper args-pointer result-pointer function))
-		   *alien-callback-trampolines*)
-		  (%sap-alien (vector-sap assembler-wrapper)
-			      (parse-alien-type specifier env))))))))
+(defun alien-callback-lisp-trampoline (wrapper function)
+  (declare (function wrapper) (optimize speed))
+  (lambda (args-pointer result-pointer)
+    (funcall wrapper args-pointer result-pointer function)))
+
+(defun alien-callback-lisp-wrapper-lambda (specifier result-type argument-types env)
+  (let* ((arguments (make-gensym-list (length argument-types)))
+	 (argument-names arguments)
+	 (argument-specs (cddr specifier)))
+    `(lambda (args-pointer result-pointer function)
+       (let ((args-sap (int-sap 
+			(sb!kernel:get-lisp-obj-address args-pointer)))
+	     (res-sap (int-sap 
+		       (sb!kernel:get-lisp-obj-address result-pointer))))
+	 (with-alien
+	     ,(loop 
+		 for spec in argument-specs
+		 for offset = 0 ; FIXME: Should this not be AND OFFSET ...?
+		 then (+ offset (alien-callback-argument-bytes spec env))
+		 collect `(,(pop argument-names) ,spec
+			    :local ,(alien-callback-accessor-form
+				     spec 'args-sap offset)))
+	   ,(flet ((store (spec)
+			  (if spec
+			      `(setf (deref (sap-alien res-sap (* ,spec)))
+				     (funcall function ,@arguments))
+			      `(funcall function ,@arguments))))
+		  (cond ((alien-void-type-p result-type)
+			 (store nil))
+			((alien-integer-type-p result-type)
+			 (if (alien-integer-type-signed result-type)
+			     (store `(signed
+				      ,(alien-type-word-aligned-bits result-type)))
+			     (store 
+			      `(unsigned
+				,(alien-type-word-aligned-bits result-type)))))
+			(t
+			 (store (unparse-alien-type result-type)))))))
+       (values))))
+
+(defun invalid-alien-callback (&rest arguments)
+  (declare (ignore arguments))
+  (error "Invalid alien callback called."))
+
 
 (defun parse-callback-specification (result-type lambda-list)
   (values
    `(function ,result-type ,@(mapcar #'second lambda-list))
    (mapcar #'first lambda-list)))
 
-;;; FIXME: This calls compiler every single time, which really sucks.
-;;;
-;;; The problem is that we need to return a pointer to the right closure,
-;;; even though the underlying function gets shared. What to do?
-;;;
-;;; 
-(defmacro alien-lambda (result-type typed-lambda-list &body forms)
-  (multiple-value-bind (specifier lambda-list)
-      (parse-callback-specification result-type typed-lambda-list)
-    `(alien-callback ',specifier (lambda ,lambda-list ,@forms))))
-
-(defmacro define-alien-callback (name result-type typed-lambda-list &body forms)
-  "Defines #'NAME as a function with the given body and lambda-list, and NAME as
-the alien callback for that function with the given alien type."
-  (multiple-value-bind (specifier lambda-list)
-      (parse-callback-specification result-type typed-lambda-list)
-    `(progn
-       (defun ,name ,lambda-list ,@forms)
-       (defparameter ,name (alien-callback ',specifier #',name)))))
-
-(defun alien-callback-lisp-wrapper (specifier result-type argument-types env)
-  (or (gethash specifier *alien-callback-wrappers*)
-      (setf (gethash specifier *alien-callback-wrappers*)
-	    (compile 
-	     nil
-	     (let* ((arguments (make-gensym-list (length argument-types)))
-		    (argument-names arguments)
-		    (argument-specs (cddr specifier)))
-	       `(lambda (args-pointer result-pointer function)
-		  (let ((args-sap (int-sap 
-				   (sb!kernel:get-lisp-obj-address args-pointer)))
-			(res-sap (int-sap 
-				  (sb!kernel:get-lisp-obj-address result-pointer))))
-		    (with-alien
-			,(loop 
-			    for spec in argument-specs
-			    for offset = 0 ; FIXME: Should this not be AND OFFSET ...?
-			        then (+ offset (alien-callback-argument-bytes spec env))
-			    collect `(,(pop argument-names) ,spec
-				       :local ,(alien-callback-accessor-form
-						spec 'args-sap offset)))
-		      ,(flet ((store (spec)
-			        (if spec
-				    `(setf (deref (sap-alien res-sap (* ,spec)))
-					   (funcall function ,@arguments))
-				    `(funcall function ,@arguments))))
-		         (cond ((alien-void-type-p result-type)
-				(store nil))
-			       ((alien-integer-type-p result-type)
-				(if (alien-integer-type-signed result-type)
-				    (store `(signed
-					     ,(alien-type-word-aligned-bits result-type)))
-				    (store 
-				     `(unsigned
-				       ,(alien-type-word-aligned-bits result-type)))))
-			       (t
-				(store (unparse-alien-type result-type)))))))
-		  (values)))))))
 
 (defun parse-alien-ftype (specifier env)
   (destructuring-bind (function result-type &rest argument-types)
@@ -892,3 +891,92 @@ the alien callback for that function with the given alien type."
   (funcall (aref *alien-callback-trampolines* index)
 	   return
 	   arguments))
+
+;;;; interface (not public, yet) for alien callbacks
+
+(defmacro alien-callback (specifier function &environment env)
+  "Returns an alien-value with of alien ftype SPECIFIER, that can be passed to
+an alien function as a pointer to the FUNCTION. If a callback for the given
+SPECIFIER and FUNCTION already exists, it is returned instead of consing a new
+one."
+  ;; Pull out as much work as is convenient to macro-expansion time, specifically
+  ;; everything that can be done given just the SPECIFIER and ENV.
+  (multiple-value-bind (result-type argument-types) (parse-alien-ftype specifier env)
+    `(%sap-alien 
+      (%alien-callback-sap ',specifier ',result-type ',argument-types
+			   ,function
+			   (or (gethash ',specifier *alien-callback-wrappers*)
+			       (setf (gethash ',specifier *alien-callback-wrappers*)
+				     ,(alien-callback-lisp-wrapper-lambda
+				       specifier result-type argument-types env))))
+      ',(parse-alien-type specifier env))))
+
+(defun alien-callback-p (alien)
+  "Returns true if the alien is associated with a lisp-side callback,
+and a secondary return value of true if the callback is still valid."
+  (let ((info (alien-callback-info alien)))
+    (when info
+      (values t (and (callback-info-function info) t)))))
+
+(defun alien-callback-function (alien)
+  "Returns the lisp function designator associated with the callback."
+  (let ((info (alien-callback-info alien)))
+    (when info
+      (callback-info-function info))))
+
+(defun (setf alien-callback-function) (function alien)
+  "Changes the lisp function designated by the callback."
+  (let ((info (alien-callback-info alien)))
+    (unless info 
+      (error "Not an alien callback: ~S" alien))
+    ;; sap cache
+    (let ((key (callback-info-key info)))
+      (remhash key *alien-callbacks*)
+      (setf (gethash key *alien-callbacks*) (alien-sap alien)))
+    ;; trampoline
+    (setf (aref *alien-callback-trampolines* (callback-info-index info))
+	  (alien-callback-lisp-trampoline (callback-info-wrapper info) function))
+    ;; metadata
+    (setf (callback-info-function info) function)
+    function))
+
+(defun invalidate-alien-callback (alien)
+  "Invalidates the callback designated by the alien, if any, allowing the
+associated lisp function to be GC'd, and causing further calls to the same
+callback signal an error."
+  (let ((info (alien-callback-info alien)))
+    (when (and info (callback-info-function info))
+      ;; sap cache
+      (remhash (callback-info-key info) *alien-callbacks*)
+      ;; trampoline
+      (setf (aref *alien-callback-trampolines* (callback-info-index info))
+	    #'invalid-alien-callback)
+      ;; metadata
+      (setf (callback-info-function info) nil)
+      t)))
+
+;;; FIXME: This calls assembles a new callback for every closure,
+;;; which suck hugely. ...not that I can think of an obvious
+;;; solution. Possibly maybe we could write a generalized closure
+;;; callback analogous to closure_tramp, and share the actual wrapper?
+;;;
+;;; For lambdas that result in simple-funs we get the callback from
+;;; the cache on subsequent calls.
+(defmacro alien-lambda (result-type typed-lambda-list &body forms)
+  (multiple-value-bind (specifier lambda-list)
+      (parse-callback-specification result-type typed-lambda-list)
+    `(alien-callback ,specifier (lambda ,lambda-list ,@forms))))
+
+;;; FIXME: Should subsequent (SETF FDEFINITION) affect the callback or not?
+;;; What about subsequent DEFINE-ALIEN-CALLBACKs? My guess is that changing
+;;; the FDEFINITION should invalidate the callback, and redefining the
+;;; callback should change existing callbacks to point to the new defintion.
+(defmacro define-alien-callback (name result-type typed-lambda-list &body forms)
+  "Defines #'NAME as a function with the given body and lambda-list, and NAME as
+the alien callback for that function with the given alien type."
+  (declare (symbol name))
+  (multiple-value-bind (specifier lambda-list)
+      (parse-callback-specification result-type typed-lambda-list)
+    `(progn
+       (defun ,name ,lambda-list ,@forms)
+       (defparameter ,name (alien-callback ,specifier #',name)))))

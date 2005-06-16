@@ -13,24 +13,32 @@
 
 (in-package :cl-user)
 
-(defun alien-callback (type fun)
-  (sb-alien-internals:alien-callback type fun))
+;;; callbacks only on ppc/darwin currently
+#-darwin (quit :unix-status 104) 
+
+;;; simple callback for a function
 
 (defun thunk ()
   (write-string "hi"))
 
-(defvar *thunk* (alien-callback '(function c-string) #'thunk))
+(defvar *thunk* 
+  (sb-alien::alien-callback (function c-string) #'thunk))
 
 (assert (equal (with-output-to-string (*standard-output*)
 		 (alien-funcall *thunk*))
 	       "hi"))
 
+;;; simple callback for a symbol
+
 (defun add-two-ints (arg1 arg2)
   (+ arg1 arg2))
 
-(defvar *add-two-ints* (alien-callback '(function int int int) 'add-two-ints))
+(defvar *add-two-ints* 
+  (sb-alien::alien-callback (function int int int) 'add-two-ints))
 
 (assert (= (alien-funcall *add-two-ints* 555 444444) 444999))
+
+;;; actually using a callback with foreign code
 
 (define-alien-routine qsort void
   (base (* t))
@@ -56,6 +64,7 @@
 	   double*-cmp))
   (assert (equalp vector sorted)))
 
+;;; returning floats
 
 (sb-alien::define-alien-callback redefined-fun int ()
     0)
@@ -76,5 +85,44 @@
 
 (assert (= spi (alien-funcall return-single spi)))
 (assert (= pi (alien-funcall return-double pi)))
+
+;;; invalidation
+
+(sb-alien::define-alien-callback to-be-invalidated int ()
+  5)
+
+(assert (= 5 (alien-funcall to-be-invalidated)))
+
+(multiple-value-bind (p valid) (sb-alien::alien-callback-p to-be-invalidated)
+  (assert p)
+  (assert valid))
+
+(sb-alien::invalidate-alien-callback to-be-invalidated)
+
+(multiple-value-bind (p valid) (sb-alien::alien-callback-p to-be-invalidated)
+  (assert p)
+  (assert (not valid)))
+
+(multiple-value-bind (res err) 
+    (ignore-errors (alien-funcall to-be-invalidated))
+  (assert (and (not res) (typep err 'error))))
+
+;;; getting and setting the underlying function
+
+(sb-alien::define-alien-callback foo int ()
+  13)
+
+(defvar *foo* #'foo)
+
+(assert (eq #'foo (sb-alien::alien-callback-function foo)))
+
+(defun bar ()
+  26)
+
+(setf (sb-alien::alien-callback-function foo) #'bar)
+
+(assert (eq #'bar (sb-alien::alien-callback-function foo)))
+
+(assert (= 26 (alien-funcall foo)))
 
 (quit :unix-status 104)
