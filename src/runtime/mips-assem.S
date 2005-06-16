@@ -3,6 +3,7 @@
 #include "globals.h"
 #include "genesis/fdefn.h"
 #include "genesis/closure.h"
+#include "genesis/return-pc.h"
 #include "genesis/simple-fun.h"
 #include "genesis/static-symbols.h"
 		
@@ -152,27 +153,18 @@ symbol:
 	lw	reg_A5, 20(reg_CFP)
 
 	/* Calculate LRA */
-	la	reg_LRA, lra + OTHER_POINTER_LOWTAG
+	la	reg_LRA, lra - RETURN_PC_RETURN_POINT_OFFSET
 
 	/* Indirect closure */
-	lw	reg_CODE, -1(reg_LEXENV)
+	lw	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
 
 	/* Jump into lisp land. */
-	addu	reg_LIP, reg_CODE, 6*4 - FUN_POINTER_LOWTAG
+	addu	reg_LIP, reg_CODE, SIMPLE_FUN_CODE_OFFSET
 	jr	reg_LIP
 
+	.align	2
 	.set	noreorder
-	.align	3
-#ifdef irix
-	/* This particular KLUDGE is kept here as a reminder; for more
-	details, see irix-asm-munge.c from CMUCL's lisp directory.
-	Other examples have been deleted from later in the file in the
-	hope that they will not be needed. */
-.globl  mipsmungelra /* for our munging afterwards in irix-asm-munge */
-mipsmungelra:
-#endif
-lra:
-	.word	RETURN_PC_HEADER_WIDETAG
+lra:	.word	RETURN_PC_HEADER_WIDETAG
 
 	/* Multiple value return spot, clear stack. */
 	move	reg_CSP, reg_OCFP
@@ -234,9 +226,11 @@ lra:
  * Transfering control from Lisp into C
  */
  	NESTED(call_into_c, 0, ra)
-	/* The stack frame was already set up from lisp. We have
-	   to fake the correct gp value for this function, though. */
+	/* The C stack frame was already set up from lisp, and the
+	   argument registers as well. We have to fake the correct
+	   gp value for this function, though. */
 	.set	noreorder
+	/* reg_NL3 is AT. */
 	.set	noat
 	lui	gp, %hi(_gp_disp)
 	addiu	gp, %lo(_gp_disp)
@@ -250,17 +244,18 @@ lra:
 	move	reg_CFP, reg_CSP
 	addu	reg_CSP, reg_CFP, 32
 
-	subu	reg_LIP, reg_CODE
-	addu	reg_LIP, OTHER_POINTER_LOWTAG
-	sw	reg_LIP, (reg_CFP)
-	sw	reg_CODE, 4(reg_CFP)
-	sw	gp, 8(reg_CFP)
-
 	/* Set the pseudo-atomic flag. */
 	.set	noreorder
 	li	reg_NL4, 0
 	addu	reg_ALLOC, 1
 	.set	reorder
+
+	/* Convert the return address to an offset and save it on the stack. */
+	subu	reg_NFP, reg_LIP, reg_CODE
+	addu	reg_NFP, OTHER_POINTER_LOWTAG
+	sw	reg_NFP, (reg_CFP)
+	sw	reg_CODE, 4(reg_CFP)
+	sw	gp, 8(reg_CFP)
 
 	/* Save LISP state. */
 	subu	reg_A0, reg_ALLOC, 1
@@ -280,18 +275,16 @@ lra:
 1:	.set	reorder
 
 	/* Into C land we go. */
-	move    t9, reg_CFUNC
+	move    t9, reg_CFUNC		# reg_ALLOC
 	jalr	t9
 
-	lw      gp, 8(reg_CFP)
-	
+	lw	gp, 8(reg_CFP)
+
 	/* Pass 64bit return value to lisp land. */ 
 	move	reg_NL0, v0		# reg_CFUNC
 	move	reg_NL1, v1		# reg_NL4
 
-	li	reg_NIL, NIL
-
-	/* Clear unsaved boxed descriptor regs */
+	/* Clear unsaved boxed descriptor regs before allowing an interrupt */
 	li	reg_A0, 0		# t0
 	li	reg_A1, 0		# t1
 	li	reg_A2, 0		# t2
@@ -301,6 +294,7 @@ lra:
 	li	reg_FDEFN, 0		# t6
 	li	reg_LEXENV, 0		# t7
 	li	reg_L1, 0		# t8
+	li	reg_LIP, 0		# ra
 
 	/* Turn on pseudo-atomic. */
 	.set	noreorder
@@ -339,11 +333,18 @@ lra:
 	jr	reg_LIP
 	END(call_into_c)
 
-	EXPORT(start_of_tramps)
-
 /*
+ * Trampolines follow the Lisp calling convention.
+ *
  * The undefined-function trampoline.
  */
+	.align	2
+	.word	SIMPLE_FUN_HEADER_WIDETAG /* header */
+	.word	undefined_tramp - SIMPLE_FUN_CODE_OFFSET /* self */
+	.word	NIL /* next */
+	.word   NIL /* name */
+	.word	NIL /* arglist */
+	.word	NIL /* type */
 	LEAF(undefined_tramp)
         break	trap_Error
         .byte	4
@@ -357,14 +358,19 @@ lra:
 /*
  * The closure trampoline.
  */
+ 	.align	2
+	.word	SIMPLE_FUN_HEADER_WIDETAG /* header */
+	.word	closure_tramp - SIMPLE_FUN_CODE_OFFSET /* self */
+	.word	NIL /* next */
+	.word   NIL /* name */
+	.word	NIL /* arglist */
+	.word	NIL /* type */
 	LEAF(closure_tramp)
         lw	reg_LEXENV, FDEFN_FUN_OFFSET(reg_FDEFN)
-        lw	reg_L0, CLOSURE_FUN_OFFSET(reg_LEXENV)
-        addu	reg_LIP, reg_L0, SIMPLE_FUN_CODE_OFFSET
+        lw	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
+        addu	reg_LIP, reg_CODE, SIMPLE_FUN_CODE_OFFSET
         jr	reg_LIP
 	END(closure_tramp)
-
-	EXPORT(end_of_tramps)
 
 /*
  * Function-end breakpoint magic.
