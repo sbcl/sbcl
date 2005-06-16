@@ -13,8 +13,9 @@
 
 (in-package :cl-user)
 
-;;; callbacks only on ppc/darwin currently
-#-darwin (quit :unix-status 104) 
+;;; callbacks only on a few platforms
+#-(or darwin x86)
+(quit :unix-status 104) 
 
 ;;; simple callback for a function
 
