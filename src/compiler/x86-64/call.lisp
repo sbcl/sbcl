@@ -1248,8 +1248,10 @@
    (inst mov value
 	 (make-ea :qword :base object :disp (- (* index n-word-bytes))))))
 
-
 ;;; Turn more arg (context, count) into a list.
+(defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))
+  t)
+
 (define-vop (listify-rest-args)
   (:translate %listify-rest-args)
   (:policy :safe)
@@ -1265,15 +1267,16 @@
   (:generator 20
     (let ((enter (gen-label))
 	  (loop (gen-label))
-	  (done (gen-label)))
+	  (done (gen-label))
+	  (stack-allocate-p (node-stack-allocate-p node)))
       (move src context)
       (move rcx count)
       ;; Check to see whether there are no args, and just return NIL if so.
       (inst mov result nil-value)
       (inst jecxz done)
       (inst lea dst (make-ea :qword :index rcx :scale 2))
-      (pseudo-atomic
-       (allocation dst dst node)
+      (maybe-pseudo-atomic stack-allocate-p
+       (allocation dst dst node stack-allocate-p)
        (inst lea dst (make-ea :byte :base dst :disp list-pointer-lowtag))
        ;; Convert the count into a raw value, so that we can use the
        ;; LOOP instruction.

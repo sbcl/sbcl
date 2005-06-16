@@ -124,6 +124,14 @@
 ;;; node-var then it is used to make an appropriate speed vs size
 ;;; decision.
 
+(defun allocation-dynamic-extent (alloc-tn size)
+  (inst sub rsp-tn size)
+  ;; see comment in x86/macros.lisp implementation of this
+  (inst and rsp-tn #.(lognot lowtag-mask))
+  (aver (not (location= alloc-tn rsp-tn)))
+  (inst mov alloc-tn rsp-tn)
+  (values))
+
 ;;; This macro should only be used inside a pseudo-atomic section,
 ;;; which should also cover subsequent initialization of the
 ;;; object.
@@ -136,8 +144,11 @@
   (inst pop alloc-tn)
   (values))
 
-(defun allocation (alloc-tn size &optional ignored)
+(defun allocation (alloc-tn size &optional ignored dynamic-extent)
   (declare (ignore ignored))
+  (when dynamic-extent
+    (allocation-dynamic-extent alloc-tn size)
+    (return-from allocation (values)))
   (let ((NOT-INLINE (gen-label))
 	(DONE (gen-label))
 	;; Yuck.
@@ -257,6 +268,12 @@
 ;;; set with a single operation and cleared with SHR *PSEUDO-ATOMIC-BITS*,-2;
 ;;; the ATOMIC bit is bit 0, the INTERRUPTED bit is bit 1, and you check
 ;;; the C flag after the shift to see whether you were interrupted.
+
+;;; FIXME: THIS NAME IS BACKWARDS!
+(defmacro maybe-pseudo-atomic (really-p &body body)
+  `(if ,really-p
+       (progn ,@body)
+       (pseudo-atomic ,@body)))
 
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)

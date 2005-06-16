@@ -34,6 +34,9 @@ changes in sbcl-0.9.2 relative to sbcl-0.9.1:
   * optimization: structure instances with raw slots now use less
     memory, and probably show better memory locality.  (thanks to
     David Lichteblau)
+  * optimization: DYNAMIC-EXTENT declarations for lists and closures
+    are treated as requests for stack allocation on the x86-64
+    platform.
   * contrib improvement: it's harder to cause SOCKET-CLOSE to close()
     the wrong file descriptor; implementation of SOCKET-OPEN-P.
     (thanks to Tony Martinez)

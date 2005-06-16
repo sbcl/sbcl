@@ -12,6 +12,10 @@
 (in-package "SB!VM")
 
 ;;;; LIST and LIST*
+(defoptimizer (list stack-allocate-result) ((&rest args))
+  (not (null args)))
+(defoptimizer (list* stack-allocate-result) ((&rest args))
+  (not (null (rest args))))
 
 (define-vop (list-or-list*)
   (:args (things :more t))
@@ -40,7 +44,9 @@
 		     (storew reg ,list ,slot list-pointer-lowtag))))
 	     (let ((cons-cells (if star (1- num) num)))
 	       (pseudo-atomic
-		(allocation res (* (pad-data-block cons-size) cons-cells) node)
+		(allocation res (* (pad-data-block cons-size) cons-cells) node
+			    (awhen (sb!c::node-lvar node)
+			      (sb!c::lvar-dynamic-extent it)))
 		(inst lea res
 		      (make-ea :byte :base res :disp list-pointer-lowtag))
 		(move ptr res)
@@ -111,14 +117,13 @@
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
   (:info length stack-allocate-p)
-  (:ignore stack-allocate-p)
   (:temporary (:sc any-reg) temp)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 10
-   (pseudo-atomic
+   (maybe-pseudo-atomic stack-allocate-p
     (let ((size (+ length closure-info-offset)))
-      (allocation result (pad-data-block size) node)
+      (allocation result (pad-data-block size) node stack-allocate-p)
       (inst lea result
 	    (make-ea :byte :base result :disp fun-pointer-lowtag))
       (storew (logior (ash (1- size) n-widetag-bits) closure-header-widetag)

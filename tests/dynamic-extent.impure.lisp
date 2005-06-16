@@ -100,7 +100,7 @@
       (funcall thunk))
     (assert (< (- (get-bytes-consed) before) times))))
 
-#+x86
+#+(or x86 x86-64)
 (progn
   (assert-no-consing (dxlength 1 2 3))
   (assert-no-consing (dxlength t t t t t t))
