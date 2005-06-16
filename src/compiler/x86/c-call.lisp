@@ -355,3 +355,59 @@
   (:generator 2
     (inst add esp-tn (fixnumize number))))
 
+#-sb-xc-host
+(defun alien-callback-accessor-form (type sp offset)
+  `(deref (sap-alien (sap+ ,sp ,offset) (* ,type))))
+
+#-sb-xc-host
+(defun alien-callback-assembler-wrapper (index return-type arg-types)
+  "Cons up a piece of code which calls call-callback with INDEX and a
+pointer to the arguments."
+  (declare (ignore arg-types))
+  (let* ((segment (make-segment))
+	 (eax eax-tn)
+	 (edx edx-tn)
+	 (ebp ebp-tn)
+	 (esp esp-tn)
+	 ([ebp-8] (make-ea :dword :base ebp :disp -8))
+	 ([ebp-4] (make-ea :dword :base ebp :disp -4)))
+    (assemble (segment)
+	      (inst push ebp)			    ; save old frame pointer
+	      (inst mov  ebp esp)		    ; establish new frame
+	      (inst mov  eax esp)		    ; 
+	      (inst sub  eax 8)		            ; place for result 
+	      (inst push eax)			    ; arg2
+	      (inst add  eax 16)		    ; arguments  
+	      (inst push eax)			    ; arg1
+	      (inst push (ash index 2))		    ; arg0
+	      (inst push (get-lisp-obj-address #'enter-alien-callback)) ; function
+	      (inst mov  eax (foreign-symbol-address-as-integer "funcall3"))
+	      (inst call eax)
+	      ;; now put the result into the right register
+	      (cond
+		((and (alien-integer-type-p return-type)
+		      (eql (alien-type-bits return-type) 64))
+		 (inst mov eax [ebp-8])
+		 (inst mov edx [ebp-4]))
+		((or (alien-integer-type-p return-type)
+		     (alien-pointer-type-p return-type)
+		     (alien-type-= #.(parse-alien-type 'system-area-pointer nil)
+				   return-type))
+		 (inst mov eax [ebp-8]))
+		((alien-single-float-type-p return-type)
+		 (inst fld  [ebp-8]))
+		((alien-double-float-type-p return-type)
+		 (inst fldd [ebp-8]))
+		((alien-void-type-p return-type))
+		(t
+		 (error "unrecognized alien type: ~A" return-type)))
+	      (inst mov esp ebp)		   ; discard frame
+	      (inst pop ebp)			   ; restore frame pointer
+	      (inst ret))
+    (finalize-segment segment)
+    ;; Now that the segment is done, convert it to a static
+    ;; vector we can point foreign code to.
+    (let ((buffer (sb!assem::segment-buffer segment)))
+      (make-static-vector (length buffer)
+			  :element-type '(unsigned-byte 8)
+			  :initial-contents buffer))))
