@@ -703,7 +703,7 @@
              collect
              (let* ((sequence-type `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))
                     (n-element-bits (sb!vm:saetp-n-bits saetp))
-                    (bash-function (intern (format nil "UB~A-BASH-COPY" n-element-bits)
+                    (bash-function (intern (format nil "UB~D-BASH-COPY" n-element-bits)
                                             (find-package "SB!KERNEL"))))
                `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
                                        (,sequence-type ,sequence-type &rest t)
@@ -737,7 +737,7 @@
              collect
              (let* ((sequence-type `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))
                     (n-element-bits (sb!vm:saetp-n-bits saetp))
-                    (bash-function (intern (format nil "UB~A-BASH-COPY" n-element-bits)
+                    (bash-function (intern (format nil "UB~D-BASH-COPY" n-element-bits)
                                            (find-package "SB!KERNEL"))))
                `(deftransform subseq ((seq start &optional end)
                                       (,sequence-type t &optional t)
@@ -764,7 +764,7 @@
              collect
              (let* ((sequence-type `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))
                     (n-element-bits (sb!vm:saetp-n-bits saetp))
-                    (bash-function (intern (format nil "UB~A-BASH-COPY" n-element-bits)
+                    (bash-function (intern (format nil "UB~D-BASH-COPY" n-element-bits)
                                            (find-package "SB!KERNEL"))))
                `(deftransform copy-seq ((seq) (,sequence-type)
                                         ,sequence-type)

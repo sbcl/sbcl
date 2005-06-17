@@ -110,7 +110,7 @@
 
 ;;; Align the SAP to a word boundary, and update the offset accordingly.
 (defmacro !define-sap-fixer (bitsize)
-  (let ((name (intern (format nil "FIX-SAP-AND-OFFSET-UB~A" bitsize))))
+  (let ((name (intern (format nil "FIX-SAP-AND-OFFSET-UB~D" bitsize))))
     `(progn
       (declaim (inline ,name))
       (defun ,name (sap offset)
@@ -128,6 +128,10 @@
                        ((8 16 32 64) '(logand address sb!vm:fixnum-tag-mask)))
                      offset)))))))
 
+;;; We cheat a little bit by using TRULY-THE in the copying function to
+;;; force the compiler to generate good code in the (= BITSIZE
+;;; SB!VM:N-WORD-BITS) case.  We don't use TRULY-THE in the other cases
+;;; to give the compiler freedom to generate better code.
 (defmacro !define-byte-bashers (bitsize)
   (let* ((bytes-per-word (/ n-word-bits bitsize))
          (byte-offset `(integer 0 (,bytes-per-word)))
@@ -149,17 +153,17 @@
          (offset `(integer 0 ,max-bytes))
          (max-word-offset (ceiling max-bytes bytes-per-word))
          (word-offset `(integer 0 ,max-word-offset))
-         (fix-sap-and-offset-name (intern (format nil "FIX-SAP-AND-OFFSET-UB~A" bitsize)))
-         (constant-bash-name (intern (format nil "CONSTANT-UB~A-BASH" bitsize) (find-package "SB!KERNEL")))
-         (array-fill-name (intern (format nil "UB~A-BASH-FILL" bitsize) (find-package "SB!KERNEL")))
-         (system-area-fill-name (intern (format nil "SYSTEM-AREA-UB~A-FILL" bitsize) (find-package "SB!KERNEL")))
-         (unary-bash-name (intern (format nil "UNARY-UB~A-BASH" bitsize) (find-package "SB!KERNEL")))
-         (array-copy-name (intern (format nil "UB~A-BASH-COPY" bitsize) (find-package "SB!KERNEL")))
-         (system-area-copy-name (intern (format nil "SYSTEM-AREA-UB~A-COPY" bitsize) (find-package "SB!KERNEL")))
+         (fix-sap-and-offset-name (intern (format nil "FIX-SAP-AND-OFFSET-UB~D" bitsize)))
+         (constant-bash-name (intern (format nil "CONSTANT-UB~D-BASH" bitsize) (find-package "SB!KERNEL")))
+         (array-fill-name (intern (format nil "UB~D-BASH-FILL" bitsize) (find-package "SB!KERNEL")))
+         (system-area-fill-name (intern (format nil "SYSTEM-AREA-UB~D-FILL" bitsize) (find-package "SB!KERNEL")))
+         (unary-bash-name (intern (format nil "UNARY-UB~D-BASH" bitsize) (find-package "SB!KERNEL")))
+         (array-copy-name (intern (format nil "UB~D-BASH-COPY" bitsize) (find-package "SB!KERNEL")))
+         (system-area-copy-name (intern (format nil "SYSTEM-AREA-UB~D-COPY" bitsize) (find-package "SB!KERNEL")))
          (array-copy-to-system-area-name
-          (intern (format nil "COPY-UB~A-TO-SYSTEM-AREA" bitsize) (find-package "SB!KERNEL")))
+          (intern (format nil "COPY-UB~D-TO-SYSTEM-AREA" bitsize) (find-package "SB!KERNEL")))
          (system-area-copy-to-array-name
-          (intern (format nil "COPY-UB~A-FROM-SYSTEM-AREA" bitsize)
+          (intern (format nil "COPY-UB~D-FROM-SYSTEM-AREA" bitsize)
                   (find-package "SB!KERNEL"))))
     `(progn
       (declaim (inline ,constant-bash-name ,unary-bash-name))
@@ -199,6 +203,13 @@
                                                      (word-logical-andc2 (funcall dst-ref-fn dst dst-word-offset)
                                                                          mask))))
                          (incf dst-word-offset))))
+                  (let ((end (+ dst-word-offset interior)))
+                    (declare (type ,word-offset end))
+                    (do ()
+                        ((>= dst-word-offset end))
+                      (funcall dst-set-fn dst dst-word-offset value)
+                      (incf dst-word-offset)))
+                  #+nil
                   (dotimes (i interior)
                     (funcall dst-set-fn dst dst-word-offset value)
                     (incf dst-word-offset))
@@ -334,10 +345,19 @@
                                 (incf src-word-offset)
                                 (incf dst-word-offset))))
                          ;; Copy the interior words.
-                         (dotimes (i interior)
-                           (funcall dst-set-fn dst dst-word-offset (funcall src-ref-fn src src-word-offset))
-                           (incf src-word-offset)
-                           (incf dst-word-offset))
+                         (let ((end ,(if (= bytes-per-word 1)
+                                         `(truly-the ,word-offset
+                                           (+ dst-word-offset interior))
+                                         `(+ dst-word-offset interior))))
+                           (declare (type ,word-offset end))
+                           (do ()
+                               ((>= dst-word-offset end))
+                             (funcall dst-set-fn dst dst-word-offset
+                                      (funcall src-ref-fn src src-word-offset))
+                             ,(if (= bytes-per-word 1)
+                                  `(setf src-word-offset (truly-the ,word-offset (+ src-word-offset 1)))
+                                  `(incf src-word-offset))
+                             (incf dst-word-offset)))
                          ,@(unless (= bytes-per-word 1)
                             `((unless (zerop final-bytes)
                                 ;; We are only writing part of the last word.
@@ -350,8 +370,14 @@
                                                             (word-logical-andc2 orig mask))))))))
                         (t
                          ;; We need to loop from right to left.
-                         (incf dst-word-offset words)
-                         (incf src-word-offset words)
+                         ,(if (= bytes-per-word 1)
+                              `(setf dst-word-offset (truly-the ,word-offset
+                                                      (+ dst-word-offset words)))
+                              `(incf dst-word-offset words))
+                         ,(if (= bytes-per-word 1)
+                              `(setf src-word-offset (truly-the ,word-offset
+                                                      (+ src-word-offset words)))
+                              `(incf src-word-offset words))
                          ,@(unless (= bytes-per-word 1)
                             `((unless (zerop final-bytes)
                                 (let ((mask (start-mask (* final-bytes ,bitsize)))
@@ -361,10 +387,13 @@
                                   (funcall dst-set-fn dst dst-word-offset
                                            (word-logical-or (word-logical-and value mask)
                                                             (word-logical-andc2 orig mask)))))))
-                         (dotimes (i interior)
-                           (decf src-word-offset)
-                           (decf dst-word-offset)
-                           (funcall dst-set-fn dst dst-word-offset (funcall src-ref-fn src src-word-offset)))
+                         (let ((end (- dst-word-offset interior)))
+                           (do ()
+                               ((<= dst-word-offset end))
+                             (decf src-word-offset)
+                             (decf dst-word-offset)
+                             (funcall dst-set-fn dst dst-word-offset
+                                      (funcall src-ref-fn src src-word-offset))))
                          ,@(unless (= bytes-per-word 1)
                             `((unless (zerop dst-byte-offset)
                                 ;; We are only writing part of the last word.
@@ -396,7 +425,8 @@
                            (declare (type word prev next))
                            (flet ((get-next-src ()
                                     (setf prev next)
-                                    (setf next (funcall src-ref-fn src (incf src-word-offset)))))
+                                    (setf next (funcall src-ref-fn src
+                                                        (setf src-word-offset (incf src-word-offset))))))
                              (declare (inline get-next-src))
                              ,@(unless (= bytes-per-word 1)
                                 `((unless (zerop dst-byte-offset)
@@ -411,14 +441,17 @@
                                                (word-logical-or (word-logical-and value mask)
                                                                 (word-logical-andc2 orig mask))))
                                     (incf dst-word-offset))))
-                             (dotimes (i interior)
-                               (get-next-src)
-                               (let ((value (word-logical-or
-                                             (shift-towards-end next (* (- src-shift) ,bitsize))
-                                             (shift-towards-start prev (* src-shift ,bitsize)))))
-                                 (declare (type word value))
-                                 (funcall dst-set-fn dst dst-word-offset value)
-                                 (incf dst-word-offset)))
+                             (let ((end (+ dst-word-offset interior)))
+                               (declare (type ,word-offset end))
+                               (do ()
+                                   ((>= dst-word-offset end))
+                                 (get-next-src)
+                                 (let ((value (word-logical-or
+                                               (shift-towards-end next (* (- src-shift) ,bitsize))
+                                               (shift-towards-start prev (* src-shift ,bitsize)))))
+                                   (declare (type word value))
+                                   (funcall dst-set-fn dst dst-word-offset value)
+                                   (incf dst-word-offset))))
                              ,@(unless (= bytes-per-word 1)
                                 `((unless (zerop final-bytes)
                                     (let ((value
@@ -438,8 +471,7 @@
                         (t
                          ;; We need to loop from right to left.
                          (incf dst-word-offset words)
-                         (incf src-word-offset
-                               (1- (ceiling (+ src-byte-offset length) ,bytes-per-word)))
+                         (incf src-word-offset (1- (ceiling (+ src-byte-offset length) ,bytes-per-word)))
                          (let ((next 0)
                                (prev (funcall src-ref-fn src src-word-offset)))
                            (declare (type word prev next))
@@ -461,14 +493,16 @@
                                                (word-logical-or (word-logical-and value mask)
                                                                 (word-logical-andc2 orig mask)))))))
                              (decf dst-word-offset)
-                             (dotimes (i interior)
-                               (get-next-src)
-                               (let ((value (word-logical-or
-                                             (shift-towards-end next (* (- src-shift) ,bitsize))
-                                             (shift-towards-start prev (* src-shift ,bitsize)))))
-                                 (declare (type word value))
-                                 (funcall dst-set-fn dst dst-word-offset value)
-                                 (decf dst-word-offset)))
+                             (let ((end (- dst-word-offset interior)))
+                               (do ()
+                                   ((<= dst-word-offset end))
+                                 (get-next-src)
+                                 (let ((value (word-logical-or
+                                               (shift-towards-end next (* (- src-shift) ,bitsize))
+                                               (shift-towards-start prev (* src-shift ,bitsize)))))
+                                   (declare (type word value))
+                                   (funcall dst-set-fn dst dst-word-offset value)
+                                   (decf dst-word-offset))))
                              ,@(unless (= bytes-per-word 1)
                                 `((unless (zerop dst-byte-offset)
                                     (if (> src-byte-offset dst-byte-offset)

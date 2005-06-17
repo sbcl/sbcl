@@ -924,6 +924,7 @@
          (fill-amounts (collect-fill-amounts n-power))
          (bash-function (intern (format nil "UB~A-BASH-FILL" bitsize)
                                 (find-package "SB-KERNEL"))))
+    (format t "~&/Function ~A..." bash-function)
     (loop for offset from padding-amount below (* 2 padding-amount) do
           (dolist (c (fill-bytes-for-testing bitsize))
             (dolist (n fill-amounts)
@@ -955,6 +956,7 @@
          (fill-amounts (collect-fill-amounts n-power))
          (bash-function (intern (format nil "UB~A-BASH-COPY" bitsize)
                                 (find-package "SB-KERNEL"))))
+    (format t "~&/Function ~A..." bash-function)
     (do ((source-offset padding-amount (1+ source-offset)))
         ((>= source-offset (* padding-amount 2))
          ;; success!

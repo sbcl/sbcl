@@ -466,7 +466,7 @@
                          (find 'character
                                sb!vm:*specialized-array-element-type-properties*
                                :key #'sb!vm:saetp-specifier)))
-                       (bash-function (intern (format nil "UB~A-BASH-COPY" n-character-array-bits)
+                       (bash-function (intern (format nil "UB~D-BASH-COPY" n-character-array-bits)
                                               (find-package "SB!KERNEL"))))
                   bash-function)
                 ibuf +ansi-stream-in-buffer-extra+
