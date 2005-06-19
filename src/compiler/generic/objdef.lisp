@@ -365,7 +365,7 @@
   ;; unbound_marker is borrowed very briefly at thread startup to 
   ;; pass the address of initial-function into new_thread_trampoline 
   (unbound-marker :init :unbound) ; tls[0] = UNBOUND_MARKER_WIDETAG 
-  (pid :c-type "pid_t")
+  (os-thread :c-type "os_thread_t")
   (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
@@ -375,10 +375,13 @@
   #!+gencgc (alloc-region :c-type "struct alloc_region" :length 5)
   (tls-cookie)				;  on x86, the LDT index 
   (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
+  (prev :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (state)				; running, stopping, stopped, dead
   #!+(or x86 x86-64) (pseudo-atomic-atomic)
   #!+(or x86 x86-64) (pseudo-atomic-interrupted)
+  (interrupt-fun)
+  (interrupt-fun-lock)
   (interrupt-data :c-type "struct interrupt_data *" 
 		  :length #!+alpha 2 #!-alpha 1)
   (interrupt-contexts :c-type "os_context_t *" :rest-p t))

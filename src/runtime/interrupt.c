@@ -47,6 +47,7 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <errno.h>
 
 #include "sbcl.h"
 #include "runtime.h"
@@ -63,6 +64,7 @@
 #include "interr.h"
 #include "genesis/fdefn.h"
 #include "genesis/simple-fun.h"
+#include "genesis/cons.h"
 
 
 
@@ -108,7 +110,7 @@ inline static void check_blockables_blocked_or_lose()
     sigset_t empty,current;
     int i;
     sigemptyset(&empty);
-    sigprocmask(SIG_BLOCK, &empty, &current);
+    thread_sigmask(SIG_BLOCK, &empty, &current);
     for(i=0;i<NSIG;i++) {
         if (sigismember(&blockable_sigset, i) && !sigismember(&current, i))
             lose("blockable signal %d not blocked",i);
@@ -145,7 +147,7 @@ void reset_signal_mask ()
 {
     sigset_t new;
     sigemptyset(&new);
-    sigprocmask(SIG_SETMASK,&new,0);
+    thread_sigmask(SIG_SETMASK,&new,0);
 }
 
 
@@ -262,7 +264,7 @@ undo_fake_foreign_function_call(os_context_t *context)
     sigset_t block;
     sigemptyset(&block);
     sigaddset_blockable(&block);
-    sigprocmask(SIG_BLOCK, &block, 0);
+    thread_sigmask(SIG_BLOCK, &block, 0);
 
     /* going back into Lisp */
     foreign_function_call_active = 0;
@@ -294,7 +296,7 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 	context_sap = alloc_sap(context);
     }
 
-    sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+    thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
     if (internal_errors_enabled) {
         SHOW("in interrupt_internal_error");
@@ -432,7 +434,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
         lispobj info_sap,context_sap = alloc_sap(context);
         info_sap = alloc_sap(info);
         /* Allow signals again. */
-        sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+        thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
 #ifdef QSHOW_SIGNALS
 	SHOW("calling Lisp-level handler");
@@ -449,7 +451,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #endif
 
         /* Allow signals again. */
-        sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+        thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 	
         (*handler.c)(signal, info, void_context);
     }
@@ -505,8 +507,8 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         SetSymbolValue(INTERRUPT_PENDING, T,thread);
 #ifdef QSHOW_SIGNALS
         FSHOW((stderr,
-               "/maybe_defer_handler(%x,%d),thread=%d: deferred\n",
-               (unsigned int)handler,signal,thread->pid));
+               "/maybe_defer_handler(%x,%d),thread=%ld: deferred\n",
+               (unsigned int)handler,signal,thread->os_thread));
 #endif
 	return 1;
     } 
@@ -522,15 +524,15 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
 	arch_set_pseudo_atomic_interrupted(context);
 #ifdef QSHOW_SIGNALS
         FSHOW((stderr,
-               "/maybe_defer_handler(%x,%d),thread=%d: deferred(PA)\n",
-               (unsigned int)handler,signal,thread->pid));
+               "/maybe_defer_handler(%x,%d),thread=%ld: deferred(PA)\n",
+               (unsigned int)handler,signal,thread->os_thread));
 #endif
 	return 1;
     }
 #ifdef QSHOW_SIGNALS
         FSHOW((stderr,
-               "/maybe_defer_handler(%x,%d),thread=%d: not deferred\n",
-               (unsigned int)handler,signal,thread->pid));
+               "/maybe_defer_handler(%x,%d),thread=%ld: not deferred\n",
+               (unsigned int)handler,signal,thread->os_thread));
 #endif
     return 0;
 }
@@ -631,13 +633,12 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 
     sigemptyset(&ss);
     for(i=1;i<NSIG;i++) sigaddset(&ss,i); /* Block everything. */
-    sigprocmask(SIG_BLOCK,&ss,0);
+    thread_sigmask(SIG_BLOCK,&ss,0);
 
     /* The GC can't tell if a thread is a zombie, so this would be a
      * good time to let the kernel reap any of our children in that
      * awful state, to stop them from being waited for indefinitely.
      * Userland reaping is done later when GC is finished  */
-    mark_dead_threads();
     if(thread->state!=STATE_STOPPING) {
       lose("sig_stop_for_gc_handler: wrong thread state: %ld\n",
            fixnum_value(thread->state));
@@ -707,6 +708,7 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
      * user's backtrace makes (as much) sense (as usual) */
 
     /* FIXME: what about restoring fp state? */
+    /* FIXME: what about restoring errno? */
 #ifdef LISP_FEATURE_X86
     /* Suppose the existence of some function that saved all
      * registers, called call_into_lisp, then restored GP registers and
@@ -714,13 +716,15 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 
      push   ebp
      mov    ebp esp
-     pushad
+     pushfl
+     pushal
      push   $0
      push   $0
      pushl  {address of function to call}
      call   0x8058db0 <call_into_lisp>
      addl   $12,%esp
-     popa
+     popal
+     popfl
      leave  
      ret    
 
@@ -826,14 +830,22 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 {
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
-    arrange_return_to_lisp_function(context,info->si_value.sival_int);
+    /* The order of interrupt execution is peculiar. If thread A
+     * interrupts thread B with I1, I2 and B for some reason recieves
+     * I1 when FUN2 is already on the list, then it is FUN2 that gets
+     * to run first. But when FUN2 is run SIG_INTERRUPT_THREAD is
+     * enabled again and I2 hits pretty soon in FUN2 and run
+     * FUN1. This is of course just one scenario, and the order of
+     * thread interrupt execution is undefined. */
+    struct thread *th=arch_os_get_current_thread();
+    struct cons *c;
+    get_spinlock(&th->interrupt_fun_lock,(long)th);
+    c=((struct cons *)native_pointer(th->interrupt_fun));
+    arrange_return_to_lisp_function(context,c->car);
+    th->interrupt_fun=(lispobj *)(c->cdr);
+    release_spinlock(&th->interrupt_fun_lock);
 }
 
-void thread_exit_handler(int num, siginfo_t *info, void *v_context)
-{   /* called when a child thread exits */
-    mark_dead_threads();
-}
-	
 #endif
 
 /* KLUDGE: Theoretically the approach we use for undefined alien
@@ -857,8 +869,8 @@ boolean handle_guard_page_triggered(os_context_t *context,void *addr){
          * protection so the error handler has some headroom, protect the
          * previous page so that we can catch returns from the guard page
          * and restore it. */
-        protect_control_stack_guard_page(th->pid,0);
-        protect_control_stack_return_guard_page(th->pid,1);
+        protect_control_stack_guard_page(th->os_thread,0);
+        protect_control_stack_return_guard_page(th->os_thread,1);
         
         arrange_return_to_lisp_function
             (context, SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
@@ -870,8 +882,8 @@ boolean handle_guard_page_triggered(os_context_t *context,void *addr){
          * unprotect this one. This works even if we somehow missed
          * the return-guard-page, and hit it on our way to new
          * exhaustion instead. */
-        protect_control_stack_guard_page(th->pid,1);
-        protect_control_stack_return_guard_page(th->pid,0);
+        protect_control_stack_guard_page(th->os_thread,1);
+        protect_control_stack_return_guard_page(th->os_thread,0);
         return 1;
     }
     else if (addr >= undefined_alien_address &&
@@ -932,7 +944,7 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
     /* restore the signal mask from the interrupted context before
      * calling into Lisp */
     if (context)
-        sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+        thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
     funcall0(SymbolFunction(SUB_GC));
 
@@ -997,7 +1009,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 
     sigemptyset(&new);
     sigaddset(&new, signal);
-    sigprocmask(SIG_BLOCK, &new, &old);
+    thread_sigmask(SIG_BLOCK, &new, &old);
 
     sigemptyset(&new);
     sigaddset_blockable(&new);
@@ -1023,7 +1035,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     oldhandler = data->interrupt_handlers[signal];
     data->interrupt_handlers[signal].c = handler;
 
-    sigprocmask(SIG_SETMASK, &old, 0);
+    thread_sigmask(SIG_SETMASK, &old, 0);
 
     FSHOW((stderr, "/leaving POSIX install_handler(%d, ..)\n", signal));
 

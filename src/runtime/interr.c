@@ -48,15 +48,9 @@ lose(char *fmt, ...)
 {
     va_list ap;
     fprintf(stderr, "fatal error encountered in SBCL pid %d",getpid());
-    /* freeze all the other threads, so we have a chance of debugging them 
-     */
-    if(all_threads) {
-	struct thread *th1,*th=arch_os_get_current_thread();
-	for_each_thread(th1) {
-	    if(th1!=th) kill(th1->pid,SIGSTOP);
-	}
-    }
-
+#if defined(LISP_FEATURE_SB_THREAD)
+    fprintf(stderr, "(tid %ld)",thread_self());
+#endif
     if (fmt) {
 	fprintf(stderr, ":\n");
 	va_start(ap, fmt);

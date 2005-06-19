@@ -53,6 +53,15 @@ typedef signed int s32;
 /* this is an integral type the same length as a machine pointer */
 typedef unsigned long pointer_sized_uint_t ;
 
+#include <sys/types.h>
+
+#if defined(LISP_FEATURE_SB_THREAD)
+#include <pthread.h>
+typedef pthread_t os_thread_t;
+#else
+typedef pid_t os_thread_t;
+#endif
+
 /* FIXME: we do things this way because of the alpha32 port.  once
    alpha64 has arrived, all this nastiness can go away */
 #if 64 == N_WORD_BITS

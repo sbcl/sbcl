@@ -80,16 +80,16 @@ validate(void)
 }
 
 void 
-protect_control_stack_guard_page(pid_t t_id, int protect_p) {
-    struct thread *th = find_thread_by_pid(t_id);
+protect_control_stack_guard_page(os_thread_t t_id, int protect_p) {
+    struct thread *th = find_thread_by_os_thread(t_id);
     os_protect(CONTROL_STACK_GUARD_PAGE(th),
 	       os_vm_page_size,protect_p ?
 	       (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
 }
 
 void 
-protect_control_stack_return_guard_page(pid_t t_id, int protect_p) {
-    struct thread *th = find_thread_by_pid(t_id);
+protect_control_stack_return_guard_page(os_thread_t t_id, int protect_p) {
+    struct thread *th = find_thread_by_os_thread(t_id);
     os_protect(CONTROL_STACK_RETURN_GUARD_PAGE(th),
 	       os_vm_page_size,protect_p ?
 	       (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);

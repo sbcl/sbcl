@@ -236,7 +236,7 @@ environment these hooks may run in any thread.")
 	    ;; of things and not a bug.
 	    (when (plusp freed)
 	      (incf *n-bytes-freed-or-purified* freed)))
-	  (sb!thread::reap-dead-threads)))
+          (sb!thread::reap-dead-threads)))
       ;; Outside the mutex, these may cause another GC. FIXME: it can
       ;; potentially exceed maximum interrupt nesting by triggering
       ;; GCs.

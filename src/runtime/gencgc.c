@@ -428,7 +428,7 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
  * e.g. boxed/unboxed, generation, ages; there may need to be many
  * allocation regions.
  *
- * Each allocation region may be start within a partly used page. Many
+ * Each allocation region may start within a partly used page. Many
  * features of memory use are noted on a page wise basis, e.g. the
  * generation; so if a region starts within an existing allocated page
  * it must be consistent with this page.
@@ -4113,8 +4113,8 @@ alloc(long nbytes)
 #ifdef LISP_FEATURE_SB_THREAD
 	if(!SymbolValue(PSEUDO_ATOMIC_ATOMIC,th)) {
 	    register u32 fs;
-	    fprintf(stderr, "fatal error in thread 0x%x, pid=%d\n",
-		    th,getpid());
+	    fprintf(stderr, "fatal error in thread 0x%x, tid=%ld\n",
+		    th,th->os_thread);
 	    __asm__("movl %fs,%0" : "=r" (fs)  : );
 	    fprintf(stderr, "fs is %x, th->tls_cookie=%x \n",
 		    debug_get_fs(),th->tls_cookie);
@@ -4152,7 +4152,7 @@ alloc(long nbytes)
             sigset_t new_mask,old_mask;
             sigemptyset(&new_mask);
             sigaddset_blockable(&new_mask);
-            sigprocmask(SIG_BLOCK,&new_mask,&old_mask);
+            thread_sigmask(SIG_BLOCK,&new_mask,&old_mask);
 
             if((!data->pending_handler) &&
                maybe_defer_handler(interrupt_maybe_gc_int,data,0,0,0)) {
@@ -4162,7 +4162,7 @@ alloc(long nbytes)
                 sigcopyset(&(data->pending_mask),&old_mask);
                 SetSymbolValue(NEED_TO_COLLECT_GARBAGE,T,thread);
             } else {
-                sigprocmask(SIG_SETMASK,&old_mask,0);
+                thread_sigmask(SIG_SETMASK,&old_mask,0);
             }
         }
     }

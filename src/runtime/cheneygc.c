@@ -140,7 +140,7 @@ collect_garbage(unsigned ignore)
      * from a signal handler (e.g. with the sigsegv gc_trigger stuff) */
     sigemptyset(&tmp);
     sigaddset_blockable(&tmp);
-    sigprocmask(SIG_BLOCK, &tmp, &old);
+    thread_sigmask(SIG_BLOCK, &tmp, &old);
 
     current_static_space_free_pointer =
 	(lispobj *) ((unsigned long)
@@ -259,7 +259,7 @@ collect_garbage(unsigned ignore)
 #endif
     zero_stack();
     set_auto_gc_trigger(size_retained+bytes_consed_between_gcs);
-    sigprocmask(SIG_SETMASK, &old, 0);
+    thread_sigmask(SIG_SETMASK, &old, 0);
 
 
 #ifdef PRINTNOISE

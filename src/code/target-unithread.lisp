@@ -19,8 +19,9 @@
 	       (* n sb!vm:n-word-bytes)))
 
 (defun current-thread-id ()
+  ;; FIXME: 32/64
   (sb!sys:sap-ref-32 (alien-sap (extern-alien "all_threads" (* t))) 
-	       (* sb!vm::thread-pid-slot sb!vm:n-word-bytes)))
+	       (* sb!vm::thread-os-thread-slot sb!vm:n-word-bytes)))
 
 (defun reap-dead-threads ())
 

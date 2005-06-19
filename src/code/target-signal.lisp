@@ -83,6 +83,14 @@
 ;;; SIGINT in --disable-debugger mode will cleanly terminate the system
 ;;; (by respecting the *DEBUGGER-HOOK* established in that mode).
 (defun sigint-%break (format-string &rest format-arguments)
+  #!+sb-thread
+  (let ((foreground-thread (sb!thread::foreground-thread)))
+    (if (eql foreground-thread (sb!thread:current-thread-id))
+        (apply #'%break 'sigint format-string format-arguments)
+        (sb!thread:interrupt-thread
+         foreground-thread
+         (lambda () (apply #'%break 'sigint format-string format-arguments)))))
+  #!-sb-thread
   (apply #'%break 'sigint format-string format-arguments))
 
 (eval-when (:compile-toplevel :execute)

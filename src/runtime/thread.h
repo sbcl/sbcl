@@ -34,7 +34,7 @@ union per_thread_data {
 
 extern struct thread *all_threads;
 extern int dynamic_values_bytes;
-extern struct thread *find_thread_by_pid(pid_t pid);
+extern struct thread *find_thread_by_os_thread(os_thread_t tid);
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define for_each_thread(th) for(th=all_threads;th;th=th->next)
@@ -107,19 +107,31 @@ static inline os_context_t *get_interrupt_context_for_thread(struct thread *th)
  * usually aren't by that time.  So, it's here instead.  Sorry */
 
 static inline struct thread *arch_os_get_current_thread() {
-#if defined(LISP_FEATURE_SB_THREAD) && defined (LISP_FEATURE_X86)
+#if defined(LISP_FEATURE_SB_THREAD)
+#if defined(LISP_FEATURE_X86)
     register struct thread *me=0;
     if(all_threads)
 	__asm__ __volatile__ ("movl %%fs:%c1,%0" : "=r" (me)
 		 : "i" (offsetof (struct thread,this)));
     return me;
 #else
-    return all_threads;
+    return pthread_getspecific(specials);
+#endif /* x86 */
+#else
+     return all_threads;
 #endif
 }
 
+#if defined(LISP_FEATURE_SB_THREAD)
+#define thread_self pthread_self
+#define thread_kill pthread_kill
+#define thread_sigmask pthread_sigmask
+#else
+#define thread_self getpid
+#define thread_kill kill
+#define thread_sigmask sigprocmask
+#endif
 
-int arch_os_thread_init(struct thread *thread);
 extern void create_initial_thread(lispobj);
 
 #endif /* _INCLUDE_THREAD_H_ */

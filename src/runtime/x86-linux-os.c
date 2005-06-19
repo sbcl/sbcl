@@ -78,7 +78,8 @@ int arch_os_thread_init(struct thread *thread) {
 	1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
     }; 
     int n;
-    get_spinlock(&modify_ldt_lock,thread);
+    /* thread->os_thread is not set yet*/
+    get_spinlock(&modify_ldt_lock,(int)thread);
     n=modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy);
     /* get next free ldt entry */
 
@@ -104,6 +105,7 @@ int arch_os_thread_init(struct thread *thread) {
     modify_ldt_lock=0;
 
     if(n<0) return 0;
+    pthread_setspecific(specials,thread);
 #endif
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     /* Signal handlers are run on the control stack, so if it is exhausted
@@ -113,6 +115,9 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_flags=0;
     sigstack.ss_size = 32*SIGSTKSZ;
     sigaltstack(&sigstack,0);
+    if(sigaltstack(&sigstack,0)<0) {
+        lose("Cannot sigaltstack: %s\n",strerror(errno));
+    }
 #endif
     return 1;
 }

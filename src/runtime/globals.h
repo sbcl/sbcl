@@ -24,6 +24,10 @@
 extern int foreign_function_call_active;
 extern boolean stop_the_world;
 
+#if defined(LISP_FEATURE_SB_THREAD)
+extern pthread_key_t specials;
+#endif
+
 extern lispobj *current_control_stack_pointer;
 extern lispobj *current_control_frame_pointer;
 # if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)

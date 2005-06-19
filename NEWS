@@ -1,7 +1,6 @@
 changes in sbcl-0.9.2 relative to sbcl-0.9.1:
   * numerous signal handling fixes to increase stability
   * Support for EUC-JP external format.  (thanks to NIIMI Satoshi)
-  * bug fix: interrupt-thread restores the eflags register on x86
   * minor incompatible change: we now correctly canonize default
     initargs, making them be a list of (INITARG INITFORM INITFUNCTION)
     as per the MOP, rather than the historical (INITARG INITFUNCTION
@@ -12,7 +11,6 @@ changes in sbcl-0.9.2 relative to sbcl-0.9.1:
   * TRUENAME and PROBE-FILE now correctly resolve symlinks even if the
     pathname is a directory pathname.
   * SB-SPROF now works (more) reliably on non-GENCGC platforms.
-  * fixed some lockups due to gc/thread interaction
   * dynamic space size on PPC has been increased to 768Mb. (thanks to
     Cyrus Harmon)
   * SB-MOP:ENSURE-CLASS-USING-CLASS now accepts a class as the
@@ -40,6 +38,12 @@ changes in sbcl-0.9.2 relative to sbcl-0.9.1:
   * contrib improvement: it's harder to cause SOCKET-CLOSE to close()
     the wrong file descriptor; implementation of SOCKET-OPEN-P.
     (thanks to Tony Martinez)
+  * threads
+    ** gcing a dead thread can no longer lead to lockups
+    ** threads block signals until they are set up properly
+    ** errno is no longer shared by threads
+    ** interrupt-thread restores the eflags register on x86
+    ** fixed some lockups due to gc/thread interaction
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** invalid dotted lists no longer raise a read error when 
        *READ-SUPPRESS* is T

@@ -152,10 +152,6 @@
 (test-interrupt #'loop-forever :quit)
 
 (let ((child (test-interrupt (lambda () (loop (sleep 2000))))))
-  ;; Interrupting a sleep form causes it to return early.  Welcome to Unix.
-  ;; Just to be sure our LOOP form works, let's check the child is still
-  ;; there
-  (assert (zerop (sb-unix:unix-kill child 0)))
   (terminate-thread child))
 		
 (let ((lock (make-mutex :name "loctite"))
@@ -186,6 +182,7 @@
 			(princ ".") (force-output)
 			(assert (zerop SB-KERNEL:*PSEUDO-ATOMIC-ATOMIC*)))))
   (terminate-thread c))
+(terpri)
 
 (defparameter *interrupt-count* 0)
 
@@ -232,11 +229,13 @@
    (when (and a-done b-done) (return))
    (sleep 1)))
 
+(terpri)
+
 (defun waste (&optional (n 100000))
   (loop repeat n do (make-string 16384)))
 
 (loop for i below 100 do
-      (format t "LOOP:~A~%" i)
+      (princ "!")
       (force-output)
       (sb-thread:make-thread
        #'(lambda ()
@@ -244,9 +243,11 @@
       (waste)
       (sb-ext:gc))
 
+(terpri)
+
 (defparameter *aaa* nil)
 (loop for i below 100 do
-      (format t "LOOP:~A~%" i)
+      (princ "!")
       (force-output)
       (sb-thread:make-thread
        #'(lambda ()
@@ -257,6 +258,58 @@
       (sb-ext:gc))
 
 (format t "~&gc test done~%")
+
+;; this used to deadlock on session-lock
+(sb-thread:make-thread (lambda () (sb-ext:gc)))
+;; expose thread creation races by exiting quickly
+(sb-thread:make-thread (lambda ()))
+
+(defun exercise-syscall (fn reference-errno)
+  (sb-thread:make-thread
+   (lambda ()
+     (loop do
+          (funcall fn)
+          (let ((errno (sb-unix::get-errno)))
+            (sleep (random 1.0))
+            (unless (eql errno reference-errno)
+              (format t "Got errno: ~A (~A) instead of ~A~%"
+                      errno
+                      (sb-unix::strerror)
+                      reference-errno)
+              (force-output)
+              (sb-ext:quit :unix-status 1)))))))
+
+(let* ((nanosleep-errno (progn
+                          (sb-unix:nanosleep -1 0)
+                          (sb-unix::get-errno)))
+       (open-errno (progn
+                     (open "no-such-file"
+                           :if-does-not-exist nil)
+                     (sb-unix::get-errno)))
+       (threads
+        (list
+         (exercise-syscall (lambda () (sb-unix:nanosleep -1 0)) nanosleep-errno)
+         (exercise-syscall (lambda () (open "no-such-file"
+                                            :if-does-not-exist nil))
+                           open-errno)
+         (sb-thread:make-thread (lambda () (loop (sb-ext:gc) (sleep 1)))))))
+  (sleep 10)
+  (princ "terminating threads")
+  (dolist (thread threads)
+    (sb-thread:terminate-thread thread)))
+
+(format t "~&errno test done~%")
+
+(loop repeat 100 do
+      (let ((thread (sb-thread:make-thread (lambda () (sleep 0.1)))))
+        (sb-thread:interrupt-thread
+         thread
+         (lambda ()
+           (assert (find-restart 'sb-thread:terminate-thread))))))
+
+(sb-ext:gc :full t)
+
+(format t "~&thread startup sigmask test done~%")
 
 #|  ;; a cll post from eric marsden
 | (defun crash ()

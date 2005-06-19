@@ -14,6 +14,7 @@
 
 #include "os.h"
 #include "signal.h"
+#include "thread.h"
 
 /* Do anything we need to do when starting up the runtime environment
  * on this architecture. */
@@ -30,6 +31,10 @@ extern void arch_remove_breakpoint(void *pc, unsigned long orig_inst);
 extern void arch_install_interrupt_handlers(void);
 extern void arch_do_displaced_inst(os_context_t *context,
 				   unsigned int orig_inst);
+
+extern int arch_os_thread_init(struct thread *thread);
+extern int arch_os_thread_cleanup(struct thread *thread);
+
 extern lispobj funcall0(lispobj function);
 extern lispobj funcall1(lispobj function, lispobj arg0);
 extern lispobj funcall2(lispobj function, lispobj arg0, lispobj arg1);

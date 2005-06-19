@@ -303,7 +303,7 @@
 #+sb-thread
 (defun thread-pids ()
   "Return a list of the pids for all threads"
-  (let ((offset (* 4 sb-vm::thread-pid-slot)))
+  (let ((offset (* 4 sb-vm::thread-os-thread-slot)))
     (sb-thread::mapcar-threads
      #'(lambda (sap) (sb-sys:sap-ref-32 sap offset)))))
 

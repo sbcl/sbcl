@@ -40,6 +40,4 @@ typedef int os_vm_prot_t;
 
 #define SIG_INTERRUPT_THREAD (SIGRTMIN)
 #define SIG_STOP_FOR_GC (SIGRTMIN+1)
-#define SIG_DEQUEUE (SIGRTMIN+2)
-#define SIG_THREAD_EXIT (SIGRTMIN+3)
 
