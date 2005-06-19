@@ -149,6 +149,15 @@
        (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)
        ,@body)))
 
+(defun align-csp (temp)
+  ;; is used for stack allocation of dynamic-extent objects
+  (let ((aligned (gen-label)))
+    (inst andi. temp csp-tn lowtag-mask)
+    (inst beq aligned)
+    (inst addi csp-tn csp-tn n-word-bytes)
+    (storew zero-tn csp-tn -1)
+    (emit-label aligned)))
+
 
 ;;;; Error Code
 (eval-when (:compile-toplevel :load-toplevel :execute)

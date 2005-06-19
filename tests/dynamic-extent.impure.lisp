@@ -121,17 +121,20 @@
       (funcall thunk))
     (assert (< (- (get-bytes-consed) before) times))))
 
-#+(or x86 x86-64 alpha)
+#+(or x86 x86-64 alpha ppc)
 (progn
   (assert-no-consing (dxlength 1 2 3))
   (assert-no-consing (dxlength t t t t t t))
   (assert-no-consing (dxlength))
   (assert-no-consing (dxcaller 1 2 3 4 5 6 7))
+  #-ppc
   (assert-no-consing (test-nip-values))
+  #-ppc
   (assert-no-consing (test-let-var-subst1 17))
+  #-ppc
   (assert-no-consing (test-let-var-subst2 17))
-  (assert-no-consing (test-lvar-subst 11))
-  )
+  #-ppc
+  (assert-no-consing (test-lvar-subst 11)))
 
 
 ;;; Bugs found by Paul F. Dietz

@@ -1072,6 +1072,9 @@ default-value-8
   (:translate %more-arg))
 
 ;;; Turn more arg (context, count) into a list.
+(defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))
+  t)
+
 (define-vop (listify-rest-args)
   (:args (context-arg :target context :scs (descriptor-reg))
 	 (count-arg :target count :scs (any-reg)))
@@ -1084,46 +1087,52 @@ default-value-8
   (:results (result :scs (descriptor-reg)))
   (:translate %listify-rest-args)
   (:policy :safe)
+  (:node-var node)
   (:generator 20
-    (move context context-arg)
-    (move count count-arg)
-    ;; Check to see if there are any arguments.
-    (inst cmpwi count 0)
-    (move result null-tn)
-    (inst beq done)
+    (let* ((enter (gen-label))
+	   (loop (gen-label))
+	   (done (gen-label))
+	   (dx-p (node-stack-allocate-p node))
+	   (alloc-area-tn (if dx-p csp-tn alloc-tn)))
+      (move context context-arg)
+      (move count count-arg)
+      ;; Check to see if there are any arguments.
+      (inst cmpwi count 0)
+      (move result null-tn)
+      (inst beq done)
 
     ;; We need to do this atomically.
     (pseudo-atomic (pa-flag)
-      (assemble ()
-	;; Allocate a cons (2 words) for each item.
-	(inst clrrwi result alloc-tn n-lowtag-bits)
-	(inst ori result result list-pointer-lowtag)
-	(move dst result)
-	(inst slwi temp count 1)
-	(inst add alloc-tn alloc-tn temp)
-	(inst b enter)
+      (when dx-p
+	(align-csp temp))
+      ;; Allocate a cons (2 words) for each item.
+      (inst clrrwi result alloc-area-tn n-lowtag-bits)
+      (inst ori result result list-pointer-lowtag)
+      (move dst result)
+      (inst slwi temp count 1)
+      (inst add alloc-area-tn alloc-area-tn temp)
+      (inst b enter)
 
-	;; Compute the next cons and store it in the current one.
-	LOOP
-	(inst addi dst dst (* 2 n-word-bytes))
-	(storew dst dst -1 list-pointer-lowtag)
+      ;; Compute the next cons and store it in the current one.
+      (emit-label loop)
+      (inst addi dst dst (* 2 n-word-bytes))
+      (storew dst dst -1 list-pointer-lowtag)
 
-	;; Grab one value.
-	ENTER
-	(loadw temp context)
-	(inst addi context context n-word-bytes)
+      ;; Grab one value.
+      (emit-label enter)
+      (loadw temp context)
+      (inst addi context context n-word-bytes)
+      
+      ;; Dec count, and if != zero, go back for more.
+      (inst addic. count count (- (fixnumize 1)))
+      ;; Store the value into the car of the current cons (in the delay
+      ;; slot).
+      (storew temp dst 0 list-pointer-lowtag)
+      (inst bgt loop)
 
-	;; Dec count, and if != zero, go back for more.
-	(inst addic. count count (- (fixnumize 1)))
-	;; Store the value into the car of the current cons (in the delay
-	;; slot).
-	(storew temp dst 0 list-pointer-lowtag)
-	(inst bgt loop)
-
-
-	;; NIL out the last cons.
-	(storew null-tn dst 1 list-pointer-lowtag)))
-    DONE))
+      ;; NIL out the last cons.
+      (storew null-tn dst 1 list-pointer-lowtag))
+    (emit-label done))))
 
 
 ;;; Return the location and size of the more arg glob created by
