@@ -1,0 +1,172 @@
+@node Foreign Linkage
+@comment  node-name,  next,  previous,  up
+@chapter Foreign Linkage
+
+@menu
+* Linkage-table::               
+* Lazy Alien Resolution::       
+* Callbacks::                   
+@end menu
+
+@node Linkage-table
+@comment  node-name,  next,  previous,  up
+@section Linkage-table
+
+Linkage-table allows saving cores with foreign code loaded, and is
+also utilized to allow references to as-of-yet unknown aliens.
+@xref{Lazy Alien Resolution}.
+
+The SBCL implementation is somewhat simplified from the CMUCL one by
+Timothy Moore, but the basic idea and mechanism remains identical:
+instead of having addresses from @code{dlsym(3)} in the core, we have
+addresses to an mmapped memory area (@code{LINKAGE_TABLE_SPACE}) that
+is initialized at startup to contain jumps & references to the correct
+addresses, based on information stored on the lisp side in
+@code{*LINKAGE-INFO*}.
+
+@subsection Differences to CMUCL 
+
+CMUCL does lazy linkage for code, keeps all foreign addresses in the
+linkage-table, and handles the initialization from C. We do eager
+linkage for everything, maintain a separate
+@code{*STATIC-FOREIGN-SYMBOLS*} just like on non-linkage-table ports
+(this allows more code sharing between ports, makes thread-safety
+easier to achieve, and cuts one jump's worth of overhead from stuff
+like closure_tramp), and do the initialization from lisp.
+
+@subsection Nitty Gritty Details 
+
+Symbols in @code{*STATIC-FOREIGN-SYMBOLS*} are handled the old
+fashioned way: linkage-table is only used for symbols resolved with
+@code{dlsym(3)}.
+
+On system startup @code{FOREIGN-REINIT} iterates through the
+@code{*LINKAGE-INFO*}, which is a hash-table mapping dynamic foreign
+names to @code{LINKAGE-INFO} structures, and calls
+@code{arch_write_linkage_table_jmp}@code{/ref} to write the
+appropriate entries to the linkage-table.
+
+When a foreign symbol is referred to, it is first looked for in the
+@code{*STATIC-FOREIGN-SYMBOLS*}. If not found,
+@code{ENSURE-FOREIGN-LINKAGE} is called, which looks for the
+corresponding entry in @code{*LINKAGE-INFO*}, creating one and writing
+the appropriate entry in the linkage table if necessary.
+
+@code{FOREIGN-SYMBOL-ADDRESS} and
+@code{FOREIGN-SYMBOL-ADDRESS-AS-INTEGER} take an optional datap
+argument, used to indicate that the symbol refers to a variable. In
+similar fashion there is a new kind of fixup and a new VOP:
+@code{:FOREIGN-DATAREF} and @code{FOREIGN-SYMBOL-DATAREF-ADDRESS}. The
+@code{DATAP} argument is automagically provided by the alien interface
+for normal definitions, but is really needed only for dynamic foreign
+variables. For those it indicates the need for the indirection either
+within a conditional branch in @code{FOREIGN-SYMBOL-ADDRESS}, or via
+@code{:FOREIGN-DATAREF} fixup and
+@code{FOREIGN-SYMBOL-DATAREF-ADDRESS} VOP: "this address holds the
+address of the foreign variable, not the variable itself". Within SBCL
+itself (in the fixups manifest in various VOPs) this fixup type is
+never used, as all foreign symbols used internally are static.
+
+One thing worth noting is that @code{FOREIGN-SYMBOL-ADDRESS} and
+friends now have the potential side-effect of entering information in
+@code{*LINKAGE-INFO*} and the linkage-table proper: hence it's important to
+use the correct datap argument even if calling these just to "check if
+it's there" (like SB-POSIX does).
+
+@subsection Porting
+
+@subsubsection Porting to new operating systems 
+
+Find a memory area for the linkage-table, and add it for the OS in
+@file{src/compiler/target/parms.lisp} by defining
+@code{SB!VM:LINKAGE-TABLE-SPACE-START} and
+@code{SB!VM:LINKAGE-TABLE-SPACE-END}. See existing ports and CMUCL for
+examples.
+
+@subsubsection Porting to new architextures 
+
+Write @code{arch_write_linkage_table_jmp} and  @code{arch_write_linkage_table_ref}.
+
+Write @code{FOREIGN-SYMBOL-DATAREF} VOP.
+
+Define correct @code{SB!VM:LINKAGE-TABLE-ENTRY-SIZE} in
+@file{src/compiler/target/parms.lisp}.
+
+@page
+@node Lazy Alien Resolution
+@comment  node-name,  next,  previous,  up
+@section Lazy Alien Resolution
+
+On linkage-table ports SBCL is able to deal with forward-references to
+aliens -- which is to say, compile and load code referring to aliens
+before the shared object containing the alien in question has been
+loaded.
+
+This is handled by @code{GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS}, which
+first tries to resolve the address in the loaded shared objects, but
+failing that records the alien as undefined and returns the address of
+a read/write/execute protected guard page for variables, and address
+of @code{undefined_alien_function} for routines. These are in turn
+responsible for catching attempts to access the undefined alien, and
+signalling the appropriate error.
+
+These placeholder addresses get recorded in the linkage-table.
+
+When new shared objects are loaded @code{UPDATE-LINKAGE-TABLE} is
+called, which in turn attempts to resolve all currently undefined
+aliens, and registers the correct addresses for them in the
+linkage-table.
+
+@page
+@node Callbacks
+@comment  node-name,  next,  previous,  up
+@section Callbacks
+
+SBCL is capable of providing C with linkage to Lisp -- the upshot of which is that
+C-functions can call Lisp functions thru what look like function pointers to C.
+
+These ``function pointers'' are called Alien Callbacks. An alien
+callback sequence has 4 parts / stages / bounces:
+
+@itemize
+@item Assembler Wrapper
+
+saves the arguments from the C-call according to the alien-fun-type of
+the callback, and calls #'ENTER-ALIEN-CALLBACK with the index
+indentifying the callback, a pointer to the arguments copied on the
+stack and a pointer to return value storage. When control returns to
+the wrapper it returns the value to C. There is one assembler wrapper
+per callback.[1] The SAP to the wrapper code vector is what is passed
+to foreign code as a callback.
+
+The Assembler Wrapper is generated by
+@code{ALIEN-CALLBACK-ASSEMBLER-WRAPPER}.
+
+@item #'ENTER-ALIEN-CALLBACK
+
+pulls the Lisp Trampoline for the given index, and calls it with the
+argument and result pointers.
+
+@item Lisp Trampoline
+
+calls the Lisp Wrapper with the argument and result pointers, and the
+function designator for the callback. There is one lisp trampoline per
+callback.
+
+@item Lisp Wrapper
+
+parses the arguments from stack, calls the actual callback with the
+arguments, and saves the return value at the result pointer. The lisp
+wrapper is shared between all the callbacks having the same same
+alien-fun-type.
+
+@end itemize
+
+[1] As assembler wrappers need to be allocated in static addresses and
+are (in the current scheme of things) never released it might be worth
+it to split it into two parts: per-callback trampoline that pushes the
+index of the lisp trampoline on the stack, and jumps to the
+appropriate assembler wrapper. The assembler wrapper could then be
+shared between all the callbacks with the same alien-fun-type. This
+would amortize most of the static allocation costs between multiple
+callbacks.
