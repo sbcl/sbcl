@@ -726,37 +726,7 @@
 
 ;;;; ALIEN CALLBACKS
 ;;;;
-;;;; An alien callback sequence has 4 parts / stages / bounces:
-;;;;
-;;;; * ASSEMBLER WRAPPER that saves the arguments from the C-call
-;;;;   according to the alien-fun-type of the callback, and calls
-;;;;   #'ENTER-ALIEN-CALLBACK with the index indentifying the
-;;;;   callback, a pointer to the arguments copied on the stack and a
-;;;;   pointer to return value storage. When control returns to the
-;;;;   wrapper it returns the value to C. There is one assembler
-;;;;   wrapper per callback.[1] The SAP to the wrapper code vector 
-;;;;   is what is passed to foreign code as a callback.
-;;;;
-;;;; * #'ENTER-ALIEN-CALLBACK pulls the LISP TRAMPOLINE for the given
-;;;;   index, and calls it with the argument and result pointers.
-;;;; 
-;;;; * LISP TRAMPOLINE that calls the LISP WRAPPER with the argument
-;;;;   and result pointers, and the function designator for the
-;;;;   callback. There is one lisp trampoline per callback.
-;;;;
-;;;; * LISP WRAPPER parses the arguments from stack, calls the actual
-;;;;   callback with the arguments, and saves the return value at the
-;;;;   result pointer. The lisp wrapper is shared between all the
-;;;;   callbacks having the same same alien-fun-type.
-;;;;
-;;;; [1] As assembler wrappers need to be allocated in static
-;;;; addresses and are (in the current scheme of things) never
-;;;; released it might be worth it to split it into two parts:
-;;;; per-callback trampoline that pushes the index of the lisp
-;;;; trampoline on the stack, and jumps to the appropriate assembler
-;;;; wrapper. The assembler wrapper could then be shared between all
-;;;; the callbacks with the same alien-fun-type. This would amortize
-;;;; most of the static allocation costs between multiple callbacks.
+;;;; See "Foreign Linkage / Callbacks" in the SBCL Internals manual.
 
 (defvar *alien-callback-info* nil
   "Maps SAPs to corresponding CALLBACK-INFO structures: contains all the
