@@ -213,9 +213,11 @@ elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
     # versions 2.3.1 and 2.3.2
     #
     # FIXME: integrate to grovel-features., maypahps
+    printf ' :stack-allocatable-closures' >> $ltf
     $GNUMAKE -C tools-for-build where-is-mcontext -I src/runtime
     tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h
 elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
+    printf ' :stack-allocatable-closures' >> $ltf
     # We provide a dlopen shim, so a little lie won't hurt
     printf " :os-provides-dlopen :linkage-table" >> $ltf
     # The default stack ulimit under darwin is too small to run PURIFY.

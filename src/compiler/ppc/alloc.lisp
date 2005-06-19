@@ -1,11 +1,21 @@
-;;;
-;;; Written by William Lott.
-;;; 
+;;;; allocation VOPs for the Alpha port
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
-
 
 ;;;; LIST and LIST*
+(defoptimizer (list stack-allocate-result) ((&rest args))
+  (not (null args)))
+(defoptimizer (list* stack-allocate-result) ((&rest args))
+  (not (null (rest args))))
 
 (define-vop (list-or-list*)
   (:args (things :more t))
@@ -18,6 +28,7 @@
   (:results (result :scs (descriptor-reg)))
   (:variant-vars star)
   (:policy :safe)
+  (:node-var node)
   (:generator 0
     (cond ((zerop num)
 	   (move result null-tn))
@@ -33,11 +44,17 @@
 		       (control-stack
 			(load-stack-tn temp ,tn)
 			temp)))))
-	     (let* ((cons-cells (if star (1- num) num))
+	     (let* ((dx-p (node-stack-allocate-p node))
+		    (cons-cells (if star (1- num) num))
 		    (alloc (* (pad-data-block cons-size) cons-cells)))
-	       (pseudo-atomic (pa-flag :extra alloc)
-		 (inst clrrwi res alloc-tn n-lowtag-bits)
-		 (inst ori res res list-pointer-lowtag)
+	       (pseudo-atomic (pa-flag :extra (if dx-p 0 alloc))
+		 (let ((allocation-area-tn (if dx-p csp-tn alloc-tn)))
+		   (when dx-p
+		     (align-csp res))
+		   (inst clrrwi res allocation-area-tn n-lowtag-bits)
+		   (inst ori res res list-pointer-lowtag)
+		   (when dx-p
+		     (inst addi csp-tn csp-tn alloc)))
 		 (move ptr res)
 		 (dotimes (i (1- cons-cells))
 		   (storew (maybe-load (tn-ref-tn things)) ptr
@@ -106,7 +123,6 @@
       (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
       (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))
 
-
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
   (:info length stack-allocate-p)
@@ -114,10 +130,18 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:results (result :scs (descriptor-reg)))
+  (:node-var node)
   (:generator 10
-    (let ((size (+ length closure-info-offset)))
-      (pseudo-atomic (pa-flag :extra (pad-data-block size))
-	(inst clrrwi. result alloc-tn n-lowtag-bits)
+    (let* ((size (+ length closure-info-offset))
+	   (alloc-size (pad-data-block size))
+	   (dx-p (node-stack-allocate-p node))
+	   (allocation-area-tn (if dx-p csp-tn alloc-tn)))
+      (pseudo-atomic (pa-flag :extra (if dx-p 0 alloc-size))
+	;; no need to align CSP for DX: FUN-POINTER-LOWTAG already has
+	;; the corresponding bit set
+	(inst clrrwi. result allocation-area-tn n-lowtag-bits)
+	(when dx-p
+	  (inst addi csp-tn alloc-size))
 	(inst ori result result fun-pointer-lowtag)
 	(inst lr temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag))
 	(storew temp result 0 fun-pointer-lowtag)))
