@@ -35,6 +35,8 @@
 ;;;     section.
 ;;;   * OTHER-IMMEDIATE-0-LOWTAG are spaced 4 apart: various code wants to 
 ;;;     iterate through these
+;;;   * Allocation code on Alpha wants lowtags for heap-allocated
+;;;     objects to be odd.
 ;;; (These are just the ones we know about as of sbcl-0.7.1.22. There
 ;;; might easily be more, since these values have stayed highly
 ;;; constrained for more than a decade, an inviting target for

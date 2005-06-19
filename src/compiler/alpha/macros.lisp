@@ -177,6 +177,15 @@
        (inst li (logior (ash (1- ,size) n-widetag-bits) ,widetag) ,temp-tn)
        (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)
        ,@body)))
+
+(defun align-csp (temp)
+  ;; is used for stack allocation of dynamic-extent objects
+  (let ((aligned (gen-label)))
+    (inst and csp-tn lowtag-mask temp)
+    (inst beq temp aligned)
+    (inst addq csp-tn n-word-bytes csp-tn)
+    (storew zero-tn csp-tn -1)
+    (emit-label aligned)))
 
 ;;;; error code
 (eval-when (:compile-toplevel :load-toplevel :execute) 

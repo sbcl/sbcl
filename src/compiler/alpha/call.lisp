@@ -1106,6 +1106,9 @@ default-value-8
 (define-full-reffer more-arg * 0 0 (descriptor-reg any-reg) * %more-arg)
 
 ;;; Turn &MORE arg (context, count) into a list.
+(defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))
+  t)
+
 (define-vop (listify-rest-args)
   (:args (context-arg :target context :scs (descriptor-reg))
 	 (count-arg :target count :scs (any-reg)))
@@ -1116,10 +1119,13 @@ default-value-8
   (:results (result :scs (descriptor-reg)))
   (:translate %listify-rest-args)
   (:policy :safe)
+  (:node-var node)
   (:generator 20
-    (let ((enter (gen-label))
-	  (loop (gen-label))
-	  (done (gen-label)))
+    (let* ((enter (gen-label))
+           (loop (gen-label))
+           (done (gen-label))
+           (dx-p (node-stack-allocate-p node))
+           (alloc-area-tn (if dx-p csp-tn alloc-tn)))
       (move context-arg context)
       (move count-arg count)
       ;; Check to see if there are any arguments.
@@ -1128,11 +1134,13 @@ default-value-8
 
       ;; We need to do this atomically.
       (pseudo-atomic ()
+        ;; align CSP
+        (when dx-p (align-csp temp))
 	;; Allocate a cons (2 words) for each item.
-	(inst bis alloc-tn list-pointer-lowtag result)
+	(inst bis alloc-area-tn list-pointer-lowtag result)
 	(move result dst)
 	(inst sll count 1 temp)
-	(inst addq alloc-tn temp alloc-tn)
+	(inst addq alloc-area-tn temp alloc-area-tn)
 	(inst br zero-tn enter)
 
 	;; Store the current cons in the cdr of the previous cons.

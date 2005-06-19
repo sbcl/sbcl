@@ -39,8 +39,13 @@
 (defun-with-dx dxcaller (&rest rest)
   (declare (dynamic-extent rest))
   (callee rest))
-
 (assert (= (dxcaller 1 2 3 4 5 6 7) 22))
+
+(defun-with-dx dxcaller-align-1 (x &rest rest)
+  (declare (dynamic-extent rest))
+  (+ x (callee rest)))
+(assert (= (dxcaller-align-1 17 1 2 3 4 5 6 7) 39))
+(assert (= (dxcaller-align-1 17 1 2 3 4 5 6 7 8) 40))
 
 ;;; %NIP-VALUES
 (defun-with-dx test-nip-values ()
@@ -90,6 +95,22 @@
       (opaque-identity :bar)
       z)))
 
+;;; alignment
+(defvar *x*)
+(defun-with-dx test-alignment-dx-list (form)
+  (multiple-value-prog1 (eval form)
+    (let ((l (list 1 2 3 4)))
+      (declare (dynamic-extent l))
+      (setq *x* (copy-list l)))))
+(dotimes (n 64)
+  (let* ((res (loop for i below n collect i))
+         (form `(values ,@res)))
+    (assert (equal (multiple-value-list (test-alignment-dx-list form)) res))
+    (assert (equal *x* '(1 2 3 4)))))
+
+
+
+
 (defmacro assert-no-consing (form &optional times)
   `(%assert-no-consing (lambda () ,form ,times)))
 (defun %assert-no-consing (thunk &optional times)
@@ -100,7 +121,7 @@
       (funcall thunk))
     (assert (< (- (get-bytes-consed) before) times))))
 
-#+(or x86 x86-64)
+#+(or x86 x86-64 alpha)
 (progn
   (assert-no-consing (dxlength 1 2 3))
   (assert-no-consing (dxlength t t t t t t))

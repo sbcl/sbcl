@@ -236,19 +236,12 @@
     (let ((info (make-ir2-lvar *backend-t-primitive-type*)))
       (setf (ir2-lvar-kind info) :delayed)
       (setf (lvar-info leaves) info)
-      #!+stack-grows-upward-not-downward
-      (let ((tn (make-normal-tn *backend-t-primitive-type*)))
-        (setf (ir2-lvar-locs info) (list tn)))
-      #!+stack-grows-downward-not-upward
       (setf (ir2-lvar-stack-pointer info)
             (make-stack-pointer-tn)))))
 
 (defoptimizer (%allocate-closures ir2-convert) ((leaves) call 2block)
-  (let ((dx-p (lvar-dynamic-extent leaves))
-        #!+stack-grows-upward-not-downward
-        (first-closure nil))
+  (let ((dx-p (lvar-dynamic-extent leaves)))
     (collect ((delayed))
-      #!+stack-grows-downward-not-upward
       (when dx-p
         (vop current-stack-pointer call 2block
              (ir2-lvar-stack-pointer (lvar-info leaves))))
@@ -263,9 +256,6 @@
                 (leaf-dx-p (and dx-p (leaf-dynamic-extent leaf))))
             (vop make-closure call 2block entry (length closure)
                  leaf-dx-p tn)
-            #!+stack-grows-upward-not-downward
-            (when (and (not first-closure) leaf-dx-p)
-              (setq first-closure tn))
             (loop for what in closure and n from 0 do
                   (unless (and (lambda-var-p what)
                                (null (leaf-refs what)))
@@ -282,10 +272,6 @@
                              tn
                              (find-in-physenv what this-env)
                              n)))))))
-      #!+stack-grows-upward-not-downward
-      (when dx-p
-        (emit-move call 2block first-closure
-                   (first (ir2-lvar-locs (lvar-info leaves)))))
       (loop for (tn what n) in (delayed)
             do (vop closure-init call 2block
                     tn what n))))
@@ -681,7 +667,6 @@
 		 (r-refs (reference-tn-list results t)))
 	    (aver (= (length info-args)
 		     (template-info-arg-count template)))
-            #!+stack-grows-downward-not-upward
             (when (and lvar (lvar-dynamic-extent lvar))
               (vop current-stack-pointer call block
                    (ir2-lvar-stack-pointer (lvar-info lvar))))
@@ -1345,12 +1330,8 @@
            (vop reset-stack-pointer node block
                 (first (ir2-lvar-locs 2lvar))))
           ((lvar-dynamic-extent lvar)
-           #!+stack-grows-downward-not-upward
            (vop reset-stack-pointer node block
-                (ir2-lvar-stack-pointer 2lvar))
-           #!-stack-grows-downward-not-upward
-           (vop %%pop-dx node block
-                (first (ir2-lvar-locs 2lvar))))
+                (ir2-lvar-stack-pointer 2lvar)))
           (t (bug "Trying to pop a not stack-allocated LVAR ~S."
                   lvar)))))
 
@@ -1382,21 +1363,11 @@
                    (nipped
                     (first (ir2-lvar-locs 2first))
                     (reference-tn-list moved-tns nil))
-                   ((reference-tn-list moved-tns t))))
-           #!-stack-grows-downward-not-upward
-           (nip-unaligned (nipped)
-             (vop* %%nip-dx node block
-                   (nipped
-                    (first (ir2-lvar-locs 2first))
-                    (reference-tn-list moved-tns nil))
                    ((reference-tn-list moved-tns t)))))
       (cond ((eq (ir2-lvar-kind 2after) :unknown)
              (nip-aligned (first (ir2-lvar-locs 2after))))
             ((lvar-dynamic-extent after)
-             #!+stack-grows-downward-not-upward
-             (nip-aligned (ir2-lvar-stack-pointer 2after))
-             #!-stack-grows-downward-not-upward
-             (nip-unaligned (ir2-lvar-stack-pointer 2after)))
+             (nip-aligned (ir2-lvar-stack-pointer 2after)))
             (t
              (bug "Trying to nip a not stack-allocated LVAR ~S." after))))))
 
@@ -1665,7 +1636,6 @@
 		       (res (lvar-result-tns
 			     lvar
 			     (list (primitive-type (specifier-type 'list))))))
-                  #!+stack-grows-downward-not-upward
                   (when (and lvar (lvar-dynamic-extent lvar))
                     (vop current-stack-pointer node block
                          (ir2-lvar-stack-pointer (lvar-info lvar))))

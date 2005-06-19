@@ -215,13 +215,7 @@
   ;; these TNs primitive type is only based on the proven type
   ;; information.
   (locs nil :type list)
-  #!+stack-grows-downward-not-upward
   (stack-pointer nil :type (or tn null)))
-;; For upward growing stack start of stack block and start of object
-;; differ only by lowtag.
-#!-stack-grows-downward-not-upward
-(defmacro ir2-lvar-stack-pointer (2lvar)
-  `(first (ir2-lvar-locs ,2lvar)))
 
 (defprinter (ir2-lvar)
   kind

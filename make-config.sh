@@ -234,6 +234,8 @@ elif [ "$sbcl_arch" = "sparc" ]; then
     if [ "$sbcl_os" = "sunos" ] || [ "$sbcl_os" = "linux" ]; then
 	printf ' :linkage-table' >> $ltf
     fi
+elif [ "$sbcl_arch" = "alpha" ]; then
+    printf ' :stack-allocatable-closures' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null

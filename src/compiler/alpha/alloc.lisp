@@ -12,6 +12,10 @@
 (in-package "SB!VM")
 
 ;;;; LIST and LIST*
+(defoptimizer (list stack-allocate-result) ((&rest args))
+  (not (null args)))
+(defoptimizer (list* stack-allocate-result) ((&rest args))
+  (not (null (rest args))))
 
 (define-vop (list-or-list*)
   (:args (things :more t))
@@ -23,6 +27,7 @@
   (:results (result :scs (descriptor-reg)))
   (:variant-vars star)
   (:policy :safe)
+  (:node-var node)
   (:generator 0
     (cond ((zerop num)
 	   (move null-tn result))
@@ -40,10 +45,16 @@
 			     (load-stack-tn temp ,tn)
 			     temp))))
 		     (storew reg ,list ,slot list-pointer-lowtag))))
-	     (let ((cons-cells (if star (1- num) num)))
-	       (pseudo-atomic (:extra (* (pad-data-block cons-size)
-					 cons-cells))
-		 (inst bis alloc-tn list-pointer-lowtag res)
+	     (let* ((dx-p (awhen (sb!c::node-lvar node) (sb!c::lvar-dynamic-extent it)))
+                    (cons-cells (if star (1- num) num))
+                    (space (* (pad-data-block cons-size) cons-cells)))
+	       (pseudo-atomic (:extra (if dx-p 0 space))
+                 (cond (dx-p
+                        (align-csp res)
+                        (inst bis csp-tn list-pointer-lowtag res)
+                        (inst lda csp-tn space csp-tn))
+                       (t
+                        (inst bis alloc-tn list-pointer-lowtag res)))
 		 (move res ptr)
 		 (dotimes (i (1- cons-cells))
 		   (store-car (tn-ref-tn things) ptr)
@@ -117,13 +128,22 @@
   (:ignore stack-allocate-p)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (descriptor-reg)))
+  (:node-var node)
   (:generator 10
-    (let ((size (+ length closure-info-offset)))
+    (let* ((size (+ length closure-info-offset))
+           (alloc-size (pad-data-block size))
+           (dx-p (node-stack-allocate-p node)))
       (inst li
 	    (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
 	    temp)
-      (pseudo-atomic (:extra (pad-data-block size))
-	(inst bis alloc-tn fun-pointer-lowtag result)
+      (pseudo-atomic (:extra (if dx-p 0 alloc-size))
+        (cond (dx-p
+               ;; no need to align CSP: FUN-POINTER-LOWTAG already has
+               ;; the corresponding bit set
+               (inst bis csp-tn fun-pointer-lowtag result)
+               (inst lda csp-tn alloc-size csp-tn))
+              (t
+               (inst bis alloc-tn fun-pointer-lowtag result)))
 	(storew temp result 0 fun-pointer-lowtag))
       (storew function result closure-fun-slot fun-pointer-lowtag))))
 

@@ -100,7 +100,6 @@
       (setf (ir2-lvar-kind info) :delayed))
      (t (let ((tn (make-normal-tn (ir2-lvar-primitive-type info))))
           (setf (ir2-lvar-locs info) (list tn))
-          #!+stack-grows-downward-not-upward
           (when (lvar-dynamic-extent lvar)
             (setf (ir2-lvar-stack-pointer info)
                   (make-stack-pointer-tn)))))))
@@ -230,7 +229,6 @@
     (setf (lvar-info lvar) info)
     (when (lvar-dynamic-extent lvar)
       (aver (proper-list-of-length-p types 1))
-      #!+stack-grows-downward-not-upward
       (setf (ir2-lvar-stack-pointer info)
             (make-stack-pointer-tn))))
   (ltn-annotate-casts lvar)
