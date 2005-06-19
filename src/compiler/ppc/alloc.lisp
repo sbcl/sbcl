@@ -1,4 +1,4 @@
-;;;; allocation VOPs for the Alpha port
+;;;; allocation VOPs
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
