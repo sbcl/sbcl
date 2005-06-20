@@ -195,7 +195,10 @@
        (barf ":OPTIONAL ~S has an ENTRY-FUN." functional))
      (let ((ef (lambda-optional-dispatch functional)))
        (check-fun-reached ef functional)
-       (unless (or (member functional (optional-dispatch-entry-points ef))
+       (unless (or (member functional (optional-dispatch-entry-points ef)
+                           :key (lambda (ep)
+                                  (when (promise-ready-p ep)
+                                    (force ep))))
 		   (eq functional (optional-dispatch-more-entry ef))
 		   (eq functional (optional-dispatch-main-entry ef)))
 	 (barf ":OPTIONAL ~S is not an e-p for its OPTIONAL-DISPATCH ~S."
@@ -238,7 +241,8 @@
 	 (barf "HOME in ~S should be ~S." var functional))))
     (optional-dispatch
      (dolist (ep (optional-dispatch-entry-points functional))
-       (check-fun-reached ep functional))
+       (when (promise-ready-p ep)
+         (check-fun-reached (force ep) functional)))
      (let ((more (optional-dispatch-more-entry functional)))
        (when more (check-fun-reached more functional)))
      (check-fun-reached (optional-dispatch-main-entry functional)
