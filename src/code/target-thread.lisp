@@ -30,14 +30,18 @@
 
 (defun get-spinlock (lock offset new-value)
   (declare (optimize (speed 3) (safety 0)))
+  ;; %instance-set-conditional can test for 0 (which is a fixnum) and
+  ;; store any value
   (loop until
-	(eql (sb!vm::%instance-set-conditional lock offset 0 new-value) 0)))
+       (eql (sb!vm::%instance-set-conditional lock offset 0 new-value) 0)))
 
-;; this should do nothing if we didn't own the lock, so safe to use in
-;; unwind-protect cleanups when lock acquisition failed for some reason
-(defun release-spinlock (lock offset our-value)
+(defun release-spinlock (lock offset)
   (declare (optimize (speed 3) (safety 0)))
-  (sb!vm::%instance-set-conditional lock offset our-value 0))
+  ;; %instance-set-conditional cannot compare arbitrary objects
+  ;; meaningfully, so 
+  ;; (sb!vm::%instance-set-conditional lock offset our-value 0)
+  ;; does not work for bignum thread ids.
+  (sb!vm::%instance-set lock offset 0))
 
 (defmacro with-spinlock ((queue) &body body)
   (with-unique-names (pid)
@@ -46,7 +50,7 @@
 	    (progn
 	      (get-spinlock ,queue 2 ,pid)
 	      ,@body)
-	 (release-spinlock ,queue 2 ,pid)))))
+	 (release-spinlock ,queue 2)))))
 
 
 ;;;; the higher-level locking operations are based on waitqueues

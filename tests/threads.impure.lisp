@@ -66,6 +66,14 @@
   (assert (eql (mutex-lock l) 0)  nil "6")
   (describe l))
 
+(let ((l (make-waitqueue :name "spinlock"))
+      (p (current-thread-id)))
+  (assert (eql (waitqueue-lock l) 0) nil "1")
+  (with-spinlock (l)
+    (assert (eql (waitqueue-lock l) p) nil "2"))
+  (assert (eql (waitqueue-lock l) 0) nil "3")
+  (describe l))
+
 ;; test that SLEEP actually sleeps for at least the given time, even
 ;; if interrupted by another thread exiting/a gc/anything
 (let ((start-time (get-universal-time)))
