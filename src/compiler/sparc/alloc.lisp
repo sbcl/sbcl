@@ -12,6 +12,10 @@
 (in-package "SB!VM")
 
 ;;;; LIST and LIST*
+(defoptimizer (list stack-allocate-result) ((&rest args))
+  (not (null args)))
+(defoptimizer (list* stack-allocate-result) ((&rest args))
+  (not (null (rest args))))
 
 (define-vop (list-or-list*)
   (:args (things :more t))
@@ -23,6 +27,7 @@
   (:results (result :scs (descriptor-reg)))
   (:variant-vars star)
   (:policy :safe)
+  (:node-var node)
   (:generator 0
     (cond ((zerop num)
 	   (move result null-tn))
@@ -38,11 +43,17 @@
 		       (control-stack
 			(load-stack-tn temp ,tn)
 			temp)))))
-	     (let* ((cons-cells (if star (1- num) num))
+	     (let* ((dx-p (node-stack-allocate-p node))
+		    (cons-cells (if star (1- num) num))
 		    (alloc (* (pad-data-block cons-size) cons-cells)))
-	       (pseudo-atomic (:extra alloc)
-		 (inst andn res alloc-tn lowtag-mask)
-		 (inst or res list-pointer-lowtag)
+	       (pseudo-atomic (:extra (if dx-p 0 alloc))
+		 (let ((allocation-area-tn (if dx-p csp-tn alloc-tn)))
+		   (when dx-p
+		     (align-csp res))
+		   (inst andn res allocation-area-tn lowtag-mask)
+		   (inst or res list-pointer-lowtag)
+		   (when dx-p
+		     (inst add csp-tn csp-tn alloc)))
 		 (move ptr res)
 		 (dotimes (i (1- cons-cells))
 		   (storew (maybe-load (tn-ref-tn things)) ptr
@@ -116,17 +127,23 @@
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
   (:info length stack-allocate-p)
-  (:ignore stack-allocate-p)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
-    (let ((size (+ length closure-info-offset)))
-      (pseudo-atomic (:extra (pad-data-block size))
-	(inst andn result alloc-tn lowtag-mask)
-	(inst or result fun-pointer-lowtag)
+    (let* ((size (+ length closure-info-offset))
+	   (alloc-size (pad-data-block size)))
+      (pseudo-atomic (:extra (if stack-allocate-p 0 alloc-size))
+	(cond (stack-allocate-p
+	       (align-csp temp)
+	       (inst andn result csp-tn lowtag-mask)
+	       (inst or result fun-pointer-lowtag)
+	       (inst add csp-tn alloc-size))
+	      (t
+	       (inst andn result alloc-tn lowtag-mask)
+	       (inst or result fun-pointer-lowtag)))
 	(inst li temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag))
-	(storew temp result 0 fun-pointer-lowtag)))
-    (storew function result closure-fun-slot fun-pointer-lowtag)))
+	(storew temp result 0 fun-pointer-lowtag))
+      (storew function result closure-fun-slot fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)

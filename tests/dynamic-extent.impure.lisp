@@ -134,7 +134,7 @@
       (funcall thunk))
     (assert (< (- (get-bytes-consed) before) times))))
 
-#+(or x86 x86-64 alpha ppc)
+#+(or x86 x86-64 alpha ppc sparc)
 (progn
   (assert-no-consing (dxclosure 42))
   (assert-no-consing (dxlength 1 2 3))

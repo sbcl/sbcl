@@ -1068,8 +1068,10 @@ default-value-8
   (:variant 0 0)
   (:translate %more-arg))
 
-
 ;;; Turn more arg (context, count) into a list.
+(defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))
+  t)
+
 (define-vop (listify-rest-args)
   (:args (context-arg :target context :scs (descriptor-reg))
 	 (count-arg :target count :scs (any-reg)))
@@ -1081,32 +1083,39 @@ default-value-8
   (:results (result :scs (descriptor-reg)))
   (:translate %listify-rest-args)
   (:policy :safe)
+  (:node-var node)
   (:generator 20
-    (move context context-arg)
-    (move count count-arg)
-    ;; Check to see if there are any arguments.
-    (inst cmp count)
-    (inst b :eq done)
-    (move result null-tn)
+    (let* ((enter (gen-label))
+	   (loop (gen-label))
+	   (done (gen-label))
+	   (dx-p (node-stack-allocate-p node))
+	   (alloc-area-tn (if dx-p csp-tn alloc-tn)))
+      (move context context-arg)
+      (move count count-arg)
+      ;; Check to see if there are any arguments.
+      (inst cmp count)
+      (inst b :eq done)
+      (move result null-tn)
 
-    ;; We need to do this atomically.
-    (pseudo-atomic ()
-      (assemble ()
+      ;; We need to do this atomically.
+      (pseudo-atomic ()
+	(when dx-p
+	  (align-csp temp))
 	;; Allocate a cons (2 words) for each item.
-	(inst andn result alloc-tn lowtag-mask)
+	(inst andn result alloc-area-tn lowtag-mask)
 	(inst or result list-pointer-lowtag)
 	(move dst result)
 	(inst sll temp count 1)
 	(inst b enter)
-	(inst add alloc-tn temp)
+	(inst add alloc-area-tn temp)
 
 	;; Compute the next cons and store it in the current one.
-	LOOP
+	(emit-label loop)
 	(inst add dst dst (* 2 n-word-bytes))
 	(storew dst dst -1 list-pointer-lowtag)
 
 	;; Grab one value.
-	ENTER
+	(emit-label enter)
 	(loadw temp context)
 	(inst add context context n-word-bytes)
 
@@ -1119,8 +1128,8 @@ default-value-8
 	(storew temp dst 0 list-pointer-lowtag)
 
 	;; NIL out the last cons.
-	(storew null-tn dst 1 list-pointer-lowtag)))
-    DONE))
+	(storew null-tn dst 1 list-pointer-lowtag))
+      (emit-label done))))
 
 
 ;;; Return the location and size of the more arg glob created by Copy-More-Arg.

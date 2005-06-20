@@ -150,6 +150,16 @@
        (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)
        ,@body)))
 
+(defun align-csp (temp)
+  (let ((aligned (gen-label)))
+    ;; FIXME: why use a TEMP?  Why not just ZERO-TN?
+    (inst andcc temp csp-tn lowtag-mask)
+    (if (member :sparc-v9 *backend-subfeatures*)
+	(inst b :eq aligned :pt)
+	(inst b :eq aligned))
+    (storew zero-tn csp-tn 0) ; sneaky use of delay slot
+    (inst add csp-tn csp-tn n-word-bytes)
+    (emit-label aligned)))
 
 ;;;; Error Code
 (eval-when (:compile-toplevel :load-toplevel :execute)
