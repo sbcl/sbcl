@@ -134,8 +134,8 @@
 	   (alloc-size (pad-data-block size))
 	   (allocation-area-tn (if stack-allocate-p csp-tn alloc-tn)))
       (pseudo-atomic (pa-flag :extra (if stack-allocate-p 0 alloc-size))
-	;; no need to align CSP for DX: FUN-POINTER-LOWTAG already has
-	;; the corresponding bit set
+	(when stack-allocate-p
+	  (align-csp result))
 	(inst clrrwi. result allocation-area-tn n-lowtag-bits)
 	(when stack-allocate-p
 	  (inst addi csp-tn csp-tn alloc-size))

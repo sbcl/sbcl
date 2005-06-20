@@ -136,8 +136,7 @@
 	    temp)
       (pseudo-atomic (:extra (if stack-allocate-p 0 alloc-size))
         (cond (stack-allocate-p
-               ;; no need to align CSP: FUN-POINTER-LOWTAG already has
-               ;; the corresponding bit set
+	       (align-csp result)
                (inst bis csp-tn fun-pointer-lowtag result)
                (inst lda csp-tn alloc-size csp-tn))
               (t
