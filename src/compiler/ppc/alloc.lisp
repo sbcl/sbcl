@@ -126,22 +126,19 @@
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
   (:info length stack-allocate-p)
-  (:ignore stack-allocate-p)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:results (result :scs (descriptor-reg)))
-  (:node-var node)
   (:generator 10
     (let* ((size (+ length closure-info-offset))
 	   (alloc-size (pad-data-block size))
-	   (dx-p (node-stack-allocate-p node))
-	   (allocation-area-tn (if dx-p csp-tn alloc-tn)))
-      (pseudo-atomic (pa-flag :extra (if dx-p 0 alloc-size))
+	   (allocation-area-tn (if stack-allocate-p csp-tn alloc-tn)))
+      (pseudo-atomic (pa-flag :extra (if stack-allocate-p 0 alloc-size))
 	;; no need to align CSP for DX: FUN-POINTER-LOWTAG already has
 	;; the corresponding bit set
 	(inst clrrwi. result allocation-area-tn n-lowtag-bits)
-	(when dx-p
-	  (inst addi csp-tn alloc-size))
+	(when stack-allocate-p
+	  (inst addi csp-tn csp-tn alloc-size))
 	(inst ori result result fun-pointer-lowtag)
 	(inst lr temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag))
 	(storew temp result 0 fun-pointer-lowtag)))

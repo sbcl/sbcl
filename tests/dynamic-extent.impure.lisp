@@ -108,11 +108,24 @@
     (assert (equal (multiple-value-list (test-alignment-dx-list form)) res))
     (assert (equal *x* '(1 2 3 4)))))
 
+;;; closure
 
+(declaim (notinline true))
+(defun true (x)
+  (declare (ignore x))
+  t)
+
+(defun-with-dx dxclosure (x)
+  (flet ((f (y) 
+	   (+ y x)))
+    (declare (dynamic-extent #'f))
+    (true #'f)))
+
+(assert (eq t (dxclosure 13)))
 
 
 (defmacro assert-no-consing (form &optional times)
-  `(%assert-no-consing (lambda () ,form ,times)))
+  `(%assert-no-consing (lambda () ,form) ,times))
 (defun %assert-no-consing (thunk &optional times)
   (let ((before (get-bytes-consed))
         (times (or times 10000)))
@@ -123,6 +136,7 @@
 
 #+(or x86 x86-64 alpha ppc)
 (progn
+  (assert-no-consing (dxclosure 42))
   (assert-no-consing (dxlength 1 2 3))
   (assert-no-consing (dxlength t t t t t t))
   (assert-no-consing (dxlength))

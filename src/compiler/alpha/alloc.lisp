@@ -45,7 +45,7 @@
 			     (load-stack-tn temp ,tn)
 			     temp))))
 		     (storew reg ,list ,slot list-pointer-lowtag))))
-	     (let* ((dx-p (awhen (sb!c::node-lvar node) (sb!c::lvar-dynamic-extent it)))
+	     (let* ((dx-p (node-stack-allocate-p node))
                     (cons-cells (if star (1- num) num))
                     (space (* (pad-data-block cons-size) cons-cells)))
 	       (pseudo-atomic (:extra (if dx-p 0 space))
@@ -125,19 +125,17 @@
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
   (:info length stack-allocate-p)
-  (:ignore stack-allocate-p)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 10
     (let* ((size (+ length closure-info-offset))
-           (alloc-size (pad-data-block size))
-           (dx-p (node-stack-allocate-p node)))
+           (alloc-size (pad-data-block size)))
       (inst li
 	    (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
 	    temp)
-      (pseudo-atomic (:extra (if dx-p 0 alloc-size))
-        (cond (dx-p
+      (pseudo-atomic (:extra (if stack-allocate-p 0 alloc-size))
+        (cond (stack-allocate-p
                ;; no need to align CSP: FUN-POINTER-LOWTAG already has
                ;; the corresponding bit set
                (inst bis csp-tn fun-pointer-lowtag result)
