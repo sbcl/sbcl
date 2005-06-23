@@ -28,7 +28,11 @@ OS_SRC = linux-os.c x86-linux-os.c
 # interface, though.:-| As far as I (WHN 2002-05-19) know, no one is
 # working on one and it would be a nice thing to have.)
 LINKFLAGS += -Wl,--export-dynamic
-OS_LIBS = -lpthread -ldl
+OS_LIBS = -ldl
+
+OS_LIBS += $(shell if grep LISP_FEATURE_SB_THREAD genesis/config.h \
+                      > /dev/null 2>&1; \
+                   then echo "-lpthread"; fi)
 
 GC_SRC = gencgc.c
 
