@@ -470,6 +470,7 @@
 		 :if-exists :supersede)
   (write-string "(defun dumped-manyraws () '#.*manyraw*)" s))
 (compile-file "tmp-defstruct.manyraw.lisp")
+(delete-file "tmp-defstruct.manyraw.lisp")
 
 ;;; nuke the objects and try another GC just to be extra careful
 (setf *manyraw* nil)

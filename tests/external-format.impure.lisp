@@ -131,4 +131,6 @@
       (when p
 	(delete-file p)))))
 
+(delete-file "external-format-test.txt")
+
 (sb-ext:quit :unix-status 104)

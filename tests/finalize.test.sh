@@ -47,9 +47,11 @@ echo "Waiting for SBCL to finish stress-testing finalizers"
 while true; do
     if [ -f finalize-test-passed ]; then
 	echo "OK"
+	rm finalize-test-passed
 	exit 104 # Success
     elif [ -f finalize-test-failed ]; then
 	echo "Failed"
+	rm finalize-test-failed
 	exit 1 # Failure
     fi
     sleep 1
