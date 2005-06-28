@@ -1,4 +1,7 @@
 changes in sbcl-0.9.3 relative to sbcl-0.9.2:
+  * New feature: Experimental support for bivalent streams: streams
+    opened with :element-type :default now allow character and binary
+    (unsigned-byte 8) I/O
   * Support for the koi8-r external format.  (thanks to Ivan Boldyrev)
 
 changes in sbcl-0.9.2 relative to sbcl-0.9.1:

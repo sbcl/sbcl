@@ -1330,19 +1330,34 @@
 ;;; Fill in the various routine slots for the given type. INPUT-P and
 ;;; OUTPUT-P indicate what slots to fill. The buffering slot must be
 ;;; set prior to calling this routine.
-(defun set-fd-stream-routines (fd-stream type input-p output-p buffer-p)
-  (let ((target-type (case type
-		       ((:default unsigned-byte)
-			'(unsigned-byte 8))
-		       (signed-byte
-			'(signed-byte 8))
-		       (t
-			type)))
-	(input-type nil)
-	(output-type nil)
-	(input-size nil)
-	(output-size nil)
-	(character-stream-p (subtypep type 'character)))
+(defun set-fd-stream-routines (fd-stream element-type external-format
+			       input-p output-p buffer-p)
+  (let* ((target-type (case element-type
+			(unsigned-byte '(unsigned-byte 8))
+			(signed-byte '(signed-byte 8))
+			(:default 'character)
+			(t element-type)))
+	 (character-stream-p (subtypep target-type 'character))
+	 (bivalent-stream-p (eq element-type :default))
+	 normalized-external-format
+	 (bin-routine #'ill-bin)
+	 (bin-type nil)
+	 (bin-size nil)
+	 (cin-routine #'ill-in)
+	 (cin-type nil)
+	 (cin-size nil)
+	 (input-type nil)	    ;calculated from bin-type/cin-type
+	 (input-size nil)	    ;calculated from bin-size/cin-size
+	 (read-n-characters #'ill-in)
+	 (bout-routine #'ill-bout)
+	 (bout-type nil)
+	 (bout-size nil)
+	 (cout-routine #'ill-out)
+	 (cout-type nil)
+	 (cout-size nil)
+	 (output-type nil)
+	 (output-size nil)
+	 (output-bytes #'ill-bout))
 
     ;; drop buffers when direction changes
     (when (and (fd-stream-obuf-sap fd-stream) (not output-p))
@@ -1351,101 +1366,121 @@
     (when (and (fd-stream-ibuf-sap fd-stream) (not input-p))
       (push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
       (setf (fd-stream-ibuf-sap fd-stream) nil))
+    (when input-p
+      (setf (fd-stream-ibuf-sap fd-stream) (next-available-buffer))
+      (setf (fd-stream-ibuf-length fd-stream) bytes-per-buffer)
+      (setf (fd-stream-ibuf-tail fd-stream) 0))
+    (when output-p
+      (setf (fd-stream-obuf-sap fd-stream) (next-available-buffer))
+      (setf (fd-stream-obuf-length fd-stream) bytes-per-buffer)
+      (setf (fd-stream-obuf-tail fd-stream) 0)
+      (setf (fd-stream-char-pos fd-stream) 0))
 
     (when (and character-stream-p
-	       (eq (fd-stream-external-format fd-stream) :default))
+	       (eq external-format :default))
       (/show0 "/getting default external format")
-      (setf (fd-stream-external-format fd-stream)
-            (default-external-format))
+      (setf external-format (default-external-format))
       (/show0 "cold-printing defaulted external-format:")
       #!+sb-show
-      (cold-print (fd-stream-external-format fd-stream))
+      (cold-print external-format)
       (/show0 "matching to known aliases")
       (dolist (entry *external-formats*
 		     (restart-case
                          (error "Invalid external-format ~A" 
-                                (fd-stream-external-format fd-stream))
+                                external-format)
 		      (use-default ()
                         :report "Set external format to LATIN-1"
-                        (setf (fd-stream-external-format fd-stream) :latin-1))))
+                        (setf external-format :latin-1))))
         (/show0 "cold printing known aliases:")
         #!+sb-show
         (dolist (alias (first entry)) (cold-print alias))
         (/show0 "done cold-printing known aliases")
-	(when (member (fd-stream-external-format fd-stream) (first entry))
+	(when (member external-format (first entry))
           (/show0 "matched")
 	  (return)))
       (/show0 "/default external format ok"))
     
     (when input-p
-      (multiple-value-bind (routine type size read-n-characters
-                                    normalized-external-format)
-	  (pick-input-routine target-type
-                              (fd-stream-external-format fd-stream))
-        (when normalized-external-format
-          (setf (fd-stream-external-format fd-stream)
-                normalized-external-format))
-	(unless routine
-	  (error "could not find any input routine for ~S" target-type))
-	(if character-stream-p
-	    (setf (fd-stream-in fd-stream) routine
-		  (fd-stream-bin fd-stream) #'ill-bin)
-	    (setf (fd-stream-in fd-stream) #'ill-in
-		  (fd-stream-bin fd-stream) routine))
-	(when (eql size 1)
-	  (setf (fd-stream-n-bin fd-stream)
-                (if character-stream-p
-                    read-n-characters
-                    #'fd-stream-read-n-bytes))
-	  (when (and buffer-p
-		     ;; We only create this buffer for streams of type
-		     ;; (unsigned-byte 8).  Because there's no buffer, the
-		     ;; other element-types will dispatch to the appropriate
-		     ;; input (output) routine in fast-read-byte.
-		     (or character-stream-p
-			 (equal target-type '(unsigned-byte 8)))
-		     (not output-p) ; temporary disable on :io streams
-		     #+(or)
-		     (or (eq type 'unsigned-byte)
-			 (eq type :default)))
-            (if character-stream-p
-                (setf (ansi-stream-cin-buffer fd-stream)
-                      (make-array +ansi-stream-in-buffer-length+
-                                  :element-type 'character))
-                (setf (ansi-stream-in-buffer fd-stream)
-                      (make-array +ansi-stream-in-buffer-length+
-                                  :element-type '(unsigned-byte 8))))))
-	(setf input-size size)
-	(setf input-type type)))
+      (when (or (not character-stream-p) bivalent-stream-p)
+	(multiple-value-setq (bin-routine bin-type bin-size read-n-characters
+					  normalized-external-format)
+	  (pick-input-routine (if bivalent-stream-p '(unsigned-byte 8)
+				  target-type)
+			      external-format))
+	(unless bin-routine
+	  (error "could not find any input routine for ~S" target-type)))
+      (when character-stream-p
+	(multiple-value-setq (cin-routine cin-type cin-size read-n-characters
+					  normalized-external-format)
+	  (pick-input-routine target-type external-format))
+	(unless cin-routine
+	  (error "could not find any input routine for ~S" target-type)))      
+      (setf (fd-stream-in fd-stream) cin-routine
+	    (fd-stream-bin fd-stream) bin-routine)
+      ;; character type gets preferential treatment
+      (setf input-size (or cin-size bin-size))
+      (setf input-type (or cin-type bin-type))
+      (when normalized-external-format
+	(setf (fd-stream-external-format fd-stream)
+	      normalized-external-format))
+      (when (= (or cin-size 1) (or bin-size 1) 1)
+	(setf (fd-stream-n-bin fd-stream) ;XXX
+	      (if (and character-stream-p (not bivalent-stream-p))
+		  read-n-characters
+		  #'fd-stream-read-n-bytes))
+	;; Sometimes turn on fast-read-char/fast-read-byte.  Switch on
+	;; for character and (unsigned-byte 8) streams.  In these
+	;; cases, fast-read-* will read from the
+	;; ansi-stream-(c)in-buffer, saving function calls.
+	;; Otherwise, the various data-reading functions in the stream
+	;; structure will be called.
+	(when (and buffer-p
+		   (not bivalent-stream-p)
+		   ;; temporary disable on :io streams
+		   (not output-p))
+	  (cond (character-stream-p 
+		 (setf (ansi-stream-cin-buffer fd-stream)
+		       (make-array +ansi-stream-in-buffer-length+
+				   :element-type 'character)))
+		((equal target-type '(unsigned-byte 8))
+		 (setf (ansi-stream-in-buffer fd-stream)
+		       (make-array +ansi-stream-in-buffer-length+
+				   :element-type '(unsigned-byte 8))))))))
 
     (when output-p
-      (multiple-value-bind (routine type size output-bytes
-				    normalized-external-format)
-	  (pick-output-routine target-type
+      (when (or (not character-stream-p) bivalent-stream-p)
+	(multiple-value-setq (bout-routine bout-type bout-size output-bytes
+					   normalized-external-format)
+	  (pick-output-routine (if bivalent-stream-p
+				   '(unsigned-byte 8)
+				   target-type)
 			       (fd-stream-buffering fd-stream)
-			       (fd-stream-external-format fd-stream))
-	(when normalized-external-format
-	  (setf (fd-stream-external-format fd-stream)
-		normalized-external-format))
-	(unless routine
+			       external-format))
+	(unless bout-routine
 	  (error "could not find any output routine for ~S buffered ~S"
 		 (fd-stream-buffering fd-stream)
-		 target-type))
-	(when character-stream-p
-	  (setf (fd-stream-output-bytes fd-stream) output-bytes))
-	(if character-stream-p
-	  (setf (fd-stream-out fd-stream) routine
-		(fd-stream-bout fd-stream) #'ill-bout)
-	  (setf (fd-stream-out fd-stream)
-		(or (if (eql size 1)
-			  (pick-output-routine
-			   'base-char (fd-stream-buffering fd-stream)))
-		    #'ill-out)
-		(fd-stream-bout fd-stream) routine))
-	(setf (fd-stream-sout fd-stream)
-	      (if (eql size 1) #'fd-sout #'ill-out))
-	(setf output-size size)
-	(setf output-type type)))
+		 target-type)))
+      (when character-stream-p
+	(multiple-value-setq (cout-routine cout-type cout-size output-bytes
+					   normalized-external-format)
+	  (pick-output-routine target-type
+			       (fd-stream-buffering fd-stream)
+			       external-format))
+	(unless cout-routine
+	  (error "could not find any output routine for ~S buffered ~S"
+		 (fd-stream-buffering fd-stream)
+		 target-type)))
+      (when normalized-external-format
+	(setf (fd-stream-external-format fd-stream)
+	      normalized-external-format))
+      (when character-stream-p
+	(setf (fd-stream-output-bytes fd-stream) output-bytes))
+      (setf (fd-stream-out fd-stream) cout-routine
+	    (fd-stream-bout fd-stream) bout-routine
+	    (fd-stream-sout fd-stream) (if (eql cout-size 1)
+					   #'fd-sout #'ill-out))
+      (setf output-size (or cout-size bout-size))
+      (setf output-type (or cout-type bout-type)))
 
     (when (and input-size output-size
 	       (not (eq input-size output-size)))
@@ -1758,16 +1793,8 @@
 				 :dual-channel-p dual-channel-p
 				 :external-format external-format
 				 :timeout timeout)))
-    (when input
-      (setf (fd-stream-ibuf-sap stream) (next-available-buffer))
-      (setf (fd-stream-ibuf-length stream) bytes-per-buffer)
-      (setf (fd-stream-ibuf-tail stream) 0))
-    (when output
-      (setf (fd-stream-obuf-sap stream) (next-available-buffer))
-      (setf (fd-stream-obuf-length stream) bytes-per-buffer)
-      (setf (fd-stream-obuf-tail stream) 0)
-      (setf (fd-stream-char-pos stream) 0))
-    (set-fd-stream-routines stream element-type input output input-buffer-p)
+    (set-fd-stream-routines stream element-type external-format
+			    input output input-buffer-p)
     (when (and auto-close (fboundp 'finalize))
       (finalize stream
 		(lambda ()
