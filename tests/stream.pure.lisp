@@ -290,3 +290,6 @@
   (assert (= (read-sequence sequence s) 3))
   (assert (string= sequence "foodef"))
   (assert (string= (get-output-stream-string os) "foo")))
+
+(with-standard-io-syntax
+  (open "/dev/null"))

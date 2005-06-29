@@ -1774,7 +1774,7 @@
 		       input-buffer-p
 		       dual-channel-p
 		       (name (if file
-				 (format nil "file ~S" file)
+				 (format nil "file ~A" file)
 				 (format nil "descriptor ~W" fd)))
 		       auto-close)
   (declare (type index fd) (type (or index null) timeout)
