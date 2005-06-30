@@ -3110,7 +3110,7 @@
 ;;; Perhaps we should have to prove that the denominator is nonzero before
 ;;; doing them?  -- WHN 19990917
 (macrolet ((def (name)
-             `(deftransform ,name ((x y) ((constant-arg (integer 0 0)) integer)
+             `(deftransform ,name ((x y) ((integer 0 0) integer)
                                    *)
                 "fold zero arg"
                 0)))
@@ -3118,7 +3118,7 @@
   (def /))
 
 (macrolet ((def (name)
-             `(deftransform ,name ((x y) ((constant-arg (integer 0 0)) integer)
+             `(deftransform ,name ((x y) ((integer 0 0) integer)
                                    *)
                 "fold zero arg"
                 '(values 0 0))))

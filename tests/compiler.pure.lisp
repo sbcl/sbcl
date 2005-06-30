@@ -1779,3 +1779,14 @@
 				  (let ((x :good))
 				    ((lambda (&optional (y x))
 				       (declare (special x)) y)))))))))
+
+;;; Bug from pfdietz's random tester: the compiler knew that IMAGPART of
+;;; a rational was zero, but didn't do the substitution, leading to a
+;;; crash in the ASH vop (since a shift of 57 wouldn't fit in the
+;;; machine's ASH instruction's immediate field) that the compiler
+;;; thought was legitimate.
+(compile 'nil
+         (LAMBDA (B)
+           (DECLARE (TYPE (INTEGER -2 14) B))
+           (DECLARE (IGNORABLE B))
+           (ASH (IMAGPART B) 57)))
