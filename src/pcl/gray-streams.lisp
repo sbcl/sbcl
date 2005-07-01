@@ -113,6 +113,25 @@
     (error 'type-error :datum non-stream :expected-type 'stream)))
 
 (let ()
+  (fmakunbound 'interactive-stream-p)
+
+  (defgeneric interactive-stream-p (stream)
+    #+sb-doc
+    (:documentation "Is STREAM an interactive stream?"))
+  
+  (defmethod interactive-stream-p ((stream ansi-stream))
+    (funcall (ansi-stream-misc stream) stream :interactive-p))
+
+  (defmethod interactive-stream-p ((stream fundamental-stream))
+    nil)
+
+  (defmethod interactive-stream-p ((stream stream))
+    (bug-or-error stream 'interactive-stream-p))
+  
+  (defmethod interactive-stream-p ((non-stream t))
+    (error 'type-error :datum non-stream :expected-type 'stream)))
+
+(let ()
   (fmakunbound 'output-stream-p)
 
   (defgeneric output-stream-p (stream)
