@@ -1,0 +1,81 @@
+@node Character and String Types
+@comment  node-name,  next,  previous,  up
+@chapter Character and String Types
+
+@menu
+* Memory Layout::
+* Reader and Printer::
+@end menu
+
+The @code{:SB-UNICODE} feature implies support for all 1114112 potential
+characters in the character space defined by the Unicode consortium,
+with the identity mapping between lisp @code{char-code} and Unicode code
+point.  SBCL releases before version 0.8.17, and those without the
+@code{:SB-UNICODE} feature, support only 256 characters, with the
+identity mapping between @code{char-code} and Latin1 (or, equivalently,
+the first 256 Unicode) code point.
+
+In the absence of the @code{:SB-UNICODE} feature, the types
+@code{base-char} and @code{character} are identical, and encompass the
+set of all 256 characters supported by the implementation.  With the
+@code{:SB-UNICODE} on @code{*features*} (the default), however,
+@code{base-char} and @code{character} are distinct: @code{character}
+encompasses the set of all 1114112 characters, while @code{base-char}
+represents the set of the first 128 characters.
+
+The effect of this on string types is that an sbcl configured with
+@code{:SB-UNICODE} has three disjoint @code{string} types: @code{(vector
+nil)}, @code{base-string} and @code{(vector character)}.  In a build
+without @code{:SB-UNICODE}, there are two such disjoint types:
+@code{(vector nil)} and @code{(vector character)}; @code{base-string} is
+identially equal to @code{(vector character)}.
+
+The @code{SB-KERNEL:CHARACTER-SET-TYPE} represents possibly
+noncontiguous sets of characters as lists of range pairs: for example,
+the type @code{standard-char} is represented as the type
+@code{(sb-kernel:character-set '((10 . 10) (32 . 126)))}
+
+@node Memory Layout
+@comment  node-name,  next,  previous,  up
+@section Memory Layout
+
+Characters are immediate objects (that is, they require no heap
+allocation) in all permutations of build-time options.  Even on a 32-bit
+platform with @code{:SB-UNICODE}, there are three bits to spare after
+allocating 8 bits for the character widetag and 21 for the character
+code.  There is only one such layout, and consequently only one widetag
+is needed: the difference between @code{base-char} and @code{character}
+is purely on the magnitude of the @code{char-code}.
+
+Objects of type @code{(simple-array nil (*))} are represented in memory
+as two words: the first is the object header, with the appropriate
+widetag, and the second is the length field.  No memory is needed for
+elements of these objects, as they can have none.
+
+Objects of type @code{simple-base-string} have the header word
+with widetag, then a word for the length, and after that a sequence of
+8-bit @code{char-code} bytes.  The system arranges for there to be a
+null byte after the sequence of lisp character codes.
+
+Objects of type @code{(simple-array character (*))}, where this is a
+distinct type from @code{simple-base-string}, have the header word with
+widetag, length, and then a sequence of 32-bit @code{char-code} bytes.
+Again, the system arranges for there to be a null word after the
+sequence of character codes.
+
+Non-simple character arrays, and simple character arrays of non-unit
+dimensionality, have an array header with a reference to an underlying
+data array of the appropriate form from the above representations.
+
+@node Reader and Printer
+@comment  node-name,  next,  previous,  up
+@section Reader and Printer
+
+The @code{"} reader macro always constructs an object of type
+@code{(simple-array character)}, even if all of the characters within
+the quotation marks are of type @code{base-char}.  This implies that
+only strings of type @code{(vector character)} will be able to be
+printed when @code{*print-readably*} is true: attempting to print
+strings of other types will cause an error of type
+@code{print-not-readable}.
+
