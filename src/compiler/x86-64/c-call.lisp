@@ -287,13 +287,13 @@
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 7) 7)))
 	(inst mov temp
-	      (make-ea :dword
+	      (make-ea :qword
 		       :disp (+ nil-value
 				(static-symbol-offset '*alien-stack*)
 				(ash symbol-tls-index-slot word-shift)
 				(- other-pointer-lowtag))))
-	(inst fs-segment-prefix)
-	(inst sub (make-ea :dword :scale 1 :index temp) delta)))
+	(inst sub (make-ea :qword :base thread-base-tn 
+			   :scale 1 :index temp) delta)))
     (load-tl-symbol-value result *alien-stack*))
   #!-sb-thread
   (:generator 0
@@ -316,13 +316,13 @@
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 7) 7)))
 	(inst mov temp
-	      (make-ea :dword
-			   :disp (+ nil-value
-				    (static-symbol-offset '*alien-stack*)
+	      (make-ea :qword
+		       :disp (+ nil-value
+				(static-symbol-offset '*alien-stack*)
 				(ash symbol-tls-index-slot word-shift)
 				(- other-pointer-lowtag))))
-	(inst fs-segment-prefix)
-	(inst add (make-ea :dword :scale 1 :index temp) delta))))
+	(inst add (make-ea :qword :base thread-base-tn :scale 1 :index temp)
+	      delta))))
   #!-sb-thread
   (:generator 0
     (unless (zerop amount)

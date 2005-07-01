@@ -32,8 +32,8 @@
 		  ;; :X86. (Note that non-X86 ports mention
 		  ;; pseudo-atomicity too, but they handle it without
 		  ;; messing with special variables.)
-		  #!+x86 *pseudo-atomic-atomic*
-		  #!+x86 *pseudo-atomic-interrupted*
+		  #!+(or x86 x86-64) *pseudo-atomic-atomic*
+		  #!+(or x86 x86-64) *pseudo-atomic-interrupted*
 		  sb!unix::*interrupts-enabled*
 		  sb!unix::*interrupt-pending*
 		  *free-interrupt-context-index*

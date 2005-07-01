@@ -169,7 +169,7 @@ struct thread * create_thread_struct(lispobj initial_function) {
 	STATIC_TLS_INIT(CONTROL_STACK_START,control_stack_start);
 	STATIC_TLS_INIT(CONTROL_STACK_END,control_stack_end);
 	STATIC_TLS_INIT(ALIEN_STACK,alien_stack_pointer);
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
 	STATIC_TLS_INIT(PSEUDO_ATOMIC_ATOMIC,pseudo_atomic_atomic);
 	STATIC_TLS_INIT(PSEUDO_ATOMIC_INTERRUPTED,pseudo_atomic_interrupted);
 #endif

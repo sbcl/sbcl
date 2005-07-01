@@ -56,7 +56,7 @@ size_t os_vm_page_size;
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;
 #ifdef LISP_FEATURE_SB_THREAD
-#error Threads are not supported on x86-64 in this SBCL version
+    pthread_setspecific(specials,thread);
 #endif
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     /* Signal handlers are run on the control stack, so if it is exhausted
@@ -65,7 +65,9 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_sp=((void *) thread)+dynamic_values_bytes;
     sigstack.ss_flags=0;
     sigstack.ss_size = 32*SIGSTKSZ;
-    sigaltstack(&sigstack,0);
+    if(sigaltstack(&sigstack,0)<0) {
+        lose("Cannot sigaltstack: %s\n",strerror(errno));
+    }
 #endif
     return 1;
 }

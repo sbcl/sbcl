@@ -764,20 +764,19 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 
 #elif defined(LISP_FEATURE_X86_64)
     u64 *sp=(u64 *)*os_context_register_addr(context,reg_RSP);
-    *(sp-20) = post_signal_tramp;  /* return address for call_into_lisp */
+    *(sp-18) = post_signal_tramp;  /* return address for call_into_lisp */
 
-    *(sp-19)=*os_context_register_addr(context,reg_R15);
-    *(sp-18)=*os_context_register_addr(context,reg_R14);
-    *(sp-17)=*os_context_register_addr(context,reg_R13);
-    *(sp-16)=*os_context_register_addr(context,reg_R12);
-    *(sp-15)=*os_context_register_addr(context,reg_R11);
-    *(sp-14)=*os_context_register_addr(context,reg_R10);
-    *(sp-13)=*os_context_register_addr(context,reg_R9);
-    *(sp-12)=*os_context_register_addr(context,reg_R8);
-    *(sp-11)=*os_context_register_addr(context,reg_RDI);
-    *(sp-10)=*os_context_register_addr(context,reg_RSI);
-    *(sp-9)=*os_context_register_addr(context,reg_RSP)-16;
-    *(sp-8)=0;
+    *(sp-17)=*os_context_register_addr(context,reg_R15);
+    *(sp-16)=*os_context_register_addr(context,reg_R14);
+    *(sp-15)=*os_context_register_addr(context,reg_R13);
+    *(sp-14)=*os_context_register_addr(context,reg_R12);
+    *(sp-13)=*os_context_register_addr(context,reg_R11);
+    *(sp-12)=*os_context_register_addr(context,reg_R10);
+    *(sp-11)=*os_context_register_addr(context,reg_R9);
+    *(sp-10)=*os_context_register_addr(context,reg_R8);
+    *(sp-9)=*os_context_register_addr(context,reg_RDI);
+    *(sp-8)=*os_context_register_addr(context,reg_RSI);
+    /* skip RBP and RSP */
     *(sp-7)=*os_context_register_addr(context,reg_RBX);
     *(sp-6)=*os_context_register_addr(context,reg_RDX);
     *(sp-5)=*os_context_register_addr(context,reg_RCX);
@@ -807,7 +806,7 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *os_context_pc_addr(context) = call_into_lisp;
     *os_context_register_addr(context,reg_RCX) = 0; 
     *os_context_register_addr(context,reg_RBP) = sp-2;
-    *os_context_register_addr(context,reg_RSP) = sp-20;
+    *os_context_register_addr(context,reg_RSP) = sp-18;
 #else
     /* this much of the calling convention is common to all
        non-x86 ports */

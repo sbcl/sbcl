@@ -27,8 +27,8 @@
 ;;; FIXME: These could be converted to DEFVARs.
 (declaim (special *gc-inhibit* *need-to-collect-garbage*
 		  *after-gc-hooks*
-		  #!+x86 *pseudo-atomic-atomic*
-		  #!+x86 *pseudo-atomic-interrupted*
+		  #!+(or x86 x86-64) *pseudo-atomic-atomic*
+		  #!+(or x86 x86-64) *pseudo-atomic-interrupted*
 		  sb!unix::*interrupts-enabled*
 		  sb!unix::*interrupt-pending*
 		  *type-system-initialized*))

@@ -68,11 +68,11 @@
       (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
       (inst or tls tls)
       (inst jmp :z global-val)
-      (inst fs-segment-prefix)
-      (inst cmp (make-ea :dword :scale 1 :index tls) unbound-marker-widetag)
+      (inst cmp (make-ea :qword :base thread-base-tn :scale 1 :index tls) 
+	    unbound-marker-widetag)
       (inst jmp :z global-val)
-      (inst fs-segment-prefix)
-      (inst mov (make-ea :dword :scale 1 :index tls) value)
+      (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls)
+	    value)
       (inst jmp done)
       (emit-label global-val)
       (storew value symbol symbol-value-slot other-pointer-lowtag)
@@ -107,8 +107,8 @@
     (let* ((err-lab (generate-error-code vop unbound-symbol-error object))
 	   (ret-lab (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-      (inst fs-segment-prefix)
-      (inst mov value (make-ea :dword :index value :scale 1))
+      (inst mov value (make-ea :qword :base thread-base-tn 
+			       :index value :scale 1))
       (inst cmp value unbound-marker-widetag)
       (inst jmp :ne ret-lab)
       (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -128,8 +128,8 @@
   (:generator 8
     (let ((ret-lab (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-      (inst fs-segment-prefix)
-      (inst mov value (make-ea :dword :index value :scale 1))
+      (inst mov value
+	    (make-ea :qword :base thread-base-tn :index value :scale 1))
       (inst cmp value unbound-marker-widetag)
       (inst jmp :ne ret-lab)
       (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -169,7 +169,7 @@
   (:generator 4
     (move result value)
     (inst lock)
-    (inst add (make-ea :dword :base object
+    (inst add (make-ea :qword :base object
 		       :disp (- (* symbol-value-slot n-word-bytes)
 				other-pointer-lowtag))
 	  value)))
@@ -189,8 +189,8 @@
 	  (inst cmp value unbound-marker-widetag)
 	  (inst jmp :ne not-target)
 	  (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-	  (inst fs-segment-prefix)
-	  (inst cmp (make-ea :dword :index value :scale 1) unbound-marker-widetag)
+	  (inst cmp (make-ea :qword  :base thread-base-tn 
+			     :index value :scale 1) unbound-marker-widetag)
 	  (inst jmp  :e  target)
 	  (emit-label not-target))
 	(progn
@@ -198,8 +198,8 @@
 	  (inst cmp value unbound-marker-widetag)
 	  (inst jmp :ne target)
 	  (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-	  (inst fs-segment-prefix)
-	  (inst cmp (make-ea :dword :index value :scale 1) unbound-marker-widetag)
+	  (inst cmp (make-ea :qword :base thread-base-tn :index value :scale 1)
+		unbound-marker-widetag)
 	  (inst jmp  :ne  target)))))
 
 #!-sb-thread
@@ -301,17 +301,17 @@
       (inst jmp :ne tls-index-valid)
       ;; allocate a new tls-index
       (load-symbol-value tls-index *free-tls-index*)
-      (inst add tls-index 4)		;XXX surely we can do this more
+      (inst add tls-index 8)		;XXX surely we can do this more
       (store-symbol-value tls-index *free-tls-index*) ;succintly
-      (inst sub tls-index 4)
+      (inst sub tls-index 8)
       (storew tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
       (emit-label tls-index-valid)
-      (inst fs-segment-prefix) 
-      (inst mov temp (make-ea :dword :scale 1 :index tls-index))
+      (inst mov temp
+	    (make-ea :qword :base thread-base-tn :scale 1 :index tls-index))
       (storew temp bsp (- binding-value-slot binding-size))
       (storew symbol bsp (- binding-symbol-slot binding-size))
-      (inst fs-segment-prefix)
-      (inst mov (make-ea :dword :scale 1 :index tls-index) val))))
+      (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls-index)
+	    val))))
 
 #!-sb-thread
 (define-vop (bind)
@@ -338,8 +338,8 @@
     (loadw value bsp (- binding-value-slot binding-size))
 
     (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)    
-    (inst fs-segment-prefix)
-    (inst mov (make-ea :dword :scale 1 :index tls-index) value)
+    (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls-index)
+          value)
 
     (storew 0 bsp (- binding-symbol-slot binding-size))
     (inst sub bsp (* binding-size n-word-bytes))
@@ -372,12 +372,13 @@
     (inst or symbol symbol)
     (inst jmp :z SKIP)
     (loadw value bsp (- binding-value-slot binding-size))
-    #!-sb-thread (storew value symbol symbol-value-slot other-pointer-lowtag)
-
-    #!+sb-thread (loadw
-		  tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
-    #!+sb-thread (inst fs-segment-prefix)
-    #!+sb-thread (inst mov (make-ea :dword :scale 1 :index tls-index) value)
+    #!-sb-thread
+    (storew value symbol symbol-value-slot other-pointer-lowtag)
+    #!+sb-thread
+    (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+    #!+sb-thread
+    (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls-index)
+          value)
     (storew 0 bsp (- binding-symbol-slot binding-size))
 
     SKIP
@@ -460,22 +461,22 @@
   (:translate %instance-set-conditional)
   (:args (object :scs (descriptor-reg) :to :eval)
 	 (slot :scs (any-reg) :to :result)
-	 (old-value :scs (descriptor-reg any-reg) :target eax)
+	 (old-value :scs (descriptor-reg any-reg) :target rax)
 	 (new-value :scs (descriptor-reg any-reg)))
   (:arg-types instance positive-fixnum * *)
-  (:temporary (:sc descriptor-reg :offset eax-offset
-		   :from (:argument 2) :to :result :target result)  eax)
+  (:temporary (:sc descriptor-reg :offset rax-offset
+		   :from (:argument 2) :to :result :target result)  rax)
   (:results (result :scs (descriptor-reg any-reg)))
   ;(:guard (backend-featurep :i486))
   (:policy :fast-safe)
   (:generator 5
-    (move eax old-value)
+    (move rax old-value)
     (inst lock)
-    (inst cmpxchg (make-ea :dword :base object :index slot :scale 1
+    (inst cmpxchg (make-ea :qword :base object :index slot :scale 1
 			   :disp (- (* instance-slots-offset n-word-bytes)
 				    instance-pointer-lowtag))
 	  new-value)
-    (move result eax)))
+    (move result rax)))
 
 
 

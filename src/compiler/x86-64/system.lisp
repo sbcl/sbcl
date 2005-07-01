@@ -277,7 +277,7 @@
     (inst break pending-interrupt-trap)))
 
 #!+sb-thread
-(defknown current-thread-offset-sap ((unsigned-byte 32))  
+(defknown current-thread-offset-sap ((unsigned-byte 64))  
   system-area-pointer (flushable))
 
 #!+sb-thread
@@ -289,8 +289,8 @@
   (:arg-types unsigned-num)
   (:policy :fast-safe)
   (:generator 2
-    (inst fs-segment-prefix)
-    (inst mov sap (make-ea :dword :disp 0 :index n :scale 4))))
+    (inst mov sap 
+	  (make-ea :qword :base thread-base-tn :disp 0 :index n :scale 8))))
 
 (define-vop (halt)
   (:generator 1

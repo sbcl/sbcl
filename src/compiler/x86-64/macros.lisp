@@ -78,8 +78,7 @@
 	       (static-symbol-offset ',symbol)
 	       (ash symbol-tls-index-slot word-shift)
 	       (- other-pointer-lowtag))))
-    (inst fs-segment-prefix)
-    (inst mov ,reg (make-ea :qword :scale 1 :index ,reg))))
+    (inst mov ,reg (make-ea :qword :base thread-base-tn :scale 1 :index ,reg))))
 #!-sb-thread
 (defmacro load-tl-symbol-value (reg symbol) `(load-symbol-value ,reg ,symbol))
 
@@ -92,8 +91,7 @@
 	       (static-symbol-offset ',symbol)
 	       (ash symbol-tls-index-slot word-shift)
 	       (- other-pointer-lowtag))))
-    (inst fs-segment-prefix)
-    (inst mov (make-ea :qword :scale 1 :index ,temp) ,reg)))
+    (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index ,temp) ,reg)))
 #!-sb-thread
 (defmacro store-tl-symbol-value (reg symbol temp)
   (declare (ignore temp))
@@ -153,27 +151,34 @@
 	(DONE (gen-label))
 	;; Yuck.
 	(in-elsewhere (eq *elsewhere* sb!assem::**current-segment**))
+        ;; thread->alloc_region.free_pointer
 	(free-pointer
-	 (make-ea :qword :disp 
-		  #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
-		  #!-sb-thread (make-fixup "boxed_region" :foreign)
-		  :scale 1))		; thread->alloc_region.free_pointer
+ 	 #!+sb-thread
+ 	 (make-ea :qword
+ 		  :base thread-base-tn :scale 1
+ 		  :disp (* n-word-bytes thread-alloc-region-slot))
+ 	 #!-sb-thread
+ 	 (make-ea :qword
+ 		  :scale 1 :disp
+ 		  (make-fixup (extern-alien-name "boxed_region") :foreign)))
+	;; thread->alloc_region.end_addr
 	(end-addr 
-	 (make-ea :qword :disp
-		  #!+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
-		  #!-sb-thread (make-fixup "boxed_region" :foreign 8)
-		  :scale 1)))		; thread->alloc_region.end_addr
+ 	 #!+sb-thread
+ 	 (make-ea :qword
+ 		  :base thread-base-tn :scale 1
+ 		  :disp (* n-word-bytes (1+ thread-alloc-region-slot)))
+ 	 #!-sb-thread
+ 	 (make-ea :qword
+ 		  :scale 1 :disp
+ 		  (make-fixup (extern-alien-name "boxed_region") :foreign 8))))
     (cond (in-elsewhere
 	   (allocation-tramp alloc-tn size))
 	  (t
 	   (unless (and (tn-p size) (location= alloc-tn size))
 	     (inst mov alloc-tn size))
-	   #!+sb-thread (inst fs-segment-prefix)
 	   (inst add alloc-tn free-pointer)
-	   #!+sb-thread (inst fs-segment-prefix)
 	   (inst cmp end-addr alloc-tn)
 	   (inst jmp :be NOT-INLINE)
-	   #!+sb-thread (inst fs-segment-prefix)
 	   (inst xchg free-pointer alloc-tn)
 	   (emit-label DONE)
 	   (assemble (*elsewhere*)
@@ -275,6 +280,32 @@
        (progn ,@body)
        (pseudo-atomic ,@body)))
 
+#!+sb-thread
+(defmacro pseudo-atomic (&rest forms)
+  (with-unique-names (label)
+    `(let ((,label (gen-label)))
+      (inst mov (make-ea :byte
+		 :base thread-base-tn
+		 :disp (* 8 thread-pseudo-atomic-interrupted-slot)) 0)
+      (inst mov (make-ea :byte
+		 :base thread-base-tn
+		 :disp (* 8 thread-pseudo-atomic-atomic-slot))
+	    (fixnumize 1))
+      ,@forms
+      (inst mov (make-ea :byte 
+		 :base thread-base-tn
+		 :disp (* 8 thread-pseudo-atomic-atomic-slot)) 0)
+      (inst cmp (make-ea :byte
+                 :base thread-base-tn
+		 :disp (* 8 thread-pseudo-atomic-interrupted-slot)) 0)
+      (inst jmp :eq ,label)
+      ;; if PAI was set, interrupts were disabled at the same
+      ;; time using the process signal mask.
+      (inst break pending-interrupt-trap)
+      (emit-label ,label))))
+
+
+#!-sb-thread
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
     `(let ((,label (gen-label)))

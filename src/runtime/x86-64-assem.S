@@ -117,20 +117,26 @@ GNAME(call_into_lisp):
 	mov	%rsp,%rbp	# Establish new frame.
 Lstack:
 	/* FIXME x86 saves FPU state here */
-	push	%rbx
-	push	%r12
-	push	%r13
-	push	%r14
-	push	%r15
-
+	push	%rbx  	# these regs are callee-saved according to C
+	push	%r12	# so must be preserved and restored when 
+	push	%r13    # the lisp function returns
+	push	%r14    #
+	push	%r15    #
 
 	mov	%rsp,%rbx	# remember current stack
 	push	%rbx		# Save entry stack on (maybe) new stack.
 
-	/* Establish Lisp args. */
-	mov	%rdi,%rax	# lexenv?
-	mov	%rsi,%rbx	# address of arg vec
-	mov	%rdx,%rcx	# num args
+	push	%rdi	# args from C
+	push	%rsi	#
+	push	%rdx	#
+#ifdef LISP_FEATURE_SB_THREAD
+	mov	specials,%rdi
+	call    pthread_getspecific
+	mov	%rax,%r12
+#endif
+	pop	%rcx	# num args
+	pop	%rbx	# arg vector
+	pop	%rax	# function ptr/lexenv
 
 	xor	%rdx,%rdx	# clear any descriptor registers 
 	xor	%rdi,%rdi	# that we can't be sure we'll 
@@ -328,10 +334,9 @@ GNAME(post_signal_tramp):
 	popq %r8
 	popq %rdi
 	popq %rsi
-	addq $8, %rsp
-	popq %rsp
-	popq %rdx
+        /* skip RBP and RSP */
 	popq %rbx
+	popq %rdx
 	popq %rcx
 	popq %rax
         popfq
