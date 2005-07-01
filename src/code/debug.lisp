@@ -530,7 +530,7 @@ reset to ~S."
 		"~2&~@<debugger invoked on a ~S in thread ~A: ~
                     ~2I~_~A~:>~%"
 		(type-of *debug-condition*)
-		(sb!thread:current-thread-id)
+                sb!thread:*current-thread*
 		*debug-condition*)
       (error (condition)
 	(setf *nested-debug-condition* condition)
@@ -606,7 +606,7 @@ reset to ~S."
 	  (format *error-output*
 		  "~&~@<unhandled ~S in thread ~S: ~2I~_~A~:>~2%"
 		  (type-of condition)
-		  (sb!thread:current-thread-id)
+		  sb!thread:*current-thread*
 		  condition)
 	  ;; Flush *ERROR-OUTPUT* even before the BACKTRACE, so that
 	  ;; even if we hit an error within BACKTRACE (e.g. a bug in

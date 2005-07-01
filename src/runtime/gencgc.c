@@ -4154,8 +4154,10 @@ alloc(long nbytes)
             sigaddset_blockable(&new_mask);
             thread_sigmask(SIG_BLOCK,&new_mask,&old_mask);
 
-            if((!data->pending_handler) &&
-               maybe_defer_handler(interrupt_maybe_gc_int,data,0,0,0)) {
+            if(!data->pending_handler) {
+  	        if(!maybe_defer_handler(interrupt_maybe_gc_int,data,0,0,0))
+	    	    lose("Not in atomic: %d.\n",
+                         SymbolValue(PSEUDO_ATOMIC_ATOMIC,thread));
                 /* Leave the signals blocked just as if it was
                  * deferred the normal way and set the
                  * pending_mask. */

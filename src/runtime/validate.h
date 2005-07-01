@@ -42,8 +42,8 @@
 #endif
 
 extern void validate(void);
-extern void protect_control_stack_guard_page(os_thread_t t_id, int protect_p);
-extern void protect_control_stack_return_guard_page(os_thread_t t_id,
+extern void protect_control_stack_guard_page(struct thread *th, int protect_p);
+extern void protect_control_stack_return_guard_page(struct thread *th,
                                                     int protect_p);
 extern os_vm_address_t undefined_alien_address;
 #endif

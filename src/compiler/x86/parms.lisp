@@ -274,7 +274,6 @@
     sb!kernel::memory-fault-error
     sb!di::handle-breakpoint
     fdefinition-object
-    #!+sb-thread sb!thread::handle-thread-exit
 
     ;; free pointers
     ;; 

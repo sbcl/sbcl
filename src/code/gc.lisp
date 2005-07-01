@@ -208,8 +208,8 @@ environment these hooks may run in any thread.")
   (sb!thread:make-mutex :name "GC lock") "ID of thread running SUB-GC")
 
 (defun sub-gc (&key (gen 0))
-  (unless (eql (sb!thread:current-thread-id)
-	       (sb!thread::mutex-value *already-in-gc*))
+  (unless (eq sb!thread:*current-thread*
+              (sb!thread::mutex-value *already-in-gc*))
     ;; With gencgc, unless *NEED-TO-COLLECT-GARBAGE* every allocation
     ;; in this function triggers another gc, potentially exceeding
     ;; maximum interrupt nesting.
@@ -235,8 +235,7 @@ environment these hooks may run in any thread.")
 	    ;; current belief is that it is part of the normal order
 	    ;; of things and not a bug.
 	    (when (plusp freed)
-	      (incf *n-bytes-freed-or-purified* freed)))
-          (sb!thread::reap-dead-threads)))
+	      (incf *n-bytes-freed-or-purified* freed)))))
       ;; Outside the mutex, these may cause another GC. FIXME: it can
       ;; potentially exceed maximum interrupt nesting by triggering
       ;; GCs.
@@ -298,4 +297,3 @@ environment these hooks may run in any thread.")
   "Disable the garbage collector."
   (setq *gc-inhibit* 1)
   nil)
-

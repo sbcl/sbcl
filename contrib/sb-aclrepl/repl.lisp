@@ -301,23 +301,21 @@
   (values))
 
 #+sb-thread
-(defun thread-pids ()
-  "Return a list of the pids for all threads"
-  (let ((offset (* 4 sb-vm::thread-os-thread-slot)))
-    (sb-thread::mapcar-threads
-     #'(lambda (sap) (sb-sys:sap-ref-32 sap offset)))))
+(defun all-threads ()
+  "Return a list of all threads"
+  (sb-thread:list-all-threads))
 
 #+sb-thread
-(defun other-thread-pids ()
-  "Returns a list of pids for all threads except the current process"
-  (delete (sb-thread:current-thread-id) (thread-pids) :test #'eql))
+(defun other-threads ()
+  "Returns a list of all threads except the current one"
+  (delete sb-thread:*current-thread* (all-threads)))
 
 (defun exit-cmd (&optional (status 0))
   #+sb-thread
-  (let ((other-pids (other-thread-pids)))
-    (when other-pids
+  (let ((other-threads (other-threads)))
+    (when other-threads
       (format *output* "There exists the following processes~%")
-      (format *output* "~{~5d~%~}" other-pids)
+      (format *output* "~{~A~%~}" other-threads)
       (format *output* "Do you want to exit lisp anyway [n]? ")
       (force-output *output*)
       (let ((input (string-trim-whitespace (read-line *input*))))
@@ -325,9 +323,9 @@
 		 (or (char= #\y (char input 0))
 		     (char= #\Y (char input 0))))
 	    ;; loop in case more threads get created while trying to exit
-	    (do ((pids other-pids (other-thread-pids)))
-		((eq nil pids))
-	      (map nil #'sb-thread:destroy-thread pids)
+	    (do ((threads other-threads (other-threads)))
+		((eq nil threads))
+	      (map nil #'sb-thread:destroy-thread threads)
 	      (sleep 0.2))
 	    (return-from exit-cmd)))))
   (sb-ext:quit :unix-status status)
@@ -566,43 +564,21 @@
 
 (defun processes-cmd ()
   #+sb-thread
-  (let ((pids (thread-pids))
-	(current-pid (sb-thread:current-thread-id)))
-    (dolist (pid pids)
-      (format *output* "~&~D" pid)
-      (when (= pid current-pid)
-	(format *output* " [current listener]"))))
+  (dolist (thread (all-threads))
+    (format *output* "~&~A" thread)
+    (when (= thread sb-thread:*current-thread*)
+      (format *output* " [current listener]")))
   #-sb-thread
   (format *output* "~&Threads are not supported in this version of sbcl")
   (values))
 
-(defun kill-cmd (&rest selected-pids)
+(defun kill-cmd (&rest selected-threads)
   #+sb-thread
-  (let ((pids (thread-pids)))
-    (dolist (selected-pid selected-pids) 
-      (if (find selected-pid pids :test #'eql)
-	  (progn
-	    (sb-thread:destroy-thread selected-pid)
-	    (format *output* "~&Thread ~A destroyed" selected-pid))
-	  (format *output* "~&No thread ~A exists" selected-pid))))
+  (dolist (thread selected-threads) 
+    (sb-thread:destroy-thread thread)
+    (format *output* "~&Thread ~A destroyed" thread))
   #-sb-thread
-  (declare (ignore selected-pids))
-  #-sb-thread
-  (format *output* "~&Threads are not supported in this version of sbcl")
-  (values))
-
-(defun signal-cmd (signal &rest selected-pids)
-  #+sb-thread
-  (let ((pids (thread-pids)))
-    (dolist (selected-pid selected-pids)
-      (if (find selected-pid pids :test #'eql)
-	  (progn
-	    (sb-unix:unix-kill selected-pid signal)
-	    (format *output* "~&Signal ~A sent to thread ~A"
-		    signal selected-pid))
-	  (format *output* "~&No thread ~A exists" selected-pid))))
-  #-sb-thread
-  (declare (ignore signal selected-pids))
+  (declare (ignore selected-threads))
   #-sb-thread
   (format *output* "~&Threads are not supported in this version of sbcl")
   (values))
@@ -658,7 +634,6 @@
 	 ("inspect" 2 inspect-cmd "inspect an object")
 	 ("istep" 1 istep-cmd "navigate within inspection of a lisp object" :parsing :string)
 	 #+sb-thread ("kill" 2 kill-cmd "kill (destroy) processes")
-	 #+sb-thread ("signal" 2 signal-cmd "send a signal to processes")
 	 #+sb-thread ("focus" 2 focus-cmd "focus the top level on a process")
 	 ("local" 3 local-cmd "print the value of a local variable")
 	 ("pwd" 3 pwd-cmd "print current directory")

@@ -13,19 +13,12 @@
 
 ;;; used bu debug-int.lisp to access interrupt contexts
 #!-sb-fluid (declaim (inline sb!vm::current-thread-offset-sap))
-(defun sb!vm::current-thread-offset-sap (n) 
+(defun sb!vm::current-thread-offset-sap (n)
   (declare (type (unsigned-byte 27) n))
-  (sb!sys:sap-ref-sap (alien-sap (extern-alien "all_threads" (* t))) 
-	       (* n sb!vm:n-word-bytes)))
+  (sb!sys:sap-ref-sap (alien-sap (extern-alien "all_threads" (* t)))
+               (* n sb!vm:n-word-bytes)))
 
-(defun current-thread-id ()
-  ;; FIXME: 32/64
-  (sb!sys:sap-ref-32 (alien-sap (extern-alien "all_threads" (* t))) 
-	       (* sb!vm::thread-os-thread-slot sb!vm:n-word-bytes)))
-
-(defun reap-dead-threads ())
-
-;;;; queues, locks 
+;;;; queues, locks
 
 ;; spinlocks use 0 as "free" value: higher-level locks use NIL
 (defun get-spinlock (lock offset new-value)
@@ -53,7 +46,7 @@
     (when (and old-value wait-p)
       (error "In unithread mode, mutex ~S was requested with WAIT-P ~S and ~
               new-value ~S, but has already been acquired (with value ~S)."
-	     lock wait-p new-value old-value))
+             lock wait-p new-value old-value))
     (setf (mutex-value lock) new-value)
     t))
 
@@ -62,7 +55,7 @@
   (setf (mutex-value lock) nil))
 
 
-;; FIXME need suitable stub or ERROR-signaling definitions for 
+;; FIXME need suitable stub or ERROR-signaling definitions for
 ;; condition-wait (queue lock)
 ;; condition-notify (queue)
 

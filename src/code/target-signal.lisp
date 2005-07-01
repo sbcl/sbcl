@@ -44,6 +44,8 @@
 ;;; When inappropriate build options are used, this also prints messages
 ;;; listing the signals that were masked
 (sb!alien:define-alien-routine "reset_signal_mask" sb!alien:void)
+
+(sb!alien:define-alien-routine "block_blockable_signals" sb!alien:void)
 
 ;;;; C routines that actually do all the work of establishing signal handlers
 (sb!alien:define-alien-routine ("install_handler" install-handler)
@@ -85,7 +87,7 @@
 (defun sigint-%break (format-string &rest format-arguments)
   #!+sb-thread
   (let ((foreground-thread (sb!thread::foreground-thread)))
-    (if (eql foreground-thread (sb!thread:current-thread-id))
+    (if (eq foreground-thread sb!thread:*current-thread*)
         (apply #'%break 'sigint format-string format-arguments)
         (sb!thread:interrupt-thread
          foreground-thread

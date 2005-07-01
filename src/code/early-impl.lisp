@@ -22,7 +22,6 @@
 		  sb!vm::*current-catch-block*
 		  sb!vm::*current-unwind-protect-block*
 		  sb!vm::*alien-stack*
-		  #!+sb-thread sb!thread::*foreground-thread-stack*
 		  sb!vm::*control-stack-start*
 		  sb!vm::*control-stack-end*
 		  sb!vm::*binding-stack-start*

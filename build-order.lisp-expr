@@ -121,6 +121,7 @@
  ;; mostly needed by stuff from comcom, but also used by "x86-vm"
  ("src/code/debug-var-io")
 
+ ("src/code/early-thread")
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; basic machinery for the target Lisp. Note that although most of these
  ;;; files are flagged :NOT-HOST, a few might not be.
@@ -637,8 +638,9 @@
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
  ("src/code/alloc"             :not-host)
 
- #!+sb-thread
  ("src/code/target-thread"     :not-host)
+ #!+sb-thread
+ ("src/code/target-multithread" :not-host)
  #!-sb-thread
  ("src/code/target-unithread"  :not-host)
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp

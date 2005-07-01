@@ -14,11 +14,8 @@
 (define-alien-routine ("protect_control_stack_guard_page"
 		       %protect-control-stack-guard-page)
     sb!alien:void
-  (thread-id #!+sb-thread sb!alien:unsigned-long
-             #!-sb-thread sb!alien:int)
+  (thread-sap system-area-pointer)
   (protect-p sb!alien:int))
 (defun protect-control-stack-guard-page (n)
   (%protect-control-stack-guard-page 
-   (sb!thread:current-thread-id) (if n 1 0)))
-
-
+   (sb!thread::thread-%sap sb!thread:*current-thread*) (if n 1 0)))

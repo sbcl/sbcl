@@ -78,8 +78,7 @@ int arch_os_thread_init(struct thread *thread) {
 	1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
     }; 
     int n;
-    /* thread->os_thread is not set yet*/
-    get_spinlock(&modify_ldt_lock,(int)thread);
+    get_spinlock(&modify_ldt_lock,(long)thread);
     n=modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy);
     /* get next free ldt entry */
 
@@ -139,7 +138,7 @@ int arch_os_thread_cleanup(struct thread *thread) {
     }; 
 
     ldt_entry.entry_number=thread->tls_cookie;
-    get_spinlock(&modify_ldt_lock,thread);
+    get_spinlock(&modify_ldt_lock,(long)thread);
     if (modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) {
 	modify_ldt_lock=0;
 	/* modify_ldt call failed: something magical is not happening */

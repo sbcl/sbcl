@@ -1,4 +1,3 @@
-
 #if !defined(_INCLUDE_THREAD_H_)
 #define _INCLUDE_THREAD_H_
 
@@ -6,6 +5,7 @@
 #include <unistd.h>
 #include <stddef.h>
 #include "sbcl.h"
+#include "globals.h"
 #include "runtime.h"
 #include "os.h"
 #include "interrupt.h"
@@ -18,11 +18,10 @@ struct alloc_region { };
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
 
-#define STATE_RUNNING (make_fixnum(0))
-#define STATE_STOPPING (make_fixnum(1))
-#define STATE_STOPPED (make_fixnum(2))
+#define STATE_STARTING (make_fixnum(0))
+#define STATE_RUNNING (make_fixnum(1))
+#define STATE_SUSPENDED (make_fixnum(2))
 #define STATE_DEAD (make_fixnum(3))
-#define STATE_STARTING (make_fixnum(4))
 
 #define THREAD_SLOT_OFFSET_WORDS(c) \
  (offsetof(struct thread,c)/(sizeof (struct thread *)))
@@ -34,7 +33,6 @@ union per_thread_data {
 
 extern struct thread *all_threads;
 extern int dynamic_values_bytes;
-extern struct thread *find_thread_by_os_thread(os_thread_t tid);
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define for_each_thread(th) for(th=all_threads;th;th=th->next)

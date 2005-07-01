@@ -5,6 +5,13 @@ changes in sbcl-0.9.3 relative to sbcl-0.9.2:
   * Support for the koi8-r external format.  (thanks to Ivan Boldyrev)
   * Bug fix: OPEN no longer fails when *PRINT-READABLY* is T. (thanks
     to Zach Beane)
+  * threads
+    ** incompatible change: the threading api now works with thread
+       objects instead of thread ids
+    ** bug fix: threads are protected from signals and interruption when
+       starting up or going down
+    ** bug fix: a race where an exiting thread could lose its stack to gc
+    ** fixed numerous gc deadlocks introduced in the pthread merge
 
 changes in sbcl-0.9.2 relative to sbcl-0.9.1:
   * numerous signal handling fixes to increase stability

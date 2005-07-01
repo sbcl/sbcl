@@ -53,4 +53,3 @@
 	  (release-mutex ,mutex)))))
   #!-sb-thread
   `(locally ,@body))
-

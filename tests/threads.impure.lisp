@@ -15,6 +15,17 @@
 
 (in-package "SB-THREAD") ; this is white-box testing, really
 
+(let ((old-threads (list-all-threads))
+      (thread (make-thread (lambda ()
+                             (assert (find *current-thread* *all-threads*))
+                             (sleep 2))))
+      (new-threads (list-all-threads)))
+  (assert (thread-alive-p thread))
+  (assert (eq thread (first new-threads)))
+  (assert (= (1+ (length old-threads)) (length new-threads)))
+  (sleep 3)
+  (assert (not (thread-alive-p thread))))
+
 ;;; We had appalling scaling properties for a while.  Make sure they
 ;;; don't reappear.
 (defun scaling-test (function &optional (nthreads 5))
@@ -55,7 +66,7 @@
 
 ;;; elementary "can we get a lock and release it again"
 (let ((l (make-mutex :name "foo"))
-      (p (current-thread-id)))
+      (p *current-thread*))
   (assert (eql (mutex-value l) nil) nil "1")
   (assert (eql (mutex-lock l) 0) nil "2")
   (sb-thread:get-mutex l)
@@ -67,7 +78,7 @@
   (describe l))
 
 (let ((l (make-waitqueue :name "spinlock"))
-      (p (current-thread-id)))
+      (p *current-thread*))
   (assert (eql (waitqueue-lock l) 0) nil "1")
   (with-spinlock (l)
     (assert (eql (waitqueue-lock l) p) nil "2"))
@@ -77,7 +88,7 @@
 ;; test that SLEEP actually sleeps for at least the given time, even
 ;; if interrupted by another thread exiting/a gc/anything
 (let ((start-time (get-universal-time)))
-  (make-thread (lambda () (sleep 1))) ; kid waits 1 then dies ->SIG_THREAD_EXIT
+  (make-thread (lambda () (sleep 1) (sb-ext:gc :full t)))
   (sleep 5)
   (assert (>= (get-universal-time) (+ 5 start-time))))
 
@@ -86,16 +97,16 @@
       (lock (make-mutex :name "lock")))
   (labels ((in-new-thread ()
 	     (with-mutex (lock)
-	       (assert (eql (mutex-value lock) (current-thread-id)))
-	       (format t "~A got mutex~%" (current-thread-id))
+	       (assert (eql (mutex-value lock) *current-thread*))
+	       (format t "~A got mutex~%" *current-thread*)
 	       ;; now drop it and sleep
 	       (condition-wait queue lock)
 	       ;; after waking we should have the lock again
-	       (assert (eql (mutex-value lock) (current-thread-id))))))
+	       (assert (eql (mutex-value lock) *current-thread*)))))
     (make-thread #'in-new-thread)
     (sleep 2)				; give it  a chance to start
     ;; check the lock is free while it's asleep
-    (format t "parent thread ~A~%" (current-thread-id))
+    (format t "parent thread ~A~%" *current-thread*)
     (assert (eql (mutex-value lock) nil))    
     (assert (eql (mutex-lock lock) 0))
     (with-mutex (lock)
@@ -119,7 +130,7 @@
     (make-thread #'in-new-thread)
     (sleep 2)				; give it  a chance to start
     ;; check the lock is free while it's asleep
-    (format t "parent thread ~A~%" (current-thread-id))
+    (format t "parent thread ~A~%" *current-thread*)
     (assert (eql (mutex-value lock) nil))    
     (assert (eql (mutex-lock lock) 0))
     (with-recursive-lock (lock)
@@ -128,13 +139,13 @@
 
 (let ((mutex (make-mutex :name "contended")))
   (labels ((run ()
-	     (let ((me (current-thread-id)))
+	     (let ((me *current-thread*))
 	       (dotimes (i 100)
 		 (with-mutex (mutex)
 		   (sleep .1)
 		   (assert (eql (mutex-value mutex) me)))
 		 (assert (not (eql (mutex-value mutex) me))))
-	       (format t "done ~A~%" (current-thread-id)))))
+	       (format t "done ~A~%" *current-thread*))))
     (let ((kid1 (make-thread #'run))
 	  (kid2 (make-thread #'run)))
       (format t "contention ~A ~A~%" kid1 kid2))))
@@ -146,14 +157,14 @@
     (format t "interrupting child ~A~%" child)
     (interrupt-thread child
 		      (lambda ()
-			(format t "child pid ~A~%" (current-thread-id))
+			(format t "child pid ~A~%" *current-thread*)
 			(when quit-p (sb-ext:quit))))
     (sleep 1)
     child))
 
-;;; separate tests for (a) interrupting Lisp code, (b) C code, (c) a syscall,
-;;; (d) waiting on a lock, (e) some code which we hope is likely to be
-;;; in pseudo-atomic
+;; separate tests for (a) interrupting Lisp code, (b) C code, (c) a syscall,
+;; (d) waiting on a lock, (e) some code which we hope is likely to be
+;; in pseudo-atomic
 
 (let ((child (test-interrupt (lambda () (loop)))))  (terminate-thread child))
 
@@ -168,18 +179,39 @@
     (setf child (test-interrupt
 		 (lambda ()
 		   (with-mutex (lock)
-		     (assert (eql (mutex-value lock) (current-thread-id))))
-		   (assert (not (eql (mutex-value lock) (current-thread-id))))
-		   (sleep 60))))
+		     (assert (eql (mutex-value lock) *current-thread*)))
+		   (assert (not (eql (mutex-value lock) *current-thread*)))
+		   (sleep 10))))
     ;;hold onto lock for long enough that child can't get it immediately
-    (sleep 20)
+    (sleep 5)
     (interrupt-thread child (lambda () (format t "l ~A~%" (mutex-value lock))))
     (format t "parent releasing lock~%"))
   (terminate-thread child))
 
+(format t "~&locking test done~%")
+
 (defun alloc-stuff () (copy-list '(1 2 3 4 5)))
 
-(let ((c (test-interrupt (lambda () (loop (alloc-stuff))))))
+(progn
+  (let ((thread (sb-thread:make-thread (lambda () (loop (alloc-stuff))))))
+    (let ((killers
+           (loop repeat 4 collect
+                 (sb-thread:make-thread
+                  (lambda ()
+                    (loop repeat 25 do
+                          (sleep (random 2d0))
+                          (princ ".")
+                          (force-output)
+                          (sb-thread:interrupt-thread
+                           thread
+                           (lambda ()))))))))
+      (loop while (some #'thread-alive-p killers) do (sleep 0.1))
+      (sb-thread:terminate-thread thread)))
+  (sb-ext:gc :full t))
+
+(format t "~&multi interrupt test done~%")
+
+(let ((c (make-thread (lambda () (loop (alloc-stuff))))))
   ;; NB this only works on x86: other ports don't have a symbol for
   ;; pseudo-atomic atomicity
   (format t "new thread ~A~%" c)
@@ -188,9 +220,11 @@
     (interrupt-thread c
 		      (lambda ()
 			(princ ".") (force-output)
+                        (assert (eq (thread-state *current-thread*) :running))
 			(assert (zerop SB-KERNEL:*PSEUDO-ATOMIC-ATOMIC*)))))
   (terminate-thread c))
-(terpri)
+
+(format t "~&interrupt test done~%")
 
 (defparameter *interrupt-count* 0)
 
@@ -212,21 +246,20 @@
                 (princ ".")
                 (force-output)
                 (sb-impl::atomic-incf/symbol *interrupt-count*))))
-    (sb-sys:with-pinned-objects (func)
-      (setq *interrupt-count* 0)
-      (dotimes (i 100)
-        (sleep (random 1d0))
-        (interrupt-thread c func))
-      (sleep 1)
-      (assert (= 100 *interrupt-count*))
-      (terminate-thread c))))
+    (setq *interrupt-count* 0)
+    (dotimes (i 100)
+      (sleep (random 1d0))
+      (interrupt-thread c func))
+    (sleep 1)
+    (assert (= 100 *interrupt-count*))
+    (terminate-thread c)))
 
-(format t "~&interrupt test done~%")
+(format t "~&interrupt count test done~%")
 
 (let (a-done b-done)
   (make-thread (lambda ()
 		 (dotimes (i 100) 
-		   (sb-ext:gc) (princ "\\") (force-output) )
+		   (sb-ext:gc) (princ "\\") (force-output))
 		 (setf a-done t)))
   (make-thread (lambda ()
 		 (dotimes (i 25) 

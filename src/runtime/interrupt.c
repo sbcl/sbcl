@@ -75,8 +75,6 @@ static void store_signal_data_for_later (struct interrupt_data *data,
 					 os_context_t *context);
 boolean interrupt_maybe_gc_int(int signal, siginfo_t *info, void *v_context);
 
-extern volatile lispobj all_threads_lock;
-
 void sigaddset_blockable(sigset_t *s)
 {
     sigaddset(s, SIGHUP);
@@ -150,7 +148,13 @@ void reset_signal_mask ()
     thread_sigmask(SIG_SETMASK,&new,0);
 }
 
-
+void block_blockable_signals ()
+{
+    sigset_t block;
+    sigemptyset(&block);
+    sigaddset_blockable(&block);
+    thread_sigmask(SIG_BLOCK, &block, 0);
+}
 
 
 /*
@@ -261,10 +265,7 @@ undo_fake_foreign_function_call(os_context_t *context)
 {
     struct thread *thread=arch_os_get_current_thread();
     /* Block all blockable signals. */
-    sigset_t block;
-    sigemptyset(&block);
-    sigaddset_blockable(&block);
-    thread_sigmask(SIG_BLOCK, &block, 0);
+    block_blockable_signals();
 
     /* going back into Lisp */
     foreign_function_call_active = 0;
@@ -639,16 +640,16 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
      * good time to let the kernel reap any of our children in that
      * awful state, to stop them from being waited for indefinitely.
      * Userland reaping is done later when GC is finished  */
-    if(thread->state!=STATE_STOPPING) {
-      lose("sig_stop_for_gc_handler: wrong thread state: %ld\n",
-           fixnum_value(thread->state));
+    if(thread->state!=STATE_RUNNING) {
+        lose("sig_stop_for_gc_handler: wrong thread state: %ld\n",
+             fixnum_value(thread->state));
     }
-    thread->state=STATE_STOPPED;
+    thread->state=STATE_SUSPENDED;
 
     sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
     sigwaitinfo(&ss,0);
-    if(thread->state!=STATE_STOPPED) {
-      lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",
+    if(thread->state!=STATE_SUSPENDED) {
+        lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",
            fixnum_value(thread->state));
     }
     thread->state=STATE_RUNNING;
@@ -839,6 +840,9 @@ void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
      * thread interrupt execution is undefined. */
     struct thread *th=arch_os_get_current_thread();
     struct cons *c;
+    if (th->state != STATE_RUNNING)
+        lose("interrupt_thread_handler: thread %ld in wrong state: %d\n",
+             th->os_thread,fixnum_value(th->state));
     get_spinlock(&th->interrupt_fun_lock,(long)th);
     c=((struct cons *)native_pointer(th->interrupt_fun));
     arrange_return_to_lisp_function(context,c->car);
@@ -869,8 +873,8 @@ boolean handle_guard_page_triggered(os_context_t *context,void *addr){
          * protection so the error handler has some headroom, protect the
          * previous page so that we can catch returns from the guard page
          * and restore it. */
-        protect_control_stack_guard_page(th->os_thread,0);
-        protect_control_stack_return_guard_page(th->os_thread,1);
+        protect_control_stack_guard_page(th,0);
+        protect_control_stack_return_guard_page(th,1);
         
         arrange_return_to_lisp_function
             (context, SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
@@ -882,8 +886,8 @@ boolean handle_guard_page_triggered(os_context_t *context,void *addr){
          * unprotect this one. This works even if we somehow missed
          * the return-guard-page, and hit it on our way to new
          * exhaustion instead. */
-        protect_control_stack_guard_page(th->os_thread,1);
-        protect_control_stack_return_guard_page(th->os_thread,0);
+        protect_control_stack_guard_page(th,1);
+        protect_control_stack_return_guard_page(th,0);
         return 1;
     }
     else if (addr >= undefined_alien_address &&

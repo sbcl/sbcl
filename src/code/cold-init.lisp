@@ -213,6 +213,7 @@
   
   (show-and-call os-cold-init-or-reinit)
 
+  (show-and-call thread-init-or-reinit)
   (show-and-call stream-cold-init-or-reset)
   (show-and-call !loader-cold-init)
   (show-and-call !foreign-cold-init)
@@ -259,7 +260,6 @@
   (terpri)
   (/show0 "going into toplevel loop")
   (handling-end-of-the-world
-    (thread-init-or-reinit)
     (toplevel-init)
     (critically-unreachable "after TOPLEVEL-INIT")))
 
@@ -278,6 +278,7 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
 ;;;; initialization functions
 
 (defun thread-init-or-reinit ()
+  (sb!thread::init-initial-thread)
   (sb!thread::init-job-control)
   (sb!thread::get-foreground))
 
@@ -285,6 +286,7 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
   (without-interrupts
     (without-gcing
 	(os-cold-init-or-reinit)
+      (thread-init-or-reinit)
       (stream-reinit)
       (signal-cold-init-or-reinit)
       (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
@@ -297,7 +299,6 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
       ;; call site.
       (set-floating-point-modes
        :traps '(:overflow #!-netbsd :invalid :divide-by-zero))))
-  (thread-init-or-reinit)
   (gc-reinit)
   ;; make sure TIME works correctly from saved cores
   (setf *internal-real-time-base-seconds* nil)

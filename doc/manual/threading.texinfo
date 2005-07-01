@@ -58,12 +58,11 @@ if you want a bounded wait.
 (defvar *a-mutex* (make-mutex :name "my lock"))
 
 (defun thread-fn ()
-  (let ((id (current-thread-id)))
-    (format t "Thread ~A running ~%" id)
-    (with-mutex (*a-mutex*)
-      (format t "Thread ~A got the lock~%" id)
-      (sleep (random 5)))
-    (format t "Thread ~A dropped lock, dying now~%" id)))
+  (format t "Thread ~A running ~%" *current-thread*)
+  (with-mutex (*a-mutex*)
+    (format t "Thread ~A got the lock~%" *current-thread*)
+    (sleep (random 5)))
+  (format t "Thread ~A dropped lock, dying now~%" *current-thread*)))
 
 (make-thread #'thread-fn)
 (make-thread #'thread-fn)
@@ -130,7 +129,7 @@ it.
       (let ((head (car *buffer*)))
         (setf *buffer* (cdr *buffer*))
         (format t "reader ~A woke, read ~A~%" 
-                (current-thread-id) head))))))
+                *current-thread* head))))))
 
 (defun writer ()
   (loop

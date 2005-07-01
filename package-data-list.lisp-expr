@@ -1587,14 +1587,15 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
       :name "SB!THREAD"
       :use ("CL" "SB!ALIEN" "SB!INT")
       :doc "public (but low-level): native thread support"
-      :export ("MAKE-THREAD"
+      :export ("*CURRENT-THREAD*" "MAKE-THREAD" "THREAD"
+               "THREAD-NAME" "THREAD-ALIVE-P"
+               "LIST-ALL-THREADS"
 	       "MAKE-LISTENER-THREAD" "DESTROY-THREAD" "TERMINATE-THREAD"
 	       "INTERRUPT-THREAD" "WITH-RECURSIVE-LOCK"
 	       "MUTEX" "MAKE-MUTEX" "GET-MUTEX" "RELEASE-MUTEX" "WITH-MUTEX"
 	       "MUTEX-VALUE" "WAITQUEUE" "MAKE-WAITQUEUE"
 	       "CONDITION-WAIT" "CONDITION-NOTIFY" "CONDITION-BROADCAST"
-	       "WITH-RECURSIVE-LOCK" "RELEASE-FOREGROUND" "WITH-NEW-SESSION"
-	       "CURRENT-THREAD-ID"))
+	       "WITH-RECURSIVE-LOCK" "RELEASE-FOREGROUND" "WITH-NEW-SESSION"))
  
    #s(sb-cold:package-data
       :name "SB!LOOP"
