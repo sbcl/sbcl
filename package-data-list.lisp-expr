@@ -1920,6 +1920,7 @@ no guarantees of interface stability."
                "NANOSLEEP"
 	       "UID-USERNAME"
 	       "UID-HOMEDIR"
+               "WITH-RESTARTED-SYSCALL"
 
 	       ;; stuff with a one-to-one mapping to Unix constructs
 	       "D-INO" "D-NAME" "D-NAMLEN" "D-OFF" "D-RECLEN" "DEV-T" "DIRECT"

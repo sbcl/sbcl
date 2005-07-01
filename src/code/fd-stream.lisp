@@ -638,22 +638,19 @@
 	     (setf (fd-stream-ibuf-head stream) 0)
 	     (setf (fd-stream-ibuf-tail stream) tail))))
     (setf (fd-stream-listen stream) nil)
-    (multiple-value-bind (count errno)
-	;; FIXME: Judging from compiler warnings, this WITH-ALIEN form expands
-	;; into something which uses the not-yet-defined type
-	;;   (SB!ALIEN-INTERNALS:ALIEN (* (SB!ALIEN:STRUCT SB!UNIX:FD-SET))).
-	;; This is probably inefficient and unsafe and generally bad, so
-	;; try to find some way to make that type known before
-	;; this is compiled.
-	(sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set)))
-	  (sb!unix:fd-zero read-fds)
-	  (sb!unix:fd-set fd read-fds)
-	  (sb!unix:unix-fast-select (1+ fd)
-				    (sb!alien:addr read-fds)
-				    nil
-				    nil
-				    0
-				    0))
+    (sb!unix:with-restarted-syscall (count errno)
+      ;; FIXME: Judging from compiler warnings, this WITH-ALIEN form expands
+      ;; into something which uses the not-yet-defined type
+      ;;   (SB!ALIEN-INTERNALS:ALIEN (* (SB!ALIEN:STRUCT SB!UNIX:FD-SET))).
+      ;; This is probably inefficient and unsafe and generally bad, so
+      ;; try to find some way to make that type known before
+      ;; this is compiled.
+      (sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set)))
+        (sb!unix:fd-zero read-fds)
+        (sb!unix:fd-set fd read-fds)
+        (sb!unix:unix-fast-select (1+ fd)
+                                  (sb!alien:addr read-fds)
+                                  nil nil 0 0))
       (case count
 	(1)
 	(0
@@ -1515,13 +1512,14 @@
 		   (fd-stream-ibuf-tail fd-stream)))
 	 (fd-stream-listen fd-stream)
 	 (setf (fd-stream-listen fd-stream)
-	       (eql (sb!alien:with-alien ((read-fds (sb!alien:struct
-						     sb!unix:fd-set)))
-		      (sb!unix:fd-zero read-fds)
-		      (sb!unix:fd-set (fd-stream-fd fd-stream) read-fds)
-		      (sb!unix:unix-fast-select (1+ (fd-stream-fd fd-stream))
-						(sb!alien:addr read-fds)
-						nil nil 0 0))
+	       (eql (sb!unix:with-restarted-syscall ()
+                      (sb!alien:with-alien ((read-fds (sb!alien:struct
+                                                       sb!unix:fd-set)))
+                        (sb!unix:fd-zero read-fds)
+                        (sb!unix:fd-set (fd-stream-fd fd-stream) read-fds)
+                        (sb!unix:unix-fast-select (1+ (fd-stream-fd fd-stream))
+                                                  (sb!alien:addr read-fds)
+                                                  nil nil 0 0)))
 		    1))))
     (:unread
      (setf (fd-stream-unread fd-stream) arg1)
@@ -1602,16 +1600,14 @@
      (setf (fd-stream-ibuf-tail fd-stream) 0)
      (catch 'eof-input-catcher
        (loop
-	(let ((count (sb!alien:with-alien ((read-fds (sb!alien:struct
-						      sb!unix:fd-set)))
-		       (sb!unix:fd-zero read-fds)
-		       (sb!unix:fd-set (fd-stream-fd fd-stream) read-fds)
-		       (sb!unix:unix-fast-select (1+ (fd-stream-fd fd-stream))
-						 (sb!alien:addr read-fds)
-						 nil
-						 nil
-						 0
-						 0))))
+	(let ((count (sb!unix:with-restarted-syscall ()
+                       (sb!alien:with-alien ((read-fds (sb!alien:struct
+                                                        sb!unix:fd-set)))
+                         (sb!unix:fd-zero read-fds)
+                         (sb!unix:fd-set (fd-stream-fd fd-stream) read-fds)
+                         (sb!unix:unix-fast-select (1+ (fd-stream-fd fd-stream))
+                                                   (sb!alien:addr read-fds)
+                                                   nil nil 0 0)))))
 	  (cond ((eql count 1)
 		 (refill-buffer/fd fd-stream)
 		 (setf (fd-stream-ibuf-head fd-stream) 0)

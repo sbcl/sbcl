@@ -52,6 +52,7 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 		       :map-file-name "output/cold-sbcl.map")
         #+cmu (ext:quit)
         #+clisp (ext:quit)
+        #+abcl (ext:quit)
 	EOF
 
 echo //testing for consistency of first and second GENESIS passes

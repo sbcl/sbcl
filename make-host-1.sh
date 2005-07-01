@@ -54,4 +54,5 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	(sb!vm:genesis :c-header-dir-name "src/runtime/genesis")
         #+cmu (ext:quit)
         #+clisp (ext:quit)
+        #+abcl (ext:quit)
 	EOF

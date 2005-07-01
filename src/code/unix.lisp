@@ -91,6 +91,19 @@
 
 (defmacro int-syscall ((name &rest arg-types) &rest args)
   `(syscall (,name ,@arg-types) (values result 0) ,@args))
+
+(defmacro with-restarted-syscall ((&optional (value (gensym))
+                                             (errno (gensym)))
+                                  syscall-form &rest body)
+  #!+sb-doc
+  "Evaluate BODY with VALUE and ERRNO bound to the return values of
+SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
+  `(let (,value ,errno)
+     (loop (multiple-value-setq (,value ,errno)
+             ,syscall-form)
+        (unless (eql ,errno sb!unix:eintr)
+          (return (values ,value ,errno))))
+     ,@body))
 
 ;;;; hacking the Unix environment
 

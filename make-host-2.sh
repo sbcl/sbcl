@@ -136,6 +136,7 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
           #+clisp (ext:saveinitmem "output/after-xc.core"))
         #+cmu (ext:quit)
         #+clisp (ext:quit)
+        #+abcl (ext:quit)
 	EOF
 
 # Run GENESIS (again) in order to create cold-sbcl.core. (The first
