@@ -28,28 +28,26 @@
 
 (defun thread-state (thread)
   (let ((state
-         (sb!kernel:make-lisp-obj
-          (sb!sys:sap-int
-           (sb!sys:sap-ref-sap (thread-%sap thread)
-                               (* sb!vm::thread-state-slot
-                                  sb!vm::n-word-bytes))))))
+	 (sb!sys:sap-int
+	  (sb!sys:sap-ref-sap (thread-%sap thread)
+			      (* sb!vm::thread-state-slot
+				 sb!vm::n-word-bytes)))))
     (ecase state
-      (0 :starting)
-      (1 :running)
-      (2 :suspended)
-      (3 :dead))))
+      (#.(sb!vm:fixnumize 0) :starting)
+      (#.(sb!vm:fixnumize 1) :running)
+      (#.(sb!vm:fixnumize 2) :suspended)
+      (#.(sb!vm:fixnumize 3) :dead))))
 
 (defun %set-thread-state (thread state)
   (setf (sb!sys:sap-ref-sap (thread-%sap thread)
                             (* sb!vm::thread-state-slot
                                sb!vm::n-word-bytes))
         (sb!sys:int-sap
-         (sb!kernel:get-lisp-obj-address
-          (ecase state
-            (:starting 0)
-            (:running 1)
-            (:suspended 2)
-            (:dead 3))))))
+	  (ecase state
+	    (:starting #.(sb!vm:fixnumize 0))
+	    (:running #.(sb!vm:fixnumize 1))
+	    (:suspended #.(sb!vm:fixnumize 2))
+	    (:dead #.(sb!vm:fixnumize 3))))))
 
 (defun thread-alive-p (thread)
   (not (eq :dead (thread-state thread))))

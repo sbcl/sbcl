@@ -31,6 +31,7 @@ volatile lispobj all_threads_lock;
 extern struct interrupt_data * global_interrupt_data;
 extern int linux_no_threads_p;
 
+#ifdef LISP_FEATURE_SB_THREAD
 /* When trying to get all_threads_lock one should make sure that
  * sig_stop_for_gc is not blocked. Else there would be a possible
  * deadlock: gc locks it, other thread blocks signals, gc sends stop
@@ -74,6 +75,7 @@ void check_sig_stop_for_gc_can_arrive_or_lose()
         release_spinlock(&all_threads_lock); \
         thread_sigmask(SIG_SETMASK,&_oldset,0); \
     }
+#endif
 
 int
 initial_thread_trampoline(struct thread *th)
