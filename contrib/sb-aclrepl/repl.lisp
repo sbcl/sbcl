@@ -566,7 +566,7 @@
   #+sb-thread
   (dolist (thread (all-threads))
     (format *output* "~&~A" thread)
-    (when (= thread sb-thread:*current-thread*)
+    (when (eq thread sb-thread:*current-thread*)
       (format *output* " [current listener]")))
   #-sb-thread
   (format *output* "~&Threads are not supported in this version of sbcl")
