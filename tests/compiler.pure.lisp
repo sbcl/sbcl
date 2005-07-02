@@ -1790,3 +1790,25 @@
            (DECLARE (TYPE (INTEGER -2 14) B))
            (DECLARE (IGNORABLE B))
            (ASH (IMAGPART B) 57)))
+
+;;; bug reported by Eduardo Mu\~noz
+(multiple-value-bind (fun warnings failure)
+    (compile nil '(lambda (struct first)
+                   (declare (optimize speed))
+                   (let* ((nodes (nodes struct))
+                          (bars (bars struct))
+                          (length (length nodes))
+                          (new (make-array length :fill-pointer 0)))
+                     (vector-push first new)
+                     (loop with i fixnum = 0
+                           for newl fixnum = (length new)
+                           while (< newl length) do
+                           (let ((oldl (length new)))
+                             (loop for j fixnum from i below newl do
+                                   (dolist (n (node-neighbours (aref new j) bars))
+                                     (unless (find n new)
+                                       (vector-push n new))))
+                             (setq i oldl)))
+                     new)))
+  (declare (ignore fun warnings failure))
+  (assert (not failure)))

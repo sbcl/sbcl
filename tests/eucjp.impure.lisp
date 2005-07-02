@@ -1,3 +1,6 @@
+#-sb-unicode
+(sb-ext:quit :unix-status 104)
+
 (let ((p "eucjp-test.data")
       (eucjp "eucjp-test-eucjp.data")
       (utf8 "eucjp-test-utf8.data"))

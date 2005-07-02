@@ -1463,7 +1463,7 @@
   (movable flushable))
 
 (defknown foreign-symbol-address-as-integer (simple-string &optional boolean)
-  integer
+  (values integer boolean)
   (movable flushable))
 
 ;;;; miscellaneous internal utilities

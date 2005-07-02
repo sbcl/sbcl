@@ -46,8 +46,11 @@
                 t))))
 
 (defun foreign-symbol-address-as-integer (name &optional datap)
-  (or (foreign-symbol-address-as-integer-or-nil name datap)
-      (error "Unknown foreign symbol: ~S" name)))
+  (multiple-value-bind (addr sharedp)
+      (foreign-symbol-address-as-integer-or-nil name datap)
+    (if addr
+        (values addr sharedp)
+        (error "Unknown foreign symbol: ~S" name))))
 
 (defun foreign-symbol-address (symbol &optional datap)
   (declare (ignorable datap))

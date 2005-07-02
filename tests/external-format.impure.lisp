@@ -15,6 +15,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#-sb-unicode
+(sb-ext:quit :unix-status 104)
+
 (defmacro do-external-formats ((xf &optional result) &body body)
   (let ((nxf (gensym)))
     `(dolist (,nxf sb-impl::*external-formats* ,result)

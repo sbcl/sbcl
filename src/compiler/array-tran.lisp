@@ -797,5 +797,7 @@
                    ((and (listp dims) (/= (length dims) 1))
                     ;; multi-dimensional array, will have a header
                     (specifier-type '(eql t)))
+                   ((eql (array-type-complexp type) t)
+                    (specifier-type '(eql t)))
                    (t
                     nil)))))))
