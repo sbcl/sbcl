@@ -105,25 +105,8 @@ time sh make-host-2.sh   || exit 1
 time sh make-target-2.sh || exit 1
 time sh make-target-contrib.sh || exit 1
 
-# Sometimes people used to see the "No tests failed." output from the last
-# DEFTEST in contrib self-tests and think that's all that is. So...
-HEADER_HAS_BEEN_PRINTED=false
-for dir in contrib/*
-do
-  if [ -d "$dir" -a -f "$dir/Makefile" -a ! -f "$dir/test-passed" ]; then
-      if $HEADER_HAS_BEEN_PRINTED; then
-	  echo > /dev/null
-      else
-	  echo "Failed contribs:"
-	  HEADER_HAS_BEEN_PRINTED=true
-      fi
-      echo "  `basename $dir`"
-  fi
-done
-
 NCONTRIBS=`find contrib -name Makefile -print | wc -l`
 NPASSED=`find contrib -name test-passed -print | wc -l`
-
 echo
 echo "The build seems to have finished successfully, including $NPASSED (out of $NCONTRIBS)"
 echo "contributed modules. If you would like to run more extensive tests on" 

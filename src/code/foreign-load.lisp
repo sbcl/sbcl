@@ -57,8 +57,8 @@
       (if objp
           (setf (shared-object-sap obj) nil)
           (setf *runtime-dlhandle* nil))
-      (error "Could not open ~:[runtime~;~:*shared object ~S~]: ~A"
-             obj (dlerror)))
+      (error "Error opening ~:[runtime~;shared object ~:*~S~]:~%  ~A."
+             file (dlerror)))
     (when objp
       (setf (shared-object-sap obj) sap))
     sap))

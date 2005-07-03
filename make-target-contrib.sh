@@ -26,7 +26,7 @@ find_gnumake
 SBCL_HOME=`pwd`/contrib
 export SBCL_HOME
 
-SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --userinit /dev/null --sysinit /dev/null" # --disable-debugger"
+SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --userinit /dev/null --sysinit /dev/null --disable-debugger"
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB
 
@@ -51,4 +51,20 @@ for i in contrib/*; do
     # export INSTALL_DIR=$SBCL_HOME/`basename $i `
     test -f $i/test-passed && rm $i/test-passed 
     $GNUMAKE -C $i test && touch $i/test-passed
+done
+
+# Sometimes people used to see the "No tests failed." output from the last
+# DEFTEST in contrib self-tests and think that's all that is. So...
+HEADER_HAS_BEEN_PRINTED=false
+for dir in contrib/*
+do
+  if [ -d "$dir" -a -f "$dir/Makefile" -a ! -f "$dir/test-passed" ]; then
+      if $HEADER_HAS_BEEN_PRINTED; then
+	  echo > /dev/null
+      else
+	  echo "Failed contribs:"
+	  HEADER_HAS_BEEN_PRINTED=true
+      fi
+      echo "  `basename $dir`"
+  fi
 done

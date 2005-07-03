@@ -648,6 +648,12 @@
 (define-condition cell-error (error)
   ((name :reader cell-error-name :initarg :name)))
 
+(def!method print-object ((condition cell-error) stream)
+  (if *print-escape*
+      (print-unreadable-object (condition stream :type t :identity t)
+	(princ (cell-error-name condition) stream))
+      (call-next-method)))
+
 (define-condition unbound-variable (cell-error) ()
   (:report
    (lambda (condition stream)
