@@ -134,6 +134,15 @@
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic"))
 
+(define-vop (fast-signed-binop32-c fast-safe-arith-op)
+  (:args (x :target r :scs (signed-reg zero)))
+  (:info y)
+  (:arg-types signed-num
+	      (:constant (and (signed-byte 32) (not (integer 0 0)))))
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:note "inline (signed-byte 32) arithmetic"))
+
 (define-vop (fast-unsigned-logop-c fast-safe-arith-op)
   (:args (x :target r :scs (unsigned-reg zero)))
   (:info y)
@@ -152,26 +161,32 @@
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 32) logical op"))
 
-
-
-(define-vop (fast-unsigned-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg zero)))
+(define-vop (fast-signed-logop32-c fast-safe-arith-op)
+  (:args (x :target r :scs (signed-reg zero)))
   (:info y)
-  (:arg-types unsigned-num
+  (:arg-types signed-num
+	      (:constant (and (unsigned-byte 32) (not (integer 0 0)))))
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:note "inline (signed-byte 32) logical op"))
+
+(define-vop (fast-signed-binop-c fast-safe-arith-op)
+  (:args (x :target r :scs (signed-reg zero)))
+  (:info y)
+  (:arg-types signed-num
 	      (:constant (and (signed-byte 16) (not (integer 0 0)))))
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:note "inline (unsigned-byte 32) arithmetic"))
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:note "inline (signed-byte 32) arithmetic"))
 
-(define-vop (fast-unsigned-logop-c fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg zero)))
+(define-vop (fast-signed-logop-c fast-safe-arith-op)
+  (:args (x :target r :scs (signed-reg zero)))
   (:info y)
-  (:arg-types unsigned-num
+  (:arg-types signed-num
 	      (:constant (and (unsigned-byte 16) (not (integer 0 0)))))
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:note "inline (unsigned-byte 32) logical op"))
-
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:note "inline (signed-byte 32) logical op"))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
@@ -425,7 +440,6 @@
       (inst unimp (logior (ash (reg-tn-encoding r) 5)
 			  fixnum-additive-overflow-trap))
       (emit-label no-overflow))))
-
 
 (define-vop (-/fixnum fast--/fixnum=>fixnum)
   (:policy :safe)
@@ -730,7 +744,6 @@
   (:args (x :scs (unsigned-reg zero)))
   (:arg-types unsigned-num (:constant (unsigned-byte 16)))
   (:info target not-p y))
-
 
 (define-vop (fast-if-</fixnum fast-conditional/fixnum)
   (:translate <)
