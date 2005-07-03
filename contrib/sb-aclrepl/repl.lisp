@@ -572,11 +572,16 @@
   (format *output* "~&Threads are not supported in this version of sbcl")
   (values))
 
-(defun kill-cmd (&rest selected-threads)
+(defun sb-aclrepl::kill-cmd (&rest selected-threads)
   #+sb-thread
   (dolist (thread selected-threads) 
-    (sb-thread:destroy-thread thread)
-    (format *output* "~&Thread ~A destroyed" thread))
+    (let ((found (find thread (all-threads) :key 'sb-thread:thread-name
+		       :test 'equal)))
+      (if found
+	  (progn
+	    (format *output* "~&Destroying thread ~A" thread)
+	    (sb-thread:destroy-thread found))
+	  (format *output* "~&Thread ~A not found" thread))))
   #-sb-thread
   (declare (ignore selected-threads))
   #-sb-thread
