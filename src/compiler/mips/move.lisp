@@ -239,7 +239,7 @@
     (inst sll y x 2)
       
     (pseudo-atomic
-	(pa-flag :extra (pad-data-block (+ bignum-digits-offset 2)))
+      (pa-flag :extra (pad-data-block (+ bignum-digits-offset 2)))
       (inst or y alloc-tn other-pointer-lowtag)
       (inst slt temp x zero-tn)
       (inst sll temp n-widetag-bits)

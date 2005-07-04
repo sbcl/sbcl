@@ -43,7 +43,8 @@
 (def-mem-op storew sw word-shift nil)
 
 (defmacro load-symbol (reg symbol)
-  `(inst addu ,reg null-tn (static-symbol-offset ,symbol)))
+  (once-only ((reg reg) (symbol symbol))
+    `(inst addu ,reg null-tn (static-symbol-offset ,symbol))))
 
 (defmacro load-symbol-value (reg symbol)
   `(progn
@@ -67,7 +68,7 @@
 	      (n-offset offset))
     (ecase *backend-byte-order*
       (:little-endian
-       `(inst lbu ,n-target ,n-source ,n-offset ))
+       `(inst lbu ,n-target ,n-source ,n-offset))
       (:big-endian
        `(inst lbu ,n-target ,n-source (+ ,n-offset 3))))))
 
@@ -182,7 +183,7 @@
 
 
 ;;;; Error Code
-(eval-when (compile load eval)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defun emit-error-break (vop kind code values)
     (let ((vector (gensym)))
       `((let ((vop ,vop))
@@ -252,9 +253,6 @@
      ,@forms
      (without-scheduling ()
        (let ((label (gen-label)))
-	 (inst nop)
-	 (inst nop)
-	 (inst nop)
 	 (inst bgez ,flag-tn label)
 	 (inst addu alloc-tn (1- ,extra))
 	 (inst break 16)

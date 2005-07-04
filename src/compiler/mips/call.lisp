@@ -1020,7 +1020,7 @@ default-value-8
     ;; Don't bother doing anything.
     ))
 
-;;; Get the lexical environment from it's passing location.
+;;; Get the lexical environment from its passing location.
 ;;;
 (define-vop (setup-closure-environment)
   (:temporary (:sc descriptor-reg :offset lexenv-offset :target closure

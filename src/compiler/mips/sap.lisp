@@ -78,6 +78,13 @@
   (sap-reg) (descriptor-reg))
 
 ;;;; SAP-INT and INT-SAP
+
+;;; The function SAP-INT is used to generate an integer corresponding
+;;; to the system area pointer, suitable for passing to the kernel
+;;; interfaces (which want all addresses specified as integers). The
+;;; function INT-SAP is used to do the opposite conversion. The
+;;; integer representation of a SAP is the byte offset of the SAP from
+;;; the start of the address space.
 (define-vop (sap-int)
   (:args (sap :scs (sap-reg) :target int))
   (:arg-types system-area-pointer)

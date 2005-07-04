@@ -146,15 +146,15 @@
 	
   DONE
   ;; We are done.  Do the jump.
-  (progn
-    (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
-    (lisp-jump temp lip)))
+  (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
+  (lisp-jump temp lip))
 
 
 ;;;; Non-local exit noise.
 
 (define-assembly-routine
     (unwind
+     (:return-style :none)
      (:translate %continue-unwind)
      (:policy :fast-safe))
     ((:arg block (any-reg descriptor-reg) a0-offset)
@@ -178,33 +178,33 @@
       
   (move cur-uwp block)
 
-  do-exit
+  DO-EXIT
       
   (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
   (loadw code-tn cur-uwp unwind-block-current-code-slot)
-  (progn
-    (loadw lra cur-uwp unwind-block-entry-pc-slot)
-    (lisp-return lra lip :frob-code nil))
+  (loadw lra cur-uwp unwind-block-entry-pc-slot)
+  (lisp-return lra lip :frob-code nil)
 
-  do-uwp
+  DO-UWP
 
   (loadw next-uwp cur-uwp unwind-block-current-uwp-slot)
   (inst b do-exit)
   (store-symbol-value next-uwp *current-unwind-protect-block*))
 
 (define-assembly-routine
-    throw
+    (throw
+     (:return-style :none))
     ((:arg target descriptor-reg a0-offset)
      (:arg start any-reg ocfp-offset)
      (:arg count any-reg nargs-offset)
      (:temp catch any-reg a1-offset)
      (:temp tag descriptor-reg a2-offset))
   
-  (progn start count) ; We just need them in the registers.
+  (declare (ignore start count)) ; We only need them in the registers.
 
   (load-symbol-value catch *current-catch-block*)
-  
-  loop
+
+  LOOP
   
   (let ((error (generate-error-code nil unseen-throw-tag-error target)))
     (inst beq catch zero-tn error)

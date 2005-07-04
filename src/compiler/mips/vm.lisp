@@ -27,36 +27,46 @@
 	       `(eval-when (:compile-toplevel :load-toplevel :execute)
 		 (defparameter ,name
 		   (list ,@(mapcar #'(lambda (name) (symbolicate name "-OFFSET")) regs))))))
-  (defreg zero 0)
-  (defreg nl3 1)
-  (defreg cfunc 2)
-  (defreg nl4 3)
-  (defreg nl0 4) ; First C argument reg.
-  (defreg nl1 5)
-  (defreg nl2 6)
-  (defreg nargs 7)
-  (defreg a0 8)
-  (defreg a1 9)
-  (defreg a2 10)
-  (defreg a3 11)
-  (defreg a4 12)
-  (defreg a5 13)
-  (defreg fdefn 14)
-  (defreg lexenv 15)
-  ;; First saved reg
-  (defreg nfp 16)
-  (defreg ocfp 17)
-  (defreg lra 18)
-  (defreg l0 19)
-  (defreg null 20)
-  (defreg bsp 21)
-  (defreg cfp 22)
-  (defreg csp 23)
-  (defreg l1 24)
-  (defreg alloc 25)
-  (defreg nsp 29)
-  (defreg code 30)
-  (defreg lip 31)
+  ;; Wired zero register.
+  (defreg zero 0) ; NULL
+  ;; Reserved for assembler use.
+  (defreg nl3 1) ; untagged temporary 3
+  ;; C return registers.
+  (defreg cfunc 2) ; FF function address, wastes a register
+  (defreg nl4 3) ; PA flag
+  ;; C argument registers.
+  (defreg nl0 4) ; untagged temporary 0
+  (defreg nl1 5) ; untagged temporary 1
+  (defreg nl2 6) ; untagged temporary 2
+  (defreg nargs 7) ; number of function arguments
+  ;; C unsaved temporaries.
+  (defreg a0 8) ; function arg 0
+  (defreg a1 9) ; function arg 1
+  (defreg a2 10) ; function arg 2
+  (defreg a3 11) ; function arg 3
+  (defreg a4 12) ; function arg 4
+  (defreg a5 13) ; function arg 5
+  (defreg fdefn 14) ; ?
+  (defreg lexenv 15) ; wastes a register
+  ;; C saved registers.
+  (defreg nfp 16) ; non-lisp frame pointer
+  (defreg ocfp 17) ; caller's control frame pointer
+  (defreg lra 18) ; tagged Lisp return address
+  (defreg l0 19) ; tagged temporary 0
+  (defreg null 20) ; NIL
+  (defreg bsp 21) ; binding stack pointer
+  (defreg cfp 22) ; control frame pointer
+  (defreg csp 23) ; control stack pointer
+  ;; More C unsaved temporaries.
+  (defreg l1 24) ; tagged temporary 1
+  (defreg alloc 25) ; ALLOC pointer
+  ;; 26 and 27 are used by the system kernel.
+  ;; 28 is the global pointer of our C runtime.
+  (defreg nsp 29) ; number (native) stack pointer
+  ;; C frame pointer, or additional saved register.
+  (defreg code 30) ; current function object
+  ;; Return link register.
+  (defreg lip 31) ; Lisp interior pointer
 
   (defregset non-descriptor-regs
       nl0 nl1 nl2 nl3 nl4 cfunc nargs)
@@ -258,21 +268,24 @@
 		    :sc (sc-or-lose ',sc)
 		    :offset ,offset-sym)))))
   (defregtn zero any-reg)
-  (defregtn lip interior-reg)
-  (defregtn code descriptor-reg)
-  (defregtn alloc any-reg)
-  (defregtn null descriptor-reg)
-
   (defregtn nargs any-reg)
+
   (defregtn fdefn descriptor-reg)
   (defregtn lexenv descriptor-reg)
 
-  (defregtn bsp any-reg)
-  (defregtn csp any-reg)
-  (defregtn cfp any-reg)
+  (defregtn nfp any-reg)
   (defregtn ocfp any-reg)
+
+  (defregtn null descriptor-reg)
+
+  (defregtn bsp any-reg)
+  (defregtn cfp any-reg)
+  (defregtn csp any-reg)
+  (defregtn alloc any-reg)
   (defregtn nsp any-reg)
-  (defregtn nfp any-reg))
+
+  (defregtn code descriptor-reg)
+  (defregtn lip interior-reg))
 
 ;;; If VALUE can be represented as an immediate constant, then return the
 ;;; appropriate SC number, otherwise return NIL.
