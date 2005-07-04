@@ -50,7 +50,13 @@
 (defmacro-mundanely multiple-value-setq (vars value-form)
   (unless (list-of-symbols-p vars)
     (error "Vars is not a list of symbols: ~S" vars))
-  `(values (setf (values ,@vars) ,value-form)))
+  ;; MULTIPLE-VALUE-SETQ is required to always return just the primary
+  ;; value of the value-from, even if there are no vars. (SETF VALUES)
+  ;; in turn is required to return as many values as there are
+  ;; value-places, hence this:
+  (if vars
+      `(values (setf (values ,@vars) ,value-form))
+      `(values ,value-form)))
 
 (defmacro-mundanely multiple-value-list (value-form)
   `(multiple-value-call #'list ,value-form))

@@ -106,7 +106,9 @@
 	   (/show0 "entering COERCE-ERROR")
 	   (error 'simple-type-error
 		  :format-control "~S can't be converted to type ~S."
-		  :format-arguments (list object output-type-spec))))
+		  :format-arguments (list object output-type-spec)
+		  :datum object
+		  :expected-type output-type-spec)))
     (let ((type (specifier-type output-type-spec)))
       (cond
 	((%typep object output-type-spec)

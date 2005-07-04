@@ -248,27 +248,30 @@
 
 ;;;; MAKE-CONDITION
 
-(defun make-condition (thing &rest args)
+(defun make-condition (type &rest args)
   #!+sb-doc
   "Make an instance of a condition object using the specified initargs."
   ;; Note: ANSI specifies no exceptional situations in this function.
   ;; signalling simple-type-error would not be wrong.
-  (let* ((thing (or (and (symbolp thing) (find-classoid thing nil))
-		    thing))
-	 (class (typecase thing
-		  (condition-classoid thing)
+  (let* ((type (or (and (symbolp type) (find-classoid type nil))
+		    type))
+	 (class (typecase type
+		  (condition-classoid type)
+		  (class
+		   ;; Punt to CLOS.
+		   (return-from make-condition (apply #'make-instance type args)))
 		  (classoid
 		   (error 'simple-type-error
-			  :datum thing
+			  :datum type
 			  :expected-type 'condition-class
 			  :format-control "~S is not a condition class."
-			  :format-arguments (list thing)))
+			  :format-arguments (list type)))
 		  (t
 		   (error 'simple-type-error
-			  :datum thing
+			  :datum type
 			  :expected-type 'condition-class
-			  :format-control "bad thing for class argument:~%  ~S"
-			  :format-arguments (list thing)))))
+			  :format-control "Bad type argument:~%  ~S"
+			  :format-arguments (list type)))))
 	 (res (make-condition-object args)))
     (setf (%instance-layout res) (classoid-layout class))
     ;; Set any class slots with initargs present in this call.

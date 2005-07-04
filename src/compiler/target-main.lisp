@@ -114,4 +114,15 @@
   otherwise THING is NAME. When NAME is not NIL, the compiled function
   is also set into (MACRO-FUNCTION NAME) if NAME names a macro, or into
   (FDEFINITION NAME) otherwise."
-  (compile-in-lexenv name definition (make-null-lexenv)))
+  (multiple-value-bind (function warnings-p failure-p) 
+      (compile-in-lexenv name definition (make-null-lexenv))
+    (values (or function
+		name
+		(lambda (&rest arguments)
+		  (error 'simple-program-error
+			 :format-control 
+			 "Called function compiled with errors. Original ~
+                          definition:~%  ~S~@[~%Arguments:~% ~{ ~S~}~]"
+			 :format-arguments (list definition arguments))))
+	    warnings-p
+	    failure-p)))
