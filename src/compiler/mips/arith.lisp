@@ -160,15 +160,24 @@
 (define-binop logand 1 3 and (unsigned-byte 14) (unsigned-byte 16))
 (define-binop logxor 1 3 xor (unsigned-byte 14) (unsigned-byte 16))
 
-;;; KLUDGE: no FIXNUM VOP for LOGNOR, because there's no efficient way
-;;; of restoring the tag bits.  (No -C/ VOPs for LOGNOR because the
-;;; NOR instruction doesn't take immediate args).  -- CSR, 2003-09-11
+;;; No -C/ VOPs for LOGNOR because the NOR instruction doesn't take
+;;; immediate args.  -- CSR, 2003-09-11
+(define-vop (fast-lognor/fixnum=>fixnum fast-fixnum-binop)
+  (:translate lognor)
+  (:args (x :target r :scs (any-reg))
+	 (y :target r :scs (any-reg)))
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:generator 4
+    (inst nor temp x y)
+    (inst addu r temp (- fixnum-tag-mask))))
+
 (define-vop (fast-lognor/signed=>signed fast-signed-binop)
   (:translate lognor)
   (:args (x :target r :scs (signed-reg))
 	 (y :target r :scs (signed-reg)))
   (:generator 4
     (inst nor r x y)))
+
 (define-vop (fast-lognor/unsigned=>unsigned fast-unsigned-binop)
   (:translate lognor)
   (:args (x :target r :scs (unsigned-reg))
