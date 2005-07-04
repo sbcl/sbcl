@@ -354,12 +354,31 @@ there is no corresponding docstring."
      (third (get-name doc)))
     (t
      ;; KLUDGE: Eugh.
+     ;;   
+     ;; believe it or not, the above comment was written before CSR
+     ;; came along and obfuscated this.  (2005-07-04)
      (when (symbolp (get-name doc))
-       (mapcar (lambda (arg)
-		 (labels ((clean (x)
-			    (if (consp x) (clean (car x)) x)))
-		   (clean arg)))
-	       (sb-introspect:function-arglist (get-name doc)))))))
+       (labels ((clean (x &key optional key)
+		  (typecase x
+		    (atom x)
+		    ((cons (member &optional))
+		     (cons (car x) (clean (cdr x) :optional t)))
+		    ((cons (member &key))
+		     (cons (car x) (clean (cdr x) :key t)))
+		    ((cons cons)
+		     (cons 
+		      (cond (key (if (consp (caar x))
+				     (caaar x)
+				     (caar x)))
+			    (optional (caar x))
+			    (t (clean (car x))))
+		      (clean (cdr x) :key key :optional optional)))
+		    (cons
+		     (cons
+		      (cond ((or key optional) (car x))
+			    (t (clean (car x))))
+		      (clean (cdr x) :key key :optional optional))))))
+	 (clean (sb-introspect:function-arglist (get-name doc))))))))
 
 (defun documentation< (x y)
   (let ((p1 (position (get-kind x) *ordered-documentation-kinds*))
@@ -644,7 +663,8 @@ followed another tabulation label or a tabulation body."
 (defun texinfo-anchor (doc)
   (format *texinfo-output* "@anchor{~A}~%" (node-name doc)))
 
-(defun texinfo-begin (doc)
+;;; KLUDGE: &AUX *PRINT-PRETTY* here means "no linebreaks please"
+(defun texinfo-begin (doc &aux *print-pretty*)
   (let ((kind (get-kind doc)))
     (format *texinfo-output* "@~A {~:(~A~)} ~(~A~@[ ~{~A~^ ~}~]~)~%"
 	    (case kind	      

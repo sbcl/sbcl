@@ -1,0 +1,12 @@
+*.aux
+*.cp
+*.fn
+*.info
+*.ky
+*.log
+*.pdf
+*.pg
+*.toc
+*.tp
+*.vr
+*.include
