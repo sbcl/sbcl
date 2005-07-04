@@ -46,9 +46,9 @@
   (:temporary (:sc non-descriptor-reg) temp)
   (:ignore r-moved-ptrs)
   (:generator 1
-    (inst move src last-preserved-ptr)
-    (inst move dest last-nipped-ptr)
-    (inst move temp zero-tn)
+    (move src last-preserved-ptr)
+    (move dest last-nipped-ptr)
+    (move temp zero-tn)
     (inst sltu temp src csp-tn)
     (inst beq temp zero-tn DONE)
     (inst nop) ; not strictly necessary
@@ -61,7 +61,7 @@
     (inst bne temp zero-tn LOOP)
     (inst nop)
     DONE
-    (inst move csp-tn dest)
+    (move csp-tn dest)
     (inst sub src src dest)
     (loop for moved = moved-ptrs then (tn-ref-across moved)
           while moved
@@ -163,8 +163,8 @@
        (inst addu src context skip)))
     (move count num)
     (inst beq num zero-tn done)
-    (inst move start csp-tn)
-    (inst move dst csp-tn)
+    (move start csp-tn t)
+    (move dst csp-tn)
     (inst addu csp-tn count)
     LOOP
     (inst lw temp src)

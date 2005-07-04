@@ -71,11 +71,11 @@
 	     (inst lw entry-point null-tn (static-fun-offset symbol))
 	     (when cur-nfp
 	       (store-stack-tn nfp-save cur-nfp))
-	     (inst move ocfp cfp-tn)
+	     (move ocfp cfp-tn)
 	     (inst compute-lra-from-code lra code-tn lra-label temp)
 	     (note-this-location vop :call-site)
 	     (inst j entry-point)
-	     (inst move cfp-tn csp-tn)
+	     (move cfp-tn csp-tn t)
 	     (emit-return-pc lra-label)
 	     ,(collect ((bindings) (links))
 		(do ((temp (temp-names) (cdr temp))

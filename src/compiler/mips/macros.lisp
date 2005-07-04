@@ -28,10 +28,10 @@
   is nil)."
   (once-only ((n-dst dst)
 	      (n-src src))
-    (if always-emit-code-p
-	`(inst move ,n-dst ,n-src)
-	`(unless (location= ,n-dst ,n-src)
-	   (inst move ,n-dst ,n-src)))))
+    `(if (location= ,n-dst ,n-src)
+	 (when ,always-emit-code-p
+	   (inst nop))
+	 (inst move ,n-dst ,n-src))))
 
 (defmacro def-mem-op (op inst shift load)
   `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
@@ -81,7 +81,7 @@
      (inst addu ,lip ,function (- (ash simple-fun-code-offset word-shift)
 				   fun-pointer-lowtag))
      (inst j ,lip)
-     (move code-tn ,function)))
+     (move code-tn ,function t)))
 
 (defmacro lisp-return (return-pc lip &key (offset 0) (frob-code t))
   "Return to RETURN-PC.  LIP is an interior-reg temporary."
@@ -90,7 +90,7 @@
 	   (- (* (1+ ,offset) n-word-bytes) other-pointer-lowtag))
      (inst j ,lip)
      ,(if frob-code
-	  `(move code-tn ,return-pc)
+	  `(move code-tn ,return-pc t)
 	  '(inst nop))))
 
 

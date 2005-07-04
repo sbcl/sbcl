@@ -64,16 +64,16 @@
   (inst nop)
 
   DEFAULT-A0-AND-ON
-  (inst move a0 null-tn)
-  (inst move a1 null-tn)
+  (move a0 null-tn)
+  (move a1 null-tn)
   DEFAULT-A2-AND-ON
-  (inst move a2 null-tn)
+  (move a2 null-tn)
   DEFAULT-A3-AND-ON
-  (inst move a3 null-tn)
+  (move a3 null-tn)
   DEFAULT-A4-AND-ON
-  (inst move a4 null-tn)
+  (move a4 null-tn)
   DEFAULT-A5-AND-ON
-  (inst move a5 null-tn)
+  (move a5 null-tn)
   DONE
   
   ;; Clear the stack.
@@ -168,8 +168,9 @@
   (declare (ignore start count))
 
   (let ((error (generate-error-code nil invalid-unwind-error)))
-    (inst beq block zero-tn error))
-  
+    (inst beq block zero-tn error)
+    (inst nop))
+
   (load-symbol-value cur-uwp *current-unwind-protect-block*)
   (loadw target-uwp block unwind-block-current-uwp-slot)
   (inst bne cur-uwp target-uwp do-uwp)
@@ -212,12 +213,10 @@
   (loadw tag catch catch-block-tag-slot)
   (inst beq tag target exit)
   (inst nop)
-  (loadw catch catch catch-block-previous-catch-slot)
   (inst b loop)
-  (inst nop)
+  (loadw catch catch catch-block-previous-catch-slot)
   
-  exit
+  EXIT
   
-  (move target catch)
   (inst j (make-fixup 'unwind :assembly-routine))
-  (inst nop))
+  (move target catch t))

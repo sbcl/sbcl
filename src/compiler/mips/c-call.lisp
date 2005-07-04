@@ -250,9 +250,8 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
 	(store-stack-tn nfp-save cur-nfp))
-      (move cfunc function)
       (inst jal (make-fixup "call_into_c" :foreign))
-      (inst nop)
+      (move cfunc function t)
       (when cur-nfp
 	(load-stack-tn cur-nfp nfp-save)))))
 

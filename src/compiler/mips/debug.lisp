@@ -92,7 +92,7 @@
       (assemble (*elsewhere*)
 	(emit-label bogus)
 	(inst b done)
-	(move code null-tn)))))
+	(move code null-tn t)))))
 
 (define-vop (code-from-lra code-from-mumble)
   (:translate lra-code-header)

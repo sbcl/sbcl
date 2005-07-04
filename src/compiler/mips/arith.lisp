@@ -238,7 +238,7 @@
     (inst bne temp zero-tn done)
     (inst srl result number ndesc)
     (inst b done)
-    (inst move result zero-tn)
+    (move result zero-tn t)
 
     POSITIVE
     ;; The result-type assures us that this shift will not overflow.
@@ -340,7 +340,7 @@
 	  (test (gen-label)))
       (move shift arg)
       (inst bgez shift test)
-      (move res zero-tn)
+      (move res zero-tn t)
       (inst b test)
       (inst nor shift shift)
 

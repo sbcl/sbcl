@@ -156,7 +156,7 @@
 	  ((= nvals 1)
 	   (let ((no-values (gen-label)))
 	     (inst beq count zero-tn no-values)
-	     (move (tn-ref-tn values) null-tn)
+	     (move (tn-ref-tn values) null-tn t)
 	     (loadw (tn-ref-tn values) start)
 	     (emit-label no-values)))
 	  (t
@@ -223,8 +223,9 @@
 	(any-reg (move new-start dst))
 	(control-stack (store-stack-tn new-start dst)))
       (inst beq num zero-tn done)
+      (inst nop)
       (sc-case new-count
-	(any-reg (inst move new-count num))
+	(any-reg (move new-count num))
 	(control-stack (store-stack-tn new-count num)))
 
       ;; Copy stuff on stack.
@@ -237,7 +238,7 @@
       (inst addu dst dst n-word-bytes)
 
       (emit-label done)
-      (inst move csp-tn dst))))
+      (move csp-tn dst))))
 
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.

@@ -31,10 +31,10 @@
 	    (note-next-instruction ,vop :call-site)
 	    (inst j (make-fixup ',name :assembly-routine))
 	    (inst nop)
-	    (emit-return-pc lra-label)
-	    (note-this-location ,vop :single-value-return)
 	    (without-scheduling ()
-	      (move csp-tn ocfp-tn)
+	      (emit-return-pc lra-label)
+	      (note-this-location ,vop :single-value-return)
+	      (inst move csp-tn ocfp-tn)
 	      (inst nop))
 	    (inst compute-code-from-lra code-tn code-tn
 		  lra-label ,temp)

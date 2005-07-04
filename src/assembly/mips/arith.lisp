@@ -27,9 +27,9 @@
   ;; DO-STATIC-FUN
   (inst lw lip null-tn (static-fun-offset 'two-arg-+))
   (inst li nargs (fixnumize 2))
-  (inst move ocfp cfp-tn)
+  (move ocfp cfp-tn)
   (inst j lip)
-  (inst move cfp-tn csp-tn)
+  (move cfp-tn csp-tn t)
 
   DO-ADD
   (inst sra temp2 y n-fixnum-tag-bits)
@@ -77,9 +77,9 @@
   ;; DO-STATIC-FUN
   (inst lw lip null-tn (static-fun-offset 'two-arg--))
   (inst li nargs (fixnumize 2))
-  (inst move ocfp cfp-tn)
+  (move ocfp cfp-tn)
   (inst j lip)
-  (inst move cfp-tn csp-tn)
+  (move cfp-tn csp-tn t)
 
   DO-SUB
   (inst sra temp2 y n-fixnum-tag-bits)
@@ -152,12 +152,8 @@
   (pseudo-atomic (pa-flag :extra (pad-data-block (+ 1 bignum-digits-offset)))
     (inst or res alloc-tn other-pointer-lowtag)
     (storew temp res 0 other-pointer-lowtag))
-
-  (storew lo res bignum-digits-offset other-pointer-lowtag)
-
-  ;; Out of here
   (inst b DONE)
-  (inst nop)
+  (storew lo res bignum-digits-offset other-pointer-lowtag)
 
   TWO-WORDS
   (pseudo-atomic (pa-flag :extra (pad-data-block (+ 2 bignum-digits-offset)))
@@ -165,18 +161,15 @@
     (storew temp res 0 other-pointer-lowtag))
 
   (storew lo res bignum-digits-offset other-pointer-lowtag)
-  (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag)
-
-  ;; Out of here
   (inst b DONE)
-  (inst nop)
+  (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag)
 
   DO-STATIC-FUN
   (inst lw lip null-tn (static-fun-offset 'two-arg-*))
   (inst li nargs (fixnumize 2))
-  (inst move ocfp cfp-tn)
+  (move ocfp cfp-tn)
   (inst j lip)
-  (inst move cfp-tn csp-tn)
+  (move cfp-tn csp-tn t)
 
   DONE)
 
@@ -209,13 +202,13 @@
 	  ;; DO-STATIC-FUN
 	  (inst lw lip null-tn (static-fun-offset ',static-fn))
 	  (inst li nargs (fixnumize 2))
-	  (inst move ocfp cfp-tn)
+	  (move ocfp cfp-tn)
 	  (inst j lip)
-	  (inst move cfp-tn csp-tn)
+	  (move cfp-tn csp-tn t)
 	  
 	  DO-COMPARE
 	  (inst beq temp DONE)
-	  (inst move res null-tn)
+	  (move res null-tn t)
 	  (load-symbol res t)
 
 	  DONE)))
@@ -248,13 +241,13 @@
   ;; DO-STATIC-FUN
   (inst lw lip null-tn (static-fun-offset 'eql))
   (inst li nargs (fixnumize 2))
-  (inst move ocfp cfp-tn)
+  (move ocfp cfp-tn)
   (inst j lip)
-  (inst move cfp-tn csp-tn)
+  (move cfp-tn csp-tn t)
 
   RETURN
   (inst bne x y DONE)
-  (inst move res null-tn)
+  (move res null-tn t)
 
   RETURN-T
   (load-symbol res t)
@@ -285,13 +278,13 @@
   ;; DO-STATIC-FUN
   (inst lw lip null-tn (static-fun-offset 'two-arg-=))
   (inst li nargs (fixnumize 2))
-  (inst move ocfp cfp-tn)
+  (move ocfp cfp-tn)
   (inst j lip)
-  (inst move cfp-tn csp-tn)
+  (move cfp-tn csp-tn t)
 
   RETURN
   (inst bne x y DONE)
-  (inst move res null-tn)
+  (move res null-tn t)
   (load-symbol res t)
 
   DONE)
@@ -320,13 +313,13 @@
   ;; DO-STATIC-FUN
   (inst lw lip null-tn (static-fun-offset 'two-arg-/=))
   (inst li nargs (fixnumize 2))
-  (inst move ocfp cfp-tn)
+  (move ocfp cfp-tn)
   (inst j lip)
-  (inst move cfp-tn csp-tn)
+  (move cfp-tn csp-tn t)
 
   RETURN
   (inst beq x y DONE)
-  (inst move res null-tn)
+  (move res null-tn t)
   (load-symbol res t)
 
   DONE)

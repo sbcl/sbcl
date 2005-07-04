@@ -335,8 +335,7 @@
     (inst addu lip offset object)
     (inst sw value lip (- (* instance-slots-offset n-word-bytes)
 			  instance-pointer-lowtag))
-    (unless (location= result value)
-      (move result value))))
+    (move result value)))
 
 (define-vop (raw-instance-ref/single)
   (:translate %raw-instance-ref/single)

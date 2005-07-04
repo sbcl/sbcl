@@ -267,7 +267,7 @@ default-value-8
 	;; gets confused.
 	(without-scheduling ()
 	  (note-this-location vop :single-value-return)
-	  (move csp-tn ocfp-tn)
+	  (inst move csp-tn ocfp-tn)
 	  (inst nop))
 	(when lra-label
 	  (inst compute-code-from-lra code-tn code-tn lra-label temp)))
@@ -282,7 +282,7 @@ default-value-8
 	  ;; If there are no stack results, clear the stack now.
 	  (if (> nvals register-arg-count)
 	      (inst addu temp nargs-tn (fixnumize (- register-arg-count)))
-	      (move csp-tn ocfp-tn)))
+	      (move csp-tn ocfp-tn t)))
 	
 	;; Do the single value calse.
 	(do ((i 1 (1+ i))
@@ -291,7 +291,7 @@ default-value-8
 	  (move (tn-ref-tn val) null-tn))
 	(when (> nvals register-arg-count)
 	  (inst b default-stack-vals)
-	  (move ocfp-tn csp-tn))
+	  (move ocfp-tn csp-tn t))
 	
 	(emit-label regs-defaulted)
 	
@@ -380,9 +380,8 @@ default-value-8
 	  ((null arg))
 	(storew (first arg) args i))
       (move start args)
-      (move count nargs)
       (inst b done)
-      (inst nop)))
+      (move count nargs t)))
   (values))
 
 
@@ -573,7 +572,7 @@ default-value-8
 	      (bytes-needed-for-non-descriptor-stack-frame))))
     (inst addu lip return-pc-temp (- n-word-bytes other-pointer-lowtag))
     (inst j lip)
-    (move cfp-tn ocfp-temp)
+    (move cfp-tn ocfp-temp t)
     (trace-table-entry trace-table-normal)))
 
 
@@ -739,7 +738,7 @@ default-value-8
 			    '((:load-ocfp
 			       (sc-case ocfp
 				 (any-reg
-				  (inst move ocfp-pass ocfp))
+				  (move ocfp-pass ocfp t))
 				 (control-stack
 				  (inst lw ocfp-pass cfp-tn
 					(ash (tn-offset ocfp)
@@ -747,7 +746,7 @@ default-value-8
 			      (:load-return-pc
 			       (sc-case return-pc
 				 (descriptor-reg
-				  (inst move return-pc-pass return-pc))
+				  (move return-pc-pass return-pc t))
 				 (control-stack
 				  (inst lw return-pc-pass cfp-tn
 					(ash (tn-offset return-pc)
@@ -761,7 +760,7 @@ default-value-8
 			      (:frob-nfp
 			       (store-stack-tn nfp-save cur-nfp))
 			      (:save-fp
-			       (inst move ocfp-pass cfp-tn))
+			       (move ocfp-pass cfp-tn t))
 			      (:load-fp
 			       ,(if variable
 				    '(move cfp-tn new-fp)
@@ -811,9 +810,10 @@ default-value-8
 		 (do-next-filler)
 		 (return)))
 	   
+	   (do-next-filler)
 	   (note-this-location vop :call-site)
 	   (inst j entry-point)
-	   (do-next-filler))
+	   (inst nop))
 
 	 ,@(ecase return
 	     (:fixed
@@ -870,15 +870,14 @@ default-value-8
     (move ocfp ocfp-arg)
     (move lra lra-arg)
 
-    ;; Clear the number stack if anything is there.
-    (let ((cur-nfp (current-nfp-tn vop)))
-      (when cur-nfp
-	(inst addu nsp-tn cur-nfp
-	      (bytes-needed-for-non-descriptor-stack-frame))))
-
-    ;; And jump to the assembly-routine that does the bliting.
+    ;; Clear the number stack if anything is there and jump to the
+    ;; assembly-routine that does the bliting.
     (inst j (make-fixup 'tail-call-variable :assembly-routine))
-    (inst nop)))
+    (let ((cur-nfp (current-nfp-tn vop)))
+      (if cur-nfp
+	(inst addu nsp-tn cur-nfp
+	      (bytes-needed-for-non-descriptor-stack-frame))
+	(inst nop)))))
 
 
 ;;;; Unknown values return:
@@ -1002,9 +1001,9 @@ default-value-8
       (move ocfp ocfp-arg)
       (move lra lra-arg)
       (move vals vals-arg)
-      (move nvals nvals-arg)
+
       (inst j (make-fixup 'return-multiple :assembly-routine))
-      (inst nop))
+      (move nvals nvals-arg t))
     (trace-table-entry trace-table-normal)))
 
 
@@ -1068,7 +1067,7 @@ default-value-8
       ;; Everything of interest in registers.
       (inst blez count do-regs)
       ;; Initialize dst to be end of stack.
-      (move dst csp-tn)
+      (move dst csp-tn t)
       ;; Initialize src to be end of args.
       (inst addu src cfp-tn nargs-tn)
 
@@ -1125,7 +1124,7 @@ default-value-8
       (move count count-arg)
       ;; Check to see if there are any arguments.
       (inst beq count zero-tn done)
-      (move result null-tn)
+      (move result null-tn t)
 
       ;; We need to do this atomically.
       (pseudo-atomic (pa-flag)

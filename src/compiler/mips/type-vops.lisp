@@ -191,7 +191,7 @@
       ;; Is it a fixnum?
       (inst and temp value 3)
       (inst beq temp zero-tn fixnum)
-      (inst move temp value)
+      (move temp value t)
 
       ;; If not, is it an other pointer?
       (inst and temp value lowtag-mask)
