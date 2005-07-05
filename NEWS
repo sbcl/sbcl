@@ -17,6 +17,7 @@ changes in sbcl-0.9.3 relative to sbcl-0.9.2:
   * various error reporting improvements.
   * optimizations: LOGNOR on fixnums is improved in the MIPS backend.
     (Thanks to Thiemo Seufer)
+  * bug fix: nested reader invokations work correctly
   * threads
     ** added x86-64 support
     ** incompatible change: the threading api now works with thread
@@ -25,6 +26,7 @@ changes in sbcl-0.9.3 relative to sbcl-0.9.2:
        starting up or going down
     ** bug fix: a race where an exiting thread could lose its stack to gc
     ** fixed numerous gc deadlocks introduced in the pthread merge
+    ** bug fix: fixed thread safety issues in read and print
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** TYPE-ERRORs from signalled by COERCE now have DATUM and
        EXPECTED-TYPE slots filled.

@@ -63,7 +63,8 @@
   ;; FIXME: should probably become inline function
   `(if (typep ,char 'base-char)
        (elt (character-attribute-array ,rt) (char-code ,char))
-       (gethash ,char (character-attribute-hash-table ,rt) +char-attr-constituent+)))
+       (gethash ,char (character-attribute-hash-table ,rt)
+        +char-attr-constituent+)))
 
 (defun set-cat-entry (char newvalue &optional (rt *readtable*))
   (if (typep char 'base-char)
@@ -292,7 +293,8 @@
 	      ((/= (the fixnum
                      (if (typep char 'base-char)
                          (aref attribute-array (char-code char))
-                         (gethash char attribute-hash-table +char-attr-constituent+)))
+                         (gethash char attribute-hash-table
+                                  +char-attr-constituent+)))
 		   +char-attr-whitespace+)
 	       (done-with-fast-read-char)
 	       char)))
@@ -305,7 +307,8 @@
 		 (/= (the fixnum
                        (if (typep char 'base-char)
                            (aref attribute-array (char-code char))
-                           (gethash char attribute-hash-table +char-attr-constituent+)))
+                           (gethash char attribute-hash-table
+                                    +char-attr-constituent+)))
 		     +char-attr-whitespace+))
 	     (if (eq char :eof)
 		 (error 'end-of-file :stream stream)
@@ -374,11 +377,6 @@
      ;; *INCH-PTR* always points to next char to read.
      (setq *inch-ptr* 0)))
 
-(defun !cold-init-read-buffer ()
-  (setq *read-buffer* (make-string 512)) ; initial bufsize
-  (setq *read-buffer-length* 512)
-  (reset-read-buffer))
-
 ;;; FIXME I removed "THE FIXNUM"'s from OUCH-READ-BUFFER and
 ;;; OUCH-UNREAD-BUFFER, check to make sure that Python really is smart
 ;;; enough to make good code without them. And while I'm at it,
@@ -428,6 +426,18 @@
 
 (defun read-buffer-to-string ()
   (subseq *read-buffer* 0 *ouch-ptr*))
+
+(defmacro with-reader ((&optional recursive-p) &body body)
+  #!+sb-doc
+  "If RECURSIVE-P is NIL, bind *READER-BUFFER* and its subservient
+variables to allow for nested and thread safe reading."
+  `(if ,recursive-p
+       (progn ,@body)
+       (let* ((*read-buffer* (make-string 128))
+              (*read-buffer-length* 128)
+              (*ouch-ptr* 0)
+              (*inch-ptr* 0))
+         ,@body)))
 
 ;;;; READ-PRESERVING-WHITESPACE, READ-DELIMITED-LIST, and READ
 
@@ -464,10 +474,11 @@
                        (result (multiple-value-list
                                 (funcall macrofun stream char))))
                   ;; Repeat if macro returned nothing.
-		  (when result 
+		  (when result
                     (return (unless *read-suppress* (car result)))))))))
-      (let ((*sharp-equal-alist* nil))
-	(read-preserving-whitespace stream eof-error-p eof-value t))))
+      (with-reader ()
+        (let ((*sharp-equal-alist* nil))
+          (read-preserving-whitespace stream eof-error-p eof-value t)))))
 
 ;;; Return NIL or a list with one thing, depending.
 ;;;
@@ -507,12 +518,12 @@
   #!+sb-doc
   "Read Lisp values from INPUT-STREAM until the next character after a
    value's representation is ENDCHAR, and return the objects as a list."
-  (declare (ignore recursive-p))
-  (do ((char (flush-whitespace input-stream)
-	     (flush-whitespace input-stream))
-       (retlist ()))
-      ((char= char endchar) (unless *read-suppress* (nreverse retlist)))
-    (setq retlist (nconc (read-maybe-nothing input-stream char) retlist))))
+  (with-reader (recursive-p)
+    (do ((char (flush-whitespace input-stream)
+               (flush-whitespace input-stream))
+         (retlist ()))
+        ((char= char endchar) (unless *read-suppress* (nreverse retlist)))
+      (setq retlist (nconc (read-maybe-nothing input-stream char) retlist)))))
 
 ;;;; basic readmacro definitions
 ;;;;
@@ -1485,11 +1496,6 @@
 
 ;;;; READ-FROM-STRING
 
-;;; FIXME: Is it really worth keeping this pool?
-(defvar *read-from-string-spares* ()
-  #!+sb-doc
-  "A resource of string streams for Read-From-String.")
-
 (defun read-from-string (string &optional (eof-error-p t) eof-value
 				&key (start 0) end
 				preserve-whitespace)
@@ -1498,23 +1504,14 @@
    and the lisp object built by the reader is returned. Macro chars
    will take effect."
   (declare (string string))
-  
   (with-array-data ((string string :offset-var offset)
 		    (start start)
 		    (end (%check-vector-sequence-bounds string start end)))
-    (unless *read-from-string-spares*
-      (push (make-string-input-stream "" 0 0) *read-from-string-spares*))
-    (let ((stream (pop *read-from-string-spares*)))
-      (setf (string-input-stream-string stream)
-	    (coerce string '(simple-array character (*))))
-      (setf (string-input-stream-current stream) start)
-      (setf (string-input-stream-end stream) end)
-      (unwind-protect
-	  (values (if preserve-whitespace
-		      (read-preserving-whitespace stream eof-error-p eof-value)
-		      (read stream eof-error-p eof-value))
-		  (- (string-input-stream-current stream) offset))
-	(push stream *read-from-string-spares*)))))
+    (let ((stream (make-string-input-stream string start end)))
+      (values (if preserve-whitespace
+                  (read-preserving-whitespace stream eof-error-p eof-value)
+                  (read stream eof-error-p eof-value))
+              (- (string-input-stream-current stream) offset)))))
 
 ;;;; PARSE-INTEGER
 
@@ -1577,7 +1574,6 @@
 ;;;; reader initialization code
 
 (defun !reader-cold-init ()
-  (!cold-init-read-buffer)
   (!cold-init-constituent-trait-table)
   (!cold-init-standard-readtable)
   ;; FIXME: This was commented out, but should probably be restored.

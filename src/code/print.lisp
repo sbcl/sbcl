@@ -230,16 +230,11 @@
 
 ;;; This produces the printed representation of an object as a string.
 ;;; The few ...-TO-STRING functions above call this.
-(defvar *string-output-streams* ())
 (defun stringify-object (object)
-  (let ((stream (if *string-output-streams*
-		    (pop *string-output-streams*)
-		    (make-string-output-stream))))
+  (let ((stream (make-string-output-stream)))
     (setup-printer-state)
     (output-object object stream)
-    (prog1
-	(get-output-stream-string stream)
-      (push stream *string-output-streams*))))
+    (get-output-stream-string stream)))
 
 ;;;; support for the PRINT-UNREADABLE-OBJECT macro
 
