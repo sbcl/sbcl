@@ -177,20 +177,21 @@ time we reacquire LOCK and return to the caller."
                 ;; output streams, and we don't necessarily have any (or we
                 ;; could be sharing them)
                 (unwind-protect
-                     (catch 'sb!impl::%end-of-the-world
-                       (with-simple-restart
-                           (terminate-thread
-                            (format nil "~~@<Terminate this thread (~A)~~@:>"
-                                    *current-thread*))
-                         ;; now that most things have a chance to work
-                         ;; properly without messing up other threads, it's
-                         ;; time to enable signals
-                         (sb!unix::reset-signal-mask)
-                         (unwind-protect
-                              (funcall real-function)
-                           ;; we're going down, can't handle
-                           ;; interrupts sanely anymore
-                           (sb!unix::block-blockable-signals))))
+                     (catch 'sb!impl::toplevel-catcher
+                       (catch 'sb!impl::%end-of-the-world
+                         (with-simple-restart
+                             (terminate-thread
+                              (format nil "~~@<Terminate this thread (~A)~~@:>"
+                                      *current-thread*))
+                           ;; now that most things have a chance to work
+                           ;; properly without messing up other threads, it's
+                           ;; time to enable signals
+                           (sb!unix::reset-signal-mask)
+                           (unwind-protect
+                                (funcall real-function)
+                             ;; we're going down, can't handle
+                             ;; interrupts sanely anymore
+                             (sb!unix::block-blockable-signals)))))
                   ;; mark the thread dead, so that the gc does not
                   ;; wait for it to handle sig-stop-for-gc
                   (%set-thread-state thread :dead)

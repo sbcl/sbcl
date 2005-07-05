@@ -345,5 +345,42 @@
   (assert (search "TRACE-THIS" out))
   (assert (search "returned OK" out)))
 
+;;;; test infinite error protection
+
+(defmacro nest-errors (n-levels error-form)
+  (if (< 0 n-levels)
+      `(handler-bind ((error (lambda (condition)
+                               (declare (ignore condition))
+                               ,error-form)))
+        (nest-errors ,(1- n-levels) ,error-form))
+      error-form))
+
+(defun erroring-debugger-hook (condition old-debugger-hook)
+  (let ((*debugger-hook* old-debugger-hook))
+    (format t "recursive condition: ~A~%" condition) (force-output)
+    (error "recursive condition: ~A" condition)))
+
+(defun test-inifinite-error-protection ()
+  ;; after 50 successful throws to SB-IMPL::TOPLEVEL-CATCHER sbcl used
+  ;; to halt, it produces so much garbage that's hard to suppress that
+  ;; it is tested only once
+  (let ((*debugger-hook* #'erroring-debugger-hook))
+    (loop repeat 1 do
+          (let ((error-counter 0)
+                (*terminal-io* (make-broadcast-stream)))
+            (assert
+             (not (eq
+                   :normal-exit
+                   (catch 'sb-impl::toplevel-catcher
+                     (nest-errors 20 (error "infinite error ~s"
+                                            (incf error-counter)))
+                     :normal-exit))))))))
+
+(test-inifinite-error-protection)
+
+#+sb-thread
+(let ((thread (sb-thread:make-thread #'test-inifinite-error-protection)))
+  (loop while (sb-thread:thread-alive-p thread)))
+
 ;;; success
 (quit :unix-status 104)
