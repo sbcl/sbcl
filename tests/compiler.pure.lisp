@@ -1785,6 +1785,12 @@
 ;;; crash in the ASH vop (since a shift of 57 wouldn't fit in the
 ;;; machine's ASH instruction's immediate field) that the compiler
 ;;; thought was legitimate.
+;;;
+;;; FIXME: this has been recorded as bug 383.  The attempted fix (sbcl
+;;; 0.9.2.6) led to lots of spurious optimization notes.  So the bug stil
+;;; exist and this test case serves as a reminder of the problem.
+;;;   --njf, 2005-07-05
+#+nil
 (compile 'nil
          (LAMBDA (B)
            (DECLARE (TYPE (INTEGER -2 14) B))

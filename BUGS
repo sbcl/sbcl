@@ -2083,3 +2083,16 @@ WORKAROUND:
 
   Similar problems exist with SIMPLE-ARRAY-P, ARRAY-HEADER accessors
   and all array dimension functions.
+
+383: ASH'ing non-constant zeros
+  Compiling
+    (lambda (b)
+      (declare (type (integer -2 14) b))
+      (declare (ignorable b))
+      (ash (imagpart b) 57))
+  on PPC (and other platforms, presumably) gives an error during the
+  emission of FASH-ASH-LEFT/FIXNUM=>FIXNUM as the assembler attempts to
+  stuff a too-large constant into the immediate field of a PPC
+  instruction.  Either the VOP should be fixed or the compiler should be
+  taught how to transform this case away, paying particular attention
+  to side-effects that might occur in the arguments to ASH.
