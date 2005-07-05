@@ -715,6 +715,6 @@ bug.~:@>")
     (read-n-bytes *fasl-input-stream* sym 0 len)
     (sb!vm:fixup-code-object code-object
 			     (read-word-arg)
-			     (foreign-symbol-address-as-integer sym t)
+			     (foreign-symbol-address sym t)
 			     kind)
     code-object))

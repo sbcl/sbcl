@@ -27,10 +27,10 @@ testfilestem=${TMPDIR:-/tmp}/sbcl-foreign-test-$$
 
 build_so() {
   echo building $1.so
-  if [ $(uname -m) = x86_64 ]; then
+  if [ "$(uname -m)" = x86_64 ]; then
     CFLAGS="$CFLAGS -fPIC"
   fi
-  if [ $(uname) = Darwin ]; then
+  if [ "$(uname)" = Darwin ]; then
     SO_FLAGS="-bundle"
   else
     SO_FLAGS="-shared"
@@ -83,6 +83,10 @@ cat > $testfilestem.def.lisp <<EOF
   (define-alien-routine "negative_short" short)
   (define-alien-routine "negative_int" int)
   (define-alien-routine "negative_long" long)
+
+  ;; compiling this gets us the FOP-FOREIGN-DATAREF-FIXUP on
+  ;; linkage-table ports
+  (defvar *extern* (extern-alien "negative_short" short))
 
   ;; Test that loading an object file didn't screw up our records
   ;; of variables visible in runtime. (This was a bug until 
@@ -149,8 +153,9 @@ cat > $testfilestem.test.lisp <<EOF
   (sb-ext:quit :unix-status 52) ; success convention for Lisp program
 EOF
 
-${SBCL:-sbcl} --eval "(progn (compile-file #p\"$testfilestem.def.lisp\") (sb-ext:quit :unix-status 52))"
-if [ $? = 52 ] ; then :
+${SBCL:-sbcl} --eval "(progn (load (compile-file #p\"$testfilestem.def.lisp\")) (sb-ext:quit :unix-status 52))"
+if [ $? = 52 ]; then
+    true # nop
 else
     # we can't compile the test file. something's wrong.
     rm $testfilestem.*
@@ -183,7 +188,7 @@ fi
 
 echo table ok
 
-$SBCL_ALLOWING_CORE --core $testfilestem.core --sysinit /dev/null --userinit /dev/null --load $testfilestem.test.lisp
+${SBCL_ALLOWING_CORE:-sbcl} --core $testfilestem.core --sysinit /dev/null --userinit /dev/null --load $testfilestem.test.lisp
 if [ $? != 52 ]; then
     rm $testfilestem.*
     echo test failed: $?
@@ -194,7 +199,7 @@ echo start ok
 
 # missing object file
 rm $testfilestem-b.so $testfilestem-b2.so
-$SBCL_ALLOWING_CORE --core $testfilestem.core --sysinit /dev/null --userinit /dev/null <<EOF
+${SBCL_ALLOWING_CORE:-sbcl} --core $testfilestem.core --sysinit /dev/null --userinit /dev/null <<EOF
   (assert (= 22 (summish 10 11)))
   (multiple-value-bind (val err) (ignore-errors (eval 'foo))
     (assert (not val))
