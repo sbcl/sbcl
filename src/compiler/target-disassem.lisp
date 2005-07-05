@@ -1950,7 +1950,7 @@
     (return-from maybe-note-assembler-routine nil))
   (let ((name (or
 	       #!+linkage-table
-	       (sb!sys:foreign-symbol-in-address (sb!sys:int-sap address))
+	       (sb!sys:sap-foreign-symbol (sb!sys:int-sap address))
 	       (find-assembler-routine address))))
     (unless (null name)
       (note (lambda (stream)

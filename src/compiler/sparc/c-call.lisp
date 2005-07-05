@@ -183,8 +183,8 @@
 			   ,@(new-args))))))
 	(sb!c::give-up-ir1-transform))))
 
-(define-vop (foreign-symbol-address)
-  (:translate foreign-symbol-address)
+(define-vop (foreign-symbol-sap)
+  (:translate foreign-symbol-sap)
   (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))
@@ -195,8 +195,8 @@
     (inst li res (make-fixup foreign-symbol :foreign))))
 
 #!+linkage-table
-(define-vop (foreign-symbol-dataref-address)
-  (:translate foreign-symbol-dataref-address)
+(define-vop (foreign-symbol-dataref-sap)
+  (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))

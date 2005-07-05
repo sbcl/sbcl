@@ -652,7 +652,7 @@
   ((name :reader cell-error-name :initarg :name)))
 
 (def!method print-object ((condition cell-error) stream)
-  (if *print-escape*
+  (if (and *print-escape* (slot-boundp condition 'name))
       (print-unreadable-object (condition stream :type t :identity t)
 	(princ (cell-error-name condition) stream))
       (call-next-method)))
@@ -975,7 +975,12 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 
 ) ; progn
 
-(define-condition undefined-alien-error (error) ())
+(define-condition undefined-alien-error (cell-error) ()
+  (:report
+   (lambda (condition stream)
+     (if (slot-boundp condition 'name)
+	 (format stream "Undefined alien: ~S" (cell-error-name condition))
+	 (format stream "Undefined alien symbol.")))))
 
 (define-condition undefined-alien-variable-error (undefined-alien-error) ()
   (:report

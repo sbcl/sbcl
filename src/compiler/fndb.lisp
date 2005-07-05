@@ -1454,15 +1454,15 @@
 (defknown sb!vm::pop-words-from-c-stack (index) (values) ())
 
 #!+linkage-table
-(defknown foreign-symbol-dataref-address (simple-string)
+(defknown foreign-symbol-dataref-sap (simple-string)
+  system-area-pointer
+  (movable flushable))
+
+(defknown foreign-symbol-sap (simple-string &optional boolean)
   system-area-pointer
   (movable flushable))
 
 (defknown foreign-symbol-address (simple-string &optional boolean)
-  system-area-pointer
-  (movable flushable))
-
-(defknown foreign-symbol-address-as-integer (simple-string &optional boolean)
   (values integer boolean)
   (movable flushable))
 

@@ -73,7 +73,7 @@
     (clear-info :variable :constant-value lisp-name)
     (setf (info :variable :alien-info lisp-name)
 	  (make-heap-alien-info :type type
-				:sap-form `(foreign-symbol-address ',alien-name t)))))
+				:sap-form `(foreign-symbol-sap ',alien-name t)))))
 
 (defmacro extern-alien (name type &environment env)
   #!+sb-doc
@@ -86,7 +86,7 @@
 	 (datap (not (alien-fun-type-p alien-type))))
     `(%heap-alien ',(make-heap-alien-info
 		     :type alien-type
-		     :sap-form `(foreign-symbol-address ',alien-name ,datap)))))
+		     :sap-form `(foreign-symbol-sap ',alien-name ,datap)))))
 
 (defmacro with-alien (bindings &body body &environment env)
   #!+sb-doc
@@ -142,9 +142,8 @@
 		     (/show0 ":EXTERN case")
 		     (let ((info (make-heap-alien-info
 				  :type alien-type
-				  :sap-form `(foreign-symbol-address
-					      ',initial-value
-					      ,datap))))
+				  :sap-form `(foreign-symbol-sap ',initial-value
+								 ,datap))))
 		       `((symbol-macrolet
 			  ((,symbol (%heap-alien ',info)))
 			  ,@body))))

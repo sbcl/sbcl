@@ -98,7 +98,7 @@ SB-EXT:SAVE-LISP-AND-DIE for details."
       (setf *shared-objects* (append (remove obj *shared-objects*)
                                      (list obj)))
       #!+linkage-table
-      (when (or old (undefined-foreign-symbols))
+      (when (or old (undefined-foreign-symbols-p))
         (update-linkage-table))
       (pathname filename))))
 
@@ -139,39 +139,54 @@ SB-EXT:SAVE-LISP-AND-DIE for details."
   (mapc #'dlclose-or-lose (reverse *shared-objects*))
   (dlclose-or-lose))
 
-(let ((symbols ())
-      (undefineds ()))
-  (defun get-dynamic-foreign-symbol-address (symbol &optional datap)
-    (dlerror)				; clear old errors
-    (unless *runtime-dlhandle*
-      (bug "Cannot resolve foreign symbol: lost *runtime-dlhandle*"))
-    ;; On real ELF & dlsym platforms the EXTERN-ALIEN-NAME is a no-op,
-    ;; but on platforms where dlsym is simulated we use the mangled name.
-    (let* ((extern (extern-alien-name symbol))
-	   (result (sap-int (dlsym *runtime-dlhandle* extern)))
-           (err (dlerror))
-           (addr (if (or (not (zerop result)) (not err))
-                     result
-                     (dolist (obj *shared-objects*)
-                       (let ((sap (shared-object-sap obj)))
-                         (when sap
-                           (setf result (sap-int (dlsym sap extern))
-                                 err (dlerror))
-                           (when (or (not (zerop result)) (not err))
-                             (return result))))))))
-      (cond  ((not addr)
-              (style-warn "Undefined alien: ~S" symbol)
-              (pushnew symbol undefineds :test #'equal)
-              (remove symbol symbols :test #'equal)
+(defun find-dynamic-foreign-symbol-address (symbol)
+  (dlerror)				; clear old errors
+  (unless *runtime-dlhandle*
+    (bug "Cannot resolve foreign symbol: lost *runtime-dlhandle*"))
+  ;; On real ELF & dlsym platforms the EXTERN-ALIEN-NAME is a no-op,
+  ;; but on platforms where dlsym is simulated we use the mangled name.
+  (let* ((extern (extern-alien-name symbol))
+	 (result (sap-int (dlsym *runtime-dlhandle* extern)))
+	 (err (dlerror)))
+    (if (or (not (zerop result)) (not err))
+	result
+	(dolist (obj *shared-objects*)
+	  (let ((sap (shared-object-sap obj)))
+	    (when sap
+	      (setf result (sap-int (dlsym sap extern))
+		    err (dlerror))
+	      (when (or (not (zerop result)) (not err))
+		(return result))))))))
+
+(let ((symbols (make-hash-table :test #'equal))
+      (undefineds (make-hash-table :test #'equal)))
+  (defun ensure-dynamic-foreign-symbol-address (symbol &optional datap)
+    "Returns the address of the foreign symbol as an integer. On linkage-table
+ports if the symbols isn't found a special guard address is returned instead,
+accesses to which will result in an UNDEFINED-ALIEN-ERROR. On other ports an
+error is immediately signalled if the symbol isn't found. The returned address
+is never in the linkage-table."
+    (let ((addr (find-dynamic-foreign-symbol-address symbol)))
+      (cond  #!-linkage-table
+	     ((not addr)
+	      (error 'undefined-alien-error :name symbol))
+	     #!+linkage-table
+	     ((not addr)
+	      (style-warn "Undefined alien: ~S" symbol)
+	      (setf (gethash symbol undefineds) t)
+	      (remhash symbol symbols)
 	      (if datap
 		  undefined-alien-address
-		  (foreign-symbol-address-as-integer 
-		   "undefined_alien_function")))
+		  (foreign-symbol-address "undefined_alien_function")))
              (addr
-              (pushnew symbol symbols :test #'equal)
-              (remove symbol undefineds :test #'equal)
+	      (setf (gethash symbol symbols) t)
+	      (remhash symbol undefineds)
               addr))))
-  (defun dynamic-foreign-symbols ()
-    symbols)
-  (defun undefined-foreign-symbols ()
-    undefineds))
+  (defun undefined-foreign-symbols-p ()
+    (plusp (hash-table-count undefineds)))
+  (defun dynamic-foreign-symbols-p ()
+    (plusp (hash-table-count symbols)))
+  (defun list-dynamic-foreign-symbols ()
+    (loop for symbol being each hash-key in symbols
+	 collect symbol)))
+

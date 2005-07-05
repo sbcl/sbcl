@@ -1490,8 +1490,7 @@ core and return a descriptor to it."
 	    (write-wordindexed fdefn
 			       sb!vm:fdefn-raw-addr-slot
 			       (make-random-descriptor
-				(cold-foreign-symbol-address-as-integer
-				 "undefined_tramp"))))
+				(cold-foreign-symbol-address "undefined_tramp"))))
 	  fdefn))))
 
 ;;; Handle the at-cold-init-time, fset-for-static-linkage operation
@@ -1517,8 +1516,7 @@ core and return a descriptor to it."
 			 (#.sb!vm:closure-header-widetag
 			  (/show0 "/static-fset (closure)")
 			  (make-random-descriptor
-			   (cold-foreign-symbol-address-as-integer
-			    "closure_tramp")))))
+			   (cold-foreign-symbol-address "closure_tramp")))))
     fdefn))
 
 (defun initialize-static-fns ()
@@ -1599,7 +1597,7 @@ core and return a descriptor to it."
 		  (setf (gethash name *cold-foreign-symbol-table*) value))))))
   (values))	;; PROGN
 
-(defun cold-foreign-symbol-address-as-integer (name)
+(defun cold-foreign-symbol-address (name)
   (or (find-foreign-symbol-in-table name *cold-foreign-symbol-table*)
       *foreign-symbol-placeholder-value*
       (progn
@@ -2513,7 +2511,7 @@ core and return a descriptor to it."
 	 (sym (make-string len)))
     (read-string-as-bytes *fasl-input-stream* sym)
     (let ((offset (read-word-arg))
-	  (value (cold-foreign-symbol-address-as-integer sym)))
+	  (value (cold-foreign-symbol-address sym)))
       (do-cold-fixup code-object offset value kind))
    code-object))
 

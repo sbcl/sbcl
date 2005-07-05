@@ -112,8 +112,8 @@
 	     :result-tn
 	     (alien-fun-type-result-type type)))))
 
-(define-vop (foreign-symbol-address)
-  (:translate foreign-symbol-address)
+(define-vop (foreign-symbol-sap)
+  (:translate foreign-symbol-sap)
   (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))

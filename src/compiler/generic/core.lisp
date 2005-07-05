@@ -57,13 +57,13 @@
 			 (error "undefined assembler routine: ~S" name)))
 		    (:foreign
 		     (aver (stringp name))
-		     ;; FOREIGN-SYMBOL-ADDRESS-AS-INTEGER signals an error
+		     ;; FOREIGN-SYMBOL-ADDRESS signals an error
 		     ;; if the symbol isn't found.
-		     (foreign-symbol-address-as-integer name))
+		     (foreign-symbol-address name))
 		    #!+linkage-table
 		    (:foreign-dataref
 		     (aver (stringp name))
-		     (foreign-symbol-address-as-integer name t))
+		     (foreign-symbol-address name t))
 		    #!+(or x86 x86-64)
 		    (:code-object
 		     (aver (null name))

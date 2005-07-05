@@ -28,41 +28,63 @@
 (declaim (type hash-table *static-foreign-symbols*))
 (defvar *static-foreign-symbols* (make-hash-table :test 'equal))
 
+(declaim 
+ (ftype (sfunction (string hash-table) (or integer null)) find-foreign-symbol-in-table))
 (defun find-foreign-symbol-in-table (name table)
   (let ((extern (extern-alien-name name)))
-    (or (gethash extern table)
-	(gethash (concatenate 'base-string "ldso_stub__" extern) table))))
+    (values 
+     (or (gethash extern table)
+	 (gethash (concatenate 'base-string "ldso_stub__" extern) table)))))
 
-(defun foreign-symbol-address-as-integer-or-nil (name &optional datap)
-  (declare (ignorable datap))
-  (or (find-foreign-symbol-in-table name  *static-foreign-symbols*)
-      #!+os-provides-dlopen
-      (progn
-        #-sb-xc-host
-        (values #!-linkage-table
-                (get-dynamic-foreign-symbol-address name datap)
-                #!+linkage-table
-                (ensure-foreign-symbol-linkage name datap)
-                t))))
+(defun find-foreign-symbol-address (name)
+  "Returns the address of the foreign symbol NAME, or NIL. Does not enter the
+symbol in the linkage table, and never returns an address in the linkage-table."
+  (or (find-foreign-symbol-in-table name *static-foreign-symbols*)
+      (find-dynamic-foreign-symbol-address name)))
 
-(defun foreign-symbol-address-as-integer (name &optional datap)
-  (multiple-value-bind (addr sharedp)
-      (foreign-symbol-address-as-integer-or-nil name datap)
-    (if addr
-        (values addr sharedp)
-        (error "Unknown foreign symbol: ~S" name))))
+(defun foreign-symbol-address (name &optional datap)
+  "Returns the address of the foreign symbol NAME. DATAP must be true if the
+symbol designates a variable (used only on linkage-table platforms). Returns a
+secondary value that is true if DATAP was true and the symbol is a dynamic
+foreign symbol.
 
-(defun foreign-symbol-address (symbol &optional datap)
+On linkage-table ports the returned address is always static: either direct
+address of a static symbol, or the linkage-table address of a dynamic one.
+Dynamic symbols are entered into the linkage-table if they aren't there already.
+
+On non-linkage-table ports signals an error if the symbol isn't found."
+  (let ((static (find-foreign-symbol-in-table name  *static-foreign-symbols*)))
+    (if static
+	(values static nil)
+	#!+os-provides-dlopen
+	(progn
+	  #-sb-xc-host
+	  (values #!-linkage-table
+		  (ensure-dynamic-foreign-symbol-address name)
+		  #!+linkage-table
+		  (ensure-foreign-symbol-linkage name datap)
+		  t)
+	  #+sb-xc-host
+	  (error 'undefined-alien-error :name name))
+	#!-os-provides-dlopen
+	(error 'undefined-alien-error :name name))))
+
+(defun foreign-symbol-sap (symbol &optional datap)
+  "Returns a SAP corresponding to the foreign symbol. DATAP must be true if the
+symbol designates a variable (used only on linkage-table platforms). May enter
+the symbol into the linkage-table. On non-linkage-table ports signals an error
+if the symbol isn't found."
   (declare (ignorable datap))
   #!-linkage-table
-  (int-sap (foreign-symbol-address-as-integer symbol))
+  (int-sap (foreign-symbol-address symbol))
   #!+linkage-table
   (multiple-value-bind (addr sharedp)
-      (foreign-symbol-address-as-integer symbol datap)
+      (foreign-symbol-address symbol datap)
     #+sb-xc-host
     (aver (not sharedp))
     ;; If the address is from linkage-table and refers to data
-    ;; we need to do a bit of juggling.
+    ;; we need to do a bit of juggling. It is not the address of the
+    ;; variable, but the address where the real address is stored.
     (if (and sharedp datap)
 	(int-sap (sap-ref-word (int-sap addr) 0))
 	(int-sap addr))))
@@ -77,23 +99,19 @@
 ;;; Cleanups before saving a core
 #-sb-xc-host
 (defun foreign-deinit ()
-  ;; KLUDGE: Giving this warning only when non-static foreign symbols
-  ;; are used would be much nicer, but actually pretty hard: we can
-  ;; get dynamic symbols thru the runtime as well, so cheking the
-  ;; list of *shared-objects* is not enough. Eugh & blech.
   #!+(and os-provides-dlopen (not linkage-table))
-  (when (dynamic-foreign-symbols)
+  (when (dynamic-foreign-symbols-p)
     (warn "~@<Saving cores with alien definitions referring to non-static ~
            foreign symbols is unsupported on this platform: references to ~
            such foreign symbols from the restarted core will not work. You ~
            may be able to work around this limitation by reloading all ~
            foreign definitions and code using them in the restarted core, ~
            but no guarantees.~%~%Dynamic foreign symbols in this core: ~
-           ~{~A~^, ~}~:@>" (dynamic-foreign-symbols)))
+           ~{~A~^, ~}~:@>" (list-dynamic-foreign-symbols)))
   #!+os-provides-dlopen
   (close-shared-objects))
 
-(defun foreign-symbol-in-address (sap)
+(defun sap-foreign-symbol (sap)
   (declare (ignorable sap))
   #-sb-xc-host
   (let ((addr (sap-int sap)))
@@ -107,7 +125,7 @@
 		   (when (<= table-addr
 			     addr
 			     (+ table-addr sb!vm:linkage-table-entry-size))
-		     (return-from foreign-symbol-in-address name))))
+		     (return-from sap-foreign-symbol name))))
 	       *linkage-info*))
     #!+os-provides-dladdr
     (with-alien ((info (struct dl-info

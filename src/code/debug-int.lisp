@@ -775,7 +775,7 @@
 					    sb!vm::n-word-bytes))) value))))))
 
 (defun foreign-function-backtrace-name (sap)
-  (let ((name (foreign-symbol-in-address sap)))
+  (let ((name (sap-foreign-symbol sap)))
     (if name
 	(format nil "foreign function: ~A" name)
 	(format nil "foreign function: #x~X" (sap-int sap)))))
@@ -3251,9 +3251,9 @@ register."
   (without-gcing
    ;; These are really code labels, not variables: but this way we get
    ;; their addresses.
-   (let* ((src-start (foreign-symbol-address "fun_end_breakpoint_guts"))
-	  (src-end (foreign-symbol-address "fun_end_breakpoint_end"))
-	  (trap-loc (foreign-symbol-address "fun_end_breakpoint_trap"))
+   (let* ((src-start (foreign-symbol-sap "fun_end_breakpoint_guts"))
+	  (src-end (foreign-symbol-sap "fun_end_breakpoint_end"))
+	  (trap-loc (foreign-symbol-sap "fun_end_breakpoint_trap"))
 	  (length (sap- src-end src-start))
 	  (code-object
 	   (%primitive sb!c:allocate-code-object (1+ bogus-lra-constants)

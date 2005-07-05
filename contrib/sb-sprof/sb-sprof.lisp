@@ -831,7 +831,7 @@
   (declare (type address pc))
   (let ((ptr (sb-di::component-ptr-from-pc (int-sap pc))))
     (cond ((sap= ptr (int-sap 0))
-	   (let ((name (foreign-symbol-in-address (int-sap pc))))
+	   (let ((name (sap-foreign-symbol (int-sap pc))))
 	     (when name
 	       (format nil "foreign function ~a" name))))
 	  (t

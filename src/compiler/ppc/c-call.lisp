@@ -299,8 +299,8 @@
 			   ,@(new-args))))))
 	(sb!c::give-up-ir1-transform))))
 
-(define-vop (foreign-symbol-address)
-  (:translate foreign-symbol-address)
+(define-vop (foreign-symbol-sap)
+  (:translate foreign-symbol-sap)
   (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))
@@ -311,8 +311,8 @@
     (inst lr res  (make-fixup foreign-symbol :foreign))))
 
 #!+linkage-table
-(define-vop (foreign-symbol-dataref-address)
-  (:translate foreign-symbol-dataref-address)
+(define-vop (foreign-symbol-dataref-sap)
+  (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))
@@ -485,7 +485,7 @@
 		(inst stw r0 sp (* 2 n-word-bytes)) ; FIXME: magic constant
 		(inst stwu sp sp (- frame-size))
 		;; Make the call
-		(load-address-into r0 (foreign-symbol-address-as-integer "funcall3"))
+		(load-address-into r0 (foreign-symbol-address "funcall3"))
 		(inst mtlr r0)
 		(inst blrl))
 	      ;; We're back!  Restore sp and lr, load the return value from just

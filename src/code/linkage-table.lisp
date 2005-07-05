@@ -48,7 +48,7 @@
   (let ((table-address (+ (* (hash-table-count *linkage-info*)
 			     sb!vm:linkage-table-entry-size)
 			  sb!vm:linkage-table-space-start))
-	(real-address (get-dynamic-foreign-symbol-address name datap)))
+	(real-address (ensure-dynamic-foreign-symbol-address name datap)))
     (aver real-address)
     (unless (< table-address sb!vm:linkage-table-space-end)
       (error "Linkage-table full (~D entries): cannot link ~S."
@@ -65,8 +65,7 @@
   (sb!thread:with-mutex (*foreign-lock*)
     (let ((info (or (gethash name *linkage-info*)
                     (link-foreign-symbol name datap))))
-      (when info
-        (linkage-info-address info)))))
+      (linkage-info-address info))))
 
 ;;; Update the linkage-table. Called during initialization after all
 ;;; shared libraries have been reopened, and after a previously loaded
@@ -77,7 +76,7 @@
              (let* ((datap (linkage-info-datap info))
 		    (table-address (linkage-info-address info))
 		    (real-address 
-		     (get-dynamic-foreign-symbol-address name datap)))
+		     (ensure-dynamic-foreign-symbol-address name datap)))
 	       (aver (and table-address real-address))
 	       (write-linkage-table-entry table-address
 					  real-address
