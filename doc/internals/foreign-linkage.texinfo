@@ -52,26 +52,27 @@ When a foreign symbol is referred to, it is first looked for in the
 corresponding entry in @code{*LINKAGE-INFO*}, creating one and writing
 the appropriate entry in the linkage table if necessary.
 
-@code{FOREIGN-SYMBOL-ADDRESS} and
-@code{FOREIGN-SYMBOL-ADDRESS-AS-INTEGER} take an optional datap
-argument, used to indicate that the symbol refers to a variable. In
-similar fashion there is a new kind of fixup and a new VOP:
-@code{:FOREIGN-DATAREF} and @code{FOREIGN-SYMBOL-DATAREF-ADDRESS}. The
-@code{DATAP} argument is automagically provided by the alien interface
-for normal definitions, but is really needed only for dynamic foreign
-variables. For those it indicates the need for the indirection either
-within a conditional branch in @code{FOREIGN-SYMBOL-ADDRESS}, or via
-@code{:FOREIGN-DATAREF} fixup and
-@code{FOREIGN-SYMBOL-DATAREF-ADDRESS} VOP: "this address holds the
+@code{FOREIGN-SYMBOL-ADDRESS} and @code{FOREIGN-SYMBOL-SAP} take an
+optional datap argument, used to indicate that the symbol refers to a
+variable. In similar fashion there is a new kind of fixup and a new
+VOP: @code{:FOREIGN-DATAREF} and @code{FOREIGN-SYMBOL-DATAREF-SAP}.
+
+The @code{DATAP} argument is automagically provided by the alien
+interface for normal definitions, but is really needed only for
+dynamic foreign variables. For those it indicates the need for the
+indirection either within a conditional branch in
+@code{FOREIGN-SYMBOL-SAP}, or via @code{:FOREIGN-DATAREF} fixup and
+@code{FOREIGN-SYMBOL-DATAREF-SAP} VOP: "this address holds the
 address of the foreign variable, not the variable itself". Within SBCL
 itself (in the fixups manifest in various VOPs) this fixup type is
 never used, as all foreign symbols used internally are static.
 
-One thing worth noting is that @code{FOREIGN-SYMBOL-ADDRESS} and
-friends now have the potential side-effect of entering information in
-@code{*LINKAGE-INFO*} and the linkage-table proper: hence it's important to
-use the correct datap argument even if calling these just to "check if
-it's there" (like SB-POSIX does).
+One thing worth noting is that @code{FOREIGN-SYMBOL-SAP} and friends
+now have the potential side-effect of entering information in
+@code{*LINKAGE-INFO*} and the linkage-table proper. If the usage case
+is about checking if the symbol is available use
+@code{FIND-FOREIGN-SYMBOL-ADDRESS}, which is side-effect free. (This
+is used by SB-POSIX.)
 
 @subsection Porting
 
@@ -102,7 +103,7 @@ aliens -- which is to say, compile and load code referring to aliens
 before the shared object containing the alien in question has been
 loaded.
 
-This is handled by @code{GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS}, which
+This is handled by @code{ENSURE-DYNAMIC-FOREIGN-SYMBOL-ADDRESS}, which
 first tries to resolve the address in the loaded shared objects, but
 failing that records the alien as undefined and returns the address of
 a read/write/execute protected guard page for variables, and address
