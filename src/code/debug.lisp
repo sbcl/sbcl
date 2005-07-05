@@ -527,10 +527,11 @@ reset to ~S."
 	;; expect to see error messages logged there, regardless of what
 	;; the debugger does afterwards.)
 	(format *error-output*
-		"~2&~@<debugger invoked on a ~S in thread ~A: ~
+		"~2&~@<debugger invoked on a ~S~@[ in thread ~A~]: ~
                     ~2I~_~A~:>~%"
 		(type-of *debug-condition*)
-                sb!thread:*current-thread*
+                #!+sb-thread sb!thread:*current-thread*
+                #!-sb-thread nil
 		*debug-condition*)
       (error (condition)
 	(setf *nested-debug-condition* condition)
@@ -604,9 +605,10 @@ reset to ~S."
     (handler-case
 	(progn
 	  (format *error-output*
-		  "~&~@<unhandled ~S in thread ~S: ~2I~_~A~:>~2%"
+		  "~&~@<unhandled ~S~@[ in thread ~S~]: ~2I~_~A~:>~2%"
 		  (type-of condition)
-		  sb!thread:*current-thread*
+                  #!+sb-thread sb!thread:*current-thread*
+                  #!-sb-thread nil
 		  condition)
 	  ;; Flush *ERROR-OUTPUT* even before the BACKTRACE, so that
 	  ;; even if we hit an error within BACKTRACE (e.g. a bug in
