@@ -166,6 +166,7 @@ ports if the symbols isn't found a special guard address is returned instead,
 accesses to which will result in an UNDEFINED-ALIEN-ERROR. On other ports an
 error is immediately signalled if the symbol isn't found. The returned address
 is never in the linkage-table."
+    (declare (ignorable datap))
     (let ((addr (find-dynamic-foreign-symbol-address symbol)))
       (cond  #!-linkage-table
 	     ((not addr)

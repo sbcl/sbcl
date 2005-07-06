@@ -53,6 +53,7 @@ address of a static symbol, or the linkage-table address of a dynamic one.
 Dynamic symbols are entered into the linkage-table if they aren't there already.
 
 On non-linkage-table ports signals an error if the symbol isn't found."
+  (declare (ignorable datap))
   (let ((static (find-foreign-symbol-in-table name  *static-foreign-symbols*)))
     (if static
 	(values static nil)
