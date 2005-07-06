@@ -18,8 +18,6 @@
 (define-alien-routine reap-dead-thread void
   (thread-sap system-area-pointer))
 
-(defvar *session* nil)
-
 ;;;; queues, locks
 
 ;; spinlocks use 0 as "free" value: higher-level locks use NIL
@@ -153,9 +151,147 @@ time we reacquire LOCK and return to the caller."
     (setf (waitqueue-data queue) me)
     (futex-wake (waitqueue-data-address queue) (ash 1 30))))
 
+;;;; job control, independent listeners
+
+(defstruct session
+  (lock (make-mutex :name "session lock"))
+  (threads nil)
+  (interactive-threads nil)
+  (interactive-threads-queue (make-waitqueue)))
+
+(defvar *session* nil)
+
+;;; the debugger itself tries to acquire the session lock, don't let
+;;; funny situations (like getting a sigint while holding the session
+;;; lock) occur
+(defmacro with-session-lock ((session) &body body)
+  `(sb!sys:without-interrupts
+    (with-mutex ((session-lock ,session))
+      ,@body)))
+
+(defun new-session ()
+  (make-session :threads (list *current-thread*)
+                :interactive-threads (list *current-thread*)))
+
+(defun init-job-control ()
+  (setf *session* (new-session)))
+
+(defun %delete-thread-from-session (thread session)
+  (with-session-lock (session)
+    (setf (session-threads session)
+          (delete thread (session-threads session))
+          (session-interactive-threads session)
+          (delete thread (session-interactive-threads session)))))
+
+(defun call-with-new-session (fn)
+  (%delete-thread-from-session *current-thread* *session*)
+  (let ((*session* (new-session)))
+    (funcall fn)))
+
+(defmacro with-new-session (args &body forms)
+  (declare (ignore args))               ;for extensibility
+  (sb!int:with-unique-names (fb-name)
+    `(labels ((,fb-name () ,@forms))
+      (call-with-new-session (function ,fb-name)))))
+
+;;; Remove thread from its session, if it has one.
+(defun handle-thread-exit (thread)
+  (with-mutex (*all-threads-lock*)
+    (setq *all-threads* (delete thread *all-threads*)))
+  (when *session*
+    (%delete-thread-from-session thread *session*)))
+
+(defun terminate-session ()
+  "Kill all threads in session except for this one.  Does nothing if current
+thread is not the foreground thread"
+  ;; FIXME: threads created in other threads may escape termination
+  (let ((to-kill
+         (with-session-lock (*session*)
+           (and (eq *current-thread*
+                    (car (session-interactive-threads *session*)))
+                (session-threads *session*)))))
+    ;; do the kill after dropping the mutex; unwind forms in dying
+    ;; threads may want to do session things
+    (dolist (thread to-kill)
+      (unless (eq thread *current-thread*)
+        ;; terminate the thread but don't be surprised if it has
+        ;; exited in the meantime
+        (handler-case (terminate-thread thread)
+          (interrupt-thread-error ()))))))
+
+;;; called from top of invoke-debugger
+(defun debugger-wait-until-foreground-thread (stream)
+  "Returns T if thread had been running in background, NIL if it was
+interactive."
+  (declare (ignore stream))
+  (prog1
+      (with-session-lock (*session*)
+        (not (member *current-thread*
+                     (session-interactive-threads *session*))))
+    (get-foreground)))
+
+(defun get-foreground ()
+  (let ((was-foreground t))
+    (loop
+     (with-session-lock (*session*)
+       (let ((int-t (session-interactive-threads *session*)))
+         (when (eq (car int-t) *current-thread*)
+           (unless was-foreground
+             (format *query-io* "Resuming thread ~A~%" *current-thread*))
+           (return-from get-foreground t))
+         (setf was-foreground nil)
+         (unless (member *current-thread* int-t)
+           (setf (cdr (last int-t))
+                 (list *current-thread*)))
+         (condition-wait
+          (session-interactive-threads-queue *session*)
+          (session-lock *session*)))))))
+
+(defun release-foreground (&optional next)
+  "Background this thread.  If NEXT is supplied, arrange for it to
+have the foreground next"
+  (with-session-lock (*session*)
+    (setf (session-interactive-threads *session*)
+          (delete *current-thread* (session-interactive-threads *session*)))
+    (when next
+      (setf (session-interactive-threads *session*)
+            (list* next
+                   (delete next (session-interactive-threads *session*)))))
+    (condition-broadcast (session-interactive-threads-queue *session*))))
+
+(defun foreground-thread ()
+  (car (session-interactive-threads *session*)))
+
+(defun make-listener-thread (tty-name)
+  (assert (probe-file tty-name))
+  (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
+         (out (sb!unix:unix-dup in))
+         (err (sb!unix:unix-dup in)))
+    (labels ((thread-repl ()
+               (sb!unix::unix-setsid)
+               (let* ((sb!impl::*stdin*
+                       (sb!sys:make-fd-stream in :input t :buffering :line
+                                              :dual-channel-p t))
+                      (sb!impl::*stdout*
+                       (sb!sys:make-fd-stream out :output t :buffering :line
+                                              :dual-channel-p t))
+                      (sb!impl::*stderr*
+                       (sb!sys:make-fd-stream err :output t :buffering :line
+                                              :dual-channel-p t))
+                      (sb!impl::*tty*
+                       (sb!sys:make-fd-stream err :input t :output t
+                                              :buffering :line
+                                              :dual-channel-p t))
+                      (sb!impl::*descriptor-handlers* nil))
+                 (with-new-session ()
+                   (unwind-protect
+                        (sb!impl::toplevel-repl nil)
+                     (sb!int:flush-standard-output-streams))))))
+      (make-thread #'thread-repl))))
+
+;;;; the beef
+
 (defun make-thread (function &key name)
-  ;;   ;; don't let them interrupt us because the child is waiting for setup-p
-  ;;   (sb!sys:without-interrupts
   (let* ((thread (%make-thread :name name))
          (setup-p nil)
          (real-function (coerce function 'function))
@@ -205,7 +341,7 @@ time we reacquire LOCK and return to the caller."
     (setf (thread-%sap thread) thread-sap)
     (with-mutex (*all-threads-lock*)
       (push thread *all-threads*))
-    (with-mutex ((session-lock *session*))
+    (with-session-lock (*session*)
       (push thread (session-threads *session*)))
     (setq setup-p t)
     (sb!impl::finalize thread (lambda () (reap-dead-thread thread-sap)))
@@ -258,131 +394,3 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
       (if (eql tl-val sb!vm::unbound-marker-widetag)
           (sb!vm::symbol-global-value symbol)
           (sb!kernel:make-lisp-obj tl-val)))))
-
-;;;; job control, independent listeners
-
-(defstruct session
-  (lock (make-mutex :name "session lock"))
-  (threads nil)
-  (interactive-threads nil)
-  (interactive-threads-queue (make-waitqueue)))
-
-(defun new-session ()
-  (make-session :threads (list *current-thread*)
-                :interactive-threads (list *current-thread*)))
-
-(defun init-job-control ()
-  (setf *session* (new-session)))
-
-(defun %delete-thread-from-session (thread session)
-  (with-mutex ((session-lock session))
-    (setf (session-threads session)
-          (delete thread (session-threads session))
-          (session-interactive-threads session)
-          (delete thread (session-interactive-threads session)))))
-
-(defun call-with-new-session (fn)
-  (%delete-thread-from-session *current-thread* *session*)
-  (let ((*session* (new-session)))
-    (funcall fn)))
-
-(defmacro with-new-session (args &body forms)
-  (declare (ignore args))               ;for extensibility
-  (sb!int:with-unique-names (fb-name)
-    `(labels ((,fb-name () ,@forms))
-      (call-with-new-session (function ,fb-name)))))
-
-;;; Remove thread from its session, if it has one.
-(defun handle-thread-exit (thread)
-  (with-mutex (*all-threads-lock*)
-    (setq *all-threads* (delete thread *all-threads*)))
-  (when *session*
-    (%delete-thread-from-session thread *session*)))
-
-(defun terminate-session ()
-  "Kill all threads in session except for this one.  Does nothing if current
-thread is not the foreground thread"
-  ;; FIXME: threads created in other threads may escape termination
-  (let ((to-kill
-         (with-mutex ((session-lock *session*))
-           (and (eq *current-thread*
-                    (car (session-interactive-threads *session*)))
-                (session-threads *session*)))))
-    ;; do the kill after dropping the mutex; unwind forms in dying
-    ;; threads may want to do session things
-    (dolist (thread to-kill)
-      (unless (eq thread *current-thread*)
-        ;; terminate the thread but don't be surprised if it has
-        ;; exited in the meantime
-        (handler-case (terminate-thread thread)
-          (interrupt-thread-error ()))))))
-
-;;; called from top of invoke-debugger
-(defun debugger-wait-until-foreground-thread (stream)
-  "Returns T if thread had been running in background, NIL if it was
-interactive."
-  (declare (ignore stream))
-  (prog1
-      (with-mutex ((session-lock *session*))
-        (not (member *current-thread*
-                     (session-interactive-threads *session*))))
-    (get-foreground)))
-
-(defun get-foreground ()
-  (let ((was-foreground t))
-    (loop
-     (with-mutex ((session-lock *session*))
-       (let ((int-t (session-interactive-threads *session*)))
-         (when (eq (car int-t) *current-thread*)
-           (unless was-foreground
-             (format *query-io* "Resuming thread ~A~%" *current-thread*))
-           (return-from get-foreground t))
-         (setf was-foreground nil)
-         (unless (member *current-thread* int-t)
-           (setf (cdr (last int-t))
-                 (list *current-thread*)))
-         (condition-wait
-          (session-interactive-threads-queue *session*)
-          (session-lock *session*)))))))
-
-(defun release-foreground (&optional next)
-  "Background this thread.  If NEXT is supplied, arrange for it to
-have the foreground next"
-  (with-mutex ((session-lock *session*))
-    (setf (session-interactive-threads *session*)
-          (delete *current-thread* (session-interactive-threads *session*)))
-    (when next
-      (setf (session-interactive-threads *session*)
-            (list* next
-                   (delete next (session-interactive-threads *session*)))))
-    (condition-broadcast (session-interactive-threads-queue *session*))))
-
-(defun foreground-thread ()
-  (car (session-interactive-threads *session*)))
-
-(defun make-listener-thread (tty-name)
-  (assert (probe-file tty-name))
-  (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
-         (out (sb!unix:unix-dup in))
-         (err (sb!unix:unix-dup in)))
-    (labels ((thread-repl ()
-               (sb!unix::unix-setsid)
-               (let* ((sb!impl::*stdin*
-                       (sb!sys:make-fd-stream in :input t :buffering :line
-                                              :dual-channel-p t))
-                      (sb!impl::*stdout*
-                       (sb!sys:make-fd-stream out :output t :buffering :line
-                                              :dual-channel-p t))
-                      (sb!impl::*stderr*
-                       (sb!sys:make-fd-stream err :output t :buffering :line
-                                              :dual-channel-p t))
-                      (sb!impl::*tty*
-                       (sb!sys:make-fd-stream err :input t :output t
-                                              :buffering :line
-                                              :dual-channel-p t))
-                      (sb!impl::*descriptor-handlers* nil))
-                 (with-new-session ()
-                   (unwind-protect
-                        (sb!impl::toplevel-repl nil)
-                     (sb!int:flush-standard-output-streams))))))
-      (make-thread #'thread-repl))))

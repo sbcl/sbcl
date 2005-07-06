@@ -352,6 +352,18 @@
 
 (format t "~&thread startup sigmask test done~%")
 
+(let* ((main-thread *current-thread*)
+       (interruptor-thread
+        (make-thread (lambda ()
+                       (sleep 2)
+                       (interrupt-thread main-thread #'break)
+                       (sleep 2)
+                       (interrupt-thread main-thread #'continue)))))
+  (with-session-lock (*session*)
+    (sleep 3))
+  (loop while (thread-alive-p interruptor-thread)))
+
+(format t "~&session lock test done~%")
 #|  ;; a cll post from eric marsden
 | (defun crash ()
 |   (setq *debugger-hook*
