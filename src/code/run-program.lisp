@@ -138,6 +138,17 @@
 (defvar *active-processes* nil
   "List of process structures for all active processes.")
 
+(defvar *active-processes-lock* 
+  (sb-thread:make-mutex :name "Lock for active processes."))
+
+;;; *ACTIVE-PROCESSES* can be accessed from multiple threads so a
+;;; mutex is needed. More importantly the sigchld signal handler also
+;;; accesses it, that's why we need without-interrupts.
+(defmacro with-active-processes-lock (() &body body)
+  `(without-interrupts
+    (sb-thread:with-mutex (*active-processes-lock*)
+      ,@body)))
+
 (defstruct (process (:copier nil))
   pid		      ; PID of child process
   %status             ; either :RUNNING, :STOPPED, :EXITED, or :SIGNALED
@@ -245,7 +256,7 @@
     (frob (process-input  proc)   t) ; .. 'cause it will generate SIGPIPE.
     (frob (process-output proc) nil)
     (frob (process-error  proc) nil))
-  (sb-sys:without-interrupts
+  (with-active-processes-lock ()
    (setf *active-processes* (delete proc *active-processes*)))
   proc)
 
@@ -260,17 +271,18 @@
 	  (wait3 t t)
 	(unless pid
 	  (return))
-	(let ((proc (find pid *active-processes* :key #'process-pid)))
-	  (when proc
-	    (setf (process-%status proc) what)
-	    (setf (process-exit-code proc) code)
-	    (setf (process-core-dumped proc) core)
-	    (when (process-status-hook proc)
-	      (funcall (process-status-hook proc) proc))
-	    (when (position what #(:exited :signaled))
-	      (sb-sys:without-interrupts
-	       (setf *active-processes*
-		     (delete proc *active-processes*)))))))))
+        (let ((proc (with-active-processes-lock ()
+                      (find pid *active-processes* :key #'process-pid))))
+          (when proc
+            (setf (process-%status proc) what)
+            (setf (process-exit-code proc) code)
+            (setf (process-core-dumped proc) core)
+            (when (process-status-hook proc)
+              (funcall (process-status-hook proc) proc))
+            (when (position what #(:exited :signaled))
+              (with-active-processes-lock ()
+                (setf *active-processes*
+                      (delete proc *active-processes*)))))))))
 
 ;;;; RUN-PROGRAM and close friends
 
@@ -585,7 +597,7 @@
 		   ;; Make sure we are not notified about the child
 		   ;; death before we have installed the PROCESS
 		   ;; structure in *ACTIVE-PROCESSES*.
-		   (sb-sys:without-interrupts
+		   (with-active-processes-lock ()
 		    (with-c-strvec (args-vec simple-args)
 		      (with-c-strvec (environment-vec environment)
 			(let ((child-pid

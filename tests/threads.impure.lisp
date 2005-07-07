@@ -352,6 +352,7 @@
 
 (format t "~&thread startup sigmask test done~%")
 
+(sb-debug::enable-debugger)
 (let* ((main-thread *current-thread*)
        (interruptor-thread
         (make-thread (lambda ()
