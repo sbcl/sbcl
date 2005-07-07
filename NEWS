@@ -31,6 +31,7 @@ changes in sbcl-0.9.3 relative to sbcl-0.9.2:
     ** bug fix: debugger doesn't hang on session lock if interrupted at
        an inappropriate moment
     ** bug fix: run-program is now thread safe(r)
+    ** bug fix: inner with-recursive-lock no longer releases the mutex
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** TYPE-ERRORs from signalled by COERCE now have DATUM and
        EXPECTED-TYPE slots filled.

@@ -77,6 +77,20 @@
   (assert (eql (mutex-lock l) 0)  nil "6")
   (describe l))
 
+(labels ((ours-p (value)
+           (sb-vm:control-stack-pointer-valid-p
+            (sb-sys:int-sap (sb-kernel:get-lisp-obj-address value)))))
+  (let ((l (make-mutex :name "rec")))
+    (assert (eql (mutex-value l) nil) nil "1")
+    (assert (eql (mutex-lock l) 0) nil "2")
+    (sb-thread:with-recursive-lock (l)
+      (assert (ours-p (mutex-value l)) nil "3")
+      (sb-thread:with-recursive-lock (l)
+        (assert (ours-p (mutex-value l)) nil "4"))
+      (assert (ours-p (mutex-value l)) nil "5"))
+    (assert (eql (mutex-value l) nil) nil "6")
+    (assert (eql (mutex-lock l) 0) nil "7")))
+
 (let ((l (make-waitqueue :name "spinlock"))
       (p *current-thread*))
   (assert (eql (waitqueue-lock l) 0) nil "1")
