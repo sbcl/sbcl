@@ -352,7 +352,7 @@
 
 #+sb-thread
 (progn
-  (defvar *pcl-lock* (sb-thread:make-waitqueue))
+  (defvar *pcl-lock* (sb-thread::make-spinlock))
 
   (defmacro with-pcl-lock (&body body)
     `(sb-thread::with-spinlock (*pcl-lock*)

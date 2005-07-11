@@ -11,9 +11,28 @@
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-sb-thread (quit :unix-status 104)
-
 (in-package "SB-THREAD") ; this is white-box testing, really
+
+(assert (eql 1 (length (list-all-threads))))
+
+(assert (eq *current-thread*
+            (find (thread-name *current-thread*) (list-all-threads)
+                  :key #'thread-name :test #'equal)))
+
+(assert (thread-alive-p *current-thread*))
+
+(let ((a 0))
+  (interrupt-thread *current-thread* (lambda () (setq a 1)))
+  (assert (eql a 1)))
+
+(let ((spinlock (make-spinlock)))
+  (with-spinlock (spinlock)))
+
+(let ((mutex (make-mutex)))
+  (with-mutex (mutex)
+    mutex))
+
+#-sb-thread (sb-ext:quit :unix-status 104)
 
 (let ((old-threads (list-all-threads))
       (thread (make-thread (lambda ()
@@ -68,36 +87,29 @@
 (let ((l (make-mutex :name "foo"))
       (p *current-thread*))
   (assert (eql (mutex-value l) nil) nil "1")
-  (assert (eql (mutex-lock l) 0) nil "2")
   (sb-thread:get-mutex l)
   (assert (eql (mutex-value l) p) nil "3")
-  (assert (eql (mutex-lock l) 0) nil "4")
   (sb-thread:release-mutex l)
-  (assert (eql (mutex-value l) nil) nil "5")
-  (assert (eql (mutex-lock l) 0)  nil "6")
-  (describe l))
+  (assert (eql (mutex-value l) nil) nil "5"))
 
 (labels ((ours-p (value)
            (sb-vm:control-stack-pointer-valid-p
             (sb-sys:int-sap (sb-kernel:get-lisp-obj-address value)))))
   (let ((l (make-mutex :name "rec")))
     (assert (eql (mutex-value l) nil) nil "1")
-    (assert (eql (mutex-lock l) 0) nil "2")
     (sb-thread:with-recursive-lock (l)
       (assert (ours-p (mutex-value l)) nil "3")
       (sb-thread:with-recursive-lock (l)
         (assert (ours-p (mutex-value l)) nil "4"))
       (assert (ours-p (mutex-value l)) nil "5"))
-    (assert (eql (mutex-value l) nil) nil "6")
-    (assert (eql (mutex-lock l) 0) nil "7")))
+    (assert (eql (mutex-value l) nil) nil "6")))
 
-(let ((l (make-waitqueue :name "spinlock"))
+(let ((l (make-spinlock :name "spinlock"))
       (p *current-thread*))
-  (assert (eql (waitqueue-lock l) 0) nil "1")
+  (assert (eql (spinlock-value l) 0) nil "1")
   (with-spinlock (l)
-    (assert (eql (waitqueue-lock l) p) nil "2"))
-  (assert (eql (waitqueue-lock l) 0) nil "3")
-  (describe l))
+    (assert (eql (spinlock-value l) p) nil "2"))
+  (assert (eql (spinlock-value l) 0) nil "3"))
 
 ;; test that SLEEP actually sleeps for at least the given time, even
 ;; if interrupted by another thread exiting/a gc/anything
@@ -108,7 +120,8 @@
 
 
 (let ((queue (make-waitqueue :name "queue"))
-      (lock (make-mutex :name "lock")))
+      (lock (make-mutex :name "lock"))
+      (n 0))
   (labels ((in-new-thread ()
 	     (with-mutex (lock)
 	       (assert (eql (mutex-value lock) *current-thread*))
@@ -116,14 +129,16 @@
 	       ;; now drop it and sleep
 	       (condition-wait queue lock)
 	       ;; after waking we should have the lock again
-	       (assert (eql (mutex-value lock) *current-thread*)))))
+	       (assert (eql (mutex-value lock) *current-thread*))
+               (assert (eql n 1))
+               (decf n))))
     (make-thread #'in-new-thread)
     (sleep 2)				; give it  a chance to start
     ;; check the lock is free while it's asleep
     (format t "parent thread ~A~%" *current-thread*)
     (assert (eql (mutex-value lock) nil))    
-    (assert (eql (mutex-lock lock) 0))
     (with-mutex (lock)
+      (incf n)
       (condition-notify queue))
     (sleep 1)))
 
@@ -146,7 +161,6 @@
     ;; check the lock is free while it's asleep
     (format t "parent thread ~A~%" *current-thread*)
     (assert (eql (mutex-value lock) nil))    
-    (assert (eql (mutex-lock lock) 0))
     (with-recursive-lock (lock)
       (condition-notify queue))
     (sleep 1)))
@@ -272,11 +286,11 @@
 
 (let (a-done b-done)
   (make-thread (lambda ()
-		 (dotimes (i 100) 
+		 (dotimes (i 100)
 		   (sb-ext:gc) (princ "\\") (force-output))
 		 (setf a-done t)))
   (make-thread (lambda ()
-		 (dotimes (i 25) 
+		 (dotimes (i 25)
 		   (sb-ext:gc :full t)
 		   (princ "/") (force-output))
 		 (setf b-done t)))

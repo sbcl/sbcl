@@ -1587,15 +1587,20 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
       :name "SB!THREAD"
       :use ("CL" "SB!ALIEN" "SB!INT")
       :doc "public (but low-level): native thread support"
-      :export ("*CURRENT-THREAD*" "MAKE-THREAD" "THREAD"
+      :export ("*CURRENT-THREAD*" "THREAD" "MAKE-THREAD"
                "THREAD-NAME" "THREAD-ALIVE-P"
                "LIST-ALL-THREADS"
-	       "MAKE-LISTENER-THREAD" "DESTROY-THREAD" "TERMINATE-THREAD"
-	       "INTERRUPT-THREAD" "WITH-RECURSIVE-LOCK"
-	       "MUTEX" "MAKE-MUTEX" "GET-MUTEX" "RELEASE-MUTEX" "WITH-MUTEX"
-	       "MUTEX-VALUE" "WAITQUEUE" "MAKE-WAITQUEUE"
+               "INTERRUPT-THREAD-ERROR"
+               "INTERRUPT-THREAD-ERROR-THREAD"
+               "INTERRUPT-THREAD-ERROR-ERRNO"
+               "INTERRUPT-THREAD" "TERMINATE-THREAD" "DESTROY-THREAD"
+	       "MUTEX" "MAKE-MUTEX" "MUTEX-NAME" "MUTEX-VALUE"
+               "GET-MUTEX" "RELEASE-MUTEX" "WITH-MUTEX"
+	       "WITH-RECURSIVE-LOCK"
+	       "WAITQUEUE" "MAKE-WAITQUEUE" "WAITQUEUE-NAME"
 	       "CONDITION-WAIT" "CONDITION-NOTIFY" "CONDITION-BROADCAST"
-	       "WITH-RECURSIVE-LOCK" "RELEASE-FOREGROUND" "WITH-NEW-SESSION"))
+	       "MAKE-LISTENER-THREAD"
+	       "RELEASE-FOREGROUND" "WITH-NEW-SESSION"))
  
    #s(sb-cold:package-data
       :name "SB!LOOP"

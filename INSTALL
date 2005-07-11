@@ -228,6 +228,7 @@ INSTALLING SBCL
     CMUCL
     OpenMCL
     CLISP (recent versions only)
+    ABCL (recent versions only)
 
     Note that every release isn't tested with every possible host
     compiler.  You're most likely to get a clean build with SBCL itself

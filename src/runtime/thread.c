@@ -325,11 +325,6 @@ struct thread *create_thread(lispobj initial_function) {
     else
         return 0;
 }
-#endif
-
-#if defined LISP_FEATURE_SB_THREAD
-/* This is not needed unless #+SB-THREAD, as there's a trivial null
- * unithread definition. */
 
 /* called from lisp from the thread object finalizer */
 void reap_dead_thread(struct thread *th)

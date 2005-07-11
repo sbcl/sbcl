@@ -639,10 +639,6 @@
  ("src/code/alloc"             :not-host)
 
  ("src/code/target-thread"     :not-host)
- #!+sb-thread
- ("src/code/target-multithread" :not-host)
- #!-sb-thread
- ("src/code/target-unithread"  :not-host)
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/gc"     :not-host)
  ("src/code/purify" :not-host)

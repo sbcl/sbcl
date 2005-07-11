@@ -9,15 +9,36 @@ multiprocessing on machines that have more than one CPU, but it does
 not allow Lisp control of the scheduler.  This is found in the
 SB-THREAD package.
 
-This requires x86 and Linux kernel 2.6 or systems with NPTL backports.
+This requires x86/x86-64 and Linux kernel 2.6 or systems with NPTL
+backports.
 
 @menu
+* Threading basics::            
 * Special Variables::           
 * Mutex Support::               
 * Waitqueue/condition variables::  
 * Sessions/Debugging::          
 * Implementation (Linux x86)::  
 @end menu
+
+@node Threading basics
+@comment  node-name,  next,  previous,  up
+@section Threading basics
+
+@lisp
+(make-thread (lambda () (write-line "Hello, world")))
+@end lisp
+
+@include struct-sb-thread-thread.texinfo
+@include var-sb-thread-star-current-thread-star.texinfo
+@include fun-sb-thread-make-thread.texinfo
+@include fun-sb-thread-thread-alive-p.texinfo
+@include fun-sb-thread-list-all-threads.texinfo
+@include condition-sb-thread-interrupt-thread-error.texinfo
+@include fun-sb-thread-interrupt-thread-error-thread.texinfo
+@include fun-sb-thread-interrupt-thread-error-errno.texinfo
+@include fun-sb-thread-interrupt-thread.texinfo
+@include fun-sb-thread-terminate-thread.texinfo
 
 @node Special Variables
 @comment  node-name,  next,  previous,  up
@@ -37,6 +58,16 @@ bindings (e.g. using LET) are local to the thread;
 initial values in a new thread are taken from the thread that created it. 
 @end itemize
 
+The last point means that
+
+@lisp
+(defparameter *x* 0)
+(let ((*x* 1))
+  (sb-thread:make-thread (lambda () (print *x*))))
+@end lisp
+
+prints @code{1}.
+    
 @node Mutex Support
 @comment  node-name,  next,  previous,  up
 @section Mutex Support
@@ -66,8 +97,16 @@ if you want a bounded wait.
 
 (make-thread #'thread-fn)
 (make-thread #'thread-fn)
-
 @end lisp
+
+@include struct-sb-thread-mutex.texinfo
+@include fun-sb-thread-make-mutex.texinfo
+@include fun-sb-thread-mutex-name.texinfo
+@include fun-sb-thread-mutex-value.texinfo
+@include fun-sb-thread-get-mutex.texinfo
+@include fun-sb-thread-release-mutex.texinfo
+@include macro-sb-thread-with-mutex.texinfo
+@include macro-sb-thread-with-recursive-lock.texinfo
 
 @node Waitqueue/condition variables
 @comment  node-name,  next,  previous,  up
@@ -144,8 +183,14 @@ it.
 (make-thread #'writer)
 (make-thread #'reader)
 (make-thread #'reader)       
-
 @end lisp
+
+@include struct-sb-thread-waitqueue.texinfo
+@include fun-sb-thread-make-waitqueue.texinfo
+@include fun-sb-thread-waitqueue-name.texinfo
+@include fun-sb-thread-condition-wait.texinfo
+@include fun-sb-thread-condition-notify.texinfo
+@include fun-sb-thread-condition-broadcast.texinfo
 
 @node Sessions/Debugging
 @comment  node-name,  next,  previous,  up
@@ -177,20 +222,17 @@ leaves other sessions running.
 
 @node Implementation (Linux x86)
 @comment  node-name,  next,  previous,  up
-@section Implementation (Linux x86)
+@section Implementation (Linux x86/x86-64)
 
-On Linux x86, threading is implemented using @code{clone()} and does
-not involve pthreads.  This is not because there is anything wrong
-with pthreads @emph{per se}, but there is plenty wrong (from our
-perspective) with LinuxThreads.  SBCL threads are mapped 1:1 onto
-Linux tasks which share a VM but nothing else - each has its own
-process id and can be seen in e.g. @command{ps} output.
+Threading is implemented using pthreads and some Linux specific bits
+like futexes.
 
-Per-thread local bindings for special variables is achieved using the
-%fs segment register to point to a per-thread storage area.  This may
-cause interesting results if you link to foreign code that expects
-threading or creates new threads, and the thread library in question
-uses %fs in an incompatible way.
+On x86 the per-thread local bindings for special variables is achieved
+using the %fs segment register to point to a per-thread storage area.
+This may cause interesting results if you link to foreign code that
+expects threading or creates new threads, and the thread library in
+question uses %fs in an incompatible way. On x86-64 the r12 register
+has a similar role.
 
 Queues require the @code{sys_futex()} system call to be available:
 this is the reason for the NPTL requirement.  We test at runtime that
