@@ -121,12 +121,12 @@ if the symbol isn't found."
     (when (<= sb!vm:linkage-table-space-start
 	      addr
 	      sb!vm:linkage-table-space-end)
-      (maphash (lambda (name info)
+      (maphash (lambda (name-and-datap info)
 		 (let ((table-addr (linkage-info-address info)))
 		   (when (<= table-addr
 			     addr
 			     (+ table-addr sb!vm:linkage-table-entry-size))
-		     (return-from sap-foreign-symbol name))))
+		     (return-from sap-foreign-symbol (car name-and-datap)))))
 	       *linkage-info*))
     #!+os-provides-dladdr
     (with-alien ((info (struct dl-info

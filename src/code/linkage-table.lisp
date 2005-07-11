@@ -55,7 +55,7 @@
              (hash-table-count *linkage-info*)
              name))
     (write-linkage-table-entry table-address real-address datap)
-    (setf (gethash name *linkage-info*)
+    (setf (gethash (cons name datap) *linkage-info*)
           (make-linkage-info :address table-address :datap datap))))
 
 ;;; Add a foreign linkage entry if none exists, return the address
@@ -63,7 +63,7 @@
 (defun ensure-foreign-symbol-linkage (name datap)
   (/show0 "ensure-foreign-symbol-linkage")
   (sb!thread:with-mutex (*foreign-lock*)
-    (let ((info (or (gethash name *linkage-info*)
+    (let ((info (or (gethash (cons name datap) *linkage-info*)
                     (link-foreign-symbol name datap))))
       (linkage-info-address info))))
 
@@ -71,9 +71,10 @@
 ;;; shared libraries have been reopened, and after a previously loaded
 ;;; shared object is reloaded.
 (defun update-linkage-table ()
-  ;; Doesn't take care of it's own locking -- callers are responsible
-  (maphash (lambda (name info)
-             (let* ((datap (linkage-info-datap info))
+  ;; Doesn't take care of its own locking -- callers are responsible
+  (maphash (lambda (name-and-datap info)
+             (let* ((name (car name-and-datap))
+		    (datap (cdr name-and-datap))
 		    (table-address (linkage-info-address info))
 		    (real-address 
 		     (ensure-dynamic-foreign-symbol-address name datap)))

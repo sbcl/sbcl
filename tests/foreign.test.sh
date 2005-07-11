@@ -217,7 +217,7 @@ fi
 
 echo missing ok
 
-rm $testfilestem.*
+rm -f $testfilestem.* $testfilestem-*
 
 # success convention for script
 exit 104 
