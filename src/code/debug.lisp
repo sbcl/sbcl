@@ -655,7 +655,8 @@ reset to ~S."
 
 (defun enable-debugger ()
   (when (eql *invoke-debugger-hook* 'debugger-disabled-hook)
-    (setf *invoke-debugger-hook* nil)))
+    (setf *debug-io* *query-io*
+          *invoke-debugger-hook* nil)))
 
 (setf *debug-io* *query-io*)
 
