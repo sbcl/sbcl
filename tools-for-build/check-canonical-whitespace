@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# Look for violations of whitespace canonicalization. On the first
+# one found, print the line (mostly to help humans) and exit with 
+# nonzero (mostly to help scripts).
+

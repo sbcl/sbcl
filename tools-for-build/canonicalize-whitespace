@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# (a script to be run in the root directory of the distribution)
+#
+# Convert tabs to spaces and delete trailing whitespace in files
+# which we can safely assume to be source files in appropriate languages.
+
+tools-for-build/whitespacely-canonical-filenames \
+  | xargs tools-for-build/canonicalize-whitespace-1

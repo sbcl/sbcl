@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# (a script to be run in the root directory of the distribution,
+# probably as part of an enclosing do-something-with-whitespace script)
+#
+# Print to stdout the names of files whose whitespace we (SBCLers)
+# try to keep canonical.
+
+# glob patterns for source files in languages for which the
+# canonicalization is safe (not affecting meaning, at least given the
+# conservative syntax used in SBCL sources)
+source_extensions='.lisp .lisp-expr .c .h'
+# other candidates:
+#   .sh
+#   ?
+
+for source_extension in $source_extensions; do 
+    find . -name '*'$source_extension -print
+done
