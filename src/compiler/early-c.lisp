@@ -138,7 +138,7 @@
   (defvar *object-id-counter* 0)
   (defun new-object-id ()
     (prog1
-	*object-id-counter*
+        *object-id-counter*
       (incf *object-id-counter*))))
 
 ;;;; miscellaneous utilities
@@ -147,16 +147,16 @@
 ;;; benefit of the compiler, but it's sometimes called from stuff like
 ;;; type-defining code which isn't logically part of the compiler.
 (declaim (ftype (function ((or symbol cons) keyword) (values))
-		note-name-defined))
+                note-name-defined))
 (defun note-name-defined (name kind)
   ;; We do this BOUNDP check because this function can be called when
   ;; not in a compilation unit (as when loading top level forms).
   (when (boundp '*undefined-warnings*)
     (setq *undefined-warnings*
-	  (delete-if (lambda (x)
-		       (and (equal (undefined-warning-name x) name)
-			    (eq (undefined-warning-kind x) kind)))
-		     *undefined-warnings*)))
+          (delete-if (lambda (x)
+                       (and (equal (undefined-warning-name x) name)
+                            (eq (undefined-warning-kind x) kind)))
+                     *undefined-warnings*)))
   (values))
 
 ;;; to be called when a variable is lexically bound

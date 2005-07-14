@@ -60,10 +60,10 @@
 (defvar *backend-meta-sc-names* (make-hash-table :test 'eq))
 (defvar *backend-meta-sb-names* (make-hash-table :test 'eq))
 (declaim (type hash-table
-	       *backend-sc-names*
-	       *backend-sb-names*
-	       *backend-meta-sc-names*
-	       *backend-meta-sb-names*))
+               *backend-sc-names*
+               *backend-sb-names*
+               *backend-meta-sc-names*
+               *backend-meta-sb-names*))
 
 
 ;;; like *SC-NUMBERS*, but updated at meta-compile time
@@ -117,9 +117,9 @@
 (defvar *backend-instruction-flavors* (make-hash-table :test 'equal))
 (defvar *backend-special-arg-types* (make-hash-table :test 'eq))
 (declaim (type hash-table
-	       *backend-instruction-formats*
-	       *backend-instruction-flavors*
-	       *backend-special-arg-types*))
+               *backend-instruction-formats*
+               *backend-instruction-flavors*
+               *backend-special-arg-types*))
 
 ;;; mappings between CTYPE structures and the corresponding predicate.
 ;;; The type->predicate mapping is implemented as an alist because
@@ -143,24 +143,24 @@
 (defvar *backend-support-routines*)
 
 (macrolet ((def-vm-support-routines (&rest routines)
-	     `(progn
-		(eval-when (:compile-toplevel :load-toplevel :execute)
-		  (defparameter *vm-support-routines* ',routines))
-		(defstruct (vm-support-routines (:copier nil))
-		  ,@(mapcar (lambda (routine)
-			      `(,routine nil :type (or function null)))
-			    routines))
-		,@(mapcar
-		   (lambda (name)
-		     `(defun ,name (&rest args)
-			(apply (or (,(symbolicate "VM-SUPPORT-ROUTINES-"
-						  name)
-				    *backend-support-routines*)
-				   (error "machine-specific support ~S ~
+             `(progn
+                (eval-when (:compile-toplevel :load-toplevel :execute)
+                  (defparameter *vm-support-routines* ',routines))
+                (defstruct (vm-support-routines (:copier nil))
+                  ,@(mapcar (lambda (routine)
+                              `(,routine nil :type (or function null)))
+                            routines))
+                ,@(mapcar
+                   (lambda (name)
+                     `(defun ,name (&rest args)
+                        (apply (or (,(symbolicate "VM-SUPPORT-ROUTINES-"
+                                                  name)
+                                    *backend-support-routines*)
+                                   (error "machine-specific support ~S ~
                                            routine undefined"
-					  ',name))
-			       args)))
-		   routines))))
+                                          ',name))
+                               args)))
+                   routines))))
 
   (def-vm-support-routines
 
@@ -205,17 +205,17 @@
 
 (defmacro !def-vm-support-routine (name ll &body body)
   (unless (member (intern (string name) (find-package "SB!C"))
-		  *vm-support-routines*)
+                  *vm-support-routines*)
     (warn "unknown VM support routine: ~A" name))
   (let ((local-name (symbolicate "IMPL-OF-VM-SUPPORT-ROUTINE-" name)))
     `(progn
        (defun ,local-name ,ll ,@body)
        (setf (,(intern (concatenate 'simple-string
-				    "VM-SUPPORT-ROUTINES-"
-				    (string name))
-		       (find-package "SB!C"))
-	      *backend-support-routines*)
-	     #',local-name))))
+                                    "VM-SUPPORT-ROUTINES-"
+                                    (string name))
+                       (find-package "SB!C"))
+              *backend-support-routines*)
+             #',local-name))))
 
 ;;; the VM support routines
 (defvar *backend-support-routines* (make-vm-support-routines))
@@ -242,9 +242,9 @@ SPARC code in CMUCL,
                    (NOT (BACKEND-FEATUREP :SPARC-64)))))
   ...)
 
-and at the IR2 translation stage, the function #'`(LAMBDA () ,GUARD) would be called. 
+and at the IR2 translation stage, the function #'`(LAMBDA () ,GUARD) would be called.
 
-Until SBCL-0.7pre57, this is translated as 
+Until SBCL-0.7pre57, this is translated as
   (:GUARD #!+(OR :SPARC-V8 (AND :SPARC-V9 (NOT :SPARC-64))) T
           #!-(OR :SPARC-V8 (AND :SPARC-V9 (NOT :SPARC-64))) NIL)
 which means that whether this VOP will ever be used is determined at

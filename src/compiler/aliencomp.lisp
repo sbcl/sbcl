@@ -72,15 +72,15 @@
 ;;;; cosmetic transforms
 
 (deftransform slot ((object slot)
-		    ((alien (* t)) symbol))
+                    ((alien (* t)) symbol))
   '(slot (deref object) slot))
 
 (deftransform %set-slot ((object slot value)
-			 ((alien (* t)) symbol t))
+                         ((alien (* t)) symbol t))
   '(%set-slot (deref object) slot value))
 
 (deftransform %slot-addr ((object slot)
-			  ((alien (* t)) symbol))
+                          ((alien (* t)) symbol))
   '(%slot-addr (deref object) slot))
 
 ;;;; SLOT support
@@ -94,62 +94,62 @@
       (give-up-ir1-transform))
     (let ((alien-type (alien-type-type-alien-type type)))
       (unless (alien-record-type-p alien-type)
-	(give-up-ir1-transform))
+        (give-up-ir1-transform))
       (let* ((slot-name (lvar-value slot))
-	     (field (find slot-name (alien-record-type-fields alien-type)
-			  :key #'alien-record-field-name)))
-	(unless field
-	  (abort-ir1-transform "~S doesn't have a slot named ~S"
-			       alien
-			       slot-name))
-	(values (alien-record-field-offset field)
-		(alien-record-field-type field))))))
+             (field (find slot-name (alien-record-type-fields alien-type)
+                          :key #'alien-record-field-name)))
+        (unless field
+          (abort-ir1-transform "~S doesn't have a slot named ~S"
+                               alien
+                               slot-name))
+        (values (alien-record-field-offset field)
+                (alien-record-field-type field))))))
 
 #+nil ;; Shouldn't be necessary.
 (defoptimizer (slot derive-type) ((alien slot))
   (block nil
     (catch 'give-up-ir1-transform
       (multiple-value-bind (slot-offset slot-type)
-	  (find-slot-offset-and-type alien slot)
-	(declare (ignore slot-offset))
-	(return (make-alien-type-type slot-type))))
+          (find-slot-offset-and-type alien slot)
+        (declare (ignore slot-offset))
+        (return (make-alien-type-type slot-type))))
     *wild-type*))
 
 (deftransform slot ((alien slot) * * :important t)
   (multiple-value-bind (slot-offset slot-type)
       (find-slot-offset-and-type alien slot)
     `(extract-alien-value (alien-sap alien)
-			  ,slot-offset
-			  ',slot-type)))
+                          ,slot-offset
+                          ',slot-type)))
 
 #+nil ;; ### But what about coercions?
 (defoptimizer (%set-slot derive-type) ((alien slot value))
   (block nil
     (catch 'give-up-ir1-transform
       (multiple-value-bind (slot-offset slot-type)
-	  (find-slot-offset-and-type alien slot)
-	(declare (ignore slot-offset))
-	(let ((type (make-alien-type-type slot-type)))
-	  (assert-lvar-type value type)
-	  (return type))))
+          (find-slot-offset-and-type alien slot)
+        (declare (ignore slot-offset))
+        (let ((type (make-alien-type-type slot-type)))
+          (assert-lvar-type value type)
+          (return type))))
     *wild-type*))
 
 (deftransform %set-slot ((alien slot value) * * :important t)
   (multiple-value-bind (slot-offset slot-type)
       (find-slot-offset-and-type alien slot)
     `(deposit-alien-value (alien-sap alien)
-			  ,slot-offset
-			  ',slot-type
-			  value)))
+                          ,slot-offset
+                          ',slot-type
+                          value)))
 
 (defoptimizer (%slot-addr derive-type) ((alien slot))
   (block nil
     (catch 'give-up-ir1-transform
       (multiple-value-bind (slot-offset slot-type)
-	  (find-slot-offset-and-type alien slot)
-	(declare (ignore slot-offset))
-	(return (make-alien-type-type
-		 (make-alien-pointer-type :to slot-type)))))
+          (find-slot-offset-and-type alien slot)
+        (declare (ignore slot-offset))
+        (return (make-alien-type-type
+                 (make-alien-pointer-type :to slot-type)))))
     *wild-type*))
 
 (deftransform %slot-addr ((alien slot) * * :important t)
@@ -157,7 +157,7 @@
       (find-slot-offset-and-type alien slot)
     (/noshow "in DEFTRANSFORM %SLOT-ADDR, creating %SAP-ALIEN")
     `(%sap-alien (sap+ (alien-sap alien) (/ ,slot-offset sb!vm:n-byte-bits))
-		 ',(make-alien-pointer-type :to slot-type))))
+                 ',(make-alien-pointer-type :to slot-type))))
 
 ;;;; DEREF support
 
@@ -167,8 +167,8 @@
       (give-up-ir1-transform))
     (let ((alien-type (alien-type-type-alien-type alien-type)))
       (if (alien-type-p alien-type)
-	  alien-type
-	  (give-up-ir1-transform)))))
+          alien-type
+          (give-up-ir1-transform)))))
 
 (defun find-deref-element-type (alien)
   (let ((alien-type (find-deref-alien-type alien)))
@@ -185,48 +185,48 @@
     (typecase alien-type
       (alien-pointer-type
        (when (cdr indices)
-	 (abort-ir1-transform "too many indices for pointer deref: ~W"
-			      (length indices)))
+         (abort-ir1-transform "too many indices for pointer deref: ~W"
+                              (length indices)))
        (let ((element-type (alien-pointer-type-to alien-type)))
-	 (if indices
-	     (let ((bits (alien-type-bits element-type))
-		   (alignment (alien-type-alignment element-type)))
-	       (unless bits
-		 (abort-ir1-transform "unknown element size"))
-	       (unless alignment
-		 (abort-ir1-transform "unknown element alignment"))
-	       (values '(offset)
-		       `(* offset
-			   ,(align-offset bits alignment))
-		       element-type))
-	     (values nil 0 element-type))))
+         (if indices
+             (let ((bits (alien-type-bits element-type))
+                   (alignment (alien-type-alignment element-type)))
+               (unless bits
+                 (abort-ir1-transform "unknown element size"))
+               (unless alignment
+                 (abort-ir1-transform "unknown element alignment"))
+               (values '(offset)
+                       `(* offset
+                           ,(align-offset bits alignment))
+                       element-type))
+             (values nil 0 element-type))))
       (alien-array-type
        (let* ((element-type (alien-array-type-element-type alien-type))
-	      (bits (alien-type-bits element-type))
-	      (alignment (alien-type-alignment element-type))
-	      (dims (alien-array-type-dimensions alien-type)))
-	 (unless (= (length indices) (length dims))
-	   (give-up-ir1-transform "incorrect number of indices"))
-	 (unless bits
-	   (give-up-ir1-transform "Element size is unknown."))
-	 (unless alignment
-	   (give-up-ir1-transform "Element alignment is unknown."))
-	 (if (null dims)
-	     (values nil 0 element-type)
-	     (let* ((arg (gensym))
-		    (args (list arg))
-		    (offsetexpr arg))
-	       (dolist (dim (cdr dims))
-		 (let ((arg (gensym)))
-		   (push arg args)
-		   (setf offsetexpr `(+ (* ,offsetexpr ,dim) ,arg))))
-	       (values (reverse args)
-		       `(* ,offsetexpr
-			   ,(align-offset bits alignment))
-		       element-type)))))
+              (bits (alien-type-bits element-type))
+              (alignment (alien-type-alignment element-type))
+              (dims (alien-array-type-dimensions alien-type)))
+         (unless (= (length indices) (length dims))
+           (give-up-ir1-transform "incorrect number of indices"))
+         (unless bits
+           (give-up-ir1-transform "Element size is unknown."))
+         (unless alignment
+           (give-up-ir1-transform "Element alignment is unknown."))
+         (if (null dims)
+             (values nil 0 element-type)
+             (let* ((arg (gensym))
+                    (args (list arg))
+                    (offsetexpr arg))
+               (dolist (dim (cdr dims))
+                 (let ((arg (gensym)))
+                   (push arg args)
+                   (setf offsetexpr `(+ (* ,offsetexpr ,dim) ,arg))))
+               (values (reverse args)
+                       `(* ,offsetexpr
+                           ,(align-offset bits alignment))
+                       element-type)))))
       (t
        (abort-ir1-transform "~S not either a pointer or array type."
-			    alien-type)))))
+                            alien-type)))))
 
 #+nil ;; Shouldn't be necessary.
 (defoptimizer (deref derive-type) ((alien &rest noise))
@@ -241,8 +241,8 @@
       (compute-deref-guts alien indices)
     `(lambda (alien ,@indices-args)
        (extract-alien-value (alien-sap alien)
-			    ,offset-expr
-			    ',element-type))))
+                            ,offset-expr
+                            ',element-type))))
 
 #+nil ;; ### Again, the value might be coerced.
 (defoptimizer (%set-deref derive-type) ((alien value &rest noise))
@@ -250,10 +250,10 @@
   (block nil
     (catch 'give-up-ir1-transform
       (let ((type (make-alien-type-type
-		   (make-alien-pointer-type
-		    :to (find-deref-element-type alien)))))
-	(assert-lvar-type value type)
-	(return type)))
+                   (make-alien-pointer-type
+                    :to (find-deref-element-type alien)))))
+        (assert-lvar-type value type)
+        (return type)))
     *wild-type*))
 
 (deftransform %set-deref ((alien value &rest indices) * * :important t)
@@ -261,17 +261,17 @@
       (compute-deref-guts alien indices)
     `(lambda (alien value ,@indices-args)
        (deposit-alien-value (alien-sap alien)
-			    ,offset-expr
-			    ',element-type
-			    value))))
+                            ,offset-expr
+                            ',element-type
+                            value))))
 
 (defoptimizer (%deref-addr derive-type) ((alien &rest noise))
   (declare (ignore noise))
   (block nil
     (catch 'give-up-ir1-transform
       (return (make-alien-type-type
-	       (make-alien-pointer-type
-		:to (find-deref-element-type alien)))))
+               (make-alien-pointer-type
+                :to (find-deref-element-type alien)))))
     *wild-type*))
 
 (deftransform %deref-addr ((alien &rest indices) * * :important t)
@@ -280,7 +280,7 @@
     (/noshow "in DEFTRANSFORM %DEREF-ADDR, creating (LAMBDA .. %SAP-ALIEN)")
     `(lambda (alien ,@indices-args)
        (%sap-alien (sap+ (alien-sap alien) (/ ,offset-expr sb!vm:n-byte-bits))
-		   ',(make-alien-pointer-type :to element-type)))))
+                   ',(make-alien-pointer-type :to element-type)))))
 
 ;;;; support for aliens on the heap
 
@@ -289,15 +289,15 @@
     (give-up-ir1-transform "info not constant; can't open code"))
   (let ((info (lvar-value info)))
     (values (heap-alien-info-sap-form info)
-	    (heap-alien-info-type info))))
+            (heap-alien-info-type info))))
 
 #+nil ; shouldn't be necessary
 (defoptimizer (%heap-alien derive-type) ((info))
   (block nil
     (catch 'give-up
       (multiple-value-bind (sap type) (heap-alien-sap-and-type info)
-	(declare (ignore sap))
-	(return (make-alien-type-type type))))
+        (declare (ignore sap))
+        (return (make-alien-type-type type))))
     *wild-type*))
 
 (deftransform %heap-alien ((info) * * :important t)
@@ -309,10 +309,10 @@
   (block nil
     (catch 'give-up-ir1-transform
       (multiple-value-bind (sap type) (heap-alien-sap-and-type info)
-	(declare (ignore sap))
-	(let ((type (make-alien-type-type type)))
-	  (assert-lvar-type value type)
-	  (return type))))
+        (declare (ignore sap))
+        (let ((type (make-alien-type-type type)))
+          (assert-lvar-type value type)
+          (return type))))
     *wild-type*))
 
 (deftransform %set-heap-alien ((info value) (heap-alien-info *) * :important t)
@@ -323,8 +323,8 @@
   (block nil
     (catch 'give-up-ir1-transform
       (multiple-value-bind (sap type) (heap-alien-sap-and-type info)
-	(declare (ignore sap))
-	(return (make-alien-type-type (make-alien-pointer-type :to type)))))
+        (declare (ignore sap))
+        (return (make-alien-type-type (make-alien-pointer-type :to type)))))
     *wild-type*))
 
 (deftransform %heap-alien-addr ((info) * * :important t)
@@ -338,8 +338,8 @@
   (unless (constant-lvar-p info)
     (abort-ir1-transform "Local alien info isn't constant?"))
   (let* ((info (lvar-value info))
-	 (alien-type (local-alien-info-type info))
-	 (bits (alien-type-bits alien-type)))
+         (alien-type (local-alien-info-type info))
+         (bits (alien-type-bits alien-type)))
     (unless bits
       (abort-ir1-transform "unknown size: ~S" (unparse-alien-type alien-type)))
     (/noshow "in DEFTRANSFORM MAKE-LOCAL-ALIEN" info)
@@ -347,25 +347,25 @@
     (/noshow alien-type (unparse-alien-type alien-type) (alien-type-bits alien-type))
     (if (local-alien-info-force-to-memory-p info)
       #!+(or x86 x86-64) `(truly-the system-area-pointer
-			 (%primitive alloc-alien-stack-space
-				     ,(ceiling (alien-type-bits alien-type)
-					       sb!vm:n-byte-bits)))
+                         (%primitive alloc-alien-stack-space
+                                     ,(ceiling (alien-type-bits alien-type)
+                                               sb!vm:n-byte-bits)))
       #!-(or x86 x86-64) `(truly-the system-area-pointer
-			 (%primitive alloc-number-stack-space
-				     ,(ceiling (alien-type-bits alien-type)
-					       sb!vm:n-byte-bits)))
+                         (%primitive alloc-number-stack-space
+                                     ,(ceiling (alien-type-bits alien-type)
+                                               sb!vm:n-byte-bits)))
       (let* ((alien-rep-type-spec (compute-alien-rep-type alien-type))
-	     (alien-rep-type (specifier-type alien-rep-type-spec)))
-	(cond ((csubtypep (specifier-type 'system-area-pointer)
-			  alien-rep-type)
-	       '(int-sap 0))
-	      ((ctypep 0 alien-rep-type) 0)
-	      ((ctypep 0.0f0 alien-rep-type) 0.0f0)
-	      ((ctypep 0.0d0 alien-rep-type) 0.0d0)
-	      (t
-	       (compiler-error
-		"Aliens of type ~S cannot be represented immediately."
-		(unparse-alien-type alien-type))))))))
+             (alien-rep-type (specifier-type alien-rep-type-spec)))
+        (cond ((csubtypep (specifier-type 'system-area-pointer)
+                          alien-rep-type)
+               '(int-sap 0))
+              ((ctypep 0 alien-rep-type) 0)
+              ((ctypep 0.0f0 alien-rep-type) 0.0f0)
+              ((ctypep 0.0d0 alien-rep-type) 0.0d0)
+              (t
+               (compiler-error
+                "Aliens of type ~S cannot be represented immediately."
+                (unparse-alien-type alien-type))))))))
 
 (deftransform note-local-alien-type ((info var) * * :important t)
   ;; FIXME: This test and error occur about a zillion times. They
@@ -377,24 +377,24 @@
     (/noshow (local-alien-info-force-to-memory-p info))
     (unless (local-alien-info-force-to-memory-p info)
       (let ((var-node (lvar-uses var)))
-	(/noshow var-node (ref-p var-node))
-	(when (ref-p var-node)
-	  (propagate-to-refs (ref-leaf var-node)
-			     (specifier-type
-			      (compute-alien-rep-type
-			       (local-alien-info-type info))))))))
+        (/noshow var-node (ref-p var-node))
+        (when (ref-p var-node)
+          (propagate-to-refs (ref-leaf var-node)
+                             (specifier-type
+                              (compute-alien-rep-type
+                               (local-alien-info-type info))))))))
   nil)
 
 (deftransform local-alien ((info var) * * :important t)
   (unless (constant-lvar-p info)
     (abort-ir1-transform "Local alien info isn't constant?"))
   (let* ((info (lvar-value info))
-	 (alien-type (local-alien-info-type info)))
+         (alien-type (local-alien-info-type info)))
     (/noshow "in DEFTRANSFORM LOCAL-ALIEN" info alien-type)
     (/noshow (local-alien-info-force-to-memory-p info))
     (if (local-alien-info-force-to-memory-p info)
-	`(extract-alien-value var 0 ',alien-type)
-	`(naturalize var ',alien-type))))
+        `(extract-alien-value var 0 ',alien-type)
+        `(naturalize var ',alien-type))))
 
 (deftransform %local-alien-forced-to-memory-p ((info) * * :important t)
   (unless (constant-lvar-p info)
@@ -406,49 +406,49 @@
   (unless (constant-lvar-p info)
     (abort-ir1-transform "Local alien info isn't constant?"))
   (let* ((info (lvar-value info))
-	 (alien-type (local-alien-info-type info)))
+         (alien-type (local-alien-info-type info)))
     (if (local-alien-info-force-to-memory-p info)
-	`(deposit-alien-value var 0 ',alien-type value)
-	'(error "This should be eliminated as dead code."))))
+        `(deposit-alien-value var 0 ',alien-type value)
+        '(error "This should be eliminated as dead code."))))
 
 (defoptimizer (%local-alien-addr derive-type) ((info var))
   (if (constant-lvar-p info)
       (let* ((info (lvar-value info))
-	     (alien-type (local-alien-info-type info)))
-	(make-alien-type-type (make-alien-pointer-type :to alien-type)))
+             (alien-type (local-alien-info-type info)))
+        (make-alien-type-type (make-alien-pointer-type :to alien-type)))
       *wild-type*))
 
 (deftransform %local-alien-addr ((info var) * * :important t)
   (unless (constant-lvar-p info)
     (abort-ir1-transform "Local alien info isn't constant?"))
   (let* ((info (lvar-value info))
-	 (alien-type (local-alien-info-type info)))
+         (alien-type (local-alien-info-type info)))
     (/noshow "in DEFTRANSFORM %LOCAL-ALIEN-ADDR, creating %SAP-ALIEN")
     (if (local-alien-info-force-to-memory-p info)
-	`(%sap-alien var ',(make-alien-pointer-type :to alien-type))
-	(error "This shouldn't happen."))))
+        `(%sap-alien var ',(make-alien-pointer-type :to alien-type))
+        (error "This shouldn't happen."))))
 
 (deftransform dispose-local-alien ((info var) * * :important t)
   (unless (constant-lvar-p info)
     (abort-ir1-transform "Local alien info isn't constant?"))
   (let* ((info (lvar-value info))
-	 (alien-type (local-alien-info-type info)))
+         (alien-type (local-alien-info-type info)))
     (if (local-alien-info-force-to-memory-p info)
       #!+(or x86 x86-64) `(%primitive dealloc-alien-stack-space
-			  ,(ceiling (alien-type-bits alien-type)
-				    sb!vm:n-byte-bits))
+                          ,(ceiling (alien-type-bits alien-type)
+                                    sb!vm:n-byte-bits))
       #!-(or x86 x86-64) `(%primitive dealloc-number-stack-space
-			  ,(ceiling (alien-type-bits alien-type)
-				    sb!vm:n-byte-bits))
+                          ,(ceiling (alien-type-bits alien-type)
+                                    sb!vm:n-byte-bits))
       nil)))
 
 ;;;; %CAST
 
 (defoptimizer (%cast derive-type) ((alien type))
   (or (when (constant-lvar-p type)
-	(let ((alien-type (lvar-value type)))
-	  (when (alien-type-p alien-type)
-	    (make-alien-type-type alien-type))))
+        (let ((alien-type (lvar-value type)))
+          (when (alien-type-p alien-type)
+            (make-alien-type-type alien-type))))
       *wild-type*))
 
 (deftransform %cast ((alien target-type) * * :important t)
@@ -457,11 +457,11 @@
      "The alien type is not constant, so access cannot be open coded."))
   (let ((target-type (lvar-value target-type)))
     (cond ((or (alien-pointer-type-p target-type)
-	       (alien-array-type-p target-type)
-	       (alien-fun-type-p target-type))
-	   `(naturalize (alien-sap alien) ',target-type))
-	  (t
-	   (abort-ir1-transform "cannot cast to alien type ~S" target-type)))))
+               (alien-array-type-p target-type)
+               (alien-fun-type-p target-type))
+           `(naturalize (alien-sap alien) ',target-type))
+          (t
+           (abort-ir1-transform "cannot cast to alien type ~S" target-type)))))
 
 ;;;; ALIEN-SAP, %SAP-ALIEN, %ADDR, etc.
 
@@ -471,8 +471,8 @@
       (combination
        (extract-fun-args alien '%sap-alien 2)
        '(lambda (sap type)
-	  (declare (ignore type))
-	  sap))
+          (declare (ignore type))
+          sap))
       (t
        (give-up-ir1-transform)))))
 
@@ -492,16 +492,16 @@
 ;;;; NATURALIZE/DEPORT/EXTRACT/DEPOSIT magic
 
 (flet ((%computed-lambda (compute-lambda type)
-	 (declare (type function compute-lambda))
-	 (unless (constant-lvar-p type)
-	   (give-up-ir1-transform
-	    "The type is not constant at compile time; can't open code."))
-	 (handler-case
-	     (let ((result (funcall compute-lambda (lvar-value type))))
-	       (/noshow "in %COMPUTED-LAMBDA" (lvar-value type) result)
-	       result)
-	   (error (condition)
-		  (compiler-error "~A" condition)))))
+         (declare (type function compute-lambda))
+         (unless (constant-lvar-p type)
+           (give-up-ir1-transform
+            "The type is not constant at compile time; can't open code."))
+         (handler-case
+             (let ((result (funcall compute-lambda (lvar-value type))))
+               (/noshow "in %COMPUTED-LAMBDA" (lvar-value type) result)
+               result)
+           (error (condition)
+                  (compiler-error "~A" condition)))))
   (deftransform naturalize ((object type) * * :important t)
     (%computed-lambda #'compute-naturalize-lambda type))
   (deftransform deport ((alien type) * * :important t)
@@ -517,43 +517,43 @@
   (typecase thing
     (lvar
      (if (constant-lvar-p thing)
-	 (count-low-order-zeros (lvar-value thing))
-	 (count-low-order-zeros (lvar-uses thing))))
+         (count-low-order-zeros (lvar-value thing))
+         (count-low-order-zeros (lvar-uses thing))))
     (combination
      (case (let ((name (lvar-fun-name (combination-fun thing))))
              (or (modular-version-info name :unsigned) name))
        ((+ -)
-	(let ((min most-positive-fixnum)
-	      (itype (specifier-type 'integer)))
-	  (dolist (arg (combination-args thing) min)
-	    (if (csubtypep (lvar-type arg) itype)
-		(setf min (min min (count-low-order-zeros arg)))
-		(return 0)))))
+        (let ((min most-positive-fixnum)
+              (itype (specifier-type 'integer)))
+          (dolist (arg (combination-args thing) min)
+            (if (csubtypep (lvar-type arg) itype)
+                (setf min (min min (count-low-order-zeros arg)))
+                (return 0)))))
        (*
-	(let ((result 0)
-	      (itype (specifier-type 'integer)))
-	  (dolist (arg (combination-args thing) result)
-	    (if (csubtypep (lvar-type arg) itype)
-		(setf result (+ result (count-low-order-zeros arg)))
-		(return 0)))))
+        (let ((result 0)
+              (itype (specifier-type 'integer)))
+          (dolist (arg (combination-args thing) result)
+            (if (csubtypep (lvar-type arg) itype)
+                (setf result (+ result (count-low-order-zeros arg)))
+                (return 0)))))
        (ash
-	(let ((args (combination-args thing)))
-	  (if (= (length args) 2)
-	      (let ((amount (second args)))
-		(if (constant-lvar-p amount)
-		    (max (+ (count-low-order-zeros (first args))
-			    (lvar-value amount))
-			 0)
-		    0))
-	      0)))
+        (let ((args (combination-args thing)))
+          (if (= (length args) 2)
+              (let ((amount (second args)))
+                (if (constant-lvar-p amount)
+                    (max (+ (count-low-order-zeros (first args))
+                            (lvar-value amount))
+                         0)
+                    0))
+              0)))
        (t
-	0)))
+        0)))
     (integer
      (if (zerop thing)
-	 most-positive-fixnum
-	 (do ((result 0 (1+ result))
-	      (num thing (ash num -1)))
-	     ((logbitp 0 num) result))))
+         most-positive-fixnum
+         (do ((result 0 (1+ result))
+              (num thing (ash num -1)))
+             ((logbitp 0 num) result))))
     (cast
      (count-low-order-zeros (cast-value thing)))
     (t
@@ -564,12 +564,12 @@
   (unless (constant-lvar-p denominator)
     (give-up-ir1-transform))
   (let* ((denominator (lvar-value denominator))
-	 (bits (1- (integer-length denominator))))
+         (bits (1- (integer-length denominator))))
     (unless (and (> denominator 0) (= (ash 1 bits) denominator))
       (give-up-ir1-transform))
     (let ((alignment (count-low-order-zeros numerator)))
       (unless (>= alignment bits)
-	(give-up-ir1-transform))
+        (give-up-ir1-transform))
       `(ash numerator ,(- bits)))))
 
 (deftransform ash ((value amount))
@@ -601,8 +601,8 @@
 ;;;; ALIEN-FUNCALL support
 
 (deftransform alien-funcall ((function &rest args)
-			     ((alien (* t)) &rest *) *
-			     :important t)
+                             ((alien (* t)) &rest *) *
+                             :important t)
   (let ((names (make-gensym-list (length args))))
     (/noshow "entering first DEFTRANSFORM ALIEN-FUNCALL" function args)
     `(lambda (function ,@names)
@@ -615,35 +615,35 @@
     (/noshow "entering second DEFTRANSFORM ALIEN-FUNCALL" function)
     (let ((alien-type (alien-type-type-alien-type type)))
       (unless (alien-fun-type-p alien-type)
-	(give-up-ir1-transform))
+        (give-up-ir1-transform))
       (let ((arg-types (alien-fun-type-arg-types alien-type)))
-	(unless (= (length args) (length arg-types))
-	  (abort-ir1-transform
-	   "wrong number of arguments; expected ~W, got ~W"
-	   (length arg-types)
-	   (length args)))
-	(collect ((params) (deports))
-	  (dolist (arg-type arg-types)
-	    (let ((param (gensym)))
-	      (params param)
-	      (deports `(deport ,param ',arg-type))))
-	  (let ((return-type (alien-fun-type-result-type alien-type))
-		(body `(%alien-funcall (deport function ',alien-type)
-				       ',alien-type
-				       ,@(deports))))
-	    (if (alien-values-type-p return-type)
-		(collect ((temps) (results))
-		  (dolist (type (alien-values-type-values return-type))
-		    (let ((temp (gensym)))
-		      (temps temp)
-		      (results `(naturalize ,temp ',type))))
-		  (setf body
-			`(multiple-value-bind ,(temps) ,body
-			   (values ,@(results)))))
-		(setf body `(naturalize ,body ',return-type)))
-	    (/noshow "returning from DEFTRANSFORM ALIEN-FUNCALL" (params) body)
-	    `(lambda (function ,@(params))
-	       ,body)))))))
+        (unless (= (length args) (length arg-types))
+          (abort-ir1-transform
+           "wrong number of arguments; expected ~W, got ~W"
+           (length arg-types)
+           (length args)))
+        (collect ((params) (deports))
+          (dolist (arg-type arg-types)
+            (let ((param (gensym)))
+              (params param)
+              (deports `(deport ,param ',arg-type))))
+          (let ((return-type (alien-fun-type-result-type alien-type))
+                (body `(%alien-funcall (deport function ',alien-type)
+                                       ',alien-type
+                                       ,@(deports))))
+            (if (alien-values-type-p return-type)
+                (collect ((temps) (results))
+                  (dolist (type (alien-values-type-values return-type))
+                    (let ((temp (gensym)))
+                      (temps temp)
+                      (results `(naturalize ,temp ',type))))
+                  (setf body
+                        `(multiple-value-bind ,(temps) ,body
+                           (values ,@(results)))))
+                (setf body `(naturalize ,body ',return-type)))
+            (/noshow "returning from DEFTRANSFORM ALIEN-FUNCALL" (params) body)
+            `(lambda (function ,@(params))
+               ,body)))))))
 
 (defoptimizer (%alien-funcall derive-type) ((function type &rest args))
   (declare (ignore function args))
@@ -657,7 +657,7 @@
       (alien-fun-type-result-type type)))))
 
 (defoptimizer (%alien-funcall ltn-annotate)
-	      ((function type &rest args) node ltn-policy)
+              ((function type &rest args) node ltn-policy)
   (setf (basic-combination-info node) :funny)
   (setf (node-tail-p node) nil)
   (annotate-ordinary-lvar function)
@@ -665,48 +665,48 @@
     (annotate-ordinary-lvar arg)))
 
 (defoptimizer (%alien-funcall ir2-convert)
-	      ((function type &rest args) call block)
+              ((function type &rest args) call block)
   (let ((type (if (constant-lvar-p type)
-		  (lvar-value type)
-		  (error "Something is broken.")))
-	(lvar (node-lvar call))
-	(args args))
+                  (lvar-value type)
+                  (error "Something is broken.")))
+        (lvar (node-lvar call))
+        (args args))
     (multiple-value-bind (nsp stack-frame-size arg-tns result-tns)
-	(make-call-out-tns type)
+        (make-call-out-tns type)
       (vop alloc-number-stack-space call block stack-frame-size nsp)
       (dolist (tn arg-tns)
-	(let* ((arg (pop args))
-	       (sc (tn-sc tn))
-	       (scn (sc-number sc))
-	       #!-(or x86 x86-64) (temp-tn (make-representation-tn (tn-primitive-type tn)
-						       scn))
-	       (move-arg-vops (svref (sc-move-arg-vops sc) scn)))
-	  (aver arg)
-	  (unless (= (length move-arg-vops) 1)
-	    (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
-	  #!+(or x86 x86-64) (emit-move-arg-template call
-					 block
-					 (first move-arg-vops)
-					 (lvar-tn call block arg)
-					 nsp
-					 tn)
-	  #!-(or x86 x86-64) (progn
-		   (emit-move call
-			      block
-			      (lvar-tn call block arg)
-			      temp-tn)
-		   (emit-move-arg-template call
-					   block
-					   (first move-arg-vops)
-					   temp-tn
-					   nsp
-					   tn))))
+        (let* ((arg (pop args))
+               (sc (tn-sc tn))
+               (scn (sc-number sc))
+               #!-(or x86 x86-64) (temp-tn (make-representation-tn (tn-primitive-type tn)
+                                                       scn))
+               (move-arg-vops (svref (sc-move-arg-vops sc) scn)))
+          (aver arg)
+          (unless (= (length move-arg-vops) 1)
+            (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
+          #!+(or x86 x86-64) (emit-move-arg-template call
+                                         block
+                                         (first move-arg-vops)
+                                         (lvar-tn call block arg)
+                                         nsp
+                                         tn)
+          #!-(or x86 x86-64) (progn
+                   (emit-move call
+                              block
+                              (lvar-tn call block arg)
+                              temp-tn)
+                   (emit-move-arg-template call
+                                           block
+                                           (first move-arg-vops)
+                                           temp-tn
+                                           nsp
+                                           tn))))
       (aver (null args))
       (unless (listp result-tns)
-	(setf result-tns (list result-tns)))
+        (setf result-tns (list result-tns)))
       (vop* call-out call block
-	    ((lvar-tn call block function)
-	     (reference-tn-list arg-tns nil))
-	    ((reference-tn-list result-tns t)))
+            ((lvar-tn call block function)
+             (reference-tn-list arg-tns nil))
+            ((reference-tn-list result-tns t)))
       (vop dealloc-number-stack-space call block stack-frame-size)
       (move-lvar-result call block result-tns lvar))))

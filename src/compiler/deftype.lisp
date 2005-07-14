@@ -16,10 +16,10 @@
     (error "type name not a symbol: ~S" name))
   (with-unique-names (whole)
     (multiple-value-bind (body local-decs doc)
-	(parse-defmacro arglist whole body name 'deftype :default-default ''*)
+        (parse-defmacro arglist whole body name 'deftype :default-default ''*)
       `(eval-when (:compile-toplevel :load-toplevel :execute)
-	 (%compiler-deftype ',name
-			    (lambda (,whole)
-			      ,@local-decs
-			      ,body)
-			    ,@(when doc `(,doc)))))))
+         (%compiler-deftype ',name
+                            (lambda (,whole)
+                              ,@local-decs
+                              ,body)
+                            ,@(when doc `(,doc)))))))

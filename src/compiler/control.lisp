@@ -50,30 +50,30 @@
 (defun find-rotated-loop-head (block)
   (declare (type cblock block))
   (let* ((num (block-number block))
-	 (env (block-physenv block))
-	 (pred (dolist (pred (block-pred block) nil)
-		 (when (and (not (block-flag pred))
-			    (eq (block-physenv pred) env)
-			    (< (block-number pred) num))
-		   (return pred)))))
+         (env (block-physenv block))
+         (pred (dolist (pred (block-pred block) nil)
+                 (when (and (not (block-flag pred))
+                            (eq (block-physenv pred) env)
+                            (< (block-number pred) num))
+                   (return pred)))))
     (cond
      ((and pred
-	   (not (physenv-nlx-info env))
-	   (not (eq (lambda-block (block-home-lambda block)) block)))
+           (not (physenv-nlx-info env))
+           (not (eq (lambda-block (block-home-lambda block)) block)))
       (let ((current pred)
-	    (current-num (block-number pred)))
-	(block DONE
-	  (loop
-	    (dolist (pred (block-pred current) (return-from DONE))
-	      (when (eq pred block)
-		(return-from DONE))
-	      (when (and (not (block-flag pred))
-			 (eq (block-physenv pred) env)
-			 (> (block-number pred) current-num))
-		(setq current pred   current-num (block-number pred))
-		(return)))))
-	(aver (not (block-flag current)))
-	current))
+            (current-num (block-number pred)))
+        (block DONE
+          (loop
+            (dolist (pred (block-pred current) (return-from DONE))
+              (when (eq pred block)
+                (return-from DONE))
+              (when (and (not (block-flag pred))
+                         (eq (block-physenv pred) env)
+                         (> (block-number pred) current-num))
+                (setq current pred   current-num (block-number pred))
+                (return)))))
+        (aver (not (block-flag current)))
+        current))
      (t
       block))))
 
@@ -104,28 +104,28 @@
       (setf (block-flag block) t)
       (aver (and (block-component block) (not (block-delete-p block))))
       (add-to-emit-order (or (block-info block)
-			     (setf (block-info block)
-				   (funcall block-info-constructor block)))
-			 (block-annotation-prev tail))
+                             (setf (block-info block)
+                                   (funcall block-info-constructor block)))
+                         (block-annotation-prev tail))
 
       (let ((last (block-last block)))
-	(cond ((and (combination-p last) (node-tail-p last)
-		    (eq (basic-combination-kind last) :local)
-		    (not (eq (node-physenv last)
-			     (lambda-physenv (combination-lambda last)))))
-	       (combination-lambda last))
-	      (t
-	       (let ((component-tail (component-tail (block-component block)))
-		     (block-succ (block-succ block))
-		     (fun nil))
-		 (dolist (succ block-succ)
-		   (unless (eq (first (block-succ succ)) component-tail)
-		     (let ((res (control-analyze-block
-				 succ tail block-info-constructor)))
-		       (when res (setq fun res)))))
-		 (dolist (succ block-succ)
-		   (control-analyze-block succ tail block-info-constructor))
-		 fun)))))))
+        (cond ((and (combination-p last) (node-tail-p last)
+                    (eq (basic-combination-kind last) :local)
+                    (not (eq (node-physenv last)
+                             (lambda-physenv (combination-lambda last)))))
+               (combination-lambda last))
+              (t
+               (let ((component-tail (component-tail (block-component block)))
+                     (block-succ (block-succ block))
+                     (fun nil))
+                 (dolist (succ block-succ)
+                   (unless (eq (first (block-succ succ)) component-tail)
+                     (let ((res (control-analyze-block
+                                 succ tail block-info-constructor)))
+                       (when res (setq fun res)))))
+                 (dolist (succ block-succ)
+                   (control-analyze-block succ tail block-info-constructor))
+                 fun)))))))
 
 ;;; Analyze all of the NLX EPs first to ensure that code reachable
 ;;; only from a NLX is emitted contiguously with the code reachable
@@ -143,28 +143,28 @@
            (type component component)
            (type function block-info-constructor))
   (let* ((tail-block (block-info (component-tail component)))
-	 (prev-block (block-annotation-prev tail-block))
-	 (bind-block (node-block (lambda-bind fun))))
+         (prev-block (block-annotation-prev tail-block))
+         (bind-block (node-block (lambda-bind fun))))
     (unless (block-flag bind-block)
       (dolist (nlx (physenv-nlx-info (lambda-physenv fun)))
-	(control-analyze-block (nlx-info-target nlx) tail-block
-			       block-info-constructor))
+        (control-analyze-block (nlx-info-target nlx) tail-block
+                               block-info-constructor))
       (cond
        ((block-flag bind-block)
-	(let* ((block-note (block-info bind-block))
-	       (prev (block-annotation-prev block-note))
-	       (next (block-annotation-next block-note)))
-	  (setf (block-annotation-prev next) prev)
-	  (setf (block-annotation-next prev) next)
-	  (add-to-emit-order block-note prev-block)))
+        (let* ((block-note (block-info bind-block))
+               (prev (block-annotation-prev block-note))
+               (next (block-annotation-next block-note)))
+          (setf (block-annotation-prev next) prev)
+          (setf (block-annotation-next prev) next)
+          (add-to-emit-order block-note prev-block)))
        (t
-	(let ((new-fun (control-analyze-block bind-block
-					      (block-annotation-next
-					       prev-block)
-					      block-info-constructor)))
-	  (when new-fun
-	    (control-analyze-1-fun new-fun component
-				   block-info-constructor)))))))
+        (let ((new-fun (control-analyze-block bind-block
+                                              (block-annotation-next
+                                               prev-block)
+                                              block-info-constructor)))
+          (when new-fun
+            (control-analyze-1-fun new-fun component
+                                   block-info-constructor)))))))
   (values))
 
 ;;; Do control analysis on COMPONENT, finding the emit order. Our only
@@ -179,11 +179,11 @@
 (defevent control-deleted-block "control analysis deleted dead block")
 (defun control-analyze (component block-info-constructor)
   (declare (type component component)
-	   (type function block-info-constructor))
+           (type function block-info-constructor))
   (let* ((head (component-head component))
-	 (head-block (funcall block-info-constructor head))
-	 (tail (component-tail component))
-	 (tail-block (funcall block-info-constructor tail)))
+         (head-block (funcall block-info-constructor head))
+         (tail (component-tail component))
+         (tail-block (funcall block-info-constructor tail)))
     (setf (block-info head) head-block)
     (setf (block-info tail) tail-block)
     (setf (block-annotation-prev tail-block) head-block)
@@ -193,21 +193,21 @@
 
     (dolist (fun (component-lambdas component))
       (when (xep-p fun)
-	(control-analyze-1-fun fun component block-info-constructor)))
+        (control-analyze-1-fun fun component block-info-constructor)))
 
     (dolist (fun (component-lambdas component))
       (control-analyze-1-fun fun component block-info-constructor))
 
     (do-blocks (block component)
       (unless (block-flag block)
-	(event control-deleted-block (block-start-node block))
-	(delete-block block))))
+        (event control-deleted-block (block-start-node block))
+        (delete-block block))))
 
   (let ((2comp (component-info component)))
     (when (ir2-component-p 2comp)
       ;; If it's not an IR2-COMPONENT, don't worry about it.
       (setf (ir2-component-values-receivers 2comp)
-	    (delete-if-not #'block-component
-			   (ir2-component-values-receivers 2comp)))))
+            (delete-if-not #'block-component
+                           (ir2-component-values-receivers 2comp)))))
 
   (values))

@@ -26,7 +26,7 @@
   (when (looks-like-name-of-special-var-p name)
     (style-warn "defining ~S as a constant, even though the name follows~@
 the usual naming convention (names like *FOO*) for special variables"
-		name))
+                name))
   (let ((kind (info :variable :kind name)))
     (case kind
       (:constant
@@ -39,17 +39,17 @@ the usual naming convention (names like *FOO*) for special variables"
        ;; something like the DEFCONSTANT-EQX macro used in SBCL (which
        ;; is occasionally more appropriate). -- WHN 2001-12-21
        (unless (eql value
-		    (info :variable :constant-value name))
-	 (multiple-value-bind (ignore aborted)
-	     (with-simple-restart (abort "Keep the old value.")
-	       (cerror "Go ahead and change the value."
-		       'defconstant-uneql
-		       :name name
-		       :old-value (info :variable :constant-value name)
-		       :new-value value))
-	   (declare (ignore ignore))
-	   (when aborted
-	     (return-from sb!c::%defconstant name)))))
+                    (info :variable :constant-value name))
+         (multiple-value-bind (ignore aborted)
+             (with-simple-restart (abort "Keep the old value.")
+               (cerror "Go ahead and change the value."
+                       'defconstant-uneql
+                       :name name
+                       :old-value (info :variable :constant-value name)
+                       :new-value value))
+           (declare (ignore ignore))
+           (when aborted
+             (return-from sb!c::%defconstant name)))))
       (:global
        ;; (This is OK -- undefined variables are of this kind. So we
        ;; don't warn or error or anything, just fall through.)
@@ -75,14 +75,14 @@ the usual naming convention (names like *FOO*) for special variables"
                  ;; CL:FOO. It would be good to unscrew the
                  ;; cross-compilation package hacks so that that
                  ;; translation doesn't happen. Perhaps:
-                 ;;   * Replace SB-XC with SB-CL. SB-CL exports all the 
+                 ;;   * Replace SB-XC with SB-CL. SB-CL exports all the
                  ;;     symbols which ANSI requires to be exported from CL.
                  ;;   * Make a nickname SB!CL which behaves like SB!XC.
                  ;;   * Go through the loaded-on-the-host code making
                  ;;     every target definition be in SB-CL. E.g.
                  ;;     DEFMACRO-MUNDANELY DEFCONSTANT becomes
                  ;;     DEFMACRO-MUNDANELY SB!CL:DEFCONSTANT.
-                 ;;   * Make IN-TARGET-COMPILATION-MODE do 
+                 ;;   * Make IN-TARGET-COMPILATION-MODE do
                  ;;     UNUSE-PACKAGE CL and USE-PACKAGE SB-CL in each
                  ;;     of the target packages (then undo it on exit).
                  ;;   * Make the cross-compiler's implementation of
@@ -110,5 +110,5 @@ the usual naming convention (names like *FOO*) for special variables"
                    (eval `(defconstant ,name ',value))))
 
   (setf (info :variable :kind name) :constant
-	(info :variable :constant-value name) value)
+        (info :variable :constant-value name) value)
   name)

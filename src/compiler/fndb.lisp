@@ -29,7 +29,7 @@
 
 ;;; These can be affected by type definitions, so they're not FOLDABLE.
 (defknown (sb!xc:upgraded-complex-part-type sb!xc:upgraded-array-element-type)
-	  (type-specifier &optional lexenv-designator) type-specifier
+          (type-specifier &optional lexenv-designator) type-specifier
   (unsafely-flushable))
 
 ;;;; from the "Predicates" chapter:
@@ -69,9 +69,9 @@
   (unsafely-flushable))
 
 (defknown (null symbolp atom consp listp numberp integerp rationalp floatp
-		complexp characterp stringp bit-vector-p vectorp
-		simple-vector-p simple-string-p simple-bit-vector-p arrayp
-		sb!xc:packagep functionp compiled-function-p not)
+                complexp characterp stringp bit-vector-p vectorp
+                simple-vector-p simple-string-p simple-bit-vector-p arrayp
+                sb!xc:packagep functionp compiled-function-p not)
   (t) boolean (movable foldable flushable))
 
 (defknown (eq eql) (t t) boolean (movable foldable flushable))
@@ -165,18 +165,18 @@
 (defknown copy-symbol (symbol &optional t) symbol (flushable))
 (defknown gensym (&optional (or string unsigned-byte)) symbol ())
 (defknown symbol-package (symbol) (or sb!xc:package null) (flushable))
-(defknown keywordp (t) boolean (flushable))	  ; If someone uninterns it...
+(defknown keywordp (t) boolean (flushable))       ; If someone uninterns it...
 
 ;;;; from the "Packages" chapter:
 
 (defknown gentemp (&optional string package-designator) symbol)
 
 (defknown make-package (string-designator &key
-					  (:use list)
-					  (:nicknames list)
-					  ;; ### extensions...
-					  (:internal-symbols index)
-					  (:external-symbols index))
+                                          (:use list)
+                                          (:nicknames list)
+                                          ;; ### extensions...
+                                          (:internal-symbols index)
+                                          (:external-symbols index))
   sb!xc:package)
 (defknown find-package (package-designator) (or sb!xc:package null)
   (flushable))
@@ -195,7 +195,7 @@
 (defknown find-symbol (string &optional package-designator)
   (values symbol (member :internal :external :inherited nil))
   (flushable))
-(defknown (export import) (symbols-designator &optional package-designator) 
+(defknown (export import) (symbols-designator &optional package-designator)
   (eql t))
 (defknown unintern (symbol &optional package-designator) boolean)
 (defknown unexport (symbols-designator &optional package-designator) (eql t))
@@ -333,8 +333,8 @@
 (defknown (float-digits float-precision) (float) float-digits
   (movable foldable flushable explicit-check))
 (defknown integer-decode-float (float)
-	  (values integer float-int-exponent (member -1 1))
-	  (movable foldable flushable explicit-check))
+          (values integer float-int-exponent (member -1 1))
+          (movable foldable flushable explicit-check))
 
 (defknown complex (real &optional real) number
   (movable foldable flushable explicit-check))
@@ -345,7 +345,7 @@
   (movable foldable flushable explicit-check))
 
 (defknown (lognand lognor logandc1 logandc2 logorc1 logorc2)
-	  (integer integer) integer
+          (integer integer) integer
   (movable foldable flushable explicit-check))
 
 (defknown boole (boole-code integer integer) integer
@@ -384,14 +384,14 @@
 
 ;;;; from the "Characters" chapter:
 (defknown (standard-char-p graphic-char-p alpha-char-p
-			   upper-case-p lower-case-p both-case-p alphanumericp)
+                           upper-case-p lower-case-p both-case-p alphanumericp)
   (character) boolean (movable foldable flushable))
 
 (defknown digit-char-p (character &optional (integer 2 36))
   (or (integer 0 35) null) (movable foldable flushable))
 
 (defknown (char= char/= char< char> char<= char>= char-equal char-not-equal
-		 char-lessp char-greaterp char-not-greaterp char-not-lessp)
+                 char-lessp char-greaterp char-not-greaterp char-not-lessp)
   (character &rest character) boolean (movable foldable flushable))
 
 (defknown character (t) character (movable foldable unsafely-flushable))
@@ -435,8 +435,8 @@
   :derive-type #'result-type-first-arg)
 
 (defknown make-sequence (type-specifier index
-					&key
-					(:initial-element t))
+                                        &key
+                                        (:initial-element t))
   consed-sequence
   (movable unsafe)
   :derive-type (creation-result-type-specifier-nth-arg 1))
@@ -472,13 +472,13 @@
 
 ;;; unsafe for :INITIAL-VALUE...
 (defknown reduce (callable
-		  sequence
-		  &key
-		  (:from-end t)
-		  (:start index)
-		  (:end sequence-end)
-		  (:initial-value t)
-		  (:key callable))
+                  sequence
+                  &key
+                  (:from-end t)
+                  (:start index)
+                  (:end sequence-end)
+                  (:initial-value t)
+                  (:key callable))
   t
   (foldable flushable call unsafe))
 
@@ -487,12 +487,12 @@
   :derive-type #'result-type-first-arg)
 
 (defknown replace (sequence
-		   sequence
-		   &key
-		   (:start1 index)
-		   (:end1 sequence-end)
-		   (:start2 index)
-		   (:end2 sequence-end))
+                   sequence
+                   &key
+                   (:start1 index)
+                   (:end1 sequence-end)
+                   (:start2 index)
+                   (:end2 sequence-end))
   sequence ()
   :derive-type #'result-type-first-arg)
 
@@ -514,7 +514,7 @@
 
 (defknown (remove-if remove-if-not)
   (callable sequence &key (:from-end t) (:start index) (:end sequence-end)
-	    (:count sequence-count) (:key callable))
+            (:count sequence-count) (:key callable))
   consed-sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 2))
@@ -544,7 +544,7 @@
 
 (defknown (delete-if delete-if-not)
   (callable sequence &key (:from-end t) (:start index) (:end sequence-end)
-	    (:count sequence-count) (:key callable))
+            (:count sequence-count) (:key callable))
   sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 2))
@@ -558,59 +558,59 @@
 
 (defknown remove-duplicates
   (sequence &key (:test callable) (:test-not callable) (:start index)
-	    (:from-end t) (:end sequence-end) (:key callable))
+            (:from-end t) (:end sequence-end) (:key callable))
   consed-sequence
   (unsafely-flushable call)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown delete-duplicates
   (sequence &key (:test callable) (:test-not callable) (:start index)
-	    (:from-end t) (:end sequence-end) (:key callable))
+            (:from-end t) (:end sequence-end) (:key callable))
   sequence
   (unsafely-flushable call)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown find (t sequence &key (:test callable) (:test-not callable)
-		  (:start index) (:from-end t) (:end sequence-end)
-		  (:key callable))
+                  (:start index) (:from-end t) (:end sequence-end)
+                  (:key callable))
   t
   (foldable flushable call))
 
 (defknown (find-if find-if-not)
   (callable sequence &key (:from-end t) (:start index) (:end sequence-end)
-	    (:key callable))
+            (:key callable))
   t
   (foldable flushable call))
 
 (defknown position (t sequence &key (:test callable) (:test-not callable)
-		      (:start index) (:from-end t) (:end sequence-end)
-		      (:key callable))
+                      (:start index) (:from-end t) (:end sequence-end)
+                      (:key callable))
   (or index null)
   (foldable flushable call))
 
 (defknown (position-if position-if-not)
   (callable sequence &key (:from-end t) (:start index) (:end sequence-end)
-	    (:key callable))
+            (:key callable))
   (or index null)
   (foldable flushable call))
 
 (defknown count (t sequence &key (:test callable) (:test-not callable)
-		      (:start index) (:from-end t) (:end sequence-end)
-		      (:key callable))
+                      (:start index) (:from-end t) (:end sequence-end)
+                      (:key callable))
   index
   (foldable flushable call))
 
 (defknown (count-if count-if-not)
   (callable sequence &key (:from-end t) (:start index) (:end sequence-end)
-	    (:key callable))
+            (:key callable))
   index
   (foldable flushable call))
 
 (defknown (mismatch search)
   (sequence sequence &key (:from-end t) (:test callable) (:test-not callable)
-	    (:start1 index) (:end1 sequence-end)
-	    (:start2 index) (:end2 sequence-end)
-	    (:key callable))
+            (:start1 index) (:end1 sequence-end)
+            (:start2 index) (:end2 sequence-end)
+            (:key callable))
   (or index null)
   (foldable flushable call))
 
@@ -623,23 +623,23 @@
   (call))
 
 (defknown merge (type-specifier sequence sequence callable
-				&key (:key callable))
+                                &key (:key callable))
   sequence
   (call)
   :derive-type (creation-result-type-specifier-nth-arg 1))
 
 ;;; not FLUSHABLE, despite what CMU CL's DEFKNOWN said..
 (defknown read-sequence (sequence stream
-				  &key
-				  (:start index)
-				  (:end sequence-end))
+                                  &key
+                                  (:start index)
+                                  (:end sequence-end))
   (index)
   ())
 
 (defknown write-sequence (sequence stream
-				   &key
-				   (:start index)
-				   (:end sequence-end))
+                                   &key
+                                   (:start index)
+                                   (:end sequence-end))
   sequence
   ()
   :derive-type (sequence-result-nth-arg 1))
@@ -697,19 +697,19 @@
 (defknown (rplaca rplacd) (cons t) list (unsafe))
 
 (defknown (nsubst subst) (t t t &key (:key callable) (:test callable)
-			    (:test-not callable))
+                            (:test-not callable))
   t (flushable unsafe call))
 
 (defknown (subst-if subst-if-not nsubst-if nsubst-if-not)
-	  (t callable t &key (:key callable))
+          (t callable t &key (:key callable))
   t (flushable unsafe call))
 
 (defknown (sublis nsublis) (list t &key (:key callable) (:test callable)
-				 (:test-not callable))
+                                 (:test-not callable))
   t (flushable unsafe call))
 
 (defknown member (t list &key (:key callable) (:test callable)
-		    (:test-not callable))
+                    (:test-not callable))
   list (foldable flushable call))
 (defknown (member-if member-if-not) (callable list &key (:key callable))
   list (foldable flushable call))
@@ -717,7 +717,7 @@
 (defknown tailp (t list) boolean (foldable flushable))
 
 (defknown adjoin (t list &key (:key callable) (:test callable)
-		    (:test-not callable))
+                    (:test-not callable))
   list (foldable flushable unsafe call))
 
 (defknown (union intersection set-difference set-exclusive-or)
@@ -739,10 +739,10 @@
 (defknown pairlis (t t &optional t) list (flushable unsafe))
 
 (defknown (rassoc assoc)
-	  (t list &key (:key callable) (:test callable) (:test-not callable))
+          (t list &key (:key callable) (:test callable) (:test-not callable))
   list (foldable flushable call))
 (defknown (assoc-if-not assoc-if rassoc-if rassoc-if-not)
-	  (callable list &key (:key callable)) list (foldable flushable call))
+          (callable list &key (:key callable)) list (foldable flushable call))
 
 (defknown (memq assq) (t list) list (foldable flushable unsafe))
 (defknown delq (t list) list (flushable unsafe))
@@ -776,14 +776,14 @@
 ;;;; from the "Arrays" chapter
 
 (defknown make-array ((or index list)
-		      &key
-		      (:element-type type-specifier)
-		      (:initial-element t)
-		      (:initial-contents t)
-		      (:adjustable t)
-		      (:fill-pointer t)
-		      (:displaced-to (or array null))
-		      (:displaced-index-offset index))
+                      &key
+                      (:element-type type-specifier)
+                      (:initial-element t)
+                      (:initial-contents t)
+                      (:adjustable t)
+                      (:fill-pointer t)
+                      (:displaced-to (or array null))
+                      (:displaced-index-offset index))
   array (flushable unsafe))
 
 (defknown vector (&rest t) simple-vector (flushable unsafe))
@@ -808,7 +808,7 @@
 (defknown sbit ((simple-array bit) &rest index) bit (foldable flushable))
 
 (defknown (bit-and bit-ior bit-xor bit-eqv bit-nand bit-nor bit-andc1 bit-andc2
-		   bit-orc1 bit-orc2)
+                   bit-orc1 bit-orc2)
   ((array bit) (array bit) &optional (or (array bit) (member t nil)))
   (array bit)
   ()
@@ -831,9 +831,9 @@
 
 (defknown adjust-array
   (array (or index list) &key (:element-type type-specifier)
-	 (:initial-element t) (:initial-contents t)
-	 (:fill-pointer t) (:displaced-to (or array null))
-	 (:displaced-index-offset index))
+         (:initial-element t) (:initial-contents t)
+         (:fill-pointer t) (:displaced-to (or array null))
+         (:displaced-index-offset index))
   array (unsafe))
 ;  :derive-type 'result-type-arg1) Not even close...
 
@@ -844,20 +844,20 @@
 
 (defknown (string= string-equal)
   (string-designator string-designator &key (:start1 index) (:end1 sequence-end)
-	      (:start2 index) (:end2 sequence-end))
+              (:start2 index) (:end2 sequence-end))
   boolean
   (foldable flushable))
 
 (defknown (string< string> string<= string>= string/= string-lessp
-		   string-greaterp string-not-lessp string-not-greaterp
-		   string-not-equal)
+                   string-greaterp string-not-lessp string-not-greaterp
+                   string-not-equal)
   (string-designator string-designator &key (:start1 index) (:end1 sequence-end)
-	      (:start2 index) (:end2 sequence-end))
+              (:start2 index) (:end2 sequence-end))
   (or index null)
   (foldable flushable))
 
 (defknown make-string (index &key (:element-type type-specifier)
-		       (:initial-element character))
+                       (:initial-element character))
   simple-string (flushable))
 
 (defknown (string-trim string-left-trim string-right-trim)
@@ -902,9 +902,9 @@
 (defknown make-string-input-stream (string &optional index sequence-end)
   stream
   (flushable unsafe))
-(defknown make-string-output-stream 
-    (&key (:element-type type-specifier)) 
-    stream 
+(defknown make-string-output-stream
+    (&key (:element-type type-specifier))
+    stream
   (flushable))
 (defknown get-output-stream-string (stream) simple-string ())
 (defknown streamp (t) boolean (movable foldable flushable))
@@ -989,8 +989,8 @@
   (explicit-check))
 (defknown unread-char (character &optional stream-designator) t
   (explicit-check))
-(defknown peek-char (&optional (or character (member nil t)) 
-			       stream-designator t t t)
+(defknown peek-char (&optional (or character (member nil t))
+                               stream-designator t t t)
   t
   (explicit-check))
 (defknown listen (&optional stream-designator) boolean (flushable explicit-check))
@@ -999,17 +999,17 @@
 
 (defknown read-from-string
   (string &optional t t
-	  &key
-	  (:start index)
-	  (:end sequence-end)
-	  (:preserve-whitespace t))
+          &key
+          (:start index)
+          (:end sequence-end)
+          (:preserve-whitespace t))
   (values t index))
 (defknown parse-integer
   (string &key
-	  (:start index)
-	  (:end sequence-end)
-	  (:radix (integer 2 36))
-	  (:junk-allowed t))
+          (:start index)
+          (:end sequence-end)
+          (:radix (integer 2 36))
+          (:junk-allowed t))
   (values (or integer null ()) index))
 
 (defknown read-byte (stream &optional t t) t (explicit-check))
@@ -1036,8 +1036,8 @@
   (any explicit-check)
   :derive-type #'result-type-first-arg)
 
-(defknown (prin1 print princ) (t &optional stream-designator) 
-  t 
+(defknown (prin1 print princ) (t &optional stream-designator)
+  t
   (any explicit-check)
   :derive-type #'result-type-first-arg)
 
@@ -1072,8 +1072,8 @@
 (defknown write-byte (integer stream) integer
   (explicit-check))
 
-(defknown format ((or (member nil t) stream string) 
-		  (or string function) &rest t)
+(defknown format ((or (member nil t) stream string)
+                  (or string function) &rest t)
   (or string null)
   (explicit-check))
 
@@ -1088,18 +1088,18 @@
 ;;; parsing of a PATHNAME-DESIGNATOR might signal an error.)
 
 (defknown wild-pathname-p (pathname-designator
-			   &optional
-			   (member nil :host :device
-				   :directory :name
-				   :type :version))
+                           &optional
+                           (member nil :host :device
+                                   :directory :name
+                                   :type :version))
   generalized-boolean
   ())
 (defknown pathname-match-p (pathname-designator pathname-designator)
   generalized-boolean
   ())
 (defknown translate-pathname (pathname-designator
-			      pathname-designator
-			      pathname-designator &key)
+                              pathname-designator
+                              pathname-designator &key)
   pathname
   ())
 
@@ -1116,10 +1116,10 @@
   (pathname-designator &optional
                        (or list host string (member :unspecific))
                        pathname-designator
-		       &key
-		       (:start index)
-		       (:end sequence-end)
-		       (:junk-allowed t))
+                       &key
+                       (:start index)
+                       (:end sequence-end)
+                       (:junk-allowed t))
   (values (or pathname null) sequence-end)
   ())
 
@@ -1141,19 +1141,19 @@
 (defknown pathnamep (t) boolean (movable flushable))
 
 (defknown pathname-host (pathname-designator
-			 &key (:case (member :local :common)))
+                         &key (:case (member :local :common)))
   pathname-host (flushable))
 (defknown pathname-device (pathname-designator
-			   &key (:case (member :local :common)))
+                           &key (:case (member :local :common)))
   pathname-device (flushable))
 (defknown pathname-directory (pathname-designator
-			      &key (:case (member :local :common)))
+                              &key (:case (member :local :common)))
   pathname-directory (flushable))
 (defknown pathname-name (pathname-designator
-			 &key (:case (member :local :common)))
+                         &key (:case (member :local :common)))
   pathname-name (flushable))
 (defknown pathname-type (pathname-designator
-			 &key (:case (member :local :common)))
+                         &key (:case (member :local :common)))
   pathname-type (flushable))
 (defknown pathname-version (pathname-designator)
   pathname-version (flushable))
@@ -1170,13 +1170,13 @@
 
 (defknown open
   (pathname-designator &key
-		       (:direction (member :input :output :io :probe))
-		       (:element-type type-specifier)
-		       (:if-exists (member :error :new-version :rename
-					   :rename-and-delete :overwrite
-					   :append :supersede nil))
-		       (:if-does-not-exist (member :error :create nil))
-		       (:external-format keyword))
+                       (:direction (member :input :output :io :probe))
+                       (:element-type type-specifier)
+                       (:if-exists (member :error :new-version :rename
+                                           :rename-and-delete :overwrite
+                                           :append :supersede nil))
+                       (:if-does-not-exist (member :error :create nil))
+                       (:external-format keyword))
   (or stream null))
 
 (defknown rename-file (pathname-designator filename)
@@ -1189,7 +1189,7 @@
   ())
 
 (defknown file-position (stream &optional
-				(or unsigned-byte (member :start :end)))
+                                (or unsigned-byte (member :start :end)))
   (or unsigned-byte (member t nil)))
 (defknown file-length (stream) (or unsigned-byte null) (unsafely-flushable))
 
@@ -1246,9 +1246,9 @@
 
    ;; ANSI options
    (:output-file (or pathname-designator
-		     null
-		     ;; FIXME: This last case is a non-ANSI hack.
-		     (member t)))
+                     null
+                     ;; FIXME: This last case is a non-ANSI hack.
+                     (member t)))
    (:verbose t)
    (:print t)
    (:external-format keyword)
@@ -1261,7 +1261,7 @@
 ;; FIXME: consider making (OR CALLABLE CONS) something like
 ;; EXTENDED-FUNCTION-DESIGNATOR
 (defknown disassemble ((or callable cons) &key
-		       (:stream stream) (:use-labels t))
+                       (:stream stream) (:use-labels t))
   null)
 
 (defknown fdocumentation (t symbol)
@@ -1281,15 +1281,15 @@
 
 (defknown get-decoded-time ()
   (values (integer 0 59) (integer 0 59) (integer 0 23) (integer 1 31)
-	  (integer 1 12) unsigned-byte (integer 0 6) boolean (rational -24 24))
+          (integer 1 12) unsigned-byte (integer 0 6) boolean (rational -24 24))
   (flushable))
 
 (defknown get-universal-time () unsigned-byte (flushable))
 
 (defknown decode-universal-time
-	  (unsigned-byte &optional (or null (rational -24 24)))
+          (unsigned-byte &optional (or null (rational -24 24)))
   (values (integer 0 59) (integer 0 59) (integer 0 23) (integer 1 31)
-	  (integer 1 12) unsigned-byte (integer 0 6) boolean (rational -24 24))
+          (integer 1 12) unsigned-byte (integer 0 6) boolean (rational -24 24))
   (flushable))
 
 (defknown encode-universal-time
@@ -1314,8 +1314,8 @@
 ;;; available, so -- unlike the related LISP-IMPLEMENTATION-FOO
 ;;; functions -- these really can return NIL.
 (defknown (machine-type machine-version machine-instance
-	   software-type software-version
-	   short-site-name long-site-name)
+           software-type software-version
+           short-site-name long-site-name)
   () (or simple-string null) (flushable))
 
 (defknown identity (t) t (movable foldable flushable unsafe)
@@ -1420,7 +1420,7 @@
 (defknown sb!impl::signal-bounding-indices-bad-error
     (sequence index sequence-end)
   nil) ; never returns
-  
+
 
 (defknown arg-count-error (t t t t t t) nil (unsafe))
 

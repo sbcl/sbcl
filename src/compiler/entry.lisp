@@ -24,10 +24,10 @@
   (let ((2comp (component-info component)))
     (dolist (fun (component-lambdas component))
       (when (xep-p fun)
-	(let ((info (or (leaf-info fun)
-			(setf (leaf-info fun) (make-entry-info)))))
-	  (compute-entry-info fun info)
-	  (push info (ir2-component-entries 2comp))))))
+        (let ((info (or (leaf-info fun)
+                        (setf (leaf-info fun) (make-entry-info)))))
+          (compute-entry-info fun info)
+          (push info (ir2-component-entries 2comp))))))
   (select-component-format component)
   (values))
 
@@ -35,14 +35,14 @@
 (defun compute-entry-info (fun info)
   (declare (type clambda fun) (type entry-info info))
   (let ((bind (lambda-bind fun))
-	(internal-fun (functional-entry-fun fun)))
+        (internal-fun (functional-entry-fun fun)))
     (setf (entry-info-closure-tn info)
           (if (physenv-closure (lambda-physenv fun))
               (make-normal-tn *backend-t-primitive-type*)
               nil))
     (setf (entry-info-offset info) (gen-label))
     (setf (entry-info-name info)
-	  (leaf-debug-name internal-fun))
+          (leaf-debug-name internal-fun))
     (when (policy bind (>= debug 1))
       (let ((args (functional-arg-documentation internal-fun)))
         (aver (not (eq args :unspecified)))
@@ -70,28 +70,28 @@
   (let ((res nil))
     (dolist (lambda (component-lambdas component))
       (case (functional-kind lambda)
-	(:external
-	 (unless (lambda-has-external-references-p lambda)
-	   (let* ((ef (functional-entry-fun lambda))
-		  (new (make-functional
-			:kind :toplevel-xep
-			:info (leaf-info lambda)
-			:%source-name (functional-%source-name ef)
-			:%debug-name (functional-%debug-name ef)
-			:lexenv (make-null-lexenv)))
-		  (closure (physenv-closure
-			    (lambda-physenv (main-entry ef)))))
-	     (dolist (ref (leaf-refs lambda))
-	       (let ((ref-component (node-component ref)))
-		 (cond ((eq ref-component component))
-		       ((or (not (component-toplevelish-p ref-component))
-			    closure)
-			(setq res t))
-		       (t
-			(setf (ref-leaf ref) new)
-			(push ref (leaf-refs new))
+        (:external
+         (unless (lambda-has-external-references-p lambda)
+           (let* ((ef (functional-entry-fun lambda))
+                  (new (make-functional
+                        :kind :toplevel-xep
+                        :info (leaf-info lambda)
+                        :%source-name (functional-%source-name ef)
+                        :%debug-name (functional-%debug-name ef)
+                        :lexenv (make-null-lexenv)))
+                  (closure (physenv-closure
+                            (lambda-physenv (main-entry ef)))))
+             (dolist (ref (leaf-refs lambda))
+               (let ((ref-component (node-component ref)))
+                 (cond ((eq ref-component component))
+                       ((or (not (component-toplevelish-p ref-component))
+                            closure)
+                        (setq res t))
+                       (t
+                        (setf (ref-leaf ref) new)
+                        (push ref (leaf-refs new))
                         (setf (leaf-refs lambda)
                               (delq ref (leaf-refs lambda))))))))))
-	(:toplevel
-	 (setq res t))))
+        (:toplevel
+         (setq res t))))
     res))

@@ -71,19 +71,19 @@
   (declare (inline subsetp))
   (let ((writes (tn-writes tn)))
     (and (eq (tn-kind tn) :normal)
-	 (not (tn-sc tn))		; Not wired or restricted.
-	 (and writes (null (tn-ref-next writes)))
-	 (let ((vop (tn-ref-vop writes)))
-	   (and (eq (vop-info-name (vop-info vop)) 'move)
-		(let ((arg-tn (tn-ref-tn (vop-args vop))))
-		  (and (or (not (tn-sc arg-tn))
-			   (eq (tn-kind arg-tn) :constant))
-		       (subsetp (primitive-type-scs
-				 (tn-primitive-type tn))
-				(primitive-type-scs
-				 (tn-primitive-type arg-tn)))
-		       (let ((leaf (tn-leaf tn)))
-			 (or (not leaf)
+         (not (tn-sc tn))               ; Not wired or restricted.
+         (and writes (null (tn-ref-next writes)))
+         (let ((vop (tn-ref-vop writes)))
+           (and (eq (vop-info-name (vop-info vop)) 'move)
+                (let ((arg-tn (tn-ref-tn (vop-args vop))))
+                  (and (or (not (tn-sc arg-tn))
+                           (eq (tn-kind arg-tn) :constant))
+                       (subsetp (primitive-type-scs
+                                 (tn-primitive-type tn))
+                                (primitive-type-scs
+                                 (tn-primitive-type arg-tn)))
+                       (let ((leaf (tn-leaf tn)))
+                         (or (not leaf)
                              (and
                               ;; Do we not care about preserving this this
                               ;; TN for debugging?
@@ -95,7 +95,7 @@
                               (not (and (lambda-var-p leaf)
                                         (memq (functional-kind (lambda-var-home leaf))
                                                    '(nil :optional)))))))
-		       arg-tn)))))))
+                       arg-tn)))))))
 
 ;;; Init the sets in BLOCK for copy propagation. To find GEN, we just
 ;;; look for MOVE vops, and then see whether the result is a eligible
@@ -105,26 +105,26 @@
 (defun init-copy-sets (block)
   (declare (type cblock block))
   (let ((kill (make-sset))
-	(gen (make-sset)))
+        (gen (make-sset)))
     (do ((vop (ir2-block-start-vop (block-info block)) (vop-next vop)))
-	((null vop))
+        ((null vop))
       (unless (and (eq (vop-info-name (vop-info vop)) 'move)
-		   (let ((y (tn-ref-tn (vop-results vop))))
-		     (when (tn-is-copy-of y)
-		       (sset-adjoin y gen)
-		       t)))
+                   (let ((y (tn-ref-tn (vop-results vop))))
+                     (when (tn-is-copy-of y)
+                       (sset-adjoin y gen)
+                       t)))
         ;; WANTED: explanation of UNLESS above.
-	(do ((res (vop-results vop) (tn-ref-across res)))
-	    ((not res))
-	  (let ((res-tn (tn-ref-tn res)))
-	    (do ((read (tn-reads res-tn) (tn-ref-next read)))
-		((null read))
-	      (let ((read-vop (tn-ref-vop read)))
-		(when (eq (vop-info-name (vop-info read-vop)) 'move)
-		  (let ((y (tn-ref-tn (vop-results read-vop))))
-		    (when (tn-is-copy-of y)
-		      (sset-delete y gen)
-		      (sset-adjoin y kill))))))))))
+        (do ((res (vop-results vop) (tn-ref-across res)))
+            ((not res))
+          (let ((res-tn (tn-ref-tn res)))
+            (do ((read (tn-reads res-tn) (tn-ref-next read)))
+                ((null read))
+              (let ((read-vop (tn-ref-vop read)))
+                (when (eq (vop-info-name (vop-info read-vop)) 'move)
+                  (let ((y (tn-ref-tn (vop-results read-vop))))
+                    (when (tn-is-copy-of y)
+                      (sset-delete y gen)
+                      (sset-adjoin y kill))))))))))
     (setf (block-out block) (copy-sset gen))
     (setf (block-kill block) kill)
     (setf (block-gen block) gen))
@@ -137,13 +137,13 @@
 (defun copy-flow-analysis (block)
   (declare (type cblock block))
   (let* ((pred (block-pred block))
-	 (in (copy-sset (block-out (first pred)))))
+         (in (copy-sset (block-out (first pred)))))
     (dolist (pred-block (rest pred))
       (sset-intersection in (block-out pred-block)))
     (setf (block-in block) in)
     (sset-union-of-difference (block-out block)
-			      in
-			      (block-kill block))))
+                              in
+                              (block-kill block))))
 
 (defevent copy-deleted-move "Copy propagation deleted a move.")
 
@@ -154,19 +154,19 @@
 ;;; to preserve parallel assignment semantics.
 (defun ok-copy-ref (vop arg in original-copy-of)
   (declare (type vop vop) (type tn arg) (type sset in)
-	   (type hash-table original-copy-of))
+           (type hash-table original-copy-of))
   (and (sset-member arg in)
        (do ((original (gethash arg original-copy-of)
-		      (gethash original original-copy-of)))
-	   ((not original) t)
-	 (unless (sset-member original in)
-	   (return nil)))
+                      (gethash original original-copy-of)))
+           ((not original) t)
+         (unless (sset-member original in)
+           (return nil)))
        (let ((info (vop-info vop)))
-	 (not (and (eq (vop-info-move-args info) :local-call)
-		   (>= (or (position-in #'tn-ref-across arg (vop-args vop)
-					:key #'tn-ref-tn)
-			   (error "Couldn't find REF?"))
-		       (length (template-arg-types info))))))))
+         (not (and (eq (vop-info-move-args info) :local-call)
+                   (>= (or (position-in #'tn-ref-across arg (vop-args vop)
+                                        :key #'tn-ref-tn)
+                           (error "Couldn't find REF?"))
+                       (length (template-arg-types info))))))))
 
 ;;; Make use of the result of flow analysis to eliminate copies. We
 ;;; scan the VOPs in block, propagating copies and keeping our IN set
@@ -207,31 +207,31 @@
   (declare (type cblock block) (type hash-table original-copy-of))
   (let ((in (block-in block)))
     (do ((vop (ir2-block-start-vop (block-info block)) (vop-next vop)))
-	((null vop))
+        ((null vop))
       (let ((this-copy (and (eq (vop-info-name (vop-info vop)) 'move)
-			    (let ((y (tn-ref-tn (vop-results vop))))
-			      (when (tn-is-copy-of y) y)))))
-	;; Substitute copied TN for copy when we find a reference to a copy.
-	;; If the copy is left with no reads, delete the move to the copy.
-	(do ((arg-ref (vop-args vop) (tn-ref-across arg-ref)))
-	    ((null arg-ref))
-	  (let* ((arg (tn-ref-tn arg-ref))
-		 (copy-of (tn-is-copy-of arg)))
-	    (when (and copy-of (ok-copy-ref vop arg in original-copy-of))
-	      (when this-copy
-		(setf (gethash this-copy original-copy-of) arg))
-	      (change-tn-ref-tn arg-ref copy-of)
-	      (when (null (tn-reads arg))
-		(event copy-deleted-move)
-		(delete-vop (tn-ref-vop (tn-writes arg)))))))
-	;; Kill any elements in IN that are copies of a TN we are clobbering.
-	(do ((res-ref (vop-results vop) (tn-ref-across res-ref)))
-	    ((null res-ref))
-	  (do-sset-elements (tn in)
-	    (when (eq (tn-is-copy-of tn) (tn-ref-tn res-ref))
-	      (sset-delete tn in))))
-	;; If this VOP is a copy, add the copy TN to IN.
-	(when this-copy (sset-adjoin this-copy in)))))
+                            (let ((y (tn-ref-tn (vop-results vop))))
+                              (when (tn-is-copy-of y) y)))))
+        ;; Substitute copied TN for copy when we find a reference to a copy.
+        ;; If the copy is left with no reads, delete the move to the copy.
+        (do ((arg-ref (vop-args vop) (tn-ref-across arg-ref)))
+            ((null arg-ref))
+          (let* ((arg (tn-ref-tn arg-ref))
+                 (copy-of (tn-is-copy-of arg)))
+            (when (and copy-of (ok-copy-ref vop arg in original-copy-of))
+              (when this-copy
+                (setf (gethash this-copy original-copy-of) arg))
+              (change-tn-ref-tn arg-ref copy-of)
+              (when (null (tn-reads arg))
+                (event copy-deleted-move)
+                (delete-vop (tn-ref-vop (tn-writes arg)))))))
+        ;; Kill any elements in IN that are copies of a TN we are clobbering.
+        (do ((res-ref (vop-results vop) (tn-ref-across res-ref)))
+            ((null res-ref))
+          (do-sset-elements (tn in)
+            (when (eq (tn-is-copy-of tn) (tn-ref-tn res-ref))
+              (sset-delete tn in))))
+        ;; If this VOP is a copy, add the copy TN to IN.
+        (when this-copy (sset-adjoin this-copy in)))))
 
   (values))
 
@@ -246,8 +246,8 @@
   (loop
     (let ((did-something nil))
       (do-blocks (block component)
-	(when (copy-flow-analysis block)
-	  (setq did-something t)))
+        (when (copy-flow-analysis block)
+          (setq did-something t)))
       (unless did-something (return))))
 
   (let ((original-copies (make-hash-table :test 'eq)))

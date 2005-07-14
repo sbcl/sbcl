@@ -82,7 +82,7 @@
 ;;; CSR, 2003-05-13
 (define-condition compiler-error (encapsulated-condition) ()
   (:report (lambda (condition stream)
-	     (print-object (encapsulated-condition condition) stream))))
+             (print-object (encapsulated-condition condition) stream))))
 
 ;;; Signal the appropriate condition. COMPILER-ERROR calls the bailout
 ;;; function so that it never returns (but compilation continues).
@@ -140,13 +140,13 @@
   (;; the position where the bad READ began, or NIL if unavailable,
    ;; redundant, or irrelevant
    (position :reader input-error-in-compile-file-position
-	     :initarg :position
-	     :initform nil))
+             :initarg :position
+             :initform nil))
   (:report
    (lambda (condition stream)
      (format stream
-	     "~@<~S failure in ~S~@[ at character ~W~]: ~2I~_~A~:>"
-	     'read
-	     'compile-file
-	     (input-error-in-compile-file-position condition)
-	     (encapsulated-condition condition)))))
+             "~@<~S failure in ~S~@[ at character ~W~]: ~2I~_~A~:>"
+             'read
+             'compile-file
+             (input-error-in-compile-file-position condition)
+             (encapsulated-condition condition)))))

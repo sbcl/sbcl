@@ -32,10 +32,10 @@
   ;; the segment is made invalid (e.g. by APPEND-SEGMENT) then the
   ;; vector can be replaced by NIL.
   (buffer (make-array 0
-		      :fill-pointer 0
-		      :adjustable t
-		      :element-type 'assembly-unit)
-	  :type (or null (vector assembly-unit)))
+                      :fill-pointer 0
+                      :adjustable t
+                      :element-type 'assembly-unit)
+          :type (or null (vector assembly-unit)))
   ;; whether or not to run the scheduler. Note: if the instruction
   ;; definitions were not compiled with the scheduler turned on, this
   ;; has no effect.
@@ -73,9 +73,9 @@
   ;; SIMPLE-VECTORs mapping locations to the instruction that reads them and
   ;; instructions that write them
   (readers (make-array *assem-max-locations* :initial-element nil)
-	   :type simple-vector)
+           :type simple-vector)
   (writers (make-array *assem-max-locations* :initial-element nil)
-	   :type simple-vector)
+           :type simple-vector)
   ;; The number of additional cycles before the next control transfer,
   ;; or NIL if a control transfer hasn't been queued. When a delayed
   ;; branch is queued, this slot is set to the delay count.
@@ -124,7 +124,7 @@
   (let ((buffer (segment-buffer segment)))
     ;; Make sure that the array is big enough.
     (do ()
-	((>= (array-dimension buffer 0) new-value))
+        ((>= (array-dimension buffer 0) new-value))
       ;; When we have to increase the size of the array, we want to
       ;; roughly double the vector length: that way growing the array
       ;; to size N conses only O(N) bytes in total. But just doubling
@@ -155,18 +155,18 @@
 ;;; FIXME: It'd probably be better to cleanly parameterize things like
 ;;; BACK-PATCH-FUN so we can avoid this nastiness altogether.
 (defmacro with-modified-segment-index-and-posn ((segment index posn)
-						&body body)
+                                                &body body)
   (with-unique-names (n-segment old-index old-posn)
     `(let* ((,n-segment ,segment)
-	    (,old-index (segment-current-index ,n-segment))
-	    (,old-posn (segment-current-posn ,n-segment)))
+            (,old-index (segment-current-index ,n-segment))
+            (,old-posn (segment-current-posn ,n-segment)))
        (unwind-protect
-	   (progn
-	     (setf (segment-current-index ,n-segment) ,index
-		   (segment-current-posn ,n-segment) ,posn)
-	     ,@body)
-	 (setf (segment-current-index ,n-segment) ,old-index
-	       (segment-current-posn ,n-segment) ,old-posn)))))
+           (progn
+             (setf (segment-current-index ,n-segment) ,index
+                   (segment-current-posn ,n-segment) ,posn)
+             ,@body)
+         (setf (segment-current-index ,n-segment) ,old-index
+               (segment-current-posn ,n-segment) ,old-posn)))))
 
 ;;;; structures/types used by the scheduler
 
@@ -186,10 +186,10 @@
   variable-length)
 
 (def!struct (instruction
-	    (:include sset-element)
-	    (:conc-name inst-)
-	    (:constructor make-instruction (number emitter attributes delay))
-	    (:copier nil))
+            (:include sset-element)
+            (:conc-name inst-)
+            (:constructor make-instruction (number emitter attributes delay))
+            (:copier nil))
   ;; The function to envoke to actually emit this instruction. Gets called
   ;; with the segment as its one argument.
   (emitter (missing-arg) :type (or null function))
@@ -221,18 +221,18 @@
   (print-unreadable-object (inst stream :type t :identity t)
     #!+sb-show-assem
     (princ (or (gethash inst *inst-ids*)
-	       (setf (gethash inst *inst-ids*)
-		     (incf *next-inst-id*)))
-	   stream)
+               (setf (gethash inst *inst-ids*)
+                     (incf *next-inst-id*)))
+           stream)
     (format stream
-	    #!+sb-show-assem " emitter=~S" #!-sb-show-assem "emitter=~S"
-	    (let ((emitter (inst-emitter inst)))
-	      (if emitter
-		  (multiple-value-bind (lambda lexenv-p name)
-		      (function-lambda-expression emitter)
-		    (declare (ignore lambda lexenv-p))
-		    name)
-		  '<flushed>)))
+            #!+sb-show-assem " emitter=~S" #!-sb-show-assem "emitter=~S"
+            (let ((emitter (inst-emitter inst)))
+              (if emitter
+                  (multiple-value-bind (lambda lexenv-p name)
+                      (function-lambda-expression emitter)
+                    (declare (ignore lambda lexenv-p))
+                    name)
+                  '<flushed>)))
     (when (inst-depth inst)
       (format stream ", depth=~W" (inst-depth inst)))))
 
@@ -244,7 +244,7 @@
 ;;;; the scheduler itself
 
 (defmacro without-scheduling ((&optional (segment '(%%current-segment%%)))
-			      &body body)
+                              &body body)
   #!+sb-doc
   "Execute BODY (as a PROGN) without scheduling any of the instructions
    generated inside it. This is not protected by UNWIND-PROTECT, so
@@ -252,87 +252,87 @@
   ;; FIXME: Why not just use UNWIND-PROTECT? Or is there some other
   ;; reason why we shouldn't use THROW or RETURN-FROM?
   (let ((var (gensym))
-	(seg (gensym)))
+        (seg (gensym)))
     `(let* ((,seg ,segment)
-	    (,var (segment-run-scheduler ,seg)))
+            (,var (segment-run-scheduler ,seg)))
        (when ,var
-	 (schedule-pending-instructions ,seg)
-	 (setf (segment-run-scheduler ,seg) nil))
+         (schedule-pending-instructions ,seg)
+         (setf (segment-run-scheduler ,seg) nil))
        ,@body
        (setf (segment-run-scheduler ,seg) ,var))))
 
 (defmacro note-dependencies ((segment inst) &body body)
   (sb!int:once-only ((segment segment) (inst inst))
     `(macrolet ((reads (loc) `(note-read-dependency ,',segment ,',inst ,loc))
-		(writes (loc &rest keys)
-		  `(note-write-dependency ,',segment ,',inst ,loc ,@keys)))
+                (writes (loc &rest keys)
+                  `(note-write-dependency ,',segment ,',inst ,loc ,@keys)))
        ,@body)))
 
 (defun note-read-dependency (segment inst read)
   (multiple-value-bind (loc-num size)
       (sb!c:location-number read)
     #!+sb-show-assem (format *trace-output*
-			     "~&~S reads ~S[~W for ~W]~%"
-			     inst read loc-num size)
+                             "~&~S reads ~S[~W for ~W]~%"
+                             inst read loc-num size)
     (when loc-num
       ;; Iterate over all the locations for this TN.
       (do ((index loc-num (1+ index))
-	   (end-loc (+ loc-num (or size 1))))
-	  ((>= index end-loc))
-	(declare (type (mod 2048) index end-loc))
-	(let ((writers (svref (segment-writers segment) index)))
-	  (when writers
-	    ;; The inst that wrote the value we want to read must have
-	    ;; completed.
-	    (let ((writer (car writers)))
-	      (sset-adjoin writer (inst-read-dependencies inst))
-	      (sset-adjoin inst (inst-read-dependents writer))
-	      (sset-delete writer (segment-emittable-insts-sset segment))
-	      ;; And it must have been completed *after* all other
-	      ;; writes to that location. Actually, that isn't quite
-	      ;; true. Each of the earlier writes could be done
-	      ;; either before this last write, or after the read, but
-	      ;; we have no way of representing that.
-	      (dolist (other-writer (cdr writers))
-		(sset-adjoin other-writer (inst-write-dependencies writer))
-		(sset-adjoin writer (inst-write-dependents other-writer))
-		(sset-delete other-writer
-			     (segment-emittable-insts-sset segment))))
-	    ;; And we don't need to remember about earlier writes any
-	    ;; more. Shortening the writers list means that we won't
-	    ;; bother generating as many explicit arcs in the graph.
-	    (setf (cdr writers) nil)))
-	(push inst (svref (segment-readers segment) index)))))
+           (end-loc (+ loc-num (or size 1))))
+          ((>= index end-loc))
+        (declare (type (mod 2048) index end-loc))
+        (let ((writers (svref (segment-writers segment) index)))
+          (when writers
+            ;; The inst that wrote the value we want to read must have
+            ;; completed.
+            (let ((writer (car writers)))
+              (sset-adjoin writer (inst-read-dependencies inst))
+              (sset-adjoin inst (inst-read-dependents writer))
+              (sset-delete writer (segment-emittable-insts-sset segment))
+              ;; And it must have been completed *after* all other
+              ;; writes to that location. Actually, that isn't quite
+              ;; true. Each of the earlier writes could be done
+              ;; either before this last write, or after the read, but
+              ;; we have no way of representing that.
+              (dolist (other-writer (cdr writers))
+                (sset-adjoin other-writer (inst-write-dependencies writer))
+                (sset-adjoin writer (inst-write-dependents other-writer))
+                (sset-delete other-writer
+                             (segment-emittable-insts-sset segment))))
+            ;; And we don't need to remember about earlier writes any
+            ;; more. Shortening the writers list means that we won't
+            ;; bother generating as many explicit arcs in the graph.
+            (setf (cdr writers) nil)))
+        (push inst (svref (segment-readers segment) index)))))
   (values))
 
 (defun note-write-dependency (segment inst write &key partially)
   (multiple-value-bind (loc-num size)
       (sb!c:location-number write)
     #!+sb-show-assem (format *trace-output*
-			     "~&~S writes ~S[~W for ~W]~%"
-			     inst write loc-num size)
+                             "~&~S writes ~S[~W for ~W]~%"
+                             inst write loc-num size)
     (when loc-num
       ;; Iterate over all the locations for this TN.
       (do ((index loc-num (1+ index))
-	   (end-loc (+ loc-num (or size 1))))
-	  ((>= index end-loc))
-	(declare (type (mod 2048) index end-loc))
-	;; All previous reads of this location must have completed.
-	(dolist (prev-inst (svref (segment-readers segment) index))
-	  (unless (eq prev-inst inst)
-	    (sset-adjoin prev-inst (inst-write-dependencies inst))
-	    (sset-adjoin inst (inst-write-dependents prev-inst))
-	    (sset-delete prev-inst (segment-emittable-insts-sset segment))))
-	(when partially
-	  ;; All previous writes to the location must have completed.
-	  (dolist (prev-inst (svref (segment-writers segment) index))
-	    (sset-adjoin prev-inst (inst-write-dependencies inst))
-	    (sset-adjoin inst (inst-write-dependents prev-inst))
-	    (sset-delete prev-inst (segment-emittable-insts-sset segment)))
-	  ;; And we can forget about remembering them, because
-	  ;; depending on us is as good as depending on them.
-	  (setf (svref (segment-writers segment) index) nil))
-	(push inst (svref (segment-writers segment) index)))))
+           (end-loc (+ loc-num (or size 1))))
+          ((>= index end-loc))
+        (declare (type (mod 2048) index end-loc))
+        ;; All previous reads of this location must have completed.
+        (dolist (prev-inst (svref (segment-readers segment) index))
+          (unless (eq prev-inst inst)
+            (sset-adjoin prev-inst (inst-write-dependencies inst))
+            (sset-adjoin inst (inst-write-dependents prev-inst))
+            (sset-delete prev-inst (segment-emittable-insts-sset segment))))
+        (when partially
+          ;; All previous writes to the location must have completed.
+          (dolist (prev-inst (svref (segment-writers segment) index))
+            (sset-adjoin prev-inst (inst-write-dependencies inst))
+            (sset-adjoin inst (inst-write-dependents prev-inst))
+            (sset-delete prev-inst (segment-emittable-insts-sset segment)))
+          ;; And we can forget about remembering them, because
+          ;; depending on us is as good as depending on them.
+          (setf (svref (segment-writers segment) index) nil))
+        (push inst (svref (segment-writers segment) index)))))
   (values))
 
 ;;; This routine is called by due to uses of the INST macro when the
@@ -342,34 +342,34 @@
 (defun queue-inst (segment inst)
   #!+sb-show-assem (format *trace-output* "~&queuing ~S~%" inst)
   #!+sb-show-assem (format *trace-output*
-			   "  reads ~S~%  writes ~S~%"
-			   (sb!int:collect ((reads))
-			     (do-sset-elements (read
-						(inst-read-dependencies inst))
-				(reads read))
-			     (reads))
-			   (sb!int:collect ((writes))
-			     (do-sset-elements (write
-						(inst-write-dependencies inst))
-				(writes write))
-			     (writes)))
+                           "  reads ~S~%  writes ~S~%"
+                           (sb!int:collect ((reads))
+                             (do-sset-elements (read
+                                                (inst-read-dependencies inst))
+                                (reads read))
+                             (reads))
+                           (sb!int:collect ((writes))
+                             (do-sset-elements (write
+                                                (inst-write-dependencies inst))
+                                (writes write))
+                             (writes)))
   (aver (segment-run-scheduler segment))
   (let ((countdown (segment-branch-countdown segment)))
     (when countdown
       (decf countdown)
       (aver (not (instruction-attributep (inst-attributes inst)
-					 variable-length))))
+                                         variable-length))))
     (cond ((instruction-attributep (inst-attributes inst) branch)
-	   (unless countdown
-	     (setf countdown (inst-delay inst)))
-	   (push (cons countdown inst)
-		 (segment-queued-branches segment)))
-	  (t
-	   (sset-adjoin inst (segment-emittable-insts-sset segment))))
+           (unless countdown
+             (setf countdown (inst-delay inst)))
+           (push (cons countdown inst)
+                 (segment-queued-branches segment)))
+          (t
+           (sset-adjoin inst (segment-emittable-insts-sset segment))))
     (when countdown
       (setf (segment-branch-countdown segment) countdown)
       (when (zerop countdown)
-	(schedule-pending-instructions segment))))
+        (schedule-pending-instructions segment))))
   (values))
 
 ;;; Emit all the pending instructions, and reset any state. This is
@@ -382,78 +382,78 @@
 
   ;; Quick blow-out if nothing to do.
   (when (and (sset-empty (segment-emittable-insts-sset segment))
-	     (null (segment-queued-branches segment)))
+             (null (segment-queued-branches segment)))
     (return-from schedule-pending-instructions
-		 (values)))
+                 (values)))
 
   #!+sb-show-assem (format *trace-output*
-			   "~&scheduling pending instructions..~%")
+                           "~&scheduling pending instructions..~%")
 
   ;; Note that any values live at the end of the block have to be
   ;; computed last.
   (let ((emittable-insts (segment-emittable-insts-sset segment))
-	(writers (segment-writers segment)))
+        (writers (segment-writers segment)))
     (dotimes (index (length writers))
       (let* ((writer (svref writers index))
-	     (inst (car writer))
-	     (overwritten (cdr writer)))
-	(when writer
-	  (when overwritten
-	    (let ((write-dependencies (inst-write-dependencies inst)))
-	      (dolist (other-inst overwritten)
-		(sset-adjoin inst (inst-write-dependents other-inst))
-		(sset-adjoin other-inst write-dependencies)
-		(sset-delete other-inst emittable-insts))))
-	  ;; If the value is live at the end of the block, we can't flush it.
-	  (setf (instruction-attributep (inst-attributes inst) flushable)
-		nil)))))
+             (inst (car writer))
+             (overwritten (cdr writer)))
+        (when writer
+          (when overwritten
+            (let ((write-dependencies (inst-write-dependencies inst)))
+              (dolist (other-inst overwritten)
+                (sset-adjoin inst (inst-write-dependents other-inst))
+                (sset-adjoin other-inst write-dependencies)
+                (sset-delete other-inst emittable-insts))))
+          ;; If the value is live at the end of the block, we can't flush it.
+          (setf (instruction-attributep (inst-attributes inst) flushable)
+                nil)))))
 
   ;; Grovel through the entire graph in the forward direction finding
   ;; all the leaf instructions.
   (labels ((grovel-inst (inst)
-	     (let ((max 0))
-	       (do-sset-elements (dep (inst-write-dependencies inst))
-		 (let ((dep-depth (or (inst-depth dep) (grovel-inst dep))))
-		   (when (> dep-depth max)
-		     (setf max dep-depth))))
-	       (do-sset-elements (dep (inst-read-dependencies inst))
-		 (let ((dep-depth
-			(+ (or (inst-depth dep) (grovel-inst dep))
-			   (inst-delay dep))))
-		   (when (> dep-depth max)
-		     (setf max dep-depth))))
-	       (cond ((and (sset-empty (inst-read-dependents inst))
-			   (instruction-attributep (inst-attributes inst)
-						   flushable))
-		      #!+sb-show-assem (format *trace-output*
-					       "flushing ~S~%"
-					       inst)
-		      (setf (inst-emitter inst) nil)
-		      (setf (inst-depth inst) max))
-		     (t
-		      (setf (inst-depth inst) max))))))
+             (let ((max 0))
+               (do-sset-elements (dep (inst-write-dependencies inst))
+                 (let ((dep-depth (or (inst-depth dep) (grovel-inst dep))))
+                   (when (> dep-depth max)
+                     (setf max dep-depth))))
+               (do-sset-elements (dep (inst-read-dependencies inst))
+                 (let ((dep-depth
+                        (+ (or (inst-depth dep) (grovel-inst dep))
+                           (inst-delay dep))))
+                   (when (> dep-depth max)
+                     (setf max dep-depth))))
+               (cond ((and (sset-empty (inst-read-dependents inst))
+                           (instruction-attributep (inst-attributes inst)
+                                                   flushable))
+                      #!+sb-show-assem (format *trace-output*
+                                               "flushing ~S~%"
+                                               inst)
+                      (setf (inst-emitter inst) nil)
+                      (setf (inst-depth inst) max))
+                     (t
+                      (setf (inst-depth inst) max))))))
     (let ((emittable-insts nil)
-	  (delayed nil))
+          (delayed nil))
       (do-sset-elements (inst (segment-emittable-insts-sset segment))
-	(grovel-inst inst)
-	(if (zerop (inst-delay inst))
-	    (push inst emittable-insts)
-	    (setf delayed
-		  (add-to-nth-list delayed inst (1- (inst-delay inst))))))
+        (grovel-inst inst)
+        (if (zerop (inst-delay inst))
+            (push inst emittable-insts)
+            (setf delayed
+                  (add-to-nth-list delayed inst (1- (inst-delay inst))))))
       (setf (segment-emittable-insts-queue segment)
-	    (sort emittable-insts #'> :key #'inst-depth))
+            (sort emittable-insts #'> :key #'inst-depth))
       (setf (segment-delayed segment) delayed))
     (dolist (branch (segment-queued-branches segment))
       (grovel-inst (cdr branch))))
   #!+sb-show-assem (format *trace-output*
-			   "queued branches: ~S~%"
-			   (segment-queued-branches segment))
+                           "queued branches: ~S~%"
+                           (segment-queued-branches segment))
   #!+sb-show-assem (format *trace-output*
-			   "initially emittable: ~S~%"
-			   (segment-emittable-insts-queue segment))
+                           "initially emittable: ~S~%"
+                           (segment-emittable-insts-queue segment))
   #!+sb-show-assem (format *trace-output*
-			   "initially delayed: ~S~%"
-			   (segment-delayed segment))
+                           "initially delayed: ~S~%"
+                           (segment-delayed segment))
 
   ;; Accumulate the results in reverse order. Well, actually, this
   ;; list will be in forward order, because we are generating the
@@ -463,79 +463,79 @@
     ;; Schedule all the branches in their exact locations.
     (let ((insts-from-end (segment-branch-countdown segment)))
       (dolist (branch (segment-queued-branches segment))
-	(let ((inst (cdr branch)))
-	  (dotimes (i (- (car branch) insts-from-end))
-	    ;; Each time through this loop we need to emit another
-	    ;; instruction. First, we check to see whether there is
-	    ;; any instruction that must be emitted before (i.e. must
-	    ;; come after) the branch inst. If so, emit it. Otherwise,
-	    ;; just pick one of the emittable insts. If there is
-	    ;; nothing to do, then emit a nop. ### Note: despite the
-	    ;; fact that this is a loop, it really won't work for
-	    ;; repetitions other then zero and one. For example, if
-	    ;; the branch has two dependents and one of them dpends on
-	    ;; the other, then the stuff that grabs a dependent could
-	    ;; easily grab the wrong one. But I don't feel like fixing
-	    ;; this because it doesn't matter for any of the
-	    ;; architectures we are using or plan on using.
-	    (flet ((maybe-schedule-dependent (dependents)
-		     (do-sset-elements (inst dependents)
-		       ;; If do-sset-elements enters the body, then there is a
-		       ;; dependent. Emit it.
-		       (note-resolved-dependencies segment inst)
-		       ;; Remove it from the emittable insts.
-		       (setf (segment-emittable-insts-queue segment)
-			     (delete inst
-				     (segment-emittable-insts-queue segment)
-				     :test #'eq))
-		       ;; And if it was delayed, removed it from the delayed
-		       ;; list. This can happen if there is a load in a
-		       ;; branch delay slot.
-		       (block scan-delayed
-			 (do ((delayed (segment-delayed segment)
-				       (cdr delayed)))
-			     ((null delayed))
-			   (do ((prev nil cons)
-				(cons (car delayed) (cdr cons)))
-			       ((null cons))
-			     (when (eq (car cons) inst)
-			       (if prev
-				   (setf (cdr prev) (cdr cons))
-				   (setf (car delayed) (cdr cons)))
-			       (return-from scan-delayed nil)))))
-		       ;; And return it.
-		       (return inst))))
-	      (let ((fill (or (maybe-schedule-dependent
-			       (inst-read-dependents inst))
-			      (maybe-schedule-dependent
-			       (inst-write-dependents inst))
- 			      (schedule-one-inst segment t)
-			      :nop)))
-		#!+sb-show-assem (format *trace-output*
-					 "filling branch delay slot with ~S~%"
-					 fill)
-		(push fill results)))
-	    (advance-one-inst segment)
-	    (incf insts-from-end))
-	  (note-resolved-dependencies segment inst)
-	  (push inst results)
-	  #!+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
-	  (advance-one-inst segment))))
+        (let ((inst (cdr branch)))
+          (dotimes (i (- (car branch) insts-from-end))
+            ;; Each time through this loop we need to emit another
+            ;; instruction. First, we check to see whether there is
+            ;; any instruction that must be emitted before (i.e. must
+            ;; come after) the branch inst. If so, emit it. Otherwise,
+            ;; just pick one of the emittable insts. If there is
+            ;; nothing to do, then emit a nop. ### Note: despite the
+            ;; fact that this is a loop, it really won't work for
+            ;; repetitions other then zero and one. For example, if
+            ;; the branch has two dependents and one of them dpends on
+            ;; the other, then the stuff that grabs a dependent could
+            ;; easily grab the wrong one. But I don't feel like fixing
+            ;; this because it doesn't matter for any of the
+            ;; architectures we are using or plan on using.
+            (flet ((maybe-schedule-dependent (dependents)
+                     (do-sset-elements (inst dependents)
+                       ;; If do-sset-elements enters the body, then there is a
+                       ;; dependent. Emit it.
+                       (note-resolved-dependencies segment inst)
+                       ;; Remove it from the emittable insts.
+                       (setf (segment-emittable-insts-queue segment)
+                             (delete inst
+                                     (segment-emittable-insts-queue segment)
+                                     :test #'eq))
+                       ;; And if it was delayed, removed it from the delayed
+                       ;; list. This can happen if there is a load in a
+                       ;; branch delay slot.
+                       (block scan-delayed
+                         (do ((delayed (segment-delayed segment)
+                                       (cdr delayed)))
+                             ((null delayed))
+                           (do ((prev nil cons)
+                                (cons (car delayed) (cdr cons)))
+                               ((null cons))
+                             (when (eq (car cons) inst)
+                               (if prev
+                                   (setf (cdr prev) (cdr cons))
+                                   (setf (car delayed) (cdr cons)))
+                               (return-from scan-delayed nil)))))
+                       ;; And return it.
+                       (return inst))))
+              (let ((fill (or (maybe-schedule-dependent
+                               (inst-read-dependents inst))
+                              (maybe-schedule-dependent
+                               (inst-write-dependents inst))
+                              (schedule-one-inst segment t)
+                              :nop)))
+                #!+sb-show-assem (format *trace-output*
+                                         "filling branch delay slot with ~S~%"
+                                         fill)
+                (push fill results)))
+            (advance-one-inst segment)
+            (incf insts-from-end))
+          (note-resolved-dependencies segment inst)
+          (push inst results)
+          #!+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
+          (advance-one-inst segment))))
 
     ;; Keep scheduling stuff until we run out.
     (loop
       (let ((inst (schedule-one-inst segment nil)))
-	(unless inst
-	  (return))
-	(push inst results)
-	(advance-one-inst segment)))
+        (unless inst
+          (return))
+        (push inst results)
+        (advance-one-inst segment)))
 
     ;; Now call the emitters, but turn the scheduler off for the duration.
     (setf (segment-run-scheduler segment) nil)
     (dolist (inst results)
       (if (eq inst :nop)
-	  (sb!c:emit-nop segment)
-	  (funcall (inst-emitter inst) segment)))
+          (sb!c:emit-nop segment)
+          (funcall (inst-emitter inst) segment)))
     (setf (segment-run-scheduler segment) t))
 
   ;; Clear out any residue left over.
@@ -554,7 +554,7 @@
 ;;; into the car of that cons cell.
 (defun add-to-nth-list (list thing n)
   (do ((cell (or list (setf list (list nil)))
-	     (or (cdr cell) (setf (cdr cell) (list nil))))
+             (or (cdr cell) (setf (cdr cell) (list nil))))
        (i n (1- i)))
       ((zerop i)
        (push thing (car cell))
@@ -570,36 +570,36 @@
       ((null remaining))
     (let ((inst (car remaining)))
       (unless (and delay-slot-p
-		   (instruction-attributep (inst-attributes inst)
-					   variable-length))
-	;; We've got us a live one here. Go for it.
-	#!+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
-	;; Delete it from the list of insts.
-	(if prev
-	    (setf (cdr prev) (cdr remaining))
-	    (setf (segment-emittable-insts-queue segment)
-		  (cdr remaining)))
-	;; Note that this inst has been emitted.
-	(note-resolved-dependencies segment inst)
-	;; And return.
-	(return-from schedule-one-inst
-		     ;; Are we wanting to flush this instruction?
-		     (if (inst-emitter inst)
-			 ;; Nope, it's still a go. So return it.
-			 inst
-			 ;; Yes, so pick a new one. We have to start
-			 ;; over, because note-resolved-dependencies
-			 ;; might have changed the emittable-insts-queue.
-			 (schedule-one-inst segment delay-slot-p))))))
+                   (instruction-attributep (inst-attributes inst)
+                                           variable-length))
+        ;; We've got us a live one here. Go for it.
+        #!+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
+        ;; Delete it from the list of insts.
+        (if prev
+            (setf (cdr prev) (cdr remaining))
+            (setf (segment-emittable-insts-queue segment)
+                  (cdr remaining)))
+        ;; Note that this inst has been emitted.
+        (note-resolved-dependencies segment inst)
+        ;; And return.
+        (return-from schedule-one-inst
+                     ;; Are we wanting to flush this instruction?
+                     (if (inst-emitter inst)
+                         ;; Nope, it's still a go. So return it.
+                         inst
+                         ;; Yes, so pick a new one. We have to start
+                         ;; over, because note-resolved-dependencies
+                         ;; might have changed the emittable-insts-queue.
+                         (schedule-one-inst segment delay-slot-p))))))
   ;; Nothing to do, so make something up.
   (cond ((segment-delayed segment)
-	 ;; No emittable instructions, but we have more work to do. Emit
-	 ;; a NOP to fill in a delay slot.
-	 #!+sb-show-assem (format *trace-output* "emitting a NOP~%")
-	 :nop)
-	(t
-	 ;; All done.
-	 nil)))
+         ;; No emittable instructions, but we have more work to do. Emit
+         ;; a NOP to fill in a delay slot.
+         #!+sb-show-assem (format *trace-output* "emitting a NOP~%")
+         :nop)
+        (t
+         ;; All done.
+         nil)))
 
 ;;; This function is called whenever an instruction has been
 ;;; scheduled, and we want to know what possibilities that opens up.
@@ -615,23 +615,23 @@
     (let ((dependents (inst-write-dependents dep)))
       (sset-delete inst dependents)
       (when (and (sset-empty dependents)
-		 (sset-empty (inst-read-dependents dep)))
-	(insert-emittable-inst segment dep))))
+                 (sset-empty (inst-read-dependents dep)))
+        (insert-emittable-inst segment dep))))
   (do-sset-elements (dep (inst-read-dependencies inst))
     ;; These are the instructions who write values we read. If there
     ;; is no delay, then just remove us from the dependent list.
     ;; Otherwise, record the fact that in n cycles, we should be
     ;; removed.
     (if (zerop (inst-delay dep))
-	(let ((dependents (inst-read-dependents dep)))
-	  (sset-delete inst dependents)
-	  (when (and (sset-empty dependents)
-		     (sset-empty (inst-write-dependents dep)))
-	    (insert-emittable-inst segment dep)))
-	(setf (segment-delayed segment)
-	      (add-to-nth-list (segment-delayed segment)
-			       (cons dep inst)
-			       (inst-delay dep)))))
+        (let ((dependents (inst-read-dependents dep)))
+          (sset-delete inst dependents)
+          (when (and (sset-empty dependents)
+                     (sset-empty (inst-write-dependents dep)))
+            (insert-emittable-inst segment dep)))
+        (setf (segment-delayed segment)
+              (add-to-nth-list (segment-delayed segment)
+                               (cons dep inst)
+                               (inst-delay dep)))))
   (values))
 
 ;;; Process the next entry in segment-delayed. This is called whenever
@@ -640,14 +640,14 @@
   (let ((delayed-stuff (pop (segment-delayed segment))))
     (dolist (stuff delayed-stuff)
       (if (consp stuff)
-	  (let* ((dependency (car stuff))
-		 (dependent (cdr stuff))
-		 (dependents (inst-read-dependents dependency)))
-	    (sset-delete dependent dependents)
-	    (when (and (sset-empty dependents)
-		       (sset-empty (inst-write-dependents dependency)))
-	      (insert-emittable-inst segment dependency)))
-	  (insert-emittable-inst segment stuff)))))
+          (let* ((dependency (car stuff))
+                 (dependent (cdr stuff))
+                 (dependents (inst-read-dependents dependency)))
+            (sset-delete dependent dependents)
+            (when (and (sset-empty dependents)
+                       (sset-empty (inst-write-dependents dependency)))
+              (insert-emittable-inst segment dependency)))
+          (insert-emittable-inst segment stuff)))))
 
 ;;; Note that inst is emittable by sticking it in the
 ;;; SEGMENT-EMITTABLE-INSTS-QUEUE list. We keep the emittable-insts
@@ -658,43 +658,43 @@
   (unless (instruction-attributep (inst-attributes inst) branch)
     #!+sb-show-assem (format *trace-output* "now emittable: ~S~%" inst)
     (do ((my-depth (inst-depth inst))
-	 (remaining (segment-emittable-insts-queue segment) (cdr remaining))
-	 (prev nil remaining))
-	((or (null remaining) (> my-depth (inst-depth (car remaining))))
-	 (if prev
-	     (setf (cdr prev) (cons inst remaining))
-	     (setf (segment-emittable-insts-queue segment)
-		   (cons inst remaining))))))
+         (remaining (segment-emittable-insts-queue segment) (cdr remaining))
+         (prev nil remaining))
+        ((or (null remaining) (> my-depth (inst-depth (car remaining))))
+         (if prev
+             (setf (cdr prev) (cons inst remaining))
+             (setf (segment-emittable-insts-queue segment)
+                   (cons inst remaining))))))
   (values))
 
 ;;;; structure used during output emission
 
 ;;; common supertype for all the different kinds of annotations
 (def!struct (annotation (:constructor nil)
-			(:copier nil))
+                        (:copier nil))
   ;; Where in the raw output stream was this annotation emitted?
   (index 0 :type index)
   ;; What position does that correspond to?
   (posn nil :type (or index null)))
 
 (def!struct (label (:include annotation)
-		   (:constructor gen-label ())
-		   (:copier nil))
+                   (:constructor gen-label ())
+                   (:copier nil))
   ;; (doesn't need any additional information beyond what is in the
   ;; annotation structure)
   )
 (sb!int:def!method print-object ((label label) stream)
   (if (or *print-escape* *print-readably*)
       (print-unreadable-object (label stream :type t)
-	(prin1 (sb!c:label-id label) stream))
+        (prin1 (sb!c:label-id label) stream))
       (format stream "L~D" (sb!c:label-id label))))
 
 ;;; a constraint on how the output stream must be aligned
 (def!struct (alignment-note (:include annotation)
-			    (:conc-name alignment-)
-			    (:predicate alignment-p)
-			    (:constructor make-alignment (bits size fill-byte))
-			    (:copier nil))
+                            (:conc-name alignment-)
+                            (:predicate alignment-p)
+                            (:constructor make-alignment (bits size fill-byte))
+                            (:copier nil))
   ;; the minimum number of low-order bits that must be zero
   (bits 0 :type alignment)
   ;; the amount of filler we are assuming this alignment op will take
@@ -705,8 +705,8 @@
 ;;; a reference to someplace that needs to be back-patched when
 ;;; we actually know what label positions, etc. are
 (def!struct (back-patch (:include annotation)
-			(:constructor make-back-patch (size fun))
-			(:copier nil))
+                        (:constructor make-back-patch (size fun))
+                        (:copier nil))
   ;; the area affected by this back-patch
   (size 0 :type index :read-only t)
   ;; the function to use to generate the real data
@@ -717,9 +717,9 @@
 ;;; BACK-PATCHes can't change their mind about how much stuff to emit,
 ;;; but CHOOSERs can.
 (def!struct (chooser (:include annotation)
-		     (:constructor make-chooser
-				   (size alignment maybe-shrink worst-case-fun))
-		     (:copier nil))
+                     (:constructor make-chooser
+                                   (size alignment maybe-shrink worst-case-fun))
+                     (:copier nil))
   ;; the worst case size for this chooser. There is this much space
   ;; allocated in the output buffer.
   (size 0 :type index :read-only t)
@@ -736,8 +736,8 @@
 ;;; This is used internally when we figure out a chooser or alignment
 ;;; doesn't really need as much space as we initially gave it.
 (def!struct (filler (:include annotation)
-		    (:constructor make-filler (bytes))
-		    (:copier nil))
+                    (:constructor make-filler (bytes))
+                    (:copier nil))
   ;; the number of bytes of filler here
   (bytes 0 :type index))
 
@@ -749,14 +749,14 @@
   (declare (type segment segment))
   (declare (type possibly-signed-assembly-unit byte))
   (vector-push-extend (logand byte assembly-unit-mask)
-		      (segment-buffer segment))
+                      (segment-buffer segment))
   (incf (segment-current-posn segment))
   (values))
 
 ;;; interface: Output AMOUNT copies of FILL-BYTE to SEGMENT.
 (defun emit-skip (segment amount &optional (fill-byte 0))
   (declare (type segment segment)
-	   (type index amount))
+           (type index amount))
   (dotimes (i amount)
     (emit-byte segment fill-byte))
   (values))
@@ -766,17 +766,17 @@
 ;;; of SEGMENT's annotations list.
 (defun emit-annotation (segment note)
   (declare (type segment segment)
-	   (type annotation note))
+           (type annotation note))
   (when (annotation-posn note)
     (error "attempt to emit ~S a second time" note))
   (setf (annotation-posn note) (segment-current-posn segment))
   (setf (annotation-index note) (segment-current-index segment))
   (let ((last (segment-last-annotation segment))
-	(new (list note)))
+        (new (list note)))
     (setf (segment-last-annotation segment)
-	  (if last
-	      (setf (cdr last) new)
-	      (setf (segment-annotations segment) new))))
+          (if last
+              (setf (cdr last) new)
+              (setf (segment-annotations segment) new))))
   (values))
 
 ;;; Note that the instruction stream has to be back-patched when label
@@ -806,7 +806,7 @@
 ;;; BACK-PATCH. (See EMIT-BACK-PATCH.)
 (defun emit-chooser (segment size alignment maybe-shrink worst-case-fun)
   (declare (type segment segment) (type index size) (type alignment alignment)
-	   (type function maybe-shrink worst-case-fun))
+           (type function maybe-shrink worst-case-fun))
   (let ((chooser (make-chooser size alignment maybe-shrink worst-case-fun)))
     (emit-annotation segment chooser)
     (emit-skip segment size)
@@ -825,16 +825,16 @@
 (defun adjust-alignment-after-chooser (segment chooser)
   (declare (type segment segment) (type chooser chooser))
   (let ((alignment (chooser-alignment chooser))
-	(seg-alignment (segment-alignment segment)))
+        (seg-alignment (segment-alignment segment)))
     (when (< alignment seg-alignment)
       ;; The chooser might change the alignment of the output. So we
       ;; have to figure out what the worst case alignment could be.
       (setf (segment-alignment segment) alignment)
       (let* ((posn (chooser-posn chooser))
-	     (sync-posn (segment-sync-posn segment))
-	     (offset (- posn sync-posn))
-	     (delta (logand offset (1- (ash 1 alignment)))))
-	(setf (segment-sync-posn segment) (- posn delta)))))
+             (sync-posn (segment-sync-posn segment))
+             (offset (- posn sync-posn))
+             (delta (logand offset (1- (ash 1 alignment)))))
+        (setf (segment-sync-posn segment) (- posn delta)))))
   (values))
 
 ;;; This is used internally whenever a chooser or alignment decides it
@@ -843,9 +843,9 @@
   (declare (type index n-bytes))
   (let ((last (segment-last-annotation segment)))
     (cond ((and last (filler-p (car last)))
-	   (incf (filler-bytes (car last)) n-bytes))
-	  (t
-	   (emit-annotation segment (make-filler n-bytes)))))
+           (incf (filler-bytes (car last)) n-bytes))
+          (t
+           (emit-annotation segment (make-filler n-bytes)))))
   (incf (segment-current-index segment) n-bytes)
   (values))
 
@@ -874,32 +874,32 @@
     (when hook
       (funcall hook segment vop :align bits)))
   (let ((alignment (segment-alignment segment))
-	(offset (- (segment-current-posn segment)
-		   (segment-sync-posn segment))))
+        (offset (- (segment-current-posn segment)
+                   (segment-sync-posn segment))))
     (cond ((> bits alignment)
-	   ;; We need more bits of alignment. First emit enough noise
-	   ;; to get back in sync with alignment, and then emit an
-	   ;; alignment note to cover the rest.
-	   (let ((slop (logand offset (1- (ash 1 alignment)))))
-	     (unless (zerop slop)
-	       (emit-skip segment (- (ash 1 alignment) slop) fill-byte)))
-	   (let ((size (logand (1- (ash 1 bits))
-			       (lognot (1- (ash 1 alignment))))))
-	     (aver (> size 0))
-	     (emit-annotation segment (make-alignment bits size fill-byte))
-	     (emit-skip segment size fill-byte))
-	   (setf (segment-alignment segment) bits)
-	   (setf (segment-sync-posn segment) (segment-current-posn segment)))
-	  (t
-	   ;; The last alignment was more restrictive then this one.
-	   ;; So we can just figure out how much noise to emit
-	   ;; assuming the last alignment was met.
-	   (let* ((mask (1- (ash 1 bits)))
-		  (new-offset (logand (+ offset mask) (lognot mask))))
-	     (emit-skip segment (- new-offset offset) fill-byte))
-	   ;; But we emit an alignment with size=0 so we can verify
-	   ;; that everything works.
-	   (emit-annotation segment (make-alignment bits 0 fill-byte)))))
+           ;; We need more bits of alignment. First emit enough noise
+           ;; to get back in sync with alignment, and then emit an
+           ;; alignment note to cover the rest.
+           (let ((slop (logand offset (1- (ash 1 alignment)))))
+             (unless (zerop slop)
+               (emit-skip segment (- (ash 1 alignment) slop) fill-byte)))
+           (let ((size (logand (1- (ash 1 bits))
+                               (lognot (1- (ash 1 alignment))))))
+             (aver (> size 0))
+             (emit-annotation segment (make-alignment bits size fill-byte))
+             (emit-skip segment size fill-byte))
+           (setf (segment-alignment segment) bits)
+           (setf (segment-sync-posn segment) (segment-current-posn segment)))
+          (t
+           ;; The last alignment was more restrictive then this one.
+           ;; So we can just figure out how much noise to emit
+           ;; assuming the last alignment was met.
+           (let* ((mask (1- (ash 1 bits)))
+                  (new-offset (logand (+ offset mask) (lognot mask))))
+             (emit-skip segment (- new-offset offset) fill-byte))
+           ;; But we emit an alignment with size=0 so we can verify
+           ;; that everything works.
+           (emit-annotation segment (make-alignment bits 0 fill-byte)))))
   (values))
 
 ;;; This is used to find how ``aligned'' different offsets are.
@@ -927,88 +927,88 @@
       (setf (segment-alignment segment) max-alignment)
       (setf (segment-sync-posn segment) 0)
       (do* ((prev nil)
-	    (remaining (segment-annotations segment) next)
-	    (next (cdr remaining) (cdr remaining)))
-	   ((null remaining))
-	(let* ((note (car remaining))
-	       (posn (annotation-posn note)))
-	  (unless (zerop delta)
-	    (decf posn delta)
-	    (setf (annotation-posn note) posn))
-	  (cond
-	   ((chooser-p note)
-	    (with-modified-segment-index-and-posn (segment (chooser-index note)
-							   posn)
-	      (setf (segment-last-annotation segment) prev)
-	      (cond
-	       ((funcall (chooser-maybe-shrink note) segment posn delta)
-		;; It emitted some replacement.
-		(let ((new-size (- (segment-current-index segment)
-				   (chooser-index note)))
-		      (old-size (chooser-size note)))
-		  (when (> new-size old-size)
-		    (error "~S emitted ~W bytes, but claimed its max was ~W."
-			   note new-size old-size))
-		  (let ((additional-delta (- old-size new-size)))
-		    (when (< (find-alignment additional-delta)
-			     (chooser-alignment note))
-		      (error "~S shrunk by ~W bytes, but claimed that it ~
+            (remaining (segment-annotations segment) next)
+            (next (cdr remaining) (cdr remaining)))
+           ((null remaining))
+        (let* ((note (car remaining))
+               (posn (annotation-posn note)))
+          (unless (zerop delta)
+            (decf posn delta)
+            (setf (annotation-posn note) posn))
+          (cond
+           ((chooser-p note)
+            (with-modified-segment-index-and-posn (segment (chooser-index note)
+                                                           posn)
+              (setf (segment-last-annotation segment) prev)
+              (cond
+               ((funcall (chooser-maybe-shrink note) segment posn delta)
+                ;; It emitted some replacement.
+                (let ((new-size (- (segment-current-index segment)
+                                   (chooser-index note)))
+                      (old-size (chooser-size note)))
+                  (when (> new-size old-size)
+                    (error "~S emitted ~W bytes, but claimed its max was ~W."
+                           note new-size old-size))
+                  (let ((additional-delta (- old-size new-size)))
+                    (when (< (find-alignment additional-delta)
+                             (chooser-alignment note))
+                      (error "~S shrunk by ~W bytes, but claimed that it ~
                               preserves ~W bits of alignment."
-			     note additional-delta (chooser-alignment note)))
-		    (incf delta additional-delta)
-		    (emit-filler segment additional-delta))
-		  (setf prev (segment-last-annotation segment))
-		  (if prev
-		      (setf (cdr prev) (cdr remaining))
-		      (setf (segment-annotations segment)
-			    (cdr remaining)))))
-	       (t
-		;; The chooser passed on shrinking. Make sure it didn't
-		;; emit anything.
-		(unless (= (segment-current-index segment)
-			   (chooser-index note))
-		  (error "Chooser ~S passed, but not before emitting ~W bytes."
-			 note
-			 (- (segment-current-index segment)
-			    (chooser-index note))))
-		;; Act like we just emitted this chooser.
-		(let ((size (chooser-size note)))
-		  (incf (segment-current-index segment) size)
-		  (incf (segment-current-posn segment) size))
-		;; Adjust the alignment accordingly.
-		(adjust-alignment-after-chooser segment note)
-		;; And keep this chooser for next time around.
-		(setf prev remaining)))))
-	   ((alignment-p note)
-	    (unless (zerop (alignment-size note))
-	      ;; Re-emit the alignment, letting it collapse if we know
-	      ;; anything more about the alignment guarantees of the
-	      ;; segment.
-	      (let ((index (alignment-index note)))
-		(with-modified-segment-index-and-posn (segment index posn)
-	 	  (setf (segment-last-annotation segment) prev)
-		  (emit-alignment segment nil (alignment-bits note)
-				  (alignment-fill-byte note))
-		  (let* ((new-index (segment-current-index segment))
-			 (size (- new-index index))
-			 (old-size (alignment-size note))
-			 (additional-delta (- old-size size)))
-		    (when (minusp additional-delta)
-		      (error "Alignment ~S needs more space now?  It was ~W, ~
+                             note additional-delta (chooser-alignment note)))
+                    (incf delta additional-delta)
+                    (emit-filler segment additional-delta))
+                  (setf prev (segment-last-annotation segment))
+                  (if prev
+                      (setf (cdr prev) (cdr remaining))
+                      (setf (segment-annotations segment)
+                            (cdr remaining)))))
+               (t
+                ;; The chooser passed on shrinking. Make sure it didn't
+                ;; emit anything.
+                (unless (= (segment-current-index segment)
+                           (chooser-index note))
+                  (error "Chooser ~S passed, but not before emitting ~W bytes."
+                         note
+                         (- (segment-current-index segment)
+                            (chooser-index note))))
+                ;; Act like we just emitted this chooser.
+                (let ((size (chooser-size note)))
+                  (incf (segment-current-index segment) size)
+                  (incf (segment-current-posn segment) size))
+                ;; Adjust the alignment accordingly.
+                (adjust-alignment-after-chooser segment note)
+                ;; And keep this chooser for next time around.
+                (setf prev remaining)))))
+           ((alignment-p note)
+            (unless (zerop (alignment-size note))
+              ;; Re-emit the alignment, letting it collapse if we know
+              ;; anything more about the alignment guarantees of the
+              ;; segment.
+              (let ((index (alignment-index note)))
+                (with-modified-segment-index-and-posn (segment index posn)
+                  (setf (segment-last-annotation segment) prev)
+                  (emit-alignment segment nil (alignment-bits note)
+                                  (alignment-fill-byte note))
+                  (let* ((new-index (segment-current-index segment))
+                         (size (- new-index index))
+                         (old-size (alignment-size note))
+                         (additional-delta (- old-size size)))
+                    (when (minusp additional-delta)
+                      (error "Alignment ~S needs more space now?  It was ~W, ~
                               and is ~W now."
-			     note old-size size))
-		    (when (plusp additional-delta)
-		      (emit-filler segment additional-delta)
-		      (incf delta additional-delta)))
-		  (setf prev (segment-last-annotation segment))
-		  (if prev
-		      (setf (cdr prev) (cdr remaining))
-		      (setf (segment-annotations segment)
-			    (cdr remaining)))))))
-	   (t
-	    (setf prev remaining)))))
+                             note old-size size))
+                    (when (plusp additional-delta)
+                      (emit-filler segment additional-delta)
+                      (incf delta additional-delta)))
+                  (setf prev (segment-last-annotation segment))
+                  (if prev
+                      (setf (cdr prev) (cdr remaining))
+                      (setf (segment-annotations segment)
+                            (cdr remaining)))))))
+           (t
+            (setf prev remaining)))))
       (when (zerop delta)
-	(return))
+        (return))
       (decf (segment-final-posn segment) delta)))
   (values))
 
@@ -1017,35 +1017,35 @@
 (defun finalize-positions (segment)
   (let ((delta 0))
     (do* ((prev nil)
-	  (remaining (segment-annotations segment) next)
-	  (next (cdr remaining) (cdr remaining)))
-	 ((null remaining))
+          (remaining (segment-annotations segment) next)
+          (next (cdr remaining) (cdr remaining)))
+         ((null remaining))
       (let* ((note (car remaining))
-	     (posn (- (annotation-posn note) delta)))
-	(cond
-	 ((alignment-p note)
-	  (let* ((bits (alignment-bits note))
-		 (mask (1- (ash 1 bits)))
-		 (new-posn (logand (+ posn mask) (lognot mask)))
-		 (size (- new-posn posn))
-		 (old-size (alignment-size note))
-		 (additional-delta (- old-size size)))
-	    (aver (<= 0 size old-size))
-	    (unless (zerop additional-delta)
-	      (setf (segment-last-annotation segment) prev)
-	      (incf delta additional-delta)
-	      (with-modified-segment-index-and-posn (segment
-						     (alignment-index note)
-						     posn)
-	        (emit-filler segment additional-delta)
-	        (setf prev (segment-last-annotation segment))
-		(if prev
-		    (setf (cdr prev) next)
-		    (setf (segment-annotations segment) next))))))
-	 (t
-	  (setf (annotation-posn note) posn)
-	  (setf prev remaining)
-	  (setf next (cdr remaining))))))
+             (posn (- (annotation-posn note) delta)))
+        (cond
+         ((alignment-p note)
+          (let* ((bits (alignment-bits note))
+                 (mask (1- (ash 1 bits)))
+                 (new-posn (logand (+ posn mask) (lognot mask)))
+                 (size (- new-posn posn))
+                 (old-size (alignment-size note))
+                 (additional-delta (- old-size size)))
+            (aver (<= 0 size old-size))
+            (unless (zerop additional-delta)
+              (setf (segment-last-annotation segment) prev)
+              (incf delta additional-delta)
+              (with-modified-segment-index-and-posn (segment
+                                                     (alignment-index note)
+                                                     posn)
+                (emit-filler segment additional-delta)
+                (setf prev (segment-last-annotation segment))
+                (if prev
+                    (setf (cdr prev) next)
+                    (setf (segment-annotations segment) next))))))
+         (t
+          (setf (annotation-posn note) posn)
+          (setf prev remaining)
+          (setf next (cdr remaining))))))
     (unless (zerop delta)
       (decf (segment-final-posn segment) delta)))
   (values))
@@ -1054,33 +1054,33 @@
 ;;; are left over, we need to emit their worst case varient.
 (defun process-back-patches (segment)
   (do* ((prev nil)
-	(remaining (segment-annotations segment) next)
-	(next (cdr remaining) (cdr remaining)))
+        (remaining (segment-annotations segment) next)
+        (next (cdr remaining) (cdr remaining)))
       ((null remaining))
     (let ((note (car remaining)))
       (flet ((fill-in (function old-size)
-	       (let ((index (annotation-index note))
-		     (posn (annotation-posn note)))
-		 (with-modified-segment-index-and-posn (segment index posn)
-	           (setf (segment-last-annotation segment) prev)
-		   (funcall function segment posn)
-		   (let ((new-size (- (segment-current-index segment) index)))
-		     (unless (= new-size old-size)
-		       (error "~S emitted ~W bytes, but claimed it was ~W."
-			      note new-size old-size)))
-		   (let ((tail (segment-last-annotation segment)))
-		     (if tail
-			 (setf (cdr tail) next)
-			 (setf (segment-annotations segment) next)))
-		   (setf next (cdr prev))))))
-	(cond ((back-patch-p note)
-	       (fill-in (back-patch-fun note)
-			(back-patch-size note)))
-	      ((chooser-p note)
-	       (fill-in (chooser-worst-case-fun note)
-			(chooser-size note)))
-	      (t
-	       (setf prev remaining)))))))
+               (let ((index (annotation-index note))
+                     (posn (annotation-posn note)))
+                 (with-modified-segment-index-and-posn (segment index posn)
+                   (setf (segment-last-annotation segment) prev)
+                   (funcall function segment posn)
+                   (let ((new-size (- (segment-current-index segment) index)))
+                     (unless (= new-size old-size)
+                       (error "~S emitted ~W bytes, but claimed it was ~W."
+                              note new-size old-size)))
+                   (let ((tail (segment-last-annotation segment)))
+                     (if tail
+                         (setf (cdr tail) next)
+                         (setf (segment-annotations segment) next)))
+                   (setf next (cdr prev))))))
+        (cond ((back-patch-p note)
+               (fill-in (back-patch-fun note)
+                        (back-patch-size note)))
+              ((chooser-p note)
+               (fill-in (chooser-worst-case-fun note)
+                        (chooser-size note)))
+              (t
+               (setf prev remaining)))))))
 
 ;;;; interface to the rest of the compiler
 
@@ -1134,107 +1134,107 @@
 ;;; hunt for good solutions until the system works and I can test them
 ;;; in isolation.
 (sb!int:def!macro assemble ((&optional segment vop &key labels) &body body
-			    &environment env)
+                            &environment env)
   #!+sb-doc
   "Execute BODY (as a progn) with SEGMENT as the current segment."
   (flet ((label-name-p (thing)
-	   (and thing (symbolp thing))))
+           (and thing (symbolp thing))))
     (let* ((seg-var (gensym "SEGMENT-"))
-	   (vop-var (gensym "VOP-"))
-	   (visible-labels (remove-if-not #'label-name-p body))
-	   (inherited-labels
-	    (multiple-value-bind (expansion expanded)
-		(macroexpand '..inherited-labels.. env)
-	      (if expanded expansion nil)))
-	   (new-labels (append labels
-			       (set-difference visible-labels
-					       inherited-labels)))
-	   (nested-labels (set-difference (append inherited-labels new-labels)
-					  visible-labels)))
+           (vop-var (gensym "VOP-"))
+           (visible-labels (remove-if-not #'label-name-p body))
+           (inherited-labels
+            (multiple-value-bind (expansion expanded)
+                (macroexpand '..inherited-labels.. env)
+              (if expanded expansion nil)))
+           (new-labels (append labels
+                               (set-difference visible-labels
+                                               inherited-labels)))
+           (nested-labels (set-difference (append inherited-labels new-labels)
+                                          visible-labels)))
       (when (intersection labels inherited-labels)
-	(error "duplicate nested labels: ~S"
-	       (intersection labels inherited-labels)))
+        (error "duplicate nested labels: ~S"
+               (intersection labels inherited-labels)))
       `(let* ((,seg-var ,(or segment '(%%current-segment%%)))
-	      (,vop-var ,(or vop '(%%current-vop%%)))
+              (,vop-var ,(or vop '(%%current-vop%%)))
               ,@(when segment
                   `((**current-segment** ,seg-var)))
               ,@(when vop
                   `((**current-vop** ,vop-var)))
-	      ,@(mapcar (lambda (name)
-			  `(,name (gen-label)))
-			new-labels))
-	(declare (ignorable ,vop-var ,seg-var)
-	         ;; Must be done so that contribs and user code doing
-	         ;; low-level stuff don't need to worry about this.
-	         (disable-package-locks %%current-segment%% %%current-vop%%))
-	(macrolet ((%%current-segment%% () '**current-segment**)
-		   (%%current-vop%% () '**current-vop**))
+              ,@(mapcar (lambda (name)
+                          `(,name (gen-label)))
+                        new-labels))
+        (declare (ignorable ,vop-var ,seg-var)
+                 ;; Must be done so that contribs and user code doing
+                 ;; low-level stuff don't need to worry about this.
+                 (disable-package-locks %%current-segment%% %%current-vop%%))
+        (macrolet ((%%current-segment%% () '**current-segment**)
+                   (%%current-vop%% () '**current-vop**))
           ;; KLUDGE: Some host lisps (CMUCL 18e Sparc at least)
           ;; can't deal with this declaration, so disable it on host.
           ;; Ditto for later ENABLE-PACKAGE-LOCKS %%C-S%% declaration.
           #-sb-xc-host
-	  (declare (enable-package-locks %%current-segment%% %%current-vop%%))
-	  (symbol-macrolet (,@(when (or inherited-labels nested-labels)
-				    `((..inherited-labels.. ,nested-labels))))
-	      ,@(mapcar (lambda (form)
-			  (if (label-name-p form)
-			      `(emit-label ,form)
-			      form))
-			body)))))))
+          (declare (enable-package-locks %%current-segment%% %%current-vop%%))
+          (symbol-macrolet (,@(when (or inherited-labels nested-labels)
+                                    `((..inherited-labels.. ,nested-labels))))
+              ,@(mapcar (lambda (form)
+                          (if (label-name-p form)
+                              `(emit-label ,form)
+                              form))
+                        body)))))))
 #+sb-xc-host
 (sb!xc:defmacro assemble ((&optional segment vop &key labels)
-			  &body body
-			  &environment env)
+                          &body body
+                          &environment env)
   #!+sb-doc
   "Execute BODY (as a progn) with SEGMENT as the current segment."
   (flet ((label-name-p (thing)
-	   (and thing (symbolp thing))))
+           (and thing (symbolp thing))))
     (let* ((seg-var (gensym "SEGMENT-"))
-	   (vop-var (gensym "VOP-"))
-	   (visible-labels (remove-if-not #'label-name-p body))
-	   (inherited-labels
-	    (multiple-value-bind
-		(expansion expanded)
-		(sb!xc:macroexpand '..inherited-labels.. env)
-	      (if expanded expansion nil)))
-	   (new-labels (append labels
-			       (set-difference visible-labels
-					       inherited-labels)))
-	   (nested-labels (set-difference (append inherited-labels new-labels)
-					  visible-labels)))
+           (vop-var (gensym "VOP-"))
+           (visible-labels (remove-if-not #'label-name-p body))
+           (inherited-labels
+            (multiple-value-bind
+                (expansion expanded)
+                (sb!xc:macroexpand '..inherited-labels.. env)
+              (if expanded expansion nil)))
+           (new-labels (append labels
+                               (set-difference visible-labels
+                                               inherited-labels)))
+           (nested-labels (set-difference (append inherited-labels new-labels)
+                                          visible-labels)))
       (when (intersection labels inherited-labels)
-	(error "duplicate nested labels: ~S"
-	       (intersection labels inherited-labels)))
+        (error "duplicate nested labels: ~S"
+               (intersection labels inherited-labels)))
       `(let* ((,seg-var ,(or segment '(%%current-segment%%)))
-	      (,vop-var ,(or vop '(%%current-vop%%)))
+              (,vop-var ,(or vop '(%%current-vop%%)))
               ,@(when segment
                   `((**current-segment** ,seg-var)))
               ,@(when vop
                   `((**current-vop** ,vop-var)))
-	      ,@(mapcar (lambda (name)
-			  `(,name (gen-label)))
-			new-labels))
-	(declare (ignorable ,vop-var ,seg-var))
-	(macrolet ((%%current-segment%% () '**current-segment**)
-		   (%%current-vop%% () '**current-vop**))
-	  (symbol-macrolet (,@(when (or inherited-labels nested-labels)
-				    `((..inherited-labels.. ,nested-labels))))
-	      ,@(mapcar (lambda (form)
-			  (if (label-name-p form)
-			      `(emit-label ,form)
-			      form))
-			body)))))))
+              ,@(mapcar (lambda (name)
+                          `(,name (gen-label)))
+                        new-labels))
+        (declare (ignorable ,vop-var ,seg-var))
+        (macrolet ((%%current-segment%% () '**current-segment**)
+                   (%%current-vop%% () '**current-vop**))
+          (symbol-macrolet (,@(when (or inherited-labels nested-labels)
+                                    `((..inherited-labels.. ,nested-labels))))
+              ,@(mapcar (lambda (form)
+                          (if (label-name-p form)
+                              `(emit-label ,form)
+                              form))
+                        body)))))))
 
 (defmacro inst (&whole whole instruction &rest args &environment env)
   #!+sb-doc
   "Emit the specified instruction to the current segment."
   (let ((inst (gethash (symbol-name instruction) *assem-instructions*)))
     (cond ((null inst)
-	   (error "unknown instruction: ~S" instruction))
-	  ((functionp inst)
-	   (funcall inst (cdr whole) env))
-	  (t
-	   `(,inst (%%current-segment%%) (%%current-vop%%) ,@args)))))
+           (error "unknown instruction: ~S" instruction))
+          ((functionp inst)
+           (funcall inst (cdr whole) env))
+          (t
+           `(,inst (%%current-segment%%) (%%current-vop%%) ,@args)))))
 
 ;;; Note: The need to capture MACROLET bindings of %%CURRENT-SEGMENT%%
 ;;; and %%CURRENT-VOP%% prevents this from being an ordinary function.
@@ -1265,8 +1265,8 @@
    should supply IF-AFTER and DELTA in order to ensure correct results."
   (let ((posn (label-posn label)))
     (if (and if-after (> posn if-after))
-	(- posn delta)
-	posn)))
+        (- posn delta)
+        posn)))
 
 (defun append-segment (segment other-segment)
   #!+sb-doc
@@ -1280,28 +1280,28 @@
       (emit-back-patch segment 0 postit)))
   (emit-alignment segment nil max-alignment #!+(or x86-64 x86) #x90)
   (let ((segment-current-index-0 (segment-current-index segment))
-	(segment-current-posn-0  (segment-current-posn  segment)))
+        (segment-current-posn-0  (segment-current-posn  segment)))
     (incf (segment-current-index segment)
-	  (segment-current-index other-segment))
+          (segment-current-index other-segment))
     (replace (segment-buffer segment)
-	     (segment-buffer other-segment)
-	     :start1 segment-current-index-0)
+             (segment-buffer other-segment)
+             :start1 segment-current-index-0)
     (setf (segment-buffer other-segment) nil) ; to prevent accidental reuse
     (incf (segment-current-posn segment)
-	  (segment-current-posn other-segment))
+          (segment-current-posn other-segment))
     (let ((other-annotations (segment-annotations other-segment)))
       (when other-annotations
-	(dolist (note other-annotations)
-	  (incf (annotation-index note) segment-current-index-0)
-	  (incf (annotation-posn note) segment-current-posn-0))
-	;; This SEGMENT-LAST-ANNOTATION code is confusing. Is it really
-	;; worth enough in efficiency to justify it? -- WHN 19990322
-	(let ((last (segment-last-annotation segment)))
-	  (if last
-	    (setf (cdr last) other-annotations)
-	    (setf (segment-annotations segment) other-annotations)))
-	(setf (segment-last-annotation segment)
-	      (segment-last-annotation other-segment)))))
+        (dolist (note other-annotations)
+          (incf (annotation-index note) segment-current-index-0)
+          (incf (annotation-posn note) segment-current-posn-0))
+        ;; This SEGMENT-LAST-ANNOTATION code is confusing. Is it really
+        ;; worth enough in efficiency to justify it? -- WHN 19990322
+        (let ((last (segment-last-annotation segment)))
+          (if last
+            (setf (cdr last) other-annotations)
+            (setf (segment-annotations segment) other-annotations)))
+        (setf (segment-last-annotation segment)
+              (segment-last-annotation other-segment)))))
   (values))
 
 (defun finalize-segment (segment)
@@ -1339,15 +1339,15 @@
 (defun on-segment-contents-vectorly (segment function)
   (declare (type function function))
   (let ((buffer (segment-buffer segment))
-	(i0 0))
+        (i0 0))
     (flet ((frob (i0 i1)
-	     (when (< i0 i1)
-	       (funcall function (subseq buffer i0 i1)))))
+             (when (< i0 i1)
+               (funcall function (subseq buffer i0 i1)))))
       (dolist (note (segment-annotations segment))
-	(when (filler-p note)
-	  (let ((i1 (filler-index note)))
-	    (frob i0 i1)
-	    (setf i0 (+ i1 (filler-bytes note))))))
+        (when (filler-p note)
+          (let ((i1 (filler-index note)))
+            (frob i0 i1)
+            (setf i0 (+ i1 (filler-bytes note))))))
       (frob i0 (segment-final-index segment))))
   (values))
 
@@ -1357,10 +1357,10 @@
   (let ((result 0))
     (declare (type index result))
     (on-segment-contents-vectorly segment
-				  (lambda (v)
-				    (declare (type (vector assembly-unit) v))
-				    (incf result (length v))
-				    (write-sequence v stream)))
+                                  (lambda (v)
+                                    (declare (type (vector assembly-unit) v))
+                                    (incf result (length v))
+                                    (write-sequence v stream)))
     result))
 
 ;;;; interface to the instruction set definition
@@ -1371,317 +1371,317 @@
 (defmacro define-bitfield-emitter (name total-bits &rest byte-specs)
   (sb!int:collect ((arg-names) (arg-types))
     (let* ((total-bits (eval total-bits))
-	   (overall-mask (ash -1 total-bits))
-	   (num-bytes (multiple-value-bind (quo rem)
-			  (truncate total-bits assembly-unit-bits)
-			(unless (zerop rem)
-			  (error "~W isn't an even multiple of ~W."
-				 total-bits assembly-unit-bits))
-			quo))
-	   (bytes (make-array num-bytes :initial-element nil))
-	   (segment-arg (gensym "SEGMENT-")))
+           (overall-mask (ash -1 total-bits))
+           (num-bytes (multiple-value-bind (quo rem)
+                          (truncate total-bits assembly-unit-bits)
+                        (unless (zerop rem)
+                          (error "~W isn't an even multiple of ~W."
+                                 total-bits assembly-unit-bits))
+                        quo))
+           (bytes (make-array num-bytes :initial-element nil))
+           (segment-arg (gensym "SEGMENT-")))
       (dolist (byte-spec-expr byte-specs)
-	(let* ((byte-spec (eval byte-spec-expr))
-	       (byte-size (byte-size byte-spec))
-	       (byte-posn (byte-position byte-spec))
-	       (arg (gensym (format nil "~:@(ARG-FOR-~S-~)" byte-spec-expr))))
-	  (when (ldb-test (byte byte-size byte-posn) overall-mask)
-	    (error "The byte spec ~S either overlaps another byte spec, or ~
+        (let* ((byte-spec (eval byte-spec-expr))
+               (byte-size (byte-size byte-spec))
+               (byte-posn (byte-position byte-spec))
+               (arg (gensym (format nil "~:@(ARG-FOR-~S-~)" byte-spec-expr))))
+          (when (ldb-test (byte byte-size byte-posn) overall-mask)
+            (error "The byte spec ~S either overlaps another byte spec, or ~
                     extends past the end."
-		   byte-spec-expr))
-	  (setf (ldb byte-spec overall-mask) -1)
-	  (arg-names arg)
-	  (arg-types `(type (integer ,(ash -1 (1- byte-size))
-				     ,(1- (ash 1 byte-size)))
-			    ,arg))
-	  (multiple-value-bind (start-byte offset)
-	      (floor byte-posn assembly-unit-bits)
-	    (let ((end-byte (floor (1- (+ byte-posn byte-size))
-				   assembly-unit-bits)))
-	      (flet ((maybe-ash (expr offset)
-		       (if (zerop offset)
-			   expr
-			   `(ash ,expr ,offset))))
-		(declare (inline maybe-ash))
-		(cond ((zerop byte-size))
-		      ((= start-byte end-byte)
-		       (push (maybe-ash `(ldb (byte ,byte-size 0) ,arg)
-					offset)
-			     (svref bytes start-byte)))
-		      (t
-		       (push (maybe-ash
-			      `(ldb (byte ,(- assembly-unit-bits offset) 0)
-				    ,arg)
-			      offset)
-			     (svref bytes start-byte))
-		       (do ((index (1+ start-byte) (1+ index)))
-			   ((>= index end-byte))
-			 (push
-			  `(ldb (byte ,assembly-unit-bits
-				      ,(- (* assembly-unit-bits
-					     (- index start-byte))
-					  offset))
-				,arg)
-			  (svref bytes index)))
-		       (let ((len (rem (+ byte-size offset)
-				       assembly-unit-bits)))
-			 (push
-			  `(ldb (byte ,(if (zerop len)
-					   assembly-unit-bits
-					   len)
-				      ,(- (* assembly-unit-bits
-					     (- end-byte start-byte))
-					  offset))
-				,arg)
-			  (svref bytes end-byte))))))))))
+                   byte-spec-expr))
+          (setf (ldb byte-spec overall-mask) -1)
+          (arg-names arg)
+          (arg-types `(type (integer ,(ash -1 (1- byte-size))
+                                     ,(1- (ash 1 byte-size)))
+                            ,arg))
+          (multiple-value-bind (start-byte offset)
+              (floor byte-posn assembly-unit-bits)
+            (let ((end-byte (floor (1- (+ byte-posn byte-size))
+                                   assembly-unit-bits)))
+              (flet ((maybe-ash (expr offset)
+                       (if (zerop offset)
+                           expr
+                           `(ash ,expr ,offset))))
+                (declare (inline maybe-ash))
+                (cond ((zerop byte-size))
+                      ((= start-byte end-byte)
+                       (push (maybe-ash `(ldb (byte ,byte-size 0) ,arg)
+                                        offset)
+                             (svref bytes start-byte)))
+                      (t
+                       (push (maybe-ash
+                              `(ldb (byte ,(- assembly-unit-bits offset) 0)
+                                    ,arg)
+                              offset)
+                             (svref bytes start-byte))
+                       (do ((index (1+ start-byte) (1+ index)))
+                           ((>= index end-byte))
+                         (push
+                          `(ldb (byte ,assembly-unit-bits
+                                      ,(- (* assembly-unit-bits
+                                             (- index start-byte))
+                                          offset))
+                                ,arg)
+                          (svref bytes index)))
+                       (let ((len (rem (+ byte-size offset)
+                                       assembly-unit-bits)))
+                         (push
+                          `(ldb (byte ,(if (zerop len)
+                                           assembly-unit-bits
+                                           len)
+                                      ,(- (* assembly-unit-bits
+                                             (- end-byte start-byte))
+                                          offset))
+                                ,arg)
+                          (svref bytes end-byte))))))))))
       (unless (= overall-mask -1)
-	(error "There are holes."))
+        (error "There are holes."))
       (let ((forms nil))
-	(dotimes (i num-bytes)
-	  (let ((pieces (svref bytes i)))
-	    (aver pieces)
-	    (push `(emit-byte ,segment-arg
-			      ,(if (cdr pieces)
-				   `(logior ,@pieces)
-				   (car pieces)))
-		  forms)))
-	`(defun ,name (,segment-arg ,@(arg-names))
-	   (declare (type segment ,segment-arg) ,@(arg-types))
-	   ,@(ecase sb!c:*backend-byte-order*
-	       (:little-endian (nreverse forms))
-	       (:big-endian forms))
-	   ',name)))))
+        (dotimes (i num-bytes)
+          (let ((pieces (svref bytes i)))
+            (aver pieces)
+            (push `(emit-byte ,segment-arg
+                              ,(if (cdr pieces)
+                                   `(logior ,@pieces)
+                                   (car pieces)))
+                  forms)))
+        `(defun ,name (,segment-arg ,@(arg-names))
+           (declare (type segment ,segment-arg) ,@(arg-types))
+           ,@(ecase sb!c:*backend-byte-order*
+               (:little-endian (nreverse forms))
+               (:big-endian forms))
+           ',name)))))
 
 (defun grovel-lambda-list (lambda-list vop-var)
   (let ((segment-name (car lambda-list))
-	(vop-var (or vop-var (gensym "VOP-"))))
+        (vop-var (or vop-var (gensym "VOP-"))))
     (sb!int:collect ((new-lambda-list))
       (new-lambda-list segment-name)
       (new-lambda-list vop-var)
       (labels
-	  ((grovel (state lambda-list)
-	     (when lambda-list
-	       (let ((param (car lambda-list)))
-		 (cond
-		  ((member param sb!xc:lambda-list-keywords)
-		   (new-lambda-list param)
-		   (grovel param (cdr lambda-list)))
-		  (t
-		   (ecase state
-		     ((nil)
-		      (new-lambda-list param)
-		      `(cons ,param ,(grovel state (cdr lambda-list))))
-		     (&optional
-		      (multiple-value-bind (name default supplied-p)
-			  (if (consp param)
-			      (values (first param)
-				      (second param)
-				      (or (third param)
-					  (gensym "SUPPLIED-P-")))
-			      (values param nil (gensym "SUPPLIED-P-")))
-			(new-lambda-list (list name default supplied-p))
-			`(and ,supplied-p
-			      (cons ,(if (consp name)
-					 (second name)
-					 name)
-				    ,(grovel state (cdr lambda-list))))))
-		     (&key
-		      (multiple-value-bind (name default supplied-p)
-			  (if (consp param)
-			      (values (first param)
-				      (second param)
-				      (or (third param)
-					  (gensym "SUPPLIED-P-")))
-			      (values param nil (gensym "SUPPLIED-P-")))
-			(new-lambda-list (list name default supplied-p))
-			(multiple-value-bind (key var)
-			    (if (consp name)
-				(values (first name) (second name))
-				(values (keywordicate name) name))
-			  `(append (and ,supplied-p (list ',key ,var))
-				   ,(grovel state (cdr lambda-list))))))
-		     (&rest
-		      (new-lambda-list param)
-		      (grovel state (cdr lambda-list))
-		      param))))))))
-	(let ((reconstructor (grovel nil (cdr lambda-list))))
-	  (values (new-lambda-list)
-		  segment-name
-		  vop-var
-		  reconstructor))))))
+          ((grovel (state lambda-list)
+             (when lambda-list
+               (let ((param (car lambda-list)))
+                 (cond
+                  ((member param sb!xc:lambda-list-keywords)
+                   (new-lambda-list param)
+                   (grovel param (cdr lambda-list)))
+                  (t
+                   (ecase state
+                     ((nil)
+                      (new-lambda-list param)
+                      `(cons ,param ,(grovel state (cdr lambda-list))))
+                     (&optional
+                      (multiple-value-bind (name default supplied-p)
+                          (if (consp param)
+                              (values (first param)
+                                      (second param)
+                                      (or (third param)
+                                          (gensym "SUPPLIED-P-")))
+                              (values param nil (gensym "SUPPLIED-P-")))
+                        (new-lambda-list (list name default supplied-p))
+                        `(and ,supplied-p
+                              (cons ,(if (consp name)
+                                         (second name)
+                                         name)
+                                    ,(grovel state (cdr lambda-list))))))
+                     (&key
+                      (multiple-value-bind (name default supplied-p)
+                          (if (consp param)
+                              (values (first param)
+                                      (second param)
+                                      (or (third param)
+                                          (gensym "SUPPLIED-P-")))
+                              (values param nil (gensym "SUPPLIED-P-")))
+                        (new-lambda-list (list name default supplied-p))
+                        (multiple-value-bind (key var)
+                            (if (consp name)
+                                (values (first name) (second name))
+                                (values (keywordicate name) name))
+                          `(append (and ,supplied-p (list ',key ,var))
+                                   ,(grovel state (cdr lambda-list))))))
+                     (&rest
+                      (new-lambda-list param)
+                      (grovel state (cdr lambda-list))
+                      param))))))))
+        (let ((reconstructor (grovel nil (cdr lambda-list))))
+          (values (new-lambda-list)
+                  segment-name
+                  vop-var
+                  reconstructor))))))
 
 (defun extract-nths (index glue list-of-lists-of-lists)
   (mapcar (lambda (list-of-lists)
-	    (cons glue
-		  (mapcar (lambda (list)
-			    (nth index list))
-			  list-of-lists)))
-	  list-of-lists-of-lists))
+            (cons glue
+                  (mapcar (lambda (list)
+                            (nth index list))
+                          list-of-lists)))
+          list-of-lists-of-lists))
 
 (defmacro define-instruction (name lambda-list &rest options)
   (let* ((sym-name (symbol-name name))
-	 (defun-name (sb!int:symbolicate sym-name "-INST-EMITTER"))
-	 (vop-var nil)
-	 (postits (gensym "POSTITS-"))
-	 (emitter nil)
-	 (decls nil)
-	 (attributes nil)
-	 (cost nil)
-	 (dependencies nil)
-	 (delay nil)
-	 (pinned nil)
-	 (pdefs nil))
+         (defun-name (sb!int:symbolicate sym-name "-INST-EMITTER"))
+         (vop-var nil)
+         (postits (gensym "POSTITS-"))
+         (emitter nil)
+         (decls nil)
+         (attributes nil)
+         (cost nil)
+         (dependencies nil)
+         (delay nil)
+         (pinned nil)
+         (pdefs nil))
     (sb!int:/noshow "entering DEFINE-INSTRUCTION" name lambda-list options)
     (dolist (option-spec options)
       (sb!int:/noshow option-spec)
       (multiple-value-bind (option args)
-	  (if (consp option-spec)
-	      (values (car option-spec) (cdr option-spec))
-	      (values option-spec nil))
-	(sb!int:/noshow option args)
-	(case option
-	  (:emitter
-	   (when emitter
-	     (error "You can only specify :EMITTER once per instruction."))
-	   (setf emitter args))
-	  (:declare
-	   (setf decls (append decls args)))
-	  (:attributes
-	   (setf attributes (append attributes args)))
-	  (:cost
-	   (setf cost (first args)))
-	  (:dependencies
-	   (setf dependencies (append dependencies args)))
-	  (:delay
-	   (when delay
-	     (error "You can only specify :DELAY once per instruction."))
-	   (setf delay args))
-	  (:pinned
-	   (setf pinned t))
-	  (:vop-var
-	   (if vop-var
-	       (error "You can only specify :VOP-VAR once per instruction.")
-	       (setf vop-var (car args))))
-	  (:printer
-	   (sb!int:/noshow "uniquifying :PRINTER with" args)
-	   (push (eval `(list (multiple-value-list
-			       ,(sb!disassem:gen-printer-def-forms-def-form
-				 name
-				 (format nil "~@:(~A[~A]~)" name args)
-				 (cdr option-spec)))))
-		 pdefs))
-	  (:printer-list
-	   ;; same as :PRINTER, but is EVALed first, and is a list of
-	   ;; printers
-	   (push
-	    (eval
-	     `(eval
-	       `(list ,@(mapcar (lambda (printer)
-				  `(multiple-value-list
-				    ,(sb!disassem:gen-printer-def-forms-def-form
-				      ',name
-				      (format nil "~@:(~A[~A]~)" ',name printer)
-				      printer
-				      nil)))
-				,(cadr option-spec)))))
-	    pdefs))
-	  (t
-	   (error "unknown option: ~S" option)))))
+          (if (consp option-spec)
+              (values (car option-spec) (cdr option-spec))
+              (values option-spec nil))
+        (sb!int:/noshow option args)
+        (case option
+          (:emitter
+           (when emitter
+             (error "You can only specify :EMITTER once per instruction."))
+           (setf emitter args))
+          (:declare
+           (setf decls (append decls args)))
+          (:attributes
+           (setf attributes (append attributes args)))
+          (:cost
+           (setf cost (first args)))
+          (:dependencies
+           (setf dependencies (append dependencies args)))
+          (:delay
+           (when delay
+             (error "You can only specify :DELAY once per instruction."))
+           (setf delay args))
+          (:pinned
+           (setf pinned t))
+          (:vop-var
+           (if vop-var
+               (error "You can only specify :VOP-VAR once per instruction.")
+               (setf vop-var (car args))))
+          (:printer
+           (sb!int:/noshow "uniquifying :PRINTER with" args)
+           (push (eval `(list (multiple-value-list
+                               ,(sb!disassem:gen-printer-def-forms-def-form
+                                 name
+                                 (format nil "~@:(~A[~A]~)" name args)
+                                 (cdr option-spec)))))
+                 pdefs))
+          (:printer-list
+           ;; same as :PRINTER, but is EVALed first, and is a list of
+           ;; printers
+           (push
+            (eval
+             `(eval
+               `(list ,@(mapcar (lambda (printer)
+                                  `(multiple-value-list
+                                    ,(sb!disassem:gen-printer-def-forms-def-form
+                                      ',name
+                                      (format nil "~@:(~A[~A]~)" ',name printer)
+                                      printer
+                                      nil)))
+                                ,(cadr option-spec)))))
+            pdefs))
+          (t
+           (error "unknown option: ~S" option)))))
     (sb!int:/noshow "done processing options")
     (setf pdefs (nreverse pdefs))
     (multiple-value-bind
-	(new-lambda-list segment-name vop-name arg-reconstructor)
-	(grovel-lambda-list lambda-list vop-var)
+        (new-lambda-list segment-name vop-name arg-reconstructor)
+        (grovel-lambda-list lambda-list vop-var)
       (sb!int:/noshow new-lambda-list segment-name vop-name arg-reconstructor)
       (push `(let ((hook (segment-inst-hook ,segment-name)))
-	       (when hook
-		 (funcall hook ,segment-name ,vop-name ,sym-name
-			  ,arg-reconstructor)))
-	    emitter)
+               (when hook
+                 (funcall hook ,segment-name ,vop-name ,sym-name
+                          ,arg-reconstructor)))
+            emitter)
       (push `(dolist (postit ,postits)
-	       (emit-back-patch ,segment-name 0 postit))
-	    emitter)
+               (emit-back-patch ,segment-name 0 postit))
+            emitter)
       (unless cost (setf cost 1))
       #!+sb-dyncount
       (push `(when (segment-collect-dynamic-statistics ,segment-name)
-	       (let* ((info (sb!c:ir2-component-dyncount-info
-			     (sb!c:component-info
-			      sb!c:*component-being-compiled*)))
-		      (costs (sb!c:dyncount-info-costs info))
-		      (block-number (sb!c:block-number
-				     (sb!c:ir2-block-block
-				      (sb!c:vop-block ,vop-name)))))
-		 (incf (aref costs block-number) ,cost)))
-	    emitter)
+               (let* ((info (sb!c:ir2-component-dyncount-info
+                             (sb!c:component-info
+                              sb!c:*component-being-compiled*)))
+                      (costs (sb!c:dyncount-info-costs info))
+                      (block-number (sb!c:block-number
+                                     (sb!c:ir2-block-block
+                                      (sb!c:vop-block ,vop-name)))))
+                 (incf (aref costs block-number) ,cost)))
+            emitter)
       (when *assem-scheduler-p*
-	(if pinned
-	    (setf emitter
-		  `((when (segment-run-scheduler ,segment-name)
-		      (schedule-pending-instructions ,segment-name))
-		    ,@emitter))
-	    (let ((flet-name
-		   (gensym (concatenate 'string "EMIT-" sym-name "-INST-")))
-		  (inst-name (gensym "INST-")))
-	      (setf emitter `((flet ((,flet-name (,segment-name)
-				       ,@emitter))
-				(if (segment-run-scheduler ,segment-name)
-				    (let ((,inst-name
-					   (make-instruction
-					    (incf (segment-inst-number
-						   ,segment-name))
-					    #',flet-name
-					    (instruction-attributes
-					     ,@attributes)
-					    (progn ,@delay))))
-				      ,@(when dependencies
-					  `((note-dependencies
-						(,segment-name ,inst-name)
-					      ,@dependencies)))
-				      (queue-inst ,segment-name ,inst-name))
-				    (,flet-name ,segment-name))))))))
+        (if pinned
+            (setf emitter
+                  `((when (segment-run-scheduler ,segment-name)
+                      (schedule-pending-instructions ,segment-name))
+                    ,@emitter))
+            (let ((flet-name
+                   (gensym (concatenate 'string "EMIT-" sym-name "-INST-")))
+                  (inst-name (gensym "INST-")))
+              (setf emitter `((flet ((,flet-name (,segment-name)
+                                       ,@emitter))
+                                (if (segment-run-scheduler ,segment-name)
+                                    (let ((,inst-name
+                                           (make-instruction
+                                            (incf (segment-inst-number
+                                                   ,segment-name))
+                                            #',flet-name
+                                            (instruction-attributes
+                                             ,@attributes)
+                                            (progn ,@delay))))
+                                      ,@(when dependencies
+                                          `((note-dependencies
+                                                (,segment-name ,inst-name)
+                                              ,@dependencies)))
+                                      (queue-inst ,segment-name ,inst-name))
+                                    (,flet-name ,segment-name))))))))
       `(progn
-	 (defun ,defun-name ,new-lambda-list
-	   ,@(when decls
-	       `((declare ,@decls)))
-	   (let ((,postits (segment-postits ,segment-name)))
-	     ;; Must be done so that contribs and user code doing
-	     ;; low-level stuff don't need to worry about this.
-	     (declare (disable-package-locks %%current-segment%%))
-	     (setf (segment-postits ,segment-name) nil)
-	     (macrolet ((%%current-segment%% ()
-			  (error "You can't use INST without an ~
+         (defun ,defun-name ,new-lambda-list
+           ,@(when decls
+               `((declare ,@decls)))
+           (let ((,postits (segment-postits ,segment-name)))
+             ;; Must be done so that contribs and user code doing
+             ;; low-level stuff don't need to worry about this.
+             (declare (disable-package-locks %%current-segment%%))
+             (setf (segment-postits ,segment-name) nil)
+             (macrolet ((%%current-segment%% ()
+                          (error "You can't use INST without an ~
                                   ASSEMBLE inside emitters.")))
                ;; KLUDGE: Some host lisps (CMUCL 18e Sparc at least)
                ;; can't deal with this declaration, so disable it on host
                ;; Ditto for earlier ENABLE-PACKAGE-LOCKS %%C-S%% %%C-V%%
                ;; declaration.
                #-sb-xc-host
-	       (declare (enable-package-locks %%current-segment%%))
-	       ,@emitter))
-	   (values))
-	 (eval-when (:compile-toplevel :load-toplevel :execute)
-	   (%define-instruction ,sym-name ',defun-name))
-	 ,@(extract-nths 1 'progn pdefs)
-	 ,@(when pdefs
-	     `((sb!disassem:install-inst-flavors
-		',name
-		(append ,@(extract-nths 0 'list pdefs)))))))))
+               (declare (enable-package-locks %%current-segment%%))
+               ,@emitter))
+           (values))
+         (eval-when (:compile-toplevel :load-toplevel :execute)
+           (%define-instruction ,sym-name ',defun-name))
+         ,@(extract-nths 1 'progn pdefs)
+         ,@(when pdefs
+             `((sb!disassem:install-inst-flavors
+                ',name
+                (append ,@(extract-nths 0 'list pdefs)))))))))
 
 (defmacro define-instruction-macro (name lambda-list &body body)
   (with-unique-names (whole env)
     (multiple-value-bind (body local-defs)
-	(sb!kernel:parse-defmacro lambda-list
-				  whole
-				  body
-				  name
-				  'instruction-macro
-				  :environment env)
+        (sb!kernel:parse-defmacro lambda-list
+                                  whole
+                                  body
+                                  name
+                                  'instruction-macro
+                                  :environment env)
       `(eval-when (:compile-toplevel :load-toplevel :execute)
-	 (%define-instruction ,(symbol-name name)
-			      (lambda (,whole ,env)
-				,@local-defs
-				(block ,name
-				  ,body)))))))
+         (%define-instruction ,(symbol-name name)
+                              (lambda (,whole ,env)
+                                ,@local-defs
+                                (block ,name
+                                  ,body)))))))
 
 (defun %define-instruction (name defun)
   (setf (gethash name *assem-instructions*) defun)

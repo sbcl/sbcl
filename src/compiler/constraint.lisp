@@ -48,9 +48,9 @@
 (in-package "SB!C")
 
 (defstruct (constraint
-	    (:include sset-element)
-	    (:constructor make-constraint (number kind x y not-p))
-	    (:copier nil))
+            (:include sset-element)
+            (:constructor make-constraint (number kind x y not-p))
+            (:copier nil))
   ;; the kind of constraint we have:
   ;;
   ;; TYPEP
@@ -80,35 +80,35 @@
 ;;; shouldn't be called on LAMBDA-VARs with no CONSTRAINTS set.
 (defun find-constraint (kind x y not-p)
   (declare (type lambda-var x) (type (or constant lambda-var ctype) y)
-	   (type boolean not-p))
+           (type boolean not-p))
   (or (etypecase y
-	(ctype
-	 (do-sset-elements (con (lambda-var-constraints x) nil)
-	   (when (and (eq (constraint-kind con) kind)
-		      (eq (constraint-not-p con) not-p)
-		      (type= (constraint-y con) y))
-	     (return con))))
-	(constant
-	 (do-sset-elements (con (lambda-var-constraints x) nil)
-	   (when (and (eq (constraint-kind con) kind)
-		      (eq (constraint-not-p con) not-p)
-		      (eq (constraint-y con) y))
-	     (return con))))
-	(lambda-var
-	 (do-sset-elements (con (lambda-var-constraints x) nil)
-	   (when (and (eq (constraint-kind con) kind)
-		      (eq (constraint-not-p con) not-p)
-		      (let ((cx (constraint-x con)))
-			(eq (if (eq cx x)
-				(constraint-y con)
-				cx)
-			    y)))
-	     (return con)))))
+        (ctype
+         (do-sset-elements (con (lambda-var-constraints x) nil)
+           (when (and (eq (constraint-kind con) kind)
+                      (eq (constraint-not-p con) not-p)
+                      (type= (constraint-y con) y))
+             (return con))))
+        (constant
+         (do-sset-elements (con (lambda-var-constraints x) nil)
+           (when (and (eq (constraint-kind con) kind)
+                      (eq (constraint-not-p con) not-p)
+                      (eq (constraint-y con) y))
+             (return con))))
+        (lambda-var
+         (do-sset-elements (con (lambda-var-constraints x) nil)
+           (when (and (eq (constraint-kind con) kind)
+                      (eq (constraint-not-p con) not-p)
+                      (let ((cx (constraint-x con)))
+                        (eq (if (eq cx x)
+                                (constraint-y con)
+                                cx)
+                            y)))
+             (return con)))))
       (let ((new (make-constraint (incf *constraint-number*) kind x y not-p)))
-	(sset-adjoin new (lambda-var-constraints x))
-	(when (lambda-var-p y)
-	  (sset-adjoin new (lambda-var-constraints y)))
-	new)))
+        (sset-adjoin new (lambda-var-constraints x))
+        (when (lambda-var-p y)
+          (sset-adjoin new (lambda-var-constraints y)))
+        new)))
 
 ;;; If REF is to a LAMBDA-VAR with CONSTRAINTs (i.e. we can do flow
 ;;; analysis on it), then return the LAMBDA-VAR, otherwise NIL.
@@ -117,7 +117,7 @@
   (declare (type ref ref))
   (let ((leaf (ref-leaf ref)))
     (when (and (lambda-var-p leaf)
-	       (lambda-var-constraints leaf))
+               (lambda-var-constraints leaf))
       leaf)))
 
 ;;; If LVAR's USE is a REF, then return OK-REF-LAMBDA-VAR of the USE,
@@ -138,20 +138,20 @@
 (defun add-test-constraint (block fun x y not-p)
   (unless (rest (block-pred block))
     (let ((con (find-constraint fun x y not-p))
-	  (old (or (block-test-constraint block)
-		   (setf (block-test-constraint block) (make-sset)))))
+          (old (or (block-test-constraint block)
+                   (setf (block-test-constraint block) (make-sset)))))
       (when (sset-adjoin con old)
-	(setf (block-type-asserted block) t))))
+        (setf (block-type-asserted block) t))))
   (values))
 
 ;;; Add complementary constraints to the consequent and alternative
 ;;; blocks of IF. We do nothing if X is NIL.
 (defun add-complement-constraints (if fun x y not-p)
   (when (and x
-	     ;; Note: Even if we do (IF test exp exp) => (PROGN test exp)
-	     ;; optimization, the *MAX-OPTIMIZE-ITERATIONS* cutoff means
-	     ;; that we can't guarantee that the optimization will be
-	     ;; done, so we still need to avoid barfing on this case.
+             ;; Note: Even if we do (IF test exp exp) => (PROGN test exp)
+             ;; optimization, the *MAX-OPTIMIZE-ITERATIONS* cutoff means
+             ;; that we can't guarantee that the optimization will be
+             ;; done, so we still need to avoid barfing on this case.
              (not (eq (if-consequent if)
                       (if-alternative if))))
     (add-test-constraint (if-consequent if) fun x y not-p)
@@ -165,7 +165,7 @@
   (typecase use
     (ref
      (add-complement-constraints if 'typep (ok-ref-lambda-var use)
-				 (specifier-type 'null) t))
+                                 (specifier-type 'null) t))
     (combination
      (unless (eq (combination-kind use)
                  :error)
@@ -222,8 +222,8 @@
   (let ((last (block-last block)))
     (when (if-p last)
       (let ((use (lvar-uses (if-test last))))
-	(when (node-p use)
-	  (add-test-constraints use last)))))
+        (when (node-p use)
+          (add-test-constraints use last)))))
 
   (setf (block-test-modified block) nil)
   (values))
@@ -248,21 +248,21 @@
 (defun constrain-integer-type (x y greater or-equal)
   (declare (type numeric-type x y))
   (flet ((exclude (x)
-	   (cond ((not x) nil)
-		 (or-equal x)
-		 (greater (1+ x))
-		 (t (1- x))))
-	 (bound (x)
-	   (if greater (numeric-type-low x) (numeric-type-high x))))
+           (cond ((not x) nil)
+                 (or-equal x)
+                 (greater (1+ x))
+                 (t (1- x))))
+         (bound (x)
+           (if greater (numeric-type-low x) (numeric-type-high x))))
     (let* ((x-bound (bound x))
-	   (y-bound (exclude (bound y)))
-	   (new-bound (cond ((not x-bound) y-bound)
-			    ((not y-bound) x-bound)
-			    (greater (max x-bound y-bound))
-			    (t (min x-bound y-bound)))))
+           (y-bound (exclude (bound y)))
+           (new-bound (cond ((not x-bound) y-bound)
+                            ((not y-bound) x-bound)
+                            (greater (max x-bound y-bound))
+                            (t (min x-bound y-bound)))))
       (if greater
-	  (modified-numeric-type x :low new-bound)
-	  (modified-numeric-type x :high new-bound)))))
+          (modified-numeric-type x :low new-bound)
+          (modified-numeric-type x :high new-bound)))))
 
 ;;; Return true if X is a float NUMERIC-TYPE.
 (defun float-type-p (x)
@@ -282,48 +282,48 @@
   x
   #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
   (labels ((exclude (x)
-	     (cond ((not x) nil)
-		   (or-equal x)
-		   (greater
-		    (if (consp x)
-			(car x)
-			x))
-		   (t
-		    (if (consp x)
-			x
-			(list x)))))
-	   (bound (x)
-	     (if greater (numeric-type-low x) (numeric-type-high x)))
-	   (max-lower-bound (x y)
-	     ;; Both X and Y are not null. Find the max.
-	     (let ((res (max (type-bound-number x) (type-bound-number y))))
-	       ;; An open lower bound is greater than a close
-	       ;; lower bound because the open bound doesn't
-	       ;; contain the bound, so choose an open lower
-	       ;; bound.
-	       (set-bound res (or (consp x) (consp y)))))
-	   (min-upper-bound (x y)
-	     ;; Same as above, but for the min of upper bounds
-	     ;; Both X and Y are not null. Find the min.
-	     (let ((res (min (type-bound-number x) (type-bound-number y))))
-	       ;; An open upper bound is less than a closed
-	       ;; upper bound because the open bound doesn't
-	       ;; contain the bound, so choose an open lower
-	       ;; bound.
-	       (set-bound res (or (consp x) (consp y))))))
+             (cond ((not x) nil)
+                   (or-equal x)
+                   (greater
+                    (if (consp x)
+                        (car x)
+                        x))
+                   (t
+                    (if (consp x)
+                        x
+                        (list x)))))
+           (bound (x)
+             (if greater (numeric-type-low x) (numeric-type-high x)))
+           (max-lower-bound (x y)
+             ;; Both X and Y are not null. Find the max.
+             (let ((res (max (type-bound-number x) (type-bound-number y))))
+               ;; An open lower bound is greater than a close
+               ;; lower bound because the open bound doesn't
+               ;; contain the bound, so choose an open lower
+               ;; bound.
+               (set-bound res (or (consp x) (consp y)))))
+           (min-upper-bound (x y)
+             ;; Same as above, but for the min of upper bounds
+             ;; Both X and Y are not null. Find the min.
+             (let ((res (min (type-bound-number x) (type-bound-number y))))
+               ;; An open upper bound is less than a closed
+               ;; upper bound because the open bound doesn't
+               ;; contain the bound, so choose an open lower
+               ;; bound.
+               (set-bound res (or (consp x) (consp y))))))
     (let* ((x-bound (bound x))
-	   (y-bound (exclude (bound y)))
-	   (new-bound (cond ((not x-bound)
-			     y-bound)
-			    ((not y-bound)
-			     x-bound)
-			    (greater
-			     (max-lower-bound x-bound y-bound))
-			    (t
-			     (min-upper-bound x-bound y-bound)))))
+           (y-bound (exclude (bound y)))
+           (new-bound (cond ((not x-bound)
+                             y-bound)
+                            ((not y-bound)
+                             x-bound)
+                            (greater
+                             (max-lower-bound x-bound y-bound))
+                            (t
+                             (min-upper-bound x-bound y-bound)))))
       (if greater
-	  (modified-numeric-type x :low new-bound)
-	  (modified-numeric-type x :high new-bound)))))
+          (modified-numeric-type x :low new-bound)
+          (modified-numeric-type x :high new-bound)))))
 
 ;;; Given the set of CONSTRAINTS for a variable and the current set of
 ;;; restrictions from flow analysis IN, set the type for REF
@@ -333,44 +333,44 @@
   (let ((var-cons (copy-sset constraints)))
     (sset-intersection var-cons in)
     (let ((res (single-value-type (node-derived-type ref)))
-	  (not-res *empty-type*)
-	  (leaf (ref-leaf ref)))
+          (not-res *empty-type*)
+          (leaf (ref-leaf ref)))
       (do-sset-elements (con var-cons)
-	(let* ((x (constraint-x con))
-	       (y (constraint-y con))
-	       (not-p (constraint-not-p con))
-	       (other (if (eq x leaf) y x))
-	       (kind (constraint-kind con)))
-	  (case kind
-	    (typep
-	     (if not-p
-		 (setq not-res (type-union not-res other))
-		 (setq res (type-approx-intersection2 res other))))
-	    (eql
-	     (let ((other-type (leaf-type other)))
-	       (if not-p
-		   (when (and (constant-p other)
-			      (member-type-p other-type))
-		     (setq not-res (type-union not-res other-type)))
-		   (let ((leaf-type (leaf-type leaf)))
-		     (when (or (constant-p other)
-			       (and (leaf-refs other) ; protect from deleted vars
+        (let* ((x (constraint-x con))
+               (y (constraint-y con))
+               (not-p (constraint-not-p con))
+               (other (if (eq x leaf) y x))
+               (kind (constraint-kind con)))
+          (case kind
+            (typep
+             (if not-p
+                 (setq not-res (type-union not-res other))
+                 (setq res (type-approx-intersection2 res other))))
+            (eql
+             (let ((other-type (leaf-type other)))
+               (if not-p
+                   (when (and (constant-p other)
+                              (member-type-p other-type))
+                     (setq not-res (type-union not-res other-type)))
+                   (let ((leaf-type (leaf-type leaf)))
+                     (when (or (constant-p other)
+                               (and (leaf-refs other) ; protect from deleted vars
                                     (csubtypep other-type leaf-type)
-				    (not (type= other-type leaf-type))))
-		       (change-ref-leaf ref other)
-		       (when (constant-p other) (return)))))))
-	    ((< >)
-	     (cond ((and (integer-type-p res) (integer-type-p y))
-		    (let ((greater (eq kind '>)))
-		      (let ((greater (if not-p (not greater) greater)))
-			(setq res
-			      (constrain-integer-type res y greater not-p)))))
-		   ((and (float-type-p res) (float-type-p y))
-		    (let ((greater (eq kind '>)))
-		      (let ((greater (if not-p (not greater) greater)))
-			(setq res
-			      (constrain-float-type res y greater not-p)))))
-		   )))))
+                                    (not (type= other-type leaf-type))))
+                       (change-ref-leaf ref other)
+                       (when (constant-p other) (return)))))))
+            ((< >)
+             (cond ((and (integer-type-p res) (integer-type-p y))
+                    (let ((greater (eq kind '>)))
+                      (let ((greater (if not-p (not greater) greater)))
+                        (setq res
+                              (constrain-integer-type res y greater not-p)))))
+                   ((and (float-type-p res) (float-type-p y))
+                    (let ((greater (eq kind '>)))
+                      (let ((greater (if not-p (not greater) greater)))
+                        (setq res
+                              (constrain-float-type res y greater not-p)))))
+                   )))))
 
       (cond ((and (if-p (node-dest ref))
                   (csubtypep (specifier-type 'null) not-res))
@@ -455,19 +455,19 @@
         (kill (block-kill block))
         (out (copy-sset (block-gen block))))
     (cond ((null kill)
-	   (sset-union out in))
-	  ((null (rest kill))
-	   (let ((con (lambda-var-constraints (first kill))))
-	     (if con
-		 (sset-union-of-difference out in con)
-		 (sset-union out in))))
-	  (t
-	   (let ((kill-set (make-sset)))
-	     (dolist (var kill)
-	       (let ((con (lambda-var-constraints var)))
-		 (when con
-		   (sset-union kill-set con))))
-	     (sset-union-of-difference out in kill-set))))
+           (sset-union out in))
+          ((null (rest kill))
+           (let ((con (lambda-var-constraints (first kill))))
+             (if con
+                 (sset-union-of-difference out in con)
+                 (sset-union out in))))
+          (t
+           (let ((kill-set (make-sset)))
+             (dolist (var kill)
+               (let ((con (lambda-var-constraints var)))
+                 (when con
+                   (sset-union kill-set con))))
+             (sset-union-of-difference out in kill-set))))
     out))
 
 ;;; Compute the initial flow analysis sets for BLOCK:
@@ -510,7 +510,7 @@
 ;;; Return True if we have done something.
 (defun flow-propagate-constraints (block)
   (let* ((pred (block-pred block))
-	 (in (progn (aver pred)
+         (in (progn (aver pred)
                     (let ((res (copy-sset (block-out (first pred)))))
                       (dolist (b (rest pred))
                         (sset-intersection res (block-out b)))
@@ -542,14 +542,14 @@
   (declare (type component component))
   (dolist (fun (component-lambdas component))
     (flet ((frob (x)
-	     (dolist (var (lambda-vars x))
-	       (unless (lambda-var-constraints var)
-		 (when (or (null (lambda-var-sets var))
-			   (not (closure-var-p var)))
-		   (setf (lambda-var-constraints var) (make-sset)))))))
+             (dolist (var (lambda-vars x))
+               (unless (lambda-var-constraints var)
+                 (when (or (null (lambda-var-sets var))
+                           (not (closure-var-p var)))
+                   (setf (lambda-var-constraints var) (make-sset)))))))
       (frob fun)
       (dolist (let (lambda-lets fun))
-	(frob let)))))
+        (frob let)))))
 
 ;;; How many blocks does COMPONENT have?
 (defun component-n-blocks (component)

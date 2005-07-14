@@ -27,15 +27,15 @@
 (defun fun-guessed-cost (name)
   (declare (symbol name))
   (let ((info (info :function :info name))
-	(call-cost (template-cost (template-or-lose 'call-named))))
+        (call-cost (template-cost (template-or-lose 'call-named))))
     (if info
-	(let ((templates (fun-info-templates info)))
-	  (if templates
-	      (template-cost (first templates))
-	      (case name
-		(null (template-cost (template-or-lose 'if-eq)))
-		(t call-cost))))
-	call-cost)))
+        (let ((templates (fun-info-templates info)))
+          (if templates
+              (template-cost (first templates))
+              (case name
+                (null (template-cost (template-or-lose 'if-eq)))
+                (t call-cost))))
+        call-cost)))
 
 ;;; Return some sort of guess for the cost of doing a test against
 ;;; TYPE. The result need not be precise as long as it isn't way out
@@ -48,34 +48,34 @@
       (when (eq type *empty-type*)
         0)
       (let ((check (type-check-template type)))
-	(if check
-	    (template-cost check)
-	    (let ((found (cdr (assoc type *backend-type-predicates*
-				     :test #'type=))))
-	      (if found
-		  (+ (fun-guessed-cost found) (fun-guessed-cost 'eq))
-		  nil))))
+        (if check
+            (template-cost check)
+            (let ((found (cdr (assoc type *backend-type-predicates*
+                                     :test #'type=))))
+              (if found
+                  (+ (fun-guessed-cost found) (fun-guessed-cost 'eq))
+                  nil))))
       (typecase type
-	(compound-type
-	 (reduce #'+ (compound-type-types type) :key 'type-test-cost))
-	(member-type
-	 (* (length (member-type-members type))
-	    (fun-guessed-cost 'eq)))
-	(numeric-type
-	 (* (if (numeric-type-complexp type) 2 1)
-	    (fun-guessed-cost
-	     (if (csubtypep type (specifier-type 'fixnum)) 'fixnump 'numberp))
-	    (+ 1
-	       (if (numeric-type-low type) 1 0)
-	       (if (numeric-type-high type) 1 0))))
-	(cons-type
-	 (+ (type-test-cost (specifier-type 'cons))
-	    (fun-guessed-cost 'car)
-	    (type-test-cost (cons-type-car-type type))
-	    (fun-guessed-cost 'cdr)
-	    (type-test-cost (cons-type-cdr-type type))))
-	(t
-	 (fun-guessed-cost 'typep)))))
+        (compound-type
+         (reduce #'+ (compound-type-types type) :key 'type-test-cost))
+        (member-type
+         (* (length (member-type-members type))
+            (fun-guessed-cost 'eq)))
+        (numeric-type
+         (* (if (numeric-type-complexp type) 2 1)
+            (fun-guessed-cost
+             (if (csubtypep type (specifier-type 'fixnum)) 'fixnump 'numberp))
+            (+ 1
+               (if (numeric-type-low type) 1 0)
+               (if (numeric-type-high type) 1 0))))
+        (cons-type
+         (+ (type-test-cost (specifier-type 'cons))
+            (fun-guessed-cost 'car)
+            (type-test-cost (cons-type-car-type type))
+            (fun-guessed-cost 'cdr)
+            (type-test-cost (cons-type-cdr-type type))))
+        (t
+         (fun-guessed-cost 'typep)))))
 
 (defun-cached
     (weaken-type :hash-bits 8
@@ -136,11 +136,11 @@
   (declare (type ctype type))
   (multiple-value-bind (res count) (values-types type)
     (values (mapcar (lambda (type)
-		      (if (fun-type-p type)
-			  (specifier-type 'function)
-			  type))
-		    res)
-	    count)))
+                      (if (fun-type-p type)
+                          (specifier-type 'function)
+                          type))
+                    res)
+            count)))
 
 ;;; Switch to disable check complementing, for evaluation.
 (defvar *complement-type-checks* t)
@@ -194,7 +194,7 @@
 
 ;;; Determines whether CAST's assertion is:
 ;;;  -- checkable by the back end (:SIMPLE), or
-;;;  -- not checkable by the back end, but checkable via an explicit 
+;;;  -- not checkable by the back end, but checkable via an explicit
 ;;;     test in type check conversion (:HAIRY), or
 ;;;  -- not reasonably checkable at all (:TOO-HAIRY).
 ;;;
@@ -330,35 +330,35 @@
           (t t))
     #+nil
     (cond ((or (not dest)
-	       (policy dest (zerop safety)))
-	   nil)
-	  ((basic-combination-p dest)
-	   (let ((kind (basic-combination-kind dest)))
-	     (cond
-	       ((eq cont (basic-combination-fun dest)) t)
-	       (t
-		(ecase kind
-		  (:local t)
-		  (:full
-		   (and (combination-p dest)
-			(not (values-subtypep ; explicit THE
-			      (continuation-externally-checkable-type cont)
-			      (continuation-type-to-check cont)))))
-		  ;; :ERROR means that we have an invalid syntax of
-		  ;; the call and the callee will detect it before
-		  ;; thinking about types.
-		  (:error nil)
-		  (:known
-		   (let ((info (basic-combination-fun-info dest)))
-		     (if (fun-info-ir2-convert info)
-			 t
-			 (dolist (template (fun-info-templates info) nil)
-			   (when (eq (template-ltn-policy template)
-				     :fast-safe)
-			     (multiple-value-bind (val win)
-				 (valid-fun-use dest (template-type template))
-			       (when (or val (not win)) (return t)))))))))))))
-	  (t t))))
+               (policy dest (zerop safety)))
+           nil)
+          ((basic-combination-p dest)
+           (let ((kind (basic-combination-kind dest)))
+             (cond
+               ((eq cont (basic-combination-fun dest)) t)
+               (t
+                (ecase kind
+                  (:local t)
+                  (:full
+                   (and (combination-p dest)
+                        (not (values-subtypep ; explicit THE
+                              (continuation-externally-checkable-type cont)
+                              (continuation-type-to-check cont)))))
+                  ;; :ERROR means that we have an invalid syntax of
+                  ;; the call and the callee will detect it before
+                  ;; thinking about types.
+                  (:error nil)
+                  (:known
+                   (let ((info (basic-combination-fun-info dest)))
+                     (if (fun-info-ir2-convert info)
+                         t
+                         (dolist (template (fun-info-templates info) nil)
+                           (when (eq (template-ltn-policy template)
+                                     :fast-safe)
+                             (multiple-value-bind (val win)
+                                 (valid-fun-use dest (template-type template))
+                               (when (or val (not win)) (return t)))))))))))))
+          (t t))))
 
 ;;; Return a lambda form that we can convert to do a hairy type check
 ;;; of the specified TYPES. TYPES is a list of the format returned by
@@ -398,11 +398,11 @@
     (setf (cast-%type-check cast) nil)
     (let* ((atype (cast-asserted-type cast))
            (atype (cond ((not (values-type-p atype))
-		         atype)
-			((= length 1)
+                         atype)
+                        ((= length 1)
                          (single-value-type atype))
                         (t
-			 (make-values-type
+                         (make-values-type
                           :required (values-type-out atype length)))))
            (dtype (node-derived-type cast))
            (dtype (make-values-type
@@ -439,17 +439,17 @@
                                                           pos)))))))
             (cond ((and (ref-p use) (constant-p (ref-leaf use)))
                    (warn 'type-warning
-			 :format-control
-			 "~:[This~;~:*~A~] is not a ~<~%~9T~:;~S:~>~%  ~S"
-			 :format-arguments
-			 (list what atype-spec 
-			       (constant-value (ref-leaf use)))))
+                         :format-control
+                         "~:[This~;~:*~A~] is not a ~<~%~9T~:;~S:~>~%  ~S"
+                         :format-arguments
+                         (list what atype-spec
+                               (constant-value (ref-leaf use)))))
                   (t
                    (warn 'type-warning
-			 :format-control
-			 "~:[Result~;~:*~A~] is a ~S, ~<~%~9T~:;not a ~S.~>"
-			 :format-arguments
-			 (list what (type-specifier dtype) atype-spec)))))))))
+                         :format-control
+                         "~:[Result~;~:*~A~] is a ~S, ~<~%~9T~:;not a ~S.~>"
+                         :format-arguments
+                         (list what (type-specifier dtype) atype-spec)))))))))
   (values))
 
 ;;; Loop over all blocks in COMPONENT that have TYPE-CHECK set,
@@ -485,7 +485,7 @@
     (do-blocks (block component)
       (when (block-type-check block)
         ;; CAST-EXTERNALLY-CHECKABLE-P wants the backward pass
-	(do-nodes-backwards (node nil block)
+        (do-nodes-backwards (node nil block)
           (when (and (cast-p node)
                      (cast-type-check node))
             (cast-check-uses node)
@@ -496,7 +496,7 @@
                    ;; the previous pass
                    (setf (cast-%type-check node) t)
                    (casts (cons node (not (probable-type-check-p node))))))))
-	(setf (block-type-check block) nil)))
+        (setf (block-type-check block) nil)))
     (dolist (cast (casts))
       (destructuring-bind (cast . force-hairy) cast
         (multiple-value-bind (check types)
