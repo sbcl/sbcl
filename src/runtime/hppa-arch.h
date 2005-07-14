@@ -2,10 +2,10 @@
 #define _HPPA_ARCH_H
 
 
-static inline void 
+static inline void
 get_spinlock(lispobj *word,long value)
 {
-    *word=value;		/* FIXME for threads */
+    *word=value;                /* FIXME for threads */
 }
 
 static inline void

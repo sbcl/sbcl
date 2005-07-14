@@ -40,7 +40,7 @@ static void *compute_pc(lispobj code_obj, int pc_offset)
 
     code = (struct code *)native_pointer(code_obj);
     return (void *)((char *)code + HeaderValue(code->header)*sizeof(lispobj)
-		    + pc_offset);
+                    + pc_offset);
 }
 
 unsigned long breakpoint_install(lispobj code_obj, int pc_offset)
@@ -49,13 +49,13 @@ unsigned long breakpoint_install(lispobj code_obj, int pc_offset)
 }
 
 void breakpoint_remove(lispobj code_obj, int pc_offset,
-		       unsigned long orig_inst)
+                       unsigned long orig_inst)
 {
     arch_remove_breakpoint(compute_pc(code_obj, pc_offset), orig_inst);
 }
 
 void breakpoint_do_displaced_inst(os_context_t* context,
-				  unsigned long orig_inst)
+                                  unsigned long orig_inst)
 {
     /* on platforms with sigreturn(), we go directly back from
      * arch_do_displaced_inst() to lisp code, so we need to clean up
@@ -79,14 +79,14 @@ static lispobj find_code(os_context_t *context)
     lispobj header;
 
     if (lowtag_of(code) != OTHER_POINTER_LOWTAG)
-	return NIL;
+        return NIL;
 
     header = *(lispobj *)(code-OTHER_POINTER_LOWTAG);
 
     if (widetag_of(header) == CODE_HEADER_WIDETAG)
-	return code;
+        return code;
     else
-	return code - HeaderValue(header)*sizeof(lispobj);
+        return code - HeaderValue(header)*sizeof(lispobj);
 #else
     return NIL;
 #endif
@@ -95,12 +95,12 @@ static lispobj find_code(os_context_t *context)
 static lispobj find_code(os_context_t *context)
 {
     lispobj codeptr =
-	(lispobj)component_ptr_from_pc((lispobj *)(*os_context_pc_addr(context)));
+        (lispobj)component_ptr_from_pc((lispobj *)(*os_context_pc_addr(context)));
 
     if (codeptr == 0) {
-	return NIL;
+        return NIL;
     } else {
-	return codeptr + OTHER_POINTER_LOWTAG;
+        return codeptr + OTHER_POINTER_LOWTAG;
     }
 }
 #endif
@@ -108,27 +108,27 @@ static lispobj find_code(os_context_t *context)
 static long compute_offset(os_context_t *context, lispobj code)
 {
     if (code == NIL)
-	return 0;
+        return 0;
     else {
-	unsigned long code_start;
-	struct code *codeptr = (struct code *)native_pointer(code);
+        unsigned long code_start;
+        struct code *codeptr = (struct code *)native_pointer(code);
 #ifdef parisc
-	unsigned long pc = *os_context_pc_addr(context) & ~3;
+        unsigned long pc = *os_context_pc_addr(context) & ~3;
 #else
-	unsigned long pc = *os_context_pc_addr(context);
+        unsigned long pc = *os_context_pc_addr(context);
 #endif
 
-	code_start = (unsigned long)codeptr
-	    + HeaderValue(codeptr->header)*sizeof(lispobj);
-	if (pc < code_start)
-	    return 0;
-	else {
-	    long offset = pc - code_start;
-	    if (offset >= codeptr->code_size)
-		return 0;
-	    else
-		return make_fixnum(offset);
-	}
+        code_start = (unsigned long)codeptr
+            + HeaderValue(codeptr->header)*sizeof(lispobj);
+        if (pc < code_start)
+            return 0;
+        else {
+            long offset = pc - code_start;
+            if (offset >= codeptr->code_size)
+                return 0;
+            else
+                return make_fixnum(offset);
+        }
     }
 }
 
@@ -145,16 +145,16 @@ void handle_breakpoint(int signal, siginfo_t* info, os_context_t *context)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
     funcall3(SymbolFunction(HANDLE_BREAKPOINT),
-	     compute_offset(context, code),
-	     code,
-	     context_sap);
+             compute_offset(context, code),
+             code,
+             context_sap);
 
     undo_fake_foreign_function_call(context);
 }
 
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
-				os_context_t *context)
+                                os_context_t *context)
 {
     lispobj code, lra;
     struct code *codeptr;
@@ -169,14 +169,14 @@ void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
     funcall3(SymbolFunction(HANDLE_BREAKPOINT),
-	     compute_offset(context, code),
-	     code,
-	     alloc_sap(context));
+             compute_offset(context, code),
+             code,
+             alloc_sap(context));
 
     lra = codeptr->constants[REAL_LRA_SLOT];
 #ifdef reg_CODE
     if (codeptr->constants[KNOWN_RETURN_P_SLOT] == NIL) {
-	*os_context_register_addr(context, reg_CODE) = lra;
+        *os_context_register_addr(context, reg_CODE) = lra;
     }
 #endif
     undo_fake_foreign_function_call(context);
@@ -184,7 +184,7 @@ void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
 }
 #else
 void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
-				os_context_t *context)
+                                os_context_t *context)
 {
     lispobj code, context_sap = alloc_sap(context);
     struct code *codeptr;
@@ -199,13 +199,13 @@ void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
     funcall3(SymbolFunction(HANDLE_BREAKPOINT),
-	     compute_offset(context, code),
-	     code,
-	     context_sap);
+             compute_offset(context, code),
+             code,
+             context_sap);
 
     undo_fake_foreign_function_call(context);
 
     return compute_pc(codeptr->constants[REAL_LRA_SLOT],
-		      fixnum_value(codeptr->constants[REAL_LRA_SLOT+1]));
+                      fixnum_value(codeptr->constants[REAL_LRA_SLOT+1]));
 }
 #endif

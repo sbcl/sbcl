@@ -20,43 +20,43 @@
      Even with the patch, the DSISR may not have its 'write' bit set
      correctly (it tends not to be set if the fault was caused by
      something other than a protection violation.)
-     
+
      Caveat callers.  */
 
 #ifndef PT_DAR
-#define PT_DAR		41
+#define PT_DAR          41
 #endif
 
 #ifndef PT_DSISR
-#define PT_DSISR	42
+#define PT_DSISR        42
 #endif
 
 void arch_init() {
 }
 
-os_vm_address_t 
+os_vm_address_t
 arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
     unsigned int *pc =  (unsigned int *)(*os_context_pc_addr(context));
     os_vm_address_t addr;
-    
-    
+
+
     /* Make sure it's not the pc thats bogus, and that it was lisp code */
     /* that caused the fault. */
     if ((((unsigned long)pc) & 3) != 0 ||
-	((pc < READ_ONLY_SPACE_START ||
-	  pc >= READ_ONLY_SPACE_START+READ_ONLY_SPACE_SIZE) &&
-	 ((lispobj *)pc < current_dynamic_space || 
-	  (lispobj *)pc >= current_dynamic_space + DYNAMIC_SPACE_SIZE)))
-	return 0;
-    
-    
+        ((pc < READ_ONLY_SPACE_START ||
+          pc >= READ_ONLY_SPACE_START+READ_ONLY_SPACE_SIZE) &&
+         ((lispobj *)pc < current_dynamic_space ||
+          (lispobj *)pc >= current_dynamic_space + DYNAMIC_SPACE_SIZE)))
+        return 0;
+
+
     addr = (os_vm_address_t) (*os_context_register_addr(context,PT_DAR));
     return addr;
 }
-      
 
-void 
+
+void
 arch_skip_instruction(os_context_t *context)
 {
     char** pcptr;
@@ -71,7 +71,7 @@ arch_internal_error_arguments(os_context_t *context)
 }
 
 
-boolean 
+boolean
 arch_pseudo_atomic_atomic(os_context_t *context)
 {
     return ((*os_context_register_addr(context,reg_ALLOC)) & 4);
@@ -79,14 +79,14 @@ arch_pseudo_atomic_atomic(os_context_t *context)
 
 #define PSEUDO_ATOMIC_INTERRUPTED_BIAS 0x7f000000
 
-void 
+void
 arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    *os_context_register_addr(context,reg_NL3) 
-	+= PSEUDO_ATOMIC_INTERRUPTED_BIAS;
+    *os_context_register_addr(context,reg_NL3)
+        += PSEUDO_ATOMIC_INTERRUPTED_BIAS;
 }
 
-unsigned long 
+unsigned long
 arch_install_breakpoint(void *pc)
 {
     unsigned long *ptr = (unsigned long *)pc;
@@ -96,7 +96,7 @@ arch_install_breakpoint(void *pc)
     return result;
 }
 
-void 
+void
 arch_remove_breakpoint(void *pc, unsigned long orig_inst)
 {
     *(unsigned long *)pc = orig_inst;
@@ -106,22 +106,22 @@ arch_remove_breakpoint(void *pc, unsigned long orig_inst)
 static unsigned long *skipped_break_addr, displaced_after_inst;
 static sigset_t orig_sigmask;
 
-void 
+void
 arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
 {
     /* not sure how we ensure that we get the breakpoint reinstalled
      * after doing this -dan */
     unsigned long *pc = (unsigned long *)(*os_context_pc_addr(context));
-    
+
     orig_sigmask = *os_context_sigmask_addr(context);
     sigaddset_blockable(os_context_sigmask_addr(context));
-    
+
     *pc = orig_inst;
     os_flush_icache((os_vm_address_t) pc, sizeof(unsigned long));
     skipped_break_addr = pc;
 }
 
-static void 
+static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
     u32 code;
@@ -130,74 +130,74 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 #endif
     code=*((u32 *)(*os_context_pc_addr(context)));
     if (code == ((3 << 26) | (16 << 21) | (reg_ALLOC << 16))) {
-	/* twlti reg_ALLOC,0 - check for deferred interrupt */
-	*os_context_register_addr(context,reg_ALLOC) 
-	    -= PSEUDO_ATOMIC_INTERRUPTED_BIAS;
-	arch_skip_instruction(context);
-	/* interrupt or GC was requested in PA; now we're done with the
-	   PA section we may as well get around to it */
-	interrupt_handle_pending(context);
-	return;
-	
+        /* twlti reg_ALLOC,0 - check for deferred interrupt */
+        *os_context_register_addr(context,reg_ALLOC)
+            -= PSEUDO_ATOMIC_INTERRUPTED_BIAS;
+        arch_skip_instruction(context);
+        /* interrupt or GC was requested in PA; now we're done with the
+           PA section we may as well get around to it */
+        interrupt_handle_pending(context);
+        return;
+
     }
     if ((code >> 16) == ((3 << 10) | (6 << 5))) {
-	/* twllei reg_ZERO,N will always trap if reg_ZERO = 0 */
-	int trap = code & 0x1f;
-	
-	switch (trap) {
-	case trap_Halt:
-	    fake_foreign_function_call(context);
-	    lose("%%primitive halt called; the party is over.\n");
-	    
-	case trap_Error:
-	case trap_Cerror:
-	    interrupt_internal_error(signal, code, context, trap == trap_Cerror);
-	    break;
-	    
-	case trap_PendingInterrupt:
-	    /* This is supposed run after WITHOUT-INTERRUPTS if there
-	     * were pending signals. */
-	    arch_skip_instruction(context);
-	    interrupt_handle_pending(context);
-	    break;
-	    
-	case trap_Breakpoint:
-	    handle_breakpoint(signal, code, context);
-	    break;
-	    
-	case trap_FunEndBreakpoint:
-	    *os_context_pc_addr(context)
-		=(int)handle_fun_end_breakpoint(signal, code, context);
-	    break;
-	    
-	case trap_AfterBreakpoint:
-	    *skipped_break_addr = trap_Breakpoint;
-	    skipped_break_addr = NULL;
-	    *(unsigned long *)*os_context_pc_addr(context) 
-		= displaced_after_inst;
-	    *os_context_sigmask_addr(context)= orig_sigmask;
- 
-	    os_flush_icache((os_vm_address_t) *os_context_pc_addr(context),
-			    sizeof(unsigned long));
-	    break;
-	    
-	default:
-	    interrupt_handle_now(signal, code, context);
-	    break;
-	}
+        /* twllei reg_ZERO,N will always trap if reg_ZERO = 0 */
+        int trap = code & 0x1f;
+
+        switch (trap) {
+        case trap_Halt:
+            fake_foreign_function_call(context);
+            lose("%%primitive halt called; the party is over.\n");
+
+        case trap_Error:
+        case trap_Cerror:
+            interrupt_internal_error(signal, code, context, trap == trap_Cerror);
+            break;
+
+        case trap_PendingInterrupt:
+            /* This is supposed run after WITHOUT-INTERRUPTS if there
+             * were pending signals. */
+            arch_skip_instruction(context);
+            interrupt_handle_pending(context);
+            break;
+
+        case trap_Breakpoint:
+            handle_breakpoint(signal, code, context);
+            break;
+
+        case trap_FunEndBreakpoint:
+            *os_context_pc_addr(context)
+                =(int)handle_fun_end_breakpoint(signal, code, context);
+            break;
+
+        case trap_AfterBreakpoint:
+            *skipped_break_addr = trap_Breakpoint;
+            skipped_break_addr = NULL;
+            *(unsigned long *)*os_context_pc_addr(context)
+                = displaced_after_inst;
+            *os_context_sigmask_addr(context)= orig_sigmask;
+
+            os_flush_icache((os_vm_address_t) *os_context_pc_addr(context),
+                            sizeof(unsigned long));
+            break;
+
+        default:
+            interrupt_handle_now(signal, code, context);
+            break;
+        }
 #ifdef LISP_FEATURE_DARWIN
-	DARWIN_FIX_CONTEXT(context);
+        DARWIN_FIX_CONTEXT(context);
 #endif
-	return;
+        return;
     }
     if (((code >> 26) == 3) && (((code >> 21) & 31) == 24)) {
-	interrupt_internal_error(signal, code, context, 0);
+        interrupt_internal_error(signal, code, context, 0);
 #ifdef LISP_FEATURE_DARWIN
-	DARWIN_FIX_CONTEXT(context);
+        DARWIN_FIX_CONTEXT(context);
 #endif
-	return;
+        return;
     }
-    
+
     interrupt_handle_now(signal, code, context);
 #ifdef LISP_FEATURE_DARWIN
     /* Work around G5 bug */
@@ -300,7 +300,7 @@ arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
    *        ori   13, 13, (low part of addr)
    *        mtctr 13
    *        bctr
-   *        
+   *
    */
   int* inst_ptr;
   unsigned long hi;                   /* Top 16 bits of address */
@@ -320,7 +320,7 @@ arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
   /*
    * addis 13, 0, (hi part)
    */
-      
+
   inst = (15 << 26) | (LINKAGE_TEMP_REG << 21) | (0 << 16) | hi;
   *inst_ptr++ = inst;
 
@@ -330,7 +330,7 @@ arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
 
   inst = (24 << 26) | (LINKAGE_TEMP_REG << 21) | (LINKAGE_TEMP_REG << 16) | lo;
   *inst_ptr++ = inst;
-  
+
   /*
    * mtctr 13
    */
@@ -347,11 +347,11 @@ arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
 
 
   *inst_ptr++ = inst;
-  
+
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - (char*) reloc_addr);
 }
 
-void 
+void
 arch_write_linkage_table_ref(void * reloc_addr, void *target_addr)
 {
     *(unsigned long *)reloc_addr = (unsigned long)target_addr;

@@ -84,7 +84,7 @@ os_context_fp_control(os_context_t *context)
     /* FIXME: Probably do something. */
 }
 
-void 
+void
 os_restore_fp_control(os_context_t *context)
 {
     /* FIXME: Probably do something. */
@@ -101,18 +101,18 @@ os_context_bd_cause(os_context_t *context)
        loop" where a (BREAK 16) not in a branch delay slot would have
        CAUSEF_BD filled. So, we comment
 
-	#include <asm/mipsregs.h>
+        #include <asm/mipsregs.h>
 
-        return (((struct sigcontext *) &(context->uc_mcontext))->sc_cause 
-	        & CAUSEF_BD);
+        return (((struct sigcontext *) &(context->uc_mcontext))->sc_cause
+                & CAUSEF_BD);
 
        out and return 0 always.  -- CSR, 2002-09-02 */
     return 0;
 }
 
-void 
+void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
     if (cacheflush(address, length, ICACHE) == -1)
-	perror("cacheflush");
+        perror("cacheflush");
 }

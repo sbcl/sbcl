@@ -26,13 +26,13 @@ static void
 ensure_space(lispobj *start, unsigned long size)
 {
     if (os_validate((os_vm_address_t)start,(os_vm_size_t)size)==NULL) {
-	fprintf(stderr,
-		"ensure_space: failed to validate %ld bytes at 0x%08lx\n",
-		size,
-		(unsigned long)start);
-	fprintf(stderr,
-		"(hint: Try \"ulimit -a\"; maybe you should increase memory limits.)\n");
-	exit(1);
+        fprintf(stderr,
+                "ensure_space: failed to validate %ld bytes at 0x%08lx\n",
+                size,
+                (unsigned long)start);
+        fprintf(stderr,
+                "(hint: Try \"ulimit -a\"; maybe you should increase memory limits.)\n");
+        exit(1);
     }
 }
 
@@ -42,10 +42,10 @@ static void
 ensure_undefined_alien(void) {
     os_vm_address_t start = os_validate(NULL, os_vm_page_size);
     if (start) {
-	os_protect(start, os_vm_page_size, OS_VM_PROT_NONE);
-	undefined_alien_address = start;
+        os_protect(start, os_vm_page_size, OS_VM_PROT_NONE);
+        undefined_alien_address = start;
     } else {
-	lose("could not allocate guard page for undefined alien");
+        lose("could not allocate guard page for undefined alien");
     }
 }
 
@@ -56,7 +56,7 @@ validate(void)
     printf("validating memory ...");
     fflush(stdout);
 #endif
-    
+
     ensure_space( (lispobj *)READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
     ensure_space( (lispobj *)STATIC_SPACE_START   , STATIC_SPACE_SIZE);
 #ifdef LISP_FEATURE_GENCGC
@@ -73,22 +73,22 @@ validate(void)
 #ifdef LISP_FEATURE_OS_PROVIDES_DLOPEN
     ensure_undefined_alien();
 #endif
- 
+
 #ifdef PRINTNOISE
     printf(" done.\n");
 #endif
 }
 
-void 
+void
 protect_control_stack_guard_page(struct thread *th, int protect_p) {
     os_protect(CONTROL_STACK_GUARD_PAGE(th),
-	       os_vm_page_size,protect_p ?
-	       (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
+               os_vm_page_size,protect_p ?
+               (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
 }
 
-void 
+void
 protect_control_stack_return_guard_page(struct thread *th, int protect_p) {
     os_protect(CONTROL_STACK_RETURN_GUARD_PAGE(th),
-	       os_vm_page_size,protect_p ?
-	       (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
+               os_vm_page_size,protect_p ?
+               (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
 }

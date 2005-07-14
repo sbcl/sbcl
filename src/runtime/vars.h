@@ -17,8 +17,8 @@ extern struct var *lookup_by_name(char *name);
 extern struct var *lookup_by_obj(lispobj obj);
 extern struct var *define_var(char *name, lispobj obj, boolean perm);
 extern struct var *define_dynamic_var(char *name,
-				      lispobj update_fn(struct var *var),
-				      boolean perm);
+                                      lispobj update_fn(struct var *var),
+                                      boolean perm);
 
 extern char *var_name(struct var *var);
 extern lispobj var_value(struct var *var);

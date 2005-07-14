@@ -41,7 +41,7 @@
    sbcl-devel dated 2004-03-29, this is the POSIXly-correct way of
    using environ: by an explicit declaration.  -- CSR, 2004-03-30 */
 extern char **environ;
-   
+
 /*
  * stuff needed by CL:DIRECTORY and other Lisp directory operations
  */
@@ -64,36 +64,36 @@ alloc_directory_lispy_filenames(const char *directory_name)
 
     if (dir_ptr) { /* if opendir success */
 
-	struct voidacc va;
+        struct voidacc va;
 
-	if (0 == voidacc_ctor(&va)) { /* if voidacc_ctor success */
-	    struct dirent *dirent_ptr;
+        if (0 == voidacc_ctor(&va)) { /* if voidacc_ctor success */
+            struct dirent *dirent_ptr;
 
-	    while ( (dirent_ptr = readdir(dir_ptr)) ) { /* until end of data */
-		char* original_name = dirent_ptr->d_name;
-		if (is_lispy_filename(original_name)) {
-		    /* strdup(3) is in Linux and *BSD. If you port
-		     * somewhere else that doesn't have it, it's easy
-		     * to reimplement. */
-		    char* dup_name = strdup(original_name);
-		    if (!dup_name) { /* if strdup failure */
-			goto dtors;
-		    }
-		    if (voidacc_acc(&va, dup_name)) { /* if acc failure */
-			goto dtors; 
-		    }
-		}
-	    }
-	    result = (char**)voidacc_give_away_result(&va);
-	}
+            while ( (dirent_ptr = readdir(dir_ptr)) ) { /* until end of data */
+                char* original_name = dirent_ptr->d_name;
+                if (is_lispy_filename(original_name)) {
+                    /* strdup(3) is in Linux and *BSD. If you port
+                     * somewhere else that doesn't have it, it's easy
+                     * to reimplement. */
+                    char* dup_name = strdup(original_name);
+                    if (!dup_name) { /* if strdup failure */
+                        goto dtors;
+                    }
+                    if (voidacc_acc(&va, dup_name)) { /* if acc failure */
+                        goto dtors;
+                    }
+                }
+            }
+            result = (char**)voidacc_give_away_result(&va);
+        }
 
     dtors:
-	voidacc_dtor(&va);
-	/* ignoring closedir(3) return code, since what could we do?
-	 *
-	 * "Never ask questions you don't want to know the answer to."
-	 * -- William Irving Zumwalt (Rich Cook, _The Wizardry Quested_) */
-	closedir(dir_ptr);
+        voidacc_dtor(&va);
+        /* ignoring closedir(3) return code, since what could we do?
+         *
+         * "Never ask questions you don't want to know the answer to."
+         * -- William Irving Zumwalt (Rich Cook, _The Wizardry Quested_) */
+        closedir(dir_ptr);
     }
 
     return result;
@@ -107,7 +107,7 @@ free_directory_lispy_filenames(char** directory_lispy_filenames)
 
     /* Free the strings. */
     for (p = directory_lispy_filenames; *p; ++p) {
-	free(*p);
+        free(*p);
     }
 
     /* Free the table of strings. */
@@ -127,18 +127,18 @@ wrapped_readlink(char *path)
 {
     int bufsiz = strlen(path) + 16;
     while (1) {
-	char *result = malloc(bufsiz);
-	int n_read = readlink(path, result, bufsiz);
-	if (n_read < 0) {
-	    free(result);
-	    return 0;
-	} else if (n_read < bufsiz) {
-	    result[n_read] = 0;
-	    return result;
-	} else {
-	    free(result);
-	    bufsiz *= 2;
-	}
+        char *result = malloc(bufsiz);
+        int n_read = readlink(path, result, bufsiz);
+        if (n_read < 0) {
+            free(result);
+            return 0;
+        } else if (n_read < bufsiz) {
+            result[n_read] = 0;
+            return result;
+        } else {
+            free(result);
+            bufsiz *= 2;
+        }
     }
 }
 
@@ -186,7 +186,7 @@ struct stat_wrapper {
     time_t        wrapped_st_ctime;       /* time_t of last change */
 };
 
-static void 
+static void
 copy_to_stat_wrapper(struct stat_wrapper *to, struct stat *from)
 {
 #define FROB(stem) to->wrapped_st_##stem = from->st_##stem
@@ -212,7 +212,7 @@ stat_wrapper(const char *file_name, struct stat_wrapper *buf)
     struct stat real_buf;
     int ret;
     if ((ret = stat(file_name,&real_buf)) >= 0)
-	copy_to_stat_wrapper(buf, &real_buf); 
+        copy_to_stat_wrapper(buf, &real_buf);
     return ret;
 }
 
@@ -221,8 +221,8 @@ lstat_wrapper(const char *file_name, struct stat_wrapper *buf)
 {
     struct stat real_buf;
     int ret;
-    if ((ret = lstat(file_name,&real_buf)) >= 0) 
-	copy_to_stat_wrapper(buf, &real_buf); 
+    if ((ret = lstat(file_name,&real_buf)) >= 0)
+        copy_to_stat_wrapper(buf, &real_buf);
     return ret;
 }
 
@@ -232,7 +232,7 @@ fstat_wrapper(int filedes, struct stat_wrapper *buf)
     struct stat real_buf;
     int ret;
     if ((ret = fstat(filedes,&real_buf)) >= 0)
-	copy_to_stat_wrapper(buf, &real_buf); 
+        copy_to_stat_wrapper(buf, &real_buf);
     return ret;
 }
 
@@ -251,12 +251,12 @@ uid_username(int uid)
 {
     struct passwd *p = getpwuid(uid);
     if (p) {
-	/* The object *p is a static struct which'll be overwritten by
-	 * the next call to getpwuid(), so it'd be unsafe to return
-	 * p->pw_name without copying. */
-	return strdup(p->pw_name);
+        /* The object *p is a static struct which'll be overwritten by
+         * the next call to getpwuid(), so it'd be unsafe to return
+         * p->pw_name without copying. */
+        return strdup(p->pw_name);
     } else {
-	return 0;
+        return 0;
     }
 }
 
@@ -265,25 +265,25 @@ uid_homedir(uid_t uid)
 {
     struct passwd *p = getpwuid(uid);
     if(p) {
-	/* Let's be careful about this, shall we? */
-	size_t len = strlen(p->pw_dir);
-	if (p->pw_dir[len-1] == '/') {
-	    return strdup(p->pw_dir);
-	} else {
-	    char *result = malloc(len + 2);
-	    if (result) {
-		int nchars = sprintf(result,"%s/",p->pw_dir);
-		if (nchars == len + 1) {
-		    return result;
-		} else {
-		    return 0;
-		}
-	    } else {
-		return 0;
-	    }
-	}
+        /* Let's be careful about this, shall we? */
+        size_t len = strlen(p->pw_dir);
+        if (p->pw_dir[len-1] == '/') {
+            return strdup(p->pw_dir);
+        } else {
+            char *result = malloc(len + 2);
+            if (result) {
+                int nchars = sprintf(result,"%s/",p->pw_dir);
+                if (nchars == len + 1) {
+                    return result;
+                } else {
+                    return 0;
+                }
+            } else {
+                return 0;
+            }
+        }
     } else {
-	return 0;
+        return 0;
     }
 }
 

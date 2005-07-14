@@ -40,10 +40,10 @@
 #error "Define threading support functions"
 #else
 int arch_os_thread_init(struct thread *thread) {
-    return 1;			/* success */
+    return 1;                   /* success */
 }
 int arch_os_thread_cleanup(struct thread *thread) {
-    return 1;			/* success */
+    return 1;                   /* success */
 }
 #endif
 
@@ -51,18 +51,18 @@ os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
 {
     if (offset == 0) {
-	static int zero;
-	zero = 0;
-	return &zero;
+        static int zero;
+        zero = 0;
+        return &zero;
     } else if (offset < 16) {
-	return &context->uc_mcontext.gregs[offset+3];
+        return &context->uc_mcontext.gregs[offset+3];
     } else if (offset < 32) {
-	/* FIXME: You know, this (int *) stuff looks decidedly
-	   dubious */
-	int *sp = (int*) context->uc_mcontext.gregs[REG_SP];
-	return &(sp[offset-16]);
+        /* FIXME: You know, this (int *) stuff looks decidedly
+           dubious */
+        int *sp = (int*) context->uc_mcontext.gregs[REG_SP];
+        return &(sp[offset-16]);
     } else {
-	return 0;
+        return 0;
     }
 }
 

@@ -52,15 +52,15 @@ os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
 {
     if (offset == 0) {
-	/* KLUDGE: I'm not sure, but it's possible that Linux puts the
+        /* KLUDGE: I'm not sure, but it's possible that Linux puts the
            contents of the Processor Status Word in the (wired-zero)
            slot in the mcontext. In any case, the following is
            unlikely to do any harm: */
-	static int zero;
-	zero = 0;
-	return &zero;
+        static int zero;
+        zero = 0;
+        return &zero;
     } else {
-	return &(((struct sigcontext *) &(context->uc_mcontext))->sc_gr[offset]);
+        return &(((struct sigcontext *) &(context->uc_mcontext))->sc_gr[offset]);
     }
 }
 
@@ -83,13 +83,13 @@ os_context_sigmask_addr(os_context_t *context)
     return &(context->uc_sigmask);
 }
 
-void 
+void
 os_restore_fp_control(os_context_t *context)
 {
     /* FIXME: Probably do something. */
 }
 
-void 
+void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
     /* FIXME: Maybe this is OK. */

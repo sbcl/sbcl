@@ -18,19 +18,19 @@
 
 extern never_returns lose(char *fmt, ...);
 
-static inline void 
+static inline void
 get_spinlock(volatile lispobj *word,long value)
 {
 #ifdef LISP_FEATURE_SB_THREAD
     u64 rax=0;
-    if(*word==value) 
-	lose("recursive get_spinlock: 0x%x,%ld\n",word,value);
+    if(*word==value)
+        lose("recursive get_spinlock: 0x%x,%ld\n",word,value);
     do {
-	asm ("xor %0,%0\n\
-              lock cmpxchg %1,%2" 
-	     : "=a" (rax)
-	     : "r" (value), "m" (*word)
-	     : "memory", "cc");
+        asm ("xor %0,%0\n\
+              lock cmpxchg %1,%2"
+             : "=a" (rax)
+             : "r" (value), "m" (*word)
+             : "memory", "cc");
     } while(rax!=0);
 #else
     *word=value;

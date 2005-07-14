@@ -7,36 +7,36 @@
  * stuff in FreeBSD and OpenBSD, but in detail they're different in
  * almost every line of code. It would be nice to find some way to
  * factor out the commonality better; failing that, it might be best
- * just to split this generic-BSD code into one variant for each BSD. 
+ * just to split this generic-BSD code into one variant for each BSD.
  *
  * KLUDGE II: this split has begun with the addition of the Darwin BSD
  * flavour, with the cross-architecture complications that this
  * entails; unfortunately, currently the situation is worse, not
  * better, than in the above paragraph. */
 
-#if defined(__FreeBSD__) || defined(__OpenBSD__)   
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 int *
 os_context_register_addr(os_context_t *context, int offset)
 {
     switch(offset) {
     case  0:
-	return CONTEXT_ADDR_FROM_STEM(eax);
+        return CONTEXT_ADDR_FROM_STEM(eax);
     case  2:
-	return CONTEXT_ADDR_FROM_STEM(ecx);
+        return CONTEXT_ADDR_FROM_STEM(ecx);
     case  4:
-	return CONTEXT_ADDR_FROM_STEM(edx);
+        return CONTEXT_ADDR_FROM_STEM(edx);
     case  6:
-	return CONTEXT_ADDR_FROM_STEM(ebx);
+        return CONTEXT_ADDR_FROM_STEM(ebx);
     case  8:
-	return CONTEXT_ADDR_FROM_STEM(esp);
+        return CONTEXT_ADDR_FROM_STEM(esp);
     case 10:
-	return CONTEXT_ADDR_FROM_STEM(ebp);
+        return CONTEXT_ADDR_FROM_STEM(ebp);
     case 12:
-	return CONTEXT_ADDR_FROM_STEM(esi);
+        return CONTEXT_ADDR_FROM_STEM(esi);
     case 14:
-	return CONTEXT_ADDR_FROM_STEM(edi);
+        return CONTEXT_ADDR_FROM_STEM(edi);
     default:
-	return 0;
+        return 0;
     }
 }
 
@@ -54,25 +54,25 @@ os_context_register_addr(os_context_t *context, int offset)
 {
     switch(offset) {
     case  0:
-	return CONTEXT_ADDR_FROM_STEM(EAX);
+        return CONTEXT_ADDR_FROM_STEM(EAX);
     case  2:
-	return CONTEXT_ADDR_FROM_STEM(ECX);
+        return CONTEXT_ADDR_FROM_STEM(ECX);
     case  4:
-	return CONTEXT_ADDR_FROM_STEM(EDX);
+        return CONTEXT_ADDR_FROM_STEM(EDX);
     case  6:
-	return CONTEXT_ADDR_FROM_STEM(EBX);
+        return CONTEXT_ADDR_FROM_STEM(EBX);
     case  8:
-	return CONTEXT_ADDR_FROM_STEM(ESP);
+        return CONTEXT_ADDR_FROM_STEM(ESP);
     case 10:
-	return CONTEXT_ADDR_FROM_STEM(EBP);
+        return CONTEXT_ADDR_FROM_STEM(EBP);
     case 12:
-	return CONTEXT_ADDR_FROM_STEM(ESI);
+        return CONTEXT_ADDR_FROM_STEM(ESI);
     case 14:
-	return CONTEXT_ADDR_FROM_STEM(EDI);
+        return CONTEXT_ADDR_FROM_STEM(EDI);
     case 16:
-	return CONTEXT_ADDR_FROM_STEM(UESP);
+        return CONTEXT_ADDR_FROM_STEM(UESP);
     default:
-	return 0;
+        return 0;
     }
 }
 
@@ -86,7 +86,7 @@ os_context_sp_addr(os_context_t *context)
 
 
 
-/* FIXME: If this can be a no-op on BSD/x86, then it 
+/* FIXME: If this can be a no-op on BSD/x86, then it
  * deserves a more precise name.
  *
  * (Perhaps os_prepare_data_area_to_be_executed()?) */

@@ -46,7 +46,7 @@
  *
  * (We could set up output to go to a special ldb_out stream for the
  * same reason, but there's been no pressure for that so far.)
- * 
+ *
  * The enter-the-ldb-monitor function is responsible for setting up
  * this stream. */
 static FILE *ldb_in = 0;
@@ -182,22 +182,22 @@ regs_cmd(char **ptr)
 #if 0
 #if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     printf("BSP\t=\t0x%08lx\n",
-	   (unsigned long)SymbolValue(BINDING_STACK_POINTER));
+           (unsigned long)SymbolValue(BINDING_STACK_POINTER));
 #endif
 
     printf("DYNAMIC\t=\t0x%08lx\n", (unsigned long)DYNAMIC_SPACE_START);
 #if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     printf("ALLOC\t=\t0x%08lx\n",
-	   (unsigned long)SymbolValue(ALLOCATION_POINTER));
+           (unsigned long)SymbolValue(ALLOCATION_POINTER));
 #else
     printf("ALLOC\t=\t0x%08X\n",
-	   (unsigned long)dynamic_space_free_pointer);
+           (unsigned long)dynamic_space_free_pointer);
     printf("TRIGGER\t=\t0x%08lx\n", (unsigned long)current_auto_gc_trigger);
 #endif
     printf("STATIC\t=\t0x%08lx\n",
-	   (unsigned long)SymbolValue(STATIC_SPACE_FREE_POINTER));
+           (unsigned long)SymbolValue(STATIC_SPACE_FREE_POINTER));
     printf("RDONLY\t=\t0x%08lx\n",
-	   (unsigned long)SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
+           (unsigned long)SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
 #endif /* 0 */
 }
 
@@ -252,13 +252,13 @@ search_cmd(char **ptr)
         if (widetag_of(obj) == SIMPLE_FUN_HEADER_WIDETAG) {
             print((long)addr | FUN_POINTER_LOWTAG);
         } else if (lowtag_of(obj) == OTHER_IMMEDIATE_0_LOWTAG ||
-		   lowtag_of(obj) == OTHER_IMMEDIATE_1_LOWTAG) {
+                   lowtag_of(obj) == OTHER_IMMEDIATE_1_LOWTAG) {
             print((lispobj)addr | OTHER_POINTER_LOWTAG);
         } else {
             print((lispobj)addr);
         } if (count == -1) {
             return;
-	}
+        }
     }
 }
 
@@ -315,12 +315,12 @@ print_context(os_context_t *context)
     int i;
 
     for (i = 0; i < NREGS; i++) {
-	printf("%s:\t", lisp_register_names[i]);
+        printf("%s:\t", lisp_register_names[i]);
 #ifdef LISP_FEATURE_X86
-	brief_print((lispobj)(*os_context_register_addr(context,
-							i*2)));
+        brief_print((lispobj)(*os_context_register_addr(context,
+                                                        i*2)));
 #else
-	brief_print((lispobj)(*os_context_register_addr(context,i)));
+        brief_print((lispobj)(*os_context_register_addr(context,i)));
 #endif
     }
 #ifdef LISP_FEATURE_DARWIN
@@ -328,7 +328,7 @@ print_context(os_context_t *context)
     printf("DSISR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 42)));
 #endif
     printf("PC:\t\t  0x%08lx\n",
-	   (unsigned long)(*os_context_pc_addr(context)));
+           (unsigned long)(*os_context_pc_addr(context)));
 }
 
 static void
@@ -338,28 +338,28 @@ print_context_cmd(char **ptr)
     struct thread *thread=arch_os_get_current_thread();
 
     free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)>>2;
-	
+
     if (more_p(ptr)) {
-	int index;
+        int index;
 
-	index = parse_number(ptr);
+        index = parse_number(ptr);
 
-	if ((index >= 0) && (index < free)) {
-	    printf("There are %d interrupt contexts.\n", free);
-	    printf("printing context %d\n", index);
-	    print_context(thread->interrupt_contexts[index]);
-	} else {
-	    printf("There aren't that many/few contexts.\n");
-	    printf("There are %d interrupt contexts.\n", free);
-	}
+        if ((index >= 0) && (index < free)) {
+            printf("There are %d interrupt contexts.\n", free);
+            printf("printing context %d\n", index);
+            print_context(thread->interrupt_contexts[index]);
+        } else {
+            printf("There aren't that many/few contexts.\n");
+            printf("There are %d interrupt contexts.\n", free);
+        }
     } else {
-	if (free == 0)
-	    printf("There are no interrupt contexts!\n");
-	else {
-	    printf("There are %d interrupt contexts.\n", free);
-	    printf("printing context %d\n", free - 1);
-	    print_context(thread->interrupt_contexts[free - 1]);
-	}
+        if (free == 0)
+            printf("There are no interrupt contexts!\n");
+        else {
+            printf("There are %d interrupt contexts.\n", free);
+            printf("printing context %d\n", free - 1);
+            print_context(thread->interrupt_contexts[free - 1]);
+        }
     }
 }
 
@@ -370,9 +370,9 @@ backtrace_cmd(char **ptr)
     int n;
 
     if (more_p(ptr))
-	n = parse_number(ptr);
+        n = parse_number(ptr);
     else
-	n = 100;
+        n = 100;
 
     printf("Backtrace:\n");
     backtrace(n);
@@ -392,17 +392,17 @@ catchers_cmd(char **ptr)
         while (catch != NULL) {
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
             printf("0x%08lX:\n\tuwp: 0x%08lX\n\tfp: 0x%08lX\n\tcode: 0x%08lx\n\tentry: 0x%08lx\n\ttag: ",
-		   (unsigned long)catch, (unsigned long)(catch->current_uwp),
-		   (unsigned long)(catch->current_cont),
-		   catch->current_code,
-		   catch->entry_pc);
+                   (unsigned long)catch, (unsigned long)(catch->current_uwp),
+                   (unsigned long)(catch->current_cont),
+                   catch->current_code,
+                   catch->entry_pc);
 #else
             printf("0x%08lX:\n\tuwp: 0x%08lX\n\tfp: 0x%08lX\n\tcode: 0x%08lx\n\tentry: 0x%08lx\n\ttag: ",
-		   (unsigned long)catch, (unsigned long)(catch->current_uwp),
-		   (unsigned long)(catch->current_cont),
-		   (unsigned long)component_ptr_from_pc((void*)catch->entry_pc) +
-		   OTHER_POINTER_LOWTAG,
-		   (unsigned long)catch->entry_pc);
+                   (unsigned long)catch, (unsigned long)(catch->current_uwp),
+                   (unsigned long)(catch->current_cont),
+                   (unsigned long)component_ptr_from_pc((void*)catch->entry_pc) +
+                   OTHER_POINTER_LOWTAG,
+                   (unsigned long)catch->entry_pc);
 #endif
             brief_print((lispobj)catch->tag);
             catch = catch->previous_catch;
@@ -428,8 +428,8 @@ sub_monitor(void)
     int ambig;
 
     if (!ldb_in) {
-	ldb_in = fopen("/dev/tty","r+");
-	ldb_in_fd = fileno(ldb_in);
+        ldb_in = fopen("/dev/tty","r+");
+        ldb_in_fd = fileno(ldb_in);
     }
 
     while (!done) {
@@ -437,15 +437,15 @@ sub_monitor(void)
         fflush(stdout);
         line = fgets(buf, sizeof(buf), ldb_in);
         if (line == NULL) {
-	    if (isatty(ldb_in_fd)) {
-		putchar('\n');
-	        continue;
-	    }
-	    else {
-		fprintf(stderr, "\nEOF on something other than a tty.\n");
-		exit(0);
-	    }
-	}
+            if (isatty(ldb_in_fd)) {
+                putchar('\n');
+                continue;
+            }
+            else {
+                fprintf(stderr, "\nEOF on something other than a tty.\n");
+                exit(0);
+            }
+        }
         ptr = line;
         if ((token = parse_token(&ptr)) == NULL)
             continue;

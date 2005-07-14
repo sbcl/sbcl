@@ -23,7 +23,7 @@ boolean search_for_type(int type, lispobj **start, int *count)
     lispobj obj, *addr;
 
     while ((*count == -1 || (*count > 0)) &&
-	   is_valid_lisp_addr((os_vm_address_t)*start)) {
+           is_valid_lisp_addr((os_vm_address_t)*start)) {
         obj = **start;
         addr = *start;
         if (*count != -1)
@@ -44,15 +44,15 @@ boolean search_for_symbol(char *name, lispobj **start, int *count)
 
     while (search_for_type(SYMBOL_HEADER_WIDETAG, start, count)) {
         symbol = (struct symbol *)native_pointer((lispobj)*start);
-	if (lowtag_of(symbol->name) == OTHER_POINTER_LOWTAG) {
+        if (lowtag_of(symbol->name) == OTHER_POINTER_LOWTAG) {
             symbol_name = (struct vector *)native_pointer(symbol->name);
             if (is_valid_lisp_addr((os_vm_address_t)symbol_name) &&
-		/* FIXME: Broken with more than one type of string
-		   (i.e. even broken given (VECTOR NIL) */
-		widetag_of(symbol_name->header) == SIMPLE_BASE_STRING_WIDETAG &&
-		strcmp((char *)symbol_name->data, name) == 0)
+                /* FIXME: Broken with more than one type of string
+                   (i.e. even broken given (VECTOR NIL) */
+                widetag_of(symbol_name->header) == SIMPLE_BASE_STRING_WIDETAG &&
+                strcmp((char *)symbol_name->data, name) == 0)
                 return 1;
-	}
+        }
         (*start) += 2;
     }
     return 0;

@@ -250,8 +250,8 @@ static boolean lookup_symbol(char *name, lispobj *result)
     /* Search static space. */
     headerptr = (lispobj *)STATIC_SPACE_START;
     count =
-	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0) -
-	(lispobj *)STATIC_SPACE_START;
+        (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0) -
+        (lispobj *)STATIC_SPACE_START;
     if (search_for_symbol(name, &headerptr, &count)) {
         *result = make_lispobj(headerptr,OTHER_POINTER_LOWTAG);
         return 1;
@@ -277,29 +277,29 @@ static int
 parse_regnum(char *s)
 {
     if ((s[1] == 'R') || (s[1] == 'r')) {
-	int regnum;
+        int regnum;
 
-	if (s[2] == '\0')
-	    return -1;
+        if (s[2] == '\0')
+            return -1;
 
-	/* skip the $R part and call atoi on the number */
-	regnum = atoi(s + 2);
-	if ((regnum >= 0) && (regnum < NREGS))
-	    return regnum;
-	else
-	    return -1;
+        /* skip the $R part and call atoi on the number */
+        regnum = atoi(s + 2);
+        if ((regnum >= 0) && (regnum < NREGS))
+            return regnum;
+        else
+            return -1;
     } else {
-	int i;
+        int i;
 
-	for (i = 0; i < NREGS ; i++)
-	    if (strcasecmp(s + 1, lisp_register_names[i]) == 0)
+        for (i = 0; i < NREGS ; i++)
+            if (strcasecmp(s + 1, lisp_register_names[i]) == 0)
 #ifdef LISP_FEATURE_X86
-		return i*2;
+                return i*2;
 #else
-	return i;
+        return i;
 #endif
-		
-	return -1;
+
+        return -1;
     }
 }
 
@@ -315,28 +315,28 @@ char **ptr;
         printf("expected an object\n");
         throw_to_monitor();
     } else if (token[0] == '$') {
-	if (isalpha(token[1])) {
-	    int free;
-	    int regnum;
-	    os_context_t *context;
+        if (isalpha(token[1])) {
+            int free;
+            int regnum;
+            os_context_t *context;
 
-	    free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)>>2;
+            free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)>>2;
 
-	    if (free == 0) {
-		printf("Variable ``%s'' is not valid -- there is no current interrupt context.\n", token);
-		throw_to_monitor();
-	    }
+            if (free == 0) {
+                printf("Variable ``%s'' is not valid -- there is no current interrupt context.\n", token);
+                throw_to_monitor();
+            }
 
-	    context = thread->interrupt_contexts[free - 1];
+            context = thread->interrupt_contexts[free - 1];
 
-	    regnum = parse_regnum(token);
-	    if (regnum < 0) {
-		printf("bogus register: ``%s''\n", token);
-		throw_to_monitor();
-	    }
+            regnum = parse_regnum(token);
+            if (regnum < 0) {
+                printf("bogus register: ``%s''\n", token);
+                throw_to_monitor();
+            }
 
-	    result = *os_context_register_addr(context, regnum);
-	} else if (!lookup_variable(token+1, &result)) {
+            result = *os_context_register_addr(context, regnum);
+        } else if (!lookup_variable(token+1, &result)) {
             printf("unknown variable: ``%s''\n", token);
             throw_to_monitor();
         }

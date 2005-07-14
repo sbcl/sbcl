@@ -41,12 +41,12 @@ os_vm_address_t arch_get_bad_addr(int signal, siginfo_t *siginfo, os_context_t *
     state = (struct save_state *)(&(scp->sc_sl.sl_ss));
 
     if (state == NULL)
-	return NULL;
+        return NULL;
 
     /* Check the instruction address first. */
     addr = (os_vm_address_t)((unsigned long)scp->sc_pcoq_head & ~3);
     if (addr < (os_vm_address_t)0x1000)
-	return addr;
+        return addr;
 
     /* Otherwise, it must have been a data fault. */
     return (os_vm_address_t)state->ss_cr21;
@@ -57,12 +57,12 @@ os_vm_address_t arch_get_bad_addr(int signal, siginfo_t *siginfo, os_context_t *
     state = (struct hp800_thread_state *)(scp->sc_ap);
 
     if (state == NULL)
-	return NULL;
+        return NULL;
 
     /* Check the instruction address first. */
     addr = scp->sc_pcoqh & ~3;
     if (addr < 0x1000)
-	return addr;
+        return addr;
 
     /* Otherwise, it must have been a data fault. */
     return state->cr21;
@@ -148,30 +148,30 @@ static void restore_breakpoint(struct sigcontext *scp)
     /* state so that we will continue as if nothing happened. */
 
     if (NextPc == NULL)
-	lose("SingleStepBreakpoint trap at strange time.");
+        lose("SingleStepBreakpoint trap at strange time.");
 
     if ((SC_PC(scp)&~3) == (unsigned long)SingleStepTraps) {
-	/* The next instruction was not nullified. */
-	SC_PC(scp) = NextPc;
-	if ((SC_NPC(scp)&~3) == (unsigned long)SingleStepTraps + 4) {
-	    /* The instruction we just stepped over was not a branch, so */
-	    /* we need to fix it up.  If it was a branch, it will point to */
-	    /* the correct place. */
-	    SC_NPC(scp) = NextPc + 4;
-	}
+        /* The next instruction was not nullified. */
+        SC_PC(scp) = NextPc;
+        if ((SC_NPC(scp)&~3) == (unsigned long)SingleStepTraps + 4) {
+            /* The instruction we just stepped over was not a branch, so */
+            /* we need to fix it up.  If it was a branch, it will point to */
+            /* the correct place. */
+            SC_NPC(scp) = NextPc + 4;
+        }
     }
     else {
-	/* The next instruction was nullified, so we want to skip it. */
-	SC_PC(scp) = NextPc + 4;
-	SC_NPC(scp) = NextPc + 8;
+        /* The next instruction was nullified, so we want to skip it. */
+        SC_PC(scp) = NextPc + 4;
+        SC_NPC(scp) = NextPc + 8;
     }
     NextPc = NULL;
 
     if (BreakpointAddr) {
-	*BreakpointAddr = trap_Breakpoint;
-	os_flush_icache((os_vm_address_t)BreakpointAddr,
-			sizeof(unsigned long));
-	BreakpointAddr = NULL;
+        *BreakpointAddr = trap_Breakpoint;
+        os_flush_icache((os_vm_address_t)BreakpointAddr,
+                        sizeof(unsigned long));
+        BreakpointAddr = NULL;
     }
 }
 #endif
@@ -183,57 +183,57 @@ static void sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
 
 #if 0
     printf("sigtrap_handler, pc=0x%08x, alloc=0x%08x\n", scp->sc_pcoqh,
-	   SC_REG(scp,reg_ALLOC));
+           SC_REG(scp,reg_ALLOC));
 #endif
 
     bad_inst = *(unsigned long *)(*os_context_pc_addr(context) & ~3);
     if (bad_inst & 0xfc001fe0)
-	interrupt_handle_now(signal, siginfo, context);
+        interrupt_handle_now(signal, siginfo, context);
     else {
-	int im5 = bad_inst & 0x1f;
+        int im5 = bad_inst & 0x1f;
 
-	switch (im5) {
-	case trap_Halt:
-	    fake_foreign_function_call(context);
-	    lose("%%primitive halt called; the party is over.\n");
-	    
-	case trap_PendingInterrupt:
-	    arch_skip_instruction(context);
-	    interrupt_handle_pending(context);
-	    break;
-	    
-	case trap_Error:
-	case trap_Cerror:
-	    interrupt_internal_error(signal, siginfo, context, im5==trap_Cerror);
-	    break;
-	    
-	case trap_Breakpoint:
-	    /*sigsetmask(scp->sc_mask); */
-	    handle_breakpoint(signal, siginfo, context);
-	    break;
-	    
-	case trap_FunEndBreakpoint:
-	    /*sigsetmask(scp->sc_mask); */
-	    {
-		unsigned long pc;
-		pc = (unsigned long)
-		    handle_fun_end_breakpoint(signal, siginfo, context);
-		*os_context_pc_addr(context) = pc;
-		*os_context_npc_addr(context) = pc + 4;
-	    }
-	    break;
-	    
-	case trap_SingleStepBreakpoint:
-	    /* Uh, FIXME */
+        switch (im5) {
+        case trap_Halt:
+            fake_foreign_function_call(context);
+            lose("%%primitive halt called; the party is over.\n");
+
+        case trap_PendingInterrupt:
+            arch_skip_instruction(context);
+            interrupt_handle_pending(context);
+            break;
+
+        case trap_Error:
+        case trap_Cerror:
+            interrupt_internal_error(signal, siginfo, context, im5==trap_Cerror);
+            break;
+
+        case trap_Breakpoint:
+            /*sigsetmask(scp->sc_mask); */
+            handle_breakpoint(signal, siginfo, context);
+            break;
+
+        case trap_FunEndBreakpoint:
+            /*sigsetmask(scp->sc_mask); */
+            {
+                unsigned long pc;
+                pc = (unsigned long)
+                    handle_fun_end_breakpoint(signal, siginfo, context);
+                *os_context_pc_addr(context) = pc;
+                *os_context_npc_addr(context) = pc + 4;
+            }
+            break;
+
+        case trap_SingleStepBreakpoint:
+            /* Uh, FIXME */
 #ifdef hpux
-	    restore_breakpoint(context);
+            restore_breakpoint(context);
 #endif
-	    break;
-	    
-	default:
-	    interrupt_handle_now(signal, siginfo, context);
-	    break;
-	}
+            break;
+
+        default:
+            interrupt_handle_now(signal, siginfo, context);
+            break;
+        }
     }
 }
 
@@ -246,80 +246,80 @@ static void sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
 
 #if 0
     printf("sigfpe_handler, pc=0x%08x, alloc=0x%08x\n", scp->sc_pcoqh,
-	   SC_REG(scp,reg_ALLOC));
+           SC_REG(scp,reg_ALLOC));
 #endif
 
     switch (siginfo->si_code) {
     case FPE_INTOVF: /*I_OVFLO: */
-	badinst = *(unsigned long *)(*os_context_pc_addr(context) & ~3);
-	opcode = badinst >> 26;
-	
-	if (opcode == 2) {
-	    /* reg/reg inst. */
-	    r1 = (badinst >> 16) & 0x1f;
-	    op1 = fixnum_value(*os_context_register_addr(context, r1));
-	    r2 = (badinst >> 21) & 0x1f;
-	    op2 = fixnum_value(*os_context_register_addr(context, r2));
-	    t = badinst & 0x1f;
-	    
-	    switch ((badinst >> 5) & 0x7f) {
-	    case 0x70:
-		/* Add and trap on overflow. */
-		res = op1 + op2;
-		break;
-		
-	    case 0x60:
-		/* Subtract and trap on overflow. */
-		res = op1 - op2;
-		break;
-		
-	    default:
-		goto not_interesting;
-	    }
-	}
-	else if ((opcode & 0x37) == 0x25 && (badinst & (1<<11))) {
-	    /* Add or subtract immediate. */
-	    op1 = ((badinst >> 3) & 0xff) | ((-badinst&1)<<8);
-	    r2 = (badinst >> 16) & 0x1f;
-	    op2 = fixnum_value(*os_context_register_addr(context, r1));
-	    t = (badinst >> 21) & 0x1f;
-	    if (opcode == 0x2d)
-		res = op1 + op2;
-	    else
-		res = op1 - op2;
-	}
-	else
-	    goto not_interesting;
-	
-	/* ?? What happens here if we hit the end of dynamic space? */
+        badinst = *(unsigned long *)(*os_context_pc_addr(context) & ~3);
+        opcode = badinst >> 26;
+
+        if (opcode == 2) {
+            /* reg/reg inst. */
+            r1 = (badinst >> 16) & 0x1f;
+            op1 = fixnum_value(*os_context_register_addr(context, r1));
+            r2 = (badinst >> 21) & 0x1f;
+            op2 = fixnum_value(*os_context_register_addr(context, r2));
+            t = badinst & 0x1f;
+
+            switch ((badinst >> 5) & 0x7f) {
+            case 0x70:
+                /* Add and trap on overflow. */
+                res = op1 + op2;
+                break;
+
+            case 0x60:
+                /* Subtract and trap on overflow. */
+                res = op1 - op2;
+                break;
+
+            default:
+                goto not_interesting;
+            }
+        }
+        else if ((opcode & 0x37) == 0x25 && (badinst & (1<<11))) {
+            /* Add or subtract immediate. */
+            op1 = ((badinst >> 3) & 0xff) | ((-badinst&1)<<8);
+            r2 = (badinst >> 16) & 0x1f;
+            op2 = fixnum_value(*os_context_register_addr(context, r1));
+            t = (badinst >> 21) & 0x1f;
+            if (opcode == 0x2d)
+                res = op1 + op2;
+            else
+                res = op1 - op2;
+        }
+        else
+            goto not_interesting;
+
+        /* ?? What happens here if we hit the end of dynamic space? */
         dynamic_space_free_pointer = (lispobj *) *os_context_register_addr(context, reg_ALLOC);
-	*os_context_register_addr(context, t) = alloc_number(res);
-	*os_context_register_addr(context, reg_ALLOC)
-	    = (unsigned long) dynamic_space_free_pointer;
-	arch_skip_instruction(context);
-	
-	break;
-	
+        *os_context_register_addr(context, t) = alloc_number(res);
+        *os_context_register_addr(context, reg_ALLOC)
+            = (unsigned long) dynamic_space_free_pointer;
+        arch_skip_instruction(context);
+
+        break;
+
     case 0: /* I_COND: ?? Maybe tagged add?? FIXME */
-	badinst = *(unsigned long *)(*os_context_pc_addr(context) & ~3);
-	if ((badinst&0xfffff800) == (0xb000e000|reg_ALLOC<<21|reg_ALLOC<<16)) {
-	    /* It is an ADDIT,OD i,ALLOC,ALLOC instruction that trapped. */
-	    /* That means that it is the end of a pseudo-atomic.  So do the */
-	    /* add stripping off the pseudo-atomic-interrupted bit, and then */
-	    /* tell the machine-independent code to process the pseudo- */
-	    /* atomic. */
-	    int immed = (badinst>>1)&0x3ff;
-	    if (badinst & 1)
-		immed |= -1<<10;
-	    *os_context_register_addr(context, reg_ALLOC) += (immed-1);
-	    arch_skip_instruction(context);
-	    interrupt_handle_pending(context);
-	    break;
-	}
-	/* else drop-through. */
+        badinst = *(unsigned long *)(*os_context_pc_addr(context) & ~3);
+        if ((badinst&0xfffff800) == (0xb000e000|reg_ALLOC<<21|reg_ALLOC<<16)) {
+            /* It is an ADDIT,OD i,ALLOC,ALLOC instruction that trapped. */
+            /* That means that it is the end of a pseudo-atomic.  So do the */
+            /* add stripping off the pseudo-atomic-interrupted bit, and then */
+            /* tell the machine-independent code to process the pseudo- */
+            /* atomic. */
+            int immed = (badinst>>1)&0x3ff;
+            if (badinst & 1)
+                immed |= -1<<10;
+            *os_context_register_addr(context, reg_ALLOC) += (immed-1);
+            arch_skip_instruction(context);
+            interrupt_handle_pending(context);
+            break;
+        }
+        /* else drop-through. */
     default:
     not_interesting:
-	interrupt_handle_now(signal, siginfo, context);
+        interrupt_handle_now(signal, siginfo, context);
     }
 }
 
@@ -340,69 +340,69 @@ static void sigbus_handler(int signal, siginfo_t *siginfo, void *void_context)
     badinst = *(unsigned long *)(*os_context_pc_addr(context) & ~3);
     /* First, test for the pseudo-atomic instruction */
     if ((badinst & 0xfffff800) == (0xb000e000 |
-				   reg_ALLOC<<21 |
-				   reg_ALLOC<<16)) {
-	/* It is an ADDIT,OD i,ALLOC,ALLOC instruction that trapped.
-	   That means that it is the end of a pseudo-atomic.  So do
-	   the add stripping off the pseudo-atomic-interrupted bit,
-	   and then tell the machine-independent code to process the
-	   pseudo-atomic. */
-	int immed = (badinst>>1) & 0x3ff;
-	if (badinst & 1)
-	    immed |= -1<<10;
-	*os_context_register_addr(context, reg_ALLOC) += (immed-1);
-	arch_skip_instruction(context);
-	interrupt_handle_pending(context);
-	return;
+                                   reg_ALLOC<<21 |
+                                   reg_ALLOC<<16)) {
+        /* It is an ADDIT,OD i,ALLOC,ALLOC instruction that trapped.
+           That means that it is the end of a pseudo-atomic.  So do
+           the add stripping off the pseudo-atomic-interrupted bit,
+           and then tell the machine-independent code to process the
+           pseudo-atomic. */
+        int immed = (badinst>>1) & 0x3ff;
+        if (badinst & 1)
+            immed |= -1<<10;
+        *os_context_register_addr(context, reg_ALLOC) += (immed-1);
+        arch_skip_instruction(context);
+        interrupt_handle_pending(context);
+        return;
     } else {
-	opcode = badinst >> 26;
-	if (opcode == 2) {
-	    /* reg/reg inst. */
-	    r1 = (badinst >> 16) & 0x1f;
-	    op1 = fixnum_value(*os_context_register_addr(context, r1));
-	    r2 = (badinst >> 21) & 0x1f;
-	    op2 = fixnum_value(*os_context_register_addr(context, r2));
-	    t = badinst & 0x1f;
-	    
-	    switch ((badinst >> 5) & 0x7f) {
-	    case 0x70:
-		/* Add and trap on overflow. */
-		res = op1 + op2;
-		break;
-		
-	    case 0x60:
-		/* Subtract and trap on overflow. */
-		res = op1 - op2;
-		break;
-		
-	    default:
-		goto not_interesting;
-	    }
-	} else if ((opcode & 0x37) == 0x25 && (badinst & (1<<11))) {
-	    /* Add or subtract immediate. */
-	    op1 = ((badinst >> 3) & 0xff) | ((-badinst&1)<<8);
-	    r2 = (badinst >> 16) & 0x1f;
-	    op2 = fixnum_value(*os_context_register_addr(context, r1));
-	    t = (badinst >> 21) & 0x1f;
-	    if (opcode == 0x2d)
-		res = op1 + op2;
-	    else
-		res = op1 - op2;
-	}
-	else
-	    goto not_interesting;
-	
-	/* ?? What happens here if we hit the end of dynamic space? */
+        opcode = badinst >> 26;
+        if (opcode == 2) {
+            /* reg/reg inst. */
+            r1 = (badinst >> 16) & 0x1f;
+            op1 = fixnum_value(*os_context_register_addr(context, r1));
+            r2 = (badinst >> 21) & 0x1f;
+            op2 = fixnum_value(*os_context_register_addr(context, r2));
+            t = badinst & 0x1f;
+
+            switch ((badinst >> 5) & 0x7f) {
+            case 0x70:
+                /* Add and trap on overflow. */
+                res = op1 + op2;
+                break;
+
+            case 0x60:
+                /* Subtract and trap on overflow. */
+                res = op1 - op2;
+                break;
+
+            default:
+                goto not_interesting;
+            }
+        } else if ((opcode & 0x37) == 0x25 && (badinst & (1<<11))) {
+            /* Add or subtract immediate. */
+            op1 = ((badinst >> 3) & 0xff) | ((-badinst&1)<<8);
+            r2 = (badinst >> 16) & 0x1f;
+            op2 = fixnum_value(*os_context_register_addr(context, r1));
+            t = (badinst >> 21) & 0x1f;
+            if (opcode == 0x2d)
+                res = op1 + op2;
+            else
+                res = op1 - op2;
+        }
+        else
+            goto not_interesting;
+
+        /* ?? What happens here if we hit the end of dynamic space? */
         dynamic_space_free_pointer = (lispobj *) *os_context_register_addr(context, reg_ALLOC);
-	*os_context_register_addr(context, t) = alloc_number(res);
-	*os_context_register_addr(context, reg_ALLOC)
-	    = (unsigned long) dynamic_space_free_pointer;
-	arch_skip_instruction(context);
-	
-	return;
-	
+        *os_context_register_addr(context, t) = alloc_number(res);
+        *os_context_register_addr(context, reg_ALLOC)
+            = (unsigned long) dynamic_space_free_pointer;
+        arch_skip_instruction(context);
+
+        return;
+
     not_interesting:
-	interrupt_handle_now(signal, siginfo, context);
+        interrupt_handle_now(signal, siginfo, context);
     }
 }
 

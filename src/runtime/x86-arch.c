@@ -29,7 +29,7 @@
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 
-#define BREAKPOINT_INST 0xcc	/* INT3 */
+#define BREAKPOINT_INST 0xcc    /* INT3 */
 
 unsigned long fast_random_state = 1;
 
@@ -74,38 +74,38 @@ void arch_skip_instruction(os_context_t *context)
     int vlen;
     int code;
 
-    
+
     /* Get and skip the Lisp interrupt code. */
     code = *(char*)(*os_context_pc_addr(context))++;
     switch (code)
-	{
-	case trap_Error:
-	case trap_Cerror:
-	    /* Lisp error arg vector length */
-	    vlen = *(char*)(*os_context_pc_addr(context))++;
-	    /* Skip Lisp error arg data bytes. */
-	    while (vlen-- > 0) {
-		++*os_context_pc_addr(context);
-	    }
-	    break;
+        {
+        case trap_Error:
+        case trap_Cerror:
+            /* Lisp error arg vector length */
+            vlen = *(char*)(*os_context_pc_addr(context))++;
+            /* Skip Lisp error arg data bytes. */
+            while (vlen-- > 0) {
+                ++*os_context_pc_addr(context);
+            }
+            break;
 
-	case trap_Breakpoint:		/* not tested */
-	case trap_FunEndBreakpoint: /* not tested */
-	    break;
+        case trap_Breakpoint:           /* not tested */
+        case trap_FunEndBreakpoint: /* not tested */
+            break;
 
-	case trap_PendingInterrupt:
-	case trap_Halt:
-	    /* only needed to skip the Code */
-	    break;
+        case trap_PendingInterrupt:
+        case trap_Halt:
+            /* only needed to skip the Code */
+            break;
 
-	default:
-	    fprintf(stderr,"[arch_skip_inst invalid code %d\n]\n",code);
-	    break;
-	}
+        default:
+            fprintf(stderr,"[arch_skip_inst invalid code %d\n]\n",code);
+            break;
+        }
 
     FSHOW((stderr,
-	   "/[arch_skip_inst resuming at %x]\n",
-	   *os_context_pc_addr(context)));
+           "/[arch_skip_inst resuming at %x]\n",
+           *os_context_pc_addr(context)));
 }
 
 unsigned char *
@@ -124,7 +124,7 @@ void
 arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),
-		   arch_os_get_current_thread());
+                   arch_os_get_current_thread());
 }
 
 /*
@@ -136,8 +136,8 @@ arch_install_breakpoint(void *pc)
 {
     unsigned long result = *(unsigned long*)pc;
 
-    *(char*)pc = BREAKPOINT_INST;		/* x86 INT3       */
-    *((char*)pc+1) = trap_Breakpoint;		/* Lisp trap code */
+    *(char*)pc = BREAKPOINT_INST;               /* x86 INT3       */
+    *((char*)pc+1) = trap_Breakpoint;           /* Lisp trap code */
 
     return result;
 }
@@ -196,32 +196,32 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 
     if (single_stepping && (signal==SIGTRAP))
     {
-	/* fprintf(stderr,"* single step trap %x\n", single_stepping); */
+        /* fprintf(stderr,"* single step trap %x\n", single_stepping); */
 
 #ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
-	/* Un-install single step helper instructions. */
-	*(single_stepping-3) = single_step_save1;
-	*(single_stepping-2) = single_step_save2;
-	*(single_stepping-1) = single_step_save3;
+        /* Un-install single step helper instructions. */
+        *(single_stepping-3) = single_step_save1;
+        *(single_stepping-2) = single_step_save2;
+        *(single_stepping-1) = single_step_save3;
 #else
-	*context_eflags_addr(context) ^= 0x100;
+        *context_eflags_addr(context) ^= 0x100;
 #endif
-	/* Re-install the breakpoint if possible. */
-	if (*os_context_pc_addr(context) == (int)single_stepping + 1) {
-	    fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
-	} else {
-	    *((char *)single_stepping) = BREAKPOINT_INST;	/* x86 INT3 */
-	    *((char *)single_stepping+1) = trap_Breakpoint;
-	}
+        /* Re-install the breakpoint if possible. */
+        if (*os_context_pc_addr(context) == (int)single_stepping + 1) {
+            fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
+        } else {
+            *((char *)single_stepping) = BREAKPOINT_INST;       /* x86 INT3 */
+            *((char *)single_stepping+1) = trap_Breakpoint;
+        }
 
-	single_stepping = NULL;
-	return;
+        single_stepping = NULL;
+        return;
     }
 
     /* This is just for info in case the monitor wants to print an
      * approximation. */
     current_control_stack_pointer =
-	(lispobj *)*os_context_sp_addr(context);
+        (lispobj *)*os_context_sp_addr(context);
 
     /* FIXME: CMUCL puts the float control restoration code here.
        Thus, it seems to me that single-stepping won't restore the
@@ -241,41 +241,41 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     switch (trap) {
 
     case trap_PendingInterrupt:
-	FSHOW((stderr, "/<trap pending interrupt>\n"));
-	arch_skip_instruction(context);
+        FSHOW((stderr, "/<trap pending interrupt>\n"));
+        arch_skip_instruction(context);
         interrupt_handle_pending(context);
-	break;
+        break;
 
     case trap_Halt:
-	/* Note: the old CMU CL code tried to save FPU state
-	 * here, and restore it after we do our thing, but there
-	 * seems to be no point in doing that, since we're just
-	 * going to lose(..) anyway. */
-	fake_foreign_function_call(context);
-	lose("%%PRIMITIVE HALT called; the party is over.");
+        /* Note: the old CMU CL code tried to save FPU state
+         * here, and restore it after we do our thing, but there
+         * seems to be no point in doing that, since we're just
+         * going to lose(..) anyway. */
+        fake_foreign_function_call(context);
+        lose("%%PRIMITIVE HALT called; the party is over.");
 
     case trap_Error:
     case trap_Cerror:
-	FSHOW((stderr, "<trap error/cerror %d>\n", code));
-	interrupt_internal_error(signal, info, context, code==trap_Cerror);
-	break;
+        FSHOW((stderr, "<trap error/cerror %d>\n", code));
+        interrupt_internal_error(signal, info, context, code==trap_Cerror);
+        break;
 
     case trap_Breakpoint:
-	--*os_context_pc_addr(context);
-	handle_breakpoint(signal, info, context);
-	break;
+        --*os_context_pc_addr(context);
+        handle_breakpoint(signal, info, context);
+        break;
 
     case trap_FunEndBreakpoint:
-	--*os_context_pc_addr(context);
-	*os_context_pc_addr(context) =
-	    (int)handle_fun_end_breakpoint(signal, info, context);
-	break;
+        --*os_context_pc_addr(context);
+        *os_context_pc_addr(context) =
+            (int)handle_fun_end_breakpoint(signal, info, context);
+        break;
 
     default:
-	FSHOW((stderr,"/[C--trap default %d %d %x]\n",
-	       signal, code, context));
-	interrupt_handle_now(signal, info, context);
-	break;
+        FSHOW((stderr,"/[C--trap default %d %d %x]\n",
+               signal, code, context));
+        interrupt_handle_now(signal, info, context);
+        break;
     }
 }
 
@@ -358,7 +358,7 @@ funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
  * things.
  */
 
-void 
+void
 arch_write_linkage_table_jmp(char * reloc, void * fun)
 {
     /* Make JMP to function entry. JMP offset is calculated from next
@@ -367,10 +367,10 @@ arch_write_linkage_table_jmp(char * reloc, void * fun)
     long offset = (char *)fun - (reloc + 5);
     int i;
 
-    *reloc++ = 0xe9;		/* opcode for JMP rel32 */
+    *reloc++ = 0xe9;            /* opcode for JMP rel32 */
     for (i = 0; i < 4; i++) {
-	*reloc++ = offset & 0xff;
-	offset >>= 8;
+        *reloc++ = offset & 0xff;
+        offset >>= 8;
     }
 
     /* write a nop for good measure. */

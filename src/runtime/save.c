@@ -31,7 +31,7 @@
 #include "genesis/symbol.h"
 
 static void
-write_lispobj(lispobj obj, FILE *file) 
+write_lispobj(lispobj obj, FILE *file)
 {
     fwrite(&obj, sizeof(lispobj), 1, file);
 }
@@ -108,14 +108,14 @@ save(char *filename, lispobj init_function)
      * being SAVE-LISP-AND-DIE instead of SAVE-LISP-AND-GO-ON). */
     printf("[undoing binding stack and other enclosing state... ");
     fflush(stdout);
-    for_each_thread(th)	{	/* XXX really? */
-	unbind_to_here((lispobj *)th->binding_stack_start,th);
-	SetSymbolValue(CURRENT_CATCH_BLOCK, 0,th);
-	SetSymbolValue(CURRENT_UNWIND_PROTECT_BLOCK, 0,th);
+    for_each_thread(th) {       /* XXX really? */
+        unbind_to_here((lispobj *)th->binding_stack_start,th);
+        SetSymbolValue(CURRENT_CATCH_BLOCK, 0,th);
+        SetSymbolValue(CURRENT_UNWIND_PROTECT_BLOCK, 0,th);
     }
     printf("done]\n");
     fflush(stdout);
-    
+
     /* (Now we can actually start copying ourselves into the output file.) */
 
     printf("[saving current Lisp image into %s:\n", filename);
@@ -129,33 +129,33 @@ save(char *filename, lispobj init_function)
 
     write_lispobj(BUILD_ID_CORE_ENTRY_TYPE_CODE, file);
     write_lispobj(/* (We're writing the word count of the entry here, and the 2
-	  * term is one word for the leading BUILD_ID_CORE_ENTRY_TYPE_CODE
-	  * word and one word where we store the count itself.) */
-	 2 + strlen(build_id),
-	 file);
+          * term is one word for the leading BUILD_ID_CORE_ENTRY_TYPE_CODE
+          * word and one word where we store the count itself.) */
+         2 + strlen(build_id),
+         file);
     {
-	char *p;
-	for (p = build_id; *p; ++p)
-	    write_lispobj(*p, file);
+        char *p;
+        for (p = build_id; *p; ++p)
+            write_lispobj(*p, file);
     }
 
     write_lispobj(NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
     write_lispobj(/* (word count = 3 spaces described by 5 words each, plus the
-	  * entry type code, plus this count itself) */
-	 (5*3)+2, file);
+          * entry type code, plus this count itself) */
+         (5*3)+2, file);
     output_space(file,
-		 READ_ONLY_CORE_SPACE_ID,
-		 (lispobj *)READ_ONLY_SPACE_START,
-		 (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
+                 READ_ONLY_CORE_SPACE_ID,
+                 (lispobj *)READ_ONLY_SPACE_START,
+                 (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
     output_space(file,
-		 STATIC_CORE_SPACE_ID,
-		 (lispobj *)STATIC_SPACE_START,
-		 (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0));
+                 STATIC_CORE_SPACE_ID,
+                 (lispobj *)STATIC_SPACE_START,
+                 (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0));
 #ifdef reg_ALLOC
     output_space(file,
-		 DYNAMIC_CORE_SPACE_ID,
-		 (lispobj *)current_dynamic_space,
-		 dynamic_space_free_pointer);
+                 DYNAMIC_CORE_SPACE_ID,
+                 (lispobj *)current_dynamic_space,
+                 dynamic_space_free_pointer);
 #else
 #ifdef LISP_FEATURE_GENCGC
     /* Flush the current_region, updating the tables. */
@@ -163,9 +163,9 @@ save(char *filename, lispobj init_function)
     update_x86_dynamic_space_free_pointer();
 #endif
     output_space(file,
-		 DYNAMIC_CORE_SPACE_ID,
-		 (lispobj *)DYNAMIC_SPACE_START,
-		 (lispobj *)SymbolValue(ALLOCATION_POINTER,0));
+                 DYNAMIC_CORE_SPACE_ID,
+                 (lispobj *)DYNAMIC_SPACE_START,
+                 (lispobj *)SymbolValue(ALLOCATION_POINTER,0));
 #endif
 
     write_lispobj(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);

@@ -36,9 +36,9 @@ char *nl_langinfo(nl_item item)
       char *lang = getenv ("LANG");
 
       if ((lang != NULL) && (!strcmp(lang, "C"))) {
-	return latin1;
+        return latin1;
       } else {
-	return utf8;
+        return utf8;
       }
     }
   }

@@ -43,9 +43,9 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
     SetBSP(binding+1);
 #ifdef LISP_FEATURE_SB_THREAD
     if(!sym->tls_index) {
-	sym->tls_index=SymbolValue(FREE_TLS_INDEX,0);
-	SetSymbolValue(FREE_TLS_INDEX,
-		       make_fixnum(fixnum_value(sym->tls_index)+1),0);
+        sym->tls_index=SymbolValue(FREE_TLS_INDEX,0);
+        SetSymbolValue(FREE_TLS_INDEX,
+                       make_fixnum(fixnum_value(sym->tls_index)+1),0);
     }
 #endif
     old_tl_value=SymbolTlValue(symbol,thread);
@@ -60,9 +60,9 @@ unbind(void *th)
     struct thread *thread=(struct thread *)th;
     struct binding *binding;
     lispobj symbol;
-	
+
     binding = GetBSP() - 1;
-		
+
     symbol = binding->symbol;
 
     SetTlSymbolValue(symbol, binding->value,thread);
@@ -81,13 +81,13 @@ unbind_to_here(lispobj *bsp,void *th)
     lispobj symbol;
 
     while (target < binding) {
-	binding--;
+        binding--;
 
-	symbol = binding->symbol;
-	if (symbol) {
-	    SetTlSymbolValue(symbol, binding->value,thread);
-	    binding->symbol = 0;
-	}
+        symbol = binding->symbol;
+        if (symbol) {
+            SetTlSymbolValue(symbol, binding->value,thread);
+            binding->symbol = 0;
+        }
     }
     SetBSP(binding);
 }

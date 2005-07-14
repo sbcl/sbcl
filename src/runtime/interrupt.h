@@ -35,7 +35,7 @@ sigcopyset(sigset_t *new, sigset_t *old)
  *
  * Note: In CMU CL, this was 4096, but there was no explanation given,
  * and it's hard to see why we'd need that many nested interrupts, so
- * I've scaled it back (to 256) to see what happens. -- WHN 20000730 
+ * I've scaled it back (to 256) to see what happens. -- WHN 20000730
 
  * Nothing happened, so let's creep it back a bit further -- dan 20030411 */
 #define MAX_INTERRUPTS 32
@@ -49,7 +49,7 @@ struct interrupt_data {
     void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, void*) ;
     union interrupt_handler interrupt_handlers[NSIG];
 
-    /* signal information for pending signal.  pending_signal=0 when there 
+    /* signal information for pending signal.  pending_signal=0 when there
      * is no pending signal. */
     void (*pending_handler) (int, siginfo_t*, void*) ;
     int pending_signal ;
@@ -65,7 +65,7 @@ extern void arrange_return_to_lisp_function(os_context_t *, lispobj);
 extern void interrupt_handle_now(int, siginfo_t*, void*);
 extern void interrupt_handle_pending(os_context_t*);
 extern void interrupt_internal_error(int, siginfo_t*, os_context_t*,
-				     boolean continuable);
+                                     boolean continuable);
 extern boolean handle_guard_page_triggered(os_context_t *,void *);
 extern boolean interrupt_maybe_gc(int, siginfo_t*, void*);
 extern boolean interrupt_maybe_gc_int(int, siginfo_t *, void *);
@@ -82,12 +82,12 @@ extern void interrupt_thread_handler(int, siginfo_t*, void*);
 extern void sig_stop_for_gc_handler(int, siginfo_t*, void*);
 #endif
 extern void undoably_install_low_level_interrupt_handler (int signal,
-							  void
-							  handler(int,
-								  siginfo_t*,
-								  void*));
+                                                          void
+                                                          handler(int,
+                                                                  siginfo_t*,
+                                                                  void*));
 extern unsigned long install_handler(int signal,
-				     void handler(int, siginfo_t*, void*));
+                                     void handler(int, siginfo_t*, void*));
 
 extern union interrupt_handler interrupt_handlers[NSIG];
 

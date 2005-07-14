@@ -24,8 +24,8 @@ hexparse(char *s)
 {
     long result;
     if (1 != sscanf(s, "%lx", &result)) {
-	fprintf(stderr, "can't parse \"%s\" as hexadecimal integer\n", s);
-	exit(1);
+        fprintf(stderr, "can't parse \"%s\" as hexadecimal integer\n", s);
+        exit(1);
     }
     return result;
 }
@@ -42,17 +42,17 @@ main(int argc, char *argv[])
      * sanity check in make-target-2.sh before we try to execute sbcl
      * itself. */
     if (argc != 3) {
-	fprintf(stderr, "usage: %s $addr $size\n", argv[0]);
-	exit(1);
+        fprintf(stderr, "usage: %s $addr $size\n", argv[0]);
+        exit(1);
     }
 
     requested_addr = (char*)hexparse(argv[1]);
     addr = mmap(requested_addr,
-		hexparse(argv[2]),
-		0x7,
-		MAP_PRIVATE | MAP_ANON | MAP_FIXED,
-		-1,
-		0);
+                hexparse(argv[2]),
+                0x7,
+                MAP_PRIVATE | MAP_ANON | MAP_FIXED,
+                -1,
+                0);
 
     /* FIXME: It would be nice to make this a stronger test. E.g.
      * besides just trying to mmap() the area, we could check that the
@@ -61,8 +61,8 @@ main(int argc, char *argv[])
      * (At least on OpenBSD, "A successful mmap deletes any previous
      * mapping in the allocated address range.") */
     if (addr != requested_addr) {
-	perror("mmap");
+        perror("mmap");
     }
-	
+
     exit(0);
 }

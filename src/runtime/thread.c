@@ -10,7 +10,7 @@
 
 #include "sbcl.h"
 #include "runtime.h"
-#include "validate.h"		/* for CONTROL_STACK_SIZE etc */
+#include "validate.h"           /* for CONTROL_STACK_SIZE etc */
 #include "alloc.h"
 #include "thread.h"
 #include "arch.h"
@@ -25,7 +25,7 @@
 
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
 
-int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
+int dynamic_values_bytes=4096*sizeof(lispobj);  /* same for all threads */
 struct thread *all_threads;
 volatile lispobj all_threads_lock;
 extern struct interrupt_data * global_interrupt_data;
@@ -128,52 +128,52 @@ new_thread_trampoline(struct thread *th)
 
 struct thread * create_thread_struct(lispobj initial_function) {
     union per_thread_data *per_thread;
-    struct thread *th=0;	/*  subdue gcc */
+    struct thread *th=0;        /*  subdue gcc */
     void *spaces=0;
 
     /* may as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
      * succeed */
     spaces=os_validate(0,
-		       THREAD_CONTROL_STACK_SIZE+
-		       BINDING_STACK_SIZE+
-		       ALIEN_STACK_SIZE+
-		       dynamic_values_bytes+
-		       32*SIGSTKSZ);
+                       THREAD_CONTROL_STACK_SIZE+
+                       BINDING_STACK_SIZE+
+                       ALIEN_STACK_SIZE+
+                       dynamic_values_bytes+
+                       32*SIGSTKSZ);
     if(!spaces)
-	 return NULL;
+         return NULL;
     per_thread=(union per_thread_data *)
-	(spaces+
-	 THREAD_CONTROL_STACK_SIZE+
-	 BINDING_STACK_SIZE+
-	 ALIEN_STACK_SIZE);
+        (spaces+
+         THREAD_CONTROL_STACK_SIZE+
+         BINDING_STACK_SIZE+
+         ALIEN_STACK_SIZE);
 
     if(all_threads) {
-	memcpy(per_thread,arch_os_get_current_thread(),
-	       dynamic_values_bytes);
+        memcpy(per_thread,arch_os_get_current_thread(),
+               dynamic_values_bytes);
     } else {
 #ifdef LISP_FEATURE_SB_THREAD
-	int i;
-	for(i=0;i<(dynamic_values_bytes/sizeof(lispobj));i++)
-	    per_thread->dynamic_values[i]=UNBOUND_MARKER_WIDETAG;
-	if(SymbolValue(FREE_TLS_INDEX,0)==UNBOUND_MARKER_WIDETAG)
-	    SetSymbolValue
-		(FREE_TLS_INDEX,
-		 make_fixnum(MAX_INTERRUPTS+
-			     sizeof(struct thread)/sizeof(lispobj)),
-		 0);
+        int i;
+        for(i=0;i<(dynamic_values_bytes/sizeof(lispobj));i++)
+            per_thread->dynamic_values[i]=UNBOUND_MARKER_WIDETAG;
+        if(SymbolValue(FREE_TLS_INDEX,0)==UNBOUND_MARKER_WIDETAG)
+            SetSymbolValue
+                (FREE_TLS_INDEX,
+                 make_fixnum(MAX_INTERRUPTS+
+                             sizeof(struct thread)/sizeof(lispobj)),
+                 0);
 #define STATIC_TLS_INIT(sym,field) \
   ((struct symbol *)(sym-OTHER_POINTER_LOWTAG))->tls_index= \
   make_fixnum(THREAD_SLOT_OFFSET_WORDS(field))
 
-	STATIC_TLS_INIT(BINDING_STACK_START,binding_stack_start);
-	STATIC_TLS_INIT(BINDING_STACK_POINTER,binding_stack_pointer);
-	STATIC_TLS_INIT(CONTROL_STACK_START,control_stack_start);
-	STATIC_TLS_INIT(CONTROL_STACK_END,control_stack_end);
-	STATIC_TLS_INIT(ALIEN_STACK,alien_stack_pointer);
+        STATIC_TLS_INIT(BINDING_STACK_START,binding_stack_start);
+        STATIC_TLS_INIT(BINDING_STACK_POINTER,binding_stack_pointer);
+        STATIC_TLS_INIT(CONTROL_STACK_START,control_stack_start);
+        STATIC_TLS_INIT(CONTROL_STACK_END,control_stack_end);
+        STATIC_TLS_INIT(ALIEN_STACK,alien_stack_pointer);
 #if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
-	STATIC_TLS_INIT(PSEUDO_ATOMIC_ATOMIC,pseudo_atomic_atomic);
-	STATIC_TLS_INIT(PSEUDO_ATOMIC_INTERRUPTED,pseudo_atomic_interrupted);
+        STATIC_TLS_INIT(PSEUDO_ATOMIC_ATOMIC,pseudo_atomic_atomic);
+        STATIC_TLS_INIT(PSEUDO_ATOMIC_INTERRUPTED,pseudo_atomic_interrupted);
 #endif
 #undef STATIC_TLS_INIT
 #endif
@@ -182,10 +182,10 @@ struct thread * create_thread_struct(lispobj initial_function) {
     th=&per_thread->thread;
     th->control_stack_start = spaces;
     th->binding_stack_start=
-	(lispobj*)((void*)th->control_stack_start+THREAD_CONTROL_STACK_SIZE);
+        (lispobj*)((void*)th->control_stack_start+THREAD_CONTROL_STACK_SIZE);
     th->control_stack_end = th->binding_stack_start;
     th->alien_stack_start=
-	(lispobj*)((void*)th->binding_stack_start+BINDING_STACK_SIZE);
+        (lispobj*)((void*)th->binding_stack_start+BINDING_STACK_SIZE);
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
     th->os_thread=0;
@@ -194,7 +194,7 @@ struct thread * create_thread_struct(lispobj initial_function) {
     th->state=STATE_STARTING;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
-			     + ALIEN_STACK_SIZE-N_WORD_BYTES);
+                             + ALIEN_STACK_SIZE-N_WORD_BYTES);
 #else
     th->alien_stack_pointer=((void *)th->alien_stack_start);
 #endif
@@ -235,12 +235,12 @@ struct thread * create_thread_struct(lispobj initial_function) {
     th->interrupt_data = (struct interrupt_data *)
         os_validate(0,(sizeof (struct interrupt_data)));
     if(all_threads)
-	memcpy(th->interrupt_data,
-	       arch_os_get_current_thread()->interrupt_data,
-	       sizeof (struct interrupt_data));
+        memcpy(th->interrupt_data,
+               arch_os_get_current_thread()->interrupt_data,
+               sizeof (struct interrupt_data));
     else
-	memcpy(th->interrupt_data,global_interrupt_data,
-	       sizeof (struct interrupt_data));
+        memcpy(th->interrupt_data,global_interrupt_data,
+               sizeof (struct interrupt_data));
 
     th->unbound_marker=initial_function;
     return th;
@@ -265,8 +265,8 @@ void create_initial_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
     os_thread_t kid_tid=thread_self();
     if(th && kid_tid>0) {
-	link_thread(th,kid_tid);
-	initial_thread_trampoline(all_threads); /* no return */
+        link_thread(th,kid_tid);
+        initial_thread_trampoline(all_threads); /* no return */
     } else lose("can't create initial thread");
 }
 
@@ -282,7 +282,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     sigemptyset(&newset);
     sigaddset_blockable(&newset);
     thread_sigmask(SIG_BLOCK, &newset, &oldset);
-    
+
     if((pthread_attr_init(&attr)) ||
        (pthread_attr_setstack(&attr,th->control_stack_start,
                               THREAD_CONTROL_STACK_SIZE-16)) ||
@@ -310,13 +310,13 @@ struct thread *create_thread(lispobj initial_function) {
 
     success=create_os_thread(th,&kid_tid);
     if (success)
-	link_thread(th,kid_tid);
+        link_thread(th,kid_tid);
     else
-	os_invalidate((os_vm_address_t) th->control_stack_start,
-		      ((sizeof (lispobj))
-		       * (th->control_stack_end-th->control_stack_start)) +
-		      BINDING_STACK_SIZE+ALIEN_STACK_SIZE+dynamic_values_bytes+
-		      32*SIGSTKSZ);
+        os_invalidate((os_vm_address_t) th->control_stack_start,
+                      ((sizeof (lispobj))
+                       * (th->control_stack_end-th->control_stack_start)) +
+                      BINDING_STACK_SIZE+ALIEN_STACK_SIZE+dynamic_values_bytes+
+                      32*SIGSTKSZ);
 
     RELEASE_ALL_THREADS_LOCK("create_thread")
 
@@ -457,7 +457,7 @@ void gc_start_the_world()
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:begin\n"));
     for(p=all_threads;p;p=p->next) {
         gc_assert(p->os_thread!=0);
-	if((p!=th) && (p->state!=STATE_DEAD)) {
+        if((p!=th) && (p->state!=STATE_DEAD)) {
             if(p->state!=STATE_SUSPENDED) {
                 lose("gc_start_the_world: wrong thread state is %ld\n",
                      fixnum_value(p->state));

@@ -12,7 +12,7 @@
  *   SHARED_FUNCTION(sinh)
  *   SHARED_FUNCTION(strlen)
  * etc. and the per-OS files could look like
- *   #define SHARED_FUNCTION(f) ....  
+ *   #define SHARED_FUNCTION(f) ....
  *   #include "shared-function-names.h"
  *   ...then going on to do OS-specific things
  * "Once and only once."
@@ -28,7 +28,7 @@
  * provided with absolutely no warranty. See the COPYING and CREDITS
  * files for more information.
  */
-   
+
 /* Pick up all the syscalls. */
 F(accept)
 F(access)

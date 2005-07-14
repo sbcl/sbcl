@@ -1,4 +1,4 @@
-#define NREGS	(32)
+#define NREGS   (32)
 
 #ifdef LANGUAGE_ASSEMBLY
 #define REG(num) num

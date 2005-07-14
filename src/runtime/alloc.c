@@ -1,5 +1,5 @@
 /*
- * allocation routines for C code.  For allocation done by Lisp look 
+ * allocation routines for C code.  For allocation done by Lisp look
  * instead at src/compiler/target/alloc.lisp and .../macros.lisp
  */
 
@@ -41,7 +41,7 @@
 #if defined LISP_FEATURE_GENCGC
 extern lispobj *alloc(int bytes);
 lispobj *
-pa_alloc(int bytes) 
+pa_alloc(int bytes)
 {
     lispobj *result=0;
     struct thread *th=arch_os_get_current_thread();
@@ -51,11 +51,11 @@ pa_alloc(int bytes)
     result=alloc(bytes);
     SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
     if (fixnum_value(SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th)))
-	/* even if we gc at this point, the new allocation will be
-	 * protected from being moved, because result is on the c stack
-	 * and points to it */
-	do_pending_interrupt(); 
-    return result; 
+        /* even if we gc at this point, the new allocation will be
+         * protected from being moved, because result is on the c stack
+         * and points to it */
+        do_pending_interrupt();
+    return result;
 }
 
 #else
@@ -72,8 +72,8 @@ pa_alloc(int bytes)
     SET_FREE_POINTER((lispobj *)(result + bytes));
 
     if (GET_GC_TRIGGER() && GET_FREE_POINTER() > GET_GC_TRIGGER()) {
-	SET_GC_TRIGGER((char *)GET_FREE_POINTER()
-		       - (char *)current_dynamic_space);
+        SET_GC_TRIGGER((char *)GET_FREE_POINTER()
+                       - (char *)current_dynamic_space);
     }
     return (lispobj *) result;
 }
@@ -127,7 +127,7 @@ alloc_number(long n)
 
         ptr->digits[0] = n;
 
-	return make_lispobj(ptr, OTHER_POINTER_LOWTAG);
+        return make_lispobj(ptr, OTHER_POINTER_LOWTAG);
     }
 }
 
@@ -149,7 +149,7 @@ alloc_sap(void *ptr)
 {
     struct sap *sap;
     sap=(struct sap *)
-	alloc_unboxed((int)SAP_WIDETAG, sizeof(struct sap)/sizeof(lispobj) -1);
+        alloc_unboxed((int)SAP_WIDETAG, sizeof(struct sap)/sizeof(lispobj) -1);
     sap->pointer = ptr;
     return make_lispobj(sap,OTHER_POINTER_LOWTAG);
 }

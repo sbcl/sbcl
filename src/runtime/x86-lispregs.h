@@ -18,7 +18,7 @@
 
 /* the number of registers visible as registers in the virtual machine
  * (excludes stuff like segment registers) */
-#define NREGS	(8)
+#define NREGS   (8)
 
 #ifdef LANGUAGE_ASSEMBLY
 #define REG(num) $ ## num

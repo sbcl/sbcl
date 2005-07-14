@@ -81,9 +81,9 @@ extern void os_invalidate(os_vm_address_t addr, os_vm_size_t len);
 /* This maps a file into memory, or calls lose(..) for various
  * failures. */
 extern os_vm_address_t os_map(int fd,
-			      int offset,
-			      os_vm_address_t addr,
-			      os_vm_size_t len);
+                              int offset,
+                              os_vm_address_t addr,
+                              os_vm_size_t len);
 
 /* This presumably flushes the instruction cache, if that can be done
  * explicitly. (It doesn't seem to be an issue for the i386 port,
@@ -95,8 +95,8 @@ extern void os_flush_icache(os_vm_address_t addr, os_vm_size_t len);
  * write-protecting a page so that the garbage collector can find out
  * whether it's modified by handling the signal. */
 extern void os_protect(os_vm_address_t addr,
-		       os_vm_size_t len,
-		       os_vm_prot_t protection);
+                       os_vm_size_t len,
+                       os_vm_prot_t protection);
 
 /* This returns true for an address which makes sense at the Lisp level. */
 extern boolean is_valid_lisp_addr(os_vm_address_t test);
@@ -140,7 +140,7 @@ sigset_t *os_context_sigmask_addr(os_context_t *context);
  * depend not only on the OS, but also on the architecture, e.g.
  * getting at EFL/EFLAGS on the x86. Such things are defined in the
  * architecture-dependence files, not the OS-dependence files.) */
-   
+
 /* These are not architecture-specific functions, but are instead
  * general utilities defined in terms of the architecture-specific
  * function os_validate(..) and os_invalidate(..).
@@ -150,8 +150,8 @@ sigset_t *os_context_sigmask_addr(os_context_t *context);
 extern os_vm_address_t os_allocate(os_vm_size_t len);
 extern os_vm_address_t os_allocate_at(os_vm_address_t addr, os_vm_size_t len);
 extern os_vm_address_t os_reallocate(os_vm_address_t addr,
-				     os_vm_size_t old_len,
-				     os_vm_size_t len);
+                                     os_vm_size_t old_len,
+                                     os_vm_size_t len);
 extern void os_deallocate(os_vm_address_t addr, os_vm_size_t len);
 
 

@@ -45,10 +45,10 @@ size_t os_vm_page_size;
 #error "Define threading support functions"
 #else
 int arch_os_thread_init(struct thread *thread) {
-    return 1;			/* success */
+    return 1;                   /* success */
 }
 int arch_os_thread_cleanup(struct thread *thread) {
-    return 1;			/* success */
+    return 1;                   /* success */
 }
 #endif
 
@@ -87,7 +87,7 @@ os_context_fp_control(os_context_t *context)
 void os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
 #ifdef __GNUC__
-    asm volatile ("imb" : : : "memory" ); 
+    asm volatile ("imb" : : : "memory" );
 #else
     /* digital CC has different syntax */
     asm("imb");

@@ -4,7 +4,7 @@
 #define REG(num) num
 #endif
 
-#define NREGS	(32)
+#define NREGS   (32)
 
 #define reg_ZERO    REG(0)
 #define reg_NL3     REG(1)
@@ -37,14 +37,14 @@
 #define reg_LIP     REG(31)
 
 #define REGNAMES \
-	"ZERO",		"NL3",		"CFUNC",	"NL4", \
-	"NL0",		"NL1",		"NL2",		"NARGS", \
-	"A0",		"A1",		"A2",		"A3", \
-	"A4",		"A5",		"FDEFN",       	"LEXENV", \
-	"NFP",		"OCFP",		"LRA",		"L0", \
-	"NIL",		"BSP",		"CFP",		"CSP", \
-	"L1",		"ALLOC",	"K0",		"K1", \
-	"GP",		"NSP",		"CODE",		"LIP"
+        "ZERO",         "NL3",          "CFUNC",        "NL4", \
+        "NL0",          "NL1",          "NL2",          "NARGS", \
+        "A0",           "A1",           "A2",           "A3", \
+        "A4",           "A5",           "FDEFN",        "LEXENV", \
+        "NFP",          "OCFP",         "LRA",          "L0", \
+        "NIL",          "BSP",          "CFP",          "CSP", \
+        "L1",           "ALLOC",        "K0",           "K1", \
+        "GP",           "NSP",          "CODE",         "LIP"
 
 
 #define BOXED_REGISTERS { \

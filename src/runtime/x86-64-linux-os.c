@@ -48,7 +48,7 @@
 #include <linux/unistd.h>
 #include <sys/mman.h>
 #include <linux/version.h>
-#include "thread.h"		/* dynamic_values_bytes */
+#include "thread.h"             /* dynamic_values_bytes */
 
 #include "validate.h"
 size_t os_vm_page_size;
@@ -87,25 +87,25 @@ os_context_register_addr(os_context_t *context, int offset)
 #define RCASE(name) case reg_ ## name: return &context->uc_mcontext.gregs[REG_ ## name];
     switch(offset) {
         RCASE(RAX)
-	RCASE(RCX)
-	RCASE(RDX)
-	RCASE(RBX)
-	RCASE(RSP)
-	RCASE(RBP)
-	RCASE(RSI)
-	RCASE(RDI)
-	RCASE(R8)
-	RCASE(R9)
-	RCASE(R10)
-	RCASE(R11)
-	RCASE(R12)
-	RCASE(R13)
-	RCASE(R14)
-	RCASE(R15)
-      default: 
-	if(offset<NGREG) 
-	    return &context->uc_mcontext.gregs[offset/2+4];
-	else return 0;
+        RCASE(RCX)
+        RCASE(RDX)
+        RCASE(RBX)
+        RCASE(RSP)
+        RCASE(RBP)
+        RCASE(RSI)
+        RCASE(RDI)
+        RCASE(R8)
+        RCASE(R9)
+        RCASE(R10)
+        RCASE(R11)
+        RCASE(R12)
+        RCASE(R13)
+        RCASE(R14)
+        RCASE(R15)
+      default:
+        if(offset<NGREG)
+            return &context->uc_mcontext.gregs[offset/2+4];
+        else return 0;
     }
     return &context->uc_mcontext.gregs[offset];
 }
@@ -118,7 +118,7 @@ os_context_pc_addr(os_context_t *context)
 
 os_context_register_t *
 os_context_sp_addr(os_context_t *context)
-{				
+{
     return &context->uc_mcontext.gregs[REG_RSP];
 }
 
@@ -131,7 +131,7 @@ os_context_fp_addr(os_context_t *context)
 unsigned long
 os_context_fp_control(os_context_t *context)
 {
-    /* return the x87 exception flags ored in with the sse2 
+    /* return the x87 exception flags ored in with the sse2
      * control+status flags */
     unsigned int result = (context->uc_mcontext.fpregs->swd & 0x3F) | context->uc_mcontext.fpregs->mxcsr;
     /* flip exception mask bits */

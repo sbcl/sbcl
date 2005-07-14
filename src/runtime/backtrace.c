@@ -35,13 +35,13 @@
 
 struct call_frame {
 #ifndef LISP_FEATURE_ALPHA
-	struct call_frame *old_cont;
+        struct call_frame *old_cont;
 #else
         u32 old_cont;
 #endif
-	lispobj saved_lra;
+        lispobj saved_lra;
         lispobj code;
-	lispobj other_state[5];
+        lispobj other_state[5];
 };
 
 struct call_info {
@@ -97,7 +97,7 @@ cs_valid_pointer_p(struct call_frame *pointer)
 {
     struct thread *thread=arch_os_get_current_thread();
     return (((char *) thread->control_stack_start <= (char *) pointer) &&
-	    ((char *) pointer < (char *) current_control_stack_pointer));
+            ((char *) pointer < (char *) current_control_stack_pointer));
 }
 
 static void
@@ -119,21 +119,21 @@ call_info_from_context(struct call_info *info, os_context_t *context)
 
     info->interrupted = 1;
     if (lowtag_of(*os_context_register_addr(context, reg_CODE))
-	== FUN_POINTER_LOWTAG) {
+        == FUN_POINTER_LOWTAG) {
         /* We tried to call a function, but crapped out before $CODE could
          * be fixed up. Probably an undefined function. */
         info->frame =
-	    (struct call_frame *)(*os_context_register_addr(context,
-							    reg_OCFP));
+            (struct call_frame *)(*os_context_register_addr(context,
+                                                            reg_OCFP));
         info->lra = (lispobj)(*os_context_register_addr(context, reg_LRA));
         info->code = code_pointer(info->lra);
         pc = (unsigned long)native_pointer(info->lra);
     }
     else {
         info->frame =
-	    (struct call_frame *)(*os_context_register_addr(context, reg_CFP));
+            (struct call_frame *)(*os_context_register_addr(context, reg_CFP));
         info->code =
-	    code_pointer(*os_context_register_addr(context, reg_CODE));
+            code_pointer(*os_context_register_addr(context, reg_CODE));
         info->lra = NIL;
         pc = *os_context_pc_addr(context);
     }
@@ -172,11 +172,11 @@ previous_info(struct call_info *info)
         /* We were interrupted. Find the correct signal context. */
         free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)>>2;
         while (free-- > 0) {
-	    os_context_t *context = 
-		thread->interrupt_contexts[free];
+            os_context_t *context =
+                thread->interrupt_contexts[free];
             if ((struct call_frame *)(*os_context_register_addr(context,
-								reg_CFP))
-		== info->frame) {
+                                                                reg_CFP))
+                == info->frame) {
                 call_info_from_context(info, context);
                 break;
             }
@@ -203,7 +203,7 @@ void
 backtrace(int nframes)
 {
     struct call_info info;
-	
+
     call_info_from_lisp_state(&info);
 
     do {
@@ -244,7 +244,7 @@ backtrace(int nframes)
                         string = (struct vector *) object;
                         printf("%s, ", (char *) string->data);
                     } else
-			/* FIXME: broken from (VECTOR NIL) */
+                        /* FIXME: broken from (VECTOR NIL) */
                         printf("(Not simple string??\?), ");
                 } else
                     printf("(Not other pointer??\?), ");

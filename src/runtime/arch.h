@@ -30,7 +30,7 @@ extern unsigned long arch_install_breakpoint(void *pc);
 extern void arch_remove_breakpoint(void *pc, unsigned long orig_inst);
 extern void arch_install_interrupt_handlers(void);
 extern void arch_do_displaced_inst(os_context_t *context,
-				   unsigned int orig_inst);
+                                   unsigned int orig_inst);
 
 extern int arch_os_thread_init(struct thread *thread);
 extern int arch_os_thread_cleanup(struct thread *thread);
@@ -39,7 +39,7 @@ extern lispobj funcall0(lispobj function);
 extern lispobj funcall1(lispobj function, lispobj arg0);
 extern lispobj funcall2(lispobj function, lispobj arg0, lispobj arg1);
 extern lispobj funcall3(lispobj function, lispobj arg0, lispobj arg1,
-			lispobj arg2);
+                        lispobj arg2);
 extern lispobj *component_ptr_from_pc(lispobj *pc);
 
 #endif /* __ARCH_H__ */

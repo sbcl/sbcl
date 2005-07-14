@@ -35,6 +35,6 @@ voidacc { /* the accumulator itself, to be treated as an opaque data type */
 } voidacc;
 int voidacc_ctor(voidacc*); /* the ctor, returning 0 for success */
 int voidacc_acc(voidacc*, void*); /* Accumulate an element into result,
-				   * returning 0 for success. */
+                                   * returning 0 for success. */
 void** voidacc_give_away_result(voidacc*); /* giving away ownership */
 void voidacc_dtor(voidacc*); /* the dtor */

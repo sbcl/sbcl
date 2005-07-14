@@ -48,7 +48,7 @@ extern void globals_init(void);
 
 # ifdef LISP_FEATURE_MIPS
 #  ifdef __linux__
-#   define EXTERN(name,bytes) .globl name 
+#   define EXTERN(name,bytes) .globl name
 #  else
 #   define EXTERN(name,bytes) .extern name bytes
 #  endif
@@ -64,7 +64,7 @@ extern void globals_init(void);
 /**/
 # ifdef LISP_FEATURE_ALPHA
 #  ifdef __linux__
-#   define EXTERN(name,bytes) .globl name 
+#   define EXTERN(name,bytes) .globl name
 #  endif
 # endif
 /**/
@@ -72,7 +72,7 @@ extern void globals_init(void);
 #  ifdef LISP_FEATURE_DARWIN
 #   define EXTERN(name,bytes) .globl _/**/name
 #  else
-#   define EXTERN(name,bytes) .globl name 
+#   define EXTERN(name,bytes) .globl name
 #  endif
 # endif
 /**/

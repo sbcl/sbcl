@@ -13,10 +13,10 @@
 #define _FIXNUMP_H
 
 static inline int fixnump(lispobj obj) {
-    return((obj & 
-	    (LOWTAG_MASK & 
-	     (~(EVEN_FIXNUM_LOWTAG|ODD_FIXNUM_LOWTAG)))) 
-	   == 0);
+    return((obj &
+            (LOWTAG_MASK &
+             (~(EVEN_FIXNUM_LOWTAG|ODD_FIXNUM_LOWTAG))))
+           == 0);
 }
 
 #endif

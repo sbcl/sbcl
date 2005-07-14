@@ -2,7 +2,7 @@
 #define _MIPS_ARCH_H
 
 
-static inline void 
+static inline void
 get_spinlock(volatile lispobj *word, long value)
 {
 #ifdef LISP_FEATURE_SB_THREAD
@@ -11,28 +11,28 @@ get_spinlock(volatile lispobj *word, long value)
     int __cmp;
 
     __asm__ __volatile__ (
-	"	.set push\n"
-	"	.set mips2\n"
-	"	.set noreorder\n"
-	"1:	ll	%[__prev],%[__mem]\n"
-	"	bne	%[__prev],%[__old],2f\n"
-	"	 li	%[__cmp],0\n"
-	"	move	%[__cmp],%[__new]\n"
-	"	sc	%[__cmp],%[__mem]\n"
-	"	beqz	%[__cmp],1b\n"
-	"	 nop\n"
-	"	sync\n"
-	"2:\n"
-	"	.set pop"
-	: [__prev] "=&r" (__prev),
-	  [__cmp] "=&r" (__cmp)
-	: [__mem] "R" (*word),
-	  [__old] "r" (__old),
-	  [__new] "r" (value)
-	: "memory");
+        "       .set push\n"
+        "       .set mips2\n"
+        "       .set noreorder\n"
+        "1:     ll      %[__prev],%[__mem]\n"
+        "       bne     %[__prev],%[__old],2f\n"
+        "        li     %[__cmp],0\n"
+        "       move    %[__cmp],%[__new]\n"
+        "       sc      %[__cmp],%[__mem]\n"
+        "       beqz    %[__cmp],1b\n"
+        "        nop\n"
+        "       sync\n"
+        "2:\n"
+        "       .set pop"
+        : [__prev] "=&r" (__prev),
+          [__cmp] "=&r" (__cmp)
+        : [__mem] "R" (*word),
+          [__old] "r" (__old),
+          [__new] "r" (value)
+        : "memory");
 
-    if (!cmp) 
-	lose("recursive get_spinlock: 0x%x,%d\n", word, value);
+    if (!cmp)
+        lose("recursive get_spinlock: 0x%x,%d\n", word, value);
 #else /* LISP_FEATURE_SB_THREAD */
     *word=value;
 #endif

@@ -33,7 +33,7 @@
 
 #if !defined(LANGUAGE_ASSEMBLY)
 #include <thread.h>
-#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD 
+#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
 #define CONTROL_STACK_GUARD_PAGE(th) ((void *)(th->control_stack_start))
 #define CONTROL_STACK_RETURN_GUARD_PAGE(th) (CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size)
 #else
@@ -59,7 +59,7 @@ extern os_vm_address_t undefined_alien_address;
  * and so forth. In SBCL, the memory map data are defined at the Lisp
  * level (compiler/target/parms.lisp) and stuffed into the sbcl.h file
  * created by GENESIS, so there's no longer a need for an
- * architecture-dependent header file of memory map data. 
+ * architecture-dependent header file of memory map data.
  */
 
 #endif

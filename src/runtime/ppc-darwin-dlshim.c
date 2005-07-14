@@ -39,14 +39,14 @@ static struct mach_header* last_header;
 
 static int last_error = 0;
 
-void 
+void
 dlshim_image_callback(struct mach_header* ptr, unsigned long phooey)
 {
     callback_count++;
     last_header = ptr;
 }
 
-int 
+int
 lib_path_count(void)
 {
     char* libpath;
@@ -55,123 +55,123 @@ lib_path_count(void)
     libpath = getenv("DYLD_LIBRARY_PATH");
     count = 1;
     if (libpath) {
-	for (i = 0; libpath[i] != '\0'; i++) {
-	    if (libpath[i] == ':') count++;
-	}
+        for (i = 0; libpath[i] != '\0'; i++) {
+            if (libpath[i] == ':') count++;
+        }
     }
     return count;
 }
 
-const char* 
+const char*
 lib_path_prefixify(int index, const char* filename)
 {
     static char* retbuf = NULL;
     int fi, li, i, count;
     char* libpath;
     if (!retbuf) {
-	retbuf = (char*) malloc(1024*sizeof(char));
+        retbuf = (char*) malloc(1024*sizeof(char));
     }
     count = 0;
     fi = 0;
     li = -1;
     libpath = getenv("DYLD_LIBRARY_PATH");
     if (libpath) {
-	i = 0;
-	while (count != index && libpath[i] != '\0') {
-	    if (libpath[i] == ':') count++;
-	    i++;
-	}
-	fi = i;
-	while (libpath[i] != '\0' && libpath[i] != ':') {
-	    i++;
-	}
-	li = i - 1;
+        i = 0;
+        while (count != index && libpath[i] != '\0') {
+            if (libpath[i] == ':') count++;
+            i++;
+        }
+        fi = i;
+        while (libpath[i] != '\0' && libpath[i] != ':') {
+            i++;
+        }
+        li = i - 1;
     }
     if (li - fi > 0) {
-	if (li - fi + 1 > 1022 - strlen(filename)) {
-	    retbuf = 
-		(char*) realloc(retbuf, (li - fi + 3 + strlen(filename))*sizeof(char));
-	}
-	memcpy(retbuf, libpath + fi, (li - fi + 1)*sizeof(char));
-	retbuf[li - fi + 1] = '/';
-	memcpy(retbuf + li - fi + 2, filename, strlen(filename) + 1);
-	return retbuf;
+        if (li - fi + 1 > 1022 - strlen(filename)) {
+            retbuf =
+                (char*) realloc(retbuf, (li - fi + 3 + strlen(filename))*sizeof(char));
+        }
+        memcpy(retbuf, libpath + fi, (li - fi + 1)*sizeof(char));
+        retbuf[li - fi + 1] = '/';
+        memcpy(retbuf + li - fi + 2, filename, strlen(filename) + 1);
+        return retbuf;
     } else {
-	return filename;
+        return filename;
     }
 }
 
-const void* 
+const void*
 dlopen(const char* filename, int flags)
 {
     static char has_callback = 0;
     if (!has_callback) {
-	_dyld_register_func_for_add_image(dlshim_image_callback);
+        _dyld_register_func_for_add_image(dlshim_image_callback);
     }
     if (!filename) {
-	return &dl_self;
+        return &dl_self;
     } else {
-	const struct mach_header* img = NULL;
-	if (!img) 
-	    img = NSAddImage(filename, NSADDIMAGE_OPTION_RETURN_ON_ERROR);
-	if (!img) 
-	    img = NSAddImage(filename, 
-			     NSADDIMAGE_OPTION_RETURN_ON_ERROR | 
-			     NSADDIMAGE_OPTION_WITH_SEARCHING);
-	if (!img) {
-	    NSObjectFileImage fileImage;
-	    callback_count = 0;
-	    last_header = NULL;
-	    if (NSCreateObjectFileImageFromFile(filename, &fileImage) 
-		== NSObjectFileImageSuccess) {
-		NSLinkModule(fileImage, filename, 
-			     NSLINKMODULE_OPTION_BINDNOW | 
-			     ((flags & RTLD_GLOBAL)?NSLINKMODULE_OPTION_PRIVATE:0) | 
-			     NSLINKMODULE_OPTION_RETURN_ON_ERROR);
-		if (callback_count && last_header) 
-		    img = last_header;
-	    }
-	}
-	if (!img) {
-	    NSObjectFileImage fileImage;
-	    int i, maxi;
-	    const char* prefixfilename;
-	    maxi = lib_path_count();
-	    for (i = 0; i < maxi && !img; i++) {
-		prefixfilename = lib_path_prefixify(i, filename);
-		callback_count = 0;
-		last_header = NULL;
-		if (NSCreateObjectFileImageFromFile(prefixfilename, &fileImage) 
-		    == NSObjectFileImageSuccess) {
-		    NSLinkModule(fileImage, filename, 
-				 NSLINKMODULE_OPTION_BINDNOW | 
-				 ((flags & RTLD_GLOBAL)?NSLINKMODULE_OPTION_PRIVATE:0) | 
-				 NSLINKMODULE_OPTION_RETURN_ON_ERROR);
-		    if (callback_count && last_header) 
-			img = last_header;
-		}
-	    }
-	}
-	if (img) {
-	    if (flags & RTLD_NOW) {
-		NSLookupSymbolInImage(img, "", 
-				      NSLOOKUPSYMBOLINIMAGE_OPTION_BIND_FULLY | 
-				      NSLOOKUPSYMBOLINIMAGE_OPTION_RETURN_ON_ERROR);
-	    }
-	    if (NSIsSymbolNameDefinedInImage(img, "__init")) {
-		NSSymbol* initsymbol;
-		void (*initfunc) (void);
-		initsymbol = NSLookupSymbolInImage(img, "__init", 0);
-		initfunc = NSAddressOfSymbol(initsymbol);
-		initfunc();
-	    }
-	} else
-	    last_error = DLOPEN_ERROR;
-	return img;
+        const struct mach_header* img = NULL;
+        if (!img)
+            img = NSAddImage(filename, NSADDIMAGE_OPTION_RETURN_ON_ERROR);
+        if (!img)
+            img = NSAddImage(filename,
+                             NSADDIMAGE_OPTION_RETURN_ON_ERROR |
+                             NSADDIMAGE_OPTION_WITH_SEARCHING);
+        if (!img) {
+            NSObjectFileImage fileImage;
+            callback_count = 0;
+            last_header = NULL;
+            if (NSCreateObjectFileImageFromFile(filename, &fileImage)
+                == NSObjectFileImageSuccess) {
+                NSLinkModule(fileImage, filename,
+                             NSLINKMODULE_OPTION_BINDNOW |
+                             ((flags & RTLD_GLOBAL)?NSLINKMODULE_OPTION_PRIVATE:0) |
+                             NSLINKMODULE_OPTION_RETURN_ON_ERROR);
+                if (callback_count && last_header)
+                    img = last_header;
+            }
+        }
+        if (!img) {
+            NSObjectFileImage fileImage;
+            int i, maxi;
+            const char* prefixfilename;
+            maxi = lib_path_count();
+            for (i = 0; i < maxi && !img; i++) {
+                prefixfilename = lib_path_prefixify(i, filename);
+                callback_count = 0;
+                last_header = NULL;
+                if (NSCreateObjectFileImageFromFile(prefixfilename, &fileImage)
+                    == NSObjectFileImageSuccess) {
+                    NSLinkModule(fileImage, filename,
+                                 NSLINKMODULE_OPTION_BINDNOW |
+                                 ((flags & RTLD_GLOBAL)?NSLINKMODULE_OPTION_PRIVATE:0) |
+                                 NSLINKMODULE_OPTION_RETURN_ON_ERROR);
+                    if (callback_count && last_header)
+                        img = last_header;
+                }
+            }
+        }
+        if (img) {
+            if (flags & RTLD_NOW) {
+                NSLookupSymbolInImage(img, "",
+                                      NSLOOKUPSYMBOLINIMAGE_OPTION_BIND_FULLY |
+                                      NSLOOKUPSYMBOLINIMAGE_OPTION_RETURN_ON_ERROR);
+            }
+            if (NSIsSymbolNameDefinedInImage(img, "__init")) {
+                NSSymbol* initsymbol;
+                void (*initfunc) (void);
+                initsymbol = NSLookupSymbolInImage(img, "__init", 0);
+                initfunc = NSAddressOfSymbol(initsymbol);
+                initfunc();
+            }
+        } else
+            last_error = DLOPEN_ERROR;
+        return img;
     }
 }
 
-const char* 
+const char*
 dlerror()
 {
     NSLinkEditErrors c;
@@ -180,50 +180,50 @@ dlerror()
     char *result = NULL;
 
     if (last_error) {
-	NSLinkEditError(&c, &errorNumber, &fileName, &errorString);
-	/* The errorString obtained by the above is too verbose for
-	 * our needs, so we just translate the errno. 
-	 *
-	 * We also have simple fallbacks in case we've somehow lost
-	 * the context before this point. */
-	if (errorNumber) {
-	    result = strerror(errorNumber);
-	} else if (DLSYM_ERROR == last_error) {
-	    result = "dlsym(3) failed";
-	} else if (DLOPEN_ERROR == last_error) {
-	    result = "dlopen(3) failed";
-	}
-	last_error = 0;
+        NSLinkEditError(&c, &errorNumber, &fileName, &errorString);
+        /* The errorString obtained by the above is too verbose for
+         * our needs, so we just translate the errno.
+         *
+         * We also have simple fallbacks in case we've somehow lost
+         * the context before this point. */
+        if (errorNumber) {
+            result = strerror(errorNumber);
+        } else if (DLSYM_ERROR == last_error) {
+            result = "dlsym(3) failed";
+        } else if (DLOPEN_ERROR == last_error) {
+            result = "dlopen(3) failed";
+        }
+        last_error = 0;
     }
-	
+
     return result;
 }
 
-void* 
+void*
 dlsym(void* handle, char* symbol)
 {
     if (handle == &dl_self) {
-	if (NSIsSymbolNameDefined(symbol)) {
-	    NSSymbol* retsym;
-	    retsym = NSLookupAndBindSymbol(symbol);
-	    return NSAddressOfSymbol(retsym);
-	} else {
+        if (NSIsSymbolNameDefined(symbol)) {
+            NSSymbol* retsym;
+            retsym = NSLookupAndBindSymbol(symbol);
+            return NSAddressOfSymbol(retsym);
+        } else {
             last_error = DLSYM_ERROR;
-	    return NULL;
-	}
+            return NULL;
+        }
     } else {
-	if (NSIsSymbolNameDefinedInImage(handle, symbol)) {
-	    NSSymbol* retsym;
-	    retsym = NSLookupSymbolInImage(handle, symbol, 0);
-	    return NSAddressOfSymbol(retsym);
-	} else {
+        if (NSIsSymbolNameDefinedInImage(handle, symbol)) {
+            NSSymbol* retsym;
+            retsym = NSLookupSymbolInImage(handle, symbol, 0);
+            return NSAddressOfSymbol(retsym);
+        } else {
             last_error = DLSYM_ERROR;
-	    return NULL;
-	}
+            return NULL;
+        }
     }
 }
 
-int 
+int
 dlclose(void *handle)
 {
     /* dlclose is not implemented, and never will be for dylibs.

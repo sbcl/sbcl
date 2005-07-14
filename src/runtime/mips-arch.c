@@ -51,69 +51,69 @@ emulate_branch(os_context_t *context, unsigned int inst)
 
     switch(opcode) {
     case 0x0: /* jr, jalr */
-	switch(inst & 0x3f) {
-	case 0x08: /* jr */
-	    tgt = *os_context_register_addr(context, r1);
-	    break;
-	case 0x09: /* jalr */
-	    tgt = *os_context_register_addr(context, r1);
-	    *os_context_register_addr(context, r3)
-		= *os_context_pc_addr(context) + 4;
-	    break;
-	}
-	break;
+        switch(inst & 0x3f) {
+        case 0x08: /* jr */
+            tgt = *os_context_register_addr(context, r1);
+            break;
+        case 0x09: /* jalr */
+            tgt = *os_context_register_addr(context, r1);
+            *os_context_register_addr(context, r3)
+                = *os_context_pc_addr(context) + 4;
+            break;
+        }
+        break;
     case 0x1: /* bltz, bgez, bltzal, bgezal */
-	switch((inst >> 16) & 0x1f) {
-	case 0x00: /* bltz */
-	    if(*os_context_register_addr(context, r1) < 0)
-		tgt += disp;
-	    break;
-	case 0x01: /* bgez */
-	    if(*os_context_register_addr(context, r1) >= 0)
-		tgt += disp;
-	    break;
-	case 0x10: /* bltzal */
-	    if(*os_context_register_addr(context, r1) < 0)
-		tgt += disp;
-	    *os_context_register_addr(context, 31)
-		= *os_context_pc_addr(context) + 4;
-	    break;
-	case 0x11: /* bgezal */
-	    if(*os_context_register_addr(context, r1) >= 0)
-		tgt += disp;
-	    *os_context_register_addr(context, 31)
-		= *os_context_pc_addr(context) + 4;
-	    break;
-	}
-	break;
+        switch((inst >> 16) & 0x1f) {
+        case 0x00: /* bltz */
+            if(*os_context_register_addr(context, r1) < 0)
+                tgt += disp;
+            break;
+        case 0x01: /* bgez */
+            if(*os_context_register_addr(context, r1) >= 0)
+                tgt += disp;
+            break;
+        case 0x10: /* bltzal */
+            if(*os_context_register_addr(context, r1) < 0)
+                tgt += disp;
+            *os_context_register_addr(context, 31)
+                = *os_context_pc_addr(context) + 4;
+            break;
+        case 0x11: /* bgezal */
+            if(*os_context_register_addr(context, r1) >= 0)
+                tgt += disp;
+            *os_context_register_addr(context, 31)
+                = *os_context_pc_addr(context) + 4;
+            break;
+        }
+        break;
     case 0x4: /* beq */
-	if(*os_context_register_addr(context, r1)
-	   == *os_context_register_addr(context, r2))
-	    tgt += disp;
-	break;
+        if(*os_context_register_addr(context, r1)
+           == *os_context_register_addr(context, r2))
+            tgt += disp;
+        break;
     case 0x5: /* bne */
-	if(*os_context_register_addr(context, r1) 
-	   != *os_context_register_addr(context, r2))
-	    tgt += disp;
-	break;
+        if(*os_context_register_addr(context, r1)
+           != *os_context_register_addr(context, r2))
+            tgt += disp;
+        break;
     case 0x6: /* blez */
-	if(*os_context_register_addr(context, r1)
-	   <= *os_context_register_addr(context, r2))
-	    tgt += disp;
-	break;
+        if(*os_context_register_addr(context, r1)
+           <= *os_context_register_addr(context, r2))
+            tgt += disp;
+        break;
     case 0x7: /* bgtz */
-	if(*os_context_register_addr(context, r1)
-	   > *os_context_register_addr(context, r2))
-	    tgt += disp;
-	break;
+        if(*os_context_register_addr(context, r1)
+           > *os_context_register_addr(context, r2))
+            tgt += disp;
+        break;
     case 0x2: /* j */
-	tgt = jtgt;
-	break;
+        tgt = jtgt;
+        break;
     case 0x3: /* jal */
-	tgt = jtgt;
-	*os_context_register_addr(context, 31)
-	    = *os_context_pc_addr(context) + 4;
-	break;
+        tgt = jtgt;
+        *os_context_register_addr(context, 31)
+            = *os_context_pc_addr(context) + 4;
+        break;
     }
     return tgt;
 }
@@ -123,15 +123,15 @@ arch_skip_instruction(os_context_t *context)
 {
     /* Skip the offending instruction */
     if (os_context_bd_cause(context)) {
-	/* Currently, we never get here, because Linux' support for
+        /* Currently, we never get here, because Linux' support for
            bd_cause seems not terribly solid (c.f os_context_bd_cause
            in mips-linux-os.c).  If a port to Irix comes along, this
            code will be executed, because presumably Irix' support is
            better (it can hardly be worse).  We lose() to remind the
            porter to review this code.  -- CSR, 2002-09-06 */
-	lose("bd_cause branch taken; review code for new OS?\n");
+        lose("bd_cause branch taken; review code for new OS?\n");
         *os_context_pc_addr(context)
-	    = emulate_branch(context, *os_context_pc_addr(context));
+            = emulate_branch(context, *os_context_pc_addr(context));
     } else
         *os_context_pc_addr(context) += 4;
 }
@@ -140,9 +140,9 @@ unsigned char *
 arch_internal_error_arguments(os_context_t *context)
 {
     if (os_context_bd_cause(context))
-	return (unsigned char *)(*os_context_pc_addr(context) + 8);
+        return (unsigned char *)(*os_context_pc_addr(context) + 8);
     else
-	return (unsigned char *)(*os_context_pc_addr(context) + 4);
+        return (unsigned char *)(*os_context_pc_addr(context) + 4);
 }
 
 boolean
@@ -194,12 +194,12 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 
     /* Figure out where the breakpoint is, and what happens next. */
     if (os_context_bd_cause(context)) {
-	break_pc = pc+1;
-	next_inst = *pc;
+        break_pc = pc+1;
+        next_inst = *pc;
     }
     else {
-	break_pc = pc;
-	next_inst = orig_inst;
+        break_pc = pc;
+        next_inst = orig_inst;
     }
 
     /* Put the original instruction back. */
@@ -211,7 +211,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     if (opcode == 1 || ((opcode & 0x3c) == 0x4) || ((next_inst & 0xf00e0000) == 0x80000000))
         next_pc = (unsigned int *)emulate_branch(context, next_inst);
     else
-	next_pc = pc+1;
+        next_pc = pc+1;
 
     displaced_after_inst = arch_install_breakpoint(next_pc);
 }
@@ -235,44 +235,44 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 
     switch (code) {
     case trap_Halt:
-	fake_foreign_function_call(context);
-	lose("%%primitive halt called; the party is over.\n");
+        fake_foreign_function_call(context);
+        lose("%%primitive halt called; the party is over.\n");
 
     case trap_PendingInterrupt:
-	arch_skip_instruction(context);
-	interrupt_handle_pending(context);
-	break;
+        arch_skip_instruction(context);
+        interrupt_handle_pending(context);
+        break;
 
     case trap_Error:
     case trap_Cerror:
-	interrupt_internal_error(signal, info, context, code==trap_Cerror);
-	break;
+        interrupt_internal_error(signal, info, context, code==trap_Cerror);
+        break;
 
     case trap_Breakpoint:
-	handle_breakpoint(signal, info, context);
-	break;
+        handle_breakpoint(signal, info, context);
+        break;
 
     case trap_FunEndBreakpoint:
-	*os_context_pc_addr(context) = (int)handle_fun_end_breakpoint(signal, info, context);
-	os_flush_icache((os_vm_address_t)*os_context_pc_addr(context), sizeof(unsigned int));
-	break;
+        *os_context_pc_addr(context) = (int)handle_fun_end_breakpoint(signal, info, context);
+        os_flush_icache((os_vm_address_t)*os_context_pc_addr(context), sizeof(unsigned int));
+        break;
 
     case trap_AfterBreakpoint:
-	arch_remove_breakpoint(os_context_pc_addr(context), displaced_after_inst);
-	displaced_after_inst = arch_install_breakpoint(skipped_break_addr);
-	*os_context_sigmask_addr(context) = orig_sigmask;
-	break;
+        arch_remove_breakpoint(os_context_pc_addr(context), displaced_after_inst);
+        displaced_after_inst = arch_install_breakpoint(skipped_break_addr);
+        *os_context_sigmask_addr(context) = orig_sigmask;
+        break;
 
     case 0x10:
-	/* Clear the pseudo-atomic flag */
-	*os_context_register_addr(context, reg_NL4) &= ~(-1LL<<31);
-	arch_skip_instruction(context);
-	interrupt_handle_pending(context);
-	return;
-	
+        /* Clear the pseudo-atomic flag */
+        *os_context_register_addr(context, reg_NL4) &= ~(-1LL<<31);
+        arch_skip_instruction(context);
+        interrupt_handle_pending(context);
+        return;
+
     default:
-	interrupt_handle_now(signal, info, context);
-	break;
+        interrupt_handle_now(signal, info, context);
+        break;
     }
 }
 
@@ -301,49 +301,49 @@ sigfpe_handler(int signal, siginfo_t *info, void *void_context)
 
     switch (op) {
     case 0x0: /* SPECIAL */
-	switch (funct) {
-	case 0x20: /* ADD */
-	    /* FIXME: Hopefully, this whole section can just go away,
+        switch (funct) {
+        case 0x20: /* ADD */
+            /* FIXME: Hopefully, this whole section can just go away,
                with the rewrite of pseudo-atomic and the deletion of
                overflow VOPs */
-	    /* Check to see if this is really a pa_interrupted hit */
-	    if (rs == reg_ALLOC && rt == reg_NL4) {
-		*os_context_register_addr(context, reg_ALLOC)
-		    += *os_context_register_addr(context, reg_NL4) &= ~(-1LL<<31);
-		arch_skip_instruction(context);
-		interrupt_handle_pending(context);
-		return;
-	    }
-	    result = FIXNUM_VALUE(*os_context_register_addr(context, rs))
-		+ FIXNUM_VALUE(*os_context_register_addr(context, rt));
-	    dest = rd;
-	    break;
-	    
-	case 0x22: /* SUB */
-	    result = FIXNUM_VALUE(*os_context_register_addr(context, rs))
-		- FIXNUM_VALUE(*os_context_register_addr(context, rt));
-	    dest = rd;
-	    break;
-	}
-	break;
-	
+            /* Check to see if this is really a pa_interrupted hit */
+            if (rs == reg_ALLOC && rt == reg_NL4) {
+                *os_context_register_addr(context, reg_ALLOC)
+                    += *os_context_register_addr(context, reg_NL4) &= ~(-1LL<<31);
+                arch_skip_instruction(context);
+                interrupt_handle_pending(context);
+                return;
+            }
+            result = FIXNUM_VALUE(*os_context_register_addr(context, rs))
+                + FIXNUM_VALUE(*os_context_register_addr(context, rt));
+            dest = rd;
+            break;
+
+        case 0x22: /* SUB */
+            result = FIXNUM_VALUE(*os_context_register_addr(context, rs))
+                - FIXNUM_VALUE(*os_context_register_addr(context, rt));
+            dest = rd;
+            break;
+        }
+        break;
+
     case 0x8: /* ADDI */
-	result = FIXNUM_VALUE(*os_context_register_addr(context,rs)) + (immed>>2);
-	dest = rt;
-	break;
+        result = FIXNUM_VALUE(*os_context_register_addr(context,rs)) + (immed>>2);
+        dest = rt;
+        break;
     }
-    
+
     if (dest < 32) {
         dynamic_space_free_pointer =
             (lispobj *) *os_context_register_addr(context,reg_ALLOC);
 
         *os_context_register_addr(context,dest) = alloc_number(result);
 
-	*os_context_register_addr(context, reg_ALLOC) =
-	    (unsigned int) dynamic_space_free_pointer;
+        *os_context_register_addr(context, reg_ALLOC) =
+            (unsigned int) dynamic_space_free_pointer;
 
         arch_skip_instruction(context);
-	
+
     }
     else
         interrupt_handle_now(signal, info, context);
@@ -351,7 +351,7 @@ sigfpe_handler(int signal, siginfo_t *info, void *void_context)
 
 void
 arch_install_interrupt_handlers()
-{    
+{
     undoably_install_low_level_interrupt_handler(SIGILL,sigill_handler);
     undoably_install_low_level_interrupt_handler(SIGTRAP,sigtrap_handler);
     undoably_install_low_level_interrupt_handler(SIGFPE,sigfpe_handler);

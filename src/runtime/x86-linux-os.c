@@ -43,10 +43,10 @@
 #include <linux/unistd.h>
 #include <sys/mman.h>
 #include <linux/version.h>
-#include "thread.h"		/* dynamic_values_bytes */
+#include "thread.h"             /* dynamic_values_bytes */
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define user_desc  modify_ldt_ldt_s 
+#define user_desc  modify_ldt_ldt_s
 #endif
 
 _syscall3(int, modify_ldt, int, func, void *, ptr, unsigned long, bytecount );
@@ -60,12 +60,12 @@ u32 local_ldt_copy[LDT_ENTRIES*LDT_ENTRY_SIZE/sizeof(u32)];
  * users have thread-related problems that maintainers can't duplicate */
 
 void debug_get_ldt()
-{ 
+{
     int n=modify_ldt (0, local_ldt_copy, sizeof local_ldt_copy);
     printf("%d bytes in ldt: print/x local_ldt_copy\n", n);
 }
 
-volatile lispobj modify_ldt_lock;	/* protect all calls to modify_ldt */
+volatile lispobj modify_ldt_lock;       /* protect all calls to modify_ldt */
 
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;
@@ -74,32 +74,32 @@ int arch_os_thread_init(struct thread *thread) {
      * held when getting modify_ldt_lock
      */
     struct user_desc ldt_entry = {
-	1, 0, 0, /* index, address, length filled in later */
-	1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
-    }; 
+        1, 0, 0, /* index, address, length filled in later */
+        1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
+    };
     int n;
     get_spinlock(&modify_ldt_lock,(long)thread);
     n=modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy);
     /* get next free ldt entry */
 
     if(n) {
-	u32 *p;
-	for(n=0,p=local_ldt_copy;*p;p+=LDT_ENTRY_SIZE/sizeof(u32))
-	    n++;
+        u32 *p;
+        for(n=0,p=local_ldt_copy;*p;p+=LDT_ENTRY_SIZE/sizeof(u32))
+            n++;
     }
     ldt_entry.entry_number=n;
     ldt_entry.base_addr=(unsigned long) thread;
     ldt_entry.limit=dynamic_values_bytes;
     ldt_entry.limit_in_pages=0;
     if (modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) {
-	modify_ldt_lock=0;
-	/* modify_ldt call failed: something magical is not happening */
-	return -1;
+        modify_ldt_lock=0;
+        /* modify_ldt call failed: something magical is not happening */
+        return -1;
     }
-    __asm__ __volatile__ ("movw %w0, %%fs" : : "q" 
-			  ((n << 3) /* selector number */
-			   + (1 << 2) /* TI set = LDT */
-			   + 3)); /* privilege level */
+    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
+                          ((n << 3) /* selector number */
+                           + (1 << 2) /* TI set = LDT */
+                           + 3)); /* privilege level */
     thread->tls_cookie=n;
     modify_ldt_lock=0;
 
@@ -133,16 +133,16 @@ struct thread *debug_get_fs() {
 
 int arch_os_thread_cleanup(struct thread *thread) {
     struct user_desc ldt_entry = {
-	0, 0, 0, 
-	0, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 0
-    }; 
+        0, 0, 0,
+        0, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 0
+    };
 
     ldt_entry.entry_number=thread->tls_cookie;
     get_spinlock(&modify_ldt_lock,(long)thread);
     if (modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) {
-	modify_ldt_lock=0;
-	/* modify_ldt call failed: something magical is not happening */
-	return 0;
+        modify_ldt_lock=0;
+        /* modify_ldt call failed: something magical is not happening */
+        return 0;
     }
     modify_ldt_lock=0;
     return 1;
@@ -159,14 +159,14 @@ os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
 {
     switch(offset) {
-    case reg_EAX: return &context->uc_mcontext.gregs[11]; 
-    case reg_ECX: return &context->uc_mcontext.gregs[10]; 
-    case reg_EDX: return &context->uc_mcontext.gregs[9]; 
-    case reg_EBX: return &context->uc_mcontext.gregs[8]; 
-    case reg_ESP: return &context->uc_mcontext.gregs[7]; 
-    case reg_EBP: return &context->uc_mcontext.gregs[6]; 
-    case reg_ESI: return &context->uc_mcontext.gregs[5]; 
-    case reg_EDI: return &context->uc_mcontext.gregs[4]; 
+    case reg_EAX: return &context->uc_mcontext.gregs[11];
+    case reg_ECX: return &context->uc_mcontext.gregs[10];
+    case reg_EDX: return &context->uc_mcontext.gregs[9];
+    case reg_EBX: return &context->uc_mcontext.gregs[8];
+    case reg_ESP: return &context->uc_mcontext.gregs[7];
+    case reg_EBP: return &context->uc_mcontext.gregs[6];
+    case reg_ESI: return &context->uc_mcontext.gregs[5];
+    case reg_EDI: return &context->uc_mcontext.gregs[4];
     default: return 0;
     }
     return &context->uc_mcontext.gregs[offset];
@@ -180,7 +180,7 @@ os_context_pc_addr(os_context_t *context)
 
 os_context_register_t *
 os_context_sp_addr(os_context_t *context)
-{				
+{
     return &context->uc_mcontext.gregs[17]; /* REG_UESP */
 }
 
@@ -194,7 +194,7 @@ unsigned long
 os_context_fp_control(os_context_t *context)
 {
     return ((((context->uc_mcontext.fpregs->cw) & 0xffff) ^ 0x3f) |
-	    (((context->uc_mcontext.fpregs->sw) & 0xffff) << 16));
+            (((context->uc_mcontext.fpregs->sw) & 0xffff) << 16));
 }
 
 sigset_t *

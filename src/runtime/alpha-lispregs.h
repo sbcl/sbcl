@@ -9,7 +9,7 @@
  * files for more information.
  */
 
-#define NREGS	(32)
+#define NREGS   (32)
 
 #ifdef LANGUAGE_ASSEMBLY
 #ifdef linux
@@ -20,40 +20,40 @@
 #else
 #define REG(num) num
 #endif
-				/* "traditional" register name and use */
-				/* courtesy of <alpha/regdef.h> */
-#define reg_LIP REG(0)		/* v0 */
-#define reg_A0 REG(1)		/* t0 - temporary (caller-saved) */
-#define reg_A1 REG(2)		/* t1 */
-#define reg_A2 REG(3)		/* t2 */
-#define reg_A3 REG(4)		/* t3 */
-#define reg_A4 REG(5)		/* t4 */
-#define reg_A5 REG(6)		/* t5 */
-#define reg_L0 REG(7)		/* t6 */
-#define reg_NARGS REG(8)	/* t7 */
-#define reg_CSP REG(9)		/* s0 - saved (callee-saved) */
-#define reg_CFP REG(10)		/* s1 */
-#define reg_OCFP REG(11)	/* s2 */
-#define reg_BSP REG(12)		/* s3 */
-#define reg_LEXENV REG(13)	/* s4 */
-#define reg_CODE REG(14)	/* s5 */
-#define reg_NULL REG(15)	/* s6 = fp (frame pointer) */
-#define reg_NL0 REG(16)		/* a0 - argument (caller-saved) */
-#define reg_NL1 REG(17)		/* a1 */
-#define reg_NL2 REG(18)		/* a2 */
-#define reg_NL3 REG(19)		/* a3 */
-#define reg_NL4 REG(20)		/* a4 */
-#define reg_NL5 REG(21)		/* a5 */
-#define reg_ALLOC REG(22)	/* t8 - more temps (caller-saved) */
-#define reg_FDEFN REG(23)	/* t9 */
-#define reg_CFUNC REG(24)	/* t10 */
-#define reg_NFP REG(25)		/* t11 */
-#define reg_LRA REG(26)		/* ra - return address */
-#define reg_L1 REG(27)		/* t12, or pv - procedure variable */
-#define reg_L2 REG(28)		/* at - assembler temporary */
-#define reg_GP REG(29)		/* global pointer */
-#define reg_NSP REG(30)		/* sp - stack pointer */
-#define reg_ZERO REG(31)	/* reads as zero, writes are noops */
+                                /* "traditional" register name and use */
+                                /* courtesy of <alpha/regdef.h> */
+#define reg_LIP REG(0)          /* v0 */
+#define reg_A0 REG(1)           /* t0 - temporary (caller-saved) */
+#define reg_A1 REG(2)           /* t1 */
+#define reg_A2 REG(3)           /* t2 */
+#define reg_A3 REG(4)           /* t3 */
+#define reg_A4 REG(5)           /* t4 */
+#define reg_A5 REG(6)           /* t5 */
+#define reg_L0 REG(7)           /* t6 */
+#define reg_NARGS REG(8)        /* t7 */
+#define reg_CSP REG(9)          /* s0 - saved (callee-saved) */
+#define reg_CFP REG(10)         /* s1 */
+#define reg_OCFP REG(11)        /* s2 */
+#define reg_BSP REG(12)         /* s3 */
+#define reg_LEXENV REG(13)      /* s4 */
+#define reg_CODE REG(14)        /* s5 */
+#define reg_NULL REG(15)        /* s6 = fp (frame pointer) */
+#define reg_NL0 REG(16)         /* a0 - argument (caller-saved) */
+#define reg_NL1 REG(17)         /* a1 */
+#define reg_NL2 REG(18)         /* a2 */
+#define reg_NL3 REG(19)         /* a3 */
+#define reg_NL4 REG(20)         /* a4 */
+#define reg_NL5 REG(21)         /* a5 */
+#define reg_ALLOC REG(22)       /* t8 - more temps (caller-saved) */
+#define reg_FDEFN REG(23)       /* t9 */
+#define reg_CFUNC REG(24)       /* t10 */
+#define reg_NFP REG(25)         /* t11 */
+#define reg_LRA REG(26)         /* ra - return address */
+#define reg_L1 REG(27)          /* t12, or pv - procedure variable */
+#define reg_L2 REG(28)          /* at - assembler temporary */
+#define reg_GP REG(29)          /* global pointer */
+#define reg_NSP REG(30)         /* sp - stack pointer */
+#define reg_ZERO REG(31)        /* reads as zero, writes are noops */
 
 
 #define REGNAMES \

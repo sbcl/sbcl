@@ -43,10 +43,10 @@ size_t os_vm_page_size;
 #error "Define threading support functions"
 #else
 int arch_os_thread_init(struct thread *thread) {
-    return 1;			/* success */
+    return 1;                   /* success */
 }
 int arch_os_thread_cleanup(struct thread *thread) {
-    return 1;			/* success */
+    return 1;                   /* success */
 }
 #endif
 
@@ -88,14 +88,14 @@ os_restore_fp_control(os_context_t *context)
        but without the UL, which would probably lead to 32/64-bit
        errors if we simply used it here.  Ugh.  CSR, 2003-09-15 */
     arch_set_fp_control(os_context_fp_control(context) & ~(0x7e0000UL) &
-			/* KLUDGE: for some reason that I don't
-			understand, by the time we get here the
-			"enable denormalized traps" bit in the fp
-			control word is set.  Since we really don't
-			want to tra every time someone types
-			LEAST-POSITIVE-SINGLE-FLOAT into the repl,
-			mask that bit out.  -- CSR, 2003-09-15 */
-			~(0x1UL<<6));
+                        /* KLUDGE: for some reason that I don't
+                        understand, by the time we get here the
+                        "enable denormalized traps" bit in the fp
+                        control word is set.  Since we really don't
+                        want to tra every time someone types
+                        LEAST-POSITIVE-SINGLE-FLOAT into the repl,
+                        mask that bit out.  -- CSR, 2003-09-15 */
+                        ~(0x1UL<<6));
 }
 
 void os_flush_icache(os_vm_address_t address, os_vm_size_t length)

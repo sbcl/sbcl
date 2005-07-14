@@ -41,10 +41,10 @@
 size_t os_vm_page_size;
 
 int arch_os_thread_init(struct thread *thread) {
-    return 1;			/* success */
+    return 1;                   /* success */
 }
 int arch_os_thread_cleanup(struct thread *thread) {
-    return 1;			/* success */
+    return 1;                   /* success */
 }
 
 os_context_register_t   *
@@ -96,41 +96,41 @@ os_context_fp_control(os_context_t *context)
        (the number of ppc registers), but that happens to get the
        right answer. -- CSR, 2002-07-11 */
 #if defined(GLIBC231_STYLE_UCONTEXT)
-    return context->uc_mcontext.regs->gpr[PT_FPSCR]; 
+    return context->uc_mcontext.regs->gpr[PT_FPSCR];
 #elif defined(GLIBC232_STYLE_UCONTEXT)
-    return context->uc_mcontext.uc_regs->gregs[PT_FPSCR]; 
+    return context->uc_mcontext.uc_regs->gregs[PT_FPSCR];
 #endif
 }
 
-void 
+void
 os_restore_fp_control(os_context_t *context)
 {
     unsigned long control;
     double d;
-    
-    control = os_context_fp_control(context) & 
-	/* FIXME: Should we preserve the user's requested rounding mode?
 
-	Note that doing 
-	
-	~(FLOAT_STICKY_BITS_MASK | FLOAT_EXCEPTIONS_BYTE_MASK)
-	
-	here leads to infinite SIGFPE for invalid operations, as
-	there are bits in the control register that need to be
-	cleared that are let through by that mask. -- CSR, 2002-07-16 */
+    control = os_context_fp_control(context) &
+        /* FIXME: Should we preserve the user's requested rounding mode?
 
-	FLOAT_TRAPS_BYTE_MASK;
-    
+        Note that doing
+
+        ~(FLOAT_STICKY_BITS_MASK | FLOAT_EXCEPTIONS_BYTE_MASK)
+
+        here leads to infinite SIGFPE for invalid operations, as
+        there are bits in the control register that need to be
+        cleared that are let through by that mask. -- CSR, 2002-07-16 */
+
+        FLOAT_TRAPS_BYTE_MASK;
+
     d = *((double *) &control);
     /* Hmp.  Apparently the following doesn't work either:
-       
+
     asm volatile ("mtfsf 0xff,%0" : : "f" (d));
 
     causing segfaults at the first GC.
     */
 }
 
-void 
+void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
     /* see ppc-arch.c */

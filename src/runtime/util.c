@@ -40,24 +40,24 @@ voidacc_acc(struct voidacc *va, void* x)
 {
     /* Ensure that we have enough space, or die. */
     if (va->n_used >= va->n_avail) { /* if we've run out of space */
-	/* We need to allocate more space. */
+        /* We need to allocate more space. */
         int new_n_avail = 1 + 2 * va->n_avail;
         void** new_result = (void**)calloc(sizeof(void*), new_n_avail);
         int i;
-	if (!new_result) {
-	    return 1;
-	}
+        if (!new_result) {
+            return 1;
+        }
         /* Copy old result into new space. */
-	for (i = va->n_used; --i >= 0; ) {
-	    new_result[i] = va->result[i];
-	}
-	free(va->result);
-	va->result = new_result;
-	va->n_avail = new_n_avail;
+        for (i = va->n_used; --i >= 0; ) {
+            new_result[i] = va->result[i];
+        }
+        free(va->result);
+        va->result = new_result;
+        va->n_avail = new_n_avail;
     }
 
-    /* If we get to this point, we have enough space to store x. 
-     *  
+    /* If we get to this point, we have enough space to store x.
+     *
      * Note that since we cleverly counted the 0 as part of the space
      * used, now we need to subtract one to get the correct offset to
      * write into.:-| */

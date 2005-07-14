@@ -20,13 +20,13 @@
  * last I tried it - dan 2003.12.21 */
 #if 1
 #define gc_assert(ex) do { \
-	if (!(ex)) gc_abort(); \
+        if (!(ex)) gc_abort(); \
 } while (0)
 #else
 #define gc_assert(ex)
 #endif
 #define gc_abort() lose("GC invariant lost, file \"%s\", line %d", \
-			__FILE__, __LINE__)
+                        __FILE__, __LINE__)
 
 #define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
 
@@ -52,8 +52,8 @@ NWORDS(unsigned long x, unsigned long n_bits)
 /* FIXME (1) this could probably be defined using something like
  *  sizeof(lispobj)*floor(sizeof(struct simple_fun)/sizeof(lispobj))
  *    -  FUN_POINTER_LOWTAG
- * as I'm reasonably sure that simple_fun->code must always be the 
- * last slot in the object 
+ * as I'm reasonably sure that simple_fun->code must always be the
+ * last slot in the object
 
  * FIXME (2) it also appears in purify.c, and it has a different value
  * for SPARC users in that bit

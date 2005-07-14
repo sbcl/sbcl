@@ -29,20 +29,20 @@
  * example code found at
  * http://www.yendor.com/programming/unix/apue/pty/main.c
 
--brkint 
+-brkint
 
  */
 
-int set_noecho(int fd) 
+int set_noecho(int fd)
 {
     struct termios  stermios;
-    
+
     if (tcgetattr(fd, &stermios) < 0) return 0;
-    
+
     stermios.c_lflag &= ~(  ECHO | /* ECHOE |  ECHOK | */  ECHONL);
-    stermios.c_oflag |= (ONLCR); 
+    stermios.c_oflag |= (ONLCR);
     stermios.c_iflag &= ~(BRKINT);
-    stermios.c_iflag |= (ICANON|ICRNL); 
+    stermios.c_iflag |= (ICANON|ICRNL);
 
     stermios.c_cc[VERASE]=0177;
     if (tcsetattr(fd, TCSANOW, &stermios) < 0) return 0;
@@ -50,13 +50,13 @@ int set_noecho(int fd)
 }
 
 int spawn(char *program, char *argv[], char *envp[], char *pty_name,
-	  int stdin, int stdout, int stderr)
+          int stdin, int stdout, int stderr)
 {
     int pid = fork();
     int fd;
 
     if (pid != 0)
-	return pid;
+        return pid;
 
     /* Put us in our own process group. */
 #if defined(hpux)
@@ -70,34 +70,34 @@ int spawn(char *program, char *argv[], char *envp[], char *pty_name,
     /* If we are supposed to be part of some other pty, go for it. */
     if (pty_name) {
 #if !defined(hpux) && !defined(SVR4)
-	fd = open("/dev/tty", O_RDWR, 0);
-	if (fd >= 0) {
-	    ioctl(fd, TIOCNOTTY, 0);
-	    close(fd);
-	}
+        fd = open("/dev/tty", O_RDWR, 0);
+        if (fd >= 0) {
+            ioctl(fd, TIOCNOTTY, 0);
+            close(fd);
+        }
 #endif
-	fd = open(pty_name, O_RDWR, 0);
-	dup2(fd, 0);
-	set_noecho(0);
-	dup2(fd, 1);
-	dup2(fd, 2);
-	close(fd);
+        fd = open(pty_name, O_RDWR, 0);
+        dup2(fd, 0);
+        set_noecho(0);
+        dup2(fd, 1);
+        dup2(fd, 2);
+        close(fd);
     } else{
     /* Set up stdin, stdout, and stderr */
     if (stdin >= 0)
-	dup2(stdin, 0);
+        dup2(stdin, 0);
     if (stdout >= 0)
-	dup2(stdout, 1);
+        dup2(stdout, 1);
     if (stderr >= 0)
-	dup2(stderr, 2);
+        dup2(stderr, 2);
     }
     /* Close all other fds. */
 #ifdef SVR4
     for (fd = sysconf(_SC_OPEN_MAX)-1; fd >= 3; fd--)
-	close(fd);
+        close(fd);
 #else
     for (fd = getdtablesize()-1; fd >= 3; fd--)
-	close(fd);
+        close(fd);
 #endif
 
     /* Exec the program. */

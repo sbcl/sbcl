@@ -38,21 +38,21 @@ os_zero(os_vm_address_t addr, os_vm_size_t length)
     block_size = os_trunc_size_to_page(length);
 
     if (block_start > addr)
-	bzero((char *)addr, block_start-addr);
+        bzero((char *)addr, block_start-addr);
     if (block_size < length)
-	bzero((char *)block_start+block_size, length-block_size);
+        bzero((char *)block_start+block_size, length-block_size);
 
     if (block_size != 0) {
-	/* Now deallocate and allocate the block so that it faults in
-	 * zero-filled. */
+        /* Now deallocate and allocate the block so that it faults in
+         * zero-filled. */
 
-	os_invalidate(block_start, block_size);
-	addr = os_validate(block_start, block_size);
+        os_invalidate(block_start, block_size);
+        addr = os_validate(block_start, block_size);
 
-	if (addr == NULL || addr != block_start)
-	    lose("os_zero: block moved! 0x%08x ==> 0x%08x",
-		 block_start,
-		 addr);
+        if (addr == NULL || addr != block_start)
+            lose("os_zero: block moved! 0x%08x ==> 0x%08x",
+                 block_start,
+                 addr);
     }
 }
 
@@ -85,25 +85,25 @@ os_reallocate(os_vm_address_t addr, os_vm_size_t old_len, os_vm_size_t len)
     old_len=os_round_up_size_to_page(old_len);
 
     if (addr==NULL)
-	return os_allocate(len);
+        return os_allocate(len);
     else{
-	long len_diff=len-old_len;
+        long len_diff=len-old_len;
 
-	if (len_diff<0)
-	    os_invalidate(addr+len,-len_diff);
-	else{
-	    if (len_diff!=0) {
-	      os_vm_address_t new=os_allocate(len);
+        if (len_diff<0)
+            os_invalidate(addr+len,-len_diff);
+        else{
+            if (len_diff!=0) {
+              os_vm_address_t new=os_allocate(len);
 
-	      if(new!=NULL){
-		bcopy(addr,new,old_len);
-		os_invalidate(addr,old_len);
-		}
-		
-	      addr=new;
-	    }
-	}
-	return addr;
+              if(new!=NULL){
+                bcopy(addr,new,old_len);
+                os_invalidate(addr,old_len);
+                }
+
+              addr=new;
+            }
+        }
+        return addr;
     }
 }
 

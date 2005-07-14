@@ -4,9 +4,9 @@
  * interface looks a lot like the Mach interface (but simpler in some
  * places). For some operating systems, a subset of these functions
  * will have to be emulated.
- * 
+ *
  * This is the OSF/1 version, based on the Linux version, itself based
- * on the OSF1 version from CMUCL by Sean Hallgren.  Now _there's_ 
+ * on the OSF1 version from CMUCL by Sean Hallgren.  Now _there's_
  * a metacircularity for you ...
  */
 
@@ -65,8 +65,8 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
     else  flags |= MAP_VARIABLE;
 
     if((addr=mmap(addr,len,OS_VM_PROT_ALL,flags,-1,0)) == (os_vm_address_t) -1)
-	perror("mmap");
-    
+        perror("mmap");
+
     return addr;
 }
 
@@ -74,7 +74,7 @@ void
 os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
     if (munmap(addr,len) == -1) {
-	perror("munmap");
+        perror("munmap");
     }
 }
 
@@ -82,13 +82,13 @@ os_vm_address_t
 os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 {
     addr = mmap(addr, len,
-		OS_VM_PROT_ALL,
-		MAP_PRIVATE | MAP_FILE | MAP_FIXED,
-		fd, (off_t) offset);
+                OS_VM_PROT_ALL,
+                MAP_PRIVATE | MAP_FILE | MAP_FIXED,
+                fd, (off_t) offset);
 
     if (addr == MAP_FAILED) {
-	perror("mmap");
-	lose("unexpected mmap(..) failure");
+        perror("mmap");
+        lose("unexpected mmap(..) failure");
     }
 
     return addr;
@@ -98,7 +98,7 @@ void
 os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {
     if (mprotect(address, length, prot) == -1) {
-	perror("mprotect");
+        perror("mprotect");
     }
 }
 
@@ -109,9 +109,9 @@ is_valid_lisp_addr(os_vm_address_t addr)
     os_vm_address_t newaddr;
     newaddr=os_trunc_to_page(addr);
     if((ret=mvalid(newaddr,newaddr-addr+4,OS_VM_PROT_ALL)) == 0)
-	return TRUE;
+        return TRUE;
     else if(errno==EINVAL)
-	perror("mvalid");
+        perror("mvalid");
     return FALSE;
 }
 
@@ -126,15 +126,15 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     os_context_t *context = arch_os_get_context(&void_context);
 
     os_vm_address_t addr = arch_get_bad_addr(signal,info,context);
-    
-    if (addr != NULL && 	
-	*os_context_register_addr(context,reg_ALLOC) & (1L<<63)){
-	/* this is lifted from linux-os.c, so violates OOAO */
-	*os_context_register_addr(context,reg_ALLOC) -= (1L<<63);
-	interrupt_handle_pending(context);
+
+    if (addr != NULL &&
+        *os_context_register_addr(context,reg_ALLOC) & (1L<<63)){
+        /* this is lifted from linux-os.c, so violates OOAO */
+        *os_context_register_addr(context,reg_ALLOC) -= (1L<<63);
+        interrupt_handle_pending(context);
     } else if (!interrupt_maybe_gc(signal, info, context)) {
-	if(!handle_guard_page_triggered(context,addr))
-	    interrupt_handle_now(signal, info, context);
+        if(!handle_guard_page_triggered(context,addr))
+            interrupt_handle_now(signal, info, context);
     }
 }
 
@@ -143,6 +143,6 @@ void
 os_install_interrupt_handlers(void)
 {
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
-						 sigsegv_handler);
+                                                 sigsegv_handler);
 }
 

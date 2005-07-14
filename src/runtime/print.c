@@ -253,11 +253,11 @@ static void brief_otherimm(lispobj obj)
             break;
 
         default:
-	    idx = type >> 2;
-	    if (idx < (sizeof(lowtag_Names) / sizeof(char *)))
-		    printf("%s", lowtag_Names[idx]);
-	    else
-		    printf("unknown type (0x%0x)", type);
+            idx = type >> 2;
+            if (idx < (sizeof(lowtag_Names) / sizeof(char *)))
+                    printf("%s", lowtag_Names[idx]);
+            else
+                    printf("unknown type (0x%0x)", type);
             break;
     }
 }
@@ -270,9 +270,9 @@ static void print_otherimm(lispobj obj)
     idx = type >> 2;
 
     if (idx < (sizeof(lowtag_Names) / sizeof(char *)))
-	    printf(", %s", lowtag_Names[idx]);
+            printf(", %s", lowtag_Names[idx]);
     else
-	    printf(", unknown type (0x%0x)", type);
+            printf(", unknown type (0x%0x)", type);
 
     switch (widetag_of(obj)) {
         case CHARACTER_WIDETAG:
@@ -296,7 +296,7 @@ static void brief_list(lispobj obj)
     int length = 0;
 
     if (!is_valid_lisp_addr((os_vm_address_t)native_pointer(obj)))
-	printf("(invalid Lisp-level address)");
+        printf("(invalid Lisp-level address)");
     else if (obj == NIL)
         printf("NIL");
     else {
@@ -328,7 +328,7 @@ static void brief_list(lispobj obj)
 static void print_list(lispobj obj)
 {
     if (!is_valid_lisp_addr((os_vm_address_t)native_pointer(obj))) {
-	printf("(invalid address)");
+        printf("(invalid address)");
     } else if (obj == NIL) {
         printf(" (NIL)");
     } else {
@@ -352,8 +352,8 @@ static void print_struct(lispobj obj)
     char buffer[16];
     print_obj("type: ", ((struct instance *)native_pointer(obj))->slots[0]);
     for (i = 1; i < HeaderValue(instance->header); i++) {
-	sprintf(buffer, "slot %d: ", i);
-	print_obj(buffer, instance->slots[i]);
+        sprintf(buffer, "slot %d: ", i);
+        print_obj(buffer, instance->slots[i]);
     }
 }
 
@@ -368,8 +368,8 @@ static void brief_otherptr(lispobj obj)
     ptr = (lispobj *) native_pointer(obj);
 
     if (!is_valid_lisp_addr((os_vm_address_t)obj)) {
-	    printf("(invalid address)");
-	    return;
+            printf("(invalid address)");
+            return;
     }
 
     header = *ptr;
@@ -410,7 +410,7 @@ static void print_slots(char **slots, int count, lispobj *ptr)
             print_obj(*slots++, *ptr++);
         } else {
             print_obj("???: ", *ptr++);
-	}
+        }
     }
 }
 
@@ -421,7 +421,7 @@ static char *symbol_slots[] = {"value: ", "unused: ",
     "plist: ", "name: ", "package: ",
 #ifdef LISP_FEATURE_SB_THREAD
     "tls-index: " ,
-#endif			       
+#endif
     NULL};
 static char *ratio_slots[] = {"numer: ", "denom: ", NULL};
 static char *complex_slots[] = {"real: ", "imag: ", NULL};
@@ -437,7 +437,7 @@ static char *value_cell_slots[] = {"value: ", NULL};
 static void print_otherptr(lispobj obj)
 {
     if (!is_valid_lisp_addr((os_vm_address_t)obj)) {
-	printf("(invalid address)");
+        printf("(invalid address)");
     } else {
 #ifndef LISP_FEATURE_ALPHA
         lispobj *ptr;
@@ -451,20 +451,20 @@ static void print_otherptr(lispobj obj)
         int count, type, index;
         char *cptr, buffer[16];
 
-	ptr = (lispobj*) native_pointer(obj);
-	if (ptr == NULL) {
-		printf(" (NULL Pointer)");
-		return;
-	}
+        ptr = (lispobj*) native_pointer(obj);
+        if (ptr == NULL) {
+                printf(" (NULL Pointer)");
+                return;
+        }
 
-	header = *ptr++;
-	length = (*ptr) >> 2;
-	count = header>>8;
-	type = widetag_of(header);
+        header = *ptr++;
+        length = (*ptr) >> 2;
+        count = header>>8;
+        type = widetag_of(header);
 
         print_obj("header: ", header);
         if (lowtag_of(header) != OTHER_IMMEDIATE_0_LOWTAG &&
-	    lowtag_of(header) != OTHER_IMMEDIATE_1_LOWTAG) {
+            lowtag_of(header) != OTHER_IMMEDIATE_1_LOWTAG) {
             NEWLINE_OR_RETURN;
             printf("(invalid header object)");
             return;
@@ -538,7 +538,7 @@ static void print_otherptr(lispobj obj)
 
             case SIMPLE_BASE_STRING_WIDETAG:
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-	case SIMPLE_CHARACTER_STRING_WIDETAG: /* FIXME */
+        case SIMPLE_CHARACTER_STRING_WIDETAG: /* FIXME */
 #endif
                 NEWLINE_OR_RETURN;
                 cptr = (char *)(ptr+1);
@@ -577,16 +577,16 @@ static void print_otherptr(lispobj obj)
             case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
             case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
-	    case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
+            case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
-	    case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
+            case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
-	    case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
+            case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
-	    case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
+            case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
 #endif
             case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
             case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
@@ -594,17 +594,17 @@ static void print_otherptr(lispobj obj)
             case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
-	    case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
+            case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
-	    case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
+            case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
-	    case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
+            case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
             case COMPLEX_BASE_STRING_WIDETAG:
 #ifdef COMPLEX_CHARACTER_STRING_WIDETAG
-	case COMPLEX_CHARACTER_STRING_WIDETAG:
+        case COMPLEX_CHARACTER_STRING_WIDETAG:
 #endif
             case COMPLEX_VECTOR_NIL_WIDETAG:
             case COMPLEX_BIT_VECTOR_WIDETAG:
@@ -633,7 +633,7 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case VALUE_CELL_HEADER_WIDETAG:
-		print_slots(value_cell_slots, 1, ptr);
+                print_slots(value_cell_slots, 1, ptr);
                 break;
 
             case SAP_WIDETAG:
@@ -646,7 +646,7 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case WEAK_POINTER_WIDETAG:
-		print_slots(weak_pointer_slots, 1, ptr);
+                print_slots(weak_pointer_slots, 1, ptr);
                 break;
 
             case CHARACTER_WIDETAG:
@@ -655,10 +655,10 @@ static void print_otherptr(lispobj obj)
                 printf("pointer to an immediate?");
                 break;
 
-	    case FDEFN_WIDETAG:
-		print_slots(fdefn_slots, count, ptr);
-		break;
-		
+            case FDEFN_WIDETAG:
+                print_slots(fdefn_slots, count, ptr);
+                break;
+
             default:
                 NEWLINE_OR_RETURN;
                 printf("Unknown header object?");
@@ -670,11 +670,11 @@ static void print_otherptr(lispobj obj)
 static void print_obj(char *prefix, lispobj obj)
 {
     static void (*verbose_fns[])(lispobj obj)
-	= {print_fixnum, print_struct, print_otherimm, print_list,
-	   print_fixnum, print_otherptr, print_otherimm, print_otherptr};
+        = {print_fixnum, print_struct, print_otherimm, print_list,
+           print_fixnum, print_otherptr, print_otherimm, print_otherptr};
     static void (*brief_fns[])(lispobj obj)
-	= {brief_fixnum, brief_struct, brief_otherimm, brief_list,
-	   brief_fixnum, brief_otherptr, brief_otherimm, brief_otherptr};
+        = {brief_fixnum, brief_struct, brief_otherimm, brief_list,
+           brief_fixnum, brief_otherptr, brief_otherimm, brief_otherptr};
     int type = lowtag_of(obj);
     struct var *var = lookup_by_obj(obj);
     char buffer[256];
@@ -687,8 +687,8 @@ static void print_obj(char *prefix, lispobj obj)
         dont_descend = 1;
 
     if (var == NULL &&
-	/* FIXME: What does this "x & y & z & .." expression mean? */
-	(obj & FUN_POINTER_LOWTAG & LIST_POINTER_LOWTAG & INSTANCE_POINTER_LOWTAG & OTHER_POINTER_LOWTAG) != 0)
+        /* FIXME: What does this "x & y & z & .." expression mean? */
+        (obj & FUN_POINTER_LOWTAG & LIST_POINTER_LOWTAG & INSTANCE_POINTER_LOWTAG & OTHER_POINTER_LOWTAG) != 0)
         var = define_var(NULL, obj, 0);
 
     if (var != NULL)
@@ -760,5 +760,5 @@ brief_print(lispobj obj)
 {
     printf("lispobj 0x%lx\n", (unsigned long)obj);
 }
-     
+
 #endif /* defined(LISP_FEATURE_SB_LDB) */

@@ -155,7 +155,7 @@ struct var *define_var(char *name, lispobj obj, boolean perm)
 }
 
 struct var *define_dynamic_var(char *name, lispobj updatefn(struct var *),
-			       boolean perm)
+                               boolean perm)
 {
     struct var *var = make_var(name, perm);
 

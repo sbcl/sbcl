@@ -64,10 +64,10 @@ size_t os_vm_page_size;
 #define __NR_sys_futex __NR_futex
 
 _syscall4(int,sys_futex,
-	  int *, futex,
-	  int, op,
-	  int, val,
-	  struct timespec *, rel);
+          int *, futex,
+          int, op,
+          int, val,
+          struct timespec *, rel);
 #endif
 
 #include "gc.h"
@@ -88,25 +88,25 @@ os_init(void)
     int minor_version;
     char *p;
     uname(&name);
-    p=name.release;  
+    p=name.release;
     major_version = atoi(p);
     p=strchr(p,'.')+1;
     minor_version = atoi(p);
     if (major_version<2) {
-	lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)",
-	     major_version);
+        lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)",
+             major_version);
     }
     if (!(major_version>2 || minor_version >= 4)) {
 #ifdef LISP_FEATURE_SPARC
-	FSHOW((stderr,"linux kernel %d.%d predates 2.4;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", major_version,minor_version));
-	linux_sparc_siginfo_bug = 1;
+        FSHOW((stderr,"linux kernel %d.%d predates 2.4;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", major_version,minor_version));
+        linux_sparc_siginfo_bug = 1;
 #endif
     }
 #ifdef LISP_FEATURE_SB_THREAD
     futex_wait(futex,-1);
     if(errno==ENOSYS)  linux_no_threads_p = 1;
-    if(linux_no_threads_p) 
-	fprintf(stderr,"Linux with NPTL support (e.g. kernel 2.6 or newer) required for \nthread-enabled SBCL.  Disabling thread support.\n\n");
+    if(linux_no_threads_p)
+        fprintf(stderr,"Linux with NPTL support (e.g. kernel 2.6 or newer) required for \nthread-enabled SBCL.  Disabling thread support.\n\n");
 #endif
     os_vm_page_size = getpagesize();
 }
@@ -114,7 +114,7 @@ os_init(void)
 
 #ifdef LISP_FEATURE_ALPHA
 /* The Alpha is a 64 bit CPU.  SBCL is a 32 bit application.  Due to all
- * the places that assume we can get a pointer into a fixnum with no 
+ * the places that assume we can get a pointer into a fixnum with no
  * information loss, we have to make sure it allocates all its ram in the
  * 0-2Gb region.  */
 
@@ -127,18 +127,18 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
     int flags =  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
     os_vm_address_t actual ;
 
-    if (addr) 
-	flags |= MAP_FIXED;
+    if (addr)
+        flags |= MAP_FIXED;
 #ifdef LISP_FEATURE_ALPHA
     else {
-	flags |= MAP_FIXED;
-	addr=under_2gb_free_pointer;
+        flags |= MAP_FIXED;
+        addr=under_2gb_free_pointer;
     }
-#endif	
+#endif
     actual = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
-    if (actual == MAP_FAILED ||	(addr && (addr!=actual))) {
-	perror("mmap");
-	return 0;		/* caller should check this */
+    if (actual == MAP_FAILED || (addr && (addr!=actual))) {
+        perror("mmap");
+        return 0;               /* caller should check this */
     }
 
 #ifdef LISP_FEATURE_ALPHA
@@ -154,7 +154,7 @@ void
 os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
     if (munmap(addr,len) == -1) {
-	perror("munmap");
+        perror("munmap");
     }
 }
 
@@ -164,10 +164,10 @@ os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
     os_vm_address_t actual;
 
     actual = mmap(addr, len, OS_VM_PROT_ALL, MAP_PRIVATE | MAP_FIXED,
-		  fd, (off_t) offset);
+                  fd, (off_t) offset);
     if (actual == MAP_FAILED || (addr && (addr != actual))) {
-	perror("mmap");
-	lose("unexpected mmap(..) failure");
+        perror("mmap");
+        lose("unexpected mmap(..) failure");
     }
 
     return actual;
@@ -177,7 +177,7 @@ void
 os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {
     if (mprotect(address, length, prot) == -1) {
-	perror("mprotect");
+        perror("mprotect");
     }
 }
 
@@ -186,24 +186,24 @@ is_valid_lisp_addr(os_vm_address_t addr)
 {
     struct thread *th;
     size_t ad = (size_t) addr;
- 
+
     if ((READ_ONLY_SPACE_START <= ad && ad < READ_ONLY_SPACE_END)
-	|| (STATIC_SPACE_START <= ad && ad < STATIC_SPACE_END)
+        || (STATIC_SPACE_START <= ad && ad < STATIC_SPACE_END)
 #if defined LISP_FEATURE_GENCGC
-	|| (DYNAMIC_SPACE_START <= ad && ad < DYNAMIC_SPACE_END)
+        || (DYNAMIC_SPACE_START <= ad && ad < DYNAMIC_SPACE_END)
 #else
-	|| (DYNAMIC_0_SPACE_START <= ad && ad < DYNAMIC_0_SPACE_END)
-	|| (DYNAMIC_1_SPACE_START <= ad && ad < DYNAMIC_1_SPACE_END)
+        || (DYNAMIC_0_SPACE_START <= ad && ad < DYNAMIC_0_SPACE_END)
+        || (DYNAMIC_1_SPACE_START <= ad && ad < DYNAMIC_1_SPACE_END)
 #endif
-	)
-	return 1;
+        )
+        return 1;
     for_each_thread(th) {
-	if((size_t)(th->control_stack_start) <= ad
-	   && ad < (size_t)(th->control_stack_end))
-	    return 1;
-	if((size_t)(th->binding_stack_start) <= ad
-	   && ad < (size_t)(th->binding_stack_start + BINDING_STACK_SIZE))
-	    return 1;
+        if((size_t)(th->control_stack_start) <= ad
+           && ad < (size_t)(th->control_stack_end))
+            return 1;
+        if((size_t)(th->binding_stack_start) <= ad
+           && ad < (size_t)(th->binding_stack_start + BINDING_STACK_SIZE))
+            return 1;
     }
     return 0;
 }
@@ -224,8 +224,8 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     void* fault_addr = (void*)info->si_addr;
-    if (!gencgc_handle_wp_violation(fault_addr)) 
-	if(!handle_guard_page_triggered(context,fault_addr))
+    if (!gencgc_handle_wp_violation(fault_addr))
+        if(!handle_guard_page_triggered(context,fault_addr))
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
 #else
@@ -249,17 +249,17 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
        (how we got here: when interrupting, we set bit 63 in reg_ALLOC.
        At the end of the atomic section we tried to write to reg_ALLOC,
        got a SIGSEGV (there's nothing mapped there) so ended up here. */
-    if (addr != NULL && 
-	*os_context_register_addr(context,reg_ALLOC) & (1L<<63)){
-	*os_context_register_addr(context,reg_ALLOC) -= (1L<<63);
-	interrupt_handle_pending(context);
-	return;
+    if (addr != NULL &&
+        *os_context_register_addr(context,reg_ALLOC) & (1L<<63)){
+        *os_context_register_addr(context,reg_ALLOC) -= (1L<<63);
+        interrupt_handle_pending(context);
+        return;
     }
 #endif
 
     if(!interrupt_maybe_gc(signal, info, context))
-	if(!handle_guard_page_triggered(context,addr))
-	    interrupt_handle_now(signal, info, context);
+        if(!handle_guard_page_triggered(context,addr))
+            interrupt_handle_now(signal, info, context);
 }
 #endif
 
@@ -267,12 +267,12 @@ void
 os_install_interrupt_handlers(void)
 {
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
-						 sigsegv_handler);
+                                                 sigsegv_handler);
 #ifdef LISP_FEATURE_SB_THREAD
     undoably_install_low_level_interrupt_handler(SIG_INTERRUPT_THREAD,
-						 interrupt_thread_handler);
+                                                 interrupt_thread_handler);
     undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
-						 sig_stop_for_gc_handler);
+                                                 sig_stop_for_gc_handler);
 #endif
 }
 

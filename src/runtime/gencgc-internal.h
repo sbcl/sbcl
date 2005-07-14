@@ -37,27 +37,27 @@ struct page {
 
     unsigned
         /* This is set when the page is write-protected. This should
-	 * always reflect the actual write_protect status of a page.
-	 * (If the page is written into, we catch the exception, make
-	 * the page writable, and clear this flag.) */
+         * always reflect the actual write_protect status of a page.
+         * (If the page is written into, we catch the exception, make
+         * the page writable, and clear this flag.) */
         write_protected :1,
-	/* This flag is set when the above write_protected flag is 
-	 * cleared by the SIGBUS handler (or SIGSEGV handler, for some
-	 * OSes). This is useful for re-scavenging pages that are
-	 * written during a GC. */
-	write_protected_cleared :1,
-	/* the region the page is allocated to: 0 for a free page; 1
+        /* This flag is set when the above write_protected flag is
+         * cleared by the SIGBUS handler (or SIGSEGV handler, for some
+         * OSes). This is useful for re-scavenging pages that are
+         * written during a GC. */
+        write_protected_cleared :1,
+        /* the region the page is allocated to: 0 for a free page; 1
          * for boxed objects; 2 for unboxed objects. If the page is
          * free the following slots are invalid (well the bytes_used
          * must be 0). */
-	allocated :3,
-	/* If this page should not be moved during a GC then this flag
+        allocated :3,
+        /* If this page should not be moved during a GC then this flag
          * is set. It's only valid during a GC for allocated pages. */
-	dont_move :1,
-	/* If the page is part of a large object then this flag is
+        dont_move :1,
+        /* If the page is part of a large object then this flag is
          * set. No other objects should be allocated to these pages.
          * This is only valid when the page is allocated. */
-	large_object :1;
+        large_object :1;
 
     /* the generation that this page belongs to. This should be valid
      * for all pages that may have objects allocated, even current
@@ -72,7 +72,7 @@ struct page {
     long  bytes_used;
 
     /* The name of this field is not well-chosen for its actual use.
-     * This is the offset from the start of the page to the start 
+     * This is the offset from the start of the page to the start
      * of the alloc_region which contains/contained it.  It's negative or 0
      */
     long  first_object_offset;
@@ -94,21 +94,21 @@ void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 
 long  update_x86_dynamic_space_free_pointer(void);
 void  gc_alloc_update_page_tables(int unboxed,
-				  struct alloc_region *alloc_region);
+                                  struct alloc_region *alloc_region);
 void gc_alloc_update_all_page_tables(void);
 void gc_set_region_empty(struct alloc_region *region);
 
 /*
  * predicates
  */
-static inline int 
+static inline int
 space_matches_p(lispobj obj, long space)
 {
     long page_index=(void*)obj - (void *)DYNAMIC_SPACE_START;
     return ((page_index >= 0)
-	    && ((page_index =
-		 ((unsigned long)page_index)/PAGE_BYTES) < NUM_PAGES)
-	    && (page_table[page_index].gen == space));
+            && ((page_index =
+                 ((unsigned long)page_index)/PAGE_BYTES) < NUM_PAGES)
+            && (page_table[page_index].gen == space));
 }
 
 static inline boolean
@@ -125,4 +125,4 @@ new_space_p(lispobj obj)
 
 
 
-#endif 
+#endif

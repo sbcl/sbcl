@@ -70,8 +70,8 @@
 static void
 sigint_handler(int signal, siginfo_t *info, void *void_context)
 {
-    lose("\nSIGINT hit at 0x%08lX\n", 
-	 (unsigned long) *os_context_pc_addr(void_context));
+    lose("\nSIGINT hit at 0x%08lX\n",
+         (unsigned long) *os_context_pc_addr(void_context));
 }
 
 /* (This is not static, because we want to be able to call it from
@@ -93,9 +93,9 @@ successful_malloc(size_t size)
 {
     void* result = malloc(size);
     if (0 == result) {
-	lose("malloc failure");
+        lose("malloc failure");
     } else {
-	return result;
+        return result;
     }
     return (void *) NULL; /* dummy value: return something ... */
 }
@@ -111,7 +111,7 @@ copied_existing_filename_or_null(char *filename)
 {
     struct stat filename_stat;
     if (stat(filename, &filename_stat)) { /* if failure */
-	return 0;
+        return 0;
     } else {
         return copied_string(filename);
     }
@@ -123,10 +123,10 @@ static lispobj
 alloc_base_string_list(char *array_ptr[])
 {
     if (*array_ptr) {
-	return alloc_cons(alloc_base_string(*array_ptr),
-			  alloc_base_string_list(1 + array_ptr));
+        return alloc_cons(alloc_base_string(*array_ptr),
+                          alloc_base_string_list(1 + array_ptr));
     } else {
-	return NIL;
+        return NIL;
     }
 }
 
@@ -204,108 +204,108 @@ main(int argc, char *argv[], char *envp[])
     /* Parse our part of the command line (aka "runtime options"),
      * stripping out those options that we handle. */
     {
-	int argi = 1;
-	while (argi < argc) {
-	    char *arg = argv[argi];
-	    if (0 == strcmp(arg, "--noinform")) {
-		noinform = 1;
-		++argi;
-	    } else if (0 == strcmp(arg, "--core")) {
-		if (core) {
-		    lose("more than one core file specified");
-		} else {
-		    ++argi;
-		    if (argi >= argc) {
-			lose("missing filename for --core argument");
-		    }
-		    core = copied_string(argv[argi]);
-		    ++argi;
-		}
-	    } else if (0 == strcmp(arg, "--help")) {
-		/* I think this is the (or a) usual convention: upon
-		 * seeing "--help" we immediately print our help
-		 * string and exit, ignoring everything else. */
-		print_help();
-		exit(0);
-	    } else if (0 == strcmp(arg, "--version")) {
-		/* As in "--help" case, I think this is expected. */
-		print_version();
-		exit(0);
-	    } else if (0 == strcmp(arg, "--end-runtime-options")) {
-		end_runtime_options = 1;
-		++argi;
-		break;
-	    } else {
-		/* This option was unrecognized as a runtime option,
-		 * so it must be a toplevel option or a user option,
-		 * so we must be past the end of the runtime option
-		 * section. */
-		break;
-	    }
-	}
-	/* This is where we strip out those options that we handle. We
-	 * also take this opportunity to make sure that we don't find
-	 * an out-of-place "--end-runtime-options" option. */
-	{
-	    char *argi0 = argv[argi];
-	    int argj = 1;
-	    /* (argc - argi) for the arguments, one for the binary,
-	       and one for the terminating NULL. */
-	    sbcl_argv = successful_malloc((2 + argc - argi) * sizeof(char *));
-	    sbcl_argv[0] = argv[0];
-	    while (argi < argc) {
-		char *arg = argv[argi++];
-		/* If we encounter --end-runtime-options for the first
-		 * time after the point where we had to give up on
-		 * runtime options, then the point where we had to
-		 * give up on runtime options must've been a user
-		 * error. */
-		if (!end_runtime_options &&
-		    0 == strcmp(arg, "--end-runtime-options")) {
-		    lose("bad runtime option \"%s\"", argi0);
-		}
-		sbcl_argv[argj++] = arg;
-	    }
-	    sbcl_argv[argj] = 0;
-	}
+        int argi = 1;
+        while (argi < argc) {
+            char *arg = argv[argi];
+            if (0 == strcmp(arg, "--noinform")) {
+                noinform = 1;
+                ++argi;
+            } else if (0 == strcmp(arg, "--core")) {
+                if (core) {
+                    lose("more than one core file specified");
+                } else {
+                    ++argi;
+                    if (argi >= argc) {
+                        lose("missing filename for --core argument");
+                    }
+                    core = copied_string(argv[argi]);
+                    ++argi;
+                }
+            } else if (0 == strcmp(arg, "--help")) {
+                /* I think this is the (or a) usual convention: upon
+                 * seeing "--help" we immediately print our help
+                 * string and exit, ignoring everything else. */
+                print_help();
+                exit(0);
+            } else if (0 == strcmp(arg, "--version")) {
+                /* As in "--help" case, I think this is expected. */
+                print_version();
+                exit(0);
+            } else if (0 == strcmp(arg, "--end-runtime-options")) {
+                end_runtime_options = 1;
+                ++argi;
+                break;
+            } else {
+                /* This option was unrecognized as a runtime option,
+                 * so it must be a toplevel option or a user option,
+                 * so we must be past the end of the runtime option
+                 * section. */
+                break;
+            }
+        }
+        /* This is where we strip out those options that we handle. We
+         * also take this opportunity to make sure that we don't find
+         * an out-of-place "--end-runtime-options" option. */
+        {
+            char *argi0 = argv[argi];
+            int argj = 1;
+            /* (argc - argi) for the arguments, one for the binary,
+               and one for the terminating NULL. */
+            sbcl_argv = successful_malloc((2 + argc - argi) * sizeof(char *));
+            sbcl_argv[0] = argv[0];
+            while (argi < argc) {
+                char *arg = argv[argi++];
+                /* If we encounter --end-runtime-options for the first
+                 * time after the point where we had to give up on
+                 * runtime options, then the point where we had to
+                 * give up on runtime options must've been a user
+                 * error. */
+                if (!end_runtime_options &&
+                    0 == strcmp(arg, "--end-runtime-options")) {
+                    lose("bad runtime option \"%s\"", argi0);
+                }
+                sbcl_argv[argj++] = arg;
+            }
+            sbcl_argv[argj] = 0;
+        }
     }
 
     /* If no core file was specified, look for one. */
     if (!core) {
-	char *sbcl_home = getenv("SBCL_HOME");
-	char *lookhere;
-	char *stem = "/sbcl.core";
-	if(!sbcl_home) sbcl_home = SBCL_HOME;
-	lookhere = (char *) calloc(strlen(sbcl_home) +
-				   strlen(stem) +
-				   1,
-				   sizeof(char));
-	sprintf(lookhere, "%s%s", sbcl_home, stem);
-	core = copied_existing_filename_or_null(lookhere);
-	free(lookhere);
-	if (!core) {
-	    lose("can't find core file");
-	}
+        char *sbcl_home = getenv("SBCL_HOME");
+        char *lookhere;
+        char *stem = "/sbcl.core";
+        if(!sbcl_home) sbcl_home = SBCL_HOME;
+        lookhere = (char *) calloc(strlen(sbcl_home) +
+                                   strlen(stem) +
+                                   1,
+                                   sizeof(char));
+        sprintf(lookhere, "%s%s", sbcl_home, stem);
+        core = copied_existing_filename_or_null(lookhere);
+        free(lookhere);
+        if (!core) {
+            lose("can't find core file");
+        }
     }
     /* Make sure that SBCL_HOME is set, no matter where the core was
      * found */
     if (!getenv("SBCL_HOME")) {
-	char *envstring, *copied_core, *dir;
-	char *stem = "SBCL_HOME=";
-	copied_core = copied_string(core);
-	dir = dirname(copied_core);
-	envstring = (char *) calloc(strlen(stem) +
-				    strlen(dir) + 
-				    1,
-				    sizeof(char));
-	sprintf(envstring, "%s%s", stem, dir);
-	putenv(envstring);
-	free(copied_core);
+        char *envstring, *copied_core, *dir;
+        char *stem = "SBCL_HOME=";
+        copied_core = copied_string(core);
+        dir = dirname(copied_core);
+        envstring = (char *) calloc(strlen(stem) +
+                                    strlen(dir) +
+                                    1,
+                                    sizeof(char));
+        sprintf(envstring, "%s%s", stem, dir);
+        putenv(envstring);
+        free(copied_core);
     }
-    
+
     if (!noinform) {
-	print_banner();
-	fflush(stdout);
+        print_banner();
+        fflush(stdout);
     }
 
 #if defined(SVR4) || defined(__linux__)
@@ -321,7 +321,7 @@ main(int argc, char *argv[], char *envp[])
 
     initial_function = load_core_file(core);
     if (initial_function == NIL) {
-	lose("couldn't find initial function");
+        lose("couldn't find initial function");
     }
     SHOW("freeing core");
     free(core);

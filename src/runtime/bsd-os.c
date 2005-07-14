@@ -50,7 +50,7 @@ os_vm_size_t os_vm_page_size;
 
 static void netbsd_init();
 #endif /* __NetBSD__ */
- 
+
 void os_init(void)
 {
     os_vm_page_size = getpagesize();
@@ -96,13 +96,13 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
     int flags = MAP_PRIVATE | MAP_ANON;
 
     if (addr)
-	flags |= MAP_FIXED;
+        flags |= MAP_FIXED;
 
     addr = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
 
     if (addr == MAP_FAILED) {
-	perror("mmap");
-	return NULL;
+        perror("mmap");
+        return NULL;
     }
 
     return addr;
@@ -112,20 +112,20 @@ void
 os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
     if (munmap(addr, len) == -1)
-	perror("munmap");
+        perror("munmap");
 }
 
 os_vm_address_t
 os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 {
     addr = mmap(addr, len,
-		OS_VM_PROT_ALL,
-		MAP_PRIVATE | MAP_FILE | MAP_FIXED,
-		fd, (off_t) offset);
+                OS_VM_PROT_ALL,
+                MAP_PRIVATE | MAP_FILE | MAP_FIXED,
+                fd, (off_t) offset);
 
     if (addr == MAP_FAILED) {
-	perror("mmap");
-	lose("unexpected mmap(..) failure");
+        perror("mmap");
+        lose("unexpected mmap(..) failure");
     }
 
     return addr;
@@ -135,7 +135,7 @@ void
 os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {
     if (mprotect(address, length, prot) == -1) {
-	perror("mprotect");
+        perror("mprotect");
     }
 }
 
@@ -155,12 +155,12 @@ is_valid_lisp_addr(os_vm_address_t addr)
     if(in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
        in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE) ||
        in_range_p(addr, DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE))
-	return 1;
+        return 1;
     for_each_thread(th) {
-	if((th->control_stack_start <= addr) && (addr < th->control_stack_end))
-	    return 1;
-	if(in_range_p(addr, th->binding_stack_start, BINDING_STACK_SIZE))
-	    return 1;
+        if((th->control_stack_start <= addr) && (addr < th->control_stack_end))
+            return 1;
+        if(in_range_p(addr, th->binding_stack_start, BINDING_STACK_SIZE))
+            return 1;
     }
     return 0;
 }
@@ -189,12 +189,12 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
 #endif
 
     os_context_t *context = arch_os_get_context(&void_context);
-    if (!gencgc_handle_wp_violation(fault_addr)) 
+    if (!gencgc_handle_wp_violation(fault_addr))
         if(!handle_guard_page_triggered(context,fault_addr))
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-	    arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
+            arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
 #else
-	    interrupt_handle_now(signal, siginfo, context);
+            interrupt_handle_now(signal, siginfo, context);
 #endif
 }
 void
@@ -202,7 +202,7 @@ os_install_interrupt_handlers(void)
 {
     SHOW("os_install_interrupt_handlers()/bsd-os/defined(GENCGC)");
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
-						 memory_fault_handler);
+                                                 memory_fault_handler);
     SHOW("leaving os_install_interrupt_handlers()");
 }
 
@@ -214,11 +214,11 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     unsigned int pc =  (unsigned int *)(*os_context_pc_addr(context));
     os_vm_address_t addr;
-    
+
     addr = arch_get_bad_addr(signal,info,context);
     if(!interrupt_maybe_gc(signal, info, context))
-	if(!handle_guard_page_triggered(context,addr))
-	    interrupt_handle_now(signal, info, context);
+        if(!handle_guard_page_triggered(context,addr))
+            interrupt_handle_now(signal, info, context);
     /* Work around G5 bug; fix courtesy gbyers */
     DARWIN_FIX_CONTEXT(context);
 }
@@ -228,7 +228,7 @@ os_install_interrupt_handlers(void)
 {
     SHOW("os_install_interrupt_handlers()/bsd-os/!defined(GENCGC)");
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
-						 sigsegv_handler);
+                                                 sigsegv_handler);
 }
 
 #endif /* defined GENCGC */
@@ -249,10 +249,10 @@ static void netbsd_init()
 
     /* If we're older than 2.0... */
     if (osrev < 200000000) {
-	fprintf(stderr, "osrev = %d (needed at least 200000000).\n", osrev);
-	lose("NetBSD kernel too old to run sbcl.\n");
+        fprintf(stderr, "osrev = %d (needed at least 200000000).\n", osrev);
+        lose("NetBSD kernel too old to run sbcl.\n");
     }
-    
+
     /* NetBSD counts mmap()ed space against the process's data size limit,
      * so yank it up. This might be a nasty thing to do? */
     getrlimit (RLIMIT_DATA, &rl);
@@ -262,11 +262,11 @@ static void netbsd_init()
        -- CSR, 2004-04-08 */
     rl.rlim_cur = 1073741824;
     if (setrlimit (RLIMIT_DATA, &rl) < 0) {
-	fprintf (stderr, 
-		 "RUNTIME WARNING: unable to raise process data size limit:\n\
+        fprintf (stderr,
+                 "RUNTIME WARNING: unable to raise process data size limit:\n\
   %s.\n\
 The system may fail to start.\n",
-		 strerror(errno));
+                 strerror(errno));
     }
 }
 #endif /* __NetBSD__ */

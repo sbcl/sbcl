@@ -16,6 +16,6 @@ typedef int os_vm_prot_t;
 
 typedef long os_context_register_t ;
 
-#ifndef NSIG			/* osf1 -D_XOPEN_SOURCE_EXTENDED omits this */
+#ifndef NSIG                    /* osf1 -D_XOPEN_SOURCE_EXTENDED omits this */
 #define NSIG (SIGMAX+1)
 #endif

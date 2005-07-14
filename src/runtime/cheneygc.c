@@ -60,13 +60,13 @@ static double
 tv_diff(struct timeval *x, struct timeval *y)
 {
     return (((double) x->tv_sec + (double) x->tv_usec * 1.0e-6) -
-	    ((double) y->tv_sec + (double) y->tv_usec * 1.0e-6));
+            ((double) y->tv_sec + (double) y->tv_usec * 1.0e-6));
 }
 #endif
 
 #define BYTES_ZERO_BEFORE_END (1<<12)
 
-/* FIXME do we need this?  Doesn't it duplicate lisp code in 
+/* FIXME do we need this?  Doesn't it duplicate lisp code in
  * scrub-control-stack? */
 
 static void
@@ -75,14 +75,14 @@ zero_stack(void)
     lispobj *ptr = current_control_stack_pointer;
  search:
     do {
-	if (*ptr)
-	    goto fill;
-	ptr++;
+        if (*ptr)
+            goto fill;
+        ptr++;
     } while (((unsigned long)ptr) & (BYTES_ZERO_BEFORE_END-1));
     return;
  fill:
     do {
-	*ptr++ = 0;
+        *ptr++ = 0;
     } while (((unsigned long)ptr) & (BYTES_ZERO_BEFORE_END-1));
 
     goto search;
@@ -121,30 +121,30 @@ collect_garbage(unsigned ignore)
 #endif
     unsigned long size_retained;
     lispobj *current_static_space_free_pointer;
-    unsigned long static_space_size; 
-    unsigned long control_stack_size, binding_stack_size; 
+    unsigned long static_space_size;
+    unsigned long control_stack_size, binding_stack_size;
     sigset_t tmp, old;
     struct thread *th=arch_os_get_current_thread();
     struct interrupt_data *data=
-	th ? th->interrupt_data : global_interrupt_data;
+        th ? th->interrupt_data : global_interrupt_data;
 
 
 #ifdef PRINTNOISE
     printf("[Collecting garbage ... \n");
-	
+
     getrusage(RUSAGE_SELF, &start_rusage);
     gettimeofday(&start_tv, (struct timezone *) 0);
 #endif
-	
-    /* it's possible that signals are blocked already if this was called 
+
+    /* it's possible that signals are blocked already if this was called
      * from a signal handler (e.g. with the sigsegv gc_trigger stuff) */
     sigemptyset(&tmp);
     sigaddset_blockable(&tmp);
     thread_sigmask(SIG_BLOCK, &tmp, &old);
 
     current_static_space_free_pointer =
-	(lispobj *) ((unsigned long)
-		     SymbolValue(STATIC_SPACE_FREE_POINTER,0));
+        (lispobj *) ((unsigned long)
+                     SymbolValue(STATIC_SPACE_FREE_POINTER,0));
 
 
     /* Set up from space and new space pointers. */
@@ -154,14 +154,14 @@ collect_garbage(unsigned ignore)
 
 #ifdef PRINTNOISE
     fprintf(stderr,"from_space = %lx\n",
-	    (unsigned long) current_dynamic_space);
+            (unsigned long) current_dynamic_space);
 #endif
     if (current_dynamic_space == (lispobj *) DYNAMIC_0_SPACE_START)
-	new_space = (lispobj *)DYNAMIC_1_SPACE_START;
+        new_space = (lispobj *)DYNAMIC_1_SPACE_START;
     else if (current_dynamic_space == (lispobj *) DYNAMIC_1_SPACE_START)
-	new_space = (lispobj *) DYNAMIC_0_SPACE_START;
+        new_space = (lispobj *) DYNAMIC_0_SPACE_START;
     else {
-	lose("GC lossage.  Current dynamic space is bogus!\n");
+        lose("GC lossage.  Current dynamic space is bogus!\n");
     }
     new_space_free_pointer = new_space;
 
@@ -177,46 +177,46 @@ collect_garbage(unsigned ignore)
 
 #ifdef PRINTNOISE
     printf("Scavenging interrupt handlers (%d bytes) ...\n",
-	   (int)sizeof(interrupt_handlers));
+           (int)sizeof(interrupt_handlers));
 #endif
     scavenge((lispobj *) data->interrupt_handlers,
-	     sizeof(data->interrupt_handlers) / sizeof(lispobj));
-	
+             sizeof(data->interrupt_handlers) / sizeof(lispobj));
+
     /* _size quantities are in units of sizeof(lispobj) - i.e. 4 */
-    control_stack_size = 
-	current_control_stack_pointer-
-	(lispobj *)th->control_stack_start;
+    control_stack_size =
+        current_control_stack_pointer-
+        (lispobj *)th->control_stack_start;
 #ifdef PRINTNOISE
     printf("Scavenging the control stack at %p (%ld words) ...\n",
-	   ((lispobj *)th->control_stack_start), 
-	   control_stack_size);
+           ((lispobj *)th->control_stack_start),
+           control_stack_size);
 #endif
     scavenge(((lispobj *)th->control_stack_start), control_stack_size);
-		 
 
-    binding_stack_size = 
-	current_binding_stack_pointer - 
-	(lispobj *)th->binding_stack_start;
+
+    binding_stack_size =
+        current_binding_stack_pointer -
+        (lispobj *)th->binding_stack_start;
 #ifdef PRINTNOISE
     printf("Scavenging the binding stack %x - %x (%d words) ...\n",
-	   th->binding_stack_start,current_binding_stack_pointer,
-	   (int)(binding_stack_size));
+           th->binding_stack_start,current_binding_stack_pointer,
+           (int)(binding_stack_size));
 #endif
     scavenge(((lispobj *)th->binding_stack_start), binding_stack_size);
-		 
-    static_space_size = 
-	current_static_space_free_pointer - (lispobj *) STATIC_SPACE_START;
+
+    static_space_size =
+        current_static_space_free_pointer - (lispobj *) STATIC_SPACE_START;
 #ifdef PRINTNOISE
     printf("Scavenging static space %x - %x (%d words) ...\n",
-	   STATIC_SPACE_START,current_static_space_free_pointer,
-	   (int)(static_space_size));
+           STATIC_SPACE_START,current_static_space_free_pointer,
+           (int)(static_space_size));
 #endif
     scavenge(((lispobj *)STATIC_SPACE_START), static_space_size);
 
     /* Scavenge newspace. */
 #ifdef PRINTNOISE
     printf("Scavenging new space (%d bytes) ...\n",
-	   (int)((new_space_free_pointer - new_space) * sizeof(lispobj)));
+           (int)((new_space_free_pointer - new_space) * sizeof(lispobj)));
 #endif
     scavenge_newspace();
 
@@ -237,11 +237,11 @@ collect_garbage(unsigned ignore)
     printf("Flipping spaces ...\n");
 #endif
 
-    /* Maybe FIXME: it's possible that we could significantly reduce 
-     * RSS by zeroing the from_space or madvise(MADV_DONTNEED) or 
+    /* Maybe FIXME: it's possible that we could significantly reduce
+     * RSS by zeroing the from_space or madvise(MADV_DONTNEED) or
      * similar os-dependent tricks here */
     os_zero((os_vm_address_t) from_space,
-	    (os_vm_size_t) DYNAMIC_SPACE_SIZE);
+            (os_vm_size_t) DYNAMIC_SPACE_SIZE);
 
     current_dynamic_space = new_space;
     dynamic_space_free_pointer = new_space_free_pointer;
@@ -267,22 +267,22 @@ collect_garbage(unsigned ignore)
     getrusage(RUSAGE_SELF, &stop_rusage);
 
     printf("done.]\n");
-	
+
     percent_retained = (((float) size_retained) /
-			((float) size_discarded)) * 100.0;
+                        ((float) size_discarded)) * 100.0;
 
     printf("Total of %ld bytes out of %ld bytes retained (%3.2f%%).\n",
-	   size_retained, size_discarded, percent_retained);
+           size_retained, size_discarded, percent_retained);
 
     real_time = tv_diff(&stop_tv, &start_tv);
     user_time = tv_diff(&stop_rusage.ru_utime, &start_rusage.ru_utime);
     system_time = tv_diff(&stop_rusage.ru_stime, &start_rusage.ru_stime);
 
     printf("Statistics: %10.2fs real, %10.2fs user, %10.2fs system.\n",
-	   real_time, user_time, system_time);
+           real_time, user_time, system_time);
 
     gc_rate = ((float) size_retained / (float) (1<<20)) / real_time;
-	
+
     printf("%10.2f M bytes/sec collected.\n", gc_rate);
 #endif
 }
@@ -297,11 +297,11 @@ scavenge_newspace(void)
 
     here = new_space;
     while (here < new_space_free_pointer) {
-	/*	printf("here=%lx, new_space_free_pointer=%lx\n",
-		here,new_space_free_pointer); */
-	next = new_space_free_pointer;
-	scavenge(here, next - here);
-	here = next;
+        /*      printf("here=%lx, new_space_free_pointer=%lx\n",
+                here,new_space_free_pointer); */
+        next = new_space_free_pointer;
+        scavenge(here, next - here);
+        here = next;
     }
     /* printf("done with newspace\n"); */
 }
@@ -338,79 +338,79 @@ scavenge_interrupt_context(os_context_t *context)
     lip_offset = (((unsigned long)1) << (N_WORD_BITS - 1)) - 1;
     lip_register_pair = -1;
     for (i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
-	unsigned long reg;
-	long offset;
-	int index;
+        unsigned long reg;
+        long offset;
+        int index;
 
-	index = boxed_registers[i];
-	reg = *os_context_register_addr(context, index);
-	/* would be using PTR if not for integer length issues */
-	if ((reg & ~((1L<<N_LOWTAG_BITS)-1)) <= lip) {
-	    offset = lip - reg;
-	    if (offset < lip_offset) {
-		lip_offset = offset;
-		lip_register_pair = index;
-	    }
-	}
+        index = boxed_registers[i];
+        reg = *os_context_register_addr(context, index);
+        /* would be using PTR if not for integer length issues */
+        if ((reg & ~((1L<<N_LOWTAG_BITS)-1)) <= lip) {
+            offset = lip - reg;
+            if (offset < lip_offset) {
+                lip_offset = offset;
+                lip_register_pair = index;
+            }
+        }
     }
 #endif /* reg_LIP */
 
     /* Compute the PC's offset from the start of the CODE */
     /* register. */
     pc_code_offset =
-	*os_context_pc_addr(context) - 
-	*os_context_register_addr(context, reg_CODE);
+        *os_context_pc_addr(context) -
+        *os_context_register_addr(context, reg_CODE);
 #ifdef ARCH_HAS_NPC_REGISTER
     npc_code_offset =
-	*os_context_npc_addr(context) - 
-	*os_context_register_addr(context, reg_CODE);
-#endif 
+        *os_context_npc_addr(context) -
+        *os_context_register_addr(context, reg_CODE);
+#endif
 #ifdef ARCH_HAS_LINK_REGISTER
     lr_code_offset =
-	*os_context_lr_addr(context) - 
-	*os_context_register_addr(context, reg_CODE);
+        *os_context_lr_addr(context) -
+        *os_context_register_addr(context, reg_CODE);
 #endif
-	       
+
     /* Scavenge all boxed registers in the context. */
     for (i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
-	int index;
-	lispobj foo;
-		
-	index = boxed_registers[i];
-	foo = *os_context_register_addr(context,index);
-	scavenge((lispobj *) &foo, 1);
-	*os_context_register_addr(context,index) = foo;
+        int index;
+        lispobj foo;
 
-	/* this is unlikely to work as intended on bigendian
-	 * 64 bit platforms */
+        index = boxed_registers[i];
+        foo = *os_context_register_addr(context,index);
+        scavenge((lispobj *) &foo, 1);
+        *os_context_register_addr(context,index) = foo;
 
-	scavenge((lispobj *)
-		 os_context_register_addr(context, index), 1);
+        /* this is unlikely to work as intended on bigendian
+         * 64 bit platforms */
+
+        scavenge((lispobj *)
+                 os_context_register_addr(context, index), 1);
     }
 
 #ifdef reg_LIP
     /* Fix the LIP */
     *os_context_register_addr(context, reg_LIP) =
-	*os_context_register_addr(context, lip_register_pair) + lip_offset;
+        *os_context_register_addr(context, lip_register_pair) + lip_offset;
 #endif /* reg_LIP */
-	
+
     /* Fix the PC if it was in from space */
     if (from_space_p(*os_context_pc_addr(context)))
-	*os_context_pc_addr(context) = 
-	    *os_context_register_addr(context, reg_CODE) + pc_code_offset;
+        *os_context_pc_addr(context) =
+            *os_context_register_addr(context, reg_CODE) + pc_code_offset;
 #ifdef ARCH_HAS_LINK_REGISTER
-    /* Fix the LR ditto; important if we're being called from 
+    /* Fix the LR ditto; important if we're being called from
      * an assembly routine that expects to return using blr, otherwise
      * harmless */
     if (from_space_p(*os_context_lr_addr(context)))
-	*os_context_lr_addr(context) = 
-	    *os_context_register_addr(context, reg_CODE) + lr_code_offset;
+        *os_context_lr_addr(context) =
+            *os_context_register_addr(context, reg_CODE) + lr_code_offset;
 #endif
 
 #ifdef ARCH_HAS_NPC_REGISTER
     if (from_space_p(*os_context_npc_addr(context)))
-	*os_context_npc_addr(context) = 
-	    *os_context_register_addr(context, reg_CODE) + npc_code_offset;
+        *os_context_npc_addr(context) =
+            *os_context_register_addr(context, reg_CODE) + npc_code_offset;
 #endif
 }
 
@@ -428,8 +428,8 @@ void scavenge_interrupt_contexts(void)
     fprintf(stderr, "%d interrupt contexts to scan\n",index);
 #endif
     for (i = 0; i < index; i++) {
-	context = th->interrupt_contexts[i];
-	scavenge_interrupt_context(context); 
+        context = th->interrupt_contexts[i];
+        scavenge_interrupt_context(context);
     }
 }
 
@@ -447,48 +447,48 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
     total_words_not_copied = 0;
     start = from_space;
     while (start < from_space_free_pointer) {
-	lispobj object;
-	int forwardp, type, nwords;
-	lispobj header;
+        lispobj object;
+        int forwardp, type, nwords;
+        lispobj header;
 
-	object = *start;
-	forwardp = is_lisp_pointer(object) && new_space_p(object);
+        object = *start;
+        forwardp = is_lisp_pointer(object) && new_space_p(object);
 
-	if (forwardp) {
-	    int tag;
-	    lispobj *pointer;
+        if (forwardp) {
+            int tag;
+            lispobj *pointer;
 
-	    tag = lowtag_of(object);
+            tag = lowtag_of(object);
 
-	    switch (tag) {
-	    case LIST_POINTER_LOWTAG:
-		nwords = 2;
-		break;
-	    case INSTANCE_POINTER_LOWTAG:
-		printf("Don't know about instances yet!\n");
-		nwords = 1;
-		break;
-	    case FUN_POINTER_LOWTAG:
-		nwords = 1;
-		break;
-	    case OTHER_POINTER_LOWTAG:
-		pointer = (lispobj *) native_pointer(object);
-		header = *pointer;
-		type = widetag_of(header);
-		nwords = (sizetab[type])(pointer);
-		break;
-	    default: nwords=1;	/* shut yer whinging, gcc */
-	    }
-	} else {
-	    type = widetag_of(object);
-	    nwords = (sizetab[type])(start);
-	    total_words_not_copied += nwords;
-	    printf("%4d words not copied at 0x%16lx; ",
-		   nwords, (unsigned long) start);
-	    printf("Header word is 0x%08x\n", 
-		   (unsigned int) object);
-	}
-	start += nwords;
+            switch (tag) {
+            case LIST_POINTER_LOWTAG:
+                nwords = 2;
+                break;
+            case INSTANCE_POINTER_LOWTAG:
+                printf("Don't know about instances yet!\n");
+                nwords = 1;
+                break;
+            case FUN_POINTER_LOWTAG:
+                nwords = 1;
+                break;
+            case OTHER_POINTER_LOWTAG:
+                pointer = (lispobj *) native_pointer(object);
+                header = *pointer;
+                type = widetag_of(header);
+                nwords = (sizetab[type])(pointer);
+                break;
+            default: nwords=1;  /* shut yer whinging, gcc */
+            }
+        } else {
+            type = widetag_of(object);
+            nwords = (sizetab[type])(start);
+            total_words_not_copied += nwords;
+            printf("%4d words not copied at 0x%16lx; ",
+                   nwords, (unsigned long) start);
+            printf("Header word is 0x%08x\n",
+                   (unsigned int) object);
+        }
+        start += nwords;
     }
     printf("%d total words not copied.\n", total_words_not_copied);
 }
@@ -501,7 +501,7 @@ scav_vector(lispobj *where, lispobj object)
 {
     if (HeaderValue(object) == subtype_VectorValidHashing) {
         *where =
-	    (subtype_VectorMustRehash<<N_WIDETAG_BITS) | SIMPLE_VECTOR_WIDETAG;
+            (subtype_VectorMustRehash<<N_WIDETAG_BITS) | SIMPLE_VECTOR_WIDETAG;
     }
 
     return 1;
@@ -511,7 +511,7 @@ scav_vector(lispobj *where, lispobj object)
 /* weak pointers */
 
 #define WEAK_POINTER_NWORDS \
-	CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
+        CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
 
 static long
 scav_weak_pointer(lispobj *where, lispobj object)
@@ -529,10 +529,10 @@ search_read_only_space(void *pointer)
     lispobj* start = (lispobj*)READ_ONLY_SPACE_START;
     lispobj* end = (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
     if ((pointer < (void *)start) || (pointer >= (void *)end))
-	return NULL;
-    return (gc_search_space(start, 
-			    (((lispobj *)pointer)+2)-start, 
-			    (lispobj *)pointer));
+        return NULL;
+    return (gc_search_space(start,
+                            (((lispobj *)pointer)+2)-start,
+                            (lispobj *)pointer));
 }
 
 lispobj *
@@ -541,10 +541,10 @@ search_static_space(void *pointer)
     lispobj* start = (lispobj*)STATIC_SPACE_START;
     lispobj* end = (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
     if ((pointer < (void *)start) || (pointer >= (void *)end))
-	return NULL;
-    return (gc_search_space(start, 
-			    (((lispobj *)pointer)+2)-start, 
-			    (lispobj *)pointer));
+        return NULL;
+    return (gc_search_space(start,
+                            (((lispobj *)pointer)+2)-start,
+                            (lispobj *)pointer));
 }
 
 lispobj *
@@ -553,10 +553,10 @@ search_dynamic_space(void *pointer)
     lispobj *start = (lispobj *) current_dynamic_space;
     lispobj *end = (lispobj *) dynamic_space_free_pointer;
     if ((pointer < (void *)start) || (pointer >= (void *)end))
-	return NULL;
-    return (gc_search_space(start, 
-			    (((lispobj *)pointer)+2)-start, 
-			    (lispobj *)pointer));
+        return NULL;
+    return (gc_search_space(start,
+                            (((lispobj *)pointer)+2)-start,
+                            (lispobj *)pointer));
 }
 
 /* initialization.  if gc_init can be moved to after core load, we could
@@ -592,23 +592,23 @@ gc_initialize_pointers(void)
  * auto_gc_trigger */
 void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
 {
-    os_vm_address_t addr=(os_vm_address_t)current_dynamic_space 
-	+ dynamic_usage;
+    os_vm_address_t addr=(os_vm_address_t)current_dynamic_space
+        + dynamic_usage;
     long length = DYNAMIC_SPACE_SIZE - dynamic_usage;
 
     if (addr < (os_vm_address_t)dynamic_space_free_pointer) {
-	fprintf(stderr,
-	   "set_auto_gc_trigger: tried to set gc trigger too low! (%ld < 0x%08lx)\n",
-		(unsigned long)dynamic_usage,
-		(unsigned long)((os_vm_address_t)dynamic_space_free_pointer
-				- (os_vm_address_t)current_dynamic_space));
-	lose("lost");
+        fprintf(stderr,
+           "set_auto_gc_trigger: tried to set gc trigger too low! (%ld < 0x%08lx)\n",
+                (unsigned long)dynamic_usage,
+                (unsigned long)((os_vm_address_t)dynamic_space_free_pointer
+                                - (os_vm_address_t)current_dynamic_space));
+        lose("lost");
     }
     else if (length < 0) {
-	fprintf(stderr,
-		"set_auto_gc_trigger: tried to set gc trigger too high! (0x%08lx)\n",
-		(unsigned long)dynamic_usage);
-	lose("lost");
+        fprintf(stderr,
+                "set_auto_gc_trigger: tried to set gc trigger too high! (0x%08lx)\n",
+                (unsigned long)dynamic_usage);
+        lose("lost");
     }
 
     addr=os_round_up_to_page(addr);
@@ -627,17 +627,17 @@ void clear_auto_gc_trigger(void)
 {
     if (current_auto_gc_trigger!=NULL){
 #if defined(SUNOS) || defined(SOLARIS)/* don't want to force whole space into swapping mode... */
-	os_vm_address_t addr=(os_vm_address_t)current_auto_gc_trigger;
-	os_vm_size_t length=
-	    DYNAMIC_SPACE_SIZE + (os_vm_address_t)current_dynamic_space - addr;
+        os_vm_address_t addr=(os_vm_address_t)current_auto_gc_trigger;
+        os_vm_size_t length=
+            DYNAMIC_SPACE_SIZE + (os_vm_address_t)current_dynamic_space - addr;
 
-	os_validate(addr,length);
+        os_validate(addr,length);
 #else
-	os_protect((os_vm_address_t)current_dynamic_space,
-		   DYNAMIC_SPACE_SIZE,
-		   OS_VM_PROT_ALL);
+        os_protect((os_vm_address_t)current_dynamic_space,
+                   DYNAMIC_SPACE_SIZE,
+                   OS_VM_PROT_ALL);
 #endif
 
-	current_auto_gc_trigger = NULL;
+        current_auto_gc_trigger = NULL;
     }
 }

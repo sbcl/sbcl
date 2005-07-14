@@ -60,7 +60,7 @@ void globals_init(void)
      * validate() and coreparse(). */
     current_control_frame_pointer = (lispobj *)0;
 
-#ifndef LISP_FEATURE_GENCGC 
+#ifndef LISP_FEATURE_GENCGC
     /* no GC trigger yet */
     current_auto_gc_trigger = NULL;
 #endif
@@ -69,5 +69,5 @@ void globals_init(void)
     foreign_function_call_active = 1;
 #if defined(LISP_FEATURE_SB_THREAD)
     pthread_key_create(&specials,0);
-#endif    
+#endif
 }

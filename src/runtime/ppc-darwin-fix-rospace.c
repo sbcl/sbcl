@@ -62,19 +62,19 @@ int main(int argc, char** argv)
       int j, max;
       max = seg->nsects;
       if (strncmp("SBCL", seg->segname, 4) == 0) {
-	is_sbcl = 1;
-	seg->vmsize = space_sizes[spacei];
+        is_sbcl = 1;
+        seg->vmsize = space_sizes[spacei];
       } else {
-	is_sbcl = 0;
+        is_sbcl = 0;
       }
       seg++;
       sectptr = (struct section*) seg;
       for (j = 0; j < max; j++) {
-	if (is_sbcl) {
-	  sectptr->size = space_sizes[spacei];
-	  spacei++;
-	}
-	sectptr++;
+        if (is_sbcl) {
+          sectptr->size = space_sizes[spacei];
+          spacei++;
+        }
+        sectptr++;
       }
     }
   }

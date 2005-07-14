@@ -28,9 +28,9 @@ void get_timezone(time_t when, int *secwest, boolean *dst)
 
     sw = (((gtm.tm_hour*60)+gtm.tm_min)*60+gtm.tm_sec) - (((ltm.tm_hour*60)+ltm.tm_min)*60+ltm.tm_sec);
     if ((gtm.tm_wday + 1) % 7 == ltm.tm_wday)
-	sw -= 24*3600;
+        sw -= 24*3600;
     else if (gtm.tm_wday == (ltm.tm_wday + 1) % 7)
-	sw += 24*3600;
+        sw += 24*3600;
     *secwest = sw;
     *dst = ltm.tm_isdst;
 }
