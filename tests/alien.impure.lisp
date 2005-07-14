@@ -10,7 +10,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -49,10 +49,10 @@
 ;;; This used to break due to too eager auxiliary type twiddling in
 ;;; parse-alien-record-type.
 (defparameter *maybe* nil)
-(defun with-alien-test-for-struct-plus-funcall () 
+(defun with-alien-test-for-struct-plus-funcall ()
   (with-alien ((x (struct bar (x unsigned) (y unsigned)))
-	       ;; bogus definition, but we just need the symbol
-	       (f (function int (* (struct bar))) :extern "printf"))
+               ;; bogus definition, but we just need the symbol
+               (f (function int (* (struct bar))) :extern "printf"))
     (when *maybe*
       (alien-funcall f (addr x)))))
 
@@ -62,16 +62,16 @@
 (let ((s1 (make-alien struct.1))
       (s2 (make-alien struct.2)))
   (setf (slot s1 'x) s2
-	(slot s2 'x) s1
-	(slot (slot s1 'x) 'y) 1
-	(slot (slot s2 'x) 'y) 2)
+        (slot s2 'x) s1
+        (slot (slot s1 'x) 'y) 1
+        (slot (slot s2 'x) 'y) 2)
   (assert (= 1 (slot (slot s1 'x) 'y)))
   (assert (= 2 (slot (slot s2 'x) 'y))))
 
 ;;; "Alien bug" on sbcl-devel 2004-10-11 by Thomas F. Burdick caused
 ;;; by recursive struct definition.
 (let ((fname "alien-bug-2004-10-11.tmp.lisp"))
-  (unwind-protect 
+  (unwind-protect
        (progn
          (with-open-file (f fname :direction :output)
            (mapc (lambda (form) (print form f))
@@ -80,7 +80,7 @@
                    (in-package :alien-bug)
                    (define-alien-type objc-class
                        (struct objc-class
-                        (protocols 
+                        (protocols
                          (* (struct protocol-list
                                     (list (array (* (struct objc-class))))))))))))
            (load fname)

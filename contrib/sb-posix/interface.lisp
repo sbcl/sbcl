@@ -1,65 +1,65 @@
 (cl:in-package :sb-posix-internal)
 
-(defmacro define-protocol-class 
+(defmacro define-protocol-class
     (name alien-type superclasses slots &rest options)
   (let ((to-protocol (intern (format nil "ALIEN-TO-~A" name)))
-	(to-alien (intern (format nil "~A-TO-ALIEN" name))))
+        (to-alien (intern (format nil "~A-TO-ALIEN" name))))
     `(progn
-      (defclass ,name ,superclasses 
-	,(loop for slotd in slots
-	       collect (ldiff slotd (member :array-length slotd)))
-	,@options)
+      (defclass ,name ,superclasses
+        ,(loop for slotd in slots
+               collect (ldiff slotd (member :array-length slotd)))
+        ,@options)
       (declaim (inline ,to-alien ,to-protocol))
       (defun ,to-protocol (alien &optional instance)
-	(declare (type (sb-alien:alien (* ,alien-type)) alien)
-		 (type (or null ,name) instance))
-	(unless instance
-	  (setf instance (make-instance ',name)))
-	,@(loop for slotd in slots
-		;; FIXME: slotds in source are more complicated in general
-		;;
-		;; FIXME: baroque construction of intricate fragility
-		for array-length = (getf (cdr slotd) :array-length)
-		if array-length
-		  collect `(progn
-			     (let ((array (make-array ,array-length)))
-			       (setf (slot-value instance ',(car slotd))
-				     array)
-			       (dotimes (i ,array-length)
-				 (setf (aref array i)
-				       (sb-alien:deref 
-					(sb-alien:slot alien ',(car slotd))
-					i)))))
-		else
-		  collect `(setf (slot-value instance ',(car slotd))
-			         (sb-alien:slot alien ',(car slotd))))
-	instance)
+        (declare (type (sb-alien:alien (* ,alien-type)) alien)
+                 (type (or null ,name) instance))
+        (unless instance
+          (setf instance (make-instance ',name)))
+        ,@(loop for slotd in slots
+                ;; FIXME: slotds in source are more complicated in general
+                ;;
+                ;; FIXME: baroque construction of intricate fragility
+                for array-length = (getf (cdr slotd) :array-length)
+                if array-length
+                  collect `(progn
+                             (let ((array (make-array ,array-length)))
+                               (setf (slot-value instance ',(car slotd))
+                                     array)
+                               (dotimes (i ,array-length)
+                                 (setf (aref array i)
+                                       (sb-alien:deref
+                                        (sb-alien:slot alien ',(car slotd))
+                                        i)))))
+                else
+                  collect `(setf (slot-value instance ',(car slotd))
+                                 (sb-alien:slot alien ',(car slotd))))
+        instance)
       (defun ,to-alien (instance &optional alien)
-	(declare (type (or null (sb-alien:alien (* ,alien-type))) alien)
-		 (type ,name instance))
-	(unless alien
-	  (setf alien (sb-alien:make-alien ,alien-type)))
-	,@(loop for slotd in slots
-		for array-length = (getf (cdr slotd) :array-length)
-		if array-length
-		  collect `(progn
-			     (let ((array (slot-value instance ',(car slotd))))
-			       (dotimes (i ,array-length)
-				 (setf (sb-alien:deref 
-					(sb-alien:slot alien ',(car slotd))
-					i)
-				       (aref array i)))))
-		else
-		  collect `(setf (sb-alien:slot alien ',(car slotd))
-			         (slot-value instance ',(car slotd)))))
+        (declare (type (or null (sb-alien:alien (* ,alien-type))) alien)
+                 (type ,name instance))
+        (unless alien
+          (setf alien (sb-alien:make-alien ,alien-type)))
+        ,@(loop for slotd in slots
+                for array-length = (getf (cdr slotd) :array-length)
+                if array-length
+                  collect `(progn
+                             (let ((array (slot-value instance ',(car slotd))))
+                               (dotimes (i ,array-length)
+                                 (setf (sb-alien:deref
+                                        (sb-alien:slot alien ',(car slotd))
+                                        i)
+                                       (aref array i)))))
+                else
+                  collect `(setf (sb-alien:slot alien ',(car slotd))
+                                 (slot-value instance ',(car slotd)))))
       (find-class ',name))))
 
 (define-condition sb-posix:syscall-error (error)
   ((errno :initarg :errno :reader sb-posix:syscall-errno))
   (:report (lambda (c s)
-	     (let ((errno (sb-posix:syscall-errno c)))
-	       (format s "System call error ~A (~A)"
-		       errno (sb-int:strerror errno))))))
+             (let ((errno (sb-posix:syscall-errno c)))
+               (format s "System call error ~A (~A)"
+                       errno (sb-int:strerror errno))))))
 
 (defun syscall-error ()
   (error 'sb-posix:syscall-error :errno (get-errno)))
@@ -75,7 +75,7 @@
 (define-call "chdir" int minusp (pathname filename))
 (define-call "chmod" int minusp (pathname filename) (mode sb-posix::mode-t))
 (define-call "chown" int minusp (pathname filename)
-	     (owner sb-posix::uid-t)  (group sb-posix::gid-t))
+             (owner sb-posix::uid-t)  (group sb-posix::gid-t))
 (define-call "chroot" int minusp (pathname filename))
 (define-call "close" int minusp (fd file-descriptor))
 (define-call "creat" int minusp (pathname filename) (mode sb-posix::mode-t))
@@ -84,12 +84,12 @@
 (define-call "fchdir" int minusp (fd file-descriptor))
 (define-call "fchmod" int minusp (fd file-descriptor) (mode sb-posix::mode-t))
 (define-call "fchown" int minusp (fd file-descriptor)
-	     (owner sb-posix::uid-t)  (group sb-posix::gid-t))
+             (owner sb-posix::uid-t)  (group sb-posix::gid-t))
 (define-call "fdatasync" int minusp (fd file-descriptor))
 (define-call "ftruncate" int minusp (fd file-descriptor) (length sb-posix::off-t))
 (define-call "fsync" int minusp (fd file-descriptor))
 (define-call "lchown" int minusp (pathname filename)
-	     (owner sb-posix::uid-t)  (group sb-posix::gid-t))
+             (owner sb-posix::uid-t)  (group sb-posix::gid-t))
 (define-call "link" int minusp (oldpath filename) (newpath filename))
 (define-call "lseek" sb-posix::off-t minusp (fd file-descriptor) (offset sb-posix::off-t) (whence int))
 (define-call "mkdir" int minusp (pathname filename) (mode sb-posix::mode-t))
@@ -115,8 +115,8 @@
 (define-entry-point "ioctl" (fd cmd &optional (arg nil argp))
   (if argp
       (etypecase arg
-	((alien int) (ioctl-with-int-arg fd cmd arg))
-	((or (alien (* t)) null) (ioctl-with-pointer-arg fd cmd arg)))
+        ((alien int) (ioctl-with-int-arg fd cmd arg))
+        ((or (alien (* t)) null) (ioctl-with-pointer-arg fd cmd arg)))
       (ioctl-without-arg fd cmd)))
 
 (define-call-internally fcntl-without-arg "fcntl" int minusp (fd file-descriptor) (cmd int))
@@ -125,8 +125,8 @@
 (define-entry-point "fcntl" (fd cmd &optional (arg nil argp))
   (if argp
       (etypecase arg
-	((alien int) (fcntl-with-int-arg fd cmd arg))
-	((or (alien (* t)) null) (fcntl-with-pointer-arg fd cmd arg)))
+        ((alien int) (fcntl-with-int-arg fd cmd arg))
+        ((or (alien (* t)) null) (fcntl-with-pointer-arg fd cmd arg)))
       (fcntl-without-arg fd cmd)))
 
 (define-call "opendir" (* t) null-alien (pathname filename))
@@ -148,10 +148,10 @@
 (define-call "seteuid" int minusp (uid sb-posix::uid-t))
 (define-call "setfsuid" int minusp (uid sb-posix::uid-t))
 (define-call "setreuid" int minusp
-	     (ruid sb-posix::uid-t) (euid sb-posix::uid-t))
+             (ruid sb-posix::uid-t) (euid sb-posix::uid-t))
 (define-call "setresuid" int minusp
-	     (ruid sb-posix::uid-t) (euid sb-posix::uid-t)
-	     (suid sb-posix::uid-t))
+             (ruid sb-posix::uid-t) (euid sb-posix::uid-t)
+             (suid sb-posix::uid-t))
 (define-call "setuid" int minusp (uid sb-posix::uid-t))
 
 (define-call "getegid" sb-posix::gid-t never-fails)
@@ -161,10 +161,10 @@
 (define-call "setfsgid" int minusp (gid sb-posix::gid-t))
 (define-call "setgid" int minusp (gid sb-posix::gid-t))
 (define-call "setregid" int minusp
-	     (rgid sb-posix::gid-t) (egid sb-posix::gid-t))
+             (rgid sb-posix::gid-t) (egid sb-posix::gid-t))
 (define-call "setresgid" int minusp
-	     (rgid sb-posix::gid-t)
-	     (egid sb-posix::gid-t) (sgid sb-posix::gid-t))
+             (rgid sb-posix::gid-t)
+             (egid sb-posix::gid-t) (sgid sb-posix::gid-t))
 
 ;;; processes, signals
 (define-call "alarm" int never-fails (seconds unsigned))
@@ -178,7 +178,7 @@
 (define-call "killpg" int minusp (pgrp int) (signal int))
 (define-call "pause" int minusp)
 (define-call "setpgid" int minusp
-	     (pid sb-posix::pid-t) (pgid sb-posix::pid-t))
+             (pid sb-posix::pid-t) (pgid sb-posix::pid-t))
 (define-call "setpgrp" int minusp)
 
 (export 'sb-posix::wait :sb-posix)
@@ -186,27 +186,27 @@
 (defun sb-posix::wait (&optional statusptr)
   (declare (type (or null (simple-array (signed-byte 32) (1))) statusptr))
   (let* ((ptr (or statusptr (make-array 1 :element-type '(signed-byte 32))))
-	 (pid (alien-funcall
-	       (extern-alien "wait" (function sb-posix::pid-t (* int)))
-	       (sb-sys:vector-sap ptr))))
+         (pid (alien-funcall
+               (extern-alien "wait" (function sb-posix::pid-t (* int)))
+               (sb-sys:vector-sap ptr))))
     (if (minusp pid)
-	(syscall-error)
-	(values pid (aref ptr 0)))))
+        (syscall-error)
+        (values pid (aref ptr 0)))))
 
 (export 'sb-posix::waitpid :sb-posix)
 (declaim (inline sb-posix::waitpid))
 (defun sb-posix::waitpid (pid options &optional statusptr)
   (declare (type (sb-alien:alien sb-posix::pid-t) pid)
-	   (type (sb-alien:alien int) options)
-	   (type (or null (simple-array (signed-byte 32) (1))) statusptr))
+           (type (sb-alien:alien int) options)
+           (type (or null (simple-array (signed-byte 32) (1))) statusptr))
   (let* ((ptr (or statusptr (make-array 1 :element-type '(signed-byte 32))))
-	 (pid (alien-funcall
-	       (extern-alien "waitpid" (function sb-posix::pid-t
-						 sb-posix::pid-t (* int) int))
-			     pid (sb-sys:vector-sap ptr) options)))
-	 (if (minusp pid)
-	     (syscall-error)
-	     (values pid (aref ptr 0)))))
+         (pid (alien-funcall
+               (extern-alien "waitpid" (function sb-posix::pid-t
+                                                 sb-posix::pid-t (* int) int))
+                             pid (sb-sys:vector-sap ptr) options)))
+         (if (minusp pid)
+             (syscall-error)
+             (values pid (aref ptr 0)))))
 
 ;; waitpid macros
 (define-call "wifexited" boolean never-fails (status int))
@@ -252,22 +252,22 @@
       (export ',lisp-name :sb-posix)
       (declaim (inline ,lisp-name))
       (defun ,lisp-name (,arg &optional stat)
-	(declare (type (or null (sb-alien:alien (* sb-posix::alien-stat))) stat))
-	(sb-posix::with-alien-stat a-stat ()
-	  (let ((r (alien-funcall
-		    (extern-alien ,name ,type)
-		    (,designator-fun ,arg)
-		    a-stat)))
-	    (when (minusp r)
-	      (syscall-error))
-	    (alien-to-stat a-stat stat)))))))
+        (declare (type (or null (sb-alien:alien (* sb-posix::alien-stat))) stat))
+        (sb-posix::with-alien-stat a-stat ()
+          (let ((r (alien-funcall
+                    (extern-alien ,name ,type)
+                    (,designator-fun ,arg)
+                    a-stat)))
+            (when (minusp r)
+              (syscall-error))
+            (alien-to-stat a-stat stat)))))))
 
 (define-stat-call "stat" pathname sb-posix::filename
-		  (function int c-string (* sb-posix::alien-stat)))
+                  (function int c-string (* sb-posix::alien-stat)))
 (define-stat-call "lstat" pathname sb-posix::filename
-		  (function int c-string (* sb-posix::alien-stat)))
+                  (function int c-string (* sb-posix::alien-stat)))
 (define-stat-call "fstat" fd sb-posix::file-descriptor
-		  (function int int (* sb-posix::alien-stat)))
+                  (function int int (* sb-posix::alien-stat)))
 
 
 ;;; mode flags
@@ -286,9 +286,9 @@
   (unless filedes2
     (setq filedes2 (make-array 2 :element-type '(signed-byte 32))))
   (let ((r (alien-funcall
-	    ;; FIXME: (* INT)?  (ARRAY INT 2) would be better
-	    (extern-alien "pipe" (function int (* int)))
-	    (sb-sys:vector-sap filedes2))))
+            ;; FIXME: (* INT)?  (ARRAY INT 2) would be better
+            (extern-alien "pipe" (function int (* int)))
+            (sb-sys:vector-sap filedes2))))
     (when (minusp r)
       (syscall-error)))
   (values (aref filedes2 0) (aref filedes2 1)))
@@ -307,24 +307,24 @@
     (termios-to-alien termios a-termios)
     (let ((fd (sb-posix::file-descriptor fd)))
       (let* ((r (alien-funcall
-		 (extern-alien 
-		  "tcsetattr" 
-		  (function int int int (* sb-posix::alien-termios)))
-		 fd actions a-termios)))
-	(when (minusp r)
-	  (syscall-error)))
+                 (extern-alien
+                  "tcsetattr"
+                  (function int int int (* sb-posix::alien-termios)))
+                 fd actions a-termios)))
+        (when (minusp r)
+          (syscall-error)))
       (values))))
 (export 'sb-posix::tcgetattr :sb-posix)
 (declaim (inline sb-posix::tcgetattr))
 (defun sb-posix::tcgetattr (fd &optional termios)
   (sb-posix::with-alien-termios a-termios ()
     (let ((r (alien-funcall
-	      (extern-alien "tcgetattr" 
-			    (function int int (* sb-posix::alien-termios)))
-	      (sb-posix::file-descriptor fd)
-	      a-termios)))
+              (extern-alien "tcgetattr"
+                            (function int int (* sb-posix::alien-termios)))
+              (sb-posix::file-descriptor fd)
+              a-termios)))
       (when (minusp r)
-	(syscall-error))
+        (syscall-error))
       (setf termios (alien-to-termios a-termios termios))))
   termios)
 
@@ -333,8 +333,8 @@
 (export 'sb-posix::getenv :sb-posix)
 (defun sb-posix::getenv (name)
   (let ((r (alien-funcall
-	    (extern-alien "getenv" (function (* char) c-string))
-	    name)))
+            (extern-alien "getenv" (function (* char) c-string))
+            name)))
     (declare (type (alien (* char)) r))
     (unless (null-alien r)
       (cast r c-string))))

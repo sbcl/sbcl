@@ -4,16 +4,16 @@
 
 (macrolet
     ((define-rfc1321-tests (test-list)
-	 `(progn
-	   ,@(loop for i upfrom 0
-		   for (string . expected-result) in test-list
-		   collect
-		   `(deftest ,(intern (format nil "SB-MD5.RFC1321.~A" i))
-		     (string= (format nil
-			       "~(~{~2,'0X~}~)"
-			       (coerce (md5sum-string ,string :external-format :ascii) 'list))
-		      ,expected-result)
-		     t)))))
+         `(progn
+           ,@(loop for i upfrom 0
+                   for (string . expected-result) in test-list
+                   collect
+                   `(deftest ,(intern (format nil "SB-MD5.RFC1321.~A" i))
+                     (string= (format nil
+                               "~(~{~2,'0X~}~)"
+                               (coerce (md5sum-string ,string :external-format :ascii) 'list))
+                      ,expected-result)
+                     t)))))
   (define-rfc1321-tests
       (("" . "d41d8cd98f00b204e9800998ecf8427e")
        ("a" ."0cc175b9c0f1b6a831c399e269772661")
@@ -25,16 +25,16 @@
 
 (macrolet
     ((define-other-tests (test-list)
-	 `(progn
-	   ,@(loop for i upfrom 0
-		   for (string . expected-result) in test-list
-		   collect
-		   `(deftest ,(intern (format nil "SB-MD5.OTHER.~A" i))
-		     (string=
-		      (format nil "~(~{~2,'0X~}~)"
+         `(progn
+           ,@(loop for i upfrom 0
+                   for (string . expected-result) in test-list
+                   collect
+                   `(deftest ,(intern (format nil "SB-MD5.OTHER.~A" i))
+                     (string=
+                      (format nil "~(~{~2,'0X~}~)"
                        (coerce (md5sum-string ,string :external-format :ascii) 'list))
-		      ,expected-result)
-		     t)))))
+                      ,expected-result)
+                     t)))))
   (define-other-tests
       (;; From padding bug report by Edi Weitz
        ("1631901HERR BUCHHEISTERCITROEN NORD1043360796beckenbauer" . "d734945e5930bb28859ccd13c830358b")
@@ -112,7 +112,7 @@
 
 (deftest sb-md5.md5sum-file.0
     (string= (format nil "~(~{~2,'0X~}~)" (coerce (md5sum-file "/dev/null") 'list))
-	     "d41d8cd98f00b204e9800998ecf8427e")
+             "d41d8cd98f00b204e9800998ecf8427e")
   t)
 
 (deftest sb-md5.md5sum-sequence.error.0

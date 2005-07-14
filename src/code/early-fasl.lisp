@@ -35,38 +35,38 @@
 
 (macrolet ((define-fasl-format-features ()
              (let (;; master value for *F-P-A-F-F*
-		   (fpaff '(:sb-thread :sb-package-locks :sb-unicode)))
-	       `(progn
-		  ;; a list of *(SHEBANG-)FEATURES* flags which affect
-		  ;; binary compatibility, i.e. which must be the same
-		  ;; between the SBCL which compiles the code and the
-		  ;; SBCL which executes the code
-		  ;;
-		  ;; This is a property of SBCL executables in the
-		  ;; abstract, not of this particular SBCL executable, 
-		  ;; so any flag in this list may or may not be present
-		  ;; in the *FEATURES* list of this particular build.
-		  (defparameter *features-potentially-affecting-fasl-format*
-		    ',fpaff)
-		  ;; a string representing flags of *F-P-A-F-F* which
-		  ;; are in this particular build
-		  ;;
-		  ;; (A list is the natural logical representation for
-		  ;; this, but we represent it as a string because
-		  ;; that's physically convenient for writing to and
-		  ;; reading from fasl files, and because we don't
-		  ;; need to do anything sophisticated with its
-		  ;; logical structure, just test it for equality.)
-		  (defparameter *features-affecting-fasl-format*
-		    ,(let ((*print-pretty* nil))
-		       (prin1-to-string
-			(sort
-			 (copy-seq
-			  (intersection sb-cold:*shebang-features* fpaff))
-			 #'string<
-			 :key #'symbol-name))))))))
+                   (fpaff '(:sb-thread :sb-package-locks :sb-unicode)))
+               `(progn
+                  ;; a list of *(SHEBANG-)FEATURES* flags which affect
+                  ;; binary compatibility, i.e. which must be the same
+                  ;; between the SBCL which compiles the code and the
+                  ;; SBCL which executes the code
+                  ;;
+                  ;; This is a property of SBCL executables in the
+                  ;; abstract, not of this particular SBCL executable,
+                  ;; so any flag in this list may or may not be present
+                  ;; in the *FEATURES* list of this particular build.
+                  (defparameter *features-potentially-affecting-fasl-format*
+                    ',fpaff)
+                  ;; a string representing flags of *F-P-A-F-F* which
+                  ;; are in this particular build
+                  ;;
+                  ;; (A list is the natural logical representation for
+                  ;; this, but we represent it as a string because
+                  ;; that's physically convenient for writing to and
+                  ;; reading from fasl files, and because we don't
+                  ;; need to do anything sophisticated with its
+                  ;; logical structure, just test it for equality.)
+                  (defparameter *features-affecting-fasl-format*
+                    ,(let ((*print-pretty* nil))
+                       (prin1-to-string
+                        (sort
+                         (copy-seq
+                          (intersection sb-cold:*shebang-features* fpaff))
+                         #'string<
+                         :key #'symbol-name))))))))
   (define-fasl-format-features))
-	   
+
 ;;; the code for a character which terminates a fasl file header
 (def!constant +fasl-header-string-stop-char-code+ 255)
 
@@ -95,10 +95,10 @@
 ;;;     <Krystof_> I think I renumbered everything again
 ;;;     <Krystof_> simple-array-unsigned-byte-7, probably
 ;;;     <Krystof_> (thanks to pfdietz)
-;;; 45: (2003-10-02) I (WHN) incremented the version for the 0.8.4 
+;;; 45: (2003-10-02) I (WHN) incremented the version for the 0.8.4
 ;;;     release because I couldn't immediately convince myself that
 ;;;     .fasl files could never possibly ever refer to the SB-C
-;;;     CONTINUATION-related data types which were changed 
+;;;     CONTINUATION-related data types which were changed
 ;;;     incompatibly in 0.8.3.62.
 ;;; 46: (2003-11-11) Tim Daly, Jr. (and Christophe Rhodes) reported
 ;;;     .fasl incompatibility on sbcl-devel 2003-11-09.
@@ -148,8 +148,8 @@
 ;;; which will perform the operation
 (defvar *fop-funs*
   (make-array 256
-	      :initial-element (lambda ()
-				 (error "corrupt fasl file: losing FOP"))))
+              :initial-element (lambda ()
+                                 (error "corrupt fasl file: losing FOP"))))
 
 ;;;; variables
 

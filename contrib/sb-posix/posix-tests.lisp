@@ -6,8 +6,8 @@
 (defvar *test-directory*
   (ensure-directories-exist
    (merge-pathnames (make-pathname :directory '(:relative "test-lab"))
-		    (make-pathname :directory
-				   (pathname-directory *load-truename*)))))
+                    (make-pathname :directory
+                                   (pathname-directory *load-truename*)))))
 
 (defvar *current-directory* *default-pathname-defaults*)
 
@@ -15,14 +15,14 @@
 
 (eval-when (:compile-toplevel :load-toplevel)
   (defconstant +mode-rwx-all+ (logior sb-posix::s-irusr sb-posix::s-iwusr sb-posix::s-ixusr
-				      sb-posix::s-irgrp sb-posix::s-iwgrp sb-posix::s-ixgrp
-				      sb-posix::s-iroth sb-posix::s-iwoth sb-posix::s-ixoth)))
+                                      sb-posix::s-irgrp sb-posix::s-iwgrp sb-posix::s-ixgrp
+                                      sb-posix::s-iroth sb-posix::s-iwoth sb-posix::s-ixoth)))
 
 (defmacro define-eacces-test (name form &rest values)
   `(deftest ,name
     (block ,name
       (when (= (sb-posix:geteuid) 0)
-	(return-from ,name (values ,@values)))
+        (return-from ,name (values ,@values)))
       ,form)
     ,@values))
 
@@ -61,9 +61,9 @@
 (deftest chdir.error.1
   (let ((dne (make-pathname :directory '(:relative "chdir.does-not-exist"))))
     (handler-case
-	(sb-posix:chdir (merge-pathnames dne *test-directory*))
+        (sb-posix:chdir (merge-pathnames dne *test-directory*))
       (sb-posix:syscall-error (c)
-	(sb-posix:syscall-errno c))))
+        (sb-posix:syscall-errno c))))
   #.sb-posix::enoent)
 
 (deftest chdir.error.2
@@ -76,7 +76,7 @@
 (deftest mkdir.1
   (let ((dne (make-pathname :directory '(:relative "mkdir.does-not-exist.1"))))
     (unwind-protect
-	 (sb-posix:mkdir (merge-pathnames dne *test-directory*) 0)
+         (sb-posix:mkdir (merge-pathnames dne *test-directory*) 0)
       ;; FIXME: no delete-directory in CL, but using our own operators
       ;; is probably not ideal
       (ignore-errors (sb-posix:rmdir (merge-pathnames dne *test-directory*)))))
@@ -85,7 +85,7 @@
 (deftest mkdir.2
   (let ((dne (make-pathname :directory '(:relative "mkdir.does-not-exist.2"))))
     (unwind-protect
-	 (sb-posix:mkdir (namestring (merge-pathnames dne *test-directory*)) 0)
+         (sb-posix:mkdir (namestring (merge-pathnames dne *test-directory*)) 0)
       (ignore-errors (sb-posix:rmdir (merge-pathnames dne *test-directory*)))))
   0)
 
@@ -105,21 +105,21 @@
 
 (define-eacces-test mkdir.error.3
   (let* ((dir (merge-pathnames
-	       (make-pathname :directory '(:relative "mkdir.error.3"))
-	       *test-directory*))
-	 (dir2 (merge-pathnames
-		(make-pathname :directory '(:relative "does-not-exist"))
-		dir)))
+               (make-pathname :directory '(:relative "mkdir.error.3"))
+               *test-directory*))
+         (dir2 (merge-pathnames
+                (make-pathname :directory '(:relative "does-not-exist"))
+                dir)))
     (sb-posix:mkdir dir 0)
     (handler-case
-	(sb-posix:mkdir dir2 0)
+        (sb-posix:mkdir dir2 0)
       (sb-posix:syscall-error (c)
-	(sb-posix:rmdir dir)
-	(sb-posix:syscall-errno c))
+        (sb-posix:rmdir dir)
+        (sb-posix:syscall-errno c))
       (:no-error (result)
-	(sb-posix:rmdir dir2)
-	(sb-posix:rmdir dir)
-	result)))
+        (sb-posix:rmdir dir2)
+        (sb-posix:rmdir dir)
+        result)))
   #.sb-posix::eacces)
 
 (deftest rmdir.1
@@ -136,10 +136,10 @@
 
 (deftest rmdir.error.1
   (let ((dne (make-pathname :directory '(:relative "rmdir.dne.error.1"))))
-    (handler-case 
-	(sb-posix:rmdir (merge-pathnames dne *test-directory*))
+    (handler-case
+        (sb-posix:rmdir (merge-pathnames dne *test-directory*))
       (sb-posix:syscall-error (c)
-	(sb-posix:syscall-errno c))))
+        (sb-posix:syscall-errno c))))
   #.sb-posix::enoent)
 
 (deftest rmdir.error.2
@@ -158,74 +158,74 @@
 
 (deftest rmdir.error.4
   (let* ((dir (ensure-directories-exist
-	       (merge-pathnames
-		(make-pathname :directory '(:relative "rmdir.error.4"))
-		*test-directory*)))
-	 (file (make-pathname :name "foo" :defaults dir)))
+               (merge-pathnames
+                (make-pathname :directory '(:relative "rmdir.error.4"))
+                *test-directory*)))
+         (file (make-pathname :name "foo" :defaults dir)))
     (with-open-file (s file :direction :output)
       (write "" :stream s))
     (handler-case
-	(sb-posix:rmdir dir)
+        (sb-posix:rmdir dir)
       (sb-posix:syscall-error (c)
-	(delete-file file)
-	(sb-posix:rmdir dir)
-	(let ((errno (sb-posix:syscall-errno c)))
-	  ;; documented by POSIX
-	  (or (= errno sb-posix::eexist) (= errno sb-posix::enotempty))))))
+        (delete-file file)
+        (sb-posix:rmdir dir)
+        (let ((errno (sb-posix:syscall-errno c)))
+          ;; documented by POSIX
+          (or (= errno sb-posix::eexist) (= errno sb-posix::enotempty))))))
   t)
 
 (define-eacces-test rmdir.error.5
   (let* ((dir (merge-pathnames
-	       (make-pathname :directory '(:relative "rmdir.error.5"))
-	       *test-directory*))
-	 (dir2 (merge-pathnames
-		(make-pathname :directory '(:relative "unremovable"))
-		dir)))
+               (make-pathname :directory '(:relative "rmdir.error.5"))
+               *test-directory*))
+         (dir2 (merge-pathnames
+                (make-pathname :directory '(:relative "unremovable"))
+                dir)))
     (sb-posix:mkdir dir +mode-rwx-all+)
     (sb-posix:mkdir dir2 +mode-rwx-all+)
     (sb-posix:chmod dir 0)
     (handler-case
-	(sb-posix:rmdir dir2)
+        (sb-posix:rmdir dir2)
       (sb-posix:syscall-error (c)
-	(sb-posix:chmod dir (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
-	(sb-posix:rmdir dir2)
-	(sb-posix:rmdir dir)
-	(sb-posix:syscall-errno c))
+        (sb-posix:chmod dir (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
+        (sb-posix:rmdir dir2)
+        (sb-posix:rmdir dir)
+        (sb-posix:syscall-errno c))
       (:no-error (result)
-	(sb-posix:chmod dir (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
-	(sb-posix:rmdir dir)
-	result)))
+        (sb-posix:chmod dir (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
+        (sb-posix:rmdir dir)
+        result)))
   #.sb-posix::eacces)
 
 (deftest stat.1
   (let* ((stat (sb-posix:stat *test-directory*))
-	 (mode (sb-posix::stat-mode stat)))
+         (mode (sb-posix::stat-mode stat)))
     ;; FIXME: Ugly ::s everywhere
     (logand mode (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec)))
   #.(logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
 
 (deftest stat.2
   (let* ((stat (sb-posix:stat "/"))
-	 (mode (sb-posix::stat-mode stat)))
+         (mode (sb-posix::stat-mode stat)))
     ;; it's logically possible for / to be writeable by others... but
     ;; if it is, either someone is playing with strange security
     ;; modules or they want to know about it anyway.
     (logand mode sb-posix::s-iwoth))
   0)
-    
+
 (deftest stat.3
   (let* ((now (get-universal-time))
-	 ;; FIXME: (encode-universal-time 00 00 00 01 01 1970)
-	 (unix-now (- now 2208988800))
-	 (stat (sb-posix:stat *test-directory*))
-	 (atime (sb-posix::stat-atime stat)))
+         ;; FIXME: (encode-universal-time 00 00 00 01 01 1970)
+         (unix-now (- now 2208988800))
+         (stat (sb-posix:stat *test-directory*))
+         (atime (sb-posix::stat-atime stat)))
     ;; FIXME: breaks if mounted noatime :-(
     (< (- atime unix-now) 10))
   t)
 
 (deftest stat.4
   (let* ((stat (sb-posix:stat (make-pathname :directory '(:absolute :up))))
-	 (mode (sb-posix::stat-mode stat)))
+         (mode (sb-posix::stat-mode stat)))
     ;; it's logically possible for / to be writeable by others... but
     ;; if it is, either someone is playing with strange security
     ;; modules or they want to know about it anyway.
@@ -243,27 +243,27 @@
 
 (define-eacces-test stat.error.2
   (let* ((dir (merge-pathnames
-	       (make-pathname :directory '(:relative "stat.error.2"))
-	       *test-directory*))
-	 (file (merge-pathnames
-		(make-pathname :name "unstatable")
-		dir)))
+               (make-pathname :directory '(:relative "stat.error.2"))
+               *test-directory*))
+         (file (merge-pathnames
+                (make-pathname :name "unstatable")
+                dir)))
     (sb-posix:mkdir dir +mode-rwx-all+)
     (with-open-file (s file :direction :output)
       (write "" :stream s))
     (sb-posix:chmod dir 0)
     (handler-case
-	(sb-posix:stat file)
+        (sb-posix:stat file)
       (sb-posix:syscall-error (c)
-	(sb-posix:chmod dir (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
-	(sb-posix:unlink file)
-	(sb-posix:rmdir dir)
-	(sb-posix:syscall-errno c))
+        (sb-posix:chmod dir (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
+        (sb-posix:unlink file)
+        (sb-posix:rmdir dir)
+        (sb-posix:syscall-errno c))
       (:no-error (result)
-	(sb-posix:chmod dir (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
-	(sb-posix:unlink file)
-	(sb-posix:rmdir dir)
-	result)))
+        (sb-posix:chmod dir (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
+        (sb-posix:unlink file)
+        (sb-posix:rmdir dir)
+        result)))
   #.sb-posix::eacces)
 
 ;;; stat-mode tests
@@ -366,14 +366,14 @@
 (deftest fcntl.1
   (let ((fd (sb-posix:open "/dev/null" sb-posix::o-nonblock)))
     (/= 0 (logand (sb-posix:fcntl fd sb-posix::f-getfl)
-		  sb-posix::o-nonblock)))
+                  sb-posix::o-nonblock)))
   t)
 
 (deftest opendir.1
   (let ((dir (sb-posix:opendir "/")))
     (unwind-protect (sb-alien:null-alien dir)
       (unless (sb-alien:null-alien dir)
-	(sb-posix:closedir dir))))
+        (sb-posix:closedir dir))))
   nil)
 
 (deftest readdir.1

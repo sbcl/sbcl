@@ -33,12 +33,12 @@
 
     (with-standard-io-syntax
       (let ((*print-readably* nil))
-	(dolist (item messages)
-	  (princ item *terminal-io*))
+        (dolist (item messages)
+          (princ item *terminal-io*))
         (terpri *terminal-io*)
         (sb!debug:backtrace most-positive-fixnum *terminal-io*)
         (force-output *terminal-io*)
-	(invoke-debugger
+        (invoke-debugger
          (coerce-to-condition "Maximum error nesting depth exceeded" nil
                               'simple-error
                               'error))))))

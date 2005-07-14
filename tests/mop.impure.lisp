@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -25,26 +25,26 @@
 
 (assert (null (class-direct-slots (find-class 'forward-ref))))
 (assert (null (class-direct-default-initargs
-	       (find-class 'forward-ref))))
+               (find-class 'forward-ref))))
 
 ;;; Readers for Generic Function Metaobjects (pp. 216--218 of AMOP)
 (defgeneric fn-with-odd-arg-precedence (a b c)
   (:argument-precedence-order b c a))
 
 (assert (equal
-	 (generic-function-lambda-list #'fn-with-odd-arg-precedence)
-	 '(a b c)))
+         (generic-function-lambda-list #'fn-with-odd-arg-precedence)
+         '(a b c)))
 (assert (equal
-	 (generic-function-argument-precedence-order #'fn-with-odd-arg-precedence)
-	 '(b c a)))
+         (generic-function-argument-precedence-order #'fn-with-odd-arg-precedence)
+         '(b c a)))
 ;;; Test for DOCUMENTATION's order, which was wrong until sbcl-0.7.8.39
 (assert (equal
-	 (generic-function-argument-precedence-order #'documentation)
-	 (let ((ll (generic-function-lambda-list #'documentation)))
-	   (list (nth 1 ll) (nth 0 ll)))))
+         (generic-function-argument-precedence-order #'documentation)
+         (let ((ll (generic-function-lambda-list #'documentation)))
+           (list (nth 1 ll) (nth 0 ll)))))
 
 (assert (null
-	 (generic-function-declarations #'fn-with-odd-arg-precedence)))
+         (generic-function-declarations #'fn-with-odd-arg-precedence)))
 (defgeneric gf-with-declarations (x)
   (declare (optimize (speed 3)))
   (declare (optimize (safety 0))))
@@ -61,13 +61,13 @@
   ((an-instance-slot :accessor an-instance-slot)
    (a-class-slot :allocation :class :accessor a-class-slot)))
 (dolist (m (list (list #'an-instance-slot :instance)
-		 (list #'a-class-slot :class)))
+                 (list #'a-class-slot :class)))
   (let ((methods (generic-function-methods (car m))))
     (assert (= (length methods) 1))
     (assert (eq (slot-definition-allocation
-		 (accessor-method-slot-definition
-		  (car methods)))
-		(cadr m)))))
+                 (accessor-method-slot-definition
+                  (car methods)))
+                (cadr m)))))
 
 ;;; Class Finalization Protocol (see section 5.5.2 of AMOP)
 (let ((finalized-count 0))
@@ -98,9 +98,9 @@
 ;;; not going to change often.
 (dolist (x '(number array sequence character symbol))
   (assert (eq (car (class-direct-superclasses (find-class x)))
-	      (find-class t)))
+              (find-class t)))
   (assert (member (find-class x)
-		  (class-direct-subclasses (find-class t)))))
+                  (class-direct-subclasses (find-class t)))))
 
 ;;; the class-prototype of the NULL class used to be some weird
 ;;; standard-instance-like thing.  Make sure it's actually NIL.
@@ -112,17 +112,17 @@
 ;;; simple consistency checks for the SB-MOP package: all of the
 ;;; functionality specified in AMOP is in functions and classes:
 (assert (null (loop for x being each external-symbol in "SB-MOP"
-		    unless (or (fboundp x) (find-class x)) collect x)))
+                    unless (or (fboundp x) (find-class x)) collect x)))
 ;;; and all generic functions in SB-MOP have at least one specified
 ;;; method, except for UPDATE-DEPENDENT
 (assert (null (loop for x being each external-symbol in "SB-MOP"
-		    unless (or (not (fboundp x))
-			       (eq x 'update-dependent)
-			       (not (typep (fdefinition x) 'generic-function))
-			       (> (length (generic-function-methods
-					   (fdefinition x)))
-				  0))
-		    collect x)))
+                    unless (or (not (fboundp x))
+                               (eq x 'update-dependent)
+                               (not (typep (fdefinition x) 'generic-function))
+                               (> (length (generic-function-methods
+                                           (fdefinition x)))
+                                  0))
+                    collect x)))
 
 ;;; make sure that ENSURE-CLASS-USING-CLASS's arguments are the right
 ;;; way round (!)
@@ -194,17 +194,17 @@
 (defclass class-to-add-instance-slot (dummy-ctais) ())
 (defmethod compute-slots ((c (eql (find-class 'class-to-add-instance-slot))))
   (append (call-next-method)
-	  (list (make-instance 'standard-effective-slot-definition
-			       :name 'y
-			       :allocation :instance))))
+          (list (make-instance 'standard-effective-slot-definition
+                               :name 'y
+                               :allocation :instance))))
 (defclass dummy-ctais () ((x :allocation :class)))
-(assert (equal (mapcar #'slot-definition-allocation 
-		       (class-slots (find-class 'class-to-add-instance-slot)))
-	       ;; FIXME: is the order really guaranteed?
-	       '(:class :instance)))
-(assert (typep (slot-definition-location 
-		(cadr (class-slots (find-class 'class-to-add-instance-slot)))) 
-	       'unsigned-byte))
+(assert (equal (mapcar #'slot-definition-allocation
+                       (class-slots (find-class 'class-to-add-instance-slot)))
+               ;; FIXME: is the order really guaranteed?
+               '(:class :instance)))
+(assert (typep (slot-definition-location
+                (cadr (class-slots (find-class 'class-to-add-instance-slot))))
+               'unsigned-byte))
 #| (assert (typep (slot-definition-location (car ...)) '???)) |#
 (let ((x (make-instance 'class-to-add-instance-slot)))
   (assert (not (slot-boundp x 'x)))
@@ -221,13 +221,13 @@
 (defclass class-to-add-class-slot (dummy-ctacs) ())
 (defmethod compute-slots ((c (eql (find-class 'class-to-add-class-slot))))
   (append (call-next-method)
-	  (list (make-instance 'standard-effective-slot-definition
-			       :name 'y
-			       :allocation :class))))
+          (list (make-instance 'standard-effective-slot-definition
+                               :name 'y
+                               :allocation :class))))
 (defclass dummy-ctacs () ((x :allocation :class)))
-(assert (equal (mapcar #'slot-definition-allocation 
-		       (class-slots (find-class 'class-to-add-class-slot)))
-	       '(:class :class)))
+(assert (equal (mapcar #'slot-definition-allocation
+                       (class-slots (find-class 'class-to-add-class-slot)))
+               '(:class :class)))
 (let ((x (make-instance 'class-to-add-class-slot)))
   (assert (not (slot-boundp x 'x)))
   (setf (slot-value x 'x) nil)
@@ -252,8 +252,8 @@
   ((frob-slot :initarg :frob-slot :allocation :frob)))
 (handler-case
     (funcall (compile nil '(lambda ()
-			    (make-instance 'class-with-frob-slot
-			     :frob-slot 1))))
+                            (make-instance 'class-with-frob-slot
+                             :frob-slot 1))))
   (sb-int:bug (c) (error c))
   (error () "Probably OK: haven't implemented SLOT-BOUNDP-USING-CLASS"))
 ;;; secondly, it failed to take account of the fact that we might wish
@@ -265,7 +265,7 @@
     (new-value class (instance class-with-special-ssvuc) slotd)
   (incf *special-ssvuc-counter*))
 (let ((fun (compile nil '(lambda () (make-instance 'class-with-special-ssvuc
-				     :some-slot 1)))))
+                                     :some-slot 1)))))
   (assert (= *special-ssvuc-counter* 0))
   (funcall fun)
   (assert (= *special-ssvuc-counter* 1))
@@ -276,7 +276,7 @@
   ((some-slot :initarg :some-slot)))
 (defvar *special-ssvuc-counter-2* 0)
 (let ((fun (compile nil '(lambda () (make-instance 'class-with-special-ssvuc-2
-				     :some-slot 1)))))
+                                     :some-slot 1)))))
   (assert (= *special-ssvuc-counter-2* 0))
   (funcall fun)
   (assert (= *special-ssvuc-counter-2* 0))
@@ -298,7 +298,7 @@
 (defclass auto-accessors-class (standard-class)
   ())
 (defmethod direct-slot-definition-class ((class auto-accessors-class)
-					 &rest initargs)
+                                         &rest initargs)
   (let ((dsd-class-name (gensym)))
     (sb-pcl:ensure-class
      dsd-class-name
@@ -306,21 +306,21 @@
      :direct-superclasses (list (find-class 'standard-direct-slot-definition))
      :containing-class-name (class-name class))
     (eval `(defmethod initialize-instance :after ((dsd ,dsd-class-name)
-						  &rest args)
-	    (when (and (null (slot-definition-readers dsd))
-		       (null (slot-definition-writers dsd)))
-	      (let* ((containing-class-name
-		      (slot-value (class-of dsd) 'containing-class-name))
-		     (accessor-name
-		      (intern
-		       (concatenate 'string
-				    (symbol-name containing-class-name)
-				    "-"
-				    (symbol-name (slot-definition-name dsd)))
-		       (symbol-package containing-class-name))))
-		(setf (slot-definition-readers dsd) (list accessor-name))
-		(setf (slot-definition-writers dsd)
-		      (list (list 'setf accessor-name)))))))
+                                                  &rest args)
+            (when (and (null (slot-definition-readers dsd))
+                       (null (slot-definition-writers dsd)))
+              (let* ((containing-class-name
+                      (slot-value (class-of dsd) 'containing-class-name))
+                     (accessor-name
+                      (intern
+                       (concatenate 'string
+                                    (symbol-name containing-class-name)
+                                    "-"
+                                    (symbol-name (slot-definition-name dsd)))
+                       (symbol-package containing-class-name))))
+                (setf (slot-definition-readers dsd) (list accessor-name))
+                (setf (slot-definition-writers dsd)
+                      (list (list 'setf accessor-name)))))))
     (find-class dsd-class-name)))
 (defmethod validate-superclass ((c1 auto-accessors-class) (c2 standard-class))
   t)
@@ -329,7 +329,7 @@
   (:metaclass auto-accessors-class))
 (let ((inst (make-instance 'testclass15 :x 12)))
   (assert (equal (list (testclass15-x inst) (setf (testclass15-y inst) 13))
-		 '(12 13))))
+                 '(12 13))))
 
 ;;; bug reported by Bruno Haible on sbcl-devel 2004-11-17: incorrect
 ;;; handling of multiple values for non-standard slot-options
@@ -338,19 +338,19 @@
     ((option :accessor sl-option :initarg :my-option)))
   (defclass option-slot-class (standard-class)
     ())
-  (defmethod sb-mop:direct-slot-definition-class 
+  (defmethod sb-mop:direct-slot-definition-class
       ((c option-slot-class) &rest args)
     (declare (ignore args))
     (find-class 'option-slot-definition))
-  (defmethod sb-mop:validate-superclass 
+  (defmethod sb-mop:validate-superclass
       ((c1 option-slot-class) (c2 standard-class))
     t)
   (eval '(defclass test-multiple-slot-option-bug ()
           ((x :my-option bar :my-option baz))
           (:metaclass option-slot-class)))
-  (assert (null (set-difference 
+  (assert (null (set-difference
                  '(bar baz)
-                 (sl-option (first (sb-mop:class-direct-slots 
+                 (sl-option (first (sb-mop:class-direct-slots
                                     (find-class 'test-multiple-slot-option-bug))))))))
 
 ;;; bug reported by Bruno Haibel on sbcl-devel 2004-11-19: AMOP requires
@@ -397,14 +397,14 @@
   (assert (not result))
   (assert error))
 
-;;; class as :metaclass                         
+;;; class as :metaclass
 (assert (typep
-	 (sb-mop:ensure-class-using-class 
-	  nil 'class-as-metaclass-test
-	  :metaclass (find-class 'standard-class)
-	  :name 'class-as-metaclass-test
-	  :direct-superclasses (list (find-class 'standard-object)))
-	 'class))
+         (sb-mop:ensure-class-using-class
+          nil 'class-as-metaclass-test
+          :metaclass (find-class 'standard-class)
+          :name 'class-as-metaclass-test
+          :direct-superclasses (list (find-class 'standard-object)))
+         'class))
 
 ;;; COMPUTE-DEFAULT-INITARGS protocol mismatch reported by Bruno
 ;;; Haible
@@ -413,16 +413,16 @@
   ())
 (defmethod compute-default-initargs ((class custom-default-initargs-class))
   (let ((original-default-initargs
-	 (remove-duplicates
-	  (reduce #'append
-		  (mapcar #'class-direct-default-initargs
-			  (class-precedence-list class)))
-	  :key #'car
-	  :from-end t)))
+         (remove-duplicates
+          (reduce #'append
+                  (mapcar #'class-direct-default-initargs
+                          (class-precedence-list class)))
+          :key #'car
+          :from-end t)))
     (cons (list ':extra '*extra-initarg-value* #'(lambda () *extra-initarg-value*))
-	  (remove ':extra original-default-initargs :key #'car))))
+          (remove ':extra original-default-initargs :key #'car))))
 (defmethod validate-superclass ((c1 custom-default-initargs-class)
-				(c2 standard-class))
+                                (c2 standard-class))
   t)
 (defclass extra-initarg ()
   ((slot :initarg :extra))

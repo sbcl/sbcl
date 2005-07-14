@@ -15,11 +15,11 @@
 ;;; We make no attempt to be fully general; our table doesn't need to be
 ;;; able to express features which we don't happen to use.
 (export '(package-data
-	  package-data-name
-	  package-data-export
-	  package-data-reexport
-	  package-data-import-from
-	  package-data-use))
+          package-data-name
+          package-data-export
+          package-data-reexport
+          package-data-import-from
+          package-data-use))
 (defstruct package-data
   ;; a string designator for the package name
   (name (error "missing PACKAGE-DATA-NAME datum"))
@@ -50,56 +50,56 @@
     ;; can without referring to any other packages.
     (dolist (package-data package-data-list)
       (let* ((package (make-package
-		       (package-data-name package-data)
-		       ;; Note: As of 0.7.0, the only nicknames we use
-		       ;; for our implementation packages are hacks
-		       ;; not needed at cross-compile time (e.g. the
-		       ;; deprecated SB-C-CALL nickname for SB-ALIEN).
-		       ;; So support for nicknaming during xc is gone,
-		       ;; since any nicknames are hacked in during
-		       ;; cold init.
-		       :nicknames nil
-		       :use nil)))
-	#-clisp ; As of "2.27 (released 2001-07-17) (built 3215971334)"
-	        ; CLISP didn't support DOCUMENTATION on PACKAGE values.
-	(progn
-	  #!+sb-doc (setf (documentation package t)
-			  (package-data-doc package-data)))
-	;; Walk the tree of exported names, exporting each name.
-	(labels ((recurse (tree)
-		   (etypecase tree
-		     ;; FIXME: The comments above say the structure is a tree,
-		     ;; but here we're sleazily treating it as though
-		     ;; dotted lists never occur. Replace this LIST case
-		     ;; with separate NULL and CONS cases to fix this.
-		     (list (mapc #'recurse tree))
-		     (string (export (intern tree package) package)))))
-	  (recurse (package-data-export package-data)))))
+                       (package-data-name package-data)
+                       ;; Note: As of 0.7.0, the only nicknames we use
+                       ;; for our implementation packages are hacks
+                       ;; not needed at cross-compile time (e.g. the
+                       ;; deprecated SB-C-CALL nickname for SB-ALIEN).
+                       ;; So support for nicknaming during xc is gone,
+                       ;; since any nicknames are hacked in during
+                       ;; cold init.
+                       :nicknames nil
+                       :use nil)))
+        #-clisp ; As of "2.27 (released 2001-07-17) (built 3215971334)"
+                ; CLISP didn't support DOCUMENTATION on PACKAGE values.
+        (progn
+          #!+sb-doc (setf (documentation package t)
+                          (package-data-doc package-data)))
+        ;; Walk the tree of exported names, exporting each name.
+        (labels ((recurse (tree)
+                   (etypecase tree
+                     ;; FIXME: The comments above say the structure is a tree,
+                     ;; but here we're sleazily treating it as though
+                     ;; dotted lists never occur. Replace this LIST case
+                     ;; with separate NULL and CONS cases to fix this.
+                     (list (mapc #'recurse tree))
+                     (string (export (intern tree package) package)))))
+          (recurse (package-data-export package-data)))))
 
     ;; Now that all packages exist, we can set up package-package
     ;; references.
     (dolist (package-data package-data-list)
       (use-package (package-data-use package-data)
-		   (package-data-name package-data))
+                   (package-data-name package-data))
       (dolist (sublist (package-data-import-from package-data))
-	(let* ((from-package (first sublist))
-	       (symbol-names (rest sublist))
-	       (symbols (mapcar (lambda (name)
-				  ;; old way, broke for importing symbols
-				  ;; like SB!C::DEBUG-SOURCE-FORM into
-				  ;; SB!DI -- WHN 19990714
-				  #+nil
-				  (let ((s (find-symbol name from-package)))
-				    (unless s
-				      (error "can't find ~S in ~S"
-					     name
-					     from-package))
-				    s)
-				  ;; new way, works for SB!DI stuff
-				  ;; -- WHN 19990714
-				  (intern name from-package))
-				symbol-names)))
-	  (import symbols (package-data-name package-data)))))
+        (let* ((from-package (first sublist))
+               (symbol-names (rest sublist))
+               (symbols (mapcar (lambda (name)
+                                  ;; old way, broke for importing symbols
+                                  ;; like SB!C::DEBUG-SOURCE-FORM into
+                                  ;; SB!DI -- WHN 19990714
+                                  #+nil
+                                  (let ((s (find-symbol name from-package)))
+                                    (unless s
+                                      (error "can't find ~S in ~S"
+                                             name
+                                             from-package))
+                                    s)
+                                  ;; new way, works for SB!DI stuff
+                                  ;; -- WHN 19990714
+                                  (intern name from-package))
+                                symbol-names)))
+          (import symbols (package-data-name package-data)))))
 
     ;; Now that all package-package references exist, we can handle
     ;; REEXPORT operations. (We have to wait until now because they
@@ -107,32 +107,32 @@
     ;; properly, but is somewhat ugly.
     (let (done)
       (labels
-	  ((reexport (package-data)
-	     (let ((package (find-package (package-data-name package-data))))
-	       (cond
-		 ((member package done))
-		 ((null (package-data-reexport package-data))
-		  (push package done))
-		 (t
-		  (mapcar #'reexport
-			  (remove-if-not
-			   (lambda (x)
-			     (member x (package-data-use package-data)
-				     :test #'string=))
-			   package-data-list
-			   :key #'package-data-name))
-		  (dolist (symbol-name (package-data-reexport package-data))
-		    (multiple-value-bind (symbol status)
-			(find-symbol symbol-name package)
-		      (unless status
-			(error "No symbol named ~S is accessible in ~S."
-			       symbol-name package))
-		      (when (eq (symbol-package symbol) package)
-			(error
-			 "~S is not inherited/imported, but native to ~S."
-			 symbol-name package))
-		      (export symbol package)))
-		  (push package done))))))
-	(dolist (x package-data-list)
-	  (reexport x))
-	(assert (= (length done) (length package-data-list))))))
+          ((reexport (package-data)
+             (let ((package (find-package (package-data-name package-data))))
+               (cond
+                 ((member package done))
+                 ((null (package-data-reexport package-data))
+                  (push package done))
+                 (t
+                  (mapcar #'reexport
+                          (remove-if-not
+                           (lambda (x)
+                             (member x (package-data-use package-data)
+                                     :test #'string=))
+                           package-data-list
+                           :key #'package-data-name))
+                  (dolist (symbol-name (package-data-reexport package-data))
+                    (multiple-value-bind (symbol status)
+                        (find-symbol symbol-name package)
+                      (unless status
+                        (error "No symbol named ~S is accessible in ~S."
+                               symbol-name package))
+                      (when (eq (symbol-package symbol) package)
+                        (error
+                         "~S is not inherited/imported, but native to ~S."
+                         symbol-name package))
+                      (export symbol package)))
+                  (push package done))))))
+        (dolist (x package-data-list)
+          (reexport x))
+        (assert (= (length done) (length package-data-list))))))

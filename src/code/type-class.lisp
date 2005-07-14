@@ -31,10 +31,10 @@
 ;;; also used in EQ comparisons to determined if two types have the
 ;;; "same kind".
 (def!struct (type-class
-	     #-no-ansi-print-object
-	     (:print-object (lambda (x stream)
-			      (print-unreadable-object (x stream :type t)
-				(prin1 (type-class-name x) stream)))))
+             #-no-ansi-print-object
+             (:print-object (lambda (x stream)
+                              (print-unreadable-object (x stream :type t)
+                                (prin1 (type-class-name x) stream)))))
   ;; the name of this type class (used to resolve references at load time)
   (name nil :type symbol) ; FIXME: should perhaps be (MISSING-ARG) default?
   ;; Dyadic type methods. If the classes of the two types are EQ, then
@@ -60,7 +60,7 @@
   ;; be done by just stuffing the two component types into an
   ;; UNION-TYPE or INTERSECTION-TYPE object. They return NIL on
   ;; failure, or a CTYPE for success.
-  ;; 
+  ;;
   ;; Note: These methods are similar to CMU CL's SIMPLE-UNION,
   ;; COMPLEX-UNION, SIMPLE-INTERSECTION, and COMPLEX-UNION methods.
   ;; They were reworked in SBCL because SBCL has INTERSECTION-TYPE
@@ -102,7 +102,7 @@
   ;; supplying both.
   (unary-typep nil :type (or symbol null))
   (typep nil :type (or symbol null))
-  ;; These are like TYPEP and UNARY-TYPEP except they coerce objects to 
+  ;; These are like TYPEP and UNARY-TYPEP except they coerce objects to
   ;; the type.
   (unary-coerce nil :type (or symbol null))
   (coerce :type (or symbol null))
@@ -155,11 +155,11 @@
   ;; reflected in *TYPE-CLASS-FUN-SLOTS*, the slots here will
   ;; have to be hand-tweaked to match. -- WHN 2001-03-19
   (make-type-class :name (type-class-name x)
-		   . #.(mapcan (lambda (type-class-fun-slot)
-				 (destructuring-bind (keyword . slot-accessor)
-				     type-class-fun-slot
-				   `(,keyword (,slot-accessor x))))
-			       *type-class-fun-slots*)))
+                   . #.(mapcan (lambda (type-class-fun-slot)
+                                 (destructuring-bind (keyword . slot-accessor)
+                                     type-class-fun-slot
+                                   `(,keyword (,slot-accessor x))))
+                               *type-class-fun-slots*)))
 
 (defun class-fun-slot-or-lose (name)
   (or (cdr (assoc name *type-class-fun-slots*))
@@ -171,29 +171,29 @@
 ) ; EVAL-WHEN
 
 (defmacro !define-type-method ((class method &rest more-methods)
-			       lambda-list &body body)
+                               lambda-list &body body)
   (let ((name (symbolicate class "-" method "-TYPE-METHOD")))
     `(progn
        (defun ,name ,lambda-list
-	 ,@body)
+         ,@body)
        (!cold-init-forms
-	,@(mapcar (lambda (method)
-		    `(setf (,(class-fun-slot-or-lose method)
-			    (type-class-or-lose ',class))
-			   #',name))
-		  (cons method more-methods)))
+        ,@(mapcar (lambda (method)
+                    `(setf (,(class-fun-slot-or-lose method)
+                            (type-class-or-lose ',class))
+                           #',name))
+                  (cons method more-methods)))
        ',name)))
 
 (defmacro !define-type-class (name &key inherits)
   `(!cold-init-forms
      ,(once-only ((n-class (if inherits
-			       `(copy-type-class-coldly (type-class-or-lose
-							 ',inherits))
-			       '(make-type-class))))
-	`(progn
-	   (setf (type-class-name ,n-class) ',name)
-	   (setf (gethash ',name *type-classes*) ,n-class)
-	   ',name))))
+                               `(copy-type-class-coldly (type-class-or-lose
+                                                         ',inherits))
+                               '(make-type-class))))
+        `(progn
+           (setf (type-class-name ,n-class) ',name)
+           (setf (gethash ',name *type-classes*) ,n-class)
+           ',name))))
 
 ;;; Invoke a type method on TYPE1 and TYPE2. If the two types have the
 ;;; same class, invoke the simple method. Otherwise, invoke any
@@ -209,22 +209,22 @@
 ;;; suspect is hard, so we'll bear with the old system for the time
 ;;; being. -- WHN 2001-03-11
 (defmacro !invoke-type-method (simple complex-arg2 type1 type2 &key
-				      (default '(values nil t))
-				      (complex-arg1 :foo complex-arg1-p))
+                                      (default '(values nil t))
+                                      (complex-arg1 :foo complex-arg1-p))
   (declare (type keyword simple complex-arg1 complex-arg2))
   `(multiple-value-bind (result-a result-b valid-p)
        (%invoke-type-method ',(class-fun-slot-or-lose simple)
-			    ',(class-fun-slot-or-lose
-			       (if complex-arg1-p
-				   complex-arg1
-				   complex-arg2))
-			    ',(class-fun-slot-or-lose complex-arg2)
-			    ,complex-arg1-p
-			    ,type1
-			    ,type2)
+                            ',(class-fun-slot-or-lose
+                               (if complex-arg1-p
+                                   complex-arg1
+                                   complex-arg2))
+                            ',(class-fun-slot-or-lose complex-arg2)
+                            ,complex-arg1-p
+                            ,type1
+                            ,type2)
      (if valid-p
-	 (values result-a result-b)
-	 ,default)))
+         (values result-a result-b)
+         ,default)))
 
 ;;; most of the implementation of !INVOKE-TYPE-METHOD
 ;;;
@@ -241,23 +241,23 @@
   (declare (type symbol simple cslot1 cslot2))
   (multiple-value-bind (result-a result-b)
       (let ((class1 (type-class-info type1))
-	    (class2 (type-class-info type2)))
-	(if (eq class1 class2)
-	    (funcall (the function (funcall simple class1)) type1 type2)
-	    (let ((complex2 (funcall cslot2 class2)))
+            (class2 (type-class-info type2)))
+        (if (eq class1 class2)
+            (funcall (the function (funcall simple class1)) type1 type2)
+            (let ((complex2 (funcall cslot2 class2)))
               (declare (type (or function null) complex2))
-	      (if complex2
-		  (funcall complex2 type1 type2)
-		  (let ((complex1 (funcall cslot1 class1)))
+              (if complex2
+                  (funcall complex2 type1 type2)
+                  (let ((complex1 (funcall cslot1 class1)))
                     (declare (type (or function null) complex1))
-		    (if complex1
-			(if complex-arg1-p
-			    (funcall complex1 type1 type2)
-			    (funcall complex1 type2 type1))
-			;; No meaningful result was found: the caller
-			;; should use the default value instead.
-			(return-from %invoke-type-method
-			  (values nil nil nil))))))))
+                    (if complex1
+                        (if complex-arg1-p
+                            (funcall complex1 type1 type2)
+                            (funcall complex1 type2 type1))
+                        ;; No meaningful result was found: the caller
+                        ;; should use the default value instead.
+                        (return-from %invoke-type-method
+                          (values nil nil nil))))))))
     ;; If we get to here (without breaking out by calling RETURN-FROM)
     ;; then a meaningful result was found, and we return it.
     (values result-a result-b t)))
@@ -284,19 +284,19 @@
 ;;; (We miss CLOS! -- CSR and WHN)
 (defun invoke-complex-subtypep-arg1-method (type1 type2 &optional subtypep win)
   (let* ((type-class (type-class-info type1))
-	 (method-fun (type-class-complex-subtypep-arg1 type-class)))
+         (method-fun (type-class-complex-subtypep-arg1 type-class)))
     (if method-fun
-	(funcall (the function method-fun) type1 type2)
-	(values subtypep win))))
+        (funcall (the function method-fun) type1 type2)
+        (values subtypep win))))
 
 ;;; KLUDGE: This function is dangerous, as its overuse could easily
 ;;; cause stack exhaustion through unbounded recursion.  We only use
 ;;; it in one place; maybe it ought not to be a function at all?
 (defun invoke-complex-=-other-method (type1 type2)
   (let* ((type-class (type-class-info type1))
-	 (method-fun (type-class-complex-= type-class)))
+         (method-fun (type-class-complex-= type-class)))
     (if method-fun
-	(funcall (the function method-fun) type2 type1)
-	(values nil t))))
+        (funcall (the function method-fun) type2 type1)
+        (values nil t))))
 
 (!defun-from-collected-cold-init-forms !type-class-cold-init)

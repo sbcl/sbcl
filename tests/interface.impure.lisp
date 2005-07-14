@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -19,22 +19,22 @@
   x)
 
 (assert (string= (documentation '(setf foo) 'function)
-		 "(setf foo) documentation"))
+                 "(setf foo) documentation"))
 (assert (string= (documentation #'(setf foo) 'function)
-		 "(setf foo) documentation"))
+                 "(setf foo) documentation"))
 
 (defun (sb-pcl::class-predicate foo) (x)
   "(class-predicate foo) documentation"
   x)
 
 (assert (string= (documentation '(setf foo) 'function)
-		 "(setf foo) documentation"))
+                 "(setf foo) documentation"))
 (assert (string= (documentation #'(setf foo) 'function)
-		 "(setf foo) documentation"))
+                 "(setf foo) documentation"))
 (assert (string= (documentation '(sb-pcl::class-predicate foo) 'function)
-		 "(class-predicate foo) documentation"))
+                 "(class-predicate foo) documentation"))
 (assert (string= (documentation #'(sb-pcl::class-predicate foo) 'function)
-		 "(class-predicate foo) documentation"))
+                 "(class-predicate foo) documentation"))
 
 ;;; DISASSEMBLE shouldn't fail on closures or unpurified functions
 (defun disassemble-fun (x) x)

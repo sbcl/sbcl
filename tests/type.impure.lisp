@@ -4,7 +4,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -21,20 +21,20 @@
 
 (defmacro assert-t-t-or-uncertain (expr)
   `(assert (let ((list (multiple-value-list ,expr)))
-	     (or (equal '(nil nil) list)
-		 (equal '(t t) list)))))
+             (or (equal '(nil nil) list)
+                 (equal '(t t) list)))))
 
 (let ((types '(character
-	       integer fixnum (integer 0 10)
-	       single-float (single-float -1.0 1.0) (single-float 0.1)
-	       (real 4 8) (real -1 7) (real 2 11)
-	       null symbol keyword
-	       (member #\a #\b #\c) (member 1 #\a) (member 3.0 3.3)
+               integer fixnum (integer 0 10)
+               single-float (single-float -1.0 1.0) (single-float 0.1)
+               (real 4 8) (real -1 7) (real 2 11)
+               null symbol keyword
+               (member #\a #\b #\c) (member 1 #\a) (member 3.0 3.3)
               (member #\a #\c #\d #\f) (integer -1 1)
-	       unsigned-byte
-	       (rational -1 7) (rational -2 4)
-	       ratio
-	       )))
+               unsigned-byte
+               (rational -1 7) (rational -2 4)
+               ratio
+               )))
   (dolist (i types)
     (format t "type I=~S~%" i)
     (dolist (j types)
@@ -44,25 +44,25 @@
       (assert (subtypep i `(or ,i ,i ,j)))
       (assert (subtypep i `(or ,j ,i)))
       (dolist (k types)
-	(format t "    type K=~S~%" k)
-	(assert (subtypep `(or ,i ,j) `(or ,i ,j ,k)))
-	(assert (subtypep `(or ,i ,j) `(or ,k ,j ,i)))))))
+        (format t "    type K=~S~%" k)
+        (assert (subtypep `(or ,i ,j) `(or ,i ,j ,k)))
+        (assert (subtypep `(or ,i ,j) `(or ,k ,j ,i)))))))
 
 ;;; gotchas that can come up in handling subtypeness as "X is a
 ;;; subtype of Y if each of the elements of X is a subtype of Y"
 (let ((subtypep-values (multiple-value-list
-			(subtypep '(single-float -1.0 1.0)
-				  '(or (real -100.0 0.0)
-				       (single-float 0.0 100.0))))))
+                        (subtypep '(single-float -1.0 1.0)
+                                  '(or (real -100.0 0.0)
+                                       (single-float 0.0 100.0))))))
   (assert (member subtypep-values
-		  '(;; The system isn't expected to
-		    ;; understand the subtype relationship.
-		    (nil nil)
-		    ;; But if it does, that'd be neat.
-		    (t t)
-		    ;; (And any other return would be wrong.)
-		    )
-		  :test #'equal)))
+                  '(;; The system isn't expected to
+                    ;; understand the subtype relationship.
+                    (nil nil)
+                    ;; But if it does, that'd be neat.
+                    (t t)
+                    ;; (And any other return would be wrong.)
+                    )
+                  :test #'equal)))
 
 (defun type-evidently-= (x y)
   (and (subtypep x y)
@@ -206,12 +206,12 @@
 ;;; the definition of the component structure). Since it's a sensible
 ;;; thing to want anyway, let's test for it here:
 (assert-t-t (subtypep '(or some-undefined-type (member :no-ir2-yet :dead))
-		      '(or some-undefined-type (member :no-ir2-yet :dead))))
+                      '(or some-undefined-type (member :no-ir2-yet :dead))))
 ;;; BUG 158 (failure to compile loops with vector references and
 ;;; increments of greater than 1) was a symptom of type system
 ;;; uncertainty, to wit:
 (assert-t-t (subtypep '(and (mod 536870911) (or (integer 0 0) (integer 2 536870912)))
-		      '(mod 536870911))) ; aka SB-INT:INDEX.
+                      '(mod 536870911))) ; aka SB-INT:INDEX.
 ;;; floating point types can be tricky.
 (assert-t-t (subtypep '(member 0.0) '(single-float 0.0 0.0)))
 (assert-t-t (subtypep '(member -0.0) '(single-float 0.0 0.0)))
@@ -292,39 +292,39 @@
      (assert (typep (make-structure-foo3) 'structure-foo2))
      (assert (not (typep (make-structure-foo1) 'structure-foo4)))
      (assert (typep (nth-value 1
-			       (ignore-errors (structure-foo2-x
-					       (make-structure-foo1))))
-		    'type-error))
+                               (ignore-errors (structure-foo2-x
+                                               (make-structure-foo1))))
+                    'type-error))
      (assert (null (ignore-errors
-		     (setf (structure-foo2-x (make-structure-foo1)) 11))))
+                     (setf (structure-foo2-x (make-structure-foo1)) 11))))
 
      ;; structure-class tests
      (assert (typep (make-instance 'structure-class-foo3)
-		    'structure-class-foo2))
+                    'structure-class-foo2))
      (assert (not (typep (make-instance 'structure-class-foo1)
-			 'structure-class-foo4)))
+                         'structure-class-foo4)))
      (assert (null (ignore-errors
-		     (setf (slot-value (make-instance 'structure-class-foo1)
-				       'x)
-			   11))))
+                     (setf (slot-value (make-instance 'structure-class-foo1)
+                                       'x)
+                           11))))
 
      ;; standard-class tests
      (assert (typep (make-instance 'standard-class-foo3)
-		    'standard-class-foo2))
+                    'standard-class-foo2))
      (assert (not (typep (make-instance 'standard-class-foo1)
-			 'standard-class-foo4)))
+                         'standard-class-foo4)))
      (assert (null (ignore-errors
-		     (setf (slot-value (make-instance 'standard-class-foo1) 'x)
-			   11))))
+                     (setf (slot-value (make-instance 'standard-class-foo1) 'x)
+                           11))))
 
      ;; condition tests
      (assert (typep (make-condition 'condition-foo3)
-		    'condition-foo2))
+                    'condition-foo2))
      (assert (not (typep (make-condition 'condition-foo1)
-			 'condition-foo4)))
+                         'condition-foo4)))
      (assert (null (ignore-errors
-		     (setf (slot-value (make-condition 'condition-foo1) 'x)
-			   11))))
+                     (setf (slot-value (make-condition 'condition-foo1) 'x)
+                           11))))
      (assert (subtypep 'error 't))
      (assert (subtypep 'simple-condition 'condition))
      (assert (subtypep 'simple-error 'simple-condition))
@@ -332,9 +332,9 @@
      (assert (not (subtypep 'condition 'simple-condition)))
      (assert (not (subtypep 'error 'simple-error)))
      (assert (eq (car (sb-pcl:class-direct-superclasses
-		       (find-class 'simple-condition)))
-		 (find-class 'condition)))
-    
+                       (find-class 'simple-condition)))
+                 (find-class 'condition)))
+
      #+nil ; doesn't look like a good test
      (let ((subclasses (mapcar #'find-class
                                '(simple-type-error
@@ -346,43 +346,43 @@
                       (sb-pcl:class-direct-subclasses (find-class
                                                        'simple-condition))
                       subclasses))))
-    
+
      ;; precedence lists
-     (assert (equal (sb-pcl:class-precedence-list 
-	 	     (find-class 'simple-condition))
-	            (mapcar #'find-class '(simple-condition
-			 		   condition
-				 	   sb-pcl::slot-object
-					   sb-kernel:instance
-					   t))))
+     (assert (equal (sb-pcl:class-precedence-list
+                     (find-class 'simple-condition))
+                    (mapcar #'find-class '(simple-condition
+                                           condition
+                                           sb-pcl::slot-object
+                                           sb-kernel:instance
+                                           t))))
 
      ;; stream classes
      (assert (equal (sb-pcl:class-direct-superclasses (find-class
-						       'fundamental-stream))
-		    (mapcar #'find-class '(standard-object stream))))
+                                                       'fundamental-stream))
+                    (mapcar #'find-class '(standard-object stream))))
      (assert (null (set-difference
-		    (sb-pcl:class-direct-subclasses (find-class
-						     'fundamental-stream))
-		    (mapcar #'find-class '(fundamental-binary-stream
-					   fundamental-character-stream
-					   fundamental-output-stream
-					   fundamental-input-stream)))))
+                    (sb-pcl:class-direct-subclasses (find-class
+                                                     'fundamental-stream))
+                    (mapcar #'find-class '(fundamental-binary-stream
+                                           fundamental-character-stream
+                                           fundamental-output-stream
+                                           fundamental-input-stream)))))
      (assert (equal (sb-pcl:class-precedence-list (find-class
-						   'fundamental-stream))
-		    (mapcar #'find-class '(fundamental-stream
-					   standard-object
-					   sb-pcl::std-object
-					   sb-pcl::slot-object
-					   stream
-					   sb-kernel:instance
-					   t))))
+                                                   'fundamental-stream))
+                    (mapcar #'find-class '(fundamental-stream
+                                           standard-object
+                                           sb-pcl::std-object
+                                           sb-pcl::slot-object
+                                           stream
+                                           sb-kernel:instance
+                                           t))))
      (assert (equal (sb-pcl:class-precedence-list (find-class
-						   'fundamental-stream))
-		    (mapcar #'find-class '(fundamental-stream
-					   standard-object
-					   sb-pcl::std-object
-					   sb-pcl::slot-object stream
-					   sb-kernel:instance t))))
+                                                   'fundamental-stream))
+                    (mapcar #'find-class '(fundamental-stream
+                                           standard-object
+                                           sb-pcl::std-object
+                                           sb-pcl::slot-object stream
+                                           sb-kernel:instance t))))
      (assert (subtypep (find-class 'stream) (find-class t)))
      (assert (subtypep (find-class 'fundamental-stream) 'stream))
      (assert (not (subtypep 'stream 'fundamental-stream)))))
@@ -412,7 +412,7 @@
   (aref x 1))
 (deftype bar () 'single-float)
 (assert (eql (foo (make-array 3 :element-type 'bar :initial-element 0.0f0))
-	     0.0f0))
+             0.0f0))
 
 ;;; bug 260a
 (assert-t-t

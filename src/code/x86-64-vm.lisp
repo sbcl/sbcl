@@ -13,7 +13,7 @@
 
 ;;;; OS-CONTEXT-T
 
-;;; a POSIX signal context, i.e. the type passed as the third 
+;;; a POSIX signal context, i.e. the type passed as the third
 ;;; argument to an SA_SIGACTION-style signal handler
 ;;;
 ;;; The real type does have slots, but at Lisp level, we never
@@ -45,17 +45,17 @@
 (defun get-machine-version ()
   #!+linux
   (with-open-file (stream "/proc/cpuinfo"
-			  ;; Even on Linux it's an option to build
-			  ;; kernels without /proc filesystems, so
-			  ;; degrade gracefully.
-			  :if-does-not-exist nil)
+                          ;; Even on Linux it's an option to build
+                          ;; kernels without /proc filesystems, so
+                          ;; degrade gracefully.
+                          :if-does-not-exist nil)
     (loop with line while (setf line (read-line stream nil))
-	  ;; The field "model name" exists on kernel 2.4.21-rc6-ac1
-	  ;; anyway, with values e.g.
-	  ;;   "AMD Athlon(TM) XP 2000+"
-	  ;;   "Intel(R) Pentium(R) M processor 1300MHz"
-	  ;; which seem comparable to the information in the example
-	  ;; in the MACHINE-VERSION page of the ANSI spec.
+          ;; The field "model name" exists on kernel 2.4.21-rc6-ac1
+          ;; anyway, with values e.g.
+          ;;   "AMD Athlon(TM) XP 2000+"
+          ;;   "Intel(R) Pentium(R) M processor 1300MHz"
+          ;; which seem comparable to the information in the example
+          ;; in the MACHINE-VERSION page of the ANSI spec.
           when (eql (search "model name" line) 0)
           return (string-trim " " (subseq line (1+ (position #\: line))))))
   #!-linux
@@ -81,68 +81,68 @@
 (defun fixup-code-object (code offset fixup kind)
   (declare (type index offset))
   (flet ((add-fixup (code offset)
-	   ;; (We check for and ignore fixups for code objects in the
-	   ;; read-only and static spaces. (In the old CMU CL code
-	   ;; this check was conditional on *ENABLE-DYNAMIC-SPACE-CODE*,
-	   ;; but in SBCL relocatable dynamic space code is always in
-	   ;; use, so we always do the check.)
-	   (incf *num-fixups*)
-	   (let ((fixups (code-header-ref code code-constants-offset)))
-	     (cond ((typep fixups '(simple-array (unsigned-byte 64) (*)))
-		    (let ((new-fixups
-			   (adjust-fixup-array fixups (1+ (length fixups)))))
-		      (setf (aref new-fixups (length fixups)) offset)
-		      (setf (code-header-ref code code-constants-offset)
-			    new-fixups)))
-		   (t
-		    (unless (or (eq (widetag-of fixups)
-				    unbound-marker-widetag)
-				(zerop fixups))
-		      (format t "** Init. code FU = ~S~%" fixups)) ; FIXME
-		    (setf (code-header-ref code code-constants-offset)
-			  (make-array
-			   1
-			   :element-type '(unsigned-byte 64)
-			   :initial-element offset)))))))
+           ;; (We check for and ignore fixups for code objects in the
+           ;; read-only and static spaces. (In the old CMU CL code
+           ;; this check was conditional on *ENABLE-DYNAMIC-SPACE-CODE*,
+           ;; but in SBCL relocatable dynamic space code is always in
+           ;; use, so we always do the check.)
+           (incf *num-fixups*)
+           (let ((fixups (code-header-ref code code-constants-offset)))
+             (cond ((typep fixups '(simple-array (unsigned-byte 64) (*)))
+                    (let ((new-fixups
+                           (adjust-fixup-array fixups (1+ (length fixups)))))
+                      (setf (aref new-fixups (length fixups)) offset)
+                      (setf (code-header-ref code code-constants-offset)
+                            new-fixups)))
+                   (t
+                    (unless (or (eq (widetag-of fixups)
+                                    unbound-marker-widetag)
+                                (zerop fixups))
+                      (format t "** Init. code FU = ~S~%" fixups)) ; FIXME
+                    (setf (code-header-ref code code-constants-offset)
+                          (make-array
+                           1
+                           :element-type '(unsigned-byte 64)
+                           :initial-element offset)))))))
     (sb!sys:without-gcing
      (let* ((sap (truly-the system-area-pointer
-			    (sb!kernel:code-instructions code)))
-	    (obj-start-addr (logand (sb!kernel:get-lisp-obj-address code)
-				    #xfffffffffffffff8))
-	    (code-start-addr (sb!sys:sap-int (sb!kernel:code-instructions
-					      code)))
-	    (ncode-words (sb!kernel:code-header-ref code 1))
-	    (code-end-addr (+ code-start-addr (* ncode-words n-word-bytes))))
+                            (sb!kernel:code-instructions code)))
+            (obj-start-addr (logand (sb!kernel:get-lisp-obj-address code)
+                                    #xfffffffffffffff8))
+            (code-start-addr (sb!sys:sap-int (sb!kernel:code-instructions
+                                              code)))
+            (ncode-words (sb!kernel:code-header-ref code 1))
+            (code-end-addr (+ code-start-addr (* ncode-words n-word-bytes))))
        (unless (member kind '(:absolute :absolute64 :relative))
-	 (error "Unknown code-object-fixup kind ~S." kind))
+         (error "Unknown code-object-fixup kind ~S." kind))
        (ecase kind
-	 (:absolute64
-	  ;; Word at sap + offset contains a value to be replaced by
-	  ;; adding that value to fixup.
-	  (setf (sap-ref-64 sap offset) (+ fixup (sap-ref-64 sap offset)))
-	  ;; Record absolute fixups that point within the code object.
-	  (when (> code-end-addr (sap-ref-64 sap offset) obj-start-addr)
-	    (add-fixup code offset)))
-	 (:absolute
-	  ;; Word at sap + offset contains a value to be replaced by
-	  ;; adding that value to fixup.
-	  (setf (sap-ref-32 sap offset) (+ fixup (sap-ref-32 sap offset)))
-	  ;; Record absolute fixups that point within the code object.
-	  (when (> code-end-addr (sap-ref-32 sap offset) obj-start-addr)
-	    (add-fixup code offset)))
-	 (:relative
-	  ;; Fixup is the actual address wanted.
-	  ;;
-	  ;; Record relative fixups that point outside the code
-	  ;; object.
-	  (when (or (< fixup obj-start-addr) (> fixup code-end-addr))
-	    (add-fixup code offset))
-	  ;; Replace word with value to add to that loc to get there.
-	  (let* ((loc-sap (+ (sap-int sap) offset))
-		 (rel-val (- fixup loc-sap (/ n-word-bytes 2))))
-	    (declare (type (unsigned-byte 64) loc-sap)
-		     (type (signed-byte 32) rel-val))
-	    (setf (signed-sap-ref-32 sap offset) rel-val))))))
+         (:absolute64
+          ;; Word at sap + offset contains a value to be replaced by
+          ;; adding that value to fixup.
+          (setf (sap-ref-64 sap offset) (+ fixup (sap-ref-64 sap offset)))
+          ;; Record absolute fixups that point within the code object.
+          (when (> code-end-addr (sap-ref-64 sap offset) obj-start-addr)
+            (add-fixup code offset)))
+         (:absolute
+          ;; Word at sap + offset contains a value to be replaced by
+          ;; adding that value to fixup.
+          (setf (sap-ref-32 sap offset) (+ fixup (sap-ref-32 sap offset)))
+          ;; Record absolute fixups that point within the code object.
+          (when (> code-end-addr (sap-ref-32 sap offset) obj-start-addr)
+            (add-fixup code offset)))
+         (:relative
+          ;; Fixup is the actual address wanted.
+          ;;
+          ;; Record relative fixups that point outside the code
+          ;; object.
+          (when (or (< fixup obj-start-addr) (> fixup code-end-addr))
+            (add-fixup code offset))
+          ;; Replace word with value to add to that loc to get there.
+          (let* ((loc-sap (+ (sap-int sap) offset))
+                 (rel-val (- fixup loc-sap (/ n-word-bytes 2))))
+            (declare (type (unsigned-byte 64) loc-sap)
+                     (type (signed-byte 32) rel-val))
+            (setf (signed-sap-ref-32 sap offset) rel-val))))))
     nil))
 
 ;;; Add a code fixup to a code object generated by GENESIS. The fixup
@@ -155,42 +155,42 @@
 #!+gencgc
 (defun !envector-load-time-code-fixup (code offset fixup kind)
   (flet ((frob (code offset)
-	   (let ((fixups (code-header-ref code code-constants-offset)))
-	     (cond ((typep fixups '(simple-array (unsigned-byte 64) (*)))
-		    (let ((new-fixups
-			   (adjust-fixup-array fixups (1+ (length fixups)))))
-		      (setf (aref new-fixups (length fixups)) offset)
-		      (setf (code-header-ref code code-constants-offset)
-			    new-fixups)))
-		   (t
-		    (unless (or (eq (widetag-of fixups)
-				    unbound-marker-widetag)
-				(zerop fixups))
-		      (sb!impl::!cold-lose "Argh! can't process fixup"))
-		    (setf (code-header-ref code code-constants-offset)
-			  (make-array
-			   1
-			   :element-type '(unsigned-byte 64)
-			   :initial-element offset)))))))
+           (let ((fixups (code-header-ref code code-constants-offset)))
+             (cond ((typep fixups '(simple-array (unsigned-byte 64) (*)))
+                    (let ((new-fixups
+                           (adjust-fixup-array fixups (1+ (length fixups)))))
+                      (setf (aref new-fixups (length fixups)) offset)
+                      (setf (code-header-ref code code-constants-offset)
+                            new-fixups)))
+                   (t
+                    (unless (or (eq (widetag-of fixups)
+                                    unbound-marker-widetag)
+                                (zerop fixups))
+                      (sb!impl::!cold-lose "Argh! can't process fixup"))
+                    (setf (code-header-ref code code-constants-offset)
+                          (make-array
+                           1
+                           :element-type '(unsigned-byte 64)
+                           :initial-element offset)))))))
     (let* ((sap (truly-the system-area-pointer
-			   (sb!kernel:code-instructions code)))
-	   (obj-start-addr
-	    ;; FIXME: looks like (LOGANDC2 foo typebits)
-	    (logand (sb!kernel:get-lisp-obj-address code) #xfffffffffffffff8))
-	   (code-start-addr (sb!sys:sap-int (sb!kernel:code-instructions
-					     code)))
-	   (ncode-words (sb!kernel:code-header-ref code 1))
-	 (code-end-addr (+ code-start-addr (* ncode-words n-word-bytes))))
+                           (sb!kernel:code-instructions code)))
+           (obj-start-addr
+            ;; FIXME: looks like (LOGANDC2 foo typebits)
+            (logand (sb!kernel:get-lisp-obj-address code) #xfffffffffffffff8))
+           (code-start-addr (sb!sys:sap-int (sb!kernel:code-instructions
+                                             code)))
+           (ncode-words (sb!kernel:code-header-ref code 1))
+         (code-end-addr (+ code-start-addr (* ncode-words n-word-bytes))))
       (ecase kind
-	(:absolute
-	 ;; Record absolute fixups that point within the code object.
-	 ;; The fixup data is 32 bits, don't use SAP-REF-64 here.
-	 (when (> code-end-addr (sap-ref-32 sap offset) obj-start-addr)
-	   (frob code offset)))
-	(:relative
-	 ;; Record relative fixups that point outside the code object.
-	 (when (or (< fixup obj-start-addr) (> fixup code-end-addr))
-	   (frob code offset)))))))
+        (:absolute
+         ;; Record absolute fixups that point within the code object.
+         ;; The fixup data is 32 bits, don't use SAP-REF-64 here.
+         (when (> code-end-addr (sap-ref-32 sap offset) obj-start-addr)
+           (frob code offset)))
+        (:relative
+         ;; Record relative fixups that point outside the code object.
+         (when (or (< fixup obj-start-addr) (> fixup code-end-addr))
+           (frob code offset)))))))
 
 ;;;; low-level signal context access functions
 ;;;;
@@ -293,27 +293,27 @@
     (/show0 "got PC")
     ;; using INT3 the pc is .. INT3 <here> code length bytes...
     (let* ((length (sap-ref-8 pc 1))
-	   (vector (make-array length :element-type '(unsigned-byte 8))))
+           (vector (make-array length :element-type '(unsigned-byte 8))))
       (declare (type (unsigned-byte 8) length)
-	       (type (simple-array (unsigned-byte 8) (*)) vector))
+               (type (simple-array (unsigned-byte 8) (*)) vector))
       (/show0 "LENGTH,VECTOR,ERROR-NUMBER=..")
       (/hexstr length)
       (/hexstr vector)
       (copy-ub8-from-system-area pc 2 vector 0 length)
       (let* ((index 0)
-	     (error-number (sb!c:read-var-integer vector index)))
-	(/hexstr error-number)
-	(collect ((sc-offsets))
-	  (loop
-	   (/show0 "INDEX=..")
-	   (/hexstr index)
-	   (when (>= index length)
-	     (return))
-	   (let ((sc-offset (sb!c:read-var-integer vector index)))
-	     (/show0 "SC-OFFSET=..")
-	     (/hexstr sc-offset)
-	     (sc-offsets sc-offset)))
-	  (values error-number (sc-offsets)))))))
+             (error-number (sb!c:read-var-integer vector index)))
+        (/hexstr error-number)
+        (collect ((sc-offsets))
+          (loop
+           (/show0 "INDEX=..")
+           (/hexstr index)
+           (when (>= index length)
+             (return))
+           (let ((sc-offset (sb!c:read-var-integer vector index)))
+             (/show0 "SC-OFFSET=..")
+             (/hexstr sc-offset)
+             (sc-offsets sc-offset)))
+          (values error-number (sc-offsets)))))))
 
 
 ;;; the current alien stack pointer; saved/restored for non-local exits

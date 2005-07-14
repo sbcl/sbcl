@@ -30,11 +30,11 @@
 (define-condition uncross-rcr-failure (style-warning)
   ((form :initarg :form :reader uncross-rcr-failure-form))
   (:report (lambda (c s)
-	     (format s
-		     "UNCROSS couldn't recurse through ~S~%~
-		      (which is OK as long as there are no SB-XC symbols ~
-		      down there)"
-		     (uncross-rcr-failure-form c)))))
+             (format s
+                     "UNCROSS couldn't recurse through ~S~%~
+                      (which is OK as long as there are no SB-XC symbols ~
+                      down there)"
+                     (uncross-rcr-failure-form c)))))
 |#
 
 ;;; When cross-compiling, EVAL-WHEN :COMPILE-TOPLEVEL code is executed
@@ -66,58 +66,58 @@
   (defun uncross (form)
     (labels ((uncross-symbol (symbol)
                (let ((old-symbol-package (symbol-package symbol)))
-		 (if (and old-symbol-package
-			  (string= (package-name old-symbol-package) "SB-XC"))
-		     (values (intern (symbol-name symbol) "COMMON-LISP"))
-		     symbol)))
-	     (rcr (form) ; recursive part
-	       (cond ((symbolp form)
-		      (uncross-symbol form))
-		     ((or (numberp form)
-			  (characterp form)
-			  (stringp form))
-		      form)
-		     (t
-		      ;; If we reach here, FORM is something with
-		      ;; internal structure which could include
-		      ;; symbols in the SB-XC package.
-		      (when (gethash form inside?)
-			(let ((*print-circle* t))
-			  ;; This code could probably be generalized
-			  ;; to work on circular structure, but it
-			  ;; seems easier just to avoid putting any
-			  ;; circular structure into the bootstrap
-			  ;; code.
-			  (error "circular structure in ~S" form)))
-		      (setf (gethash form inside?) t)
-		      (unwind-protect
-			  (typecase form
-			    (cons (rcr-cons form))
-			    (t
-			     ;; KLUDGE: There are other types
-			     ;; (especially (ARRAY T) and
-			     ;; STRUCTURE-OBJECT, but also HASH-TABLE
-			     ;; and perhaps others) which could hold
-			     ;; symbols. In principle we should handle
-			     ;; those types as well. Failing that, we
-			     ;; could give warnings for them. However,
-			     ;; the current system works for
-			     ;; bootstrapping in practice (because we
-			     ;; don't use those constructs that way)
-			     ;; and the warnings more annoying than
-			     ;; useful, so I simply turned the
-			     ;; warnings off. -- WHN 20001105
-			     #+nil (warn 'uncross-rcr-failure :form form)
-			     form))
-			(remhash form inside?)))))
-	     (rcr-cons (form)
-	       (declare (type cons form))
-	       (let* ((car (car form))
-		      (rcr-car (rcr car))
-		      (cdr (cdr form))
-		      (rcr-cdr (rcr cdr)))
-		 (if (and (eq rcr-car car) (eq rcr-cdr cdr))
-		   form
-		   (cons rcr-car rcr-cdr)))))
+                 (if (and old-symbol-package
+                          (string= (package-name old-symbol-package) "SB-XC"))
+                     (values (intern (symbol-name symbol) "COMMON-LISP"))
+                     symbol)))
+             (rcr (form) ; recursive part
+               (cond ((symbolp form)
+                      (uncross-symbol form))
+                     ((or (numberp form)
+                          (characterp form)
+                          (stringp form))
+                      form)
+                     (t
+                      ;; If we reach here, FORM is something with
+                      ;; internal structure which could include
+                      ;; symbols in the SB-XC package.
+                      (when (gethash form inside?)
+                        (let ((*print-circle* t))
+                          ;; This code could probably be generalized
+                          ;; to work on circular structure, but it
+                          ;; seems easier just to avoid putting any
+                          ;; circular structure into the bootstrap
+                          ;; code.
+                          (error "circular structure in ~S" form)))
+                      (setf (gethash form inside?) t)
+                      (unwind-protect
+                          (typecase form
+                            (cons (rcr-cons form))
+                            (t
+                             ;; KLUDGE: There are other types
+                             ;; (especially (ARRAY T) and
+                             ;; STRUCTURE-OBJECT, but also HASH-TABLE
+                             ;; and perhaps others) which could hold
+                             ;; symbols. In principle we should handle
+                             ;; those types as well. Failing that, we
+                             ;; could give warnings for them. However,
+                             ;; the current system works for
+                             ;; bootstrapping in practice (because we
+                             ;; don't use those constructs that way)
+                             ;; and the warnings more annoying than
+                             ;; useful, so I simply turned the
+                             ;; warnings off. -- WHN 20001105
+                             #+nil (warn 'uncross-rcr-failure :form form)
+                             form))
+                        (remhash form inside?)))))
+             (rcr-cons (form)
+               (declare (type cons form))
+               (let* ((car (car form))
+                      (rcr-car (rcr car))
+                      (cdr (cdr form))
+                      (rcr-cdr (rcr cdr)))
+                 (if (and (eq rcr-car car) (eq rcr-cdr cdr))
+                   form
+                   (cons rcr-car rcr-cdr)))))
       (clrhash inside?)
       (rcr form))))

@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -23,8 +23,8 @@
 ;;; and works at all optimization settings.  However, it now signals a
 ;;; STORAGE-CONDITION instead of an ERROR.
 
-(defun recurse () 
-  (recurse) 
+(defun recurse ()
+  (recurse)
   (recurse))
 
 (defvar *count* 100)
@@ -33,7 +33,7 @@
 (assert (eq :exhausted
             (handler-case
                 (recurse)
-              (storage-condition (c) 
+              (storage-condition (c)
                 (declare (ignore c))
                 :exhausted))))
 

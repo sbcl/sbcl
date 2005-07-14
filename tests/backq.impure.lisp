@@ -6,13 +6,13 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
 (in-package "CL-USER")
-  
+
 (defparameter *qq* '(*rr* *ss*))
 (defparameter *rr* '(3 5))
 (defparameter *ss* '(4 6))
@@ -33,7 +33,7 @@
                  value))
   (format t "Ok. Look at PPRINTed version: ")
   (pprint (read-from-string expression)))
-  
+
 (defparameter *backquote-tests*
   '(("``(,,*QQ*)" . (24))
     ("``(,@,*QQ*)" . 24)
@@ -52,12 +52,12 @@
     ("``(,@,@*QQ*)" . (3 5 4 6))))
 
 (mapc (lambda (test)
-	(test-double-backquote (car test) (cdr test)))
+        (test-double-backquote (car test) (cdr test)))
       *backquote-tests*)
 
 (let ((string "`(foobar a b ,c ,'(e f g) d ,@'(e f g) (h i j) ,@foo)"))
   (assert (equal (print (read-from-string string)) (read-from-string string))))
-    
+
 (let ((a '`(1 ,@a ,@b ,.c ,.d)))
   (let ((*print-circle* t))
     (assert (equal (read-from-string (write-to-string a)) a))))

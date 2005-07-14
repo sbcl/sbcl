@@ -15,21 +15,21 @@
 (defun get-machine-version ()
   #!+linux
   (with-open-file (stream "/proc/cpuinfo"
-			  ;; /proc is optional even in Linux, so
-			  ;; fail gracefully.
-			  :if-does-not-exist nil)
+                          ;; /proc is optional even in Linux, so
+                          ;; fail gracefully.
+                          :if-does-not-exist nil)
     (loop with line while (setf line (read-line stream nil))
-	  ;; hoping "cpu" exists and gives something useful in
-	  ;; all relevant Linuxen...
-	  ;;
-	  ;; from Lars Brinkhoff sbcl-devel 26 Jun 2003:
-	  ;;   I examined different versions of Linux/PPC at
-	  ;;   http://lxr.linux.no/ (the file that outputs
-	  ;;   /proc/cpuinfo is arch/ppc/kernel/setup.c, if
-	  ;;   you want to check), and all except 2.0.x
-	  ;;   seemed to do the same thing as far as the
-	  ;;   "cpu" field is concerned, i.e. it always
-	  ;;   starts with the (C-syntax) string "cpu\t\t: ".
+          ;; hoping "cpu" exists and gives something useful in
+          ;; all relevant Linuxen...
+          ;;
+          ;; from Lars Brinkhoff sbcl-devel 26 Jun 2003:
+          ;;   I examined different versions of Linux/PPC at
+          ;;   http://lxr.linux.no/ (the file that outputs
+          ;;   /proc/cpuinfo is arch/ppc/kernel/setup.c, if
+          ;;   you want to check), and all except 2.0.x
+          ;;   seemed to do the same thing as far as the
+          ;;   "cpu" field is concerned, i.e. it always
+          ;;   starts with the (C-syntax) string "cpu\t\t: ".
           when (eql (search "cpu" line) 0)
           return (string-trim " " (subseq line (1+ (position #\: line))))))
   #!-linux
@@ -43,28 +43,28 @@
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb!sys:without-gcing
    (let ((sap (truly-the system-area-pointer
-			 (%primitive sb!kernel::code-instructions code))))
+                         (%primitive sb!kernel::code-instructions code))))
      (ecase kind
        (:b
-	(error "Can't deal with CALL fixups, yet."))
+        (error "Can't deal with CALL fixups, yet."))
        (:ba
-	(setf (ldb (byte 24 2) (sap-ref-32 sap offset))
-	      (ash fixup -2)))
+        (setf (ldb (byte 24 2) (sap-ref-32 sap offset))
+              (ash fixup -2)))
        (:ha
-	(let* ((h (ldb (byte 16 16) fixup))
-	       (l (ldb (byte 16 0) fixup)))
-	  ; Compensate for possible sign-extension when the low half
-	  ; is added to the high.  We could avoid this by ORI-ing
-	  ; the low half in 32-bit absolute loads, but it'd be
-	  ; nice to be able to do:
-	  ;  lis rX,foo@ha
-	  ;  lwz rY,foo@l(rX)
-	  ; and lwz/stw and friends all use a signed 16-bit offset.
-	  (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-		 (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
+        (let* ((h (ldb (byte 16 16) fixup))
+               (l (ldb (byte 16 0) fixup)))
+          ; Compensate for possible sign-extension when the low half
+          ; is added to the high.  We could avoid this by ORI-ing
+          ; the low half in 32-bit absolute loads, but it'd be
+          ; nice to be able to do:
+          ;  lis rX,foo@ha
+          ;  lwz rY,foo@l(rX)
+          ; and lwz/stw and friends all use a signed 16-bit offset.
+          (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
+                 (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
        (:l
-	(setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-	      (ldb (byte 16 0) fixup)))))))
+        (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
+              (ldb (byte 16 0) fixup)))))))
 
 
 ;;;; "Sigcontext" access functions, cut & pasted from x86-vm.lisp then
@@ -136,48 +136,48 @@
 ;;;
 ;;; Given the sigcontext, extract the internal error arguments from the
 ;;; instruction stream.
-;;; 
+;;;
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
   (let* ((pc (context-pc context))
-	 (bad-inst (sap-ref-32 pc 0))
-	 (op (ldb (byte 16 16) bad-inst)))
+         (bad-inst (sap-ref-32 pc 0))
+         (op (ldb (byte 16 16) bad-inst)))
     (declare (type system-area-pointer pc))
     (cond ((= op (logior (ash 3 10) (ash 6 5)))
-	   (args-for-unimp-inst context))
-	  ((and (= (ldb (byte 6 10) op) 3)
-		(= (ldb (byte 5 5) op) 24))
-	   (let* ((regnum (ldb (byte 5 0) op))
-		  (prev (sap-ref-32 (int-sap (- (sap-int pc) 4)) 0)))
-	     (if (and (= (ldb (byte 6 26) prev) 3)
-		      (= (ldb (byte 5 21) prev) 0))
-		 (values (ldb (byte 16 0) prev)
-			 (list (sb!c::make-sc-offset sb!vm:any-reg-sc-number
+           (args-for-unimp-inst context))
+          ((and (= (ldb (byte 6 10) op) 3)
+                (= (ldb (byte 5 5) op) 24))
+           (let* ((regnum (ldb (byte 5 0) op))
+                  (prev (sap-ref-32 (int-sap (- (sap-int pc) 4)) 0)))
+             (if (and (= (ldb (byte 6 26) prev) 3)
+                      (= (ldb (byte 5 21) prev) 0))
+                 (values (ldb (byte 16 0) prev)
+                         (list (sb!c::make-sc-offset sb!vm:any-reg-sc-number
                                                      (ldb (byte 5 16) prev))))
-		 (values #.(sb!kernel:error-number-or-lose
-			    'sb!kernel:invalid-arg-count-error)
+                 (values #.(sb!kernel:error-number-or-lose
+                            'sb!kernel:invalid-arg-count-error)
                          (list (sb!c::make-sc-offset sb!vm:any-reg-sc-number regnum))))))
-          
-	  (t
-	   (values #.(error-number-or-lose 'unknown-error) nil)))))
+
+          (t
+           (values #.(error-number-or-lose 'unknown-error) nil)))))
 
 (defun args-for-unimp-inst (context)
   (declare (type (alien (* os-context-t)) context))
   (let* ((pc (context-pc context))
-	 (length (sap-ref-8 pc 4))
-	 (vector (make-array length :element-type '(unsigned-byte 8))))
+         (length (sap-ref-8 pc 4))
+         (vector (make-array length :element-type '(unsigned-byte 8))))
     (declare (type system-area-pointer pc)
-	     (type (unsigned-byte 8) length)
-	     (type (simple-array (unsigned-byte 8) (*)) vector))
+             (type (unsigned-byte 8) length)
+             (type (simple-array (unsigned-byte 8) (*)) vector))
     (copy-ub8-from-system-area pc 5 vector 0 length)
     (let* ((index 0)
-	   (error-number (sb!c:read-var-integer vector index)))
+           (error-number (sb!c:read-var-integer vector index)))
       (collect ((sc-offsets))
-	       (loop
-		(when (>= index length)
-		  (return))
-		(sc-offsets (sb!c:read-var-integer vector index)))
-	       (values error-number (sc-offsets))))))
+               (loop
+                (when (>= index length)
+                  (return))
+                (sc-offsets (sb!c:read-var-integer vector index)))
+               (values error-number (sc-offsets))))))
 
 
 

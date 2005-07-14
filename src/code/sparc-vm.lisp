@@ -29,16 +29,16 @@
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb!sys:without-gcing
    (let ((sap (truly-the system-area-pointer
-			 (%primitive sb!kernel::code-instructions code))))
+                         (%primitive sb!kernel::code-instructions code))))
      (ecase kind
        (:call
-	(error "Can't deal with CALL fixups, yet."))
+        (error "Can't deal with CALL fixups, yet."))
        (:sethi
-	(setf (ldb (byte 22 0) (sap-ref-32 sap offset))
-	      (ldb (byte 22 10) fixup)))
+        (setf (ldb (byte 22 0) (sap-ref-32 sap offset))
+              (ldb (byte 22 10) fixup)))
        (:add
-	(setf (ldb (byte 10 0) (sap-ref-32 sap offset))
-	      (ldb (byte 10 0) fixup)))))))
+        (setf (ldb (byte 10 0) (sap-ref-32 sap offset))
+              (ldb (byte 10 0) fixup)))))))
 
 
 ;;;; "Sigcontext" access functions, cut & pasted from alpha-vm.lisp.
@@ -108,7 +108,7 @@
 
 ;;; Given a (POSIX) signal context, extract the internal error
 ;;; arguments from the instruction stream.  This is e.g.
-;;; 4       23      254     240     2       0       0       0 
+;;; 4       23      254     240     2       0       0       0
 ;;; |       ~~~~~~~~~~~~~~~~~~~~~~~~~
 ;;; length         data              (everything is an octet)
 ;;;  (pc)
@@ -116,66 +116,66 @@
   (declare (type (alien (* os-context-t)) context))
   (sb!int::/show0 "entering INTERNAL-ERROR-ARGS")
   (let* ((pc (context-pc context))
-	 (bad-inst (sap-ref-32 pc 0))
-	 (op (ldb (byte 2 30) bad-inst))
-	 (op2 (ldb (byte 3 22) bad-inst))
-	 (op3 (ldb (byte 6 19) bad-inst)))
+         (bad-inst (sap-ref-32 pc 0))
+         (op (ldb (byte 2 30) bad-inst))
+         (op2 (ldb (byte 3 22) bad-inst))
+         (op3 (ldb (byte 6 19) bad-inst)))
     (declare (type system-area-pointer pc))
     (cond ((and (= op #b00) (= op2 #b000))
-	   (args-for-unimp-inst context))
-	  ((and (= op #b10) (= (ldb (byte 4 2) op3) #b1000))
-	   (args-for-tagged-add-inst context bad-inst))
-	  ((and (= op #b10) (= op3 #b111010))
-	   (args-for-tcc-inst bad-inst))
-	  (t
-	   (values #.(error-number-or-lose 'unknown-error) nil)))))
+           (args-for-unimp-inst context))
+          ((and (= op #b10) (= (ldb (byte 4 2) op3) #b1000))
+           (args-for-tagged-add-inst context bad-inst))
+          ((and (= op #b10) (= op3 #b111010))
+           (args-for-tcc-inst bad-inst))
+          (t
+           (values #.(error-number-or-lose 'unknown-error) nil)))))
 
 (defun args-for-unimp-inst (context)
   (declare (type (alien (* os-context-t)) context))
   (let* ((pc (context-pc context))
-	 (length (sap-ref-8 pc 4))
-	 (vector (make-array length :element-type '(unsigned-byte 8))))
+         (length (sap-ref-8 pc 4))
+         (vector (make-array length :element-type '(unsigned-byte 8))))
     (declare (type system-area-pointer pc)
-	     (type (unsigned-byte 8) length)
-	     (type (simple-array (unsigned-byte 8) (*)) vector))
+             (type (unsigned-byte 8) length)
+             (type (simple-array (unsigned-byte 8) (*)) vector))
     (copy-ub8-from-system-area pc 5 vector 0 length)
     (let* ((index 0)
-	   (error-number (sb!c:read-var-integer vector index)))
+           (error-number (sb!c:read-var-integer vector index)))
       (collect ((sc-offsets))
-	       (loop
-		(when (>= index length)
-		  (return))
-		(sc-offsets (sb!c:read-var-integer vector index)))
-	       (values error-number (sc-offsets))))))
+               (loop
+                (when (>= index length)
+                  (return))
+                (sc-offsets (sb!c:read-var-integer vector index)))
+               (values error-number (sc-offsets))))))
 
 (defun args-for-tagged-add-inst (context bad-inst)
   (declare (type (alien (* os-context-t)) context))
   (let* ((rs1 (ldb (byte 5 14) bad-inst))
-	 (op1 (sb!kernel:make-lisp-obj (context-register context rs1))))
+         (op1 (sb!kernel:make-lisp-obj (context-register context rs1))))
     (if (fixnump op1)
-	(if (zerop (ldb (byte 1 13) bad-inst))
-	    (let* ((rs2 (ldb (byte 5 0) bad-inst))
-		   (op2 (sb!kernel:make-lisp-obj (context-register context rs2))))
-	      (if (fixnump op2)
-		  (values #.(error-number-or-lose 'unknown-error) nil)
-		  (values #.(error-number-or-lose 'object-not-fixnum-error)
-			  (list (sb!c::make-sc-offset
-				 descriptor-reg-sc-number
-				 rs2)))))
-	    (values #.(error-number-or-lose 'unknown-error) nil))
-	(values #.(error-number-or-lose 'object-not-fixnum-error)
-		(list (sb!c::make-sc-offset descriptor-reg-sc-number
-					    rs1))))))
+        (if (zerop (ldb (byte 1 13) bad-inst))
+            (let* ((rs2 (ldb (byte 5 0) bad-inst))
+                   (op2 (sb!kernel:make-lisp-obj (context-register context rs2))))
+              (if (fixnump op2)
+                  (values #.(error-number-or-lose 'unknown-error) nil)
+                  (values #.(error-number-or-lose 'object-not-fixnum-error)
+                          (list (sb!c::make-sc-offset
+                                 descriptor-reg-sc-number
+                                 rs2)))))
+            (values #.(error-number-or-lose 'unknown-error) nil))
+        (values #.(error-number-or-lose 'object-not-fixnum-error)
+                (list (sb!c::make-sc-offset descriptor-reg-sc-number
+                                            rs1))))))
 
 (defun args-for-tcc-inst (bad-inst)
   (let* ((trap-number (ldb (byte 8 0) bad-inst))
-	 (reg (ldb (byte 5 8) bad-inst)))
+         (reg (ldb (byte 5 8) bad-inst)))
     (values (case trap-number
-	      (#.object-not-list-trap
-	       #.(error-number-or-lose 'object-not-list-error))
-	      (#.object-not-instance-trap
-	       #.(error-number-or-lose 'object-not-instance-error))
-	      (t
-	       #.(error-number-or-lose 'unknown-error)))
-	    (list (sb!c::make-sc-offset descriptor-reg-sc-number reg)))))
+              (#.object-not-list-trap
+               #.(error-number-or-lose 'object-not-list-error))
+              (#.object-not-instance-trap
+               #.(error-number-or-lose 'object-not-instance-error))
+              (t
+               #.(error-number-or-lose 'unknown-error)))
+            (list (sb!c::make-sc-offset descriptor-reg-sc-number reg)))))
 

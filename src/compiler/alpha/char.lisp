@@ -35,10 +35,10 @@
 ;;; Move untagged character values.
 (define-vop (character-move)
   (:args (x :target y
-	    :scs (character-reg)
-	    :load-if (not (location= x y))))
+            :scs (character-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (character-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:generator 0
@@ -49,9 +49,9 @@
 ;;; Move untagged character arguments/return-values.
 (define-vop (move-character-arg)
   (:args (x :target y
-	    :scs (character-reg))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y character-reg))))
+            :scs (character-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y character-reg))))
   (:results (y))
   (:generator 0
     (sc-case y
@@ -93,7 +93,7 @@
 
 (define-vop (character-compare)
   (:args (x :scs (character-reg))
-	 (y :scs (character-reg)))
+         (y :scs (character-reg)))
   (:arg-types character character)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:conditional)
@@ -107,8 +107,8 @@
       (:lt (inst cmplt x y temp))
       (:gt (inst cmplt y x temp)))
     (if not-p
-	(inst beq temp target)
-	(inst bne temp target))))
+        (inst beq temp target)
+        (inst bne temp target))))
 
 (define-vop (fast-char=/character character-compare)
   (:translate char=)
@@ -137,12 +137,12 @@
       (:lt (inst cmplt x (sb!xc:char-code y) temp))
       (:gt (inst cmple x (sb!xc:char-code y) temp)))
     (if not-p
-	(if (eq cond :gt)
-	    (inst bne temp target)
-	    (inst beq temp target))
         (if (eq cond :gt)
-	    (inst beq temp target)
-	    (inst bne temp target)))))
+            (inst bne temp target)
+            (inst beq temp target))
+        (if (eq cond :gt)
+            (inst beq temp target)
+            (inst bne temp target)))))
 
 (define-vop (fast-char=/character/c character-compare/c)
   (:translate char=)

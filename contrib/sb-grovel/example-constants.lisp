@@ -9,27 +9,27 @@
 ((:integer af-inet "AF_INET" "IP Protocol family")
  (:integer af-unspec "AF_UNSPEC" "Unspecified.")
  (:integer af-local
-	   #+(or sunos solaris) "AF_UNIX"
-	   #-(or sunos solaris) "AF_LOCAL"
-	   "Local to host (pipes and file-domain).")
+           #+(or sunos solaris) "AF_UNIX"
+           #-(or sunos solaris) "AF_LOCAL"
+           "Local to host (pipes and file-domain).")
  (:integer sigterm "SIGTERM")
  (:structure stat ("struct stat"
                    (integer dev "dev_t" "st_dev")
                    (integer atime "time_t" "st_atime")))
- 
- 
+
+
  (:function accept ("accept" int
-			     (socket int)
-			     (my-addr (* t))
-			     (addrlen int :in-out)))
+                             (socket int)
+                             (my-addr (* t))
+                             (addrlen int :in-out)))
  (:function bind ("bind" int
-			 (sockfd int)
-			 (my-addr (* t))
-			 (addrlen int)))
+                         (sockfd int)
+                         (my-addr (* t))
+                         (addrlen int)))
  (:function getpid ("getpid" int ))
  (:function getppid ("getppid" int))
  (:function kill ("kill" int
-			 (pid int) (signal int)))
+                         (pid int) (signal int)))
  (:function mkdir ("mkdir" int
-			   (name c-string))))
+                           (name c-string))))
 

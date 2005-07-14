@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -41,7 +41,7 @@
     ;; an extremely meaningless MAKE-LOAD-FORM method whose only point
     ;; is to exercise the mechanism a little bit
     (values `(make-foo :x (list ',(foo-x foo)))
-	    `(setf (foo-y ,foo) ',foo))))
+            `(setf (foo-y ,foo) ',foo))))
 
 (defparameter *foo*
   #.(make-foo :x "X" :y "Y"))
@@ -55,7 +55,7 @@
 ;;; symbol involves dumping a reference to the name of its package).
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setf (logical-pathname-translations "MY-LOGICAL-HOST")
-	(list '("**;*.*.*" "/tmp/*.*"))))
+        (list '("**;*.*.*" "/tmp/*.*"))))
 
 (defparameter *path* #p"MY-LOGICAL-HOST:FOO;BAR.LISP")
 
@@ -63,8 +63,8 @@
 ;;; their complex attributes.
 
 (defparameter *string* #.(make-array 3 :initial-element #\a
-				       :fill-pointer 2
-				       :element-type 'character))
+                                       :fill-pointer 2
+                                       :element-type 'character))
 
 ;;; SBCL 0.7.8 incorrectly read high bits of (COMPLEX DOUBLE-FLOAT)
 ;;; components as unsigned bytes.

@@ -29,13 +29,13 @@ stepper's prompt:
 
 (defmethod single-step ((condition step-variable-condition))
   (format *debug-io* "; ~A => ~S~%"
-	  (step-condition-form condition)
-	  (step-condition-result condition)))
+          (step-condition-form condition)
+          (step-condition-result condition)))
 
 (defmethod single-step ((condition step-values-condition))
   (let ((values (step-condition-result condition)))
     (format *debug-io* "; ~A => ~:[#<no value>~;~{~S~^, ~}~]~%"
-	    (step-condition-form condition)
+            (step-condition-form condition)
             values values)))
 
 (defmethod single-step ((condition step-form-condition))
@@ -65,7 +65,7 @@ with the STEP-CONDITION as argument.")
 (defun invoke-stepper (condition)
   (when (and *stepping* *stepper-hook*)
     (let ((hook *stepper-hook*)
-	  (*stepper-hook* nil))
+          (*stepper-hook* nil))
       (funcall hook condition))))
 
 (defmacro step (form)
@@ -75,7 +75,7 @@ outside the lexical scope of the form can be stepped into only if the
 functions in question have been compiled with sufficient DEBUG policy
 to be at least partially steppable."
   `(let ((*stepping* t)
-	 (*step* t))
+         (*step* t))
     (declare (optimize (sb-c:insert-step-conditions 0)))
     (format t "Single stepping. Type ? for help.~%")
     (locally (declare (optimize (sb-c:insert-step-conditions 3)))

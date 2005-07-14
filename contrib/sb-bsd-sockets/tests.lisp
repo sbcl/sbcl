@@ -28,18 +28,18 @@
     ;; fail to make a socket: check correct error return.  There's no nice
     ;; way to check the condition stuff on its own, which is a shame
     (handler-case
-	(make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "udp"))
+        (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "udp"))
       ((or socket-type-not-supported-error protocol-not-supported-error) (c)
-	(declare (ignorable c)) t)
+        (declare (ignorable c)) t)
       (:no-error nil))
   t)
 
 (deftest make-inet-socket-keyword-wrong
     ;; same again with keywords
     (handler-case
-	(make-instance 'inet-socket :type :stream :protocol :udp)
+        (make-instance 'inet-socket :type :stream :protocol :udp)
       ((or protocol-not-supported-error socket-type-not-supported-error) (c)
-	(declare (ignorable c)) t)
+        (declare (ignorable c)) t)
       (:no-error nil))
   t)
 
@@ -67,9 +67,9 @@
     (do-gc-portably) ;gc should clear out any old sockets bound to this port
     (socket-bind s (make-inet-address "127.0.0.1") 1974)
     (handler-case
-	(let ((s2 (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
-	  (socket-bind s2 (make-inet-address "127.0.0.1") 1974)
-	  nil)
+        (let ((s2 (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
+          (socket-bind s2 (make-inet-address "127.0.0.1") 1974)
+          nil)
       (address-in-use-error () t)))
   t)
 
@@ -99,24 +99,24 @@
 #+internet-available
 (deftest simple-tcp-client
     (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp))
-	  (data (make-string 200)))
+          (data (make-string 200)))
       (socket-connect s #(127 0 0 1) 7)
       (let ((stream (socket-make-stream s :input t :output t :buffering :none)))
-	(format stream "here is some text")
-	(let ((data (subseq data 0 (read-buf-nonblock data stream))))
-	  (format t "~&Got ~S back from TCP echo server~%" data)
-	  (> (length data) 0))))
+        (format stream "here is some text")
+        (let ((data (subseq data 0 (read-buf-nonblock data stream))))
+          (format t "~&Got ~S back from TCP echo server~%" data)
+          (> (length data) 0))))
   t)
 
 #+internet-available
 (deftest sockaddr-return-type
   (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
-    (unwind-protect 
-	 (progn
-	   (socket-connect s #(127 0 0 1) 7)
-	   (multiple-value-bind (host port) (socket-peername s)
-	     (and (vectorp host)
-		  (numberp port))))
+    (unwind-protect
+         (progn
+           (socket-connect s #(127 0 0 1) 7)
+           (multiple-value-bind (host port) (socket-peername s)
+             (and (vectorp host)
+                  (numberp port))))
       (socket-close s)))
   t)
 
@@ -129,8 +129,8 @@
     (let ((stream (socket-make-stream s :input t :output t :buffering :none)))
       (format stream "here is some text")
       (let ((data (subseq data 0 (read-buf-nonblock data stream))))
-	(format t "~&Got ~S back from UDP echo server~%" data)
-	(> (length data) 0))))
+        (format t "~&Got ~S back from UDP echo server~%" data)
+        (> (length data) 0))))
   t)
 
 ;;; A fairly rudimentary test that connects to the syslog socket and
@@ -146,22 +146,22 @@
       ;; unavailable, or if it's a symlink to some weird character
       ;; device.
       (when (and (probe-file "/dev/log")
-		 (sb-posix:s-issock
-		  (sb-posix::stat-mode (sb-posix:stat "/dev/log"))))
-	(let ((s (make-instance 'local-socket :type :datagram)))
-	  (format t "Connecting ~A... " s)
-	  (finish-output)
-	  (handler-case
-	      (socket-connect s "/dev/log")
-	    (sb-bsd-sockets::socket-error ()
-	      (setq s (make-instance 'local-socket :type :stream))
-	      (format t "failed~%Retrying with ~A... " s)
-	      (finish-output)
-	      (socket-connect s "/dev/log")))
-	  (format t "ok.~%")
-	  (let ((stream (socket-make-stream s :input t :output t :buffering :none)))
-	    (format stream
-		    "<7>bsd-sockets: Don't panic.  We're testing local-domain client code; this message can safely be ignored"))))
+                 (sb-posix:s-issock
+                  (sb-posix::stat-mode (sb-posix:stat "/dev/log"))))
+        (let ((s (make-instance 'local-socket :type :datagram)))
+          (format t "Connecting ~A... " s)
+          (finish-output)
+          (handler-case
+              (socket-connect s "/dev/log")
+            (sb-bsd-sockets::socket-error ()
+              (setq s (make-instance 'local-socket :type :stream))
+              (format t "failed~%Retrying with ~A... " s)
+              (finish-output)
+              (socket-connect s "/dev/log")))
+          (format t "ok.~%")
+          (let ((stream (socket-make-stream s :input t :output t :buffering :none)))
+            (format stream
+                    "<7>bsd-sockets: Don't panic.  We're testing local-domain client code; this message can safely be ignored"))))
       t)
   t)
 
@@ -197,13 +197,13 @@
 #+internet-available
 (deftest simple-http-client-1
     (handler-case
-	(let ((s (http-stream "ww.telent.net" 80 "HEAD /")))
-	  (let ((data (make-string 200)))
-	    (setf data (subseq data 0
-			       (read-buf-nonblock data
-						  (socket-make-stream s))))
-	    (princ data)
-	    (> (length data) 0)))
+        (let ((s (http-stream "ww.telent.net" 80 "HEAD /")))
+          (let ((data (make-string 200)))
+            (setf data (subseq data 0
+                               (read-buf-nonblock data
+                                                  (socket-make-stream s))))
+            (princ data)
+            (> (length data) 0)))
       (network-unreachable-error () 'network-unreachable))
   t)
 
@@ -214,14 +214,14 @@
     ;; kernel: we set a size of x and then getsockopt() returns 2x.
     ;; This is why we compare with >= instead of =
     (handler-case
-	(let ((s (http-stream "ww.telent.net" 80 "HEAD /")))
-	  (setf (sockopt-receive-buffer s) 1975)
-	  (let ((data (make-string 200)))
-	    (setf data (subseq data 0
-			       (read-buf-nonblock data
-						  (socket-make-stream s))))
-	    (and (> (length data) 0)
-		 (>= (sockopt-receive-buffer s) 1975))))
+        (let ((s (http-stream "ww.telent.net" 80 "HEAD /")))
+          (setf (sockopt-receive-buffer s) 1975)
+          (let ((data (make-string 200)))
+            (setf data (subseq data 0
+                               (read-buf-nonblock data
+                                                  (socket-make-stream s))))
+            (and (> (length data) 0)
+                 (>= (sockopt-receive-buffer s) 1975))))
       (network-unreachable-error () 'network-unreachable))
   t)
 
@@ -231,11 +231,11 @@
 #+internet-available
 (deftest socket-open-p-true.2
     (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
-      (unwind-protect 
-	   (progn
-	     (socket-connect s #(127 0 0 1) 7)
-	     (socket-open-p s))
-	(socket-close s)))
+      (unwind-protect
+           (progn
+             (socket-connect s #(127 0 0 1) 7)
+             (socket-open-p s))
+        (socket-close s)))
   t)
 (deftest socket-open-p-false
     (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
@@ -261,6 +261,6 @@
     (loop
      (multiple-value-bind (buf len address port) (socket-receive s nil 500)
        (format t "Received ~A bytes from ~A:~A - ~A ~%"
-	       len address port (subseq buf 0 (min 10 len)))))))
-  
-  
+               len address port (subseq buf 0 (min 10 len)))))))
+
+

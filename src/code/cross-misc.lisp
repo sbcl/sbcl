@@ -63,7 +63,7 @@
 (defun sb!kernel:array-header-p (x)
   (and (typep x 'array)
        (or (not (typep x 'simple-array))
-	   (/= (array-rank x) 1))))
+           (/= (array-rank x) 1))))
 
 ;;; GENESIS needs these at cross-compile time. The target
 ;;; implementation of these is reasonably efficient by virtue of its
@@ -80,10 +80,10 @@
       ;; of this function at cross-compile time don't really care if
       ;; the count is a little too high.) -- WHN 19990826
       (multiple-value-bind (symbol status)
-	  (find-symbol (symbol-name i) package)
-	(declare (ignore symbol))
-	(when (member status '(:internal :inherited))
-	  (incf result))))
+          (find-symbol (symbol-name i) package)
+        (declare (ignore symbol))
+        (when (member status '(:internal :inherited))
+          (incf result))))
     result))
 (defun package-external-symbol-count (package)
   (let ((result 0))
@@ -144,8 +144,8 @@
 (defmacro without-package-locks (&body body)
   `(progn ,@body))
 
-(defmacro with-single-package-locked-error ((&optional kind thing &rest format) 
-					    &body body)
+(defmacro with-single-package-locked-error ((&optional kind thing &rest format)
+                                            &body body)
   (declare (ignore kind thing format))
   `(progn ,@body))
 

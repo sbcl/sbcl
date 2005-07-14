@@ -23,7 +23,7 @@
 (sb-int:defconstant-eqx +flag-bits+
                         '(:simple       ; instance is valid
                           :input :output ; direction
-                          :dual :string	; type of stream
+                          :dual :string ; type of stream
                           :eof          ; latched EOF
                           :dirty        ; output buffer needs write
                           :interactive) ; interactive stream
@@ -32,17 +32,17 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun %flags (flags)
     (loop for flag in flags
-	  as pos = (position flag +flag-bits+)
-	when (eq flag :gray) do
-	  (error "Gray streams not supported.")
-	if pos
-	  sum (ash 1 pos) into bits
-	else
-	  collect flag into unused
+          as pos = (position flag +flag-bits+)
+        when (eq flag :gray) do
+          (error "Gray streams not supported.")
+        if pos
+          sum (ash 1 pos) into bits
+        else
+          collect flag into unused
       finally (when unused
-		(warn "Invalid stream instance flag~P: ~{~S~^, ~}"
-		      (length unused) unused))
-	      (return bits))))
+                (warn "Invalid stream instance flag~P: ~{~S~^, ~}"
+                      (length unused) unused))
+              (return bits))))
 
 ;;; Setup an environment where sm, funcall-stm-handler and
 ;;; funcall-stm-handler-2 are valid and efficient for a stream of type
@@ -55,36 +55,36 @@
 (defmacro with-stream-class ((class-name &optional stream) &body body)
   (if stream
     (let ((stm (gensym "STREAM"))
-	  (slt (gensym "SV")))
+          (slt (gensym "SV")))
       `(let* ((,stm ,stream)
-	      (,slt (sb-kernel:%instance-ref ,stm 1)))
-	 (declare (type ,class-name ,stm)
-		  (type simple-vector ,slt)
-		  (ignorable ,slt))
-	 (macrolet ((sm (slot-name stream)
-		      (declare (ignore stream))
-		      #-count-sm
-		      `(slot-value ,',stm ',slot-name)
-		      #+count-sm
-		      `(%sm ',slot-name ,',stm))
-		    (add-stream-instance-flags (stream &rest flags)
-		      (declare (ignore stream))
-		      `(setf (sm %flags ,',stm) (logior (the fixnum (sm %flags ,',stm))
-							,(%flags flags))))
-		    (remove-stream-instance-flags (stream &rest flags)
-		      (declare (ignore stream))
-		      `(setf (sm %flags ,',stm) (logandc2 (the fixnum (sm %flags ,',stm))
-							  ,(%flags flags))))
-		    (any-stream-instance-flags (stream &rest flags)
-		      (declare (ignore stream))
-		      `(not (zerop (logand (the fixnum (sm %flags ,',stm))
- 					   ,(%flags flags))))))
-	   ,@body)))
+              (,slt (sb-kernel:%instance-ref ,stm 1)))
+         (declare (type ,class-name ,stm)
+                  (type simple-vector ,slt)
+                  (ignorable ,slt))
+         (macrolet ((sm (slot-name stream)
+                      (declare (ignore stream))
+                      #-count-sm
+                      `(slot-value ,',stm ',slot-name)
+                      #+count-sm
+                      `(%sm ',slot-name ,',stm))
+                    (add-stream-instance-flags (stream &rest flags)
+                      (declare (ignore stream))
+                      `(setf (sm %flags ,',stm) (logior (the fixnum (sm %flags ,',stm))
+                                                        ,(%flags flags))))
+                    (remove-stream-instance-flags (stream &rest flags)
+                      (declare (ignore stream))
+                      `(setf (sm %flags ,',stm) (logandc2 (the fixnum (sm %flags ,',stm))
+                                                          ,(%flags flags))))
+                    (any-stream-instance-flags (stream &rest flags)
+                      (declare (ignore stream))
+                      `(not (zerop (logand (the fixnum (sm %flags ,',stm))
+                                           ,(%flags flags))))))
+           ,@body)))
     `(macrolet ((sm (slot-name stream)
-		  #-count-sm
-		  `(slot-value ,stream ',slot-name)
-		  #+count-sm
-		  `(%sm ',slot-name ,stream)))
+                  #-count-sm
+                  `(slot-value ,stream ',slot-name)
+                  #+count-sm
+                  `(%sm ',slot-name ,stream)))
        ,@body)))
 
 (defmacro sm (slot-name stream)
@@ -109,43 +109,43 @@
   (let ((s (gensym "STREAM")))
     `(let ((,s ,stream))
        (with-stream-class (simple-stream ,s)
-	 (add-stream-instance-flags ,s ,@flags)))))
+         (add-stream-instance-flags ,s ,@flags)))))
 
 (defmacro remove-stream-instance-flags (stream &rest flags)
   "Clear the given Flags in Stream."
   (let ((s (gensym "STREAM")))
     `(let ((,s ,stream))
        (with-stream-class (simple-stream ,s)
-	 (remove-stream-instance-flags ,s ,@flags)))))
+         (remove-stream-instance-flags ,s ,@flags)))))
 
 (defmacro any-stream-instance-flags (stream &rest flags)
   "Determine whether any one of the Flags is set in Stream."
   (let ((s (gensym "STREAM")))
     `(let ((,s ,stream))
        (with-stream-class (simple-stream ,s)
-	 (any-stream-instance-flags ,s ,@flags)))))
+         (any-stream-instance-flags ,s ,@flags)))))
 
 (defmacro simple-stream-dispatch (stream single dual string)
   (let ((s (gensym "STREAM")))
     `(let ((,s ,stream))
        (with-stream-class (simple-stream ,s)
-	 (let ((%flags (sm %flags ,s)))
-	   (cond ((zerop (logand %flags ,(%flags '(:string :dual))))
-		  ,single)
-		 ((zerop (logand %flags ,(%flags '(:string))))
-		  ,dual)
-		 (t
-		  ,string)))))))
+         (let ((%flags (sm %flags ,s)))
+           (cond ((zerop (logand %flags ,(%flags '(:string :dual))))
+                  ,single)
+                 ((zerop (logand %flags ,(%flags '(:string))))
+                  ,dual)
+                 (t
+                  ,string)))))))
 
 (defmacro simple-stream-dispatch-2 (stream non-string string)
   (let ((s (gensym "STREAM")))
     `(let ((,s ,stream))
        (with-stream-class (simple-stream ,s)
-	 (let ((%flags (sm %flags ,s)))
-	   (cond ((zerop (logand %flags ,(%flags '(:string))))
-		  ,non-string)
-		 (t
-		  ,string)))))))
+         (let ((%flags (sm %flags ,s)))
+           (cond ((zerop (logand %flags ,(%flags '(:string))))
+                  ,non-string)
+                 (t
+                  ,string)))))))
 
 
 ;;;; The following two forms are for Franz source-compatibility,
@@ -155,11 +155,11 @@
 (defpackage "EXCL"
   (:use "SB-SIMPLE-STREAMS")
   (:import-from "SB-SIMPLE-STREAMS"
-	"BUFFER" "BUFFPOS" "BUFFER-PTR"
-	"OUT-BUFFER" "MAX-OUT-POS"
-	"INPUT-HANDLE" "OUTPUT-HANDLE"
-	"MELDED-STREAM"
-	"J-READ-CHARS"))
+        "BUFFER" "BUFFPOS" "BUFFER-PTR"
+        "OUT-BUFFER" "MAX-OUT-POS"
+        "INPUT-HANDLE" "OUTPUT-HANDLE"
+        "MELDED-STREAM"
+        "J-READ-CHARS"))
 
 #+nil
 (provide :iodefs)

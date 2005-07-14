@@ -18,31 +18,31 @@
 
 (defparameter *float-trap-alist*
   (list (cons :underflow float-underflow-trap-bit)
-	(cons :overflow float-overflow-trap-bit)
-	(cons :inexact float-inexact-trap-bit)
-	(cons :invalid float-invalid-trap-bit)
-	(cons :divide-by-zero float-divide-by-zero-trap-bit)
-	#!+x86 (cons :denormalized-operand float-denormal-trap-bit)))
+        (cons :overflow float-overflow-trap-bit)
+        (cons :inexact float-inexact-trap-bit)
+        (cons :invalid float-invalid-trap-bit)
+        (cons :divide-by-zero float-divide-by-zero-trap-bit)
+        #!+x86 (cons :denormalized-operand float-denormal-trap-bit)))
 
 (defparameter *rounding-mode-alist*
   (list (cons :nearest float-round-to-nearest)
-	(cons :zero float-round-to-zero)
-	(cons :positive-infinity float-round-to-positive)
-	(cons :negative-infinity float-round-to-negative)))
+        (cons :zero float-round-to-zero)
+        (cons :positive-infinity float-round-to-positive)
+        (cons :negative-infinity float-round-to-negative)))
 
 #!+x86
 (defparameter *precision-mode-alist*
   (list (cons :24-bit float-precision-24-bit)
-	(cons :53-bit float-precision-53-bit)
-	(cons :64-bit float-precision-64-bit)))
+        (cons :53-bit float-precision-53-bit)
+        (cons :64-bit float-precision-64-bit)))
 
 ;;; Return a mask with all the specified float trap bits set.
 (defun float-trap-mask (names)
   (reduce #'logior
-	  (mapcar (lambda (x)
-		    (or (cdr (assoc x *float-trap-alist*))
-			(error "unknown float trap kind: ~S" x)))
-		  names)))
+          (mapcar (lambda (x)
+                    (or (cdr (assoc x *float-trap-alist*))
+                        (error "unknown float trap kind: ~S" x)))
+                  names)))
 ) ; EVAL-WHEN
 
 ;;; interpreter stubs for floating point modes get/setters for the
@@ -50,9 +50,9 @@
 ;;; in C rather than as VOPs.
 #!-(or alpha x86-64)
 (progn
-  (defun floating-point-modes () 
+  (defun floating-point-modes ()
     (floating-point-modes))
-  (defun (setf floating-point-modes) (new) 
+  (defun (setf floating-point-modes) (new)
     (setf (floating-point-modes) new)))
 
 ;;; This function sets options controlling the floating-point
@@ -88,39 +88,39 @@
 ;;; enabled traps
 
 (defun set-floating-point-modes (&key (traps nil traps-p)
-				      (rounding-mode nil round-p)
-				      (current-exceptions nil current-x-p)
-				      (accrued-exceptions nil accrued-x-p)
-				      (fast-mode nil fast-mode-p)
-				 #!+x86 (precision nil precisionp))
+                                      (rounding-mode nil round-p)
+                                      (current-exceptions nil current-x-p)
+                                      (accrued-exceptions nil accrued-x-p)
+                                      (fast-mode nil fast-mode-p)
+                                 #!+x86 (precision nil precisionp))
   (let ((modes (floating-point-modes)))
     (when traps-p
       (setf (ldb float-traps-byte modes) (float-trap-mask traps)))
     (when round-p
       (setf (ldb float-rounding-mode modes)
-	    (or (cdr (assoc rounding-mode *rounding-mode-alist*))
-		(error "unknown rounding mode: ~S" rounding-mode))))
+            (or (cdr (assoc rounding-mode *rounding-mode-alist*))
+                (error "unknown rounding mode: ~S" rounding-mode))))
     (when current-x-p
       (setf (ldb float-exceptions-byte modes)
-	    (float-trap-mask current-exceptions)))
+            (float-trap-mask current-exceptions)))
     (when accrued-x-p
       (setf (ldb float-sticky-bits modes)
-	    (float-trap-mask accrued-exceptions)))
+            (float-trap-mask accrued-exceptions)))
     (when fast-mode-p
       (if fast-mode
-	  (setq modes (logior float-fast-bit modes))
-	  (setq modes (logand (lognot float-fast-bit) modes))))
+          (setq modes (logior float-fast-bit modes))
+          (setq modes (logand (lognot float-fast-bit) modes))))
     #!+x86
     (when precisionp
       (setf (ldb float-precision-control modes)
-	    (or (cdr (assoc precision *precision-mode-alist*))
-		(error "unknown precision mode: ~S" precision))))
+            (or (cdr (assoc precision *precision-mode-alist*))
+                (error "unknown precision mode: ~S" precision))))
     ;; FIXME: This apparently doesn't work on Darwin
     #!-darwin (setf (floating-point-modes) modes))
 
   (values))
 
-;;; This function returns a list representing the state of the floating 
+;;; This function returns a list representing the state of the floating
 ;;; point modes. The list is in the same format as the &KEY arguments to
 ;;; SET-FLOATING-POINT-MODES, i.e.
 ;;;    (apply #'set-floating-point-modes (get-floating-point-modes))
@@ -128,56 +128,56 @@
 ;;; no-op).
 (defun get-floating-point-modes ()
   (flet ((exc-keys (bits)
-	   (macrolet ((frob ()
-			`(collect ((res))
-			   ,@(mapcar (lambda (x)
-				       `(when (logtest bits ,(cdr x))
-					  (res ',(car x))))
-				     *float-trap-alist*)
-			   (res))))
-	     (frob))))
+           (macrolet ((frob ()
+                        `(collect ((res))
+                           ,@(mapcar (lambda (x)
+                                       `(when (logtest bits ,(cdr x))
+                                          (res ',(car x))))
+                                     *float-trap-alist*)
+                           (res))))
+             (frob))))
     (let ((modes (floating-point-modes)))
       `(:traps ,(exc-keys (ldb float-traps-byte modes))
-	:rounding-mode ,(car (rassoc (ldb float-rounding-mode modes)
-				     *rounding-mode-alist*))
-	:current-exceptions ,(exc-keys (ldb float-exceptions-byte modes))
-	:accrued-exceptions ,(exc-keys (ldb float-sticky-bits modes))
-	:fast-mode ,(logtest float-fast-bit modes)
-	#!+x86 :precision
-	#!+x86 ,(car (rassoc (ldb float-precision-control modes)
-			     *precision-mode-alist*))))))
+        :rounding-mode ,(car (rassoc (ldb float-rounding-mode modes)
+                                     *rounding-mode-alist*))
+        :current-exceptions ,(exc-keys (ldb float-exceptions-byte modes))
+        :accrued-exceptions ,(exc-keys (ldb float-sticky-bits modes))
+        :fast-mode ,(logtest float-fast-bit modes)
+        #!+x86 :precision
+        #!+x86 ,(car (rassoc (ldb float-precision-control modes)
+                             *precision-mode-alist*))))))
 
 ;;; Return true if any of the named traps are currently trapped, false
 ;;; otherwise.
 (defmacro current-float-trap (&rest traps)
   `(not (zerop (logand ,(dpb (float-trap-mask traps) float-traps-byte 0)
-		       (floating-point-modes)))))
+                       (floating-point-modes)))))
 
 ;;; Signal the appropriate condition when we get a floating-point error.
 (defun sigfpe-handler (signal info context)
   (declare (ignore signal info))
   (declare (type system-area-pointer context))
   (let* ((modes (context-floating-point-modes
-		 (sb!alien:sap-alien context (* os-context-t))))
-	 (traps (logand (ldb float-exceptions-byte modes)
-			(ldb float-traps-byte modes))))
+                 (sb!alien:sap-alien context (* os-context-t))))
+         (traps (logand (ldb float-exceptions-byte modes)
+                        (ldb float-traps-byte modes))))
     (cond ((not (zerop (logand float-divide-by-zero-trap-bit traps)))
-	   (error 'division-by-zero))
-	  ((not (zerop (logand float-invalid-trap-bit traps)))
-	   (error 'floating-point-invalid-operation))
-	  ((not (zerop (logand float-overflow-trap-bit traps)))
-	   (error 'floating-point-overflow))
-	  ((not (zerop (logand float-underflow-trap-bit traps)))
-	   (error 'floating-point-underflow))
-	  ((not (zerop (logand float-inexact-trap-bit traps)))
-	   (error 'floating-point-inexact))
-	  #!+freebsd
-	  ((zerop (ldb float-exceptions-byte modes))
-	   ;; I can't tell what caused the exception!!
-	   (error 'floating-point-exception
-		  :traps (getf (get-floating-point-modes) :traps)))
-	  (t
-	   (error 'floating-point-exception)))))
+           (error 'division-by-zero))
+          ((not (zerop (logand float-invalid-trap-bit traps)))
+           (error 'floating-point-invalid-operation))
+          ((not (zerop (logand float-overflow-trap-bit traps)))
+           (error 'floating-point-overflow))
+          ((not (zerop (logand float-underflow-trap-bit traps)))
+           (error 'floating-point-underflow))
+          ((not (zerop (logand float-inexact-trap-bit traps)))
+           (error 'floating-point-inexact))
+          #!+freebsd
+          ((zerop (ldb float-exceptions-byte modes))
+           ;; I can't tell what caused the exception!!
+           (error 'floating-point-exception
+                  :traps (getf (get-floating-point-modes) :traps)))
+          (t
+           (error 'floating-point-exception)))))
 
 ;;; Execute BODY with the floating point exceptions listed in TRAPS
 ;;; masked (disabled). TRAPS should be a list of possible exceptions
@@ -187,20 +187,20 @@
 ;;; to support their testing within, and restored on exit.
 (defmacro with-float-traps-masked (traps &body body)
   (let ((traps (dpb (float-trap-mask traps) float-traps-byte 0))
-	(exceptions (dpb (float-trap-mask traps) float-sticky-bits 0))
-	(trap-mask (dpb (lognot (float-trap-mask traps))
-			float-traps-byte #xffffffff))
-	(exception-mask (dpb (lognot (float-trap-mask traps))
-			     float-sticky-bits #xffffffff))
+        (exceptions (dpb (float-trap-mask traps) float-sticky-bits 0))
+        (trap-mask (dpb (lognot (float-trap-mask traps))
+                        float-traps-byte #xffffffff))
+        (exception-mask (dpb (lognot (float-trap-mask traps))
+                             float-sticky-bits #xffffffff))
         (orig-modes (gensym)))
     `(let ((,orig-modes (floating-point-modes)))
       (unwind-protect
-	   (progn
-	     (setf (floating-point-modes)
-		   (logand ,orig-modes ,(logand trap-mask exception-mask)))
-	     ,@body)
-	;; Restore the original traps and exceptions.
-	(setf (floating-point-modes)
-	      (logior (logand ,orig-modes ,(logior traps exceptions))
-		      (logand (floating-point-modes)
-			      ,(logand trap-mask exception-mask))))))))
+           (progn
+             (setf (floating-point-modes)
+                   (logand ,orig-modes ,(logand trap-mask exception-mask)))
+             ,@body)
+        ;; Restore the original traps and exceptions.
+        (setf (floating-point-modes)
+              (logior (logand ,orig-modes ,(logior traps exceptions))
+                      (logand (floating-point-modes)
+                              ,(logand trap-mask exception-mask))))))))

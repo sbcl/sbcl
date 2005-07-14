@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -15,26 +15,26 @@
 
 ;;; callbacks only on a few platforms
 #-(or darwin x86)
-(quit :unix-status 104) 
+(quit :unix-status 104)
 
 ;;; simple callback for a function
 
 (defun thunk ()
   (write-string "hi"))
 
-(defvar *thunk* 
+(defvar *thunk*
   (sb-alien::alien-callback (function c-string) #'thunk))
 
 (assert (equal (with-output-to-string (*standard-output*)
-		 (alien-funcall *thunk*))
-	       "hi"))
+                 (alien-funcall *thunk*))
+               "hi"))
 
 ;;; simple callback for a symbol
 
 (defun add-two-ints (arg1 arg2)
   (+ arg1 arg2))
 
-(defvar *add-two-ints* 
+(defvar *add-two-ints*
   (sb-alien::alien-callback (function int int int) 'add-two-ints))
 
 (assert (= (alien-funcall *add-two-ints* 555 444444) 444999))
@@ -49,20 +49,20 @@
 
 (sb-alien::define-alien-callback double*-cmp int ((arg1 (* double)) (arg2 (* double)))
   (let ((a1 (deref arg1))
-	(a2 (deref arg2)))
+        (a2 (deref arg2)))
     (cond ((= a1 a2) 0)
-	  ((< a1 a2) -1)
-	  (t 1))))
+          ((< a1 a2) -1)
+          (t 1))))
 
 (let* ((vector (coerce '(0.1d0 0.5d0 0.2d0 1.2d0 1.5d0 2.5d0 0.0d0 0.1d0 0.2d0 0.3d0)
-		       '(vector double-float)))
+                       '(vector double-float)))
        (sorted (sort (copy-seq vector) #'<)))
   (gc :full t)
   (sb-sys:with-pinned-objects (vector)
     (qsort (sb-sys:vector-sap vector)
-	   (length vector)
-	   (alien-size double :bytes)
-	   double*-cmp))
+           (length vector)
+           (alien-size double :bytes)
+           double*-cmp))
   (assert (equalp vector sorted)))
 
 ;;; returning floats
@@ -104,7 +104,7 @@
   (assert p)
   (assert (not valid)))
 
-(multiple-value-bind (res err) 
+(multiple-value-bind (res err)
     (ignore-errors (alien-funcall to-be-invalidated))
   (assert (and (not res) (typep err 'error))))
 

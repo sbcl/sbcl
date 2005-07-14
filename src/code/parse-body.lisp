@@ -35,46 +35,46 @@
     ;; a little bit.
     (flet ((doc-string-p (x remaining-forms)
              (if (stringp x)
-		 (if doc-string-allowed
-		     ;; ANSI 3.4.11 explicitly requires that a doc
-		     ;; string be followed by another form (either an
-		     ;; ordinary form or a declaration). Hence:
-		     (if remaining-forms
-			 (if doc
-			     ;; ANSI 3.4.11 says that the consequences of
-			     ;; duplicate doc strings are unspecified.
-			     ;; That's probably not something the
-			     ;; programmer intends. We raise an error so
-			     ;; that this won't pass unnoticed.
-			     (error "duplicate doc string ~S" x)
-			     t)))))
+                 (if doc-string-allowed
+                     ;; ANSI 3.4.11 explicitly requires that a doc
+                     ;; string be followed by another form (either an
+                     ;; ordinary form or a declaration). Hence:
+                     (if remaining-forms
+                         (if doc
+                             ;; ANSI 3.4.11 says that the consequences of
+                             ;; duplicate doc strings are unspecified.
+                             ;; That's probably not something the
+                             ;; programmer intends. We raise an error so
+                             ;; that this won't pass unnoticed.
+                             (error "duplicate doc string ~S" x)
+                             t)))))
            (declaration-p (x)
              (if (consp x)
                  (let ((name (car x)))
-		   (case name
-		     ((declare) t)
-		     ((declaim)
-		      (unless toplevel
-			;; technically legal, but rather unlikely to
-			;; be what the user meant to do...
-			(style-warn
-			 "DECLAIM where DECLARE was probably intended")
-			nil))
-		     (t nil))))))
+                   (case name
+                     ((declare) t)
+                     ((declaim)
+                      (unless toplevel
+                        ;; technically legal, but rather unlikely to
+                        ;; be what the user meant to do...
+                        (style-warn
+                         "DECLAIM where DECLARE was probably intended")
+                        nil))
+                     (t nil))))))
       (tagbody
         :again
         (if forms
-	    (let ((form1 (first forms)))
-	      ;; Note: The (IF (IF ..) ..) stuff is because we don't
-	      ;; have the macro AND yet.:-|
-	      (if (doc-string-p form1 (rest forms))
-		  (setq doc form1)
-		  (if (declaration-p form1)
-		      (setq reversed-decls
-			    (cons form1 reversed-decls))
-		      (go :done)))
-	      (setq forms (rest forms))
-	      (go :again)))
+            (let ((form1 (first forms)))
+              ;; Note: The (IF (IF ..) ..) stuff is because we don't
+              ;; have the macro AND yet.:-|
+              (if (doc-string-p form1 (rest forms))
+                  (setq doc form1)
+                  (if (declaration-p form1)
+                      (setq reversed-decls
+                            (cons form1 reversed-decls))
+                      (go :done)))
+              (setq forms (rest forms))
+              (go :again)))
         :done)
       (values forms
               (nreverse reversed-decls)

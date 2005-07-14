@@ -25,7 +25,7 @@
 
 (define-vop (if-eq)
   (:args (x :scs (any-reg descriptor-reg zero null))
-	 (y :scs (any-reg descriptor-reg zero null)))
+         (y :scs (any-reg descriptor-reg zero null)))
   (:conditional)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:info target not-p)
@@ -34,5 +34,5 @@
   (:generator 3
     (inst cmpeq x y temp)
     (if not-p
-	(inst beq temp target)
-	(inst bne temp target))))
+        (inst beq temp target)
+        (inst bne temp target))))

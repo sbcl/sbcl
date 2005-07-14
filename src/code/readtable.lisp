@@ -45,11 +45,11 @@
 (def!constant +char-attr-delimiter+ 14) ; (a fake for READ-UNQUALIFIED-TOKEN)
 
 (sb!xc:defstruct (readtable (:conc-name nil)
-			    (:predicate readtablep)
-			    ;; ANSI requires a CL:COPY-READTABLE to do
-			    ;; a deep copy, so the DEFSTRUCT-generated
-			    ;; default is not suitable.
-			    (:copier nil))
+                            (:predicate readtablep)
+                            ;; ANSI requires a CL:COPY-READTABLE to do
+                            ;; a deep copy, so the DEFSTRUCT-generated
+                            ;; default is not suitable.
+                            (:copier nil))
   #!+sb-doc
   "A READTABLE is a data structure that maps characters into syntax
    types for the Common Lisp expression reader."
@@ -66,8 +66,8 @@
   ;; constituents.
   (character-attribute-array
    (make-array base-char-code-limit
-	       :element-type '(unsigned-byte 8)
-	       :initial-element +char-attr-constituent+)
+               :element-type '(unsigned-byte 8)
+               :initial-element +char-attr-constituent+)
    :type attribute-table)
   (character-attribute-hash-table (make-hash-table) :type hash-table)
   ;; The CHARACTER-MACRO-TABLE is a vector of CHAR-CODE-LIMIT

@@ -21,29 +21,29 @@
 ;;; leaf is the body to be executed in that case.
 (defun parse-number-dispatch (vars result types var-types body)
   (cond ((null vars)
-	 (unless (null types) (error "More types than vars."))
-	 (when (cdr result)
-	   (error "Duplicate case: ~S." body))
-	 (setf (cdr result)
-	       (sublis var-types body :test #'equal)))
-	((null types)
-	 (error "More vars than types."))
-	(t
-	 (flet ((frob (var type)
-		  (parse-number-dispatch
-		   (rest vars)
-		   (or (assoc type (cdr result) :test #'equal)
-		       (car (setf (cdr result)
-				  (acons type nil (cdr result)))))
-		   (rest types)
-		   (acons `(dispatch-type ,var) type var-types)
-		   body)))
-	   (let ((type (first types))
-		 (var (first vars)))
-	     (if (and (consp type) (eq (first type) 'foreach))
-		 (dolist (type (rest type))
-		   (frob var type))
-		 (frob var type)))))))
+         (unless (null types) (error "More types than vars."))
+         (when (cdr result)
+           (error "Duplicate case: ~S." body))
+         (setf (cdr result)
+               (sublis var-types body :test #'equal)))
+        ((null types)
+         (error "More vars than types."))
+        (t
+         (flet ((frob (var type)
+                  (parse-number-dispatch
+                   (rest vars)
+                   (or (assoc type (cdr result) :test #'equal)
+                       (car (setf (cdr result)
+                                  (acons type nil (cdr result)))))
+                   (rest types)
+                   (acons `(dispatch-type ,var) type var-types)
+                   body)))
+           (let ((type (first types))
+                 (var (first vars)))
+             (if (and (consp type) (eq (first type) 'foreach))
+                 (dolist (type (rest type))
+                   (frob var type))
+                 (frob var type)))))))
 
 ;;; our guess for the preferred order in which to do type tests
 ;;; (cheaper and/or more probable first.)
@@ -54,26 +54,26 @@
 ;;; Should TYPE1 be tested before TYPE2?
 (defun type-test-order (type1 type2)
   (let ((o1 (position type1 *type-test-ordering*))
-	(o2 (position type2 *type-test-ordering*)))
+        (o2 (position type2 *type-test-ordering*)))
     (cond ((not o1) nil)
-	  ((not o2) t)
-	  (t
-	   (< o1 o2)))))
+          ((not o2) t)
+          (t
+           (< o1 o2)))))
 
 ;;; Return an ETYPECASE form that does the type dispatch, ordering the
 ;;; cases for efficiency.
 (defun generate-number-dispatch (vars error-tags cases)
   (if vars
       (let ((var (first vars))
-	    (cases (sort cases #'type-test-order :key #'car)))
-	`((typecase ,var
-	    ,@(mapcar (lambda (case)
-			`(,(first case)
-			  ,@(generate-number-dispatch (rest vars)
-						      (rest error-tags)
-						      (cdr case))))
-		      cases)
-	    (t (go ,(first error-tags))))))
+            (cases (sort cases #'type-test-order :key #'car)))
+        `((typecase ,var
+            ,@(mapcar (lambda (case)
+                        `(,(first case)
+                          ,@(generate-number-dispatch (rest vars)
+                                                      (rest error-tags)
+                                                      (cdr case))))
+                      cases)
+            (t (go ,(first error-tags))))))
       cases))
 
 ) ; EVAL-WHEN
@@ -94,38 +94,38 @@
 ;;; not applied recursively.
 (defmacro number-dispatch (var-specs &body cases)
   (let ((res (list nil))
-	(vars (mapcar #'car var-specs))
-	(block (gensym)))
+        (vars (mapcar #'car var-specs))
+        (block (gensym)))
     (dolist (case cases)
       (if (symbolp (first case))
-	  (let ((cases (apply (symbol-function (first case)) (rest case))))
-	    (dolist (case cases)
-	      (parse-number-dispatch vars res (first case) nil (rest case))))
-	  (parse-number-dispatch vars res (first case) nil (rest case))))
+          (let ((cases (apply (symbol-function (first case)) (rest case))))
+            (dolist (case cases)
+              (parse-number-dispatch vars res (first case) nil (rest case))))
+          (parse-number-dispatch vars res (first case) nil (rest case))))
 
     (collect ((errors)
-	      (error-tags))
+              (error-tags))
       (dolist (spec var-specs)
-	(let ((var (first spec))
-	      (type (second spec))
-	      (tag (gensym)))
-	  (error-tags tag)
-	  (errors tag)
-	  (errors `(return-from
-		    ,block
-		    (error 'simple-type-error :datum ,var
-			   :expected-type ',type
-			   :format-control
-			   "~@<Argument ~A is not a ~S: ~2I~_~S~:>"
-			   :format-arguments
-			   (list ',var ',type ,var))))))
+        (let ((var (first spec))
+              (type (second spec))
+              (tag (gensym)))
+          (error-tags tag)
+          (errors tag)
+          (errors `(return-from
+                    ,block
+                    (error 'simple-type-error :datum ,var
+                           :expected-type ',type
+                           :format-control
+                           "~@<Argument ~A is not a ~S: ~2I~_~S~:>"
+                           :format-arguments
+                           (list ',var ',type ,var))))))
 
       `(block ,block
-	 (tagbody
-	   (return-from ,block
-			,@(generate-number-dispatch vars (error-tags)
-						    (cdr res)))
-	   ,@(errors))))))
+         (tagbody
+           (return-from ,block
+                        ,@(generate-number-dispatch vars (error-tags)
+                                                    (cdr res)))
+           ,@(errors))))))
 
 ;;;; binary operation dispatching utilities
 
@@ -173,17 +173,17 @@
   (if (eql imagpart 0)
       realpart
       (cond #!+long-float
-	    ((and (typep realpart 'long-float)
-		  (typep imagpart 'long-float))
-	     (truly-the (complex long-float) (complex realpart imagpart)))
-	    ((and (typep realpart 'double-float)
-		  (typep imagpart 'double-float))
-	     (truly-the (complex double-float) (complex realpart imagpart)))
-	    ((and (typep realpart 'single-float)
-		  (typep imagpart 'single-float))
-	     (truly-the (complex single-float) (complex realpart imagpart)))
-	    (t
-	     (%make-complex realpart imagpart)))))
+            ((and (typep realpart 'long-float)
+                  (typep imagpart 'long-float))
+             (truly-the (complex long-float) (complex realpart imagpart)))
+            ((and (typep realpart 'double-float)
+                  (typep imagpart 'double-float))
+             (truly-the (complex double-float) (complex realpart imagpart)))
+            ((and (typep realpart 'single-float)
+                  (typep imagpart 'single-float))
+             (truly-the (complex single-float) (complex realpart imagpart)))
+            (t
+             (%make-complex realpart imagpart)))))
 
 ;;; Given a numerator and denominator with the GCD already divided
 ;;; out, make a canonical rational. We make the denominator positive,
@@ -192,13 +192,13 @@
 (defun build-ratio (num den)
   (multiple-value-bind (num den)
       (if (minusp den)
-	  (values (- num) (- den))
-	  (values num den))
+          (values (- num) (- den))
+          (values num den))
     (cond
       ((eql den 0)
        (error 'division-by-zero
-	      :operands (list num den)
-	      :operation 'build-ratio))
+              :operands (list num den)
+              :operation 'build-ratio))
       ((eql den 1) num)
       (t (%make-ratio num den)))))
 
@@ -215,21 +215,21 @@
   #!+sb-doc
   "Return a complex number with the specified real and imaginary components."
   (flet ((%%make-complex (realpart imagpart)
-	   (cond #!+long-float
-		 ((and (typep realpart 'long-float)
-		       (typep imagpart 'long-float))
-		  (truly-the (complex long-float)
-			     (complex realpart imagpart)))
-		 ((and (typep realpart 'double-float)
-		       (typep imagpart 'double-float))
-		  (truly-the (complex double-float)
-			     (complex realpart imagpart)))
-		 ((and (typep realpart 'single-float)
-		       (typep imagpart 'single-float))
-		  (truly-the (complex single-float)
-			     (complex realpart imagpart)))
-		 (t
-		  (%make-complex realpart imagpart)))))
+           (cond #!+long-float
+                 ((and (typep realpart 'long-float)
+                       (typep imagpart 'long-float))
+                  (truly-the (complex long-float)
+                             (complex realpart imagpart)))
+                 ((and (typep realpart 'double-float)
+                       (typep imagpart 'double-float))
+                  (truly-the (complex double-float)
+                             (complex realpart imagpart)))
+                 ((and (typep realpart 'single-float)
+                       (typep imagpart 'single-float))
+                  (truly-the (complex single-float)
+                             (complex realpart imagpart)))
+                 (t
+                  (%make-complex realpart imagpart)))))
   (number-dispatch ((realpart real) (imagpart real))
     ((rational rational)
      (canonical-complex realpart imagpart))
@@ -283,8 +283,8 @@
   (if (zerop number)
       number
       (if (rationalp number)
-	  (if (plusp number) 1 -1)
-	  (/ number (abs number)))))
+          (if (plusp number) 1 -1)
+          (/ number (abs number)))))
 
 ;;;; ratios
 
@@ -301,15 +301,15 @@
 ;;;; arithmetic operations
 
 (macrolet ((define-arith (op init doc)
-	     #!-sb-doc (declare (ignore doc))
-	     `(defun ,op (&rest args)
-		#!+sb-doc ,doc
-		(if (null args) ,init
-		    (do ((args (cdr args) (cdr args))
-			 (result (car args) (,op result (car args))))
-			((null args) result)
-		      ;; to signal TYPE-ERROR when exactly 1 arg of wrong type:
-		      (declare (type number result)))))))
+             #!-sb-doc (declare (ignore doc))
+             `(defun ,op (&rest args)
+                #!+sb-doc ,doc
+                (if (null args) ,init
+                    (do ((args (cdr args) (cdr args))
+                         (result (car args) (,op result (car args))))
+                        ((null args) result)
+                      ;; to signal TYPE-ERROR when exactly 1 arg of wrong type:
+                      (declare (type number result)))))))
   (define-arith + 0
     "Return the sum of its arguments. With no args, returns 0.")
   (define-arith * 1
@@ -317,14 +317,14 @@
 
 (defun - (number &rest more-numbers)
   #!+sb-doc
-  "Subtract the second and all subsequent arguments from the first; 
+  "Subtract the second and all subsequent arguments from the first;
   or with one argument, negate the first argument."
   (if more-numbers
       (do ((nlist more-numbers (cdr nlist))
-	   (result number))
-	  ((atom nlist) result)
-	 (declare (list nlist))
-	 (setq result (- result (car nlist))))
+           (result number))
+          ((atom nlist) result)
+         (declare (list nlist))
+         (setq result (- result (car nlist))))
       (- number)))
 
 (defun / (number &rest more-numbers)
@@ -333,10 +333,10 @@
   With one argument, return reciprocal."
   (if more-numbers
       (do ((nlist more-numbers (cdr nlist))
-	   (result number))
-	  ((atom nlist) result)
-	 (declare (list nlist))
-	 (setq result (/ result (car nlist))))
+           (result number))
+          ((atom nlist) result)
+         (declare (list nlist))
+         (setq result (/ result (car nlist))))
       (/ number)))
 
 (defun 1+ (number)
@@ -358,40 +358,40 @@
        (float-contagion ,op x y)
 
        ((complex complex)
-	(canonical-complex (,op (realpart x) (realpart y))
-			   (,op (imagpart x) (imagpart y))))
+        (canonical-complex (,op (realpart x) (realpart y))
+                           (,op (imagpart x) (imagpart y))))
        (((foreach bignum fixnum ratio single-float double-float
-		  #!+long-float long-float) complex)
-	(complex (,op x (realpart y)) (,op (imagpart y))))
+                  #!+long-float long-float) complex)
+        (complex (,op x (realpart y)) (,op (imagpart y))))
        ((complex (or rational float))
-	(complex (,op (realpart x) y) (imagpart x)))
+        (complex (,op (realpart x) y) (imagpart x)))
 
        (((foreach fixnum bignum) ratio)
-	(let* ((dy (denominator y))
-	       (n (,op (* x dy) (numerator y))))
-	  (%make-ratio n dy)))
+        (let* ((dy (denominator y))
+               (n (,op (* x dy) (numerator y))))
+          (%make-ratio n dy)))
        ((ratio integer)
-	(let* ((dx (denominator x))
-	       (n (,op (numerator x) (* y dx))))
-	  (%make-ratio n dx)))
+        (let* ((dx (denominator x))
+               (n (,op (numerator x) (* y dx))))
+          (%make-ratio n dx)))
        ((ratio ratio)
-	(let* ((nx (numerator x))
-	       (dx (denominator x))
-	       (ny (numerator y))
-	       (dy (denominator y))
-	       (g1 (gcd dx dy)))
-	  (if (eql g1 1)
-	      (%make-ratio (,op (* nx dy) (* dx ny)) (* dx dy))
-	      (let* ((t1 (,op (* nx (truncate dy g1)) (* (truncate dx g1) ny)))
-		     (g2 (gcd t1 g1))
-		     (t2 (truncate dx g1)))
-		(cond ((eql t1 0) 0)
-		      ((eql g2 1)
-		       (%make-ratio t1 (* t2 dy)))
-		      (t (let* ((nn (truncate t1 g2))
-				(t3 (truncate dy g2))
-				(nd (if (eql t2 1) t3 (* t2 t3))))
-			   (if (eql nd 1) nn (%make-ratio nn nd))))))))))))
+        (let* ((nx (numerator x))
+               (dx (denominator x))
+               (ny (numerator y))
+               (dy (denominator y))
+               (g1 (gcd dx dy)))
+          (if (eql g1 1)
+              (%make-ratio (,op (* nx dy) (* dx ny)) (* dx dy))
+              (let* ((t1 (,op (* nx (truncate dy g1)) (* (truncate dx g1) ny)))
+                     (g2 (gcd t1 g1))
+                     (t2 (truncate dx g1)))
+                (cond ((eql t1 0) 0)
+                      ((eql g2 1)
+                       (%make-ratio t1 (* t2 dy)))
+                      (t (let* ((nn (truncate t1 g2))
+                                (t3 (truncate dy g2))
+                                (nd (if (eql t2 1) t3 (* t2 t3))))
+                           (if (eql nd 1) nn (%make-ratio nn nd))))))))))))
 
 ) ; EVAL-WHEN
 
@@ -400,19 +400,19 @@
 
 (defun two-arg-* (x y)
   (flet ((integer*ratio (x y)
-	   (if (eql x 0) 0
-	       (let* ((ny (numerator y))
-		      (dy (denominator y))
-		      (gcd (gcd x dy)))
-		 (if (eql gcd 1)
-		     (%make-ratio (* x ny) dy)
-		     (let ((nn (* (truncate x gcd) ny))
-			   (nd (truncate dy gcd)))
-		       (if (eql nd 1)
-			   nn
-			   (%make-ratio nn nd)))))))
-	 (complex*real (x y)
-	   (canonical-complex (* (realpart x) y) (* (imagpart x) y))))
+           (if (eql x 0) 0
+               (let* ((ny (numerator y))
+                      (dy (denominator y))
+                      (gcd (gcd x dy)))
+                 (if (eql gcd 1)
+                     (%make-ratio (* x ny) dy)
+                     (let ((nn (* (truncate x gcd) ny))
+                           (nd (truncate dy gcd)))
+                       (if (eql nd 1)
+                           nn
+                           (%make-ratio nn nd)))))))
+         (complex*real (x y)
+           (canonical-complex (* (realpart x) y) (* (imagpart x) y))))
     (number-dispatch ((x number) (y number))
       (float-contagion * x y)
 
@@ -423,13 +423,13 @@
 
       ((complex complex)
        (let* ((rx (realpart x))
-	      (ix (imagpart x))
-	      (ry (realpart y))
-	      (iy (imagpart y)))
-	 (canonical-complex (- (* rx ry) (* ix iy)) (+ (* rx iy) (* ix ry)))))
+              (ix (imagpart x))
+              (ry (realpart y))
+              (iy (imagpart y)))
+         (canonical-complex (- (* rx ry) (* ix iy)) (+ (* rx iy) (* ix ry)))))
       (((foreach bignum fixnum ratio single-float double-float
-		 #!+long-float long-float)
-	complex)
+                 #!+long-float long-float)
+        complex)
        (complex*real y x))
       ((complex (or rational float))
        (complex*real x y))
@@ -438,15 +438,15 @@
       ((ratio integer) (integer*ratio y x))
       ((ratio ratio)
        (let* ((nx (numerator x))
-	      (dx (denominator x))
-	      (ny (numerator y))
-	      (dy (denominator y))
-	      (g1 (gcd nx dy))
-	      (g2 (gcd dx ny)))
-	 (build-ratio (* (maybe-truncate nx g1)
-			 (maybe-truncate ny g2))
-		      (* (maybe-truncate dx g2)
-			 (maybe-truncate dy g1))))))))
+              (dx (denominator x))
+              (ny (numerator y))
+              (dy (denominator y))
+              (g1 (gcd nx dy))
+              (g2 (gcd dx ny)))
+         (build-ratio (* (maybe-truncate nx g1)
+                         (maybe-truncate ny g2))
+                      (* (maybe-truncate dx g2)
+                         (maybe-truncate dy g1))))))))
 
 ;;; Divide two integers, producing a canonical rational. If a fixnum,
 ;;; we see whether they divide evenly before trying the GCD. In the
@@ -455,17 +455,17 @@
 (defun integer-/-integer (x y)
   (if (and (typep x 'fixnum) (typep y 'fixnum))
       (multiple-value-bind (quo rem) (truncate x y)
-	(if (zerop rem)
-	    quo
-	    (let ((gcd (gcd x y)))
-	      (declare (fixnum gcd))
-	      (if (eql gcd 1)
-		  (build-ratio x y)
-		  (build-ratio (truncate x gcd) (truncate y gcd))))))
+        (if (zerop rem)
+            quo
+            (let ((gcd (gcd x y)))
+              (declare (fixnum gcd))
+              (if (eql gcd 1)
+                  (build-ratio x y)
+                  (build-ratio (truncate x gcd) (truncate y gcd))))))
       (let ((gcd (gcd x y)))
-	(if (eql gcd 1)
-	    (build-ratio x y)
-	    (build-ratio (truncate x gcd) (truncate y gcd))))))
+        (if (eql gcd 1)
+            (build-ratio x y)
+            (build-ratio (truncate x gcd) (truncate y gcd))))))
 
 (defun two-arg-/ (x y)
   (number-dispatch ((x number) (y number))
@@ -473,61 +473,61 @@
 
     ((complex complex)
      (let* ((rx (realpart x))
-	    (ix (imagpart x))
-	    (ry (realpart y))
-	    (iy (imagpart y)))
+            (ix (imagpart x))
+            (ry (realpart y))
+            (iy (imagpart y)))
        (if (> (abs ry) (abs iy))
-	   (let* ((r (/ iy ry))
-		  (dn (* ry (+ 1 (* r r)))))
-	     (canonical-complex (/ (+ rx (* ix r)) dn)
-				(/ (- ix (* rx r)) dn)))
-	   (let* ((r (/ ry iy))
-		  (dn (* iy (+ 1 (* r r)))))
-	     (canonical-complex (/ (+ (* rx r) ix) dn)
-				(/ (- (* ix r) rx) dn))))))
+           (let* ((r (/ iy ry))
+                  (dn (* ry (+ 1 (* r r)))))
+             (canonical-complex (/ (+ rx (* ix r)) dn)
+                                (/ (- ix (* rx r)) dn)))
+           (let* ((r (/ ry iy))
+                  (dn (* iy (+ 1 (* r r)))))
+             (canonical-complex (/ (+ (* rx r) ix) dn)
+                                (/ (- (* ix r) rx) dn))))))
     (((foreach integer ratio single-float double-float) complex)
      (let* ((ry (realpart y))
-	    (iy (imagpart y)))
+            (iy (imagpart y)))
        (if (> (abs ry) (abs iy))
-	   (let* ((r (/ iy ry))
-		  (dn (* ry (+ 1 (* r r)))))
-	     (canonical-complex (/ x dn)
-				(/ (- (* x r)) dn)))
-	   (let* ((r (/ ry iy))
-		  (dn (* iy (+ 1 (* r r)))))
-	     (canonical-complex (/ (* x r) dn)
-				(/ (- x) dn))))))
+           (let* ((r (/ iy ry))
+                  (dn (* ry (+ 1 (* r r)))))
+             (canonical-complex (/ x dn)
+                                (/ (- (* x r)) dn)))
+           (let* ((r (/ ry iy))
+                  (dn (* iy (+ 1 (* r r)))))
+             (canonical-complex (/ (* x r) dn)
+                                (/ (- x) dn))))))
     ((complex (or rational float))
      (canonical-complex (/ (realpart x) y)
-			(/ (imagpart x) y)))
+                        (/ (imagpart x) y)))
 
     ((ratio ratio)
      (let* ((nx (numerator x))
-	    (dx (denominator x))
-	    (ny (numerator y))
-	    (dy (denominator y))
-	    (g1 (gcd nx ny))
-	    (g2 (gcd dx dy)))
+            (dx (denominator x))
+            (ny (numerator y))
+            (dy (denominator y))
+            (g1 (gcd nx ny))
+            (g2 (gcd dx dy)))
        (build-ratio (* (maybe-truncate nx g1) (maybe-truncate dy g2))
-		    (* (maybe-truncate dx g2) (maybe-truncate ny g1)))))
+                    (* (maybe-truncate dx g2) (maybe-truncate ny g1)))))
 
     ((integer integer)
      (integer-/-integer x y))
 
     ((integer ratio)
      (if (zerop x)
-	 0
-	 (let* ((ny (numerator y))
-		(dy (denominator y))
-		(gcd (gcd x ny)))
-	   (build-ratio (* (maybe-truncate x gcd) dy)
-			(maybe-truncate ny gcd)))))
+         0
+         (let* ((ny (numerator y))
+                (dy (denominator y))
+                (gcd (gcd x ny)))
+           (build-ratio (* (maybe-truncate x gcd) dy)
+                        (maybe-truncate ny gcd)))))
 
     ((ratio integer)
      (let* ((nx (numerator x))
-	    (gcd (gcd nx y)))
+            (gcd (gcd nx y)))
        (build-ratio (maybe-truncate nx gcd)
-		    (* (maybe-truncate y gcd) (denominator x)))))))
+                    (* (maybe-truncate y gcd) (denominator x)))))))
 
 (defun %negate (n)
   (number-dispatch ((n number))
@@ -547,34 +547,34 @@
   "Return number (or number/divisor) as an integer, rounded toward 0.
   The second returned value is the remainder."
   (macrolet ((truncate-float (rtype)
-	       `(let* ((float-div (coerce divisor ',rtype))
-		       (res (%unary-truncate (/ number float-div))))
-		  (values res
-			  (- number
-			     (* (coerce res ',rtype) float-div))))))
+               `(let* ((float-div (coerce divisor ',rtype))
+                       (res (%unary-truncate (/ number float-div))))
+                  (values res
+                          (- number
+                             (* (coerce res ',rtype) float-div))))))
     (number-dispatch ((number real) (divisor real))
       ((fixnum fixnum) (truncate number divisor))
       (((foreach fixnum bignum) ratio)
        (let ((q (truncate (* number (denominator divisor))
-			  (numerator divisor))))
-	 (values q (- number (* q divisor)))))
+                          (numerator divisor))))
+         (values q (- number (* q divisor)))))
       ((fixnum bignum)
        (bignum-truncate (make-small-bignum number) divisor))
       ((ratio (or float rational))
        (let ((q (truncate (numerator number)
-			  (* (denominator number) divisor))))
-	 (values q (- number (* q divisor)))))
+                          (* (denominator number) divisor))))
+         (values q (- number (* q divisor)))))
       ((bignum fixnum)
        (bignum-truncate number (make-small-bignum divisor)))
       ((bignum bignum)
        (bignum-truncate number divisor))
 
       (((foreach single-float double-float #!+long-float long-float)
-	(or rational single-float))
+        (or rational single-float))
        (if (eql divisor 1)
-	   (let ((res (%unary-truncate number)))
-	     (values res (- number (coerce res '(dispatch-type number)))))
-	   (truncate-float (dispatch-type number))))
+           (let ((res (%unary-truncate number)))
+             (values res (- number (coerce res '(dispatch-type number)))))
+           (truncate-float (dispatch-type number))))
       #!+long-float
       ((long-float (or single-float double-float long-float))
        (truncate-float long-float))
@@ -586,7 +586,7 @@
       ((single-float double-float)
        (truncate-float double-float))
       (((foreach fixnum bignum ratio)
-	(foreach single-float double-float #!+long-float long-float))
+        (foreach single-float double-float #!+long-float long-float))
        (truncate-float (dispatch-type divisor))))))
 
 ;;; Declare these guys inline to let them get optimized a little.
@@ -607,11 +607,11 @@
   ;; and augment the remainder by the divisor.
   (multiple-value-bind (tru rem) (truncate number divisor)
     (if (and (not (zerop rem))
-	     (if (minusp divisor)
-		 (plusp number)
-		 (minusp number)))
-	(values (1- tru) (+ rem divisor))
-	(values tru rem))))
+             (if (minusp divisor)
+                 (plusp number)
+                 (minusp number)))
+        (values (1- tru) (+ rem divisor))
+        (values tru rem))))
 
 (defun ceiling (number &optional (divisor 1))
   #!+sb-doc
@@ -622,11 +622,11 @@
   ;; and decrement the remainder by the divisor.
   (multiple-value-bind (tru rem) (truncate number divisor)
     (if (and (not (zerop rem))
-	     (if (minusp divisor)
-		 (minusp number)
-		 (plusp number)))
-	(values (+ tru 1) (- rem divisor))
-	(values tru rem))))
+             (if (minusp divisor)
+                 (minusp number)
+                 (plusp number)))
+        (values (+ tru 1) (- rem divisor))
+        (values tru rem))))
 
 (defun round (number &optional (divisor 1))
   #!+sb-doc
@@ -635,21 +635,21 @@
   (if (eql divisor 1)
       (round number)
       (multiple-value-bind (tru rem) (truncate number divisor)
-	(if (zerop rem)
-	    (values tru rem)
-	    (let ((thresh (/ (abs divisor) 2)))
-	      (cond ((or (> rem thresh)
-			 (and (= rem thresh) (oddp tru)))
-		     (if (minusp divisor)
-			 (values (- tru 1) (+ rem divisor))
-			 (values (+ tru 1) (- rem divisor))))
-		    ((let ((-thresh (- thresh)))
-		       (or (< rem -thresh)
-			   (and (= rem -thresh) (oddp tru))))
-		     (if (minusp divisor)
-			 (values (+ tru 1) (- rem divisor))
-			 (values (- tru 1) (+ rem divisor))))
-		    (t (values tru rem))))))))
+        (if (zerop rem)
+            (values tru rem)
+            (let ((thresh (/ (abs divisor) 2)))
+              (cond ((or (> rem thresh)
+                         (and (= rem thresh) (oddp tru)))
+                     (if (minusp divisor)
+                         (values (- tru 1) (+ rem divisor))
+                         (values (+ tru 1) (- rem divisor))))
+                    ((let ((-thresh (- thresh)))
+                       (or (< rem -thresh)
+                           (and (= rem -thresh) (oddp tru))))
+                     (if (minusp divisor)
+                         (values (+ tru 1) (- rem divisor))
+                         (values (- tru 1) (+ rem divisor))))
+                    (t (values tru rem))))))))
 
 (defun rem (number divisor)
   #!+sb-doc
@@ -663,11 +663,11 @@
   "Return second result of FLOOR."
   (let ((rem (rem number divisor)))
     (if (and (not (zerop rem))
-	     (if (minusp divisor)
-		 (plusp number)
-		 (minusp number)))
-	(+ rem divisor)
-	rem)))
+             (if (minusp divisor)
+                 (plusp number)
+                 (minusp number)))
+        (+ rem divisor)
+        rem)))
 
 (defmacro !define-float-rounding-function (name op doc)
   `(defun ,name (number &optional (divisor 1))
@@ -679,22 +679,22 @@
   #!+sb-doc
   "Same as TRUNCATE, but returns first value as a float."
   (macrolet ((ftruncate-float (rtype)
-	       `(let* ((float-div (coerce divisor ',rtype))
-		       (res (%unary-ftruncate (/ number float-div))))
-		  (values res
-			  (- number
-			     (* (coerce res ',rtype) float-div))))))
+               `(let* ((float-div (coerce divisor ',rtype))
+                       (res (%unary-ftruncate (/ number float-div))))
+                  (values res
+                          (- number
+                             (* (coerce res ',rtype) float-div))))))
     (number-dispatch ((number real) (divisor real))
       (((foreach fixnum bignum ratio) (or fixnum bignum ratio))
        (multiple-value-bind (q r)
-	   (truncate number divisor)
-	 (values (float q) r)))
+           (truncate number divisor)
+         (values (float q) r)))
       (((foreach single-float double-float #!+long-float long-float)
-	(or rational single-float))
+        (or rational single-float))
        (if (eql divisor 1)
-	   (let ((res (%unary-ftruncate number)))
-	     (values res (- number (coerce res '(dispatch-type number)))))
-	   (ftruncate-float (dispatch-type number))))
+           (let ((res (%unary-ftruncate number)))
+             (values res (- number (coerce res '(dispatch-type number)))))
+           (ftruncate-float (dispatch-type number))))
       #!+long-float
       ((long-float (or single-float double-float long-float))
        (ftruncate-float long-float))
@@ -706,7 +706,7 @@
       ((single-float double-float)
        (ftruncate-float double-float))
       (((foreach fixnum bignum ratio)
-	(foreach single-float double-float #!+long-float long-float))
+        (foreach single-float double-float #!+long-float long-float))
        (ftruncate-float (dispatch-type divisor))))))
 
 (defun ffloor (number &optional (divisor 1))
@@ -752,20 +752,20 @@
   #!+sb-doc
   "Return T if no two of its arguments are numerically equal, NIL otherwise."
   (do* ((head (the number number) (car nlist))
-	(nlist more-numbers (cdr nlist)))
+        (nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
      (declare (list nlist))
      (unless (do* ((nl nlist (cdr nl)))
-		  ((atom nl) t)
-	       (declare (list nl))
-	       (if (= head (car nl)) (return nil)))
+                  ((atom nl) t)
+               (declare (list nl))
+               (if (= head (car nl)) (return nil)))
        (return nil))))
 
 (defun < (number &rest more-numbers)
   #!+sb-doc
   "Return T if its arguments are in strictly increasing order, NIL otherwise."
   (do* ((n (the number number) (car nlist))
-	(nlist more-numbers (cdr nlist)))
+        (nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
      (declare (list nlist))
      (if (not (< n (car nlist))) (return nil))))
@@ -774,7 +774,7 @@
   #!+sb-doc
   "Return T if its arguments are in strictly decreasing order, NIL otherwise."
   (do* ((n (the number number) (car nlist))
-	(nlist more-numbers (cdr nlist)))
+        (nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
      (declare (list nlist))
      (if (not (> n (car nlist))) (return nil))))
@@ -783,7 +783,7 @@
   #!+sb-doc
   "Return T if arguments are in strictly non-decreasing order, NIL otherwise."
   (do* ((n (the number number) (car nlist))
-	(nlist more-numbers (cdr nlist)))
+        (nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
      (declare (list nlist))
      (if (not (<= n (car nlist))) (return nil))))
@@ -792,7 +792,7 @@
   #!+sb-doc
   "Return T if arguments are in strictly non-increasing order, NIL otherwise."
   (do* ((n (the number number) (car nlist))
-	(nlist more-numbers (cdr nlist)))
+        (nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
      (declare (list nlist))
      (if (not (>= n (car nlist))) (return nil))))
@@ -853,72 +853,72 @@ the first."
          ;; If the fixnum has an exact float representation, do a
          ;; float comparison. Otherwise do the slow float -> ratio
          ;; conversion.
-	 (multiple-value-bind (lo hi)
-	     (case '(dispatch-type y)
-	       ('single-float
-		(values most-negative-exactly-single-float-fixnum
-			most-positive-exactly-single-float-fixnum))
-	       ('double-float
-		(values most-negative-exactly-double-float-fixnum
-			most-positive-exactly-double-float-fixnum)))
-	   (if (<= lo y hi)
-	       (,op (coerce x '(dispatch-type y)) y)
-	       (,op x (rational y))))))
+         (multiple-value-bind (lo hi)
+             (case '(dispatch-type y)
+               ('single-float
+                (values most-negative-exactly-single-float-fixnum
+                        most-positive-exactly-single-float-fixnum))
+               ('double-float
+                (values most-negative-exactly-double-float-fixnum
+                        most-positive-exactly-double-float-fixnum)))
+           (if (<= lo y hi)
+               (,op (coerce x '(dispatch-type y)) y)
+               (,op x (rational y))))))
     (((foreach single-float double-float) fixnum)
      (if (eql y 0)
          (,op x (coerce 0 '(dispatch-type x)))
          (if (float-infinity-p x)
              ,infinite-x-finite-y
              ;; Likewise
-	     (multiple-value-bind (lo hi)
-		 (case '(dispatch-type x)
-		   ('single-float
-		    (values most-negative-exactly-single-float-fixnum
-			    most-positive-exactly-single-float-fixnum))
-		   ('double-float
-		    (values most-negative-exactly-double-float-fixnum
-			    most-positive-exactly-double-float-fixnum)))
-	       (if (<= lo y hi)
-		   (,op x (coerce y '(dispatch-type x)))
-		   (,op (rational x) y))))))
+             (multiple-value-bind (lo hi)
+                 (case '(dispatch-type x)
+                   ('single-float
+                    (values most-negative-exactly-single-float-fixnum
+                            most-positive-exactly-single-float-fixnum))
+                   ('double-float
+                    (values most-negative-exactly-double-float-fixnum
+                            most-positive-exactly-double-float-fixnum)))
+               (if (<= lo y hi)
+                   (,op x (coerce y '(dispatch-type x)))
+                   (,op (rational x) y))))))
     (((foreach single-float double-float) double-float)
      (,op (coerce x 'double-float) y))
     ((double-float single-float)
      (,op x (coerce y 'double-float)))
     (((foreach single-float double-float #!+long-float long-float) rational)
      (if (eql y 0)
-	 (,op x (coerce 0 '(dispatch-type x)))
-	 (if (float-infinity-p x)
-	     ,infinite-x-finite-y
-	     (,op (rational x) y))))
+         (,op x (coerce 0 '(dispatch-type x)))
+         (if (float-infinity-p x)
+             ,infinite-x-finite-y
+             (,op (rational x) y))))
     (((foreach bignum fixnum ratio) float)
      (if (float-infinity-p y)
-	 ,infinite-y-finite-x
-	 (,op x (rational y))))))
+         ,infinite-y-finite-x
+         (,op x (rational y))))))
 ) ; EVAL-WHEN
 
 (macrolet ((def-two-arg-</> (name op ratio-arg1 ratio-arg2 &rest cases)
              `(defun ,name (x y)
-		(number-dispatch ((x real) (y real))
-				 (basic-compare
-				  ,op
-				  :infinite-x-finite-y
-				  (,op x (coerce 0 '(dispatch-type x)))
-				  :infinite-y-finite-x
-				  (,op (coerce 0 '(dispatch-type y)) y))
-				 (((foreach fixnum bignum) ratio)
-				  (,op x (,ratio-arg2 (numerator y)
-						      (denominator y))))
-				 ((ratio integer)
-				  (,op (,ratio-arg1 (numerator x)
-						    (denominator x))
-				       y))
-				 ((ratio ratio)
-				  (,op (* (numerator   (truly-the ratio x))
-					  (denominator (truly-the ratio y)))
-				       (* (numerator   (truly-the ratio y))
-					  (denominator (truly-the ratio x)))))
-				 ,@cases))))
+                (number-dispatch ((x real) (y real))
+                                 (basic-compare
+                                  ,op
+                                  :infinite-x-finite-y
+                                  (,op x (coerce 0 '(dispatch-type x)))
+                                  :infinite-y-finite-x
+                                  (,op (coerce 0 '(dispatch-type y)) y))
+                                 (((foreach fixnum bignum) ratio)
+                                  (,op x (,ratio-arg2 (numerator y)
+                                                      (denominator y))))
+                                 ((ratio integer)
+                                  (,op (,ratio-arg1 (numerator x)
+                                                    (denominator x))
+                                       y))
+                                 ((ratio ratio)
+                                  (,op (* (numerator   (truly-the ratio x))
+                                          (denominator (truly-the ratio y)))
+                                       (* (numerator   (truly-the ratio y))
+                                          (denominator (truly-the ratio x)))))
+                                 ,@cases))))
   (def-two-arg-</> two-arg-< < floor ceiling
     ((fixnum bignum)
      (bignum-plus-p y))
@@ -937,9 +937,9 @@ the first."
 (defun two-arg-= (x y)
   (number-dispatch ((x number) (y number))
     (basic-compare =
-		   ;; An infinite value is never equal to a finite value.
-		   :infinite-x-finite-y nil
-		   :infinite-y-finite-x nil)
+                   ;; An infinite value is never equal to a finite value.
+                   :infinite-x-finite-y nil
+                   :infinite-y-finite-x nil)
     ((fixnum (or bignum ratio)) nil)
 
     ((bignum (or fixnum ratio)) nil)
@@ -949,51 +949,51 @@ the first."
     ((ratio integer) nil)
     ((ratio ratio)
      (and (eql (numerator x) (numerator y))
-	  (eql (denominator x) (denominator y))))
+          (eql (denominator x) (denominator y))))
 
     ((complex complex)
      (and (= (realpart x) (realpart y))
-	  (= (imagpart x) (imagpart y))))
+          (= (imagpart x) (imagpart y))))
     (((foreach fixnum bignum ratio single-float double-float
-	       #!+long-float long-float) complex)
+               #!+long-float long-float) complex)
      (and (= x (realpart y))
-	  (zerop (imagpart y))))
+          (zerop (imagpart y))))
     ((complex (or float rational))
      (and (= (realpart x) y)
-	  (zerop (imagpart x))))))
+          (zerop (imagpart x))))))
 
 (defun eql (obj1 obj2)
   #!+sb-doc
   "Return T if OBJ1 and OBJ2 represent the same object, otherwise NIL."
   (or (eq obj1 obj2)
       (if (or (typep obj2 'fixnum)
-	      (not (typep obj2 'number)))
-	  nil
-	  (macrolet ((foo (&rest stuff)
-		       `(typecase obj2
-			  ,@(mapcar (lambda (foo)
-				      (let ((type (car foo))
-					    (fn (cadr foo)))
-					`(,type
-					  (and (typep obj1 ',type)
-					       (,fn obj1 obj2)))))
-				    stuff))))
-	    (foo
-	      (single-float eql)
-	      (double-float eql)
-	      #!+long-float
-	      (long-float eql)
-	      (bignum
-	       (lambda (x y)
-		 (zerop (bignum-compare x y))))
-	      (ratio
-	       (lambda (x y)
-		 (and (eql (numerator x) (numerator y))
-		      (eql (denominator x) (denominator y)))))
-	      (complex
-	       (lambda (x y)
-		 (and (eql (realpart x) (realpart y))
-		      (eql (imagpart x) (imagpart y))))))))))
+              (not (typep obj2 'number)))
+          nil
+          (macrolet ((foo (&rest stuff)
+                       `(typecase obj2
+                          ,@(mapcar (lambda (foo)
+                                      (let ((type (car foo))
+                                            (fn (cadr foo)))
+                                        `(,type
+                                          (and (typep obj1 ',type)
+                                               (,fn obj1 obj2)))))
+                                    stuff))))
+            (foo
+              (single-float eql)
+              (double-float eql)
+              #!+long-float
+              (long-float eql)
+              (bignum
+               (lambda (x y)
+                 (zerop (bignum-compare x y))))
+              (ratio
+               (lambda (x y)
+                 (and (eql (numerator x) (numerator y))
+                      (eql (denominator x) (denominator y)))))
+              (complex
+               (lambda (x y)
+                 (and (eql (realpart x) (realpart y))
+                      (eql (imagpart x) (imagpart y))))))))))
 
 ;;;; logicals
 
@@ -1003,8 +1003,8 @@ the first."
   (declare (list integers))
   (if integers
       (do ((result (pop integers) (logior result (pop integers))))
-	  ((null integers) result)
-	(declare (integer result)))
+          ((null integers) result)
+        (declare (integer result)))
       0))
 
 (defun logxor (&rest integers)
@@ -1013,8 +1013,8 @@ the first."
   (declare (list integers))
   (if integers
       (do ((result (pop integers) (logxor result (pop integers))))
-	  ((null integers) result)
-	(declare (integer result)))
+          ((null integers) result)
+        (declare (integer result)))
       0))
 
 (defun logand (&rest integers)
@@ -1023,8 +1023,8 @@ the first."
   (declare (list integers))
   (if integers
       (do ((result (pop integers) (logand result (pop integers))))
-	  ((null integers) result)
-	(declare (integer result)))
+          ((null integers) result)
+        (declare (integer result)))
       -1))
 
 (defun logeqv (&rest integers)
@@ -1033,8 +1033,8 @@ the first."
   (declare (list integers))
   (if integers
       (do ((result (pop integers) (logeqv result (pop integers))))
-	  ((null integers) result)
-	(declare (integer result)))
+          ((null integers) result)
+        (declare (integer result)))
       -1))
 
 (defun lognot (number)
@@ -1045,21 +1045,21 @@ the first."
     (bignum (bignum-logical-not number))))
 
 (macrolet ((def (name op big-op &optional doc)
-	     `(defun ,name (integer1 integer2)
-		,@(when doc
-		    (list doc))
-		(let ((x integer1)
-		      (y integer2))
-		  (number-dispatch ((x integer) (y integer))
-		    (bignum-cross-fixnum ,op ,big-op))))))
+             `(defun ,name (integer1 integer2)
+                ,@(when doc
+                    (list doc))
+                (let ((x integer1)
+                      (y integer2))
+                  (number-dispatch ((x integer) (y integer))
+                    (bignum-cross-fixnum ,op ,big-op))))))
   (def two-arg-and logand bignum-logical-and)
   (def two-arg-ior logior bignum-logical-ior)
   (def two-arg-xor logxor bignum-logical-xor)
   ;; BIGNUM-LOGICAL-{AND,IOR,XOR} need not return a bignum, so must
   ;; call the generic LOGNOT...
   (def two-arg-eqv logeqv (lambda (x y) (lognot (bignum-logical-xor x y))))
-  (def lognand lognand 
-       (lambda (x y) (lognot (bignum-logical-and x y))) 
+  (def lognand lognand
+       (lambda (x y) (lognot (bignum-logical-and x y)))
        #!+sb-doc "Complement the logical AND of INTEGER1 and INTEGER2.")
   (def lognor lognor
        (lambda (x y) (lognot (bignum-logical-ior x y)))
@@ -1085,11 +1085,11 @@ the first."
   (etypecase integer
     (fixnum
      (logcount (truly-the (integer 0
-				   #.(max sb!xc:most-positive-fixnum
-					  (lognot sb!xc:most-negative-fixnum)))
-			  (if (minusp (truly-the fixnum integer))
-			      (lognot (truly-the fixnum integer))
-			      integer))))
+                                   #.(max sb!xc:most-positive-fixnum
+                                          (lognot sb!xc:most-negative-fixnum)))
+                          (if (minusp (truly-the fixnum integer))
+                              (lognot (truly-the fixnum integer))
+                              integer))))
     (bignum
      (bignum-logcount integer))))
 
@@ -1103,8 +1103,8 @@ the first."
   "Predicate returns T if bit index of integer is a 1."
   (number-dispatch ((index integer) (integer integer))
     ((fixnum fixnum) (if (> index #.(- sb!vm:n-word-bits sb!vm:n-lowtag-bits))
-			 (minusp integer)
-			 (not (zerop (logand integer (ash 1 index))))))
+                         (minusp integer)
+                         (not (zerop (logand integer (ash 1 index))))))
     ((fixnum bignum) (bignum-logbitp index integer))
     ((bignum (foreach fixnum bignum)) (minusp integer))))
 
@@ -1115,26 +1115,26 @@ the first."
   (etypecase integer
     (fixnum
      (cond ((zerop integer)
-	    0)
-	   ((fixnump count)
-	    (let ((length (integer-length (truly-the fixnum integer)))
-		  (count (truly-the fixnum count)))
-	      (declare (fixnum length count))
-	      (cond ((and (plusp count)
-			  (> (+ length count)
-			     (integer-length most-positive-fixnum)))
-		     (bignum-ashift-left (make-small-bignum integer) count))
-		    (t
-		     (truly-the fixnum
-				(ash (truly-the fixnum integer) count))))))
-	   ((minusp count)
-	    (if (minusp integer) -1 0))
-	   (t
-	    (bignum-ashift-left (make-small-bignum integer) count))))
+            0)
+           ((fixnump count)
+            (let ((length (integer-length (truly-the fixnum integer)))
+                  (count (truly-the fixnum count)))
+              (declare (fixnum length count))
+              (cond ((and (plusp count)
+                          (> (+ length count)
+                             (integer-length most-positive-fixnum)))
+                     (bignum-ashift-left (make-small-bignum integer) count))
+                    (t
+                     (truly-the fixnum
+                                (ash (truly-the fixnum integer) count))))))
+           ((minusp count)
+            (if (minusp integer) -1 0))
+           (t
+            (bignum-ashift-left (make-small-bignum integer) count))))
     (bignum
      (if (plusp count)
-	 (bignum-ashift-left integer count)
-	 (bignum-ashift-right integer (- count))))))
+         (bignum-ashift-left integer count)
+         (bignum-ashift-right integer (- count))))))
 
 (defun integer-length (integer)
   #!+sb-doc
@@ -1191,7 +1191,7 @@ the first."
 
 (defun %ldb (size posn integer)
   (logand (ash integer (- posn))
-	  (1- (ash 1 size))))
+          (1- (ash 1 size))))
 
 (defun %mask-field (size posn integer)
   (logand integer (ash (1- (ash 1 size)) posn)))
@@ -1199,12 +1199,12 @@ the first."
 (defun %dpb (newbyte size posn integer)
   (let ((mask (1- (ash 1 size))))
     (logior (logand integer (lognot (ash mask posn)))
-	    (ash (logand newbyte mask) posn))))
+            (ash (logand newbyte mask) posn))))
 
 (defun %deposit-field (newbyte size posn integer)
   (let ((mask (ash (ldb (byte size 0) -1) posn)))
     (logior (logand newbyte mask)
-	    (logand integer (lognot mask)))))
+            (logand integer (lognot mask)))))
 
 (defun sb!c::mask-signed-field (size integer)
   #!+sb-doc
@@ -1334,27 +1334,27 @@ the first."
   "Return the greatest common divisor of the arguments, which must be
   integers. Gcd with no arguments is defined to be 0."
   (cond ((null numbers) 0)
-	((null (cdr numbers)) (abs (the integer (car numbers))))
-	(t
-	 (do ((gcd (the integer (car numbers))
-		   (gcd gcd (the integer (car rest))))
-	      (rest (cdr numbers) (cdr rest)))
-	     ((null rest) gcd)
-	   (declare (integer gcd)
-		    (list rest))))))
+        ((null (cdr numbers)) (abs (the integer (car numbers))))
+        (t
+         (do ((gcd (the integer (car numbers))
+                   (gcd gcd (the integer (car rest))))
+              (rest (cdr numbers) (cdr rest)))
+             ((null rest) gcd)
+           (declare (integer gcd)
+                    (list rest))))))
 
 (defun lcm (&rest numbers)
   #!+sb-doc
   "Return the least common multiple of one or more integers. LCM of no
   arguments is defined to be 1."
   (cond ((null numbers) 1)
-	((null (cdr numbers)) (abs (the integer (car numbers))))
-	(t
-	 (do ((lcm (the integer (car numbers))
-		   (lcm lcm (the integer (car rest))))
-	      (rest (cdr numbers) (cdr rest)))
-	     ((null rest) lcm)
-	   (declare (integer lcm) (list rest))))))
+        ((null (cdr numbers)) (abs (the integer (car numbers))))
+        (t
+         (do ((lcm (the integer (car numbers))
+                   (lcm lcm (the integer (car rest))))
+              (rest (cdr numbers) (cdr rest)))
+             ((null rest) lcm)
+           (declare (integer lcm) (list rest))))))
 
 (defun two-arg-lcm (n m)
   (declare (integer n m))
@@ -1366,12 +1366,12 @@ the first."
       ;; LCM, and I don't know why.  To be investigated.  -- CSR,
       ;; 2003-09-11
       (let ((m (abs m))
-	    (n (abs n)))
-	(multiple-value-bind (max min)
-	    (if (> m n)
-		(values m n)
-		(values n m))
-	  (* (truncate max (gcd n m)) min)))))
+            (n (abs n)))
+        (multiple-value-bind (max min)
+            (if (> m n)
+                (values m n)
+                (values n m))
+          (* (truncate max (gcd n m)) min)))))
 
 ;;; Do the GCD of two integer arguments. With fixnum arguments, we use the
 ;;; binary GCD algorithm from Knuth's seminumerical algorithms (slightly
@@ -1380,38 +1380,38 @@ the first."
 ;;; about "small bignum" zeros.
 (defun two-arg-gcd (u v)
   (cond ((eql u 0) (abs v))
-	((eql v 0) (abs u))
-	(t
-	 (number-dispatch ((u integer) (v integer))
-	   ((fixnum fixnum)
-	    (locally
-	      (declare (optimize (speed 3) (safety 0)))
-	      (do ((k 0 (1+ k))
-		   (u (abs u) (ash u -1))
-		   (v (abs v) (ash v -1)))
-		  ((oddp (logior u v))
-		   (do ((temp (if (oddp u) (- v) (ash u -1))
-			      (ash temp -1)))
-		       (nil)
-		     (declare (fixnum temp))
-		     (when (oddp temp)
-		       (if (plusp temp)
-			   (setq u temp)
-			   (setq v (- temp)))
-		       (setq temp (- u v))
-		       (when (zerop temp)
-			 (let ((res (ash u k)))
-			   (declare (type (signed-byte 31) res)
-				    (optimize (inhibit-warnings 3)))
-			   (return res))))))
-		(declare (type (mod 30) k)
-			 (type (signed-byte 31) u v)))))
-	   ((bignum bignum)
-	    (bignum-gcd u v))
-	   ((bignum fixnum)
-	    (bignum-gcd u (make-small-bignum v)))
-	   ((fixnum bignum)
-	    (bignum-gcd (make-small-bignum u) v))))))
+        ((eql v 0) (abs u))
+        (t
+         (number-dispatch ((u integer) (v integer))
+           ((fixnum fixnum)
+            (locally
+              (declare (optimize (speed 3) (safety 0)))
+              (do ((k 0 (1+ k))
+                   (u (abs u) (ash u -1))
+                   (v (abs v) (ash v -1)))
+                  ((oddp (logior u v))
+                   (do ((temp (if (oddp u) (- v) (ash u -1))
+                              (ash temp -1)))
+                       (nil)
+                     (declare (fixnum temp))
+                     (when (oddp temp)
+                       (if (plusp temp)
+                           (setq u temp)
+                           (setq v (- temp)))
+                       (setq temp (- u v))
+                       (when (zerop temp)
+                         (let ((res (ash u k)))
+                           (declare (type (signed-byte 31) res)
+                                    (optimize (inhibit-warnings 3)))
+                           (return res))))))
+                (declare (type (mod 30) k)
+                         (type (signed-byte 31) u v)))))
+           ((bignum bignum)
+            (bignum-gcd u v))
+           ((bignum fixnum)
+            (bignum-gcd u (make-small-bignum v)))
+           ((fixnum bignum)
+            (bignum-gcd (make-small-bignum u) v))))))
 
 ;;; From discussion on comp.lang.lisp and Akira Kurihara.
 (defun isqrt (n)
@@ -1422,25 +1422,25 @@ the first."
   ;; Theoretically (> n 7), i.e., n-len-quarter > 0.
   (if (and (fixnump n) (<= n 24))
       (cond ((> n 15) 4)
-	    ((> n  8) 3)
-	    ((> n  3) 2)
-	    ((> n  0) 1)
-	    (t 0))
+            ((> n  8) 3)
+            ((> n  3) 2)
+            ((> n  0) 1)
+            (t 0))
       (let* ((n-len-quarter (ash (integer-length n) -2))
-	     (n-half (ash n (- (ash n-len-quarter 1))))
-	     (n-half-isqrt (isqrt n-half))
-	     (init-value (ash (1+ n-half-isqrt) n-len-quarter)))
-	(loop
-	  (let ((iterated-value
-		 (ash (+ init-value (truncate n init-value)) -1)))
-	    (unless (< iterated-value init-value)
-	      (return init-value))
-	    (setq init-value iterated-value))))))
+             (n-half (ash n (- (ash n-len-quarter 1))))
+             (n-half-isqrt (isqrt n-half))
+             (init-value (ash (1+ n-half-isqrt) n-len-quarter)))
+        (loop
+          (let ((iterated-value
+                 (ash (+ init-value (truncate n init-value)) -1)))
+            (unless (< iterated-value init-value)
+              (return init-value))
+            (setq init-value iterated-value))))))
 
 ;;;; miscellaneous number predicates
 
 (macrolet ((def (name doc)
-	     `(defun ,name (number) ,doc (,name number))))
+             `(defun ,name (number) ,doc (,name number))))
   (def zerop "Is this number zero?")
   (def plusp "Is this real number strictly positive?")
   (def minusp "Is this real number strictly negative?")
@@ -1509,7 +1509,7 @@ the first."
     ((unsigned-byte 64) (ldb (byte 64 0) (ash integer amount)))
     (fixnum (ldb (byte 64 0) (ash (logand integer #xffffffffffffffff) amount)))
     (bignum (ldb (byte 64 0)
-		 (ash (logand integer #xffffffffffffffff) amount)))))
+                 (ash (logand integer #xffffffffffffffff) amount)))))
 
 #!+x86
 (defun sb!vm::ash-left-smod30 (integer amount)

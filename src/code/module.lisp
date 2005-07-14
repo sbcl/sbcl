@@ -38,12 +38,12 @@
 
 (defun require-error (control &rest arguments)
   (error 'extension-failure
-	 :format-control control
-	 :format-arguments arguments
-	 :references
-	 (list
-	  '(:sbcl :variable *module-provider-functions*)
-	  '(:sbcl :function require))))
+         :format-control control
+         :format-arguments arguments
+         :references
+         (list
+          '(:sbcl :variable *module-provider-functions*)
+          '(:sbcl :function require))))
 
 (defun require (module-name &optional pathnames)
   #!+sb-doc
@@ -59,19 +59,19 @@
       (require-error "~@<Could not ~S ~A: circularity detected. Please check ~
                      your configuration.~:@>" 'require module-name))
     (let ((saved-modules (copy-list *modules*))
-	  (*requiring* (cons name *requiring*)))
+          (*requiring* (cons name *requiring*)))
       (unless (member name *modules* :test #'string=)
-	(cond (pathnames
-	       (unless (listp pathnames) (setf pathnames (list pathnames)))
-	       ;; ambiguity in standard: should we try all pathnames in the
-	       ;; list, or should we stop as soon as one of them calls PROVIDE?
-	       (dolist (ele pathnames t)
-		 (load ele)))
-	      (t
-	       (unless (some (lambda (p) (funcall p module-name))
-			     *module-provider-functions*)
-		 (require-error "Don't know how to ~S ~A."
-				'require module-name)))))
+        (cond (pathnames
+               (unless (listp pathnames) (setf pathnames (list pathnames)))
+               ;; ambiguity in standard: should we try all pathnames in the
+               ;; list, or should we stop as soon as one of them calls PROVIDE?
+               (dolist (ele pathnames t)
+                 (load ele)))
+              (t
+               (unless (some (lambda (p) (funcall p module-name))
+                             *module-provider-functions*)
+                 (require-error "Don't know how to ~S ~A."
+                                'require module-name)))))
       (set-difference *modules* saved-modules))))
 
 
@@ -81,22 +81,22 @@
   "Stringify and downcase NAME, then attempt to load the file
    $SBCL_HOME/name/name"
   (let* ((filesys-name (string-downcase (string name)))
-	 (unadorned-path
-	  (merge-pathnames
-	   (make-pathname :directory (list :relative filesys-name)
-			  :name filesys-name)
-	   (truename (posix-getenv "SBCL_HOME"))))
-	 (fasl-path (merge-pathnames
-		     (make-pathname :type *fasl-file-type*)
-		     unadorned-path))
-	 (lisp-path (merge-pathnames (make-pathname :type "lisp")
-				     unadorned-path)))
+         (unadorned-path
+          (merge-pathnames
+           (make-pathname :directory (list :relative filesys-name)
+                          :name filesys-name)
+           (truename (posix-getenv "SBCL_HOME"))))
+         (fasl-path (merge-pathnames
+                     (make-pathname :type *fasl-file-type*)
+                     unadorned-path))
+         (lisp-path (merge-pathnames (make-pathname :type "lisp")
+                                     unadorned-path)))
     ;; KLUDGE: there's a race condition here; the file we probe could
     ;; be removed by the time we get round to trying to load it.
     ;; Maybe factor out the logic in the LOAD guesser as to which file
     ;; was meant, so that we can use it here on open streams instead?
     (when (or (probe-file unadorned-path)
-	      (probe-file fasl-path)
-	      (probe-file lisp-path))
+              (probe-file fasl-path)
+              (probe-file lisp-path))
       (load unadorned-path)
       t)))

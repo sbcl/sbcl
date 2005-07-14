@@ -31,27 +31,27 @@
   ;; simpler, and also be made to deal with negative integers too.
   (let ((size (sb-c::lvar-type size)))
     (if (numeric-type-p size)
-	(let ((size-high (numeric-type-high size))
-	      (num-type (sb-c::lvar-type num)))
-	  (if (and size-high
-		   num-type
-		   (<= size-high sb-vm:n-word-bits)
-		   (csubtypep num-type
-			      (specifier-type `(unsigned-byte ,size-high))))
+        (let ((size-high (numeric-type-high size))
+              (num-type (sb-c::lvar-type num)))
+          (if (and size-high
+                   num-type
+                   (<= size-high sb-vm:n-word-bits)
+                   (csubtypep num-type
+                              (specifier-type `(unsigned-byte ,size-high))))
               (specifier-type `(unsigned-byte ,size-high))
-	      *universal-type*))
+              *universal-type*))
         *universal-type*)))
 
 (deftransform %rotate-byte ((count size pos integer)
-			    ((constant-arg (member 0)) * * *) *)
+                            ((constant-arg (member 0)) * * *) *)
   "fold identity operation"
   'integer)
 
 (deftransform %rotate-byte ((count size pos integer)
-			    ((integer -31 31)
-			     (constant-arg (member 32))
-			     (constant-arg (member 0))
-			     (unsigned-byte 32)) *)
+                            ((integer -31 31)
+                             (constant-arg (member 32))
+                             (constant-arg (member 0))
+                             (unsigned-byte 32)) *)
   "inline 32-bit rotation"
   ;; FIXME: What happens when, as here, the two type specifiers for
   ;; COUNT overlap?  Which gets to run first?

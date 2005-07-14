@@ -14,29 +14,29 @@
 ;;;; utilities
 
 (defmacro with-pretty-stream ((stream-var
-			       &optional (stream-expression stream-var))
-			      &body body)
+                               &optional (stream-expression stream-var))
+                              &body body)
   (let ((flet-name (gensym "WITH-PRETTY-STREAM-")))
     `(flet ((,flet-name (,stream-var)
-	      ,@body))
+              ,@body))
        (let ((stream ,stream-expression))
-	 (if (pretty-stream-p stream)
-	     (,flet-name stream)
-	     (catch 'line-limit-abbreviation-happened
-	       (let ((stream (make-pretty-stream stream)))
-		 (,flet-name stream)
-		 (force-pretty-output stream)))))
+         (if (pretty-stream-p stream)
+             (,flet-name stream)
+             (catch 'line-limit-abbreviation-happened
+               (let ((stream (make-pretty-stream stream)))
+                 (,flet-name stream)
+                 (force-pretty-output stream)))))
        nil)))
 
 ;;;; user interface to the pretty printer
 
 (defmacro pprint-logical-block ((stream-symbol
-				 object
-				 &key
-				 (prefix nil prefixp)
-				 (per-line-prefix nil per-line-prefix-p)
-				 (suffix "" suffixp))
-				&body body
+                                 object
+                                 &key
+                                 (prefix nil prefixp)
+                                 (per-line-prefix nil per-line-prefix-p)
+                                 (suffix "" suffixp))
+                                &body body
                                 &environment env)
   #!+sb-doc
   "Group some output into a logical block. STREAM-SYMBOL should be either a
@@ -46,108 +46,108 @@
     (error "cannot specify values for both PREFIX and PER-LINE-PREFIX."))
   (multiple-value-bind (stream-var stream-expression)
       (case stream-symbol
-	((nil)
-	 (values '*standard-output* '*standard-output*))
-	((t)
-	 (values '*terminal-io* '*terminal-io*))
-	(t
-	 (values stream-symbol
-		 (once-only ((stream stream-symbol))
-		   `(case ,stream
-		      ((nil) *standard-output*)
-		      ((t) *terminal-io*)
-		      (t ,stream))))))
+        ((nil)
+         (values '*standard-output* '*standard-output*))
+        ((t)
+         (values '*terminal-io* '*terminal-io*))
+        (t
+         (values stream-symbol
+                 (once-only ((stream stream-symbol))
+                   `(case ,stream
+                      ((nil) *standard-output*)
+                      ((t) *terminal-io*)
+                      (t ,stream))))))
     (let* ((object-var (if object (gensym) nil))
-	   (block-name (gensym "PPRINT-LOGICAL-BLOCK-"))
-	   (count-name (gensym "PPRINT-LOGICAL-BLOCK-LENGTH-"))
-	   (pp-pop-name (gensym "PPRINT-POP-"))
-	   (body
-	    ;; FIXME: It looks as though PPRINT-LOGICAL-BLOCK might
-	    ;; expand into a boatload of code, since DESCEND-INTO is a
-	    ;; macro too. It might be worth looking at this to make
-	    ;; sure it's not too bloated, since PPRINT-LOGICAL-BLOCK
-	    ;; is called many times from system pretty-printing code.
-	    ;;
-	    ;; FIXME: I think pprint-logical-block is broken wrt
-	    ;; argument order, multiple evaluation, etc. of its
-	    ;; keyword (:PREFIX, :PER-LINE-PREFIX and :SUFFIX)
-	    ;; arguments.  Dunno if that's legal.
-	    `(descend-into (,stream-var)
-	       (let ((,count-name 0))
-		 (declare (type index ,count-name) (ignorable ,count-name))
-		 ,@(when (and (or prefixp per-line-prefix-p)
+           (block-name (gensym "PPRINT-LOGICAL-BLOCK-"))
+           (count-name (gensym "PPRINT-LOGICAL-BLOCK-LENGTH-"))
+           (pp-pop-name (gensym "PPRINT-POP-"))
+           (body
+            ;; FIXME: It looks as though PPRINT-LOGICAL-BLOCK might
+            ;; expand into a boatload of code, since DESCEND-INTO is a
+            ;; macro too. It might be worth looking at this to make
+            ;; sure it's not too bloated, since PPRINT-LOGICAL-BLOCK
+            ;; is called many times from system pretty-printing code.
+            ;;
+            ;; FIXME: I think pprint-logical-block is broken wrt
+            ;; argument order, multiple evaluation, etc. of its
+            ;; keyword (:PREFIX, :PER-LINE-PREFIX and :SUFFIX)
+            ;; arguments.  Dunno if that's legal.
+            `(descend-into (,stream-var)
+               (let ((,count-name 0))
+                 (declare (type index ,count-name) (ignorable ,count-name))
+                 ,@(when (and (or prefixp per-line-prefix-p)
                               (not (and (sb!xc:constantp (or prefix per-line-prefix) env)
                                         ;; KLUDGE: EVAL-IN-ENV would
                                         ;; be useful here.
                                         (typep (eval (or prefix per-line-prefix)) 'string))))
- 		     `((unless (typep ,(or prefix per-line-prefix) 'string)
-			 (error 'type-error
-				:datum ,(or prefix per-line-prefix)
-				:expected-type 'string))))
-		 ,@(when (and suffixp
+                     `((unless (typep ,(or prefix per-line-prefix) 'string)
+                         (error 'type-error
+                                :datum ,(or prefix per-line-prefix)
+                                :expected-type 'string))))
+                 ,@(when (and suffixp
                               (not (and (sb!xc:constantp suffix env)
                                         (typep (eval suffix) 'string))))
-		     `((unless (typep ,suffix 'string)
-			 (error 'type-error
-				:datum ,suffix
-				:expected-type 'string))))
-		 (start-logical-block ,stream-var
-				      ,(if (or prefixp per-line-prefix-p)
-					   (or prefix per-line-prefix)
-					   nil)
-				      ,(if per-line-prefix-p t nil)
-				      ,suffix)
-		 (block ,block-name
-		   (flet ((,pp-pop-name ()
-			    ,@(when object
-				`((unless (listp ,object-var)
-				    (write-string ". " ,stream-var)
-				    (output-object ,object-var ,stream-var)
-				    (return-from ,block-name nil))))
-			    (when (and (not *print-readably*)
-				       (eql ,count-name *print-length*))
-			      (write-string "..." ,stream-var)
-			      (return-from ,block-name nil))
-			    ,@(when object
-				`((when (and ,object-var
-					     (plusp ,count-name)
-					     (check-for-circularity
-					      ,object-var
+                     `((unless (typep ,suffix 'string)
+                         (error 'type-error
+                                :datum ,suffix
+                                :expected-type 'string))))
+                 (start-logical-block ,stream-var
+                                      ,(if (or prefixp per-line-prefix-p)
+                                           (or prefix per-line-prefix)
+                                           nil)
+                                      ,(if per-line-prefix-p t nil)
+                                      ,suffix)
+                 (block ,block-name
+                   (flet ((,pp-pop-name ()
+                            ,@(when object
+                                `((unless (listp ,object-var)
+                                    (write-string ". " ,stream-var)
+                                    (output-object ,object-var ,stream-var)
+                                    (return-from ,block-name nil))))
+                            (when (and (not *print-readably*)
+                                       (eql ,count-name *print-length*))
+                              (write-string "..." ,stream-var)
+                              (return-from ,block-name nil))
+                            ,@(when object
+                                `((when (and ,object-var
+                                             (plusp ,count-name)
+                                             (check-for-circularity
+                                              ,object-var
                                               nil
-					      :logical-block))
-				    (write-string ". " ,stream-var)
-				    (output-object ,object-var ,stream-var)
-				    (return-from ,block-name nil))))
-			    (incf ,count-name)
-			    ,@(if object
+                                              :logical-block))
+                                    (write-string ". " ,stream-var)
+                                    (output-object ,object-var ,stream-var)
+                                    (return-from ,block-name nil))))
+                            (incf ,count-name)
+                            ,@(if object
                                   `((pop ,object-var))
                                   `(nil))))
                      (declare (ignorable (function ,pp-pop-name)))
-		     (locally
-			 (declare (disable-package-locks 
-				   pprint-pop pprint-exit-if-list-exhausted))
-		       (macrolet ((pprint-pop ()
-				    '(,pp-pop-name))
-				  (pprint-exit-if-list-exhausted ()
-				    ,(if object
-					 `'(when (null ,object-var)
-					    (return-from ,block-name nil))
-					 `'(return-from ,block-name nil))))
-			 (declare (enable-package-locks
-				   pprint-pop pprint-exit-if-list-exhausted))
-			 ,@body))))
-		 ;; FIXME: Don't we need UNWIND-PROTECT to ensure this
-		 ;; always gets executed?
-		 (end-logical-block ,stream-var)))))
+                     (locally
+                         (declare (disable-package-locks
+                                   pprint-pop pprint-exit-if-list-exhausted))
+                       (macrolet ((pprint-pop ()
+                                    '(,pp-pop-name))
+                                  (pprint-exit-if-list-exhausted ()
+                                    ,(if object
+                                         `'(when (null ,object-var)
+                                            (return-from ,block-name nil))
+                                         `'(return-from ,block-name nil))))
+                         (declare (enable-package-locks
+                                   pprint-pop pprint-exit-if-list-exhausted))
+                         ,@body))))
+                 ;; FIXME: Don't we need UNWIND-PROTECT to ensure this
+                 ;; always gets executed?
+                 (end-logical-block ,stream-var)))))
       (when object
-	(setf body
-	      `(let ((,object-var ,object))
-		 (if (listp ,object-var)
-		     (with-circularity-detection (,object-var ,stream-var)
-		       ,body)
-		     (output-object ,object-var ,stream-var)))))
+        (setf body
+              `(let ((,object-var ,object))
+                 (if (listp ,object-var)
+                     (with-circularity-detection (,object-var ,stream-var)
+                       ,body)
+                     (output-object ,object-var ,stream-var)))))
       `(with-pretty-stream (,stream-var ,stream-expression)
-	 ,body))))
+         ,body))))
 
 (defmacro pprint-exit-if-list-exhausted ()
   #!+sb-doc

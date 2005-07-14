@@ -15,17 +15,17 @@
 ;;;; allocation
 
 (define-assembly-routine (allocate-vector
-			  (:policy :fast-safe)
-			  (:translate allocate-vector)
-			  (:arg-types positive-fixnum
-				      positive-fixnum
-				      positive-fixnum))
-			 ((:arg type unsigned-reg eax-offset)
-			  (:arg length any-reg ebx-offset)
-			  (:arg words any-reg ecx-offset)
-			  (:res result descriptor-reg edx-offset))
+                          (:policy :fast-safe)
+                          (:translate allocate-vector)
+                          (:arg-types positive-fixnum
+                                      positive-fixnum
+                                      positive-fixnum))
+                         ((:arg type unsigned-reg eax-offset)
+                          (:arg length any-reg ebx-offset)
+                          (:arg words any-reg ecx-offset)
+                          (:res result descriptor-reg edx-offset))
   (inst mov result (+ (1- (ash 1 n-lowtag-bits))
-		      (* vector-data-offset n-word-bytes)))
+                      (* vector-data-offset n-word-bytes)))
   (inst add result words)
   (inst and result (lognot lowtag-mask))
   (pseudo-atomic

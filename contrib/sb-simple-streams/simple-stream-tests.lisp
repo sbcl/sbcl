@@ -118,11 +118,11 @@
 (deftest write-read-inet
   (handler-case
       (with-open-stream (s (make-instance 'socket-simple-stream
-					  :remote-host #(127 0 0 1)
-					  :remote-port 7
+                                          :remote-host #(127 0 0 1)
+                                          :remote-port 7
                                           :direction :io))
-	(string= (prog1 (write-line "Got it!" s) (finish-output s))
-		 (read-line s)))
+        (string= (prog1 (write-line "Got it!" s) (finish-output s))
+                 (read-line s)))
     ;; Fail gracefully if echo isn't activated on the system
     (sb-bsd-sockets::connection-refused-error () t))
   t)
@@ -428,7 +428,7 @@ Nothing to see here, move along.")
   T)
 
 (deftest line-length-dc-1
-    ;; does LINE-LENGTH support simple streams?  
+    ;; does LINE-LENGTH support simple streams?
     (with-dc-test-stream (s)
       (eql (sb-simple-streams:line-length s)
            (sb-kernel:line-length s)))

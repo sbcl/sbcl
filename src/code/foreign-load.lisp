@@ -19,9 +19,9 @@
 
 (define-unsupported-fun load-foreign
     "Unsupported as of SBCL 0.8.13. See LOAD-SHARED-OBJECT."
-  "~S is unsupported as of SBCL 0.8.13. See LOAD-SHARED-OBJECT." 
+  "~S is unsupported as of SBCL 0.8.13. See LOAD-SHARED-OBJECT."
   (load-foreign))
-  
+
 (define-unsupported-fun load-1-foreign
     "Unsupported as of SBCL 0.8.13. Please use LOAD-SHARED-OBJECT."
   "~S is unsupported as of SBCL 0.8.13. Please use LOAD-SHARED-OBJECT."
@@ -106,28 +106,28 @@ SB-EXT:SAVE-LISP-AND-DIE for details."
   (declare (type shared-object obj))
   (tagbody :dlopen
      (restart-case
-	 (dlopen-or-lose obj)
+         (dlopen-or-lose obj)
        (continue ()
-	 :report "Skip this shared object and continue."
-	 (setf (shared-object-sap obj) nil))
+         :report "Skip this shared object and continue."
+         (setf (shared-object-sap obj) nil))
        (retry ()
-	 :report "Retry loading this shared object."
-	 (go :dlopen))
+         :report "Retry loading this shared object."
+         (go :dlopen))
        (load-other ()
-	 :report "Specify an alternate shared object file to load."
-	 (setf (shared-object-file obj)
-	       (tagbody :query
-		  (format *query-io* "~&Enter pathname (evaluated):~%")
-		  (force-output *query-io*)
-		  (let ((pathname (ignore-errors (pathname (read *query-io*)))))
-		    (unless (pathnamep pathname)
-		      (format *query-io* "~&Error: invalid pathname.~%")
-		      (go :query))
-		    (unix-namestring pathname)))))))
+         :report "Specify an alternate shared object file to load."
+         (setf (shared-object-file obj)
+               (tagbody :query
+                  (format *query-io* "~&Enter pathname (evaluated):~%")
+                  (force-output *query-io*)
+                  (let ((pathname (ignore-errors (pathname (read *query-io*)))))
+                    (unless (pathnamep pathname)
+                      (format *query-io* "~&Error: invalid pathname.~%")
+                      (go :query))
+                    (unix-namestring pathname)))))))
   obj)
 
 ;;; Open libraries in *SHARED-OBJECTS* and the runtime. Called during
-;;; initialization. 
+;;; initialization.
 (defun reopen-shared-objects ()
   ;; Ensure that the runtime is open
   (setf *runtime-dlhandle* (dlopen-or-lose)
@@ -140,23 +140,23 @@ SB-EXT:SAVE-LISP-AND-DIE for details."
   (dlclose-or-lose))
 
 (defun find-dynamic-foreign-symbol-address (symbol)
-  (dlerror)				; clear old errors
+  (dlerror)                             ; clear old errors
   (unless *runtime-dlhandle*
     (bug "Cannot resolve foreign symbol: lost *runtime-dlhandle*"))
   ;; On real ELF & dlsym platforms the EXTERN-ALIEN-NAME is a no-op,
   ;; but on platforms where dlsym is simulated we use the mangled name.
   (let* ((extern (extern-alien-name symbol))
-	 (result (sap-int (dlsym *runtime-dlhandle* extern)))
-	 (err (dlerror)))
+         (result (sap-int (dlsym *runtime-dlhandle* extern)))
+         (err (dlerror)))
     (if (or (not (zerop result)) (not err))
-	result
-	(dolist (obj *shared-objects*)
-	  (let ((sap (shared-object-sap obj)))
-	    (when sap
-	      (setf result (sap-int (dlsym sap extern))
-		    err (dlerror))
-	      (when (or (not (zerop result)) (not err))
-		(return result))))))))
+        result
+        (dolist (obj *shared-objects*)
+          (let ((sap (shared-object-sap obj)))
+            (when sap
+              (setf result (sap-int (dlsym sap extern))
+                    err (dlerror))
+              (when (or (not (zerop result)) (not err))
+                (return result))))))))
 
 (let ((symbols (make-hash-table :test #'equal))
       (undefineds (make-hash-table :test #'equal)))
@@ -169,19 +169,19 @@ is never in the linkage-table."
     (declare (ignorable datap))
     (let ((addr (find-dynamic-foreign-symbol-address symbol)))
       (cond  #!-linkage-table
-	     ((not addr)
-	      (error 'undefined-alien-error :name symbol))
-	     #!+linkage-table
-	     ((not addr)
-	      (style-warn "Undefined alien: ~S" symbol)
-	      (setf (gethash symbol undefineds) t)
-	      (remhash symbol symbols)
-	      (if datap
-		  undefined-alien-address
-		  (foreign-symbol-address "undefined_alien_function")))
+             ((not addr)
+              (error 'undefined-alien-error :name symbol))
+             #!+linkage-table
+             ((not addr)
+              (style-warn "Undefined alien: ~S" symbol)
+              (setf (gethash symbol undefineds) t)
+              (remhash symbol symbols)
+              (if datap
+                  undefined-alien-address
+                  (foreign-symbol-address "undefined_alien_function")))
              (addr
-	      (setf (gethash symbol symbols) t)
-	      (remhash symbol undefineds)
+              (setf (gethash symbol symbols) t)
+              (remhash symbol undefineds)
               addr))))
   (defun undefined-foreign-symbols-p ()
     (plusp (hash-table-count undefineds)))
@@ -189,5 +189,5 @@ is never in the linkage-table."
     (plusp (hash-table-count symbols)))
   (defun list-dynamic-foreign-symbols ()
     (loop for symbol being each hash-key in symbols
-	 collect symbol)))
+         collect symbol)))
 

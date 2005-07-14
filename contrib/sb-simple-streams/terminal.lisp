@@ -3,7 +3,7 @@
 ;;; **********************************************************************
 ;;; This code was written by Paul Foley and has been placed in the public
 ;;; domain.
-;;; 
+;;;
 
 ;;; Sbcl port by Rudi Schlatte.
 
@@ -26,7 +26,7 @@
       (setf (sm input-handle stream) (getf options :input-handle))
       (add-stream-instance-flags stream :simple :dual :input)
       (when (sb-unix:unix-isatty (sm input-handle stream))
-	(add-stream-instance-flags stream :interactive))
+        (add-stream-instance-flags stream :interactive))
       (unless (sm buffer stream)
         (let ((length (device-buffer-length stream)))
           (setf (sm buffer stream) (allocate-buffer length)
@@ -55,7 +55,7 @@
   (unless buffer-only
     (let ((buffer (allocate-buffer sb-impl::bytes-per-buffer)))
       (unwind-protect
-	   (loop until (<= (read-octets stream buffer
-					0 sb-impl::bytes-per-buffer nil)
-			   0))
-	(free-buffer buffer)))))
+           (loop until (<= (read-octets stream buffer
+                                        0 sb-impl::bytes-per-buffer nil)
+                           0))
+        (free-buffer buffer)))))

@@ -44,12 +44,12 @@
         ((sb-c::compiled-debug-fun-p obj)
          (format stream "#<compiled-debug-fun ~A>"
                  (sb-c::compiled-debug-fun-name obj)))
-	((sb-kernel:code-component-p obj)
-	 (format stream "#<code ~A>"
-		 (let ((dinfo (sb-kernel:%code-debug-info obj)))
-		   (cond
-		     ((eq dinfo :bogus-lra) "BOGUS-LRA")
-		     (t (sb-c::debug-info-name dinfo))))))
+        ((sb-kernel:code-component-p obj)
+         (format stream "#<code ~A>"
+                 (let ((dinfo (sb-kernel:%code-debug-info obj)))
+                   (cond
+                     ((eq dinfo :bogus-lra) "BOGUS-LRA")
+                     (t (sb-c::debug-info-name dinfo))))))
         (t
          (format stream "~w" obj))))
 
@@ -57,8 +57,8 @@
   (declare (type symbol obj))
   (let ((package (symbol-package obj)))
     (and package
-	 (eq (nth-value 1 (find-symbol (symbol-name obj) package))
-	     :external))))
+         (eq (nth-value 1 (find-symbol (symbol-name obj) package))
+             :external))))
 
 (defun find-stale-objects ()
   (dolist (space '(:static :dynamic :read-only))
@@ -67,34 +67,34 @@
        (declare (optimize (safety 0))
                 (ignore size))
        (block mapper
-	 (when (eql type sb-vm:symbol-header-widetag)
-	   (ignore-errors
-	     (let ((refs (let ((res nil)
-			       (count 0))
-			   (dolist (space '(:static :dynamic :read-only))
-			     (sb-vm::map-referencing-objects
-			      (lambda (o)
-				(when (> (incf count) 1)
-				  (return-from mapper nil))
-				(push (cons space o) res))
-			      space obj))
-			   res)))
-	       (let ((externalp (external-symbol-p obj)))
-		 (format t "~:[S~;External s~]ymbol ~:[#~;~:*~A:~]~2:*~:[:~;~]~*~A~%"
-			 externalp
-			 (and (symbol-package obj)
-			      (package-name (symbol-package obj)))
-			 (symbol-name obj)))
-	       (if (null refs)
-		   (progn (princ "   No references found") (terpri))
-		   (progn
-		     (ecase (caar refs)
-		       (:read-only
-			(princ "   Reference in read-only space: "))
-		       (:static
-			(princ "   Reference in static space: "))
-		       (:dynamic
-			(princ "   Reference in dynamic space: ")))
-		     (print-stale-reference (cdar refs) t)
-		     (terpri))))))))
+         (when (eql type sb-vm:symbol-header-widetag)
+           (ignore-errors
+             (let ((refs (let ((res nil)
+                               (count 0))
+                           (dolist (space '(:static :dynamic :read-only))
+                             (sb-vm::map-referencing-objects
+                              (lambda (o)
+                                (when (> (incf count) 1)
+                                  (return-from mapper nil))
+                                (push (cons space o) res))
+                              space obj))
+                           res)))
+               (let ((externalp (external-symbol-p obj)))
+                 (format t "~:[S~;External s~]ymbol ~:[#~;~:*~A:~]~2:*~:[:~;~]~*~A~%"
+                         externalp
+                         (and (symbol-package obj)
+                              (package-name (symbol-package obj)))
+                         (symbol-name obj)))
+               (if (null refs)
+                   (progn (princ "   No references found") (terpri))
+                   (progn
+                     (ecase (caar refs)
+                       (:read-only
+                        (princ "   Reference in read-only space: "))
+                       (:static
+                        (princ "   Reference in static space: "))
+                       (:dynamic
+                        (princ "   Reference in dynamic space: ")))
+                     (print-stale-reference (cdar refs) t)
+                     (terpri))))))))
      space)))

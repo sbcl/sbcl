@@ -20,10 +20,10 @@
 ;;; numeric types
 (/show0 "precomputing numeric types")
 (precompute-types '((mod 2) (mod 4) (mod 16) (mod #x100) (mod #x10000)
-		    (mod #x100000000)
-		    (unsigned-byte 1) (unsigned-byte 2) (unsigned-byte 4)
-		    (unsigned-byte 8) (unsigned-byte 16) (unsigned-byte 32)
-		    (signed-byte 8) (signed-byte 16) (signed-byte 32)))
+                    (mod #x100000000)
+                    (unsigned-byte 1) (unsigned-byte 2) (unsigned-byte 4)
+                    (unsigned-byte 8) (unsigned-byte 16) (unsigned-byte 32)
+                    (signed-byte 8) (signed-byte 16) (signed-byte 32)))
 
 ;;; built-in symbol type specifiers
 (/show0 "precomputing built-in symbol type specifiers")

@@ -49,21 +49,21 @@
 ;;; Motivated by the mips port. -- CSR, 2002-08-22
 (def!type signed-byte-with-a-bite-out (s bite)
   (cond ((eq s '*) 'integer)
-	((and (integerp s) (> s 1))
-	 (let ((bound (ash 1 (1- s))))
-	   `(integer ,(- bound) ,(- bound bite 1))))
-	(t
-	 (error "Bad size specified for SIGNED-BYTE type specifier: ~S." s))))
+        ((and (integerp s) (> s 1))
+         (let ((bound (ash 1 (1- s))))
+           `(integer ,(- bound) ,(- bound bite 1))))
+        (t
+         (error "Bad size specified for SIGNED-BYTE type specifier: ~S." s))))
 
 (def!type load/store-index (scale lowtag min-offset
-				 &optional (max-offset min-offset))
+                                 &optional (max-offset min-offset))
   `(integer ,(- (truncate (+ (ash 1 16)
-			     (* min-offset sb!vm:n-word-bytes)
-			     (- lowtag))
-			  scale))
-	    ,(truncate (- (+ (1- (ash 1 16)) lowtag)
-			  (* max-offset sb!vm:n-word-bytes))
-		       scale)))
+                             (* min-offset sb!vm:n-word-bytes)
+                             (- lowtag))
+                          scale))
+            ,(truncate (- (+ (1- (ash 1 16)) lowtag)
+                          (* max-offset sb!vm:n-word-bytes))
+                       scale)))
 
 ;;; Similar to FUNCTION, but the result type is "exactly" specified:
 ;;; if it is an object type, then the function returns exactly one
@@ -130,27 +130,27 @@
 ;;; Is X a list containing a cycle?
 (defun cyclic-list-p (x)
   (and (listp x)
-       (labels ((safe-cddr (x) (if (listp (cdr x)) (cddr x)))) 
-	 (do ((y x (safe-cddr y))
-	      (started-p nil t)
-	      (z x (cdr z)))
-	     ((not (and (consp z) (consp y))) nil)
-	   (when (and started-p (eq y z))
-	     (return t))))))
+       (labels ((safe-cddr (x) (if (listp (cdr x)) (cddr x))))
+         (do ((y x (safe-cddr y))
+              (started-p nil t)
+              (z x (cdr z)))
+             ((not (and (consp z) (consp y))) nil)
+           (when (and started-p (eq y z))
+             (return t))))))
 
 ;;; Is X a (possibly-improper) list of at least N elements?
 (declaim (ftype (function (t index)) list-of-length-at-least-p))
 (defun list-of-length-at-least-p (x n)
   (or (zerop n) ; since anything can be considered an improper list of length 0
       (and (consp x)
-	   (list-of-length-at-least-p (cdr x) (1- n)))))
+           (list-of-length-at-least-p (cdr x) (1- n)))))
 
 (declaim (inline singleton-p))
 (defun singleton-p (list)
   (and (consp list)
        (null (rest list))))
 
-;;; Is X is a positive prime integer? 
+;;; Is X is a positive prime integer?
 (defun positive-primep (x)
   ;; This happens to be called only from one place in sbcl-0.7.0, and
   ;; only for fixnums, we can limit it to fixnums for efficiency. (And
@@ -160,14 +160,14 @@
   (if (<= x 5)
       (and (>= x 2) (/= x 4))
       (and (not (evenp x))
-	   (not (zerop (rem x 3)))
-	   (do ((q 6)
-		(r 1)
-		(inc 2 (logxor inc 6)) ;; 2,4,2,4...
-		(d 5 (+ d inc)))
-	       ((or (= r 0) (> d q)) (/= r 0))
-	     (declare (fixnum inc))
-	     (multiple-value-setq (q r) (truncate x d))))))
+           (not (zerop (rem x 3)))
+           (do ((q 6)
+                (r 1)
+                (inc 2 (logxor inc 6)) ;; 2,4,2,4...
+                (d 5 (+ d inc)))
+               ((or (= r 0) (> d q)) (/= r 0))
+             (declare (fixnum inc))
+             (multiple-value-setq (q r) (truncate x d))))))
 
 ;;; Could this object contain other objects? (This is important to
 ;;; the implementation of things like *PRINT-CIRCLE* and the dumper.)
@@ -196,15 +196,15 @@
   (defun collect-list-expander (n-value n-tail forms)
     (let ((n-res (gensym)))
       `(progn
-	 ,@(mapcar (lambda (form)
-		     `(let ((,n-res (cons ,form nil)))
-			(cond (,n-tail
-			       (setf (cdr ,n-tail) ,n-res)
-			       (setq ,n-tail ,n-res))
-			      (t
-			       (setq ,n-tail ,n-res  ,n-value ,n-res)))))
-		   forms)
-	 ,n-value))))
+         ,@(mapcar (lambda (form)
+                     `(let ((,n-res (cons ,form nil)))
+                        (cond (,n-tail
+                               (setf (cdr ,n-tail) ,n-res)
+                               (setq ,n-tail ,n-res))
+                              (t
+                               (setq ,n-tail ,n-res  ,n-value ,n-res)))))
+                   forms)
+         ,n-value))))
 
 ;;; Collect some values somehow. Each of the collections specifies a
 ;;; bunch of things which collected during the evaluation of the body
@@ -227,30 +227,30 @@
 ;;; in the functional position, including macros and lambdas.
 (defmacro collect (collections &body body)
   (let ((macros ())
-	(binds ()))
+        (binds ()))
     (dolist (spec collections)
       (unless (proper-list-of-length-p spec 1 3)
-	(error "malformed collection specifier: ~S" spec))
+        (error "malformed collection specifier: ~S" spec))
       (let* ((name (first spec))
-	     (default (second spec))
-	     (kind (or (third spec) 'collect))
-	     (n-value (gensym (concatenate 'string
-					   (symbol-name name)
-					   "-N-VALUE-"))))
-	(push `(,n-value ,default) binds)
-	(if (eq kind 'collect)
-	  (let ((n-tail (gensym (concatenate 'string
-					     (symbol-name name)
-					     "-N-TAIL-"))))
-	    (if default
-	      (push `(,n-tail (last ,n-value)) binds)
-	      (push n-tail binds))
-	    (push `(,name (&rest args)
-		     (collect-list-expander ',n-value ',n-tail args))
-		  macros))
-	  (push `(,name (&rest args)
-		   (collect-normal-expander ',n-value ',kind args))
-		macros))))
+             (default (second spec))
+             (kind (or (third spec) 'collect))
+             (n-value (gensym (concatenate 'string
+                                           (symbol-name name)
+                                           "-N-VALUE-"))))
+        (push `(,n-value ,default) binds)
+        (if (eq kind 'collect)
+          (let ((n-tail (gensym (concatenate 'string
+                                             (symbol-name name)
+                                             "-N-TAIL-"))))
+            (if default
+              (push `(,n-tail (last ,n-value)) binds)
+              (push n-tail binds))
+            (push `(,name (&rest args)
+                     (collect-list-expander ',n-value ',n-tail args))
+                  macros))
+          (push `(,name (&rest args)
+                   (collect-normal-expander ',n-value ',kind args))
+                macros))))
     `(macrolet ,macros (let* ,(nreverse binds) ,@body))))
 
 ;;;; some old-fashioned functions. (They're not just for old-fashioned
@@ -288,7 +288,7 @@
   ;; just define ASSQ explicitly in terms of more primitive
   ;; operations:
   (dolist (pair alist)
-    ;; though it may look more natural to write this as 
+    ;; though it may look more natural to write this as
     ;;   (AND PAIR (EQ (CAR PAIR) ITEM))
     ;; the temptation to do so should be resisted, as pointed out by PFD
     ;; sbcl-devel 2003-08-16, as NIL elements are rare in association
@@ -302,13 +302,13 @@
 (defun delq (item list)
   (let ((list list))
     (do ((x list (cdr x))
-	 (splice '()))
-	((endp x) list)
+         (splice '()))
+        ((endp x) list)
       (cond ((eq item (car x))
-	     (if (null splice)
-	       (setq list (cdr x))
-	       (rplacd splice (cdr x))))
-	    (t (setq splice x)))))) ; Move splice along to include element.
+             (if (null splice)
+               (setq list (cdr x))
+               (rplacd splice (cdr x))))
+            (t (setq splice x)))))) ; Move splice along to include element.
 
 
 ;;; like (POSITION .. :TEST #'EQ):
@@ -358,27 +358,27 @@
 ;;; just like DOLIST, but with one-dimensional arrays
 (defmacro dovector ((elt vector &optional result) &rest forms)
   (let ((index (gensym))
-	(length (gensym))
-	(vec (gensym)))
+        (length (gensym))
+        (vec (gensym)))
     `(let ((,vec ,vector))
        (declare (type vector ,vec))
        (do ((,index 0 (1+ ,index))
-	    (,length (length ,vec)))
-	   ((>= ,index ,length) ,result)
-	 (let ((,elt (aref ,vec ,index)))
-	   ,@forms)))))
+            (,length (length ,vec)))
+           ((>= ,index ,length) ,result)
+         (let ((,elt (aref ,vec ,index)))
+           ,@forms)))))
 
 ;;; Iterate over the entries in a HASH-TABLE.
 (defmacro dohash ((key-var value-var table &optional result) &body body)
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
     (let ((gen (gensym))
-	  (n-more (gensym)))
+          (n-more (gensym)))
       `(with-hash-table-iterator (,gen ,table)
-	 (loop
-	  (multiple-value-bind (,n-more ,key-var ,value-var) (,gen)
-	    ,@decls
-	    (unless ,n-more (return ,result))
-	    ,@forms))))))
+         (loop
+          (multiple-value-bind (,n-more ,key-var ,value-var) (,gen)
+            ,@decls
+            (unless ,n-more (return ,result))
+            ,@forms))))))
 
 ;;;; hash cache utility
 
@@ -425,34 +425,34 @@
 ;;;   in type system definitions so that caches will be created
 ;;;   before top level forms run.)
 (defmacro define-hash-cache (name args &key hash-function hash-bits default
-				  (init-wrapper 'progn)
-				  (values 1))
+                                  (init-wrapper 'progn)
+                                  (values 1))
   (let* ((var-name (symbolicate "*" name "-CACHE-VECTOR*"))
-	 (nargs (length args))
-	 (entry-size (+ nargs values))
-	 (size (ash 1 hash-bits))
-	 (total-size (* entry-size size))
-	 (default-values (if (and (consp default) (eq (car default) 'values))
-			     (cdr default)
-			     (list default)))
-	 (n-index (gensym))
-	 (n-cache (gensym)))
+         (nargs (length args))
+         (entry-size (+ nargs values))
+         (size (ash 1 hash-bits))
+         (total-size (* entry-size size))
+         (default-values (if (and (consp default) (eq (car default) 'values))
+                             (cdr default)
+                             (list default)))
+         (n-index (gensym))
+         (n-cache (gensym)))
 
     (unless (= (length default-values) values)
       (error "The number of default values ~S differs from :VALUES ~W."
-	     default values))
+             default values))
 
     (collect ((inlines)
-	      (forms)
-	      (inits)
-	      (tests)
-	      (sets)
-	      (arg-vars)
-	      (values-indices)
-	      (values-names))
+              (forms)
+              (inits)
+              (tests)
+              (sets)
+              (arg-vars)
+              (values-indices)
+              (values-names))
       (dotimes (i values)
-	(values-indices `(+ ,n-index ,(+ nargs i)))
-	(values-names (gensym)))
+        (values-indices `(+ ,n-index ,(+ nargs i)))
+        (values-names (gensym)))
       (let ((n 0))
         (dolist (arg args)
           (unless (= (length arg) 2)
@@ -465,119 +465,119 @@
           (incf n)))
 
       (when *profile-hash-cache*
-	(let ((n-probe (symbolicate "*" name "-CACHE-PROBES*"))
-	      (n-miss (symbolicate "*" name "-CACHE-MISSES*")))
-	  (inits `(setq ,n-probe 0))
-	  (inits `(setq ,n-miss 0))
-	  (forms `(defvar ,n-probe))
-	  (forms `(defvar ,n-miss))
-	  (forms `(declaim (fixnum ,n-miss ,n-probe)))))
+        (let ((n-probe (symbolicate "*" name "-CACHE-PROBES*"))
+              (n-miss (symbolicate "*" name "-CACHE-MISSES*")))
+          (inits `(setq ,n-probe 0))
+          (inits `(setq ,n-miss 0))
+          (forms `(defvar ,n-probe))
+          (forms `(defvar ,n-miss))
+          (forms `(declaim (fixnum ,n-miss ,n-probe)))))
 
       (let ((fun-name (symbolicate name "-CACHE-LOOKUP")))
-	(inlines fun-name)
-	(forms
-	 `(defun ,fun-name ,(arg-vars)
-	    ,@(when *profile-hash-cache*
-		`((incf ,(symbolicate  "*" name "-CACHE-PROBES*"))))
-	    (let ((,n-index (* (,hash-function ,@(arg-vars)) ,entry-size))
-		  (,n-cache ,var-name))
-	      (declare (type fixnum ,n-index))
-	      (cond ((and ,@(tests))
-		     (values ,@(mapcar (lambda (x) `(svref ,n-cache ,x))
-				       (values-indices))))
-		    (t
-		     ,@(when *profile-hash-cache*
-			 `((incf ,(symbolicate  "*" name "-CACHE-MISSES*"))))
-		     ,default))))))
+        (inlines fun-name)
+        (forms
+         `(defun ,fun-name ,(arg-vars)
+            ,@(when *profile-hash-cache*
+                `((incf ,(symbolicate  "*" name "-CACHE-PROBES*"))))
+            (let ((,n-index (* (,hash-function ,@(arg-vars)) ,entry-size))
+                  (,n-cache ,var-name))
+              (declare (type fixnum ,n-index))
+              (cond ((and ,@(tests))
+                     (values ,@(mapcar (lambda (x) `(svref ,n-cache ,x))
+                                       (values-indices))))
+                    (t
+                     ,@(when *profile-hash-cache*
+                         `((incf ,(symbolicate  "*" name "-CACHE-MISSES*"))))
+                     ,default))))))
 
       (let ((fun-name (symbolicate name "-CACHE-ENTER")))
-	(inlines fun-name)
-	(forms
-	 `(defun ,fun-name (,@(arg-vars) ,@(values-names))
-	    (let ((,n-index (* (,hash-function ,@(arg-vars)) ,entry-size))
-		  (,n-cache ,var-name))
-	      (declare (type fixnum ,n-index))
-	      ,@(sets)
-	      ,@(mapcar (lambda (i val)
-			  `(setf (svref ,n-cache ,i) ,val))
-			(values-indices)
-			(values-names))
-	      (values)))))
+        (inlines fun-name)
+        (forms
+         `(defun ,fun-name (,@(arg-vars) ,@(values-names))
+            (let ((,n-index (* (,hash-function ,@(arg-vars)) ,entry-size))
+                  (,n-cache ,var-name))
+              (declare (type fixnum ,n-index))
+              ,@(sets)
+              ,@(mapcar (lambda (i val)
+                          `(setf (svref ,n-cache ,i) ,val))
+                        (values-indices)
+                        (values-names))
+              (values)))))
 
       (let ((fun-name (symbolicate name "-CACHE-CLEAR")))
-	(forms
-	 `(defun ,fun-name ()
-	    (do ((,n-index ,(- total-size entry-size) (- ,n-index ,entry-size))
-		 (,n-cache ,var-name))
-		((minusp ,n-index))
-	      (declare (type fixnum ,n-index))
-	      ,@(collect ((arg-sets))
-		  (dotimes (i nargs)
-		    (arg-sets `(setf (svref ,n-cache (+ ,n-index ,i)) nil)))
-		  (arg-sets))
-	      ,@(mapcar (lambda (i val)
-			  `(setf (svref ,n-cache ,i) ,val))
-			(values-indices)
-			default-values))
-	    (values)))
-	(forms `(,fun-name)))
+        (forms
+         `(defun ,fun-name ()
+            (do ((,n-index ,(- total-size entry-size) (- ,n-index ,entry-size))
+                 (,n-cache ,var-name))
+                ((minusp ,n-index))
+              (declare (type fixnum ,n-index))
+              ,@(collect ((arg-sets))
+                  (dotimes (i nargs)
+                    (arg-sets `(setf (svref ,n-cache (+ ,n-index ,i)) nil)))
+                  (arg-sets))
+              ,@(mapcar (lambda (i val)
+                          `(setf (svref ,n-cache ,i) ,val))
+                        (values-indices)
+                        default-values))
+            (values)))
+        (forms `(,fun-name)))
 
       (inits `(unless (boundp ',var-name)
-		(setq ,var-name (make-array ,total-size))))
+                (setq ,var-name (make-array ,total-size))))
       #!+sb-show (inits `(setq *hash-caches-initialized-p* t))
 
       `(progn
-	 (defvar ,var-name)
-	 (declaim (type (simple-vector ,total-size) ,var-name))
-	 #!-sb-fluid (declaim (inline ,@(inlines)))
-	 (,init-wrapper ,@(inits))
-	 ,@(forms)
-	 ',name))))
+         (defvar ,var-name)
+         (declaim (type (simple-vector ,total-size) ,var-name))
+         #!-sb-fluid (declaim (inline ,@(inlines)))
+         (,init-wrapper ,@(inits))
+         ,@(forms)
+         ',name))))
 
 ;;; some syntactic sugar for defining a function whose values are
 ;;; cached by DEFINE-HASH-CACHE
 (defmacro defun-cached ((name &rest options &key (values 1) default
-			      &allow-other-keys)
-			args &body body-decls-doc)
+                              &allow-other-keys)
+                        args &body body-decls-doc)
   (let ((default-values (if (and (consp default) (eq (car default) 'values))
-			    (cdr default)
-			    (list default)))
-	(arg-names (mapcar #'car args)))
+                            (cdr default)
+                            (list default)))
+        (arg-names (mapcar #'car args)))
     (collect ((values-names))
       (dotimes (i values)
-	(values-names (gensym)))
+        (values-names (gensym)))
       (multiple-value-bind (body decls doc) (parse-body body-decls-doc)
-	`(progn
-	   (define-hash-cache ,name ,args ,@options)
-	   (defun ,name ,arg-names
-	     ,@decls
-	     ,doc
-	     (cond #!+sb-show
-		   ((not (boundp '*hash-caches-initialized-p*))
-		    ;; This shouldn't happen, but it did happen to me
-		    ;; when revising the type system, and it's a lot
-		    ;; easier to figure out what what's going on with
-		    ;; that kind of problem if the system can be kept
-		    ;; alive until cold boot is complete. The recovery
-		    ;; mechanism should definitely be conditional on
-		    ;; some debugging feature (e.g. SB-SHOW) because
-		    ;; it's big, duplicating all the BODY code. -- WHN
-		    (/show0 ,name " too early in cold init, uncached")
-		    (/show0 ,(first arg-names) "=..")
-		    (/hexstr ,(first arg-names))
-		    ,@body)
-		   (t
-		    (multiple-value-bind ,(values-names)
-			(,(symbolicate name "-CACHE-LOOKUP") ,@arg-names)
-		      (if (and ,@(mapcar (lambda (val def)
-					   `(eq ,val ,def))
-					 (values-names) default-values))
-			  (multiple-value-bind ,(values-names)
-			      (progn ,@body)
-			    (,(symbolicate name "-CACHE-ENTER") ,@arg-names
-			     ,@(values-names))
-			    (values ,@(values-names)))
-			  (values ,@(values-names))))))))))))
+        `(progn
+           (define-hash-cache ,name ,args ,@options)
+           (defun ,name ,arg-names
+             ,@decls
+             ,doc
+             (cond #!+sb-show
+                   ((not (boundp '*hash-caches-initialized-p*))
+                    ;; This shouldn't happen, but it did happen to me
+                    ;; when revising the type system, and it's a lot
+                    ;; easier to figure out what what's going on with
+                    ;; that kind of problem if the system can be kept
+                    ;; alive until cold boot is complete. The recovery
+                    ;; mechanism should definitely be conditional on
+                    ;; some debugging feature (e.g. SB-SHOW) because
+                    ;; it's big, duplicating all the BODY code. -- WHN
+                    (/show0 ,name " too early in cold init, uncached")
+                    (/show0 ,(first arg-names) "=..")
+                    (/hexstr ,(first arg-names))
+                    ,@body)
+                   (t
+                    (multiple-value-bind ,(values-names)
+                        (,(symbolicate name "-CACHE-LOOKUP") ,@arg-names)
+                      (if (and ,@(mapcar (lambda (val def)
+                                           `(eq ,val ,def))
+                                         (values-names) default-values))
+                          (multiple-value-bind ,(values-names)
+                              (progn ,@body)
+                            (,(symbolicate name "-CACHE-ENTER") ,@arg-names
+                             ,@(values-names))
+                            (values ,@(values-names)))
+                          (values ,@(values-names))))))))))))
 
 (defmacro define-cached-synonym
     (name &optional (original (symbolicate "%" name)))
@@ -609,8 +609,8 @@
     ((eql x y) t)
     ((consp x)
      (and (consp y)
-	  (eql (car x) (car y))
-	  (equal-but-no-car-recursion (cdr x) (cdr y))))
+          (eql (car x) (car y))
+          (equal-but-no-car-recursion (cdr x) (cdr y))))
     (t nil)))
 
 ;;;; package idioms
@@ -622,9 +622,9 @@
 (defun %find-package-or-lose (package-designator)
   (or (find-package package-designator)
       (error 'sb!kernel:simple-package-error
-	     :package package-designator
-	     :format-control "The name ~S does not designate any package."
-	     :format-arguments (list package-designator))))
+             :package package-designator
+             :format-control "The name ~S does not designate any package."
+             :format-arguments (list package-designator))))
 
 ;;; ANSI specifies (in the section for FIND-PACKAGE) that the
 ;;; consequences of most operations on deleted packages are
@@ -632,11 +632,11 @@
 (defun find-undeleted-package-or-lose (package-designator)
   (let ((maybe-result (%find-package-or-lose package-designator)))
     (if (package-name maybe-result)     ; if not deleted
-	maybe-result
-	(error 'sb!kernel:simple-package-error
-	       :package maybe-result
-	       :format-control "The package ~S has been deleted."
-	       :format-arguments (list maybe-result)))))
+        maybe-result
+        (error 'sb!kernel:simple-package-error
+               :package maybe-result
+               :format-control "The package ~S has been deleted."
+               :format-arguments (list maybe-result)))))
 
 ;;;; various operations on names
 
@@ -651,10 +651,10 @@
 (defun legal-fun-name-or-type-error (name)
   (unless (legal-fun-name-p name)
     (error 'simple-type-error
-	   :datum name
-	   :expected-type 'function-name
-	   :format-control "invalid function name: ~S"
-	   :format-arguments (list name))))
+           :datum name
+           :expected-type 'function-name
+           :format-control "invalid function name: ~S"
+           :format-arguments (list name))))
 
 ;;; Given a function name, return the symbol embedded in it.
 ;;;
@@ -667,22 +667,22 @@
 (declaim (ftype (function ((or symbol cons)) symbol) fun-name-block-name))
 (defun fun-name-block-name (fun-name)
   (cond ((symbolp fun-name)
-	 fun-name)
-	((consp fun-name)
-	 (multiple-value-bind (legalp block-name)
-	     (valid-function-name-p fun-name)
-	   (if legalp
-	       block-name
-	       (error "not legal as a function name: ~S" fun-name))))
-	(t
-	 (error "not legal as a function name: ~S" fun-name))))
+         fun-name)
+        ((consp fun-name)
+         (multiple-value-bind (legalp block-name)
+             (valid-function-name-p fun-name)
+           (if legalp
+               block-name
+               (error "not legal as a function name: ~S" fun-name))))
+        (t
+         (error "not legal as a function name: ~S" fun-name))))
 
 (defun looks-like-name-of-special-var-p (x)
   (and (symbolp x)
        (let ((name (symbol-name x)))
-	 (and (> (length name) 2) ; to exclude '* and '**
-	      (char= #\* (aref name 0))
-	      (char= #\* (aref name (1- (length name))))))))
+         (and (> (length name) 2) ; to exclude '* and '**
+              (char= #\* (aref name 0))
+              (char= #\* (aref name (1- (length name))))))))
 
 ;;; Some symbols are defined by ANSI to be self-evaluating. Return
 ;;; non-NIL for such symbols (and make the non-NIL value a traditional
@@ -691,13 +691,13 @@
 (defun symbol-self-evaluating-p (symbol)
   (declare (type symbol symbol))
   (cond ((eq symbol t)
-	 "Veritas aeterna. (can't change T)")
-	((eq symbol nil)
-	 "Nihil ex nihil. (can't change NIL)")
-	((keywordp symbol)
-	 "Keyword values can't be changed.")
-	(t
-	 nil)))
+         "Veritas aeterna. (can't change T)")
+        ((eq symbol nil)
+         "Nihil ex nihil. (can't change NIL)")
+        ((keywordp symbol)
+         "Keyword values can't be changed.")
+        (t
+         nil)))
 
 ;;; This function is to be called just before a change which would
 ;;; affect the symbol value. (We don't absolutely have to call this
@@ -726,12 +726,12 @@
 ;;; the linking eventually, so as long as #'FOO and #'BAR aren't
 ;;; needed until "cold toplevel forms" have executed, it's OK.
 (defmacro cold-fset (name lambda)
-  (style-warn 
+  (style-warn
    "~@<COLD-FSET ~S not cross-compiled at top level: demoting to ~
 (SETF FDEFINITION)~:@>"
    name)
   ;; We convert the LAMBDA expression to the corresponding NAMED-LAMBDA
-  ;; expression so that the compiler can use NAME in debug names etc. 
+  ;; expression so that the compiler can use NAME in debug names etc.
   (destructuring-bind (lambda-symbol &rest lambda-rest) lambda
     (assert (eql lambda-symbol 'lambda)) ; else dunno how to do conversion
     `(setf (fdefinition ',name)
@@ -755,19 +755,19 @@
 ;;; bound to the corresponding temporary variable.
 (defmacro once-only (specs &body body)
   (named-let frob ((specs specs)
-		   (body body))
+                   (body body))
     (if (null specs)
-	`(progn ,@body)
-	(let ((spec (first specs)))
-	  ;; FIXME: should just be DESTRUCTURING-BIND of SPEC
-	  (unless (proper-list-of-length-p spec 2)
-	    (error "malformed ONCE-ONLY binding spec: ~S" spec))
-	  (let* ((name (first spec))
-		 (exp-temp (gensym (symbol-name name))))
-	    `(let ((,exp-temp ,(second spec))
-		   (,name (gensym "ONCE-ONLY-")))
-	       `(let ((,,name ,,exp-temp))
-		  ,,(frob (rest specs) body))))))))
+        `(progn ,@body)
+        (let ((spec (first specs)))
+          ;; FIXME: should just be DESTRUCTURING-BIND of SPEC
+          (unless (proper-list-of-length-p spec 2)
+            (error "malformed ONCE-ONLY binding spec: ~S" spec))
+          (let* ((name (first spec))
+                 (exp-temp (gensym (symbol-name name))))
+            `(let ((,exp-temp ,(second spec))
+                   (,name (gensym "ONCE-ONLY-")))
+               `(let ((,,name ,,exp-temp))
+                  ,,(frob (rest specs) body))))))))
 
 ;;;; various error-checking utilities
 
@@ -811,8 +811,8 @@
 
 (defun bug (format-control &rest format-arguments)
   (error 'bug
-	 :format-control format-control
-	 :format-arguments format-arguments))
+         :format-control format-control
+         :format-arguments format-arguments))
 
 (defmacro enforce-type (value type)
   (once-only ((value value))
@@ -822,11 +822,11 @@
 (defun %failed-enforce-type (value type)
   ;; maybe should be TYPE-BUG, subclass of BUG?  If it is changed,
   ;; check uses of it in user-facing code (e.g. WARN)
-  (error 'simple-type-error 
-	 :datum value
-	 :expected-type type
-	 :format-control "~@<~S ~_is not a ~_~S~:>"
-	 :format-arguments (list value type)))
+  (error 'simple-type-error
+         :datum value
+         :expected-type type
+         :format-control "~@<~S ~_is not a ~_~S~:>"
+         :format-arguments (list value type)))
 
 ;;; Return a function like FUN, but expecting its (two) arguments in
 ;;; the opposite order that FUN does.
@@ -851,8 +851,8 @@
 
 ;;; some commonly-occuring CONSTANTLY forms
 (macrolet ((def-constantly-fun (name constant-expr)
-	     `(setf (symbol-function ',name)
-		    (constantly ,constant-expr))))
+             `(setf (symbol-function ',name)
+                    (constantly ,constant-expr))))
   (def-constantly-fun constantly-t t)
   (def-constantly-fun constantly-nil nil)
   (def-constantly-fun constantly-0 0))
@@ -864,8 +864,8 @@
     (case (car x)
       ((:not not)
        (if (cddr x)
-	 (error "too many subexpressions in feature expression: ~S" x)
-	 (not (featurep (cadr x)))))
+         (error "too many subexpressions in feature expression: ~S" x)
+         (not (featurep (cadr x)))))
       ((:and and) (every #'featurep (cdr x)))
       ((:or or) (some #'featurep (cdr x)))
       (t
@@ -893,10 +893,10 @@
       (declare (type symbol old new))
       ;; Walk through RESULT renaming any OLD key argument to NEW.
       (do ((in-result result (cddr in-result)))
-	  ((null in-result))
-	(declare (type list in-result))
-	(when (eq (car in-result) old)
-	  (setf (car in-result) new))))))
+          ((null in-result))
+        (declare (type list in-result))
+        (when (eq (car in-result) old)
+          (setf (car in-result) new))))))
 
 ;;; ANSI Common Lisp's READ-SEQUENCE function, unlike most of the
 ;;; other ANSI input functions, is defined to communicate end of file
@@ -908,9 +908,9 @@
   ;; implementation using READ-SEQUENCE
   #-no-ansi-read-sequence
   (let ((read-end (read-sequence sequence
-				 stream
-				 :start start
-				 :end end)))
+                                 stream
+                                 :start start
+                                 :end end)))
     (unless (= read-end end)
       (error 'end-of-file :stream stream))
     (values))
@@ -920,12 +920,12 @@
     (aver (<= start end))
     (let ((etype (stream-element-type stream)))
     (cond ((equal etype '(unsigned-byte 8))
-	   (do ((i start (1+ i)))
-	       ((>= i end)
-		(values))
-	     (setf (aref sequence i)
-		   (read-byte stream))))
-	  (t (error "unsupported element type ~S" etype))))))
+           (do ((i start (1+ i)))
+               ((>= i end)
+                (values))
+             (setf (aref sequence i)
+                   (read-byte stream))))
+          (t (error "unsupported element type ~S" etype))))))
 
 ;;;; utilities for two-VALUES predicates
 
@@ -958,24 +958,24 @@
   (let ((certain? t))
     (dolist (i list (values nil certain?))
       (multiple-value-bind (sub-value sub-certain?) (funcall op thing i)
-	(if sub-certain?
-	    (when sub-value (return (values t t)))
-	    (setf certain? nil))))))
+        (if sub-certain?
+            (when sub-value (return (values t t)))
+            (setf certain? nil))))))
 (defun every/type (op thing list)
   (declare (type function op))
   (let ((certain? t))
     (dolist (i list (if certain? (values t t) (values nil nil)))
       (multiple-value-bind (sub-value sub-certain?) (funcall op thing i)
-	(if sub-certain?
-	    (unless sub-value (return (values nil t)))
-	    (setf certain? nil))))))
+        (if sub-certain?
+            (unless sub-value (return (values nil t)))
+            (setf certain? nil))))))
 
 ;;;; DEFPRINTER
 
 ;;; These functions are called by the expansion of the DEFPRINTER
 ;;; macro to do the actual printing.
 (declaim (ftype (function (symbol t stream) (values))
-		defprinter-prin1 defprinter-princ))
+                defprinter-prin1 defprinter-princ))
 (defun defprinter-prin1 (name value stream)
   (defprinter-prinx #'prin1 name value stream))
 (defun defprinter-princ (name value stream)
@@ -1014,57 +1014,57 @@
 ;;; The structure being printed is bound to STRUCTURE and the stream
 ;;; is bound to STREAM.
 (defmacro defprinter ((name
-		       &key
-		       (conc-name (concatenate 'simple-string
-					       (symbol-name name)
-					       "-"))
-		       identity)
-		      &rest slot-descs)
+                       &key
+                       (conc-name (concatenate 'simple-string
+                                               (symbol-name name)
+                                               "-"))
+                       identity)
+                      &rest slot-descs)
   (let ((first? t)
-	maybe-print-space
-	(reversed-prints nil)
-	(stream (gensym "STREAM")))
+        maybe-print-space
+        (reversed-prints nil)
+        (stream (gensym "STREAM")))
     (flet ((sref (slot-name)
-	     `(,(symbolicate conc-name slot-name) structure)))
+             `(,(symbolicate conc-name slot-name) structure)))
       (dolist (slot-desc slot-descs)
-	(if first?
-	    (setf maybe-print-space nil
-		  first? nil)
-	    (setf maybe-print-space `(defprinter-print-space ,stream)))
-	(cond ((atom slot-desc)
-	       (push maybe-print-space reversed-prints)
-	       (push `(defprinter-prin1 ',slot-desc ,(sref slot-desc) ,stream)
-		     reversed-prints))
-	      (t
-	       (let ((sname (first slot-desc))
-		     (test t))
-		 (collect ((stuff))
-		   (do ((option (rest slot-desc) (cddr option)))
-		       ((null option)
-			(push `(let ((,sname ,(sref sname)))
-				 (when ,test
-				   ,maybe-print-space
-				   ,@(or (stuff)
-					 `((defprinter-prin1
-					     ',sname ,sname ,stream)))))
-			      reversed-prints))
-		     (case (first option)
-		       (:prin1
-			(stuff `(defprinter-prin1
-				  ',sname ,(second option) ,stream)))
-		       (:princ
-			(stuff `(defprinter-princ
-				  ',sname ,(second option) ,stream)))
-		       (:test (setq test (second option)))
-		       (t
-			(error "bad option: ~S" (first option)))))))))))
+        (if first?
+            (setf maybe-print-space nil
+                  first? nil)
+            (setf maybe-print-space `(defprinter-print-space ,stream)))
+        (cond ((atom slot-desc)
+               (push maybe-print-space reversed-prints)
+               (push `(defprinter-prin1 ',slot-desc ,(sref slot-desc) ,stream)
+                     reversed-prints))
+              (t
+               (let ((sname (first slot-desc))
+                     (test t))
+                 (collect ((stuff))
+                   (do ((option (rest slot-desc) (cddr option)))
+                       ((null option)
+                        (push `(let ((,sname ,(sref sname)))
+                                 (when ,test
+                                   ,maybe-print-space
+                                   ,@(or (stuff)
+                                         `((defprinter-prin1
+                                             ',sname ,sname ,stream)))))
+                              reversed-prints))
+                     (case (first option)
+                       (:prin1
+                        (stuff `(defprinter-prin1
+                                  ',sname ,(second option) ,stream)))
+                       (:princ
+                        (stuff `(defprinter-princ
+                                  ',sname ,(second option) ,stream)))
+                       (:test (setq test (second option)))
+                       (t
+                        (error "bad option: ~S" (first option)))))))))))
     `(def!method print-object ((structure ,name) ,stream)
        (pprint-logical-block (,stream nil)
-	 (print-unreadable-object (structure
-				   ,stream
-				   :type t
-				   :identity ,identity)
-	   ,@(nreverse reversed-prints))))))
+         (print-unreadable-object (structure
+                                   ,stream
+                                   :type t
+                                   :identity ,identity)
+           ,@(nreverse reversed-prints))))))
 
 ;;;; etc.
 
@@ -1076,8 +1076,8 @@
 
 (defun deprecation-warning (bad-name &optional good-name)
   (warn "using deprecated ~S~@[, should use ~S instead~]"
-	bad-name
-	good-name))
+        bad-name
+        good-name))
 
 ;;; Anaphoric macros
 (defmacro awhen (test &body body)
@@ -1150,25 +1150,25 @@
 (defun %with-rebound-io-syntax (function)
   (declare (type function function))
   (let ((*package* *package*)
-	(*print-array* *print-array*)
-	(*print-base* *print-base*)
-	(*print-case* *print-case*)
-	(*print-circle* *print-circle*)
-	(*print-escape* *print-escape*)
-	(*print-gensym* *print-gensym*)
-	(*print-length* *print-length*)
-	(*print-level* *print-level*)
-	(*print-lines* *print-lines*)
-	(*print-miser-width* *print-miser-width*)
-	(*print-pretty* *print-pretty*)
-	(*print-radix* *print-radix*)
-	(*print-readably* *print-readably*)
-	(*print-right-margin* *print-right-margin*)
-	(*read-base* *read-base*)
-	(*read-default-float-format* *read-default-float-format*)
-	(*read-eval* *read-eval*)
-	(*read-suppress* *read-suppress*)
-	(*readtable* *readtable*))
+        (*print-array* *print-array*)
+        (*print-base* *print-base*)
+        (*print-case* *print-case*)
+        (*print-circle* *print-circle*)
+        (*print-escape* *print-escape*)
+        (*print-gensym* *print-gensym*)
+        (*print-length* *print-length*)
+        (*print-level* *print-level*)
+        (*print-lines* *print-lines*)
+        (*print-miser-width* *print-miser-width*)
+        (*print-pretty* *print-pretty*)
+        (*print-radix* *print-radix*)
+        (*print-readably* *print-readably*)
+        (*print-right-margin* *print-right-margin*)
+        (*read-base* *read-base*)
+        (*read-default-float-format* *read-default-float-format*)
+        (*read-eval* *read-eval*)
+        (*read-suppress* *read-suppress*)
+        (*readtable* *readtable*))
     (funcall function)))
 
 ;;; Bind a few "potentially dangerous" printer control variables to

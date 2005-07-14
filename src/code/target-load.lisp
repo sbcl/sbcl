@@ -31,13 +31,13 @@
 (defun load-as-source (stream verbose print)
   (maybe-announce-load stream verbose)
   (do ((sexpr (read stream nil *eof-object*)
-	      (read stream nil *eof-object*)))
+              (read stream nil *eof-object*)))
       ((eq sexpr *eof-object*)
        t)
     (if print
-	(let ((results (multiple-value-list (eval sexpr))))
-	  (load-fresh-line)
-	  (format t "~{~S~^, ~}~%" results))
+        (let ((results (multiple-value-list (eval sexpr))))
+          (load-fresh-line)
+          (format t "~{~S~^, ~}~%" results))
       (eval sexpr))))
 
 ;;;; LOAD itself
@@ -48,9 +48,9 @@
    (lambda (condition stream)
      (format stream "~@<File ~S has a fasl file type, but no fasl header:~%~
                      Expected ~S, but got ~S.~:@>"
-	     (invalid-fasl-stream condition)
-	     (invalid-fasl-expected condition)
-	     (invalid-fasl-fhsss condition)))))
+             (invalid-fasl-stream condition)
+             (invalid-fasl-expected condition)
+             (invalid-fasl-fhsss condition)))))
 
 ;;; a helper function for LOAD: Load the stuff in a file when we have
 ;;; the name.
@@ -58,46 +58,46 @@
 ;;; FIXME: with the addition of the EXTERNAL-FORMAT argument, this
 ;;; interface has become truly sucky.
 (defun internal-load (pathname truename if-does-not-exist verbose print
-		      &optional contents external-format)
+                      &optional contents external-format)
   (declare (type (member nil :error) if-does-not-exist))
   (unless truename
     (if if-does-not-exist
-	(error 'simple-file-error
-	       :pathname pathname
-	       :format-control "~S does not exist."
-	       :format-arguments (list (namestring pathname)))
-	(return-from internal-load nil)))
+        (error 'simple-file-error
+               :pathname pathname
+               :format-control "~S does not exist."
+               :format-arguments (list (namestring pathname)))
+        (return-from internal-load nil)))
 
   (let ((*load-truename* truename)
-	(*load-pathname* (merge-pathnames pathname)))
+        (*load-pathname* (merge-pathnames pathname)))
     (case contents
       (:source
        (with-open-file (stream truename
-			       :direction :input
-			       :if-does-not-exist if-does-not-exist
+                               :direction :input
+                               :if-does-not-exist if-does-not-exist
                                :external-format external-format)
-	 (load-as-source stream verbose print)))
+         (load-as-source stream verbose print)))
       (:binary
        (with-open-file (stream truename
-			       :direction :input
-			       :if-does-not-exist if-does-not-exist
-			       :element-type '(unsigned-byte 8))
-	 (load-as-fasl stream verbose print)))
+                               :direction :input
+                               :if-does-not-exist if-does-not-exist
+                               :element-type '(unsigned-byte 8))
+         (load-as-fasl stream verbose print)))
       (t
        (let* ((fhsss *fasl-header-string-start-string*)
-	      (first-line (make-array (length fhsss)
-				      :element-type '(unsigned-byte 8)))
-	      (read-length
-	       (with-open-file (stream truename
-				       :direction :input
-				       :element-type '(unsigned-byte 8))
-		 (read-sequence first-line stream))))
-	 (cond
-	   ((and (= read-length (length fhsss))
-		 (do ((i 0 (1+ i)))
-		     ((= i read-length) t)
-		   (when (/= (char-code (aref fhsss i)) (aref first-line i))
-		     (return))))
+              (first-line (make-array (length fhsss)
+                                      :element-type '(unsigned-byte 8)))
+              (read-length
+               (with-open-file (stream truename
+                                       :direction :input
+                                       :element-type '(unsigned-byte 8))
+                 (read-sequence first-line stream))))
+         (cond
+           ((and (= read-length (length fhsss))
+                 (do ((i 0 (1+ i)))
+                     ((= i read-length) t)
+                   (when (/= (char-code (aref fhsss i)) (aref first-line i))
+                     (return))))
             (internal-load pathname truename if-does-not-exist verbose print
                            :binary))
            (t
@@ -130,29 +130,29 @@
   (multiple-value-bind (src-pn src-tn)
       (try-default-type pathname *load-source-default-type*)
     (multiple-value-bind (obj-pn obj-tn)
-	(try-default-type pathname *fasl-file-type*)
+        (try-default-type pathname *fasl-file-type*)
       (cond
        ((and obj-tn
-	     src-tn
-	     (> (file-write-date src-tn) (file-write-date obj-tn)))
-	(restart-case
-	 (error "The object file ~A is~@
+             src-tn
+             (> (file-write-date src-tn) (file-write-date obj-tn)))
+        (restart-case
+         (error "The object file ~A is~@
                  older than the presumed source:~%  ~A."
-		(namestring obj-tn)
-		(namestring src-tn))
-	 (source () :report "load source file"
-	   (internal-load src-pn src-tn if-does-not-exist verbose print
-			  :source external-format))
-	 (object () :report "load object file"
-	    (internal-load src-pn obj-tn if-does-not-exist verbose print
-			   :binary))))
+                (namestring obj-tn)
+                (namestring src-tn))
+         (source () :report "load source file"
+           (internal-load src-pn src-tn if-does-not-exist verbose print
+                          :source external-format))
+         (object () :report "load object file"
+            (internal-load src-pn obj-tn if-does-not-exist verbose print
+                           :binary))))
        (obj-tn
-	(internal-load obj-pn obj-tn if-does-not-exist verbose print :binary))
+        (internal-load obj-pn obj-tn if-does-not-exist verbose print :binary))
        (src-pn
-	(internal-load src-pn src-tn if-does-not-exist
+        (internal-load src-pn src-tn if-does-not-exist
                        verbose print :source external-format))
        (t
-	(internal-load pathname nil if-does-not-exist
+        (internal-load pathname nil if-does-not-exist
                        verbose print nil external-format))))))
 
 ;;; This function mainly sets up special bindings and then calls
@@ -166,51 +166,51 @@
 ;;; CL does not correctly record source file information when LOADing a
 ;;; non-compiled file. Check whether this bug exists in SBCL and fix it if so.
 (defun load (filespec
-	     &key
-	     (verbose *load-verbose*)
-	     (print *load-print*)
-	     (if-does-not-exist t)
-	     (external-format :default))
+             &key
+             (verbose *load-verbose*)
+             (print *load-print*)
+             (if-does-not-exist t)
+             (external-format :default))
   #!+sb-doc
   "Load the file given by FILESPEC into the Lisp environment, returning
    T on success."
   (let ((*load-depth* (1+ *load-depth*))
-	;; KLUDGE: I can't find in the ANSI spec where it says that
-	;; DECLAIM/PROCLAIM of optimization policy should have file
-	;; scope. CMU CL did this, and it seems reasonable, but it
-	;; might not be right; after all, things like (PROCLAIM '(TYPE
-	;; ..)) don't have file scope, and I can't find anything under
-	;; PROCLAIM or COMPILE-FILE or LOAD or OPTIMIZE which
-	;; justifies this behavior. Hmm. -- WHN 2001-04-06
-	(sb!c::*policy* sb!c::*policy*)
-	;; The ANSI spec for LOAD says "LOAD binds *READTABLE* and
-	;; *PACKAGE* to the values they held before loading the file."
-	(*package* (sane-package))
-	(*readtable* *readtable*)
-	;; The old CMU CL LOAD function used an IF-DOES-NOT-EXIST
-	;; argument of (MEMBER :ERROR NIL) type. ANSI constrains us to
-	;; accept a generalized boolean argument value for this
-	;; externally-visible function, but the internal functions
-	;; still use the old convention.
-	(internal-if-does-not-exist (if if-does-not-exist :error nil)))
+        ;; KLUDGE: I can't find in the ANSI spec where it says that
+        ;; DECLAIM/PROCLAIM of optimization policy should have file
+        ;; scope. CMU CL did this, and it seems reasonable, but it
+        ;; might not be right; after all, things like (PROCLAIM '(TYPE
+        ;; ..)) don't have file scope, and I can't find anything under
+        ;; PROCLAIM or COMPILE-FILE or LOAD or OPTIMIZE which
+        ;; justifies this behavior. Hmm. -- WHN 2001-04-06
+        (sb!c::*policy* sb!c::*policy*)
+        ;; The ANSI spec for LOAD says "LOAD binds *READTABLE* and
+        ;; *PACKAGE* to the values they held before loading the file."
+        (*package* (sane-package))
+        (*readtable* *readtable*)
+        ;; The old CMU CL LOAD function used an IF-DOES-NOT-EXIST
+        ;; argument of (MEMBER :ERROR NIL) type. ANSI constrains us to
+        ;; accept a generalized boolean argument value for this
+        ;; externally-visible function, but the internal functions
+        ;; still use the old convention.
+        (internal-if-does-not-exist (if if-does-not-exist :error nil)))
     ;; FIXME: This VALUES wrapper is inherited from CMU CL. Once SBCL
     ;; gets function return type checking right, we can achieve a
     ;; similar effect better by adding FTYPE declarations.
     (values
      (if (streamp filespec)
-	 (if (or (equal (stream-element-type filespec)
-			'(unsigned-byte 8)))
-	     (load-as-fasl filespec verbose print)
-	     (load-as-source filespec verbose print))
-	 (let* ((pathname (pathname filespec))
-		(physical-pathname (translate-logical-pathname pathname))
-		(probed-file (probe-file physical-pathname)))
-	   (if (or probed-file
-		   (pathname-type physical-pathname))
-	       (internal-load
+         (if (or (equal (stream-element-type filespec)
+                        '(unsigned-byte 8)))
+             (load-as-fasl filespec verbose print)
+             (load-as-source filespec verbose print))
+         (let* ((pathname (pathname filespec))
+                (physical-pathname (translate-logical-pathname pathname))
+                (probed-file (probe-file physical-pathname)))
+           (if (or probed-file
+                   (pathname-type physical-pathname))
+               (internal-load
                 physical-pathname probed-file internal-if-does-not-exist
                 verbose print nil external-format)
-	       (internal-load-default-type
+               (internal-load-default-type
                 pathname internal-if-does-not-exist
                 verbose print external-format)))))))
 
@@ -221,17 +221,17 @@
   (declare (fixnum box-num code-length))
   (with-fop-stack t
     (let ((code (%primitive sb!c:allocate-code-object box-num code-length))
-	  (index (+ sb!vm:code-trace-table-offset-slot box-num)))
+          (index (+ sb!vm:code-trace-table-offset-slot box-num)))
       (declare (type index index))
       (setf (%code-debug-info code) (pop-stack))
       (dotimes (i box-num)
-	(declare (fixnum i))
-	(setf (code-header-ref code (decf index)) (pop-stack)))
+        (declare (fixnum i))
+        (setf (code-header-ref code (decf index)) (pop-stack)))
       (sb!sys:without-gcing
-	(read-n-bytes *fasl-input-stream*
-		      (code-instructions code)
-		      0
-		      code-length))
+        (read-n-bytes *fasl-input-stream*
+                      (code-instructions code)
+                      0
+                      code-length))
       code)))
 
 ;;; Moving native code during a GC or purify is not so trivial on the
@@ -248,43 +248,43 @@
   (with-fop-stack t
     (let ((stuff (list (pop-stack))))
       (dotimes (i box-num)
-	(declare (fixnum i))
-	(push (pop-stack) stuff))
-      (let* ((dbi (car (last stuff)))	; debug-info
-	     (tto (first stuff)))	; trace-table-offset
+        (declare (fixnum i))
+        (push (pop-stack) stuff))
+      (let* ((dbi (car (last stuff)))   ; debug-info
+             (tto (first stuff)))       ; trace-table-offset
 
-	(setq stuff (nreverse stuff))
+        (setq stuff (nreverse stuff))
 
-	;; FIXME: *LOAD-CODE-VERBOSE* should probably be #!+SB-SHOW.
-	(when *load-code-verbose*
-	      (format t "stuff: ~S~%" stuff)
-	      (format t
-		      "   : ~S ~S ~S ~S~%"
-		      (sb!c::compiled-debug-info-p dbi)
-		      (sb!c::debug-info-p dbi)
-		      (sb!c::compiled-debug-info-name dbi)
-		      tto)
+        ;; FIXME: *LOAD-CODE-VERBOSE* should probably be #!+SB-SHOW.
+        (when *load-code-verbose*
+              (format t "stuff: ~S~%" stuff)
+              (format t
+                      "   : ~S ~S ~S ~S~%"
+                      (sb!c::compiled-debug-info-p dbi)
+                      (sb!c::debug-info-p dbi)
+                      (sb!c::compiled-debug-info-name dbi)
+                      tto)
               (format t "   loading to the dynamic space~%"))
 
-	(let ((code (%primitive sb!c:allocate-code-object
+        (let ((code (%primitive sb!c:allocate-code-object
                                 box-num
                                 code-length))
-	      (index (+ sb!vm:code-trace-table-offset-slot box-num)))
-	  (declare (type index index))
-	  (when *load-code-verbose*
-	    (format t
-		    "  obj addr=~X~%"
-		    (sb!kernel::get-lisp-obj-address code)))
-	  (setf (%code-debug-info code) (pop stuff))
-	  (dotimes (i box-num)
-	    (declare (fixnum i))
-	    (setf (code-header-ref code (decf index)) (pop stuff)))
-	  (sb!sys:without-gcing
-	   (read-n-bytes *fasl-input-stream*
-			 (code-instructions code)
-			 0
-			 code-length))
-	  code)))))
+              (index (+ sb!vm:code-trace-table-offset-slot box-num)))
+          (declare (type index index))
+          (when *load-code-verbose*
+            (format t
+                    "  obj addr=~X~%"
+                    (sb!kernel::get-lisp-obj-address code)))
+          (setf (%code-debug-info code) (pop stuff))
+          (dotimes (i box-num)
+            (declare (fixnum i))
+            (setf (code-header-ref code (decf index)) (pop stuff)))
+          (sb!sys:without-gcing
+           (read-n-bytes *fasl-input-stream*
+                         (code-instructions code)
+                         0
+                         code-length))
+          code)))))
 
 ;;;; linkage fixups
 

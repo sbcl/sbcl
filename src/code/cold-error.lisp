@@ -23,20 +23,20 @@
    (TYPEP condition *BREAK-ON-SIGNALS*) is true, the debugger is invoked
    before any signalling is done."
   (let ((condition (coerce-to-condition datum
-					arguments
-					'simple-condition
-					'signal))
-	(*handler-clusters* *handler-clusters*)
-	(old-bos *break-on-signals*))
+                                        arguments
+                                        'simple-condition
+                                        'signal))
+        (*handler-clusters* *handler-clusters*)
+        (old-bos *break-on-signals*))
     (restart-case
-	(when (typep condition *break-on-signals*)
-	  (let ((*break-on-signals* nil))
-	    (break "~A~%BREAK was entered because of *BREAK-ON-SIGNALS* ~
+        (when (typep condition *break-on-signals*)
+          (let ((*break-on-signals* nil))
+            (break "~A~%BREAK was entered because of *BREAK-ON-SIGNALS* ~
                     (now rebound to NIL)."
-		   condition)))
+                   condition)))
       ;; Give the user a chance to unset *BREAK-ON-SIGNALS* on the
       ;; way out.
-      ;; 
+      ;;
       ;; (e.g.: Consider a long compilation. After a failed compile
       ;; the user sets *BREAK-ON-SIGNALS* to T, and select the
       ;; RECOMPILE restart. Once the user diagnoses and fixes the
@@ -44,35 +44,35 @@
       ;; he's entered the *BREAK-ON-SIGNALS* hell with no escape,
       ;; unless we provide this restart.)
       (reassign (new-value)
-	:report
-	"Return from BREAK and assign a new value to *BREAK-ON-SIGNALS*."
-	:interactive
-	(lambda ()
-	  (let (new-value)
-	    (loop
-	     (format *query-io*
-		     "Enter new value for *BREAK-ON-SIGNALS*. ~
+        :report
+        "Return from BREAK and assign a new value to *BREAK-ON-SIGNALS*."
+        :interactive
+        (lambda ()
+          (let (new-value)
+            (loop
+             (format *query-io*
+                     "Enter new value for *BREAK-ON-SIGNALS*. ~
                       Current value is ~S.~%~
                       > "
-		     old-bos)
-	     (force-output *query-io*)
-	     (let ((*break-on-signals* nil))
-	       (setf new-value (eval (read *query-io*)))
-	       (if (typep new-value 'type-specifier)
-		   (return)
-		   (format *query-io*
-			   "~S is not a valid value for *BREAK-ON-SIGNALS* ~
+                     old-bos)
+             (force-output *query-io*)
+             (let ((*break-on-signals* nil))
+               (setf new-value (eval (read *query-io*)))
+               (if (typep new-value 'type-specifier)
+                   (return)
+                   (format *query-io*
+                           "~S is not a valid value for *BREAK-ON-SIGNALS* ~
                             (must be a type-specifier).~%"
-			   new-value))))
-	    (list new-value)))
-	(setf *break-on-signals* new-value)))
+                           new-value))))
+            (list new-value)))
+        (setf *break-on-signals* new-value)))
     (loop
       (unless *handler-clusters*
-	(return))
+        (return))
       (let ((cluster (pop *handler-clusters*)))
-	(dolist (handler cluster)
-	  (when (typep condition (car handler))
-	    (funcall (cdr handler) condition)))))
+        (dolist (handler cluster)
+          (when (typep condition (car handler))
+            (funcall (cdr handler) condition)))))
     nil))
 
 ;;; a shared idiom in ERROR, CERROR, and BREAK: The user probably
@@ -82,7 +82,7 @@
 (eval-when (:compile-toplevel :execute)
   (defmacro-mundanely maybe-find-stack-top-hint ()
     `(or sb!debug:*stack-top-hint*
-	 (nth-value 1 (find-caller-name-and-frame)))))
+         (nth-value 1 (find-caller-name-and-frame)))))
 
 (defun error (datum &rest arguments)
   #!+sb-doc
@@ -93,33 +93,33 @@
 
   (/show0 "cold-printing ERROR arguments one by one..")
   #!+sb-show (dolist (argument arguments)
-	       (sb!impl::cold-print argument))
+               (sb!impl::cold-print argument))
   (/show0 "done cold-printing ERROR arguments")
 
   (infinite-error-protect
     (let ((condition (coerce-to-condition datum arguments
-					  'simple-error 'error))
-	  (sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
+                                          'simple-error 'error))
+          (sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
       (/show0 "done coercing DATUM to CONDITION")
       (let ((sb!debug:*stack-top-hint* nil))
-	(/show0 "signalling CONDITION from within ERROR")
-	(signal condition))
+        (/show0 "signalling CONDITION from within ERROR")
+        (signal condition))
       (/show0 "done signalling CONDITION within ERROR")
       (invoke-debugger condition))))
 
 (defun cerror (continue-string datum &rest arguments)
   (infinite-error-protect
     (with-simple-restart
-	(continue "~A" (apply #'format nil continue-string arguments))
+        (continue "~A" (apply #'format nil continue-string arguments))
       (let ((condition (coerce-to-condition datum
-					    arguments
-					    'simple-error
-					    'cerror))
-	    (sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
-	(with-condition-restarts condition (list (find-restart 'continue))
-	  (let ((sb!debug:*stack-top-hint* nil))
-	    (signal condition))
-	  (invoke-debugger condition)))))
+                                            arguments
+                                            'simple-error
+                                            'cerror))
+            (sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
+        (with-condition-restarts condition (list (find-restart 'continue))
+          (let ((sb!debug:*stack-top-hint* nil))
+            (signal condition))
+          (invoke-debugger condition)))))
   nil)
 
 ;;; like BREAK, but without rebinding *DEBUGGER-HOOK* to NIL, so that
@@ -131,8 +131,8 @@
   (infinite-error-protect
     (with-simple-restart (continue "Return from ~S." what)
       (let ((sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
-	(invoke-debugger
-	 (coerce-to-condition datum arguments 'simple-condition what)))))
+        (invoke-debugger
+         (coerce-to-condition datum arguments 'simple-condition what)))))
   nil)
 
 (defun break (&optional (datum "break") &rest arguments)
@@ -141,7 +141,7 @@
    of condition handling occurring."
   (let ((*debugger-hook* nil)) ; as specifically required by ANSI
     (apply #'%break 'break datum arguments)))
-	    
+
 (defun warn (datum &rest arguments)
   #!+sb-doc
   "Warn about a situation by signalling a condition formed by DATUM and
@@ -155,29 +155,29 @@
   ;; -- WHN 19991009
   (if (not *cold-init-complete-p*)
       (progn
-	(/show0 "ignoring WARN in cold init, arguments=..")
-	#!+sb-show (dolist (argument arguments)
-		     (sb!impl::cold-print argument)))
+        (/show0 "ignoring WARN in cold init, arguments=..")
+        #!+sb-show (dolist (argument arguments)
+                     (sb!impl::cold-print argument)))
       (infinite-error-protect
        (/show0 "doing COERCE-TO-CONDITION")
        (let ((condition (coerce-to-condition datum arguments
-					     'simple-warning 'warn)))
-	 (/show0 "back from COERCE-TO-CONDITION, doing ENFORCE-TYPE")
-	 (enforce-type condition warning)
-	 (/show0 "back from ENFORCE-TYPE, doing RESTART-CASE MUFFLE-WARNING")
-	 (restart-case (signal condition)
-	   (muffle-warning ()
-	     :report "Skip warning."
-	     (return-from warn nil)))
-	 (/show0 "back from RESTART-CASE MUFFLE-WARNING (i.e. normal return)")
+                                             'simple-warning 'warn)))
+         (/show0 "back from COERCE-TO-CONDITION, doing ENFORCE-TYPE")
+         (enforce-type condition warning)
+         (/show0 "back from ENFORCE-TYPE, doing RESTART-CASE MUFFLE-WARNING")
+         (restart-case (signal condition)
+           (muffle-warning ()
+             :report "Skip warning."
+             (return-from warn nil)))
+         (/show0 "back from RESTART-CASE MUFFLE-WARNING (i.e. normal return)")
 
-	 (let ((badness (etypecase condition
-			  (style-warning 'style-warning)
-			  (warning 'warning))))
-	   (/show0 "got BADNESS, calling FORMAT")
-	   (format *error-output*
-		   "~&~@<~S: ~3i~:_~A~:>~%"
-		   badness
-		   condition)
-	   (/show0 "back from FORMAT, voila!")))))
+         (let ((badness (etypecase condition
+                          (style-warning 'style-warning)
+                          (warning 'warning))))
+           (/show0 "got BADNESS, calling FORMAT")
+           (format *error-output*
+                   "~&~@<~S: ~3i~:_~A~:>~%"
+                   badness
+                   condition)
+           (/show0 "back from FORMAT, voila!")))))
   nil)

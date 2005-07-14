@@ -6,9 +6,9 @@
 (defun %define-fun-name-syntax (symbol checker)
   (let ((found (assoc symbol *valid-fun-names-alist* :test #'eq)))
     (if found
-	(setf (cdr found) checker)
-	(setq *valid-fun-names-alist*
-	      (acons symbol checker *valid-fun-names-alist*)))))
+        (setf (cdr found) checker)
+        (setq *valid-fun-names-alist*
+              (acons symbol checker *valid-fun-names-alist*)))))
 
 (defmacro define-function-name-syntax (symbol (var) &body body)
   #!+sb-doc
@@ -45,16 +45,16 @@ use as a BLOCK name in the function in question."
 
 (define-function-name-syntax setf (name)
   (when (and (cdr name)
-	     (consp (cdr name)))
+             (consp (cdr name)))
     (destructuring-bind (fun &rest rest) (cdr name)
       (when (null rest)
-	(typecase fun
-	  ;; ordinary (SETF FOO) case
-	  (symbol (values t fun))
-	  ;; reasonable (SETF (QUUX BAZ)) case [but not (SETF (SETF
-	  ;; FOO))]
-	  (cons (unless (eq (car fun) 'setf)
-		  (valid-function-name-p fun))))))))
+        (typecase fun
+          ;; ordinary (SETF FOO) case
+          (symbol (values t fun))
+          ;; reasonable (SETF (QUUX BAZ)) case [but not (SETF (SETF
+          ;; FOO))]
+          (cons (unless (eq (car fun) 'setf)
+                  (valid-function-name-p fun))))))))
 
 #-sb-xc-host
 (defun !function-names-cold-init ()

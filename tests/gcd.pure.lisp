@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -20,22 +20,22 @@
   (defun random-factor (n)
     (let ((accum 1))
       (dotimes (i n accum)
-	(setf accum (* accum (nth (random 20)
-				  '(2 2 2 3 3
-				    5 7 11 13 17
-				    19 23 29 31 37
-				    41 43 47 53 59)))))))
-  
+        (setf accum (* accum (nth (random 20)
+                                  '(2 2 2 3 3
+                                    5 7 11 13 17
+                                    19 23 29 31 37
+                                    41 43 47 53 59)))))))
+
   (with-open-file (s "tests/gcd.impure.lisp"
-		     :direction :output :if-exists :supersede)
+                     :direction :output :if-exists :supersede)
     (dotimes (i 40)
       (dotimes (j (ceiling i 2))
-	(let ((x (random-factor i))
-	      (y (random-factor j)))
-	  (format s "~&~S~%" `(assert (= (gcd ,x ,y) ,(gcd x y)))))))))
+        (let ((x (random-factor i))
+              (y (random-factor j)))
+          (format s "~&~S~%" `(assert (= (gcd ,x ,y) ,(gcd x y)))))))))
 ;;; run from a different lisp implementation.  As such, if you get a
 ;;; failure, check (by hand!) who is right.  -- CSR, 2004-08-10
-     
+
 (ASSERT (= (GCD 3 1) 1))
 (ASSERT (= (GCD 9 1) 1))
 (ASSERT (= (GCD 1353 1) 1))

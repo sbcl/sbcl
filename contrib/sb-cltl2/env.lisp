@@ -59,15 +59,15 @@ alist of declarations that apply to the apparent binding of VAR."
     (case declaration-name
       (optimize
        (let ((policy (sb-c::lexenv-policy env)))
-	 (collect ((res))
-	   (dolist (name sb-c::*policy-qualities*)
-	     (res (list name (cdr (assoc name policy)))))
-	   (loop for (name . nil) in sb-c::*policy-dependent-qualities*
-		 do (res (list name (sb-c::policy-quality policy name))))
-	   (res))))
+         (collect ((res))
+           (dolist (name sb-c::*policy-qualities*)
+             (res (list name (cdr (assoc name policy)))))
+           (loop for (name . nil) in sb-c::*policy-dependent-qualities*
+                 do (res (list name (sb-c::policy-quality policy name))))
+           (res))))
       (sb-ext:muffle-conditions
        (car (rassoc 'muffle-warning
-		    (sb-c::lexenv-handled-conditions env))))
+                    (sb-c::lexenv-handled-conditions env))))
       (t (error "Unsupported declaration ~S." declaration-name)))))
 
 (defun parse-macro (name lambda-list body &optional env)

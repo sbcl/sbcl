@@ -37,21 +37,21 @@
 ;;; running under the cross-compilation host ANSI Common Lisp.
 #+sb-xc-host
 (defun make-specializable-array (dimensions
-				 &rest rest
-				 &key (element-type t)
-				 &allow-other-keys)
+                                 &rest rest
+                                 &key (element-type t)
+                                 &allow-other-keys)
   (apply #'make-array
-	 dimensions
-	 (if (eq element-type t)
-	   rest
-	   (do ((reversed-modified-rest nil))
-	       ((null rest) (nreverse reversed-modified-rest))
-	     (let ((first (pop rest))
-		   (second (pop rest)))
-	       (when (eq first :element-type)
-		 (setf second t))
-	       (push first reversed-modified-rest)
-	       (push second reversed-modified-rest))))))
+         dimensions
+         (if (eq element-type t)
+           rest
+           (do ((reversed-modified-rest nil))
+               ((null rest) (nreverse reversed-modified-rest))
+             (let ((first (pop rest))
+                   (second (pop rest)))
+               (when (eq first :element-type)
+                 (setf second t))
+               (push first reversed-modified-rest)
+               (push second reversed-modified-rest))))))
 #-sb-xc-host
 (declaim #!-sb-fluid (inline make-specializable-array))
 #-sb-xc-host

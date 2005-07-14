@@ -14,7 +14,7 @@
 (in-package "SB!IMPL")
 
 (macrolet ((def (name &optional (args '(x)))
-	     `(defun ,name ,args (,name ,@args))))
+             `(defun ,name ,args (,name ,@args))))
   (def %code-code-size)
   (def %code-debug-info)
   (def %code-entry-points)

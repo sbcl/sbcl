@@ -73,29 +73,29 @@ where a is the intended low-order byte and d the high-order byte."
 ;;; Section 3.4:  Auxilliary functions
 
 (declaim (inline f g h i)
-	 (ftype (function (ub32 ub32 ub32) ub32) f g h i))
+         (ftype (function (ub32 ub32 ub32) ub32) f g h i))
 
 (defun f (x y z)
   (declare (type ub32 x y z)
-	   (optimize (speed 3) (safety 0) (space 0) (debug 0)))
+           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   #+cmu
   (kernel:32bit-logical-or (kernel:32bit-logical-and x y)
-			   (kernel:32bit-logical-andc1 x z))
+                           (kernel:32bit-logical-andc1 x z))
   #-cmu
   (logior (logand x y) (logandc1 x z)))
 
 (defun g (x y z)
   (declare (type ub32 x y z)
-	   (optimize (speed 3) (safety 0) (space 0) (debug 0)))
+           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   #+cmu
   (kernel:32bit-logical-or (kernel:32bit-logical-and x z)
-			   (kernel:32bit-logical-andc2 y z))
+                           (kernel:32bit-logical-andc2 y z))
   #-cmu
   (logior (logand x z) (logandc2 y z)))
 
 (defun h (x y z)
   (declare (type ub32 x y z)
-	   (optimize (speed 3) (safety 0) (space 0) (debug 0)))
+           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   #+cmu
   (kernel:32bit-logical-xor x (kernel:32bit-logical-xor y z))
   #-cmu
@@ -103,14 +103,14 @@ where a is the intended low-order byte and d the high-order byte."
 
 (defun i (x y z)
   (declare (type ub32 x y z)
-	   (optimize (speed 3) (safety 0) (space 0) (debug 0)))
+           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   #+cmu
   (kernel:32bit-logical-xor y (kernel:32bit-logical-orc2 x z))
   #-cmu
   (ldb (byte 32 0) (logxor y (logorc2 x z))))
 
 (declaim (inline mod32+)
-	 (ftype (function (ub32 ub32) ub32) mod32+))
+         (ftype (function (ub32 ub32) ub32) mod32+))
 (defun mod32+ (a b)
   (declare (type ub32 a b) (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   (ldb (byte 32 0) (+ a b)))
@@ -126,14 +126,14 @@ where a is the intended low-order byte and d the high-order byte."
   `(ldb (byte 32 0) (+ ,a ,b)))
 
 (declaim (inline rol32)
-	 (ftype (function (ub32 (unsigned-byte 5)) ub32) rol32))
+         (ftype (function (ub32 (unsigned-byte 5)) ub32) rol32))
 (defun rol32 (a s)
   (declare (type ub32 a) (type (unsigned-byte 5) s)
-	   (optimize (speed 3) (safety 0) (space 0) (debug 0)))
+           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   #+cmu
   (kernel:32bit-logical-or #+little-endian (kernel:shift-towards-end a s)
-			   #+big-endian (kernel:shift-towards-start a s)
-			   (ash a (- s 32)))
+                           #+big-endian (kernel:shift-towards-start a s)
+                           (ash a (- s 32)))
   #+sbcl
   (sb-rotate-byte:rotate-byte s (byte 32 0) a)
   #-(or cmu sbcl)
@@ -143,25 +143,25 @@ where a is the intended low-order byte and d the high-order byte."
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *t* (make-array 64 :element-type 'ub32
-				:initial-contents
-				(loop for i from 1 to 64
-				      collect
-				      (truncate
-				       (* 4294967296
-					  (abs (sin (float i 0.0d0)))))))))
+                                :initial-contents
+                                (loop for i from 1 to 64
+                                      collect
+                                      (truncate
+                                       (* 4294967296
+                                          (abs (sin (float i 0.0d0)))))))))
 
 ;;; Section 3.4:  Helper Macro for single round definitions
 
 (defmacro with-md5-round ((op block) &rest clauses)
   (loop for (a b c d k s i) in clauses
-	collect
-	`(setq ,a (mod32+ ,b (rol32 (mod32+ (mod32+ ,a (,op ,b ,c ,d))
-					    (mod32+ (aref ,block ,k)
-						    ,(aref *t* (1- i))))
-			            ,s)))
-	into result
-	finally
-	(return `(progn ,@result))))
+        collect
+        `(setq ,a (mod32+ ,b (rol32 (mod32+ (mod32+ ,a (,op ,b ,c ,d))
+                                            (mod32+ (aref ,block ,k)
+                                                    ,(aref *t* (1- i))))
+                                    ,s)))
+        into result
+        finally
+        (return `(progn ,@result))))
 
 ;;; Section 3.3:  (Initial) MD5 Working Set
 
@@ -198,9 +198,9 @@ registers A, B, C and D."
   (let ((regs (make-array 4 :element-type '(unsigned-byte 32))))
     (declare (type md5-regs regs))
     (setf (md5-regs-a regs) +md5-magic-a+
-	  (md5-regs-b regs) +md5-magic-b+
-	  (md5-regs-c regs) +md5-magic-c+
-	  (md5-regs-d regs) +md5-magic-d+)
+          (md5-regs-b regs) +md5-magic-b+
+          (md5-regs-c regs) +md5-magic-c+
+          (md5-regs-d regs) +md5-magic-d+)
     regs))
 
 ;;; Section 3.4:  Operation on 16-Word Blocks
@@ -210,10 +210,10 @@ registers A, B, C and D."
 word block of input, and updates the working state in A, B, C, and D
 accordingly."
   (declare (type md5-regs regs)
-	   (type (simple-array ub32 (16)) block)
-	   (optimize (speed 3) (safety 0) (space 0) (debug 0)))
+           (type (simple-array ub32 (16)) block)
+           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   (let ((a (md5-regs-a regs)) (b (md5-regs-b regs))
-	(c (md5-regs-c regs)) (d (md5-regs-d regs)))
+        (c (md5-regs-c regs)) (d (md5-regs-d regs)))
     (declare (type ub32 a b c d))
     ;; Round 1
     (with-md5-round (f block)
@@ -241,9 +241,9 @@ accordingly."
       (A B C D  4  6 61)(D A B C 11 10 62)(C D A B  2 15 63)(B C D A  9 21 64))
     ;; Update and return
     (setf (md5-regs-a regs) (mod32+ (md5-regs-a regs) a)
-	  (md5-regs-b regs) (mod32+ (md5-regs-b regs) b)
-	  (md5-regs-c regs) (mod32+ (md5-regs-c regs) c)
-	  (md5-regs-d regs) (mod32+ (md5-regs-d regs) d))
+          (md5-regs-b regs) (mod32+ (md5-regs-b regs) b)
+          (md5-regs-c regs) (mod32+ (md5-regs-c regs) c)
+          (md5-regs-d regs) (mod32+ (md5-regs-d regs) d))
     regs))
 
 ;;; Section 3.4:  Converting 8bit-vectors into 16-Word Blocks
@@ -255,9 +255,9 @@ word MD5 block.  This currently works on (unsigned-byte 8) and
 character simple-arrays, via the functions `fill-block-ub8' and
 `fill-block-char' respectively."
   (declare (type (integer 0 #.(- most-positive-fixnum 64)) offset)
-	   (type (simple-array ub32 (16)) block)
-	   (type (simple-array * (*)) buffer)
-	   (optimize (speed 3) (safety 0) (space 0) (debug 0)))
+           (type (simple-array ub32 (16)) block)
+           (type (simple-array * (*)) buffer)
+           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   (etypecase buffer
     ((simple-array (unsigned-byte 8) (*))
      (fill-block-ub8 block buffer offset))
@@ -268,9 +268,9 @@ character simple-arrays, via the functions `fill-block-ub8' and
   "Convert a complete 64 (unsigned-byte 8) input vector segment
 starting from offset into the given 16 word MD5 block."
   (declare (type (integer 0 #.(- most-positive-fixnum 64)) offset)
-	   (type (simple-array ub32 (16)) block)
-	   (type (simple-array (unsigned-byte 8) (*)) buffer)
-	   (optimize (speed 3) (safety 0) (space 0) (debug 0)))
+           (type (simple-array ub32 (16)) block)
+           (type (simple-array (unsigned-byte 8) (*)) buffer)
+           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   #+(and :cmu :little-endian)
   (kernel:bit-bash-copy
    buffer (+ (* vm:vector-data-offset vm:word-bits) (* offset vm:byte-bits))
@@ -280,22 +280,22 @@ starting from offset into the given 16 word MD5 block."
   (sb-kernel:ub8-bash-copy buffer offset block 0 64)
   #-(or (and :sbcl :little-endian) (and :cmu :little-endian))
   (loop for i of-type (integer 0 16) from 0
-	for j of-type (integer 0 #.most-positive-fixnum)
-	from offset to (+ offset 63) by 4
-	do
-	(setf (aref block i)
-	      (assemble-ub32 (aref buffer j)
-			     (aref buffer (+ j 1))
-			     (aref buffer (+ j 2))
-			     (aref buffer (+ j 3))))))
+        for j of-type (integer 0 #.most-positive-fixnum)
+        from offset to (+ offset 63) by 4
+        do
+        (setf (aref block i)
+              (assemble-ub32 (aref buffer j)
+                             (aref buffer (+ j 1))
+                             (aref buffer (+ j 2))
+                             (aref buffer (+ j 3))))))
 
 (defun fill-block-char (block buffer offset)
   "Convert a complete 64 character input string segment starting from
 offset into the given 16 word MD5 block."
   (declare (type (integer 0 #.(- most-positive-fixnum 64)) offset)
-	   (type (simple-array ub32 (16)) block)
-	   (type simple-string buffer)
-	   (optimize (speed 3) (safety 0) (space 0) (debug 0)))
+           (type (simple-array ub32 (16)) block)
+           (type simple-string buffer)
+           (optimize (speed 3) (safety 0) (space 0) (debug 0)))
   #+(and :cmu :little-endian)
   (kernel:bit-bash-copy
    buffer (+ (* vm:vector-data-offset vm:word-bits) (* offset vm:byte-bits))
@@ -305,14 +305,14 @@ offset into the given 16 word MD5 block."
   (sb-kernel:ub8-bash-copy buffer offset block 0 64)
   #-(or (and :sbcl :little-endian) (and :cmu :little-endian))
   (loop for i of-type (integer 0 16) from 0
-	for j of-type (integer 0 #.most-positive-fixnum)
-	from offset to (+ offset 63) by 4
-	do
-	(setf (aref block i)
-	      (assemble-ub32 (char-code (schar buffer j))
-			     (char-code (schar buffer (+ j 1)))
-			     (char-code (schar buffer (+ j 2)))
-			     (char-code (schar buffer (+ j 3)))))))
+        for j of-type (integer 0 #.most-positive-fixnum)
+        from offset to (+ offset 63) by 4
+        do
+        (setf (aref block i)
+              (assemble-ub32 (char-code (schar buffer j))
+                             (char-code (schar buffer (+ j 1)))
+                             (char-code (schar buffer (+ j 2)))
+                             (char-code (schar buffer (+ j 3)))))))
 
 ;;; Section 3.5:  Message Digest Output
 
@@ -321,18 +321,18 @@ offset into the given 16 word MD5 block."
   "Create the final 16 byte message-digest from the MD5 working state
 in regs.  Returns a (simple-array (unsigned-byte 8) (16))."
   (declare (optimize (speed 3) (safety 0) (space 0) (debug 0))
-	   (type md5-regs regs))
+           (type md5-regs regs))
   (let ((result (make-array 16 :element-type '(unsigned-byte 8))))
     (declare (type (simple-array (unsigned-byte 8) (16)) result))
     (macrolet ((frob (reg offset)
-		 (let ((var (gensym)))
-		   `(let ((,var ,reg))
-		      (declare (type ub32 ,var))
-		      (setf
-		       (aref result ,offset) (ldb (byte 8 0) ,var)
-		       (aref result ,(+ offset 1)) (ldb (byte 8 8) ,var)
-		       (aref result ,(+ offset 2)) (ldb (byte 8 16) ,var)
-		       (aref result ,(+ offset 3)) (ldb (byte 8 24) ,var))))))
+                 (let ((var (gensym)))
+                   `(let ((,var ,reg))
+                      (declare (type ub32 ,var))
+                      (setf
+                       (aref result ,offset) (ldb (byte 8 0) ,var)
+                       (aref result ,(+ offset 1)) (ldb (byte 8 8) ,var)
+                       (aref result ,(+ offset 2)) (ldb (byte 8 16) ,var)
+                       (aref result ,(+ offset 3)) (ldb (byte 8 24) ,var))))))
       (frob (md5-regs-a regs) 0)
       (frob (md5-regs-b regs) 4)
       (frob (md5-regs-c regs) 8)
@@ -342,16 +342,16 @@ in regs.  Returns a (simple-array (unsigned-byte 8) (16))."
 ;;; Mid-Level Drivers
 
 (defstruct (md5-state
-	     (:constructor make-md5-state ())
-	     (:copier))
+             (:constructor make-md5-state ())
+             (:copier))
   (regs (initial-md5-regs) :type md5-regs :read-only t)
   (amount 0 :type
-	  #-md5-small-length (integer 0 *)
-	  #+md5-small-length (unsigned-byte 29))
+          #-md5-small-length (integer 0 *)
+          #+md5-small-length (unsigned-byte 29))
   (block (make-array 16 :element-type '(unsigned-byte 32)) :read-only t
-	 :type (simple-array (unsigned-byte 32) (16)))
+         :type (simple-array (unsigned-byte 32) (16)))
   (buffer (make-array 64 :element-type '(unsigned-byte 8)) :read-only t
-	 :type (simple-array (unsigned-byte 8) (64)))
+         :type (simple-array (unsigned-byte 8) (64)))
   (buffer-index 0 :type (integer 0 63))
   (finalized-p nil))
 
@@ -361,15 +361,15 @@ in regs.  Returns a (simple-array (unsigned-byte 8) (16))."
 from-offset and copying count elements into the 64 byte buffer
 starting at buffer-offset."
   (declare (optimize (speed 3) (safety 0) (space 0) (debug 0))
-	   (type (unsigned-byte 29) from-offset)
-	   (type (integer 0 63) count buffer-offset)
-	   (type (simple-array * (*)) from)
-	   (type (simple-array (unsigned-byte 8) (64)) buffer))
+           (type (unsigned-byte 29) from-offset)
+           (type (integer 0 63) count buffer-offset)
+           (type (simple-array * (*)) from)
+           (type (simple-array (unsigned-byte 8) (64)) buffer))
   #+cmu
   (kernel:bit-bash-copy
    from (+ (* vm:vector-data-offset vm:word-bits) (* from-offset vm:byte-bits))
    buffer (+ (* vm:vector-data-offset vm:word-bits)
-	     (* buffer-offset vm:byte-bits))
+             (* buffer-offset vm:byte-bits))
    (* count vm:byte-bits))
   #+sbcl
   (sb-kernel:ub8-bash-copy from from-offset buffer buffer-offset count)
@@ -377,82 +377,82 @@ starting at buffer-offset."
   (etypecase from
     (simple-string
      (loop for buffer-index of-type (integer 0 64) from buffer-offset
-	   for from-index of-type fixnum from from-offset
-	   below (+ from-offset count)
-	   do
-	   (setf (aref buffer buffer-index)
-		 (char-code (schar (the simple-string from) from-index)))))
+           for from-index of-type fixnum from from-offset
+           below (+ from-offset count)
+           do
+           (setf (aref buffer buffer-index)
+                 (char-code (schar (the simple-string from) from-index)))))
     ((simple-array (unsigned-byte 8) (*))
      (loop for buffer-index of-type (integer 0 64) from buffer-offset
-	   for from-index of-type fixnum from from-offset
-	   below (+ from-offset count)
-	   do
-	   (setf (aref buffer buffer-index)
-		 (aref (the (simple-array (unsigned-byte 8) (*)) from)
-		       from-index))))))
+           for from-index of-type fixnum from from-offset
+           below (+ from-offset count)
+           do
+           (setf (aref buffer buffer-index)
+                 (aref (the (simple-array (unsigned-byte 8) (*)) from)
+                       from-index))))))
 
 (defun update-md5-state (state sequence &key (start 0) (end (length sequence)))
   "Update the given md5-state from sequence, which is either a
 simple-string or a simple-array with element-type (unsigned-byte 8),
 bounded by start and end, which must be numeric bounding-indices."
   (declare (type md5-state state)
-	   (type (simple-array * (*)) sequence)
-	   (type fixnum start end)
-	   (optimize (speed 3) #+(or cmu sbcl) (safety 0) (space 0) (debug 0))
-	   #+cmu
-	   (ext:optimize-interface (safety 1) (debug 1)))
+           (type (simple-array * (*)) sequence)
+           (type fixnum start end)
+           (optimize (speed 3) #+(or cmu sbcl) (safety 0) (space 0) (debug 0))
+           #+cmu
+           (ext:optimize-interface (safety 1) (debug 1)))
   (let ((regs (md5-state-regs state))
-	(block (md5-state-block state))
-	(buffer (md5-state-buffer state))
-	(buffer-index (md5-state-buffer-index state))
-	(length (- end start)))
+        (block (md5-state-block state))
+        (buffer (md5-state-buffer state))
+        (buffer-index (md5-state-buffer-index state))
+        (length (- end start)))
     (declare (type md5-regs regs) (type fixnum length)
-	     (type (integer 0 63) buffer-index)
-	     (type (simple-array (unsigned-byte 32) (16)) block)
-	     (type (simple-array (unsigned-byte 8) (64)) buffer))
+             (type (integer 0 63) buffer-index)
+             (type (simple-array (unsigned-byte 32) (16)) block)
+             (type (simple-array (unsigned-byte 8) (64)) buffer))
     ;; Handle old rest
     (unless (zerop buffer-index)
       (let ((amount (min (- 64 buffer-index) length)))
-	(declare (type (integer 0 63) amount))
-	(copy-to-buffer sequence start amount buffer buffer-index)
-	(setq start (the fixnum (+ start amount)))
-	(when (>= start end)
-	  (setf (md5-state-buffer-index state) (+ buffer-index amount))
-	  (return-from update-md5-state state)))
+        (declare (type (integer 0 63) amount))
+        (copy-to-buffer sequence start amount buffer buffer-index)
+        (setq start (the fixnum (+ start amount)))
+        (when (>= start end)
+          (setf (md5-state-buffer-index state) (+ buffer-index amount))
+          (return-from update-md5-state state)))
       (fill-block-ub8 block buffer 0)
       (update-md5-block regs block))
     ;; Handle main-part and new-rest
     (etypecase sequence
       ((simple-array (unsigned-byte 8) (*))
        (locally
-	   (declare (type (simple-array (unsigned-byte 8) (*)) sequence))
-	 (loop for offset of-type (unsigned-byte 29) from start below end by 64
-	       until (< (- end offset) 64)
-	       do
-	       (fill-block-ub8 block sequence offset)
-	       (update-md5-block regs block)
-	       finally
-	       (let ((amount (- end offset)))
-		 (unless (zerop amount)
-		   (copy-to-buffer sequence offset amount buffer 0))
-		 (setf (md5-state-buffer-index state) amount)))))
+           (declare (type (simple-array (unsigned-byte 8) (*)) sequence))
+         (loop for offset of-type (unsigned-byte 29) from start below end by 64
+               until (< (- end offset) 64)
+               do
+               (fill-block-ub8 block sequence offset)
+               (update-md5-block regs block)
+               finally
+               (let ((amount (- end offset)))
+                 (unless (zerop amount)
+                   (copy-to-buffer sequence offset amount buffer 0))
+                 (setf (md5-state-buffer-index state) amount)))))
       (simple-string
        (locally
-	   (declare (type simple-string sequence))
-	 (loop for offset of-type (unsigned-byte 29) from start below end by 64
-	       until (< (- end offset) 64)
-	       do
-	       (fill-block-char block sequence offset)
-	       (update-md5-block regs block)
-	       finally
-	       (let ((amount (- end offset)))
-		 (unless (zerop amount)
-		   (copy-to-buffer sequence offset amount buffer 0))
-		 (setf (md5-state-buffer-index state) amount))))))
+           (declare (type simple-string sequence))
+         (loop for offset of-type (unsigned-byte 29) from start below end by 64
+               until (< (- end offset) 64)
+               do
+               (fill-block-char block sequence offset)
+               (update-md5-block regs block)
+               finally
+               (let ((amount (- end offset)))
+                 (unless (zerop amount)
+                   (copy-to-buffer sequence offset amount buffer 0))
+                 (setf (md5-state-buffer-index state) amount))))))
     (setf (md5-state-amount state)
-	  #-md5-small-length (+ (md5-state-amount state) length)
-	  #+md5-small-length (the (unsigned-byte 29)
-			       (+ (md5-state-amount state) length)))
+          #-md5-small-length (+ (md5-state-amount state) length)
+          #+md5-small-length (the (unsigned-byte 29)
+                               (+ (md5-state-amount state) length)))
     state))
 
 (defun finalize-md5-state (state)
@@ -464,41 +464,41 @@ The resulting MD5 message-digest is returned as an array of sixteen
 (unsigned-byte 8) values.  Calling `update-md5-state' after a call to
 `finalize-md5-state' results in unspecified behaviour."
   (declare (type md5-state state)
-	   (optimize (speed 3) #+(or cmu sbcl) (safety 0) (space 0) (debug 0))
-	   #+cmu
-	   (ext:optimize-interface (safety 1) (debug 1)))
+           (optimize (speed 3) #+(or cmu sbcl) (safety 0) (space 0) (debug 0))
+           #+cmu
+           (ext:optimize-interface (safety 1) (debug 1)))
   (or (md5-state-finalized-p state)
       (let ((regs (md5-state-regs state))
-	    (block (md5-state-block state))
-	    (buffer (md5-state-buffer state))
-	    (buffer-index (md5-state-buffer-index state))
-	    (total-length (* 8 (md5-state-amount state))))
-	(declare (type md5-regs regs)
-		 (type (integer 0 63) buffer-index)
-		 (type (simple-array ub32 (16)) block)
-		 (type (simple-array (unsigned-byte 8) (*)) buffer))
-	;; Add mandatory bit 1 padding
-	(setf (aref buffer buffer-index) #x80)
-	;; Fill with 0 bit padding
-	(loop for index of-type (integer 0 64)
-	      from (1+ buffer-index) below 64
-	      do (setf (aref buffer index) #x00))
-	(fill-block-ub8 block buffer 0)
-	;; Flush block first if length wouldn't fit
-	(when (>= buffer-index 56)
-	  (update-md5-block regs block)
-	  ;; Create new fully 0 padded block
-	  (loop for index of-type (integer 0 16) from 0 below 16
-		do (setf (aref block index) #x00000000)))
-	;; Add 64bit message bit length
-	(setf (aref block 14) (ldb (byte 32 0) total-length))
-	#-md5-small-length
-	(setf (aref block 15) (ldb (byte 32 32) total-length))
-	;; Flush last block
-	(update-md5-block regs block)
-	;; Done, remember digest for later calls
-	(setf (md5-state-finalized-p state)
-	      (md5regs-digest regs)))))
+            (block (md5-state-block state))
+            (buffer (md5-state-buffer state))
+            (buffer-index (md5-state-buffer-index state))
+            (total-length (* 8 (md5-state-amount state))))
+        (declare (type md5-regs regs)
+                 (type (integer 0 63) buffer-index)
+                 (type (simple-array ub32 (16)) block)
+                 (type (simple-array (unsigned-byte 8) (*)) buffer))
+        ;; Add mandatory bit 1 padding
+        (setf (aref buffer buffer-index) #x80)
+        ;; Fill with 0 bit padding
+        (loop for index of-type (integer 0 64)
+              from (1+ buffer-index) below 64
+              do (setf (aref buffer index) #x00))
+        (fill-block-ub8 block buffer 0)
+        ;; Flush block first if length wouldn't fit
+        (when (>= buffer-index 56)
+          (update-md5-block regs block)
+          ;; Create new fully 0 padded block
+          (loop for index of-type (integer 0 16) from 0 below 16
+                do (setf (aref block index) #x00000000)))
+        ;; Add 64bit message bit length
+        (setf (aref block 14) (ldb (byte 32 0) total-length))
+        #-md5-small-length
+        (setf (aref block 15) (ldb (byte 32 32) total-length))
+        ;; Flush last block
+        (update-md5-block regs block)
+        ;; Done, remember digest for later calls
+        (setf (md5-state-finalized-p state)
+              (md5regs-digest regs)))))
 
 ;;; High-Level Drivers
 
@@ -507,21 +507,21 @@ The resulting MD5 message-digest is returned as an array of sixteen
 in SEQUENCE , which must be a vector with element-type (UNSIGNED-BYTE
 8)."
   (declare (optimize (speed 3) (safety 3) (space 0) (debug 1))
-	   (type (vector (unsigned-byte 8)) sequence) (type fixnum start))
+           (type (vector (unsigned-byte 8)) sequence) (type fixnum start))
   (locally
     (declare (optimize (safety 1) (debug 0)))
     (let ((state (make-md5-state)))
       (declare (type md5-state state))
       #+cmu
       (lisp::with-array-data ((data sequence) (real-start start) (real-end end))
-	(update-md5-state state data :start real-start :end real-end))
+        (update-md5-state state data :start real-start :end real-end))
       #+sbcl
       (sb-kernel:with-array-data ((data sequence) (real-start start) (real-end end))
-	(update-md5-state state data :start real-start :end real-end))
+        (update-md5-state state data :start real-start :end real-end))
       #-(or cmu sbcl)
       (let ((real-end (or end (length sequence))))
-	(declare (type fixnum real-end))
-	(update-md5-state state sequence :start start :end real-end))
+        (declare (type fixnum real-end))
+        (update-md5-state state sequence :start start :end real-end))
       (finalize-md5-state state))))
 
 (defun md5sum-string (string &key (external-format :default) (start 0) end)
@@ -535,8 +535,8 @@ in the resulting binary representation."
     (declare (optimize (safety 1) (debug 0)))
     (md5sum-sequence
      (sb-ext:string-to-octets string
-			      :external-format external-format
-			      :start start :end end))))
+                              :external-format external-format
+                              :start start :end end))))
 
 (defconstant +buffer-size+ (* 128 1024)
   "Size of internal buffer to use for md5sum-stream and md5sum-file
@@ -554,28 +554,28 @@ element-type has to be (UNSIGNED-BYTE 8)."
     (let ((state (make-md5-state)))
       (declare (type md5-state state))
       (cond
-	((equal (stream-element-type stream) '(unsigned-byte 8))
-	 (let ((buffer (make-array +buffer-size+
-				   :element-type '(unsigned-byte 8))))
-	   (declare (type (simple-array (unsigned-byte 8) (#.+buffer-size+))
-			  buffer))
-	   (loop for bytes of-type buffer-index = (read-sequence buffer stream)
-		 do (update-md5-state state buffer :end bytes)
-		 until (< bytes +buffer-size+)
-		 finally
-		 (return (finalize-md5-state state)))))
-	#+(or)
-	((equal (stream-element-type stream) 'character)
-	 (let ((buffer (make-string +buffer-size+)))
-	   (declare (type (simple-string #.+buffer-size+) buffer))
-	   (loop for bytes of-type buffer-index = (read-sequence buffer stream)
-		 do (update-md5-state state buffer :end bytes)
-		 until (< bytes +buffer-size+)
-		 finally
-		 (return (finalize-md5-state state)))))
-	(t
-	 (error "Unsupported stream element-type ~S for stream ~S."
-		(stream-element-type stream) stream))))))
+        ((equal (stream-element-type stream) '(unsigned-byte 8))
+         (let ((buffer (make-array +buffer-size+
+                                   :element-type '(unsigned-byte 8))))
+           (declare (type (simple-array (unsigned-byte 8) (#.+buffer-size+))
+                          buffer))
+           (loop for bytes of-type buffer-index = (read-sequence buffer stream)
+                 do (update-md5-state state buffer :end bytes)
+                 until (< bytes +buffer-size+)
+                 finally
+                 (return (finalize-md5-state state)))))
+        #+(or)
+        ((equal (stream-element-type stream) 'character)
+         (let ((buffer (make-string +buffer-size+)))
+           (declare (type (simple-string #.+buffer-size+) buffer))
+           (loop for bytes of-type buffer-index = (read-sequence buffer stream)
+                 do (update-md5-state state buffer :end bytes)
+                 until (< bytes +buffer-size+)
+                 finally
+                 (return (finalize-md5-state state)))))
+        (t
+         (error "Unsupported stream element-type ~S for stream ~S."
+                (stream-element-type stream) stream))))))
 
 (defun md5sum-file (pathname)
   "Calculate the MD5 message-digest of the file designated by

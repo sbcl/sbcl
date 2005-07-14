@@ -8,7 +8,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -81,7 +81,7 @@
 ;;; reported by Henrik Motakef
 (defpackage "")
 (assert (eq (symbol-package (read-from-string "||::FOO"))
-	    (find-package "")))
+            (find-package "")))
 
 ;;; test nested reads, test case by Helmut Eller for cmucl
 (defclass my-in-stream (sb-gray:fundamental-character-input-stream)
@@ -93,8 +93,8 @@
     (with-input-from-string (s "b") (read s))
     (with-slots (last-char) s
       (cond (last-char (prog1 last-char (setf last-char nil)))
-	     (t (prog1 (aref string i)
-		  (setq i (mod (1+ i) (length string)))))))))
+             (t (prog1 (aref string i)
+                  (setq i (mod (1+ i) (length string)))))))))
 
 (defmethod sb-gray:stream-unread-char ((s my-in-stream) char)
   (setf (slot-value s 'last-char) char)

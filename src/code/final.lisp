@@ -13,11 +13,11 @@
 
 (defvar *finalizer-store* nil)
 
-(defvar *finalizer-store-lock* 
+(defvar *finalizer-store-lock*
   (sb!thread:make-mutex :name "Finalizer store lock."))
 
 (defun finalize (object function)
-  #!+sb-doc 
+  #!+sb-doc
   "Arrange for the designated FUNCTION to be called when there
 are no more references to OBJECT, including references in
 FUNCTION itself.
@@ -48,19 +48,19 @@ Examples:
   (defvar *rec* nil)
 
   (defun oops ()
-   (when *rec* 
+   (when *rec*
      (error \"recursive OOPS\"))
    (let ((*rec* t))
      (gc))) ; or just cons enough to cause one
 
-  (progn 
+  (progn
     (finalize \"oops\" #'oops)
     (oops)) ; causes GC and re-entry to #'oops due to the finalizer
             ; -> ERROR, caught, WARNING signalled"
   (sb!sys:without-gcing
       (sb!thread:with-mutex (*finalizer-store-lock*)
-	(push (cons (make-weak-pointer object) function)
-	      *finalizer-store*)))
+        (push (cons (make-weak-pointer object) function)
+              *finalizer-store*)))
   object)
 
 (defun cancel-finalization (object)
@@ -70,28 +70,28 @@ Examples:
   ;; run.
   (when object
     (sb!sys:without-gcing
-	(sb!thread:with-mutex (*finalizer-store-lock*)
-	  (setf *finalizer-store*
-		(delete object *finalizer-store*
-			:key (lambda (pair) 
-			       (weak-pointer-value (car pair)))))))
+        (sb!thread:with-mutex (*finalizer-store-lock*)
+          (setf *finalizer-store*
+                (delete object *finalizer-store*
+                        :key (lambda (pair)
+                               (weak-pointer-value (car pair)))))))
     object))
 
 (defun run-pending-finalizers ()
   (let (pending)
     (sb!sys:without-gcing
-	(sb!thread:with-mutex (*finalizer-store-lock*)
-	  (setf *finalizer-store*
-		(delete-if  (lambda (pair)
-			      (when (null (weak-pointer-value (car pair)))
-				(push (cdr pair) pending)
-				t))
-			    *finalizer-store*))))
+        (sb!thread:with-mutex (*finalizer-store-lock*)
+          (setf *finalizer-store*
+                (delete-if  (lambda (pair)
+                              (when (null (weak-pointer-value (car pair)))
+                                (push (cdr pair) pending)
+                                t))
+                            *finalizer-store*))))
     ;; We want to run the finalizer bodies outside the lock in case
     ;; finalization of X causes finalization to be added for Y.
     (dolist (fun pending)
       (handler-case
-	  (funcall fun)
-	(error (c)
-	  (warn "Error calling finalizer ~S:~%  ~S" fun c)))))
+          (funcall fun)
+        (error (c)
+          (warn "Error calling finalizer ~S:~%  ~S" fun c)))))
   nil)

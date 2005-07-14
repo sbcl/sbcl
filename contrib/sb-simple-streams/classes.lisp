@@ -3,7 +3,7 @@
 ;;; **********************************************************************
 ;;; This code was written by Paul Foley and has been placed in the public
 ;;; domain.
-;;; 
+;;;
 
 ;;; Sbcl port by Rudi Schlatte.
 
@@ -34,7 +34,7 @@
 
 (deftype j-read-chars-fn ()
   '(function (simple-stream string (or character null) fixnum fixnum blocking)
-	     (values fixnum &optional (member nil t :eof))))
+             (values fixnum &optional (member nil t :eof))))
 
 (deftype j-write-char-fn ()
   '(function ((or character null) simple-stream) (or character null)))
@@ -81,12 +81,12 @@
    ;; the stream is not open for input.
    (input-handle :initform nil :initarg :input-handle
                  :type (or null fixnum stream)
-		 :accessor stream-input-handle)
+                 :accessor stream-input-handle)
    ;; A fixnum (denoting a valid file descriptor), a stream, or nil if
    ;; the stream is not open for output.
    (output-handle :initform nil :initarg :output-handle
-		  :type (or null fixnum stream)
-		  :accessor stream-output-handle)
+                  :type (or null fixnum stream)
+                  :accessor stream-output-handle)
    (control-in :initform nil :type (or null simple-vector))
    (control-out :initform nil :type (or null simple-vector))
 
@@ -96,7 +96,7 @@
    ;; a stream, allowing for composing external formats (see
    ;; streams.htm, section 12.5) TODO: document this better
    (melding-base :type (or null simple-stream))
-   
+
    ;; Number of octets the last read-char operation consumed TODO:
    ;; document this better; what is the difference to
    ;; last-char-read-size ?
@@ -104,7 +104,7 @@
    ;; Number of octets the last read-char operation consumed
    (last-char-read-size :initform 0 :type fixnum)
    (charpos :initform 0 :type (or null integer)
-	    :accessor stream-line-column)
+            :accessor stream-line-column)
    (record-end :initform nil :type (or null fixnum))
 
   ;; Input/output buffer.
@@ -167,7 +167,7 @@
 
 
 (defmethod shared-initialize :after ((instance simple-stream) slot-names
-				     &rest initargs &key &allow-other-keys)
+                                     &rest initargs &key &allow-other-keys)
   (declare (ignore slot-names))
   (unless (slot-boundp instance 'melded-stream)
     (setf (slot-value instance 'melded-stream) instance)
@@ -179,9 +179,9 @@
 (defmethod print-object ((object simple-stream) stream)
   (print-unreadable-object (object stream :type nil :identity nil)
     (cond ((not (any-stream-instance-flags object :simple))
-	   (princ "Invalid " stream))
-	  ((not (any-stream-instance-flags object :input :output))
-	   (princ "Closed " stream)))
+           (princ "Invalid " stream))
+          ((not (any-stream-instance-flags object :input :output))
+           (princ "Closed " stream)))
     (format stream "~:(~A~)" (type-of object))))
 
 ;;; This takes care of the things all device-close methods have to do,
@@ -190,12 +190,12 @@
   (with-stream-class (simple-stream stream)
     (when (any-stream-instance-flags stream :input :output)
       (when (any-stream-instance-flags stream :output)
-	(ignore-errors (if abort
-			   (clear-output stream)
-			   (finish-output stream))))
+        (ignore-errors (if abort
+                           (clear-output stream)
+                           (finish-output stream))))
       (call-next-method)
       (setf (sm input-handle stream) nil
-	    (sm output-handle stream) nil)
+            (sm output-handle stream) nil)
       (remove-stream-instance-flags stream :input :output)
       (sb-ext:cancel-finalization stream)
       ;; This sets all readers and writers to error-raising functions
@@ -238,11 +238,11 @@
 
 
 (defmethod device-read ((stream single-channel-simple-stream) buffer
-			start end blocking)
+                        start end blocking)
   (read-octets stream buffer start end blocking))
 
 (defmethod device-read ((stream dual-channel-simple-stream) buffer
-			start end blocking)
+                        start end blocking)
   (read-octets stream buffer start end blocking))
 
 (defmethod device-clear-input ((stream simple-stream) buffer-only)
@@ -253,7 +253,7 @@
                          start end blocking)
   ;; buffer may be :flush to force/finish-output
   (when (or (and (null buffer) (not (eql start end)))
-	    (eq buffer :flush))
+            (eq buffer :flush))
     (with-stream-class (single-channel-simple-stream stream)
       (setf buffer (sm buffer stream))
       (setf end (sm buffpos stream))))
@@ -263,7 +263,7 @@
                          start end blocking)
   ;; buffer may be :flush to force/finish-output
   (when (or (and (null buffer) (not (eql start end)))
-	    (eq buffer :flush))
+            (eq buffer :flush))
     (with-stream-class (dual-channel-simple-stream stream)
       (setf buffer (sm out-buffer stream))
       (setf end (sm outpos stream))))

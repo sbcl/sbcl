@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -17,9 +17,9 @@
 ;;; We should be able to output X readably (at least when *READ-EVAL*).
 (defun assert-readable-output (x)
   (assert (eql x
-	       (let ((*read-eval* t))
-		 (read-from-string (with-output-to-string (s)
-				     (write x :stream s :readably t)))))))
+               (let ((*read-eval* t))
+                 (read-from-string (with-output-to-string (s)
+                                     (write x :stream s :readably t)))))))
 
 ;;; Even when *READ-EVAL* is NIL, we should be able to output some
 ;;; (not necessarily readable) representation without signalling an
@@ -27,7 +27,7 @@
 (defun assert-unreadable-output (x)
   (let ((*read-eval* nil))
     (with-output-to-string (s) (write x :stream s :readably nil))))
-  
+
 (defun assert-output (x)
   (assert-readable-output x)
   (assert-unreadable-output x))
@@ -35,11 +35,11 @@
 ;;; Nathan Froyd reported that sbcl-0.6.11.34 screwed up output of
 ;;; floating point infinities.
 (dolist (x (list short-float-positive-infinity short-float-negative-infinity
-		 single-float-positive-infinity single-float-negative-infinity
-		 double-float-positive-infinity double-float-negative-infinity
-		 long-float-positive-infinity long-float-negative-infinity))
+                 single-float-positive-infinity single-float-negative-infinity
+                 double-float-positive-infinity double-float-negative-infinity
+                 long-float-positive-infinity long-float-negative-infinity))
   (assert-output x))
- 
+
 ;;; Eric Marsden reported that this would blow up in CMU CL (even
 ;;; though ANSI says that the mismatch between ~F expected type and
 ;;; provided string type is supposed to be handled without signalling
@@ -51,7 +51,7 @@
 (loop for base from 2 to 36
       with *print-radix* = t
       do (let ((*print-base* base))
-	   (assert (string= "#*101" (format nil "~S" #*101)))))
+           (assert (string= "#*101" (format nil "~S" #*101)))))
 
 ;;; bug in sbcl-0.7.1.25, reported by DB sbcl-devel 2002-02-25
 (assert (string= "0.5" (format nil "~2D" 0.5)))
@@ -106,28 +106,28 @@
 ;;; Check that arrays that we print while *PRINT-READABLY* is true are
 ;;; in fact generating similar objects.
 (assert (equal (array-dimensions
-		(read-from-string
-		 (with-output-to-string (s)
-		   (let ((*print-readably* t))
-		     (print (make-array '(1 2 0)) s)))))
-	       '(1 2 0)))
+                (read-from-string
+                 (with-output-to-string (s)
+                   (let ((*print-readably* t))
+                     (print (make-array '(1 2 0)) s)))))
+               '(1 2 0)))
 
 (dolist (array (list (make-array '(1 0 1))
-		     (make-array 0 :element-type nil)
-		     (make-array 1 :element-type 'base-char)
-		     (make-array 1 :element-type 'character)))
+                     (make-array 0 :element-type nil)
+                     (make-array 1 :element-type 'base-char)
+                     (make-array 1 :element-type 'character)))
   (assert (multiple-value-bind (result error)
-	      (ignore-errors (read-from-string
-			      (with-output-to-string (s)
-				(let ((*print-readably* t))
-				  (print array s)))))
-	    ;; it might not be readably-printable
-	    (or (typep error 'print-not-readable)
-		(and
-		 ;; or else it had better have the same dimensions
-		 (equal (array-dimensions result) (array-dimensions array))
-		 ;; and the same element-type
-		 (equal (array-element-type result) (array-element-type array)))))))
+              (ignore-errors (read-from-string
+                              (with-output-to-string (s)
+                                (let ((*print-readably* t))
+                                  (print array s)))))
+            ;; it might not be readably-printable
+            (or (typep error 'print-not-readable)
+                (and
+                 ;; or else it had better have the same dimensions
+                 (equal (array-dimensions result) (array-dimensions array))
+                 ;; and the same element-type
+                 (equal (array-element-type result) (array-element-type array)))))))
 
 ;;; before 0.8.0.66 it signalled UNBOUND-VARIABLE
 (write #(1 2 3) :pretty nil :readably t)
@@ -165,9 +165,9 @@
   (wexercise-0-8-7-interpreted "~W")
   (wexercise-0-8-7-compiled-without-atsign))
 (remove-method #'print-object
-	       (find-method #'print-object
-			    '(:before)
-			    (mapcar #'find-class '(wexerciser-0-8-7 t))))
+               (find-method #'print-object
+                            '(:before)
+                            (mapcar #'find-class '(wexerciser-0-8-7 t))))
 (defmethod print-object :before ((wexerciser-0-8-7 wexerciser-0-8-7) stream)
   (when (or *print-level* *print-length*)
     (error "gotcha going")))
@@ -182,7 +182,7 @@
 (defpackage "SCRATCH-WRITE-TO-STRING" (:use))
 (with-standard-io-syntax
   (let* ((*package* (find-package "SCRATCH-WRITE-TO-STRING"))
-	 (answer (write-to-string 'scratch-write-to-string::x :readably nil)))
+         (answer (write-to-string 'scratch-write-to-string::x :readably nil)))
     (assert (string= answer "X"))))
 ;;; and a couple from Bruno Haible
 (defun my-pprint-reverse (out list)
@@ -228,15 +228,15 @@
 (let ((x1 (float -5496527/100000000000000000))
       (x2 (float -54965272/1000000000000000000)))
   (assert (or (equal (multiple-value-list (integer-decode-float x1))
-		     (multiple-value-list (integer-decode-float x2)))
-	      (string/= (prin1-to-string x1) (prin1-to-string x2)))))
+                     (multiple-value-list (integer-decode-float x2)))
+              (string/= (prin1-to-string x1) (prin1-to-string x2)))))
 
 ;;; readable printing of arrays with *print-radix* t
-(let ((*print-radix* t) 
+(let ((*print-radix* t)
       (*print-readably* t)
       (*print-pretty* nil))
   (let ((output (with-output-to-string (s)
-		  (write #2a((t t) (nil nil)) :stream s))))
+                  (write #2a((t t) (nil nil)) :stream s))))
     (assert (equalp (read-from-string output) #2a((t t) (nil nil))))))
 
 ;;; NIL parameters to "interpreted" FORMAT directives
@@ -245,7 +245,7 @@
 ;;; PRINC-TO-STRING should bind print-readably
 (let ((*print-readably* t))
   (assert (string= (princ-to-string #\7)
-		   (write-to-string #\7 :escape nil :readably nil))))
+                   (write-to-string #\7 :escape nil :readably nil))))
 
 ;;; in FORMAT, ~^ inside ~:{ should go to the next case, not break
 ;;; iteration, even if one argument is just a one-element list.
@@ -301,7 +301,7 @@
                         (incf *read-base*))
                     (assert (not (eql r (read-from-string (prin1-to-string r)))))
                     (let ((*print-radix* t))
-                      (assert (= r (read-from-string 
+                      (assert (= r (read-from-string
                                     (princ-to-string r)))))))))
        (write-char #\.)
        (finish-output)))

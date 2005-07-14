@@ -27,7 +27,7 @@
 ;;; single argument that's directly usable by all the other routines.
 (defun coerce-to-condition (datum arguments default-type fun-name)
   (cond ((typep datum 'condition)
-	 (when (and arguments (not (eq fun-name 'cerror)))
+         (when (and arguments (not (eq fun-name 'cerror)))
            (cerror "Ignore the additional arguments."
                    'simple-type-error
                    :datum arguments
@@ -35,30 +35,30 @@
                    :format-control "You may not supply additional arguments ~
                                     when giving ~S to ~S."
                    :format-arguments (list datum fun-name)))
-	 datum)
-	((symbolp datum) ; roughly, (SUBTYPEP DATUM 'CONDITION)
-	 (apply #'make-condition datum arguments))
-	((or (stringp datum) (functionp datum))
-	 (make-condition default-type
-			 :format-control datum
-			 :format-arguments arguments))
-	(t
-	 (error 'simple-type-error
-		:datum datum
-		:expected-type '(or symbol string)
-		:format-control "bad argument to ~S: ~S"
-		:format-arguments (list fun-name datum)))))
+         datum)
+        ((symbolp datum) ; roughly, (SUBTYPEP DATUM 'CONDITION)
+         (apply #'make-condition datum arguments))
+        ((or (stringp datum) (functionp datum))
+         (make-condition default-type
+                         :format-control datum
+                         :format-arguments arguments))
+        (t
+         (error 'simple-type-error
+                :datum datum
+                :expected-type '(or symbol string)
+                :format-control "bad argument to ~S: ~S"
+                :format-arguments (list fun-name datum)))))
 
 (define-condition layout-invalid (type-error)
   ()
   (:report
    (lambda (condition stream)
      (format stream
-	     "~@<invalid structure layout: ~
+             "~@<invalid structure layout: ~
               ~2I~_A test for class ~4I~_~S ~
               ~2I~_was passed the obsolete instance ~4I~_~S~:>"
-	     (classoid-proper-name (type-error-expected-type condition))
-	     (type-error-datum condition)))))
+             (classoid-proper-name (type-error-expected-type condition))
+             (type-error-datum condition)))))
 
 (define-condition case-failure (type-error)
   ((name :reader case-failure-name :initarg :name)
@@ -67,19 +67,19 @@
     (lambda (condition stream)
       (format stream "~@<~S fell through ~S expression. ~
                       ~:_Wanted one of ~:S.~:>"
-	      (type-error-datum condition)
-	      (case-failure-name condition)
-	      (case-failure-possibilities condition)))))
+              (type-error-datum condition)
+              (case-failure-name condition)
+              (case-failure-possibilities condition)))))
 
 (define-condition compiled-program-error (program-error)
   ((message :initarg :message :reader program-error-message)
    (source :initarg :source :reader program-error-source))
   (:report (lambda (condition stream)
-	     (format stream "Execution of a form compiled with errors.~%~
+             (format stream "Execution of a form compiled with errors.~%~
                              Form:~%  ~A~%~
                              Compile-time-error:~%  ~A"
-		       (program-error-source condition)
-		       (program-error-message condition)))))
+                       (program-error-source condition)
+                       (program-error-message condition)))))
 
 (define-condition simple-control-error (simple-condition control-error) ())
 (define-condition simple-file-error    (simple-condition file-error)    ())

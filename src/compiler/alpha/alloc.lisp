@@ -22,7 +22,7 @@
   (:temporary (:scs (descriptor-reg) :type list) ptr)
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg) :type list :to (:result 0) :target result)
-	      res)
+              res)
   (:info num)
   (:results (result :scs (descriptor-reg)))
   (:variant-vars star)
@@ -30,48 +30,48 @@
   (:node-var node)
   (:generator 0
     (cond ((zerop num)
-	   (move null-tn result))
-	  ((and star (= num 1))
-	   (move (tn-ref-tn things) result))
-	  (t
-	   (macrolet
-	       ((store-car (tn list &optional (slot cons-car-slot))
-		  `(let ((reg
-			  (sc-case ,tn
-			    ((any-reg descriptor-reg) ,tn)
-			    (zero zero-tn)
-			    (null null-tn)
-			    (control-stack
-			     (load-stack-tn temp ,tn)
-			     temp))))
-		     (storew reg ,list ,slot list-pointer-lowtag))))
-	     (let* ((dx-p (node-stack-allocate-p node))
+           (move null-tn result))
+          ((and star (= num 1))
+           (move (tn-ref-tn things) result))
+          (t
+           (macrolet
+               ((store-car (tn list &optional (slot cons-car-slot))
+                  `(let ((reg
+                          (sc-case ,tn
+                            ((any-reg descriptor-reg) ,tn)
+                            (zero zero-tn)
+                            (null null-tn)
+                            (control-stack
+                             (load-stack-tn temp ,tn)
+                             temp))))
+                     (storew reg ,list ,slot list-pointer-lowtag))))
+             (let* ((dx-p (node-stack-allocate-p node))
                     (cons-cells (if star (1- num) num))
                     (space (* (pad-data-block cons-size) cons-cells)))
-	       (pseudo-atomic (:extra (if dx-p 0 space))
+               (pseudo-atomic (:extra (if dx-p 0 space))
                  (cond (dx-p
                         (align-csp res)
                         (inst bis csp-tn list-pointer-lowtag res)
                         (inst lda csp-tn space csp-tn))
                        (t
                         (inst bis alloc-tn list-pointer-lowtag res)))
-		 (move res ptr)
-		 (dotimes (i (1- cons-cells))
-		   (store-car (tn-ref-tn things) ptr)
-		   (setf things (tn-ref-across things))
-		   (inst lda ptr (pad-data-block cons-size) ptr)
-		   (storew ptr ptr
-			   (- cons-cdr-slot cons-size)
-			   list-pointer-lowtag))
-		 (store-car (tn-ref-tn things) ptr)
-		 (cond (star
-			(setf things (tn-ref-across things))
-			(store-car (tn-ref-tn things) ptr cons-cdr-slot))
-		       (t
-			(storew null-tn ptr
-				cons-cdr-slot list-pointer-lowtag)))
-		 (aver (null (tn-ref-across things)))
-		 (move res result))))))))
+                 (move res ptr)
+                 (dotimes (i (1- cons-cells))
+                   (store-car (tn-ref-tn things) ptr)
+                   (setf things (tn-ref-across things))
+                   (inst lda ptr (pad-data-block cons-size) ptr)
+                   (storew ptr ptr
+                           (- cons-cdr-slot cons-size)
+                           list-pointer-lowtag))
+                 (store-car (tn-ref-tn things) ptr)
+                 (cond (star
+                        (setf things (tn-ref-across things))
+                        (store-car (tn-ref-tn things) ptr cons-cdr-slot))
+                       (t
+                        (storew null-tn ptr
+                                cons-cdr-slot list-pointer-lowtag)))
+                 (aver (null (tn-ref-across things)))
+                 (move res result))))))))
 
 (define-vop (list list-or-list*)
   (:variant nil))
@@ -83,7 +83,7 @@
 
 (define-vop (allocate-code-object)
   (:args (boxed-arg :scs (any-reg))
-	 (unboxed-arg :scs (any-reg)))
+         (unboxed-arg :scs (any-reg)))
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:temporary (:scs (any-reg) :from (:argument 0)) boxed)
@@ -91,14 +91,14 @@
   (:generator 100
     (inst li (lognot lowtag-mask) ndescr)
     (inst lda boxed (fixnumize (1+ code-trace-table-offset-slot))
-	  boxed-arg)
+          boxed-arg)
     (inst and boxed ndescr boxed)
     (inst srl unboxed-arg word-shift unboxed)
     (inst lda unboxed lowtag-mask unboxed)
     (inst and unboxed ndescr unboxed)
     (inst sll boxed (- n-widetag-bits word-shift) ndescr)
     (inst bis ndescr code-header-widetag ndescr)
-    
+
     (pseudo-atomic ()
       (inst bis alloc-tn other-pointer-lowtag result)
       (storew ndescr result 0 other-pointer-lowtag)
@@ -132,16 +132,16 @@
     (let* ((size (+ length closure-info-offset))
            (alloc-size (pad-data-block size)))
       (inst li
-	    (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
-	    temp)
+            (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
+            temp)
       (pseudo-atomic (:extra (if stack-allocate-p 0 alloc-size))
         (cond (stack-allocate-p
-	       (align-csp result)
+               (align-csp result)
                (inst bis csp-tn fun-pointer-lowtag result)
                (inst lda csp-tn alloc-size csp-tn))
               (t
                (inst bis alloc-tn fun-pointer-lowtag result)))
-	(storew temp result 0 fun-pointer-lowtag))
+        (storew temp result 0 fun-pointer-lowtag))
       (storew function result closure-fun-slot fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
@@ -151,7 +151,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (with-fixed-allocation
-	(result temp value-cell-header-widetag value-cell-size)
+        (result temp value-cell-header-widetag value-cell-size)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; automatic allocators for primitive objects
@@ -172,8 +172,8 @@
     (pseudo-atomic (:extra (pad-data-block words))
       (inst bis alloc-tn lowtag result)
       (when type
-	(inst li (logior (ash (1- words) n-widetag-bits) type) temp)
-	(storew temp result 0 lowtag)))))
+        (inst li (logior (ash (1- words) n-widetag-bits) type) temp)
+        (storew temp result 0 lowtag)))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))

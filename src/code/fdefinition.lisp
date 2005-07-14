@@ -27,13 +27,13 @@
 
 (defun fdefn-fun (fdefn)
   (declare (type fdefn fdefn)
-	   (values (or function null)))
+           (values (or function null)))
   (fdefn-fun fdefn))
 
 (defun (setf fdefn-fun) (fun fdefn)
   (declare (type function fun)
-	   (type fdefn fdefn)
-	   (values function))
+           (type fdefn fdefn)
+           (values function))
   (setf (fdefn-fun fdefn) fun))
 
 (defun fdefn-makunbound (fdefn)
@@ -57,17 +57,17 @@
   (legal-fun-name-or-type-error name)
   (let ((fdefn (info :function :definition name)))
     (if (and (null fdefn) create)
-	(setf (info :function :definition name) (make-fdefn name))
-	fdefn)))
+        (setf (info :function :definition name) (make-fdefn name))
+        fdefn)))
 
 ;;; Return the fdefinition of NAME, including any encapsulations.
-;;; The compiler emits calls to this when someone tries to FUNCALL 
+;;; The compiler emits calls to this when someone tries to FUNCALL
 ;;; something. SETFable.
 #!-sb-fluid (declaim (inline %coerce-name-to-fun))
 (defun %coerce-name-to-fun (name)
   (let ((fdefn (fdefinition-object name nil)))
     (or (and fdefn (fdefn-fun fdefn))
-	(error 'undefined-function :name name))))
+        (error 'undefined-function :name name))))
 (defun (setf %coerce-name-to-fun) (function name)
   (let ((fdefn (fdefinition-object name t)))
     (setf (fdefn-fun fdefn) function)))
@@ -80,8 +80,8 @@
 ;;;; definition encapsulation
 
 (defstruct (encapsulation-info (:constructor make-encapsulation-info
-					     (type definition))
-			       (:copier nil))
+                                             (type definition))
+                               (:copier nil))
   ;; This is definition's encapsulation type. The encapsulated
   ;; definition is in the previous ENCAPSULATION-INFO element or
   ;; installed as the global definition of some function name.
@@ -112,11 +112,11 @@
     ;; an encapsulation that no longer exists.
     (let ((info (make-encapsulation-info type (fdefn-fun fdefn))))
       (setf (fdefn-fun fdefn)
-	    (named-lambda encapsulation (&rest arg-list)
-	      (declare (special arg-list))
-	      (let ((basic-definition (encapsulation-info-definition info)))
-		(declare (special basic-definition))
-		(eval body)))))))
+            (named-lambda encapsulation (&rest arg-list)
+              (declare (special arg-list))
+              (let ((basic-definition (encapsulation-info-definition info)))
+                (declare (special basic-definition))
+                (eval body)))))))
 
 ;;; This is like FIND-IF, except that we do it on a compiled closure's
 ;;; environment.
@@ -125,7 +125,7 @@
   (dotimes (index (1- (get-closure-length fun)))
     (let ((elt (%closure-index-ref fun index)))
       (when (funcall test elt)
-	(return elt)))))
+        (return elt)))))
 
 ;;; Find the encapsulation info that has been closed over.
 (defun encapsulation-info (fun)
@@ -148,41 +148,41 @@
   #!+sb-doc
   "Removes NAME's most recent encapsulation of the specified TYPE."
   (let* ((fdefn (fdefinition-object name nil))
-	 (encap-info (encapsulation-info (fdefn-fun fdefn))))
+         (encap-info (encapsulation-info (fdefn-fun fdefn))))
     (declare (type (or encapsulation-info null) encap-info))
     (cond ((not encap-info)
-	   ;; It disappeared on us, so don't worry about it.
-	   )
-	  ((eq (encapsulation-info-type encap-info) type)
-	   ;; It's the first one, so change the fdefn object.
-	   (setf (fdefn-fun fdefn)
-		 (encapsulation-info-definition encap-info)))
-	  (t
-	   ;; It must be an interior one, so find it.
-	   (loop
-	     (let ((next-info (encapsulation-info
-			       (encapsulation-info-definition encap-info))))
-	       (unless next-info
-		 ;; Not there, so don't worry about it.
-		 (return))
-	       (when (eq (encapsulation-info-type next-info) type)
-		 ;; This is it, so unlink us.
-		 (setf (encapsulation-info-definition encap-info)
-		       (encapsulation-info-definition next-info))
-		 (return))
-	       (setf encap-info next-info))))))
+           ;; It disappeared on us, so don't worry about it.
+           )
+          ((eq (encapsulation-info-type encap-info) type)
+           ;; It's the first one, so change the fdefn object.
+           (setf (fdefn-fun fdefn)
+                 (encapsulation-info-definition encap-info)))
+          (t
+           ;; It must be an interior one, so find it.
+           (loop
+             (let ((next-info (encapsulation-info
+                               (encapsulation-info-definition encap-info))))
+               (unless next-info
+                 ;; Not there, so don't worry about it.
+                 (return))
+               (when (eq (encapsulation-info-type next-info) type)
+                 ;; This is it, so unlink us.
+                 (setf (encapsulation-info-definition encap-info)
+                       (encapsulation-info-definition next-info))
+                 (return))
+               (setf encap-info next-info))))))
   t)
 
 ;;; Does NAME have an encapsulation of the given TYPE?
 (defun encapsulated-p (name type)
   (let ((fdefn (fdefinition-object name nil)))
     (do ((encap-info (encapsulation-info (fdefn-fun fdefn))
-		     (encapsulation-info
-		      (encapsulation-info-definition encap-info))))
-	((null encap-info) nil)
+                     (encapsulation-info
+                      (encapsulation-info-definition encap-info))))
+        ((null encap-info) nil)
       (declare (type (or encapsulation-info null) encap-info))
       (when (eq (encapsulation-info-type encap-info) type)
-	(return t)))))
+        (return t)))))
 
 ;;;; FDEFINITION
 
@@ -222,8 +222,8 @@
     (loop
      (let ((encap-info (encapsulation-info fun)))
        (if encap-info
-	   (setf fun (encapsulation-info-definition encap-info))
-	   (return fun))))))
+           (setf fun (encapsulation-info-definition encap-info))
+           (return fun))))))
 
 (defvar *setf-fdefinition-hook* nil
   #!+sb-doc
@@ -239,23 +239,23 @@
       ;; *SETF-FDEFINITION-HOOK* won't be bound when initially running
       ;; top level forms in the kernel core startup.
       (when (boundp '*setf-fdefinition-hook*)
-	(dolist (f *setf-fdefinition-hook*)
-	  (declare (type function f))
-	  (funcall f name new-value)))
-      
+        (dolist (f *setf-fdefinition-hook*)
+          (declare (type function f))
+          (funcall f name new-value)))
+
       (let ((encap-info (encapsulation-info (fdefn-fun fdefn))))
-	(cond (encap-info
-	       (loop
-		(let ((more-info
-		       (encapsulation-info
-			(encapsulation-info-definition encap-info))))
-		  (if more-info
-		      (setf encap-info more-info)
-		      (return
-			(setf (encapsulation-info-definition encap-info)
-			      new-value))))))
-	      (t
-	       (setf (fdefn-fun fdefn) new-value)))))))
+        (cond (encap-info
+               (loop
+                (let ((more-info
+                       (encapsulation-info
+                        (encapsulation-info-definition encap-info))))
+                  (if more-info
+                      (setf encap-info more-info)
+                      (return
+                        (setf (encapsulation-info-definition encap-info)
+                              new-value))))))
+              (t
+               (setf (fdefn-fun fdefn) new-value)))))))
 
 ;;;; FBOUNDP and FMAKUNBOUND
 
@@ -268,10 +268,10 @@
 (defun fmakunbound (name)
   #!+sb-doc
   "Make NAME have no global function definition."
-  (with-single-package-locked-error 
+  (with-single-package-locked-error
       (:symbol name "removing the function or macro definition of ~A")
     (let ((fdefn (fdefinition-object name nil)))
       (when fdefn
-	(fdefn-makunbound fdefn)))
+        (fdefn-makunbound fdefn)))
     (sb!kernel:undefine-fun-name name)
     name))

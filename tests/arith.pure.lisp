@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -18,13 +18,13 @@
 ;;; unlikely that anything with such fundamental arithmetic errors as
 ;;; these are going to get this far, it's probably worth checking.
 (macrolet ((test (op res1 res2)
-	     `(progn
-	       (assert (= (,op 4 2) ,res1))
-	       (assert (= (,op 2 4) ,res2))
-	       (assert (= (funcall (compile nil (lambda (x y) (,op x y))) 4 2) 
-			,res1))
-	       (assert (= (funcall (compile nil (lambda (x y) (,op x y))) 2 4) 
-			,res2)))))
+             `(progn
+               (assert (= (,op 4 2) ,res1))
+               (assert (= (,op 2 4) ,res2))
+               (assert (= (funcall (compile nil (lambda (x y) (,op x y))) 4 2)
+                        ,res1))
+               (assert (= (funcall (compile nil (lambda (x y) (,op x y))) 2 4)
+                        ,res2)))))
   (test + 6 6)
   (test - 2 -2)
   (test * 8 8)
@@ -108,21 +108,21 @@
 ;;; checkins later, we'll have doubled the coverage.
 (dotimes (i 100)
   (let* ((x (random most-positive-fixnum))
-	 (x2 (* x 2))
-	 (x3 (* x 3)))
+         (x2 (* x 2))
+         (x3 (* x 3)))
     (let ((fn (handler-bind ((sb-ext:compiler-note
                               (lambda (c)
                                 (when (<= x3 most-positive-fixnum)
                                   (error c)))))
-		(compile nil
-			 `(lambda (y)
-			    (declare (optimize speed) (type (integer 0 3) y))
-			    (* y ,x))))))
+                (compile nil
+                         `(lambda (y)
+                            (declare (optimize speed) (type (integer 0 3) y))
+                            (* y ,x))))))
       (unless (and (= (funcall fn 0) 0)
-		   (= (funcall fn 1) x)
-		   (= (funcall fn 2) x2)
-		   (= (funcall fn 3) x3))
-	(error "bad results for ~D" x)))))
+                   (= (funcall fn 1) x)
+                   (= (funcall fn 2) x2)
+                   (= (funcall fn 3) x3))
+        (error "bad results for ~D" x)))))
 
 ;;; Bugs reported by Paul Dietz:
 
@@ -141,21 +141,21 @@
 
 ;;; x86 LEA bug:
 (assert (= (funcall
-	    (compile nil '(lambda (x) (declare (bit x)) (+ x #xf0000000)))
-	    1)
-	   #xf0000001))
+            (compile nil '(lambda (x) (declare (bit x)) (+ x #xf0000000)))
+            1)
+           #xf0000001))
 
 ;;; LOGBITP on bignums:
 (dolist (x '(((1+ most-positive-fixnum) 1 nil)
-	     ((1+ most-positive-fixnum) -1 t)
-	     ((1+ most-positive-fixnum) (1+ most-positive-fixnum) nil)
-	     ((1+ most-positive-fixnum) (1- most-negative-fixnum) t)
-	     (1 (ash most-negative-fixnum 1) nil)
-	     (#.(- sb-vm:n-word-bits sb-vm:n-lowtag-bits) most-negative-fixnum t)
-	     (#.(1+ (- sb-vm:n-word-bits sb-vm:n-lowtag-bits)) (ash most-negative-fixnum 1) t)
-	     (#.(+ 2 (- sb-vm:n-word-bits sb-vm:n-lowtag-bits)) (ash most-negative-fixnum 1) t)
-	     (#.(+ sb-vm:n-word-bits 32) (ash most-negative-fixnum #.(+ 32 sb-vm:n-lowtag-bits 1)) nil)
-	     (#.(+ sb-vm:n-word-bits 33) (ash most-negative-fixnum #.(+ 32 sb-vm:n-lowtag-bits 1)) t)))
+             ((1+ most-positive-fixnum) -1 t)
+             ((1+ most-positive-fixnum) (1+ most-positive-fixnum) nil)
+             ((1+ most-positive-fixnum) (1- most-negative-fixnum) t)
+             (1 (ash most-negative-fixnum 1) nil)
+             (#.(- sb-vm:n-word-bits sb-vm:n-lowtag-bits) most-negative-fixnum t)
+             (#.(1+ (- sb-vm:n-word-bits sb-vm:n-lowtag-bits)) (ash most-negative-fixnum 1) t)
+             (#.(+ 2 (- sb-vm:n-word-bits sb-vm:n-lowtag-bits)) (ash most-negative-fixnum 1) t)
+             (#.(+ sb-vm:n-word-bits 32) (ash most-negative-fixnum #.(+ 32 sb-vm:n-lowtag-bits 1)) nil)
+             (#.(+ sb-vm:n-word-bits 33) (ash most-negative-fixnum #.(+ 32 sb-vm:n-lowtag-bits 1)) t)))
   (destructuring-bind (index int result) x
     (assert (eq (eval `(logbitp ,index ,int)) result))))
 
@@ -169,8 +169,8 @@
 
 ;;; type inference leading to an internal compiler error:
 (let ((f (compile nil '(lambda (x)
-			(declare (type fixnum x))
-			(ldb (byte 0 0) x)))))
+                        (declare (type fixnum x))
+                        (ldb (byte 0 0) x)))))
   (assert (= (funcall f 1) 0))
   (assert (= (funcall f most-positive-fixnum) 0))
   (assert (= (funcall f -1) 0)))
@@ -214,10 +214,10 @@
 ;;; Whoops.  Too much optimization in division operators for 0
 ;;; divisor.
 (macrolet ((frob (name)
-	     `(let ((fn (compile nil '(lambda (x)
-				       (declare (optimize speed) (fixnum x))
-				       (,name x 0)))))
-	       (assert (raises-error? (funcall fn 1) division-by-zero)))))
+             `(let ((fn (compile nil '(lambda (x)
+                                       (declare (optimize speed) (fixnum x))
+                                       (,name x 0)))))
+               (assert (raises-error? (funcall fn 1) division-by-zero)))))
   (frob mod)
   (frob truncate)
   (frob rem)
@@ -229,31 +229,31 @@
 ;; comparisons without rationalizing the floats still gives the right anwers
 ;; in the edge cases (had a fencepost error).
 (macrolet ((test (range type sign)
-	     `(let (ints
-		    floats
-		    (start (- ,(find-symbol (format nil
-						    "MOST-~A-EXACTLY-~A-FIXNUM"
-						    sign type)
-					    :sb-kernel)
-			      ,range)))
-		(dotimes (i (1+ (* ,range 2)))
-		  (let* ((x (+ start i))
-			 (y (coerce x ',type)))
-		    (push x ints)
-		    (push y floats)))
-		(dolist (i ints)
-		  (dolist (f floats)
-		    (dolist (op '(< <= = >= >))
-		      (unless (eq (funcall op i f)
-				  (funcall op i (rationalize f)))
-			(error "(not (eq (~a ~a ~f) (~a ~a ~a)))~%"
-			       op i f
-			       op i (rationalize f)))
-		      (unless (eq (funcall op f i)
-				  (funcall op (rationalize f) i))
-			(error "(not (eq (~a ~f ~a) (~a ~a ~a)))~%"
-			       op f i
-			       op (rationalize f) i))))))))
+             `(let (ints
+                    floats
+                    (start (- ,(find-symbol (format nil
+                                                    "MOST-~A-EXACTLY-~A-FIXNUM"
+                                                    sign type)
+                                            :sb-kernel)
+                              ,range)))
+                (dotimes (i (1+ (* ,range 2)))
+                  (let* ((x (+ start i))
+                         (y (coerce x ',type)))
+                    (push x ints)
+                    (push y floats)))
+                (dolist (i ints)
+                  (dolist (f floats)
+                    (dolist (op '(< <= = >= >))
+                      (unless (eq (funcall op i f)
+                                  (funcall op i (rationalize f)))
+                        (error "(not (eq (~a ~a ~f) (~a ~a ~a)))~%"
+                               op i f
+                               op i (rationalize f)))
+                      (unless (eq (funcall op f i)
+                                  (funcall op (rationalize f) i))
+                        (error "(not (eq (~a ~f ~a) (~a ~a ~a)))~%"
+                               op f i
+                               op (rationalize f) i))))))))
   (test 32 double-float negative)
   (test 32 double-float positive)
   (test 32 single-float negative)
@@ -261,6 +261,6 @@
 
 ;; x86-64 sign-extension bug found using pfdietz's random tester.
 (assert (= 286142502
-	   (funcall (lambda () 
-		      (declare (notinline logxor)) 
-		      (min (logxor 0 0 0 286142502))))))
+           (funcall (lambda ()
+                      (declare (notinline logxor))
+                      (min (logxor 0 0 0 286142502))))))

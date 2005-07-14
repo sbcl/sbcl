@@ -47,10 +47,10 @@
   (1))
 
 (defun smv (env)
-  (multiple-value-bind (expansion macro-p) 
-      (macroexpand 'srlt env) 
+  (multiple-value-bind (expansion macro-p)
+      (macroexpand 'srlt env)
     (when macro-p (eval expansion))))
-(defmacro testr (&environment env) 
+(defmacro testr (&environment env)
   `',(getf (smv env) nil))
 
 (deftest macroexpand-all.4
@@ -61,21 +61,21 @@
   `',(declaration-information thing env))
 
 (macrolet ((def (x)
-	       `(macrolet ((frob (suffix answer &optional declaration)
-			    `(deftest ,(intern (concatenate 'string
-							    "DECLARATION-INFORMATION."
-							    (symbol-name ',x)
-							    suffix))
-			       (locally (declare ,@(when declaration
-							 (list declaration)))
-				 (cadr (assoc ',',x (dinfo optimize))))
-			      ,answer)))
-		 (frob ".DEFAULT" 1)
-		 (frob ".0" 0 (optimize (,x 0)))
-		 (frob ".1" 1 (optimize (,x 1)))
-		 (frob ".2" 2 (optimize (,x 2)))
-		 (frob ".3" 3 (optimize (,x 3)))
-		 (frob ".IMPLICIT" 3 (optimize ,x)))))
+               `(macrolet ((frob (suffix answer &optional declaration)
+                            `(deftest ,(intern (concatenate 'string
+                                                            "DECLARATION-INFORMATION."
+                                                            (symbol-name ',x)
+                                                            suffix))
+                               (locally (declare ,@(when declaration
+                                                         (list declaration)))
+                                 (cadr (assoc ',',x (dinfo optimize))))
+                              ,answer)))
+                 (frob ".DEFAULT" 1)
+                 (frob ".0" 0 (optimize (,x 0)))
+                 (frob ".1" 1 (optimize (,x 1)))
+                 (frob ".2" 2 (optimize (,x 2)))
+                 (frob ".3" 3 (optimize (,x 3)))
+                 (frob ".IMPLICIT" 3 (optimize ,x)))))
   (def speed)
   (def safety)
   (def debug)
@@ -93,8 +93,8 @@
   (locally (declare (sb-ext:muffle-conditions warning))
     (locally (declare (sb-ext:unmuffle-conditions style-warning))
       (let ((dinfo (dinfo sb-ext:muffle-conditions)))
-	(not
-	 (not
-	  (and (subtypep dinfo '(and warning (not style-warning)))
-	       (subtypep '(and warning (not style-warning)) dinfo)))))))
+        (not
+         (not
+          (and (subtypep dinfo '(and warning (not style-warning)))
+               (subtypep '(and warning (not style-warning)) dinfo)))))))
   t)

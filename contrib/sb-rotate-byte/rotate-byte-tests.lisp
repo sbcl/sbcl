@@ -25,7 +25,7 @@
 
 (defun pfixnum (count integer)
   (declare (type (unsigned-byte 29) integer)
-	   (type (integer -31 31) count))
+           (type (integer -31 31) count))
   (rotate-byte count (byte 32 0) integer))
 
 (assert (= (pfixnum 5 5) 160))
@@ -44,7 +44,7 @@
 
 (defun ub32 (count integer)
   (declare (type (unsigned-byte 32) integer)
-	   (type (integer -31 31) count))
+           (type (integer -31 31) count))
   (rotate-byte count (byte 32 0) integer))
 
 (assert (= (ub32 5 5) 160))

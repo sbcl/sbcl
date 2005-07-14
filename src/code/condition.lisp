@@ -18,7 +18,7 @@
 ;;; Signalling an error when trying to print an error condition is
 ;;; generally a PITA, so whatever the failure encountered when
 ;;; wondering about FILE-POSITION within a condition printer, 'tis
-;;; better silently to give up than to try to complain. 
+;;; better silently to give up than to try to complain.
 (defun file-position-or-nil-for-error (stream &optional (pos nil posp))
   ;; Arguably FILE-POSITION shouldn't be signalling errors at all; but
   ;; "NIL if this cannot be determined" in the ANSI spec doesn't seem
@@ -42,7 +42,7 @@
 (/show0 "condition.lisp 24")
 
 (def!struct (condition-classoid (:include slot-classoid)
-				(:constructor make-condition-classoid))
+                                (:constructor make-condition-classoid))
   ;; list of CONDITION-SLOT structures for the direct slots of this
   ;; class
   (slots nil :type list)
@@ -104,60 +104,60 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (/show0 "condition.lisp 103")
   (let ((condition-class (locally
-			   ;; KLUDGE: There's a DEFTRANSFORM
-			   ;; FIND-CLASSOID for constant class names
-			   ;; which creates fast but
-			   ;; non-cold-loadable, non-compact code. In
-			   ;; this context, we'd rather have compact,
-			   ;; cold-loadable code. -- WHN 19990928
-			   (declare (notinline find-classoid))
-			   (find-classoid 'condition))))
+                           ;; KLUDGE: There's a DEFTRANSFORM
+                           ;; FIND-CLASSOID for constant class names
+                           ;; which creates fast but
+                           ;; non-cold-loadable, non-compact code. In
+                           ;; this context, we'd rather have compact,
+                           ;; cold-loadable code. -- WHN 19990928
+                           (declare (notinline find-classoid))
+                           (find-classoid 'condition))))
     (setf (condition-classoid-cpl condition-class)
-	  (list condition-class)))
+          (list condition-class)))
   (/show0 "condition.lisp 103"))
 
 (setf (condition-classoid-report (locally
-				   ;; KLUDGE: There's a DEFTRANSFORM
-				   ;; FIND-CLASSOID for constant class
-				   ;; names which creates fast but
-				   ;; non-cold-loadable, non-compact
-				   ;; code. In this context, we'd
-				   ;; rather have compact,
-				   ;; cold-loadable code. -- WHN
-				   ;; 19990928
-				   (declare (notinline find-classoid))
-				   (find-classoid 'condition)))
+                                   ;; KLUDGE: There's a DEFTRANSFORM
+                                   ;; FIND-CLASSOID for constant class
+                                   ;; names which creates fast but
+                                   ;; non-cold-loadable, non-compact
+                                   ;; code. In this context, we'd
+                                   ;; rather have compact,
+                                   ;; cold-loadable code. -- WHN
+                                   ;; 19990928
+                                   (declare (notinline find-classoid))
+                                   (find-classoid 'condition)))
       (lambda (cond stream)
-	(format stream "Condition ~S was signalled." (type-of cond))))
+        (format stream "Condition ~S was signalled." (type-of cond))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 (defun find-condition-layout (name parent-types)
   (let* ((cpl (remove-duplicates
-	       (reverse
-		(reduce #'append
-			(mapcar (lambda (x)
-				  (condition-classoid-cpl
-				   (find-classoid x)))
-				parent-types)))))
-	 (cond-layout (info :type :compiler-layout 'condition))
-	 (olayout (info :type :compiler-layout name))
-	 ;; FIXME: Does this do the right thing in case of multiple
-	 ;; inheritance? A quick look at DEFINE-CONDITION didn't make
-	 ;; it obvious what ANSI intends to be done in the case of
-	 ;; multiple inheritance, so it's not actually clear what the
-	 ;; right thing is..
-	 (new-inherits
-	  (order-layout-inherits (concatenate 'simple-vector
-					      (layout-inherits cond-layout)
-					      (mapcar #'classoid-layout cpl)))))
+               (reverse
+                (reduce #'append
+                        (mapcar (lambda (x)
+                                  (condition-classoid-cpl
+                                   (find-classoid x)))
+                                parent-types)))))
+         (cond-layout (info :type :compiler-layout 'condition))
+         (olayout (info :type :compiler-layout name))
+         ;; FIXME: Does this do the right thing in case of multiple
+         ;; inheritance? A quick look at DEFINE-CONDITION didn't make
+         ;; it obvious what ANSI intends to be done in the case of
+         ;; multiple inheritance, so it's not actually clear what the
+         ;; right thing is..
+         (new-inherits
+          (order-layout-inherits (concatenate 'simple-vector
+                                              (layout-inherits cond-layout)
+                                              (mapcar #'classoid-layout cpl)))))
     (if (and olayout
-	     (not (mismatch (layout-inherits olayout) new-inherits)))
-	olayout
-	(make-layout :classoid (make-undefined-classoid name)
-		     :inherits new-inherits
-		     :depthoid -1
-		     :length (layout-length cond-layout)))))
+             (not (mismatch (layout-inherits olayout) new-inherits)))
+        olayout
+        (make-layout :classoid (make-undefined-classoid name)
+                     :inherits new-inherits
+                     :depthoid -1
+                     :length (layout-length cond-layout)))))
 
 ) ; EVAL-WHEN
 
@@ -176,10 +176,10 @@
       ;;   7/13/98 BUG? CPL is not sorted and results here depend on order of
       ;;   superclasses in define-condition call!
       (dolist (class (condition-classoid-cpl (classoid-of x))
-		     (error "no REPORT? shouldn't happen!"))
-	(let ((report (condition-classoid-report class)))
-	  (when report
-	    (return (funcall report x stream)))))))
+                     (error "no REPORT? shouldn't happen!"))
+        (let ((report (condition-classoid-report class)))
+          (when report
+            (return (funcall report x stream)))))))
 
 ;;;; slots of CONDITION objects
 
@@ -187,38 +187,38 @@
 
 (defun find-slot-default (class slot)
   (let ((initargs (condition-slot-initargs slot))
-	(cpl (condition-classoid-cpl class)))
+        (cpl (condition-classoid-cpl class)))
     (dolist (class cpl)
       (let ((default-initargs (condition-classoid-default-initargs class)))
-	(dolist (initarg initargs)
-	  (let ((val (getf default-initargs initarg *empty-condition-slot*)))
-	    (unless (eq val *empty-condition-slot*)
-	      (return-from find-slot-default
-			   (if (functionp val)
-			       (funcall val)
-			       val)))))))
+        (dolist (initarg initargs)
+          (let ((val (getf default-initargs initarg *empty-condition-slot*)))
+            (unless (eq val *empty-condition-slot*)
+              (return-from find-slot-default
+                           (if (functionp val)
+                               (funcall val)
+                               val)))))))
 
     (if (condition-slot-initform-p slot)
-	(let ((initform (condition-slot-initform slot)))
-	  (if (functionp initform)
-	      (funcall initform)
-	      initform))
-	(error "unbound condition slot: ~S" (condition-slot-name slot)))))
+        (let ((initform (condition-slot-initform slot)))
+          (if (functionp initform)
+              (funcall initform)
+              initform))
+        (error "unbound condition slot: ~S" (condition-slot-name slot)))))
 
 (defun find-condition-class-slot (condition-class slot-name)
   (dolist (sclass
-	   (condition-classoid-cpl condition-class)
-	   (error "There is no slot named ~S in ~S."
-		  slot-name condition-class))
+           (condition-classoid-cpl condition-class)
+           (error "There is no slot named ~S in ~S."
+                  slot-name condition-class))
     (dolist (slot (condition-classoid-slots sclass))
       (when (eq (condition-slot-name slot) slot-name)
-	(return-from find-condition-class-slot slot)))))
+        (return-from find-condition-class-slot slot)))))
 
 (defun condition-writer-function (condition new-value name)
   (dolist (cslot (condition-classoid-class-slots
-		  (layout-classoid (%instance-layout condition)))
-		 (setf (getf (condition-assigned-slots condition) name)
-		       new-value))
+                  (layout-classoid (%instance-layout condition)))
+                 (setf (getf (condition-assigned-slots condition) name)
+                       new-value))
     (when (eq (condition-slot-name cslot) name)
       (return (setf (car (condition-slot-cell cslot)) new-value)))))
 
@@ -226,25 +226,25 @@
   (let ((class (layout-classoid (%instance-layout condition))))
     (dolist (cslot (condition-classoid-class-slots class))
       (when (eq (condition-slot-name cslot) name)
-	(return-from condition-reader-function
-		     (car (condition-slot-cell cslot)))))
+        (return-from condition-reader-function
+                     (car (condition-slot-cell cslot)))))
     (let ((val (getf (condition-assigned-slots condition) name
-		     *empty-condition-slot*)))
+                     *empty-condition-slot*)))
       (if (eq val *empty-condition-slot*)
-	  (let ((actual-initargs (condition-actual-initargs condition))
-		(slot (find-condition-class-slot class name)))
+          (let ((actual-initargs (condition-actual-initargs condition))
+                (slot (find-condition-class-slot class name)))
             (unless slot
-	      (error "missing slot ~S of ~S" name condition))
-	    (do ((initargs actual-initargs (cddr initargs)))
-		((endp initargs)
-		 (setf (getf (condition-assigned-slots condition) name)
-		       (find-slot-default class slot)))
-	      (when (member (car initargs) (condition-slot-initargs slot))
-		(return-from condition-reader-function
-		  (setf (getf (condition-assigned-slots condition)
-			      name)
-			(cadr initargs))))))
-	  val))))
+              (error "missing slot ~S of ~S" name condition))
+            (do ((initargs actual-initargs (cddr initargs)))
+                ((endp initargs)
+                 (setf (getf (condition-assigned-slots condition) name)
+                       (find-slot-default class slot)))
+              (when (member (car initargs) (condition-slot-initargs slot))
+                (return-from condition-reader-function
+                  (setf (getf (condition-assigned-slots condition)
+                              name)
+                        (cadr initargs))))))
+          val))))
 
 ;;;; MAKE-CONDITION
 
@@ -254,91 +254,91 @@
   ;; Note: ANSI specifies no exceptional situations in this function.
   ;; signalling simple-type-error would not be wrong.
   (let* ((type (or (and (symbolp type) (find-classoid type nil))
-		    type))
-	 (class (typecase type
-		  (condition-classoid type)
-		  (class
-		   ;; Punt to CLOS.
-		   (return-from make-condition (apply #'make-instance type args)))
-		  (classoid
-		   (error 'simple-type-error
-			  :datum type
-			  :expected-type 'condition-class
-			  :format-control "~S is not a condition class."
-			  :format-arguments (list type)))
-		  (t
-		   (error 'simple-type-error
-			  :datum type
-			  :expected-type 'condition-class
-			  :format-control "Bad type argument:~%  ~S"
-			  :format-arguments (list type)))))
-	 (res (make-condition-object args)))
+                    type))
+         (class (typecase type
+                  (condition-classoid type)
+                  (class
+                   ;; Punt to CLOS.
+                   (return-from make-condition (apply #'make-instance type args)))
+                  (classoid
+                   (error 'simple-type-error
+                          :datum type
+                          :expected-type 'condition-class
+                          :format-control "~S is not a condition class."
+                          :format-arguments (list type)))
+                  (t
+                   (error 'simple-type-error
+                          :datum type
+                          :expected-type 'condition-class
+                          :format-control "Bad type argument:~%  ~S"
+                          :format-arguments (list type)))))
+         (res (make-condition-object args)))
     (setf (%instance-layout res) (classoid-layout class))
     ;; Set any class slots with initargs present in this call.
     (dolist (cslot (condition-classoid-class-slots class))
       (dolist (initarg (condition-slot-initargs cslot))
-	(let ((val (getf args initarg *empty-condition-slot*)))
-	  (unless (eq val *empty-condition-slot*)
-	    (setf (car (condition-slot-cell cslot)) val)))))
+        (let ((val (getf args initarg *empty-condition-slot*)))
+          (unless (eq val *empty-condition-slot*)
+            (setf (car (condition-slot-cell cslot)) val)))))
     ;; Default any slots with non-constant defaults now.
     (dolist (hslot (condition-classoid-hairy-slots class))
       (when (dolist (initarg (condition-slot-initargs hslot) t)
-	      (unless (eq (getf args initarg *empty-condition-slot*)
-			  *empty-condition-slot*)
-		(return nil)))
-	(setf (getf (condition-assigned-slots res) (condition-slot-name hslot))
-	      (find-slot-default class hslot))))
+              (unless (eq (getf args initarg *empty-condition-slot*)
+                          *empty-condition-slot*)
+                (return nil)))
+        (setf (getf (condition-assigned-slots res) (condition-slot-name hslot))
+              (find-slot-default class hslot))))
     res))
 
 ;;;; DEFINE-CONDITION
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun %compiler-define-condition (name direct-supers layout
-				   all-readers all-writers)
-  (with-single-package-locked-error 
+                                   all-readers all-writers)
+  (with-single-package-locked-error
       (:symbol name "defining ~A as a condition")
     (sb!xc:proclaim `(ftype (function (t) t) ,@all-readers))
     (sb!xc:proclaim `(ftype (function (t t) t) ,@all-writers))
     (multiple-value-bind (class old-layout)
-	(insured-find-classoid name
-			       #'condition-classoid-p
-			       #'make-condition-classoid)
+        (insured-find-classoid name
+                               #'condition-classoid-p
+                               #'make-condition-classoid)
       (setf (layout-classoid layout) class)
       (setf (classoid-direct-superclasses class)
-	    (mapcar #'find-classoid direct-supers))
+            (mapcar #'find-classoid direct-supers))
       (cond ((not old-layout)
-	     (register-layout layout))
-	    ((not *type-system-initialized*)
-	     (setf (layout-classoid old-layout) class)
-	     (setq layout old-layout)
-	     (unless (eq (classoid-layout class) layout)
-	       (register-layout layout)))
-	    ((redefine-layout-warning "current"
-				      old-layout
-				      "new"
-				      (layout-length layout)
-				      (layout-inherits layout)
-				      (layout-depthoid layout)
-				      (layout-n-untagged-slots layout))
-	     (register-layout layout :invalidate t))
-	    ((not (classoid-layout class))
-	     (register-layout layout)))
-      
+             (register-layout layout))
+            ((not *type-system-initialized*)
+             (setf (layout-classoid old-layout) class)
+             (setq layout old-layout)
+             (unless (eq (classoid-layout class) layout)
+               (register-layout layout)))
+            ((redefine-layout-warning "current"
+                                      old-layout
+                                      "new"
+                                      (layout-length layout)
+                                      (layout-inherits layout)
+                                      (layout-depthoid layout)
+                                      (layout-n-untagged-slots layout))
+             (register-layout layout :invalidate t))
+            ((not (classoid-layout class))
+             (register-layout layout)))
+
       (setf (layout-info layout)
-	    (locally
-		;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM for constant class
-		;; names which creates fast but non-cold-loadable, non-compact
-		;; code. In this context, we'd rather have compact, cold-loadable
-		;; code. -- WHN 19990928
-		(declare (notinline find-classoid))
-	      (layout-info (classoid-layout (find-classoid 'condition)))))
-      
+            (locally
+                ;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM for constant class
+                ;; names which creates fast but non-cold-loadable, non-compact
+                ;; code. In this context, we'd rather have compact, cold-loadable
+                ;; code. -- WHN 19990928
+                (declare (notinline find-classoid))
+              (layout-info (classoid-layout (find-classoid 'condition)))))
+
       (setf (find-classoid name) class)
-      
+
       ;; Initialize CPL slot.
       (setf (condition-classoid-cpl class)
-	    (remove-if-not #'condition-classoid-p 
-			   (std-compute-class-precedence-list class)))))
+            (remove-if-not #'condition-classoid-p
+                           (std-compute-class-precedence-list class)))))
   (values))
 ) ; EVAL-WHEN
 
@@ -354,22 +354,22 @@
   (collect ((res (copy-list (condition-classoid-slots class))))
     (dolist (sclass (cdr (condition-classoid-cpl class)))
       (dolist (sslot (condition-classoid-slots sclass))
-	(let ((found (find (condition-slot-name sslot) (res)
+        (let ((found (find (condition-slot-name sslot) (res)
                            :key #'condition-slot-name)))
-	  (cond (found
-		 (setf (condition-slot-initargs found)
-		       (union (condition-slot-initargs found)
-			      (condition-slot-initargs sslot)))
-		 (unless (condition-slot-initform-p found)
-		   (setf (condition-slot-initform-p found)
-			 (condition-slot-initform-p sslot))
-		   (setf (condition-slot-initform found)
-			 (condition-slot-initform sslot)))
-		 (unless (condition-slot-allocation found)
-		   (setf (condition-slot-allocation found)
-			 (condition-slot-allocation sslot))))
-		(t
-		 (res (copy-structure sslot)))))))
+          (cond (found
+                 (setf (condition-slot-initargs found)
+                       (union (condition-slot-initargs found)
+                              (condition-slot-initargs sslot)))
+                 (unless (condition-slot-initform-p found)
+                   (setf (condition-slot-initform-p found)
+                         (condition-slot-initform-p sslot))
+                   (setf (condition-slot-initform found)
+                         (condition-slot-initform sslot)))
+                 (unless (condition-slot-allocation found)
+                   (setf (condition-slot-allocation found)
+                         (condition-slot-allocation sslot))))
+                (t
+                 (res (copy-structure sslot)))))))
     (res)))
 
 ;;; Early definitions of slot accessor creators.
@@ -392,8 +392,8 @@
           (condition-writer-function condition new-value slot-name))))
 
 (defun %define-condition (name parent-types layout slots documentation
-			  report default-initargs all-readers all-writers)
-  (with-single-package-locked-error 
+                          report default-initargs all-readers all-writers)
+  (with-single-package-locked-error
       (:symbol name "defining ~A as a condition")
     (%compiler-define-condition name parent-types layout all-readers all-writers)
     (let ((class (find-classoid name)))
@@ -401,46 +401,46 @@
       (setf (condition-classoid-report class) report)
       (setf (condition-classoid-default-initargs class) default-initargs)
       (setf (fdocumentation name 'type) documentation)
-      
+
       (dolist (slot slots)
-	
-	;; Set up reader and writer functions.
-	(let ((slot-name (condition-slot-name slot)))
-	  (dolist (reader (condition-slot-readers slot))
-	    (install-condition-slot-reader reader name slot-name))
-	  (dolist (writer (condition-slot-writers slot))
-	    (install-condition-slot-writer writer name slot-name))))
-      
+
+        ;; Set up reader and writer functions.
+        (let ((slot-name (condition-slot-name slot)))
+          (dolist (reader (condition-slot-readers slot))
+            (install-condition-slot-reader reader name slot-name))
+          (dolist (writer (condition-slot-writers slot))
+            (install-condition-slot-writer writer name slot-name))))
+
       ;; Compute effective slots and set up the class and hairy slots
       ;; (subsets of the effective slots.)
       (let ((eslots (compute-effective-slots class))
-	    (e-def-initargs
-	     (reduce #'append
-		     (mapcar #'condition-classoid-default-initargs
-			   (condition-classoid-cpl class)))))
-	(dolist (slot eslots)
-	  (ecase (condition-slot-allocation slot)
-	    (:class
-	     (unless (condition-slot-cell slot)
-	       (setf (condition-slot-cell slot)
-		     (list (if (condition-slot-initform-p slot)
-			       (let ((initform (condition-slot-initform slot)))
-				 (if (functionp initform)
-				     (funcall initform)
-				     initform))
-			       *empty-condition-slot*))))
-	     (push slot (condition-classoid-class-slots class)))
-	    ((:instance nil)
-	     (setf (condition-slot-allocation slot) :instance)
-	     (when (or (functionp (condition-slot-initform slot))
-		       (dolist (initarg (condition-slot-initargs slot) nil)
-			 (when (functionp (getf e-def-initargs initarg))
-			   (return t))))
-	       (push slot (condition-classoid-hairy-slots class))))))))
+            (e-def-initargs
+             (reduce #'append
+                     (mapcar #'condition-classoid-default-initargs
+                           (condition-classoid-cpl class)))))
+        (dolist (slot eslots)
+          (ecase (condition-slot-allocation slot)
+            (:class
+             (unless (condition-slot-cell slot)
+               (setf (condition-slot-cell slot)
+                     (list (if (condition-slot-initform-p slot)
+                               (let ((initform (condition-slot-initform slot)))
+                                 (if (functionp initform)
+                                     (funcall initform)
+                                     initform))
+                               *empty-condition-slot*))))
+             (push slot (condition-classoid-class-slots class)))
+            ((:instance nil)
+             (setf (condition-slot-allocation slot) :instance)
+             (when (or (functionp (condition-slot-initform slot))
+                       (dolist (initarg (condition-slot-initargs slot) nil)
+                         (when (functionp (getf e-def-initargs initarg))
+                           (return t))))
+               (push slot (condition-classoid-hairy-slots class))))))))
     name))
 
 (defmacro define-condition (name (&rest parent-types) (&rest slot-specs)
-				 &body options)
+                                 &body options)
   #!+sb-doc
   "DEFINE-CONDITION Name (Parent-Type*) (Slot-Spec*) Option*
    Define NAME as a condition type. This new type inherits slots and its
@@ -460,111 +460,111 @@
    CLtL2) are neither STANDARD-OBJECTs nor STRUCTURE-OBJECTs. WITH-SLOTS and
    SLOT-VALUE may not be used on condition objects."
   (let* ((parent-types (or parent-types '(condition)))
-	 (layout (find-condition-layout name parent-types))
-	 (documentation nil)
-	 (report nil)
-	 (default-initargs ()))
+         (layout (find-condition-layout name parent-types))
+         (documentation nil)
+         (report nil)
+         (default-initargs ()))
     (collect ((slots)
-	      (all-readers nil append)
-	      (all-writers nil append))
+              (all-readers nil append)
+              (all-writers nil append))
       (dolist (spec slot-specs)
-	(when (keywordp spec)
-	  (warn "Keyword slot name indicates probable syntax error:~%  ~S"
-		spec))
-	(let* ((spec (if (consp spec) spec (list spec)))
-	       (slot-name (first spec))
-	       (allocation :instance)
-	       (initform-p nil)
-	       documentation
-	       initform)
-	  (collect ((initargs)
-		    (readers)
-		    (writers))
-	    (do ((options (rest spec) (cddr options)))
-		((null options))
-	      (unless (and (consp options) (consp (cdr options)))
-		(error "malformed condition slot spec:~%  ~S." spec))
-	      (let ((arg (second options)))
-		(case (first options)
-		  (:reader (readers arg))
-		  (:writer (writers arg))
-		  (:accessor
-		   (readers arg)
-		   (writers `(setf ,arg)))
-		  (:initform
-		   (when initform-p
-		     (error "more than one :INITFORM in ~S" spec))
-		   (setq initform-p t)
-		   (setq initform arg))
-		  (:initarg (initargs arg))
-		  (:allocation
-		   (setq allocation arg))
-		  (:documentation
-		   (when documentation
-		     (error "more than one :DOCUMENTATION in ~S" spec))
-		   (unless (stringp arg)
-		     (error "slot :DOCUMENTATION argument is not a string: ~S"
-			    arg))
-		   (setq documentation arg))
-		  (:type)
-		  (t
-		   (error "unknown slot option:~%  ~S" (first options))))))
+        (when (keywordp spec)
+          (warn "Keyword slot name indicates probable syntax error:~%  ~S"
+                spec))
+        (let* ((spec (if (consp spec) spec (list spec)))
+               (slot-name (first spec))
+               (allocation :instance)
+               (initform-p nil)
+               documentation
+               initform)
+          (collect ((initargs)
+                    (readers)
+                    (writers))
+            (do ((options (rest spec) (cddr options)))
+                ((null options))
+              (unless (and (consp options) (consp (cdr options)))
+                (error "malformed condition slot spec:~%  ~S." spec))
+              (let ((arg (second options)))
+                (case (first options)
+                  (:reader (readers arg))
+                  (:writer (writers arg))
+                  (:accessor
+                   (readers arg)
+                   (writers `(setf ,arg)))
+                  (:initform
+                   (when initform-p
+                     (error "more than one :INITFORM in ~S" spec))
+                   (setq initform-p t)
+                   (setq initform arg))
+                  (:initarg (initargs arg))
+                  (:allocation
+                   (setq allocation arg))
+                  (:documentation
+                   (when documentation
+                     (error "more than one :DOCUMENTATION in ~S" spec))
+                   (unless (stringp arg)
+                     (error "slot :DOCUMENTATION argument is not a string: ~S"
+                            arg))
+                   (setq documentation arg))
+                  (:type)
+                  (t
+                   (error "unknown slot option:~%  ~S" (first options))))))
 
-	    (all-readers (readers))
-	    (all-writers (writers))
-	    (slots `(make-condition-slot
-		     :name ',slot-name
-		     :initargs ',(initargs)
-		     :readers ',(readers)
-		     :writers ',(writers)
-		     :initform-p ',initform-p
-		     :documentation ',documentation
-		     :initform
-		     ,(if (constantp initform)
-			  `',(eval initform)
-			  `#'(lambda () ,initform)))))))
+            (all-readers (readers))
+            (all-writers (writers))
+            (slots `(make-condition-slot
+                     :name ',slot-name
+                     :initargs ',(initargs)
+                     :readers ',(readers)
+                     :writers ',(writers)
+                     :initform-p ',initform-p
+                     :documentation ',documentation
+                     :initform
+                     ,(if (constantp initform)
+                          `',(eval initform)
+                          `#'(lambda () ,initform)))))))
 
       (dolist (option options)
-	(unless (consp option)
-	  (error "bad option:~%  ~S" option))
-	(case (first option)
-	  (:documentation (setq documentation (second option)))
-	  (:report
-	   (let ((arg (second option)))
-	     (setq report
-		   (if (stringp arg)
-		       `#'(lambda (condition stream)
-			  (declare (ignore condition))
-			  (write-string ,arg stream))
-		       `#'(lambda (condition stream)
-			  (funcall #',arg condition stream))))))
-	  (:default-initargs
-	   (do ((initargs (rest option) (cddr initargs)))
-	       ((endp initargs))
-	     (let ((val (second initargs)))
-	       (setq default-initargs
-		     (list* `',(first initargs)
-			    (if (constantp val)
-				`',(eval val)
-				`#'(lambda () ,val))
-			    default-initargs)))))
-	  (t
-	   (error "unknown option: ~S" (first option)))))
+        (unless (consp option)
+          (error "bad option:~%  ~S" option))
+        (case (first option)
+          (:documentation (setq documentation (second option)))
+          (:report
+           (let ((arg (second option)))
+             (setq report
+                   (if (stringp arg)
+                       `#'(lambda (condition stream)
+                          (declare (ignore condition))
+                          (write-string ,arg stream))
+                       `#'(lambda (condition stream)
+                          (funcall #',arg condition stream))))))
+          (:default-initargs
+           (do ((initargs (rest option) (cddr initargs)))
+               ((endp initargs))
+             (let ((val (second initargs)))
+               (setq default-initargs
+                     (list* `',(first initargs)
+                            (if (constantp val)
+                                `',(eval val)
+                                `#'(lambda () ,val))
+                            default-initargs)))))
+          (t
+           (error "unknown option: ~S" (first option)))))
 
       `(progn
-	 (eval-when (:compile-toplevel)
-	   (%compiler-define-condition ',name ',parent-types ',layout
-				       ',(all-readers) ',(all-writers)))
-	 (eval-when (:load-toplevel :execute)
-	   (%define-condition ',name
-			      ',parent-types
-			      ',layout
-			      (list ,@(slots))
-			      ,documentation
-			      ,report
-			      (list ,@default-initargs)
-			      ',(all-readers)
-			      ',(all-writers)))))))
+         (eval-when (:compile-toplevel)
+           (%compiler-define-condition ',name ',parent-types ',layout
+                                       ',(all-readers) ',(all-writers)))
+         (eval-when (:load-toplevel :execute)
+           (%define-condition ',name
+                              ',parent-types
+                              ',layout
+                              (list ,@(slots))
+                              ,documentation
+                              ,report
+                              (list ,@default-initargs)
+                              ',(all-readers)
+                              ',(all-writers)))))))
 
 ;;;; DESCRIBE on CONDITIONs
 
@@ -573,12 +573,12 @@
 ;;; methods)
 (defun describe-condition (condition stream)
   (format stream
-	  "~&~@<~S ~_is a ~S. ~_Its slot values are ~_~S.~:>~%"
-	  condition
-	  (type-of condition)
-	  (concatenate 'list
-		       (condition-actual-initargs condition)
-		       (condition-assigned-slots condition))))
+          "~&~@<~S ~_is a ~S. ~_Its slot values are ~_~S.~:>~%"
+          condition
+          (type-of condition)
+          (concatenate 'list
+                       (condition-actual-initargs condition)
+                       (condition-assigned-slots condition))))
 
 ;;;; various CONDITIONs specified by ANSI
 
@@ -591,17 +591,17 @@
 
 (defun simple-condition-printer (condition stream)
   (apply #'format
-	 stream
-	 (simple-condition-format-control condition)
-	 (simple-condition-format-arguments condition)))
+         stream
+         (simple-condition-format-control condition)
+         (simple-condition-format-arguments condition)))
 
 (define-condition simple-condition ()
   ((format-control :reader simple-condition-format-control
-		   :initarg :format-control
+                   :initarg :format-control
                    :type format-control)
    (format-arguments :reader simple-condition-format-arguments
-		     :initarg :format-arguments
-		     :initform '()
+                     :initarg :format-arguments
+                     :initform '()
                      :type list))
   (:report simple-condition-printer))
 
@@ -620,9 +620,9 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "~@<The value ~2I~:_~S ~I~_is not of type ~2I~_~S.~:>"
-	     (type-error-datum condition)
-	     (type-error-expected-type condition)))))
+             "~@<The value ~2I~:_~S ~I~_is not of type ~2I~_~S.~:>"
+             (type-error-datum condition)
+             (type-error-expected-type condition)))))
 
 (define-condition simple-type-error (simple-condition type-error) ())
 
@@ -636,8 +636,8 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "end of file on ~S"
-	     (stream-error-stream condition)))))
+             "end of file on ~S"
+             (stream-error-stream condition)))))
 
 (define-condition file-error (error)
   ((pathname :reader file-error-pathname :initarg :pathname))
@@ -654,45 +654,45 @@
 (def!method print-object ((condition cell-error) stream)
   (if (and *print-escape* (slot-boundp condition 'name))
       (print-unreadable-object (condition stream :type t :identity t)
-	(princ (cell-error-name condition) stream))
+        (princ (cell-error-name condition) stream))
       (call-next-method)))
 
 (define-condition unbound-variable (cell-error) ()
   (:report
    (lambda (condition stream)
      (format stream
-	     "The variable ~S is unbound."
-	     (cell-error-name condition)))))
+             "The variable ~S is unbound."
+             (cell-error-name condition)))))
 
 (define-condition undefined-function (cell-error) ()
   (:report
    (lambda (condition stream)
      (format stream
-	     "The function ~S is undefined."
-	     (cell-error-name condition)))))
+             "The function ~S is undefined."
+             (cell-error-name condition)))))
 
 (define-condition special-form-function (undefined-function) ()
   (:report
    (lambda (condition stream)
      (format stream
-	     "Cannot FUNCALL the SYMBOL-FUNCTION of special operator ~S."
-	     (cell-error-name condition)))))
+             "Cannot FUNCALL the SYMBOL-FUNCTION of special operator ~S."
+             (cell-error-name condition)))))
 
 (define-condition arithmetic-error (error)
   ((operation :reader arithmetic-error-operation
-	      :initarg :operation
-	      :initform nil)
+              :initarg :operation
+              :initform nil)
    (operands :reader arithmetic-error-operands
-	     :initarg :operands))
+             :initarg :operands))
   (:report (lambda (condition stream)
-	     (format stream
-		     "arithmetic error ~S signalled"
-		     (type-of condition))
-	     (when (arithmetic-error-operation condition)
-	       (format stream
-		       "~%Operation was ~S, operands ~S."
-		       (arithmetic-error-operation condition)
-		       (arithmetic-error-operands condition))))))
+             (format stream
+                     "arithmetic error ~S signalled"
+                     (type-of condition))
+             (when (arithmetic-error-operation condition)
+               (format stream
+                       "~%Operation was ~S, operands ~S."
+                       (arithmetic-error-operation condition)
+                       (arithmetic-error-operands condition))))))
 
 (define-condition division-by-zero         (arithmetic-error) ())
 (define-condition floating-point-overflow  (arithmetic-error) ())
@@ -705,7 +705,7 @@
   (:report
    (lambda (condition stream)
      (let ((obj (print-not-readable-object condition))
-	   (*print-array* nil))
+           (*print-array* nil))
        (format stream "~S cannot be printed readably." obj)))))
 
 (define-condition reader-error (parse-error stream-error)
@@ -719,39 +719,39 @@
   (:report
    (lambda (condition stream)
      (let* ((error-stream (stream-error-stream condition))
-	    (pos (file-position-or-nil-for-error error-stream)))
+            (pos (file-position-or-nil-for-error error-stream)))
        (let (lineno colno)
-	 (when (and pos
-		    (< pos sb!xc:array-dimension-limit)
-		    ;; KLUDGE: lseek() (which is what FILE-POSITION
-		    ;; reduces to on file-streams) is undefined on
-		    ;; "some devices", which in practice means that it
-		    ;; can claim to succeed on /dev/stdin on Darwin
-		    ;; and Solaris.  This is obviously bad news,
-		    ;; because the READ-SEQUENCE below will then
-		    ;; block, not complete, and the report will never
-		    ;; be printed.  As a workaround, we exclude
-		    ;; interactive streams from this attempt to report
-		    ;; positions.  -- CSR, 2003-08-21
-		    (not (interactive-stream-p error-stream))
-		    (file-position error-stream :start))
-	   (let ((string
-		  (make-string pos
-			       :element-type (stream-element-type
-					      error-stream))))
-	     (when (= pos (read-sequence string error-stream))
-	       (setq lineno (1+ (count #\Newline string))
-		     colno (- pos
-			      (or (position #\Newline string :from-end t) -1)
-			      1))))
-	   (file-position-or-nil-for-error error-stream pos))
-	 (format stream
-		 "READER-ERROR ~@[at ~W ~]~
+         (when (and pos
+                    (< pos sb!xc:array-dimension-limit)
+                    ;; KLUDGE: lseek() (which is what FILE-POSITION
+                    ;; reduces to on file-streams) is undefined on
+                    ;; "some devices", which in practice means that it
+                    ;; can claim to succeed on /dev/stdin on Darwin
+                    ;; and Solaris.  This is obviously bad news,
+                    ;; because the READ-SEQUENCE below will then
+                    ;; block, not complete, and the report will never
+                    ;; be printed.  As a workaround, we exclude
+                    ;; interactive streams from this attempt to report
+                    ;; positions.  -- CSR, 2003-08-21
+                    (not (interactive-stream-p error-stream))
+                    (file-position error-stream :start))
+           (let ((string
+                  (make-string pos
+                               :element-type (stream-element-type
+                                              error-stream))))
+             (when (= pos (read-sequence string error-stream))
+               (setq lineno (1+ (count #\Newline string))
+                     colno (- pos
+                              (or (position #\Newline string :from-end t) -1)
+                              1))))
+           (file-position-or-nil-for-error error-stream pos))
+         (format stream
+                 "READER-ERROR ~@[at ~W ~]~
                   ~@[(line ~W~]~@[, column ~W) ~]~
                   on ~S:~%~?"
-		 pos lineno colno error-stream
-		 (reader-error-format-control condition)
-		 (reader-error-format-arguments condition)))))))
+                 pos lineno colno error-stream
+                 (reader-error-format-control condition)
+                 (reader-error-format-arguments condition)))))))
 
 ;;;; special SBCL extension conditions
 
@@ -771,10 +771,10 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "~@<  ~? ~:@_~?~:>"
-	     (simple-condition-format-control condition)
-	     (simple-condition-format-arguments condition)
-	     "~@<This is probably a bug in SBCL itself. (Alternatively, ~
+             "~@<  ~? ~:@_~?~:>"
+             (simple-condition-format-control condition)
+             (simple-condition-format-arguments condition)
+             "~@<This is probably a bug in SBCL itself. (Alternatively, ~
               SBCL might have been corrupted by bad user code, e.g. by an ~
               undefined Lisp operation like ~S, or by stray pointers from ~
               alien code or from unsafe Lisp code; or there might be a bug ~
@@ -783,7 +783,7 @@
               about it. Bug reports are welcome on the SBCL ~
               mailing lists, which you can find at ~
               <http://sbcl.sourceforge.net/>.~:@>"
-	     '((fmakunbound 'compile))))))
+             '((fmakunbound 'compile))))))
 
 (define-condition simple-storage-condition (storage-condition simple-condition) ())
 
@@ -799,7 +799,7 @@
 ;;; By signalling a standard condition in this case, we make it
 ;;; possible for test code to distinguish between (1) intentionally
 ;;; unimplemented and (2) unintentionally just screwed up somehow.
-;;; (Before this condition was defined, test code tried to deal with 
+;;; (Before this condition was defined, test code tried to deal with
 ;;; this by checking for FBOUNDP, but that didn't work reliably. In
 ;;; sbcl-0.7.0, a a package screwup left the definition of
 ;;; LOAD-FOREIGN in the wrong package, so it was unFBOUNDP even on
@@ -825,27 +825,27 @@
      (format stream ", ")
      (destructuring-bind (type data) (cdr reference)
        (ecase type
-	 (:generic-function (format stream "Generic Function ~S" data))
-	 (:section (format stream "Section ~{~D~^.~}" data)))))
+         (:generic-function (format stream "Generic Function ~S" data))
+         (:section (format stream "Section ~{~D~^.~}" data)))))
     (:ansi-cl
      (format stream "The ANSI Standard")
      (format stream ", ")
      (destructuring-bind (type data) (cdr reference)
        (ecase type
-	 (:function (format stream "Function ~S" data))
-	 (:special-operator (format stream "Special Operator ~S" data))
-	 (:macro (format stream "Macro ~S" data))
-	 (:section (format stream "Section ~{~D~^.~}" data))
-	 (:glossary (format stream "Glossary entry for ~S" data))
-	 (:issue (format stream "writeup for Issue ~A" data)))))
+         (:function (format stream "Function ~S" data))
+         (:special-operator (format stream "Special Operator ~S" data))
+         (:macro (format stream "Macro ~S" data))
+         (:section (format stream "Section ~{~D~^.~}" data))
+         (:glossary (format stream "Glossary entry for ~S" data))
+         (:issue (format stream "writeup for Issue ~A" data)))))
     (:sbcl
      (format stream "The SBCL Manual")
      (format stream ", ")
      (destructuring-bind (type data) (cdr reference)
        (ecase type
-	 (:node (format stream "Node ~S" data))
-	 (:variable (format stream "Variable ~S" data))
-	 (:function (format stream "Function ~S" data)))))
+         (:node (format stream "Node ~S" data))
+         (:variable (format stream "Variable ~S" data))
+         (:function (format stream "Function ~S" data)))))
     ;; FIXME: other documents (e.g. CLIM, Franz documentation :-)
     ))
 (define-condition reference-condition ()
@@ -858,22 +858,22 @@
                (reference-condition-references o))
       (format s "~&See also:~%")
       (pprint-logical-block (s nil :per-line-prefix "  ")
-	(do* ((rs (reference-condition-references o) (cdr rs))
-	      (r (car rs) (car rs)))
-	     ((null rs))
-	  (print-reference r s)
-	  (unless (null (cdr rs))
-	    (terpri s)))))))
+        (do* ((rs (reference-condition-references o) (cdr rs))
+              (r (car rs) (car rs)))
+             ((null rs))
+          (print-reference r s)
+          (unless (null (cdr rs))
+            (terpri s)))))))
 
 (define-condition duplicate-definition (reference-condition warning)
   ((name :initarg :name :reader duplicate-definition-name))
   (:report (lambda (c s)
-	     (format s "~@<Duplicate definition for ~S found in ~
+             (format s "~@<Duplicate definition for ~S found in ~
                         one file.~@:>"
-		     (duplicate-definition-name c))))
+                     (duplicate-definition-name c))))
   (:default-initargs :references (list '(:ansi-cl :section (3 2 2 3)))))
 
-(define-condition package-at-variance (reference-condition simple-warning) 
+(define-condition package-at-variance (reference-condition simple-warning)
   ()
   (:default-initargs :references (list '(:ansi-cl :macro defpackage))))
 
@@ -884,20 +884,20 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "~@<The constant ~S is being redefined (from ~S to ~S)~@:>"
-	     (defconstant-uneql-name condition)
-	     (defconstant-uneql-old-value condition)
-	     (defconstant-uneql-new-value condition))))
+             "~@<The constant ~S is being redefined (from ~S to ~S)~@:>"
+             (defconstant-uneql-name condition)
+             (defconstant-uneql-old-value condition)
+             (defconstant-uneql-new-value condition))))
   (:default-initargs :references (list '(:ansi-cl :macro defconstant)
-				       '(:sbcl :node "Idiosyncrasies"))))
+                                       '(:sbcl :node "Idiosyncrasies"))))
 
-(define-condition array-initial-element-mismatch 
+(define-condition array-initial-element-mismatch
     (reference-condition simple-warning)
   ()
-  (:default-initargs 
-      :references (list 
-		   '(:ansi-cl :function make-array) 
-		   '(:ansi-cl :function sb!xc:upgraded-array-element-type))))
+  (:default-initargs
+      :references (list
+                   '(:ansi-cl :function make-array)
+                   '(:ansi-cl :function sb!xc:upgraded-array-element-type))))
 
 (define-condition displaced-to-array-too-small-error
     (reference-condition simple-error)
@@ -917,7 +917,7 @@
   ()
   (:default-initargs :references (list '(:ansi-cl :section (22 3 10 2)))))
 
-(define-condition format-too-few-args-warning 
+(define-condition format-too-few-args-warning
     (format-args-mismatch simple-warning)
   ())
 (define-condition format-too-many-args-warning
@@ -936,21 +936,21 @@
 (progn
 
 (define-condition package-lock-violation (reference-condition package-error)
-  ((format-control :initform nil :initarg :format-control 
-		   :reader package-error-format-control)
+  ((format-control :initform nil :initarg :format-control
+                   :reader package-error-format-control)
    (format-arguments :initform nil :initarg :format-arguments
-		     :reader package-error-format-arguments))
-  (:report 
+                     :reader package-error-format-arguments))
+  (:report
    (lambda (condition stream)
      (let ((control (package-error-format-control condition)))
        (if control
-	   (apply #'format stream
+           (apply #'format stream
                   (format nil "~~@<Lock on package ~A violated when ~A.~~:@>"
                           (package-name (package-error-package condition))
                           control)
                   (package-error-format-arguments condition))
-	   (format stream "~@<Lock on package ~A violated.~:@>"
-		   (package-name (package-error-package condition)))))))
+           (format stream "~@<Lock on package ~A violated.~:@>"
+                   (package-name (package-error-package condition)))))))
   ;; no :default-initargs -- reference-stuff provided by the
   ;; signalling form in target-package.lisp
   #!+sb-doc
@@ -979,8 +979,8 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
   (:report
    (lambda (condition stream)
      (if (slot-boundp condition 'name)
-	 (format stream "Undefined alien: ~S" (cell-error-name condition))
-	 (format stream "Undefined alien symbol.")))))
+         (format stream "Undefined alien: ~S" (cell-error-name condition))
+         (format stream "Undefined alien symbol.")))))
 
 (define-condition undefined-alien-variable-error (undefined-alien-error) ()
   (:report
@@ -1010,9 +1010,9 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
   (:report
    (lambda (condition stream)
      (format stream
-	     "~@<The values set ~2I~:_[~{~S~^ ~}] ~I~_is not of type ~2I~_~S.~:>"
-	     (type-error-datum condition)
-	     (type-error-expected-type condition)))))
+             "~@<The values set ~2I~:_[~{~S~^ ~}] ~I~_is not of type ~2I~_~S.~:>"
+             (type-error-datum condition)
+             (type-error-expected-type condition)))))
 
 ;;; KLUDGE: a condition for floating point errors when we can't or
 ;;; won't figure out what type they are. (In FreeBSD and OpenBSD we
@@ -1025,64 +1025,64 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 (define-condition floating-point-exception (arithmetic-error)
   ((flags :initarg :traps
           :initform nil
-	  :reader floating-point-exception-traps))
+          :reader floating-point-exception-traps))
   (:report (lambda (condition stream)
-	     (format stream
-		     "An arithmetic error ~S was signalled.~%"
-		     (type-of condition))
-	     (let ((traps (floating-point-exception-traps condition)))
-	       (if traps
-		   (format stream
-			   "Trapping conditions are: ~%~{ ~S~^~}~%"
-			   traps)
-		   (write-line
-		    "No traps are enabled? How can this be?"
-		    stream))))))
+             (format stream
+                     "An arithmetic error ~S was signalled.~%"
+                     (type-of condition))
+             (let ((traps (floating-point-exception-traps condition)))
+               (if traps
+                   (format stream
+                           "Trapping conditions are: ~%~{ ~S~^~}~%"
+                           traps)
+                   (write-line
+                    "No traps are enabled? How can this be?"
+                    stream))))))
 
 (define-condition index-too-large-error (type-error)
   ()
   (:report
    (lambda (condition stream)
      (format stream
-	     "The index ~S is too large."
-	     (type-error-datum condition)))))
+             "The index ~S is too large."
+             (type-error-datum condition)))))
 
 (define-condition bounding-indices-bad-error (reference-condition type-error)
   ((object :reader bounding-indices-bad-object :initarg :object))
   (:report
    (lambda (condition stream)
      (let* ((datum (type-error-datum condition))
-	    (start (car datum))
-	    (end (cdr datum))
-	    (object (bounding-indices-bad-object condition)))
+            (start (car datum))
+            (end (cdr datum))
+            (object (bounding-indices-bad-object condition)))
        (etypecase object
-	 (sequence
-	  (format stream
-		  "The bounding indices ~S and ~S are bad ~
+         (sequence
+          (format stream
+                  "The bounding indices ~S and ~S are bad ~
                    for a sequence of length ~S."
-		  start end (length object)))
-	 (array
-	  ;; from WITH-ARRAY-DATA
-	  (format stream
-		  "The START and END parameters ~S and ~S are ~
+                  start end (length object)))
+         (array
+          ;; from WITH-ARRAY-DATA
+          (format stream
+                  "The START and END parameters ~S and ~S are ~
                    bad for an array of total size ~S."
-		  start end (array-total-size object)))))))
-  (:default-initargs 
-      :references 
+                  start end (array-total-size object)))))))
+  (:default-initargs
+      :references
       (list '(:ansi-cl :glossary "bounding index designator")
-	    '(:ansi-cl :issue "SUBSEQ-OUT-OF-BOUNDS:IS-AN-ERROR"))))
+            '(:ansi-cl :issue "SUBSEQ-OUT-OF-BOUNDS:IS-AN-ERROR"))))
 
 (define-condition nil-array-accessed-error (reference-condition type-error)
   ()
   (:report (lambda (condition stream)
-	     (declare (ignore condition))
-	     (format stream
-		     "An attempt to access an array of element-type ~
+             (declare (ignore condition))
+             (format stream
+                     "An attempt to access an array of element-type ~
                       NIL was made.  Congratulations!")))
   (:default-initargs
       :references (list '(:ansi-cl :function sb!xc:upgraded-array-element-type)
-			'(:ansi-cl :section (15 1 2 1))
-			'(:ansi-cl :section (15 1 2 2)))))
+                        '(:ansi-cl :section (15 1 2 1))
+                        '(:ansi-cl :section (15 1 2 2)))))
 
 (define-condition io-timeout (stream-error)
   ((direction :reader io-timeout-direction :initarg :direction))
@@ -1090,9 +1090,9 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
    (lambda (condition stream)
      (declare (type stream stream))
      (format stream
-	     "I/O timeout ~(~A~)ing ~S"
-	     (io-timeout-direction condition)
-	     (stream-error-stream condition)))))
+             "I/O timeout ~(~A~)ing ~S"
+             (io-timeout-direction condition)
+             (stream-error-stream condition)))))
 
 (define-condition namestring-parse-error (parse-error)
   ((complaint :reader namestring-parse-error-complaint :initarg :complaint)
@@ -1102,11 +1102,11 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
   (:report
    (lambda (condition stream)
      (format stream
-	     "parse error in namestring: ~?~%  ~A~%  ~V@T^"
-	     (namestring-parse-error-complaint condition)
-	     (namestring-parse-error-args condition)
-	     (namestring-parse-error-namestring condition)
-	     (namestring-parse-error-offset condition)))))
+             "parse error in namestring: ~?~%  ~A~%  ~V@T^"
+             (namestring-parse-error-complaint condition)
+             (namestring-parse-error-args condition)
+             (namestring-parse-error-namestring condition)
+             (namestring-parse-error-offset condition)))))
 
 (define-condition simple-package-error (simple-condition package-error) ())
 
@@ -1117,9 +1117,9 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
   (:report
    (lambda (condition stream)
      (format stream
-	     "unexpected end of file on ~S ~A"
-	     (stream-error-stream condition)
-	     (reader-eof-error-context condition)))))
+             "unexpected end of file on ~S ~A"
+             (stream-error-stream condition)
+             (reader-eof-error-context condition)))))
 
 (define-condition reader-impossible-number-error (reader-error)
   ((error :reader reader-impossible-number-error-error :initarg :error))
@@ -1127,15 +1127,15 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
    (lambda (condition stream)
      (let ((error-stream (stream-error-stream condition)))
        (format stream "READER-ERROR ~@[at ~W ~]on ~S:~%~?~%Original error: ~A"
-	       (file-position-or-nil-for-error error-stream) error-stream
-	       (reader-error-format-control condition)
-	       (reader-error-format-arguments condition)
-	       (reader-impossible-number-error-error condition))))))
+               (file-position-or-nil-for-error error-stream) error-stream
+               (reader-error-format-control condition)
+               (reader-error-format-arguments condition)
+               (reader-impossible-number-error-error condition))))))
 
 (define-condition timeout (serious-condition) ())
 
 (define-condition declaration-type-conflict-error (reference-condition
-						   simple-error)
+                                                   simple-error)
   ()
   (:default-initargs
       :format-control "symbol ~S cannot be both the name of a type and the name of a declaration"
@@ -1222,14 +1222,14 @@ the value of the variable. No associated restarts."))
   (invoke-restart (find-restart-or-control-error 'muffle-warning condition)))
 
 (macrolet ((define-nil-returning-restart (name args doc)
-	     #!-sb-doc (declare (ignore doc))
-	     `(defun ,name (,@args &optional condition)
-		#!+sb-doc ,doc
-		;; FIXME: Perhaps this shared logic should be pulled out into
-		;; FLET MAYBE-INVOKE-RESTART? See whether it shrinks code..
-	        (let ((restart (find-restart ',name condition)))
-		  (when restart
-		    (invoke-restart restart ,@args))))))
+             #!-sb-doc (declare (ignore doc))
+             `(defun ,name (,@args &optional condition)
+                #!+sb-doc ,doc
+                ;; FIXME: Perhaps this shared logic should be pulled out into
+                ;; FLET MAYBE-INVOKE-RESTART? See whether it shrinks code..
+                (let ((restart (find-restart ',name condition)))
+                  (when restart
+                    (invoke-restart restart ,@args))))))
   (define-nil-returning-restart continue ()
     "Transfer control to a restart named CONTINUE, or return NIL if none exists.")
   (define-nil-returning-restart store-value (value)
@@ -1242,10 +1242,10 @@ the value of the variable. No associated restarts."))
 ;;; single-stepping restarts
 
 (macrolet ((def (name doc)
-	       #!-sb-doc (declare (ignore doc))
-	       `(defun ,name (condition)
-		 #!+sb-doc ,doc
-		 (invoke-restart (find-restart-or-control-error ',name condition)))))
+               #!-sb-doc (declare (ignore doc))
+               `(defun ,name (condition)
+                 #!+sb-doc ,doc
+                 (invoke-restart (find-restart-or-control-error ',name condition)))))
   (def step-continue
       "Transfers control to the STEP-CONTINUE restart associated with
 the condition, continuing execution without stepping. Signals a

@@ -25,26 +25,26 @@
 ;;; special values, etc.
 (defun single-from-bits (sign exp sig)
   (declare (type bit sign) (type (unsigned-byte 24) sig)
-	   (type (unsigned-byte 8) exp))
+           (type (unsigned-byte 8) exp))
   (make-single-float
    (dpb exp sb!vm:single-float-exponent-byte
-	(dpb sig sb!vm:single-float-significand-byte
-	     (if (zerop sign) 0 -1)))))
+        (dpb sig sb!vm:single-float-significand-byte
+             (if (zerop sign) 0 -1)))))
 (defun double-from-bits (sign exp sig)
   (declare (type bit sign) (type (unsigned-byte 53) sig)
-	   (type (unsigned-byte 11) exp))
+           (type (unsigned-byte 11) exp))
   (make-double-float (dpb exp sb!vm:double-float-exponent-byte
-			  (dpb (ash sig -32)
-			       sb!vm:double-float-significand-byte
-			       (if (zerop sign) 0 -1)))
-		     (ldb (byte 32 0) sig)))
+                          (dpb (ash sig -32)
+                               sb!vm:double-float-significand-byte
+                               (if (zerop sign) 0 -1)))
+                     (ldb (byte 32 0) sig)))
 #!+(and long-float x86)
 (defun long-from-bits (sign exp sig)
   (declare (type bit sign) (type (unsigned-byte 64) sig)
-	   (type (unsigned-byte 15) exp))
+           (type (unsigned-byte 15) exp))
   (make-long-float (logior (ash sign 15) exp)
-		   (ldb (byte 32 32) sig)
-		   (ldb (byte 32 0) sig)))
+                   (ldb (byte 32 32) sig)
+                   (ldb (byte 32 0) sig)))
 
 ) ; EVAL-WHEN
 
@@ -81,7 +81,7 @@
 #!+(and long-float x86)
 (defconstant least-positive-normalized-long-float
   (long-from-bits 0 sb!vm:long-float-normal-exponent-min
-		  (ash sb!vm:long-float-hidden-bit 32)))
+                  (ash sb!vm:long-float-hidden-bit 32)))
 (defconstant least-negative-normalized-double-float
   (double-from-bits 1 sb!vm:double-float-normal-exponent-min 0))
 #!-long-float
@@ -90,25 +90,25 @@
 #!+(and long-float x86)
 (defconstant least-negative-normalized-long-float
   (long-from-bits 1 sb!vm:long-float-normal-exponent-min
-		  (ash sb!vm:long-float-hidden-bit 32)))
+                  (ash sb!vm:long-float-hidden-bit 32)))
 
 (defconstant most-positive-single-float
   (single-from-bits 0 sb!vm:single-float-normal-exponent-max
-		    (ldb sb!vm:single-float-significand-byte -1)))
+                    (ldb sb!vm:single-float-significand-byte -1)))
 (defconstant most-positive-short-float most-positive-single-float)
 (defconstant most-negative-single-float
   (single-from-bits 1 sb!vm:single-float-normal-exponent-max
-		    (ldb sb!vm:single-float-significand-byte -1)))
+                    (ldb sb!vm:single-float-significand-byte -1)))
 (defconstant most-negative-short-float most-negative-single-float)
 (defconstant most-positive-double-float
   (double-from-bits 0 sb!vm:double-float-normal-exponent-max
-		    (ldb (byte sb!vm:double-float-digits 0) -1)))
+                    (ldb (byte sb!vm:double-float-digits 0) -1)))
 
 (defconstant most-positive-long-float most-positive-double-float)
 
 (defconstant most-negative-double-float
   (double-from-bits 1 sb!vm:double-float-normal-exponent-max
-		    (ldb (byte sb!vm:double-float-digits 0) -1)))
+                    (ldb (byte sb!vm:double-float-digits 0) -1)))
 (defconstant most-negative-long-float most-negative-double-float)
 
 ;;; We don't want to do these DEFCONSTANTs at cross-compilation time,
@@ -137,7 +137,7 @@
 #!+(and long-float x86)
 (defconstant long-float-positive-infinity
   (long-from-bits 0 (1+ sb!vm:long-float-normal-exponent-max)
-		  (ash sb!vm:long-float-hidden-bit 32)))
+                  (ash sb!vm:long-float-hidden-bit 32)))
 (defconstant double-float-negative-infinity
   (double-from-bits 1 (1+ sb!vm:double-float-normal-exponent-max) 0))
 #!+(not long-float)
@@ -146,25 +146,25 @@
 #!+(and long-float x86)
 (defconstant long-float-negative-infinity
   (long-from-bits 1 (1+ sb!vm:long-float-normal-exponent-max)
-		  (ash sb!vm:long-float-hidden-bit 32)))
+                  (ash sb!vm:long-float-hidden-bit 32)))
 ) ; LET-to-suppress-possible-EVAL-WHENs
 
 (defconstant single-float-epsilon
   (single-from-bits 0 (- sb!vm:single-float-bias
-			 (1- sb!vm:single-float-digits)) 1))
+                         (1- sb!vm:single-float-digits)) 1))
 (defconstant short-float-epsilon single-float-epsilon)
 (defconstant single-float-negative-epsilon
   (single-from-bits 0 (- sb!vm:single-float-bias sb!vm:single-float-digits) 1))
 (defconstant short-float-negative-epsilon single-float-negative-epsilon)
 (defconstant double-float-epsilon
   (double-from-bits 0 (- sb!vm:double-float-bias
-			 (1- sb!vm:double-float-digits)) 1))
+                         (1- sb!vm:double-float-digits)) 1))
 #!-long-float
 (defconstant long-float-epsilon double-float-epsilon)
 #!+(and long-float x86)
 (defconstant long-float-epsilon
   (long-from-bits 0 (- sb!vm:long-float-bias (1- sb!vm:long-float-digits))
-		  (+ 1 (ash sb!vm:long-float-hidden-bit 32))))
+                  (+ 1 (ash sb!vm:long-float-hidden-bit 32))))
 (defconstant double-float-negative-epsilon
   (double-from-bits 0 (- sb!vm:double-float-bias sb!vm:double-float-digits) 1))
 #!-long-float
@@ -172,4 +172,4 @@
 #!+(and long-float x86)
 (defconstant long-float-negative-epsilon
   (long-from-bits 0 (- sb!vm:long-float-bias sb!vm:long-float-digits)
-		  (+ 1 (ash sb!vm:long-float-hidden-bit 32))))
+                  (+ 1 (ash sb!vm:long-float-hidden-bit 32))))

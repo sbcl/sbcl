@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -22,14 +22,14 @@
   (let ((blah2 (intern "blah2" package)))
     (export blah2 package))
   (assert (equal '("blah" "blah2")
-		 (sort (loop for sym being each present-symbol of package
-			     for sym-name = (symbol-name sym)
-			     collect sym-name)
-		       #'string<)))
+                 (sort (loop for sym being each present-symbol of package
+                             for sym-name = (symbol-name sym)
+                             collect sym-name)
+                       #'string<)))
   (assert (equal '("blah2")
-		 (sort (loop for sym being each external-symbol of package for
-			     sym-name = (symbol-name sym) collect sym-name)
-		       (function string<)))))
+                 (sort (loop for sym being each external-symbol of package for
+                             sym-name = (symbol-name sym) collect sym-name)
+                       (function string<)))))
 
 ;;; success
 (quit :unix-status 104)

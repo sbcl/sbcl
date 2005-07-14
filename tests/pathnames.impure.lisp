@@ -9,7 +9,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -48,7 +48,7 @@
                      "tmp/rel/foo.lisp")))
 (assert (equal (namestring (translate-logical-pathname "demo1:;foo.lisp"))
                "/tmp/rel/foo.lisp"))
-                     
+
 ;;; Under SBCL: new function #'UNPARSE-ENOUGH-NAMESTRING, to
 ;;; handle the following case exactly (otherwise we get an error:
 ;;; "#'IDENTITY CALLED WITH 2 ARGS."
@@ -62,11 +62,11 @@
 ;;; in the cleanup issue PATHNAME-LOGICAL:ADD seem to be a pretty
 ;;; compelling reason for the implementors to choose case
 ;;; insensitivity and a canonical case.)
-(setf (logical-pathname-translations "FOO") 
+(setf (logical-pathname-translations "FOO")
       '(("**;*.*.*" "/full/path/to/foo/**/*.*")))
-(let* ((pn1 (make-pathname :host "FOO" :directory "etc" :name "INETD" 
+(let* ((pn1 (make-pathname :host "FOO" :directory "etc" :name "INETD"
                            :type "conf"))
-       (pn2 (make-pathname :host "foo" :directory "ETC" :name "inetd" 
+       (pn2 (make-pathname :host "foo" :directory "ETC" :name "inetd"
                            :type "CONF"))
        (pn3 (read-from-string (prin1-to-string pn1))))
   (assert (equal pn1 pn2))
@@ -81,18 +81,18 @@
 (locally
   ;; MAKE-PATHNAME is UNSAFELY-FLUSHABLE
   (declare (optimize safety))
-  
+
   (assert (not (ignore-errors
-		(make-pathname :host "FOO" :directory "!bla" :name "bar"))))
-  
+                (make-pathname :host "FOO" :directory "!bla" :name "bar"))))
+
   ;; error: name-component not valid
   (assert (not (ignore-errors
-		(make-pathname :host "FOO" :directory "bla" :name "!bar"))))
-  
+                (make-pathname :host "FOO" :directory "bla" :name "!bar"))))
+
   ;; error: type-component not valid.
   (assert (not (ignore-errors
-		(make-pathname :host "FOO" :directory "bla" :name "bar"
-			       :type "&baz")))))
+                (make-pathname :host "FOO" :directory "bla" :name "bar"
+                               :type "&baz")))))
 
 ;;; We may need to parse the host as a LOGICAL-NAMESTRING HOST. The
 ;;; HOST in PARSE-NAMESTRING can be either a string or :UNSPECIFIC
@@ -225,14 +225,14 @@
         ;; recognizes a logical pathname namestring when
         ;; default-pathname is a logical pathname
         ;; FIXME: 0.6.12.23 fails this one.
-	;;
-	;; And, as it happens, it's right to fail it. Because
-	;; #p"name1" is read in with the ambient *d-p-d* value, which
-	;; has a physical (Unix) host; therefore, the host of the
-	;; default-pathname argument to merge-pathnames is
-	;; irrelevant. The result is (correctly) different if
-	;; '#p"name1"' is replaced by "name1", below, though it's
-	;; still not what one might expect... -- CSR, 2002-05-09
+        ;;
+        ;; And, as it happens, it's right to fail it. Because
+        ;; #p"name1" is read in with the ambient *d-p-d* value, which
+        ;; has a physical (Unix) host; therefore, the host of the
+        ;; default-pathname argument to merge-pathnames is
+        ;; irrelevant. The result is (correctly) different if
+        ;; '#p"name1"' is replaced by "name1", below, though it's
+        ;; still not what one might expect... -- CSR, 2002-05-09
         #+nil (#P"scratch:foo;name1" #p"name1" #p"scratch:foo;")
         ;; or when the namestring begins with the name of a defined
         ;; logical host followed by a colon [I assume that refers to pathname
@@ -241,23 +241,23 @@
         ;; conduct the previous set of tests again, with a lpn first argument
         (#P"SCRATCH:USR;LOCAL;DOC;FOO" #p"scratch:;foo" #p"/usr/local/doc/")
         (#p"SCRATCH:SUPPLIED-DIR;NAME.TYPE"
-	 #p"scratch:supplied-dir;"
-	 #p"/dir/name.type")
+         #p"scratch:supplied-dir;"
+         #p"/dir/name.type")
         (#p"SCRATCH:DIR;SUPPLIED-NAME.TYPE"
-	 #p"scratch:;supplied-name"
-	 #p"/dir/name.type")
+         #p"scratch:;supplied-name"
+         #p"/dir/name.type")
         (#p"SCRATCH:DIR;NAME.SUPPLIED-TYPE"
          ,(make-pathname :host "scratch" :type "supplied-type")
-	 #p"/dir/name.type")
+         #p"/dir/name.type")
         (#p"SCRATCH:AAA;BBB;CCC;DDD;FOO;BAR"
          ,(make-pathname :host "scratch"
-			 :directory '(:relative "foo")
-			 :name "bar")
+                         :directory '(:relative "foo")
+                         :name "bar")
          #p"/aaa/bbb/ccc/ddd/eee")
         (#p"SCRATCH:AAA;BBB;CCC;FOO;BAR"
          ,(make-pathname :host "scratch"
-			 :directory '(:relative :back "foo")
-			 :name "bar")
+                         :directory '(:relative :back "foo")
+                         :name "bar")
          #p"/aaa/bbb/ccc/ddd/eee")
         (#p"SCRATCH:ABSOLUTE;PATH;NAME.TYPE"
          #p"scratch:absolute;path;name" #p"/dir/default-name.type")
@@ -265,23 +265,23 @@
         ;; FIXME: test version handling in LPNs
         )
       do (let ((result (apply #'merge-pathnames params)))
-	   (macrolet ((frob (op)
-			`(assert (equal (,op result) (,op expected-result)))))
-	     (frob pathname-host)
-	     (frob pathname-directory)
-	     (frob pathname-name)
-	     (frob pathname-type))))
+           (macrolet ((frob (op)
+                        `(assert (equal (,op result) (,op expected-result)))))
+             (frob pathname-host)
+             (frob pathname-directory)
+             (frob pathname-name)
+             (frob pathname-type))))
 
 ;;; host-namestring testing
 (assert (string=
-	 (namestring (parse-namestring "/foo" (host-namestring #p"/bar")))
-	 "/foo"))
+         (namestring (parse-namestring "/foo" (host-namestring #p"/bar")))
+         "/foo"))
 (assert (string=
-	 (namestring (parse-namestring "FOO" (host-namestring #p"SCRATCH:BAR")))
-	 "SCRATCH:FOO"))
+         (namestring (parse-namestring "FOO" (host-namestring #p"SCRATCH:BAR")))
+         "SCRATCH:FOO"))
 (assert (raises-error?
-	 (setf (logical-pathname-translations "")
-	       (list '("**;*.*.*" "/**/*.*")))))
+         (setf (logical-pathname-translations "")
+               (list '("**;*.*.*" "/**/*.*")))))
 
 ;;; Bug 200: translate-logical-pathname is according to the spec supposed
 ;;; not to give errors if asked to translate a namestring for a valid
@@ -294,41 +294,41 @@
 ;;; functions (they would cause memory protection errors).  Make sure
 ;;; that those errors are gone:
 (assert (raises-error? (pathname (make-string-input-stream "FOO"))
-		       type-error))
+                       type-error))
 (assert (raises-error? (merge-pathnames (make-string-output-stream))
-		       type-error))
+                       type-error))
 
 ;;; ensure read/print consistency (or print-not-readable-error) on
 ;;; pathnames:
 (let ((pathnames (list
-		  (make-pathname :name "foo" :type "txt" :version :newest)
-		  (make-pathname :name "foo" :type "txt" :version 1)
-		  (make-pathname :name "foo" :type ".txt")
-		  (make-pathname :name "foo." :type "txt")
-		  (parse-namestring "SCRATCH:FOO.TXT.1")
-		  (parse-namestring "SCRATCH:FOO.TXT.NEWEST")
-		  (parse-namestring "SCRATCH:FOO.TXT"))))
+                  (make-pathname :name "foo" :type "txt" :version :newest)
+                  (make-pathname :name "foo" :type "txt" :version 1)
+                  (make-pathname :name "foo" :type ".txt")
+                  (make-pathname :name "foo." :type "txt")
+                  (parse-namestring "SCRATCH:FOO.TXT.1")
+                  (parse-namestring "SCRATCH:FOO.TXT.NEWEST")
+                  (parse-namestring "SCRATCH:FOO.TXT"))))
   (dolist (p pathnames)
     (print p)
     (handler-case
-	(let ((*print-readably* t))
-	  (assert (equal (read-from-string (format nil "~S" p)) p)))
+        (let ((*print-readably* t))
+          (assert (equal (read-from-string (format nil "~S" p)) p)))
       (print-not-readable () nil))))
 
 ;;; BUG 330: "PARSE-NAMESTRING should accept namestrings as the
 ;;; default argument" ...and streams as well
 (assert (equal (parse-namestring "foo" nil "/")
-	       (parse-namestring "foo" nil #P"/")))
+               (parse-namestring "foo" nil #P"/")))
 (let ((test "parse-namestring-test.tmp"))
   (unwind-protect
        (with-open-file (f test :direction :output)
-	 ;; FIXME: This test is a bit flaky, since we only check that
-	 ;; no error is signalled. The dilemma here is "what is the
-	 ;; correct result when defaults is a _file_, not a
-	 ;; directory". Currently (0.8.10.73) we get #P"foo" here (as
-	 ;; opposed to eg. #P"/path/to/current/foo"), which is
-	 ;; possibly mildly surprising but probably conformant.
-	 (assert (parse-namestring "foo" nil f)))
+         ;; FIXME: This test is a bit flaky, since we only check that
+         ;; no error is signalled. The dilemma here is "what is the
+         ;; correct result when defaults is a _file_, not a
+         ;; directory". Currently (0.8.10.73) we get #P"foo" here (as
+         ;; opposed to eg. #P"/path/to/current/foo"), which is
+         ;; possibly mildly surprising but probably conformant.
+         (assert (parse-namestring "foo" nil f)))
     (when (probe-file test)
       (delete-file test))))
 

@@ -22,7 +22,7 @@
 
 (defmacro make-sc-offset (scn offset)
   `(dpb ,scn sc-offset-scn-byte
-	(dpb ,offset sc-offset-offset-byte 0)))
+        (dpb ,offset sc-offset-offset-byte 0)))
 
 (defmacro sc-offset-scn (sco) `(ldb sc-offset-scn-byte ,sco))
 (defmacro sc-offset-offset (sco) `(ldb sc-offset-offset-byte ,sco))

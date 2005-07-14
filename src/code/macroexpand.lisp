@@ -35,35 +35,35 @@
    fact, a macro. ENV is the lexical environment to expand in, which defaults
    to the null environment."
   (cond ((and (consp form) (symbolp (car form)))
-	 (let ((def (sb!xc:macro-function (car form) env)))
-	   (if def
-	       (values (funcall sb!xc:*macroexpand-hook*
-				def
-				form
-				;; As far as I can tell, it's not clear from
-				;; the ANSI spec whether a MACRO-FUNCTION
-				;; function needs to be prepared to handle
-				;; NIL as a lexical environment. CMU CL
-				;; passed NIL through to the MACRO-FUNCTION
-				;; function, but I prefer SBCL "be conservative
-				;; in what it sends and liberal in what it
-				;; accepts" by doing the defaulting itself.
-				;; -- WHN 19991128
-				(coerce-to-lexenv env))
-		       t)
-	       (values form nil))))
-	((symbolp form)
-	 (let* ((venv (when env (sb!c::lexenv-vars env)))
-		(local-def (cdr (assoc form venv))))
-	   (cond ((and (consp local-def)
-		       (eq (car local-def) 'macro))
-		  (values (cdr local-def) t))
-		 ((eq (info :variable :kind form) :macro)
-		  (values (info :variable :macro-expansion form) t))
-		 (t
-		  (values form nil)))))
-	(t
-	 (values form nil))))
+         (let ((def (sb!xc:macro-function (car form) env)))
+           (if def
+               (values (funcall sb!xc:*macroexpand-hook*
+                                def
+                                form
+                                ;; As far as I can tell, it's not clear from
+                                ;; the ANSI spec whether a MACRO-FUNCTION
+                                ;; function needs to be prepared to handle
+                                ;; NIL as a lexical environment. CMU CL
+                                ;; passed NIL through to the MACRO-FUNCTION
+                                ;; function, but I prefer SBCL "be conservative
+                                ;; in what it sends and liberal in what it
+                                ;; accepts" by doing the defaulting itself.
+                                ;; -- WHN 19991128
+                                (coerce-to-lexenv env))
+                       t)
+               (values form nil))))
+        ((symbolp form)
+         (let* ((venv (when env (sb!c::lexenv-vars env)))
+                (local-def (cdr (assoc form venv))))
+           (cond ((and (consp local-def)
+                       (eq (car local-def) 'macro))
+                  (values (cdr local-def) t))
+                 ((eq (info :variable :kind form) :macro)
+                  (values (info :variable :macro-expansion form) t))
+                 (t
+                  (values form nil)))))
+        (t
+         (values form nil))))
 
 (defun sb!xc:macroexpand (form &optional env)
   #!+sb-doc
@@ -72,9 +72,9 @@
    lexical environment to expand in, or NIL (the default) for the null
    environment."
   (labels ((frob (form expanded)
-	     (multiple-value-bind (new-form newly-expanded-p)
-		 (sb!xc:macroexpand-1 form env)
-	       (if newly-expanded-p
-		   (frob new-form t)
-		   (values new-form expanded)))))
+             (multiple-value-bind (new-form newly-expanded-p)
+                 (sb!xc:macroexpand-1 form env)
+               (if newly-expanded-p
+                   (frob new-form t)
+                   (values new-form expanded)))))
     (frob form nil)))

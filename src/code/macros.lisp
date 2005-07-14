@@ -32,19 +32,19 @@
   `(do () (,test-form)
      (assert-error ',test-form ',places ,datum ,@arguments)
      ,@(mapcar (lambda (place)
-		 `(setf ,place (assert-prompt ',place ,place)))
-	       places)))
+                 `(setf ,place (assert-prompt ',place ,place)))
+               places)))
 
 (defun assert-prompt (name value)
   (cond ((y-or-n-p "The old value of ~S is ~S.~
                     ~%Do you want to supply a new value? "
-		   name value)
-	 (format *query-io* "~&Type a form to be evaluated:~%")
-	 (flet ((read-it () (eval (read *query-io*))))
-	   (if (symbolp name) ;help user debug lexical variables
-	       (progv (list name) (list value) (read-it))
-	       (read-it))))
-	(t value)))
+                   name value)
+         (format *query-io* "~&Type a form to be evaluated:~%")
+         (flet ((read-it () (eval (read *query-io*))))
+           (if (symbolp name) ;help user debug lexical variables
+               (progv (list name) (list value) (read-it))
+               (read-it))))
+        (t value)))
 
 ;;; CHECK-TYPE is written this way, to call CHECK-TYPE-ERROR, because
 ;;; of how closures are compiled. RESTART-CASE has forms with closures
@@ -64,9 +64,9 @@
   invoked. In that case it will store into PLACE and start over."
   (let ((place-value (gensym)))
     `(do ((,place-value ,place ,place))
-	 ((typep ,place-value ',type))
+         ((typep ,place-value ',type))
        (setf ,place
-	     (check-type-error ',place ,place-value ',type ,type-string)))))
+             (check-type-error ',place ,place-value ',type ,type-string)))))
 
 ;;;; DEFINE-SYMBOL-MACRO
 
@@ -77,9 +77,9 @@
 (defun sb!c::%define-symbol-macro (name expansion)
   (unless (symbolp name)
     (error 'simple-type-error :datum name :expected-type 'symbol
-	   :format-control "Symbol macro name is not a symbol: ~S."
-	   :format-arguments (list name)))
-  (with-single-package-locked-error 
+           :format-control "Symbol macro name is not a symbol: ~S."
+           :format-arguments (list name)))
+  (with-single-package-locked-error
       (:symbol name "defining ~A as a symbol-macro"))
   (ecase (info :variable :kind name)
     ((:macro :global nil)
@@ -87,12 +87,12 @@
      (setf (info :variable :macro-expansion name) expansion))
     (:special
      (error 'simple-program-error
-	    :format-control "Symbol macro name already declared special: ~S."
-	    :format-arguments (list name)))
+            :format-control "Symbol macro name already declared special: ~S."
+            :format-arguments (list name)))
     (:constant
      (error 'simple-program-error
-	    :format-control "Symbol macro name already declared constant: ~S."
-	    :format-arguments (list name))))
+            :format-control "Symbol macro name already declared constant: ~S."
+            :format-arguments (list name))))
   name)
 
 ;;;; DEFINE-COMPILER-MACRO
@@ -119,17 +119,17 @@
      "defining compiler macro of (SETF ...), which will not be expanded"))
   (when (and (symbolp name) (special-operator-p name))
     (error 'simple-program-error
-	   :format-control "cannot define a compiler-macro for a special operator: ~S"
-	   :format-arguments (list name)))
+           :format-control "cannot define a compiler-macro for a special operator: ~S"
+           :format-arguments (list name)))
   (with-unique-names (whole environment)
     (multiple-value-bind (body local-decs doc)
-	(parse-defmacro lambda-list whole body name 'define-compiler-macro
-			:environment environment)
+        (parse-defmacro lambda-list whole body name 'define-compiler-macro
+                        :environment environment)
       (let ((def `(lambda (,whole ,environment)
-		    ,@local-decs
-		    ,body))
-	    (debug-name (sb!c::debug-name 'compiler-macro-function name)))
-	`(eval-when (:compile-toplevel :load-toplevel :execute)
+                    ,@local-decs
+                    ,body))
+            (debug-name (sb!c::debug-name 'compiler-macro-function name)))
+        `(eval-when (:compile-toplevel :load-toplevel :execute)
            (sb!c::%define-compiler-macro ',name
                                          #',def
                                          ',lambda-list
@@ -141,31 +141,31 @@
 ;;; bits of logic should be shared (notably arglist setting).
 (macrolet
     ((def (times set-p)
-	 `(eval-when (,@times)
-	   (defun sb!c::%define-compiler-macro
-	       (name definition lambda-list doc debug-name)
-	     ,@(unless set-p
-		 '((declare (ignore lambda-list debug-name))))
-	     ;; FIXME: warn about incompatible lambda list with
-	     ;; respect to parent function?
-	     (setf (sb!xc:compiler-macro-function name) definition)
-	     ;; FIXME: Add support for (SETF FDOCUMENTATION) when
-	     ;; object is a list and type is COMPILER-MACRO. (Until
-	     ;; then, we have to discard any compiler macro
-	     ;; documentation for (SETF FOO).)
-	     (unless (listp name)
-	       (setf (fdocumentation name 'compiler-macro) doc))
-	     ,(when set-p
-		    `(case (widetag-of definition)
+         `(eval-when (,@times)
+           (defun sb!c::%define-compiler-macro
+               (name definition lambda-list doc debug-name)
+             ,@(unless set-p
+                 '((declare (ignore lambda-list debug-name))))
+             ;; FIXME: warn about incompatible lambda list with
+             ;; respect to parent function?
+             (setf (sb!xc:compiler-macro-function name) definition)
+             ;; FIXME: Add support for (SETF FDOCUMENTATION) when
+             ;; object is a list and type is COMPILER-MACRO. (Until
+             ;; then, we have to discard any compiler macro
+             ;; documentation for (SETF FOO).)
+             (unless (listp name)
+               (setf (fdocumentation name 'compiler-macro) doc))
+             ,(when set-p
+                    `(case (widetag-of definition)
                       (#.sb!vm:closure-header-widetag
                        (setf (%simple-fun-arglist (%closure-fun definition))
                              lambda-list
-			     (%simple-fun-name (%closure-fun definition))
-			     debug-name))
+                             (%simple-fun-name (%closure-fun definition))
+                             debug-name))
                       (#.sb!vm:simple-fun-header-widetag
                        (setf (%simple-fun-arglist definition) lambda-list
-			     (%simple-fun-name definition) debug-name))))
-	     name))))
+                             (%simple-fun-name definition) debug-name))))
+             name))))
   (progn
     (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)
     #-sb-xc (def (:compile-toplevel) nil)))
@@ -190,57 +190,57 @@
   (unless (or cases (not needcasesp))
     (warn "no clauses in ~S" name))
   (let ((keyform-value (gensym))
-	(clauses ())
-	(keys ()))
+        (clauses ())
+        (keys ()))
     (do* ((cases cases (cdr cases))
-	  (case (car cases) (car cases)))
-	 ((null cases) nil)
+          (case (car cases) (car cases)))
+         ((null cases) nil)
       (unless (list-of-length-at-least-p case 1)
-	(error "~S -- bad clause in ~S" case name))
+        (error "~S -- bad clause in ~S" case name))
       (destructuring-bind (keyoid &rest forms) case
-	(cond (;; an OTHERWISE-CLAUSE 
-	       ;;
-	       ;; By the way... The old code here tried gave
-	       ;; STYLE-WARNINGs for normal-clauses which looked as
-	       ;; though they might've been intended to be
-	       ;; otherwise-clauses. As Tony Martinez reported on
-	       ;; sbcl-devel 2004-11-09 there are sometimes good
-	       ;; reasons to write clauses like that; and as I noticed
-	       ;; when trying to understand the old code so I could
-	       ;; understand his patch, trying to guess which clauses
-	       ;; don't have good reasons is fundamentally kind of a
-	       ;; mess. SBCL does issue style warnings rather
-	       ;; enthusiastically, and I have often justified that by
-	       ;; arguing that we're doing that to detect issues which
-	       ;; are tedious for programmers to detect for by
-	       ;; proofreading (like small typoes in long symbol
-	       ;; names, or duplicate function definitions in large
-	       ;; files). This doesn't seem to be an issue like that,
-	       ;; and I can't think of a comparably good justification
-	       ;; for giving STYLE-WARNINGs for legal code here, so
-	       ;; now we just hope the programmer knows what he's
-	       ;; doing. -- WHN 2004-11-20
-	       (and (not errorp) ; possible only in CASE or TYPECASE,
-		                 ; not in [EC]CASE or [EC]TYPECASE
-		    (memq keyoid '(t otherwise))
-		    (null (cdr cases)))
-	       (push `(t nil ,@forms) clauses))
-	      ((and multi-p (listp keyoid))
-	       (setf keys (append keyoid keys))
-	       (push `((or ,@(mapcar (lambda (key)
-				       `(,test ,keyform-value ',key))
-				     keyoid))
-		       nil
-		       ,@forms)
-		     clauses))
-	      (t
-	       (push keyoid keys)
-	       (push `((,test ,keyform-value ',keyoid)
-		       nil
-		       ,@forms)
-		     clauses)))))
+        (cond (;; an OTHERWISE-CLAUSE
+               ;;
+               ;; By the way... The old code here tried gave
+               ;; STYLE-WARNINGs for normal-clauses which looked as
+               ;; though they might've been intended to be
+               ;; otherwise-clauses. As Tony Martinez reported on
+               ;; sbcl-devel 2004-11-09 there are sometimes good
+               ;; reasons to write clauses like that; and as I noticed
+               ;; when trying to understand the old code so I could
+               ;; understand his patch, trying to guess which clauses
+               ;; don't have good reasons is fundamentally kind of a
+               ;; mess. SBCL does issue style warnings rather
+               ;; enthusiastically, and I have often justified that by
+               ;; arguing that we're doing that to detect issues which
+               ;; are tedious for programmers to detect for by
+               ;; proofreading (like small typoes in long symbol
+               ;; names, or duplicate function definitions in large
+               ;; files). This doesn't seem to be an issue like that,
+               ;; and I can't think of a comparably good justification
+               ;; for giving STYLE-WARNINGs for legal code here, so
+               ;; now we just hope the programmer knows what he's
+               ;; doing. -- WHN 2004-11-20
+               (and (not errorp) ; possible only in CASE or TYPECASE,
+                                 ; not in [EC]CASE or [EC]TYPECASE
+                    (memq keyoid '(t otherwise))
+                    (null (cdr cases)))
+               (push `(t nil ,@forms) clauses))
+              ((and multi-p (listp keyoid))
+               (setf keys (append keyoid keys))
+               (push `((or ,@(mapcar (lambda (key)
+                                       `(,test ,keyform-value ',key))
+                                     keyoid))
+                       nil
+                       ,@forms)
+                     clauses))
+              (t
+               (push keyoid keys)
+               (push `((,test ,keyform-value ',keyoid)
+                       nil
+                       ,@forms)
+                     clauses)))))
     (case-body-aux name keyform keyform-value clauses keys errorp proceedp
-		   `(,(if multi-p 'member 'or) ,@keys))))
+                   `(,(if multi-p 'member 'or) ,@keys))))
 
 ;;; CASE-BODY-AUX provides the expansion once CASE-BODY has groveled
 ;;; all the cases. Note: it is not necessary that the resulting code
@@ -253,34 +253,34 @@
 ;;; The CASE-BODY-ERROR function is defined later, when the
 ;;; RESTART-CASE macro has been defined.
 (defun case-body-aux (name keyform keyform-value clauses keys
-		      errorp proceedp expected-type)
+                      errorp proceedp expected-type)
   (if proceedp
       (let ((block (gensym))
-	    (again (gensym)))
-	`(let ((,keyform-value ,keyform))
-	   (block ,block
-	     (tagbody
-	      ,again
-	      (return-from
-	       ,block
-	       (cond ,@(nreverse clauses)
-		     (t
-		      (setf ,keyform-value
-			    (setf ,keyform
-				  (case-body-error
-				   ',name ',keyform ,keyform-value
-				   ',expected-type ',keys)))
-		      (go ,again))))))))
+            (again (gensym)))
+        `(let ((,keyform-value ,keyform))
+           (block ,block
+             (tagbody
+              ,again
+              (return-from
+               ,block
+               (cond ,@(nreverse clauses)
+                     (t
+                      (setf ,keyform-value
+                            (setf ,keyform
+                                  (case-body-error
+                                   ',name ',keyform ,keyform-value
+                                   ',expected-type ',keys)))
+                      (go ,again))))))))
       `(let ((,keyform-value ,keyform))
-	 (declare (ignorable ,keyform-value)) ; e.g. (CASE KEY (T))
-	 (cond
-	  ,@(nreverse clauses)
-	  ,@(if errorp
-		`((t (error 'case-failure
-			    :name ',name
-			    :datum ,keyform-value
-			    :expected-type ',expected-type
-			    :possibilities ',keys))))))))
+         (declare (ignorable ,keyform-value)) ; e.g. (CASE KEY (T))
+         (cond
+          ,@(nreverse clauses)
+          ,@(if errorp
+                `((t (error 'case-failure
+                            :name ',name
+                            :datum ,keyform-value
+                            :expected-type ',expected-type
+                            :possibilities ',keys))))))))
 ) ; EVAL-WHEN
 
 (defmacro-mundanely case (keyform &body cases)
@@ -333,50 +333,50 @@
       (parse-body forms-decls :doc-string-allowed nil)
     (let ((abortp (gensym)))
       `(let ((,var ,stream)
-	     (,abortp t))
-	 ,@decls
-	 (unwind-protect
-	     (multiple-value-prog1
-	      (progn ,@forms)
-	      (setq ,abortp nil))
-	   (when ,var
-	     (close ,var :abort ,abortp)))))))
+             (,abortp t))
+         ,@decls
+         (unwind-protect
+             (multiple-value-prog1
+              (progn ,@forms)
+              (setq ,abortp nil))
+           (when ,var
+             (close ,var :abort ,abortp)))))))
 
 (defmacro-mundanely with-open-file ((stream filespec &rest options)
-				    &body body)
+                                    &body body)
   `(with-open-stream (,stream (open ,filespec ,@options))
      ,@body))
 
 (defmacro-mundanely with-input-from-string ((var string &key index start end)
-					    &body forms-decls)
+                                            &body forms-decls)
   (multiple-value-bind (forms decls)
       (parse-body forms-decls :doc-string-allowed nil)
     ;; The ONCE-ONLY inhibits compiler note for unreachable code when
     ;; END is true.
     (once-only ((string string))
       `(let ((,var
-	      ,(cond ((null end)
-		      `(make-string-input-stream ,string ,(or start 0)))
-		     ((symbolp end)
-		      `(if ,end
-			   (make-string-input-stream ,string
-						     ,(or start 0)
-						     ,end)
-			   (make-string-input-stream ,string
-						     ,(or start 0))))
-		     (t
-		      `(make-string-input-stream ,string
-						 ,(or start 0)
-						 ,end)))))
-	 ,@decls
-	 (multiple-value-prog1
-	     (unwind-protect
-		  (progn ,@forms)
-	       (close ,var))
-	   ,@(when index
-	       `((setf ,index (string-input-stream-current ,var)))))))))
+              ,(cond ((null end)
+                      `(make-string-input-stream ,string ,(or start 0)))
+                     ((symbolp end)
+                      `(if ,end
+                           (make-string-input-stream ,string
+                                                     ,(or start 0)
+                                                     ,end)
+                           (make-string-input-stream ,string
+                                                     ,(or start 0))))
+                     (t
+                      `(make-string-input-stream ,string
+                                                 ,(or start 0)
+                                                 ,end)))))
+         ,@decls
+         (multiple-value-prog1
+             (unwind-protect
+                  (progn ,@forms)
+               (close ,var))
+           ,@(when index
+               `((setf ,index (string-input-stream-current ,var)))))))))
 
-(defmacro-mundanely with-output-to-string 
+(defmacro-mundanely with-output-to-string
     ((var &optional string &key (element-type ''character))
      &body forms-decls)
   (multiple-value-bind (forms decls)
@@ -389,16 +389,16 @@
                  ;; but it still has to be evaluated for side-effects.
                  (,element-type-var ,element-type))
             (declare (ignore ,element-type-var))
-            ,@decls        
+            ,@decls
             (unwind-protect
                  (progn ,@forms)
               (close ,var))))
       `(let ((,var (make-string-output-stream :element-type ,element-type)))
-  	 ,@decls
-  	 (unwind-protect
-	     (progn ,@forms)
-  	   (close ,var))
-  	 (get-output-stream-string ,var)))))
+         ,@decls
+         (unwind-protect
+             (progn ,@forms)
+           (close ,var))
+         (get-output-stream-string ,var)))))
 
 ;;;; miscellaneous macros
 
@@ -415,21 +415,21 @@
   ;; hairy.
   (if (integerp n)
       (let ((dummy-list nil)
-	    (keeper (gensym "KEEPER-")))
-	;; We build DUMMY-LIST, a list of variables to bind to useless
-	;; values, then we explicitly IGNORE those bindings and return
-	;; KEEPER, the only thing we're really interested in right now.
-	(dotimes (i n)
-	  (push (gensym "IGNORE-") dummy-list))
-	`(multiple-value-bind (,@dummy-list ,keeper) ,form
-	   (declare (ignore ,@dummy-list))
-	   ,keeper))
+            (keeper (gensym "KEEPER-")))
+        ;; We build DUMMY-LIST, a list of variables to bind to useless
+        ;; values, then we explicitly IGNORE those bindings and return
+        ;; KEEPER, the only thing we're really interested in right now.
+        (dotimes (i n)
+          (push (gensym "IGNORE-") dummy-list))
+        `(multiple-value-bind (,@dummy-list ,keeper) ,form
+           (declare (ignore ,@dummy-list))
+           ,keeper))
       (once-only ((n n))
-	`(case (the fixnum ,n)
-	   (0 (nth-value 0 ,form))
-	   (1 (nth-value 1 ,form))
-	   (2 (nth-value 2 ,form))
-	   (t (nth (the fixnum ,n) (multiple-value-list ,form)))))))
+        `(case (the fixnum ,n)
+           (0 (nth-value 0 ,form))
+           (1 (nth-value 1 ,form))
+           (2 (nth-value 2 ,form))
+           (t (nth (the fixnum ,n) (multiple-value-list ,form)))))))
 
 (defmacro-mundanely declaim (&rest specs)
   #!+sb-doc
@@ -437,17 +437,17 @@
   Do a declaration or declarations for the global environment."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      ,@(mapcar (lambda (spec) `(sb!xc:proclaim ',spec))
-	       specs)))
+               specs)))
 
 (defmacro-mundanely print-unreadable-object ((object stream &key type identity)
-					     &body body)
+                                             &body body)
   "Output OBJECT to STREAM with \"#<\" prefix, \">\" suffix, optionally
   with object-type prefix and object-identity suffix, and executing the
   code in BODY to provide possible further output."
   `(%print-unreadable-object ,object ,stream ,type ,identity
-			     ,(if body
-				  `(lambda () ,@body)
-				  nil)))
+                             ,(if body
+                                  `(lambda () ,@body)
+                                  nil)))
 
 (defmacro-mundanely ignore-errors (&rest forms)
   #!+sb-doc

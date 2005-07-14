@@ -3,7 +3,7 @@
 ;;;; a PCOUNTER is used to represent an unsigned integer quantity which
 ;;;; can grow bigger than a fixnum, but typically does so, if at all,
 ;;;; in many small steps, where we don't want to cons on every step.
-;;;; Such quantities typically arise in profiling, e.g. 
+;;;; Such quantities typically arise in profiling, e.g.
 ;;;; total system consing, time spent in a profiled function, and
 ;;;; bytes consed in a profiled function are all examples of such
 ;;;; quantities. The name is an abbreviation for "Profiling COUNTER".

@@ -20,9 +20,9 @@
 ;;;
 ;;; CMU CL 18b used :EMPTY for this purpose, which was somewhat nasty
 ;;; since it's easily accessible to the user, so that e.g.
-;;;	(DEFVAR *HT* (MAKE-HASH-TABLE))
-;;;	(SETF (GETHASH :EMPTY *HT*) :EMPTY)
-;;;	(MAPHASH (LAMBDA (K V) (FORMAT T "~&~S ~S~%" K V)))
+;;;     (DEFVAR *HT* (MAKE-HASH-TABLE))
+;;;     (SETF (GETHASH :EMPTY *HT*) :EMPTY)
+;;;     (MAPHASH (LAMBDA (K V) (FORMAT T "~&~S ~S~%" K V)))
 ;;; gives no output -- oops!
 ;;;
 ;;; FIXME: It'd probably be good to use the unbound marker for this.
@@ -49,7 +49,7 @@
 ;;;     work when compiled into a file and loaded back into SBCL.
 ;;;     (Thus, just uninterning %EMPTY-HT-SLOT% doesn't work.)
 ;;;   * The replacement value needs to be acceptable to the
-;;;     low-level gencgc.lisp hash table scavenging code. 
+;;;     low-level gencgc.lisp hash table scavenging code.
 ;;;   * The change will break binary compatibility, since comparisons
 ;;;     against the value used at the time of compilation are wired
 ;;;     into FASL files.
@@ -60,50 +60,50 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun frob-do-body (varlist endlist decls-and-code bind step name block)
     (let* ((r-inits nil) ; accumulator for reversed list
-	   (r-steps nil) ; accumulator for reversed list
-	   (label-1 (gensym))
-	   (label-2 (gensym)))
+           (r-steps nil) ; accumulator for reversed list
+           (label-1 (gensym))
+           (label-2 (gensym)))
       ;; Check for illegal old-style DO.
       (when (or (not (listp varlist)) (atom endlist))
-	(error "ill-formed ~S -- possibly illegal old style DO?" name))
+        (error "ill-formed ~S -- possibly illegal old style DO?" name))
       ;; Parse VARLIST to get R-INITS and R-STEPS.
       (dolist (v varlist)
-	(flet (;; (We avoid using CL:PUSH here so that CL:PUSH can be
-	       ;; defined in terms of CL:SETF, and CL:SETF can be
-	       ;; defined in terms of CL:DO, and CL:DO can be defined
-	       ;; in terms of the current function.)
-	       (push-on-r-inits (x)
-		 (setq r-inits (cons x r-inits)))
-	       ;; common error-handling
-	       (illegal-varlist ()
-		 (error "~S is an illegal form for a ~S varlist." v name)))
-	  (cond ((symbolp v) (push-on-r-inits v))
-		((listp v)
-		 (unless (symbolp (first v))
-		   (error "~S step variable is not a symbol: ~S"
-			  name
-			  (first v)))
-		 (let ((lv (length v)))
-		   ;; (We avoid using CL:CASE here so that CL:CASE can
-		   ;; be defined in terms of CL:SETF, and CL:SETF can
-		   ;; be defined in terms of CL:DO, and CL:DO can be
-		   ;; defined in terms of the current function.)
-		   (cond ((= lv 1)
-			  (push-on-r-inits (first v)))
-			 ((= lv 2)
-			  (push-on-r-inits v))
-			 ((= lv 3)
-			  (push-on-r-inits (list (first v) (second v)))
-			  (setq r-steps (list* (third v) (first v) r-steps)))
-			 (t (illegal-varlist)))))
-		(t (illegal-varlist)))))
+        (flet (;; (We avoid using CL:PUSH here so that CL:PUSH can be
+               ;; defined in terms of CL:SETF, and CL:SETF can be
+               ;; defined in terms of CL:DO, and CL:DO can be defined
+               ;; in terms of the current function.)
+               (push-on-r-inits (x)
+                 (setq r-inits (cons x r-inits)))
+               ;; common error-handling
+               (illegal-varlist ()
+                 (error "~S is an illegal form for a ~S varlist." v name)))
+          (cond ((symbolp v) (push-on-r-inits v))
+                ((listp v)
+                 (unless (symbolp (first v))
+                   (error "~S step variable is not a symbol: ~S"
+                          name
+                          (first v)))
+                 (let ((lv (length v)))
+                   ;; (We avoid using CL:CASE here so that CL:CASE can
+                   ;; be defined in terms of CL:SETF, and CL:SETF can
+                   ;; be defined in terms of CL:DO, and CL:DO can be
+                   ;; defined in terms of the current function.)
+                   (cond ((= lv 1)
+                          (push-on-r-inits (first v)))
+                         ((= lv 2)
+                          (push-on-r-inits v))
+                         ((= lv 3)
+                          (push-on-r-inits (list (first v) (second v)))
+                          (setq r-steps (list* (third v) (first v) r-steps)))
+                         (t (illegal-varlist)))))
+                (t (illegal-varlist)))))
       ;; Construct the new form.
       (multiple-value-bind (code decls)
-	  (parse-body decls-and-code :doc-string-allowed nil)
-	`(block ,block
-	   (,bind ,(nreverse r-inits)
-		  ,@decls
-		  (tagbody
+          (parse-body decls-and-code :doc-string-allowed nil)
+        `(block ,block
+           (,bind ,(nreverse r-inits)
+                  ,@decls
+                  (tagbody
                      (go ,label-2)
                      ,label-1
                      (tagbody ,@code)
@@ -135,12 +135,12 @@
 ;;; _On Lisp_ calls WITH-GENSYMS.
 (defmacro with-unique-names (symbols &body body)
   `(let ,(mapcar (lambda (symbol)
-		   (let* ((symbol-name (symbol-name symbol))
-			  (stem (if (every #'alpha-char-p symbol-name)
-				    symbol-name
-				    (concatenate 'string symbol-name "-"))))
-		     `(,symbol (gensym ,stem))))
-		 symbols)
+                   (let* ((symbol-name (symbol-name symbol))
+                          (stem (if (every #'alpha-char-p symbol-name)
+                                    symbol-name
+                                    (concatenate 'string symbol-name "-"))))
+                     `(,symbol (gensym ,stem))))
+                 symbols)
      ,@body))
 
 ;;; Return a list of N gensyms. (This is a common suboperation in
@@ -191,30 +191,30 @@
 (defun sane-package ()
   (let ((maybe-package *package*))
     (cond ((and (packagep maybe-package)
-		;; For good measure, we also catch the problem of
-		;; *PACKAGE* being bound to a deleted package.
-		;; Technically, this is not undefined behavior in itself,
-		;; but it will immediately lead to undefined to behavior,
-		;; since almost any operation on a deleted package is
-		;; undefined.
-		(package-name maybe-package))
-	   maybe-package)
-	  (t
-	   ;; We're in the undefined behavior zone. First, munge the
-	   ;; system back into a defined state.
-	   (let ((really-package (find-package :cl-user)))
-	     (setf *package* really-package)
-	     ;; Then complain.
-	     (error 'simple-type-error
-		    :datum maybe-package
-		    :expected-type '(and package (satisfies package-name))
-		    :format-control
-		    "~@<~S can't be a ~A: ~2I~_~S has been reset to ~S.~:>"
-		    :format-arguments (list '*package*
-					    (if (packagep maybe-package)
-						"deleted package"
-						(type-of maybe-package))
-					    '*package* really-package)))))))
+                ;; For good measure, we also catch the problem of
+                ;; *PACKAGE* being bound to a deleted package.
+                ;; Technically, this is not undefined behavior in itself,
+                ;; but it will immediately lead to undefined to behavior,
+                ;; since almost any operation on a deleted package is
+                ;; undefined.
+                (package-name maybe-package))
+           maybe-package)
+          (t
+           ;; We're in the undefined behavior zone. First, munge the
+           ;; system back into a defined state.
+           (let ((really-package (find-package :cl-user)))
+             (setf *package* really-package)
+             ;; Then complain.
+             (error 'simple-type-error
+                    :datum maybe-package
+                    :expected-type '(and package (satisfies package-name))
+                    :format-control
+                    "~@<~S can't be a ~A: ~2I~_~S has been reset to ~S.~:>"
+                    :format-arguments (list '*package*
+                                            (if (packagep maybe-package)
+                                                "deleted package"
+                                                (type-of maybe-package))
+                                            '*package* really-package)))))))
 
 ;;; Access *DEFAULT-PATHNAME-DEFAULTS*, issuing a warning if its value
 ;;; is silly. (Unlike the vaguely-analogous SANE-PACKAGE, we don't
@@ -223,13 +223,13 @@
 ;;; in a state where it's hard to recover interactively.)
 (defun sane-default-pathname-defaults ()
   (let* ((dfd *default-pathname-defaults*)
-	 (dfd-dir (pathname-directory dfd)))
+         (dfd-dir (pathname-directory dfd)))
     ;; It's generally not good to use a relative pathname for
     ;; *DEFAULT-PATHNAME-DEFAULTS*, since relative pathnames
     ;; are defined by merging into a default pathname (which is,
     ;; by default, *DEFAULT-PATHNAME-DEFAULTS*).
     (when (and (consp dfd-dir)
-	       (eql (first dfd-dir) :relative))
+               (eql (first dfd-dir) :relative))
       (warn
        "~@<~S is a relative pathname. (But we'll try using it anyway.)~@:>"
        '*default-pathname-defaults*))
@@ -237,21 +237,21 @@
 
 ;;; Give names to elements of a numeric sequence.
 (defmacro defenum ((&key (prefix "") (suffix "") (start 0) (step 1))
-		   &rest identifiers)
+                   &rest identifiers)
   (let ((results nil)
-	(index 0)
- 	(start (eval start))
-	(step (eval step)))
+        (index 0)
+        (start (eval start))
+        (step (eval step)))
     (dolist (id identifiers)
       (when id
-	(multiple-value-bind (root docs)
-	    (if (consp id)
-		(values (car id) (cdr id))
-		(values id nil))
-	  (push `(def!constant ,(symbolicate prefix root suffix)
-		   ,(+ start (* step index))
-		   ,@docs)
-		results)))
+        (multiple-value-bind (root docs)
+            (if (consp id)
+                (values (car id) (cdr id))
+                (values id nil))
+          (push `(def!constant ,(symbolicate prefix root suffix)
+                   ,(+ start (* step index))
+                   ,@docs)
+                results)))
       (incf index))
     `(progn
        ,@(nreverse results))))
@@ -284,19 +284,19 @@
 (defun %defconstant-eqx-value (symbol expr eqx)
   (declare (type function eqx))
   (flet ((bummer (explanation)
-	   (error "~@<bad DEFCONSTANT-EQX ~S ~2I~_~S: ~2I~_~A ~S~:>"
-		  symbol
-		  expr
-		  explanation
-		  (symbol-value symbol))))
+           (error "~@<bad DEFCONSTANT-EQX ~S ~2I~_~S: ~2I~_~A ~S~:>"
+                  symbol
+                  expr
+                  explanation
+                  (symbol-value symbol))))
     (cond ((not (boundp symbol))
-	   expr)
-	  ((not (constantp symbol))
-	   (bummer "already bound as a non-constant"))
-	  ((not (funcall eqx (symbol-value symbol) expr))
-	   (bummer "already bound as a different constant value"))
-	  (t
-	   (symbol-value symbol)))))
+           expr)
+          ((not (constantp symbol))
+           (bummer "already bound as a non-constant"))
+          ((not (funcall eqx (symbol-value symbol) expr))
+           (bummer "already bound as a different constant value"))
+          (t
+           (symbol-value symbol)))))
 
 ;;; a helper function for various macros which expect clauses of a
 ;;; given length, etc.
@@ -309,21 +309,21 @@
   ;; job is to deal with screwed-up input, it'd be good style to fix
   ;; it so that it can deal with circular list structure.
   (cond ((minusp max) nil)
-	((null x) (zerop min))
-	((consp x)
-	 (and (plusp max)
-	      (proper-list-of-length-p (cdr x)
-				       (if (plusp (1- min))
-					   (1- min)
-					   0)
-				       (1- max))))
-	(t nil)))
+        ((null x) (zerop min))
+        ((consp x)
+         (and (plusp max)
+              (proper-list-of-length-p (cdr x)
+                                       (if (plusp (1- min))
+                                           (1- min)
+                                           0)
+                                       (1- max))))
+        (t nil)))
 
-;;; Helpers for defining error-signalling NOP's for "not supported 
+;;; Helpers for defining error-signalling NOP's for "not supported
 ;;; here" operations.
-(defmacro define-unsupported-fun (name &optional 
+(defmacro define-unsupported-fun (name &optional
                                   (doc "Unsupported on this platform.")
-                                  (control 
+                                  (control
                                    "~S is unsupported on this platform ~
                                     (OS, CPU, whatever)."
                                    controlp)
@@ -331,6 +331,6 @@
   `(defun ,name (&rest args)
     ,doc
     (declare (ignore args))
-    (error 'unsupported-operator 
+    (error 'unsupported-operator
      :format-control ,control
      :format-arguments (if ,controlp ',arguments (list ',name)))))

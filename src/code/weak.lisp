@@ -33,5 +33,5 @@ returns the values NIL and NIL."
   ;; compiler will never try to reorder them even in code where we
   ;; neglect to frame them in a LET?
   (let ((value (sb!c::%weak-pointer-value weak-pointer))
-	(broken (sb!c::%weak-pointer-broken weak-pointer)))
+        (broken (sb!c::%weak-pointer-broken weak-pointer)))
     (values value (not broken))))

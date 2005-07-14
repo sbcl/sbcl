@@ -6,18 +6,18 @@
 (eval-when (:load-toplevel :compile-toplevel :execute)
 (defclass socket ()
   ((file-descriptor :initarg :descriptor
-		    :reader socket-file-descriptor)
+                    :reader socket-file-descriptor)
    (family :initform (error "No socket family")
-	   :reader socket-family)
+           :reader socket-family)
    (protocol :initarg :protocol
-	     :reader socket-protocol
-	     :documentation "Protocol used by the socket. If a
+             :reader socket-protocol
+             :documentation "Protocol used by the socket. If a
 keyword, the symbol-name of the keyword will be passed to
 GET-PROTOCOL-BY-NAME downcased, and the returned value used as
 protocol. Other values are used as-is.")
    (type  :initarg :type
-	  :reader socket-type
-	  :documentation "Type of the socket: :STREAM or :DATAGRAM.")
+          :reader socket-type
+          :documentation "Type of the socket: :STREAM or :DATAGRAM.")
    (stream))
   (:documentation "Common base class of all sockets, not ment to be
 directly instantiated.")))
@@ -29,24 +29,24 @@ directly instantiated.")))
 
 
 (defmethod shared-initialize :after ((socket socket) slot-names
-				     &key protocol type
-				     &allow-other-keys)
+                                     &key protocol type
+                                     &allow-other-keys)
   (let* ((proto-num
-	  (cond ((and protocol (keywordp protocol))
-		 (get-protocol-by-name (string-downcase (symbol-name protocol))))
-		(protocol protocol)
-		(t 0)))
-	 (fd (or (and (slot-boundp socket 'file-descriptor)
-		      (socket-file-descriptor socket))
-		 (sockint::socket (socket-family socket)
-				  (ecase type
-				    ((:datagram) sockint::sock-dgram)
-				    ((:stream) sockint::sock-stream))
-				  proto-num))))
+          (cond ((and protocol (keywordp protocol))
+                 (get-protocol-by-name (string-downcase (symbol-name protocol))))
+                (protocol protocol)
+                (t 0)))
+         (fd (or (and (slot-boundp socket 'file-descriptor)
+                      (socket-file-descriptor socket))
+                 (sockint::socket (socket-family socket)
+                                  (ecase type
+                                    ((:datagram) sockint::sock-dgram)
+                                    ((:stream) sockint::sock-stream))
+                                  proto-num))))
       (if (= fd -1) (socket-error "socket"))
       (setf (slot-value socket 'file-descriptor) fd
-	    (slot-value socket 'protocol) proto-num
-	    (slot-value socket 'type) type)
+            (slot-value socket 'protocol) proto-num
+            (slot-value socket 'type) type)
       (sb-ext:finalize socket (lambda () (sockint::close fd)))))
 
 
@@ -78,8 +78,8 @@ See also bind(2)"))
                         &rest address)
   (with-sockaddr-for (socket sockaddr address)
     (if (= (sockint::bind (socket-file-descriptor socket)
-			  sockaddr
-			  (size-of-sockaddr socket))
+                          sockaddr
+                          (size-of-sockaddr socket))
            -1)
         (socket-error "bind"))))
 
@@ -88,24 +88,24 @@ See also bind(2)"))
   (:documentation "Perform the accept(2) call, returning a
 newly-created connected socket and the peer address as multiple
 values"))
-  
+
 (defmethod socket-accept ((socket socket))
   (with-sockaddr-for (socket sockaddr)
     (let ((fd (sockint::accept (socket-file-descriptor socket)
-			       sockaddr
-			       (size-of-sockaddr socket))))
+                               sockaddr
+                               (size-of-sockaddr socket))))
       (cond
-	((and (= fd -1) (= sockint::EAGAIN (sb-unix::get-errno)))
-	 nil)
-	((= fd -1) (socket-error "accept"))
-	(t (apply #'values
-		  (let ((s (make-instance (class-of socket)
-			      :type (socket-type socket)
-			      :protocol (socket-protocol socket)
-			      :descriptor fd)))
-		    (sb-ext:finalize s (lambda () (sockint::close fd))))
-		  (multiple-value-list (bits-of-sockaddr socket sockaddr))))))))
-    
+        ((and (= fd -1) (= sockint::EAGAIN (sb-unix::get-errno)))
+         nil)
+        ((= fd -1) (socket-error "accept"))
+        (t (apply #'values
+                  (let ((s (make-instance (class-of socket)
+                              :type (socket-type socket)
+                              :protocol (socket-protocol socket)
+                              :descriptor fd)))
+                    (sb-ext:finalize s (lambda () (sockint::close fd))))
+                  (multiple-value-list (bits-of-sockaddr socket sockaddr))))))))
+
 (defgeneric socket-connect (socket &rest address)
   (:documentation "Perform the connect(2) call to connect SOCKET to a
   remote PEER.  No useful return value."))
@@ -113,21 +113,21 @@ values"))
 (defmethod socket-connect ((socket socket) &rest peer)
   (with-sockaddr-for (socket sockaddr peer)
     (if (= (sockint::connect (socket-file-descriptor socket)
-			     sockaddr
-			     (size-of-sockaddr socket))
-	   -1)
-	(socket-error "connect"))))
+                             sockaddr
+                             (size-of-sockaddr socket))
+           -1)
+        (socket-error "connect"))))
 
 (defgeneric socket-peername (socket)
   (:documentation "Return the socket's peer; depending on the address
   family this may return multiple values"))
-  
+
 (defmethod socket-peername ((socket socket))
   (with-sockaddr-for (socket sockaddr)
     (when (= (sockint::getpeername (socket-file-descriptor socket)
-				    sockaddr
-				    (size-of-sockaddr socket))
-	     -1)
+                                    sockaddr
+                                    (size-of-sockaddr socket))
+             -1)
       (socket-error "getpeername"))
     (bits-of-sockaddr socket sockaddr)))
 
@@ -138,9 +138,9 @@ values"))
 (defmethod socket-name ((socket socket))
   (with-sockaddr-for (socket sockaddr)
     (when (= (sockint::getsockname (socket-file-descriptor socket)
-				   sockaddr
-				   (size-of-sockaddr socket))
-	     -1)
+                                   sockaddr
+                                   (size-of-sockaddr socket))
+             -1)
       (socket-error "getsockname"))
     (bits-of-sockaddr socket sockaddr)))
 
@@ -152,8 +152,8 @@ values"))
 ;;; to learn who the sender of the packet was
 
 (defgeneric socket-receive (socket buffer length
-			    &key
-			    oob peek waitall element-type)
+                            &key
+                            oob peek waitall element-type)
   (:documentation "Read LENGTH octets from SOCKET into BUFFER (or a freshly-consed buffer if
 NIL), using recvfrom(2).  If LENGTH is NIL, the length of BUFFER is
 used, so at least one of these two arguments must be non-NIL.  If
@@ -162,54 +162,54 @@ Returns the buffer, its length, and the address of the peer
 that sent it, as multiple values.  On datagram sockets, sets MSG_TRUNC
 so that the actual packet length is returned even if the buffer was too
 small"))
-  
+
 (defmethod socket-receive ((socket socket) buffer length
-			   &key
-			   oob peek waitall
-			   (element-type 'character))
+                           &key
+                           oob peek waitall
+                           (element-type 'character))
   (with-sockaddr-for (socket sockaddr)
     (let ((flags
-	   (logior (if oob sockint::MSG-OOB 0)
-		   (if peek sockint::MSG-PEEK 0)
-		   (if waitall sockint::MSG-WAITALL 0)
-		   #+linux sockint::MSG-NOSIGNAL ;don't send us SIGPIPE
-		   (if (eql (socket-type socket) :datagram)
-		       sockint::msg-TRUNC 0))))
+           (logior (if oob sockint::MSG-OOB 0)
+                   (if peek sockint::MSG-PEEK 0)
+                   (if waitall sockint::MSG-WAITALL 0)
+                   #+linux sockint::MSG-NOSIGNAL ;don't send us SIGPIPE
+                   (if (eql (socket-type socket) :datagram)
+                       sockint::msg-TRUNC 0))))
       (unless (or buffer length)
-	(error "Must supply at least one of BUFFER or LENGTH"))
+        (error "Must supply at least one of BUFFER or LENGTH"))
       (unless length
-	(setf length (length buffer)))
+        (setf length (length buffer)))
       (when buffer (setf element-type (array-element-type buffer)))
       (unless (or (subtypep element-type 'character)
-		  (subtypep element-type 'integer))
-	(error "Buffer element-type must be either a character or an integer subtype."))
+                  (subtypep element-type 'integer))
+        (error "Buffer element-type must be either a character or an integer subtype."))
       (unless buffer
-	(setf buffer (make-array length :element-type element-type)))
+        (setf buffer (make-array length :element-type element-type)))
       ;; really big FIXME: This whole copy-buffer thing is broken.
       ;; doesn't support characters more than 8 bits wide, or integer
       ;; types that aren't (unsigned-byte 8).
       (let ((copy-buffer (sb-alien:make-alien (array (sb-alien:unsigned 8) 1) length)))
-	(unwind-protect
-	    (sb-alien:with-alien ((sa-len sockint::socklen-t (size-of-sockaddr socket)))
-	      (let ((len
-		     (sockint::recvfrom (socket-file-descriptor socket)
-					copy-buffer
-					length
-					flags
-					sockaddr
-					(sb-alien:addr sa-len))))
-		(cond
-		  ((and (= len -1) (= sockint::EAGAIN (sb-unix::get-errno))) nil)
-		  ((= len -1) (socket-error "recvfrom"))
-		  (t (loop for i from 0 below len
-			   do (setf (elt buffer i)
-				    (cond
-				      ((or (eql element-type 'character) (eql element-type 'base-char))
-				       (code-char (sb-alien:deref (sb-alien:deref copy-buffer) i)))
-				      (t (sb-alien:deref (sb-alien:deref copy-buffer) i)))))
-		     (apply #'values buffer len (multiple-value-list
-						 (bits-of-sockaddr socket sockaddr)))))))
-	  (sb-alien:free-alien copy-buffer))))))
+        (unwind-protect
+            (sb-alien:with-alien ((sa-len sockint::socklen-t (size-of-sockaddr socket)))
+              (let ((len
+                     (sockint::recvfrom (socket-file-descriptor socket)
+                                        copy-buffer
+                                        length
+                                        flags
+                                        sockaddr
+                                        (sb-alien:addr sa-len))))
+                (cond
+                  ((and (= len -1) (= sockint::EAGAIN (sb-unix::get-errno))) nil)
+                  ((= len -1) (socket-error "recvfrom"))
+                  (t (loop for i from 0 below len
+                           do (setf (elt buffer i)
+                                    (cond
+                                      ((or (eql element-type 'character) (eql element-type 'base-char))
+                                       (code-char (sb-alien:deref (sb-alien:deref copy-buffer) i)))
+                                      (t (sb-alien:deref (sb-alien:deref copy-buffer) i)))))
+                     (apply #'values buffer len (multiple-value-list
+                                                 (bits-of-sockaddr socket sockaddr)))))))
+          (sb-alien:free-alien copy-buffer))))))
 
 (defgeneric socket-listen (socket backlog)
   (:documentation "Mark SOCKET as willing to accept incoming connections.  BACKLOG
@@ -224,7 +224,7 @@ grow to before new connection attempts are refused.  See also listen(2)"))
 (defgeneric socket-open-p (socket)
   (:documentation "Return true if SOCKET is open; otherwise, return false.")
   (:method ((socket t)) (error 'type-error
-			       :datum socket :expected-type 'socket)))
+                               :datum socket :expected-type 'socket)))
 
 (defmethod socket-open-p ((socket socket))
   (if (slot-boundp socket 'stream)
@@ -245,30 +245,30 @@ calls CLOSE on that stream instead"))
   ;; descriptor).  Presumably this is an oversight and we could also
   ;; get anything that write(2) would have given us.
 
-  ;; note that if you have a socket _and_ a stream on the same fd, 
+  ;; note that if you have a socket _and_ a stream on the same fd,
   ;; the socket will avoid doing anything to close the fd in case
   ;; the stream has done it already - if so, it may have been
   ;; reassigned to some other file, and closing it would be bad
 
   (let ((fd (socket-file-descriptor socket)))
     (cond ((eql fd -1) ; already closed
-	   nil)
-	  ((slot-boundp socket 'stream)
-	   (unwind-protect (close (slot-value socket 'stream)) ;; closes fd
-	     (setf (slot-value socket 'file-descriptor) -1)
-	     (slot-makunbound socket 'stream)))
-	  (t
-	   (sb-ext:cancel-finalization socket)
-	   (handler-case
-	       (if (= (sockint::close fd) -1)
-		   (socket-error "close"))
-	     (bad-file-descriptor-error (c) (declare (ignore c)) nil)
-	     (:no-error (c)
+           nil)
+          ((slot-boundp socket 'stream)
+           (unwind-protect (close (slot-value socket 'stream)) ;; closes fd
+             (setf (slot-value socket 'file-descriptor) -1)
+             (slot-makunbound socket 'stream)))
+          (t
+           (sb-ext:cancel-finalization socket)
+           (handler-case
+               (if (= (sockint::close fd) -1)
+                   (socket-error "close"))
+             (bad-file-descriptor-error (c) (declare (ignore c)) nil)
+             (:no-error (c)
                (declare (ignore c))
                (setf (slot-value socket 'file-descriptor) -1)
                nil))))))
 
-    
+
 (defgeneric socket-make-stream (socket &rest args)
   (:documentation "Find or create a STREAM that can be used for IO on
 SOCKET (which must be connected).  ARGS are passed onto
@@ -276,13 +276,13 @@ SB-SYS:MAKE-FD-STREAM."))
 
 (defmethod socket-make-stream ((socket socket) &rest args)
   (let ((stream
-	 (and (slot-boundp socket 'stream) (slot-value socket 'stream))))
+         (and (slot-boundp socket 'stream) (slot-value socket 'stream))))
     (unless stream
       (setf stream (apply #'sb-sys:make-fd-stream
-			  (socket-file-descriptor socket)
-			  :name "a constant string"
-			  :dual-channel-p t
-			  args))
+                          (socket-file-descriptor socket)
+                          :name "a constant string"
+                          :dual-channel-p t
+                          args))
       (setf (slot-value socket 'stream) stream)
       (sb-ext:cancel-finalization socket))
     stream))
@@ -293,8 +293,8 @@ SB-SYS:MAKE-FD-STREAM."))
 
 (define-condition socket-error (error)
   ((errno :initform nil
-          :initarg :errno  
-          :reader socket-error-errno) 
+          :initarg :errno
+          :reader socket-error-errno)
    (symbol :initform nil :initarg :symbol :reader socket-error-symbol)
    (syscall  :initform "outer space" :initarg :syscall :reader socket-error-syscall))
   (:report (lambda (c s)
@@ -339,7 +339,7 @@ SB-SYS:MAKE-FD-STREAM."))
 
 (defun condition-for-errno (err)
   (or (cdr (assoc err *conditions-for-errno* :test #'eql)) 'socket-error))
-      
+
 #+cmu
 (defun socket-error (where)
   ;; Peter's debian/x86 cmucl packages (and sbcl, derived from them)

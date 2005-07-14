@@ -24,15 +24,15 @@
 
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
-	 (value :scs (descriptor-reg any-reg null zero)))
+         (value :scs (descriptor-reg any-reg null zero)))
   (:info name offset lowtag #!+gengc remember)
   (:ignore name)
   (:results)
   (:generator 1
     #!+gengc
     (if remember
-	(storew-and-remember-slot value object offset lowtag)
-	(storew value object offset lowtag))
+        (storew-and-remember-slot value object offset lowtag)
+        (storew value object offset lowtag))
     #!-gengc
     (storew value object offset lowtag)))
 
@@ -79,8 +79,8 @@
     (loadw value object symbol-value-slot other-pointer-lowtag)
     (inst xor value unbound-marker-widetag temp)
     (if not-p
-	(inst beq temp target)
-	(inst bne temp target))))
+        (inst beq temp target)
+        (inst bne temp target))))
 
 (define-vop (fast-symbol-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
@@ -124,7 +124,7 @@
   (:policy :fast-safe)
   (:translate (setf fdefn-fun))
   (:args (function :scs (descriptor-reg) :target result)
-	 (fdefn :scs (descriptor-reg)))
+         (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (interior-reg)) lip)
   (:temporary (:scs (non-descriptor-reg)) type)
   (:results (result :scs (descriptor-reg)))
@@ -133,15 +133,15 @@
       (load-type type function (- fun-pointer-lowtag))
       (inst xor type simple-fun-header-widetag type)
       (inst addq function
-	    (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
-	    lip)
+            (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
+            lip)
       (inst beq type normal-fn)
       (inst li (make-fixup "closure_tramp" :foreign) lip)
       (emit-label normal-fn)
       (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
       (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
       (move function result))))
-          
+
 
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)
@@ -161,7 +161,7 @@
 ;;; symbol on the binding stack and stuff the new value into the symbol.
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
-	 (symbol :scs (descriptor-reg)))
+         (symbol :scs (descriptor-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 5
     (loadw temp symbol symbol-value-slot other-pointer-lowtag)
@@ -169,7 +169,7 @@
     (storew temp bsp-tn (- binding-value-slot binding-size))
     (storew symbol bsp-tn (- binding-symbol-slot binding-size))
     (#!+gengc storew-and-remember-slot #!-gengc storew
-	     val symbol symbol-value-slot other-pointer-lowtag)))
+             val symbol symbol-value-slot other-pointer-lowtag)))
 
 
 (define-vop (unbind)
@@ -178,7 +178,7 @@
     (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
     (loadw value bsp-tn (- binding-value-slot binding-size))
     (#!+gengc storew-and-remember-slot #!-gengc storew
-	     value symbol symbol-value-slot other-pointer-lowtag)
+             value symbol symbol-value-slot other-pointer-lowtag)
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
     (inst subq bsp-tn (* 2 n-word-bytes) bsp-tn)))
 
@@ -190,8 +190,8 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 0
     (let ((loop (gen-label))
-	  (skip (gen-label))
-	  (done (gen-label)))
+          (skip (gen-label))
+          (done (gen-label)))
       (move arg where)
       (inst cmpeq where bsp-tn temp)
       (inst bne temp done)
@@ -201,7 +201,7 @@
       (loadw value bsp-tn (- binding-value-slot binding-size))
       (inst beq symbol skip)
       (#!+gengc storew-and-remember-slot #!-gengc storew
-	       value symbol symbol-value-slot other-pointer-lowtag)
+               value symbol symbol-value-slot other-pointer-lowtag)
       (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
       (emit-label skip)
@@ -342,22 +342,22 @@
                    (offset (symbolicate "MUTATOR-" slot "-SLOT"))
                    (fn
                     (let ((*package* (find-package :kernel)))
-	     (symbolicate "MUTATOR-" slot))))
+             (symbolicate "MUTATOR-" slot))))
                (multiple-value-bind
                    (lisp-type ref-vop set-vop)
                    (ecase type
                      (:des
                       (values t
-			      'mutator-descriptor-ref
-			      'mutator-descriptor-set))
+                              'mutator-descriptor-ref
+                              'mutator-descriptor-set))
                      (:ub32
                       (values '(unsigned-byte 32)
-			      'mutator-ub32-ref
-			      'mutator-ub32-set))
+                              'mutator-ub32-ref
+                              'mutator-ub32-set))
                      (:sap
                       (values 'system-area-pointer
-			      'mutator-sap-ref
-			      'mutator-sap-set)))
+                              'mutator-sap-ref
+                              'mutator-sap-set)))
                  `(progn
                     (export ',fn :kernel)
                     (defknown ,fn () ,lisp-type (flushable))
@@ -366,7 +366,7 @@
                       (:variant ,offset))
                     ,@(when writable
                         `((defknown ((setf ,fn)) (,lisp-type) ,lisp-type
-			    (unsafe))
+                            (unsafe))
                           (define-vop (,set ,set-vop)
                             (:translate (setf ,fn))
                             (:variant ,offset)))))))))
@@ -397,7 +397,7 @@
   (:translate %raw-instance-ref/word)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg)))
+         (index :scs (any-reg)))
   (:arg-types * positive-fixnum)
   (:results (value :scs (unsigned-reg)))
   (:temporary (:scs (non-descriptor-reg)) offset)
@@ -411,17 +411,17 @@
     (inst subq offset n-word-bytes offset)
     (inst addq object offset lip)
     (inst ldl
-	  value
-	  (- (* instance-slots-offset n-word-bytes)
+          value
+          (- (* instance-slots-offset n-word-bytes)
              instance-pointer-lowtag)
-	  lip)
+          lip)
     (inst mskll value 4 value)))
 
 (define-vop (raw-instance-set/word)
   (:translate %raw-instance-set/word)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg))
+         (index :scs (any-reg))
          (value :scs (unsigned-reg)))
   (:arg-types * positive-fixnum unsigned-num)
   (:results (result :scs (unsigned-reg)))
@@ -436,17 +436,17 @@
     (inst subq offset n-word-bytes offset)
     (inst addq object offset lip)
     (inst stl
-	  value
-	  (- (* instance-slots-offset n-word-bytes)
+          value
+          (- (* instance-slots-offset n-word-bytes)
              instance-pointer-lowtag)
-	  lip)
+          lip)
     (move value result)))
 
 (define-vop (raw-instance-ref/single)
   (:translate %raw-instance-ref/single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg)))
+         (index :scs (any-reg)))
   (:arg-types * positive-fixnum)
   (:results (value :scs (single-reg)))
   (:temporary (:scs (non-descriptor-reg)) offset)
@@ -460,16 +460,16 @@
     (inst subq offset n-word-bytes offset)
     (inst addq object offset lip)
     (inst lds
-	  value
-	  (- (* instance-slots-offset n-word-bytes)
+          value
+          (- (* instance-slots-offset n-word-bytes)
              instance-pointer-lowtag)
-	  lip)))
+          lip)))
 
 (define-vop (raw-instance-set/single)
   (:translate %raw-instance-set/single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg))
+         (index :scs (any-reg))
          (value :scs (single-reg)))
   (:arg-types * positive-fixnum single-float)
   (:results (result :scs (single-reg)))
@@ -484,10 +484,10 @@
     (inst subq offset n-word-bytes offset)
     (inst addq object offset lip)
     (inst sts
-	  value
-	  (- (* instance-slots-offset n-word-bytes)
+          value
+          (- (* instance-slots-offset n-word-bytes)
              instance-pointer-lowtag)
-	  lip)
+          lip)
     (unless (location= result value)
       (inst fmove value result))))
 
@@ -495,7 +495,7 @@
   (:translate %raw-instance-ref/double)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg)))
+         (index :scs (any-reg)))
   (:arg-types * positive-fixnum)
   (:results (value :scs (double-reg)))
   (:temporary (:scs (non-descriptor-reg)) offset)
@@ -509,16 +509,16 @@
     (inst subq offset (* 2 n-word-bytes) offset)
     (inst addq object offset lip)
     (inst ldt
-	  value
-	  (- (* instance-slots-offset n-word-bytes)
+          value
+          (- (* instance-slots-offset n-word-bytes)
              instance-pointer-lowtag)
-	  lip)))
+          lip)))
 
 (define-vop (raw-instance-set/double)
   (:translate %raw-instance-set/double)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg))
+         (index :scs (any-reg))
          (value :scs (double-reg)))
   (:arg-types * positive-fixnum double-float)
   (:results (result :scs (double-reg)))
@@ -533,10 +533,10 @@
     (inst subq offset (* 2 n-word-bytes) offset)
     (inst addq object offset lip)
     (inst stt
-	  value
-	  (- (* instance-slots-offset n-word-bytes)
+          value
+          (- (* instance-slots-offset n-word-bytes)
              instance-pointer-lowtag)
-	  lip)
+          lip)
     (unless (location= result value)
       (inst fmove value result))))
 
@@ -544,7 +544,7 @@
   (:translate %raw-instance-ref/complex-single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg)))
+         (index :scs (any-reg)))
   (:arg-types * positive-fixnum)
   (:results (value :scs (complex-single-reg)))
   (:temporary (:scs (non-descriptor-reg)) offset)
@@ -558,21 +558,21 @@
     (inst subq offset (* 2 n-word-bytes) offset)
     (inst addq object offset lip)
     (inst lds
-	  (complex-double-reg-real-tn value)
-	  (- (* instance-slots-offset n-word-bytes)
+          (complex-double-reg-real-tn value)
+          (- (* instance-slots-offset n-word-bytes)
              instance-pointer-lowtag)
-	  lip)
+          lip)
     (inst lds
-	  (complex-double-reg-imag-tn value)
-	  (- (* (1+ instance-slots-offset) n-word-bytes)
+          (complex-double-reg-imag-tn value)
+          (- (* (1+ instance-slots-offset) n-word-bytes)
              instance-pointer-lowtag)
-	  lip)))
+          lip)))
 
 (define-vop (raw-instance-set/complex-single)
   (:translate %raw-instance-set/complex-single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg))
+         (index :scs (any-reg))
          (value :scs (complex-single-reg)))
   (:arg-types * positive-fixnum complex-single-float)
   (:results (result :scs (complex-single-reg)))
@@ -589,27 +589,27 @@
     (let ((value-real (complex-single-reg-real-tn value))
           (result-real (complex-single-reg-real-tn result)))
       (inst sts
-	    value-real
-	    (- (* instance-slots-offset n-word-bytes)
-	       instance-pointer-lowtag)
-	    lip)
+            value-real
+            (- (* instance-slots-offset n-word-bytes)
+               instance-pointer-lowtag)
+            lip)
       (unless (location= result-real value-real)
-	(inst fmove value-real result-real)))
+        (inst fmove value-real result-real)))
     (let ((value-imag (complex-single-reg-imag-tn value))
           (result-imag (complex-single-reg-imag-tn result)))
       (inst sts
-	    value-imag
-	    (- (* (1+ instance-slots-offset) n-word-bytes)
-	       instance-pointer-lowtag)
-	    lip)
+            value-imag
+            (- (* (1+ instance-slots-offset) n-word-bytes)
+               instance-pointer-lowtag)
+            lip)
       (unless (location= result-imag value-imag)
-	(inst fmove value-imag result-imag)))))
+        (inst fmove value-imag result-imag)))))
 
 (define-vop (raw-instance-ref/complex-double)
   (:translate %raw-instance-ref/complex-double)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg)))
+         (index :scs (any-reg)))
   (:arg-types * positive-fixnum)
   (:results (value :scs (complex-double-reg)))
   (:temporary (:scs (non-descriptor-reg)) offset)
@@ -623,21 +623,21 @@
     (inst subq offset (* 4 n-word-bytes) offset)
     (inst addq object offset lip)
     (inst ldt
-	  (complex-double-reg-real-tn value)
-	  (- (* instance-slots-offset n-word-bytes)
+          (complex-double-reg-real-tn value)
+          (- (* instance-slots-offset n-word-bytes)
              instance-pointer-lowtag)
-	  lip)
+          lip)
     (inst ldt
-	  (complex-double-reg-imag-tn value)
-	  (- (* (+ instance-slots-offset 2) n-word-bytes)
+          (complex-double-reg-imag-tn value)
+          (- (* (+ instance-slots-offset 2) n-word-bytes)
              instance-pointer-lowtag)
-	  lip)))
+          lip)))
 
 (define-vop (raw-instance-set/complex-double)
   (:translate %raw-instance-set/complex-double)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg))
+         (index :scs (any-reg))
          (value :scs (complex-double-reg)))
   (:arg-types * positive-fixnum complex-double-float)
   (:results (result :scs (complex-double-reg)))
@@ -654,18 +654,18 @@
     (let ((value-real (complex-double-reg-real-tn value))
           (result-real (complex-double-reg-real-tn result)))
       (inst stt
-	    value-real
-	    (- (* instance-slots-offset n-word-bytes)
-	       instance-pointer-lowtag)
-	    lip)
+            value-real
+            (- (* instance-slots-offset n-word-bytes)
+               instance-pointer-lowtag)
+            lip)
       (unless (location= result-real value-real)
-	(inst fmove value-real result-real)))
+        (inst fmove value-real result-real)))
     (let ((value-imag (complex-double-reg-imag-tn value))
           (result-imag (complex-double-reg-imag-tn result)))
       (inst stt
-	    value-imag
-	    (- (* (+ instance-slots-offset 2) n-word-bytes)
-	       instance-pointer-lowtag)
-	    lip)
+            value-imag
+            (- (* (+ instance-slots-offset 2) n-word-bytes)
+               instance-pointer-lowtag)
+            lip)
       (unless (location= result-imag value-imag)
-	(inst fmove value-imag result-imag)))))
+        (inst fmove value-imag result-imag)))))

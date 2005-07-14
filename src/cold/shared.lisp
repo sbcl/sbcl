@@ -34,7 +34,7 @@
 (defvar *target-obj-prefix*)
 
 ;;; suffixes for filename stems when cross-compiling
-(defvar *host-obj-suffix* 
+(defvar *host-obj-suffix*
   (or
    ;; On some xc hosts, it's impossible to LOAD a fasl file unless it
    ;; has the same extension that the host uses for COMPILE-FILE
@@ -89,14 +89,14 @@
 ;;; COMPILE-STEM function above. -- WHN 19990321
 (defun rename-file-a-la-unix (x y)
 
-  (let ((path 	 ;; (Note that the TRUENAME expression here is lifted from an
-		 ;; example in the ANSI spec for TRUENAME.)
-	 (with-open-file (stream y :direction :output)
-	   (close stream)
-	   ;; From the ANSI spec: "In this case, the file is closed
-	   ;; when the truename is tried, so the truename
-	   ;; information is reliable."
-	   (truename stream))))
+  (let ((path    ;; (Note that the TRUENAME expression here is lifted from an
+                 ;; example in the ANSI spec for TRUENAME.)
+         (with-open-file (stream y :direction :output)
+           (close stream)
+           ;; From the ANSI spec: "In this case, the file is closed
+           ;; when the truename is tried, so the truename
+           ;; information is reliable."
+           (truename stream))))
     (delete-file path)
     (rename-file x path)))
 (compile 'rename-file-a-la-unix)
@@ -113,7 +113,7 @@
 ;;;   :OBJ-PREFIX, :OBJ-SUFFIX =
 ;;;      strings to be concatenated to STEM to produce object filename
 ;;;   :TMP-OBJ-SUFFIX-SUFFIX =
-;;;      string to be appended to the name of an object file to produce 
+;;;      string to be appended to the name of an object file to produce
 ;;;      the name of a temporary object file
 ;;;   :COMPILE-FILE, :IGNORE-FAILURE-P =
 ;;;     :COMPILE-FILE is a function to use for compiling the file
@@ -123,29 +123,29 @@
 ;;;     :IGNORE-FAILURE-P is set, in which case only a warning will be
 ;;;     signalled.
 (defun compile-stem (stem
-		     &key
-		     (obj-prefix "")
-		     (obj-suffix (error "missing OBJ-SUFFIX"))
-		     (tmp-obj-suffix-suffix "-tmp")
-		     (src-prefix "")
-		     (src-suffix ".lisp")
-		     (compile-file #'compile-file)
-		     trace-file
-		     ignore-failure-p)
+                     &key
+                     (obj-prefix "")
+                     (obj-suffix (error "missing OBJ-SUFFIX"))
+                     (tmp-obj-suffix-suffix "-tmp")
+                     (src-prefix "")
+                     (src-suffix ".lisp")
+                     (compile-file #'compile-file)
+                     trace-file
+                     ignore-failure-p)
 
   (declare (type function compile-file))
 
   (let* (;; KLUDGE: Note that this CONCATENATE 'STRING stuff is not The Common
-	 ;; Lisp Way, although it works just fine for common UNIX environments.
-	 ;; Should it come to pass that the system is ported to environments
-	 ;; where version numbers and so forth become an issue, it might become
-	 ;; urgent to rewrite this using the fancy Common Lisp PATHNAME
-	 ;; machinery instead of just using strings. In the absence of such a
-	 ;; port, it might or might be a good idea to do the rewrite.
-	 ;; -- WHN 19990815
-	 (src (concatenate 'string src-prefix stem src-suffix))
-	 (obj (concatenate 'string obj-prefix stem obj-suffix))
-	 (tmp-obj (concatenate 'string obj tmp-obj-suffix-suffix)))
+         ;; Lisp Way, although it works just fine for common UNIX environments.
+         ;; Should it come to pass that the system is ported to environments
+         ;; where version numbers and so forth become an issue, it might become
+         ;; urgent to rewrite this using the fancy Common Lisp PATHNAME
+         ;; machinery instead of just using strings. In the absence of such a
+         ;; port, it might or might be a good idea to do the rewrite.
+         ;; -- WHN 19990815
+         (src (concatenate 'string src-prefix stem src-suffix))
+         (obj (concatenate 'string obj-prefix stem obj-suffix))
+         (tmp-obj (concatenate 'string obj tmp-obj-suffix-suffix)))
 
     (ensure-directories-exist obj :verbose t)
 
@@ -169,23 +169,23 @@
     ;; behaviour is right; and in any case absolutifying the pathname
     ;; insulates us against changes of behaviour. -- CSR, 2002-08-09
     (setf tmp-obj
-	  ;; (Note that this idiom is taken from the ANSI
-	  ;; documentation for TRUENAME.)
-	  (with-open-file (stream tmp-obj
+          ;; (Note that this idiom is taken from the ANSI
+          ;; documentation for TRUENAME.)
+          (with-open-file (stream tmp-obj
                                   :direction :output
                                   ;; Compilation would overwrite the
                                   ;; temporary object anyway and overly
                                   ;; strict implementations default
                                   ;; to :ERROR.
                                   :if-exists :supersede)
-	    (close stream)
-	    (truename stream)))
+            (close stream)
+            (truename stream)))
     ;; and some compilers (e.g. OpenMCL) will complain if they're
     ;; asked to write over a file that exists already (and isn't
     ;; recognizeably a fasl file), so
     (when (probe-file tmp-obj)
       (delete-file tmp-obj))
-    
+
     ;; Try to use the compiler to generate a new temporary object file.
     (flet ((report-recompile-restart (stream)
              (format stream "Recompile file ~S" src))
@@ -250,33 +250,33 @@
 ;;; readmacros instead of the ordinary #+ and #- readmacros.
 (setf *shebang-features*
       (let* ((default-features
-	       (append (read-from-file "base-target-features.lisp-expr")
-		       (read-from-file "local-target-features.lisp-expr")))
-	     (customizer-file-name "customize-target-features.lisp")
-	     (customizer (if (probe-file customizer-file-name)
-			     (compile nil 
-				      (read-from-file customizer-file-name))
-			     #'identity)))
-	(funcall customizer default-features)))
+               (append (read-from-file "base-target-features.lisp-expr")
+                       (read-from-file "local-target-features.lisp-expr")))
+             (customizer-file-name "customize-target-features.lisp")
+             (customizer (if (probe-file customizer-file-name)
+                             (compile nil
+                                      (read-from-file customizer-file-name))
+                             #'identity)))
+        (funcall customizer default-features)))
 (let ((*print-length* nil)
       (*print-level* nil))
   (format t
-	  "target features *SHEBANG-FEATURES*=~@<~S~:>~%"
-	  *shebang-features*))
+          "target features *SHEBANG-FEATURES*=~@<~S~:>~%"
+          *shebang-features*))
 
 (defvar *shebang-backend-subfeatures*
   (let* ((default-subfeatures nil)
-	 (customizer-file-name "customize-backend-subfeatures.lisp")
-	 (customizer (if (probe-file customizer-file-name)
-			 (compile nil 
-				  (read-from-file customizer-file-name))
-			 #'identity)))
+         (customizer-file-name "customize-backend-subfeatures.lisp")
+         (customizer (if (probe-file customizer-file-name)
+                         (compile nil
+                                  (read-from-file customizer-file-name))
+                         #'identity)))
     (funcall customizer default-subfeatures)))
 (let ((*print-length* nil)
       (*print-level* nil))
   (format t
-	  "target backend-subfeatures *SHEBANG-BACKEND-FEATURES*=~@<~S~:>~%"
-	  *shebang-backend-subfeatures*))
+          "target backend-subfeatures *SHEBANG-BACKEND-FEATURES*=~@<~S~:>~%"
+          *shebang-backend-subfeatures*))
 
 ;;;; cold-init-related PACKAGE and SYMBOL tools
 
@@ -331,8 +331,8 @@
   (let ((stem-and-flags (gensym "STEM-AND-FLAGS")))
     `(dolist (,stem-and-flags *stems-and-flags*)
        (let ((,stem (first ,stem-and-flags))
-	     (,flags (rest ,stem-and-flags)))
-	 ,@body))))
+             (,flags (rest ,stem-and-flags)))
+         ,@body))))
 
 ;;; Check for stupid typos in FLAGS list keywords.
 (let ((stems (make-hash-table :test 'equal)))
@@ -342,8 +342,8 @@
       (setf (gethash stem stems) t))
     (let ((set-difference (set-difference flags *expected-stem-flags*)))
       (when set-difference
-	(error "found unexpected flag(s) in *STEMS-AND-FLAGS*: ~S"
-	       set-difference)))))
+        (error "found unexpected flag(s) in *STEMS-AND-FLAGS*: ~S"
+               set-difference)))))
 
 ;;;; tools to compile SBCL sources to create the cross-compiler
 
@@ -352,11 +352,11 @@
 (defun in-host-compilation-mode (fn)
   (declare (type function fn))
   (let ((*features* (cons :sb-xc-host *features*))
-	;; the CROSS-FLOAT-INFINITY-KLUDGE, as documented in
-	;; base-target-features.lisp-expr:
-	(*shebang-features* (set-difference *shebang-features*
-					    '(:sb-propagate-float-type
-					      :sb-propagate-fun-type))))
+        ;; the CROSS-FLOAT-INFINITY-KLUDGE, as documented in
+        ;; base-target-features.lisp-expr:
+        (*shebang-features* (set-difference *shebang-features*
+                                            '(:sb-propagate-float-type
+                                              :sb-propagate-fun-type))))
     (with-additional-nickname ("SB-XC" "SB!XC")
       (funcall fn))))
 (compile 'in-host-compilation-mode)
@@ -366,13 +366,13 @@
 ;;; into the cross-compilation host Common lisp.
 (defun host-cload-stem (stem &key ignore-failure-p)
   (let ((compiled-filename (in-host-compilation-mode
-			    (lambda ()
-			      (compile-stem
-			       stem
-			       :obj-prefix *host-obj-prefix*
-			       :obj-suffix *host-obj-suffix*
-			       :compile-file #'cl:compile-file
-			       :ignore-failure-p ignore-failure-p)))))
+                            (lambda ()
+                              (compile-stem
+                               stem
+                               :obj-prefix *host-obj-prefix*
+                               :obj-suffix *host-obj-suffix*
+                               :compile-file #'cl:compile-file
+                               :ignore-failure-p ignore-failure-p)))))
     (load compiled-filename)))
 (compile 'host-cload-stem)
 
@@ -393,15 +393,15 @@
 ;;; produce a corresponding file in the target object directory tree.
 (defun target-compile-stem (stem &key assem-p ignore-failure-p trace-file)
   (funcall *in-target-compilation-mode-fn*
-	   (lambda ()
-	     (compile-stem stem
-			   :obj-prefix *target-obj-prefix*
-			   :obj-suffix *target-obj-suffix*
+           (lambda ()
+             (compile-stem stem
+                           :obj-prefix *target-obj-prefix*
+                           :obj-suffix *target-obj-suffix*
                           :trace-file trace-file
-			   :ignore-failure-p ignore-failure-p
-			   :compile-file (if assem-p
-					     *target-assemble-file*
-					     *target-compile-file*)))))
+                           :ignore-failure-p ignore-failure-p
+                           :compile-file (if assem-p
+                                             *target-assemble-file*
+                                             *target-compile-file*)))))
 (compile 'target-compile-stem)
 
 ;;; (This function is not used by the build process, but is intended
@@ -410,6 +410,6 @@
 ;;; necessarily in the source tree, e.g. in "/tmp".)
 (defun target-compile-file (filename)
   (funcall *in-target-compilation-mode-fn*
-	   (lambda ()
-	     (funcall *target-compile-file* filename))))
+           (lambda ()
+             (funcall *target-compile-file* filename))))
 (compile 'target-compile-file)

@@ -3,7 +3,7 @@
 ;;; **********************************************************************
 ;;; This code was written by Paul Foley and has been placed in the public
 ;;; domain.
-;;; 
+;;;
 
 ;;; Sbcl port by Rudi Schlatte.
 
@@ -40,11 +40,11 @@
   (with-stream-class (string-input-simple-stream stream)
     (let ((string (getf options :string)))
       (when (and string (null (sm buffer stream)))
-	(let ((start (getf options :start))
-	      (end (or (getf options :end) (length string))))
-	  (setf (sm buffer stream) string
-		(sm buffpos stream) start
-		(sm buffer-ptr stream) end))))
+        (let ((start (getf options :start))
+              (end (or (getf options :end) (length string))))
+          (setf (sm buffer stream) string
+                (sm buffpos stream) start
+                (sm buffer-ptr stream) end))))
     (install-string-input-character-strategy stream)
     (add-stream-instance-flags stream :string :input :simple)))
 
@@ -53,12 +53,12 @@
   (with-stream-class (string-output-simple-stream stream)
     (unless (sm out-buffer stream)
       (let ((string (getf options :string)))
-	(if string
-	    (setf (sm out-buffer stream) string
-		  (sm max-out-pos stream) (length string))
-	    (let ((buflen (max (device-buffer-length stream) 16)))
-	      (setf (sm out-buffer stream) (make-string buflen)
-		    (sm max-out-pos stream) buflen)))))
+        (if string
+            (setf (sm out-buffer stream) string
+                  (sm max-out-pos stream) (length string))
+            (let ((buflen (max (device-buffer-length stream) 16)))
+              (setf (sm out-buffer stream) (make-string buflen)
+                    (sm max-out-pos stream) buflen)))))
     (unless (sm control-out stream)
       (setf (sm control-out stream) *std-control-out-table*))
     (install-string-output-character-strategy stream)
@@ -68,9 +68,9 @@
   (declare (ignore options))
   (with-stream-class (string-simple-stream stream)
     (if (and (any-stream-instance-flags stream :simple)
-	     (any-stream-instance-flags stream :input :output))
-	t
-	nil)))
+             (any-stream-instance-flags stream :input :output))
+        t
+        nil)))
 
 (defmethod device-file-position ((stream string-simple-stream))
   (with-stream-class (simple-stream stream)
@@ -79,14 +79,14 @@
 (defmethod (setf device-file-position) (value (stream string-simple-stream))
   (with-stream-class (simple-stream stream)
     (cond ((or (> value (sm buffer-ptr stream))
-	       (< value (- -1 (sm buffer-ptr stream))))
-	   nil)
-	  ((>= value 0)
-	   (setf (sm buffpos stream) value)
-	   t)
-	  (t
-	   (setf (sm buffpos stream) (+ (sm buffer-ptr stream) value 1))
-	   t))))
+               (< value (- -1 (sm buffer-ptr stream))))
+           nil)
+          ((>= value 0)
+           (setf (sm buffpos stream) value)
+           t)
+          (t
+           (setf (sm buffpos stream) (+ (sm buffer-ptr stream) value 1))
+           t))))
 
 (defmethod device-file-length ((stream string-simple-stream))
   (with-stream-class (simple-stream stream)
@@ -105,13 +105,13 @@
   (with-stream-class (fill-pointer-output-simple-stream stream)
     (let ((buffer (sm out-buffer stream)))
       (cond ((or (> value (array-total-size buffer))
-		 (< value (- -1 (array-total-size buffer))))
-	     nil)
-	    ((>= value 0)
-	     (setf (fill-pointer buffer) value))
-	    (t
-	     (setf (fill-pointer buffer)
-		   (+ (array-total-size buffer) value 1)))))))
+                 (< value (- -1 (array-total-size buffer))))
+             nil)
+            ((>= value 0)
+             (setf (fill-pointer buffer) value))
+            (t
+             (setf (fill-pointer buffer)
+                   (+ (array-total-size buffer) value 1)))))))
 
 (defmethod device-open ((stream xp-simple-stream) options)
   #| do something |#

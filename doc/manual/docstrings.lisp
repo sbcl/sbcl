@@ -94,13 +94,13 @@ you deserve to lose.")
 
 (defun flatten (list)
   (cond ((null list)
-	 nil)
-	((consp (car list))
-	 (nconc (flatten (car list)) (flatten (cdr list))))
-	((null (cdr list))
-	 (cons (car list) nil))
-	(t
-	 (cons (car list) (flatten (cdr list))))))
+         nil)
+        ((consp (car list))
+         (nconc (flatten (car list)) (flatten (cdr list))))
+        ((null (cdr list))
+         (cons (car list) nil))
+        (t
+         (cons (car list) (flatten (cdr list))))))
 
 (defun whitespacep (char)
   (find char #(#\tab #\space #\page)))
@@ -120,15 +120,15 @@ you deserve to lose.")
 (defun specialized-lambda-list (method)
   ;; courtecy of AMOP p. 61
   (let* ((specializers (method-specializers method))
-	 (lambda-list (method-lambda-list method))
-	 (n-required (length specializers)))
+         (lambda-list (method-lambda-list method))
+         (n-required (length specializers)))
     (append (mapcar (lambda (arg specializer)
-		      (if  (eq specializer (find-class 't))
-			   arg
-			   `(,arg ,(specializer-name specializer))))
-		    (subseq lambda-list 0 n-required)
-		    specializers)
-	   (subseq lambda-list n-required))))
+                      (if  (eq specializer (find-class 't))
+                           arg
+                           `(,arg ,(specializer-name specializer))))
+                    (subseq lambda-list 0 n-required)
+                    specializers)
+           (subseq lambda-list n-required))))
 
 (defun string-lines (string)
   "Lines in STRING as a vector."
@@ -152,9 +152,9 @@ you deserve to lose.")
 up filename handling. See `*character-replacements*' and
 `*characters-to-drop*' for customization."
   (let ((name (remove-if (lambda (x) (member x *characters-to-drop*))
-			 (if (listp original)
-			     (flatten-to-string original)
-			     (string original))))
+                         (if (listp original)
+                             (flatten-to-string original)
+                             (string original))))
         (chars-to-replace (mapcar #'car *character-replacements*)))
     (flet ((replacement-delimiter (index)
              (cond ((or (< index 0) (>= index (length name))) "")
@@ -211,9 +211,9 @@ symbols or lists of symbols."))
 
 (defmethod name-using-kind/name ((kind (eql 'method)) name doc)
   (format nil "~A~{ ~A~} ~A"
-	  (name-using-kind/name nil (first name) doc)
-	  (second name)
-	  (third name)))
+          (name-using-kind/name nil (first name) doc)
+          (second name)
+          (third name)))
 
 (defun node-name (doc)
   "Returns TexInfo node name as a string for a DOCUMENTATION instance."
@@ -239,8 +239,8 @@ symbols or lists of symbols."))
 
 (defmethod title-using-kind/name ((kind (eql 'method)) name doc)
   (format nil "~{~A ~}~A"
-	  (second name)
-	  (title-using-kind/name nil (first name) doc)))
+          (second name)
+          (title-using-kind/name nil (first name) doc)))
 
 (defun title-name (doc)
   "Returns a string to be used as name of the definition."
@@ -248,17 +248,17 @@ symbols or lists of symbols."))
 
 (defun include-pathname (doc)
   (let* ((kind (get-kind doc))
-	 (name (nstring-downcase
-		(if (eq 'package kind)
-		    (format nil "package-~A" (alphanumize (get-name doc)))
-		    (format nil "~A-~A-~A"
-			    (case (get-kind doc)
-			      ((function generic-function) "fun")
-			      (structure "struct")
-			      (variable "var")
-			      (otherwise (symbol-name (get-kind doc))))
-			    (alphanumize (package-name (get-package doc)))
-			    (alphanumize (get-name doc)))))))
+         (name (nstring-downcase
+                (if (eq 'package kind)
+                    (format nil "package-~A" (alphanumize (get-name doc)))
+                    (format nil "~A-~A-~A"
+                            (case (get-kind doc)
+                              ((function generic-function) "fun")
+                              (structure "struct")
+                              (variable "var")
+                              (otherwise (symbol-name (get-kind doc))))
+                            (alphanumize (package-name (get-package doc)))
+                            (alphanumize (get-name doc)))))))
     (make-pathname :name name  :type "texinfo")))
 
 ;;;; documentation class and related methods
@@ -275,69 +275,69 @@ symbols or lists of symbols."))
 (defmethod make-documentation ((x package) doc-type string)
   (declare (ignore doc-type))
   (make-instance 'documentation
-		 :name (name x)
-		 :kind 'package
-		 :string string))
+                 :name (name x)
+                 :kind 'package
+                 :string string))
 
 (defmethod make-documentation (x (doc-type (eql 'function)) string)
   (declare (ignore doc-type))
   (let* ((fdef (and (fboundp x) (fdefinition x)))
-	 (name x)
-	 (kind (cond ((and (symbolp x) (special-operator-p x))
-		      'special-operator)
-		     ((and (symbolp x) (macro-function x))
-		      'macro)
-		     ((typep fdef 'generic-function)
-		      (assert (or (symbolp name) (setf-name-p name)))
-		      'generic-function)		     
-		     (t
-		      (assert (or (symbolp name) (setf-name-p name)))
-		      'function)))
-	 (children (when (eq kind 'generic-function)
-			     (collect-gf-documentation fdef))))
+         (name x)
+         (kind (cond ((and (symbolp x) (special-operator-p x))
+                      'special-operator)
+                     ((and (symbolp x) (macro-function x))
+                      'macro)
+                     ((typep fdef 'generic-function)
+                      (assert (or (symbolp name) (setf-name-p name)))
+                      'generic-function)
+                     (t
+                      (assert (or (symbolp name) (setf-name-p name)))
+                      'function)))
+         (children (when (eq kind 'generic-function)
+                             (collect-gf-documentation fdef))))
     (make-instance 'documentation
-		   :name (name x)
-		   :string string
-		   :kind kind
-		   :children children)))
+                   :name (name x)
+                   :string string
+                   :kind kind
+                   :children children)))
 
 (defmethod make-documentation ((x method) doc-type string)
   (declare (ignore doc-type))
   (make-instance 'documentation
-		 :name (name x)
-		 :kind 'method
-		 :string string))
+                 :name (name x)
+                 :kind 'method
+                 :string string))
 
 (defmethod make-documentation (x (doc-type (eql 'type)) string)
   (make-instance 'documentation
-		 :name (name x)
-		 :string string
-		 :kind (etypecase (find-class x nil)
-			 (structure-class 'structure)
-			 (standard-class 'class)
-			 (sb-pcl::condition-class 'condition)
-			 ((or built-in-class null) 'type))))
+                 :name (name x)
+                 :string string
+                 :kind (etypecase (find-class x nil)
+                         (structure-class 'structure)
+                         (standard-class 'class)
+                         (sb-pcl::condition-class 'condition)
+                         ((or built-in-class null) 'type))))
 
 (defmethod make-documentation (x (doc-type (eql 'variable)) string)
   (make-instance 'documentation
-		 :name (name x)
-		 :string string
-		 :kind (if (constantp x)
-			   'constant
-			   'variable)))
+                 :name (name x)
+                 :string string
+                 :kind (if (constantp x)
+                           'constant
+                           'variable)))
 
 (defmethod make-documentation (x (doc-type (eql 'setf)) string)
   (declare (ignore doc-type))
   (make-instance 'documentation
-		 :name (name x)
-		 :kind 'setf-expander
-		 :string string))
+                 :name (name x)
+                 :kind 'setf-expander
+                 :string string))
 
 (defmethod make-documentation (x doc-type string)
   (make-instance 'documentation
-		 :name (name x)
-		 :kind doc-type
-		 :string string))
+                 :name (name x)
+                 :kind doc-type
+                 :string string))
 
 (defun maybe-documentation (x doc-type)
   "Returns a DOCUMENTATION instance for X and DOC-TYPE, or NIL if
@@ -347,45 +347,45 @@ there is no corresponding docstring."
       (make-documentation x doc-type docstring))))
 
 (defun lambda-list (doc)
-  (case (get-kind doc)    
+  (case (get-kind doc)
     ((package constant variable type structure class condition)
      nil)
     (method
      (third (get-name doc)))
     (t
      ;; KLUDGE: Eugh.
-     ;;   
+     ;;
      ;; believe it or not, the above comment was written before CSR
      ;; came along and obfuscated this.  (2005-07-04)
      (when (symbolp (get-name doc))
        (labels ((clean (x &key optional key)
-		  (typecase x
-		    (atom x)
-		    ((cons (member &optional))
-		     (cons (car x) (clean (cdr x) :optional t)))
-		    ((cons (member &key))
-		     (cons (car x) (clean (cdr x) :key t)))
-		    ((cons cons)
-		     (cons 
-		      (cond (key (if (consp (caar x))
-				     (caaar x)
-				     (caar x)))
-			    (optional (caar x))
-			    (t (clean (car x))))
-		      (clean (cdr x) :key key :optional optional)))
-		    (cons
-		     (cons
-		      (cond ((or key optional) (car x))
-			    (t (clean (car x))))
-		      (clean (cdr x) :key key :optional optional))))))
-	 (clean (sb-introspect:function-arglist (get-name doc))))))))
+                  (typecase x
+                    (atom x)
+                    ((cons (member &optional))
+                     (cons (car x) (clean (cdr x) :optional t)))
+                    ((cons (member &key))
+                     (cons (car x) (clean (cdr x) :key t)))
+                    ((cons cons)
+                     (cons
+                      (cond (key (if (consp (caar x))
+                                     (caaar x)
+                                     (caar x)))
+                            (optional (caar x))
+                            (t (clean (car x))))
+                      (clean (cdr x) :key key :optional optional)))
+                    (cons
+                     (cons
+                      (cond ((or key optional) (car x))
+                            (t (clean (car x))))
+                      (clean (cdr x) :key key :optional optional))))))
+         (clean (sb-introspect:function-arglist (get-name doc))))))))
 
 (defun documentation< (x y)
   (let ((p1 (position (get-kind x) *ordered-documentation-kinds*))
-	(p2 (position (get-kind y) *ordered-documentation-kinds*)))
-    (if (or (not (and p1 p2)) (= p1 p2)) 
-	(string< (string (get-name x)) (string (get-name y)))
-	(< p1 p2))))
+        (p2 (position (get-kind y) *ordered-documentation-kinds*)))
+    (if (or (not (and p1 p2)) (= p1 p2))
+        (string< (string (get-name x)) (string (get-name y)))
+        (< p1 p2))))
 
 ;;;; turning text into texinfo
 
@@ -393,10 +393,10 @@ there is no corresponding docstring."
   "Return STRING with characters in *TEXINFO-ESCAPED-CHARS* escaped
 with #\@. Optionally downcase the result."
   (let ((result (with-output-to-string (s)
-		  (loop for char across string
-			when (find char *texinfo-escaped-chars*)
-			do (write-char #\@ s)
-			do (write-char char s)))))
+                  (loop for char across string
+                        when (find char *texinfo-escaped-chars*)
+                        do (write-char #\@ s)
+                        do (write-char char s)))))
     (if downcasep (nstring-downcase result) result)))
 
 (defun empty-p (line-number lines)
@@ -449,7 +449,7 @@ variables if the symbol in question is contained in symbols
         (write-string (subseq line last (first symbol/index)) result)
         (let ((symbol-name (apply #'subseq line symbol/index)))
           (format result (if (member symbol-name *texinfo-variables*
-				     :test #'string=)
+                                     :test #'string=)
                              "@var{~A}"
                              "@code{~A}")
                   (string-downcase symbol-name)))
@@ -464,15 +464,15 @@ ie. if it starts with whitespace followed by a paren or
 semicolon, and the previous line is empty"
   (let ((offset (indentation line)))
     (and offset
-	 (plusp offset)
-	 (find (find-if-not #'whitespacep line) "(;")
-	 (empty-p (1- line-number) lines))))
+         (plusp offset)
+         (find (find-if-not #'whitespacep line) "(;")
+         (empty-p (1- line-number) lines))))
 
 (defun collect-lisp-section (lines line-number)
   (let ((lisp (loop for index = line-number then (1+ index)
-		    for line = (and (< index (length lines)) (svref lines index))
-		    while (indentation line)
-		    collect line)))
+                    for line = (and (< index (length lines)) (svref lines index))
+                    while (indentation line)
+                    collect line)))
     (values (length lisp) `("@lisp" ,@lisp "@end lisp"))))
 
 ;;; itemized sections
@@ -481,12 +481,12 @@ semicolon, and the previous line is empty"
   "Return NIL or the indentation offset if LINE looks like it starts
 an item in an itemization."
   (let* ((offset (indentation line))
-	 (char (when offset (char line offset))))
+         (char (when offset (char line offset))))
     (and offset
-	 (member char *itemize-start-characters* :test #'char=)
-	 (char= #\Space (find-if-not (lambda (c) (char= c char))
-				     line :start offset))
-	 offset)))
+         (member char *itemize-start-characters* :test #'char=)
+         (char= #\Space (find-if-not (lambda (c) (char= c char))
+                                     line :start offset))
+         offset)))
 
 (defun collect-maybe-itemized-section (lines starting-line)
   ;; Return index of next line to be processed outside
@@ -504,7 +504,7 @@ an item in an itemization."
              (incf lines-consumed))
             ((and offset (> indentation this-offset))
              ;; nested itemization -- handle recursively
-	     ;; FIXME: tables in itemizations go wrong
+             ;; FIXME: tables in itemizations go wrong
              (multiple-value-bind (sub-lines-consumed sub-itemization)
                  (collect-maybe-itemized-section lines line-number)
                (when sub-lines-consumed
@@ -526,8 +526,8 @@ an item in an itemization."
              (loop-finish))))
     ;; a single-line itemization isn't.
     (if (> (count-if (lambda (line) (> (length line) 0)) result) 1)
-	(values lines-consumed `("@itemize" ,@(reverse result) "@end itemize"))
-	nil)))
+        (values lines-consumed `("@itemize" ,@(reverse result) "@end itemize"))
+        nil)))
 
 ;;; table sections
 
@@ -538,14 +538,14 @@ an item in an itemization."
 
 (defun tabulation-p (offset line-number lines direction)
   (let ((step  (ecase direction
-		 (:backwards (1- line-number))
-		 (:forwards (1+ line-number)))))
+                 (:backwards (1- line-number))
+                 (:forwards (1+ line-number)))))
     (when (and (plusp line-number) (< line-number (length lines)))
       (and (eql offset (indentation (svref lines line-number)))
-	   (or (when (eq direction :backwards)
-		 (empty-p step lines))
-	       (tabulation-p offset step lines direction)
-	       (tabulation-body-p offset step lines))))))
+           (or (when (eq direction :backwards)
+                 (empty-p step lines))
+               (tabulation-p offset step lines direction)
+               (tabulation-body-p offset step lines))))))
 
 (defun maybe-table-offset (line-number lines)
   "Return NIL or the indentation offset if LINE looks like it starts
@@ -553,16 +553,16 @@ an item in a tabulation. Ie, if it is (1) indented, (2) preceded by an
 empty line, another tabulation label, or a tabulation body, (3) and
 followed another tabulation label or a tabulation body."
   (let* ((line (svref lines line-number))
-	 (offset (indentation line))
-	 (prev (1- line-number))
-	 (next (1+ line-number)))
+         (offset (indentation line))
+         (prev (1- line-number))
+         (next (1+ line-number)))
     (when (and offset (plusp offset))
       (and (or (empty-p prev lines)
-	       (tabulation-body-p offset prev lines)
-	       (tabulation-p offset prev lines :backwards))
-	   (or (tabulation-body-p offset next lines)
-	       (tabulation-p offset next lines :forwards))
-	   offset))))
+               (tabulation-body-p offset prev lines)
+               (tabulation-p offset prev lines :backwards))
+           (or (tabulation-body-p offset next lines)
+               (tabulation-p offset next lines :forwards))
+           offset))))
 
 ;;; FIXME: This and itemization are very similar: could they share
 ;;; some code, mayhap?
@@ -573,36 +573,36 @@ followed another tabulation label or a tabulation body."
         (result nil)
         (lines-consumed 0))
     (loop for line-number from starting-line below (length lines)
-	  for line = (svref lines line-number)
-	  for indentation = (indentation line)
-	  for offset = (maybe-table-offset line-number lines)
-	  do (cond
-	       ((not indentation)
-		;; empty line -- inserts paragraph.
-		(push "" result)
-		(incf lines-consumed))
-	       ((and offset (= indentation this-offset))
-		;; start of new item, or continuation of previous item
-		(if (and result (search "@item" (car result) :test #'char=))
-		    (push (format nil "@itemx ~A" (texinfo-line line))
-			  result)
-		    (progn
-		      (push "" result)
-		      (push (format nil "@item ~A" (texinfo-line line))
-			    result)))
-		(incf lines-consumed))
-	       ((> indentation this-offset)
-		;; continued item from previous line
-		(push (texinfo-line line) result)
-		(incf lines-consumed))
-	       (t		
-		;; end of itemization
-		(loop-finish))))
+          for line = (svref lines line-number)
+          for indentation = (indentation line)
+          for offset = (maybe-table-offset line-number lines)
+          do (cond
+               ((not indentation)
+                ;; empty line -- inserts paragraph.
+                (push "" result)
+                (incf lines-consumed))
+               ((and offset (= indentation this-offset))
+                ;; start of new item, or continuation of previous item
+                (if (and result (search "@item" (car result) :test #'char=))
+                    (push (format nil "@itemx ~A" (texinfo-line line))
+                          result)
+                    (progn
+                      (push "" result)
+                      (push (format nil "@item ~A" (texinfo-line line))
+                            result)))
+                (incf lines-consumed))
+               ((> indentation this-offset)
+                ;; continued item from previous line
+                (push (texinfo-line line) result)
+                (incf lines-consumed))
+               (t
+                ;; end of itemization
+                (loop-finish))))
      ;; a single-line table isn't.
     (if (> (count-if (lambda (line) (> (length line) 0)) result) 1)
-	(values lines-consumed
-		`("" "@table @emph" ,@(reverse result) "@end table" ""))
-	nil)))
+        (values lines-consumed
+                `("" "@table @emph" ,@(reverse result) "@end table" ""))
+        nil)))
 
 ;;; section markup
 
@@ -610,27 +610,27 @@ followed another tabulation label or a tabulation body."
   `(multiple-value-bind (count collected) (progn ,@forms)
     (when count
       (dolist (line collected)
-	(write-line line *texinfo-output*))
+        (write-line line *texinfo-output*))
       (incf ,index (1- count)))))
 
 (defun write-texinfo-string (string &optional lambda-list)
   "Try to guess as much formatting for a raw docstring as possible."
   (let ((*texinfo-variables* (flatten lambda-list))
-	(lines (string-lines (escape-for-texinfo string nil))))
+        (lines (string-lines (escape-for-texinfo string nil))))
       (loop for line-number from 0 below (length lines)
-	    for line = (svref lines line-number)
-	    do (cond
-		 ((with-maybe-section line-number
-		    (and (lisp-section-p line line-number lines)
-			 (collect-lisp-section lines line-number))))
-		 ((with-maybe-section line-number
-		    (and (maybe-itemize-offset line)
-			 (collect-maybe-itemized-section lines line-number))))
-		 ((with-maybe-section line-number
-		    (and (maybe-table-offset line-number lines)
-			 (collect-maybe-table-section lines line-number))))
-		 (t
-		  (write-line (texinfo-line line) *texinfo-output*))))))
+            for line = (svref lines line-number)
+            do (cond
+                 ((with-maybe-section line-number
+                    (and (lisp-section-p line line-number lines)
+                         (collect-lisp-section lines line-number))))
+                 ((with-maybe-section line-number
+                    (and (maybe-itemize-offset line)
+                         (collect-maybe-itemized-section lines line-number))))
+                 ((with-maybe-section line-number
+                    (and (maybe-table-offset line-number lines)
+                         (collect-maybe-table-section lines line-number))))
+                 (t
+                  (write-line (texinfo-line line) *texinfo-output*))))))
 
 ;;;; texinfo formatting tools
 
@@ -641,24 +641,24 @@ followed another tabulation label or a tabulation body."
      ;; classes in CP-lists, unless the symbol we're documenting is
      ;; internal as well.
      (and (member super-package #.'(mapcar #'find-package *undocumented-packages*))
-	  (not (eq super-package (symbol-package class-name))))
+          (not (eq super-package (symbol-package class-name))))
      ;; KLUDGE: We don't generally want to advertise SIMPLE-ERROR or
      ;; SIMPLE-CONDITION in the CPLs of conditions that inherit them
      ;; simply as a matter of convenience. The assumption here is that
      ;; the inheritance is incidental unless the name of the condition
      ;; begins with SIMPLE-.
      (and (member super-name '(simple-error simple-condition))
-	  (let ((prefix "SIMPLE-"))
-	    (mismatch prefix (string class-name) :end2 (length prefix)))
-	  t ; don't return number from MISMATCH
-	  ))))
+          (let ((prefix "SIMPLE-"))
+            (mismatch prefix (string class-name) :end2 (length prefix)))
+          t ; don't return number from MISMATCH
+          ))))
 
 (defun hide-slot-p (symbol slot)
   ;; FIXME: There is no pricipal reason to avoid the slot docs fo
   ;; structures and conditions, but their DOCUMENTATION T doesn't
   ;; currently work with them the way we'd like.
   (not (and (typep (find-class symbol nil) 'standard-class)
-	    (docstring slot t))))
+            (docstring slot t))))
 
 (defun texinfo-anchor (doc)
   (format *texinfo-output* "@anchor{~A}~%" (node-name doc)))
@@ -667,16 +667,16 @@ followed another tabulation label or a tabulation body."
 (defun texinfo-begin (doc &aux *print-pretty*)
   (let ((kind (get-kind doc)))
     (format *texinfo-output* "@~A {~:(~A~)} ~(~A~@[ ~{~A~^ ~}~]~)~%"
-	    (case kind	      
-	      ((package constant variable)
-	       "defvr")
-	      ((structure class condition type)
-	       "deftp")
-	      (t
-	       "deffn"))
-	    (map 'string (lambda (char) (if (eql char #\-) #\Space char)) (string kind))
-	    (title-name doc)
-	    (lambda-list doc))))
+            (case kind
+              ((package constant variable)
+               "defvr")
+              ((structure class condition type)
+               "deftp")
+              (t
+               "deffn"))
+            (map 'string (lambda (char) (if (eql char #\-) #\Space char)) (string kind))
+            (title-name doc)
+            (lambda-list doc))))
 
 (defun texinfo-index (doc)
   (let ((title (title-name doc)))
@@ -693,31 +693,31 @@ followed another tabulation label or a tabulation body."
     (let ((name (get-name doc)))
       ;; class precedence list
       (format *texinfo-output* "Class precedence list: @code{~(~{@w{~A}~^, ~}~)}~%~%"
-	      (remove-if (lambda (class)  (hide-superclass-p name class))
-			 (mapcar #'class-name (class-precedence-list (find-class name)))))
+              (remove-if (lambda (class)  (hide-superclass-p name class))
+                         (mapcar #'class-name (class-precedence-list (find-class name)))))
       ;; slots
       (let ((slots (remove-if (lambda (slot) (hide-slot-p name slot))
-			      (class-direct-slots (find-class name)))))
-	(when slots
-	  (format *texinfo-output* "Slots:~%@itemize~%")
-	  (dolist (slot slots)
-	    (format *texinfo-output* "@item ~(@code{~A} ~
+                              (class-direct-slots (find-class name)))))
+        (when slots
+          (format *texinfo-output* "Slots:~%@itemize~%")
+          (dolist (slot slots)
+            (format *texinfo-output* "@item ~(@code{~A} ~
                                      ~@[--- initargs: @code{~{@w{~S}~^, ~}}~]~)~%~%"
-		    (slot-definition-name slot)
-		    (slot-definition-initargs slot))
-	    ;; FIXME: Would be neater to handler as children
-	    (write-texinfo-string (docstring slot t)))
-	  (format *texinfo-output* "@end itemize~%~%"))))))
+                    (slot-definition-name slot)
+                    (slot-definition-initargs slot))
+            ;; FIXME: Would be neater to handler as children
+            (write-texinfo-string (docstring slot t)))
+          (format *texinfo-output* "@end itemize~%~%"))))))
 
 (defun texinfo-body (doc)
   (write-texinfo-string (get-string doc)))
 
 (defun texinfo-end (doc)
   (write-line (case (get-kind doc)
-		((package variable constant) "@end defvr")
-		((structure type class condition) "@end deftp")
-		(t "@end deffn"))
-	      *texinfo-output*))
+                ((package variable constant) "@end defvr")
+                ((structure type class condition) "@end deftp")
+                (t "@end deffn"))
+              *texinfo-output*))
 
 (defun write-texinfo (doc)
   "Writes TexInfo for a DOCUMENTATION instance to *TEXINFO-OUTPUT*."
@@ -735,22 +735,22 @@ followed another tabulation label or a tabulation body."
 (defun collect-gf-documentation (gf)
   "Collects method documentation for the generic function GF"
   (loop for method in (generic-function-methods gf)
-	for doc = (maybe-documentation method t)
-	when doc
-	collect doc))
+        for doc = (maybe-documentation method t)
+        when doc
+        collect doc))
 
 (defun collect-name-documentation (name)
   (loop for type in *documentation-types*
-	for doc = (maybe-documentation name type)
-	when doc
-	collect doc))
+        for doc = (maybe-documentation name type)
+        when doc
+        collect doc))
 
 (defun collect-symbol-documentation (symbol)
   "Collects all docs for a SYMBOL and (SETF SYMBOL), returns a list of
 the form DOC instances. See `*documentation-types*' for the possible
 values of doc-type."
   (nconc (collect-name-documentation symbol)
-	 (collect-name-documentation (list 'setf symbol))))
+         (collect-name-documentation (list 'setf symbol))))
 
 (defun collect-documentation (package)
   "Collects all documentation for all external symbols of the given
@@ -762,14 +762,14 @@ package, as well as for the package itself."
       (setf docs (nconc (collect-symbol-documentation symbol) docs)))
     (let ((doc (maybe-documentation *documentation-package* t)))
       (when doc
-	(push doc docs)))
+        (push doc docs)))
     docs))
 
 (defmacro with-texinfo-file (pathname &body forms)
   `(with-open-file (*texinfo-output* ,pathname
-				    :direction :output
-				    :if-does-not-exist :create
-				    :if-exists :supersede)
+                                    :direction :output
+                                    :if-does-not-exist :create
+                                    :if-exists :supersede)
     ,@forms))
 
 (defun generate-includes (directory &rest packages)
@@ -785,9 +785,9 @@ markup, you lose."
     (let ((directory (merge-pathnames (pathname directory))))
       (ensure-directories-exist directory)
       (dolist (package packages)
-	(dolist (doc (collect-documentation (find-package package)))
-	  (with-texinfo-file (merge-pathnames (include-pathname doc) directory)
-	    (write-texinfo doc))))
+        (dolist (doc (collect-documentation (find-package package)))
+          (with-texinfo-file (merge-pathnames (include-pathname doc) directory)
+            (write-texinfo doc))))
       directory)))
 
 (defun document-package (package &optional filename)
@@ -801,11 +801,11 @@ syntax-significant characters are escaped in symbol names, but if a
 docstring contains invalid Texinfo markup, you lose."
   (handler-bind ((warning #'muffle-warning))
     (let* ((package (find-package package))
-	   (filename (or filename (make-pathname
-				   :name (string-downcase (package-name package))
-				   :type "texinfo")))
-	   (docs (sort (collect-documentation package) #'documentation<)))
+           (filename (or filename (make-pathname
+                                   :name (string-downcase (package-name package))
+                                   :type "texinfo")))
+           (docs (sort (collect-documentation package) #'documentation<)))
       (with-texinfo-file filename
-	(dolist (doc docs)
-	  (write-texinfo doc)))
+        (dolist (doc docs)
+          (write-texinfo doc)))
       filename)))

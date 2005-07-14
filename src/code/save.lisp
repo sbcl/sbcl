@@ -27,10 +27,10 @@
 ;;; image to make a running Lisp, the memory never gets reclaimed.
 ;;; (But with the PURIFY option it seems to work OK.)
 (defun save-lisp-and-die (core-file-name &key
-					 (toplevel #'toplevel-init)
-					 (purify t)
-					 (root-structures ())
-					 (environment-name "auxiliary"))
+                                         (toplevel #'toplevel-init)
+                                         (purify t)
+                                         (root-structures ())
+                                         (environment-name "auxiliary"))
   #!+sb-doc
   "Save a \"core image\", i.e. enough information to restart a Lisp
 process later in the same state, in the file of the specified name.
@@ -99,24 +99,24 @@ sufficiently motivated to do lengthy fixes."
   ;; SAVE-LISP-AND-DIE.)
   (if purify
       (purify :root-structures root-structures
-	      :environment-name environment-name)
+              :environment-name environment-name)
       #-gencgc (gc) #+gencgc (gc :full t))
   (flet ((restart-lisp ()
            (handling-end-of-the-world
-	     (reinit)
-	     (funcall toplevel))))
+             (reinit)
+             (funcall toplevel))))
     ;; FIXME: Perhaps WITHOUT-GCING should be wrapped around the
     ;; LET as well, to avoid the off chance of an interrupt triggering
     ;; GC and making our saved RESTART-LISP address invalid?
     (without-gcing
      (save (unix-namestring core-file-name nil)
-	   (get-lisp-obj-address #'restart-lisp)))))
+           (get-lisp-obj-address #'restart-lisp)))))
 
 (defun deinit ()
   (dolist (hook *save-hooks*)
     (with-simple-restart (continue "Skip this save hook.")
       (funcall hook)))
-  (when (fboundp 'cancel-finalization)    
+  (when (fboundp 'cancel-finalization)
     (cancel-finalization sb!sys:*tty*))
   (profile-deinit)
   (debug-deinit)

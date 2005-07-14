@@ -129,8 +129,8 @@
 (defsetf sap-ref-double %set-sap-ref-double)
 #!+long-float (defsetf sap-ref-long %set-sap-ref-long)
 #-sb-xc-host (defsetf subseq (sequence start &optional (end nil)) (v)
-	    `(progn (replace ,sequence ,v :start1 ,start :end1 ,end)
-		    ,v))
+            `(progn (replace ,sequence ,v :start1 ,start :end1 ,end)
+                    ,v))
 
 ;;; from fdefinition.lisp
 (in-package "SB!IMPL")

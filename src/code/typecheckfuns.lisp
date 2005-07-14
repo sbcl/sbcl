@@ -3,7 +3,7 @@
 ;;;; unreasonable to implement them all as different compiled
 ;;;; functions, because that's too much bloat. But when they are
 ;;;; called, it's unreasonable to just punt to interpreted TYPEP,
-;;;; because that's unreasonably slow. The system implemented here 
+;;;; because that's unreasonably slow. The system implemented here
 ;;;; tries to be a reasonable compromise solution to this problem.
 ;;;;
 ;;;; Structure accessor functions are still implemented as closures,
@@ -39,60 +39,60 @@
 (eval-when (:compile-toplevel)
   (defvar *compile-time-common-typespecs*
     (let (;; When we generate collections of common specialized
-	  ;; array types, what should their element types be?
-	  (common-element-typespecs
-	   ;; Note: This table is pretty arbitrary, just things I use a lot
-	   ;; or see used a lot. If someone has ideas for better values,
-	   ;; lemme know. -- WHN 2001-10-15
-	   #(t
-	     character
-	     bit fixnum (unsigned-byte 32) (signed-byte 32)
-	     single-float double-float)))
+          ;; array types, what should their element types be?
+          (common-element-typespecs
+           ;; Note: This table is pretty arbitrary, just things I use a lot
+           ;; or see used a lot. If someone has ideas for better values,
+           ;; lemme know. -- WHN 2001-10-15
+           #(t
+             character
+             bit fixnum (unsigned-byte 32) (signed-byte 32)
+             single-float double-float)))
       (coerce (remove-duplicates
-	       (mapcar (lambda (typespec)
-			 (type-specifier (specifier-type typespec)))
-		       ;; Note: This collection of input values is
-		       ;; pretty arbitrary, just inspired by things I
-		       ;; use a lot or see being used a lot in the
-		       ;; system. If someone has ideas for better
-		       ;; values, lemme know. -- WHN 2001-10-15
-		       (concatenate
-			'list
-			;; non-array types
-			'(bit
-			  boolean
-			  character
-			  cons
-			  double-float
-			  fixnum
-			  hash-table
-			  index
-			  integer
-			  list
-			  package
-			  signed-byte
-			  (signed-byte 8)
-			  single-float
-			  structure-object
-			  symbol
-			  unsigned-byte
-			  (unsigned-byte 8)
-			  (unsigned-byte 32))
-			;; systematic names for array types
-			(map 'list
-			     (lambda (element-type)
-			       `(simple-array ,element-type 1))
-			     common-element-typespecs)
-			(map 'list
-			     (lambda (element-type)
-			       `(vector ,element-type))
-			     common-element-typespecs)
-			;; idiosyncratic names for array types
-			'(simple-vector
-			  bit-vector simple-bit-vector
-			  string simple-string)))
-	       :test #'equal)
-	      'simple-vector))))
+               (mapcar (lambda (typespec)
+                         (type-specifier (specifier-type typespec)))
+                       ;; Note: This collection of input values is
+                       ;; pretty arbitrary, just inspired by things I
+                       ;; use a lot or see being used a lot in the
+                       ;; system. If someone has ideas for better
+                       ;; values, lemme know. -- WHN 2001-10-15
+                       (concatenate
+                        'list
+                        ;; non-array types
+                        '(bit
+                          boolean
+                          character
+                          cons
+                          double-float
+                          fixnum
+                          hash-table
+                          index
+                          integer
+                          list
+                          package
+                          signed-byte
+                          (signed-byte 8)
+                          single-float
+                          structure-object
+                          symbol
+                          unsigned-byte
+                          (unsigned-byte 8)
+                          (unsigned-byte 32))
+                        ;; systematic names for array types
+                        (map 'list
+                             (lambda (element-type)
+                               `(simple-array ,element-type 1))
+                             common-element-typespecs)
+                        (map 'list
+                             (lambda (element-type)
+                               `(vector ,element-type))
+                             common-element-typespecs)
+                        ;; idiosyncratic names for array types
+                        '(simple-vector
+                          bit-vector simple-bit-vector
+                          string simple-string)))
+               :test #'equal)
+              'simple-vector))))
 
 ;;; What are the common testable types? (If a slot accessor looks up
 ;;; one of these types, it doesn't need to supply a compiled TYPEP
@@ -102,13 +102,13 @@
 (declaim (type simple-vector *common-typespecs*))
 (defvar *common-typespecs*)
 #-sb-xc (eval-when (:compile-toplevel :load-toplevel :execute)
-	  (setf *common-typespecs*
-		#.*compile-time-common-typespecs*))
+          (setf *common-typespecs*
+                #.*compile-time-common-typespecs*))
 ;; (#+SB-XC initialization is handled elsewhere, at cold init time.)
 
 (defun ctype-is-common-typecheckfun-type-p (ctype)
   (position (type-specifier ctype) *common-typespecs*
-	    :test #'equal))
+            :test #'equal))
 
 (defun typecheck-failure (arg typespec)
   (error 'type-error :datum arg :expected-type typespec))
@@ -125,8 +125,8 @@
   (with-unique-names (n-typespec)
     `(let ((,n-typespec ,typespec))
        (or (gethash ,n-typespec *typecheckfuns*)
-	   (setf (gethash ,n-typespec *typecheckfuns*)
-		 ,form)))))
+           (setf (gethash ,n-typespec *typecheckfuns*)
+                 ,form)))))
 
 #+sb-xc
 (defun !typecheckfuns-cold-init ()
@@ -137,15 +137,15 @@
   ;; Initialize *TYPECHECKFUNS* with typecheckfuns for common typespecs.
   (/show0 "typecheckfuns-cold-init initial setfs done")
   (macrolet ((macro ()
-	       `(progn
-		  ,@(map 'list
-			 (lambda (typespec)
-			   `(progn
+               `(progn
+                  ,@(map 'list
+                         (lambda (typespec)
+                           `(progn
                               (/show0 "setf")
                               (setf (gethash ',typespec *typecheckfuns*)
                                     (progn
                                       (/show0 "lambda")
-                                      (lambda (arg)                                      
+                                      (lambda (arg)
                                         (unless (typep arg ',typespec)
                                           (typecheck-failure arg ',typespec))
                                         (values))))))
@@ -157,7 +157,7 @@
 ;;; implementation of a function which checks the type of its argument.
 (defun interpreted-typecheckfun (typespec)
   ;; Note that we don't and shouldn't memoize this, since otherwise the
-  ;; user could do 
+  ;; user could do
   ;;   (DEFSTRUCT FOO (X NIL :TYPE XYTYPE))
   ;;   (DEFTYPE XYTYPE () (OR SYMBOL CHARACTER))
   ;;   (DEFSTRUCT BAR (Y NIL :TYPE XYTYPE))
@@ -177,11 +177,11 @@
   (let ((layout (compiler-layout-or-lose typespec)))
     (lambda (arg)
       (unless (typep-to-layout arg layout)
-	(typecheck-failure arg typespec))
+        (typecheck-failure arg typespec))
       (values))))
 (defun structure-object-typecheckfun (typespec)
   (memoized-typecheckfun-form (%structure-object-typecheckfun typespec)
-			      typespec))
+                              typespec))
 
 ;;; General type checks need the full compiler, not just stereotyped
 ;;; closures. We arrange for UNMEMOIZED-TYPECHECKFUN to be produced
@@ -200,11 +200,11 @@
   ;; Until then this toy version should be good enough for some testing.
   (warn "FIXME: This is just a toy stub CTYPE-NEEDS-TO-BE-INTERPRETED-P.")
   (not (or (position (type-specifier ctype)
-		     *common-typespecs*
-		     :test #'equal)
-	   (member-type-p ctype)
-	   (numeric-type-p ctype)
-	   (array-type-p ctype)
+                     *common-typespecs*
+                     :test #'equal)
+           (member-type-p ctype)
+           (numeric-type-p ctype)
+           (array-type-p ctype)
            (cons-type-p ctype)
            (intersection-type-p ctype)
            (union-type-p ctype)
@@ -227,36 +227,36 @@
 ;;; well be able to avoid interpreting it at runtime.
 (define-compiler-macro typespec-typecheckfun (&whole whole typespec-form)
   (if (and (consp typespec-form)
-	   (eql (first typespec-form) 'quote))
+           (eql (first typespec-form) 'quote))
       (let* ((typespec (second typespec-form))
-	     (ctype (specifier-type typespec)))
-	(aver (= 2 (length typespec-form)))
-	(cond ((structure-classoid-p ctype)
-	       `(structure-object-typecheckfun ,typespec-form))
-	      ((ctype-needs-to-be-interpreted-p ctype)
-	       whole) ; i.e. give up compiler macro
-	      (t
-	       `(let ((typespec ,typespec-form))
-		  (general-typecheckfun
-		   typespec
-		   ;; Unless we know that the function is already in the
-		   ;; memoization cache
-		   ,@(unless (ctype-is-common-typecheckfun-type-p ctype)
-		       ;; Note that we're arranging for the
-		       ;; UNMEMOIZED-TYPECHECKFUN argument value to be
-		       ;; constructed at compile time. This means the
-		       ;; compiler does the work of compiling the function,
-		       ;; and the loader does the work of loading the
-		       ;; function, regardless of whether the runtime check
-		       ;; for "is it in the memoization cache?" succeeds.
-		       ;; (Then if the memoization check succeeds, the
-		       ;; compiled and loaded function is eventually GCed.)
-		       ;; The wasted motion in the case of a successful
-		       ;; memoization check is unfortunate, but it avoids
-		       ;; having to invoke the compiler at load time when
-		       ;; memoization fails, which is probably more
-		       ;; important.
-		       `((lambda (arg)
-			   (unless (typep arg typespec)
-			     (typecheck-failure arg typespec))))))))))
+             (ctype (specifier-type typespec)))
+        (aver (= 2 (length typespec-form)))
+        (cond ((structure-classoid-p ctype)
+               `(structure-object-typecheckfun ,typespec-form))
+              ((ctype-needs-to-be-interpreted-p ctype)
+               whole) ; i.e. give up compiler macro
+              (t
+               `(let ((typespec ,typespec-form))
+                  (general-typecheckfun
+                   typespec
+                   ;; Unless we know that the function is already in the
+                   ;; memoization cache
+                   ,@(unless (ctype-is-common-typecheckfun-type-p ctype)
+                       ;; Note that we're arranging for the
+                       ;; UNMEMOIZED-TYPECHECKFUN argument value to be
+                       ;; constructed at compile time. This means the
+                       ;; compiler does the work of compiling the function,
+                       ;; and the loader does the work of loading the
+                       ;; function, regardless of whether the runtime check
+                       ;; for "is it in the memoization cache?" succeeds.
+                       ;; (Then if the memoization check succeeds, the
+                       ;; compiled and loaded function is eventually GCed.)
+                       ;; The wasted motion in the case of a successful
+                       ;; memoization check is unfortunate, but it avoids
+                       ;; having to invoke the compiler at load time when
+                       ;; memoization fails, which is probably more
+                       ;; important.
+                       `((lambda (arg)
+                           (unless (typep arg typespec)
+                             (typecheck-failure arg typespec))))))))))
       whole)) ; i.e. give up compiler macro

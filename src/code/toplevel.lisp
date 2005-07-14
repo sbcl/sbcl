@@ -26,12 +26,12 @@
 
 ;;; FIXME: These could be converted to DEFVARs.
 (declaim (special *gc-inhibit* *need-to-collect-garbage*
-		  *after-gc-hooks*
-		  #!+(or x86 x86-64) *pseudo-atomic-atomic*
-		  #!+(or x86 x86-64) *pseudo-atomic-interrupted*
-		  sb!unix::*interrupts-enabled*
-		  sb!unix::*interrupt-pending*
-		  *type-system-initialized*))
+                  *after-gc-hooks*
+                  #!+(or x86 x86-64) *pseudo-atomic-atomic*
+                  #!+(or x86 x86-64) *pseudo-atomic-interrupted*
+                  sb!unix::*interrupts-enabled*
+                  sb!unix::*interrupt-pending*
+                  *type-system-initialized*))
 
 (defvar *cold-init-complete-p*)
 
@@ -42,7 +42,7 @@
 ;;;; stepping control
 (defvar *step*)
 (defvar *stepping*)
-(defvar *step-form-stack* nil 
+(defvar *step-form-stack* nil
   "A place for single steppers to push information about
 STEP-FORM-CONDITIONS avaiting the corresponding
 STEP-VALUES-CONDITIONS. The system is guaranteed to empty the stack
@@ -58,8 +58,8 @@ steppers to maintain contextual information.")
 (defmacro handling-end-of-the-world (&body body)
   (with-unique-names (caught)
     `(let ((,caught (catch '%end-of-the-world
-		      (/show0 "inside CATCH '%END-OF-THE-WORLD")
-		      ,@body)))
+                      (/show0 "inside CATCH '%END-OF-THE-WORLD")
+                      ,@body)))
       (/show0 "back from CATCH '%END-OF-THE-WORLD, flushing output")
       (flush-standard-output-streams)
       (sb!thread::terminate-session)
@@ -84,26 +84,26 @@ steppers to maintain contextual information.")
   (/show0 "entering INFINITE-ERROR-PROTECTOR, *CURRENT-ERROR-DEPTH*=..")
   (/hexstr *current-error-depth*)
   (cond ((not *cold-init-complete-p*)
-	 (%primitive print "Argh! error in cold init, halting")
-	 (%primitive sb!c:halt))
-	((or (not (boundp '*current-error-depth*))
-	     (not (realp   *current-error-depth*))
-	     (not (boundp '*maximum-error-depth*))
-	     (not (realp   *maximum-error-depth*)))
-	 (%primitive print "Argh! corrupted error depth, halting")
-	 (%primitive sb!c:halt))
-	((> *current-error-depth* *maximum-error-depth*)
-	 (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
-	 (/hexstr *maximum-error-depth*)
-	 (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
-	 (error-error "Help! "
-		      *current-error-depth*
-		      " nested errors. "
-		      "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
-	 t)
-	(t
-	 (/show0 "returning normally from INFINITE-ERROR-PROTECTOR")
-	 nil)))
+         (%primitive print "Argh! error in cold init, halting")
+         (%primitive sb!c:halt))
+        ((or (not (boundp '*current-error-depth*))
+             (not (realp   *current-error-depth*))
+             (not (boundp '*maximum-error-depth*))
+             (not (realp   *maximum-error-depth*)))
+         (%primitive print "Argh! corrupted error depth, halting")
+         (%primitive sb!c:halt))
+        ((> *current-error-depth* *maximum-error-depth*)
+         (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
+         (/hexstr *maximum-error-depth*)
+         (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
+         (error-error "Help! "
+                      *current-error-depth*
+                      " nested errors. "
+                      "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
+         t)
+        (t
+         (/show0 "returning normally from INFINITE-ERROR-PROTECTOR")
+         nil)))
 
 ;;; FIXME: I had a badly broken version of INFINITE-ERROR-PROTECTOR at
 ;;; one point (shown below), and SBCL cross-compiled it without
@@ -113,25 +113,25 @@ steppers to maintain contextual information.")
 #|
 (defun infinite-error-protector ()
   `(cond ((not *cold-init-complete-p*)
-	  (%primitive print "Argh! error in cold init, halting")
-	  (%primitive sb!c:halt))
-	 ((or (not (boundp '*current-error-depth*))
-	      (not (realp   *current-error-depth*))
-	      (not (boundp '*maximum-error-depth*))
-	      (not (realp   *maximum-error-depth*)))
-	  (%primitive print "Argh! corrupted error depth, halting")
-	  (%primitive sb!c:halt))
-	 ((> *current-error-depth* *maximum-error-depth*)
-	  (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
-	  (error-error "Help! "
-		       *current-error-depth*
-		       " nested errors. "
-		       "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
-	  (progn ,@forms)
-	  t)
-	 (t
-	  (/show0 "in INFINITE-ERROR-PROTECTOR, returning normally")
-	  nil)))
+          (%primitive print "Argh! error in cold init, halting")
+          (%primitive sb!c:halt))
+         ((or (not (boundp '*current-error-depth*))
+              (not (realp   *current-error-depth*))
+              (not (boundp '*maximum-error-depth*))
+              (not (realp   *maximum-error-depth*)))
+          (%primitive print "Argh! corrupted error depth, halting")
+          (%primitive sb!c:halt))
+         ((> *current-error-depth* *maximum-error-depth*)
+          (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
+          (error-error "Help! "
+                       *current-error-depth*
+                       " nested errors. "
+                       "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
+          (progn ,@forms)
+          t)
+         (t
+          (/show0 "in INFINITE-ERROR-PROTECTOR, returning normally")
+          nil)))
 |#
 
 ;;;; miscellaneous external functions
@@ -141,7 +141,7 @@ steppers to maintain contextual information.")
   "This function causes execution to be suspended for N seconds. N may
   be any non-negative, non-complex number."
   (when (or (not (realp n))
-	    (minusp n))
+            (minusp n))
     (error 'simple-type-error
            :format-control "invalid argument to SLEEP: ~S"
            :format-arguments (list n)
@@ -149,10 +149,10 @@ steppers to maintain contextual information.")
            :expected-type '(real 0)))
   (multiple-value-bind (sec nsec)
       (if (integerp n)
-	  (values n 0)
-	  (multiple-value-bind (sec frac)
-	      (truncate n)
-	    (values sec (truncate frac 1e-9))))
+          (values n 0)
+          (multiple-value-bind (sec frac)
+              (truncate n)
+            (values sec (truncate frac 1e-9))))
     (sb!unix:nanosleep sec nsec))
   nil)
 
@@ -178,79 +178,79 @@ steppers to maintain contextual information.")
 
 (defun scrub-control-stack ()
   (declare (optimize (speed 3) (safety 0))
-	   (values (unsigned-byte 20))) ; FIXME: DECLARE VALUES?
+           (values (unsigned-byte 20))) ; FIXME: DECLARE VALUES?
 
   #!-stack-grows-downward-not-upward
   (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
-	 (initial-offset (logand csp (1- bytes-per-scrub-unit)))
-	 (end-of-stack
-	  (- (sb!vm:fixnumize sb!vm:*control-stack-end*)
-	     sb!c:*backend-page-size*)))
+         (initial-offset (logand csp (1- bytes-per-scrub-unit)))
+         (end-of-stack
+          (- (sb!vm:fixnumize sb!vm:*control-stack-end*)
+             sb!c:*backend-page-size*)))
     (labels
-	((scrub (ptr offset count)
-	   (declare (type system-area-pointer ptr)
-		    (type (unsigned-byte 16) offset)
-		    (type (unsigned-byte 20) count)
-		    (values (unsigned-byte 20)))
-	   (cond ((>= (sap-int ptr) end-of-stack) 0)
-		 ((= offset bytes-per-scrub-unit)
-		  (look (sap+ ptr bytes-per-scrub-unit) 0 count))
-		 (t
-		  (setf (sap-ref-word ptr offset) 0)
-		  (scrub ptr (+ offset sb!vm:n-word-bytes) count))))
-	 (look (ptr offset count)
-	   (declare (type system-area-pointer ptr)
-		    (type (unsigned-byte 16) offset)
-		    (type (unsigned-byte 20) count)
-		    (values (unsigned-byte 20)))
-	   (cond ((>= (sap-int ptr) end-of-stack) 0)
-		 ((= offset bytes-per-scrub-unit)
-		  count)
-		 ((zerop (sap-ref-word ptr offset))
-		  (look ptr (+ offset sb!vm:n-word-bytes) count))
-		 (t
-		  (scrub ptr offset (+ count sb!vm:n-word-bytes))))))
+        ((scrub (ptr offset count)
+           (declare (type system-area-pointer ptr)
+                    (type (unsigned-byte 16) offset)
+                    (type (unsigned-byte 20) count)
+                    (values (unsigned-byte 20)))
+           (cond ((>= (sap-int ptr) end-of-stack) 0)
+                 ((= offset bytes-per-scrub-unit)
+                  (look (sap+ ptr bytes-per-scrub-unit) 0 count))
+                 (t
+                  (setf (sap-ref-word ptr offset) 0)
+                  (scrub ptr (+ offset sb!vm:n-word-bytes) count))))
+         (look (ptr offset count)
+           (declare (type system-area-pointer ptr)
+                    (type (unsigned-byte 16) offset)
+                    (type (unsigned-byte 20) count)
+                    (values (unsigned-byte 20)))
+           (cond ((>= (sap-int ptr) end-of-stack) 0)
+                 ((= offset bytes-per-scrub-unit)
+                  count)
+                 ((zerop (sap-ref-word ptr offset))
+                  (look ptr (+ offset sb!vm:n-word-bytes) count))
+                 (t
+                  (scrub ptr offset (+ count sb!vm:n-word-bytes))))))
       (declare (type sb!vm::word csp))
       (scrub (int-sap (- csp initial-offset))
-	     (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
-	     0)))
+             (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
+             0)))
 
   #!+stack-grows-downward-not-upward
   (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
-	 (end-of-stack (+ (sb!vm:fixnumize sb!vm:*control-stack-start*)
-			  sb!c:*backend-page-size*))
-	 (initial-offset (logand csp (1- bytes-per-scrub-unit))))
+         (end-of-stack (+ (sb!vm:fixnumize sb!vm:*control-stack-start*)
+                          sb!c:*backend-page-size*))
+         (initial-offset (logand csp (1- bytes-per-scrub-unit))))
     (labels
-	((scrub (ptr offset count)
-	   (declare (type system-area-pointer ptr)
-		    (type (unsigned-byte 16) offset)
-		    (type (unsigned-byte 20) count)
-		    (values (unsigned-byte 20)))
-	   (let ((loc (int-sap (- (sap-int ptr) (+ offset sb!vm:n-word-bytes)))))
-	     (cond ((< (sap-int loc) end-of-stack) 0)
-		   ((= offset bytes-per-scrub-unit)
-		    (look (int-sap (- (sap-int ptr) bytes-per-scrub-unit))
-			  0 count))
-		   (t ;; need to fix bug in %SET-STACK-REF
-		    (setf (sap-ref-word loc 0) 0)
-		    (scrub ptr (+ offset sb!vm:n-word-bytes) count)))))
-	 (look (ptr offset count)
-	   (declare (type system-area-pointer ptr)
-		    (type (unsigned-byte 16) offset)
-		    (type (unsigned-byte 20) count)
-		    (values (unsigned-byte 20)))
-	   (let ((loc (int-sap (- (sap-int ptr) offset))))
-	     (cond ((< (sap-int loc) end-of-stack) 0)
-		   ((= offset bytes-per-scrub-unit)
-		    count)
-		   ((zerop (sb!kernel::get-lisp-obj-address (stack-ref loc 0)))
-		    (look ptr (+ offset sb!vm:n-word-bytes) count))
-		   (t
-		    (scrub ptr offset (+ count sb!vm:n-word-bytes)))))))
+        ((scrub (ptr offset count)
+           (declare (type system-area-pointer ptr)
+                    (type (unsigned-byte 16) offset)
+                    (type (unsigned-byte 20) count)
+                    (values (unsigned-byte 20)))
+           (let ((loc (int-sap (- (sap-int ptr) (+ offset sb!vm:n-word-bytes)))))
+             (cond ((< (sap-int loc) end-of-stack) 0)
+                   ((= offset bytes-per-scrub-unit)
+                    (look (int-sap (- (sap-int ptr) bytes-per-scrub-unit))
+                          0 count))
+                   (t ;; need to fix bug in %SET-STACK-REF
+                    (setf (sap-ref-word loc 0) 0)
+                    (scrub ptr (+ offset sb!vm:n-word-bytes) count)))))
+         (look (ptr offset count)
+           (declare (type system-area-pointer ptr)
+                    (type (unsigned-byte 16) offset)
+                    (type (unsigned-byte 20) count)
+                    (values (unsigned-byte 20)))
+           (let ((loc (int-sap (- (sap-int ptr) offset))))
+             (cond ((< (sap-int loc) end-of-stack) 0)
+                   ((= offset bytes-per-scrub-unit)
+                    count)
+                   ((zerop (sb!kernel::get-lisp-obj-address (stack-ref loc 0)))
+                    (look ptr (+ offset sb!vm:n-word-bytes) count))
+                   (t
+                    (scrub ptr offset (+ count sb!vm:n-word-bytes)))))))
       (declare (type sb!vm::word csp))
       (scrub (int-sap (+ csp initial-offset))
-	     (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
-	     0))))
+             (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
+             0))))
 
 ;;;; the default toplevel function
 
@@ -273,172 +273,172 @@ steppers to maintain contextual information.")
   (setf - form)
   (let ((results (multiple-value-list (eval form))))
     (setf /// //
-	  // /
-	  / results
-	  *** **
-	  ** *
-	  * (car results)))
+          // /
+          / results
+          *** **
+          ** *
+          * (car results)))
   (setf +++ ++
-	++ +
-	+ -)
+        ++ +
+        + -)
   (unless (boundp '*)
     ;; The bogon returned an unbound marker.
     ;; FIXME: It would be safer to check every one of the values in RESULTS,
     ;; instead of just the first one.
     (setf * nil)
     (cerror "Go on with * set to NIL."
-	    "EVAL returned an unbound marker."))
+            "EVAL returned an unbound marker."))
   (values-list /))
 
 ;;; Flush anything waiting on one of the ANSI Common Lisp standard
 ;;; output streams before proceeding.
 (defun flush-standard-output-streams ()
   (dolist (name '(*debug-io*
-		  *error-output*
-		  *query-io*
-		  *standard-output*
-		  *trace-output*))
+                  *error-output*
+                  *query-io*
+                  *standard-output*
+                  *trace-output*))
     (finish-output (symbol-value name)))
   (values))
 
 (defun process-init-file (truename)
   (when truename
-    (restart-case 
-	(with-open-file (s truename :if-does-not-exist nil)
-	  (flet ((next ()
-		   (let ((form (read s nil s)))
-		     (if (eq s form)
-			 (return-from process-init-file nil)
-			 (eval form)))))
-	    (loop
-	       (restart-case
-		   (handler-bind ((error (lambda (e)
-					   (error
-					    "Error during processing of ~
+    (restart-case
+        (with-open-file (s truename :if-does-not-exist nil)
+          (flet ((next ()
+                   (let ((form (read s nil s)))
+                     (if (eq s form)
+                         (return-from process-init-file nil)
+                         (eval form)))))
+            (loop
+               (restart-case
+                   (handler-bind ((error (lambda (e)
+                                           (error
+                                            "Error during processing of ~
                                             initialization file ~A:~%~%  ~A"
-					    truename e))))
-		     (next))
-		 (continue ()
-		   :report "Ignore and continue processing.")))))
+                                            truename e))))
+                     (next))
+                 (continue ()
+                   :report "Ignore and continue processing.")))))
       (abort ()
-	:report "Skip rest of initialization file."))))
+        :report "Skip rest of initialization file."))))
 
-(defun process-eval-options (eval-strings)  
+(defun process-eval-options (eval-strings)
   (/show0 "handling --eval options")
   (flet ((process-1 (string)
-	   (multiple-value-bind (expr pos) (read-from-string string)
-	     (unless (eq string (read-from-string string nil string :start pos))
-	       (error "More the one expression in ~S" string))
-	     (eval expr)
-	     (flush-standard-output-streams))))
+           (multiple-value-bind (expr pos) (read-from-string string)
+             (unless (eq string (read-from-string string nil string :start pos))
+               (error "More the one expression in ~S" string))
+             (eval expr)
+             (flush-standard-output-streams))))
     (restart-case
-	(dolist (expr-as-string eval-strings)
-	  (/show0 "handling one --eval option")
-	  (restart-case
-	      (handler-bind ((error (lambda (e)
-				      (error "Error during processing of --eval ~
+        (dolist (expr-as-string eval-strings)
+          (/show0 "handling one --eval option")
+          (restart-case
+              (handler-bind ((error (lambda (e)
+                                      (error "Error during processing of --eval ~
                                               option ~S:~%~%  ~A"
-					     expr-as-string e))))
-		(process-1 expr-as-string))
-	    (continue ()
-	      :report "Ignore and continue with next --eval option.")))
+                                             expr-as-string e))))
+                (process-1 expr-as-string))
+            (continue ()
+              :report "Ignore and continue with next --eval option.")))
       (abort ()
-	:report "Skip rest of --eval options."))))
+        :report "Skip rest of --eval options."))))
 
 ;;; the default system top level function
 (defun toplevel-init ()
-  (/show0 "entering TOPLEVEL-INIT")  
+  (/show0 "entering TOPLEVEL-INIT")
   (let (;; value of --sysinit option
-	(sysinit nil)
-	;; value of --userinit option
-	(userinit nil)
-	;; values of --eval options, in reverse order; and also any
-	;; other options (like --load) which're translated into --eval
-	;;
-	;; The values are stored as strings, so that they can be
-	;; passed to READ only after their predecessors have been
-	;; EVALed, so that things work when e.g. REQUIRE in one EVAL
-	;; form creates a package referred to in the next EVAL form.
-	(reversed-evals nil) 
-	;; Has a --noprint option been seen?
-	(noprint nil)        
-	;; everything in *POSIX-ARGV* except for argv[0]=programname
-	(options (rest *posix-argv*))) 
+        (sysinit nil)
+        ;; value of --userinit option
+        (userinit nil)
+        ;; values of --eval options, in reverse order; and also any
+        ;; other options (like --load) which're translated into --eval
+        ;;
+        ;; The values are stored as strings, so that they can be
+        ;; passed to READ only after their predecessors have been
+        ;; EVALed, so that things work when e.g. REQUIRE in one EVAL
+        ;; form creates a package referred to in the next EVAL form.
+        (reversed-evals nil)
+        ;; Has a --noprint option been seen?
+        (noprint nil)
+        ;; everything in *POSIX-ARGV* except for argv[0]=programname
+        (options (rest *posix-argv*)))
 
     (declare (type list options))
 
     (/show0 "done with outer LET in TOPLEVEL-INIT")
-  
+
     ;; FIXME: There are lots of ways for errors to happen around here
     ;; (e.g. bad command line syntax, or READ-ERROR while trying to
     ;; READ an --eval string). Make sure that they're handled
     ;; reasonably.
-    
+
     ;; Process command line options.
     (flet (;; Errors while processing the command line cause the system
-	   ;; to QUIT, instead of trying to go into the Lisp debugger,
-	   ;; because trying to go into the Lisp debugger would get
-	   ;; into various annoying issues of where we should go after
-	   ;; the user tries to return from the debugger.
-	   (startup-error (control-string &rest args)
+           ;; to QUIT, instead of trying to go into the Lisp debugger,
+           ;; because trying to go into the Lisp debugger would get
+           ;; into various annoying issues of where we should go after
+           ;; the user tries to return from the debugger.
+           (startup-error (control-string &rest args)
              (format
-	      *error-output*
-	      "fatal error before reaching READ-EVAL-PRINT loop: ~%  ~?~%"
-	      control-string
-	      args)
+              *error-output*
+              "fatal error before reaching READ-EVAL-PRINT loop: ~%  ~?~%"
+              control-string
+              args)
              (quit :unix-status 1)))
       (loop while options do
-	    (/show0 "at head of LOOP WHILE OPTIONS DO in TOPLEVEL-INIT")
-	    (let ((option (first options)))
-	      (flet ((pop-option ()
-		       (if options
-			   (pop options)
-			   (startup-error
-			    "unexpected end of command line options"))))
-		(cond ((string= option "--sysinit")
-		       (pop-option)
-		       (if sysinit
-			   (startup-error "multiple --sysinit options")
-			   (setf sysinit (pop-option))))
-		      ((string= option "--userinit")
-		       (pop-option)
-		       (if userinit
-			   (startup-error "multiple --userinit options")
-			   (setf userinit (pop-option))))
-		      ((string= option "--eval")
-		       (pop-option)
-		       (push (pop-option) reversed-evals))
-		      ((string= option "--load")
-		       (pop-option)
-		       (push
-			;; FIXME: see BUG 296
-			(concatenate 'string "(|LOAD| \"" (pop-option) "\")")
-			reversed-evals))
-		      ((string= option "--noprint")
-		       (pop-option)
-		       (setf noprint t))
-		      ((string= option "--disable-debugger")
-		       (pop-option)
-		       (push "(|DISABLE-DEBUGGER|)" reversed-evals))
-		      ((string= option "--end-toplevel-options")
-		       (pop-option)
-		       (return))
-		      (t
-		       ;; Anything we don't recognize as a toplevel
-		       ;; option must be the start of user-level
-		       ;; options.. except that if we encounter
-		       ;; "--end-toplevel-options" after we gave up
-		       ;; because we didn't recognize an option as a
-		       ;; toplevel option, then the option we gave up on
-		       ;; must have been an error. (E.g. in
-		       ;;  "sbcl --eval '(a)' --eval'(b)' --end-toplevel-options"
-		       ;; this test will let us detect that the string
-		       ;; "--eval(b)" is an error.)
-		       (if (find "--end-toplevel-options" options
-				 :test #'string=)
-			   (startup-error "bad toplevel option: ~S"
-					  (first options))
-			   (return)))))))
+            (/show0 "at head of LOOP WHILE OPTIONS DO in TOPLEVEL-INIT")
+            (let ((option (first options)))
+              (flet ((pop-option ()
+                       (if options
+                           (pop options)
+                           (startup-error
+                            "unexpected end of command line options"))))
+                (cond ((string= option "--sysinit")
+                       (pop-option)
+                       (if sysinit
+                           (startup-error "multiple --sysinit options")
+                           (setf sysinit (pop-option))))
+                      ((string= option "--userinit")
+                       (pop-option)
+                       (if userinit
+                           (startup-error "multiple --userinit options")
+                           (setf userinit (pop-option))))
+                      ((string= option "--eval")
+                       (pop-option)
+                       (push (pop-option) reversed-evals))
+                      ((string= option "--load")
+                       (pop-option)
+                       (push
+                        ;; FIXME: see BUG 296
+                        (concatenate 'string "(|LOAD| \"" (pop-option) "\")")
+                        reversed-evals))
+                      ((string= option "--noprint")
+                       (pop-option)
+                       (setf noprint t))
+                      ((string= option "--disable-debugger")
+                       (pop-option)
+                       (push "(|DISABLE-DEBUGGER|)" reversed-evals))
+                      ((string= option "--end-toplevel-options")
+                       (pop-option)
+                       (return))
+                      (t
+                       ;; Anything we don't recognize as a toplevel
+                       ;; option must be the start of user-level
+                       ;; options.. except that if we encounter
+                       ;; "--end-toplevel-options" after we gave up
+                       ;; because we didn't recognize an option as a
+                       ;; toplevel option, then the option we gave up on
+                       ;; must have been an error. (E.g. in
+                       ;;  "sbcl --eval '(a)' --eval'(b)' --end-toplevel-options"
+                       ;; this test will let us detect that the string
+                       ;; "--eval(b)" is an error.)
+                       (if (find "--end-toplevel-options" options
+                                 :test #'string=)
+                           (startup-error "bad toplevel option: ~S"
+                                          (first options))
+                           (return)))))))
       (/show0 "done with LOOP WHILE OPTIONS DO in TOPLEVEL-INIT")
 
       ;; Delete all the options that we processed, so that only
@@ -448,60 +448,60 @@ steppers to maintain contextual information.")
       ;; Handle initialization files.
       (/show0 "handling initialization files in TOPLEVEL-INIT")
       (flet (;; shared idiom for searching for SYSINITish and
-	     ;; USERINITish files
+             ;; USERINITish files
              (probe-init-files (explicitly-specified-init-file-name
-				&rest default-init-file-names)
+                                &rest default-init-file-names)
                (declare (type list default-init-file-names))
-	       (if explicitly-specified-init-file-name
-		   (or (probe-file explicitly-specified-init-file-name)
+               (if explicitly-specified-init-file-name
+                   (or (probe-file explicitly-specified-init-file-name)
                         (startup-error "The file ~S was not found."
-				       explicitly-specified-init-file-name))
+                                       explicitly-specified-init-file-name))
                    (find-if (lambda (x)
                               (and (stringp x) (probe-file x)))
                             default-init-file-names)))
-	     ;; shared idiom for creating default names for
-	     ;; SYSINITish and USERINITish files
-	     (init-file-name (maybe-dir-name basename)
-	       (and maybe-dir-name
-		    (concatenate 'string maybe-dir-name "/" basename))))
+             ;; shared idiom for creating default names for
+             ;; SYSINITish and USERINITish files
+             (init-file-name (maybe-dir-name basename)
+               (and maybe-dir-name
+                    (concatenate 'string maybe-dir-name "/" basename))))
         (let ((sysinit-truename
-	       (probe-init-files sysinit
-				 (init-file-name (posix-getenv "SBCL_HOME")
-						 "sbclrc")
-				 "/etc/sbclrc"))
+               (probe-init-files sysinit
+                                 (init-file-name (posix-getenv "SBCL_HOME")
+                                                 "sbclrc")
+                                 "/etc/sbclrc"))
                (userinit-truename
-		(probe-init-files userinit
-				  (init-file-name (posix-getenv "HOME")
-						  ".sbclrc"))))
+                (probe-init-files userinit
+                                  (init-file-name (posix-getenv "HOME")
+                                                  ".sbclrc"))))
 
-	  ;; This CATCH is needed for the debugger command TOPLEVEL to
-	  ;; work.
-	  (catch 'toplevel-catcher
-	    ;; We wrap all the pre-REPL user/system customized startup
-	    ;; code in a restart.
-	    ;;
-	    ;; (Why not wrap everything, even the stuff above, in this
-	    ;; restart? Errors above here are basically command line
-	    ;; or Unix environment errors, e.g. a missing file or a
-	    ;; typo on the Unix command line, and you don't need to
-	    ;; get into Lisp to debug them, you should just start over
-	    ;; and do it right at the Unix level. Errors below here
-	    ;; are generally errors in user Lisp code, and it might be
-	    ;; helpful to let the user reach the REPL in order to help
-	    ;; figure out what's going on.)
-	    (restart-case
-		(progn
-		  (process-init-file sysinit-truename)
-		  (process-init-file userinit-truename)
-		  (process-eval-options (reverse reversed-evals)))
-	      (abort ()
-		:report "Skip to toplevel READ/EVAL/PRINT loop."
-		(/show0 "CONTINUEing from pre-REPL RESTART-CASE")
-		(values))                 ; (no-op, just fall through)
-	      (quit ()
-		:report "Quit SBCL (calling #'QUIT, killing the process)."
-		(/show0 "falling through to QUIT from pre-REPL RESTART-CASE")
-		(quit)))))
+          ;; This CATCH is needed for the debugger command TOPLEVEL to
+          ;; work.
+          (catch 'toplevel-catcher
+            ;; We wrap all the pre-REPL user/system customized startup
+            ;; code in a restart.
+            ;;
+            ;; (Why not wrap everything, even the stuff above, in this
+            ;; restart? Errors above here are basically command line
+            ;; or Unix environment errors, e.g. a missing file or a
+            ;; typo on the Unix command line, and you don't need to
+            ;; get into Lisp to debug them, you should just start over
+            ;; and do it right at the Unix level. Errors below here
+            ;; are generally errors in user Lisp code, and it might be
+            ;; helpful to let the user reach the REPL in order to help
+            ;; figure out what's going on.)
+            (restart-case
+                (progn
+                  (process-init-file sysinit-truename)
+                  (process-init-file userinit-truename)
+                  (process-eval-options (reverse reversed-evals)))
+              (abort ()
+                :report "Skip to toplevel READ/EVAL/PRINT loop."
+                (/show0 "CONTINUEing from pre-REPL RESTART-CASE")
+                (values))                 ; (no-op, just fall through)
+              (quit ()
+                :report "Quit SBCL (calling #'QUIT, killing the process)."
+                (/show0 "falling through to QUIT from pre-REPL RESTART-CASE")
+                (quit)))))
 
         ;; one more time for good measure, in case we fell out of the
         ;; RESTART-CASE above before one of the flushes in the ordinary
@@ -534,32 +534,32 @@ steppers to maintain contextual information.")
 (defun toplevel-repl (noprint)
   (/show0 "entering TOPLEVEL-REPL")
   (let ((* nil) (** nil) (*** nil)
-	(- nil)
-	(+ nil) (++ nil) (+++ nil)
-	(/// nil) (// nil) (/ nil))
+        (- nil)
+        (+ nil) (++ nil) (+++ nil)
+        (/// nil) (// nil) (/ nil))
     (/show0 "about to funcall *REPL-FUN-GENERATOR*")
     (let ((repl-fun (funcall *repl-fun-generator*)))
       ;; Each REPL in a multithreaded world should have bindings of
       ;; most CL specials (most critically *PACKAGE*).
       (with-rebound-io-syntax
-	  (handler-bind ((step-condition 'invoke-stepper))
-	    (let ((*stepping* nil)
-		  (*step* nil))
-	      (loop
-	       (/show0 "about to set up restarts in TOPLEVEL-REPL")
-		 ;; CLHS recommends that there should always be an
-		 ;; ABORT restart; we have this one here, and one per
-		 ;; debugger level.
-		 (with-simple-restart
-		     (abort "~@<Exit debugger, returning to top level.~@:>")
-		   (catch 'toplevel-catcher
-		     (sb!unix::reset-signal-mask)
-		     ;; In the event of a control-stack-exhausted-error, we
-		     ;; should have unwound enough stack by the time we get
-		     ;; here that this is now possible.
-		     (sb!kernel::protect-control-stack-guard-page 1)
-		     (funcall repl-fun noprint)
-		     (critically-unreachable "after REPL"))))))))))
+          (handler-bind ((step-condition 'invoke-stepper))
+            (let ((*stepping* nil)
+                  (*step* nil))
+              (loop
+               (/show0 "about to set up restarts in TOPLEVEL-REPL")
+                 ;; CLHS recommends that there should always be an
+                 ;; ABORT restart; we have this one here, and one per
+                 ;; debugger level.
+                 (with-simple-restart
+                     (abort "~@<Exit debugger, returning to top level.~@:>")
+                   (catch 'toplevel-catcher
+                     (sb!unix::reset-signal-mask)
+                     ;; In the event of a control-stack-exhausted-error, we
+                     ;; should have unwound enough stack by the time we get
+                     ;; here that this is now possible.
+                     (sb!kernel::protect-control-stack-guard-page 1)
+                     (funcall repl-fun noprint)
+                     (critically-unreachable "after REPL"))))))))))
 
 ;;; Our default REPL prompt is the minimal traditional one.
 (defun repl-prompt-fun (stream)
@@ -571,39 +571,39 @@ steppers to maintain contextual information.")
 (defun repl-read-form-fun (in out)
   (declare (type stream in out) (ignore out))
   (let* ((eof-marker (cons nil nil))
-	 (form (read in nil eof-marker)))
+         (form (read in nil eof-marker)))
     (if (eq form eof-marker)
-	(quit)
-	form)))
+        (quit)
+        form)))
 
 (defun repl-fun (noprint)
   (/show0 "entering REPL")
   (loop
    (unwind-protect
-	(progn
-	  ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
-	  (scrub-control-stack)
-	  (sb!thread::get-foreground)
-	  (unless noprint
-	    (funcall *repl-prompt-fun* *standard-output*)
-	    ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own
-	    ;; FORCE-OUTPUT? I can't imagine a valid reason for it not to
-	    ;; be done here, so leaving it up to *REPL-PROMPT-FUN* seems
-	    ;; odd. But maybe there *is* a valid reason in some
-	    ;; circumstances? perhaps some deadlock issue when being driven
-	    ;; by another process or something...)
-	    (force-output *standard-output*))
-	  (let* ((form (funcall *repl-read-form-fun*
-				*standard-input*
-				*standard-output*))
-		 (results (multiple-value-list (interactive-eval form))))
-	    (unless noprint
-	      (dolist (result results)
-		(fresh-line)
-		(prin1 result)))))
+        (progn
+          ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
+          (scrub-control-stack)
+          (sb!thread::get-foreground)
+          (unless noprint
+            (funcall *repl-prompt-fun* *standard-output*)
+            ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own
+            ;; FORCE-OUTPUT? I can't imagine a valid reason for it not to
+            ;; be done here, so leaving it up to *REPL-PROMPT-FUN* seems
+            ;; odd. But maybe there *is* a valid reason in some
+            ;; circumstances? perhaps some deadlock issue when being driven
+            ;; by another process or something...)
+            (force-output *standard-output*))
+          (let* ((form (funcall *repl-read-form-fun*
+                                *standard-input*
+                                *standard-output*))
+                 (results (multiple-value-list (interactive-eval form))))
+            (unless noprint
+              (dolist (result results)
+                (fresh-line)
+                (prin1 result)))))
      ;; If we started stepping in the debugger we want to stop now.
      (setf *stepping* nil
-	   *step* nil))))
+           *step* nil))))
 
 ;;; a convenient way to get into the assembly-level debugger
 (defun %halt ()

@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -14,9 +14,9 @@
 (cl:in-package :cl-user)
 
 (dolist (ifnis (list (cons single-float-positive-infinity
-			   single-float-negative-infinity)
-		     (cons double-float-positive-infinity
-			   double-float-negative-infinity)))
+                           single-float-negative-infinity)
+                     (cons double-float-positive-infinity
+                           double-float-negative-infinity)))
   (destructuring-bind (+ifni . -ifni) ifnis
     (assert (= (* +ifni 1) +ifni))
     (assert (= (* +ifni -0.1) -ifni))
@@ -47,7 +47,7 @@
 ;;; (Peter Van Eynde's ansi-test suite caught this, and Eric Marsden
 ;;; reported a fix for CMU CL, which was ported to sbcl-0.6.12.35.)
 (assert (typep (nth-value 1 (ignore-errors (float-radix "notfloat")))
-	       'type-error))
+               'type-error))
 
 (assert (typep (nth-value 1 (ignore-errors
                               (funcall (fdefinition 'float-radix) "notfloat")))
@@ -82,21 +82,21 @@
 ;;; bug found by Peter Seibel: scale-float was only accepting float
 ;;; exponents, when it should accept all integers.  (also bug #269)
 (assert (= (multiple-value-bind (significand expt sign)
-	       (integer-decode-float least-positive-double-float)
-	     (* (scale-float (float significand 0.0d0) expt) sign))
-	   least-positive-double-float))
+               (integer-decode-float least-positive-double-float)
+             (* (scale-float (float significand 0.0d0) expt) sign))
+           least-positive-double-float))
 (assert (= (multiple-value-bind (significand expt sign)
-	       (decode-float least-positive-double-float)
-	     (* (scale-float significand expt) sign))
-	   least-positive-double-float))
+               (decode-float least-positive-double-float)
+             (* (scale-float significand expt) sign))
+           least-positive-double-float))
 (assert (= 0.0 (scale-float 1.0 most-negative-fixnum)))
 (assert (= 0.0d0 (scale-float 1.0d0 (1- most-negative-fixnum))))
 #-(or darwin) ;; bug 372
 (progn
   (assert (raises-error? (scale-float 1.0 most-positive-fixnum)
-			 floating-point-overflow))
+                         floating-point-overflow))
   (assert (raises-error? (scale-float 1.0d0 (1+ most-positive-fixnum))
-			 floating-point-overflow)))
+                         floating-point-overflow)))
 
 ;;; bug found by jsnell when nfroyd tried to implement better LOGAND
 ;;; type derivation.

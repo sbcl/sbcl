@@ -26,15 +26,15 @@
   (etypecase feature
     (symbol (member feature list :test #'eq))
     (cons (flet ((subfeature-in-list-p (subfeature)
-		   (feature-in-list-p subfeature list)))
-	    (ecase (first feature)
-	      (:or  (some  #'subfeature-in-list-p (rest feature)))
-	      (:and (every #'subfeature-in-list-p (rest feature)))
-	      (:not (let ((rest (cdr feature)))
-		      (if (or (null (car rest)) (cdr rest))
-			(error "wrong number of terms in compound feature ~S"
-			       feature)
-			(not (subfeature-in-list-p (second feature)))))))))))
+                   (feature-in-list-p subfeature list)))
+            (ecase (first feature)
+              (:or  (some  #'subfeature-in-list-p (rest feature)))
+              (:and (every #'subfeature-in-list-p (rest feature)))
+              (:not (let ((rest (cdr feature)))
+                      (if (or (null (car rest)) (cdr rest))
+                        (error "wrong number of terms in compound feature ~S"
+                               feature)
+                        (not (subfeature-in-list-p (second feature)))))))))))
 (compile 'feature-in-list-p)
 
 (defun shebang-reader (stream sub-character infix-parameter)
@@ -48,15 +48,15 @@
     ;; FIXME: clearer if order of NOT-P and (NOT NOT-P) were reversed? then
     ;; would become "unless test is satisfied"..
     (when (let* ((*package* (find-package "KEYWORD"))
-		 (*read-suppress* nil)
-		 (not-p (char= next-char #\-))
-		 (feature (read stream)))
-	    (if (feature-in-list-p feature *shebang-features*)
-		not-p
-		(not not-p)))
+                 (*read-suppress* nil)
+                 (not-p (char= next-char #\-))
+                 (feature (read stream)))
+            (if (feature-in-list-p feature *shebang-features*)
+                not-p
+                (not not-p)))
       ;; Read (and discard) a form from input.
       (let ((*read-suppress* t))
-	(read stream t nil t))))
+        (read stream t nil t))))
   (values))
 (compile 'shebang-reader)
 
@@ -99,42 +99,42 @@
 ;;; it until run-time.
 (defun shebang-double-quote (stream)
   (labels ((rc () (read-char stream))
-	   (white-p (char)
-	     ;; Putting non-standard characters in the compiler source is
-	     ;; generally a bad idea, since we'd like to be really portable.
-	     ;; It's specifically a bad idea in strings intended to be
-	     ;; processed by SHEBANG-DOUBLE-QUOTE, because there seems to be no
-	     ;; portable way to test a non-STANDARD-CHAR for whitespaceness.
-	     ;; (The most common problem would be to put a #\TAB -- which is
-	     ;; not a STANDARD-CHAR -- into the string. If this is part of the
-	     ;; to-be-skipped-over whitespace after a #\~ #\NEWLINE sequence in
-	     ;; the string, it won't work, because it won't be recognized as
-	     ;; whitespace.)
-	     (unless (typep char 'standard-char)
-	       (warn "non-STANDARD-CHAR in #!\": ~C" result))
-	     (or (char= char #\newline)
-		 (char= char #\space)))
-	   (skip-white ()
-	     (do ((char (rc) (rc))
-		  (count 0 (1+ count)))
-		 ((not (white-p char))
-		  (unread-char char stream)
-		  count))))
+           (white-p (char)
+             ;; Putting non-standard characters in the compiler source is
+             ;; generally a bad idea, since we'd like to be really portable.
+             ;; It's specifically a bad idea in strings intended to be
+             ;; processed by SHEBANG-DOUBLE-QUOTE, because there seems to be no
+             ;; portable way to test a non-STANDARD-CHAR for whitespaceness.
+             ;; (The most common problem would be to put a #\TAB -- which is
+             ;; not a STANDARD-CHAR -- into the string. If this is part of the
+             ;; to-be-skipped-over whitespace after a #\~ #\NEWLINE sequence in
+             ;; the string, it won't work, because it won't be recognized as
+             ;; whitespace.)
+             (unless (typep char 'standard-char)
+               (warn "non-STANDARD-CHAR in #!\": ~C" result))
+             (or (char= char #\newline)
+                 (char= char #\space)))
+           (skip-white ()
+             (do ((char (rc) (rc))
+                  (count 0 (1+ count)))
+                 ((not (white-p char))
+                  (unread-char char stream)
+                  count))))
     (do ((adj-string (make-array 0 :element-type 'char :adjustable t))
-	 (char (rc) (rc)))
-	((char= char #\") (coerce adj-string 'simple-string))
+         (char (rc) (rc)))
+        ((char= char #\") (coerce adj-string 'simple-string))
       (cond ((char= char #\~)
-	     (let ((next-char (read-char stream)))
-	       (cond ((char= next-char #\newline)
-		      (incf *shebang-double-quote--approx-bytes-saved*
-			    (+ 2 (skip-white))))
-		     (t
-		      (vector-push-extend      char adj-string)
-		      (vector-push-extend next-char adj-string)))))
-	    ((char= char #\\)
-	     (vector-push-extend char adj-string)
-	     (vector-push-extend (rc) adj-string))
-	    (t (vector-push-extend char adj-string))))))
+             (let ((next-char (read-char stream)))
+               (cond ((char= next-char #\newline)
+                      (incf *shebang-double-quote--approx-bytes-saved*
+                            (+ 2 (skip-white))))
+                     (t
+                      (vector-push-extend      char adj-string)
+                      (vector-push-extend next-char adj-string)))))
+            ((char= char #\\)
+             (vector-push-extend char adj-string)
+             (vector-push-extend (rc) adj-string))
+            (t (vector-push-extend char adj-string))))))
 
 (setf (gethash #\" *shebang-dispatch*)
       #'shebang-double-quote)

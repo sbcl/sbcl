@@ -43,9 +43,9 @@
   "Make SYMBOL unbound, removing any value it may currently have."
   (with-single-package-locked-error (:symbol symbol "unbinding the symbol ~A")
     (set symbol
-	 (%primitive sb!c:make-other-immediate-type
-		     0
-		     sb!vm:unbound-marker-widetag))
+         (%primitive sb!c:make-other-immediate-type
+                     0
+                     sb!vm:unbound-marker-widetag))
     symbol))
 
 ;;; Return the built-in hash value for SYMBOL.
@@ -59,7 +59,7 @@
 
 (defun (setf symbol-function) (new-value symbol)
   (declare (type symbol symbol) (type function new-value))
-  (with-single-package-locked-error 
+  (with-single-package-locked-error
       (:symbol symbol "setting the symbol-function of ~A")
     (setf (%coerce-name-to-fun symbol) new-value)))
 
@@ -97,10 +97,10 @@
   (do ((pl (symbol-plist symbol) (cddr pl)))
       ((atom pl) default)
     (cond ((atom (cdr pl))
-	   (error "~S has an odd number of items in its property list."
-		   symbol))
-	  ((eq (car pl) indicator)
-	   (return (cadr pl))))))
+           (error "~S has an odd number of items in its property list."
+                   symbol))
+          ((eq (car pl) indicator)
+           (return (cadr pl))))))
 
 (defun %put (symbol indicator value)
   #!+sb-doc
@@ -109,14 +109,14 @@
   (do ((pl (symbol-plist symbol) (cddr pl)))
       ((endp pl)
        (setf (symbol-plist symbol)
-	     (list* indicator value (symbol-plist symbol)))
+             (list* indicator value (symbol-plist symbol)))
        value)
     (cond ((endp (cdr pl))
-	   (error "~S has an odd number of items in its property list."
-		  symbol))
-	  ((eq (car pl) indicator)
-	   (rplaca (cdr pl) value)
-	   (return value)))))
+           (error "~S has an odd number of items in its property list."
+                  symbol))
+          ((eq (car pl) indicator)
+           (rplaca (cdr pl) value)
+           (return value)))))
 
 (defun remprop (symbol indicator)
   #!+sb-doc
@@ -131,13 +131,13 @@
        (prev nil pl))
       ((atom pl) nil)
     (cond ((atom (cdr pl))
-	   (error "~S has an odd number of items in its property list."
-		  symbol))
-	  ((eq (car pl) indicator)
-	   (cond (prev (rplacd (cdr prev) (cddr pl)))
-		 (t
-		  (setf (symbol-plist symbol) (cddr pl))))
-	   (return pl)))))
+           (error "~S has an odd number of items in its property list."
+                  symbol))
+          ((eq (car pl) indicator)
+           (cond (prev (rplacd (cdr prev) (cddr pl)))
+                 (t
+                  (setf (symbol-plist symbol) (cddr pl))))
+           (return pl)))))
 
 (defun getf (place indicator &optional (default ()))
   #!+sb-doc
@@ -146,13 +146,13 @@
   (do ((plist place (cddr plist)))
       ((null plist) default)
     (cond ((atom (cdr plist))
-	   (error 'simple-type-error
-		  :format-control "malformed property list: ~S."
-		  :format-arguments (list place)
-		  :datum (cdr plist)
-		  :expected-type 'cons))
-	  ((eq (car plist) indicator)
-	   (return (cadr plist))))))
+           (error 'simple-type-error
+                  :format-control "malformed property list: ~S."
+                  :format-arguments (list place)
+                  :datum (cdr plist)
+                  :expected-type 'cons))
+          ((eq (car plist) indicator)
+           (return (cadr plist))))))
 
 (defun %putf (place property new-value)
   (declare (type list place))
@@ -171,13 +171,13 @@
   (do ((plist place (cddr plist)))
       ((null plist) (values nil nil nil))
     (cond ((atom (cdr plist))
-	   (error 'simple-type-error
-		  :format-control "malformed property list: ~S."
-		  :format-arguments (list place)
-		  :datum (cdr plist)
-		  :expected-type 'cons))
-	  ((memq (car plist) indicator-list)
-	   (return (values (car plist) (cadr plist) plist))))))
+           (error 'simple-type-error
+                  :format-control "malformed property list: ~S."
+                  :format-arguments (list place)
+                  :datum (cdr plist)
+                  :expected-type 'cons))
+          ((memq (car plist) indicator-list)
+           (return (values (car plist) (cadr plist) plist))))))
 
 (defun copy-symbol (symbol &optional (copy-props nil) &aux new-symbol)
   #!+sb-doc
@@ -189,9 +189,9 @@
   (setq new-symbol (make-symbol (symbol-name symbol)))
   (when copy-props
     (%set-symbol-value new-symbol
-		       (%primitive sb!c:fast-symbol-value symbol))
+                       (%primitive sb!c:fast-symbol-value symbol))
     (setf (symbol-plist new-symbol)
-	  (copy-list (symbol-plist symbol)))
+          (copy-list (symbol-plist symbol)))
     (when (fboundp symbol)
       (setf (symbol-function new-symbol) (symbol-function symbol))))
   new-symbol)
@@ -223,20 +223,20 @@
   (let ((old *gensym-counter*))
     (unless (numberp thing)
       (let ((new (etypecase old
-		   (index (1+ old))
-		   (unsigned-byte (1+ old)))))
-	(declare (optimize (speed 3) (safety 0)(inhibit-warnings 3)))
-	(setq *gensym-counter* new)))
+                   (index (1+ old))
+                   (unsigned-byte (1+ old)))))
+        (declare (optimize (speed 3) (safety 0)(inhibit-warnings 3)))
+        (setq *gensym-counter* new)))
     (multiple-value-bind (prefix int)
-	(etypecase thing
-	  (simple-string (values thing old))
-	  (fixnum (values "G" thing))
-	  (string (values (coerce thing 'simple-string) old)))
+        (etypecase thing
+          (simple-string (values thing old))
+          (fixnum (values "G" thing))
+          (string (values (coerce thing 'simple-string) old)))
       (declare (simple-string prefix))
       (make-symbol
        (concatenate 'simple-string prefix
-		    (the simple-string
-			 (quick-integer-to-string int)))))))
+                    (the simple-string
+                         (quick-integer-to-string int)))))))
 
 (defvar *gentemp-counter* 0)
 (declaim (type unsigned-byte *gentemp-counter*))
@@ -247,9 +247,9 @@
   (declare (type string prefix))
   (loop
     (let ((*print-base* 10)
-	  (*print-radix* nil)
-	  (*print-pretty* nil)
-	  (new-pname (format nil "~A~D" prefix (incf *gentemp-counter*))))
+          (*print-radix* nil)
+          (*print-pretty* nil)
+          (new-pname (format nil "~A~D" prefix (incf *gentemp-counter*))))
       (multiple-value-bind (symbol existsp) (find-symbol new-pname package)
-	(declare (ignore symbol))
-	(unless existsp (return (values (intern new-pname package))))))))
+        (declare (ignore symbol))
+        (unless existsp (return (values (intern new-pname package))))))))

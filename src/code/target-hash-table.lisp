@@ -34,7 +34,7 @@
 (defun eq-hash (key)
   (declare (values hash (member t nil)))
   (values (pointer-hash key)
-	  (oddp (get-lisp-obj-address key))))
+          (oddp (get-lisp-obj-address key))))
 
 #!-sb-fluid (declaim (inline equal-hash))
 (defun equal-hash (key)
@@ -72,10 +72,10 @@
   #!+sb-doc
   "Define a new kind of hash table test."
   (declare (type symbol name)
-	   (type function test-fun hash-fun))
+           (type function test-fun hash-fun))
   (setf *hash-table-tests*
-	(cons (list name test-fun hash-fun)
-	      (remove name *hash-table-tests* :test #'eq :key #'car)))
+        (cons (list name test-fun hash-fun)
+              (remove name *hash-table-tests* :test #'eq :key #'car)))
   name)
 
 ;;;; construction and simple accessors
@@ -88,10 +88,10 @@
 (defconstant +magic-hash-vector-value+ #x80000000)
 
 (defun make-hash-table (&key (test 'eql)
-			     (size +min-hash-table-size+)
-			     (rehash-size 1.5)
-			     (rehash-threshold 1)
-			     (weak-p nil))
+                             (size +min-hash-table-size+)
+                             (rehash-size 1.5)
+                             (rehash-threshold 1)
+                             (weak-p nil))
   #!+sb-doc
   "Create and return a new hash table. The keywords are as follows:
      :TEST -- Indicates what kind of test to use.
@@ -114,38 +114,38 @@
     (error "stub: unsupported WEAK-P option"))
   (multiple-value-bind (test test-fun hash-fun)
       (cond ((or (eq test #'eq) (eq test 'eq))
-	     (values 'eq #'eq #'eq-hash))
-	    ((or (eq test #'eql) (eq test 'eql))
-	     (values 'eql #'eql #'eql-hash))
-	    ((or (eq test #'equal) (eq test 'equal))
-	     (values 'equal #'equal #'equal-hash))
-	    ((or (eq test #'equalp) (eq test 'equalp))
-	     (values 'equalp #'equalp #'equalp-hash))
-	    (t
-	     ;; FIXME: I'd like to remove *HASH-TABLE-TESTS* stuff.
-	     ;; Failing that, I'd like to rename it to
-	     ;; *USER-HASH-TABLE-TESTS*.
-	     (dolist (info *hash-table-tests*
-			   (error "unknown :TEST for MAKE-HASH-TABLE: ~S"
-				  test))
-	       (destructuring-bind (test-name test-fun hash-fun) info
-		 (when (or (eq test test-name) (eq test test-fun))
-		   (return (values test-name test-fun hash-fun)))))))
+             (values 'eq #'eq #'eq-hash))
+            ((or (eq test #'eql) (eq test 'eql))
+             (values 'eql #'eql #'eql-hash))
+            ((or (eq test #'equal) (eq test 'equal))
+             (values 'equal #'equal #'equal-hash))
+            ((or (eq test #'equalp) (eq test 'equalp))
+             (values 'equalp #'equalp #'equalp-hash))
+            (t
+             ;; FIXME: I'd like to remove *HASH-TABLE-TESTS* stuff.
+             ;; Failing that, I'd like to rename it to
+             ;; *USER-HASH-TABLE-TESTS*.
+             (dolist (info *hash-table-tests*
+                           (error "unknown :TEST for MAKE-HASH-TABLE: ~S"
+                                  test))
+               (destructuring-bind (test-name test-fun hash-fun) info
+                 (when (or (eq test test-name) (eq test test-fun))
+                   (return (values test-name test-fun hash-fun)))))))
     (let* ((size (max +min-hash-table-size+
-		      (min size
-			   ;; SIZE is just a hint, so if the user asks
-			   ;; for a SIZE which'd be too big for us to
- 			   ;; easily implement, we bump it down.
-			   (floor array-dimension-limit 1024))))
-	   (rehash-size (if (integerp rehash-size)
-			    rehash-size
-			    (float rehash-size 1.0)))
-	   ;; FIXME: Original REHASH-THRESHOLD default should be 1.0,
-	   ;; not 1, to make it easier for the compiler to avoid
-	   ;; boxing.
-	   (rehash-threshold (max +min-hash-table-rehash-threshold+
-				  (float rehash-threshold 1.0)))
-	   (size+1 (1+ size))		; The first element is not usable.
+                      (min size
+                           ;; SIZE is just a hint, so if the user asks
+                           ;; for a SIZE which'd be too big for us to
+                           ;; easily implement, we bump it down.
+                           (floor array-dimension-limit 1024))))
+           (rehash-size (if (integerp rehash-size)
+                            rehash-size
+                            (float rehash-size 1.0)))
+           ;; FIXME: Original REHASH-THRESHOLD default should be 1.0,
+           ;; not 1, to make it easier for the compiler to avoid
+           ;; boxing.
+           (rehash-threshold (max +min-hash-table-rehash-threshold+
+                                  (float rehash-threshold 1.0)))
+           (size+1 (1+ size))           ; The first element is not usable.
            ;; KLUDGE: The most natural way of expressing the below is
            ;; (round (/ (float size+1) rehash-threshold)), and indeed
            ;; it was expressed like that until 0.7.0. However,
@@ -154,43 +154,43 @@
            ;; but only for truncating; therefore, we fudge this issue
            ;; a little. The other uses of truncate, below, similarly
            ;; used to be round. -- CSR, 2002-10-01
-	   ;;
-	   ;; Note that this has not yet been audited for
-	   ;; correctness. It just seems to work. -- CSR, 2002-11-02
-	   (scaled-size (truncate (/ (float size+1) rehash-threshold)))
-	   (length (almost-primify (max scaled-size
-					(1+ +min-hash-table-size+))))
-	   (index-vector (make-array length
-				     :element-type
-				     '(unsigned-byte #.sb!vm:n-word-bits)
-				     :initial-element 0))
-	   ;; needs to be the same length as the KV vector
+           ;;
+           ;; Note that this has not yet been audited for
+           ;; correctness. It just seems to work. -- CSR, 2002-11-02
+           (scaled-size (truncate (/ (float size+1) rehash-threshold)))
+           (length (almost-primify (max scaled-size
+                                        (1+ +min-hash-table-size+))))
+           (index-vector (make-array length
+                                     :element-type
+                                     '(unsigned-byte #.sb!vm:n-word-bits)
+                                     :initial-element 0))
+           ;; needs to be the same length as the KV vector
            ;; (FIXME: really?  why doesn't the code agree?)
-	   (next-vector (make-array size+1
-				    :element-type
-				    '(unsigned-byte #.sb!vm:n-word-bits)))
-	   (kv-vector (make-array (* 2 size+1)
-				  :initial-element +empty-ht-slot+))
-	   (table (%make-hash-table
-		   :test test
-		   :test-fun test-fun
-		   :hash-fun hash-fun
-		   :rehash-size rehash-size
-		   :rehash-threshold rehash-threshold
-		   :rehash-trigger size
-		   :table kv-vector
-		   :weak-p weak-p
-		   :index-vector index-vector
-		   :next-vector next-vector
-		   :hash-vector (unless (eq test 'eq)
-				  (make-array size+1
-					      :element-type '(unsigned-byte #.sb!vm:n-word-bits)
-					      :initial-element +magic-hash-vector-value+)))))
+           (next-vector (make-array size+1
+                                    :element-type
+                                    '(unsigned-byte #.sb!vm:n-word-bits)))
+           (kv-vector (make-array (* 2 size+1)
+                                  :initial-element +empty-ht-slot+))
+           (table (%make-hash-table
+                   :test test
+                   :test-fun test-fun
+                   :hash-fun hash-fun
+                   :rehash-size rehash-size
+                   :rehash-threshold rehash-threshold
+                   :rehash-trigger size
+                   :table kv-vector
+                   :weak-p weak-p
+                   :index-vector index-vector
+                   :next-vector next-vector
+                   :hash-vector (unless (eq test 'eq)
+                                  (make-array size+1
+                                              :element-type '(unsigned-byte #.sb!vm:n-word-bits)
+                                              :initial-element +magic-hash-vector-value+)))))
       (declare (type index size+1 scaled-size length))
       ;; Set up the free list, all free. These lists are 0 terminated.
       (do ((i 1 (1+ i)))
-	  ((>= i size))
-	(setf (aref next-vector i) (1+ i)))
+          ((>= i size))
+        (setf (aref next-vector i) (1+ i)))
       (setf (aref next-vector size) 0)
       (setf (hash-table-next-free-kv table) 1)
       (setf (hash-table-needing-rehash table) 0)
@@ -201,7 +201,7 @@
   #!+sb-doc
   "Return the number of entries in the given HASH-TABLE."
   (declare (type hash-table hash-table)
-	   (values index))
+           (values index))
   (hash-table-number-entries hash-table))
 
 #!+sb-doc
@@ -235,32 +235,32 @@
 (defun rehash (table)
   (declare (type hash-table table))
   (let* ((old-kv-vector (hash-table-table table))
-	 (old-next-vector (hash-table-next-vector table))
-	 (old-hash-vector (hash-table-hash-vector table))
-	 (old-size (length old-next-vector))
-	 (new-size
-	  (let ((rehash-size (hash-table-rehash-size table)))
-	    (etypecase rehash-size
-	      (fixnum
-	       (+ rehash-size old-size))
-	      (float
-	       (the index (truncate (* rehash-size old-size)))))))
-	 (new-kv-vector (make-array (* 2 new-size)
-				    :initial-element +empty-ht-slot+))
-	 (new-next-vector (make-array new-size
-				      :element-type '(unsigned-byte #.sb!vm:n-word-bits)
-				      :initial-element 0))
-	 (new-hash-vector (when old-hash-vector
-			    (make-array new-size
-					:element-type '(unsigned-byte #.sb!vm:n-word-bits)
-					:initial-element +magic-hash-vector-value+)))
-	 (old-index-vector (hash-table-index-vector table))
-	 (new-length (almost-primify
-		      (truncate (/ (float new-size)
-				(hash-table-rehash-threshold table)))))
-	 (new-index-vector (make-array new-length
-				       :element-type '(unsigned-byte #.sb!vm:n-word-bits)
-				       :initial-element 0)))
+         (old-next-vector (hash-table-next-vector table))
+         (old-hash-vector (hash-table-hash-vector table))
+         (old-size (length old-next-vector))
+         (new-size
+          (let ((rehash-size (hash-table-rehash-size table)))
+            (etypecase rehash-size
+              (fixnum
+               (+ rehash-size old-size))
+              (float
+               (the index (truncate (* rehash-size old-size)))))))
+         (new-kv-vector (make-array (* 2 new-size)
+                                    :initial-element +empty-ht-slot+))
+         (new-next-vector (make-array new-size
+                                      :element-type '(unsigned-byte #.sb!vm:n-word-bits)
+                                      :initial-element 0))
+         (new-hash-vector (when old-hash-vector
+                            (make-array new-size
+                                        :element-type '(unsigned-byte #.sb!vm:n-word-bits)
+                                        :initial-element +magic-hash-vector-value+)))
+         (old-index-vector (hash-table-index-vector table))
+         (new-length (almost-primify
+                      (truncate (/ (float new-size)
+                                (hash-table-rehash-threshold table)))))
+         (new-index-vector (make-array new-length
+                                       :element-type '(unsigned-byte #.sb!vm:n-word-bits)
+                                       :initial-element 0)))
     (declare (type index new-size new-length old-size))
 
     ;; Disable GC tricks on the OLD-KV-VECTOR.
@@ -280,46 +280,46 @@
     ;; Copy over the hash-vector.
     (when old-hash-vector
       (dotimes (i old-size)
-	(setf (aref new-hash-vector i) (aref old-hash-vector i))))
+        (setf (aref new-hash-vector i) (aref old-hash-vector i))))
 
     (setf (hash-table-next-free-kv table) 0)
     (setf (hash-table-needing-rehash table) 0)
     ;; Rehash all the entries; last to first so that after the pushes
     ;; the chains are first to last.
     (do ((i (1- new-size) (1- i)))
-	((zerop i))
+        ((zerop i))
       (let ((key (aref new-kv-vector (* 2 i)))
-	    (value (aref new-kv-vector (1+ (* 2 i)))))
-	(cond ((and (eq key +empty-ht-slot+)
-		    (eq value +empty-ht-slot+))
-	       ;; Slot is empty, push it onto the free list.
-	       (setf (aref new-next-vector i)
-		     (hash-table-next-free-kv table))
-	       (setf (hash-table-next-free-kv table) i))
-	      ((and new-hash-vector
-		    (not (= (aref new-hash-vector i) +magic-hash-vector-value+)))
-	       ;; Can use the existing hash value (not EQ based)
-	       (let* ((hashing (aref new-hash-vector i))
-		      (index (rem hashing new-length))
-		      (next (aref new-index-vector index)))
-		 (declare (type index index)
-			  (type hash hashing))
-		 ;; Push this slot into the next chain.
-		 (setf (aref new-next-vector i) next)
-		 (setf (aref new-index-vector index) i)))
-	      (t
-	       ;; EQ base hash.
-	       ;; Enable GC tricks.
-	       (set-header-data new-kv-vector
-				sb!vm:vector-valid-hashing-subtype)
-	       (let* ((hashing (pointer-hash key))
-		      (index (rem hashing new-length))
-		      (next (aref new-index-vector index)))
-		 (declare (type index index)
-			  (type hash hashing))
-		 ;; Push this slot onto the next chain.
-		 (setf (aref new-next-vector i) next)
-		 (setf (aref new-index-vector index) i))))))
+            (value (aref new-kv-vector (1+ (* 2 i)))))
+        (cond ((and (eq key +empty-ht-slot+)
+                    (eq value +empty-ht-slot+))
+               ;; Slot is empty, push it onto the free list.
+               (setf (aref new-next-vector i)
+                     (hash-table-next-free-kv table))
+               (setf (hash-table-next-free-kv table) i))
+              ((and new-hash-vector
+                    (not (= (aref new-hash-vector i) +magic-hash-vector-value+)))
+               ;; Can use the existing hash value (not EQ based)
+               (let* ((hashing (aref new-hash-vector i))
+                      (index (rem hashing new-length))
+                      (next (aref new-index-vector index)))
+                 (declare (type index index)
+                          (type hash hashing))
+                 ;; Push this slot into the next chain.
+                 (setf (aref new-next-vector i) next)
+                 (setf (aref new-index-vector index) i)))
+              (t
+               ;; EQ base hash.
+               ;; Enable GC tricks.
+               (set-header-data new-kv-vector
+                                sb!vm:vector-valid-hashing-subtype)
+               (let* ((hashing (pointer-hash key))
+                      (index (rem hashing new-length))
+                      (next (aref new-index-vector index)))
+                 (declare (type index index)
+                          (type hash hashing))
+                 ;; Push this slot onto the next chain.
+                 (setf (aref new-next-vector i) next)
+                 (setf (aref new-index-vector index) i))))))
     (setf (hash-table-table table) new-kv-vector)
     (setf (hash-table-index-vector table) new-index-vector)
     (setf (hash-table-next-vector table) new-next-vector)
@@ -337,11 +337,11 @@
 (defun rehash-without-growing (table)
   (declare (type hash-table table))
   (let* ((kv-vector (hash-table-table table))
-	 (next-vector (hash-table-next-vector table))
-	 (hash-vector (hash-table-hash-vector table))
-	 (size (length next-vector))
-	 (index-vector (hash-table-index-vector table))
-	 (length (length index-vector)))
+         (next-vector (hash-table-next-vector table))
+         (hash-vector (hash-table-hash-vector table))
+         (size (length next-vector))
+         (index-vector (hash-table-index-vector table))
+         (length (length index-vector)))
     (declare (type index size length))
 
     ;; Disable GC tricks, they will be re-enabled during the re-hash
@@ -356,52 +356,52 @@
     (dotimes (i length)
       (setf (aref index-vector i) 0))
     (do ((i (1- size) (1- i)))
-	((zerop i))
+        ((zerop i))
       (let ((key (aref kv-vector (* 2 i)))
-	    (value (aref kv-vector (1+ (* 2 i)))))
-	(cond ((and (eq key +empty-ht-slot+)
-		    (eq value +empty-ht-slot+))
-	       ;; Slot is empty, push it onto free list.
-	       (setf (aref next-vector i) (hash-table-next-free-kv table))
-	       (setf (hash-table-next-free-kv table) i))
-	      ((and hash-vector (not (= (aref hash-vector i) +magic-hash-vector-value+)))
-	       ;; Can use the existing hash value (not EQ based)
-	       (let* ((hashing (aref hash-vector i))
-		      (index (rem hashing length))
-		      (next (aref index-vector index)))
-		 (declare (type index index))
-		 ;; Push this slot into the next chain.
-		 (setf (aref next-vector i) next)
-		 (setf (aref index-vector index) i)))
-	      (t
-	       ;; EQ base hash.
-	       ;; Enable GC tricks.
-	       (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype)
-	       (let* ((hashing (pointer-hash key))
-		      (index (rem hashing length))
-		      (next (aref index-vector index)))
-		 (declare (type index index)
-			  (type hash hashing))
-		 ;; Push this slot into the next chain.
-		 (setf (aref next-vector i) next)
-		 (setf (aref index-vector index) i)))))))
+            (value (aref kv-vector (1+ (* 2 i)))))
+        (cond ((and (eq key +empty-ht-slot+)
+                    (eq value +empty-ht-slot+))
+               ;; Slot is empty, push it onto free list.
+               (setf (aref next-vector i) (hash-table-next-free-kv table))
+               (setf (hash-table-next-free-kv table) i))
+              ((and hash-vector (not (= (aref hash-vector i) +magic-hash-vector-value+)))
+               ;; Can use the existing hash value (not EQ based)
+               (let* ((hashing (aref hash-vector i))
+                      (index (rem hashing length))
+                      (next (aref index-vector index)))
+                 (declare (type index index))
+                 ;; Push this slot into the next chain.
+                 (setf (aref next-vector i) next)
+                 (setf (aref index-vector index) i)))
+              (t
+               ;; EQ base hash.
+               ;; Enable GC tricks.
+               (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype)
+               (let* ((hashing (pointer-hash key))
+                      (index (rem hashing length))
+                      (next (aref index-vector index)))
+                 (declare (type index index)
+                          (type hash hashing))
+                 ;; Push this slot into the next chain.
+                 (setf (aref next-vector i) next)
+                 (setf (aref index-vector index) i)))))))
   (values))
 
 (defun flush-needing-rehash (table)
   (let* ((kv-vector (hash-table-table table))
-	 (index-vector (hash-table-index-vector table))
-	 (next-vector (hash-table-next-vector table))
-	 (length (length index-vector)))
+         (index-vector (hash-table-index-vector table))
+         (next-vector (hash-table-next-vector table))
+         (length (length index-vector)))
     (do ((next (hash-table-needing-rehash table)))
-	((zerop next))
+        ((zerop next))
       (declare (type index next))
       (let* ((key (aref kv-vector (* 2 next)))
-	     (hashing (pointer-hash key))
-	     (index (rem hashing length))
-	     (temp (aref next-vector next)))
-	(setf (aref next-vector next) (aref index-vector index))
-	(setf (aref index-vector index) next)
-	(setf next temp))))
+             (hashing (pointer-hash key))
+             (index (rem hashing length))
+             (temp (aref next-vector next)))
+        (setf (aref next-vector next) (aref index-vector index))
+        (setf (aref index-vector index) next)
+        (setf next temp))))
   (setf (hash-table-needing-rehash table) 0)
   (values))
 
@@ -411,40 +411,40 @@
    value and T as multiple values, or returns DEFAULT and NIL if there is no
    such entry. Entries can be added using SETF."
   (declare (type hash-table hash-table)
-	   (values t (member t nil)))
+           (values t (member t nil)))
   (without-gcing
    (cond ((= (get-header-data (hash-table-table hash-table))
-	     sb!vm:vector-must-rehash-subtype)
-	  (rehash-without-growing hash-table))
-	 ((not (zerop (hash-table-needing-rehash hash-table)))
-	  (flush-needing-rehash hash-table)))
+             sb!vm:vector-must-rehash-subtype)
+          (rehash-without-growing hash-table))
+         ((not (zerop (hash-table-needing-rehash hash-table)))
+          (flush-needing-rehash hash-table)))
    ;; Search for key in the hash table.
    (multiple-value-bind (hashing eq-based)
        (funcall (hash-table-hash-fun hash-table) key)
      (declare (type hash hashing))
      (let* ((index-vector (hash-table-index-vector hash-table))
-	    (length (length index-vector))
-	    (index (rem hashing length))
-	    (next (aref index-vector index))
-	    (table (hash-table-table hash-table))
-	    (next-vector (hash-table-next-vector hash-table))
-	    (hash-vector (hash-table-hash-vector hash-table))
-	    (test-fun (hash-table-test-fun hash-table)))
+            (length (length index-vector))
+            (index (rem hashing length))
+            (next (aref index-vector index))
+            (table (hash-table-table hash-table))
+            (next-vector (hash-table-next-vector hash-table))
+            (hash-vector (hash-table-hash-vector hash-table))
+            (test-fun (hash-table-test-fun hash-table)))
        (declare (type index index))
        ;; Search next-vector chain for a matching key.
        (if (or eq-based (not hash-vector))
-	   (do ((next next (aref next-vector next)))
-	       ((zerop next) (values default nil))
-	     (declare (type index next))
-	     (when (eq key (aref table (* 2 next)))
-	       (return (values (aref table (1+ (* 2 next))) t))))
-	   (do ((next next (aref next-vector next)))
-	       ((zerop next) (values default nil))
-	     (declare (type index next))
-	     (when (and (= hashing (aref hash-vector next))
-			(funcall test-fun key (aref table (* 2 next))))
-	       ;; Found.
-	       (return (values (aref table (1+ (* 2 next))) t)))))))))
+           (do ((next next (aref next-vector next)))
+               ((zerop next) (values default nil))
+             (declare (type index next))
+             (when (eq key (aref table (* 2 next)))
+               (return (values (aref table (1+ (* 2 next))) t))))
+           (do ((next next (aref next-vector next)))
+               ((zerop next) (values default nil))
+             (declare (type index next))
+             (when (and (= hashing (aref hash-vector next))
+                        (funcall test-fun key (aref table (* 2 next))))
+               ;; Found.
+               (return (values (aref table (1+ (* 2 next))) t)))))))))
 
 ;;; so people can call #'(SETF GETHASH)
 (defun (setf gethash) (new-value key table &optional default)
@@ -459,71 +459,71 @@
    ;; exists. Check that there is room for one more entry. May not be
    ;; needed if the key is already present.
    (cond ((zerop (hash-table-next-free-kv hash-table))
-	  (rehash hash-table))
-	 ((= (get-header-data (hash-table-table hash-table))
-	     sb!vm:vector-must-rehash-subtype)
-	  (rehash-without-growing hash-table))
-	 ((not (zerop (hash-table-needing-rehash hash-table)))
-	  (flush-needing-rehash hash-table)))
+          (rehash hash-table))
+         ((= (get-header-data (hash-table-table hash-table))
+             sb!vm:vector-must-rehash-subtype)
+          (rehash-without-growing hash-table))
+         ((not (zerop (hash-table-needing-rehash hash-table)))
+          (flush-needing-rehash hash-table)))
 
    ;; Search for key in the hash table.
    (multiple-value-bind (hashing eq-based)
        (funcall (hash-table-hash-fun hash-table) key)
      (declare (type hash hashing))
      (let* ((index-vector (hash-table-index-vector hash-table))
-	    (length (length index-vector))
-	    (index (rem hashing length))
-	    (next (aref index-vector index))
-	    (kv-vector (hash-table-table hash-table))
-	    (next-vector (hash-table-next-vector hash-table))
-	    (hash-vector (hash-table-hash-vector hash-table))
-	    (test-fun (hash-table-test-fun hash-table)))
+            (length (length index-vector))
+            (index (rem hashing length))
+            (next (aref index-vector index))
+            (kv-vector (hash-table-table hash-table))
+            (next-vector (hash-table-next-vector hash-table))
+            (hash-vector (hash-table-hash-vector hash-table))
+            (test-fun (hash-table-test-fun hash-table)))
        (declare (type index index))
 
        (cond ((or eq-based (not hash-vector))
-	      (when eq-based
-		(set-header-data kv-vector sb!vm:vector-valid-hashing-subtype))
+              (when eq-based
+                (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype))
 
-	      ;; Search next-vector chain for a matching key.
-	      (do ((next next (aref next-vector next)))
-		  ((zerop next))
-		(declare (type index next))
-		(when (eq key (aref kv-vector (* 2 next)))
-		  ;; Found, just replace the value.
-		  (setf (aref kv-vector (1+ (* 2 next))) value)
-		  (return-from %puthash value))))
-	     (t
-	      ;; Search next-vector chain for a matching key.
-	      (do ((next next (aref next-vector next)))
-		  ((zerop next))
-		(declare (type index next))
-		(when (and (= hashing (aref hash-vector next))
-			   (funcall test-fun key
-				    (aref kv-vector (* 2 next))))
-		  ;; Found, just replace the value.
-		  (setf (aref kv-vector (1+ (* 2 next))) value)
-		  (return-from %puthash value)))))
+              ;; Search next-vector chain for a matching key.
+              (do ((next next (aref next-vector next)))
+                  ((zerop next))
+                (declare (type index next))
+                (when (eq key (aref kv-vector (* 2 next)))
+                  ;; Found, just replace the value.
+                  (setf (aref kv-vector (1+ (* 2 next))) value)
+                  (return-from %puthash value))))
+             (t
+              ;; Search next-vector chain for a matching key.
+              (do ((next next (aref next-vector next)))
+                  ((zerop next))
+                (declare (type index next))
+                (when (and (= hashing (aref hash-vector next))
+                           (funcall test-fun key
+                                    (aref kv-vector (* 2 next))))
+                  ;; Found, just replace the value.
+                  (setf (aref kv-vector (1+ (* 2 next))) value)
+                  (return-from %puthash value)))))
 
        ;; Pop a KV slot off the free list
        (let ((free-kv-slot (hash-table-next-free-kv hash-table)))
-	 ;; Double-check for overflow.
-	 (aver (not (zerop free-kv-slot)))
-	 (setf (hash-table-next-free-kv hash-table)
-	       (aref next-vector free-kv-slot))
-	 (incf (hash-table-number-entries hash-table))
+         ;; Double-check for overflow.
+         (aver (not (zerop free-kv-slot)))
+         (setf (hash-table-next-free-kv hash-table)
+               (aref next-vector free-kv-slot))
+         (incf (hash-table-number-entries hash-table))
 
-	 (setf (aref kv-vector (* 2 free-kv-slot)) key)
-	 (setf (aref kv-vector (1+ (* 2 free-kv-slot))) value)
+         (setf (aref kv-vector (* 2 free-kv-slot)) key)
+         (setf (aref kv-vector (1+ (* 2 free-kv-slot))) value)
 
-	 ;; Setup the hash-vector if necessary.
-	 (when hash-vector
-	   (if (not eq-based)
-	       (setf (aref hash-vector free-kv-slot) hashing)
-	       (aver (= (aref hash-vector free-kv-slot) +magic-hash-vector-value+))))
+         ;; Setup the hash-vector if necessary.
+         (when hash-vector
+           (if (not eq-based)
+               (setf (aref hash-vector free-kv-slot) hashing)
+               (aver (= (aref hash-vector free-kv-slot) +magic-hash-vector-value+))))
 
-	 ;; Push this slot into the next chain.
-	 (setf (aref next-vector free-kv-slot) next)
-	 (setf (aref index-vector index) free-kv-slot)))))
+         ;; Push this slot into the next chain.
+         (setf (aref next-vector free-kv-slot) next)
+         (setf (aref index-vector index) free-kv-slot)))))
   value)
 
 (defun remhash (key hash-table)
@@ -531,28 +531,28 @@
   "Remove the entry in HASH-TABLE associated with KEY. Return T if there
    was such an entry, or NIL if not."
   (declare (type hash-table hash-table)
-	   (values (member t nil)))
+           (values (member t nil)))
   (without-gcing
    ;; We need to rehash here so that a current key can be found if it
    ;; exists.
    (cond ((= (get-header-data (hash-table-table hash-table))
-	     sb!vm:vector-must-rehash-subtype)
-	  (rehash-without-growing hash-table))
-	 ((not (zerop (hash-table-needing-rehash hash-table)))
-	  (flush-needing-rehash hash-table)))
+             sb!vm:vector-must-rehash-subtype)
+          (rehash-without-growing hash-table))
+         ((not (zerop (hash-table-needing-rehash hash-table)))
+          (flush-needing-rehash hash-table)))
 
    ;; Search for key in the hash table.
    (multiple-value-bind (hashing eq-based)
        (funcall (hash-table-hash-fun hash-table) key)
      (declare (type hash hashing))
      (let* ((index-vector (hash-table-index-vector hash-table))
-	    (length (length index-vector))
-	    (index (rem hashing length))
-	    (next (aref index-vector index))
-	    (table (hash-table-table hash-table))
-	    (next-vector (hash-table-next-vector hash-table))
-	    (hash-vector (hash-table-hash-vector hash-table))
-	    (test-fun (hash-table-test-fun hash-table)))
+            (length (length index-vector))
+            (index (rem hashing length))
+            (next (aref index-vector index))
+            (table (hash-table-table hash-table))
+            (next-vector (hash-table-next-vector hash-table))
+            (hash-vector (hash-table-hash-vector hash-table))
+            (test-fun (hash-table-test-fun hash-table)))
        (declare (type index index next))
        (flet ((clear-slot (chain-vector prior-slot-location slot-location)
                 ;; Mark slot as empty.
@@ -601,10 +601,10 @@
    itself."
   (declare (optimize speed))
   (let* ((kv-vector (hash-table-table hash-table))
-	 (next-vector (hash-table-next-vector hash-table))
-	 (hash-vector (hash-table-hash-vector hash-table))
-	 (size (length next-vector))
-	 (index-vector (hash-table-index-vector hash-table)))
+         (next-vector (hash-table-next-vector hash-table))
+         (hash-vector (hash-table-hash-vector hash-table))
+         (size (length next-vector))
+         (index-vector (hash-table-index-vector hash-table)))
     ;; Disable GC tricks.
     (set-header-data kv-vector sb!vm:vector-normal-subtype)
     ;; Mark all slots as empty by setting all keys and values to magic
@@ -613,7 +613,7 @@
     (fill kv-vector +empty-ht-slot+ :start 2)
     ;; Set up the free list, all free.
     (do ((i 1 (1+ i)))
-	((>= i (1- size)))
+        ((>= i (1- size)))
       (setf (aref next-vector i) (1+ i)))
     (setf (aref next-vector (1- size)) 0)
     (setf (hash-table-next-free-kv hash-table) 1)
@@ -640,17 +640,17 @@
   "For each entry in HASH-TABLE, call the designated two-argument function
    on the key and value of the entry. Return NIL."
   (let ((fun (%coerce-callable-to-fun function-designator))
-	(size (length (hash-table-next-vector hash-table))))
+        (size (length (hash-table-next-vector hash-table))))
     (declare (type function fun))
     (do ((i 1 (1+ i)))
-	((>= i size))
+        ((>= i size))
       (declare (type index i))
       (let* ((kv-vector (hash-table-table hash-table))
-	     (key (aref kv-vector (* 2 i)))
-	     (value (aref kv-vector (1+ (* 2 i)))))
-	(unless (and (eq key +empty-ht-slot+)
-		     (eq value +empty-ht-slot+))
-	  (funcall fun key value))))))
+             (key (aref kv-vector (* 2 i)))
+             (value (aref kv-vector (1+ (* 2 i)))))
+        (unless (and (eq key +empty-ht-slot+)
+                     (eq value +empty-ht-slot+))
+          (funcall fun key value))))))
 
 ;;;; methods on HASH-TABLE
 
@@ -672,8 +672,8 @@
 (defun %hash-table-alist (hash-table)
   (let ((result nil))
     (maphash (lambda (key value)
-	       (push (cons key value) result))
-	     hash-table)
+               (push (cons key value) result))
+             hash-table)
     result))
 
 ;;; Stuff an association list into HASH-TABLE. Return the hash table,
@@ -688,22 +688,22 @@
 (def!method print-object ((hash-table hash-table) stream)
   (declare (type stream stream))
   (cond ((not *print-readably*)
-	 (print-unreadable-object (hash-table stream :type t :identity t)
-	   (format stream
-		   ":TEST ~S :COUNT ~S"
-		   (hash-table-test hash-table)
-		   (hash-table-count hash-table))))
-	((not *read-eval*)
-	 (error "can't print hash tables readably without *READ-EVAL*"))
-	(t
-	 (with-standard-io-syntax
-	  (format stream
-		  "#.~W"
-		  `(%stuff-hash-table (make-hash-table ,@(%hash-table-ctor-args
-							  hash-table))
-				     ',(%hash-table-alist hash-table)))))))
+         (print-unreadable-object (hash-table stream :type t :identity t)
+           (format stream
+                   ":TEST ~S :COUNT ~S"
+                   (hash-table-test hash-table)
+                   (hash-table-count hash-table))))
+        ((not *read-eval*)
+         (error "can't print hash tables readably without *READ-EVAL*"))
+        (t
+         (with-standard-io-syntax
+          (format stream
+                  "#.~W"
+                  `(%stuff-hash-table (make-hash-table ,@(%hash-table-ctor-args
+                                                          hash-table))
+                                     ',(%hash-table-alist hash-table)))))))
 
 (def!method make-load-form ((hash-table hash-table) &optional environment)
   (declare (ignore environment))
   (values `(make-hash-table ,@(%hash-table-ctor-args hash-table))
-	  `(%stuff-hash-table ,hash-table ',(%hash-table-alist hash-table))))
+          `(%stuff-hash-table ,hash-table ',(%hash-table-alist hash-table))))

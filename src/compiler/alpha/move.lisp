@@ -24,7 +24,7 @@
        (load-symbol y val))
       (character
        (inst li (logior (ash (char-code val) n-widetag-bits) character-widetag)
-	     y)))))
+             y)))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((zero immediate)
@@ -79,19 +79,19 @@
 
 (define-vop (move)
   (:args (x :target y
-	    :scs (any-reg descriptor-reg zero null)
-	    :load-if (not (location= x y))))
+            :scs (any-reg descriptor-reg zero null)
+            :load-if (not (location= x y))))
   (:results (y :scs (any-reg descriptor-reg control-stack)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:generator 0
     (unless (location= x y)
       (sc-case y
-	((any-reg descriptor-reg)
-	 (inst move x y))
-	(control-stack
-	 (store-stack-tn y x))))))
+        ((any-reg descriptor-reg)
+         (inst move x y))
+        (control-stack
+         (store-stack-tn y x))))))
 
 (define-move-vop move :move
   (any-reg descriptor-reg zero null)
@@ -106,9 +106,9 @@
 ;;; another frame for argument or known value passing.
 (define-vop (move-arg)
   (:args (x :target y
-	    :scs (any-reg descriptor-reg null zero))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y any-reg descriptor-reg))))
+            :scs (any-reg descriptor-reg null zero))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
   (:generator 0
     (sc-case y
@@ -229,7 +229,7 @@
     (inst cmoveq temp 1 header)
     (inst sll header n-widetag-bits header)
     (inst bis header bignum-widetag header)
-      
+
     (pseudo-atomic (:extra (pad-data-block (+ bignum-digits-offset 3)))
       (inst bis alloc-tn other-pointer-lowtag y)
       (storew header y 0 other-pointer-lowtag)
@@ -254,7 +254,7 @@
     (inst srl x n-positive-fixnum-bits temp)
     (inst sll x n-fixnum-tag-bits y)
     (inst beq temp done)
-      
+
     (inst li 3 temp)
     (inst cmovge x 2 temp)
     (inst srl x 31 temp1)
@@ -275,10 +275,10 @@
 ;;; Move untagged numbers.
 (define-vop (word-move)
   (:args (x :target y
-	    :scs (signed-reg unsigned-reg)
-	    :load-if (not (location= x y))))
+            :scs (signed-reg unsigned-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (signed-reg unsigned-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:note "word integer move")
@@ -290,9 +290,9 @@
 ;;; Move untagged number arguments/return-values.
 (define-vop (move-word-arg)
   (:args (x :target y
-	    :scs (signed-reg unsigned-reg))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y sap-reg))))
+            :scs (signed-reg unsigned-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y sap-reg))))
   (:results (y))
   (:note "word integer argument move")
   (:generator 0

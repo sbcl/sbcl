@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -20,14 +20,14 @@
   (read-sequence buffer stream))
 ;;; test for the new N-BIN method doing what it's supposed to
 (let* ((substrings (list "This " "is " "a " ""
-			 "test of concatenated streams behaving "
-			 "as ordinary streams do under READ-SEQUENCE. "
-			 (make-string 140041 :initial-element #\%)
-			 "For any size of read.."
-			 (make-string 4123 :initial-element #\.)
-			 "they should give the same results."
-			 (make-string (expt 2 14) :initial-element #\*)
-			 "There should be no differences."))
+                         "test of concatenated streams behaving "
+                         "as ordinary streams do under READ-SEQUENCE. "
+                         (make-string 140041 :initial-element #\%)
+                         "For any size of read.."
+                         (make-string 4123 :initial-element #\.)
+                         "they should give the same results."
+                         (make-string (expt 2 14) :initial-element #\*)
+                         "There should be no differences."))
        (substreams (mapcar #'make-string-input-stream substrings))
        (concatenated-stream (apply #'make-concatenated-stream substreams))
        (concatenated-string (apply #'concatenate 'string substrings))
@@ -37,17 +37,17 @@
        (buffer-2 (make-string max-n-to-read)))
   (loop
    (let* ((n-to-read (random max-n-to-read))
-	  (n-actually-read-1 (read-sequence buffer-1
-					    concatenated-stream
-					    :end n-to-read))
-	  (n-actually-read-2 (read-sequence buffer-2
-					    stream
-					    :end n-to-read)))
+          (n-actually-read-1 (read-sequence buffer-1
+                                            concatenated-stream
+                                            :end n-to-read))
+          (n-actually-read-2 (read-sequence buffer-2
+                                            stream
+                                            :end n-to-read)))
 ;;     (format t "buffer-1=~S~%buffer-2=~S~%" buffer-1 buffer-2)
      (assert (= n-actually-read-1 n-actually-read-2))
      (assert (string= buffer-1 buffer-2
-		      :end1 n-actually-read-1
-		      :end2 n-actually-read-2))
+                      :end1 n-actually-read-1
+                      :end2 n-actually-read-2))
      (unless (= n-actually-read-1 n-to-read)
        (assert (< n-actually-read-1 n-to-read))
        (return)))))
@@ -55,24 +55,24 @@
 ;;; Entomotomy PEEK-CHAR-WRONGLY-ECHOS-TO-ECHO-STREAM bug, fixed by
 ;;; MRD patch sbcl-devel 2002-11-02 merged ca. sbcl-0.7.9.32...
 (assert (string=
-	 (with-output-to-string (out)
-	   (peek-char #\]
-		      (make-echo-stream  
-		       (make-string-input-stream "ab cd e df s]") out)))
-	 ;; (Before the fix, the result had a trailing #\] in it.)
-	 "ab cd e df s"))
+         (with-output-to-string (out)
+           (peek-char #\]
+                      (make-echo-stream
+                       (make-string-input-stream "ab cd e df s]") out)))
+         ;; (Before the fix, the result had a trailing #\] in it.)
+         "ab cd e df s"))
 ;;; ...and a missing wrinkle in the original patch, dealing with
 ;;; PEEK-CHAR/UNREAD-CHAR on ECHO-STREAMs, fixed by MRD patch
 ;;; sbcl-devel 2002-11-18, merged ca. sbcl-0.7.9.66
 (assert (string=
-	 (let* ((in-stream (make-string-input-stream "abc"))
-		(out-stream (make-string-output-stream))
-		(echo-stream (make-echo-stream in-stream out-stream)))  
-	   (unread-char (read-char echo-stream) echo-stream)  
-	   (peek-char #\a echo-stream)
-	   (get-output-stream-string out-stream))
-	 ;; (Before the fix, the LET* expression just signalled an error.)
-	 "a"))
+         (let* ((in-stream (make-string-input-stream "abc"))
+                (out-stream (make-string-output-stream))
+                (echo-stream (make-echo-stream in-stream out-stream)))
+           (unread-char (read-char echo-stream) echo-stream)
+           (peek-char #\a echo-stream)
+           (get-output-stream-string out-stream))
+         ;; (Before the fix, the LET* expression just signalled an error.)
+         "a"))
 
 ;;; Reported by Fredrik Sandstrom to sbcl-devel 2005-05-17 ("Bug in
 ;;; peek-char"):
@@ -80,20 +80,20 @@
 ;;; the same character that peek-char returns, the character is
 ;;; removed from the input stream, as if read by read-char.
 (assert (equal (with-input-from-string (s "123")
-		 (list (peek-char nil s nil #\1) (read-char s) (read-char s)))
-	       '(#\1 #\1 #\2)))
+                 (list (peek-char nil s nil #\1) (read-char s) (read-char s)))
+               '(#\1 #\1 #\2)))
 
 ;;; ... and verify that the fix does not break echo streams
 (assert (string= (let ((out (make-string-output-stream)))
-		   (with-open-stream (s (make-echo-stream
-					 (make-string-input-stream "123")
-					 out))
-		     (format s "=>~{~A~}"
-			     (list (peek-char nil s nil #\1)
-				   (read-char s)
-				   (read-char s)))
-		     (get-output-stream-string out)))
-		 "12=>112"))
+                   (with-open-stream (s (make-echo-stream
+                                         (make-string-input-stream "123")
+                                         out))
+                     (format s "=>~{~A~}"
+                             (list (peek-char nil s nil #\1)
+                                   (read-char s)
+                                   (read-char s)))
+                     (get-output-stream-string out)))
+                 "12=>112"))
 
 ;;; 0.7.12 doesn't advance current stream in concatenated streams
 ;;; correctly when searching a stream for a char to read.
@@ -143,11 +143,11 @@
 ;;; MAKE-STRING-OUTPUT-STREAM
 ;;;
 ;;; * Observe FILE-POSITION :START and :END, and allow setting of
-;;;   FILE-POSITION to an arbitrary index. 
+;;;   FILE-POSITION to an arbitrary index.
 ;;;
 ;;; * END will always refer to the farthest position of stream so-far
 ;;;   seen, and setting FILE-POSITION beyond the current END will extend
-;;;   the string/stream with uninitialized elements. 
+;;;   the string/stream with uninitialized elements.
 ;;;
 ;;; * Rewinding the stream works with overwriting semantics.
 ;;;
@@ -191,9 +191,9 @@
 ;;; * Rewinding the stream works with overwriting semantics.
 ;;;
 #+nil (let ((str (make-array 0
-		       :element-type 'character
-		       :adjustable nil
-		       :fill-pointer t)))
+                       :element-type 'character
+                       :adjustable nil
+                       :fill-pointer t)))
   (with-output-to-string (stream str)
     (princ "abcd" stream)
     (assert (= 4 (file-position stream)))
@@ -215,9 +215,9 @@
     (assert (equal "0b2d" str))))
 
 (let ((str (make-array 0
-		       :element-type 'character
-		       :adjustable nil
-		       :fill-pointer t)))
+                       :element-type 'character
+                       :adjustable nil
+                       :fill-pointer t)))
   (with-output-to-string (stream str)
     (princ "abcd" stream)
     (assert (= 4 (file-position stream)))
@@ -244,18 +244,18 @@
 ;;; MAKE-STRING-OUTPUT-STREAM and WITH-OUTPUT-TO-STRING take an
 ;;; :ELEMENT-TYPE keyword argument
 (macrolet ((frob (element-type-form)
-	     `(progn
-		(let ((s (with-output-to-string 
-			   (s nil ,@(when element-type-form
-				      `(:element-type ,element-type-form))))))
-		  (assert (typep s '(simple-array ,(if element-type-form
-						       (eval element-type-form)
-						       'character)
-						  (0)))))
-		(get-output-stream-string 
-		 (make-string-output-stream
-		  ,@(when element-type-form
-		      `(:element-type ,element-type-form)))))))
+             `(progn
+                (let ((s (with-output-to-string
+                           (s nil ,@(when element-type-form
+                                      `(:element-type ,element-type-form))))))
+                  (assert (typep s '(simple-array ,(if element-type-form
+                                                       (eval element-type-form)
+                                                       'character)
+                                                  (0)))))
+                (get-output-stream-string
+                 (make-string-output-stream
+                  ,@(when element-type-form
+                      `(:element-type ,element-type-form)))))))
   (frob nil)
   (frob 'character)
   (frob 'base-char)

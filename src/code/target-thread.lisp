@@ -40,10 +40,10 @@ in future versions."
 
 (defun thread-state (thread)
   (let ((state
-	 (sb!sys:sap-int
-	  (sb!sys:sap-ref-sap (thread-%sap thread)
-			      (* sb!vm::thread-state-slot
-				 sb!vm::n-word-bytes)))))
+         (sb!sys:sap-int
+          (sb!sys:sap-ref-sap (thread-%sap thread)
+                              (* sb!vm::thread-state-slot
+                                 sb!vm::n-word-bytes)))))
     (ecase state
       (#.(sb!vm:fixnumize 0) :starting)
       (#.(sb!vm:fixnumize 1) :running)
@@ -55,11 +55,11 @@ in future versions."
                             (* sb!vm::thread-state-slot
                                sb!vm::n-word-bytes))
         (sb!sys:int-sap
-	  (ecase state
-	    (:starting #.(sb!vm:fixnumize 0))
-	    (:running #.(sb!vm:fixnumize 1))
-	    (:suspended #.(sb!vm:fixnumize 2))
-	    (:dead #.(sb!vm:fixnumize 3))))))
+          (ecase state
+            (:starting #.(sb!vm:fixnumize 0))
+            (:running #.(sb!vm:fixnumize 1))
+            (:suspended #.(sb!vm:fixnumize 2))
+            (:dead #.(sb!vm:fixnumize 3))))))
 
 (defun thread-alive-p (thread)
   #!+sb-doc
@@ -130,7 +130,7 @@ in future versions."
   "Spinlock type."
   (name nil :type (or null simple-string))
   (value 0))
-  
+
 (declaim (inline get-spinlock release-spinlock))
 
 ;;; The bare 2 here and below are offsets of the slots in the struct.

@@ -1,4 +1,4 @@
-;;;; tests related to Gray streams 
+;;;; tests related to Gray streams
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -60,23 +60,23 @@
 
 (defclass character-output-stream (fundamental-character-output-stream)
   ((lisp-stream :initarg :lisp-stream
-		:accessor character-output-stream-lisp-stream)))
-  
+                :accessor character-output-stream-lisp-stream)))
+
 (defclass character-input-stream (fundamental-character-input-stream)
   ((lisp-stream :initarg :lisp-stream
-		:accessor character-input-stream-lisp-stream)))
-  
+                :accessor character-input-stream-lisp-stream)))
+
 ;;;; example character output stream encapsulating a lisp-stream
 
 (defun make-character-output-stream (lisp-stream)
   (make-instance 'character-output-stream :lisp-stream lisp-stream))
-  
+
 (defmethod open-stream-p ((stream character-output-stream))
   (open-stream-p (character-output-stream-lisp-stream stream)))
-  
+
 (defmethod close ((stream character-output-stream) &key abort)
   (close (character-output-stream-lisp-stream stream) :abort abort))
-  
+
 (defmethod input-stream-p ((stream character-output-stream))
   (input-stream-p (character-output-stream-lisp-stream stream)))
 
@@ -176,10 +176,10 @@
 ;;; bare Gray streams and thus bogusly omitting pretty-printing
 ;;; operations.
 (flet ((frob ()
-	 (with-output-to-string (string)
-	   (let ((gray-output-stream (make-character-output-stream string)))
-	     (format gray-output-stream
-		     "~@<testing: ~@:_pretty Gray line breaks~:>~%")))))
+         (with-output-to-string (string)
+           (let ((gray-output-stream (make-character-output-stream string)))
+             (format gray-output-stream
+                     "~@<testing: ~@:_pretty Gray line breaks~:>~%")))))
   (assert (= 1 (count #\newline (let ((*print-pretty* nil)) (frob)))))
   (assert (= 2 (count #\newline (let ((*print-pretty* t)) (frob))))))
 
@@ -220,11 +220,11 @@
 
 (defclass binary-to-char-output-stream (fundamental-binary-output-stream)
   ((lisp-stream :initarg :lisp-stream
-		:accessor binary-to-char-output-stream-lisp-stream)))
-  
+                :accessor binary-to-char-output-stream-lisp-stream)))
+
 (defclass binary-to-char-input-stream (fundamental-binary-input-stream)
   ((lisp-stream :initarg :lisp-stream
-		:accessor binary-to-char-input-stream-lisp-stream)))
+                :accessor binary-to-char-input-stream-lisp-stream)))
 
 (defmethod stream-element-type ((stream binary-to-char-output-stream))
   '(unsigned-byte 8))
@@ -233,24 +233,24 @@
 
 (defun make-binary-to-char-input-stream (lisp-stream)
   (make-instance 'binary-to-char-input-stream
-		 :lisp-stream lisp-stream))
+                 :lisp-stream lisp-stream))
 
 (defun make-binary-to-char-output-stream (lisp-stream)
   (make-instance 'binary-to-char-output-stream
-		 :lisp-stream lisp-stream))
-  
+                 :lisp-stream lisp-stream))
+
 (defmethod stream-read-byte ((stream binary-to-char-input-stream))
   (let ((char (read-char
-	       (binary-to-char-input-stream-lisp-stream stream) nil :eof)))
+               (binary-to-char-input-stream-lisp-stream stream) nil :eof)))
     (if (eq char :eof)
-	char
-	(char-code char))))
+        char
+        (char-code char))))
 
 (defmethod stream-write-byte ((stream binary-to-char-output-stream) integer)
   (let ((char (code-char integer)))
     (write-char char
-		(binary-to-char-output-stream-lisp-stream stream))))
-      
+                (binary-to-char-output-stream-lisp-stream stream))))
+
 ;;;; tests using binary i/o, using the above
 
 (let ((test-string (format nil
@@ -260,9 +260,9 @@
     (assert (equal
              (with-output-to-string (bar)
                (let ((our-bin-to-char-input (make-binary-to-char-input-stream
-					     foo))
+                                             foo))
                      (our-bin-to-char-output (make-binary-to-char-output-stream
-					      bar)))
+                                              bar)))
                  (assert (open-stream-p our-bin-to-char-input))
                  (assert (open-stream-p our-bin-to-char-output))
                  (assert (input-stream-p our-bin-to-char-input))

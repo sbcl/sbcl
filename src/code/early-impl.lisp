@@ -16,38 +16,38 @@
 ;;; listed here and then listed separately (and by now, 2001-06-06,
 ;;; slightly differently) elsewhere.
 (declaim (special *posix-argv*
-		  *read-only-space-free-pointer*
-		  sb!vm:*static-space-free-pointer*
-		  sb!vm:*initial-dynamic-space-free-pointer*
-		  sb!vm::*current-catch-block*
-		  sb!vm::*current-unwind-protect-block*
-		  sb!vm::*alien-stack*
-		  sb!vm::*control-stack-start*
-		  sb!vm::*control-stack-end*
-		  sb!vm::*binding-stack-start*
-		  ;; FIXME: The pseudo-atomic variable stuff should be
-		  ;; conditional on :SB-PSEUDO-ATOMIC-SYMBOLS, which
-		  ;; should be conditional on :X86, instead of the
-		  ;; pseudo-atomic stuff being directly conditional on
-		  ;; :X86. (Note that non-X86 ports mention
-		  ;; pseudo-atomicity too, but they handle it without
-		  ;; messing with special variables.)
-		  #!+(or x86 x86-64) *pseudo-atomic-atomic*
-		  #!+(or x86 x86-64) *pseudo-atomic-interrupted*
-		  sb!unix::*interrupts-enabled*
-		  sb!unix::*interrupt-pending*
-		  *free-interrupt-context-index*
-		  sb!vm::*allocation-pointer*
-		  sb!vm::*binding-stack-pointer*
-		  sb!vm::*fp-constant-0d0*
-		  sb!vm::*fp-constant-1d0*
-		  sb!vm::*fp-constant-0f0*
-		  sb!vm::*fp-constant-1f0*
-		  sb!vm::*fp-constant-0l0*
-		  sb!vm::*fp-constant-1l0*
-		  sb!vm::*fp-constant-pi*
-		  sb!vm::*fp-constant-l2t*
-		  sb!vm::*fp-constant-l2e*
-		  sb!vm::*fp-constant-lg2*
-		  sb!vm::*fp-constant-ln2*
-		  sb!pcl::..slot-unbound..))
+                  *read-only-space-free-pointer*
+                  sb!vm:*static-space-free-pointer*
+                  sb!vm:*initial-dynamic-space-free-pointer*
+                  sb!vm::*current-catch-block*
+                  sb!vm::*current-unwind-protect-block*
+                  sb!vm::*alien-stack*
+                  sb!vm::*control-stack-start*
+                  sb!vm::*control-stack-end*
+                  sb!vm::*binding-stack-start*
+                  ;; FIXME: The pseudo-atomic variable stuff should be
+                  ;; conditional on :SB-PSEUDO-ATOMIC-SYMBOLS, which
+                  ;; should be conditional on :X86, instead of the
+                  ;; pseudo-atomic stuff being directly conditional on
+                  ;; :X86. (Note that non-X86 ports mention
+                  ;; pseudo-atomicity too, but they handle it without
+                  ;; messing with special variables.)
+                  #!+(or x86 x86-64) *pseudo-atomic-atomic*
+                  #!+(or x86 x86-64) *pseudo-atomic-interrupted*
+                  sb!unix::*interrupts-enabled*
+                  sb!unix::*interrupt-pending*
+                  *free-interrupt-context-index*
+                  sb!vm::*allocation-pointer*
+                  sb!vm::*binding-stack-pointer*
+                  sb!vm::*fp-constant-0d0*
+                  sb!vm::*fp-constant-1d0*
+                  sb!vm::*fp-constant-0f0*
+                  sb!vm::*fp-constant-1f0*
+                  sb!vm::*fp-constant-0l0*
+                  sb!vm::*fp-constant-1l0*
+                  sb!vm::*fp-constant-pi*
+                  sb!vm::*fp-constant-l2t*
+                  sb!vm::*fp-constant-l2e*
+                  sb!vm::*fp-constant-lg2*
+                  sb!vm::*fp-constant-ln2*
+                  sb!pcl::..slot-unbound..))

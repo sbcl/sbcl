@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -30,7 +30,7 @@
 (defpackage :test
   (:use :test-used)
   (:shadow #:shadowed)
-  (:export 
+  (:export
    #:*special*
    #:car
    #:cdr
@@ -62,26 +62,26 @@
 (defun maybe-unintern (name package)
     (let ((s (find-symbol name package)))
       (when s
-	(unintern s package))))
+        (unintern s package))))
 
 (defun set-test-locks (lock-p)
   (dolist (p '(:test :test-aux :test-delete))
     (when (find-package p)
       (if lock-p
-	  (sb-ext:lock-package p)
-	  (sb-ext:unlock-package p)))))
+          (sb-ext:lock-package p)
+          (sb-ext:unlock-package p)))))
 
 (defun reset-test ()
   "Reset TEST package to a known state, ensure that TEST-DELETE exists."
   (unless (find-package :test-delete)
     (make-package :test-delete))
   (sb-ext:with-unlocked-packages (:test :test-aux)
-    (dolist (s '(test:nosymbol-macro 
-		 test:noclass test:nostruct test:nostruct2 test:nocondition))
+    (dolist (s '(test:nosymbol-macro
+                 test:noclass test:nostruct test:nostruct2 test:nocondition))
       (makunbound s)
       (unintern s)
       (intern (symbol-name s) :test))
-    (rename-package (find-package :test) :test)    
+    (rename-package (find-package :test) :test)
     (unexport (intern "INTERNAL" :test) :test)
     (intern *interned* :test)
     (use-package :test-used :test)
@@ -94,11 +94,11 @@
     (defconstant test:constant 'test:constant)
     (intern "UNUSED" :test)
     (dolist (s '(test:nocondition-slot test:noclass-slot test:nostruct-slot
-		 test-aux:noslot test-aux:noslot2))
+                 test-aux:noslot test-aux:noslot2))
       (fmakunbound s))
     (ignore-errors (progn
-		     (fmakunbound 'test:unused)
-		     (makunbound 'test:unused)))
+                     (fmakunbound 'test:unused)
+                     (makunbound 'test:unused)))
     (maybe-unintern *uninterned* :test)
     (maybe-unintern "NOT-FROM-TEST" :test)
     (defconstant test:num 0)
@@ -116,8 +116,8 @@
 
 (defmacro with-error-info ((string &rest args) &body forms)
   `(handler-bind ((error (lambda (e)
-			   (format t ,string ,@args)
-			   (finish-output))))
+                           (format t ,string ,@args)
+                           (finish-output))))
      (progn ,@forms)))
 
 ;;;; Test cases
@@ -136,10 +136,10 @@
     (use-package :test-used :test)
     (unuse-package :test-unused :test)
     (shadow "SHADOWED" :test)
-    (let ((s (with-unlocked-packages (:test) 
-	       (let ((s (intern *uninterned* :test)))
-		 (unintern s :test)
-		 s))))
+    (let ((s (with-unlocked-packages (:test)
+               (let ((s (intern *uninterned* :test)))
+                 (unintern s :test)
+                 s))))
       (unintern s :test))
 
     ;; binding and altering value
@@ -152,7 +152,7 @@
       (assert (eql test:*special* :quux)))
     (let ((test:unused :zot))
       (assert (eql test:unused :zot)))
-    
+
     ;; symbol-macrolet
     (symbol-macrolet ((test:function :sym-ok))
         (assert (eql test:function :sym-ok)))
@@ -201,17 +201,17 @@
     ;; defining or undefining as a macro or compiler macro
     (defmacro test:unused () ''foo)
     (setf (macro-function 'test:unused) (constantly 'foo))
-    (define-compiler-macro test:unused (&whole form arg) 
+    (define-compiler-macro test:unused (&whole form arg)
       form)
     (setf (compiler-macro-function 'test:unused) (constantly 'foo))
-    
+
     ;; type-specifier or structure
     (progn
       (defstruct test:nostruct test:nostruct-slot)
       ;; test creation as well, since the structure-class won't be
       ;; finalized before that
       (make-nostruct :nostruct-slot :foo))
-    (defclass test:noclass () 
+    (defclass test:noclass ()
       ((slot :initform nil :accessor test:noclass-slot)))
     (deftype test:notype () 'string)
     (define-condition test:nocondition (error)
@@ -241,7 +241,7 @@
       `(setf (car ,cons) ,new-car))
     (define-setf-expander test:car (place)
       (multiple-value-bind (dummies vals newval setter getter)
-	  (get-setf-expansion place)
+          (get-setf-expansion place)
         (let ((store (gensym)))
           (values dummies
                   vals
@@ -252,11 +252,11 @@
     ;; setf function names
     (defun (setf test:function) (obj)
       obj)
-    (tmp-fmakunbound '(setf test:cdr))    
-    
+    (tmp-fmakunbound '(setf test:cdr))
+
     ;; define-method-combination
     (define-method-combination test:unused)
-    
+
     ;; setf find-class
     (setf (find-class 'test:class) (find-class 'standard-class))
     ))
@@ -304,7 +304,7 @@
     (test:num . (locally
                     (declare (type fixnum test:num))
                   (cons t t)))
-      
+
     ;; special
     (test:nospecial . (locally
                           (declare (special test:nospecial))
@@ -392,10 +392,10 @@
                                                (declare (ignore x))
                                                (incf error-count)
                                                (continue x))))
-	(eval form)
-	(unless (= 2 error-count)
-	  (error "expected 2 errors per form, got ~A for ~A" 
-		 error-count form))))))
+        (eval form)
+        (unless (= 2 error-count)
+          (error "expected 2 errors per form, got ~A for ~A"
+                 error-count form))))))
 
 ;;; COMPILE-FILE when unlocked, LOAD locked -- *illegal-runtime-forms* only
 (let* ((tmp "package-locks.tmp.lisp")
@@ -403,18 +403,18 @@
        (n 0))
   (dolist (form *illegal-runtime-forms*)
     (unwind-protect
-	 (with-simple-restart (next "~S failed, continue with next test" form)
-	   (reset-test)
-	   (set-test-locks nil)
-	   (with-open-file (f tmp :direction :output)
-	     (prin1 form f))
-	   (multiple-value-bind (file warnings failure-p) (compile-file tmp)
-	     (set-test-locks t)
-	     (assert (raises-error? (load fasl) sb-ext:package-lock-violation))))
+         (with-simple-restart (next "~S failed, continue with next test" form)
+           (reset-test)
+           (set-test-locks nil)
+           (with-open-file (f tmp :direction :output)
+             (prin1 form f))
+           (multiple-value-bind (file warnings failure-p) (compile-file tmp)
+             (set-test-locks t)
+             (assert (raises-error? (load fasl) sb-ext:package-lock-violation))))
       (when (probe-file tmp)
-	(delete-file tmp))
+        (delete-file tmp))
       (when (probe-file fasl)
-	(delete-file fasl)))))
+        (delete-file fasl)))))
 
 ;;;; Tests for enable-package-locks declarations
 (reset-test)
@@ -442,7 +442,7 @@
   (destructuring-bind (sym . form) pair
       (declare (ignore sym))
     (let ((fun (compile nil `(lambda ()
-			      ,form))))
+                              ,form))))
       (assert (raises-error? (funcall fun) program-error)))))
 
 ;;;; See that trace on functions in locked packages doesn't break
@@ -453,8 +453,8 @@
 ;;;; package. Reported by by Francois-Rene Rideau.
 (assert (package-locked-p :sb-gray))
 (multiple-value-bind (fun compile-errors)
-    (ignore-errors 
-      (compile nil 
+    (ignore-errors
+      (compile nil
                '(lambda ()
                  (defclass fare-class ()
                    ((line-column :initform 0 :reader sb-gray:stream-line-column))))))
@@ -472,10 +472,10 @@
   test:*special*)
 (assert (eq *terminal-io* (pcl-type-declaration-method-bug *terminal-io*)))
 (assert (raises-error?
-	 (eval '(defmethod pcl-type-declaration-method-bug ((test:*special* stream))
-		 (declare (type stream test:*special*))
-		 test:*special*))
-	 package-lock-violation))
+         (eval '(defmethod pcl-type-declaration-method-bug ((test:*special* stream))
+                 (declare (type stream test:*special*))
+                 test:*special*))
+         package-lock-violation))
 
 ;;; WOOT! Done.
 (sb-ext:quit :unix-status 104)

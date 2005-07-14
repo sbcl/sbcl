@@ -28,7 +28,7 @@
   ;; then add that amount. If a floating point number, then multiply
   ;; it by that.
   (rehash-size (missing-arg) :type (or index (single-float (1.0)))
-	       :read-only t)
+               :read-only t)
   ;; how full the hash table has to get before we rehash
   (rehash-threshold (missing-arg) :type (single-float (0.0) 1.0) :read-only t)
   ;; The number of entries before a rehash, just one less than the
@@ -54,19 +54,19 @@
   ;; The index vector. This may be larger than the hash size to help
   ;; reduce collisions.
   (index-vector (missing-arg)
-		:type (simple-array (unsigned-byte #.sb!vm:n-word-bits) (*)))
+                :type (simple-array (unsigned-byte #.sb!vm:n-word-bits) (*)))
   ;; This table parallels the KV vector, and is used to chain together
   ;; the hash buckets, the free list, and the values needing rehash, a
   ;; slot will only ever be in one of these lists.
   (next-vector (missing-arg)
-	       :type (simple-array (unsigned-byte #.sb!vm:n-word-bits) (*)))
+               :type (simple-array (unsigned-byte #.sb!vm:n-word-bits) (*)))
   ;; This table parallels the KV table, and can be used to store the
   ;; hash associated with the key, saving recalculation. Could be
   ;; useful for EQL, and EQUAL hash tables. This table is not needed
   ;; for EQ hash tables, and when present the value of #x80000000
   ;; represents EQ-based hashing on the respective key.
   (hash-vector nil :type (or null (simple-array (unsigned-byte
-						 #.sb!vm:n-word-bits) (*)))))
+                                                 #.sb!vm:n-word-bits) (*)))))
 
 (defmacro-mundanely with-hash-table-iterator ((function hash-table) &body body)
   #!+sb-doc
@@ -78,23 +78,23 @@
    the second and third values are the key and the value of the next object."
   (let ((n-function (gensym "WITH-HASH-TABLE-ITERATOR-")))
     `(let ((,n-function
-	    (let* ((table ,hash-table)
-		   (length (length (hash-table-next-vector table)))
-		   (index 1))
-	      (declare (type (mod #.(floor most-positive-fixnum 2)) index))
-	      (labels
-		  ((,function ()
-		     ;; (We grab the table again on each iteration just in
-		     ;; case it was rehashed by a PUTHASH.)
-		     (let ((kv-vector (hash-table-table table)))
-		       (do ()
-			   ((>= index length) (values nil))
-			 (let ((key (aref kv-vector (* 2 index)))
-			       (value (aref kv-vector (1+ (* 2 index)))))
-			   (incf index)
-			   (unless (and (eq key +empty-ht-slot+)
-					(eq value +empty-ht-slot+))
-			     (return (values t key value))))))))
-		#',function))))
+            (let* ((table ,hash-table)
+                   (length (length (hash-table-next-vector table)))
+                   (index 1))
+              (declare (type (mod #.(floor most-positive-fixnum 2)) index))
+              (labels
+                  ((,function ()
+                     ;; (We grab the table again on each iteration just in
+                     ;; case it was rehashed by a PUTHASH.)
+                     (let ((kv-vector (hash-table-table table)))
+                       (do ()
+                           ((>= index length) (values nil))
+                         (let ((key (aref kv-vector (* 2 index)))
+                               (value (aref kv-vector (1+ (* 2 index)))))
+                           (incf index)
+                           (unless (and (eq key +empty-ht-slot+)
+                                        (eq value +empty-ht-slot+))
+                             (return (values t key value))))))))
+                #',function))))
       (macrolet ((,function () '(funcall ,n-function)))
-	,@body))))
+        ,@body))))

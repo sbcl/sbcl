@@ -52,7 +52,7 @@ using getprotobyname(2) which typically looks in NIS or /etc/protocols"
 
       ;; We have no truck with such dreadful type punning.  Octets to
       ;; octets, dust to dust.
-      
+
       (setf (sockint::sockaddr-in-family sockaddr) sockint::af-inet)
       (setf (sb-alien:deref (sockint::sockaddr-in-port sockaddr) 0) (ldb (byte 8 8) port))
       (setf (sb-alien:deref (sockint::sockaddr-in-port sockaddr) 1) (ldb (byte 8 0) port))
@@ -73,11 +73,11 @@ using getprotobyname(2) which typically looks in NIS or /etc/protocols"
   "Returns address and port of SOCKADDR as multiple values"
   (values
    (coerce (loop for i from 0 below 4
-		 collect (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) i))
-	   '(vector (unsigned-byte 8) 4))
+                 collect (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) i))
+           '(vector (unsigned-byte 8) 4))
    (+ (* 256 (sb-alien:deref (sockint::sockaddr-in-port sockaddr) 0))
       (sb-alien:deref (sockint::sockaddr-in-port sockaddr) 1))))
-   
+
 (defun make-inet-socket (type protocol)
   "Make an INET socket.  Deprecated in favour of make-instance"
   (make-instance 'inet-socket :type type :protocol protocol))

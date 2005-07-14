@@ -11,11 +11,11 @@
 
 (defparameter *format-whitespace-chars*
   (vector #\space
-	  #\newline
-	  ;; We leave out this non-STANDARD-CHARACTER entry from this table
-	  ;; when we're running in the cross-compilation host, since ANSI
-	  ;; doesn't require the cross-compilation host to know what a tab is.
-	  #-sb-xc-host (code-char tab-char-code)))
+          #\newline
+          ;; We leave out this non-STANDARD-CHARACTER entry from this table
+          ;; when we're running in the cross-compilation host, since ANSI
+          ;; doesn't require the cross-compilation host to know what a tab is.
+          #-sb-xc-host (code-char tab-char-code)))
 
 (defvar *format-directive-expanders*
   (make-array base-char-code-limit :initial-element nil))

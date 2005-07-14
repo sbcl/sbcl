@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -27,7 +27,7 @@
 ;;;     0 is not of type (OR FUNCTION SB-KERNEL:FDEFN).
 ;;; Correct behavior is to warn at compile time because the symbol
 ;;; isn't declared as a variable, but to set its SYMBOL-VALUE anyway.
-;;; 
+;;;
 ;;; This bug was in sbcl-0.6.11.13.
 (print (setq improperly-declared-var '(1 2)))
 (assert (equal (symbol-value 'improperly-declared-var) '(1 2)))
@@ -85,15 +85,15 @@
 
 (defun #:foo (b c)
   (declare (type (integer -23228343 2) b)
-	   (type (integer -115581022 512244512) c)
-	   (optimize (speed 3) (safety 1) (debug 1)))
+           (type (integer -115581022 512244512) c)
+           (optimize (speed 3) (safety 1) (debug 1)))
   (* (* (logorc2 3 (deposit-field 4667947 (byte 14 26) b))
-	(deposit-field b (byte 25 27) -30424886))
+        (deposit-field b (byte 25 27) -30424886))
      (dpb b (byte 23 29) c)))
 
 (defun #:foo (x y)
   (declare (type (integer -1 1000000000000000000000000) x y)
-	   (optimize speed))
+           (optimize speed))
   (* x (* y x)))
 
 (defun #:foo (b)

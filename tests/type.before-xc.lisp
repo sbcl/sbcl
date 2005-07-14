@@ -1,4 +1,4 @@
-;;;; tests of the type system, intended to be executed as soon as 
+;;;; tests of the type system, intended to be executed as soon as
 ;;;; the cross-compiler is built
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -7,7 +7,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -17,11 +17,11 @@
 (/show "beginning tests/type.before-xc.lisp")
 
 (assert (type= (specifier-type '(and fixnum (satisfies foo)))
-	       (specifier-type '(and (satisfies foo) fixnum))))
+               (specifier-type '(and (satisfies foo) fixnum))))
 (assert (type= (specifier-type '(member 1 2 3))
-	       (specifier-type '(member 2 3 1))))
+               (specifier-type '(member 2 3 1))))
 (assert (type= (specifier-type '(and (member 1.0 2 3) single-float))
-	       (specifier-type '(member 1.0))))
+               (specifier-type '(member 1.0))))
 
 (assert (sb-xc:typep #(1 2 3) 'simple-vector))
 (assert (sb-xc:typep #(1 2 3) 'vector))
@@ -40,57 +40,57 @@
 (assert (not (sb-xc:typep nil '(member 1 2 3))))
 
 (assert (type= *empty-type*
-	       (type-intersection (specifier-type 'list)
-				  (specifier-type 'vector))))
+               (type-intersection (specifier-type 'list)
+                                  (specifier-type 'vector))))
 (assert (eql *empty-type*
-	     (type-intersection (specifier-type 'list)
-				(specifier-type 'vector))))
+             (type-intersection (specifier-type 'list)
+                                (specifier-type 'vector))))
 (assert (type= (specifier-type 'null)
-	       (type-intersection (specifier-type 'list)
-				  (specifier-type '(or vector null)))))
+               (type-intersection (specifier-type 'list)
+                                  (specifier-type '(or vector null)))))
 (assert (type= (specifier-type 'null)
-	       (type-intersection (specifier-type 'sequence)
-				  (specifier-type 'symbol))))
+               (type-intersection (specifier-type 'sequence)
+                                  (specifier-type 'symbol))))
 (assert (type= (specifier-type 'cons)
-	       (type-intersection (specifier-type 'sequence)
-				  (specifier-type '(or cons number)))))
+               (type-intersection (specifier-type 'sequence)
+                                  (specifier-type '(or cons number)))))
 (assert (eql *empty-type*
-	     (type-intersection (specifier-type '(satisfies keywordp))
-				*empty-type*)))
+             (type-intersection (specifier-type '(satisfies keywordp))
+                                *empty-type*)))
 
 (assert (type= (specifier-type 'list)
-	       (type-union (specifier-type 'cons) (specifier-type 'null))))
+               (type-union (specifier-type 'cons) (specifier-type 'null))))
 (assert (type= (specifier-type 'list)
-	       (type-union (specifier-type 'null) (specifier-type 'cons))))
+               (type-union (specifier-type 'null) (specifier-type 'cons))))
 (assert (type= (specifier-type 'sequence)
-	       (type-union (specifier-type 'list) (specifier-type 'vector))))
+               (type-union (specifier-type 'list) (specifier-type 'vector))))
 (assert (type= (specifier-type 'sequence)
-	       (type-union (specifier-type 'vector) (specifier-type 'list))))
+               (type-union (specifier-type 'vector) (specifier-type 'list))))
 (assert (type= (specifier-type 'list)
-	       (type-union (specifier-type 'cons) (specifier-type 'list))))
+               (type-union (specifier-type 'cons) (specifier-type 'list))))
 (assert (not (csubtypep (type-union (specifier-type 'list)
-				    (specifier-type '(satisfies foo)))
-			(specifier-type 'list))))
+                                    (specifier-type '(satisfies foo)))
+                        (specifier-type 'list))))
 (assert (csubtypep (specifier-type 'list)
-		   (type-union (specifier-type 'list)
-			       (specifier-type '(satisfies foo)))))
+                   (type-union (specifier-type 'list)
+                               (specifier-type '(satisfies foo)))))
 
 ;;; Identities should be identities.
 (dolist (type-specifier '(nil
-			  t
-			  null
-			  (satisfies keywordp) 
-			  (satisfies foo) 
-			  (not fixnum)
-			  (not null)
-			  (and symbol (satisfies foo))
-			  (and (satisfies foo) string)
-			  (or symbol sequence)
-			  (or single-float character)
-			  (or float (satisfies bar))
-			  integer (integer 0 1)
-			  character standard-char
-			  (member 1 2 3)))
+                          t
+                          null
+                          (satisfies keywordp)
+                          (satisfies foo)
+                          (not fixnum)
+                          (not null)
+                          (and symbol (satisfies foo))
+                          (and (satisfies foo) string)
+                          (or symbol sequence)
+                          (or single-float character)
+                          (or float (satisfies bar))
+                          integer (integer 0 1)
+                          character standard-char
+                          (member 1 2 3)))
   (/show type-specifier)
   (let ((ctype (specifier-type type-specifier)))
 
@@ -103,7 +103,7 @@
     (assert (type= ctype (type-intersection *universal-type* ctype)))
     (assert (type= ctype (type-intersection2 ctype *universal-type*)))
     (assert (type= ctype (type-intersection2 *universal-type* ctype)))
-      
+
     (assert (eql *universal-type* (type-union ctype *universal-type*)))
     (assert (eql *universal-type* (type-union *universal-type* ctype)))
     (assert (eql *universal-type* (type-union2 ctype *universal-type*)))
@@ -130,21 +130,21 @@
   (assert-secondnil (sb-xc:subtypep t '(or (satisfies foo) (satisfies bar))))
   (assert-secondnil (sb-xc:subtypep '(satisfies foo) nil))
   (assert-secondnil (sb-xc:subtypep '(and (satisfies foo) (satisfies bar))
-				    nil))
+                                    nil))
   (assert-secondnil (sb-xc:subtypep '(or (satisfies foo) (satisfies bar))
-				    nil)))
+                                    nil)))
 
 ;;; tests of 2-value quantifieroids FOO/TYPE
 (macrolet ((2= (v1 v2 expr2)
              (let ((x1 (gensym))
-		   (x2 (gensym)))
-	       `(multiple-value-bind (,x1 ,x2) ,expr2
-		  (unless (and (eql ,x1 ,v1) (eql ,x2 ,v2))
-		    (error "mismatch for EXPR2=~S" ',expr2))))))
+                   (x2 (gensym)))
+               `(multiple-value-bind (,x1 ,x2) ,expr2
+                  (unless (and (eql ,x1 ,v1) (eql ,x2 ,v2))
+                    (error "mismatch for EXPR2=~S" ',expr2))))))
   (flet (;; SUBTYPEP running in the cross-compiler
-	 (xsubtypep (x y)
-	   (csubtypep (specifier-type x)
-		      (specifier-type y))))
+         (xsubtypep (x y)
+           (csubtypep (specifier-type x)
+                      (specifier-type y))))
     (2=   t   t (any/type   #'xsubtypep 'fixnum '(real integer)))
     (2=   t   t (any/type   #'xsubtypep 'fixnum '(real cons)))
     (2= nil   t (any/type   #'xsubtypep 'fixnum '(cons vector)))
@@ -164,24 +164,24 @@
 
 ;;; various dead bugs
 (assert (union-type-p (type-intersection (specifier-type 'list)
-					 (specifier-type '(or list vector)))))
+                                         (specifier-type '(or list vector)))))
 (assert (type= (type-intersection (specifier-type 'list)
-				  (specifier-type '(or list vector)))
-	       (specifier-type 'list)))
+                                  (specifier-type '(or list vector)))
+               (specifier-type 'list)))
 (assert (array-type-p (type-intersection (specifier-type 'vector)
-					 (specifier-type '(or list vector)))))
+                                         (specifier-type '(or list vector)))))
 (assert (type= (type-intersection (specifier-type 'vector)
-				  (specifier-type '(or list vector)))
-	       (specifier-type 'vector)))
+                                  (specifier-type '(or list vector)))
+               (specifier-type 'vector)))
 (assert (type= (type-intersection (specifier-type 'number)
-				  (specifier-type 'integer))
-	       (specifier-type 'integer)))
+                                  (specifier-type 'integer))
+               (specifier-type 'integer)))
 (assert (null (type-intersection2 (specifier-type 'symbol)
-				  (specifier-type '(satisfies foo)))))
+                                  (specifier-type '(satisfies foo)))))
 (assert (intersection-type-p (specifier-type '(and symbol (satisfies foo)))))
 (assert (ctypep :x86 (specifier-type '(satisfies keywordp))))
 (assert (type= (specifier-type '(member :x86))
-	       (specifier-type '(and (member :x86) (satisfies keywordp)))))
+               (specifier-type '(and (member :x86) (satisfies keywordp)))))
 (let* ((type1 (specifier-type '(member :x86)))
        (type2 (specifier-type '(or keyword null)))
        (isect (type-intersection type1 type2)))
@@ -199,15 +199,15 @@
   (assert (type= isect (type-intersection type1 type1 type2 type1)))
   (assert (type= isect (type-intersection type1 type2 type1 type2))))
 (assert (csubtypep (specifier-type '(or (single-float -1.0 1.0)
-					(single-float 0.1)))
-		   (specifier-type '(or (real -1 7)
-					(single-float 0.1)
-					(single-float -1.0 1.0)))))
+                                        (single-float 0.1)))
+                   (specifier-type '(or (real -1 7)
+                                        (single-float 0.1)
+                                        (single-float -1.0 1.0)))))
 (assert (not (csubtypep (specifier-type '(or (real -1 7)
-					     (single-float 0.1)
-					     (single-float -1.0 1.0)))
-			(specifier-type '(or (single-float -1.0 1.0)
-					     (single-float 0.1))))))
+                                             (single-float 0.1)
+                                             (single-float -1.0 1.0)))
+                        (specifier-type '(or (single-float -1.0 1.0)
+                                             (single-float 0.1))))))
 
 (assert (sb-xc:typep #\, 'character))
 (assert (sb-xc:typep #\@ 'character))

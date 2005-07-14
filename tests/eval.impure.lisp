@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -133,8 +133,8 @@
 
 ;;; No extra output, please
 (assert (equal ".."
-	       (with-output-to-string (*standard-output*)
-		 (eval '(progn (princ ".") (let ((x 42)) t) (princ "."))))))
+               (with-output-to-string (*standard-output*)
+                 (eval '(progn (princ ".") (let ((x 42)) t) (princ "."))))))
 
 ;;; success
 (sb-ext:quit :unix-status 104)

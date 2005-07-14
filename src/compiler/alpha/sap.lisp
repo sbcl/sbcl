@@ -40,10 +40,10 @@
 ;;; Move untagged SAP values.
 (define-vop (sap-move)
   (:args (x :target y
-	    :scs (sap-reg)
-	    :load-if (not (location= x y))))
+            :scs (sap-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (sap-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:generator 0
@@ -54,9 +54,9 @@
 ;;; Move untagged SAP arguments/return-values.
 (define-vop (move-sap-arg)
   (:args (x :target y
-	    :scs (sap-reg))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y sap-reg))))
+            :scs (sap-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y sap-reg))))
   (:results (y))
   (:generator 0
     (sc-case y
@@ -99,7 +99,7 @@
 (define-vop (pointer+)
   (:translate sap+)
   (:args (ptr :scs (sap-reg))
-	 (offset :scs (signed-reg immediate)))
+         (offset :scs (signed-reg immediate)))
   (:arg-types system-area-pointer signed-num)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
@@ -114,7 +114,7 @@
 (define-vop (pointer-)
   (:translate sap-)
   (:args (ptr1 :scs (sap-reg))
-	 (ptr2 :scs (sap-reg)))
+         (ptr2 :scs (sap-reg)))
   (:arg-types system-area-pointer system-area-pointer)
   (:policy :fast-safe)
   (:results (res :scs (signed-reg)))
@@ -220,9 +220,9 @@
                                      '((inst lds result offset object)))
                                     (:double
                                      '((inst ldt
-					     result
-					     (+ offset n-word-bytes)
-					     object))))))
+                                             result
+                                             (+ offset n-word-bytes)
+                                             object))))))
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
@@ -354,5 +354,5 @@
   (:result-types system-area-pointer)
   (:generator 2
     (inst lda sap
-	  (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
-	  vector)))
+          (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+          vector)))

@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -27,42 +27,42 @@
 (assert
  (loop for i from 0 to 9 always
        (loop for j from i to 10 always
-	     (loop for c from 0 to (- j i) always
-		   (let* ((orig '(a a a a a a a a a a))
-			  (x (copy-seq orig))
-			  (y (nsubstitute 'x 'a x :start i :end j :count c)))
-		     (equal y (nconc (make-list i :initial-element 'a)
-				     (make-list c :initial-element 'x)
-				     (make-list (- 10 (+ i c))
-						:initial-element 'a))))))))
+             (loop for c from 0 to (- j i) always
+                   (let* ((orig '(a a a a a a a a a a))
+                          (x (copy-seq orig))
+                          (y (nsubstitute 'x 'a x :start i :end j :count c)))
+                     (equal y (nconc (make-list i :initial-element 'a)
+                                     (make-list c :initial-element 'x)
+                                     (make-list (- 10 (+ i c))
+                                                :initial-element 'a))))))))
 
 (assert
  (loop for i from 0 to 9 always
        (loop for j from i to 10 always
-	     (loop for c from 0 to (- j i) always
-		   (let* ((orig '(a a a a a a a a a a))
-			  (x (copy-seq orig))
-			  (y (nsubstitute-if 'x (lambda (x) (eq x 'a)) x
-					     :start i :end j
-					     :count c :from-end t)))
-		     (equal y (nconc (make-list (- j c) :initial-element 'a)
-				     (make-list c :initial-element 'x)
-				     (make-list (- 10 j)
-						:initial-element 'a))))))))
+             (loop for c from 0 to (- j i) always
+                   (let* ((orig '(a a a a a a a a a a))
+                          (x (copy-seq orig))
+                          (y (nsubstitute-if 'x (lambda (x) (eq x 'a)) x
+                                             :start i :end j
+                                             :count c :from-end t)))
+                     (equal y (nconc (make-list (- j c) :initial-element 'a)
+                                     (make-list c :initial-element 'x)
+                                     (make-list (- 10 j)
+                                                :initial-element 'a))))))))
 (assert
  (loop for i from 0 to 9 always
        (loop for j from i to 10 always
-	     (loop for c from 0 to (- j i) always
-		   (let* ((orig '(a a a a a a a a a a))
-			  (x (copy-seq orig))
-			  (y (nsubstitute-if-not 'x (lambda (x)
-						      (not (eq x 'a))) x
-						 :start i :end j
-						 :count c :from-end t)))
-		     (equal y (nconc (make-list (- j c) :initial-element 'a)
-				     (make-list c :initial-element 'x)
-				     (make-list (- 10 j)
-						:initial-element 'a))))))))
+             (loop for c from 0 to (- j i) always
+                   (let* ((orig '(a a a a a a a a a a))
+                          (x (copy-seq orig))
+                          (y (nsubstitute-if-not 'x (lambda (x)
+                                                      (not (eq x 'a))) x
+                                                 :start i :end j
+                                                 :count c :from-end t)))
+                     (equal y (nconc (make-list (- j c) :initial-element 'a)
+                                     (make-list c :initial-element 'x)
+                                     (make-list (- 10 j)
+                                                :initial-element 'a))))))))
 
 ;;; And equally similarly, REMOVE-DUPLICATES misbehaved when given
 ;;; :START arguments:
@@ -78,29 +78,29 @@
 
 ;;; tests of COUNT-IF and COUNT-IF-NOT
 (macrolet (;; the guts of CCI, abstracted over whether we're testing
-	   ;; COUNT-IF or COUNT-IF-NOT
-	   (%cci (expected count-if test sequence-as-list &rest keys)
+           ;; COUNT-IF or COUNT-IF-NOT
+           (%cci (expected count-if test sequence-as-list &rest keys)
              `(let* ((list ',sequence-as-list)
-		     (simple-vector (coerce list 'simple-vector))
-		     (length (length list))
-		     (vector (make-array (* 2 length) :fill-pointer length)))
-		(replace vector list :end1 length)
-		(dolist (seq (list list simple-vector vector))
-		  (assert (= ,expected (,count-if ,test seq ,@keys))))))
-	   ;; "Check COUNT-IF"
-	   (cci (expected test sequence-as-list &rest keys) 
-	     `(progn
+                     (simple-vector (coerce list 'simple-vector))
+                     (length (length list))
+                     (vector (make-array (* 2 length) :fill-pointer length)))
+                (replace vector list :end1 length)
+                (dolist (seq (list list simple-vector vector))
+                  (assert (= ,expected (,count-if ,test seq ,@keys))))))
+           ;; "Check COUNT-IF"
+           (cci (expected test sequence-as-list &rest keys)
+             `(progn
                 (format t "~&SEQUENCE-AS-LIST=~S~%" ',sequence-as-list)
-		(%cci ,expected
-		      count-if
-		      ,test
-		      ,sequence-as-list
-		      ,@keys)
-		(%cci ,expected
-		      count-if-not
-		      (complement ,test)
-		      ,sequence-as-list
-		      ,@keys))))
+                (%cci ,expected
+                      count-if
+                      ,test
+                      ,sequence-as-list
+                      ,@keys)
+                (%cci ,expected
+                      count-if-not
+                      (complement ,test)
+                      ,sequence-as-list
+                      ,@keys))))
   (cci 1 #'consp (1 (12) 1))
   (cci 3 #'consp (1 (2) 3 (4) (5) 6))
   (cci 3 #'consp (1 (2) 3 (4) (5) 6) :from-end t)
@@ -152,16 +152,16 @@
 (assert (equal (merge 'list (list 1 2 4) (list 2 3 7) '<) '(1 2 2 3 4 7)))
 (assert (equal (merge 'list (list 1 2 4) (list -2 3 7) #'<) '(-2 1 2 3 4 7)))
 (assert (equal (merge 'list (list 1 2 4) (vector -2 3 7) '< :key 'abs)
-	       '(1 2 -2 3 4 7)))
+               '(1 2 -2 3 4 7)))
 (assert (equal (merge 'list (list 1 -2 4) (list -2 3 7) '< :key #'abs)
-	       '(1 -2 -2 3 4 7)))
+               '(1 -2 -2 3 4 7)))
 (assert (equal (stable-sort (list 1 10 2 12 13 3) '<) '(1 2 3 10 12 13)))
 (assert (equal (stable-sort (list 1 10 2 12 13 3) #'< :key '-)
-	       '(13 12 10 3 2 1)))
+               '(13 12 10 3 2 1)))
 (assert (equal (stable-sort (list 1 10 2 12 13 3) '> :key #'-)
-	       '(1 2 3 10 12 13)))
+               '(1 2 3 10 12 13)))
 (assert (equal (stable-sort (list 1 2 3 -3 -2 -1) '< :key 'abs)
-	       '(1 -1 2 -2 3 -3)))
+               '(1 -1 2 -2 3 -3)))
 
 ;;; CSR broke FILL by not returning the sequence argument in a transform.
 (let* ((s1 (copy-seq "abcde"))

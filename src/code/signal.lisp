@@ -70,8 +70,8 @@
   (let ((name (gensym)))
     `(flet ((,name () ,@body))
        (if *interrupts-enabled*
-	   (,name)
-	   (let ((*interrupts-enabled* t))
-	     (when *interrupt-pending*
-	       (receive-pending-interrupt))
-	     (,name))))))
+           (,name)
+           (let ((*interrupts-enabled* t))
+             (when *interrupt-pending*
+               (receive-pending-interrupt))
+             (,name))))))

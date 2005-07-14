@@ -14,11 +14,11 @@
 ;;;; general warm init compilation policy
 
 (proclaim '(optimize (compilation-speed 1)
-		     (debug #+sb-show 2 #-sb-show 1)
-		     (inhibit-warnings 2)
-		     (safety 2)
-		     (space 1)
-		     (speed 2)))
+                     (debug #+sb-show 2 #-sb-show 1)
+                     (inhibit-warnings 2)
+                     (safety 2)
+                     (space 1)
+                     (speed 2)))
 
 
 ;;;; package hacking
@@ -41,15 +41,15 @@
   (dolist (package (list-all-packages))
     (let ((old-package-name (package-name package)))
       (when (and (>= (length old-package-name) (length boot-prefix))
-		 (string= boot-prefix old-package-name
-			  :end2 (length boot-prefix)))
-	(let ((new-package-name (concatenate 'string
-					     perm-prefix
-					     (subseq old-package-name
-						     (length boot-prefix)))))
-	  (rename-package package
-			  new-package-name
-			  (package-nicknames package)))))))
+                 (string= boot-prefix old-package-name
+                          :end2 (length boot-prefix)))
+        (let ((new-package-name (concatenate 'string
+                                             perm-prefix
+                                             (subseq old-package-name
+                                                     (length boot-prefix)))))
+          (rename-package package
+                          new-package-name
+                          (package-nicknames package)))))))
 
 ;;; FIXME: This nickname is a deprecated hack for backwards
 ;;; compatibility with code which assumed the CMU-CL-style
@@ -57,47 +57,47 @@
 ;;; in 0.7.0, so we should get rid of this nickname after a while.
 (let ((package (find-package "SB-ALIEN")))
   (rename-package package
-		  (package-name package)
-		  (cons "SB-C-CALL" (package-nicknames package))))
+                  (package-name package)
+                  (cons "SB-C-CALL" (package-nicknames package))))
 
 ;;;; compiling and loading more of the system
 
 (let* ((sys *default-pathname-defaults*)
        (src
-	(merge-pathnames
-	 (make-pathname :directory '(:relative "src" :wild-inferiors)
-			:name :wild :type :wild)
-	 sys))
+        (merge-pathnames
+         (make-pathname :directory '(:relative "src" :wild-inferiors)
+                        :name :wild :type :wild)
+         sys))
        (contrib
-	(merge-pathnames
-	 (make-pathname :directory '(:relative "contrib" :wild-inferiors)
-			:name :wild :type :wild)
-	 sys)))
+        (merge-pathnames
+         (make-pathname :directory '(:relative "contrib" :wild-inferiors)
+                        :name :wild :type :wild)
+         sys)))
   (setf (logical-pathname-translations "SYS")
-	`(("SYS:SRC;**;*.*.*" ,src)
-	  ("SYS:CONTRIB;**;*.*.*" ,contrib))))
+        `(("SYS:SRC;**;*.*.*" ,src)
+          ("SYS:CONTRIB;**;*.*.*" ,contrib))))
 
 ;;; FIXME: CMU CL's pclcom.lisp had extra optional stuff wrapped around
 ;;; COMPILE-PCL, at least some of which we should probably have too:
 ;;;
 ;;; (with-compilation-unit
 ;;;     (:optimize '(optimize (debug #+(and (not high-security) small) .5
-;;;				  #-(or high-security small) 2
-;;;				  #+high-security 3)
-;;;			   (speed 2) (safety #+(and (not high-security) small) 0
-;;;					     #-(or high-security small) 2
-;;;					     #+high-security 3)
-;;;			   (inhibit-warnings 2))
+;;;                               #-(or high-security small) 2
+;;;                               #+high-security 3)
+;;;                        (speed 2) (safety #+(and (not high-security) small) 0
+;;;                                          #-(or high-security small) 2
+;;;                                          #+high-security 3)
+;;;                        (inhibit-warnings 2))
 ;;;      :optimize-interface '(optimize-interface #+(and (not high-security) small)
 ;;; (safety 1)
-;;;					       #+high-security (safety 3))
+;;;                                            #+high-security (safety 3))
 ;;;      :context-declarations
 ;;;      '((:external (declare (optimize-interface (safety #-high-security 2 #+high-
 ;;; security 3)
-;;;						(debug #-high-security 1 #+high-s
+;;;                                             (debug #-high-security 1 #+high-s
 ;;; ecurity 3))))
-;;;	((:or :macro (:match "$EARLY-") (:match "$BOOT-"))
-;;;	(declare (optimize (speed 0))))))
+;;;     ((:or :macro (:match "$EARLY-") (:match "$BOOT-"))
+;;;     (declare (optimize (speed 0))))))
 ;;;
 ;;; FIXME: This has mutated into a hack which crudely duplicates
 ;;; functionality from the existing mechanism to load files from
@@ -106,75 +106,75 @@
 ;;; parallel directory trees.) Maybe we could merge the filenames here
 ;;; into build-order.lisp-expr with some new flag (perhaps :WARM) to
 ;;; indicate that the files should be handled not in cold load but
-;;; afterwards. 
+;;; afterwards.
 (dolist (stem '(;; CLOS, derived from the PCL reference implementation
-		;;
-		;; This PCL build order is based on a particular
-		;; (arbitrary) linearization of the declared build
-		;; order dependencies from the old PCL defsys.lisp
-		;; dependency database.
-		#+nil "src/pcl/walk" ; #+NIL = moved to build-order.lisp-expr
-		"SRC;PCL;EARLY-LOW"
-		"SRC;PCL;MACROS"
+                ;;
+                ;; This PCL build order is based on a particular
+                ;; (arbitrary) linearization of the declared build
+                ;; order dependencies from the old PCL defsys.lisp
+                ;; dependency database.
+                #+nil "src/pcl/walk" ; #+NIL = moved to build-order.lisp-expr
+                "SRC;PCL;EARLY-LOW"
+                "SRC;PCL;MACROS"
                 "SRC;PCL;COMPILER-SUPPORT"
-		"SRC;PCL;LOW"
+                "SRC;PCL;LOW"
                 "SRC;PCL;SLOT-NAME"
-		"SRC;PCL;DEFCLASS"
-		"SRC;PCL;DEFS"
-		"SRC;PCL;FNGEN"
-		"SRC;PCL;CACHE"
-		"SRC;PCL;DLISP"
-		"SRC;PCL;DLISP2"
-		"SRC;PCL;BOOT"
-		"SRC;PCL;VECTOR"
-		"SRC;PCL;SLOTS-BOOT"
-		"SRC;PCL;COMBIN"
-		"SRC;PCL;DFUN"
-		"SRC;PCL;CTOR"
-		"SRC;PCL;BRAID"
-		"SRC;PCL;DLISP3"
-		"SRC;PCL;GENERIC-FUNCTIONS"
-		"SRC;PCL;SLOTS"
-		"SRC;PCL;INIT"
-		"SRC;PCL;STD-CLASS"
-		"SRC;PCL;CPL"
-		"SRC;PCL;FSC"
-		"SRC;PCL;METHODS"
-		"SRC;PCL;FIXUP"
-		"SRC;PCL;DEFCOMBIN"
-		"SRC;PCL;CTYPES"
-		"SRC;PCL;ENV"
-		"SRC;PCL;DOCUMENTATION"
-		"SRC;PCL;PRINT-OBJECT"
-		"SRC;PCL;PRECOM1"
-		"SRC;PCL;PRECOM2"
+                "SRC;PCL;DEFCLASS"
+                "SRC;PCL;DEFS"
+                "SRC;PCL;FNGEN"
+                "SRC;PCL;CACHE"
+                "SRC;PCL;DLISP"
+                "SRC;PCL;DLISP2"
+                "SRC;PCL;BOOT"
+                "SRC;PCL;VECTOR"
+                "SRC;PCL;SLOTS-BOOT"
+                "SRC;PCL;COMBIN"
+                "SRC;PCL;DFUN"
+                "SRC;PCL;CTOR"
+                "SRC;PCL;BRAID"
+                "SRC;PCL;DLISP3"
+                "SRC;PCL;GENERIC-FUNCTIONS"
+                "SRC;PCL;SLOTS"
+                "SRC;PCL;INIT"
+                "SRC;PCL;STD-CLASS"
+                "SRC;PCL;CPL"
+                "SRC;PCL;FSC"
+                "SRC;PCL;METHODS"
+                "SRC;PCL;FIXUP"
+                "SRC;PCL;DEFCOMBIN"
+                "SRC;PCL;CTYPES"
+                "SRC;PCL;ENV"
+                "SRC;PCL;DOCUMENTATION"
+                "SRC;PCL;PRINT-OBJECT"
+                "SRC;PCL;PRECOM1"
+                "SRC;PCL;PRECOM2"
 
-		;; miscellaneous functionality which depends on CLOS
-		"SRC;CODE;FORCE-DELAYED-DEFBANGMETHODS"
+                ;; miscellaneous functionality which depends on CLOS
+                "SRC;CODE;FORCE-DELAYED-DEFBANGMETHODS"
                 "SRC;CODE;LATE-CONDITION"
 
-		;; CLOS-level support for the Gray OO streams
-		;; extension (which is also supported by various
-		;; lower-level hooks elsewhere in the code)
-		"SRC;PCL;GRAY-STREAMS-CLASS"
-		"SRC;PCL;GRAY-STREAMS"
+                ;; CLOS-level support for the Gray OO streams
+                ;; extension (which is also supported by various
+                ;; lower-level hooks elsewhere in the code)
+                "SRC;PCL;GRAY-STREAMS-CLASS"
+                "SRC;PCL;GRAY-STREAMS"
 
-		;; other functionality not needed for cold init, moved
-		;; to warm init to reduce peak memory requirement in
-		;; cold init
-		"SRC;CODE;DESCRIBE"
+                ;; other functionality not needed for cold init, moved
+                ;; to warm init to reduce peak memory requirement in
+                ;; cold init
+                "SRC;CODE;DESCRIBE"
                 "SRC;CODE;DESCRIBE-POLICY"
-		"SRC;CODE;INSPECT"
-		"SRC;CODE;PROFILE"
-		"SRC;CODE;NTRACE"
+                "SRC;CODE;INSPECT"
+                "SRC;CODE;PROFILE"
+                "SRC;CODE;NTRACE"
                 "SRC;CODE;STEP"
-		"SRC;CODE;RUN-PROGRAM"
+                "SRC;CODE;RUN-PROGRAM"
 
-		;; Code derived from PCL's pre-ANSI DESCRIBE-OBJECT
-		;; facility is still used in our ANSI DESCRIBE
-		;; facility, and should be compiled and loaded after
-		;; our DESCRIBE facility is compiled and loaded.
-		"SRC;PCL;DESCRIBE"))
+                ;; Code derived from PCL's pre-ANSI DESCRIBE-OBJECT
+                ;; facility is still used in our ANSI DESCRIBE
+                ;; facility, and should be compiled and loaded after
+                ;; our DESCRIBE facility is compiled and loaded.
+                "SRC;PCL;DESCRIBE"))
 
   (let ((fullname (concatenate 'string "SYS:" stem ".LISP")))
     (sb-int:/show "about to compile" fullname)
@@ -182,36 +182,36 @@
              (format stream "Recompile file ~S" fullname))
            (report-continue-restart (stream)
              (format stream
-		     "Continue, using possibly bogus file ~S"
-		     (compile-file-pathname fullname))))
+                     "Continue, using possibly bogus file ~S"
+                     (compile-file-pathname fullname))))
       (tagbody
        retry-compile-file
          (multiple-value-bind (output-truename warnings-p failure-p)
              (compile-file fullname)
            (declare (ignore warnings-p))
-	   (sb-int:/show "done compiling" fullname)
+           (sb-int:/show "done compiling" fullname)
            (cond ((not output-truename)
                   (error "COMPILE-FILE of ~S failed." fullname))
                  (failure-p
-		  (unwind-protect
-		       (restart-case
-			   (error "FAILURE-P was set when creating ~S."
-				  output-truename)
-			 (recompile ()
-			   :report report-recompile-restart
-			   (go retry-compile-file))
-			 (continue ()
-			   :report report-continue-restart
-			   (setf failure-p nil)))
-		    ;; Don't leave failed object files lying around.
-		    (when (and failure-p (probe-file output-truename))
+                  (unwind-protect
+                       (restart-case
+                           (error "FAILURE-P was set when creating ~S."
+                                  output-truename)
+                         (recompile ()
+                           :report report-recompile-restart
+                           (go retry-compile-file))
+                         (continue ()
+                           :report report-continue-restart
+                           (setf failure-p nil)))
+                    ;; Don't leave failed object files lying around.
+                    (when (and failure-p (probe-file output-truename))
                           (delete-file output-truename)
                           (format t "~&deleted ~S~%" output-truename))))
                  ;; Otherwise: success, just fall through.
                  (t nil))
-	   (unless (load output-truename)
-	     (error "LOAD of ~S failed." output-truename))
-	   (sb-int:/show "done loading" output-truename))))))
+           (unless (load output-truename)
+             (error "LOAD of ~S failed." output-truename))
+           (sb-int:/show "done loading" output-truename))))))
 
 ;;;; setting package documentation
 
@@ -223,8 +223,8 @@
 #+sb-doc (setf (documentation (find-package "COMMON-LISP") t)
 "public: home of symbols defined by the ANSI language specification")
 #+sb-doc (setf (documentation (find-package "COMMON-LISP-USER") t)
-	       "public: the default package for user code and data")
+               "public: the default package for user code and data")
 #+sb-doc (setf (documentation (find-package "KEYWORD") t)
-	       "public: home of keywords")
+               "public: home of keywords")
 
 

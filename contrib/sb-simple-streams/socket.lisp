@@ -3,7 +3,7 @@
 ;;; **********************************************************************
 ;;; This code was written by Paul Foley and has been placed in the public
 ;;; domain.
-;;; 
+;;;
 
 ;;; Sbcl port by Rudi Schlatte.
 
@@ -28,7 +28,7 @@
             ((not (any-stream-instance-flags object :input :output))
              (princ "Closed " stream)))
       (format stream "~:(~A~)"
-	      (type-of object))
+              (type-of object))
       (when (any-stream-instance-flags object :input :output)
         (multiple-value-bind (host port)
             (sb-bsd-sockets:socket-peername (sm socket object))
@@ -47,41 +47,41 @@
              'socket-simple-stream))
     (with-stream-class (socket-simple-stream stream)
       (ecase (getf options :direction :input)
-	(:input (add-stream-instance-flags stream :input))
-	(:output (add-stream-instance-flags stream :output))
-	(:io (add-stream-instance-flags stream :input :output)))
+        (:input (add-stream-instance-flags stream :input))
+        (:output (add-stream-instance-flags stream :output))
+        (:io (add-stream-instance-flags stream :input :output)))
       (setf (sm socket stream) socket)
       (sb-bsd-sockets:socket-connect socket remote-host remote-port)
       (let ((fd (sb-bsd-sockets:socket-file-descriptor socket)))
         (when fd
-	  (add-stream-instance-flags stream :dual :simple)
-	  (when (any-stream-instance-flags stream :input)
-	    (setf (sm input-handle stream) fd)
-	    (unless (sm buffer stream)
-	      (let ((length (device-buffer-length stream)))
-		(setf (sm buffer stream) (allocate-buffer length)
-		      (sm buffpos stream) 0
-		      (sm buffer-ptr stream) 0
-		      (sm buf-len stream) length))))
-	  (when (any-stream-instance-flags stream :output)
-	    (setf (sm output-handle stream) fd)
-	    (unless (sm out-buffer stream)
-	      (let ((length (device-buffer-length stream)))
-		(setf (sm out-buffer stream) (allocate-buffer length)
-		      (sm outpos stream) 0
-		      (sm max-out-pos stream) length)))
-	    (setf (sm control-out stream) *std-control-out-table*))          
+          (add-stream-instance-flags stream :dual :simple)
+          (when (any-stream-instance-flags stream :input)
+            (setf (sm input-handle stream) fd)
+            (unless (sm buffer stream)
+              (let ((length (device-buffer-length stream)))
+                (setf (sm buffer stream) (allocate-buffer length)
+                      (sm buffpos stream) 0
+                      (sm buffer-ptr stream) 0
+                      (sm buf-len stream) length))))
+          (when (any-stream-instance-flags stream :output)
+            (setf (sm output-handle stream) fd)
+            (unless (sm out-buffer stream)
+              (let ((length (device-buffer-length stream)))
+                (setf (sm out-buffer stream) (allocate-buffer length)
+                      (sm outpos stream) 0
+                      (sm max-out-pos stream) length)))
+            (setf (sm control-out stream) *std-control-out-table*))
           (sb-ext:cancel-finalization socket)
           (sb-ext:finalize stream
                            (lambda ()
                              (sb-unix:unix-close fd)
                              (format *debug-io*
                                      "~&;;; ** closed socket (fd ~D)~%" fd)))
-	  ;; this should be done with (setf stream-external-format)
-	  (let ((efmt (getf options :external-format :default)))
-	    (compose-encapsulating-streams stream efmt)
-	    (install-dual-channel-character-strategy (melding-stream stream)
-						     efmt))
+          ;; this should be done with (setf stream-external-format)
+          (let ((efmt (getf options :external-format :default)))
+            (compose-encapsulating-streams stream efmt)
+            (install-dual-channel-character-strategy (melding-stream stream)
+                                                     efmt))
           stream)))))
 
 (defmethod device-close ((stream socket-simple-stream) abort)

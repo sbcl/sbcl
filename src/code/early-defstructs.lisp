@@ -15,7 +15,7 @@
 
 #.`(progn
      ,@(mapcar (lambda (args)
-		 `(defstruct ,@args))
-	       (sb-cold:read-from-file "src/code/early-defstruct-args.lisp-expr")))
+                 `(defstruct ,@args))
+               (sb-cold:read-from-file "src/code/early-defstruct-args.lisp-expr")))
 
 (/show0 "done with early-defstructs.lisp")

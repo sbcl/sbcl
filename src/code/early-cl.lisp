@@ -15,7 +15,7 @@
 (proclaim '(special sb!xc:*macroexpand-hook*))
 
 ;;; the Common Lisp defined type spec symbols
-(defparameter *!standard-type-names* 
+(defparameter *!standard-type-names*
   '(array atom bignum bit bit-vector character compiled-function
     complex cons double-float extended-char fixnum float function
     hash-table integer keyword list long-float nil null number package

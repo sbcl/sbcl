@@ -21,10 +21,10 @@
    ((zerop n)
     (let ((old-ie (car *info-environment*)))
       (setq *info-environment*
-	    (list* (make-info-environment :name "Working")
-		   (compact-info-environment (first *info-environment*)
-					     :name name)
-		   (rest *info-environment*)))
+            (list* (make-info-environment :name "Working")
+                   (compact-info-environment (first *info-environment*)
+                                             :name name)
+                   (rest *info-environment*)))
       (shrink-vector (sb!c::volatile-info-env-table old-ie) 0)))
    (t
     (compact-environment-aux name (1- n))
@@ -46,4 +46,4 @@
 
   (when environment-name (compact-environment-aux environment-name 200))
   (%purify (get-lisp-obj-address root-structures)
-	   (get-lisp-obj-address nil)))
+           (get-lisp-obj-address nil)))

@@ -36,7 +36,7 @@
                 eof-value))
           ((characterp ,peek-type)
            (do ((,char-var ,char-var ,read-form))
-               ((or (eql ,char-var ,read-eof) 
+               ((or (eql ,char-var ,read-eof)
                     (char= ,char-var ,peek-type))
                 (cond ((eql ,char-var ,read-eof)
                        ,(if eof-detected-form
@@ -78,14 +78,14 @@
          (generalized-peeking-mechanism
           peek-type eof-value char
           (ansi-stream-read-char stream eof-error-p :eof recursive-p)
-	  :eof
+          :eof
           (ansi-stream-unread-char char stream)))))
 
 (defun peek-char (&optional (peek-type nil)
-			    (stream *standard-input*)
-			    (eof-error-p t)
-			    eof-value
-			    recursive-p)
+                            (stream *standard-input*)
+                            (eof-error-p t)
+                            eof-value
+                            recursive-p)
   (the (or character boolean) peek-type)
   (let ((stream (in-synonym-of stream)))
     (if (ansi-stream-p stream)
@@ -97,7 +97,7 @@
          (if (null peek-type)
              (stream-peek-char stream)
              (stream-read-char stream))
-	 :eof
+         :eof
          (if (null peek-type)
              ()
              (stream-unread-char stream char))
@@ -106,21 +106,21 @@
 
 (defun echo-misc (stream operation &optional arg1 arg2)
   (let* ((in (two-way-stream-input-stream stream))
-	 (out (two-way-stream-output-stream stream)))
+         (out (two-way-stream-output-stream stream)))
     (case operation
       (:listen
        (or (not (null (echo-stream-unread-stuff stream)))
-	   (if (ansi-stream-p in)
-	       (or (/= (the fixnum (ansi-stream-in-index in))
-		       +ansi-stream-in-buffer-length+)
-		   (funcall (ansi-stream-misc in) in :listen))
-	       (stream-misc-dispatch in :listen))))
+           (if (ansi-stream-p in)
+               (or (/= (the fixnum (ansi-stream-in-index in))
+                       +ansi-stream-in-buffer-length+)
+                   (funcall (ansi-stream-misc in) in :listen))
+               (stream-misc-dispatch in :listen))))
       (:unread (push arg1 (echo-stream-unread-stuff stream)))
       (:element-type
        (let ((in-type (stream-element-type in))
-	     (out-type (stream-element-type out)))
-	 (if (equal in-type out-type)
-	     in-type `(and ,in-type ,out-type))))
+             (out-type (stream-element-type out)))
+         (if (equal in-type out-type)
+             in-type `(and ,in-type ,out-type))))
       (:close
        (set-closed-flame stream))
       (:peek-char
@@ -138,32 +138,32 @@
        ;; the semantics for UNREAD-CHAR are held; the character should
        ;; not be echoed again.
        (let ((unread-char-p nil))
-	 (flet ((outfn (c)
-		  (unless unread-char-p
-		    (if (ansi-stream-p out)
-			(funcall (ansi-stream-out out) out c)
-			;; gray-stream
-			(stream-write-char out c))))
-		(infn ()
-		  ;; Obtain input from unread buffer or input stream,
-		  ;; and set the flag appropriately.
-		  (cond ((not (null (echo-stream-unread-stuff stream)))
-			 (setf unread-char-p t)
-			 (pop (echo-stream-unread-stuff stream)))
-			(t
-			 (setf unread-char-p nil)
-			 (read-char in (first arg2) :eof)))))
-	   (generalized-peeking-mechanism
-	    arg1 (second arg2) char
-	    (infn)
-	    :eof
-	    (unread-char char in)
-	    (outfn char)))))
+         (flet ((outfn (c)
+                  (unless unread-char-p
+                    (if (ansi-stream-p out)
+                        (funcall (ansi-stream-out out) out c)
+                        ;; gray-stream
+                        (stream-write-char out c))))
+                (infn ()
+                  ;; Obtain input from unread buffer or input stream,
+                  ;; and set the flag appropriately.
+                  (cond ((not (null (echo-stream-unread-stuff stream)))
+                         (setf unread-char-p t)
+                         (pop (echo-stream-unread-stuff stream)))
+                        (t
+                         (setf unread-char-p nil)
+                         (read-char in (first arg2) :eof)))))
+           (generalized-peeking-mechanism
+            arg1 (second arg2) char
+            (infn)
+            :eof
+            (unread-char char in)
+            (outfn char)))))
       (t
        (or (if (ansi-stream-p in)
-	       (funcall (ansi-stream-misc in) in operation arg1 arg2)
-	       (stream-misc-dispatch in operation arg1 arg2))
-	   (if (ansi-stream-p out)
-	       (funcall (ansi-stream-misc out) out operation arg1 arg2)
-	       (stream-misc-dispatch out operation arg1 arg2)))))))
+               (funcall (ansi-stream-misc in) in operation arg1 arg2)
+               (stream-misc-dispatch in operation arg1 arg2))
+           (if (ansi-stream-p out)
+               (funcall (ansi-stream-misc out) out operation arg1 arg2)
+               (stream-misc-dispatch out operation arg1 arg2)))))))
 

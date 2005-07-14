@@ -14,21 +14,21 @@
 ;;;; Addition and subtraction.
 
 (define-assembly-routine (generic-+
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:translate +)
-			  (:policy :safe)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:translate +)
+                          (:policy :safe)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:res res (descriptor-reg any-reg) a0-offset)
+                          (:res res (descriptor-reg any-reg) a0-offset)
 
-			  (:temp temp non-descriptor-reg nl0-offset)
-			  (:temp temp2 non-descriptor-reg nl1-offset)
-			  (:temp lra descriptor-reg lra-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:temp temp non-descriptor-reg nl0-offset)
+                          (:temp temp2 non-descriptor-reg nl1-offset)
+                          (:temp lra descriptor-reg lra-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst andcc zero-tn x fixnum-tag-mask)
   (inst b :ne DO-STATIC-FUN)
   (inst andcc zero-tn y fixnum-tag-mask)
@@ -50,7 +50,7 @@
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn
-	(- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+        (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
   DONE
@@ -58,21 +58,21 @@
 
 
 (define-assembly-routine (generic--
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:translate -)
-			  (:policy :safe)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:translate -)
+                          (:policy :safe)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:res res (descriptor-reg any-reg) a0-offset)
+                          (:res res (descriptor-reg any-reg) a0-offset)
 
-			  (:temp temp non-descriptor-reg nl0-offset)
-			  (:temp temp2 non-descriptor-reg nl1-offset)
-			  (:temp lra descriptor-reg lra-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:temp temp non-descriptor-reg nl0-offset)
+                          (:temp temp2 non-descriptor-reg nl1-offset)
+                          (:temp lra descriptor-reg lra-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst andcc zero-tn x fixnum-tag-mask)
   (inst b :ne DO-STATIC-FUN)
   (inst andcc zero-tn y fixnum-tag-mask)
@@ -94,7 +94,7 @@
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn
-	(- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+        (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
   DONE
@@ -106,22 +106,22 @@
 
 
 (define-assembly-routine (generic-*
-			  (:cost 50)
-			  (:return-style :full-call)
-			  (:translate *)
-			  (:policy :safe)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
+                          (:cost 50)
+                          (:return-style :full-call)
+                          (:translate *)
+                          (:policy :safe)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:res res (descriptor-reg any-reg) a0-offset)
+                          (:res res (descriptor-reg any-reg) a0-offset)
 
-			  (:temp temp non-descriptor-reg nl0-offset)
-			  (:temp lo non-descriptor-reg nl1-offset)
-			  (:temp hi non-descriptor-reg nl2-offset)
-			  (:temp lra descriptor-reg lra-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:temp temp non-descriptor-reg nl0-offset)
+                          (:temp lo non-descriptor-reg nl1-offset)
+                          (:temp hi non-descriptor-reg nl2-offset)
+                          (:temp lra descriptor-reg lra-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   ;; If either arg is not a fixnum, call the static function.
   (inst andcc zero-tn x fixnum-tag-mask)
   (inst b :ne DO-STATIC-FUN)
@@ -143,7 +143,7 @@
      (inst move lo hi)
      (inst srax hi 32))
     ((or (member :sparc-v8 *backend-subfeatures*)
-	 (member :sparc-v9 *backend-subfeatures*))
+         (member :sparc-v9 *backend-subfeatures*))
      (inst smul lo temp y)
      (inst rdy hi))
     (t
@@ -153,7 +153,7 @@
        (inst nop)
        (inst nop)
        (dotimes (i 32)
-	 (inst mulscc hi y))
+         (inst mulscc hi y))
        (inst mulscc hi zero-tn)
        (inst cmp x)
        (inst b :ge MULTIPLIER-POSITIVE)
@@ -174,21 +174,21 @@
   ;; Allocate a BIGNUM for the result.
   #+nil
   (pseudo-atomic (:extra (pad-data-block (1+ bignum-digits-offset)))
-		 (let ((one-word (gen-label)))
-		   (inst or res alloc-tn other-pointer-lowtag)
-		   ;; We start out assuming that we need one word.  Is that correct?
-		   (inst sra temp lo 31)
-		   (inst xorcc temp hi)
-		   (inst b :eq one-word)
-		   (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
-		   ;; Nope, we need two, so allocate the addition space.
-		   (inst add alloc-tn (- (pad-data-block (+ 2 bignum-digits-offset))
-					 (pad-data-block (1+ bignum-digits-offset))))
-		   (inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))
-		   (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag)
-		   (emit-label one-word)
-		   (storew temp res 0 other-pointer-lowtag)
-		   (storew lo res bignum-digits-offset other-pointer-lowtag)))
+                 (let ((one-word (gen-label)))
+                   (inst or res alloc-tn other-pointer-lowtag)
+                   ;; We start out assuming that we need one word.  Is that correct?
+                   (inst sra temp lo 31)
+                   (inst xorcc temp hi)
+                   (inst b :eq one-word)
+                   (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
+                   ;; Nope, we need two, so allocate the addition space.
+                   (inst add alloc-tn (- (pad-data-block (+ 2 bignum-digits-offset))
+                                         (pad-data-block (1+ bignum-digits-offset))))
+                   (inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))
+                   (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag)
+                   (emit-label one-word)
+                   (storew temp res 0 other-pointer-lowtag)
+                   (storew lo res bignum-digits-offset other-pointer-lowtag)))
   ;; Always allocate 2 words for the bignum result, even if we only
   ;; need one.  The copying GC will take care of the extra word if it
   ;; isn't needed.
@@ -210,13 +210,13 @@
       (storew lo res bignum-digits-offset other-pointer-lowtag)))
   ;; Out of here
   (lisp-return lra :offset 2)
-  
+
   DO-STATIC-FUN
   (inst ld code-tn null-tn (static-fun-offset 'two-arg-*))
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn
-	(- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+        (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
   LOW-FITS-IN-FIXNUM
@@ -225,36 +225,36 @@
 (macrolet
     ((frob (name note cost type sc)
        `(define-assembly-routine (,name
-				  (:note ,note)
-				  (:cost ,cost)
-				  (:translate *)
-				  (:policy :fast-safe)
-				  (:arg-types ,type ,type)
-				  (:result-types ,type))
-				 ((:arg x ,sc nl0-offset)
-				  (:arg y ,sc nl1-offset)
-				  (:res res ,sc nl0-offset)
-				  (:temp temp ,sc nl2-offset))
-	  ,@(when (eq type 'tagged-num)
-	      `((inst sra x 2)))
-	 (cond
-	   ((member :sparc-64 *backend-subfeatures*)
-	    ;; Sign extend, then multiply
-	    (inst sra x 0)
-	    (inst sra y 0)
-	    (inst mulx res x y))
-	   ((or (member :sparc-v8 *backend-subfeatures*)
-		(member :sparc-v9 *backend-subfeatures*))
-	    (inst smul res x y))
-	   (t
-	    (inst wry x)
-	    (inst andcc temp zero-tn)
-	    (inst nop)
-	    (inst nop)
-	    (dotimes (i 32)
-	      (inst mulscc temp y))
-	    (inst mulscc temp zero-tn)
-	   (inst rdy res))))))
+                                  (:note ,note)
+                                  (:cost ,cost)
+                                  (:translate *)
+                                  (:policy :fast-safe)
+                                  (:arg-types ,type ,type)
+                                  (:result-types ,type))
+                                 ((:arg x ,sc nl0-offset)
+                                  (:arg y ,sc nl1-offset)
+                                  (:res res ,sc nl0-offset)
+                                  (:temp temp ,sc nl2-offset))
+          ,@(when (eq type 'tagged-num)
+              `((inst sra x 2)))
+         (cond
+           ((member :sparc-64 *backend-subfeatures*)
+            ;; Sign extend, then multiply
+            (inst sra x 0)
+            (inst sra y 0)
+            (inst mulx res x y))
+           ((or (member :sparc-v8 *backend-subfeatures*)
+                (member :sparc-v9 *backend-subfeatures*))
+            (inst smul res x y))
+           (t
+            (inst wry x)
+            (inst andcc temp zero-tn)
+            (inst nop)
+            (inst nop)
+            (dotimes (i 32)
+              (inst mulscc temp y))
+            (inst mulscc temp zero-tn)
+           (inst rdy res))))))
   (frob unsigned-* "unsigned *" 40 unsigned-num unsigned-reg)
   (frob signed-* "unsigned *" 41 signed-num signed-reg)
   (frob fixnum-* "fixnum *" 30 tagged-num any-reg))
@@ -268,42 +268,42 @@
   (inst li quo 0)
   (labels
       ((do-loop (depth)
-	 (cond
-	  ((zerop depth)
-	   (inst unimp 0))
-	  (t
-	   (let ((label-1 (gen-label))
-		 (label-2 (gen-label)))
-	     (inst cmp divisor rem)
-	     (inst b :geu label-1)
-	     (inst nop)
-	     (inst sll divisor 1)
-	     (do-loop (1- depth))
-	     (inst srl divisor 1)
-	     (inst cmp divisor rem)
-	     (emit-label label-1)
-	     (inst b :gtu label-2)
-	     (inst sll quo 1)
-	     (inst add quo (if tagged (fixnumize 1) 1))
-	     (inst sub rem divisor)
-	     (emit-label label-2))))))
+         (cond
+          ((zerop depth)
+           (inst unimp 0))
+          (t
+           (let ((label-1 (gen-label))
+                 (label-2 (gen-label)))
+             (inst cmp divisor rem)
+             (inst b :geu label-1)
+             (inst nop)
+             (inst sll divisor 1)
+             (do-loop (1- depth))
+             (inst srl divisor 1)
+             (inst cmp divisor rem)
+             (emit-label label-1)
+             (inst b :gtu label-2)
+             (inst sll quo 1)
+             (inst add quo (if tagged (fixnumize 1) 1))
+             (inst sub rem divisor)
+             (emit-label label-2))))))
     (do-loop (if tagged 30 32))))
 
 (define-assembly-routine (positive-fixnum-truncate
-			  (:note "unsigned fixnum truncate")
-			  (:cost 45)
-			  (:translate truncate)
-			  (:policy :fast-safe)
-			  (:arg-types positive-fixnum positive-fixnum)
-			  (:result-types positive-fixnum positive-fixnum))
-			 ((:arg dividend any-reg nl0-offset)
-			  (:arg divisor any-reg nl1-offset)
+                          (:note "unsigned fixnum truncate")
+                          (:cost 45)
+                          (:translate truncate)
+                          (:policy :fast-safe)
+                          (:arg-types positive-fixnum positive-fixnum)
+                          (:result-types positive-fixnum positive-fixnum))
+                         ((:arg dividend any-reg nl0-offset)
+                          (:arg divisor any-reg nl1-offset)
 
-			  (:res quo any-reg nl2-offset)
-			  (:res rem any-reg nl0-offset))
+                          (:res quo any-reg nl2-offset)
+                          (:res rem any-reg nl0-offset))
 
   (let ((error (generate-error-code nil division-by-zero-error
-				    dividend divisor)))
+                                    dividend divisor)))
     (inst cmp divisor)
     (inst b :eq error))
 
@@ -312,23 +312,23 @@
 
 
 (define-assembly-routine (fixnum-truncate
-			  (:note "fixnum truncate")
-			  (:cost 50)
-			  (:policy :fast-safe)
-			  (:translate truncate)
-			  (:arg-types tagged-num tagged-num)
-			  (:result-types tagged-num tagged-num))
-			 ((:arg dividend any-reg nl0-offset)
-			  (:arg divisor any-reg nl1-offset)
+                          (:note "fixnum truncate")
+                          (:cost 50)
+                          (:policy :fast-safe)
+                          (:translate truncate)
+                          (:arg-types tagged-num tagged-num)
+                          (:result-types tagged-num tagged-num))
+                         ((:arg dividend any-reg nl0-offset)
+                          (:arg divisor any-reg nl1-offset)
 
-			  (:res quo any-reg nl2-offset)
-			  (:res rem any-reg nl0-offset)
+                          (:res quo any-reg nl2-offset)
+                          (:res rem any-reg nl0-offset)
 
-			  (:temp quo-sign any-reg nl5-offset)
-			  (:temp rem-sign any-reg nargs-offset))
-  
+                          (:temp quo-sign any-reg nl5-offset)
+                          (:temp rem-sign any-reg nargs-offset))
+
   (let ((error (generate-error-code nil division-by-zero-error
-				    dividend divisor)))
+                                    dividend divisor)))
     (inst cmp divisor)
     (inst b :eq error))
 
@@ -361,24 +361,24 @@
 
 
 (define-assembly-routine (signed-truncate
-			  (:note "(signed-byte 32) truncate")
-			  (:cost 60)
-			  (:policy :fast-safe)
-			  (:translate truncate)
-			  (:arg-types signed-num signed-num)
-			  (:result-types signed-num signed-num))
+                          (:note "(signed-byte 32) truncate")
+                          (:cost 60)
+                          (:policy :fast-safe)
+                          (:translate truncate)
+                          (:arg-types signed-num signed-num)
+                          (:result-types signed-num signed-num))
 
-			 ((:arg dividend signed-reg nl0-offset)
-			  (:arg divisor signed-reg nl1-offset)
+                         ((:arg dividend signed-reg nl0-offset)
+                          (:arg divisor signed-reg nl1-offset)
 
-			  (:res quo signed-reg nl2-offset)
-			  (:res rem signed-reg nl0-offset)
+                          (:res quo signed-reg nl2-offset)
+                          (:res rem signed-reg nl0-offset)
 
-			  (:temp quo-sign signed-reg nl5-offset)
-			  (:temp rem-sign signed-reg nargs-offset))
-  
+                          (:temp quo-sign signed-reg nl5-offset)
+                          (:temp rem-sign signed-reg nargs-offset))
+
   (let ((error (generate-error-code nil division-by-zero-error
-				    dividend divisor)))
+                                    dividend divisor)))
     (inst cmp divisor)
     (inst b :eq error))
 
@@ -415,37 +415,37 @@
 (macrolet
     ((define-cond-assem-rtn (name translate static-fn cmp)
        `(define-assembly-routine (,name
-				  (:cost 10)
-				  (:return-style :full-call)
-				  (:policy :safe)
-				  (:translate ,translate)
-				  (:save-p t))
-				 ((:arg x (descriptor-reg any-reg) a0-offset)
-				  (:arg y (descriptor-reg any-reg) a1-offset)
-				  
-				  (:res res descriptor-reg a0-offset)
-				  
-				  (:temp nargs any-reg nargs-offset)
-				  (:temp ocfp any-reg ocfp-offset))
-	  (inst andcc zero-tn x fixnum-tag-mask)
-	  (inst b :ne DO-STATIC-FN)
-	  (inst andcc zero-tn y fixnum-tag-mask)
-	  (inst b :eq DO-COMPARE)
-	  (inst cmp x y)
-	  
-	  DO-STATIC-FN
-	  (inst ld code-tn null-tn (static-fun-offset ',static-fn))
-	  (inst li nargs (fixnumize 2))
-	  (inst move ocfp cfp-tn)
-	  (inst j code-tn
-		(- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
-	  (inst move cfp-tn csp-tn)
-	  
-	  DO-COMPARE
-	  (inst b ,cmp done)
-	  (load-symbol res t)
-	  (inst move res null-tn)
-	  DONE)))
+                                  (:cost 10)
+                                  (:return-style :full-call)
+                                  (:policy :safe)
+                                  (:translate ,translate)
+                                  (:save-p t))
+                                 ((:arg x (descriptor-reg any-reg) a0-offset)
+                                  (:arg y (descriptor-reg any-reg) a1-offset)
+
+                                  (:res res descriptor-reg a0-offset)
+
+                                  (:temp nargs any-reg nargs-offset)
+                                  (:temp ocfp any-reg ocfp-offset))
+          (inst andcc zero-tn x fixnum-tag-mask)
+          (inst b :ne DO-STATIC-FN)
+          (inst andcc zero-tn y fixnum-tag-mask)
+          (inst b :eq DO-COMPARE)
+          (inst cmp x y)
+
+          DO-STATIC-FN
+          (inst ld code-tn null-tn (static-fun-offset ',static-fn))
+          (inst li nargs (fixnumize 2))
+          (inst move ocfp cfp-tn)
+          (inst j code-tn
+                (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+          (inst move cfp-tn csp-tn)
+
+          DO-COMPARE
+          (inst b ,cmp done)
+          (load-symbol res t)
+          (inst move res null-tn)
+          DONE)))
 
   (define-cond-assem-rtn generic-< < two-arg-< :lt)
   (define-cond-assem-rtn generic-<= <= two-arg-<= :le)
@@ -454,19 +454,19 @@
 
 
 (define-assembly-routine (generic-eql
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:policy :safe)
-			  (:translate eql)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
-			  
-			  (:res res descriptor-reg a0-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:policy :safe)
+                          (:translate eql)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:temp lra descriptor-reg lra-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:res res descriptor-reg a0-offset)
+
+                          (:temp lra descriptor-reg lra-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst cmp x y)
   (inst b :eq RETURN-T)
   (inst andcc zero-tn x fixnum-tag-mask)
@@ -484,26 +484,26 @@
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn
-	(- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+        (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
   RETURN-T
   (load-symbol res t))
 
 (define-assembly-routine (generic-=
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:policy :safe)
-			  (:translate =)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:policy :safe)
+                          (:translate =)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:res res descriptor-reg a0-offset)
+                          (:res res descriptor-reg a0-offset)
 
-			  (:temp lra descriptor-reg lra-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:temp lra descriptor-reg lra-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst andcc zero-tn x fixnum-tag-mask)
   (inst b :ne DO-STATIC-FN)
   (inst andcc zero-tn y fixnum-tag-mask)
@@ -520,26 +520,26 @@
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn
-	(- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+        (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
   RETURN-T
   (load-symbol res t))
 
 (define-assembly-routine (generic-/=
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:policy :safe)
-			  (:translate /=)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:policy :safe)
+                          (:translate /=)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:res res descriptor-reg a0-offset)
+                          (:res res descriptor-reg a0-offset)
 
-			  (:temp lra descriptor-reg lra-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:temp lra descriptor-reg lra-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst cmp x y)
   (inst b :eq RETURN-NIL)
   (inst andcc zero-tn x fixnum-tag-mask)
@@ -556,7 +556,7 @@
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn
-	(- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+        (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
   RETURN-NIL

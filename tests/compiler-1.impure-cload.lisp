@@ -7,7 +7,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -39,7 +39,7 @@
 (declaim (ftype (function (real) (values integer single-float)) valuesify))
 (defun valuesify (x)
   (values (round x)
-	  (coerce x 'single-float)))
+          (coerce x 'single-float)))
 (defun exercise-valuesify (x)
   (multiple-value-bind (i f) (valuesify x)
     (declare (type integer i))
@@ -112,9 +112,9 @@
   (when (consp (aref x 0))
     (aref x 0)))
 (assert (raises-error?
-	 (array-element-type-handling
-	  (make-array 3 :element-type t :initial-element 0))
-	 type-error))
+         (array-element-type-handling
+          (make-array 3 :element-type t :initial-element 0))
+         type-error))
 
 ;;; bug 220: type check inserted after all arguments in MV-CALL caused
 ;;; failure of stack analysis

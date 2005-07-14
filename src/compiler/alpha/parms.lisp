@@ -77,11 +77,11 @@
 (def!constant float-overflow-trap-bit       (ash 1 2)) ; ro
 (def!constant float-divide-by-zero-trap-bit (ash 1 1)) ; ro
 (def!constant float-invalid-trap-bit        (ash 1 0)) ; ro
-(defconstant-eqx float-traps-byte          (byte 6  1) #'equalp)  
+(defconstant-eqx float-traps-byte          (byte 6  1) #'equalp)
 
 ;;; exceptions are also read/written in software (by syscalls, no less).
 ;;; This is kind of dumb, but has to be done
-(defconstant-eqx float-sticky-bits     (byte 6 17) #'equalp)	; fp_control
+(defconstant-eqx float-sticky-bits     (byte 6 17) #'equalp)    ; fp_control
 
 ;;; (We don't actually _have_ "current exceptions" on Alpha; the
 ;;; hardware only ever sets bits.  So, set this the same as accrued
@@ -93,7 +93,7 @@
 (def!constant float-round-to-negative 1)
 (def!constant float-round-to-nearest  2)
 (def!constant float-round-to-positive 3)
-(defconstant-eqx float-rounding-mode   (byte 2 58) #'equalp) 
+(defconstant-eqx float-rounding-mode   (byte 2 58) #'equalp)
 
 ;;; Miscellaneous stuff - I think it's far to say that you deserve
 ;;; what you get if you ask for fast mode.
@@ -211,8 +211,8 @@
     sb!kernel:two-arg->
     sb!kernel:two-arg-=
     ;; FIXME: Is this
-    ;;     probably need the following as they are defined in 
-    ;;     arith.lisp: two-arg-<= two-arg->= two-arg-/= 
+    ;;     probably need the following as they are defined in
+    ;;     arith.lisp: two-arg-<= two-arg->= two-arg-/=
     ;; a comment from old CMU CL or old old CMU CL or
     ;; the SBCL alpha port or what? Do we need to worry about it,
     ;; or can we delete it?

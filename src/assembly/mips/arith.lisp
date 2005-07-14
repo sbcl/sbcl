@@ -2,23 +2,23 @@
 
 
 (define-assembly-routine (generic-+
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:translate +)
-			  (:policy :safe)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:translate +)
+                          (:policy :safe)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:res res (descriptor-reg any-reg) a0-offset)
+                          (:res res (descriptor-reg any-reg) a0-offset)
 
-			  (:temp temp non-descriptor-reg nl0-offset)
-			  (:temp temp1 non-descriptor-reg nl1-offset)
-			  (:temp temp2 non-descriptor-reg nl2-offset)
-			  (:temp pa-flag non-descriptor-reg nl4-offset)
-			  (:temp lip interior-reg lip-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:temp temp non-descriptor-reg nl0-offset)
+                          (:temp temp1 non-descriptor-reg nl1-offset)
+                          (:temp temp2 non-descriptor-reg nl2-offset)
+                          (:temp pa-flag non-descriptor-reg nl4-offset)
+                          (:temp lip interior-reg lip-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst or temp x y)
   (inst and temp fixnum-tag-mask)
   (inst beq temp DO-ADD)
@@ -52,23 +52,23 @@
 
 
 (define-assembly-routine (generic--
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:translate -)
-			  (:policy :safe)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:translate -)
+                          (:policy :safe)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:res res (descriptor-reg any-reg) a0-offset)
+                          (:res res (descriptor-reg any-reg) a0-offset)
 
-			  (:temp temp non-descriptor-reg nl0-offset)
-			  (:temp temp1 non-descriptor-reg nl1-offset)
-			  (:temp temp2 non-descriptor-reg nl2-offset)
-			  (:temp pa-flag non-descriptor-reg nl4-offset)
-			  (:temp lip interior-reg lip-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:temp temp non-descriptor-reg nl0-offset)
+                          (:temp temp1 non-descriptor-reg nl1-offset)
+                          (:temp temp2 non-descriptor-reg nl2-offset)
+                          (:temp pa-flag non-descriptor-reg nl4-offset)
+                          (:temp lip interior-reg lip-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst or temp x y)
   (inst and temp fixnum-tag-mask)
   (inst beq temp DO-SUB)
@@ -102,23 +102,23 @@
 
 
 (define-assembly-routine (generic-*
-			  (:cost 25)
-			  (:return-style :full-call)
-			  (:translate *)
-			  (:policy :safe)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
+                          (:cost 25)
+                          (:return-style :full-call)
+                          (:translate *)
+                          (:policy :safe)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:res res (descriptor-reg any-reg) a0-offset)
+                          (:res res (descriptor-reg any-reg) a0-offset)
 
-			  (:temp temp non-descriptor-reg nl0-offset)
-			  (:temp lo non-descriptor-reg nl1-offset)
-			  (:temp hi non-descriptor-reg nl2-offset)
-			  (:temp pa-flag non-descriptor-reg nl4-offset)
-			  (:temp lip interior-reg lip-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:temp temp non-descriptor-reg nl0-offset)
+                          (:temp lo non-descriptor-reg nl1-offset)
+                          (:temp hi non-descriptor-reg nl2-offset)
+                          (:temp pa-flag non-descriptor-reg nl4-offset)
+                          (:temp lip interior-reg lip-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   ;; If either arg is not a fixnum, call the static function.
   (inst or temp x y)
   (inst and temp fixnum-tag-mask)
@@ -180,58 +180,58 @@
 (macrolet
     ((define-cond-assem-rtn (name translate static-fn cmp)
        `(define-assembly-routine (,name
-				  (:cost 10)
-				  (:return-style :full-call)
-				  (:policy :safe)
-				  (:translate ,translate)
-				  (:save-p t))
-				 ((:arg x (descriptor-reg any-reg) a0-offset)
-				  (:arg y (descriptor-reg any-reg) a1-offset)
-				  
-				  (:res res descriptor-reg a0-offset)
-				  
-				  (:temp temp non-descriptor-reg nl0-offset)
-				  (:temp lip interior-reg lip-offset)
-				  (:temp nargs any-reg nargs-offset)
-				  (:temp ocfp any-reg ocfp-offset))
-	  (inst or temp x y)
-	  (inst and temp fixnum-tag-mask)
-	  (inst beq temp DO-COMPARE)
-	  ,cmp
+                                  (:cost 10)
+                                  (:return-style :full-call)
+                                  (:policy :safe)
+                                  (:translate ,translate)
+                                  (:save-p t))
+                                 ((:arg x (descriptor-reg any-reg) a0-offset)
+                                  (:arg y (descriptor-reg any-reg) a1-offset)
 
-	  ;; DO-STATIC-FUN
-	  (inst lw lip null-tn (static-fun-offset ',static-fn))
-	  (inst li nargs (fixnumize 2))
-	  (move ocfp cfp-tn)
-	  (inst j lip)
-	  (move cfp-tn csp-tn t)
-	  
-	  DO-COMPARE
-	  (inst beq temp DONE)
-	  (move res null-tn t)
-	  (load-symbol res t)
+                                  (:res res descriptor-reg a0-offset)
 
-	  DONE)))
+                                  (:temp temp non-descriptor-reg nl0-offset)
+                                  (:temp lip interior-reg lip-offset)
+                                  (:temp nargs any-reg nargs-offset)
+                                  (:temp ocfp any-reg ocfp-offset))
+          (inst or temp x y)
+          (inst and temp fixnum-tag-mask)
+          (inst beq temp DO-COMPARE)
+          ,cmp
+
+          ;; DO-STATIC-FUN
+          (inst lw lip null-tn (static-fun-offset ',static-fn))
+          (inst li nargs (fixnumize 2))
+          (move ocfp cfp-tn)
+          (inst j lip)
+          (move cfp-tn csp-tn t)
+
+          DO-COMPARE
+          (inst beq temp DONE)
+          (move res null-tn t)
+          (load-symbol res t)
+
+          DONE)))
 
   (define-cond-assem-rtn generic-< < two-arg-< (inst slt temp x y))
   (define-cond-assem-rtn generic-> > two-arg-> (inst slt temp y x)))
 
 
 (define-assembly-routine (generic-eql
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:policy :safe)
-			  (:translate eql)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
-			  
-			  (:res res descriptor-reg a0-offset)
-			  
-			  (:temp temp non-descriptor-reg nl0-offset)
-			  (:temp lip interior-reg lip-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:policy :safe)
+                          (:translate eql)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
+
+                          (:res res descriptor-reg a0-offset)
+
+                          (:temp temp non-descriptor-reg nl0-offset)
+                          (:temp lip interior-reg lip-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst beq x y RETURN-T)
   (inst or temp x y)
   (inst and temp fixnum-tag-mask)
@@ -256,20 +256,20 @@
 
 
 (define-assembly-routine (generic-=
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:policy :safe)
-			  (:translate =)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
-			  
-			  (:res res descriptor-reg a0-offset)
-			  
-			  (:temp temp non-descriptor-reg nl0-offset)
-			  (:temp lip interior-reg lip-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:policy :safe)
+                          (:translate =)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
+
+                          (:res res descriptor-reg a0-offset)
+
+                          (:temp temp non-descriptor-reg nl0-offset)
+                          (:temp lip interior-reg lip-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst or temp x y)
   (inst and temp fixnum-tag-mask)
   (inst beq temp RETURN)
@@ -291,20 +291,20 @@
 
 
 (define-assembly-routine (generic-/=
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:policy :safe)
-			  (:translate /=)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
-			  
-			  (:res res descriptor-reg a0-offset)
-			  
-			  (:temp temp non-descriptor-reg nl0-offset)
-			  (:temp lip interior-reg lip-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:policy :safe)
+                          (:translate /=)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
+
+                          (:res res descriptor-reg a0-offset)
+
+                          (:temp temp non-descriptor-reg nl0-offset)
+                          (:temp lip interior-reg lip-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst or temp x y)
   (inst and temp fixnum-tag-mask)
   (inst beq temp RETURN)

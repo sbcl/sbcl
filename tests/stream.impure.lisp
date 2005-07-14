@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -19,11 +19,11 @@
 (locally
     (declare (optimize (safety 3)))
   (assert (raises-error? (make-two-way-stream (make-string-output-stream)
-					      (make-string-output-stream))
-			 type-error))
+                                              (make-string-output-stream))
+                         type-error))
   (assert (raises-error? (make-two-way-stream (make-string-input-stream "foo")
-					      (make-string-input-stream "bar"))
-			 type-error))
+                                              (make-string-input-stream "bar"))
+                         type-error))
   ;; the following two aren't actually guaranteed, because ANSI, as it
   ;; happens, doesn't say "should signal an error" for
   ;; MAKE-ECHO-STREAM. It's still good to have, but if future
@@ -31,15 +31,15 @@
   ;; MAKE-ECHO-STREAM clauses, consider simply removing these clauses
   ;; from the test. -- CSR, 2002-10-06
   (assert (raises-error? (make-echo-stream (make-string-output-stream)
-					   (make-string-output-stream))
-			 type-error))
+                                           (make-string-output-stream))
+                         type-error))
   (assert (raises-error? (make-echo-stream (make-string-input-stream "foo")
-					   (make-string-input-stream "bar"))
-			 type-error))
+                                           (make-string-input-stream "bar"))
+                         type-error))
   (assert (raises-error? (make-concatenated-stream
-			  (make-string-output-stream)
-			  (make-string-input-stream "foo"))
-			 type-error)))
+                          (make-string-output-stream)
+                          (make-string-input-stream "foo"))
+                         type-error)))
 
 ;;; bug 225: STRING-STREAM was not a class
 (eval `(defgeneric bug225 (s)
@@ -58,9 +58,9 @@
 ;;; improper buffering on (SIGNED-BYTE 8) streams (fixed by David Lichteblau):
 (let ((p "signed-byte-8-test.data"))
   (with-open-file (s p
-		     :direction :output
-		     :element-type '(unsigned-byte 8)
-		     :if-exists :supersede)
+                     :direction :output
+                     :element-type '(unsigned-byte 8)
+                     :if-exists :supersede)
     (write-byte 255 s))
   (with-open-file (s p :element-type '(signed-byte 8))
     (assert (= (read-byte s) -1)))
@@ -72,15 +72,15 @@
        (stream (open p :direction :output :if-exists :error)))
   (assert (null (with-open-file (s p :direction :output :if-exists nil) s)))
   (assert (raises-error?
-	   (with-open-file (s p :direction :output :if-exists :error))))
+           (with-open-file (s p :direction :output :if-exists :error))))
   (close stream)
   (delete-file p))
 
 (assert (raises-error? (read-byte (make-string-input-stream "abc"))
-		       type-error))
+                       type-error))
 (assert (raises-error? (with-open-file (s "/dev/zero")
-			 (read-byte s))
-		       type-error))
+                         (read-byte s))
+                       type-error))
 ;;; bidirectional streams getting confused about their position
 (let ((p "bidirectional-stream-test"))
   (with-open-file (s p :direction :output :if-exists :supersede)
@@ -130,25 +130,25 @@
 ;;; files should be restored.
 (let ((test "test-file-for-close-should-not-delete"))
   (macrolet ((test-mode (mode)
-	       `(progn
-		 (catch :close-test-exit
-		   (with-open-file (f test :direction :output :if-exists ,mode)
-		     (write-line "test" f)
-		     (throw :close-test-exit t)))
-		 (assert (and (probe-file test) ,mode)))))
+               `(progn
+                 (catch :close-test-exit
+                   (with-open-file (f test :direction :output :if-exists ,mode)
+                     (write-line "test" f)
+                     (throw :close-test-exit t)))
+                 (assert (and (probe-file test) ,mode)))))
     (unwind-protect
-	 (progn
-	   (with-open-file (f test :direction :output)
-	     (write-line "test" f))
-	   (test-mode :append)
-	   (test-mode :overwrite)
-	   ;; FIXME: We really should recover supersede files as well, according to
-	   ;; CLOSE in CLHS, but at the moment we don't.
-	   ;; (test-mode :supersede)
-	   (test-mode :rename)
-	   (test-mode :rename-and-delete))
+         (progn
+           (with-open-file (f test :direction :output)
+             (write-line "test" f))
+           (test-mode :append)
+           (test-mode :overwrite)
+           ;; FIXME: We really should recover supersede files as well, according to
+           ;; CLOSE in CLHS, but at the moment we don't.
+           ;; (test-mode :supersede)
+           (test-mode :rename)
+           (test-mode :rename-and-delete))
       (when (probe-file test)
-	(delete-file test)))))
+        (delete-file test)))))
 
 ;;; test for read-write invariance of signed bytes, from Bruno Haible
 ;;; cmucl-imp 2004-09-06

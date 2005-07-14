@@ -5,13 +5,13 @@
      (:policy :fast-safe)
      (:translate allocate-vector)
      (:arg-types positive-fixnum
-		 positive-fixnum
-		 positive-fixnum))
+                 positive-fixnum
+                 positive-fixnum))
     ((:arg type any-reg a0-offset)
      (:arg length any-reg a1-offset)
      (:arg words any-reg a2-offset)
      (:res result descriptor-reg a0-offset)
-     
+
      (:temp ndescr non-descriptor-reg nl0-offset)
      (:temp vector descriptor-reg a3-offset))
   (pseudo-atomic ()
@@ -58,7 +58,7 @@
      (:policy :fast-safe)
      (:arg-types * positive-fixnum)
      (:result-types positive-fixnum))
-    
+
     ((:arg string descriptor-reg a0-offset)
      (:arg length any-reg a1-offset)
      (:res result any-reg a0-offset)

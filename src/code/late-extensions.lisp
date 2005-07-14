@@ -20,12 +20,12 @@
 (defun list-with-length-p (x)
   (values (ignore-errors (list-length x))))
 
-;;; not used in 0.7.8, but possibly useful for defensive programming 
+;;; not used in 0.7.8, but possibly useful for defensive programming
 ;;; in e.g. (COERCE ... 'VECTOR)
 ;;;(defun list-length-or-die (x)
 ;;;  (or (list-length x)
 ;;;      ;; not clear how to do this best:
-;;;      ;;   * Should this be a TYPE-ERROR? Colloquially that'd make 
+;;;      ;;   * Should this be a TYPE-ERROR? Colloquially that'd make
 ;;;      ;;     lots of sense, but since I'm not sure how to express
 ;;;      ;;     "noncircular list" as a Lisp type expression, coding
 ;;;      ;;     it seems awkward.

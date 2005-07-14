@@ -25,16 +25,16 @@
   NAME is some name (for debugging only) or NIL if there is no name."
     (declare (type function fun))
     (let* ((fun (%simple-fun-self fun))
-	   (name (%fun-name fun))
-	   (code (sb!di::fun-code-header fun))
-	   (info (sb!kernel:%code-debug-info code)))
+           (name (%fun-name fun))
+           (code (sb!di::fun-code-header fun))
+           (info (sb!kernel:%code-debug-info code)))
       (if info
         (let ((source (sb!c::debug-info-source info)))
           (cond ((and (eq (sb!c::debug-source-from source) :lisp)
                       (eq (sb!c::debug-source-function source) fun))
                  (values (svref (sb!c::debug-source-name source) 0)
                          nil
-			 name))
+                         name))
                 ((legal-fun-name-p name)
                  (let ((exp (fun-name-inline-expansion name)))
                    (values exp (not exp) name)))
@@ -48,9 +48,9 @@
 (defun %fun-fun (function)
   (declare (function function))
   (case (widetag-of function)
-    (#.sb!vm:simple-fun-header-widetag 
+    (#.sb!vm:simple-fun-header-widetag
      function)
-    (#.sb!vm:closure-header-widetag 
+    (#.sb!vm:closure-header-widetag
      (%closure-fun function))
     (#.sb!vm:funcallable-instance-header-widetag
      (funcallable-instance-fun function))))
@@ -92,7 +92,7 @@
        ;; When/if weak hash tables become supported
        ;; again, it'll become easy to fix this, but for now there
        ;; seems to be no easy way (short of the ugly way of adding a
-       ;; slot to every single closure header), so we don't. 
+       ;; slot to every single closure header), so we don't.
        ;;
        ;; Meanwhile, users might encounter this problem by doing DEFUN
        ;; in a non-null lexical environment, so we try to give a
@@ -106,7 +106,7 @@
        ;; user-level code, so we can give a implementor-level
        ;; "error" (warning) message.
        (warn "can't set function name ((~S function)=~S), leaving it unchanged"
-	     'widetag-of widetag))))
+             'widetag-of widetag))))
   new-name)
 
 (defun %fun-doc (x)
@@ -140,7 +140,7 @@ are running on, or NIL if we can't find any useful information."
   (unless (boundp '*machine-version*)
     (setf *machine-version* (get-machine-version)))
   *machine-version*)
-  
+
 ;;; FIXME: Don't forget to set these in a sample site-init file.
 ;;; FIXME: Perhaps the functions could be SETFable instead of having the
 ;;; interface be through special variables? As far as I can tell
@@ -172,10 +172,10 @@ until one of them returns non-NIL; these functions are responsible for
 signalling a FILE-ERROR to indicate failure to perform an operation on
 the file system."
   (dolist (fun *ed-functions*
-	   (error 'extension-failure
-		  :format-control "Don't know how to ~S ~A"
-		  :format-arguments (list 'ed x)
-		  :references (list '(:sbcl :variable *ed-functions*))))
+           (error 'extension-failure
+                  :format-control "Don't know how to ~S ~A"
+                  :format-arguments (list 'ed x)
+                  :references (list '(:sbcl :variable *ed-functions*))))
     (when (funcall fun x)
       (return t))))
 
@@ -202,33 +202,33 @@ the file system."
   record of further I/O to that file. Without an argument, it closes
   the dribble file, and quits logging."
   (cond (pathname
-	 (let* ((new-dribble-stream
-		 (open pathname
-		       :direction :output
-		       :if-exists if-exists
-		       :if-does-not-exist :create))
-		(new-standard-output
-		 (make-broadcast-stream *standard-output* new-dribble-stream))
-		(new-error-output
-		 (make-broadcast-stream *error-output* new-dribble-stream))
-		(new-standard-input
-		 (make-echo-stream *standard-input* new-dribble-stream)))
-	   (push (list *dribble-stream* *standard-input* *standard-output*
-		       *error-output*)
-		 *previous-dribble-streams*)
-	   (setf *dribble-stream* new-dribble-stream)
-	   (setf *standard-input* new-standard-input)
-	   (setf *standard-output* new-standard-output)
-	   (setf *error-output* new-error-output)))
-	((null *dribble-stream*)
-	 (error "not currently dribbling"))
-	(t
-	 (let ((old-streams (pop *previous-dribble-streams*)))
-	   (close *dribble-stream*)
-	   (setf *dribble-stream* (first old-streams))
-	   (setf *standard-input* (second old-streams))
-	   (setf *standard-output* (third old-streams))
-	   (setf *error-output* (fourth old-streams)))))
+         (let* ((new-dribble-stream
+                 (open pathname
+                       :direction :output
+                       :if-exists if-exists
+                       :if-does-not-exist :create))
+                (new-standard-output
+                 (make-broadcast-stream *standard-output* new-dribble-stream))
+                (new-error-output
+                 (make-broadcast-stream *error-output* new-dribble-stream))
+                (new-standard-input
+                 (make-echo-stream *standard-input* new-dribble-stream)))
+           (push (list *dribble-stream* *standard-input* *standard-output*
+                       *error-output*)
+                 *previous-dribble-streams*)
+           (setf *dribble-stream* new-dribble-stream)
+           (setf *standard-input* new-standard-input)
+           (setf *standard-output* new-standard-output)
+           (setf *error-output* new-error-output)))
+        ((null *dribble-stream*)
+         (error "not currently dribbling"))
+        (t
+         (let ((old-streams (pop *previous-dribble-streams*)))
+           (close *dribble-stream*)
+           (setf *dribble-stream* (first old-streams))
+           (setf *standard-input* (second old-streams))
+           (setf *standard-output* (third old-streams))
+           (setf *error-output* (fourth old-streams)))))
   (values))
 
 (defun %byte-blt (src src-start dst dst-start dst-end)

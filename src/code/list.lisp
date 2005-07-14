@@ -18,12 +18,12 @@
 ;;;; -- WHN 20000127
 
 (declaim (maybe-inline
-	  tree-equal nth %setnth nthcdr last make-list append
-	  nconc member member-if member-if-not tailp adjoin union
-	  nunion intersection nintersection set-difference nset-difference
-	  set-exclusive-or nset-exclusive-or subsetp acons assoc
-	  assoc-if assoc-if-not rassoc rassoc-if rassoc-if-not subst subst-if
-	  subst-if-not nsubst nsubst-if nsubst-if-not sublis nsublis))
+          tree-equal nth %setnth nthcdr last make-list append
+          nconc member member-if member-if-not tailp adjoin union
+          nunion intersection nintersection set-difference nset-difference
+          set-exclusive-or nset-exclusive-or subsetp acons assoc
+          assoc-if assoc-if-not rassoc rassoc-if rassoc-if-not subst subst-if
+          subst-if-not nsubst nsubst-if nsubst-if-not sublis nsublis))
 
 ;;; These functions perform basic list operations.
 (defun car (list) #!+sb-doc "Return the 1st object in a list." (car list))
@@ -117,22 +117,22 @@
 (defun tree-equal-test-not (x y test-not)
   (declare (type function test-not))
   (cond ((consp x)
-	 (and (consp y)
-	      (tree-equal-test-not (car x) (car y) test-not)
-	      (tree-equal-test-not (cdr x) (cdr y) test-not)))
-	((consp y) nil)
-	((not (funcall test-not x y)) t)
-	(t ())))
+         (and (consp y)
+              (tree-equal-test-not (car x) (car y) test-not)
+              (tree-equal-test-not (cdr x) (cdr y) test-not)))
+        ((consp y) nil)
+        ((not (funcall test-not x y)) t)
+        (t ())))
 
 (defun tree-equal-test (x y test)
   (declare (type function test))
-  (cond	((consp x)
-	 (and (consp y)
-	      (tree-equal-test (car x) (car y) test)
-	      (tree-equal-test (cdr x) (cdr y) test)))
-	((consp y) nil)
-	((funcall test x y) t)
-	(t ())))
+  (cond ((consp x)
+         (and (consp y)
+              (tree-equal-test (car x) (car y) test)
+              (tree-equal-test (cdr x) (cdr y) test)))
+        ((consp y) nil)
+        ((funcall test x y) t)
+        (t ())))
 
 (defun tree-equal (x y &key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
@@ -255,10 +255,10 @@
   #!+sb-doc
   "Return a list of the arguments with last cons a dotted pair"
   (cond ((atom others) arg)
-	((atom (cdr others)) (cons arg (car others)))
-	(t (do ((x others (cdr x)))
-	       ((null (cddr x)) (rplacd x (cadr x))))
-	   (cons arg others))))
+        ((atom (cdr others)) (cons arg (car others)))
+        (t (do ((x others (cdr x)))
+               ((null (cddr x)) (rplacd x (cadr x))))
+           (cons arg others))))
 
 (defun make-list (size &key initial-element)
   #!+sb-doc
@@ -311,13 +311,13 @@
   (if (atom list)
       list
       (let ((result (list (car list))))
-	(do ((x (cdr list) (cdr x))
-	     (splice result
-		     (cdr (rplacd splice (cons (car x) '())))))
-	    ((atom x)
-	     (unless (null x)
-	       (rplacd splice x))))
-	result)))
+        (do ((x (cdr list) (cdr x))
+             (splice result
+                     (cdr (rplacd splice (cons (car x) '())))))
+            ((atom x)
+             (unless (null x)
+               (rplacd splice x))))
+        result)))
 
 (defun copy-alist (alist)
   #!+sb-doc
@@ -325,20 +325,20 @@
   (if (endp alist)
       alist
       (let ((result
-	     (cons (if (atom (car alist))
-		       (car alist)
-		       (cons (caar alist) (cdar alist)))
-		   nil)))
-	(do ((x (cdr alist) (cdr x))
-	     (splice result
-		     (cdr (rplacd splice
-				  (cons
-				   (if (atom (car x))
-				       (car x)
-				       (cons (caar x) (cdar x)))
-				   nil)))))
-	    ((endp x)))
-	result)))
+             (cons (if (atom (car alist))
+                       (car alist)
+                       (cons (caar alist) (cdar alist)))
+                   nil)))
+        (do ((x (cdr alist) (cdr x))
+             (splice result
+                     (cdr (rplacd splice
+                                  (cons
+                                   (if (atom (car x))
+                                       (car x)
+                                       (cons (caar x) (cdar x)))
+                                   nil)))))
+            ((endp x)))
+        result)))
 
 (defun copy-tree (object)
   #!+sb-doc
@@ -413,11 +413,11 @@
        ;; possibly-improper list LIST. (Or if LIST is circular, you
        ;; lose.)
        (count-conses (list)
-	 (do ((in-list list (cdr in-list))
-	      (result 0 (1+ result)))
-	     ((atom in-list)
-	      result)
-	   (declare (type index result)))))
+         (do ((in-list list (cdr in-list))
+              (result 0 (1+ result)))
+             ((atom in-list)
+              result)
+           (declare (type index result)))))
   (declare (ftype (function (t) index) count-conses))
   (defun butlast (list &optional (n 1))
     (if (typep n 'index)
@@ -454,15 +454,15 @@
    OBJECT. If OBJECT is not a tail of LIST, a copy of LIST is returned.
    LIST must be a proper list or a dotted list."
   (do* ((list list (cdr list))
-	(result (list ()))
-	(splice result))
+        (result (list ()))
+        (splice result))
        ((atom list)
-	(if (eql list object)
-	    (cdr result)
-	    (progn (rplacd splice list) (cdr result))))
+        (if (eql list object)
+            (cdr result)
+            (progn (rplacd splice list) (cdr result))))
     (if (eql list object)
-	(return (cdr result))
-	(setq splice (cdr (rplacd splice (list (car list))))))))
+        (return (cdr result))
+        (setq splice (cdr (rplacd splice (list (car list))))))))
 
 ;;;; functions to alter list structure
 
@@ -522,8 +522,8 @@
   (let ((key-tmp (gensym)))
     `(let ((,key-tmp (apply-key key ,elt)))
       (cond (testp (funcall test ,item ,key-tmp))
-	    (notp (not (funcall test-not ,item ,key-tmp)))
-	    (t (funcall test ,item ,key-tmp))))))
+            (notp (not (funcall test-not ,item ,key-tmp)))
+            (t (funcall test ,item ,key-tmp))))))
 
 ;;;; substitution of expressions
 
@@ -671,8 +671,8 @@
   (let ((key-tmp (gensym)))
     `(let ((,key-tmp (apply-key key subtree)))
       (if notp
-	  (assoc ,key-tmp alist :test-not test-not)
-	  (assoc ,key-tmp alist :test test)))))
+          (assoc ,key-tmp alist :test-not test-not)
+          (assoc ,key-tmp alist :test test)))))
 
 (defun nsublis (alist tree &key key (test #'eql testp) (test-not #'eql notp))
   #!+sb-doc
@@ -744,7 +744,7 @@
   (do ((list list (cdr list)))
       ((atom list) (eql list object))
     (if (eql object list)
-	(return t))))
+        (return t))))
 
 (defun adjoin (item list &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
@@ -784,8 +784,8 @@
 (defmacro steve-splice (source destination)
   `(let ((temp ,source))
      (setf ,source (cdr ,source)
-	   (cdr temp) ,destination
-	   ,destination temp)))
+           (cdr temp) ,destination
+           ,destination temp)))
 
 (defun nunion (list1 list2 &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
@@ -879,7 +879,7 @@
     (declare (type function test test-not))
     (dolist (elt list1)
       (unless (with-set-keys (member (apply-key key elt) list2))
-	(setq result (cons elt result))))
+        (setq result (cons elt result))))
     (let ((test (if testp
                     (lambda (x y) (funcall test y x))
                     test))
@@ -977,7 +977,7 @@
        (y data (cdr y)))
       ((and (endp x) (endp y)) alist)
     (if (or (endp x) (endp y))
-	(error "The lists of keys and data are of unequal length."))
+        (error "The lists of keys and data are of unequal length."))
     (setq alist (acons (car x) (car y) alist))))
 
 ;;; This is defined in the run-time environment, not just the compile-time

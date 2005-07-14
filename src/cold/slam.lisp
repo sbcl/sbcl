@@ -29,16 +29,16 @@
        ;; recompile unnecessarily than sometimes bogusly to assume
        ;; up-to-date-ness.)
        (> (file-write-date output)
-	  (file-write-date input))))
+          (file-write-date input))))
 
 (do-stems-and-flags (stem flags)
   (unless (position :not-target flags)
     (let ((srcname (concatenate 'string stem ".lisp"))
-	  (objname (concatenate 'string
-				*target-obj-prefix*
-				stem
-				*target-obj-suffix*)))
+          (objname (concatenate 'string
+                                *target-obj-prefix*
+                                stem
+                                *target-obj-suffix*)))
       (unless (output-up-to-date-wrt-input-p objname srcname)
-	(target-compile-stem stem
-			     :assem-p (find :assem flags)
-			     :ignore-failure-p (find :ignore-failure-p flags))))))
+        (target-compile-stem stem
+                             :assem-p (find :assem flags)
+                             :ignore-failure-p (find :ignore-failure-p flags))))))

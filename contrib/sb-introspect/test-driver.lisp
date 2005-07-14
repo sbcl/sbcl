@@ -8,15 +8,15 @@
   (load (compile-file (merge-pathnames "test.lisp" *load-pathname*))))
 
 (assert (equal (function-arglist 'cl-user::one)
-	       '(cl-user::a cl-user::b cl-user::c)))
+               '(cl-user::a cl-user::b cl-user::c)))
 (assert (equal (function-arglist 'the)
-	       '(type sb-c::value)))
+               '(type sb-c::value)))
 
 (let ((source (find-definition-source 'cl-user::one)))
   (assert (= (definition-source-file-write-date source)
-	     (file-write-date (merge-pathnames "test.lisp" *load-pathname*))))
+             (file-write-date (merge-pathnames "test.lisp" *load-pathname*))))
   (assert (equal (getf (definition-source-plist source) :test-outer)
-		 "OUT")))
+                 "OUT")))
 
 (let ((plist (definition-source-plist (find-definition-source 'cl-user::four))))
   (assert (equal (getf plist :test-outer) "OUT"))
@@ -25,7 +25,7 @@
 (defun matchp (object form-number)
   (let ((ds (sb-introspect:find-definition-source object)))
     (and (pathnamep (sb-introspect:definition-source-pathname ds))
-	 (= form-number
+         (= form-number
             (first (sb-introspect:definition-source-form-path ds))))))
 
 (assert (matchp 'cl-user::one 2))

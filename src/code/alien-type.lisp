@@ -18,10 +18,10 @@
 (!begin-collecting-cold-init-forms)
 
 (defstruct (alien-type-type
-	    (:include ctype
-		      (class-info (type-class-or-lose 'alien)))
-	    (:constructor %make-alien-type-type (alien-type))
-	    (:copier nil))
+            (:include ctype
+                      (class-info (type-class-or-lose 'alien)))
+            (:constructor %make-alien-type-type (alien-type))
+            (:copier nil))
   (alien-type nil :type alien-type))
 
 (!define-type-class alien)
@@ -34,8 +34,8 @@
 
 (!define-type-method (alien :simple-subtypep) (type1 type2)
   (values (alien-subtype-p (alien-type-type-alien-type type1)
-			   (alien-type-type-alien-type type2))
-	  t))
+                           (alien-type-type-alien-type type2))
+          t))
 
 ;;; KLUDGE: This !DEFINE-SUPERCLASSES gets executed much later than the
 ;;; others (toplevel form time instead of cold load init time) because
@@ -45,10 +45,10 @@
 
 (!define-type-method (alien :simple-=) (type1 type2)
   (let ((alien-type-1 (alien-type-type-alien-type type1))
-	(alien-type-2 (alien-type-type-alien-type type2)))
+        (alien-type-2 (alien-type-type-alien-type type2)))
     (values (or (eq alien-type-1 alien-type-2)
-		(alien-type-= alien-type-1 alien-type-2))
-	    t)))
+                (alien-type-= alien-type-1 alien-type-2))
+            t)))
 
 (!def-type-translator alien (&optional (alien-type nil))
   (typecase alien-type
@@ -62,9 +62,9 @@
 (defun make-alien-type-type (&optional alien-type)
   (if alien-type
       (let ((lisp-rep-type (compute-lisp-rep-type alien-type)))
-	(if lisp-rep-type
-	    (single-value-specifier-type lisp-rep-type)
-	    (%make-alien-type-type alien-type)))
+        (if lisp-rep-type
+            (single-value-specifier-type lisp-rep-type)
+            (%make-alien-type-type alien-type)))
       *universal-type*))
 
 (!defun-from-collected-cold-init-forms !alien-type-cold-init)

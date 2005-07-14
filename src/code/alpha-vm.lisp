@@ -29,32 +29,32 @@
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb!sys:without-gcing
    (let ((sap (truly-the system-area-pointer
-			 (%primitive code-instructions code))))
+                         (%primitive code-instructions code))))
      (ecase kind
        (:jmp-hint
-	(aver (zerop (ldb (byte 2 0) value)))
-	#+nil
-	(setf (sap-ref-16 sap offset)
-	      (logior (sap-ref-16 sap offset)
-		      (ldb (byte 14 0) (ash value -2)))))
+        (aver (zerop (ldb (byte 2 0) value)))
+        #+nil
+        (setf (sap-ref-16 sap offset)
+              (logior (sap-ref-16 sap offset)
+                      (ldb (byte 14 0) (ash value -2)))))
        (:bits-63-48
-	(let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
-	       (value (if (logbitp 31 value) (+ value (ash 1 32)) value))
-	       (value (if (logbitp 47 value) (+ value (ash 1 48)) value)))
-	  (setf (sap-ref-8 sap offset) (ldb (byte 8 48) value))
-	  (setf (sap-ref-8 sap (1+ offset)) (ldb (byte 8 56) value))))
+        (let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
+               (value (if (logbitp 31 value) (+ value (ash 1 32)) value))
+               (value (if (logbitp 47 value) (+ value (ash 1 48)) value)))
+          (setf (sap-ref-8 sap offset) (ldb (byte 8 48) value))
+          (setf (sap-ref-8 sap (1+ offset)) (ldb (byte 8 56) value))))
        (:bits-47-32
-	(let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
-	       (value (if (logbitp 31 value) (+ value (ash 1 32)) value)))
-	  (setf (sap-ref-8 sap offset) (ldb (byte 8 32) value))
-	  (setf (sap-ref-8 sap (1+ offset)) (ldb (byte 8 40) value))))
+        (let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
+               (value (if (logbitp 31 value) (+ value (ash 1 32)) value)))
+          (setf (sap-ref-8 sap offset) (ldb (byte 8 32) value))
+          (setf (sap-ref-8 sap (1+ offset)) (ldb (byte 8 40) value))))
        (:ldah
-	(let ((value (if (logbitp 15 value) (+ value (ash 1 16)) value)))
-	  (setf (sap-ref-8 sap offset) (ldb (byte 8 16) value))
-	  (setf (sap-ref-8 sap (1+ offset)) (ldb (byte 8 24) value))))
+        (let ((value (if (logbitp 15 value) (+ value (ash 1 16)) value)))
+          (setf (sap-ref-8 sap offset) (ldb (byte 8 16) value))
+          (setf (sap-ref-8 sap (1+ offset)) (ldb (byte 8 24) value))))
        (:lda
-	(setf (sap-ref-8 sap offset) (ldb (byte 8 0) value))
-	(setf (sap-ref-8 sap (1+ offset)) (ldb (byte 8 8) value)))))))
+        (setf (sap-ref-8 sap offset) (ldb (byte 8 0) value))
+        (setf (sap-ref-8 sap (1+ offset)) (ldb (byte 8 8) value)))))))
 
 ;;;; "sigcontext" access functions, cut & pasted from x86-vm.lisp then
 ;;;; hacked for types.
@@ -87,13 +87,13 @@
 (defun context-register (context index)
   (declare (type (alien (* os-context-t)) context))
   (deref (the (alien (* unsigned-long))
-	   (context-register-addr context index))))
+           (context-register-addr context index))))
 
 (defun %set-context-register (context index new)
   (declare (type (alien (* os-context-t)) context))
   (setf (deref (the (alien (* unsigned-long))
-		 (context-register-addr context index)))
-	new))
+                 (context-register-addr context index)))
+        new))
 
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float
 ;;; register. FORMAT is the type of float to return.
@@ -101,7 +101,7 @@
 ;;; FIXME: Whether COERCE actually knows how to make a float out of a
 ;;; long is another question. This stuff still needs testing.
 (define-alien-routine ("os_context_float_register_addr"
-		       context-float-register-addr)
+                       context-float-register-addr)
   (* long)
   (context (* os-context-t))
   (index int))
@@ -141,7 +141,7 @@
 
 ;;; Given a (POSIX) signal context, extract the internal error
 ;;; arguments from the instruction stream.  This is e.g.
-;;; 4       23      254     240     2       0       0       0 
+;;; 4       23      254     240     2       0       0       0
 ;;; |       ~~~~~~~~~~~~~~~~~~~~~~~~~
 ;;; length         data              (everything is an octet)
 ;;;  (pc)

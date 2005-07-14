@@ -21,9 +21,9 @@ and the mutex is in use, sleep until it is available"
   (with-unique-names (got)
     `(let ((,got (get-mutex ,mutex ,value ,wait-p)))
       (when ,got
-	(unwind-protect
-	     (locally ,@body)
-	  (release-mutex ,mutex)))))
+        (unwind-protect
+             (locally ,@body)
+          (release-mutex ,mutex)))))
   ;; KLUDGE: this separate expansion for (NOT SB-THREAD) is not
   ;; strictly necessary; GET-MUTEX and RELEASE-MUTEX are implemented.
   ;; However, there would be a (possibly slight) performance hit in
@@ -47,17 +47,17 @@ mutex."
                   (sb!sys:int-sap
                    (sb!kernel:get-lisp-obj-address (mutex-value ,mutex)))))))
       (unless ,inner-lock
-	;; this punning with MAKE-LISP-OBJ depends for its safety on
-	;; the frame pointer being a lispobj-aligned integer.  While
-	;; it is, then MAKE-LISP-OBJ will always return a FIXNUM, so
-	;; we're safe to do that.  Should this ever change, this
-	;; MAKE-LISP-OBJ could return something that looks like a
-	;; pointer, but pointing into neverneverland, which will
-	;; confuse GC completely.  -- CSR, 2003-06-03
-	(get-mutex ,mutex (sb!kernel:make-lisp-obj (sb!sys:sap-int ,cfp))))
+        ;; this punning with MAKE-LISP-OBJ depends for its safety on
+        ;; the frame pointer being a lispobj-aligned integer.  While
+        ;; it is, then MAKE-LISP-OBJ will always return a FIXNUM, so
+        ;; we're safe to do that.  Should this ever change, this
+        ;; MAKE-LISP-OBJ could return something that looks like a
+        ;; pointer, but pointing into neverneverland, which will
+        ;; confuse GC completely.  -- CSR, 2003-06-03
+        (get-mutex ,mutex (sb!kernel:make-lisp-obj (sb!sys:sap-int ,cfp))))
       (unwind-protect
-	   (locally ,@body)
+           (locally ,@body)
         (unless ,inner-lock
-	  (release-mutex ,mutex)))))
+          (release-mutex ,mutex)))))
   #!-sb-thread
   `(locally ,@body))

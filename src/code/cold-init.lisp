@@ -29,21 +29,21 @@
       (nil)
     (dolist (package (list-all-packages))
       (do-symbols (symbol package)
-	(let ((name (symbol-name symbol)))
-	  (when (or (string= name "!" :end1 1 :end2 1)
-		    (and (>= (length name) 2)
-			 (string= name "*!" :end1 2 :end2 2)))
-	    (/show0 "uninterning cold-init-only symbol..")
-	    (/primitive-print name)
-	    ;; FIXME: Is this (FIRST (LAST *INFO-ENVIRONMENT*)) really
-	    ;; meant to be an idiom to use?  Is there a more obvious
-	    ;; name for this? [e.g. (GLOBAL-ENVIRONMENT)?]
-	    (do-info ((first (last *info-environment*))
-			    :name entry :class class :type type)
-	      (when (eq entry symbol)
-		(clear-info class type entry)))
-	    (unintern symbol package)
-	    (setf any-changes? t)))))
+        (let ((name (symbol-name symbol)))
+          (when (or (string= name "!" :end1 1 :end2 1)
+                    (and (>= (length name) 2)
+                         (string= name "*!" :end1 2 :end2 2)))
+            (/show0 "uninterning cold-init-only symbol..")
+            (/primitive-print name)
+            ;; FIXME: Is this (FIRST (LAST *INFO-ENVIRONMENT*)) really
+            ;; meant to be an idiom to use?  Is there a more obvious
+            ;; name for this? [e.g. (GLOBAL-ENVIRONMENT)?]
+            (do-info ((first (last *info-environment*))
+                            :name entry :class class :type type)
+              (when (eq entry symbol)
+                (clear-info class type entry)))
+            (unintern symbol package)
+            (setf any-changes? t)))))
     (unless any-changes?
       (return))))
 
@@ -93,10 +93,10 @@
   ;; *TYPE-SYSTEM-INITIALIZED-WHEN-BOUND* so that it doesn't need to
   ;; be explicitly set in order to be meaningful.
   (setf *after-gc-hooks* nil
-	*gc-inhibit* 1
-	*need-to-collect-garbage* nil
-	sb!unix::*interrupts-enabled* t
-	sb!unix::*interrupt-pending* nil
+        *gc-inhibit* 1
+        *need-to-collect-garbage* nil
+        sb!unix::*interrupts-enabled* t
+        sb!unix::*interrupt-pending* nil
         *break-on-signals* nil
         *maximum-error-depth* 10
         *current-error-depth* 0
@@ -114,7 +114,7 @@
 
   (show-and-call !early-package-cold-init)
   (show-and-call !package-cold-init)
-  
+
   ;; All sorts of things need INFO and/or (SETF INFO).
   (/show0 "about to SHOW-AND-CALL !GLOBALDB-COLD-INIT")
   (show-and-call !globaldb-cold-init)
@@ -144,7 +144,7 @@
   (/show0 "back from !POLICY-COLD-INIT-OR-RESANIFY")
 
   (show-and-call !early-proclaim-cold-init)
-  
+
   ;; KLUDGE: Why are fixups mixed up with toplevel forms? Couldn't
   ;; fixups be done separately? Wouldn't that be clearer and better?
   ;; -- WHN 19991204
@@ -154,47 +154,47 @@
   (/show0 "about to calculate (LENGTH *!REVERSED-COLD-TOPLEVELS*)")
   (/show0 "(LENGTH *!REVERSED-COLD-TOPLEVELS*)=..")
   #!+sb-show (let ((r-c-tl-length (length *!reversed-cold-toplevels*)))
-	       (/show0 "(length calculated..)")
-	       (let ((hexstr (hexstr r-c-tl-length)))
-		 (/show0 "(hexstr calculated..)")
-		 (/primitive-print hexstr)))
+               (/show0 "(length calculated..)")
+               (let ((hexstr (hexstr r-c-tl-length)))
+                 (/show0 "(hexstr calculated..)")
+                 (/primitive-print hexstr)))
   (let (#!+sb-show (index-in-cold-toplevels 0))
     #!+sb-show (declare (type fixnum index-in-cold-toplevels))
 
     (dolist (toplevel-thing (prog1
-				(nreverse *!reversed-cold-toplevels*)
-			      ;; (Now that we've NREVERSEd it, it's
-			      ;; somewhat scrambled, so keep anyone
-			      ;; else from trying to get at it.)
-			      (makunbound '*!reversed-cold-toplevels*)))
+                                (nreverse *!reversed-cold-toplevels*)
+                              ;; (Now that we've NREVERSEd it, it's
+                              ;; somewhat scrambled, so keep anyone
+                              ;; else from trying to get at it.)
+                              (makunbound '*!reversed-cold-toplevels*)))
       #!+sb-show
       (when (zerop (mod index-in-cold-toplevels 1024))
-	(/show0 "INDEX-IN-COLD-TOPLEVELS=..")
-	(/hexstr index-in-cold-toplevels))
+        (/show0 "INDEX-IN-COLD-TOPLEVELS=..")
+        (/hexstr index-in-cold-toplevels))
       #!+sb-show
       (setf index-in-cold-toplevels
-	    (the fixnum (1+ index-in-cold-toplevels)))
+            (the fixnum (1+ index-in-cold-toplevels)))
       (typecase toplevel-thing
-	(function
-	 (funcall toplevel-thing))
-	(cons
-	 (case (first toplevel-thing)
-	   (:load-time-value
-	    (setf (svref *!load-time-values* (third toplevel-thing))
-		  (funcall (second toplevel-thing))))
-	   (:load-time-value-fixup
-	    (setf (sap-ref-word (second toplevel-thing) 0)
-		  (get-lisp-obj-address
-		   (svref *!load-time-values* (third toplevel-thing)))))
-	   #!+(and (or x86 x86-64) gencgc)
-	   (:load-time-code-fixup
-	    (sb!vm::!envector-load-time-code-fixup (second toplevel-thing)
-						   (third  toplevel-thing)
-						   (fourth toplevel-thing)
-						   (fifth  toplevel-thing)))
-	   (t
-	    (!cold-lose "bogus fixup code in *!REVERSED-COLD-TOPLEVELS*"))))
-	(t (!cold-lose "bogus function in *!REVERSED-COLD-TOPLEVELS*")))))
+        (function
+         (funcall toplevel-thing))
+        (cons
+         (case (first toplevel-thing)
+           (:load-time-value
+            (setf (svref *!load-time-values* (third toplevel-thing))
+                  (funcall (second toplevel-thing))))
+           (:load-time-value-fixup
+            (setf (sap-ref-word (second toplevel-thing) 0)
+                  (get-lisp-obj-address
+                   (svref *!load-time-values* (third toplevel-thing)))))
+           #!+(and (or x86 x86-64) gencgc)
+           (:load-time-code-fixup
+            (sb!vm::!envector-load-time-code-fixup (second toplevel-thing)
+                                                   (third  toplevel-thing)
+                                                   (fourth toplevel-thing)
+                                                   (fifth  toplevel-thing)))
+           (t
+            (!cold-lose "bogus fixup code in *!REVERSED-COLD-TOPLEVELS*"))))
+        (t (!cold-lose "bogus function in *!REVERSED-COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
 
   ;; Set sane values again, so that the user sees sane values instead
@@ -210,7 +210,7 @@
   (show-and-call !fixup-type-cold-init)
   ;; run the PROCLAIMs.
   (show-and-call !late-proclaim-cold-init)
-  
+
   (show-and-call os-cold-init-or-reinit)
 
   (show-and-call thread-init-or-reinit)
@@ -285,7 +285,7 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
 (defun reinit ()
   (without-interrupts
     (without-gcing
-	(os-cold-init-or-reinit)
+        (os-cold-init-or-reinit)
       (thread-init-or-reinit)
       (stream-reinit)
       (signal-cold-init-or-reinit)
@@ -316,20 +316,20 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
 (defun hexstr (thing)
   (/noshow0 "entering HEXSTR")
   (let ((addr (get-lisp-obj-address thing))
-	(str (make-string 10 :element-type 'base-char)))
+        (str (make-string 10 :element-type 'base-char)))
     (/noshow0 "ADDR and STR calculated")
     (setf (char str 0) #\0
-	  (char str 1) #\x)
+          (char str 1) #\x)
     (/noshow0 "CHARs 0 and 1 set")
     (dotimes (i 8)
       (/noshow0 "at head of DOTIMES loop")
       (let* ((nibble (ldb (byte 4 0) addr))
-	     (chr (char "0123456789abcdef" nibble)))
-	(declare (type (unsigned-byte 4) nibble)
-		 (base-char chr))
-	(/noshow0 "NIBBLE and CHR calculated")
-	(setf (char str (- 9 i)) chr
-	      addr (ash addr -4))))
+             (chr (char "0123456789abcdef" nibble)))
+        (declare (type (unsigned-byte 4) nibble)
+                 (base-char chr))
+        (/noshow0 "NIBBLE and CHR calculated")
+        (setf (char str (- 9 i)) chr
+              addr (ash addr -4))))
     str))
 
 #!+sb-show
@@ -338,10 +338,10 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
     (simple-string (sb!sys:%primitive print x))
     (symbol (sb!sys:%primitive print (symbol-name x)))
     (list (let ((count 0))
-	    (sb!sys:%primitive print "list:")
-	    (dolist (i x)
-	      (when (>= (incf count) 4)
-		(sb!sys:%primitive print "...")
-		(return))
-	      (cold-print i))))
+            (sb!sys:%primitive print "list:")
+            (dolist (i x)
+              (when (>= (incf count) 4)
+                (sb!sys:%primitive print "...")
+                (return))
+              (cold-print i))))
     (t (sb!sys:%primitive print (hexstr x)))))

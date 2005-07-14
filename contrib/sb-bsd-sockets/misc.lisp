@@ -32,7 +32,7 @@
               (logior arg1 sockint::o-nonblock)
             (logand (lognot sockint::o-nonblock) arg1))))
     (when (= (the (signed-byte 32) -1)
-             (the (signed-byte 32) 
+             (the (signed-byte 32)
                (sockint::fcntl fd sockint::f-setfl arg2)))
       (socket-error "fcntl"))
     non-blocking-p))

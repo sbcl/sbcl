@@ -13,7 +13,7 @@
   (unless (subtypep (stream-element-type to) (stream-element-type from))
     (error "Incompatible streams ~A and ~A." from to))
   (let ((buf (make-array *stream-buffer-size*
-			 :element-type (stream-element-type from))))
+                         :element-type (stream-element-type from))))
     (loop
      (let ((pos (read-sequence buf from)))
        (when (zerop pos) (return))
@@ -25,33 +25,33 @@ exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type
 ")
 
 (defun make-executable (output-file fasls
-			&key (runtime-flags '("--disable-debugger"
-					      "--userinit /dev/null"
-					      "--sysinit /dev/null"))
-			initial-function)
+                        &key (runtime-flags '("--disable-debugger"
+                                              "--userinit /dev/null"
+                                              "--sysinit /dev/null"))
+                        initial-function)
   "Write an executable called OUTPUT-FILE which can be run from the shell, by 'linking' together code from FASLS.  Actually works by concatenating them and prepending a #! header"
   (with-open-file (out output-file
-		       :direction :output
-		       :if-exists :supersede
-		       :element-type '(unsigned-byte 8))
+                       :direction :output
+                       :if-exists :supersede
+                       :element-type '(unsigned-byte 8))
     (write-sequence (map 'vector #'char-code
-			 (format nil *exec-header* runtime-flags
-				 (or initial-function 'values))) out)
+                         (format nil *exec-header* runtime-flags
+                                 (or initial-function 'values))) out)
     (dolist (input-file (if (listp fasls) fasls (list fasls)))
       (with-open-file (in (merge-pathnames input-file
-					   (make-pathname :type "fasl"))
-			  :element-type '(unsigned-byte 8))
-	(copy-stream in out))))
+                                           (make-pathname :type "fasl"))
+                          :element-type '(unsigned-byte 8))
+        (copy-stream in out))))
   (let* (;; FIXME: use OUT as the pathname designator
-	 (out-name (namestring (translate-logical-pathname output-file)))
-	 (prot (elt (multiple-value-list (sb-unix:unix-stat out-name)) 3)))
+         (out-name (namestring (translate-logical-pathname output-file)))
+         (prot (elt (multiple-value-list (sb-unix:unix-stat out-name)) 3)))
     (if prot
-	(sb-unix::void-syscall ("chmod" c-string int)
-			       out-name
-			       (logior prot
-				       (if (logand prot #o400) #o100)
-				       (if (logand prot  #o40)  #o10)
-				       (if (logand prot   #o4)   #o1)))
-	(error "stat() call failed"))))
-			 
+        (sb-unix::void-syscall ("chmod" c-string int)
+                               out-name
+                               (logior prot
+                                       (if (logand prot #o400) #o100)
+                                       (if (logand prot  #o40)  #o10)
+                                       (if (logand prot   #o4)   #o1)))
+        (error "stat() call failed"))))
+
 (provide 'sb-executable)

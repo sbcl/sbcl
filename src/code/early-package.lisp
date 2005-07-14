@@ -18,13 +18,13 @@
 ;;; packages for which locks are ignored, T when locks for
 ;;; all packages are ignored, and :invalid outside package-lock
 ;;; context. FIXME: This needs to be rebound for each thread.
-(defvar *ignored-package-locks* 
+(defvar *ignored-package-locks*
   (error "*IGNORED-PACKAGE-LOCKS* should be set up in cold-init."))
 (!cold-init-forms
   (setf *ignored-package-locks* :invalid))
 
-(defmacro with-single-package-locked-error ((&optional kind thing &rest format) 
-					    &body body)
+(defmacro with-single-package-locked-error ((&optional kind thing &rest format)
+                                            &body body)
   #!-sb-package-locks (declare (ignore kind thing format))
   #!-sb-package-locks
   `(progn ,@body)
@@ -33,33 +33,33 @@
     `(progn
        (/show0 ,(first format))
        (let ((,topmost nil))
-	 ;; We use assignment and conditional restoration instead of
-	 ;; dynamic binding because we want the ignored locks
-	 ;; to propagate to the topmost context.
-	 (when (eq :invalid *ignored-package-locks*)
-	   (setf *ignored-package-locks* nil
-		 ,topmost t))
-	 (unwind-protect
-	      (progn 
-		,@(ecase kind
-		   (:symbol 
-		    `((assert-symbol-home-package-unlocked ,thing ,@format)))
-		   (:package
-		    `((assert-package-unlocked 
-		       (find-undeleted-package-or-lose ,thing) ,@format)))
-		   ((nil)
-		    `()))
-		,@body)
-	   (when ,topmost
-	     (setf *ignored-package-locks* :invalid)))))))
+         ;; We use assignment and conditional restoration instead of
+         ;; dynamic binding because we want the ignored locks
+         ;; to propagate to the topmost context.
+         (when (eq :invalid *ignored-package-locks*)
+           (setf *ignored-package-locks* nil
+                 ,topmost t))
+         (unwind-protect
+              (progn
+                ,@(ecase kind
+                   (:symbol
+                    `((assert-symbol-home-package-unlocked ,thing ,@format)))
+                   (:package
+                    `((assert-package-unlocked
+                       (find-undeleted-package-or-lose ,thing) ,@format)))
+                   ((nil)
+                    `()))
+                ,@body)
+           (when ,topmost
+             (setf *ignored-package-locks* :invalid)))))))
 
 (defun compiler-assert-symbol-home-package-unlocked (symbol control)
   #!-sb-package-locks
   (declare (ignore symbol control))
   #!+sb-package-locks
   (flet ((resignal (condition)
-	   ;; Signal the condition to give user defined handlers a chance,
-	   ;; if they decline convert to compiler-error.
+           ;; Signal the condition to give user defined handlers a chance,
+           ;; if they decline convert to compiler-error.
            (signal condition)
            (sb!c:compiler-error condition)))
     (handler-bind ((package-lock-violation #'resignal))
@@ -69,7 +69,7 @@
 (defmacro without-package-locks (&body body)
   #!+sb-doc
   "Ignores all runtime package lock violations during the execution of
-body. Body can begin with declarations."  
+body. Body can begin with declarations."
   `(let (#!+sb-package-locks (*ignored-package-locks* t))
     ,@body))
 

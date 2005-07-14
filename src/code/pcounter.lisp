@@ -3,7 +3,7 @@
 ;;;; a PCOUNTER is used to represent an unsigned integer quantity which
 ;;;; can grow bigger than a fixnum, but typically does so, if at all,
 ;;;; in many small steps, where we don't want to cons on every step.
-;;;; Such quantities typically arise in profiling, e.g. 
+;;;; Such quantities typically arise in profiling, e.g.
 ;;;; total system consing, time spent in a profiled function, and
 ;;;; bytes consed in a profiled function are all examples of such
 ;;;; quantities. The name is an abbreviation for "Profiling COUNTER".
@@ -25,10 +25,10 @@
   (aver (typep delta 'unsigned-byte))
   (let ((sum (+ (pcounter-fixnum pcounter) delta)))
     (cond ((typep sum 'fixnum)
-	   (setf (pcounter-fixnum pcounter) sum))
-	  (t
-	   (incf (pcounter-integer pcounter) sum)
-	   (setf (pcounter-fixnum pcounter) 0))))
+           (setf (pcounter-fixnum pcounter) sum))
+          (t
+           (incf (pcounter-integer pcounter) sum)
+           (setf (pcounter-fixnum pcounter) 0))))
   pcounter)
 
 (/show0 "pcounter.lisp 34")
@@ -52,11 +52,11 @@
     (fixnum
      (let ((sum (+ x delta)))
        (if (typep sum 'fixnum)
-	   sum
-	   (make-pcounter :integer sum))))
+           sum
+           (make-pcounter :integer sum))))
     (pcounter
      (incf-pcounter x delta))))
-  
+
 (define-modify-macro incf-pcounter-or-fixnum (delta) %incf-pcounter-or-fixnum)
 
 (/show0 "pcounter.lisp 62")
@@ -70,8 +70,8 @@
        (aver (typep ,delta-sym 'unsigned-byte))
        ;;(declare (type unsigned-byte ,delta-sym))
        (if (typep ,delta-sym 'fixnum)
-	   (incf-pcounter-or-fixnum ,x ,delta)
-	   (incf-pcounter-or-fixnum ,x ,delta)))))
+           (incf-pcounter-or-fixnum ,x ,delta)
+           (incf-pcounter-or-fixnum ,x ,delta)))))
 
 (/show0 "pcounter.lisp 76")
 

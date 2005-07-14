@@ -4,7 +4,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -19,13 +19,13 @@
 (defun test-small-bit-vectors ()
   ;; deal with the potential length 0 special case
   (let ((a (make-array 0 :element-type 'bit))
-	(b (make-array 0 :element-type 'bit)))
+        (b (make-array 0 :element-type 'bit)))
     (assert (equal (bit-not a) #*))
     (assert (equal (bit-xor a b a) #*))
     (assert (equal (bit-and a a b) #*)))
   ;; also test some return values for sanity
   (let ((a (make-array 33 :element-type 'bit :initial-element 0))
-	(b (make-array 33 :element-type 'bit :initial-element 0)))
+        (b (make-array 33 :element-type 'bit :initial-element 0)))
     (assert (equal (bit-not a a) #*111111111111111111111111111111111))
     (setf (aref a 0) 0) ; a = #*011..1
     (setf (aref b 1) 1) ; b = #*010..0
@@ -35,8 +35,8 @@
   (locally
       (declare (optimize (speed 3) (space 1)))
     (let ((bv1 (make-array 5 :element-type 'bit))
-	  (bv2 (make-array 0 :element-type 'bit))
-	  (bv3 (make-array 68 :element-type 'bit)))
+          (bv2 (make-array 0 :element-type 'bit))
+          (bv3 (make-array 68 :element-type 'bit)))
       (declare (type simple-bit-vector bv1 bv2 bv3))
       (setf (sbit bv3 42) 1)
       ;; bitvector smaller than the word size
@@ -55,14 +55,14 @@
 
 (defun test-big-bit-vectors ()
   ;; now test the biggy, mostly that it works...
-  (let ((a (progn 
-	     (inform :make-array-1)
-	     (make-array (1- array-dimension-limit) 
-			 :element-type 'bit :initial-element 0)))
-	(b (progn
-	     (inform :make-array-2)
-	     (make-array (1- array-dimension-limit) 
-			 :element-type 'bit :initial-element 0))))
+  (let ((a (progn
+             (inform :make-array-1)
+             (make-array (1- array-dimension-limit)
+                         :element-type 'bit :initial-element 0)))
+        (b (progn
+             (inform :make-array-2)
+             (make-array (1- array-dimension-limit)
+                         :element-type 'bit :initial-element 0))))
     (inform :bit-not)
     (bit-not a a)
     (inform :aref-1)
@@ -80,7 +80,7 @@
 
 (test-small-bit-vectors)
 
-#-x86-64 
+#-x86-64
 ;; except on machines where addressable space is likely to be
 ;; much bigger than physical memory
 (test-big-bit-vectors)

@@ -13,22 +13,22 @@
 (in-package "SB!VM")
 
 (define-assembly-routine (allocate-vector
-			  (:policy :fast-safe)
-			  (:translate allocate-vector)
-			  (:arg-types positive-fixnum
-				      positive-fixnum
-				      positive-fixnum))
-			 ((:arg type any-reg a0-offset)
-			  (:arg length any-reg a1-offset)
-			  (:arg words any-reg a2-offset)
-			  (:res result descriptor-reg a0-offset)
+                          (:policy :fast-safe)
+                          (:translate allocate-vector)
+                          (:arg-types positive-fixnum
+                                      positive-fixnum
+                                      positive-fixnum))
+                         ((:arg type any-reg a0-offset)
+                          (:arg length any-reg a1-offset)
+                          (:arg words any-reg a2-offset)
+                          (:res result descriptor-reg a0-offset)
 
-			  (:temp ndescr non-descriptor-reg nl0-offset)
-			  (:temp pa-flag non-descriptor-reg nl4-offset))
+                          (:temp ndescr non-descriptor-reg nl0-offset)
+                          (:temp pa-flag non-descriptor-reg nl4-offset))
   ;; This is kinda sleezy, changing words like this.  But we can because
   ;; the vop thinks it is temporary.
   (inst addu words (+ (1- (ash 1 n-lowtag-bits))
-		      (* vector-data-offset n-word-bytes)))
+                      (* vector-data-offset n-word-bytes)))
   (inst li ndescr (lognot lowtag-mask))
   (inst and words ndescr)
   (inst srl ndescr type word-shift)

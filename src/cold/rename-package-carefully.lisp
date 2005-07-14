@@ -14,10 +14,10 @@
 ;;; (ANSI on RENAME-PACKAGE: "The consequences are undefined if new-name or any
 ;;; new-nickname conflicts with any existing package names.")
 (defun rename-package-carefully (package-designator
-				 new-name
-				 &optional new-nicknames)
+                                 new-name
+                                 &optional new-nicknames)
   (let ((package (find-package package-designator))
-	(unused-name "UNUSED-PACKAGE-NAME"))
+        (unused-name "UNUSED-PACKAGE-NAME"))
     (assert (not (find-package unused-name)))
     (assert (not (string= unused-name new-name)))
     (assert (not (find unused-name new-nicknames :test #'string=)))

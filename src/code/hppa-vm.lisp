@@ -19,30 +19,30 @@
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb!sys:without-gcing
    (let* ((sap (truly-the system-area-pointer
-			  (%primitive sb!kernel::code-instructions code)))
-	  (inst (sap-ref-32 sap offset)))
+                          (%primitive sb!kernel::code-instructions code)))
+          (inst (sap-ref-32 sap offset)))
      (setf (sap-ref-32 sap offset)
-	   (ecase kind
-	     (:load
-	      (logior (ash (ldb (byte 11 0) value) 1)
-		      (logand inst #xffffc000)))
-	     (:load-short
-	      (let ((low-bits (ldb (byte 11 0) value)))
-		(aver (<= 0 low-bits (1- (ash 1 4))))
-		(logior (ash low-bits 17)
-			(logand inst #xffe0ffff))))
-	     (:hi
-	      (logior (ash (ldb (byte 5 13) value) 16)
-		      (ash (ldb (byte 2 18) value) 14)
-		      (ash (ldb (byte 2 11) value) 12)
-		      (ash (ldb (byte 11 20) value) 1)
-		      (ldb (byte 1 31) value)
-		      (logand inst #xffe00000)))
-	     (:branch
-	      (let ((bits (ldb (byte 9 2) value)))
-		(aver (zerop (ldb (byte 2 0) value)))
-		(logior (ash bits 3)
-			(logand inst #xffe0e002)))))))))
+           (ecase kind
+             (:load
+              (logior (ash (ldb (byte 11 0) value) 1)
+                      (logand inst #xffffc000)))
+             (:load-short
+              (let ((low-bits (ldb (byte 11 0) value)))
+                (aver (<= 0 low-bits (1- (ash 1 4))))
+                (logior (ash low-bits 17)
+                        (logand inst #xffe0ffff))))
+             (:hi
+              (logior (ash (ldb (byte 5 13) value) 16)
+                      (ash (ldb (byte 2 18) value) 14)
+                      (ash (ldb (byte 2 11) value) 12)
+                      (ash (ldb (byte 11 20) value) 1)
+                      (ldb (byte 1 31) value)
+                      (logand inst #xffe00000)))
+             (:branch
+              (let ((bits (ldb (byte 9 2) value)))
+                (aver (zerop (ldb (byte 2 0) value)))
+                (logior (ash bits 3)
+                        (logand inst #xffe0e002)))))))))
 
 (define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-int)
   (context (* os-context-t)))
@@ -79,21 +79,21 @@
 ;;;
 ;;; Given the sigcontext, extract the internal error arguments from the
 ;;; instruction stream.
-;;; 
+;;;
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
   (let ((pc (context-pc context)))
     (declare (type system-area-pointer pc))
     (let* ((length (sap-ref-8 pc 4))
-	   (vector (make-array length :element-type '(unsigned-byte 8))))
+           (vector (make-array length :element-type '(unsigned-byte 8))))
       (declare (type (unsigned-byte 8) length)
-	       (type (simple-array (unsigned-byte 8) (*)) vector))
+               (type (simple-array (unsigned-byte 8) (*)) vector))
       (copy-ub8-from-system-area pc 5 vector 0 length)
       (let* ((index 0)
-	     (error-number (sb!c:read-var-integer vector index)))
-	(collect ((sc-offsets))
-	 (loop
-	  (when (>= index length)
-	    (return))
-	  (sc-offsets (sb!c:read-var-integer vector index)))
-	 (values error-number (sc-offsets)))))))
+             (error-number (sb!c:read-var-integer vector index)))
+        (collect ((sc-offsets))
+         (loop
+          (when (>= index length)
+            (return))
+          (sc-offsets (sb!c:read-var-integer vector index)))
+         (values error-number (sc-offsets)))))))

@@ -69,7 +69,7 @@
   (inst add dst n-word-bytes)
   (inst b :gt loop)
   (inst subcc count (fixnumize 1))
-		
+
   (inst b done)
   (inst nop)
 
@@ -85,12 +85,12 @@
   DEFAULT-A5-AND-ON
   (inst move a5 null-tn)
   DONE
-  
+
   ;; Clear the stack.
   (move ocfp-tn cfp-tn)
   (move cfp-tn ocfp)
   (inst add csp-tn ocfp-tn nvals)
-  
+
   ;; Return.
   (lisp-return lra))
 
@@ -127,7 +127,7 @@
 
   ;; Calculate NARGS (as a fixnum)
   (inst sub nargs csp-tn args)
-     
+
   ;; Load the argument regs (must do this now, 'cause the blt might
   ;; trash these locations)
   (inst ld a0 args (* 0 n-word-bytes))
@@ -142,7 +142,7 @@
   (inst b :le done)
   (inst add src args (* n-word-bytes register-arg-count))
   (inst add dst cfp-tn (* n-word-bytes register-arg-count))
-	
+
   LOOP
   ;; Copy one arg.
   (inst ld temp src)
@@ -151,7 +151,7 @@
   (inst addcc count (fixnumize -1))
   (inst b :gt loop)
   (inst add dst dst n-word-bytes)
-	
+
   DONE
   ;; We are done.  Do the jump.
   (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
@@ -162,32 +162,32 @@
 ;;;; Non-local exit noise.
 
 (define-assembly-routine (unwind
-			  (:return-style :none)
-			  (:translate %continue-unwind)
-			  (:policy :fast-safe))
-			 ((:arg block (any-reg descriptor-reg) a0-offset)
-			  (:arg start (any-reg descriptor-reg) ocfp-offset)
-			  (:arg count (any-reg descriptor-reg) nargs-offset)
-			  (:temp lra descriptor-reg lra-offset)
-			  (:temp cur-uwp any-reg nl0-offset)
-			  (:temp next-uwp any-reg nl1-offset)
-			  (:temp target-uwp any-reg nl2-offset))
+                          (:return-style :none)
+                          (:translate %continue-unwind)
+                          (:policy :fast-safe))
+                         ((:arg block (any-reg descriptor-reg) a0-offset)
+                          (:arg start (any-reg descriptor-reg) ocfp-offset)
+                          (:arg count (any-reg descriptor-reg) nargs-offset)
+                          (:temp lra descriptor-reg lra-offset)
+                          (:temp cur-uwp any-reg nl0-offset)
+                          (:temp next-uwp any-reg nl1-offset)
+                          (:temp target-uwp any-reg nl2-offset))
   (declare (ignore start count))
 
   (let ((error (generate-error-code nil invalid-unwind-error)))
     (inst cmp block)
     (inst b :eq error))
-  
+
   (load-symbol-value cur-uwp *current-unwind-protect-block*)
   (loadw target-uwp block unwind-block-current-uwp-slot)
   (inst cmp cur-uwp target-uwp)
   (inst b :ne do-uwp)
   (inst nop)
-      
+
   (move cur-uwp block)
 
   DO-EXIT
-      
+
   (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
   (loadw code-tn cur-uwp unwind-block-current-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
@@ -201,25 +201,25 @@
 
 
 (define-assembly-routine (throw
-			  (:return-style :none))
-			 ((:arg target descriptor-reg a0-offset)
-			  (:arg start any-reg ocfp-offset)
-			  (:arg count any-reg nargs-offset)
-			  (:temp catch any-reg a1-offset)
-			  (:temp tag descriptor-reg a2-offset)
-			  (:temp temp non-descriptor-reg nl0-offset))
-  
+                          (:return-style :none))
+                         ((:arg target descriptor-reg a0-offset)
+                          (:arg start any-reg ocfp-offset)
+                          (:arg count any-reg nargs-offset)
+                          (:temp catch any-reg a1-offset)
+                          (:temp tag descriptor-reg a2-offset)
+                          (:temp temp non-descriptor-reg nl0-offset))
+
   (declare (ignore start count))
 
   (load-symbol-value catch *current-catch-block*)
-  
+
   loop
-  
+
   (let ((error (generate-error-code nil unseen-throw-tag-error target)))
     (inst cmp catch)
     (inst b :eq error)
     (inst nop))
-  
+
   (loadw tag catch catch-block-tag-slot)
   (inst cmp tag target)
   (inst b :eq exit)
@@ -227,9 +227,9 @@
   (loadw catch catch catch-block-previous-catch-slot)
   (inst b loop)
   (inst nop)
-  
+
   exit
-  
+
   (move target catch)
   (inst li temp (make-fixup 'unwind :assembly-routine))
   (inst j temp)

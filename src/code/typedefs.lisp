@@ -41,29 +41,29 @@
   ;;   package!)
   (multiple-value-bind (whole wholeless-arglist)
       (if (eq '&whole (car arglist))
-	  (values (cadr arglist) (cddr arglist))
-	  (values (gensym) arglist))
+          (values (cadr arglist) (cddr arglist))
+          (values (gensym) arglist))
     (multiple-value-bind (forms decls)
-	(parse-body body :doc-string-allowed nil)
+        (parse-body body :doc-string-allowed nil)
       `(progn
-	 (!cold-init-forms
-	  (setf (info :type :translator ',name)
-		(lambda (,whole)
-		  (block ,name
-		    (destructuring-bind ,wholeless-arglist
-			(rest ,whole) ; discarding NAME
-		      ,@decls
-		      ,@forms)))))
-	 ',name))))
+         (!cold-init-forms
+          (setf (info :type :translator ',name)
+                (lambda (,whole)
+                  (block ,name
+                    (destructuring-bind ,wholeless-arglist
+                        (rest ,whole) ; discarding NAME
+                      ,@decls
+                      ,@forms)))))
+         ',name))))
 
 ;;; DEFVARs for these come later, after we have enough stuff defined.
 (declaim (special *wild-type* *universal-type* *empty-type*))
 
 ;;; the base class for the internal representation of types
 (def!struct (ctype (:conc-name type-)
-		   (:constructor nil)
-		   (:make-load-form-fun make-type-load-form)
-		   #-sb-xc-host (:pure t))
+                   (:constructor nil)
+                   (:make-load-form-fun make-type-load-form)
+                   #-sb-xc-host (:pure t))
   ;; the class of this type
   ;;
   ;; FIXME: It's unnecessarily confusing to have a structure accessor
@@ -78,8 +78,8 @@
   ;; an arbitrary hash code used in EQ-style hashing of identity
   ;; (since EQ hashing can't be done portably)
   (hash-value (random #.(ash 1 15))
-	      :type (and fixnum unsigned-byte)
-	      :read-only t)
+              :type (and fixnum unsigned-byte)
+              :read-only t)
   ;; Can this object contain other types? A global property of our
   ;; implementation (which unfortunately seems impossible to enforce
   ;; with assertions or other in-the-code checks and constraints) is
@@ -107,13 +107,13 @@
   (multiple-value-bind (subtypep1 win1) (csubtypep type1 type2)
     (multiple-value-bind (subtypep2 win2) (csubtypep type2 type1)
       (cond (subtypep1 type1)
-	    (subtypep2 type2)
-	    ((and win1 win2) *empty-type*)
-	    (t nil)))))
+            (subtypep2 type2)
+            ((and win1 win2) *empty-type*)
+            (t nil)))))
 (defun hierarchical-union2 (type1 type2)
   (cond ((csubtypep type1 type2) type2)
-	((csubtypep type2 type1) type1)
-	(t nil)))
+        ((csubtypep type2 type1) type1)
+        (t nil)))
 
 ;;; Hash two things (types) down to 8 bits. In CMU CL this was an EQ
 ;;; hash, but since it now needs to run in vanilla ANSI Common Lisp at
@@ -127,8 +127,8 @@
 (declaim (ftype (function (ctype ctype) (unsigned-byte 8)) type-cache-hash))
 (defun type-cache-hash (type1 type2)
   (logand (logxor (ash (type-hash-value type1) -3)
-		  (type-hash-value type2))
-	  #xFF))
+                  (type-hash-value type2))
+          #xFF))
 #!-sb-fluid (declaim (inline type-list-cache-hash))
 (declaim (ftype (function (list) (unsigned-byte 8)) type-list-cache-hash))
 (defun type-list-cache-hash (types)
@@ -137,7 +137,7 @@
              for hash = (type-hash-value type)
              do (setq res (logxor res hash))
              finally (return res))
-	  #xFF))
+          #xFF))
 
 ;;;; cold loading initializations
 

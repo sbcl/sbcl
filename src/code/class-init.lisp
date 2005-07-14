@@ -25,8 +25,8 @@
     (when trans-p
       (/show0 "in TRANS-P case")
       (let ((classoid (classoid-cell-classoid (find-classoid-cell name)))
-	    (type (specifier-type translation)))
-	(setf (built-in-classoid-translation classoid) type)
-	(setf (info :type :builtin name) type)))))
+            (type (specifier-type translation)))
+        (setf (built-in-classoid-translation classoid) type)
+        (setf (info :type :builtin name) type)))))
 
 (/show0 "done with class-init.lisp")

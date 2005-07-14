@@ -31,11 +31,11 @@
 (defmacro def!type (name &rest rest)
   `(progn
      (deftype ,name ,@rest)
-     #+sb-xc-host 
+     #+sb-xc-host
      ,(let ((form `(sb!xc:deftype ,(uncross name) ,@rest)))
-	(if (boundp '*delayed-def!types*)
-	    `(push ',form *delayed-def!types*)
-	    form))))
+        (if (boundp '*delayed-def!types*)
+            `(push ',form *delayed-def!types*)
+            form))))
 
 ;;; machinery to implement DEF!TYPE delays
 #+sb-xc-host
@@ -45,12 +45,12 @@
   (/show "done binding *DELAYED-DEF!TYPES*")
   (defun force-delayed-def!types ()
     (if (boundp '*delayed-def!types*)
-	(progn
-	  (mapc #'eval *delayed-def!types*)
-	  (makunbound '*delayed-def!types*))
-	;; This condition is probably harmless if it comes up when
-	;; interactively experimenting with the system by loading a
-	;; source file into it more than once. But it's worth warning
-	;; about it because it definitely shouldn't come up in an
-	;; ordinary build process.
-	(warn "*DELAYED-DEF!TYPES* is already unbound."))))
+        (progn
+          (mapc #'eval *delayed-def!types*)
+          (makunbound '*delayed-def!types*))
+        ;; This condition is probably harmless if it comes up when
+        ;; interactively experimenting with the system by loading a
+        ;; source file into it more than once. But it's worth warning
+        ;; about it because it definitely shouldn't come up in an
+        ;; ordinary build process.
+        (warn "*DELAYED-DEF!TYPES* is already unbound."))))

@@ -22,7 +22,7 @@ wants to have type (* t).  Note that even for options that have
 integer arguments, this is still a pointer to said integer.
 
 size is the size of the buffer that the return of mangle-arg points
-to, and also of the buffer that we should allocate for getsockopt 
+to, and also of the buffer that we should allocate for getsockopt
 to write into.
 
 mangle-return is called with an alien buffer and should turn it into
@@ -40,41 +40,41 @@ Code for options that not every system has should be conditionalised:
      level number buffer-type mangle-arg mangle-return mangle-setf-buffer
      &optional features info)
   (let ((find-level
-	 (if (numberp (eval level))
-	     level
-	     `(get-protocol-by-name ,(string-downcase (symbol-name level)))))
-	(supportedp (or (null features) (featurep features))))
+         (if (numberp (eval level))
+             level
+             `(get-protocol-by-name ,(string-downcase (symbol-name level)))))
+        (supportedp (or (null features) (featurep features))))
     `(progn
       (export ',lisp-name)
       (defun ,lisp-name (socket)
-	,@(when documentation (list (concatenate 'string documentation " " info)))
-	,(if supportedp
-	     `(sb-alien:with-alien ((size sb-alien:int)
-				      (buffer ,buffer-type))
-		  (setf size (sb-alien:alien-size ,buffer-type :bytes))
-		  (if (= -1 (sockint::getsockopt (socket-file-descriptor socket)
-						 ,find-level ,number
-						 (sb-alien:addr buffer)
-						 (sb-alien:addr size)))
-		      (socket-error "getsockopt")
-		      (,mangle-return buffer size)))
-	     `(error 'unsupported-operator 
-               :format-control "Socket option ~S is not supported in this platform." 
+        ,@(when documentation (list (concatenate 'string documentation " " info)))
+        ,(if supportedp
+             `(sb-alien:with-alien ((size sb-alien:int)
+                                      (buffer ,buffer-type))
+                  (setf size (sb-alien:alien-size ,buffer-type :bytes))
+                  (if (= -1 (sockint::getsockopt (socket-file-descriptor socket)
+                                                 ,find-level ,number
+                                                 (sb-alien:addr buffer)
+                                                 (sb-alien:addr size)))
+                      (socket-error "getsockopt")
+                      (,mangle-return buffer size)))
+             `(error 'unsupported-operator
+               :format-control "Socket option ~S is not supported in this platform."
                :format-arguments (list ',lisp-name))))
       (defun (setf ,lisp-name) (new-val socket)
-	,(if supportedp
-	     `(sb-alien:with-alien ((buffer ,buffer-type))
-		  (setf buffer ,(if mangle-arg
-				    `(,mangle-arg new-val)
-				    `new-val))
-		  (when (= -1 (sockint::setsockopt (socket-file-descriptor socket)
-						   ,find-level ,number
-						   (,mangle-setf-buffer buffer)
-						   ,(if (eql buffer-type 'sb-alien:c-string)
-							`(length new-val)
-							`(sb-alien:alien-size ,buffer-type :bytes))))
-		    (socket-error "setsockopt")))
-	     `(error 'unsupported-operator 
+        ,(if supportedp
+             `(sb-alien:with-alien ((buffer ,buffer-type))
+                  (setf buffer ,(if mangle-arg
+                                    `(,mangle-arg new-val)
+                                    `new-val))
+                  (when (= -1 (sockint::setsockopt (socket-file-descriptor socket)
+                                                   ,find-level ,number
+                                                   (,mangle-setf-buffer buffer)
+                                                   ,(if (eql buffer-type 'sb-alien:c-string)
+                                                        `(length new-val)
+                                                        `(sb-alien:alien-size ,buffer-type :bytes))))
+                    (socket-error "setsockopt")))
+             `(error 'unsupported-operator
                :format-control "Socket option ~S is not supported on this platform."
                :format-arguments (list ',lisp-name)))))))
 
@@ -116,7 +116,7 @@ Code for options that not every system has should be conditionalised:
   `(define-socket-option ,name
     ,(format nil "~@<Return the value of the ~A socket option for SOCKET. ~
                  This can also be updated with SETF.~:@>"
-	     (symbol-name c-name))
+             (symbol-name c-name))
     ,level ,c-name
     sb-alien:int bool-to-foreign-int foreign-int-to-bool sb-alien:addr
     ,features ,info))

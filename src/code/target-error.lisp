@@ -30,7 +30,7 @@
 (def!method print-object ((restart restart) stream)
   (if *print-escape*
       (print-unreadable-object (restart stream :type t :identity t)
-	(prin1 (restart-name restart) stream))
+        (prin1 (restart-name restart) stream))
       (restart-report restart stream)))
 
 (defun compute-restarts (&optional condition)
@@ -40,20 +40,20 @@
    specified, then only restarts associated with CONDITION (or with no
    condition) will be returned."
   (let ((associated ())
-	(other ()))
+        (other ()))
     (dolist (alist *condition-restarts*)
       (if (eq (car alist) condition)
-	  (setq associated (cdr alist))
-	  (setq other (append (cdr alist) other))))
+          (setq associated (cdr alist))
+          (setq other (append (cdr alist) other))))
     (collect ((res))
       (dolist (restart-cluster *restart-clusters*)
-	(dolist (restart restart-cluster)
-	  (when (and (or (not condition)
-			 (member restart associated)
-			 (not (member restart other)))
-		     (funcall (restart-test-function restart)
+        (dolist (restart restart-cluster)
+          (when (and (or (not condition)
+                         (member restart associated)
+                         (not (member restart other)))
+                     (funcall (restart-test-function restart)
                               condition))
-	    (res restart))))
+            (res restart))))
       (res))))
 
 #!+sb-doc
@@ -62,11 +62,11 @@
 
 (defun restart-report (restart stream)
   (funcall (or (restart-report-function restart)
-	       (let ((name (restart-name restart)))
-		 (lambda (stream)
-		   (if name (format stream "~S" name)
-		       (format stream "~S" restart)))))
-	   stream))
+               (let ((name (restart-name restart)))
+                 (lambda (stream)
+                   (if name (format stream "~S" name)
+                       (format stream "~S" restart)))))
+           stream))
 
 (defun find-restart (name &optional condition)
   #!+sb-doc
@@ -87,8 +87,8 @@
 (defun find-restart-or-control-error (identifier &optional condition)
   (or (find-restart identifier condition)
       (error 'simple-control-error
-	     :format-control "No restart ~S is active~@[ for ~S~]."
-	     :format-arguments (list identifier condition))))
+             :format-control "No restart ~S is active~@[ for ~S~]."
+             :format-arguments (list identifier condition))))
 
 (defun invoke-restart (restart &rest values)
   #!+sb-doc
@@ -102,8 +102,8 @@
 (defun interactive-restart-arguments (real-restart)
   (let ((interactive-function (restart-interactive-function real-restart)))
     (if interactive-function
-	(funcall interactive-function)
-	'())))
+        (funcall interactive-function)
+        '())))
 
 (defun invoke-restart-interactively (restart)
   #!+sb-doc
@@ -111,30 +111,30 @@
    necessary arguments. If the argument restart is not a restart or a
    currently active non-NIL restart name, then a CONTROL-ERROR is signalled."
   (let* ((real-restart (find-restart-or-control-error restart))
-	 (args (interactive-restart-arguments real-restart)))
+         (args (interactive-restart-arguments real-restart)))
     (apply (restart-function real-restart) args)))
 
 (defun assert-error (assertion places datum &rest arguments)
   (let ((cond (if datum
-		(coerce-to-condition datum
-						    arguments
-						    'simple-error
-						    'error)
-		(make-condition 'simple-error
-				:format-control "The assertion ~S failed."
-				:format-arguments (list assertion)))))
+                (coerce-to-condition datum
+                                                    arguments
+                                                    'simple-error
+                                                    'error)
+                (make-condition 'simple-error
+                                :format-control "The assertion ~S failed."
+                                :format-arguments (list assertion)))))
     (restart-case
-	(error cond)
+        (error cond)
       (continue ()
-		:report (lambda (stream)
-			  (format stream "Retry assertion")
-			  (if places
-			      (format stream
-				      " with new value~P for ~{~S~^, ~}."
-				      (length places)
-				      places)
-			      (format stream ".")))
-		nil))))
+                :report (lambda (stream)
+                          (format stream "Retry assertion")
+                          (if places
+                              (format stream
+                                      " with new value~P for ~{~S~^, ~}."
+                                      (length places)
+                                      places)
+                              (format stream ".")))
+                nil))))
 
 ;;; READ-EVALUATED-FORM is used as the interactive method for restart cases
 ;;; setup by the Common Lisp "casing" (e.g., CCASE and CTYPECASE) macros
@@ -145,29 +145,29 @@
 
 (defun check-type-error (place place-value type type-string)
   (let ((condition
-	 (make-condition
-	  'simple-type-error
-	  :datum place-value
-	  :expected-type type
-	  :format-control
-	  "The value of ~S is ~S, which is not ~:[of type ~S~;~:*~A~]."
-	  :format-arguments (list place place-value type-string type))))
+         (make-condition
+          'simple-type-error
+          :datum place-value
+          :expected-type type
+          :format-control
+          "The value of ~S is ~S, which is not ~:[of type ~S~;~:*~A~]."
+          :format-arguments (list place place-value type-string type))))
     (restart-case (error condition)
       (store-value (value)
-	:report (lambda (stream)
-		  (format stream "Supply a new value for ~S." place))
-	:interactive read-evaluated-form
-	value))))
+        :report (lambda (stream)
+                  (format stream "Supply a new value for ~S." place))
+        :interactive read-evaluated-form
+        value))))
 
 (defun case-body-error (name keyform keyform-value expected-type keys)
   (restart-case
       (error 'case-failure
-	     :name name
-	     :datum keyform-value
-	     :expected-type expected-type
-	     :possibilities keys)
+             :name name
+             :datum keyform-value
+             :expected-type expected-type
+             :possibilities keys)
     (store-value (value)
       :report (lambda (stream)
-		(format stream "Supply a new value for ~S." keyform))
+                (format stream "Supply a new value for ~S." keyform))
       :interactive read-evaluated-form
       value)))

@@ -34,12 +34,12 @@
 (defun fun-signature (name)
   (let ((type (info :function :type name)))
     (cond ((not (fun-type-p type))
-	   (values 0 t))
-	  (t
-	   (values (length (fun-type-required type))
-		   (or (fun-type-optional type)
-		       (fun-type-keyp type)
-		       (fun-type-rest type)))))))
+           (values 0 t))
+          (t
+           (values (length (fun-type-required type))
+                   (or (fun-type-optional type)
+                       (fun-type-keyp type)
+                       (fun-type-rest type)))))))
 |#
 
 ;;;; global data structures
@@ -106,17 +106,17 @@
 (defmacro fastbig- (x y)
   (once-only ((x x) (y y))
     `(if (and (typep ,x '(and fixnum unsigned-byte))
-	      (typep ,y '(and fixnum unsigned-byte)))
-	 ;; special case: can use fixnum arithmetic and be guaranteed
-	 ;; the result is also a fixnum
-	 (- ,x ,y)
-	 ;; general case
-	 (- ,x ,y))))
+              (typep ,y '(and fixnum unsigned-byte)))
+         ;; special case: can use fixnum arithmetic and be guaranteed
+         ;; the result is also a fixnum
+         (- ,x ,y)
+         ;; general case
+         (- ,x ,y))))
 (defmacro fastbig-1+ (x)
   (once-only ((x x))
     `(if (typep ,x 'index)
-	 (1+ ,x)
-	 (1+ ,x))))
+         (1+ ,x)
+         (1+ ,x))))
 
 ;;; Return a collection of closures over the same lexical context,
 ;;;   (VALUES ENCAPSULATION-FUN READ-STATS-FUN CLEAR-STATS-FUN).
@@ -142,9 +142,9 @@
 (defun profile-encapsulation-lambdas (encapsulated-fun)
   (declare (type function encapsulated-fun))
   (let* ((count 0)
-	 (ticks 0)
-	 (consing 0)
-	 (profiles 0))
+         (ticks 0)
+         (consing 0)
+         (profiles 0))
     (declare (type (or pcounter fixnum) count ticks consing profiles))
     (values
      ;; ENCAPSULATION-FUN
@@ -152,71 +152,71 @@
        (declare (optimize speed safety))
        ;; Make sure that we're not recursing infinitely.
        (when (boundp '*computing-profiling-data-for*)
-	 (unprofile-all) ; to avoid further recursion
-	 (error "~@<When computing profiling data for ~S, the profiled function ~S was called. To get out of this infinite recursion, all functions have been unprofiled. (Since the profiling system evidently uses ~S in its computations, it looks as though it's a bad idea to profile it.)~:@>"
-		*computing-profiling-data-for*
-		encapsulated-fun
-		encapsulated-fun))
+         (unprofile-all) ; to avoid further recursion
+         (error "~@<When computing profiling data for ~S, the profiled function ~S was called. To get out of this infinite recursion, all functions have been unprofiled. (Since the profiling system evidently uses ~S in its computations, it looks as though it's a bad idea to profile it.)~:@>"
+                *computing-profiling-data-for*
+                encapsulated-fun
+                encapsulated-fun))
        ;; FIXME: Probably when this is stable, we should optimize (SAFETY 0).
        (fastbig-incf-pcounter-or-fixnum count 1)
        (let ((dticks 0)
-	     (dconsing 0)
-	     (inner-enclosed-profiles 0))
-	 (declare (type unsigned-byte dticks dconsing))
-	 (declare (type unsigned-byte inner-enclosed-profiles))
-	 (aver (typep dticks 'unsigned-byte))
-	 (aver (typep dconsing 'unsigned-byte))
-	 (aver (typep inner-enclosed-profiles 'unsigned-byte))
-	 (unwind-protect
-	     (let* ((start-ticks (get-internal-ticks))
-		    (*enclosed-ticks* 0)
-		    (*enclosed-consing* 0)
-		    (*enclosed-profiles* 0)
-		    (nbf0 *n-bytes-freed-or-purified*)
-		    (dynamic-usage-0 (sb-kernel:dynamic-usage)))
-	       (declare (inline pcounter-or-fixnum->integer))
-	       (unwind-protect
-		   (multiple-value-call encapsulated-fun
-					(sb-c:%more-arg-values arg-context
-							       0
-							       arg-count))
-		 (let ((*computing-profiling-data-for* encapsulated-fun)
-		       (dynamic-usage-1 (sb-kernel:dynamic-usage)))
-		   (setf dticks (fastbig- (get-internal-ticks) start-ticks))
-		   (setf dconsing
-			 (if (eql *n-bytes-freed-or-purified* nbf0)
-			     ;; common special case where we can avoid
-			     ;; bignum arithmetic
-			     (- dynamic-usage-1 dynamic-usage-0)
-			     ;; general case
-			     (- (get-bytes-consed) nbf0 dynamic-usage-0)))
-		   (setf inner-enclosed-profiles
-			 (pcounter-or-fixnum->integer *enclosed-profiles*))
-		   (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))
-		     (fastbig-incf-pcounter-or-fixnum ticks net-dticks))
-		   (let ((net-dconsing (fastbig- dconsing
-						 (pcounter-or-fixnum->integer
-						  *enclosed-consing*))))
-		     (fastbig-incf-pcounter-or-fixnum consing net-dconsing))
-		   (fastbig-incf-pcounter-or-fixnum profiles
-						    inner-enclosed-profiles))))
-	   (fastbig-incf-pcounter-or-fixnum *enclosed-ticks* dticks)
-	   (fastbig-incf-pcounter-or-fixnum *enclosed-consing* dconsing)
-	   (fastbig-incf-pcounter-or-fixnum *enclosed-profiles*
-					    (fastbig-1+
-					     inner-enclosed-profiles)))))
+             (dconsing 0)
+             (inner-enclosed-profiles 0))
+         (declare (type unsigned-byte dticks dconsing))
+         (declare (type unsigned-byte inner-enclosed-profiles))
+         (aver (typep dticks 'unsigned-byte))
+         (aver (typep dconsing 'unsigned-byte))
+         (aver (typep inner-enclosed-profiles 'unsigned-byte))
+         (unwind-protect
+             (let* ((start-ticks (get-internal-ticks))
+                    (*enclosed-ticks* 0)
+                    (*enclosed-consing* 0)
+                    (*enclosed-profiles* 0)
+                    (nbf0 *n-bytes-freed-or-purified*)
+                    (dynamic-usage-0 (sb-kernel:dynamic-usage)))
+               (declare (inline pcounter-or-fixnum->integer))
+               (unwind-protect
+                   (multiple-value-call encapsulated-fun
+                                        (sb-c:%more-arg-values arg-context
+                                                               0
+                                                               arg-count))
+                 (let ((*computing-profiling-data-for* encapsulated-fun)
+                       (dynamic-usage-1 (sb-kernel:dynamic-usage)))
+                   (setf dticks (fastbig- (get-internal-ticks) start-ticks))
+                   (setf dconsing
+                         (if (eql *n-bytes-freed-or-purified* nbf0)
+                             ;; common special case where we can avoid
+                             ;; bignum arithmetic
+                             (- dynamic-usage-1 dynamic-usage-0)
+                             ;; general case
+                             (- (get-bytes-consed) nbf0 dynamic-usage-0)))
+                   (setf inner-enclosed-profiles
+                         (pcounter-or-fixnum->integer *enclosed-profiles*))
+                   (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))
+                     (fastbig-incf-pcounter-or-fixnum ticks net-dticks))
+                   (let ((net-dconsing (fastbig- dconsing
+                                                 (pcounter-or-fixnum->integer
+                                                  *enclosed-consing*))))
+                     (fastbig-incf-pcounter-or-fixnum consing net-dconsing))
+                   (fastbig-incf-pcounter-or-fixnum profiles
+                                                    inner-enclosed-profiles))))
+           (fastbig-incf-pcounter-or-fixnum *enclosed-ticks* dticks)
+           (fastbig-incf-pcounter-or-fixnum *enclosed-consing* dconsing)
+           (fastbig-incf-pcounter-or-fixnum *enclosed-profiles*
+                                            (fastbig-1+
+                                             inner-enclosed-profiles)))))
      ;; READ-STATS-FUN
      (lambda ()
        (values (pcounter-or-fixnum->integer count)
-	       (pcounter-or-fixnum->integer ticks)
-	       (pcounter-or-fixnum->integer consing)
-	       (pcounter-or-fixnum->integer profiles)))
+               (pcounter-or-fixnum->integer ticks)
+               (pcounter-or-fixnum->integer consing)
+               (pcounter-or-fixnum->integer profiles)))
      ;; CLEAR-STATS-FUN
      (lambda ()
        (setf count 0
-	     ticks 0
-	     consing 0
-	     profiles 0)))))
+             ticks 0
+             consing 0
+             profiles 0)))))
 
 ;;;; interfaces
 
@@ -231,15 +231,15 @@
        ;; Then we map onto it.
        (funcall function name))
       (string (let ((package (find-undeleted-package-or-lose name)))
-		(do-symbols (symbol package)
-		  (when (eq (symbol-package symbol) package)
-		    (when (and (fboundp symbol)
-			       (not (macro-function symbol))
-			       (not (special-operator-p symbol)))
-		      (funcall function symbol))
-		    (let ((setf-name `(setf ,symbol)))
-		      (when (fboundp setf-name)
-			(funcall function setf-name)))))))))
+                (do-symbols (symbol package)
+                  (when (eq (symbol-package symbol) package)
+                    (when (and (fboundp symbol)
+                               (not (macro-function symbol))
+                               (not (special-operator-p symbol)))
+                      (funcall function symbol))
+                    (let ((setf-name `(setf ,symbol)))
+                      (when (fboundp setf-name)
+                        (funcall function setf-name)))))))))
   (values))
 
 ;;; Profile the named function, which should exist and not be profiled
@@ -247,41 +247,41 @@
 (defun profile-1-unprofiled-fun (name)
   (let ((encapsulated-fun (fdefinition name)))
     (multiple-value-bind (encapsulation-fun read-stats-fun clear-stats-fun)
-	(profile-encapsulation-lambdas encapsulated-fun)
+        (profile-encapsulation-lambdas encapsulated-fun)
       (without-package-locks
        (setf (fdefinition name)
-	     encapsulation-fun))
+             encapsulation-fun))
       (setf (gethash name *profiled-fun-name->info*)
-	    (make-profile-info :name name
-			       :encapsulated-fun encapsulated-fun
-			       :encapsulation-fun encapsulation-fun
-			       :read-stats-fun read-stats-fun
-			       :clear-stats-fun clear-stats-fun))
+            (make-profile-info :name name
+                               :encapsulated-fun encapsulated-fun
+                               :encapsulation-fun encapsulation-fun
+                               :read-stats-fun read-stats-fun
+                               :clear-stats-fun clear-stats-fun))
       (values))))
 
 ;;; Profile the named function. If already profiled, unprofile first.
 (defun profile-1-fun (name)
   (cond ((fboundp name)
-	 (when (gethash name *profiled-fun-name->info*)
-	   (warn "~S is already profiled, so unprofiling it first." name)
-	   (unprofile-1-fun name))
-	 (profile-1-unprofiled-fun name))
-	(t
-	 (warn "ignoring undefined function ~S" name)))
+         (when (gethash name *profiled-fun-name->info*)
+           (warn "~S is already profiled, so unprofiling it first." name)
+           (unprofile-1-fun name))
+         (profile-1-unprofiled-fun name))
+        (t
+         (warn "ignoring undefined function ~S" name)))
   (values))
 
 ;;; Unprofile the named function, if it is profiled.
 (defun unprofile-1-fun (name)
   (let ((pinfo (gethash name *profiled-fun-name->info*)))
     (cond (pinfo
-	   (remhash name *profiled-fun-name->info*)
-	   (if (eq (fdefinition name) (profile-info-encapsulation-fun pinfo))
-	       (without-package-locks
-		(setf (fdefinition name) (profile-info-encapsulated-fun pinfo)))
-	       (warn "preserving current definition of redefined function ~S"
-		     name)))
-	  (t
-	   (warn "~S is not a profiled function." name))))
+           (remhash name *profiled-fun-name->info*)
+           (if (eq (fdefinition name) (profile-info-encapsulation-fun pinfo))
+               (without-package-locks
+                (setf (fdefinition name) (profile-info-encapsulated-fun pinfo)))
+               (warn "preserving current definition of redefined function ~S"
+                     name)))
+          (t
+           (warn "~S is not a profiled function." name))))
   (values))
 
 (defmacro profile (&rest names)
@@ -299,7 +299,7 @@
    UNPROFILE, REPORT and RESET."
   (if (null names)
       `(loop for k being each hash-key in *profiled-fun-name->info*
-	     collecting k)
+             collecting k)
       `(mapc-on-named-funs #'profile-1-fun ',names)))
 
 (defmacro unprofile (&rest names)
@@ -307,7 +307,7 @@
   "Unwrap any profiling code around the named functions, or if no names
   are given, unprofile all profiled functions. A symbol names
   a function. A string names all the functions named by symbols in the
-  named package. NAMES defaults to the list of names of all currently 
+  named package. NAMES defaults to the list of names of all currently
   profiled functions."
   (if names
       `(mapc-on-named-funs #'unprofile-1-fun ',names)
@@ -346,11 +346,11 @@
 ;;; the enclosing function.
 (defun compensate-time (calls ticks profile)
   (let ((raw-compensated
-	 (- (/ (float ticks) (float +ticks-per-second+))
-	    (* (overhead-internal *overhead*) (float calls))
-	    (* (- (overhead-total *overhead*)
-		  (overhead-internal *overhead*))
-	       (float profile)))))
+         (- (/ (float ticks) (float +ticks-per-second+))
+            (* (overhead-internal *overhead*) (float calls))
+            (* (- (overhead-total *overhead*)
+                  (overhead-internal *overhead*))
+               (float profile)))))
     (max raw-compensated 0.0)))
 
 (defun report ()
@@ -360,39 +360,39 @@ bignums are involved in runtime calculation, as in a very-long-running
 Lisp process."
   (unless (boundp '*overhead*)
     (setf *overhead*
-	  (compute-overhead)))
+          (compute-overhead)))
   (let ((time-info-list ())
-	(no-call-name-list ()))
+        (no-call-name-list ()))
     (dohash (name pinfo *profiled-fun-name->info*)
       (unless (eq (fdefinition name)
-		  (profile-info-encapsulation-fun pinfo))
-	(warn "Function ~S has been redefined, so times may be inaccurate.~@
-	       PROFILE it again to record calls to the new definition."
-	      name))
+                  (profile-info-encapsulation-fun pinfo))
+        (warn "Function ~S has been redefined, so times may be inaccurate.~@
+               PROFILE it again to record calls to the new definition."
+              name))
       (multiple-value-bind (calls ticks consing profile)
-	  (funcall (profile-info-read-stats-fun pinfo))
-	(if (zerop calls)
-	    (push name no-call-name-list)
-	    (push (make-time-info :name name
-				  :calls calls
-				  :seconds (compensate-time calls
-							    ticks
-							    profile)
-				  :consing consing)
-		  time-info-list))))
+          (funcall (profile-info-read-stats-fun pinfo))
+        (if (zerop calls)
+            (push name no-call-name-list)
+            (push (make-time-info :name name
+                                  :calls calls
+                                  :seconds (compensate-time calls
+                                                            ticks
+                                                            profile)
+                                  :consing consing)
+                  time-info-list))))
 
     (setf time-info-list
-	  (sort time-info-list
-		#'>=
-		:key #'time-info-seconds))
+          (sort time-info-list
+                #'>=
+                :key #'time-info-seconds))
     (print-profile-table time-info-list)
 
     (when no-call-name-list
       (format *trace-output*
-	      "~%These functions were not called:~%~{~<~%~:; ~S~>~}~%"
-	      (sort no-call-name-list #'string<
-		    :key (lambda (name)
-			   (symbol-name (fun-name-block-name name))))))
+              "~%These functions were not called:~%~{~<~%~:; ~S~>~}~%"
+              (sort no-call-name-list #'string<
+                    :key (lambda (name)
+                           (symbol-name (fun-name-block-name name))))))
 
     (values)))
 
@@ -449,13 +449,13 @@ Lisp process."
                 calls-width total-calls)
 
       (format *trace-output*
-	      "~%estimated total profiling overhead: ~4,2F seconds~%"
-	      (* (overhead-total *overhead*) (float total-calls)))
+              "~%estimated total profiling overhead: ~4,2F seconds~%"
+              (* (overhead-total *overhead*) (float total-calls)))
       (format *trace-output*
-	      "~&overhead estimation parameters:~%  ~Ss/call, ~Ss total profiling, ~Ss internal profiling~%"
-	      (overhead-call *overhead*)
-	      (overhead-total *overhead*)
-	      (overhead-internal *overhead*)))))
+              "~&overhead estimation parameters:~%  ~Ss/call, ~Ss total profiling, ~Ss internal profiling~%"
+              (overhead-call *overhead*)
+              (overhead-total *overhead*)
+              (overhead-internal *overhead*)))))
 
 
 ;;;; overhead estimation
@@ -479,38 +479,38 @@ Lisp process."
 (defun compute-overhead ()
   (format *debug-io* "~&measuring PROFILE overhead..")
   (flet ((frob ()
-	   (let ((start (get-internal-ticks))
-	         (fun (symbol-function 'compute-overhead-aux)))
+           (let ((start (get-internal-ticks))
+                 (fun (symbol-function 'compute-overhead-aux)))
              (declare (type function fun))
-	     (dotimes (i *timer-overhead-iterations*)
-	       (funcall fun fun))
-	     (/ (float (- (get-internal-ticks) start))
-		(float +ticks-per-second+)
-		(float *timer-overhead-iterations*)))))
+             (dotimes (i *timer-overhead-iterations*)
+               (funcall fun fun))
+             (/ (float (- (get-internal-ticks) start))
+                (float +ticks-per-second+)
+                (float *timer-overhead-iterations*)))))
     (let (;; Measure unprofiled calls to estimate call overhead.
-	  (call-overhead (frob))
-	  total-overhead
-	  internal-overhead)
+          (call-overhead (frob))
+          total-overhead
+          internal-overhead)
       ;; Measure profiled calls to estimate profiling overhead.
       (unwind-protect
-	  (progn
-	    (profile compute-overhead-aux)
-	    (setf total-overhead
-		  (- (frob) call-overhead)))
-	(let* ((pinfo (gethash 'compute-overhead-aux
-			       *profiled-fun-name->info*))
-	       (read-stats-fun (profile-info-read-stats-fun pinfo))
-	       (time (nth-value 1 (funcall read-stats-fun))))
-	  (setf internal-overhead
-		(/ (float time)
-		   (float +ticks-per-second+)
-		   (float *timer-overhead-iterations*))))
-	(unprofile compute-overhead-aux))
+          (progn
+            (profile compute-overhead-aux)
+            (setf total-overhead
+                  (- (frob) call-overhead)))
+        (let* ((pinfo (gethash 'compute-overhead-aux
+                               *profiled-fun-name->info*))
+               (read-stats-fun (profile-info-read-stats-fun pinfo))
+               (time (nth-value 1 (funcall read-stats-fun))))
+          (setf internal-overhead
+                (/ (float time)
+                   (float +ticks-per-second+)
+                   (float *timer-overhead-iterations*))))
+        (unprofile compute-overhead-aux))
       (prog1
-	  (make-overhead :call call-overhead
-			 :total total-overhead
-			 :internal internal-overhead)
-	(format *debug-io* "done~%")))))
+          (make-overhead :call call-overhead
+                         :total total-overhead
+                         :internal internal-overhead)
+        (format *debug-io* "done~%")))))
 
 ;;; It would be bad to compute *OVERHEAD*, save it into a .core file,
 ;;; then load the old *OVERHEAD* value from the .core file into a

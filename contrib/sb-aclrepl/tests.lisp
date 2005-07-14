@@ -1,11 +1,11 @@
-;; Tests for sb-aclrepl 
+;; Tests for sb-aclrepl
 
 (defpackage #:aclrepl-tests
   (:use #:sb-aclrepl #:cl #:sb-rt))
 (in-package #:aclrepl-tests)
 
 (declaim (special sb-aclrepl::*skip-address-display*
-		  sb-aclrepl::*inspect-unbound-object-marker*))
+                  sb-aclrepl::*inspect-unbound-object-marker*))
 
 (setf sb-rt::*catch-errors* nil)
 
@@ -55,8 +55,8 @@
 (defparameter *bignum* 1234567890123456789)
 (defparameter *array* (make-array '(3 3 2) :initial-element nil))
 (defparameter *vector* (make-array '(20):initial-contents
-			     '(0 1 2 3 4 5 6 7 8 9
-			       10 11 12 13 14 15 16 17 18 19)))
+                             '(0 1 2 3 4 5 6 7 8 9
+                               10 11 12 13 14 15 16 17 18 19)))
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *circle-list1* '(a))
   (setf (car *circle-list1*) *circle-list1*)
@@ -126,27 +126,27 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun basename (id &optional print (skip 0))
     (let ((name (typecase id
-		  (symbol (symbol-name id))
-		  (string (string-upcase id))
-		  (t (format nil "~A" id)))))
+                  (symbol (symbol-name id))
+                  (string (string-upcase id))
+                  (t (format nil "~A" id)))))
       (format nil "~A~A~A"
-	      (string-left-trim "*" (string-right-trim "*" name))
-	      (if print (format nil ".P~D" print) "")
-	      (if (not (zerop skip)) (format nil ".S~D" skip) ""))))
-  
+              (string-left-trim "*" (string-right-trim "*" name))
+              (if print (format nil ".P~D" print) "")
+              (if (not (zerop skip)) (format nil ".S~D" skip) ""))))
+
   (defun elements-tests-name (id ext print skip)
     (intern (format nil "ELEM.~A.~A" (basename id print skip) ext))))
 
 (defmacro def-elements-tests (object count components labels
-			  &optional (print nil) (skip 0))
+                          &optional (print nil) (skip 0))
   `(progn
     (deftest ,(elements-tests-name object "COUNT" print skip)
-	(elements-count ,object ,print ,skip) ,count)
+        (elements-count ,object ,print ,skip) ,count)
     (unless (eq ,components :dont-check)
       (deftest ,(elements-tests-name object "COMPONENTS" print skip)
-	  (elements-components ,object ,print ,skip) ,components))
+          (elements-components ,object ,print ,skip) ,components))
     (deftest ,(elements-tests-name object "LABELS" print skip)
-	(elements-labels ,object ,print ,skip) ,labels)))
+        (elements-labels ,object ,print ,skip) ,labels)))
 
 (def-elements-tests *normal-list* 3 #(a b 3) #(0 1 2))
 (def-elements-tests *dotted-list* 3 #(a b 3) #(0 1 :tail))
@@ -164,9 +164,9 @@
 (deftest circle-list2-components.1
     (aref (elements-components *circle-list2*) 1) #.*circle-list2*)
 (deftest circle-list3-components.0
-    (aref (elements-components *circle-list3*) 0) #.*circle-list3*) 
+    (aref (elements-components *circle-list3*) 0) #.*circle-list3*)
 (deftest circle-list3-components.1
-    (aref (elements-components *circle-list3*) 1) b) 
+    (aref (elements-components *circle-list3*) 1) b)
 (deftest circle-list3-components.2
     (aref (elements-components *circle-list3*) 2) c)
 (deftest circle-list4-components.0
@@ -183,10 +183,10 @@
     (aref (elements-components *circle-list5*) 2) #.*circle-list5*)
 
 (def-elements-tests *cons-pair* 2 #(#c(1 2) a-symbol)
-		#((0 . "car") (1 . "cdr"))) 
+                #((0 . "car") (1 . "cdr")))
 (def-elements-tests *complex* 2 #(1 2) #((0 . "real") (1 . "imag")))
 (def-elements-tests *ratio* 2 #(22 7)
-		#((0 . "numerator") (1 . "denominator")))
+                #((0 . "numerator") (1 . "denominator")))
 (case sb-vm::n-word-bits
   (32
    (def-elements-tests *bignum* 2
@@ -198,8 +198,8 @@
      #((0 . :HEX64)))))
 
 (def-elements-tests *vector* 20
-		#(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19)
-		#(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19))
+                #(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19)
+                #(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19))
 (def-elements-tests *vector* 18
   #(nil 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19)
   #(:ellipses 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19)
@@ -290,9 +290,9 @@
 
 (def-elements-tests *tiny-struct* 1 #(10) #((0 . "FIRST")))
 (def-elements-tests *tiny-struct* 1
-		    #(nil) #(:ellipses) nil 1)
+                    #(nil) #(:ellipses) nil 1)
 (def-elements-tests *tiny-struct* 1
-		    #(nil) #(:ellipses) nil 2)
+                    #(nil) #(:ellipses) nil 2)
 
 (def-elements-tests *double* 0 nil nil)
 (def-elements-tests *double* 0 nil nil nil 1)
@@ -373,15 +373,15 @@ tail-> a cyclic list with 2 elements+tail")
 
 ;;; Inspector traversal tests
 (deftest inspect.0 (progn (setq * *simple-struct*)
-			  (istep '("*")))
+                          (istep '("*")))
   "#<STRUCTURE-CLASS ACLREPL-TESTS::SIMPLE-STRUCT>
    0 FIRST ----------> the symbol NIL
    1 SLOT-2 ---------> the symbol A-VALUE
    2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\"")
 
 (deftest istep.0 (progn (setq * *simple-struct*)
-			  (istep '("*"))
-			  (istep '("=")))
+                          (istep '("*"))
+                          (istep '("=")))
   "#<STRUCTURE-CLASS ACLREPL-TESTS::SIMPLE-STRUCT>
    0 FIRST ----------> the symbol NIL
    1 SLOT-2 ---------> the symbol A-VALUE
@@ -389,8 +389,8 @@ tail-> a cyclic list with 2 elements+tail")
 
 
 (deftest istep.1 (progn (setq * *simple-struct*)
-			(istep '("*"))
-			(istep '("first")))
+                        (istep '("*"))
+                        (istep '("first")))
 "the symbol NIL
    0 NAME -----------> a simple-string (3) \"NIL\"
    1 PACKAGE --------> the COMMON-LISP package
@@ -400,9 +400,9 @@ tail-> a cyclic list with 2 elements+tail")
 
 
 (deftest istep.2  (progn (setq * *simple-struct*)
-			 (istep '("*"))
-			 (istep '("first"))
-			 (istep '(">")))
+                         (istep '("*"))
+                         (istep '("first"))
+                         (istep '(">")))
 "the symbol A-VALUE
    0 NAME -----------> a simple-string (7) \"A-VALUE\"
    1 PACKAGE --------> the ACLREPL-TESTS package
@@ -411,10 +411,10 @@ tail-> a cyclic list with 2 elements+tail")
    4 PLIST ----------> the symbol NIL")
 
 (deftest istep.3  (progn (setq * *simple-struct*)
-			 (istep '("*"))
-			 (istep '("first"))
-			 (istep '(">"))
-			 (istep '("<")))
+                         (istep '("*"))
+                         (istep '("first"))
+                         (istep '(">"))
+                         (istep '("<")))
 "the symbol NIL
    0 NAME -----------> a simple-string (3) \"NIL\"
    1 PACKAGE --------> the COMMON-LISP package
@@ -423,43 +423,43 @@ tail-> a cyclic list with 2 elements+tail")
    4 PLIST ----------> the symbol NIL")
 
 (deftest istep.4  (progn (setq * *simple-struct*)
-			 (istep '("*"))
-			 (istep '("first"))
-			 (istep '(">"))
-			 (istep '("<"))
-			 (istep '("tree")))
+                         (istep '("*"))
+                         (istep '("first"))
+                         (istep '(">"))
+                         (istep '("<"))
+                         (istep '("tree")))
 "The current object is:
 the symbol NIL, which was selected by FIRST
 #<STRUCTURE-CLASS ACLREPL-TESTS::SIMPLE-STRUCT>, which was selected by (inspect *)
 ")
 
 (deftest istep.5  (progn (setq * *simple-struct*)
-			 (istep '("*"))
-			 (istep '("first"))
-			 (istep '(">"))
-			 (istep '("<"))
-			 (istep '("-")))
+                         (istep '("*"))
+                         (istep '("first"))
+                         (istep '(">"))
+                         (istep '("<"))
+                         (istep '("-")))
   "#<STRUCTURE-CLASS ACLREPL-TESTS::SIMPLE-STRUCT>
    0 FIRST ----------> the symbol NIL
    1 SLOT-2 ---------> the symbol A-VALUE
    2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\"")
 
 (deftest istep.6 (progn (setq * *dotted-list*)
-			(istep '("*"))
-			(istep '("tail")))
+                        (istep '("*"))
+                        (istep '("tail")))
 "fixnum 3")
 
 (deftest istep.7 (progn (setq * *dotted-list*)
-			(istep '("*"))
-			(istep '("2")))
+                        (istep '("*"))
+                        (istep '("2")))
 "fixnum 3")
 
 (deftest istep.8 (progn (setq * 5.5d0)
-			(istep '("*"))) 
+                        (istep '("*")))
   "double-float 5.5d0")
 
 (deftest istep.9 (progn (setq * 5.5d0)
-			(istep '("-")))
+                        (istep '("-")))
   "Object has no parent
 ")
 

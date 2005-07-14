@@ -26,7 +26,7 @@
 ;;; desiderata:
 ;;;   * Non-commutativity keeps us from hashing e.g. #(1 5) to the
 ;;;     same value as #(5 1), and ending up in real trouble in some
-;;;     special cases like bit vectors the way that CMUCL 18b SXHASH 
+;;;     special cases like bit vectors the way that CMUCL 18b SXHASH
 ;;;     does. (Under CMUCL 18b, SXHASH of any bit vector is 1..)
 ;;;   * We'd like to scatter our hash values over the entire possible range
 ;;;     of values instead of hashing small or common key values (like
@@ -90,15 +90,15 @@
   (declare (type string string))
   (declare (type index count))
   (macrolet ((set-result (form)
-	       `(setf result (ldb (byte #.sb!vm:n-word-bits 0) ,form))))
+               `(setf result (ldb (byte #.sb!vm:n-word-bits 0) ,form))))
     (let ((result 0))
       (declare (type (unsigned-byte #.sb!vm:n-word-bits) result))
       (unless (typep string '(vector nil))
-	(dotimes (i count)
-	  (declare (type index i))
-	  (set-result (+ result (char-code (aref string i))))
-	  (set-result (+ result (ash result 10)))
-	  (set-result (logxor result (ash result -6)))))
+        (dotimes (i count)
+          (declare (type index i))
+          (set-result (+ result (char-code (aref string i))))
+          (set-result (+ result (ash result 10)))
+          (set-result (logxor result (ash result -6)))))
       (set-result (+ result (ash result 3)))
       (set-result (logxor result (ash result -11)))
       (set-result (logxor result (ash result 15)))
@@ -107,11 +107,11 @@
 ;;;   (let ((ht (make-hash-table :test 'equal)))
 ;;;     (do-all-symbols (symbol)
 ;;;       (let* ((string (symbol-name symbol))
-;;;	      (hash (%sxhash-substring string)))
-;;;	 (if (gethash hash ht)
-;;;	     (unless (string= (gethash hash ht) string)
-;;;	       (format t "collision: ~S ~S~%" string (gethash hash ht)))
-;;;	     (setf (gethash hash ht) string))))
+;;;           (hash (%sxhash-substring string)))
+;;;      (if (gethash hash ht)
+;;;          (unless (string= (gethash hash ht) string)
+;;;            (format t "collision: ~S ~S~%" string (gethash hash ht)))
+;;;          (setf (gethash hash ht) string))))
 ;;;     (format t "final count=~W~%" (hash-table-count ht)))
 
 (defun %sxhash-simple-string (x)
@@ -131,7 +131,7 @@
   (declare (type index count))
   ;; see comment in %SXHASH-SIMPLE-STRING
   (flet ((trick (x count)
-	   (%sxhash-substring x count)))
+           (%sxhash-substring x count)))
     (declare (notinline trick))
     (trick x count)))
 
@@ -148,67 +148,67 @@
   ;; fast, in case it is the bottleneck somwhere.  -- CSR, 2003-03-14
   (declare (optimize speed))
   (labels ((sxhash-number (x)
-	     (etypecase x
-	       (fixnum (sxhash x))	; through DEFTRANSFORM
-	       (integer (sb!bignum:sxhash-bignum x))
-	       (single-float (sxhash x)) ; through DEFTRANSFORM
-	       (double-float (sxhash x)) ; through DEFTRANSFORM
-	       #!+long-float (long-float (error "stub: no LONG-FLOAT"))
-	       (ratio (let ((result 127810327))
-			(declare (type fixnum result))
-			(mixf result (sxhash-number (numerator x)))
-			(mixf result (sxhash-number (denominator x)))
-			result))
-	       (complex (let ((result 535698211))
-			  (declare (type fixnum result))
-			  (mixf result (sxhash-number (realpart x)))
-			  (mixf result (sxhash-number (imagpart x)))
-			  result))))
-	   (sxhash-recurse (x depthoid)
-	     (declare (type index depthoid))
-	     (typecase x
-	       ;; we test for LIST here, rather than CONS, because the
-	       ;; type test for CONS is in fact the test for
-	       ;; LIST-POINTER-LOWTAG followed by a negated test for
-	       ;; NIL.  If we're going to have to test for NIL anyway,
-	       ;; we might as well do it explicitly and pick off the
-	       ;; answer.  -- CSR, 2004-07-14
-	       (list
-		(if (null x)
-		    (sxhash x) ; through DEFTRANSFORM
-		    (if (plusp depthoid)
-			(mix (sxhash-recurse (car x) (1- depthoid))
-			     (sxhash-recurse (cdr x) (1- depthoid)))
-			261835505)))
-	       (instance
-		(if (or (typep x 'structure-object) (typep x 'condition))
-		    (logxor 422371266
-			    (sxhash ; through DEFTRANSFORM
-			     (classoid-name
-			      (layout-classoid (%instance-layout x)))))
-		    (sxhash-instance x)))
-	       (symbol (sxhash x)) ; through DEFTRANSFORM
-	       (array
-		(typecase x
-		  (simple-string (sxhash x)) ; through DEFTRANSFORM
-		  (string (%sxhash-substring x))
-		  (simple-bit-vector (sxhash x)) ; through DEFTRANSFORM
-		  (bit-vector
-		   ;; FIXME: It must surely be possible to do better
-		   ;; than this.  The problem is that a non-SIMPLE
-		   ;; BIT-VECTOR could be displaced to another, with a
-		   ;; non-zero offset -- so that significantly more
-		   ;; work needs to be done using the %RAW-BITS
-		   ;; approach.  This will probably do for now.
-		   (sxhash-recurse (copy-seq x) depthoid))
-		  (t (logxor 191020317 (sxhash (array-rank x))))))
-	       (character
-		(logxor 72185131
-			(sxhash (char-code x)))) ; through DEFTRANSFORM
-	       ;; general, inefficient case of NUMBER
-	       (number (sxhash-number x))
-	       (generic-function (sxhash-instance x))
-	       (t 42))))
+             (etypecase x
+               (fixnum (sxhash x))      ; through DEFTRANSFORM
+               (integer (sb!bignum:sxhash-bignum x))
+               (single-float (sxhash x)) ; through DEFTRANSFORM
+               (double-float (sxhash x)) ; through DEFTRANSFORM
+               #!+long-float (long-float (error "stub: no LONG-FLOAT"))
+               (ratio (let ((result 127810327))
+                        (declare (type fixnum result))
+                        (mixf result (sxhash-number (numerator x)))
+                        (mixf result (sxhash-number (denominator x)))
+                        result))
+               (complex (let ((result 535698211))
+                          (declare (type fixnum result))
+                          (mixf result (sxhash-number (realpart x)))
+                          (mixf result (sxhash-number (imagpart x)))
+                          result))))
+           (sxhash-recurse (x depthoid)
+             (declare (type index depthoid))
+             (typecase x
+               ;; we test for LIST here, rather than CONS, because the
+               ;; type test for CONS is in fact the test for
+               ;; LIST-POINTER-LOWTAG followed by a negated test for
+               ;; NIL.  If we're going to have to test for NIL anyway,
+               ;; we might as well do it explicitly and pick off the
+               ;; answer.  -- CSR, 2004-07-14
+               (list
+                (if (null x)
+                    (sxhash x) ; through DEFTRANSFORM
+                    (if (plusp depthoid)
+                        (mix (sxhash-recurse (car x) (1- depthoid))
+                             (sxhash-recurse (cdr x) (1- depthoid)))
+                        261835505)))
+               (instance
+                (if (or (typep x 'structure-object) (typep x 'condition))
+                    (logxor 422371266
+                            (sxhash ; through DEFTRANSFORM
+                             (classoid-name
+                              (layout-classoid (%instance-layout x)))))
+                    (sxhash-instance x)))
+               (symbol (sxhash x)) ; through DEFTRANSFORM
+               (array
+                (typecase x
+                  (simple-string (sxhash x)) ; through DEFTRANSFORM
+                  (string (%sxhash-substring x))
+                  (simple-bit-vector (sxhash x)) ; through DEFTRANSFORM
+                  (bit-vector
+                   ;; FIXME: It must surely be possible to do better
+                   ;; than this.  The problem is that a non-SIMPLE
+                   ;; BIT-VECTOR could be displaced to another, with a
+                   ;; non-zero offset -- so that significantly more
+                   ;; work needs to be done using the %RAW-BITS
+                   ;; approach.  This will probably do for now.
+                   (sxhash-recurse (copy-seq x) depthoid))
+                  (t (logxor 191020317 (sxhash (array-rank x))))))
+               (character
+                (logxor 72185131
+                        (sxhash (char-code x)))) ; through DEFTRANSFORM
+               ;; general, inefficient case of NUMBER
+               (number (sxhash-number x))
+               (generic-function (sxhash-instance x))
+               (t 42))))
     (sxhash-recurse x +max-hash-depthoid+)))
 
 ;;;; the PSXHASH function
@@ -246,37 +246,37 @@
     ;; that we must respect fill pointers.
     (vector
      (macrolet ((frob ()
-		  '(let ((result 572539))
-		     (declare (type fixnum result))
-		     (mixf result (length key))
-		     (dotimes (i (min depthoid (length key)))
-		       (declare (type fixnum i))
-		       (mixf result
-			     (psxhash (aref key i)
-				      (- depthoid 1 i))))
-		     result)))
+                  '(let ((result 572539))
+                     (declare (type fixnum result))
+                     (mixf result (length key))
+                     (dotimes (i (min depthoid (length key)))
+                       (declare (type fixnum i))
+                       (mixf result
+                             (psxhash (aref key i)
+                                      (- depthoid 1 i))))
+                     result)))
        ;; CMU can compile SIMPLE-ARRAY operations so much more efficiently
        ;; than the general case that it's probably worth picking off the
        ;; common special cases.
        (typecase key
-	 (simple-string
-	  ;;(format t "~&SIMPLE-STRING special case~%")
-	  (frob))
-	 (simple-vector
-	  ;;(format t "~&SIMPLE-VECTOR special case~%")
-	  (frob))
-	 (t (frob)))))
+         (simple-string
+          ;;(format t "~&SIMPLE-STRING special case~%")
+          (frob))
+         (simple-vector
+          ;;(format t "~&SIMPLE-VECTOR special case~%")
+          (frob))
+         (t (frob)))))
     ;; Any other array can be hashed by working with its underlying
     ;; one-dimensional physical representation.
     (t
      (let ((result 60828))
        (declare (type fixnum result))
        (dotimes (i (min depthoid (array-rank key)))
-	 (mixf result (array-dimension key i)))
+         (mixf result (array-dimension key i)))
        (dotimes (i (min depthoid (array-total-size key)))
-	 (mixf result
-	       (psxhash (row-major-aref key i)
-			(- depthoid 1 i))))
+         (mixf result
+               (psxhash (row-major-aref key i)
+                        (- depthoid 1 i))))
        result))))
 
 (defun structure-object-psxhash (key depthoid)
@@ -284,18 +284,18 @@
   (declare (type structure-object key))
   (declare (type (integer 0 #.+max-hash-depthoid+) depthoid))
   (let* ((layout (%instance-layout key)) ; i.e. slot #0
-	 (length (layout-length layout))
-	 (classoid (layout-classoid layout))
-	 (name (classoid-name classoid))
-	 (result (mix (sxhash name) (the fixnum 79867))))
+         (length (layout-length layout))
+         (classoid (layout-classoid layout))
+         (name (classoid-name classoid))
+         (result (mix (sxhash name) (the fixnum 79867))))
     (declare (type fixnum result))
     (dotimes (i (min depthoid (- length 1 (layout-n-untagged-slots layout))))
       (declare (type fixnum i))
       (let ((j (1+ i))) ; skipping slot #0, which is for LAYOUT
-	(declare (type fixnum j))
-	(mixf result
-	      (psxhash (%instance-ref key j)
-		       (1- depthoid)))))
+        (declare (type fixnum j))
+        (mixf result
+              (psxhash (%instance-ref key j)
+                       (1- depthoid)))))
     ;; KLUDGE: Should hash untagged slots, too.  (Although +max-hash-depthoid+
     ;; is pretty low currently, so they might not make it into the hash
     ;; value anyway.)
@@ -306,12 +306,12 @@
   (declare (type list key))
   (declare (type (integer 0 #.+max-hash-depthoid+) depthoid))
   (cond ((null key)
-	 (the fixnum 480929))
-	((zerop depthoid)
-	 (the fixnum 779578))
-	(t
-	 (mix (psxhash (car key) (1- depthoid))
-	      (psxhash (cdr key) (1- depthoid))))))
+         (the fixnum 480929))
+        ((zerop depthoid)
+         (the fixnum 779578))
+        (t
+         (mix (psxhash (car key) (1- depthoid))
+              (psxhash (cdr key) (1- depthoid))))))
 
 (defun hash-table-psxhash (key)
   (declare (optimize speed))
@@ -326,46 +326,46 @@
   (declare (optimize speed))
   (declare (type number key))
   (flet ((sxhash-double-float (val)
-	   (declare (type double-float val))
-	   ;; FIXME: Check to make sure that the DEFTRANSFORM kicks in and the
-	   ;; resulting code works without consing. (In Debian cmucl 2.4.17,
-	   ;; it didn't.)
-	   (sxhash val)))
+           (declare (type double-float val))
+           ;; FIXME: Check to make sure that the DEFTRANSFORM kicks in and the
+           ;; resulting code works without consing. (In Debian cmucl 2.4.17,
+           ;; it didn't.)
+           (sxhash val)))
     (etypecase key
       (integer (sxhash key))
       (float (macrolet ((frob (type)
-			  (let ((lo (coerce most-negative-fixnum type))
-				(hi (coerce most-positive-fixnum type)))
-			    `(cond (;; This clause allows FIXNUM-sized integer
-				    ;; values to be handled without consing.
-				    (<= ,lo key ,hi)
-				    (multiple-value-bind (q r)
-					(floor (the (,type ,lo ,hi) key))
-				      (if (zerop (the ,type r))
-					  (sxhash q)
-					  (sxhash-double-float
-					   (coerce key 'double-float)))))
-				   (t
-				    (multiple-value-bind (q r) (floor key)
-				      (if (zerop (the ,type r))
-					  (sxhash q)
-					  (sxhash-double-float
-					   (coerce key 'double-float)))))))))
-	       (etypecase key
-		 (single-float (frob single-float))
-		 (double-float (frob double-float))
-		 #!+long-float
-		 (long-float (error "LONG-FLOAT not currently supported")))))
+                          (let ((lo (coerce most-negative-fixnum type))
+                                (hi (coerce most-positive-fixnum type)))
+                            `(cond (;; This clause allows FIXNUM-sized integer
+                                    ;; values to be handled without consing.
+                                    (<= ,lo key ,hi)
+                                    (multiple-value-bind (q r)
+                                        (floor (the (,type ,lo ,hi) key))
+                                      (if (zerop (the ,type r))
+                                          (sxhash q)
+                                          (sxhash-double-float
+                                           (coerce key 'double-float)))))
+                                   (t
+                                    (multiple-value-bind (q r) (floor key)
+                                      (if (zerop (the ,type r))
+                                          (sxhash q)
+                                          (sxhash-double-float
+                                           (coerce key 'double-float)))))))))
+               (etypecase key
+                 (single-float (frob single-float))
+                 (double-float (frob double-float))
+                 #!+long-float
+                 (long-float (error "LONG-FLOAT not currently supported")))))
       (rational (if (and (<= most-negative-double-float
-			     key
-			     most-positive-double-float)
-			 (= (coerce key 'double-float) key))
-		    (sxhash-double-float (coerce key 'double-float))
-		    (sxhash key)))
+                             key
+                             most-positive-double-float)
+                         (= (coerce key 'double-float) key))
+                    (sxhash-double-float (coerce key 'double-float))
+                    (sxhash key)))
       (complex (if (zerop (imagpart key))
-		   (number-psxhash (realpart key))
-		   (let ((result 330231))
-		     (declare (type fixnum result))
-		     (mixf result (number-psxhash (realpart key)))
-		     (mixf result (number-psxhash (imagpart key)))
-		     result))))))
+                   (number-psxhash (realpart key))
+                   (let ((result 330231))
+                     (declare (type fixnum result))
+                     (mixf result (number-psxhash (realpart key)))
+                     (mixf result (number-psxhash (imagpart key)))
+                     result))))))

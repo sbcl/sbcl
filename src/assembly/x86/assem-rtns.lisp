@@ -48,9 +48,9 @@
   ;; address. Therefore, we need to iterate from larger addresses to
   ;; smaller addresses. pfw-this says copy ecx words from esi to edi
   ;; counting down.
-  (inst shr ecx 2)			; fixnum to raw word count
-  (inst std)				; count down
-  (inst sub esi 4)			; ?
+  (inst shr ecx 2)                      ; fixnum to raw word count
+  (inst std)                            ; count down
+  (inst sub esi 4)                      ; ?
   (inst lea edi (make-ea :dword :base ebx :disp (- n-word-bytes)))
   (inst rep)
   (inst movs :dword)
@@ -78,7 +78,7 @@
   (inst jmp eax)
 
   ONE-VALUE ; Note: we can get this, because the return-multiple vop
-	    ; doesn't check for this case when size > speed.
+            ; doesn't check for this case when size > speed.
   (loadw edx esi -1)
   (inst mov esp-tn ebx)
   (inst add eax 2)
@@ -140,8 +140,8 @@
   ;; Do the blit. Because we are coping from smaller addresses to
   ;; larger addresses, we have to start at the largest pair and work
   ;; our way down.
-  (inst shr ecx 2)			; fixnum to raw words
-  (inst std)				; count down
+  (inst shr ecx 2)                      ; fixnum to raw words
+  (inst std)                            ; count down
   (inst lea edi (make-ea :dword :base ebp-tn :disp (- n-word-bytes)))
   (inst sub esi (fixnumize 1))
   (inst rep)
@@ -152,7 +152,7 @@
 
   ;; Restore OLD-FP and ECX.
   (inst pop ecx)
-  (popw ebp-tn -1)			; overwrites a0
+  (popw ebp-tn -1)                      ; overwrites a0
 
   ;; Blow off the stack above the arguments.
   (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))
@@ -166,9 +166,9 @@
 
   ;; And jump into the function.
     (inst jmp
-	  (make-ea :byte :base eax
-		   :disp (- (* closure-fun-slot n-word-bytes)
-			    fun-pointer-lowtag)))
+          (make-ea :byte :base eax
+                   :disp (- (* closure-fun-slot n-word-bytes)
+                            fun-pointer-lowtag)))
 
   ;; All the arguments fit in registers, so load them.
   REGISTER-ARGS
@@ -178,22 +178,22 @@
 
   ;; Clear most of the stack.
   (inst lea esp-tn
-	(make-ea :dword :base ebp-tn :disp (* -3 n-word-bytes)))
+        (make-ea :dword :base ebp-tn :disp (* -3 n-word-bytes)))
 
   ;; Push the return-pc so it looks like we just called.
   (pushw ebp-tn -2)
 
   ;; And away we go.
   (inst jmp (make-ea :byte :base eax
-		     :disp (- (* closure-fun-slot n-word-bytes)
-			      fun-pointer-lowtag))))
+                     :disp (- (* closure-fun-slot n-word-bytes)
+                              fun-pointer-lowtag))))
 
 (define-assembly-routine (throw
-			  (:return-style :none))
-			 ((:arg target (descriptor-reg any-reg) edx-offset)
-			  (:arg start any-reg ebx-offset)
-			  (:arg count any-reg ecx-offset)
-			  (:temp catch any-reg eax-offset))
+                          (:return-style :none))
+                         ((:arg target (descriptor-reg any-reg) edx-offset)
+                          (:arg start any-reg ebx-offset)
+                          (:arg count any-reg ecx-offset)
+                          (:temp catch any-reg eax-offset))
 
   (declare (ignore start count))
 
@@ -202,7 +202,7 @@
   LOOP
 
   (let ((error (generate-error-code nil unseen-throw-tag-error target)))
-    (inst or catch catch)		; check for NULL pointer
+    (inst or catch catch)               ; check for NULL pointer
     (inst jmp :z error))
 
   (inst cmp target (make-ea-for-object-slot catch catch-block-tag-slot 0))
@@ -219,17 +219,17 @@
 ;;;; non-local exit noise
 
 (define-assembly-routine (unwind
-			  (:return-style :none)
-			  (:translate %continue-unwind)
-			  (:policy :fast-safe))
-			 ((:arg block (any-reg descriptor-reg) eax-offset)
-			  (:arg start (any-reg descriptor-reg) ebx-offset)
-			  (:arg count (any-reg descriptor-reg) ecx-offset)
-			  (:temp uwp unsigned-reg esi-offset))
+                          (:return-style :none)
+                          (:translate %continue-unwind)
+                          (:policy :fast-safe))
+                         ((:arg block (any-reg descriptor-reg) eax-offset)
+                          (:arg start (any-reg descriptor-reg) ebx-offset)
+                          (:arg count (any-reg descriptor-reg) ecx-offset)
+                          (:temp uwp unsigned-reg esi-offset))
   (declare (ignore start count))
 
   (let ((error (generate-error-code nil invalid-unwind-error)))
-    (inst or block block)		; check for NULL pointer
+    (inst or block block)               ; check for NULL pointer
     (inst jmp :z error))
 
   (load-tl-symbol-value uwp *current-unwind-protect-block*)
@@ -237,7 +237,7 @@
   ;; Does *CURRENT-UNWIND-PROTECT-BLOCK* match the value stored in
   ;; argument's CURRENT-UWP-SLOT?
   (inst cmp uwp
-	(make-ea-for-object-slot block unwind-block-current-uwp-slot 0))
+        (make-ea-for-object-slot block unwind-block-current-uwp-slot 0))
   ;; If a match, return to context in arg block.
   (inst jmp :e do-exit)
 
@@ -260,4 +260,4 @@
   ;; count in ecx-tn.
 
   (inst jmp (make-ea :byte :base block
-		     :disp (* unwind-block-entry-pc-slot n-word-bytes))))
+                     :disp (* unwind-block-entry-pc-slot n-word-bytes))))

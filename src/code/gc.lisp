@@ -14,7 +14,7 @@
 ;;;; DYNAMIC-USAGE and friends
 
 (declaim (special sb!vm:*read-only-space-free-pointer*
-		  sb!vm:*static-space-free-pointer*))
+                  sb!vm:*static-space-free-pointer*))
 
 (eval-when (:compile-toplevel :execute)
   (sb!xc:defmacro def-c-var-fun (lisp-fun c-var-name)
@@ -67,17 +67,17 @@
   (format t "Control stack usage is:   ~10:D bytes.~%" (control-stack-usage))
   (format t "Binding stack usage is:   ~10:D bytes.~%" (binding-stack-usage))
   #!+sb-thread
-  (format t 
-	  "Control and binding stack usage is for the current thread only.~%")
+  (format t
+          "Control and binding stack usage is for the current thread only.~%")
   (format t "Garbage collection is currently ~:[enabled~;DISABLED~].~%"
-	  (> *gc-inhibit* 0)))
+          (> *gc-inhibit* 0)))
 
 (defun room-intermediate-info ()
   (room-minimal-info)
   (sb!vm:memory-usage :count-spaces '(:dynamic)
-		      :print-spaces t
-		      :cutoff 0.05f0
-		      :print-summary nil))
+                      :print-spaces t
+                      :cutoff 0.05f0
+                      :print-summary nil))
 
 (defun room-maximal-info ()
   ;; FIXME: SB!VM:INSTANCE-USAGE calls suppressed until bug 344 is fixed
@@ -168,8 +168,8 @@ environment these hooks may run in any thread.")
 (declaim (type (or index null) *gc-trigger*))
 (defvar *gc-trigger* nil)
 
-;;; When T, indicates that a GC should have happened but did not due to 
-;;; *GC-INHIBIT*. 
+;;; When T, indicates that a GC should have happened but did not due to
+;;; *GC-INHIBIT*.
 (defvar *need-to-collect-garbage* nil) ; initialized in cold init
 
 ;;;; internal GC
@@ -190,7 +190,7 @@ environment these hooks may run in any thread.")
 ;;;; SUB-GC
 
 ;;; SUB-GC does a garbage collection.  This is called from three places:
-;;; (1) The C runtime will call here when it detects that we've consed 
+;;; (1) The C runtime will call here when it detects that we've consed
 ;;;     enough to exceed the gc trigger threshold.  This is done in
 ;;;     alloc() for gencgc or interrupt_maybe_gc() for cheneygc
 ;;; (2) The user may request a collection using GC, below
@@ -204,7 +204,7 @@ environment these hooks may run in any thread.")
 
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
-(defvar *already-in-gc* 
+(defvar *already-in-gc*
   (sb!thread:make-mutex :name "GC lock") "ID of thread running SUB-GC")
 
 (defun sub-gc (&key (gen 0))
@@ -216,35 +216,35 @@ environment these hooks may run in any thread.")
     (setf *need-to-collect-garbage* t)
     (when (zerop *gc-inhibit*)
       (sb!thread:with-mutex (*already-in-gc*)
-	(let ((old-usage (dynamic-usage))
-	      (new-usage 0))
-	  (unsafe-clear-roots)
-	  ;; We need to disable interrupts for GC, but we also want
-	  ;; to run as little as possible without them.
-	  (without-interrupts
-	    (gc-stop-the-world)	      
-	    (collect-garbage gen)
-	    (setf *need-to-collect-garbage* nil
-		  new-usage (dynamic-usage))
-	    (gc-start-the-world))
-	  ;; Interrupts re-enabled, but still inside the mutex.
-	  ;; In a multithreaded environment the other threads will
-	  ;; see *n-b-f-o-p* change a little late, but that's OK.
-	  (let ((freed (- old-usage new-usage)))
-	    ;; GENCGC occasionally reports negative here, but the
-	    ;; current belief is that it is part of the normal order
-	    ;; of things and not a bug.
-	    (when (plusp freed)
-	      (incf *n-bytes-freed-or-purified* freed)))))
+        (let ((old-usage (dynamic-usage))
+              (new-usage 0))
+          (unsafe-clear-roots)
+          ;; We need to disable interrupts for GC, but we also want
+          ;; to run as little as possible without them.
+          (without-interrupts
+            (gc-stop-the-world)
+            (collect-garbage gen)
+            (setf *need-to-collect-garbage* nil
+                  new-usage (dynamic-usage))
+            (gc-start-the-world))
+          ;; Interrupts re-enabled, but still inside the mutex.
+          ;; In a multithreaded environment the other threads will
+          ;; see *n-b-f-o-p* change a little late, but that's OK.
+          (let ((freed (- old-usage new-usage)))
+            ;; GENCGC occasionally reports negative here, but the
+            ;; current belief is that it is part of the normal order
+            ;; of things and not a bug.
+            (when (plusp freed)
+              (incf *n-bytes-freed-or-purified* freed)))))
       ;; Outside the mutex, these may cause another GC. FIXME: it can
       ;; potentially exceed maximum interrupt nesting by triggering
       ;; GCs.
       (run-pending-finalizers)
       (dolist (hook *after-gc-hooks*)
-	(handler-case
-	    (funcall hook)
-	  (error (c)
-	    (warn "Error calling after GC hook ~S:~%  ~S" hook c)))))))
+        (handler-case
+            (funcall hook)
+          (error (c)
+            (warn "Error calling after GC hook ~S:~%  ~S" hook c)))))))
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)
@@ -273,13 +273,13 @@ environment these hooks may run in any thread.")
   "Return the amount of memory that will be allocated before the next garbage
    collection is initiated. This can be set with SETF."
   (sb!alien:extern-alien "bytes_consed_between_gcs"
-			 (sb!alien:unsigned 32)))
+                         (sb!alien:unsigned 32)))
 
 (defun (setf bytes-consed-between-gcs) (val)
   (declare (type index val))
   (setf (sb!alien:extern-alien "bytes_consed_between_gcs"
-			       (sb!alien:unsigned 32))
-	val))
+                               (sb!alien:unsigned 32))
+        val))
 
 ;;; FIXME: Aren't these utterly wrong if called inside WITHOUT-GCING?
 ;;; Unless something that works there too can be deviced this fact

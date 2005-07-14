@@ -36,19 +36,19 @@
 (defun write-linkage-table-entry (table-address real-address datap)
   (/show0 "write-linkage-table-entry")
   (let ((reloc (int-sap table-address))
-	(target (int-sap real-address)))
+        (target (int-sap real-address)))
     (if datap
-	(arch-write-linkage-table-ref reloc target)
-	(arch-write-linkage-table-jmp reloc target))))
+        (arch-write-linkage-table-ref reloc target)
+        (arch-write-linkage-table-jmp reloc target))))
 
 ;;; Add the linkage information about a foreign symbol in the
 ;;; persistent table, and write the linkage-table entry.
 (defun link-foreign-symbol (name datap)
   (/show0 "link-foreign-symbol")
   (let ((table-address (+ (* (hash-table-count *linkage-info*)
-			     sb!vm:linkage-table-entry-size)
-			  sb!vm:linkage-table-space-start))
-	(real-address (ensure-dynamic-foreign-symbol-address name datap)))
+                             sb!vm:linkage-table-entry-size)
+                          sb!vm:linkage-table-space-start))
+        (real-address (ensure-dynamic-foreign-symbol-address name datap)))
     (aver real-address)
     (unless (< table-address sb!vm:linkage-table-space-end)
       (error "Linkage-table full (~D entries): cannot link ~S."
@@ -74,12 +74,12 @@
   ;; Doesn't take care of its own locking -- callers are responsible
   (maphash (lambda (name-and-datap info)
              (let* ((name (car name-and-datap))
-		    (datap (cdr name-and-datap))
-		    (table-address (linkage-info-address info))
-		    (real-address 
-		     (ensure-dynamic-foreign-symbol-address name datap)))
-	       (aver (and table-address real-address))
-	       (write-linkage-table-entry table-address
-					  real-address
-					  datap)))
+                    (datap (cdr name-and-datap))
+                    (table-address (linkage-info-address info))
+                    (real-address
+                     (ensure-dynamic-foreign-symbol-address name datap)))
+               (aver (and table-address real-address))
+               (write-linkage-table-entry table-address
+                                          real-address
+                                          datap)))
            *linkage-info*))

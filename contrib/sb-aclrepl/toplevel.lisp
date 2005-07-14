@@ -25,19 +25,19 @@
   "boolean: T if break caused by continuable error")
 
 (defun repl (&key
-	     (break-level (1+ *break-level*))
-	     (noprint *noprint*)
-	     (inspect nil)
-	     (continuable nil))
+             (break-level (1+ *break-level*))
+             (noprint *noprint*)
+             (inspect nil)
+             (continuable nil))
   (let ((*noprint* noprint)
-	(*break-level* break-level)
-	(*inspect-break* inspect)
-	(*continuable-break* continuable))
+        (*break-level* break-level)
+        (*inspect-break* inspect)
+        (*continuable-break* continuable))
     (sb-int:/show0 "entering REPL")
     (loop
      (multiple-value-bind (reason reason-param)
-	 (catch 'repl-catcher
-	   (loop
+         (catch 'repl-catcher
+           (loop
             (unwind-protect
                  (rep-one)
               ;; reset toplevel step-condition handler
@@ -45,12 +45,12 @@
                     *stepping* nil))))
        (declare (ignore reason-param))
        (cond
-	 ((and (eq reason :inspect)
-	       (plusp *break-level*))
-	  (return-from repl))
-	 ((and (eq reason :pop)
-	       (plusp *break-level*))
-	  (return-from repl)))))))
+         ((and (eq reason :inspect)
+               (plusp *break-level*))
+          (return-from repl))
+         ((and (eq reason :pop)
+               (plusp *break-level*))
+          (return-from repl)))))))
 
 (defun rep-one ()
   "Read-Eval-Print one form"
@@ -66,15 +66,15 @@
     ;; by another process or something...)
     (force-output *standard-output*))
   (let* ((form (funcall *repl-read-form-fun*
-			*standard-input*
-			*standard-output*))
-	 (results (multiple-value-list (sb-impl::interactive-eval form))))
+                        *standard-input*
+                        *standard-output*))
+         (results (multiple-value-list (sb-impl::interactive-eval form))))
     (unless *noprint*
       (dolist (result results)
-	;; FIXME: Calling fresh-line before a result ensures the result starts
-	;; on a newline, but it usually generates an empty line.
-	;; One solution would be to have the newline's entered on the
-	;; input stream inform the output stream that the column should be
-	;; reset to the beginning of the line.
-	(fresh-line *standard-output*)
-	(prin1 result *standard-output*)))))
+        ;; FIXME: Calling fresh-line before a result ensures the result starts
+        ;; on a newline, but it usually generates an empty line.
+        ;; One solution would be to have the newline's entered on the
+        ;; input stream inform the output stream that the column should be
+        ;; reset to the beginning of the line.
+        (fresh-line *standard-output*)
+        (prin1 result *standard-output*)))))

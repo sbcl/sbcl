@@ -29,17 +29,17 @@
 (defpackage :sb-introspect
   (:use "CL")
   (:export "FUNCTION-ARGLIST"
-	   "VALID-FUNCTION-NAME-P"
-	   "FIND-DEFINITION-SOURCE"
-	   "DEFINITION-SOURCE"
-	   "DEFINITION-SOURCE-PATHNAME"
-	   "DEFINITION-SOURCE-FORM-PATH"
-	   "DEFINITION-SOURCE-CHARACTER-OFFSET"
-	   "DEFINITION-SOURCE-FILE-WRITE-DATE"
-	   "DEFINITION-SOURCE-PLIST"
-	   "DEFINITION-NOT-FOUND" "DEFINITION-NAME"
-	   "FIND-FUNCTION-CALLEES"
-	   "FIND-FUNCTION-CALLERS"))
+           "VALID-FUNCTION-NAME-P"
+           "FIND-DEFINITION-SOURCE"
+           "DEFINITION-SOURCE"
+           "DEFINITION-SOURCE-PATHNAME"
+           "DEFINITION-SOURCE-FORM-PATH"
+           "DEFINITION-SOURCE-CHARACTER-OFFSET"
+           "DEFINITION-SOURCE-FILE-WRITE-DATE"
+           "DEFINITION-SOURCE-PLIST"
+           "DEFINITION-NOT-FOUND" "DEFINITION-NAME"
+           "FIND-FUNCTION-CALLEES"
+           "FIND-FUNCTION-CALLERS"))
 
 (in-package :sb-introspect)
 
@@ -162,7 +162,7 @@ include the pathname of the file and the position of the definition."
   (let ((self (sb-vm::%simple-fun-self function)))
     ;; FIXME there are other kinds of struct accessor.  Fill out this list
     (member self (list *struct-slotplace-reader*
-		       *struct-slotplace-writer*))))
+                       *struct-slotplace-writer*))))
 
 (defun struct-predicate-p (function)
   (let ((self (sb-vm::%simple-fun-self function)))
@@ -174,22 +174,22 @@ include the pathname of the file and the position of the definition."
   "Describe the lambda list for the function designator FUNCTION.
 Works for special-operators, macros, simple functions and generic
 functions.  Signals error if not found"
-  (cond ((valid-function-name-p function) 
+  (cond ((valid-function-name-p function)
          (function-arglist
-	  (or (macro-function function) (fdefinition function))))
+          (or (macro-function function) (fdefinition function))))
         ((typep function 'generic-function)
          (sb-pcl::generic-function-pretty-arglist function))
-	(t (sb-impl::%simple-fun-arglist
-	    (sb-impl::%closure-fun function)))))
+        (t (sb-impl::%simple-fun-arglist
+            (sb-impl::%closure-fun function)))))
 
 (defun struct-accessor-structure-class (function)
   (let ((self (sb-vm::%simple-fun-self function)))
     (cond
       ((member self (list *struct-slotplace-reader* *struct-slotplace-writer*))
        (find-class
-	(sb-kernel::classoid-name
-	 (sb-kernel::layout-classoid
-	  (sb-kernel:%closure-index-ref function 1)))))
+        (sb-kernel::classoid-name
+         (sb-kernel::layout-classoid
+          (sb-kernel:%closure-index-ref function 1)))))
       )))
 
 (defun struct-predicate-structure-class (function)
@@ -197,14 +197,14 @@ functions.  Signals error if not found"
     (cond
       ((member self (list *struct-predicate*))
        (find-class
-	(sb-kernel::classoid-name
-	 (sb-kernel::layout-classoid
-	  (sb-kernel:%closure-index-ref function 0)))))
+        (sb-kernel::classoid-name
+         (sb-kernel::layout-classoid
+          (sb-kernel:%closure-index-ref function 0)))))
       )))
 
 ;;;; find callers/callees, liberated from Helmut Eller's code in SLIME
 
-;;; This interface is trmendously experimental.  
+;;; This interface is trmendously experimental.
 
 ;;; For the moment I'm taking the view that FDEFN is an internal
 ;;; object (one out of one CMUCL developer surveyed didn't know what
@@ -219,39 +219,39 @@ functions.  Signals error if not found"
 (defun find-function-callees (function)
   "Return functions called by FUNCTION."
   (let ((callees '()))
-    (map-code-constants 
+    (map-code-constants
      (sb-kernel:fun-code-header function)
      (lambda (obj)
        (when (sb-kernel:fdefn-p obj)
-	 (push (sb-kernel:fdefn-fun obj) 
-	       callees))))
+         (push (sb-kernel:fdefn-fun obj)
+               callees))))
     callees))
 
 
-(defun find-function-callers (function &optional (spaces '(:read-only :static 
-							   :dynamic)))
+(defun find-function-callers (function &optional (spaces '(:read-only :static
+                                                           :dynamic)))
   "Return functions which call FUNCTION, by searching SPACES for code objects"
   (let ((referrers '()))
-    (map-caller-code-components 
+    (map-caller-code-components
      function
      spaces
      (lambda (code)
        (let ((entry (sb-kernel:%code-entry-points  code)))
-	 (cond ((not entry)
-		(push (princ-to-string code) referrers))
-	       (t 
-		(loop for e = entry then (sb-kernel::%simple-fun-next e)
-		      while e
-		      do (pushnew e referrers)))))))
+         (cond ((not entry)
+                (push (princ-to-string code) referrers))
+               (t
+                (loop for e = entry then (sb-kernel::%simple-fun-next e)
+                      while e
+                      do (pushnew e referrers)))))))
     referrers))
 
 (declaim (inline map-code-constants))
 (defun map-code-constants (code fn)
   "Call FN for each constant in CODE's constant pool."
   (check-type code sb-kernel:code-component)
-  (loop for i from sb-vm:code-constants-offset below 
-	(sb-kernel:get-header-data code)
-	do (funcall fn (sb-kernel:code-header-ref code i))))
+  (loop for i from sb-vm:code-constants-offset below
+        (sb-kernel:get-header-data code)
+        do (funcall fn (sb-kernel:code-header-ref code i))))
 
 (declaim (inline map-allocated-code-components))
 (defun map-allocated-code-components (spaces fn)
@@ -262,7 +262,7 @@ list of the symbols :dynamic, :static, or :read-only."
     (sb-vm::map-allocated-objects
      (lambda (obj header size)
        (when (= sb-vm:code-header-widetag header)
-	 (funcall fn obj size)))
+         (funcall fn obj size)))
      space)))
 
 (declaim (inline map-caller-code-components))
@@ -271,15 +271,15 @@ list of the symbols :dynamic, :static, or :read-only."
 constant pool."
   (let ((function (coerce function 'function)))
     (map-allocated-code-components
-     spaces 
+     spaces
      (lambda (obj size)
        (declare (ignore size))
-       (map-code-constants 
-	obj 
-	(lambda (constant)
-	  (when (and (sb-kernel:fdefn-p constant)
-		     (eq (sb-kernel:fdefn-fun constant)
-			 function))
-	    (funcall fn obj))))))))
+       (map-code-constants
+        obj
+        (lambda (constant)
+          (when (and (sb-kernel:fdefn-p constant)
+                     (eq (sb-kernel:fdefn-fun constant)
+                         function))
+            (funcall fn obj))))))))
 
 (provide 'sb-introspect)

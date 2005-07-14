@@ -16,8 +16,8 @@
 ;;; The flags passed back by BACKQUOTIFY can be interpreted as follows:
 ;;;
 ;;;   |`,|: [a] => a
-;;;    NIL: [a] => a		;the NIL flag is used only when a is NIL
-;;;      T: [a] => a		;the T flag is used when a is self-evaluating
+;;;    NIL: [a] => a            ;the NIL flag is used only when a is NIL
+;;;      T: [a] => a            ;the T flag is used when a is self-evaluating
 ;;;  QUOTE: [a] => (QUOTE a)
 ;;; APPEND: [a] => (APPEND . a)
 ;;;  NCONC: [a] => (NCONC . a)
@@ -54,11 +54,11 @@
   (declare (ignore ignore))
   (let ((*backquote-count* (1+ *backquote-count*)))
     (multiple-value-bind (flag thing)
-	(backquotify stream (read stream t nil t))
+        (backquotify stream (read stream t nil t))
       (when (eq flag *bq-at-flag*)
-	(%reader-error stream ",@ after backquote in ~S" thing))
+        (%reader-error stream ",@ after backquote in ~S" thing))
       (when (eq flag *bq-dot-flag*)
-	(%reader-error stream ",. after backquote in ~S" thing))
+        (%reader-error stream ",. after backquote in ~S" thing))
       (backquotify-1 flag thing))))
 
 (/show0 "backq.lisp 64")
@@ -70,13 +70,13 @@
       (return-from comma-macro nil))
     (%reader-error stream "comma not inside a backquote"))
   (let ((c (read-char stream))
-	(*backquote-count* (1- *backquote-count*)))
+        (*backquote-count* (1- *backquote-count*)))
     (cond ((char= c #\@)
-	   (cons *bq-at-flag* (read stream t nil t)))
-	  ((char= c #\.)
-	   (cons *bq-dot-flag* (read stream t nil t)))
-	  (t (unread-char c stream)
-	     (cons *bq-comma-flag* (read stream t nil t))))))
+           (cons *bq-at-flag* (read stream t nil t)))
+          ((char= c #\.)
+           (cons *bq-dot-flag* (read stream t nil t)))
+          (t (unread-char c stream)
+             (cons *bq-comma-flag* (read stream t nil t))))))
 
 (/show0 "backq.lisp 83")
 
@@ -90,107 +90,107 @@
 ;;; This does the expansion from table 2.
 (defun backquotify (stream code)
   (cond ((atom code)
-	 (cond ((null code) (values nil nil))
-	       ((or (consp code)
+         (cond ((null code) (values nil nil))
+               ((or (consp code)
                     (symbolp code))
-		;; Keywords are self-evaluating. Install after packages.
+                ;; Keywords are self-evaluating. Install after packages.
                 (values 'quote code))
-	       (t (values t code))))
-	((or (eq (car code) *bq-at-flag*)
-	     (eq (car code) *bq-dot-flag*))
-	 (values (car code) (cdr code)))
-	((eq (car code) *bq-comma-flag*)
-	 (comma (cdr code)))
-	((eq (car code) *bq-vector-flag*)
-	 (multiple-value-bind (dflag d) (backquotify stream (cdr code))
-	   (values 'vector (backquotify-1 dflag d))))
-	(t (multiple-value-bind (aflag a) (backquotify stream (car code))
-	     (multiple-value-bind (dflag d) (backquotify stream (cdr code))
-	       (when (eq dflag *bq-at-flag*)
-		 ;; Get the errors later.
-		 (%reader-error stream ",@ after dot in ~S" code))
-	       (when (eq dflag *bq-dot-flag*)
-		 (%reader-error stream ",. after dot in ~S" code))
-	       (cond
-		((eq aflag *bq-at-flag*)
-		 (if (null dflag)
-		     (if (expandable-backq-expression-p a)
+               (t (values t code))))
+        ((or (eq (car code) *bq-at-flag*)
+             (eq (car code) *bq-dot-flag*))
+         (values (car code) (cdr code)))
+        ((eq (car code) *bq-comma-flag*)
+         (comma (cdr code)))
+        ((eq (car code) *bq-vector-flag*)
+         (multiple-value-bind (dflag d) (backquotify stream (cdr code))
+           (values 'vector (backquotify-1 dflag d))))
+        (t (multiple-value-bind (aflag a) (backquotify stream (car code))
+             (multiple-value-bind (dflag d) (backquotify stream (cdr code))
+               (when (eq dflag *bq-at-flag*)
+                 ;; Get the errors later.
+                 (%reader-error stream ",@ after dot in ~S" code))
+               (when (eq dflag *bq-dot-flag*)
+                 (%reader-error stream ",. after dot in ~S" code))
+               (cond
+                ((eq aflag *bq-at-flag*)
+                 (if (null dflag)
+                     (if (expandable-backq-expression-p a)
                          (values 'append (list a))
                          (comma a))
-		     (values 'append
-			     (cond ((eq dflag 'append)
-				    (cons a d ))
-				   (t (list a (backquotify-1 dflag d)))))))
-		((eq aflag *bq-dot-flag*)
-		 (if (null dflag)
-		     (if (expandable-backq-expression-p a)
+                     (values 'append
+                             (cond ((eq dflag 'append)
+                                    (cons a d ))
+                                   (t (list a (backquotify-1 dflag d)))))))
+                ((eq aflag *bq-dot-flag*)
+                 (if (null dflag)
+                     (if (expandable-backq-expression-p a)
                          (values 'nconc (list a))
                          (comma a))
-		     (values 'nconc
-			     (cond ((eq dflag 'nconc)
-				    (cons a d))
-				   (t (list a (backquotify-1 dflag d)))))))
-		((null dflag)
-		 (if (member aflag '(quote t nil))
-		     (values 'quote (list a))
-		     (values 'list (list (backquotify-1 aflag a)))))
-		((member dflag '(quote t))
-		 (if (member aflag '(quote t nil))
-		     (values 'quote (cons a d ))
-		     (values 'list* (list (backquotify-1 aflag a)
-					  (backquotify-1 dflag d)))))
-		(t (setq a (backquotify-1 aflag a))
-		   (if (member dflag '(list list*))
-		       (values dflag (cons a d))
-		       (values 'list*
-			       (list a (backquotify-1 dflag d)))))))))))
+                     (values 'nconc
+                             (cond ((eq dflag 'nconc)
+                                    (cons a d))
+                                   (t (list a (backquotify-1 dflag d)))))))
+                ((null dflag)
+                 (if (member aflag '(quote t nil))
+                     (values 'quote (list a))
+                     (values 'list (list (backquotify-1 aflag a)))))
+                ((member dflag '(quote t))
+                 (if (member aflag '(quote t nil))
+                     (values 'quote (cons a d ))
+                     (values 'list* (list (backquotify-1 aflag a)
+                                          (backquotify-1 dflag d)))))
+                (t (setq a (backquotify-1 aflag a))
+                   (if (member dflag '(list list*))
+                       (values dflag (cons a d))
+                       (values 'list*
+                               (list a (backquotify-1 dflag d)))))))))))
 
 (/show0 "backq.lisp 139")
 
 ;;; This handles the <hair> cases.
 (defun comma (code)
   (cond ((atom code)
-	 (cond ((null code)
-		(values nil nil))
-	       ((or (numberp code) (eq code t))
-		(values t code))
-	       (t (values *bq-comma-flag* code))))
-	((and (eq (car code) 'quote)
+         (cond ((null code)
+                (values nil nil))
+               ((or (numberp code) (eq code t))
+                (values t code))
+               (t (values *bq-comma-flag* code))))
+        ((and (eq (car code) 'quote)
               (not (expandable-backq-expression-p (cadr code))))
          (values (car code) (cadr code)))
-	((member (car code) '(append list list* nconc))
-	 (values (car code) (cdr code)))
-	((eq (car code) 'cons)
-	 (values 'list* (cdr code)))
-	(t (values *bq-comma-flag* code))))
+        ((member (car code) '(append list list* nconc))
+         (values (car code) (cdr code)))
+        ((eq (car code) 'cons)
+         (values 'list* (cdr code)))
+        (t (values *bq-comma-flag* code))))
 
 (/show0 "backq.lisp 157")
 
 ;;; This handles table 1.
 (defun backquotify-1 (flag thing)
   (cond ((or (eq flag *bq-comma-flag*)
-	     (member flag '(t nil)))
-	 thing)
-	((eq flag 'quote)
-	 (list  'quote thing))
-	((eq flag 'list*)
+             (member flag '(t nil)))
+         thing)
+        ((eq flag 'quote)
+         (list  'quote thing))
+        ((eq flag 'list*)
          (cond ((and (null (cddr thing))
                      (not (expandable-backq-expression-p (cadr thing))))
-		(cons 'backq-cons thing))
-	       ((expandable-backq-expression-p (car (last thing)))
+                (cons 'backq-cons thing))
+               ((expandable-backq-expression-p (car (last thing)))
                 (list 'backq-append
                       (cons 'backq-list (butlast thing))
                       ;; Can it be optimized further? -- APD, 2001-12-21
                       (car (last thing))))
                (t
-		(cons 'backq-list* thing))))
-	((eq flag 'vector)
-	 (list 'backq-vector thing))
-	(t (cons (ecase flag
-		   ((list) 'backq-list)
-		   ((append) 'backq-append)
-		   ((nconc) 'backq-nconc))
-		 thing))))
+                (cons 'backq-list* thing))))
+        ((eq flag 'vector)
+         (list 'backq-vector thing))
+        (t (cons (ecase flag
+                   ((list) 'backq-list)
+                   ((append) 'backq-append)
+                   ((nconc) 'backq-nconc))
+                 thing))))
 
 ;;;; magic BACKQ- versions of builtin functions
 
@@ -200,15 +200,15 @@
 ;;; them, the backquoted material will be recognizable to the
 ;;; pretty-printer.
 (macrolet ((def (b-name name)
-	     (let ((args (gensym "ARGS")))
-	       ;; FIXME: This function should be INLINE so that the lists
-	       ;; aren't consed twice, but I ran into an optimizer bug the
-	       ;; first time I tried to make this work for BACKQ-LIST. See
-	       ;; whether there's still an optimizer bug, and fix it if so, and
-	       ;; then make these INLINE.
-	       `(defun ,b-name (&rest ,args)
+             (let ((args (gensym "ARGS")))
+               ;; FIXME: This function should be INLINE so that the lists
+               ;; aren't consed twice, but I ran into an optimizer bug the
+               ;; first time I tried to make this work for BACKQ-LIST. See
+               ;; whether there's still an optimizer bug, and fix it if so, and
+               ;; then make these INLINE.
+               `(defun ,b-name (&rest ,args)
                   (declare (dynamic-extent ,args))
-		  (apply #',name ,args)))))
+                  (apply #',name ,args)))))
   (def backq-list list)
   (def backq-list* list*)
   (def backq-append append)

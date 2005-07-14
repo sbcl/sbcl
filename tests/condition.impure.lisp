@@ -44,7 +44,7 @@
 (defmethod frob-counted-condition ((x counted-condition)) x)
 (assert (= 0 *condition-count*))
 (assert (typep (sb-mop:class-prototype (find-class 'counted-condition))
-	       '(and condition counted-condition)))
+               '(and condition counted-condition)))
 
 ;;; success
 (sb-ext:quit :unix-status 104)

@@ -4,7 +4,7 @@
   (set-macro-character #\] (get-macro-character #\)))
 
   (set-dispatch-macro-character #\# #\[
-				#'(lambda (s c n) (declare (ignore c))
+                                #'(lambda (s c n) (declare (ignore c))
                                     (let* ((type (if n `(unsigned-byte ,n)
                                                    '(unsigned-byte 8)))
                                            (list (read-delimited-list #\] s nil))

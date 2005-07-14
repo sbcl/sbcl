@@ -58,7 +58,7 @@
 
      (:res quo signed-reg nl2-offset)
      (:res rem signed-reg nl3-offset))
-  
+
   ;; Move abs(divident) into quo.
   (inst move dividend quo :>=)
   (inst sub zero-tn quo quo)
@@ -92,20 +92,20 @@
 ;;;; Generic arithmetic.
 
 (define-assembly-routine (generic-+
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:translate +)
-			  (:policy :safe)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:translate +)
+                          (:policy :safe)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:res res (descriptor-reg any-reg) a0-offset)
+                          (:res res (descriptor-reg any-reg) a0-offset)
 
-			  (:temp lip interior-reg lip-offset)
-			  (:temp lra descriptor-reg lra-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:temp lip interior-reg lip-offset)
+                          (:temp lra descriptor-reg lra-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst extru x 31 2 zero-tn :=)
   (inst b do-static-fun :nullify t)
   (inst extru y 31 2 zero-tn :=)
@@ -121,20 +121,20 @@
   (inst move csp-tn cfp-tn))
 
 (define-assembly-routine (generic--
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:translate -)
-			  (:policy :safe)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:translate -)
+                          (:policy :safe)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:res res (descriptor-reg any-reg) a0-offset)
+                          (:res res (descriptor-reg any-reg) a0-offset)
 
-			  (:temp lip interior-reg lip-offset)
-			  (:temp lra descriptor-reg lra-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:temp lip interior-reg lip-offset)
+                          (:temp lra descriptor-reg lra-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst extru x 31 2 zero-tn :=)
   (inst b do-static-fun :nullify t)
   (inst extru y 31 2 zero-tn :=)
@@ -156,36 +156,36 @@
 (macrolet
     ((define-cond-assem-rtn (name translate static-fn cond)
        `(define-assembly-routine (,name
-				  (:cost 10)
-				  (:return-style :full-call)
-				  (:policy :safe)
-				  (:translate ,translate)
-				  (:save-p t))
-				 ((:arg x (descriptor-reg any-reg) a0-offset)
-				  (:arg y (descriptor-reg any-reg) a1-offset)
-				  
-				  (:res res descriptor-reg a0-offset)
-				  
-				  (:temp lip interior-reg lip-offset)
-				  (:temp lra descriptor-reg lra-offset)
-				  (:temp nargs any-reg nargs-offset)
-				  (:temp ocfp any-reg ocfp-offset))
-	  (inst extru x 31 2 zero-tn :=)
-	  (inst b do-static-fn :nullify t)
-	  (inst extru y 31 2 zero-tn :=)
-	  (inst b do-static-fn :nullify t)
+                                  (:cost 10)
+                                  (:return-style :full-call)
+                                  (:policy :safe)
+                                  (:translate ,translate)
+                                  (:save-p t))
+                                 ((:arg x (descriptor-reg any-reg) a0-offset)
+                                  (:arg y (descriptor-reg any-reg) a1-offset)
 
-	  (inst comclr x y zero-tn ,cond)
-	  (inst move null-tn res :tr)
-	  (load-symbol res t)
-	  (lisp-return lra :offset 1)
+                                  (:res res descriptor-reg a0-offset)
 
-	  DO-STATIC-FN
-	  (inst ldw (static-fun-offset ',static-fn) null-tn lip)
-	  (inst li (fixnumize 2) nargs)
-	  (inst move cfp-tn ocfp)
-	  (inst bv lip)
-	  (inst move csp-tn cfp-tn))))
+                                  (:temp lip interior-reg lip-offset)
+                                  (:temp lra descriptor-reg lra-offset)
+                                  (:temp nargs any-reg nargs-offset)
+                                  (:temp ocfp any-reg ocfp-offset))
+          (inst extru x 31 2 zero-tn :=)
+          (inst b do-static-fn :nullify t)
+          (inst extru y 31 2 zero-tn :=)
+          (inst b do-static-fn :nullify t)
+
+          (inst comclr x y zero-tn ,cond)
+          (inst move null-tn res :tr)
+          (load-symbol res t)
+          (lisp-return lra :offset 1)
+
+          DO-STATIC-FN
+          (inst ldw (static-fun-offset ',static-fn) null-tn lip)
+          (inst li (fixnumize 2) nargs)
+          (inst move cfp-tn ocfp)
+          (inst bv lip)
+          (inst move csp-tn cfp-tn))))
 
   (define-cond-assem-rtn generic-< < two-arg-< :<)
   (define-cond-assem-rtn generic-> > two-arg-> :>))
@@ -200,9 +200,9 @@
      (:save-p t))
     ((:arg x (descriptor-reg any-reg) a0-offset)
      (:arg y (descriptor-reg any-reg) a1-offset)
-     
+
      (:res res descriptor-reg a0-offset)
-     
+
      (:temp lip interior-reg lip-offset)
      (:temp lra descriptor-reg lra-offset)
      (:temp nargs any-reg nargs-offset)
@@ -237,9 +237,9 @@
      (:save-p t))
     ((:arg x (descriptor-reg any-reg) a0-offset)
      (:arg y (descriptor-reg any-reg) a1-offset)
-     
+
      (:res res descriptor-reg a0-offset)
-     
+
      (:temp lip interior-reg lip-offset)
      (:temp lra descriptor-reg lra-offset)
      (:temp nargs any-reg nargs-offset)

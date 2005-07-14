@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -18,12 +18,12 @@
 (assert (string= (string-downcase   "This is a test.") "this is a test."))
 (assert (string= (string-capitalize "This is a test.") "This Is A Test."))
 (assert (string= (string-upcase "Is this 900-Sex-hott, please?" :start 3)
-		 "Is THIS 900-SEX-HOTT, PLEASE?"))
+                 "Is THIS 900-SEX-HOTT, PLEASE?"))
 (assert (string= (string-downcase "Is this 900-Sex-hott, please?"
-				  :start 10 :end 16)
-		 "Is this 900-sex-hott, please?"))
+                                  :start 10 :end 16)
+                 "Is this 900-sex-hott, please?"))
 (assert (string= (string-capitalize "Is this 900-Sex-hott, please?")
-		 "Is This 900-Sex-Hott, Please?"))
+                 "Is This 900-Sex-Hott, Please?"))
 
 ;;; The non-destructive case operations accept string designators, not
 ;;; just strings.
@@ -54,36 +54,36 @@
 (assert (not (typep (make-string 4 :element-type nil) 'simple-base-string)))
 
 (assert (subtypep (class-of (make-array 1 :element-type nil))
-		  (find-class 'string)))
+                  (find-class 'string)))
 (assert (subtypep (class-of (make-array 2 :element-type nil :fill-pointer 1))
-		  (find-class 'string)))
+                  (find-class 'string)))
 
 (assert (string= "" (make-array 0 :element-type nil)))
 (assert (string/= "a" (make-array 0 :element-type nil)))
 (assert (string= "" (make-array 5 :element-type nil :fill-pointer 0)))
 
 (assert (= (sxhash "")
-	   (sxhash (make-array 0 :element-type nil))
-	   (sxhash (make-array 5 :element-type nil :fill-pointer 0))
-	   (sxhash (make-string 0 :element-type nil))))
+           (sxhash (make-array 0 :element-type nil))
+           (sxhash (make-array 5 :element-type nil :fill-pointer 0))
+           (sxhash (make-string 0 :element-type nil))))
 (assert (subtypep (type-of (make-array 2 :element-type nil)) 'simple-string))
 (assert (subtypep (type-of (make-array 4 :element-type nil :fill-pointer t))
-		  'string))
+                  'string))
 
 (assert (eq (intern "") (intern (make-array 0 :element-type nil))))
 (assert (eq (intern "")
-	    (intern (make-array 5 :element-type nil :fill-pointer 0))))
+            (intern (make-array 5 :element-type nil :fill-pointer 0))))
 
 (assert (raises-error? (make-string 5 :element-type t)))
 (assert (raises-error? (let () (make-string 5 :element-type t))))
 
 ;; MISC.574
 (assert (= (funcall (lambda (a)
-		      (declare (optimize (speed 3) (safety 1)
-					 (debug 1) (space 2))
-			       (fixnum a))
-		      (string<= (coerce "e99mo7yAJ6oU4" 'base-string)
-				(coerce "aaABAAbaa" 'base-string)
-				:start1 a))
-		    9)
-	   9))
+                      (declare (optimize (speed 3) (safety 1)
+                                         (debug 1) (space 2))
+                               (fixnum a))
+                      (string<= (coerce "e99mo7yAJ6oU4" 'base-string)
+                                (coerce "aaABAAbaa" 'base-string)
+                                :start1 a))
+                    9)
+           9))

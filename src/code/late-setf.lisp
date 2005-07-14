@@ -26,21 +26,21 @@
   (declare (type sb!c::lexenv env))
   (collect ((let*-bindings) (mv-bindings) (setters))
     (do ((a args (cddr a)))
-	((endp a))
+        ((endp a))
       (if (endp (cdr a))
-	  (error "Odd number of args to PSETF."))
+          (error "Odd number of args to PSETF."))
       (multiple-value-bind (dummies vals newval setter getter)
-	  (sb!xc:get-setf-expansion (car a) env)
-	(declare (ignore getter))
-	(let*-bindings (mapcar #'list dummies vals))
-	(mv-bindings (list newval (cadr a)))
-	(setters setter)))
+          (sb!xc:get-setf-expansion (car a) env)
+        (declare (ignore getter))
+        (let*-bindings (mapcar #'list dummies vals))
+        (mv-bindings (list newval (cadr a)))
+        (setters setter)))
     (labels ((thunk (let*-bindings mv-bindings)
-	       (if let*-bindings
-		   `(let* ,(car let*-bindings)
-		      (multiple-value-bind ,@(car mv-bindings)
-			,(thunk (cdr let*-bindings) (cdr mv-bindings))))
-		   `(progn ,@(setters) nil))))
+               (if let*-bindings
+                   `(let* ,(car let*-bindings)
+                      (multiple-value-bind ,@(car mv-bindings)
+                        ,(thunk (cdr let*-bindings) (cdr mv-bindings))))
+                   `(progn ,@(setters) nil))))
       (thunk (let*-bindings) (mv-bindings)))))
 
 ;;; FIXME: Compiling this definition of ROTATEF apparently blows away the
@@ -57,41 +57,41 @@
   (when args
     (collect ((let*-bindings) (mv-bindings) (setters) (getters))
       (dolist (arg args)
-	(multiple-value-bind (temps subforms store-vars setter getter)
-	    (sb!xc:get-setf-expansion arg env)
-	  (loop
-	    for temp in temps
-	    for subform in subforms
-	    do (let*-bindings `(,temp ,subform)))
-	  (mv-bindings store-vars)
-	  (setters setter)
-	  (getters getter)))
+        (multiple-value-bind (temps subforms store-vars setter getter)
+            (sb!xc:get-setf-expansion arg env)
+          (loop
+            for temp in temps
+            for subform in subforms
+            do (let*-bindings `(,temp ,subform)))
+          (mv-bindings store-vars)
+          (setters setter)
+          (getters getter)))
       (setters nil)
       (getters (car (getters)))
       (labels ((thunk (mv-bindings getters)
-		 (if mv-bindings
-		     `((multiple-value-bind ,(car mv-bindings) ,(car getters)
-			 ,@(thunk (cdr mv-bindings) (cdr getters))))
-		     (setters))))
-	`(let* ,(let*-bindings)
-	   ,@(thunk (mv-bindings) (cdr (getters))))))))
+                 (if mv-bindings
+                     `((multiple-value-bind ,(car mv-bindings) ,(car getters)
+                         ,@(thunk (cdr mv-bindings) (cdr getters))))
+                     (setters))))
+        `(let* ,(let*-bindings)
+           ,@(thunk (mv-bindings) (cdr (getters))))))))
 
 (sb!xc:define-setf-expander values (&rest places &environment env)
   (declare (type sb!c::lexenv env))
   (collect ((setters) (getters))
     (let ((all-dummies '())
-	  (all-vals '())
-	  (newvals '()))
+          (all-vals '())
+          (newvals '()))
       (dolist (place places)
-	(multiple-value-bind (dummies vals newval setter getter)
-	    (sb!xc:get-setf-expansion place env)
-	  ;; ANSI 5.1.2.3 explains this logic quite precisely.  --
-	  ;; CSR, 2004-06-29
-	  (setq all-dummies (append all-dummies dummies (cdr newval))
-		all-vals (append all-vals vals
-				 (mapcar (constantly nil) (cdr newval)))
-		newvals (append newvals (list (car newval))))
-	  (setters setter)
-	  (getters getter)))
+        (multiple-value-bind (dummies vals newval setter getter)
+            (sb!xc:get-setf-expansion place env)
+          ;; ANSI 5.1.2.3 explains this logic quite precisely.  --
+          ;; CSR, 2004-06-29
+          (setq all-dummies (append all-dummies dummies (cdr newval))
+                all-vals (append all-vals vals
+                                 (mapcar (constantly nil) (cdr newval)))
+                newvals (append newvals (list (car newval))))
+          (setters setter)
+          (getters getter)))
       (values all-dummies all-vals newvals
-	      `(values ,@(setters)) `(values ,@(getters))))))
+              `(values ,@(setters)) `(values ,@(getters))))))

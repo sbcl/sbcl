@@ -10,7 +10,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -46,9 +46,9 @@
   (let (num x)
     (flet ((digs ()
              (setq num index))
-	   (z ()
-	     (let ()
-	       (setq x nil))))
+           (z ()
+             (let ()
+               (setq x nil))))
       (when (and (digs) (digs)) x))))
 
 ;;; Bug 132: The compiler used to fail to compile INTEGER-valued CATCH
@@ -68,8 +68,8 @@
     (flet ((wufn () (glorp table1 4.9)))
       (gleep *uustk* #'wufn "#1" (list)))
     (if (eql (lo foomax 3.2))
-	(values)
-	(error "not ~S" '(eql (lo foomax 3.2))))
+        (values)
+        (error "not ~S" '(eql (lo foomax 3.2))))
     (values)))
 ;;; A simpler test case for bug 150: The compiler died with the
 ;;; same type error when trying to compile this.
@@ -84,9 +84,9 @@
 (defun bug147 (string ind)
   (flet ((digs ()
            (let (old-index)
-	     (if (and (< ind ind)
-		      (typep (char string ind) '(member #\1)))
-		 nil))))))
+             (if (and (< ind ind)
+                      (typep (char string ind) '(member #\1)))
+                 nil))))))
 
 ;;; bug reported and fixed by Matthias Hoelzl sbcl-devel 2002-05-13
 (defmacro foo-2002-05-13 () ''x)
@@ -120,24 +120,24 @@
 (defstruct something-known-to-be-a-struct x y)
 (multiple-value-bind (fun warnings-p failure-p)
     (compile nil
-	     '(lambda ()
-		(labels ((a1 (a2 a3)
-			     (cond (t (a4 a2 a3))))
-			 (a4 (a2 a3 a5 a6)
-			     (declare (type (or simple-vector null) a5 a6))
-			     (something-known-to-be-a-struct-x a5))
-			 (a8 (a2 a3)
-			     (a9 #'a1 a10 a2 a3))
-			 (a11 (a2 a3)
-			      (cond ((and (funcall a12 a2)
-					  (funcall a12 a3))
-				     (funcall a13 a2 a3))
-				    (t
-				     (when a14
-				     (let ((a15 (a1 a2 a3)))
-				       ))
-				     a16))))
-		  (values #'a17 #'a11))))
+             '(lambda ()
+                (labels ((a1 (a2 a3)
+                             (cond (t (a4 a2 a3))))
+                         (a4 (a2 a3 a5 a6)
+                             (declare (type (or simple-vector null) a5 a6))
+                             (something-known-to-be-a-struct-x a5))
+                         (a8 (a2 a3)
+                             (a9 #'a1 a10 a2 a3))
+                         (a11 (a2 a3)
+                              (cond ((and (funcall a12 a2)
+                                          (funcall a12 a3))
+                                     (funcall a13 a2 a3))
+                                    (t
+                                     (when a14
+                                     (let ((a15 (a1 a2 a3)))
+                                       ))
+                                     a16))))
+                  (values #'a17 #'a11))))
   ;; Python sees the structure accessor on the known-not-to-be-a-struct
   ;; A5 value and is very, very disappointed in you. (But it doesn't
   ;; signal BUG any more.)
@@ -149,10 +149,10 @@
 ;;; spotted and fixed by Raymond Toy for CMUCL)
 (defun logand-sparc-bogons (a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
   (declare (type (unsigned-byte 32) a0)
-	   (type (signed-byte 32) a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
-	   ;; to ensure that the call is a candidate for
-	   ;; transformation
-	   (optimize (speed 3) (safety 0) (compilation-speed 0) (debug 0)))
+           (type (signed-byte 32) a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
+           ;; to ensure that the call is a candidate for
+           ;; transformation
+           (optimize (speed 3) (safety 0) (compilation-speed 0) (debug 0)))
   (values
    ;; the call that fails compilation
    (logand a0 a10)
@@ -165,7 +165,7 @@
 ;;; except that there was no non-VOP definition of DATA-VECTOR-REF, so
 ;;; it would fail.
 (defun bug192 ()
-      (funcall 
+      (funcall
        (LAMBDA (TEXT I L )
          (LABELS ((G908 (I)
                     (LET ((INDEX
@@ -208,65 +208,65 @@
   (labels
     ((alpha-equal-bound-term-lists (listx listy)
        (or (and (null listx) (null listy))
-	   (and listx listy
-		(let ((bindings-x (bindings-of-bound-term (car listx)))
-		      (bindings-y (bindings-of-bound-term (car listy))))
-		  (if (and (null bindings-x) (null bindings-y))
-		      (alpha-equal-terms (term-of-bound-term (car listx))
-					 (term-of-bound-term (car listy)))
-		      (and (= (length bindings-x) (length bindings-y))
-			   (prog2
-			       (enter-binding-pairs (bindings-of-bound-term (car listx))
-						    (bindings-of-bound-term (car listy)))
-			       (alpha-equal-terms (term-of-bound-term (car listx))
-						  (term-of-bound-term (car listy)))
-			     (exit-binding-pairs (bindings-of-bound-term (car listx))
-						 (bindings-of-bound-term (car listy)))))))
-		(alpha-equal-bound-term-lists (cdr listx) (cdr listy)))))
+           (and listx listy
+                (let ((bindings-x (bindings-of-bound-term (car listx)))
+                      (bindings-y (bindings-of-bound-term (car listy))))
+                  (if (and (null bindings-x) (null bindings-y))
+                      (alpha-equal-terms (term-of-bound-term (car listx))
+                                         (term-of-bound-term (car listy)))
+                      (and (= (length bindings-x) (length bindings-y))
+                           (prog2
+                               (enter-binding-pairs (bindings-of-bound-term (car listx))
+                                                    (bindings-of-bound-term (car listy)))
+                               (alpha-equal-terms (term-of-bound-term (car listx))
+                                                  (term-of-bound-term (car listy)))
+                             (exit-binding-pairs (bindings-of-bound-term (car listx))
+                                                 (bindings-of-bound-term (car listy)))))))
+                (alpha-equal-bound-term-lists (cdr listx) (cdr listy)))))
 
      (alpha-equal-terms (termx termy)
        (if (and (variable-p termx)
-		(variable-p termy))
-	   (equal-bindings (id-of-variable-term termx)
-			   (id-of-variable-term termy))
-	   (and (equal-operators-p (operator-of-term termx) (operator-of-term termy))
-		(alpha-equal-bound-term-lists (bound-terms-of-term termx)
-					      (bound-terms-of-term termy))))))
+                (variable-p termy))
+           (equal-bindings (id-of-variable-term termx)
+                           (id-of-variable-term termy))
+           (and (equal-operators-p (operator-of-term termx) (operator-of-term termy))
+                (alpha-equal-bound-term-lists (bound-terms-of-term termx)
+                                              (bound-terms-of-term termy))))))
 
     (or (eq termx termy)
-	(and termx termy
-	     (with-variable-invocation (alpha-equal-terms termx termy))))))
+        (and termx termy
+             (with-variable-invocation (alpha-equal-terms termx termy))))))
 (defun bug65-2 () ; from Bob Rogers cmucl-imp 1999-07-28
   ;; Given an FSSP alignment file named by the argument . . .
   (labels ((get-fssp-char ()
-	     (get-fssp-char))
-	   (read-fssp-char ()
-	     (get-fssp-char)))
+             (get-fssp-char))
+           (read-fssp-char ()
+             (get-fssp-char)))
     ;; Stub body, enough to tickle the bug.
     (list (read-fssp-char)
-	  (read-fssp-char))))
+          (read-fssp-char))))
 (defun bug70 ; from David Young cmucl-help 30 Nov 2000
     (item sequence &key (test #'eql))
   (labels ((find-item (obj seq test &optional (val nil))
-		      (let ((item (first seq)))
-			(cond ((null seq)
-			       (values nil nil))
-			      ((funcall test obj item)
-			       (values val seq))
-			      (t	
-			       (find-item obj
-					  (rest seq)
-					  test
-					  (nconc val `(,item))))))))
+                      (let ((item (first seq)))
+                        (cond ((null seq)
+                               (values nil nil))
+                              ((funcall test obj item)
+                               (values val seq))
+                              (t
+                               (find-item obj
+                                          (rest seq)
+                                          test
+                                          (nconc val `(,item))))))))
     (find-item item sequence test)))
 (defun bug109 () ; originally from CMU CL bugs collection, reported as
                  ; SBCL bug by MNA 2001-06-25
-  (labels 
+  (labels
       ((eff (&key trouble)
-	    (eff)
-	    ;; nil
-	    ;; Uncomment and it works
-	    ))
+            (eff)
+            ;; nil
+            ;; Uncomment and it works
+            ))
     (eff)))
 
 ;;; bug 192a, fixed by APD "more strict type checking" patch
@@ -316,11 +316,11 @@
   (assert (raises-error? (funcall function) program-error)))
 (multiple-value-bind (function warnings-p failure-p)
     (compile nil
-	     '(lambda ()
+             '(lambda ()
                ;; not interested in the package lock violation here
                (declare (sb-ext:disable-package-locks *standard-input*))
-		(symbol-macrolet ((*standard-input* nil))
-		  *standard-input*)))
+                (symbol-macrolet ((*standard-input* nil))
+                  *standard-input*)))
   (assert failure-p)
   (assert (raises-error? (funcall function) program-error)))
 (multiple-value-bind (function warnings-p failure-p)
@@ -342,7 +342,7 @@
   (declare (optimize (speed 3) (safety 1) (debug 1)))
   (if x t (if y t (dont-constrain-if-too-much x y))))
 
-(assert (null (dont-constrain-if-too-much-aux nil nil)))  
+(assert (null (dont-constrain-if-too-much-aux nil nil)))
 
 ;;; TYPE-ERROR confusion ca. sbcl-0.7.7.24, reported and fixed by
 ;;; APD sbcl-devel 2002-09-14
@@ -585,7 +585,7 @@
 ;;; bug 172: macro lambda lists were too permissive until 0.7.9.28
 ;;; (fix provided by Matthew Danish) on sbcl-devel
 (assert (null (ignore-errors
-		(defmacro bug172 (&rest rest foo) `(list ,rest ,foo)))))
+                (defmacro bug172 (&rest rest foo) `(list ,rest ,foo)))))
 
 ;;; embedded THEs
 (defun check-embedded-thes (policy1 policy2 x y)
@@ -632,9 +632,9 @@
   (defun to-be-inlined (y)
     (frob y)))
 (assert (= (call-inlined 3)
-	   ;; we should have inlined the previous definition, so the
-	   ;; new one won't show up yet.
-	   4))
+           ;; we should have inlined the previous definition, so the
+           ;; new one won't show up yet.
+           4))
 (defun call-inlined (z)
   (to-be-inlined z))
 (assert (= (call-inlined 3) 6))
@@ -655,7 +655,7 @@
 (defun bug219-a-aux ()
   (bug219-a 2))
 (assert (= (bug219-a-aux)
-	   (if *bug219-a-expanded-p* 4 3)))
+           (if *bug219-a-expanded-p* 4 3)))
 (defvar *bug219-a-temp* 3)
 (assert (= (bug219-a *bug219-a-temp*) 4))
 
@@ -675,7 +675,7 @@
 (defun bug219-b (x)
   x)
 (assert (= (bug219-b-aux2 1)
-	   (if *bug219-b-expanded-p* 3 1)))
+           (if *bug219-b-expanded-p* 3 1)))
 
 ;;; bug 224: failure in unreachable code deletion
 (defmacro do-optimizations (&body body)
@@ -747,11 +747,11 @@
 ;;; WHN's original report
 (defun debug-return-catch-break1 ()
   (with-open-file (s "/tmp/foo"
-		     :direction :output
-		     :element-type (list
-				    'signed-byte
-				    (1+
-				     (integer-length most-positive-fixnum))))
+                     :direction :output
+                     :element-type (list
+                                    'signed-byte
+                                    (1+
+                                     (integer-length most-positive-fixnum))))
     (read-byte s)
     (read-byte s)
     (read-byte s)
@@ -766,8 +766,8 @@
 ;;; can understand.  Here's a simple test for that on a function
 ;;; that's likely to return a hairier list than just a lambda:
 (macrolet ((def (fn) `(progn
-		       (declaim (inline ,fn))
-		       (defun ,fn (x) (1+ x)))))
+                       (declaim (inline ,fn))
+                       (defun ,fn (x) (1+ x)))))
   (def bug228))
 (let ((x (function-lambda-expression #'bug228)))
   (when x
@@ -818,9 +818,9 @@
   (+ x y))
 (defun baz8alpha04 (this kids)
   (flet ((n-i (&rest rest)
-	   ;; Removing the #+NIL here makes the bug go away.
-	   #+nil (format t "~&in N-I REST=~S~%" rest)
-	   (apply #'frob8alpha04 this rest)))
+           ;; Removing the #+NIL here makes the bug go away.
+           #+nil (format t "~&in N-I REST=~S~%" rest)
+           (apply #'frob8alpha04 this rest)))
     (n-i kids)))
 ;;; failed in 0.8alpha.0.4 with "The value 13 is not of type LIST."
 (assert (= (baz8alpha04 12 13) 25))
@@ -875,7 +875,7 @@
   (unless (< a b)
     (truncate (expt a b))))
 (assert (equal (multiple-value-list (expt-derive-type-bug 1 1))
-	       '(1 0)))
+               '(1 0)))
 
 ;;; Problems with type checking in functions with EXPLICIT-CHECK
 ;;; attribute (reported by Peter Graves)
@@ -900,18 +900,18 @@
 (defvar *compiler-note-count* 0)
 #-(or alpha x86-64) ; FIXME: make a better test!
 (handler-bind ((sb-ext:compiler-note (lambda (c)
-				       (declare (ignore c))
-				       (incf *compiler-note-count*))))
+                                       (declare (ignore c))
+                                       (incf *compiler-note-count*))))
   (let ((fun
-	 (compile nil
-		  '(lambda (x)
-		    (declare (optimize speed) (fixnum x))
-		    (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
-		    (values (* x 5) ; no compiler note from this
-		     (locally
-		       (declare (sb-ext:unmuffle-conditions sb-ext:compiler-note))
-		       ;; this one gives a compiler note
-		       (* x -5)))))))
+         (compile nil
+                  '(lambda (x)
+                    (declare (optimize speed) (fixnum x))
+                    (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
+                    (values (* x 5) ; no compiler note from this
+                     (locally
+                       (declare (sb-ext:unmuffle-conditions sb-ext:compiler-note))
+                       ;; this one gives a compiler note
+                       (* x -5)))))))
     (assert (= *compiler-note-count* 1))
     (assert (equal (multiple-value-list (funcall fun 1)) '(5 -5)))))
 
@@ -940,61 +940,61 @@
   (dolist (template (fun-info-templates (info :function :info function)))
     (when (template-more-results-type template)
       (format t "~&Template ~A has :MORE results, and translates ~A.~%"
-	      (template-name template)
-	      function)
+              (template-name template)
+              function)
       (return nil))
     (when (eq (template-result-types template) :conditional)
       ;; dunno.
       (return t))
     (let ((types (template-result-types template))
-	  (result-type (fun-type-returns (info :function :type function))))
+          (result-type (fun-type-returns (info :function :type function))))
       (cond
-	((values-type-p result-type)
-	 (do ((ltypes (append (args-type-required result-type)
-			      (args-type-optional result-type))
-		      (rest ltypes))
-	      (types types (rest types)))
-	     ((null ltypes)
-	      (unless (null types)
-		(format t "~&More types than ltypes in ~A, translating ~A.~%"
-			(template-name template)
-			function)
-		(return nil)))
-	   (when (null types)
-	     (unless (null ltypes)
-	       (format t "~&More ltypes than types in ~A, translating ~A.~%"
-		       (template-name template)
-		       function)
-	       (return nil)))))
-	((eq result-type (specifier-type nil))
-	 (unless (null types)
-	   (format t "~&Template ~A returns values for function ~A with RESULT-TYPE NIL.~%"
-		   (template-name template)
-		   function)
-	   (return nil)))
-	((/= (length types) 1)
-	 (format t "~&Template ~A isn't returning 1 value for ~A.~%"
-		 (template-name template)
-		 function)
-	 (return nil))
-	(t t)))))
+        ((values-type-p result-type)
+         (do ((ltypes (append (args-type-required result-type)
+                              (args-type-optional result-type))
+                      (rest ltypes))
+              (types types (rest types)))
+             ((null ltypes)
+              (unless (null types)
+                (format t "~&More types than ltypes in ~A, translating ~A.~%"
+                        (template-name template)
+                        function)
+                (return nil)))
+           (when (null types)
+             (unless (null ltypes)
+               (format t "~&More ltypes than types in ~A, translating ~A.~%"
+                       (template-name template)
+                       function)
+               (return nil)))))
+        ((eq result-type (specifier-type nil))
+         (unless (null types)
+           (format t "~&Template ~A returns values for function ~A with RESULT-TYPE NIL.~%"
+                   (template-name template)
+                   function)
+           (return nil)))
+        ((/= (length types) 1)
+         (format t "~&Template ~A isn't returning 1 value for ~A.~%"
+                 (template-name template)
+                 function)
+         (return nil))
+        (t t)))))
 (defun identify-suspect-vops (&optional (env (first
-					      (last *info-environment*))))
+                                              (last *info-environment*))))
   (do-info (env :class class :type type :name name :value value)
     (when (and (eq class :function) (eq type :type))
       ;; OK, so we have an entry in the INFO database. Now, if ...
       (let* ((info (info :function :info name))
-	     (templates (and info (fun-info-templates info))))
-	(when templates
-	  ;; ... it has translators
-	  (grovel-results name))))))
+             (templates (and info (fun-info-templates info))))
+        (when templates
+          ;; ... it has translators
+          (grovel-results name))))))
 (identify-suspect-vops)
 
 ;;;; tests for compiler output
 (let* ((*error-output* (make-broadcast-stream))
        (output (with-output-to-string (*standard-output*)
-		 (compile-file "compiler-output-test.lisp" 
-			       :print nil :verbose nil))))
+                 (compile-file "compiler-output-test.lisp"
+                               :print nil :verbose nil))))
   (print output)
   (assert (zerop (length output))))
 
@@ -1003,27 +1003,27 @@
 (define-condition optimization-error (error) ())
 
 (labels ((compile-lambda (type sense)
-	   (handler-bind ((compiler-note (lambda (_)
-					   (declare (ignore _))
-					   (error 'optimization-error))))
-	     (values
-	      (compile 
-	       nil
-	       `(lambda ()
-		  (declare 
-		   ,@(when type '((ftype (function () (integer 0 10)) bug-305)))
-		   (,sense bug-305)
-		   (optimize speed))
-		  (1+ (bug-305))))
-	      nil)))
-	 (expect-error (sense)
-	   (multiple-value-bind (f e)  (ignore-errors (compile-lambda nil sense))
-	     (assert (not f))
-	     (assert (typep e 'optimization-error))))
-	 (expect-pass (sense)
-	   (multiple-value-bind (f e)  (ignore-errors (compile-lambda t sense))
-	     (assert f)
-	     (assert (not e)))))
+           (handler-bind ((compiler-note (lambda (_)
+                                           (declare (ignore _))
+                                           (error 'optimization-error))))
+             (values
+              (compile
+               nil
+               `(lambda ()
+                  (declare
+                   ,@(when type '((ftype (function () (integer 0 10)) bug-305)))
+                   (,sense bug-305)
+                   (optimize speed))
+                  (1+ (bug-305))))
+              nil)))
+         (expect-error (sense)
+           (multiple-value-bind (f e)  (ignore-errors (compile-lambda nil sense))
+             (assert (not f))
+             (assert (typep e 'optimization-error))))
+         (expect-pass (sense)
+           (multiple-value-bind (f e)  (ignore-errors (compile-lambda t sense))
+             (assert f)
+             (assert (not e)))))
   (expect-error 'inline)
   (expect-error 'notinline)
   (expect-pass 'inline)
@@ -1033,38 +1033,38 @@
 ;;; a local function.
 (handler-bind ((style-warning #'error))
   (let ((f (compile nil '(lambda ()
-			  (flet ((foo (&key y) (list y)))
-			    (list (foo :y 1 :y 2)))))))
+                          (flet ((foo (&key y) (list y)))
+                            (list (foo :y 1 :y 2)))))))
     (assert (equal '((1)) (funcall f)))))
 
 ;;; check that EQL is optimized when other argument is (OR SYMBOL FIXNUM).
 (handler-bind ((compiler-note #'error))
-  (let ((f1 (compile nil '(lambda (x1 y1) 
-			   (declare (type (or symbol fixnum) x1)
-			            (optimize speed))
-			   (eql x1 y1))))
-	(f2 (compile nil '(lambda (x2 y2)
-			   (declare (type (or symbol fixnum) y2)
-			            (optimize speed))
-			   (eql x2 y2)))))
+  (let ((f1 (compile nil '(lambda (x1 y1)
+                           (declare (type (or symbol fixnum) x1)
+                                    (optimize speed))
+                           (eql x1 y1))))
+        (f2 (compile nil '(lambda (x2 y2)
+                           (declare (type (or symbol fixnum) y2)
+                                    (optimize speed))
+                           (eql x2 y2)))))
     (let ((fix (random most-positive-fixnum))
-	  (sym (gensym))
-	  (e-count 0))
+          (sym (gensym))
+          (e-count 0))
       (assert (funcall f1 fix fix))
       (assert (funcall f2 fix fix))
       (assert (funcall f1 sym sym))
-      (assert (funcall f2 sym sym))    
+      (assert (funcall f2 sym sym))
       (handler-bind ((type-error (lambda (c)
-				   (incf e-count)
-				   (continue c))))
-	(flet ((test (f x y)
-		 (with-simple-restart (continue "continue with next test")
-		   (funcall f x y)
-		   (error "fell through with (~S ~S ~S)" f x y))))
-	  (test f1 "oops" 42)
-	  (test f1 (1+ most-positive-fixnum) 42)
-	  (test f2 42 "oops")
-	  (test f2 42 (1+ most-positive-fixnum))))
+                                   (incf e-count)
+                                   (continue c))))
+        (flet ((test (f x y)
+                 (with-simple-restart (continue "continue with next test")
+                   (funcall f x y)
+                   (error "fell through with (~S ~S ~S)" f x y))))
+          (test f1 "oops" 42)
+          (test f1 (1+ most-positive-fixnum) 42)
+          (test f2 42 "oops")
+          (test f2 42 (1+ most-positive-fixnum))))
       (assert (= e-count 4)))))
 
 ;;; success

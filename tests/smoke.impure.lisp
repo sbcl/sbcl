@@ -7,7 +7,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -51,12 +51,12 @@
 (assert (= (oidentity +const+) 1))
 (handler-bind
     ((sb-ext:defconstant-uneql
-	 (lambda (c) (abort c))))
+         (lambda (c) (abort c))))
   (defconstant +const+ 3))
 (assert (= (oidentity +const+) 1))
 (handler-bind
     ((sb-ext:defconstant-uneql
-	 (lambda (c) (continue c))))
+         (lambda (c) (continue c))))
   (defconstant +const+ 3))
 (assert (= (oidentity +const+) 3))
 

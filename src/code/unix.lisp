@@ -29,8 +29,8 @@
 
 (defmacro def-enum (inc cur &rest names)
   (flet ((defform (name)
-	   (prog1 (when name `(defconstant ,name ,cur))
-	     (setf cur (funcall inc cur 1)))))
+           (prog1 (when name `(defconstant ,name ,cur))
+             (setf cur (funcall inc cur 1)))))
     `(progn ,@(mapcar #'defform names))))
 
 ;;; Given a C-level zero-terminated array of C strings, return a
@@ -41,9 +41,9 @@
     (dotimes (i most-positive-fixnum (error "argh! can't happen"))
       (declare (type index i))
       (let ((c-string (deref c-strings i)))
-	(if c-string
+        (if c-string
             (push c-string reversed-result)
-	    (return (nreverse reversed-result)))))))
+            (return (nreverse reversed-result)))))))
 
 ;;;; Lisp types used by syscalls
 
@@ -67,10 +67,10 @@
   `(locally
     (declare (optimize (sb!c::float-accuracy 0)))
     (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
-				,@args)))
+                                ,@args)))
       (if (minusp result)
-	  (values nil (get-errno))
-	  ,success-form))))
+          (values nil (get-errno))
+          ,success-form))))
 
 ;;; This is like SYSCALL, but if it fails, signal an error instead of
 ;;; returning error codes. Should only be used for syscalls that will
@@ -79,10 +79,10 @@
   `(locally
     (declare (optimize (sb!c::float-accuracy 0)))
     (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
-				 ,@args)))
+                                 ,@args)))
       (if (minusp result)
-	  (error "Syscall ~A failed: ~A" ,name (strerror))
-	  ,success-form))))
+          (error "Syscall ~A failed: ~A" ,name (strerror))
+          ,success-form))))
 
 (/show0 "unix.lisp 109")
 
@@ -136,15 +136,15 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 
 (define-alien-type nil
   (struct fd-set
-	  (fds-bits (array fd-mask #.(/ fd-setsize
-					sb!vm:n-machine-word-bits)))))
+          (fds-bits (array fd-mask #.(/ fd-setsize
+                                        sb!vm:n-machine-word-bits)))))
 
 (/show0 "unix.lisp 304")
 
 
 ;;;; fcntl.h
 ;;;;
-;;;; POSIX Standard: 6.5 File Control Operations	<fcntl.h>
+;;;; POSIX Standard: 6.5 File Control Operations        <fcntl.h>
 
 ;;; Open the file whose pathname is specified by PATH for reading
 ;;; and/or writing as specified by the FLAGS argument. Various FLAGS
@@ -155,8 +155,8 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; file descriptor is returned by UNIX-OPEN.
 (defun unix-open (path flags mode)
   (declare (type unix-pathname path)
-	   (type fixnum flags)
-	   (type unix-file-mode mode))
+           (type fixnum flags)
+           (type unix-file-mode mode))
   (int-syscall ("open" c-string int int) path flags mode))
 
 ;;; UNIX-CLOSE accepts a file descriptor and attempts to close the file
@@ -172,8 +172,8 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;; microsecond but also has a range of years.
 (define-alien-type nil
   (struct timeval
-	  (tv-sec time-t)		; seconds
-	  (tv-usec time-t)))		; and microseconds
+          (tv-sec time-t)               ; seconds
+          (tv-usec time-t)))            ; and microseconds
 
 ;;;; resourcebits.h
 
@@ -183,22 +183,22 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 
 (define-alien-type nil
   (struct rusage
-    (ru-utime (struct timeval))	    ; user time used
-    (ru-stime (struct timeval))	    ; system time used.
-    (ru-maxrss long)		    ; maximum resident set size (in kilobytes)
-    (ru-ixrss long)		    ; integral shared memory size
-    (ru-idrss long)		    ; integral unshared data size
-    (ru-isrss long)		    ; integral unshared stack size
-    (ru-minflt long)		    ; page reclaims
-    (ru-majflt long)		    ; page faults
-    (ru-nswap long)		    ; swaps
-    (ru-inblock long)		    ; block input operations
-    (ru-oublock long)		    ; block output operations
-    (ru-msgsnd long)		    ; messages sent
-    (ru-msgrcv long)		    ; messages received
-    (ru-nsignals long)		    ; signals received
-    (ru-nvcsw long)		    ; voluntary context switches
-    (ru-nivcsw long)))		    ; involuntary context switches
+    (ru-utime (struct timeval))     ; user time used
+    (ru-stime (struct timeval))     ; system time used.
+    (ru-maxrss long)                ; maximum resident set size (in kilobytes)
+    (ru-ixrss long)                 ; integral shared memory size
+    (ru-idrss long)                 ; integral unshared data size
+    (ru-isrss long)                 ; integral unshared stack size
+    (ru-minflt long)                ; page reclaims
+    (ru-majflt long)                ; page faults
+    (ru-nswap long)                 ; swaps
+    (ru-inblock long)               ; block input operations
+    (ru-oublock long)               ; block output operations
+    (ru-msgsnd long)                ; messages sent
+    (ru-msgrcv long)                ; messages received
+    (ru-nsignals long)              ; signals received
+    (ru-nvcsw long)                 ; voluntary context switches
+    (ru-nivcsw long)))              ; involuntary context switches
 
 ;;;; unistd.h
 
@@ -206,7 +206,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; return T if the file is accessible with that mode and NIL if not.
 ;;; When NIL, also return an errno value with NIL which tells why the
 ;;; file was not accessible.
-;;; 
+;;;
 ;;; The access modes are:
 ;;;   r_ok     Read permission.
 ;;;   w_ok     Write permission.
@@ -214,7 +214,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;;   f_ok     Presence of file.
 (defun unix-access (path mode)
   (declare (type unix-pathname path)
-	   (type (mod 8) mode))
+           (type (mod 8) mode))
   (void-syscall ("access" c-string int) path mode))
 
 ;;; values for the second argument to UNIX-LSEEK
@@ -228,7 +228,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   (int-syscall ("isatty" int) fd))
 
 (defun unix-lseek (fd offset whence)
-  "Unix-lseek accepts a file descriptor and moves the file pointer by 
+  "Unix-lseek accepts a file descriptor and moves the file pointer by
    OFFSET octets.  Whence can be any of the following:
 
    L_SET        Set the file pointer.
@@ -236,11 +236,11 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
    L_XTND       Extend the file size.
   "
   (declare (type unix-fd fd)
-	   (type (integer 0 2) whence))
+           (type (integer 0 2) whence))
   (let ((result (alien-funcall (extern-alien "lseek" (function off-t int off-t int))
-		 fd offset whence)))
+                 fd offset whence)))
     (if (minusp result )
-	(values nil (get-errno))
+        (values nil (get-errno))
       (values result 0))))
 
 ;;; UNIX-READ accepts a file descriptor, a buffer, and the length to read.
@@ -249,7 +249,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; bytes read.
 (defun unix-read (fd buf len)
   (declare (type unix-fd fd)
-	   (type (unsigned-byte 32) len))
+           (type (unsigned-byte 32) len))
 
   (int-syscall ("read" int (* char) int) fd buf len))
 
@@ -259,16 +259,16 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; the actual number of bytes written.
 (defun unix-write (fd buf offset len)
   (declare (type unix-fd fd)
-	   (type (unsigned-byte 32) offset len))
+           (type (unsigned-byte 32) offset len))
   (int-syscall ("write" int (* char) int)
-	       fd
-	       (with-alien ((ptr (* char) (etypecase buf
-					    ((simple-array * (*))
-					     (vector-sap buf))
-					    (system-area-pointer
-					     buf))))
-		 (addr (deref ptr offset)))
-	       len))
+               fd
+               (with-alien ((ptr (* char) (etypecase buf
+                                            ((simple-array * (*))
+                                             (vector-sap buf))
+                                            (system-area-pointer
+                                             buf))))
+                 (addr (deref ptr offset)))
+               len))
 
 ;;; Set up a unix-piping mechanism consisting of an input pipe and an
 ;;; output pipe. Return two values: if no error occurred the first
@@ -278,12 +278,12 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 (defun unix-pipe ()
   (with-alien ((fds (array int 2)))
     (syscall ("pipe" (* int))
-	     (values (deref fds 0) (deref fds 1))
-	     (cast fds (* int)))))
+             (values (deref fds 0) (deref fds 1))
+             (cast fds (* int)))))
 
 (defun unix-mkdir (name mode)
   (declare (type unix-pathname name)
-	   (type unix-file-mode mode))
+           (type unix-file-mode mode))
   (void-syscall ("mkdir" c-string int) name mode))
 
 ;;; Given a C char* pointer allocated by malloc(), free it and return a
@@ -293,11 +293,11 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   (if (null-alien newcharstar)
       nil
       (prog1
-	  (cast newcharstar c-string)
-	(free-alien newcharstar))))
+          (cast newcharstar c-string)
+        (free-alien newcharstar))))
 
 ;;; Return the Unix current directory as a SIMPLE-STRING, in the
-;;; style returned by getcwd() (no trailing slash character). 
+;;; style returned by getcwd() (no trailing slash character).
 (defun posix-getcwd ()
   ;; This implementation relies on a BSD/Linux extension to getcwd()
   ;; behavior, automatically allocating memory when a null buffer
@@ -314,12 +314,12 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   #!-(or linux openbsd freebsd netbsd sunos osf1 darwin) (,stub,)
   #!+(or linux openbsd freebsd netbsd sunos osf1 darwin)
   (or (newcharstar-string (alien-funcall (extern-alien "getcwd"
-						       (function (* char)
-								 (* char)
-								 size-t))
-					 nil 
-					 #!+(or linux openbsd freebsd netbsd darwin) 0
-					 #!+(or sunos osf1) 1025))
+                                                       (function (* char)
+                                                                 (* char)
+                                                                 size-t))
+                                         nil
+                                         #!+(or linux openbsd freebsd netbsd darwin) 0
+                                         #!+(or sunos osf1) 1025))
       (simple-perror "getcwd")))
 
 ;;; Return the Unix current directory as a SIMPLE-STRING terminated
@@ -366,16 +366,16 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; Translate a user id into a login name.
 (defun uid-username (uid)
   (or (newcharstar-string (alien-funcall (extern-alien "uid_username"
-						       (function (* char) int))
-					 uid))
+                                                       (function (* char) int))
+                                         uid))
       (error "found no match for Unix uid=~S" uid)))
 
 ;;; Return the namestring of the home directory, being careful to
 ;;; include a trailing #\/
 (defun uid-homedir (uid)
   (or (newcharstar-string (alien-funcall (extern-alien "uid_homedir"
-						       (function (* char) int))
-					 uid))
+                                                       (function (* char) int))
+                                         uid))
       (error "failed to resolve home directory for Unix uid=~S" uid)))
 
 ;;; Invoke readlink(2) on the file name specified by PATH. Return
@@ -384,19 +384,19 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 (defun unix-readlink (path)
   (declare (type unix-pathname path))
   (with-alien ((ptr (* char)
-		    (alien-funcall (extern-alien
-				    "wrapped_readlink"
-				    (function (* char) c-string))
-				   path)))
+                    (alien-funcall (extern-alien
+                                    "wrapped_readlink"
+                                    (function (* char) c-string))
+                                   path)))
     (if (null-alien ptr)
-	(values nil (get-errno))
-	(multiple-value-prog1
-	    (values (with-alien ((c-string c-string ptr)) c-string)
-		    nil)
-	  (free-alien ptr)))))
+        (values nil (get-errno))
+        (multiple-value-prog1
+            (values (with-alien ((c-string c-string ptr)) c-string)
+                    nil)
+          (free-alien ptr)))))
 
 ;;; UNIX-UNLINK accepts a name and deletes the directory entry for that
-;;; name and the file if this is the last link. 
+;;; name and the file if this is the last link.
 (defun unix-unlink (name)
   (declare (type unix-pathname name))
   (void-syscall ("unlink" c-string) name))
@@ -405,8 +405,8 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 (defun unix-gethostname ()
   (with-alien ((buf (array char 256)))
     (syscall ("gethostname" (* char) int)
-	     (cast buf c-string)
-	     (cast buf (* char)) 256)))
+             (cast buf c-string)
+             (cast buf (* char)) 256)))
 
 (defun unix-setsid ()
   (int-syscall ("setsid")))
@@ -418,7 +418,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; information.
 (defun unix-ioctl (fd cmd arg)
   (declare (type unix-fd fd)
-	   (type (signed-byte 32) cmd))
+           (type (signed-byte 32) cmd))
   (void-syscall ("ioctl" int int (* char)) fd cmd arg))
 
 ;;;; sys/resource.h
@@ -431,16 +431,16 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 #!-sb-fluid (declaim (inline unix-fast-getrusage))
 (defun unix-fast-getrusage (who)
   (declare (values (member t)
-		   (unsigned-byte 31) (integer 0 1000000)
-		   (unsigned-byte 31) (integer 0 1000000)))
+                   (unsigned-byte 31) (integer 0 1000000)
+                   (unsigned-byte 31) (integer 0 1000000)))
   (with-alien ((usage (struct rusage)))
     (syscall* ("getrusage" int (* (struct rusage)))
-	      (values t
-		      (slot (slot usage 'ru-utime) 'tv-sec)
-		      (slot (slot usage 'ru-utime) 'tv-usec)
-		      (slot (slot usage 'ru-stime) 'tv-sec)
-		      (slot (slot usage 'ru-stime) 'tv-usec))
-	      who (addr usage))))
+              (values t
+                      (slot (slot usage 'ru-utime) 'tv-sec)
+                      (slot (slot usage 'ru-utime) 'tv-usec)
+                      (slot (slot usage 'ru-stime) 'tv-sec)
+                      (slot (slot usage 'ru-stime) 'tv-usec))
+              who (addr usage))))
 
 ;;; Return information about the resource usage of the process
 ;;; specified by WHO. WHO can be either the current process
@@ -450,26 +450,26 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 (defun unix-getrusage (who)
   (with-alien ((usage (struct rusage)))
     (syscall ("getrusage" int (* (struct rusage)))
-	      (values t
-		      (+ (* (slot (slot usage 'ru-utime) 'tv-sec) 1000000)
-			 (slot (slot usage 'ru-utime) 'tv-usec))
-		      (+ (* (slot (slot usage 'ru-stime) 'tv-sec) 1000000)
-			 (slot (slot usage 'ru-stime) 'tv-usec))
-		      (slot usage 'ru-maxrss)
-		      (slot usage 'ru-ixrss)
-		      (slot usage 'ru-idrss)
-		      (slot usage 'ru-isrss)
-		      (slot usage 'ru-minflt)
-		      (slot usage 'ru-majflt)
-		      (slot usage 'ru-nswap)
-		      (slot usage 'ru-inblock)
-		      (slot usage 'ru-oublock)
-		      (slot usage 'ru-msgsnd)
-		      (slot usage 'ru-msgrcv)
-		      (slot usage 'ru-nsignals)
-		      (slot usage 'ru-nvcsw)
-		      (slot usage 'ru-nivcsw))
-	      who (addr usage))))
+              (values t
+                      (+ (* (slot (slot usage 'ru-utime) 'tv-sec) 1000000)
+                         (slot (slot usage 'ru-utime) 'tv-usec))
+                      (+ (* (slot (slot usage 'ru-stime) 'tv-sec) 1000000)
+                         (slot (slot usage 'ru-stime) 'tv-usec))
+                      (slot usage 'ru-maxrss)
+                      (slot usage 'ru-ixrss)
+                      (slot usage 'ru-idrss)
+                      (slot usage 'ru-isrss)
+                      (slot usage 'ru-minflt)
+                      (slot usage 'ru-majflt)
+                      (slot usage 'ru-nswap)
+                      (slot usage 'ru-inblock)
+                      (slot usage 'ru-oublock)
+                      (slot usage 'ru-msgsnd)
+                      (slot usage 'ru-msgrcv)
+                      (slot usage 'ru-nsignals)
+                      (slot usage 'ru-nvcsw)
+                      (slot usage 'ru-nivcsw))
+              who (addr usage))))
 
 ;;;; sys/select.h
 
@@ -478,13 +478,13 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; Perform the UNIX select(2) system call.
 (declaim (inline unix-fast-select)) ; (used to be a macro in CMU CL)
 (defun unix-fast-select (num-descriptors
-			 read-fds write-fds exception-fds
-			 timeout-secs &optional (timeout-usecs 0))
+                         read-fds write-fds exception-fds
+                         timeout-secs &optional (timeout-usecs 0))
   (declare (type (integer 0 #.fd-setsize) num-descriptors)
-	   (type (or (alien (* (struct fd-set))) null)
-		 read-fds write-fds exception-fds)
-	   (type (or null (unsigned-byte 31)) timeout-secs)
-	   (type (unsigned-byte 31) timeout-usecs))
+           (type (or (alien (* (struct fd-set))) null)
+                 read-fds write-fds exception-fds)
+           (type (or null (unsigned-byte 31)) timeout-secs)
+           (type (unsigned-byte 31) timeout-usecs))
   ;; FIXME: CMU CL had
   ;;   (declare (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
   ;; here. Is that important for SBCL? If so, why? Profiling might tell us..
@@ -493,48 +493,48 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
       (setf (slot tv 'tv-sec) timeout-secs)
       (setf (slot tv 'tv-usec) timeout-usecs))
     (int-syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
-		  (* (struct fd-set)) (* (struct timeval)))
-		 num-descriptors read-fds write-fds exception-fds
-		 (if timeout-secs (alien-sap (addr tv)) (int-sap 0)))))
+                  (* (struct fd-set)) (* (struct timeval)))
+                 num-descriptors read-fds write-fds exception-fds
+                 (if timeout-secs (alien-sap (addr tv)) (int-sap 0)))))
 
 ;;; UNIX-SELECT accepts sets of file descriptors and waits for an event
 ;;; to happen on one of them or to time out.
 (defmacro num-to-fd-set (fdset num)
   `(if (fixnump ,num)
        (progn
-	 (setf (deref (slot ,fdset 'fds-bits) 0) ,num)
-	 ,@(loop for index upfrom 1 below (/ fd-setsize
-					     sb!vm:n-machine-word-bits)
-	     collect `(setf (deref (slot ,fdset 'fds-bits) ,index) 0)))
+         (setf (deref (slot ,fdset 'fds-bits) 0) ,num)
+         ,@(loop for index upfrom 1 below (/ fd-setsize
+                                             sb!vm:n-machine-word-bits)
+             collect `(setf (deref (slot ,fdset 'fds-bits) ,index) 0)))
        (progn
-	 ,@(loop for index upfrom 0 below (/ fd-setsize
-					     sb!vm:n-machine-word-bits)
-	     collect `(setf (deref (slot ,fdset 'fds-bits) ,index)
-			    (ldb (byte sb!vm:n-machine-word-bits 
-				       ,(* index sb!vm:n-machine-word-bits))
-				 ,num))))))
+         ,@(loop for index upfrom 0 below (/ fd-setsize
+                                             sb!vm:n-machine-word-bits)
+             collect `(setf (deref (slot ,fdset 'fds-bits) ,index)
+                            (ldb (byte sb!vm:n-machine-word-bits
+                                       ,(* index sb!vm:n-machine-word-bits))
+                                 ,num))))))
 
 (defmacro fd-set-to-num (nfds fdset)
   `(if (<= ,nfds sb!vm:n-machine-word-bits)
        (deref (slot ,fdset 'fds-bits) 0)
        (+ ,@(loop for index upfrom 0 below (/ fd-setsize
-					      sb!vm:n-machine-word-bits)
-	      collect `(ash (deref (slot ,fdset 'fds-bits) ,index)
-			    ,(* index sb!vm:n-machine-word-bits))))))
+                                              sb!vm:n-machine-word-bits)
+              collect `(ash (deref (slot ,fdset 'fds-bits) ,index)
+                            ,(* index sb!vm:n-machine-word-bits))))))
 
 ;;; Examine the sets of descriptors passed as arguments to see whether
 ;;; they are ready for reading and writing. See the UNIX Programmer's
 ;;; Manual for more information.
 (defun unix-select (nfds rdfds wrfds xpfds to-secs &optional (to-usecs 0))
   (declare (type (integer 0 #.fd-setsize) nfds)
-	   (type unsigned-byte rdfds wrfds xpfds)
-	   (type (or (unsigned-byte 31) null) to-secs)
-	   (type (unsigned-byte 31) to-usecs)
-	   (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
+           (type unsigned-byte rdfds wrfds xpfds)
+           (type (or (unsigned-byte 31) null) to-secs)
+           (type (unsigned-byte 31) to-usecs)
+           (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
   (with-alien ((tv (struct timeval))
-	       (rdf (struct fd-set))
-	       (wrf (struct fd-set))
-	       (xpf (struct fd-set)))
+               (rdf (struct fd-set))
+               (wrf (struct fd-set))
+               (xpf (struct fd-set)))
     (when to-secs
       (setf (slot tv 'tv-sec) to-secs)
      (setf (slot tv 'tv-usec) to-usecs))
@@ -542,17 +542,17 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
     (num-to-fd-set wrf wrfds)
     (num-to-fd-set xpf xpfds)
     (macrolet ((frob (lispvar alienvar)
-		 `(if (zerop ,lispvar)
-		      (int-sap 0)
-		      (alien-sap (addr ,alienvar)))))
+                 `(if (zerop ,lispvar)
+                      (int-sap 0)
+                      (alien-sap (addr ,alienvar)))))
       (syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
-		(* (struct fd-set)) (* (struct timeval)))
-	       (values result
-		       (fd-set-to-num nfds rdf)
-		       (fd-set-to-num nfds wrf)
-		       (fd-set-to-num nfds xpf))
-	       nfds (frob rdfds rdf) (frob wrfds wrf) (frob xpfds xpf)
-	       (if to-secs (alien-sap (addr tv)) (int-sap 0))))))
+                (* (struct fd-set)) (* (struct timeval)))
+               (values result
+                       (fd-set-to-num nfds rdf)
+                       (fd-set-to-num nfds wrf)
+                       (fd-set-to-num nfds xpf))
+               nfds (frob rdfds rdf) (frob wrfds wrf) (frob xpfds xpf)
+               (if to-secs (alien-sap (addr tv)) (int-sap 0))))))
 
 ;;;; sys/stat.h
 
@@ -580,7 +580,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
     (st-uid  uid-t)
     (st-gid  gid-t)
     (st-rdev unsigned-int)             ; would be dev-t in a real stat
-    (st-size unsigned-int)		; would be off-t in a real stat
+    (st-size unsigned-int)              ; would be off-t in a real stat
     (st-blksize unsigned-long)
     (st-blocks unsigned-long)
     (st-atime time-t)
@@ -603,19 +603,19 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 (defun %extract-stat-results (wrapped-stat)
   (declare (type (alien (* (struct wrapped_stat))) wrapped-stat))
   (values t
-	  (slot wrapped-stat 'st-dev)
-	  (slot wrapped-stat 'st-ino)
-	  (slot wrapped-stat 'st-mode)
-	  (slot wrapped-stat 'st-nlink)
-	  (slot wrapped-stat 'st-uid)
-	  (slot wrapped-stat 'st-gid)
-	  (slot wrapped-stat 'st-rdev)
-	  (slot wrapped-stat 'st-size)
-	  (slot wrapped-stat 'st-atime)
-	  (slot wrapped-stat 'st-mtime)
-	  (slot wrapped-stat 'st-ctime)
-	  (slot wrapped-stat 'st-blksize)
-	  (slot wrapped-stat 'st-blocks)))
+          (slot wrapped-stat 'st-dev)
+          (slot wrapped-stat 'st-ino)
+          (slot wrapped-stat 'st-mode)
+          (slot wrapped-stat 'st-nlink)
+          (slot wrapped-stat 'st-uid)
+          (slot wrapped-stat 'st-gid)
+          (slot wrapped-stat 'st-rdev)
+          (slot wrapped-stat 'st-size)
+          (slot wrapped-stat 'st-atime)
+          (slot wrapped-stat 'st-mtime)
+          (slot wrapped-stat 'st-ctime)
+          (slot wrapped-stat 'st-blksize)
+          (slot wrapped-stat 'st-blocks)))
 
 ;;; Unix system calls in the stat(2) family are handled by calls to
 ;;; C-level wrapper functions which copy all the raw "struct stat"
@@ -627,20 +627,20 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   (declare (type unix-pathname name))
   (with-alien ((buf (struct wrapped_stat)))
     (syscall ("stat_wrapper" c-string (* (struct wrapped_stat)))
-	     (%extract-stat-results (addr buf))
-	     name (addr buf))))
+             (%extract-stat-results (addr buf))
+             name (addr buf))))
 (defun unix-lstat (name)
   (declare (type unix-pathname name))
   (with-alien ((buf (struct wrapped_stat)))
     (syscall ("lstat_wrapper" c-string (* (struct wrapped_stat)))
-	     (%extract-stat-results (addr buf))
-	     name (addr buf))))
+             (%extract-stat-results (addr buf))
+             name (addr buf))))
 (defun unix-fstat (fd)
   (declare (type unix-fd fd))
   (with-alien ((buf (struct wrapped_stat)))
     (syscall ("fstat_wrapper" int (* (struct wrapped_stat)))
-	     (%extract-stat-results (addr buf))
-	     fd (addr buf))))
+             (%extract-stat-results (addr buf))
+             fd (addr buf))))
 
 ;;;; time.h
 
@@ -648,23 +648,23 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;; timeval" but has nanoseconds instead of microseconds.
 (define-alien-type nil
     (struct timespec
-	    (tv-sec long)   ; seconds
-	    (tv-nsec long))) ; nanoseconds
+            (tv-sec long)   ; seconds
+            (tv-nsec long))) ; nanoseconds
 
 ;; used by other time functions
 (define-alien-type nil
     (struct tm
-	    (tm-sec int)   ; Seconds.	[0-60] (1 leap second)
-	    (tm-min int)   ; Minutes.	[0-59]
-	    (tm-hour int)  ; Hours.	[0-23]
-	    (tm-mday int)  ; Day.       [1-31]
-	    (tm-mon int)   ; Month.	[0-11]
-	    (tm-year int)  ; Year - 1900.
-	    (tm-wday int)  ; Day of week. [0-6]
-	    (tm-yday int)  ; Days in year. [0-365]
-	    (tm-isdst int) ; DST.       [-1/0/1]
-	    (tm-gmtoff long) ;  Seconds east of UTC.
-	    (tm-zone c-string))) ; Timezone abbreviation.
+            (tm-sec int)   ; Seconds.   [0-60] (1 leap second)
+            (tm-min int)   ; Minutes.   [0-59]
+            (tm-hour int)  ; Hours.     [0-23]
+            (tm-mday int)  ; Day.       [1-31]
+            (tm-mon int)   ; Month.     [0-11]
+            (tm-year int)  ; Year - 1900.
+            (tm-wday int)  ; Day of week. [0-6]
+            (tm-yday int)  ; Days in year. [0-365]
+            (tm-isdst int) ; DST.       [-1/0/1]
+            (tm-gmtoff long) ;  Seconds east of UTC.
+            (tm-zone c-string))) ; Timezone abbreviation.
 
 (define-alien-routine get-timezone sb!alien:void
   (when sb!alien:long :in)
@@ -694,8 +694,8 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; obsolete and should never be used.
 (define-alien-type nil
   (struct timezone
-    (tz-minuteswest int)		; minutes west of Greenwich
-    (tz-dsttime	int)))			; type of dst correction
+    (tz-minuteswest int)                ; minutes west of Greenwich
+    (tz-dsttime int)))                  ; type of dst correction
 
 ;;; If it works, UNIX-GETTIMEOFDAY returns 5 values: T, the seconds
 ;;; and microseconds of the current time of day, the timezone (in
@@ -704,24 +704,24 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 #!-sb-fluid (declaim (inline unix-gettimeofday))
 (defun unix-gettimeofday ()
   (with-alien ((tv (struct timeval))
-	       (tz (struct timezone)))
+               (tz (struct timezone)))
     (syscall* ("gettimeofday" (* (struct timeval))
-			      (* (struct timezone)))
-	      (values t
-		      (slot tv 'tv-sec)
-		      (slot tv 'tv-usec)
-		      (slot tz 'tz-minuteswest)
-		      (slot tz 'tz-dsttime))
-	      (addr tv)
-	      (addr tz))))
+                              (* (struct timezone)))
+              (values t
+                      (slot tv 'tv-sec)
+                      (slot tv 'tv-usec)
+                      (slot tz 'tz-minuteswest)
+                      (slot tz 'tz-dsttime))
+              (addr tv)
+              (addr tz))))
 
 
 ;; Type of the second argument to `getitimer' and
-;; the second and third arguments `setitimer'. 
+;; the second and third arguments `setitimer'.
 (define-alien-type nil
   (struct itimerval
-    (it-interval (struct timeval))	; timer interval
-    (it-value (struct timeval))))	; current value
+    (it-interval (struct timeval))      ; timer interval
+    (it-value (struct timeval))))       ; current value
 
 (defconstant itimer-real 0)
 (defconstant itimer-virtual 1)
@@ -733,21 +733,21 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
    unix-getitimer returns 5 values,
    T, it-interval-secs, it-interval-usec, it-value-secs, it-value-usec."
   (declare (type (member :real :virtual :profile) which)
-	   (values t
-		   (unsigned-byte 29) (mod 1000000)
-		   (unsigned-byte 29) (mod 1000000)))
+           (values t
+                   (unsigned-byte 29) (mod 1000000)
+                   (unsigned-byte 29) (mod 1000000)))
   (let ((which (ecase which
-		 (:real itimer-real)
-		 (:virtual itimer-virtual)
-		 (:profile itimer-prof))))
+                 (:real itimer-real)
+                 (:virtual itimer-virtual)
+                 (:profile itimer-prof))))
     (with-alien ((itv (struct itimerval)))
       (syscall* ("getitimer" int (* (struct itimerval)))
-		(values t
-			(slot (slot itv 'it-interval) 'tv-sec)
-			(slot (slot itv 'it-interval) 'tv-usec)
-			(slot (slot itv 'it-value) 'tv-sec)
-			(slot (slot itv 'it-value) 'tv-usec))
-		which (alien-sap (addr itv))))))
+                (values t
+                        (slot (slot itv 'it-interval) 'tv-sec)
+                        (slot (slot itv 'it-interval) 'tv-usec)
+                        (slot (slot itv 'it-value) 'tv-sec)
+                        (slot (slot itv 'it-value) 'tv-usec))
+                which (alien-sap (addr itv))))))
 
 (defun unix-setitimer (which int-secs int-usec val-secs val-usec)
   " Unix-setitimer sets the INTERVAL and VALUE slots of one of
@@ -759,28 +759,28 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
    unix-setitimer returns the old contents of the INTERVAL and VALUE
    slots as in unix-getitimer."
   (declare (type (member :real :virtual :profile) which)
-	   (type (unsigned-byte 29) int-secs val-secs)
-	   (type (integer 0 (1000000)) int-usec val-usec)
-	   (values t
-		   (unsigned-byte 29) (mod 1000000)
-		   (unsigned-byte 29) (mod 1000000)))
+           (type (unsigned-byte 29) int-secs val-secs)
+           (type (integer 0 (1000000)) int-usec val-usec)
+           (values t
+                   (unsigned-byte 29) (mod 1000000)
+                   (unsigned-byte 29) (mod 1000000)))
   (let ((which (ecase which
-		 (:real itimer-real)
-		 (:virtual itimer-virtual)
-		 (:profile itimer-prof))))
+                 (:real itimer-real)
+                 (:virtual itimer-virtual)
+                 (:profile itimer-prof))))
     (with-alien ((itvn (struct itimerval))
-		 (itvo (struct itimerval)))
+                 (itvo (struct itimerval)))
       (setf (slot (slot itvn 'it-interval) 'tv-sec ) int-secs
-	    (slot (slot itvn 'it-interval) 'tv-usec) int-usec
-	    (slot (slot itvn 'it-value   ) 'tv-sec ) val-secs
-	    (slot (slot itvn 'it-value   ) 'tv-usec) val-usec)
+            (slot (slot itvn 'it-interval) 'tv-usec) int-usec
+            (slot (slot itvn 'it-value   ) 'tv-sec ) val-secs
+            (slot (slot itvn 'it-value   ) 'tv-usec) val-usec)
       (syscall* ("setitimer" int (* (struct timeval))(* (struct timeval)))
-		(values t
-			(slot (slot itvo 'it-interval) 'tv-sec)
-			(slot (slot itvo 'it-interval) 'tv-usec)
-			(slot (slot itvo 'it-value) 'tv-sec)
-			(slot (slot itvo 'it-value) 'tv-usec))
-		which (alien-sap (addr itvn))(alien-sap (addr itvo))))))
+                (values t
+                        (slot (slot itvo 'it-interval) 'tv-sec)
+                        (slot (slot itvo 'it-interval) 'tv-usec)
+                        (slot (slot itvo 'it-value) 'tv-sec)
+                        (slot (slot itvo 'it-value) 'tv-usec))
+                which (alien-sap (addr itvn))(alien-sap (addr itvo))))))
 
 (defmacro sb!ext:with-timeout (expires &body body)
   "Execute the body, interrupting it with a SIGALRM after at least
@@ -789,21 +789,21 @@ previous timer after the body has finished executing"
   (with-unique-names (saved-seconds saved-useconds s u)
     `(let (- ,saved-seconds ,saved-useconds)
       (multiple-value-setq (- - - ,saved-seconds ,saved-useconds)
-	(unix-getitimer :real))
+        (unix-getitimer :real))
       (multiple-value-bind (,s ,u) (floor ,expires)
-	(setf ,u (floor (* ,u 1000000)))
-	(if (and (> ,expires 0)
-		 (or (and (zerop ,saved-seconds) (zerop ,saved-useconds))
-		     (> ,saved-seconds ,s)
-		     (and (= ,saved-seconds ,s)
-			  (> ,saved-useconds ,u))))
-	    (unwind-protect
-		 (progn
-		   (unix-setitimer :real 0 0 ,s ,u)
-		   ,@body)
-	      (unix-setitimer :real 0 0 ,saved-seconds ,saved-useconds))
-	    (progn
-	      ,@body))))))
+        (setf ,u (floor (* ,u 1000000)))
+        (if (and (> ,expires 0)
+                 (or (and (zerop ,saved-seconds) (zerop ,saved-useconds))
+                     (> ,saved-seconds ,s)
+                     (and (= ,saved-seconds ,s)
+                          (> ,saved-useconds ,u))))
+            (unwind-protect
+                 (progn
+                   (unix-setitimer :real 0 0 ,s ,u)
+                   ,@body)
+              (unix-setitimer :real 0 0 ,saved-seconds ,saved-useconds))
+            (progn
+              ,@body))))))
 
 ;;; FIXME: Many Unix error code definitions were deleted from the old
 ;;; CMU CL source code here, but not in the exports of SB-UNIX. I
@@ -821,13 +821,13 @@ previous timer after the body has finished executing"
   (multiple-value-bind (res dev ino mode)
       (if check-for-links (unix-lstat name) (unix-stat name))
     (declare (type (or fixnum null) mode)
-	     (ignore dev ino))
+             (ignore dev ino))
     (when res
       (let ((kind (logand mode s-ifmt)))
-	(cond ((eql kind s-ifdir) :directory)
-	      ((eql kind s-ifreg) :file)
-	      ((eql kind s-iflnk) :link)
-	      (t :special))))))
+        (cond ((eql kind s-ifdir) :directory)
+              ((eql kind s-ifreg) :file)
+              ((eql kind s-iflnk) :link)
+              (t :special))))))
 
 ;;; Is the Unix pathname PATHNAME relative, instead of absolute? (E.g.
 ;;; "passwd" or "etc/passwd" instead of "/etc/passwd"?)
@@ -854,126 +854,126 @@ previous timer after the body has finished executing"
   (loop with previous-pathnames = nil do
        (/noshow pathname previous-pathnames)
        (let ((link (unix-readlink pathname)))
-	  (/noshow link)
-	  ;; Unlike the old CMU CL code, we handle a broken symlink by
-	  ;; returning the link itself. That way, CL:TRUENAME on a
-	  ;; broken link returns the link itself, so that CL:DIRECTORY
-	  ;; can return broken links, so that even without
-	  ;; Unix-specific extensions to do interesting things with
-	  ;; them, at least Lisp programs can see them and, if
-	  ;; necessary, delete them. (This is handy e.g. when your
-	  ;; managed-by-Lisp directories are visited by Emacs, which
-	  ;; creates broken links as notes to itself.)
-	  (if (null link)
-	      (return pathname)
-	      (let ((new-pathname 
-		     (unix-simplify-pathname
-		      (if (relative-unix-pathname? link)
-			  (let* ((dir-len (1+ (position #\/
-							pathname
-							:from-end t)))
-				 (dir (subseq pathname 0 dir-len)))
-			    (/noshow dir)
-			    (concatenate 'base-string dir link))
-			  link))))
-		(if (unix-file-kind new-pathname)
-		    (setf pathname new-pathname)
-		    (return pathname)))))
-	;; To generalize the principle that even if portable Lisp code
-	;; can't do anything interesting with a broken symlink, at
-	;; least it should be able to see and delete it, when we
-	;; detect a cyclic link, we return the link itself. (So even
-	;; though portable Lisp code can't do anything interesting
-	;; with a cyclic link, at least it can see it and delete it.)
-	(if (member pathname previous-pathnames :test #'string=)
-	    (return pathname)
-	    (push pathname previous-pathnames))))
+          (/noshow link)
+          ;; Unlike the old CMU CL code, we handle a broken symlink by
+          ;; returning the link itself. That way, CL:TRUENAME on a
+          ;; broken link returns the link itself, so that CL:DIRECTORY
+          ;; can return broken links, so that even without
+          ;; Unix-specific extensions to do interesting things with
+          ;; them, at least Lisp programs can see them and, if
+          ;; necessary, delete them. (This is handy e.g. when your
+          ;; managed-by-Lisp directories are visited by Emacs, which
+          ;; creates broken links as notes to itself.)
+          (if (null link)
+              (return pathname)
+              (let ((new-pathname
+                     (unix-simplify-pathname
+                      (if (relative-unix-pathname? link)
+                          (let* ((dir-len (1+ (position #\/
+                                                        pathname
+                                                        :from-end t)))
+                                 (dir (subseq pathname 0 dir-len)))
+                            (/noshow dir)
+                            (concatenate 'base-string dir link))
+                          link))))
+                (if (unix-file-kind new-pathname)
+                    (setf pathname new-pathname)
+                    (return pathname)))))
+        ;; To generalize the principle that even if portable Lisp code
+        ;; can't do anything interesting with a broken symlink, at
+        ;; least it should be able to see and delete it, when we
+        ;; detect a cyclic link, we return the link itself. (So even
+        ;; though portable Lisp code can't do anything interesting
+        ;; with a cyclic link, at least it can see it and delete it.)
+        (if (member pathname previous-pathnames :test #'string=)
+            (return pathname)
+            (push pathname previous-pathnames))))
 
 (defun unix-simplify-pathname (src)
   (declare (type simple-base-string src))
   (let* ((src-len (length src))
-	 (dst (make-string src-len :element-type 'base-char))
-	 (dst-len 0)
-	 (dots 0)
-	 (last-slash nil))
+         (dst (make-string src-len :element-type 'base-char))
+         (dst-len 0)
+         (dots 0)
+         (last-slash nil))
     (macrolet ((deposit (char)
-		 `(progn
-		    (setf (schar dst dst-len) ,char)
-		    (incf dst-len))))
+                 `(progn
+                    (setf (schar dst dst-len) ,char)
+                    (incf dst-len))))
       (dotimes (src-index src-len)
-	(let ((char (schar src src-index)))
-	  (cond ((char= char #\.)
-		 (when dots
-		   (incf dots))
-		 (deposit char))
-		((char= char #\/)
-		 (case dots
-		   (0
-		    ;; either ``/...' or ``...//...'
-		    (unless last-slash
-		      (setf last-slash dst-len)
-		      (deposit char)))
-		   (1
-		    ;; either ``./...'' or ``..././...''
-		    (decf dst-len))
-		   (2
-		    ;; We've found ..
-		    (cond
-		     ((and last-slash (not (zerop last-slash)))
-		      ;; There is something before this ..
-		      (let ((prev-prev-slash
-			     (position #\/ dst :end last-slash :from-end t)))
-			(cond ((and (= (+ (or prev-prev-slash 0) 2)
-				       last-slash)
-				    (char= (schar dst (- last-slash 2)) #\.)
-				    (char= (schar dst (1- last-slash)) #\.))
-			       ;; The something before this .. is another ..
-			       (deposit char)
-			       (setf last-slash dst-len))
-			      (t
-			       ;; The something is some directory or other.
-			       (setf dst-len
-				     (if prev-prev-slash
-					 (1+ prev-prev-slash)
-					 0))
-			       (setf last-slash prev-prev-slash)))))
-		     (t
-		      ;; There is nothing before this .., so we need to keep it
-		      (setf last-slash dst-len)
-		      (deposit char))))
-		   (t
-		    ;; something other than a dot between slashes
-		    (setf last-slash dst-len)
-		    (deposit char)))
-		 (setf dots 0))
-		(t
-		 (setf dots nil)
-		 (setf (schar dst dst-len) char)
-		 (incf dst-len))))))
+        (let ((char (schar src src-index)))
+          (cond ((char= char #\.)
+                 (when dots
+                   (incf dots))
+                 (deposit char))
+                ((char= char #\/)
+                 (case dots
+                   (0
+                    ;; either ``/...' or ``...//...'
+                    (unless last-slash
+                      (setf last-slash dst-len)
+                      (deposit char)))
+                   (1
+                    ;; either ``./...'' or ``..././...''
+                    (decf dst-len))
+                   (2
+                    ;; We've found ..
+                    (cond
+                     ((and last-slash (not (zerop last-slash)))
+                      ;; There is something before this ..
+                      (let ((prev-prev-slash
+                             (position #\/ dst :end last-slash :from-end t)))
+                        (cond ((and (= (+ (or prev-prev-slash 0) 2)
+                                       last-slash)
+                                    (char= (schar dst (- last-slash 2)) #\.)
+                                    (char= (schar dst (1- last-slash)) #\.))
+                               ;; The something before this .. is another ..
+                               (deposit char)
+                               (setf last-slash dst-len))
+                              (t
+                               ;; The something is some directory or other.
+                               (setf dst-len
+                                     (if prev-prev-slash
+                                         (1+ prev-prev-slash)
+                                         0))
+                               (setf last-slash prev-prev-slash)))))
+                     (t
+                      ;; There is nothing before this .., so we need to keep it
+                      (setf last-slash dst-len)
+                      (deposit char))))
+                   (t
+                    ;; something other than a dot between slashes
+                    (setf last-slash dst-len)
+                    (deposit char)))
+                 (setf dots 0))
+                (t
+                 (setf dots nil)
+                 (setf (schar dst dst-len) char)
+                 (incf dst-len))))))
     (when (and last-slash (not (zerop last-slash)))
       (case dots
-	(1
-	 ;; We've got  ``foobar/.''
-	 (decf dst-len))
-	(2
-	 ;; We've got ``foobar/..''
-	 (unless (and (>= last-slash 2)
-		      (char= (schar dst (1- last-slash)) #\.)
-		      (char= (schar dst (- last-slash 2)) #\.)
-		      (or (= last-slash 2)
-			  (char= (schar dst (- last-slash 3)) #\/)))
-	   (let ((prev-prev-slash
-		  (position #\/ dst :end last-slash :from-end t)))
-	     (if prev-prev-slash
-		 (setf dst-len (1+ prev-prev-slash))
-		 (return-from unix-simplify-pathname
-		   (coerce "./" 'simple-base-string))))))))
+        (1
+         ;; We've got  ``foobar/.''
+         (decf dst-len))
+        (2
+         ;; We've got ``foobar/..''
+         (unless (and (>= last-slash 2)
+                      (char= (schar dst (1- last-slash)) #\.)
+                      (char= (schar dst (- last-slash 2)) #\.)
+                      (or (= last-slash 2)
+                          (char= (schar dst (- last-slash 3)) #\/)))
+           (let ((prev-prev-slash
+                  (position #\/ dst :end last-slash :from-end t)))
+             (if prev-prev-slash
+                 (setf dst-len (1+ prev-prev-slash))
+                 (return-from unix-simplify-pathname
+                   (coerce "./" 'simple-base-string))))))))
     (cond ((zerop dst-len)
-	   "./")
-	  ((= dst-len src-len)
-	   dst)
-	  (t
-	   (subseq dst 0 dst-len)))))
+           "./")
+          ((= dst-len src-len)
+           dst)
+          (t
+           (subseq dst 0 dst-len)))))
 
 ;;;; A magic constant for wait3().
 ;;;;
@@ -993,38 +993,38 @@ previous timer after the body has finished executing"
 ;;; not checked for linux...
 (defmacro fd-set (offset fd-set)
   (let ((word (gensym))
-	(bit (gensym)))
+        (bit (gensym)))
     `(multiple-value-bind (,word ,bit) (floor ,offset
-					      sb!vm:n-machine-word-bits)
+                                              sb!vm:n-machine-word-bits)
        (setf (deref (slot ,fd-set 'fds-bits) ,word)
-	     (logior (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
-				(ash 1 ,bit))
-		     (deref (slot ,fd-set 'fds-bits) ,word))))))
+             (logior (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
+                                (ash 1 ,bit))
+                     (deref (slot ,fd-set 'fds-bits) ,word))))))
 
 ;;; not checked for linux...
 (defmacro fd-clr (offset fd-set)
   (let ((word (gensym))
-	(bit (gensym)))
+        (bit (gensym)))
     `(multiple-value-bind (,word ,bit) (floor ,offset
-					      sb!vm:n-machine-word-bits)
+                                              sb!vm:n-machine-word-bits)
        (setf (deref (slot ,fd-set 'fds-bits) ,word)
-	     (logand (deref (slot ,fd-set 'fds-bits) ,word)
-		     (sb!kernel:word-logical-not
-		      (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
-				 (ash 1 ,bit))))))))
+             (logand (deref (slot ,fd-set 'fds-bits) ,word)
+                     (sb!kernel:word-logical-not
+                      (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
+                                 (ash 1 ,bit))))))))
 
 ;;; not checked for linux...
 (defmacro fd-isset (offset fd-set)
   (let ((word (gensym))
-	(bit (gensym)))
+        (bit (gensym)))
     `(multiple-value-bind (,word ,bit) (floor ,offset
-					      sb!vm:n-machine-word-bits)
+                                              sb!vm:n-machine-word-bits)
        (logbitp ,bit (deref (slot ,fd-set 'fds-bits) ,word)))))
 
 ;;; not checked for linux...
 (defmacro fd-zero (fd-set)
   `(progn
      ,@(loop for index upfrom 0 below (/ fd-setsize sb!vm:n-machine-word-bits)
-	 collect `(setf (deref (slot ,fd-set 'fds-bits) ,index) 0))))
+         collect `(setf (deref (slot ,fd-set 'fds-bits) ,index) 0))))
 
 

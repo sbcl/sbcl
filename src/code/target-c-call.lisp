@@ -47,18 +47,18 @@
                         until (zerop (sap-ref-8 sap offset))
                         finally (return offset))))
       (let ((result (make-string length :element-type 'base-char)))
-	(sb!kernel:copy-ub8-from-system-area sap 0 result 0 length)
-	result))))
+        (sb!kernel:copy-ub8-from-system-area sap 0 result 0 length)
+        result))))
 
 (defun %naturalize-utf8-string (sap)
   (declare (type system-area-pointer sap))
   (locally
     (declare (optimize (speed 3) (safety 0)))
     (let ((byte-length (do* ((offset 0 (1+ offset))
-			     (byte #1=(sap-ref-8 sap offset) #1#))
-			    ((zerop byte) offset))))
+                             (byte #1=(sap-ref-8 sap offset) #1#))
+                            ((zerop byte) offset))))
       (handler-bind ((sb!impl::octet-decoding-error #'sb!impl::use-unicode-replacement-char))
-	(sb!impl::utf8->string-sap-ref-8 sap 0 byte-length)))))
+        (sb!impl::utf8->string-sap-ref-8 sap 0 byte-length)))))
 
 (defun %deport-utf8-string (string)
   (declare (type simple-string string))

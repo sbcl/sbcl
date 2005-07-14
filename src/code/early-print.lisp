@@ -23,22 +23,22 @@
 (defmacro descend-into ((stream) &body body)
   (let ((flet-name (gensym)))
     `(flet ((,flet-name ()
-	      ,@body))
+              ,@body))
        (cond ((and (null *print-readably*)
-		   *print-level*
-		   (>= *current-level-in-print* *print-level*))
-	      (write-char #\# ,stream))
-	     (t
-	      (let ((*current-level-in-print* (1+ *current-level-in-print*)))
-		(,flet-name)))))))
+                   *print-level*
+                   (>= *current-level-in-print* *print-level*))
+              (write-char #\# ,stream))
+             (t
+              (let ((*current-level-in-print* (1+ *current-level-in-print*)))
+                (,flet-name)))))))
 
 ;;; Punt if INDEX is equal or larger then *PRINT-LENGTH* (and
 ;;; *PRINT-READABLY* is NIL) by outputting \"...\" and returning from
 ;;; the block named NIL.
 (defmacro punt-print-if-too-long (index stream)
   `(when (and (not *print-readably*)
-	      *print-length*
-	      (>= ,index *print-length*))
+              *print-length*
+              (>= ,index *print-length*))
      (write-string "..." ,stream)
      (return)))
 
@@ -73,7 +73,7 @@
 ;;; you need to initiate the circularity detection noise, e.g. bind
 ;;; *CIRCULARITY-HASH-TABLE* and *CIRCULARITY-COUNTER* to suitable values
 ;;; (see #'OUTPUT-OBJECT for an example).
-;;; 
+;;;
 ;;; Circularity detection is done in two places, OUTPUT-OBJECT and
 ;;; WITH-CIRCULARITY-DETECTION (which is used from PPRINT-LOGICAL-BLOCK).
 ;;; These checks aren't really redundant (at least I can't really see
@@ -85,51 +85,51 @@
 ;;; correcting this problem.
 (defun check-for-circularity (object &optional assign (mode t))
   (cond ((null *print-circle*)
-	 ;; Don't bother, nobody cares.
-	 nil)
-	((null *circularity-hash-table*)
+         ;; Don't bother, nobody cares.
+         nil)
+        ((null *circularity-hash-table*)
           (values nil :initiate))
-	((null *circularity-counter*)
-	 (ecase (gethash object *circularity-hash-table*)
-	   ((nil)
-	    ;; first encounter
-	    (setf (gethash object *circularity-hash-table*) mode)
-	    ;; We need to keep looking.
-	    nil)
-	   ((:logical-block)
-	    (setf (gethash object *circularity-hash-table*)
+        ((null *circularity-counter*)
+         (ecase (gethash object *circularity-hash-table*)
+           ((nil)
+            ;; first encounter
+            (setf (gethash object *circularity-hash-table*) mode)
+            ;; We need to keep looking.
+            nil)
+           ((:logical-block)
+            (setf (gethash object *circularity-hash-table*)
                   :logical-block-circular)
-	    t)
-	   ((t)
-	    (cond ((eq mode :logical-block)
-		   ;; We've seen the object before in output-object, and now
-		   ;; a second time in a PPRINT-LOGICAL-BLOCK (for example
-		   ;; via pprint-dispatch). Don't mark it as circular yet.
-		   (setf (gethash object *circularity-hash-table*)
-			 :logical-block)
-		   nil)
-		  (t
-		   ;; second encounter
-		   (setf (gethash object *circularity-hash-table*) 0)
-		   ;; It's a circular reference.
-		   t)))
-	   ((0 :logical-block-circular)
-	    ;; It's a circular reference.
-	    t)))
-	(t
-	 (let ((value (gethash object *circularity-hash-table*)))
-	   (case value
-	     ((nil t :logical-block)
-	      ;; If NIL, we found an object that wasn't there the
-	      ;; first time around. If T or :LOGICAL-BLOCK, this
-	      ;; object appears exactly once. Either way, just print
-	      ;; the thing without any special processing. Note: you
-	      ;; might argue that finding a new object means that
-	      ;; something is broken, but this can happen. If someone
-	      ;; uses the ~@<...~:> format directive, it conses a new
-	      ;; list each time though format (i.e. the &REST list),
-	      ;; so we will have different cdrs.
-	      nil)
+            t)
+           ((t)
+            (cond ((eq mode :logical-block)
+                   ;; We've seen the object before in output-object, and now
+                   ;; a second time in a PPRINT-LOGICAL-BLOCK (for example
+                   ;; via pprint-dispatch). Don't mark it as circular yet.
+                   (setf (gethash object *circularity-hash-table*)
+                         :logical-block)
+                   nil)
+                  (t
+                   ;; second encounter
+                   (setf (gethash object *circularity-hash-table*) 0)
+                   ;; It's a circular reference.
+                   t)))
+           ((0 :logical-block-circular)
+            ;; It's a circular reference.
+            t)))
+        (t
+         (let ((value (gethash object *circularity-hash-table*)))
+           (case value
+             ((nil t :logical-block)
+              ;; If NIL, we found an object that wasn't there the
+              ;; first time around. If T or :LOGICAL-BLOCK, this
+              ;; object appears exactly once. Either way, just print
+              ;; the thing without any special processing. Note: you
+              ;; might argue that finding a new object means that
+              ;; something is broken, but this can happen. If someone
+              ;; uses the ~@<...~:> format directive, it conses a new
+              ;; list each time though format (i.e. the &REST list),
+              ;; so we will have different cdrs.
+              nil)
              ;; A circular reference to something that will be printed
              ;; as a logical block. Wait until we're called from
              ;; PPRINT-LOGICAL-BLOCK with ASSIGN true before assigning the
@@ -139,28 +139,28 @@
              ;; to indicate that this object is circular, but don't assign
              ;; it a number yet. This is neccessary for cases like
              ;; #1=(#2=(#2# . #3=(#1# . #3#))))).
-	     (:logical-block-circular
-	      (cond ((and (not assign)
+             (:logical-block-circular
+              (cond ((and (not assign)
                           (eq mode :logical-block))
                      t)
-		    ((and assign
+                    ((and assign
                           (eq mode :logical-block))
                      (let ((value (incf *circularity-counter*)))
                        ;; first occurrence of this object: Set the counter.
                        (setf (gethash object *circularity-hash-table*) value)
                        value))
-		    (t
-		     nil)))
-	     (0
-	      (if (eq assign t)
-		  (let ((value (incf *circularity-counter*)))
-		    ;; first occurrence of this object: Set the counter.
-		    (setf (gethash object *circularity-hash-table*) value)
-		    value)
-		  t))
-	     (t
-	      ;; second or later occurrence
-	      (- value)))))))
+                    (t
+                     nil)))
+             (0
+              (if (eq assign t)
+                  (let ((value (incf *circularity-counter*)))
+                    ;; first occurrence of this object: Set the counter.
+                    (setf (gethash object *circularity-hash-table*) value)
+                    value)
+                  t))
+             (t
+              ;; second or later occurrence
+              (- value)))))))
 
 ;;; Handle the results of CHECK-FOR-CIRCULARITY. If this returns T then
 ;;; you should go ahead and print the object. If it returns NIL, then
@@ -180,13 +180,13 @@
      (write-char #\# stream)
      (let ((*print-base* 10) (*print-radix* nil))
        (cond ((minusp marker)
-	      (output-integer (- marker) stream)
-	      (write-char #\# stream)
-	      nil)
-	     (t
-	      (output-integer marker stream)
-	      (write-char #\= stream)
-	      t))))))
+              (output-integer (- marker) stream)
+              (write-char #\# stream)
+              nil)
+             (t
+              (output-integer marker stream)
+              (write-char #\= stream)
+              t))))))
 
 (defmacro with-circularity-detection ((object stream) &body body)
   (let ((marker (gensym "WITH-CIRCULARITY-DETECTION-"))
@@ -210,4 +210,4 @@
                    (when ,marker
                      (handle-circularity ,marker ,stream)))
                 (,body-name))))))))
-	    
+

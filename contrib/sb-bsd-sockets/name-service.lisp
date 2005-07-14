@@ -4,7 +4,7 @@
   ((name :initarg :name :accessor host-ent-name)
    (aliases :initarg :aliases :accessor host-ent-aliases)
    (address-type :initarg :type :accessor host-ent-address-type)
-					; presently always AF_INET
+                                        ; presently always AF_INET
    (addresses :initarg :addresses :accessor host-ent-addresses))
   ;; FIXME: Our Texinfo documentation extracter need at least his to spit
   ;; out the signature. Real documentation would be better...
@@ -15,7 +15,7 @@
   ;; out the signature. Real documentation would be better...
   (:documentation ""))
 
-(defmethod host-ent-address ((host-ent host-ent))  
+(defmethod host-ent-address ((host-ent host-ent))
   (car (host-ent-addresses host-ent)))
 
 ;(define-condition host-not-found-error (socket-error)) ; host unknown
@@ -26,26 +26,26 @@
 (defun make-host-ent (h)
   (if (sb-grovel::foreign-nullp h) (name-service-error "gethostbyname"))
   (let* ((length (sockint::hostent-length h))
-	 (aliases (loop for i = 0 then (1+ i)
-			for al = (sb-alien:deref (sockint::hostent-aliases h) i)
-			while al
-			collect al))
-	 (addresses 
-	  (loop for i = 0 then (1+ i)
-		for ad = (sb-alien:deref (sockint::hostent-addresses h) i)
-		until (sb-alien:null-alien ad)
-		collect (ecase (sockint::hostent-type h)
-			  (#.sockint::af-inet
-			     (assert (= length 4))
-			     (let ((addr (make-array 4 :element-type '(unsigned-byte 8))))
-			       (loop for i from 0 below length
-				     do (setf (elt addr i) (sb-alien:deref ad i)))
-			       addr))
-			  (#.sockint::af-local
-			   (sb-alien:cast ad sb-alien:c-string))))))
+         (aliases (loop for i = 0 then (1+ i)
+                        for al = (sb-alien:deref (sockint::hostent-aliases h) i)
+                        while al
+                        collect al))
+         (addresses
+          (loop for i = 0 then (1+ i)
+                for ad = (sb-alien:deref (sockint::hostent-addresses h) i)
+                until (sb-alien:null-alien ad)
+                collect (ecase (sockint::hostent-type h)
+                          (#.sockint::af-inet
+                             (assert (= length 4))
+                             (let ((addr (make-array 4 :element-type '(unsigned-byte 8))))
+                               (loop for i from 0 below length
+                                     do (setf (elt addr i) (sb-alien:deref ad i)))
+                               addr))
+                          (#.sockint::af-local
+                           (sb-alien:cast ad sb-alien:c-string))))))
     (make-instance 'host-ent
                    :name (sockint::hostent-name h)
-		   :type (sockint::hostent-type h)
+                   :type (sockint::hostent-type h)
                    :aliases aliases
                    :addresses addresses)))
 
@@ -62,11 +62,11 @@ grisly details."
   (sockint::with-in-addr packed-addr ()
     (let ((addr-vector (coerce address 'vector)))
       (loop for i from 0 below (length addr-vector)
-	    do (setf (sb-alien:deref (sockint::in-addr-addr packed-addr) i)
-		     (elt addr-vector i)))
+            do (setf (sb-alien:deref (sockint::in-addr-addr packed-addr) i)
+                     (elt addr-vector i)))
       (make-host-ent (sockint::gethostbyaddr packed-addr
-					     4
-					     sockint::af-inet)))))
+                                             4
+                                             sockint::af-inet)))))
 
 ;;; The remainder is my fault - gw
 
@@ -84,22 +84,22 @@ GET-NAME-SERVICE-ERRNO")
   (if (= *name-service-errno* sockint::NETDB-INTERNAL)
       (socket-error where)
     (let ((condition
-	   (condition-for-name-service-errno *name-service-errno*)))
+           (condition-for-name-service-errno *name-service-errno*)))
       (error condition :errno *name-service-errno* :syscall where))))
 
 (define-condition name-service-error (condition)
   ((errno :initform nil
-	  :initarg :errno
-	  :reader name-service-error-errno)
+          :initarg :errno
+          :reader name-service-error-errno)
    (symbol :initform nil :initarg :symbol :reader name-service-error-symbol)
    (syscall :initform "an unknown location" :initarg :syscall :reader name-service-error-syscall))
   (:report (lambda (c s)
-	     (let ((num (name-service-error-errno c)))
-	       (format s "Name service error in \"~A\": ~A (~A)"
-		       (name-service-error-syscall c)
-		       (or (name-service-error-symbol c)
-			   (name-service-error-errno c))
-		       (get-name-service-error-message num))))))
+             (let ((num (name-service-error-errno c)))
+               (format s "Name service error in \"~A\": ~A (~A)"
+                       (name-service-error-syscall c)
+                       (or (name-service-error-symbol c)
+                           (name-service-error-errno c))
+                       (get-name-service-error-message num))))))
 
 (defmacro define-name-service-condition (symbol name)
   `(progn
@@ -126,8 +126,8 @@ GET-NAME-SERVICE-ERRNO")
 
 (defun get-name-service-errno ()
   (setf *name-service-errno*
-	(sb-alien:alien-funcall
-	 (sb-alien:extern-alien "get_h_errno" (function integer)))))
+        (sb-alien:alien-funcall
+         (sb-alien:extern-alien "get_h_errno" (function integer)))))
 
 #-(and cmu solaris)
 (progn

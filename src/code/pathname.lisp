@@ -29,17 +29,17 @@
   (print-unreadable-object (host stream :type t :identity t)))
 
 (def!struct (logical-host
-	     (:make-load-form-fun make-logical-host-load-form-fun)
-	     (:include host
-		       (parse #'parse-logical-namestring)
-		       (unparse #'unparse-logical-namestring)
-		       (unparse-host
-			(lambda (x)
-			  (logical-host-name (%pathname-host x))))
-		       (unparse-directory #'unparse-logical-directory)
-		       (unparse-file #'unparse-logical-file)
-		       (unparse-enough #'unparse-enough-namestring)
-		       (customary-case :upper)))
+             (:make-load-form-fun make-logical-host-load-form-fun)
+             (:include host
+                       (parse #'parse-logical-namestring)
+                       (unparse #'unparse-logical-namestring)
+                       (unparse-host
+                        (lambda (x)
+                          (logical-host-name (%pathname-host x))))
+                       (unparse-directory #'unparse-logical-directory)
+                       (unparse-file #'unparse-logical-file)
+                       (unparse-enough #'unparse-enough-namestring)
+                       (customary-case :upper)))
   (name "" :type simple-base-string)
   (translations nil :type list)
   (canon-transls nil :type list))
@@ -50,7 +50,7 @@
 
 (defun make-logical-host-load-form-fun (logical-host)
   (values `(find-logical-host ',(logical-host-name logical-host))
-	  nil))
+          nil))
 
 ;;; A PATTERN is a list of entries and wildcards used for pattern
 ;;; matches of translations.
@@ -66,13 +66,13 @@
     '(member nil :unspecific :wild)))
 
 (sb!xc:defstruct (pathname (:conc-name %pathname-)
-			   (:constructor %make-pathname (host
-							 device
-							 directory
-							 name
-							 type
-							 version))
-			   (:predicate pathnamep))
+                           (:constructor %make-pathname (host
+                                                         device
+                                                         directory
+                                                         name
+                                                         type
+                                                         version))
+                           (:predicate pathnamep))
   ;; the host (at present either a UNIX or logical host)
   (host nil :type (or host null))
   ;; the name of a logical or physical device holding files
@@ -90,7 +90,7 @@
 ;;; Logical pathnames have the following format:
 ;;;
 ;;; logical-namestring ::=
-;;;	 [host ":"] [";"] {directory ";"}* [name] ["." type ["." version]]
+;;;      [host ":"] [";"] {directory ";"}* [name] ["." type ["." version]]
 ;;;
 ;;; host ::= word
 ;;; directory ::= word | wildcard-word | **
@@ -106,11 +106,11 @@
 ;;; Logical pathnames are a subclass of PATHNAME. Their class
 ;;; relations are mimicked using structures for efficiency.
 (sb!xc:defstruct (logical-pathname (:conc-name %logical-pathname-)
-				   (:include pathname)
-				   (:constructor %make-logical-pathname
-						 (host
-						  device
-						  directory
-						  name
-						  type
-						  version))))
+                                   (:include pathname)
+                                   (:constructor %make-logical-pathname
+                                                 (host
+                                                  device
+                                                  directory
+                                                  name
+                                                  type
+                                                  version))))

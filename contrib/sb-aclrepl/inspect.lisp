@@ -13,19 +13,19 @@
   (defconstant +default-inspect-length+ 20))
 
 (defstruct (%inspect (:constructor make-inspect)
-		     (:conc-name inspect-))
+                     (:conc-name inspect-))
   ;; stack of parents of inspected object
-  object-stack 
+  object-stack
   ;;  a stack of indices of parent object components
   select-stack)
 
 ;; FIXME - raw mode isn't currently used in object display
 (defparameter *current-inspect* nil
-  "current inspect") 
+  "current inspect")
 (defparameter *inspect-raw* nil
   "Raw mode for object display.")
 (defparameter *inspect-length* +default-inspect-length+
-  "maximum number of components to print") 
+  "maximum number of components to print")
 (defparameter *skip-address-display* nil
   "Skip displaying addresses of objects.")
 
@@ -60,14 +60,14 @@ The commands are:
 
 (defun inspector-fun (object input-stream output-stream)
   (let ((*current-inspect* nil)
-	(*inspect-raw* nil)
-	(*inspect-length* *inspect-length*)
-	(*skip-address-display* nil))
+        (*inspect-raw* nil)
+        (*inspect-length* *inspect-length*)
+        (*skip-address-display* nil))
     (setq *current-inspect* (make-inspect))
     (reset-stack object "(inspect ...)")
     (redisplay output-stream)
     (let ((*input* input-stream)
-	  (*output* output-stream))
+          (*output* output-stream))
       (repl :inspect t)))
   (values))
 
@@ -77,9 +77,9 @@ The commands are:
   (unless *current-inspect*
     (setq *current-inspect* (make-inspect)))
   (istep-dispatch args
-		  (first args)
-		  (when (first args) (read-from-string (first args)))
-		  stream))
+                  (first args)
+                  (when (first args) (read-from-string (first args)))
+                  stream))
 
 (defun istep-dispatch (args option-string option stream)
   (cond
@@ -92,7 +92,7 @@ The commands are:
     ((string= "+" option-string)
      (istep-cmd-inspect-new-form (read-from-string (second args)) stream))
     ((or (string= "<" option-string)
-	 (string= ">" option-string))
+         (string= ">" option-string))
      (istep-cmd-select-parent-component option-string stream))
     ((string-equal "set" option-string)
      (istep-cmd-set (second args) (third args) stream))
@@ -105,13 +105,13 @@ The commands are:
     ((string-equal "skip" option-string)
      (istep-cmd-skip (second args) stream))
     ((string-equal "tree" option-string)
-     (istep-cmd-tree stream)) 
+     (istep-cmd-tree stream))
     ((string-equal "print" option-string)
      (istep-cmd-print (second args) stream))
     ((string-equal "slot" option-string)
      (istep-cmd-select-component (read-from-string (second args)) stream))
     ((or (symbolp option)
-	 (integerp option))
+         (integerp option))
      (istep-cmd-select-component option stream))
     (t
      (istep-cmd-set-stack option stream))))
@@ -149,9 +149,9 @@ The commands are:
   (cond
     ((> (length (inspect-object-stack *current-inspect*)) 1)
      (setf (inspect-object-stack *current-inspect*)
-	   (cdr (inspect-object-stack *current-inspect*)))
+           (cdr (inspect-object-stack *current-inspect*)))
      (setf (inspect-select-stack *current-inspect*)
-	   (cdr (inspect-select-stack *current-inspect*)))
+           (cdr (inspect-select-stack *current-inspect*)))
      (redisplay stream))
     ((stack)
        (output-inspect-note stream "Object has no parent"))
@@ -168,24 +168,24 @@ The commands are:
 (defun istep-cmd-select-parent-component (option stream)
   (if (stack)
       (if (eql (length (stack)) 1)
-	  (output-inspect-note stream "Object does not have a parent")
-	  (let ((parent (second (stack)))
-		(id (car (inspect-select-stack *current-inspect*))))
-	    (multiple-value-bind (position parts)
-		(find-part-id parent id)
-	      (let ((new-position (if (string= ">" option)
-				      (1+ position)
-				      (1- position))))
-		(if (< -1 new-position (parts-count parts))
-		    (let* ((value (component-at parts new-position)))
-		      (setf (car (inspect-object-stack *current-inspect*))
-			    value)
-		      (setf (car (inspect-select-stack *current-inspect*))
-			    (id-at parts new-position))
-		      (redisplay stream))
-		    (output-inspect-note stream
-					 "Parent has no selectable component indexed by ~d"
-					 new-position))))))
+          (output-inspect-note stream "Object does not have a parent")
+          (let ((parent (second (stack)))
+                (id (car (inspect-select-stack *current-inspect*))))
+            (multiple-value-bind (position parts)
+                (find-part-id parent id)
+              (let ((new-position (if (string= ">" option)
+                                      (1+ position)
+                                      (1- position))))
+                (if (< -1 new-position (parts-count parts))
+                    (let* ((value (component-at parts new-position)))
+                      (setf (car (inspect-object-stack *current-inspect*))
+                            value)
+                      (setf (car (inspect-select-stack *current-inspect*))
+                            (id-at parts new-position))
+                      (redisplay stream))
+                    (output-inspect-note stream
+                                         "Parent has no selectable component indexed by ~d"
+                                         new-position))))))
       (no-object-msg stream)))
 
 (defun istep-cmd-set-raw (option-string stream)
@@ -209,17 +209,17 @@ The commands are:
 (defun istep-cmd-skip (option-string stream)
   (if option-string
       (let ((len (read-from-string option-string)))
-	(if (and (integerp len) (>= len 0))
-	    (redisplay stream len)
-	    (output-inspect-note stream "Skip length invalid")))
+        (if (and (integerp len) (>= len 0))
+            (redisplay stream len)
+            (output-inspect-note stream "Skip length invalid")))
       (output-inspect-note stream "Skip length missing")))
 
 (defun istep-cmd-print (option-string stream)
   (if option-string
       (let ((len (read-from-string option-string)))
-	(if (and (integerp len) (plusp len))
-	    (setq *inspect-length* len)
-	    (output-inspect-note stream "Cannot set print limit to ~A~%" len)))
+        (if (and (integerp len) (plusp len))
+            (setq *inspect-length* len)
+            (output-inspect-note stream "Cannot set print limit to ~A~%" len)))
       (output-inspect-note stream "Print length missing")))
 
 (defun select-description (select)
@@ -236,67 +236,67 @@ The commands are:
 (defun istep-cmd-tree (stream)
   (let ((stack (inspect-object-stack *current-inspect*)))
     (if stack
-	(progn
-	  (output-inspect-note stream "The current object is:")
-	  (dotimes (i (length stack))
-	    (output-inspect-note
-	       stream "~A, ~A"
-	       (inspected-description (nth i stack))
-	       (select-description
-		(nth i (inspect-select-stack *current-inspect*))))))
-	(no-object-msg stream))))
+        (progn
+          (output-inspect-note stream "The current object is:")
+          (dotimes (i (length stack))
+            (output-inspect-note
+               stream "~A, ~A"
+               (inspected-description (nth i stack))
+               (select-description
+                (nth i (inspect-select-stack *current-inspect*))))))
+        (no-object-msg stream))))
 
 (defun istep-cmd-set (id-string value-string stream)
   (if (stack)
       (let ((id (when id-string (read-from-string id-string))))
-	(multiple-value-bind (position parts)
-	    (find-part-id (car (stack)) id)
-	  (if parts
-	      (if position
-		  (when value-string
-		    (let ((new-value (eval (read-from-string value-string))))
-		      (let ((result (set-component-value (car (stack))
-							 id
-							 new-value
-							 (component-at
-							  parts position))))
-			(typecase result
-			  (string
-			   (output-inspect-note stream result))
-			  (t
-			   (redisplay stream))))))
-		  (output-inspect-note
-		   stream
-		   "Object has no selectable component named by ~A" id))
-	      (output-inspect-note stream
-				   "Object has no selectable components"))))
+        (multiple-value-bind (position parts)
+            (find-part-id (car (stack)) id)
+          (if parts
+              (if position
+                  (when value-string
+                    (let ((new-value (eval (read-from-string value-string))))
+                      (let ((result (set-component-value (car (stack))
+                                                         id
+                                                         new-value
+                                                         (component-at
+                                                          parts position))))
+                        (typecase result
+                          (string
+                           (output-inspect-note stream result))
+                          (t
+                           (redisplay stream))))))
+                  (output-inspect-note
+                   stream
+                   "Object has no selectable component named by ~A" id))
+              (output-inspect-note stream
+                                   "Object has no selectable components"))))
       (no-object-msg stream)))
 
 (defun istep-cmd-select-component (id stream)
   (if (stack)
       (multiple-value-bind (position parts)
-	  (find-part-id (car (stack)) id)
-	(cond
-	  ((integerp position)
-	   (let* ((value (component-at parts position)))
-	     (cond ((eq value *inspect-unbound-object-marker*)
-		    (output-inspect-note stream "That slot is unbound"))
-		   (t
-		    (push value (inspect-object-stack *current-inspect*))
-		    (push id (inspect-select-stack *current-inspect*))
-		    (redisplay stream)))))
-	  ((null parts)
-	   (output-inspect-note stream "Object does not contain any subobjects"))
-	  (t
-	   (typecase id
-	     (symbol
-	      (output-inspect-note
-	       stream "Object has no selectable component named ~A"
-	       id))
-	     (integer
-	      (output-inspect-note
-	       stream "Object has no selectable component indexed by ~d"
-	       id))))))
+          (find-part-id (car (stack)) id)
+        (cond
+          ((integerp position)
+           (let* ((value (component-at parts position)))
+             (cond ((eq value *inspect-unbound-object-marker*)
+                    (output-inspect-note stream "That slot is unbound"))
+                   (t
+                    (push value (inspect-object-stack *current-inspect*))
+                    (push id (inspect-select-stack *current-inspect*))
+                    (redisplay stream)))))
+          ((null parts)
+           (output-inspect-note stream "Object does not contain any subobjects"))
+          (t
+           (typecase id
+             (symbol
+              (output-inspect-note
+               stream "Object has no selectable component named ~A"
+               id))
+             (integer
+              (output-inspect-note
+               stream "Object has no selectable component indexed by ~d"
+               id))))))
       (no-object-msg stream)))
 
 (defun istep-cmd-set-stack (form stream)
@@ -310,8 +310,8 @@ The commands are:
 (defun display-current (s length skip)
   (if (stack)
       (let ((inspected (car (stack))))
-	(setq cl:* inspected)
-	(display-inspect inspected s length skip))
+        (setq cl:* inspected)
+        (display-inspect inspected s length skip))
       (no-object-msg s)))
 
 
@@ -325,16 +325,16 @@ The commands are:
     (fresh-line stream)
     (format stream "~A" (inspected-description object))
     (unless (or *skip-address-display*
-		(eq object *inspect-unbound-object-marker*)
-		(characterp object) (typep object 'fixnum))
+                (eq object *inspect-unbound-object-marker*)
+                (characterp object) (typep object 'fixnum))
       (write-string " at #x" stream)
       (format stream (n-word-bits-hex-format)
-	      (logand (sb-kernel:get-lisp-obj-address object)
-		      (lognot sb-vm:lowtag-mask))))
+              (logand (sb-kernel:get-lisp-obj-address object)
+                      (lognot sb-vm:lowtag-mask))))
     (dotimes (i count)
       (fresh-line stream)
       (display-labeled-element (elt elements i) (elt labels i) stream))))
-  
+
 (defun array-label-p (label)
   (and (consp label)
        (stringp (cdr label))
@@ -346,10 +346,10 @@ The commands are:
 (defun hex-label-p (label &optional width)
   (and (consp label)
        (case width
-	     (32 (eq (cdr label) :hex32))
-	     (64 (eq (cdr label) :hex64))
-	     (t (or (eq (cdr label) :hex32)
-		    (eq (cdr label) :hex64))))))
+             (32 (eq (cdr label) :hex32))
+             (64 (eq (cdr label) :hex64))
+             (t (or (eq (cdr label) :hex32)
+                    (eq (cdr label) :hex64))))))
 
 (defun display-labeled-element (element label stream)
   (cond
@@ -359,12 +359,12 @@ The commands are:
      (format stream "tail-> ~A" (inspected-description element)))
     ((named-or-array-label-p label)
      (format stream
-	     (if (array-label-p label)
-		 "~4,' D ~A-> ~A"
-		 "~4,' D ~16,1,1,'-A> ~A")
-	     (car label)
-	     (format nil "~A " (cdr label))
-	     (inspected-description element)))
+             (if (array-label-p label)
+                 "~4,' D ~A-> ~A"
+                 "~4,' D ~16,1,1,'-A> ~A")
+             (car label)
+             (format nil "~A " (cdr label))
+             (inspected-description element)))
     ((hex-label-p label 32)
      (format stream "~4,' D-> #x~8,'0X" (car label) element))
     ((hex-label-p label 64)
@@ -401,59 +401,59 @@ The commands are:
 Returns (VALUES POSITION PARTS).
 POSITION is NIL if the id is invalid or not found."
   (let* ((parts (inspected-parts object))
-	 (name (if (symbolp id) (symbol-name id) id)))
+         (name (if (symbolp id) (symbol-name id) id)))
     (values
      (cond
        ((and (numberp id)
-	     (< -1 id (parts-count parts))
-	     (not (eq (parts-seq-type parts) :bignum)))
-	id)
+             (< -1 id (parts-count parts))
+             (not (eq (parts-seq-type parts) :bignum)))
+        id)
        (t
-	(case (parts-seq-type parts)
-	  (:named
-	   (position name (the list (parts-components parts))
-		     :key #'car :test #'string-equal))
-	  ((:dotted-list :cyclic-list)
-	   (when (string-equal name "tail")
-	     (1- (parts-count parts)))))))
+        (case (parts-seq-type parts)
+          (:named
+           (position name (the list (parts-components parts))
+                     :key #'car :test #'string-equal))
+          ((:dotted-list :cyclic-list)
+           (when (string-equal name "tail")
+             (1- (parts-count parts)))))))
      parts)))
 
 (defun component-at (parts position)
   (let ((count (parts-count parts))
-	(components (parts-components parts)))
+        (components (parts-components parts)))
     (when (< -1 position count)
       (case (parts-seq-type parts)
-	(:dotted-list
-	 (if (= position (1- count))
-	     (cdr (last components))
-	     (elt components position)))
-	(:cyclic-list
-	 (if (= position (1- count))
-	     components
-	     (elt components position)))
-	(:named
-	 (cdr (elt components position)))
-	(:array
-	 (aref (the array components) position))
-	(:bignum
-	 (bignum-component-at components position))
-	(t
-	 (elt components position))))))
+        (:dotted-list
+         (if (= position (1- count))
+             (cdr (last components))
+             (elt components position)))
+        (:cyclic-list
+         (if (= position (1- count))
+             components
+             (elt components position)))
+        (:named
+         (cdr (elt components position)))
+        (:array
+         (aref (the array components) position))
+        (:bignum
+         (bignum-component-at components position))
+        (t
+         (elt components position))))))
 
 (defun id-at (parts position)
   (let ((count (parts-count parts)))
     (when (< -1 position count)
       (case (parts-seq-type parts)
-	((:dotted-list :cyclic-list)
-	 (if (= position (1- count))
-	     :tail
-	     position))
-	(:array
-	 (array-index-string position parts))
-	(:named
-	 (car (elt (parts-components parts) position)))
-	(t
-	 position)))))
+        ((:dotted-list :cyclic-list)
+         (if (= position (1- count))
+             :tail
+             position))
+        (:array
+         (array-index-string position parts))
+        (:named
+         (car (elt (parts-components parts) position)))
+        (t
+         position)))))
 
 (defun inspected-elements (object &optional length (skip 0))
   "Returns elements of an object that have been trimmed and labeled based on
@@ -464,29 +464,29 @@ This function may return an ELEMENT-COUNT of up to (+ 3 length) which would
 include an :ellipses at the beginning, :ellipses at the end,
 and the last element."
   (let* ((parts (inspected-parts object))
-	 (print-length (if length length (parts-count parts)))
-	 (last-part (last-part parts))
-	 (last-requested (last-requested parts print-length skip))
-	 (element-count (compute-elements-count parts print-length skip))
-	 (first-to (if (first-element-ellipses-p parts skip) 1 0))
-	 (elements (when (plusp element-count) (make-array element-count)))
-	 (labels (when (plusp element-count) (make-array element-count))))
+         (print-length (if length length (parts-count parts)))
+         (last-part (last-part parts))
+         (last-requested (last-requested parts print-length skip))
+         (element-count (compute-elements-count parts print-length skip))
+         (first-to (if (first-element-ellipses-p parts skip) 1 0))
+         (elements (when (plusp element-count) (make-array element-count)))
+         (labels (when (plusp element-count) (make-array element-count))))
     (when (plusp element-count)
       ;; possible first ellipses
       (when (first-element-ellipses-p parts skip)
-	(set-element-values elements labels 0 nil :ellipses))
+        (set-element-values elements labels 0 nil :ellipses))
       ;; main elements
       (do* ((i 0 (1+ i)))
-	   ((> i (- last-requested skip)))
-	(set-element elements labels parts (+ i first-to) (+ i skip)))
+           ((> i (- last-requested skip)))
+        (set-element elements labels parts (+ i first-to) (+ i skip)))
       ;; last parts value if needed
-      (when (< last-requested last-part) 
-	(set-element elements labels parts (- element-count 1) last-part))
+      (when (< last-requested last-part)
+        (set-element elements labels parts (- element-count 1) last-part))
       ;; ending ellipses or next to last parts value if needed
-      (when (< last-requested (1- last-part)) 
-	(if (= last-requested (- last-part 2))
-	    (set-element elements labels parts (- element-count 2) (1- last-part)) 
-	    (set-element-values elements labels (- element-count 2) nil :ellipses))))
+      (when (< last-requested (1- last-part))
+        (if (= last-requested (- last-part 2))
+            (set-element elements labels parts (- element-count 2) (1- last-part))
+            (set-element-values elements labels (- element-count 2) nil :ellipses))))
     (values elements labels element-count)))
 
 (defun last-requested (parts print skip)
@@ -496,22 +496,22 @@ and the last element."
   (1- (parts-count parts)))
 
 (defun compute-elements-count (parts length skip)
-  "Compute the number of elements in parts given the print length and skip." 
+  "Compute the number of elements in parts given the print length and skip."
   (let ((element-count (min (parts-count parts) length
-			    (max 0 (- (parts-count parts) skip)))))
+                            (max 0 (- (parts-count parts) skip)))))
     (when (and (plusp (parts-count parts)) (plusp skip)) ; starting ellipses
       (incf element-count))
     (when (< (last-requested parts length skip)
-	     (last-part parts)) ; last value
-      (incf element-count) 
+             (last-part parts)) ; last value
+      (incf element-count)
       (when (< (last-requested parts length skip)
-	       (1- (last-part parts))) ; ending ellipses
-	(incf element-count)))
+               (1- (last-part parts))) ; ending ellipses
+        (incf element-count)))
     element-count))
 
 (defun set-element (elements labels parts to-index from-index)
   (set-element-values elements labels to-index (component-at parts from-index)
-		      (label-at parts from-index)))
+                      (label-at parts from-index)))
 
 (defun set-element-values (elements labels index element label)
   (setf (aref elements index) element)
@@ -528,23 +528,23 @@ position with the label if the label is a string."
       ((stringp id)
        (cons position id))
       ((eq (parts-seq-type parts) :bignum)
-       (cons position (case sb-vm::n-word-bits 
-			    (32 :hex32)
-			    (64 :hex64))))
+       (cons position (case sb-vm::n-word-bits
+                            (32 :hex32)
+                            (64 :hex64))))
       (t
-	id))))
+        id))))
 
 (defun array-index-string (index parts)
   "Formats an array index in row major format."
   (let ((rev-dimensions (parts-seq-hint parts)))
     (if (null rev-dimensions)
-	"[]"
-	(let ((list nil))
-	  (dolist (dim rev-dimensions)
-	    (multiple-value-bind (q r) (floor index dim)
-	      (setq index q)
-	      (push r list)))
-	  (format nil "[~W~{,~W~}]" (car list) (cdr list))))))
+        "[]"
+        (let ((list nil))
+          (dolist (dim rev-dimensions)
+            (multiple-value-bind (q r) (floor index dim)
+              (setq index q)
+              (push r list)))
+          (format nil "[~W~{,~W~}]" (car list) (cdr list))))))
 
 
 ;;; INSPECTED-DESCRIPTION
@@ -576,23 +576,23 @@ position with the label if the label is a string."
 (defmethod inspected-description ((object vector))
   (declare (vector object))
   (format nil "a ~:[~;displaced ~]vector (~W)"
-	  (and (sb-kernel:array-header-p object)
-	       (sb-kernel:%array-displaced-p object))
-	  (length object)))
+          (and (sb-kernel:array-header-p object)
+               (sb-kernel:%array-displaced-p object))
+          (length object)))
 
 (defmethod inspected-description ((object simple-vector))
   (declare (simple-vector object))
   (format nil "a simple ~A vector (~D)"
-	  (array-element-type object)
-	  (length object)))
+          (array-element-type object)
+          (length object)))
 
 (defmethod inspected-description ((object array))
   (declare (array object))
   (format nil "~:[A displaced~;An~] array of ~A with dimensions ~W"
-	  (and (sb-kernel:array-header-p object)
-	       (sb-kernel:%array-displaced-p object))
-	  (array-element-type object)
-	  (array-dimensions object)))
+          (and (sb-kernel:array-header-p object)
+               (sb-kernel:%array-displaced-p object))
+          (array-element-type object)
+          (array-dimensions object)))
 
 (defun simple-cons-pair-p (object)
   (atom (cdr object)))
@@ -606,26 +606,26 @@ position with the label if the label is a string."
   "Returns (VALUES LENGTH LIST-TYPE) where length is the number of
 cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
     (do ((length 1 (1+ length))
-	 (lst (cdr object) (cdr lst)))
-	((or (not (consp lst))
-	     (eq object lst))
-	 (cond
-	   ((null lst)
-	    (values length :normal))
-	   ((atom lst)
-	    (values length :dotted))
-	   ((eq object lst)
-	    (values length :cyclic))))
+         (lst (cdr object) (cdr lst)))
+        ((or (not (consp lst))
+             (eq object lst))
+         (cond
+           ((null lst)
+            (values length :normal))
+           ((atom lst)
+            (values length :dotted))
+           ((eq object lst)
+            (values length :cyclic))))
       ;; nothing to do in body
       ))
 
 (defun inspected-description-of-nontrivial-list (object)
   (multiple-value-bind (length list-type) (cons-safe-length object)
     (format nil "a ~A list with ~D element~:*~P~A"
-	    (string-downcase (symbol-name list-type)) length
-	    (ecase list-type
-	      ((:dotted :cyclic) "+tail")
-	      (:normal "")))))
+            (string-downcase (symbol-name list-type)) length
+            (ecase list-type
+              ((:dotted :cyclic) "+tail")
+              (:normal "")))))
 
 (defun n-word-bits-hex-format ()
   (case sb-vm::n-word-bits
@@ -646,21 +646,21 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 (defun description-maybe-internals (fmt objects internal-fmt &rest args)
   (let ((base (apply #'format nil fmt objects)))
     (if *skip-address-display*
-	base
-	(concatenate 'string
-		     base " " (apply #'format nil internal-fmt args)))))
-	      
+        base
+        (concatenate 'string
+                     base " " (apply #'format nil internal-fmt args)))))
+
 (defmethod inspected-description ((object double-float))
   (let ((start (round (* 2 sb-vm::n-word-bits) 8)))
     (description-maybe-internals "double-float ~W" (list object)
-				 "[#~A ~A]"
-				 (ref32-hexstr object (+ start 4))
-				 (ref32-hexstr object start))))
+                                 "[#~A ~A]"
+                                 (ref32-hexstr object (+ start 4))
+                                 (ref32-hexstr object start))))
 
 (defmethod inspected-description ((object single-float))
   (description-maybe-internals "single-float ~W" (list object)
-			       "[#x~A]"
-			       (ref32-hexstr object (round sb-vm::n-word-bits 8))))
+                               "[#x~A]"
+                               (ref32-hexstr object (round sb-vm::n-word-bits 8))))
 
 (defmethod inspected-description ((object fixnum))
   (description-maybe-internals
@@ -678,21 +678,21 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
   "Return the number of words in a bignum"
   (ash
    (logand (ref32 bignum) (lognot sb-vm:widetag-mask))
-   (- sb-vm:n-widetag-bits))) 
+   (- sb-vm:n-widetag-bits)))
 
 (defun bignum-component-at (bignum offset)
   "Return the word at offset"
   (case sb-vm::n-word-bits
-	(32
-	 (ref32 bignum (* 4 (1+ offset))))
-	(64
-	 (let ((start (* 8 (1+ offset))))
-	   (+ (ref32 bignum start)
-	      (ash (ref32 bignum (+ 4 start)) 32))))))
+        (32
+         (ref32 bignum (* 4 (1+ offset))))
+        (64
+         (let ((start (* 8 (1+ offset))))
+           (+ (ref32 bignum start)
+              (ash (ref32 bignum (+ 4 start)) 32))))))
 
 (defmethod inspected-description ((object bignum))
   (format nil  "bignum ~W with ~D ~A-bit word~P" object
-	  (bignum-words object)	sb-vm::n-word-bits (bignum-words object)))
+          (bignum-words object) sb-vm::n-word-bits (bignum-words object)))
 
 (defmethod inspected-description ((object ratio))
   (format nil "ratio ~W" object))
@@ -705,7 +705,7 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
    (list object (char-code object))
    "[#x~8,'0X]"
    (logior sb-vm:character-widetag (ash (char-code object)
-					sb-vm:n-widetag-bits))))
+                                        sb-vm:n-widetag-bits))))
 
 (defmethod inspected-description ((object t))
   (format nil "a generic object ~W" object))
@@ -734,9 +734,9 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 ;;;      If SEQ-TYPE is :list, then each element is a value of an array
 ;;;      If SEQ-TYPE is :vector, then each element is a value of an vector
 ;;;      If SEQ-TYPE is :array, then each element is a value of an array
-;;;        with rank >= 2. The 
+;;;        with rank >= 2. The
 ;;;      If SEQ-TYPE is :bignum, then object is just a bignum and not a
-;;;        a sequence 
+;;;        a sequence
 ;;;
 ;;;   COUNT is the total number of components in the OBJECT
 ;;;
@@ -768,25 +768,25 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 
 (defmethod inspected-parts ((object symbol))
   (let ((components
-	 (list (cons "NAME" (symbol-name object))
-	       (cons "PACKAGE" (symbol-package object))
-	       (cons "VALUE" (if (boundp object)
-				 (symbol-value object)
-				 *inspect-unbound-object-marker*))
-	       (cons "FUNCTION" (if (fboundp object)
-				    (symbol-function object)
-				    *inspect-unbound-object-marker*))
-	       (cons "PLIST" (symbol-plist object)))))
+         (list (cons "NAME" (symbol-name object))
+               (cons "PACKAGE" (symbol-package object))
+               (cons "VALUE" (if (boundp object)
+                                 (symbol-value object)
+                                 *inspect-unbound-object-marker*))
+               (cons "FUNCTION" (if (fboundp object)
+                                    (symbol-function object)
+                                    *inspect-unbound-object-marker*))
+               (cons "PLIST" (symbol-plist object)))))
     (list components (length components) :named nil)))
 
 (defun inspected-structure-parts (object)
   (let ((components-list '())
-	(info (sb-kernel:layout-info (sb-kernel:layout-of object))))
+        (info (sb-kernel:layout-info (sb-kernel:layout-of object))))
     (when (sb-kernel::defstruct-description-p info)
       (dolist (dd-slot (sb-kernel:dd-slots info) (nreverse components-list))
-	(push (cons (string (sb-kernel:dsd-name dd-slot))
-		    (funcall (sb-kernel:dsd-accessor-name dd-slot) object))
-	      components-list)))))
+        (push (cons (string (sb-kernel:dsd-name dd-slot))
+                    (funcall (sb-kernel:dsd-accessor-name dd-slot) object))
+              components-list)))))
 
 (defmethod inspected-parts ((object structure-object))
   (let ((components (inspected-structure-parts object)))
@@ -794,13 +794,13 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 
 (defun inspected-standard-object-parts (object)
   (let ((components nil)
-	(class-slots (sb-pcl::class-slots (class-of object))))
+        (class-slots (sb-pcl::class-slots (class-of object))))
     (dolist (class-slot class-slots (nreverse components))
       (let* ((slot-name (slot-value class-slot 'sb-pcl::name))
-	     (slot-value (if (slot-boundp object slot-name)
-			     (slot-value object slot-name)
-			     *inspect-unbound-object-marker*)))
-	(push (cons (symbol-name slot-name) slot-value) components)))))
+             (slot-value (if (slot-boundp object slot-name)
+                             (slot-value object slot-name)
+                             *inspect-unbound-object-marker*)))
+        (push (cons (symbol-name slot-name) slot-value) components)))))
 
 
 (defmethod inspected-parts ((object standard-object))
@@ -817,11 +817,11 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 
 (defmethod inspected-parts ((object function))
   (let* ((type (sb-kernel:widetag-of object))
-	 (object (if (= type sb-vm:closure-header-widetag)
-		     (sb-kernel:%closure-fun object)
-		     object))
-	 (components (list (cons "arglist"
-			       (sb-kernel:%simple-fun-arglist object)))))
+         (object (if (= type sb-vm:closure-header-widetag)
+                     (sb-kernel:%closure-fun object)
+                     object))
+         (components (list (cons "arglist"
+                               (sb-kernel:%simple-fun-arglist object)))))
     (list components (length components) :named nil)))
 
 (defmethod inspected-parts ((object vector))
@@ -829,12 +829,12 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 
 (defmethod inspected-parts ((object array))
   (let ((size (array-total-size object)))
-    (list (make-array size 
+    (list (make-array size
                       :element-type (array-element-type object)
-		      :displaced-to object)
-	    size
-	    :array
-	    (reverse (array-dimensions object)))))
+                      :displaced-to object)
+            size
+            :array
+            (reverse (array-dimensions object)))))
 
 (defmethod inspected-parts ((object cons))
   (if (simple-cons-pair-p object)
@@ -843,28 +843,28 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 
 (defun inspected-parts-of-simple-cons (object)
   (let ((components (list (cons "car" (car object))
-			(cons "cdr" (cdr object)))))
+                        (cons "cdr" (cdr object)))))
     (list components 2 :named nil)))
 
 (defun inspected-parts-of-nontrivial-list (object)
     (multiple-value-bind (count list-type) (cons-safe-length object)
       (case list-type
-	(:normal
-	 (list object count :list nil))
-	(:cyclic
-	 (list object (1+ count) :cyclic-list nil))
-	(:dotted
-	 ;; count tail element
-	 (list object (1+ count) :dotted-list nil)))))
+        (:normal
+         (list object count :list nil))
+        (:cyclic
+         (list object (1+ count) :cyclic-list nil))
+        (:dotted
+         ;; count tail element
+         (list object (1+ count) :dotted-list nil)))))
 
 (defmethod inspected-parts ((object complex))
   (let ((components (list (cons "real" (realpart object))
-			(cons "imag" (imagpart object)))))
+                        (cons "imag" (imagpart object)))))
     (list components (length components) :named nil)))
 
 (defmethod inspected-parts ((object ratio))
   (let ((components (list (cons "numerator" (numerator object))
-			(cons "denominator" (denominator object)))))
+                        (cons "denominator" (denominator object)))))
     (list components (length components) :named nil)))
 
 (defmethod inspected-parts ((object bignum))

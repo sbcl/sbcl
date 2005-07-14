@@ -33,18 +33,18 @@
 
 (sb!xc:deftype signed-byte (&optional s)
   (cond ((eq s '*) 'integer)
-	((and (integerp s) (> s 0))
-	 (let ((bound (ash 1 (1- s))))
-	   `(integer ,(- bound) ,(1- bound))))
-	(t
-	 (error "bad size specified for SIGNED-BYTE type specifier: ~S" s))))
+        ((and (integerp s) (> s 0))
+         (let ((bound (ash 1 (1- s))))
+           `(integer ,(- bound) ,(1- bound))))
+        (t
+         (error "bad size specified for SIGNED-BYTE type specifier: ~S" s))))
 
 (sb!xc:deftype unsigned-byte (&optional s)
   (cond ((eq s '*) '(integer 0))
-	((and (integerp s) (> s 0))
-	 `(integer 0 ,(1- (ash 1 s))))
-	(t
-	 (error "bad size specified for UNSIGNED-BYTE type specifier: ~S" s))))
+        ((and (integerp s) (> s 0))
+         `(integer 0 ,(1- (ash 1 s))))
+        (t
+         (error "bad size specified for UNSIGNED-BYTE type specifier: ~S" s))))
 
 ;;; ANSI got UNSIGNED-BYTE wrong, prohibiting (UNSIGNED-BYTE 0).
 ;;; Since this is actually a substantial impediment to clarity...
@@ -180,28 +180,28 @@
 ;;; decomposing floats into integers
 (sb!xc:deftype single-float-exponent ()
   `(integer ,(- sb!vm:single-float-normal-exponent-min
-		sb!vm:single-float-bias
-		sb!vm:single-float-digits)
-	    ,(- sb!vm:single-float-normal-exponent-max
-		sb!vm:single-float-bias)))
+                sb!vm:single-float-bias
+                sb!vm:single-float-digits)
+            ,(- sb!vm:single-float-normal-exponent-max
+                sb!vm:single-float-bias)))
 (sb!xc:deftype double-float-exponent ()
   `(integer ,(- sb!vm:double-float-normal-exponent-min
-		sb!vm:double-float-bias
-		sb!vm:double-float-digits)
-	    ,(- sb!vm:double-float-normal-exponent-max
-		sb!vm:double-float-bias)))
+                sb!vm:double-float-bias
+                sb!vm:double-float-digits)
+            ,(- sb!vm:double-float-normal-exponent-max
+                sb!vm:double-float-bias)))
 (sb!xc:deftype single-float-int-exponent ()
   `(integer ,(- sb!vm:single-float-normal-exponent-min
-		sb!vm:single-float-bias
-		(* sb!vm:single-float-digits 2))
-	    ,(- sb!vm:single-float-normal-exponent-max
-		sb!vm:single-float-bias
-		sb!vm:single-float-digits)))
+                sb!vm:single-float-bias
+                (* sb!vm:single-float-digits 2))
+            ,(- sb!vm:single-float-normal-exponent-max
+                sb!vm:single-float-bias
+                sb!vm:single-float-digits)))
 (sb!xc:deftype double-float-int-exponent ()
   `(integer ,(- sb!vm:double-float-normal-exponent-min sb!vm:double-float-bias
-		(* sb!vm:double-float-digits 2))
-	    ,(- sb!vm:double-float-normal-exponent-max sb!vm:double-float-bias
-		sb!vm:double-float-digits)))
+                (* sb!vm:double-float-digits 2))
+            ,(- sb!vm:double-float-normal-exponent-max sb!vm:double-float-bias
+                sb!vm:double-float-digits)))
 (sb!xc:deftype single-float-significand ()
   `(integer 0 (,(ash 1 sb!vm:single-float-digits))))
 (sb!xc:deftype double-float-significand ()

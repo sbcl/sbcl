@@ -27,7 +27,7 @@
     ;;   DESCRIBE exists as an interface primarily to manage argument
     ;;   defaulting (including conversion of arguments T and NIL into
     ;;   stream objects) and to inhibit any return values from
-    ;;   DESCRIBE-OBJECT. 
+    ;;   DESCRIBE-OBJECT.
     ;; doesn't mention either FRESH-LINEing or PPRINT-LOGICAL-BLOCKing,
     ;; and the example of typical DESCRIBE-OBJECT behavior in ANSI's
     ;; specification of DESCRIBE-OBJECT will work poorly if we do them
@@ -49,7 +49,7 @@
 (defmethod describe-object ((x cons) s)
   (call-next-method)
   (when (and (legal-fun-name-p x)
-	     (fboundp x))
+             (fboundp x))
     (%describe-fun (fdefinition x) s :function x)
     ;;was: (format s "~@:_Its FDEFINITION is ~S.~@:_" (fdefinition x))
     ;; TO DO: should check for SETF documentation.
@@ -63,21 +63,21 @@
     (cond
      ((= 1 (array-rank x))
       (format s "~S is a vector with ~D elements."
-	      x (car (array-dimensions x)))
+              x (car (array-dimensions x)))
       (when (array-has-fill-pointer-p x)
-	(format s "~@:_It has a fill pointer value of ~S."
-		(fill-pointer x))))
+        (format s "~@:_It has a fill pointer value of ~S."
+                (fill-pointer x))))
      (t
       (format s "~S is an array of dimension ~:S."
-	      x (array-dimensions x))))
+              x (array-dimensions x))))
     (let ((array-element-type (array-element-type x)))
       (unless (eq array-element-type t)
-	(format s
-		"~@:_Its element type is specialized to ~S."
-		array-element-type)))
+        (format s
+                "~@:_Its element type is specialized to ~S."
+                array-element-type)))
     (if (and (array-header-p x) (%array-displaced-p x))
-	(format s "~@:_The array is displaced with offset ~S."
-		(%array-displacement x))))
+        (format s "~@:_The array is displaced with offset ~S."
+                (%array-displacement x))))
   (terpri s))
 
 (defmethod describe-object ((x hash-table) s)
@@ -85,24 +85,24 @@
   (format s "~&~@<~S ~_is an ~S hash table.~:>" x (hash-table-test x))
   (format s "~&Its SIZE is ~S." (hash-table-size x))
   (format s
-	  "~&~@<Its REHASH-SIZE is ~S. ~_Its REHASH-THRESHOLD is ~S.~:>"
-	  (hash-table-rehash-size x)
-	  (hash-table-rehash-threshold x))
+          "~&~@<Its REHASH-SIZE is ~S. ~_Its REHASH-THRESHOLD is ~S.~:>"
+          (hash-table-rehash-size x)
+          (hash-table-rehash-threshold x))
   (fresh-line s)
   (pprint-logical-block (s nil)
     (let ((count (hash-table-count x)))
       (format s "It holds ~S key/value pair~:P~:[: ~2I~_~;.~]"
-	      count (zerop count))
+              count (zerop count))
       (let ((n 0))
-	(declare (type index n))
-	(dohash (k v x)
-	  (unless (zerop n)
-	    (write-char #\space s))
-	  (incf n)
-	  (when (and *print-length* (> n *print-length*))
-	    (format s "~:_...")
-	    (return))
-	  (format s "~:_(~@<~S ~:_~S~:>)" k v)))))
+        (declare (type index n))
+        (dohash (k v x)
+          (unless (zerop n)
+            (write-char #\space s))
+          (incf n)
+          (when (and *print-length* (> n *print-length*))
+            (format s "~:_...")
+            (return))
+          (format s "~:_(~@<~S ~:_~S~:>)" k v)))))
   (terpri s))
 
 (defmethod describe-object ((condition condition) s)
@@ -119,8 +119,8 @@
   (when (and name (typep name '(or symbol cons)))
     (let ((doc (fdocumentation name kind)))
       (when doc
-	(format s "~&~@(~A documentation:~)~%  ~A"
-		(or kind-doc kind) doc))))
+        (format s "~&~@(~A documentation:~)~%  ~A"
+                (or kind-doc kind) doc))))
   (values))
 
 ;;; Describe various stuff about the functional semantics attached to
@@ -129,23 +129,23 @@
 ;;; things, it might not be.) TYPE-SPEC is the function type specifier
 ;;; extracted from the definition, or NIL if none.
 (declaim (ftype (function (t stream t)) %describe-fun-name))
-(defun %describe-fun-name (name s type-spec) 
+(defun %describe-fun-name (name s type-spec)
   (when (and name (typep name '(or symbol cons)))
     (multiple-value-bind (type where)
-	(if (legal-fun-name-p name)
-	    (values (type-specifier (info :function :type name))
-		    (info :function :where-from name))
-	    (values type-spec :defined))
+        (if (legal-fun-name-p name)
+            (values (type-specifier (info :function :type name))
+                    (info :function :where-from name))
+            (values type-spec :defined))
       (when (consp type)
-	(format s "~&Its ~(~A~) argument types are:~%  ~S"
-		where (second type))
-	(format s "~&Its result type is:~%  ~S" (third type))))
+        (format s "~&Its ~(~A~) argument types are:~%  ~S"
+                where (second type))
+        (format s "~&Its result type is:~%  ~S" (third type))))
     (let ((inlinep (info :function :inlinep name)))
       (when inlinep
-	(format s
-		"~&It is currently declared ~(~A~);~
-		 ~:[no~;~] expansion is available."
-		inlinep (info :function :inline-expansion-designator name))))))
+        (format s
+                "~&It is currently declared ~(~A~);~
+                 ~:[no~;~] expansion is available."
+                inlinep (info :function :inline-expansion-designator name))))))
 
 ;;; Print information from the debug-info about where CODE-OBJ was
 ;;; compiled from.
@@ -154,19 +154,19 @@
   (let ((info (sb-kernel:%code-debug-info code-obj)))
     (when info
       (let ((source (sb-c::debug-info-source info)))
-	(when source
-	  (format s "~&On ~A it was compiled from:"
-		  ;; FIXME: The FORMAT-UNIVERSAL-TIME calls in the system
-		  ;; should become more consistent, probably not using
-		  ;; any nondefault options.
-		  (format-universal-time nil (sb-c::debug-source-compiled source)
-					 :style :abbreviated))
-	  (let ((name (sb-c::debug-source-name source)))
-	    (ecase (sb-c::debug-source-from source)
-	      (:file
-	       (format s "~&~A~@:_  Created: " (namestring name))
-	       (format-universal-time s (sb-c::debug-source-created source)))
-	      (:lisp (format s "~&~S" name)))))))))
+        (when source
+          (format s "~&On ~A it was compiled from:"
+                  ;; FIXME: The FORMAT-UNIVERSAL-TIME calls in the system
+                  ;; should become more consistent, probably not using
+                  ;; any nondefault options.
+                  (format-universal-time nil (sb-c::debug-source-compiled source)
+                                         :style :abbreviated))
+          (let ((name (sb-c::debug-source-name source)))
+            (ecase (sb-c::debug-source-from source)
+              (:file
+               (format s "~&~A~@:_  Created: " (namestring name))
+               (format-universal-time s (sb-c::debug-source-created source)))
+              (:lisp (format s "~&~S" name)))))))))
 
 ;;; Describe a compiled function. The closure case calls us to print
 ;;; the guts.
@@ -174,10 +174,10 @@
   (declare (type stream s))
   (let ((args (%simple-fun-arglist x)))
     (cond ((not args)
-	   (write-string "  There are no arguments." s))
-	  (t
+           (write-string "  There are no arguments." s))
+          (t
            (format s "~&~@(The ~@[~A's ~]arguments are:~@:_~)" kind)
-	   (write-string "  " s)
+           (write-string "  " s)
             (let ((*print-pretty* t)
                   (*print-escape* t)
                   (*print-base* 10)
@@ -202,19 +202,19 @@
     (ecase kind
       (:macro (format s "Macro-function: ~S" x))
       (:function (if name
-		     (format s "Function: ~S" x)
-		     (format s "~S is a function." x))))
+                     (format s "Function: ~S" x)
+                     (format s "~S is a function." x))))
     (format s "~@:_~@<Its associated name (as in ~S) is ~2I~_~S.~:>"
-	    'function-lambda-expression
-	    (%fun-name x))
+            'function-lambda-expression
+            (%fun-name x))
     (case (widetag-of x)
       (#.sb-vm:closure-header-widetag
        (%describe-fun-compiled (%closure-fun x) s kind name)
        (format s "~@:_Its closure environment is:")
        (pprint-logical-block (s nil)
-	 (pprint-indent :current 8)
-	 (dotimes (i (- (get-closure-length x) (1- sb-vm:closure-info-offset)))
-	   (format s "~@:_~S: ~S" i (%closure-index-ref x i)))))
+         (pprint-indent :current 8)
+         (dotimes (i (- (get-closure-length x) (1- sb-vm:closure-info-offset)))
+           (format s "~@:_~S: ~S" i (%closure-index-ref x i)))))
       (#.sb-vm:simple-fun-header-widetag
        (%describe-fun-compiled x s kind name))
       (#.sb-vm:funcallable-instance-header-widetag
@@ -246,12 +246,12 @@
   ;; Describe the packaging.
   (let ((package (symbol-package x)))
     (if package
-	(multiple-value-bind (symbol status)
-	    (find-symbol (symbol-name x) package)
-	  (declare (ignore symbol))
-	  (format s "~&~@<~S is ~_an ~(~A~) symbol ~_in ~S.~:>"
-		  x status (symbol-package x)))
-	(format s "~&~@<~S is ~_an uninterned symbol.~:>" x)))
+        (multiple-value-bind (symbol status)
+            (find-symbol (symbol-name x) package)
+          (declare (ignore symbol))
+          (format s "~&~@<~S is ~_an ~(~A~) symbol ~_in ~S.~:>"
+                  x status (symbol-package x)))
+        (format s "~&~@<~S is ~_an uninterned symbol.~:>" x)))
   ;; TO DO: We could grovel over all packages looking for and
   ;; reporting other phenomena, e.g. IMPORT and SHADOW, or
   ;; availability in some package even after (SYMBOL-PACKAGE X) has
@@ -259,34 +259,34 @@
 
   ;; Describe the value cell.
   (let* ((kind (info :variable :kind x))
-	 (wot (ecase kind
-		(:special "special variable")
-		(:macro "symbol macro")
-		(:constant "constant")
-		(:global "undefined variable")
-		(:alien nil))))
+         (wot (ecase kind
+                (:special "special variable")
+                (:macro "symbol macro")
+                (:constant "constant")
+                (:global "undefined variable")
+                (:alien nil))))
     (pprint-logical-block (s nil)
       (cond
        ((eq kind :alien)
-	(let ((info (info :variable :alien-info x)))
-	  (format s "~&~@<It is an alien at #X~8,'0X of type ~3I~:_~S.~:>"
-		  (sap-int (eval (sb-alien::heap-alien-info-sap-form info)))
-		  (sb-alien-internals:unparse-alien-type
-		   (sb-alien::heap-alien-info-type info)))
-	  (format s "~&~@<Its current value is ~3I~:_~S.~:>"
-		  (eval x))))
+        (let ((info (info :variable :alien-info x)))
+          (format s "~&~@<It is an alien at #X~8,'0X of type ~3I~:_~S.~:>"
+                  (sap-int (eval (sb-alien::heap-alien-info-sap-form info)))
+                  (sb-alien-internals:unparse-alien-type
+                   (sb-alien::heap-alien-info-type info)))
+          (format s "~&~@<Its current value is ~3I~:_~S.~:>"
+                  (eval x))))
        ((eq kind :macro)
-	(let ((expansion (info :variable :macro-expansion x)))
-	  (format s "~&It is a ~A with expansion ~S." wot expansion)))
+        (let ((expansion (info :variable :macro-expansion x)))
+          (format s "~&It is a ~A with expansion ~S." wot expansion)))
        ((boundp x)
-	(format s "~&~@<It is a ~A; its ~_value is ~S.~:>"
-		wot (symbol-value x)))
+        (format s "~&~@<It is a ~A; its ~_value is ~S.~:>"
+                wot (symbol-value x)))
        ((not (eq kind :global))
-	(format s "~&~@<It is a ~A; no current value.~:>" wot)))
+        (format s "~&~@<It is a ~A; no current value.~:>" wot)))
 
       (when (eq (info :variable :where-from x) :declared)
-	(format s "~&~@<Its declared type ~_is ~S.~:>"
-		(type-specifier (info :variable :type x)))))
+        (format s "~&~@<Its declared type ~_is ~S.~:>"
+                (type-specifier (info :variable :type x)))))
 
     (%describe-doc x s 'variable kind))
 
@@ -295,11 +295,11 @@
 
   ;; Describe the function cell.
   (cond ((macro-function x)
-	 (%describe-fun (macro-function x) s :macro x))
-	((special-operator-p x)
-	 (%describe-doc x s :function "Special form"))
-	((fboundp x)
-	 (describe-symbol-fdefinition (fdefinition x) s :name x)))
+         (%describe-fun (macro-function x) s :macro x))
+        ((special-operator-p x)
+         (%describe-doc x s :function "Special form"))
+        ((fboundp x)
+         (describe-symbol-fdefinition (fdefinition x) s :name x)))
 
   ;; Print other documentation.
   (%describe-doc x s 'structure "Structure")
@@ -307,10 +307,10 @@
   (%describe-doc x s 'setf "Setf macro")
   (dolist (assoc (info :random-documentation :stuff x))
     (format s
-	    "~&~@<Documentation on the ~(~A~):~@:_~A~:>"
-	    (car assoc)
-	    (cdr assoc)))
-  
+            "~&~@<Documentation on the ~(~A~):~@:_~A~:>"
+            (car assoc)
+            (cdr assoc)))
+
   ;; Mention the associated type information, if any.
   ;;
   ;; As of sbcl-0.7.2, (INFO :TYPE :KIND X) might be

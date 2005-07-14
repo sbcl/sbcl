@@ -4,7 +4,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -21,7 +21,7 @@
 (make-person :name "James") ; not an error, 007 not used
 (assert (raises-error? (make-person) type-error))
 (assert (raises-error? (setf (person-name (make-person :name "Q")) 1)
-		       type-error))
+                       type-error))
 
 ;;; An &AUX variable in a boa-constructor without a default value
 ;;; means "do not initialize slot" and does not cause type error
@@ -65,7 +65,7 @@
 
 ;;; basic inheritance
 (defstruct (astronaut (:include person)
-		      (:conc-name astro-))
+                      (:conc-name astro-))
   helmet-size
   (favorite-beverage 'tang))
 (let ((x (make-astronaut :name "Buzz" :helmet-size 17.5)))
@@ -84,16 +84,16 @@
   operand-1
   operand-2)
 (defstruct (annotated-binop (:type list)
-			    (:initial-offset 3)
-			    (:include binop))
+                            (:initial-offset 3)
+                            (:include binop))
   commutative associative identity)
 (assert (equal (make-annotated-binop :operator '*
-				     :operand-1 'x
-				     :operand-2 5
-				     :commutative t
-				     :associative t
-				     :identity 1)
-	       '(nil nil binop * x 5 nil nil nil t t 1)))
+                                     :operand-1 'x
+                                     :operand-2 5
+                                     :commutative t
+                                     :associative t
+                                     :identity 1)
+               '(nil nil binop * x 5 nil nil nil t t 1)))
 
 ;;; effect of :NAMED on :TYPE
 (defstruct (named-binop (:type list) :named)
@@ -114,7 +114,7 @@
   area
   watertowers
   (firetrucks 1 :type fixnum)
-  population 
+  population
   (elevation 5128 :read-only t))
 (let ((town1 (make-town :area 0 :watertowers 0)))
   (assert (town-p town1))
@@ -126,24 +126,24 @@
   (assert (eql (town-population town1) 99))
   (let ((town2 (copy-town town1)))
     (dolist (slot-accessor-name '(town-area
-				  town-watertowers
-				  town-firetrucks
-				  town-population
-				  town-elevation))
+                                  town-watertowers
+                                  town-firetrucks
+                                  town-population
+                                  town-elevation))
       (assert (eql (funcall slot-accessor-name town1)
-		   (funcall slot-accessor-name town2))))
+                   (funcall slot-accessor-name town2))))
     (assert (not (fboundp '(setf town-elevation)))))) ; 'cause it's :READ-ONLY
 
 ;;; example 2
 (defstruct (clown (:conc-name bozo-))
-  (nose-color 'red)         
+  (nose-color 'red)
   frizzy-hair-p
   polkadots)
 (let ((funny-clown (make-clown)))
   (assert (eql (bozo-nose-color funny-clown) 'red)))
 (defstruct (klown (:constructor make-up-klown)
-		  (:copier clone-klown)
-		  (:predicate is-a-bozo-p))
+                  (:copier clone-klown)
+                  (:predicate is-a-bozo-p))
   nose-color
   frizzy-hair-p
   polkadots)
@@ -167,7 +167,7 @@
 
 (defun string+ (&rest rest)
   (apply #'concatenate 'string
-	 (mapcar #'string rest)))
+         (mapcar #'string rest)))
 (defun symbol+ (&rest rest)
   (values (intern (apply #'string+ rest))))
 
@@ -180,28 +180,28 @@
   (funcall (accessor-name conc-name slot-name) instance))
 (defun write-slot-notinline (new-value conc-name slot-name instance)
   (funcall (fdefinition `(setf ,(accessor-name conc-name slot-name)))
-	   new-value instance))
+           new-value instance))
 
 ;;; Use inline expansions of slot accessors, if possible, to read and
 ;;; write a structure slot.
 (defun read-slot-inline (conc-name slot-name instance)
   (funcall (compile nil
-		    `(lambda (instance)
-		       (,(accessor-name conc-name slot-name) instance)))
-	   instance))
+                    `(lambda (instance)
+                       (,(accessor-name conc-name slot-name) instance)))
+           instance))
 (defun write-slot-inline (new-value conc-name slot-name instance)
   (funcall (compile nil
-		    `(lambda (new-value instance)
-		       (setf (,(accessor-name conc-name slot-name) instance)
-			     new-value)))
-	   new-value
-	   instance))
+                    `(lambda (new-value instance)
+                       (setf (,(accessor-name conc-name slot-name) instance)
+                             new-value)))
+           new-value
+           instance))
 
 ;;; Read a structure slot, checking that the inline and out-of-line
 ;;; accessors give the same result.
 (defun read-slot (conc-name slot-name instance)
   (let ((inline-value (read-slot-inline conc-name slot-name instance))
-	(notinline-value (read-slot-notinline conc-name slot-name instance)))
+        (notinline-value (read-slot-notinline conc-name slot-name instance)))
     (assert (eql inline-value notinline-value))
     inline-value))
 
@@ -215,19 +215,19 @@
 ;;; bound during the tests so that we can get to it even if the
 ;;; debugger is having a bad day
 (defvar *instance*)
-  
+
 (defmacro test-variant (defstructname &key colontype boa-constructor-p)
   `(progn
 
      (format t "~&/beginning PROGN for COLONTYPE=~S~%" ',colontype)
 
      (defstruct (,defstructname
-		  ,@(when colontype `((:type ,colontype)))
+                  ,@(when colontype `((:type ,colontype)))
                   ,@(when boa-constructor-p
                           `((:constructor ,(symbol+ "CREATE-" defstructname)
                              (id
-			      &optional
-			      (optional-test 2 optional-test-p)
+                              &optional
+                              (optional-test 2 optional-test-p)
                               &key
                               (home nil home-p)
                               (no-home-comment "Home package CL not provided.")
@@ -235,7 +235,7 @@
                               (refcount (if optional-test-p optional-test nil))
                               hash
                               weight)))))
-       
+
        ;; some ordinary tagged slots
        id
        (home nil :type package :read-only t)
@@ -249,28 +249,28 @@
      (format t "~&/done with DEFSTRUCT~%")
 
      (let* ((cn (string+ ',defstructname "-")) ; conc-name
-	    (ctor (symbol-function ',(symbol+ (if boa-constructor-p
+            (ctor (symbol-function ',(symbol+ (if boa-constructor-p
                                                "CREATE-"
                                                "MAKE-")
                                              defstructname)))
-	    (*instance* (funcall ctor
-				 ,@(unless boa-constructor-p
+            (*instance* (funcall ctor
+                                 ,@(unless boa-constructor-p
                                            `(:id)) "some id"
-				 ,@(when boa-constructor-p
-					 '(1))
-				 :home (find-package :cl)
-				 :hash (+ 14 most-positive-fixnum)
-				 ,@(unless boa-constructor-p
-					   `(:refcount 1)))))
+                                 ,@(when boa-constructor-p
+                                         '(1))
+                                 :home (find-package :cl)
+                                 :hash (+ 14 most-positive-fixnum)
+                                 ,@(unless boa-constructor-p
+                                           `(:refcount 1)))))
 
-       ;; Check that ctor set up slot values correctly. 
+       ;; Check that ctor set up slot values correctly.
        (format t "~&/checking constructed structure~%")
        (assert (string= "some id" (read-slot cn "ID" *instance*)))
        (assert (eql (find-package :cl) (read-slot cn "HOME" *instance*)))
        (assert (string= "" (read-slot cn "COMMENT" *instance*)))
        (assert (= 1.0 (read-slot cn "WEIGHT" *instance*)))
        (assert (eql (+ 14 most-positive-fixnum)
-		    (read-slot cn "HASH" *instance*)))
+                    (read-slot cn "HASH" *instance*)))
        (assert (= 1 (read-slot cn "REFCOUNT" *instance*)))
 
        ;; There should be no writers for read-only slots.
@@ -280,55 +280,55 @@
        ;; (Read-only slot values are checked in the loop below.)
 
        (dolist (inlinep '(t nil))
-	 (format t "~&/doing INLINEP=~S~%" inlinep)
-	 ;; Fiddle with writable slot values.
-	 (let ((new-id (format nil "~S" (random 100)))
-	       (new-comment (format nil "~X" (random 5555)))
-	       (new-weight (random 10.0)))
-	   (write-slot new-id cn "ID" *instance* inlinep)
-	   (write-slot new-comment cn "COMMENT" *instance* inlinep)
-	   (write-slot new-weight cn "WEIGHT" *instance* inlinep)
-	   (assert (eql new-id (read-slot cn "ID" *instance*)))
-	   (assert (eql new-comment (read-slot cn "COMMENT" *instance*)))
-	   ;;(unless (eql new-weight (read-slot cn "WEIGHT" *instance*))
-	   ;;  (error "WEIGHT mismatch: ~S vs. ~S"
-	   ;;         new-weight (read-slot cn "WEIGHT" *instance*)))
-	   (assert (eql new-weight (read-slot cn "WEIGHT" *instance*)))))
+         (format t "~&/doing INLINEP=~S~%" inlinep)
+         ;; Fiddle with writable slot values.
+         (let ((new-id (format nil "~S" (random 100)))
+               (new-comment (format nil "~X" (random 5555)))
+               (new-weight (random 10.0)))
+           (write-slot new-id cn "ID" *instance* inlinep)
+           (write-slot new-comment cn "COMMENT" *instance* inlinep)
+           (write-slot new-weight cn "WEIGHT" *instance* inlinep)
+           (assert (eql new-id (read-slot cn "ID" *instance*)))
+           (assert (eql new-comment (read-slot cn "COMMENT" *instance*)))
+           ;;(unless (eql new-weight (read-slot cn "WEIGHT" *instance*))
+           ;;  (error "WEIGHT mismatch: ~S vs. ~S"
+           ;;         new-weight (read-slot cn "WEIGHT" *instance*)))
+           (assert (eql new-weight (read-slot cn "WEIGHT" *instance*)))))
        (format t "~&/done with INLINEP loop~%")
 
        ;; :TYPE FOO objects don't go in the Lisp type system, so we
        ;; can't test TYPEP stuff for them.
        ;;
        ;; FIXME: However, when they're named, they do define
-       ;; predicate functions, and we could test those. 
-       ,@(unless colontype 
-	   `(;; Fiddle with predicate function.
-	     (let ((pred-name (symbol+ ',defstructname "-P")))
-	       (format t "~&/doing tests on PRED-NAME=~S~%" pred-name)
-	       (assert (funcall pred-name *instance*))
-	       (assert (not (funcall pred-name 14)))
-	       (assert (not (funcall pred-name "test")))
-	       (assert (not (funcall pred-name (make-hash-table))))
-	       (let ((compiled-pred
-		      (compile nil `(lambda (x) (,pred-name x)))))
-		 (format t "~&/doing COMPILED-PRED tests~%")
-		 (assert (funcall compiled-pred *instance*))
-		 (assert (not (funcall compiled-pred 14)))
-		 (assert (not (funcall compiled-pred #()))))
-	       ;; Fiddle with TYPEP.
-	       (format t "~&/doing TYPEP tests, COLONTYPE=~S~%" ',colontype)
-	       (assert (typep *instance* ',defstructname))
-	       (assert (not (typep 0 ',defstructname)))
-	       (assert (funcall (symbol+ "TYPEP") *instance* ',defstructname))
-	       (assert (not (funcall (symbol+ "TYPEP") nil ',defstructname)))
-	       (let* ((typename ',defstructname)
-		      (compiled-typep
-		       (compile nil `(lambda (x) (typep x ',typename)))))
-		 (assert (funcall compiled-typep *instance*))
-		 (assert (not (funcall compiled-typep nil))))))))
-     
+       ;; predicate functions, and we could test those.
+       ,@(unless colontype
+           `(;; Fiddle with predicate function.
+             (let ((pred-name (symbol+ ',defstructname "-P")))
+               (format t "~&/doing tests on PRED-NAME=~S~%" pred-name)
+               (assert (funcall pred-name *instance*))
+               (assert (not (funcall pred-name 14)))
+               (assert (not (funcall pred-name "test")))
+               (assert (not (funcall pred-name (make-hash-table))))
+               (let ((compiled-pred
+                      (compile nil `(lambda (x) (,pred-name x)))))
+                 (format t "~&/doing COMPILED-PRED tests~%")
+                 (assert (funcall compiled-pred *instance*))
+                 (assert (not (funcall compiled-pred 14)))
+                 (assert (not (funcall compiled-pred #()))))
+               ;; Fiddle with TYPEP.
+               (format t "~&/doing TYPEP tests, COLONTYPE=~S~%" ',colontype)
+               (assert (typep *instance* ',defstructname))
+               (assert (not (typep 0 ',defstructname)))
+               (assert (funcall (symbol+ "TYPEP") *instance* ',defstructname))
+               (assert (not (funcall (symbol+ "TYPEP") nil ',defstructname)))
+               (let* ((typename ',defstructname)
+                      (compiled-typep
+                       (compile nil `(lambda (x) (typep x ',typename)))))
+                 (assert (funcall compiled-typep *instance*))
+                 (assert (not (funcall compiled-typep nil))))))))
+
      (format t "~&/done with PROGN for COLONTYPE=~S~%" ',colontype)))
-      
+
 (test-variant vanilla-struct)
 (test-variant vector-struct :colontype vector)
 (test-variant list-struct :colontype list)
@@ -407,24 +407,24 @@
       for m in (reverse manyraws)
       for i from 0
       do
-	;; Compare the tagged reference values with raw reffer results.
-	(destructuring-bind (j a b c d e)
-	    (manyraw-unraw-slot-just-for-variety m)
-	  (assert (eql i j))
-	  (assert (= (manyraw-a m) a))
-	  (assert (= (manyraw-b m) b))
-	  (assert (= (manyraw-c m) c))
-	  (assert (= (manyraw-d m) d))
-	  (assert (= (manyraw-e m) e)))
-	;; Test the funny out-of-line OAOOM-style closures, too.
-	(mapcar (lambda (fn value)
-		  (assert (= (funcall fn m) value)))
-		(list #'manyraw-a
-		      #'manyraw-b
-		      #'manyraw-c
-		      #'manyraw-d
-		      #'manyraw-e)
-		(cdr (manyraw-unraw-slot-just-for-variety m)))))
+        ;; Compare the tagged reference values with raw reffer results.
+        (destructuring-bind (j a b c d e)
+            (manyraw-unraw-slot-just-for-variety m)
+          (assert (eql i j))
+          (assert (= (manyraw-a m) a))
+          (assert (= (manyraw-b m) b))
+          (assert (= (manyraw-c m) c))
+          (assert (= (manyraw-d m) d))
+          (assert (= (manyraw-e m) e)))
+        ;; Test the funny out-of-line OAOOM-style closures, too.
+        (mapcar (lambda (fn value)
+                  (assert (= (funcall fn m) value)))
+                (list #'manyraw-a
+                      #'manyraw-b
+                      #'manyraw-c
+                      #'manyraw-d
+                      #'manyraw-e)
+                (cdr (manyraw-unraw-slot-just-for-variety m)))))
 
 (defstruct (manyraw-subclass (:include manyraw))
   (stolperstein 0 :type (unsigned-byte 32)))
@@ -433,25 +433,25 @@
 (dotimes (y +n-manyraw+)
   (dotimes (x +m-manyraw+)
     (let ((a (random (expt 2 32)))
-	  (b (random most-positive-single-float))
-	  (c (random most-positive-double-float))
-	  (d (complex
-	      (random most-positive-single-float)
-	      (random most-positive-single-float)))
-	  (e (complex
-	      (random most-positive-double-float)
-	      (random most-positive-double-float))))
+          (b (random most-positive-single-float))
+          (c (random most-positive-double-float))
+          (d (complex
+              (random most-positive-single-float)
+              (random most-positive-single-float)))
+          (e (complex
+              (random most-positive-double-float)
+              (random most-positive-double-float))))
       (push (funcall (if (zerop (mod x 3))
-			 #'make-manyraw-subclass
-			 #'make-manyraw)
-		     :unraw-slot-just-for-variety
-		     (list (+ x (* y +m-manyraw+)) a b c d e)
-		     :a a
-		     :b b
-		     :c c
-		     :d d
-		     :e e)
-	    *manyraw*)))
+                         #'make-manyraw-subclass
+                         #'make-manyraw)
+                     :unraw-slot-just-for-variety
+                     (list (+ x (* y +m-manyraw+)) a b c d e)
+                     :a a
+                     :b b
+                     :c c
+                     :d d
+                     :e e)
+            *manyraw*)))
   (room)
   (sb-ext:gc))
 (check-manyraws *manyraw*)
@@ -466,8 +466,8 @@
   self env
   :sb-just-dump-it-normally)
 (with-open-file (s "tmp-defstruct.manyraw.lisp"
-		 :direction :output
-		 :if-exists :supersede)
+                 :direction :output
+                 :if-exists :supersede)
   (write-string "(defun dumped-manyraws () '#.*manyraw*)" s))
 (compile-file "tmp-defstruct.manyraw.lisp")
 (delete-file "tmp-defstruct.manyraw.lisp")
@@ -548,15 +548,15 @@
 ;;; too fragile:
 (defstruct (conc-name-syntax :conc-name) a-conc-name-slot)
 (assert (eq (a-conc-name-slot (make-conc-name-syntax :a-conc-name-slot 'y))
-	    'y))
+            'y))
 ;;; and further :CONC-NAME NIL was being wrongly treated:
 (defpackage "DEFSTRUCT-TEST-SCRATCH")
 (defstruct (conc-name-nil :conc-name)
   defstruct-test-scratch::conc-name-nil-slot)
 (assert (= (defstruct-test-scratch::conc-name-nil-slot
-	    (make-conc-name-nil :conc-name-nil-slot 1)) 1))
+            (make-conc-name-nil :conc-name-nil-slot 1)) 1))
 (assert (raises-error? (conc-name-nil-slot (make-conc-name-nil))
-		       undefined-function))
+                       undefined-function))
 
 ;;; The named/typed predicates were a little fragile, in that they
 ;;; could throw errors on innocuous input:
@@ -621,11 +621,11 @@
 (assert (bug-332b-p '(1 2 3 4 5 x 1 2 bug-332b)))
 
 ;;; Similar test for vectors, just for good measure.
-(defstruct (bug-332a-aux (:type vector) 
-			 (:initial-offset 5) :named))
-(defstruct (bug-332b-aux (:type vector) 
-			 (:initial-offset 2) :named 
-			 (:include bug-332a-aux)))
+(defstruct (bug-332a-aux (:type vector)
+                         (:initial-offset 5) :named))
+(defstruct (bug-332b-aux (:type vector)
+                         (:initial-offset 2) :named
+                         (:include bug-332a-aux)))
 (assert (not (bug-332b-aux-p #(1 2 3 4 5 x 1 premature-end))))
 (assert (not (bug-332b-aux-p 873257)))
 (assert (not (bug-332b-aux-p #(1 2 3 4 5 x 1 2 bug-332a-aux))))

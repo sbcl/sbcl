@@ -14,54 +14,54 @@
 ;;;; addition, subtraction, and multiplication
 
 (macrolet ((define-generic-arith-routine ((fun cost) &body body)
-	     `(define-assembly-routine (,(symbolicate "GENERIC-" fun)
-					(:cost ,cost)
-					(:return-style :full-call)
-					(:translate ,fun)
-					(:policy :safe)
-					(:save-p t))
-		((:arg x (descriptor-reg any-reg) edx-offset)
-		 (:arg y (descriptor-reg any-reg)
-		       ;; this seems wrong esi-offset -- FIXME: What's it mean?
-		       edi-offset)
+             `(define-assembly-routine (,(symbolicate "GENERIC-" fun)
+                                        (:cost ,cost)
+                                        (:return-style :full-call)
+                                        (:translate ,fun)
+                                        (:policy :safe)
+                                        (:save-p t))
+                ((:arg x (descriptor-reg any-reg) edx-offset)
+                 (:arg y (descriptor-reg any-reg)
+                       ;; this seems wrong esi-offset -- FIXME: What's it mean?
+                       edi-offset)
 
-		 (:res res (descriptor-reg any-reg) edx-offset)
+                 (:res res (descriptor-reg any-reg) edx-offset)
 
-		 (:temp eax unsigned-reg eax-offset)
-		 (:temp ebx unsigned-reg ebx-offset)
-		 (:temp ecx unsigned-reg ecx-offset))
+                 (:temp eax unsigned-reg eax-offset)
+                 (:temp ebx unsigned-reg ebx-offset)
+                 (:temp ecx unsigned-reg ecx-offset))
 
-		(declare (ignorable ebx))
+                (declare (ignorable ebx))
 
-		(inst test x 3)	 ; fixnum?
-		(inst jmp :nz DO-STATIC-FUN) ; no - do generic
-		(inst test y 3)	 ; fixnum?
-		(inst jmp :z DO-BODY)   ; yes - doit here
+                (inst test x 3)  ; fixnum?
+                (inst jmp :nz DO-STATIC-FUN) ; no - do generic
+                (inst test y 3)  ; fixnum?
+                (inst jmp :z DO-BODY)   ; yes - doit here
 
-		DO-STATIC-FUN
-		(inst pop eax)
-		(inst push ebp-tn)
-		(inst lea
-		      ebp-tn
-		      (make-ea :dword :base esp-tn :disp n-word-bytes))
-		(inst sub esp-tn (fixnumize 2))
-		(inst push eax)	 ; callers return addr
-		(inst mov ecx (fixnumize 2)) ; arg count
-		(inst jmp
-		      (make-ea :dword
-			       :disp (+ nil-value
-					(static-fun-offset
-					 ',(symbolicate "TWO-ARG-" fun)))))
+                DO-STATIC-FUN
+                (inst pop eax)
+                (inst push ebp-tn)
+                (inst lea
+                      ebp-tn
+                      (make-ea :dword :base esp-tn :disp n-word-bytes))
+                (inst sub esp-tn (fixnumize 2))
+                (inst push eax)  ; callers return addr
+                (inst mov ecx (fixnumize 2)) ; arg count
+                (inst jmp
+                      (make-ea :dword
+                               :disp (+ nil-value
+                                        (static-fun-offset
+                                         ',(symbolicate "TWO-ARG-" fun)))))
 
-		DO-BODY
-		,@body)))
+                DO-BODY
+                ,@body)))
 
   (define-generic-arith-routine (+ 10)
     (move res x)
     (inst add res y)
     (inst jmp :no OKAY)
-    (inst rcr res 1)		      ; carry has correct sign
-    (inst sar res 1)		      ; remove type bits
+    (inst rcr res 1)                  ; carry has correct sign
+    (inst sar res 1)                  ; remove type bits
 
     (move ecx res)
 
@@ -76,7 +76,7 @@
     (inst jmp :no OKAY)
     (inst cmc)                        ; carry has correct sign now
     (inst rcr res 1)
-    (inst sar res 1)		      ; remove type bits
+    (inst sar res 1)                  ; remove type bits
 
     (move ecx res)
 
@@ -85,19 +85,19 @@
     OKAY)
 
   (define-generic-arith-routine (* 30)
-    (move eax x)			  ; must use eax for 64-bit result
-    (inst sar eax 2)		      ; remove *4 fixnum bias
-    (inst imul y)			 ; result in edx:eax
-    (inst jmp :no okay)		   ; still fixnum
+    (move eax x)                          ; must use eax for 64-bit result
+    (inst sar eax 2)                  ; remove *4 fixnum bias
+    (inst imul y)                        ; result in edx:eax
+    (inst jmp :no okay)            ; still fixnum
 
     ;; zzz jrd changed edx to ebx in here, as edx isn't listed as a temp, above
     ;;     pfw says that loses big -- edx is target for arg x and result res
     ;;     note that 'edx' is not defined -- using x
-    (inst shrd eax x 2)		   ; high bits from edx
-    (inst sar x 2)			; now shift edx too
+    (inst shrd eax x 2)            ; high bits from edx
+    (inst sar x 2)                      ; now shift edx too
 
-    (move ecx x)			  ; save high bits from cdq
-    (inst cdq)			    ; edx:eax <- sign-extend of eax
+    (move ecx x)                          ; save high bits from cdq
+    (inst cdq)                      ; edx:eax <- sign-extend of eax
     (inst cmp x ecx)
     (inst jmp :e SINGLE-WORD-BIGNUM)
 
@@ -119,16 +119,16 @@
 ;;;; negation
 
 (define-assembly-routine (generic-negate
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:policy :safe)
-			  (:translate %negate)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) edx-offset)
-			  (:res res (descriptor-reg any-reg) edx-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:policy :safe)
+                          (:translate %negate)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) edx-offset)
+                          (:res res (descriptor-reg any-reg) edx-offset)
 
-			  (:temp eax unsigned-reg eax-offset)
-			  (:temp ecx unsigned-reg ecx-offset))
+                          (:temp eax unsigned-reg eax-offset)
+                          (:temp ecx unsigned-reg ecx-offset))
   (inst test x 3)
   (inst jmp :z FIXNUM)
 
@@ -137,15 +137,15 @@
   (inst lea ebp-tn (make-ea :dword :base esp-tn :disp n-word-bytes))
   (inst sub esp-tn (fixnumize 2))
   (inst push eax)
-  (inst mov ecx (fixnumize 1))	  ; arg count
+  (inst mov ecx (fixnumize 1))    ; arg count
   (inst jmp (make-ea :dword
-		     :disp (+ nil-value (static-fun-offset '%negate))))
+                     :disp (+ nil-value (static-fun-offset '%negate))))
 
   FIXNUM
   (move res x)
-  (inst neg res)			; (- most-negative-fixnum) is BIGNUM
+  (inst neg res)                        ; (- most-negative-fixnum) is BIGNUM
   (inst jmp :no OKAY)
-  (inst shr res 2)		      ; sign bit is data - remove type bits
+  (inst shr res 2)                    ; sign bit is data - remove type bits
   (move ecx res)
 
   (with-fixed-allocation (res bignum-widetag (1+ bignum-digits-offset))
@@ -156,78 +156,78 @@
 ;;;; comparison
 
 (macrolet ((define-cond-assem-rtn (name translate static-fn test)
-	     `(define-assembly-routine (,name
-					(:cost 10)
-					(:return-style :full-call)
-					(:policy :safe)
-					(:translate ,translate)
-					(:save-p t))
-		((:arg x (descriptor-reg any-reg) edx-offset)
-		 (:arg y (descriptor-reg any-reg) edi-offset)
+             `(define-assembly-routine (,name
+                                        (:cost 10)
+                                        (:return-style :full-call)
+                                        (:policy :safe)
+                                        (:translate ,translate)
+                                        (:save-p t))
+                ((:arg x (descriptor-reg any-reg) edx-offset)
+                 (:arg y (descriptor-reg any-reg) edi-offset)
 
-		 (:res res descriptor-reg edx-offset)
+                 (:res res descriptor-reg edx-offset)
 
-		 (:temp eax unsigned-reg eax-offset)
-		 (:temp ecx unsigned-reg ecx-offset))
+                 (:temp eax unsigned-reg eax-offset)
+                 (:temp ecx unsigned-reg ecx-offset))
 
-		;; KLUDGE: The "3" here is a mask for the bits which will be
-		;; zero in a fixnum. It should have a symbolic name. (Actually,
-		;; it might already have a symbolic name which the coder
-		;; couldn't be bothered to use..) -- WHN 19990917
-		(inst test x 3)
-		(inst jmp :nz TAIL-CALL-TO-STATIC-FN)
-		(inst test y 3)
-		(inst jmp :z INLINE-FIXNUM-COMPARE)
+                ;; KLUDGE: The "3" here is a mask for the bits which will be
+                ;; zero in a fixnum. It should have a symbolic name. (Actually,
+                ;; it might already have a symbolic name which the coder
+                ;; couldn't be bothered to use..) -- WHN 19990917
+                (inst test x 3)
+                (inst jmp :nz TAIL-CALL-TO-STATIC-FN)
+                (inst test y 3)
+                (inst jmp :z INLINE-FIXNUM-COMPARE)
 
-		TAIL-CALL-TO-STATIC-FN
-		(inst pop eax)
-		(inst push ebp-tn)
-		(inst lea ebp-tn (make-ea :dword
-					  :base esp-tn
-					  :disp n-word-bytes))
-		(inst sub esp-tn (fixnumize 2)) ; FIXME: Push 2 words on stack,
-						; weirdly?
-		(inst push eax)
-		(inst mov ecx (fixnumize 2)) ; FIXME: FIXNUMIZE and
-					; SINGLE-FLOAT-BITS are parallel,
-					; should be named parallelly.
-		(inst jmp (make-ea :dword
-				   :disp (+ nil-value
-					    (static-fun-offset ',static-fn))))
+                TAIL-CALL-TO-STATIC-FN
+                (inst pop eax)
+                (inst push ebp-tn)
+                (inst lea ebp-tn (make-ea :dword
+                                          :base esp-tn
+                                          :disp n-word-bytes))
+                (inst sub esp-tn (fixnumize 2)) ; FIXME: Push 2 words on stack,
+                                                ; weirdly?
+                (inst push eax)
+                (inst mov ecx (fixnumize 2)) ; FIXME: FIXNUMIZE and
+                                        ; SINGLE-FLOAT-BITS are parallel,
+                                        ; should be named parallelly.
+                (inst jmp (make-ea :dword
+                                   :disp (+ nil-value
+                                            (static-fun-offset ',static-fn))))
 
-		INLINE-FIXNUM-COMPARE
-		(inst cmp x y)
-		(inst jmp ,test RETURN-TRUE)
-		(inst mov res nil-value)
-		;; FIXME: A note explaining this return convention, or a
-		;; symbolic name for it, would be nice. (It looks as though we
-		;; should be hand-crafting the same return sequence as would be
-		;; produced by GENERATE-RETURN-SEQUENCE, but in that case it's
-		;; not clear why we don't just jump to the end of this function
-		;; to share the return sequence there.
-		(inst pop eax)
-		(inst add eax 2)
-		(inst jmp eax)
+                INLINE-FIXNUM-COMPARE
+                (inst cmp x y)
+                (inst jmp ,test RETURN-TRUE)
+                (inst mov res nil-value)
+                ;; FIXME: A note explaining this return convention, or a
+                ;; symbolic name for it, would be nice. (It looks as though we
+                ;; should be hand-crafting the same return sequence as would be
+                ;; produced by GENERATE-RETURN-SEQUENCE, but in that case it's
+                ;; not clear why we don't just jump to the end of this function
+                ;; to share the return sequence there.
+                (inst pop eax)
+                (inst add eax 2)
+                (inst jmp eax)
 
-		RETURN-TRUE
-		(load-symbol res t))))
+                RETURN-TRUE
+                (load-symbol res t))))
 
   (define-cond-assem-rtn generic-< < two-arg-< :l)
   (define-cond-assem-rtn generic-> > two-arg-> :g))
 
 (define-assembly-routine (generic-eql
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:policy :safe)
-			  (:translate eql)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) edx-offset)
-			  (:arg y (descriptor-reg any-reg) edi-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:policy :safe)
+                          (:translate eql)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) edx-offset)
+                          (:arg y (descriptor-reg any-reg) edi-offset)
 
-			  (:res res descriptor-reg edx-offset)
+                          (:res res descriptor-reg edx-offset)
 
-			  (:temp eax unsigned-reg eax-offset)
-			  (:temp ecx unsigned-reg ecx-offset))
+                          (:temp eax unsigned-reg eax-offset)
+                          (:temp ecx unsigned-reg ecx-offset))
   (inst cmp x y)
   (inst jmp :e RETURN-T)
   (inst test x 3)
@@ -249,7 +249,7 @@
   (inst push eax)
   (inst mov ecx (fixnumize 2))
   (inst jmp (make-ea :dword
-		     :disp (+ nil-value (static-fun-offset 'eql))))
+                     :disp (+ nil-value (static-fun-offset 'eql))))
 
   RETURN-T
   (load-symbol res t)
@@ -257,25 +257,25 @@
   )
 
 (define-assembly-routine (generic-=
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:policy :safe)
-			  (:translate =)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) edx-offset)
-			  (:arg y (descriptor-reg any-reg) edi-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:policy :safe)
+                          (:translate =)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) edx-offset)
+                          (:arg y (descriptor-reg any-reg) edi-offset)
 
-			  (:res res descriptor-reg edx-offset)
+                          (:res res descriptor-reg edx-offset)
 
-			  (:temp eax unsigned-reg eax-offset)
-			  (:temp ecx unsigned-reg ecx-offset)
-			  )
-  (inst test x 3)		       ; descriptor?
+                          (:temp eax unsigned-reg eax-offset)
+                          (:temp ecx unsigned-reg ecx-offset)
+                          )
+  (inst test x 3)                      ; descriptor?
   (inst jmp :nz DO-STATIC-FN)          ; yes, do it here
-  (inst test y 3)		       ; descriptor?
+  (inst test y 3)                      ; descriptor?
   (inst jmp :nz DO-STATIC-FN)
   (inst cmp x y)
-  (inst jmp :e RETURN-T)		; ok
+  (inst jmp :e RETURN-T)                ; ok
 
   (inst mov res nil-value)
   (inst pop eax)
@@ -290,7 +290,7 @@
   (inst push eax)
   (inst mov ecx (fixnumize 2))
   (inst jmp (make-ea :dword
-		     :disp (+ nil-value (static-fun-offset 'two-arg-=))))
+                     :disp (+ nil-value (static-fun-offset 'two-arg-=))))
 
   RETURN-T
   (load-symbol res t))
@@ -329,13 +329,13 @@
   (inst xor k k)
   LOOP1
   (inst mov y (make-ea :dword :base state :index k :scale 4
-		       :disp (- (* (+ 3 vector-data-offset)
-				   n-word-bytes)
-				other-pointer-lowtag)))
+                       :disp (- (* (+ 3 vector-data-offset)
+                                   n-word-bytes)
+                                other-pointer-lowtag)))
   (inst mov tmp (make-ea :dword :base state :index k :scale 4
-			 :disp (- (* (+ 1 3 vector-data-offset)
-				     n-word-bytes)
-				  other-pointer-lowtag)))
+                         :disp (- (* (+ 1 3 vector-data-offset)
+                                     n-word-bytes)
+                                  other-pointer-lowtag)))
   (inst and y #x80000000)
   (inst and tmp #x7fffffff)
   (inst or y tmp)
@@ -344,26 +344,26 @@
   (inst xor y #x9908b0df)
   SKIP1
   (inst xor y (make-ea :dword :base state :index k :scale 4
-		       :disp (- (* (+ 397 3 vector-data-offset)
-				   n-word-bytes)
-				other-pointer-lowtag)))
+                       :disp (- (* (+ 397 3 vector-data-offset)
+                                   n-word-bytes)
+                                other-pointer-lowtag)))
   (inst mov (make-ea :dword :base state :index k :scale 4
-		     :disp (- (* (+ 3 vector-data-offset)
-				 n-word-bytes)
-			      other-pointer-lowtag))
-	y)
+                     :disp (- (* (+ 3 vector-data-offset)
+                                 n-word-bytes)
+                              other-pointer-lowtag))
+        y)
   (inst inc k)
   (inst cmp k (- 624 397))
   (inst jmp :b loop1)
   LOOP2
   (inst mov y (make-ea :dword :base state :index k :scale 4
-		       :disp (- (* (+ 3 vector-data-offset)
-				   n-word-bytes)
-				other-pointer-lowtag)))
+                       :disp (- (* (+ 3 vector-data-offset)
+                                   n-word-bytes)
+                                other-pointer-lowtag)))
   (inst mov tmp (make-ea :dword :base state :index k :scale 4
-			 :disp (- (* (+ 1 3 vector-data-offset)
-				     n-word-bytes)
-				  other-pointer-lowtag)))
+                         :disp (- (* (+ 1 3 vector-data-offset)
+                                     n-word-bytes)
+                                  other-pointer-lowtag)))
   (inst and y #x80000000)
   (inst and tmp #x7fffffff)
   (inst or y tmp)
@@ -372,26 +372,26 @@
   (inst xor y #x9908b0df)
   SKIP2
   (inst xor y (make-ea :dword :base state :index k :scale 4
-		       :disp (- (* (+ (- 397 624) 3 vector-data-offset)
-				   n-word-bytes)
-				other-pointer-lowtag)))
+                       :disp (- (* (+ (- 397 624) 3 vector-data-offset)
+                                   n-word-bytes)
+                                other-pointer-lowtag)))
   (inst mov (make-ea :dword :base state :index k :scale 4
-		     :disp (- (* (+ 3 vector-data-offset)
-				 n-word-bytes)
-			      other-pointer-lowtag))
-	y)
+                     :disp (- (* (+ 3 vector-data-offset)
+                                 n-word-bytes)
+                              other-pointer-lowtag))
+        y)
   (inst inc k)
   (inst cmp k (- 624 1))
   (inst jmp :b loop2)
 
   (inst mov y (make-ea :dword :base state
-		       :disp (- (* (+ (- 624 1) 3 vector-data-offset)
-				   n-word-bytes)
-				other-pointer-lowtag)))
+                       :disp (- (* (+ (- 624 1) 3 vector-data-offset)
+                                   n-word-bytes)
+                                other-pointer-lowtag)))
   (inst mov tmp (make-ea :dword :base state
-			 :disp (- (* (+ 0 3 vector-data-offset)
-				     n-word-bytes)
-				  other-pointer-lowtag)))
+                         :disp (- (* (+ 0 3 vector-data-offset)
+                                     n-word-bytes)
+                                  other-pointer-lowtag)))
   (inst and y #x80000000)
   (inst and tmp #x7fffffff)
   (inst or y tmp)
@@ -400,14 +400,14 @@
   (inst xor y #x9908b0df)
   SKIP3
   (inst xor y (make-ea :dword :base state
-		       :disp (- (* (+ (- 397 1) 3 vector-data-offset)
-				   n-word-bytes)
-				other-pointer-lowtag)))
+                       :disp (- (* (+ (- 397 1) 3 vector-data-offset)
+                                   n-word-bytes)
+                                other-pointer-lowtag)))
   (inst mov (make-ea :dword :base state
-		     :disp (- (* (+ (- 624 1) 3 vector-data-offset)
-				 n-word-bytes)
-			      other-pointer-lowtag))
-	y)
+                     :disp (- (* (+ (- 624 1) 3 vector-data-offset)
+                                 n-word-bytes)
+                              other-pointer-lowtag))
+        y)
 
   ;; Restore the temporary registers and return.
   (inst pop tmp)

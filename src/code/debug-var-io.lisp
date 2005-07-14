@@ -29,35 +29,35 @@
 (defmacro read-var-integer (vec index)
   (once-only ((val `(aref ,vec ,index)))
     `(cond ((<= ,val 253)
-	    (incf ,index)
-	    ,val)
-	   ((= ,val 254)
-	    (prog1
-		(logior (aref ,vec (+ ,index 1))
-			(ash (aref ,vec (+ ,index 2)) 8))
-	      (incf ,index 3)))
-	   (t
-	    (prog1
-		(logior (aref ,vec (+ ,index 1))
-			(ash (aref ,vec (+ ,index 2)) 8)
-	      		(ash (aref ,vec (+ ,index 3)) 16)
-	      		(ash (aref ,vec (+ ,index 4)) 24))
-	      (incf ,index 5))))))
+            (incf ,index)
+            ,val)
+           ((= ,val 254)
+            (prog1
+                (logior (aref ,vec (+ ,index 1))
+                        (ash (aref ,vec (+ ,index 2)) 8))
+              (incf ,index 3)))
+           (t
+            (prog1
+                (logior (aref ,vec (+ ,index 1))
+                        (ash (aref ,vec (+ ,index 2)) 8)
+                        (ash (aref ,vec (+ ,index 3)) 16)
+                        (ash (aref ,vec (+ ,index 4)) 24))
+              (incf ,index 5))))))
 
 ;;; Take an adjustable vector VEC with a fill pointer and push the
 ;;; variable length representation of INT on the end.
 (defun write-var-integer (int vec)
   (declare (type (unsigned-byte 32) int))
   (cond ((<= int 253)
-	 (vector-push-extend int vec))
-	(t
-	 (let ((32-p (> int #xFFFF)))
-	   (vector-push-extend (if 32-p 255 254) vec)
-	   (vector-push-extend (ldb (byte 8 0) int) vec)
-	   (vector-push-extend (ldb (byte 8 8) int) vec)
-	   (when 32-p
-	     (vector-push-extend (ldb (byte 8 16) int) vec)
-	     (vector-push-extend (ldb (byte 8 24) int) vec)))))
+         (vector-push-extend int vec))
+        (t
+         (let ((32-p (> int #xFFFF)))
+           (vector-push-extend (if 32-p 255 254) vec)
+           (vector-push-extend (ldb (byte 8 0) int) vec)
+           (vector-push-extend (ldb (byte 8 8) int) vec)
+           (when 32-p
+             (vector-push-extend (ldb (byte 8 16) int) vec)
+             (vector-push-extend (ldb (byte 8 24) int) vec)))))
   (values))
 
 ;;;; packed strings
@@ -70,9 +70,9 @@
   (once-only ((len `(read-var-integer ,vec ,index)))
     (once-only ((res `(make-string ,len)))
       `(progn
-	 (%byte-blt ,vec ,index ,res 0 ,len)
-	 (incf ,index ,len)
-	 ,res))))
+         (%byte-blt ,vec ,index ,res 0 ,len)
+         (incf ,index ,len)
+         ,res))))
 
 ;;; Write STRING into VEC (adjustable, with fill-pointer) represented
 ;;; as the length (in a var-length integer) followed by the codes of
@@ -93,6 +93,6 @@
   (once-only ((n-bytes bytes))
     (once-only ((n-res `(make-array (* ,n-bytes 8) :element-type 'bit)))
       `(progn
-	 (%byte-blt ,vec ,index ,n-res 0 ,n-bytes)
-	 (incf ,index ,n-bytes)
-	 ,n-res))))
+         (%byte-blt ,vec ,index ,n-res 0 ,n-bytes)
+         (incf ,index ,n-bytes)
+         ,n-res))))

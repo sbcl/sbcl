@@ -1,5 +1,5 @@
 ;;;; This file is for testing debugging functionality, using
-;;;; test machinery which might have side effects (e.g. 
+;;;; test machinery which might have side effects (e.g.
 ;;;; executing DEFUN).
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -8,7 +8,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -29,7 +29,7 @@
     (#.sb-vm:simple-fun-header-widetag
       (sb-kernel:%simple-fun-arglist fun))
     (#.sb-vm:closure-header-widetag (get-arglist
-				     (sb-kernel:%closure-fun fun)))
+                                     (sb-kernel:%closure-fun fun)))
     ;; In code/describe.lisp, ll. 227 (%describe-fun), we use a scheme
     ;; like above, and it seems to work. -- MNA 2001-06-12
     ;;
@@ -87,30 +87,30 @@
                                                  (sb-debug:backtrace-as-list)
                                                  :key #'car
                                                  :test #'equal))))
-                        
+
                         (setf result condition)
-                        
+
                         (unless backtrace
                           (print :missing-backtrace)
                           (setf result nil))
-                        
+
                         ;; check that we have all the frames we wanted
-                        (mapcar 
+                        (mapcar
                          (lambda (spec frame)
                            (unless (or (not spec)
                                        (and (equal (car spec) (car frame))
-                                            (args-equal (cdr spec) 
+                                            (args-equal (cdr spec)
                                                         (cdr frame))))
                              (print (list :mismatch spec frame))
                              (setf result nil)))
                          frame-specs
                          backtrace)
-                        
+
                         ;; Make sure the backtrace isn't stunted in
                         ;; any way.  (Depends on running in the main
                         ;; thread.)
                         (let ((end (last backtrace 2)))
-                          (unless (equal (caar end) 
+                          (unless (equal (caar end)
                                          (if *show-entry-point-details*
                                              '(sb-c::tl-xep sb-impl::toplevel-init)
                                              'sb-impl::toplevel-init))
@@ -144,11 +144,11 @@
            (lambda () (test #'optimized))
            (list *undefined-function-frame*
                  (list '(flet test) #'optimized))))
-  
+
   ;; bug 353: This test fails at least most of the time for x86/linux
   ;; ca. 0.8.20.16. -- WHN
   #-(and x86 linux)
-  (assert (verify-backtrace 
+  (assert (verify-backtrace
            (lambda () (test #'not-optimized))
            (list *undefined-function-frame*
                  (list '(flet not-optimized))
@@ -177,7 +177,7 @@
          (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
          (funcall fun)))
   (assert (verify-backtrace (lambda () (test #'optimized))
-                            (list '(/ 42 &rest) 
+                            (list '(/ 42 &rest)
                                   (list '(flet test) #'optimized))))
   (assert (verify-backtrace (lambda () (test #'not-optimized))
                             (list '(/ 42 &rest)
@@ -198,14 +198,14 @@
 (defmacro defbt (n ll &body body)
   `(progn
      ;; normal debug info
-     (defun ,(intern (format nil "BT.~A.1" n)) ,ll 
+     (defun ,(intern (format nil "BT.~A.1" n)) ,ll
        ,@body)
      ;; no arguments saved
-     (defun ,(intern (format nil "BT.~A.2" n)) ,ll 
+     (defun ,(intern (format nil "BT.~A.2" n)) ,ll
        (declare (optimize (debug 1) (speed 3)))
        ,@body)
      ;; no lambda-list saved
-     (defun ,(intern (format nil "BT.~A.3" n)) ,ll 
+     (defun ,(intern (format nil "BT.~A.3" n)) ,ll
        (declare (optimize (debug 0)))
        ,@body)))
 
@@ -330,18 +330,18 @@
   'ok)
 
 (let ((out (with-output-to-string (*trace-output*)
-	     (trace trace-this)
-	     (assert (eq 'ok (trace-this)))
-	     (untrace))))
+             (trace trace-this)
+             (assert (eq 'ok (trace-this)))
+             (untrace))))
   (assert (search "TRACE-THIS" out))
   (assert (search "returned OK" out)))
 
 #-(and ppc darwin)
 ;;; bug 379
 (let ((out (with-output-to-string (*trace-output*)
-	     (trace trace-this :encapsulate nil)
-	     (assert (eq 'ok (trace-this)))
-	     (untrace))))
+             (trace trace-this :encapsulate nil)
+             (assert (eq 'ok (trace-this)))
+             (untrace))))
   (assert (search "TRACE-THIS" out))
   (assert (search "returned OK" out)))
 

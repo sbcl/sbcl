@@ -3,7 +3,7 @@
 ;;; **********************************************************************
 ;;; This code was written by Paul Foley and has been placed in the public
 ;;; domain.
-;;; 
+;;;
 
 ;;; Sbcl port by Rudi Schlatte.
 
@@ -52,22 +52,22 @@
     ;;(install-single-channel-character-strategy
     ;; stream (getf options :external-format :default) nil)
     (setf (sm j-read-char stream) #'null-read-char
-	  (sm j-read-chars stream) #'null-read-chars
-	  (sm j-unread-char stream) #'null-unread-char
-	  (sm j-write-char stream) #'null-write-char
-	  (sm j-write-chars stream) #'null-write-chars
-	  (sm j-listen stream) #'null-listen))
+          (sm j-read-chars stream) #'null-read-chars
+          (sm j-unread-char stream) #'null-unread-char
+          (sm j-write-char stream) #'null-write-char
+          (sm j-write-chars stream) #'null-write-chars
+          (sm j-listen stream) #'null-listen))
   stream)
 
 (defmethod device-buffer-length ((stream null-simple-stream))
   256)
 
 (defmethod device-read ((stream null-simple-stream) buffer
-			start end blocking)
+                        start end blocking)
   (declare (ignore buffer start end blocking))
   -1)
 
 (defmethod device-write ((stream null-simple-stream) buffer
-			 start end blocking)
+                         start end blocking)
   (declare (ignore buffer blocking))
   (- end start))

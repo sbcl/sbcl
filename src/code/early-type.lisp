@@ -18,11 +18,11 @@
 ;;; and unreasonably complicated types involving AND. We just remember
 ;;; the original type spec.
 (defstruct (hairy-type (:include ctype
-				 (class-info (type-class-or-lose 'hairy))
-				 (enumerable t)
-				 (might-contain-other-types-p t))
-		       (:copier nil)
-		       #!+cmu (:pure nil))
+                                 (class-info (type-class-or-lose 'hairy))
+                                 (enumerable t)
+                                 (might-contain-other-types-p t))
+                       (:copier nil)
+                       #!+cmu (:pure nil))
   ;; the Common Lisp type-specifier of the type we represent
   (specifier nil :type t))
 
@@ -32,16 +32,16 @@
 ;;; defined). We make this distinction since we don't want to complain
 ;;; about types that are hairy but defined.
 (defstruct (unknown-type (:include hairy-type)
-			 (:copier nil)))
+                         (:copier nil)))
 
 (defstruct (negation-type (:include ctype
-				    (class-info (type-class-or-lose 'negation))
-				    ;; FIXME: is this right?  It's
-				    ;; what they had before, anyway
-				    (enumerable t)
-				    (might-contain-other-types-p t))
-			  (:copier nil)
-			  #!+cmu (:pure nil))
+                                    (class-info (type-class-or-lose 'negation))
+                                    ;; FIXME: is this right?  It's
+                                    ;; what they had before, anyway
+                                    (enumerable t)
+                                    (might-contain-other-types-p t))
+                          (:copier nil)
+                          #!+cmu (:pure nil))
   (type (missing-arg) :type ctype))
 
 (!define-type-class negation)
@@ -49,8 +49,8 @@
 ;;; ARGS-TYPE objects are used both to represent VALUES types and
 ;;; to represent FUNCTION types.
 (defstruct (args-type (:include ctype)
-		      (:constructor nil)
-		      (:copier nil))
+                      (:constructor nil)
+                      (:copier nil))
   ;; Lists of the type for each required and optional argument.
   (required nil :type list)
   (optional nil :type list)
@@ -82,38 +82,38 @@
 
 (defun args-types (lambda-list-like-thing)
   (multiple-value-bind
-	(required optional restp rest keyp keys allowp auxp aux
+        (required optional restp rest keyp keys allowp auxp aux
                   morep more-context more-count llk-p)
       (parse-lambda-list-like-thing lambda-list-like-thing)
     (declare (ignore aux morep more-context more-count))
     (when auxp
       (error "&AUX in a FUNCTION or VALUES type: ~S." lambda-list-like-thing))
     (let ((required (mapcar #'single-value-specifier-type required))
-	  (optional (mapcar #'single-value-specifier-type optional))
-	  (rest (when restp (single-value-specifier-type rest)))
-	  (keywords
-	   (collect ((key-info))
-	     (dolist (key keys)
-	       (unless (proper-list-of-length-p key 2)
-		 (error "Keyword type description is not a two-list: ~S." key))
-	       (let ((kwd (first key)))
-		 (when (find kwd (key-info) :key #'key-info-name)
-		   (error "~@<repeated keyword ~S in lambda list: ~2I~_~S~:>"
-			  kwd lambda-list-like-thing))
-		 (key-info
-		  (make-key-info
-		   :name kwd
-		   :type (single-value-specifier-type (second key))))))
-	     (key-info))))
+          (optional (mapcar #'single-value-specifier-type optional))
+          (rest (when restp (single-value-specifier-type rest)))
+          (keywords
+           (collect ((key-info))
+             (dolist (key keys)
+               (unless (proper-list-of-length-p key 2)
+                 (error "Keyword type description is not a two-list: ~S." key))
+               (let ((kwd (first key)))
+                 (when (find kwd (key-info) :key #'key-info-name)
+                   (error "~@<repeated keyword ~S in lambda list: ~2I~_~S~:>"
+                          kwd lambda-list-like-thing))
+                 (key-info
+                  (make-key-info
+                   :name kwd
+                   :type (single-value-specifier-type (second key))))))
+             (key-info))))
       (multiple-value-bind (required optional rest)
-	  (canonicalize-args-type-args required optional rest)
-	(values required optional rest keyp keywords allowp llk-p)))))
+          (canonicalize-args-type-args required optional rest)
+        (values required optional rest keyp keywords allowp llk-p)))))
 
 (defstruct (values-type
-	    (:include args-type
-		      (class-info (type-class-or-lose 'values)))
+            (:include args-type
+                      (class-info (type-class-or-lose 'values)))
             (:constructor %make-values-type)
-	    (:copier nil)))
+            (:copier nil)))
 
 (defun-cached (make-values-type-cached
                :hash-bits 8
@@ -139,10 +139,10 @@
                          required optional rest allowp)
   (if argsp
       (if (eq args '*)
-	  *wild-type*
-	  (multiple-value-bind (required optional rest keyp keywords allowp
+          *wild-type*
+          (multiple-value-bind (required optional rest keyp keywords allowp
                                 llk-p)
-	      (args-types args)
+              (args-types args)
             (declare (ignore keywords))
             (when keyp
               (error "&KEY appeared in a VALUES type specifier ~S."
@@ -168,7 +168,7 @@
 
 ;;; (SPECIFIER-TYPE 'FUNCTION) and its subtypes
 (defstruct (fun-type (:include args-type
-			       (class-info (type-class-or-lose 'function)))
+                               (class-info (type-class-or-lose 'function)))
                      (:constructor
                       %make-fun-type (&key required optional rest
                                            keyp keywords allowp
@@ -183,28 +183,28 @@
   ;; when multiple values were specified for the return.
   (returns (missing-arg) :type ctype))
 (defun make-fun-type (&rest initargs
-		      &key (args nil argsp) returns &allow-other-keys)
+                      &key (args nil argsp) returns &allow-other-keys)
   (if argsp
       (if (eq args '*)
-	  (if (eq returns *wild-type*)
-	      (specifier-type 'function)
-	      (%make-fun-type :wild-args t :returns returns))
-	  (multiple-value-bind (required optional rest keyp keywords allowp)
-	      (args-types args)
-	    (if (and (null required)
-		     (null optional)
-		     (eq rest *universal-type*)
-		     (not keyp))
-		(if (eq returns *wild-type*)
-		    (specifier-type 'function)
-		    (%make-fun-type :wild-args t :returns returns))
-		(%make-fun-type :required required
-				:optional optional
-				:rest rest
-				:keyp keyp
-				:keywords keywords
-				:allowp allowp
-				:returns returns))))
+          (if (eq returns *wild-type*)
+              (specifier-type 'function)
+              (%make-fun-type :wild-args t :returns returns))
+          (multiple-value-bind (required optional rest keyp keywords allowp)
+              (args-types args)
+            (if (and (null required)
+                     (null optional)
+                     (eq rest *universal-type*)
+                     (not keyp))
+                (if (eq returns *wild-type*)
+                    (specifier-type 'function)
+                    (%make-fun-type :wild-args t :returns returns))
+                (%make-fun-type :required required
+                                :optional optional
+                                :rest rest
+                                :keyp keyp
+                                :keywords keywords
+                                :allowp allowp
+                                :returns returns))))
       ;; FIXME: are we really sure that we won't make something that
       ;; looks like a completely wild function here?
       (apply #'%make-fun-type initargs)))
@@ -214,9 +214,9 @@
 ;;; type specifiers used within the compiler. (It represents something
 ;;; that the compiler knows to be a constant.)
 (defstruct (constant-type
-	    (:include ctype
-		      (class-info (type-class-or-lose 'constant)))
-	    (:copier nil))
+            (:include ctype
+                      (class-info (type-class-or-lose 'constant)))
+            (:copier nil))
   ;; The type which the argument must be a constant instance of for this type
   ;; specifier to win.
   (type (missing-arg) :type ctype))
@@ -226,8 +226,8 @@
 ;;; NIL aren't classes anyway, so it wouldn't make much sense to make
 ;;; them built-in classes.
 (defstruct (named-type (:include ctype
-				 (class-info (type-class-or-lose 'named)))
-		       (:copier nil))
+                                 (class-info (type-class-or-lose 'named)))
+                       (:copier nil))
   (name nil :type symbol))
 
 ;;; a list of all the float "formats" (i.e. internal representations;
@@ -242,9 +242,9 @@
 ;;; A NUMERIC-TYPE represents any numeric type, including things
 ;;; such as FIXNUM.
 (defstruct (numeric-type (:include ctype
-				   (class-info (type-class-or-lose 'number)))
-			 (:constructor %make-numeric-type)
-			 (:copier nil))
+                                   (class-info (type-class-or-lose 'number)))
+                         (:constructor %make-numeric-type)
+                         (:copier nil))
   ;; the kind of numeric type we have, or NIL if not specified (just
   ;; NUMBER or COMPLEX)
   ;;
@@ -281,54 +281,54 @@
 ;;; cases, despite the name, we return *EMPTY-TYPE* instead of a
 ;;; NUMERIC-TYPE.
 (defun make-numeric-type (&key class format (complexp :real) low high
-			       enumerable)
+                               enumerable)
   ;; if interval is empty
   (if (and low
-	   high
-	   (if (or (consp low) (consp high)) ; if either bound is exclusive
-	       (>= (type-bound-number low) (type-bound-number high))
-	       (> low high)))
+           high
+           (if (or (consp low) (consp high)) ; if either bound is exclusive
+               (>= (type-bound-number low) (type-bound-number high))
+               (> low high)))
       *empty-type*
       (multiple-value-bind (canonical-low canonical-high)
-	  (case class
-	    (integer
-	     ;; INTEGER types always have their LOW and HIGH bounds
-	     ;; represented as inclusive, not exclusive values.
-	     (values (if (consp low)
-			 (1+ (type-bound-number low))
-			 low)
-		     (if (consp high)
-			 (1- (type-bound-number high))
-			 high)))
-	    (t 
-	     ;; no canonicalization necessary
-	     (values low high)))
-	(when (and (eq class 'rational)
-		   (integerp canonical-low)
-		   (integerp canonical-high)
-		   (= canonical-low canonical-high))
-	  (setf class 'integer))
-	(%make-numeric-type :class class
-			    :format format
-			    :complexp complexp
-			    :low canonical-low
-			    :high canonical-high
-			    :enumerable enumerable))))
+          (case class
+            (integer
+             ;; INTEGER types always have their LOW and HIGH bounds
+             ;; represented as inclusive, not exclusive values.
+             (values (if (consp low)
+                         (1+ (type-bound-number low))
+                         low)
+                     (if (consp high)
+                         (1- (type-bound-number high))
+                         high)))
+            (t
+             ;; no canonicalization necessary
+             (values low high)))
+        (when (and (eq class 'rational)
+                   (integerp canonical-low)
+                   (integerp canonical-high)
+                   (= canonical-low canonical-high))
+          (setf class 'integer))
+        (%make-numeric-type :class class
+                            :format format
+                            :complexp complexp
+                            :low canonical-low
+                            :high canonical-high
+                            :enumerable enumerable))))
 
 (defun modified-numeric-type (base
-			      &key
-			      (class      (numeric-type-class      base))
-			      (format     (numeric-type-format     base))
-			      (complexp   (numeric-type-complexp   base))
-			      (low        (numeric-type-low        base))
-			      (high       (numeric-type-high       base))
-			      (enumerable (numeric-type-enumerable base)))
+                              &key
+                              (class      (numeric-type-class      base))
+                              (format     (numeric-type-format     base))
+                              (complexp   (numeric-type-complexp   base))
+                              (low        (numeric-type-low        base))
+                              (high       (numeric-type-high       base))
+                              (enumerable (numeric-type-enumerable base)))
   (make-numeric-type :class class
-		     :format format
-		     :complexp complexp
-		     :low low
-		     :high high
-		     :enumerable enumerable))
+                     :format format
+                     :complexp complexp
+                     :low low
+                     :high high
+                     :enumerable enumerable))
 
 (defstruct (character-set-type
             (:include ctype
@@ -361,9 +361,9 @@
 ;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-BASE-STRING.
 (defstruct (array-type (:include ctype
-				 (class-info (type-class-or-lose 'array)))
+                                 (class-info (type-class-or-lose 'array)))
                        (:constructor %make-array-type)
-		       (:copier nil))
+                       (:copier nil))
   ;; the dimensions of the array, or * if unspecified. If a dimension
   ;; is unspecified, it is *.
   (dimensions '* :type (or list (member *)))
@@ -379,11 +379,11 @@
 ;;; bother with this at this level because MEMBER types are fairly
 ;;; important and union and intersection are well defined.
 (defstruct (member-type (:include ctype
-				  (class-info (type-class-or-lose 'member))
-				  (enumerable t))
-			(:copier nil)
-			(:constructor %make-member-type (members))
-			#-sb-xc-host (:pure nil))
+                                  (class-info (type-class-or-lose 'member))
+                                  (enumerable t))
+                        (:copier nil)
+                        (:constructor %make-member-type (members))
+                        #-sb-xc-host (:pure nil))
   ;; the things in the set, with no duplications
   (members nil :type list))
 (defun make-member-type (&key members)
@@ -395,35 +395,35 @@
   ;; ranges are compared by arithmetic operators (while MEMBERship is
   ;; compared by EQL).  -- CSR, 2003-04-23
   (let ((singlep (subsetp `(,(load-time-value (make-unportable-float :single-float-negative-zero)) 0.0f0) members))
-	(doublep (subsetp `(,(load-time-value (make-unportable-float :double-float-negative-zero)) 0.0d0) members))
-	#!+long-float
-	(longp (subsetp `(,(load-time-value (make-unportable-float :long-float-negative-zero)) 0.0l0) members)))
+        (doublep (subsetp `(,(load-time-value (make-unportable-float :double-float-negative-zero)) 0.0d0) members))
+        #!+long-float
+        (longp (subsetp `(,(load-time-value (make-unportable-float :long-float-negative-zero)) 0.0l0) members)))
     (if (or singlep doublep #!+long-float longp)
-	(let (union-types)
-	  (when singlep
-	    (push (ctype-of 0.0f0) union-types)
-	    (setf members (set-difference members `(,(load-time-value (make-unportable-float :single-float-negative-zero)) 0.0f0))))
-	  (when doublep
-	    (push (ctype-of 0.0d0) union-types)
-	    (setf members (set-difference members `(,(load-time-value (make-unportable-float :double-float-negative-zero)) 0.0d0))))
-	  #!+long-float
-	  (when longp
-	    (push (ctype-of 0.0l0) union-types)
-	    (setf members (set-difference members `(,(load-time-value (make-unportable-float :long-float-negative-zero)) 0.0l0))))
-	  (aver (not (null union-types)))
-	  (make-union-type t
-			   (if (null members)
-			       union-types
-			       (cons (%make-member-type members)
-				     union-types))))
-	(%make-member-type members))))
+        (let (union-types)
+          (when singlep
+            (push (ctype-of 0.0f0) union-types)
+            (setf members (set-difference members `(,(load-time-value (make-unportable-float :single-float-negative-zero)) 0.0f0))))
+          (when doublep
+            (push (ctype-of 0.0d0) union-types)
+            (setf members (set-difference members `(,(load-time-value (make-unportable-float :double-float-negative-zero)) 0.0d0))))
+          #!+long-float
+          (when longp
+            (push (ctype-of 0.0l0) union-types)
+            (setf members (set-difference members `(,(load-time-value (make-unportable-float :long-float-negative-zero)) 0.0l0))))
+          (aver (not (null union-types)))
+          (make-union-type t
+                           (if (null members)
+                               union-types
+                               (cons (%make-member-type members)
+                                     union-types))))
+        (%make-member-type members))))
 
 ;;; A COMPOUND-TYPE is a type defined out of a set of types, the
 ;;; common parent of UNION-TYPE and INTERSECTION-TYPE.
 (defstruct (compound-type (:include ctype
-				    (might-contain-other-types-p t))
-			  (:constructor nil)
-			  (:copier nil))
+                                    (might-contain-other-types-p t))
+                          (:constructor nil)
+                          (:copier nil))
   (types nil :type list :read-only t))
 
 ;;; A UNION-TYPE represents a use of the OR type specifier which we
@@ -434,9 +434,9 @@
 ;;;      this hadn't been fully implemented yet.
 ;;;   2. There are never any UNION-TYPE components.
 (defstruct (union-type (:include compound-type
-				 (class-info (type-class-or-lose 'union)))
-		       (:constructor %make-union-type (enumerable types))
-		       (:copier nil)))
+                                 (class-info (type-class-or-lose 'union)))
+                       (:constructor %make-union-type (enumerable types))
+                       (:copier nil)))
 (define-cached-synonym make-union-type)
 
 ;;; An INTERSECTION-TYPE represents a use of the AND type specifier
@@ -451,11 +451,11 @@
 ;;;      unions contain intersections and not vice versa, or we
 ;;;      should just punt to using a HAIRY-TYPE.
 (defstruct (intersection-type (:include compound-type
-					(class-info (type-class-or-lose
-						     'intersection)))
-			      (:constructor %make-intersection-type
-					    (enumerable types))
-			      (:copier nil)))
+                                        (class-info (type-class-or-lose
+                                                     'intersection)))
+                              (:constructor %make-intersection-type
+                                            (enumerable types))
+                              (:copier nil)))
 
 ;;; Return TYPE converted to canonical form for a situation where the
 ;;; "type" '* (which SBCL still represents as a type even though ANSI
@@ -468,10 +468,10 @@
 
 ;;; A CONS-TYPE is used to represent a CONS type.
 (defstruct (cons-type (:include ctype (class-info (type-class-or-lose 'cons)))
-		      (:constructor
-		       %make-cons-type (car-type
-					cdr-type))
-		      (:copier nil))
+                      (:constructor
+                       %make-cons-type (car-type
+                                        cdr-type))
+                      (:copier nil))
   ;; the CAR and CDR element types (to support ANSI (CONS FOO BAR) types)
   ;;
   ;; FIXME: Most or all other type structure slots could also be :READ-ONLY.
@@ -481,7 +481,7 @@
   (aver (not (or (eq car-type *wild-type*)
                  (eq cdr-type *wild-type*))))
   (if (or (eq car-type *empty-type*)
-	  (eq cdr-type *empty-type*))
+          (eq cdr-type *empty-type*))
       *empty-type*
       (%make-cons-type car-type cdr-type)))
 
@@ -491,17 +491,17 @@
        (cdr (cons-type-cdr-type type) (cons-type-cdr-type cdr)))
       ((not (cons-type-p cdr))
        (cond
-	 ((csubtypep cdr (specifier-type 'null))
-	  (values min t))
-	 ((csubtypep *universal-type* cdr)
-	  (values min nil))
-	 ((type/= (type-intersection (specifier-type 'cons) cdr) *empty-type*)
-	  (values min nil))
-	 ((type/= (type-intersection (specifier-type 'null) cdr) *empty-type*)
-	  (values min t))
-	 (t (values min :maybe))))
+         ((csubtypep cdr (specifier-type 'null))
+          (values min t))
+         ((csubtypep *universal-type* cdr)
+          (values min nil))
+         ((type/= (type-intersection (specifier-type 'cons) cdr) *empty-type*)
+          (values min nil))
+         ((type/= (type-intersection (specifier-type 'null) cdr) *empty-type*)
+          (values min t))
+         (t (values min :maybe))))
     ()))
-       
+
 
 ;;;; type utilities
 
@@ -511,49 +511,49 @@
 ;;; Note: VALUES-SPECIFIER-TYPE-CACHE-CLEAR must be called whenever a
 ;;; type is defined (or redefined).
 (defun-cached (values-specifier-type
-	       :hash-function (lambda (x)
+               :hash-function (lambda (x)
                                 (logand (sxhash x) #x3FF))
-	       :hash-bits 10
-	       :init-wrapper !cold-init-forms)
-	      ((orig equal-but-no-car-recursion))
+               :hash-bits 10
+               :init-wrapper !cold-init-forms)
+              ((orig equal-but-no-car-recursion))
   (let ((u (uncross orig)))
     (or (info :type :builtin u)
-	(let ((spec (type-expand u)))
-	  (cond
-	   ((and (not (eq spec u))
-		 (info :type :builtin spec)))
-	   ((eq (info :type :kind spec) :instance)
-	    (find-classoid spec))
-	   ((typep spec 'classoid)
-	    ;; There doesn't seem to be any way to translate
-	    ;; (TYPEP SPEC 'BUILT-IN-CLASS) into something which can be
-	    ;; executed on the host Common Lisp at cross-compilation time.
-	    #+sb-xc-host (error
-			  "stub: (TYPEP SPEC 'BUILT-IN-CLASS) on xc host")
-	    (if (typep spec 'built-in-classoid)
-		(or (built-in-classoid-translation spec) spec)
-		spec))
-	   (t
-	    (when (and (atom spec)
-		       (member spec '(and or not member eql satisfies values)))
-	      (error "The symbol ~S is not valid as a type specifier." spec))
-	    (let* ((lspec (if (atom spec) (list spec) spec))
-		   (fun (info :type :translator (car lspec))))
-	      (cond (fun
-		     (funcall fun lspec))
-		    ((or (and (consp spec) (symbolp (car spec))
-			      (not (info :type :builtin (car spec))))
-			 (and (symbolp spec) (not (info :type :builtin spec))))
-		     (when (and *type-system-initialized*
+        (let ((spec (type-expand u)))
+          (cond
+           ((and (not (eq spec u))
+                 (info :type :builtin spec)))
+           ((eq (info :type :kind spec) :instance)
+            (find-classoid spec))
+           ((typep spec 'classoid)
+            ;; There doesn't seem to be any way to translate
+            ;; (TYPEP SPEC 'BUILT-IN-CLASS) into something which can be
+            ;; executed on the host Common Lisp at cross-compilation time.
+            #+sb-xc-host (error
+                          "stub: (TYPEP SPEC 'BUILT-IN-CLASS) on xc host")
+            (if (typep spec 'built-in-classoid)
+                (or (built-in-classoid-translation spec) spec)
+                spec))
+           (t
+            (when (and (atom spec)
+                       (member spec '(and or not member eql satisfies values)))
+              (error "The symbol ~S is not valid as a type specifier." spec))
+            (let* ((lspec (if (atom spec) (list spec) spec))
+                   (fun (info :type :translator (car lspec))))
+              (cond (fun
+                     (funcall fun lspec))
+                    ((or (and (consp spec) (symbolp (car spec))
+                              (not (info :type :builtin (car spec))))
+                         (and (symbolp spec) (not (info :type :builtin spec))))
+                     (when (and *type-system-initialized*
                                 (not (eq (info :type :kind spec)
                                          :forthcoming-defclass-type)))
-		       (signal 'parse-unknown-type :specifier spec))
-		     ;; (The RETURN-FROM here inhibits caching.)
-		     (return-from values-specifier-type
-		       (make-unknown-type :specifier spec)))
-		    (t
-		     (error "bad thing to be a type specifier: ~S"
-			    spec))))))))))
+                       (signal 'parse-unknown-type :specifier spec))
+                     ;; (The RETURN-FROM here inhibits caching.)
+                     (return-from values-specifier-type
+                       (make-unknown-type :specifier spec)))
+                    (t
+                     (error "bad thing to be a type specifier: ~S"
+                            spec))))))))))
 
 ;;; This is like VALUES-SPECIFIER-TYPE, except that we guarantee to
 ;;; never return a VALUES type.
@@ -577,7 +577,7 @@
   (let ((def (cond ((symbolp form)
                     (info :type :expander form))
                    ((and (consp form) (symbolp (car form)))
-		    (info :type :expander (car form)))
+                    (info :type :expander (car form)))
                    (t nil))))
     (if def
         (type-expand (funcall def (if (consp form) form (list form))))

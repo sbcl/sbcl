@@ -59,7 +59,7 @@
   (inst subu count (fixnumize 1))
   (inst bne count zero-tn loop)
   (inst addu dst n-word-bytes)
-		
+
   (inst b done)
   (inst nop)
 
@@ -75,12 +75,12 @@
   DEFAULT-A5-AND-ON
   (move a5 null-tn)
   DONE
-  
+
   ;; Clear the stack.
   (move ocfp-tn cfp-tn)
   (move cfp-tn ocfp)
   (inst addu csp-tn ocfp-tn nvals)
-  
+
   ;; Return.
   (lisp-return lra lip))
 
@@ -119,7 +119,7 @@
 
   ;; Calculate NARGS (as a fixnum)
   (inst subu nargs csp-tn args)
-     
+
   ;; Load the argument regs (must do this now, 'cause the blt might
   ;; trash these locations)
   (inst lw a0 args (* 0 n-word-bytes))
@@ -134,7 +134,7 @@
   (inst blez count done)
   (inst addu src args (* n-word-bytes register-arg-count))
   (inst addu dst cfp-tn (* n-word-bytes register-arg-count))
-	
+
   LOOP
   ;; Copy one arg.
   (inst lw temp src)
@@ -143,7 +143,7 @@
   (inst addu count (fixnumize -1))
   (inst bgtz count loop)
   (inst addu dst dst n-word-bytes)
-	
+
   DONE
   ;; We are done.  Do the jump.
   (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
@@ -175,11 +175,11 @@
   (loadw target-uwp block unwind-block-current-uwp-slot)
   (inst bne cur-uwp target-uwp do-uwp)
   (inst nop)
-      
+
   (move cur-uwp block)
 
   DO-EXIT
-      
+
   (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
   (loadw code-tn cur-uwp unwind-block-current-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
@@ -199,24 +199,24 @@
      (:arg count any-reg nargs-offset)
      (:temp catch any-reg a1-offset)
      (:temp tag descriptor-reg a2-offset))
-  
+
   (declare (ignore start count)) ; We only need them in the registers.
 
   (load-symbol-value catch *current-catch-block*)
 
   LOOP
-  
+
   (let ((error (generate-error-code nil unseen-throw-tag-error target)))
     (inst beq catch zero-tn error)
     (inst nop))
-  
+
   (loadw tag catch catch-block-tag-slot)
   (inst beq tag target exit)
   (inst nop)
   (inst b loop)
   (loadw catch catch catch-block-previous-catch-slot)
-  
+
   EXIT
-  
+
   (inst j (make-fixup 'unwind :assembly-routine))
   (move target catch t))

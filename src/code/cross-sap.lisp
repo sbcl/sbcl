@@ -16,7 +16,7 @@
 ;;; so we need a compound type to represent it in the host Common Lisp
 ;;; at cross-compile time:
 (defstruct (system-area-pointer (:constructor make-sap)
-				(:conc-name "SAP-"))
+                                (:conc-name "SAP-"))
   ;; the integer representation of the address
   (int (error "missing SAP-INT argument") :type sap-int :read-only t))
 
@@ -28,10 +28,10 @@
   (make-sap :int (+ (sap-int sap) offset)))
 #.`(progn
      ,@(mapcar (lambda (info)
-		 (destructuring-bind (sap-fun int-fun) info
-		   `(defun ,sap-fun (x y)
-		      (,int-fun (sap-int x) (sap-int y)))))
-	       '((sap< <) (sap<= <=) (sap= =) (sap>= >=) (sap> >) (sap- -))))
+                 (destructuring-bind (sap-fun int-fun) info
+                   `(defun ,sap-fun (x y)
+                      (,int-fun (sap-int x) (sap-int y)))))
+               '((sap< <) (sap<= <=) (sap= =) (sap>= >=) (sap> >) (sap- -))))
 
 ;;; dummies, defined so that we can declare they never return and
 ;;; thereby eliminate a thundering herd of optimization notes along
@@ -41,26 +41,26 @@
   (error "~S doesn't make sense on cross-compilation host." name))
 #.`(progn
      ,@(mapcan (lambda (name)
-		 `((declaim (ftype (function (system-area-pointer fixnum) nil)
-				   ,name))
-		   (defun ,name (sap offset)
-		     (declare (ignore sap offset))
-		     (sap-ref-stub ',name))
-		   ,@(let ((setter-stub (gensym "SETTER-STUB-")))
-		       `((defun ,setter-stub (foo sap offset)
-			   (declare (ignore foo sap offset))
-			   (sap-ref-stub '(setf ,name)))
-			 (defsetf ,name ,setter-stub)))))
-	       '(sap-ref-8
-		 sap-ref-16
-		 sap-ref-32
-		 sap-ref-64
-		 sap-ref-sap
-		 sap-ref-word
-		 sap-ref-single
-		 sap-ref-double
-		 signed-sap-ref-8
-		 signed-sap-ref-16
-		 signed-sap-ref-32
-		 signed-sap-ref-64
-		 signed-sap-ref-word)))
+                 `((declaim (ftype (function (system-area-pointer fixnum) nil)
+                                   ,name))
+                   (defun ,name (sap offset)
+                     (declare (ignore sap offset))
+                     (sap-ref-stub ',name))
+                   ,@(let ((setter-stub (gensym "SETTER-STUB-")))
+                       `((defun ,setter-stub (foo sap offset)
+                           (declare (ignore foo sap offset))
+                           (sap-ref-stub '(setf ,name)))
+                         (defsetf ,name ,setter-stub)))))
+               '(sap-ref-8
+                 sap-ref-16
+                 sap-ref-32
+                 sap-ref-64
+                 sap-ref-sap
+                 sap-ref-word
+                 sap-ref-single
+                 sap-ref-double
+                 signed-sap-ref-8
+                 signed-sap-ref-16
+                 signed-sap-ref-32
+                 signed-sap-ref-64
+                 signed-sap-ref-word)))

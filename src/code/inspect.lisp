@@ -50,68 +50,68 @@ evaluated expressions.
 (defun %inspect (*inspected* s)
   (named-let redisplay () ; "LAMBDA, the ultimate GOTO":-|
     (multiple-value-bind (description named-p elements)
-	(inspected-parts *inspected*)
+        (inspected-parts *inspected*)
       (tty-display-inspected-parts description named-p elements s)
       (named-let reread ()
-	(format s "~&> ")
-	(force-output)
-	(let* (;; newly-consed object for hermetic protection against
-	       ;; mischievous input like #.*EOF-OBJECT*:
-	       (eof (cons *eof-object* nil))
+        (format s "~&> ")
+        (force-output)
+        (let* (;; newly-consed object for hermetic protection against
+               ;; mischievous input like #.*EOF-OBJECT*:
+               (eof (cons *eof-object* nil))
                (command (read *standard-input* nil eof)))
           (when (eq command eof)
-	     ;; currently-undocumented feature: EOF is handled as Q.
-	     ;; If there's ever consensus that this is *the* right
-	     ;; thing to do (as opposed to e.g. handling it as U), we
-	     ;; could document it. Meanwhile, it seems more Unix-y to
-	     ;; do this than to signal an error.
-	     (/show0 "THROWing QUIT-INSPECT for EOF")
-	     (throw 'quit-inspect nil))
-	  (typecase command
-	    (integer
-	     (let ((elements-length (length elements)))
-	       (cond ((< -1 command elements-length)
-		      (let* ((element (nth command elements))
-			     (value (if named-p (cdr element) element)))
-			(cond ((eq value *inspect-unbound-object-marker*)
-			       (format s "~%That slot is unbound.~%")
-			       (return-from %inspect (reread)))
-			      (t
-			       (%inspect value s)
-			       ;; If we ever return, then we should be
-			       ;; looking at *INSPECTED* again.
-			       (return-from %inspect (redisplay))))))
-		     ((zerop elements-length)
-		      (format s "~%The object contains nothing to inspect.~%")
-		      (return-from %inspect (reread)))
-		     (t
-		      (format s "~%Enter a valid index (~:[0-~W~;0~]).~%"
-			      (= elements-length 1) (1- elements-length))
-		      (return-from %inspect (reread))))))
-	    (symbol
-	     (case (find-symbol (symbol-name command) *keyword-package*)
-	       ((:q :e)
-		(/show0 "THROWing QUIT-INSPECT for :Q or :E")
-		(throw 'quit-inspect nil))
-	       (:u
-		(return-from %inspect))
-	       (:r
-		(return-from %inspect (redisplay)))
-	       ((:h :? :help)
-		(write-string *help-for-inspect* s)
-		(return-from %inspect (reread)))
-	       (t
-		(eval-for-inspect command s)
-		(return-from %inspect (reread)))))
-	    (t
-	     (eval-for-inspect command s)
-	     (return-from %inspect (reread)))))))))
+             ;; currently-undocumented feature: EOF is handled as Q.
+             ;; If there's ever consensus that this is *the* right
+             ;; thing to do (as opposed to e.g. handling it as U), we
+             ;; could document it. Meanwhile, it seems more Unix-y to
+             ;; do this than to signal an error.
+             (/show0 "THROWing QUIT-INSPECT for EOF")
+             (throw 'quit-inspect nil))
+          (typecase command
+            (integer
+             (let ((elements-length (length elements)))
+               (cond ((< -1 command elements-length)
+                      (let* ((element (nth command elements))
+                             (value (if named-p (cdr element) element)))
+                        (cond ((eq value *inspect-unbound-object-marker*)
+                               (format s "~%That slot is unbound.~%")
+                               (return-from %inspect (reread)))
+                              (t
+                               (%inspect value s)
+                               ;; If we ever return, then we should be
+                               ;; looking at *INSPECTED* again.
+                               (return-from %inspect (redisplay))))))
+                     ((zerop elements-length)
+                      (format s "~%The object contains nothing to inspect.~%")
+                      (return-from %inspect (reread)))
+                     (t
+                      (format s "~%Enter a valid index (~:[0-~W~;0~]).~%"
+                              (= elements-length 1) (1- elements-length))
+                      (return-from %inspect (reread))))))
+            (symbol
+             (case (find-symbol (symbol-name command) *keyword-package*)
+               ((:q :e)
+                (/show0 "THROWing QUIT-INSPECT for :Q or :E")
+                (throw 'quit-inspect nil))
+               (:u
+                (return-from %inspect))
+               (:r
+                (return-from %inspect (redisplay)))
+               ((:h :? :help)
+                (write-string *help-for-inspect* s)
+                (return-from %inspect (reread)))
+               (t
+                (eval-for-inspect command s)
+                (return-from %inspect (reread)))))
+            (t
+             (eval-for-inspect command s)
+             (return-from %inspect (reread)))))))))
 
 (defun eval-for-inspect (command stream)
   (let ((result-list (restart-case (multiple-value-list (eval command))
-		       (nil () :report "Return to the inspector."
-			  (format stream "~%returning to the inspector~%")
-			  (return-from eval-for-inspect nil)))))
+                       (nil () :report "Return to the inspector."
+                          (format stream "~%returning to the inspector~%")
+                          (return-from eval-for-inspect nil)))))
     ;; FIXME: Much of this interactive-EVAL logic is shared with
     ;; the main REPL EVAL and with the debugger EVAL. The code should
     ;; be shared explicitly.
@@ -125,12 +125,12 @@ evaluated expressions.
   (let ((index 0))
     (dolist (element elements)
       (if named-p
-	  (destructuring-bind (name . value) element
-	    (format stream "~W. ~A: ~W~%" index name
-		    (if (eq value *inspect-unbound-object-marker*)
-			"unbound"
-			value)))
-	  (format stream "~W. ~W~%" index element))
+          (destructuring-bind (name . value) element
+            (format stream "~W. ~A: ~W~%" index name
+                    (if (eq value *inspect-unbound-object-marker*)
+                        "unbound"
+                        value)))
+          (format stream "~W. ~W~%" index element))
       (incf index))))
 
 ;;;; INSPECTED-PARTS
@@ -156,16 +156,16 @@ evaluated expressions.
 
 (defmethod inspected-parts ((object symbol))
   (values (format nil "The object is a SYMBOL.~%")
-	  t
-	  (list (cons "Name" (symbol-name object))
-		(cons "Package" (symbol-package object))
-	        (cons "Value" (if (boundp object)
-				  (symbol-value object)
-				  *inspect-unbound-object-marker*))
-		(cons "Function" (if (fboundp object)
-				     (symbol-function object)
-				     *inspect-unbound-object-marker*))
-		(cons "Plist" (symbol-plist object)))))
+          t
+          (list (cons "Name" (symbol-name object))
+                (cons "Package" (symbol-package object))
+                (cons "Value" (if (boundp object)
+                                  (symbol-value object)
+                                  *inspect-unbound-object-marker*))
+                (cons "Function" (if (fboundp object)
+                                     (symbol-function object)
+                                     *inspect-unbound-object-marker*))
+                (cons "Plist" (symbol-plist object)))))
 
 (defun inspected-structure-elements (object)
   (let ((parts-list '())
@@ -178,40 +178,40 @@ evaluated expressions.
 
 (defmethod inspected-parts ((object structure-object))
   (values (format nil "The object is a STRUCTURE-OBJECT of type ~S.~%"
-		  (type-of object))
-	  t
-	  (inspected-structure-elements object)))
+                  (type-of object))
+          t
+          (inspected-structure-elements object)))
 
 (defun inspected-standard-object-elements (object)
   (let ((reversed-elements nil)
-	(class-slots (sb-pcl::class-slots (class-of object))))
+        (class-slots (sb-pcl::class-slots (class-of object))))
     (dolist (class-slot class-slots (nreverse reversed-elements))
       (let* ((slot-name (slot-value class-slot 'sb-pcl::name))
-	     (slot-value (if (slot-boundp object slot-name)
-			     (slot-value object slot-name)
-			     *inspect-unbound-object-marker*)))
-	(push (cons slot-name slot-value) reversed-elements)))))
+             (slot-value (if (slot-boundp object slot-name)
+                             (slot-value object slot-name)
+                             *inspect-unbound-object-marker*)))
+        (push (cons slot-name slot-value) reversed-elements)))))
 
 (defmethod inspected-parts ((object standard-object))
   (values (format nil "The object is a STANDARD-OBJECT of type ~S.~%"
-		  (type-of object))
-	  t
-	  (inspected-standard-object-elements object)))
+                  (type-of object))
+          t
+          (inspected-standard-object-elements object)))
 
 (defmethod inspected-parts ((object funcallable-instance))
   (values (format nil "The object is a FUNCALLABLE-INSTANCE of type ~S.~%"
-		  (type-of object))
-	  t
-	  (inspected-standard-object-elements object)))
+                  (type-of object))
+          t
+          (inspected-standard-object-elements object)))
 
 (defmethod inspected-parts ((object condition))
   (values (format nil "The object is a CONDITION of type ~S.~%"
-		  (type-of object))
-	  t
-	  (inspected-standard-object-elements object)))
+                  (type-of object))
+          t
+          (inspected-standard-object-elements object)))
 
 (defmethod inspected-parts ((object function))
-           (values (format nil "The object is a ~A named ~S.~%" 
+           (values (format nil "The object is a ~A named ~S.~%"
                            (if (closurep object) 'closure 'function)
                            (%fun-name object))
                    t
@@ -227,48 +227,48 @@ evaluated expressions.
 
 (defmethod inspected-parts ((object vector))
   (values (format nil
-		  "The object is a ~:[~;displaced ~]VECTOR of length ~W.~%"
-		  (and (array-header-p object)
-		       (%array-displaced-p object))
-		  (length object))
-	  nil
-	  ;; FIXME: Should we respect *INSPECT-LENGTH* here? If not, what
-	  ;; does *INSPECT-LENGTH* mean?
-	  (coerce object 'list)))
+                  "The object is a ~:[~;displaced ~]VECTOR of length ~W.~%"
+                  (and (array-header-p object)
+                       (%array-displaced-p object))
+                  (length object))
+          nil
+          ;; FIXME: Should we respect *INSPECT-LENGTH* here? If not, what
+          ;; does *INSPECT-LENGTH* mean?
+          (coerce object 'list)))
 
 (defun inspected-index-string (index rev-dimensions)
   (if (null rev-dimensions)
       "[]"
       (let ((list nil))
-	(dolist (dim rev-dimensions)
-	  (multiple-value-bind (q r) (floor index dim)
-	    (setq index q)
-	    (push r list)))
-	(format nil "[~W~{,~W~}]" (car list) (cdr list)))))
+        (dolist (dim rev-dimensions)
+          (multiple-value-bind (q r) (floor index dim)
+            (setq index q)
+            (push r list)))
+        (format nil "[~W~{,~W~}]" (car list) (cdr list)))))
 
 (defmethod inspected-parts ((object array))
   (let* ((length (min (array-total-size object) *inspect-length*))
-	 (reference-array (make-array length 
-				      :element-type (array-element-type object)
-				      :displaced-to object))
-	 (dimensions (array-dimensions object))
-	 (reversed-elements nil))
+         (reference-array (make-array length
+                                      :element-type (array-element-type object)
+                                      :displaced-to object))
+         (dimensions (array-dimensions object))
+         (reversed-elements nil))
     ;; FIXME: Should we respect *INSPECT-LENGTH* here? If not, what does
     ;; *INSPECT-LENGTH* mean?
     (dotimes (i length)
       (push (cons (format nil
-			  "~A "
-			  (inspected-index-string i (reverse dimensions)))
-		  (aref reference-array i))
-	    reversed-elements))
+                          "~A "
+                          (inspected-index-string i (reverse dimensions)))
+                  (aref reference-array i))
+            reversed-elements))
     (values (format nil "The object is ~:[a displaced~;an~] ARRAY of ~A.~%~
                          Its dimensions are ~S.~%"
-		    (array-element-type object)
-		    (and (array-header-p object)
-			 (%array-displaced-p object))
-		    dimensions)
-	    t
-	    (nreverse reversed-elements))))
+                    (array-element-type object)
+                    (and (array-header-p object)
+                         (%array-displaced-p object))
+                    dimensions)
+            t
+            (nreverse reversed-elements))))
 
 (defmethod inspected-parts ((object cons))
   (if (consp (cdr object))
@@ -278,31 +278,31 @@ evaluated expressions.
 (defun inspected-parts-of-simple-cons (object)
   (values "The object is a CONS.
 "
-	  t
-	  (list (cons 'car (car object))
-		(cons 'cdr (cdr object)))))
+          t
+          (list (cons 'car (car object))
+                (cons 'cdr (cdr object)))))
 
 (defun inspected-parts-of-nontrivial-list (object)
   (let ((length 0)
-	(in-list object)
-	(reversed-elements nil))
+        (in-list object)
+        (reversed-elements nil))
     (flet ((done (description-format)
-	     (return-from inspected-parts-of-nontrivial-list
-	       (values (format nil description-format length)
-		       t
-		       (nreverse reversed-elements)))))
+             (return-from inspected-parts-of-nontrivial-list
+               (values (format nil description-format length)
+                       t
+                       (nreverse reversed-elements)))))
       (loop
        (cond ((null in-list)
-	      (done "The object is a proper list of length ~S.~%"))
-	     ((>= length *inspect-length*)
-	      (push (cons 'rest in-list) reversed-elements)
-	      (done "The object is a long list (more than ~S elements).~%"))
-	     ((consp in-list)
-	      (push (cons length (pop in-list)) reversed-elements)
-	      (incf length))
-	     (t
-	      (push (cons 'rest in-list) reversed-elements)
-	      (done "The object is an improper list of length ~S.~%")))))))
+              (done "The object is a proper list of length ~S.~%"))
+             ((>= length *inspect-length*)
+              (push (cons 'rest in-list) reversed-elements)
+              (done "The object is a long list (more than ~S elements).~%"))
+             ((consp in-list)
+              (push (cons length (pop in-list)) reversed-elements)
+              (incf length))
+             (t
+              (push (cons 'rest in-list) reversed-elements)
+              (done "The object is an improper list of length ~S.~%")))))))
 
 (defmethod inspected-parts ((object t))
   (values (format nil "The object is an ATOM:~%  ~W~%" object) nil nil))

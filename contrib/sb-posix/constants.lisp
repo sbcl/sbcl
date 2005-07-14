@@ -6,11 +6,11 @@
 (#||#
  "sys/types.h"
  "sys/stat.h"
- 
+
  "sys/socket.h" "sys/un.h" "netinet/in.h" "netinet/in_systm.h"
  "netinet/ip.h" "net/if.h" "netinet/tcp.h" "sys/mman.h" "sys/wait.h"
- "fcntl.h" 
- "netdb.h" "errno.h" 
+ "fcntl.h"
+ "netdb.h" "errno.h"
  "dirent.h" "signal.h"
  "unistd.h"
 
@@ -28,7 +28,7 @@
  (:type nlink-t "nlink_t")
  (:type time-t "time_t")
  (:type dev-t "dev_t")
- 
+
  ;; signals
  (:integer SIGHUP "SIGHUP" #+sb-doc "terminal line hangup." t)
  (:integer SIGINT "SIGINT" #+sb-doc "interrupt program." t)
@@ -195,7 +195,7 @@
  (:integer edquot "EDQUOT" nil t)
  (:integer enomedium "ENOMEDIUM" nil t)
  (:integer emediumtype "EMEDIUMTYPE" nil t)
- 
+
  ;; wait
  (:integer wnohang "WNOHANG")
  (:integer wuntraced "WUNTRACED")
@@ -242,22 +242,22 @@
 
  ;; opendir()
  (:structure dirent
-	     ("struct dirent"
-	      (:c-string name "char *" "d_name"
-			 :distrust-length #+sunos t #-sunos nil)) t)
+             ("struct dirent"
+              (:c-string name "char *" "d_name"
+                         :distrust-length #+sunos t #-sunos nil)) t)
 
  (:structure alien-stat
-	     ("struct stat"
-	      (mode-t mode "mode_t" "st_mode")
-	      (ino-t ino "ino_t" "st_ino")
-	      (dev-t dev "dev_t" "st_dev")
-	      (nlink-t nlink "nlink_t" "st_nlink")
-	      (uid-t uid "uid_t" "st_uid")
-	      (gid-t gid "gid_t" "st_gid")
-	      (off-t size "off_t" "st_size")
-	      (time-t atime "time_t" "st_atime")
-	      (time-t mtime "time_t" "st_mtime")
-	      (time-t ctime "time_t" "st_ctime")))
+             ("struct stat"
+              (mode-t mode "mode_t" "st_mode")
+              (ino-t ino "ino_t" "st_ino")
+              (dev-t dev "dev_t" "st_dev")
+              (nlink-t nlink "nlink_t" "st_nlink")
+              (uid-t uid "uid_t" "st_uid")
+              (gid-t gid "gid_t" "st_gid")
+              (off-t size "off_t" "st_size")
+              (time-t atime "time_t" "st_atime")
+              (time-t mtime "time_t" "st_mtime")
+              (time-t ctime "time_t" "st_ctime")))
 
  ;; open()
  (:integer o-rdonly "O_RDONLY" nil t)
@@ -275,7 +275,7 @@
  (:integer o-directory "O_DIRECTORY" nil t)
  (:integer o-direct "O_DIRECT" nil t)
  (:integer o-async "O_ASYNC" nil t)
- (:integer o-largefile "O_LARGEFILE" nil t)	; hmm...
+ (:integer o-largefile "O_LARGEFILE" nil t)     ; hmm...
  (:integer o-dsync "O_DSYNC" nil t)
  (:integer o-rsync "O_RSYNC" nil t)
 
@@ -301,15 +301,15 @@
  (:type speed-t "speed_t" nil t)
  (:type tcflag-t "tcflag_t" nil t)
  (:integer nccs "NCCS" nil t)
- 
+
  (:structure alien-termios
-	     ("struct termios"
-	      (tcflag-t iflag "tcflag_t" "c_iflag")
-	      (tcflag-t oflag "tcflag_t" "c_oflag")
-	      (tcflag-t cflag "tcflag_t" "c_cflag")
-	      (tcflag-t lflag "tcflag_t" "c_lflag")
-	      ((array cc-t) cc "cc_t" "c_cc")))
- 
+             ("struct termios"
+              (tcflag-t iflag "tcflag_t" "c_iflag")
+              (tcflag-t oflag "tcflag_t" "c_oflag")
+              (tcflag-t cflag "tcflag_t" "c_cflag")
+              (tcflag-t lflag "tcflag_t" "c_lflag")
+              ((array cc-t) cc "cc_t" "c_cc")))
+
  (:integer veof "VEOF" nil t)
  (:integer veol "VEOL" nil t)
  (:integer verase "VERASE" nil t)
@@ -330,7 +330,7 @@
  (:integer inlcr "INLCR" nil t)
  (:integer inpck "INPCK" nil t)
  (:integer istrip "ISTRIP" nil t)
- #+xsi				     ; FIXME: an extension, apparently
+ #+xsi                               ; FIXME: an extension, apparently
  (:integer ixany "IXANY" nil t)
  (:integer ixoff "IXOFF" nil t)
  (:integer ixon "IXON" nil t)
@@ -415,5 +415,5 @@
  (:integer tcion "TCION" nil t)
  (:integer tcooff "TCOOFF" nil t)
  (:integer tcoon "TCOON" nil t)
- 
+
  )

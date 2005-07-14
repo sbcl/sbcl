@@ -38,12 +38,12 @@
 (defmacro def!macro (name &rest rest)
   #-(or sb-xc-host sb-xc) `(defmacro ,name ,@rest)
   #+sb-xc-host `(progn
-		  (defmacro ,name ,@rest)
-		  ,(let ((uncrossed-args `(,(uncross name) ,@rest)))
-		     (if (boundp '*delayed-def!macros*)
-			 `(push (make-delayed-def!macro :args ',uncrossed-args)
-				*delayed-def!macros*)
-			 `(sb!xc:defmacro ,@uncrossed-args))))
+                  (defmacro ,name ,@rest)
+                  ,(let ((uncrossed-args `(,(uncross name) ,@rest)))
+                     (if (boundp '*delayed-def!macros*)
+                         `(push (make-delayed-def!macro :args ',uncrossed-args)
+                                *delayed-def!macros*)
+                         `(sb!xc:defmacro ,@uncrossed-args))))
   ;; When cross-compiling, we don't want the DEF!MACRO to have any
   ;; effect at compile time, because (1) we already defined the macro
   ;; when building the cross-compiler, so at best it would be redundant
@@ -62,9 +62,9 @@
   (if (boundp '*delayed-def!macros*)
     (progn
       (mapcar (lambda (x)
-		(let ((*package* (delayed-def!macro-package x)))
-		  (eval `(sb!xc:defmacro ,@(delayed-def!macro-args x)))))
-	      (reverse *delayed-def!macros*))
+                (let ((*package* (delayed-def!macro-package x)))
+                  (eval `(sb!xc:defmacro ,@(delayed-def!macro-args x)))))
+              (reverse *delayed-def!macros*))
       ;; We shouldn't need this list any more. Making it unbound serves as a
       ;; signal to DEF!MACRO that it needn't delayed DEF!MACROs any more.
       ;; It is also generally a good thing for other reasons: it frees

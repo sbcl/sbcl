@@ -49,30 +49,30 @@
   (let ((svar (gensym)))
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-input*)
-	     ((eq ,svar t) *terminal-io*)
-	     (t ,@(when check-type `((enforce-type ,svar ,check-type)))	;
-		#!+high-security
-		(unless (input-stream-p ,svar)
-		  (error 'simple-type-error
-			 :datum ,svar
-			 :expected-type '(satisfies input-stream-p)
-			 :format-control "~S isn't an input stream"
-			 :format-arguments (list ,svar)))
-		,svar)))))
+             ((eq ,svar t) *terminal-io*)
+             (t ,@(when check-type `((enforce-type ,svar ,check-type))) ;
+                #!+high-security
+                (unless (input-stream-p ,svar)
+                  (error 'simple-type-error
+                         :datum ,svar
+                         :expected-type '(satisfies input-stream-p)
+                         :format-control "~S isn't an input stream"
+                         :format-arguments (list ,svar)))
+                ,svar)))))
 (defmacro out-synonym-of (stream &optional check-type)
   (let ((svar (gensym)))
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-output*)
-	     ((eq ,svar t) *terminal-io*)
-	     (t ,@(when check-type `((check-type ,svar ,check-type)))
-		#!+high-security
-		(unless (output-stream-p ,svar)
-		  (error 'simple-type-error
-			 :datum ,svar
-			 :expected-type '(satisfies output-stream-p)
-			 :format-control "~S isn't an output stream."
-			 :format-arguments (list ,svar)))
-		,svar)))))
+             ((eq ,svar t) *terminal-io*)
+             (t ,@(when check-type `((check-type ,svar ,check-type)))
+                #!+high-security
+                (unless (output-stream-p ,svar)
+                  (error 'simple-type-error
+                         :datum ,svar
+                         :expected-type '(satisfies output-stream-p)
+                         :format-control "~S isn't an output stream."
+                         :format-arguments (list ,svar)))
+                ,svar)))))
 
 ;;; WITH-mumble-STREAM calls the function in the given SLOT of the
 ;;; STREAM with the ARGS for ANSI-STREAMs, or the FUNCTION with the
@@ -80,22 +80,22 @@
 (defmacro with-in-stream (stream (slot &rest args) &optional stream-dispatch)
   `(let ((stream (in-synonym-of ,stream)))
     ,(if stream-dispatch
-	 `(if (ansi-stream-p stream)
-	      (funcall (,slot stream) stream ,@args)
-	      ,@(when stream-dispatch
-		  `(,(destructuring-bind (function &rest args) stream-dispatch
-		       `(,function stream ,@args)))))
-	 `(funcall (,slot stream) stream ,@args))))
+         `(if (ansi-stream-p stream)
+              (funcall (,slot stream) stream ,@args)
+              ,@(when stream-dispatch
+                  `(,(destructuring-bind (function &rest args) stream-dispatch
+                       `(,function stream ,@args)))))
+         `(funcall (,slot stream) stream ,@args))))
 
 (defmacro with-out-stream (stream (slot &rest args) &optional stream-dispatch)
   `(let ((stream (out-synonym-of ,stream)))
     ,(if stream-dispatch
-	 `(if (ansi-stream-p stream)
-	      (funcall (,slot stream) stream ,@args)
-	      ,@(when stream-dispatch
-		  `(,(destructuring-bind (function &rest args) stream-dispatch
-					 `(,function stream ,@args)))))
-	 `(funcall (,slot stream) stream ,@args))))
+         `(if (ansi-stream-p stream)
+              (funcall (,slot stream) stream ,@args)
+              ,@(when stream-dispatch
+                  `(,(destructuring-bind (function &rest args) stream-dispatch
+                                         `(,function stream ,@args)))))
+         `(funcall (,slot stream) stream ,@args))))
 
 ;;;; These are hacks to make the reader win.
 
@@ -104,11 +104,11 @@
 ;;; is assumed to be a ANSI-STREAM.
 (defmacro prepare-for-fast-read-char (stream &body forms)
   `(let* ((%frc-stream% ,stream)
-	  (%frc-method% (ansi-stream-in %frc-stream%))
-	  (%frc-buffer% (ansi-stream-cin-buffer %frc-stream%))
-	  (%frc-index% (ansi-stream-in-index %frc-stream%)))
+          (%frc-method% (ansi-stream-in %frc-stream%))
+          (%frc-buffer% (ansi-stream-cin-buffer %frc-stream%))
+          (%frc-index% (ansi-stream-in-index %frc-stream%)))
      (declare (type index %frc-index%)
-	      (type ansi-stream %frc-stream%))
+              (type ansi-stream %frc-stream%))
      ,@forms))
 
 ;;; This macro must be called after one is done with FAST-READ-CHAR
@@ -124,10 +124,10 @@
      (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value))
     ((= %frc-index% +ansi-stream-in-buffer-length+)
      (prog1 (fast-read-char-refill %frc-stream% ,eof-error-p ,eof-value)
-	    (setq %frc-index% (ansi-stream-in-index %frc-stream%))))
+            (setq %frc-index% (ansi-stream-in-index %frc-stream%))))
     (t
      (prog1 (aref %frc-buffer% %frc-index%)
-	    (incf %frc-index%)))))
+            (incf %frc-index%)))))
 
 ;;;; And these for the fasloader...
 
@@ -143,11 +143,11 @@
 ;;; for the FAST-READ-CHAR stuff) -- WHN 19990825
 (defmacro prepare-for-fast-read-byte (stream &body forms)
   `(let* ((%frc-stream% ,stream)
-	  (%frc-method% (ansi-stream-bin %frc-stream%))
-	  (%frc-buffer% (ansi-stream-in-buffer %frc-stream%))
-	  (%frc-index% (ansi-stream-in-index %frc-stream%)))
+          (%frc-method% (ansi-stream-bin %frc-stream%))
+          (%frc-buffer% (ansi-stream-in-buffer %frc-stream%))
+          (%frc-index% (ansi-stream-in-index %frc-stream%)))
      (declare (type index %frc-index%)
-	      (type ansi-stream %frc-stream%))
+              (type ansi-stream %frc-stream%))
      ,@forms))
 
 ;;; Similar to fast-read-char, but we use a different refill routine & don't
@@ -162,9 +162,9 @@
       (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value))
      ((= %frc-index% +ansi-stream-in-buffer-length+)
       (prog1 (fast-read-byte-refill %frc-stream% ,eof-error-p ,eof-value)
-	(setq %frc-index% (ansi-stream-in-index %frc-stream%))))
+        (setq %frc-index% (ansi-stream-in-index %frc-stream%))))
      (t
       (prog1 (aref %frc-buffer% %frc-index%)
-	(incf %frc-index%))))))
+        (incf %frc-index%))))))
 (defmacro done-with-fast-read-byte ()
   `(done-with-fast-read-char))

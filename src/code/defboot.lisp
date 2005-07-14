@@ -38,13 +38,13 @@
     ;; at this level, but the CMU CL code did it, so.. -- WHN 19990411
     (if (= (length vars) 1)
       `(let ((,(car vars) ,value-form))
-	 ,@body)
+         ,@body)
       (let ((ignore (gensym)))
-	`(multiple-value-call #'(lambda (&optional ,@(mapcar #'list vars)
-					 &rest ,ignore)
-				  (declare (ignore ,ignore))
-				  ,@body)
-			      ,value-form)))
+        `(multiple-value-call #'(lambda (&optional ,@(mapcar #'list vars)
+                                         &rest ,ignore)
+                                  (declare (ignore ,ignore))
+                                  ,@body)
+                              ,value-form)))
     (error "Vars is not a list of symbols: ~S" vars)))
 
 (defmacro-mundanely multiple-value-setq (vars value-form)
@@ -68,19 +68,19 @@
   (if (endp clauses)
       nil
       (let ((clause (first clauses)))
-	(if (atom clause)
-	    (error "COND clause is not a list: ~S" clause)
-	    (let ((test (first clause))
-		  (forms (rest clause)))
-	      (if (endp forms)
-		  (let ((n-result (gensym)))
-		    `(let ((,n-result ,test))
-		       (if ,n-result
-			   ,n-result
-			   (cond ,@(rest clauses)))))
-		  `(if ,test
-		       (progn ,@forms)
-		       (cond ,@(rest clauses)))))))))
+        (if (atom clause)
+            (error "COND clause is not a list: ~S" clause)
+            (let ((test (first clause))
+                  (forms (rest clause)))
+              (if (endp forms)
+                  (let ((n-result (gensym)))
+                    `(let ((,n-result ,test))
+                       (if ,n-result
+                           ,n-result
+                           (cond ,@(rest clauses)))))
+                  `(if ,test
+                       (progn ,@forms)
+                       (cond ,@(rest clauses)))))))))
 
 ;;; other things defined in terms of COND
 (defmacro-mundanely when (test &body forms)
@@ -95,30 +95,30 @@
   `(cond ((not ,test) nil ,@forms)))
 (defmacro-mundanely and (&rest forms)
   (cond ((endp forms) t)
-	((endp (rest forms)) (first forms))
-	(t
-	 `(if ,(first forms)
-	      (and ,@(rest forms))
-	      nil))))
+        ((endp (rest forms)) (first forms))
+        (t
+         `(if ,(first forms)
+              (and ,@(rest forms))
+              nil))))
 (defmacro-mundanely or (&rest forms)
   (cond ((endp forms) nil)
-	((endp (rest forms)) (first forms))
-	(t
-	 (let ((n-result (gensym)))
-	   `(let ((,n-result ,(first forms)))
-	      (if ,n-result
-		  ,n-result
-		  (or ,@(rest forms))))))))
+        ((endp (rest forms)) (first forms))
+        (t
+         (let ((n-result (gensym)))
+           `(let ((,n-result ,(first forms)))
+              (if ,n-result
+                  ,n-result
+                  (or ,@(rest forms))))))))
 
 ;;;; various sequencing constructs
 
 (flet ((prog-expansion-from-let (varlist body-decls let)
          (multiple-value-bind (body decls)
-	     (parse-body body-decls :doc-string-allowed nil)
-	   `(block nil
-	      (,let ,varlist
-		,@decls
-		(tagbody ,@body))))))
+             (parse-body body-decls :doc-string-allowed nil)
+           `(block nil
+              (,let ,varlist
+                ,@decls
+                (tagbody ,@body))))))
   (defmacro-mundanely prog (varlist &body body-decls)
     (prog-expansion-from-let varlist body-decls 'let))
   (defmacro-mundanely prog* (varlist &body body-decls)
@@ -161,46 +161,46 @@
     (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body)
     (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA and NAMED-LAMBDA
-	   (lambda-guts `(,args
-			  ,@decls
-			  (block ,(fun-name-block-name name)
-			    ,@forms)))
-	   (lambda `(lambda ,@lambda-guts))
+           (lambda-guts `(,args
+                          ,@decls
+                          (block ,(fun-name-block-name name)
+                            ,@forms)))
+           (lambda `(lambda ,@lambda-guts))
            #-sb-xc-host
-	   (named-lambda `(named-lambda ,name ,@lambda-guts))
-	   (inline-lambda
-	    (when (inline-fun-name-p name)
-	      ;; we want to attempt to inline, so complain if we can't
-	      (or (sb!c:maybe-inline-syntactic-closure lambda env)
-		  (progn
-		    (#+sb-xc-host warn
-		     #-sb-xc-host sb!c:maybe-compiler-notify
-		     "lexical environment too hairy, can't inline DEFUN ~S"
-		     name)
-		    nil)))))
+           (named-lambda `(named-lambda ,name ,@lambda-guts))
+           (inline-lambda
+            (when (inline-fun-name-p name)
+              ;; we want to attempt to inline, so complain if we can't
+              (or (sb!c:maybe-inline-syntactic-closure lambda env)
+                  (progn
+                    (#+sb-xc-host warn
+                     #-sb-xc-host sb!c:maybe-compiler-notify
+                     "lexical environment too hairy, can't inline DEFUN ~S"
+                     name)
+                    nil)))))
       `(progn
-	 ;; In cross-compilation of toplevel DEFUNs, we arrange for
-	 ;; the LAMBDA to be statically linked by GENESIS.
+         ;; In cross-compilation of toplevel DEFUNs, we arrange for
+         ;; the LAMBDA to be statically linked by GENESIS.
          ;;
          ;; It may seem strangely inconsistent not to use NAMED-LAMBDA
          ;; here instead of LAMBDA. The reason is historical:
          ;; COLD-FSET was written before NAMED-LAMBDA, and has special
          ;; logic of its own to notify the compiler about NAME.
- 	 #+sb-xc-host
-	 (cold-fset ,name ,lambda)
-         
-	 (eval-when (:compile-toplevel)
-	   (sb!c:%compiler-defun ',name ',inline-lambda t))
-	 (eval-when (:load-toplevel :execute)
-	   (%defun ',name
-		   ;; In normal compilation (not for cold load) this is
-		   ;; where the compiled LAMBDA first appears. In
-		   ;; cross-compilation, we manipulate the
-		   ;; previously-statically-linked LAMBDA here.
-		   #-sb-xc-host ,named-lambda
-		   #+sb-xc-host (fdefinition ',name)
-		   ,doc
-		   ',inline-lambda))))))
+         #+sb-xc-host
+         (cold-fset ,name ,lambda)
+
+         (eval-when (:compile-toplevel)
+           (sb!c:%compiler-defun ',name ',inline-lambda t))
+         (eval-when (:load-toplevel :execute)
+           (%defun ',name
+                   ;; In normal compilation (not for cold load) this is
+                   ;; where the compiled LAMBDA first appears. In
+                   ;; cross-compilation, we manipulate the
+                   ;; previously-statically-linked LAMBDA here.
+                   #-sb-xc-host ,named-lambda
+                   #+sb-xc-host (fdefinition ',name)
+                   ,doc
+                   ',inline-lambda))))))
 
 #-sb-xc-host
 (defun %defun (name def doc inline-lambda)
@@ -212,13 +212,13 @@
     (/show0 "redefining NAME in %DEFUN")
     (style-warn "redefining ~S in DEFUN" name))
   (setf (sb!xc:fdefinition name) def)
-  
+
   ;; FIXME: I want to do this here (and fix bug 137), but until the
   ;; breathtaking CMU CL function name architecture is converted into
-  ;; something sane, (1) doing so doesn't really fix the bug, and 
+  ;; something sane, (1) doing so doesn't really fix the bug, and
   ;; (2) doing probably isn't even really safe.
   #+nil (setf (%fun-name def) name)
-  
+
   (when doc
     (setf (fdocumentation name 'function) doc))
   name)
@@ -310,12 +310,12 @@
 ;;; destructuring mechanisms.
 (defmacro-mundanely dotimes ((var count &optional (result nil)) &body body)
   (cond ((numberp count)
-	 `(do ((,var 0 (1+ ,var)))
+         `(do ((,var 0 (1+ ,var)))
               ((>= ,var ,count) ,result)
             (declare (type unsigned-byte ,var))
             ,@body))
-	(t (let ((v1 (gensym)))
-	     `(do ((,var 0 (1+ ,var)) (,v1 ,count))
+        (t (let ((v1 (gensym)))
+             `(do ((,var 0 (1+ ,var)) (,v1 ,count))
                   ((>= ,var ,v1) ,result)
                 (declare (type unsigned-byte ,var))
                 ,@body)))))
@@ -329,7 +329,7 @@
                                     (eq (car clause) 'ignore))))
                          (cdr decl))))
           decls))
-    
+
 (defmacro-mundanely dolist ((var list &optional (result nil)) &body body)
   ;; We repeatedly bind the var instead of setting it so that we never
   ;; have to give the var an arbitrary value such as NIL (which might
@@ -379,11 +379,11 @@
    to the error currently being debugged. See also RESTART-CASE."
   (let ((n-cond (gensym)))
     `(let ((*condition-restarts*
-	    (cons (let ((,n-cond ,condition-form))
-		    (cons ,n-cond
-			  (append ,restarts-form
-				  (cdr (assoc ,n-cond *condition-restarts*)))))
-		  *condition-restarts*)))
+            (cons (let ((,n-cond ,condition-form))
+                    (cons ,n-cond
+                          (append ,restarts-form
+                                  (cdr (assoc ,n-cond *condition-restarts*)))))
+                  *condition-restarts*)))
        ,@body)))
 
 (defmacro-mundanely restart-bind (bindings &body forms)
@@ -392,20 +392,20 @@
    in effect. Users probably want to use RESTART-CASE. When clauses contain
    the same restart name, FIND-RESTART will find the first such clause."
   `(let ((*restart-clusters*
-	  (cons (list
-		 ,@(mapcar (lambda (binding)
-			     (unless (or (car binding)
-					 (member :report-function
-						 binding
-						 :test #'eq))
-			       (warn "Unnamed restart does not have a ~
+          (cons (list
+                 ,@(mapcar (lambda (binding)
+                             (unless (or (car binding)
+                                         (member :report-function
+                                                 binding
+                                                 :test #'eq))
+                               (warn "Unnamed restart does not have a ~
                                       report function: ~S"
-				     binding))
-			     `(make-restart :name ',(car binding)
-					    :function ,(cadr binding)
-					    ,@(cddr binding)))
-			   bindings))
-		*restart-clusters*)))
+                                     binding))
+                             `(make-restart :name ',(car binding)
+                                            :function ,(cadr binding)
+                                            ,@(cddr binding)))
+                           bindings))
+                *restart-clusters*)))
      ,@forms))
 
 ;;; Wrap the RESTART-CASE expression in a WITH-CONDITION-RESTARTS if
@@ -413,25 +413,25 @@
 (defun munge-restart-case-expression (expression env)
   (let ((exp (sb!xc:macroexpand expression env)))
     (if (consp exp)
-	(let* ((name (car exp))
-	       (args (if (eq name 'cerror) (cddr exp) (cdr exp))))
-	  (if (member name '(signal error cerror warn))
-	      (once-only ((n-cond `(coerce-to-condition
-				    ,(first args)
-				    (list ,@(rest args))
-				    ',(case name
-					(warn 'simple-warning)
-					(signal 'simple-condition)
-					(t 'simple-error))
-				    ',name)))
-		`(with-condition-restarts
-		     ,n-cond
-		     (car *restart-clusters*)
-		   ,(if (eq name 'cerror)
-			`(cerror ,(second exp) ,n-cond)
-			`(,name ,n-cond))))
-	      expression))
-	expression)))
+        (let* ((name (car exp))
+               (args (if (eq name 'cerror) (cddr exp) (cdr exp))))
+          (if (member name '(signal error cerror warn))
+              (once-only ((n-cond `(coerce-to-condition
+                                    ,(first args)
+                                    (list ,@(rest args))
+                                    ',(case name
+                                        (warn 'simple-warning)
+                                        (signal 'simple-condition)
+                                        (t 'simple-error))
+                                    ',name)))
+                `(with-condition-restarts
+                     ,n-cond
+                     (car *restart-clusters*)
+                   ,(if (eq name 'cerror)
+                        `(cerror ,(second exp) ,n-cond)
+                        `(,name ,n-cond))))
+              expression))
+        expression)))
 
 ;;; FIXME: I did a fair amount of rearrangement of this code in order to
 ;;; get WITH-KEYWORD-PAIRS to work cleanly. This code should be tested..
@@ -446,94 +446,94 @@
    macroexpands into such) then the signalled condition will be associated with
    the new restarts."
   (flet ((transform-keywords (&key report interactive test)
-	   (let ((result '()))
-	     (when report
-	       (setq result (list* (if (stringp report)
-				       `#'(lambda (stream)
-					    (write-string ,report stream))
-				       `#',report)
-				   :report-function
-				   result)))
-	     (when interactive
-	       (setq result (list* `#',interactive
-				   :interactive-function
-				   result)))
-	     (when test
-	       (setq result (list* `#',test :test-function result)))
-	     (nreverse result)))
-	 (parse-keyword-pairs (list keys)
-	   (do ((l list (cddr l))
-		(k '() (list* (cadr l) (car l) k)))
-	       ((or (null l) (not (member (car l) keys)))
-		(values (nreverse k) l)))))
+           (let ((result '()))
+             (when report
+               (setq result (list* (if (stringp report)
+                                       `#'(lambda (stream)
+                                            (write-string ,report stream))
+                                       `#',report)
+                                   :report-function
+                                   result)))
+             (when interactive
+               (setq result (list* `#',interactive
+                                   :interactive-function
+                                   result)))
+             (when test
+               (setq result (list* `#',test :test-function result)))
+             (nreverse result)))
+         (parse-keyword-pairs (list keys)
+           (do ((l list (cddr l))
+                (k '() (list* (cadr l) (car l) k)))
+               ((or (null l) (not (member (car l) keys)))
+                (values (nreverse k) l)))))
     (let ((block-tag (gensym))
-	  (temp-var (gensym))
-	  (data
-	   (macrolet (;; KLUDGE: This started as an old DEFMACRO
-		      ;; WITH-KEYWORD-PAIRS general utility, which was used
-		      ;; only in this one place in the code. It was translated
-		      ;; literally into this MACROLET in order to avoid some
-		      ;; cross-compilation bootstrap problems. It would almost
-		      ;; certainly be clearer, and it would certainly be more
-		      ;; concise, to do a more idiomatic translation, merging
-		      ;; this with the TRANSFORM-KEYWORDS logic above.
-		      ;;   -- WHN 19990925
-		      (with-keyword-pairs ((names expression) &body forms)
-			(let ((temp (member '&rest names)))
-			  (unless (= (length temp) 2)
-			    (error "&REST keyword is ~:[missing~;misplaced~]."
-				   temp))
-			  (let* ((key-vars (ldiff names temp))
-				 (keywords (mapcar #'keywordicate key-vars))
-				 (key-var (gensym))
-				 (rest-var (cadr temp)))
-			    `(multiple-value-bind (,key-var ,rest-var)
-				 (parse-keyword-pairs ,expression ',keywords)
-			       (let ,(mapcar (lambda (var keyword)
-					       `(,var (getf ,key-var
-							    ,keyword)))
-					     key-vars keywords)
-				 ,@forms))))))
-	     (mapcar (lambda (clause)
-		       (with-keyword-pairs ((report interactive test
-						    &rest forms)
-					    (cddr clause))
-			 (list (car clause) ;name=0
-			       (gensym) ;tag=1
-			       (transform-keywords :report report ;keywords=2
-						   :interactive interactive
-						   :test test)
-			       (cadr clause) ;bvl=3
-			       forms))) ;body=4
-		   clauses))))
+          (temp-var (gensym))
+          (data
+           (macrolet (;; KLUDGE: This started as an old DEFMACRO
+                      ;; WITH-KEYWORD-PAIRS general utility, which was used
+                      ;; only in this one place in the code. It was translated
+                      ;; literally into this MACROLET in order to avoid some
+                      ;; cross-compilation bootstrap problems. It would almost
+                      ;; certainly be clearer, and it would certainly be more
+                      ;; concise, to do a more idiomatic translation, merging
+                      ;; this with the TRANSFORM-KEYWORDS logic above.
+                      ;;   -- WHN 19990925
+                      (with-keyword-pairs ((names expression) &body forms)
+                        (let ((temp (member '&rest names)))
+                          (unless (= (length temp) 2)
+                            (error "&REST keyword is ~:[missing~;misplaced~]."
+                                   temp))
+                          (let* ((key-vars (ldiff names temp))
+                                 (keywords (mapcar #'keywordicate key-vars))
+                                 (key-var (gensym))
+                                 (rest-var (cadr temp)))
+                            `(multiple-value-bind (,key-var ,rest-var)
+                                 (parse-keyword-pairs ,expression ',keywords)
+                               (let ,(mapcar (lambda (var keyword)
+                                               `(,var (getf ,key-var
+                                                            ,keyword)))
+                                             key-vars keywords)
+                                 ,@forms))))))
+             (mapcar (lambda (clause)
+                       (with-keyword-pairs ((report interactive test
+                                                    &rest forms)
+                                            (cddr clause))
+                         (list (car clause) ;name=0
+                               (gensym) ;tag=1
+                               (transform-keywords :report report ;keywords=2
+                                                   :interactive interactive
+                                                   :test test)
+                               (cadr clause) ;bvl=3
+                               forms))) ;body=4
+                   clauses))))
       `(block ,block-tag
-	 (let ((,temp-var nil))
-	   (tagbody
-	    (restart-bind
-		,(mapcar (lambda (datum)
-			   (let ((name (nth 0 datum))
-				 (tag  (nth 1 datum))
-				 (keys (nth 2 datum)))
-			     `(,name #'(lambda (&rest temp)
-					 (setq ,temp-var temp)
-					 (go ,tag))
-				     ,@keys)))
-			 data)
-	      (return-from ,block-tag
-			   ,(munge-restart-case-expression expression env)))
-	    ,@(mapcan (lambda (datum)
-			(let ((tag  (nth 1 datum))
-			      (bvl  (nth 3 datum))
-			      (body (nth 4 datum)))
-			  (list tag
-				`(return-from ,block-tag
-				   (apply (lambda ,bvl ,@body)
-					  ,temp-var)))))
-		      data)))))))
+         (let ((,temp-var nil))
+           (tagbody
+            (restart-bind
+                ,(mapcar (lambda (datum)
+                           (let ((name (nth 0 datum))
+                                 (tag  (nth 1 datum))
+                                 (keys (nth 2 datum)))
+                             `(,name #'(lambda (&rest temp)
+                                         (setq ,temp-var temp)
+                                         (go ,tag))
+                                     ,@keys)))
+                         data)
+              (return-from ,block-tag
+                           ,(munge-restart-case-expression expression env)))
+            ,@(mapcan (lambda (datum)
+                        (let ((tag  (nth 1 datum))
+                              (bvl  (nth 3 datum))
+                              (body (nth 4 datum)))
+                          (list tag
+                                `(return-from ,block-tag
+                                   (apply (lambda ,bvl ,@body)
+                                          ,temp-var)))))
+                      data)))))))
 
 (defmacro-mundanely with-simple-restart ((restart-name format-string
-						       &rest format-arguments)
-					 &body forms)
+                                                       &rest format-arguments)
+                                         &body forms)
   #!+sb-doc
   "(WITH-SIMPLE-RESTART (restart-name format-string format-arguments)
    body)
@@ -545,8 +545,8 @@
        ;; RESTART-CASE to "see" calls to ERROR, etc.
        ,(if (= (length forms) 1) (car forms) `(progn ,@forms))
      (,restart-name ()
-	:report (lambda (stream)
-		  (format stream ,format-string ,@format-arguments))
+        :report (lambda (stream)
+                  (format stream ,format-string ,@format-arguments))
       (values nil t))))
 
 (defmacro-mundanely handler-bind (bindings &body forms)
@@ -557,17 +557,17 @@
    argument. The bindings are searched first to last in the event of a
    signalled condition."
   (let ((member-if (member-if (lambda (x)
-				(not (proper-list-of-length-p x 2)))
-			      bindings)))
+                                (not (proper-list-of-length-p x 2)))
+                              bindings)))
     (when member-if
       (error "ill-formed handler binding: ~S" (first member-if))))
   `(let ((*handler-clusters*
-	  (cons (list ,@(mapcar (lambda (x) `(cons ',(car x) ,(cadr x)))
-				bindings))
-		*handler-clusters*)))
+          (cons (list ,@(mapcar (lambda (x) `(cons ',(car x) ,(cadr x)))
+                                bindings))
+                *handler-clusters*)))
      (multiple-value-prog1
-	 (progn
-	   ,@forms)
+         (progn
+           ,@forms)
        ;; Wait for any float exceptions.
        #!+x86 (float-wait))))
 
@@ -584,49 +584,49 @@
   ;; understand the code below.
   (let ((no-error-clause (assoc ':no-error cases)))
     (if no-error-clause
-	(let ((normal-return (make-symbol "normal-return"))
-	      (error-return  (make-symbol "error-return")))
-	  `(block ,error-return
-	     (multiple-value-call (lambda ,@(cdr no-error-clause))
-	       (block ,normal-return
-		 (return-from ,error-return
-		   (handler-case (return-from ,normal-return ,form)
-		     ,@(remove no-error-clause cases)))))))
-	(let ((tag (gensym))
-	      (var (gensym))
-	      (annotated-cases (mapcar (lambda (case) (cons (gensym) case))
-				       cases)))
-	  `(block ,tag
-	     (let ((,var nil))
-	       (declare (ignorable ,var))
-	       (tagbody
-		(handler-bind
-		    ,(mapcar (lambda (annotated-case)
-			       (list (cadr annotated-case)
-				     `(lambda (temp)
-					,(if (caddr annotated-case)
-					     `(setq ,var temp)
-					     '(declare (ignore temp)))
-					(go ,(car annotated-case)))))
-			     annotated-cases)
-		  (return-from ,tag
-		    #!-x86 ,form
-		    #!+x86 (multiple-value-prog1 ,form
-			     ;; Need to catch FP errors here!
-			     (float-wait))))
-		,@(mapcan
-		   (lambda (annotated-case)
-		     (list (car annotated-case)
-			   (let ((body (cdddr annotated-case)))
-			     `(return-from
-				  ,tag
-				,(cond ((caddr annotated-case)
-					`(let ((,(caaddr annotated-case)
-						,var))
-					   ,@body))
-				       (t
-					`(locally ,@body)))))))
-		   annotated-cases))))))))
+        (let ((normal-return (make-symbol "normal-return"))
+              (error-return  (make-symbol "error-return")))
+          `(block ,error-return
+             (multiple-value-call (lambda ,@(cdr no-error-clause))
+               (block ,normal-return
+                 (return-from ,error-return
+                   (handler-case (return-from ,normal-return ,form)
+                     ,@(remove no-error-clause cases)))))))
+        (let ((tag (gensym))
+              (var (gensym))
+              (annotated-cases (mapcar (lambda (case) (cons (gensym) case))
+                                       cases)))
+          `(block ,tag
+             (let ((,var nil))
+               (declare (ignorable ,var))
+               (tagbody
+                (handler-bind
+                    ,(mapcar (lambda (annotated-case)
+                               (list (cadr annotated-case)
+                                     `(lambda (temp)
+                                        ,(if (caddr annotated-case)
+                                             `(setq ,var temp)
+                                             '(declare (ignore temp)))
+                                        (go ,(car annotated-case)))))
+                             annotated-cases)
+                  (return-from ,tag
+                    #!-x86 ,form
+                    #!+x86 (multiple-value-prog1 ,form
+                             ;; Need to catch FP errors here!
+                             (float-wait))))
+                ,@(mapcan
+                   (lambda (annotated-case)
+                     (list (car annotated-case)
+                           (let ((body (cdddr annotated-case)))
+                             `(return-from
+                                  ,tag
+                                ,(cond ((caddr annotated-case)
+                                        `(let ((,(caaddr annotated-case)
+                                                ,var))
+                                           ,@body))
+                                       (t
+                                        `(locally ,@body)))))))
+                   annotated-cases))))))))
 
 ;;;; miscellaneous
 
@@ -646,8 +646,8 @@
       ((endp pair) `(psetf ,@pairs))
     (unless (symbolp (car pair))
       (error 'simple-program-error
-	     :format-control "variable ~S in PSETQ is not a SYMBOL"
-	     :format-arguments (list (car pair))))))
+             :format-control "variable ~S in PSETQ is not a SYMBOL"
+             :format-arguments (list (car pair))))))
 
 (defmacro-mundanely lambda (&whole whole args &body body)
   (declare (ignore args body))
@@ -658,8 +658,8 @@
   `#',whole)
 
 (defmacro-mundanely lambda-with-lexenv (&whole whole
-					declarations macros symbol-macros
-					&body body)
+                                        declarations macros symbol-macros
+                                        &body body)
   (declare (ignore declarations macros symbol-macros body))
   `#',whole)
 
@@ -669,26 +669,26 @@
 ;;; magic functions here.  -- CSR, 2003-04-01
 #+sb-xc-host
 (sb!xc:proclaim '(ftype (function * *)
-		        ;; functions appearing in fundamental defining
-		        ;; macro expansions:
-		        %compiler-deftype
-		        %compiler-defvar
-		        %defun
-		        %defsetf
-		        %defparameter
-		        %defvar
-		        sb!c:%compiler-defun
-		        sb!c::%define-symbol-macro
-		        sb!c::%defconstant
-		        sb!c::%define-compiler-macro
-		        sb!c::%defmacro
-		        sb!kernel::%compiler-defstruct
-		        sb!kernel::%compiler-define-condition
-		        sb!kernel::%defstruct
-		        sb!kernel::%define-condition
-		        ;; miscellaneous functions commonly appearing
-		        ;; as a result of macro expansions or compiler
-		        ;; transformations:
-		        sb!int:find-undeleted-package-or-lose ; IN-PACKAGE
-		        sb!kernel::arg-count-error ; PARSE-DEFMACRO
-		        ))
+                        ;; functions appearing in fundamental defining
+                        ;; macro expansions:
+                        %compiler-deftype
+                        %compiler-defvar
+                        %defun
+                        %defsetf
+                        %defparameter
+                        %defvar
+                        sb!c:%compiler-defun
+                        sb!c::%define-symbol-macro
+                        sb!c::%defconstant
+                        sb!c::%define-compiler-macro
+                        sb!c::%defmacro
+                        sb!kernel::%compiler-defstruct
+                        sb!kernel::%compiler-define-condition
+                        sb!kernel::%defstruct
+                        sb!kernel::%define-condition
+                        ;; miscellaneous functions commonly appearing
+                        ;; as a result of macro expansions or compiler
+                        ;; transformations:
+                        sb!int:find-undeleted-package-or-lose ; IN-PACKAGE
+                        sb!kernel::arg-count-error ; PARSE-DEFMACRO
+                        ))

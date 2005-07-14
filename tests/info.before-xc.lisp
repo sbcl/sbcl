@@ -8,7 +8,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -18,7 +18,7 @@
 (/show "beginning tests/info.before-xc.lisp")
 
 (assert (eq (sb!int:info :variable :kind 'sb!vm:vector-data-offset)
-	    :constant))
+            :constant))
 ;;; It's possible in general for a constant to have the value NIL, but
 ;;; not for vector-data-offset, which must be a number:
 (multiple-value-bind (value successp)

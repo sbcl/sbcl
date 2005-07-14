@@ -22,8 +22,8 @@
 (defpackage :sb-rt
   (:use #:cl)
   (:export #:*do-tests-when-defined* #:*test* #:continue-testing
-	   #:deftest #:do-test #:do-tests #:get-test #:pending-tests
-	   #:rem-all-tests #:rem-test)
+           #:deftest #:do-test #:do-tests #:get-test #:pending-tests
+           #:rem-all-tests #:rem-test)
   (:documentation "The MIT regression tester"))
 
 (in-package :sb-rt)
@@ -44,7 +44,7 @@
   "A list of test names that are expected to fail.")
 
 (defstruct (entry (:conc-name nil)
-		  (:type list))
+                  (:type list))
   pend name form)
 
 (defmacro vals (entry) `(cdddr ,entry))
@@ -74,12 +74,12 @@
 
 (defun get-entry (name)
   (let ((entry (find name (cdr *entries*)
-		     :key #'name
-		     :test #'equal)))
+                     :key #'name
+                     :test #'equal)))
     (when (null entry)
       (report-error t
         "~%No test with name ~:@(~S~)."
-	name))
+        name))
     entry))
 
 (defmacro deftest (name form &rest values)
@@ -91,8 +91,8 @@
     (when (null (cdr l))
       (setf (cdr l) (list entry))
       (return nil))
-    (when (equal (name (cadr l)) 
-		 (name entry))
+    (when (equal (name (cadr l))
+                 (name entry))
       (setf (cadr l) entry)
       (report-error nil
         "Redefining test ~:@(~S~)"
@@ -103,11 +103,11 @@
   (setq *test* (name entry)))
 
 (defun report-error (error? &rest args)
-  (cond (*debug* 
-	 (apply #'format t args)
-	 (if error? (throw '*debug* nil)))
-	(error? (apply #'error args))
-	(t (apply #'warn args))))
+  (cond (*debug*
+         (apply #'format t args)
+         (if error? (throw '*debug* nil)))
+        (error? (apply #'error args))
+        (t (apply #'warn args))))
 
 (defun do-test (&optional (name *test*))
   (do-entry (get-entry name)))
@@ -118,84 +118,84 @@
    ((eq x y) t)
    ((consp x)
     (and (consp y)
-	 (equalp-with-case (car x) (car y))
-	 (equalp-with-case (cdr x) (cdr y))))
+         (equalp-with-case (car x) (car y))
+         (equalp-with-case (cdr x) (cdr y))))
    ((and (typep x 'array)
-	 (= (array-rank x) 0))
+         (= (array-rank x) 0))
     (equalp-with-case (aref x) (aref y)))
    ((typep x 'vector)
     (and (typep y 'vector)
-	 (let ((x-len (length x))
-	       (y-len (length y)))
-	   (and (eql x-len y-len)
-		(loop
-		 for e1 across x
-		 for e2 across y
-		 always (equalp-with-case e1 e2))))))
+         (let ((x-len (length x))
+               (y-len (length y)))
+           (and (eql x-len y-len)
+                (loop
+                 for e1 across x
+                 for e2 across y
+                 always (equalp-with-case e1 e2))))))
    ((and (typep x 'array)
-	 (typep y 'array)
-	 (not (equal (array-dimensions x)
-		     (array-dimensions y))))
+         (typep y 'array)
+         (not (equal (array-dimensions x)
+                     (array-dimensions y))))
     nil)
    ((typep x 'array)
     (and (typep y 'array)
-	 (let ((size (array-total-size x)))
-	   (loop for i from 0 below size
-		 always (equalp-with-case (row-major-aref x i)
-					  (row-major-aref y i))))))
+         (let ((size (array-total-size x)))
+           (loop for i from 0 below size
+                 always (equalp-with-case (row-major-aref x i)
+                                          (row-major-aref y i))))))
    (t (eql x y))))
 
 (defun do-entry (entry &optional
-		       (s *standard-output*))
+                       (s *standard-output*))
   (catch '*in-test*
     (setq *test* (name entry))
     (setf (pend entry) t)
     (let* ((*in-test* t)
-	   ;; (*break-on-warnings* t)
-	   (aborted nil)
-	   r)
+           ;; (*break-on-warnings* t)
+           (aborted nil)
+           r)
       ;; (declare (special *break-on-warnings*))
 
       (block aborted
-	(setf r
-	      (flet ((%do
-		      ()
-		      (if *compile-tests*
-			  (multiple-value-list
-			   (funcall (compile
-				     nil
-				     `(lambda ()
-					(declare
-					 (optimize ,@*optimization-settings*))
-					,(form entry)))))
-			(multiple-value-list
-			 (eval (form entry))))))
-		(if *catch-errors*
-		    (handler-bind
-			((style-warning #'muffle-warning)
-			 (error #'(lambda (c)
-				    (setf aborted t)
-				    (setf r (list c))
-				    (return-from aborted nil))))
-		      (%do))
-		  (%do)))))
+        (setf r
+              (flet ((%do
+                      ()
+                      (if *compile-tests*
+                          (multiple-value-list
+                           (funcall (compile
+                                     nil
+                                     `(lambda ()
+                                        (declare
+                                         (optimize ,@*optimization-settings*))
+                                        ,(form entry)))))
+                        (multiple-value-list
+                         (eval (form entry))))))
+                (if *catch-errors*
+                    (handler-bind
+                        ((style-warning #'muffle-warning)
+                         (error #'(lambda (c)
+                                    (setf aborted t)
+                                    (setf r (list c))
+                                    (return-from aborted nil))))
+                      (%do))
+                  (%do)))))
 
       (setf (pend entry)
-	    (or aborted
-		(not (equalp-with-case r (vals entry)))))
-      
+            (or aborted
+                (not (equalp-with-case r (vals entry)))))
+
       (when (pend entry)
-	(let ((*print-circle* *print-circle-on-failure*))
-	  (format s "~&Test ~:@(~S~) failed~
+        (let ((*print-circle* *print-circle-on-failure*))
+          (format s "~&Test ~:@(~S~) failed~
                    ~%Form: ~S~
                    ~%Expected value~P: ~
                       ~{~S~^~%~17t~}~%"
-		  *test* (form entry)
-		  (length (vals entry))
-		  (vals entry))
-	  (format s "Actual value~P: ~
+                  *test* (form entry)
+                  (length (vals entry))
+                  (vals entry))
+          (format s "Actual value~P: ~
                       ~{~S~^~%~15t~}.~%"
-		  (length r) r)))))
+                  (length r) r)))))
   (when (not (pend entry)) *test*))
 
 (defun continue-testing ()
@@ -204,51 +204,51 @@
       (do-entries *standard-output*)))
 
 (defun do-tests (&optional
-		 (out *standard-output*))
+                 (out *standard-output*))
   (dolist (entry (cdr *entries*))
     (setf (pend entry) t))
   (if (streamp out)
       (do-entries out)
-      (with-open-file 
-	  (stream out :direction :output)
-	(do-entries stream))))
+      (with-open-file
+          (stream out :direction :output)
+        (do-entries stream))))
 
 (defun do-entries (s)
   (format s "~&Doing ~A pending test~:P ~
              of ~A tests total.~%"
           (count t (cdr *entries*)
-		 :key #'pend)
-	  (length (cdr *entries*)))
+                 :key #'pend)
+          (length (cdr *entries*)))
   (dolist (entry (cdr *entries*))
     (when (pend entry)
       (format s "~@[~<~%~:; ~:@(~S~)~>~]"
-	      (do-entry entry s))))
+              (do-entry entry s))))
   (let ((pending (pending-tests))
-	(expected-table (make-hash-table :test #'equal)))
+        (expected-table (make-hash-table :test #'equal)))
     (dolist (ex *expected-failures*)
       (setf (gethash ex expected-table) t))
     (let ((new-failures
-	   (loop for pend in pending
-		 unless (gethash pend expected-table)
-		 collect pend)))
+           (loop for pend in pending
+                 unless (gethash pend expected-table)
+                 collect pend)))
       (if (null pending)
-	  (format s "~&No tests failed.")
-	(progn
-	  (format s "~&~A out of ~A ~
+          (format s "~&No tests failed.")
+        (progn
+          (format s "~&~A out of ~A ~
                    total tests failed: ~
                    ~:@(~{~<~%   ~1:;~S~>~
                          ~^, ~}~)."
-		  (length pending)
-		  (length (cdr *entries*))
-		  pending)
-	  (if (null new-failures)
-	      (format s "~&No unexpected failures.")
-	    (when *expected-failures*
-	      (format s "~&~A unexpected failures: ~
+                  (length pending)
+                  (length (cdr *entries*))
+                  pending)
+          (if (null new-failures)
+              (format s "~&No unexpected failures.")
+            (when *expected-failures*
+              (format s "~&~A unexpected failures: ~
                    ~:@(~{~<~%   ~1:;~S~>~
                          ~^, ~}~)."
-		    (length new-failures)
-		    new-failures)))
-	  ))
+                    (length new-failures)
+                    new-failures)))
+          ))
       (finish-output s)
       (null pending))))

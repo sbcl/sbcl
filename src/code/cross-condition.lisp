@@ -45,17 +45,17 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "~@<  ~? ~:@_~?~:>"
-	     (simple-condition-format-control condition)
-	     (simple-condition-format-arguments condition)
-	     "~@<If you see this and are an SBCL ~
+             "~@<  ~? ~:@_~?~:>"
+             (simple-condition-format-control condition)
+             (simple-condition-format-arguments condition)
+             "~@<If you see this and are an SBCL ~
 developer, then it is probable that you have made a change to the ~
 system that has broken the ability for SBCL to compile, usually by ~
 removing an assumed invariant of the system, but sometimes by making ~
 an averrance that is violated (check your code!). If you are a user, ~
 please submit a bug report to the developers' mailing list, details of ~
 which can be found at <http://sbcl.sourceforge.net/>.~:@>"
-	     ()))))
+             ()))))
 
 ;;; These are should never be instantiated before the real definitions
 ;;; come in.

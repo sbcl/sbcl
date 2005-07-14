@@ -16,29 +16,29 @@
 (in-package "SB!IMPL")
 
 (declaim (special *keyword-package* *cl-package*
-		  original-lisp-environment
-		  *standard-readtable*
-		  sb!debug:*in-the-debugger*
-		  sb!debug:*stack-top-hint*
-		  *handler-clusters*
-		  *restart-clusters*
-		  *gc-inhibit* *need-to-collect-garbage*
-		  *software-interrupt-vector* *load-verbose*
-		  *load-print-stuff* *in-compilation-unit*
-		  *aborted-compilation-unit-count* *char-name-alist*
-		  *posix-argv*))
+                  original-lisp-environment
+                  *standard-readtable*
+                  sb!debug:*in-the-debugger*
+                  sb!debug:*stack-top-hint*
+                  *handler-clusters*
+                  *restart-clusters*
+                  *gc-inhibit* *need-to-collect-garbage*
+                  *software-interrupt-vector* *load-verbose*
+                  *load-print-stuff* *in-compilation-unit*
+                  *aborted-compilation-unit-count* *char-name-alist*
+                  *posix-argv*))
 
 (declaim (ftype (function * *)
-		find-keyword keyword-test assert-error
-		assert-prompt check-type-error case-body-error print-object
-		describe-object sb!pcl::check-wrapper-validity))
+                find-keyword keyword-test assert-error
+                assert-prompt check-type-error case-body-error print-object
+                describe-object sb!pcl::check-wrapper-validity))
 
 ;;; Gray streams functions not defined until after PCL is loaded
 (declaim (ftype (function * *)
-		stream-advance-to-column stream-clear-input
-		stream-clear-output stream-finish-output stream-force-output
-		stream-fresh-line stream-line-column stream-line-length
-		stream-listen stream-peek-char stream-read-byte
-		stream-read-char stream-read-char-no-hang stream-read-line
-		stream-start-line-p stream-terpri stream-unread-char
-		stream-write-byte stream-write-char stream-write-string))
+                stream-advance-to-column stream-clear-input
+                stream-clear-output stream-finish-output stream-force-output
+                stream-fresh-line stream-line-column stream-line-length
+                stream-listen stream-peek-char stream-read-byte
+                stream-read-char stream-read-char-no-hang stream-read-line
+                stream-start-line-p stream-terpri stream-unread-char
+                stream-write-byte stream-write-char stream-write-string))

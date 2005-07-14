@@ -12,12 +12,12 @@
 ((:integer af-inet "AF_INET" "IP Protocol family")
  (:integer af-unspec "AF_UNSPEC" "Unspecified")
  (:integer af-local
-	   #+(or sunos solaris) "AF_UNIX"
-	   #-(or sunos solaris) "AF_LOCAL"
-	   "Local to host (pipes and file-domain).")
+           #+(or sunos solaris) "AF_UNIX"
+           #-(or sunos solaris) "AF_LOCAL"
+           "Local to host (pipes and file-domain).")
  #+linux (:integer af-inet6 "AF_INET6"   "IP version 6")
  #+linux (:integer af-route "AF_NETLINK" "Alias to emulate 4.4BSD ")
- 
+
  (:integer sock-stream "SOCK_STREAM"
            "Sequenced, reliable, connection-based byte streams.")
  (:integer sock-dgram "SOCK_DGRAM"
@@ -60,7 +60,7 @@
  (:integer tcp-nodelay "TCP_NODELAY")
  #+linux (:integer so-bindtodevice "SO_BINDTODEVICE")
  (:integer ifnamsiz "IFNAMSIZ")
- 
+
  (:integer EADDRINUSE "EADDRINUSE")
  (:integer EAGAIN "EAGAIN")
  (:integer EBADF "EBADF")
@@ -111,18 +111,18 @@
  (:structure protoent ("struct protoent"
                        (c-string-pointer name "char *" "p_name")
                        ((* (* t)) aliases "char **" "p_aliases")
-		       (integer proto "int" "p_proto")))
+                       (integer proto "int" "p_proto")))
  (:function getprotobyname ("getprotobyname" (* protoent)
-					     (name c-string)))
+                                             (name c-string)))
  (:integer inaddr-any "INADDR_ANY")
  (:structure in-addr ("struct in_addr"
-		      ((array (unsigned 8)) addr "u_int32_t" "s_addr")))
+                      ((array (unsigned 8)) addr "u_int32_t" "s_addr")))
  (:structure sockaddr-in ("struct sockaddr_in"
                           (integer family "sa_family_t" "sin_family")
-			  ;; These two could be in-port-t and
-			  ;; in-addr-t, but then we'd throw away the
-			  ;; convenience (and byte-order agnosticism)
-			  ;; of the old sb-grovel scheme.
+                          ;; These two could be in-port-t and
+                          ;; in-addr-t, but then we'd throw away the
+                          ;; convenience (and byte-order agnosticism)
+                          ;; of the old sb-grovel scheme.
                           ((array (unsigned 8)) port "u_int16_t" "sin_port")
                           ((array (unsigned 8)) addr "struct in_addr" "sin_addr")))
  (:structure sockaddr-un ("struct sockaddr_un"
@@ -161,21 +161,21 @@
                     (socket int)
                     (his-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                     (addrlen int )))
- 
+
  (:function close ("close" int
                    (fd int)))
  (:function recvfrom ("recvfrom" int
-				 (socket int)
-				 (buf (* t))
-				 (len integer)
-				 (flags int)
-				 (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-				 (socklen (* socklen-t))))
+                                 (socket int)
+                                 (buf (* t))
+                                 (len integer)
+                                 (flags int)
+                                 (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
+                                 (socklen (* socklen-t))))
  (:function gethostbyname ("gethostbyname" (* hostent) (name c-string)))
  (:function gethostbyaddr ("gethostbyaddr" (* hostent)
-					   (addr (* t))
-					   (len int)
-					   (af int)))
+                                           (addr (* t))
+                                           (len int)
+                                           (af int)))
  (:function setsockopt ("setsockopt" int
                         (socket int)
                         (level int)

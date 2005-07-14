@@ -28,13 +28,13 @@
 (declaim (type hash-table *static-foreign-symbols*))
 (defvar *static-foreign-symbols* (make-hash-table :test 'equal))
 
-(declaim 
+(declaim
  (ftype (sfunction (string hash-table) (or integer null)) find-foreign-symbol-in-table))
 (defun find-foreign-symbol-in-table (name table)
   (let ((extern (extern-alien-name name)))
-    (values 
+    (values
      (or (gethash extern table)
-	 (gethash (concatenate 'base-string "ldso_stub__" extern) table)))))
+         (gethash (concatenate 'base-string "ldso_stub__" extern) table)))))
 
 (defun find-foreign-symbol-address (name)
   "Returns the address of the foreign symbol NAME, or NIL. Does not enter the
@@ -56,19 +56,19 @@ On non-linkage-table ports signals an error if the symbol isn't found."
   (declare (ignorable datap))
   (let ((static (find-foreign-symbol-in-table name  *static-foreign-symbols*)))
     (if static
-	(values static nil)
-	#!+os-provides-dlopen
-	(progn
-	  #-sb-xc-host
-	  (values #!-linkage-table
-		  (ensure-dynamic-foreign-symbol-address name)
-		  #!+linkage-table
-		  (ensure-foreign-symbol-linkage name datap)
-		  t)
-	  #+sb-xc-host
-	  (error 'undefined-alien-error :name name))
-	#!-os-provides-dlopen
-	(error 'undefined-alien-error :name name))))
+        (values static nil)
+        #!+os-provides-dlopen
+        (progn
+          #-sb-xc-host
+          (values #!-linkage-table
+                  (ensure-dynamic-foreign-symbol-address name)
+                  #!+linkage-table
+                  (ensure-foreign-symbol-linkage name datap)
+                  t)
+          #+sb-xc-host
+          (error 'undefined-alien-error :name name))
+        #!-os-provides-dlopen
+        (error 'undefined-alien-error :name name))))
 
 (defun foreign-symbol-sap (symbol &optional datap)
   "Returns a SAP corresponding to the foreign symbol. DATAP must be true if the
@@ -87,8 +87,8 @@ if the symbol isn't found."
     ;; we need to do a bit of juggling. It is not the address of the
     ;; variable, but the address where the real address is stored.
     (if (and sharedp datap)
-	(int-sap (sap-ref-word (int-sap addr) 0))
-	(int-sap addr))))
+        (int-sap (sap-ref-word (int-sap addr) 0))
+        (int-sap addr))))
 
 #-sb-xc-host
 (defun foreign-reinit ()
@@ -119,27 +119,27 @@ if the symbol isn't found."
     (declare (ignorable addr))
     #!+linkage-table
     (when (<= sb!vm:linkage-table-space-start
-	      addr
-	      sb!vm:linkage-table-space-end)
+              addr
+              sb!vm:linkage-table-space-end)
       (maphash (lambda (name-and-datap info)
-		 (let ((table-addr (linkage-info-address info)))
-		   (when (<= table-addr
-			     addr
-			     (+ table-addr sb!vm:linkage-table-entry-size))
-		     (return-from sap-foreign-symbol (car name-and-datap)))))
-	       *linkage-info*))
+                 (let ((table-addr (linkage-info-address info)))
+                   (when (<= table-addr
+                             addr
+                             (+ table-addr sb!vm:linkage-table-entry-size))
+                     (return-from sap-foreign-symbol (car name-and-datap)))))
+               *linkage-info*))
     #!+os-provides-dladdr
     (with-alien ((info (struct dl-info
-			       (filename c-string)
-			       (base unsigned)
-			       (symbol c-string)
-			       (symbol-address unsigned)))
-		 (dladdr (function unsigned unsigned (* (struct dl-info)))
-			 :extern "dladdr"))
+                               (filename c-string)
+                               (base unsigned)
+                               (symbol c-string)
+                               (symbol-address unsigned)))
+                 (dladdr (function unsigned unsigned (* (struct dl-info)))
+                         :extern "dladdr"))
       (let ((err (alien-funcall dladdr addr (addr info))))
-	(if (zerop err)
-	    nil
-	    (slot info 'symbol))))
+        (if (zerop err)
+            nil
+            (slot info 'symbol))))
     ;; FIXME: Even in the absence of dladdr we could search the
     ;; static foreign symbols (and *linkage-info*, for that matter).
     ))

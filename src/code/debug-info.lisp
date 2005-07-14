@@ -17,13 +17,13 @@
 ;;;    Compiled debug variables are in a packed binary representation in the
 ;;; DEBUG-FUN-VARS:
 ;;;    single byte of boolean flags:
-;;;	uninterned name
-;;;	   packaged name
-;;;	environment-live
-;;;	has distinct save location
-;;;	has ID (name not unique in this fun)
-;;;	minimal debug-info argument (name generated as ARG-0, ...)
-;;;	deleted: placeholder for unused minimal argument
+;;;     uninterned name
+;;;        packaged name
+;;;     environment-live
+;;;     has distinct save location
+;;;     has ID (name not unique in this fun)
+;;;     minimal debug-info argument (name generated as ARG-0, ...)
+;;;     deleted: placeholder for unused minimal argument
 ;;;    [name length in bytes (as var-length integer), if not minimal]
 ;;;    [...name bytes..., if not minimal]
 ;;;    [if packaged, var-length integer that is package name length]
@@ -33,20 +33,20 @@
 ;;;    [If has save SC, SC-OFFSET of save location (as var-length integer)]
 
 ;;; FIXME: The first two are no longer used in SBCL.
-;;;(defconstant compiled-debug-var-uninterned		#b00000001)
-;;;(defconstant compiled-debug-var-packaged		#b00000010)
-(def!constant compiled-debug-var-environment-live	#b00000100)
-(def!constant compiled-debug-var-save-loc-p		#b00001000)
-(def!constant compiled-debug-var-id-p			#b00010000)
-(def!constant compiled-debug-var-minimal-p		#b00100000)
-(def!constant compiled-debug-var-deleted-p		#b01000000)
+;;;(defconstant compiled-debug-var-uninterned           #b00000001)
+;;;(defconstant compiled-debug-var-packaged             #b00000010)
+(def!constant compiled-debug-var-environment-live       #b00000100)
+(def!constant compiled-debug-var-save-loc-p             #b00001000)
+(def!constant compiled-debug-var-id-p                   #b00010000)
+(def!constant compiled-debug-var-minimal-p              #b00100000)
+(def!constant compiled-debug-var-deleted-p              #b01000000)
 
 ;;;; compiled debug blocks
 ;;;;
 ;;;;    Compiled debug blocks are in a packed binary representation in the
 ;;;; DEBUG-FUN-BLOCKS:
 ;;;;    number of successors + bit flags (single byte)
-;;;;	elsewhere-p
+;;;;    elsewhere-p
 ;;;;    ...ordinal number of each successor in the function's blocks vector...
 ;;;;    number of locations in this block
 ;;;;    kind of first location (single byte)
@@ -70,7 +70,7 @@
 (def!struct (debug-fun (:constructor nil)))
 
 (def!struct (compiled-debug-fun (:include debug-fun)
-				#-sb-xc-host (:pure t))
+                                #-sb-xc-host (:pure t))
   ;; KLUDGE: Courtesy of more than a decade of, ah, organic growth in
   ;; CMU CL, there are two distinct -- but coupled -- mechanisms to
   ;; finding the name of a function. The slot here is one mechanism
@@ -196,33 +196,33 @@
 ;;; of records in this format:
 ;;;    name representation + kind + return convention (single byte)
 ;;;    bit flags (single byte)
-;;;	setf, nfp, variables
+;;;     setf, nfp, variables
 ;;;    [package name length (as var-length int), if name is packaged]
 ;;;    [...package name bytes, if name is packaged]
 ;;;    [name length (as var-length int), if there is a name]
 ;;;    [...name bytes, if there is a name]
 ;;;    [variables length (as var-length int), if variables flag]
 ;;;    [...bytes holding variable descriptions]
-;;;	If variables are dumped (level 1), then the variables are all
-;;;	arguments (in order) with the minimal-arg bit set.
+;;;     If variables are dumped (level 1), then the variables are all
+;;;     arguments (in order) with the minimal-arg bit set.
 ;;;    [If returns is specified, then the number of return values]
 ;;;    [...sequence of var-length ints holding sc-offsets of the return
-;;;	value locations, if fixed return values are specified.]
+;;;     value locations, if fixed return values are specified.]
 ;;;    return-pc location sc-offset (as var-length int)
 ;;;    old-fp location sc-offset (as var-length int)
 ;;;    [nfp location sc-offset (as var-length int), if nfp flag]
 ;;;    code-start-pc (as a var-length int)
-;;;	This field implicitly encodes start of this function's code in the
-;;;	function map, as a delta from the previous function's code start.
-;;;	If the first function in the component, then this is the delta from
-;;;	0 (i.e. the absolute offset.)
+;;;     This field implicitly encodes start of this function's code in the
+;;;     function map, as a delta from the previous function's code start.
+;;;     If the first function in the component, then this is the delta from
+;;;     0 (i.e. the absolute offset.)
 ;;;    start-pc (as a var-length int)
-;;;	This encodes the environment start PC as an offset from the
-;;;	code-start PC.
+;;;     This encodes the environment start PC as an offset from the
+;;;     code-start PC.
 ;;;    elsewhere-pc
-;;;	This encodes the elsewhere code start for this function, as a delta
-;;;	from the previous function's elsewhere code start. (i.e. the
-;;;	encoding is the same as for code-start-pc.)
+;;;     This encodes the elsewhere code start for this function, as a delta
+;;;     from the previous function's elsewhere code start. (i.e. the
+;;;     encoding is the same as for code-start-pc.)
 
 ;;; ### For functions with XEPs, name could be represented more simply
 ;;; and compactly as some sort of info about with how to find the
@@ -272,14 +272,14 @@
   ;; component came from, in the order that they were read.
   ;;
   ;; KLUDGE: comment from CMU CL:
-  ;;   *** NOTE: the offset of this slot is wired into the fasl dumper 
+  ;;   *** NOTE: the offset of this slot is wired into the fasl dumper
   ;;   *** so that it can backpatch the source info when compilation
   ;;   *** is complete.
   (source nil))
 
 (def!struct (compiled-debug-info
-	     (:include debug-info)
-	     #-sb-xc-host (:pure t))
+             (:include debug-info)
+             #-sb-xc-host (:pure t))
   ;; a SIMPLE-VECTOR of alternating DEBUG-FUN objects and fixnum
   ;; PCs, used to map PCs to functions, so that we can figure out what
   ;; function we were running in. Each function is valid between the

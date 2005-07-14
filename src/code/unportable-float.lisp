@@ -20,9 +20,9 @@
     (declare (notinline opaque-identity make-single-float make-double-float))
     (ecase name
       (:single-float-negative-zero (make-single-float
-				    (opaque-identity #x-80000000)))
+                                    (opaque-identity #x-80000000)))
       (:double-float-negative-zero (make-double-float
-				    (opaque-identity #x-80000000)
-				    (opaque-identity #x00000000)))
+                                    (opaque-identity #x-80000000)
+                                    (opaque-identity #x00000000)))
       #!+long-float
       (:long-float-negative-zero (error "write LONG-FLOAT creation form")))))

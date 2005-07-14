@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;; 
+;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -55,17 +55,17 @@
     (dotimes (i nthreads)
       (sb-thread:make-thread (lambda ()
                                (sb-thread:condition-wait queue mutex)
-			       (sb-ext:quit))))
+                               (sb-ext:quit))))
     (let ((start-time (get-internal-run-time)))
       (funcall function)
       (prog1 (- (get-internal-run-time) start-time)
-	(sb-thread:condition-broadcast queue)))))
+        (sb-thread:condition-broadcast queue)))))
 (defun fact (n)
   "A function that does work with the CPU."
   (if (zerop n) 1 (* n (fact (1- n)))))
 (let ((work (lambda () (fact 15000))))
   (let ((zero (scaling-test work 0))
-	(four (scaling-test work 4)))
+        (four (scaling-test work 4)))
     ;; a slightly weak assertion, but good enough for starters.
     (assert (< four (* 1.5 zero)))))
 
@@ -74,7 +74,7 @@
 
 (with-open-file (o "threads-foreign.c" :direction :output :if-exists :supersede)
   (format o "void loop_forever() { while(1) ; }~%"))
-(sb-ext:run-program	
+(sb-ext:run-program
  "cc"
  (or #+linux '("-shared" "-o" "threads-foreign.so" "threads-foreign.c")
      (error "Missing shared library compilation options for this platform"))
@@ -123,20 +123,20 @@
       (lock (make-mutex :name "lock"))
       (n 0))
   (labels ((in-new-thread ()
-	     (with-mutex (lock)
-	       (assert (eql (mutex-value lock) *current-thread*))
-	       (format t "~A got mutex~%" *current-thread*)
-	       ;; now drop it and sleep
-	       (condition-wait queue lock)
-	       ;; after waking we should have the lock again
-	       (assert (eql (mutex-value lock) *current-thread*))
+             (with-mutex (lock)
+               (assert (eql (mutex-value lock) *current-thread*))
+               (format t "~A got mutex~%" *current-thread*)
+               ;; now drop it and sleep
+               (condition-wait queue lock)
+               ;; after waking we should have the lock again
+               (assert (eql (mutex-value lock) *current-thread*))
                (assert (eql n 1))
                (decf n))))
     (make-thread #'in-new-thread)
-    (sleep 2)				; give it  a chance to start
+    (sleep 2)                           ; give it  a chance to start
     ;; check the lock is free while it's asleep
     (format t "parent thread ~A~%" *current-thread*)
-    (assert (eql (mutex-value lock) nil))    
+    (assert (eql (mutex-value lock) nil))
     (with-mutex (lock)
       (incf n)
       (condition-notify queue))
@@ -145,37 +145,37 @@
 (let ((queue (make-waitqueue :name "queue"))
       (lock (make-mutex :name "lock")))
   (labels ((ours-p (value)
-	     (sb-vm:control-stack-pointer-valid-p
-	      (sb-sys:int-sap (sb-kernel:get-lisp-obj-address value))))
-	   (in-new-thread ()
-	     (with-recursive-lock (lock)
-	       (assert (ours-p (mutex-value lock)))
-	       (format t "~A got mutex~%" (mutex-value lock))
-	       ;; now drop it and sleep
-	       (condition-wait queue lock)
-	       ;; after waking we should have the lock again
-	       (format t "woken, ~A got mutex~%" (mutex-value lock))
-	       (assert (ours-p (mutex-value lock))))))
+             (sb-vm:control-stack-pointer-valid-p
+              (sb-sys:int-sap (sb-kernel:get-lisp-obj-address value))))
+           (in-new-thread ()
+             (with-recursive-lock (lock)
+               (assert (ours-p (mutex-value lock)))
+               (format t "~A got mutex~%" (mutex-value lock))
+               ;; now drop it and sleep
+               (condition-wait queue lock)
+               ;; after waking we should have the lock again
+               (format t "woken, ~A got mutex~%" (mutex-value lock))
+               (assert (ours-p (mutex-value lock))))))
     (make-thread #'in-new-thread)
-    (sleep 2)				; give it  a chance to start
+    (sleep 2)                           ; give it  a chance to start
     ;; check the lock is free while it's asleep
     (format t "parent thread ~A~%" *current-thread*)
-    (assert (eql (mutex-value lock) nil))    
+    (assert (eql (mutex-value lock) nil))
     (with-recursive-lock (lock)
       (condition-notify queue))
     (sleep 1)))
 
 (let ((mutex (make-mutex :name "contended")))
   (labels ((run ()
-	     (let ((me *current-thread*))
-	       (dotimes (i 100)
-		 (with-mutex (mutex)
-		   (sleep .1)
-		   (assert (eql (mutex-value mutex) me)))
-		 (assert (not (eql (mutex-value mutex) me))))
-	       (format t "done ~A~%" *current-thread*))))
+             (let ((me *current-thread*))
+               (dotimes (i 100)
+                 (with-mutex (mutex)
+                   (sleep .1)
+                   (assert (eql (mutex-value mutex) me)))
+                 (assert (not (eql (mutex-value mutex) me))))
+               (format t "done ~A~%" *current-thread*))))
     (let ((kid1 (make-thread #'run))
-	  (kid2 (make-thread #'run)))
+          (kid2 (make-thread #'run)))
       (format t "contention ~A ~A~%" kid1 kid2))))
 
 (defun test-interrupt (function-to-interrupt &optional quit-p)
@@ -184,9 +184,9 @@
     (sleep 2)
     (format t "interrupting child ~A~%" child)
     (interrupt-thread child
-		      (lambda ()
-			(format t "child pid ~A~%" *current-thread*)
-			(when quit-p (sb-ext:quit))))
+                      (lambda ()
+                        (format t "child pid ~A~%" *current-thread*)
+                        (when quit-p (sb-ext:quit))))
     (sleep 1)
     child))
 
@@ -200,16 +200,16 @@
 
 (let ((child (test-interrupt (lambda () (loop (sleep 2000))))))
   (terminate-thread child))
-		
+
 (let ((lock (make-mutex :name "loctite"))
       child)
   (with-mutex (lock)
     (setf child (test-interrupt
-		 (lambda ()
-		   (with-mutex (lock)
-		     (assert (eql (mutex-value lock) *current-thread*)))
-		   (assert (not (eql (mutex-value lock) *current-thread*)))
-		   (sleep 10))))
+                 (lambda ()
+                   (with-mutex (lock)
+                     (assert (eql (mutex-value lock) *current-thread*)))
+                   (assert (not (eql (mutex-value lock) *current-thread*)))
+                   (sleep 10))))
     ;;hold onto lock for long enough that child can't get it immediately
     (sleep 5)
     (interrupt-thread child (lambda () (format t "l ~A~%" (mutex-value lock))))
@@ -246,10 +246,10 @@
   (dotimes (i 100)
     (sleep (random 1d0))
     (interrupt-thread c
-		      (lambda ()
-			(princ ".") (force-output)
+                      (lambda ()
+                        (princ ".") (force-output)
                         (assert (eq (thread-state *current-thread*) :running))
-			(assert (zerop SB-KERNEL:*PSEUDO-ATOMIC-ATOMIC*)))))
+                        (assert (zerop SB-KERNEL:*PSEUDO-ATOMIC-ATOMIC*)))))
   (terminate-thread c))
 
 (format t "~&interrupt test done~%")
@@ -286,14 +286,14 @@
 
 (let (a-done b-done)
   (make-thread (lambda ()
-		 (dotimes (i 100)
-		   (sb-ext:gc) (princ "\\") (force-output))
-		 (setf a-done t)))
+                 (dotimes (i 100)
+                   (sb-ext:gc) (princ "\\") (force-output))
+                 (setf a-done t)))
   (make-thread (lambda ()
-		 (dotimes (i 25)
-		   (sb-ext:gc :full t)
-		   (princ "/") (force-output))
-		 (setf b-done t)))
+                 (dotimes (i 25)
+                   (sb-ext:gc :full t)
+                   (princ "/") (force-output))
+                 (setf b-done t)))
   (loop
    (when (and a-done b-done) (return))
    (sleep 1)))
@@ -408,6 +408,6 @@
 
 ;; give the other thread time to die before we leave, otherwise the
 ;; overall exit status is 0, not 104
-(sleep 2) 
+(sleep 2)
 
 (sb-ext:quit :unix-status 104)

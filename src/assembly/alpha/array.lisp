@@ -13,22 +13,22 @@
 
 
 (define-assembly-routine (allocate-vector
-			  (:policy :fast-safe)
-			  (:translate allocate-vector)
-			  (:arg-types positive-fixnum
-				      positive-fixnum
-				      positive-fixnum))
-			 ((:arg type any-reg a0-offset)
-			  (:arg length any-reg a1-offset)
-			  (:arg words any-reg a2-offset)
-			  (:res result descriptor-reg a0-offset)
+                          (:policy :fast-safe)
+                          (:translate allocate-vector)
+                          (:arg-types positive-fixnum
+                                      positive-fixnum
+                                      positive-fixnum))
+                         ((:arg type any-reg a0-offset)
+                          (:arg length any-reg a1-offset)
+                          (:arg words any-reg a2-offset)
+                          (:res result descriptor-reg a0-offset)
 
-			  (:temp ndescr non-descriptor-reg nl0-offset))
+                          (:temp ndescr non-descriptor-reg nl0-offset))
   ;; This is kinda sleezy, changing words like this.  But we can because
   ;; the vop thinks it is temporary.
   (inst addq words (+ (1- (ash 1 n-lowtag-bits))
-		      (* vector-data-offset n-word-bytes))
-	words)
+                      (* vector-data-offset n-word-bytes))
+        words)
   (inst li (lognot lowtag-mask) ndescr)
   (inst and words ndescr words)
   (inst srl type word-shift ndescr)
@@ -42,20 +42,20 @@
 ;;;; hash primitives
 #|
 (define-assembly-routine (sxhash-simple-string
-			  (:translate %sxhash-simple-string)
-			  (:policy :fast-safe)
-			  (:result-types positive-fixnum))
-			 ((:arg string descriptor-reg a0-offset)
-			  (:res result any-reg a0-offset)
+                          (:translate %sxhash-simple-string)
+                          (:policy :fast-safe)
+                          (:result-types positive-fixnum))
+                         ((:arg string descriptor-reg a0-offset)
+                          (:res result any-reg a0-offset)
 
-			  (:temp length any-reg a1-offset)
+                          (:temp length any-reg a1-offset)
 
-			  (:temp lip interior-reg lip-offset)
-			  (:temp accum non-descriptor-reg nl0-offset)
-			  (:temp data non-descriptor-reg nl1-offset)
-			  (:temp byte non-descriptor-reg nl2-offset)
-			  (:temp retaddr non-descriptor-reg nl3-offset)
-			  (:temp temp1 non-descriptor-reg nl4-offset))
+                          (:temp lip interior-reg lip-offset)
+                          (:temp accum non-descriptor-reg nl0-offset)
+                          (:temp data non-descriptor-reg nl1-offset)
+                          (:temp byte non-descriptor-reg nl2-offset)
+                          (:temp retaddr non-descriptor-reg nl3-offset)
+                          (:temp temp1 non-descriptor-reg nl4-offset))
 
   ;; These are needed after we jump into sxhash-simple-substring.
   (progn result lip accum data byte  retaddr)
@@ -63,30 +63,30 @@
   (inst li (make-fixup 'sxhash-simple-substring :assembly-routine) temp1)
   (loadw length string vector-length-slot other-pointer-lowtag)
   (inst jmp zero-tn temp1
-	(make-fixup 'sxhash-simple-substring :assembly-routine)))
+        (make-fixup 'sxhash-simple-substring :assembly-routine)))
 
 (define-assembly-routine (sxhash-simple-substring
-			  (:translate %sxhash-simple-substring)
-			  (:policy :fast-safe)
-			  (:arg-types * positive-fixnum)
-			  (:result-types positive-fixnum))
-			 ((:arg string descriptor-reg a0-offset)
-			  (:arg length any-reg a1-offset)
-			  (:res result any-reg a0-offset)
+                          (:translate %sxhash-simple-substring)
+                          (:policy :fast-safe)
+                          (:arg-types * positive-fixnum)
+                          (:result-types positive-fixnum))
+                         ((:arg string descriptor-reg a0-offset)
+                          (:arg length any-reg a1-offset)
+                          (:res result any-reg a0-offset)
 
-			  (:temp lip interior-reg lip-offset)
-			  (:temp accum non-descriptor-reg nl0-offset)
-			  (:temp data non-descriptor-reg nl1-offset)
-			  (:temp byte non-descriptor-reg nl2-offset)
-			  (:temp retaddr non-descriptor-reg nl3-offset))
+                          (:temp lip interior-reg lip-offset)
+                          (:temp accum non-descriptor-reg nl0-offset)
+                          (:temp data non-descriptor-reg nl1-offset)
+                          (:temp byte non-descriptor-reg nl2-offset)
+                          (:temp retaddr non-descriptor-reg nl3-offset))
 
   ;; Save the return address
   (inst subq lip code-tn retaddr)
 
   ;; Get a pointer to the data.
   (inst addq string
-	(- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
-	lip)
+        (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+        lip)
   (move zero-tn accum)
   (inst br zero-tn test)
 

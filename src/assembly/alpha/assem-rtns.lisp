@@ -67,7 +67,7 @@
   (inst subq count (fixnumize 1) count)
   (inst addq dst n-word-bytes dst)
   (inst bne count loop)
-		
+
   (inst br zero-tn done)
 
   DEFAULT-A0-AND-ON
@@ -82,12 +82,12 @@
   DEFAULT-A5-AND-ON
   (inst move null-tn a5)
   DONE
-  
+
   ;; Clear the stack.
   (move cfp-tn ocfp-tn)
   (move ocfp cfp-tn)
   (inst addq ocfp-tn nvals csp-tn)
-  
+
   ;; Return.
   (lisp-return lra lip))
 
@@ -125,7 +125,7 @@
 
   ;; Calculate NARGS (as a fixnum)
   (inst subq csp-tn args nargs)
-     
+
   ;; Load the argument regs (must do this now, 'cause the blt might
   ;; trash these locations)
   (inst ldl a0 (* 0 n-word-bytes) args)
@@ -140,7 +140,7 @@
   (inst addq args (* n-word-bytes register-arg-count) src)
   (inst ble count done)
   (inst addq cfp-tn (* n-word-bytes register-arg-count) dst)
-	
+
   LOOP
   ;; Copy one arg.
   (inst ldl temp 0 src)
@@ -149,7 +149,7 @@
   (inst subq count (fixnumize 1) count)
   (inst addq dst n-word-bytes dst)
   (inst bgt count loop)
-	
+
   DONE
   ;; We are done.  Do the jump.
   (progn
@@ -177,15 +177,15 @@
   (load-symbol-value cur-uwp *current-unwind-protect-block*)
   (let ((error (generate-error-code nil invalid-unwind-error)))
     (inst beq block error))
-  
+
   (loadw target-uwp block unwind-block-current-uwp-slot)
   (inst cmpeq cur-uwp target-uwp temp1)
   (inst beq temp1 do-uwp)
-      
+
   (move block cur-uwp)
 
   do-exit
-      
+
   (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
   (loadw code-tn cur-uwp unwind-block-current-code-slot)
   (progn
@@ -206,24 +206,24 @@
      (:temp catch any-reg a1-offset)
      (:temp tag descriptor-reg a2-offset)
      (:temp temp1 non-descriptor-reg nl0-offset))
-  
+
   (progn start count) ; We just need them in the registers.
 
   (load-symbol-value catch *current-catch-block*)
-  
+
   loop
-  
+
   (let ((error (generate-error-code nil unseen-throw-tag-error target)))
     (inst beq catch error))
-  
+
   (loadw tag catch catch-block-tag-slot)
   (inst cmpeq tag target temp1)
   (inst bne temp1 exit)
   (loadw catch catch catch-block-previous-catch-slot)
   (inst br zero-tn loop)
-  
+
   exit
-  
+
   (move catch target)
   (inst li (make-fixup 'unwind :assembly-routine) temp1)
   (inst jmp zero-tn temp1 (make-fixup 'unwind :assembly-routine)))

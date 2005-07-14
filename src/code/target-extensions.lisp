@@ -38,11 +38,11 @@ applications.")
 ;;; like LISTEN, but any whitespace in the input stream will be flushed
 (defun listen-skip-whitespace (&optional (stream *standard-input*))
   (do ((char (read-char-no-hang stream nil nil nil)
-	     (read-char-no-hang stream nil nil nil)))
+             (read-char-no-hang stream nil nil nil)))
       ((null char) nil)
     (cond ((not (whitespacep char))
-	   (unread-char char stream)
-	   (return t)))))
+           (unread-char char stream)
+           (return t)))))
 
 ;;;; helpers for C library calls
 
@@ -50,15 +50,15 @@ applications.")
 ;;; errno problem, arranging for the condition's print representation
 ;;; to be similar to the ANSI C perror(3) style.
 (defun simple-perror (prefix-string
-		      &key
-		      (errno (get-errno))
-		      (simple-error 'simple-error)
-		      other-condition-args)
+                      &key
+                      (errno (get-errno))
+                      (simple-error 'simple-error)
+                      other-condition-args)
   (declare (type symbol simple-error))
   (aver (subtypep simple-error 'simple-condition))
   (aver (subtypep simple-error 'error))
   (apply #'error
-	 simple-error
-	 :format-control "~@<~A: ~2I~_~A~:>"
-	 :format-arguments (list prefix-string (strerror errno))
-	 other-condition-args))
+         simple-error
+         :format-control "~@<~A: ~2I~_~A~:>"
+         :format-arguments (list prefix-string (strerror errno))
+         other-condition-args))

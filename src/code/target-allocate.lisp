@@ -12,21 +12,21 @@
 (in-package "SB!KERNEL")
 
 (sb!alien:define-alien-routine ("os_allocate" allocate-system-memory)
-			       system-area-pointer
+                               system-area-pointer
   (bytes sb!alien:unsigned-long))
 
 (sb!alien:define-alien-routine ("os_allocate_at" allocate-system-memory-at)
-			       system-area-pointer
+                               system-area-pointer
   (address system-area-pointer)
   (bytes sb!alien:unsigned-long))
 
 (sb!alien:define-alien-routine ("os_reallocate" reallocate-system-memory)
-			       system-area-pointer
+                               system-area-pointer
   (old system-area-pointer)
   (old-size sb!alien:unsigned-long)
   (new-size sb!alien:unsigned-long))
 
 (sb!alien:define-alien-routine ("os_deallocate" deallocate-system-memory)
-			       sb!alien:void
+                               sb!alien:void
   (addr system-area-pointer)
   (bytes sb!alien:unsigned-long))

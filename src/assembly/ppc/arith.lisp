@@ -9,8 +9,8 @@
 
 ;;; Note that there is only one use of static-fun-offset outside this
 ;;; file (in genesis.lisp)
-			     
-(define-assembly-routine 
+
+(define-assembly-routine
   (generic-+
    (:cost 10)
    (:return-style :full-call)
@@ -19,9 +19,9 @@
    (:save-p t))
   ((:arg x (descriptor-reg any-reg) a0-offset)
    (:arg y (descriptor-reg any-reg) a1-offset)
-   
+
    (:res res (descriptor-reg any-reg) a0-offset)
-   
+
    (:temp temp non-descriptor-reg nl0-offset)
    (:temp temp2 non-descriptor-reg nl1-offset)
    (:temp flag non-descriptor-reg nl3-offset)
@@ -29,7 +29,7 @@
    (:temp nargs any-reg nargs-offset)
    (:temp lip interior-reg lip-offset)
    (:temp ocfp any-reg ocfp-offset))
- 
+
   ; Clear the damned "sticky overflow" bit in :cr0 and :xer
   (inst mtxer zero-tn)
   (inst or temp x y)
@@ -37,26 +37,26 @@
   (inst bne DO-STATIC-FUN)
   (inst addo. temp x y)
   (inst bns done)
-  
+
   (inst srawi temp x 2)
   (inst srawi temp2 y 2)
   (inst add temp2 temp2 temp)
   (with-fixed-allocation (res flag temp bignum-widetag (1+ bignum-digits-offset))
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))
   (lisp-return lra lip :offset 2)
-  
+
   DO-STATIC-FUN
   (inst lwz lip null-tn (static-fun-offset 'two-arg-+) )
   (inst li nargs (fixnumize 2))
   (inst mr ocfp cfp-tn)
   (inst mr cfp-tn csp-tn)
   (inst j lip 0)
-  
+
   DONE
   (move res temp))
 
 
-(define-assembly-routine 
+(define-assembly-routine
   (generic--
    (:cost 10)
    (:return-style :full-call)
@@ -65,9 +65,9 @@
    (:save-p t))
   ((:arg x (descriptor-reg any-reg) a0-offset)
    (:arg y (descriptor-reg any-reg) a1-offset)
-   
+
    (:res res (descriptor-reg any-reg) a0-offset)
-   
+
    (:temp temp non-descriptor-reg nl0-offset)
    (:temp temp2 non-descriptor-reg nl1-offset)
    (:temp flag non-descriptor-reg nl3-offset)
@@ -108,7 +108,7 @@
 ;;;; Multiplication
 
 
-(define-assembly-routine 
+(define-assembly-routine
   (generic-*
    (:cost 50)
    (:return-style :full-call)
@@ -117,9 +117,9 @@
    (:save-p t))
   ((:arg x (descriptor-reg any-reg) a0-offset)
    (:arg y (descriptor-reg any-reg) a1-offset)
-   
+
    (:res res (descriptor-reg any-reg) a0-offset)
-   
+
    (:temp temp non-descriptor-reg nl0-offset)
    (:temp lo non-descriptor-reg nl1-offset)
    (:temp hi non-descriptor-reg nl2-offset)
@@ -145,7 +145,7 @@
   (inst bns ONE-WORD-ANSWER)
   (inst mulhw hi nargs temp)
   (inst b CONS-BIGNUM)
-  
+
   ONE-WORD-ANSWER                       ; We know that all of the overflow bits are clear.
   (inst addo temp lo lo)
   (inst addo. res temp temp)
@@ -163,7 +163,7 @@
       (inst beq one-word)
       ;; Nope, we need two, so allocate the additional space.
       (inst addi alloc-tn alloc-tn (- (pad-data-block (+ 2 bignum-digits-offset))
-			              (pad-data-block (1+ bignum-digits-offset))))
+                                      (pad-data-block (1+ bignum-digits-offset))))
       (inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))
       (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag)
       (emit-label one-word)
@@ -186,17 +186,17 @@
 (macrolet
     ((frob (name note cost type sc)
        `(define-assembly-routine (,name
-				  (:note ,note)
-				  (:cost ,cost)
-				  (:translate *)
-				  (:policy :fast-safe)
-				  (:arg-types ,type ,type)
-				  (:result-types ,type))
-				 ((:arg x ,sc nl0-offset)
-				  (:arg y ,sc nl1-offset)
-				  (:res res ,sc nl0-offset))
-	  ,@(when (eq type 'tagged-num)
-	      `((inst srawi x x 2)))
+                                  (:note ,note)
+                                  (:cost ,cost)
+                                  (:translate *)
+                                  (:policy :fast-safe)
+                                  (:arg-types ,type ,type)
+                                  (:result-types ,type))
+                                 ((:arg x ,sc nl0-offset)
+                                  (:arg y ,sc nl1-offset)
+                                  (:res res ,sc nl0-offset))
+          ,@(when (eq type 'tagged-num)
+              `((inst srawi x x 2)))
           (inst mullw res x y))))
   (frob unsigned-* "unsigned *" 40 unsigned-num unsigned-reg)
   (frob signed-* "unsigned *" 41 signed-num signed-reg)
@@ -208,20 +208,20 @@
 
 
 (define-assembly-routine (positive-fixnum-truncate
-			  (:note "unsigned fixnum truncate")
-			  (:cost 45)
-			  (:translate truncate)
-			  (:policy :fast-safe)
-			  (:arg-types positive-fixnum positive-fixnum)
-			  (:result-types positive-fixnum positive-fixnum))
-			 ((:arg dividend any-reg nl0-offset)
-			  (:arg divisor any-reg nl1-offset)
+                          (:note "unsigned fixnum truncate")
+                          (:cost 45)
+                          (:translate truncate)
+                          (:policy :fast-safe)
+                          (:arg-types positive-fixnum positive-fixnum)
+                          (:result-types positive-fixnum positive-fixnum))
+                         ((:arg dividend any-reg nl0-offset)
+                          (:arg divisor any-reg nl1-offset)
 
-			  (:res quo any-reg nl2-offset)
-			  (:res rem any-reg nl0-offset))
+                          (:res quo any-reg nl2-offset)
+                          (:res rem any-reg nl0-offset))
   (aver (location= rem dividend))
   (let ((error (generate-error-code nil division-by-zero-error
-				    dividend divisor)))
+                                    dividend divisor)))
     (inst cmpwi divisor 0)
     (inst beq error))
     (inst divwu quo dividend divisor)
@@ -232,21 +232,21 @@
 
 
 (define-assembly-routine (fixnum-truncate
-			  (:note "fixnum truncate")
-			  (:cost 50)
-			  (:policy :fast-safe)
-			  (:translate truncate)
-			  (:arg-types tagged-num tagged-num)
-			  (:result-types tagged-num tagged-num))
-			 ((:arg dividend any-reg nl0-offset)
-			  (:arg divisor any-reg nl1-offset)
+                          (:note "fixnum truncate")
+                          (:cost 50)
+                          (:policy :fast-safe)
+                          (:translate truncate)
+                          (:arg-types tagged-num tagged-num)
+                          (:result-types tagged-num tagged-num))
+                         ((:arg dividend any-reg nl0-offset)
+                          (:arg divisor any-reg nl1-offset)
 
-			  (:res quo any-reg nl2-offset)
-			  (:res rem any-reg nl0-offset))
-  
+                          (:res quo any-reg nl2-offset)
+                          (:res rem any-reg nl0-offset))
+
   (aver (location= rem dividend))
   (let ((error (generate-error-code nil division-by-zero-error
-				    dividend divisor)))
+                                    dividend divisor)))
     (inst cmpwi divisor 0)
     (inst beq error))
 
@@ -257,21 +257,21 @@
 
 
 (define-assembly-routine (signed-truncate
-			  (:note "(signed-byte 32) truncate")
-			  (:cost 60)
-			  (:policy :fast-safe)
-			  (:translate truncate)
-			  (:arg-types signed-num signed-num)
-			  (:result-types signed-num signed-num))
+                          (:note "(signed-byte 32) truncate")
+                          (:cost 60)
+                          (:policy :fast-safe)
+                          (:translate truncate)
+                          (:arg-types signed-num signed-num)
+                          (:result-types signed-num signed-num))
 
-			 ((:arg dividend signed-reg nl0-offset)
-			  (:arg divisor signed-reg nl1-offset)
+                         ((:arg dividend signed-reg nl0-offset)
+                          (:arg divisor signed-reg nl1-offset)
 
-			  (:res quo signed-reg nl2-offset)
-			  (:res rem signed-reg nl0-offset))
-  
+                          (:res quo signed-reg nl2-offset)
+                          (:res rem signed-reg nl0-offset))
+
   (let ((error (generate-error-code nil division-by-zero-error
-				    dividend divisor)))
+                                    dividend divisor)))
     (inst cmpwi divisor 0)
     (inst beq error))
 
@@ -284,7 +284,7 @@
 
 (macrolet
     ((define-cond-assem-rtn (name translate static-fn cmp)
-       `(define-assembly-routine 
+       `(define-assembly-routine
           (,name
            (:cost 10)
            (:return-style :full-call)
@@ -293,30 +293,30 @@
            (:save-p t))
           ((:arg x (descriptor-reg any-reg) a0-offset)
            (:arg y (descriptor-reg any-reg) a1-offset)
-           
+
            (:res res descriptor-reg a0-offset)
-           
-	   (:temp lip interior-reg lip-offset)
+
+           (:temp lip interior-reg lip-offset)
            (:temp nargs any-reg nargs-offset)
            (:temp ocfp any-reg ocfp-offset))
-                          
+
           (inst or nargs x y)
           (inst andi. nargs nargs 3)
           (inst cmpw :cr1 x y)
           (inst beq DO-COMPARE)
-	  
-	  DO-STATIC-FN
-	  (inst lwz lip null-tn (static-fun-offset ',static-fn))
-	  (inst li nargs (fixnumize 2))
-	  (inst mr ocfp cfp-tn)
-	  (inst mr cfp-tn csp-tn)
-	  (inst j lip 0)
-	  
-	  DO-COMPARE
-	  (load-symbol res t)
-	  (inst b? :cr1 ,cmp done)
-	  (inst mr res null-tn)
-	  DONE)))
+
+          DO-STATIC-FN
+          (inst lwz lip null-tn (static-fun-offset ',static-fn))
+          (inst li nargs (fixnumize 2))
+          (inst mr ocfp cfp-tn)
+          (inst mr cfp-tn csp-tn)
+          (inst j lip 0)
+
+          DO-COMPARE
+          (load-symbol res t)
+          (inst b? :cr1 ,cmp done)
+          (inst mr res null-tn)
+          DONE)))
 
   (define-cond-assem-rtn generic-< < two-arg-< :lt)
   (define-cond-assem-rtn generic-<= <= two-arg-<= :le)
@@ -325,20 +325,20 @@
 
 
 (define-assembly-routine (generic-eql
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:policy :safe)
-			  (:translate eql)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
-			  
-			  (:res res descriptor-reg a0-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:policy :safe)
+                          (:translate eql)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:temp lra descriptor-reg lra-offset)
-			  (:temp lip interior-reg lip-offset)
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:res res descriptor-reg a0-offset)
+
+                          (:temp lra descriptor-reg lra-offset)
+                          (:temp lip interior-reg lip-offset)
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst cmpw :cr1 x y)
   (inst andi. nargs x 3)
   (inst beq :cr1 RETURN-T)
@@ -360,7 +360,7 @@
   RETURN-T
   (load-symbol res t))
 
-(define-assembly-routine 
+(define-assembly-routine
   (generic-=
    (:cost 10)
    (:return-style :full-call)
@@ -369,7 +369,7 @@
    (:save-p t))
   ((:arg x (descriptor-reg any-reg) a0-offset)
    (:arg y (descriptor-reg any-reg) a1-offset)
-   
+
    (:res res descriptor-reg a0-offset)
 
    (:temp lip interior-reg lip-offset)
@@ -397,21 +397,21 @@
   (load-symbol res t))
 
 (define-assembly-routine (generic-/=
-			  (:cost 10)
-			  (:return-style :full-call)
-			  (:policy :safe)
-			  (:translate /=)
-			  (:save-p t))
-			 ((:arg x (descriptor-reg any-reg) a0-offset)
-			  (:arg y (descriptor-reg any-reg) a1-offset)
+                          (:cost 10)
+                          (:return-style :full-call)
+                          (:policy :safe)
+                          (:translate /=)
+                          (:save-p t))
+                         ((:arg x (descriptor-reg any-reg) a0-offset)
+                          (:arg y (descriptor-reg any-reg) a1-offset)
 
-			  (:res res descriptor-reg a0-offset)
+                          (:res res descriptor-reg a0-offset)
 
-			  (:temp lra descriptor-reg lra-offset)
-			  (:temp lip interior-reg lip-offset)
+                          (:temp lra descriptor-reg lra-offset)
+                          (:temp lip interior-reg lip-offset)
 
-			  (:temp nargs any-reg nargs-offset)
-			  (:temp ocfp any-reg ocfp-offset))
+                          (:temp nargs any-reg nargs-offset)
+                          (:temp ocfp any-reg ocfp-offset))
   (inst or nargs x y)
   (inst andi. nargs nargs 3)
   (inst cmpw :cr1 x y)

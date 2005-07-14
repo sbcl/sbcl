@@ -5,7 +5,7 @@
 ;;; Define NAME as a fasl operation, with op-code FOP-CODE. PUSHP
 ;;; describes what the body does to the fop stack:
 ;;;   T
-;;;     The body might pop the fop stack. The result of the body is 
+;;;     The body might pop the fop stack. The result of the body is
 ;;;     pushed on the fop stack.
 ;;;   NIL
 ;;;     The body might pop the fop stack. The result of the body is
@@ -31,8 +31,8 @@
     (when (and ocode (/= ocode code))
       (error "multiple codes for fop name ~S: ~D and ~D" name code ocode)))
   (setf (svref *fop-names* code) name
-	(get name 'fop-code) code
-	(svref *fop-funs* code) (symbol-function name))
+        (get name 'fop-code) code
+        (svref *fop-funs* code) (symbol-function name))
   (values))
 
 ;;; Define a pair of fops which are identical except that one reads
@@ -43,14 +43,14 @@
 ;;; value ranges went with which fop variant, and chose the correct
 ;;; fop code to use. Currently, since such logic isn't encapsulated,
 ;;; we see callers doing stuff like
-;;;	(cond ((and (< num-consts #x100) (< total-length #x10000))
-;;;	       (dump-fop 'sb!impl::fop-small-code file)
-;;;	       (dump-byte num-consts file)
-;;;	       (dump-integer-as-n-bytes total-length 2 file))
-;;;	      (t
-;;;	       (dump-fop 'sb!impl::fop-code file)
-;;;	       (dump-word num-consts file)
-;;;	       (dump-word total-length file))))
+;;;     (cond ((and (< num-consts #x100) (< total-length #x10000))
+;;;            (dump-fop 'sb!impl::fop-small-code file)
+;;;            (dump-byte num-consts file)
+;;;            (dump-integer-as-n-bytes total-length 2 file))
+;;;           (t
+;;;            (dump-fop 'sb!impl::fop-code file)
+;;;            (dump-word num-consts file)
+;;;            (dump-word total-length file))))
 ;;; in several places. It would be cleaner if this could be replaced with
 ;;; something like
 ;;;     (dump-fop file fop-code num-consts total-length)
@@ -58,7 +58,7 @@
 ;;; caller to know that it's a 1-byte-arg/4-byte-arg cloned fop pair, and to
 ;;; know both the 1-byte-arg and the 4-byte-arg fop names. -- WHN 19990902
 (defmacro define-cloned-fops ((name code &key (pushp t) (stackp t))
-			      (small-name small-code) &rest forms)
+                              (small-name small-code) &rest forms)
   (aver (member pushp '(nil t)))
   (aver (member stackp '(nil t)))
   `(progn
@@ -76,7 +76,7 @@
 (defun read-string-as-bytes (stream string &optional (length (length string)))
   (dotimes (i length)
     (setf (aref string i)
-	  (sb!xc:code-char (read-byte stream))))
+          (sb!xc:code-char (read-byte stream))))
   ;; FIXME: The classic CMU CL code to do this was
   ;;   (READ-N-BYTES FILE STRING START END).
   ;; It was changed for SBCL because we needed a portable version for
@@ -89,11 +89,11 @@
   #+sb-xc-host (bug "READ-STRING-AS-WORDS called")
   (dotimes (i length)
     (setf (aref string i)
-	  (let ((code 0))
-	    ;; FIXME: is this the same as READ-WORD-ARG?
-	    (dotimes (k sb!vm:n-word-bytes (sb!xc:code-char code))
-	      (setf code (logior code (ash (read-byte stream) 
-					   (* k sb!vm:n-byte-bits))))))))
+          (let ((code 0))
+            ;; FIXME: is this the same as READ-WORD-ARG?
+            (dotimes (k sb!vm:n-word-bytes (sb!xc:code-char code))
+              (setf code (logior code (ash (read-byte stream)
+                                           (* k sb!vm:n-byte-bits))))))))
   (values))
 
 ;;;; miscellaneous fops
@@ -140,26 +140,26 @@
 
 (define-cloned-fops (fop-struct 48) (fop-small-struct 49)
   (let* ((size (clone-arg))
-	 (res (%make-instance size)))
+         (res (%make-instance size)))
     (declare (type index size))
     (let* ((layout (pop-stack))
-	   (nuntagged (layout-n-untagged-slots layout))
-	   (ntagged (- size nuntagged)))
+           (nuntagged (layout-n-untagged-slots layout))
+           (ntagged (- size nuntagged)))
       (setf (%instance-ref res 0) layout)
       (dotimes (n (1- ntagged))
-	(declare (type index n))
-	(setf (%instance-ref res (1+ n)) (pop-stack)))
+        (declare (type index n))
+        (setf (%instance-ref res (1+ n)) (pop-stack)))
       (dotimes (n nuntagged)
-	(declare (type index n))
-	(setf (%raw-instance-ref/word res (- nuntagged n 1)) (pop-stack))))
+        (declare (type index n))
+        (setf (%raw-instance-ref/word res (- nuntagged n 1)) (pop-stack))))
     res))
 
 (define-fop (fop-layout 45)
   (let ((nuntagged (pop-stack))
-	(length (pop-stack))
-	(depthoid (pop-stack))
-	(inherits (pop-stack))
-	(name (pop-stack)))
+        (length (pop-stack))
+        (depthoid (pop-stack))
+        (inherits (pop-stack))
+        (name (pop-stack)))
     (find-and-init-or-check-layout name length inherits depthoid nuntagged)))
 
 (define-fop (fop-end-group 64 :stackp nil)
@@ -183,36 +183,36 @@
 ;;;; fops for loading symbols
 
 (macrolet (;; FIXME: Should all this code really be duplicated inside
-	   ;; each fop? Perhaps it would be better for this shared
-	   ;; code to live in FLET FROB1 and FLET FROB4 (for the
-	   ;; two different sizes of counts).
-	   (frob (name code name-size package)
-	     (let ((n-package (gensym))
-		   (n-size (gensym))
-		   (n-buffer (gensym)))
-	       `(define-fop (,name ,code)
-		  (prepare-for-fast-read-byte *fasl-input-stream*
-		    (let ((,n-package ,package)
-			  (,n-size (fast-read-u-integer ,name-size)))
-		      (when (> ,n-size (length *fasl-symbol-buffer*))
-			(setq *fasl-symbol-buffer*
-			      (make-string (* ,n-size 2))))
-		      (done-with-fast-read-byte)
-		      (let ((,n-buffer *fasl-symbol-buffer*))
+           ;; each fop? Perhaps it would be better for this shared
+           ;; code to live in FLET FROB1 and FLET FROB4 (for the
+           ;; two different sizes of counts).
+           (frob (name code name-size package)
+             (let ((n-package (gensym))
+                   (n-size (gensym))
+                   (n-buffer (gensym)))
+               `(define-fop (,name ,code)
+                  (prepare-for-fast-read-byte *fasl-input-stream*
+                    (let ((,n-package ,package)
+                          (,n-size (fast-read-u-integer ,name-size)))
+                      (when (> ,n-size (length *fasl-symbol-buffer*))
+                        (setq *fasl-symbol-buffer*
+                              (make-string (* ,n-size 2))))
+                      (done-with-fast-read-byte)
+                      (let ((,n-buffer *fasl-symbol-buffer*))
                         #+sb-xc-host
-			(read-string-as-bytes *fasl-input-stream*
-					      ,n-buffer
-					      ,n-size)
+                        (read-string-as-bytes *fasl-input-stream*
+                                              ,n-buffer
+                                              ,n-size)
                         #-sb-xc-host
-			(#!+sb-unicode read-string-as-words
+                        (#!+sb-unicode read-string-as-words
                          #!-sb-unicode read-string-as-bytes
                          *fasl-input-stream*
                          ,n-buffer
                          ,n-size)
-			(push-fop-table (without-package-locks
-					 (intern* ,n-buffer
-						  ,n-size
-						  ,n-package))))))))))
+                        (push-fop-table (without-package-locks
+                                         (intern* ,n-buffer
+                                                  ,n-size
+                                                  ,n-package))))))))))
 
   ;; Note: CMU CL had FOP-SYMBOL-SAVE and FOP-SMALL-SYMBOL-SAVE, but
   ;; since they made the behavior of the fasloader depend on the
@@ -229,10 +229,10 @@
   ;;       (SETF *PACKAGE* (FIND-PACKAGE :CL)))
   ;; which in CMU CL 2.4.9 defines a variable CL-USER::*FOO* instead of
   ;; defining CL::*FOO*. Therefore, we don't use those fops in SBCL.
-  ;;(frob fop-symbol-save		6 4 *package*)
-  ;;(frob fop-small-symbol-save	  7 1 *package*)
+  ;;(frob fop-symbol-save               6 4 *package*)
+  ;;(frob fop-small-symbol-save   7 1 *package*)
 
-  (frob fop-lisp-symbol-save	      75 #.sb!vm:n-word-bytes *cl-package*)
+  (frob fop-lisp-symbol-save          75 #.sb!vm:n-word-bytes *cl-package*)
   (frob fop-lisp-small-symbol-save    76 1 *cl-package*)
   (frob fop-keyword-symbol-save       77 #.sb!vm:n-word-bytes *keyword-package*)
   (frob fop-keyword-small-symbol-save 78 1 *keyword-package*)
@@ -252,9 +252,9 @@
     (svref *current-fop-table* (fast-read-u-integer 1))))
 
 (define-cloned-fops (fop-uninterned-symbol-save 12)
-		    (fop-uninterned-small-symbol-save 13)
+                    (fop-uninterned-small-symbol-save 13)
   (let* ((arg (clone-arg))
-	 (res (make-string arg)))
+         (res (make-string arg)))
     #!-sb-unicode
     (read-string-as-bytes *fasl-input-stream* res)
     #!+sb-unicode
@@ -271,13 +271,13 @@
   (declare (fixnum length))
   ;; #+cmu (declare (optimize (inhibit-warnings 2)))
   (do* ((index length (1- index))
-	(byte 0 (read-byte *fasl-input-stream*))
-	(result 0 (+ result (ash byte bits)))
-	(bits 0 (+ bits 8)))
+        (byte 0 (read-byte *fasl-input-stream*))
+        (result 0 (+ result (ash byte bits)))
+        (bits 0 (+ bits 8)))
        ((= index 0)
-	(if (logbitp 7 byte)	; look at sign bit
-	    (- result (ash 1 bits))
-	    result))
+        (if (logbitp 7 byte)    ; look at sign bit
+            (- result (ash 1 bits))
+            result))
     (declare (fixnum index byte bits))))
 
 (define-cloned-fops (fop-integer 33) (fop-small-integer 34)
@@ -347,8 +347,8 @@
     (declare (type index n))))
 
 (macrolet ((frob (name op fun n)
-	     `(define-fop (,name ,op)
-		(call-with-popped-args ,fun ,n))))
+             `(define-fop (,name ,op)
+                (call-with-popped-args ,fun ,n))))
 
   (frob fop-list-1 17 list 1)
   (frob fop-list-2 18 list 2)
@@ -372,7 +372,7 @@
 
 (define-cloned-fops (fop-base-string 37) (fop-small-base-string 38)
   (let* ((arg (clone-arg))
-	 (res (make-string arg :element-type 'base-char)))
+         (res (make-string arg :element-type 'base-char)))
     (read-string-as-bytes *fasl-input-stream* res)
     res))
 
@@ -391,49 +391,49 @@
 
 (define-cloned-fops (fop-vector 39) (fop-small-vector 40)
   (let* ((size (clone-arg))
-	 (res (make-array size)))
+         (res (make-array size)))
     (declare (fixnum size))
     (do ((n (1- size) (1- n)))
-	((minusp n))
+        ((minusp n))
       (setf (svref res n) (pop-stack)))
     res))
 
 (define-fop (fop-array 83)
   (let* ((rank (read-word-arg))
-	 (vec (pop-stack))
-	 (length (length vec))
-	 (res (make-array-header sb!vm:simple-array-widetag rank)))
+         (vec (pop-stack))
+         (length (length vec))
+         (res (make-array-header sb!vm:simple-array-widetag rank)))
     (declare (simple-array vec)
-	     (type (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits)) rank))
+             (type (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits)) rank))
     (set-array-header res vec length nil 0
-		      (do ((i rank (1- i))
-			   (dimensions () (cons (pop-stack) dimensions)))
-			  ((zerop i) dimensions)
-			(declare (type index i)))
-		      nil)
+                      (do ((i rank (1- i))
+                           (dimensions () (cons (pop-stack) dimensions)))
+                          ((zerop i) dimensions)
+                        (declare (type index i)))
+                      nil)
     res))
 
 (define-fop (fop-single-float-vector 84)
   (let* ((length (read-word-arg))
-	 (result (make-array length :element-type 'single-float)))
+         (result (make-array length :element-type 'single-float)))
     (read-n-bytes *fasl-input-stream* result 0 (* length 4))
     result))
 
 (define-fop (fop-double-float-vector 85)
   (let* ((length (read-word-arg))
-	 (result (make-array length :element-type 'double-float)))
+         (result (make-array length :element-type 'double-float)))
     (read-n-bytes *fasl-input-stream* result 0 (* length 8))
     result))
 
 (define-fop (fop-complex-single-float-vector 86)
   (let* ((length (read-word-arg))
-	 (result (make-array length :element-type '(complex single-float))))
+         (result (make-array length :element-type '(complex single-float))))
     (read-n-bytes *fasl-input-stream* result 0 (* length 8))
     result))
 
 (define-fop (fop-complex-double-float-vector 87)
   (let* ((length (read-word-arg))
-	 (result (make-array length :element-type '(complex double-float))))
+         (result (make-array length :element-type '(complex double-float))))
     (read-n-bytes *fasl-input-stream* result 0 (* length 16))
     result))
 
@@ -445,32 +445,32 @@
 (define-fop (fop-int-vector 43)
   (prepare-for-fast-read-byte *fasl-input-stream*
     (let* ((len (fast-read-u-integer #.sb!vm:n-word-bytes))
-	   (size (fast-read-byte))
-	   (res (case size
-		  (0 (make-array len :element-type 'nil))
-		  (1 (make-array len :element-type 'bit))
-		  (2 (make-array len :element-type '(unsigned-byte 2)))
-		  (4 (make-array len :element-type '(unsigned-byte 4)))
-		  (7 (prog1 (make-array len :element-type '(unsigned-byte 7))
-		       (setf size 8)))
-		  (8 (make-array len :element-type '(unsigned-byte 8)))
-		  (15 (prog1 (make-array len :element-type '(unsigned-byte 15))
-			(setf size 16)))
-		  (16 (make-array len :element-type '(unsigned-byte 16)))
-		  (31 (prog1 (make-array len :element-type '(unsigned-byte 31))
-			(setf size 32)))
-		  (32 (make-array len :element-type '(unsigned-byte 32)))
+           (size (fast-read-byte))
+           (res (case size
+                  (0 (make-array len :element-type 'nil))
+                  (1 (make-array len :element-type 'bit))
+                  (2 (make-array len :element-type '(unsigned-byte 2)))
+                  (4 (make-array len :element-type '(unsigned-byte 4)))
+                  (7 (prog1 (make-array len :element-type '(unsigned-byte 7))
+                       (setf size 8)))
+                  (8 (make-array len :element-type '(unsigned-byte 8)))
+                  (15 (prog1 (make-array len :element-type '(unsigned-byte 15))
+                        (setf size 16)))
+                  (16 (make-array len :element-type '(unsigned-byte 16)))
+                  (31 (prog1 (make-array len :element-type '(unsigned-byte 31))
+                        (setf size 32)))
+                  (32 (make-array len :element-type '(unsigned-byte 32)))
                   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
                   (63 (prog1 (make-array len :element-type '(unsigned-byte 63))
                         (setf size 64)))
                   (64 (make-array len :element-type '(unsigned-byte 64)))
-		  (t (bug "losing i-vector element size: ~S" size)))))
+                  (t (bug "losing i-vector element size: ~S" size)))))
       (declare (type index len))
       (done-with-fast-read-byte)
       (read-n-bytes *fasl-input-stream*
-		    res
-		    0
-		    (ceiling (the index (* size len)) sb!vm:n-byte-bits))
+                    res
+                    0
+                    (ceiling (the index (* size len)) sb!vm:n-byte-bits))
       res)))
 
 ;;; This is the same as FOP-INT-VECTOR, except this is for signed
@@ -478,17 +478,17 @@
 (define-fop (fop-signed-int-vector 50)
   (prepare-for-fast-read-byte *fasl-input-stream*
     (let* ((len (fast-read-u-integer #.sb!vm:n-word-bytes))
-	   (size (fast-read-byte))
-	   (res (case size
- 		  (8 (make-array len :element-type '(signed-byte 8)))
- 		  (16 (make-array len :element-type '(signed-byte 16)))
+           (size (fast-read-byte))
+           (res (case size
+                  (8 (make-array len :element-type '(signed-byte 8)))
+                  (16 (make-array len :element-type '(signed-byte 16)))
                   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-		  (29 (prog1 (make-array len :element-type '(unsigned-byte 29))
+                  (29 (prog1 (make-array len :element-type '(unsigned-byte 29))
                         (setf size 32)))
                   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
- 		  (30 (prog1 (make-array len :element-type '(signed-byte 30))
+                  (30 (prog1 (make-array len :element-type '(signed-byte 30))
                         (setf size 32)))
- 		  (32 (make-array len :element-type '(signed-byte 32)))
+                  (32 (make-array len :element-type '(signed-byte 32)))
                   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
                   (60 (prog1 (make-array len :element-type '(unsigned-byte 60))
                         (setf size 64)))
@@ -497,13 +497,13 @@
                         (setf size 64)))
                   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
                   (64 (make-array len :element-type '(signed-byte 64)))
- 		  (t (bug "losing si-vector element size: ~S" size)))))
+                  (t (bug "losing si-vector element size: ~S" size)))))
       (declare (type index len))
       (done-with-fast-read-byte)
       (read-n-bytes *fasl-input-stream*
-		    res
-		    0
- 		    (ceiling (the index (* size len)) sb!vm:n-byte-bits))
+                    res
+                    0
+                    (ceiling (the index (* size len)) sb!vm:n-byte-bits))
       res)))
 
 (define-fop (fop-eval 53)
@@ -523,55 +523,55 @@
     ;; FIXME: See the comment about *LOAD-PRINT* in FOP-EVAL.
     (declare (ignore result))
     #+nil (when *load-print*
-	    (load-fresh-line)
-	    (prin1 result)
-	    (terpri))))
+            (load-fresh-line)
+            (prin1 result)
+            (terpri))))
 
 (define-fop (fop-funcall 55)
   (let ((arg (read-byte-arg)))
     (if (zerop arg)
-	(funcall (pop-stack))
-	(do ((args () (cons (pop-stack) args))
-	     (n arg (1- n)))
-	    ((zerop n) (apply (pop-stack) args))
-	  (declare (type index n))))))
+        (funcall (pop-stack))
+        (do ((args () (cons (pop-stack) args))
+             (n arg (1- n)))
+            ((zerop n) (apply (pop-stack) args))
+          (declare (type index n))))))
 
 (define-fop (fop-funcall-for-effect 56 :pushp nil)
   (let ((arg (read-byte-arg)))
     (if (zerop arg)
-	(funcall (pop-stack))
-	(do ((args () (cons (pop-stack) args))
-	     (n arg (1- n)))
-	    ((zerop n) (apply (pop-stack) args))
-	  (declare (type index n))))))
+        (funcall (pop-stack))
+        (do ((args () (cons (pop-stack) args))
+             (n arg (1- n)))
+            ((zerop n) (apply (pop-stack) args))
+          (declare (type index n))))))
 
 ;;;; fops for fixing up circularities
 
 (define-fop (fop-rplaca 200 :pushp nil)
   (let ((obj (svref *current-fop-table* (read-word-arg)))
-	(idx (read-word-arg))
-	(val (pop-stack)))
+        (idx (read-word-arg))
+        (val (pop-stack)))
     (setf (car (nthcdr idx obj)) val)))
 
 (define-fop (fop-rplacd 201 :pushp nil)
   (let ((obj (svref *current-fop-table* (read-word-arg)))
-	(idx (read-word-arg))
-	(val (pop-stack)))
+        (idx (read-word-arg))
+        (val (pop-stack)))
     (setf (cdr (nthcdr idx obj)) val)))
 
 (define-fop (fop-svset 202 :pushp nil)
   (let* ((obi (read-word-arg))
-	 (obj (svref *current-fop-table* obi))
-	 (idx (read-word-arg))
-	 (val (pop-stack)))
+         (obj (svref *current-fop-table* obi))
+         (idx (read-word-arg))
+         (val (pop-stack)))
     (if (typep obj 'instance)
-	(setf (%instance-ref obj idx) val)
-	(setf (svref obj idx) val))))
+        (setf (%instance-ref obj idx) val)
+        (setf (svref obj idx) val))))
 
 (define-fop (fop-structset 204 :pushp nil)
   (setf (%instance-ref (svref *current-fop-table* (read-word-arg))
-		       (read-word-arg))
-	(pop-stack)))
+                       (read-word-arg))
+        (pop-stack)))
 
 ;;; In the original CMUCL code, this actually explicitly declared PUSHP
 ;;; to be T, even though that's what it defaults to in DEFINE-FOP.
@@ -619,13 +619,13 @@ bug.~:@>")
   ;; depend more strongly than in CMU CL on FOP-FSET actually doing
   ;; something.)
   (let ((fn (pop-stack))
-	(name (pop-stack)))
+        (name (pop-stack)))
     (setf (fdefinition name) fn)))
 
 ;;; Modify a slot in a CONSTANTS object.
 (define-cloned-fops (fop-alter-code 140 :pushp nil) (fop-byte-alter-code 141)
   (let ((value (pop-stack))
-	(code (pop-stack)))
+        (code (pop-stack)))
     (setf (code-header-ref code (clone-arg)) value)
     (values)))
 
@@ -634,10 +634,10 @@ bug.~:@>")
   (error "FOP-FUN-ENTRY can't be defined without %PRIMITIVE.")
   #-sb-xc-host
   (let ((type (pop-stack))
-	(arglist (pop-stack))
-	(name (pop-stack))
-	(code-object (pop-stack))
-	(offset (read-word-arg)))
+        (arglist (pop-stack))
+        (name (pop-stack))
+        (code-object (pop-stack))
+        (offset (read-word-arg)))
     (declare (type index offset))
     (unless (zerop (logand offset sb!vm:lowtag-mask))
       (bug "unaligned function object, offset = #X~X" offset))
@@ -650,8 +650,8 @@ bug.~:@>")
       (setf (%simple-fun-type fun) type)
       ;; FIXME: See the comment about *LOAD-PRINT* in FOP-EVAL.
       #+nil (when *load-print*
-	      (load-fresh-line)
-	      (format t "~S defined~%" fun))
+              (load-fresh-line)
+              (format t "~S defined~%" fun))
       fun)))
 
 ;;;; Some Dylan FOPs used to live here. By 1 November 1998 the code
@@ -676,45 +676,45 @@ bug.~:@>")
 
 (define-fop (fop-foreign-fixup 147)
   (let* ((kind (pop-stack))
-	 (code-object (pop-stack))
-	 (len (read-byte-arg))
-	 (sym (make-string len :element-type 'base-char)))
+         (code-object (pop-stack))
+         (len (read-byte-arg))
+         (sym (make-string len :element-type 'base-char)))
     (read-n-bytes *fasl-input-stream* sym 0 len)
     (sb!vm:fixup-code-object code-object
-			     (read-word-arg)
-			     (foreign-symbol-address sym)
-			     kind)
+                             (read-word-arg)
+                             (foreign-symbol-address sym)
+                             kind)
     code-object))
 
 (define-fop (fop-assembler-fixup 148)
   (let ((routine (pop-stack))
-	(kind (pop-stack))
-	(code-object (pop-stack)))
+        (kind (pop-stack))
+        (code-object (pop-stack)))
     (multiple-value-bind (value found) (gethash routine *assembler-routines*)
       (unless found
-	(error "undefined assembler routine: ~S" routine))
+        (error "undefined assembler routine: ~S" routine))
       (sb!vm:fixup-code-object code-object (read-word-arg) value kind))
     code-object))
 
 (define-fop (fop-code-object-fixup 149)
   (let ((kind (pop-stack))
-	(code-object (pop-stack)))
+        (code-object (pop-stack)))
     ;; Note: We don't have to worry about GC moving the code-object after
     ;; the GET-LISP-OBJ-ADDRESS and before that value is deposited, because
     ;; we can only use code-object fixups when code-objects don't move.
     (sb!vm:fixup-code-object code-object (read-word-arg)
-			     (get-lisp-obj-address code-object) kind)
+                             (get-lisp-obj-address code-object) kind)
     code-object))
 
 #!+linkage-table
 (define-fop (fop-foreign-dataref-fixup 150)
   (let* ((kind (pop-stack))
-	 (code-object (pop-stack))
-	 (len (read-byte-arg))
-	 (sym (make-string len :element-type 'base-char)))
+         (code-object (pop-stack))
+         (len (read-byte-arg))
+         (sym (make-string len :element-type 'base-char)))
     (read-n-bytes *fasl-input-stream* sym 0 len)
     (sb!vm:fixup-code-object code-object
-			     (read-word-arg)
-			     (foreign-symbol-address sym t)
-			     kind)
+                             (read-word-arg)
+                             (foreign-symbol-address sym t)
+                             kind)
     code-object))

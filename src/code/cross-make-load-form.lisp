@@ -35,7 +35,7 @@
 (in-package "SB!INT")
 
 (defun sb!xc:make-load-form-saving-slots (object &rest args
-					  &key slot-names environment)
+                                          &key slot-names environment)
   (declare (ignore environment))
   (if (member :sb-xc-host *features*)
       ;; we're still building the cross-compiler, so use the host's
@@ -47,7 +47,7 @@
       ;; target's MAKE-LOAD-FORM-SAVING-SLOTS; it would be nice to
       ;; share code with that if possible. -- CSR, 2002-05-30
       (if slot-names
-	  (bug "MAKE-LOAD-FORM-SAVING-SLOTS ~
+          (bug "MAKE-LOAD-FORM-SAVING-SLOTS ~
                 called with :SLOT-NAMES argument during cross-compilation")
-	  :sb-just-dump-it-normally)))
+          :sb-just-dump-it-normally)))
 

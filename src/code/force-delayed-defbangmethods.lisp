@@ -10,20 +10,20 @@
 (in-package "SB-IMPL") ;(SB-IMPL, not SB!IMPL, since we're built in warm load.)
 
 (macrolet ((force-delayed-def!methods ()
-	     `(progn
-		,@(mapcar (lambda (args)
-			    `(progn
-			       #+sb-show
-			       (format t
-				       "~&/about to do ~S~%"
-				       '(defmethod ,@args))
-			       (defmethod ,@args)
-			       #+sb-show
-			       (format t
-				       "~&/done with DEFMETHOD ~S~%"
-				       ',(first args))))
-			  *delayed-def!method-args*)
-		(defmacro def!method (&rest args) `(defmethod ,@args))
-		;; We're no longer needed, ordinary DEFMETHOD is enough now.
-		(makunbound '*delayed-def!method-args*))))
+             `(progn
+                ,@(mapcar (lambda (args)
+                            `(progn
+                               #+sb-show
+                               (format t
+                                       "~&/about to do ~S~%"
+                                       '(defmethod ,@args))
+                               (defmethod ,@args)
+                               #+sb-show
+                               (format t
+                                       "~&/done with DEFMETHOD ~S~%"
+                                       ',(first args))))
+                          *delayed-def!method-args*)
+                (defmacro def!method (&rest args) `(defmethod ,@args))
+                ;; We're no longer needed, ordinary DEFMETHOD is enough now.
+                (makunbound '*delayed-def!method-args*))))
   (force-delayed-def!methods))

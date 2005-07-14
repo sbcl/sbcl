@@ -18,9 +18,9 @@
     (:full-call
      (values
       `((note-this-location ,vop :call-site)
-	(inst call (make-fixup ',name :assembly-routine))
-	(note-this-location ,vop :single-value-return)
-	(move esp-tn ebx-tn))
+        (inst call (make-fixup ',name :assembly-routine))
+        (note-this-location ,vop :single-value-return)
+        (move esp-tn ebx-tn))
       '((:save-p :compute-only))))))
 
 (!def-vm-support-routine generate-return-sequence (style)

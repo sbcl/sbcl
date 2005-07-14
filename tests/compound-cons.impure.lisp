@@ -9,14 +9,14 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
 (cl:in-package :cl-user)
 
-;;; This block of eight assertions is taken directly from 
+;;; This block of eight assertions is taken directly from
 ;;; 'Issue CONS-TYPE-SPECIFIER Writeup' in the ANSI spec.
 (assert (typep '(a b c) '(cons t)))
 (assert (typep '(a b c) '(cons symbol)))

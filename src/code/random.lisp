@@ -25,5 +25,5 @@
   (1- (ash 1 (- random-chunk-length random-integer-extra-bits))))
 
 (sb!xc:defstruct (random-state (:constructor %make-random-state)
-			       (:copier nil)) ; since shallow copy is wrong
+                               (:copier nil)) ; since shallow copy is wrong
   (state (init-random-state) :type (simple-array (unsigned-byte 32) (627))))

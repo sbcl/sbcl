@@ -43,32 +43,32 @@
        (mapcar #'backq-unparse (cdr form)))
       (backq-list*
        (do ((tail (cdr form) (cdr tail))
-	    (accum nil))
-	   ((null (cdr tail))
-	    (nconc (nreverse accum)
-		   (backq-unparse (car tail) t)))
-	 (push (backq-unparse (car tail)) accum)))
+            (accum nil))
+           ((null (cdr tail))
+            (nconc (nreverse accum)
+                   (backq-unparse (car tail) t)))
+         (push (backq-unparse (car tail)) accum)))
       (backq-append
        (apply #'append
-	      (mapcar (lambda (el) (backq-unparse el t))
-		      (cdr form))))
+              (mapcar (lambda (el) (backq-unparse el t))
+                      (cdr form))))
       (backq-nconc
        (apply #'append
-	      (mapcar (lambda (el) (backq-unparse el :nconc))
-		      (cdr form))))
+              (mapcar (lambda (el) (backq-unparse el :nconc))
+                      (cdr form))))
       (backq-cons
        (cons (backq-unparse (cadr form) nil)
-	     (backq-unparse (caddr form) t)))
+             (backq-unparse (caddr form) t)))
       (backq-vector
        (coerce (backq-unparse (cadr form)) 'vector))
       (quote
        (cond
-	 ((atom (cadr form)) (cadr form))
-	 ((and (consp (cadr form))
-	       (member (caadr form) *backq-tokens*))
-	  (backq-unparse-expr form splicing))
-	 (t (cons (backq-unparse `(quote ,(caadr form)))
-		  (backq-unparse `(quote ,(cdadr form)))))))
+         ((atom (cadr form)) (cadr form))
+         ((and (consp (cadr form))
+               (member (caadr form) *backq-tokens*))
+          (backq-unparse-expr form splicing))
+         (t (cons (backq-unparse `(quote ,(caadr form)))
+                  (backq-unparse `(quote ,(cdadr form)))))))
       (t
        (backq-unparse-expr form splicing))))))
 
@@ -97,12 +97,12 @@
   ;; work for pretty streams which need to do margin calculations.  Oh
   ;; well.  It was good while it lasted.  -- CSR, 2003-12-15
   (let ((output (with-output-to-string (s)
-		  (write (cadr form) :stream s))))
+                  (write (cadr form) :stream s))))
     (unless (= (length output) 0)
       (when (and (eql (car form) 'backq-comma)
-		 (or (char= (char output 0) #\.)
-		     (char= (char output 0) #\@)))
-	(write-char #\Space stream))
+                 (or (char= (char output 0) #\.)
+                     (char= (char output 0) #\@)))
+        (write-char #\Space stream))
       (write (cadr form) :stream stream))))
 
 ;;; This is called by !PPRINT-COLD-INIT, fairly late, because

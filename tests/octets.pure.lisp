@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -17,69 +17,69 @@
     (declare (optimize debug (speed 0)))
 
 (labels ((ub8 (len-or-seq)
-	   (if (numberp len-or-seq)
-	       (make-array len-or-seq :element-type '(unsigned-byte 8) :initial-element 0)
-	       (coerce len-or-seq '(simple-array (unsigned-byte 8) (*)))))
+           (if (numberp len-or-seq)
+               (make-array len-or-seq :element-type '(unsigned-byte 8) :initial-element 0)
+               (coerce len-or-seq '(simple-array (unsigned-byte 8) (*)))))
 
-	 (ensure-roundtrip-ascii ()
-	   (let ((octets (ub8 128)))
-	     (dotimes (i 128)
-	       (setf (aref octets i) i))
-	     (let* ((str (octets-to-string octets :external-format :ascii))
-		    (oct2 (string-to-octets str :external-format :ascii)))
-	       (assert (= (length octets) (length oct2)))
-	       (assert (every #'= octets oct2))))
-	   t)
+         (ensure-roundtrip-ascii ()
+           (let ((octets (ub8 128)))
+             (dotimes (i 128)
+               (setf (aref octets i) i))
+             (let* ((str (octets-to-string octets :external-format :ascii))
+                    (oct2 (string-to-octets str :external-format :ascii)))
+               (assert (= (length octets) (length oct2)))
+               (assert (every #'= octets oct2))))
+           t)
 
-	 (ensure-roundtrip-latin (format)
-	   (let ((octets (ub8 256)))
-	     (dotimes (i 256)
-	       (setf (aref octets i) i))
-	     (let* ((str (octets-to-string octets :external-format format))
-		    (oct2 (string-to-octets str :external-format format)))
-	       (assert (= (length octets) (length oct2)))
-	       (assert (every #'= octets oct2))))
-	   t)
+         (ensure-roundtrip-latin (format)
+           (let ((octets (ub8 256)))
+             (dotimes (i 256)
+               (setf (aref octets i) i))
+             (let* ((str (octets-to-string octets :external-format format))
+                    (oct2 (string-to-octets str :external-format format)))
+               (assert (= (length octets) (length oct2)))
+               (assert (every #'= octets oct2))))
+           t)
 
-	 (ensure-roundtrip-latin1 ()
-	   (ensure-roundtrip-latin :latin1))
+         (ensure-roundtrip-latin1 ()
+           (ensure-roundtrip-latin :latin1))
 
-	 #+sb-unicode
-	 (ensure-roundtrip-latin9 ()
-	   (ensure-roundtrip-latin :latin9))
+         #+sb-unicode
+         (ensure-roundtrip-latin9 ()
+           (ensure-roundtrip-latin :latin9))
 
-	 (ensure-roundtrip-utf8 ()
-	   (let ((string (make-string char-code-limit)))
-	     (dotimes (i char-code-limit)
-	       (setf (char string i) (code-char i)))
-	     (let ((string2
-		    (octets-to-string (string-to-octets string :external-format :utf8)
-				      :external-format :utf8)))
-	       (assert (= (length string2) (length string)))
-	       (assert (string= string string2))))
-	   t)
+         (ensure-roundtrip-utf8 ()
+           (let ((string (make-string char-code-limit)))
+             (dotimes (i char-code-limit)
+               (setf (char string i) (code-char i)))
+             (let ((string2
+                    (octets-to-string (string-to-octets string :external-format :utf8)
+                                      :external-format :utf8)))
+               (assert (= (length string2) (length string)))
+               (assert (string= string string2))))
+           t)
 
-	 (utf8-decode-test (octets expected-results expected-errors)
-	   (let ((error-count 0))
-	     (handler-bind ((sb-int:character-decoding-error
-			     (lambda (c)
-			       (incf error-count)
-			       (use-value "?" c))))
-	       (assert (string= expected-results
-				(octets-to-string (ub8 octets)
-						  :external-format :utf-8)))
-	       (assert (= error-count expected-errors)))))
+         (utf8-decode-test (octets expected-results expected-errors)
+           (let ((error-count 0))
+             (handler-bind ((sb-int:character-decoding-error
+                             (lambda (c)
+                               (incf error-count)
+                               (use-value "?" c))))
+               (assert (string= expected-results
+                                (octets-to-string (ub8 octets)
+                                                  :external-format :utf-8)))
+               (assert (= error-count expected-errors)))))
 
-	 (utf8-decode-tests (octets expected-results)
-	   (let ((expected-errors (count #\? expected-results)))
-	     (utf8-decode-test octets expected-results expected-errors)
-	     (utf8-decode-test (concatenate 'vector
-					    '(34)
-					    octets
-					    '(34))
-			       (format nil "\"~A\"" expected-results)
-			       expected-errors))))
-  
+         (utf8-decode-tests (octets expected-results)
+           (let ((expected-errors (count #\? expected-results)))
+             (utf8-decode-test octets expected-results expected-errors)
+             (utf8-decode-test (concatenate 'vector
+                                            '(34)
+                                            octets
+                                            '(34))
+                               (format nil "\"~A\"" expected-results)
+                               expected-errors))))
+
   (ensure-roundtrip-ascii)
   (ensure-roundtrip-latin1)
   #+sb-unicode
@@ -91,29 +91,29 @@
     (let ((l9c (map 'string #'code-char '(8364 352 353 381 382 338 339 376))))
       (assert
        (string= (octets-to-string (string-to-octets l9c :external-format :latin9)
-				  :external-format :latin9)
-		l9c))))
+                                  :external-format :latin9)
+                l9c))))
   (ensure-roundtrip-utf8)
 
   (let ((non-ascii-bytes (make-array 128
-				     :element-type '(unsigned-byte 8)
-				     :initial-contents (loop for i from 128 below 256
-							     collect i))))
+                                     :element-type '(unsigned-byte 8)
+                                     :initial-contents (loop for i from 128 below 256
+                                                             collect i))))
     (handler-bind ((sb-int:character-decoding-error
-		    (lambda (c)
-		      (use-value "??" c))))
+                    (lambda (c)
+                      (use-value "??" c))))
       (assert (string= (octets-to-string non-ascii-bytes :external-format :ascii)
-		       (make-string 256 :initial-element #\?)))))
+                       (make-string 256 :initial-element #\?)))))
   (let ((non-ascii-chars (make-array 128
-				     :element-type 'character
-				     :initial-contents (loop for i from 128 below 256
-							     collect (code-char i)))))
+                                     :element-type 'character
+                                     :initial-contents (loop for i from 128 below 256
+                                                             collect (code-char i)))))
     (handler-bind ((sb-int:character-encoding-error
-		    (lambda (c)
-		      (use-value "??" c))))
+                    (lambda (c)
+                      (use-value "??" c))))
       (assert (equalp (string-to-octets non-ascii-chars :external-format :ascii)
-		      (make-array 256 :initial-element (char-code #\?))))))
-  
+                      (make-array 256 :initial-element (char-code #\?))))))
+
   ;; From Markus Kuhn's UTF-8 test file:
   ;; http://www.cl.cam.ac.uk/~mgk25/ucs/examples/UTF-8-test.txt
 
@@ -131,7 +131,7 @@
   (utf8-decode-tests #(#xfb #xbf #xbf #xbf #xbf) "?") ; #x3ffffff
   (utf8-decode-tests #(#xfc #x84 #x80 #x80 #x80 #x80) "?") ; #x4000000
   (utf8-decode-tests #(#xfd #xbf #xbf #xbf #xbf #xbf) "?") ; #x7fffffff
-  
+
   ;; Unexpected continuation bytes
   (utf8-decode-tests #(#x80) "?")
   (utf8-decode-tests #(#xbf) "?")
@@ -144,26 +144,26 @@
 
   ;; All 64 continuation bytes in a row
   (apply #'utf8-decode-tests
-	 (loop for i from #x80 to #xbf
-	       collect i into bytes
-	       collect #\? into chars
-	       finally (return (list bytes
-				     (coerce chars 'string)))))
+         (loop for i from #x80 to #xbf
+               collect i into bytes
+               collect #\? into chars
+               finally (return (list bytes
+                                     (coerce chars 'string)))))
 
   ;; Lonely start characters
   (flet ((lsc (first last)
-	   (apply #'utf8-decode-tests
-		  (loop for i from first to last
-			nconc (list i 32) into bytes
-			nconc (list #\? #\Space) into chars
-			finally (return (list bytes
-					      (coerce chars 'string)))))
-	   (apply #'utf8-decode-tests
-		  (loop for i from first to last
-			collect i into bytes
-			collect #\? into chars
-			finally (return (list bytes
-					      (coerce chars 'string)))))))
+           (apply #'utf8-decode-tests
+                  (loop for i from first to last
+                        nconc (list i 32) into bytes
+                        nconc (list #\? #\Space) into chars
+                        finally (return (list bytes
+                                              (coerce chars 'string)))))
+           (apply #'utf8-decode-tests
+                  (loop for i from first to last
+                        collect i into bytes
+                        collect #\? into chars
+                        finally (return (list bytes
+                                              (coerce chars 'string)))))))
     (lsc #xc0 #xdf) ; 2-byte sequence start chars
     (lsc #xe0 #xef) ; 3-byte
     (lsc #xf0 #xf7) ; 4-byte
@@ -184,7 +184,7 @@
 
   ;; All ten previous tests concatenated
   (utf8-decode-tests (concatenate 'vector #0# #1# #2# #3# #4# #5# #6# #7# #8# #9#)
-		     "??????????")
+                     "??????????")
 
   ;; Random impossible bytes
   (utf8-decode-tests #(#xfe) "?")

@@ -28,22 +28,22 @@
   if not available."
   (or *software-version*
       (setf *software-version*
-	    (string-trim '(#\newline)
-			 (with-output-to-string (stream)
-			   (sb!ext:run-program "/bin/uname" `("-r")
-					       :output stream))))))
+            (string-trim '(#\newline)
+                         (with-output-to-string (stream)
+                           (sb!ext:run-program "/bin/uname" `("-r")
+                                               :output stream))))))
 
 (defun os-cold-init-or-reinit () ; KLUDGE: don't know what to do here
   (/show "entering osf1-os.lisp OS-COLD-INIT-OR-REINIT")
   (setf *software-version* nil)
   (/show "setting *DEFAULT-PATHNAME-DEFAULTS*")
   (setf *default-pathname-defaults*
-	;; (temporary value, so that #'PATHNAME won't blow up when
-	;; we call it below:)
-	(make-trivial-default-pathname)
-	*default-pathname-defaults*
-	;; (final value, constructed using #'PATHNAME:)
-	(pathname (sb!unix:posix-getcwd/)))
+        ;; (temporary value, so that #'PATHNAME won't blow up when
+        ;; we call it below:)
+        (make-trivial-default-pathname)
+        *default-pathname-defaults*
+        ;; (final value, constructed using #'PATHNAME:)
+        (pathname (sb!unix:posix-getcwd/)))
   (/show "leaving osf1-os.lisp OS-COLD-INIT-OR-REINIT"))
 
 ;;; Return system time, user time and number of page faults.

@@ -7,7 +7,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -103,20 +103,20 @@
   ((redefined :allocation :class)))
 (assert (slot-boundp (make-instance 'shared-to-local-initform-sub) 'redefined))
 (assert (eq 'orig-initform
-	    (slot-value (make-instance 'shared-to-local-initform-sub) 'redefined)))
+            (slot-value (make-instance 'shared-to-local-initform-sub) 'redefined)))
 
 (defgeneric no-ignored-warnings (x y))
 (handler-case
     (eval '(defmethod no-ignored-warnings ((x t) (y t))
-	    (declare (ignore x y)) nil))
+            (declare (ignore x y)) nil))
   (style-warning (c) (error c)))
 (handler-case
     (eval '(defmethod no-ignored-warnings ((x number) (y t))
-	    (declare (ignore x y)) (setq *print-level* nil)))
+            (declare (ignore x y)) (setq *print-level* nil)))
   (style-warning (c) (error c)))
 (handler-case
     (eval '(defmethod no-ignored-warnings ((x fixnum) (y t))
-	    (declare (ignore x)) (setq y 'foo)))
+            (declare (ignore x)) (setq y 'foo)))
   (style-warning (c) (error c)))
 
 ;;; ctor optimization bugs:
@@ -135,7 +135,7 @@
   ((foo :initarg :valid-initarg))
   (:default-initargs :valid-initarg 2))
 (defmethod shared-initialize :before ((thing default-initargs-with-method)
-				      slot-names &key valid-initarg)
+                                      slot-names &key valid-initarg)
   (assert (= valid-initarg 2)))
 (make-instance 'default-initargs-with-method)
 ;;; and a test with a non-constant initarg
@@ -144,7 +144,7 @@
   ((foo :initarg :valid-initarg))
   (:default-initargs :valid-initarg (incf *d-i-w-m-2*)))
 (defmethod shared-initialize :before ((thing default-initargs-with-method2)
-				      slot-names &key valid-initarg)
+                                      slot-names &key valid-initarg)
   (assert (= valid-initarg 1)))
 (make-instance 'default-initargs-with-method2)
 (assert (= *d-i-w-m-2* 1))
@@ -155,8 +155,8 @@
 (defmethod initialize-instance :after
     ((x class-with-symbol-initarg) &rest initargs &key &allow-other-keys)
   (unless (or (null initargs)
-	      (eql (getf initargs 'slot)
-		   (slot-value x 'slot)))
+              (eql (getf initargs 'slot)
+                   (slot-value x 'slot)))
     (error "bad bad bad")))
 (defun make-thing (arg)
   (make-instance 'class-with-symbol-initarg 'slot arg))

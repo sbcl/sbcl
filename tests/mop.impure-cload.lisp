@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -24,8 +24,8 @@
 ;;; hyperobject.  Fix from Gerd Moellmann.
 (defclass hyperobject-class (standard-class)
   ((user-name :initarg :user-name :type string :initform nil
-	      :accessor user-name
-	      :documentation "User name for class")))
+              :accessor user-name
+              :documentation "User name for class")))
 
 (defclass hyperobject-dsd (standard-direct-slot-definition)
   ())
@@ -34,7 +34,7 @@
   ((vc :initform 42)))
 
 (defmethod validate-superclass ((class hyperobject-class)
-				(superclass standard-class))
+                                (superclass standard-class))
   t)
 
 (defmethod compute-effective-slot-definition :around

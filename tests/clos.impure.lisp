@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -81,26 +81,26 @@
 ;;; section 3.4.2 of the ANSI spec. Since Alexey Dejneka's patch for
 ;;; bug 191-b ca. sbcl-0.7.22, these limitations should be enforced.
 (labels ((coerce-to-boolean (x)
-	   (if x t nil))
-	 (%like-or-dislike (expr expected-failure-p)
+           (if x t nil))
+         (%like-or-dislike (expr expected-failure-p)
            (declare (type boolean expected-failure-p))
            (format t "~&trying ~S~%" expr)
            (multiple-value-bind (fun warnings-p failure-p)
-	     (compile nil
-		      `(lambda ()
+             (compile nil
+                      `(lambda ()
                          ,expr))
-	     (declare (ignore fun))
-	     ;; In principle the constraint on WARNINGS-P below seems
-	     ;; reasonable, but in practice we get warnings about
-	     ;; undefined functions from the DEFGENERICs, apparently
-	     ;; because the DECLAIMs which ordinarily prevent such
-	     ;; warnings don't take effect because EVAL-WHEN
-	     ;; (:COMPILE-TOPLEVEL) loses its magic when compiled
-	     ;; within a LAMBDA. So maybe we can't test WARNINGS-P
-	     ;; after all?
+             (declare (ignore fun))
+             ;; In principle the constraint on WARNINGS-P below seems
+             ;; reasonable, but in practice we get warnings about
+             ;; undefined functions from the DEFGENERICs, apparently
+             ;; because the DECLAIMs which ordinarily prevent such
+             ;; warnings don't take effect because EVAL-WHEN
+             ;; (:COMPILE-TOPLEVEL) loses its magic when compiled
+             ;; within a LAMBDA. So maybe we can't test WARNINGS-P
+             ;; after all?
              ;;(unless expected-failure-p
-	     ;;  (assert (not warnings-p)))
-	     (assert (eq (coerce-to-boolean failure-p) expected-failure-p))))
+             ;;  (assert (not warnings-p)))
+             (assert (eq (coerce-to-boolean failure-p) expected-failure-p))))
          (like (expr)
            (%like-or-dislike expr nil))
          (dislike (expr)
@@ -110,14 +110,14 @@
   (like    '(defgeneric gf-for-ll-test-1 ()))
   (like    '(defgeneric gf-for-ll-test-2 (x)))
   ;; forbidden default or supplied-p for &OPTIONAL or &KEY arguments
-  (dislike '(defgeneric gf-for-ll-test-3 (x &optional (y 0)))) 
-  (like    '(defgeneric gf-for-ll-test-4 (x &optional y))) 
-  (dislike '(defgeneric gf-for-ll-test-5 (x y &key (z :z z-p)))) 
+  (dislike '(defgeneric gf-for-ll-test-3 (x &optional (y 0))))
+  (like    '(defgeneric gf-for-ll-test-4 (x &optional y)))
+  (dislike '(defgeneric gf-for-ll-test-5 (x y &key (z :z z-p))))
   (like    '(defgeneric gf-for-ll-test-6 (x y &key z)))
-  (dislike '(defgeneric gf-for-ll-test-7 (x &optional (y 0) &key z))) 
-  (like    '(defgeneric gf-for-ll-test-8 (x &optional y &key z))) 
-  (dislike '(defgeneric gf-for-ll-test-9 (x &optional y &key (z :z)))) 
-  (like    '(defgeneric gf-for-ll-test-10 (x &optional y &key z))) 
+  (dislike '(defgeneric gf-for-ll-test-7 (x &optional (y 0) &key z)))
+  (like    '(defgeneric gf-for-ll-test-8 (x &optional y &key z)))
+  (dislike '(defgeneric gf-for-ll-test-9 (x &optional y &key (z :z))))
+  (like    '(defgeneric gf-for-ll-test-10 (x &optional y &key z)))
   (dislike '(defgeneric gf-for-ll-test-11 (&optional &key (k :k k-p))))
   (like    '(defgeneric gf-for-ll-test-12 (&optional &key k)))
   ;; forbidden &AUX
@@ -148,7 +148,7 @@
 ;;; DEFGENERIC's blow-away-old-methods behavior is specified to have
 ;;; special hacks to distinguish between defined-with-DEFGENERIC-:METHOD
 ;;; methods and defined-with-DEFMETHOD methods, so that reLOADing
-;;; DEFGENERIC-containing files does the right thing instead of 
+;;; DEFGENERIC-containing files does the right thing instead of
 ;;; randomly slicing your generic functions. (APD made this work
 ;;; in sbcl-0.7.0.2.)
 (defgeneric born-to-be-redefined (x)
@@ -193,9 +193,9 @@
    (c-slot :initarg :c-slot :accessor c-slot)))
 
 (let ((foo (make-instance 'class-with-slots
-			  :a-slot 1
-			  :b-slot 2
-			  :c-slot 3)))
+                          :a-slot 1
+                          :b-slot 2
+                          :c-slot 3)))
   (let ((bar (change-class foo 'class-with-slots)))
     (assert (= (a-slot bar) 1))
     (assert (= (b-slot bar) 2))
@@ -291,49 +291,49 @@
 ;;; Until sbcl-0.7.7.20, some conditions weren't being signalled, and
 ;;; some others were of the wrong type:
 (macrolet ((assert-program-error (form)
-	     `(multiple-value-bind (value error)
-	          (ignore-errors ,form)
-	        (unless (and (null value) (typep error 'program-error))
+             `(multiple-value-bind (value error)
+                  (ignore-errors ,form)
+                (unless (and (null value) (typep error 'program-error))
                   (error "~S failed: ~S, ~S" ',form value error)))))
   (assert-program-error (defclass foo001 () (a b a)))
-  (assert-program-error (defclass foo002 () 
-			  (a b) 
-			  (:default-initargs x 'a x 'b)))
+  (assert-program-error (defclass foo002 ()
+                          (a b)
+                          (:default-initargs x 'a x 'b)))
   (assert-program-error (defclass foo003 ()
-			  ((a :allocation :class :allocation :class))))
+                          ((a :allocation :class :allocation :class))))
   (assert-program-error (defclass foo004 ()
-			  ((a :silly t))))
+                          ((a :silly t))))
   ;; and some more, found by Wolfhard Buss and fixed for cmucl by Gerd
   ;; Moellmann in sbcl-0.7.8.x:
   (assert-program-error (progn
-			  (defmethod odd-key-args-checking (&key (key 42)) key)
-			  (odd-key-args-checking 3)))
+                          (defmethod odd-key-args-checking (&key (key 42)) key)
+                          (odd-key-args-checking 3)))
   (assert (= (odd-key-args-checking) 42))
   (assert (eq (odd-key-args-checking :key t) t))
   ;; yet some more, fixed in sbcl-0.7.9.xx
   (assert-program-error (defclass foo005 ()
-			  (:metaclass sb-pcl::funcallable-standard-class)
-			  (:metaclass 1)))
+                          (:metaclass sb-pcl::funcallable-standard-class)
+                          (:metaclass 1)))
   (assert-program-error (defclass foo006 ()
-			  ((a :reader (setf a)))))
+                          ((a :reader (setf a)))))
   (assert-program-error (defclass foo007 ()
-			  ((a :initarg 1))))
+                          ((a :initarg 1))))
   (assert-program-error (defclass foo008 ()
-			  (a :initarg :a)
-			  (:default-initargs :a 1)
-			  (:default-initargs :a 2)))
+                          (a :initarg :a)
+                          (:default-initargs :a 1)
+                          (:default-initargs :a 2)))
   ;; and also BUG 47d, fixed in sbcl-0.8alpha.0.26
   (assert-program-error (defgeneric if (x)))
   ;; DEFCLASS should detect an error if slot names aren't suitable as
   ;; variable names:
   (assert-program-error (defclass foo009 ()
-			  ((:a :initarg :a))))
+                          ((:a :initarg :a))))
   (assert-program-error (defclass foo010 ()
-			  (("a" :initarg :a))))
+                          (("a" :initarg :a))))
   (assert-program-error (defclass foo011 ()
-			  ((#1a() :initarg :a))))
+                          ((#1a() :initarg :a))))
   (assert-program-error (defclass foo012 ()
-			  ((t :initarg :t))))
+                          ((t :initarg :t))))
   (assert-program-error (defclass foo013 () ("a")))
   ;; specialized lambda lists have certain restrictions on ordering,
   ;; repeating keywords, and the like:
@@ -341,7 +341,7 @@
   (assert-program-error (defmethod foo015 ((foo t) &rest x y) nil))
   (assert-program-error (defmethod foo016 ((foo t) &allow-other-keys) nil))
   (assert-program-error (defmethod foo017 ((foo t)
-					   &optional x &optional y) nil))
+                                           &optional x &optional y) nil))
   (assert-program-error (defmethod foo018 ((foo t) &rest x &rest y) nil))
   (assert-program-error (defmethod foo019 ((foo t) &rest x &optional y) nil))
   (assert-program-error (defmethod foo020 ((foo t) &key x &optional y) nil))
@@ -357,14 +357,14 @@
 
 ;;; only certain declarations are permitted in DEFGENERIC
 (macrolet ((assert-program-error (form)
-	     `(multiple-value-bind (value error)
-	          (ignore-errors ,form)
-	        (assert (null value))
-	        (assert (typep error 'program-error)))))
+             `(multiple-value-bind (value error)
+                  (ignore-errors ,form)
+                (assert (null value))
+                (assert (typep error 'program-error)))))
   (assert-program-error (defgeneric bogus-declaration (x)
-			  (declare (special y))))
+                          (declare (special y))))
   (assert-program-error (defgeneric bogus-declaration2 (x)
-			  (declare (notinline concatenate)))))
+                          (declare (notinline concatenate)))))
 ;;; CALL-NEXT-METHOD should call NO-NEXT-METHOD if there is no next
 ;;; method.
 (defmethod no-next-method-test ((x integer)) (call-next-method))
@@ -409,46 +409,46 @@
   (:method-combination dmc-test-mc))
 
 (defmethod dmc-test-mc dmc-test-mc (&key k)
-	   k)
+           k)
 
 (dmc-test-mc :k 1)
 ;;; While I'm at it, DEFINE-METHOD-COMBINATION is defined to return
 ;;; the NAME argument, not some random method object. So:
 (assert (eq (define-method-combination dmc-test-return-foo)
-	    'dmc-test-return-foo))
+            'dmc-test-return-foo))
 (assert (eq (define-method-combination dmc-test-return-bar :operator and)
-	    'dmc-test-return-bar))
+            'dmc-test-return-bar))
 (assert (eq (define-method-combination dmc-test-return
-		(&optional (order :most-specific-first))
-	      ((around (:around))
-	       (primary (dmc-test-return) :order order :required t))
-	      (let ((form (if (rest primary)
-			      `(and ,@(mapcar #'(lambda (method)
-						  `(call-method ,method))
-					      primary))
-			      `(call-method ,(first primary)))))
-		(if around
-		    `(call-method ,(first around)
-		      (,@(rest around)
-		       (make-method ,form)))
-		    form)))
-	    'dmc-test-return))
+                (&optional (order :most-specific-first))
+              ((around (:around))
+               (primary (dmc-test-return) :order order :required t))
+              (let ((form (if (rest primary)
+                              `(and ,@(mapcar #'(lambda (method)
+                                                  `(call-method ,method))
+                                              primary))
+                              `(call-method ,(first primary)))))
+                (if around
+                    `(call-method ,(first around)
+                      (,@(rest around)
+                       (make-method ,form)))
+                    form)))
+            'dmc-test-return))
 
 ;;; DEFINE-METHOD-COMBINATION should, according to the description in 7.7,
-;;; allow you to do everything in the body forms yourself if you specify  
+;;; allow you to do everything in the body forms yourself if you specify
 ;;; exactly one method group whose qualifier-pattern is *
 ;;;
 ;;; The specific language is:
-;;; "The use of method group specifiers provides a convenient syntax to select 
-;;; methods, to divide them among the possible roles, and to perform the 
-;;; necessary error checking. It is possible to perform further filtering of 
-;;; methods in the body forms by using normal list-processing operations and 
+;;; "The use of method group specifiers provides a convenient syntax to select
+;;; methods, to divide them among the possible roles, and to perform the
+;;; necessary error checking. It is possible to perform further filtering of
+;;; methods in the body forms by using normal list-processing operations and
 ;;; the functions method-qualifiers and invalid-method-error. It is permissible
-;;; to use setq on the variables named in the method group specifiers and to 
+;;; to use setq on the variables named in the method group specifiers and to
 ;;; bind additional variables. It is also possible to bypass the method group
-;;; specifier mechanism and do everything in the body forms. This is 
-;;; accomplished by writing a single method group with * as its only 
-;;; qualifier-pattern; the variable is then bound to a list of all of the 
+;;; specifier mechanism and do everything in the body forms. This is
+;;; accomplished by writing a single method group with * as its only
+;;; qualifier-pattern; the variable is then bound to a list of all of the
 ;;; applicable methods, in most-specific-first order."
 (define-method-combination wam-test-method-combination-a ()
   ((all-methods *))
@@ -457,23 +457,23 @@
        (around nil))
       ((null methods)
        (let ((primary (nreverse primary))
-	     (around (nreverse around)))
-	 (if primary
-	      (let ((form (if (rest primary)
-			     `(call-method ,(first primary) ,(rest primary))
-			     `(call-method ,(first primary)))))
-		(if around
-		    `(call-method ,(first around) (,@(rest around)
-						   (make-method ,form)))
-		    form))
-	      `(make-method (error "No primary methods")))))
+             (around (nreverse around)))
+         (if primary
+              (let ((form (if (rest primary)
+                             `(call-method ,(first primary) ,(rest primary))
+                             `(call-method ,(first primary)))))
+                (if around
+                    `(call-method ,(first around) (,@(rest around)
+                                                   (make-method ,form)))
+                    form))
+              `(make-method (error "No primary methods")))))
     (let* ((method (first methods))
-	   (qualifier (first (method-qualifiers method))))
+           (qualifier (first (method-qualifiers method))))
       (cond
-	((equal :around qualifier)
-	 (push method around))
-	((null qualifier)
-	 (push method primary))))))
+        ((equal :around qualifier)
+         (push method around))
+        ((null qualifier)
+         (push method primary))))))
 
 (defgeneric wam-test-mc-a (val)
   (:method-combination wam-test-method-combination-a))
@@ -485,8 +485,8 @@
   (+ val (if (next-method-p) (call-next-method) 0)))
 (assert (= (wam-test-mc-a 13) 26))
 
-;;; DEFINE-METHOD-COMBINATION 
-;;; When two methods are in the same method group and have the same 
+;;; DEFINE-METHOD-COMBINATION
+;;; When two methods are in the same method group and have the same
 ;;; specializers, their sort order within the group may be ambiguous. Therefore,
 ;;; we should throw an error when we have two methods in the same group with
 ;;; the same specializers /as long as/ we have more than one method group
@@ -494,14 +494,14 @@
 ;;; apparent conflict with the above 'It is also possible to bypass' language.
 ;;;
 ;;; The language specifying this behavior is:
-;;; "Note that two methods with identical specializers, but with different 
-;;; qualifiers, are not ordered by the algorithm described in Step 2 of the 
-;;; method selection and combination process described in Section 7.6.6 
+;;; "Note that two methods with identical specializers, but with different
+;;; qualifiers, are not ordered by the algorithm described in Step 2 of the
+;;; method selection and combination process described in Section 7.6.6
 ;;; (Method Selection and Combination). Normally the two methods play different
-;;; roles in the effective method because they have different qualifiers, and 
-;;; no matter how they are ordered in the result of Step 2, the effective 
-;;; method is the same. If the two methods play the same role and their order 
-;;; matters, an error is signaled. This happens as part of the qualifier 
+;;; roles in the effective method because they have different qualifiers, and
+;;; no matter how they are ordered in the result of Step 2, the effective
+;;; method is the same. If the two methods play the same role and their order
+;;; matters, an error is signaled. This happens as part of the qualifier
 ;;; pattern matching in define-method-combination."
 ;;;
 ;;; Note that the spec pretty much equates 'method group' and 'role'.
@@ -511,12 +511,12 @@
   ((around (:around))
    (primary * :required t))
   (let ((form (if (rest primary)
-		  `(call-method ,(first primary) ,(rest primary))
-		  `(call-method ,(first primary)))))
+                  `(call-method ,(first primary) ,(rest primary))
+                  `(call-method ,(first primary)))))
     (if around
-	`(call-method ,(first around) (,@(rest around)
-				       (make-method ,form)))
-	form)))
+        `(call-method ,(first around) (,@(rest around)
+                                       (make-method ,form)))
+        form)))
 
 (defgeneric wam-test-mc-b (val)
   (:method-combination wam-test-method-combination-b))
@@ -526,7 +526,7 @@
 (defmethod wam-test-mc-b :around ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
 (assert (= (wam-test-mc-b 13) 26))
-(defmethod wam-test-mc-b :somethingelse ((val number)) 
+(defmethod wam-test-mc-b :somethingelse ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
 (assert (raises-error? (wam-test-mc-b 13)))
 
@@ -555,16 +555,16 @@
 (assert (raises-error? (defmethod incompatible-ll-test-1 (x &rest y) y)))
 ;;; Sneakily using a bit of MOPness to check some consistency
 (assert (= (length
-	    (sb-pcl:generic-function-methods #'incompatible-ll-test-1)) 1))
+            (sb-pcl:generic-function-methods #'incompatible-ll-test-1)) 1))
 
 (defmethod incompatible-ll-test-2 (x &key bar) bar)
 (assert (raises-error? (defmethod incompatible-ll-test-2 (x) x)))
 (defmethod incompatible-ll-test-2 (x &rest y) y)
 (assert (= (length
-	    (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 1))
+            (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 1))
 (defmethod incompatible-ll-test-2 ((x integer) &key bar) bar)
 (assert (= (length
-	    (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 2))
+            (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 2))
 
 ;;; Per Christophe, this is an illegal method call because of 7.6.5
 (assert (raises-error? (incompatible-ll-test-2 t 1 2)))
@@ -615,9 +615,9 @@
   (:arguments object)
   `(unwind-protect
     (progn (lock (object-lock ,object))
-	   ,@(mapcar #'(lambda (method)
-			 `(call-method ,method))
-		     methods))
+           ,@(mapcar #'(lambda (method)
+                         `(call-method ,method))
+                     methods))
     (unlock (object-lock ,object))))
 (defun object-lock (obj)
   (push "object-lock" *d-m-c-args-test*)
@@ -636,11 +636,11 @@
   (error "foo"))
 (assert (equal (d-m-c-args-test t) '("primary" "lock" "object-lock")))
 (assert (equal *d-m-c-args-test*
-	       '("unlock" "object-lock" "primary" "lock" "object-lock")))
+               '("unlock" "object-lock" "primary" "lock" "object-lock")))
 (setf *d-m-c-args-test* nil)
 (ignore-errors (d-m-c-args-test 1))
 (assert (equal *d-m-c-args-test*
-	       '("unlock" "object-lock" "lock" "object-lock")))
+               '("unlock" "object-lock" "lock" "object-lock")))
 
 ;;; The walker (on which DEFMETHOD depended) didn't know how to handle
 ;;; SYMBOL-MACROLET properly.  In fact, as of sbcl-0.7.10.20 it still
@@ -683,8 +683,8 @@
   (incf *bug234*))
 (assert (typep (subbug-234) 'subclass234))
 (assert (= *bug234*
-	   ;; once for MAKE-INSTANCE, once for REINITIALIZE-INSTANCE
-	   2))
+           ;; once for MAKE-INSTANCE, once for REINITIALIZE-INSTANCE
+           2))
 
 ;;; also, some combinations of MAKE-INSTANCE and subclassing missed
 ;;; new methods (Gerd Moellmann sbcl-devel 2002-12-29):
@@ -708,19 +708,19 @@
 ;;; SLOT-MISSING should be called when there are missing slots.
 (defclass class-with-all-slots-missing () ())
 (defmethod slot-missing (class (o class-with-all-slots-missing)
-			 slot-name op
-			 &optional new-value)
+                         slot-name op
+                         &optional new-value)
   op)
 (assert (eq (slot-value (make-instance 'class-with-all-slots-missing) 'foo)
-	    'slot-value))
+            'slot-value))
 (assert (eq (funcall (lambda (x) (slot-value x 'bar))
-		     (make-instance 'class-with-all-slots-missing))
-	    'slot-value))
+                     (make-instance 'class-with-all-slots-missing))
+            'slot-value))
 (assert (eq (funcall (lambda (x) (setf (slot-value x 'baz) 'baz))
-		     (make-instance 'class-with-all-slots-missing))
-	    ;; SLOT-MISSING's value is specified to be ignored; we
-	    ;; return NEW-VALUE.
-	    'baz))
+                     (make-instance 'class-with-all-slots-missing))
+            ;; SLOT-MISSING's value is specified to be ignored; we
+            ;; return NEW-VALUE.
+            'baz))
 
 ;;; we should be able to specialize on anything that names a class.
 (defclass name-for-class () ())
@@ -729,7 +729,7 @@
 (defmethod something-that-specializes ((x other-name-for-class)) 2)
 (assert (= (something-that-specializes (make-instance 'name-for-class)) 2))
 (assert (= (something-that-specializes (make-instance 'other-name-for-class))
-	   2))
+           2))
 
 ;;; more forward referenced classes stuff
 (defclass frc-1 (frc-2) ())
@@ -755,7 +755,7 @@
 ;;; DEFSTRUCT (and not DEFCLASS :METACLASS STRUCTURE-CLASS).
 (defstruct allocatable-structure a)
 (assert (typep (allocate-instance (find-class 'allocatable-structure))
-	       'allocatable-structure))
+               'allocatable-structure))
 
 ;;; Bug found by Paul Dietz when devising CPL tests: somewhat
 ;;; amazingly, calls to CPL would work a couple of times, and then
@@ -774,11 +774,11 @@
 (assert (equal (cpl 0) '(integer number)))
 (assert (equal (cpl 0) '(integer number)))
 (assert (equal (cpl (make-broadcast-stream))
-	       '(broadcast-stream stream structure-object)))
+               '(broadcast-stream stream structure-object)))
 (assert (equal (cpl (make-broadcast-stream))
-	       '(broadcast-stream stream structure-object)))
+               '(broadcast-stream stream structure-object)))
 (assert (equal (cpl (make-broadcast-stream))
-	       '(broadcast-stream stream structure-object)))
+               '(broadcast-stream stream structure-object)))
 
 ;;; Bug in CALL-NEXT-METHOD: assignment to the method's formal
 ;;; parameters shouldn't affect the arguments to the next method for a
@@ -786,7 +786,7 @@
 (defgeneric cnm-assignment (x)
   (:method (x) x)
   (:method ((x integer)) (setq x 3)
-	   (list x (call-next-method) (call-next-method x))))
+           (list x (call-next-method) (call-next-method x))))
 (assert (equal (cnm-assignment 1) '(3 1 3)))
 
 ;;; Bug reported by Istvan Marko 2003-07-09
@@ -834,17 +834,17 @@
 (defmethod width ((c character-class) &key font) font)
 (defmethod width ((p picture-class) &key pixel-size) pixel-size)
 
-(assert (raises-error? 
-	 (width (make-instance 'character-class :char #\Q) 
-		:font 'baskerville :pixel-size 10)
-	 program-error))
 (assert (raises-error?
-	 (width (make-instance 'picture-class :glyph #\Q)
-		:font 'baskerville :pixel-size 10)
-	 program-error))
+         (width (make-instance 'character-class :char #\Q)
+                :font 'baskerville :pixel-size 10)
+         program-error))
+(assert (raises-error?
+         (width (make-instance 'picture-class :glyph #\Q)
+                :font 'baskerville :pixel-size 10)
+         program-error))
 (assert (eq (width (make-instance 'character-picture-class :char #\Q)
-		   :font 'baskerville :pixel-size 10)
-	    'baskerville))
+                   :font 'baskerville :pixel-size 10)
+            'baskerville))
 
 ;;; class redefinition shouldn't give any warnings, in the usual case
 (defclass about-to-be-redefined () ((some-slot :accessor some-slot)))
@@ -855,8 +855,8 @@
 ;;; complex lambda lists should fail
 (defgeneric accessoroid (object &key &allow-other-keys))
 (assert (raises-error?
-	 (defclass accessoroid-class () ((slot :accessor accessoroid)))
-	 program-error))
+         (defclass accessoroid-class () ((slot :accessor accessoroid)))
+         program-error))
 
 ;;; reported by Bruno Haible sbcl-devel 2004-04-15
 (defclass shared-slot-and-redefinition ()
@@ -895,26 +895,26 @@
 ;;; shared -> local slot transfers of inherited slots, reported by
 ;;; Bruno Haible
 (let (i)
-  (defclass super-with-magic-slot () 
+  (defclass super-with-magic-slot ()
     ((magic :initarg :size :initform 1 :allocation :class)))
   (defclass sub-of-super-with-magic-slot (super-with-magic-slot) ())
   (setq i (make-instance 'sub-of-super-with-magic-slot))
-  (defclass super-with-magic-slot () 
+  (defclass super-with-magic-slot ()
     ((magic :initarg :size :initform 2)))
   (assert (= 1 (slot-value i 'magic))))
 
 ;;; MAKE-INSTANCES-OBSOLETE return values
 (defclass one-more-to-obsolete () ())
-(assert (eq 'one-more-to-obsolete 
-	    (make-instances-obsolete 'one-more-to-obsolete)))
-(assert (eq (find-class 'one-more-to-obsolete) 
-	    (make-instances-obsolete (find-class 'one-more-to-obsolete))))
+(assert (eq 'one-more-to-obsolete
+            (make-instances-obsolete 'one-more-to-obsolete)))
+(assert (eq (find-class 'one-more-to-obsolete)
+            (make-instances-obsolete (find-class 'one-more-to-obsolete))))
 
 ;;; Sensible error instead of a BUG. Reported by Thomas Burdick.
 (multiple-value-bind (value err)
     (ignore-errors
       (defclass slot-def-with-duplicate-accessors ()
-	((slot :writer get-slot :reader get-slot))))
+        ((slot :writer get-slot :reader get-slot))))
   (assert (typep err 'error))
   (assert (not (typep err 'sb-int:bug))))
 
@@ -988,36 +988,36 @@
 ;;; methods on all of these.
 (progn
   (defgeneric method-for-defined-classes (x))
-  (dolist (c '(arithmetic-error 
-	       generic-function simple-error array hash-table 
-	       simple-type-error 
-	       bit-vector integer simple-warning             
-	       broadcast-stream list standard-class             
-	       built-in-class logical-pathname standard-generic-function  
-	       cell-error method standard-method            
-	       character method-combination standard-object            
-	       class null storage-condition          
-	       complex number stream                     
-	       concatenated-stream package stream-error               
-	       condition package-error string                     
-	       cons parse-error string-stream              
-	       control-error pathname structure-class            
-	       division-by-zero print-not-readable structure-object           
-	       echo-stream program-error style-warning              
-	       end-of-file random-state symbol                     
-	       error ratio synonym-stream             
-	       file-error rational t                          
-	       file-stream reader-error two-way-stream             
-	       float readtable type-error                 
-	       floating-point-inexact real unbound-slot               
-	       floating-point-invalid-operation restart unbound-variable
-	       floating-point-overflow sequence undefined-function 
-	       floating-point-underflow serious-condition vector 
-	       function simple-condition warning))
+  (dolist (c '(arithmetic-error
+               generic-function simple-error array hash-table
+               simple-type-error
+               bit-vector integer simple-warning
+               broadcast-stream list standard-class
+               built-in-class logical-pathname standard-generic-function
+               cell-error method standard-method
+               character method-combination standard-object
+               class null storage-condition
+               complex number stream
+               concatenated-stream package stream-error
+               condition package-error string
+               cons parse-error string-stream
+               control-error pathname structure-class
+               division-by-zero print-not-readable structure-object
+               echo-stream program-error style-warning
+               end-of-file random-state symbol
+               error ratio synonym-stream
+               file-error rational t
+               file-stream reader-error two-way-stream
+               float readtable type-error
+               floating-point-inexact real unbound-slot
+               floating-point-invalid-operation restart unbound-variable
+               floating-point-overflow sequence undefined-function
+               floating-point-underflow serious-condition vector
+               function simple-condition warning))
     (eval `(defmethod method-for-defined-classes ((x ,c)) (princ x))))
   (assert (string= (with-output-to-string (*standard-output*)
-		     (method-for-defined-classes #\3))
-		   "3")))
+                     (method-for-defined-classes #\3))
+                   "3")))
 
 
 
@@ -1054,9 +1054,9 @@
 ;; bug 281
 (let ((sb-pcl::*max-emf-precomputation-methods* 0))
   (eval '(defgeneric bug-281 (x)
-	  (:method-combination +)
-	  (:method ((x symbol)) 1)
-	  (:method + ((x number)) x)))
+          (:method-combination +)
+          (:method ((x symbol)) 1)
+          (:method + ((x number)) x)))
   (assert (= 1 (bug-281 1)))
   (assert (= 4.2 (bug-281 4.2)))
   (multiple-value-bind (val err) (ignore-errors (bug-281 'symbol))
@@ -1074,46 +1074,46 @@
 
 (defun rc-cm/add-method-restarts (form method)
   (let ((block (gensym))
-	(tag (gensym)))
+        (tag (gensym)))
     `(block ,block
       (tagbody
-	 ,tag
-	 (return-from ,block
-	   (restart-case ,form
-	     (method-redo ()
-	       :report (lambda (stream)
-			 (format stream "Try calling ~S again." ,method))
-	       (go ,tag))
-	     (method-return (l)
-	       :report (lambda (stream)
-			 (format stream "Specify return values for ~S call."
-				 ,method))
-	       :interactive (lambda () (rc-cm/prompt-for-new-values))
-	       (return-from ,block (values-list l)))))))))
+         ,tag
+         (return-from ,block
+           (restart-case ,form
+             (method-redo ()
+               :report (lambda (stream)
+                         (format stream "Try calling ~S again." ,method))
+               (go ,tag))
+             (method-return (l)
+               :report (lambda (stream)
+                         (format stream "Specify return values for ~S call."
+                                 ,method))
+               :interactive (lambda () (rc-cm/prompt-for-new-values))
+               (return-from ,block (values-list l)))))))))
 
 (defun rc-cm/convert-effective-method (efm)
   (if (consp efm)
       (if (eq (car efm) 'call-method)
-	  (let ((method-list (third efm)))
-	    (if (or (typep (first method-list) 'method) (rest method-list))
-		;; Reduce the case of multiple methods to a single one.
-		;; Make the call to the next-method explicit.
-		(rc-cm/convert-effective-method
-		 `(call-method ,(second efm)
-		   ((make-method
-		     (call-method ,(first method-list) ,(rest method-list))))))
-		;; Now the case of at most one method.
-		(if (typep (second efm) 'method)
-		    ;; Wrap the method call in a RESTART-CASE.
-		    (rc-cm/add-method-restarts
-		     (cons (rc-cm/convert-effective-method (car efm))
-			   (rc-cm/convert-effective-method (cdr efm)))
-		     (second efm))
-		    ;; Normal recursive processing.
-		    (cons (rc-cm/convert-effective-method (car efm))
-			  (rc-cm/convert-effective-method (cdr efm))))))
-	  (cons (rc-cm/convert-effective-method (car efm))
-		(rc-cm/convert-effective-method (cdr efm))))
+          (let ((method-list (third efm)))
+            (if (or (typep (first method-list) 'method) (rest method-list))
+                ;; Reduce the case of multiple methods to a single one.
+                ;; Make the call to the next-method explicit.
+                (rc-cm/convert-effective-method
+                 `(call-method ,(second efm)
+                   ((make-method
+                     (call-method ,(first method-list) ,(rest method-list))))))
+                ;; Now the case of at most one method.
+                (if (typep (second efm) 'method)
+                    ;; Wrap the method call in a RESTART-CASE.
+                    (rc-cm/add-method-restarts
+                     (cons (rc-cm/convert-effective-method (car efm))
+                           (rc-cm/convert-effective-method (cdr efm)))
+                     (second efm))
+                    ;; Normal recursive processing.
+                    (cons (rc-cm/convert-effective-method (car efm))
+                          (rc-cm/convert-effective-method (cdr efm))))))
+          (cons (rc-cm/convert-effective-method (car efm))
+                (rc-cm/convert-effective-method (cdr efm))))
       efm))
 
 (define-method-combination standard-with-restarts ()
@@ -1122,20 +1122,20 @@
    (primary () :required t)
    (after (:after)))
   (flet ((call-methods-sequentially (methods)
-	   (mapcar #'(lambda (method)
-		       `(call-method ,method))
-		   methods)))
+           (mapcar #'(lambda (method)
+                       `(call-method ,method))
+                   methods)))
     (let ((form (if (or before after (rest primary))
                     `(multiple-value-prog1
                        (progn
                          ,@(call-methods-sequentially before)
                          (call-method ,(first primary) ,(rest primary)))
-		      ,@(call-methods-sequentially (reverse after)))
+                      ,@(call-methods-sequentially (reverse after)))
                     `(call-method ,(first primary)))))
       (when around
-	(setq form
-	      `(call-method ,(first around)
-		(,@(rest around) (make-method ,form)))))
+        (setq form
+              `(call-method ,(first around)
+                (,@(rest around) (make-method ,form)))))
       (rc-cm/convert-effective-method form))))
 
 (defgeneric rc-cm/testgf16 (x)
@@ -1155,7 +1155,7 @@
 (defmethod rc-cm/testgf16 ((x rc-cm/testclass16d))
   (cons 'd (call-next-method)))
 (assert (equal (rc-cm/testgf16 (make-instance 'rc-cm/testclass16d))
-	       '(d b c a t t)))
+               '(d b c a t t)))
 
 ;;; test case from Gerd Moellmann
 (define-method-combination r-c/c-m-1 ()

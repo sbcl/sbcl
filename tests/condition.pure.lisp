@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -18,8 +18,8 @@
 ;;; referred to unbound slots. This was reported and fixed by Antonio
 ;;; Martinez (sbcl-devel 2002-09-10).
 (format t
-	"~&printable now: ~A~%"
-	(make-condition 'file-error :pathname "foo"))
+        "~&printable now: ~A~%"
+        (make-condition 'file-error :pathname "foo"))
 
 (assert (eq
          (block nil
@@ -104,7 +104,7 @@
 
 ;;; clauses in HANDLER-CASE are allowed to have declarations (and
 ;;; indeed, only declarations)
-(assert 
+(assert
  (null (handler-case (error "foo") (error () (declare (optimize speed))))))
 
 (handler-case
@@ -119,7 +119,7 @@
     (funcall (lambda (x) (check-type x fixnum) x) t)
   (type-error (c)
     (assert (and (subtypep (type-error-expected-type c) 'fixnum)
-		 (subtypep 'fixnum (type-error-expected-type c))))
+                 (subtypep 'fixnum (type-error-expected-type c))))
     (assert (eq (type-error-datum c) t)))
   (:no-error (&rest rest) (error "no error: ~S" rest)))
 
@@ -127,13 +127,13 @@
 ;;; designators for a condition. Reported by Bruno Haible on cmucl-imp
 ;;; 2004-10-12.
 (flet ((test (&rest args)
-         (multiple-value-bind (res err) 
+         (multiple-value-bind (res err)
              (ignore-errors (apply #'error args))
            (assert (not res))
            (assert (typep err 'type-error))
-           (assert (not (nth-value 1 (ignore-errors 
+           (assert (not (nth-value 1 (ignore-errors
                                        (type-error-datum err)))))
-           (assert (not (nth-value 1 (ignore-errors 
+           (assert (not (nth-value 1 (ignore-errors
                                        (type-error-expected-type err))))))))
   (test '#:no-such-condition)
   (test nil)

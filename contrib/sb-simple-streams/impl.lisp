@@ -3,7 +3,7 @@
 ;;; **********************************************************************
 ;;; This code was written by Paul Foley and has been placed in the public
 ;;; domain.
-;;; 
+;;;
 
 ;;; Sbcl port by Rudi Schlatte.
 
@@ -19,19 +19,19 @@
 
 (defun %check (stream kind)
   (declare (type simple-stream stream)
-	   (optimize (speed 3) (space 1) (debug 0) (safety 0)))
+           (optimize (speed 3) (space 1) (debug 0) (safety 0)))
   (with-stream-class (simple-stream stream)
     (cond ((not (any-stream-instance-flags stream :simple))
-	   (%uninitialized stream))
-	  ((and (eq kind :open)
-		(not (any-stream-instance-flags stream :input :output)))
-	   (sb-kernel:closed-flame stream))
-	  ((and (or (eq kind :input) (eq kind :io))
-		(not (any-stream-instance-flags stream :input)))
-	   (sb-kernel:ill-in stream))
-	  ((and (or (eq kind :output) (eq kind :io))
-		(not (any-stream-instance-flags stream :output)))
-	   (sb-kernel:ill-out stream)))))
+           (%uninitialized stream))
+          ((and (eq kind :open)
+                (not (any-stream-instance-flags stream :input :output)))
+           (sb-kernel:closed-flame stream))
+          ((and (or (eq kind :input) (eq kind :io))
+                (not (any-stream-instance-flags stream :input)))
+           (sb-kernel:ill-in stream))
+          ((and (or (eq kind :output) (eq kind :io))
+                (not (any-stream-instance-flags stream :output)))
+           (sb-kernel:ill-out stream)))))
 
 (defmethod input-stream-p ((stream simple-stream))
   (any-stream-instance-flags stream :input))
@@ -51,54 +51,54 @@
 
 (defun %file-position (stream position)
   (declare (type simple-stream stream)
-	   (type (or (integer 0 *) (member nil :start :end)) position))
+           (type (or (integer 0 *) (member nil :start :end)) position))
   (with-stream-class (simple-stream stream)
     (%check stream :open)
     (if position
-	;; Adjust current position
-	(let ((position (case position (:start 0) (:end -1)
-			      (otherwise position))))
-	  (etypecase stream
-	    (single-channel-simple-stream
+        ;; Adjust current position
+        (let ((position (case position (:start 0) (:end -1)
+                              (otherwise position))))
+          (etypecase stream
+            (single-channel-simple-stream
              (when (sc-dirty-p stream)
                (flush-buffer stream t)))
-	    (dual-channel-simple-stream
+            (dual-channel-simple-stream
              (with-stream-class (dual-channel-simple-stream stream)
-	       (when (> (sm outpos stream) 0)
+               (when (> (sm outpos stream) 0)
                  (device-write stream :flush 0 nil t))))
-	    (string-simple-stream
+            (string-simple-stream
              nil))
 
-	  (setf (sm last-char-read-size stream) 0)
-	  (setf (sm buffpos stream) 0	; set pointer to 0 to force a read
-		(sm buffer-ptr stream) 0)
-	  (setf (sm charpos stream) nil)
-	  (remove-stream-instance-flags stream :eof)
-	  (setf	(device-file-position stream) position))
-	;; Just report current position
-	(let ((posn (device-file-position stream)))
-	  (when posn
-	    (when (sm handler stream)
-	      (dolist (queued (sm pending stream))
-		(incf posn (- (the sb-int:index (third queued))
-			      (the sb-int:index (second queued))))))
-	    (etypecase stream
-	      (single-channel-simple-stream
+          (setf (sm last-char-read-size stream) 0)
+          (setf (sm buffpos stream) 0   ; set pointer to 0 to force a read
+                (sm buffer-ptr stream) 0)
+          (setf (sm charpos stream) nil)
+          (remove-stream-instance-flags stream :eof)
+          (setf (device-file-position stream) position))
+        ;; Just report current position
+        (let ((posn (device-file-position stream)))
+          (when posn
+            (when (sm handler stream)
+              (dolist (queued (sm pending stream))
+                (incf posn (- (the sb-int:index (third queued))
+                              (the sb-int:index (second queued))))))
+            (etypecase stream
+              (single-channel-simple-stream
                (case (sm mode stream)
-                 ((0 3)		; read, read-modify
+                 ((0 3)         ; read, read-modify
                   ;; Note that posn can increase here if we wrote
                   ;; past the end of previously-read data
                   (decf posn (- (sm buffer-ptr stream) (sm buffpos stream))))
-                 (1			; write
+                 (1                     ; write
                   (incf posn (sm buffpos stream)))))
-	      (dual-channel-simple-stream
+              (dual-channel-simple-stream
                (with-stream-class (dual-channel-simple-stream stream)
-		 (incf posn (sm outpos stream))
+                 (incf posn (sm outpos stream))
                  (when (>= (sm buffer-ptr stream) 0)
                    (decf posn (- (sm buffer-ptr stream) (sm buffpos stream))))))
-	      (string-simple-stream
+              (string-simple-stream
                nil)))
-	  posn))))
+          posn))))
 
 (defun %file-length (stream)
   (declare (type simple-stream stream))
@@ -125,9 +125,9 @@
   (%check stream nil)
   (if (typep stream 'file-simple-stream)
       (with-stream-class (file-simple-stream stream)
-	(setf (sm pathname stream) new-name)
-	(setf (sm filename stream) (sb-int:unix-namestring new-name nil))
-	t)
+        (setf (sm pathname stream) new-name)
+        (setf (sm filename stream) (sb-int:unix-namestring new-name nil))
+        t)
       nil))
 
 
@@ -138,102 +138,102 @@
     ;; FIXME: need to account for compositions on the stream...
     (let ((count 0))
       (flet ((fn (octet)
-	       (declare (ignore octet))
-	       (incf count)))
-	(etypecase object
-	  (character
-	   (let ((x nil))
-	     (char-to-octets (sm external-format stream) object x #'fn)))
-	  (string
-	   (let ((x nil)
-		 (ef (sm external-format stream)))
-	     (dotimes (i (length object))
-	       (declare (type sb-int:index i))
-	       (char-to-octets ef (char object i) x #'fn))))))
+               (declare (ignore octet))
+               (incf count)))
+        (etypecase object
+          (character
+           (let ((x nil))
+             (char-to-octets (sm external-format stream) object x #'fn)))
+          (string
+           (let ((x nil)
+                 (ef (sm external-format stream)))
+             (dotimes (i (length object))
+               (declare (type sb-int:index i))
+               (char-to-octets ef (char object i) x #'fn))))))
       count)))
 
 
 (defun %read-line (stream eof-error-p eof-value recursive-p)
   (declare (optimize (speed 3) (space 1) (safety 0) (debug 0))
-	   (type simple-stream stream)
-	   (ignore recursive-p))
+           (type simple-stream stream)
+           (ignore recursive-p))
   (with-stream-class (simple-stream stream)
     (%check stream :input)
     (when (any-stream-instance-flags stream :eof)
       (return-from %read-line
-	(sb-impl::eof-or-lose stream eof-error-p eof-value)))
+        (sb-impl::eof-or-lose stream eof-error-p eof-value)))
     ;; for interactive streams, finish output first to force prompt
     (when (and (any-stream-instance-flags stream :output)
-	       (any-stream-instance-flags stream :interactive))
+               (any-stream-instance-flags stream :interactive))
       (%finish-output stream))
     (let* ((encap (sm melded-stream stream)) ; encapsulating stream
-	   (cbuf (make-string 80))	; current buffer
-	   (bufs (list cbuf))		; list of buffers
-	   (tail bufs)			; last cons of bufs list
-	   (index 0)			; current index in current buffer
-	   (total 0))			; total characters
+           (cbuf (make-string 80))      ; current buffer
+           (bufs (list cbuf))           ; list of buffers
+           (tail bufs)                  ; last cons of bufs list
+           (index 0)                    ; current index in current buffer
+           (total 0))                   ; total characters
       (declare (type simple-stream encap)
-	       (type simple-string cbuf)
-	       (type cons bufs tail)
-	       (type sb-int:index index total))
+               (type simple-string cbuf)
+               (type cons bufs tail)
+               (type sb-int:index index total))
       (loop
-	(multiple-value-bind (chars done)
-	    (funcall-stm-handler j-read-chars encap cbuf
-				 #\Newline index (length cbuf) t)
-	  (declare (type sb-int:index chars))
-	  (incf index chars)
-	  (incf total chars)
-	  (when (and (eq done :eof) (zerop total))
-	    (if eof-error-p
-		(error 'end-of-file :stream stream)
-		(return (values eof-value t))))
-	  (when done
-	    ;; If there's only one buffer in use, return it directly
-	    (when (null (cdr bufs))
-	      (return (values (sb-kernel:shrink-vector cbuf total)
-			      (eq done :eof))))
-	    ;; If total fits in final buffer, use it
-	    (when (<= total (length cbuf))
-	      (replace cbuf cbuf :start1 (- total index) :end2 index)
-	      (let ((idx 0))
-		(declare (type sb-int:index idx))
-		(do ((list bufs (cdr list)))
-		    ((eq list tail))
-		  (let ((buf (car list)))
-		    (declare (type simple-string buf))
-		    (replace cbuf buf :start1 idx)
-		    (incf idx (length buf)))))
-	      (return (values (sb-kernel:shrink-vector cbuf total)
-			      (eq done :eof))))
-	    ;; Allocate new string of appropriate length
-	    (let ((string (make-string total))
-		  (index 0))
-	      (declare (type sb-int:index index))
-	      (dolist (buf bufs)
-		(declare (type simple-string buf))
-		(replace string buf :start1 index)
-		(incf index (length buf)))
-	      (return  (values string (eq done :eof)))))
-	  (when (>= index (length cbuf))
-	    (setf cbuf (make-string (the sb-int:index (* 2 index))))
-	    (setf index 0)
-	    (setf (cdr tail) (cons cbuf nil))
-	    (setf tail (cdr tail))))))))
+        (multiple-value-bind (chars done)
+            (funcall-stm-handler j-read-chars encap cbuf
+                                 #\Newline index (length cbuf) t)
+          (declare (type sb-int:index chars))
+          (incf index chars)
+          (incf total chars)
+          (when (and (eq done :eof) (zerop total))
+            (if eof-error-p
+                (error 'end-of-file :stream stream)
+                (return (values eof-value t))))
+          (when done
+            ;; If there's only one buffer in use, return it directly
+            (when (null (cdr bufs))
+              (return (values (sb-kernel:shrink-vector cbuf total)
+                              (eq done :eof))))
+            ;; If total fits in final buffer, use it
+            (when (<= total (length cbuf))
+              (replace cbuf cbuf :start1 (- total index) :end2 index)
+              (let ((idx 0))
+                (declare (type sb-int:index idx))
+                (do ((list bufs (cdr list)))
+                    ((eq list tail))
+                  (let ((buf (car list)))
+                    (declare (type simple-string buf))
+                    (replace cbuf buf :start1 idx)
+                    (incf idx (length buf)))))
+              (return (values (sb-kernel:shrink-vector cbuf total)
+                              (eq done :eof))))
+            ;; Allocate new string of appropriate length
+            (let ((string (make-string total))
+                  (index 0))
+              (declare (type sb-int:index index))
+              (dolist (buf bufs)
+                (declare (type simple-string buf))
+                (replace string buf :start1 index)
+                (incf index (length buf)))
+              (return  (values string (eq done :eof)))))
+          (when (>= index (length cbuf))
+            (setf cbuf (make-string (the sb-int:index (* 2 index))))
+            (setf index 0)
+            (setf (cdr tail) (cons cbuf nil))
+            (setf tail (cdr tail))))))))
 
 (defun %read-char (stream eof-error-p eof-value recursive-p blocking-p)
   (declare (type simple-stream stream)
-	   (ignore recursive-p))
+           (ignore recursive-p))
   (with-stream-class (simple-stream stream)
     (%check stream :input)
     (when (any-stream-instance-flags stream :eof)
       (return-from %read-char
-	(sb-impl::eof-or-lose stream eof-error-p eof-value)))
+        (sb-impl::eof-or-lose stream eof-error-p eof-value)))
     ;; for interactive streams, finish output first to force prompt
     (when (and (any-stream-instance-flags stream :output)
-	       (any-stream-instance-flags stream :interactive))
+               (any-stream-instance-flags stream :interactive))
       (%finish-output stream))
     (funcall-stm-handler j-read-char (sm melded-stream stream)
-			 eof-error-p eof-value blocking-p)))
+                         eof-error-p eof-value blocking-p)))
 
 
 (defun %unread-char (stream character)
@@ -241,45 +241,45 @@
   (with-stream-class (simple-stream stream)
     (%check stream :input)
     (if (zerop (sm last-char-read-size stream))
-	(error "Nothing to unread.")
-	(progn
-	  (funcall-stm-handler j-unread-char (sm melded-stream stream) nil)
-	  (remove-stream-instance-flags stream :eof)
-	  (setf (sm last-char-read-size stream) 0)))))
+        (error "Nothing to unread.")
+        (progn
+          (funcall-stm-handler j-unread-char (sm melded-stream stream) nil)
+          (remove-stream-instance-flags stream :eof)
+          (setf (sm last-char-read-size stream) 0)))))
 
 
 (defun %peek-char (stream peek-type eof-error-p eof-value recursive-p)
   (declare (type simple-stream stream)
-	   (ignore recursive-p))
+           (ignore recursive-p))
   (with-stream-class (simple-stream stream)
     (%check stream :input)
     (when (any-stream-instance-flags stream :eof)
       (return-from %peek-char
-	(sb-impl::eof-or-lose stream eof-error-p eof-value)))
+        (sb-impl::eof-or-lose stream eof-error-p eof-value)))
     (let* ((encap (sm melded-stream stream))
-	   (char (funcall-stm-handler j-read-char encap
-				     eof-error-p stream t)))
+           (char (funcall-stm-handler j-read-char encap
+                                     eof-error-p stream t)))
       (cond ((eq char stream) eof-value)
-	    ((characterp peek-type)
-	     (do ((char char (funcall-stm-handler j-read-char encap
-						  eof-error-p
-						  stream t)))
-		 ((or (eq char stream) (char= char peek-type))
-		  (unless (eq char stream)
-		    (funcall-stm-handler j-unread-char encap t))
-		  (if (eq char stream) eof-value char))))
-	    ((eq peek-type t)
-	     (do ((char char (funcall-stm-handler j-read-char encap
-						  eof-error-p
-						  stream t)))
-		 ((or (eq char stream)
-		      (not (sb-impl::whitespacep char)))
-		  (unless (eq char stream)
-		    (funcall-stm-handler j-unread-char encap t))
-		  (if (eq char stream) eof-value char))))
-	    (t
-	     (funcall-stm-handler j-unread-char encap t)
-	     char)))))
+            ((characterp peek-type)
+             (do ((char char (funcall-stm-handler j-read-char encap
+                                                  eof-error-p
+                                                  stream t)))
+                 ((or (eq char stream) (char= char peek-type))
+                  (unless (eq char stream)
+                    (funcall-stm-handler j-unread-char encap t))
+                  (if (eq char stream) eof-value char))))
+            ((eq peek-type t)
+             (do ((char char (funcall-stm-handler j-read-char encap
+                                                  eof-error-p
+                                                  stream t)))
+                 ((or (eq char stream)
+                      (not (sb-impl::whitespacep char)))
+                  (unless (eq char stream)
+                    (funcall-stm-handler j-unread-char encap t))
+                  (if (eq char stream) eof-value char))))
+            (t
+             (funcall-stm-handler j-unread-char encap t)
+             char)))))
 
 (defun %listen (stream width)
   (declare (type simple-stream stream))
@@ -290,24 +290,24 @@
     (when (any-stream-instance-flags stream :eof)
       (return-from %listen nil))
     (if (not (or (eql width 1) (null width)))
-	(funcall-stm-handler j-listen (sm melded-stream stream))
-	(or (< (sm buffpos stream) (sm buffer-ptr stream))
-	    ;; Attempt buffer refill
-	    (let ((lcrs (sm last-char-read-size stream)))
-	      (when (and (not (any-stream-instance-flags stream :dual :string))
-			 (>= (sm mode stream) 0))
-		;; single-channel stream dirty -> write data before reading
-		(flush-buffer stream nil))
-	      (>= (refill-buffer stream nil) width))))))
+        (funcall-stm-handler j-listen (sm melded-stream stream))
+        (or (< (sm buffpos stream) (sm buffer-ptr stream))
+            ;; Attempt buffer refill
+            (let ((lcrs (sm last-char-read-size stream)))
+              (when (and (not (any-stream-instance-flags stream :dual :string))
+                         (>= (sm mode stream) 0))
+                ;; single-channel stream dirty -> write data before reading
+                (flush-buffer stream nil))
+              (>= (refill-buffer stream nil) width))))))
 
 (defun %clear-input (stream buffer-only)
   (declare (type simple-stream stream))
   (with-stream-class (simple-stream stream)
     (%check stream :input)
     (setf (sm buffpos stream) 0
-	  (sm buffer-ptr stream) 0
-	  (sm last-char-read-size stream) 0
-	  #|(sm unread-past-soft-eof stream) nil|#)
+          (sm buffer-ptr stream) 0
+          (sm last-char-read-size stream) 0
+          #|(sm unread-past-soft-eof stream) nil|#)
     #| (setf (sm reread-count stream) 0)  on dual-channel streams? |#
     )
   (device-clear-input stream buffer-only))
@@ -318,15 +318,15 @@
   (with-stream-class (simple-stream stream)
     (%check stream :input)
     (if (any-stream-instance-flags stream :eof)
-	(sb-impl::eof-or-lose stream eof-error-p eof-value)
-	(etypecase stream
-	  (single-channel-simple-stream
+        (sb-impl::eof-or-lose stream eof-error-p eof-value)
+        (etypecase stream
+          (single-channel-simple-stream
            (read-byte-internal stream eof-error-p eof-value t))
           (dual-channel-simple-stream
            (read-byte-internal stream eof-error-p eof-value t))
-	  (string-simple-stream
+          (string-simple-stream
            (with-stream-class (string-simple-stream stream)
-	     (let ((encap (sm input-handle stream)))
+             (let ((encap (sm input-handle stream)))
                (unless encap
                  (error 'simple-type-error
                         :datum stream
@@ -360,7 +360,7 @@
   (with-stream-class (simple-stream stream)
     (%check stream :output)
     (funcall-stm-handler-2 j-write-chars string (sm melded-stream stream)
-			   start end)))
+                           start end)))
 
 
 (defun %line-length (stream)
@@ -376,8 +376,8 @@
     (%check stream :output)
     (when (sm handler stream)
       (do ()
-	  ((null (sm pending stream)))
-	(sb-sys:serve-all-events)))
+          ((null (sm pending stream)))
+        (sb-sys:serve-all-events)))
     (etypecase stream
       (single-channel-simple-stream
        ;(when (and (> (sm mode stream) 0) (> (sm buffer-ptr stream) 0))
@@ -389,7 +389,7 @@
       (dual-channel-simple-stream
        (with-stream-class (dual-channel-simple-stream stream)
          (device-write stream :flush 0 nil t)
-	 (setf (sm outpos stream) 0)))
+         (setf (sm outpos stream) 0)))
       (string-simple-stream
            (device-write stream :flush 0 nil t))))
   nil)
@@ -410,7 +410,7 @@
       (dual-channel-simple-stream
        (with-stream-class (dual-channel-simple-stream stream)
          (device-write stream :flush 0 nil nil)
-	 (setf (sm outpos stream) 0)))
+         (setf (sm outpos stream) 0)))
       (string-simple-stream
        (device-write stream :flush 0 nil nil))))
   nil)
@@ -423,11 +423,11 @@
     (when (sm handler stream)
       (sb-sys:remove-fd-handler (sm handler stream))
       (setf (sm handler stream) nil
-	    (sm pending stream) nil))
+            (sm pending stream) nil))
     (etypecase stream
       (single-channel-simple-stream
        (with-stream-class (single-channel-simple-stream stream)
-	 (case (sm mode stream)
+         (case (sm mode stream)
            (1 (setf (sm buffpos stream) 0))
            (3 (setf (sm mode stream) 0)))))
       (dual-channel-simple-stream
@@ -444,16 +444,16 @@
     (etypecase stream
       (single-channel-simple-stream
        (with-stream-class (single-channel-simple-stream stream)
-	 (let ((ptr (sm buffpos stream)))
-	  (when (>= ptr (sm buf-len stream))
-	    (setf ptr (flush-buffer stream t)))
-	  (setf (sm buffpos stream) (1+ ptr))
+         (let ((ptr (sm buffpos stream)))
+          (when (>= ptr (sm buf-len stream))
+            (setf ptr (flush-buffer stream t)))
+          (setf (sm buffpos stream) (1+ ptr))
           (setf (sm charpos stream) nil)
-	  (setf (bref (sm buffer stream) ptr) integer)
+          (setf (bref (sm buffer stream) ptr) integer)
           (sc-set-dirty stream))))
       (dual-channel-simple-stream
        (with-stream-class (dual-channel-simple-stream stream)
-	 (let ((ptr (sm outpos stream)))
+         (let ((ptr (sm outpos stream)))
            (when (>= ptr (sm max-out-pos stream))
              (setf ptr (flush-out-buffer stream t)))
            (setf (sm outpos stream) (1+ ptr))
@@ -461,7 +461,7 @@
            (setf (bref (sm out-buffer stream) ptr) integer))))
       (string-simple-stream
        (with-stream-class (string-simple-stream stream)
-	 (let ((encap (sm output-handle stream)))
+         (let ((encap (sm output-handle stream)))
            (unless encap
              (error 'simple-type-error
                     :datum stream
@@ -473,9 +473,9 @@
 
 (defun %read-sequence (stream seq start end partial-fill)
   (declare (type simple-stream stream)
-	   (type sequence seq)
-	   (type sb-int:index start end)
-	   (type boolean partial-fill))
+           (type sequence seq)
+           (type sb-int:index start end)
+           (type boolean partial-fill))
   (with-stream-class (simple-stream stream)
     (%check stream :input)
     (when (any-stream-instance-flags stream :eof)
@@ -486,12 +486,12 @@
     (etypecase seq
       (string
        (funcall-stm-handler j-read-chars (sm melded-stream stream) seq nil
-			    start end
-			    (if partial-fill :bnb t)))
+                            start end
+                            (if partial-fill :bnb t)))
       ((or (simple-array (unsigned-byte 8) (*))
-	   (simple-array (signed-byte 8) (*)))
+           (simple-array (signed-byte 8) (*)))
        (when (any-stream-instance-flags stream :string)
-         (error "Can't read into byte sequence from a string stream."))       
+         (error "Can't read into byte sequence from a string stream."))
        ;; "read-vector" equivalent, but blocking if partial-fill is NIL
        ;; FIXME: this could be implemented faster via buffer-copy
        (loop with encap = (sm melded-stream stream)
@@ -506,16 +506,16 @@
 
 (defun %write-sequence (stream seq start end)
   (declare (type simple-stream stream)
-	   (type sequence seq)
-	   (type sb-int:index start end))
+           (type sequence seq)
+           (type sb-int:index start end))
   (with-stream-class (simple-stream stream)
     (%check stream :output)
     (etypecase seq
       (string
        (funcall-stm-handler-2 j-write-chars seq (sm melded-stream stream)
-			      start end))
+                              start end))
       ((or (simple-array (unsigned-byte 8) (*))
-	   (simple-array (signed-byte 8) (*)))
+           (simple-array (signed-byte 8) (*)))
        ;; "write-vector" equivalent
        (setf (sm charpos stream) nil)
        (etypecase stream
@@ -562,7 +562,7 @@
 
 (defun read-vector (vector stream &key (start 0) end (endian-swap :byte-8))
   (declare (type (sb-kernel:simple-unboxed-array (*)) vector)
-	   (type stream stream))
+           (type stream stream))
   ;; START and END are octet offsets, not vector indices!  [Except for strings]
   ;; Return value is index of next octet to be read into (i.e., start+count)
   (etypecase stream
@@ -591,8 +591,8 @@
                 (setf (bref vector (logxor index endian-swap)) byte))))))
     ((or ansi-stream fundamental-stream)
      (unless (typep vector '(or string
-			     (simple-array (signed-byte 8) (*))
-			     (simple-array (unsigned-byte 8) (*))))
+                             (simple-array (signed-byte 8) (*))
+                             (simple-array (unsigned-byte 8) (*))))
        (error "Wrong vector type for read-vector on stream not of type simple-stream."))
      (read-sequence vector stream :start (or start 0) :end end))))
 
@@ -687,16 +687,16 @@
   (declare (ignore element-type external-format input-handle output-handle
                    if-exists if-does-not-exist))
   (let ((class (or class 'sb-sys:fd-stream))
-	(options (copy-list options))
+        (options (copy-list options))
         (filespec (merge-pathnames filename)))
     (cond ((eq class 'sb-sys:fd-stream)
-	   (remf options :class)
+           (remf options :class)
            (remf options :mapped)
            (remf options :input-handle)
            (remf options :output-handle)
            (apply #'open-fd-stream filespec options))
-	  ((subtypep class 'simple-stream)
-	   (when element-type-given
+          ((subtypep class 'simple-stream)
+           (when element-type-given
              (cerror "Do it anyway."
                      "Can't create simple-streams with an element-type."))
            (when (and (eq class 'file-simple-stream) mapped)
@@ -706,12 +706,12 @@
              (when (eq direction :probe)
                (setq class 'probe-simple-stream)))
            (apply #'make-instance class :filename filespec options))
-	  ((subtypep class 'sb-gray:fundamental-stream)
-	   (remf options :class)
+          ((subtypep class 'sb-gray:fundamental-stream)
+           (remf options :class)
            (remf options :mapped)
            (remf options :input-handle)
            (remf options :output-handle)
-	   (make-instance class :lisp-stream
+           (make-instance class :lisp-stream
                           (apply #'open-fd-stream filespec options))))))
 
 
@@ -727,12 +727,12 @@
        (sb-impl::ansi-stream-read-byte stream eof-error-p eof-value nil))
       (fundamental-stream
        (let ((char (sb-gray:stream-read-byte stream)))
-	 (if (eq char :eof)
-	     (sb-impl::eof-or-lose stream eof-error-p eof-value)
-	     char))))))
+         (if (eq char :eof)
+             (sb-impl::eof-or-lose stream eof-error-p eof-value)
+             char))))))
 
 (defun read-char (&optional (stream *standard-input*) (eof-error-p t)
-			    eof-value recursive-p)
+                            eof-value recursive-p)
   "Inputs a character from Stream and returns it."
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
@@ -743,12 +743,12 @@
                                        recursive-p))
       (fundamental-stream
        (let ((char (sb-gray:stream-read-char stream)))
-	 (if (eq char :eof)
-	     (sb-impl::eof-or-lose stream eof-error-p eof-value)
-	     char))))))
+         (if (eq char :eof)
+             (sb-impl::eof-or-lose stream eof-error-p eof-value)
+             char))))))
 
 (defun read-char-no-hang (&optional (stream *standard-input*) (eof-error-p t)
-				    eof-value recursive-p)
+                                    eof-value recursive-p)
   "Returns the next character from the Stream if one is availible, or nil."
   (declare (ignore recursive-p))
   (let ((stream (sb-impl::in-synonym-of stream)))
@@ -756,15 +756,15 @@
       (simple-stream
        (%check stream :input)
        (with-stream-class (simple-stream)
-	 (funcall-stm-handler j-read-char stream eof-error-p eof-value nil)))
+         (funcall-stm-handler j-read-char stream eof-error-p eof-value nil)))
       (ansi-stream
        (sb-impl::ansi-stream-read-char-no-hang stream eof-error-p eof-value
                                                recursive-p))
       (fundamental-stream
        (let ((char (sb-gray:stream-read-char-no-hang stream)))
-	 (if (eq char :eof)
-	     (sb-impl::eof-or-lose stream eof-error-p eof-value)
-	     char))))))
+         (if (eq char :eof)
+             (sb-impl::eof-or-lose stream eof-error-p eof-value)
+             char))))))
 
 (defun unread-char (character &optional (stream *standard-input*))
   "Puts the Character back on the front of the input Stream."
@@ -781,7 +781,7 @@
 (declaim (notinline read-byte read-char read-char-no-hang unread-char))
 
 (defun peek-char (&optional (peek-type nil) (stream *standard-input*)
-			    (eof-error-p t) eof-value recursive-p)
+                            (eof-error-p t) eof-value recursive-p)
   "Peeks at the next character in the input Stream.  See manual for details."
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
@@ -794,28 +794,28 @@
                                        recursive-p))
       (fundamental-stream
        (cond ((characterp peek-type)
-	      (do ((char (sb-gray:stream-read-char stream)
-			 (sb-gray:stream-read-char stream)))
-		  ((or (eq char :eof) (char= char peek-type))
-		   (cond ((eq char :eof)
-			  (sb-impl::eof-or-lose stream eof-error-p eof-value))
-			 (t
-			  (sb-gray:stream-unread-char stream char)
-			  char)))))
-	     ((eq peek-type t)
-	      (do ((char (sb-gray:stream-read-char stream)
-			 (sb-gray:stream-read-char stream)))
-		  ((or (eq char :eof) (not (sb-impl::whitespacep char)))
-		   (cond ((eq char :eof)
-			  (sb-impl::eof-or-lose stream eof-error-p eof-value))
-			 (t
-			  (sb-gray:stream-unread-char stream char)
-			  char)))))
-	     (t
-	      (let ((char (sb-gray:stream-peek-char stream)))
-		(if (eq char :eof)
-		    (sb-impl::eof-or-lose stream eof-error-p eof-value)
-		    char))))))))
+              (do ((char (sb-gray:stream-read-char stream)
+                         (sb-gray:stream-read-char stream)))
+                  ((or (eq char :eof) (char= char peek-type))
+                   (cond ((eq char :eof)
+                          (sb-impl::eof-or-lose stream eof-error-p eof-value))
+                         (t
+                          (sb-gray:stream-unread-char stream char)
+                          char)))))
+             ((eq peek-type t)
+              (do ((char (sb-gray:stream-read-char stream)
+                         (sb-gray:stream-read-char stream)))
+                  ((or (eq char :eof) (not (sb-impl::whitespacep char)))
+                   (cond ((eq char :eof)
+                          (sb-impl::eof-or-lose stream eof-error-p eof-value))
+                         (t
+                          (sb-gray:stream-unread-char stream char)
+                          char)))))
+             (t
+              (let ((char (sb-gray:stream-peek-char stream)))
+                (if (eq char :eof)
+                    (sb-impl::eof-or-lose stream eof-error-p eof-value)
+                    char))))))))
 
 (defun listen (&optional (stream *standard-input*) (width 1))
   "Returns T if WIDTH octets are available on STREAM.  If WIDTH is
@@ -834,7 +834,7 @@ is supported only on simple-streams."
 
 
 (defun read-line (&optional (stream *standard-input*) (eof-error-p t)
-			    eof-value recursive-p)
+                            eof-value recursive-p)
   "Returns a line of text read from the Stream as a string, discarding the
   newline character."
   (let ((stream (sb-impl::in-synonym-of stream)))
@@ -846,9 +846,9 @@ is supported only on simple-streams."
                                        recursive-p))
       (fundamental-stream
        (multiple-value-bind (string eof) (sb-gray:stream-read-line stream)
-	 (if (and eof (zerop (length string)))
-	     (values (sb-impl::eof-or-lose stream eof-error-p eof-value) t)
-	     (values string eof)))))))
+         (if (and eof (zerop (length string)))
+             (values (sb-impl::eof-or-lose stream eof-error-p eof-value) t)
+             (values string eof)))))))
 
 (defun read-sequence (seq stream &key (start 0) (end nil) partial-fill)
   "Destructively modify SEQ by reading elements from STREAM.
@@ -858,11 +858,11 @@ is supported only on simple-streams."
   then the extra elements near the end of sequence are not updated, and
   the index of the next element is returned."
   (let ((stream (sb-impl::in-synonym-of stream))
-	(end (or end (length seq))))
+        (end (or end (length seq))))
     (etypecase stream
       (simple-stream
        (with-stream-class (simple-stream stream)
-	 (%read-sequence stream seq start end partial-fill)))
+         (%read-sequence stream seq start end partial-fill)))
       (ansi-stream
        (sb-impl::ansi-stream-read-sequence seq stream start end))
       (fundamental-stream
@@ -905,10 +905,10 @@ is supported only on simple-streams."
   character)
 
 (defun write-string (string &optional (stream *standard-output*)
-			    &key (start 0) (end nil))
+                            &key (start 0) (end nil))
   "Outputs the String to the given Stream."
   (let ((stream (sb-impl::out-synonym-of stream))
-	(end (sb-impl::%check-vector-sequence-bounds string start end)))
+        (end (sb-impl::%check-vector-sequence-bounds string start end)))
     (etypecase stream
       (simple-stream
        (%write-string stream string start end)
@@ -919,16 +919,16 @@ is supported only on simple-streams."
        (sb-gray:stream-write-string stream string start end)))))
 
 (defun write-line (string &optional (stream *standard-output*)
-			  &key (start 0) end)
+                          &key (start 0) end)
   (declare (type string string))
   (let ((stream (sb-impl::out-synonym-of stream))
-	(end (sb-impl::%check-vector-sequence-bounds string start end)))
+        (end (sb-impl::%check-vector-sequence-bounds string start end)))
     (etypecase stream
       (simple-stream
        (%check stream :output)
        (with-stream-class (simple-stream stream)
-	 (funcall-stm-handler-2 j-write-chars string stream start end)
-	 (funcall-stm-handler-2 j-write-char #\Newline stream)))
+         (funcall-stm-handler-2 j-write-chars string stream start end)
+         (funcall-stm-handler-2 j-write-char #\Newline stream)))
       (ansi-stream
        (sb-impl::ansi-stream-write-string string stream start end)
        (funcall (sb-kernel:ansi-stream-out stream) stream #\Newline))
@@ -940,7 +940,7 @@ is supported only on simple-streams."
 (defun write-sequence (seq stream &key (start 0) (end nil))
   "Write the elements of SEQ bounded by START and END to STREAM."
   (let ((stream (sb-impl::out-synonym-of stream))
-	(end (or end (length seq))))
+        (end (or end (length seq))))
     (etypecase stream
       (simple-stream
        (%write-sequence stream seq start end))
@@ -956,7 +956,7 @@ is supported only on simple-streams."
       (simple-stream
        (%check stream :output)
        (with-stream-class (simple-stream stream)
-	 (funcall-stm-handler-2 j-write-char #\Newline stream)))
+         (funcall-stm-handler-2 j-write-char #\Newline stream)))
       (ansi-stream
        (funcall (sb-kernel:ansi-stream-out stream) stream #\Newline))
       (fundamental-stream
@@ -1074,17 +1074,17 @@ is supported only on simple-streams."
       (simple-stream
        (%check stream :input)
        (with-stream-class (simple-stream stream)
-	 (or (< (sm buffpos stream) (sm buffer-ptr stream))
-	     (wait-for-input-available (sm input-handle stream) timeout))))
+         (or (< (sm buffpos stream) (sm buffer-ptr stream))
+             (wait-for-input-available (sm input-handle stream) timeout))))
       (two-way-stream
        (wait-for-input-available (two-way-stream-input-stream stream) timeout))
       (synonym-stream
        (wait-for-input-available (symbol-value (synonym-stream-symbol stream))
-				 timeout))
+                                 timeout))
       (sb-sys:fd-stream
        (or (< (sb-impl::fd-stream-in-index stream)
-	      (length (sb-impl::fd-stream-in-buffer stream)))
-	   (wait-for-input-available (sb-sys:fd-stream-fd stream) timeout))))))
+              (length (sb-impl::fd-stream-in-buffer stream)))
+           (wait-for-input-available (sb-sys:fd-stream-fd stream) timeout))))))
 
 ;; Make PATHNAME and NAMESTRING work
 (defun sb-int:file-name (stream &optional new-name)
@@ -1093,13 +1093,13 @@ is supported only on simple-streams."
      (with-stream-class (file-simple-stream stream)
        (cond (new-name
               (%file-rename stream new-name))
-	     (t
-	      (%file-name stream)))))
+             (t
+              (%file-name stream)))))
     (sb-sys:fd-stream
      (cond (new-name
-	    (setf (sb-impl::fd-stream-pathname stream) new-name)
-	    (setf (sb-impl::fd-stream-file stream)
-		  (sb-int:unix-namestring new-name nil))
-	    t)
-	   (t
-	    (sb-impl::fd-stream-pathname stream))))))
+            (setf (sb-impl::fd-stream-pathname stream) new-name)
+            (setf (sb-impl::fd-stream-file stream)
+                  (sb-int:unix-namestring new-name nil))
+            t)
+           (t
+            (sb-impl::fd-stream-pathname stream))))))

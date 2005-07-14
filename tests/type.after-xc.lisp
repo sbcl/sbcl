@@ -7,7 +7,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -18,11 +18,11 @@
 
 ;;; various dead bugs
 (assert (eql *empty-type*
-	     (type-intersection *empty-type*
-				(specifier-type 'keyword))))
+             (type-intersection *empty-type*
+                                (specifier-type 'keyword))))
 (assert (eql *empty-type*
-	     (type-intersection (specifier-type 'keyword)
-				*empty-type*)))
+             (type-intersection (specifier-type 'keyword)
+                                *empty-type*)))
 (assert (member-type-p (specifier-type '(or float-format null))))
 
 (/show "done with tests/type.after-xc.lisp")

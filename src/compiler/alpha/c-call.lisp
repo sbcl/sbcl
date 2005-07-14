@@ -13,8 +13,8 @@
 
 (defun my-make-wired-tn (prim-type-name sc-name offset)
   (make-wired-tn (primitive-type-or-lose prim-type-name )
-		 (sc-number-or-lose sc-name )
-		 offset))
+                 (sc-number-or-lose sc-name )
+                 offset))
 
 (defstruct arg-state
   (stack-frame-size 0))
@@ -23,63 +23,63 @@
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
     (multiple-value-bind
-	(ptype reg-sc stack-sc)
-	(if (alien-integer-type-signed type)
-	    (values 'signed-byte-64 'signed-reg 'signed-stack)
-	    (values 'unsigned-byte-64 'unsigned-reg 'unsigned-stack))
+        (ptype reg-sc stack-sc)
+        (if (alien-integer-type-signed type)
+            (values 'signed-byte-64 'signed-reg 'signed-stack)
+            (values 'unsigned-byte-64 'unsigned-reg 'unsigned-stack))
       (if (< stack-frame-size 4)
-	  (my-make-wired-tn ptype reg-sc (+ stack-frame-size nl0-offset))
-	  (my-make-wired-tn ptype stack-sc (* 2 (- stack-frame-size 4)))))))
+          (my-make-wired-tn ptype reg-sc (+ stack-frame-size nl0-offset))
+          (my-make-wired-tn ptype stack-sc (* 2 (- stack-frame-size 4)))))))
 
 (define-alien-type-method (system-area-pointer :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
     (if (< stack-frame-size 4)
-	(my-make-wired-tn 'system-area-pointer
-			  'sap-reg
-			  (+ stack-frame-size nl0-offset))
-	(my-make-wired-tn 'system-area-pointer
-			  'sap-stack
-			  (* 2 (- stack-frame-size 4))))))
+        (my-make-wired-tn 'system-area-pointer
+                          'sap-reg
+                          (+ stack-frame-size nl0-offset))
+        (my-make-wired-tn 'system-area-pointer
+                          'sap-stack
+                          (* 2 (- stack-frame-size 4))))))
 
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
     (if (< stack-frame-size 6)
-	(my-make-wired-tn 'double-float
-			  'double-reg
-			  (+ stack-frame-size nl0-offset))
-	(my-make-wired-tn 'double-float
-			  'double-stack
-			  (* 2 (- stack-frame-size 6))))))
+        (my-make-wired-tn 'double-float
+                          'double-reg
+                          (+ stack-frame-size nl0-offset))
+        (my-make-wired-tn 'double-float
+                          'double-stack
+                          (* 2 (- stack-frame-size 6))))))
 
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
     (if (< stack-frame-size 6)
-	(my-make-wired-tn 'single-float
-			  'single-reg
-			  (+ stack-frame-size nl0-offset))
-	(my-make-wired-tn 'single-float
-			  'single-stack
-			  (* 2 (- stack-frame-size 6))))))
+        (my-make-wired-tn 'single-float
+                          'single-reg
+                          (+ stack-frame-size nl0-offset))
+        (my-make-wired-tn 'single-float
+                          'single-stack
+                          (* 2 (- stack-frame-size 6))))))
 
 (define-alien-type-method (integer :result-tn) (type state)
   (declare (ignore state))
   (multiple-value-bind
       (ptype reg-sc)
       (if (alien-integer-type-signed type)
-	  (values 'signed-byte-64 'signed-reg)
-	  (values 'unsigned-byte-64 'unsigned-reg))
+          (values 'signed-byte-64 'signed-reg)
+          (values 'unsigned-byte-64 'unsigned-reg))
     (my-make-wired-tn ptype reg-sc lip-offset)))
 
 (define-alien-type-method (system-area-pointer :result-tn) (type state)
   (declare (ignore type state))
   (my-make-wired-tn 'system-area-pointer 'sap-reg lip-offset))
-    
+
 (define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type state))
   (my-make-wired-tn 'double-float 'double-reg lip-offset))
@@ -99,13 +99,13 @@
   (let ((arg-state (make-arg-state)))
     (collect ((arg-tns))
       (dolist (arg-type (alien-fun-type-arg-types type))
-	(arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
+        (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
       (values (my-make-wired-tn 'positive-fixnum 'any-reg nsp-offset)
-	      (* (max (arg-state-stack-frame-size arg-state) 4) n-word-bytes)
-	      (arg-tns)
-	      (invoke-alien-type-method :result-tn
-					(alien-fun-type-result-type type)
-					nil)))))
+              (* (max (arg-state-stack-frame-size arg-state) 4) n-word-bytes)
+              (arg-tns)
+              (invoke-alien-type-method :result-tn
+                                        (alien-fun-type-result-type type)
+                                        nil)))))
 
 (define-vop (foreign-symbol-address)
   (:translate foreign-symbol-address)
@@ -120,24 +120,24 @@
 
 (define-vop (call-out)
   (:args (function :scs (sap-reg) :target cfunc)
-	 (args :more t))
+         (args :more t))
   (:results (results :more t))
   (:ignore args results)
   (:save-p t)
   (:temporary (:sc any-reg :offset cfunc-offset
-		   :from (:argument 0) :to (:result 0)) cfunc)
+                   :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:vop-var vop)
   (:generator 0
     (let ((cur-nfp (sb!c::current-nfp-tn vop)))
       (when cur-nfp
-	(store-stack-tn nfp-save cur-nfp))
+        (store-stack-tn nfp-save cur-nfp))
       (move function cfunc)
       (inst li (make-fixup "call_into_c" :foreign) temp)
       (inst jsr lip-tn temp (make-fixup "call_into_c" :foreign))
       (when cur-nfp
-	(maybe-load-stack-nfp-tn cur-nfp nfp-save temp)))))
+        (maybe-load-stack-nfp-tn cur-nfp nfp-save temp)))))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)
@@ -146,11 +146,11 @@
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 7) 7)))
-	(cond ((< delta (ash 1 15))
-	       (inst lda nsp-tn (- delta) nsp-tn))
-	      (t
-	       (inst li delta temp)
-	       (inst subq nsp-tn temp nsp-tn)))))
+        (cond ((< delta (ash 1 15))
+               (inst lda nsp-tn (- delta) nsp-tn))
+              (t
+               (inst li delta temp)
+               (inst subq nsp-tn temp nsp-tn)))))
     (move nsp-tn result)))
 
 (define-vop (dealloc-number-stack-space)
@@ -160,8 +160,8 @@
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 7) 7)))
-	(cond ((< delta (ash 1 15))
-	       (inst lda nsp-tn delta nsp-tn))
-	      (t
-	       (inst li delta temp)
-	       (inst addq nsp-tn temp nsp-tn)))))))
+        (cond ((< delta (ash 1 15))
+               (inst lda nsp-tn delta nsp-tn))
+              (t
+               (inst li delta temp)
+               (inst addq nsp-tn temp nsp-tn)))))))

@@ -30,7 +30,7 @@
 
 (defun clarify-legal-query-input (yes no)
   (format *query-io* "~&Please type \"~A\" for yes or \"~A\" for no.~%"
-	  yes no))
+          yes no))
 
 (defun y-or-n-p (&optional format-string &rest arguments)
   #!+sb-doc
@@ -39,24 +39,24 @@
    n or N as a negative answer. It asks again if you enter any other
    characters."
   (flet ((print-query ()
-	   (apply #'maybe-print-query "(y or n)" format-string arguments)))
+           (apply #'maybe-print-query "(y or n)" format-string arguments)))
     (loop (print-query)
-	  (case (query-read-char)
-	    ((#\y #\Y) (return t))
-	    ((#\n #\N) (return nil))
-	    (t (clarify-legal-query-input "y" "n"))))))
-     
+          (case (query-read-char)
+            ((#\y #\Y) (return t))
+            ((#\n #\N) (return nil))
+            (t (clarify-legal-query-input "y" "n"))))))
+
 (defun yes-or-no-p (&optional format-string &rest arguments)
   #!+sb-doc
   "YES-OR-NO-P is similar to Y-OR-N-P, except that it clears the
    input buffer, beeps, and uses READ-LINE to get the strings
    YES or NO."
   (flet ((print-query ()
-	   (apply #'maybe-print-query "(yes or no)" format-string arguments)))
+           (apply #'maybe-print-query "(yes or no)" format-string arguments)))
     (beep *query-io*)
     (loop (print-query)
-	  (let ((input (query-read-line)))
-	    (cond
-	      ((string-equal input "yes") (return t))
-	      ((string-equal input "no") (return nil))
-	      (t (clarify-legal-query-input "yes" "no")))))))
+          (let ((input (query-read-line)))
+            (cond
+              ((string-equal input "yes") (return t))
+              ((string-equal input "no") (return nil))
+              (t (clarify-legal-query-input "yes" "no")))))))

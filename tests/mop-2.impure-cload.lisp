@@ -6,7 +6,7 @@
 ;;;; While most of SBCL is derived from the CMU CL system, the test
 ;;;; files (like this one) were written from scratch after the fork
 ;;;; from CMU CL.
-;;;; 
+;;;;
 ;;;; This software is in the public domain and is provided with
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
@@ -82,21 +82,21 @@
         (call-next-method))))
 
 (defmethod (setf slot-value-using-class) (new-value (class dynamic-slot-class)
-					  instance slotd)
+                                          instance slotd)
   (let ((slot (find slotd (class-slots class))))
     (if (and slot (dynamic-slot-p slot))
-	(write-dynamic-slot-value new-value instance (slot-definition-name slotd))
-	(call-next-method))))
+        (write-dynamic-slot-value new-value instance (slot-definition-name slotd))
+        (call-next-method))))
 
 (defmethod slot-boundp-using-class ((class dynamic-slot-class)
-				    instance slotd)
+                                    instance slotd)
   (let ((slot (find slotd (class-slots class))))
     (if (and slot (dynamic-slot-p slot))
         (dynamic-slot-boundp instance (slot-definition-name slotd))
         (call-next-method))))
 
 (defmethod slot-makunbound-using-class ((class dynamic-slot-class)
-					instance slotd)
+                                        instance slotd)
   (let ((slot (find slotd (class-slots class))))
     (if (and slot (dynamic-slot-p slot))
         (dynamic-slot-makunbound instance (slot-definition-name slotd))
@@ -135,18 +135,18 @@
 
 (defmethod (setf slot-value-using-class) (new-value
                                           (class dynamic-slot-subclass)
-					  instance slotd)
+                                          instance slotd)
   (let ((slot (find slotd (class-slots class))))
     (if (and slot (dynamic-slot-p slot))
-	(write-dynamic-slot-value new-value instance (slot-definition-name slotd))
-	(call-next-method))))
+        (write-dynamic-slot-value new-value instance (slot-definition-name slotd))
+        (call-next-method))))
 
 (defmethod slot-boundp-using-class ((class dynamic-slot-subclass)
                                     instance slotd)
   (let ((slot (find slotd (class-slots class))))
     (if (and slot (dynamic-slot-p slot))
-	(dynamic-slot-boundp instance (slot-definition-name slotd))
-	(call-next-method))))
+        (dynamic-slot-boundp instance (slot-definition-name slotd))
+        (call-next-method))))
 
 (defclass test-class-3 (test-class-1)
   ((slot2 :initarg :slot2 :initform t :allocation :dynamic)

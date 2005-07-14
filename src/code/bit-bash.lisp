@@ -21,8 +21,8 @@
 ;;; these, or DEFTRANSFORMs to convert them into something supported
 ;;; by the architecture.
 (macrolet ((def (name &rest args)
-	     `(defun ,name ,args
-		(,name ,@args))))
+             `(defun ,name ,args
+                (,name ,@args))))
   (def word-logical-not x)
   (def word-logical-and x y)
   (def word-logical-or x y)
@@ -44,12 +44,12 @@
   (let ((count (ldb (byte (1- (integer-length sb!vm:n-word-bits)) 0) countoid)))
     (declare (type bit-offset count))
     (if (zerop count)
-	number
-	(ecase sb!c:*backend-byte-order*
-	  (:big-endian
-	   (ash (ldb (byte (- sb!vm:n-word-bits count) 0) number) count))
-	  (:little-endian
-	   (ash number (- count)))))))
+        number
+        (ecase sb!c:*backend-byte-order*
+          (:big-endian
+           (ash (ldb (byte (- sb!vm:n-word-bits count) 0) number) count))
+          (:little-endian
+           (ash number (- count)))))))
 
 ;;; Shift NUMBER by COUNT bits, adding zero bits at the "start" and
 ;;; removing bits from the "end". On big-endian machines this is a
@@ -59,12 +59,12 @@
   (let ((count (ldb (byte (1- (integer-length sb!vm:n-word-bits)) 0) count)))
     (declare (type bit-offset count))
     (if (zerop count)
-	number
-	(ecase sb!c:*backend-byte-order*
-	  (:big-endian
-	   (ash number (- count)))
-	  (:little-endian
-	   (ash (ldb (byte (- sb!vm:n-word-bits count) 0) number) count))))))
+        number
+        (ecase sb!c:*backend-byte-order*
+          (:big-endian
+           (ash number (- count)))
+          (:little-endian
+           (ash (ldb (byte (- sb!vm:n-word-bits count) 0) number) count))))))
 
 #!-sb-fluid (declaim (inline start-mask end-mask))
 
@@ -87,18 +87,18 @@
 #!-sb-fluid (declaim (inline word-sap-ref %set-word-sap-ref))
 (defun word-sap-ref (sap offset)
   (declare (type system-area-pointer sap)
-	   (type index offset)
-	   (values sb!vm:word)
-	   (optimize (speed 3) (safety 0) #-sb-xc-host (inhibit-warnings 3)))
+           (type index offset)
+           (values sb!vm:word)
+           (optimize (speed 3) (safety 0) #-sb-xc-host (inhibit-warnings 3)))
   (sap-ref-word sap (the index (ash offset sb!vm:n-fixnum-tag-bits))))
 (defun %set-word-sap-ref (sap offset value)
   (declare (type system-area-pointer sap)
-	   (type index offset)
-	   (type sb!vm:word value)
-	   (values sb!vm:word)
-	   (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
+           (type index offset)
+           (type sb!vm:word value)
+           (values sb!vm:word)
+           (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
   (setf (sap-ref-word sap (the index (ash offset sb!vm:n-fixnum-tag-bits)))
-	value))
+        value))
 
 
 ;;; the actual bashers and common uses of same
@@ -149,7 +149,7 @@
                            (8  0)
                            (16 0)
                            (32 0)
-			   (64 0))))
+                           (64 0))))
          (offset `(integer 0 ,max-bytes))
          (max-word-offset (ceiling max-bytes bytes-per-word))
          (word-offset `(integer 0 ,max-word-offset))

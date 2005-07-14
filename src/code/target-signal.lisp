@@ -49,7 +49,7 @@
 
 ;;;; C routines that actually do all the work of establishing signal handlers
 (sb!alien:define-alien-routine ("install_handler" install-handler)
-			       sb!alien:unsigned-long
+                               sb!alien:unsigned-long
   (signal sb!alien:int)
   (handler sb!alien:unsigned-long))
 
@@ -60,15 +60,15 @@
   (/show0 "enable-interrupt")
   (without-gcing
    (let ((result (install-handler signal
-				  (case handler
-				    (:default sig_dfl)
-				    (:ignore sig_ign)
-				    (t
-				     (sb!kernel:get-lisp-obj-address
-				      handler))))))
+                                  (case handler
+                                    (:default sig_dfl)
+                                    (:ignore sig_ign)
+                                    (t
+                                     (sb!kernel:get-lisp-obj-address
+                                      handler))))))
      (cond ((= result sig_dfl) :default)
-	   ((= result sig_ign) :ignore)
-	   (t (the (or function fixnum) (sb!kernel:make-lisp-obj result)))))))
+           ((= result sig_ign) :ignore)
+           (t (the (or function fixnum) (sb!kernel:make-lisp-obj result)))))))
 
 (defun default-interrupt (signal)
   (enable-interrupt signal :default))
@@ -97,15 +97,15 @@
 
 (eval-when (:compile-toplevel :execute)
   (sb!xc:defmacro define-signal-handler (name
-					 what
-					 &optional (function 'error))
+                                         what
+                                         &optional (function 'error))
     `(defun ,name (signal info context)
        (declare (ignore signal info))
        (declare (type system-area-pointer context))
        (/show "in Lisp-level signal handler" ,(symbol-name name) (sap-int context))
        (,function ,(concatenate 'simple-string what " at #X~X")
-		  (with-alien ((context (* os-context-t) context))
-		    (sap-int (sb!vm:context-pc context)))))))
+                  (with-alien ((context (* os-context-t) context))
+                    (sap-int (sb!vm:context-pc context)))))))
 
 (define-signal-handler sigint-handler "interrupted" sigint-%break)
 (define-signal-handler sigill-handler "illegal instruction")
@@ -164,20 +164,20 @@
    Establish function as a handler for the Unix signal interrupt which
    should be a number between 1 and 31 inclusive."
   (let ((il (gensym))
-	(it (gensym)))
+        (it (gensym)))
     `(let ((,il NIL))
        (unwind-protect
-	   (progn
-	     ,@(do* ((item interrupt-list (cdr item))
-		     (intr (caar item) (caar item))
-		     (ifcn (cadar item) (cadar item))
-		     (forms NIL))
-		    ((null item) (nreverse forms))
-		 (when (symbolp intr)
-		   (setq intr (symbol-value intr)))
-		 (push `(push `(,,intr ,(enable-interrupt ,intr ,ifcn)) ,il)
-		       forms))
-	     ,@body)
-	 (dolist (,it (nreverse ,il))
-	   (enable-interrupt (car ,it) (cadr ,it)))))))
+           (progn
+             ,@(do* ((item interrupt-list (cdr item))
+                     (intr (caar item) (caar item))
+                     (ifcn (cadar item) (cadar item))
+                     (forms NIL))
+                    ((null item) (nreverse forms))
+                 (when (symbolp intr)
+                   (setq intr (symbol-value intr)))
+                 (push `(push `(,,intr ,(enable-interrupt ,intr ,ifcn)) ,il)
+                       forms))
+             ,@body)
+         (dolist (,it (nreverse ,il))
+           (enable-interrupt (car ,it) (cadr ,it)))))))
 |#

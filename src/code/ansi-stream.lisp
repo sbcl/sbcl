@@ -20,38 +20,38 @@
 ;;; considered closed. The functions in the operation slots take
 ;;; arguments as follows:
 ;;;
-;;; In:			Stream, Eof-Errorp, Eof-Value
-;;; Bin:		Stream, Eof-Errorp, Eof-Value
-;;; N-Bin:		Stream, Buffer, Start, Numbytes, Eof-Errorp
-;;; Out:		Stream, Character
-;;; Bout:		Stream, Integer
-;;; Sout:		Stream, String, Start, End
-;;; Misc:		Stream, Operation, &Optional Arg1, Arg2
+;;; In:                 Stream, Eof-Errorp, Eof-Value
+;;; Bin:                Stream, Eof-Errorp, Eof-Value
+;;; N-Bin:              Stream, Buffer, Start, Numbytes, Eof-Errorp
+;;; Out:                Stream, Character
+;;; Bout:               Stream, Integer
+;;; Sout:               Stream, String, Start, End
+;;; Misc:               Stream, Operation, &Optional Arg1, Arg2
 ;;;
 ;;; In order to save space, some of the less common stream operations
 ;;; are handled by just one function, the MISC method. This function
 ;;; is passed a keyword which indicates the operation to perform.
 ;;; The following keywords are used:
-;;;  :listen 		- Return the following values:
-;;; 			     t if any input waiting.
-;;; 			     :eof if at eof.
-;;; 			     nil if no input is available and not at eof.
-;;;  :unread		- Unread the character Arg.
-;;;  :close		- Do any stream specific stuff to close the stream.
-;;;			  The methods are set to closed-flame by the close
-;;;			  function, so that need not be done by this
-;;;			  function.
-;;;  :clear-input 	- Clear any unread input
+;;;  :listen            - Return the following values:
+;;;                          t if any input waiting.
+;;;                          :eof if at eof.
+;;;                          nil if no input is available and not at eof.
+;;;  :unread            - Unread the character Arg.
+;;;  :close             - Do any stream specific stuff to close the stream.
+;;;                       The methods are set to closed-flame by the close
+;;;                       function, so that need not be done by this
+;;;                       function.
+;;;  :clear-input       - Clear any unread input
 ;;;  :finish-output,
-;;;  :force-output	- Cause output to happen
-;;;  :clear-output	- Clear any undone output
-;;;  :element-type 	- Return the type of element the stream deals with.
-;;;  :line-length	- Return the length of a line of output.
-;;;  :charpos		- Return current output position on the line.
-;;;  :file-length	- Return the file length of a file stream.
-;;;  :file-position	- Return or change the current position of a
+;;;  :force-output      - Cause output to happen
+;;;  :clear-output      - Clear any undone output
+;;;  :element-type      - Return the type of element the stream deals with.
+;;;  :line-length       - Return the length of a line of output.
+;;;  :charpos           - Return current output position on the line.
+;;;  :file-length       - Return the file length of a file stream.
+;;;  :file-position     - Return or change the current position of a
 ;;;                       file stream.
-;;;  :file-name		- Return the name of an associated file.
+;;;  :file-name         - Return the name of an associated file.
 ;;;  :interactive-p     - Is this an interactive device?
 ;;;
 ;;; In order to do almost anything useful, it is necessary to
@@ -95,7 +95,7 @@
 ;;; base class for ANSI standard streams (as opposed to the Gray
 ;;; streams extension)
 (defstruct (ansi-stream (:constructor nil)
-			(:copier nil))
+                        (:copier nil))
 
   ;; input buffer
   ;;
@@ -107,14 +107,14 @@
   (in-index +ansi-stream-in-buffer-length+ :type index)
 
   ;; buffered input functions
-  (in #'ill-in :type function)			; READ-CHAR function
-  (bin #'ill-bin :type function)		; byte input function
-  (n-bin #'ill-bin :type function)		; n-byte input function
+  (in #'ill-in :type function)                  ; READ-CHAR function
+  (bin #'ill-bin :type function)                ; byte input function
+  (n-bin #'ill-bin :type function)              ; n-byte input function
 
   ;; output functions
-  (out #'ill-out :type function)		; WRITE-CHAR function
-  (bout #'ill-bout :type function)		; byte output function
-  (sout #'ill-out :type function)		; string output function
+  (out #'ill-out :type function)                ; WRITE-CHAR function
+  (bout #'ill-bout :type function)              ; byte output function
+  (sout #'ill-out :type function)               ; string output function
 
   ;; other, less-used methods
   (misc #'no-op-placeholder :type function))

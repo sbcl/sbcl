@@ -10,56 +10,56 @@
 ;;; all? Seems not.
 #+ignore
 (declaim (special
-	  sb-debug::*debug-command-level*
-	  sb-debug::*real-stack-top* sb-debug::*stack-top*
-	  sb-debug::*stack-top-hint* sb-debug::*current-frame*
-	  sb-debug::*flush-debug-errors*))
+          sb-debug::*debug-command-level*
+          sb-debug::*real-stack-top* sb-debug::*stack-top*
+          sb-debug::*stack-top-hint* sb-debug::*current-frame*
+          sb-debug::*flush-debug-errors*))
 
 (defun debug-loop ()
   (let* ((sb-debug::*debug-command-level* (1+ sb-debug::*debug-command-level*))
-	 (sb-debug::*real-stack-top* (sb-di:top-frame))
-	 (sb-debug::*stack-top* (or sb-debug::*stack-top-hint*
-				    sb-debug::*real-stack-top*))
-	 (sb-debug::*stack-top-hint* nil)
-	 (sb-debug::*current-frame* sb-debug::*stack-top*)
-	 (continuable (continuable-break-p)))
+         (sb-debug::*real-stack-top* (sb-di:top-frame))
+         (sb-debug::*stack-top* (or sb-debug::*stack-top-hint*
+                                    sb-debug::*real-stack-top*))
+         (sb-debug::*stack-top-hint* nil)
+         (sb-debug::*current-frame* sb-debug::*stack-top*)
+         (continuable (continuable-break-p)))
     (handler-bind ((sb-di:debug-condition
-		    (lambda (condition)
-		      (princ condition sb-debug::*debug-io*)
-		      (sb-int:/show0 "handling d-c by THROWing DEBUG-LOOP-CATCHER")
-		      (throw 'debug-loop-catcher nil))))
+                    (lambda (condition)
+                      (princ condition sb-debug::*debug-io*)
+                      (sb-int:/show0 "handling d-c by THROWing DEBUG-LOOP-CATCHER")
+                      (throw 'debug-loop-catcher nil))))
       (fresh-line)
       ;;(sb-debug::print-frame-call sb-debug::*current-frame* :verbosity 2)
       (loop ;; only valid to way to exit invoke-debugger is by a restart
        (catch 'debug-loop-catcher
-	 (handler-bind ((error (lambda (condition)
-				 (when sb-debug::*flush-debug-errors*
-				   (clear-input *debug-io*)
-				   (princ condition)
-				   ;; FIXME: Doing input on *DEBUG-IO*
-				   ;; and output on T seems broken.
-				   (format t
-					   "~&error flushed (because ~
-					     ~S is set)"
-					  'sb-debug::*flush-debug-errors*)
-				   (sb-int:/show0 "throwing DEBUG-LOOP-CATCHER")
-				   (throw 'debug-loop-catcher nil)))))
-	   
-	   (if (zerop *break-level*) ; restart added by SBCL
-	       (repl :continuable continuable)       
-	       (let ((level *break-level*))
-		 (with-simple-restart
-		     (abort "~@<Reduce debugger level (to break level ~W).~@:>"
-			    level)
-		   (let ((sb-debug::*debug-restarts* (compute-restarts)))
-		     (repl :continuable continuable)))))))
+         (handler-bind ((error (lambda (condition)
+                                 (when sb-debug::*flush-debug-errors*
+                                   (clear-input *debug-io*)
+                                   (princ condition)
+                                   ;; FIXME: Doing input on *DEBUG-IO*
+                                   ;; and output on T seems broken.
+                                   (format t
+                                           "~&error flushed (because ~
+                                             ~S is set)"
+                                          'sb-debug::*flush-debug-errors*)
+                                   (sb-int:/show0 "throwing DEBUG-LOOP-CATCHER")
+                                   (throw 'debug-loop-catcher nil)))))
+
+           (if (zerop *break-level*) ; restart added by SBCL
+               (repl :continuable continuable)
+               (let ((level *break-level*))
+                 (with-simple-restart
+                     (abort "~@<Reduce debugger level (to break level ~W).~@:>"
+                            level)
+                   (let ((sb-debug::*debug-restarts* (compute-restarts)))
+                     (repl :continuable continuable)))))))
        (throw 'repl-catcher (values :debug :exit))
        ))))
 
 
 (defun continuable-break-p ()
   (when (eq 'continue
-	    (restart-name (car (compute-restarts))))
+            (restart-name (car (compute-restarts))))
     t))
 
 #+ignore
@@ -80,7 +80,7 @@
   (let ((old-hook *debugger-hook*))
     (when old-hook
       (let ((*debugger-hook* nil))
-	(funcall old-hook condition old-hook))))
+        (funcall old-hook condition old-hook))))
   (%debugger condition))
 
 #+ignore
@@ -94,13 +94,13 @@
 #+ignore
 (defun print-condition-type (condition)
   (format *output* "~&  [Condition type: ~A]~%" (type-of condition)))
- 
+
 #+ignore
 (defun %debugger (condition)
   (print-condition condition)
   (print-condition-type condition)
   (princ #\newline *output*)
-  (print-restarts) 
+  (print-restarts)
   (acldebug-loop))
 
 
@@ -108,10 +108,10 @@
 (defun acldebug-loop ()
   (let ((continuable (continuable-break-p)))
     (if continuable
-	(aclrepl :continuable t)
-	(let ((level *break-level*))
-	  (with-simple-restart
-	      (abort "~@<Reduce debugger level (to debug level ~W).~@:>" level)
-	    (loop
-	     (repl)))))))
+        (aclrepl :continuable t)
+        (let ((level *break-level*))
+          (with-simple-restart
+              (abort "~@<Reduce debugger level (to debug level ~W).~@:>" level)
+            (loop
+             (repl)))))))
 

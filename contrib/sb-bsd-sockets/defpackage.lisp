@@ -35,8 +35,8 @@
            socket-send socket-receive socket-recv
            socket-name socket-peername socket-listen
            socket-close socket-file-descriptor
-	   socket-family socket-protocol socket-open-p
-	   socket-type socket-make-stream get-protocol-by-name
+           socket-family socket-protocol socket-open-p
+           socket-type socket-make-stream get-protocol-by-name
 
            get-host-by-name get-host-by-address
            host-ent
@@ -49,15 +49,15 @@
            host-not-found-error
            try-again-error
            no-recovery-error
-           
-	   ;; all socket options are also exported, by code in
-	   ;; sockopt.lisp
 
-	   socket-error
+           ;; all socket options are also exported, by code in
+           ;; sockopt.lisp
 
-	   ;; other errno-based socket errors are exported by code in
-	   ;; sockets.lisp
-	   
+           socket-error
+
+           ;; other errno-based socket errors are exported by code in
+           ;; sockets.lisp
+
            make-inet-address
 
            non-blocking-mode
@@ -87,7 +87,7 @@ arguments to fit Lisp style more closely.
 <li> Methods applicable to a particular subclass
 <ol>
 <li> <a href="#internet">INET-SOCKET</a> - Internet Protocol (TCP, UDP, raw) sockets
-<li> Methods on <a href="#LOCAL-SOCKET">LOCAL-SOCKET</a> - Local-domain sockets 
+<li> Methods on <a href="#LOCAL-SOCKET">LOCAL-SOCKET</a> - Local-domain sockets
 </ol>
 <li> <a href="#name-service">Name resolution</a> (DNS, /etc/hosts, &amp;c)
 </ol>
@@ -124,7 +124,7 @@ than "network-endian integers".  See the section on <a href="#internet"
     ((package (eql #.*package*)) symbol kind)
   (declare (ignore kind))
   (format nil "file://~A#~A"
-	  #.(namestring
-	     (merge-pathnames "index.html"
-			      (or *load-pathname* *compile-file-pathname*)))
-	  symbol))
+          #.(namestring
+             (merge-pathnames "index.html"
+                              (or *load-pathname* *compile-file-pathname*)))
+          symbol))

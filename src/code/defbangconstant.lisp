@@ -29,12 +29,12 @@
      (defconstant ,@(cdr whole))
      #+sb-xc-host
      ,(unless (eql (find-symbol (symbol-name name) :cl) name)
-	`(defconstant ,@(cdr whole)))
-     #+sb-xc-host 
+        `(defconstant ,@(cdr whole)))
+     #+sb-xc-host
      ,(let ((form `(sb!xc:defconstant ,@(cdr whole))))
-	(if (boundp '*delayed-def!constants*)
-	    `(push ',form *delayed-def!constants*)
-	    form))))
+        (if (boundp '*delayed-def!constants*)
+            `(push ',form *delayed-def!constants*)
+            form))))
 
 ;;; machinery to implement DEF!CONSTANT delays
 #+sb-xc-host
@@ -44,12 +44,12 @@
   (/show "done binding *DELAYED-DEF!CONSTANTS*")
   (defun force-delayed-def!constants ()
     (if (boundp '*delayed-def!constants*)
-	(progn
-	  (mapc #'eval *delayed-def!constants*)
-	  (makunbound '*delayed-def!constants*))
-	;; This condition is probably harmless if it comes up when
-	;; interactively experimenting with the system by loading a
-	;; source file into it more than once. But it's worth warning
-	;; about it because it definitely shouldn't come up in an
-	;; ordinary build process.
-	(warn "*DELAYED-DEF!CONSTANTS* is already unbound."))))
+        (progn
+          (mapc #'eval *delayed-def!constants*)
+          (makunbound '*delayed-def!constants*))
+        ;; This condition is probably harmless if it comes up when
+        ;; interactively experimenting with the system by loading a
+        ;; source file into it more than once. But it's worth warning
+        ;; about it because it definitely shouldn't come up in an
+        ;; ordinary build process.
+        (warn "*DELAYED-DEF!CONSTANTS* is already unbound."))))

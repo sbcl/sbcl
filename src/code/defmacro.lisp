@@ -33,17 +33,17 @@
              name))
     (with-unique-names (whole environment)
       (multiple-value-bind (new-body local-decs doc)
-	  (parse-defmacro lambda-list whole body name 'defmacro
-			  :environment environment)
-	(let ((def `(lambda (,whole ,environment)
-		      ,@local-decs
+          (parse-defmacro lambda-list whole body name 'defmacro
+                          :environment environment)
+        (let ((def `(lambda (,whole ,environment)
+                      ,@local-decs
                       ,new-body))
-	      ;; If we want to move over to list-style names
-	      ;; [e.g. (DEFMACRO FOO), maybe to support some XREF-like
-	      ;; functionality] here might be a good place to start.
-	      (debug-name (sb!c::debug-name 'macro-function name)))
-	  `(eval-when (:compile-toplevel :load-toplevel :execute)
-             (sb!c::%defmacro ',name #',def ',lambda-list 
+              ;; If we want to move over to list-style names
+              ;; [e.g. (DEFMACRO FOO), maybe to support some XREF-like
+              ;; functionality] here might be a good place to start.
+              (debug-name (sb!c::debug-name 'macro-function name)))
+          `(eval-when (:compile-toplevel :load-toplevel :execute)
+             (sb!c::%defmacro ',name #',def ',lambda-list
                               ,doc ',debug-name)))))))
 
 (macrolet
@@ -91,11 +91,11 @@
                       (#.sb!vm:closure-header-widetag
                        (setf (%simple-fun-arglist (%closure-fun definition))
                              lambda-list
-			     (%simple-fun-name (%closure-fun definition))
-			     debug-name))
+                             (%simple-fun-name (%closure-fun definition))
+                             debug-name))
                       (#.sb!vm:simple-fun-header-widetag
                        (setf (%simple-fun-arglist definition) lambda-list
-			     (%simple-fun-name definition) debug-name))))
+                             (%simple-fun-name definition) debug-name))))
             name))))
   (progn
     (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)

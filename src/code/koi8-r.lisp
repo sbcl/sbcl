@@ -139,14 +139,14 @@
 (declaim (inline get-koi8-r-bytes))
 (defun get-koi8-r-bytes (string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :koi8-r string pos end))
 
 (defun string->koi8-r (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-koi8-r-bytes null-padding)))
 
 (defmacro define-koi8-r->string* (accessor type)
@@ -154,7 +154,7 @@
   (let ((name (make-od-name 'koi8-r->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 (instantiate-octets-definition define-koi8-r->string*)
 
 (defmacro define-koi8-r->string (accessor type)

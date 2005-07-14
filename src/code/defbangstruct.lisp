@@ -34,7 +34,7 @@
   (defun def!struct-supertype (type)
     (multiple-value-bind (value value-p) (gethash type *def!struct-supertype*)
       (unless value-p
-	(error "~S is not a DEF!STRUCT-defined type." type))
+        (error "~S is not a DEF!STRUCT-defined type." type))
       value))
   (defun (setf def!struct-supertype) (value type)
     (when (and value #-sb-xc-host *type-system-initialized*)
@@ -52,19 +52,19 @@
   (defvar *def!struct-type-make-load-form-fun* (make-hash-table))
   (defun def!struct-type-make-load-form-fun (type)
     (do ((supertype type))
-	(nil)
+        (nil)
       (multiple-value-bind (value value-p)
-	  (gethash supertype *def!struct-type-make-load-form-fun*)
-	(unless value-p
-	  (error "~S (supertype of ~S) is not a DEF!STRUCT-defined type."
-		 supertype
-		 type))
-	(when value
-	  (return value))
-	(setf supertype (def!struct-supertype supertype))
-	(unless supertype
-	  (error "There is no MAKE-LOAD-FORM function for bootstrap type ~S."
-		 type)))))
+          (gethash supertype *def!struct-type-make-load-form-fun*)
+        (unless value-p
+          (error "~S (supertype of ~S) is not a DEF!STRUCT-defined type."
+                 supertype
+                 type))
+        (when value
+          (return value))
+        (setf supertype (def!struct-supertype supertype))
+        (unless supertype
+          (error "There is no MAKE-LOAD-FORM function for bootstrap type ~S."
+                 type)))))
   (defun (setf def!struct-type-make-load-form-fun) (new-value type)
     (when #+sb-xc-host t #-sb-xc-host *type-system-initialized*
       (aver (subtypep type 'structure!object))
@@ -125,26 +125,26 @@
   ;; otherwise.
   (defun parse-def!struct-args (nameoid &rest rest)
     (multiple-value-bind (name options) ; Note: OPTIONS can change below.
-	(if (consp nameoid)
-	    (values (first nameoid) (rest nameoid))
-	    (values nameoid nil))
+        (if (consp nameoid)
+            (values (first nameoid) (rest nameoid))
+            (values nameoid nil))
       (declare (type list options))
       (let* ((include-clause (find :include options :key #'first))
-	     (def!struct-supertype nil) ; may change below
-	     (mlff-clause (find :make-load-form-fun options :key #'first))
-	     (mlff (and mlff-clause (second mlff-clause))))
-	(when (find :type options :key #'first)
-	  (error "can't use :TYPE option in DEF!STRUCT"))
-	(when mlff-clause
-	  (setf options (remove mlff-clause options)))
-	(when include-clause
-	  (setf def!struct-supertype (second include-clause)))
-	(if (eq name 'structure!object) ; if root of hierarchy
-	    (aver (not include-clause))
-	    (unless include-clause
-	      (setf def!struct-supertype 'structure!object)
-	      (push `(:include ,def!struct-supertype) options)))
-	(values name `((,name ,@options) ,@rest) mlff def!struct-supertype)))))
+             (def!struct-supertype nil) ; may change below
+             (mlff-clause (find :make-load-form-fun options :key #'first))
+             (mlff (and mlff-clause (second mlff-clause))))
+        (when (find :type options :key #'first)
+          (error "can't use :TYPE option in DEF!STRUCT"))
+        (when mlff-clause
+          (setf options (remove mlff-clause options)))
+        (when include-clause
+          (setf def!struct-supertype (second include-clause)))
+        (if (eq name 'structure!object) ; if root of hierarchy
+            (aver (not include-clause))
+            (unless include-clause
+              (setf def!struct-supertype 'structure!object)
+              (push `(:include ,def!struct-supertype) options)))
+        (values name `((,name ,@options) ,@rest) mlff def!struct-supertype)))))
 
 ;;; Part of the raison d'etre for DEF!STRUCT is to be able to emulate
 ;;; these low-level CMU CL functions in a vanilla ANSI Common Lisp
@@ -159,27 +159,27 @@
   (defun %instance-ref (instance index)
     (aver (typep instance 'structure!object))
     (let* ((class (find-classoid (type-of instance)))
-	   (layout (classoid-layout class)))
+           (layout (classoid-layout class)))
       (if (zerop index)
-	  layout
-	  (let* ((dd (layout-info layout))
-		 (dsd (elt (dd-slots dd) (1- index)))
-		 (accessor-name (dsd-accessor-name dsd)))
-	    (declare (type symbol accessor-name))
-	    (funcall accessor-name instance)))))
+          layout
+          (let* ((dd (layout-info layout))
+                 (dsd (elt (dd-slots dd) (1- index)))
+                 (accessor-name (dsd-accessor-name dsd)))
+            (declare (type symbol accessor-name))
+            (funcall accessor-name instance)))))
   (defun %instance-set (instance index new-value)
     (aver (typep instance 'structure!object))
     (let* ((class (find-classoid (type-of instance)))
-	   (layout (classoid-layout class)))
+           (layout (classoid-layout class)))
       (if (zerop index)
-	  (error "can't set %INSTANCE-REF FOO 0 in cross-compilation host")
-	  (let* ((dd (layout-info layout))
-		 (dsd (elt (dd-slots dd) (1- index)))
-		 (accessor-name (dsd-accessor-name dsd)))
-	    (declare (type symbol accessor-name))
-	    (funcall (fdefinition `(setf ,accessor-name))
-		     new-value
-		     instance))))))
+          (error "can't set %INSTANCE-REF FOO 0 in cross-compilation host")
+          (let* ((dd (layout-info layout))
+                 (dsd (elt (dd-slots dd) (1- index)))
+                 (accessor-name (dsd-accessor-name dsd)))
+            (declare (type symbol accessor-name))
+            (funcall (fdefinition `(setf ,accessor-name))
+                     new-value
+                     instance))))))
 
 ;;; a helper function for DEF!STRUCT in the #+SB-XC-HOST case: Return
 ;;; DEFSTRUCT-style arguments with any class names in the SB!XC
@@ -191,22 +191,22 @@
   (defun uncross-defstruct-args (defstruct-args)
     (destructuring-bind (name-and-options &rest slots-and-doc) defstruct-args
       (multiple-value-bind (name options)
-	  (if (symbolp name-and-options)
-	      (values name-and-options nil)
-	      (values (first name-and-options)
-		      (rest name-and-options)))
-	(flet ((uncross-option (option)
-		 (if (eq (first option) :include)
-		     (destructuring-bind
-			 (include-keyword included-name &rest rest)
-			 option
-		       `(,include-keyword
-			 ,(uncross included-name)
-			 ,@rest))
-		   option)))
-	  `((,(uncross name)
-	     ,@(mapcar #'uncross-option options))
-	    ,@slots-and-doc))))))
+          (if (symbolp name-and-options)
+              (values name-and-options nil)
+              (values (first name-and-options)
+                      (rest name-and-options)))
+        (flet ((uncross-option (option)
+                 (if (eq (first option) :include)
+                     (destructuring-bind
+                         (include-keyword included-name &rest rest)
+                         option
+                       `(,include-keyword
+                         ,(uncross included-name)
+                         ,@rest))
+                   option)))
+          `((,(uncross name)
+             ,@(mapcar #'uncross-option options))
+            ,@slots-and-doc))))))
 
 ;;; DEF!STRUCT's arguments are like DEFSTRUCT's arguments, except that
 ;;; DEF!STRUCT accepts an extra optional :MAKE-LOAD-FORM-FUN clause.
@@ -229,20 +229,20 @@
        ;; otherwise the bug might lurk until someone tried to do
        ;; MAKE-LOAD-FORM on an instance of the class.
        ,@(if (eq name 'structure!object)
-	     (aver (null def!struct-supertype))
-	     `((aver (subtypep ',def!struct-supertype 'structure!object))))
+             (aver (null def!struct-supertype))
+             `((aver (subtypep ',def!struct-supertype 'structure!object))))
        (defstruct ,@defstruct-args)
        (setf (def!struct-type-make-load-form-fun ',name)
-	     ,(if (symbolp mlff)
-		  `',mlff
-		  mlff)
-	     (def!struct-supertype ',name)
-	     ',def!struct-supertype)
+             ,(if (symbolp mlff)
+                  `',mlff
+                  mlff)
+             (def!struct-supertype ',name)
+             ',def!struct-supertype)
        #+sb-xc-host ,(let ((u (uncross-defstruct-args defstruct-args)))
-		       (if (boundp '*delayed-def!structs*)
-			   `(push (make-delayed-def!struct :args ',u)
-				  *delayed-def!structs*)
-			   `(sb!xc:defstruct ,@u)))
+                       (if (boundp '*delayed-def!structs*)
+                           `(push (make-delayed-def!struct :args ',u)
+                                  *delayed-def!structs*)
+                           `(sb!xc:defstruct ,@u)))
        ',name)))
 
 ;;; When building the cross-compiler, this function has to be called
@@ -252,22 +252,22 @@
 (defun force-delayed-def!structs ()
   (if (boundp '*delayed-def!structs*)
       (progn
-	(mapcar (lambda (x)
-		  (let ((*package* (delayed-def!struct-package x)))
-		    ;; KLUDGE(?): EVAL is almost always the wrong thing.
-		    ;; However, since we have to map DEFSTRUCT over the
-		    ;; list, and since ANSI declined to specify any
-		    ;; functional primitives corresponding to the
-		    ;; DEFSTRUCT macro, it seems to me that EVAL is
-		    ;; required in there somewhere..
-		    (eval `(sb!xc:defstruct ,@(delayed-def!struct-args x)))))
-		(reverse *delayed-def!structs*))
-	;; We shouldn't need this list any more. Making it unbound
-	;; serves as a signal to DEF!STRUCT that it needn't delay
-	;; DEF!STRUCTs any more. It is also generally a good thing for
-	;; other reasons: it frees garbage, and it discourages anyone
-	;; else from pushing anything else onto the list later.
-	(makunbound '*delayed-def!structs*))
+        (mapcar (lambda (x)
+                  (let ((*package* (delayed-def!struct-package x)))
+                    ;; KLUDGE(?): EVAL is almost always the wrong thing.
+                    ;; However, since we have to map DEFSTRUCT over the
+                    ;; list, and since ANSI declined to specify any
+                    ;; functional primitives corresponding to the
+                    ;; DEFSTRUCT macro, it seems to me that EVAL is
+                    ;; required in there somewhere..
+                    (eval `(sb!xc:defstruct ,@(delayed-def!struct-args x)))))
+                (reverse *delayed-def!structs*))
+        ;; We shouldn't need this list any more. Making it unbound
+        ;; serves as a signal to DEF!STRUCT that it needn't delay
+        ;; DEF!STRUCTs any more. It is also generally a good thing for
+        ;; other reasons: it frees garbage, and it discourages anyone
+        ;; else from pushing anything else onto the list later.
+        (makunbound '*delayed-def!structs*))
       ;; This condition is probably harmless if it comes up when
       ;; interactively experimenting with the system by loading a source
       ;; file into it more than once. But it's worth warning about it
@@ -289,7 +289,7 @@
 (defun structure!object-make-load-form (object &optional env)
   (declare (ignore env))
   (funcall (def!struct-type-make-load-form-fun (type-of object))
-	   object))
+           object))
 
 ;;; Do the right thing at cold load time.
 ;;;
