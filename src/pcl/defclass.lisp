@@ -109,7 +109,7 @@
                ;; full-blown class, so the "a class of this name is
                ;; coming" note we write here would be irrelevant.
                (eval-when (:compile-toplevel)
-                 (%compiler-defclass ',name 
+                 (%compiler-defclass ',name
                                      ',*readers-for-this-defclass*
                                      ',*writers-for-this-defclass*
                                      ',*slot-names-for-this-defclass*))
@@ -120,10 +120,10 @@
   (maplist (lambda (sublist)
              (let ((option-name (first (pop sublist))))
                (when (member option-name sublist :key #'first)
-                 (error "Multiple ~S options in DEFCLASS ~S." 
+                 (error "Multiple ~S options in DEFCLASS ~S."
                         option-name class-name))))
            options)
-  (let (metaclass 
+  (let (metaclass
         default-initargs
         documentation
         canonized-options)
@@ -131,7 +131,7 @@
         (unless (listp option)
           (error "~S is not a legal defclass option." option))
         (case (first option)
-          (:metaclass 
+          (:metaclass
            (let ((maybe-metaclass (second option)))
              (unless (and maybe-metaclass (legal-class-name-p maybe-metaclass))
                (error "~@<The value of the :metaclass option (~S) ~
@@ -142,15 +142,15 @@
            (let (initargs arg-names)
              (doplist (key val) (cdr option)
                (when (member key arg-names)
-                 (error 'simple-program-error 
+                 (error 'simple-program-error
                         :format-control "~@<Duplicate initialization argument ~
                                            name ~S in :DEFAULT-INITARGS of ~
-                                           DEFCLASS ~S.~:>" 
+                                           DEFCLASS ~S.~:>"
                         :format-arguments (list key class-name)))
                (push key arg-names)
                (push ``(,',key ,',val ,,(make-initfunction val)) initargs))
              (setf default-initargs t)
-             (push `(:direct-default-initargs (list ,@(nreverse initargs))) 
+             (push `(:direct-default-initargs (list ,@(nreverse initargs)))
                    canonized-options)))
           (:documentation
            (unless (stringp (second option))
@@ -185,9 +185,9 @@
         (push name *slot-names-for-this-defclass*)
         (flet ((note-reader (x)
                  (unless (symbolp x)
-                   (error 'simple-program-error 
+                   (error 'simple-program-error
                           :format-control "Slot reader name ~S for slot ~S in ~
-                                           DEFCLASS ~S is not a symbol." 
+                                           DEFCLASS ~S is not a symbol."
                           :format-arguments (list x name class-name)))
                  (push x readers)
                  (push x *readers-for-this-defclass*))
@@ -201,7 +201,7 @@
               (:writer   (note-writer val))
               (:initarg
                (unless (symbolp val)
-                 (error 'simple-program-error 
+                 (error 'simple-program-error
                         :format-control "Slot initarg name ~S for slot ~S in ~
                                          DEFCLASS ~S is not a symbol."
                         :format-arguments (list val name class-name)))
@@ -211,9 +211,9 @@
                  (when (eq key :initform)
                    (setf initform val))
                  (when (get-properties others (list key))
-                   (error 'simple-program-error 
+                   (error 'simple-program-error
                           :format-control "Duplicate slot option ~S for slot ~
-                                           ~S in DEFCLASS ~S." 
+                                           ~S in DEFCLASS ~S."
                           :format-arguments (list key name class-name))))
                ;; For non-standard options multiple entries go in a list
                (push val (getf others key))))))
@@ -246,29 +246,29 @@
           ((constantp name env)
            (slot-name-illegal "a constant"))
           ((member name *slot-names-for-this-defclass*)
-           (error 'simple-program-error 
+           (error 'simple-program-error
                   :format-control "Multiple slots named ~S in DEFCLASS ~S."
                   :format-arguments (list name class-name))))))
 
 (defun make-initfunction (initform)
   (cond ((or (eq initform t)
-	     (equal initform ''t))
-	 '(function constantly-t))
-	((or (eq initform nil)
-	     (equal initform ''nil))
-	 '(function constantly-nil))
-	((or (eql initform 0)
-	     (equal initform ''0))
-	 '(function constantly-0))
-	(t
-	 (let ((entry (assoc initform *initfunctions-for-this-defclass*
-			     :test #'equal)))
-	   (unless entry
-	     (setq entry (list initform
-			       (gensym)
-			       `(function (lambda () ,initform))))
-	     (push entry *initfunctions-for-this-defclass*))
-	   (cadr entry)))))
+             (equal initform ''t))
+         '(function constantly-t))
+        ((or (eq initform nil)
+             (equal initform ''nil))
+         '(function constantly-nil))
+        ((or (eql initform 0)
+             (equal initform ''0))
+         '(function constantly-0))
+        (t
+         (let ((entry (assoc initform *initfunctions-for-this-defclass*
+                             :test #'equal)))
+           (unless entry
+             (setq entry (list initform
+                               (gensym)
+                               `(function (lambda () ,initform))))
+             (push entry *initfunctions-for-this-defclass*))
+           (cadr entry)))))
 
 (defun %compiler-defclass (name readers writers slots)
   ;; ANSI says (Macro DEFCLASS, section 7.7) that DEFCLASS, if it
@@ -328,10 +328,10 @@
 
 (defun make-early-class-definition
        (name source metaclass
-	superclass-names canonical-slots other-initargs)
+        superclass-names canonical-slots other-initargs)
   (list 'early-class-definition
-	name source metaclass
-	superclass-names canonical-slots other-initargs))
+        name source metaclass
+        superclass-names canonical-slots other-initargs))
 
 (defun ecd-class-name        (ecd) (nth 1 ecd))
 (defun ecd-source            (ecd) (nth 2 ecd))
@@ -347,11 +347,11 @@
 
 (defun early-class-slots (class-name)
   (cdr (or (assoc class-name *early-class-slots*)
-	   (let ((a (cons class-name
-			  (mapcar #'canonical-slot-name
-				  (early-collect-inheritance class-name)))))
-	     (push a *early-class-slots*)
-	     a))))
+           (let ((a (cons class-name
+                          (mapcar #'canonical-slot-name
+                                  (early-collect-inheritance class-name)))))
+             (push a *early-class-slots*)
+             a))))
 
 (defun early-class-size (class-name)
   (length (early-class-slots class-name)))
@@ -360,50 +360,50 @@
   ;;(declare (values slots cpl default-initargs direct-subclasses))
   (let ((cpl (early-collect-cpl class-name)))
     (values (early-collect-slots cpl)
-	    cpl
-	    (early-collect-default-initargs cpl)
-	    (let (collect)
-	      (dolist (definition *early-class-definitions*)
-		(when (memq class-name (ecd-superclass-names definition))
-		  (push (ecd-class-name definition) collect)))
+            cpl
+            (early-collect-default-initargs cpl)
+            (let (collect)
+              (dolist (definition *early-class-definitions*)
+                (when (memq class-name (ecd-superclass-names definition))
+                  (push (ecd-class-name definition) collect)))
               (nreverse collect)))))
 
 (defun early-collect-slots (cpl)
   (let* ((definitions (mapcar #'early-class-definition cpl))
-	 (super-slots (mapcar #'ecd-canonical-slots definitions))
-	 (slots (apply #'append (reverse super-slots))))
+         (super-slots (mapcar #'ecd-canonical-slots definitions))
+         (slots (apply #'append (reverse super-slots))))
     (dolist (s1 slots)
       (let ((name1 (canonical-slot-name s1)))
-	(dolist (s2 (cdr (memq s1 slots)))
-	  (when (eq name1 (canonical-slot-name s2))
-	    (error "More than one early class defines a slot with the~%~
-		    name ~S. This can't work because the bootstrap~%~
-		    object system doesn't know how to compute effective~%~
-		    slots."
-		   name1)))))
+        (dolist (s2 (cdr (memq s1 slots)))
+          (when (eq name1 (canonical-slot-name s2))
+            (error "More than one early class defines a slot with the~%~
+                    name ~S. This can't work because the bootstrap~%~
+                    object system doesn't know how to compute effective~%~
+                    slots."
+                   name1)))))
     slots))
 
 (defun early-collect-cpl (class-name)
   (labels ((walk (c)
-	     (let* ((definition (early-class-definition c))
-		    (supers (ecd-superclass-names definition)))
-	       (cons c
-		     (apply #'append (mapcar #'early-collect-cpl supers))))))
+             (let* ((definition (early-class-definition c))
+                    (supers (ecd-superclass-names definition)))
+               (cons c
+                     (apply #'append (mapcar #'early-collect-cpl supers))))))
     (remove-duplicates (walk class-name) :from-end nil :test #'eq)))
 
 (defun early-collect-default-initargs (cpl)
   (let ((default-initargs ()))
     (dolist (class-name cpl)
       (let* ((definition (early-class-definition class-name))
-	     (others (ecd-other-initargs definition)))
-	(loop (when (null others) (return nil))
-	      (let ((initarg (pop others)))
-		(unless (eq initarg :direct-default-initargs)
-		 (error "~@<The defclass option ~S is not supported by ~
-			the bootstrap object system.~:@>"
-			initarg)))
-	      (setq default-initargs
-		    (nconc default-initargs (reverse (pop others)))))))
+             (others (ecd-other-initargs definition)))
+        (loop (when (null others) (return nil))
+              (let ((initarg (pop others)))
+                (unless (eq initarg :direct-default-initargs)
+                 (error "~@<The defclass option ~S is not supported by ~
+                        the bootstrap object system.~:@>"
+                        initarg)))
+              (setq default-initargs
+                    (nconc default-initargs (reverse (pop others)))))))
     (reverse default-initargs)))
 
 (defun !bootstrap-slot-index (class-name slot-name)
@@ -427,7 +427,7 @@
 ;;; by the full object system later.
 (defmacro !bootstrap-get-slot (type object slot-name)
   `(clos-slots-ref (get-slots ,object)
-		   (!bootstrap-slot-index ,type ,slot-name)))
+                   (!bootstrap-slot-index ,type ,slot-name)))
 (defun !bootstrap-set-slot (type object slot-name new-value)
   (setf (!bootstrap-get-slot type object slot-name) new-value))
 
@@ -454,7 +454,7 @@
 
 (unless (fboundp 'class-name-of)
   (setf (symbol-function 'class-name-of)
-	(symbol-function 'early-class-name-of)))
+        (symbol-function 'early-class-name-of)))
 (unintern 'early-class-name-of)
 
 (defun early-class-direct-subclasses (class)
@@ -465,17 +465,17 @@
                       readers writers slot-names)
   (%compiler-defclass name readers writers slot-names)
   (setq supers  (copy-tree supers)
-	canonical-slots   (copy-tree canonical-slots)
-	canonical-options (copy-tree canonical-options))
+        canonical-slots   (copy-tree canonical-slots)
+        canonical-options (copy-tree canonical-options))
   (let ((ecd
-	  (make-early-class-definition name
-				       *load-pathname*
-				       metaclass
-				       supers
-				       canonical-slots
-				       canonical-options))
-	(existing
-	  (find name *early-class-definitions* :key #'ecd-class-name)))
+          (make-early-class-definition name
+                                       *load-pathname*
+                                       metaclass
+                                       supers
+                                       canonical-slots
+                                       canonical-options))
+        (existing
+          (find name *early-class-definitions* :key #'ecd-class-name)))
     (setq *early-class-definitions*
-	  (cons ecd (remove existing *early-class-definitions*)))
+          (cons ecd (remove existing *early-class-definitions*)))
     ecd))

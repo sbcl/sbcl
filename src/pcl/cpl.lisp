@@ -78,12 +78,12 @@
   (compute-std-cpl root (class-direct-superclasses root)))
 
 (defstruct (class-precedence-description
-	    (:conc-name nil)
-	    (:print-object (lambda (obj str)
-			     (print-unreadable-object (obj str :type t)
-			       (format str "~D" (cpd-count obj)))))
-	    (:constructor make-cpd ())
-	    (:copier nil))
+            (:conc-name nil)
+            (:print-object (lambda (obj str)
+                             (print-unreadable-object (obj str :type t)
+                               (format str "~D" (cpd-count obj)))))
+            (:constructor make-cpd ())
+            (:copier nil))
   (cpd-class  nil)
   (cpd-supers ())
   (cpd-after  ())
@@ -94,17 +94,17 @@
     ;; the first two branches of this COND are implementing an
     ;; optimization for single inheritance.
     ((and (null supers)
-	  (not (forward-referenced-class-p class)))
+          (not (forward-referenced-class-p class)))
      (list class))
     ((and (car supers)
-	  (null (cdr supers))
-	  (not (forward-referenced-class-p (car supers))))
+          (null (cdr supers))
+          (not (forward-referenced-class-p (car supers))))
      (cons class
-	   (compute-std-cpl (car supers)
-			    (class-direct-superclasses (car supers)))))
+           (compute-std-cpl (car supers)
+                            (class-direct-superclasses (car supers)))))
     (t
      (multiple-value-bind (all-cpds nclasses)
-	 (compute-std-cpl-phase-1 class supers)
+         (compute-std-cpl-phase-1 class supers)
        (compute-std-cpl-phase-2 all-cpds)
        (compute-std-cpl-phase-3 class all-cpds nclasses)))))
 
@@ -112,27 +112,27 @@
 
 (defun compute-std-cpl-phase-1 (class supers)
   (let ((nclasses 0)
-	(all-cpds ())
-	(table (make-hash-table :size *compute-std-cpl-class->entry-table-size*
-				:test #'eq)))
+        (all-cpds ())
+        (table (make-hash-table :size *compute-std-cpl-class->entry-table-size*
+                                :test #'eq)))
     (declare (fixnum nclasses))
     (labels ((get-cpd (c)
-	       (or (gethash c table)
-		   (setf (gethash c table) (make-cpd))))
-	     (walk (c supers)
-	       (declare (special *allow-forward-referenced-classes-in-cpl-p*))
-	       (if (and (forward-referenced-class-p c)
-			(not *allow-forward-referenced-classes-in-cpl-p*))
-		   (cpl-forward-referenced-class-error class c)
-		   (let ((cpd (get-cpd c)))
-		     (unless (cpd-class cpd)	;If we have already done this
-						;class before, we can quit.
-		       (setf (cpd-class cpd) c)
-		       (incf nclasses)
-		       (push cpd all-cpds)
-		       (setf (cpd-supers cpd) (mapcar #'get-cpd supers))
-		       (dolist (super supers)
-			 (walk super (class-direct-superclasses super))))))))
+               (or (gethash c table)
+                   (setf (gethash c table) (make-cpd))))
+             (walk (c supers)
+               (declare (special *allow-forward-referenced-classes-in-cpl-p*))
+               (if (and (forward-referenced-class-p c)
+                        (not *allow-forward-referenced-classes-in-cpl-p*))
+                   (cpl-forward-referenced-class-error class c)
+                   (let ((cpd (get-cpd c)))
+                     (unless (cpd-class cpd)    ;If we have already done this
+                                                ;class before, we can quit.
+                       (setf (cpd-class cpd) c)
+                       (incf nclasses)
+                       (push cpd all-cpds)
+                       (setf (cpd-supers cpd) (mapcar #'get-cpd supers))
+                       (dolist (super supers)
+                         (walk super (class-direct-superclasses super))))))))
       (walk class supers)
       (values all-cpds nclasses))))
 
@@ -140,18 +140,18 @@
   (dolist (cpd all-cpds)
     (let ((supers (cpd-supers cpd)))
       (when supers
-	(setf (cpd-after cpd) (nconc (cpd-after cpd) supers))
-	(incf (cpd-count (car supers)) 1)
-	(do* ((t1 supers t2)
-	      (t2 (cdr t1) (cdr t1)))
-	     ((null t2))
-	  (incf (cpd-count (car t2)) 2)
-	  (push (car t2) (cpd-after (car t1))))))))
+        (setf (cpd-after cpd) (nconc (cpd-after cpd) supers))
+        (incf (cpd-count (car supers)) 1)
+        (do* ((t1 supers t2)
+              (t2 (cdr t1) (cdr t1)))
+             ((null t2))
+          (incf (cpd-count (car t2)) 2)
+          (push (car t2) (cpd-after (car t1))))))))
 
 (defun compute-std-cpl-phase-3 (class all-cpds nclasses)
   (let ((candidates ())
-	(next-cpd nil)
-	(rcpl ()))
+        (next-cpd nil)
+        (rcpl ()))
 
     ;; We have to bootstrap the collection of those CPD's that
     ;; have a zero count. Once we get going, we will maintain
@@ -162,12 +162,12 @@
     (loop
       (when (null candidates)
 
-	;; If there are no candidates, and enough classes have been put
-	;; into the precedence list, then we are all done. Otherwise
-	;; it means there is a consistency problem.
-	(if (zerop nclasses)
-	    (return (reverse rcpl))
-	    (cpl-inconsistent-error class all-cpds)))
+        ;; If there are no candidates, and enough classes have been put
+        ;; into the precedence list, then we are all done. Otherwise
+        ;; it means there is a consistency problem.
+        (if (zerop nclasses)
+            (return (reverse rcpl))
+            (cpl-inconsistent-error class all-cpds)))
 
       ;; Try to find the next class to put in from among the candidates.
       ;; If there is only one, its easy, otherwise we have to use the
@@ -175,71 +175,71 @@
       ;; having to call DELETE on the list of candidates. I dunno if
       ;; its worth it but what the hell.
       (setq next-cpd
-	    (if (null (cdr candidates))
-		(prog1 (car candidates)
-		       (setq candidates ()))
-		(block tie-breaker
-		  (dolist (c rcpl)
-		    (let ((supers (class-direct-superclasses c)))
-		      (if (memq (cpd-class (car candidates)) supers)
-			  (return-from tie-breaker (pop candidates))
-			  (do ((loc candidates (cdr loc)))
-			      ((null (cdr loc)))
-			    (let ((cpd (cadr loc)))
-			      (when (memq (cpd-class cpd) supers)
-				(setf (cdr loc) (cddr loc))
-				(return-from tie-breaker cpd))))))))))
+            (if (null (cdr candidates))
+                (prog1 (car candidates)
+                       (setq candidates ()))
+                (block tie-breaker
+                  (dolist (c rcpl)
+                    (let ((supers (class-direct-superclasses c)))
+                      (if (memq (cpd-class (car candidates)) supers)
+                          (return-from tie-breaker (pop candidates))
+                          (do ((loc candidates (cdr loc)))
+                              ((null (cdr loc)))
+                            (let ((cpd (cadr loc)))
+                              (when (memq (cpd-class cpd) supers)
+                                (setf (cdr loc) (cddr loc))
+                                (return-from tie-breaker cpd))))))))))
       (decf nclasses)
       (push (cpd-class next-cpd) rcpl)
       (dolist (after (cpd-after next-cpd))
-	(when (zerop (decf (cpd-count after)))
-	  (push after candidates))))))
+        (when (zerop (decf (cpd-count after)))
+          (push after candidates))))))
 
 ;;;; support code for signalling nice error messages
 
 (defun cpl-error (class format-string &rest format-args)
   (error "While computing the class precedence list of the class ~A.~%~A"
-	  (if (class-name class)
-	      (format nil "named ~S" (class-name class))
-	      class)
-	  (apply #'format nil format-string format-args)))
+          (if (class-name class)
+              (format nil "named ~S" (class-name class))
+              class)
+          (apply #'format nil format-string format-args)))
 
 (defun cpl-forward-referenced-class-error (class forward-class)
   (flet ((class-or-name (class)
-	   (if (class-name class)
-	       (format nil "named ~S" (class-name class))
-	       class)))
+           (if (class-name class)
+               (format nil "named ~S" (class-name class))
+               class)))
     (if (eq class forward-class)
-	(cpl-error class
-		   "The class ~A is a forward referenced class."
-		   (class-or-name class))
-	(let ((names (mapcar #'class-or-name
-			     (cdr (find-superclass-chain class forward-class)))))
-	  (cpl-error class
-		     "The class ~A is a forward referenced class.~@
+        (cpl-error class
+                   "The class ~A is a forward referenced class."
+                   (class-or-name class))
+        (let ((names (mapcar #'class-or-name
+                             (cdr (find-superclass-chain class forward-class)))))
+          (cpl-error class
+                     "The class ~A is a forward referenced class.~@
                       The class ~A is ~A."
-		     (class-or-name forward-class)
-		     (class-or-name forward-class)
-		     (if (null (cdr names))
-			 (format nil
-				 "a direct superclass of the class ~A"
-				 (class-or-name class))
-			 (format nil
-				 "reached from the class ~A by following~@
-			      the direct superclass chain through: ~A~
-			      ~%  ending at the class ~A"
-				 (class-or-name class)
-				 (format nil
-					 "~{~%  the class ~A,~}"
-					 (butlast names))
-				 (car (last names)))))))))
+                     (class-or-name forward-class)
+                     (class-or-name forward-class)
+                     (if (null (cdr names))
+                         (format nil
+                                 "a direct superclass of the class ~A"
+                                 (class-or-name class))
+                         (format nil
+                                 "reached from the class ~A by following~@
+                              the direct superclass chain through: ~A~
+                              ~%  ending at the class ~A"
+                                 (class-or-name class)
+                                 (format nil
+                                         "~{~%  the class ~A,~}"
+                                         (butlast names))
+                                 (car (last names)))))))))
 
 (defun find-superclass-chain (bottom top)
   (labels ((walk (c chain)
-	     (if (eq c top)
-		 (return-from find-superclass-chain (nreverse chain))
-		 (dolist (super (class-direct-superclasses c))
-		   (walk super (cons super chain))))))
+             (if (eq c top)
+                 (return-from find-superclass-chain (nreverse chain))
+                 (dolist (super (class-direct-superclasses c))
+                   (walk super (cons super chain))))))
     (walk bottom (list bottom))))
 
 (defun cpl-inconsistent-error (class all-cpds)
@@ -254,57 +254,57 @@
 
 (defun format-cycle-reasons (reasons)
   (flet ((class-or-name (cpd)
-	   (let ((class (cpd-class cpd)))
-	     (if (class-name class)
-		 (format nil "named ~S" (class-name class))
-		 class))))
+           (let ((class (cpd-class cpd)))
+             (if (class-name class)
+                 (format nil "named ~S" (class-name class))
+                 class))))
     (mapcar
       (lambda (reason)
-	(ecase (caddr reason)
-	  (:super
-	   (format
-	    nil
-	    "The class ~A appears in the supers of the class ~A."
-	    (class-or-name (cadr reason))
-	    (class-or-name (car reason))))
-	  (:in-supers
-	   (format
-	    nil
-	    "The class ~A follows the class ~A in the supers of the class ~A."
-	    (class-or-name (cadr reason))
-	    (class-or-name (car reason))
-	    (class-or-name (cadddr reason))))))
+        (ecase (caddr reason)
+          (:super
+           (format
+            nil
+            "The class ~A appears in the supers of the class ~A."
+            (class-or-name (cadr reason))
+            (class-or-name (car reason))))
+          (:in-supers
+           (format
+            nil
+            "The class ~A follows the class ~A in the supers of the class ~A."
+            (class-or-name (cadr reason))
+            (class-or-name (car reason))
+            (class-or-name (cadddr reason))))))
       reasons)))
 
 (defun find-cycle-reasons (all-cpds)
-  (let ((been-here ())	   ; list of classes we have visited
-	(cycle-reasons ()))
+  (let ((been-here ())     ; list of classes we have visited
+        (cycle-reasons ()))
 
     (labels ((chase (path)
-	       (if (memq (car path) (cdr path))
-		   (record-cycle (memq (car path) (nreverse path)))
-		   (unless (memq (car path) been-here)
-		     (push (car path) been-here)
-		     (dolist (after (cpd-after (car path)))
-		       (chase (cons after path))))))
-	     (record-cycle (cycle)
-	       (let ((reasons ()))
-		 (do* ((t1 cycle t2)
-		       (t2 (cdr t1) (cdr t1)))
-		      ((null t2))
-		   (let ((c1 (car t1))
-			 (c2 (car t2)))
-		     (if (memq c2 (cpd-supers c1))
-			 (push (list c1 c2 :super) reasons)
-			 (dolist (cpd all-cpds)
-			   (when (memq c2 (memq c1 (cpd-supers cpd)))
-			     (return
-			       (push (list c1 c2 :in-supers cpd) reasons)))))))
-		 (push (nreverse reasons) cycle-reasons))))
+               (if (memq (car path) (cdr path))
+                   (record-cycle (memq (car path) (nreverse path)))
+                   (unless (memq (car path) been-here)
+                     (push (car path) been-here)
+                     (dolist (after (cpd-after (car path)))
+                       (chase (cons after path))))))
+             (record-cycle (cycle)
+               (let ((reasons ()))
+                 (do* ((t1 cycle t2)
+                       (t2 (cdr t1) (cdr t1)))
+                      ((null t2))
+                   (let ((c1 (car t1))
+                         (c2 (car t2)))
+                     (if (memq c2 (cpd-supers c1))
+                         (push (list c1 c2 :super) reasons)
+                         (dolist (cpd all-cpds)
+                           (when (memq c2 (memq c1 (cpd-supers cpd)))
+                             (return
+                               (push (list c1 c2 :in-supers cpd) reasons)))))))
+                 (push (nreverse reasons) cycle-reasons))))
 
       (dolist (cpd all-cpds)
-	(unless (zerop (cpd-count cpd))
-	  (chase (list cpd))))
+        (unless (zerop (cpd-count cpd))
+          (chase (list cpd))))
 
       cycle-reasons)))
 

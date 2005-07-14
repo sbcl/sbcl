@@ -46,9 +46,9 @@
 #|
 (defclass character-output-stream (fundamental-character-output-stream)
   ((lisp-stream :initarg :lisp-stream
-		:accessor character-output-stream-lisp-stream)))
+                :accessor character-output-stream-lisp-stream)))
 
 (defclass character-input-stream (fundamental-character-input-stream)
   ((lisp-stream :initarg :lisp-stream
-		:accessor character-input-stream-lisp-stream)))
+                :accessor character-input-stream-lisp-stream)))
 |#

@@ -53,9 +53,9 @@
 (defclass traced-method (method)
      ((method :initarg :method)
       (function :initarg :function
-		:reader method-function)
+                :reader method-function)
       (generic-function :initform nil
-			:accessor method-generic-function)))
+                        :accessor method-generic-function)))
 
 (defmethod method-lambda-list ((m traced-method))
   (with-slots (method) m (method-lambda-list method)))
@@ -75,11 +75,11 @@
   (multiple-value-bind (gf omethod name)
       (parse-method-or-spec spec)
     (let* ((tfunction (trace-method-internal (method-function omethod)
-					     name
-					     options))
-	   (tmethod (make-instance 'traced-method
-				   :method omethod
-				   :function tfunction)))
+                                             name
+                                             options))
+           (tmethod (make-instance 'traced-method
+                                   :method omethod
+                                   :function tfunction)))
       (remove-method gf omethod)
       (add-method gf tmethod)
       (pushnew tmethod *traced-methods*)
@@ -87,19 +87,19 @@
 
 (defun untrace-method (&optional spec)
   (flet ((untrace-1 (m)
-	   (let ((gf (method-generic-function m)))
-	     (when gf
-	       (remove-method gf m)
-	       (add-method gf (slot-value m 'method))
-	       (setq *traced-methods* (remove m *traced-methods*))))))
+           (let ((gf (method-generic-function m)))
+             (when gf
+               (remove-method gf m)
+               (add-method gf (slot-value m 'method))
+               (setq *traced-methods* (remove m *traced-methods*))))))
     (if (not (null spec))
-	(multiple-value-bind (gf method)
-	    (parse-method-or-spec spec)
-	  (declare (ignore gf))
-	  (if (memq method *traced-methods*)
-	      (untrace-1 method)
-	      (error "~S is not a traced method?" method)))
-	(dolist (m *traced-methods*) (untrace-1 m)))))
+        (multiple-value-bind (gf method)
+            (parse-method-or-spec spec)
+          (declare (ignore gf))
+          (if (memq method *traced-methods*)
+              (untrace-1 method)
+              (error "~S is not a traced method?" method)))
+        (dolist (m *traced-methods*) (untrace-1 m)))))
 
 (defun trace-method-internal (ofunction name options)
   (eval `(untrace ,name))
@@ -128,7 +128,7 @@
 ;; Link bootstrap-time how-to-dump-it information into the shiny new
 ;; CLOS system.
 (defmethod make-load-form ((obj sb-sys:structure!object)
-			   &optional (env nil env-p))
+                           &optional (env nil env-p))
   (if env-p
       (sb-sys:structure!object-make-load-form obj env)
       (sb-sys:structure!object-make-load-form obj)))
@@ -136,26 +136,26 @@
 (defmethod make-load-form ((object wrapper) &optional env)
   (declare (ignore env))
   (let ((pname (classoid-proper-name
-		(layout-classoid object))))
+                (layout-classoid object))))
     (unless pname
       (error "can't dump wrapper for anonymous class:~%  ~S"
-	     (layout-classoid object)))
+             (layout-classoid object)))
     `(classoid-layout (find-classoid ',pname))))
 
 (defmethod make-load-form ((object structure-object) &optional env)
   (declare (ignore env))
   (error "~@<don't know how to dump ~S (default ~S method called).~@>"
-	 object 'make-load-form))
+         object 'make-load-form))
 
 (defmethod make-load-form ((object standard-object) &optional env)
   (declare (ignore env))
   (error "~@<don't know how to dump ~S (default ~S method called).~@>"
-	 object 'make-load-form))
+         object 'make-load-form))
 
 (defmethod make-load-form ((object condition) &optional env)
   (declare (ignore env))
   (error "~@<don't know how to dump ~S (default ~S method called).~@>"
-	 object 'make-load-form))
+         object 'make-load-form))
 
 (defun make-load-form-saving-slots (object &key slot-names environment)
   (declare (ignore environment))
@@ -168,14 +168,14 @@
                          (eq :instance (slot-definition-allocation slot))))
             (if (slot-boundp-using-class class object slot)
                 (let ((value (slot-value-using-class class object slot)))
-		  (if (typep object 'structure-object)
-		      ;; low-level but less noisy initializer form
-		      (let* ((dd (get-structure-dd (class-name class)))
-			     (dsd (find slot-name (dd-slots dd)
-					:key #'dsd-name)))
-			(inits `(,(slot-setter-lambda-form dd dsd)
-				 ',value ,object)))
-		      (inits `(setf (slot-value ,object ',slot-name) ',value))))
+                  (if (typep object 'structure-object)
+                      ;; low-level but less noisy initializer form
+                      (let* ((dd (get-structure-dd (class-name class)))
+                             (dsd (find slot-name (dd-slots dd)
+                                        :key #'dsd-name)))
+                        (inits `(,(slot-setter-lambda-form dd dsd)
+                                 ',value ,object)))
+                      (inits `(setf (slot-value ,object ',slot-name) ',value))))
                 (inits `(slot-makunbound ,object ',slot-name))))))
       (values `(allocate-instance (find-class ',(class-name class)))
               `(progn ,@(inits))))))

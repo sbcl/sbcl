@@ -30,13 +30,13 @@
 ;;; so we've left 'em in.)
 (when (eq *boot-state* 'complete)
   (error "Trying to load (or compile) PCL in an environment in which it~%~
-	  has already been loaded. This doesn't work, you will have to~%~
-	  get a fresh lisp (reboot) and then load PCL."))
+          has already been loaded. This doesn't work, you will have to~%~
+          get a fresh lisp (reboot) and then load PCL."))
 (when *boot-state*
   (cerror "Try loading (or compiling) PCL anyways."
-	  "Trying to load (or compile) PCL in an environment in which it~%~
-	   has already been partially loaded. This may not work, you may~%~
-	   need to get a fresh lisp (reboot) and then load PCL."))
+          "Trying to load (or compile) PCL in an environment in which it~%~
+           has already been partially loaded. This may not work, you may~%~
+           need to get a fresh lisp (reboot) and then load PCL."))
 
 ;;; comments from CMU CL version of PCL:
 ;;;     This is like fdefinition on the Lispm. If Common Lisp had
@@ -50,7 +50,7 @@
 ;;;   which has a 'real' function spec mechanism can use that instead
 ;;;   and in that way get rid of setf generic function names.
 (defmacro parse-gspec (spec
-		       (non-setf-var . non-setf-case))
+                       (non-setf-var . non-setf-case))
   `(let ((,non-setf-var ,spec)) ,@non-setf-case))
 
 ;;; If symbol names a function which is traced, return the untraced
@@ -89,7 +89,7 @@
 (defun coerce-to-class (class &optional make-forward-referenced-class-p)
   (if (symbolp class)
       (or (find-class class (not make-forward-referenced-class-p))
-	  (ensure-class class))
+          (ensure-class class))
       class))
 
 ;;; interface
@@ -97,49 +97,49 @@
   (when (consp type)
     (setq args (cdr type) type (car type)))
   (cond ((symbolp type)
-	 (or (and (null args) (find-class type))
-	     (ecase type
-	       (class    (coerce-to-class (car args)))
-	       (prototype (make-instance 'class-prototype-specializer
-					 :object (coerce-to-class (car args))))
-	       (class-eq (class-eq-specializer (coerce-to-class (car args))))
-	       (eql      (intern-eql-specializer (car args))))))
-	;; FIXME: do we still need this?
-	((and (null args) (typep type 'classoid))
-	 (or (classoid-pcl-class type)
-	     (ensure-non-standard-class (classoid-name type))))
-	((specializerp type) type)))
+         (or (and (null args) (find-class type))
+             (ecase type
+               (class    (coerce-to-class (car args)))
+               (prototype (make-instance 'class-prototype-specializer
+                                         :object (coerce-to-class (car args))))
+               (class-eq (class-eq-specializer (coerce-to-class (car args))))
+               (eql      (intern-eql-specializer (car args))))))
+        ;; FIXME: do we still need this?
+        ((and (null args) (typep type 'classoid))
+         (or (classoid-pcl-class type)
+             (ensure-non-standard-class (classoid-name type))))
+        ((specializerp type) type)))
 
 ;;; interface
 (defun type-from-specializer (specl)
   (cond ((eq specl t)
-	 t)
-	((consp specl)
-	 (unless (member (car specl) '(class prototype class-eq eql))
-	   (error "~S is not a legal specializer type." specl))
-	 specl)
-	((progn
-	   (when (symbolp specl)
-	     ;;maybe (or (find-class specl nil) (ensure-class specl)) instead?
-	     (setq specl (find-class specl)))
-	   (or (not (eq *boot-state* 'complete))
-	       (specializerp specl)))
-	 (specializer-type specl))
-	(t
-	 (error "~S is neither a type nor a specializer." specl))))
+         t)
+        ((consp specl)
+         (unless (member (car specl) '(class prototype class-eq eql))
+           (error "~S is not a legal specializer type." specl))
+         specl)
+        ((progn
+           (when (symbolp specl)
+             ;;maybe (or (find-class specl nil) (ensure-class specl)) instead?
+             (setq specl (find-class specl)))
+           (or (not (eq *boot-state* 'complete))
+               (specializerp specl)))
+         (specializer-type specl))
+        (t
+         (error "~S is neither a type nor a specializer." specl))))
 
 (defun type-class (type)
   (declare (special *the-class-t*))
   (setq type (type-from-specializer type))
   (if (atom type)
       (if (eq type t)
-	  *the-class-t*
-	  (error "bad argument to TYPE-CLASS"))
+          *the-class-t*
+          (error "bad argument to TYPE-CLASS"))
       (case (car type)
-	(eql (class-of (cadr type)))
-	(prototype (class-of (cadr type))) ;?
-	(class-eq (cadr type))
-	(class (cadr type)))))
+        (eql (class-of (cadr type)))
+        (prototype (class-of (cadr type))) ;?
+        (class-eq (cadr type))
+        (class (cadr type)))))
 
 (defun class-eq-type (class)
   (specializer-type (class-eq-specializer class)))
@@ -150,34 +150,34 @@
 ;;; class objects or types where they should.
 (defun *normalize-type (type)
   (cond ((consp type)
-	 (if (member (car type) '(not and or))
-	     `(,(car type) ,@(mapcar #'*normalize-type (cdr type)))
-	     (if (null (cdr type))
-		 (*normalize-type (car type))
-		 type)))
-	((symbolp type)
-	 (let ((class (find-class type nil)))
-	   (if class
-	       (let ((type (specializer-type class)))
-		 (if (listp type) type `(,type)))
-	       `(,type))))
-	((or (not (eq *boot-state* 'complete))
-	     (specializerp type))
-	 (specializer-type type))
-	(t
-	 (error "~S is not a type." type))))
+         (if (member (car type) '(not and or))
+             `(,(car type) ,@(mapcar #'*normalize-type (cdr type)))
+             (if (null (cdr type))
+                 (*normalize-type (car type))
+                 type)))
+        ((symbolp type)
+         (let ((class (find-class type nil)))
+           (if class
+               (let ((type (specializer-type class)))
+                 (if (listp type) type `(,type)))
+               `(,type))))
+        ((or (not (eq *boot-state* 'complete))
+             (specializerp type))
+         (specializer-type type))
+        (t
+         (error "~S is not a type." type))))
 
 ;;; internal to this file...
 (defun convert-to-system-type (type)
   (case (car type)
     ((not and or) `(,(car type) ,@(mapcar #'convert-to-system-type
-					  (cdr type))))
+                                          (cdr type))))
     ((class class-eq) ; class-eq is impossible to do right
      (layout-classoid (class-wrapper (cadr type))))
     (eql type)
     (t (if (null (cdr type))
-	   (car type)
-	   type))))
+           (car type)
+           type))))
 
 ;;; Writing the missing NOT and AND clauses will improve the quality
 ;;; of code generated by GENERATE-DISCRIMINATION-NET, but calling
@@ -185,31 +185,31 @@
 ;;; slow. *SUBTYPEP is used by PCL itself, and must be fast.
 ;;;
 ;;; FIXME: SB-KERNEL has fast-and-not-quite-precise type code for use
-;;; in the compiler. Could we share some of it here? 
+;;; in the compiler. Could we share some of it here?
 (defun *subtypep (type1 type2)
   (if (equal type1 type2)
       (values t t)
       (if (eq *boot-state* 'early)
-	  (values (eq type1 type2) t)
-	  (let ((*in-precompute-effective-methods-p* t))
-	    (declare (special *in-precompute-effective-methods-p*))
-	    ;; FIXME: *IN-PRECOMPUTE-EFFECTIVE-METHODS-P* is not a
-	    ;; good name. It changes the way
-	    ;; CLASS-APPLICABLE-USING-CLASS-P works.
-	    (setq type1 (*normalize-type type1))
-	    (setq type2 (*normalize-type type2))
-	    (case (car type2)
-	      (not
-	       (values nil nil)) ; XXX We should improve this.
-	      (and
-	       (values nil nil)) ; XXX We should improve this.
-	      ((eql wrapper-eq class-eq class)
-	       (multiple-value-bind (app-p maybe-app-p)
-		   (specializer-applicable-using-type-p type2 type1)
-		 (values app-p (or app-p (not maybe-app-p)))))
-	      (t
-	       (subtypep (convert-to-system-type type1)
-			 (convert-to-system-type type2))))))))
+          (values (eq type1 type2) t)
+          (let ((*in-precompute-effective-methods-p* t))
+            (declare (special *in-precompute-effective-methods-p*))
+            ;; FIXME: *IN-PRECOMPUTE-EFFECTIVE-METHODS-P* is not a
+            ;; good name. It changes the way
+            ;; CLASS-APPLICABLE-USING-CLASS-P works.
+            (setq type1 (*normalize-type type1))
+            (setq type2 (*normalize-type type2))
+            (case (car type2)
+              (not
+               (values nil nil)) ; XXX We should improve this.
+              (and
+               (values nil nil)) ; XXX We should improve this.
+              ((eql wrapper-eq class-eq class)
+               (multiple-value-bind (app-p maybe-app-p)
+                   (specializer-applicable-using-type-p type2 type1)
+                 (values app-p (or app-p (not maybe-app-p)))))
+              (t
+               (subtypep (convert-to-system-type type1)
+                         (convert-to-system-type type2))))))))
 
 (defvar *built-in-class-symbols* ())
 (defvar *built-in-wrapper-symbols* ())
@@ -217,14 +217,14 @@
 (defun get-built-in-class-symbol (class-name)
   (or (cadr (assq class-name *built-in-class-symbols*))
       (let ((symbol (make-class-symbol class-name)))
-	(push (list class-name symbol) *built-in-class-symbols*)
-	symbol)))
+        (push (list class-name symbol) *built-in-class-symbols*)
+        symbol)))
 
 (defun get-built-in-wrapper-symbol (class-name)
   (or (cadr (assq class-name *built-in-wrapper-symbols*))
       (let ((symbol (make-wrapper-symbol class-name)))
-	(push (list class-name symbol) *built-in-wrapper-symbols*)
-	symbol)))
+        (push (list class-name symbol) *built-in-wrapper-symbols*)
+        symbol)))
 
 (pushnew '%class *var-declarations*)
 (pushnew '%variable-rebinding *var-declarations*)
@@ -238,7 +238,7 @@
 
 (defun make-class-predicate-name (name)
   (list 'class-predicate name))
-  
+
 (defun plist-value (object name)
   (getf (object-plist object) name))
 
@@ -246,8 +246,8 @@
   (if new-value
       (setf (getf (object-plist object) name) new-value)
       (progn
-	(remf (object-plist object) name)
-	nil)))
+        (remf (object-plist object) name)
+        nil)))
 
 ;;;; built-in classes
 
@@ -256,59 +256,59 @@
 (/show "about to set up SB-PCL::*BUILT-IN-CLASSES*")
 (defvar *built-in-classes*
   (labels ((direct-supers (class)
-	     (/noshow "entering DIRECT-SUPERS" (classoid-name class))
-	     (if (typep class 'built-in-classoid)
-		 (built-in-classoid-direct-superclasses class)
-		 (let ((inherits (layout-inherits
-				  (classoid-layout class))))
-		   (/noshow inherits)
-		   (list (svref inherits (1- (length inherits)))))))
-	   (direct-subs (class)
-	     (/noshow "entering DIRECT-SUBS" (classoid-name class))
-	     (collect ((res))
-	       (let ((subs (classoid-subclasses class)))
-		 (/noshow subs)
-		 (when subs
-		   (dohash (sub v subs)
-		     (declare (ignore v))
-		     (/noshow sub)
-		     (when (member class (direct-supers sub))
-		       (res sub)))))
-	       (res))))
+             (/noshow "entering DIRECT-SUPERS" (classoid-name class))
+             (if (typep class 'built-in-classoid)
+                 (built-in-classoid-direct-superclasses class)
+                 (let ((inherits (layout-inherits
+                                  (classoid-layout class))))
+                   (/noshow inherits)
+                   (list (svref inherits (1- (length inherits)))))))
+           (direct-subs (class)
+             (/noshow "entering DIRECT-SUBS" (classoid-name class))
+             (collect ((res))
+               (let ((subs (classoid-subclasses class)))
+                 (/noshow subs)
+                 (when subs
+                   (dohash (sub v subs)
+                     (declare (ignore v))
+                     (/noshow sub)
+                     (when (member class (direct-supers sub))
+                       (res sub)))))
+               (res))))
     (mapcar (lambda (kernel-bic-entry)
-	      (/noshow "setting up" kernel-bic-entry)
-	      (let* ((name (car kernel-bic-entry))
-		     (class (find-classoid name))
-		     (prototype-form
-		      (getf (cdr kernel-bic-entry) :prototype-form)))
-		(/noshow name class)
-		`(,name
-		  ,(mapcar #'classoid-name (direct-supers class))
-		  ,(mapcar #'classoid-name (direct-subs class))
-		  ,(map 'list
-			(lambda (x)
-			  (classoid-name
-			   (layout-classoid x)))
-			(reverse
-			 (layout-inherits
-			  (classoid-layout class))))
-		  ,(if prototype-form
-		       (eval prototype-form)
-		       ;; This is the default prototype value which
-		       ;; was used, without explanation, by the CMU CL
-		       ;; code we're derived from. Evidently it's safe
-		       ;; in all relevant cases.
-		       42))))
-	    (remove-if (lambda (kernel-bic-entry)
-			 (member (first kernel-bic-entry)
-				 ;; I'm not sure why these are removed from
-				 ;; the list, but that's what the original
-				 ;; CMU CL code did. -- WHN 20000715
-				 '(t instance
-				     funcallable-instance
-				     function stream 
-				     file-stream string-stream)))
-		       sb-kernel::*built-in-classes*))))
+              (/noshow "setting up" kernel-bic-entry)
+              (let* ((name (car kernel-bic-entry))
+                     (class (find-classoid name))
+                     (prototype-form
+                      (getf (cdr kernel-bic-entry) :prototype-form)))
+                (/noshow name class)
+                `(,name
+                  ,(mapcar #'classoid-name (direct-supers class))
+                  ,(mapcar #'classoid-name (direct-subs class))
+                  ,(map 'list
+                        (lambda (x)
+                          (classoid-name
+                           (layout-classoid x)))
+                        (reverse
+                         (layout-inherits
+                          (classoid-layout class))))
+                  ,(if prototype-form
+                       (eval prototype-form)
+                       ;; This is the default prototype value which
+                       ;; was used, without explanation, by the CMU CL
+                       ;; code we're derived from. Evidently it's safe
+                       ;; in all relevant cases.
+                       42))))
+            (remove-if (lambda (kernel-bic-entry)
+                         (member (first kernel-bic-entry)
+                                 ;; I'm not sure why these are removed from
+                                 ;; the list, but that's what the original
+                                 ;; CMU CL code did. -- WHN 20000715
+                                 '(t instance
+                                     funcallable-instance
+                                     function stream
+                                     file-stream string-stream)))
+                       sb-kernel::*built-in-classes*))))
 (/noshow "done setting up SB-PCL::*BUILT-IN-CLASSES*")
 
 ;;;; the classes that define the kernel of the metabraid
@@ -344,8 +344,8 @@
   (:metaclass structure-class))
 
 (defstruct (dead-beef-structure-object
-	    (:constructor |STRUCTURE-OBJECT class constructor|)
-	    (:copier nil)))
+            (:constructor |STRUCTURE-OBJECT class constructor|)
+            (:copier nil)))
 
 (defclass std-object (slot-object) ()
   (:metaclass std-class))
@@ -382,8 +382,8 @@
 ;;; superclass of any kind of class. That is, any class that can be a
 ;;; metaclass must have the class CLASS in its class precedence list.
 (defclass class (dependent-update-mixin
-		 definition-source-mixin
-		 specializer)
+                 definition-source-mixin
+                 specializer)
   ((name
     :initform nil
     :initarg  :name
@@ -419,7 +419,7 @@
   (let ((name (class-name class)))
     (unless (and name (eq (find-class name nil) class))
       (error "~@<Can't use anonymous or undefined class as constant: ~S~:@>"
-	     class))
+             class))
     `(find-class ',name)))
 
 ;;; The class PCL-CLASS is an implementation-specific common
@@ -486,26 +486,26 @@
 (defclass exact-class-specializer (specializer) ())
 
 (defclass class-eq-specializer (exact-class-specializer
-				specializer-with-object)
+                                specializer-with-object)
   ((object :initarg :class
-	   :reader specializer-class
-	   :reader specializer-object)))
+           :reader specializer-class
+           :reader specializer-object)))
 
 (defclass class-prototype-specializer (specializer-with-object)
   ((object :initarg :class
-	   :reader specializer-class
-	   :reader specializer-object)))
+           :reader specializer-class
+           :reader specializer-object)))
 
 (defclass eql-specializer (exact-class-specializer specializer-with-object)
   ((object :initarg :object :reader specializer-object
-	   :reader eql-specializer-object)))
+           :reader eql-specializer-object)))
 
 (defvar *eql-specializer-table* (make-hash-table :test 'eql))
 
 (defun intern-eql-specializer (object)
   (or (gethash object *eql-specializer-table*)
       (setf (gethash object *eql-specializer-table*)
-	    (make-instance 'eql-specializer :object object))))
+            (make-instance 'eql-specializer :object object))))
 
 ;;;; slot definitions
 
@@ -594,41 +594,41 @@
     :initform 0)))
 
 (defclass standard-direct-slot-definition (standard-slot-definition
-					   direct-slot-definition)
+                                           direct-slot-definition)
   ())
 
 (defclass standard-effective-slot-definition (standard-slot-definition
-					      effective-slot-definition)
+                                              effective-slot-definition)
   ((location ; nil, a fixnum, a cons: (slot-name . value)
     :initform nil
     :accessor slot-definition-location)))
 
 (defclass condition-direct-slot-definition (condition-slot-definition
-					    direct-slot-definition)
+                                            direct-slot-definition)
   ())
 
 (defclass condition-effective-slot-definition (condition-slot-definition
-					       effective-slot-definition)
+                                               effective-slot-definition)
   ())
 
 (defclass structure-direct-slot-definition (structure-slot-definition
-					    direct-slot-definition)
+                                            direct-slot-definition)
   ())
 
 (defclass structure-effective-slot-definition (structure-slot-definition
-					       effective-slot-definition)
+                                               effective-slot-definition)
   ())
 
 (defclass method (standard-object) ())
 
 (defclass standard-method (definition-source-mixin plist-mixin method)
   ((generic-function
-    :initform nil	
+    :initform nil
     :accessor method-generic-function)
 ;;;     (qualifiers
-;;;	:initform ()
-;;;	:initarg  :qualifiers
-;;;	:reader method-qualifiers)
+;;;     :initform ()
+;;;     :initarg  :qualifiers
+;;;     :reader method-qualifiers)
    (specializers
     :initform ()
     :initarg  :specializers
@@ -639,10 +639,10 @@
     :reader method-lambda-list)
    (function
     :initform nil
-    :initarg :function)			;no writer
+    :initarg :function)                 ;no writer
    (fast-function
     :initform nil
-    :initarg :fast-function		;no writer
+    :initarg :fast-function             ;no writer
     :reader method-fast-function)
    (documentation
     :initform nil
@@ -650,11 +650,11 @@
 
 (defclass standard-accessor-method (standard-method)
   ((slot-name :initform nil
-	      :initarg :slot-name
-	      :reader accessor-method-slot-name)
+              :initarg :slot-name
+              :reader accessor-method-slot-name)
    (slot-definition :initform nil
-		    :initarg :slot-definition
-		    :reader accessor-method-slot-definition)))
+                    :initarg :slot-definition
+                    :reader accessor-method-slot-definition)))
 
 (defclass standard-reader-method (standard-accessor-method) ())
 
@@ -663,8 +663,8 @@
 (defclass standard-boundp-method (standard-accessor-method) ())
 
 (defclass generic-function (dependent-update-mixin
-			    definition-source-mixin
-			    funcallable-standard-object)
+                            definition-source-mixin
+                            funcallable-standard-object)
   ((documentation
     :initform nil
     :initarg :documentation)
@@ -715,7 +715,7 @@
     :accessor gf-dfun-state))
   (:metaclass funcallable-standard-class)
   (:default-initargs :method-class *the-class-standard-method*
-		     :method-combination *standard-method-combination*))
+                     :method-combination *standard-method-combination*))
 
 (defclass method-combination (standard-object)
   ((documentation
@@ -724,7 +724,7 @@
     :initarg :documentation)))
 
 (defclass standard-method-combination (definition-source-mixin
-				       method-combination)
+                                       method-combination)
   ((type
     :reader method-combination-type
     :initarg :type)

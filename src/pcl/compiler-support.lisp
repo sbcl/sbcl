@@ -39,7 +39,7 @@
 
 (deftransform sb-pcl::pcl-instance-p ((object))
   (let* ((otype (lvar-type object))
-	 (std-obj (specifier-type 'sb-pcl::std-object)))
+         (std-obj (specifier-type 'sb-pcl::std-object)))
     (cond
       ;; Flush tests whose result is known at compile time.
       ((csubtypep otype std-obj) t)
@@ -50,12 +50,12 @@
 (define-source-context defmethod (name &rest stuff)
   (let ((arg-pos (position-if #'listp stuff)))
     (if arg-pos
-	`(defmethod ,name ,@(subseq stuff 0 arg-pos)
-	   ,(handler-case
-	        (nth-value 2 (sb-pcl::parse-specialized-lambda-list
-			      (elt stuff arg-pos)))
-	      (error () "<illegal syntax>")))
-	`(defmethod ,name "<illegal syntax>"))))
+        `(defmethod ,name ,@(subseq stuff 0 arg-pos)
+           ,(handler-case
+                (nth-value 2 (sb-pcl::parse-specialized-lambda-list
+                              (elt stuff arg-pos)))
+              (error () "<illegal syntax>")))
+        `(defmethod ,name "<illegal syntax>"))))
 
 (defvar sb-pcl::*internal-pcl-generalized-fun-name-symbols* nil)
 
@@ -68,16 +68,16 @@
   (when (cdr list)
     (destructuring-bind (name &rest rest) (cdr list)
       (when (and (symbolp name)
-		 (null rest))
-	(values t name)))))
+                 (null rest))
+        (values t name)))))
 
 (define-internal-pcl-function-name-syntax sb-pcl::slot-accessor (list)
   (when (= (length list) 4)
     (destructuring-bind (class slot rwb) (cdr list)
       (when (and (member rwb '(sb-pcl::reader sb-pcl::writer sb-pcl::boundp))
-		 (symbolp slot)
-		 (symbolp class))
-	(values t slot)))))
+                 (symbolp slot)
+                 (symbolp class))
+        (values t slot)))))
 
 (define-internal-pcl-function-name-syntax sb-pcl::fast-method (list)
   (valid-function-name-p (cadr list)))
@@ -94,9 +94,9 @@
 (defun sb-pcl::set-random-documentation (name type new-value)
   (let ((pair (assoc type (info :random-documentation :stuff name))))
     (if pair
-	(setf (cdr pair) new-value)
-	(push (cons type new-value)
-	      (info :random-documentation :stuff name))))
+        (setf (cdr pair) new-value)
+        (push (cons type new-value)
+              (info :random-documentation :stuff name))))
   new-value)
 
 (defsetf sb-pcl::random-documentation sb-pcl::set-random-documentation)

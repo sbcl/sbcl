@@ -65,11 +65,11 @@
 (dolist (key *checking-or-caching-list*)
   (destructuring-bind (cached-emf-p return-value-p metatypes applyp) key
     (multiple-value-bind (args generator)
-	(if cached-emf-p
-	    (if return-value-p
-		(values (list metatypes) 'emit-constant-value)
-		(values (list metatypes applyp) 'emit-caching))
-	    (if return-value-p
-		(values (list metatypes) 'emit-in-checking-p)
-		(values (list metatypes applyp) 'emit-checking)))
+        (if cached-emf-p
+            (if return-value-p
+                (values (list metatypes) 'emit-constant-value)
+                (values (list metatypes applyp) 'emit-caching))
+            (if return-value-p
+                (values (list metatypes) 'emit-in-checking-p)
+                (values (list metatypes applyp) 'emit-checking)))
       (apply #'get-dfun-constructor generator args))))

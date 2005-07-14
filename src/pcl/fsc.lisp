@@ -43,23 +43,23 @@
   'allocate-funcallable-instance)
 
 (defmethod validate-superclass ((fsc funcallable-standard-class)
-				(new-super std-class))
+                                (new-super std-class))
   (let ((new-super-meta-class (class-of new-super)))
     (or (eq new-super-meta-class *the-class-std-class*)
-	(eq (class-of fsc) new-super-meta-class))))
+        (eq (class-of fsc) new-super-meta-class))))
 
 (defmethod allocate-instance
-	   ((class funcallable-standard-class) &rest initargs)
+           ((class funcallable-standard-class) &rest initargs)
   (declare (ignore initargs))
   (unless (class-finalized-p class) (finalize-inheritance class))
   (allocate-funcallable-instance (class-wrapper class)))
 
 (defmethod make-reader-method-function ((class funcallable-standard-class)
-					slot-name)
+                                        slot-name)
   (make-std-reader-method-function (class-name class) slot-name))
 
 (defmethod make-writer-method-function ((class funcallable-standard-class)
-					slot-name)
+                                        slot-name)
   (make-std-writer-method-function (class-name class) slot-name))
 
 ;;;; See the comment about reader-function--std and writer-function--sdt.
@@ -68,17 +68,17 @@
 ;  `(function
 ;     (lambda (instance)
 ;       (slot-value-using-class (wrapper-class (get-wrapper instance))
-;			       instance
-;			       slot-name))))
+;                              instance
+;                              slot-name))))
 ;
 ;(define-function-template writer-function--fsc () '(slot-name)
 ;  `(function
 ;     (lambda (nv instance)
 ;       (setf
-;	 (slot-value-using-class (wrapper-class (get-wrapper instance))
-;				 instance
-;				 slot-name)
-;	 nv))))
+;        (slot-value-using-class (wrapper-class (get-wrapper instance))
+;                                instance
+;                                slot-name)
+;        nv))))
 ;
 ;(eval-when (:load-toplevel)
 ;  (pre-make-templated-function-constructor reader-function--fsc)

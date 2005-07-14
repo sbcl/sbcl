@@ -171,16 +171,16 @@
 (defgeneric (setf class-slots) (new-value slot-class))
 
 (defgeneric (setf generic-function-method-class) (new-value
-						  standard-generic-function))
+                                                  standard-generic-function))
 
 (defgeneric (setf generic-function-method-combination)
   (new-value standard-generic-function))
 
 (defgeneric (setf generic-function-declarations) (new-value
-						  standard-generic-function))
+                                                  standard-generic-function))
 
 (defgeneric (setf generic-function-methods) (new-value
-					     standard-generic-function))
+                                             standard-generic-function))
 
 (defgeneric (setf generic-function-name) (new-value standard-generic-function))
 
@@ -194,7 +194,7 @@
 (defgeneric (setf object-plist) (new-value plist-mixin))
 
 (defgeneric (setf slot-definition-allocation) (new-value
-					       standard-slot-definition))
+                                               standard-slot-definition))
 
 (defgeneric (setf slot-definition-boundp-function)
   (new-value effective-slot-definition))
@@ -222,7 +222,7 @@
 (defgeneric (setf slot-definition-name) (new-value slot-definition))
 
 (defgeneric (setf slot-definition-reader-function) (new-value
-						    effective-slot-definition))
+                                                    effective-slot-definition))
 
 (defgeneric (setf slot-definition-readers) (new-value slot-definition))
 
@@ -410,8 +410,8 @@
 ;;; COMPUTE-EFFECTIVE-METHOD returns one value as do Allegro and
 ;;; Lispworks.
 (defgeneric compute-effective-method (generic-function
-				      combin
-				      applicable-methods))
+                                      combin
+                                      applicable-methods))
 
 (defgeneric compute-effective-slot-definition (class name dslotds))
 
@@ -438,50 +438,50 @@
 ;;;; 4 arguments
 
 (defgeneric make-method-lambda (proto-generic-function
-				proto-method
-				lambda-expression
-				environment))
+                                proto-method
+                                lambda-expression
+                                environment))
 
 (defgeneric (setf slot-value-using-class) (new-value class object slotd))
 
 ;;;; 5 arguments
 
 (defgeneric make-method-initargs-form (proto-generic-function
-				       proto-method
-				       lambda-expression
-				       lambda-list
-				       environment))
+                                       proto-method
+                                       lambda-expression
+                                       lambda-list
+                                       environment))
 
 ;;;; optional arguments
 
 (defgeneric get-method (generic-function
-			qualifiers
-			specializers
-			&optional errorp))
+                        qualifiers
+                        specializers
+                        &optional errorp))
 
 (defgeneric find-method (generic-function
-			 qualifiers
-			 specializers
-			 &optional errorp))
+                         qualifiers
+                         specializers
+                         &optional errorp))
 
 (defgeneric slot-missing (class
-			  instance
-			  slot-name
-			  operation
-			  &optional new-value))
+                          instance
+                          slot-name
+                          operation
+                          &optional new-value))
 
 ;;;; &KEY arguments
 
 (defgeneric allocate-instance (class &rest initargs))
 
 (defgeneric ensure-class-using-class (class
-				      name
-				      &rest args
-				      &key &allow-other-keys))
+                                      name
+                                      &rest args
+                                      &key &allow-other-keys))
 
 (defgeneric ensure-generic-function-using-class (generic-function
-						 fun-name
-						 &key &allow-other-keys))
+                                                 fun-name
+                                                 &key &allow-other-keys))
 
 (defgeneric initialize-instance (gf &key &allow-other-keys))
 
@@ -500,19 +500,19 @@
 (defgeneric reinitialize-instance (gf &rest args &key &allow-other-keys))
 
 (defgeneric shared-initialize (generic-function
-			       slot-names
-			       &key &allow-other-keys))
+                               slot-names
+                               &key &allow-other-keys))
 
 (defgeneric update-dependent (metaobject dependent &rest initargs))
 
 (defgeneric update-instance-for-different-class (previous
-						 current
-						 &rest initargs))
+                                                 current
+                                                 &rest initargs))
 
 (defgeneric update-instance-for-redefined-class (instance
-						 added-slots
-						 discarded-slots
-						 property-list
-						 &rest initargs))
+                                                 added-slots
+                                                 discarded-slots
+                                                 property-list
+                                                 &rest initargs))
 
 (defgeneric writer-method-class (class direct-slot &rest initargs))

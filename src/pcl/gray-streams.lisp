@@ -96,7 +96,7 @@
   (defgeneric input-stream-p (stream)
     #+sb-doc
     (:documentation "Can STREAM perform input operations?"))
-  
+
   (defmethod input-stream-p ((stream ansi-stream))
     (ansi-stream-input-stream-p stream))
 
@@ -108,7 +108,7 @@
 
   (defmethod input-stream-p ((stream stream))
     (bug-or-error stream 'input-stream-p))
-  
+
   (defmethod input-stream-p ((non-stream t))
     (error 'type-error :datum non-stream :expected-type 'stream)))
 
@@ -118,7 +118,7 @@
   (defgeneric interactive-stream-p (stream)
     #+sb-doc
     (:documentation "Is STREAM an interactive stream?"))
-  
+
   (defmethod interactive-stream-p ((stream ansi-stream))
     (funcall (ansi-stream-misc stream) stream :interactive-p))
 
@@ -127,7 +127,7 @@
 
   (defmethod interactive-stream-p ((stream stream))
     (bug-or-error stream 'interactive-stream-p))
-  
+
   (defmethod interactive-stream-p ((non-stream t))
     (error 'type-error :datum non-stream :expected-type 'stream)))
 
@@ -143,7 +143,7 @@
 
   (defmethod output-stream-p ((stream fundamental-stream))
     nil)
-  
+
   (defmethod output-stream-p ((stream fundamental-output-stream))
     t)
 
@@ -224,22 +224,22 @@
 
 (defmethod stream-read-line ((stream fundamental-character-input-stream))
   (let ((res (make-string 80))
-	(len 80)
-	(index 0))
+        (len 80)
+        (index 0))
     (loop
      (let ((ch (stream-read-char stream)))
        (cond ((eq ch :eof)
-	      (return (values (shrink-vector res index) t)))
-	     (t
-	      (when (char= ch #\newline)
-		(return (values (shrink-vector res index) nil)))
-	      (when (= index len)
-		(setq len (* len 2))
-		(let ((new (make-string len)))
-		  (replace new res)
-		  (setq res new)))
-	      (setf (schar res index) ch)
-	      (incf index)))))))
+              (return (values (shrink-vector res index) t)))
+             (t
+              (when (char= ch #\newline)
+                (return (values (shrink-vector res index) nil)))
+              (when (= index len)
+                (setq len (* len 2))
+                (let ((new (make-string len)))
+                  (replace new res)
+                  (setq res new)))
+              (setf (schar res index) ch)
+              (incf index)))))))
 
 (defgeneric stream-clear-input (stream)
   #+sb-doc
@@ -266,11 +266,11 @@
 ;;; not updated, and the index of the next element is returned.
 (defun basic-io-type-stream-read-sequence (stream seq start end read-fun)
   (declare (type sequence seq)
-	   (type stream stream)
-	   (type index start)
-	   (type sequence-end end)
+           (type stream stream)
+           (type index start)
+           (type sequence-end end)
            (type function read-fun)
-	   (values index))
+           (values index))
   (let ((end (or end (length seq))))
     (declare (type index end))
     (etypecase seq
@@ -372,13 +372,13 @@
   STREAM-WRITE-CHAR."))
 
 (defmethod stream-write-string ((stream fundamental-character-output-stream)
-				string &optional (start 0) end)
+                                string &optional (start 0) end)
   (declare (string string)
-	   (fixnum start))
+           (fixnum start))
   (let ((end (or end (length string))))
     (declare (fixnum end))
     (do ((pos start (1+ pos)))
-	((>= pos end))
+        ((>= pos end))
       (declare (type index pos))
       (stream-write-char stream (aref string pos))))
   string)
@@ -456,12 +456,12 @@
   #\SPACE character; it returns NIL if STREAM-LINE-COLUMN returns NIL."))
 
 (defmethod stream-advance-to-column ((stream fundamental-character-output-stream)
-				     column)
+                                     column)
   (let ((current-column (stream-line-column stream)))
     (when current-column
       (let ((fill (- column current-column)))
-	(dotimes (i fill)
-	  (stream-write-char stream #\Space)))
+        (dotimes (i fill)
+          (stream-write-char stream #\Space)))
       T)))
 
 (defgeneric stream-write-sequence (stream seq &optional start end)
@@ -471,11 +471,11 @@
 ;;; Write the elements of SEQ bounded by START and END to STREAM.
 (defun basic-io-type-stream-write-sequence (stream seq start end write-fun)
   (declare (type sequence seq)
-	   (type stream stream)
-	   (type index start)
-	   (type sequence-end end)
+           (type stream stream)
+           (type index start)
+           (type sequence-end end)
            (type function write-fun)
-	   (values sequence))
+           (values sequence))
   (let ((end (or end (length seq))))
     (declare (type index start end))
     (etypecase seq

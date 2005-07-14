@@ -64,31 +64,31 @@
 
 (defun quote-plist-keys (plist)
   (loop for (key . more) on plist by #'cddr
-	if (null more) do
-	  (error "Not a property list: ~S" plist)
-	else
-	  collect `(quote ,key)
-	  and collect (car more)))
+        if (null more) do
+          (error "Not a property list: ~S" plist)
+        else
+          collect `(quote ,key)
+          and collect (car more)))
 
 (defun plist-keys (plist &key test)
   (loop for (key . more) on plist by #'cddr
-	if (null more) do
-	  (error "Not a property list: ~S" plist)
-	else if (or (null test) (funcall test key))
-	  collect key))
+        if (null more) do
+          (error "Not a property list: ~S" plist)
+        else if (or (null test) (funcall test key))
+          collect key))
 
 (defun plist-values (plist &key test)
   (loop for (key . more) on plist by #'cddr
-	if (null more) do
-	  (error "Not a property list: ~S" plist)
-	else if (or (null test) (funcall test (car more)))
-	  collect (car more)))
+        if (null more) do
+          (error "Not a property list: ~S" plist)
+        else if (or (null test) (funcall test (car more)))
+          collect (car more)))
 
 (defun constant-symbol-p (form)
   (and (constantp form)
        (let ((constant (eval form)))
-	 (and (symbolp constant)
-	      (not (null (symbol-package constant)))))))
+         (and (symbolp constant)
+              (not (null (symbol-package constant)))))))
 
 ;;; somewhat akin to DEFAULT-INITARGS (SLOT-CLASS T T), but just
 ;;; collecting the defaulted initargs for the call.
@@ -128,11 +128,11 @@
   (when (or force-p (ctor-class ctor))
     (setf (ctor-class ctor) nil)
     (setf (funcallable-instance-fun ctor)
-	  #'(instance-lambda (&rest args)
-	      (install-optimized-constructor ctor)
-	      (apply ctor args)))
+          #'(instance-lambda (&rest args)
+              (install-optimized-constructor ctor)
+              (apply ctor args)))
     (setf (%funcallable-instance-info ctor 1)
-	  (ctor-function-name ctor))))
+          (ctor-function-name ctor))))
 
 (defun make-ctor-function-name (class-name initargs)
   (list* 'ctor class-name initargs))
@@ -165,66 +165,66 @@
   (destructuring-bind (fn class-name &rest args) form
     (declare (ignore fn))
     (flet (;;
-	   ;; Return the name of parameter number I of a constructor
-	   ;; function.
-	   (parameter-name (i)
-	     (let ((ps #(.p0. .p1. .p2. .p3. .p4. .p5.)))
-	       (if (array-in-bounds-p ps i)
-		   (aref ps i)
-		   (format-symbol *pcl-package* ".P~D." i))))
-	   ;; Check if CLASS-NAME is a constant symbol.  Give up if
-	   ;; not.
-	   (check-class ()
-	     (unless (and class-name (constant-symbol-p class-name))
-	       (return-from make-instance->constructor-call nil)))
-	   ;; Check if ARGS are suitable for an optimized constructor.
-	   ;; Return NIL from the outer function if not.
-	   (check-args ()
-	     (loop for (key . more) on args by #'cddr do
-		     (when (or (null more)
-			       (not (constant-symbol-p key))
-			       (eq :allow-other-keys (eval key)))
-		       (return-from make-instance->constructor-call nil)))))
+           ;; Return the name of parameter number I of a constructor
+           ;; function.
+           (parameter-name (i)
+             (let ((ps #(.p0. .p1. .p2. .p3. .p4. .p5.)))
+               (if (array-in-bounds-p ps i)
+                   (aref ps i)
+                   (format-symbol *pcl-package* ".P~D." i))))
+           ;; Check if CLASS-NAME is a constant symbol.  Give up if
+           ;; not.
+           (check-class ()
+             (unless (and class-name (constant-symbol-p class-name))
+               (return-from make-instance->constructor-call nil)))
+           ;; Check if ARGS are suitable for an optimized constructor.
+           ;; Return NIL from the outer function if not.
+           (check-args ()
+             (loop for (key . more) on args by #'cddr do
+                     (when (or (null more)
+                               (not (constant-symbol-p key))
+                               (eq :allow-other-keys (eval key)))
+                       (return-from make-instance->constructor-call nil)))))
       (check-class)
       (check-args)
       ;; Collect a plist of initargs and constant values/parameter names
       ;; in INITARGS.  Collect non-constant initialization forms in
       ;; VALUE-FORMS.
       (multiple-value-bind (initargs value-forms)
-	  (loop for (key value) on args by #'cddr and i from 0
-		collect (eval key) into initargs
-		if (constantp value)
-		  collect value into initargs
-		else
-	          collect (parameter-name i) into initargs
-		  and collect value into value-forms
-		finally
-		  (return (values initargs value-forms)))
-	(let* ((class-name (eval class-name))
-	       (function-name (make-ctor-function-name class-name initargs)))
-	  ;; Prevent compiler warnings for calling the ctor.
-	  (proclaim-as-fun-name function-name)
-	  (note-name-defined function-name :function)
-	  (when (eq (info :function :where-from function-name) :assumed)
-	    (setf (info :function :where-from function-name) :defined)
-	    (when (info :function :assumed-type function-name)
-	      (setf (info :function :assumed-type function-name) nil)))
-	  ;; Return code constructing a ctor at load time, which, when
-	  ;; called, will set its funcallable instance function to an
-	  ;; optimized constructor function.
-	  `(locally 
-	       (declare (disable-package-locks ,function-name))
-	    (let ((.x. (load-time-value
-			(ensure-ctor ',function-name ',class-name ',initargs))))
-	      (declare (ignore .x.))
-	      ;; ??? check if this is worth it.
-	      (declare
-	       (ftype (or (function ,(make-list (length value-forms)
-						:initial-element t)
-				    t)
-			  (function (&rest t) t))
-		      ,function-name))
-	      (funcall (function ,function-name) ,@value-forms))))))))
+          (loop for (key value) on args by #'cddr and i from 0
+                collect (eval key) into initargs
+                if (constantp value)
+                  collect value into initargs
+                else
+                  collect (parameter-name i) into initargs
+                  and collect value into value-forms
+                finally
+                  (return (values initargs value-forms)))
+        (let* ((class-name (eval class-name))
+               (function-name (make-ctor-function-name class-name initargs)))
+          ;; Prevent compiler warnings for calling the ctor.
+          (proclaim-as-fun-name function-name)
+          (note-name-defined function-name :function)
+          (when (eq (info :function :where-from function-name) :assumed)
+            (setf (info :function :where-from function-name) :defined)
+            (when (info :function :assumed-type function-name)
+              (setf (info :function :assumed-type function-name) nil)))
+          ;; Return code constructing a ctor at load time, which, when
+          ;; called, will set its funcallable instance function to an
+          ;; optimized constructor function.
+          `(locally
+               (declare (disable-package-locks ,function-name))
+            (let ((.x. (load-time-value
+                        (ensure-ctor ',function-name ',class-name ',initargs))))
+              (declare (ignore .x.))
+              ;; ??? check if this is worth it.
+              (declare
+               (ftype (or (function ,(make-list (length value-forms)
+                                                :initial-element t)
+                                    t)
+                          (function (&rest t) t))
+                      ,function-name))
+              (funcall (function ,function-name) ,@value-forms))))))))
 
 
 ;;; **************************************************
@@ -245,109 +245,109 @@
     (setf (ctor-class ctor) class)
     (pushnew ctor (plist-value class 'ctors))
     (setf (funcallable-instance-fun ctor)
-	  ;; KLUDGE: Gerd here has the equivalent of (COMPILE NIL
-	  ;; (CONSTRUCTOR-FUNCTION-FORM)), but SBCL's COMPILE doesn't
-	  ;; deal with INSTANCE-LAMBDA expressions, only with LAMBDA
-	  ;; expressions.  The below should be equivalent, since we
-	  ;; have a compiler-only implementation.
-	  ;;
-	  ;; (except maybe for optimization qualities? -- CSR,
-	  ;; 2004-07-12)
-	  (eval `(function ,(constructor-function-form ctor))))))
-	      
+          ;; KLUDGE: Gerd here has the equivalent of (COMPILE NIL
+          ;; (CONSTRUCTOR-FUNCTION-FORM)), but SBCL's COMPILE doesn't
+          ;; deal with INSTANCE-LAMBDA expressions, only with LAMBDA
+          ;; expressions.  The below should be equivalent, since we
+          ;; have a compiler-only implementation.
+          ;;
+          ;; (except maybe for optimization qualities? -- CSR,
+          ;; 2004-07-12)
+          (eval `(function ,(constructor-function-form ctor))))))
+
 (defun constructor-function-form (ctor)
   (let* ((class (ctor-class ctor))
-	 (proto (class-prototype class))
+         (proto (class-prototype class))
          (make-instance-methods
-	  (compute-applicable-methods #'make-instance (list class)))
+          (compute-applicable-methods #'make-instance (list class)))
          (allocate-instance-methods
-	  (compute-applicable-methods #'allocate-instance (list class)))
-	 ;; I stared at this in confusion for a while, thinking
-	 ;; carefully about the possibility of the class prototype not
-	 ;; being of sufficient discrimiating power, given the
-	 ;; possibility of EQL-specialized methods on
-	 ;; INITIALIZE-INSTANCE or SHARED-INITIALIZE.  However, given
-	 ;; that this is a constructor optimization, the user doesn't
-	 ;; yet have the instance to create a method with such an EQL
-	 ;; specializer.
-	 ;;
-	 ;; There remains the (theoretical) possibility of someone
-	 ;; coming along with code of the form
-	 ;;
-	 ;; (defmethod initialize-instance :before ((o foo) ...)
-	 ;;   (eval `(defmethod shared-initialize :before ((o foo) ...) ...)))
-	 ;;
-	 ;; but probably we can afford not to worry about this too
-	 ;; much for now.  -- CSR, 2004-07-12
+          (compute-applicable-methods #'allocate-instance (list class)))
+         ;; I stared at this in confusion for a while, thinking
+         ;; carefully about the possibility of the class prototype not
+         ;; being of sufficient discrimiating power, given the
+         ;; possibility of EQL-specialized methods on
+         ;; INITIALIZE-INSTANCE or SHARED-INITIALIZE.  However, given
+         ;; that this is a constructor optimization, the user doesn't
+         ;; yet have the instance to create a method with such an EQL
+         ;; specializer.
+         ;;
+         ;; There remains the (theoretical) possibility of someone
+         ;; coming along with code of the form
+         ;;
+         ;; (defmethod initialize-instance :before ((o foo) ...)
+         ;;   (eval `(defmethod shared-initialize :before ((o foo) ...) ...)))
+         ;;
+         ;; but probably we can afford not to worry about this too
+         ;; much for now.  -- CSR, 2004-07-12
          (ii-methods
-	  (compute-applicable-methods #'initialize-instance (list proto)))
+          (compute-applicable-methods #'initialize-instance (list proto)))
          (si-methods
-	  (compute-applicable-methods #'shared-initialize (list proto t)))
-	 (setf-svuc-slots-methods
-	  (loop for slot in (class-slots class)
-		collect (compute-applicable-methods
-			 #'(setf slot-value-using-class)
-			 (list nil class proto slot))))
-	 (sbuc-slots-methods
-	  (loop for slot in (class-slots class)
-		collect (compute-applicable-methods
-			 #'slot-boundp-using-class
-			 (list class proto slot)))))
+          (compute-applicable-methods #'shared-initialize (list proto t)))
+         (setf-svuc-slots-methods
+          (loop for slot in (class-slots class)
+                collect (compute-applicable-methods
+                         #'(setf slot-value-using-class)
+                         (list nil class proto slot))))
+         (sbuc-slots-methods
+          (loop for slot in (class-slots class)
+                collect (compute-applicable-methods
+                         #'slot-boundp-using-class
+                         (list class proto slot)))))
     ;; Cannot initialize these variables earlier because the generic
     ;; functions don't exist when PCL is built.
     (when (null *the-system-si-method*)
       (setq *the-system-si-method*
-	    (find-method #'shared-initialize
-			 () (list *the-class-slot-object* *the-class-t*)))
+            (find-method #'shared-initialize
+                         () (list *the-class-slot-object* *the-class-t*)))
       (setq *the-system-ii-method*
-	    (find-method #'initialize-instance
-			 () (list *the-class-slot-object*))))
+            (find-method #'initialize-instance
+                         () (list *the-class-slot-object*))))
     ;; Note that when there are user-defined applicable methods on
     ;; MAKE-INSTANCE and/or ALLOCATE-INSTANCE, these will show up
     ;; together with the system-defined ones in what
     ;; COMPUTE-APPLICABLE-METHODS returns.
     (or (and (not (structure-class-p class))
-	     (not (condition-class-p class))
-	     (null (cdr make-instance-methods))
-	     (null (cdr allocate-instance-methods))
-	     (every (lambda (x)
-		      (member (slot-definition-allocation x)
-			      '(:instance :class)))
-		    (class-slots class))
-	     (null (check-initargs-1
+             (not (condition-class-p class))
+             (null (cdr make-instance-methods))
+             (null (cdr allocate-instance-methods))
+             (every (lambda (x)
+                      (member (slot-definition-allocation x)
+                              '(:instance :class)))
+                    (class-slots class))
+             (null (check-initargs-1
                     class
                     (append
                      (ctor-default-initkeys
                       (ctor-initargs ctor) (class-default-initargs class))
                      (plist-keys (ctor-initargs ctor)))
                     (append ii-methods si-methods) nil nil))
-	     (not (around-or-nonstandard-primary-method-p
-		   ii-methods *the-system-ii-method*))
-	     (not (around-or-nonstandard-primary-method-p
-		   si-methods *the-system-si-method*))
-	     ;; the instance structure protocol goes through
-	     ;; slot-value(-using-class) and friends (actually just
-	     ;; (SETF SLOT-VALUE-USING-CLASS) and
-	     ;; SLOT-BOUNDP-USING-CLASS), so if there are non-standard
-	     ;; applicable methods we can't shortcircuit them.
-	     (every (lambda (x) (= (length x) 1)) setf-svuc-slots-methods)
-	     (every (lambda (x) (= (length x) 1)) sbuc-slots-methods)
-	     (optimizing-generator ctor ii-methods si-methods))
-	(fallback-generator ctor ii-methods si-methods))))
+             (not (around-or-nonstandard-primary-method-p
+                   ii-methods *the-system-ii-method*))
+             (not (around-or-nonstandard-primary-method-p
+                   si-methods *the-system-si-method*))
+             ;; the instance structure protocol goes through
+             ;; slot-value(-using-class) and friends (actually just
+             ;; (SETF SLOT-VALUE-USING-CLASS) and
+             ;; SLOT-BOUNDP-USING-CLASS), so if there are non-standard
+             ;; applicable methods we can't shortcircuit them.
+             (every (lambda (x) (= (length x) 1)) setf-svuc-slots-methods)
+             (every (lambda (x) (= (length x) 1)) sbuc-slots-methods)
+             (optimizing-generator ctor ii-methods si-methods))
+        (fallback-generator ctor ii-methods si-methods))))
 
 (defun around-or-nonstandard-primary-method-p
     (methods &optional standard-method)
   (loop with primary-checked-p = nil
-	for method in methods
-	as qualifiers = (method-qualifiers method)
-	when (or (eq :around (car qualifiers))
-		 (and (null qualifiers)
-		      (not primary-checked-p)
-		      (not (null standard-method))
-		      (not (eq standard-method method))))
-	  return t
-	when (null qualifiers) do
-	  (setq primary-checked-p t)))
+        for method in methods
+        as qualifiers = (method-qualifiers method)
+        when (or (eq :around (car qualifiers))
+                 (and (null qualifiers)
+                      (not primary-checked-p)
+                      (not (null standard-method))
+                      (not (eq standard-method method))))
+          return t
+        when (null qualifiers) do
+          (setq primary-checked-p t)))
 
 (defun fallback-generator (ctor ii-methods si-methods)
   (declare (ignore ii-methods si-methods))
@@ -374,24 +374,24 @@
 ;;; vector around BODY.
 (defun wrap-in-allocate-forms (ctor body before-method-p)
   (let* ((class (ctor-class ctor))
-	 (wrapper (class-wrapper class))
-	 (allocation-function (raw-instance-allocator class))
-	 (slots-fetcher (slots-fetcher class)))
+         (wrapper (class-wrapper class))
+         (allocation-function (raw-instance-allocator class))
+         (slots-fetcher (slots-fetcher class)))
     (if (eq allocation-function 'allocate-standard-instance)
-	`(let ((.instance. (%make-standard-instance nil
-						    (get-instance-hash-code)))
-	       (.slots. (make-array
-			 ,(layout-length wrapper)
-	                 ,@(when before-method-p
-			     '(:initial-element +slot-unbound+)))))
-	   (setf (std-instance-wrapper .instance.) ,wrapper)
-	   (setf (std-instance-slots .instance.) .slots.)
-	   ,body
-	   .instance.)
-	`(let* ((.instance. (,allocation-function ,wrapper))
-		(.slots. (,slots-fetcher .instance.)))
-	   ,body
-	   .instance.))))
+        `(let ((.instance. (%make-standard-instance nil
+                                                    (get-instance-hash-code)))
+               (.slots. (make-array
+                         ,(layout-length wrapper)
+                         ,@(when before-method-p
+                             '(:initial-element +slot-unbound+)))))
+           (setf (std-instance-wrapper .instance.) ,wrapper)
+           (setf (std-instance-slots .instance.) .slots.)
+           ,body
+           .instance.)
+        `(let* ((.instance. (,allocation-function ,wrapper))
+                (.slots. (,slots-fetcher .instance.)))
+           ,body
+           .instance.))))
 
 ;;; Return a form for invoking METHOD with arguments from ARGS.  As
 ;;; can be seen in METHOD-FUNCTION-FROM-FAST-FUNCTION, method
@@ -409,31 +409,31 @@
       (standard-sort-methods ii-methods)
     (declare (ignore ii-primary))
     (multiple-value-bind (si-around si-before si-primary si-after)
-	(standard-sort-methods si-methods)
+        (standard-sort-methods si-methods)
       (declare (ignore si-primary))
       (aver (and (null ii-around) (null si-around)))
       (let ((initargs (ctor-initargs ctor)))
         (multiple-value-bind (bindings vars defaulting-initargs body)
-	    (slot-init-forms ctor (or ii-before si-before))
-	(values
+            (slot-init-forms ctor (or ii-before si-before))
+        (values
          `(let ,bindings
            (declare (ignorable ,@vars))
            (let (,@(when (or ii-before ii-after)
                      `((.ii-args.
                         (list .instance. ,@(quote-plist-keys initargs) ,@defaulting-initargs))))
                  ,@(when (or si-before si-after)
-		     `((.si-args.
+                     `((.si-args.
                         (list .instance. t ,@(quote-plist-keys initargs) ,@defaulting-initargs)))))
-	    ,@(loop for method in ii-before
-		    collect `(invoke-method ,method .ii-args.))
-	    ,@(loop for method in si-before
-		    collect `(invoke-method ,method .si-args.))
-	    ,@body
-	    ,@(loop for method in si-after
-		    collect `(invoke-method ,method .si-args.))
-	    ,@(loop for method in ii-after
-		    collect `(invoke-method ,method .ii-args.))))
-	 (or ii-before si-before)))))))
+            ,@(loop for method in ii-before
+                    collect `(invoke-method ,method .ii-args.))
+            ,@(loop for method in si-before
+                    collect `(invoke-method ,method .si-args.))
+            ,@body
+            ,@(loop for method in si-after
+                    collect `(invoke-method ,method .si-args.))
+            ,@(loop for method in ii-after
+                    collect `(invoke-method ,method .ii-args.))))
+         (or ii-before si-before)))))))
 
 ;;; Return four values from APPLICABLE-METHODS: around methods, before
 ;;; methods, the applicable primary method, and applicable after
@@ -441,17 +441,17 @@
 ;;; must be called.
 (defun standard-sort-methods (applicable-methods)
   (loop for method in applicable-methods
-	as qualifiers = (method-qualifiers method)
-	if (null qualifiers)
-	  collect method into primary
-	else if (eq :around (car qualifiers))
-	  collect method into around
-	else if (eq :after (car qualifiers))
-	  collect method into after
-	else if (eq :before (car qualifiers))
-	  collect method into before
-	finally
-	  (return (values around before (first primary) (reverse after)))))
+        as qualifiers = (method-qualifiers method)
+        if (null qualifiers)
+          collect method into primary
+        else if (eq :around (car qualifiers))
+          collect method into around
+        else if (eq :after (car qualifiers))
+          collect method into after
+        else if (eq :before (car qualifiers))
+          collect method into before
+        finally
+          (return (values around before (first primary) (reverse after)))))
 
 ;;; Return as multiple values bindings for default initialization
 ;;; arguments, variable names, defaulting initargs and a body for
@@ -463,53 +463,53 @@
 ;;; that we have to check if these before-methods have set slots.
 (defun slot-init-forms (ctor before-method-p)
   (let* ((class (ctor-class ctor))
-	 (initargs (ctor-initargs ctor))
-	 (initkeys (plist-keys initargs))
-	 (slot-vector
-	  (make-array (layout-length (class-wrapper class))
-		      :initial-element nil))
-	 (class-inits ())
-	 (default-inits ())
+         (initargs (ctor-initargs ctor))
+         (initkeys (plist-keys initargs))
+         (slot-vector
+          (make-array (layout-length (class-wrapper class))
+                      :initial-element nil))
+         (class-inits ())
+         (default-inits ())
          (defaulting-initargs ())
-	 (default-initargs (class-default-initargs class))
-	 (initarg-locations
-	  (compute-initarg-locations
-	   class (append initkeys (mapcar #'car default-initargs)))))
+         (default-initargs (class-default-initargs class))
+         (initarg-locations
+          (compute-initarg-locations
+           class (append initkeys (mapcar #'car default-initargs)))))
     (labels ((initarg-locations (initarg)
-	       (cdr (assoc initarg initarg-locations :test #'eq)))
-	     (initializedp (location)
-	       (cond
-		 ((consp location)
-		  (assoc location class-inits :test #'eq))
-		 ((integerp location)
-		  (not (null (aref slot-vector location))))
-		 (t (bug "Weird location in ~S" 'slot-init-forms))))
-	     (class-init (location type val)
-	       (aver (consp location))
-	       (unless (initializedp location)
-		 (push (list location type val) class-inits)))
-	     (instance-init (location type val)
-	       (aver (integerp location))
-	       (unless (initializedp location)
-		 (setf (aref slot-vector location) (list type val))))
-	     (default-init-var-name (i)
-	       (let ((ps #(.d0. .d1. .d2. .d3. .d4. .d5.)))
-		 (if (array-in-bounds-p ps i)
-		     (aref ps i)
-		     (format-symbol *pcl-package* ".D~D." i)))))
+               (cdr (assoc initarg initarg-locations :test #'eq)))
+             (initializedp (location)
+               (cond
+                 ((consp location)
+                  (assoc location class-inits :test #'eq))
+                 ((integerp location)
+                  (not (null (aref slot-vector location))))
+                 (t (bug "Weird location in ~S" 'slot-init-forms))))
+             (class-init (location type val)
+               (aver (consp location))
+               (unless (initializedp location)
+                 (push (list location type val) class-inits)))
+             (instance-init (location type val)
+               (aver (integerp location))
+               (unless (initializedp location)
+                 (setf (aref slot-vector location) (list type val))))
+             (default-init-var-name (i)
+               (let ((ps #(.d0. .d1. .d2. .d3. .d4. .d5.)))
+                 (if (array-in-bounds-p ps i)
+                     (aref ps i)
+                     (format-symbol *pcl-package* ".D~D." i)))))
       ;; Loop over supplied initargs and values and record which
       ;; instance and class slots they initialize.
       (loop for (key value) on initargs by #'cddr
-	    as locations = (initarg-locations key) do
-	      (if (constantp value)
-		  (dolist (location locations)
-		    (if (consp location)
-			(class-init location 'constant value)
-			(instance-init location 'constant value)))
-		  (dolist (location locations)
-		      (if (consp location)
-			  (class-init location 'param value)
-			  (instance-init location 'param value)))))
+            as locations = (initarg-locations key) do
+              (if (constantp value)
+                  (dolist (location locations)
+                    (if (consp location)
+                        (class-init location 'constant value)
+                        (instance-init location 'constant value)))
+                  (dolist (location locations)
+                      (if (consp location)
+                          (class-init location 'param value)
+                          (instance-init location 'param value)))))
       ;; Loop over default initargs of the class, recording
       ;; initializations of slots that have not been initialized
       ;; above.  Default initargs which are not in the supplied
@@ -517,9 +517,9 @@
       ;; initargs, that is, their values must be evaluated even
       ;; if not actually used for initializing a slot.
       (loop for (key initform initfn) in default-initargs and i from 0
-	    unless (member key initkeys :test #'eq) do
-	    (let* ((type (if (constantp initform) 'constant 'var))
-		   (init (if (eq type 'var) initfn initform)))
+            unless (member key initkeys :test #'eq) do
+            (let* ((type (if (constantp initform) 'constant 'var))
+                   (init (if (eq type 'var) initfn initform)))
               (ecase type
                 (constant
                  (push key defaulting-initargs)
@@ -527,69 +527,69 @@
                 (var
                  (push key defaulting-initargs)
                  (push (default-init-var-name i) defaulting-initargs)))
-	      (when (eq type 'var)
-		(let ((init-var (default-init-var-name i)))
-		  (setq init init-var)
-		  (push (cons init-var initfn) default-inits)))
-	      (dolist (location (initarg-locations key))
-		(if (consp location)
-		    (class-init location type init)
-		    (instance-init location type init)))))
+              (when (eq type 'var)
+                (let ((init-var (default-init-var-name i)))
+                  (setq init init-var)
+                  (push (cons init-var initfn) default-inits)))
+              (dolist (location (initarg-locations key))
+                (if (consp location)
+                    (class-init location type init)
+                    (instance-init location type init)))))
       ;; Loop over all slots of the class, filling in the rest from
       ;; slot initforms.
       (loop for slotd in (class-slots class)
-	    as location = (slot-definition-location slotd)
-	    as allocation = (slot-definition-allocation slotd)
-	    as initfn = (slot-definition-initfunction slotd)
-	    as initform = (slot-definition-initform slotd) do
-	      (unless (or (eq allocation :class)
-			  (null initfn)
-			  (initializedp location))
-		(if (constantp initform)
-		    (instance-init location 'initform initform)
-		    (instance-init location 'initform/initfn initfn))))
+            as location = (slot-definition-location slotd)
+            as allocation = (slot-definition-allocation slotd)
+            as initfn = (slot-definition-initfunction slotd)
+            as initform = (slot-definition-initform slotd) do
+              (unless (or (eq allocation :class)
+                          (null initfn)
+                          (initializedp location))
+                (if (constantp initform)
+                    (instance-init location 'initform initform)
+                    (instance-init location 'initform/initfn initfn))))
       ;; Generate the forms for initializing instance and class slots.
       (let ((instance-init-forms
-	     (loop for slot-entry across slot-vector and i from 0
-		   as (type value) = slot-entry collect
-		     (ecase type
-		       ((nil)
-			(unless before-method-p
-			  `(setf (clos-slots-ref .slots. ,i) +slot-unbound+)))
-		       ((param var)
-			`(setf (clos-slots-ref .slots. ,i) ,value))
-		       (initfn
-			`(setf (clos-slots-ref .slots. ,i) (funcall ,value)))
-		       (initform/initfn
-			(if before-method-p
-			    `(when (eq (clos-slots-ref .slots. ,i)
-				       +slot-unbound+)
-			       (setf (clos-slots-ref .slots. ,i)
-				     (funcall ,value)))
-			    `(setf (clos-slots-ref .slots. ,i)
-			           (funcall ,value))))
-		       (initform
-			(if before-method-p
-			    `(when (eq (clos-slots-ref .slots. ,i)
-				       +slot-unbound+)
-			       (setf (clos-slots-ref .slots. ,i)
-				     ',(eval value)))
-			    `(setf (clos-slots-ref .slots. ,i)
-			           ',(eval value))))
-		       (constant
-			`(setf (clos-slots-ref .slots. ,i) ',(eval value))))))
-	    (class-init-forms
-	     (loop for (location type value) in class-inits collect
-		     `(setf (cdr ',location)
-			    ,(ecase type
-			       (constant `',(eval value))
-			       ((param var) `,value)
-			       (initfn `(funcall ,value)))))))
-	(multiple-value-bind (vars bindings)
-	    (loop for (var . initfn) in (nreverse default-inits)
-		  collect var into vars
-		  collect `(,var (funcall ,initfn)) into bindings
-		  finally (return (values vars bindings)))
+             (loop for slot-entry across slot-vector and i from 0
+                   as (type value) = slot-entry collect
+                     (ecase type
+                       ((nil)
+                        (unless before-method-p
+                          `(setf (clos-slots-ref .slots. ,i) +slot-unbound+)))
+                       ((param var)
+                        `(setf (clos-slots-ref .slots. ,i) ,value))
+                       (initfn
+                        `(setf (clos-slots-ref .slots. ,i) (funcall ,value)))
+                       (initform/initfn
+                        (if before-method-p
+                            `(when (eq (clos-slots-ref .slots. ,i)
+                                       +slot-unbound+)
+                               (setf (clos-slots-ref .slots. ,i)
+                                     (funcall ,value)))
+                            `(setf (clos-slots-ref .slots. ,i)
+                                   (funcall ,value))))
+                       (initform
+                        (if before-method-p
+                            `(when (eq (clos-slots-ref .slots. ,i)
+                                       +slot-unbound+)
+                               (setf (clos-slots-ref .slots. ,i)
+                                     ',(eval value)))
+                            `(setf (clos-slots-ref .slots. ,i)
+                                   ',(eval value))))
+                       (constant
+                        `(setf (clos-slots-ref .slots. ,i) ',(eval value))))))
+            (class-init-forms
+             (loop for (location type value) in class-inits collect
+                     `(setf (cdr ',location)
+                            ,(ecase type
+                               (constant `',(eval value))
+                               ((param var) `,value)
+                               (initfn `(funcall ,value)))))))
+        (multiple-value-bind (vars bindings)
+            (loop for (var . initfn) in (nreverse default-inits)
+                  collect var into vars
+                  collect `(,var (funcall ,initfn)) into bindings
+                  finally (return (values vars bindings)))
           (values bindings vars (nreverse defaulting-initargs)
                   `(,@(delete nil instance-init-forms)
                     ,@class-init-forms)))))))
@@ -599,15 +599,15 @@
 ;;; CLASS is the class of the instance being initialized.
 (defun compute-initarg-locations (class initkeys)
   (loop with slots = (class-slots class)
-	for key in initkeys collect
-	  (loop for slot in slots
-		if (memq key (slot-definition-initargs slot))
-		  collect (slot-definition-location slot) into locations
-		else
-		  collect slot into remaining-slots
-		finally
-		  (setq slots remaining-slots)
-		  (return (cons key locations)))))
+        for key in initkeys collect
+          (loop for slot in slots
+                if (memq key (slot-definition-initargs slot))
+                  collect (slot-definition-location slot) into locations
+                else
+                  collect slot into remaining-slots
+                finally
+                  (setq slots remaining-slots)
+                  (return (cons key locations)))))
 
 
 ;;; *******************************
@@ -616,13 +616,13 @@
 
 (defun update-ctors (reason &key class name generic-function method)
   (labels ((reset (class &optional ri-cache-p (ctorsp t))
-	     (when ctorsp
-	       (dolist (ctor (plist-value class 'ctors))
-		 (install-initial-constructor ctor)))
-	     (when ri-cache-p
-	       (setf (plist-value class 'ri-initargs) ()))
-	     (dolist (subclass (class-direct-subclasses class))
-	       (reset subclass ri-cache-p ctorsp))))
+             (when ctorsp
+               (dolist (ctor (plist-value class 'ctors))
+                 (install-initial-constructor ctor)))
+             (when ri-cache-p
+               (setf (plist-value class 'ri-initargs) ()))
+             (dolist (subclass (class-direct-subclasses class))
+               (reset subclass ri-cache-p ctorsp))))
     (ecase reason
       ;; CLASS must have been specified.
       (finalize-inheritance
@@ -630,56 +630,56 @@
       ;; NAME must have been specified.
       (setf-find-class
        (loop for ctor in *all-ctors*
-	     when (eq (ctor-class-name ctor) name) do
-	     (when (ctor-class ctor)
-	       (reset (ctor-class ctor)))
-	     (loop-finish)))
+             when (eq (ctor-class-name ctor) name) do
+             (when (ctor-class ctor)
+               (reset (ctor-class ctor)))
+             (loop-finish)))
       ;; GENERIC-FUNCTION and METHOD must have been specified.
       ((add-method remove-method)
        (flet ((class-of-1st-method-param (method)
-		(type-class (first (method-specializers method)))))
-	 (case (generic-function-name generic-function)
-	   ((make-instance allocate-instance
-	     initialize-instance shared-initialize)
-	    (reset (class-of-1st-method-param method) t t))
-	   ((reinitialize-instance)
-	    (reset (class-of-1st-method-param method) t nil))
-	   (t (when (or (eq (generic-function-name generic-function)
-			    'slot-boundp-using-class)
-			(equal (generic-function-name generic-function)
-			       '(setf slot-value-using-class)))
-		;; this looks awfully expensive, but given that one
-		;; can specialize on the SLOTD argument, nothing is
-		;; safe.  -- CSR, 2004-07-12
-		(reset (find-class 'standard-object))))))))))
+                (type-class (first (method-specializers method)))))
+         (case (generic-function-name generic-function)
+           ((make-instance allocate-instance
+             initialize-instance shared-initialize)
+            (reset (class-of-1st-method-param method) t t))
+           ((reinitialize-instance)
+            (reset (class-of-1st-method-param method) t nil))
+           (t (when (or (eq (generic-function-name generic-function)
+                            'slot-boundp-using-class)
+                        (equal (generic-function-name generic-function)
+                               '(setf slot-value-using-class)))
+                ;; this looks awfully expensive, but given that one
+                ;; can specialize on the SLOTD argument, nothing is
+                ;; safe.  -- CSR, 2004-07-12
+                (reset (find-class 'standard-object))))))))))
 
 (defun precompile-ctors ()
   (dolist (ctor *all-ctors*)
     (when (null (ctor-class ctor))
       (let ((class (find-class (ctor-class-name ctor) nil)))
-	(when (and class (class-finalized-p class))
-	  (install-optimized-constructor ctor))))))
+        (when (and class (class-finalized-p class))
+          (install-optimized-constructor ctor))))))
 
 (defun check-ri-initargs (instance initargs)
   (let* ((class (class-of instance))
-	 (keys (plist-keys initargs))
-	 (cached (assoc keys (plist-value class 'ri-initargs)
-			:test #'equal))
-	 (invalid-keys
-	  (if (consp cached)
-	      (cdr cached)
-	      (let ((invalid
-		     ;; FIXME: give CHECK-INITARGS-1 and friends a
-		     ;; more mnemonic name and (possibly) a nicer,
-		     ;; more orthogonal interface.
-		     (check-initargs-1
-		      class initargs
-		      (list (list* 'reinitialize-instance instance initargs)
-			    (list* 'shared-initialize instance nil initargs))
-		      t nil)))
-		(setf (plist-value class 'ri-initargs)
-		      (acons keys invalid cached))
-		invalid))))
+         (keys (plist-keys initargs))
+         (cached (assoc keys (plist-value class 'ri-initargs)
+                        :test #'equal))
+         (invalid-keys
+          (if (consp cached)
+              (cdr cached)
+              (let ((invalid
+                     ;; FIXME: give CHECK-INITARGS-1 and friends a
+                     ;; more mnemonic name and (possibly) a nicer,
+                     ;; more orthogonal interface.
+                     (check-initargs-1
+                      class initargs
+                      (list (list* 'reinitialize-instance instance initargs)
+                            (list* 'shared-initialize instance nil initargs))
+                      t nil)))
+                (setf (plist-value class 'ri-initargs)
+                      (acons keys invalid cached))
+                invalid))))
     (when invalid-keys
       (error 'initarg-error :class class :initargs invalid-keys))))
 

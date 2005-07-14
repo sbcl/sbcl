@@ -40,24 +40,24 @@
 ;;; to GET-FUN:
 ;;;   COMPUTE-TEST converts the lambda into a key to be used for lookup,
 ;;;   COMPUTE-CODE is used by GET-NEW-FUN-GENERATOR-INTERNAL to
-;;;		generate the actual lambda to be compiled, and
+;;;             generate the actual lambda to be compiled, and
 ;;;   COMPUTE-CONSTANTS is used to generate the argument list that is
-;;;		to be passed to the compiled function.
+;;;             to be passed to the compiled function.
 ;;;
 (defun get-fun (lambda &optional
-		 (test-converter #'default-test-converter)
-		 (code-converter #'default-code-converter)
-		 (constant-converter #'default-constant-converter))
+                 (test-converter #'default-test-converter)
+                 (code-converter #'default-code-converter)
+                 (constant-converter #'default-constant-converter))
   (function-apply (get-fun-generator lambda test-converter code-converter)
-		  (compute-constants      lambda constant-converter)))
+                  (compute-constants      lambda constant-converter)))
 
 (defun get-fun1 (lambda &optional
-		  (test-converter #'default-test-converter)
-		  (code-converter #'default-code-converter)
-		  (constant-converter #'default-constant-converter))
+                  (test-converter #'default-test-converter)
+                  (code-converter #'default-code-converter)
+                  (constant-converter #'default-constant-converter))
   (values (the function
-	    (get-fun-generator lambda test-converter code-converter))
-	  (compute-constants lambda constant-converter)))
+            (get-fun-generator lambda test-converter code-converter))
+          (compute-constants lambda constant-converter)))
 
 (defun default-constantp (form)
   (and (constantp form)
@@ -86,10 +86,10 @@
 (defun store-fgen (fgen)
   (let ((old (lookup-fgen (fgen-test fgen))))
     (if old
-	(setf (svref old 2) (fgen-generator fgen)
-	      (svref old 4) (or (svref old 4)
-				(fgen-system fgen)))
-	(setq *fgens* (nconc *fgens* (list fgen))))))
+        (setf (svref old 2) (fgen-generator fgen)
+              (svref old 4) (or (svref old 4)
+                                (fgen-system fgen)))
+        (setq *fgens* (nconc *fgens* (list fgen))))))
 
 (defun lookup-fgen (test)
   (find test (the list *fgens*) :key #'fgen-test :test #'equal))
@@ -97,30 +97,30 @@
 (defun make-fgen (test gensyms generator generator-lambda system)
   (let ((new (make-array 6)))
     (setf (svref new 0) test
-	  (svref new 1) gensyms
-	  (svref new 2) generator
-	  (svref new 3) generator-lambda
-	  (svref new 4) system)
+          (svref new 1) gensyms
+          (svref new 2) generator
+          (svref new 3) generator-lambda
+          (svref new 4) system)
     new))
 
-(defun fgen-test	     (fgen) (svref fgen 0))
-(defun fgen-gensyms	     (fgen) (svref fgen 1))
-(defun fgen-generator	     (fgen) (svref fgen 2))
+(defun fgen-test             (fgen) (svref fgen 0))
+(defun fgen-gensyms          (fgen) (svref fgen 1))
+(defun fgen-generator        (fgen) (svref fgen 2))
 (defun fgen-generator-lambda (fgen) (svref fgen 3))
-(defun fgen-system	     (fgen) (svref fgen 4))
+(defun fgen-system           (fgen) (svref fgen 4))
 
 (defun get-fun-generator (lambda test-converter code-converter)
   (let* ((test (compute-test lambda test-converter))
-	 (fgen (lookup-fgen test)))
+         (fgen (lookup-fgen test)))
     (if fgen
-	(fgen-generator fgen)
-	(get-new-fun-generator lambda test code-converter))))
+        (fgen-generator fgen)
+        (get-new-fun-generator lambda test code-converter))))
 
 (defun get-new-fun-generator (lambda test code-converter)
   (multiple-value-bind (gensyms generator-lambda)
       (get-new-fun-generator-internal lambda code-converter)
     (let* ((generator (compile nil generator-lambda))
-	   (fgen (make-fgen test gensyms generator generator-lambda nil)))
+           (fgen (make-fgen test gensyms generator generator-lambda nil)))
       (store-fgen fgen)
       generator)))
 
@@ -132,28 +132,28 @@
 (defun compute-test (lambda test-converter)
   (let ((*walk-form-expand-macros-p* t))
     (walk-form lambda
-	       nil
-	       (lambda (f c e)
-		 (declare (ignore e))
-		 (if (neq c :eval)
-		     f
-		     (let ((converted (funcall test-converter f)))
-		       (values converted (neq converted f))))))))
+               nil
+               (lambda (f c e)
+                 (declare (ignore e))
+                 (if (neq c :eval)
+                     f
+                     (let ((converted (funcall test-converter f)))
+                       (values converted (neq converted f))))))))
 
 (defun compute-code (lambda code-converter)
   (let ((*walk-form-expand-macros-p* t)
-	(gensyms ()))
+        (gensyms ()))
     (values (walk-form lambda
-		       nil
-		       (lambda (f c e)
-			 (declare (ignore e))
-			 (if (neq c :eval)
-			     f
-			     (multiple-value-bind (converted gens)
-				 (funcall code-converter f)
-			       (when gens (setq gensyms (append gensyms gens)))
-			       (values converted (neq converted f))))))
-	    gensyms)))
+                       nil
+                       (lambda (f c e)
+                         (declare (ignore e))
+                         (if (neq c :eval)
+                             f
+                             (multiple-value-bind (converted gens)
+                                 (funcall code-converter f)
+                               (when gens (setq gensyms (append gensyms gens)))
+                               (values converted (neq converted f))))))
+            gensyms)))
 
 (defun compute-constants (lambda constant-converter)
   (let ((*walk-form-expand-macros-p* t) ; doesn't matter here.
@@ -161,15 +161,15 @@
     (walk-form lambda
                nil
                (lambda (f c e)
-		 (declare (ignore e))
-		 (if (neq c :eval)
-		     f
-		     (let ((consts (funcall constant-converter f)))
-		       (if consts
-			   (progn
-			     (setq collect (append collect consts))
-			     (values f t))
-			   f)))))
+                 (declare (ignore e))
+                 (if (neq c :eval)
+                     f
+                     (let ((consts (funcall constant-converter f)))
+                       (if consts
+                           (progn
+                             (setq collect (append collect consts))
+                             (values f t))
+                           f)))))
     collect))
 
 (defmacro precompile-function-generators (&optional system)

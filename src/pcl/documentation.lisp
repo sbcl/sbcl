@@ -45,8 +45,8 @@
   (if (typep x 'generic-function)
       (setf (slot-value x 'documentation) new-value)
       (let ((name (%fun-name x)))
-	(when (and name (typep name '(or symbol cons)))
-	  (setf (info :function :documentation name) new-value))))
+        (when (and name (typep name '(or symbol cons)))
+          (setf (info :function :documentation name) new-value))))
   new-value)
 
 (defmethod (setf documentation)
@@ -54,8 +54,8 @@
   (if (typep x 'generic-function)
       (setf (slot-value x 'documentation) new-value)
       (let ((name (%fun-name x)))
-	(when (and name (typep name '(or symbol cons)))
-	  (setf (info :function :documentation name) new-value))))
+        (when (and name (typep name '(or symbol cons)))
+          (setf (info :function :documentation name) new-value))))
   new-value)
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'function)))
@@ -66,8 +66,8 @@
   (setf (random-documentation x 'compiler-macro) new-value))
 
 (defmethod (setf documentation) (new-value
-				 (x symbol)
-				 (doc-type (eql 'function)))
+                                 (x symbol)
+                                 (doc-type (eql 'function)))
   (setf (info :function :documentation x) new-value))
 
 (defmethod (setf documentation)
@@ -140,70 +140,70 @@
 (defmethod documentation ((x symbol) (doc-type (eql 'type)))
   (or (values (info :type :documentation x))
       (let ((class (find-class x nil)))
-	(when class
-	  (slot-value class 'documentation)))))
+        (when class
+          (slot-value class 'documentation)))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'structure)))
   (cond ((eq (info :type :kind x) :instance)
-	 (values (info :type :documentation x)))
-	((info :typed-structure :info x)
-	 (values (info :typed-structure :documentation x)))
-	(t
-	 (error "~S is not the name of a structure type." x))))
+         (values (info :type :documentation x)))
+        ((info :typed-structure :info x)
+         (values (info :typed-structure :documentation x)))
+        (t
+         (error "~S is not the name of a structure type." x))))
 
 (defmethod (setf documentation) (new-value
-				 (x structure-class)
-				 (doc-type (eql 't)))
+                                 (x structure-class)
+                                 (doc-type (eql 't)))
   (setf (info :type :documentation (class-name x)) new-value))
 
 (defmethod (setf documentation) (new-value
-				 (x structure-class)
-				 (doc-type (eql 'type)))
+                                 (x structure-class)
+                                 (doc-type (eql 'type)))
   (setf (info :type :documentation (class-name x)) new-value))
 
 (defmethod (setf documentation) (new-value
-				 (x standard-class)
-				 (doc-type (eql 't)))
+                                 (x standard-class)
+                                 (doc-type (eql 't)))
   (setf (slot-value x 'documentation) new-value))
 
 (defmethod (setf documentation) (new-value
-				 (x standard-class)
-				 (doc-type (eql 'type)))
+                                 (x standard-class)
+                                 (doc-type (eql 'type)))
   (setf (slot-value x 'documentation) new-value))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'type)))
   (if (or (structure-type-p x) (condition-type-p x))
       (setf (info :type :documentation x) new-value)
       (let ((class (find-class x nil)))
-	(if class
-	    (setf (slot-value class 'documentation) new-value)
-	    (setf (info :type :documentation x) new-value)))))
+        (if class
+            (setf (slot-value class 'documentation) new-value)
+            (setf (info :type :documentation x) new-value)))))
 
 (defmethod (setf documentation) (new-value
-				 (x symbol)
-				 (doc-type (eql 'structure)))
+                                 (x symbol)
+                                 (doc-type (eql 'structure)))
   (cond ((eq (info :type :kind x) :instance)
-	 (setf (info :type :documentation x) new-value))
-	((info :typed-structure :info x)
-	 (setf (info :typed-structure :documentation x) new-value))
-	(t
-	 (error "~S is not the name of a structure type." x))))
-  
+         (setf (info :type :documentation x) new-value))
+        ((info :typed-structure :info x)
+         (setf (info :typed-structure :documentation x) new-value))
+        (t
+         (error "~S is not the name of a structure type." x))))
+
 
 ;;; variables
 (defmethod documentation ((x symbol) (doc-type (eql 'variable)))
   (values (info :variable :documentation x)))
 
 (defmethod (setf documentation) (new-value
-				 (x symbol)
-				 (doc-type (eql 'variable)))
+                                 (x symbol)
+                                 (doc-type (eql 'variable)))
   (setf (info :variable :documentation x) new-value))
 
 ;;; default if DOC-TYPE doesn't match one of the specified types
 (defmethod documentation (object doc-type)
   (warn "unsupported DOCUMENTATION: type ~S for object ~S"
-	doc-type
-	(type-of object))
+        doc-type
+        (type-of object))
   nil)
 
 ;;; default if DOC-TYPE doesn't match one of the specified types
@@ -212,8 +212,8 @@
   ;; doc types an implementation is permitted to discard docs at any time
   ;; for any reason, this feels to me more like a warning. -- WHN 19991214
   (warn "discarding unsupported DOCUMENTATION of type ~S for object ~S"
-	doc-type
-	(type-of object))
+        doc-type
+        (type-of object))
   new-value)
 
 ;;; extra-standard methods, for getting at slot documentation
