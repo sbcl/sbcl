@@ -73,10 +73,10 @@
 (def!constant float-round-to-positive 2)
 (def!constant float-round-to-negative 3)
 
-(defconstant-eqx float-rounding-mode (byte 2 30) #'equalp)	  ; RD 
-(defconstant-eqx float-sticky-bits (byte 5 5) #'equalp)	  ; aexc
-(defconstant-eqx float-traps-byte (byte 5 23) #'equalp)	  ; TEM
-(defconstant-eqx float-exceptions-byte (byte 5 0) #'equalp)	  ; cexc
+(defconstant-eqx float-rounding-mode (byte 2 30) #'equalp)        ; RD
+(defconstant-eqx float-sticky-bits (byte 5 5) #'equalp)   ; aexc
+(defconstant-eqx float-traps-byte (byte 5 23) #'equalp)   ; TEM
+(defconstant-eqx float-exceptions-byte (byte 5 0) #'equalp)       ; cexc
 
 ;;; According to the SPARC doc (as opposed to FPU doc), the fast mode
 ;;; bit (EFM) is "reserved", and should always be zero.  However, for
@@ -94,7 +94,7 @@
 (progn
   (def!constant linkage-table-space-start #x0f800000)
   (def!constant linkage-table-space-end   #x10000000)
-  
+
   (def!constant read-only-space-start     #x10000000)
   (def!constant read-only-space-end       #x15000000)
 
@@ -103,7 +103,7 @@
 
   (def!constant dynamic-0-space-start #x30000000)
   (def!constant dynamic-0-space-end   #x38000000)
-  
+
   (def!constant dynamic-1-space-start #x40000000)
   (def!constant dynamic-1-space-end   #x48000000))
 
@@ -111,16 +111,16 @@
 (progn
   (def!constant linkage-table-space-start #x0f800000)
   (def!constant linkage-table-space-end   #x10000000)
-  
+
   (def!constant read-only-space-start     #x10000000)
   (def!constant read-only-space-end       #x15000000)
-  
+
   (def!constant static-space-start        #x28000000)
   (def!constant static-space-end          #x2c000000)
 
   (def!constant dynamic-0-space-start     #x30000000)
   (def!constant dynamic-0-space-end       #x38000000)
-  
+
   (def!constant dynamic-1-space-start     #x40000000)
   (def!constant dynamic-1-space-end       #x48000000))
 
@@ -188,7 +188,7 @@
     *binding-stack-start*
     *control-stack-start*
     *control-stack-end*
-    
+
     ;; interrupt handling
     *free-interrupt-context-index*
     sb!unix::*interrupts-enabled*

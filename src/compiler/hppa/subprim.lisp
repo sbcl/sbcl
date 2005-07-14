@@ -11,7 +11,7 @@
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) ptr)
   (:temporary (:scs (non-descriptor-reg) :type random) temp)
   (:temporary (:scs (any-reg) :type fixnum :to (:result 0) :target result)
-	      count)
+              count)
   (:results (result :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)

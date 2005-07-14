@@ -45,7 +45,7 @@
 ;;;
 (define-vop (slot-set)
   (:args (object :scs (descriptor-reg))
-	 (value :scs (descriptor-reg any-reg)))
+         (value :scs (descriptor-reg any-reg)))
   (:variant-vars base lowtag)
   (:info offset)
   (:generator 4
@@ -59,41 +59,41 @@
 (defmacro define-indexer (name write-p ri-op rr-op shift &optional sign-extend-byte)
   `(define-vop (,name)
      (:args (object :scs (descriptor-reg))
-	    (index :scs (any-reg zero immediate))
-	    ,@(when write-p
-		'((value :scs (any-reg descriptor-reg) :target result))))
+            (index :scs (any-reg zero immediate))
+            ,@(when write-p
+                '((value :scs (any-reg descriptor-reg) :target result))))
      (:arg-types * tagged-num ,@(when write-p '(*)))
      (:temporary (:scs (non-descriptor-reg)) temp)
      (:results (,(if write-p 'result 'value)
-		:scs (any-reg descriptor-reg)))
+                :scs (any-reg descriptor-reg)))
      (:result-types *)
      (:variant-vars offset lowtag)
      (:policy :fast-safe)
      (:generator 5
        (sc-case index
-	 ((immediate zero)
-	  (let ((offset (- (+ (if (sc-is index zero)
-				  0
-				  (ash (tn-value index)
-				       (- word-shift ,shift)))
-			      (ash offset word-shift))
-			   lowtag)))
-	    (etypecase offset
-	      ((signed-byte 16)
-	       (inst ,ri-op value object offset))
-	      ((or (unsigned-byte 32) (signed-byte 32))
-	       (inst lr temp offset)
-	       (inst ,rr-op value object temp)))))
-	 (t
-	  ,@(unless (zerop shift)
-	      `((inst srwi temp index ,shift)))
-	  (inst addi temp ,(if (zerop shift) 'index 'temp)
-		(- (ash offset word-shift) lowtag))
-	  (inst ,rr-op value object temp)))
+         ((immediate zero)
+          (let ((offset (- (+ (if (sc-is index zero)
+                                  0
+                                  (ash (tn-value index)
+                                       (- word-shift ,shift)))
+                              (ash offset word-shift))
+                           lowtag)))
+            (etypecase offset
+              ((signed-byte 16)
+               (inst ,ri-op value object offset))
+              ((or (unsigned-byte 32) (signed-byte 32))
+               (inst lr temp offset)
+               (inst ,rr-op value object temp)))))
+         (t
+          ,@(unless (zerop shift)
+              `((inst srwi temp index ,shift)))
+          (inst addi temp ,(if (zerop shift) 'index 'temp)
+                (- (ash offset word-shift) lowtag))
+          (inst ,rr-op value object temp)))
        ,@(when sign-extend-byte
            `((inst extsb value value)))
        ,@(when write-p
-	   '((move result value))))))
+           '((move result value))))))
 
 (define-indexer word-index-ref nil lwz lwzx 0)
 (define-indexer word-index-set t stw stwx 0)

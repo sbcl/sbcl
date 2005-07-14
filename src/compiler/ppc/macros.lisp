@@ -16,14 +16,14 @@
 (defmacro move (dst src)
   "Move SRC into DST unless they are location=."
   (once-only ((n-dst dst)
-	      (n-src src))
+              (n-src src))
     `(unless (location= ,n-dst ,n-src)
        (inst mr ,n-dst ,n-src))))
 
 (macrolet
     ((def (op inst shift)
        `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
-	  `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag)))))
+          `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag)))))
   (def loadw lwz word-shift)
   (def storew stw word-shift))
 
@@ -33,27 +33,27 @@
 (macrolet
     ((frob (slot)
        (let ((loader (intern (concatenate 'simple-string
-					  "LOAD-SYMBOL-"
-					  (string slot))))
-	     (storer (intern (concatenate 'simple-string
-					  "STORE-SYMBOL-"
-					  (string slot))))
-	     (offset (intern (concatenate 'simple-string
-					  "SYMBOL-"
-					  (string slot)
-					  "-SLOT")
-			     (find-package "SB!VM"))))
-	 `(progn
-	    (defmacro ,loader (reg symbol)
-	      `(inst lwz ,reg null-tn
-		     (+ (static-symbol-offset ',symbol)
-			(ash ,',offset word-shift)
-			(- other-pointer-lowtag))))
-	    (defmacro ,storer (reg symbol)
-	      `(inst stw ,reg null-tn
-		     (+ (static-symbol-offset ',symbol)
-			(ash ,',offset word-shift)
-			(- other-pointer-lowtag))))))))
+                                          "LOAD-SYMBOL-"
+                                          (string slot))))
+             (storer (intern (concatenate 'simple-string
+                                          "STORE-SYMBOL-"
+                                          (string slot))))
+             (offset (intern (concatenate 'simple-string
+                                          "SYMBOL-"
+                                          (string slot)
+                                          "-SLOT")
+                             (find-package "SB!VM"))))
+         `(progn
+            (defmacro ,loader (reg symbol)
+              `(inst lwz ,reg null-tn
+                     (+ (static-symbol-offset ',symbol)
+                        (ash ,',offset word-shift)
+                        (- other-pointer-lowtag))))
+            (defmacro ,storer (reg symbol)
+              `(inst stw ,reg null-tn
+                     (+ (static-symbol-offset ',symbol)
+                        (ash ,',offset word-shift)
+                        (- other-pointer-lowtag))))))))
   (frob value)
   (frob function))
 
@@ -61,8 +61,8 @@
   "Loads the type bits of a pointer into target independent of
   byte-ordering issues."
   (once-only ((n-target target)
-	      (n-source source)
-	      (n-offset offset))
+              (n-source source)
+              (n-offset offset))
     (ecase *backend-byte-order*
       (:little-endian
        `(inst lbz ,n-target ,n-source ,n-offset))
@@ -70,7 +70,7 @@
        `(inst lbz ,n-target ,n-source (+ ,n-offset 3))))))
 
 ;;; Macros to handle the fact that we cannot use the machine native call and
-;;; return instructions. 
+;;; return instructions.
 
 (defmacro lisp-jump (function lip)
   "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
@@ -105,35 +105,35 @@
 ;;; Move a stack TN to a register and vice-versa.
 (defmacro load-stack-tn (reg stack)
   `(let ((reg ,reg)
-	 (stack ,stack))
+         (stack ,stack))
      (let ((offset (tn-offset stack)))
        (sc-case stack
-	 ((control-stack)
-	  (loadw reg cfp-tn offset))))))
+         ((control-stack)
+          (loadw reg cfp-tn offset))))))
 (defmacro store-stack-tn (stack reg)
   `(let ((stack ,stack)
-	 (reg ,reg))
+         (reg ,reg))
      (let ((offset (tn-offset stack)))
        (sc-case stack
-	 ((control-stack)
-	  (storew reg cfp-tn offset))))))
+         ((control-stack)
+          (storew reg cfp-tn offset))))))
 
 (defmacro maybe-load-stack-tn (reg reg-or-stack)
   "Move the TN Reg-Or-Stack into Reg if it isn't already there."
   (once-only ((n-reg reg)
-	      (n-stack reg-or-stack))
+              (n-stack reg-or-stack))
     `(sc-case ,n-reg
        ((any-reg descriptor-reg)
-	(sc-case ,n-stack
-	  ((any-reg descriptor-reg)
-	   (move ,n-reg ,n-stack))
-	  ((control-stack)
-	   (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
+        (sc-case ,n-stack
+          ((any-reg descriptor-reg)
+           (move ,n-reg ,n-stack))
+          ((control-stack)
+           (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
 
 
 ;;;; Storage allocation:
 (defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size)
-				 &body body)
+                                 &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
   word header having the specified Type-Code.  The result is placed in
   Result-TN, and Temp-TN is a non-descriptor temp (which may be randomly used
@@ -142,7 +142,7 @@
   (unless body
     (bug "empty &body in WITH-FIXED-ALLOCATION"))
   (once-only ((result-tn result-tn) (temp-tn temp-tn) (flag-tn flag-tn)
-	      (type-code type-code) (size size))
+              (type-code type-code) (size size))
     `(pseudo-atomic (,flag-tn :extra (pad-data-block ,size))
        (inst ori ,result-tn alloc-tn other-pointer-lowtag)
        (inst lr ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
@@ -164,27 +164,27 @@
   (defun emit-error-break (vop kind code values)
     (let ((vector (gensym)))
       `((let ((vop ,vop))
-	  (when vop
-	    (note-this-location vop :internal-error)))
-	(inst unimp ,kind)
-	(with-adjustable-vector (,vector)
-	  (write-var-integer (error-number-or-lose ',code) ,vector)
-	  ,@(mapcar #'(lambda (tn)
-			`(let ((tn ,tn))
-			   (write-var-integer (make-sc-offset (sc-number
-							       (tn-sc tn))
-							      (tn-offset tn))
-					      ,vector)))
-		    values)
-	  (inst byte (length ,vector))
-	  (dotimes (i (length ,vector))
-	    (inst byte (aref ,vector i))))
-	(align word-shift)))))
+          (when vop
+            (note-this-location vop :internal-error)))
+        (inst unimp ,kind)
+        (with-adjustable-vector (,vector)
+          (write-var-integer (error-number-or-lose ',code) ,vector)
+          ,@(mapcar #'(lambda (tn)
+                        `(let ((tn ,tn))
+                           (write-var-integer (make-sc-offset (sc-number
+                                                               (tn-sc tn))
+                                                              (tn-offset tn))
+                                              ,vector)))
+                    values)
+          (inst byte (length ,vector))
+          (dotimes (i (length ,vector))
+            (inst byte (aref ,vector i))))
+        (align word-shift)))))
 
 (defmacro error-call (vop error-code &rest values)
   "Cause an error.  ERROR-CODE is the error to cause."
   (cons 'progn
-	(emit-error-break vop error-trap error-code values)))
+        (emit-error-break vop error-trap error-code values)))
 
 
 (defmacro cerror-call (vop label error-code &rest values)
@@ -212,10 +212,10 @@
     `(let ((,continue (gen-label)))
        (emit-label ,continue)
        (assemble (*elsewhere*)
-	 (let ((,error (gen-label)))
-	   (emit-label ,error)
-	   (cerror-call ,vop ,continue ,error-code ,@values)
-	   ,error)))))
+         (let ((,error (gen-label)))
+           (emit-label ,error)
+           (cerror-call ,vop ,continue ,error-code ,@values)
+           ,error)))))
 
 ;;;; PSEUDO-ATOMIC
 
@@ -231,21 +231,21 @@
   (let ((n-extra (gensym)))
     `(let ((,n-extra ,extra))
        (without-scheduling ()
-	;; Extra debugging stuff:
-	#+debug
-	(progn
-	  (inst andi. ,flag-tn alloc-tn 7)
-	  (inst twi :ne ,flag-tn 0))
-	(inst lr ,flag-tn (- ,n-extra 4))
-	(inst addi alloc-tn alloc-tn 4))
+        ;; Extra debugging stuff:
+        #+debug
+        (progn
+          (inst andi. ,flag-tn alloc-tn 7)
+          (inst twi :ne ,flag-tn 0))
+        (inst lr ,flag-tn (- ,n-extra 4))
+        (inst addi alloc-tn alloc-tn 4))
       ,@forms
       (without-scheduling ()
        (inst add alloc-tn alloc-tn ,flag-tn)
        (inst twi :lt alloc-tn 0))
       #+debug
       (progn
-	(inst andi. ,flag-tn alloc-tn 7)
-	(inst twi :ne ,flag-tn 0)))))
+        (inst andi. ,flag-tn alloc-tn 7)
+        (inst twi :ne ,flag-tn 0)))))
 
 
 
@@ -255,6 +255,6 @@
 OBJECTS will not be moved in memory for the duration of BODY.
 Useful for e.g. foreign calls where another thread may trigger
 garbage collection.  This is currently implemented by disabling GC"
-  (declare (ignore objects))		;should we eval these for side-effect?
+  (declare (ignore objects))            ;should we eval these for side-effect?
   `(without-gcing
     ,@body))

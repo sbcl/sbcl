@@ -14,7 +14,7 @@
        (load-symbol y val))
       (character
        (inst li y (logior (ash (char-code val) n-widetag-bits)
-			  character-widetag))))))
+                          character-widetag))))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((zero immediate)
@@ -62,19 +62,19 @@
 ;;;
 (define-vop (move)
   (:args (x :target y
-	    :scs (any-reg descriptor-reg zero null)
-	    :load-if (not (location= x y))))
+            :scs (any-reg descriptor-reg zero null)
+            :load-if (not (location= x y))))
   (:results (y :scs (any-reg descriptor-reg control-stack)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:generator 0
     (unless (location= x y)
       (sc-case y
-	((any-reg descriptor-reg)
-	 (inst move y x))
-	(control-stack
-	 (store-stack-tn y x))))))
+        ((any-reg descriptor-reg)
+         (inst move y x))
+        (control-stack
+         (store-stack-tn y x))))))
 
 (define-move-vop move :move
   (any-reg descriptor-reg zero null)
@@ -91,9 +91,9 @@
 ;;;
 (define-vop (move-arg)
   (:args (x :target y
-	    :scs (any-reg descriptor-reg null zero))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y any-reg descriptor-reg))))
+            :scs (any-reg descriptor-reg null zero))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
   (:generator 0
     (sc-case y
@@ -202,19 +202,19 @@
   (:generator 18
     (move x arg)
     (let ((fixnum (gen-label))
-	  (done (gen-label)))
+          (done (gen-label)))
       (inst sra temp x 29)
       (inst beq temp fixnum)
       (inst nor temp zero-tn)
       (inst beq temp done)
       (inst sll y x 2)
-      
+
       (with-fixed-allocation
-	  (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
-	(storew x y bignum-digits-offset other-pointer-lowtag))
+          (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
+        (storew x y bignum-digits-offset other-pointer-lowtag))
       (inst b done)
       (inst nop)
-      
+
       (emit-label fixnum)
       (inst sll y x 2)
       (emit-label done))))
@@ -237,7 +237,7 @@
     (inst srl temp x 29)
     (inst beq temp done)
     (inst sll y x 2)
-      
+
     (pseudo-atomic
       (pa-flag :extra (pad-data-block (+ bignum-digits-offset 2)))
       (inst or y alloc-tn other-pointer-lowtag)
@@ -257,10 +257,10 @@
 ;;;
 (define-vop (word-move)
   (:args (x :target y
-	    :scs (signed-reg unsigned-reg)
-	    :load-if (not (location= x y))))
+            :scs (signed-reg unsigned-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (signed-reg unsigned-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:note "word integer move")
@@ -275,9 +275,9 @@
 ;;;
 (define-vop (move-word-arg)
   (:args (x :target y
-	    :scs (signed-reg unsigned-reg))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y sap-reg))))
+            :scs (signed-reg unsigned-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y sap-reg))))
   (:results (y))
   (:note "word integer argument move")
   (:generator 0

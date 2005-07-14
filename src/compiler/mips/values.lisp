@@ -90,22 +90,22 @@
   (:info nvals)
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg)
-	       :to (:result 0)
-	       :target start)
-	      start-temp)
+               :to (:result 0)
+               :target start)
+              start-temp)
   (:generator 20
     (move start-temp csp-tn)
     (inst addu csp-tn csp-tn (* nvals n-word-bytes))
     (do ((val vals (tn-ref-across val))
-	 (i 0 (1+ i)))
-	((null val))
+         (i 0 (1+ i)))
+        ((null val))
       (let ((tn (tn-ref-tn val)))
-	(sc-case tn
-	  (descriptor-reg
-	   (storew tn start-temp i))
-	  (control-stack
-	   (load-stack-tn temp tn)
-	   (storew temp start-temp i)))))
+        (sc-case tn
+          (descriptor-reg
+           (storew tn start-temp i))
+          (control-stack
+           (load-stack-tn temp tn)
+           (storew temp start-temp i)))))
     (move start start-temp)
     (inst li count (fixnumize nvals))))
 
@@ -116,7 +116,7 @@
   (:arg-types list)
   (:policy :fast-safe)
   (:results (start :scs (any-reg))
-	    (count :scs (any-reg)))
+            (count :scs (any-reg)))
   (:temporary (:scs (descriptor-reg) :type list :from (:argument 0)) list)
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
@@ -125,7 +125,7 @@
   (:generator 0
     (move list arg)
     (move start csp-tn)
-    
+
     LOOP
     (inst beq list null-tn done)
     (loadw temp list cons-car-slot list-pointer-lowtag)
@@ -137,7 +137,7 @@
     (inst beq ndescr zero-tn loop)
     (inst nop)
     (error-call vop bogus-arg-to-values-list-error list)
-    
+
     DONE
     (inst subu count csp-tn start)))
 
@@ -145,14 +145,14 @@
 ;;; as function arguments.
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :target src)
-	 (skip :scs (any-reg zero immediate))
-	 (num :scs (any-reg) :target count))
+         (skip :scs (any-reg zero immediate))
+         (num :scs (any-reg) :target count))
   (:arg-types * positive-fixnum positive-fixnum)
   (:temporary (:sc any-reg :from (:argument 0)) src)
   (:temporary (:sc any-reg :from (:argument 2)) dst)
   (:temporary (:sc descriptor-reg :from (:argument 1)) temp)
   (:results (start :scs (any-reg))
-	    (count :scs (any-reg)))
+            (count :scs (any-reg)))
   (:generator 20
     (sc-case skip
       (zero

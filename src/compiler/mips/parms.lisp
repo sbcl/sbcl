@@ -52,13 +52,13 @@
 (defconstant-eqx float-traps-byte (byte 5 7) #'equalp)
 (defconstant-eqx float-exceptions-byte (byte 5 12) #'equalp)
 (defconstant-eqx float-condition-bit (ash 1 23) #'equalp)
-(def!constant float-fast-bit 0)			  ; No fast mode on PMAX.
+(def!constant float-fast-bit 0)                   ; No fast mode on PMAX.
 
 
 ;;;; Description of the target address space.
 
 ;;; Where to put the different spaces.
-;;; 
+;;;
 (def!constant read-only-space-start #x01000000)
 (def!constant read-only-space-end   #x05000000)
 
@@ -127,7 +127,7 @@
     *binding-stack-start*
     *control-stack-start*
     *control-stack-end*
-    
+
     ;; Interrupt Handling
     *free-interrupt-context-index*
     sb!unix::*interrupts-enabled*
@@ -135,21 +135,21 @@
     ))
 
 (defparameter *static-funs*
-  '(sb!kernel:two-arg-+ 
-    sb!kernel:two-arg-- 
-    sb!kernel:two-arg-* 
-    sb!kernel:two-arg-/ 
-    sb!kernel:two-arg-< 
-    sb!kernel:two-arg-> 
+  '(sb!kernel:two-arg-+
+    sb!kernel:two-arg--
+    sb!kernel:two-arg-*
+    sb!kernel:two-arg-/
+    sb!kernel:two-arg-<
+    sb!kernel:two-arg->
     sb!kernel:two-arg-=
-    sb!kernel:two-arg-<= 
-    sb!kernel:two-arg->= 
-    sb!kernel:two-arg-/= 
-    eql 
+    sb!kernel:two-arg-<=
+    sb!kernel:two-arg->=
+    sb!kernel:two-arg-/=
+    eql
     sb!kernel:%negate
-    sb!kernel:two-arg-and 
-    sb!kernel:two-arg-ior 
+    sb!kernel:two-arg-and
+    sb!kernel:two-arg-ior
     sb!kernel:two-arg-xor
-    length 
-    sb!kernel:two-arg-gcd 
+    length
+    sb!kernel:two-arg-gcd
     sb!kernel:two-arg-lcm))

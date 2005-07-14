@@ -30,10 +30,10 @@
     FUNCTION-PTR
     (load-type result object (- fun-pointer-lowtag))
     (inst nop :tr)
-    
+
     OTHER-PTR
     (load-type result object (- other-pointer-lowtag))
-    
+
     DONE))
 
 (define-vop (fun-subtype)
@@ -49,7 +49,7 @@
   (:translate (setf fun-subtype))
   (:policy :fast-safe)
   (:args (type :scs (unsigned-reg) :target result)
-	 (function :scs (descriptor-reg)))
+         (function :scs (descriptor-reg)))
   (:arg-types positive-fixnum *)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -81,7 +81,7 @@
   (:translate set-header-data)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target res)
-	 (data :scs (unsigned-reg)))
+         (data :scs (unsigned-reg)))
   (:arg-types * positive-fixnum)
   (:results (res :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -116,7 +116,7 @@
 
 (define-vop (make-other-immediate-type)
   (:args (val :scs (any-reg descriptor-reg))
-	 (type :scs (any-reg descriptor-reg) :target temp))
+         (type :scs (any-reg descriptor-reg) :target temp))
   (:results (res :scs (any-reg descriptor-reg) :from (:argument 0)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 2
@@ -170,7 +170,7 @@
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
-	 (offset :scs (signed-reg unsigned-reg)))
+         (offset :scs (signed-reg unsigned-reg)))
   (:arg-types * positive-fixnum)
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
@@ -207,7 +207,7 @@
   (:temporary (:scs (non-descriptor-reg)) count)
   (:generator 1
     (let ((offset
-	   (- (* (+ index vector-data-offset) n-word-bytes) other-pointer-lowtag)))
+           (- (* (+ index vector-data-offset) n-word-bytes) other-pointer-lowtag)))
       (inst ldw offset count-vector count)
       (inst addi 1 count count)
       (inst stw count offset count-vector))))

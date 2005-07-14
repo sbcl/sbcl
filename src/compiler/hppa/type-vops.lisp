@@ -24,7 +24,7 @@
       (inst extru value 31 2 zero-tn :<>)
       (inst b (if not-p drop-through target) :nullify t))
     (%test-headers value target not-p nil headers
-		   :drop-through drop-through :temp temp)))
+                   :drop-through drop-through :temp temp)))
 
 (defun %test-immediate (value target not-p immediate &key temp)
   (assemble ()
@@ -32,45 +32,45 @@
     (inst bci := not-p immediate temp target)))
 
 (defun %test-lowtag (value target not-p lowtag
-		     &key temp temp-loaded)
+                     &key temp temp-loaded)
   (assemble ()
     (unless temp-loaded
       (inst extru value 31 3 temp))
     (inst bci := not-p lowtag temp target)))
 
 (defun %test-headers (value target not-p function-p headers
-		      &key temp (drop-through (gen-label)) temp-loaded)
+                      &key temp (drop-through (gen-label)) temp-loaded)
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind
-	(equal greater-or-equal when-true when-false)
-	;; EQUAL and GREATER-OR-EQUAL are the conditions for branching to
-	;; TARGET.  WHEN-TRUE and WHEN-FALSE are the labels to branch to when
-	;; we know it's true and when we know it's false respectively.
-	(if not-p
-	    (values :<> :< drop-through target)
-	    (values := :>= target drop-through))
+        (equal greater-or-equal when-true when-false)
+        ;; EQUAL and GREATER-OR-EQUAL are the conditions for branching to
+        ;; TARGET.  WHEN-TRUE and WHEN-FALSE are the labels to branch to when
+        ;; we know it's true and when we know it's false respectively.
+        (if not-p
+            (values :<> :< drop-through target)
+            (values := :>= target drop-through))
       (assemble ()
-	(%test-lowtag value when-false t lowtag
-		      :temp temp :temp-loaded temp-loaded)
-	(inst ldb (- 3 lowtag) value temp)
-	(do ((remaining headers (cdr remaining)))
-	    ((null remaining))
-	  (let ((header (car remaining))
-		(last (null (cdr remaining))))
-	    (cond
-	     ((atom header)
-	      (if last
-		  (inst bci equal nil header temp target)
-		  (inst bci := nil header temp when-true)))
-	     (t
-	      (let ((start (car header))
-		    (end (cdr header)))
-		(unless (= start bignum-widetag)
-		  (inst bci :> nil start temp when-false))
-		(if last
-		    (inst bci greater-or-equal nil end temp target)
-		    (inst bci :>= nil end temp when-true)))))))
-	(emit-label drop-through)))))
+        (%test-lowtag value when-false t lowtag
+                      :temp temp :temp-loaded temp-loaded)
+        (inst ldb (- 3 lowtag) value temp)
+        (do ((remaining headers (cdr remaining)))
+            ((null remaining))
+          (let ((header (car remaining))
+                (last (null (cdr remaining))))
+            (cond
+             ((atom header)
+              (if last
+                  (inst bci equal nil header temp target)
+                  (inst bci := nil header temp when-true)))
+             (t
+              (let ((start (car header))
+                    (end (cdr header)))
+                (unless (= start bignum-widetag)
+                  (inst bci :> nil start temp when-false))
+                (if last
+                    (inst bci greater-or-equal nil end temp target)
+                    (inst bci :>= nil end temp when-true)))))))
+        (emit-label drop-through)))))
 
 ;;;; Type checking and testing:
 
@@ -93,24 +93,24 @@
      (if (> (apply #'max type-codes) lowtag-limit) 7 2)))
 
 (defmacro !define-type-vops (pred-name check-name ptype error-code
-			     (&rest type-codes)
-			     &key &allow-other-keys)
+                             (&rest type-codes)
+                             &key &allow-other-keys)
   (let ((cost (cost-to-test-types (mapcar #'eval type-codes))))
     `(progn
        ,@(when pred-name
-	   `((define-vop (,pred-name type-predicate)
-	       (:translate ,pred-name)
-	       (:generator ,cost
-		 (test-type value target not-p (,@type-codes) :temp temp)))))
+           `((define-vop (,pred-name type-predicate)
+               (:translate ,pred-name)
+               (:generator ,cost
+                 (test-type value target not-p (,@type-codes) :temp temp)))))
        ,@(when check-name
-	   `((define-vop (,check-name check-type)
-	       (:generator ,cost
-		 (let ((err-lab
-			(generate-error-code vop ,error-code value)))
-		   (test-type value err-lab t (,@type-codes) :temp temp)
-		   (move value result))))))
+           `((define-vop (,check-name check-type)
+               (:generator ,cost
+                 (let ((err-lab
+                        (generate-error-code vop ,error-code value)))
+                   (test-type value err-lab t (,@type-codes) :temp temp)
+                   (move value result))))))
        ,@(when ptype
-	   `((primitive-type-vop ,check-name (:check) ,ptype))))))
+           `((primitive-type-vop ,check-name (:check) ,ptype))))))
 
 ;;;; Other integer ranges.
 
@@ -121,8 +121,8 @@
   (multiple-value-bind
       (yep nope)
       (if not-p
-	  (values not-target target)
-	  (values target not-target))
+          (values not-target target)
+          (values target not-target))
     (assemble ()
       (inst extru value 31 2 zero-tn :<>)
       (inst b yep :nullify t)
@@ -141,7 +141,7 @@
 (define-vop (check-signed-byte-32 check-type)
   (:generator 45
     (let ((loose (generate-error-code vop object-not-signed-byte-32-error
-				      value)))
+                                      value)))
       (signed-byte-32-test value temp t loose okay))
     OKAY
     (move value result)))
@@ -172,7 +172,7 @@
       ;; All zeros, its an (unsigned-byte 32).
       (inst comb (if not-p := :<>) temp zero-tn not-target :nullify t)
       (inst b target :nullify t)
-	
+
       SINGLE-WORD
       ;; Get the single digit.
       (loadw temp value bignum-digits-offset other-pointer-lowtag)
@@ -191,14 +191,14 @@
 (define-vop (check-unsigned-byte-32 check-type)
   (:generator 45
     (let ((loose (generate-error-code vop object-not-unsigned-byte-32-error
-				      value)))
+                                      value)))
       (unsigned-byte-32-test value temp t loose okay))
     OKAY
     (move value result)))
 
 
 ;;;; List/symbol types:
-;;; 
+;;;
 ;;; symbolp (or symbol (eq nil))
 ;;; consp (and list (not (eq nil)))
 
@@ -216,7 +216,7 @@
       (test-type value error t (symbol-header-widetag) :temp temp))
     DROP-THRU
     (move value result)))
-  
+
 (define-vop (consp type-predicate)
   (:translate consp)
   (:generator 8

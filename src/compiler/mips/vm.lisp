@@ -18,15 +18,15 @@
   (defvar *register-names* (make-array 32 :initial-element nil)))
 
 (macrolet ((defreg (name offset)
-	       (let ((offset-sym (symbolicate name "-OFFSET")))
-		 `(eval-when (:compile-toplevel :load-toplevel :execute)
-		   (def!constant ,offset-sym ,offset)
-		   (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
+               (let ((offset-sym (symbolicate name "-OFFSET")))
+                 `(eval-when (:compile-toplevel :load-toplevel :execute)
+                   (def!constant ,offset-sym ,offset)
+                   (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
 
-	   (defregset (name &rest regs)
-	       `(eval-when (:compile-toplevel :load-toplevel :execute)
-		 (defparameter ,name
-		   (list ,@(mapcar #'(lambda (name) (symbolicate name "-OFFSET")) regs))))))
+           (defregset (name &rest regs)
+               `(eval-when (:compile-toplevel :load-toplevel :execute)
+                 (defparameter ,name
+                   (list ,@(mapcar #'(lambda (name) (symbolicate name "-OFFSET")) regs))))))
   ;; Wired zero register.
   (defreg zero 0) ; NULL
   ;; Reserved for assembler use.
@@ -96,19 +96,19 @@
 ;;;
 ;;; Handy macro so we don't have to keep changing all the numbers whenever
 ;;; we insert a new storage class.
-;;; 
+;;;
 (defmacro !define-storage-classes (&rest classes)
   (do ((forms (list 'progn)
-	      (let* ((class (car classes))
-		     (sc-name (car class))
-		     (constant-name (intern (concatenate 'simple-string
-							 (string sc-name)
-							 "-SC-NUMBER"))))
-		(list* `(define-storage-class ,sc-name ,index
-			  ,@(cdr class))
-		       `(defconstant ,constant-name ,index)
-		       `(export ',constant-name)
-		       forms)))
+              (let* ((class (car classes))
+                     (sc-name (car class))
+                     (constant-name (intern (concatenate 'simple-string
+                                                         (string sc-name)
+                                                         "-SC-NUMBER"))))
+                (list* `(define-storage-class ,sc-name ,index
+                          ,@(cdr class))
+                       `(defconstant ,constant-name ,index)
+                       `(export ',constant-name)
+                       forms)))
        (index 0 (1+ index))
        (classes classes (cdr classes)))
       ((null classes)
@@ -152,7 +152,7 @@
    registers
    :locations #.(append non-descriptor-regs descriptor-regs)
    :reserve-locations #.(append reserve-non-descriptor-regs
-				reserve-descriptor-regs)
+                                reserve-descriptor-regs)
    :constant-scs (constant zero immediate)
    :save-p t
    :alternate-scs (control-stack))
@@ -261,12 +261,12 @@
 ;;;; Random TNs for interesting registers
 
 (macrolet ((defregtn (name sc)
-	       (let ((offset-sym (symbolicate name "-OFFSET"))
-		     (tn-sym (symbolicate name "-TN")))
-		 `(defparameter ,tn-sym
-		   (make-random-tn :kind :normal
-		    :sc (sc-or-lose ',sc)
-		    :offset ,offset-sym)))))
+               (let ((offset-sym (symbolicate name "-OFFSET"))
+                     (tn-sym (symbolicate name "-TN")))
+                 `(defparameter ,tn-sym
+                   (make-random-tn :kind :normal
+                    :sc (sc-or-lose ',sc)
+                    :offset ,offset-sym)))))
   (defregtn zero any-reg)
   (defregtn nargs any-reg)
 
@@ -297,10 +297,10 @@
      (sc-number-or-lose 'null))
     (symbol
      (if (static-symbol-p value)
-	 (sc-number-or-lose 'immediate)
-	 nil))
+         (sc-number-or-lose 'immediate)
+         nil))
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
-	 system-area-pointer character)
+         system-area-pointer character)
      (sc-number-or-lose 'immediate))
     (system-area-pointer
      (sc-number-or-lose 'immediate))
@@ -332,7 +332,7 @@
 ;;;
 
 ;;; Names to use for the argument registers.
-;;; 
+;;;
 (defconstant-eqx register-arg-names '(a0 a1 a2 a3 a4 a5) #'equal)
 
 ) ; EVAL-WHEN
@@ -342,10 +342,10 @@
 ;;;
 (defparameter register-arg-tns
   (mapcar #'(lambda (n)
-	      (make-random-tn :kind :normal
-			      :sc (sc-or-lose 'descriptor-reg)
-			      :offset n))
-	  *register-arg-offsets*))
+              (make-random-tn :kind :normal
+                              :sc (sc-or-lose 'descriptor-reg)
+                              :offset n))
+          *register-arg-offsets*))
 
 ;;; This is used by the debugger.
 (defconstant single-value-return-byte-offset 8)
@@ -355,10 +355,10 @@
 (!def-vm-support-routine location-print-name (tn)
   (declare (type tn tn))
   (let ((sb (sb-name (sc-sb (tn-sc tn))))
-	(offset (tn-offset tn)))
+        (offset (tn-offset tn)))
     (ecase sb
       (registers (or (svref *register-names* offset)
-		     (format nil "R~D" offset)))
+                     (format nil "R~D" offset)))
       (float-registers (format nil "F~D" offset))
       (control-stack (format nil "CS~D" offset))
       (non-descriptor-stack (format nil "NS~D" offset))

@@ -16,7 +16,7 @@
 ;;; The number of bytes reserved above the number stack pointer.  These
 ;;; slots are required by architecture, mostly (?) to make C backtrace
 ;;; work. This must be a power of 2 - see BYTES-REQUIRED-FOR-NUMBER-STACK.
-;;; 
+;;;
 (def!constant number-stack-displacement
   (* #!-darwin 2
      #!+darwin 8
@@ -32,7 +32,7 @@
                  `(eval-when (:compile-toplevel :load-toplevel :execute)
                    (def!constant ,offset-sym ,offset)
                    (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
-           
+
            (defregset (name &rest regs)
                `(eval-when (:compile-toplevel :load-toplevel :execute)
                  (defparameter ,name
@@ -49,7 +49,7 @@
   (defreg nl4 7)
   (defreg nl5 8)
   (defreg nl6 9)
-  (defreg fdefn 10)			; was nl7
+  (defreg fdefn 10)                     ; was nl7
   (defreg nargs 11)
   ;; FIXME: some kind of comment here would be nice.
   ;;
@@ -79,11 +79,11 @@
 
   (defregset non-descriptor-regs
       nl0 nl1 nl2 nl3 nl4 nl5 nl6 #+nil nl7 cfunc nargs nfp)
-  
+
   (defregset descriptor-regs
       fdefn a0 a1 a2 a3  ocfp lra cname lexenv l0 l1 l2 )
 
-  
+
  (defregset *register-arg-offsets*  a0 a1 a2 a3)
  (defparameter register-arg-names '(a0 a1 a2 a3)))
 
@@ -101,18 +101,18 @@
 ;;;
 ;;; Handy macro so we don't have to keep changing all the numbers whenever
 ;;; we insert a new storage class.
-;;; 
+;;;
 (defmacro define-storage-classes (&rest classes)
   (do ((forms (list 'progn)
-	      (let* ((class (car classes))
-		     (sc-name (car class))
-		     (constant-name (intern (concatenate 'simple-string
-							 (string sc-name)
-							 "-SC-NUMBER"))))
-		(list* `(define-storage-class ,sc-name ,index
-			  ,@(cdr class))
-		       `(def!constant ,constant-name ,index)
-		       forms)))
+              (let* ((class (car classes))
+                     (sc-name (car class))
+                     (constant-name (intern (concatenate 'simple-string
+                                                         (string sc-name)
+                                                         "-SC-NUMBER"))))
+                (list* `(define-storage-class ,sc-name ,index
+                          ,@(cdr class))
+                       `(def!constant ,constant-name ,index)
+                       forms)))
        (index 0 (1+ index))
        (classes classes (cdr classes)))
       ((null classes)
@@ -145,7 +145,7 @@
   (sap-stack non-descriptor-stack) ; System area pointers.
   (single-stack non-descriptor-stack) ; single-floats
   (double-stack non-descriptor-stack
-		:element-size 2 :alignment 2) ; double floats.
+                :element-size 2 :alignment 2) ; double floats.
   (complex-single-stack non-descriptor-stack :element-size 2)
   (complex-double-stack non-descriptor-stack :element-size 4 :alignment 2)
 
@@ -256,7 +256,7 @@
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
   (defregtn alloc any-reg)
-  
+
   (defregtn nargs any-reg)
   (defregtn bsp any-reg)
   (defregtn csp any-reg)
@@ -273,12 +273,12 @@
     (null
      (sc-number-or-lose 'null))
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
-	 system-area-pointer character)
+         system-area-pointer character)
      (sc-number-or-lose 'immediate))
     (symbol
      (if (static-symbol-p value)
-	 (sc-number-or-lose 'immediate)
-	 nil))))
+         (sc-number-or-lose 'immediate)
+         nil))))
 
 ;;;; function call parameters
 
@@ -307,10 +307,10 @@
 ;;;
 (defparameter *register-arg-tns*
   (mapcar #'(lambda (n)
-	      (make-random-tn :kind :normal
-			      :sc (sc-or-lose 'descriptor-reg)
-			      :offset n))
-	  *register-arg-offsets*))
+              (make-random-tn :kind :normal
+                              :sc (sc-or-lose 'descriptor-reg)
+                              :offset n))
+          *register-arg-offsets*))
 
 (export 'single-value-return-byte-offset)
 
@@ -322,10 +322,10 @@
 (!def-vm-support-routine location-print-name (tn)
   (declare (type tn tn))
   (let ((sb (sb-name (sc-sb (tn-sc tn))))
-	(offset (tn-offset tn)))
+        (offset (tn-offset tn)))
     (ecase sb
       (registers (or (svref *register-names* offset)
-		     (format nil "R~D" offset)))
+                     (format nil "R~D" offset)))
       (float-registers (format nil "F~D" offset))
       (control-stack (format nil "CS~D" offset))
       (non-descriptor-stack (format nil "NS~D" offset))

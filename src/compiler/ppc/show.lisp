@@ -16,7 +16,7 @@
   (:generator 100
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-	(store-stack-tn nfp-save cur-nfp))
+        (store-stack-tn nfp-save cur-nfp))
       (move nl0 object)
       (inst lr temp  (make-fixup "call_into_c" :foreign))
       (inst mr lip temp)
@@ -24,5 +24,5 @@
       (inst lr cfunc (make-fixup "debug_print" :foreign))
       (inst bctrl)
       (when cur-nfp
-	(load-stack-tn cur-nfp nfp-save))
+        (load-stack-tn cur-nfp nfp-save))
       (move result nl0))))

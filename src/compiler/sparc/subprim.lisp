@@ -19,15 +19,15 @@
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) ptr)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (any-reg) :type fixnum :to (:result 0) :target result)
-	      count)
+              count)
   (:results (result :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 50
     (let ((done (gen-label))
-	  (loop (gen-label))
-	  (not-list (generate-cerror-code vop object-not-list-error object)))
+          (loop (gen-label))
+          (not-list (generate-cerror-code vop object-not-list-error object)))
       (move ptr object)
       (move count zero-tn)
 
@@ -50,7 +50,7 @@
 
       (emit-label done)
       (move result count))))
-       
+
 
 (define-static-fun length (object) :translate length)
 

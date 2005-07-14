@@ -32,7 +32,7 @@
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:results (res :scs (descriptor-reg)))
-  (:note "SAP to pointer coercion") 
+  (:note "SAP to pointer coercion")
   (:generator 20
     (with-fixed-allocation (res pa-flag ndescr sap-widetag sap-size)
       (storew sap res sap-pointer-slot other-pointer-lowtag))))
@@ -43,10 +43,10 @@
 ;;; Move untagged sap values.
 (define-vop (sap-move)
   (:args (x :target y
-	    :scs (sap-reg)
-	    :load-if (not (location= x y))))
+            :scs (sap-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (sap-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:note "SAP move")
   (:effects)
   (:affected)
@@ -60,9 +60,9 @@
 ;;; Move untagged sap arguments/return-values.
 (define-vop (move-sap-arg)
   (:args (x :target y
-	    :scs (sap-reg))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y sap-reg))))
+            :scs (sap-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y sap-reg))))
   (:results (y))
   (:note "SAP argument move")
   (:generator 0
@@ -105,7 +105,7 @@
 (define-vop (pointer+)
   (:translate sap+)
   (:args (ptr :scs (sap-reg))
-	 (offset :scs (signed-reg)))
+         (offset :scs (signed-reg)))
   (:arg-types system-area-pointer signed-num)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
@@ -127,7 +127,7 @@
 (define-vop (pointer-)
   (:translate sap-)
   (:args (ptr1 :scs (sap-reg))
-	 (ptr2 :scs (sap-reg)))
+         (ptr2 :scs (sap-reg)))
   (:arg-types system-area-pointer system-area-pointer)
   (:policy :fast-safe)
   (:results (res :scs (signed-reg)))
@@ -137,96 +137,96 @@
 
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 (macrolet ((def-system-ref-and-set
-	       (ref-name set-name sc type size &optional signed)
-	       (let ((ref-name-c (symbolicate ref-name "-C"))
-		     (set-name-c (symbolicate set-name "-C")))
-		 `(progn
-		   (define-vop (,ref-name)
-		       (:translate ,ref-name)
-		     (:policy :fast-safe)
-		     (:args (sap :scs (sap-reg))
-		      (offset :scs (signed-reg)))
-		     (:arg-types system-area-pointer signed-num)
-		     (:results (result :scs (,sc)))
-		     (:result-types ,type)
-		     (:generator 5
-		      (inst ,(ecase size
-				    (:byte 'lbzx)
-				    (:short (if signed 'lhax 'lhzx))
-				    (:long 'lwzx)
-				    (:single 'lfsx)
-				    (:double 'lfdx))
-			    result sap offset)
-		      ,@(when (and (eq size :byte) signed)
-			      '((inst extsb result result)))))
-		   (define-vop (,ref-name-c)
-		       (:translate ,ref-name)
-		     (:policy :fast-safe)
-		     (:args (sap :scs (sap-reg)))
-		     (:arg-types system-area-pointer (:constant (signed-byte 16)))
-		     (:info offset)
-		     (:results (result :scs (,sc)))
-		     (:result-types ,type)
-		     (:generator 4
-		      (inst ,(ecase size
-				    (:byte 'lbz)
-				    (:short (if signed 'lha 'lhz))
-				    (:long 'lwz)
-				    (:single 'lfs)
-				    (:double 'lfd))
-			    result sap offset)
-		      ,@(when (and (eq size :byte) signed)
-			      '((inst extsb result result)))))
-		   (define-vop (,set-name)
-		       (:translate ,set-name)
-		     (:policy :fast-safe)
-		     (:args (sap :scs (sap-reg))
-		      (offset :scs (signed-reg))
-		      (value :scs (,sc) :target result))
-		     (:arg-types system-area-pointer signed-num ,type)
-		     (:results (result :scs (,sc)))
-		     (:result-types ,type)
-		     (:generator 5
-		      (inst ,(ecase size
-				    (:byte 'stbx)
-				    (:short 'sthx)
-				    (:long 'stwx)
-				    (:single 'stfsx)
-				    (:double 'stfdx))
-			    value sap offset)
-		      (unless (location= result value)
-			,@(case size
-				(:single
-				 '((inst frsp result value)))
-				(:double
-				 '((inst fmr result value)))
-				(t
-				 '((inst mr result value)))))))
-		   (define-vop (,set-name-c)
-		       (:translate ,set-name)
-		     (:policy :fast-safe)
-		     (:args (sap :scs (sap-reg))
-		      (value :scs (,sc) :target result))
-		     (:arg-types system-area-pointer (:constant (signed-byte 16)) ,type)
-		     (:info offset)
-		     (:results (result :scs (,sc)))
-		     (:result-types ,type)
-		     (:generator 4
-		      (inst ,(ecase size
-				    (:byte 'stb)
-				    (:short 'sth)
-				    (:long 'stw)
-				    (:single 'stfs)
-				    (:double 'stfd))
-			    value sap offset)
-		      (unless (location= result value)
-			,@(case size
-				(:single
-				 '((inst frsp result value)))
-				(:double
-				 '((inst fmr result value)))
-				(t
-				 '((inst mr result value)))))))))))
+               (ref-name set-name sc type size &optional signed)
+               (let ((ref-name-c (symbolicate ref-name "-C"))
+                     (set-name-c (symbolicate set-name "-C")))
+                 `(progn
+                   (define-vop (,ref-name)
+                       (:translate ,ref-name)
+                     (:policy :fast-safe)
+                     (:args (sap :scs (sap-reg))
+                      (offset :scs (signed-reg)))
+                     (:arg-types system-area-pointer signed-num)
+                     (:results (result :scs (,sc)))
+                     (:result-types ,type)
+                     (:generator 5
+                      (inst ,(ecase size
+                                    (:byte 'lbzx)
+                                    (:short (if signed 'lhax 'lhzx))
+                                    (:long 'lwzx)
+                                    (:single 'lfsx)
+                                    (:double 'lfdx))
+                            result sap offset)
+                      ,@(when (and (eq size :byte) signed)
+                              '((inst extsb result result)))))
+                   (define-vop (,ref-name-c)
+                       (:translate ,ref-name)
+                     (:policy :fast-safe)
+                     (:args (sap :scs (sap-reg)))
+                     (:arg-types system-area-pointer (:constant (signed-byte 16)))
+                     (:info offset)
+                     (:results (result :scs (,sc)))
+                     (:result-types ,type)
+                     (:generator 4
+                      (inst ,(ecase size
+                                    (:byte 'lbz)
+                                    (:short (if signed 'lha 'lhz))
+                                    (:long 'lwz)
+                                    (:single 'lfs)
+                                    (:double 'lfd))
+                            result sap offset)
+                      ,@(when (and (eq size :byte) signed)
+                              '((inst extsb result result)))))
+                   (define-vop (,set-name)
+                       (:translate ,set-name)
+                     (:policy :fast-safe)
+                     (:args (sap :scs (sap-reg))
+                      (offset :scs (signed-reg))
+                      (value :scs (,sc) :target result))
+                     (:arg-types system-area-pointer signed-num ,type)
+                     (:results (result :scs (,sc)))
+                     (:result-types ,type)
+                     (:generator 5
+                      (inst ,(ecase size
+                                    (:byte 'stbx)
+                                    (:short 'sthx)
+                                    (:long 'stwx)
+                                    (:single 'stfsx)
+                                    (:double 'stfdx))
+                            value sap offset)
+                      (unless (location= result value)
+                        ,@(case size
+                                (:single
+                                 '((inst frsp result value)))
+                                (:double
+                                 '((inst fmr result value)))
+                                (t
+                                 '((inst mr result value)))))))
+                   (define-vop (,set-name-c)
+                       (:translate ,set-name)
+                     (:policy :fast-safe)
+                     (:args (sap :scs (sap-reg))
+                      (value :scs (,sc) :target result))
+                     (:arg-types system-area-pointer (:constant (signed-byte 16)) ,type)
+                     (:info offset)
+                     (:results (result :scs (,sc)))
+                     (:result-types ,type)
+                     (:generator 4
+                      (inst ,(ecase size
+                                    (:byte 'stb)
+                                    (:short 'sth)
+                                    (:long 'stw)
+                                    (:single 'stfs)
+                                    (:double 'stfd))
+                            value sap offset)
+                      (unless (location= result value)
+                        ,@(case size
+                                (:single
+                                 '((inst frsp result value)))
+                                (:double
+                                 '((inst fmr result value)))
+                                (t
+                                 '((inst mr result value)))))))))))
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8
     unsigned-reg positive-fixnum :byte nil)
   (def-system-ref-and-set signed-sap-ref-8 %set-signed-sap-ref-8
@@ -255,16 +255,16 @@
   (:result-types system-area-pointer)
   (:generator 2
     (inst addi sap vector
-	  (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))))
+          (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))))
 
 ;;; Transforms for 64-bit SAP accessors.
 (deftransform sap-ref-64 ((sap offset) (* *))
   '(logior (ash (sap-ref-32 sap offset) 32)
-	   (sap-ref-32 sap (+ offset 4))))
+           (sap-ref-32 sap (+ offset 4))))
 
 (deftransform signed-sap-ref-64 ((sap offset) (* *))
   '(logior (ash (signed-sap-ref-32 sap offset) 32)
-	   (sap-ref-32 sap (+ 4 offset))))
+           (sap-ref-32 sap (+ 4 offset))))
 
 (deftransform %set-sap-ref-64 ((sap offset value) (* * *))
   '(progn

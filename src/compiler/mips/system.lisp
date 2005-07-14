@@ -5,7 +5,7 @@
 
 (define-vop (pointer-compare)
   (:args (x :scs (sap-reg))
-	 (y :scs (sap-reg)))
+         (y :scs (sap-reg)))
   (:arg-types system-area-pointer system-area-pointer)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:conditional)
@@ -18,12 +18,12 @@
 
 #+nil
 (macrolet ((frob (name cond)
-	     `(progn
-		(def-primitive-translator ,name (x y) `(,',name ,x ,y))
-		(defknown ,name (t t) boolean (movable foldable flushable))
-		(define-vop (,name pointer-compare)
-		  (:translate ,name)
-		  (:variant ,cond)))))
+             `(progn
+                (def-primitive-translator ,name (x y) `(,',name ,x ,y))
+                (defknown ,name (t t) boolean (movable foldable flushable))
+                (define-vop (,name pointer-compare)
+                  (:translate ,name)
+                  (:variant ,cond)))))
   (frob pointer< :lt)
   (frob pointer> :gt))
 
@@ -80,7 +80,7 @@
     OTHER-PTR
     (load-type result object (- other-pointer-lowtag))
     (inst nop)
-      
+
     DONE))
 
 (define-vop (fun-subtype)
@@ -97,7 +97,7 @@
   (:translate (setf fun-subtype))
   (:policy :fast-safe)
   (:args (type :scs (unsigned-reg) :target result)
-	 (function :scs (descriptor-reg)))
+         (function :scs (descriptor-reg)))
   (:arg-types positive-fixnum *)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -130,7 +130,7 @@
   (:translate set-header-data)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target res)
-	 (data :scs (any-reg immediate zero)))
+         (data :scs (any-reg immediate zero)))
   (:arg-types * positive-fixnum)
   (:results (res :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) t1 t2)
@@ -159,8 +159,8 @@
 
 (define-vop (make-other-immediate-type)
   (:args (val :scs (any-reg descriptor-reg))
-	 (type :scs (any-reg descriptor-reg immediate)
-	       :target temp))
+         (type :scs (any-reg descriptor-reg immediate)
+               :target temp))
   (:results (res :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 2
@@ -219,7 +219,7 @@
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
-	 (offset :scs (signed-reg unsigned-reg)))
+         (offset :scs (signed-reg unsigned-reg)))
   (:arg-types * positive-fixnum)
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
@@ -256,7 +256,7 @@
   (:temporary (:scs (non-descriptor-reg)) count)
   (:generator 1
     (let ((offset
-	   (- (* (+ index vector-data-offset) n-word-bytes) other-pointer-lowtag)))
+           (- (* (+ index vector-data-offset) n-word-bytes) other-pointer-lowtag)))
       (inst lw count count-vector offset)
       (inst nop)
       (inst addu count 1)

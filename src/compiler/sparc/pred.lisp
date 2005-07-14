@@ -26,7 +26,7 @@
 
 (define-vop (if-eq)
   (:args (x :scs (any-reg descriptor-reg zero null))
-	 (y :scs (any-reg descriptor-reg zero null)))
+         (y :scs (any-reg descriptor-reg zero null)))
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe)

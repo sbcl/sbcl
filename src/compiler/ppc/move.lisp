@@ -24,7 +24,7 @@
        (load-symbol y val))
       (character
        (inst lr y (logior (ash (char-code val) n-widetag-bits)
-			  character-widetag))))))
+                          character-widetag))))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate zero)
@@ -71,10 +71,10 @@
 ;;;; The Move VOP:
 (define-vop (move)
   (:args (x :target y
-	    :scs (any-reg descriptor-reg zero null)
-	    :load-if (not (location= x y))))
+            :scs (any-reg descriptor-reg zero null)
+            :load-if (not (location= x y))))
   (:results (y :scs (any-reg descriptor-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:generator 0
@@ -93,9 +93,9 @@
 ;;; frame for argument or known value passing.
 (define-vop (move-arg)
   (:args (x :target y
-	    :scs (any-reg descriptor-reg zero null))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y any-reg descriptor-reg))))
+            :scs (any-reg descriptor-reg zero null))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
   (:generator 0
     (sc-case y
@@ -165,14 +165,14 @@
     (let ((done (gen-label)))
       (inst andi. temp x 3)
       (sc-case y
-	(signed-reg
-	 (inst srawi y x 2))
-	(unsigned-reg
-	 (inst srwi y x 2)))
-      
+        (signed-reg
+         (inst srawi y x 2))
+        (unsigned-reg
+         (inst srwi y x 2)))
+
       (inst beq done)
       (loadw y x bignum-digits-offset other-pointer-lowtag)
-      
+
       (emit-label done))))
 (define-move-vop move-to-word/integer :move
   (descriptor-reg) (signed-reg unsigned-reg))
@@ -205,9 +205,9 @@
       (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
       (inst slwi y x 2)                 ; assume fixnum (tagged ok, maybe lost some high bits)
       (inst bns done)
-      
+
       (with-fixed-allocation (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
-	(storew x y bignum-digits-offset other-pointer-lowtag))
+        (storew x y bignum-digits-offset other-pointer-lowtag))
       (emit-label done))))
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
@@ -224,24 +224,24 @@
   (:generator 20
     (move x arg)
     (let ((done (gen-label))
-	  (one-word (gen-label))
-	  (initial-alloc (pad-data-block (1+ bignum-digits-offset))))
+          (one-word (gen-label))
+          (initial-alloc (pad-data-block (1+ bignum-digits-offset))))
       (inst srawi. temp x 29)
       (inst slwi y x 2)
       (inst beq done)
-      
+
       (pseudo-atomic (pa-flag :extra initial-alloc)
-	(inst cmpwi x 0)
-	(inst ori y alloc-tn other-pointer-lowtag)
-	(inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
-	(inst bge one-word)
-	(inst addi alloc-tn alloc-tn
-	      (- (pad-data-block (+ bignum-digits-offset 2))
-		 (pad-data-block (+ bignum-digits-offset 1))))
-	(inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))
-	(emit-label one-word)
-	(storew temp y 0 other-pointer-lowtag)
-	(storew x y bignum-digits-offset other-pointer-lowtag))
+        (inst cmpwi x 0)
+        (inst ori y alloc-tn other-pointer-lowtag)
+        (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
+        (inst bge one-word)
+        (inst addi alloc-tn alloc-tn
+              (- (pad-data-block (+ bignum-digits-offset 2))
+                 (pad-data-block (+ bignum-digits-offset 1))))
+        (inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))
+        (emit-label one-word)
+        (storew temp y 0 other-pointer-lowtag)
+        (storew x y bignum-digits-offset other-pointer-lowtag))
       (emit-label done))))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
@@ -250,10 +250,10 @@
 ;;; Move untagged numbers.
 (define-vop (word-move)
   (:args (x :target y
-	    :scs (signed-reg unsigned-reg)
-	    :load-if (not (location= x y))))
+            :scs (signed-reg unsigned-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (signed-reg unsigned-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:note "word integer move")
@@ -266,9 +266,9 @@
 ;;; Move untagged number arguments/return-values.
 (define-vop (move-word-arg)
   (:args (x :target y
-	    :scs (signed-reg unsigned-reg))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y sap-reg))))
+            :scs (signed-reg unsigned-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y sap-reg))))
   (:results (y))
   (:note "word integer argument move")
   (:generator 0

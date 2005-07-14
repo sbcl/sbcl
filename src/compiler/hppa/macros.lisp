@@ -33,17 +33,17 @@
 
 (defmacro load-symbol-value (reg symbol)
   `(inst ldw
-	 (+ (static-symbol-offset ',symbol)
-	    (ash symbol-value-slot word-shift)
-	    (- other-pointer-lowtag))
-	 null-tn
-	 ,reg))
+         (+ (static-symbol-offset ',symbol)
+            (ash symbol-value-slot word-shift)
+            (- other-pointer-lowtag))
+         null-tn
+         ,reg))
 
 (defmacro store-symbol-value (reg symbol)
   `(inst stw ,reg (+ (static-symbol-offset ',symbol)
-		     (ash symbol-value-slot word-shift)
-		     (- other-pointer-lowtag))
-	 null-tn))
+                     (ash symbol-value-slot word-shift)
+                     (- other-pointer-lowtag))
+         null-tn))
 
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
@@ -55,15 +55,15 @@
      `(inst ldb (+ ,offset 3) ,source ,target))))
 
 ;;; Macros to handle the fact that we cannot use the machine native call and
-;;; return instructions. 
+;;; return instructions.
 
 (defmacro lisp-jump (function)
   "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
   `(progn
      (inst addi
-	   (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
-	   ,function
-	   lip-tn)
+           (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
+           ,function
+           lip-tn)
      (inst bv lip-tn)
      (move ,function code-tn)))
 
@@ -71,10 +71,10 @@
   "Return to RETURN-PC."
   `(progn
      (inst addi (- (* (1+ ,offset) n-word-bytes) other-pointer-lowtag)
-	   ,return-pc lip-tn)
+           ,return-pc lip-tn)
      (inst bv lip-tn ,@(unless frob-code '(:nullify t)))
      ,@(when frob-code
-	 `((move ,return-pc code-tn)))))
+         `((move ,return-pc code-tn)))))
 
 (defmacro emit-return-pc (label)
   "Emit a return-pc header word.  LABEL is the label to use for this
@@ -90,36 +90,36 @@
 ;;; Move a stack TN to a register and vice-versa.
 (defmacro load-stack-tn (reg stack)
   `(let ((reg ,reg)
-	 (stack ,stack))
+         (stack ,stack))
      (let ((offset (tn-offset stack)))
        (sc-case stack
-	 ((control-stack)
-	  (loadw reg cfp-tn offset))))))
+         ((control-stack)
+          (loadw reg cfp-tn offset))))))
 (defmacro store-stack-tn (stack reg)
   `(let ((stack ,stack)
-	 (reg ,reg))
+         (reg ,reg))
      (let ((offset (tn-offset stack)))
        (sc-case stack
-	 ((control-stack)
-	  (storew reg cfp-tn offset))))))
+         ((control-stack)
+          (storew reg cfp-tn offset))))))
 
 (defmacro maybe-load-stack-tn (reg reg-or-stack)
   "Move the TN Reg-Or-Stack into Reg if it isn't already there."
   (once-only ((n-reg reg)
-	      (n-stack reg-or-stack))
+              (n-stack reg-or-stack))
     `(sc-case ,n-reg
        ((any-reg descriptor-reg)
-	(sc-case ,n-stack
-	  ((any-reg descriptor-reg)
-	   (move ,n-stack ,n-reg))
-	  ((control-stack)
-	   (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
+        (sc-case ,n-stack
+          ((any-reg descriptor-reg)
+           (move ,n-stack ,n-reg))
+          ((control-stack)
+           (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
 
 
 ;;;; Storage allocation:
 
 (defmacro with-fixed-allocation ((result-tn temp-tn type-code size)
-				 &body body)
+                                 &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
   word header having the specified Type-Code.  The result is placed in
   Result-TN, and Temp-TN is a non-descriptor temp (which may be randomly used
@@ -128,7 +128,7 @@
   (unless body
     (bug "empty &body in WITH-FIXED-ALLOCATION"))
   (once-only ((result-tn result-tn) (temp-tn temp-tn)
-	      (type-code type-code) (size size))
+              (type-code type-code) (size size))
     `(pseudo-atomic (:extra (pad-data-block ,size))
        (inst move alloc-tn ,result-tn)
        (inst dep other-pointer-lowtag 31 3 ,result-tn)
@@ -142,27 +142,27 @@
   (defun emit-error-break (vop kind code values)
     (let ((vector (gensym)))
       `((let ((vop ,vop))
-	  (when vop
-	    (note-this-location vop :internal-error)))
-	(inst break ,kind)
-	(with-adjustable-vector (,vector)
-	  (write-var-integer (error-number-or-lose ',code) ,vector)
-	  ,@(mapcar #'(lambda (tn)
-			`(let ((tn ,tn))
-			   (write-var-integer (make-sc-offset (sc-number
-							       (tn-sc tn))
-							      (tn-offset tn))
-					      ,vector)))
-		    values)
-	  (inst byte (length ,vector))
-	  (dotimes (i (length ,vector))
-	    (inst byte (aref ,vector i))))
-	(align word-shift)))))
+          (when vop
+            (note-this-location vop :internal-error)))
+        (inst break ,kind)
+        (with-adjustable-vector (,vector)
+          (write-var-integer (error-number-or-lose ',code) ,vector)
+          ,@(mapcar #'(lambda (tn)
+                        `(let ((tn ,tn))
+                           (write-var-integer (make-sc-offset (sc-number
+                                                               (tn-sc tn))
+                                                              (tn-offset tn))
+                                              ,vector)))
+                    values)
+          (inst byte (length ,vector))
+          (dotimes (i (length ,vector))
+            (inst byte (aref ,vector i))))
+        (align word-shift)))))
 
 (defmacro error-call (vop error-code &rest values)
   "Cause an error.  ERROR-CODE is the error to cause."
   (cons 'progn
-	(emit-error-break vop error-trap error-code values)))
+        (emit-error-break vop error-trap error-code values)))
 
 
 (defmacro cerror-call (vop label error-code &rest values)
@@ -190,10 +190,10 @@
     `(let ((,continue (gen-label)))
        (emit-label ,continue)
        (assemble (*elsewhere*)
-	 (let ((,error (gen-label)))
-	   (emit-label ,error)
-	   (cerror-call ,vop ,continue ,error-code ,@values)
-	   ,error)))))
+         (let ((,error (gen-label)))
+           (emit-label ,error)
+           (cerror-call ,vop ,continue ,error-code ,@values)
+           ,error)))))
 
 ;;;; PSEUDO-ATOMIC
 
@@ -208,163 +208,163 @@
 ;;;; indexed references
 
 (deftype load/store-index (scale lowtag min-offset
-				 &optional (max-offset min-offset))
+                                 &optional (max-offset min-offset))
   `(integer ,(- (truncate (+ (ash 1 14)
-			     (* min-offset n-word-bytes)
-			     (- lowtag))
-			  scale))
-	    ,(truncate (- (+ (1- (ash 1 14)) lowtag)
-			  (* max-offset n-word-bytes))
-		       scale)))
+                             (* min-offset n-word-bytes)
+                             (- lowtag))
+                          scale))
+            ,(truncate (- (+ (1- (ash 1 14)) lowtag)
+                          (* max-offset n-word-bytes))
+                       scale)))
 
 (defmacro define-full-reffer (name type offset lowtag scs el-type
-				   &optional translate)
+                                   &optional translate)
   `(progn
      (define-vop (,name)
        ,@(when translate
-	   `((:translate ,translate)))
+           `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg) :to (:eval 0))
-	      (index :scs (any-reg) :target temp))
+              (index :scs (any-reg) :target temp))
        (:arg-types ,type tagged-num)
        (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) temp)
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 5
-	 (inst addi (- (* ,offset n-word-bytes) ,lowtag) index temp)
-	 (inst ldwx temp object value)))
+         (inst addi (- (* ,offset n-word-bytes) ,lowtag) index temp)
+         (inst ldwx temp object value)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
-	   `((:translate ,translate)))
+           `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)))
        (:info index)
        (:arg-types ,type
-		   (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
-						,(eval offset))))
+                   (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
+                                                ,(eval offset))))
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 4
-	 (inst ldw (- (* (+ ,offset index) n-word-bytes) ,lowtag)
-	       object value)))))
+         (inst ldw (- (* (+ ,offset index) n-word-bytes) ,lowtag)
+               object value)))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type
-				   &optional translate)
+                                   &optional translate)
   `(progn
      (define-vop (,name)
        ,@(when translate
-	   `((:translate ,translate)))
+           `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-	      (index :scs (any-reg))
-	      (value :scs ,scs :target result))
+              (index :scs (any-reg))
+              (value :scs ,scs :target result))
        (:arg-types ,type tagged-num ,el-type)
        (:temporary (:scs (interior-reg)) lip)
        (:results (result :scs ,scs))
        (:result-types ,el-type)
        (:generator 2
-	 (inst add object index lip)
-	 (inst stw value (- (* ,offset n-word-bytes) ,lowtag) lip)
-	 (move value result)))
+         (inst add object index lip)
+         (inst stw value (- (* ,offset n-word-bytes) ,lowtag) lip)
+         (move value result)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
-	   `((:translate ,translate)))
+           `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-	      (value :scs ,scs))
+              (value :scs ,scs))
        (:info index)
        (:arg-types ,type
-		   (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
-						,(eval offset)))
-		   ,el-type)
+                   (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
+                                                ,(eval offset)))
+                   ,el-type)
        (:results (result :scs ,scs))
        (:result-types ,el-type)
        (:generator 1
-	 (inst stw value (- (* (+ ,offset index) n-word-bytes) ,lowtag) object)
-	 (move value result)))))
+         (inst stw value (- (* (+ ,offset index) n-word-bytes) ,lowtag) object)
+         (move value result)))))
 
 
 (defmacro define-partial-reffer (name type size signed offset lowtag scs
-				      el-type &optional translate)
+                                      el-type &optional translate)
   (let ((scale (ecase size (:byte 1) (:short 2))))
     `(progn
        (define-vop (,name)
-	 ,@(when translate
-	     `((:translate ,translate)))
-	 (:policy :fast-safe)
-	 (:args (object :scs (descriptor-reg) :to (:eval 0))
-		(index :scs (unsigned-reg)))
-	 (:arg-types ,type positive-fixnum)
-	 (:results (value :scs ,scs))
-	 (:result-types ,el-type)
-	 (:temporary (:scs (interior-reg)) lip)
-	 (:generator 5
-	   (inst ,(ecase size (:byte 'add) (:short 'sh1add))
-		 index object lip)
-	   (inst ,(ecase size (:byte 'ldb) (:short 'ldh))
-		 (- (* ,offset n-word-bytes) ,lowtag) lip value)
-	   ,@(when signed
-	       `((inst extrs value 31 ,(* scale n-byte-bits) value)))))
+         ,@(when translate
+             `((:translate ,translate)))
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg) :to (:eval 0))
+                (index :scs (unsigned-reg)))
+         (:arg-types ,type positive-fixnum)
+         (:results (value :scs ,scs))
+         (:result-types ,el-type)
+         (:temporary (:scs (interior-reg)) lip)
+         (:generator 5
+           (inst ,(ecase size (:byte 'add) (:short 'sh1add))
+                 index object lip)
+           (inst ,(ecase size (:byte 'ldb) (:short 'ldh))
+                 (- (* ,offset n-word-bytes) ,lowtag) lip value)
+           ,@(when signed
+               `((inst extrs value 31 ,(* scale n-byte-bits) value)))))
        (define-vop (,(symbolicate name "-C"))
-	 ,@(when translate
-	     `((:translate ,translate)))
-	 (:policy :fast-safe)
-	 (:args (object :scs (descriptor-reg)))
-	 (:info index)
-	 (:arg-types ,type
-		     (:constant (load/store-index ,scale
-						  ,(eval lowtag)
-						  ,(eval offset))))
-	 (:results (value :scs ,scs))
-	 (:result-types ,el-type)
-	 (:generator 5
-	   (inst ,(ecase size (:byte 'ldb) (:short 'ldh))
-		 (- (+ (* ,offset n-word-bytes) (* index ,scale)) ,lowtag)
-		 object value)
-	   ,@(when signed
-	       `((inst extrs value 31 ,(* scale n-byte-bits) value))))))))
+         ,@(when translate
+             `((:translate ,translate)))
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg)))
+         (:info index)
+         (:arg-types ,type
+                     (:constant (load/store-index ,scale
+                                                  ,(eval lowtag)
+                                                  ,(eval offset))))
+         (:results (value :scs ,scs))
+         (:result-types ,el-type)
+         (:generator 5
+           (inst ,(ecase size (:byte 'ldb) (:short 'ldh))
+                 (- (+ (* ,offset n-word-bytes) (* index ,scale)) ,lowtag)
+                 object value)
+           ,@(when signed
+               `((inst extrs value 31 ,(* scale n-byte-bits) value))))))))
 
 (defmacro define-partial-setter (name type size offset lowtag scs el-type
-				      &optional translate)
+                                      &optional translate)
   (let ((scale (ecase size (:byte 1) (:short 2))))
     `(progn
        (define-vop (,name)
-	 ,@(when translate
-	     `((:translate ,translate)))
-	 (:policy :fast-safe)
-	 (:args (object :scs (descriptor-reg))
-		(index :scs (unsigned-reg))
-		(value :scs ,scs :target result))
-	 (:arg-types ,type positive-fixnum ,el-type)
-	 (:temporary (:scs (interior-reg)) lip)
-	 (:results (result :scs ,scs))
-	 (:result-types ,el-type)
-	 (:generator 5
-	   (inst ,(ecase size (:byte 'add) (:short 'sh1add))
-		 index object lip)
-	   (inst ,(ecase size (:byte 'stb) (:short 'sth))
-		 value (- (* ,offset n-word-bytes) ,lowtag) lip)
-	   (move value result)))
+         ,@(when translate
+             `((:translate ,translate)))
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg))
+                (index :scs (unsigned-reg))
+                (value :scs ,scs :target result))
+         (:arg-types ,type positive-fixnum ,el-type)
+         (:temporary (:scs (interior-reg)) lip)
+         (:results (result :scs ,scs))
+         (:result-types ,el-type)
+         (:generator 5
+           (inst ,(ecase size (:byte 'add) (:short 'sh1add))
+                 index object lip)
+           (inst ,(ecase size (:byte 'stb) (:short 'sth))
+                 value (- (* ,offset n-word-bytes) ,lowtag) lip)
+           (move value result)))
        (define-vop (,(symbolicate name "-C"))
-	 ,@(when translate
-	     `((:translate ,translate)))
-	 (:policy :fast-safe)
-	 (:args (object :scs (descriptor-reg))
-		(value :scs ,scs :target result))
-	 (:info index)
-	 (:arg-types ,type
-		     (:constant (load/store-index ,scale
-						  ,(eval lowtag)
-						  ,(eval offset)))
-		     ,el-type)
-	 (:results (result :scs ,scs))
-	 (:result-types ,el-type)
-	 (:generator 5
-	   (inst ,(ecase size (:byte 'stb) (:short 'sth))
-		 value
-		 (- (+ (* ,offset n-word-bytes) (* index ,scale)) ,lowtag)
-		 object)
-	   (move value result))))))
+         ,@(when translate
+             `((:translate ,translate)))
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg))
+                (value :scs ,scs :target result))
+         (:info index)
+         (:arg-types ,type
+                     (:constant (load/store-index ,scale
+                                                  ,(eval lowtag)
+                                                  ,(eval offset)))
+                     ,el-type)
+         (:results (result :scs ,scs))
+         (:result-types ,el-type)
+         (:generator 5
+           (inst ,(ecase size (:byte 'stb) (:short 'sth))
+                 value
+                 (- (+ (* ,offset n-word-bytes) (* index ,scale)) ,lowtag)
+                 object)
+           (move value result))))))
 
 
 (defmacro sb!sys::with-pinned-objects ((&rest objects) &body body)
@@ -372,6 +372,6 @@
 OBJECTS will not be moved in memory for the duration of BODY.
 Useful for e.g. foreign calls where another thread may trigger
 garbage collection.  This is currently implemented by disabling GC"
-  (declare (ignore objects))		;should we eval these for side-effect?
+  (declare (ignore objects))            ;should we eval these for side-effect?
   `(without-gcing
     ,@body))

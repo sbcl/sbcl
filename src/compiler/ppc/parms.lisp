@@ -1,6 +1,6 @@
 ;;;; This file contains some parameterizations of various VM
-;;;; attributes for the PPC.  This file is separate from other stuff so 
-;;;; that it can be compiled and loaded earlier. 
+;;;; attributes for the PPC.  This file is separate from other stuff so
+;;;; that it can be compiled and loaded earlier.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -61,14 +61,14 @@
 (def!constant float-round-to-positive 2)
 (def!constant float-round-to-negative 3)
 
-(defconstant-eqx float-rounding-mode (byte 2 0) #'equalp)	  ; RD
+(defconstant-eqx float-rounding-mode (byte 2 0) #'equalp)         ; RD
 ;;; FIXME I: Beware, all ye who trespass here. Despite its name,
 ;;; FLOAT-STICKY-BITS is not the byte specifier for sticky bits in the
 ;;; floating point control word. It is more like "accrued exceptions"
 ;;; where FLOAT-EXCEPTIONS-BYTE is "current exceptions". Consequently,
 ;;; on architectures where there is no "current exceptions"
 ;;; FLOAT-EXCEPTIONS-BYTE and FLOAT-STICKY-BITS had better be the
-;;; same. 
+;;; same.
 ;;;
 ;;; FIXME II: So, I've now documented this in comments in the PowerPC
 ;;; tree. This may not make it easy to find for when new architectures
@@ -77,9 +77,9 @@
 ;;; CSR, 2002-06-11
 (defconstant-eqx float-sticky-bits (byte 5 25) #'equalp)
 (defconstant-eqx float-traps-byte (byte 5 3) #'equalp)
-(defconstant-eqx float-exceptions-byte (byte 5 25) #'equalp)	  ; cexc
+(defconstant-eqx float-exceptions-byte (byte 5 25) #'equalp)      ; cexc
 
-(def!constant float-fast-bit 2)		; Non-IEEE mode
+(def!constant float-fast-bit 2)         ; Non-IEEE mode
 
 
 ;;; Where to put the different spaces.
@@ -90,7 +90,7 @@
 (def!constant static-space-start    #x08000000)
 (def!constant static-space-end      #x097fff00)
 
-;;; nothing _seems_ to be using these addresses 
+;;; nothing _seems_ to be using these addresses
 (def!constant dynamic-0-space-start #x10000000)
 (def!constant dynamic-0-space-end   #x3ffff000)
 (def!constant dynamic-1-space-start #x40000000)
@@ -182,7 +182,7 @@
     sb!kernel:two-arg->
     sb!kernel:two-arg-=
     sb!kernel:two-arg-<=
-    sb!kernel:two-arg->=   
+    sb!kernel:two-arg->=
     sb!kernel:two-arg-/=
     eql
     sb!kernel:%negate

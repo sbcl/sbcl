@@ -19,10 +19,10 @@
   (declare (type unsigned-byte n))
   (if (< n register-arg-count)
       (make-wired-tn *backend-t-primitive-type*
-		     register-arg-scn
-		     (elt *register-arg-offsets* n))
+                     register-arg-scn
+                     (elt *register-arg-offsets* n))
       (make-wired-tn *backend-t-primitive-type*
-		     control-stack-arg-scn n)))
+                     control-stack-arg-scn n)))
 
 
 ;;; Make a passing location TN for a local call return PC.  If standard is
@@ -51,8 +51,8 @@
   (specify-save-tn
    (physenv-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
    (make-wired-tn *fixnum-primitive-type*
-		  control-stack-arg-scn
-		  ocfp-save-offset)))
+                  control-stack-arg-scn
+                  ocfp-save-offset)))
 (!def-vm-support-routine make-return-pc-save-location (env)
   (let ((ptype *backend-t-primitive-type*))
     (specify-save-tn
@@ -82,7 +82,7 @@
 ;;; continuation within a function.
 (!def-vm-support-routine make-unknown-values-locations ()
   (list (make-stack-pointer-tn)
-	(make-normal-tn *fixnum-primitive-type*)))
+        (make-normal-tn *fixnum-primitive-type*)))
 
 
 ;;; This function is called by the ENTRY-ANALYZE phase, allowing
@@ -93,7 +93,7 @@
   (declare (type component component))
   (dotimes (i code-constants-offset)
     (vector-push-extend nil
-			(ir2-component-constants (component-info component))))
+                        (ir2-component-constants (component-info component))))
   (values))
 
 
@@ -104,7 +104,7 @@
 ;;; Return the number of bytes needed for the current non-descriptor stack
 ;;; frame.  Non-descriptor stack frames must be multiples of 8 bytes on
 ;;; the PMAX.
-;;; 
+;;;
 (defun bytes-needed-for-non-descriptor-stack-frame ()
   (* (logandc2 (1+ (sb-allocated-size 'non-descriptor-stack)) 1)
      n-word-bytes))
@@ -125,7 +125,7 @@
   (:generator 1
     (let ((nfp (current-nfp-tn vop)))
       (when nfp
-	(inst addu val nfp (bytes-needed-for-non-descriptor-stack-frame))))))
+        (inst addu val nfp (bytes-needed-for-non-descriptor-stack-frame))))))
 
 
 (define-vop (xep-allocate-frame)
@@ -153,26 +153,26 @@
       )
     ;; Build our stack frames.
     (inst addu csp-tn cfp-tn
-	  (* n-word-bytes (sb-allocated-size 'control-stack)))
+          (* n-word-bytes (sb-allocated-size 'control-stack)))
     (let ((nfp (current-nfp-tn vop)))
       (when nfp
-	(inst addu nsp-tn nsp-tn
-	      (- (bytes-needed-for-non-descriptor-stack-frame)))
-	(move nfp nsp-tn)))
+        (inst addu nsp-tn nsp-tn
+              (- (bytes-needed-for-non-descriptor-stack-frame)))
+        (move nfp nsp-tn)))
     (trace-table-entry trace-table-normal)))
 
 (define-vop (allocate-frame)
   (:results (res :scs (any-reg))
-	    (nfp :scs (any-reg)))
+            (nfp :scs (any-reg)))
   (:info callee)
   (:generator 2
     (trace-table-entry trace-table-fun-prologue)
     (move res csp-tn)
     (inst addu csp-tn csp-tn
-	  (* n-word-bytes (sb-allocated-size 'control-stack)))
+          (* n-word-bytes (sb-allocated-size 'control-stack)))
     (when (ir2-physenv-number-stack-p callee)
       (inst addu nsp-tn nsp-tn
-	    (- (bytes-needed-for-non-descriptor-stack-frame)))
+            (- (bytes-needed-for-non-descriptor-stack-frame)))
       (move nfp nsp-tn))
     (trace-table-entry trace-table-normal)))
 
@@ -216,122 +216,122 @@
 ;;;
 ;;; The general-case code looks like this:
 #|
-	b regs-defaulted		; Skip if MVs
-	nop
+        b regs-defaulted                ; Skip if MVs
+        nop
 
-	move a1 null-tn			; Default register values
-	...
-	loadi nargs 1			; Force defaulting of stack values
-	move ocfp csp			; Set up args for SP resetting
+        move a1 null-tn                 ; Default register values
+        ...
+        loadi nargs 1                   ; Force defaulting of stack values
+        move ocfp csp                   ; Set up args for SP resetting
 
 regs-defaulted
-	subu temp nargs register-arg-count
+        subu temp nargs register-arg-count
 
-	bltz temp default-value-7	; jump to default code
+        bltz temp default-value-7       ; jump to default code
         addu temp temp -1
-	loadw move-temp ocfp-tn 6	; Move value to correct location.
-	store-stack-tn val4-tn move-temp
+        loadw move-temp ocfp-tn 6       ; Move value to correct location.
+        store-stack-tn val4-tn move-temp
 
-	bltz temp default-value-8
+        bltz temp default-value-8
         addu temp temp -1
-	loadw move-temp ocfp-tn 7
-	store-stack-tn val5-tn move-temp
+        loadw move-temp ocfp-tn 7
+        store-stack-tn val5-tn move-temp
 
-	...
+        ...
 
 defaulting-done
-	move sp ocfp			; Reset SP.
+        move sp ocfp                    ; Reset SP.
 <end of code>
 
 <elsewhere>
 default-value-7
-	store-stack-tn val4-tn null-tn	; Nil out 7'th value. (first on stack)
+        store-stack-tn val4-tn null-tn  ; Nil out 7'th value. (first on stack)
 
 default-value-8
-	store-stack-tn val5-tn null-tn	; Nil out 8'th value.
+        store-stack-tn val5-tn null-tn  ; Nil out 8'th value.
 
-	...
+        ...
 
-	br defaulting-done
+        br defaulting-done
         nop
 |#
 ;;;
 (defun default-unknown-values (vop values nvals move-temp temp lra-label)
   (declare (type (or tn-ref null) values)
-	   (type unsigned-byte nvals) (type tn move-temp temp))
+           (type unsigned-byte nvals) (type tn move-temp temp))
   (if (<= nvals 1)
       (progn
-	;; Note that this is a single-value return point.  This is actually
-	;; the multiple-value entry point for a single desired value, but
-	;; the code location has to be here, or the debugger backtrace
-	;; gets confused.
-	(without-scheduling ()
-	  (note-this-location vop :single-value-return)
-	  (inst move csp-tn ocfp-tn)
-	  (inst nop))
-	(when lra-label
-	  (inst compute-code-from-lra code-tn code-tn lra-label temp)))
+        ;; Note that this is a single-value return point.  This is actually
+        ;; the multiple-value entry point for a single desired value, but
+        ;; the code location has to be here, or the debugger backtrace
+        ;; gets confused.
+        (without-scheduling ()
+          (note-this-location vop :single-value-return)
+          (inst move csp-tn ocfp-tn)
+          (inst nop))
+        (when lra-label
+          (inst compute-code-from-lra code-tn code-tn lra-label temp)))
       (let ((regs-defaulted (gen-label))
-	    (defaulting-done (gen-label))
-	    (default-stack-vals (gen-label)))
-	(without-scheduling ()
-	  ;; Note that this is an unknown-values return point.
-	  (note-this-location vop :unknown-return)
-	  ;; Branch off to the MV case.
-	  (inst b regs-defaulted)
-	  ;; If there are no stack results, clear the stack now.
-	  (if (> nvals register-arg-count)
-	      (inst addu temp nargs-tn (fixnumize (- register-arg-count)))
-	      (move csp-tn ocfp-tn t)))
-	
-	;; Do the single value calse.
-	(do ((i 1 (1+ i))
-	     (val (tn-ref-across values) (tn-ref-across val)))
-	    ((= i (min nvals register-arg-count)))
-	  (move (tn-ref-tn val) null-tn))
-	(when (> nvals register-arg-count)
-	  (inst b default-stack-vals)
-	  (move ocfp-tn csp-tn t))
-	
-	(emit-label regs-defaulted)
-	
-	(when (> nvals register-arg-count)
-	  ;; If there are stack results, we have to default them
-	  ;; and clear the stack.
-	  (collect ((defaults))
-	    (do ((i register-arg-count (1+ i))
-		 (val (do ((i 0 (1+ i))
-			   (val values (tn-ref-across val)))
-			  ((= i register-arg-count) val))
-		      (tn-ref-across val)))
-		((null val))
-	      
-	      (let ((default-lab (gen-label))
-		    (tn (tn-ref-tn val)))
-		(defaults (cons default-lab tn))
-		
-		(inst blez temp default-lab)
-		(inst lw move-temp ocfp-tn (* i n-word-bytes))
-		(inst addu temp temp (fixnumize -1))
-		(store-stack-tn tn move-temp)))
-	    
-	    (emit-label defaulting-done)
-	    (move csp-tn ocfp-tn)
-	    
-	    (let ((defaults (defaults)))
-	      (aver defaults)
-	      (assemble (*elsewhere*)
-		(emit-label default-stack-vals)
-		(do ((remaining defaults (cdr remaining)))
-		    ((null remaining))
-		  (let ((def (car remaining)))
-		    (emit-label (car def))
-		    (when (null (cdr remaining))
-		      (inst b defaulting-done))
-		    (store-stack-tn (cdr def) null-tn)))))))
+            (defaulting-done (gen-label))
+            (default-stack-vals (gen-label)))
+        (without-scheduling ()
+          ;; Note that this is an unknown-values return point.
+          (note-this-location vop :unknown-return)
+          ;; Branch off to the MV case.
+          (inst b regs-defaulted)
+          ;; If there are no stack results, clear the stack now.
+          (if (> nvals register-arg-count)
+              (inst addu temp nargs-tn (fixnumize (- register-arg-count)))
+              (move csp-tn ocfp-tn t)))
 
-	(when lra-label
-	  (inst compute-code-from-lra code-tn code-tn lra-label temp))))
+        ;; Do the single value calse.
+        (do ((i 1 (1+ i))
+             (val (tn-ref-across values) (tn-ref-across val)))
+            ((= i (min nvals register-arg-count)))
+          (move (tn-ref-tn val) null-tn))
+        (when (> nvals register-arg-count)
+          (inst b default-stack-vals)
+          (move ocfp-tn csp-tn t))
+
+        (emit-label regs-defaulted)
+
+        (when (> nvals register-arg-count)
+          ;; If there are stack results, we have to default them
+          ;; and clear the stack.
+          (collect ((defaults))
+            (do ((i register-arg-count (1+ i))
+                 (val (do ((i 0 (1+ i))
+                           (val values (tn-ref-across val)))
+                          ((= i register-arg-count) val))
+                      (tn-ref-across val)))
+                ((null val))
+
+              (let ((default-lab (gen-label))
+                    (tn (tn-ref-tn val)))
+                (defaults (cons default-lab tn))
+
+                (inst blez temp default-lab)
+                (inst lw move-temp ocfp-tn (* i n-word-bytes))
+                (inst addu temp temp (fixnumize -1))
+                (store-stack-tn tn move-temp)))
+
+            (emit-label defaulting-done)
+            (move csp-tn ocfp-tn)
+
+            (let ((defaults (defaults)))
+              (aver defaults)
+              (assemble (*elsewhere*)
+                (emit-label default-stack-vals)
+                (do ((remaining defaults (cdr remaining)))
+                    ((null remaining))
+                  (let ((def (car remaining)))
+                    (emit-label (car def))
+                    (when (null (cdr remaining))
+                      (inst b defaulting-done))
+                    (store-stack-tn (cdr def) null-tn)))))))
+
+        (when lra-label
+          (inst compute-code-from-lra code-tn code-tn lra-label temp))))
   (values))
 
 
@@ -357,7 +357,7 @@ default-value-8
 (defun receive-unknown-values (args nargs start count lra-label temp)
   (declare (type tn args nargs start count temp))
   (let ((variable-values (gen-label))
-	(done (gen-label)))
+        (done (gen-label)))
     (without-scheduling ()
       (inst b variable-values)
       (inst nop))
@@ -368,17 +368,17 @@ default-value-8
     (storew (first register-arg-tns) csp-tn -1)
     (inst addu start csp-tn -4)
     (inst li count (fixnumize 1))
-    
+
     (emit-label done)
-    
+
     (assemble (*elsewhere*)
       (emit-label variable-values)
       (when lra-label
-	(inst compute-code-from-lra code-tn code-tn lra-label temp))
+        (inst compute-code-from-lra code-tn code-tn lra-label temp))
       (do ((arg register-arg-tns (rest arg))
-	   (i 0 (1+ i)))
-	  ((null arg))
-	(storew (first arg) args i))
+           (i 0 (1+ i)))
+          ((null arg))
+        (storew (first arg) args i))
       (move start args)
       (inst b done)
       (move count nargs t)))
@@ -393,11 +393,11 @@ default-value-8
    (start :scs (any-reg))
    (count :scs (any-reg)))
   (:temporary (:sc descriptor-reg :offset ocfp-offset
-		   :from :eval :to (:result 0))
-	      values-start)
+                   :from :eval :to (:result 0))
+              values-start)
   (:temporary (:sc any-reg :offset nargs-offset
-	       :from :eval :to (:result 1))
-	      nvals)
+               :from :eval :to (:result 1))
+              nvals)
   (:temporary (:scs (non-descriptor-reg)) temp))
 
 
@@ -424,8 +424,8 @@ default-value-8
 ;;;
 (define-vop (call-local)
   (:args (fp)
-	 (nfp)
-	 (args :more t))
+         (nfp)
+         (args :more t))
   (:results (values :more t))
   (:save-p t)
   (:move-args :local-call)
@@ -438,16 +438,16 @@ default-value-8
   (:ignore arg-locs args ocfp)
   (:generator 5
     (let ((label (gen-label))
-	  (cur-nfp (current-nfp-tn vop)))
+          (cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-	(store-stack-tn nfp-save cur-nfp))
+        (store-stack-tn nfp-save cur-nfp))
       (let ((callee-nfp (callee-nfp-tn callee)))
-	(when callee-nfp
-	  (maybe-load-stack-tn callee-nfp nfp)))
+        (when callee-nfp
+          (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
       (trace-table-entry trace-table-call-site)
       (inst compute-lra-from-code
-	    (callee-return-pc-tn callee) code-tn label temp)
+            (callee-return-pc-tn callee) code-tn label temp)
       (note-this-location vop :call-site)
       (inst b target)
       (inst nop)
@@ -455,7 +455,7 @@ default-value-8
       (emit-return-pc label)
       (default-unknown-values vop values nvals move-temp temp label)
       (when cur-nfp
-	(load-stack-tn cur-nfp nfp-save)))))
+        (load-stack-tn cur-nfp nfp-save)))))
 
 
 ;;; Non-TR local call for a variable number of return values passed according
@@ -468,8 +468,8 @@ default-value-8
 ;;;
 (define-vop (multiple-call-local unknown-values-receiver)
   (:args (fp)
-	 (nfp)
-	 (args :more t))
+         (nfp)
+         (args :more t))
   (:save-p t)
   (:move-args :local-call)
   (:info save callee target)
@@ -478,16 +478,16 @@ default-value-8
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:generator 20
     (let ((label (gen-label))
-	  (cur-nfp (current-nfp-tn vop)))
+          (cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-	(store-stack-tn nfp-save cur-nfp))
+        (store-stack-tn nfp-save cur-nfp))
       (let ((callee-nfp (callee-nfp-tn callee)))
-	(when callee-nfp
-	  (maybe-load-stack-tn callee-nfp nfp)))
+        (when callee-nfp
+          (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
       (trace-table-entry trace-table-call-site)
       (inst compute-lra-from-code
-	    (callee-return-pc-tn callee) code-tn label temp)
+            (callee-return-pc-tn callee) code-tn label temp)
       (note-this-location vop :call-site)
       (inst b target)
       (inst nop)
@@ -496,7 +496,7 @@ default-value-8
       (note-this-location vop :unknown-return)
       (receive-unknown-values values-start nvals start count label temp)
       (when cur-nfp
-	(load-stack-tn cur-nfp nfp-save)))))
+        (load-stack-tn cur-nfp nfp-save)))))
 
 
 ;;;; Local call with known values return:
@@ -510,8 +510,8 @@ default-value-8
 ;;;
 (define-vop (known-call-local)
   (:args (fp)
-	 (nfp)
-	 (args :more t))
+         (nfp)
+         (args :more t))
   (:results (res :more t))
   (:move-args :local-call)
   (:save-p t)
@@ -522,16 +522,16 @@ default-value-8
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 5
     (let ((label (gen-label))
-	  (cur-nfp (current-nfp-tn vop)))
+          (cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-	(store-stack-tn nfp-save cur-nfp))
+        (store-stack-tn nfp-save cur-nfp))
       (let ((callee-nfp (callee-nfp-tn callee)))
-	(when callee-nfp
-	  (maybe-load-stack-tn callee-nfp nfp)))
+        (when callee-nfp
+          (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
       (trace-table-entry trace-table-call-site)
       (inst compute-lra-from-code
-	    (callee-return-pc-tn callee) code-tn label temp)
+            (callee-return-pc-tn callee) code-tn label temp)
       (note-this-location vop :call-site)
       (inst b target)
       (inst nop)
@@ -539,7 +539,7 @@ default-value-8
       (emit-return-pc label)
       (note-this-location vop :known-return)
       (when cur-nfp
-	(load-stack-tn cur-nfp nfp-save)))))
+        (load-stack-tn cur-nfp nfp-save)))))
 
 ;;; Return from known values call.  We receive the return locations as
 ;;; arguments to terminate their lifetimes in the returning function.  We
@@ -551,11 +551,11 @@ default-value-8
 ;;;
 (define-vop (known-return)
   (:args (ocfp :target ocfp-temp)
-	 (return-pc :target return-pc-temp)
-	 (vals :more t))
+         (return-pc :target return-pc-temp)
+         (vals :more t))
   (:temporary (:sc any-reg :from (:argument 0)) ocfp-temp)
   (:temporary (:sc descriptor-reg :from (:argument 1))
-	      return-pc-temp)
+              return-pc-temp)
   (:temporary (:scs (interior-reg)) lip)
   (:move-args :known-return)
   (:info val-locs)
@@ -568,8 +568,8 @@ default-value-8
     (move csp-tn cfp-tn)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-	(inst addu nsp-tn cur-nfp
-	      (bytes-needed-for-non-descriptor-stack-frame))))
+        (inst addu nsp-tn cur-nfp
+              (bytes-needed-for-non-descriptor-stack-frame))))
     (inst addu lip return-pc-temp (- n-word-bytes other-pointer-lowtag))
     (inst j lip)
     (move cfp-tn ocfp-temp t)
@@ -593,7 +593,7 @@ default-value-8
 ;;; replication in defining the cross-product VOPs.
 ;;;
 ;;; Name is the name of the VOP to define.
-;;; 
+;;;
 ;;; Named is true if the first argument is a symbol whose global function
 ;;; definition is to be called.
 ;;;
@@ -619,219 +619,219 @@ default-value-8
 (defmacro define-full-call (name named return variable)
   (aver (not (and variable (eq return :tail))))
   `(define-vop (,name
-		,@(when (eq return :unknown)
-		    '(unknown-values-receiver)))
+                ,@(when (eq return :unknown)
+                    '(unknown-values-receiver)))
      (:args
       ,@(unless (eq return :tail)
-	  '((new-fp :scs (any-reg) :to :eval)))
+          '((new-fp :scs (any-reg) :to :eval)))
 
       ,(if named
-	   '(name :target name-pass)
-	   '(arg-fun :target lexenv))
-      
+           '(name :target name-pass)
+           '(arg-fun :target lexenv))
+
       ,@(when (eq return :tail)
-	  '((ocfp :target ocfp-pass)
-	    (return-pc :target return-pc-pass)))
-      
+          '((ocfp :target ocfp-pass)
+            (return-pc :target return-pc-pass)))
+
       ,@(unless variable '((args :more t :scs (descriptor-reg)))))
 
      ,@(when (eq return :fixed)
-	 '((:results (values :more t))))
-   
+         '((:results (values :more t))))
+
      (:save-p ,(if (eq return :tail) :compute-only t))
 
      ,@(unless (or (eq return :tail) variable)
-	 '((:move-args :full-call)))
+         '((:move-args :full-call)))
 
      (:vop-var vop)
      (:info ,@(unless (or variable (eq return :tail)) '(arg-locs))
-	    ,@(unless variable '(nargs))
-	    ,@(when (eq return :fixed) '(nvals)))
+            ,@(unless variable '(nargs))
+            ,@(when (eq return :fixed) '(nvals)))
 
      (:ignore ,@(unless (or variable (eq return :tail)) '(arg-locs))
-	      ,@(unless variable '(args)))
+              ,@(unless variable '(args)))
 
      (:temporary (:sc descriptor-reg
-		  :offset ocfp-offset
-		  :from (:argument 1)
-		  ,@(unless (eq return :fixed)
-		      '(:to :eval)))
-		 ocfp-pass)
+                  :offset ocfp-offset
+                  :from (:argument 1)
+                  ,@(unless (eq return :fixed)
+                      '(:to :eval)))
+                 ocfp-pass)
 
      (:temporary (:sc descriptor-reg
-		  :offset lra-offset 
-		  :from (:argument ,(if (eq return :tail) 2 1))
-		  :to :eval)
-		 return-pc-pass)
+                  :offset lra-offset
+                  :from (:argument ,(if (eq return :tail) 2 1))
+                  :to :eval)
+                 return-pc-pass)
 
      ,@(if named
-	 `((:temporary (:sc descriptor-reg :offset fdefn-offset
-			:from (:argument ,(if (eq return :tail) 0 1))
-			:to :eval)
-		       name-pass))
+         `((:temporary (:sc descriptor-reg :offset fdefn-offset
+                        :from (:argument ,(if (eq return :tail) 0 1))
+                        :to :eval)
+                       name-pass))
 
-	 `((:temporary (:sc descriptor-reg :offset lexenv-offset
-			:from (:argument ,(if (eq return :tail) 0 1))
-			:to :eval)
-		       lexenv)
-	   (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
-		       function)))
+         `((:temporary (:sc descriptor-reg :offset lexenv-offset
+                        :from (:argument ,(if (eq return :tail) 0 1))
+                        :to :eval)
+                       lexenv)
+           (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
+                       function)))
 
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
-		 nargs-pass)
+                 nargs-pass)
 
      ,@(when variable
-	 (mapcar #'(lambda (name offset)
-		     `(:temporary (:sc descriptor-reg
-				   :offset ,offset
-				   :to :eval)
-			 ,name))
-		 register-arg-names *register-arg-offsets*))
+         (mapcar #'(lambda (name offset)
+                     `(:temporary (:sc descriptor-reg
+                                   :offset ,offset
+                                   :to :eval)
+                         ,name))
+                 register-arg-names *register-arg-offsets*))
      ,@(when (eq return :fixed)
-	 '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)))
+         '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)))
 
      ,@(unless (eq return :tail)
-	 '((:temporary (:scs (non-descriptor-reg)) temp)
-	   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
+         '((:temporary (:scs (non-descriptor-reg)) temp)
+           (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
 
      (:temporary (:sc interior-reg :offset lip-offset) entry-point)
 
      (:generator ,(+ (if named 5 0)
-		     (if variable 19 1)
-		     (if (eq return :tail) 0 10)
-		     15
-		     (if (eq return :unknown) 25 0))
+                     (if variable 19 1)
+                     (if (eq return :tail) 0 10)
+                     15
+                     (if (eq return :unknown) 25 0))
        (let* ((cur-nfp (current-nfp-tn vop))
-	      ,@(unless (eq return :tail)
-		  '((lra-label (gen-label))))
-	      (filler
-	       (remove nil
-		       (list :load-nargs
-			     ,@(if (eq return :tail)
-				   '((unless (location= ocfp ocfp-pass)
-				       :load-ocfp)
-				     (unless (location= return-pc
-							return-pc-pass)
-				       :load-return-pc)
-				     (when cur-nfp
-				       :frob-nfp))
-				   '(:comp-lra
-				     (when cur-nfp
-				       :frob-nfp)
-				     :save-fp
-				     :load-fp))))))
-	 (flet ((do-next-filler ()
-		  (let* ((next (pop filler))
-			 (what (if (consp next) (car next) next)))
-		    (ecase what
-		      (:load-nargs
-		       ,@(if variable
-			     `((inst subu nargs-pass csp-tn new-fp)
-			       ,@(let ((index -1))
-				   (mapcar #'(lambda (name)
-					       `(inst lw ,name new-fp
-						      ,(ash (incf index)
-							    word-shift)))
-					   register-arg-names)))
-			     '((inst li nargs-pass (fixnumize nargs)))))
-		      ,@(if (eq return :tail)
-			    '((:load-ocfp
-			       (sc-case ocfp
-				 (any-reg
-				  (move ocfp-pass ocfp t))
-				 (control-stack
-				  (inst lw ocfp-pass cfp-tn
-					(ash (tn-offset ocfp)
-					     word-shift)))))
-			      (:load-return-pc
-			       (sc-case return-pc
-				 (descriptor-reg
-				  (move return-pc-pass return-pc t))
-				 (control-stack
-				  (inst lw return-pc-pass cfp-tn
-					(ash (tn-offset return-pc)
-					     word-shift)))))
-			      (:frob-nfp
-			       (inst addu nsp-tn cur-nfp
-				     (bytes-needed-for-non-descriptor-stack-frame))))
-			    `((:comp-lra
-			       (inst compute-lra-from-code
-				     return-pc-pass code-tn lra-label temp))
-			      (:frob-nfp
-			       (store-stack-tn nfp-save cur-nfp))
-			      (:save-fp
-			       (move ocfp-pass cfp-tn t))
-			      (:load-fp
-			       ,(if variable
-				    '(move cfp-tn new-fp)
-				    '(if (> nargs register-arg-count)
-					 (move cfp-tn new-fp)
-					 (move cfp-tn csp-tn)))
-			       (trace-table-entry trace-table-call-site))))
-		      ((nil)
-		       (inst nop))))))
+              ,@(unless (eq return :tail)
+                  '((lra-label (gen-label))))
+              (filler
+               (remove nil
+                       (list :load-nargs
+                             ,@(if (eq return :tail)
+                                   '((unless (location= ocfp ocfp-pass)
+                                       :load-ocfp)
+                                     (unless (location= return-pc
+                                                        return-pc-pass)
+                                       :load-return-pc)
+                                     (when cur-nfp
+                                       :frob-nfp))
+                                   '(:comp-lra
+                                     (when cur-nfp
+                                       :frob-nfp)
+                                     :save-fp
+                                     :load-fp))))))
+         (flet ((do-next-filler ()
+                  (let* ((next (pop filler))
+                         (what (if (consp next) (car next) next)))
+                    (ecase what
+                      (:load-nargs
+                       ,@(if variable
+                             `((inst subu nargs-pass csp-tn new-fp)
+                               ,@(let ((index -1))
+                                   (mapcar #'(lambda (name)
+                                               `(inst lw ,name new-fp
+                                                      ,(ash (incf index)
+                                                            word-shift)))
+                                           register-arg-names)))
+                             '((inst li nargs-pass (fixnumize nargs)))))
+                      ,@(if (eq return :tail)
+                            '((:load-ocfp
+                               (sc-case ocfp
+                                 (any-reg
+                                  (move ocfp-pass ocfp t))
+                                 (control-stack
+                                  (inst lw ocfp-pass cfp-tn
+                                        (ash (tn-offset ocfp)
+                                             word-shift)))))
+                              (:load-return-pc
+                               (sc-case return-pc
+                                 (descriptor-reg
+                                  (move return-pc-pass return-pc t))
+                                 (control-stack
+                                  (inst lw return-pc-pass cfp-tn
+                                        (ash (tn-offset return-pc)
+                                             word-shift)))))
+                              (:frob-nfp
+                               (inst addu nsp-tn cur-nfp
+                                     (bytes-needed-for-non-descriptor-stack-frame))))
+                            `((:comp-lra
+                               (inst compute-lra-from-code
+                                     return-pc-pass code-tn lra-label temp))
+                              (:frob-nfp
+                               (store-stack-tn nfp-save cur-nfp))
+                              (:save-fp
+                               (move ocfp-pass cfp-tn t))
+                              (:load-fp
+                               ,(if variable
+                                    '(move cfp-tn new-fp)
+                                    '(if (> nargs register-arg-count)
+                                         (move cfp-tn new-fp)
+                                         (move cfp-tn csp-tn)))
+                               (trace-table-entry trace-table-call-site))))
+                      ((nil)
+                       (inst nop))))))
 
-	   ,@(if named
-		 `((sc-case name
-		     (descriptor-reg (move name-pass name))
-		     (control-stack
-		      (inst lw name-pass cfp-tn
-			    (ash (tn-offset name) word-shift))
-		      (do-next-filler))
-		     (constant
-		      (inst lw name-pass code-tn
-			    (- (ash (tn-offset name) word-shift)
-			       other-pointer-lowtag))
-		      (do-next-filler)))
-		   (inst lw entry-point name-pass
-			 (- (ash fdefn-raw-addr-slot word-shift)
-			    other-pointer-lowtag))
-		   (do-next-filler))
-		 `((sc-case arg-fun
-		     (descriptor-reg (move lexenv arg-fun))
-		     (control-stack
-		      (inst lw lexenv cfp-tn
-			    (ash (tn-offset arg-fun) word-shift))
-		      (do-next-filler))
-		     (constant
-		      (inst lw lexenv code-tn
-			    (- (ash (tn-offset arg-fun) word-shift)
-			       other-pointer-lowtag))
-		      (do-next-filler)))
-		   (inst lw function lexenv
-			 (- (ash closure-fun-slot word-shift)
-			    fun-pointer-lowtag))
-		   (do-next-filler)
-		   (inst addu entry-point function
-			 (- (ash simple-fun-code-offset word-shift)
-			    fun-pointer-lowtag))))
-	   (loop
-	     (if (cdr filler)
-		 (do-next-filler)
-		 (return)))
-	   
-	   (do-next-filler)
-	   (note-this-location vop :call-site)
-	   (inst j entry-point)
-	   (inst nop))
+           ,@(if named
+                 `((sc-case name
+                     (descriptor-reg (move name-pass name))
+                     (control-stack
+                      (inst lw name-pass cfp-tn
+                            (ash (tn-offset name) word-shift))
+                      (do-next-filler))
+                     (constant
+                      (inst lw name-pass code-tn
+                            (- (ash (tn-offset name) word-shift)
+                               other-pointer-lowtag))
+                      (do-next-filler)))
+                   (inst lw entry-point name-pass
+                         (- (ash fdefn-raw-addr-slot word-shift)
+                            other-pointer-lowtag))
+                   (do-next-filler))
+                 `((sc-case arg-fun
+                     (descriptor-reg (move lexenv arg-fun))
+                     (control-stack
+                      (inst lw lexenv cfp-tn
+                            (ash (tn-offset arg-fun) word-shift))
+                      (do-next-filler))
+                     (constant
+                      (inst lw lexenv code-tn
+                            (- (ash (tn-offset arg-fun) word-shift)
+                               other-pointer-lowtag))
+                      (do-next-filler)))
+                   (inst lw function lexenv
+                         (- (ash closure-fun-slot word-shift)
+                            fun-pointer-lowtag))
+                   (do-next-filler)
+                   (inst addu entry-point function
+                         (- (ash simple-fun-code-offset word-shift)
+                            fun-pointer-lowtag))))
+           (loop
+             (if (cdr filler)
+                 (do-next-filler)
+                 (return)))
 
-	 ,@(ecase return
-	     (:fixed
-	      '((trace-table-entry trace-table-normal)
-		(emit-return-pc lra-label)
-		(default-unknown-values vop values nvals
-					move-temp temp lra-label)
-		(when cur-nfp
-		  (load-stack-tn cur-nfp nfp-save))))
-	     (:unknown
-	      '((trace-table-entry trace-table-normal)
-		(emit-return-pc lra-label)
-		(note-this-location vop :unknown-return)
-		(receive-unknown-values values-start nvals start count
-					lra-label temp)
-		(when cur-nfp
-		  (load-stack-tn cur-nfp nfp-save))))
-	     (:tail))))))
+           (do-next-filler)
+           (note-this-location vop :call-site)
+           (inst j entry-point)
+           (inst nop))
+
+         ,@(ecase return
+             (:fixed
+              '((trace-table-entry trace-table-normal)
+                (emit-return-pc lra-label)
+                (default-unknown-values vop values nvals
+                                        move-temp temp lra-label)
+                (when cur-nfp
+                  (load-stack-tn cur-nfp nfp-save))))
+             (:unknown
+              '((trace-table-entry trace-table-normal)
+                (emit-return-pc lra-label)
+                (note-this-location vop :unknown-return)
+                (receive-unknown-values values-start nvals start count
+                                        lra-label temp)
+                (when cur-nfp
+                  (load-stack-tn cur-nfp nfp-save))))
+             (:tail))))))
 
 
 (define-full-call call nil :fixed nil)
@@ -875,19 +875,19 @@ default-value-8
     (inst j (make-fixup 'tail-call-variable :assembly-routine))
     (let ((cur-nfp (current-nfp-tn vop)))
       (if cur-nfp
-	(inst addu nsp-tn cur-nfp
-	      (bytes-needed-for-non-descriptor-stack-frame))
-	(inst nop)))))
+        (inst addu nsp-tn cur-nfp
+              (bytes-needed-for-non-descriptor-stack-frame))
+        (inst nop)))))
 
 
 ;;;; Unknown values return:
 
 ;;; Return a single value using the unknown-values convention.
-;;; 
+;;;
 (define-vop (return-single)
   (:args (ocfp :scs (any-reg))
-	 (return-pc :scs (descriptor-reg))
-	 (value))
+         (return-pc :scs (descriptor-reg))
+         (value))
   (:ignore value)
   (:temporary (:scs (interior-reg)) lip)
   (:vop-var vop)
@@ -896,8 +896,8 @@ default-value-8
     (trace-table-entry trace-table-fun-epilogue)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-	(inst addu nsp-tn cur-nfp
-	      (bytes-needed-for-non-descriptor-stack-frame))))
+        (inst addu nsp-tn cur-nfp
+              (bytes-needed-for-non-descriptor-stack-frame))))
     ;; Clear the control stack, and restore the frame pointer.
     (move csp-tn cfp-tn)
     (move cfp-tn ocfp)
@@ -921,8 +921,8 @@ default-value-8
 ;;;
 (define-vop (return)
   (:args (ocfp :scs (any-reg))
-	 (return-pc :scs (descriptor-reg) :to (:eval 1))
-	 (values :more t))
+         (return-pc :scs (descriptor-reg) :to (:eval 1))
+         (values :more t))
   (:ignore values)
   (:info nvals)
   (:temporary (:sc descriptor-reg :offset a0-offset :from (:eval 0)) a0)
@@ -940,8 +940,8 @@ default-value-8
     (trace-table-entry trace-table-fun-epilogue)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-	(inst addu nsp-tn cur-nfp
-	      (bytes-needed-for-non-descriptor-stack-frame))))
+        (inst addu nsp-tn cur-nfp
+              (bytes-needed-for-non-descriptor-stack-frame))))
     ;; Establish the values pointer and values count.
     (move val-ptr cfp-tn)
     (inst li nargs (fixnumize nvals))
@@ -952,7 +952,7 @@ default-value-8
     ;; pre-default any argument register that need it.
     (when (< nvals register-arg-count)
       (dolist (reg (subseq (list a0 a1 a2 a3 a4 a5) nvals))
-	(move reg null-tn)))
+        (move reg null-tn)))
     ;; And away we go.
     (lisp-return return-pc lip)
     (trace-table-entry trace-table-normal)))
@@ -964,9 +964,9 @@ default-value-8
 ;;;
 (define-vop (return-multiple)
   (:args (ocfp-arg :scs (any-reg) :target ocfp)
-	 (lra-arg :scs (descriptor-reg) :target lra)
-	 (vals-arg :scs (any-reg) :target vals)
-	 (nvals-arg :scs (any-reg) :target nvals))
+         (lra-arg :scs (descriptor-reg) :target lra)
+         (vals-arg :scs (any-reg) :target vals)
+         (nvals-arg :scs (any-reg) :target nvals))
 
   (:temporary (:sc any-reg :offset nl1-offset :from (:argument 0)) ocfp)
   (:temporary (:sc descriptor-reg :offset lra-offset :from (:argument 1)) lra)
@@ -982,9 +982,9 @@ default-value-8
     (let ((not-single (gen-label)))
       ;; Clear the number stack.
       (let ((cur-nfp (current-nfp-tn vop)))
-	(when cur-nfp
-	  (inst addu nsp-tn cur-nfp
-		(bytes-needed-for-non-descriptor-stack-frame))))
+        (when cur-nfp
+          (inst addu nsp-tn cur-nfp
+                (bytes-needed-for-non-descriptor-stack-frame))))
 
       ;; Check for the single case.
       (inst li a0 (fixnumize 1))
@@ -1024,8 +1024,8 @@ default-value-8
 ;;;
 (define-vop (setup-closure-environment)
   (:temporary (:sc descriptor-reg :offset lexenv-offset :target closure
-	       :to (:result 0))
-	      lexenv)
+               :to (:result 0))
+              lexenv)
   (:results (closure :scs (descriptor-reg)))
   (:info label)
   (:ignore label)
@@ -1034,7 +1034,7 @@ default-value-8
     (move closure lexenv)))
 
 ;;; Copy a more arg from the argument area to the end of the current frame.
-;;; Fixed is the number of non-more arguments. 
+;;; Fixed is the number of non-more arguments.
 ;;;
 (define-vop (copy-more-arg)
   (:temporary (:sc any-reg :offset nl0-offset) result)
@@ -1045,25 +1045,25 @@ default-value-8
   (:info fixed)
   (:generator 20
     (let ((loop (gen-label))
-	  (do-regs (gen-label))
-	  (done (gen-label)))
+          (do-regs (gen-label))
+          (done (gen-label)))
       (when (< fixed register-arg-count)
-	;; Save a pointer to the results so we can fill in register args.
-	;; We don't need this if there are more fixed args than reg args.
-	(move result csp-tn))
+        ;; Save a pointer to the results so we can fill in register args.
+        ;; We don't need this if there are more fixed args than reg args.
+        (move result csp-tn))
       ;; Allocate the space on the stack.
       (cond ((zerop fixed)
-	     (inst beq nargs-tn done)
-	     (inst addu csp-tn csp-tn nargs-tn))
-	    (t
-	     (inst addu count nargs-tn (fixnumize (- fixed)))
-	     (inst blez count done)
-	     (inst nop)
-	     (inst addu csp-tn csp-tn count)))
+             (inst beq nargs-tn done)
+             (inst addu csp-tn csp-tn nargs-tn))
+            (t
+             (inst addu count nargs-tn (fixnumize (- fixed)))
+             (inst blez count done)
+             (inst nop)
+             (inst addu csp-tn csp-tn count)))
       (when (< fixed register-arg-count)
-	;; We must stop when we run out of stack args, not when we run out of
-	;; more args.
-	(inst addu count nargs-tn (fixnumize (- register-arg-count))))
+        ;; We must stop when we run out of stack args, not when we run out of
+        ;; more args.
+        (inst addu count nargs-tn (fixnumize (- register-arg-count))))
       ;; Everything of interest in registers.
       (inst blez count do-regs)
       ;; Initialize dst to be end of stack.
@@ -1082,18 +1082,18 @@ default-value-8
 
       (emit-label do-regs)
       (when (< fixed register-arg-count)
-	;; Now we have to deposit any more args that showed up in registers.
-	;; We know there is at least one more arg, otherwise we would have
-	;; branched to done up at the top.
-	(inst subu count nargs-tn (fixnumize (1+ fixed)))
-	(do ((i fixed (1+ i)))
-	    ((>= i register-arg-count))
-	  ;; Is this the last one?
-	  (inst beq count done)
-	  ;; Store it relative to the pointer saved at the start.
-	  (storew (nth i register-arg-tns) result (- i fixed))
-	  ;; Decrement count.
-	  (inst subu count (fixnumize 1))))
+        ;; Now we have to deposit any more args that showed up in registers.
+        ;; We know there is at least one more arg, otherwise we would have
+        ;; branched to done up at the top.
+        (inst subu count nargs-tn (fixnumize (1+ fixed)))
+        (do ((i fixed (1+ i)))
+            ((>= i register-arg-count))
+          ;; Is this the last one?
+          (inst beq count done)
+          ;; Store it relative to the pointer saved at the start.
+          (storew (nth i register-arg-tns) result (- i fixed))
+          ;; Decrement count.
+          (inst subu count (fixnumize 1))))
       (emit-label done))))
 
 
@@ -1107,7 +1107,7 @@ default-value-8
 ;;;
 (define-vop (listify-rest-args)
   (:args (context-arg :target context :scs (descriptor-reg))
-	 (count-arg :target count :scs (any-reg)))
+         (count-arg :target count :scs (any-reg)))
   (:arg-types * tagged-num)
   (:temporary (:scs (any-reg) :from (:argument 0)) context)
   (:temporary (:scs (any-reg) :from (:argument 1)) count)
@@ -1118,8 +1118,8 @@ default-value-8
   (:policy :safe)
   (:generator 20
     (let ((enter (gen-label))
-	  (loop (gen-label))
-	  (done (gen-label)))
+          (loop (gen-label))
+          (done (gen-label)))
       (move context context-arg)
       (move count count-arg)
       ;; Check to see if there are any arguments.
@@ -1128,32 +1128,32 @@ default-value-8
 
       ;; We need to do this atomically.
       (pseudo-atomic (pa-flag)
-	;; Allocate a cons (2 words) for each item.
-	(inst or result alloc-tn list-pointer-lowtag)
-	(move dst result)
-	(inst sll temp count 1)
-	(inst b enter)
-	(inst addu alloc-tn alloc-tn temp)
+        ;; Allocate a cons (2 words) for each item.
+        (inst or result alloc-tn list-pointer-lowtag)
+        (move dst result)
+        (inst sll temp count 1)
+        (inst b enter)
+        (inst addu alloc-tn alloc-tn temp)
 
-	;; Store the current cons in the cdr of the previous cons.
-	(emit-label loop)
-	(inst addu dst dst (* 2 n-word-bytes))
-	(storew dst dst -1 list-pointer-lowtag)
+        ;; Store the current cons in the cdr of the previous cons.
+        (emit-label loop)
+        (inst addu dst dst (* 2 n-word-bytes))
+        (storew dst dst -1 list-pointer-lowtag)
 
-	(emit-label enter)
-	;; Grab one value.
-	(loadw temp context)
-	(inst addu context context n-word-bytes)
+        (emit-label enter)
+        ;; Grab one value.
+        (loadw temp context)
+        (inst addu context context n-word-bytes)
 
-	;; Dec count, and if != zero, go back for more.
-	(inst addu count count (fixnumize -1))
-	(inst bne count zero-tn loop)
+        ;; Dec count, and if != zero, go back for more.
+        (inst addu count count (fixnumize -1))
+        (inst bne count zero-tn loop)
 
-	;; Store the value in the car (in delay slot)
-	(storew temp dst 0 list-pointer-lowtag)
+        ;; Store the value in the car (in delay slot)
+        (storew temp dst 0 list-pointer-lowtag)
 
-	;; NIL out the last cons.
-	(storew null-tn dst 1 list-pointer-lowtag))
+        ;; NIL out the last cons.
+        (storew null-tn dst 1 list-pointer-lowtag))
       (emit-label done))))
 
 ;;; Return the location and size of the more arg glob created by Copy-More-Arg.
@@ -1173,7 +1173,7 @@ default-value-8
   (:arg-types tagged-num (:constant fixnum))
   (:info fixed)
   (:results (context :scs (descriptor-reg))
-	    (count :scs (any-reg)))
+            (count :scs (any-reg)))
   (:result-types t tagged-num)
   (:note "more-arg-context")
   (:generator 5
@@ -1194,29 +1194,29 @@ default-value-8
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
-	   (generate-error-code vop invalid-arg-count-error nargs)))
+           (generate-error-code vop invalid-arg-count-error nargs)))
       (cond ((zerop count)
-	     (inst bne nargs zero-tn err-lab)
-	     (inst nop))
-	    (t
-	     (inst li temp (fixnumize count))
-	     (inst bne nargs temp err-lab)
-	     (inst nop))))))
+             (inst bne nargs zero-tn err-lab)
+             (inst nop))
+            (t
+             (inst li temp (fixnumize count))
+             (inst bne nargs temp err-lab)
+             (inst nop))))))
 
 ;;; Various other error signalers.
 ;;;
 (macrolet ((frob (name error translate &rest args)
-	     `(define-vop (,name)
-		,@(when translate
-		    `((:policy :fast-safe)
-		      (:translate ,translate)))
-		(:args ,@(mapcar #'(lambda (arg)
-				     `(,arg :scs (any-reg descriptor-reg)))
-				 args))
-		(:vop-var vop)
-		(:save-p :compute-only)
-		(:generator 1000
-		  (error-call vop ,error ,@args)))))
+             `(define-vop (,name)
+                ,@(when translate
+                    `((:policy :fast-safe)
+                      (:translate ,translate)))
+                (:args ,@(mapcar #'(lambda (arg)
+                                     `(,arg :scs (any-reg descriptor-reg)))
+                                 args))
+                (:vop-var vop)
+                (:save-p :compute-only)
+                (:generator 1000
+                  (error-call vop ,error ,@args)))))
   (frob arg-count-error invalid-arg-count-error
     sb!c::%arg-count-error nargs)
   (frob type-check-error object-not-type-error sb!c::%type-check-error

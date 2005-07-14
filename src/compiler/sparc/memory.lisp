@@ -43,7 +43,7 @@
 
 (define-vop (slot-set)
   (:args (object :scs (descriptor-reg))
-	 (value :scs (descriptor-reg any-reg)))
+         (value :scs (descriptor-reg any-reg)))
   (:variant-vars base lowtag)
   (:info offset)
   (:generator 4
@@ -53,41 +53,41 @@
 
 ;;; Define some VOPs for indexed memory reference.
 (macrolet ((define-indexer (name write-p op shift)
-	       `(define-vop (,name)
-		 (:args (object :scs (descriptor-reg))
-		  (index :scs (any-reg zero immediate))
-		  ,@(when write-p
-			  '((value :scs (any-reg descriptor-reg) :target result))))
-		 (:arg-types * tagged-num ,@(when write-p '(*)))
-		 (:temporary (:scs (non-descriptor-reg)) temp)
-		 (:results (,(if write-p 'result 'value)
-			    :scs (any-reg descriptor-reg)))
-		 (:result-types *)
-		 (:variant-vars offset lowtag)
-		 (:policy :fast-safe)
-		 (:generator 5
-		  (sc-case index
-		   ((immediate zero)
-		    (let ((offset (- (+ (if (sc-is index zero)
-					    0
-					    (ash (tn-value index)
-						 (- word-shift ,shift)))
-					(ash offset word-shift))
-				     lowtag)))
-		      (etypecase offset
-			((signed-byte 13)
-			 (inst ,op value object offset))
-			((or (unsigned-byte 32) (signed-byte 32))
-			 (inst li temp offset)
-			 (inst ,op value object temp)))))
-		   (t
-		    ,@(unless (zerop shift)
-			      `((inst srl temp index ,shift)))
-		    (inst add temp ,(if (zerop shift) 'index 'temp)
-			  (- (ash offset word-shift) lowtag))
-		    (inst ,op value object temp)))
-		  ,@(when write-p
-			  '((move result value)))))))
+               `(define-vop (,name)
+                 (:args (object :scs (descriptor-reg))
+                  (index :scs (any-reg zero immediate))
+                  ,@(when write-p
+                          '((value :scs (any-reg descriptor-reg) :target result))))
+                 (:arg-types * tagged-num ,@(when write-p '(*)))
+                 (:temporary (:scs (non-descriptor-reg)) temp)
+                 (:results (,(if write-p 'result 'value)
+                            :scs (any-reg descriptor-reg)))
+                 (:result-types *)
+                 (:variant-vars offset lowtag)
+                 (:policy :fast-safe)
+                 (:generator 5
+                  (sc-case index
+                   ((immediate zero)
+                    (let ((offset (- (+ (if (sc-is index zero)
+                                            0
+                                            (ash (tn-value index)
+                                                 (- word-shift ,shift)))
+                                        (ash offset word-shift))
+                                     lowtag)))
+                      (etypecase offset
+                        ((signed-byte 13)
+                         (inst ,op value object offset))
+                        ((or (unsigned-byte 32) (signed-byte 32))
+                         (inst li temp offset)
+                         (inst ,op value object temp)))))
+                   (t
+                    ,@(unless (zerop shift)
+                              `((inst srl temp index ,shift)))
+                    (inst add temp ,(if (zerop shift) 'index 'temp)
+                          (- (ash offset word-shift) lowtag))
+                    (inst ,op value object temp)))
+                  ,@(when write-p
+                          '((move result value)))))))
   (define-indexer word-index-ref nil ld 0)
   (define-indexer word-index-set t st 0)
   (define-indexer halfword-index-ref nil lduh 1)

@@ -19,14 +19,14 @@
 
 ;;; FIXME: These want to turn into macrolets.
 (macrolet ((defreg (name offset)
-	       (let ((offset-sym (symbolicate name "-OFFSET")))
-		 `(eval-when (:compile-toplevel :load-toplevel :execute)
-		   (def!constant ,offset-sym ,offset)
-		   (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
-	   (defregset (name &rest regs)
-	       `(eval-when (:compile-toplevel :load-toplevel :execute)
-		 (defparameter ,name
-		   (list ,@(mapcar #'(lambda (name) (symbolicate name "-OFFSET")) regs))))))
+               (let ((offset-sym (symbolicate name "-OFFSET")))
+                 `(eval-when (:compile-toplevel :load-toplevel :execute)
+                   (def!constant ,offset-sym ,offset)
+                   (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
+           (defregset (name &rest regs)
+               `(eval-when (:compile-toplevel :load-toplevel :execute)
+                 (defparameter ,name
+                   (list ,@(mapcar #'(lambda (name) (symbolicate name "-OFFSET")) regs))))))
 
   ;; Wired-zero
   (defreg zero 0)
@@ -92,19 +92,19 @@
 ;;;
 ;;; Handy macro so we don't have to keep changing all the numbers whenever
 ;;; we insert a new storage class.
-;;; 
+;;;
 (defmacro !define-storage-classes (&rest classes)
   (do ((forms (list 'progn)
-	      (let* ((class (car classes))
-		     (sc-name (car class))
-		     (constant-name (intern (concatenate 'simple-string
-							 (string sc-name)
-							 "-SC-NUMBER"))))
-		(list* `(define-storage-class ,sc-name ,index
-			  ,@(cdr class))
-		       `(defconstant ,constant-name ,index)
-		       `(export ',constant-name)
-		       forms)))
+              (let* ((class (car classes))
+                     (sc-name (car class))
+                     (constant-name (intern (concatenate 'simple-string
+                                                         (string sc-name)
+                                                         "-SC-NUMBER"))))
+                (list* `(define-storage-class ,sc-name ,index
+                          ,@(cdr class))
+                       `(defconstant ,constant-name ,index)
+                       `(export ',constant-name)
+                       forms)))
        (index 0 (1+ index))
        (classes classes (cdr classes)))
       ((null classes)
@@ -139,7 +139,7 @@
   (sap-stack non-descriptor-stack) ; System area pointers.
   (single-stack non-descriptor-stack) ; single-floats
   (double-stack non-descriptor-stack
-		:element-size 2 :alignment 2) ; double floats.
+                :element-size 2 :alignment 2) ; double floats.
   (complex-single-stack non-descriptor-stack :element-size 2)
   (complex-double-stack non-descriptor-stack :element-size 4 :alignment 2)
 
@@ -234,15 +234,15 @@
 ;;;; Make some random tns for important registers.
 
 (macrolet ((defregtn (name sc)
-	       (let ((offset-sym (symbolicate name "-OFFSET"))
-		     (tn-sym (symbolicate name "-TN")))
-		 `(defparameter ,tn-sym
-		   (make-random-tn :kind :normal
-		    :sc (sc-or-lose ',sc)
-		    :offset ,offset-sym)))))
+               (let ((offset-sym (symbolicate name "-OFFSET"))
+                     (tn-sym (symbolicate name "-TN")))
+                 `(defparameter ,tn-sym
+                   (make-random-tn :kind :normal
+                    :sc (sc-or-lose ',sc)
+                    :offset ,offset-sym)))))
 
   ;; These, we access by foo-TN only
-  
+
   (defregtn zero any-reg)
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
@@ -251,7 +251,7 @@
   (defregtn csp any-reg)
   (defregtn cfp any-reg)
   (defregtn nsp any-reg)
-  
+
   ;; These alias regular locations, so we have to make sure we don't bypass
   ;; the register allocator when using them.
   (defregtn nargs any-reg)
@@ -261,12 +261,12 @@
 ;; And some floating point values.
 (defparameter fp-single-zero-tn
   (make-random-tn :kind :normal
-		  :sc (sc-or-lose 'single-reg)
-		  :offset 0))
+                  :sc (sc-or-lose 'single-reg)
+                  :offset 0))
 (defparameter fp-double-zero-tn
   (make-random-tn :kind :normal
-		  :sc (sc-or-lose 'double-reg)
-		  :offset 0))
+                  :sc (sc-or-lose 'double-reg)
+                  :offset 0))
 
 
 ;;; If VALUE can be represented as an immediate constant, then return
@@ -278,20 +278,20 @@
     (null
      (sc-number-or-lose 'null))
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
-	 system-area-pointer character)
+         system-area-pointer character)
      (sc-number-or-lose 'immediate))
     (symbol
      (if (static-symbol-p value)
-	 (sc-number-or-lose 'immediate)
-	 nil))
+         (sc-number-or-lose 'immediate)
+         nil))
     (single-float
      (if (zerop value)
-	 (sc-number-or-lose 'fp-single-zero)
-	 nil))
+         (sc-number-or-lose 'fp-single-zero)
+         nil))
     (double-float
      (if (zerop value)
-	 (sc-number-or-lose 'fp-double-zero)
-	 nil))))
+         (sc-number-or-lose 'fp-double-zero)
+         nil))))
 
 
 ;;;; Function Call Parameters
@@ -314,7 +314,7 @@
 (defconstant register-arg-count 6)
 
 ;;; Names to use for the argument registers.
-;;; 
+;;;
 (defconstant-eqx register-arg-names '(a0 a1 a2 a3 a4 a5) #'equal)
 
 ) ; EVAL-WHEN
@@ -324,10 +324,10 @@
 ;;;
 (defparameter register-arg-tns
   (mapcar #'(lambda (n)
-	      (make-random-tn :kind :normal
-			      :sc (sc-or-lose 'descriptor-reg)
-			      :offset n))
-	  *register-arg-offsets*))
+              (make-random-tn :kind :normal
+                              :sc (sc-or-lose 'descriptor-reg)
+                              :offset n))
+          *register-arg-offsets*))
 
 ;;; This is used by the debugger.
 (defconstant single-value-return-byte-offset 4)
@@ -337,10 +337,10 @@
 (!def-vm-support-routine location-print-name (tn)
   (declare (type tn tn))
   (let ((sb (sb-name (sc-sb (tn-sc tn))))
-	(offset (tn-offset tn)))
+        (offset (tn-offset tn)))
     (ecase sb
       (registers (or (svref *register-names* offset)
-		     (format nil "R~D" offset)))
+                     (format nil "R~D" offset)))
       (float-registers (format nil "F~D" offset))
       (control-stack (format nil "CS~D" offset))
       (non-descriptor-stack (format nil "NS~D" offset))

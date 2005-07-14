@@ -48,7 +48,7 @@
     ;; It wasn't a fixnum, so get the low 8 bits.
     (inst b done)
     (inst and result object widetag-mask)
-    
+
     FUNCTION-POINTER
     (inst b done)
     (load-type result object (- fun-pointer-lowtag))
@@ -74,7 +74,7 @@
   (:translate (setf fun-subtype))
   (:policy :fast-safe)
   (:args (type :scs (unsigned-reg) :target result)
-	 (function :scs (descriptor-reg)))
+         (function :scs (descriptor-reg)))
   (:arg-types positive-fixnum *)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -108,7 +108,7 @@
   (:translate set-header-data)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target res)
-	 (data :scs (any-reg immediate zero)))
+         (data :scs (any-reg immediate zero)))
   (:arg-types * positive-fixnum)
   (:results (res :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) t1 t2)
@@ -138,8 +138,8 @@
 
 (define-vop (make-other-immediate-type)
   (:args (val :scs (any-reg descriptor-reg))
-	 (type :scs (any-reg descriptor-reg immediate)
-	       :target temp))
+         (type :scs (any-reg descriptor-reg immediate)
+               :target temp))
   (:results (res :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 2
@@ -198,7 +198,7 @@
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
-	 (offset :scs (signed-reg unsigned-reg)))
+         (offset :scs (signed-reg unsigned-reg)))
   (:arg-types * positive-fixnum)
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
@@ -239,8 +239,8 @@
   (:temporary (:scs (non-descriptor-reg)) count)
   (:generator 1
     (let ((offset
-	   (- (* (+ index vector-data-offset) n-word-bytes)
-	      other-pointer-lowtag)))
+           (- (* (+ index vector-data-offset) n-word-bytes)
+              other-pointer-lowtag)))
       (aver (typep offset '(signed-byte 13)))
       (inst ld count count-vector offset)
       (inst add count 1)

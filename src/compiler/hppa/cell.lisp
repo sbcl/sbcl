@@ -24,7 +24,7 @@
 
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
-	 (value :scs (descriptor-reg any-reg)))
+         (value :scs (descriptor-reg any-reg)))
   (:info name offset lowtag)
   (:ignore name)
   (:results)
@@ -114,7 +114,7 @@
   (:policy :fast-safe)
   (:translate (setf fdefn-fun))
   (:args (function :scs (descriptor-reg) :target result)
-	 (fdefn :scs (descriptor-reg)))
+         (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (interior-reg)) lip)
   (:temporary (:scs (non-descriptor-reg)) type)
   (:results (result :scs (descriptor-reg)))
@@ -123,7 +123,7 @@
     (inst addi (- simple-fun-header-widetag) type type)
     (inst comb := type zero-tn normal-fn)
     (inst addi (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
-	  function lip)
+          function lip)
     (inst li (make-fixup "closure_tramp" :foreign) lip)
     NORMAL-FN
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
@@ -152,7 +152,7 @@
 
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
-	 (symbol :scs (descriptor-reg)))
+         (symbol :scs (descriptor-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 5
     (loadw temp symbol symbol-value-slot other-pointer-lowtag)

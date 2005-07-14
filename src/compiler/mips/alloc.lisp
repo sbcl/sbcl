@@ -8,7 +8,7 @@
   (:temporary (:scs (descriptor-reg) :type list) ptr)
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg) :type list :to (:result 0) :target result)
-	      res)
+              res)
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:info num)
   (:results (result :scs (descriptor-reg)))
@@ -16,43 +16,43 @@
   (:policy :safe)
   (:generator 0
     (cond ((zerop num)
-	   (move result null-tn))
-	  ((and star (= num 1))
-	   (move result (tn-ref-tn things)))
-	  (t
-	   (macrolet
-	       ((store-car (tn list &optional (slot cons-car-slot))
-		  `(let ((reg
-			  (sc-case ,tn
-			    ((any-reg descriptor-reg) ,tn)
-			    (zero zero-tn)
-			    (null null-tn)
-			    (control-stack
-			     (load-stack-tn temp ,tn)
-			     temp))))
-		     (storew reg ,list ,slot list-pointer-lowtag))))
-	     (let ((cons-cells (if star (1- num) num)))
-	       (pseudo-atomic (pa-flag
-			       :extra (* (pad-data-block cons-size)
-					 cons-cells))
-		 (inst or res alloc-tn list-pointer-lowtag)
-		 (move ptr res)
-		 (dotimes (i (1- cons-cells))
-		   (store-car (tn-ref-tn things) ptr)
-		   (setf things (tn-ref-across things))
-		   (inst addu ptr ptr (pad-data-block cons-size))
-		   (storew ptr ptr
-			   (- cons-cdr-slot cons-size)
-			   list-pointer-lowtag))
-		 (store-car (tn-ref-tn things) ptr)
-		 (cond (star
-			(setf things (tn-ref-across things))
-			(store-car (tn-ref-tn things) ptr cons-cdr-slot))
-		       (t
-			(storew null-tn ptr
-				cons-cdr-slot list-pointer-lowtag)))
-		 (aver (null (tn-ref-across things)))
-		 (move result res))))))))
+           (move result null-tn))
+          ((and star (= num 1))
+           (move result (tn-ref-tn things)))
+          (t
+           (macrolet
+               ((store-car (tn list &optional (slot cons-car-slot))
+                  `(let ((reg
+                          (sc-case ,tn
+                            ((any-reg descriptor-reg) ,tn)
+                            (zero zero-tn)
+                            (null null-tn)
+                            (control-stack
+                             (load-stack-tn temp ,tn)
+                             temp))))
+                     (storew reg ,list ,slot list-pointer-lowtag))))
+             (let ((cons-cells (if star (1- num) num)))
+               (pseudo-atomic (pa-flag
+                               :extra (* (pad-data-block cons-size)
+                                         cons-cells))
+                 (inst or res alloc-tn list-pointer-lowtag)
+                 (move ptr res)
+                 (dotimes (i (1- cons-cells))
+                   (store-car (tn-ref-tn things) ptr)
+                   (setf things (tn-ref-across things))
+                   (inst addu ptr ptr (pad-data-block cons-size))
+                   (storew ptr ptr
+                           (- cons-cdr-slot cons-size)
+                           list-pointer-lowtag))
+                 (store-car (tn-ref-tn things) ptr)
+                 (cond (star
+                        (setf things (tn-ref-across things))
+                        (store-car (tn-ref-tn things) ptr cons-cdr-slot))
+                       (t
+                        (storew null-tn ptr
+                                cons-cdr-slot list-pointer-lowtag)))
+                 (aver (null (tn-ref-across things)))
+                 (move result res))))))))
 
 (define-vop (list list-or-list*)
   (:variant nil))
@@ -65,7 +65,7 @@
 
 (define-vop (allocate-code-object)
   (:args (boxed-arg :scs (any-reg))
-	 (unboxed-arg :scs (any-reg)))
+         (unboxed-arg :scs (any-reg)))
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:temporary (:scs (any-reg) :from (:argument 0)) boxed)
@@ -74,14 +74,14 @@
   (:generator 100
     (inst li ndescr (lognot lowtag-mask))
     (inst addu boxed boxed-arg
-	  (fixnumize (1+ code-trace-table-offset-slot)))
+          (fixnumize (1+ code-trace-table-offset-slot)))
     (inst and boxed ndescr)
     (inst srl unboxed unboxed-arg word-shift)
     (inst addu unboxed unboxed lowtag-mask)
     (inst and unboxed ndescr)
     (inst sll ndescr boxed (- n-widetag-bits word-shift))
     (inst or ndescr code-header-widetag)
-    
+
     (pseudo-atomic (pa-flag)
       (inst or result alloc-tn other-pointer-lowtag)
       (storew ndescr result 0 other-pointer-lowtag)
@@ -117,12 +117,12 @@
     (let ((size (+ length closure-info-offset)))
       (inst li temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag))
       (pseudo-atomic (pa-flag :extra (pad-data-block size))
-	(inst or result alloc-tn fun-pointer-lowtag)
-	(storew temp result 0 fun-pointer-lowtag))
+        (inst or result alloc-tn fun-pointer-lowtag)
+        (storew temp result 0 fun-pointer-lowtag))
       (storew function result closure-fun-slot fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
-;;; 
+;;;
 (define-vop (make-value-cell)
   (:args (value :to :save :scs (descriptor-reg any-reg null zero)))
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -152,8 +152,8 @@
     (pseudo-atomic (pa-flag :extra (pad-data-block words))
       (inst or result alloc-tn lowtag)
       (when type
-	(inst li temp (logior (ash (1- words) n-widetag-bits) type))
-	(storew temp result 0 lowtag)))))
+        (inst li temp (logior (ash (1- words) n-widetag-bits) type))
+        (storew temp result 0 lowtag)))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))

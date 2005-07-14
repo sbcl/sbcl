@@ -34,7 +34,7 @@
 ;;;
 (define-vop (slot-set)
   (:args (object :scs (descriptor-reg))
-	 (value :scs (descriptor-reg any-reg null zero)))
+         (value :scs (descriptor-reg any-reg null zero)))
   (:variant-vars base lowtag)
   (:info offset)
   (:generator 4

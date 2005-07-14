@@ -54,14 +54,14 @@
 (defconstant-eqx float-traps-byte (byte 5 0) #'equal)
 (defconstant-eqx float-exceptions-byte (byte 5 27) #'equal)
 (def!constant float-condition-bit (ash 1 26))
-(def!constant float-fast-bit 0)			  ; No fast mode on HPPA.
+(def!constant float-fast-bit 0)                   ; No fast mode on HPPA.
 
 
 
 ;;;; Description of the target address space.
 
 ;;; Where to put the different spaces.
-;;; 
+;;;
 (def!constant read-only-space-start #x20000000)
 (def!constant read-only-space-end   #x24000000)
 
@@ -116,7 +116,7 @@
 
     ;; The C startup code must fill these in.
     *posix-argv*
-    
+
     ;; Functions that the C code needs to call
     sb!impl::sub-gc
     sb!kernel::internal-error
@@ -138,7 +138,7 @@
     *binding-stack-start*
     *control-stack-start*
     *control-stack-end*
-    
+
     ;; Interrupt Handling
     *free-interrupt-context-index*
     sb!unix::*interrupts-enabled*

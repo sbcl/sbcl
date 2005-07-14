@@ -24,8 +24,8 @@
        (load-symbol y val))
       (character
        (inst li (logior (ash (char-code val) n-widetag-bits)
-			character-widetag)
-	     y)))))
+                        character-widetag)
+             y)))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate zero)
@@ -73,10 +73,10 @@
 ;;;; The Move VOP:
 (define-vop (move)
   (:args (x :target y
-	    :scs (any-reg descriptor-reg)
-	    :load-if (not (location= x y))))
+            :scs (any-reg descriptor-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (any-reg descriptor-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:generator 0
@@ -95,9 +95,9 @@
 ;;; frame for argument or known value passing.
 (define-vop (move-arg)
   (:args (x :target y
-	    :scs (any-reg descriptor-reg))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y any-reg descriptor-reg))))
+            :scs (any-reg descriptor-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
   (:generator 0
     (sc-case y
@@ -242,10 +242,10 @@
 ;;; Move untagged numbers.
 (define-vop (word-move)
   (:args (x :target y
-	    :scs (signed-reg unsigned-reg)
-	    :load-if (not (location= x y))))
+            :scs (signed-reg unsigned-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (signed-reg unsigned-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:note "word integer move")
@@ -257,9 +257,9 @@
 ;;; Move untagged number args/return-values.
 (define-vop (move-word-arg)
   (:args (x :target y
-	    :scs (signed-reg unsigned-reg))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y sap-reg))))
+            :scs (signed-reg unsigned-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y sap-reg))))
   (:results (y))
   (:note "word integer argument move")
   (:generator 0

@@ -58,7 +58,7 @@
 
 (define-vop (fast-fixnum-binop fast-safe-arith-op)
   (:args (x :target r :scs (any-reg zero))
-	 (y :target r :scs (any-reg zero)))
+         (y :target r :scs (any-reg zero)))
   (:arg-types tagged-num tagged-num)
   (:results (r :scs (any-reg)))
   (:result-types tagged-num)
@@ -66,7 +66,7 @@
 
 (define-vop (fast-unsigned-binop fast-safe-arith-op)
   (:args (x :target r :scs (unsigned-reg zero))
-	 (y :target r :scs (unsigned-reg zero)))
+         (y :target r :scs (unsigned-reg zero)))
   (:arg-types unsigned-num unsigned-num)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
@@ -74,7 +74,7 @@
 
 (define-vop (fast-signed-binop fast-safe-arith-op)
   (:args (x :target r :scs (signed-reg zero))
-	 (y :target r :scs (signed-reg zero)))
+         (y :target r :scs (signed-reg zero)))
   (:arg-types signed-num signed-num)
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
@@ -85,7 +85,7 @@
   (:args (x :target r :scs (any-reg zero)))
   (:info y)
   (:arg-types tagged-num
-	      (:constant (and (signed-byte 11) (not (integer 0 0)))))
+              (:constant (and (signed-byte 11) (not (integer 0 0)))))
   (:results (r :scs (any-reg)))
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic"))
@@ -94,7 +94,7 @@
   (:args (x :target r :scs (unsigned-reg zero)))
   (:info y)
   (:arg-types unsigned-num
-	      (:constant (and (signed-byte 13) (not (integer 0 0)))))
+              (:constant (and (signed-byte 13) (not (integer 0 0)))))
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic"))
@@ -103,7 +103,7 @@
   (:args (x :target r :scs (signed-reg zero)))
   (:info y)
   (:arg-types signed-num
-	      (:constant (and (signed-byte 13) (not (integer 0 0)))))
+              (:constant (and (signed-byte 13) (not (integer 0 0)))))
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:note "inline (signed-byte 32) arithmetic"))
@@ -112,55 +112,55 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 (defmacro define-binop (translate untagged-penalty op
-			&optional arg-swap restore-fixnum-mask)
+                        &optional arg-swap restore-fixnum-mask)
   `(progn
      (define-vop (,(symbolicate 'fast translate '/fixnum=>fixnum)
-		  fast-fixnum-binop)
+                  fast-fixnum-binop)
        ,@(when restore-fixnum-mask
-	   `((:temporary (:sc non-descriptor-reg) temp)))
+           `((:temporary (:sc non-descriptor-reg) temp)))
        (:translate ,translate)
        (:generator 2
-	 ,(if arg-swap
-	      `(inst ,op ,(if restore-fixnum-mask 'temp 'r) y x)
-	      `(inst ,op ,(if restore-fixnum-mask 'temp 'r) x y))
-	 ,@(when restore-fixnum-mask
-	     `((inst andn r temp fixnum-tag-mask)))))
+         ,(if arg-swap
+              `(inst ,op ,(if restore-fixnum-mask 'temp 'r) y x)
+              `(inst ,op ,(if restore-fixnum-mask 'temp 'r) x y))
+         ,@(when restore-fixnum-mask
+             `((inst andn r temp fixnum-tag-mask)))))
      ,@(unless arg-swap
-	 `((define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
-			fast-fixnum-binop-c)
-	     ,@(when restore-fixnum-mask
-		 `((:temporary (:sc non-descriptor-reg) temp)))
-	     (:translate ,translate)
-	     (:generator 1
-	       (inst ,op ,(if restore-fixnum-mask 'temp 'r) x (fixnumize y))
-	       ,@(when restore-fixnum-mask
-		   `((inst andn r temp fixnum-tag-mask)))))))
+         `((define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
+                        fast-fixnum-binop-c)
+             ,@(when restore-fixnum-mask
+                 `((:temporary (:sc non-descriptor-reg) temp)))
+             (:translate ,translate)
+             (:generator 1
+               (inst ,op ,(if restore-fixnum-mask 'temp 'r) x (fixnumize y))
+               ,@(when restore-fixnum-mask
+                   `((inst andn r temp fixnum-tag-mask)))))))
      (define-vop (,(symbolicate 'fast- translate '/signed=>signed)
-		  fast-signed-binop)
+                  fast-signed-binop)
        (:translate ,translate)
        (:generator ,(1+ untagged-penalty)
-	 ,(if arg-swap
-	      `(inst ,op r y x)
-	      `(inst ,op r x y))))
+         ,(if arg-swap
+              `(inst ,op r y x)
+              `(inst ,op r x y))))
      ,@(unless arg-swap
-	 `((define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
-			fast-signed-binop-c)
-	     (:translate ,translate)
-	     (:generator ,untagged-penalty
-	       (inst ,op r x y)))))
+         `((define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
+                        fast-signed-binop-c)
+             (:translate ,translate)
+             (:generator ,untagged-penalty
+               (inst ,op r x y)))))
      (define-vop (,(symbolicate 'fast- translate '/unsigned=>unsigned)
-		  fast-unsigned-binop)
+                  fast-unsigned-binop)
        (:translate ,translate)
        (:generator ,(1+ untagged-penalty)
-	 ,(if arg-swap
-	      `(inst ,op r y x)
-	      `(inst ,op r x y))))
+         ,(if arg-swap
+              `(inst ,op r y x)
+              `(inst ,op r x y))))
      ,@(unless arg-swap
-	 `((define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
-			fast-unsigned-binop-c)
-	     (:translate ,translate)
-	     (:generator ,untagged-penalty
-	       (inst ,op r x y)))))))
+         `((define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
+                        fast-unsigned-binop-c)
+             (:translate ,translate)
+             (:generator ,untagged-penalty
+               (inst ,op r x y)))))))
 
 ); eval-when
 
@@ -229,10 +229,10 @@
 (define-vop (fast-v8-truncate/fixnum=>fixnum fast-safe-arith-op)
   (:translate truncate)
   (:args (x :scs (any-reg))
-	 (y :scs (any-reg)))
+         (y :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:results (quo :scs (any-reg))
-	    (rem :scs (any-reg)))
+            (rem :scs (any-reg)))
   (:result-types tagged-num tagged-num)
   (:note "inline fixnum arithmetic")
   (:temporary (:scs (any-reg) :target quo) q)
@@ -241,8 +241,8 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:guard (or (member :sparc-v8 *backend-subfeatures*)
-	      (and (member :sparc-v9 *backend-subfeatures*)
-		   (not (member :sparc-64 *backend-subfeatures*)))))
+              (and (member :sparc-v9 *backend-subfeatures*)
+                   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 12
     (let ((zero (generate-error-code vop division-by-zero-error x y)))
       (inst cmp y zero-tn)
@@ -255,20 +255,20 @@
       (inst nop)
       (inst nop)
 
-      (inst sdiv q x y-int)		; Q is tagged.
+      (inst sdiv q x y-int)             ; Q is tagged.
       ;; We have the quotient so we need to compute the remainder
-      (inst smul r q y-int)		; R is tagged
+      (inst smul r q y-int)             ; R is tagged
       (inst sub rem x r)
       (unless (location= quo q)
-	(move quo q)))))
+        (move quo q)))))
 
 (define-vop (fast-v8-truncate/signed=>signed fast-safe-arith-op)
   (:translate truncate)
   (:args (x :scs (signed-reg))
-	 (y :scs (signed-reg)))
+         (y :scs (signed-reg)))
   (:arg-types signed-num signed-num)
   (:results (quo :scs (signed-reg))
-	    (rem :scs (signed-reg)))
+            (rem :scs (signed-reg)))
   (:result-types signed-num signed-num)
   (:note "inline (signed-byte 32) arithmetic")
   (:temporary (:scs (signed-reg) :target quo) q)
@@ -276,14 +276,14 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:guard (or (member :sparc-v8 *backend-subfeatures*)
-	      (and (member :sparc-v9 *backend-subfeatures*)
-		   (not (member :sparc-64 *backend-subfeatures*)))))
+              (and (member :sparc-v9 *backend-subfeatures*)
+                   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 12
     (let ((zero (generate-error-code vop division-by-zero-error x y)))
       (inst cmp y zero-tn)
       (if (member :sparc-v9 *backend-subfeatures*)
-	  (inst b :eq zero :pn)
-	  (inst b :eq zero))
+          (inst b :eq zero :pn)
+          (inst b :eq zero))
       ;; Extend the sign of X into the Y register
       (inst sra r x 31)
       (inst wry r)
@@ -293,18 +293,18 @@
 
       (inst sdiv q x y)
       ;; We have the quotient so we need to compue the remainder
-      (inst smul r q y)		; rem
+      (inst smul r q y)         ; rem
       (inst sub rem x r)
       (unless (location= quo q)
-	(move quo q)))))
+        (move quo q)))))
 
 (define-vop (fast-v8-truncate/unsigned=>unsigned fast-safe-arith-op)
   (:translate truncate)
   (:args (x :scs (unsigned-reg))
-	 (y :scs (unsigned-reg)))
+         (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
   (:results (quo :scs (unsigned-reg))
-	    (rem :scs (unsigned-reg)))
+            (rem :scs (unsigned-reg)))
   (:result-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic")
   (:temporary (:scs (unsigned-reg) :target quo) q)
@@ -312,33 +312,33 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:guard (or (member :sparc-v8 *backend-subfeatures*)
-	      (and (member :sparc-v9 *backend-subfeatures*)
-		   (not (member :sparc-64 *backend-subfeatures*)))))
+              (and (member :sparc-v9 *backend-subfeatures*)
+                   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 8
     (let ((zero (generate-error-code vop division-by-zero-error x y)))
       (inst cmp y zero-tn)
       (if (member :sparc-v9 *backend-subfeatures*)
-	  (inst b :eq zero :pn)
-	  (inst b :eq zero))
-      (inst wry zero-tn)		; Clear out high part
+          (inst b :eq zero :pn)
+          (inst b :eq zero))
+      (inst wry zero-tn)                ; Clear out high part
       (inst nop)
       (inst nop)
       (inst nop)
-      
+
       (inst udiv q x y)
       ;; Compute remainder
       (inst umul r q y)
       (inst sub rem x r)
       (unless (location= quo q)
-	(inst move quo q)))))
+        (inst move quo q)))))
 
 (define-vop (fast-v9-truncate/signed=>signed fast-safe-arith-op)
   (:translate truncate)
   (:args (x :scs (signed-reg))
-	 (y :scs (signed-reg)))
+         (y :scs (signed-reg)))
   (:arg-types signed-num signed-num)
   (:results (quo :scs (signed-reg))
-	    (rem :scs (signed-reg)))
+            (rem :scs (signed-reg)))
   (:result-types signed-num signed-num)
   (:note "inline (signed-byte 32) arithmetic")
   (:temporary (:scs (signed-reg) :target quo) q)
@@ -358,15 +358,15 @@
       (inst mulx r q y)
       (inst sub rem x r)
       (unless (location= quo q)
-	(inst move quo q)))))
+        (inst move quo q)))))
 
 (define-vop (fast-v9-truncate/unsigned=>unsigned fast-safe-arith-op)
   (:translate truncate)
   (:args (x :scs (unsigned-reg))
-	 (y :scs (unsigned-reg)))
+         (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
   (:results (quo :scs (unsigned-reg))
-	    (rem :scs (unsigned-reg)))
+            (rem :scs (unsigned-reg)))
   (:result-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic")
   (:temporary (:scs (unsigned-reg) :target quo) q)
@@ -386,14 +386,14 @@
       (inst mulx r q y)
       (inst sub rem x r)
       (unless (location= quo q)
-	(inst move quo q)))))
+        (inst move quo q)))))
 
 ;;; Shifting
 
 (define-vop (fast-ash/signed=>signed)
   (:note "inline ASH")
   (:args (number :scs (signed-reg) :to :save)
-	 (amount :scs (signed-reg) :to :save))
+         (amount :scs (signed-reg) :to :save))
   (:arg-types signed-num signed-num)
   (:results (result :scs (signed-reg)))
   (:result-types signed-num)
@@ -410,13 +410,13 @@
       (inst neg ndesc amount)
       (inst cmp ndesc 31)
       (if (member :sparc-v9 *backend-subfeatures*)
-	  (progn
-	    (inst cmove :ge ndesc 31)
-	    (inst sra result number ndesc))
-	  (progn
-	    (inst b :le done)
-	    (inst sra result number ndesc)
-	    (inst sra result number 31)))
+          (progn
+            (inst cmove :ge ndesc 31)
+            (inst sra result number ndesc))
+          (progn
+            (inst b :le done)
+            (inst sra result number ndesc)
+            (inst sra result number 31)))
       (emit-label done))))
 
 (define-vop (fast-ash-c/signed=>signed)
@@ -437,7 +437,7 @@
 (define-vop (fast-ash/unsigned=>unsigned)
   (:note "inline ASH")
   (:args (number :scs (unsigned-reg) :to :save)
-	 (amount :scs (signed-reg) :to :save))
+         (amount :scs (signed-reg) :to :save))
   (:arg-types unsigned-num signed-num)
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
@@ -454,13 +454,13 @@
       (inst neg ndesc amount)
       (inst cmp ndesc 32)
       (if (member :sparc-v9 *backend-subfeatures*)
-	  (progn
-	    (inst srl result number ndesc)
-	    (inst cmove :ge result zero-tn))
-	  (progn
-	    (inst b :lt done)
-	    (inst srl result number ndesc)
-	    (move result zero-tn)))
+          (progn
+            (inst srl result number ndesc)
+            (inst cmove :ge result zero-tn))
+          (progn
+            (inst b :lt done)
+            (inst srl result number ndesc)
+            (move result zero-tn)))
       (emit-label done))))
 
 (define-vop (fast-ash-c/unsigned=>unsigned)
@@ -484,25 +484,25 @@
 (macrolet
     ((def (name sc-type type result-type cost)
        `(define-vop (,name)
-	 (:note "inline ASH")
-	 (:translate ash)
-	 (:args (number :scs (,sc-type))
-	        (amount :scs (signed-reg unsigned-reg immediate)))
-	 (:arg-types ,type positive-fixnum)
-	 (:results (result :scs (,result-type)))
-	 (:result-types ,type)
-	 (:policy :fast-safe)
-	 (:generator ,cost
-	  ;; The result-type assures us that this shift will not
-	  ;; overflow. And for fixnums, the zero bits that get
-	  ;; shifted in are just fine for the fixnum tag.
-	  (sc-case amount
-	   ((signed-reg unsigned-reg)
-	    (inst sll result number amount))
-	   (immediate
-	    (let ((amount (tn-value amount)))
-	      (aver (>= amount 0))
-	      (inst sll result number amount))))))))
+         (:note "inline ASH")
+         (:translate ash)
+         (:args (number :scs (,sc-type))
+                (amount :scs (signed-reg unsigned-reg immediate)))
+         (:arg-types ,type positive-fixnum)
+         (:results (result :scs (,result-type)))
+         (:result-types ,type)
+         (:policy :fast-safe)
+         (:generator ,cost
+          ;; The result-type assures us that this shift will not
+          ;; overflow. And for fixnums, the zero bits that get
+          ;; shifted in are just fine for the fixnum tag.
+          (sc-case amount
+           ((signed-reg unsigned-reg)
+            (inst sll result number amount))
+           (immediate
+            (let ((amount (tn-value amount)))
+              (aver (>= amount 0))
+              (inst sll result number amount))))))))
   (def fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
   (def fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)
   (def fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
@@ -519,7 +519,7 @@
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) shift)
   (:generator 30
     (let ((loop (gen-label))
-	  (test (gen-label)))
+          (test (gen-label)))
       (inst addcc shift zero-tn arg)
       (inst b :ge test)
       (move res zero-tn)
@@ -528,7 +528,7 @@
 
       (emit-label loop)
       (inst add res (fixnumize 1))
-      
+
       (emit-label test)
       (inst cmp shift)
       (inst b :ne loop)
@@ -547,17 +547,17 @@
       (move res arg)
 
       (dolist (stuff '((1 #x55555555) (2 #x33333333) (4 #x0f0f0f0f)
-		       (8 #x00ff00ff) (16 #x0000ffff)))
-	(destructuring-bind (shift bit-mask)
-	    stuff
-	  ;; Set mask
-	  (inst sethi mask (ldb (byte 22 10) bit-mask))
-	  (inst add mask (ldb (byte 10 0) bit-mask))
+                       (8 #x00ff00ff) (16 #x0000ffff)))
+        (destructuring-bind (shift bit-mask)
+            stuff
+          ;; Set mask
+          (inst sethi mask (ldb (byte 22 10) bit-mask))
+          (inst add mask (ldb (byte 10 0) bit-mask))
 
-	  (inst and temp res mask)
-	  (inst srl res shift)
-	  (inst and res mask)
-	  (inst add res temp)))))
+          (inst and temp res mask)
+          (inst srl res shift)
+          (inst and res mask)
+          (inst add res temp)))))
 
 
 ;;; Multiply and Divide.
@@ -566,8 +566,8 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:translate *)
   (:guard (or (member :sparc-v8 *backend-subfeatures*)
-	      (and (member :sparc-v9 *backend-subfeatures*)
-		   (not (member :sparc-64 *backend-subfeatures*)))))
+              (and (member :sparc-v9 *backend-subfeatures*)
+                   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 2
     ;; The cost here should be less than the cost for
     ;; */signed=>signed.  Why?  A fixnum product using signed=>signed
@@ -580,46 +580,46 @@
   (:args (x :target r :scs (any-reg zero)))
   (:info y)
   (:arg-types tagged-num
-	      (:constant (and (signed-byte 13) (not (integer 0 0)))))
+              (:constant (and (signed-byte 13) (not (integer 0 0)))))
   (:results (r :scs (any-reg)))
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic")
   (:translate *)
   (:guard (or (member :sparc-v8 *backend-subfeatures*)
-	      (and (member :sparc-v9 *backend-subfeatures*)
-		   (not (member :sparc-64 *backend-subfeatures*)))))
+              (and (member :sparc-v9 *backend-subfeatures*)
+                   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 1
     (inst smul r x y)))
 
 (define-vop (fast-v8-*/signed=>signed fast-signed-binop)
   (:translate *)
   (:guard (or (member :sparc-v8 *backend-subfeatures*)
-	      (and (member :sparc-v9 *backend-subfeatures*)
-		   (not (member :sparc-64 *backend-subfeatures*)))))
+              (and (member :sparc-v9 *backend-subfeatures*)
+                   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 3
     (inst smul r x y)))
 
 (define-vop (fast-v8-*-c/signed=>signed fast-signed-binop-c)
   (:translate *)
   (:guard (or (member :sparc-v8 *backend-subfeatures*)
-	      (and (member :sparc-v9 *backend-subfeatures*)
-		   (not (member :sparc-64 *backend-subfeatures*)))))
+              (and (member :sparc-v9 *backend-subfeatures*)
+                   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 2
     (inst smul r x y)))
-	  
+
 (define-vop (fast-v8-*/unsigned=>unsigned fast-unsigned-binop)
   (:translate *)
   (:guard (or (member :sparc-v8 *backend-subfeatures*)
-	      (and (member :sparc-v9 *backend-subfeatures*)
-		   (not (member :sparc-64 *backend-subfeatures*)))))
+              (and (member :sparc-v9 *backend-subfeatures*)
+                   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 3
     (inst umul r x y)))
 
 (define-vop (fast-v8-*-c/unsigned=>unsigned fast-unsigned-binop-c)
   (:translate *)
   (:guard (or (member :sparc-v8 *backend-subfeatures*)
-	      (and (member :sparc-v9 *backend-subfeatures*)
-		   (not (member :sparc-64 *backend-subfeatures*)))))
+              (and (member :sparc-v9 *backend-subfeatures*)
+                   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 2
     (inst umul r x y)))
 
@@ -669,9 +669,9 @@
             (define-modular-fun ,mfun-name (x y) ,fun :unsigned 32)
             (define-vop (,modvop ,vop)
               (:translate ,mfun-name))
-	    ,@(when constantp
-		`((define-vop (,modcvop ,cvop)
-		    (:translate ,mfun-name))))))))
+            ,@(when constantp
+                `((define-vop (,modcvop ,cvop)
+                    (:translate ,mfun-name))))))))
   (define-modular-backend + t)
   (define-modular-backend - t)
   (define-modular-backend logxor t)
@@ -687,13 +687,13 @@
   `(lognot (logior ,x ,y)))
 
 (define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
-	     fast-ash-c/unsigned=>unsigned)
+             fast-ash-c/unsigned=>unsigned)
   (:translate ash-left-mod32))
 
 (define-vop (fast-ash-left-mod32/unsigned=>unsigned
              fast-ash-left/unsigned=>unsigned))
 (deftransform ash-left-mod32 ((integer count)
-			      ((unsigned-byte 32) (unsigned-byte 5)))
+                              ((unsigned-byte 32) (unsigned-byte 5)))
   (when (sb!c::constant-lvar-p count)
     (sb!c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
@@ -709,7 +709,7 @@
 
 (define-vop (fast-conditional/fixnum fast-conditional)
   (:args (x :scs (any-reg zero))
-	 (y :scs (any-reg zero)))
+         (y :scs (any-reg zero)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison"))
 
@@ -720,7 +720,7 @@
 
 (define-vop (fast-conditional/signed fast-conditional)
   (:args (x :scs (signed-reg zero))
-	 (y :scs (signed-reg zero)))
+         (y :scs (signed-reg zero)))
   (:arg-types signed-num signed-num)
   (:note "inline (signed-byte 32) comparison"))
 
@@ -731,7 +731,7 @@
 
 (define-vop (fast-conditional/unsigned fast-conditional)
   (:args (x :scs (unsigned-reg zero))
-	 (y :scs (unsigned-reg zero)))
+         (y :scs (unsigned-reg zero)))
   (:arg-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 32) comparison"))
 
@@ -744,25 +744,25 @@
 (defmacro define-conditional-vop (tran cond unsigned not-cond not-unsigned)
   `(progn
      ,@(mapcar (lambda (suffix cost signed)
-		 (unless (and (member suffix '(/fixnum -c/fixnum))
-			      (eq tran 'eql))
-		   `(define-vop (,(intern (format nil "~:@(FAST-IF-~A~A~)"
-						  tran suffix))
-				 ,(intern
-				   (format nil "~:@(FAST-CONDITIONAL~A~)"
-					   suffix)))
-		     (:translate ,tran)
-		     (:generator ,cost
-		      (inst cmp x
-		       ,(if (eq suffix '-c/fixnum) '(fixnumize y) 'y))
-		      (inst b (if not-p
-				  ,(if signed not-cond not-unsigned)
-				  ,(if signed cond unsigned))
-		       target)
-		      (inst nop)))))
-	       '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
-	       '(4 3 6 5 6 5)
-	       '(t t t t nil nil))))
+                 (unless (and (member suffix '(/fixnum -c/fixnum))
+                              (eq tran 'eql))
+                   `(define-vop (,(intern (format nil "~:@(FAST-IF-~A~A~)"
+                                                  tran suffix))
+                                 ,(intern
+                                   (format nil "~:@(FAST-CONDITIONAL~A~)"
+                                           suffix)))
+                     (:translate ,tran)
+                     (:generator ,cost
+                      (inst cmp x
+                       ,(if (eq suffix '-c/fixnum) '(fixnumize y) 'y))
+                      (inst b (if not-p
+                                  ,(if signed not-cond not-unsigned)
+                                  ,(if signed cond unsigned))
+                       target)
+                      (inst nop)))))
+               '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
+               '(4 3 6 5 6 5)
+               '(t t t t nil nil))))
 
 (define-conditional-vop < :lt :ltu :ge :geu)
 
@@ -782,7 +782,7 @@
 
 (define-vop (fast-eql/fixnum fast-conditional)
   (:args (x :scs (any-reg descriptor-reg zero))
-	 (y :scs (any-reg zero)))
+         (y :scs (any-reg zero)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
   (:translate eql)
@@ -814,8 +814,8 @@
 (define-vop (merge-bits)
   (:translate merge-bits)
   (:args (shift :scs (signed-reg unsigned-reg))
-	 (prev :scs (unsigned-reg))
-	 (next :scs (unsigned-reg)))
+         (prev :scs (unsigned-reg))
+         (next :scs (unsigned-reg)))
   (:arg-types tagged-num unsigned-num unsigned-num)
   (:temporary (:scs (unsigned-reg) :to (:result 0)) temp)
   (:temporary (:scs (unsigned-reg) :to (:result 0) :target result) res)
@@ -836,7 +836,7 @@
 (define-vop (shift-towards-someplace)
   (:policy :fast-safe)
   (:args (num :scs (unsigned-reg))
-	 (amount :scs (signed-reg)))
+         (amount :scs (signed-reg)))
   (:arg-types unsigned-num tagged-num)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num))
@@ -872,8 +872,8 @@
   (:variant bignum-digits-offset other-pointer-lowtag)
   (:translate sb!bignum:%bignum-set)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg immediate zero))
-	 (value :scs (unsigned-reg)))
+         (index :scs (any-reg immediate zero))
+         (value :scs (unsigned-reg)))
   (:arg-types t positive-fixnum unsigned-num)
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num))
@@ -924,11 +924,11 @@
   (:translate sb!bignum:%add-with-carry)
   (:policy :fast-safe)
   (:args (a :scs (unsigned-reg))
-	 (b :scs (unsigned-reg))
-	 (c :scs (any-reg)))
+         (b :scs (unsigned-reg))
+         (c :scs (any-reg)))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
   (:results (result :scs (unsigned-reg))
-	    (carry :scs (unsigned-reg)))
+            (carry :scs (unsigned-reg)))
   (:result-types unsigned-num positive-fixnum)
   (:generator 3
     (inst addcc zero-tn c -1)
@@ -939,11 +939,11 @@
   (:translate sb!bignum:%subtract-with-borrow)
   (:policy :fast-safe)
   (:args (a :scs (unsigned-reg))
-	 (b :scs (unsigned-reg))
-	 (c :scs (any-reg)))
+         (b :scs (unsigned-reg))
+         (c :scs (any-reg)))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
   (:results (result :scs (unsigned-reg))
-	    (borrow :scs (unsigned-reg)))
+            (borrow :scs (unsigned-reg)))
   (:result-types unsigned-num positive-fixnum)
   (:generator 4
     (inst subcc zero-tn c 1)
@@ -953,13 +953,13 @@
 
 ;;; EMIT-MULTIPLY -- This is used both for bignum stuff and in assembly
 ;;; routines.
-;;; 
+;;;
 (defun emit-multiply (multiplier multiplicand result-high result-low)
   "Emit code to multiply MULTIPLIER with MULTIPLICAND, putting the result
   in RESULT-HIGH and RESULT-LOW.  KIND is either :signed or :unsigned.
   Note: the lifetimes of MULTIPLICAND and RESULT-HIGH overlap."
   (declare (type tn multiplier result-high result-low)
-	   (type (or tn (signed-byte 13)) multiplicand))
+           (type (or tn (signed-byte 13)) multiplicand))
   ;; It seems that emit-multiply is only used to do an unsigned
   ;; multiply, so the code only does an unsigned multiply.
   (cond
@@ -970,7 +970,7 @@
      ;; unsigned 64-bit numbers.
      (inst srl multiplier 0)
      (inst srl multiplicand 0)
-  
+
      ;; Multiply the two numbers and put the result in
      ;; result-high.  Copy the low 32-bits to result-low.  Then
      ;; shift result-high so the high 32-bits end up in the low
@@ -979,7 +979,7 @@
      (inst move result-low result-high)
      (inst srax result-high 32))
     ((or (member :sparc-v8 *backend-subfeatures*)
-	 (member :sparc-v9 *backend-subfeatures*))
+         (member :sparc-v9 *backend-subfeatures*))
      ;; V8 has a multiply instruction.  This should also work for
      ;; the V9, but umul and the Y register is deprecated on the
      ;; V9.
@@ -994,7 +994,7 @@
        (inst nop)
        (inst nop)
        (dotimes (i 32)
-	 (inst mulscc result-high multiplicand))
+         (inst mulscc result-high multiplicand))
        (inst mulscc result-high zero-tn)
        (inst cmp multiplicand)
        (inst b :ge label)
@@ -1007,11 +1007,11 @@
   (:translate sb!bignum:%multiply-and-add)
   (:policy :fast-safe)
   (:args (x :scs (unsigned-reg) :to (:eval 1))
-	 (y :scs (unsigned-reg) :to (:eval 1))
-	 (carry-in :scs (unsigned-reg) :to (:eval 2)))
+         (y :scs (unsigned-reg) :to (:eval 1))
+         (carry-in :scs (unsigned-reg) :to (:eval 2)))
   (:arg-types unsigned-num unsigned-num unsigned-num)
   (:results (hi :scs (unsigned-reg) :from (:eval 0))
-	    (lo :scs (unsigned-reg) :from (:eval 1)))
+            (lo :scs (unsigned-reg) :from (:eval 1)))
   (:result-types unsigned-num unsigned-num)
   (:generator 40
     (emit-multiply x y hi lo)
@@ -1022,12 +1022,12 @@
   (:translate sb!bignum:%multiply-and-add)
   (:policy :fast-safe)
   (:args (x :scs (unsigned-reg) :to (:eval 1))
-	 (y :scs (unsigned-reg) :to (:eval 1))
-	 (prev :scs (unsigned-reg) :to (:eval 2))
-	 (carry-in :scs (unsigned-reg) :to (:eval 2)))
+         (y :scs (unsigned-reg) :to (:eval 1))
+         (prev :scs (unsigned-reg) :to (:eval 2))
+         (carry-in :scs (unsigned-reg) :to (:eval 2)))
   (:arg-types unsigned-num unsigned-num unsigned-num unsigned-num)
   (:results (hi :scs (unsigned-reg) :from (:eval 0))
-	    (lo :scs (unsigned-reg) :from (:eval 1)))
+            (lo :scs (unsigned-reg) :from (:eval 1)))
   (:result-types unsigned-num unsigned-num)
   (:generator 40
     (emit-multiply x y hi lo)
@@ -1040,10 +1040,10 @@
   (:translate sb!bignum:%multiply)
   (:policy :fast-safe)
   (:args (x :scs (unsigned-reg) :to (:result 1))
-	 (y :scs (unsigned-reg) :to (:result 1)))
+         (y :scs (unsigned-reg) :to (:result 1)))
   (:arg-types unsigned-num unsigned-num)
   (:results (hi :scs (unsigned-reg))
-	    (lo :scs (unsigned-reg)))
+            (lo :scs (unsigned-reg)))
   (:result-types unsigned-num unsigned-num)
   (:generator 40
     (emit-multiply x y hi lo)))
@@ -1065,41 +1065,41 @@
   (:translate sb!bignum:%floor)
   (:policy :fast-safe)
   (:args (div-high :scs (unsigned-reg) :target rem)
-	 (div-low :scs (unsigned-reg) :target quo)
-	 (divisor :scs (unsigned-reg)))
+         (div-low :scs (unsigned-reg) :target quo)
+         (divisor :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num unsigned-num)
   (:results (quo :scs (unsigned-reg) :from (:argument 1))
-	    (rem :scs (unsigned-reg) :from (:argument 0)))
+            (rem :scs (unsigned-reg) :from (:argument 0)))
   (:result-types unsigned-num unsigned-num)
   (:generator 300
     (move rem div-high)
     (move quo div-low)
     (dotimes (i 33)
       (let ((label (gen-label)))
-	(inst cmp rem divisor)
-	(inst b :ltu label)
-	(inst addxcc quo quo)
-	(inst sub rem divisor)
-	(emit-label label)
-	(unless (= i 32)
-	  (inst addx rem rem))))
+        (inst cmp rem divisor)
+        (inst b :ltu label)
+        (inst addxcc quo quo)
+        (inst sub rem divisor)
+        (emit-label label)
+        (unless (= i 32)
+          (inst addx rem rem))))
     (inst not quo)))
 
 (define-vop (bignum-floor-v8)
   (:translate sb!bignum:%floor)
   (:policy :fast-safe)
   (:args (div-high :scs (unsigned-reg) :target rem)
-	 (div-low :scs (unsigned-reg) :target quo)
-	 (divisor :scs (unsigned-reg)))
+         (div-low :scs (unsigned-reg) :target quo)
+         (divisor :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num unsigned-num)
   (:results (quo :scs (unsigned-reg) :from (:argument 1))
-	    (rem :scs (unsigned-reg) :from (:argument 0)))
+            (rem :scs (unsigned-reg) :from (:argument 0)))
   (:result-types unsigned-num unsigned-num)
   (:temporary (:scs (unsigned-reg) :target quo) q)
   ;; This vop is for a v8 or v9, provided we're also not using
   ;; sparc-64, for which there a special sparc-64 vop.
   (:guard (or (member :sparc-v8 *backend-subfeatures*)
-	      (member :sparc-v9 *backend-subfeatures*)))
+              (member :sparc-v9 *backend-subfeatures*)))
   (:generator 15
     (inst wry div-high)
     (inst nop)
@@ -1118,16 +1118,16 @@
   (:translate sb!bignum:%floor)
   (:policy :fast-safe)
   (:args (div-high :scs (unsigned-reg))
-	 (div-low :scs (unsigned-reg))
-	 (divisor :scs (unsigned-reg) :to (:result 1)))
+         (div-low :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg) :to (:result 1)))
   (:arg-types unsigned-num unsigned-num unsigned-num)
   (:temporary (:sc unsigned-reg :from (:argument 0)) dividend)
   (:results (quo :scs (unsigned-reg))
-	    (rem :scs (unsigned-reg)))
+            (rem :scs (unsigned-reg)))
   (:result-types unsigned-num unsigned-num)
   (:guard (member :sparc-64 *backend-subfeatures*))
   (:generator 5
-    ;; Set dividend to be div-high and div-low	      
+    ;; Set dividend to be div-high and div-low
     (inst sllx dividend div-high 32)
     (inst add dividend div-low)
     ;; Compute quotient
@@ -1154,7 +1154,7 @@
   (:translate sb!bignum:%ashr)
   (:policy :fast-safe)
   (:args (digit :scs (unsigned-reg))
-	 (count :scs (unsigned-reg)))
+         (count :scs (unsigned-reg)))
   (:arg-types unsigned-num positive-fixnum)
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
@@ -1200,20 +1200,20 @@
 (in-package "SB!C")
 
 (deftransform * ((x y)
-		 ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
-		 (unsigned-byte 32))
+                 ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
+                 (unsigned-byte 32))
   "recode as shifts and adds"
   (let ((y (lvar-value y)))
     (multiple-value-bind (result adds shifts)
-	(ub32-strength-reduce-constant-multiply 'x y)
+        (ub32-strength-reduce-constant-multiply 'x y)
       (cond
         ;; we assume, perhaps foolishly, that good SPARCs don't have an
         ;; issue with multiplications.  (Remember that there's a
         ;; different transform for converting x*2^k to a shift).
         ((member :sparc-64 *backend-subfeatures*) (give-up-ir1-transform))
         ((or (member :sparc-v9 *backend-subfeatures*)
-	     (member :sparc-v8 *backend-subfeatures*))
-	 ;; breakeven point as measured by Raymond Toy
-	 (when (> (+ adds shifts) 9)
-	   (give-up-ir1-transform))))
+             (member :sparc-v8 *backend-subfeatures*))
+         ;; breakeven point as measured by Raymond Toy
+         (when (> (+ adds shifts) 9)
+           (give-up-ir1-transform))))
       (or result 0))))

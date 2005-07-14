@@ -36,10 +36,10 @@
 ;;; Move untagged character values.
 (define-vop (character-move)
   (:args (x :target y
-	    :scs (character-reg)
-	    :load-if (not (location= x y))))
+            :scs (character-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (character-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:generator 0
@@ -50,9 +50,9 @@
 ;;; Move untagged character arguments/return-values.
 (define-vop (move-character-arg)
   (:args (x :target y
-	    :scs (character-reg))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y character-reg))))
+            :scs (character-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y character-reg))))
   (:results (y))
   (:generator 0
     (sc-case y
@@ -94,7 +94,7 @@
 ;;;
 (define-vop (character-compare pointer-compare)
   (:args (x :scs (character-reg))
-	 (y :scs (character-reg)))
+         (y :scs (character-reg)))
   (:arg-types character character))
 
 (define-vop (fast-char=/character character-compare)

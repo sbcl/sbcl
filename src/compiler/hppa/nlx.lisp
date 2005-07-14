@@ -23,26 +23,26 @@
 
 (define-vop (save-dynamic-state)
   (:results (catch :scs (descriptor-reg))
-	    (nfp :scs (descriptor-reg))
-	    (nsp :scs (descriptor-reg)))
+            (nfp :scs (descriptor-reg))
+            (nsp :scs (descriptor-reg)))
   (:vop-var vop)
   (:generator 13
     (load-symbol-value catch *current-catch-block*)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-	(move cur-nfp nfp)))
+        (move cur-nfp nfp)))
     (move nsp-tn nsp)))
 
 (define-vop (restore-dynamic-state)
   (:args (catch :scs (descriptor-reg))
-	 (nfp :scs (descriptor-reg))
-	 (nsp :scs (descriptor-reg)))
+         (nfp :scs (descriptor-reg))
+         (nsp :scs (descriptor-reg)))
   (:vop-var vop)
   (:generator 10
     (store-symbol-value catch *current-catch-block*)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-	(move nfp cur-nfp)))
+        (move nfp cur-nfp)))
     (move nsp nsp-tn)))
 
 (define-vop (current-stack-pointer)
@@ -81,7 +81,7 @@
 ;;;
 (define-vop (make-catch-block)
   (:args (tn)
-	 (tag :scs (any-reg descriptor-reg)))
+         (tag :scs (any-reg descriptor-reg)))
   (:info entry-label)
   (:results (block :scs (any-reg) :from (:argument 0)))
   (:temporary (:scs (descriptor-reg)) temp)
@@ -136,9 +136,9 @@
 
 (define-vop (nlx-entry)
   (:args (sp) ; Note: we can't list an sc-restriction, 'cause any load vops
-	      ; would be inserted before the LRA.
-	 (start)
-	 (count))
+              ; would be inserted before the LRA.
+         (start)
+         (count))
   (:results (values :more t))
   (:temporary (:scs (descriptor-reg)) move-temp)
   (:info label nvals)
@@ -148,43 +148,43 @@
     (emit-return-pc label)
     (note-this-location vop :non-local-entry)
     (cond ((zerop nvals))
-	  ((= nvals 1)
-	   (inst comclr count zero-tn zero-tn :<>)
-	   (inst move null-tn (tn-ref-tn values) :tr)
-	   (loadw (tn-ref-tn values) start))
-	  (t
-	   (collect ((defaults))
-	     (do ((i 0 (1+ i))
-		  (tn-ref values (tn-ref-across tn-ref)))
-		 ((null tn-ref))
-	       (let ((default-lab (gen-label))
-		     (tn (tn-ref-tn tn-ref)))
-		 (defaults (cons default-lab tn))
+          ((= nvals 1)
+           (inst comclr count zero-tn zero-tn :<>)
+           (inst move null-tn (tn-ref-tn values) :tr)
+           (loadw (tn-ref-tn values) start))
+          (t
+           (collect ((defaults))
+             (do ((i 0 (1+ i))
+                  (tn-ref values (tn-ref-across tn-ref)))
+                 ((null tn-ref))
+               (let ((default-lab (gen-label))
+                     (tn (tn-ref-tn tn-ref)))
+                 (defaults (cons default-lab tn))
 
-		 (inst bci := nil (fixnumize i) count default-lab)
-		 (sc-case tn
-		   ((descriptor-reg any-reg)
-		    (loadw tn start i))
-		   (control-stack
-		    (loadw move-temp start i)
-		    (store-stack-tn tn move-temp)))))
-	     
-	     (let ((defaulting-done (gen-label)))
-	       (emit-label defaulting-done)
-	       
-	       (assemble (*elsewhere*)
-		 (do ((defs (defaults) (cdr defs)))
-		     ((null defs))
-		   (let ((def (car defs)))
-		     (emit-label (car def))
-		     (unless (cdr defs)
-		       (inst b defaulting-done))
-		     (let ((tn (cdr def)))
-		       (sc-case tn
-			 ((descriptor-reg any-reg)
-			  (move null-tn tn))
-			 (control-stack
-			  (store-stack-tn tn null-tn)))))))))))
+                 (inst bci := nil (fixnumize i) count default-lab)
+                 (sc-case tn
+                   ((descriptor-reg any-reg)
+                    (loadw tn start i))
+                   (control-stack
+                    (loadw move-temp start i)
+                    (store-stack-tn tn move-temp)))))
+
+             (let ((defaulting-done (gen-label)))
+               (emit-label defaulting-done)
+
+               (assemble (*elsewhere*)
+                 (do ((defs (defaults) (cdr defs)))
+                     ((null defs))
+                   (let ((def (car defs)))
+                     (emit-label (car def))
+                     (unless (cdr defs)
+                       (inst b defaulting-done))
+                     (let ((tn (cdr def)))
+                       (sc-case tn
+                         ((descriptor-reg any-reg)
+                          (move null-tn tn))
+                         (control-stack
+                          (store-stack-tn tn null-tn)))))))))))
     (load-stack-tn csp-tn sp)))
 
 
