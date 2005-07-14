@@ -16,21 +16,21 @@
 (defun make-byte-tn (tn)
   (aver (sc-is tn any-reg descriptor-reg unsigned-reg signed-reg))
   (make-random-tn :kind :normal
-		  :sc (sc-or-lose 'byte-reg)
-		  :offset (tn-offset tn)))
+                  :sc (sc-or-lose 'byte-reg)
+                  :offset (tn-offset tn)))
 
 (defun generate-fixnum-test (value)
   "zero flag set if VALUE is fixnum"
   (let ((offset (tn-offset value)))
     ;; The x86 backend uses a pun from E[A-D]X -> [A-D]L for these
-    ;; tests. The Athlon 64 optimization guide says that this is a 
+    ;; tests. The Athlon 64 optimization guide says that this is a
     ;; bad idea, so it's been removed.
     (cond ((sc-is value control-stack)
-	   (inst test (make-ea :byte :base rbp-tn
-			       :disp (- (* (1+ offset) n-word-bytes)))
-		 sb!vm::fixnum-tag-mask))
-	  (t
-	   (inst test value sb!vm::fixnum-tag-mask)))))
+           (inst test (make-ea :byte :base rbp-tn
+                               :disp (- (* (1+ offset) n-word-bytes)))
+                 sb!vm::fixnum-tag-mask))
+          (t
+           (inst test value sb!vm::fixnum-tag-mask)))))
 
 (defun %test-fixnum (value target not-p)
   (generate-fixnum-test value)
@@ -49,32 +49,32 @@
     (%test-immediate value target not-p immediate drop-through)))
 
 (defun %test-fixnum-immediate-and-headers (value target not-p immediate
-					   headers)
+                                           headers)
   (let ((drop-through (gen-label)))
     (generate-fixnum-test value)
     (inst jmp :z (if not-p drop-through target))
     (%test-immediate-and-headers value target not-p immediate headers
-				 drop-through)))
+                                 drop-through)))
 
 (defun %test-immediate (value target not-p immediate
-			&optional (drop-through (gen-label)))
+                        &optional (drop-through (gen-label)))
   ;; Code a single instruction byte test if possible.
   (cond ((sc-is value any-reg descriptor-reg)
-	 (inst cmp (make-byte-tn value) immediate))
-	(t
-	 (move rax-tn value)
-	 (inst cmp al-tn immediate)))
-  (inst jmp (if not-p :ne :e) target)  
-  (emit-label drop-through))  
+         (inst cmp (make-byte-tn value) immediate))
+        (t
+         (move rax-tn value)
+         (inst cmp al-tn immediate)))
+  (inst jmp (if not-p :ne :e) target)
+  (emit-label drop-through))
 
 (defun %test-immediate-and-headers (value target not-p immediate headers
-				    &optional (drop-through (gen-label)))
+                                    &optional (drop-through (gen-label)))
   ;; Code a single instruction byte test if possible.
   (cond ((sc-is value any-reg descriptor-reg)
-	 (inst cmp (make-byte-tn value) immediate))
-	(t
-	 (move rax-tn value)
-	 (inst cmp al-tn immediate)))
+         (inst cmp (make-byte-tn value) immediate))
+        (t
+         (move rax-tn value)
+         (inst cmp al-tn immediate)))
   (inst jmp :e (if not-p drop-through target))
   (%test-headers value target not-p nil headers drop-through))
 
@@ -85,37 +85,37 @@
   (inst jmp (if not-p :ne :e) target))
 
 (defun %test-headers (value target not-p function-p headers
-			    &optional (drop-through (gen-label)))
+                            &optional (drop-through (gen-label)))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal when-true when-false)
-	;; EQUAL and LESS-OR-EQUAL are the conditions for branching to TARGET.
-	;; WHEN-TRUE and WHEN-FALSE are the labels to branch to when we know
-	;; it's true and when we know it's false respectively.
-	(if not-p
-	    (values :ne :a drop-through target)
-	    (values :e :na target drop-through))
+        ;; EQUAL and LESS-OR-EQUAL are the conditions for branching to TARGET.
+        ;; WHEN-TRUE and WHEN-FALSE are the labels to branch to when we know
+        ;; it's true and when we know it's false respectively.
+        (if not-p
+            (values :ne :a drop-through target)
+            (values :e :na target drop-through))
       (%test-lowtag value when-false t lowtag)
       (inst mov al-tn (make-ea :byte :base value :disp (- lowtag)))
       (do ((remaining headers (cdr remaining)))
-	  ((null remaining))
-	(let ((header (car remaining))
-	      (last (null (cdr remaining))))
-	  (cond
-	   ((atom header)
-	    (inst cmp al-tn header)
-	    (if last
-		(inst jmp equal target)
-		(inst jmp :e when-true)))
-	   (t
-	     (let ((start (car header))
-		   (end (cdr header)))
-	       (unless (= start bignum-widetag)
-		 (inst cmp al-tn start)
-		 (inst jmp :b when-false)) ; was :l
-	       (inst cmp al-tn end)
-	       (if last
-		   (inst jmp less-or-equal target)
-		   (inst jmp :be when-true))))))) ; was :le
+          ((null remaining))
+        (let ((header (car remaining))
+              (last (null (cdr remaining))))
+          (cond
+           ((atom header)
+            (inst cmp al-tn header)
+            (if last
+                (inst jmp equal target)
+                (inst jmp :e when-true)))
+           (t
+             (let ((start (car header))
+                   (end (cdr header)))
+               (unless (= start bignum-widetag)
+                 (inst cmp al-tn start)
+                 (inst jmp :b when-false)) ; was :l
+               (inst cmp al-tn end)
+               (if last
+                   (inst jmp less-or-equal target)
+                   (inst jmp :be when-true))))))) ; was :le
       (emit-label drop-through))))
 
 
@@ -141,8 +141,8 @@
 (define-vop (simple-check-type)
   (:args (value :target result :scs (any-reg descriptor-reg)))
   (:results (result :scs (any-reg descriptor-reg)
-		    :load-if (not (and (sc-is value any-reg descriptor-reg)
-				       (sc-is result control-stack)))))
+                    :load-if (not (and (sc-is value any-reg descriptor-reg)
+                                       (sc-is result control-stack)))))
   (:vop-var vop)
   (:save-p :compute-only))
 
@@ -157,29 +157,29 @@
      (if (> (apply #'max type-codes) lowtag-limit) 7 2)))
 
 (defmacro !define-type-vops (pred-name check-name ptype error-code
-			     (&rest type-codes)
-			     &key (variant nil variant-p) &allow-other-keys)
+                             (&rest type-codes)
+                             &key (variant nil variant-p) &allow-other-keys)
   ;; KLUDGE: UGH. Why do we need this eval? Can't we put this in the
   ;; expansion?
   (let* ((cost (cost-to-test-types (mapcar #'eval type-codes)))
-	 (prefix (if variant-p
-		     (concatenate 'string (string variant) "-")
-		     "")))
+         (prefix (if variant-p
+                     (concatenate 'string (string variant) "-")
+                     "")))
     `(progn
        ,@(when pred-name
-	   `((define-vop (,pred-name ,(intern (concatenate 'string prefix "TYPE-PREDICATE")))
-	       (:translate ,pred-name)
-	       (:generator ,cost
-		 (test-type value target not-p (,@type-codes))))))
+           `((define-vop (,pred-name ,(intern (concatenate 'string prefix "TYPE-PREDICATE")))
+               (:translate ,pred-name)
+               (:generator ,cost
+                 (test-type value target not-p (,@type-codes))))))
        ,@(when check-name
-	   `((define-vop (,check-name ,(intern (concatenate 'string prefix "CHECK-TYPE")))
-	       (:generator ,cost
-		 (let ((err-lab
-			(generate-error-code vop ,error-code value)))
-		   (test-type value err-lab t (,@type-codes))
-		   (move result value))))))
+           `((define-vop (,check-name ,(intern (concatenate 'string prefix "CHECK-TYPE")))
+               (:generator ,cost
+                 (let ((err-lab
+                        (generate-error-code vop ,error-code value)))
+                   (test-type value err-lab t (,@type-codes))
+                   (move result value))))))
        ,@(when ptype
-	   `((primitive-type-vop ,check-name (:check) ,ptype))))))
+           `((primitive-type-vop ,check-name (:check) ,ptype))))))
 
 ;;;; other integer ranges
 
@@ -202,10 +202,10 @@
     (inst jmp :ne (if not-p target NOT-TARGET))
     (inst sar rax-tn (+ 32 3 -1))
     (if not-p
-	(progn
-	  (inst jmp :nz MAYBE)
-	  (inst jmp NOT-TARGET))
-	(inst jmp :z target))
+        (progn
+          (inst jmp :nz MAYBE)
+          (inst jmp NOT-TARGET))
+        (inst jmp :z target))
     MAYBE
     (inst cmp rax-tn -1)
     (inst jmp (if not-p :ne :eq) target)
@@ -214,13 +214,13 @@
 (define-vop (check-signed-byte-32 check-type)
   (:generator 8
     (let ((nope (generate-error-code vop
-				     object-not-signed-byte-32-error
-				     value))
-	  (ok (gen-label)))
+                                     object-not-signed-byte-32-error
+                                     value))
+          (ok (gen-label)))
       (move rax-tn value)
       (inst test rax-tn 7)
       (inst jmp :ne nope)
-      (inst sar rax-tn (+ 32 3 -1))      
+      (inst sar rax-tn (+ 32 3 -1))
       (inst jmp :z ok)
       (inst cmp rax-tn -1)
       (inst jmp :ne nope)
@@ -242,7 +242,7 @@
 (define-vop (check-unsigned-byte-32 check-type)
   (:generator 8
     (let ((nope
-	   (generate-error-code vop object-not-unsigned-byte-32-error value)))
+           (generate-error-code vop object-not-unsigned-byte-32-error value)))
       (move rax-tn value)
       (inst test rax-tn 7)
       (inst jmp :ne nope)
@@ -257,54 +257,54 @@
   (:translate unsigned-byte-64-p)
   (:generator 45
     (let ((not-target (gen-label))
-	  (single-word (gen-label))
-	  (fixnum (gen-label)))
+          (single-word (gen-label))
+          (fixnum (gen-label)))
       (multiple-value-bind (yep nope)
-	  (if not-p
-	      (values not-target target)
-	      (values target not-target))
-	;; Is it a fixnum?
-	(generate-fixnum-test value)
-	(move rax-tn value)
-	(inst jmp :e fixnum)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        ;; Is it a fixnum?
+        (generate-fixnum-test value)
+        (move rax-tn value)
+        (inst jmp :e fixnum)
 
-	;; If not, is it an other pointer?
-	(inst and rax-tn lowtag-mask)
-	(inst cmp rax-tn other-pointer-lowtag)
-	(inst jmp :ne nope)
-	;; Get the header.
-	(loadw rax-tn value 0 other-pointer-lowtag)
-	;; Is it one?
-	(inst cmp rax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
-	(inst jmp :e single-word)
-	;; If it's other than two, we can't be an (unsigned-byte 64)
-	(inst cmp rax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
-	(inst jmp :ne nope)
-	;; Get the second digit.
-	(loadw rax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
-	;; All zeros, its an (unsigned-byte 64).
-	(inst or rax-tn rax-tn)
-	(inst jmp :z yep)
-	(inst jmp nope)
-	
-	(emit-label single-word)
-	;; Get the single digit.
-	(loadw rax-tn value bignum-digits-offset other-pointer-lowtag)
+        ;; If not, is it an other pointer?
+        (inst and rax-tn lowtag-mask)
+        (inst cmp rax-tn other-pointer-lowtag)
+        (inst jmp :ne nope)
+        ;; Get the header.
+        (loadw rax-tn value 0 other-pointer-lowtag)
+        ;; Is it one?
+        (inst cmp rax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+        (inst jmp :e single-word)
+        ;; If it's other than two, we can't be an (unsigned-byte 64)
+        (inst cmp rax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
+        (inst jmp :ne nope)
+        ;; Get the second digit.
+        (loadw rax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
+        ;; All zeros, its an (unsigned-byte 64).
+        (inst or rax-tn rax-tn)
+        (inst jmp :z yep)
+        (inst jmp nope)
 
-	;; positive implies (unsigned-byte 64).
-	(emit-label fixnum)
-	(inst or rax-tn rax-tn)
-	(inst jmp (if not-p :s :ns) target)
+        (emit-label single-word)
+        ;; Get the single digit.
+        (loadw rax-tn value bignum-digits-offset other-pointer-lowtag)
 
-	(emit-label not-target)))))
+        ;; positive implies (unsigned-byte 64).
+        (emit-label fixnum)
+        (inst or rax-tn rax-tn)
+        (inst jmp (if not-p :s :ns) target)
+
+        (emit-label not-target)))))
 
 (define-vop (check-unsigned-byte-64 check-type)
   (:generator 45
     (let ((nope
-	   (generate-error-code vop object-not-unsigned-byte-64-error value))
-	  (yep (gen-label))
-	  (fixnum (gen-label))
-	  (single-word (gen-label)))
+           (generate-error-code vop object-not-unsigned-byte-64-error value))
+          (yep (gen-label))
+          (fixnum (gen-label))
+          (single-word (gen-label)))
 
       ;; Is it a fixnum?
       (generate-fixnum-test value)
@@ -329,7 +329,7 @@
       (inst or rax-tn rax-tn)
       (inst jmp :z yep)
       (inst jmp nope)
-	
+
       (emit-label single-word)
       ;; Get the single digit.
       (loadw rax-tn value bignum-digits-offset other-pointer-lowtag)

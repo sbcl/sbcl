@@ -17,11 +17,11 @@
 (define-vop (print)
   (:args (object :scs (descriptor-reg any-reg)))
   (:temporary (:sc unsigned-reg
-	       :offset rax-offset
-	       :target result
-	       :from :eval
-	       :to (:result 0))
-	      rax)
+               :offset rax-offset
+               :target result
+               :from :eval
+               :to (:result 0))
+              rax)
   (:temporary (:sc unsigned-reg) call-target)
   (:results (result :scs (descriptor-reg)))
   (:save-p t)
@@ -29,8 +29,8 @@
     (inst push object)
     (inst lea rax (make-fixup "debug_print" :foreign))
     (inst lea call-target
-	  (make-ea :qword
-		   :disp (make-fixup "call_into_c" :foreign)))
+          (make-ea :qword
+                   :disp (make-fixup "call_into_c" :foreign)))
     (inst call call-target)
     (inst add rsp-tn n-word-bytes)
     (move result rax)))

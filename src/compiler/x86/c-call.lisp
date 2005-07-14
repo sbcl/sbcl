@@ -19,8 +19,8 @@
 
 (defun my-make-wired-tn (prim-type-name sc-name offset)
   (make-wired-tn (primitive-type-or-lose prim-type-name)
-		 (sc-number-or-lose sc-name)
-		 offset))
+                 (sc-number-or-lose sc-name)
+                 offset))
 
 (defstruct (arg-state (:copier nil))
   (stack-frame-size 0))
@@ -29,9 +29,9 @@
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
     (multiple-value-bind (ptype stack-sc)
-	(if (alien-integer-type-signed type)
-	    (values 'signed-byte-32 'signed-stack)
-	    (values 'unsigned-byte-32 'unsigned-stack))
+        (if (alien-integer-type-signed type)
+            (values 'signed-byte-32 'signed-stack)
+            (values 'unsigned-byte-32 'unsigned-stack))
       (my-make-wired-tn ptype stack-sc stack-frame-size))))
 
 (define-alien-type-method (system-area-pointer :arg-tn) (type state)
@@ -39,8 +39,8 @@
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
     (my-make-wired-tn 'system-area-pointer
-		      'sap-stack
-		      stack-frame-size)))
+                      'sap-stack
+                      stack-frame-size)))
 
 #!+long-float
 (define-alien-type-method (long-float :arg-tn) (type state)
@@ -73,9 +73,9 @@
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
     (multiple-value-bind (ptype reg-sc)
-	(if (alien-integer-type-signed type)
-	    (values 'signed-byte-32 'signed-reg)
-	    (values 'unsigned-byte-32 'unsigned-reg))
+        (if (alien-integer-type-signed type)
+            (values 'signed-byte-32 'signed-reg)
+            (values 'unsigned-byte-32 'unsigned-reg))
       (my-make-wired-tn ptype reg-sc (result-reg-offset num-results)))))
 
 (define-alien-type-method (system-area-pointer :result-tn) (type state)
@@ -83,7 +83,7 @@
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
     (my-make-wired-tn 'system-area-pointer 'sap-reg
-		      (result-reg-offset num-results))))
+                      (result-reg-offset num-results))))
 
 #!+long-float
 (define-alien-type-method (long-float :result-tn) (type state)
@@ -109,26 +109,26 @@
     (when (> (length values) 2)
       (error "Too many result values from c-call."))
     (mapcar (lambda (type)
-	      (invoke-alien-type-method :result-tn type state))
-	    values)))
+              (invoke-alien-type-method :result-tn type state))
+            values)))
 
 (!def-vm-support-routine make-call-out-tns (type)
   (let ((arg-state (make-arg-state)))
     (collect ((arg-tns))
       (dolist (arg-type (alien-fun-type-arg-types type))
-	(arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
+        (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
       (values (my-make-wired-tn 'positive-fixnum 'any-reg esp-offset)
-	      (* (arg-state-stack-frame-size arg-state) n-word-bytes)
-	      (arg-tns)
-	      (invoke-alien-type-method :result-tn
-					(alien-fun-type-result-type type)
-					(make-result-state))))))
+              (* (arg-state-stack-frame-size arg-state) n-word-bytes)
+              (arg-tns)
+              (invoke-alien-type-method :result-tn
+                                        (alien-fun-type-result-type type)
+                                        (make-result-state))))))
 
 
 (deftransform %alien-funcall ((function type &rest args) * * :node node)
   (aver (sb!c::constant-lvar-p type))
   (let* ((type (sb!c::lvar-value type))
-	 (env (sb!c::node-lexenv node))
+         (env (sb!c::node-lexenv node))
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type)))
     (aver (= (length arg-types) (length args)))
@@ -161,7 +161,7 @@
                            (if (alien-integer-type-signed result-type)
                                '(values (unsigned 32) (signed 32))
                                '(values (unsigned 32) (unsigned 32)))
-			   env))))
+                           env))))
                    `(lambda (function type ,@(lambda-vars))
                       (declare (ignore type))
                       (multiple-value-bind (low high)
@@ -206,42 +206,42 @@
 
 (define-vop (call-out)
   (:args (function :scs (sap-reg))
-	 (args :more t))
+         (args :more t))
   (:results (results :more t))
   (:temporary (:sc unsigned-reg :offset eax-offset
-		   :from :eval :to :result) eax)
+                   :from :eval :to :result) eax)
   (:temporary (:sc unsigned-reg :offset ecx-offset
-		   :from :eval :to :result) ecx)
+                   :from :eval :to :result) ecx)
   (:temporary (:sc unsigned-reg :offset edx-offset
-		   :from :eval :to :result) edx)
+                   :from :eval :to :result) edx)
   (:node-var node)
   (:vop-var vop)
   (:save-p t)
   (:ignore args ecx edx)
   (:generator 0
     (cond ((policy node (> space speed))
-	   (move eax function)
-	   (inst call (make-fixup "call_into_c" :foreign)))
-	  (t
-	   ;; Setup the NPX for C; all the FP registers need to be
-	   ;; empty; pop them all.
-	   (dotimes (i 8)
-	     (inst fstp fr0-tn))
+           (move eax function)
+           (inst call (make-fixup "call_into_c" :foreign)))
+          (t
+           ;; Setup the NPX for C; all the FP registers need to be
+           ;; empty; pop them all.
+           (dotimes (i 8)
+             (inst fstp fr0-tn))
 
-	   (inst call function)
-	   ;; To give the debugger a clue. XX not really internal-error?
-	   (note-this-location vop :internal-error)
+           (inst call function)
+           ;; To give the debugger a clue. XX not really internal-error?
+           (note-this-location vop :internal-error)
 
-	   ;; Restore the NPX for lisp; ensure no regs are empty
-	   (dotimes (i 7)
-	     (inst fldz))
+           ;; Restore the NPX for lisp; ensure no regs are empty
+           (dotimes (i 7)
+             (inst fldz))
 
-	   (if (and results
-		    (location= (tn-ref-tn results) fr0-tn))
-	       ;; The return result is in fr0.
-	       (inst fxch fr7-tn) ; move the result back to fr0
-	       (inst fldz)) ; insure no regs are empty
-	   ))))
+           (if (and results
+                    (location= (tn-ref-tn results) fr0-tn))
+               ;; The return result is in fr0.
+               (inst fxch fr7-tn) ; move the result back to fr0
+               (inst fldz)) ; insure no regs are empty
+           ))))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)
@@ -258,7 +258,7 @@
       (inst wait))
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
-	(inst sub esp-tn delta)))
+        (inst sub esp-tn delta)))
     (move result esp-tn)))
 
 (define-vop (dealloc-number-stack-space)
@@ -267,7 +267,7 @@
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
-	(inst add esp-tn delta)))
+        (inst add esp-tn delta)))
     (when (policy node (= sb!c::float-accuracy 3))
       (inst fnstcw (make-ea :word :base esp-tn))
       (inst wait)
@@ -285,14 +285,14 @@
     (aver (not (location= result esp-tn)))
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
-	(inst mov temp
-	      (make-ea :dword
-		       :disp (+ nil-value
-				(static-symbol-offset '*alien-stack*)
-				(ash symbol-tls-index-slot word-shift)
-				(- other-pointer-lowtag))))
-	(inst fs-segment-prefix)
-	(inst sub (make-ea :dword :scale 1 :index temp) delta)))
+        (inst mov temp
+              (make-ea :dword
+                       :disp (+ nil-value
+                                (static-symbol-offset '*alien-stack*)
+                                (ash symbol-tls-index-slot word-shift)
+                                (- other-pointer-lowtag))))
+        (inst fs-segment-prefix)
+        (inst sub (make-ea :dword :scale 1 :index temp) delta)))
     (load-tl-symbol-value result *alien-stack*))
   #!-sb-thread
   (:generator 0
@@ -314,14 +314,14 @@
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
-	(inst mov temp
-	      (make-ea :dword
-			   :disp (+ nil-value
-				    (static-symbol-offset '*alien-stack*)
-				(ash symbol-tls-index-slot word-shift)
-				(- other-pointer-lowtag))))
-	(inst fs-segment-prefix)
-	(inst add (make-ea :dword :scale 1 :index temp) delta))))
+        (inst mov temp
+              (make-ea :dword
+                           :disp (+ nil-value
+                                    (static-symbol-offset '*alien-stack*)
+                                (ash symbol-tls-index-slot word-shift)
+                                (- other-pointer-lowtag))))
+        (inst fs-segment-prefix)
+        (inst add (make-ea :dword :scale 1 :index temp) delta))))
   #!-sb-thread
   (:generator 0
     (unless (zerop amount)
@@ -365,49 +365,49 @@
 pointer to the arguments."
   (declare (ignore arg-types))
   (let* ((segment (make-segment))
-	 (eax eax-tn)
-	 (edx edx-tn)
-	 (ebp ebp-tn)
-	 (esp esp-tn)
-	 ([ebp-8] (make-ea :dword :base ebp :disp -8))
-	 ([ebp-4] (make-ea :dword :base ebp :disp -4)))
+         (eax eax-tn)
+         (edx edx-tn)
+         (ebp ebp-tn)
+         (esp esp-tn)
+         ([ebp-8] (make-ea :dword :base ebp :disp -8))
+         ([ebp-4] (make-ea :dword :base ebp :disp -4)))
     (assemble (segment)
-	      (inst push ebp)			    ; save old frame pointer
-	      (inst mov  ebp esp)		    ; establish new frame
-	      (inst mov  eax esp)		    ; 
-	      (inst sub  eax 8)		            ; place for result 
-	      (inst push eax)			    ; arg2
-	      (inst add  eax 16)		    ; arguments  
-	      (inst push eax)			    ; arg1
-	      (inst push (ash index 2))		    ; arg0
-	      (inst push (get-lisp-obj-address #'enter-alien-callback)) ; function
-	      (inst mov  eax (foreign-symbol-address "funcall3"))
-	      (inst call eax)
-	      ;; now put the result into the right register
-	      (cond
-		((and (alien-integer-type-p return-type)
-		      (eql (alien-type-bits return-type) 64))
-		 (inst mov eax [ebp-8])
-		 (inst mov edx [ebp-4]))
-		((or (alien-integer-type-p return-type)
-		     (alien-pointer-type-p return-type)
-		     (alien-type-= #.(parse-alien-type 'system-area-pointer nil)
-				   return-type))
-		 (inst mov eax [ebp-8]))
-		((alien-single-float-type-p return-type)
-		 (inst fld  [ebp-8]))
-		((alien-double-float-type-p return-type)
-		 (inst fldd [ebp-8]))
-		((alien-void-type-p return-type))
-		(t
-		 (error "unrecognized alien type: ~A" return-type)))
-	      (inst mov esp ebp)		   ; discard frame
-	      (inst pop ebp)			   ; restore frame pointer
-	      (inst ret))
+              (inst push ebp)                       ; save old frame pointer
+              (inst mov  ebp esp)                   ; establish new frame
+              (inst mov  eax esp)                   ;
+              (inst sub  eax 8)                     ; place for result
+              (inst push eax)                       ; arg2
+              (inst add  eax 16)                    ; arguments
+              (inst push eax)                       ; arg1
+              (inst push (ash index 2))             ; arg0
+              (inst push (get-lisp-obj-address #'enter-alien-callback)) ; function
+              (inst mov  eax (foreign-symbol-address "funcall3"))
+              (inst call eax)
+              ;; now put the result into the right register
+              (cond
+                ((and (alien-integer-type-p return-type)
+                      (eql (alien-type-bits return-type) 64))
+                 (inst mov eax [ebp-8])
+                 (inst mov edx [ebp-4]))
+                ((or (alien-integer-type-p return-type)
+                     (alien-pointer-type-p return-type)
+                     (alien-type-= #.(parse-alien-type 'system-area-pointer nil)
+                                   return-type))
+                 (inst mov eax [ebp-8]))
+                ((alien-single-float-type-p return-type)
+                 (inst fld  [ebp-8]))
+                ((alien-double-float-type-p return-type)
+                 (inst fldd [ebp-8]))
+                ((alien-void-type-p return-type))
+                (t
+                 (error "unrecognized alien type: ~A" return-type)))
+              (inst mov esp ebp)                   ; discard frame
+              (inst pop ebp)                       ; restore frame pointer
+              (inst ret))
     (finalize-segment segment)
     ;; Now that the segment is done, convert it to a static
     ;; vector we can point foreign code to.
     (let ((buffer (sb!assem::segment-buffer segment)))
       (make-static-vector (length buffer)
-			  :element-type '(unsigned-byte 8)
-			  :initial-contents buffer))))
+                          :element-type '(unsigned-byte 8)
+                          :initial-contents buffer))))

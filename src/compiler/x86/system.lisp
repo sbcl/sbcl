@@ -17,7 +17,7 @@
   (:translate lowtag-of)
   (:policy :fast-safe)
   (:args (object :scs (any-reg descriptor-reg control-stack)
-		 :target result))
+                 :target result))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 1
@@ -76,18 +76,18 @@
   (:translate (setf fun-subtype))
   (:policy :fast-safe)
   (:args (type :scs (unsigned-reg) :target eax)
-	 (function :scs (descriptor-reg)))
+         (function :scs (descriptor-reg)))
   (:arg-types positive-fixnum *)
   (:temporary (:sc unsigned-reg :offset eax-offset :from (:argument 0)
-		   :to (:result 0) :target result)
-	      eax)
+                   :to (:result 0) :target result)
+              eax)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
     (move eax type)
     (inst mov
-	  (make-ea :byte :base function :disp (- fun-pointer-lowtag))
-	  al-tn)
+          (make-ea :byte :base function :disp (- fun-pointer-lowtag))
+          al-tn)
     (move result eax)))
 
 (define-vop (get-header-data)
@@ -114,11 +114,11 @@
   (:translate set-header-data)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target res :to (:result 0))
-	 (data :scs (any-reg) :target eax))
+         (data :scs (any-reg) :target eax))
   (:arg-types * positive-fixnum)
   (:results (res :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg :offset eax-offset
-		   :from (:argument 1) :to (:result 0)) eax)
+                   :from (:argument 1) :to (:result 0)) eax)
   (:generator 6
     (move eax data)
     (inst shl eax (- n-widetag-bits 2))
@@ -138,14 +138,14 @@
 
 (define-vop (make-other-immediate-type)
   (:args (val :scs (any-reg descriptor-reg) :target res)
-	 (type :scs (unsigned-reg immediate)))
+         (type :scs (unsigned-reg immediate)))
   (:results (res :scs (any-reg descriptor-reg) :from (:argument 0)))
   (:generator 2
     (move res val)
     (inst shl res (- n-widetag-bits 2))
     (inst or res (sc-case type
-		   (unsigned-reg type)
-		   (immediate (tn-value type))))))
+                   (unsigned-reg type)
+                   (immediate (tn-value type))))))
 
 ;;;; allocation
 
@@ -200,19 +200,19 @@
     (loadw sap code 0 other-pointer-lowtag)
     (inst shr sap n-widetag-bits)
     (inst lea sap (make-ea :byte :base code :index sap :scale 4
-			   :disp (- other-pointer-lowtag)))))
+                           :disp (- other-pointer-lowtag)))))
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg) :to (:result 0))
-	 (offset :scs (signed-reg unsigned-reg) :to (:result 0)))
+         (offset :scs (signed-reg unsigned-reg) :to (:result 0)))
   (:arg-types * positive-fixnum)
   (:results (func :scs (descriptor-reg) :from (:argument 0)))
   (:generator 10
     (loadw func code 0 other-pointer-lowtag)
     (inst shr func n-widetag-bits)
     (inst lea func
-	  (make-ea :byte :base offset :index func :scale 4
-		   :disp (- fun-pointer-lowtag other-pointer-lowtag)))
+          (make-ea :byte :base offset :index func :scale 4
+                   :disp (- fun-pointer-lowtag other-pointer-lowtag)))
     (inst add func code)))
 
 (define-vop (%simple-fun-self)
@@ -223,9 +223,9 @@
   (:generator 3
     (loadw result function simple-fun-self-slot fun-pointer-lowtag)
     (inst lea result
-	  (make-ea :byte :base result
-		   :disp (- fun-pointer-lowtag
-			    (* simple-fun-code-offset n-word-bytes))))))
+          (make-ea :byte :base result
+                   :disp (- fun-pointer-lowtag
+                            (* simple-fun-code-offset n-word-bytes))))))
 
 ;;; The closure function slot is a pointer to raw code on X86 instead
 ;;; of a pointer to the code function object itself. This VOP is used
@@ -240,14 +240,14 @@
   (:policy :fast-safe)
   (:translate (setf %simple-fun-self))
   (:args (new-self :scs (descriptor-reg) :target result :to :result)
-	 (function :scs (descriptor-reg) :to :result))
+         (function :scs (descriptor-reg) :to :result))
   (:temporary (:sc any-reg :from (:argument 0) :to :result) temp)
   (:results (result :scs (descriptor-reg)))
   (:generator 3
     (inst lea temp
-	  (make-ea :byte :base new-self
-		   :disp (- (ash simple-fun-code-offset word-shift)
-			    fun-pointer-lowtag)))
+          (make-ea :byte :base new-self
+                   :disp (- (ash simple-fun-code-offset word-shift)
+                            fun-pointer-lowtag)))
     (storew temp function simple-fun-self-slot fun-pointer-lowtag)
     (move result new-self)))
 
@@ -275,7 +275,7 @@
     (inst break pending-interrupt-trap)))
 
 #!+sb-thread
-(defknown current-thread-offset-sap ((unsigned-byte 32))  
+(defknown current-thread-offset-sap ((unsigned-byte 32))
   system-area-pointer (flushable))
 
 #!+sb-thread
@@ -312,5 +312,5 @@
   (:info index)
   (:generator 0
     (inst inc (make-ea :dword :base count-vector
-		       :disp (- (* (+ vector-data-offset index) n-word-bytes)
-				other-pointer-lowtag)))))
+                       :disp (- (* (+ vector-data-offset index) n-word-bytes)
+                                other-pointer-lowtag)))))

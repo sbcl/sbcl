@@ -34,7 +34,7 @@
   (:translate stack-ref)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to :eval)
-	 (offset :scs (any-reg) :target temp))
+         (offset :scs (any-reg) :target temp))
   (:arg-types system-area-pointer positive-fixnum)
   (:temporary (:sc unsigned-reg :from (:argument 1)) temp)
   (:results (result :scs (descriptor-reg)))
@@ -43,7 +43,7 @@
     (move temp offset)
     (inst neg temp)
     (inst mov result
-	  (make-ea :qword :base sap :disp (- n-word-bytes) :index temp))))
+          (make-ea :qword :base sap :disp (- n-word-bytes) :index temp))))
 
 (define-vop (read-control-stack-c)
   (:translate stack-ref)
@@ -55,14 +55,14 @@
   (:result-types *)
   (:generator 5
     (inst mov result (make-ea :qword :base sap
-			      :disp (- (* (1+ index) n-word-bytes))))))
+                              :disp (- (* (1+ index) n-word-bytes))))))
 
 (define-vop (write-control-stack)
   (:translate %set-stack-ref)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to :eval)
-	 (offset :scs (any-reg) :target temp)
-	 (value :scs (descriptor-reg) :to :result :target result))
+         (offset :scs (any-reg) :target temp)
+         (value :scs (descriptor-reg) :to :result :target result))
   (:arg-types system-area-pointer positive-fixnum *)
   (:temporary (:sc unsigned-reg :from (:argument 1) :to :result) temp)
   (:results (result :scs (descriptor-reg)))
@@ -71,22 +71,22 @@
     (move temp offset)
     (inst neg temp)
     (inst mov
-	  (make-ea :qword :base sap :disp (- n-word-bytes) :index temp) value)
+          (make-ea :qword :base sap :disp (- n-word-bytes) :index temp) value)
     (move result value)))
 
 (define-vop (write-control-stack-c)
   (:translate %set-stack-ref)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
-	 (value :scs (descriptor-reg) :target result))
+         (value :scs (descriptor-reg) :target result))
   (:info index)
   (:arg-types system-area-pointer (:constant (signed-byte 29)) *)
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:generator 5
     (inst mov (make-ea :qword :base sap
-		       :disp (- (* (1+ index) n-word-bytes)))
-	  value)
+                       :disp (- (* (1+ index) n-word-bytes)))
+          value)
     (move result value)))
 
 (define-vop (code-from-mumble)
@@ -97,20 +97,20 @@
   (:variant-vars lowtag)
   (:generator 5
     (let ((bogus (gen-label))
-	  (done (gen-label)))
+          (done (gen-label)))
       (loadw temp thing 0 lowtag)
       (inst shr temp n-widetag-bits)
       (inst jmp :z bogus)
       (inst shl temp (1- (integer-length n-word-bytes)))
       (unless (= lowtag other-pointer-lowtag)
-	(inst add temp (- lowtag other-pointer-lowtag)))
+        (inst add temp (- lowtag other-pointer-lowtag)))
       (move code thing)
       (inst sub code temp)
       (emit-label done)
       (assemble (*elsewhere*)
-	(emit-label bogus)
-	(inst mov code nil-value)
-	(inst jmp done)))))
+        (emit-label bogus)
+        (inst mov code nil-value)
+        (inst jmp done)))))
 
 (define-vop (code-from-lra code-from-mumble)
   (:translate sb!di::lra-code-header)
@@ -126,8 +126,8 @@
   (:args (value :scs (unsigned-reg unsigned-stack) :target result))
   (:arg-types unsigned-num)
   (:results (result :scs (descriptor-reg)
-		    :load-if (not (sc-is value unsigned-reg))
-		    ))
+                    :load-if (not (sc-is value unsigned-reg))
+                    ))
   (:generator 1
     (move result value)))
 
@@ -136,8 +136,8 @@
   (:translate sb!di::get-lisp-obj-address)
   (:args (thing :scs (descriptor-reg control-stack) :target result))
   (:results (result :scs (unsigned-reg)
-		    :load-if (not (and (sc-is thing descriptor-reg)
-				       (sc-is result unsigned-stack)))))
+                    :load-if (not (and (sc-is thing descriptor-reg)
+                                       (sc-is result unsigned-stack)))))
   (:result-types unsigned-num)
   (:generator 1
     (move result thing)))

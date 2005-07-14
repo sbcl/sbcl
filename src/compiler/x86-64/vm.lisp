@@ -25,24 +25,24 @@
   (defvar *float-register-names* (make-array 16 :initial-element nil)))
 
 (macrolet ((defreg (name offset size)
-	     (let ((offset-sym (symbolicate name "-OFFSET"))
-		   (names-vector (symbolicate "*" size "-REGISTER-NAMES*")))
-	       `(progn
-		  (eval-when (:compile-toplevel :load-toplevel :execute)
+             (let ((offset-sym (symbolicate name "-OFFSET"))
+                   (names-vector (symbolicate "*" size "-REGISTER-NAMES*")))
+               `(progn
+                  (eval-when (:compile-toplevel :load-toplevel :execute)
                     ;; EVAL-WHEN is necessary because stuff like #.EAX-OFFSET
                     ;; (in the same file) depends on compile-time evaluation
                     ;; of the DEFCONSTANT. -- AL 20010224
-		    (def!constant ,offset-sym ,offset))
-		  (setf (svref ,names-vector ,offset-sym)
-			,(symbol-name name)))))
-	   ;; FIXME: It looks to me as though DEFREGSET should also
-	   ;; define the related *FOO-REGISTER-NAMES* variable.
-	   (defregset (name &rest regs)
-	     `(eval-when (:compile-toplevel :load-toplevel :execute)
-		(defparameter ,name
-		  (list ,@(mapcar (lambda (name)
-				    (symbolicate name "-OFFSET"))
-				  regs))))))
+                    (def!constant ,offset-sym ,offset))
+                  (setf (svref ,names-vector ,offset-sym)
+                        ,(symbol-name name)))))
+           ;; FIXME: It looks to me as though DEFREGSET should also
+           ;; define the related *FOO-REGISTER-NAMES* variable.
+           (defregset (name &rest regs)
+             `(eval-when (:compile-toplevel :load-toplevel :execute)
+                (defparameter ,name
+                  (list ,@(mapcar (lambda (name)
+                                    (symbolicate name "-OFFSET"))
+                                  regs))))))
 
   ;; byte registers
   ;;
@@ -116,8 +116,8 @@
   ;; list of qword registers.  However
   ;; <jsnell> r13 is already used as temporary [#lisp irc 2005/01/30]
   ;; and we're now going to use r12 for the struct thread*
-  (defregset *qword-regs* rax rcx rdx rbx rsi rdi 
-	     r8 r9 r10 r11      r14 r15)
+  (defregset *qword-regs* rax rcx rdx rbx rsi rdi
+             r8 r9 r10 r11      r14 r15)
 
   ;; floating point registers
   (defreg float0 0 :float)
@@ -137,7 +137,7 @@
   (defreg float14 14 :float)
   (defreg float15 15 :float)
   (defregset *float-regs* float0 float1 float2 float3 float4 float5 float6 float7
-	     float8 float9 float10 float11 float12 float13 float14 float15)
+             float8 float9 float10 float11 float12 float13 float14 float15)
 
   ;; registers used to pass arguments
   ;;
@@ -175,12 +175,12 @@
   (collect ((forms))
     (let ((index 0))
       (dolist (class classes)
-	(let* ((sc-name (car class))
-	       (constant-name (symbolicate sc-name "-SC-NUMBER")))
-	  (forms `(define-storage-class ,sc-name ,index
-		    ,@(cdr class)))
-	  (forms `(def!constant ,constant-name ,index))
-	  (incf index))))
+        (let* ((sc-name (car class))
+               (constant-name (symbolicate sc-name "-SC-NUMBER")))
+          (forms `(define-storage-class ,sc-name ,index
+                    ,@(cdr class)))
+          (forms `(def!constant ,constant-name ,index))
+          (incf index))))
     `(progn
        ,@(forms))))
 
@@ -218,20 +218,20 @@
   ;;
   ;; the stacks
   ;;
-  
+
   ;; the control stack
-  (control-stack stack)			; may be pointers, scanned by GC
+  (control-stack stack)                 ; may be pointers, scanned by GC
 
   ;; the non-descriptor stacks
   ;; XXX alpha backend has :element-size 2 :alignment 2 in these entries
-  (signed-stack stack)			; (signed-byte 32)
-  (unsigned-stack stack)		; (unsigned-byte 32)
-  (character-stack stack)		; non-descriptor characters.
-  (sap-stack stack)			; System area pointers.
-  (single-stack stack)			; single-floats
+  (signed-stack stack)                  ; (signed-byte 32)
+  (unsigned-stack stack)                ; (unsigned-byte 32)
+  (character-stack stack)               ; non-descriptor characters.
+  (sap-stack stack)                     ; System area pointers.
+  (single-stack stack)                  ; single-floats
   (double-stack stack)
-  (complex-single-stack stack :element-size 2)	; complex-single-floats
-  (complex-double-stack stack :element-size 2)	; complex-double-floats
+  (complex-single-stack stack :element-size 2)  ; complex-single-floats
+  (complex-double-stack stack :element-size 2)  ; complex-double-floats
 
 
   ;;
@@ -252,109 +252,109 @@
   ;; immediate descriptor objects. Don't have to be seen by GC, but nothing
   ;; bad will happen if they are. (fixnums, characters, header values, etc).
   (any-reg registers
-	   :locations #.*qword-regs*
-	   :element-size 2 ; I think this is for the al/ah overlap thing
-	   :constant-scs (immediate)
-	   :save-p t
-	   :alternate-scs (control-stack))
+           :locations #.*qword-regs*
+           :element-size 2 ; I think this is for the al/ah overlap thing
+           :constant-scs (immediate)
+           :save-p t
+           :alternate-scs (control-stack))
 
   ;; pointer descriptor objects -- must be seen by GC
   (descriptor-reg registers
-		  :locations #.*qword-regs*
-		  :element-size 2
-;		  :reserve-locations (#.eax-offset)
-		  :constant-scs (constant immediate)
-		  :save-p t
-		  :alternate-scs (control-stack))
+                  :locations #.*qword-regs*
+                  :element-size 2
+;                 :reserve-locations (#.eax-offset)
+                  :constant-scs (constant immediate)
+                  :save-p t
+                  :alternate-scs (control-stack))
 
   ;; non-descriptor characters
   (character-reg registers
-		 :locations #!-sb-unicode #.*byte-regs*
-		            #!+sb-unicode #.*qword-regs*
-		 #!-sb-unicode #!-sb-unicode
-		 :reserve-locations (#.al-offset)
-		 :constant-scs (immediate)
-		 :save-p t
-		 :alternate-scs (character-stack))
+                 :locations #!-sb-unicode #.*byte-regs*
+                            #!+sb-unicode #.*qword-regs*
+                 #!-sb-unicode #!-sb-unicode
+                 :reserve-locations (#.al-offset)
+                 :constant-scs (immediate)
+                 :save-p t
+                 :alternate-scs (character-stack))
 
   ;; non-descriptor SAPs (arbitrary pointers into address space)
   (sap-reg registers
-	   :locations #.*qword-regs*
-	   :element-size 2
-;	   :reserve-locations (#.eax-offset)
-	   :constant-scs (immediate)
-	   :save-p t
-	   :alternate-scs (sap-stack))
+           :locations #.*qword-regs*
+           :element-size 2
+;          :reserve-locations (#.eax-offset)
+           :constant-scs (immediate)
+           :save-p t
+           :alternate-scs (sap-stack))
 
   ;; non-descriptor (signed or unsigned) numbers
   (signed-reg registers
-	      :locations #.*qword-regs*
-	      :element-size 2
-	      :constant-scs (immediate)
-	      :save-p t
-	      :alternate-scs (signed-stack))
+              :locations #.*qword-regs*
+              :element-size 2
+              :constant-scs (immediate)
+              :save-p t
+              :alternate-scs (signed-stack))
   (unsigned-reg registers
-		:locations #.*qword-regs*
-		:element-size 2
-		:constant-scs (immediate)
-		:save-p t
-		:alternate-scs (unsigned-stack))
+                :locations #.*qword-regs*
+                :element-size 2
+                :constant-scs (immediate)
+                :save-p t
+                :alternate-scs (unsigned-stack))
 
   ;; miscellaneous objects that must not be seen by GC. Used only as
   ;; temporaries.
   (word-reg registers
-	    :locations #.*word-regs*
-	    :element-size 2
-	    )
+            :locations #.*word-regs*
+            :element-size 2
+            )
   (dword-reg registers
-	    :locations #.*dword-regs*
-	    :element-size 2
-	    )
+            :locations #.*dword-regs*
+            :element-size 2
+            )
   (byte-reg registers
-	    :locations #.*byte-regs*
-	    )
+            :locations #.*byte-regs*
+            )
 
   ;; that can go in the floating point registers
 
   ;; non-descriptor SINGLE-FLOATs
   (single-reg float-registers
-	      :locations #.(loop for i from 0 below 15 collect i)
-	      :constant-scs (fp-single-zero)
-	      :save-p t
-	      :alternate-scs (single-stack))
+              :locations #.(loop for i from 0 below 15 collect i)
+              :constant-scs (fp-single-zero)
+              :save-p t
+              :alternate-scs (single-stack))
 
   ;; non-descriptor DOUBLE-FLOATs
   (double-reg float-registers
-	      :locations #.(loop for i from 0 below 15 collect i)
-	      :constant-scs (fp-double-zero)
-	      :save-p t
-	      :alternate-scs (double-stack))
+              :locations #.(loop for i from 0 below 15 collect i)
+              :constant-scs (fp-double-zero)
+              :save-p t
+              :alternate-scs (double-stack))
 
   (complex-single-reg float-registers
-		      :locations #.(loop for i from 0 to 14 by 2 collect i)
-		      :element-size 2
-		      :constant-scs ()
-		      :save-p t
-		      :alternate-scs (complex-single-stack))
+                      :locations #.(loop for i from 0 to 14 by 2 collect i)
+                      :element-size 2
+                      :constant-scs ()
+                      :save-p t
+                      :alternate-scs (complex-single-stack))
 
   (complex-double-reg float-registers
-		      :locations #.(loop for i from 0 to 14 by 2 collect i)
-		      :element-size 2
-		      :constant-scs ()
-		      :save-p t
-		      :alternate-scs (complex-double-stack))
+                      :locations #.(loop for i from 0 to 14 by 2 collect i)
+                      :element-size 2
+                      :constant-scs ()
+                      :save-p t
+                      :alternate-scs (complex-double-stack))
 
   ;; a catch or unwind block
   (catch-block stack :element-size kludge-nondeterministic-catch-block-size))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defparameter *byte-sc-names* 
+(defparameter *byte-sc-names*
   '(#!-sb-unicode character-reg byte-reg #!-sb-unicode character-stack))
 (defparameter *word-sc-names* '(word-reg))
 (defparameter *dword-sc-names* '(dword-reg))
-(defparameter *qword-sc-names* 
+(defparameter *qword-sc-names*
   '(any-reg descriptor-reg sap-reg signed-reg unsigned-reg control-stack
-    signed-stack unsigned-stack sap-stack single-stack 
+    signed-stack unsigned-stack sap-stack single-stack
     #!+sb-unicode character-reg #!+sb-unicode character-stack constant))
 ;;; added by jrd. I guess the right thing to do is to treat floats
 ;;; as a separate size...
@@ -367,68 +367,68 @@
 ;;;; miscellaneous TNs for the various registers
 
 (macrolet ((def-misc-reg-tns (sc-name &rest reg-names)
-	     (collect ((forms))
-		      (dolist (reg-name reg-names)
-			(let ((tn-name (symbolicate reg-name "-TN"))
-			      (offset-name (symbolicate reg-name "-OFFSET")))
-			  ;; FIXME: It'd be good to have the special
-			  ;; variables here be named with the *FOO*
-			  ;; convention.
-			  (forms `(defparameter ,tn-name
-				    (make-random-tn :kind :normal
-						    :sc (sc-or-lose ',sc-name)
-						    :offset
-						    ,offset-name)))))
-		      `(progn ,@(forms)))))
+             (collect ((forms))
+                      (dolist (reg-name reg-names)
+                        (let ((tn-name (symbolicate reg-name "-TN"))
+                              (offset-name (symbolicate reg-name "-OFFSET")))
+                          ;; FIXME: It'd be good to have the special
+                          ;; variables here be named with the *FOO*
+                          ;; convention.
+                          (forms `(defparameter ,tn-name
+                                    (make-random-tn :kind :normal
+                                                    :sc (sc-or-lose ',sc-name)
+                                                    :offset
+                                                    ,offset-name)))))
+                      `(progn ,@(forms)))))
 
   (def-misc-reg-tns unsigned-reg rax rbx rcx rdx rbp rsp rdi rsi
-		    r8 r9 r10 r11  r12 r13 r14 r15)
+                    r8 r9 r10 r11  r12 r13 r14 r15)
   (def-misc-reg-tns dword-reg eax ebx ecx edx ebp esp edi esi)
   (def-misc-reg-tns word-reg ax bx cx dx bp sp di si)
   (def-misc-reg-tns byte-reg al cl dl bl sil dil r8b r9b r10b
-		    r11b r14b r15b)
-  (def-misc-reg-tns single-reg 
+                    r11b r14b r15b)
+  (def-misc-reg-tns single-reg
       float0 float1 float2 float3 float4 float5 float6 float7
       float8 float9 float10 float11 float12 float13 float14 float15))
 
 ;;; TNs for registers used to pass arguments
 (defparameter *register-arg-tns*
   (mapcar (lambda (register-arg-name)
-	    (symbol-value (symbolicate register-arg-name "-TN")))
-	  *register-arg-names*))
+            (symbol-value (symbolicate register-arg-name "-TN")))
+          *register-arg-names*))
 
 (defparameter thread-base-tn
   (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg )
-		  :offset r12-offset))
+                  :offset r12-offset))
 
 (defparameter fp-single-zero-tn
   (make-random-tn :kind :normal
-		  :sc (sc-or-lose 'single-reg)
-		  :offset 15))
+                  :sc (sc-or-lose 'single-reg)
+                  :offset 15))
 
 (defparameter fp-double-zero-tn
   (make-random-tn :kind :normal
-		  :sc (sc-or-lose 'double-reg)
-		  :offset 15))
+                  :sc (sc-or-lose 'double-reg)
+                  :offset 15))
 
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (!def-vm-support-routine immediate-constant-sc (value)
   (typecase value
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
-	 #-sb-xc-host system-area-pointer character)
+         #-sb-xc-host system-area-pointer character)
      (sc-number-or-lose 'immediate))
     (symbol
      (when (static-symbol-p value)
        (sc-number-or-lose 'immediate)))
     (single-float
      (if (eql value 0f0)
-	 (sc-number-or-lose 'fp-single-zero )
-	 nil))
+         (sc-number-or-lose 'fp-single-zero )
+         nil))
     (double-float
      (if (eql value 0d0)
-	 (sc-number-or-lose 'fp-double-zero )
-	 nil))))
+         (sc-number-or-lose 'fp-double-zero )
+         nil))))
 
 
 ;;;; miscellaneous function call parameters
@@ -448,24 +448,24 @@
 (!def-vm-support-routine location-print-name (tn)
   (declare (type tn tn))
   (let* ((sc (tn-sc tn))
-	 (sb (sb-name (sc-sb sc)))
-	 (offset (tn-offset tn)))
+         (sb (sb-name (sc-sb sc)))
+         (offset (tn-offset tn)))
     (ecase sb
       (registers
        (let* ((sc-name (sc-name sc))
-	      (name-vec (cond ((member sc-name *byte-sc-names*)
-			       *byte-register-names*)
-			      ((member sc-name *word-sc-names*)
-			       *word-register-names*)
-			      ((member sc-name *dword-sc-names*)
-			       *dword-register-names*)
-			      ((member sc-name *qword-sc-names*)
-			       *qword-register-names*))))
-	 (or (and name-vec
-		  (< -1 offset (length name-vec))
-		  (svref name-vec offset))
-	     ;; FIXME: Shouldn't this be an ERROR?
-	     (format nil "<unknown reg: off=~W, sc=~A>" offset sc-name))))
+              (name-vec (cond ((member sc-name *byte-sc-names*)
+                               *byte-register-names*)
+                              ((member sc-name *word-sc-names*)
+                               *word-register-names*)
+                              ((member sc-name *dword-sc-names*)
+                               *dword-register-names*)
+                              ((member sc-name *qword-sc-names*)
+                               *qword-register-names*))))
+         (or (and name-vec
+                  (< -1 offset (length name-vec))
+                  (svref name-vec offset))
+             ;; FIXME: Shouldn't this be an ERROR?
+             (format nil "<unknown reg: off=~W, sc=~A>" offset sc-name))))
       (float-registers (format nil "FLOAT~D" offset))
       (stack (format nil "S~D" offset))
       (constant (format nil "Const~D" offset))
@@ -475,12 +475,12 @@
 
 (defun dwords-for-quad (value)
   (let* ((lo (logand value (1- (ash 1 32))))
-	 (hi (ash value -32)))
+         (hi (ash value -32)))
     (values lo hi)))
 
 (defun words-for-dword (value)
   (let* ((lo (logand value (1- (ash 1 16))))
-	 (hi (ash value -16)))
+         (hi (ash value -16)))
     (values lo hi)))
 
 (def!constant cfp-offset rbp-offset) ; pfw - needed by stuff in /code

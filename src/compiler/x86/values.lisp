@@ -58,9 +58,9 @@
   (:results (start) (count))
   (:info nvals)
   (:generator 20
-    (move temp esp-tn)			; WARN pointing 1 below
+    (move temp esp-tn)                  ; WARN pointing 1 below
     (do ((val vals (tn-ref-across val)))
-	((null val))
+        ((null val))
       (inst push (tn-ref-tn val)))
     (move start temp)
     (inst mov count (fixnumize nvals))))
@@ -72,7 +72,7 @@
   (:arg-types list)
   (:policy :fast-safe)
   (:results (start :scs (any-reg))
-	    (count :scs (any-reg)))
+            (count :scs (any-reg)))
   (:temporary (:sc descriptor-reg :from (:argument 0) :to (:result 1)) list)
   (:temporary (:sc descriptor-reg :to (:result 1)) nil-temp)
   (:temporary (:sc unsigned-reg :offset eax-offset :to (:result 1)) eax)
@@ -80,7 +80,7 @@
   (:save-p :compute-only)
   (:generator 0
     (move list arg)
-    (move start esp-tn)			; WARN pointing 1 below
+    (move start esp-tn)                 ; WARN pointing 1 below
     (inst mov nil-temp nil-value)
 
     LOOP
@@ -95,8 +95,8 @@
     (error-call vop bogus-arg-to-values-list-error list)
 
     DONE
-    (inst mov count start)		; start is high address
-    (inst sub count esp-tn)))		; stackp is low address
+    (inst mov count start)              ; start is high address
+    (inst sub count esp-tn)))           ; stackp is low address
 
 ;;; Copy the more arg block to the top of the stack so we can use them
 ;;; as function arguments.
@@ -108,26 +108,26 @@
 ;;; defining a new stack frame.
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :target src)
-	 (skip :scs (any-reg immediate))
-	 (num :scs (any-reg) :target count))
+         (skip :scs (any-reg immediate))
+         (num :scs (any-reg) :target count))
   (:arg-types * positive-fixnum positive-fixnum)
   (:temporary (:sc any-reg :offset esi-offset :from (:argument 0)) src)
   (:temporary (:sc descriptor-reg :offset eax-offset) temp)
   (:temporary (:sc unsigned-reg :offset ecx-offset) temp1)
   (:results (start :scs (any-reg))
-	    (count :scs (any-reg)))
+            (count :scs (any-reg)))
   (:generator 20
     (sc-case skip
       (immediate
        (cond ((zerop (tn-value skip))
-	      (move src context)
-	      (move count num))
-	     (t
-	      (inst lea src (make-ea :dword :base context
-				     :disp (- (* (tn-value skip)
-						 n-word-bytes))))
-	      (move count num)
-	      (inst sub count (* (tn-value skip) n-word-bytes)))))
+              (move src context)
+              (move count num))
+             (t
+              (inst lea src (make-ea :dword :base context
+                                     :disp (- (* (tn-value skip)
+                                                 n-word-bytes))))
+              (move count num)
+              (inst sub count (* (tn-value skip) n-word-bytes)))))
 
       (any-reg
        (move src context)

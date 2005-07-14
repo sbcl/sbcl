@@ -26,7 +26,7 @@
 
 (defun offset-next (value dstate)
   (declare (type integer value)
-	   (type sb!disassem:disassem-state dstate))
+           (type sb!disassem:disassem-state dstate))
   (+ (sb!disassem:dstate-next-addr dstate) value))
 
 (defparameter *default-address-size*
@@ -43,49 +43,49 @@
 (defun print-reg-with-width (value width stream dstate)
   (declare (ignore dstate))
   (princ (aref (ecase width
-		 (:byte *byte-reg-names*)
-		 (:word *word-reg-names*)
-		 (:dword *dword-reg-names*))
-	       value)
-	 stream)
+                 (:byte *byte-reg-names*)
+                 (:word *word-reg-names*)
+                 (:dword *dword-reg-names*))
+               value)
+         stream)
   ;; XXX plus should do some source-var notes
   )
 
 (defun print-reg (value stream dstate)
   (declare (type reg value)
-	   (type stream stream)
-	   (type sb!disassem:disassem-state dstate))
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
   (print-reg-with-width value
-			(sb!disassem:dstate-get-prop dstate 'width)
-			stream
-			dstate))
+                        (sb!disassem:dstate-get-prop dstate 'width)
+                        stream
+                        dstate))
 
 (defun print-word-reg (value stream dstate)
   (declare (type reg value)
-	   (type stream stream)
-	   (type sb!disassem:disassem-state dstate))
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
   (print-reg-with-width value
-			(or (sb!disassem:dstate-get-prop dstate 'word-width)
-			    +default-operand-size+)
-			stream
-			dstate))
+                        (or (sb!disassem:dstate-get-prop dstate 'word-width)
+                            +default-operand-size+)
+                        stream
+                        dstate))
 
 (defun print-byte-reg (value stream dstate)
   (declare (type reg value)
-	   (type stream stream)
-	   (type sb!disassem:disassem-state dstate))
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
   (print-reg-with-width value :byte stream dstate))
 
 (defun print-addr-reg (value stream dstate)
   (declare (type reg value)
-	   (type stream stream)
-	   (type sb!disassem:disassem-state dstate))
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
   (print-reg-with-width value *default-address-size* stream dstate))
 
 (defun print-reg/mem (value stream dstate)
   (declare (type (or list reg) value)
-	   (type stream stream)
-	   (type sb!disassem:disassem-state dstate))
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
   (if (typep value 'reg)
       (print-reg value stream dstate)
       (print-mem-access value stream nil dstate)))
@@ -94,24 +94,24 @@
 ;; memory references.
 (defun print-sized-reg/mem (value stream dstate)
   (declare (type (or list reg) value)
-	   (type stream stream)
-	   (type sb!disassem:disassem-state dstate))
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
   (if (typep value 'reg)
       (print-reg value stream dstate)
       (print-mem-access value stream t dstate)))
 
 (defun print-byte-reg/mem (value stream dstate)
   (declare (type (or list reg) value)
-	   (type stream stream)
-	   (type sb!disassem:disassem-state dstate))
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
   (if (typep value 'reg)
       (print-byte-reg value stream dstate)
       (print-mem-access value stream t dstate)))
 
 (defun print-word-reg/mem (value stream dstate)
   (declare (type (or list reg) value)
-	   (type stream stream)
-	   (type sb!disassem:disassem-state dstate))
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
   (if (typep value 'reg)
       (print-word-reg value stream dstate)
       (print-mem-access value stream nil dstate)))
@@ -126,65 +126,65 @@
 ;;; obvious default value (e.g., 1 for the index-scale).
 (defun prefilter-reg/mem (value dstate)
   (declare (type list value)
-	   (type sb!disassem:disassem-state dstate))
+           (type sb!disassem:disassem-state dstate))
   (let ((mod (car value))
-	(r/m (cadr value)))
+        (r/m (cadr value)))
     (declare (type (unsigned-byte 2) mod)
-	     (type (unsigned-byte 3) r/m))
+             (type (unsigned-byte 3) r/m))
     (cond ((= mod #b11)
-	   ;; registers
-	   r/m)
-	  ((= r/m #b100)
-	   ;; sib byte
-	   (let ((sib (sb!disassem:read-suffix 8 dstate)))
-	     (declare (type (unsigned-byte 8) sib))
-	     (let ((base-reg (ldb (byte 3 0) sib))
-		   (index-reg (ldb (byte 3 3) sib))
-		   (index-scale (ldb (byte 2 6) sib)))
-	       (declare (type (unsigned-byte 3) base-reg index-reg)
-			(type (unsigned-byte 2) index-scale))
-	       (let* ((offset
-		       (case mod
-			 (#b00
-			  (if (= base-reg #b101)
-			      (sb!disassem:read-signed-suffix 32 dstate)
-			      nil))
-			 (#b01
-			  (sb!disassem:read-signed-suffix 8 dstate))
-			 (#b10
-			  (sb!disassem:read-signed-suffix 32 dstate)))))
-		 (list (if (and (= mod #b00) (= base-reg #b101)) nil base-reg)
-		       offset
-		       (if (= index-reg #b100) nil index-reg)
-		       (ash 1 index-scale))))))
-	  ((and (= mod #b00) (= r/m #b101))
-	   (list nil (sb!disassem:read-signed-suffix 32 dstate)) )
-	  ((= mod #b00)
-	   (list r/m))
-	  ((= mod #b01)
-	   (list r/m (sb!disassem:read-signed-suffix 8 dstate)))
-	  (t				; (= mod #b10)
-	   (list r/m (sb!disassem:read-signed-suffix 32 dstate))))))
+           ;; registers
+           r/m)
+          ((= r/m #b100)
+           ;; sib byte
+           (let ((sib (sb!disassem:read-suffix 8 dstate)))
+             (declare (type (unsigned-byte 8) sib))
+             (let ((base-reg (ldb (byte 3 0) sib))
+                   (index-reg (ldb (byte 3 3) sib))
+                   (index-scale (ldb (byte 2 6) sib)))
+               (declare (type (unsigned-byte 3) base-reg index-reg)
+                        (type (unsigned-byte 2) index-scale))
+               (let* ((offset
+                       (case mod
+                         (#b00
+                          (if (= base-reg #b101)
+                              (sb!disassem:read-signed-suffix 32 dstate)
+                              nil))
+                         (#b01
+                          (sb!disassem:read-signed-suffix 8 dstate))
+                         (#b10
+                          (sb!disassem:read-signed-suffix 32 dstate)))))
+                 (list (if (and (= mod #b00) (= base-reg #b101)) nil base-reg)
+                       offset
+                       (if (= index-reg #b100) nil index-reg)
+                       (ash 1 index-scale))))))
+          ((and (= mod #b00) (= r/m #b101))
+           (list nil (sb!disassem:read-signed-suffix 32 dstate)) )
+          ((= mod #b00)
+           (list r/m))
+          ((= mod #b01)
+           (list r/m (sb!disassem:read-signed-suffix 8 dstate)))
+          (t                            ; (= mod #b10)
+           (list r/m (sb!disassem:read-signed-suffix 32 dstate))))))
 
 
 ;;; This is a sort of bogus prefilter that just stores the info globally for
 ;;; other people to use; it probably never gets printed.
 (defun prefilter-width (value dstate)
   (setf (sb!disassem:dstate-get-prop dstate 'width)
-	(if (zerop value)
-	    :byte
-	    (let ((word-width
-		   ;; set by a prefix instruction
-		   (or (sb!disassem:dstate-get-prop dstate 'word-width)
-		       +default-operand-size+)))
-	      (when (not (eql word-width +default-operand-size+))
-		;; Reset it.
-		(setf (sb!disassem:dstate-get-prop dstate 'word-width)
-		      +default-operand-size+))
-	      word-width))))
+        (if (zerop value)
+            :byte
+            (let ((word-width
+                   ;; set by a prefix instruction
+                   (or (sb!disassem:dstate-get-prop dstate 'word-width)
+                       +default-operand-size+)))
+              (when (not (eql word-width +default-operand-size+))
+                ;; Reset it.
+                (setf (sb!disassem:dstate-get-prop dstate 'word-width)
+                      +default-operand-size+))
+              word-width))))
 
 (defun read-address (value dstate)
-  (declare (ignore value))		; always nil anyway
+  (declare (ignore value))              ; always nil anyway
   (sb!disassem:read-suffix (width-bits *default-address-size*) dstate))
 
 (defun width-bits (width)
@@ -203,22 +203,22 @@
   :sign-extend t
   :use-label #'offset-next
   :printer (lambda (value stream dstate)
-	     (sb!disassem:maybe-note-assembler-routine value nil dstate)
-	     (print-label value stream dstate)))
+             (sb!disassem:maybe-note-assembler-routine value nil dstate)
+             (print-label value stream dstate)))
 
 (sb!disassem:define-arg-type accum
   :printer (lambda (value stream dstate)
-	     (declare (ignore value)
-		      (type stream stream)
-		      (type sb!disassem:disassem-state dstate))
-	     (print-reg 0 stream dstate)))
+             (declare (ignore value)
+                      (type stream stream)
+                      (type sb!disassem:disassem-state dstate))
+             (print-reg 0 stream dstate)))
 
 (sb!disassem:define-arg-type word-accum
   :printer (lambda (value stream dstate)
-	     (declare (ignore value)
-		      (type stream stream)
-		      (type sb!disassem:disassem-state dstate))
-	     (print-word-reg 0 stream dstate)))
+             (declare (ignore value)
+                      (type stream stream)
+                      (type sb!disassem:disassem-state dstate))
+             (print-word-reg 0 stream dstate)))
 
 (sb!disassem:define-arg-type reg
   :printer #'print-reg)
@@ -235,48 +235,48 @@
 
 (sb!disassem:define-arg-type imm-data
   :prefilter (lambda (value dstate)
-	       (declare (ignore value)) ; always nil anyway
-	       (sb!disassem:read-suffix
-		(width-bits (sb!disassem:dstate-get-prop dstate 'width))
-		dstate)))
+               (declare (ignore value)) ; always nil anyway
+               (sb!disassem:read-suffix
+                (width-bits (sb!disassem:dstate-get-prop dstate 'width))
+                dstate)))
 
 (sb!disassem:define-arg-type signed-imm-data
   :prefilter (lambda (value dstate)
-	       (declare (ignore value)) ; always nil anyway
-	       (let ((width (sb!disassem:dstate-get-prop dstate 'width)))
-		 (sb!disassem:read-signed-suffix (width-bits width) dstate))))
+               (declare (ignore value)) ; always nil anyway
+               (let ((width (sb!disassem:dstate-get-prop dstate 'width)))
+                 (sb!disassem:read-signed-suffix (width-bits width) dstate))))
 
 (sb!disassem:define-arg-type signed-imm-byte
   :prefilter (lambda (value dstate)
-	       (declare (ignore value)) ; always nil anyway
-	       (sb!disassem:read-signed-suffix 8 dstate)))
+               (declare (ignore value)) ; always nil anyway
+               (sb!disassem:read-signed-suffix 8 dstate)))
 
 (sb!disassem:define-arg-type signed-imm-dword
   :prefilter (lambda (value dstate)
-	       (declare (ignore value))	; always nil anyway
-	       (sb!disassem:read-signed-suffix 32 dstate)))
+               (declare (ignore value)) ; always nil anyway
+               (sb!disassem:read-signed-suffix 32 dstate)))
 
 (sb!disassem:define-arg-type imm-word
   :prefilter (lambda (value dstate)
-	       (declare (ignore value)) ; always nil anyway
-	       (let ((width
-		      (or (sb!disassem:dstate-get-prop dstate 'word-width)
-			  +default-operand-size+)))
-		 (sb!disassem:read-suffix (width-bits width) dstate))))
+               (declare (ignore value)) ; always nil anyway
+               (let ((width
+                      (or (sb!disassem:dstate-get-prop dstate 'word-width)
+                          +default-operand-size+)))
+                 (sb!disassem:read-suffix (width-bits width) dstate))))
 
 (sb!disassem:define-arg-type signed-imm-word
   :prefilter (lambda (value dstate)
-	       (declare (ignore value)) ; always nil anyway
-	       (let ((width
-		      (or (sb!disassem:dstate-get-prop dstate 'word-width)
-			  +default-operand-size+)))
-		 (sb!disassem:read-signed-suffix (width-bits width) dstate))))
+               (declare (ignore value)) ; always nil anyway
+               (let ((width
+                      (or (sb!disassem:dstate-get-prop dstate 'word-width)
+                          +default-operand-size+)))
+                 (sb!disassem:read-signed-suffix (width-bits width) dstate))))
 
 ;;; needed for the ret imm16 instruction
 (sb!disassem:define-arg-type imm-word-16
   :prefilter (lambda (value dstate)
-	       (declare (ignore value)) ; always nil anyway
-	       (sb!disassem:read-suffix 16 dstate)))
+               (declare (ignore value)) ; always nil anyway
+               (sb!disassem:read-suffix 16 dstate)))
 
 (sb!disassem:define-arg-type reg/mem
   :prefilter #'prefilter-reg/mem
@@ -304,21 +304,21 @@
   value)
 ) ; EVAL-WHEN
 (sb!disassem:define-arg-type fp-reg
-			     :prefilter #'prefilter-fp-reg
-			     :printer #'print-fp-reg)
+                             :prefilter #'prefilter-fp-reg
+                             :printer #'print-fp-reg)
 
 (sb!disassem:define-arg-type width
   :prefilter #'prefilter-width
   :printer (lambda (value stream dstate)
-	     (if;; (zerop value)
-		 (or (null value)
-		     (and (numberp value) (zerop value))) ; zzz jrd
-		 (princ 'b stream)
-		 (let ((word-width
-			;; set by a prefix instruction
-			(or (sb!disassem:dstate-get-prop dstate 'word-width)
-			    +default-operand-size+)))
-		   (princ (schar (symbol-name word-width) 0) stream)))))
+             (if;; (zerop value)
+                 (or (null value)
+                     (and (numberp value) (zerop value))) ; zzz jrd
+                 (princ 'b stream)
+                 (let ((word-width
+                        ;; set by a prefix instruction
+                        (or (sb!disassem:dstate-get-prop dstate 'word-width)
+                            +default-operand-size+)))
+                   (princ (schar (symbol-name word-width) 0) stream)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *conditions*
@@ -342,7 +342,7 @@
   (let ((vec (make-array 16 :initial-element nil)))
     (dolist (cond *conditions*)
       (when (null (aref vec (cdr cond)))
-	(setf (aref vec (cdr cond)) (car cond))))
+        (setf (aref vec (cdr cond)) (car cond))))
     vec))
 ) ; EVAL-WHEN
 
@@ -362,8 +362,8 @@
 (eval-when (:compile-toplevel :execute)
   (defun swap-if (direction field1 separator field2)
     `(:if (,direction :constant 0)
-	  (,field1 ,separator ,field2)
-	  (,field2 ,separator ,field1))))
+          (,field1 ,separator ,field2)
+          (,field2 ,separator ,field1))))
 
 (sb!disassem:define-instruction-format (byte 8 :default-printer '(:name))
   (op    :field (byte 8 0))
@@ -386,14 +386,14 @@
 ;;; Same as simple, but with the immediate value occurring by default,
 ;;; and with an appropiate printer.
 (sb!disassem:define-instruction-format (accum-imm 8
-				     :include 'simple
-				     :default-printer '(:name
-							:tab accum ", " imm))
+                                     :include 'simple
+                                     :default-printer '(:name
+                                                        :tab accum ", " imm))
   (imm :type 'imm-data))
 
 (sb!disassem:define-instruction-format (reg-no-width 8
-				     :default-printer '(:name :tab reg))
-  (op	 :field (byte 5 3))
+                                     :default-printer '(:name :tab reg))
+  (op    :field (byte 5 3))
   (reg   :field (byte 3 0) :type 'word-reg)
   ;; optional fields
   (accum :type 'word-accum)
@@ -401,7 +401,7 @@
 
 ;;; adds a width field to reg-no-width
 (sb!disassem:define-instruction-format (reg 8
-					:default-printer '(:name :tab reg))
+                                        :default-printer '(:name :tab reg))
   (op    :field (byte 4 4))
   (width :field (byte 1 3) :type 'width)
   (reg   :field (byte 3 0) :type 'reg)
@@ -416,46 +416,46 @@
   (dir :field (byte 1 4)))
 
 (sb!disassem:define-instruction-format (two-bytes 16
-					:default-printer '(:name))
+                                        :default-printer '(:name))
   (op :fields (list (byte 8 0) (byte 8 8))))
 
 (sb!disassem:define-instruction-format (reg-reg/mem 16
-					:default-printer
-					`(:name :tab reg ", " reg/mem))
+                                        :default-printer
+                                        `(:name :tab reg ", " reg/mem))
   (op      :field (byte 7 1))
-  (width   :field (byte 1 0)	:type 'width)
+  (width   :field (byte 1 0)    :type 'width)
   (reg/mem :fields (list (byte 2 14) (byte 3 8))
-	   			:type 'reg/mem)
-  (reg     :field (byte 3 11)	:type 'reg)
+                                :type 'reg/mem)
+  (reg     :field (byte 3 11)   :type 'reg)
   ;; optional fields
   (imm))
 
 ;;; same as reg-reg/mem, but with direction bit
 (sb!disassem:define-instruction-format (reg-reg/mem-dir 16
-					:include 'reg-reg/mem
-					:default-printer
-					`(:name
-					  :tab
-					  ,(swap-if 'dir 'reg/mem ", " 'reg)))
+                                        :include 'reg-reg/mem
+                                        :default-printer
+                                        `(:name
+                                          :tab
+                                          ,(swap-if 'dir 'reg/mem ", " 'reg)))
   (op  :field (byte 6 2))
   (dir :field (byte 1 1)))
 
 ;;; Same as reg-rem/mem, but uses the reg field as a second op code.
 (sb!disassem:define-instruction-format (reg/mem 16
-					:default-printer '(:name :tab reg/mem))
+                                        :default-printer '(:name :tab reg/mem))
   (op      :fields (list (byte 7 1) (byte 3 11)))
-  (width   :field (byte 1 0)	:type 'width)
+  (width   :field (byte 1 0)    :type 'width)
   (reg/mem :fields (list (byte 2 14) (byte 3 8))
-	   			:type 'sized-reg/mem)
+                                :type 'sized-reg/mem)
   ;; optional fields
   (imm))
 
 ;;; Same as reg/mem, but with the immediate value occurring by default,
 ;;; and with an appropiate printer.
 (sb!disassem:define-instruction-format (reg/mem-imm 16
-					:include 'reg/mem
-					:default-printer
-					'(:name :tab reg/mem ", " imm))
+                                        :include 'reg/mem
+                                        :default-printer
+                                        '(:name :tab reg/mem ", " imm))
   (reg/mem :type 'sized-reg/mem)
   (imm     :type 'imm-data))
 
@@ -463,36 +463,36 @@
 (sb!disassem:define-instruction-format
     (accum-reg/mem 16
      :include 'reg/mem :default-printer '(:name :tab accum ", " reg/mem))
-  (reg/mem :type 'reg/mem)		; don't need a size
+  (reg/mem :type 'reg/mem)              ; don't need a size
   (accum :type 'accum))
 
 ;;; Same as reg-reg/mem, but with a prefix of #b00001111
 (sb!disassem:define-instruction-format (ext-reg-reg/mem 24
-					:default-printer
-					`(:name :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0)	:value #b00001111)
+                                        :default-printer
+                                        `(:name :tab reg ", " reg/mem))
+  (prefix  :field (byte 8 0)    :value #b00001111)
   (op      :field (byte 7 9))
-  (width   :field (byte 1 8)	:type 'width)
+  (width   :field (byte 1 8)    :type 'width)
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
-	   			:type 'reg/mem)
-  (reg     :field (byte 3 19)	:type 'reg)
+                                :type 'reg/mem)
+  (reg     :field (byte 3 19)   :type 'reg)
   ;; optional fields
   (imm))
 
 ;;; Same as reg/mem, but with a prefix of #b00001111
 (sb!disassem:define-instruction-format (ext-reg/mem 24
-					:default-printer '(:name :tab reg/mem))
-  (prefix  :field (byte 8 0)	:value #b00001111)
+                                        :default-printer '(:name :tab reg/mem))
+  (prefix  :field (byte 8 0)    :value #b00001111)
   (op      :fields (list (byte 7 9) (byte 3 19)))
-  (width   :field (byte 1 8)	:type 'width)
+  (width   :field (byte 1 8)    :type 'width)
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
-	   			:type 'sized-reg/mem)
+                                :type 'sized-reg/mem)
   ;; optional fields
   (imm))
 
 (sb!disassem:define-instruction-format (ext-reg/mem-imm 24
                                         :include 'ext-reg/mem
-					:default-printer
+                                        :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (imm :type 'imm-data))
 
@@ -500,15 +500,15 @@
 
 ;;; regular fp inst to/from registers/memory
 (sb!disassem:define-instruction-format (floating-point 16
-					:default-printer
-					`(:name :tab reg/mem))
+                                        :default-printer
+                                        `(:name :tab reg/mem))
   (prefix :field (byte 5 3) :value #b11011)
   (op     :fields (list (byte 3 0) (byte 3 11)))
   (reg/mem :fields (list (byte 2 14) (byte 3 8)) :type 'reg/mem))
 
 ;;; fp insn to/from fp reg
 (sb!disassem:define-instruction-format (floating-point-fp 16
-					:default-printer `(:name :tab fp-reg))
+                                        :default-printer `(:name :tab fp-reg))
   (prefix :field (byte 5 3) :value #b11011)
   (suffix :field (byte 2 14) :value #b11)
   (op     :fields (list (byte 3 0) (byte 3 11)))
@@ -528,73 +528,73 @@
 ;;; (added by (?) pfw)
 ;;; fp no operand isns
 (sb!disassem:define-instruction-format (floating-point-no 16
-				      :default-printer '(:name))
+                                      :default-printer '(:name))
   (prefix :field (byte 8  0) :value #b11011001)
   (suffix :field (byte 3 13) :value #b111)
   (op     :field (byte 5  8)))
 
 (sb!disassem:define-instruction-format (floating-point-3 16
-				      :default-printer '(:name))
+                                      :default-printer '(:name))
   (prefix :field (byte 5 3) :value #b11011)
   (suffix :field (byte 2 14) :value #b11)
   (op     :fields (list (byte 3 0) (byte 6 8))))
 
 (sb!disassem:define-instruction-format (floating-point-5 16
-				      :default-printer '(:name))
+                                      :default-printer '(:name))
   (prefix :field (byte 8  0) :value #b11011011)
   (suffix :field (byte 3 13) :value #b111)
   (op     :field (byte 5  8)))
 
 (sb!disassem:define-instruction-format (floating-point-st 16
-				      :default-printer '(:name))
+                                      :default-printer '(:name))
   (prefix :field (byte 8  0) :value #b11011111)
   (suffix :field (byte 3 13) :value #b111)
   (op     :field (byte 5  8)))
 
 (sb!disassem:define-instruction-format (string-op 8
-				     :include 'simple
-				     :default-printer '(:name width)))
+                                     :include 'simple
+                                     :default-printer '(:name width)))
 
 (sb!disassem:define-instruction-format (short-cond-jump 16)
   (op    :field (byte 4 4))
-  (cc	 :field (byte 4 0) :type 'condition-code)
+  (cc    :field (byte 4 0) :type 'condition-code)
   (label :field (byte 8 8) :type 'displacement))
 
 (sb!disassem:define-instruction-format (short-jump 16
-				     :default-printer '(:name :tab label))
+                                     :default-printer '(:name :tab label))
   (const :field (byte 4 4) :value #b1110)
-  (op	 :field (byte 4 0))
+  (op    :field (byte 4 0))
   (label :field (byte 8 8) :type 'displacement))
 
 (sb!disassem:define-instruction-format (near-cond-jump 16)
   (op    :fields (list (byte 8 0) (byte 4 12)) :value '(#b00001111 #b1000))
-  (cc	 :field (byte 4 8) :type 'condition-code)
+  (cc    :field (byte 4 8) :type 'condition-code)
   ;; The disassembler currently doesn't let you have an instruction > 32 bits
   ;; long, so we fake it by using a prefilter to read the offset.
   (label :type 'displacement
-	 :prefilter (lambda (value dstate)
-		      (declare (ignore value)) ; always nil anyway
-		      (sb!disassem:read-signed-suffix 32 dstate))))
+         :prefilter (lambda (value dstate)
+                      (declare (ignore value)) ; always nil anyway
+                      (sb!disassem:read-signed-suffix 32 dstate))))
 
 (sb!disassem:define-instruction-format (near-jump 8
-				     :default-printer '(:name :tab label))
+                                     :default-printer '(:name :tab label))
   (op    :field (byte 8 0))
   ;; The disassembler currently doesn't let you have an instruction > 32 bits
   ;; long, so we fake it by using a prefilter to read the address.
   (label :type 'displacement
-	 :prefilter (lambda (value dstate)
-		      (declare (ignore value)) ; always nil anyway
-		      (sb!disassem:read-signed-suffix 32 dstate))))
+         :prefilter (lambda (value dstate)
+                      (declare (ignore value)) ; always nil anyway
+                      (sb!disassem:read-signed-suffix 32 dstate))))
 
 
 (sb!disassem:define-instruction-format (cond-set 24
-				     :default-printer '('set cc :tab reg/mem))
+                                     :default-printer '('set cc :tab reg/mem))
   (prefix :field (byte 8 0) :value #b00001111)
   (op    :field (byte 4 12) :value #b1001)
-  (cc	 :field (byte 4 8) :type 'condition-code)
+  (cc    :field (byte 4 8) :type 'condition-code)
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
-	   :type 'byte-reg/mem)
-  (reg     :field (byte 3 19)	:value #b000))
+           :type 'byte-reg/mem)
+  (reg     :field (byte 3 19)   :value #b000))
 
 (sb!disassem:define-instruction-format (cond-move 24
                                      :default-printer
@@ -607,17 +607,17 @@
   (reg     :field (byte 3 19)   :type 'reg))
 
 (sb!disassem:define-instruction-format (enter-format 32
-				     :default-printer '(:name
-							:tab disp
-							(:unless (:constant 0)
-							  ", " level)))
+                                     :default-printer '(:name
+                                                        :tab disp
+                                                        (:unless (:constant 0)
+                                                          ", " level)))
   (op :field (byte 8 0))
   (disp :field (byte 16 8))
   (level :field (byte 8 24)))
 
 (sb!disassem:define-instruction-format (prefetch 24
-						 :default-printer
-						 '(:name ", " reg/mem))
+                                                 :default-printer
+                                                 '(:name ", " reg/mem))
   (prefix :field (byte 8 0) :value #b00001111)
   (op :field (byte 8 8) :value #b00011000)
   (reg/mem :fields (list (byte 2 22) (byte 3 16)) :type 'byte-reg/mem)
@@ -625,7 +625,7 @@
 
 ;;; Single byte instruction with an immediate byte argument.
 (sb!disassem:define-instruction-format (byte-imm 16
-				     :default-printer '(:name :tab code))
+                                     :default-printer '(:name :tab code))
  (op :field (byte 8 0))
  (code :field (byte 8 8)))
 
@@ -652,16 +652,16 @@
   (note-fixup segment :absolute fixup)
   (let ((offset (fixup-offset fixup)))
     (if (label-p offset)
-	(emit-back-patch segment
-			 4 ; FIXME: n-word-bytes
-			 (lambda (segment posn)
-			   (declare (ignore posn))
-			   (emit-dword segment
-				       (- (+ (component-header-length)
-					     (or (label-position offset)
-						 0))
-					  other-pointer-lowtag))))
-	(emit-dword segment (or offset 0)))))
+        (emit-back-patch segment
+                         4 ; FIXME: n-word-bytes
+                         (lambda (segment posn)
+                           (declare (ignore posn))
+                           (emit-dword segment
+                                       (- (+ (component-header-length)
+                                             (or (label-position offset)
+                                                 0))
+                                          other-pointer-lowtag))))
+        (emit-dword segment (or offset 0)))))
 
 (defun emit-relative-fixup (segment fixup)
   (note-fixup segment :relative fixup)
@@ -674,10 +674,10 @@
   (aver (eq (sb-name (sc-sb (tn-sc tn))) 'registers))
   (let ((offset (tn-offset tn)))
     (logior (ash (logand offset 1) 2)
-	    (ash offset -1))))
+            (ash offset -1))))
 
 (defstruct (ea (:constructor make-ea (size &key base index scale disp))
-	       (:copier nil))
+               (:copier nil))
   (size nil :type (member :byte :word :dword))
   (base nil :type (or tn null))
   (index nil :type (or tn null))
@@ -685,93 +685,93 @@
   (disp 0 :type (or (unsigned-byte 32) (signed-byte 32) fixup)))
 (def!method print-object ((ea ea) stream)
   (cond ((or *print-escape* *print-readably*)
-	 (print-unreadable-object (ea stream :type t)
-	   (format stream
-		   "~S~@[ base=~S~]~@[ index=~S~]~@[ scale=~S~]~@[ disp=~S~]"
-		   (ea-size ea)
-		   (ea-base ea)
-		   (ea-index ea)
-		   (let ((scale (ea-scale ea)))
-		     (if (= scale 1) nil scale))
-		   (ea-disp ea))))
-	(t
-	 (format stream "~A PTR [" (symbol-name (ea-size ea)))
-	 (when (ea-base ea)
-	   (write-string (sb!c::location-print-name (ea-base ea)) stream)
-	   (when (ea-index ea)
-	     (write-string "+" stream)))
-	 (when (ea-index ea)
-	   (write-string (sb!c::location-print-name (ea-index ea)) stream))
-	 (unless (= (ea-scale ea) 1)
-	   (format stream "*~A" (ea-scale ea)))
-	 (typecase (ea-disp ea)
-	   (null)
-	   (integer
-	    (format stream "~@D" (ea-disp ea)))
-	   (t
-	    (format stream "+~A" (ea-disp ea))))
-	 (write-char #\] stream))))
+         (print-unreadable-object (ea stream :type t)
+           (format stream
+                   "~S~@[ base=~S~]~@[ index=~S~]~@[ scale=~S~]~@[ disp=~S~]"
+                   (ea-size ea)
+                   (ea-base ea)
+                   (ea-index ea)
+                   (let ((scale (ea-scale ea)))
+                     (if (= scale 1) nil scale))
+                   (ea-disp ea))))
+        (t
+         (format stream "~A PTR [" (symbol-name (ea-size ea)))
+         (when (ea-base ea)
+           (write-string (sb!c::location-print-name (ea-base ea)) stream)
+           (when (ea-index ea)
+             (write-string "+" stream)))
+         (when (ea-index ea)
+           (write-string (sb!c::location-print-name (ea-index ea)) stream))
+         (unless (= (ea-scale ea) 1)
+           (format stream "*~A" (ea-scale ea)))
+         (typecase (ea-disp ea)
+           (null)
+           (integer
+            (format stream "~@D" (ea-disp ea)))
+           (t
+            (format stream "+~A" (ea-disp ea))))
+         (write-char #\] stream))))
 
 (defun emit-ea (segment thing reg &optional allow-constants)
   (etypecase thing
     (tn
      (ecase (sb-name (sc-sb (tn-sc thing)))
        (registers
-	(emit-mod-reg-r/m-byte segment #b11 reg (reg-tn-encoding thing)))
+        (emit-mod-reg-r/m-byte segment #b11 reg (reg-tn-encoding thing)))
        (stack
-	;; Convert stack tns into an index off of EBP.
-	(let ((disp (- (* (1+ (tn-offset thing)) n-word-bytes))))
-	  (cond ((< -128 disp 127)
-		 (emit-mod-reg-r/m-byte segment #b01 reg #b101)
-		 (emit-byte segment disp))
-		(t
-		 (emit-mod-reg-r/m-byte segment #b10 reg #b101)
-		 (emit-dword segment disp)))))
+        ;; Convert stack tns into an index off of EBP.
+        (let ((disp (- (* (1+ (tn-offset thing)) n-word-bytes))))
+          (cond ((< -128 disp 127)
+                 (emit-mod-reg-r/m-byte segment #b01 reg #b101)
+                 (emit-byte segment disp))
+                (t
+                 (emit-mod-reg-r/m-byte segment #b10 reg #b101)
+                 (emit-dword segment disp)))))
        (constant
-	(unless allow-constants
-	  (error
-	   "Constant TNs can only be directly used in MOV, PUSH, and CMP."))
-	(emit-mod-reg-r/m-byte segment #b00 reg #b101)
-	(emit-absolute-fixup segment
-			     (make-fixup nil
-					 :code-object
-					 (- (* (tn-offset thing) n-word-bytes)
-					    other-pointer-lowtag))))))
+        (unless allow-constants
+          (error
+           "Constant TNs can only be directly used in MOV, PUSH, and CMP."))
+        (emit-mod-reg-r/m-byte segment #b00 reg #b101)
+        (emit-absolute-fixup segment
+                             (make-fixup nil
+                                         :code-object
+                                         (- (* (tn-offset thing) n-word-bytes)
+                                            other-pointer-lowtag))))))
     (ea
      (let* ((base (ea-base thing))
-	    (index (ea-index thing))
-	    (scale (ea-scale thing))
-	    (disp (ea-disp thing))
-	    (mod (cond ((or (null base)
-			    (and (eql disp 0)
-				 (not (= (reg-tn-encoding base) #b101))))
-			#b00)
-		       ((and (fixnump disp) (<= -128 disp 127))
-			#b01)
-		       (t
-			#b10)))
-	    (r/m (cond (index #b100)
-		       ((null base) #b101)
-		       (t (reg-tn-encoding base)))))
+            (index (ea-index thing))
+            (scale (ea-scale thing))
+            (disp (ea-disp thing))
+            (mod (cond ((or (null base)
+                            (and (eql disp 0)
+                                 (not (= (reg-tn-encoding base) #b101))))
+                        #b00)
+                       ((and (fixnump disp) (<= -128 disp 127))
+                        #b01)
+                       (t
+                        #b10)))
+            (r/m (cond (index #b100)
+                       ((null base) #b101)
+                       (t (reg-tn-encoding base)))))
        (emit-mod-reg-r/m-byte segment mod reg r/m)
        (when (= r/m #b100)
-	 (let ((ss (1- (integer-length scale)))
-	       (index (if (null index)
-			  #b100
-			  (let ((index (reg-tn-encoding index)))
-			    (if (= index #b100)
-				(error "can't index off of ESP")
-				index))))
-	       (base (if (null base)
-			 #b101
-			 (reg-tn-encoding base))))
-	   (emit-sib-byte segment ss index base)))
+         (let ((ss (1- (integer-length scale)))
+               (index (if (null index)
+                          #b100
+                          (let ((index (reg-tn-encoding index)))
+                            (if (= index #b100)
+                                (error "can't index off of ESP")
+                                index))))
+               (base (if (null base)
+                         #b101
+                         (reg-tn-encoding base))))
+           (emit-sib-byte segment ss index base)))
        (cond ((= mod #b01)
-	      (emit-byte segment disp))
-	     ((or (= mod #b10) (null base))
-	      (if (fixup-p disp)
-		  (emit-absolute-fixup segment disp)
-		  (emit-dword segment disp))))))
+              (emit-byte segment disp))
+             ((or (= mod #b10) (null base))
+              (if (fixup-p disp)
+                  (emit-absolute-fixup segment disp)
+                  (emit-dword segment disp))))))
     (fixup
      (emit-mod-reg-r/m-byte segment #b00 reg #b101)
      (emit-absolute-fixup segment thing))))
@@ -784,8 +784,8 @@
 (defun emit-fp-op (segment thing op)
   (if (fp-reg-tn-p thing)
       (emit-byte segment (dpb op (byte 3 3) (dpb (tn-offset thing)
-						 (byte 3 0)
-						 #b11000000)))
+                                                 (byte 3 0)
+                                                 #b11000000)))
     (emit-ea segment thing op)))
 
 (defun byte-reg-p (thing)
@@ -849,18 +849,18 @@
      ;; to hack up the code
      (case (sc-name (tn-sc thing))
        (#.*dword-sc-names*
-	:dword)
+        :dword)
        (#.*word-sc-names*
-	:word)
+        :word)
        (#.*byte-sc-names*
-	:byte)
+        :byte)
        ;; added by jrd: float-registers is a separate size (?)
        (#.*float-sc-names*
-	:float)
+        :float)
        (#.*double-sc-names*
-	:double)
+        :double)
        (t
-	(error "can't tell the size of ~S ~S" thing (sc-name (tn-sc thing))))))
+        (error "can't tell the size of ~S ~S" thing (sc-name (tn-sc thing))))))
     (ea
      (ea-size thing))
     (t
@@ -868,17 +868,17 @@
 
 (defun matching-operand-size (dst src)
   (let ((dst-size (operand-size dst))
-	(src-size (operand-size src)))
+        (src-size (operand-size src)))
     (if dst-size
-	(if src-size
-	    (if (eq dst-size src-size)
-		dst-size
-		(error "size mismatch: ~S is a ~S and ~S is a ~S."
-		       dst dst-size src src-size))
-	    dst-size)
-	(if src-size
-	    src-size
-	    (error "can't tell the size of either ~S or ~S" dst src)))))
+        (if src-size
+            (if (eq dst-size src-size)
+                dst-size
+                (error "size mismatch: ~S is a ~S and ~S is a ~S."
+                       dst dst-size src src-size))
+            dst-size)
+        (if src-size
+            src-size
+            (error "can't tell the size of either ~S or ~S" dst src)))))
 
 (defun emit-sized-immediate (segment size value)
   (ecase size
@@ -894,10 +894,10 @@
 (define-instruction mov (segment dst src)
   ;; immediate to register
   (:printer reg ((op #b1011) (imm nil :type 'imm-data))
-	    '(:name :tab reg ", " imm))
+            '(:name :tab reg ", " imm))
   ;; absolute mem to/from accumulator
   (:printer simple-dir ((op #b101000) (imm nil :type 'imm-addr))
-	    `(:name :tab ,(swap-if 'dir 'accum ", " '("[" imm "]"))))
+            `(:name :tab ,(swap-if 'dir 'accum ", " '("[" imm "]"))))
   ;; register to/from register/memory
   (:printer reg-reg/mem-dir ((op #b100010)))
   ;; immediate to register/memory
@@ -907,47 +907,47 @@
    (let ((size (matching-operand-size dst src)))
      (maybe-emit-operand-size-prefix segment size)
      (cond ((register-p dst)
-	    (cond ((integerp src)
-		   (emit-byte-with-reg segment
-				       (if (eq size :byte)
-					   #b10110
-					   #b10111)
-				       (reg-tn-encoding dst))
-		   (emit-sized-immediate segment size src))
-		  ((and (fixup-p src) (accumulator-p dst))
-		   (emit-byte segment
-			      (if (eq size :byte)
-				  #b10100000
-				  #b10100001))
-		   (emit-absolute-fixup segment src))
-		  (t
-		   (emit-byte segment
-			      (if (eq size :byte)
-				  #b10001010
-				  #b10001011))
-		   (emit-ea segment src (reg-tn-encoding dst) t))))
-	   ((and (fixup-p dst) (accumulator-p src))
-	    (emit-byte segment (if (eq size :byte) #b10100010 #b10100011))
-	    (emit-absolute-fixup segment dst))
-	   ((integerp src)
-	    (emit-byte segment (if (eq size :byte) #b11000110 #b11000111))
-	    (emit-ea segment dst #b000)
-	    (emit-sized-immediate segment size src))
-	   ((register-p src)
-	    (emit-byte segment (if (eq size :byte) #b10001000 #b10001001))
-	    (emit-ea segment dst (reg-tn-encoding src)))
-	   ((fixup-p src)
-	    (aver (eq size :dword))
-	    (emit-byte segment #b11000111)
-	    (emit-ea segment dst #b000)
-	    (emit-absolute-fixup segment src))
-	   (t
-	    (error "bogus arguments to MOV: ~S ~S" dst src))))))
+            (cond ((integerp src)
+                   (emit-byte-with-reg segment
+                                       (if (eq size :byte)
+                                           #b10110
+                                           #b10111)
+                                       (reg-tn-encoding dst))
+                   (emit-sized-immediate segment size src))
+                  ((and (fixup-p src) (accumulator-p dst))
+                   (emit-byte segment
+                              (if (eq size :byte)
+                                  #b10100000
+                                  #b10100001))
+                   (emit-absolute-fixup segment src))
+                  (t
+                   (emit-byte segment
+                              (if (eq size :byte)
+                                  #b10001010
+                                  #b10001011))
+                   (emit-ea segment src (reg-tn-encoding dst) t))))
+           ((and (fixup-p dst) (accumulator-p src))
+            (emit-byte segment (if (eq size :byte) #b10100010 #b10100011))
+            (emit-absolute-fixup segment dst))
+           ((integerp src)
+            (emit-byte segment (if (eq size :byte) #b11000110 #b11000111))
+            (emit-ea segment dst #b000)
+            (emit-sized-immediate segment size src))
+           ((register-p src)
+            (emit-byte segment (if (eq size :byte) #b10001000 #b10001001))
+            (emit-ea segment dst (reg-tn-encoding src)))
+           ((fixup-p src)
+            (aver (eq size :dword))
+            (emit-byte segment #b11000111)
+            (emit-ea segment dst #b000)
+            (emit-absolute-fixup segment src))
+           (t
+            (error "bogus arguments to MOV: ~S ~S" dst src))))))
 
 (defun emit-move-with-extension (segment dst src opcode)
   (aver (register-p dst))
   (let ((dst-size (operand-size dst))
-	(src-size (operand-size src)))
+        (src-size (operand-size src)))
     (ecase dst-size
       (:word
        (aver (eq src-size :byte))
@@ -957,15 +957,15 @@
        (emit-ea segment src (reg-tn-encoding dst)))
       (:dword
        (ecase src-size
-	 (:byte
-	  (maybe-emit-operand-size-prefix segment :dword)
-	  (emit-byte segment #b00001111)
-	  (emit-byte segment opcode)
-	  (emit-ea segment src (reg-tn-encoding dst)))
-	 (:word
-	  (emit-byte segment #b00001111)
-	  (emit-byte segment (logior opcode 1))
-	  (emit-ea segment src (reg-tn-encoding dst))))))))
+         (:byte
+          (maybe-emit-operand-size-prefix segment :dword)
+          (emit-byte segment #b00001111)
+          (emit-byte segment opcode)
+          (emit-ea segment src (reg-tn-encoding dst)))
+         (:word
+          (emit-byte segment #b00001111)
+          (emit-byte segment (logior opcode 1))
+          (emit-ea segment src (reg-tn-encoding dst))))))))
 
 (define-instruction movsx (segment dst src)
   (:printer ext-reg-reg/mem ((op #b1011111) (reg nil :type 'word-reg)))
@@ -982,32 +982,32 @@
   (:printer reg/mem ((op '(#b1111111 #b110)) (width 1)))
   ;; immediate
   (:printer byte ((op #b01101010) (imm nil :type 'signed-imm-byte))
-	    '(:name :tab imm))
+            '(:name :tab imm))
   (:printer byte ((op #b01101000) (imm nil :type 'imm-word))
-	    '(:name :tab imm))
+            '(:name :tab imm))
   ;; ### segment registers?
 
   (:emitter
    (cond ((integerp src)
-	  (cond ((<= -128 src 127)
-		 (emit-byte segment #b01101010)
-		 (emit-byte segment src))
-		(t
-		 (emit-byte segment #b01101000)
-		 (emit-dword segment src))))
-	 ((fixup-p src)
-	  ;; Interpret the fixup as an immediate dword to push.
-	  (emit-byte segment #b01101000)
-	  (emit-absolute-fixup segment src))
-	 (t
-	  (let ((size (operand-size src)))
-	    (aver (not (eq size :byte)))
-	    (maybe-emit-operand-size-prefix segment size)
-	    (cond ((register-p src)
-		   (emit-byte-with-reg segment #b01010 (reg-tn-encoding src)))
-		  (t
-		   (emit-byte segment #b11111111)
-		   (emit-ea segment src #b110 t))))))))
+          (cond ((<= -128 src 127)
+                 (emit-byte segment #b01101010)
+                 (emit-byte segment src))
+                (t
+                 (emit-byte segment #b01101000)
+                 (emit-dword segment src))))
+         ((fixup-p src)
+          ;; Interpret the fixup as an immediate dword to push.
+          (emit-byte segment #b01101000)
+          (emit-absolute-fixup segment src))
+         (t
+          (let ((size (operand-size src)))
+            (aver (not (eq size :byte)))
+            (maybe-emit-operand-size-prefix segment size)
+            (cond ((register-p src)
+                   (emit-byte-with-reg segment #b01010 (reg-tn-encoding src)))
+                  (t
+                   (emit-byte segment #b11111111)
+                   (emit-ea segment src #b110 t))))))))
 
 (define-instruction pusha (segment)
   (:printer byte ((op #b01100000)))
@@ -1022,10 +1022,10 @@
      (aver (not (eq size :byte)))
      (maybe-emit-operand-size-prefix segment size)
      (cond ((register-p dst)
-	    (emit-byte-with-reg segment #b01011 (reg-tn-encoding dst)))
-	   (t
-	    (emit-byte segment #b10001111)
-	    (emit-ea segment dst #b000))))))
+            (emit-byte-with-reg segment #b01011 (reg-tn-encoding dst)))
+           (t
+            (emit-byte segment #b10001111)
+            (emit-ea segment dst #b000))))))
 
 (define-instruction popa (segment)
   (:printer byte ((op #b01100001)))
@@ -1041,24 +1041,24 @@
    (let ((size (matching-operand-size operand1 operand2)))
      (maybe-emit-operand-size-prefix segment size)
      (labels ((xchg-acc-with-something (acc something)
-		(if (and (not (eq size :byte)) (register-p something))
-		    (emit-byte-with-reg segment
-					#b10010
-					(reg-tn-encoding something))
-		    (xchg-reg-with-something acc something)))
-	      (xchg-reg-with-something (reg something)
-		(emit-byte segment (if (eq size :byte) #b10000110 #b10000111))
-		(emit-ea segment something (reg-tn-encoding reg))))
+                (if (and (not (eq size :byte)) (register-p something))
+                    (emit-byte-with-reg segment
+                                        #b10010
+                                        (reg-tn-encoding something))
+                    (xchg-reg-with-something acc something)))
+              (xchg-reg-with-something (reg something)
+                (emit-byte segment (if (eq size :byte) #b10000110 #b10000111))
+                (emit-ea segment something (reg-tn-encoding reg))))
        (cond ((accumulator-p operand1)
-	      (xchg-acc-with-something operand1 operand2))
-	     ((accumulator-p operand2)
-	      (xchg-acc-with-something operand2 operand1))
-	     ((register-p operand1)
-	      (xchg-reg-with-something operand1 operand2))
-	     ((register-p operand2)
-	      (xchg-reg-with-something operand2 operand1))
-	     (t
-	      (error "bogus args to XCHG: ~S ~S" operand1 operand2)))))))
+              (xchg-acc-with-something operand1 operand2))
+             ((accumulator-p operand2)
+              (xchg-acc-with-something operand2 operand1))
+             ((register-p operand1)
+              (xchg-reg-with-something operand1 operand2))
+             ((register-p operand2)
+              (xchg-reg-with-something operand2 operand1))
+             (t
+              (error "bogus args to XCHG: ~S ~S" operand1 operand2)))))))
 
 (define-instruction lea (segment dst src)
   (:printer reg-reg/mem ((op #b1000110) (width 1)))
@@ -1155,38 +1155,38 @@
 ;;;; arithmetic
 
 (defun emit-random-arith-inst (name segment dst src opcode
-				    &optional allow-constants)
+                                    &optional allow-constants)
   (let ((size (matching-operand-size dst src)))
     (maybe-emit-operand-size-prefix segment size)
     (cond
      ((integerp src)
       (cond ((and (not (eq size :byte)) (<= -128 src 127))
-	     (emit-byte segment #b10000011)
-	     (emit-ea segment dst opcode allow-constants)
-	     (emit-byte segment src))
-	    ((accumulator-p dst)
-	     (emit-byte segment
-			(dpb opcode
-			     (byte 3 3)
-			     (if (eq size :byte)
-				 #b00000100
-				 #b00000101)))
-	     (emit-sized-immediate segment size src))
-	    (t
-	     (emit-byte segment (if (eq size :byte) #b10000000 #b10000001))
-	     (emit-ea segment dst opcode allow-constants)
-	     (emit-sized-immediate segment size src))))
+             (emit-byte segment #b10000011)
+             (emit-ea segment dst opcode allow-constants)
+             (emit-byte segment src))
+            ((accumulator-p dst)
+             (emit-byte segment
+                        (dpb opcode
+                             (byte 3 3)
+                             (if (eq size :byte)
+                                 #b00000100
+                                 #b00000101)))
+             (emit-sized-immediate segment size src))
+            (t
+             (emit-byte segment (if (eq size :byte) #b10000000 #b10000001))
+             (emit-ea segment dst opcode allow-constants)
+             (emit-sized-immediate segment size src))))
      ((register-p src)
       (emit-byte segment
-		 (dpb opcode
-		      (byte 3 3)
-		      (if (eq size :byte) #b00000000 #b00000001)))
+                 (dpb opcode
+                      (byte 3 3)
+                      (if (eq size :byte) #b00000000 #b00000001)))
       (emit-ea segment dst (reg-tn-encoding src) allow-constants))
      ((register-p dst)
       (emit-byte segment
-		 (dpb opcode
-		      (byte 3 3)
-		      (if (eq size :byte) #b00000010 #b00000011)))
+                 (dpb opcode
+                      (byte 3 3)
+                      (if (eq size :byte) #b00000010 #b00000011)))
       (emit-ea segment src (reg-tn-encoding dst) allow-constants))
      (t
       (error "bogus operands to ~A" name)))))
@@ -1196,7 +1196,7 @@
     `((accum-imm ((op ,(dpb subop (byte 3 2) #b0000010))))
       (reg/mem-imm ((op (#b1000000 ,subop))))
       (reg/mem-imm ((op (#b1000001 ,subop))
-		    (imm nil :type signed-imm-byte)))
+                    (imm nil :type signed-imm-byte)))
       (reg-reg/mem-dir ((op ,(dpb subop (byte 3 1) #b000000))))))
   )
 
@@ -1229,10 +1229,10 @@
    (let ((size (operand-size dst)))
      (maybe-emit-operand-size-prefix segment size)
      (cond ((and (not (eq size :byte)) (register-p dst))
-	    (emit-byte-with-reg segment #b01000 (reg-tn-encoding dst)))
-	   (t
-	    (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
-	    (emit-ea segment dst #b000))))))
+            (emit-byte-with-reg segment #b01000 (reg-tn-encoding dst)))
+           (t
+            (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
+            (emit-ea segment dst #b000))))))
 
 (define-instruction dec (segment dst)
   ;; Register.
@@ -1243,10 +1243,10 @@
    (let ((size (operand-size dst)))
      (maybe-emit-operand-size-prefix segment size)
      (cond ((and (not (eq size :byte)) (register-p dst))
-	    (emit-byte-with-reg segment #b01001 (reg-tn-encoding dst)))
-	   (t
-	    (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
-	    (emit-ea segment dst #b001))))))
+            (emit-byte-with-reg segment #b01001 (reg-tn-encoding dst)))
+           (t
+            (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
+            (emit-ea segment dst #b001))))))
 
 (define-instruction neg (segment dst)
   (:printer reg/mem ((op '(#b1111011 #b011))))
@@ -1290,35 +1290,35 @@
   (:printer ext-reg-reg/mem ((op #b1010111)))
   (:printer reg-reg/mem ((op #b0110100) (width 1)
                          (imm nil :type 'signed-imm-word))
-	    '(:name :tab reg ", " reg/mem ", " imm))
+            '(:name :tab reg ", " reg/mem ", " imm))
   (:printer reg-reg/mem ((op #b0110101) (width 1)
-			 (imm nil :type 'signed-imm-byte))
-	    '(:name :tab reg ", " reg/mem ", " imm))
+                         (imm nil :type 'signed-imm-byte))
+            '(:name :tab reg ", " reg/mem ", " imm))
   (:emitter
    (flet ((r/m-with-immed-to-reg (reg r/m immed)
-	    (let* ((size (matching-operand-size reg r/m))
-		   (sx (and (not (eq size :byte)) (<= -128 immed 127))))
-	      (maybe-emit-operand-size-prefix segment size)
-	      (emit-byte segment (if sx #b01101011 #b01101001))
-	      (emit-ea segment r/m (reg-tn-encoding reg))
-	      (if sx
-		  (emit-byte segment immed)
-		  (emit-sized-immediate segment size immed)))))
+            (let* ((size (matching-operand-size reg r/m))
+                   (sx (and (not (eq size :byte)) (<= -128 immed 127))))
+              (maybe-emit-operand-size-prefix segment size)
+              (emit-byte segment (if sx #b01101011 #b01101001))
+              (emit-ea segment r/m (reg-tn-encoding reg))
+              (if sx
+                  (emit-byte segment immed)
+                  (emit-sized-immediate segment size immed)))))
      (cond (src2
-	    (r/m-with-immed-to-reg dst src1 src2))
-	   (src1
-	    (if (integerp src1)
-		(r/m-with-immed-to-reg dst dst src1)
-		(let ((size (matching-operand-size dst src1)))
-		  (maybe-emit-operand-size-prefix segment size)
-		  (emit-byte segment #b00001111)
-		  (emit-byte segment #b10101111)
-		  (emit-ea segment src1 (reg-tn-encoding dst)))))
-	   (t
-	    (let ((size (operand-size dst)))
-	      (maybe-emit-operand-size-prefix segment size)
-	      (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
-	      (emit-ea segment dst #b101)))))))
+            (r/m-with-immed-to-reg dst src1 src2))
+           (src1
+            (if (integerp src1)
+                (r/m-with-immed-to-reg dst dst src1)
+                (let ((size (matching-operand-size dst src1)))
+                  (maybe-emit-operand-size-prefix segment size)
+                  (emit-byte segment #b00001111)
+                  (emit-byte segment #b10101111)
+                  (emit-ea segment src1 (reg-tn-encoding dst)))))
+           (t
+            (let ((size (operand-size dst)))
+              (maybe-emit-operand-size-prefix segment size)
+              (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
+              (emit-ea segment dst #b101)))))))
 
 (define-instruction div (segment dst src)
   (:printer accum-reg/mem ((op '(#b1111011 #b110))))
@@ -1393,24 +1393,24 @@
   (let ((size (operand-size dst)))
     (maybe-emit-operand-size-prefix segment size)
     (multiple-value-bind (major-opcode immed)
-	(case amount
-	  (:cl (values #b11010010 nil))
-	  (1 (values #b11010000 nil))
-	  (t (values #b11000000 t)))
+        (case amount
+          (:cl (values #b11010010 nil))
+          (1 (values #b11010000 nil))
+          (t (values #b11000000 t)))
       (emit-byte segment
-		 (if (eq size :byte) major-opcode (logior major-opcode 1)))
+                 (if (eq size :byte) major-opcode (logior major-opcode 1)))
       (emit-ea segment dst opcode)
       (when immed
-	(emit-byte segment amount)))))
+        (emit-byte segment amount)))))
 
 (eval-when (:compile-toplevel :execute)
   (defun shift-inst-printer-list (subop)
     `((reg/mem ((op (#b1101000 ,subop)))
-	       (:name :tab reg/mem ", 1"))
+               (:name :tab reg/mem ", 1"))
       (reg/mem ((op (#b1101001 ,subop)))
-	       (:name :tab reg/mem ", " 'cl))
+               (:name :tab reg/mem ", " 'cl))
       (reg/mem-imm ((op (#b1100000 ,subop))
-		    (imm nil :type signed-imm-byte))))))
+                    (imm nil :type signed-imm-byte))))))
 
 (define-instruction rol (segment dst amount)
   (:printer-list
@@ -1461,10 +1461,10 @@
     (maybe-emit-operand-size-prefix segment size)
     (emit-byte segment #b00001111)
     (emit-byte segment (dpb opcode (byte 1 3)
-			    (if (eq amt :cl) #b10100101 #b10100100)))
+                            (if (eq amt :cl) #b10100101 #b10100100)))
     #+nil
     (emit-ea segment dst src)
-    (emit-ea segment dst (reg-tn-encoding src))	; pw tries this
+    (emit-ea segment dst (reg-tn-encoding src)) ; pw tries this
     (unless (eq amt :cl)
       (emit-byte segment amt))))
 
@@ -1472,9 +1472,9 @@
   (defun double-shift-inst-printer-list (op)
     `(#+nil
       (ext-reg-reg/mem-imm ((op ,(logior op #b10))
-			    (imm nil :type signed-imm-byte)))
+                            (imm nil :type signed-imm-byte)))
       (ext-reg-reg/mem ((op ,(logior op #b10)))
-	 (:name :tab reg/mem ", " reg ", " 'cl)))))
+         (:name :tab reg/mem ", " reg ", " 'cl)))))
 
 (define-instruction shld (segment dst src amt)
   (:declare (type (or (member :cl) (mod 32)) amt))
@@ -1502,28 +1502,28 @@
    (let ((size (matching-operand-size this that)))
      (maybe-emit-operand-size-prefix segment size)
      (flet ((test-immed-and-something (immed something)
-	      (cond ((accumulator-p something)
-		     (emit-byte segment
-				(if (eq size :byte) #b10101000 #b10101001))
-		     (emit-sized-immediate segment size immed))
-		    (t
-		     (emit-byte segment
-				(if (eq size :byte) #b11110110 #b11110111))
-		     (emit-ea segment something #b000)
-		     (emit-sized-immediate segment size immed))))
-	    (test-reg-and-something (reg something)
-	      (emit-byte segment (if (eq size :byte) #b10000100 #b10000101))
-	      (emit-ea segment something (reg-tn-encoding reg))))
+              (cond ((accumulator-p something)
+                     (emit-byte segment
+                                (if (eq size :byte) #b10101000 #b10101001))
+                     (emit-sized-immediate segment size immed))
+                    (t
+                     (emit-byte segment
+                                (if (eq size :byte) #b11110110 #b11110111))
+                     (emit-ea segment something #b000)
+                     (emit-sized-immediate segment size immed))))
+            (test-reg-and-something (reg something)
+              (emit-byte segment (if (eq size :byte) #b10000100 #b10000101))
+              (emit-ea segment something (reg-tn-encoding reg))))
        (cond ((integerp that)
-	      (test-immed-and-something that this))
-	     ((integerp this)
-	      (test-immed-and-something this that))
-	     ((register-p this)
-	      (test-reg-and-something this that))
-	     ((register-p that)
-	      (test-reg-and-something that this))
-	     (t
-	      (error "bogus operands for TEST: ~S and ~S" this that)))))))
+              (test-immed-and-something that this))
+             ((integerp this)
+              (test-immed-and-something this that))
+             ((register-p this)
+              (test-reg-and-something this that))
+             ((register-p that)
+              (test-reg-and-something that this))
+             (t
+              (error "bogus operands for TEST: ~S and ~S" this that)))))))
 
 (define-instruction or (segment dst src)
   (:printer-list
@@ -1650,12 +1650,12 @@
     (maybe-emit-operand-size-prefix segment size)
     (emit-byte segment #b00001111)
     (cond ((integerp index)
-	   (emit-byte segment #b10111010)
-	   (emit-ea segment src opcode)
-	   (emit-byte segment index))
-	  (t
-	   (emit-byte segment (dpb opcode (byte 3 3) #b10000011))
-	   (emit-ea segment src (reg-tn-encoding index))))))
+           (emit-byte segment #b10111010)
+           (emit-ea segment src opcode)
+           (emit-byte segment index))
+          (t
+           (emit-byte segment (dpb opcode (byte 3 3) #b10000011))
+           (emit-ea segment src (reg-tn-encoding index))))))
 
 (eval-when (:compile-toplevel :execute)
   (defun bit-test-inst-printer-list (subop)
@@ -1698,11 +1698,11 @@
      (label
       (emit-byte segment #b11101000)
       (emit-back-patch segment
-		       4
-		       (lambda (segment posn)
-			 (emit-dword segment
-				     (- (label-position where)
-					(+ posn 4))))))
+                       4
+                       (lambda (segment posn)
+                         (emit-dword segment
+                                     (- (label-position where)
+                                        (+ posn 4))))))
      (fixup
       (emit-byte segment #b11101000)
       (emit-relative-fixup segment where))
@@ -1712,11 +1712,11 @@
 
 (defun emit-byte-displacement-backpatch (segment target)
   (emit-back-patch segment
-		   1
-		   (lambda (segment posn)
-		     (let ((disp (- (label-position target) (1+ posn))))
-		       (aver (<= -128 disp 127))
-		       (emit-byte segment disp)))))
+                   1
+                   (lambda (segment posn)
+                     (let ((disp (- (label-position target) (1+ posn))))
+                       (aver (<= -128 disp 127))
+                       (emit-byte segment disp)))))
 
 (define-instruction jmp (segment cond &optional where)
   ;; conditional jumps
@@ -1728,48 +1728,48 @@
   (:printer reg/mem ((op '(#b1111111 #b100)) (width 1)))
   (:emitter
    (cond (where
-	  (emit-chooser
-	   segment 6 2
-	   (lambda (segment posn delta-if-after)
-	     (let ((disp (- (label-position where posn delta-if-after)
-			    (+ posn 2))))
-	       (when (<= -128 disp 127)
-		 (emit-byte segment
-			    (dpb (conditional-opcode cond)
-				 (byte 4 0)
-				 #b01110000))
-		 (emit-byte-displacement-backpatch segment where)
-		 t)))
-	   (lambda (segment posn)
-	     (let ((disp (- (label-position where) (+ posn 6))))
-	       (emit-byte segment #b00001111)
-	       (emit-byte segment
-			  (dpb (conditional-opcode cond)
-			       (byte 4 0)
-			       #b10000000))
-	       (emit-dword segment disp)))))
-	 ((label-p (setq where cond))
-	  (emit-chooser
-	   segment 5 0
-	   (lambda (segment posn delta-if-after)
-	     (let ((disp (- (label-position where posn delta-if-after)
-			    (+ posn 2))))
-	       (when (<= -128 disp 127)
-		 (emit-byte segment #b11101011)
-		 (emit-byte-displacement-backpatch segment where)
-		 t)))
-	   (lambda (segment posn)
-	     (let ((disp (- (label-position where) (+ posn 5))))
-	       (emit-byte segment #b11101001)
-	       (emit-dword segment disp)))))
-	 ((fixup-p where)
-	  (emit-byte segment #b11101001)
-	  (emit-relative-fixup segment where))
-	 (t
-	  (unless (or (ea-p where) (tn-p where))
-		  (error "don't know what to do with ~A" where))
-	  (emit-byte segment #b11111111)
-	  (emit-ea segment where #b100)))))
+          (emit-chooser
+           segment 6 2
+           (lambda (segment posn delta-if-after)
+             (let ((disp (- (label-position where posn delta-if-after)
+                            (+ posn 2))))
+               (when (<= -128 disp 127)
+                 (emit-byte segment
+                            (dpb (conditional-opcode cond)
+                                 (byte 4 0)
+                                 #b01110000))
+                 (emit-byte-displacement-backpatch segment where)
+                 t)))
+           (lambda (segment posn)
+             (let ((disp (- (label-position where) (+ posn 6))))
+               (emit-byte segment #b00001111)
+               (emit-byte segment
+                          (dpb (conditional-opcode cond)
+                               (byte 4 0)
+                               #b10000000))
+               (emit-dword segment disp)))))
+         ((label-p (setq where cond))
+          (emit-chooser
+           segment 5 0
+           (lambda (segment posn delta-if-after)
+             (let ((disp (- (label-position where posn delta-if-after)
+                            (+ posn 2))))
+               (when (<= -128 disp 127)
+                 (emit-byte segment #b11101011)
+                 (emit-byte-displacement-backpatch segment where)
+                 t)))
+           (lambda (segment posn)
+             (let ((disp (- (label-position where) (+ posn 5))))
+               (emit-byte segment #b11101001)
+               (emit-dword segment disp)))))
+         ((fixup-p where)
+          (emit-byte segment #b11101001)
+          (emit-relative-fixup segment where))
+         (t
+          (unless (or (ea-p where) (tn-p where))
+                  (error "don't know what to do with ~A" where))
+          (emit-byte segment #b11111111)
+          (emit-ea segment where #b100)))))
 
 (define-instruction jmp-short (segment label)
   (:emitter
@@ -1779,13 +1779,13 @@
 (define-instruction ret (segment &optional stack-delta)
   (:printer byte ((op #b11000011)))
   (:printer byte ((op #b11000010) (imm nil :type 'imm-word-16))
-	    '(:name :tab imm))
+            '(:name :tab imm))
   (:emitter
    (cond (stack-delta
-	  (emit-byte segment #b11000010)
-	  (emit-word segment stack-delta))
-	 (t
-	  (emit-byte segment #b11000011)))))
+          (emit-byte segment #b11000010)
+          (emit-word segment stack-delta))
+         (t
+          (emit-byte segment #b11000011)))))
 
 (define-instruction jecxz (segment target)
   (:printer short-jump ((op #b0011)))
@@ -1796,7 +1796,7 @@
 (define-instruction loop (segment target)
   (:printer short-jump ((op #b0010)))
   (:emitter
-   (emit-byte segment #b11100010)	; pfw this was 11100011, or jecxz!!!!
+   (emit-byte segment #b11100010)       ; pfw this was 11100011, or jecxz!!!!
    (emit-byte-displacement-backpatch segment target)))
 
 (define-instruction loopz (segment target)
@@ -1836,7 +1836,7 @@
 
 (define-instruction enter (segment disp &optional (level 0))
   (:declare (type (unsigned-byte 16) disp)
-	    (type (unsigned-byte 8) level))
+            (type (unsigned-byte 8) level))
   (:printer enter-format ((op #b11001000)))
   (:emitter
    (emit-byte segment #b11001000)
@@ -1889,40 +1889,40 @@
 
 (defun snarf-error-junk (sap offset &optional length-only)
   (let* ((length (sb!sys:sap-ref-8 sap offset))
-	 (vector (make-array length :element-type '(unsigned-byte 8))))
+         (vector (make-array length :element-type '(unsigned-byte 8))))
     (declare (type sb!sys:system-area-pointer sap)
-	     (type (unsigned-byte 8) length)
-	     (type (simple-array (unsigned-byte 8) (*)) vector))
+             (type (unsigned-byte 8) length)
+             (type (simple-array (unsigned-byte 8) (*)) vector))
     (cond (length-only
-	   (values 0 (1+ length) nil nil))
-	  (t
-	   (sb!kernel:copy-ub8-from-system-area sap (1+ offset)
+           (values 0 (1+ length) nil nil))
+          (t
+           (sb!kernel:copy-ub8-from-system-area sap (1+ offset)
                                                 vector 0 length)
-	   (collect ((sc-offsets)
-		     (lengths))
-	     (lengths 1)		; the length byte
-	     (let* ((index 0)
-		    (error-number (sb!c:read-var-integer vector index)))
-	       (lengths index)
-	       (loop
-		 (when (>= index length)
-		   (return))
-		 (let ((old-index index))
-		   (sc-offsets (sb!c:read-var-integer vector index))
-		   (lengths (- index old-index))))
-	       (values error-number
-		       (1+ length)
-		       (sc-offsets)
-		       (lengths))))))))
+           (collect ((sc-offsets)
+                     (lengths))
+             (lengths 1)                ; the length byte
+             (let* ((index 0)
+                    (error-number (sb!c:read-var-integer vector index)))
+               (lengths index)
+               (loop
+                 (when (>= index length)
+                   (return))
+                 (let ((old-index index))
+                   (sc-offsets (sb!c:read-var-integer vector index))
+                   (lengths (- index old-index))))
+               (values error-number
+                       (1+ length)
+                       (sc-offsets)
+                       (lengths))))))))
 
 #|
 (defmacro break-cases (breaknum &body cases)
   (let ((bn-temp (gensym)))
     (collect ((clauses))
       (dolist (case cases)
-	(clauses `((= ,bn-temp ,(car case)) ,@(cdr case))))
+        (clauses `((= ,bn-temp ,(car case)) ,@(cdr case))))
       `(let ((,bn-temp ,breaknum))
-	 (cond ,@(clauses))))))
+         (cond ,@(clauses))))))
 |#
 
 (defun break-control (chunk inst stream dstate)
@@ -1952,7 +1952,7 @@
 (define-instruction break (segment code)
   (:declare (type (unsigned-byte 8) code))
   (:printer byte-imm ((op #b11001100)) '(:name :tab code)
-	    :control #'break-control)
+            :control #'break-control)
   (:emitter
    (emit-byte segment #b11001100)
    (emit-byte segment code)))
@@ -2025,14 +2025,14 @@
 
 (defun emit-header-data (segment type)
   (emit-back-patch segment
-		   4
-		   (lambda (segment posn)
-		     (emit-dword segment
-				 (logior type
-					 (ash (+ posn
-						 (component-header-length))
-					      (- n-widetag-bits
-						 word-shift)))))))
+                   4
+                   (lambda (segment posn)
+                     (emit-dword segment
+                                 (logior type
+                                         (ash (+ posn
+                                                 (component-header-length))
+                                              (- n-widetag-bits
+                                                 word-shift)))))))
 
 (define-instruction simple-fun-header-word (segment)
   (:emitter
@@ -2078,11 +2078,11 @@
   (:printer floating-point ((op '(#b001 #b010))))
   (:emitter
     (cond ((fp-reg-tn-p dest)
-	   (emit-byte segment #b11011101)
-	   (emit-fp-op segment dest #b010))
-	  (t
-	   (emit-byte segment #b11011001)
-	   (emit-fp-op segment dest #b010)))))
+           (emit-byte segment #b11011101)
+           (emit-fp-op segment dest #b010))
+          (t
+           (emit-byte segment #b11011001)
+           (emit-fp-op segment dest #b010)))))
 
 ;;; Store double from st(0).
 (define-instruction fstd (segment dest)
@@ -2090,11 +2090,11 @@
   (:printer floating-point-fp ((op '(#b101 #b010))))
   (:emitter
    (cond ((fp-reg-tn-p dest)
-	  (emit-byte segment #b11011101)
-	  (emit-fp-op segment dest #b010))
-	 (t
-	  (emit-byte segment #b11011101)
-	  (emit-fp-op segment dest #b010)))))
+          (emit-byte segment #b11011101)
+          (emit-fp-op segment dest #b010))
+         (t
+          (emit-byte segment #b11011101)
+          (emit-fp-op segment dest #b010)))))
 
 ;;; Arithmetic ops are all done with at least one operand at top of
 ;;; stack. The other operand is is another register or a 32/64 bit
@@ -2330,7 +2330,7 @@
   (:printer floating-point-fp ((op '(#b001 #b001))))
   (:emitter
     (unless (and (tn-p source)
-		 (eq (sb-name (sc-sb (tn-sc source))) 'float-registers))
+                 (eq (sb-name (sc-sb (tn-sc source))) 'float-registers))
       (cl:break))
     (emit-byte segment #b11011001)
     (emit-fp-op segment source #b001)))
@@ -2375,11 +2375,11 @@
   (:printer floating-point ((op '(#b001 #b011))))
   (:emitter
    (cond ((fp-reg-tn-p dest)
-	  (emit-byte segment #b11011101)
-	  (emit-fp-op segment dest #b011))
-	 (t
-	  (emit-byte segment #b11011001)
-	  (emit-fp-op segment dest #b011)))))
+          (emit-byte segment #b11011101)
+          (emit-fp-op segment dest #b011))
+         (t
+          (emit-byte segment #b11011001)
+          (emit-fp-op segment dest #b011)))))
 
 ;;; Store double from st(0) and pop.
 (define-instruction fstpd (segment dest)
@@ -2387,11 +2387,11 @@
   (:printer floating-point-fp ((op '(#b101 #b011))))
   (:emitter
    (cond ((fp-reg-tn-p dest)
-	  (emit-byte segment #b11011101)
-	  (emit-fp-op segment dest #b011))
-	 (t
-	  (emit-byte segment #b11011101)
-	  (emit-fp-op segment dest #b011)))))
+          (emit-byte segment #b11011101)
+          (emit-fp-op segment dest #b011))
+         (t
+          (emit-byte segment #b11011101)
+          (emit-fp-op segment dest #b011)))))
 
 ;;; Store long from st(0) and pop.
 (define-instruction fstpl (segment dest)
@@ -2595,7 +2595,7 @@
 ;;; in any VOPs that use them. See the book.
 
 ;;; st0 <- st1*log2(st0)
-(define-instruction fyl2x(segment)	; pops stack
+(define-instruction fyl2x(segment)      ; pops stack
   (:printer floating-point-no ((op #b10001)))
   (:emitter
    (emit-byte segment #b11011001)
@@ -2613,13 +2613,13 @@
    (emit-byte segment #b11011001)
    (emit-byte segment #b11110000)))
 
-(define-instruction fptan(segment)	; st(0) <- 1; st(1) <- tan
+(define-instruction fptan(segment)      ; st(0) <- 1; st(1) <- tan
   (:printer floating-point-no ((op #b10010)))
   (:emitter
    (emit-byte segment #b11011001)
    (emit-byte segment #b11110010)))
 
-(define-instruction fpatan(segment)	; POPS STACK
+(define-instruction fpatan(segment)     ; POPS STACK
   (:printer floating-point-no ((op #b10011)))
   (:emitter
    (emit-byte segment #b11011001)

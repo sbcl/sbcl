@@ -24,59 +24,59 @@
 ;;; :QWORD and a corresponding size indicator is printed first.
 (defun print-mem-access (value width stream dstate)
   (declare (type list value)
-	   (type (member nil :byte :word :dword :qword) width)
-	   (type stream stream)
-	   (type sb!disassem:disassem-state dstate))
+           (type (member nil :byte :word :dword :qword) width)
+           (type stream stream)
+           (type sb!disassem:disassem-state dstate))
   (when width
     (princ width stream)
     (princ '| PTR | stream))
   (write-char #\[ stream)
   (let ((firstp t) (rip-p nil))
     (macrolet ((pel ((var val) &body body)
-		 ;; Print an element of the address, maybe with
-		 ;; a leading separator.
-		 `(let ((,var ,val))
-		    (when ,var
-		      (unless firstp
-			(write-char #\+ stream))
-		      ,@body
-		      (setq firstp nil)))))
+                 ;; Print an element of the address, maybe with
+                 ;; a leading separator.
+                 `(let ((,var ,val))
+                    (when ,var
+                      (unless firstp
+                        (write-char #\+ stream))
+                      ,@body
+                      (setq firstp nil)))))
       (pel (base-reg (first value))
-	(cond ((eql 'rip base-reg)
-	       (setf rip-p t)
-	       (princ base-reg stream))
-	      (t
-	       (print-addr-reg base-reg stream dstate))))
+        (cond ((eql 'rip base-reg)
+               (setf rip-p t)
+               (princ base-reg stream))
+              (t
+               (print-addr-reg base-reg stream dstate))))
       (pel (index-reg (third value))
-	(print-addr-reg index-reg stream dstate)
-	(let ((index-scale (fourth value)))
-	  (when (and index-scale (not (= index-scale 1)))
-	    (write-char #\* stream)
-	    (princ index-scale stream))))
+        (print-addr-reg index-reg stream dstate)
+        (let ((index-scale (fourth value)))
+          (when (and index-scale (not (= index-scale 1)))
+            (write-char #\* stream)
+            (princ index-scale stream))))
       (let ((offset (second value)))
-	(when (and offset (or firstp (not (zerop offset))))
-	  (unless (or firstp (minusp offset))
-	    (write-char #\+ stream))
-	  (cond
-	    (rip-p
-	     (princ offset stream)
-	     (let ((addr (+ offset (sb!disassem:dstate-next-addr dstate))))
-	       (when (plusp addr)
-		 (or (nth-value 1
-				(sb!disassem::note-code-constant-absolute
-				 addr dstate))
-		     (sb!disassem:maybe-note-assembler-routine addr
-							       nil
-							       dstate)))))
-	    (firstp
-	     (progn
-	       (sb!disassem:princ16 offset stream)
-	       (or (minusp offset)
-		   (nth-value 1
-			      (sb!disassem::note-code-constant-absolute offset dstate))
-		   (sb!disassem:maybe-note-assembler-routine offset
-							     nil
-							     dstate))))
+        (when (and offset (or firstp (not (zerop offset))))
+          (unless (or firstp (minusp offset))
+            (write-char #\+ stream))
+          (cond
+            (rip-p
+             (princ offset stream)
+             (let ((addr (+ offset (sb!disassem:dstate-next-addr dstate))))
+               (when (plusp addr)
+                 (or (nth-value 1
+                                (sb!disassem::note-code-constant-absolute
+                                 addr dstate))
+                     (sb!disassem:maybe-note-assembler-routine addr
+                                                               nil
+                                                               dstate)))))
+            (firstp
+             (progn
+               (sb!disassem:princ16 offset stream)
+               (or (minusp offset)
+                   (nth-value 1
+                              (sb!disassem::note-code-constant-absolute offset dstate))
+                   (sb!disassem:maybe-note-assembler-routine offset
+                                                             nil
+                                                             dstate))))
             (t
              (princ offset stream)))))))
   (write-char #\] stream))

@@ -38,10 +38,10 @@
 ;;; Move untagged sap values.
 (define-vop (sap-move)
   (:args (x :target y
-	    :scs (sap-reg)
-	    :load-if (not (location= x y))))
+            :scs (sap-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (sap-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:note "SAP move")
   (:effects)
   (:affected)
@@ -53,9 +53,9 @@
 ;;; Move untagged sap arguments/return-values.
 (define-vop (move-sap-arg)
   (:args (x :target y
-	    :scs (sap-reg))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y sap-reg))))
+            :scs (sap-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y sap-reg))))
   (:results (y))
   (:note "SAP argument move")
   (:generator 0
@@ -64,8 +64,8 @@
        (move y x))
       (sap-stack
        (if (= (tn-offset fp) esp-offset)
-	   (storew x fp (tn-offset y))	; c-call
-	   (storew x fp (- (1+ (tn-offset y)))))))))
+           (storew x fp (tn-offset y))  ; c-call
+           (storew x fp (- (1+ (tn-offset y)))))))))
 (define-move-vop move-sap-arg :move-arg
   (descriptor-reg sap-reg) (sap-reg))
 
@@ -106,34 +106,34 @@
 (define-vop (pointer+)
   (:translate sap+)
   (:args (ptr :scs (sap-reg) :target res
-	      :load-if (not (location= ptr res)))
-	 (offset :scs (signed-reg immediate)))
+              :load-if (not (location= ptr res)))
+         (offset :scs (signed-reg immediate)))
   (:arg-types system-area-pointer signed-num)
   (:results (res :scs (sap-reg) :from (:argument 0)
-		 :load-if (not (location= ptr res))))
+                 :load-if (not (location= ptr res))))
   (:result-types system-area-pointer)
   (:policy :fast-safe)
   (:generator 1
     (cond ((and (sc-is ptr sap-reg) (sc-is res sap-reg)
-		(not (location= ptr res)))
-	   (sc-case offset
-	     (signed-reg
-	      (inst lea res (make-ea :dword :base ptr :index offset :scale 1)))
-	     (immediate
-	      (inst lea res (make-ea :dword :base ptr
-				     :disp (tn-value offset))))))
-	  (t
-	   (move res ptr)
-	   (sc-case offset
-	     (signed-reg
-	      (inst add res offset))
-	     (immediate
-	      (inst add res (tn-value offset))))))))
+                (not (location= ptr res)))
+           (sc-case offset
+             (signed-reg
+              (inst lea res (make-ea :dword :base ptr :index offset :scale 1)))
+             (immediate
+              (inst lea res (make-ea :dword :base ptr
+                                     :disp (tn-value offset))))))
+          (t
+           (move res ptr)
+           (sc-case offset
+             (signed-reg
+              (inst add res offset))
+             (immediate
+              (inst add res (tn-value offset))))))))
 
 (define-vop (pointer-)
   (:translate sap-)
   (:args (ptr1 :scs (sap-reg) :target res)
-	 (ptr2 :scs (sap-reg)))
+         (ptr2 :scs (sap-reg)))
   (:arg-types system-area-pointer system-area-pointer)
   (:policy :fast-safe)
   (:results (res :scs (signed-reg) :from (:argument 0)))
@@ -145,107 +145,107 @@
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 
 (macrolet ((def-system-ref-and-set (ref-name
-				    set-name
-				    sc
-				    type
-				    size
-				    &optional signed)
-	     (let ((ref-name-c (symbolicate ref-name "-C"))
-		   (set-name-c (symbolicate set-name "-C"))
-		   (temp-sc (symbolicate size "-REG")))
-	       `(progn
-		  (define-vop (,ref-name)
-		    (:translate ,ref-name)
-		    (:policy :fast-safe)
-		    (:args (sap :scs (sap-reg))
-			   (offset :scs (signed-reg)))
-		    (:arg-types system-area-pointer signed-num)
-		    ,@(unless (eq size :dword)
-			`((:temporary (:sc ,temp-sc
-				       :from (:eval 0)
-				       :to (:eval 1))
-				      temp)))
-		    (:results (result :scs (,sc)))
-		    (:result-types ,type)
-		    (:generator 5
-				(inst mov ,(if (eq size :dword) 'result 'temp)
-				      (make-ea ,size :base sap :index offset))
-				,@(unless (eq size :dword)
-				    `((inst ,(if signed 'movsx 'movzx)
-					    result temp)))))
-		  (define-vop (,ref-name-c)
-		    (:translate ,ref-name)
-		    (:policy :fast-safe)
-		    (:args (sap :scs (sap-reg)))
-		    (:arg-types system-area-pointer
-				(:constant (signed-byte 32)))
-		    (:info offset)
-		    ,@(unless (eq size :dword)
-			`((:temporary (:sc ,temp-sc
-				       :from (:eval 0)
-				       :to (:eval 1))
-				      temp)))
-		    (:results (result :scs (,sc)))
-		    (:result-types ,type)
-		    (:generator 4
-				(inst mov ,(if (eq size :dword) 'result 'temp)
-				      (make-ea ,size :base sap :disp offset))
-				,@(unless (eq size :dword)
-				    `((inst ,(if signed 'movsx 'movzx)
-					    result temp)))))
-		  (define-vop (,set-name)
-		    (:translate ,set-name)
-		    (:policy :fast-safe)
-		    (:args (sap :scs (sap-reg) :to (:eval 0))
-			   (offset :scs (signed-reg) :to (:eval 0))
-			   (value :scs (,sc)
-				  :target ,(if (eq size :dword)
-					       'result
-					       'temp)))
-		    (:arg-types system-area-pointer signed-num ,type)
-		    ,@(unless (eq size :dword)
-			`((:temporary (:sc ,temp-sc :offset eax-offset
-					   :from (:argument 2) :to (:result 0)
-					   :target result)
-				      temp)))
-		    (:results (result :scs (,sc)))
-		    (:result-types ,type)
-		    (:generator 5
-				,@(unless (eq size :dword)
-				    `((move eax-tn value)))
-				(inst mov (make-ea ,size
-						   :base sap
-						   :index offset)
-				      ,(if (eq size :dword) 'value 'temp))
-				(move result
-				      ,(if (eq size :dword) 'value 'eax-tn))))
-		  (define-vop (,set-name-c)
-		    (:translate ,set-name)
-		    (:policy :fast-safe)
-		    (:args (sap :scs (sap-reg) :to (:eval 0))
-			   (value :scs (,sc)
-				  :target ,(if (eq size :dword)
-					       'result
-					       'temp)))
-		    (:arg-types system-area-pointer
-				(:constant (signed-byte 32)) ,type)
-		    (:info offset)
-		    ,@(unless (eq size :dword)
-			`((:temporary (:sc ,temp-sc :offset eax-offset
-					   :from (:argument 2) :to (:result 0)
-					   :target result)
-				      temp)))
-		    (:results (result :scs (,sc)))
-		    (:result-types ,type)
-		    (:generator 4
-				,@(unless (eq size :dword)
-				    `((move eax-tn value)))
-				(inst mov
-				      (make-ea ,size :base sap :disp offset)
-				      ,(if (eq size :dword) 'value 'temp))
-				(move result ,(if (eq size :dword)
-						  'value
-						  'eax-tn))))))))
+                                    set-name
+                                    sc
+                                    type
+                                    size
+                                    &optional signed)
+             (let ((ref-name-c (symbolicate ref-name "-C"))
+                   (set-name-c (symbolicate set-name "-C"))
+                   (temp-sc (symbolicate size "-REG")))
+               `(progn
+                  (define-vop (,ref-name)
+                    (:translate ,ref-name)
+                    (:policy :fast-safe)
+                    (:args (sap :scs (sap-reg))
+                           (offset :scs (signed-reg)))
+                    (:arg-types system-area-pointer signed-num)
+                    ,@(unless (eq size :dword)
+                        `((:temporary (:sc ,temp-sc
+                                       :from (:eval 0)
+                                       :to (:eval 1))
+                                      temp)))
+                    (:results (result :scs (,sc)))
+                    (:result-types ,type)
+                    (:generator 5
+                                (inst mov ,(if (eq size :dword) 'result 'temp)
+                                      (make-ea ,size :base sap :index offset))
+                                ,@(unless (eq size :dword)
+                                    `((inst ,(if signed 'movsx 'movzx)
+                                            result temp)))))
+                  (define-vop (,ref-name-c)
+                    (:translate ,ref-name)
+                    (:policy :fast-safe)
+                    (:args (sap :scs (sap-reg)))
+                    (:arg-types system-area-pointer
+                                (:constant (signed-byte 32)))
+                    (:info offset)
+                    ,@(unless (eq size :dword)
+                        `((:temporary (:sc ,temp-sc
+                                       :from (:eval 0)
+                                       :to (:eval 1))
+                                      temp)))
+                    (:results (result :scs (,sc)))
+                    (:result-types ,type)
+                    (:generator 4
+                                (inst mov ,(if (eq size :dword) 'result 'temp)
+                                      (make-ea ,size :base sap :disp offset))
+                                ,@(unless (eq size :dword)
+                                    `((inst ,(if signed 'movsx 'movzx)
+                                            result temp)))))
+                  (define-vop (,set-name)
+                    (:translate ,set-name)
+                    (:policy :fast-safe)
+                    (:args (sap :scs (sap-reg) :to (:eval 0))
+                           (offset :scs (signed-reg) :to (:eval 0))
+                           (value :scs (,sc)
+                                  :target ,(if (eq size :dword)
+                                               'result
+                                               'temp)))
+                    (:arg-types system-area-pointer signed-num ,type)
+                    ,@(unless (eq size :dword)
+                        `((:temporary (:sc ,temp-sc :offset eax-offset
+                                           :from (:argument 2) :to (:result 0)
+                                           :target result)
+                                      temp)))
+                    (:results (result :scs (,sc)))
+                    (:result-types ,type)
+                    (:generator 5
+                                ,@(unless (eq size :dword)
+                                    `((move eax-tn value)))
+                                (inst mov (make-ea ,size
+                                                   :base sap
+                                                   :index offset)
+                                      ,(if (eq size :dword) 'value 'temp))
+                                (move result
+                                      ,(if (eq size :dword) 'value 'eax-tn))))
+                  (define-vop (,set-name-c)
+                    (:translate ,set-name)
+                    (:policy :fast-safe)
+                    (:args (sap :scs (sap-reg) :to (:eval 0))
+                           (value :scs (,sc)
+                                  :target ,(if (eq size :dword)
+                                               'result
+                                               'temp)))
+                    (:arg-types system-area-pointer
+                                (:constant (signed-byte 32)) ,type)
+                    (:info offset)
+                    ,@(unless (eq size :dword)
+                        `((:temporary (:sc ,temp-sc :offset eax-offset
+                                           :from (:argument 2) :to (:result 0)
+                                           :target result)
+                                      temp)))
+                    (:results (result :scs (,sc)))
+                    (:result-types ,type)
+                    (:generator 4
+                                ,@(unless (eq size :dword)
+                                    `((move eax-tn value)))
+                                (inst mov
+                                      (make-ea ,size :base sap :disp offset)
+                                      ,(if (eq size :dword) 'value 'temp))
+                                (move result ,(if (eq size :dword)
+                                                  'value
+                                                  'eax-tn))))))))
 
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8
     unsigned-reg positive-fixnum :byte nil)
@@ -268,13 +268,13 @@
   (:translate sap-ref-double)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
-	 (offset :scs (signed-reg)))
+         (offset :scs (signed-reg)))
   (:arg-types system-area-pointer signed-num)
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 5
      (with-empty-tn@fp-top(result)
-	(inst fldd (make-ea :dword :base sap :index offset)))))
+        (inst fldd (make-ea :dword :base sap :index offset)))))
 
 (define-vop (sap-ref-double-c)
   (:translate sap-ref-double)
@@ -286,65 +286,65 @@
   (:result-types double-float)
   (:generator 4
      (with-empty-tn@fp-top(result)
-	(inst fldd (make-ea :dword :base sap :disp offset)))))
+        (inst fldd (make-ea :dword :base sap :disp offset)))))
 
 (define-vop (%set-sap-ref-double)
   (:translate %set-sap-ref-double)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to (:eval 0))
-	 (offset :scs (signed-reg) :to (:eval 0))
-	 (value :scs (double-reg)))
+         (offset :scs (signed-reg) :to (:eval 0))
+         (value :scs (double-reg)))
   (:arg-types system-area-pointer signed-num double-float)
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 5
     (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0.
-	   (inst fstd (make-ea :dword :base sap :index offset))
-	   (unless (zerop (tn-offset result))
-		   ;; Value is in ST0 but not result.
-		   (inst fstd result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (inst fstd (make-ea :dword :base sap :index offset))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fstd value))
-		 (t
-		  ;; Neither value or result are in ST0.
-		  (unless (location= value result)
-			  (inst fstd result))
-		  (inst fxch value)))))))
+           ;; Value is in ST0.
+           (inst fstd (make-ea :dword :base sap :index offset))
+           (unless (zerop (tn-offset result))
+                   ;; Value is in ST0 but not result.
+                   (inst fstd result)))
+          (t
+           ;; Value is not in ST0.
+           (inst fxch value)
+           (inst fstd (make-ea :dword :base sap :index offset))
+           (cond ((zerop (tn-offset result))
+                  ;; The result is in ST0.
+                  (inst fstd value))
+                 (t
+                  ;; Neither value or result are in ST0.
+                  (unless (location= value result)
+                          (inst fstd result))
+                  (inst fxch value)))))))
 
 (define-vop (%set-sap-ref-double-c)
   (:translate %set-sap-ref-double)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to (:eval 0))
-	 (value :scs (double-reg)))
+         (value :scs (double-reg)))
   (:arg-types system-area-pointer (:constant (signed-byte 32)) double-float)
   (:info offset)
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 4
     (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0.
-	   (inst fstd (make-ea :dword :base sap :disp offset))
-	   (unless (zerop (tn-offset result))
-		   ;; Value is in ST0 but not result.
-		   (inst fstd result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (inst fstd (make-ea :dword :base sap :disp offset))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fstd value))
-		 (t
-		  ;; Neither value or result are in ST0.
-		  (unless (location= value result)
-			  (inst fstd result))
-		  (inst fxch value)))))))
+           ;; Value is in ST0.
+           (inst fstd (make-ea :dword :base sap :disp offset))
+           (unless (zerop (tn-offset result))
+                   ;; Value is in ST0 but not result.
+                   (inst fstd result)))
+          (t
+           ;; Value is not in ST0.
+           (inst fxch value)
+           (inst fstd (make-ea :dword :base sap :disp offset))
+           (cond ((zerop (tn-offset result))
+                  ;; The result is in ST0.
+                  (inst fstd value))
+                 (t
+                  ;; Neither value or result are in ST0.
+                  (unless (location= value result)
+                          (inst fstd result))
+                  (inst fxch value)))))))
 
 ;;;; SAP-REF-SINGLE
 
@@ -352,13 +352,13 @@
   (:translate sap-ref-single)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
-	 (offset :scs (signed-reg)))
+         (offset :scs (signed-reg)))
   (:arg-types system-area-pointer signed-num)
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 5
      (with-empty-tn@fp-top(result)
-	(inst fld (make-ea :dword :base sap :index offset)))))
+        (inst fld (make-ea :dword :base sap :index offset)))))
 
 (define-vop (sap-ref-single-c)
   (:translate sap-ref-single)
@@ -370,65 +370,65 @@
   (:result-types single-float)
   (:generator 4
      (with-empty-tn@fp-top(result)
-	(inst fld (make-ea :dword :base sap :disp offset)))))
+        (inst fld (make-ea :dword :base sap :disp offset)))))
 
 (define-vop (%set-sap-ref-single)
   (:translate %set-sap-ref-single)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to (:eval 0))
-	 (offset :scs (signed-reg) :to (:eval 0))
-	 (value :scs (single-reg)))
+         (offset :scs (signed-reg) :to (:eval 0))
+         (value :scs (single-reg)))
   (:arg-types system-area-pointer signed-num single-float)
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 5
     (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0
-	   (inst fst (make-ea :dword :base sap :index offset))
-	   (unless (zerop (tn-offset result))
-		   ;; Value is in ST0 but not result.
-		   (inst fst result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (inst fst (make-ea :dword :base sap :index offset))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fst value))
-		 (t
-		  ;; Neither value or result are in ST0
-		  (unless (location= value result)
-			  (inst fst result))
-		  (inst fxch value)))))))
+           ;; Value is in ST0
+           (inst fst (make-ea :dword :base sap :index offset))
+           (unless (zerop (tn-offset result))
+                   ;; Value is in ST0 but not result.
+                   (inst fst result)))
+          (t
+           ;; Value is not in ST0.
+           (inst fxch value)
+           (inst fst (make-ea :dword :base sap :index offset))
+           (cond ((zerop (tn-offset result))
+                  ;; The result is in ST0.
+                  (inst fst value))
+                 (t
+                  ;; Neither value or result are in ST0
+                  (unless (location= value result)
+                          (inst fst result))
+                  (inst fxch value)))))))
 
 (define-vop (%set-sap-ref-single-c)
   (:translate %set-sap-ref-single)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to (:eval 0))
-	 (value :scs (single-reg)))
+         (value :scs (single-reg)))
   (:arg-types system-area-pointer (:constant (signed-byte 32)) single-float)
   (:info offset)
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 4
     (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0
-	   (inst fst (make-ea :dword :base sap :disp offset))
-	   (unless (zerop (tn-offset result))
-		   ;; Value is in ST0 but not result.
-		   (inst fst result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (inst fst (make-ea :dword :base sap :disp offset))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fst value))
-		 (t
-		  ;; Neither value or result are in ST0
-		  (unless (location= value result)
-			  (inst fst result))
-		  (inst fxch value)))))))
+           ;; Value is in ST0
+           (inst fst (make-ea :dword :base sap :disp offset))
+           (unless (zerop (tn-offset result))
+                   ;; Value is in ST0 but not result.
+                   (inst fst result)))
+          (t
+           ;; Value is not in ST0.
+           (inst fxch value)
+           (inst fst (make-ea :dword :base sap :disp offset))
+           (cond ((zerop (tn-offset result))
+                  ;; The result is in ST0.
+                  (inst fst value))
+                 (t
+                  ;; Neither value or result are in ST0
+                  (unless (location= value result)
+                          (inst fst result))
+                  (inst fxch value)))))))
 
 ;;;; SAP-REF-LONG
 
@@ -436,13 +436,13 @@
   (:translate sap-ref-long)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
-	 (offset :scs (signed-reg)))
+         (offset :scs (signed-reg)))
   (:arg-types system-area-pointer signed-num)
   (:results (result :scs (#!+long-float long-reg #!-long-float double-reg)))
   (:result-types #!+long-float long-float #!-long-float double-float)
   (:generator 5
      (with-empty-tn@fp-top(result)
-	(inst fldl (make-ea :dword :base sap :index offset)))))
+        (inst fldl (make-ea :dword :base sap :index offset)))))
 
 (define-vop (sap-ref-long-c)
   (:translate sap-ref-long)
@@ -454,37 +454,37 @@
   (:result-types #!+long-float long-float #!-long-float double-float)
   (:generator 4
      (with-empty-tn@fp-top(result)
-	(inst fldl (make-ea :dword :base sap :disp offset)))))
+        (inst fldl (make-ea :dword :base sap :disp offset)))))
 
 #!+long-float
 (define-vop (%set-sap-ref-long)
   (:translate %set-sap-ref-long)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to (:eval 0))
-	 (offset :scs (signed-reg) :to (:eval 0))
-	 (value :scs (long-reg)))
+         (offset :scs (signed-reg) :to (:eval 0))
+         (value :scs (long-reg)))
   (:arg-types system-area-pointer signed-num long-float)
   (:results (result :scs (long-reg)))
   (:result-types long-float)
   (:generator 5
     (cond ((zerop (tn-offset value))
-	   ;; Value is in ST0
-	   (store-long-float (make-ea :dword :base sap :index offset))
-	   (unless (zerop (tn-offset result))
-	     ;; Value is in ST0 but not result.
-	     (inst fstd result)))
-	  (t
-	   ;; Value is not in ST0.
-	   (inst fxch value)
-	   (store-long-float (make-ea :dword :base sap :index offset))
-	   (cond ((zerop (tn-offset result))
-		  ;; The result is in ST0.
-		  (inst fstd value))
-		 (t
-		  ;; Neither value or result are in ST0
-		  (unless (location= value result)
-		    (inst fstd result))
-		  (inst fxch value)))))))
+           ;; Value is in ST0
+           (store-long-float (make-ea :dword :base sap :index offset))
+           (unless (zerop (tn-offset result))
+             ;; Value is in ST0 but not result.
+             (inst fstd result)))
+          (t
+           ;; Value is not in ST0.
+           (inst fxch value)
+           (store-long-float (make-ea :dword :base sap :index offset))
+           (cond ((zerop (tn-offset result))
+                  ;; The result is in ST0.
+                  (inst fstd value))
+                 (t
+                  ;; Neither value or result are in ST0
+                  (unless (location= value result)
+                    (inst fstd result))
+                  (inst fxch value)))))))
 
 ;;; noise to convert normal lisp data objects into SAPs
 
@@ -497,8 +497,8 @@
   (:generator 2
     (move sap vector)
     (inst add
-	  sap
-	  (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))))
+          sap
+          (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))))
 
 ;;; Transforms for 64-bit SAP accessors.
 

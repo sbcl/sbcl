@@ -23,30 +23,30 @@
 
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
-	 (value :scs (descriptor-reg any-reg immediate)))
+         (value :scs (descriptor-reg any-reg immediate)))
   (:info name offset lowtag)
   (:ignore name)
   (:results)
   (:generator 1
      (if (sc-is value immediate)
-	(let ((val (tn-value value)))
-	   (etypecase val
-	      (integer
-	       (inst mov
-		     (make-ea :dword :base object
-			      :disp (- (* offset n-word-bytes) lowtag))
-		     (fixnumize val)))
-	      (symbol
-	       (inst mov
-		     (make-ea :dword :base object
-			      :disp (- (* offset n-word-bytes) lowtag))
-		     (+ nil-value (static-symbol-offset val))))
-	      (character
-	       (inst mov
-		     (make-ea :dword :base object
-			      :disp (- (* offset n-word-bytes) lowtag))
-		     (logior (ash (char-code val) n-widetag-bits)
-			     character-widetag)))))
+        (let ((val (tn-value value)))
+           (etypecase val
+              (integer
+               (inst mov
+                     (make-ea :dword :base object
+                              :disp (- (* offset n-word-bytes) lowtag))
+                     (fixnumize val)))
+              (symbol
+               (inst mov
+                     (make-ea :dword :base object
+                              :disp (- (* offset n-word-bytes) lowtag))
+                     (+ nil-value (static-symbol-offset val))))
+              (character
+               (inst mov
+                     (make-ea :dword :base object
+                              :disp (- (* offset n-word-bytes) lowtag))
+                     (logior (ash (char-code val) n-widetag-bits)
+                             character-widetag)))))
        ;; Else, value not immediate.
        (storew value object offset lowtag))))
 
@@ -67,7 +67,7 @@
   ;;(:policy :fast-safe)
   (:generator 4
     (let ((global-val (gen-label))
-	  (done (gen-label)))
+          (done (gen-label)))
       (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
       (inst or tls tls)
       (inst jmp :z global-val)
@@ -82,7 +82,7 @@
       (emit-label done))))
 
 ;; unithreaded it's a lot simpler ...
-#!-sb-thread 
+#!-sb-thread
 (define-vop (set cell-set)
   (:variant symbol-value-slot other-pointer-lowtag))
 
@@ -108,7 +108,7 @@
   (:save-p :compute-only)
   (:generator 9
     (let* ((err-lab (generate-error-code vop unbound-symbol-error object))
-	   (ret-lab (gen-label)))
+           (ret-lab (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst fs-segment-prefix)
       (inst mov value (make-ea :dword :index value :scale 1))
@@ -162,7 +162,7 @@
 
 (define-vop (locked-symbol-global-value-add)
     (:args (object :scs (descriptor-reg) :to :result)
-	   (value :scs (any-reg) :target result))
+           (value :scs (any-reg) :target result))
   (:arg-types * tagged-num)
   (:results (result :scs (any-reg) :from (:argument 1)))
   (:policy :fast)
@@ -173,9 +173,9 @@
     (move result value)
     (inst lock)
     (inst add (make-ea :dword :base object
-		       :disp (- (* symbol-value-slot n-word-bytes)
-				other-pointer-lowtag))
-	  value)))
+                       :disp (- (* symbol-value-slot n-word-bytes)
+                                other-pointer-lowtag))
+          value)))
 
 #!+sb-thread
 (define-vop (boundp)
@@ -187,23 +187,23 @@
   (:temporary (:sc descriptor-reg #+nil(:from (:argument 0))) value)
   (:generator 9
     (if not-p
-	(let ((not-target (gen-label)))
-	  (loadw value object symbol-value-slot other-pointer-lowtag)
-	  (inst cmp value unbound-marker-widetag)
-	  (inst jmp :ne not-target)
-	  (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-	  (inst fs-segment-prefix)
-	  (inst cmp (make-ea :dword :index value :scale 1) unbound-marker-widetag)
-	  (inst jmp  :e  target)
-	  (emit-label not-target))
-	(progn
-	  (loadw value object symbol-value-slot other-pointer-lowtag)
-	  (inst cmp value unbound-marker-widetag)
-	  (inst jmp :ne target)
-	  (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-	  (inst fs-segment-prefix)
-	  (inst cmp (make-ea :dword :index value :scale 1) unbound-marker-widetag)
-	  (inst jmp  :ne  target)))))
+        (let ((not-target (gen-label)))
+          (loadw value object symbol-value-slot other-pointer-lowtag)
+          (inst cmp value unbound-marker-widetag)
+          (inst jmp :ne not-target)
+          (loadw value object symbol-tls-index-slot other-pointer-lowtag)
+          (inst fs-segment-prefix)
+          (inst cmp (make-ea :dword :index value :scale 1) unbound-marker-widetag)
+          (inst jmp  :e  target)
+          (emit-label not-target))
+        (progn
+          (loadw value object symbol-value-slot other-pointer-lowtag)
+          (inst cmp value unbound-marker-widetag)
+          (inst jmp :ne target)
+          (loadw value object symbol-tls-index-slot other-pointer-lowtag)
+          (inst fs-segment-prefix)
+          (inst cmp (make-ea :dword :index value :scale 1) unbound-marker-widetag)
+          (inst jmp  :ne  target)))))
 
 #!-sb-thread
 (define-vop (boundp)
@@ -235,7 +235,7 @@
 
 ;;;; fdefinition (FDEFN) objects
 
-(define-vop (fdefn-fun cell-ref)	; /pfw - alpha
+(define-vop (fdefn-fun cell-ref)        ; /pfw - alpha
   (:variant fdefn-fun-slot other-pointer-lowtag))
 
 (define-vop (safe-fdefn-fun)
@@ -253,16 +253,16 @@
   (:policy :fast-safe)
   (:translate (setf fdefn-fun))
   (:args (function :scs (descriptor-reg) :target result)
-	 (fdefn :scs (descriptor-reg)))
+         (fdefn :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) raw)
   (:temporary (:sc byte-reg) type)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (load-type type function (- fun-pointer-lowtag))
     (inst lea raw
-	  (make-ea :byte :base function
-		   :disp (- (* simple-fun-code-offset n-word-bytes)
-			    fun-pointer-lowtag)))
+          (make-ea :byte :base function
+                   :disp (- (* simple-fun-code-offset n-word-bytes)
+                            fun-pointer-lowtag)))
     (inst cmp type simple-fun-header-widetag)
     (inst jmp :e normal-fn)
     (inst lea raw (make-fixup "closure_tramp" :foreign))
@@ -279,7 +279,7 @@
   (:generator 38
     (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
     (storew (make-fixup "undefined_tramp" :foreign)
-	    fdefn fdefn-raw-addr-slot other-pointer-lowtag)
+            fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result fdefn)))
 
 ;;;; binding and unbinding
@@ -291,7 +291,7 @@
 #!+sb-thread
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
-	 (symbol :scs (descriptor-reg)))
+         (symbol :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) tls-index temp bsp)
   (:generator 5
     (let ((tls-index-valid (gen-label)))
@@ -299,17 +299,17 @@
       (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
       (inst add bsp (* binding-size n-word-bytes))
       (store-tl-symbol-value bsp *binding-stack-pointer* temp)
-      
+
       (inst or tls-index tls-index)
       (inst jmp :ne tls-index-valid)
       ;; allocate a new tls-index
       (load-symbol-value tls-index *free-tls-index*)
-      (inst add tls-index 4)		;XXX surely we can do this more
+      (inst add tls-index 4)            ;XXX surely we can do this more
       (store-symbol-value tls-index *free-tls-index*) ;succintly
       (inst sub tls-index 4)
       (storew tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
       (emit-label tls-index-valid)
-      (inst fs-segment-prefix) 
+      (inst fs-segment-prefix)
       (inst mov temp (make-ea :dword :scale 1 :index tls-index))
       (storew temp bsp (- binding-value-slot binding-size))
       (storew symbol bsp (- binding-symbol-slot binding-size))
@@ -333,14 +333,14 @@
 
 #!+sb-thread
 (define-vop (unbind)
-    ;; four temporaries?   
+    ;; four temporaries?
   (:temporary (:sc unsigned-reg) symbol value bsp tls-index)
   (:generator 0
     (load-tl-symbol-value bsp *binding-stack-pointer*)
     (loadw symbol bsp (- binding-symbol-slot binding-size))
     (loadw value bsp (- binding-value-slot binding-size))
 
-    (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)    
+    (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
     (inst fs-segment-prefix)
     (inst mov (make-ea :dword :scale 1 :index tls-index) value)
 
@@ -378,7 +378,7 @@
     #!-sb-thread (storew value symbol symbol-value-slot other-pointer-lowtag)
 
     #!+sb-thread (loadw
-		  tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+                  tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
     #!+sb-thread (inst fs-segment-prefix)
     #!+sb-thread (inst mov (make-ea :dword :scale 1 :index tls-index) value)
     (storew 0 bsp (- binding-symbol-slot binding-size))
@@ -457,17 +457,17 @@
 
 
 (defknown %instance-set-conditional (instance index t t) t
-	  (unsafe))
+          (unsafe))
 
 (define-vop (instance-set-conditional)
   (:translate %instance-set-conditional)
   (:args (object :scs (descriptor-reg) :to :eval)
-	 (slot :scs (any-reg) :to :result)
-	 (old-value :scs (descriptor-reg any-reg) :target eax)
-	 (new-value :scs (descriptor-reg any-reg)))
+         (slot :scs (any-reg) :to :result)
+         (old-value :scs (descriptor-reg any-reg) :target eax)
+         (new-value :scs (descriptor-reg any-reg)))
   (:arg-types instance positive-fixnum * *)
   (:temporary (:sc descriptor-reg :offset eax-offset
-		   :from (:argument 2) :to :result :target result)  eax)
+                   :from (:argument 2) :to :result :target result)  eax)
   (:results (result :scs (descriptor-reg any-reg)))
   ;(:guard (backend-featurep :i486))
   (:policy :fast-safe)
@@ -475,9 +475,9 @@
     (move eax old-value)
     (inst lock)
     (inst cmpxchg (make-ea :dword :base object :index slot :scale 1
-			   :disp (- (* instance-slots-offset n-word-bytes)
-				    instance-pointer-lowtag))
-	  new-value)
+                           :disp (- (* instance-slots-offset n-word-bytes)
+                                    instance-pointer-lowtag))
+          new-value)
     (move result eax)))
 
 
@@ -508,19 +508,19 @@
     (inst shl tmp 2)
     (inst sub tmp index)
     (inst mov
-	  value
-	  (make-ea :dword
-		   :base object
-		   :index tmp
-		   :disp (- (* (1- instance-slots-offset) n-word-bytes)
-			    instance-pointer-lowtag)))))
+          value
+          (make-ea :dword
+                   :base object
+                   :index tmp
+                   :disp (- (* (1- instance-slots-offset) n-word-bytes)
+                            instance-pointer-lowtag)))))
 
 (define-vop (raw-instance-set/word)
   (:translate %raw-instance-set/word)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg))
-	 (value :scs (unsigned-reg) :target result))
+         (index :scs (any-reg))
+         (value :scs (unsigned-reg) :target result))
   (:arg-types * tagged-num unsigned-num)
   (:temporary (:sc unsigned-reg) tmp)
   (:results (result :scs (unsigned-reg)))
@@ -531,12 +531,12 @@
     (inst shl tmp 2)
     (inst sub tmp index)
     (inst mov
-	  (make-ea :dword
-		   :base object
-		   :index tmp
-		   :disp (- (* (1- instance-slots-offset) n-word-bytes)
-			    instance-pointer-lowtag))
-	  value)
+          (make-ea :dword
+                   :base object
+                   :index tmp
+                   :disp (- (* (1- instance-slots-offset) n-word-bytes)
+                            instance-pointer-lowtag))
+          value)
     (move result value)))
 
 (define-vop (raw-instance-ref/single)
@@ -554,18 +554,18 @@
     (inst sub tmp index)
     (with-empty-tn@fp-top(value)
       (inst fld
-	    (make-ea :dword
-		     :base object
-		     :index tmp
-		     :disp (- (* (1- instance-slots-offset) n-word-bytes)
-			      instance-pointer-lowtag))))))
+            (make-ea :dword
+                     :base object
+                     :index tmp
+                     :disp (- (* (1- instance-slots-offset) n-word-bytes)
+                              instance-pointer-lowtag))))))
 
 (define-vop (raw-instance-set/single)
   (:translate %raw-instance-set/single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg))
-	 (value :scs (single-reg) :target result))
+         (index :scs (any-reg))
+         (value :scs (single-reg) :target result))
   (:arg-types * tagged-num single-float)
   (:temporary (:sc unsigned-reg) tmp)
   (:results (result :scs (single-reg)))
@@ -578,21 +578,21 @@
     (unless (zerop (tn-offset value))
       (inst fxch value))
     (inst fst
-	  (make-ea :dword
-		   :base object
-		   :index tmp
-		   :disp (- (* (1- instance-slots-offset) n-word-bytes)
-			    instance-pointer-lowtag)))
+          (make-ea :dword
+                   :base object
+                   :index tmp
+                   :disp (- (* (1- instance-slots-offset) n-word-bytes)
+                            instance-pointer-lowtag)))
     (cond
       ((zerop (tn-offset value))
-	(unless (zerop (tn-offset result))
-	  (inst fst result)))
+        (unless (zerop (tn-offset result))
+          (inst fst result)))
       ((zerop (tn-offset result))
-	(inst fst value))
+        (inst fst value))
       (t
-	(unless (location= value result)
-	  (inst fst result))
-	(inst fxch value)))))
+        (unless (location= value result)
+          (inst fst result))
+        (inst fxch value)))))
 
 (define-vop (raw-instance-ref/double)
   (:translate %raw-instance-ref/double)
@@ -609,18 +609,18 @@
     (inst sub tmp index)
     (with-empty-tn@fp-top(value)
       (inst fldd
-	    (make-ea :dword
-		     :base object
-		     :index tmp
-		     :disp (- (* (- instance-slots-offset 2) n-word-bytes)
-			      instance-pointer-lowtag))))))
+            (make-ea :dword
+                     :base object
+                     :index tmp
+                     :disp (- (* (- instance-slots-offset 2) n-word-bytes)
+                              instance-pointer-lowtag))))))
 
 (define-vop (raw-instance-set/double)
   (:translate %raw-instance-set/double)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg))
-	 (value :scs (double-reg) :target result))
+         (index :scs (any-reg))
+         (value :scs (double-reg) :target result))
   (:arg-types * tagged-num double-float)
   (:temporary (:sc unsigned-reg) tmp)
   (:results (result :scs (double-reg)))
@@ -633,27 +633,27 @@
     (unless (zerop (tn-offset value))
       (inst fxch value))
     (inst fstd
-	  (make-ea :dword
-		   :base object
-		   :index tmp
-		   :disp (- (* (- instance-slots-offset 2) n-word-bytes)
-			    instance-pointer-lowtag)))
+          (make-ea :dword
+                   :base object
+                   :index tmp
+                   :disp (- (* (- instance-slots-offset 2) n-word-bytes)
+                            instance-pointer-lowtag)))
     (cond
       ((zerop (tn-offset value))
-	(unless (zerop (tn-offset result))
-	  (inst fstd result)))
+        (unless (zerop (tn-offset result))
+          (inst fstd result)))
       ((zerop (tn-offset result))
-	(inst fstd value))
+        (inst fstd value))
       (t
-	(unless (location= value result)
-	  (inst fstd result))
-	(inst fxch value)))))
+        (unless (location= value result)
+          (inst fstd result))
+        (inst fxch value)))))
 
 (define-vop (raw-instance-ref/complex-single)
   (:translate %raw-instance-ref/complex-single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg)))
+         (index :scs (any-reg)))
   (:arg-types * positive-fixnum)
   (:temporary (:sc unsigned-reg) tmp)
   (:results (value :scs (complex-single-reg)))
@@ -665,27 +665,27 @@
     (inst sub tmp index)
     (let ((real-tn (complex-single-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
-	(inst fld (make-ea :dword
-			   :base object
-			   :index tmp
-			   :disp (- (* (- instance-slots-offset 2)
-				       n-word-bytes)
-				    instance-pointer-lowtag)))))
+        (inst fld (make-ea :dword
+                           :base object
+                           :index tmp
+                           :disp (- (* (- instance-slots-offset 2)
+                                       n-word-bytes)
+                                    instance-pointer-lowtag)))))
     (let ((imag-tn (complex-single-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
-	(inst fld (make-ea :dword
-			   :base object
-			   :index tmp
-			   :disp (- (* (1- instance-slots-offset)
-				       n-word-bytes)
-				    instance-pointer-lowtag)))))))
+        (inst fld (make-ea :dword
+                           :base object
+                           :index tmp
+                           :disp (- (* (1- instance-slots-offset)
+                                       n-word-bytes)
+                                    instance-pointer-lowtag)))))))
 
 (define-vop (raw-instance-set/complex-single)
   (:translate %raw-instance-set/complex-single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg))
-	 (value :scs (complex-single-reg) :target result))
+         (index :scs (any-reg))
+         (value :scs (complex-single-reg) :target result))
   (:arg-types * positive-fixnum complex-single-float)
   (:temporary (:sc unsigned-reg) tmp)
   (:results (result :scs (complex-single-reg)))
@@ -696,53 +696,53 @@
     (inst shl tmp 2)
     (inst sub tmp index)
     (let ((value-real (complex-single-reg-real-tn value))
-	  (result-real (complex-single-reg-real-tn result)))
+          (result-real (complex-single-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
-	     ;; Value is in ST0.
-	     (inst fst (make-ea :dword
-				:base object
-				:index tmp
-				:disp (- (* (- instance-slots-offset 2)
-					    n-word-bytes)
-					 instance-pointer-lowtag)))
-	     (unless (zerop (tn-offset result-real))
-	       ;; Value is in ST0 but not result.
-	       (inst fst result-real)))
-	    (t
-	     ;; Value is not in ST0.
-	     (inst fxch value-real)
-	     (inst fst (make-ea :dword
-				:base object
-				:index tmp
-				:disp (- (* (- instance-slots-offset 2)
-					    n-word-bytes)
-					 instance-pointer-lowtag)))
-	     (cond ((zerop (tn-offset result-real))
-		    ;; The result is in ST0.
-		    (inst fst value-real))
-		   (t
-		    ;; Neither value or result are in ST0
-		    (unless (location= value-real result-real)
-		      (inst fst result-real))
-		    (inst fxch value-real))))))
+             ;; Value is in ST0.
+             (inst fst (make-ea :dword
+                                :base object
+                                :index tmp
+                                :disp (- (* (- instance-slots-offset 2)
+                                            n-word-bytes)
+                                         instance-pointer-lowtag)))
+             (unless (zerop (tn-offset result-real))
+               ;; Value is in ST0 but not result.
+               (inst fst result-real)))
+            (t
+             ;; Value is not in ST0.
+             (inst fxch value-real)
+             (inst fst (make-ea :dword
+                                :base object
+                                :index tmp
+                                :disp (- (* (- instance-slots-offset 2)
+                                            n-word-bytes)
+                                         instance-pointer-lowtag)))
+             (cond ((zerop (tn-offset result-real))
+                    ;; The result is in ST0.
+                    (inst fst value-real))
+                   (t
+                    ;; Neither value or result are in ST0
+                    (unless (location= value-real result-real)
+                      (inst fst result-real))
+                    (inst fxch value-real))))))
     (let ((value-imag (complex-single-reg-imag-tn value))
-	  (result-imag (complex-single-reg-imag-tn result)))
+          (result-imag (complex-single-reg-imag-tn result)))
       (inst fxch value-imag)
       (inst fst (make-ea :dword
-			 :base object
-			 :index tmp
-			 :disp (- (* (1- instance-slots-offset)
-				     n-word-bytes)
-				  instance-pointer-lowtag)))
+                         :base object
+                         :index tmp
+                         :disp (- (* (1- instance-slots-offset)
+                                     n-word-bytes)
+                                  instance-pointer-lowtag)))
       (unless (location= value-imag result-imag)
-	(inst fst result-imag))
+        (inst fst result-imag))
       (inst fxch value-imag))))
 
 (define-vop (raw-instance-ref/complex-double)
   (:translate %raw-instance-ref/complex-double)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg)))
+         (index :scs (any-reg)))
   (:arg-types * positive-fixnum)
   (:temporary (:sc unsigned-reg) tmp)
   (:results (value :scs (complex-double-reg)))
@@ -754,27 +754,27 @@
     (inst sub tmp index)
     (let ((real-tn (complex-double-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
-	(inst fldd (make-ea :dword
-			    :base object
-			    :index tmp
-			    :disp (- (* (- instance-slots-offset 4)
-					n-word-bytes)
-				     instance-pointer-lowtag)))))
+        (inst fldd (make-ea :dword
+                            :base object
+                            :index tmp
+                            :disp (- (* (- instance-slots-offset 4)
+                                        n-word-bytes)
+                                     instance-pointer-lowtag)))))
     (let ((imag-tn (complex-double-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
-	(inst fldd (make-ea :dword
-			    :base object
-			    :index tmp
-			    :disp (- (* (- instance-slots-offset 2)
-					n-word-bytes)
-				     instance-pointer-lowtag)))))))
+        (inst fldd (make-ea :dword
+                            :base object
+                            :index tmp
+                            :disp (- (* (- instance-slots-offset 2)
+                                        n-word-bytes)
+                                     instance-pointer-lowtag)))))))
 
 (define-vop (raw-instance-set/complex-double)
   (:translate %raw-instance-set/complex-double)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-	 (index :scs (any-reg))
-	 (value :scs (complex-double-reg) :target result))
+         (index :scs (any-reg))
+         (value :scs (complex-double-reg) :target result))
   (:arg-types * positive-fixnum complex-double-float)
   (:temporary (:sc unsigned-reg) tmp)
   (:results (result :scs (complex-double-reg)))
@@ -785,44 +785,44 @@
     (inst shl tmp 2)
     (inst sub tmp index)
     (let ((value-real (complex-double-reg-real-tn value))
-	  (result-real (complex-double-reg-real-tn result)))
+          (result-real (complex-double-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
-	     ;; Value is in ST0.
-	     (inst fstd (make-ea :dword
-				 :base object
-				 :index tmp
-				 :disp (- (* (- instance-slots-offset 4)
-					     n-word-bytes)
-					  instance-pointer-lowtag)))
-	     (unless (zerop (tn-offset result-real))
-	       ;; Value is in ST0 but not result.
-	       (inst fstd result-real)))
-	    (t
-	     ;; Value is not in ST0.
-	     (inst fxch value-real)
-	     (inst fstd (make-ea :dword
-				 :base object
-				 :index tmp
-				 :disp (- (* (- instance-slots-offset 4)
-					     n-word-bytes)
-					  instance-pointer-lowtag)))
-	     (cond ((zerop (tn-offset result-real))
-		    ;; The result is in ST0.
-		    (inst fstd value-real))
-		   (t
-		    ;; Neither value or result are in ST0
-		    (unless (location= value-real result-real)
-		      (inst fstd result-real))
-		    (inst fxch value-real))))))
+             ;; Value is in ST0.
+             (inst fstd (make-ea :dword
+                                 :base object
+                                 :index tmp
+                                 :disp (- (* (- instance-slots-offset 4)
+                                             n-word-bytes)
+                                          instance-pointer-lowtag)))
+             (unless (zerop (tn-offset result-real))
+               ;; Value is in ST0 but not result.
+               (inst fstd result-real)))
+            (t
+             ;; Value is not in ST0.
+             (inst fxch value-real)
+             (inst fstd (make-ea :dword
+                                 :base object
+                                 :index tmp
+                                 :disp (- (* (- instance-slots-offset 4)
+                                             n-word-bytes)
+                                          instance-pointer-lowtag)))
+             (cond ((zerop (tn-offset result-real))
+                    ;; The result is in ST0.
+                    (inst fstd value-real))
+                   (t
+                    ;; Neither value or result are in ST0
+                    (unless (location= value-real result-real)
+                      (inst fstd result-real))
+                    (inst fxch value-real))))))
     (let ((value-imag (complex-double-reg-imag-tn value))
-	  (result-imag (complex-double-reg-imag-tn result)))
+          (result-imag (complex-double-reg-imag-tn result)))
       (inst fxch value-imag)
       (inst fstd (make-ea :dword
-			  :base object
-			  :index tmp
-			  :disp (- (* (- instance-slots-offset 2)
-				      n-word-bytes)
-				   instance-pointer-lowtag)))
+                          :base object
+                          :index tmp
+                          :disp (- (* (- instance-slots-offset 2)
+                                      n-word-bytes)
+                                   instance-pointer-lowtag)))
       (unless (location= value-imag result-imag)
-	(inst fstd result-imag))
+        (inst fstd result-imag))
       (inst fxch value-imag))))

@@ -28,43 +28,43 @@
   (:node-var node)
   (:generator 0
     (cond ((zerop num)
-	   ;; (move result nil-value)
-	   (inst mov result nil-value))
-	  ((and star (= num 1))
-	   (move result (tn-ref-tn things)))
-	  (t
-	   (macrolet
-	       ((store-car (tn list &optional (slot cons-car-slot))
-		  `(let ((reg
-			  (sc-case ,tn
-			    ((any-reg descriptor-reg) ,tn)
-			    ((control-stack)
-			     (move temp ,tn)
-			     temp))))
-		     (storew reg ,list ,slot list-pointer-lowtag))))
-	     (let ((cons-cells (if star (1- num) num)))
-	       (pseudo-atomic
-		(allocation res (* (pad-data-block cons-size) cons-cells) node
-			    (awhen (sb!c::node-lvar node)
-			      (sb!c::lvar-dynamic-extent it)))
-		(inst lea res
-		      (make-ea :byte :base res :disp list-pointer-lowtag))
-		(move ptr res)
-		(dotimes (i (1- cons-cells))
-		  (store-car (tn-ref-tn things) ptr)
-		  (setf things (tn-ref-across things))
-		  (inst add ptr (pad-data-block cons-size))
-		  (storew ptr ptr (- cons-cdr-slot cons-size)
-			  list-pointer-lowtag))
-		(store-car (tn-ref-tn things) ptr)
-		(cond (star
-		       (setf things (tn-ref-across things))
-		       (store-car (tn-ref-tn things) ptr cons-cdr-slot))
-		      (t
-		       (storew nil-value ptr cons-cdr-slot
-			       list-pointer-lowtag)))
-		(aver (null (tn-ref-across things)))))
-	     (move result res))))))
+           ;; (move result nil-value)
+           (inst mov result nil-value))
+          ((and star (= num 1))
+           (move result (tn-ref-tn things)))
+          (t
+           (macrolet
+               ((store-car (tn list &optional (slot cons-car-slot))
+                  `(let ((reg
+                          (sc-case ,tn
+                            ((any-reg descriptor-reg) ,tn)
+                            ((control-stack)
+                             (move temp ,tn)
+                             temp))))
+                     (storew reg ,list ,slot list-pointer-lowtag))))
+             (let ((cons-cells (if star (1- num) num)))
+               (pseudo-atomic
+                (allocation res (* (pad-data-block cons-size) cons-cells) node
+                            (awhen (sb!c::node-lvar node)
+                              (sb!c::lvar-dynamic-extent it)))
+                (inst lea res
+                      (make-ea :byte :base res :disp list-pointer-lowtag))
+                (move ptr res)
+                (dotimes (i (1- cons-cells))
+                  (store-car (tn-ref-tn things) ptr)
+                  (setf things (tn-ref-across things))
+                  (inst add ptr (pad-data-block cons-size))
+                  (storew ptr ptr (- cons-cdr-slot cons-size)
+                          list-pointer-lowtag))
+                (store-car (tn-ref-tn things) ptr)
+                (cond (star
+                       (setf things (tn-ref-across things))
+                       (store-car (tn-ref-tn things) ptr cons-cdr-slot))
+                      (t
+                       (storew nil-value ptr cons-cdr-slot
+                               list-pointer-lowtag)))
+                (aver (null (tn-ref-across things)))))
+             (move result res))))))
 
 (define-vop (list list-or-list*)
   (:variant nil))
@@ -76,7 +76,7 @@
 
 (define-vop (allocate-code-object)
   (:args (boxed-arg :scs (any-reg) :target boxed)
-	 (unboxed-arg :scs (any-reg) :target unboxed))
+         (unboxed-arg :scs (any-reg) :target unboxed))
   (:results (result :scs (descriptor-reg) :from :eval))
   (:temporary (:sc unsigned-reg :from (:argument 0)) boxed)
   (:temporary (:sc unsigned-reg :from (:argument 1)) unboxed)
@@ -112,7 +112,7 @@
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
       (storew (make-fixup "undefined_tramp" :foreign)
-	      result fdefn-raw-addr-slot other-pointer-lowtag))))
+              result fdefn-raw-addr-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
@@ -125,9 +125,9 @@
     (let ((size (+ length closure-info-offset)))
       (allocation result (pad-data-block size) node stack-allocate-p)
       (inst lea result
-	    (make-ea :byte :base result :disp fun-pointer-lowtag))
+            (make-ea :byte :base result :disp fun-pointer-lowtag))
       (storew (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
-	      result 0 fun-pointer-lowtag))
+              result 0 fun-pointer-lowtag))
     (loadw temp function closure-fun-slot fun-pointer-lowtag)
     (storew temp result closure-fun-slot fun-pointer-lowtag))))
 
@@ -138,7 +138,7 @@
   (:node-var node)
   (:generator 10
     (with-fixed-allocation
-	(result value-cell-header-widetag value-cell-size node)
+        (result value-cell-header-widetag value-cell-size node)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; automatic allocators for primitive objects
@@ -161,9 +161,9 @@
      (inst lea result (make-ea :byte :base result :disp lowtag))
      (when type
        (storew (logior (ash (1- words) n-widetag-bits) type)
-	       result
-	       0
-	       lowtag)))))
+               result
+               0
+               lowtag)))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
@@ -176,11 +176,11 @@
   (:node-var node)
   (:generator 50
     (inst lea bytes
-	  (make-ea :qword :base extra :disp (* (1+ words) n-word-bytes)))
+          (make-ea :qword :base extra :disp (* (1+ words) n-word-bytes)))
     (inst mov header bytes)
     (inst shl header (- n-widetag-bits 3)) ; w+1 to length field
-    (inst lea header			; (w-1 << 8) | type
-	  (make-ea :qword :base header :disp (+ (ash -2 n-widetag-bits) type)))
+    (inst lea header                    ; (w-1 << 8) | type
+          (make-ea :qword :base header :disp (+ (ash -2 n-widetag-bits) type)))
     (inst and bytes (lognot lowtag-mask))
     (pseudo-atomic
      (allocation result bytes node)
@@ -198,20 +198,20 @@
     (with-fixed-allocation (result symbol-header-widetag symbol-size node)
       (storew name result symbol-name-slot other-pointer-lowtag)
       (storew unbound-marker-widetag
-	      result
-	      symbol-value-slot
-	      other-pointer-lowtag)
+              result
+              symbol-value-slot
+              other-pointer-lowtag)
       ;; Set up a random hash value for the symbol. Perhaps the object
       ;; address could be used for even faster and smaller code!
       ;; FIXME: We don't mind the symbol hash not being repeatable, so
       ;; we might as well add in the object address here, too. (Adding entropy
       ;; is good, even if ANSI doesn't understand that.)
       (inst imul temp
-	    (make-fixup "fast_random_state" :foreign)
-	    1103515245)
+            (make-fixup "fast_random_state" :foreign)
+            1103515245)
       (inst add temp 12345)
       (inst mov (make-fixup "fast_random_state" :foreign)
-	    temp)
+            temp)
       ;; We want a positive fixnum for the hash value, so discard the LS bits.
       ;;
       ;; FIXME: OK, who wants to tell me (CSR) why these two

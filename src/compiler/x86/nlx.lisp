@@ -24,7 +24,7 @@
 (defun catch-block-ea (tn)
   (aver (sc-is tn catch-block))
   (make-ea :dword :base ebp-tn
-	   :disp (- (* (+ (tn-offset tn) catch-block-size) n-word-bytes))))
+           :disp (- (* (+ (tn-offset tn) catch-block-size) n-word-bytes))))
 
 
 ;;;; Save and restore dynamic environment.
@@ -42,14 +42,14 @@
 
 (define-vop (save-dynamic-state)
   (:results (catch :scs (descriptor-reg))
-	    (alien-stack :scs (descriptor-reg)))
+            (alien-stack :scs (descriptor-reg)))
   (:generator 13
     (load-tl-symbol-value catch *current-catch-block*)
     (load-tl-symbol-value alien-stack *alien-stack*)))
 
 (define-vop (restore-dynamic-state)
   (:args (catch :scs (descriptor-reg))
-	 (alien-stack :scs (descriptor-reg)))
+         (alien-stack :scs (descriptor-reg)))
   #!+sb-thread (:temporary (:sc unsigned-reg) temp)
   (:generator 10
     (store-tl-symbol-value catch *current-catch-block* temp)
@@ -80,13 +80,13 @@
     (storew temp block unwind-block-current-uwp-slot)
     (storew ebp-tn block unwind-block-current-cont-slot)
     (storew (make-fixup nil :code-object entry-label)
-	    block catch-block-entry-pc-slot)))
+            block catch-block-entry-pc-slot)))
 
 ;;; like MAKE-UNWIND-BLOCK, except that we also store in the specified
 ;;; tag, and link the block into the CURRENT-CATCH list
 (define-vop (make-catch-block)
   (:args (tn)
-	 (tag :scs (any-reg descriptor-reg) :to (:result 1)))
+         (tag :scs (any-reg descriptor-reg) :to (:result 1)))
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:sc descriptor-reg) temp)
@@ -96,7 +96,7 @@
     (storew temp block  unwind-block-current-uwp-slot)
     (storew ebp-tn block  unwind-block-current-cont-slot)
     (storew (make-fixup nil :code-object entry-label)
-	    block catch-block-entry-pc-slot)
+            block catch-block-entry-pc-slot)
     (storew tag block catch-block-tag-slot)
     (load-tl-symbol-value temp *current-catch-block*)
     (storew temp block catch-block-previous-catch-slot)
@@ -134,8 +134,8 @@
   ;; Note: we can't list an sc-restriction, 'cause any load vops would
   ;; be inserted before the return-pc label.
   (:args (sp)
-	 (start)
-	 (count))
+         (start)
+         (count))
   (:results (values :more t))
   (:temporary (:sc descriptor-reg) move-temp)
   (:info label nvals)
@@ -145,42 +145,42 @@
     (emit-label label)
     (note-this-location vop :non-local-entry)
     (cond ((zerop nvals))
-	  ((= nvals 1)
-	   (let ((no-values (gen-label)))
-	     (inst mov (tn-ref-tn values) nil-value)
-	     (inst jecxz no-values)
-	     (loadw (tn-ref-tn values) start -1)
-	     (emit-label no-values)))
-	  (t
-	   (collect ((defaults))
-	     (do ((i 0 (1+ i))
-		  (tn-ref values (tn-ref-across tn-ref)))
-		 ((null tn-ref))
-	       (let ((default-lab (gen-label))
-		     (tn (tn-ref-tn tn-ref)))
-		 (defaults (cons default-lab tn))
+          ((= nvals 1)
+           (let ((no-values (gen-label)))
+             (inst mov (tn-ref-tn values) nil-value)
+             (inst jecxz no-values)
+             (loadw (tn-ref-tn values) start -1)
+             (emit-label no-values)))
+          (t
+           (collect ((defaults))
+             (do ((i 0 (1+ i))
+                  (tn-ref values (tn-ref-across tn-ref)))
+                 ((null tn-ref))
+               (let ((default-lab (gen-label))
+                     (tn (tn-ref-tn tn-ref)))
+                 (defaults (cons default-lab tn))
 
-		 (inst cmp count (fixnumize i))
-		 (inst jmp :le default-lab)
-		 (sc-case tn
-		   ((descriptor-reg any-reg)
-		    (loadw tn start (- (1+ i))))
-		   ((control-stack)
-		    (loadw move-temp start (- (1+ i)))
-		    (inst mov tn move-temp)))))
-	     (let ((defaulting-done (gen-label)))
-	       (emit-label defaulting-done)
-	       (assemble (*elsewhere*)
-		 (dolist (def (defaults))
-		   (emit-label (car def))
-		   (inst mov (cdr def) nil-value))
-		 (inst jmp defaulting-done))))))
+                 (inst cmp count (fixnumize i))
+                 (inst jmp :le default-lab)
+                 (sc-case tn
+                   ((descriptor-reg any-reg)
+                    (loadw tn start (- (1+ i))))
+                   ((control-stack)
+                    (loadw move-temp start (- (1+ i)))
+                    (inst mov tn move-temp)))))
+             (let ((defaulting-done (gen-label)))
+               (emit-label defaulting-done)
+               (assemble (*elsewhere*)
+                 (dolist (def (defaults))
+                   (emit-label (car def))
+                   (inst mov (cdr def) nil-value))
+                 (inst jmp defaulting-done))))))
     (inst mov esp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
   (:args (top)
-	 (source)
-	 (count :target ecx))
+         (source)
+         (count :target ecx))
   ;; Again, no SC restrictions for the args, 'cause the loading would
   ;; happen before the entry label.
   (:info label)
@@ -188,7 +188,7 @@
   (:temporary (:sc unsigned-reg :offset esi-offset) esi)
   (:temporary (:sc unsigned-reg :offset edi-offset) edi)
   (:results (result :scs (any-reg) :from (:argument 0))
-	    (num :scs (any-reg control-stack)))
+            (num :scs (any-reg control-stack)))
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
@@ -203,9 +203,9 @@
     (move result edi)
 
     (inst sub edi n-word-bytes)
-    (move ecx count)			; fixnum words == bytes
+    (move ecx count)                    ; fixnum words == bytes
     (move num ecx)
-    (inst shr ecx word-shift)		; word count for <rep movs>
+    (inst shr ecx word-shift)           ; word count for <rep movs>
     ;; If we got zero, we be done.
     (inst jecxz done)
     ;; Copy them down.

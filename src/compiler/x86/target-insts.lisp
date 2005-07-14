@@ -17,36 +17,36 @@
 
 (defun print-mem-access (value stream print-size-p dstate)
   (declare (type list value)
-	   (type stream stream)
-	   (type (member t nil) print-size-p)
-	   (type sb!disassem:disassem-state dstate))
+           (type stream stream)
+           (type (member t nil) print-size-p)
+           (type sb!disassem:disassem-state dstate))
   (when print-size-p
     (princ (sb!disassem:dstate-get-prop dstate 'width) stream)
     (princ '| PTR | stream))
   (write-char #\[ stream)
   (let ((firstp t))
     (macrolet ((pel ((var val) &body body)
-		 ;; Print an element of the address, maybe with
-		 ;; a leading separator.
-		 `(let ((,var ,val))
-		    (when ,var
-		      (unless firstp
-			(write-char #\+ stream))
-		      ,@body
-		      (setq firstp nil)))))
+                 ;; Print an element of the address, maybe with
+                 ;; a leading separator.
+                 `(let ((,var ,val))
+                    (when ,var
+                      (unless firstp
+                        (write-char #\+ stream))
+                      ,@body
+                      (setq firstp nil)))))
       (pel (base-reg (first value))
-	(print-addr-reg base-reg stream dstate))
+        (print-addr-reg base-reg stream dstate))
       (pel (index-reg (third value))
-	(print-addr-reg index-reg stream dstate)
-	(let ((index-scale (fourth value)))
-	  (when (and index-scale (not (= index-scale 1)))
-	    (write-char #\* stream)
-	    (princ index-scale stream))))
+        (print-addr-reg index-reg stream dstate)
+        (let ((index-scale (fourth value)))
+          (when (and index-scale (not (= index-scale 1)))
+            (write-char #\* stream)
+            (princ index-scale stream))))
       (let ((offset (second value)))
-	(when (and offset (or firstp (not (zerop offset))))
-	  (unless (or firstp (minusp offset))
-	    (write-char #\+ stream))
-	  (if firstp
+        (when (and offset (or firstp (not (zerop offset))))
+          (unless (or firstp (minusp offset))
+            (write-char #\+ stream))
+          (if firstp
             (progn
               (sb!disassem:princ16 offset stream)
               (or (minusp offset)

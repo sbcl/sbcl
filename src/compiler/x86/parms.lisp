@@ -41,7 +41,7 @@
 ;;;   These values were taken from the alpha code. The values for
 ;;;   bias and exponent min/max are not the same as shown in the 486 book.
 ;;;   They may be correct for how Python uses them.
-(def!constant single-float-bias 126)	; Intel says 127.
+(def!constant single-float-bias 126)    ; Intel says 127.
 (defconstant-eqx single-float-exponent-byte    (byte 8 23) #'equalp)
 (defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
 ;;; comment from CMU CL:
@@ -65,7 +65,7 @@
 (defconstant-eqx long-float-significand-byte (byte 31 0) #'equalp)
 (def!constant long-float-normal-exponent-min 1)
 (def!constant long-float-normal-exponent-max #x7FFE)
-(def!constant long-float-hidden-bit (ash 1 31))		; actually not hidden
+(def!constant long-float-hidden-bit (ash 1 31))         ; actually not hidden
 (def!constant long-float-trapping-nan-bit (ash 1 30))
 
 (def!constant single-float-digits
@@ -78,12 +78,12 @@
   (+ (byte-size long-float-significand-byte) n-word-bits 1))
 
 ;;; pfw -- from i486 microprocessor programmer's reference manual
-(def!constant float-invalid-trap-bit	   (ash 1 0))
+(def!constant float-invalid-trap-bit       (ash 1 0))
 (def!constant float-denormal-trap-bit       (ash 1 1))
 (def!constant float-divide-by-zero-trap-bit (ash 1 2))
 (def!constant float-overflow-trap-bit       (ash 1 3))
 (def!constant float-underflow-trap-bit      (ash 1 4))
-(def!constant float-inexact-trap-bit	   (ash 1 5))
+(def!constant float-inexact-trap-bit       (ash 1 5))
 
 (def!constant float-round-to-nearest  0)
 (def!constant float-round-to-negative 1)
@@ -276,10 +276,10 @@
     fdefinition-object
 
     ;; free pointers
-    ;; 
+    ;;
     ;; Note that these are FIXNUM word counts, not (as one might
     ;; expect) byte counts or SAPs. The reason seems to be that by
-    ;; representing them this way, we can avoid consing bignums. 
+    ;; representing them this way, we can avoid consing bignums.
     ;; -- WHN 2000-10-02
     *read-only-space-free-pointer*
     *static-space-free-pointer*
@@ -298,7 +298,7 @@
     *free-interrupt-context-index*
 
     *free-tls-index*
-    
+
     *allocation-pointer*
     *binding-stack-pointer*
     *binding-stack-start*

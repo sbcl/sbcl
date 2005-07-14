@@ -28,42 +28,42 @@
   (:node-var node)
   (:generator 0
     (cond ((zerop num)
-	   ;; (move result nil-value)
-	   (inst mov result nil-value))
-	  ((and star (= num 1))
-	   (move result (tn-ref-tn things)))
-	  (t
-	   (macrolet
-	       ((store-car (tn list &optional (slot cons-car-slot))
-		  `(let ((reg
-			  (sc-case ,tn
-			    ((any-reg descriptor-reg) ,tn)
-			    ((control-stack)
-			     (move temp ,tn)
-			     temp))))
-		     (storew reg ,list ,slot list-pointer-lowtag))))
-	     (let ((cons-cells (if star (1- num) num)))
-	       (pseudo-atomic
-		(allocation res (* (pad-data-block cons-size) cons-cells) node
+           ;; (move result nil-value)
+           (inst mov result nil-value))
+          ((and star (= num 1))
+           (move result (tn-ref-tn things)))
+          (t
+           (macrolet
+               ((store-car (tn list &optional (slot cons-car-slot))
+                  `(let ((reg
+                          (sc-case ,tn
+                            ((any-reg descriptor-reg) ,tn)
+                            ((control-stack)
+                             (move temp ,tn)
+                             temp))))
+                     (storew reg ,list ,slot list-pointer-lowtag))))
+             (let ((cons-cells (if star (1- num) num)))
+               (pseudo-atomic
+                (allocation res (* (pad-data-block cons-size) cons-cells) node
                             (awhen (sb!c::node-lvar node) (sb!c::lvar-dynamic-extent it)))
-		(inst lea res
-		      (make-ea :byte :base res :disp list-pointer-lowtag))
-		(move ptr res)
-		(dotimes (i (1- cons-cells))
-		  (store-car (tn-ref-tn things) ptr)
-		  (setf things (tn-ref-across things))
-		  (inst add ptr (pad-data-block cons-size))
-		  (storew ptr ptr (- cons-cdr-slot cons-size)
-			  list-pointer-lowtag))
-		(store-car (tn-ref-tn things) ptr)
-		(cond (star
-		       (setf things (tn-ref-across things))
-		       (store-car (tn-ref-tn things) ptr cons-cdr-slot))
-		      (t
-		       (storew nil-value ptr cons-cdr-slot
-			       list-pointer-lowtag)))
-		(aver (null (tn-ref-across things)))))
-	     (move result res))))))
+                (inst lea res
+                      (make-ea :byte :base res :disp list-pointer-lowtag))
+                (move ptr res)
+                (dotimes (i (1- cons-cells))
+                  (store-car (tn-ref-tn things) ptr)
+                  (setf things (tn-ref-across things))
+                  (inst add ptr (pad-data-block cons-size))
+                  (storew ptr ptr (- cons-cdr-slot cons-size)
+                          list-pointer-lowtag))
+                (store-car (tn-ref-tn things) ptr)
+                (cond (star
+                       (setf things (tn-ref-across things))
+                       (store-car (tn-ref-tn things) ptr cons-cdr-slot))
+                      (t
+                       (storew nil-value ptr cons-cdr-slot
+                               list-pointer-lowtag)))
+                (aver (null (tn-ref-across things)))))
+             (move result res))))))
 
 (define-vop (list list-or-list*)
   (:variant nil))
@@ -149,7 +149,7 @@
                                         'sb!vm::allocate-vector-on-heap))))
     (dolist (arg args)
       (setf (lvar-info arg)
-	    (make-ir2-lvar (primitive-type (lvar-type arg)))))
+            (make-ir2-lvar (primitive-type (lvar-type arg)))))
     (unless (is-ok-template-use template call (ltn-policy-safe-p ltn-policy))
       (ltn-default-call call)
       (return-from allocate-vector-ltn-annotate-optimizer (values)))
@@ -163,7 +163,7 @@
 ;;;
 (define-vop (allocate-code-object)
   (:args (boxed-arg :scs (any-reg) :target boxed)
-	 (unboxed-arg :scs (any-reg) :target unboxed))
+         (unboxed-arg :scs (any-reg) :target unboxed))
   (:results (result :scs (descriptor-reg) :from :eval))
   (:temporary (:sc unsigned-reg :from (:argument 0)) boxed)
   (:temporary (:sc unsigned-reg :from (:argument 1)) unboxed)
@@ -199,7 +199,7 @@
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
       (storew (make-fixup "undefined_tramp" :foreign)
-	      result fdefn-raw-addr-slot other-pointer-lowtag))))
+              result fdefn-raw-addr-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
@@ -226,7 +226,7 @@
   (:node-var node)
   (:generator 10
     (with-fixed-allocation
-	(result value-cell-header-widetag value-cell-size node)
+        (result value-cell-header-widetag value-cell-size node)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; automatic allocators for primitive objects
@@ -249,9 +249,9 @@
      (inst lea result (make-ea :byte :base result :disp lowtag))
      (when type
        (storew (logior (ash (1- words) n-widetag-bits) type)
-	       result
-	       0
-	       lowtag)))))
+               result
+               0
+               lowtag)))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
@@ -264,11 +264,11 @@
   (:node-var node)
   (:generator 50
     (inst lea bytes
-	  (make-ea :dword :base extra :disp (* (1+ words) n-word-bytes)))
+          (make-ea :dword :base extra :disp (* (1+ words) n-word-bytes)))
     (inst mov header bytes)
     (inst shl header (- n-widetag-bits 2)) ; w+1 to length field
-    (inst lea header			; (w-1 << 8) | type
-	  (make-ea :dword :base header :disp (+ (ash -2 n-widetag-bits) type)))
+    (inst lea header                    ; (w-1 << 8) | type
+          (make-ea :dword :base header :disp (+ (ash -2 n-widetag-bits) type)))
     (inst and bytes (lognot lowtag-mask))
     (pseudo-atomic
      (allocation result bytes node)

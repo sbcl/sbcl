@@ -17,11 +17,11 @@
 (define-vop (print)
   (:args (object :scs (descriptor-reg any-reg)))
   (:temporary (:sc unsigned-reg
-	       :offset eax-offset
-	       :target result
-	       :from :eval
-	       :to (:result 0))
-	      eax)
+               :offset eax-offset
+               :target result
+               :from :eval
+               :to (:result 0))
+              eax)
   (:results (result :scs (descriptor-reg)))
   (:save-p t)
   (:generator 100

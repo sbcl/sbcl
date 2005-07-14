@@ -18,13 +18,13 @@
     (etypecase val
       (integer
        (if (zerop val)
-	   (inst xor y y)
-	 (inst mov y (fixnumize val))))
+           (inst xor y y)
+         (inst mov y (fixnumize val))))
       (symbol
        (load-symbol y val))
       (character
        (inst mov y (logior (ash (char-code val) n-widetag-bits)
-			   character-widetag))))))
+                           character-widetag))))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate) (signed-reg unsigned-reg))
@@ -61,28 +61,28 @@
 ;;;; the MOVE VOP
 (define-vop (move)
   (:args (x :scs (any-reg descriptor-reg immediate) :target y
-	    :load-if (not (location= x y))))
+            :load-if (not (location= x y))))
   (:results (y :scs (any-reg descriptor-reg)
-	       :load-if
-	       (not (or (location= x y)
-			(and (sc-is x any-reg descriptor-reg immediate)
-			     (sc-is y control-stack))))))
+               :load-if
+               (not (or (location= x y)
+                        (and (sc-is x any-reg descriptor-reg immediate)
+                             (sc-is y control-stack))))))
   (:effects)
   (:affected)
   (:generator 0
     (if (and (sc-is x immediate)
-	     (sc-is y any-reg descriptor-reg control-stack))
-	(let ((val (tn-value x)))
-	  (etypecase val
-	    (integer
-	     (if (and (zerop val) (sc-is y any-reg descriptor-reg))
-		 (inst xor y y)
-	       (inst mov y (fixnumize val))))
-	    (symbol
-	     (inst mov y (+ nil-value (static-symbol-offset val))))
-	    (character
-	     (inst mov y (logior (ash (char-code val) n-widetag-bits)
-				 character-widetag)))))
+             (sc-is y any-reg descriptor-reg control-stack))
+        (let ((val (tn-value x)))
+          (etypecase val
+            (integer
+             (if (and (zerop val) (sc-is y any-reg descriptor-reg))
+                 (inst xor y y)
+               (inst mov y (fixnumize val))))
+            (symbol
+             (inst mov y (+ nil-value (static-symbol-offset val))))
+            (character
+             (inst mov y (logior (ash (char-code val) n-widetag-bits)
+                                 character-widetag)))))
       (move y x))))
 
 (define-move-vop move :move
@@ -102,58 +102,58 @@
 ;;; this case the loading works out.
 (define-vop (move-arg)
   (:args (x :scs (any-reg descriptor-reg immediate) :target y
-	    :load-if (not (and (sc-is y any-reg descriptor-reg)
-			       (sc-is x control-stack))))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y any-reg descriptor-reg))))
+            :load-if (not (and (sc-is y any-reg descriptor-reg)
+                               (sc-is x control-stack))))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
   (:generator 0
     (sc-case y
       ((any-reg descriptor-reg)
        (if (sc-is x immediate)
-	   (let ((val (tn-value x)))
-	     (etypecase val
-	      (integer
-	       (if (zerop val)
-		   (inst xor y y)
-		 (inst mov y (fixnumize val))))
-	      (symbol
-	       (load-symbol y val))
-	      (character
-	       (inst mov y (logior (ash (char-code val) n-widetag-bits)
-				   character-widetag)))))
-	 (move y x)))
+           (let ((val (tn-value x)))
+             (etypecase val
+              (integer
+               (if (zerop val)
+                   (inst xor y y)
+                 (inst mov y (fixnumize val))))
+              (symbol
+               (load-symbol y val))
+              (character
+               (inst mov y (logior (ash (char-code val) n-widetag-bits)
+                                   character-widetag)))))
+         (move y x)))
       ((control-stack)
        (if (sc-is x immediate)
-	   (let ((val (tn-value x)))
-	     (if (= (tn-offset fp) esp-offset)
-		 ;; C-call
-		 (etypecase val
-		   (integer
-		    (storew (fixnumize val) fp (tn-offset y)))
-		   (symbol
-		    (storew (+ nil-value (static-symbol-offset val))
-			    fp (tn-offset y)))
-		   (character
-		    (storew (logior (ash (char-code val) n-widetag-bits)
-				    character-widetag)
-			    fp (tn-offset y))))
-	       ;; Lisp stack
-	       (etypecase val
-		 (integer
-		  (storew (fixnumize val) fp (- (1+ (tn-offset y)))))
-		 (symbol
-		  (storew (+ nil-value (static-symbol-offset val))
-			  fp (- (1+ (tn-offset y)))))
-		 (character
-		  (storew (logior (ash (char-code val) n-widetag-bits)
-				  character-widetag)
-			  fp (- (1+ (tn-offset y))))))))
-	 (if (= (tn-offset fp) esp-offset)
-	     ;; C-call
-	     (storew x fp (tn-offset y))
-	   ;; Lisp stack
-	   (storew x fp (- (1+ (tn-offset y))))))))))
+           (let ((val (tn-value x)))
+             (if (= (tn-offset fp) esp-offset)
+                 ;; C-call
+                 (etypecase val
+                   (integer
+                    (storew (fixnumize val) fp (tn-offset y)))
+                   (symbol
+                    (storew (+ nil-value (static-symbol-offset val))
+                            fp (tn-offset y)))
+                   (character
+                    (storew (logior (ash (char-code val) n-widetag-bits)
+                                    character-widetag)
+                            fp (tn-offset y))))
+               ;; Lisp stack
+               (etypecase val
+                 (integer
+                  (storew (fixnumize val) fp (- (1+ (tn-offset y)))))
+                 (symbol
+                  (storew (+ nil-value (static-symbol-offset val))
+                          fp (- (1+ (tn-offset y)))))
+                 (character
+                  (storew (logior (ash (char-code val) n-widetag-bits)
+                                  character-widetag)
+                          fp (- (1+ (tn-offset y))))))))
+         (if (= (tn-offset fp) esp-offset)
+             ;; C-call
+             (storew x fp (tn-offset y))
+           ;; Lisp stack
+           (storew x fp (- (1+ (tn-offset y))))))))))
 
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)
@@ -185,9 +185,9 @@
 ;;; possible bignum arg SCs.
 (define-vop (move-to-word/fixnum)
   (:args (x :scs (any-reg descriptor-reg) :target y
-	    :load-if (not (location= x y))))
+            :load-if (not (location= x y))))
   (:results (y :scs (signed-reg unsigned-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:arg-types tagged-num)
   (:note "fixnum untagging")
   (:generator 1
@@ -213,7 +213,7 @@
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "integer to untagged word coercion")
   (:temporary (:sc unsigned-reg :offset eax-offset
-		   :from (:argument 0) :to (:result 0) :target y) eax)
+                   :from (:argument 0) :to (:result 0) :target y) eax)
   (:generator 4
     (move eax x)
     (inst test al-tn 3)
@@ -232,20 +232,20 @@
 ;;; restriction because of the control-stack ambiguity noted above.
 (define-vop (move-from-word/fixnum)
   (:args (x :scs (signed-reg unsigned-reg) :target y
-	    :load-if (not (location= x y))))
+            :load-if (not (location= x y))))
   (:results (y :scs (any-reg descriptor-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:result-types tagged-num)
   (:note "fixnum tagging")
   (:generator 1
     (cond ((and (sc-is x signed-reg unsigned-reg)
-		(not (location= x y)))
-	   ;; Uses 7 bytes, but faster on the Pentium
-	   (inst lea y (make-ea :dword :index x :scale 4)))
-	  (t
-	   ;; Uses: If x is a reg 2 + 3; if x = y uses only 3 bytes
-	   (move y x)
-	   (inst shl y 2)))))
+                (not (location= x y)))
+           ;; Uses 7 bytes, but faster on the Pentium
+           (inst lea y (make-ea :dword :index x :scale 4)))
+          (t
+           ;; Uses: If x is a reg 2 + 3; if x = y uses only 3 bytes
+           (move y x)
+           (inst shl y 2)))))
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
@@ -261,9 +261,9 @@
   (:args (x :scs (signed-reg unsigned-reg) :target eax))
   (:temporary (:sc unsigned-reg :offset eax-offset :from (:argument 0)) eax)
   (:temporary (:sc unsigned-reg :offset ebx-offset :to (:result 0) :target y)
-	      ebx)
+              ebx)
   (:temporary (:sc unsigned-reg :offset ecx-offset
-		   :from (:argument 0) :to (:result 0)) ecx)
+                   :from (:argument 0) :to (:result 0)) ecx)
   (:ignore ecx)
   (:results (y :scs (any-reg descriptor-reg)))
   (:note "signed word to integer coercion")
@@ -282,7 +282,7 @@
   (:generator 20
      (aver (not (location= x y)))
      (let ((bignum (gen-label))
-	   (done (gen-label)))
+           (done (gen-label)))
        (inst mov y x)
        (inst shl y 1)
        (inst jmp :o bignum)
@@ -304,11 +304,11 @@
        ;;   emit-label done
 
        (assemble (*elsewhere*)
-	  (emit-label bignum)
-	  (with-fixed-allocation
-	      (y bignum-widetag (+ bignum-digits-offset 1) node)
-	    (storew x y bignum-digits-offset other-pointer-lowtag))
-	  (inst jmp done)))))
+          (emit-label bignum)
+          (with-fixed-allocation
+              (y bignum-widetag (+ bignum-digits-offset 1) node)
+            (storew x y bignum-digits-offset other-pointer-lowtag))
+          (inst jmp done)))))
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
@@ -320,9 +320,9 @@
   (:args (x :scs (signed-reg unsigned-reg) :target eax))
   (:temporary (:sc unsigned-reg :offset eax-offset :from (:argument 0)) eax)
   (:temporary (:sc unsigned-reg :offset ebx-offset :to (:result 0) :target y)
-	      ebx)
+              ebx)
   (:temporary (:sc unsigned-reg :offset ecx-offset
-		   :from (:argument 0) :to (:result 0)) ecx)
+                   :from (:argument 0) :to (:result 0)) ecx)
   (:ignore ecx)
   (:results (y :scs (any-reg descriptor-reg)))
   (:note "unsigned word to integer coercion")
@@ -346,9 +346,9 @@
     (aver (not (location= x alloc)))
     (aver (not (location= y alloc)))
     (let ((bignum (gen-label))
-	  (done (gen-label))
-	  (one-word-bignum (gen-label))
-	  (L1 (gen-label)))
+          (done (gen-label))
+          (one-word-bignum (gen-label))
+          (L1 (gen-label)))
       (inst test x #xe0000000)
       (inst jmp :nz bignum)
       ;; Fixnum.
@@ -358,39 +358,39 @@
       (emit-label done)
 
       (assemble (*elsewhere*)
-	 (emit-label bignum)
-	 ;; Note: As on the mips port, space for a two word bignum is
-	 ;; always allocated and the header size is set to either one
-	 ;; or two words as appropriate.
-	 (inst jmp :ns one-word-bignum)
-	 ;; two word bignum
-	 (inst mov y (logior (ash (1- (+ bignum-digits-offset 2))
-				  n-widetag-bits)
-			     bignum-widetag))
-	 (inst jmp L1)
-	 (emit-label one-word-bignum)
-	 (inst mov y (logior (ash (1- (+ bignum-digits-offset 1))
-				  n-widetag-bits)
-			     bignum-widetag))
-	 (emit-label L1)
-	 (pseudo-atomic
-	  (allocation alloc (pad-data-block (+ bignum-digits-offset 2)) node)
-	  (storew y alloc)
-	  (inst lea y (make-ea :byte :base alloc :disp other-pointer-lowtag))
-	  (storew x y bignum-digits-offset other-pointer-lowtag))
-	 (inst jmp done)))))
+         (emit-label bignum)
+         ;; Note: As on the mips port, space for a two word bignum is
+         ;; always allocated and the header size is set to either one
+         ;; or two words as appropriate.
+         (inst jmp :ns one-word-bignum)
+         ;; two word bignum
+         (inst mov y (logior (ash (1- (+ bignum-digits-offset 2))
+                                  n-widetag-bits)
+                             bignum-widetag))
+         (inst jmp L1)
+         (emit-label one-word-bignum)
+         (inst mov y (logior (ash (1- (+ bignum-digits-offset 1))
+                                  n-widetag-bits)
+                             bignum-widetag))
+         (emit-label L1)
+         (pseudo-atomic
+          (allocation alloc (pad-data-block (+ bignum-digits-offset 2)) node)
+          (storew y alloc)
+          (inst lea y (make-ea :byte :base alloc :disp other-pointer-lowtag))
+          (storew x y bignum-digits-offset other-pointer-lowtag))
+         (inst jmp done)))))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
 
 ;;; Move untagged numbers.
 (define-vop (word-move)
   (:args (x :scs (signed-reg unsigned-reg) :target y
-	    :load-if (not (location= x y))))
+            :load-if (not (location= x y))))
   (:results (y :scs (signed-reg unsigned-reg)
-	       :load-if
-	       (not (or (location= x y)
-			(and (sc-is x signed-reg unsigned-reg)
-			     (sc-is y signed-stack unsigned-stack))))))
+               :load-if
+               (not (or (location= x y)
+                        (and (sc-is x signed-reg unsigned-reg)
+                             (sc-is y signed-stack unsigned-stack))))))
   (:effects)
   (:affected)
   (:note "word integer move")
@@ -402,7 +402,7 @@
 ;;; Move untagged number arguments/return-values.
 (define-vop (move-word-arg)
   (:args (x :scs (signed-reg unsigned-reg) :target y)
-	 (fp :scs (any-reg) :load-if (not (sc-is y sap-reg))))
+         (fp :scs (any-reg) :load-if (not (sc-is y sap-reg))))
   (:results (y))
   (:note "word integer argument move")
   (:generator 0
@@ -411,8 +411,8 @@
        (move y x))
       ((signed-stack unsigned-stack)
        (if (= (tn-offset fp) esp-offset)
-	   (storew x fp (tn-offset y))	; c-call
-	   (storew x fp (- (1+ (tn-offset y)))))))))
+           (storew x fp (tn-offset y))  ; c-call
+           (storew x fp (- (1+ (tn-offset y)))))))))
 (define-move-vop move-word-arg :move-arg
   (descriptor-reg any-reg signed-reg unsigned-reg) (signed-reg unsigned-reg))
 

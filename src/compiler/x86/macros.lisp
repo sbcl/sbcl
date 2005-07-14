@@ -34,7 +34,7 @@
     (inst fstp ,tn)
     ,@body
     (unless (zerop (tn-offset ,tn))
-      (inst fxch ,tn))))		; save into new dest and restore st(0)
+      (inst fxch ,tn))))                ; save into new dest and restore st(0)
 
 ;;;; instruction-like macros
 
@@ -42,7 +42,7 @@
   #!+sb-doc
   "Move SRC into DST unless they are location=."
   (once-only ((n-dst dst)
-	      (n-src src))
+              (n-src src))
     `(unless (location= ,n-dst ,n-src)
        (inst mov ,n-dst ,n-src))))
 
@@ -69,20 +69,20 @@
 
 (defmacro load-symbol-value (reg symbol)
   `(inst mov ,reg
-	 (make-ea :dword
-		  :disp (+ nil-value
-			   (static-symbol-offset ',symbol)
-			   (ash symbol-value-slot word-shift)
-			   (- other-pointer-lowtag)))))
+         (make-ea :dword
+                  :disp (+ nil-value
+                           (static-symbol-offset ',symbol)
+                           (ash symbol-value-slot word-shift)
+                           (- other-pointer-lowtag)))))
 
 (defmacro store-symbol-value (reg symbol)
   `(inst mov
-	 (make-ea :dword
-		  :disp (+ nil-value
-			   (static-symbol-offset ',symbol)
-			   (ash symbol-value-slot word-shift)
-			   (- other-pointer-lowtag)))
-	 ,reg))
+         (make-ea :dword
+                  :disp (+ nil-value
+                           (static-symbol-offset ',symbol)
+                           (ash symbol-value-slot word-shift)
+                           (- other-pointer-lowtag)))
+         ,reg))
 
 #!+sb-thread
 (defmacro load-tl-symbol-value (reg symbol)
@@ -90,9 +90,9 @@
     (inst mov ,reg
      (make-ea :dword
       :disp (+ nil-value
-	       (static-symbol-offset ',symbol)
-	       (ash symbol-tls-index-slot word-shift)
-	       (- other-pointer-lowtag))))
+               (static-symbol-offset ',symbol)
+               (ash symbol-tls-index-slot word-shift)
+               (- other-pointer-lowtag))))
     (inst fs-segment-prefix)
     (inst mov ,reg (make-ea :dword :scale 1 :index ,reg))))
 #!-sb-thread
@@ -104,30 +104,30 @@
     (inst mov ,temp
      (make-ea :dword
       :disp (+ nil-value
-	       (static-symbol-offset ',symbol)
-	       (ash symbol-tls-index-slot word-shift)
-	       (- other-pointer-lowtag))))
+               (static-symbol-offset ',symbol)
+               (ash symbol-tls-index-slot word-shift)
+               (- other-pointer-lowtag))))
     (inst fs-segment-prefix)
     (inst mov (make-ea :dword :scale 1 :index ,temp) ,reg)))
 #!-sb-thread
 (defmacro store-tl-symbol-value (reg symbol temp)
   (declare (ignore temp))
   `(store-symbol-value ,reg ,symbol))
-  
+
 (defmacro load-type (target source &optional (offset 0))
   #!+sb-doc
   "Loads the type bits of a pointer into target independent of
    byte-ordering issues."
   (once-only ((n-target target)
-	      (n-source source)
-	      (n-offset offset))
+              (n-source source)
+              (n-offset offset))
     (ecase *backend-byte-order*
       (:little-endian
        `(inst mov ,n-target
-	      (make-ea :byte :base ,n-source :disp ,n-offset)))
+              (make-ea :byte :base ,n-source :disp ,n-offset)))
       (:big-endian
        `(inst mov ,n-target
-	      (make-ea :byte :base ,n-source :disp (+ ,n-offset 3)))))))
+              (make-ea :byte :base ,n-source :disp (+ ,n-offset 3)))))))
 
 ;;;; allocation helpers
 
@@ -160,37 +160,37 @@
 
 (defun allocation-notinline (alloc-tn size)
   (let* ((alloc-tn-offset (tn-offset alloc-tn))
-	 ;; C call to allocate via dispatch routines. Each
-	 ;; destination has a special entry point. The size may be a
-	 ;; register or a constant.
-	 (tn-text (ecase alloc-tn-offset
-		    (#.eax-offset "eax")
-		    (#.ecx-offset "ecx")
-		    (#.edx-offset "edx")
-		    (#.ebx-offset "ebx")
-		    (#.esi-offset "esi")
-		    (#.edi-offset "edi")))
-	 (size-text (case size (8 "8_") (16 "16_") (t ""))))
+         ;; C call to allocate via dispatch routines. Each
+         ;; destination has a special entry point. The size may be a
+         ;; register or a constant.
+         (tn-text (ecase alloc-tn-offset
+                    (#.eax-offset "eax")
+                    (#.ecx-offset "ecx")
+                    (#.edx-offset "edx")
+                    (#.ebx-offset "ebx")
+                    (#.esi-offset "esi")
+                    (#.edi-offset "edi")))
+         (size-text (case size (8 "8_") (16 "16_") (t ""))))
     (unless (or (eql size 8) (eql size 16))
       (unless (and (tn-p size) (location= alloc-tn size))
-	(inst mov alloc-tn size)))
+        (inst mov alloc-tn size)))
     (inst call (make-fixup (concatenate 'string
-					 "alloc_" size-text
-					 "to_" tn-text)
-			   :foreign))))
+                                         "alloc_" size-text
+                                         "to_" tn-text)
+                           :foreign))))
 
 (defun allocation-inline (alloc-tn size)
   (let ((ok (gen-label))
-	(free-pointer
-	 (make-ea :dword :disp 
-		  #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
-		  #!-sb-thread (make-fixup "boxed_region" :foreign)
-		  :scale 1)) ; thread->alloc_region.free_pointer
-	(end-addr 
-	 (make-ea :dword :disp
-		  #!+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
-		  #!-sb-thread (make-fixup "boxed_region" :foreign 4)
-		  :scale 1)))	; thread->alloc_region.end_addr
+        (free-pointer
+         (make-ea :dword :disp
+                  #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
+                  #!-sb-thread (make-fixup "boxed_region" :foreign)
+                  :scale 1)) ; thread->alloc_region.free_pointer
+        (end-addr
+         (make-ea :dword :disp
+                  #!+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
+                  #!-sb-thread (make-fixup "boxed_region" :foreign 4)
+                  :scale 1)))   ; thread->alloc_region.end_addr
     (unless (and (tn-p size) (location= alloc-tn size))
       (inst mov alloc-tn size))
     #!+sb-thread (inst fs-segment-prefix)
@@ -199,12 +199,12 @@
     (inst cmp alloc-tn end-addr)
     (inst jmp :be OK)
     (let ((dst (ecase (tn-offset alloc-tn)
-		 (#.eax-offset "alloc_overflow_eax")
-		 (#.ecx-offset "alloc_overflow_ecx")
-		 (#.edx-offset "alloc_overflow_edx")
-		 (#.ebx-offset "alloc_overflow_ebx")
-		 (#.esi-offset "alloc_overflow_esi")
-		 (#.edi-offset "alloc_overflow_edi"))))
+                 (#.eax-offset "alloc_overflow_eax")
+                 (#.ecx-offset "alloc_overflow_ecx")
+                 (#.edx-offset "alloc_overflow_edx")
+                 (#.ebx-offset "alloc_overflow_ebx")
+                 (#.esi-offset "alloc_overflow_esi")
+                 (#.edi-offset "alloc_overflow_edi"))))
       (inst call (make-fixup dst :foreign)))
     (emit-label ok)
     #!+sb-thread (inst fs-segment-prefix)
@@ -231,7 +231,7 @@
     ;; a bit of a KLUDGE, really.  -- CSR, 2004-08-05 (following
     ;; observations made by ASF and Juho Snellman)
     ((and (member :inline-allocation-is-good *backend-subfeatures*)
-	  (or (null inline) (policy inline (>= speed space))))
+          (or (null inline) (policy inline (>= speed space))))
      (allocation-inline alloc-tn size))
     (t (allocation-notinline alloc-tn size)))
   (values))
@@ -240,50 +240,50 @@
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.
 (defmacro with-fixed-allocation ((result-tn widetag size &optional inline)
-				 &body forms)
+                                 &body forms)
   (unless forms
     (bug "empty &body in WITH-FIXED-ALLOCATION"))
   (once-only ((result-tn result-tn) (size size))
     `(pseudo-atomic
       (allocation ,result-tn (pad-data-block ,size) ,inline)
       (storew (logior (ash (1- ,size) n-widetag-bits) ,widetag)
-	      ,result-tn)
+              ,result-tn)
       (inst lea ,result-tn
-	    (make-ea :byte :base ,result-tn :disp other-pointer-lowtag))
+            (make-ea :byte :base ,result-tn :disp other-pointer-lowtag))
       ,@forms)))
 
 ;;;; error code
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun emit-error-break (vop kind code values)
     (let ((vector (gensym)))
-      `((inst int 3)				; i386 breakpoint instruction
-	;; The return PC points here; note the location for the debugger.
-	(let ((vop ,vop))
-  	  (when vop
-		(note-this-location vop :internal-error)))
-	(inst byte ,kind)			; eg trap_Xyyy
-	(with-adjustable-vector (,vector)	; interr arguments
-	  (write-var-integer (error-number-or-lose ',code) ,vector)
-	  ,@(mapcar (lambda (tn)
-		      `(let ((tn ,tn))
-			 ;; classic CMU CL comment:
-			 ;;   zzzzz jrd here. tn-offset is zero for constant
-			 ;;   tns.
-			 (write-var-integer (make-sc-offset (sc-number
-							     (tn-sc tn))
-							    (or (tn-offset tn)
-								0))
-					    ,vector)))
-		    values)
-	  (inst byte (length ,vector))
-	  (dotimes (i (length ,vector))
-	    (inst byte (aref ,vector i))))))))
+      `((inst int 3)                            ; i386 breakpoint instruction
+        ;; The return PC points here; note the location for the debugger.
+        (let ((vop ,vop))
+          (when vop
+                (note-this-location vop :internal-error)))
+        (inst byte ,kind)                       ; eg trap_Xyyy
+        (with-adjustable-vector (,vector)       ; interr arguments
+          (write-var-integer (error-number-or-lose ',code) ,vector)
+          ,@(mapcar (lambda (tn)
+                      `(let ((tn ,tn))
+                         ;; classic CMU CL comment:
+                         ;;   zzzzz jrd here. tn-offset is zero for constant
+                         ;;   tns.
+                         (write-var-integer (make-sc-offset (sc-number
+                                                             (tn-sc tn))
+                                                            (or (tn-offset tn)
+                                                                0))
+                                            ,vector)))
+                    values)
+          (inst byte (length ,vector))
+          (dotimes (i (length ,vector))
+            (inst byte (aref ,vector i))))))))
 
 (defmacro error-call (vop error-code &rest values)
   #!+sb-doc
   "Cause an error. ERROR-CODE is the error to cause."
   (cons 'progn
-	(emit-error-break vop error-trap error-code values)))
+        (emit-error-break vop error-trap error-code values)))
 
 (defmacro generate-error-code (vop error-code &rest values)
   #!+sb-doc
@@ -302,7 +302,7 @@
 ;;; around.  It's an operation which the AOP weenies would describe as
 ;;; having "cross-cutting concerns", meaning it appears all over the
 ;;; place and there's no logical single place to attach documentation.
-;;; grep (mostly in src/runtime) is your friend 
+;;; grep (mostly in src/runtime) is your friend
 
 ;;; FIXME: *PSEUDO-ATOMIC-FOO* could be made into *PSEUDO-ATOMIC-BITS*,
 ;;; set with a single operation and cleared with SHR *PSEUDO-ATOMIC-BITS*,-2;
@@ -312,7 +312,7 @@
 ;;; KLUDGE: since the stack on the x86 is treated conservatively, it
 ;;; does not matter whether a signal occurs during construction of a
 ;;; dynamic-extent object, as the half-finished construction of the
-;;; object will not cause any difficulty.  We can therefore elide 
+;;; object will not cause any difficulty.  We can therefore elide
 (defmacro maybe-pseudo-atomic (really-p &body forms)
   `(if ,really-p
        (progn ,@forms)
@@ -393,64 +393,64 @@
   `(progn
      (define-vop (,name)
        ,@(when translate
-	   `((:translate ,translate)))
+           `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-	      (index :scs (any-reg)))
+              (index :scs (any-reg)))
        (:arg-types ,type tagged-num)
        (:results (value :scs ,scs))
        (:result-types ,el-type)
-       (:generator 3			; pw was 5
-	 (inst mov value (make-ea :dword :base object :index index
-				  :disp (- (* ,offset n-word-bytes)
-					   ,lowtag)))))
+       (:generator 3                    ; pw was 5
+         (inst mov value (make-ea :dword :base object :index index
+                                  :disp (- (* ,offset n-word-bytes)
+                                           ,lowtag)))))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
-	   `((:translate ,translate)))
+           `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)))
        (:info index)
        (:arg-types ,type (:constant (signed-byte 30)))
        (:results (value :scs ,scs))
        (:result-types ,el-type)
-       (:generator 2			; pw was 5
-	 (inst mov value (make-ea :dword :base object
-				  :disp (- (* (+ ,offset index) n-word-bytes)
-					   ,lowtag)))))))
+       (:generator 2                    ; pw was 5
+         (inst mov value (make-ea :dword :base object
+                                  :disp (- (* (+ ,offset index) n-word-bytes)
+                                           ,lowtag)))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
   `(progn
      (define-vop (,name)
        ,@(when translate
-	   `((:translate ,translate)))
+           `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-	      (index :scs (any-reg))
-	      (value :scs ,scs :target result))
+              (index :scs (any-reg))
+              (value :scs ,scs :target result))
        (:arg-types ,type tagged-num ,el-type)
        (:results (result :scs ,scs))
        (:result-types ,el-type)
-       (:generator 4			; was 5
-	 (inst mov (make-ea :dword :base object :index index
-			    :disp (- (* ,offset n-word-bytes) ,lowtag))
-	       value)
-	 (move result value)))
+       (:generator 4                    ; was 5
+         (inst mov (make-ea :dword :base object :index index
+                            :disp (- (* ,offset n-word-bytes) ,lowtag))
+               value)
+         (move result value)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
-	   `((:translate ,translate)))
+           `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-	      (value :scs ,scs :target result))
+              (value :scs ,scs :target result))
        (:info index)
        (:arg-types ,type (:constant (signed-byte 30)) ,el-type)
        (:results (result :scs ,scs))
        (:result-types ,el-type)
-       (:generator 3			; was 5
-	 (inst mov (make-ea :dword :base object
-			    :disp (- (* (+ ,offset index) n-word-bytes)
-				     ,lowtag))
-	       value)
-	 (move result value)))))
+       (:generator 3                    ; was 5
+         (inst mov (make-ea :dword :base object
+                            :disp (- (* (+ ,offset index) n-word-bytes)
+                                     ,lowtag))
+               value)
+         (move result value)))))
 
 ;;; helper for alien stuff.
 (defmacro with-pinned-objects ((&rest objects) &body body)
@@ -460,10 +460,10 @@ Useful for e.g. foreign calls where another thread may trigger
 garbage collection"
   `(multiple-value-prog1
        (progn
-	 ,@(loop for p in objects 
-		 collect `(push-word-on-c-stack
-			   (int-sap (sb!kernel:get-lisp-obj-address ,p))))
-	 ,@body)
+         ,@(loop for p in objects
+                 collect `(push-word-on-c-stack
+                           (int-sap (sb!kernel:get-lisp-obj-address ,p))))
+         ,@body)
      ;; If the body returned normally, we should restore the stack pointer
      ;; for the benefit of any following code in the same function.  If
      ;; there's a non-local exit in the body, sp is garbage anyway and

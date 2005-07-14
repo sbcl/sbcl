@@ -28,10 +28,10 @@
 (define-vop (move-to-character)
   (:args (x :scs (any-reg control-stack) :target al))
   (:temporary (:sc byte-reg :offset al-offset
-		   :from (:argument 0) :to (:eval 0)) al)
+                   :from (:argument 0) :to (:eval 0)) al)
   (:ignore al)
   (:temporary (:sc byte-reg :offset ah-offset :target y
-		   :from (:argument 0) :to (:result 0)) ah)
+                   :from (:argument 0) :to (:result 0)) ah)
   (:results (y :scs (character-reg character-stack)))
   (:note "character untagging")
   (:generator 1
@@ -59,15 +59,15 @@
 (define-vop (move-from-character)
   (:args (x :scs (character-reg character-stack) :target ah))
   (:temporary (:sc byte-reg :offset al-offset :target y
-		   :from (:argument 0) :to (:result 0)) al)
+                   :from (:argument 0) :to (:result 0)) al)
   (:temporary (:sc byte-reg :offset ah-offset
-		   :from (:argument 0) :to (:result 0)) ah)
+                   :from (:argument 0) :to (:result 0)) ah)
   (:results (y :scs (any-reg descriptor-reg control-stack)))
   (:note "character tagging")
   (:generator 1
-    (move ah x)				; Maybe move char byte.
-    (inst mov al character-widetag)	; x86 to type bits
-    (inst and eax-tn #xffff)		; Remove any junk bits.
+    (move ah x)                         ; Maybe move char byte.
+    (inst mov al character-widetag)     ; x86 to type bits
+    (inst and eax-tn #xffff)            ; Remove any junk bits.
     (move y eax-tn)))
 (define-move-vop move-from-character :move
   (character-reg #!-sb-unicode character-stack)
@@ -76,10 +76,10 @@
 ;;; Move untagged character values.
 (define-vop (character-move)
   (:args (x :target y
-	    :scs (character-reg)
-	    :load-if (not (location= x y))))
+            :scs (character-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (character-reg character-stack)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:note "character move")
   (:effects)
   (:affected)
@@ -91,9 +91,9 @@
 ;;; Move untagged character arguments/return-values.
 (define-vop (move-character-arg)
   (:args (x :target y
-	    :scs (character-reg))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y character-reg))))
+            :scs (character-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y character-reg))))
   (:results (y))
   (:note "character arg move")
   (:generator 0
@@ -103,12 +103,12 @@
       (character-stack
        #!-sb-unicode
        (inst mov
-	     (make-ea :byte :base fp :disp (- (* (1+ (tn-offset y)) 4)))
-	     x)
+             (make-ea :byte :base fp :disp (- (* (1+ (tn-offset y)) 4)))
+             x)
        #!+sb-unicode
        (if (= (tn-offset fp) esp-offset)
-	   (storew x fp (tn-offset y))	; c-call
-	   (storew x fp (- (1+ (tn-offset y)))))))))
+           (storew x fp (tn-offset y))  ; c-call
+           (storew x fp (- (1+ (tn-offset y)))))))))
 (define-move-vop move-character-arg :move-arg
   (any-reg character-reg) (character-reg))
 
@@ -149,8 +149,8 @@
   (:args (code :scs (unsigned-reg unsigned-stack) :target eax))
   (:arg-types positive-fixnum)
   (:temporary (:sc unsigned-reg :offset eax-offset :target res
-		   :from (:argument 0) :to (:result 0))
-	      eax)
+                   :from (:argument 0) :to (:result 0))
+              eax)
   (:results (res :scs (character-reg)))
   (:result-types character)
   (:generator 1
@@ -160,9 +160,9 @@
 ;;; comparison of CHARACTERs
 (define-vop (character-compare)
   (:args (x :scs (character-reg character-stack))
-	 (y :scs (character-reg)
-	    :load-if (not (and (sc-is x character-reg)
-			       (sc-is y character-stack)))))
+         (y :scs (character-reg)
+            :load-if (not (and (sc-is x character-reg)
+                               (sc-is y character-stack)))))
   (:arg-types character character)
   (:conditional)
   (:info target not-p)

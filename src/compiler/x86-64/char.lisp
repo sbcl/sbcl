@@ -17,9 +17,9 @@
 #!+sb-unicode
 (define-vop (move-to-character)
   (:args (x :scs (any-reg descriptor-reg) :target y
-	    :load-if (not (location= x y))))
+            :load-if (not (location= x y))))
   (:results (y :scs (character-reg)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:note "character untagging")
   (:generator 1
     (move y x)
@@ -31,14 +31,14 @@
   (:note "character untagging")
   (:generator 1
     (let ((y-wide-tn (make-random-tn
-		      :kind :normal
-		      :sc (sc-or-lose 'any-reg)
-		      :offset (tn-offset y))))
+                      :kind :normal
+                      :sc (sc-or-lose 'any-reg)
+                      :offset (tn-offset y))))
       (move y-wide-tn x)
       (inst shr y-wide-tn 8)
       (inst and y-wide-tn #xff))))
 (define-move-vop move-to-character :move
-  (any-reg #!-sb-unicode control-stack) 
+  (any-reg #!-sb-unicode control-stack)
   (character-reg))
 
 ;;; Move an untagged char to a tagged representation.
@@ -57,22 +57,22 @@
   (:note "character tagging")
   (:generator 1
     (move (make-random-tn :kind :normal :sc (sc-or-lose 'character-reg)
-			  :offset (tn-offset y))
-	  x)
+                          :offset (tn-offset y))
+          x)
     (inst shl y n-widetag-bits)
     (inst or y character-widetag)
     (inst and y #xffff)))
 (define-move-vop move-from-character :move
-  (character-reg) 
+  (character-reg)
   (any-reg descriptor-reg #!-sb-unicode control-stack))
 
 ;;; Move untagged character values.
 (define-vop (character-move)
   (:args (x :target y
-	    :scs (character-reg)
-	    :load-if (not (location= x y))))
+            :scs (character-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (character-reg character-stack)
-	       :load-if (not (location= x y))))
+               :load-if (not (location= x y))))
   (:note "character move")
   (:effects)
   (:affected)
@@ -84,9 +84,9 @@
 ;;; Move untagged character arguments/return-values.
 (define-vop (move-character-arg)
   (:args (x :target y
-	    :scs (character-reg))
-	 (fp :scs (any-reg)
-	     :load-if (not (sc-is y character-reg))))
+            :scs (character-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y character-reg))))
   (:results (y))
   (:note "character arg move")
   (:generator 0
@@ -96,14 +96,14 @@
       (character-stack
        #!-sb-unicode
        (inst mov
-	     ;; FIXME: naked 8 (should be... what?  n-register-bytes?
-	     ;; n-word-bytes?  Dunno.
-	     (make-ea :byte :base fp :disp (- (* (1+ (tn-offset y)) 8)))
-	     x)
+             ;; FIXME: naked 8 (should be... what?  n-register-bytes?
+             ;; n-word-bytes?  Dunno.
+             (make-ea :byte :base fp :disp (- (* (1+ (tn-offset y)) 8)))
+             x)
        #!+sb-unicode
        (if (= (tn-offset fp) esp-offset)
-	   (storew x fp (tn-offset y)) ; c-call
-	   (storew x fp (- (1+ (tn-offset y)))))))))
+           (storew x fp (tn-offset y)) ; c-call
+           (storew x fp (- (1+ (tn-offset y)))))))))
 (define-move-vop move-character-arg :move-arg
   (any-reg character-reg) (character-reg))
 
@@ -144,8 +144,8 @@
   (:args (code :scs (unsigned-reg unsigned-stack) :target eax))
   (:arg-types positive-fixnum)
   (:temporary (:sc unsigned-reg :offset rax-offset :target res
-		   :from (:argument 0) :to (:result 0))
-	      eax)
+                   :from (:argument 0) :to (:result 0))
+              eax)
   (:results (res :scs (character-reg)))
   (:result-types character)
   (:generator 1
@@ -155,9 +155,9 @@
 ;;; comparison of CHARACTERs
 (define-vop (character-compare)
   (:args (x :scs (character-reg character-stack))
-	 (y :scs (character-reg)
-	    :load-if (not (and (sc-is x character-reg)
-			       (sc-is y character-stack)))))
+         (y :scs (character-reg)
+            :load-if (not (and (sc-is x character-reg)
+                               (sc-is y character-stack)))))
   (:arg-types character character)
   (:conditional)
   (:info target not-p)

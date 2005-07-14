@@ -19,8 +19,8 @@
 
 (defun my-make-wired-tn (prim-type-name sc-name offset)
   (make-wired-tn (primitive-type-or-lose prim-type-name)
-		 (sc-number-or-lose sc-name)
-		 offset))
+                 (sc-number-or-lose sc-name)
+                 offset))
 
 (defstruct (arg-state (:copier nil))
   (register-args 0)
@@ -30,13 +30,13 @@
 (defun int-arg (state prim-type reg-sc stack-sc)
   (let ((reg-args (arg-state-register-args state)))
     (cond ((< reg-args 6)
-	   (setf (arg-state-register-args state) (1+ reg-args))
-	   (my-make-wired-tn prim-type reg-sc
-			     (nth reg-args *c-call-register-arg-offsets*)))
-	  (t
-	   (let ((frame-size (arg-state-stack-frame-size state)))
-	     (setf (arg-state-stack-frame-size state) (1+ frame-size))
-	     (my-make-wired-tn prim-type stack-sc frame-size))))))
+           (setf (arg-state-register-args state) (1+ reg-args))
+           (my-make-wired-tn prim-type reg-sc
+                             (nth reg-args *c-call-register-arg-offsets*)))
+          (t
+           (let ((frame-size (arg-state-stack-frame-size state)))
+             (setf (arg-state-stack-frame-size state) (1+ frame-size))
+             (my-make-wired-tn prim-type stack-sc frame-size))))))
 
 (define-alien-type-method (integer :arg-tn) (type state)
   (if (alien-integer-type-signed type)
@@ -50,13 +50,13 @@
 (defun float-arg (state prim-type reg-sc stack-sc)
   (let ((xmm-args (arg-state-xmm-args state)))
     (cond ((< xmm-args 8)
-	   (setf (arg-state-xmm-args state) (1+ xmm-args))
-	   (my-make-wired-tn prim-type reg-sc
-			     (nth xmm-args *float-regs*)))
-	  (t
-	   (let ((frame-size (arg-state-stack-frame-size state)))
-	     (setf (arg-state-stack-frame-size state) (1+ frame-size))
-	     (my-make-wired-tn prim-type stack-sc frame-size))))))
+           (setf (arg-state-xmm-args state) (1+ xmm-args))
+           (my-make-wired-tn prim-type reg-sc
+                             (nth xmm-args *float-regs*)))
+          (t
+           (let ((frame-size (arg-state-stack-frame-size state)))
+             (setf (arg-state-stack-frame-size state) (1+ frame-size))
+             (my-make-wired-tn prim-type stack-sc frame-size))))))
 
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
@@ -80,14 +80,14 @@
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
     (multiple-value-bind (ptype reg-sc)
-	(if (alien-integer-type-signed type)
-	    (values 'signed-byte-64 'signed-reg)
-	    (values 'unsigned-byte-64 'unsigned-reg))
+        (if (alien-integer-type-signed type)
+            (values 'signed-byte-64 'signed-reg)
+            (values 'unsigned-byte-64 'unsigned-reg))
       (my-make-wired-tn ptype reg-sc (result-reg-offset num-results)))))
 
 (define-alien-type-method (integer :naturalize-gen) (type alien)
   (if (and (alien-integer-type-signed type)
-	   (<= (alien-type-bits type) 32))
+           (<= (alien-type-bits type) 32))
       `(sign-extend ,alien)
       alien))
 
@@ -96,7 +96,7 @@
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
     (my-make-wired-tn 'system-area-pointer 'sap-reg
-		      (result-reg-offset num-results))))
+                      (result-reg-offset num-results))))
 
 (define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type))
@@ -115,26 +115,26 @@
     (when (> (length values) 2)
       (error "Too many result values from c-call."))
     (mapcar (lambda (type)
-	      (invoke-alien-type-method :result-tn type state))
-	    values)))
+              (invoke-alien-type-method :result-tn type state))
+            values)))
 
 (!def-vm-support-routine make-call-out-tns (type)
   (let ((arg-state (make-arg-state)))
     (collect ((arg-tns))
       (dolist (arg-type (alien-fun-type-arg-types type))
-	(arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
+        (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
       (values (my-make-wired-tn 'positive-fixnum 'any-reg esp-offset)
-	      (* (arg-state-stack-frame-size arg-state) n-word-bytes)
-	      (arg-tns)
-	      (invoke-alien-type-method :result-tn
-					(alien-fun-type-result-type type)
-					(make-result-state))))))
+              (* (arg-state-stack-frame-size arg-state) n-word-bytes)
+              (arg-tns)
+              (invoke-alien-type-method :result-tn
+                                        (alien-fun-type-result-type type)
+                                        (make-result-state))))))
 
 
 (deftransform %alien-funcall ((function type &rest args) * * :node node)
   (aver (sb!c::constant-lvar-p type))
   (let* ((type (sb!c::lvar-value type))
-	 (env (sb!c::node-lexenv node))
+         (env (sb!c::node-lexenv node))
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type)))
     (aver (= (length arg-types) (length args)))
@@ -167,7 +167,7 @@
                            (if (alien-integer-type-signed result-type)
                                '(values (unsigned 64) (signed 64))
                                '(values (unsigned 64) (unsigned 64)))
-			   env))))
+                           env))))
                    `(lambda (function type ,@(lambda-vars))
                       (declare (ignore type))
                       (multiple-value-bind (low high)
@@ -190,7 +190,7 @@
 ;;; The ABI specifies that signed short/int's are returned as 32-bit
 ;;; values. Negative values need to be sign-extended to 64-bits (done
 ;;; in a :NATURALIZE-GEN alien-type-method).
-(defknown sign-extend (fixnum) fixnum (foldable flushable movable))  	  
+(defknown sign-extend (fixnum) fixnum (foldable flushable movable))
 
 (define-vop (sign-extend)
   (:translate sign-extend)
@@ -201,9 +201,9 @@
   (:result-types fixnum)
   (:generator 1
    (inst movsxd res
-	 (make-random-tn :kind :normal
-			 :sc (sc-or-lose 'dword-reg)
-			 :offset (tn-offset val)))))
+         (make-random-tn :kind :normal
+                         :sc (sc-or-lose 'dword-reg)
+                         :offset (tn-offset val)))))
 
 (defun sign-extend (x)
   (if (logbitp 31 x)
@@ -235,7 +235,7 @@
 
 (define-vop (call-out)
   (:args (function :scs (sap-reg))
-	 (args :more t))
+         (args :more t))
   (:results (results :more t))
   (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
   (:ignore results)
@@ -245,17 +245,17 @@
     ;; ABI: AL contains amount of arguments passed in XMM registers
     ;; for vararg calls.
     (move-immediate rax
-		    (loop for tn-ref = args then (tn-ref-across tn-ref)
-		       while tn-ref
-		       count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
-				 'float-registers)))
+                    (loop for tn-ref = args then (tn-ref-across tn-ref)
+                       while tn-ref
+                       count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
+                                 'float-registers)))
     (inst call function)
     ;; To give the debugger a clue. XX not really internal-error?
     (note-this-location vop :internal-error)
     ;; FLOAT15 needs to contain FP zero in Lispland
-    (let ((float15 (make-random-tn :kind :normal 
-			       :sc (sc-or-lose 'double-reg)
-			       :offset float15-offset)))
+    (let ((float15 (make-random-tn :kind :normal
+                               :sc (sc-or-lose 'double-reg)
+                               :offset float15-offset)))
       (inst xorpd float15 float15))))
 
 (define-vop (alloc-number-stack-space)
@@ -265,7 +265,7 @@
     (aver (location= result rsp-tn))
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 7) 7)))
-	(inst sub rsp-tn delta)))
+        (inst sub rsp-tn delta)))
     ;; C stack must be 16 byte aligned
     (inst and rsp-tn #xfffffff0)
     (move result rsp-tn)))
@@ -275,7 +275,7 @@
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 7) 7)))
-	(inst add rsp-tn delta)))))
+        (inst add rsp-tn delta)))))
 
 (define-vop (alloc-alien-stack-space)
   (:info amount)
@@ -286,14 +286,14 @@
     (aver (not (location= result rsp-tn)))
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 7) 7)))
-	(inst mov temp
-	      (make-ea :qword
-		       :disp (+ nil-value
-				(static-symbol-offset '*alien-stack*)
-				(ash symbol-tls-index-slot word-shift)
-				(- other-pointer-lowtag))))
-	(inst sub (make-ea :qword :base thread-base-tn 
-			   :scale 1 :index temp) delta)))
+        (inst mov temp
+              (make-ea :qword
+                       :disp (+ nil-value
+                                (static-symbol-offset '*alien-stack*)
+                                (ash symbol-tls-index-slot word-shift)
+                                (- other-pointer-lowtag))))
+        (inst sub (make-ea :qword :base thread-base-tn
+                           :scale 1 :index temp) delta)))
     (load-tl-symbol-value result *alien-stack*))
   #!-sb-thread
   (:generator 0
@@ -315,14 +315,14 @@
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 7) 7)))
-	(inst mov temp
-	      (make-ea :qword
-		       :disp (+ nil-value
-				(static-symbol-offset '*alien-stack*)
-				(ash symbol-tls-index-slot word-shift)
-				(- other-pointer-lowtag))))
-	(inst add (make-ea :qword :base thread-base-tn :scale 1 :index temp)
-	      delta))))
+        (inst mov temp
+              (make-ea :qword
+                       :disp (+ nil-value
+                                (static-symbol-offset '*alien-stack*)
+                                (ash symbol-tls-index-slot word-shift)
+                                (- other-pointer-lowtag))))
+        (inst add (make-ea :qword :base thread-base-tn :scale 1 :index temp)
+              delta))))
   #!-sb-thread
   (:generator 0
     (unless (zerop amount)
