@@ -84,14 +84,14 @@
   (collect ((types (list 'or)))
     (dolist (type *specialized-array-element-types*)
       (when (subtypep type '(or integer character float (complex float)))
-	(types `(array ,type ,dims))))
+        (types `(array ,type ,dims))))
     (types)))
 
 (sb!xc:deftype simple-unboxed-array (&optional dims)
   (collect ((types (list 'or)))
     (dolist (type *specialized-array-element-types*)
       (when (subtypep type '(or integer character float (complex float)))
-	(types `(simple-array ,type ,dims))))
+        (types `(simple-array ,type ,dims))))
     (types)))
 
 ;;; Return the symbol that describes the format of FLOAT.
@@ -110,24 +110,24 @@
 (defun specialize-array-type (type)
   (let ((eltype (array-type-element-type type)))
     (setf (array-type-specialized-element-type type)
-	  (if (or (eq eltype *wild-type*)
-		  ;; This is slightly dubious, but not as dubious as
-		  ;; assuming that the upgraded-element-type should be
-		  ;; equal to T, given the way that the AREF
-		  ;; DERIVE-TYPE optimizer works.  -- CSR, 2002-08-19
-		  (unknown-type-p eltype))
-	      *wild-type*
-	      (dolist (stype-name *specialized-array-element-types*
-				  *universal-type*)
-		;; FIXME: Mightn't it be better to have
-		;; *SPECIALIZED-ARRAY-ELEMENT-TYPES* be stored as precalculated
-		;; SPECIFIER-TYPE results, instead of having to calculate
-		;; them on the fly this way? (Call the new array
-		;; *SPECIALIZED-ARRAY-ELEMENT-SPECIFIER-TYPES* or something..)
-		(let ((stype (specifier-type stype-name)))
-		  (aver (not (unknown-type-p stype)))
-		  (when (csubtypep eltype stype)
-		    (return stype))))))
+          (if (or (eq eltype *wild-type*)
+                  ;; This is slightly dubious, but not as dubious as
+                  ;; assuming that the upgraded-element-type should be
+                  ;; equal to T, given the way that the AREF
+                  ;; DERIVE-TYPE optimizer works.  -- CSR, 2002-08-19
+                  (unknown-type-p eltype))
+              *wild-type*
+              (dolist (stype-name *specialized-array-element-types*
+                                  *universal-type*)
+                ;; FIXME: Mightn't it be better to have
+                ;; *SPECIALIZED-ARRAY-ELEMENT-TYPES* be stored as precalculated
+                ;; SPECIFIER-TYPE results, instead of having to calculate
+                ;; them on the fly this way? (Call the new array
+                ;; *SPECIALIZED-ARRAY-ELEMENT-SPECIFIER-TYPES* or something..)
+                (let ((stype (specifier-type stype-name)))
+                  (aver (not (unknown-type-p stype)))
+                  (when (csubtypep eltype stype)
+                    (return stype))))))
     type))
 
 (defun sb!xc:upgraded-array-element-type (spec &optional environment)
@@ -138,7 +138,7 @@
   (if (unknown-type-p (specifier-type spec))
       (error "undefined type: ~S" spec)
       (type-specifier (array-type-specialized-element-type
-		       (specifier-type `(array ,spec))))))
+                       (specifier-type `(array ,spec))))))
 
 (defun sb!xc:upgraded-complex-part-type (spec &optional environment)
   #!+sb-doc
@@ -168,10 +168,10 @@
 ;;; includes the given type.
 (defun containing-integer-type (subtype)
   (dolist (type '(fixnum
-		  (signed-byte 32)
-		  (unsigned-byte 32)
-		  integer)
-		(error "~S isn't an integer type?" subtype))
+                  (signed-byte 32)
+                  (unsigned-byte 32)
+                  integer)
+                (error "~S isn't an integer type?" subtype))
     (when (csubtypep subtype (specifier-type type))
       (return type))))
 
@@ -182,20 +182,20 @@
   (typecase type
     (cons-type
      (if (type= type (specifier-type 'cons))
-	 'sb!c:check-cons
-	 nil))
+         'sb!c:check-cons
+         nil))
     (built-in-classoid
      (if (type= type (specifier-type 'symbol))
-	 'sb!c:check-symbol
-	 nil))
+         'sb!c:check-symbol
+         nil))
     (numeric-type
      (cond ((type= type (specifier-type 'fixnum))
-	    'sb!c:check-fixnum)
-	   ((type= type (specifier-type '(signed-byte 32)))
-	    'sb!c:check-signed-byte-32)
-	   ((type= type (specifier-type '(unsigned-byte 32)))
-	    'sb!c:check-unsigned-byte-32)
-	   (t nil)))
+            'sb!c:check-fixnum)
+           ((type= type (specifier-type '(signed-byte 32)))
+            'sb!c:check-signed-byte-32)
+           ((type= type (specifier-type '(unsigned-byte 32)))
+            'sb!c:check-unsigned-byte-32)
+           (t nil)))
     (fun-type
      'sb!c:check-fun)
     (t

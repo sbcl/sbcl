@@ -15,12 +15,12 @@
 ;;; state for use with the SAVE- and RESTORE-DYNAMIC-ENVIRONMENT VOPs.
 (!def-vm-support-routine make-dynamic-state-tns ()
   (make-n-tns #.(let ((nsave
-		       (sb!c::vop-info-num-results
-			(template-or-lose 'save-dynamic-state)))
-		      (nrestore
-		       (sb!c::vop-info-num-args
-			(template-or-lose 'restore-dynamic-state))))
-		  (aver (= nsave nrestore))
-		  nsave)
-	      *backend-t-primitive-type*))
+                       (sb!c::vop-info-num-results
+                        (template-or-lose 'save-dynamic-state)))
+                      (nrestore
+                       (sb!c::vop-info-num-args
+                        (template-or-lose 'restore-dynamic-state))))
+                  (aver (= nsave nrestore))
+                  nsave)
+              *backend-t-primitive-type*))
 

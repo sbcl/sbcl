@@ -21,15 +21,15 @@
                `(eval-when (:compile-toplevel :load-toplevel :execute)
                   (def!constant ,offset-sym ,offset)
                   (setf (svref *register-names* ,offset-sym)
-			,(symbol-name name)))))
+                        ,(symbol-name name)))))
            (defregset (name &rest regs)
              `(eval-when  (:compile-toplevel :load-toplevel :execute)
                 (defparameter ,name
                   (list ,@(mapcar (lambda (name)
-				    (symbolicate name "-OFFSET"))
+                                    (symbolicate name "-OFFSET"))
                                   regs))))))
   ;; c.f. src/runtime/alpha-lispregs.h
-  
+
   ;; Ra
   (defreg lip 0)
   ;; Caller saved 0-7
@@ -73,13 +73,13 @@
   (defreg nsp 30)
   ;; Wired zero
   (defreg zero 31)
-  
+
   (defregset non-descriptor-regs
     nl0 nl1 nl2 nl3 nl4 nl5 nfp cfunc)
-  
+
   (defregset descriptor-regs
     fdefn lexenv nargs ocfp lra a0 a1 a2 a3 a4 a5 l0 l1 l2)
-  
+
   (defregset *register-arg-offsets*
     a0 a1 a2 a3 a4 a5)
   (defparameter register-arg-names '(a0 a1 a2 a3 a4 a5)))
@@ -96,22 +96,22 @@
 
 (defmacro !define-storage-classes (&rest classes)
   (do ((forms (list 'progn)
-	      (let* ((class (car classes))
-		     (sc-name (car class))
-		     (constant-name (intern (concatenate 'simple-string
-							 (string sc-name)
-							 "-SC-NUMBER"))))
-		(list* `(define-storage-class ,sc-name ,index
-			  ,@(cdr class))
-		       `(def!constant ,constant-name ,index)
-		       ;; (The CMU CL version of this macro did
-		       ;;   `(EXPORT ',CONSTANT-NAME)
-		       ;; here, but in SBCL we try to have package
-		       ;; structure described statically in one
-		       ;; master source file, instead of building it
-		       ;; dynamically by letting all the system code
-		       ;; modify it as the system boots.)
-		       forms)))
+              (let* ((class (car classes))
+                     (sc-name (car class))
+                     (constant-name (intern (concatenate 'simple-string
+                                                         (string sc-name)
+                                                         "-SC-NUMBER"))))
+                (list* `(define-storage-class ,sc-name ,index
+                          ,@(cdr class))
+                       `(def!constant ,constant-name ,index)
+                       ;; (The CMU CL version of this macro did
+                       ;;   `(EXPORT ',CONSTANT-NAME)
+                       ;; here, but in SBCL we try to have package
+                       ;; structure described statically in one
+                       ;; master source file, instead of building it
+                       ;; dynamically by letting all the system code
+                       ;; modify it as the system boots.)
+                       forms)))
        (index 0 (1+ index))
        (classes classes (cdr classes)))
       ((null classes)
@@ -141,15 +141,15 @@
 
   ;; The non-descriptor stacks.
   (signed-stack non-descriptor-stack
-		:element-size 2 :alignment 2) ; (signed-byte 64)
+                :element-size 2 :alignment 2) ; (signed-byte 64)
   (unsigned-stack non-descriptor-stack
-		  :element-size 2 :alignment 2) ; (unsigned-byte 64)
+                  :element-size 2 :alignment 2) ; (unsigned-byte 64)
   (character-stack non-descriptor-stack) ; non-descriptor characters.
   (sap-stack non-descriptor-stack
-	     :element-size 2 :alignment 2) ; System area pointers.
+             :element-size 2 :alignment 2) ; System area pointers.
   (single-stack non-descriptor-stack) ; single-floats
   (double-stack non-descriptor-stack
-		:element-size 2 :alignment 2) ; double floats.
+                :element-size 2 :alignment 2) ; double floats.
   (complex-single-stack non-descriptor-stack :element-size 2)
   (complex-double-stack non-descriptor-stack :element-size 4 :alignment 2)
 
@@ -248,8 +248,8 @@
                    (tn-sym (symbolicate name "-TN")))
                `(defparameter ,tn-sym
                   (make-random-tn :kind :normal
-		       :sc (sc-or-lose ',sc)
-		       :offset ,offset-sym)))))
+                       :sc (sc-or-lose ',sc)
+                       :offset ,offset-sym)))))
 
   ;; These, we access by foo-TN only
 
@@ -271,12 +271,12 @@
 ;; and some floating point values..
 (defparameter fp-single-zero-tn
   (make-random-tn :kind :normal
-		  :sc (sc-or-lose 'single-reg)
-		  :offset 31))
+                  :sc (sc-or-lose 'single-reg)
+                  :offset 31))
 (defparameter fp-double-zero-tn
   (make-random-tn :kind :normal
-		  :sc (sc-or-lose 'double-reg)
-		  :offset 31))
+                  :sc (sc-or-lose 'double-reg)
+                  :offset 31))
 
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
@@ -287,20 +287,20 @@
     (null
      (sc-number-or-lose 'null ))
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
-	 system-area-pointer character)
+         system-area-pointer character)
      (sc-number-or-lose 'immediate ))
     (symbol
      (if (static-symbol-p value)
-	 (sc-number-or-lose 'immediate )
-	 nil))
+         (sc-number-or-lose 'immediate )
+         nil))
     (single-float
      (if (eql value 0f0)
-	 (sc-number-or-lose 'fp-single-zero )
-	 nil))
+         (sc-number-or-lose 'fp-single-zero )
+         nil))
     (double-float
      (if (eql value 0d0)
-	 (sc-number-or-lose 'fp-double-zero )
-	 nil))))
+         (sc-number-or-lose 'fp-double-zero )
+         nil))))
 
 ;;;; function call parameters
 
@@ -327,10 +327,10 @@
 ;;; a list of TN's describing the register arguments
 (defparameter *register-arg-tns*
   (mapcar (lambda (n)
-	    (make-random-tn :kind :normal
-			    :sc (sc-or-lose 'descriptor-reg)
-			    :offset n))
-	  *register-arg-offsets*))
+            (make-random-tn :kind :normal
+                            :sc (sc-or-lose 'descriptor-reg)
+                            :offset n))
+          *register-arg-offsets*))
 
 ;;; This is used by the debugger.
 (def!constant single-value-return-byte-offset 4)
@@ -341,10 +341,10 @@
 (!def-vm-support-routine location-print-name (tn)
 ;  (declare (type tn tn))
   (let ((sb (sb-name (sc-sb (tn-sc tn))))
-	(offset (tn-offset tn)))
+        (offset (tn-offset tn)))
     (ecase sb
       (registers (or (svref *register-names* offset)
-		     (format nil "R~D" offset)))
+                     (format nil "R~D" offset)))
       (float-registers (format nil "F~D" offset))
       (control-stack (format nil "CS~D" offset))
       (non-descriptor-stack (format nil "NS~D" offset))

@@ -36,62 +36,62 @@
 (define-type-predicate simple-array-p simple-array)
 (define-type-predicate simple-array-nil-p (simple-array nil (*)))
 (define-type-predicate simple-array-unsigned-byte-2-p
-		       (simple-array (unsigned-byte 2) (*)))
+                       (simple-array (unsigned-byte 2) (*)))
 (define-type-predicate simple-array-unsigned-byte-4-p
-		       (simple-array (unsigned-byte 4) (*)))
+                       (simple-array (unsigned-byte 4) (*)))
 (define-type-predicate simple-array-unsigned-byte-7-p
                        (simple-array (unsigned-byte 7) (*)))
 (define-type-predicate simple-array-unsigned-byte-8-p
-		       (simple-array (unsigned-byte 8) (*)))
+                       (simple-array (unsigned-byte 8) (*)))
 (define-type-predicate simple-array-unsigned-byte-15-p
                        (simple-array (unsigned-byte 15) (*)))
 (define-type-predicate simple-array-unsigned-byte-16-p
-		       (simple-array (unsigned-byte 16) (*)))
+                       (simple-array (unsigned-byte 16) (*)))
 #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
 (define-type-predicate simple-array-unsigned-byte-29-p
                        (simple-array (unsigned-byte 29) (*)))
 (define-type-predicate simple-array-unsigned-byte-31-p
                        (simple-array (unsigned-byte 31) (*)))
 (define-type-predicate simple-array-unsigned-byte-32-p
-		       (simple-array (unsigned-byte 32) (*)))
+                       (simple-array (unsigned-byte 32) (*)))
 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
 (define-type-predicate simple-array-unsigned-byte-60-p
-		       (simple-array (unsigned-byte 60) (*)))
+                       (simple-array (unsigned-byte 60) (*)))
 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
 (define-type-predicate simple-array-unsigned-byte-63-p
-		       (simple-array (unsigned-byte 63) (*)))
+                       (simple-array (unsigned-byte 63) (*)))
 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
 (define-type-predicate simple-array-unsigned-byte-64-p
-		       (simple-array (unsigned-byte 64) (*)))
+                       (simple-array (unsigned-byte 64) (*)))
 (define-type-predicate simple-array-signed-byte-8-p
-		       (simple-array (signed-byte 8) (*)))
+                       (simple-array (signed-byte 8) (*)))
 (define-type-predicate simple-array-signed-byte-16-p
-		       (simple-array (signed-byte 16) (*)))
+                       (simple-array (signed-byte 16) (*)))
 #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
 (define-type-predicate simple-array-signed-byte-30-p
-		       (simple-array (signed-byte 30) (*)))
+                       (simple-array (signed-byte 30) (*)))
 (define-type-predicate simple-array-signed-byte-32-p
-		       (simple-array (signed-byte 32) (*)))
+                       (simple-array (signed-byte 32) (*)))
 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
 (define-type-predicate simple-array-signed-byte-61-p
-		       (simple-array (signed-byte 61) (*)))
+                       (simple-array (signed-byte 61) (*)))
 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
 (define-type-predicate simple-array-signed-byte-64-p
-		       (simple-array (signed-byte 64) (*)))
+                       (simple-array (signed-byte 64) (*)))
 (define-type-predicate simple-array-single-float-p
-		       (simple-array single-float (*)))
+                       (simple-array single-float (*)))
 (define-type-predicate simple-array-double-float-p
-		       (simple-array double-float (*)))
+                       (simple-array double-float (*)))
 #!+long-float
 (define-type-predicate simple-array-long-float-p
-		       (simple-array long-float (*)))
+                       (simple-array long-float (*)))
 (define-type-predicate simple-array-complex-single-float-p
-		       (simple-array (complex single-float) (*)))
+                       (simple-array (complex single-float) (*)))
 (define-type-predicate simple-array-complex-double-float-p
-		       (simple-array (complex double-float) (*)))
+                       (simple-array (complex double-float) (*)))
 #!+long-float
 (define-type-predicate simple-array-complex-long-float-p
-		       (simple-array (complex long-float) (*)))
+                       (simple-array (complex long-float) (*)))
 (define-type-predicate simple-base-string-p simple-base-string)
 #!+sb-unicode (define-type-predicate simple-character-string-p
                   (simple-array character (*)))

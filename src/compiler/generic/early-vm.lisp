@@ -37,7 +37,7 @@
 ;;; a mask to extract the type from a data block header word
 (def!constant widetag-mask (1- (ash 1 n-widetag-bits)))
 
-(def!constant sb!xc:most-positive-fixnum  
+(def!constant sb!xc:most-positive-fixnum
     (1- (ash 1 (- n-word-bits n-lowtag-bits)))
   #!+sb-doc
   "the fixnum closest in value to positive infinity")

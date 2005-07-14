@@ -28,11 +28,11 @@
 (defun static-symbol-offset (symbol)
   (if symbol
       (let ((posn (position symbol *static-symbols*)))
-	(unless posn (error "~S is not a static symbol." symbol))
-	(+ (* posn (pad-data-block symbol-size))
-	   (pad-data-block (1- symbol-size))
-	   other-pointer-lowtag
-	   (- list-pointer-lowtag)))
+        (unless posn (error "~S is not a static symbol." symbol))
+        (+ (* posn (pad-data-block symbol-size))
+           (pad-data-block (1- symbol-size))
+           other-pointer-lowtag
+           (- list-pointer-lowtag)))
       0))
 
 ;;; Given a byte offset, OFFSET, return the appropriate static symbol.
@@ -40,18 +40,18 @@
   (if (zerop offset)
       nil
       (multiple-value-bind (n rem)
-	  (truncate (+ offset list-pointer-lowtag (- other-pointer-lowtag)
-		       (- (pad-data-block (1- symbol-size))))
-		    (pad-data-block symbol-size))
-	(unless (and (zerop rem) (<= 0 n (1- (length *static-symbols*))))
-	  (error "The byte offset ~W is not valid." offset))
-	(elt *static-symbols* n))))
+          (truncate (+ offset list-pointer-lowtag (- other-pointer-lowtag)
+                       (- (pad-data-block (1- symbol-size))))
+                    (pad-data-block symbol-size))
+        (unless (and (zerop rem) (<= 0 n (1- (length *static-symbols*))))
+          (error "The byte offset ~W is not valid." offset))
+        (elt *static-symbols* n))))
 
 ;;; Return the (byte) offset from NIL to the start of the fdefn object
 ;;; for the static function NAME.
 (defun static-fun-offset (name)
   (let ((static-syms (length *static-symbols*))
-	(static-fun-index (position name *static-funs*)))
+        (static-fun-index (position name *static-funs*)))
     (unless static-fun-index
       (error "~S isn't a static function." name))
     (+ (* static-syms (pad-data-block symbol-size))

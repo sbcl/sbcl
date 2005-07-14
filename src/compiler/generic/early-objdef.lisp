@@ -20,12 +20,12 @@
 ;;; 'def.*even-fixnum-lowtag' can find them.
 
 ;;; Tags for the main low-level types are stored in the low n (usually three)
-;;; bits to identify the type of a machine word.  Certain constraints 
+;;; bits to identify the type of a machine word.  Certain constraints
 ;;; apply:
 ;;;   * EVEN-FIXNUM-LOWTAG and ODD-FIXNUM-LOWTAG must be 0 and 4: code
 ;;;     which shifts left two places to convert raw integers to tagged
 ;;;     fixnums is ubiquitous.
-;;;   * LIST-POINTER-LOWTAG + N-WORD-BYTES = OTHER-POINTER-LOWTAG: NIL 
+;;;   * LIST-POINTER-LOWTAG + N-WORD-BYTES = OTHER-POINTER-LOWTAG: NIL
 ;;;     is both a cons and a symbol (at the same address) and depends on this.
 ;;;     See the definition of SYMBOL in objdef.lisp
 ;;;   * OTHER-POINTER-LOWTAG > 4: Some code in the SPARC backend,
@@ -33,7 +33,7 @@
 ;;;     PSEUDO-ATOMIC is on, doesn't strip the low bits of reg_ALLOC
 ;;;     before ORing in OTHER-POINTER-LOWTAG within a PSEUDO-ATOMIC
 ;;;     section.
-;;;   * OTHER-IMMEDIATE-0-LOWTAG are spaced 4 apart: various code wants to 
+;;;   * OTHER-IMMEDIATE-0-LOWTAG are spaced 4 apart: various code wants to
 ;;;     iterate through these
 ;;;   * Allocation code on Alpha wants lowtags for heap-allocated
 ;;;     objects to be odd.
@@ -110,13 +110,13 @@
 ;;;   ANDcc tag,  0xA6, tag
 ;;;   JNE   tag, label
 ;;;
-;;; rather than two separate tests and jumps 
+;;; rather than two separate tests and jumps
 (defenum (:suffix -widetag
           ;; The first widetag must be greater than SB!VM:LOWTAG-LIMIT
           ;; otherwise code in generic/early-type-vops will suffer
           ;; a long, horrible death.  --njf, 2004-08-09
-	  :start (+ (ash 1 n-lowtag-bits) other-immediate-0-lowtag)
-	  :step 4)
+          :start (+ (ash 1 n-lowtag-bits) other-immediate-0-lowtag)
+          :step 4)
   ;; NOTE: the binary numbers off to the side are only valid for 32-bit
   ;; ports; add #b1000 if you want to know the values for 64-bit ports.
   ;; And note that the numbers get a little scrambled further down.

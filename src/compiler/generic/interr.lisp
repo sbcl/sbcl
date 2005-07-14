@@ -24,14 +24,14 @@
 ;;; functions as closures instead of DEFUNs?
 (eval-when (:compile-toplevel :execute)
   (def!macro define-internal-errors (&rest errors)
-	     (let ((info (mapcar (lambda (x)
-				   (cons (symbolicate (first x) "-ERROR")
-					 (second x)))
-				 errors)))
-	       `(progn
-		  (setf sb!c:*backend-internal-errors*
-			',(coerce info 'vector))
-		  nil))))
+             (let ((info (mapcar (lambda (x)
+                                   (cons (symbolicate (first x) "-ERROR")
+                                         (second x)))
+                                 errors)))
+               `(progn
+                  (setf sb!c:*backend-internal-errors*
+                        ',(coerce info 'vector))
+                  nil))))
 
 (define-internal-errors
   (unknown
@@ -147,11 +147,11 @@
    "Object is not a complex (non-SIMPLE-ARRAY) vector.")
   .
   #.(map 'list
-	 (lambda (saetp)
-	   (list
-	    (symbolicate "OBJECT-NOT-" (sb!vm:saetp-primitive-type-name saetp))
-	    (format nil "Object is not of type ~A."
-		    (specifier-type
-		     `(simple-array ,(sb!vm:saetp-specifier saetp) (*))))))
-	 sb!vm:*specialized-array-element-type-properties*))
+         (lambda (saetp)
+           (list
+            (symbolicate "OBJECT-NOT-" (sb!vm:saetp-primitive-type-name saetp))
+            (format nil "Object is not of type ~A."
+                    (specifier-type
+                     `(simple-array ,(sb!vm:saetp-specifier saetp) (*))))))
+         sb!vm:*specialized-array-element-type-properties*))
 

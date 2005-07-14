@@ -24,66 +24,66 @@
       (inst and value fixnum-tag-mask temp)
       (inst beq temp (if not-p drop-through target)))
     (%test-headers value target not-p nil headers
-		   :drop-through drop-through :temp temp)))
+                   :drop-through drop-through :temp temp)))
 
 (defun %test-immediate (value target not-p immediate &key temp)
   (assemble ()
     (inst and value 255 temp)
     (inst xor temp immediate temp)
     (if not-p
-	(inst bne temp target)
-	(inst beq temp target))))
+        (inst bne temp target)
+        (inst beq temp target))))
 
 (defun %test-lowtag (value target not-p lowtag &key temp)
   (assemble ()
     (inst and value lowtag-mask temp)
     (inst xor temp lowtag temp)
     (if not-p
-	(inst bne temp target)
-	(inst beq temp target))))
+        (inst bne temp target)
+        (inst beq temp target))))
 
 (defun %test-headers (value target not-p function-p headers
-		      &key (drop-through (gen-label)) temp)
+                      &key (drop-through (gen-label)) temp)
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind
-	(when-true when-false)
-	;; WHEN-TRUE and WHEN-FALSE are the labels to branch to when
-	;; we know it's true and when we know it's false respectively.
-	(if not-p
-	    (values drop-through target)
-	    (values target drop-through))
+        (when-true when-false)
+        ;; WHEN-TRUE and WHEN-FALSE are the labels to branch to when
+        ;; we know it's true and when we know it's false respectively.
+        (if not-p
+            (values drop-through target)
+            (values target drop-through))
       (assemble ()
-	(%test-lowtag value when-false t lowtag :temp temp)
-	(load-type temp value (- lowtag))
-	(let ((delta 0))
-	  (do ((remaining headers (cdr remaining)))
-	      ((null remaining))
-	    (let ((header (car remaining))
-		  (last (null (cdr remaining))))
-	      (cond
-	       ((atom header)
-		(inst subq temp (- header delta) temp)
-		(setf delta header)
-		(if last
-		    (if not-p
-			(inst bne temp target)
-			(inst beq temp target))
-		    (inst beq temp when-true)))
-	       (t
-		(let ((start (car header))
-		      (end (cdr header)))
-		  (unless (= start bignum-widetag)
-		    (inst subq temp (- start delta) temp)
-		    (setf delta start)
-		    (inst blt temp when-false))
-		  (inst subq temp (- end delta) temp)
-		  (setf delta end)
-		  (if last
-		      (if not-p
-			  (inst bgt temp target)
-			  (inst ble temp target))
-		      (inst ble temp when-true))))))))
-	(emit-label drop-through)))))
+        (%test-lowtag value when-false t lowtag :temp temp)
+        (load-type temp value (- lowtag))
+        (let ((delta 0))
+          (do ((remaining headers (cdr remaining)))
+              ((null remaining))
+            (let ((header (car remaining))
+                  (last (null (cdr remaining))))
+              (cond
+               ((atom header)
+                (inst subq temp (- header delta) temp)
+                (setf delta header)
+                (if last
+                    (if not-p
+                        (inst bne temp target)
+                        (inst beq temp target))
+                    (inst beq temp when-true)))
+               (t
+                (let ((start (car header))
+                      (end (cdr header)))
+                  (unless (= start bignum-widetag)
+                    (inst subq temp (- start delta) temp)
+                    (setf delta start)
+                    (inst blt temp when-false))
+                  (inst subq temp (- end delta) temp)
+                  (setf delta end)
+                  (if last
+                      (if not-p
+                          (inst bgt temp target)
+                          (inst ble temp target))
+                      (inst ble temp when-true))))))))
+        (emit-label drop-through)))))
 
 ;;;; Type checking and testing:
 
@@ -106,24 +106,24 @@
      (if (> (apply #'max type-codes) lowtag-limit) 7 2)))
 
 (defmacro !define-type-vops (pred-name check-name ptype error-code
-			     (&rest type-codes)
-			     &key &allow-other-keys)
+                             (&rest type-codes)
+                             &key &allow-other-keys)
   (let ((cost (cost-to-test-types (mapcar #'eval type-codes))))
     `(progn
        ,@(when pred-name
-	   `((define-vop (,pred-name type-predicate)
-	       (:translate ,pred-name)
-	       (:generator ,cost
-		 (test-type value target not-p (,@type-codes) :temp temp)))))
+           `((define-vop (,pred-name type-predicate)
+               (:translate ,pred-name)
+               (:generator ,cost
+                 (test-type value target not-p (,@type-codes) :temp temp)))))
        ,@(when check-name
-	   `((define-vop (,check-name check-type)
-	       (:generator ,cost
-		 (let ((err-lab
-			(generate-error-code vop ,error-code value)))
-		   (test-type value err-lab t (,@type-codes) :temp temp)
-		   (move value result))))))
+           `((define-vop (,check-name check-type)
+               (:generator ,cost
+                 (let ((err-lab
+                        (generate-error-code vop ,error-code value)))
+                   (test-type value err-lab t (,@type-codes) :temp temp)
+                   (move value result))))))
        ,@(when ptype
-	   `((primitive-type-vop ,check-name (:check) ,ptype))))))
+           `((primitive-type-vop ,check-name (:check) ,ptype))))))
 
 ;;;; Other integer ranges.
 
@@ -134,8 +134,8 @@
   (multiple-value-bind
       (yep nope)
       (if not-p
-	  (values not-target target)
-	  (values target not-target))
+          (values not-target target)
+          (values target not-target))
     (assemble ()
       (inst and value fixnum-tag-mask temp)
       (inst beq temp yep)
@@ -146,8 +146,8 @@
       (inst li (+ (ash 1 n-widetag-bits) bignum-widetag) temp1)
       (inst xor temp temp1 temp)
       (if not-p
-	  (inst bne temp target)
-	  (inst beq temp target))))
+          (inst bne temp target)
+          (inst beq temp target))))
   (values))
 
 (define-vop (signed-byte-32-p type-predicate)
@@ -161,7 +161,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp1)
   (:generator 45
     (let ((loose (generate-error-code vop object-not-signed-byte-32-error
-				      value)))
+                                      value)))
       (signed-byte-32-test value temp temp1 t loose okay))
     OKAY
     (move value result)))
@@ -172,9 +172,9 @@
 
 (defun unsigned-byte-32-test (value temp temp1 not-p target not-target)
   (multiple-value-bind (yep nope)
-		       (if not-p
-			   (values not-target target)
-			   (values target not-target))
+                       (if not-p
+                           (values not-target target)
+                           (values target not-target))
     (assemble ()
       ;; Is it a fixnum?
       (inst and value fixnum-tag-mask temp1)
@@ -193,8 +193,8 @@
       (inst beq temp single-word)
       ;; If it's other than two, we can't be an (unsigned-byte 32)
       (inst li (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
-		       (+ (ash 2 n-widetag-bits) bignum-widetag))
-	    temp1)
+                       (+ (ash 2 n-widetag-bits) bignum-widetag))
+            temp1)
       (inst xor temp temp1 temp)
       (inst bne temp nope)
       ;; Get the second digit.
@@ -202,7 +202,7 @@
       ;; All zeros, its an (unsigned-byte 32).
       (inst beq temp yep)
       (inst br zero-tn nope)
-	
+
       SINGLE-WORD
       ;; Get the single digit.
       (loadw temp value bignum-digits-offset other-pointer-lowtag)
@@ -210,8 +210,8 @@
       ;; positive implies (unsigned-byte 32).
       FIXNUM
       (if not-p
-	  (inst blt temp target)
-	  (inst bge temp target))))
+          (inst blt temp target)
+          (inst bge temp target))))
   (values))
 
 (define-vop (unsigned-byte-32-p type-predicate)
@@ -225,7 +225,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp1)
   (:generator 45
     (let ((loose (generate-error-code vop object-not-unsigned-byte-32-error
-				      value)))
+                                      value)))
       (unsigned-byte-32-test value temp temp1 t loose okay))
     OKAY
     (move value result)))
@@ -233,7 +233,7 @@
 
 
 ;;;; List/symbol types:
-;;; 
+;;;
 ;;; symbolp (or symbol (eq nil))
 ;;; consp (and list (not (eq nil)))
 
@@ -255,7 +255,7 @@
       (test-type value error t (symbol-header-widetag) :temp temp))
     DROP-THRU
     (move value result)))
-  
+
 (define-vop (consp type-predicate)
   (:translate consp)
   (:temporary (:scs (non-descriptor-reg)) temp)

@@ -100,14 +100,14 @@
 ;;; primitive other-pointer array types
 (/show0 "primtype.lisp 96")
 (macrolet ((define-simple-array-primitive-types ()
-	       `(progn
-		 ,@(map 'list
-			(lambda (saetp)
-			  `(!def-primitive-type
-			    ,(saetp-primitive-type-name saetp)
-			    (descriptor-reg)
-			    :type (simple-array ,(saetp-specifier saetp) (*))))
-			*specialized-array-element-type-properties*))))
+               `(progn
+                 ,@(map 'list
+                        (lambda (saetp)
+                          `(!def-primitive-type
+                            ,(saetp-primitive-type-name saetp)
+                            (descriptor-reg)
+                            :type (simple-array ,(saetp-specifier saetp) (*))))
+                        *specialized-array-element-type-properties*))))
   (define-simple-array-primitive-types))
 ;;; Note: The complex array types are not included, 'cause it is
 ;;; pointless to restrict VOPs to them.
@@ -126,10 +126,10 @@
 (!def-vm-support-routine primitive-type-of (object)
   (let ((type (ctype-of object)))
     (cond ((not (member-type-p type)) (primitive-type type))
-	  ((equal (member-type-members type) '(nil))
-	   (primitive-type-or-lose 'list))
-	  (t
-	   *backend-t-primitive-type*))))
+          ((equal (member-type-members type) '(nil))
+           (primitive-type-or-lose 'list))
+          (t
+           *backend-t-primitive-type*))))
 
 ;;; Return the primitive type corresponding to a type descriptor
 ;;; structure. The second value is true when the primitive type is
@@ -145,172 +145,172 @@
   (primitive-type-aux type))
 (/show0 "primtype.lisp 191")
 (defun-cached (primitive-type-aux
-	       :hash-function (lambda (x)
-				(logand (type-hash-value x) #x1FF))
-	       :hash-bits 9
-	       :values 2
-	       :default (values nil :empty))
-	      ((type eq))
+               :hash-function (lambda (x)
+                                (logand (type-hash-value x) #x1FF))
+               :hash-bits 9
+               :values 2
+               :default (values nil :empty))
+              ((type eq))
   (declare (type ctype type))
   (macrolet ((any () '(values *backend-t-primitive-type* nil))
-	     (exactly (type)
-	       `(values (primitive-type-or-lose ',type) t))
-	     (part-of (type)
-	       `(values (primitive-type-or-lose ',type) nil)))
+             (exactly (type)
+               `(values (primitive-type-or-lose ',type) t))
+             (part-of (type)
+               `(values (primitive-type-or-lose ',type) nil)))
     (flet ((maybe-numeric-type-union (t1 t2)
-	     (let ((t1-name (primitive-type-name t1))
-		   (t2-name (primitive-type-name t2)))
-	       (case t1-name
-		 (positive-fixnum
-		  (if (or (eq t2-name 'fixnum)
-			  (eq t2-name
-			      (ecase sb!vm::n-machine-word-bits
-				(32 'signed-byte-32)
-				(64 'signed-byte-64)))
-			  (eq t2-name
-			      (ecase sb!vm::n-machine-word-bits
-				(32 'unsigned-byte-31)
-				(64 'unsigned-byte-63)))
-			  (eq t2-name
-			      (ecase sb!vm::n-machine-word-bits
-				(32 'unsigned-byte-32)
-				(64 'unsigned-byte-64))))
-		      t2))
-		 (fixnum
-		  (case t2-name
-		    (#.(ecase sb!vm::n-machine-word-bits
-			 (32 'signed-byte-32)
-			 (64 'signed-byte-64))
-		       t2)
-		    (#.(ecase sb!vm::n-machine-word-bits
-			 (32 'unsigned-byte-31)
-			 (64 'unsigned-byte-63))
-		       (primitive-type-or-lose
-			(ecase sb!vm::n-machine-word-bits
-			  (32 'signed-byte-32)
-			  (64 'signed-byte-64))))))
-		 (#.(ecase sb!vm::n-machine-word-bits
-		      (32 'signed-byte-32)
-		      (64 'signed-byte-64))
-		  (if (eq t2-name
-			  (ecase sb!vm::n-machine-word-bits
-			    (32 'unsigned-byte-31)
-			    (64 'unsigned-byte-63)))
-		      t1))
-		 (#.(ecase sb!vm::n-machine-word-bits
-		      (32 'unsigned-byte-31)
-		      (64 'unsigned-byte-63))
-		    (if (eq t2-name
-			    (ecase sb!vm::n-machine-word-bits
-			      (32 'unsigned-byte-32)
-			      (64 'unsigned-byte-64)))
-			t2))))))
+             (let ((t1-name (primitive-type-name t1))
+                   (t2-name (primitive-type-name t2)))
+               (case t1-name
+                 (positive-fixnum
+                  (if (or (eq t2-name 'fixnum)
+                          (eq t2-name
+                              (ecase sb!vm::n-machine-word-bits
+                                (32 'signed-byte-32)
+                                (64 'signed-byte-64)))
+                          (eq t2-name
+                              (ecase sb!vm::n-machine-word-bits
+                                (32 'unsigned-byte-31)
+                                (64 'unsigned-byte-63)))
+                          (eq t2-name
+                              (ecase sb!vm::n-machine-word-bits
+                                (32 'unsigned-byte-32)
+                                (64 'unsigned-byte-64))))
+                      t2))
+                 (fixnum
+                  (case t2-name
+                    (#.(ecase sb!vm::n-machine-word-bits
+                         (32 'signed-byte-32)
+                         (64 'signed-byte-64))
+                       t2)
+                    (#.(ecase sb!vm::n-machine-word-bits
+                         (32 'unsigned-byte-31)
+                         (64 'unsigned-byte-63))
+                       (primitive-type-or-lose
+                        (ecase sb!vm::n-machine-word-bits
+                          (32 'signed-byte-32)
+                          (64 'signed-byte-64))))))
+                 (#.(ecase sb!vm::n-machine-word-bits
+                      (32 'signed-byte-32)
+                      (64 'signed-byte-64))
+                  (if (eq t2-name
+                          (ecase sb!vm::n-machine-word-bits
+                            (32 'unsigned-byte-31)
+                            (64 'unsigned-byte-63)))
+                      t1))
+                 (#.(ecase sb!vm::n-machine-word-bits
+                      (32 'unsigned-byte-31)
+                      (64 'unsigned-byte-63))
+                    (if (eq t2-name
+                            (ecase sb!vm::n-machine-word-bits
+                              (32 'unsigned-byte-32)
+                              (64 'unsigned-byte-64)))
+                        t2))))))
       (etypecase type
-	(numeric-type
-	 (let ((lo (numeric-type-low type))
-	       (hi (numeric-type-high type)))
-	   (case (numeric-type-complexp type)
-	     (:real
-	      (case (numeric-type-class type)
-		(integer
-		 (cond ((and hi lo)
-			(dolist (spec
-				  `((positive-fixnum 0 ,sb!xc:most-positive-fixnum)
-				    ,@(ecase sb!vm::n-machine-word-bits
-					(32
-					 `((unsigned-byte-31
-					    0 ,(1- (ash 1 31)))
-					   (unsigned-byte-32
-					    0 ,(1- (ash 1 32)))))
-					(64
-					 `((unsigned-byte-63
-					    0 ,(1- (ash 1 63)))
-					   (unsigned-byte-64
-					    0 ,(1- (ash 1 64))))))
-				    (fixnum ,sb!xc:most-negative-fixnum
-					    ,sb!xc:most-positive-fixnum)
-				    ,(ecase sb!vm::n-machine-word-bits
-				       (32
-					`(signed-byte-32 ,(ash -1 31)
-					                 ,(1- (ash 1 31))))
-				       (64
-					`(signed-byte-64 ,(ash -1 63)
-							 ,(1- (ash 1 63))))))
-				 (if (or (< hi sb!xc:most-negative-fixnum)
-					 (> lo sb!xc:most-positive-fixnum))
-				     (part-of bignum)
-				     (any)))
-			  (let ((type (car spec))
-				(min (cadr spec))
-				(max (caddr spec)))
-			    (when (<= min lo hi max)
-			      (return (values
-				       (primitive-type-or-lose type)
-				       (and (= lo min) (= hi max))))))))
-		       ((or (and hi (< hi sb!xc:most-negative-fixnum))
-			    (and lo (> lo sb!xc:most-positive-fixnum)))
-			(part-of bignum))
-		       (t
-			(any))))
-		(float
-		 (let ((exact (and (null lo) (null hi))))
-		   (case (numeric-type-format type)
-		     ((short-float single-float)
-		      (values (primitive-type-or-lose 'single-float)
-			      exact))
-		     ((double-float)
-		      (values (primitive-type-or-lose 'double-float)
-			      exact))
-		     (t
-		      (any)))))
-		(t
-		 (any))))
-	     (:complex
-	      (if (eq (numeric-type-class type) 'float)
-		  (let ((exact (and (null lo) (null hi))))
-		    (case (numeric-type-format type)
-		      ((short-float single-float)
-		       (values (primitive-type-or-lose 'complex-single-float)
-			       exact))
-		      ((double-float long-float)
-		       (values (primitive-type-or-lose 'complex-double-float)
-			       exact))
-		      (t
-		       (part-of complex))))
-		  (part-of complex)))
-	     (t
-	      (any)))))
-	(array-type
-	 (if (array-type-complexp type)
-	     (any)
-	     (let* ((dims (array-type-dimensions type))
-		    (etype (array-type-specialized-element-type type))
-		    (type-spec (type-specifier etype))
-		    ;; FIXME: We're _WHAT_?  Testing for type equality
-		    ;; with a specifier and #'EQUAL?  *BOGGLE*.  --
-		    ;; CSR, 2003-06-24
-		    (ptype (cdr (assoc type-spec *simple-array-primitive-types*
-				       :test #'equal))))
-	       (if (and (consp dims) (null (rest dims)) ptype)
-		   (values (primitive-type-or-lose ptype)
-			   (eq (first dims) '*))
-		   (any)))))
-	(union-type
-	 (if (type= type (specifier-type 'list))
-	     (exactly list)
-	     (let ((types (union-type-types type)))
-	       (multiple-value-bind (res exact) (primitive-type (first types))
-		 (dolist (type (rest types) (values res exact))
-		   (multiple-value-bind (ptype ptype-exact)
-		       (primitive-type type)
-		     (unless ptype-exact (setq exact nil))
-		     (unless (eq ptype res)
-		       (let ((new-ptype 
+        (numeric-type
+         (let ((lo (numeric-type-low type))
+               (hi (numeric-type-high type)))
+           (case (numeric-type-complexp type)
+             (:real
+              (case (numeric-type-class type)
+                (integer
+                 (cond ((and hi lo)
+                        (dolist (spec
+                                  `((positive-fixnum 0 ,sb!xc:most-positive-fixnum)
+                                    ,@(ecase sb!vm::n-machine-word-bits
+                                        (32
+                                         `((unsigned-byte-31
+                                            0 ,(1- (ash 1 31)))
+                                           (unsigned-byte-32
+                                            0 ,(1- (ash 1 32)))))
+                                        (64
+                                         `((unsigned-byte-63
+                                            0 ,(1- (ash 1 63)))
+                                           (unsigned-byte-64
+                                            0 ,(1- (ash 1 64))))))
+                                    (fixnum ,sb!xc:most-negative-fixnum
+                                            ,sb!xc:most-positive-fixnum)
+                                    ,(ecase sb!vm::n-machine-word-bits
+                                       (32
+                                        `(signed-byte-32 ,(ash -1 31)
+                                                         ,(1- (ash 1 31))))
+                                       (64
+                                        `(signed-byte-64 ,(ash -1 63)
+                                                         ,(1- (ash 1 63))))))
+                                 (if (or (< hi sb!xc:most-negative-fixnum)
+                                         (> lo sb!xc:most-positive-fixnum))
+                                     (part-of bignum)
+                                     (any)))
+                          (let ((type (car spec))
+                                (min (cadr spec))
+                                (max (caddr spec)))
+                            (when (<= min lo hi max)
+                              (return (values
+                                       (primitive-type-or-lose type)
+                                       (and (= lo min) (= hi max))))))))
+                       ((or (and hi (< hi sb!xc:most-negative-fixnum))
+                            (and lo (> lo sb!xc:most-positive-fixnum)))
+                        (part-of bignum))
+                       (t
+                        (any))))
+                (float
+                 (let ((exact (and (null lo) (null hi))))
+                   (case (numeric-type-format type)
+                     ((short-float single-float)
+                      (values (primitive-type-or-lose 'single-float)
+                              exact))
+                     ((double-float)
+                      (values (primitive-type-or-lose 'double-float)
+                              exact))
+                     (t
+                      (any)))))
+                (t
+                 (any))))
+             (:complex
+              (if (eq (numeric-type-class type) 'float)
+                  (let ((exact (and (null lo) (null hi))))
+                    (case (numeric-type-format type)
+                      ((short-float single-float)
+                       (values (primitive-type-or-lose 'complex-single-float)
+                               exact))
+                      ((double-float long-float)
+                       (values (primitive-type-or-lose 'complex-double-float)
+                               exact))
+                      (t
+                       (part-of complex))))
+                  (part-of complex)))
+             (t
+              (any)))))
+        (array-type
+         (if (array-type-complexp type)
+             (any)
+             (let* ((dims (array-type-dimensions type))
+                    (etype (array-type-specialized-element-type type))
+                    (type-spec (type-specifier etype))
+                    ;; FIXME: We're _WHAT_?  Testing for type equality
+                    ;; with a specifier and #'EQUAL?  *BOGGLE*.  --
+                    ;; CSR, 2003-06-24
+                    (ptype (cdr (assoc type-spec *simple-array-primitive-types*
+                                       :test #'equal))))
+               (if (and (consp dims) (null (rest dims)) ptype)
+                   (values (primitive-type-or-lose ptype)
+                           (eq (first dims) '*))
+                   (any)))))
+        (union-type
+         (if (type= type (specifier-type 'list))
+             (exactly list)
+             (let ((types (union-type-types type)))
+               (multiple-value-bind (res exact) (primitive-type (first types))
+                 (dolist (type (rest types) (values res exact))
+                   (multiple-value-bind (ptype ptype-exact)
+                       (primitive-type type)
+                     (unless ptype-exact (setq exact nil))
+                     (unless (eq ptype res)
+                       (let ((new-ptype
                               (or (maybe-numeric-type-union res ptype)
-				  (maybe-numeric-type-union ptype res))))
-			 (if new-ptype
-			     (setq res new-ptype)
-			     (return (any)))))))))))
+                                  (maybe-numeric-type-union ptype res))))
+                         (if new-ptype
+                             (setq res new-ptype)
+                             (return (any)))))))))))
         (intersection-type
          (let ((types (intersection-type-types type))
                (res (any))
@@ -334,21 +334,21 @@
                    ;; (any). Takes care of undecidable types in
                    ;; intersections with decidable ones.
                    (setq res ptype))))))
-	(member-type
-	 (let* ((members (member-type-members type))
-		(res (primitive-type-of (first members))))
-	   (dolist (mem (rest members) (values res nil))
-	     (let ((ptype (primitive-type-of mem)))
-	       (unless (eq ptype res)
-		 (let ((new-ptype (or (maybe-numeric-type-union res ptype)
-				      (maybe-numeric-type-union ptype res))))
-		   (if new-ptype
-		       (setq res new-ptype)
-		       (return (any)))))))))
-	(named-type
-	 (ecase (named-type-name type)
-	   ((t *) (values *backend-t-primitive-type* t))
-	   ((nil) (any))))
+        (member-type
+         (let* ((members (member-type-members type))
+                (res (primitive-type-of (first members))))
+           (dolist (mem (rest members) (values res nil))
+             (let ((ptype (primitive-type-of mem)))
+               (unless (eq ptype res)
+                 (let ((new-ptype (or (maybe-numeric-type-union res ptype)
+                                      (maybe-numeric-type-union ptype res))))
+                   (if new-ptype
+                       (setq res new-ptype)
+                       (return (any)))))))))
+        (named-type
+         (ecase (named-type-name type)
+           ((t *) (values *backend-t-primitive-type* t))
+           ((nil) (any))))
        (character-set-type
         (let ((pairs (character-set-type-pairs type)))
           (if (and (= (length pairs) 1)

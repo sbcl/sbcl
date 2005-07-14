@@ -37,7 +37,7 @@
 
 (!define-type-vops complexp check-complex complex object-not-complex-error
   (complex-widetag complex-single-float-widetag complex-double-float-widetag
-		   #!+long-float complex-long-float-widetag))
+                   #!+long-float complex-long-float-widetag))
 
 (!define-type-vops complex-rational-p check-complex-rational nil
     object-not-complex-rational-error
@@ -46,7 +46,7 @@
 (!define-type-vops complex-float-p check-complex-float nil
     object-not-complex-float-error
   (complex-single-float-widetag complex-double-float-widetag
-				#!+long-float complex-long-float-widetag))
+                                #!+long-float complex-long-float-widetag))
 
 (!define-type-vops complex-single-float-p check-complex-single-float complex-single-float
     object-not-complex-single-float-error
@@ -71,17 +71,17 @@
 
 (macrolet
     ((define-simple-array-type-vops ()
-	 `(progn
-	   ,@(map 'list
-		  (lambda (saetp)
-		    (let ((primtype (saetp-primitive-type-name saetp)))
-		    `(!define-type-vops
-		      ,(symbolicate primtype "-P")
-		      ,(symbolicate "CHECK-" primtype)
-		      ,primtype
-		      ,(symbolicate "OBJECT-NOT-" primtype "-ERROR")
-		      (,(saetp-typecode saetp)))))
-		  *specialized-array-element-type-properties*))))
+         `(progn
+           ,@(map 'list
+                  (lambda (saetp)
+                    (let ((primtype (saetp-primitive-type-name saetp)))
+                    `(!define-type-vops
+                      ,(symbolicate primtype "-P")
+                      ,(symbolicate "CHECK-" primtype)
+                      ,primtype
+                      ,(symbolicate "OBJECT-NOT-" primtype "-ERROR")
+                      (,(saetp-typecode saetp)))))
+                  *specialized-array-element-type-properties*))))
   (define-simple-array-type-vops))
 
 (!define-type-vops characterp check-character character
@@ -141,12 +141,12 @@
   (complex-vector-widetag .
    #.(append
       (map 'list
-	   #'saetp-typecode
-	   *specialized-array-element-type-properties*)
+           #'saetp-typecode
+           *specialized-array-element-type-properties*)
       (mapcan (lambda (saetp)
-		(when (saetp-complex-typecode saetp)
-		  (list (saetp-complex-typecode saetp))))
-	      (coerce *specialized-array-element-type-properties* 'list)))))
+                (when (saetp-complex-typecode saetp)
+                  (list (saetp-complex-typecode saetp))))
+              (coerce *specialized-array-element-type-properties* 'list)))))
 
 ;;; Note that this "type VOP" is sort of an oddball; it doesn't so
 ;;; much test for a Lisp-level type as just expose a low-level type
@@ -166,8 +166,8 @@
     object-not-simple-array-error
   (simple-array-widetag .
    #.(map 'list
-	  #'saetp-typecode
-	  *specialized-array-element-type-properties*)))
+          #'saetp-typecode
+          *specialized-array-element-type-properties*)))
 
 (!define-type-vops arrayp check-array nil object-not-array-error
   (simple-array-widetag
@@ -175,12 +175,12 @@
    complex-vector-widetag .
    #.(append
       (map 'list
-	   #'saetp-typecode
-	   *specialized-array-element-type-properties*)
+           #'saetp-typecode
+           *specialized-array-element-type-properties*)
       (mapcan (lambda (saetp)
-		(when (saetp-complex-typecode saetp)
-		  (list (saetp-complex-typecode saetp))))
-	      (coerce *specialized-array-element-type-properties* 'list)))))
+                (when (saetp-complex-typecode saetp)
+                  (list (saetp-complex-typecode saetp))))
+              (coerce *specialized-array-element-type-properties* 'list)))))
 
 (!define-type-vops numberp check-number nil object-not-number-error
   (even-fixnum-lowtag

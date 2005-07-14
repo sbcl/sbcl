@@ -54,7 +54,7 @@
 
     OTHER-PTR
     (load-type result object (- other-pointer-lowtag))
-      
+
     DONE))
 
 (define-vop (fun-subtype)
@@ -70,7 +70,7 @@
   (:translate (setf fun-subtype))
   (:policy :fast-safe)
   (:args (type :scs (unsigned-reg) :target result)
-	 (function :scs (descriptor-reg)))
+         (function :scs (descriptor-reg)))
   (:arg-types positive-fixnum *)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (unsigned-reg)))
@@ -107,7 +107,7 @@
   (:translate set-header-data)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target res)
-	 (data :scs (any-reg immediate zero)))
+         (data :scs (any-reg immediate zero)))
   (:arg-types * positive-fixnum)
   (:results (res :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) t1 t2)
@@ -120,11 +120,11 @@
        (inst bis t1 t2 t1))
       (immediate
        (let ((c (ash (tn-value data) n-widetag-bits)))
-	 (cond ((<= 0 c (1- (ash 1 8)))
-		(inst bis t1 c t1))
-	       (t
-		(inst li c t2)
-		(inst bis t1 t2 t1)))))
+         (cond ((<= 0 c (1- (ash 1 8)))
+                (inst bis t1 c t1))
+               (t
+                (inst li c t2)
+                (inst bis t1 t2 t1)))))
       (zero))
     (storew t1 x 0 other-pointer-lowtag)
     (move x res)))
@@ -141,8 +141,8 @@
 
 (define-vop (make-other-immediate-type)
   (:args (val :scs (any-reg descriptor-reg))
-	 (type :scs (any-reg descriptor-reg immediate)
-	       :target temp))
+         (type :scs (any-reg descriptor-reg immediate)
+               :target temp))
   (:results (res :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 2
@@ -201,7 +201,7 @@
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
-	 (offset :scs (signed-reg unsigned-reg)))
+         (offset :scs (signed-reg unsigned-reg)))
   (:arg-types * positive-fixnum)
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
@@ -239,8 +239,8 @@
   (:temporary (:scs (non-descriptor-reg)) count)
   (:generator 1
     (let ((offset
-	   (- (* (+ index vector-data-offset) n-word-bytes)
-	      other-pointer-lowtag)))
+           (- (* (+ index vector-data-offset) n-word-bytes)
+              other-pointer-lowtag)))
       (inst ldl count offset count-vector)
       (inst addq count 1 count)
       (inst stl count offset count-vector))))

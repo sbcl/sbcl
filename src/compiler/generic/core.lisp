@@ -14,11 +14,11 @@
 ;;; A CORE-OBJECT structure holds the state needed to resolve cross-component
 ;;; references during in-core compilation.
 (defstruct (core-object
-	    (:constructor make-core-object ())
-	    #-no-ansi-print-object
-	    (:print-object (lambda (x s)
-			     (print-unreadable-object (x s :type t))))
-	    (:copier nil))
+            (:constructor make-core-object ())
+            #-no-ansi-print-object
+            (:print-object (lambda (x s)
+                             (print-unreadable-object (x s :type t))))
+            (:copier nil))
   ;; A hashtable translating ENTRY-INFO structures to the corresponding actual
   ;; FUNCTIONs for functions in this compilation.
   (entry-table (make-hash-table :test 'eq) :type hash-table)
@@ -33,7 +33,7 @@
 ;;; Note the existence of FUNCTION.
 (defun note-fun (info function object)
   (declare (type function function)
-	   (type core-object object))
+           (type core-object object))
   (let ((patch-table (core-object-patch-table object)))
     (dolist (patch (gethash info patch-table))
       (setf (code-header-ref (car patch) (the index (cdr patch))) function))
@@ -46,41 +46,41 @@
   (declare (list fixup-notes))
   (dolist (note fixup-notes)
     (let* ((kind (fixup-note-kind note))
-	   (fixup (fixup-note-fixup note))
-	   (position (fixup-note-position note))
-	   (name (fixup-name fixup))
-	   (flavor (fixup-flavor fixup))
-	   (value (ecase flavor
-		    (:assembly-routine
-		     (aver (symbolp name))
-		     (or (gethash name *assembler-routines*)
-			 (error "undefined assembler routine: ~S" name)))
-		    (:foreign
-		     (aver (stringp name))
-		     ;; FOREIGN-SYMBOL-ADDRESS signals an error
-		     ;; if the symbol isn't found.
-		     (foreign-symbol-address name))
-		    #!+linkage-table
-		    (:foreign-dataref
-		     (aver (stringp name))
-		     (foreign-symbol-address name t))
-		    #!+(or x86 x86-64)
-		    (:code-object
-		     (aver (null name))
-		     (values (get-lisp-obj-address code) t)))))
+           (fixup (fixup-note-fixup note))
+           (position (fixup-note-position note))
+           (name (fixup-name fixup))
+           (flavor (fixup-flavor fixup))
+           (value (ecase flavor
+                    (:assembly-routine
+                     (aver (symbolp name))
+                     (or (gethash name *assembler-routines*)
+                         (error "undefined assembler routine: ~S" name)))
+                    (:foreign
+                     (aver (stringp name))
+                     ;; FOREIGN-SYMBOL-ADDRESS signals an error
+                     ;; if the symbol isn't found.
+                     (foreign-symbol-address name))
+                    #!+linkage-table
+                    (:foreign-dataref
+                     (aver (stringp name))
+                     (foreign-symbol-address name t))
+                    #!+(or x86 x86-64)
+                    (:code-object
+                     (aver (null name))
+                     (values (get-lisp-obj-address code) t)))))
       (sb!vm:fixup-code-object code position value kind))))
 
 ;;; Stick a reference to the function FUN in CODE-OBJECT at index I. If the
 ;;; function hasn't been compiled yet, make a note in the patch table.
 (defun reference-core-fun (code-obj i fun object)
   (declare (type core-object object) (type functional fun)
-	   (type index i))
+           (type index i))
   (let* ((info (leaf-info fun))
-	 (found (gethash info (core-object-entry-table object))))
+         (found (gethash info (core-object-entry-table object))))
     (if found
-	(setf (code-header-ref code-obj i) found)
-	(push (cons code-obj i)
-	      (gethash info (core-object-patch-table object)))))
+        (setf (code-header-ref code-obj i) found)
+        (push (cons code-obj i)
+              (gethash info (core-object-patch-table object)))))
   (values))
 
 ;;; Call the top level lambda function dumped for ENTRY, returning the
@@ -88,15 +88,15 @@
 (defun core-call-toplevel-lambda (entry object)
   (declare (type functional entry) (type core-object object))
   (funcall (or (gethash (leaf-info entry)
-			(core-object-entry-table object))
-	       (error "Unresolved forward reference."))))
+                        (core-object-entry-table object))
+               (error "Unresolved forward reference."))))
 
 ;;; Backpatch all the DEBUG-INFOs dumped so far with the specified
 ;;; SOURCE-INFO list. We also check that there are no outstanding
 ;;; forward references to functions.
 (defun fix-core-source-info (info object &optional function)
   (declare (type core-object object)
-	   (type (or null function) function))
+           (type (or null function) function))
   (aver (zerop (hash-table-count (core-object-patch-table object))))
   (let ((source (debug-source-for-info info)))
     (setf (debug-source-function source) function)

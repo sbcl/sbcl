@@ -18,8 +18,8 @@
 
 (define-vop (%%nip-values)
   (:args (last-nipped-ptr :scs (any-reg) :target dest)
-	 (last-preserved-ptr :scs (any-reg) :target src)
-	 (moved-ptrs :scs (any-reg) :more t))
+         (last-preserved-ptr :scs (any-reg) :target src)
+         (moved-ptrs :scs (any-reg) :more t))
   (:results (r-moved-ptrs :scs (any-reg) :more t))
   (:temporary (:sc any-reg) src)
   (:temporary (:sc any-reg) dest)
@@ -41,14 +41,14 @@
     (inst lda csp-tn 0 dest)
     (inst subq src dest src)
     (loop for moved = moved-ptrs then (tn-ref-across moved)
-	  while moved
-	  do (sc-case (tn-ref-tn moved)
+          while moved
+          do (sc-case (tn-ref-tn moved)
                ((descriptor-reg any-reg)
-		(inst subq (tn-ref-tn moved) src (tn-ref-tn moved)))
-	       ((control-stack)
-		(load-stack-tn temp (tn-ref-tn moved))
-		(inst subq temp src temp)
-		(store-stack-tn (tn-ref-tn moved) temp))))))
+                (inst subq (tn-ref-tn moved) src (tn-ref-tn moved)))
+               ((control-stack)
+                (load-stack-tn temp (tn-ref-tn moved))
+                (inst subq temp src temp)
+                (store-stack-tn (tn-ref-tn moved) temp))))))
 
 ;;; Push some values onto the stack, returning the start and number of
 ;;; values pushed as results. It is assumed that the Vals are wired to
@@ -68,22 +68,22 @@
   (:info nvals)
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg)
-	       :to (:result 0)
-	       :target start)
-	      start-temp)
+               :to (:result 0)
+               :target start)
+              start-temp)
   (:generator 20
     (move csp-tn start-temp)
     (inst lda csp-tn (* nvals n-word-bytes) csp-tn)
     (do ((val vals (tn-ref-across val))
-	 (i 0 (1+ i)))
-	((null val))
+         (i 0 (1+ i)))
+        ((null val))
       (let ((tn (tn-ref-tn val)))
-	(sc-case tn
-	  (descriptor-reg
-	   (storew tn start-temp i))
-	  (control-stack
-	   (load-stack-tn temp tn)
-	   (storew temp start-temp i)))))
+        (sc-case tn
+          (descriptor-reg
+           (storew tn start-temp i))
+          (control-stack
+           (load-stack-tn temp tn)
+           (storew temp start-temp i)))))
     (move start-temp start)
     (inst li (fixnumize nvals) count)))
 
@@ -94,7 +94,7 @@
   (:arg-types list)
   (:policy :fast-safe)
   (:results (start :scs (any-reg))
-	    (count :scs (any-reg)))
+            (count :scs (any-reg)))
   (:temporary (:scs (descriptor-reg) :type list :from (:argument 0)) list)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
@@ -103,7 +103,7 @@
   (:generator 0
     (move arg list)
     (move csp-tn start)
-    
+
     LOOP
     (inst cmpeq list null-tn temp)
     (inst bne temp done)
@@ -115,7 +115,7 @@
     (inst xor ndescr list-pointer-lowtag ndescr)
     (inst beq ndescr loop)
     (error-call vop bogus-arg-to-values-list-error list)
-    
+
     DONE
     (inst subq csp-tn start count)))
 

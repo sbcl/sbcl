@@ -20,7 +20,7 @@
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) ptr)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (any-reg) :type fixnum :to (:result 0) :target result)
-	      count)
+              count)
   (:results (result :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -28,24 +28,24 @@
   (:generator 50
     (move object ptr)
     (move zero-tn count)
-    
+
     LOOP
-    
+
     (inst cmpeq ptr null-tn temp)
     (inst bne temp done)
-    
+
     (inst and ptr lowtag-mask temp)
     (inst xor temp list-pointer-lowtag temp)
     (inst bne temp not-list)
-    
+
     (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
     (inst addq count (fixnumize 1) count)
     (inst br zero-tn loop)
-    
+
     NOT-LIST
     (cerror-call vop done object-not-list-error ptr)
-    
+
     DONE
     (move count result)))
-       
+
 (define-static-fun length (object) :translate length)

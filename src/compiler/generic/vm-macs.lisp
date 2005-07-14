@@ -26,16 +26,16 @@
 
 (defun remove-keywords (options keywords)
   (cond ((null options) nil)
-	((member (car options) keywords)
-	 (remove-keywords (cddr options) keywords))
-	(t
-	 (list* (car options) (cadr options)
-		(remove-keywords (cddr options) keywords)))))
+        ((member (car options) keywords)
+         (remove-keywords (cddr options) keywords))
+        (t
+         (list* (car options) (cadr options)
+                (remove-keywords (cddr options) keywords)))))
 
 (def!struct (prim-object-slot
-	     (:constructor make-slot (name docs rest-p offset options))
-	     (:make-load-form-fun just-dump-it-normally)
-	     (:conc-name slot-))
+             (:constructor make-slot (name docs rest-p offset options))
+             (:make-load-form-fun just-dump-it-normally)
+             (:conc-name slot-))
   (name nil :type symbol)
   (docs nil :type (or null simple-string))
   (rest-p nil :type (member t nil))
@@ -56,72 +56,72 @@
 (defun %define-primitive-object (primobj)
   (let ((name (primitive-object-name primobj)))
     (setf *primitive-objects*
-	  (cons primobj
-		(remove name *primitive-objects*
-			:key #'primitive-object-name :test #'eq)))
+          (cons primobj
+                (remove name *primitive-objects*
+                        :key #'primitive-object-name :test #'eq)))
     name))
 
 (defmacro define-primitive-object
-	  ((name &key lowtag widetag alloc-trans (type t))
-	   &rest slot-specs)
+          ((name &key lowtag widetag alloc-trans (type t))
+           &rest slot-specs)
   (collect ((slots) (exports) (constants) (forms) (inits))
     (let ((offset (if widetag 1 0))
-	  (variable-length-p nil))
+          (variable-length-p nil))
       (dolist (spec slot-specs)
-	(when variable-length-p
-	  (error "No more slots can follow a :rest-p slot."))
-	(destructuring-bind
-	    (slot-name &rest options
-		       &key docs rest-p (length (if rest-p 0 1))
-		       ((:type slot-type) t) init
-		       (ref-known nil ref-known-p) ref-trans
-		       (set-known nil set-known-p) set-trans
-		       &allow-other-keys)
-	    (if (atom spec) (list spec) spec)
-	  (slots (make-slot slot-name docs rest-p offset
-			    (remove-keywords options
-					     '(:docs :rest-p :length))))
-	  (let ((offset-sym (symbolicate name "-" slot-name
-					 (if rest-p "-OFFSET" "-SLOT"))))
-	    (constants `(def!constant ,offset-sym ,offset
-			  ,@(when docs (list docs))))
-	    (exports offset-sym))
-	  (when ref-trans
-	    (when ref-known-p
-	      (forms `(defknown ,ref-trans (,type) ,slot-type ,ref-known)))
-	    (forms `(def-reffer ,ref-trans ,offset ,lowtag)))
-	  (when set-trans
-	    (when set-known-p
-	      (forms `(defknown ,set-trans
-				,(if (listp set-trans)
-				     (list slot-type type)
-				     (list type slot-type))
-				,slot-type
-			,set-known)))
-	    (forms `(def-setter ,set-trans ,offset ,lowtag)))
-	  (when init
-	    (inits (cons init offset)))
-	  (when rest-p
-	    (setf variable-length-p t))
-	  (incf offset length)))
+        (when variable-length-p
+          (error "No more slots can follow a :rest-p slot."))
+        (destructuring-bind
+            (slot-name &rest options
+                       &key docs rest-p (length (if rest-p 0 1))
+                       ((:type slot-type) t) init
+                       (ref-known nil ref-known-p) ref-trans
+                       (set-known nil set-known-p) set-trans
+                       &allow-other-keys)
+            (if (atom spec) (list spec) spec)
+          (slots (make-slot slot-name docs rest-p offset
+                            (remove-keywords options
+                                             '(:docs :rest-p :length))))
+          (let ((offset-sym (symbolicate name "-" slot-name
+                                         (if rest-p "-OFFSET" "-SLOT"))))
+            (constants `(def!constant ,offset-sym ,offset
+                          ,@(when docs (list docs))))
+            (exports offset-sym))
+          (when ref-trans
+            (when ref-known-p
+              (forms `(defknown ,ref-trans (,type) ,slot-type ,ref-known)))
+            (forms `(def-reffer ,ref-trans ,offset ,lowtag)))
+          (when set-trans
+            (when set-known-p
+              (forms `(defknown ,set-trans
+                                ,(if (listp set-trans)
+                                     (list slot-type type)
+                                     (list type slot-type))
+                                ,slot-type
+                        ,set-known)))
+            (forms `(def-setter ,set-trans ,offset ,lowtag)))
+          (when init
+            (inits (cons init offset)))
+          (when rest-p
+            (setf variable-length-p t))
+          (incf offset length)))
       (unless variable-length-p
-	(let ((size (symbolicate name "-SIZE")))
-	  (constants `(def!constant ,size ,offset))
-	  (exports size)))
+        (let ((size (symbolicate name "-SIZE")))
+          (constants `(def!constant ,size ,offset))
+          (exports size)))
       (when alloc-trans
-	(forms `(def-alloc ,alloc-trans ,offset ,variable-length-p ,widetag
-			   ,lowtag ',(inits))))
+        (forms `(def-alloc ,alloc-trans ,offset ,variable-length-p ,widetag
+                           ,lowtag ',(inits))))
       `(progn
-	 (eval-when (:compile-toplevel :load-toplevel :execute)
-	   (%define-primitive-object
-	    ',(make-primitive-object :name name
-				     :widetag widetag
-				     :lowtag lowtag
-				     :slots (slots)
-				     :size offset
-				     :variable-length-p variable-length-p))
-	   ,@(constants))
-	 ,@(forms)))))
+         (eval-when (:compile-toplevel :load-toplevel :execute)
+           (%define-primitive-object
+            ',(make-primitive-object :name name
+                                     :widetag widetag
+                                     :lowtag lowtag
+                                     :slots (slots)
+                                     :size offset
+                                     :variable-length-p variable-length-p))
+           ,@(constants))
+         ,@(forms)))))
 
 ;;;; stuff for defining reffers and setters
 

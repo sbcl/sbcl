@@ -11,17 +11,17 @@
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
-	 (locs (lvar-result-tns lvar
-					(list *backend-t-primitive-type*)))
-	 (res (first locs)))
+         (locs (lvar-result-tns lvar
+                                        (list *backend-t-primitive-type*)))
+         (res (first locs)))
     (vop slot node block (lvar-tn node block object)
-	 name offset lowtag res)
+         name offset lowtag res)
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-setter ((object value) node block name offset lowtag)
   (let ((value-tn (lvar-tn node block value)))
     (vop set-slot node block (lvar-tn node block object) value-tn
-	 name offset lowtag)
+         name offset lowtag)
     (move-lvar-result node block (list value-tn) (node-lvar node))))
 
 ;;; FIXME: Isn't there a name for this which looks less like a typo?
@@ -29,56 +29,56 @@
 (defoptimizer ir2-convert-setfer ((value object) node block name offset lowtag)
   (let ((value-tn (lvar-tn node block value)))
     (vop set-slot node block (lvar-tn node block object) value-tn
-	 name offset lowtag)
+         name offset lowtag)
     (move-lvar-result node block (list value-tn) (node-lvar node))))
 
 (defun do-inits (node block name result lowtag inits args)
   (let ((unbound-marker-tn nil))
     (dolist (init inits)
       (let ((kind (car init))
-	    (slot (cdr init)))
-	(vop set-slot node block result
-	     (ecase kind
-	       (:arg
-		(aver args)
-		(lvar-tn node block (pop args)))
-	       (:unbound
-		(or unbound-marker-tn
-		    (setf unbound-marker-tn
-			  (let ((tn (make-restricted-tn
-				     nil
-				     (sc-number-or-lose 'sb!vm::any-reg))))
-			    (vop make-unbound-marker node block tn)
-			    tn))))
-	       (:null
-		(emit-constant nil)))
-	     name slot lowtag))))
+            (slot (cdr init)))
+        (vop set-slot node block result
+             (ecase kind
+               (:arg
+                (aver args)
+                (lvar-tn node block (pop args)))
+               (:unbound
+                (or unbound-marker-tn
+                    (setf unbound-marker-tn
+                          (let ((tn (make-restricted-tn
+                                     nil
+                                     (sc-number-or-lose 'sb!vm::any-reg))))
+                            (vop make-unbound-marker node block tn)
+                            tn))))
+               (:null
+                (emit-constant nil)))
+             name slot lowtag))))
   (aver (null args)))
 
 (defun do-fixed-alloc (node block name words type lowtag result)
   (vop fixed-alloc node block name words type lowtag result))
 
 (defoptimizer ir2-convert-fixed-allocation
-	      ((&rest args) node block name words type lowtag inits)
+              ((&rest args) node block name words type lowtag inits)
   (let* ((lvar (node-lvar node))
-	 (locs (lvar-result-tns lvar
-					(list *backend-t-primitive-type*)))
-	 (result (first locs)))
+         (locs (lvar-result-tns lvar
+                                        (list *backend-t-primitive-type*)))
+         (result (first locs)))
     (do-fixed-alloc node block name words type lowtag result)
     (do-inits node block name result lowtag inits args)
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-variable-allocation
-	      ((extra &rest args) node block name words type lowtag inits)
+              ((extra &rest args) node block name words type lowtag inits)
   (let* ((lvar (node-lvar node))
-	 (locs (lvar-result-tns lvar
-					(list *backend-t-primitive-type*)))
-	 (result (first locs)))
+         (locs (lvar-result-tns lvar
+                                        (list *backend-t-primitive-type*)))
+         (result (first locs)))
     (if (constant-lvar-p extra)
-	(let ((words (+ (lvar-value extra) words)))
-	  (do-fixed-alloc node block name words type lowtag result))
-	(vop var-alloc node block (lvar-tn node block extra) name words
-	     type lowtag result))
+        (let ((words (+ (lvar-value extra) words)))
+          (do-fixed-alloc node block name words type lowtag result))
+        (vop var-alloc node block (lvar-tn node block extra) name words
+             type lowtag result))
     (do-inits node block name result lowtag inits args)
     (move-lvar-result node block locs lvar)))
 
@@ -89,11 +89,11 @@
 ;;; by hand.  -- CSR, 2003-05-08
 (let ((fun-info (fun-info-or-lose '%set-symbol-value)))
   (setf (fun-info-ir2-convert fun-info)
-	(lambda (node block)
-	  (let ((args (basic-combination-args node)))
-	    (destructuring-bind (symbol value) args
-	      (let ((value-tn (lvar-tn node block value)))
-		(vop set node block
-		     (lvar-tn node block symbol) value-tn)
-		(move-lvar-result
-		 node block (list value-tn) (node-lvar node))))))))
+        (lambda (node block)
+          (let ((args (basic-combination-args node)))
+            (destructuring-bind (symbol value) args
+              (let ((value-tn (lvar-tn node block value)))
+                (vop set node block
+                     (lvar-tn node block symbol) value-tn)
+                (move-lvar-result
+                 node block (list value-tn) (node-lvar node))))))))

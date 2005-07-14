@@ -37,44 +37,44 @@
 ;;; vector and node info.
 (defun make-core-component (component segment length trace-table fixup-notes object)
   (declare (type component component)
-	   (type sb!assem:segment segment)
-	   (type index length)
-	   (list trace-table fixup-notes)
-	   (type core-object object))
+           (type sb!assem:segment segment)
+           (type index length)
+           (list trace-table fixup-notes)
+           (type core-object object))
   (without-gcing
     (let* ((2comp (component-info component))
-	   (constants (ir2-component-constants 2comp))
-	   (trace-table (pack-trace-table trace-table))
-	   (trace-table-len (length trace-table))
-	   (trace-table-bits (* trace-table-len tt-bits-per-entry))
-	   (total-length (+ length
-			    (ceiling trace-table-bits sb!vm:n-byte-bits)))
-	   (box-num (- (length constants) sb!vm:code-trace-table-offset-slot))
-	   (code-obj
-	    (%primitive allocate-code-object box-num total-length))
-	   (fill-ptr (code-instructions code-obj)))
+           (constants (ir2-component-constants 2comp))
+           (trace-table (pack-trace-table trace-table))
+           (trace-table-len (length trace-table))
+           (trace-table-bits (* trace-table-len tt-bits-per-entry))
+           (total-length (+ length
+                            (ceiling trace-table-bits sb!vm:n-byte-bits)))
+           (box-num (- (length constants) sb!vm:code-trace-table-offset-slot))
+           (code-obj
+            (%primitive allocate-code-object box-num total-length))
+           (fill-ptr (code-instructions code-obj)))
       (declare (type index box-num total-length))
 
       (sb!assem:on-segment-contents-vectorly
        segment
        (lambda (v)
-	 (declare (type (simple-array sb!assem:assembly-unit 1) v))
-	 (copy-byte-vector-to-system-area v fill-ptr)
-	 (setf fill-ptr (sap+ fill-ptr (length v)))))
+         (declare (type (simple-array sb!assem:assembly-unit 1) v))
+         (copy-byte-vector-to-system-area v fill-ptr)
+         (setf fill-ptr (sap+ fill-ptr (length v)))))
 
       (do-core-fixups code-obj fixup-notes)
 
       (dolist (entry (ir2-component-entries 2comp))
-	(make-fun-entry entry code-obj object))
+        (make-fun-entry entry code-obj object))
 
       (sb!vm:sanctify-for-execution code-obj)
 
       (let ((info (debug-info-for-component component)))
-	(push info (core-object-debug-info object))
-	(setf (%code-debug-info code-obj) info))
+        (push info (core-object-debug-info object))
+        (setf (%code-debug-info code-obj) info))
 
       (setf (code-header-ref code-obj sb!vm:code-trace-table-offset-slot)
-	    length)
+            length)
       ;; KLUDGE: the "old" COPY-TO-SYSTEM-AREA automagically worked if
       ;; somebody changed the number of bytes in a trace table entry.
       ;; This version is a bit more fragile; if only there were some way
@@ -88,18 +88,18 @@
       (copy-ub16-to-system-area trace-table 0 fill-ptr 0 trace-table-len)
 
       (do ((index sb!vm:code-constants-offset (1+ index)))
-	  ((>= index (length constants)))
-	(let ((const (aref constants index)))
-	  (etypecase const
-	    (null)
-	    (constant
-	     (setf (code-header-ref code-obj index)
-		   (constant-value const)))
-	    (list
-	     (ecase (car const)
-	       (:entry
-		(reference-core-fun code-obj index (cdr const) object))
-	       (:fdefinition
-		(setf (code-header-ref code-obj index)
-		      (fdefinition-object (cdr const) t))))))))))
+          ((>= index (length constants)))
+        (let ((const (aref constants index)))
+          (etypecase const
+            (null)
+            (constant
+             (setf (code-header-ref code-obj index)
+                   (constant-value const)))
+            (list
+             (ecase (car const)
+               (:entry
+                (reference-core-fun code-obj index (cdr const) object))
+               (:fdefinition
+                (setf (code-header-ref code-obj index)
+                      (fdefinition-object (cdr const) t))))))))))
   (values))

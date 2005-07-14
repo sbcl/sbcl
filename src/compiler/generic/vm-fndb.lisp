@@ -16,44 +16,44 @@
 ;;; Simple TYPEP uses that don't have any standard predicate are
 ;;; translated into non-standard unary predicates.
 (defknown (fixnump bignump ratiop
-	   short-float-p single-float-p double-float-p long-float-p
-	   complex-rational-p complex-float-p complex-single-float-p
-	   complex-double-float-p #!+long-float complex-long-float-p
-	   complex-vector-p
-	   base-char-p %standard-char-p %instancep
-	   base-string-p simple-base-string-p
+           short-float-p single-float-p double-float-p long-float-p
+           complex-rational-p complex-float-p complex-single-float-p
+           complex-double-float-p #!+long-float complex-long-float-p
+           complex-vector-p
+           base-char-p %standard-char-p %instancep
+           base-string-p simple-base-string-p
            #!+sb-unicode character-string-p
            #!+sb-unicode simple-character-string-p
-	   array-header-p
-	   simple-array-p simple-array-nil-p vector-nil-p
-	   simple-array-unsigned-byte-2-p
-	   simple-array-unsigned-byte-4-p simple-array-unsigned-byte-7-p
-	   simple-array-unsigned-byte-8-p simple-array-unsigned-byte-15-p
-	   simple-array-unsigned-byte-16-p
+           array-header-p
+           simple-array-p simple-array-nil-p vector-nil-p
+           simple-array-unsigned-byte-2-p
+           simple-array-unsigned-byte-4-p simple-array-unsigned-byte-7-p
+           simple-array-unsigned-byte-8-p simple-array-unsigned-byte-15-p
+           simple-array-unsigned-byte-16-p
            #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
            simple-array-unsigned-byte-29-p
-	   simple-array-unsigned-byte-31-p
-	   simple-array-unsigned-byte-32-p
+           simple-array-unsigned-byte-31-p
+           simple-array-unsigned-byte-32-p
            #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
            simple-array-unsigned-byte-60-p
            #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
            simple-array-unsigned-byte-63-p
            #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
            simple-array-unsigned-byte-64-p
-	   simple-array-signed-byte-8-p simple-array-signed-byte-16-p
+           simple-array-signed-byte-8-p simple-array-signed-byte-16-p
            #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-	   simple-array-signed-byte-30-p
+           simple-array-signed-byte-30-p
            simple-array-signed-byte-32-p
            #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
            simple-array-signed-byte-61-p
            #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
            simple-array-signed-byte-64-p
-	   simple-array-single-float-p simple-array-double-float-p
-	   #!+long-float simple-array-long-float-p
-	   simple-array-complex-single-float-p
-	   simple-array-complex-double-float-p
-	   #!+long-float simple-array-complex-long-float-p
-	   system-area-pointer-p realp
+           simple-array-single-float-p simple-array-double-float-p
+           #!+long-float simple-array-long-float-p
+           simple-array-complex-single-float-p
+           simple-array-complex-double-float-p
+           #!+long-float simple-array-complex-long-float-p
+           system-area-pointer-p realp
            ;; #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
            unsigned-byte-32-p
            ;; #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
@@ -62,8 +62,8 @@
            unsigned-byte-64-p
            #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
            signed-byte-64-p
-	   vector-t-p weak-pointer-p code-component-p lra-p
-	   funcallable-instance-p)
+           vector-t-p weak-pointer-p code-component-p lra-p
+           funcallable-instance-p)
   (t) boolean (movable foldable flushable))
 
 ;;;; miscellaneous "sub-primitives"
@@ -217,7 +217,7 @@
   (flushable movable))
 
 (defknown (dynamic-space-free-pointer binding-stack-pointer-sap
-				      control-stack-pointer-sap)  ()
+                                      control-stack-pointer-sap)  ()
   system-area-pointer
   (flushable))
 
@@ -243,11 +243,11 @@
   (foldable flushable movable))
 
 (defknown (word-logical-and word-logical-nand
-	   word-logical-or word-logical-nor
-	   word-logical-xor word-logical-eqv
-	   word-logical-andc1 word-logical-andc2
-	   word-logical-orc1 word-logical-orc2)
-	  (sb!vm:word sb!vm:word) sb!vm:word
+           word-logical-or word-logical-nor
+           word-logical-xor word-logical-eqv
+           word-logical-andc1 word-logical-andc2
+           word-logical-orc1 word-logical-orc2)
+          (sb!vm:word sb!vm:word) sb!vm:word
   (foldable flushable movable))
 
 (defknown (shift-towards-start shift-towards-end) (sb!vm:word fixnum)
@@ -276,13 +276,13 @@
   (foldable flushable movable))
 
 (defknown (%add-with-carry %subtract-with-borrow)
-	  (bignum-element-type bignum-element-type (mod 2))
+          (bignum-element-type bignum-element-type (mod 2))
   (values bignum-element-type (mod 2))
   (foldable flushable movable))
 
 (defknown %multiply-and-add
-	  (bignum-element-type bignum-element-type bignum-element-type
-			       &optional bignum-element-type)
+          (bignum-element-type bignum-element-type bignum-element-type
+                               &optional bignum-element-type)
   (values bignum-element-type bignum-element-type)
   (foldable flushable movable))
 
@@ -309,7 +309,7 @@
   (foldable flushable movable))
 
 (defknown (%ashl %ashr %digit-logical-shift-right)
-	  (bignum-element-type (mod #.sb!vm:n-word-bits)) bignum-element-type
+          (bignum-element-type (mod #.sb!vm:n-word-bits)) bignum-element-type
   (foldable flushable movable))
 
 ;;;; bit-bashing routines
@@ -360,7 +360,7 @@
 (defknown fun-subtype (function) (unsigned-byte #.sb!vm:n-widetag-bits)
   (flushable))
 (defknown ((setf fun-subtype))
-	  ((unsigned-byte #.sb!vm:n-widetag-bits) function)
+          ((unsigned-byte #.sb!vm:n-widetag-bits) function)
   (unsigned-byte #.sb!vm:n-widetag-bits)
   ())
 
@@ -394,4 +394,4 @@
 
 (defknown %data-vector-and-index (array index)
                                  (values (simple-array * (*)) index)
-				 (foldable flushable))
+                                 (foldable flushable))
