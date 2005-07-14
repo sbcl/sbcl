@@ -58,18 +58,18 @@
 ;;; this shouldn't matter, since the only two slots that WRAPPER adds
 ;;; are meaningless in those cases.
 (defstruct (wrapper
-	    (:include layout
-		      ;; KLUDGE: In CMU CL, the initialization default
-		      ;; for LAYOUT-INVALID was NIL. In SBCL, that has
-		      ;; changed to :UNINITIALIZED, but PCL code might
-		      ;; still expect NIL for the initialization
-		      ;; default of WRAPPER-INVALID. Instead of trying
-		      ;; to find out, I just overrode the LAYOUT
-		      ;; default here. -- WHN 19991204
-		      (invalid nil))
-	    (:conc-name %wrapper-)
-	    (:constructor make-wrapper-internal)
-	    (:copier nil))
+            (:include layout
+                      ;; KLUDGE: In CMU CL, the initialization default
+                      ;; for LAYOUT-INVALID was NIL. In SBCL, that has
+                      ;; changed to :UNINITIALIZED, but PCL code might
+                      ;; still expect NIL for the initialization
+                      ;; default of WRAPPER-INVALID. Instead of trying
+                      ;; to find out, I just overrode the LAYOUT
+                      ;; default here. -- WHN 19991204
+                      (invalid nil))
+            (:conc-name %wrapper-)
+            (:constructor make-wrapper-internal)
+            (:copier nil))
   (instance-slots-layout nil :type list)
   (class-slots nil :type list))
 #-sb-fluid (declaim (sb-ext:freeze-type wrapper))
@@ -134,13 +134,13 @@
 ;; a temporary definition used for debugging the bootstrap
 #+sb-show
 (defun print-std-instance (instance stream depth)
-  (declare (ignore depth))	
+  (declare (ignore depth))
   (print-unreadable-object (instance stream :type t :identity t)
     (let ((class (class-of instance)))
       (when (or (eq class (find-class 'standard-class nil))
-		(eq class (find-class 'funcallable-standard-class nil))
-		(eq class (find-class 'built-in-class nil)))
-	(princ (early-class-name instance) stream)))))
+                (eq class (find-class 'funcallable-standard-class nil))
+                (eq class (find-class 'built-in-class nil)))
+        (princ (early-class-name instance) stream)))))
 
 ;;; This is the value that we stick into a slot to tell us that it is
 ;;; unbound. It may seem gross, but for performance reasons, we make
@@ -181,10 +181,10 @@
     (setq fun (fdefinition fun)))
   (when (funcallable-instance-p fun)
     (if (if (eq *boot-state* 'complete)
-		 (typep fun 'generic-function)
-		 (eq (class-of fun) *the-class-standard-generic-function*))
-	     (setf (%funcallable-instance-info fun 1) new-name)
-	     (bug "unanticipated function type")))
+                 (typep fun 'generic-function)
+                 (eq (class-of fun) *the-class-standard-generic-function*))
+             (setf (%funcallable-instance-info fun 1) new-name)
+             (bug "unanticipated function type")))
   ;; Fixup name-to-function mappings in cases where the function
   ;; hasn't been defined by DEFUN.  (FIXME: is this right?  This logic
   ;; comes from CMUCL).  -- CSR, 2004-12-31
@@ -212,12 +212,12 @@
 ;;;   we make it, and we want the accessor to still be type-correct.
 #|
 (defstruct (standard-instance
-	    (:predicate nil)
-	    (:constructor %%allocate-instance--class ())
-	    (:copier nil)
-	    (:alternate-metaclass instance
-				  cl:standard-class
-				  make-standard-class))
+            (:predicate nil)
+            (:constructor %%allocate-instance--class ())
+            (:copier nil)
+            (:alternate-metaclass instance
+                                  cl:standard-class
+                                  make-standard-class))
   (slots nil))
 |#
 (!defstruct-with-alternate-metaclass standard-instance
@@ -269,8 +269,8 @@
 (defmacro get-instance-wrapper-or-nil (inst)
   (once-only ((wrapper `(wrapper-of ,inst)))
     `(if (typep ,wrapper 'wrapper)
-	 ,wrapper
-	 nil)))
+         ,wrapper
+         nil)))
 
 ;;;; support for useful hashing of PCL instances
 
@@ -285,7 +285,7 @@
   ;; Hopefully there was no virtue to the old counter implementation
   ;; that I am insufficiently insightful to insee. -- WHN 2004-10-28
   (random most-positive-fixnum
-	  *instance-hash-code-random-state*))
+          *instance-hash-code-random-state*))
 
 (defun sb-impl::sxhash-instance (x)
   (cond
@@ -307,14 +307,14 @@
 (defun structure-type-included-type-name (type)
   (let ((include (dd-include (get-structure-dd type))))
     (if (consp include)
-	(car include)
-	include)))
+        (car include)
+        include)))
 
 (defun structure-type-slot-description-list (type)
   (nthcdr (length (let ((include (structure-type-included-type-name type)))
-		    (and include
-			 (dd-slots (get-structure-dd include)))))
-	  (dd-slots (get-structure-dd type))))
+                    (and include
+                         (dd-slots (get-structure-dd include)))))
+          (dd-slots (get-structure-dd type))))
 
 (defun structure-slotd-name (slotd)
   (dsd-name slotd))
@@ -328,7 +328,7 @@
 (defun structure-slotd-writer-function (type slotd)
   (if (dsd-read-only slotd)
       (let ((dd (get-structure-dd type)))
-	(coerce (slot-setter-lambda-form dd slotd) 'function))
+        (coerce (slot-setter-lambda-form dd slotd) 'function))
       (fdefinition `(setf ,(dsd-accessor-name slotd)))))
 
 (defun structure-slotd-type (slotd)

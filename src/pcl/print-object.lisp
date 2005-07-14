@@ -68,45 +68,45 @@
 (defmethod print-object ((method standard-method) stream)
   (print-unreadable-object (method stream :type t :identity t)
     (if (slot-boundp method 'generic-function)
-	(let ((generic-function (method-generic-function method)))
-	  (format stream "~S ~{~S ~}~:S"
-		  (and generic-function
-		       (generic-function-name generic-function))
-		  (method-qualifiers method)
-		  (unparse-specializers method)))
-	;; FIXME: Why do we do CALL-NEXT-METHOD in this method (and
-	;; in the PRINT-OBJECT STANDARD-ACCESSOR-METHOD method too)?
-	(call-next-method))))
+        (let ((generic-function (method-generic-function method)))
+          (format stream "~S ~{~S ~}~:S"
+                  (and generic-function
+                       (generic-function-name generic-function))
+                  (method-qualifiers method)
+                  (unparse-specializers method)))
+        ;; FIXME: Why do we do CALL-NEXT-METHOD in this method (and
+        ;; in the PRINT-OBJECT STANDARD-ACCESSOR-METHOD method too)?
+        (call-next-method))))
 
 (defmethod print-object ((method standard-accessor-method) stream)
   (print-unreadable-object (method stream :type t :identity t)
     (if (slot-boundp method 'generic-function)
-	(let ((generic-function (method-generic-function method)))
-	  (format stream "~S, slot:~S, ~:S"
-		  (and generic-function
-		       (generic-function-name generic-function))
-		  (accessor-method-slot-name method)
-		  (unparse-specializers method)))
-	(call-next-method))))
+        (let ((generic-function (method-generic-function method)))
+          (format stream "~S, slot:~S, ~:S"
+                  (and generic-function
+                       (generic-function-name generic-function))
+                  (accessor-method-slot-name method)
+                  (unparse-specializers method)))
+        (call-next-method))))
 
 (defmethod print-object ((mc standard-method-combination) stream)
   (print-unreadable-object (mc stream :type t :identity t)
     (format stream
-	    "~S ~S"
-	    (slot-value-or-default mc 'type)
-	    (slot-value-or-default mc 'options))))
+            "~S ~S"
+            (slot-value-or-default mc 'type)
+            (slot-value-or-default mc 'options))))
 
 (defun named-object-print-function (instance stream
-				    &optional (extra nil extra-p))
+                                    &optional (extra nil extra-p))
   (print-unreadable-object (instance stream :type t)
-    (if extra-p					
-	(format stream
-		"~S ~:S"
-		(slot-value-or-default instance 'name)
-		extra)
-	(format stream
-		"~S"
-		(slot-value-or-default instance 'name)))))
+    (if extra-p
+        (format stream
+                "~S ~:S"
+                (slot-value-or-default instance 'name)
+                extra)
+        (format stream
+                "~S"
+                (slot-value-or-default instance 'name)))))
 
 (defmethod print-object ((class class) stream)
   (named-object-print-function class stream))
@@ -119,16 +119,16 @@
     generic-function
     stream
     (if (slot-boundp generic-function 'methods)
-	(list (length (generic-function-methods generic-function)))
-	"?")))
+        (list (length (generic-function-methods generic-function)))
+        "?")))
 
 (defmethod print-object ((cache cache) stream)
   (print-unreadable-object (cache stream :type t :identity t)
     (format stream
-	    "~W ~S ~W"
-	    (cache-nkeys cache)
-	    (cache-valuep cache)
-	    (cache-nlines cache))))
+            "~W ~S ~W"
+            (cache-nkeys cache)
+            (cache-valuep cache)
+            (cache-nlines cache))))
 
 (defmethod print-object ((wrapper wrapper) stream)
   (print-unreadable-object (wrapper stream :type t :identity t)

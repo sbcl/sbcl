@@ -114,8 +114,8 @@
 (defmacro with-augmented-environment
     ((new-env old-env &key functions macros) &body body)
   `(let ((,new-env (with-augmented-environment-internal ,old-env
-							,functions
-							,macros)))
+                                                        ,functions
+                                                        ,macros)))
      ,@body))
 
 ;;; a unique tag to show that we're the intended caller of BOGO-FUN
@@ -154,66 +154,66 @@
     (sb!c::make-lexenv
      :default lexenv
      :vars (when (eql (caar macros) *key-to-walker-environment*)
-	     (copy-tree (remove :lexical-var (fourth (cadar macros))
-				:key #'cadr)))
+             (copy-tree (remove :lexical-var (fourth (cadar macros))
+                                :key #'cadr)))
      :funs (append (mapcar (lambda (f)
-			     (cons (car f)
-				   (sb!c::make-functional :lexenv lexenv)))
-			   funs)
-		   (mapcar (lambda (m)
-			     (list* (car m)
-				    'sb!c::macro
-				    (if (eq (car m)
-					    *key-to-walker-environment*)
-					(walker-info-to-bogo-fun (cadr m))
-					(coerce (cadr m) 'function))))
-			   macros)))))
+                             (cons (car f)
+                                   (sb!c::make-functional :lexenv lexenv)))
+                           funs)
+                   (mapcar (lambda (m)
+                             (list* (car m)
+                                    'sb!c::macro
+                                    (if (eq (car m)
+                                            *key-to-walker-environment*)
+                                        (walker-info-to-bogo-fun (cadr m))
+                                        (coerce (cadr m) 'function))))
+                           macros)))))
 
 (defun environment-function (env fn)
   (when env
     (let ((entry (assoc fn (sb!c::lexenv-funs env) :test #'equal)))
       (and entry
-	   (sb!c::functional-p (cdr entry))
-	   (cdr entry)))))
+           (sb!c::functional-p (cdr entry))
+           (cdr entry)))))
 
 (defun environment-macro (env macro)
   (when env
     (let ((entry (assoc macro (sb!c::lexenv-funs env) :test #'eq)))
       (and entry
-	   (eq (cadr entry) 'sb!c::macro)
+           (eq (cadr entry) 'sb!c::macro)
            (if (eq macro *key-to-walker-environment*)
-	       (values (bogo-fun-to-walker-info (cddr entry)))
-	       (values (function-lambda-expression (cddr entry))))))))
+               (values (bogo-fun-to-walker-info (cddr entry)))
+               (values (function-lambda-expression (cddr entry))))))))
 
 ;;;; other environment hacking, not so SBCL-specific as the
 ;;;; environment hacking in the previous section
 
 (defmacro with-new-definition-in-environment
-	  ((new-env old-env macrolet/flet/labels-form) &body body)
+          ((new-env old-env macrolet/flet/labels-form) &body body)
   (let ((functions (make-symbol "Functions"))
-	(macros (make-symbol "Macros")))
+        (macros (make-symbol "Macros")))
     `(let ((,functions ())
-	   (,macros ()))
+           (,macros ()))
        (ecase (car ,macrolet/flet/labels-form)
-	 ((flet labels)
-	  (dolist (fn (cadr ,macrolet/flet/labels-form))
-	    (push fn ,functions)))
-	 ((macrolet)
-	  (dolist (mac (cadr ,macrolet/flet/labels-form))
-	    (push (list (car mac)
-			(convert-macro-to-lambda (cadr mac)
-						 (cddr mac)
-						 ,old-env
-						 (string (car mac))))
-		  ,macros))))
+         ((flet labels)
+          (dolist (fn (cadr ,macrolet/flet/labels-form))
+            (push fn ,functions)))
+         ((macrolet)
+          (dolist (mac (cadr ,macrolet/flet/labels-form))
+            (push (list (car mac)
+                        (convert-macro-to-lambda (cadr mac)
+                                                 (cddr mac)
+                                                 ,old-env
+                                                 (string (car mac))))
+                  ,macros))))
        (with-augmented-environment
-	      (,new-env ,old-env :functions ,functions :macros ,macros)
-	 ,@body))))
+              (,new-env ,old-env :functions ,functions :macros ,macros)
+         ,@body))))
 
 (defun convert-macro-to-lambda (llist body env &optional (name "dummy macro"))
   (let ((gensym (make-symbol name)))
     (eval-in-lexenv `(defmacro ,gensym ,llist ,@body)
-		    (sb!c::make-restricted-lexenv env))
+                    (sb!c::make-restricted-lexenv env))
     (macro-function gensym)))
 
 ;;;; the actual walker
@@ -226,7 +226,7 @@
 ;;; functions. This is what makes the NESTED-WALK-FORM facility work
 ;;; properly.
 (defmacro walker-environment-bind ((var env &rest key-args)
-				      &body body)
+                                      &body body)
   `(with-augmented-environment
      (,var ,env :macros (walker-environment-bind-1 ,env ,.key-args))
      .,body))
@@ -237,16 +237,16 @@
   (environment-macro env *key-to-walker-environment*))
 
 (defun walker-environment-bind-1 (env &key (walk-function nil wfnp)
-					   (walk-form nil wfop)
-					   (declarations nil decp)
-					   (lexical-vars nil lexp))
+                                           (walk-form nil wfop)
+                                           (declarations nil decp)
+                                           (lexical-vars nil lexp))
   (let ((lock (env-lock env)))
     (list
       (list *key-to-walker-environment*
-	    (list (if wfnp walk-function (car lock))
-		  (if wfop walk-form     (cadr lock))
-		  (if decp declarations  (caddr lock))
-		  (if lexp lexical-vars  (cadddr lock)))))))
+            (list (if wfnp walk-function (car lock))
+                  (if wfop walk-form     (cadr lock))
+                  (if decp declarations  (caddr lock))
+                  (if lexp lexical-vars  (cadddr lock)))))))
 
 (defun env-walk-function (env)
   (car (env-lock env)))
@@ -282,10 +282,10 @@
   (if (not (member declaration *var-declarations*))
       (error "~S is not a recognized variable declaration." declaration)
       (let ((id (or (var-lexical-p var env) var)))
-	(dolist (decl (env-declarations env))
-	  (when (and (eq (car decl) declaration)
-		     (eq (cadr decl) id))
-	    (return decl))))))
+        (dolist (decl (env-declarations env))
+          (when (and (eq (car decl) declaration)
+                     (eq (cadr decl) id))
+            (return decl))))))
 
 (defun var-special-p (var env)
   (or (not (null (var-declaration 'special var env)))
@@ -318,13 +318,13 @@
 ;;; having only 24 special forms as seriously as might be nice. There
 ;;; are (at least) 3 ways to lose:
 ;;
-;;;   1 - Implementation x implements a Common Lisp special form as 
+;;;   1 - Implementation x implements a Common Lisp special form as
 ;;;       a macro which expands into a special form which:
-;;;	 - Is a common lisp special form (not likely)
-;;;	 - Is not a common lisp special form (on the 3600 IF --> COND).
+;;;      - Is a common lisp special form (not likely)
+;;;      - Is not a common lisp special form (on the 3600 IF --> COND).
 ;;;
 ;;;     * We can save ourselves from this case (second subcase really)
-;;;       by checking to see whether there is a template defined for 
+;;;       by checking to see whether there is a template defined for
 ;;;       something before we check to see whether we can macroexpand it.
 ;;;
 ;;;   2 - Implementation x implements a Common Lisp macro as a special form.
@@ -339,8 +339,8 @@
 ;;;   3 - Implementation x has a special form which is not on the list of
 ;;;       Common Lisp special forms.
 ;;;
-;;;     * This is a bad sort of a screw and happens more than I would 
-;;;       like to think, especially in the implementations which provide 
+;;;     * This is a bad sort of a screw and happens more than I would
+;;;       like to think, especially in the implementations which provide
 ;;;       more than just Common Lisp (3600, Xerox etc.).
 ;;;       The fix is not terribly satisfactory, but will have to do for
 ;;;       now. There is a hook in get walker-template which can get a
@@ -354,23 +354,23 @@
   `(get ,x 'walker-template))
 
 (defmacro define-walker-template (name
-				  &optional (template '(nil repeat (eval))))
+                                  &optional (template '(nil repeat (eval))))
   `(eval-when (:load-toplevel :execute)
      (setf (get-walker-template-internal ',name) ',template)))
 
 (defun get-walker-template (x context)
   (cond ((symbolp x)
          (get-walker-template-internal x))
-	((and (listp x) (eq (car x) 'lambda))
-	 '(lambda repeat (eval)))
-	(t
-	 ;; FIXME: In an ideal world we would do something similar to
-	 ;; COMPILER-ERROR here, replacing the form within the walker
-	 ;; with an error-signalling form. This is slightly less
-	 ;; pretty, but informative non the less. Best is the enemy of
-	 ;; good, etc.
-	 (error "Illegal function call in method body:~%  ~S"
-		context))))
+        ((and (listp x) (eq (car x) 'lambda))
+         '(lambda repeat (eval)))
+        (t
+         ;; FIXME: In an ideal world we would do something similar to
+         ;; COMPILER-ERROR here, replacing the form within the walker
+         ;; with an error-signalling form. This is slightly less
+         ;; pretty, but informative non the less. Best is the enemy of
+         ;; good, etc.
+         (error "Illegal function call in method body:~%  ~S"
+                context))))
 
 ;;;; the actual templates
 
@@ -413,11 +413,11 @@
 (defvar *walk-form-expand-macros-p* nil)
 
 (defun walk-form (form
-		  &optional environment
-			    (walk-function
-			     (lambda (subform context env)
-			       (declare (ignore context env))
-			       subform)))
+                  &optional environment
+                            (walk-function
+                             (lambda (subform context env)
+                               (declare (ignore context env))
+                               subform)))
   (walker-environment-bind (new-env environment :walk-function walk-function)
     (walk-form-internal form :eval new-env)))
 
@@ -429,10 +429,10 @@
 ;;;    that is a list whose car is a symbol as follows:
 ;;;
 ;;;     1. If the program has particular knowledge about the symbol,
-;;;	   process the form using special-purpose code. All of the
-;;;	   standard special forms should fall into this category.
+;;;        process the form using special-purpose code. All of the
+;;;        standard special forms should fall into this category.
 ;;;     2. Otherwise, if MACRO-FUNCTION is true of the symbol apply
-;;;	   either MACROEXPAND or MACROEXPAND-1 and start over.
+;;;        either MACROEXPAND or MACROEXPAND-1 and start over.
 ;;;     3. Otherwise, assume it is a function call. "
 (defun walk-form-internal (form context env)
   ;; First apply the walk-function to perform whatever translation
@@ -440,102 +440,102 @@
   ;; by walk-function is T then we don't recurse...
   (catch form
     (multiple-value-bind (newform walk-no-more-p)
-	(funcall (env-walk-function env) form context env)
+        (funcall (env-walk-function env) form context env)
       (catch newform
-	(cond
-	 (walk-no-more-p newform)
-	 ((not (eq form newform))
-	  (walk-form-internal newform context env))
-	 ((not (consp newform))
-	  (let ((symmac (car (variable-symbol-macro-p newform env))))
-	    (if symmac
-		(let ((newnewform (walk-form-internal (cddr symmac)
-						      context
-						      env)))
-		  (if (eq newnewform (cddr symmac))
-		      (if *walk-form-expand-macros-p* newnewform newform)
-		      newnewform))
-		newform)))
-	 (t
-	  (let* ((fn (car newform))
-		 (template (get-walker-template fn newform)))
-	    (if template
-		(if (symbolp template)
-		    (funcall template newform context env)
-		    (walk-template newform template context env))
-		(multiple-value-bind (newnewform macrop)
-		    (walker-environment-bind
-			(new-env env :walk-form newform)
-		      (sb-xc:macroexpand-1 newform new-env))
-		  (cond
-		   (macrop
-		    (let ((newnewnewform (walk-form-internal newnewform
-							     context
-							     env)))
-		      (if (eq newnewnewform newnewform)
-			  (if *walk-form-expand-macros-p* newnewform newform)
-			  newnewnewform)))
-		   ((and (symbolp fn)
-			 (not (fboundp fn))
-			 (special-operator-p fn))
-		    ;; This shouldn't happen, since this walker is now
-		    ;; maintained as part of SBCL, so it should know
-		    ;; about all the special forms that SBCL knows
-		    ;; about.
-		    (bug "unexpected special form ~S" fn))
-		   (t
-		    ;; Otherwise, walk the form as if it's just a
-		    ;; standard function call using a template for
-		    ;; standard function call.
-		    (walk-template
-		     newnewform '(call repeat (eval)) context env))))))))))))
+        (cond
+         (walk-no-more-p newform)
+         ((not (eq form newform))
+          (walk-form-internal newform context env))
+         ((not (consp newform))
+          (let ((symmac (car (variable-symbol-macro-p newform env))))
+            (if symmac
+                (let ((newnewform (walk-form-internal (cddr symmac)
+                                                      context
+                                                      env)))
+                  (if (eq newnewform (cddr symmac))
+                      (if *walk-form-expand-macros-p* newnewform newform)
+                      newnewform))
+                newform)))
+         (t
+          (let* ((fn (car newform))
+                 (template (get-walker-template fn newform)))
+            (if template
+                (if (symbolp template)
+                    (funcall template newform context env)
+                    (walk-template newform template context env))
+                (multiple-value-bind (newnewform macrop)
+                    (walker-environment-bind
+                        (new-env env :walk-form newform)
+                      (sb-xc:macroexpand-1 newform new-env))
+                  (cond
+                   (macrop
+                    (let ((newnewnewform (walk-form-internal newnewform
+                                                             context
+                                                             env)))
+                      (if (eq newnewnewform newnewform)
+                          (if *walk-form-expand-macros-p* newnewform newform)
+                          newnewnewform)))
+                   ((and (symbolp fn)
+                         (not (fboundp fn))
+                         (special-operator-p fn))
+                    ;; This shouldn't happen, since this walker is now
+                    ;; maintained as part of SBCL, so it should know
+                    ;; about all the special forms that SBCL knows
+                    ;; about.
+                    (bug "unexpected special form ~S" fn))
+                   (t
+                    ;; Otherwise, walk the form as if it's just a
+                    ;; standard function call using a template for
+                    ;; standard function call.
+                    (walk-template
+                     newnewform '(call repeat (eval)) context env))))))))))))
 
 (defun walk-template (form template context env)
   (if (atom template)
       (ecase template
-	((eval function test effect return)
-	 (walk-form-internal form :eval env))
-	((quote nil) form)
-	(set
-	  (walk-form-internal form :set env))
-	((lambda call)
-	 (cond ((legal-fun-name-p form)
-		form)
-	       (t (walk-form-internal form context env)))))
+        ((eval function test effect return)
+         (walk-form-internal form :eval env))
+        ((quote nil) form)
+        (set
+          (walk-form-internal form :set env))
+        ((lambda call)
+         (cond ((legal-fun-name-p form)
+                form)
+               (t (walk-form-internal form context env)))))
       (case (car template)
-	(repeat
-	  (walk-template-handle-repeat form
-				       (cdr template)
-				       ;; For the case where nothing
-				       ;; happens after the repeat
-				       ;; optimize away the call to
-				       ;; LENGTH.
-				       (if (null (cddr template))
-					   ()
-					   (nthcdr (- (length form)
-						      (length
-							(cddr template)))
-						   form))
-				       context
-				       env))
-	(if
-	  (walk-template form
-			 (if (if (listp (cadr template))
-				 (eval (cadr template))
-				 (funcall (cadr template) form))
-			     (caddr template)
-			     (cadddr template))
-			 context
-			 env))
-	(remote
-	  (walk-template form (cadr template) context env))
-	(otherwise
-	  (cond ((atom form) form)
-		(t (recons form
-			   (walk-template
-			     (car form) (car template) context env)
-			   (walk-template
-			     (cdr form) (cdr template) context env))))))))
+        (repeat
+          (walk-template-handle-repeat form
+                                       (cdr template)
+                                       ;; For the case where nothing
+                                       ;; happens after the repeat
+                                       ;; optimize away the call to
+                                       ;; LENGTH.
+                                       (if (null (cddr template))
+                                           ()
+                                           (nthcdr (- (length form)
+                                                      (length
+                                                        (cddr template)))
+                                                   form))
+                                       context
+                                       env))
+        (if
+          (walk-template form
+                         (if (if (listp (cadr template))
+                                 (eval (cadr template))
+                                 (funcall (cadr template) form))
+                             (caddr template)
+                             (cadddr template))
+                         context
+                         env))
+        (remote
+          (walk-template form (cadr template) context env))
+        (otherwise
+          (cond ((atom form) form)
+                (t (recons form
+                           (walk-template
+                             (car form) (car template) context env)
+                           (walk-template
+                             (cdr form) (cdr template) context env))))))))
 
 (defun walk-template-handle-repeat (form template stop-form context env)
   (if (eq form stop-form)
@@ -544,35 +544,35 @@
        form template (car template) stop-form context env)))
 
 (defun walk-template-handle-repeat-1 (form template repeat-template
-					   stop-form context env)
+                                           stop-form context env)
   (cond ((null form) ())
-	((eq form stop-form)
-	 (if (null repeat-template)
-	     (walk-template stop-form (cdr template) context env)
-	     (error "while handling code walker REPEAT:
+        ((eq form stop-form)
+         (if (null repeat-template)
+             (walk-template stop-form (cdr template) context env)
+             (error "while handling code walker REPEAT:
                      ~%ran into STOP while still in REPEAT template")))
-	((null repeat-template)
-	 (walk-template-handle-repeat-1
-	   form template (car template) stop-form context env))
-	(t
-	 (recons form
-		 (walk-template (car form) (car repeat-template) context env)
-		 (walk-template-handle-repeat-1 (cdr form)
-						template
-						(cdr repeat-template)
-						stop-form
-						context
-						env)))))
+        ((null repeat-template)
+         (walk-template-handle-repeat-1
+           form template (car template) stop-form context env))
+        (t
+         (recons form
+                 (walk-template (car form) (car repeat-template) context env)
+                 (walk-template-handle-repeat-1 (cdr form)
+                                                template
+                                                (cdr repeat-template)
+                                                stop-form
+                                                context
+                                                env)))))
 
 (defun walk-repeat-eval (form env)
   (and form
        (recons form
-	       (walk-form-internal (car form) :eval env)
-	       (walk-repeat-eval (cdr form) env))))
+               (walk-form-internal (car form) :eval env)
+               (walk-repeat-eval (cdr form) env))))
 
 (defun recons (x car cdr)
   (if (or (not (eq (car x) car))
-	  (not (eq (cdr x) cdr)))
+          (not (eq (cdr x) cdr)))
       (cons car cdr)
       x))
 
@@ -587,98 +587,98 @@
 (defun relist-internal (x args *p)
   (if (null (cdr args))
       (if *p
-	  (car args)
-	  (recons x (car args) nil))
+          (car args)
+          (recons x (car args) nil))
       (recons x
-	      (car args)
-	      (relist-internal (cdr x) (cdr args) *p))))
+              (car args)
+              (relist-internal (cdr x) (cdr args) *p))))
 
 ;;;; special walkers
 
 (defun walk-declarations (body fn env
-			       &optional doc-string-p declarations old-body
-			       &aux (form (car body)) macrop new-form)
-  (cond ((and (stringp form)			;might be a doc string
-	      (cdr body)			;isn't the returned value
-	      (null doc-string-p)		;no doc string yet
-	      (null declarations))		;no declarations yet
-	 (recons body
-		 form
-		 (walk-declarations (cdr body) fn env t)))
-	((and (listp form) (eq (car form) 'declare))
-	 ;; We got ourselves a real live declaration. Record it, look
-	 ;; for more.
-	 (dolist (declaration (cdr form))
-	   (let ((type (car declaration))
-		 (name (cadr declaration))
-		 (args (cddr declaration)))
-	     (if (member type *var-declarations*)
-		 (note-declaration `(,type
-				     ,(or (var-lexical-p name env) name)
-				     ,.args)
-				   env)
-		 (note-declaration declaration env))
-	     (push declaration declarations)))
-	 (recons body
-		 form
-		 (walk-declarations
-		   (cdr body) fn env doc-string-p declarations)))
-	((and form
-	      (listp form)
-	      (null (get-walker-template (car form) form))
-	      (progn
-		(multiple-value-setq (new-form macrop)
-				     (sb-xc:macroexpand-1 form env))
-		macrop))
-	 ;; This form was a call to a macro. Maybe it expanded
-	 ;; into a declare?  Recurse to find out.
-	 (walk-declarations (recons body new-form (cdr body))
-			    fn env doc-string-p declarations
-			    (or old-body body)))
-	(t
-	 ;; Now that we have walked and recorded the declarations,
-	 ;; call the function our caller provided to expand the body.
-	 ;; We call that function rather than passing the real-body
-	 ;; back, because we are RECONSING up the new body.
-	 (funcall fn (or old-body body) env))))
+                               &optional doc-string-p declarations old-body
+                               &aux (form (car body)) macrop new-form)
+  (cond ((and (stringp form)                    ;might be a doc string
+              (cdr body)                        ;isn't the returned value
+              (null doc-string-p)               ;no doc string yet
+              (null declarations))              ;no declarations yet
+         (recons body
+                 form
+                 (walk-declarations (cdr body) fn env t)))
+        ((and (listp form) (eq (car form) 'declare))
+         ;; We got ourselves a real live declaration. Record it, look
+         ;; for more.
+         (dolist (declaration (cdr form))
+           (let ((type (car declaration))
+                 (name (cadr declaration))
+                 (args (cddr declaration)))
+             (if (member type *var-declarations*)
+                 (note-declaration `(,type
+                                     ,(or (var-lexical-p name env) name)
+                                     ,.args)
+                                   env)
+                 (note-declaration declaration env))
+             (push declaration declarations)))
+         (recons body
+                 form
+                 (walk-declarations
+                   (cdr body) fn env doc-string-p declarations)))
+        ((and form
+              (listp form)
+              (null (get-walker-template (car form) form))
+              (progn
+                (multiple-value-setq (new-form macrop)
+                                     (sb-xc:macroexpand-1 form env))
+                macrop))
+         ;; This form was a call to a macro. Maybe it expanded
+         ;; into a declare?  Recurse to find out.
+         (walk-declarations (recons body new-form (cdr body))
+                            fn env doc-string-p declarations
+                            (or old-body body)))
+        (t
+         ;; Now that we have walked and recorded the declarations,
+         ;; call the function our caller provided to expand the body.
+         ;; We call that function rather than passing the real-body
+         ;; back, because we are RECONSING up the new body.
+         (funcall fn (or old-body body) env))))
 
 (defun walk-unexpected-declare (form context env)
   (declare (ignore context env))
   (warn "encountered ~S ~_in a place where a DECLARE was not expected"
-	form)
+        form)
   form)
 
 (defun walk-arglist (arglist context env &optional (destructuringp nil)
-					 &aux arg)
+                                         &aux arg)
   (cond ((null arglist) ())
-	((symbolp (setq arg (car arglist)))
-	 (or (member arg lambda-list-keywords)
-	     (note-lexical-binding arg env))
-	 (recons arglist
-		 arg
-		 (walk-arglist (cdr arglist)
-			       context
-			       env
-			       (and destructuringp
-				    (not (member arg
-						 lambda-list-keywords))))))
-	((consp arg)
-	 (prog1 (recons arglist
-			(if destructuringp
-			    (walk-arglist arg context env destructuringp)
-			    (relist* arg
-				     (car arg)
-				     (walk-form-internal (cadr arg) :eval env)
-				     (cddr arg)))
-			(walk-arglist (cdr arglist) context env nil))
-		(if (symbolp (car arg))
-		    (note-lexical-binding (car arg) env)
-		    (note-lexical-binding (cadar arg) env))
-		(or (null (cddr arg))
-		    (not (symbolp (caddr arg)))
-		    (note-lexical-binding (caddr arg) env))))
-	  (t
-	   (error "can't understand something in the arglist ~S" arglist))))
+        ((symbolp (setq arg (car arglist)))
+         (or (member arg lambda-list-keywords)
+             (note-lexical-binding arg env))
+         (recons arglist
+                 arg
+                 (walk-arglist (cdr arglist)
+                               context
+                               env
+                               (and destructuringp
+                                    (not (member arg
+                                                 lambda-list-keywords))))))
+        ((consp arg)
+         (prog1 (recons arglist
+                        (if destructuringp
+                            (walk-arglist arg context env destructuringp)
+                            (relist* arg
+                                     (car arg)
+                                     (walk-form-internal (cadr arg) :eval env)
+                                     (cddr arg)))
+                        (walk-arglist (cdr arglist) context env nil))
+                (if (symbolp (car arg))
+                    (note-lexical-binding (car arg) env)
+                    (note-lexical-binding (cadar arg) env))
+                (or (null (cddr arg))
+                    (not (symbolp (caddr arg)))
+                    (note-lexical-binding (caddr arg) env))))
+          (t
+           (error "can't understand something in the arglist ~S" arglist))))
 
 (defun walk-let (form context env)
   (walk-let/let* form context env nil))
@@ -689,177 +689,177 @@
 (defun walk-let/let* (form context old-env sequentialp)
   (walker-environment-bind (new-env old-env)
     (let* ((let/let* (car form))
-	   (bindings (cadr form))
-	   (body (cddr form))
-	   (walked-bindings
-	     (walk-bindings-1 bindings
-			      old-env
-			      new-env
-			      context
-			      sequentialp))
-	   (walked-body
-	     (walk-declarations body #'walk-repeat-eval new-env)))
+           (bindings (cadr form))
+           (body (cddr form))
+           (walked-bindings
+             (walk-bindings-1 bindings
+                              old-env
+                              new-env
+                              context
+                              sequentialp))
+           (walked-body
+             (walk-declarations body #'walk-repeat-eval new-env)))
       (relist*
-	form let/let* walked-bindings walked-body))))
+        form let/let* walked-bindings walked-body))))
 
 (defun walk-locally (form context env)
   (declare (ignore context))
   (let* ((locally (car form))
-	 (body (cdr form))
-	 (walked-body
-	  (walk-declarations body #'walk-repeat-eval env)))
+         (body (cdr form))
+         (walked-body
+          (walk-declarations body #'walk-repeat-eval env)))
     (relist*
      form locally walked-body)))
 
 (defun walk-multiple-value-setq (form context env)
   (let ((vars (cadr form)))
     (if (some (lambda (var)
-		(variable-symbol-macro-p var env))
-	      vars)
-	(let* ((temps (mapcar (lambda (var)
-				(declare (ignore var))
-				(gensym))
-			      vars))
-	       (sets (mapcar (lambda (var temp) `(setq ,var ,temp))
-			     vars
-			     temps))
-	       (expanded `(multiple-value-bind ,temps ,(caddr form)
-			     ,@sets))
-	       (walked (walk-form-internal expanded context env)))
-	  (if (eq walked expanded)
-	      form
-	      walked))
-	(walk-template form '(nil (repeat (set)) eval) context env))))
+                (variable-symbol-macro-p var env))
+              vars)
+        (let* ((temps (mapcar (lambda (var)
+                                (declare (ignore var))
+                                (gensym))
+                              vars))
+               (sets (mapcar (lambda (var temp) `(setq ,var ,temp))
+                             vars
+                             temps))
+               (expanded `(multiple-value-bind ,temps ,(caddr form)
+                             ,@sets))
+               (walked (walk-form-internal expanded context env)))
+          (if (eq walked expanded)
+              form
+              walked))
+        (walk-template form '(nil (repeat (set)) eval) context env))))
 
 (defun walk-multiple-value-bind (form context old-env)
   (walker-environment-bind (new-env old-env)
     (let* ((mvb (car form))
-	   (bindings (cadr form))
-	   (mv-form (walk-template (caddr form) 'eval context old-env))
-	   (body (cdddr form))
-	   walked-bindings
-	   (walked-body
-	     (walk-declarations
-	       body
-	       (lambda (real-body real-env)
-		 (setq walked-bindings
-		       (walk-bindings-1 bindings
-					old-env
-					new-env
-					context
-					nil))
-		 (walk-repeat-eval real-body real-env))
-	       new-env)))
+           (bindings (cadr form))
+           (mv-form (walk-template (caddr form) 'eval context old-env))
+           (body (cdddr form))
+           walked-bindings
+           (walked-body
+             (walk-declarations
+               body
+               (lambda (real-body real-env)
+                 (setq walked-bindings
+                       (walk-bindings-1 bindings
+                                        old-env
+                                        new-env
+                                        context
+                                        nil))
+                 (walk-repeat-eval real-body real-env))
+               new-env)))
       (relist* form mvb walked-bindings mv-form walked-body))))
 
 (defun walk-bindings-1 (bindings old-env new-env context sequentialp)
   (and bindings
        (let ((binding (car bindings)))
-	 (recons bindings
-		 (if (symbolp binding)
-		     (prog1 binding
-			    (note-lexical-binding binding new-env))
-		     (prog1 (relist* binding
-				     (car binding)
-				     (walk-form-internal (cadr binding)
-							 context
-							 (if sequentialp
-							     new-env
-							     old-env))
-				     ;; Save cddr for DO/DO*; it is
-				     ;; the next value form. Don't
-				     ;; walk it now, though.
-				     (cddr binding))	
-			    (note-lexical-binding (car binding) new-env)))
-		 (walk-bindings-1 (cdr bindings)
-				  old-env
-				  new-env
-				  context
-				  sequentialp)))))
+         (recons bindings
+                 (if (symbolp binding)
+                     (prog1 binding
+                            (note-lexical-binding binding new-env))
+                     (prog1 (relist* binding
+                                     (car binding)
+                                     (walk-form-internal (cadr binding)
+                                                         context
+                                                         (if sequentialp
+                                                             new-env
+                                                             old-env))
+                                     ;; Save cddr for DO/DO*; it is
+                                     ;; the next value form. Don't
+                                     ;; walk it now, though.
+                                     (cddr binding))
+                            (note-lexical-binding (car binding) new-env)))
+                 (walk-bindings-1 (cdr bindings)
+                                  old-env
+                                  new-env
+                                  context
+                                  sequentialp)))))
 
 (defun walk-bindings-2 (bindings walked-bindings context env)
   (and bindings
        (let ((binding (car bindings))
-	     (walked-binding (car walked-bindings)))
-	 (recons bindings
-		 (if (symbolp binding)
-		     binding
-		     (relist* binding
-			      (car walked-binding)
-			      (cadr walked-binding)
-			      (walk-template (cddr binding)
-					     '(eval)
-					     context
-					     env)))
-		 (walk-bindings-2 (cdr bindings)
-				  (cdr walked-bindings)
-				  context
-				  env)))))
+             (walked-binding (car walked-bindings)))
+         (recons bindings
+                 (if (symbolp binding)
+                     binding
+                     (relist* binding
+                              (car walked-binding)
+                              (cadr walked-binding)
+                              (walk-template (cddr binding)
+                                             '(eval)
+                                             context
+                                             env)))
+                 (walk-bindings-2 (cdr bindings)
+                                  (cdr walked-bindings)
+                                  context
+                                  env)))))
 
 (defun walk-lambda (form context old-env)
   (walker-environment-bind (new-env old-env)
     (let* ((arglist (cadr form))
-	   (body (cddr form))
-	   (walked-arglist (walk-arglist arglist context new-env))
-	   (walked-body
-	     (walk-declarations body #'walk-repeat-eval new-env)))
+           (body (cddr form))
+           (walked-arglist (walk-arglist arglist context new-env))
+           (walked-body
+             (walk-declarations body #'walk-repeat-eval new-env)))
       (relist* form
-	       (car form)
-	       walked-arglist
-	       walked-body))))
+               (car form)
+               walked-arglist
+               walked-body))))
 
 (defun walk-named-lambda (form context old-env)
   (walker-environment-bind (new-env old-env)
     (let* ((name (second form))
            (arglist (third form))
-	   (body (cdddr form))
-	   (walked-arglist (walk-arglist arglist context new-env))
-	   (walked-body
-	     (walk-declarations body #'walk-repeat-eval new-env)))
+           (body (cdddr form))
+           (walked-arglist (walk-arglist arglist context new-env))
+           (walked-body
+             (walk-declarations body #'walk-repeat-eval new-env)))
       (relist* form
-	       (car form)
+               (car form)
                name
-	       walked-arglist
-	       walked-body))))
+               walked-arglist
+               walked-body))))
 
 (defun walk-setq (form context env)
   (if (cdddr form)
       (let* ((expanded (let ((rforms nil)
-			     (tail (cdr form)))
-			 (loop (when (null tail) (return (nreverse rforms)))
-			       (let ((var (pop tail)) (val (pop tail)))
-				 (push `(setq ,var ,val) rforms)))))
-	     (walked (walk-repeat-eval expanded env)))
-	(if (eq expanded walked)
-	    form
-	    `(progn ,@walked)))
+                             (tail (cdr form)))
+                         (loop (when (null tail) (return (nreverse rforms)))
+                               (let ((var (pop tail)) (val (pop tail)))
+                                 (push `(setq ,var ,val) rforms)))))
+             (walked (walk-repeat-eval expanded env)))
+        (if (eq expanded walked)
+            form
+            `(progn ,@walked)))
       (let* ((var (cadr form))
-	     (val (caddr form))
-	     (symmac (car (variable-symbol-macro-p var env))))
-	(if symmac
-	    (let* ((expanded `(setf ,(cddr symmac) ,val))
-		   (walked (walk-form-internal expanded context env)))
-	      (if (eq expanded walked)
-		  form
-		  walked))
-	    (relist form 'setq
-		    (walk-form-internal var :set env)
-		    (walk-form-internal val :eval env))))))
+             (val (caddr form))
+             (symmac (car (variable-symbol-macro-p var env))))
+        (if symmac
+            (let* ((expanded `(setf ,(cddr symmac) ,val))
+                   (walked (walk-form-internal expanded context env)))
+              (if (eq expanded walked)
+                  form
+                  walked))
+            (relist form 'setq
+                    (walk-form-internal var :set env)
+                    (walk-form-internal val :eval env))))))
 
 (defun walk-symbol-macrolet (form context old-env)
   (declare (ignore context))
   (let* ((bindings (cadr form))
-	 (body (cddr form)))
+         (body (cddr form)))
     (walker-environment-bind
-	(new-env old-env
-		 :lexical-vars
-		 (append (mapcar (lambda (binding)
-				   `(,(car binding)
-				     sb!sys:macro . ,(cadr binding)))
-				 bindings)
-			 (env-lexical-variables old-env)))
+        (new-env old-env
+                 :lexical-vars
+                 (append (mapcar (lambda (binding)
+                                   `(,(car binding)
+                                     sb!sys:macro . ,(cadr binding)))
+                                 bindings)
+                         (env-lexical-variables old-env)))
       (relist* form 'symbol-macrolet bindings
-	       (walk-declarations body #'walk-repeat-eval new-env)))))
+               (walk-declarations body #'walk-repeat-eval new-env)))))
 
 (defun walk-tagbody (form context env)
   (recons form (car form) (walk-tagbody-1 (cdr form) context env)))
@@ -867,77 +867,77 @@
 (defun walk-tagbody-1 (form context env)
   (and form
        (recons form
-	       (walk-form-internal (car form)
-				   (if (symbolp (car form)) 'quote context)
-				   env)
-	       (walk-tagbody-1 (cdr form) context env))))
+               (walk-form-internal (car form)
+                                   (if (symbolp (car form)) 'quote context)
+                                   env)
+               (walk-tagbody-1 (cdr form) context env))))
 
 (defun walk-macrolet (form context old-env)
   (walker-environment-bind (macro-env
-			    nil
-			    :walk-function (env-walk-function old-env))
+                            nil
+                            :walk-function (env-walk-function old-env))
     (labels ((walk-definitions (definitions)
-	       (and definitions
-		    (let ((definition (car definitions)))
-		      (recons definitions
-			      (relist* definition
-				       (car definition)
-				       (walk-arglist (cadr definition)
-						     context
-						     macro-env
-						     t)
-				       (walk-declarations (cddr definition)
-							  #'walk-repeat-eval
-							  macro-env))
-			      (walk-definitions (cdr definitions)))))))
+               (and definitions
+                    (let ((definition (car definitions)))
+                      (recons definitions
+                              (relist* definition
+                                       (car definition)
+                                       (walk-arglist (cadr definition)
+                                                     context
+                                                     macro-env
+                                                     t)
+                                       (walk-declarations (cddr definition)
+                                                          #'walk-repeat-eval
+                                                          macro-env))
+                              (walk-definitions (cdr definitions)))))))
       (with-new-definition-in-environment (new-env old-env form)
-	(relist* form
-		 (car form)
-		 (walk-definitions (cadr form))
-		 (walk-declarations (cddr form)
-				    #'walk-repeat-eval
-				    new-env))))))
+        (relist* form
+                 (car form)
+                 (walk-definitions (cadr form))
+                 (walk-declarations (cddr form)
+                                    #'walk-repeat-eval
+                                    new-env))))))
 
 (defun walk-flet (form context old-env)
   (labels ((walk-definitions (definitions)
-	     (if (null definitions)
-		 ()
-		 (recons definitions
-			 (walk-lambda (car definitions) context old-env)
-			 (walk-definitions (cdr definitions))))))
+             (if (null definitions)
+                 ()
+                 (recons definitions
+                         (walk-lambda (car definitions) context old-env)
+                         (walk-definitions (cdr definitions))))))
     (recons form
-	    (car form)
-	    (recons (cdr form)
-		    (walk-definitions (cadr form))
-		    (with-new-definition-in-environment (new-env old-env form)
-		      (walk-declarations (cddr form)
-					 #'walk-repeat-eval
-					 new-env))))))
+            (car form)
+            (recons (cdr form)
+                    (walk-definitions (cadr form))
+                    (with-new-definition-in-environment (new-env old-env form)
+                      (walk-declarations (cddr form)
+                                         #'walk-repeat-eval
+                                         new-env))))))
 
 (defun walk-labels (form context old-env)
   (with-new-definition-in-environment (new-env old-env form)
     (labels ((walk-definitions (definitions)
-	       (if (null definitions)
-		   ()
-		   (recons definitions
-			   (walk-lambda (car definitions) context new-env)
-			   (walk-definitions (cdr definitions))))))
+               (if (null definitions)
+                   ()
+                   (recons definitions
+                           (walk-lambda (car definitions) context new-env)
+                           (walk-definitions (cdr definitions))))))
       (recons form
-	      (car form)
-	      (recons (cdr form)
-		      (walk-definitions (cadr form))
-		      (walk-declarations (cddr form)
-					 #'walk-repeat-eval
-					 new-env))))))
+              (car form)
+              (recons (cdr form)
+                      (walk-definitions (cadr form))
+                      (walk-declarations (cddr form)
+                                         #'walk-repeat-eval
+                                         new-env))))))
 
 (defun walk-if (form context env)
   (destructuring-bind (if predicate arm1 &optional arm2) form
     (declare (ignore if)) ; should be 'IF
     (relist form
-	    'if
-	    (walk-form-internal predicate context env)
-	    (walk-form-internal arm1 context env)
-	    (walk-form-internal arm2 context env))))
+            'if
+            (walk-form-internal predicate context env)
+            (walk-form-internal arm1 context env)
+            (walk-form-internal arm2 context env))))
 
 ;;;; examples
 

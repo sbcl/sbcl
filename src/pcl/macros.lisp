@@ -29,18 +29,18 @@
 (/show "starting pcl/macros.lisp")
 
 (declaim (declaration
-	  ;; As of sbcl-0.7.0.6, SBCL actively uses this declaration
-	  ;; to propagate information needed to set up nice debug
-	  ;; names (as seen e.g. in BACKTRACE) for method functions.
-	  %method-name
-	  ;; These nonstandard declarations seem to be used privately
-	  ;; within PCL itself to pass information around, so we can't
-	  ;; just delete them.
-	  %class
-	  %method-lambda-list
-	  ;; This declaration may also be used within PCL to pass
-	  ;; information around, I'm not sure. -- WHN 2000-12-30
-	  %variable-rebinding))
+          ;; As of sbcl-0.7.0.6, SBCL actively uses this declaration
+          ;; to propagate information needed to set up nice debug
+          ;; names (as seen e.g. in BACKTRACE) for method functions.
+          %method-name
+          ;; These nonstandard declarations seem to be used privately
+          ;; within PCL itself to pass information around, so we can't
+          ;; just delete them.
+          %class
+          %method-lambda-list
+          ;; This declaration may also be used within PCL to pass
+          ;; information around, I'm not sure. -- WHN 2000-12-30
+          %variable-rebinding))
 
 (/show "done with DECLAIM DECLARATION")
 
@@ -48,30 +48,30 @@
   (dolist (d declarations default)
     (dolist (form (cdr d))
       (when (and (consp form) (eq (car form) name))
-	(return-from get-declaration (cdr form))))))
+        (return-from get-declaration (cdr form))))))
 
 (/show "pcl/macros.lisp 85")
 
 (defmacro doplist ((key val) plist &body body)
   `(let ((.plist-tail. ,plist) ,key ,val)
      (loop (when (null .plist-tail.) (return nil))
-	   (setq ,key (pop .plist-tail.))
-	   (when (null .plist-tail.)
-	     (error "malformed plist, odd number of elements"))
-	   (setq ,val (pop .plist-tail.))
-	   (progn ,@body))))
+           (setq ,key (pop .plist-tail.))
+           (when (null .plist-tail.)
+             (error "malformed plist, odd number of elements"))
+           (setq ,val (pop .plist-tail.))
+           (progn ,@body))))
 
 (/show "pcl/macros.lisp 101")
 
 (defmacro dolist-carefully ((var list improper-list-handler) &body body)
   `(let ((,var nil)
-	 (.dolist-carefully. ,list))
+         (.dolist-carefully. ,list))
      (loop (when (null .dolist-carefully.) (return nil))
-	   (if (consp .dolist-carefully.)
-	       (progn
-		 (setq ,var (pop .dolist-carefully.))
-		 ,@body)
-	       (,improper-list-handler)))))
+           (if (consp .dolist-carefully.)
+               (progn
+                 (setq ,var (pop .dolist-carefully.))
+                 ,@body)
+               (,improper-list-handler)))))
 
 ;;;; FIND-CLASS
 ;;;;
@@ -94,9 +94,9 @@
 (defun find-class-cell (symbol &optional dont-create-p)
   (or (gethash symbol *find-class*)
       (unless dont-create-p
-	(unless (legal-class-name-p symbol)
-	  (error "~S is not a legal class name." symbol))
-	(setf (gethash symbol *find-class*) (make-find-class-cell symbol)))))
+        (unless (legal-class-name-p symbol)
+          (error "~S is not a legal class name." symbol))
+        (setf (gethash symbol *find-class*) (make-find-class-cell symbol)))))
 
 (/show "pcl/macros.lisp 157")
 
@@ -105,13 +105,13 @@
 (defun find-class-from-cell (symbol cell &optional (errorp t))
   (or (find-class-cell-class cell)
       (and *create-classes-from-internal-structure-definitions-p*
-	   (or (structure-type-p symbol) (condition-type-p symbol))
-	   (ensure-non-standard-class symbol))
+           (or (structure-type-p symbol) (condition-type-p symbol))
+           (ensure-non-standard-class symbol))
       (cond ((null errorp) nil)
-	    ((legal-class-name-p symbol)
-	     (error "There is no class named ~S." symbol))
-	    (t
-	     (error "~S is not a legal class name." symbol)))))
+            ((legal-class-name-p symbol)
+             (error "There is no class named ~S." symbol))
+            (t
+             (error "~S is not a legal class name." symbol)))))
 
 (defun find-class-predicate-from-cell (symbol cell &optional (errorp t))
   (unless (find-class-cell-class cell)
@@ -124,14 +124,14 @@
 (defun find-class (symbol &optional (errorp t) environment)
   (declare (ignore environment))
   (find-class-from-cell symbol
-			(find-class-cell symbol errorp)
-			errorp))
+                        (find-class-cell symbol errorp)
+                        errorp))
 
 (defun find-class-predicate (symbol &optional (errorp t) environment)
   (declare (ignore environment))
   (find-class-predicate-from-cell symbol
-				  (find-class-cell symbol errorp)
-				  errorp))
+                                  (find-class-cell symbol errorp)
+                                  errorp))
 
 ;;; This DEFVAR was originally in defs.lisp, now moved here.
 ;;;
@@ -144,44 +144,44 @@
 (/show "pcl/macros.lisp 187")
 
 (define-compiler-macro find-class (&whole form
-				   symbol &optional (errorp t) environment)
+                                   symbol &optional (errorp t) environment)
   (declare (ignore environment))
   (if (and (constantp symbol)
-	   (legal-class-name-p (eval symbol))
-	   (constantp errorp)
-	   (member *boot-state* '(braid complete)))
+           (legal-class-name-p (eval symbol))
+           (constantp errorp)
+           (member *boot-state* '(braid complete)))
       (let ((symbol (eval symbol))
-	    (errorp (not (null (eval errorp))))
-	    (class-cell (make-symbol "CLASS-CELL")))	
-	`(let ((,class-cell (load-time-value (find-class-cell ',symbol))))
-	   (or (find-class-cell-class ,class-cell)
-	       ,(if errorp
-		    `(find-class-from-cell ',symbol ,class-cell t)
-		    `(and (classoid-cell-classoid
-			   ',(find-classoid-cell symbol))
-			  (find-class-from-cell ',symbol ,class-cell nil))))))
+            (errorp (not (null (eval errorp))))
+            (class-cell (make-symbol "CLASS-CELL")))
+        `(let ((,class-cell (load-time-value (find-class-cell ',symbol))))
+           (or (find-class-cell-class ,class-cell)
+               ,(if errorp
+                    `(find-class-from-cell ',symbol ,class-cell t)
+                    `(and (classoid-cell-classoid
+                           ',(find-classoid-cell symbol))
+                          (find-class-from-cell ',symbol ,class-cell nil))))))
       form))
 
 (defun (setf find-class) (new-value name &optional errorp environment)
   (declare (ignore errorp environment))
   (cond ((legal-class-name-p name)
-	 (with-single-package-locked-error
-	     (:symbol name "using ~A as the class-name argument in ~
+         (with-single-package-locked-error
+             (:symbol name "using ~A as the class-name argument in ~
                            (SETF FIND-CLASS)"))
-	 (let ((cell (find-class-cell name)))
-	   (setf (find-class-cell-class cell) new-value)
-	   (when (and (eq *boot-state* 'complete) (null new-value))
-	     (setf (find-classoid name) nil))
-	   (when (or (eq *boot-state* 'complete)
-		     (eq *boot-state* 'braid))
-	     (when (and new-value (class-wrapper new-value)
+         (let ((cell (find-class-cell name)))
+           (setf (find-class-cell-class cell) new-value)
+           (when (and (eq *boot-state* 'complete) (null new-value))
+             (setf (find-classoid name) nil))
+           (when (or (eq *boot-state* 'complete)
+                     (eq *boot-state* 'braid))
+             (when (and new-value (class-wrapper new-value)
                         (class-predicate-name new-value))
-	       (setf (find-class-cell-predicate cell)
-		     (fdefinition (class-predicate-name new-value))))
-	     (update-ctors 'setf-find-class :class new-value :name name))
-	   new-value))
-	(t
-	 (error "~S is not a legal class name." name))))
+               (setf (find-class-cell-predicate cell)
+                     (fdefinition (class-predicate-name new-value))))
+             (update-ctors 'setf-find-class :class new-value :name name))
+           new-value))
+        (t
+         (error "~S is not a legal class name." name))))
 
 (/show "pcl/macros.lisp 230")
 
