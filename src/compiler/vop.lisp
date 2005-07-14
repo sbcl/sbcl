@@ -94,9 +94,9 @@
 ;;;
 ;;; BASIC-COMBINATION-INFO
 ;;;    The template chosen by LTN, or
-;;;	:FULL if this is definitely a full call.
-;;;	:FUNNY if this is an oddball thing with IR2-convert.
-;;;	:LOCAL if this is a local call.
+;;;     :FULL if this is definitely a full call.
+;;;     :FUNNY if this is an oddball thing with IR2-convert.
+;;;     :LOCAL if this is a local call.
 ;;;
 ;;; NODE-TAIL-P
 ;;;    After LTN analysis, this is true only in combination nodes that are
@@ -106,8 +106,8 @@
 ;;; and after IR2 conversion. It is stored in the BLOCK-INFO slot for
 ;;; the associated block.
 (defstruct (ir2-block (:include block-annotation)
-		      (:constructor make-ir2-block (block))
-		      (:copier nil))
+                      (:constructor make-ir2-block (block))
+                      (:copier nil))
   ;; the IR2-BLOCK's number, which differs from BLOCK's BLOCK-NUMBER
   ;; if any blocks are split. This is assigned by lifetime analysis.
   (number nil :type (or index null))
@@ -152,15 +152,15 @@
   ;; index for a TN is non-zero in WRITTEN if it is ever written in
   ;; the block, and in LIVE-OUT if the first reference is a read.
   (written (make-array local-tn-limit :element-type 'bit
-		       :initial-element 0)
-	   :type local-tn-bit-vector)
+                       :initial-element 0)
+           :type local-tn-bit-vector)
   (live-out (make-array local-tn-limit :element-type 'bit)
-	    :type local-tn-bit-vector)
+            :type local-tn-bit-vector)
   ;; This is similar to the above, but is updated by lifetime flow
   ;; analysis to have a 1 for LTN numbers of TNs live at the end of
   ;; the block. This takes into account all TNs that aren't :LIVE.
   (live-in (make-array local-tn-limit :element-type 'bit :initial-element 0)
-	   :type local-tn-bit-vector)
+           :type local-tn-bit-vector)
   ;; a thread running through the global-conflicts structures for this
   ;; block, sorted by TN number
   (global-tns nil :type (or global-conflicts null))
@@ -182,8 +182,8 @@
 ;;; An IR2-LVAR structure is used to annotate LVARs that are used as a
 ;;; function result LVARs or that receive MVs.
 (defstruct (ir2-lvar
-	    (:constructor make-ir2-lvar (primitive-type))
-	    (:copier nil))
+            (:constructor make-ir2-lvar (primitive-type))
+            (:copier nil))
   ;; If this is :DELAYED, then this is a single value LVAR for which
   ;; the evaluation of the use is to be postponed until the evaluation
   ;; of destination. This can be done for ref nodes or predicates
@@ -275,7 +275,7 @@
   ;;    Is replaced by the code pointer for the specified function.
   ;;    This is how compiled code (including DEFUN) gets its hands on
   ;;    a function. <function> is the XEP lambda for the called
-  ;;    function; its LEAF-INFO	should be an ENTRY-INFO structure.
+  ;;    function; its LEAF-INFO should be an ENTRY-INFO structure.
   ;;
   ;; (:label . <label>)
   ;;    Is replaced with the byte offset of that label from the start
@@ -408,8 +408,8 @@
   (save-sp (missing-arg) :type tn)
   ;; the list of dynamic state save TNs
   (dynamic-state (list* (make-stack-pointer-tn)
-			(make-dynamic-state-tns))
-		 :type list)
+                        (make-dynamic-state-tns))
+                 :type list)
   ;; the target label for NLX entry
   (target (gen-label) :type label))
 (defprinter (ir2-nlx-info)
@@ -418,9 +418,9 @@
   dynamic-state)
 
 (defstruct (cloop (:conc-name loop-)
-		  (:predicate loop-p)
-		  (:constructor make-loop)
-		  (:copier copy-loop))
+                  (:predicate loop-p)
+                  (:constructor make-loop)
+                  (:copier copy-loop))
   ;; The kind of loop that this is.  These values are legal:
   ;;
   ;;    :OUTER
@@ -462,7 +462,7 @@
 ;;; A VOP is a Virtual Operation. It represents an operation and the
 ;;; operands to the operation.
 (def!struct (vop (:constructor make-vop (block node info args results))
-		 (:copier nil))
+                 (:copier nil))
   ;; VOP-INFO structure containing static info about the operation
   (info nil :type (or vop-info null))
   ;; the IR2-BLOCK this VOP is in
@@ -502,7 +502,7 @@
 ;;; to a TN. The information in TN-REFs largely determines how TNs are
 ;;; packed.
 (def!struct (tn-ref (:constructor make-tn-ref (tn write-p))
-		    (:copier nil))
+                    (:copier nil))
   ;; the TN referenced
   (tn (missing-arg) :type tn)
   ;; Is this is a write reference? (as opposed to a read reference)
@@ -533,7 +533,7 @@
 ;;; A TEMPLATE object represents a particular IR2 coding strategy for
 ;;; a known function.
 (def!struct (template (:constructor nil)
-		      #-sb-xc-host (:pure t))
+                      #-sb-xc-host (:pure t))
   ;; the symbol name of this VOP. This is used when printing the VOP
   ;; and is also used to provide a handle for definition and
   ;; translation.
@@ -545,7 +545,7 @@
   ;; lists of restrictions on the argument and result types. A
   ;; restriction may take several forms:
   ;; -- The restriction * is no restriction at all.
-  ;; -- A restriction (:OR <primitive-type>*) means that the operand 
+  ;; -- A restriction (:OR <primitive-type>*) means that the operand
   ;;    must have one of the specified primitive types.
   ;; -- A restriction (:CONSTANT <predicate> <type-spec>) means that the
   ;;    argument (not a result) must be a compile-time constant that
@@ -615,8 +615,8 @@
 ;;; virtual operation. We include TEMPLATE so that functions with a
 ;;; direct VOP equivalent can be translated easily.
 (def!struct (vop-info
-	     (:include template)
-	     (:make-load-form-fun ignore-it))
+             (:include template)
+             (:make-load-form-fun ignore-it))
   ;; side effects of this VOP and side effects that affect the value
   ;; of this VOP
   (effects (missing-arg) :type attributes)
@@ -809,9 +809,9 @@
   ;; then the entries are NIL. LOAD-COSTS is initialized to have a 0
   ;; for this SC.
   (move-funs (make-array sc-number-limit :initial-element nil)
-	     :type sc-vector)
+             :type sc-vector)
   (load-costs (make-array sc-number-limit :initial-element nil)
-	      :type sc-vector)
+              :type sc-vector)
   ;; a vector mapping from SC numbers to possibly
   ;; representation-specific move and coerce VOPs. Each entry is a
   ;; list of VOP-INFOs for VOPs that move/coerce an object in the
@@ -831,18 +831,18 @@
   ;; already be live TNs wired in those locations holding the values
   ;; that we are setting up for unknown-values return.
   (move-vops (make-array sc-number-limit :initial-element nil)
-	     :type sc-vector)
+             :type sc-vector)
   ;; the costs corresponding to the MOVE-VOPS. Separate because this
   ;; info is needed at meta-compile time, while the MOVE-VOPs don't
   ;; exist till load time. If no move is defined, then the entry is
   ;; NIL.
   (move-costs (make-array sc-number-limit :initial-element nil)
-	      :type sc-vector)
+              :type sc-vector)
   ;; similar to Move-VOPs, except that we only ever use the entries
   ;; for this SC and its alternates, since we never combine complex
   ;; representation conversion with argument passing.
   (move-arg-vops (make-array sc-number-limit :initial-element nil)
-		 :type sc-vector)
+                 :type sc-vector)
   ;; true if this SC or one of its alternates in in the NUMBER-STACK SB.
   (number-stack-p nil :type boolean)
   ;; alignment restriction. The offset must be an even multiple of this.
@@ -858,67 +858,67 @@
 ;;;; TNs
 
 (def!struct (tn (:include sset-element)
-	       (:constructor make-random-tn)
-	       (:constructor make-tn (number kind primitive-type sc))
-	       (:copier nil))
+               (:constructor make-random-tn)
+               (:constructor make-tn (number kind primitive-type sc))
+               (:copier nil))
   ;; The kind of TN this is:
   ;;
   ;;   :NORMAL
-  ;;	A normal, non-constant TN, representing a variable or temporary.
-  ;;	Lifetime information is computed so that packing can be done.
+  ;;    A normal, non-constant TN, representing a variable or temporary.
+  ;;    Lifetime information is computed so that packing can be done.
   ;;
   ;;   :ENVIRONMENT
-  ;;	A TN that has hidden references (debugger or NLX), and thus must be
-  ;;	allocated for the duration of the environment it is referenced in.
+  ;;    A TN that has hidden references (debugger or NLX), and thus must be
+  ;;    allocated for the duration of the environment it is referenced in.
   ;;
   ;;   :DEBUG-ENVIRONMENT
-  ;;	Like :ENVIRONMENT, but is used for TNs that we want to be able to
-  ;;	target to/from and that don't absolutely have to be live
-  ;;	everywhere. These TNs are live in all blocks in the environment
-  ;;	that don't reference this TN.
+  ;;    Like :ENVIRONMENT, but is used for TNs that we want to be able to
+  ;;    target to/from and that don't absolutely have to be live
+  ;;    everywhere. These TNs are live in all blocks in the environment
+  ;;    that don't reference this TN.
   ;;
   ;;   :COMPONENT
-  ;;	A TN that implicitly conflicts with all other TNs. No conflict
-  ;;	info is computed.
+  ;;    A TN that implicitly conflicts with all other TNs. No conflict
+  ;;    info is computed.
   ;;
   ;;   :SAVE
   ;;   :SAVE-ONCE
-  ;;	A TN used for saving a :NORMAL TN across function calls. The
-  ;;	lifetime information slots are unitialized: get the original
-  ;;	TN our of the SAVE-TN slot and use it for conflicts. SAVE-ONCE
-  ;;	is like :SAVE, except that it is only save once at the single
-  ;;	writer of the original TN.
+  ;;    A TN used for saving a :NORMAL TN across function calls. The
+  ;;    lifetime information slots are unitialized: get the original
+  ;;    TN our of the SAVE-TN slot and use it for conflicts. SAVE-ONCE
+  ;;    is like :SAVE, except that it is only save once at the single
+  ;;    writer of the original TN.
   ;;
   ;;   :SPECIFIED-SAVE
-  ;;	A TN that was explicitly specified as the save TN for another TN.
-  ;;	When we actually get around to doing the saving, this will be
-  ;;	changed to :SAVE or :SAVE-ONCE.
+  ;;    A TN that was explicitly specified as the save TN for another TN.
+  ;;    When we actually get around to doing the saving, this will be
+  ;;    changed to :SAVE or :SAVE-ONCE.
   ;;
   ;;   :LOAD
-  ;;	A load-TN used to compute an argument or result that is
-  ;;	restricted to some finite SB. Load TNs don't have any conflict
-  ;;	information. Load TN pack uses a special local conflict
-  ;;	determination method.
+  ;;    A load-TN used to compute an argument or result that is
+  ;;    restricted to some finite SB. Load TNs don't have any conflict
+  ;;    information. Load TN pack uses a special local conflict
+  ;;    determination method.
   ;;
   ;;   :CONSTANT
-  ;;	Represents a constant, with TN-LEAF a CONSTANT leaf. Lifetime
-  ;;	information isn't computed, since the value isn't allocated by
-  ;;	pack, but is instead generated as a load at each use. Since
-  ;;	lifetime analysis isn't done on :CONSTANT TNs, they don't have
-  ;;	LOCAL-NUMBERs and similar stuff.
+  ;;    Represents a constant, with TN-LEAF a CONSTANT leaf. Lifetime
+  ;;    information isn't computed, since the value isn't allocated by
+  ;;    pack, but is instead generated as a load at each use. Since
+  ;;    lifetime analysis isn't done on :CONSTANT TNs, they don't have
+  ;;    LOCAL-NUMBERs and similar stuff.
   ;;
   ;;   :ALIAS
-  ;;	A special kind of TN used to represent initialization of local
-  ;;	call arguments in the caller. It provides another name for the
-  ;;	argument TN so that lifetime analysis doesn't get confused by
-  ;;	self-recursive calls. Lifetime analysis treats this the same
-  ;;	as :NORMAL, but then at the end merges the conflict info into
-  ;;	the original TN and replaces all uses of the alias with the
-  ;;	original TN. SAVE-TN holds the aliased TN.
+  ;;    A special kind of TN used to represent initialization of local
+  ;;    call arguments in the caller. It provides another name for the
+  ;;    argument TN so that lifetime analysis doesn't get confused by
+  ;;    self-recursive calls. Lifetime analysis treats this the same
+  ;;    as :NORMAL, but then at the end merges the conflict info into
+  ;;    the original TN and replaces all uses of the alias with the
+  ;;    original TN. SAVE-TN holds the aliased TN.
   (kind (missing-arg)
-	:type (member :normal :environment :debug-environment
-		      :save :save-once :specified-save :load :constant
-		      :component :alias))
+        :type (member :normal :environment :debug-environment
+                      :save :save-once :specified-save :load :constant
+                      :component :alias))
   ;; the primitive-type for this TN's value. Null in restricted or
   ;; wired TNs.
   (primitive-type nil :type (or primitive-type null))
@@ -944,9 +944,9 @@
   ;; If this object is a local TN, this slot is a bit-vector with 1
   ;; for the local-number of every TN that we conflict with.
   (local-conflicts (make-array local-tn-limit
-			       :element-type 'bit
-			       :initial-element 0)
-		   :type local-tn-bit-vector)
+                               :element-type 'bit
+                               :initial-element 0)
+                   :type local-tn-bit-vector)
   ;; head of the list of GLOBAL-CONFLICTS structures for a global TN.
   ;; This list is sorted by block number (i.e. reverse DFO), allowing
   ;; the intersection between the lifetimes for two global TNs to be
@@ -985,8 +985,8 @@
 ;;; lifetime analysis to represent the set of TNs live at the start of
 ;;; the IR2 block.
 (defstruct (global-conflicts
-	    (:constructor make-global-conflicts (kind tn block number))
-	    (:copier nil))
+            (:constructor make-global-conflicts (kind tn block number))
+            (:copier nil))
   ;; the IR2-BLOCK that this structure represents the conflicts for
   (block (missing-arg) :type ir2-block)
   ;; thread running through all the GLOBAL-CONFLICTSs for BLOCK. This
@@ -995,20 +995,20 @@
   ;; the way that TN is used by BLOCK
   ;;
   ;;   :READ
-  ;;	 The TN is read before it is written. It starts the block live,
-  ;;	 but is written within the block.
+  ;;     The TN is read before it is written. It starts the block live,
+  ;;     but is written within the block.
   ;;
   ;;   :WRITE
-  ;;	 The TN is written before any read. It starts the block dead,
-  ;;	 and need not have a read within the block.
+  ;;     The TN is written before any read. It starts the block dead,
+  ;;     and need not have a read within the block.
   ;;
   ;;   :READ-ONLY
-  ;;	 The TN is read, but never written. It starts the block live,
-  ;;	 and is not killed by the block. Lifetime analysis will promote
-  ;;	 :READ-ONLY TNs to :LIVE if they are live at the block end.
+  ;;     The TN is read, but never written. It starts the block live,
+  ;;     and is not killed by the block. Lifetime analysis will promote
+  ;;     :READ-ONLY TNs to :LIVE if they are live at the block end.
   ;;
   ;;   :LIVE
-  ;;	 The TN is not referenced. It is live everywhere in the block.
+  ;;     The TN is not referenced. It is live everywhere in the block.
   (kind :read-only :type (member :read :write :read-only :live))
   ;; a local conflicts vector representing conflicts with TNs live in
   ;; BLOCK. The index for the local TN number of each TN we conflict
@@ -1016,9 +1016,9 @@
   ;; TNs for BLOCK must also be included. This slot is not meaningful
   ;; when KIND is :LIVE.
   (conflicts (make-array local-tn-limit
-			 :element-type 'bit
-			 :initial-element 0)
-	     :type local-tn-bit-vector)
+                         :element-type 'bit
+                         :initial-element 0)
+             :type local-tn-bit-vector)
   ;; the TN we are recording conflicts for.
   (tn (missing-arg) :type tn)
   ;; thread through all the GLOBAL-CONFLICTSs for TN

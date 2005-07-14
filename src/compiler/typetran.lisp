@@ -43,9 +43,9 @@
   (let ((type (specifier-type specifier)))
     (setf (gethash name *backend-predicate-types*) type)
     (setf *backend-type-predicates*
-	  (cons (cons type name)
-		(remove name *backend-type-predicates*
-			:key #'cdr)))
+          (cons (cons type name)
+                (remove name *backend-type-predicates*
+                        :key #'cdr)))
     (%deftransform name '(function (t) *) #'fold-type-predicate)
     name))
 
@@ -69,13 +69,13 @@
   (declare (type lvar object) (type ctype type))
   (let ((otype (lvar-type object)))
     (cond ((not (types-equal-or-intersect otype type))
-	   nil)
-	  ((csubtypep otype type)
-	   t)
+           nil)
+          ((csubtypep otype type)
+           t)
           ((eq type *empty-type*)
            nil)
-	  (t
-	   (give-up-ir1-transform)))))
+          (t
+           (give-up-ir1-transform)))))
 
 ;;; Flush %TYPEP tests whose result is known at compile time.
 (deftransform %typep ((object type))
@@ -90,10 +90,10 @@
 ;;; appropriate type, expanding to T or NIL as appropriate.
 (deftransform fold-type-predicate ((object) * * :node node :defun-only t)
   (let ((ctype (gethash (leaf-source-name
-			 (ref-leaf
-			  (lvar-uses
-			   (basic-combination-fun node))))
-			*backend-predicate-types*)))
+                         (ref-leaf
+                          (lvar-uses
+                           (basic-combination-fun node))))
+                        *backend-predicate-types*)))
     (aver ctype)
     (ir1-transform-type-predicate object ctype)))
 
@@ -101,9 +101,9 @@
 ;;; at load time.
 (deftransform find-classoid ((name) ((constant-arg symbol)) *)
   (let* ((name (lvar-value name))
-	 (cell (find-classoid-cell name)))
+         (cell (find-classoid-cell name)))
     `(or (classoid-cell-classoid ',cell)
-	 (error "class not yet defined: ~S" name))))
+         (error "class not yet defined: ~S" name))))
 
 ;;;; standard type predicates, i.e. those defined in package COMMON-LISP,
 ;;;; plus at least one oddball (%INSTANCEP)
@@ -161,17 +161,17 @@
 (defun transform-numeric-bound-test (n-object type base)
   (declare (type numeric-type type))
   (let ((low (numeric-type-low type))
-	(high (numeric-type-high type)))
+        (high (numeric-type-high type)))
     `(locally
        (declare (optimize (safety 0)))
        (and ,@(when low
-		(if (consp low)
-		    `((> (truly-the ,base ,n-object) ,(car low)))
-		    `((>= (truly-the ,base ,n-object) ,low))))
-	    ,@(when high
-		(if (consp high)
-		    `((< (truly-the ,base ,n-object) ,(car high)))
-		    `((<= (truly-the ,base ,n-object) ,high))))))))
+                (if (consp low)
+                    `((> (truly-the ,base ,n-object) ,(car low)))
+                    `((>= (truly-the ,base ,n-object) ,low))))
+            ,@(when high
+                (if (consp high)
+                    `((< (truly-the ,base ,n-object) ,(car high)))
+                    `((<= (truly-the ,base ,n-object) ,high))))))))
 
 ;;; Do source transformation of a test of a known numeric type. We can
 ;;; assume that the type doesn't have a corresponding predicate, since
@@ -191,32 +191,32 @@
 ;;; realpart and the imagpart must be the same.
 (defun source-transform-numeric-typep (object type)
   (let* ((class (numeric-type-class type))
-	 (base (ecase class
-		 (integer (containing-integer-type
+         (base (ecase class
+                 (integer (containing-integer-type
                            (if (numeric-type-complexp type)
                                (modified-numeric-type type
                                                       :complexp :real)
                                type)))
-		 (rational 'rational)
-		 (float (or (numeric-type-format type) 'float))
-		 ((nil) 'real))))
+                 (rational 'rational)
+                 (float (or (numeric-type-format type) 'float))
+                 ((nil) 'real))))
     (once-only ((n-object object))
       (ecase (numeric-type-complexp type)
-	(:real
-	 `(and (typep ,n-object ',base)
-	       ,(transform-numeric-bound-test n-object type base)))
-	(:complex
-	 `(and (complexp ,n-object)
-	       ,(once-only ((n-real `(realpart (truly-the complex ,n-object)))
-			    (n-imag `(imagpart (truly-the complex ,n-object))))
-		  `(progn
-		     ,n-imag ; ignorable
-		     (and (typep ,n-real ',base)
-			  ,@(when (eq class 'integer)
-			      `((typep ,n-imag ',base)))
-			  ,(transform-numeric-bound-test n-real type base)
-			  ,(transform-numeric-bound-test n-imag type
-							 base))))))))))
+        (:real
+         `(and (typep ,n-object ',base)
+               ,(transform-numeric-bound-test n-object type base)))
+        (:complex
+         `(and (complexp ,n-object)
+               ,(once-only ((n-real `(realpart (truly-the complex ,n-object)))
+                            (n-imag `(imagpart (truly-the complex ,n-object))))
+                  `(progn
+                     ,n-imag ; ignorable
+                     (and (typep ,n-real ',base)
+                          ,@(when (eq class 'integer)
+                              `((typep ,n-imag ',base)))
+                          ,(transform-numeric-bound-test n-real type base)
+                          ,(transform-numeric-bound-test n-imag type
+                                                         base))))))))))
 
 ;;; Do the source transformation for a test of a hairy type. AND,
 ;;; SATISFIES and NOT are converted into the obvious code. We convert
@@ -226,18 +226,18 @@
   (declare (type hairy-type type))
   (let ((spec (hairy-type-specifier type)))
     (cond ((unknown-type-p type)
-	   (when (policy *lexenv* (> speed inhibit-warnings))
-	     (compiler-notify "can't open-code test of unknown type ~S"
-			      (type-specifier type)))
-	   `(%typep ,object ',spec))
-	  (t
-	   (ecase (first spec)
-	     (satisfies `(if (funcall #',(second spec) ,object) t nil))
-	     ((not and)
-	      (once-only ((n-obj object))
-		`(,(first spec) ,@(mapcar (lambda (x)
-					    `(typep ,n-obj ',x))
-					  (rest spec))))))))))
+           (when (policy *lexenv* (> speed inhibit-warnings))
+             (compiler-notify "can't open-code test of unknown type ~S"
+                              (type-specifier type)))
+           `(%typep ,object ',spec))
+          (t
+           (ecase (first spec)
+             (satisfies `(if (funcall #',(second spec) ,object) t nil))
+             ((not and)
+              (once-only ((n-obj object))
+                `(,(first spec) ,@(mapcar (lambda (x)
+                                            `(typep ,n-obj ',x))
+                                          (rest spec))))))))))
 
 (defun source-transform-negation-typep (object type)
   (declare (type negation-type type))
@@ -254,47 +254,47 @@
 (defun source-transform-union-typep (object type)
   (let* ((types (union-type-types type))
          (type-cons (specifier-type 'cons))
-	 (mtype (find-if #'member-type-p types))
+         (mtype (find-if #'member-type-p types))
          (members (when mtype (member-type-members mtype))))
     (if (and mtype
              (memq nil members)
              (memq type-cons types))
-	(once-only ((n-obj object))
+        (once-only ((n-obj object))
           `(or (listp ,n-obj)
                (typep ,n-obj
                       '(or ,@(mapcar #'type-specifier
                                      (remove type-cons
                                              (remove mtype types)))
                         (member ,@(remove nil members))))))
-	(once-only ((n-obj object))
-	  `(or ,@(mapcar (lambda (x)
-			   `(typep ,n-obj ',(type-specifier x)))
-			 types))))))
+        (once-only ((n-obj object))
+          `(or ,@(mapcar (lambda (x)
+                           `(typep ,n-obj ',(type-specifier x)))
+                         types))))))
 
 ;;; Do source transformation for TYPEP of a known intersection type.
 (defun source-transform-intersection-typep (object type)
   (once-only ((n-obj object))
     `(and ,@(mapcar (lambda (x)
-		      `(typep ,n-obj ',(type-specifier x)))
-		    (intersection-type-types type)))))
+                      `(typep ,n-obj ',(type-specifier x)))
+                    (intersection-type-types type)))))
 
 ;;; If necessary recurse to check the cons type.
 (defun source-transform-cons-typep (object type)
   (let* ((car-type (cons-type-car-type type))
-	 (cdr-type (cons-type-cdr-type type)))
+         (cdr-type (cons-type-cdr-type type)))
     (let ((car-test-p (not (type= car-type *universal-type*)))
-	  (cdr-test-p (not (type= cdr-type *universal-type*))))
+          (cdr-test-p (not (type= cdr-type *universal-type*))))
       (if (and (not car-test-p) (not cdr-test-p))
-	  `(consp ,object)
-	  (once-only ((n-obj object))
-	    `(and (consp ,n-obj)
-		  ,@(if car-test-p
-			`((typep (car ,n-obj)
-				 ',(type-specifier car-type))))
-		  ,@(if cdr-test-p
-			`((typep (cdr ,n-obj)
-				 ',(type-specifier cdr-type))))))))))
- 
+          `(consp ,object)
+          (once-only ((n-obj object))
+            `(and (consp ,n-obj)
+                  ,@(if car-test-p
+                        `((typep (car ,n-obj)
+                                 ',(type-specifier car-type))))
+                  ,@(if cdr-test-p
+                        `((typep (cdr ,n-obj)
+                                 ',(type-specifier cdr-type))))))))))
+
 (defun source-transform-character-set-typep (object type)
   (let ((pairs (character-set-type-pairs type)))
     (if (and (= (length pairs) 1)
@@ -315,14 +315,14 @@
 (defun find-supertype-predicate (type)
   (declare (type ctype type))
   (let ((res nil)
-	(res-type nil))
+        (res-type nil))
     (dolist (x *backend-type-predicates*)
       (let ((stype (car x)))
-	(when (and (csubtypep type stype)
-		   (or (not res-type)
-		       (csubtypep stype res-type)))
-	  (setq res-type stype)
-	  (setq res (cdr x)))))
+        (when (and (csubtypep type stype)
+                   (or (not res-type)
+                       (csubtypep stype res-type)))
+          (setq res-type stype)
+          (setq res (cdr x)))))
     (values res res-type)))
 
 ;;; Return forms to test that OBJ has the rank and dimensions
@@ -331,19 +331,19 @@
 (defun test-array-dimensions (obj type stype)
   (declare (type array-type type stype))
   (let ((obj `(truly-the ,(type-specifier stype) ,obj))
-	(dims (array-type-dimensions type)))
+        (dims (array-type-dimensions type)))
     (unless (or (eq dims '*)
-		(equal dims (array-type-dimensions stype)))
+                (equal dims (array-type-dimensions stype)))
       (collect ((res))
-	(when (eq (array-type-dimensions stype) '*)
-	  (res `(= (array-rank ,obj) ,(length dims))))
-	(do ((i 0 (1+ i))
-	     (dim dims (cdr dim)))
-	    ((null dim))
-	  (let ((dim (car dim)))
-	    (unless (eq dim '*)
-	      (res `(= (array-dimension ,obj ,i) ,dim)))))
-	(res)))))
+        (when (eq (array-type-dimensions stype) '*)
+          (res `(= (array-rank ,obj) ,(length dims))))
+        (do ((i 0 (1+ i))
+             (dim dims (cdr dim)))
+            ((null dim))
+          (let ((dim (car dim)))
+            (unless (eq dim '*)
+              (res `(= (array-dimension ,obj ,i) ,dim)))))
+        (res)))))
 
 ;;; Return forms to test that OBJ has the element-type specified by
 ;;; type specified by TYPE, where STYPE is the type we have checked
@@ -351,17 +351,17 @@
 (defun test-array-element-type (obj type stype)
   (declare (type array-type type stype))
   (let ((obj `(truly-the ,(type-specifier stype) ,obj))
-	(eltype (array-type-specialized-element-type type)))
+        (eltype (array-type-specialized-element-type type)))
     (unless (type= eltype (array-type-specialized-element-type stype))
       (with-unique-names (data)
-	`((do ((,data ,obj (%array-data-vector ,data)))
-	      ((not (array-header-p ,data))
-	       ;; KLUDGE: this isn't in fact maximally efficient,
-	       ;; because though we know that DATA is a (SIMPLE-ARRAY *
-	       ;; (*)), we will still check to see if the lowtag is
-	       ;; appropriate.
-	       (typep ,data
-		      '(simple-array ,(type-specifier eltype) (*))))))))))
+        `((do ((,data ,obj (%array-data-vector ,data)))
+              ((not (array-header-p ,data))
+               ;; KLUDGE: this isn't in fact maximally efficient,
+               ;; because though we know that DATA is a (SIMPLE-ARRAY *
+               ;; (*)), we will still check to see if the lowtag is
+               ;; appropriate.
+               (typep ,data
+                      '(simple-array ,(type-specifier eltype) (*))))))))))
 
 ;;; If we can find a type predicate that tests for the type without
 ;;; dimensions, then use that predicate and test for dimensions.
@@ -369,16 +369,16 @@
 (defun source-transform-array-typep (obj type)
   (multiple-value-bind (pred stype) (find-supertype-predicate type)
     (if (and (array-type-p stype)
-	     ;; (If the element type hasn't been defined yet, it's
-	     ;; not safe to assume here that it will eventually
-	     ;; have (UPGRADED-ARRAY-ELEMENT-TYPE type)=T, so punt.)
-	     (not (unknown-type-p (array-type-element-type type)))
-	     (eq (array-type-complexp stype) (array-type-complexp type)))
-	(once-only ((n-obj obj))
-	  `(and (,pred ,n-obj)
-	        ,@(test-array-dimensions n-obj type stype)
-	        ,@(test-array-element-type n-obj type stype)))
-	`(%typep ,obj ',(type-specifier type)))))
+             ;; (If the element type hasn't been defined yet, it's
+             ;; not safe to assume here that it will eventually
+             ;; have (UPGRADED-ARRAY-ELEMENT-TYPE type)=T, so punt.)
+             (not (unknown-type-p (array-type-element-type type)))
+             (eq (array-type-complexp stype) (array-type-complexp type)))
+        (once-only ((n-obj obj))
+          `(and (,pred ,n-obj)
+                ,@(test-array-dimensions n-obj type stype)
+                ,@(test-array-element-type n-obj type stype)))
+        `(%typep ,obj ',(type-specifier type)))))
 
 ;;; Transform a type test against some instance type. The type test is
 ;;; flushed if the result is known at compile time. If not properly
@@ -391,13 +391,13 @@
 (deftransform %instance-typep ((object spec) (* *) * :node node)
   (aver (constant-lvar-p spec))
   (let* ((spec (lvar-value spec))
-	 (class (specifier-type spec))
-	 (name (classoid-name class))
-	 (otype (lvar-type object))
-	 (layout (let ((res (info :type :compiler-layout name)))
-		   (if (and res (not (layout-invalid res)))
-		       res
-		       nil))))
+         (class (specifier-type spec))
+         (name (classoid-name class))
+         (otype (lvar-type object))
+         (layout (let ((res (info :type :compiler-layout name)))
+                   (if (and res (not (layout-invalid res)))
+                       res
+                       nil))))
     (cond
       ;; Flush tests whose result is known at compile time.
       ((not (types-equal-or-intersect otype class))
@@ -408,72 +408,72 @@
       ((not (and name (eq (find-classoid name) class)))
        (compiler-error "can't compile TYPEP of anonymous or undefined ~
                         class:~%  ~S"
-		       class))
+                       class))
       (t
         ;; Delay the type transform to give type propagation a chance.
         (delay-ir1-transform node :constraint)
 
        ;; Otherwise transform the type test.
        (multiple-value-bind (pred get-layout)
-	   (cond
-	     ((csubtypep class (specifier-type 'funcallable-instance))
-	      (values 'funcallable-instance-p '%funcallable-instance-layout))
-	     ((csubtypep class (specifier-type 'instance))
-	      (values '%instancep '%instance-layout))
-	     (t
-	      (values '(lambda (x) (declare (ignore x)) t) 'layout-of)))
-	 (cond
-	   ((and (eq (classoid-state class) :sealed) layout
-		 (not (classoid-subclasses class)))
-	    ;; Sealed and has no subclasses.
-	    (let ((n-layout (gensym)))
-	      `(and (,pred object)
-		    (let ((,n-layout (,get-layout object)))
-		      ,@(when (policy *lexenv* (>= safety speed))
-			      `((when (layout-invalid ,n-layout)
-				  (%layout-invalid-error object ',layout))))
-		      (eq ,n-layout ',layout)))))
-	   ((and (typep class 'basic-structure-classoid) layout)
-	    ;; structure type tests; hierarchical layout depths
-	    (let ((depthoid (layout-depthoid layout))
-		  (n-layout (gensym)))
-	      `(and (,pred object)
-		    (let ((,n-layout (,get-layout object)))
-		      ,@(when (policy *lexenv* (>= safety speed))
-			      `((when (layout-invalid ,n-layout)
-				  (%layout-invalid-error object ',layout))))
-		      (if (eq ,n-layout ',layout)
-			  t
-			  (and (> (layout-depthoid ,n-layout)
-				  ,depthoid)
-			       (locally (declare (optimize (safety 0)))
-				 (eq (svref (layout-inherits ,n-layout)
-					    ,depthoid)
-				     ',layout))))))))
+           (cond
+             ((csubtypep class (specifier-type 'funcallable-instance))
+              (values 'funcallable-instance-p '%funcallable-instance-layout))
+             ((csubtypep class (specifier-type 'instance))
+              (values '%instancep '%instance-layout))
+             (t
+              (values '(lambda (x) (declare (ignore x)) t) 'layout-of)))
+         (cond
+           ((and (eq (classoid-state class) :sealed) layout
+                 (not (classoid-subclasses class)))
+            ;; Sealed and has no subclasses.
+            (let ((n-layout (gensym)))
+              `(and (,pred object)
+                    (let ((,n-layout (,get-layout object)))
+                      ,@(when (policy *lexenv* (>= safety speed))
+                              `((when (layout-invalid ,n-layout)
+                                  (%layout-invalid-error object ',layout))))
+                      (eq ,n-layout ',layout)))))
+           ((and (typep class 'basic-structure-classoid) layout)
+            ;; structure type tests; hierarchical layout depths
+            (let ((depthoid (layout-depthoid layout))
+                  (n-layout (gensym)))
+              `(and (,pred object)
+                    (let ((,n-layout (,get-layout object)))
+                      ,@(when (policy *lexenv* (>= safety speed))
+                              `((when (layout-invalid ,n-layout)
+                                  (%layout-invalid-error object ',layout))))
+                      (if (eq ,n-layout ',layout)
+                          t
+                          (and (> (layout-depthoid ,n-layout)
+                                  ,depthoid)
+                               (locally (declare (optimize (safety 0)))
+                                 (eq (svref (layout-inherits ,n-layout)
+                                            ,depthoid)
+                                     ',layout))))))))
            ((and layout (>= (layout-depthoid layout) 0))
-	    ;; hierarchical layout depths for other things (e.g.
-	    ;; CONDITIONs)
-	    (let ((depthoid (layout-depthoid layout))
-		  (n-layout (gensym))
-		  (n-inherits (gensym)))
-	      `(and (,pred object)
-		    (let ((,n-layout (,get-layout object)))
-		      ,@(when (policy *lexenv* (>= safety speed))
-			  `((when (layout-invalid ,n-layout)
-			      (%layout-invalid-error object ',layout))))
-		      (if (eq ,n-layout ',layout)
-			  t
-			  (let ((,n-inherits (layout-inherits ,n-layout)))
-			    (declare (optimize (safety 0)))
-			    (and (> (length ,n-inherits) ,depthoid)
-				 (eq (svref ,n-inherits ,depthoid)
-				     ',layout))))))))
-	   (t
-	    (/noshow "default case -- ,PRED and CLASS-CELL-TYPEP")
-	    `(and (,pred object)
-		  (classoid-cell-typep (,get-layout object)
-				       ',(find-classoid-cell name)
-		                       object)))))))))
+            ;; hierarchical layout depths for other things (e.g.
+            ;; CONDITIONs)
+            (let ((depthoid (layout-depthoid layout))
+                  (n-layout (gensym))
+                  (n-inherits (gensym)))
+              `(and (,pred object)
+                    (let ((,n-layout (,get-layout object)))
+                      ,@(when (policy *lexenv* (>= safety speed))
+                          `((when (layout-invalid ,n-layout)
+                              (%layout-invalid-error object ',layout))))
+                      (if (eq ,n-layout ',layout)
+                          t
+                          (let ((,n-inherits (layout-inherits ,n-layout)))
+                            (declare (optimize (safety 0)))
+                            (and (> (length ,n-inherits) ,depthoid)
+                                 (eq (svref ,n-inherits ,depthoid)
+                                     ',layout))))))))
+           (t
+            (/noshow "default case -- ,PRED and CLASS-CELL-TYPEP")
+            `(and (,pred object)
+                  (classoid-cell-typep (,get-layout object)
+                                       ',(find-classoid-cell name)
+                                       object)))))))))
 
 ;;; If the specifier argument is a quoted constant, then we consider
 ;;; converting into a simple predicate or other stuff. If the type is
@@ -487,7 +487,7 @@
 ;;; If the type is TYPE= to a type that has a predicate, then expand
 ;;; to that predicate. Otherwise, we dispatch off of the type's type.
 ;;; These transformations can increase space, but it is hard to tell
-;;; when, so we ignore policy and always do them. 
+;;; when, so we ignore policy and always do them.
 (define-source-transform typep (object spec)
   ;; KLUDGE: It looks bad to only do this on explicitly quoted forms,
   ;; since that would overlook other kinds of constants. But it turns
@@ -497,42 +497,42 @@
   ;; weird roundabout way. -- WHN 2001-03-18
   (if (and (consp spec) (eq (car spec) 'quote))
       (let ((type (careful-specifier-type (cadr spec))))
-	(or (when (not type)
+        (or (when (not type)
               (compiler-warn "illegal type specifier for TYPEP: ~S"
                              (cadr spec))
               `(%typep ,object ,spec))
             (let ((pred (cdr (assoc type *backend-type-predicates*
-				    :test #'type=))))
-	      (when pred `(,pred ,object)))
-	    (typecase type
-	      (hairy-type
-	       (source-transform-hairy-typep object type))
-	      (negation-type
-	       (source-transform-negation-typep object type))
-	      (union-type
-	       (source-transform-union-typep object type))
-	      (intersection-type
-	       (source-transform-intersection-typep object type))
-	      (member-type
-	       `(if (member ,object ',(member-type-members type)) t))
-	      (args-type
-	       (compiler-warn "illegal type specifier for TYPEP: ~S"
-			      (cadr spec))
-	       `(%typep ,object ,spec))
-	      (t nil))
-	    (typecase type
-	      (numeric-type
-	       (source-transform-numeric-typep object type))
-	      (classoid
-	       `(%instance-typep ,object ,spec))
-	      (array-type
-	       (source-transform-array-typep object type))
-	      (cons-type
-	       (source-transform-cons-typep object type))
+                                    :test #'type=))))
+              (when pred `(,pred ,object)))
+            (typecase type
+              (hairy-type
+               (source-transform-hairy-typep object type))
+              (negation-type
+               (source-transform-negation-typep object type))
+              (union-type
+               (source-transform-union-typep object type))
+              (intersection-type
+               (source-transform-intersection-typep object type))
+              (member-type
+               `(if (member ,object ',(member-type-members type)) t))
+              (args-type
+               (compiler-warn "illegal type specifier for TYPEP: ~S"
+                              (cadr spec))
+               `(%typep ,object ,spec))
+              (t nil))
+            (typecase type
+              (numeric-type
+               (source-transform-numeric-typep object type))
+              (classoid
+               `(%instance-typep ,object ,spec))
+              (array-type
+               (source-transform-array-typep object type))
+              (cons-type
+               (source-transform-cons-typep object type))
              (character-set-type
               (source-transform-character-set-typep object type))
-	      (t nil))
-	    `(%typep ,object ,spec)))
+              (t nil))
+            `(%typep ,object ,spec)))
       (values nil t)))
 
 ;;;; coercion
@@ -552,28 +552,28 @@
     (give-up-ir1-transform))
   (let ((tspec (ir1-transform-specifier-type (lvar-value type))))
     (if (csubtypep (lvar-type x) tspec)
-	'x
-	;; Note: The THE here makes sure that specifiers like
-	;; (SINGLE-FLOAT 0.0 1.0) can raise a TYPE-ERROR.
-	`(the ,(lvar-value type)
-	   ,(cond
-	     ((csubtypep tspec (specifier-type 'double-float))
-	      '(%double-float x))
-	     ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
-	     ((csubtypep tspec (specifier-type 'float))
-	      '(%single-float x))
-	     ((and (csubtypep tspec (specifier-type 'simple-vector))
-		   ;; Can we avoid checking for dimension issues like
-		   ;; (COERCE FOO '(SIMPLE-VECTOR 5)) returning a
-		   ;; vector of length 6?
-		   (or (policy node (< safety 3)) ; no need in unsafe code
-		       (and (array-type-p tspec) ; no need when no dimensions
-			    (equal (array-type-dimensions tspec) '(*)))))
-	      `(if (simple-vector-p x)
-		   x
-		   (replace (make-array (length x)) x)))
-	     ;; FIXME: other VECTOR types?
-	     (t
-	      (give-up-ir1-transform)))))))
+        'x
+        ;; Note: The THE here makes sure that specifiers like
+        ;; (SINGLE-FLOAT 0.0 1.0) can raise a TYPE-ERROR.
+        `(the ,(lvar-value type)
+           ,(cond
+             ((csubtypep tspec (specifier-type 'double-float))
+              '(%double-float x))
+             ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
+             ((csubtypep tspec (specifier-type 'float))
+              '(%single-float x))
+             ((and (csubtypep tspec (specifier-type 'simple-vector))
+                   ;; Can we avoid checking for dimension issues like
+                   ;; (COERCE FOO '(SIMPLE-VECTOR 5)) returning a
+                   ;; vector of length 6?
+                   (or (policy node (< safety 3)) ; no need in unsafe code
+                       (and (array-type-p tspec) ; no need when no dimensions
+                            (equal (array-type-dimensions tspec) '(*)))))
+              `(if (simple-vector-p x)
+                   x
+                   (replace (make-array (length x)) x)))
+             ;; FIXME: other VECTOR types?
+             (t
+              (give-up-ir1-transform)))))))
 
 

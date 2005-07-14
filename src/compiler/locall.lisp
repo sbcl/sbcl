@@ -101,15 +101,15 @@
   (let ((return (node-dest call)))
     (when (return-p return)
       (let ((call-set (lambda-tail-set (node-home-lambda call)))
-	    (fun-set (lambda-tail-set new-fun)))
-	(unless (eq call-set fun-set)
-	  (let ((funs (tail-set-funs fun-set)))
-	    (dolist (fun funs)
-	      (setf (lambda-tail-set fun) call-set))
-	    (setf (tail-set-funs call-set)
-		  (nconc (tail-set-funs call-set) funs)))
-	  (reoptimize-lvar (return-result return))
-	  t)))))
+            (fun-set (lambda-tail-set new-fun)))
+        (unless (eq call-set fun-set)
+          (let ((funs (tail-set-funs fun-set)))
+            (dolist (fun funs)
+              (setf (lambda-tail-set fun) call-set))
+            (setf (tail-set-funs call-set)
+                  (nconc (tail-set-funs call-set) funs)))
+          (reoptimize-lvar (return-result return))
+          t)))))
 
 ;;; Convert a combination into a local call. We PROPAGATE-TO-ARGS, set
 ;;; the combination kind to :LOCAL, add FUN to the CALLS of the
@@ -170,47 +170,47 @@
   (etypecase fun
     (clambda
      (let ((nargs (length (lambda-vars fun)))
-	   (n-supplied (gensym))
-	   (temps (make-gensym-list (length (lambda-vars fun)))))
+           (n-supplied (gensym))
+           (temps (make-gensym-list (length (lambda-vars fun)))))
        `(lambda (,n-supplied ,@temps)
-	  (declare (type index ,n-supplied))
-	  ,(if (policy *lexenv* (zerop verify-arg-count))
-	       `(declare (ignore ,n-supplied))
-	       `(%verify-arg-count ,n-supplied ,nargs))
-	  (locally
-	    (declare (optimize (merge-tail-calls 3)))
-	    (%funcall ,fun ,@temps)))))
+          (declare (type index ,n-supplied))
+          ,(if (policy *lexenv* (zerop verify-arg-count))
+               `(declare (ignore ,n-supplied))
+               `(%verify-arg-count ,n-supplied ,nargs))
+          (locally
+            (declare (optimize (merge-tail-calls 3)))
+            (%funcall ,fun ,@temps)))))
     (optional-dispatch
      (let* ((min (optional-dispatch-min-args fun))
-	    (max (optional-dispatch-max-args fun))
-	    (more (optional-dispatch-more-entry fun))
-	    (n-supplied (gensym))
-	    (temps (make-gensym-list max)))
+            (max (optional-dispatch-max-args fun))
+            (more (optional-dispatch-more-entry fun))
+            (n-supplied (gensym))
+            (temps (make-gensym-list max)))
        (collect ((entries))
          ;; Force convertion of all entries
          (optional-dispatch-entry-point-fun fun 0)
-	 (loop for ep in (optional-dispatch-entry-points fun)
+         (loop for ep in (optional-dispatch-entry-points fun)
                and n from min
                do (entries `((= ,n-supplied ,n)
                              (%funcall ,(force ep) ,@(subseq temps 0 n)))))
-	 `(lambda (,n-supplied ,@temps)
-	    ;; FIXME: Make sure that INDEX type distinguishes between
-	    ;; target and host. (Probably just make the SB!XC:DEFTYPE
-	    ;; different from CL:DEFTYPE.)
-	    (declare (type index ,n-supplied))
-	    (cond
-	     ,@(if more (butlast (entries)) (entries))
-	     ,@(when more
-		 `((,(if (zerop min) t `(>= ,n-supplied ,max))
-		    ,(let ((n-context (gensym))
-			   (n-count (gensym)))
-		       `(multiple-value-bind (,n-context ,n-count)
-			    (%more-arg-context ,n-supplied ,max)
-			  (locally
-			    (declare (optimize (merge-tail-calls 3)))
-			    (%funcall ,more ,@temps ,n-context ,n-count)))))))
-	     (t
-	      (%arg-count-error ,n-supplied)))))))))
+         `(lambda (,n-supplied ,@temps)
+            ;; FIXME: Make sure that INDEX type distinguishes between
+            ;; target and host. (Probably just make the SB!XC:DEFTYPE
+            ;; different from CL:DEFTYPE.)
+            (declare (type index ,n-supplied))
+            (cond
+             ,@(if more (butlast (entries)) (entries))
+             ,@(when more
+                 `((,(if (zerop min) t `(>= ,n-supplied ,max))
+                    ,(let ((n-context (gensym))
+                           (n-count (gensym)))
+                       `(multiple-value-bind (,n-context ,n-count)
+                            (%more-arg-context ,n-supplied ,max)
+                          (locally
+                            (declare (optimize (merge-tail-calls 3)))
+                            (%funcall ,more ,@temps ,n-context ,n-count)))))))
+             (t
+              (%arg-count-error ,n-supplied)))))))))
 
 ;;; Make an external entry point (XEP) for FUN and return it. We
 ;;; convert the result of MAKE-XEP-LAMBDA in the correct environment,
@@ -226,22 +226,22 @@
   (aver (null (functional-entry-fun fun)))
   (with-ir1-environment-from-node (lambda-bind (main-entry fun))
     (let ((res (ir1-convert-lambda (make-xep-lambda-expression fun)
-				   :debug-name (debug-name 
+                                   :debug-name (debug-name
                                                 'xep (leaf-debug-name fun)))))
       (setf (functional-kind res) :external
-	    (leaf-ever-used res) t
-	    (functional-entry-fun res) fun
-	    (functional-entry-fun fun) res
-	    (component-reanalyze *current-component*) t)
+            (leaf-ever-used res) t
+            (functional-entry-fun res) fun
+            (functional-entry-fun fun) res
+            (component-reanalyze *current-component*) t)
       (reoptimize-component *current-component* :maybe)
       (etypecase fun
-	(clambda
-	 (locall-analyze-fun-1 fun))
-	(optional-dispatch
-	 (dolist (ep (optional-dispatch-entry-points fun))
-	   (locall-analyze-fun-1 (force ep)))
-	 (when (optional-dispatch-more-entry fun)
-	   (locall-analyze-fun-1 (optional-dispatch-more-entry fun)))))
+        (clambda
+         (locall-analyze-fun-1 fun))
+        (optional-dispatch
+         (dolist (ep (optional-dispatch-entry-points fun))
+           (locall-analyze-fun-1 (force ep)))
+         (when (optional-dispatch-more-entry fun)
+           (locall-analyze-fun-1 (optional-dispatch-more-entry fun)))))
       res)))
 
 ;;; Notice a REF that is not in a local-call context. If the REF is
@@ -254,9 +254,9 @@
   (declare (type ref ref))
   (let ((fun (ref-leaf ref)))
     (unless (or (xep-p fun)
-		(member (functional-kind fun) '(:escape :cleanup)))
+                (member (functional-kind fun) '(:escape :cleanup)))
       (change-ref-leaf ref (or (functional-entry-fun fun)
-			       (make-xep fun))))))
+                               (make-xep fun))))))
 
 ;;; Attempt to convert all references to FUN to local calls. The
 ;;; reference must be the function for a call, and the function lvar
@@ -277,7 +277,7 @@
   (let ((refs (leaf-refs fun)))
     (dolist (ref refs)
       (let* ((lvar (node-lvar ref))
-	     (dest (when lvar (lvar-dest lvar))))
+             (dest (when lvar (lvar-dest lvar))))
         (unless (node-to-be-deleted-p ref)
           (cond ((and (basic-combination-p dest)
                       (eq (basic-combination-fun dest) lvar)
@@ -315,36 +315,36 @@
   (aver-live-component component)
   (loop
     (let* ((new-functional (pop (component-new-functionals component)))
-	   (functional (or new-functional
-			   (pop (component-reanalyze-functionals component)))))
+           (functional (or new-functional
+                           (pop (component-reanalyze-functionals component)))))
       (unless functional
-	(return))
+        (return))
       (let ((kind (functional-kind functional)))
-	(cond ((or (functional-somewhat-letlike-p functional)
-		   (memq kind '(:deleted :zombie)))
-	       (values)) ; nothing to do
-	      ((and (null (leaf-refs functional)) (eq kind nil)
-		    (not (functional-entry-fun functional)))
-	       (delete-functional functional))
-	      (t
-	       ;; Fix/check FUNCTIONAL's relationship to COMPONENT-LAMDBAS.
-	       (cond ((not (lambda-p functional))
-		      ;; Since FUNCTIONAL isn't a LAMBDA, this doesn't
-		      ;; apply: no-op.
-		      (values))
-		     (new-functional ; FUNCTIONAL came from
-				     ; NEW-FUNCTIONALS, hence is new.
-		      ;; FUNCTIONAL becomes part of COMPONENT-LAMBDAS now.
-		      (aver (not (member functional
-					 (component-lambdas component))))
-		      (push functional (component-lambdas component)))
-		     (t ; FUNCTIONAL is old.
-		      ;; FUNCTIONAL should be in COMPONENT-LAMBDAS already.
-		      (aver (member functional (component-lambdas
-						component)))))
-	       (locall-analyze-fun-1 functional)
-	       (when (lambda-p functional)
-		 (maybe-let-convert functional)))))))
+        (cond ((or (functional-somewhat-letlike-p functional)
+                   (memq kind '(:deleted :zombie)))
+               (values)) ; nothing to do
+              ((and (null (leaf-refs functional)) (eq kind nil)
+                    (not (functional-entry-fun functional)))
+               (delete-functional functional))
+              (t
+               ;; Fix/check FUNCTIONAL's relationship to COMPONENT-LAMDBAS.
+               (cond ((not (lambda-p functional))
+                      ;; Since FUNCTIONAL isn't a LAMBDA, this doesn't
+                      ;; apply: no-op.
+                      (values))
+                     (new-functional ; FUNCTIONAL came from
+                                     ; NEW-FUNCTIONALS, hence is new.
+                      ;; FUNCTIONAL becomes part of COMPONENT-LAMBDAS now.
+                      (aver (not (member functional
+                                         (component-lambdas component))))
+                      (push functional (component-lambdas component)))
+                     (t ; FUNCTIONAL is old.
+                      ;; FUNCTIONAL should be in COMPONENT-LAMBDAS already.
+                      (aver (member functional (component-lambdas
+                                                component)))))
+               (locall-analyze-fun-1 functional)
+               (when (lambda-p functional)
+                 (maybe-let-convert functional)))))))
   (values))
 
 (defun locall-analyze-clambdas-until-done (clambdas)
@@ -352,15 +352,15 @@
    (let ((did-something nil))
      (dolist (clambda clambdas)
        (let* ((component (lambda-component clambda))
-	      (*all-components* (list component)))
-	 ;; The original CMU CL code seemed to implicitly assume that
-	 ;; COMPONENT is the only one here. Let's make that explicit.
-	 (aver (= 1 (length (functional-components clambda))))
-	 (aver (eql component (first (functional-components clambda))))
-	 (when (or (component-new-functionals component)
+              (*all-components* (list component)))
+         ;; The original CMU CL code seemed to implicitly assume that
+         ;; COMPONENT is the only one here. Let's make that explicit.
+         (aver (= 1 (length (functional-components clambda))))
+         (aver (eql component (first (functional-components clambda))))
+         (when (or (component-new-functionals component)
                    (component-reanalyze-functionals component))
-	   (setf did-something t)
-	   (locall-analyze-component component))))
+           (setf did-something t)
+           (locall-analyze-component component))))
      (unless did-something
        (return))))
   (values))
@@ -371,10 +371,10 @@
 ;;; reference.
 (defun maybe-expand-local-inline (original-functional ref call)
   (if (and (policy call
-		   (and (>= speed space)
-			(>= speed compilation-speed)))
-	   (not (eq (functional-kind (node-home-lambda call)) :external))
-	   (inline-expansion-ok call))
+                   (and (>= speed space)
+                        (>= speed compilation-speed)))
+           (not (eq (functional-kind (node-home-lambda call)) :external))
+           (inline-expansion-ok call))
       (let* ((end (component-last-block (node-component call)))
              (pred (block-prev end)))
         (multiple-value-bind (losing-local-object converted-lambda)
@@ -384,8 +384,8 @@
                   (values nil
                           (ir1-convert-lambda
                            (functional-inline-expansion original-functional)
-                           :debug-name (debug-name 'local-inline 
-                                                   (leaf-debug-name 
+                           :debug-name (debug-name 'local-inline
+                                                   (leaf-debug-name
                                                     original-functional)))))))
           (cond (losing-local-object
                  (if (functional-p losing-local-object)
@@ -433,35 +433,35 @@
 (defun convert-call-if-possible (ref call)
   (declare (type ref ref) (type basic-combination call))
   (let* ((block (node-block call))
-	 (component (block-component block))
-	 (original-fun (ref-leaf ref)))
+         (component (block-component block))
+         (original-fun (ref-leaf ref)))
     (aver (functional-p original-fun))
     (unless (or (member (basic-combination-kind call) '(:local :error))
                 (node-to-be-deleted-p call)
-		(member (functional-kind original-fun)
-			'(:toplevel-xep :deleted))
-		(not (or (eq (component-kind component) :initial)
-			 (eq (block-component
-			      (node-block
-			       (lambda-bind (main-entry original-fun))))
-			     component))))
+                (member (functional-kind original-fun)
+                        '(:toplevel-xep :deleted))
+                (not (or (eq (component-kind component) :initial)
+                         (eq (block-component
+                              (node-block
+                               (lambda-bind (main-entry original-fun))))
+                             component))))
       (let ((fun (if (xep-p original-fun)
-		     (functional-entry-fun original-fun)
-		     original-fun))
-	    (*compiler-error-context* call))
+                     (functional-entry-fun original-fun)
+                     original-fun))
+            (*compiler-error-context* call))
 
-	(when (and (eq (functional-inlinep fun) :inline)
-		   (rest (leaf-refs original-fun)))
-	  (setq fun (maybe-expand-local-inline fun ref call)))
+        (when (and (eq (functional-inlinep fun) :inline)
+                   (rest (leaf-refs original-fun)))
+          (setq fun (maybe-expand-local-inline fun ref call)))
 
-	(aver (member (functional-kind fun)
-		      '(nil :escape :cleanup :optional)))
-	(cond ((mv-combination-p call)
-	       (convert-mv-call ref call fun))
-	      ((lambda-p fun)
-	       (convert-lambda-call ref call fun))
-	      (t
-	       (convert-hairy-call ref call fun))))))
+        (aver (member (functional-kind fun)
+                      '(nil :escape :cleanup :optional)))
+        (cond ((mv-combination-p call)
+               (convert-mv-call ref call fun))
+              ((lambda-p fun)
+               (convert-lambda-call ref call fun))
+              (t
+               (convert-hairy-call ref call fun))))))
 
   (values))
 
@@ -483,8 +483,8 @@
 (defun convert-mv-call (ref call fun)
   (declare (type ref ref) (type mv-combination call) (type functional fun))
   (when (and (looks-like-an-mv-bind fun)
-	     (singleton-p (leaf-refs fun))
-	     (singleton-p (basic-combination-args call)))
+             (singleton-p (leaf-refs fun))
+             (singleton-p (basic-combination-args call)))
     (let* ((*current-component* (node-component ref))
            (ep (optional-dispatch-entry-point-fun
                 fun (optional-dispatch-max-args fun))))
@@ -509,16 +509,16 @@
 (defun convert-lambda-call (ref call fun)
   (declare (type ref ref) (type combination call) (type clambda fun))
   (let ((nargs (length (lambda-vars fun)))
-	(n-call-args (length (combination-args call))))
+        (n-call-args (length (combination-args call))))
     (cond ((= n-call-args nargs)
-	   (convert-call ref call fun))
-	  (t
-	   (warn
-	    'local-argument-mismatch
-	    :format-control
-	    "function called with ~R argument~:P, but wants exactly ~R"
-	    :format-arguments (list n-call-args nargs))
-	   (setf (basic-combination-kind call) :error)))))
+           (convert-call ref call fun))
+          (t
+           (warn
+            'local-argument-mismatch
+            :format-control
+            "function called with ~R argument~:P, but wants exactly ~R"
+            :format-arguments (list n-call-args nargs))
+           (setf (basic-combination-kind call) :error)))))
 
 ;;;; &OPTIONAL, &MORE and &KEYWORD calls
 
@@ -529,32 +529,32 @@
 ;;; that have a &MORE (or &REST) arg.
 (defun convert-hairy-call (ref call fun)
   (declare (type ref ref) (type combination call)
-	   (type optional-dispatch fun))
+           (type optional-dispatch fun))
   (let ((min-args (optional-dispatch-min-args fun))
-	(max-args (optional-dispatch-max-args fun))
-	(call-args (length (combination-args call))))
+        (max-args (optional-dispatch-max-args fun))
+        (call-args (length (combination-args call))))
     (cond ((< call-args min-args)
-	   (warn
-	    'local-argument-mismatch
-	    :format-control
-	    "function called with ~R argument~:P, but wants at least ~R"
-	    :format-arguments (list call-args min-args))
-	   (setf (basic-combination-kind call) :error))
-	  ((<= call-args max-args)
-	   (convert-call ref call
+           (warn
+            'local-argument-mismatch
+            :format-control
+            "function called with ~R argument~:P, but wants at least ~R"
+            :format-arguments (list call-args min-args))
+           (setf (basic-combination-kind call) :error))
+          ((<= call-args max-args)
+           (convert-call ref call
                          (let ((*current-component* (node-component ref)))
                            (optional-dispatch-entry-point-fun
                             fun (- call-args min-args)))))
-	  ((optional-dispatch-more-entry fun)
-	   (convert-more-call ref call fun))
-	  (t
-	   (warn
-	    'local-argument-mismatch
-	    :format-control
-	    "function called with ~R argument~:P, but wants at most ~R"
-	    :format-arguments
-	    (list call-args max-args))
-	   (setf (basic-combination-kind call) :error))))
+          ((optional-dispatch-more-entry fun)
+           (convert-more-call ref call fun))
+          (t
+           (warn
+            'local-argument-mismatch
+            :format-control
+            "function called with ~R argument~:P, but wants at most ~R"
+            :format-arguments
+            (list call-args max-args))
+           (setf (basic-combination-kind call) :error))))
   (values))
 
 ;;; This function is used to convert a call to an entry point when
@@ -570,14 +570,14 @@
 ;;; that everything gets converted during the single pass.
 (defun convert-hairy-fun-entry (ref call entry vars ignores args)
   (declare (list vars ignores args) (type ref ref) (type combination call)
-	   (type clambda entry))
+           (type clambda entry))
   (let ((new-fun
-	 (with-ir1-environment-from-node call
-	   (ir1-convert-lambda
-	    `(lambda ,vars
-	       (declare (ignorable ,@ignores))
-	       (%funcall ,entry ,@args))
-	    :debug-name (debug-name 'hairy-function-entry 
+         (with-ir1-environment-from-node call
+           (ir1-convert-lambda
+            `(lambda ,vars
+               (declare (ignorable ,@ignores))
+               (%funcall ,entry ,@args))
+            :debug-name (debug-name 'hairy-function-entry
                                     (lvar-fun-name
                                      (basic-combination-fun call)))))))
     (convert-call ref call new-fun)
@@ -602,52 +602,52 @@
 (defun convert-more-call (ref call fun)
   (declare (type ref ref) (type combination call) (type optional-dispatch fun))
   (let* ((max (optional-dispatch-max-args fun))
-	 (arglist (optional-dispatch-arglist fun))
-	 (args (combination-args call))
-	 (more (nthcdr max args))
-	 (flame (policy call (or (> speed inhibit-warnings)
-				 (> space inhibit-warnings))))
-	 (loser nil)
+         (arglist (optional-dispatch-arglist fun))
+         (args (combination-args call))
+         (more (nthcdr max args))
+         (flame (policy call (or (> speed inhibit-warnings)
+                                 (> space inhibit-warnings))))
+         (loser nil)
          (allowp nil)
          (allow-found nil)
-	 (temps (make-gensym-list max))
-	 (more-temps (make-gensym-list (length more))))
+         (temps (make-gensym-list max))
+         (more-temps (make-gensym-list (length more))))
     (collect ((ignores)
-	      (supplied)
-	      (key-vars))
+              (supplied)
+              (key-vars))
 
       (dolist (var arglist)
-	(let ((info (lambda-var-arg-info var)))
-	  (when info
-	    (ecase (arg-info-kind info)
-	      (:keyword
-	       (key-vars var))
-	      ((:rest :optional))
-	      ((:more-context :more-count)
-	       (compiler-warn "can't local-call functions with &MORE args")
-	       (setf (basic-combination-kind call) :error)
-	       (return-from convert-more-call))))))
+        (let ((info (lambda-var-arg-info var)))
+          (when info
+            (ecase (arg-info-kind info)
+              (:keyword
+               (key-vars var))
+              ((:rest :optional))
+              ((:more-context :more-count)
+               (compiler-warn "can't local-call functions with &MORE args")
+               (setf (basic-combination-kind call) :error)
+               (return-from convert-more-call))))))
 
       (when (optional-dispatch-keyp fun)
-	(when (oddp (length more))
-	  (compiler-warn "function called with odd number of ~
+        (when (oddp (length more))
+          (compiler-warn "function called with odd number of ~
                           arguments in keyword portion")
-	  (setf (basic-combination-kind call) :error)
-	  (return-from convert-more-call))
+          (setf (basic-combination-kind call) :error)
+          (return-from convert-more-call))
 
-	(do ((key more (cddr key))
-	     (temp more-temps (cddr temp)))
-	    ((null key))
-	  (let ((lvar (first key)))
-	    (unless (constant-lvar-p lvar)
-	      (when flame
-		(compiler-notify "non-constant keyword in keyword call"))
-	      (setf (basic-combination-kind call) :error)
-	      (return-from convert-more-call))
+        (do ((key more (cddr key))
+             (temp more-temps (cddr temp)))
+            ((null key))
+          (let ((lvar (first key)))
+            (unless (constant-lvar-p lvar)
+              (when flame
+                (compiler-notify "non-constant keyword in keyword call"))
+              (setf (basic-combination-kind call) :error)
+              (return-from convert-more-call))
 
-	    (let ((name (lvar-value lvar))
-		  (dummy (first temp))
-		  (val (second temp)))
+            (let ((name (lvar-value lvar))
+                  (dummy (first temp))
+                  (val (second temp)))
               (when (and (eq name :allow-other-keys) (not allow-found))
                 (let ((val (second key)))
                   (cond ((constant-lvar-p val)
@@ -657,55 +657,55 @@
                              (compiler-notify "non-constant :ALLOW-OTHER-KEYS value"))
                            (setf (basic-combination-kind call) :error)
                            (return-from convert-more-call)))))
-	      (dolist (var (key-vars)
-			   (progn
-			     (ignores dummy val)
+              (dolist (var (key-vars)
+                           (progn
+                             (ignores dummy val)
                              (unless (eq name :allow-other-keys)
                                (setq loser (list name)))))
-		(let ((info (lambda-var-arg-info var)))
-		  (when (eq (arg-info-key info) name)
-		      (ignores dummy)
-		      (if (member var (supplied) :key #'car)
-			  (ignores val)
-			  (supplied (cons var val)))
-		      (return)))))))
+                (let ((info (lambda-var-arg-info var)))
+                  (when (eq (arg-info-key info) name)
+                      (ignores dummy)
+                      (if (member var (supplied) :key #'car)
+                          (ignores val)
+                          (supplied (cons var val)))
+                      (return)))))))
 
-	(when (and loser (not (optional-dispatch-allowp fun)) (not allowp))
-	  (compiler-warn "function called with unknown argument keyword ~S"
-			 (car loser))
-	  (setf (basic-combination-kind call) :error)
-	  (return-from convert-more-call)))
+        (when (and loser (not (optional-dispatch-allowp fun)) (not allowp))
+          (compiler-warn "function called with unknown argument keyword ~S"
+                         (car loser))
+          (setf (basic-combination-kind call) :error)
+          (return-from convert-more-call)))
 
       (collect ((call-args))
-	(do ((var arglist (cdr var))
-	     (temp temps (cdr temp)))
-	    ((null var))
-	  (let ((info (lambda-var-arg-info (car var))))
-	    (if info
-		(ecase (arg-info-kind info)
-		  (:optional
-		   (call-args (car temp))
-		   (when (arg-info-supplied-p info)
-		     (call-args t)))
-		  (:rest
-		   (call-args `(list ,@more-temps))
-		   (return))
-		  (:keyword
-		   (return)))
-		(call-args (car temp)))))
+        (do ((var arglist (cdr var))
+             (temp temps (cdr temp)))
+            ((null var))
+          (let ((info (lambda-var-arg-info (car var))))
+            (if info
+                (ecase (arg-info-kind info)
+                  (:optional
+                   (call-args (car temp))
+                   (when (arg-info-supplied-p info)
+                     (call-args t)))
+                  (:rest
+                   (call-args `(list ,@more-temps))
+                   (return))
+                  (:keyword
+                   (return)))
+                (call-args (car temp)))))
 
-	(dolist (var (key-vars))
-	  (let ((info (lambda-var-arg-info var))
-		(temp (cdr (assoc var (supplied)))))
-	    (if temp
-		(call-args temp)
-		(call-args (arg-info-default info)))
-	    (when (arg-info-supplied-p info)
-	      (call-args (not (null temp))))))
+        (dolist (var (key-vars))
+          (let ((info (lambda-var-arg-info var))
+                (temp (cdr (assoc var (supplied)))))
+            (if temp
+                (call-args temp)
+                (call-args (arg-info-default info)))
+            (when (arg-info-supplied-p info)
+              (call-args (not (null temp))))))
 
-	(convert-hairy-fun-entry ref call (optional-dispatch-main-entry fun)
-				 (append temps more-temps)
-				 (ignores) (call-args)))))
+        (convert-hairy-fun-entry ref call (optional-dispatch-main-entry fun)
+                                 (append temps more-temps)
+                                 (ignores) (call-args)))))
 
   (values))
 
@@ -741,13 +741,13 @@
 (defun insert-let-body (clambda call)
   (declare (type clambda clambda) (type basic-combination call))
   (let* ((call-block (node-block call))
-	 (bind-block (node-block (lambda-bind clambda)))
-	 (component (block-component call-block)))
+         (bind-block (node-block (lambda-bind clambda)))
+         (component (block-component call-block)))
     (aver-live-component component)
     (let ((clambda-component (block-component bind-block)))
       (unless (eq clambda-component component)
-	(aver (eq (component-kind component) :initial))
-	(join-components component clambda-component)))
+        (aver (eq (component-kind component) :initial))
+        (join-components component clambda-component)))
     (let ((*current-component* component))
       (node-ends-block call))
     (destructuring-bind (next-block)
@@ -780,7 +780,7 @@
   ;; FINALIZE-XEP-DEFINITION tried to find out its DEFINED-TYPE from
   ;; the now-NILed-out TAIL-SET. So..
   ;;
-  ;; To deal with this problem, we no longer NIL out 
+  ;; To deal with this problem, we no longer NIL out
   ;; (LAMBDA-TAIL-SET CLAMBDA) here. Instead:
   ;;   * If we're the only function in TAIL-SET-FUNS, it should
   ;;     be safe to leave ourself linked to it, and it to you.
@@ -793,13 +793,13 @@
   ;;     FINALIZE-XEP-DEFINITION) which might want to
   ;;     know about our return type.
   (let* ((old-tail-set (lambda-tail-set clambda))
-	 (old-tail-set-funs (tail-set-funs old-tail-set)))
+         (old-tail-set-funs (tail-set-funs old-tail-set)))
     (unless (= 1 (length old-tail-set-funs))
       (setf (tail-set-funs old-tail-set)
-	    (delete clambda old-tail-set-funs))
+            (delete clambda old-tail-set-funs))
       (let ((new-tail-set (copy-tail-set old-tail-set)))
-	(setf (lambda-tail-set clambda) new-tail-set
-	      (tail-set-funs new-tail-set) (list clambda)))))
+        (setf (lambda-tail-set clambda) new-tail-set
+              (tail-set-funs new-tail-set) (list clambda)))))
   ;; The documentation on TAIL-SET-INFO doesn't tell whether it could
   ;; remain valid in this case, so we nuke it on the theory that
   ;; missing information tends to be less dangerous than incorrect
@@ -821,14 +821,14 @@
   (let ((component (node-component call)))
     (unlink-blocks (component-head component) (lambda-block clambda))
     (setf (component-lambdas component)
-	  (delete clambda (component-lambdas component)))
+          (delete clambda (component-lambdas component)))
     (setf (component-reanalyze component) t))
   (setf (lambda-call-lexenv clambda) (node-lexenv call))
 
   (depart-from-tail-set clambda)
 
   (let* ((home (node-home-lambda call))
-	 (home-physenv (lambda-physenv home)))
+         (home-physenv (lambda-physenv home)))
 
     (aver (not (eq home clambda)))
 
@@ -841,7 +841,7 @@
     (let ((lets (lambda-lets clambda)))
       (dolist (let lets)
         (setf (lambda-home let) home)
-	(setf (lambda-physenv let) home-physenv))
+        (setf (lambda-physenv let) home-physenv))
       (setf (lambda-lets home) (nconc lets (lambda-lets home))))
     ;; CLAMBDA no longer has an independent existence as an entity
     ;; which has LETs.
@@ -872,13 +872,13 @@
 ;;; instead. Move all the uses of the result lvar to CALL's lvar.
 (defun move-return-uses (fun call next-block)
   (declare (type clambda fun) (type basic-combination call)
-	   (type cblock next-block))
+           (type cblock next-block))
   (let* ((return (lambda-return fun))
-	 (return-block (progn
+         (return-block (progn
                          (ensure-block-start (node-prev return))
                          (node-block return))))
     (unlink-blocks return-block
-		   (component-tail (block-component return-block)))
+                   (component-tail (block-component return-block)))
     (link-blocks return-block next-block)
     (unlink-node return)
     (delete-return return)
@@ -905,26 +905,26 @@
   (dolist (called (lambda-calls-or-closes fun))
     (when (lambda-p called)
       (dolist (ref (leaf-refs called))
-	(let ((this-call (node-dest ref)))
-	  (when (and this-call
-		     (node-tail-p this-call)
-		     (eq (node-home-lambda this-call) fun))
-	    (setf (node-tail-p this-call) nil)
-	    (ecase (functional-kind called)
-	      ((nil :cleanup :optional)
-	       (let ((block (node-block this-call))
-		     (lvar (node-lvar call)))
-		 (unlink-blocks block (first (block-succ block)))
-		 (link-blocks block next-block)
+        (let ((this-call (node-dest ref)))
+          (when (and this-call
+                     (node-tail-p this-call)
+                     (eq (node-home-lambda this-call) fun))
+            (setf (node-tail-p this-call) nil)
+            (ecase (functional-kind called)
+              ((nil :cleanup :optional)
+               (let ((block (node-block this-call))
+                     (lvar (node-lvar call)))
+                 (unlink-blocks block (first (block-succ block)))
+                 (link-blocks block next-block)
                  (aver (not (node-lvar this-call)))
-		 (add-lvar-use this-call lvar)))
-	      (:deleted)
-	      ;; The called function might be an assignment in the
-	      ;; case where we are currently converting that function.
-	      ;; In steady-state, assignments never appear as a called
-	      ;; function.
-	      (:assignment
-	       (aver (eq called fun)))))))))
+                 (add-lvar-use this-call lvar)))
+              (:deleted)
+              ;; The called function might be an assignment in the
+              ;; case where we are currently converting that function.
+              ;; In steady-state, assignments never appear as a called
+              ;; function.
+              (:assignment
+               (aver (eq called fun)))))))))
   (values))
 
 ;;; Deal with returning from a LET or assignment that we are
@@ -952,28 +952,28 @@
 ;;;    move the return to the caller.
 (defun move-return-stuff (fun call next-block)
   (declare (type clambda fun) (type basic-combination call)
-	   (type (or cblock null) next-block))
+           (type (or cblock null) next-block))
   (when next-block
     (unconvert-tail-calls fun call next-block))
   (let* ((return (lambda-return fun))
-	 (call-fun (node-home-lambda call))
-	 (call-return (lambda-return call-fun)))
+         (call-fun (node-home-lambda call))
+         (call-return (lambda-return call-fun)))
     (when (and call-return
                (block-delete-p (node-block call-return)))
       (delete-return call-return)
       (unlink-node call-return)
       (setq call-return nil))
     (cond ((not return))
-	  ((or next-block call-return)
-	   (unless (block-delete-p (node-block return))
+          ((or next-block call-return)
+           (unless (block-delete-p (node-block return))
              (unless next-block
                (ensure-block-start (node-prev call-return))
                (setq next-block (node-block call-return)))
-	     (move-return-uses fun call next-block)))
-	  (t
-	   (aver (node-tail-p call))
-	   (setf (lambda-return call-fun) return)
-	   (setf (return-lambda return) call-fun)
+             (move-return-uses fun call next-block)))
+          (t
+           (aver (node-tail-p call))
+           (setf (lambda-return call-fun) return)
+           (setf (return-lambda return) call-fun)
            (setf (lambda-return fun) nil))))
   (%delete-lvar-use call) ; LET call does not have value semantics
   (values))
@@ -1017,12 +1017,12 @@
   (when (leaf-has-source-name-p clambda)
     ;; ANSI requires that explicit NOTINLINE be respected.
     (or (eq (lambda-inlinep clambda) :notinline)
-	;; If (= LET-CONVERTION 0) we can guess that inlining
-	;; generally won't be appreciated, but if the user
-	;; specifically requests inlining, that takes precedence over
-	;; our general guess.
-	(and (policy clambda (= let-convertion 0))
-	     (not (eq (lambda-inlinep clambda) :inline))))))
+        ;; If (= LET-CONVERTION 0) we can guess that inlining
+        ;; generally won't be appreciated, but if the user
+        ;; specifically requests inlining, that takes precedence over
+        ;; our general guess.
+        (and (policy clambda (= let-convertion 0))
+             (not (eq (lambda-inlinep clambda) :inline))))))
 
 ;;; We also don't convert calls to named functions which appear in the
 ;;; initial component, delaying this until optimization. This
@@ -1030,9 +1030,9 @@
 ;;; may have references added due to later local inline expansion.
 (defun ok-initial-convert-p (fun)
   (not (and (leaf-has-source-name-p fun)
-	    (or (declarations-suppress-let-conversion-p fun)
-		(eq (component-kind (lambda-component fun))
-		    :initial)))))
+            (or (declarations-suppress-let-conversion-p fun)
+                (eq (component-kind (lambda-component fun))
+                    :initial)))))
 
 ;;; This function is called when there is some reason to believe that
 ;;; CLAMBDA might be converted into a LET. This is done after local
@@ -1060,30 +1060,30 @@
     ;; OK-INITIAL-CONVERT-P.
     (let ((refs (leaf-refs clambda)))
       (when (and refs
-		 (null (rest refs))
-		 (memq (functional-kind clambda) '(nil :assignment))
-		 (not (functional-entry-fun clambda)))
-	(binding* ((ref (first refs))
+                 (null (rest refs))
+                 (memq (functional-kind clambda) '(nil :assignment))
+                 (not (functional-entry-fun clambda)))
+        (binding* ((ref (first refs))
                    (ref-lvar (node-lvar ref) :exit-if-null)
                    (dest (lvar-dest ref-lvar)))
-	  (when (and (basic-combination-p dest)
-		     (eq (basic-combination-fun dest) ref-lvar)
-		     (eq (basic-combination-kind dest) :local)
+          (when (and (basic-combination-p dest)
+                     (eq (basic-combination-fun dest) ref-lvar)
+                     (eq (basic-combination-kind dest) :local)
                      (not (node-to-be-deleted-p dest))
                      (not (block-delete-p (lambda-block clambda)))
-		     (cond ((ok-initial-convert-p clambda) t)
-			   (t
-			    (reoptimize-lvar ref-lvar)
-			    nil)))
+                     (cond ((ok-initial-convert-p clambda) t)
+                           (t
+                            (reoptimize-lvar ref-lvar)
+                            nil)))
             (when (eq clambda (node-home-lambda dest))
               (delete-lambda clambda)
               (return-from maybe-let-convert nil))
-	    (unless (eq (functional-kind clambda) :assignment)
+            (unless (eq (functional-kind clambda) :assignment)
               (let-convert clambda dest))
-	    (reoptimize-call dest)
-	    (setf (functional-kind clambda)
-		  (if (mv-combination-p dest) :mv-let :let))))
-	t))))
+            (reoptimize-call dest)
+            (setf (functional-kind clambda)
+                  (if (mv-combination-p dest) :mv-let :let))))
+        t))))
 
 ;;;; tail local calls and assignments
 
@@ -1095,14 +1095,14 @@
   (declare (type cblock block1 block2))
   (or (eq block1 block2)
       (let ((cleanup2 (block-start-cleanup block2)))
-	(do ((cleanup (block-end-cleanup block1)
-		      (node-enclosing-cleanup (cleanup-mess-up cleanup))))
-	    ((eq cleanup cleanup2) t)
-	  (case (cleanup-kind cleanup)
-	    ((:block :tagbody)
-	     (unless (null (entry-exits (cleanup-mess-up cleanup)))
-	       (return nil)))
-	    (t (return nil)))))))
+        (do ((cleanup (block-end-cleanup block1)
+                      (node-enclosing-cleanup (cleanup-mess-up cleanup))))
+            ((eq cleanup cleanup2) t)
+          (case (cleanup-kind cleanup)
+            ((:block :tagbody)
+             (unless (null (entry-exits (cleanup-mess-up cleanup)))
+               (return nil)))
+            (t (return nil)))))))
 
 ;;; If a potentially TR local call really is TR, then convert it to
 ;;; jump directly to the called function. We also call
@@ -1115,22 +1115,22 @@
     (aver (return-p return))
     (when (and (not (node-tail-p call)) ; otherwise already converted
                ;; this is a tail call
-	       (immediately-used-p (return-result return) call)
-	       (only-harmless-cleanups (node-block call)
-				       (node-block return))
+               (immediately-used-p (return-result return) call)
+               (only-harmless-cleanups (node-block call)
+                                       (node-block return))
                ;; If the call is in an XEP, we might decide to make it
                ;; non-tail so that we can use known return inside the
                ;; component.
-	       (not (eq (functional-kind (node-home-lambda call))
-			:external))
+               (not (eq (functional-kind (node-home-lambda call))
+                        :external))
                (not (block-delete-p (lambda-block fun))))
       (node-ends-block call)
       (let ((block (node-block call)))
-	(setf (node-tail-p call) t)
-	(unlink-blocks block (first (block-succ block)))
-	(link-blocks block (lambda-block fun))
+        (setf (node-tail-p call) t)
+        (unlink-blocks block (first (block-succ block)))
+        (link-blocks block (lambda-block fun))
         (delete-lvar-use call)
-	(values t (maybe-convert-to-assignment fun))))))
+        (values t (maybe-convert-to-assignment fun))))))
 
 ;;; This is called when we believe it might make sense to convert
 ;;; CLAMBDA to an assignment. All this function really does is
@@ -1138,7 +1138,7 @@
 ;;; combined with the calling function's environment. We can convert
 ;;; when:
 ;;; -- The function is a normal, non-entry function, and
-;;; -- Except for one call, all calls must be tail recursive calls 
+;;; -- Except for one call, all calls must be tail recursive calls
 ;;;    in the called function (i.e. are self-recursive tail calls)
 ;;; -- OK-INITIAL-CONVERT-P is true.
 ;;;
@@ -1156,24 +1156,24 @@
 (defun maybe-convert-to-assignment (clambda)
   (declare (type clambda clambda))
   (when (and (not (functional-kind clambda))
-	     (not (functional-entry-fun clambda)))
+             (not (functional-entry-fun clambda)))
     (let ((outside-non-tail-call nil)
-	  (outside-call nil))
+          (outside-call nil))
       (when (and (dolist (ref (leaf-refs clambda) t)
-		   (let ((dest (node-dest ref)))
-		     (when (or (not dest)
+                   (let ((dest (node-dest ref)))
+                     (when (or (not dest)
                                (block-delete-p (node-block dest)))
                        (return nil))
-		     (let ((home (node-home-lambda ref)))
-		       (unless (eq home clambda)
-			 (when outside-call
-			   (return nil))
-			 (setq outside-call dest))
-		       (unless (node-tail-p dest)
-			 (when (or outside-non-tail-call (eq home clambda))
-			   (return nil))
-			 (setq outside-non-tail-call dest)))))
-		 (ok-initial-convert-p clambda))
+                     (let ((home (node-home-lambda ref)))
+                       (unless (eq home clambda)
+                         (when outside-call
+                           (return nil))
+                         (setq outside-call dest))
+                       (unless (node-tail-p dest)
+                         (when (or outside-non-tail-call (eq home clambda))
+                           (return nil))
+                         (setq outside-non-tail-call dest)))))
+                 (ok-initial-convert-p clambda))
         (cond (outside-call (setf (functional-kind clambda) :assignment)
                             (let-convert clambda outside-call)
                             (when outside-non-tail-call

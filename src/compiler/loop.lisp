@@ -23,7 +23,7 @@
 ;;; NIL when we are done.
 (defun find-dominators (component)
   (let ((head (loop-head (component-outer-loop component)))
-	changed)
+        changed)
     (let ((set (make-sset)))
       (sset-adjoin head set)
       (setf (block-dominators head) set))
@@ -31,16 +31,16 @@
      (setq changed nil)
      (do-blocks (block component :tail)
        (let ((dom (block-dominators block)))
-	 (when dom (sset-delete block dom))
-	 (dolist (pred (block-pred block))
-	   (let ((pdom (block-dominators pred)))
-	     (when pdom
-	       (if dom
-		   (when (sset-intersection dom pdom)
-		     (setq changed t))
-		   (setq dom (copy-sset pdom) changed t)))))	 
-	 (setf (block-dominators block) dom)
-	 (when dom (sset-adjoin block dom))))
+         (when dom (sset-delete block dom))
+         (dolist (pred (block-pred block))
+           (let ((pdom (block-dominators pred)))
+             (when pdom
+               (if dom
+                   (when (sset-intersection dom pdom)
+                     (setq changed t))
+                   (setq dom (copy-sset pdom) changed t)))))
+         (setf (block-dominators block) dom)
+         (when dom (sset-adjoin block dom))))
      (unless changed (return)))))
 
 
@@ -50,8 +50,8 @@
 (defun dominates-p (block1 block2)
   (let ((set (block-dominators block2)))
     (if set
-	(sset-member block1 set)
-	t)))
+        (sset-member block1 set)
+        t)))
 
 ;;; LOOP-ANALYZE  --  Interface
 ;;;
@@ -72,15 +72,15 @@
     (setf (loop-blocks loop) nil)
     (do-blocks (block component)
       (let ((number (block-number block)))
-	(dolist (pred (block-pred block))
-	  (when (<= (block-number pred) number)
-	    (when (note-loop-head block component)
-	      (clear-flags component)
-	      (setf (block-flag block) :good)
-	      (dolist (succ (block-succ block))
-		(find-strange-loop-blocks succ block))
-	      (find-strange-loop-segments block component))
-	    (return)))))
+        (dolist (pred (block-pred block))
+          (when (<= (block-number pred) number)
+            (when (note-loop-head block component)
+              (clear-flags component)
+              (setf (block-flag block) :good)
+              (dolist (succ (block-succ block))
+                (find-strange-loop-blocks succ block))
+              (find-strange-loop-segments block component))
+            (return)))))
     (find-loop-blocks (component-outer-loop component))))
 
 
@@ -106,22 +106,22 @@
   (dolist (sub-loop (loop-inferiors loop))
     (dolist (exit (loop-exits sub-loop))
       (dolist (succ (block-succ exit))
-	(find-blocks-from-here succ loop))))
-  
+        (find-blocks-from-here succ loop))))
+
   (collect ((exits))
     (dolist (sub-loop (loop-inferiors loop))
       (dolist (exit (loop-exits sub-loop))
-	(dolist (succ (block-succ exit))
-	  (unless (block-loop succ)
-	    (exits exit)
-	    (return)))))
-    
+        (dolist (succ (block-succ exit))
+          (unless (block-loop succ)
+            (exits exit)
+            (return)))))
+
     (do ((block (loop-blocks loop) (block-loop-next block)))
-	((null block))
+        ((null block))
       (dolist (succ (block-succ block))
-	(unless (block-loop succ)
-	  (exits block)
-	  (return))))    
+        (unless (block-loop succ)
+          (exits block)
+          (return))))
     (setf (loop-exits loop) (exits))))
 
 
@@ -134,7 +134,7 @@
 ;;; recurse on its successors.
 (defun find-blocks-from-here (block loop)
   (when (and (not (block-loop block))
-	     (dominates-p (loop-head loop) block))
+             (dominates-p (loop-head loop) block))
     (setf (block-loop block) loop)
     (shiftf (block-loop-next block) (loop-blocks loop) block)
     (dolist (succ (block-succ block))
@@ -152,17 +152,17 @@
   (let ((superior (find-superior head (component-outer-loop component))))
     (unless (eq (loop-head superior) head)
       (let ((result (make-loop :head head
-			       :kind :natural
-			       :superior superior
-			       :depth (1+ (loop-depth superior))))
-	    (number (block-number head)))
-	(push result (loop-inferiors superior))
-	(dolist (pred (block-pred head))
-	  (when (<= (block-number pred) number)
-	    (if (dominates-p head pred)
-		(push pred (loop-tail result))
-		(setf (loop-kind result) :strange))))
-	(eq (loop-kind result) :strange)))))
+                               :kind :natural
+                               :superior superior
+                               :depth (1+ (loop-depth superior))))
+            (number (block-number head)))
+        (push result (loop-inferiors superior))
+        (dolist (pred (block-pred head))
+          (when (<= (block-number pred) number)
+            (if (dominates-p head pred)
+                (push pred (loop-tail result))
+                (setf (loop-kind result) :strange))))
+        (eq (loop-kind result) :strange)))))
 
 
 ;;; FIND-SUPERIOR  --  Internal
@@ -174,8 +174,8 @@
   (if (eq (loop-head loop) head)
       loop
       (dolist (inferior (loop-inferiors loop) loop)
-	(when (dominates-p (loop-head inferior) head)
-	  (return (find-superior head inferior))))))
+        (when (dominates-p (loop-head inferior) head)
+          (return (find-superior head inferior))))))
 
 
 ;;; FIND-STRANGE-LOOP-BLOCKS  --  Internal
@@ -190,16 +190,16 @@
 (defun find-strange-loop-blocks (block head)
   (let ((flag (block-flag block)))
     (cond (flag
-	   (if (eq flag :good)
-	       t
-	       nil))
-	  (t
-	   (setf (block-flag block) :bad)
-	   (unless (dominates-p block head)
-	     (dolist (succ (block-succ block))
-	       (when (find-strange-loop-blocks succ head)
-		 (setf (block-flag block) :good))))
-	   (eq (block-flag block) :good)))))
+           (if (eq flag :good)
+               t
+               nil))
+          (t
+           (setf (block-flag block) :bad)
+           (unless (dominates-p block head)
+             (dolist (succ (block-succ block))
+               (when (find-strange-loop-blocks succ head)
+                 (setf (block-flag block) :good))))
+           (eq (block-flag block) :good)))))
 
 ;;; FIND-STRANGE-LOOP-SEGMENTS  --  Internal
 ;;;
@@ -212,7 +212,7 @@
   (when (eq (block-flag block) :good)
     (setf (block-flag block) :done)
     (unless (every #'(lambda (x) (member (block-flag x) '(:good :done)))
-		   (block-pred block))
+                   (block-pred block))
       (note-loop-head block component))
     (dolist (succ (block-succ block))
       (find-strange-loop-segments succ component))))

@@ -24,22 +24,22 @@
     (when (cdr stores)
       (error "multiple store variables for ~S" place))
     (let ((n-item (gensym))
-	  (n-place (gensym))
-	  (n-current (gensym))
-	  (n-prev (gensym)))
+          (n-place (gensym))
+          (n-current (gensym))
+          (n-prev (gensym)))
       `(let* (,@(mapcar #'list temps vals)
-	      (,n-place ,access)
-	      (,n-item ,item))
-	 (if (eq ,n-place ,n-item)
-	     (let ((,(first stores) (,next ,n-place)))
-	       ,store)
-	     (do ((,n-prev ,n-place ,n-current)
-		  (,n-current (,next ,n-place)
-			      (,next ,n-current)))
-		 ((eq ,n-current ,n-item)
-		  (setf (,next ,n-prev)
-			(,next ,n-current)))))
-	 (values)))))
+              (,n-place ,access)
+              (,n-item ,item))
+         (if (eq ,n-place ,n-item)
+             (let ((,(first stores) (,next ,n-place)))
+               ,store)
+             (do ((,n-prev ,n-place ,n-current)
+                  (,n-current (,next ,n-place)
+                              (,next ,n-current)))
+                 ((eq ,n-current ,n-item)
+                  (setf (,next ,n-prev)
+                        (,next ,n-current)))))
+         (values)))))
 
 ;;; Push ITEM onto a list linked by the accessor function NEXT that is
 ;;; stored in PLACE.
@@ -50,7 +50,7 @@
     (when (cdr stores)
       (error "multiple store variables for ~S" place))
     `(let (,@(mapcar #'list temps vals)
-	   (,(first stores) ,item))
+           (,(first stores) ,item))
        (setf (,next ,(first stores)) ,access)
        ,store
        (values))))
@@ -58,9 +58,9 @@
 ;;; the target-code case of setting boolean attributes
 #+sb-xc-host
 (defmacro-mundanely !def-boolean-attribute-setter (test-name
-						   translations-name
-						   &rest attribute-names)
+                                                   translations-name
+                                                   &rest attribute-names)
   (guts-of-!def-boolean-attribute-setter test-name
-					 translations-name
-					 attribute-names
-					 'sb!xc:get-setf-expansion))
+                                         translations-name
+                                         attribute-names
+                                         'sb!xc:get-setf-expansion))

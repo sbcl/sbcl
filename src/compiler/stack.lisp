@@ -22,17 +22,17 @@
 ;;; invariant that all pushes come after the last pop.
 (defun find-pushed-lvars (block)
   (let* ((2block (block-info block))
-	 (popped (ir2-block-popped 2block))
-	 (last-pop (if popped
-		       (lvar-dest (car (last popped)))
-		       nil)))
+         (popped (ir2-block-popped 2block))
+         (last-pop (if popped
+                       (lvar-dest (car (last popped)))
+                       nil)))
     (collect ((pushed))
       (let ((saw-last nil))
-	(do-nodes (node lvar block)
-	  (when (eq node last-pop)
-	    (setq saw-last t))
+        (do-nodes (node lvar block)
+          (when (eq node last-pop)
+            (setq saw-last t))
 
-	  (when (and lvar
+          (when (and lvar
                      (or (lvar-dynamic-extent lvar)
                          (let ((dest (lvar-dest lvar))
                                (2lvar (lvar-info lvar)))
@@ -277,9 +277,9 @@
   (collect ((res nil adjoin))
     (dolist (rec receivers)
       (dolist (pop (ir2-block-popped (block-info rec)))
-	(do-uses (use pop)
-	  (unless (exit-p use)
-	    (res (node-block use))))))
+        (do-uses (use pop)
+          (unless (exit-p use)
+            (res (node-block use))))))
     (dolist (dx-lvar dx-lvars)
       (do-uses (use dx-lvar)
         (res (node-block use))))
@@ -293,8 +293,8 @@
 (defun stack-analyze (component)
   (declare (type component component))
   (let* ((2comp (component-info component))
-	 (receivers (ir2-component-values-receivers 2comp))
-	 (generators (find-pushing-blocks receivers
+         (receivers (ir2-component-values-receivers 2comp))
+         (generators (find-pushing-blocks receivers
                                           (component-dx-lvars component))))
 
     (dolist (block generators)
@@ -311,10 +311,10 @@
 
     (do-blocks (block component)
       (let ((top (ir2-block-end-stack (block-info block))))
-	(dolist (succ (block-succ block))
-	  (when (and (block-start succ)
-		     (not (eq (ir2-block-start-stack (block-info succ))
-			      top)))
-	    (discard-unused-values block succ))))))
+        (dolist (succ (block-succ block))
+          (when (and (block-start succ)
+                     (not (eq (ir2-block-start-stack (block-info succ))
+                              top)))
+            (discard-unused-values block succ))))))
 
   (values))

@@ -15,13 +15,13 @@
 
 ;;; An INLINEP value describes how a function is called. The values
 ;;; have these meanings:
-;;;	NIL	No declaration seen: do whatever you feel like, but don't 
-;;;		dump an inline expansion.
+;;;     NIL     No declaration seen: do whatever you feel like, but don't
+;;;             dump an inline expansion.
 ;;; :NOTINLINE  NOTINLINE declaration seen: always do full function call.
-;;;    :INLINE	INLINE declaration seen: save expansion, expanding to it 
-;;;		if policy favors.
+;;;    :INLINE  INLINE declaration seen: save expansion, expanding to it
+;;;             if policy favors.
 ;;; :MAYBE-INLINE
-;;;		Retain expansion, but only use it opportunistically.
+;;;             Retain expansion, but only use it opportunistically.
 (deftype inlinep () '(member :inline :maybe-inline :notinline nil))
 
 ;;;; source-hacking defining forms
@@ -35,43 +35,43 @@
 ;;; result continuations for the resulting IR1. KIND is the function
 ;;; kind to associate with NAME.
 (defmacro def-ir1-translator (name (lambda-list start-var next-var result-var)
-			      &body body)
+                              &body body)
   (let ((fn-name (symbolicate "IR1-CONVERT-" name))
-	(n-form (gensym))
-	(n-env (gensym)))
+        (n-form (gensym))
+        (n-env (gensym)))
     (multiple-value-bind (body decls doc)
-	(parse-defmacro lambda-list n-form body name "special form"
-			:environment n-env
-			:error-fun 'compiler-error
+        (parse-defmacro lambda-list n-form body name "special form"
+                        :environment n-env
+                        :error-fun 'compiler-error
                         :wrap-block nil)
       `(progn
-	 (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
-			 ,fn-name))
-	 (defun ,fn-name (,start-var ,next-var ,result-var ,n-form
-			  &aux (,n-env *lexenv*))
-	   (declare (ignorable ,start-var ,next-var ,result-var))
-	   ,@decls
-	   ,body
-	   (values))
-	 ,@(when doc
-	     `((setf (fdocumentation ',name 'function) ,doc)))
-	 ;; FIXME: Evidently "there can only be one!" -- we overwrite any
-	 ;; other :IR1-CONVERT value. This deserves a warning, I think.
-	 (setf (info :function :ir1-convert ',name) #',fn-name)
-	 ;; FIXME: rename this to SPECIAL-OPERATOR, to update it to
-	 ;; the 1990s?
-	 (setf (info :function :kind ',name) :special-form)
-	 ;; It's nice to do this for error checking in the target
-	 ;; SBCL, but it's not nice to do this when we're running in
-	 ;; the cross-compilation host Lisp, which owns the
-	 ;; SYMBOL-FUNCTION of its COMMON-LISP symbols.
-	 #-sb-xc-host
-	 (let ((fun (lambda (&rest rest)
-		      (declare (ignore rest))
-		      (error 'special-form-function :name ',name))))
-	   (setf (%simple-fun-arglist fun) ',lambda-list)
-	   (setf (symbol-function ',name) fun))
-	 ',name))))
+         (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
+                         ,fn-name))
+         (defun ,fn-name (,start-var ,next-var ,result-var ,n-form
+                          &aux (,n-env *lexenv*))
+           (declare (ignorable ,start-var ,next-var ,result-var))
+           ,@decls
+           ,body
+           (values))
+         ,@(when doc
+             `((setf (fdocumentation ',name 'function) ,doc)))
+         ;; FIXME: Evidently "there can only be one!" -- we overwrite any
+         ;; other :IR1-CONVERT value. This deserves a warning, I think.
+         (setf (info :function :ir1-convert ',name) #',fn-name)
+         ;; FIXME: rename this to SPECIAL-OPERATOR, to update it to
+         ;; the 1990s?
+         (setf (info :function :kind ',name) :special-form)
+         ;; It's nice to do this for error checking in the target
+         ;; SBCL, but it's not nice to do this when we're running in
+         ;; the cross-compilation host Lisp, which owns the
+         ;; SYMBOL-FUNCTION of its COMMON-LISP symbols.
+         #-sb-xc-host
+         (let ((fun (lambda (&rest rest)
+                      (declare (ignore rest))
+                      (error 'special-form-function :name ',name))))
+           (setf (%simple-fun-arglist fun) ',lambda-list)
+           (setf (symbol-function ',name) fun))
+         ',name))))
 
 ;;; (This is similar to DEF-IR1-TRANSLATOR, except that we pass if the
 ;;; syntax is invalid.)
@@ -94,15 +94,15 @@
 ;;; determine when to pass.
 (defmacro source-transform-lambda (lambda-list &body body)
   (let ((n-form (gensym))
-	(n-env (gensym))
-	(name (gensym)))
+        (n-env (gensym))
+        (name (gensym)))
     (multiple-value-bind (body decls)
-	(parse-defmacro lambda-list n-form body "source transform" "form"
-			:environment n-env
-			:error-fun `(lambda (&rest stuff)
-				      (declare (ignore stuff))
-				      (return-from ,name
-					(values nil t)))
+        (parse-defmacro lambda-list n-form body "source transform" "form"
+                        :environment n-env
+                        :error-fun `(lambda (&rest stuff)
+                                      (declare (ignore stuff))
+                                      (return-from ,name
+                                        (values nil t)))
                         :wrap-block nil)
       `(lambda (,n-form &aux (,n-env *lexenv*))
          ,@decls
@@ -128,9 +128,9 @@
   (collect ((res 0 logior))
     (dolist (name names)
       (let ((mask (cdr (assoc name alist))))
-	(unless mask
-	  (error "unknown attribute name: ~S" name))
-	(res mask)))
+        (unless mask
+          (error "unknown attribute name: ~S" name))
+        (res mask)))
     (res)))
 
 ) ; EVAL-WHEN
@@ -152,33 +152,33 @@
   (def!macro !def-boolean-attribute (name &rest attribute-names)
 
     (let ((translations-name (symbolicate "*" name "-ATTRIBUTE-TRANSLATIONS*"))
-	  (test-name (symbolicate name "-ATTRIBUTEP"))
+          (test-name (symbolicate name "-ATTRIBUTEP"))
           (decoder-name (symbolicate "DECODE-" name "-ATTRIBUTES")))
       (collect ((alist))
         (do ((mask 1 (ash mask 1))
-	     (names attribute-names (cdr names)))
-	    ((null names))
-	  (alist (cons (car names) mask)))
-	`(progn
-	   (eval-when (:compile-toplevel :load-toplevel :execute)
-	     (defparameter ,translations-name ',(alist)))
-	   (defmacro ,(symbolicate name "-ATTRIBUTES") (&rest attribute-names)
-	     "Automagically generated boolean attribute creation function.
+             (names attribute-names (cdr names)))
+            ((null names))
+          (alist (cons (car names) mask)))
+        `(progn
+           (eval-when (:compile-toplevel :load-toplevel :execute)
+             (defparameter ,translations-name ',(alist)))
+           (defmacro ,(symbolicate name "-ATTRIBUTES") (&rest attribute-names)
+             "Automagically generated boolean attribute creation function.
   See !DEF-BOOLEAN-ATTRIBUTE."
-	     (compute-attribute-mask attribute-names ,translations-name))
-	   (defmacro ,test-name (attributes &rest attribute-names)
-	     "Automagically generated boolean attribute test function.
+             (compute-attribute-mask attribute-names ,translations-name))
+           (defmacro ,test-name (attributes &rest attribute-names)
+             "Automagically generated boolean attribute test function.
   See !DEF-BOOLEAN-ATTRIBUTE."
-	     `(logtest ,(compute-attribute-mask attribute-names
-						,translations-name)
-		       (the attributes ,attributes)))
-	   ;; This definition transforms strangely under UNCROSS, in a
-	   ;; way that DEF!MACRO doesn't understand, so we delegate it
-	   ;; to a submacro then define the submacro differently when
-	   ;; building the xc and when building the target compiler.
-	   (!def-boolean-attribute-setter ,test-name
-					  ,translations-name
-					  ,@attribute-names)
+             `(logtest ,(compute-attribute-mask attribute-names
+                                                ,translations-name)
+                       (the attributes ,attributes)))
+           ;; This definition transforms strangely under UNCROSS, in a
+           ;; way that DEF!MACRO doesn't understand, so we delegate it
+           ;; to a submacro then define the submacro differently when
+           ;; building the xc and when building the target compiler.
+           (!def-boolean-attribute-setter ,test-name
+                                          ,translations-name
+                                          ,@attribute-names)
            (defun ,decoder-name (attributes)
              (loop for (name . mask) in ,translations-name
                    when (logtest mask attributes)
@@ -189,11 +189,11 @@
   ;; hack it by hand, passing a different GET-SETF-EXPANSION-FUN-NAME
   ;; in the host DEFMACRO and target DEFMACRO-MUNDANELY cases.
   (defun guts-of-!def-boolean-attribute-setter (test-name
-						translations-name
-						attribute-names
-						get-setf-expansion-fun-name)
+                                                translations-name
+                                                attribute-names
+                                                get-setf-expansion-fun-name)
     `(define-setf-expander ,test-name (place &rest attributes
-					     &environment env)
+                                             &environment env)
        "Automagically generated boolean attribute setter. See
  !DEF-BOOLEAN-ATTRIBUTE."
        #-sb-xc-host (declare (type sb!c::lexenv env))
@@ -201,35 +201,35 @@
        ;; automatically declared to have type LEXENV by the
        ;; hairy-argument-handling code.
        (multiple-value-bind (temps values stores set get)
-	   (,get-setf-expansion-fun-name place env)
-	 (when (cdr stores)
-	   (error "multiple store variables for ~S" place))
-	 (let ((newval (gensym))
-	       (n-place (gensym))
-	       (mask (compute-attribute-mask attributes ,translations-name)))
-	   (values `(,@temps ,n-place)
-		   `(,@values ,get)
-		   `(,newval)
-		   `(let ((,(first stores)
-			   (if ,newval
-			       (logior ,n-place ,mask)
-			       (logand ,n-place ,(lognot mask)))))
-		      ,set
-		      ,newval)
-		   `(,',test-name ,n-place ,@attributes))))))
+           (,get-setf-expansion-fun-name place env)
+         (when (cdr stores)
+           (error "multiple store variables for ~S" place))
+         (let ((newval (gensym))
+               (n-place (gensym))
+               (mask (compute-attribute-mask attributes ,translations-name)))
+           (values `(,@temps ,n-place)
+                   `(,@values ,get)
+                   `(,newval)
+                   `(let ((,(first stores)
+                           (if ,newval
+                               (logior ,n-place ,mask)
+                               (logand ,n-place ,(lognot mask)))))
+                      ,set
+                      ,newval)
+                   `(,',test-name ,n-place ,@attributes))))))
   ;; We define the host version here, and the just-like-it-but-different
   ;; target version later, after DEFMACRO-MUNDANELY has been defined.
   (defmacro !def-boolean-attribute-setter (test-name
-					   translations-name
-					   &rest attribute-names)
+                                           translations-name
+                                           &rest attribute-names)
     (guts-of-!def-boolean-attribute-setter test-name
-					   translations-name
-					   attribute-names
-					   'get-setf-expansion)))
+                                           translations-name
+                                           attribute-names
+                                           'get-setf-expansion)))
 
 ;;; And now for some gratuitous pseudo-abstraction...
 ;;;
-;;; ATTRIBUTES-UNION 
+;;; ATTRIBUTES-UNION
 ;;;   Return the union of all the sets of boolean attributes which are its
 ;;;   arguments.
 ;;; ATTRIBUTES-INTERSECTION
@@ -240,10 +240,10 @@
 ;;;   those in ATTR2.
 (defmacro attributes-union (&rest attributes)
   `(the attributes
-	(logior ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
+        (logior ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
 (defmacro attributes-intersection (&rest attributes)
   `(the attributes
-	(logand ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
+        (logand ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
 (declaim (ftype (function (attributes attributes) boolean) attributes=))
 #!-sb-fluid (declaim (inline attributes=))
 (defun attributes= (attr1 attr2)
@@ -272,60 +272,60 @@
   (multiple-value-bind (req opt restp rest keyp keys allowp)
       (parse-lambda-list lambda-list)
     (let* ((min-args (length req))
-	   (max-args (+ min-args (length opt)))
-	   (n-keys (gensym)))
+           (max-args (+ min-args (length opt)))
+           (n-keys (gensym)))
       (collect ((binds)
-		(vars)
-		(pos 0 +)
-		(keywords))
-	(dolist (arg req)
-	  (vars arg)
-	  (binds `(,arg (nth ,(pos) ,args)))
-	  (pos 1))
+                (vars)
+                (pos 0 +)
+                (keywords))
+        (dolist (arg req)
+          (vars arg)
+          (binds `(,arg (nth ,(pos) ,args)))
+          (pos 1))
 
-	(dolist (arg opt)
-	  (let ((var (if (atom arg) arg (first  arg))))
-	    (vars var)
-	    (binds `(,var (nth ,(pos) ,args)))
-	    (pos 1)))
+        (dolist (arg opt)
+          (let ((var (if (atom arg) arg (first  arg))))
+            (vars var)
+            (binds `(,var (nth ,(pos) ,args)))
+            (pos 1)))
 
-	(when restp
-	  (vars rest)
-	  (binds `(,rest (nthcdr ,(pos) ,args))))
+        (when restp
+          (vars rest)
+          (binds `(,rest (nthcdr ,(pos) ,args))))
 
-	(dolist (spec keys)
-	  (if (or (atom spec) (atom (first spec)))
-	      (let* ((var (if (atom spec) spec (first spec)))
-		     (key (keywordicate var)))
-		(vars var)
-		(binds `(,var (find-keyword-lvar ,n-keys ,key)))
-		(keywords key))
-	      (let* ((head (first spec))
-		     (var (second head))
-		     (key (first head)))
-		(vars var)
-		(binds `(,var (find-keyword-lvar ,n-keys ,key)))
-		(keywords key))))
+        (dolist (spec keys)
+          (if (or (atom spec) (atom (first spec)))
+              (let* ((var (if (atom spec) spec (first spec)))
+                     (key (keywordicate var)))
+                (vars var)
+                (binds `(,var (find-keyword-lvar ,n-keys ,key)))
+                (keywords key))
+              (let* ((head (first spec))
+                     (var (second head))
+                     (key (first head)))
+                (vars var)
+                (binds `(,var (find-keyword-lvar ,n-keys ,key)))
+                (keywords key))))
 
-	(let ((n-length (gensym))
-	      (limited-legal (not (or restp keyp))))
-	  (values
-	   `(let ((,n-length (length ,args))
-		  ,@(when keyp `((,n-keys (nthcdr ,(pos) ,args)))))
-	      (unless (and
-		       ;; FIXME: should be PROPER-LIST-OF-LENGTH-P
-		       ,(if limited-legal
-			    `(<= ,min-args ,n-length ,max-args)
-			    `(<= ,min-args ,n-length))
-		       ,@(when keyp
-			   (if allowp
-			       `((check-key-args-constant ,n-keys))
-			       `((check-transform-keys ,n-keys ',(keywords))))))
-		,error-form)
-	      (let ,(binds)
-		(declare (ignorable ,@(vars)))
-		,@body))
-	   (vars)))))))
+        (let ((n-length (gensym))
+              (limited-legal (not (or restp keyp))))
+          (values
+           `(let ((,n-length (length ,args))
+                  ,@(when keyp `((,n-keys (nthcdr ,(pos) ,args)))))
+              (unless (and
+                       ;; FIXME: should be PROPER-LIST-OF-LENGTH-P
+                       ,(if limited-legal
+                            `(<= ,min-args ,n-length ,max-args)
+                            `(<= ,min-args ,n-length))
+                       ,@(when keyp
+                           (if allowp
+                               `((check-key-args-constant ,n-keys))
+                               `((check-transform-keys ,n-keys ',(keywords))))))
+                ,error-form)
+              (let ,(binds)
+                (declare (ignorable ,@(vars)))
+                ,@body))
+           (vars)))))))
 
 ) ; EVAL-WHEN
 
@@ -389,50 +389,50 @@
 ;;;             transform fails even if INHIBIT-WARNINGS=SPEED (but not if
 ;;;             INHIBIT-WARNINGS>SPEED).
 (defmacro deftransform (name (lambda-list &optional (arg-types '*)
-					  (result-type '*)
-					  &key result policy node defun-only
-					  eval-name important)
-			     &body body-decls-doc)
+                                          (result-type '*)
+                                          &key result policy node defun-only
+                                          eval-name important)
+                             &body body-decls-doc)
   (when (and eval-name defun-only)
     (error "can't specify both DEFUN-ONLY and EVAL-NAME"))
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc)
     (let ((n-args (gensym))
-	  (n-node (or node (gensym)))
-	  (n-decls (gensym))
-	  (n-lambda (gensym))
-	  (decls-body `(,@decls ,@body)))
+          (n-node (or node (gensym)))
+          (n-decls (gensym))
+          (n-lambda (gensym))
+          (decls-body `(,@decls ,@body)))
       (multiple-value-bind (parsed-form vars)
-	  (parse-deftransform lambda-list
-			      (if policy
-				  `((unless (policy ,n-node ,policy)
-				      (give-up-ir1-transform))
-				    ,@decls-body)
-				  body)
-			      n-args
-			      '(give-up-ir1-transform))
-	(let ((stuff
-	       `((,n-node)
-		 (let* ((,n-args (basic-combination-args ,n-node))
-			,@(when result
-			    `((,result (node-lvar ,n-node)))))
-		   (multiple-value-bind (,n-lambda ,n-decls)
-		       ,parsed-form
-		     (if (and (consp ,n-lambda) (eq (car ,n-lambda) 'lambda))
-			 ,n-lambda
-		       `(lambda ,',lambda-list
-			  (declare (ignorable ,@',vars))
-			  ,@,n-decls
-			  ,,n-lambda)))))))
-	  (if defun-only
-	      `(defun ,name ,@(when doc `(,doc)) ,@stuff)
-	      `(%deftransform
-		,(if eval-name name `',name)
-		,(if eval-name
-		     ``(function ,,arg-types ,,result-type)
-		     `'(function ,arg-types ,result-type))
-		(lambda ,@stuff)
-		,doc
-		,(if important t nil))))))))
+          (parse-deftransform lambda-list
+                              (if policy
+                                  `((unless (policy ,n-node ,policy)
+                                      (give-up-ir1-transform))
+                                    ,@decls-body)
+                                  body)
+                              n-args
+                              '(give-up-ir1-transform))
+        (let ((stuff
+               `((,n-node)
+                 (let* ((,n-args (basic-combination-args ,n-node))
+                        ,@(when result
+                            `((,result (node-lvar ,n-node)))))
+                   (multiple-value-bind (,n-lambda ,n-decls)
+                       ,parsed-form
+                     (if (and (consp ,n-lambda) (eq (car ,n-lambda) 'lambda))
+                         ,n-lambda
+                       `(lambda ,',lambda-list
+                          (declare (ignorable ,@',vars))
+                          ,@,n-decls
+                          ,,n-lambda)))))))
+          (if defun-only
+              `(defun ,name ,@(when doc `(,doc)) ,@stuff)
+              `(%deftransform
+                ,(if eval-name name `',name)
+                ,(if eval-name
+                     ``(function ,,arg-types ,,result-type)
+                     `'(function ,arg-types ,result-type))
+                (lambda ,@stuff)
+                ,doc
+                ,(if important t nil))))))))
 
 ;;;; DEFKNOWN and DEFOPTIMIZER
 
@@ -457,7 +457,7 @@
 (defmacro defknown (name arg-types result-type &optional (attributes '(any))
                     &rest keys)
   (when (and (intersection attributes '(any call unwind))
-	     (intersection attributes '(movable)))
+             (intersection attributes '(movable)))
     (error "function cannot have both good and bad attributes: ~S" attributes))
 
   (when (member 'any attributes)
@@ -466,12 +466,12 @@
     (pushnew 'unsafely-flushable attributes))
 
   `(%defknown ',(if (and (consp name)
-			 (not (legal-fun-name-p name)))
-		    name
-		    (list name))
-	      '(sfunction ,arg-types ,result-type)
-	      (ir1-attributes ,@attributes)
-	      ,@keys))
+                         (not (legal-fun-name-p name)))
+                    name
+                    (list name))
+              '(sfunction ,arg-types ,result-type)
+              (ir1-attributes ,@attributes)
+              ,@keys))
 
 ;;; Create a function which parses combination args according to WHAT
 ;;; and LAMBDA-LIST, where WHAT is either a function name or a list
@@ -495,23 +495,23 @@
 ;;; methods are passed an additional POLICY argument, and IR2-CONVERT
 ;;; methods are passed an additional IR2-BLOCK argument.
 (defmacro defoptimizer (what (lambda-list &optional (n-node (gensym))
-					  &rest vars)
-			     &body body)
+                                          &rest vars)
+                             &body body)
   (let ((name (if (symbolp what) what
-		  (symbolicate (first what) "-" (second what) "-OPTIMIZER"))))
+                  (symbolicate (first what) "-" (second what) "-OPTIMIZER"))))
 
     (let ((n-args (gensym)))
       `(progn
-	(defun ,name (,n-node ,@vars)
-	  (declare (ignorable ,@vars))
-	  (let ((,n-args (basic-combination-args ,n-node)))
-	    ,(parse-deftransform lambda-list body n-args
-				 `(return-from ,name nil))))
-	,@(when (consp what)
-	    `((setf (,(let ((*package* (symbol-package 'sb!c::fun-info)))
+        (defun ,name (,n-node ,@vars)
+          (declare (ignorable ,@vars))
+          (let ((,n-args (basic-combination-args ,n-node)))
+            ,(parse-deftransform lambda-list body n-args
+                                 `(return-from ,name nil))))
+        ,@(when (consp what)
+            `((setf (,(let ((*package* (symbol-package 'sb!c::fun-info)))
                         (symbolicate "FUN-INFO-" (second what)))
-		     (fun-info-or-lose ',(first what)))
-		    #',name)))))))
+                     (fun-info-or-lose ',(first what)))
+                    #',name)))))))
 
 ;;;; IR groveling macros
 
@@ -528,33 +528,33 @@
   (unless (member ends '(nil :head :tail :both))
     (error "losing ENDS value: ~S" ends))
   (let ((n-component (gensym))
-	(n-tail (gensym)))
+        (n-tail (gensym)))
     `(let* ((,n-component ,component)
-	    (,n-tail ,(if (member ends '(:both :tail))
-			  nil
-			  `(component-tail ,n-component))))
+            (,n-tail ,(if (member ends '(:both :tail))
+                          nil
+                          `(component-tail ,n-component))))
        (do ((,block-var ,(if (member ends '(:both :head))
-			     `(component-head ,n-component)
-			     `(block-next (component-head ,n-component)))
-			(block-next ,block-var)))
-	   ((eq ,block-var ,n-tail) ,result)
-	 ,@body))))
+                             `(component-head ,n-component)
+                             `(block-next (component-head ,n-component)))
+                        (block-next ,block-var)))
+           ((eq ,block-var ,n-tail) ,result)
+         ,@body))))
 ;;; like DO-BLOCKS, only iterating over the blocks in reverse order
 (defmacro do-blocks-backwards ((block-var component &optional ends result) &body body)
   (unless (member ends '(nil :head :tail :both))
     (error "losing ENDS value: ~S" ends))
   (let ((n-component (gensym))
-	(n-head (gensym)))
+        (n-head (gensym)))
     `(let* ((,n-component ,component)
-	    (,n-head ,(if (member ends '(:both :head))
-			  nil
-			  `(component-head ,n-component))))
+            (,n-head ,(if (member ends '(:both :head))
+                          nil
+                          `(component-head ,n-component))))
        (do ((,block-var ,(if (member ends '(:both :tail))
-			     `(component-tail ,n-component)
-			     `(block-prev (component-tail ,n-component)))
-			(block-prev ,block-var)))
-	   ((eq ,block-var ,n-head) ,result)
-	 ,@body))))
+                             `(component-tail ,n-component)
+                             `(block-prev (component-tail ,n-component)))
+                        (block-prev ,block-var)))
+           ((eq ,block-var ,n-head) ,result)
+         ,@body))))
 
 ;;; Iterate over the uses of LVAR, binding NODE to each one
 ;;; successively.
@@ -613,9 +613,9 @@
                                    (t (return)))))
            ,@(when lvar-var
                    `((,lvar-var (when (valued-node-p ,node-var)
-				  (node-lvar ,node-var))
-		                (when (valued-node-p ,node-var)
-				  (node-lvar ,node-var))))))
+                                  (node-lvar ,node-var))
+                                (when (valued-node-p ,node-var)
+                                  (node-lvar ,node-var))))))
           (nil)
        ,@body
        ,@(when restart-p
@@ -626,7 +626,7 @@
 ;;; with block being split under us.
 (defmacro do-nodes-backwards ((node-var lvar block &key restart-p) &body body)
   (let ((n-block (gensym))
-	(n-prev (gensym)))
+        (n-prev (gensym)))
     `(loop with ,n-block = ,block
            for ,node-var = (block-last ,n-block) then
                            ,(if restart-p
@@ -636,7 +636,7 @@
                                 `(ctran-use ,n-prev))
            for ,n-prev = (when ,node-var (node-prev ,node-var))
            and ,lvar = (when (and ,node-var (valued-node-p ,node-var))
-			 (node-lvar ,node-var))
+                         (node-lvar ,node-var))
            while ,(if restart-p
                       `(and ,node-var (not (block-to-be-deleted-p ,n-block)))
                       node-var)
@@ -656,15 +656,15 @@
 ;;; after the original conversion pass has finished.
 (defmacro with-ir1-environment-from-node (node &rest forms)
   `(flet ((closure-needing-ir1-environment-from-node ()
-	    ,@forms))
+            ,@forms))
      (%with-ir1-environment-from-node
       ,node
       #'closure-needing-ir1-environment-from-node)))
 (defun %with-ir1-environment-from-node (node fun)
   (declare (type node node) (type function fun))
   (let ((*current-component* (node-component node))
-	(*lexenv* (node-lexenv node))
-	(*current-path* (node-source-path node)))
+        (*lexenv* (node-lexenv node))
+        (*current-path* (node-source-path node)))
     (aver-live-component *current-component*)
     (funcall fun)))
 
@@ -672,12 +672,12 @@
 ;;; functions, etc. Also establish condition handlers.
 (defmacro with-ir1-namespace (&body forms)
   `(let ((*free-vars* (make-hash-table :test 'eq))
-	 (*free-funs* (make-hash-table :test 'equal))
-	 (*constants* (make-hash-table :test 'equal))
-	 (*source-paths* (make-hash-table :test 'eq)))
+         (*free-funs* (make-hash-table :test 'equal))
+         (*constants* (make-hash-table :test 'equal))
+         (*source-paths* (make-hash-table :test 'eq)))
      (handler-bind ((compiler-error #'compiler-error-handler)
-		    (style-warning #'compiler-style-warning-handler)
-		    (warning #'compiler-warning-handler))
+                    (style-warning #'compiler-style-warning-handler)
+                    (warning #'compiler-warning-handler))
        ,@forms)))
 
 ;;; Look up NAME in the lexical environment namespace designated by
@@ -688,10 +688,10 @@
   (once-only ((n-res `(assoc ,name (,(let ((*package* (symbol-package 'lexenv-funs)))
                                           (symbolicate "LEXENV-" slot))
                                      *lexenv*)
-			     :test ,(or test '#'eq))))
+                             :test ,(or test '#'eq))))
     `(if ,n-res
-	 (values (cdr ,n-res) t)
-	 (values nil nil))))
+         (values (cdr ,n-res) t)
+         (values nil nil))))
 
 (defmacro with-component-last-block ((component block) &body body)
   (with-unique-names (old-last-block)
@@ -755,10 +755,10 @@
 (defun event-action (name)
   (event-info-action (event-info-or-lose name)))
 (declaim (ftype (function (symbol (or function null)) (or function null))
-		%set-event-action))
+                %set-event-action))
 (defun %set-event-action (name new-value)
   (setf (event-info-action (event-info-or-lose name))
-	new-value))
+        new-value))
 (defsetf event-action %set-event-action)
 
 ;;; Return the non-negative integer which represents the level of
@@ -771,7 +771,7 @@
 (declaim (ftype (function (symbol unsigned-byte) unsigned-byte) %set-event-level))
 (defun %set-event-level (name new-value)
   (setf (event-info-level (event-info-or-lose name))
-	new-value))
+        new-value))
 (defsetf event-level %set-event-level)
 
 ;;; Define a new kind of event. NAME is a symbol which names the event
@@ -783,10 +783,10 @@
   (let ((var-name (symbolicate "*" name "-EVENT-INFO*")))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (defvar ,var-name
-	 (make-event-info :name ',name
-			  :description ',description
-			  :var ',var-name
-			  :level ,level))
+         (make-event-info :name ',name
+                          :description ',description
+                          :var ',var-name
+                          :level ,level))
        (setf (gethash ',name *event-info*) ,var-name)
        ',name)))
 
@@ -808,22 +808,22 @@
 (defun event-statistics (&optional (min-count 1) (stream *standard-output*))
   (collect ((info))
     (maphash (lambda (k v)
-	       (declare (ignore k))
-	       (when (>= (event-info-count v) min-count)
-		 (info v)))
-	     *event-info*)
+               (declare (ignore k))
+               (when (>= (event-info-count v) min-count)
+                 (info v)))
+             *event-info*)
     (dolist (event (sort (info) #'> :key #'event-info-count))
       (format stream "~6D: ~A~%" (event-info-count event)
-	      (event-info-description event)))
+              (event-info-description event)))
     (values))
   (values))
 
 (declaim (ftype (function nil (values)) clear-event-statistics))
 (defun clear-event-statistics ()
   (maphash (lambda (k v)
-	     (declare (ignore k))
-	     (setf (event-info-count v) 0))
-	   *event-info*)
+             (declare (ignore k))
+             (setf (event-info-count v) 0))
+           *event-info*)
   (values))
 
 ;;;; functions on directly-linked lists (linked through specialized
@@ -835,49 +835,49 @@
 ;;; function NEXT. KEY, TEST and TEST-NOT are the same as for generic
 ;;; sequence functions.
 (defun find-in (next
-		element
-		list
-		&key
-		(key #'identity)
-		(test #'eql test-p)
-		(test-not #'eql not-p))
+                element
+                list
+                &key
+                (key #'identity)
+                (test #'eql test-p)
+                (test-not #'eql not-p))
   (declare (type function next key test test-not))
   (when (and test-p not-p)
     (error "It's silly to supply both :TEST and :TEST-NOT arguments."))
   (if not-p
       (do ((current list (funcall next current)))
-	  ((null current) nil)
-	(unless (funcall test-not (funcall key current) element)
-	  (return current)))
+          ((null current) nil)
+        (unless (funcall test-not (funcall key current) element)
+          (return current)))
       (do ((current list (funcall next current)))
-	  ((null current) nil)
-	(when (funcall test (funcall key current) element)
-	  (return current)))))
+          ((null current) nil)
+        (when (funcall test (funcall key current) element)
+          (return current)))))
 
 ;;; Return the position of ELEMENT (or NIL if absent) in a
 ;;; null-terminated LIST linked by the accessor function NEXT. KEY,
 ;;; TEST and TEST-NOT are the same as for generic sequence functions.
 (defun position-in (next
-		    element
-		    list
-		    &key
-		    (key #'identity)
-		    (test #'eql test-p)
-		    (test-not #'eql not-p))
+                    element
+                    list
+                    &key
+                    (key #'identity)
+                    (test #'eql test-p)
+                    (test-not #'eql not-p))
   (declare (type function next key test test-not))
   (when (and test-p not-p)
     (error "It's silly to supply both :TEST and :TEST-NOT arguments."))
   (if not-p
       (do ((current list (funcall next current))
-	   (i 0 (1+ i)))
-	  ((null current) nil)
-	(unless (funcall test-not (funcall key current) element)
-	  (return i)))
+           (i 0 (1+ i)))
+          ((null current) nil)
+        (unless (funcall test-not (funcall key current) element)
+          (return i)))
       (do ((current list (funcall next current))
-	   (i 0 (1+ i)))
-	  ((null current) nil)
-	(when (funcall test (funcall key current) element)
-	  (return i)))))
+           (i 0 (1+ i)))
+          ((null current) nil)
+        (when (funcall test (funcall key current) element)
+          (return i)))))
 
 
 ;;; KLUDGE: This is expanded out twice, by cut-and-paste, in a
@@ -897,22 +897,22 @@
     (when (cdr stores)
       (error "multiple store variables for ~S" place))
     (let ((n-item (gensym))
-	  (n-place (gensym))
-	  (n-current (gensym))
-	  (n-prev (gensym)))
+          (n-place (gensym))
+          (n-current (gensym))
+          (n-prev (gensym)))
       `(let* (,@(mapcar #'list temps vals)
-	      (,n-place ,access)
-	      (,n-item ,item))
-	 (if (eq ,n-place ,n-item)
-	     (let ((,(first stores) (,next ,n-place)))
-	       ,store)
-	     (do ((,n-prev ,n-place ,n-current)
-		  (,n-current (,next ,n-place)
-			      (,next ,n-current)))
-		 ((eq ,n-current ,n-item)
-		  (setf (,next ,n-prev)
-			(,next ,n-current)))))
-	 (values)))))
+              (,n-place ,access)
+              (,n-item ,item))
+         (if (eq ,n-place ,n-item)
+             (let ((,(first stores) (,next ,n-place)))
+               ,store)
+             (do ((,n-prev ,n-place ,n-current)
+                  (,n-current (,next ,n-place)
+                              (,next ,n-current)))
+                 ((eq ,n-current ,n-item)
+                  (setf (,next ,n-prev)
+                        (,next ,n-current)))))
+         (values)))))
 ;;; #+SB-XC-HOST SB!XC:DEFMACRO version is in late-macros.lisp. -- WHN 19990806
 
 ;;; Push ITEM onto a list linked by the accessor function NEXT that is
@@ -935,7 +935,7 @@
     (when (cdr stores)
       (error "multiple store variables for ~S" place))
     `(let (,@(mapcar #'list temps vals)
-	   (,(first stores) ,item))
+           (,(first stores) ,item))
        (setf (,next ,(first stores)) ,access)
        ,store
        (values))))

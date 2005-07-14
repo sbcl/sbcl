@@ -42,7 +42,7 @@
 ;;; Inside the scope of declarations, new entries are added at the
 ;;; head of the alist.
 (declaim (type policy *policy*))
-(defvar *policy*)	   ; initialized in cold init
+(defvar *policy*)          ; initialized in cold init
 
 ;;; This is to be called early in cold init to set things up, and may
 ;;; also be called again later in cold init in order to reset default
@@ -50,31 +50,31 @@
 ;;; OPTIMIZE forms have messed with it.
 (defun !policy-cold-init-or-resanify ()
   (setf *policy-qualities*
-	'(;; ANSI standard qualities
-	  compilation-speed
-	  debug
-	  safety
-	  space
-	  speed
-	  ;; SBCL extensions
-	  ;;
-	  ;; FIXME: INHIBIT-WARNINGS is a misleading name for this.
-	  ;; Perhaps BREVITY would be better. But the ideal name would
-	  ;; have connotations of suppressing not warnings but only
-	  ;; optimization-related notes, which is already mostly the
-	  ;; behavior, and should probably become the exact behavior.
-	  ;; Perhaps INHIBIT-NOTES?
-	  inhibit-warnings))
+        '(;; ANSI standard qualities
+          compilation-speed
+          debug
+          safety
+          space
+          speed
+          ;; SBCL extensions
+          ;;
+          ;; FIXME: INHIBIT-WARNINGS is a misleading name for this.
+          ;; Perhaps BREVITY would be better. But the ideal name would
+          ;; have connotations of suppressing not warnings but only
+          ;; optimization-related notes, which is already mostly the
+          ;; behavior, and should probably become the exact behavior.
+          ;; Perhaps INHIBIT-NOTES?
+          inhibit-warnings))
   (setf *policy*
-	(mapcar (lambda (name)
-		  ;; CMU CL didn't use 1 as the default for
-		  ;; everything, but since ANSI says 1 is the ordinary
-		  ;; value, we do.
-		  (cons name 1))
-		*policy-qualities*))
+        (mapcar (lambda (name)
+                  ;; CMU CL didn't use 1 as the default for
+                  ;; everything, but since ANSI says 1 is the ordinary
+                  ;; value, we do.
+                  (cons name 1))
+                *policy-qualities*))
   ;; not actually POLICY, but very similar
   (setf *handled-conditions* nil
-	*disabled-package-locks* nil))
+        *disabled-package-locks* nil))
 
 ;;; On the cross-compilation host, we initialize immediately (not
 ;;; waiting for "cold init", since cold init doesn't exist on
@@ -97,9 +97,9 @@
 ;;; referring to them by name, e.g. (> SPEED SPACE).
 (defmacro policy (thing expr)
   (let* ((n-policy (gensym "N-POLICY-"))
-	 (binds (mapcar (lambda (name)
-			  `(,name (policy-quality ,n-policy ',name)))
-			*policy-qualities*))
+         (binds (mapcar (lambda (name)
+                          `(,name (policy-quality ,n-policy ',name)))
+                        *policy-qualities*))
          (dependent-binds
           (loop for (name . info) in *policy-dependent-qualities*
                collect `(,name (policy-quality ,n-policy ',name))
@@ -107,7 +107,7 @@
                                    ,(policy-dependent-quality-expression info)
                                    ,name)))))
     `(let* ((,n-policy (%coerce-to-policy ,thing))
-	    ,@binds
+            ,@binds
             ,@dependent-binds)
        (declare (ignorable ,@*policy-qualities*
                            ,@(mapcar #'car *policy-dependent-qualities*)))

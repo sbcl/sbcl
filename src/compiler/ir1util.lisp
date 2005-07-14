@@ -20,7 +20,7 @@
 (defun node-enclosing-cleanup (node)
   (declare (type node node))
   (do ((lexenv (node-lexenv node)
-	       (lambda-call-lexenv (lexenv-lambda lexenv))))
+               (lambda-call-lexenv (lexenv-lambda lexenv))))
       ((null lexenv) nil)
     (let ((cup (lexenv-cleanup lexenv)))
       (when cup (return cup)))))
@@ -34,7 +34,7 @@
 ;;; that cleanup.
 (defun insert-cleanup-code (block1 block2 node form &optional cleanup)
   (declare (type cblock block1 block2) (type node node)
-	   (type (or cleanup null) cleanup))
+           (type (or cleanup null) cleanup))
   (setf (component-reanalyze (block-component block1)) t)
   (with-ir1-environment-from-node node
     (with-component-last-block (*current-component*
@@ -156,9 +156,9 @@
       (exit (setf (exit-value dest) new))
       (basic-combination
        (if (eq old (basic-combination-fun dest))
-	   (setf (basic-combination-fun dest) new)
-	   (setf (basic-combination-args dest)
-		 (nsubst new old (basic-combination-args dest)))))
+           (setf (basic-combination-fun dest) new)
+           (setf (basic-combination-args dest)
+                 (nsubst new old (basic-combination-args dest)))))
       (cast (setf (cast-value dest) new)))
 
     (setf (lvar-dest old) nil)
@@ -358,7 +358,7 @@
 (defun node-home-lambda (node)
   (declare (type node node))
   (do ((fun (lexenv-lambda (node-lexenv node))
-	    (lexenv-lambda (lambda-call-lexenv fun))))
+            (lexenv-lambda (lambda-call-lexenv fun))))
       ((not (memq (functional-kind fun) '(:deleted :zombie)))
        (lambda-home fun))
     (when (eq (lambda-home fun) fun)
@@ -428,25 +428,25 @@
       ;;   1. It can fail in a few cases even when a meaningful home
       ;;      lambda exists, e.g. in IR1-CONVERT of one of the legs of
       ;;      an IF.
-      ;;   2. It can fail when converting a form which is born orphaned 
+      ;;   2. It can fail when converting a form which is born orphaned
       ;;      so that it never had a meaningful home lambda, e.g. a form
       ;;      which follows a RETURN-FROM or GO form.
       (let ((pred-list (block-pred block)))
-	;; To deal with case 1, we reason that
-	;; previous-in-target-execution-order blocks should be in the
-	;; same lambda, and that they seem in practice to be
-	;; previous-in-compilation-order blocks too, so we look back
-	;; to find one which is sufficiently initialized to tell us
-	;; what the home lambda is.
-	(if pred-list
-	    ;; We could get fancy about this, flooding through the
-	    ;; graph of all the previous blocks, but in practice it
-	    ;; seems to work just to grab the first previous block and
-	    ;; use it.
-	    (node-home-lambda (block-last (first pred-list)))
-	    ;; In case 2, we end up with an empty PRED-LIST and
-	    ;; have to punt: There's no home lambda.
-	    nil))))
+        ;; To deal with case 1, we reason that
+        ;; previous-in-target-execution-order blocks should be in the
+        ;; same lambda, and that they seem in practice to be
+        ;; previous-in-compilation-order blocks too, so we look back
+        ;; to find one which is sufficiently initialized to tell us
+        ;; what the home lambda is.
+        (if pred-list
+            ;; We could get fancy about this, flooding through the
+            ;; graph of all the previous blocks, but in practice it
+            ;; seems to work just to grab the first previous block and
+            ;; use it.
+            (node-home-lambda (block-last (first pred-list)))
+            ;; In case 2, we end up with an empty PRED-LIST and
+            ;; have to punt: There's no home lambda.
+            nil))))
 
 ;;; Return the non-LET LAMBDA that holds BLOCK's code.
 (declaim (ftype (sfunction (cblock) clambda) block-home-lambda))
@@ -487,18 +487,18 @@
 (defun node-source-form (node)
   (declare (type node node))
   (let* ((path (node-source-path node))
-	 (forms (source-path-forms path)))
+         (forms (source-path-forms path)))
     (if forms
-	(first forms)
-	(values (find-original-source path)))))
+        (first forms)
+        (values (find-original-source path)))))
 
 ;;; Return NODE-SOURCE-FORM, T if lvar has a single use, otherwise
 ;;; NIL, NIL.
 (defun lvar-source (lvar)
   (let ((use (lvar-uses lvar)))
     (if (listp use)
-	(values nil nil)
-	(values (node-source-form use) t))))
+        (values nil nil)
+        (values (node-source-form use) t))))
 
 ;;; Return the unique node, delivering a value to LVAR.
 #!-sb-fluid (declaim (inline lvar-use))
@@ -523,11 +523,11 @@
   ;; approach fails, and furthermore realize that in some exceptional
   ;; cases it might return NIL. -- WHN 2001-12-04
   (cond ((ctran-use ctran)
-	 (node-home-lambda (ctran-use ctran)))
-	((ctran-block ctran)
-	 (block-home-lambda-or-null (ctran-block ctran)))
-	(t
-	 (bug "confused about home lambda for ~S" ctran))))
+         (node-home-lambda (ctran-use ctran)))
+        ((ctran-block ctran)
+         (block-home-lambda-or-null (ctran-block ctran)))
+        (t
+         (bug "confused about home lambda for ~S" ctran))))
 
 ;;; Return the LAMBDA that is CTRAN's home.
 (declaim (ftype (sfunction (ctran) clambda) ctran-home-lambda))
@@ -574,26 +574,26 @@
 ;;; slot values. Values for the alist slots are NCONCed to the
 ;;; beginning of the current value, rather than replacing it entirely.
 (defun make-lexenv (&key (default *lexenv*)
-			 funs vars blocks tags
+                         funs vars blocks tags
                          type-restrictions
-			 (lambda (lexenv-lambda default))
-			 (cleanup (lexenv-cleanup default))
-		         (handled-conditions (lexenv-handled-conditions default))
-		         (disabled-package-locks 
-			  (lexenv-disabled-package-locks default))
-			 (policy (lexenv-policy default)))
+                         (lambda (lexenv-lambda default))
+                         (cleanup (lexenv-cleanup default))
+                         (handled-conditions (lexenv-handled-conditions default))
+                         (disabled-package-locks
+                          (lexenv-disabled-package-locks default))
+                         (policy (lexenv-policy default)))
   (macrolet ((frob (var slot)
-	       `(let ((old (,slot default)))
-		  (if ,var
-		      (nconc ,var old)
-		      old))))
+               `(let ((old (,slot default)))
+                  (if ,var
+                      (nconc ,var old)
+                      old))))
     (internal-make-lexenv
      (frob funs lexenv-funs)
      (frob vars lexenv-vars)
      (frob blocks lexenv-blocks)
      (frob tags lexenv-tags)
      (frob type-restrictions lexenv-type-restrictions)
-     lambda cleanup handled-conditions 
+     lambda cleanup handled-conditions
      disabled-package-locks policy)))
 
 ;;; Makes a LEXENV, suitable for using in a MACROLET introduced
@@ -633,9 +633,9 @@
 (defun link-blocks (block1 block2)
   (declare (type cblock block1 block2))
   (setf (block-succ block1)
-	(if (block-succ block1)
-	    (%link-blocks block1 block2)
-	    (list block2)))
+        (if (block-succ block1)
+            (%link-blocks block1 block2)
+            (list block2)))
   (push block1 (block-pred block2))
   (values))
 (defun %link-blocks (block1 block2)
@@ -652,19 +652,19 @@
   (declare (type cblock block1 block2))
   (let ((succ1 (block-succ block1)))
     (if (eq block2 (car succ1))
-	(setf (block-succ block1) (cdr succ1))
-	(do ((succ (cdr succ1) (cdr succ))
-	     (prev succ1 succ))
-	    ((eq (car succ) block2)
-	     (setf (cdr prev) (cdr succ)))
-	  (aver succ))))
+        (setf (block-succ block1) (cdr succ1))
+        (do ((succ (cdr succ1) (cdr succ))
+             (prev succ1 succ))
+            ((eq (car succ) block2)
+             (setf (cdr prev) (cdr succ)))
+          (aver succ))))
 
   (let ((new-pred (delq block1 (block-pred block2))))
     (setf (block-pred block2) new-pred)
     (when (singleton-p new-pred)
       (let ((pred-block (first new-pred)))
-	(when (if-p (block-last pred-block))
-	  (setf (block-test-modified pred-block) t)))))
+        (when (if-p (block-last pred-block))
+          (setf (block-test-modified pred-block) t)))))
   (values))
 
 ;;; Swing the succ/pred link between BLOCK and OLD to be between BLOCK
@@ -676,29 +676,29 @@
   (declare (type cblock new old block))
   (unlink-blocks block old)
   (let ((last (block-last block))
-	(comp (block-component block)))
+        (comp (block-component block)))
     (setf (component-reanalyze comp) t)
     (typecase last
       (cif
        (setf (block-test-modified block) t)
        (let* ((succ-left (block-succ block))
-	      (new (if (and (eq new (component-tail comp))
-			    succ-left)
-		       (first succ-left)
-		       new)))
-	 (unless (memq new succ-left)
-	   (link-blocks block new))
-	 (macrolet ((frob (slot)
-		      `(when (eq (,slot last) old)
-			 (setf (,slot last) new))))
-	   (frob if-consequent)
-	   (frob if-alternative)
+              (new (if (and (eq new (component-tail comp))
+                            succ-left)
+                       (first succ-left)
+                       new)))
+         (unless (memq new succ-left)
+           (link-blocks block new))
+         (macrolet ((frob (slot)
+                      `(when (eq (,slot last) old)
+                         (setf (,slot last) new))))
+           (frob if-consequent)
+           (frob if-alternative)
            (when (eq (if-consequent last)
                      (if-alternative last))
              (reoptimize-component (block-component block) :maybe)))))
       (t
        (unless (memq new (block-succ block))
-	 (link-blocks block new)))))
+         (link-blocks block new)))))
 
   (values))
 
@@ -707,7 +707,7 @@
 (declaim (ftype (sfunction (cblock) (values)) remove-from-dfo))
 (defun remove-from-dfo (block)
   (let ((next (block-next block))
-	(prev (block-prev block)))
+        (prev (block-prev block)))
     (setf (block-component block) nil)
     (setf (block-next prev) next)
     (setf (block-prev next) prev))
@@ -718,7 +718,7 @@
 (defun add-to-dfo (block after)
   (declare (type cblock block after))
   (let ((next (block-next after))
-	(comp (block-component after)))
+        (comp (block-component after)))
     (aver (not (eq (component-kind comp) :deleted)))
     (setf (block-component block) comp)
     (setf (block-next after) block)
@@ -759,7 +759,7 @@
 (declaim (ftype (sfunction (component) (values)) clear-flags))
 (defun clear-flags (component)
   (let ((head (component-head component))
-	(tail (component-tail component)))
+        (tail (component-tail component)))
     (setf (block-flag head) t)
     (setf (block-flag tail) t)
     (do-blocks (block component)
@@ -771,8 +771,8 @@
 (declaim (ftype (sfunction () component) make-empty-component))
 (defun make-empty-component ()
   (let* ((head (make-block-key :start nil :component nil))
-	 (tail (make-block-key :start nil :component nil))
-	 (res (make-component head tail)))
+         (tail (make-block-key :start nil :component nil))
+         (res (make-component head tail)))
     (setf (block-flag head) t)
     (setf (block-flag tail) t)
     (setf (block-component head) res)
@@ -786,34 +786,34 @@
 (defun node-ends-block (node)
   (declare (type node node))
   (let* ((block (node-block node))
-	 (start (node-next node))
-	 (last (block-last block)))
+         (start (node-next node))
+         (last (block-last block)))
     (unless (eq last node)
       (aver (and (eq (ctran-kind start) :inside-block)
                  (not (block-delete-p block))))
       (let* ((succ (block-succ block))
-	     (new-block
-	      (make-block-key :start start
-			      :component (block-component block)
-			      :succ succ :last last)))
-	(setf (ctran-kind start) :block-start)
+             (new-block
+              (make-block-key :start start
+                              :component (block-component block)
+                              :succ succ :last last)))
+        (setf (ctran-kind start) :block-start)
         (setf (ctran-use start) nil)
-	(setf (block-last block) node)
+        (setf (block-last block) node)
         (setf (node-next node) nil)
-	(dolist (b succ)
-	  (setf (block-pred b)
-		(cons new-block (remove block (block-pred b)))))
-	(setf (block-succ block) ())
-	(link-blocks block new-block)
-	(add-to-dfo new-block block)
-	(setf (component-reanalyze (block-component block)) t)
+        (dolist (b succ)
+          (setf (block-pred b)
+                (cons new-block (remove block (block-pred b)))))
+        (setf (block-succ block) ())
+        (link-blocks block new-block)
+        (add-to-dfo new-block block)
+        (setf (component-reanalyze (block-component block)) t)
 
-	(do ((ctran start (node-next (ctran-next ctran))))
-	    ((not ctran))
-	  (setf (ctran-block ctran) new-block))
+        (do ((ctran start (node-next (ctran-next ctran))))
+            ((not ctran))
+          (setf (ctran-block ctran) new-block))
 
-	(setf (block-type-asserted block) t)
-	(setf (block-test-modified block) t))))
+        (setf (block-type-asserted block) t)
+        (setf (block-test-modified block) t))))
   (values))
 
 ;;;; deleting stuff
@@ -827,18 +827,18 @@
   ;; mark the LET for reoptimization, since it may be that we have
   ;; deleted its last variable.
   (let* ((fun (lambda-var-home leaf))
-	 (n (position leaf (lambda-vars fun))))
+         (n (position leaf (lambda-vars fun))))
     (dolist (ref (leaf-refs fun))
       (let* ((lvar (node-lvar ref))
-	     (dest (and lvar (lvar-dest lvar))))
-	(when (and (combination-p dest)
-		   (eq (basic-combination-fun dest) lvar)
-		   (eq (basic-combination-kind dest) :local))
-	  (let* ((args (basic-combination-args dest))
-		 (arg (elt args n)))
-	    (reoptimize-lvar arg)
-	    (flush-dest arg)
-	    (setf (elt args n) nil))))))
+             (dest (and lvar (lvar-dest lvar))))
+        (when (and (combination-p dest)
+                   (eq (basic-combination-fun dest) lvar)
+                   (eq (basic-combination-kind dest) :local))
+          (let* ((args (basic-combination-args dest))
+                 (arg (elt args n)))
+            (reoptimize-lvar arg)
+            (flush-dest arg)
+            (setf (elt args n) nil))))))
 
   ;; The LAMBDA-VAR may still have some SETs, but this doesn't cause
   ;; too much difficulty, since we can efficiently implement
@@ -857,13 +857,13 @@
     ;; We only deal with LET variables, marking the corresponding
     ;; initial value arg as needing to be reoptimized.
     (when (and (eq (functional-kind fun) :let)
-	       (leaf-refs var))
+               (leaf-refs var))
       (do ((args (basic-combination-args
-		  (lvar-dest (node-lvar (first (leaf-refs fun)))))
-		 (cdr args))
-	   (vars (lambda-vars fun) (cdr vars)))
-	  ((eq (car vars) var)
-	   (reoptimize-lvar (car args))))))
+                  (lvar-dest (node-lvar (first (leaf-refs fun)))))
+                 (cdr args))
+           (vars (lambda-vars fun) (cdr vars)))
+          ((eq (car vars) var)
+           (reoptimize-lvar (car args))))))
   (values))
 
 ;;; Delete a function that has no references. This need only be called
@@ -871,7 +871,7 @@
 ;;; DELETE-REF will handle the deletion.
 (defun delete-functional (fun)
   (aver (and (null (leaf-refs fun))
-	     (not (functional-entry-fun fun))))
+             (not (functional-entry-fun fun))))
   (etypecase fun
     (optional-dispatch (delete-optional-dispatch fun))
     (clambda (delete-lambda fun)))
@@ -884,7 +884,7 @@
 (defun delete-lambda (clambda)
   (declare (type clambda clambda))
   (let ((original-kind (functional-kind clambda))
-	(bind (lambda-bind clambda)))
+        (bind (lambda-bind clambda)))
     (aver (not (member original-kind '(:deleted :toplevel))))
     (aver (not (functional-has-external-references-p clambda)))
     (aver (or (eq original-kind :zombie) bind))
@@ -957,9 +957,9 @@
     ;; point anymore.
     (when (eq original-kind :external)
       (let ((fun (functional-entry-fun clambda)))
-	(setf (functional-entry-fun fun) nil)
-	(when (optional-dispatch-p fun)
-	  (delete-optional-dispatch fun)))))
+        (setf (functional-entry-fun fun) nil)
+        (when (optional-dispatch-p fun)
+          (delete-optional-dispatch fun)))))
 
   (values))
 
@@ -989,29 +989,29 @@
       (setf (functional-kind leaf) :deleted)
 
       (flet ((frob (fun)
-	       (unless (eq (functional-kind fun) :deleted)
-		 (aver (eq (functional-kind fun) :optional))
-		 (setf (functional-kind fun) nil)
-		 (let ((refs (leaf-refs fun)))
-		   (cond ((null refs)
-			  (delete-lambda fun))
-			 ((null (rest refs))
-			  (or (maybe-let-convert fun)
-			      (maybe-convert-to-assignment fun)))
-			 (t
-			  (maybe-convert-to-assignment fun)))))))
+               (unless (eq (functional-kind fun) :deleted)
+                 (aver (eq (functional-kind fun) :optional))
+                 (setf (functional-kind fun) nil)
+                 (let ((refs (leaf-refs fun)))
+                   (cond ((null refs)
+                          (delete-lambda fun))
+                         ((null (rest refs))
+                          (or (maybe-let-convert fun)
+                              (maybe-convert-to-assignment fun)))
+                         (t
+                          (maybe-convert-to-assignment fun)))))))
 
-	(dolist (ep (optional-dispatch-entry-points leaf))
+        (dolist (ep (optional-dispatch-entry-points leaf))
           (when (promise-ready-p ep)
             (frob (force ep))))
-	(when (optional-dispatch-more-entry leaf)
-	  (frob (optional-dispatch-more-entry leaf)))
-	(let ((main (optional-dispatch-main-entry leaf)))
+        (when (optional-dispatch-more-entry leaf)
+          (frob (optional-dispatch-more-entry leaf)))
+        (let ((main (optional-dispatch-main-entry leaf)))
           (when entry
             (setf (functional-entry-fun entry) main)
             (setf (functional-entry-fun main) entry))
-	  (when (eq (functional-kind main) :optional)
-	    (frob main))))))
+          (when (eq (functional-kind main) :optional)
+            (frob main))))))
 
   (values))
 
@@ -1021,32 +1021,32 @@
 (defun delete-ref (ref)
   (declare (type ref ref))
   (let* ((leaf (ref-leaf ref))
-	 (refs (delq ref (leaf-refs leaf))))
+         (refs (delq ref (leaf-refs leaf))))
     (setf (leaf-refs leaf) refs)
 
     (cond ((null refs)
-	   (typecase leaf
-	     (lambda-var
-	      (delete-lambda-var leaf))
-	     (clambda
-	      (ecase (functional-kind leaf)
-		((nil :let :mv-let :assignment :escape :cleanup)
-		 (aver (null (functional-entry-fun leaf)))
-		 (delete-lambda leaf))
-		(:external
-		 (delete-lambda leaf))
-		((:deleted :zombie :optional))))
-	     (optional-dispatch
-	      (unless (eq (functional-kind leaf) :deleted)
-		(delete-optional-dispatch leaf)))))
-	  ((null (rest refs))
-	   (typecase leaf
-	     (clambda (or (maybe-let-convert leaf)
-			  (maybe-convert-to-assignment leaf)))
-	     (lambda-var (reoptimize-lambda-var leaf))))
-	  (t
-	   (typecase leaf
-	     (clambda (maybe-convert-to-assignment leaf))))))
+           (typecase leaf
+             (lambda-var
+              (delete-lambda-var leaf))
+             (clambda
+              (ecase (functional-kind leaf)
+                ((nil :let :mv-let :assignment :escape :cleanup)
+                 (aver (null (functional-entry-fun leaf)))
+                 (delete-lambda leaf))
+                (:external
+                 (delete-lambda leaf))
+                ((:deleted :zombie :optional))))
+             (optional-dispatch
+              (unless (eq (functional-kind leaf) :deleted)
+                (delete-optional-dispatch leaf)))))
+          ((null (rest refs))
+           (typecase leaf
+             (clambda (or (maybe-let-convert leaf)
+                          (maybe-convert-to-assignment leaf)))
+             (lambda-var (reoptimize-lambda-var leaf))))
+          (t
+           (typecase leaf
+             (clambda (maybe-convert-to-assignment leaf))))))
 
   (values))
 
@@ -1061,7 +1061,7 @@
     (flush-lvar-externally-checkable-type lvar)
     (do-uses (use lvar)
       (let ((prev (node-prev use)))
-	(let ((block (ctran-block prev)))
+        (let ((block (ctran-block prev)))
           (reoptimize-component (block-component block) t)
           (setf (block-attributep (block-flags block)
                                   flush-p type-asserted type-check)
@@ -1200,20 +1200,20 @@
   (declare (type clambda fun))
   (dolist (var (lambda-vars fun))
     (unless (or (leaf-ever-used var)
-		(lambda-var-ignorep var))
+                (lambda-var-ignorep var))
       (let ((*compiler-error-context* (lambda-bind fun)))
-	(unless (policy *compiler-error-context* (= inhibit-warnings 3))
-	  ;; ANSI section "3.2.5 Exceptional Situations in the Compiler"
-	  ;; requires this to be no more than a STYLE-WARNING.
-	  #-sb-xc-host
-	  (compiler-style-warn "The variable ~S is defined but never used."
-			       (leaf-debug-name var))
-	  ;; There's no reason to accept this kind of equivocation
-	  ;; when compiling our own code, though.
-	  #+sb-xc-host
-	  (warn "The variable ~S is defined but never used."
-		(leaf-debug-name var)))
-	(setf (leaf-ever-used var) t)))) ; to avoid repeated warnings? -- WHN
+        (unless (policy *compiler-error-context* (= inhibit-warnings 3))
+          ;; ANSI section "3.2.5 Exceptional Situations in the Compiler"
+          ;; requires this to be no more than a STYLE-WARNING.
+          #-sb-xc-host
+          (compiler-style-warn "The variable ~S is defined but never used."
+                               (leaf-debug-name var))
+          ;; There's no reason to accept this kind of equivocation
+          ;; when compiling our own code, though.
+          #+sb-xc-host
+          (warn "The variable ~S is defined but never used."
+                (leaf-debug-name var)))
+        (setf (leaf-ever-used var) t)))) ; to avoid repeated warnings? -- WHN
   (values))
 
 (defvar *deletion-ignored-objects* '(t nil))
@@ -1226,22 +1226,22 @@
 (defun present-in-form (obj form depth)
   (declare (type (integer 0 20) depth))
   (cond ((= depth 20) nil)
-	((eq obj form) t)
-	((atom form) nil)
-	(t
-	 (let ((first (car form))
-	       (depth (1+ depth)))
-	   (if (member first '(quote function))
-	       nil
-	       (or (and (not (symbolp first))
-			(present-in-form obj first depth))
-		   (do ((l (cdr form) (cdr l))
-			(n 0 (1+ n)))
-		       ((or (atom l) (> n 100))
-			nil)
-		     (declare (fixnum n))
-		     (when (present-in-form obj (car l) depth)
-		       (return t)))))))))
+        ((eq obj form) t)
+        ((atom form) nil)
+        (t
+         (let ((first (car form))
+               (depth (1+ depth)))
+           (if (member first '(quote function))
+               nil
+               (or (and (not (symbolp first))
+                        (present-in-form obj first depth))
+                   (do ((l (cdr form) (cdr l))
+                        (n 0 (1+ n)))
+                       ((or (atom l) (> n 100))
+                        nil)
+                     (declare (fixnum n))
+                     (when (present-in-form obj (car l) depth)
+                       (return t)))))))))
 
 ;;; This function is called on a block immediately before we delete
 ;;; it. We check to see whether any of the code about to die appeared
@@ -1265,27 +1265,27 @@
   (let ((home (block-home-lambda block)))
     (unless (eq (functional-kind home) :deleted)
       (do-nodes (node nil block)
-	(let* ((path (node-source-path node))
-	       (first (first path)))
-	  (when (or (eq first 'original-source-start)
-		    (and (atom first)
-			 (or (not (symbolp first))
-			     (let ((pkg (symbol-package first)))
-			       (and pkg
-				    (not (eq pkg (symbol-package :end))))))
-			 (not (member first *deletion-ignored-objects*))
-			 (not (typep first '(or fixnum character)))
-			 (every (lambda (x)
-				  (present-in-form first x 0))
-				(source-path-forms path))
-			 (present-in-form first (find-original-source path)
-					  0)))
-	    (unless (return-p node)
-	      (let ((*compiler-error-context* node))
-		(compiler-notify 'code-deletion-note
-				 :format-control "deleting unreachable code"
-				 :format-arguments nil)))
-	    (return))))))
+        (let* ((path (node-source-path node))
+               (first (first path)))
+          (when (or (eq first 'original-source-start)
+                    (and (atom first)
+                         (or (not (symbolp first))
+                             (let ((pkg (symbol-package first)))
+                               (and pkg
+                                    (not (eq pkg (symbol-package :end))))))
+                         (not (member first *deletion-ignored-objects*))
+                         (not (typep first '(or fixnum character)))
+                         (every (lambda (x)
+                                  (present-in-form first x 0))
+                                (source-path-forms path))
+                         (present-in-form first (find-original-source path)
+                                          0)))
+            (unless (return-p node)
+              (let ((*compiler-error-context* node))
+                (compiler-notify 'code-deletion-note
+                                 :format-control "deleting unreachable code"
+                                 :format-arguments nil)))
+            (return))))))
   (values))
 
 ;;; Delete a node from a block, deleting the block if there are no
@@ -1304,57 +1304,57 @@
     (delete-lvar-use node))
 
   (let* ((ctran (node-next node))
-	 (next (and ctran (ctran-next ctran)))
-	 (prev (node-prev node))
-	 (block (ctran-block prev))
-	 (prev-kind (ctran-kind prev))
-	 (last (block-last block)))
+         (next (and ctran (ctran-next ctran)))
+         (prev (node-prev node))
+         (block (ctran-block prev))
+         (prev-kind (ctran-kind prev))
+         (last (block-last block)))
 
     (setf (block-type-asserted block) t)
     (setf (block-test-modified block) t)
 
     (cond ((or (eq prev-kind :inside-block)
-	       (and (eq prev-kind :block-start)
-		    (not (eq node last))))
-	   (cond ((eq node last)
-		  (setf (block-last block) (ctran-use prev))
-		  (setf (node-next (ctran-use prev)) nil))
-		 (t
-		  (setf (ctran-next prev) next)
-		  (setf (node-prev next) prev)
+               (and (eq prev-kind :block-start)
+                    (not (eq node last))))
+           (cond ((eq node last)
+                  (setf (block-last block) (ctran-use prev))
+                  (setf (node-next (ctran-use prev)) nil))
+                 (t
+                  (setf (ctran-next prev) next)
+                  (setf (node-prev next) prev)
                   (when (if-p next) ; AOP wanted
                     (reoptimize-lvar (if-test next)))))
-	   (setf (node-prev node) nil)
-	   nil)
-	  (t
-	   (aver (eq prev-kind :block-start))
-	   (aver (eq node last))
-	   (let* ((succ (block-succ block))
-		  (next (first succ)))
-	     (aver (singleton-p succ))
-	     (cond
-	      ((eq block (first succ))
-	       (with-ir1-environment-from-node node
-		 (let ((exit (make-exit)))
-		   (setf (ctran-next prev) nil)
-		   (link-node-to-previous-ctran exit prev)
-		   (setf (block-last block) exit)))
-	       (setf (node-prev node) nil)
-	       nil)
-	      (t
-	       (aver (eq (block-start-cleanup block)
-			 (block-end-cleanup block)))
-	       (unlink-blocks block next)
-	       (dolist (pred (block-pred block))
-		 (change-block-successor pred block next))
-	       (when (block-delete-p block)
+           (setf (node-prev node) nil)
+           nil)
+          (t
+           (aver (eq prev-kind :block-start))
+           (aver (eq node last))
+           (let* ((succ (block-succ block))
+                  (next (first succ)))
+             (aver (singleton-p succ))
+             (cond
+              ((eq block (first succ))
+               (with-ir1-environment-from-node node
+                 (let ((exit (make-exit)))
+                   (setf (ctran-next prev) nil)
+                   (link-node-to-previous-ctran exit prev)
+                   (setf (block-last block) exit)))
+               (setf (node-prev node) nil)
+               nil)
+              (t
+               (aver (eq (block-start-cleanup block)
+                         (block-end-cleanup block)))
+               (unlink-blocks block next)
+               (dolist (pred (block-pred block))
+                 (change-block-successor pred block next))
+               (when (block-delete-p block)
                  (let ((component (block-component block)))
                    (setf (component-delete-blocks component)
                          (delq block (component-delete-blocks component)))))
                (remove-from-dfo block)
                (setf (block-delete-p block) t)
-	       (setf (node-prev node) nil)
-	       t)))))))
+               (setf (node-prev node) nil)
+               t)))))))
 
 ;;; Return true if CTRAN has been deleted, false if it is still a valid
 ;;; part of IR1.
@@ -1417,36 +1417,36 @@
    to feed directly to the LVAR-DEST of LVAR, which must be a
    combination."
   (declare (type lvar lvar)
-	   (type symbol fun)
-	   (type index num-args))
+           (type symbol fun)
+           (type index num-args))
   (let ((outside (lvar-dest lvar))
-	(inside (lvar-uses lvar)))
+        (inside (lvar-uses lvar)))
     (aver (combination-p outside))
     (unless (combination-p inside)
       (give-up-ir1-transform))
     (let ((inside-fun (combination-fun inside)))
       (unless (eq (lvar-fun-name inside-fun) fun)
-	(give-up-ir1-transform))
+        (give-up-ir1-transform))
       (let ((inside-args (combination-args inside)))
-	(unless (= (length inside-args) num-args)
-	  (give-up-ir1-transform))
-	(let* ((outside-args (combination-args outside))
-	       (arg-position (position lvar outside-args))
-	       (before-args (subseq outside-args 0 arg-position))
-	       (after-args (subseq outside-args (1+ arg-position))))
-	  (dolist (arg inside-args)
-	    (setf (lvar-dest arg) outside)
+        (unless (= (length inside-args) num-args)
+          (give-up-ir1-transform))
+        (let* ((outside-args (combination-args outside))
+               (arg-position (position lvar outside-args))
+               (before-args (subseq outside-args 0 arg-position))
+               (after-args (subseq outside-args (1+ arg-position))))
+          (dolist (arg inside-args)
+            (setf (lvar-dest arg) outside)
             (flush-lvar-externally-checkable-type arg))
-	  (setf (combination-args inside) nil)
-	  (setf (combination-args outside)
-		(append before-args inside-args after-args))
-	  (change-ref-leaf (lvar-uses inside-fun)
-			   (find-free-fun 'list "???"))
-	  (setf (combination-fun-info inside) (info :function :info 'list)
-		(combination-kind inside) :known)
-	  (setf (node-derived-type inside) *wild-type*)
-	  (flush-dest lvar)
-	  (values))))))
+          (setf (combination-args inside) nil)
+          (setf (combination-args outside)
+                (append before-args inside-args after-args))
+          (change-ref-leaf (lvar-uses inside-fun)
+                           (find-free-fun 'list "???"))
+          (setf (combination-fun-info inside) (info :function :info 'list)
+                (combination-kind inside) :known)
+          (setf (node-derived-type inside) *wild-type*)
+          (flush-dest lvar)
+          (values))))))
 
 (defun flush-combination (combination)
   (declare (type combination combination))
@@ -1474,8 +1474,8 @@
             (and (basic-combination-p dest)
                  (eq lvar (basic-combination-fun dest))
                  (csubtypep ltype (specifier-type 'function))))
-	  (setf (node-derived-type ref) vltype)
-	  (derive-node-type ref vltype)))
+          (setf (node-derived-type ref) vltype)
+          (derive-node-type ref vltype)))
     (reoptimize-lvar (node-lvar ref)))
   (values))
 
@@ -1500,19 +1500,19 @@
 ;;; LEAF and enter it.
 (defun find-constant (object)
   (if (typep object
-	     ;; FIXME: What is the significance of this test? ("things
-	     ;; that are worth uniquifying"?)
-	     '(or symbol number character instance))
+             ;; FIXME: What is the significance of this test? ("things
+             ;; that are worth uniquifying"?)
+             '(or symbol number character instance))
       (or (gethash object *constants*)
-	  (setf (gethash object *constants*)
-		(make-constant :value object
-			       :%source-name '.anonymous.
-			       :type (ctype-of object)
-			       :where-from :defined)))
+          (setf (gethash object *constants*)
+                (make-constant :value object
+                               :%source-name '.anonymous.
+                               :type (ctype-of object)
+                               :where-from :defined)))
       (make-constant :value object
-		     :%source-name '.anonymous.
-		     :type (ctype-of object)
-		     :where-from :defined)))
+                     :%source-name '.anonymous.
+                     :type (ctype-of object)
+                     :where-from :defined)))
 
 ;;; Return true if VAR would have to be closed over if environment
 ;;; analysis ran now (i.e. if there are any uses that have a different
@@ -1540,7 +1540,7 @@
     (dolist (nlx (physenv-nlx-info (node-physenv entry)) nil)
       (when (and (eq (nlx-info-block nlx) block)
                  (eq (nlx-info-cleanup nlx) cleanup))
-	(return nlx)))))
+        (return nlx)))))
 
 (defun nlx-info-lvar (nlx)
   (declare (type nlx-info nlx))
@@ -1563,17 +1563,17 @@
 (defun looks-like-an-mv-bind (functional)
   (and (optional-dispatch-p functional)
        (do ((arg (optional-dispatch-arglist functional) (cdr arg)))
-	   ((null arg) nil)
-	 (let ((info (lambda-var-arg-info (car arg))))
-	   (unless info (return nil))
-	   (case (arg-info-kind info)
-	     (:optional
-	      (when (or (arg-info-supplied-p info) (arg-info-default info))
-		(return nil)))
-	     (:rest
-	      (return (and (null (cdr arg)) (null (leaf-refs (car arg))))))
-	     (t
-	      (return nil)))))))
+           ((null arg) nil)
+         (let ((info (lambda-var-arg-info (car arg))))
+           (unless info (return nil))
+           (case (arg-info-kind info)
+             (:optional
+              (when (or (arg-info-supplied-p info) (arg-info-default info))
+                (return nil)))
+             (:rest
+              (return (and (null (cdr arg)) (null (leaf-refs (car arg))))))
+             (t
+              (return nil)))))))
 
 ;;; Return true if function is an external entry point. This is true
 ;;; of normal XEPs (:EXTERNAL kind) and also of top level lambdas
@@ -1589,15 +1589,15 @@
   (declare (type lvar lvar))
   (let ((use (lvar-uses lvar)))
     (if (ref-p use)
-	(let ((leaf (ref-leaf use)))
-	  (if (and (global-var-p leaf)
-		   (eq (global-var-kind leaf) :global-function)
-		   (or (not (defined-fun-p leaf))
-		       (not (eq (defined-fun-inlinep leaf) :notinline))
-		       notinline-ok))
-	      (leaf-source-name leaf)
-	      nil))
-	nil)))
+        (let ((leaf (ref-leaf use)))
+          (if (and (global-var-p leaf)
+                   (eq (global-var-kind leaf) :global-function)
+                   (or (not (defined-fun-p leaf))
+                       (not (eq (defined-fun-inlinep leaf) :notinline))
+                       notinline-ok))
+              (leaf-source-name leaf)
+              nil))
+        nil)))
 
 ;;; Return the source name of a combination. (This is an idiom
 ;;; which was used in CMU CL. I gather it always works. -- WHN)
@@ -1617,7 +1617,7 @@
   (declare (type lambda-var var))
   (let ((fun (lambda-var-home var)))
     (elt (combination-args (let-combination fun))
-	 (position-or-lose var (lambda-vars fun)))))
+         (position-or-lose var (lambda-vars fun)))))
 
 ;;; Return the LAMBDA that is called by the local CALL.
 (defun combination-lambda (call)
@@ -1634,28 +1634,28 @@
 ;;; limit, and warn if so, returning NIL.
 (defun inline-expansion-ok (node)
   (let ((expanded (incf (component-inline-expansions
-			 (block-component
-			  (node-block node))))))
+                         (block-component
+                          (node-block node))))))
     (cond ((> expanded *inline-expansion-limit*) nil)
-	  ((= expanded *inline-expansion-limit*)
-	   ;; FIXME: If the objective is to stop the recursive
-	   ;; expansion of inline functions, wouldn't it be more
-	   ;; correct to look back through surrounding expansions
-	   ;; (which are, I think, stored in the *CURRENT-PATH*, and
-	   ;; possibly stored elsewhere too) and suppress expansion
-	   ;; and print this warning when the function being proposed
-	   ;; for inline expansion is found there? (I don't like the
-	   ;; arbitrary numerical limit in principle, and I think
-	   ;; it'll be a nuisance in practice if we ever want the
-	   ;; compiler to be able to use WITH-COMPILATION-UNIT on
-	   ;; arbitrarily huge blocks of code. -- WHN)
-	   (let ((*compiler-error-context* node))
-	     (compiler-notify "*INLINE-EXPANSION-LIMIT* (~W) was exceeded, ~
+          ((= expanded *inline-expansion-limit*)
+           ;; FIXME: If the objective is to stop the recursive
+           ;; expansion of inline functions, wouldn't it be more
+           ;; correct to look back through surrounding expansions
+           ;; (which are, I think, stored in the *CURRENT-PATH*, and
+           ;; possibly stored elsewhere too) and suppress expansion
+           ;; and print this warning when the function being proposed
+           ;; for inline expansion is found there? (I don't like the
+           ;; arbitrary numerical limit in principle, and I think
+           ;; it'll be a nuisance in practice if we ever want the
+           ;; compiler to be able to use WITH-COMPILATION-UNIT on
+           ;; arbitrarily huge blocks of code. -- WHN)
+           (let ((*compiler-error-context* node))
+             (compiler-notify "*INLINE-EXPANSION-LIMIT* (~W) was exceeded, ~
                                probably trying to~%  ~
                                inline a recursive function."
-			      *inline-expansion-limit*))
-	   nil)
-	  (t t))))
+                              *inline-expansion-limit*))
+           nil)
+          (t t))))
 
 ;;; Make sure that FUNCTIONAL is not let-converted or deleted.
 (defun assure-functional-live-p (functional)
@@ -1676,14 +1676,14 @@
   (let ((kind (basic-combination-kind call)))
     (or (eq kind :full)
         (and (eq kind :known)
-	     (let ((info (basic-combination-fun-info call)))
-	       (and
-		(not (fun-info-ir2-convert info))
-		(dolist (template (fun-info-templates info) t)
-		  (when (eq (template-ltn-policy template) :fast-safe)
-		    (multiple-value-bind (val win)
-		       (valid-fun-use call (template-type template))
-		      (when (or val (not win)) (return nil)))))))))))
+             (let ((info (basic-combination-fun-info call)))
+               (and
+                (not (fun-info-ir2-convert info))
+                (dolist (template (fun-info-templates info) t)
+                  (when (eq (template-ltn-policy template) :fast-safe)
+                    (multiple-value-bind (val win)
+                       (valid-fun-use call (template-type template))
+                      (when (or val (not win)) (return nil)))))))))))
 
 ;;;; careful call
 
@@ -1694,16 +1694,16 @@
 ;;; the error context for any error message, and CONTEXT is a string
 ;;; that is spliced into the warning.
 (declaim (ftype (sfunction ((or symbol function) list node function string)
-			  (values list boolean))
-		careful-call))
+                          (values list boolean))
+                careful-call))
 (defun careful-call (function args node warn-fun context)
   (values
    (multiple-value-list
     (handler-case (apply function args)
       (error (condition)
-	(let ((*compiler-error-context* node))
-	  (funcall warn-fun "Lisp error during ~A:~%~A" context condition)
-	  (return-from careful-call (values nil nil))))))
+        (let ((*compiler-error-context* node))
+          (funcall warn-fun "Lisp error during ~A:~%~A" context condition)
+          (return-from careful-call (values nil nil))))))
    t))
 
 ;;; Variations of SPECIFIER-TYPE for parsing possibly wrong
@@ -1713,8 +1713,8 @@
        `(progn
           (defun ,careful (specifier)
             (handler-case (,basic specifier)
-	      (sb!kernel::arg-count-error (condition)
-		(values nil (list (format nil "~A" condition))))
+              (sb!kernel::arg-count-error (condition)
+                (values nil (list (format nil "~A" condition))))
               (simple-error (condition)
                 (values nil (list* (simple-condition-format-control condition)
                                    (simple-condition-format-arguments condition))))))
@@ -1739,7 +1739,7 @@
 ;;; otherwise. The legality and constantness of the keywords should
 ;;; already have been checked.
 (declaim (ftype (sfunction (list keyword) (or lvar null))
-		find-keyword-lvar))
+                find-keyword-lvar))
 (defun find-keyword-lvar (args key)
   (do ((arg args (cddr arg)))
       ((null arg) nil)
@@ -1754,7 +1754,7 @@
   (do ((arg args (cddr arg)))
       ((null arg) t)
     (unless (and (rest arg)
-		 (constant-lvar-p (first arg)))
+                 (constant-lvar-p (first arg)))
       (return nil))))
 
 ;;; This function is used by the result of PARSE-DEFTRANSFORM to
@@ -1764,9 +1764,9 @@
 (defun check-transform-keys (args keys)
   (and (check-key-args-constant args)
        (do ((arg args (cddr arg)))
-	   ((null arg) t)
-	 (unless (member (lvar-value (first arg)) keys)
-	   (return nil)))))
+           ((null arg) t)
+         (unless (member (lvar-value (first arg)) keys)
+           (return nil)))))
 
 ;;;; miscellaneous
 
@@ -1775,8 +1775,8 @@
 (defun %event (info node)
   (incf (event-info-count info))
   (when (and (>= (event-info-level info) *event-note-threshold*)
-	     (policy (or node *lexenv*)
-		     (= inhibit-warnings 0)))
+             (policy (or node *lexenv*)
+                     (= inhibit-warnings 0)))
     (let ((*compiler-error-context* node))
       (compiler-notify (event-info-description info))))
 

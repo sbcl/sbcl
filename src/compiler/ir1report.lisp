@@ -33,10 +33,10 @@
 ;;; this end, we convert source forms to strings so that source forms
 ;;; that contain IR1 references (e.g. %DEFUN) don't hold onto the IR.
 (defstruct (compiler-error-context
-	    #-no-ansi-print-object
-	    (:print-object (lambda (x stream)
-			     (print-unreadable-object (x stream :type t))))
-	    (:copier nil))
+            #-no-ansi-print-object
+            (:print-object (lambda (x stream)
+                             (print-unreadable-object (x stream :type t))))
+            (:copier nil))
   ;; a list of the stringified CARs of the enclosing non-original source forms
   ;; exceeding the *enclosing-source-cutoff*
   (enclosing-source nil :type list)
@@ -87,8 +87,8 @@
    list of subforms suitable for a \"~{~S ~}\" format string."
   (let ((n-whole (gensym)))
     `(setf (gethash ',name *source-context-methods*)
-	   (lambda (,n-whole)
-	     (destructuring-bind ,lambda-list ,n-whole ,@body)))))
+           (lambda (,n-whole)
+             (destructuring-bind ,lambda-list ,n-whole ,@body)))))
 
 (defmacro def-source-context (&rest rest)
   (deprecation-warning 'def-source-context 'define-source-context)
@@ -97,8 +97,8 @@
 (define-source-context defstruct (name-or-options &rest slots)
   (declare (ignore slots))
   `(defstruct ,(if (consp name-or-options)
-		   (car name-or-options)
-		   name-or-options)))
+                   (car name-or-options)
+                   name-or-options)))
 
 (define-source-context function (thing)
   (if (and (consp thing) (eq (first thing) 'lambda) (consp (rest thing)))
@@ -109,17 +109,17 @@
 ;;; CAR of the second form if appropriate.
 (defun source-form-context (form)
   (cond ((atom form) nil)
-	((>= (length form) 2)
+        ((>= (length form) 2)
          (let* ((context-fun-default (lambda (x)
-				       (declare (ignore x))
-				       (list (first form) (second form))))
-		(context-fun (gethash (first form)
-				      *source-context-methods*
-				      context-fun-default)))
+                                       (declare (ignore x))
+                                       (list (first form) (second form))))
+                (context-fun (gethash (first form)
+                                      *source-context-methods*
+                                      context-fun-default)))
            (declare (type function context-fun))
            (funcall context-fun (rest form))))
-	(t
-	 form)))
+        (t
+         form)))
 
 ;;; Given a source path, return the original source form and a
 ;;; description of the interesting aspects of the context in which it
@@ -137,31 +137,31 @@
 (defun find-original-source (path)
   (declare (list path))
   (let* ((rpath (reverse (source-path-original-source path)))
-	 (tlf (first rpath))
-	 (root (find-source-root tlf *source-info*)))
+         (tlf (first rpath))
+         (root (find-source-root tlf *source-info*)))
     (collect ((context))
       (let ((form root)
-	    (current (rest rpath)))
-	(loop
-	  (when (atom form)
-	    (aver (null current))
-	    (return))
-	  (let ((head (first form)))
-	    (when (symbolp head)
-	      (let ((name (symbol-name head)))
-		(when (and (>= (length name) 3) (string= name "DEF" :end1 3))
-		  (context (source-form-context form))))))
-	  (when (null current) (return))
-	  (setq form (nth (pop current) form)))
-	
-	(cond ((context)
-	       (values form (context)))
-	      ((and path root)
-	       (let ((c (source-form-context root)))
-		 (values form (if c (list c) nil))))
-	      (t
-	       (values '(unable to locate source)
-		       '((some strange place)))))))))
+            (current (rest rpath)))
+        (loop
+          (when (atom form)
+            (aver (null current))
+            (return))
+          (let ((head (first form)))
+            (when (symbolp head)
+              (let ((name (symbol-name head)))
+                (when (and (>= (length name) 3) (string= name "DEF" :end1 3))
+                  (context (source-form-context form))))))
+          (when (null current) (return))
+          (setq form (nth (pop current) form)))
+
+        (cond ((context)
+               (values form (context)))
+              ((and path root)
+               (let ((c (source-form-context root)))
+                 (values form (if c (list c) nil))))
+              (t
+               (values '(unable to locate source)
+                       '((some strange place)))))))))
 
 ;;; Convert a source form to a string, suitably formatted for use in
 ;;; compiler warnings.
@@ -181,46 +181,46 @@
 (defun find-error-context (args)
   (let ((context *compiler-error-context*))
     (if (compiler-error-context-p context)
-	context
-	(let ((path (or (and (boundp '*current-path*) *current-path*)
-			(if context
-			    (node-source-path context)
-			    nil))))
-	  (when (and *source-info* path)
-	    (multiple-value-bind (form src-context) (find-original-source path)
-	      (collect ((full nil cons)
-			(short nil cons))
-		(let ((forms (source-path-forms path))
-		      (n 0))
-		  (dolist (src (if (member (first forms) args)
-				   (rest forms)
-				   forms))
-		    (if (>= n *enclosing-source-cutoff*)
-			(short (stringify-form (if (consp src)
-						   (car src)
-						   src)
-					       nil))
-			(full (stringify-form src)))
-		    (incf n)))
+        context
+        (let ((path (or (and (boundp '*current-path*) *current-path*)
+                        (if context
+                            (node-source-path context)
+                            nil))))
+          (when (and *source-info* path)
+            (multiple-value-bind (form src-context) (find-original-source path)
+              (collect ((full nil cons)
+                        (short nil cons))
+                (let ((forms (source-path-forms path))
+                      (n 0))
+                  (dolist (src (if (member (first forms) args)
+                                   (rest forms)
+                                   forms))
+                    (if (>= n *enclosing-source-cutoff*)
+                        (short (stringify-form (if (consp src)
+                                                   (car src)
+                                                   src)
+                                               nil))
+                        (full (stringify-form src)))
+                    (incf n)))
 
-		(let* ((tlf (source-path-tlf-number path))
-		       (file-info (source-info-file-info *source-info*)))
-		  (make-compiler-error-context
-		   :enclosing-source (short)
-		   :source (full)
-		   :original-source (stringify-form form)
-		   :context src-context
-		   :file-name (file-info-name file-info)
-		   :file-position
-		   (multiple-value-bind (ignore pos)
-		       (find-source-root tlf *source-info*)
-		     (declare (ignore ignore))
-		     pos)
-		   :original-source-path
-		   (source-path-original-source path)
-		   :lexenv (if context
-			       (node-lexenv context)
-			       (if (boundp '*lexenv*) *lexenv* nil)))))))))))
+                (let* ((tlf (source-path-tlf-number path))
+                       (file-info (source-info-file-info *source-info*)))
+                  (make-compiler-error-context
+                   :enclosing-source (short)
+                   :source (full)
+                   :original-source (stringify-form form)
+                   :context src-context
+                   :file-name (file-info-name file-info)
+                   :file-position
+                   (multiple-value-bind (ignore pos)
+                       (find-source-root tlf *source-info*)
+                     (declare (ignore ignore))
+                     pos)
+                   :original-source-path
+                   (source-path-original-source path)
+                   :lexenv (if context
+                               (node-lexenv context)
+                               (if (boundp '*lexenv*) *lexenv* nil)))))))))))
 
 ;;;; printing error messages
 
@@ -247,11 +247,11 @@
 ;;; count when we are done.
 (defun note-message-repeats (stream &optional (terpri t))
   (cond ((= *last-message-count* 1)
-	 (when terpri 
-	   (terpri stream)))
-	((> *last-message-count* 1)
-	 (format stream "~&; [Last message occurs ~W times.]~2%"
-		 *last-message-count*)))
+         (when terpri
+           (terpri stream)))
+        ((> *last-message-count* 1)
+         (format stream "~&; [Last message occurs ~W times.]~2%"
+                 *last-message-count*)))
   (setq *last-message-count* 0))
 
 ;;; Print out the message, with appropriate context if we can find it.
@@ -268,70 +268,70 @@
 
 (defun %print-compiler-message (stream format-string format-args)
   (declare (type simple-string format-string))
-  (declare (type list format-args))  
+  (declare (type list format-args))
   (let ((context (find-error-context format-args)))
     (cond (context
-	   (let ((file (compiler-error-context-file-name context))
-		 (in (compiler-error-context-context context))
-		 (form (compiler-error-context-original-source context))
-		 (enclosing (compiler-error-context-enclosing-source context))
-		 (source (compiler-error-context-source context))
-		 (last *last-error-context*))
+           (let ((file (compiler-error-context-file-name context))
+                 (in (compiler-error-context-context context))
+                 (form (compiler-error-context-original-source context))
+                 (enclosing (compiler-error-context-enclosing-source context))
+                 (source (compiler-error-context-source context))
+                 (last *last-error-context*))
 
-	     (unless  (and last
-			   (equal file (compiler-error-context-file-name last)))
-	       (when (pathnamep file)
-		 (note-message-repeats stream)
-		 (setq last nil)
-		 (format stream "~2&; file: ~A~%" (namestring file))))
-	     
-	     (unless (and last
-			  (equal in (compiler-error-context-context last)))
-	       (note-message-repeats stream)
-	       (setq last nil)
-	       (pprint-logical-block (stream nil :per-line-prefix "; ")
-		 (format stream "in:~{~<~%    ~4:;~{ ~S~}~>~^ =>~}" in))
-	       (terpri stream))
-	     
-	     (unless (and last
-			  (string= form
-				   (compiler-error-context-original-source last)))
-	       (note-message-repeats stream)
-	       (setq last nil)
-	       (pprint-logical-block (stream nil :per-line-prefix "; ")
-		 (format stream "  ~A" form))
-	       (fresh-line stream))
-	     
-	     (unless (and last
-			  (equal enclosing
-				 (compiler-error-context-enclosing-source last)))
-	       (when enclosing
-		 (note-message-repeats stream)
-		 (setq last nil)
-		 (format stream "~&; --> ~{~<~%; --> ~1:;~A~> ~}~%" enclosing)))
-	     
-	     (unless (and last
-			  (equal source (compiler-error-context-source last)))
-	       (setq *last-format-string* nil)
-	       (when source
-		 (note-message-repeats stream)
-		 (dolist (src source)
-		   (fresh-line stream)
-		   (write-string "; ==>" stream)
-		   (terpri stream)
-		   (pprint-logical-block (stream nil :per-line-prefix "; ")
-		     (write-string src stream)))))))
-	  (t
-	   (fresh-line stream)
-	   (note-message-repeats stream)
-	   (setq *last-format-string* nil)))
-    
+             (unless  (and last
+                           (equal file (compiler-error-context-file-name last)))
+               (when (pathnamep file)
+                 (note-message-repeats stream)
+                 (setq last nil)
+                 (format stream "~2&; file: ~A~%" (namestring file))))
+
+             (unless (and last
+                          (equal in (compiler-error-context-context last)))
+               (note-message-repeats stream)
+               (setq last nil)
+               (pprint-logical-block (stream nil :per-line-prefix "; ")
+                 (format stream "in:~{~<~%    ~4:;~{ ~S~}~>~^ =>~}" in))
+               (terpri stream))
+
+             (unless (and last
+                          (string= form
+                                   (compiler-error-context-original-source last)))
+               (note-message-repeats stream)
+               (setq last nil)
+               (pprint-logical-block (stream nil :per-line-prefix "; ")
+                 (format stream "  ~A" form))
+               (fresh-line stream))
+
+             (unless (and last
+                          (equal enclosing
+                                 (compiler-error-context-enclosing-source last)))
+               (when enclosing
+                 (note-message-repeats stream)
+                 (setq last nil)
+                 (format stream "~&; --> ~{~<~%; --> ~1:;~A~> ~}~%" enclosing)))
+
+             (unless (and last
+                          (equal source (compiler-error-context-source last)))
+               (setq *last-format-string* nil)
+               (when source
+                 (note-message-repeats stream)
+                 (dolist (src source)
+                   (fresh-line stream)
+                   (write-string "; ==>" stream)
+                   (terpri stream)
+                   (pprint-logical-block (stream nil :per-line-prefix "; ")
+                     (write-string src stream)))))))
+          (t
+           (fresh-line stream)
+           (note-message-repeats stream)
+           (setq *last-format-string* nil)))
+
     (setq *last-error-context* context))
 
   ;; FIXME: this testing for effective equality of compiler messages
   ;; is ugly, and really ought to be done at a higher level.
   (unless (and (equal format-string *last-format-string*)
-	       (tree-equal format-args *last-format-args*))
+               (tree-equal format-args *last-format-args*))
     (note-message-repeats stream nil)
     (setq *last-format-string* format-string)
     (setq *last-format-args* format-args)
@@ -339,20 +339,20 @@
     (pprint-logical-block (stream nil :per-line-prefix "; ")
       (format stream "~&~?" format-string format-args))
     (fresh-line stream))
-  
+
   (incf *last-message-count*)
   (values))
 
 (defun print-compiler-condition (condition)
   (declare (type condition condition))
   (let (;; These different classes of conditions have different
-	;; effects on the return codes of COMPILE-FILE, so it's nice
-	;; for users to be able to pick them out by lexical search
-	;; through the output.
-	(what (etypecase condition
-		(style-warning 'style-warning)
-		(warning 'warning)
-		((or error compiler-error) 'error))))
+        ;; effects on the return codes of COMPILE-FILE, so it's nice
+        ;; for users to be able to pick them out by lexical search
+        ;; through the output.
+        (what (etypecase condition
+                (style-warning 'style-warning)
+                (warning 'warning)
+                ((or error compiler-error) 'error))))
     (print-compiler-message
      *error-output*
      (format nil "caught ~S:~%~~@<  ~~@;~~A~~:>" what)
@@ -377,43 +377,43 @@ a STYLE-WARNING (or any more serious condition)."))
 has written, having proved that it is unreachable."))
 
 (macrolet ((with-condition ((condition datum args) &body body)
-	     (with-unique-names (block)
-	       `(block ,block
-		  (let ((,condition
-			 (coerce-to-condition ,datum ,args
-					      'simple-compiler-note
-					      'with-condition)))
-		    (restart-case
-			(signal ,condition)
-		      (muffle-warning ()
-			(return-from ,block (values))))
-		    ,@body
-		    (values))))))
+             (with-unique-names (block)
+               `(block ,block
+                  (let ((,condition
+                         (coerce-to-condition ,datum ,args
+                                              'simple-compiler-note
+                                              'with-condition)))
+                    (restart-case
+                        (signal ,condition)
+                      (muffle-warning ()
+                        (return-from ,block (values))))
+                    ,@body
+                    (values))))))
 
   (defun compiler-notify (datum &rest args)
     (unless (if *compiler-error-context*
-	      (policy *compiler-error-context* (= inhibit-warnings 3))
-	      (policy *lexenv* (= inhibit-warnings 3)))
+              (policy *compiler-error-context* (= inhibit-warnings 3))
+              (policy *lexenv* (= inhibit-warnings 3)))
       (with-condition (condition datum args)
-	(incf *compiler-note-count*)
-	(print-compiler-message 
-	 *error-output*
-	 (format nil "note: ~~A")
-	 (list (princ-to-string condition)))))
+        (incf *compiler-note-count*)
+        (print-compiler-message
+         *error-output*
+         (format nil "note: ~~A")
+         (list (princ-to-string condition)))))
     (values))
 
   ;; Issue a note when we might or might not be in the compiler.
   (defun maybe-compiler-notify (&rest rest)
     (if (boundp '*lexenv*) ; if we're in the compiler
-	(apply #'compiler-notify rest)
-	(with-condition (condition (car rest) (cdr rest))
-	  (let ((stream *error-output*))
-	    (pprint-logical-block (stream nil :per-line-prefix ";")
-	      (format stream " note: ~3I~_")
-	      (pprint-logical-block (stream nil)
-		(format stream "~A" condition)))
-	    ;; (outside logical block, no per-line-prefix)
-	    (fresh-line stream))))))
+        (apply #'compiler-notify rest)
+        (with-condition (condition (car rest) (cdr rest))
+          (let ((stream *error-output*))
+            (pprint-logical-block (stream nil :per-line-prefix ";")
+              (format stream " note: ~3I~_")
+              (pprint-logical-block (stream nil)
+                (format stream "~A" condition)))
+            ;; (outside logical block, no per-line-prefix)
+            (fresh-line stream))))))
 
 ;;; The politically correct way to print out progress messages and
 ;;; such like. We clear the current error context so that we know that
@@ -436,12 +436,12 @@ has written, having proved that it is unreachable."))
   (let ((ep (first (block-succ (component-head component)))))
     (aver ep) ; else no entry points??
     (multiple-value-bind (form context)
-	(find-original-source
-	 (node-source-path (block-start-node ep)))
+        (find-original-source
+         (node-source-path (block-start-node ep)))
       (declare (ignore form))
       (let ((*print-level* 2)
-	    (*print-pretty* nil))
-	(format nil "~{~{~S~^ ~}~^ => ~}" context)))))
+            (*print-pretty* nil))
+        (format nil "~{~{~S~^ ~}~^ => ~}" context)))))
 
 ;;;; condition system interface
 
@@ -463,14 +463,14 @@ has written, having proved that it is unreachable."))
   (signal condition)
   (incf *compiler-error-count*)
   (setf *warnings-p* t
-	*failure-p* t)
+        *failure-p* t)
   (print-compiler-condition condition)
   (continue condition))
 (defun compiler-warning-handler (condition)
   (signal condition)
   (incf *compiler-warning-count*)
   (setf *warnings-p* t
-	*failure-p* t)
+        *failure-p* t)
   (print-compiler-condition condition)
   (muffle-warning condition))
 (defun compiler-style-warning-handler (condition)
@@ -499,40 +499,40 @@ has written, having proved that it is unreachable."))
 ;;; the compiler, hence the BOUNDP check.
 (defun note-undefined-reference (name kind)
   (unless (and
-	   ;; Check for boundness so we don't blow up if we're called
-	   ;; when IR1 conversion isn't going on.
-	   (boundp '*lexenv*)
-	   (or
-	    ;; FIXME: I'm pretty sure the INHIBIT-WARNINGS test below
-	    ;; isn't a good idea; we should have INHIBIT-WARNINGS
-	    ;; affect compiler notes, not STYLE-WARNINGs. And I'm not
-	    ;; sure what the BOUNDP '*LEXENV* test above is for; it's
-	    ;; likely a good idea, but it probably deserves an
-	    ;; explanatory comment.
-	    (policy *lexenv* (= inhibit-warnings 3))
-	    ;; KLUDGE: weird decoupling between here and where we're
-	    ;; going to signal the condition.  I don't think we can
-	    ;; rewrite this using SIGNAL and RESTART-CASE (to take
-	    ;; advantage of the (SATISFIES HANDLE-CONDITION-P)
-	    ;; handler, because if that doesn't handle it the ordinary
-	    ;; compiler handlers will trigger.
-	    (typep
-	     (ecase kind
-	       (:variable (make-condition 'warning))
-	       ((:function :type) (make-condition 'style-warning)))
-	     (car
-	      (rassoc 'muffle-warning
-		      (lexenv-handled-conditions *lexenv*))))))
+           ;; Check for boundness so we don't blow up if we're called
+           ;; when IR1 conversion isn't going on.
+           (boundp '*lexenv*)
+           (or
+            ;; FIXME: I'm pretty sure the INHIBIT-WARNINGS test below
+            ;; isn't a good idea; we should have INHIBIT-WARNINGS
+            ;; affect compiler notes, not STYLE-WARNINGs. And I'm not
+            ;; sure what the BOUNDP '*LEXENV* test above is for; it's
+            ;; likely a good idea, but it probably deserves an
+            ;; explanatory comment.
+            (policy *lexenv* (= inhibit-warnings 3))
+            ;; KLUDGE: weird decoupling between here and where we're
+            ;; going to signal the condition.  I don't think we can
+            ;; rewrite this using SIGNAL and RESTART-CASE (to take
+            ;; advantage of the (SATISFIES HANDLE-CONDITION-P)
+            ;; handler, because if that doesn't handle it the ordinary
+            ;; compiler handlers will trigger.
+            (typep
+             (ecase kind
+               (:variable (make-condition 'warning))
+               ((:function :type) (make-condition 'style-warning)))
+             (car
+              (rassoc 'muffle-warning
+                      (lexenv-handled-conditions *lexenv*))))))
     (let* ((found (dolist (warning *undefined-warnings* nil)
-		    (when (and (equal (undefined-warning-name warning) name)
-			       (eq (undefined-warning-kind warning) kind))
-		      (return warning))))
-	   (res (or found
-		    (make-undefined-warning :name name :kind kind))))
+                    (when (and (equal (undefined-warning-name warning) name)
+                               (eq (undefined-warning-kind warning) kind))
+                      (return warning))))
+           (res (or found
+                    (make-undefined-warning :name name :kind kind))))
       (unless found (push res *undefined-warnings*))
       (when (or (not *undefined-warning-limit*)
-		(< (undefined-warning-count res) *undefined-warning-limit*))
-	(push (find-error-context (list name))
-	      (undefined-warning-warnings res)))
+                (< (undefined-warning-count res) *undefined-warning-limit*))
+        (push (find-error-context (list name))
+              (undefined-warning-warnings res)))
       (incf (undefined-warning-count res))))
   (values))

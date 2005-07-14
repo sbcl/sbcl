@@ -157,18 +157,18 @@
 ;;; Grab the FUN-INFO and enter the function, replacing any old
 ;;; one with the same type and note.
 (declaim (ftype (function (t list function &optional (or string null)
-			     (member t nil))
-			  *)
-		%deftransform))
+                             (member t nil))
+                          *)
+                %deftransform))
 (defun %deftransform (name type fun &optional note important)
   (let* ((ctype (specifier-type type))
-	 (note (or note "optimize"))
-	 (info (fun-info-or-lose name))
-	 (old (find-if (lambda (x)
-			 (and (type= (transform-type x) ctype)
-			      (string-equal (transform-note x) note)
-			      (eq (transform-important x) important)))
-		       (fun-info-transforms info))))
+         (note (or note "optimize"))
+         (info (fun-info-or-lose name))
+         (old (find-if (lambda (x)
+                         (and (type= (transform-type x) ctype)
+                              (string-equal (transform-note x) note)
+                              (eq (transform-important x) important)))
+                       (fun-info-transforms info))))
     (cond (old
            (style-warn "Overwriting ~S" old)
            (setf (transform-function old) fun
@@ -182,31 +182,31 @@
 ;;; Make a FUN-INFO structure with the specified type, attributes
 ;;; and optimizers.
 (declaim (ftype (function (list list attributes &key
-				(:derive-type (or function null))
-				(:optimizer (or function null)))
-			  *)
-		%defknown))
+                                (:derive-type (or function null))
+                                (:optimizer (or function null)))
+                          *)
+                %defknown))
 (defun %defknown (names type attributes &key derive-type optimizer)
   (let ((ctype (specifier-type type))
-	(info (make-fun-info :attributes attributes
+        (info (make-fun-info :attributes attributes
                              :derive-type derive-type
                              :optimizer optimizer))
-	(target-env *info-environment*))
+        (target-env *info-environment*))
     (dolist (name names)
       (let ((old-fun-info (info :function :info name)))
-	(when old-fun-info
-	  ;; This is handled as an error because it's generally a bad
-	  ;; thing to blow away all the old optimization stuff. It's
-	  ;; also a potential source of sneaky bugs:
-	  ;;    DEFKNOWN FOO
-	  ;;    DEFTRANSFORM FOO
-	  ;;    DEFKNOWN FOO ; possibly hidden inside some macroexpansion
-	  ;;    ; Now the DEFTRANSFORM doesn't exist in the target Lisp.
-	  ;; However, it's continuable because it might be useful to do
-	  ;; it when testing new optimization stuff interactively.
-	  (cerror "Go ahead, overwrite it."
-		  "~@<overwriting old FUN-INFO ~2I~_~S ~I~_for ~S~:>"
-		  old-fun-info name)))
+        (when old-fun-info
+          ;; This is handled as an error because it's generally a bad
+          ;; thing to blow away all the old optimization stuff. It's
+          ;; also a potential source of sneaky bugs:
+          ;;    DEFKNOWN FOO
+          ;;    DEFTRANSFORM FOO
+          ;;    DEFKNOWN FOO ; possibly hidden inside some macroexpansion
+          ;;    ; Now the DEFTRANSFORM doesn't exist in the target Lisp.
+          ;; However, it's continuable because it might be useful to do
+          ;; it when testing new optimization stuff interactively.
+          (cerror "Go ahead, overwrite it."
+                  "~@<overwriting old FUN-INFO ~2I~_~S ~I~_for ~S~:>"
+                  old-fun-info name)))
       (setf (info :function :type name target-env) ctype)
       (setf (info :function :where-from name target-env) :declared)
       (setf (info :function :kind name target-env) :function)
@@ -221,11 +221,11 @@
 (declaim (ftype (sfunction (t) fun-info) fun-info-or-lose))
 (defun fun-info-or-lose (name)
   (let (;; FIXME: Do we need this rebinding here? It's a literal
-	;; translation of the old CMU CL rebinding to
-	;; (OR *BACKEND-INFO-ENVIRONMENT* *INFO-ENVIRONMENT*),
-	;; and it's not obvious whether the rebinding to itself is
-	;; needed that SBCL doesn't need *BACKEND-INFO-ENVIRONMENT*.
-	(*info-environment* *info-environment*))
+        ;; translation of the old CMU CL rebinding to
+        ;; (OR *BACKEND-INFO-ENVIRONMENT* *INFO-ENVIRONMENT*),
+        ;; and it's not obvious whether the rebinding to itself is
+        ;; needed that SBCL doesn't need *BACKEND-INFO-ENVIRONMENT*.
+        (*info-environment* *info-environment*))
     (let ((old (info :function :info name)))
       (unless old (error "~S is not a known function." name))
       (setf (info :function :info name) (copy-fun-info old)))))
@@ -249,8 +249,8 @@
 (defun result-type-float-contagion (call)
   (declare (type combination call))
   (reduce #'numeric-contagion (combination-args call)
-	  :key #'lvar-type
-	  :initial-value (specifier-type 'single-float)))
+          :key #'lvar-type
+          :initial-value (specifier-type 'single-float)))
 
 ;;; Return a closure usable as a derive-type method for accessing the
 ;;; N'th argument. If arg is a list, result is a list. If arg is a
@@ -260,13 +260,13 @@
     (declare (type combination call))
     (let ((lvar (nth (1- n) (combination-args call))))
       (when lvar
-	(let ((type (lvar-type lvar)))
-	  (if (array-type-p type)
-	      (specifier-type
-	       `(vector ,(type-specifier (array-type-element-type type))))
-	      (let ((ltype (specifier-type 'list)))
-		(when (csubtypep type ltype)
-		  ltype))))))))
+        (let ((type (lvar-type lvar)))
+          (if (array-type-p type)
+              (specifier-type
+               `(vector ,(type-specifier (array-type-element-type type))))
+              (let ((ltype (specifier-type 'list)))
+                (when (csubtypep type ltype)
+                  ltype))))))))
 
 ;;; Derive the type to be the type specifier which is the Nth arg.
 (defun result-type-specifier-nth-arg (n)
@@ -274,7 +274,7 @@
     (declare (type combination call))
     (let ((lvar (nth (1- n) (combination-args call))))
       (when (and lvar (constant-lvar-p lvar))
-	(careful-specifier-type (lvar-value lvar))))))
+        (careful-specifier-type (lvar-value lvar))))))
 
 ;;; Derive the type to be the type specifier which is the Nth arg,
 ;;; with the additional restriptions noted in the CLHS for STRING and
@@ -285,35 +285,35 @@
     (declare (type combination call))
     (let ((lvar (nth (1- n) (combination-args call))))
       (when (and lvar (constant-lvar-p lvar))
-	(let* ((specifier (lvar-value lvar))
-	       (lspecifier (if (atom specifier) (list specifier) specifier)))
-	  (cond
-	    ((eq (car lspecifier) 'string)
-	     (destructuring-bind (string &rest size)
-		 lspecifier
-	       (declare (ignore string))
-	       (careful-specifier-type
-		`(vector character ,@(when size size)))))
-	    ((eq (car lspecifier) 'simple-string)
-	     (destructuring-bind (simple-string &rest size)
-		 lspecifier
-	       (declare (ignore simple-string))
-	       (careful-specifier-type
-		`(simple-array character ,@(if size (list size) '((*)))))))
-	    (t
-	     (let ((ctype (careful-specifier-type specifier)))
-	       (if (and (array-type-p ctype)
-			(eq (array-type-specialized-element-type ctype)
-			    *wild-type*))
-		   ;; I don't think I'm allowed to modify what I get
-		   ;; back from SPECIFIER-TYPE; it is, after all,
-		   ;; cached.  Better copy it, then.
-		   (let ((real-ctype (copy-structure ctype)))
-		     (setf (array-type-element-type real-ctype)
-			   *universal-type*
-			   (array-type-specialized-element-type real-ctype)
-			   *universal-type*)
-		     real-ctype)
-		   ctype)))))))))
+        (let* ((specifier (lvar-value lvar))
+               (lspecifier (if (atom specifier) (list specifier) specifier)))
+          (cond
+            ((eq (car lspecifier) 'string)
+             (destructuring-bind (string &rest size)
+                 lspecifier
+               (declare (ignore string))
+               (careful-specifier-type
+                `(vector character ,@(when size size)))))
+            ((eq (car lspecifier) 'simple-string)
+             (destructuring-bind (simple-string &rest size)
+                 lspecifier
+               (declare (ignore simple-string))
+               (careful-specifier-type
+                `(simple-array character ,@(if size (list size) '((*)))))))
+            (t
+             (let ((ctype (careful-specifier-type specifier)))
+               (if (and (array-type-p ctype)
+                        (eq (array-type-specialized-element-type ctype)
+                            *wild-type*))
+                   ;; I don't think I'm allowed to modify what I get
+                   ;; back from SPECIFIER-TYPE; it is, after all,
+                   ;; cached.  Better copy it, then.
+                   (let ((real-ctype (copy-structure ctype)))
+                     (setf (array-type-element-type real-ctype)
+                           *universal-type*
+                           (array-type-specialized-element-type real-ctype)
+                           *universal-type*)
+                     real-ctype)
+                   ctype)))))))))
 
 (/show0 "knownfun.lisp end of file")

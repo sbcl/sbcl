@@ -32,7 +32,7 @@
         (setf *stepping* nil))
       (step-next ()
         nil)
-      (step-into () 
+      (step-into ()
         t))))
 
 (defun step-variable (symbol value)
@@ -47,8 +47,8 @@
 
 (defun insert-step-conditions (form)
   `(locally (declare
-	     (optimize (insert-step-conditions
-			,(policy *lexenv* insert-step-conditions))))
+             (optimize (insert-step-conditions
+                        ,(policy *lexenv* insert-step-conditions))))
     ,form))
 
 ;;; Flag to control instrumentation function call arguments.
@@ -84,8 +84,8 @@
   #+sb-xc-host (declare (ignore form))
   #-sb-xc-host
   (flet ((step-symbol-p (symbol)
-           (not (member (symbol-package symbol) 
-                        (load-time-value 
+           (not (member (symbol-package symbol)
+                        (load-time-value
                          ;; KLUDGE: packages we're not interested in stepping.
                          (mapcar #'find-package '(sb!c sb!int sb!impl sb!kernel sb!pcl)))))))
     (let ((lexenv *lexenv*))

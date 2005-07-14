@@ -25,7 +25,7 @@
       (assign-ir2-nlx-info fun)
       (assign-lambda-var-tns fun nil)
       (dolist (let (lambda-lets fun))
-	(assign-lambda-var-tns let t))))
+        (assign-lambda-var-tns let t))))
 
   (values))
 
@@ -41,17 +41,17 @@
   (dolist (var (lambda-vars fun))
     (when (leaf-refs var)
       (let* ((type (if (lambda-var-indirect var)
-		       *backend-t-primitive-type*
-		       (primitive-type (leaf-type var))))
-	     (temp (make-normal-tn type))
-	     (node (lambda-bind fun))
-	     (res (if (or (and let-p (policy node (< debug 3)))
-			  (policy node (zerop debug))
-			  (policy node (= speed 3)))
-		      temp
-		      (physenv-debug-live-tn temp (lambda-physenv fun)))))
-	(setf (tn-leaf res) var)
-	(setf (leaf-info var) res))))
+                       *backend-t-primitive-type*
+                       (primitive-type (leaf-type var))))
+             (temp (make-normal-tn type))
+             (node (lambda-bind fun))
+             (res (if (or (and let-p (policy node (< debug 3)))
+                          (policy node (zerop debug))
+                          (policy node (= speed 3)))
+                      temp
+                      (physenv-debug-live-tn temp (lambda-physenv fun)))))
+        (setf (tn-leaf res) var)
+        (setf (leaf-info var) res))))
   (values))
 
 ;;; Give CLAMBDA an IR2-PHYSENV structure. (And in order to
@@ -60,28 +60,28 @@
 (defun assign-ir2-physenv (clambda)
   (declare (type clambda clambda))
   (let ((lambda-physenv (lambda-physenv clambda))
-	(reversed-ir2-physenv-alist nil))
+        (reversed-ir2-physenv-alist nil))
     ;; FIXME: should be MAPCAR, not DOLIST
     (dolist (thing (physenv-closure lambda-physenv))
       (let ((ptype (etypecase thing
-		     (lambda-var
-		      (if (lambda-var-indirect thing)
-			  *backend-t-primitive-type*
-			  (primitive-type (leaf-type thing))))
-		     (nlx-info *backend-t-primitive-type*)
+                     (lambda-var
+                      (if (lambda-var-indirect thing)
+                          *backend-t-primitive-type*
+                          (primitive-type (leaf-type thing))))
+                     (nlx-info *backend-t-primitive-type*)
                      (clambda *backend-t-primitive-type*))))
-	(push (cons thing (make-normal-tn ptype))
-	      reversed-ir2-physenv-alist)))
+        (push (cons thing (make-normal-tn ptype))
+              reversed-ir2-physenv-alist)))
 
     (let ((res (make-ir2-physenv
-		:closure (nreverse reversed-ir2-physenv-alist)
-		:return-pc-pass (make-return-pc-passing-location
-				 (xep-p clambda)))))
+                :closure (nreverse reversed-ir2-physenv-alist)
+                :return-pc-pass (make-return-pc-passing-location
+                                 (xep-p clambda)))))
       (setf (physenv-info lambda-physenv) res)
       (setf (ir2-physenv-old-fp res)
-	    (make-old-fp-save-location lambda-physenv))
+            (make-old-fp-save-location lambda-physenv))
       (setf (ir2-physenv-return-pc res)
-	    (make-return-pc-save-location lambda-physenv))))
+            (make-return-pc-save-location lambda-physenv))))
 
   (values))
 
@@ -94,11 +94,11 @@
   (declare (type clambda fun))
   (let ((return (lambda-return fun)))
     (and return
-	 (do-uses (use (return-result return) nil)
-	   (when (and (node-tail-p use)
-		      (basic-combination-p use)
-		      (eq (basic-combination-kind use) :full))
-	     (return t))))))
+         (do-uses (use (return-result return) nil)
+           (when (and (node-tail-p use)
+                      (basic-combination-p use)
+                      (eq (basic-combination-kind use) :full))
+             (return t))))))
 
 ;;; Return true if we should use the standard (unknown) return
 ;;; convention for a TAIL-SET. We use the standard return convention
@@ -112,17 +112,17 @@
   (declare (type tail-set tails))
   (let ((funs (tail-set-funs tails)))
     (or (and (find-if #'xep-p funs)
-	     (find-if #'has-full-call-use funs))
-	(block punt
-	  (dolist (fun funs t)
-	    (dolist (ref (leaf-refs fun))
-	      (let* ((lvar (node-lvar ref))
-		     (dest (and lvar (lvar-dest lvar))))
-		(when (and (basic-combination-p dest)
-			   (not (node-tail-p dest))
-			   (eq (basic-combination-fun dest) lvar)
-			   (eq (basic-combination-kind dest) :local))
-		  (return-from punt nil)))))))))
+             (find-if #'has-full-call-use funs))
+        (block punt
+          (dolist (fun funs t)
+            (dolist (ref (leaf-refs fun))
+              (let* ((lvar (node-lvar ref))
+                     (dest (and lvar (lvar-dest lvar))))
+                (when (and (basic-combination-p dest)
+                           (not (node-tail-p dest))
+                           (eq (basic-combination-fun dest) lvar)
+                           (eq (basic-combination-kind dest) :local))
+                  (return-from punt nil)))))))))
 
 ;;; If policy indicates, give an efficiency note about our inability to
 ;;; use the known return convention. We try to find a function in the
@@ -132,28 +132,28 @@
   (declare (type tail-set tails))
   (let ((funs (tail-set-funs tails)))
     (when (policy (lambda-bind (first funs))
-		  (> (max speed space)
-		     inhibit-warnings))
+                  (> (max speed space)
+                     inhibit-warnings))
       (dolist (fun funs
-		   (let ((*compiler-error-context* (lambda-bind (first funs))))
-		     (compiler-notify
-		      "Return value count mismatch prevents known return ~
+                   (let ((*compiler-error-context* (lambda-bind (first funs))))
+                     (compiler-notify
+                      "Return value count mismatch prevents known return ~
                        from these functions:~
                        ~{~%  ~A~}"
-		      (mapcar #'leaf-source-name
-			      (remove-if-not #'leaf-has-source-name-p funs)))))
-	(let ((ret (lambda-return fun)))
-	  (when ret
-	    (let ((rtype (return-result-type ret)))
-	      (multiple-value-bind (ignore count) (values-types rtype)
-		(declare (ignore ignore))
-		(when (eq count :unknown)
-		  (let ((*compiler-error-context* (lambda-bind fun)))
-		    (compiler-notify
-		     "Return type not fixed values, so can't use known return ~
+                      (mapcar #'leaf-source-name
+                              (remove-if-not #'leaf-has-source-name-p funs)))))
+        (let ((ret (lambda-return fun)))
+          (when ret
+            (let ((rtype (return-result-type ret)))
+              (multiple-value-bind (ignore count) (values-types rtype)
+                (declare (ignore ignore))
+                (when (eq count :unknown)
+                  (let ((*compiler-error-context* (lambda-bind fun)))
+                    (compiler-notify
+                     "Return type not fixed values, so can't use known return ~
                       convention:~%  ~S"
-		     (type-specifier rtype)))
-		  (return)))))))))
+                     (type-specifier rtype)))
+                  (return)))))))))
   (values))
 
 ;;; Return a RETURN-INFO structure describing how we should return
@@ -165,18 +165,18 @@
   (declare (type tail-set tails))
   (multiple-value-bind (types count) (values-types (tail-set-type tails))
     (let ((ptypes (mapcar #'primitive-type types))
-	  (use-standard (use-standard-returns tails)))
+          (use-standard (use-standard-returns tails)))
       (when (and (eq count :unknown) (not use-standard)
                  (not (eq (tail-set-type tails) *empty-type*)))
-	(return-value-efficiency-note tails))
+        (return-value-efficiency-note tails))
       (if (or (eq count :unknown) use-standard)
-	  (make-return-info :kind :unknown
-			    :count count
-			    :types ptypes)
-	  (make-return-info :kind :fixed
-			    :count count
-			    :types ptypes
-			    :locations (mapcar #'make-normal-tn ptypes))))))
+          (make-return-info :kind :unknown
+                            :count count
+                            :types ptypes)
+          (make-return-info :kind :fixed
+                            :count count
+                            :types ptypes
+                            :locations (mapcar #'make-normal-tn ptypes))))))
 
 ;;; If TAIL-SET doesn't have any INFO, then make a RETURN-INFO for it.
 ;;; If we choose a return convention other than :UNKNOWN, and this
@@ -186,15 +186,15 @@
 (defun assign-return-locations (fun)
   (declare (type clambda fun))
   (let* ((tails (lambda-tail-set fun))
-	 (returns (or (tail-set-info tails)
-		      (setf (tail-set-info tails)
-			    (return-info-for-set tails))))
-	 (return (lambda-return fun)))
+         (returns (or (tail-set-info tails)
+                      (setf (tail-set-info tails)
+                            (return-info-for-set tails))))
+         (return (lambda-return fun)))
     (when (and return
-	       (not (eq (return-info-kind returns) :unknown))
-	       (xep-p fun))
+               (not (eq (return-info-kind returns) :unknown))
+               (xep-p fun))
       (do-uses (use (return-result return))
-	(setf (node-tail-p use) nil))))
+        (setf (node-tail-p use) nil))))
   (values))
 
 ;;; Make an IR2-NLX-INFO structure for each NLX entry point recorded.
@@ -207,11 +207,11 @@
   (let ((physenv (lambda-physenv fun)))
     (dolist (nlx (physenv-nlx-info physenv))
       (setf (nlx-info-info nlx)
-	    (make-ir2-nlx-info
-	     :home (when (member (cleanup-kind (nlx-info-cleanup nlx))
-				 '(:block :tagbody))
+            (make-ir2-nlx-info
+             :home (when (member (cleanup-kind (nlx-info-cleanup nlx))
+                                 '(:block :tagbody))
                      (if (nlx-info-safe-p nlx)
                          (make-normal-tn *backend-t-primitive-type*)
                          (make-stack-pointer-tn)))
-	     :save-sp (make-nlx-sp-tn physenv)))))
+             :save-sp (make-nlx-sp-tn physenv)))))
   (values))

@@ -37,11 +37,11 @@
 (declaim (ftype (sfunction (list)
                            (values list list boolean t boolean list boolean
                                    boolean list boolean t t boolean))
-		parse-lambda-list-like-thing))
+                parse-lambda-list-like-thing))
 (declaim (ftype (sfunction (list)
                            (values list list boolean t boolean list boolean
                                    boolean list boolean t t))
-		parse-lambda-list))
+                parse-lambda-list))
 (defun parse-lambda-list-like-thing (list)
   (collect ((required)
             (optional)
@@ -53,7 +53,7 @@
           (more-context nil)
           (more-count nil)
           (keyp nil)
-	  (auxp nil)
+          (auxp nil)
           (allowp nil)
           (state :required))
       (declare (type (member :allow-other-keys :aux
@@ -84,10 +84,10 @@
                (unless (member state
                                '(:required :optional :post-rest :post-more))
                  (compiler-error "misplaced &KEY in lambda list: ~S" list))
-	       #-sb-xc-host
-	       (when (optional)
-		 (compiler-style-warn
-		  "&OPTIONAL and &KEY found in the same lambda list: ~S" list))
+               #-sb-xc-host
+               (when (optional)
+                 (compiler-style-warn
+                  "&OPTIONAL and &KEY found in the same lambda list: ~S" list))
                (setq keyp t
                      state :key))
               (&allow-other-keys
@@ -103,34 +103,34 @@
                (when auxp
                  (compiler-error "multiple &AUX in lambda list: ~S" list))
                (setq auxp t
-		     state :aux))
+                     state :aux))
               (t (bug "unknown LAMBDA-LIST-KEYWORD in lambda list: ~S." arg)))
-	    (progn
-	      (when (symbolp arg)
-		(let ((name (symbol-name arg)))
-		  (when (and (plusp (length name))
-			     (char= (char name 0) #\&))
-		    (style-warn
-		     "suspicious variable in lambda list: ~S." arg))))
-	      (case state
-		(:required (required arg))
-		(:optional (optional arg))
-		(:rest
-		 (setq restp t
-		       rest arg
-		       state :post-rest))
-		(:more-context
-		 (setq more-context arg
-		       state :more-count))
-		(:more-count
-		 (setq more-count arg
-		       state :post-more))
-		(:key (keys arg))
-		(:aux (aux arg))
-		(t
-		 (compiler-error "found garbage in lambda list when expecting ~
+            (progn
+              (when (symbolp arg)
+                (let ((name (symbol-name arg)))
+                  (when (and (plusp (length name))
+                             (char= (char name 0) #\&))
+                    (style-warn
+                     "suspicious variable in lambda list: ~S." arg))))
+              (case state
+                (:required (required arg))
+                (:optional (optional arg))
+                (:rest
+                 (setq restp t
+                       rest arg
+                       state :post-rest))
+                (:more-context
+                 (setq more-context arg
+                       state :more-count))
+                (:more-count
+                 (setq more-count arg
+                       state :post-more))
+                (:key (keys arg))
+                (:aux (aux arg))
+                (t
+                 (compiler-error "found garbage in lambda list when expecting ~
                                   a keyword: ~S"
-				 arg))))))
+                                 arg))))))
       (when (eq state :rest)
         (compiler-error "&REST without rest variable"))
 
@@ -147,45 +147,45 @@
 
   ;; Classify parameters without checking their validity individually.
   (multiple-value-bind (required optional restp rest keyp keys allowp auxp aux
-			morep more-context more-count)
+                        morep more-context more-count)
       (parse-lambda-list-like-thing lambda-list)
 
     ;; Check validity of parameters.
     (flet ((need-symbol (x why)
-	     (unless (symbolp x)
-	       (compiler-error "~A is not a symbol: ~S" why x))))
+             (unless (symbolp x)
+               (compiler-error "~A is not a symbol: ~S" why x))))
       (dolist (i required)
-	(need-symbol i "Required argument"))
+        (need-symbol i "Required argument"))
       (dolist (i optional)
-	(typecase i
-	  (symbol)
-	  (cons
-	   (destructuring-bind (var &optional init-form supplied-p) i
-	     (declare (ignore init-form supplied-p))
-	     (need-symbol var "&OPTIONAL parameter name")))
-	  (t
-	   (compiler-error "&OPTIONAL parameter is not a symbol or cons: ~S"
-			   i))))
+        (typecase i
+          (symbol)
+          (cons
+           (destructuring-bind (var &optional init-form supplied-p) i
+             (declare (ignore init-form supplied-p))
+             (need-symbol var "&OPTIONAL parameter name")))
+          (t
+           (compiler-error "&OPTIONAL parameter is not a symbol or cons: ~S"
+                           i))))
       (when restp
-	(need-symbol rest "&REST argument"))
+        (need-symbol rest "&REST argument"))
       (when keyp
-	(dolist (i keys)
-	  (typecase i
-	    (symbol)
-	    (cons
-	     (destructuring-bind (var-or-kv &optional init-form supplied-p) i
-	       (declare (ignore init-form supplied-p))
-	       (if (consp var-or-kv)
-		   (destructuring-bind (keyword-name var) var-or-kv
-		     (declare (ignore keyword-name))
-		     (need-symbol var "&KEY parameter name"))
-		   (need-symbol var-or-kv "&KEY parameter name"))))
-	    (t
-	     (compiler-error "&KEY parameter is not a symbol or cons: ~S"
-			     i))))))
+        (dolist (i keys)
+          (typecase i
+            (symbol)
+            (cons
+             (destructuring-bind (var-or-kv &optional init-form supplied-p) i
+               (declare (ignore init-form supplied-p))
+               (if (consp var-or-kv)
+                   (destructuring-bind (keyword-name var) var-or-kv
+                     (declare (ignore keyword-name))
+                     (need-symbol var "&KEY parameter name"))
+                   (need-symbol var-or-kv "&KEY parameter name"))))
+            (t
+             (compiler-error "&KEY parameter is not a symbol or cons: ~S"
+                             i))))))
 
     ;; Voila.
     (values required optional restp rest keyp keys allowp auxp aux
-	    morep more-context more-count)))
+            morep more-context more-count)))
 
 (/show0 "parse-lambda-list.lisp end of file")

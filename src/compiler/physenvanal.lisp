@@ -17,7 +17,7 @@
 
 ;;; Do environment analysis on the code in COMPONENT. This involves
 ;;; various things:
-;;;  1. Make a PHYSENV structure for each non-LET LAMBDA, assigning 
+;;;  1. Make a PHYSENV structure for each non-LET LAMBDA, assigning
 ;;;     the LAMBDA-PHYSENV for all LAMBDAs.
 ;;;  2. Find all values that need to be closed over by each
 ;;;     physical environment.
@@ -25,17 +25,17 @@
 ;;;     continuations.
 ;;;  4. Delete all non-top-level functions with no references. This
 ;;;     should only get functions with non-NULL kinds, since normal
-;;;     functions are deleted when their references go to zero. 
+;;;     functions are deleted when their references go to zero.
 (defun physenv-analyze (component)
   (declare (type component component))
   (aver (every (lambda (x)
-		 (eq (functional-kind x) :deleted))
-	       (component-new-functionals component)))
+                 (eq (functional-kind x) :deleted))
+               (component-new-functionals component)))
   (setf (component-new-functionals component) ())
   (dolist (clambda (component-lambdas component))
     (reinit-lambda-physenv clambda))
   (mapc #'add-lambda-vars-and-let-vars-to-closures
-	(component-lambdas component))
+        (component-lambdas component))
 
   (find-non-local-exits component)
   (recheck-dynamic-extent-lvars component)
@@ -45,10 +45,10 @@
   (dolist (fun (component-lambdas component))
     (when (null (leaf-refs fun))
       (let ((kind (functional-kind fun)))
-	(unless (or (eq kind :toplevel)
-		    (functional-has-external-references-p fun))
-	  (aver (member kind '(:optional :cleanup :escape)))
-	  (setf (functional-kind fun) nil)
+        (unless (or (eq kind :toplevel)
+                    (functional-has-external-references-p fun))
+          (aver (member kind '(:optional :cleanup :escape)))
+          (setf (functional-kind fun) nil)
           (delete-functional fun)))))
 
   (setf (component-nlx-info-generated-p component) t)
@@ -66,7 +66,7 @@
   (let ((found-it nil))
     (dolist (lambda (component-lambdas component))
       (when (add-lambda-vars-and-let-vars-to-closures lambda)
-	(setq found-it t)))
+        (setq found-it t)))
     found-it))
 
 ;;; If CLAMBDA has a PHYSENV, return it, otherwise assign an empty one
@@ -75,17 +75,17 @@
   (declare (type clambda clambda))
   (let ((homefun (lambda-home clambda)))
     (or (lambda-physenv homefun)
-	(let ((res (make-physenv :lambda homefun)))
-	  (setf (lambda-physenv homefun) res)
-	  ;; All the LETLAMBDAs belong to HOMEFUN, and share the same
-	  ;; PHYSENV. Thus, (1) since HOMEFUN's PHYSENV was NIL,
-	  ;; theirs should be NIL too, and (2) since we're modifying
-	  ;; HOMEFUN's PHYSENV, we should modify theirs, too.
-	  (dolist (letlambda (lambda-lets homefun))
-	    (aver (eql (lambda-home letlambda) homefun))
-	    (aver (null (lambda-physenv letlambda)))
-	    (setf (lambda-physenv letlambda) res))
-	  res))))
+        (let ((res (make-physenv :lambda homefun)))
+          (setf (lambda-physenv homefun) res)
+          ;; All the LETLAMBDAs belong to HOMEFUN, and share the same
+          ;; PHYSENV. Thus, (1) since HOMEFUN's PHYSENV was NIL,
+          ;; theirs should be NIL too, and (2) since we're modifying
+          ;; HOMEFUN's PHYSENV, we should modify theirs, too.
+          (dolist (letlambda (lambda-lets homefun))
+            (aver (eql (lambda-home letlambda) homefun))
+            (aver (null (lambda-physenv letlambda)))
+            (setf (lambda-physenv letlambda) res))
+          res))))
 
 ;;; If FUN has no physical environment, assign one, otherwise clean up
 ;;; the old physical environment, removing/flagging variables that
@@ -95,18 +95,18 @@
 (defun reinit-lambda-physenv (fun)
   (let ((old (lambda-physenv (lambda-home fun))))
     (cond (old
-	   (setf (physenv-closure old)
-		 (delete-if (lambda (x)
-			      (and (lambda-var-p x)
-				   (null (leaf-refs x))))
-			    (physenv-closure old)))
-	   (flet ((clear (fun)
-		    (dolist (var (lambda-vars fun))
-		      (setf (lambda-var-indirect var) nil))))
-	     (clear fun)
-	     (map nil #'clear (lambda-lets fun))))
-	  (t
-	   (get-lambda-physenv fun))))
+           (setf (physenv-closure old)
+                 (delete-if (lambda (x)
+                              (and (lambda-var-p x)
+                                   (null (leaf-refs x))))
+                            (physenv-closure old)))
+           (flet ((clear (fun)
+                    (dolist (var (lambda-vars fun))
+                      (setf (lambda-var-indirect var) nil))))
+             (clear fun)
+             (map nil #'clear (lambda-lets fun))))
+          (t
+           (get-lambda-physenv fun))))
   (values))
 
 ;;; Get NODE's environment, assigning one if necessary.
@@ -125,33 +125,33 @@
 ;;; the LAMBDA-VARS of CLAMBDA's LAMBDA-LETS.
 (defun %add-lambda-vars-to-closures (clambda)
   (let ((physenv (get-lambda-physenv clambda))
-	(did-something nil))
+        (did-something nil))
     (note-unreferenced-vars clambda)
     (dolist (var (lambda-vars clambda))
       (dolist (ref (leaf-refs var))
-	(let ((ref-physenv (get-node-physenv ref)))
-	  (unless (eq ref-physenv physenv)
-	    (when (lambda-var-sets var)
-	      (setf (lambda-var-indirect var) t))
-	    (setq did-something t)
-	    (close-over var ref-physenv physenv))))
+        (let ((ref-physenv (get-node-physenv ref)))
+          (unless (eq ref-physenv physenv)
+            (when (lambda-var-sets var)
+              (setf (lambda-var-indirect var) t))
+            (setq did-something t)
+            (close-over var ref-physenv physenv))))
       (dolist (set (basic-var-sets var))
 
-	;; Variables which are set but never referenced can be
-	;; optimized away, and closing over them here would just
-	;; interfere with that. (In bug 147, it *did* interfere with
-	;; that, causing confusion later. This UNLESS solves that
-	;; problem, but I (WHN) am not 100% sure it's best to solve
-	;; the problem this way instead of somehow solving it
-	;; somewhere upstream and just doing (AVER (LEAF-REFS VAR))
-	;; here.)
-	(unless (null (leaf-refs var))
+        ;; Variables which are set but never referenced can be
+        ;; optimized away, and closing over them here would just
+        ;; interfere with that. (In bug 147, it *did* interfere with
+        ;; that, causing confusion later. This UNLESS solves that
+        ;; problem, but I (WHN) am not 100% sure it's best to solve
+        ;; the problem this way instead of somehow solving it
+        ;; somewhere upstream and just doing (AVER (LEAF-REFS VAR))
+        ;; here.)
+        (unless (null (leaf-refs var))
 
-	  (let ((set-physenv (get-node-physenv set)))
-	    (unless (eq set-physenv physenv)
+          (let ((set-physenv (get-node-physenv set)))
+            (unless (eq set-physenv physenv)
               (setf did-something t
-		    (lambda-var-indirect var) t)
-	      (close-over var set-physenv physenv))))))
+                    (lambda-var-indirect var) t)
+              (close-over var set-physenv physenv))))))
     did-something))
 
 ;;; Find any variables in CLAMBDA -- either directly in LAMBDA-VARS or
@@ -172,7 +172,7 @@
       ;; here, since LETS only go one layer deep.
       (aver (null (lambda-lets lambda-let)))
       (when (%add-lambda-vars-to-closures lambda-let)
-	(setf did-something t)))
+        (setf did-something t)))
     did-something))
 
 (defun xep-allocator (xep)
@@ -239,15 +239,15 @@
 (defun insert-nlx-entry-stub (exit env)
   (declare (type physenv env) (type exit exit))
   (let* ((exit-block (node-block exit))
-	 (next-block (first (block-succ exit-block)))
-	 (entry (exit-entry exit))
-	 (cleanup (entry-cleanup entry))
-	 (info (make-nlx-info cleanup exit))
-	 (new-block (insert-cleanup-code exit-block next-block
-					 entry
-					 `(%nlx-entry ',info)
-					 cleanup))
-	 (component (block-component new-block)))
+         (next-block (first (block-succ exit-block)))
+         (entry (exit-entry exit))
+         (cleanup (entry-cleanup entry))
+         (info (make-nlx-info cleanup exit))
+         (new-block (insert-cleanup-code exit-block next-block
+                                         entry
+                                         `(%nlx-entry ',info)
+                                         cleanup))
+         (component (block-component new-block)))
     (unlink-blocks exit-block new-block)
     (link-blocks exit-block (component-tail component))
     (link-blocks (component-head component) new-block)
@@ -259,7 +259,7 @@
     (push info (cleanup-nlx-info cleanup))
     (when (member (cleanup-kind cleanup) '(:catch :unwind-protect))
       (setf (node-lexenv (block-last new-block))
-	    (node-lexenv entry))))
+            (node-lexenv entry))))
 
   (values))
 
@@ -283,7 +283,7 @@
 (defun note-non-local-exit (env exit)
   (declare (type physenv env) (type exit exit))
   (let ((lvar (node-lvar exit))
-	(exit-fun (node-home-lambda exit))
+        (exit-fun (node-home-lambda exit))
         (info (find-nlx-info exit)))
     (cond (info
            (let ((block (node-block exit)))
@@ -322,10 +322,10 @@
   (dolist (lambda (component-lambdas component))
     (dolist (entry (lambda-entries lambda))
       (dolist (exit (entry-exits entry))
-	(let ((target-physenv (node-physenv entry)))
-	  (if (eq (node-physenv exit) target-physenv)
-	      (maybe-delete-exit exit)
-	      (note-non-local-exit target-physenv exit))))))
+        (let ((target-physenv (node-physenv entry)))
+          (if (eq (node-physenv exit) target-physenv)
+              (maybe-delete-exit exit)
+              (note-non-local-exit target-physenv exit))))))
   (values))
 
 ;;;; final decision on stack allocation of dynamic-extent structures
@@ -393,38 +393,38 @@
 (defun emit-cleanups (block1 block2)
   (declare (type cblock block1 block2))
   (collect ((code)
-	    (reanalyze-funs))
+            (reanalyze-funs))
     (let ((cleanup2 (block-start-cleanup block2)))
       (do ((cleanup (block-end-cleanup block1)
-		    (node-enclosing-cleanup (cleanup-mess-up cleanup))))
-	  ((eq cleanup cleanup2))
-	(let* ((node (cleanup-mess-up cleanup))
-	       (args (when (basic-combination-p node)
-		       (basic-combination-args node))))
-	  (ecase (cleanup-kind cleanup)
-	    (:special-bind
-	     (code `(%special-unbind ',(lvar-value (first args)))))
-	    (:catch
-	     (code `(%catch-breakup)))
-	    (:unwind-protect
-	     (code `(%unwind-protect-breakup))
-	     (let ((fun (ref-leaf (lvar-uses (second args)))))
-	       (reanalyze-funs fun)
-	       (code `(%funcall ,fun))))
-	    ((:block :tagbody)
-	     (dolist (nlx (cleanup-nlx-info cleanup))
-	       (code `(%lexical-exit-breakup ',nlx))))
-	    (:dynamic-extent
-	     (when (not (null (cleanup-info cleanup)))
+                    (node-enclosing-cleanup (cleanup-mess-up cleanup))))
+          ((eq cleanup cleanup2))
+        (let* ((node (cleanup-mess-up cleanup))
+               (args (when (basic-combination-p node)
+                       (basic-combination-args node))))
+          (ecase (cleanup-kind cleanup)
+            (:special-bind
+             (code `(%special-unbind ',(lvar-value (first args)))))
+            (:catch
+             (code `(%catch-breakup)))
+            (:unwind-protect
+             (code `(%unwind-protect-breakup))
+             (let ((fun (ref-leaf (lvar-uses (second args)))))
+               (reanalyze-funs fun)
+               (code `(%funcall ,fun))))
+            ((:block :tagbody)
+             (dolist (nlx (cleanup-nlx-info cleanup))
+               (code `(%lexical-exit-breakup ',nlx))))
+            (:dynamic-extent
+             (when (not (null (cleanup-info cleanup)))
                (code `(%cleanup-point)))))))
 
       (when (code)
-	(aver (not (node-tail-p (block-last block1))))
-	(insert-cleanup-code block1 block2
-			     (block-last block1)
-			     `(progn ,@(code)))
-	(dolist (fun (reanalyze-funs))
-	  (locall-analyze-fun-1 fun)))))
+        (aver (not (node-tail-p (block-last block1))))
+        (insert-cleanup-code block1 block2
+                             (block-last block1)
+                             `(progn ,@(code)))
+        (dolist (fun (reanalyze-funs))
+          (locall-analyze-fun-1 fun)))))
 
   (values))
 
@@ -437,18 +437,18 @@
   (declare (type component component))
   (do-blocks (block1 component)
     (let ((env1 (block-physenv block1))
-	  (cleanup1 (block-end-cleanup block1)))
+          (cleanup1 (block-end-cleanup block1)))
       (dolist (block2 (block-succ block1))
-	(when (block-start block2)
-	  (let ((env2 (block-physenv block2))
-		(cleanup2 (block-start-cleanup block2)))
-	    (unless (or (not (eq env2 env1))
-			(eq cleanup1 cleanup2)
-			(and cleanup2
-			     (eq (node-enclosing-cleanup
-				  (cleanup-mess-up cleanup2))
-				 cleanup1)))
-	      (emit-cleanups block1 block2)))))))
+        (when (block-start block2)
+          (let ((env2 (block-physenv block2))
+                (cleanup2 (block-start-cleanup block2)))
+            (unless (or (not (eq env2 env1))
+                        (eq cleanup1 cleanup2)
+                        (and cleanup2
+                             (eq (node-enclosing-cleanup
+                                  (cleanup-mess-up cleanup2))
+                                 cleanup1)))
+              (emit-cleanups block1 block2)))))))
   (values))
 
 ;;; Mark optimizable tail-recursive uses of function result
@@ -471,12 +471,12 @@
       ;; backtrace for (defun foo (x) (error "foo ~S" x)) wich seems
       ;; less then optimal. --NS 2005-02-28
       (when ret
-	(let ((result (return-result ret)))
-	  (do-uses (use result)
-	    (when (and (policy use merge-tail-calls)
+        (let ((result (return-result ret)))
+          (do-uses (use result)
+            (when (and (policy use merge-tail-calls)
                        (basic-combination-p use)
-		       (immediately-used-p result use)
-		       (or (not (eq (node-derived-type use) *empty-type*))
-			   (eq (basic-combination-kind use) :local)))
-	      (setf (node-tail-p use) t)))))))
+                       (immediately-used-p result use)
+                       (or (not (eq (node-derived-type use) *empty-type*))
+                           (eq (basic-combination-kind use) :local)))
+              (setf (node-tail-p use) t)))))))
   (values))

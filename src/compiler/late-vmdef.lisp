@@ -31,6 +31,6 @@
    it."
   (let ((loc (note-debug-location vop nil kind)))
     (sb!assem:emit-postit (lambda (segment posn)
-			    (declare (ignore segment))
-			    (setf (location-info-label loc) posn))))
+                            (declare (ignore segment))
+                            (setf (location-info-label loc) posn))))
   (values))

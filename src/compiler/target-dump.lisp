@@ -50,8 +50,8 @@
       (dump-integer (array-dimension array i) file))
     (with-array-data ((vector array) (start) (end))
       (if (and (= start 0) (= end (length vector)))
-	  (sub-dump-object vector file)
-	  (sub-dump-object (subseq vector start end) file)))
+          (sub-dump-object vector file)
+          (sub-dump-object (subseq vector start end) file)))
     (dump-fop 'fop-array file)
     (dump-word rank file)
     (eq-save-object array file)))
@@ -76,8 +76,8 @@
     (dump-fop 'fop-long-float-vector file)
     (dump-word length file)
     (dump-raw-bytes vec
-		    (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4)
-		    file)))
+                    (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4)
+                    file)))
 
 (defun dump-complex-single-float-vector (vec file)
   (let ((length (length vec)))
@@ -97,15 +97,15 @@
     (dump-fop 'fop-complex-long-float-vector file)
     (dump-word length file)
     (dump-raw-bytes vec
-		    (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4 2)
-		    file)))
+                    (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4 2)
+                    file)))
 
 #!+(and long-float x86)
 (defun dump-long-float (float file)
   (declare (long-float float))
   (let ((exp-bits (long-float-exp-bits float))
-	(high-bits (long-float-high-bits float))
-	(low-bits (long-float-low-bits float)))
+        (high-bits (long-float-high-bits float))
+        (low-bits (long-float-low-bits float)))
     ;; We could get away with DUMP-WORD here, since the x86 has 4-byte words,
     ;; but we prefer to make things as explicit as possible.
     ;;     --njf, 2004-08-16
@@ -117,9 +117,9 @@
 (defun dump-long-float (float file)
   (declare (long-float float))
   (let ((exp-bits (long-float-exp-bits float))
-	(high-bits (long-float-high-bits float))
-	(mid-bits (long-float-mid-bits float))
-	(low-bits (long-float-low-bits float)))
+        (high-bits (long-float-high-bits float))
+        (mid-bits (long-float-mid-bits float))
+        (low-bits (long-float-low-bits float)))
     ;; We could get away with DUMP-WORD here, since the sparc has 4-byte
     ;; words, but we prefer to make things as explicit as possible.
     ;;     --njf, 2004-08-16

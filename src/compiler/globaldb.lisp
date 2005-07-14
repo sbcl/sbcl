@@ -42,9 +42,9 @@
 ;;;   2. This function is in a potential bottleneck for the compiler,
 ;;;      and avoiding the general TYPECASE lets us improve performance
 ;;;      because
-;;;	2a. the general TYPECASE is intrinsically slow, and
-;;;	2b. the general TYPECASE is too big for us to easily afford
-;;;	    to inline it, so it brings with it a full function call.
+;;;     2a. the general TYPECASE is intrinsically slow, and
+;;;     2b. the general TYPECASE is too big for us to easily afford
+;;;         to inline it, so it brings with it a full function call.
 ;;;
 ;;; Why not specialize instead of optimize? (I.e. why fall through to
 ;;; general SXHASH as a last resort?) Because the INFO database is used
@@ -55,18 +55,18 @@
 #!-sb-fluid (declaim (inline globaldb-sxhashoid))
 (defun globaldb-sxhashoid (x)
   (logand sb!xc:most-positive-fixnum
-	  (cond	((symbolp x) (sxhash x))
-		((and (listp x)
-		      (eq (first x) 'setf)
-		      (let ((rest (rest x)))
-			(and (symbolp (car rest))
-			     (null (cdr rest)))))
-		 ;; We need to declare the type of the value we're feeding to
-		 ;; SXHASH so that the DEFTRANSFORM on symbols kicks in.
-		 (let ((symbol (second x)))
-		   (declare (symbol symbol))
-		   (logxor (sxhash symbol) 110680597)))
-		(t (sxhash x)))))
+          (cond ((symbolp x) (sxhash x))
+                ((and (listp x)
+                      (eq (first x) 'setf)
+                      (let ((rest (rest x)))
+                        (and (symbolp (car rest))
+                             (null (cdr rest)))))
+                 ;; We need to declare the type of the value we're feeding to
+                 ;; SXHASH so that the DEFTRANSFORM on symbols kicks in.
+                 (let ((symbol (second x)))
+                   (declare (symbol symbol))
+                   (logxor (sxhash symbol) 110680597)))
+                (t (sxhash x)))))
 
 ;;; Given any non-negative integer, return a prime number >= to it.
 ;;;
@@ -114,12 +114,12 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 (defstruct (class-info
-	    (:constructor make-class-info (name))
-	    #-no-ansi-print-object
-	    (:print-object (lambda (x s)
-			     (print-unreadable-object (x s :type t)
-			       (prin1 (class-info-name x)))))
-	    (:copier nil))
+            (:constructor make-class-info (name))
+            #-no-ansi-print-object
+            (:print-object (lambda (x s)
+                             (print-unreadable-object (x s :type t)
+                               (prin1 (class-info-name x)))))
+            (:copier nil))
   ;; name of this class
   (name nil :type keyword :read-only t)
   ;; list of Type-Info structures for each type in this class
@@ -143,18 +143,18 @@
 #-sb-xc ; as per KLUDGE note above
 (eval-when (:compile-toplevel :execute)
   (setf *info-types*
-	(make-array (ash 1 type-number-bits) :initial-element nil)))
+        (make-array (ash 1 type-number-bits) :initial-element nil)))
 
 (defstruct (type-info
-	    #-no-ansi-print-object
-	    (:print-object (lambda (x s)
-			     (print-unreadable-object (x s)
-			       (format s
-				       "~S ~S, Number = ~W"
-				       (class-info-name (type-info-class x))
-				       (type-info-name x)
-				       (type-info-number x)))))
-	    (:copier nil))
+            #-no-ansi-print-object
+            (:print-object (lambda (x s)
+                             (print-unreadable-object (x s)
+                               (format s
+                                       "~S ~S, Number = ~W"
+                                       (class-info-name (type-info-class x))
+                                       (type-info-name x)
+                                       (type-info-number x)))))
+            (:copier nil))
   ;; the name of this type
   (name (missing-arg) :type keyword)
   ;; this type's class
@@ -162,7 +162,7 @@
   ;; a number that uniquely identifies this type (and implicitly its class)
   (number (missing-arg) :type type-number)
   ;; a type specifier which info of this type must satisfy
-  (type nil :type t)  
+  (type nil :type t)
   ;; a function called when there is no information of this type
   (default (lambda () (error "type not defined yet")) :type function)
   ;; called by (SETF INFO) before calling SET-INFO-VALUE
@@ -198,7 +198,7 @@
   #+sb-xc (/nohexstr class)
   (prog1
       (or (gethash class *info-classes*)
-	  (error "~S is not a defined info class." class))
+          (error "~S is not a defined info class." class))
     #+sb-xc (/noshow0 "returning from CLASS-INFO-OR-LOSE")))
 (declaim (ftype (function (keyword keyword) type-info) type-info-or-lose))
 (defun type-info-or-lose (class type)
@@ -207,7 +207,7 @@
   #+sb-xc (/nohexstr type)
   (prog1
       (or (find-type-info type (class-info-or-lose class))
-	  (error "~S is not a defined info type." type))
+          (error "~S is not a defined info type." type))
     #+sb-xc (/noshow0 "returning from TYPE-INFO-OR-LOSE")))
 
 ) ; EVAL-WHEN
@@ -241,7 +241,7 @@
      ;; those data structures.)
      (eval-when (:compile-toplevel :execute)
        (unless (gethash ,class *info-classes*)
-	 (setf (gethash ,class *info-classes*) (make-class-info ,class))))
+         (setf (gethash ,class *info-classes*) (make-class-info ,class))))
      ,class))
 
 ;;; Find a type number not already in use by looking for a null entry
@@ -269,7 +269,7 @@
 ;;; hasn't been set, and TYPE-SPEC is a type specifier which values of
 ;;; the type must satisfy. The default expression is evaluated each
 ;;; time the information is needed, with NAME bound to the name for
-;;; which the information is being looked up. 
+;;; which the information is being looked up.
 ;;;
 ;;; The main thing we do is determine the type's number. We need to do
 ;;; this at macroexpansion time, since both the COMPILE and LOAD time
@@ -277,10 +277,10 @@
 (#+sb-xc-host defmacro
  #-sb-xc-host sb!xc:defmacro
     define-info-type (&key (class (missing-arg))
-			   (type (missing-arg))
-			   (type-spec (missing-arg))
-			   (validate-function)
-			   default)
+                           (type (missing-arg))
+                           (type-spec (missing-arg))
+                           (validate-function)
+                           default)
   (declare (type keyword class type))
   `(progn
      (eval-when (:compile-toplevel :execute)
@@ -290,15 +290,15 @@
        ;; looks at the compile time state and generates code to
        ;; replicate it at cold load time.
        (let* ((class-info (class-info-or-lose ',class))
-	      (old-type-info (find-type-info ',type class-info)))
-	 (unless old-type-info
-	   (let* ((new-type-number (find-unused-type-number))
-		  (new-type-info
-		   (make-type-info :name ',type
-				   :class class-info
-				   :number new-type-number)))
-	     (setf (aref *info-types* new-type-number) new-type-info)
-	     (push new-type-info (class-info-types class-info)))))
+              (old-type-info (find-type-info ',type class-info)))
+         (unless old-type-info
+           (let* ((new-type-number (find-unused-type-number))
+                  (new-type-info
+                   (make-type-info :name ',type
+                                   :class class-info
+                                   :number new-type-number)))
+             (setf (aref *info-types* new-type-number) new-type-info)
+             (push new-type-info (class-info-types class-info)))))
        ;; Arrange for TYPE-INFO-DEFAULT and TYPE-INFO-TYPE to be set
        ;; at cold load time. (They can't very well be set at
        ;; cross-compile time, since they differ between the
@@ -307,22 +307,22 @@
        ;; values differ in the use of SB!XC symbols instead of CL
        ;; symbols.)
        (push `(let ((type-info (type-info-or-lose ,',class ,',type)))
-	        (setf (type-info-validate-function type-info)
-		      ,',validate-function)
-		(setf (type-info-default type-info)
-		       ;; FIXME: This code is sort of nasty. It would
-		       ;; be cleaner if DEFAULT accepted a real
-		       ;; function, instead of accepting a statement
-		       ;; which will be turned into a lambda assuming
-		       ;; that the argument name is NAME. It might
-		       ;; even be more microefficient, too, since many
-		       ;; DEFAULTs could be implemented as (CONSTANTLY
-		       ;; NIL) instead of full-blown (LAMBDA (X) NIL).
-		       (lambda (name)
-			 (declare (ignorable name))
-			 ,',default))
-		(setf (type-info-type type-info) ',',type-spec))
-	     *!reversed-type-info-init-forms*))
+                (setf (type-info-validate-function type-info)
+                      ,',validate-function)
+                (setf (type-info-default type-info)
+                       ;; FIXME: This code is sort of nasty. It would
+                       ;; be cleaner if DEFAULT accepted a real
+                       ;; function, instead of accepting a statement
+                       ;; which will be turned into a lambda assuming
+                       ;; that the argument name is NAME. It might
+                       ;; even be more microefficient, too, since many
+                       ;; DEFAULTs could be implemented as (CONSTANTLY
+                       ;; NIL) instead of full-blown (LAMBDA (X) NIL).
+                       (lambda (name)
+                         (declare (ignorable name))
+                         ,',default))
+                (setf (type-info-type type-info) ',',type-spec))
+             *!reversed-type-info-init-forms*))
      ',type))
 
 ) ; EVAL-WHEN
@@ -335,7 +335,7 @@
 ;;; didn't win, we would try to use the type system before it was
 ;;; properly initialized.
 (defstruct (info-env (:constructor nil)
-		     (:copier nil))
+                     (:copier nil))
   ;; some string describing what is in this environment, for
   ;; printing/debugging purposes only
   (name (missing-arg) :type string))
@@ -347,8 +347,8 @@
 
 ;;; FIXME: used only in this file, needn't be in runtime
 (defmacro do-info ((env &key (name (gensym)) (class (gensym)) (type (gensym))
-			(type-number (gensym)) (value (gensym)) known-volatile)
-		   &body body)
+                        (type-number (gensym)) (value (gensym)) known-volatile)
+                   &body body)
   #!+sb-doc
   "DO-INFO (Env &Key Name Class Type Value) Form*
   Iterate over all the values stored in the Info-Env Env. Name is bound to
@@ -356,75 +356,75 @@
   (represented as keywords), and Value is bound to the entry's value."
   (once-only ((n-env env))
     (if known-volatile
-	(do-volatile-info name class type type-number value n-env body)
-	`(if (typep ,n-env 'volatile-info-env)
-	     ,(do-volatile-info name class type type-number value n-env body)
-	     ,(do-compact-info name class type type-number value
-			       n-env body)))))
+        (do-volatile-info name class type type-number value n-env body)
+        `(if (typep ,n-env 'volatile-info-env)
+             ,(do-volatile-info name class type type-number value n-env body)
+             ,(do-compact-info name class type type-number value
+                               n-env body)))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 ;;; Return code to iterate over a compact info environment.
 (defun do-compact-info (name-var class-var type-var type-number-var value-var
-				 n-env body)
+                                 n-env body)
   (let ((n-index (gensym))
-	(n-type (gensym))
-	(punt (gensym)))
+        (n-type (gensym))
+        (punt (gensym)))
     (once-only ((n-table `(compact-info-env-table ,n-env))
-		(n-entries-index `(compact-info-env-index ,n-env))
-		(n-entries `(compact-info-env-entries ,n-env))
-		(n-entries-info `(compact-info-env-entries-info ,n-env))
-		(n-info-types '*info-types*))
+                (n-entries-index `(compact-info-env-index ,n-env))
+                (n-entries `(compact-info-env-entries ,n-env))
+                (n-entries-info `(compact-info-env-entries-info ,n-env))
+                (n-info-types '*info-types*))
       `(dotimes (,n-index (length ,n-table))
-	 (declare (type index ,n-index))
-	 (block ,punt
-	   (let ((,name-var (svref ,n-table ,n-index)))
-	     (unless (eql ,name-var 0)
-	       (do-anonymous ((,n-type (aref ,n-entries-index ,n-index)
-				       (1+ ,n-type)))
-			     (nil)
-		 (declare (type index ,n-type))
-		 ,(once-only ((n-info `(aref ,n-entries-info ,n-type)))
-		    `(let ((,type-number-var
-			    (logand ,n-info compact-info-entry-type-mask)))
-		       ,(once-only ((n-type-info
-				     `(svref ,n-info-types
-					     ,type-number-var)))
-			  `(let ((,type-var (type-info-name ,n-type-info))
-				 (,class-var (class-info-name
-					      (type-info-class ,n-type-info)))
-				 (,value-var (svref ,n-entries ,n-type)))
-			     (declare (ignorable ,type-var ,class-var
-						 ,value-var))
-			     ,@body
-			     (unless (zerop (logand ,n-info
-						    compact-info-entry-last))
-			       (return-from ,punt))))))))))))))
+         (declare (type index ,n-index))
+         (block ,punt
+           (let ((,name-var (svref ,n-table ,n-index)))
+             (unless (eql ,name-var 0)
+               (do-anonymous ((,n-type (aref ,n-entries-index ,n-index)
+                                       (1+ ,n-type)))
+                             (nil)
+                 (declare (type index ,n-type))
+                 ,(once-only ((n-info `(aref ,n-entries-info ,n-type)))
+                    `(let ((,type-number-var
+                            (logand ,n-info compact-info-entry-type-mask)))
+                       ,(once-only ((n-type-info
+                                     `(svref ,n-info-types
+                                             ,type-number-var)))
+                          `(let ((,type-var (type-info-name ,n-type-info))
+                                 (,class-var (class-info-name
+                                              (type-info-class ,n-type-info)))
+                                 (,value-var (svref ,n-entries ,n-type)))
+                             (declare (ignorable ,type-var ,class-var
+                                                 ,value-var))
+                             ,@body
+                             (unless (zerop (logand ,n-info
+                                                    compact-info-entry-last))
+                               (return-from ,punt))))))))))))))
 
 ;;; Return code to iterate over a volatile info environment.
 (defun do-volatile-info (name-var class-var type-var type-number-var value-var
-				  n-env body)
+                                  n-env body)
   (let ((n-index (gensym)) (n-names (gensym)) (n-types (gensym)))
     (once-only ((n-table `(volatile-info-env-table ,n-env))
-		(n-info-types '*info-types*))
+                (n-info-types '*info-types*))
       `(dotimes (,n-index (length ,n-table))
-	 (declare (type index ,n-index))
-	 (do-anonymous ((,n-names (svref ,n-table ,n-index)
-				  (cdr ,n-names)))
-		       ((null ,n-names))
-	   (let ((,name-var (caar ,n-names)))
-	     (declare (ignorable ,name-var))
-	     (do-anonymous ((,n-types (cdar ,n-names) (cdr ,n-types)))
-			   ((null ,n-types))
-	       (let ((,type-number-var (caar ,n-types)))
-		 ,(once-only ((n-type `(svref ,n-info-types
-					      ,type-number-var)))
-		    `(let ((,type-var (type-info-name ,n-type))
-			   (,class-var (class-info-name
-					(type-info-class ,n-type)))
-			   (,value-var (cdar ,n-types)))
-		       (declare (ignorable ,type-var ,class-var ,value-var))
-		       ,@body))))))))))
+         (declare (type index ,n-index))
+         (do-anonymous ((,n-names (svref ,n-table ,n-index)
+                                  (cdr ,n-names)))
+                       ((null ,n-names))
+           (let ((,name-var (caar ,n-names)))
+             (declare (ignorable ,name-var))
+             (do-anonymous ((,n-types (cdar ,n-names) (cdr ,n-types)))
+                           ((null ,n-types))
+               (let ((,type-number-var (caar ,n-types)))
+                 ,(once-only ((n-type `(svref ,n-info-types
+                                              ,type-number-var)))
+                    `(let ((,type-var (type-info-name ,n-type))
+                           (,class-var (class-info-name
+                                        (type-info-class ,n-type)))
+                           (,value-var (cdar ,n-types)))
+                       (declare (ignorable ,type-var ,class-var ,value-var))
+                       ,@body))))))))))
 
 ) ; EVAL-WHEN
 
@@ -446,8 +446,8 @@
 (defun info-cache-hash (name type)
   (logand
     (the fixnum
-	 (logxor (globaldb-sxhashoid name)
-		 (ash (the fixnum type) 7)))
+         (logxor (globaldb-sxhashoid name)
+                 (ash (the fixnum type) 7)))
     #x3FF))
 
 (!cold-init-forms
@@ -482,14 +482,14 @@
 ;;;; compact info environments
 
 ;;; The upper limit on the size of the ENTRIES vector in a COMPACT-INFO-ENV.
-;;; 
+;;;
 ;;; "Why (U-B 28)?", you might wonder. Originally this was (U-B 16),
-;;; presumably to ensure that the arrays of :ELEMENT-TYPE 
+;;; presumably to ensure that the arrays of :ELEMENT-TYPE
 ;;; COMPACT-INFO-ENTRIES-INDEX could use a more space-efficient representation.
 ;;; It turns out that a environment of of only 65536 entries is insufficient in
 ;;; the modern world (see message from Cyrus Harmon to sbcl-devel, "Subject:
 ;;; purify failure when compact-info-env-entries-bits is too small"). Using
-;;; (U-B 28) instead of (U-B 29) is to avoid the need for bignum overflow 
+;;; (U-B 28) instead of (U-B 29) is to avoid the need for bignum overflow
 ;;; checks, a probably pointless micro-optimization. Hardcoding the amount of
 ;;; bits instead of deriving it from SB!VM::N-WORD-BITS is done to allow
 ;;; use of a more efficient array representation on 64-bit platforms.
@@ -505,8 +505,8 @@
 ;;; indirect through a parallel vector to find the index in the
 ;;; ENTRIES at which the entries for a given name starts.
 (defstruct (compact-info-env (:include info-env)
-			     #-sb-xc-host (:pure :substructure)
-			     (:copier nil))
+                             #-sb-xc-host (:pure :substructure)
+                             (:copier nil))
   ;; If this value is EQ to the name we want to look up, then the
   ;; cache hit function can be called instead of the lookup function.
   (cache-name 0)
@@ -539,48 +539,48 @@
 (defun compact-info-cache-hit (env number)
   (declare (type compact-info-env env) (type type-number number))
   (let ((entries-info (compact-info-env-entries-info env))
-	(index (compact-info-env-cache-index env)))
+        (index (compact-info-env-cache-index env)))
     (if index
-	(do ((index index (1+ index)))
-	    (nil)
-	  (declare (type index index))
-	  (let ((info (aref entries-info index)))
-	    (when (= (logand info compact-info-entry-type-mask) number)
-	      (return (values (svref (compact-info-env-entries env) index)
-			      t)))
-	    (unless (zerop (logand compact-info-entry-last info))
-	      (return (values nil nil)))))
-	(values nil nil))))
+        (do ((index index (1+ index)))
+            (nil)
+          (declare (type index index))
+          (let ((info (aref entries-info index)))
+            (when (= (logand info compact-info-entry-type-mask) number)
+              (return (values (svref (compact-info-env-entries env) index)
+                              t)))
+            (unless (zerop (logand compact-info-entry-last info))
+              (return (values nil nil)))))
+        (values nil nil))))
 
 ;;; Encache NAME in the compact environment ENV. HASH is the
 ;;; GLOBALDB-SXHASHOID of NAME.
 (defun compact-info-lookup (env name hash)
   (declare (type compact-info-env env)
-	   (type (integer 0 #.sb!xc:most-positive-fixnum) hash))
+           (type (integer 0 #.sb!xc:most-positive-fixnum) hash))
   (let* ((table (compact-info-env-table env))
-	 (len (length table))
-	 (len-2 (- len 2))
-	 (hash2 (- len-2 (rem hash len-2))))
+         (len (length table))
+         (len-2 (- len 2))
+         (hash2 (- len-2 (rem hash len-2))))
     (declare (type index len-2 hash2))
     (macrolet ((lookup (test)
-		 `(do ((probe (rem hash len)
-			      (let ((new (+ probe hash2)))
-				(declare (type index new))
-				;; same as (MOD NEW LEN), but faster.
-				(if (>= new len)
-				    (the index (- new len))
-				    new))))
-		      (nil)
-		    (let ((entry (svref table probe)))
-		      (when (eql entry 0)
-			(return nil))
-		      (when (,test entry name)
-			(return (aref (compact-info-env-index env)
-				      probe)))))))
+                 `(do ((probe (rem hash len)
+                              (let ((new (+ probe hash2)))
+                                (declare (type index new))
+                                ;; same as (MOD NEW LEN), but faster.
+                                (if (>= new len)
+                                    (the index (- new len))
+                                    new))))
+                      (nil)
+                    (let ((entry (svref table probe)))
+                      (when (eql entry 0)
+                        (return nil))
+                      (when (,test entry name)
+                        (return (aref (compact-info-env-index env)
+                                      probe)))))))
       (setf (compact-info-env-cache-index env)
-	    (if (symbolp name)
-		(lookup eq)
-		(lookup equal)))
+            (if (symbolp name)
+                (lookup eq)
+                (lookup equal)))
       (setf (compact-info-env-cache-name env) name)))
 
   (values))
@@ -593,8 +593,8 @@
 ;;; information as ENV.
 (defun compact-info-environment (env &key (name (info-env-name env)))
   (let ((name-count 0)
-	(prev-name 0)
-	(entry-count 0))
+        (prev-name 0)
+        (entry-count 0))
     (/show0 "before COLLECT in COMPACT-INFO-ENVIRONMENT")
 
     ;; Iterate over the environment once to find out how many names
@@ -606,93 +606,93 @@
 
       (/show0 "at head of COLLECT in COMPACT-INFO-ENVIRONMENT")
       (let ((types ()))
-	(do-info (env :name name :type-number num :value value)
-	  (/noshow0 "at head of DO-INFO in COMPACT-INFO-ENVIRONMENT")
-	  (unless (eq name prev-name)
+        (do-info (env :name name :type-number num :value value)
+          (/noshow0 "at head of DO-INFO in COMPACT-INFO-ENVIRONMENT")
+          (unless (eq name prev-name)
             (/noshow0 "not (EQ NAME PREV-NAME) case")
-	    (incf name-count)
-	    (unless (eql prev-name 0)
-	      (names (cons prev-name types)))
-	    (setq prev-name name)
-	    (setq types ()))
-	  (incf entry-count)
-	  (push (cons num value) types))
-	(unless (eql prev-name 0)
+            (incf name-count)
+            (unless (eql prev-name 0)
+              (names (cons prev-name types)))
+            (setq prev-name name)
+            (setq types ()))
+          (incf entry-count)
+          (push (cons num value) types))
+        (unless (eql prev-name 0)
           (/show0 "not (EQL PREV-NAME 0) case")
-	  (names (cons prev-name types))))
+          (names (cons prev-name types))))
 
       ;; Now that we know how big the environment is, we can build
       ;; a table to represent it.
-      ;; 
+      ;;
       ;; When building the table, we sort the entries by pointer
       ;; comparison in an attempt to preserve any VM locality present
       ;; in the original load order, rather than randomizing with the
       ;; original hash function.
       (/show0 "about to make/sort vectors in COMPACT-INFO-ENVIRONMENT")
       (let* ((table-size (primify
-			  (+ (truncate (* name-count 100)
-				       compact-info-environment-density)
-			     3)))
-	     (table (make-array table-size :initial-element 0))
-	     (index (make-array table-size
-				:element-type 'compact-info-entries-index))
-	     (entries (make-array entry-count))
-	     (entries-info (make-array entry-count
-				       :element-type 'compact-info-entry))
-	     (sorted (sort (names)
-			   #+sb-xc-host #'<
-			   ;; (This MAKE-FIXNUM hack implements
-			   ;; pointer comparison, as explained above.)
-			   #-sb-xc-host (lambda (x y)
-					  (< (%primitive make-fixnum x)
-					     (%primitive make-fixnum y))))))
-	(/show0 "done making/sorting vectors in COMPACT-INFO-ENVIRONMENT")
-	(let ((entries-idx 0))
-	  (dolist (types sorted)
-	    (let* ((name (first types))
-		   (hash (globaldb-sxhashoid name))
-		   (len-2 (- table-size 2))
-		   (hash2 (- len-2 (rem hash len-2))))
-	      (do ((probe (rem hash table-size)
-			  (rem (+ probe hash2) table-size)))
-		  (nil)
-		(let ((entry (svref table probe)))
-		  (when (eql entry 0)
-		    (setf (svref table probe) name)
-		    (setf (aref index probe) entries-idx)
-		    (return))
-		  (aver (not (equal entry name))))))
+                          (+ (truncate (* name-count 100)
+                                       compact-info-environment-density)
+                             3)))
+             (table (make-array table-size :initial-element 0))
+             (index (make-array table-size
+                                :element-type 'compact-info-entries-index))
+             (entries (make-array entry-count))
+             (entries-info (make-array entry-count
+                                       :element-type 'compact-info-entry))
+             (sorted (sort (names)
+                           #+sb-xc-host #'<
+                           ;; (This MAKE-FIXNUM hack implements
+                           ;; pointer comparison, as explained above.)
+                           #-sb-xc-host (lambda (x y)
+                                          (< (%primitive make-fixnum x)
+                                             (%primitive make-fixnum y))))))
+        (/show0 "done making/sorting vectors in COMPACT-INFO-ENVIRONMENT")
+        (let ((entries-idx 0))
+          (dolist (types sorted)
+            (let* ((name (first types))
+                   (hash (globaldb-sxhashoid name))
+                   (len-2 (- table-size 2))
+                   (hash2 (- len-2 (rem hash len-2))))
+              (do ((probe (rem hash table-size)
+                          (rem (+ probe hash2) table-size)))
+                  (nil)
+                (let ((entry (svref table probe)))
+                  (when (eql entry 0)
+                    (setf (svref table probe) name)
+                    (setf (aref index probe) entries-idx)
+                    (return))
+                  (aver (not (equal entry name))))))
 
-	    (unless (zerop entries-idx)
-	      (setf (aref entries-info (1- entries-idx))
-		    (logior (aref entries-info (1- entries-idx))
-			    compact-info-entry-last)))
+            (unless (zerop entries-idx)
+              (setf (aref entries-info (1- entries-idx))
+                    (logior (aref entries-info (1- entries-idx))
+                            compact-info-entry-last)))
 
-	    (loop for (num . value) in (rest types) do
-	      (setf (aref entries-info entries-idx) num)
-	      (setf (aref entries entries-idx) value)
-	      (incf entries-idx)))
-	  (/show0 "done w/ DOLIST (TYPES SORTED) in COMPACT-INFO-ENVIRONMENT")
+            (loop for (num . value) in (rest types) do
+              (setf (aref entries-info entries-idx) num)
+              (setf (aref entries entries-idx) value)
+              (incf entries-idx)))
+          (/show0 "done w/ DOLIST (TYPES SORTED) in COMPACT-INFO-ENVIRONMENT")
 
-	  (unless (zerop entry-count)
-	    (/show0 "nonZEROP ENTRY-COUNT")
-	    (setf (aref entries-info (1- entry-count))
-		  (logior (aref entries-info (1- entry-count))
-			  compact-info-entry-last)))
+          (unless (zerop entry-count)
+            (/show0 "nonZEROP ENTRY-COUNT")
+            (setf (aref entries-info (1- entry-count))
+                  (logior (aref entries-info (1- entry-count))
+                          compact-info-entry-last)))
 
-	  (/show0 "falling through to MAKE-COMPACT-INFO-ENV")
-	  (make-compact-info-env :name name
-				 :table table
-				 :index index
-				 :entries entries
-				 :entries-info entries-info))))))
+          (/show0 "falling through to MAKE-COMPACT-INFO-ENV")
+          (make-compact-info-env :name name
+                                 :table table
+                                 :index index
+                                 :entries entries
+                                 :entries-info entries-info))))))
 
 ;;;; volatile environments
 
 ;;; This is a closed hashtable, with the bucket being computed by
 ;;; taking the GLOBALDB-SXHASHOID of the NAME modulo the table size.
 (defstruct (volatile-info-env (:include info-env)
-			      (:copier nil))
+                              (:copier nil))
   ;; If this value is EQ to the name we want to look up, then the
   ;; cache hit function can be called instead of the lookup function.
   (cache-name 0)
@@ -719,16 +719,16 @@
 ;;; Just like COMPACT-INFO-LOOKUP, only do it on a volatile environment.
 (defun volatile-info-lookup (env name hash)
   (declare (type volatile-info-env env)
-	   (type (integer 0 #.sb!xc:most-positive-fixnum) hash))
+           (type (integer 0 #.sb!xc:most-positive-fixnum) hash))
   (let ((table (volatile-info-env-table env)))
     (macrolet ((lookup (test)
-		 `(dolist (entry (svref table (mod hash (length table))) ())
-		    (when (,test (car entry) name)
-		      (return (cdr entry))))))
+                 `(dolist (entry (svref table (mod hash (length table))) ())
+                    (when (,test (car entry) name)
+                      (return (cdr entry))))))
       (setf (volatile-info-env-cache-types env)
-	    (if (symbolp name)
-		(lookup eq)
-		(lookup equal)))
+            (if (symbolp name)
+                (lookup eq)
+                (lookup equal)))
       (setf (volatile-info-env-cache-name env) name)))
   (values))
 
@@ -740,13 +740,13 @@
    #-sb-xc-host sb!xc:defmacro
       with-info-bucket ((table-var index-var name env) &body body)
     (once-only ((n-name name)
-		(n-env env))
+                (n-env env))
       `(progn
-	 (setf (volatile-info-env-cache-name ,n-env) 0)
-	 (let* ((,table-var (volatile-info-env-table ,n-env))
-		(,index-var (mod (globaldb-sxhashoid ,n-name)
-				 (length ,table-var))))
-	   ,@body)))))
+         (setf (volatile-info-env-cache-name ,n-env) 0)
+         (let* ((,table-var (volatile-info-env-table ,n-env))
+                (,index-var (mod (globaldb-sxhashoid ,n-name)
+                                 (length ,table-var))))
+           ,@body)))))
 
 ;;; Get the info environment that we use for write/modification operations.
 ;;; This is always the first environment in the list, and must be a
@@ -772,9 +772,9 @@
 ;;; We return the new value so that this can be conveniently used in a
 ;;; SETF function.
 (defun set-info-value (name0 type new-value
-			     &optional (env (get-write-info-env)))
+                             &optional (env (get-write-info-env)))
   (declare (type type-number type) (type volatile-info-env env)
-	   (inline assoc))
+           (inline assoc))
   (let ((name (uncross name0)))
     (when (eql name 0)
       (error "0 is not a legal INFO name."))
@@ -783,29 +783,29 @@
     (info-cache-enter name type nil :empty)
     (with-info-bucket (table index name env)
       (let ((types (if (symbolp name)
-		       (assoc name (svref table index) :test #'eq)
-		       (assoc name (svref table index) :test #'equal))))
-	(cond
-	 (types
-	  (let ((value (assoc type (cdr types))))
-	    (if value
-		(setf (cdr value) new-value)
-		(push (cons type new-value) (cdr types)))))
-	 (t
-	  (push (cons name (list (cons type new-value)))
-		(svref table index))
+                       (assoc name (svref table index) :test #'eq)
+                       (assoc name (svref table index) :test #'equal))))
+        (cond
+         (types
+          (let ((value (assoc type (cdr types))))
+            (if value
+                (setf (cdr value) new-value)
+                (push (cons type new-value) (cdr types)))))
+         (t
+          (push (cons name (list (cons type new-value)))
+                (svref table index))
 
-	  (let ((count (incf (volatile-info-env-count env))))
-	    (when (>= count (volatile-info-env-threshold env))
-	      (let ((new (make-info-environment :size (* count 2))))
-		(do-info (env :name entry-name :type-number entry-num
-			      :value entry-val :known-volatile t)
-			 (set-info-value entry-name entry-num entry-val new))
-		(fill (volatile-info-env-table env) nil)
-		(setf (volatile-info-env-table env)
-		      (volatile-info-env-table new))
-		(setf (volatile-info-env-threshold env)
-		      (volatile-info-env-threshold new)))))))))
+          (let ((count (incf (volatile-info-env-count env))))
+            (when (>= count (volatile-info-env-threshold env))
+              (let ((new (make-info-environment :size (* count 2))))
+                (do-info (env :name entry-name :type-number entry-num
+                              :value entry-val :known-volatile t)
+                         (set-info-value entry-name entry-num entry-val new))
+                (fill (volatile-info-env-table env) nil)
+                (setf (volatile-info-env-table env)
+                      (volatile-info-env-table new))
+                (setf (volatile-info-env-threshold env)
+                      (volatile-info-env-threshold new)))))))))
     new-value))
 
 ;;; FIXME: It should be possible to eliminate the hairy compiler macros below
@@ -826,8 +826,8 @@
   ;; least none in any inner loops.
   (let ((info (type-info-or-lose class type)))
     (if env-list-p
-	(get-info-value name (type-info-number info) env-list)
-	(get-info-value name (type-info-number info)))))
+        (get-info-value name (type-info-number info) env-list)
+        (get-info-value name (type-info-number info)))))
 #!-sb-fluid
 (define-compiler-macro info
   (&whole whole class type name &optional (env-list nil env-list-p))
@@ -835,31 +835,31 @@
   ;; and we can implement it much more efficiently than the general case.
   (if (and (constantp class) (constantp type))
       (let ((info (type-info-or-lose class type)))
-	(with-unique-names (value foundp)
-	  `(multiple-value-bind (,value ,foundp)
-	       (get-info-value ,name
-			       ,(type-info-number info)
-			       ,@(when env-list-p `(,env-list))) 
-	     (declare (type ,(type-info-type info) ,value))
-	     (values ,value ,foundp))))
+        (with-unique-names (value foundp)
+          `(multiple-value-bind (,value ,foundp)
+               (get-info-value ,name
+                               ,(type-info-number info)
+                               ,@(when env-list-p `(,env-list)))
+             (declare (type ,(type-info-type info) ,value))
+             (values ,value ,foundp))))
       whole))
 (defun (setf info) (new-value
-		    class
-		    type
-		    name
-		    &optional (env-list nil env-list-p))
+                    class
+                    type
+                    name
+                    &optional (env-list nil env-list-p))
   (let* ((info (type-info-or-lose class type))
-	 (tin (type-info-number info)))
+         (tin (type-info-number info)))
     (when (type-info-validate-function info)
       (funcall (type-info-validate-function info) name new-value))
     (if env-list-p
-	(set-info-value name
-			tin
-			new-value
-			(get-write-info-env env-list))
-	(set-info-value name
-			tin
-			new-value)))
+        (set-info-value name
+                        tin
+                        new-value
+                        (get-write-info-env env-list))
+        (set-info-value name
+                        tin
+                        new-value)))
   new-value)
 ;;; FIXME: We'd like to do this, but Python doesn't support
 ;;; compiler macros and it's hard to change it so that it does.
@@ -872,25 +872,25 @@
 #!-sb-fluid
 (progn
   (define-compiler-macro (setf info) (&whole whole
-				      new-value
-				      class
-				      type
-				      name
-				      &optional (env-list nil env-list-p))
+                                      new-value
+                                      class
+                                      type
+                                      name
+                                      &optional (env-list nil env-list-p))
     ;; Constant CLASS and TYPE is an overwhelmingly common special case, and we
     ;; can resolve it much more efficiently than the general case.
     (if (and (constantp class) (constantp type))
-	(let* ((info (type-info-or-lose class type))
-	       (tin (type-info-number info)))
-	  (if env-list-p
-	      `(set-info-value ,name
-			       ,tin
-			       ,new-value
-			       (get-write-info-env ,env-list))
-	      `(set-info-value ,name
-			       ,tin
-			       ,new-value)))
-	whole)))
+        (let* ((info (type-info-or-lose class type))
+               (tin (type-info-number info)))
+          (if env-list-p
+              `(set-info-value ,name
+                               ,tin
+                               ,new-value
+                               (get-write-info-env ,env-list))
+              `(set-info-value ,name
+                               ,tin
+                               ,new-value)))
+        whole)))
 |#
 
 ;;; the maximum density of the hashtable in a volatile env (in
@@ -904,10 +904,10 @@
 (defun make-info-environment (&key (size 42) (name "Unknown"))
   (declare (type (integer 1) size))
   (let ((table-size (primify (truncate (* size 100)
-				       volatile-info-environment-density))))
+                                       volatile-info-environment-density))))
     (make-volatile-info-env :name name
-			    :table (make-array table-size :initial-element nil)
-			    :threshold size)))
+                            :table (make-array table-size :initial-element nil)
+                            :threshold size)))
 
 ;;; Clear the information of the specified TYPE and CLASS for NAME in
 ;;; the current environment, allowing any inherited info to become
@@ -930,10 +930,10 @@
   (with-info-bucket (table index name (get-write-info-env))
     (let ((types (assoc name (svref table index) :test #'equal)))
       (when (and types
-		 (assoc type (cdr types)))
-	(setf (cdr types)
-	      (delete type (cdr types) :key #'car))
-	t))))
+                 (assoc type (cdr types)))
+        (setf (cdr types)
+              (delete type (cdr types) :key #'car))
+        t))))
 
 ;;;; *INFO-ENVIRONMENT*
 
@@ -943,7 +943,7 @@
 (declaim (type list *info-environment*))
 (!cold-init-forms
   (setq *info-environment*
-	(list (make-info-environment :name "initial global")))
+        (list (make-info-environment :name "initial global")))
   (/show0 "done setting *INFO-ENVIRONMENT*"))
 ;;; FIXME: should perhaps be *INFO-ENV-LIST*. And rename
 ;;; all FOO-INFO-ENVIRONMENT-BAR stuff to FOO-INFO-ENV-BAR.
@@ -970,43 +970,43 @@
   (aver (aref *info-types* type))
   (let ((name (uncross name0)))
     (flet ((lookup-ignoring-global-cache (env-list)
-	     (let ((hash nil))
-	       (dolist (env env-list
-			    (multiple-value-bind (val winp)
-				(funcall (type-info-default
-					  (svref *info-types* type))
-					 name)
-			      (values val winp)))
-		 (macrolet ((frob (lookup cache slot)
-			      `(progn
-				 (unless (eq name (,slot env))
-				   (unless hash
-				     (setq hash (globaldb-sxhashoid name)))
-				   (setf (,slot env) 0)
-				   (,lookup env name hash))
-				 (multiple-value-bind (value winp)
-				     (,cache env type)
-				   (when winp (return (values value t)))))))
-		   (etypecase env
-		     (volatile-info-env (frob
-					 volatile-info-lookup
-					 volatile-info-cache-hit
-					 volatile-info-env-cache-name))
-		     (compact-info-env (frob
-					compact-info-lookup
-					compact-info-cache-hit
-					compact-info-env-cache-name))))))))
+             (let ((hash nil))
+               (dolist (env env-list
+                            (multiple-value-bind (val winp)
+                                (funcall (type-info-default
+                                          (svref *info-types* type))
+                                         name)
+                              (values val winp)))
+                 (macrolet ((frob (lookup cache slot)
+                              `(progn
+                                 (unless (eq name (,slot env))
+                                   (unless hash
+                                     (setq hash (globaldb-sxhashoid name)))
+                                   (setf (,slot env) 0)
+                                   (,lookup env name hash))
+                                 (multiple-value-bind (value winp)
+                                     (,cache env type)
+                                   (when winp (return (values value t)))))))
+                   (etypecase env
+                     (volatile-info-env (frob
+                                         volatile-info-lookup
+                                         volatile-info-cache-hit
+                                         volatile-info-env-cache-name))
+                     (compact-info-env (frob
+                                        compact-info-lookup
+                                        compact-info-cache-hit
+                                        compact-info-env-cache-name))))))))
       (cond (env-list-p
-	     (lookup-ignoring-global-cache env-list))
-	    (t
-	     (clear-invalid-info-cache)
-	     (multiple-value-bind (val winp) (info-cache-lookup name type)
-	       (if (eq winp :empty)
-		   (multiple-value-bind (val winp)
-		       (lookup-ignoring-global-cache *info-environment*)
-		     (info-cache-enter name type val winp)
-		     (values val winp))
-		   (values val winp))))))))
+             (lookup-ignoring-global-cache env-list))
+            (t
+             (clear-invalid-info-cache)
+             (multiple-value-bind (val winp) (info-cache-lookup name type)
+               (if (eq winp :empty)
+                   (multiple-value-bind (val winp)
+                       (lookup-ignoring-global-cache *info-environment*)
+                     (info-cache-enter name type val winp)
+                     (values val winp))
+                   (values val winp))))))))
 
 ;;;; definitions for function information
 
@@ -1039,8 +1039,8 @@
   :default
   #+sb-xc-host (specifier-type 'function)
   #-sb-xc-host (if (fboundp name)
-		   (extract-fun-type (fdefinition name))
-		   (specifier-type 'function)))
+                   (extract-fun-type (fdefinition name))
+                   (specifier-type 'function)))
 
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type
 ;;; due to not having a declaration or definition
@@ -1078,7 +1078,7 @@
 ;;; To inline a function, we want a lambda expression, e.g.
 ;;; '(LAMBDA (X) (+ X 1)). That can be encoded here in one of two
 ;;; ways.
-;;;   * The value in INFO can be the lambda expression itself, e.g. 
+;;;   * The value in INFO can be the lambda expression itself, e.g.
 ;;;       (SETF (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR 'FOO)
 ;;;             '(LAMBDA (X) (+ X 1)))
 ;;;     This is the ordinary way, the natural way of representing e.g.
@@ -1164,8 +1164,8 @@
   :type :kind
   :type-spec (member :special :constant :macro :global :alien)
   :default (if (symbol-self-evaluating-p name)
-	       :constant
-	       :global))
+               :constant
+               :global))
 
 ;;; the declared type for this variable
 (define-info-type
@@ -1194,8 +1194,8 @@
   ;; as a constant?") should check (EQL (INFO :VARIABLE :KIND ..) :CONSTANT)
   ;; instead.
   :default (if (symbol-self-evaluating-p name)
-	       name
-	       (bug "constant lookup of nonconstant ~S" name)))
+               name
+               (bug "constant lookup of nonconstant ~S" name)))
 
 ;;; the macro-expansion for symbol-macros
 (define-info-type
@@ -1226,14 +1226,14 @@
   :class :type
   :type :kind
   :type-spec (member :primitive :defined :instance
-		     :forthcoming-defclass-type nil)
+                     :forthcoming-defclass-type nil)
   :default nil
   :validate-function (lambda (name new-value)
-		       (declare (ignore new-value)
-				(notinline info))
-		       (when (info :declaration :recognized name)
-			 (error 'declaration-type-conflict-error
-				:format-arguments (list name)))))
+                       (declare (ignore new-value)
+                                (notinline info))
+                       (when (info :declaration :recognized name)
+                         (error 'declaration-type-conflict-error
+                                :format-arguments (list name)))))
 
 ;;; the expander function for a defined type
 (define-info-type
@@ -1283,7 +1283,7 @@
   :type :compiler-layout
   :type-spec (or layout null)
   :default (let ((class (find-classoid name nil)))
-	     (when class (classoid-layout class))))
+             (when class (classoid-layout class))))
 
 (define-info-class :typed-structure)
 (define-info-type
@@ -1292,7 +1292,7 @@
   :type-spec t
   :default nil)
 (define-info-type
-  :class :typed-structure 
+  :class :typed-structure
   :type :documentation
   :type-spec (or string null)
   :default nil)
@@ -1303,11 +1303,11 @@
   :type :recognized
   :type-spec boolean
   :validate-function (lambda (name new-value)
-		       (declare (ignore new-value)
-				(notinline info))
-		       (when (info :type :kind name)
-			 (error 'declaration-type-conflict-error
-				:format-arguments (list name)))))
+                       (declare (ignore new-value)
+                                (notinline info))
+                       (when (info :type :kind name)
+                         (error 'declaration-type-conflict-error
+                                :format-arguments (list name)))))
 
 (define-info-class :alien-type)
 (define-info-type
@@ -1378,48 +1378,48 @@
 (!cold-init-forms
   (/show0 "beginning *INFO-CLASSES* init, calling MAKE-HASH-TABLE")
   (setf *info-classes*
-	(make-hash-table :size #.(hash-table-size *info-classes*)))
+        (make-hash-table :size #.(hash-table-size *info-classes*)))
   (/show0 "done with MAKE-HASH-TABLE in *INFO-CLASSES* init")
   (dolist (class-info-name '#.(let ((result nil))
-				(maphash (lambda (key value)
-					   (declare (ignore value))
-					   (push key result))
-					 *info-classes*)
-				result))
+                                (maphash (lambda (key value)
+                                           (declare (ignore value))
+                                           (push key result))
+                                         *info-classes*)
+                                result))
     (let ((class-info (make-class-info class-info-name)))
       (setf (gethash class-info-name *info-classes*)
-	    class-info)))
+            class-info)))
   (/show0 "done with *INFO-CLASSES* initialization")
   (/show0 "beginning *INFO-TYPES* initialization")
   (setf *info-types*
-	(map 'vector
-	     (lambda (x)
-	       (/show0 "in LAMBDA (X), X=..")
-	       (/hexstr x)
-	       (when x
-		 (let* ((class-info (class-info-or-lose (second x)))
-			(type-info (make-type-info :name (first x)
-						   :class class-info
-						   :number (third x)
-						   :type (fourth x))))
-		   (/show0 "got CLASS-INFO in LAMBDA (X)")
-		   (push type-info (class-info-types class-info))
-		   type-info)))
-	     '#.(map 'list
-		     (lambda (info-type)
-		       (when info-type
-			 (list (type-info-name info-type)
-			       (class-info-name (type-info-class info-type))
-			       (type-info-number info-type)
-			       (type-info-type info-type))))
-		     *info-types*)))
+        (map 'vector
+             (lambda (x)
+               (/show0 "in LAMBDA (X), X=..")
+               (/hexstr x)
+               (when x
+                 (let* ((class-info (class-info-or-lose (second x)))
+                        (type-info (make-type-info :name (first x)
+                                                   :class class-info
+                                                   :number (third x)
+                                                   :type (fourth x))))
+                   (/show0 "got CLASS-INFO in LAMBDA (X)")
+                   (push type-info (class-info-types class-info))
+                   type-info)))
+             '#.(map 'list
+                     (lambda (info-type)
+                       (when info-type
+                         (list (type-info-name info-type)
+                               (class-info-name (type-info-class info-type))
+                               (type-info-number info-type)
+                               (type-info-type info-type))))
+                     *info-types*)))
   (/show0 "done with *INFO-TYPES* initialization"))
 
 ;;; At cold load time, after the INFO-TYPE objects have been created,
 ;;; we can set their DEFAULT and TYPE slots.
 (macrolet ((frob ()
-	     `(!cold-init-forms
-		,@(reverse *!reversed-type-info-init-forms*))))
+             `(!cold-init-forms
+                ,@(reverse *!reversed-type-info-init-forms*))))
   (frob))
 
 ;;;; a hack for detecting

@@ -56,9 +56,9 @@
 
 (define-optimization-quality stack-allocate-dynamic-extent
     (if (and (> (max speed space) (max debug safety))
-	     (< safety 3))
-	3
-	0)
+             (< safety 3))
+        3
+        0)
   ("no" "maybe" "yes" "yes"))
 
 (define-optimization-quality stack-allocate-vector

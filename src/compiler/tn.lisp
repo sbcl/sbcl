@@ -23,15 +23,15 @@
   (let ((n-component (gensym)))
     `(let ((,n-component (component-info ,component)))
        (do ((,tn (ir2-component-normal-tns ,n-component) (tn-next ,tn)))
-	   ((null ,tn))
-	 ,@body)
+           ((null ,tn))
+         ,@body)
        (do ((,tn (ir2-component-restricted-tns ,n-component) (tn-next ,tn)))
-	   ((null ,tn))
-	 ,@body)
+           ((null ,tn))
+         ,@body)
        (do ((,tn (ir2-component-wired-tns ,n-component) (tn-next ,tn)))
-	   ((null ,tn)
-	    ,result)
-	 ,@body))))
+           ((null ,tn)
+            ,result)
+         ,@body))))
 
 (defun set-ir2-physenv-live-tns (value instance)
   (setf (ir2-physenv-live-tns instance) value))
@@ -57,52 +57,52 @@
 ;;; aliased TNs aren't considered to be unreferenced.
 (defun delete-unreferenced-tns (component)
   (let* ((2comp (component-info component))
-	 (aliases (make-array (1+ (ir2-component-global-tn-counter 2comp))
-			      :element-type 'bit :initial-element 0)))
+         (aliases (make-array (1+ (ir2-component-global-tn-counter 2comp))
+                              :element-type 'bit :initial-element 0)))
     (labels ((delete-some (getter setter)
-	       (let ((prev nil))
-		 (do ((tn (funcall getter 2comp) (tn-next tn)))
-		     ((null tn))
-		   (cond
-		    ((or (used-p tn)
-			 (and (eq (tn-kind tn) :specified-save)
-			      (used-p (tn-save-tn tn))))
-		     (setq prev tn))
-		    (t
-		     (delete-1 tn prev setter))))))
-	     (used-p (tn)
-	       (or (tn-reads tn) (tn-writes tn)
-		   (member (tn-kind tn) '(:component :environment))
-		   (not (zerop (sbit aliases (tn-number tn))))))
-	     (delete-1 (tn prev setter)
-	       (if prev
-		   (setf (tn-next prev) (tn-next tn))
-		   (funcall setter (tn-next tn) 2comp))
-	       (setf (tn-offset tn) nil)
-	       (case (tn-kind tn)
-		 (:environment
-		  (clear-live tn
-			      #'ir2-physenv-live-tns
-			      #'set-ir2-physenv-live-tns))
-		 (:debug-environment
-		  (clear-live tn
-			      #'ir2-physenv-debug-live-tns
-			      #'set-ir2-physenv-debug-live-tns))))
-	     (clear-live (tn getter setter)
-	       (let ((env (physenv-info (tn-physenv tn))))
-		 (funcall setter (delete tn (funcall getter env)) env))))
+               (let ((prev nil))
+                 (do ((tn (funcall getter 2comp) (tn-next tn)))
+                     ((null tn))
+                   (cond
+                    ((or (used-p tn)
+                         (and (eq (tn-kind tn) :specified-save)
+                              (used-p (tn-save-tn tn))))
+                     (setq prev tn))
+                    (t
+                     (delete-1 tn prev setter))))))
+             (used-p (tn)
+               (or (tn-reads tn) (tn-writes tn)
+                   (member (tn-kind tn) '(:component :environment))
+                   (not (zerop (sbit aliases (tn-number tn))))))
+             (delete-1 (tn prev setter)
+               (if prev
+                   (setf (tn-next prev) (tn-next tn))
+                   (funcall setter (tn-next tn) 2comp))
+               (setf (tn-offset tn) nil)
+               (case (tn-kind tn)
+                 (:environment
+                  (clear-live tn
+                              #'ir2-physenv-live-tns
+                              #'set-ir2-physenv-live-tns))
+                 (:debug-environment
+                  (clear-live tn
+                              #'ir2-physenv-debug-live-tns
+                              #'set-ir2-physenv-debug-live-tns))))
+             (clear-live (tn getter setter)
+               (let ((env (physenv-info (tn-physenv tn))))
+                 (funcall setter (delete tn (funcall getter env)) env))))
       (declare (inline used-p delete-some delete-1 clear-live))
       (delete-some #'ir2-component-alias-tns
-		   #'set-ir2-component-alias-tns)
+                   #'set-ir2-component-alias-tns)
       (do ((tn (ir2-component-alias-tns 2comp) (tn-next tn)))
-	  ((null tn))
-	(setf (sbit aliases (tn-number (tn-save-tn tn))) 1))
+          ((null tn))
+        (setf (sbit aliases (tn-number (tn-save-tn tn))) 1))
       (delete-some #'ir2-component-normal-tns
-		   #'set-ir2-component-normal-tns)
+                   #'set-ir2-component-normal-tns)
       (delete-some #'ir2-component-restricted-tns
-		   #'set-ir2-component-restricted-tns)
+                   #'set-ir2-component-restricted-tns)
       (delete-some #'ir2-component-wired-tns
-		   #'set-ir2-component-wired-tns)))
+                   #'set-ir2-component-wired-tns)))
   (values))
 
 ;;;; TN creation
@@ -113,8 +113,8 @@
 (defun make-normal-tn (type)
   (declare (type primitive-type type))
   (let* ((component (component-info *component-being-compiled*))
-	 (res (make-tn (incf (ir2-component-global-tn-counter component))
-		       :normal type nil)))
+         (res (make-tn (incf (ir2-component-global-tn-counter component))
+                       :normal type nil)))
     (push-in tn-next res (ir2-component-normal-tns component))
     res))
 
@@ -122,9 +122,9 @@
 (defun make-representation-tn (ptype scn)
   (declare (type primitive-type ptype) (type sc-number scn))
   (let* ((component (component-info *component-being-compiled*))
-	 (res (make-tn (incf (ir2-component-global-tn-counter component))
-		       :normal ptype
-		       (svref *backend-sc-numbers* scn))))
+         (res (make-tn (incf (ir2-component-global-tn-counter component))
+                       :normal ptype
+                       (svref *backend-sc-numbers* scn))))
     (push-in tn-next res (ir2-component-normal-tns component))
     res))
 
@@ -134,11 +134,11 @@
 ;;; temporaries.
 (defun make-wired-tn (ptype scn offset)
   (declare (type (or primitive-type null) ptype)
-	   (type sc-number scn) (type unsigned-byte offset))
+           (type sc-number scn) (type unsigned-byte offset))
   (let* ((component (component-info *component-being-compiled*))
-	 (res (make-tn (incf (ir2-component-global-tn-counter component))
-		       :normal ptype
-		       (svref *backend-sc-numbers* scn))))
+         (res (make-tn (incf (ir2-component-global-tn-counter component))
+                       :normal ptype
+                       (svref *backend-sc-numbers* scn))))
     (setf (tn-offset res) offset)
     (push-in tn-next res (ir2-component-wired-tns component))
     res))
@@ -148,9 +148,9 @@
 (defun make-restricted-tn (ptype scn)
   (declare (type (or primitive-type null) ptype) (type sc-number scn))
   (let* ((component (component-info *component-being-compiled*))
-	 (res (make-tn (incf (ir2-component-global-tn-counter component))
-		       :normal ptype
-		       (svref *backend-sc-numbers* scn))))
+         (res (make-tn (incf (ir2-component-global-tn-counter component))
+                       :normal ptype
+                       (svref *backend-sc-numbers* scn))))
     (push-in tn-next res (ir2-component-restricted-tns component))
     res))
 
@@ -180,7 +180,7 @@
   (aver (eq (tn-kind tn) :normal))
   (setf (tn-kind tn) :component)
   (push tn (ir2-component-component-tns (component-info
-					 *component-being-compiled*)))
+                                         *component-being-compiled*)))
   tn)
 
 ;;; Specify that SAVE be used as the save location for TN. TN is returned.
@@ -192,8 +192,8 @@
   (setf (tn-save-tn tn) save)
   (setf (tn-save-tn save) tn)
   (push save
-	(ir2-component-specified-save-tns
-	 (component-info *component-being-compiled*)))
+        (ir2-component-specified-save-tns
+         (component-info *component-being-compiled*)))
   tn)
 
 ;;; Create a constant TN. The implementation dependent
@@ -202,24 +202,24 @@
 (defun make-constant-tn (constant)
   (declare (type constant constant))
   (let* ((component (component-info *component-being-compiled*))
-	 (immed (immediate-constant-sc (constant-value constant)))
-	 (sc (svref *backend-sc-numbers*
-		    (or immed (sc-number-or-lose 'constant))))
-	 (res (make-tn 0 :constant (primitive-type (leaf-type constant)) sc)))
+         (immed (immediate-constant-sc (constant-value constant)))
+         (sc (svref *backend-sc-numbers*
+                    (or immed (sc-number-or-lose 'constant))))
+         (res (make-tn 0 :constant (primitive-type (leaf-type constant)) sc)))
     (unless immed
       (let ((constants (ir2-component-constants component)))
-	(setf (tn-offset res) (fill-pointer constants))
-	(vector-push-extend constant constants)))
+        (setf (tn-offset res) (fill-pointer constants))
+        (vector-push-extend constant constants)))
     (push-in tn-next res (ir2-component-constant-tns component))
     (setf (tn-leaf res) constant)
     res))
 
 (defun make-load-time-value-tn (handle type)
   (let* ((component (component-info *component-being-compiled*))
-	 (sc (svref *backend-sc-numbers*
-		    (sc-number-or-lose 'constant)))
-	 (res (make-tn 0 :constant (primitive-type type) sc))
-	 (constants (ir2-component-constants component)))
+         (sc (svref *backend-sc-numbers*
+                    (sc-number-or-lose 'constant)))
+         (res (make-tn 0 :constant (primitive-type type) sc))
+         (constants (ir2-component-constants component)))
     (setf (tn-offset res) (fill-pointer constants))
     (vector-push-extend (cons :load-time-value handle) constants)
     (push-in tn-next res (ir2-component-constant-tns component))
@@ -229,11 +229,11 @@
 (defun make-alias-tn (tn)
   (declare (type tn tn))
   (let* ((component (component-info *component-being-compiled*))
-	 (res (make-tn (incf (ir2-component-global-tn-counter component))
-		       :alias (tn-primitive-type tn) nil)))
+         (res (make-tn (incf (ir2-component-global-tn-counter component))
+                       :alias (tn-primitive-type tn) nil)))
     (setf (tn-save-tn res) tn)
     (push-in tn-next res
-	     (ir2-component-alias-tns component))
+             (ir2-component-alias-tns component))
     res))
 
 ;;; Return a load-time constant TN with the specified KIND and INFO.
@@ -242,25 +242,25 @@
 (defun make-load-time-constant-tn (kind info)
   (declare (type keyword kind))
   (let* ((component (component-info *component-being-compiled*))
-	 (res (make-tn 0
-		       :constant
-		       *backend-t-primitive-type*
-		       (svref *backend-sc-numbers*
-			      (sc-number-or-lose 'constant))))
-	 (constants (ir2-component-constants component)))
+         (res (make-tn 0
+                       :constant
+                       *backend-t-primitive-type*
+                       (svref *backend-sc-numbers*
+                              (sc-number-or-lose 'constant))))
+         (constants (ir2-component-constants component)))
 
     (do ((i 0 (1+ i)))
-	((= i (length constants))
-	 (setf (tn-offset res) i)
-	 (vector-push-extend (cons kind info) constants))
+        ((= i (length constants))
+         (setf (tn-offset res) i)
+         (vector-push-extend (cons kind info) constants))
       (let ((entry (aref constants i)))
-	(when (and (consp entry)
-		   (eq (car entry) kind)
-		   (or (eq (cdr entry) info)
-		       (and (consp info)
-			    (equal (cdr entry) info))))
-	  (setf (tn-offset res) i)
-	  (return))))
+        (when (and (consp entry)
+                   (eq (car entry) kind)
+                   (or (eq (cdr entry) info)
+                       (and (consp info)
+                            (equal (cdr entry) info))))
+          (setf (tn-offset res) i)
+          (return))))
 
     (push-in tn-next res (ir2-component-constant-tns component))
     res))
@@ -275,8 +275,8 @@
   (declare (type tn tn) (type boolean write-p))
   (let ((res (make-tn-ref tn write-p)))
     (if write-p
-	(push-in tn-ref-next res (tn-writes tn))
-	(push-in tn-ref-next res (tn-reads tn)))
+        (push-in tn-ref-next res (tn-writes tn))
+        (push-in tn-ref-next res (tn-reads tn)))
     res))
 
 ;;; Make TN-REFS to reference each TN in TNs, linked together by
@@ -287,13 +287,13 @@
   (declare (list tns) (type boolean write-p) (type (or tn-ref null) more))
   (if tns
       (let* ((first (reference-tn (first tns) write-p))
-	     (prev first))
-	(dolist (tn (rest tns))
-	  (let ((res (reference-tn tn write-p)))
-	    (setf (tn-ref-across prev) res)
-	    (setq prev res)))
-	(setf (tn-ref-across prev) more)
-	first)
+             (prev first))
+        (dolist (tn (rest tns))
+          (let ((res (reference-tn tn write-p)))
+            (setf (tn-ref-across prev) res)
+            (setq prev res)))
+        (setf (tn-ref-across prev) more)
+        first)
       more))
 
 ;;; Remove Ref from the references for its associated TN.
@@ -324,49 +324,49 @@
 ;;; inserted.
 (defun emit-move-template (node block template x y &optional before)
   (declare (type node node) (type ir2-block block)
-	   (type template template) (type tn x y))
+           (type template template) (type tn x y))
   (let ((arg (reference-tn x nil))
-	(result (reference-tn y t)))
+        (result (reference-tn y t)))
     (multiple-value-bind (first last)
-	(funcall (template-emit-function template) node block template arg
-		 result)
+        (funcall (template-emit-function template) node block template arg
+                 result)
       (insert-vop-sequence first last block before)
       last)))
 
 ;;; like EMIT-MOVE-TEMPLATE, except that we pass in INFO args too
 (defun emit-load-template (node block template x y info &optional before)
   (declare (type node node) (type ir2-block block)
-	   (type template template) (type tn x y))
+           (type template template) (type tn x y))
   (let ((arg (reference-tn x nil))
-	(result (reference-tn y t)))
+        (result (reference-tn y t)))
     (multiple-value-bind (first last)
-	(funcall (template-emit-function template) node block template arg
-		 result info)
+        (funcall (template-emit-function template) node block template arg
+                 result info)
       (insert-vop-sequence first last block before)
       last)))
 
 ;;; like EMIT-MOVE-TEMPLATE, except that the VOP takes two args
 (defun emit-move-arg-template (node block template x f y &optional before)
   (declare (type node node) (type ir2-block block)
-	   (type template template) (type tn x f y))
+           (type template template) (type tn x f y))
   (let ((x-ref (reference-tn x nil))
-	(f-ref (reference-tn f nil))
-	(y-ref (reference-tn y t)))
+        (f-ref (reference-tn f nil))
+        (y-ref (reference-tn y t)))
     (setf (tn-ref-across x-ref) f-ref)
     (multiple-value-bind (first last)
-	(funcall (template-emit-function template) node block template x-ref
-		 y-ref)
+        (funcall (template-emit-function template) node block template x-ref
+                 y-ref)
       (insert-vop-sequence first last block before)
       last)))
 
 ;;; like EMIT-MOVE-TEMPLATE, except that the VOP takes no args
 (defun emit-context-template (node block template y &optional before)
   (declare (type node node) (type ir2-block block)
-	   (type template template) (type tn y))
+           (type template template) (type tn y))
   (let ((y-ref (reference-tn y t)))
     (multiple-value-bind (first last)
-	(funcall (template-emit-function template) node block template nil
-		 y-ref)
+        (funcall (template-emit-function template) node block template nil
+                 y-ref)
       (insert-vop-sequence first last block before)
       last)))
 
@@ -375,7 +375,7 @@
   (declare (type cblock block))
   (let ((2block (block-info block)))
     (or (ir2-block-%label 2block)
-	(setf (ir2-block-%label 2block) (gen-label)))))
+        (setf (ir2-block-%label 2block) (gen-label)))))
 
 ;;; Return true if Block is emitted immediately after the block ended by Node.
 (defun drop-thru-p (node block)
@@ -388,21 +388,21 @@
 ;;; VOP. If Before is NIL, insert at the end.
 (defun insert-vop-sequence (first last block before)
   (declare (type vop first last) (type ir2-block block)
-	   (type (or vop null) before))
+           (type (or vop null) before))
   (if before
       (let ((prev (vop-prev before)))
-	(setf (vop-prev first) prev)
-	(if prev
-	    (setf (vop-next prev) first)
-	    (setf (ir2-block-start-vop block) first))
-	(setf (vop-next last) before)
-	(setf (vop-prev before) last))
+        (setf (vop-prev first) prev)
+        (if prev
+            (setf (vop-next prev) first)
+            (setf (ir2-block-start-vop block) first))
+        (setf (vop-next last) before)
+        (setf (vop-prev before) last))
       (let ((current (ir2-block-last-vop block)))
-	(setf (vop-prev first) current)
-	(setf (ir2-block-last-vop block) last)
-	(if current
-	    (setf (vop-next current) first)
-	    (setf (ir2-block-start-vop block) first))))
+        (setf (vop-prev first) current)
+        (setf (ir2-block-last-vop block) last)
+        (if current
+            (setf (vop-next current) first)
+            (setf (ir2-block-start-vop block) first))))
   (values))
 
 ;;; Delete all of the TN-REFs associated with VOP and remove VOP from the IR2.
@@ -413,14 +413,14 @@
     (delete-tn-ref ref))
 
   (let ((prev (vop-prev vop))
-	(next (vop-next vop))
-	(block (vop-block vop)))
+        (next (vop-next vop))
+        (block (vop-block vop)))
     (if prev
-	(setf (vop-next prev) next)
-	(setf (ir2-block-start-vop block) next))
+        (setf (vop-next prev) next)
+        (setf (ir2-block-start-vop block) next))
     (if next
-	(setf (vop-prev next) prev)
-	(setf (ir2-block-last-vop block) prev)))
+        (setf (vop-prev next) prev)
+        (setf (ir2-block-last-vop block) prev)))
 
   (values))
 
@@ -437,7 +437,7 @@
   (and (eq (sc-sb (tn-sc x)) (sc-sb (tn-sc y)))
        (eql (tn-offset x) (tn-offset y))
        (not (or (eq (tn-kind x) :constant)
-		(eq (tn-kind y) :constant)))))
+                (eq (tn-kind y) :constant)))))
 
 ;;; Return the value of an immediate constant TN.
 (defun tn-value (tn)
@@ -454,13 +454,13 @@
   (declare (type tn tn))
   (let ((sc (tn-sc tn)))
     (unless (and (not (sc-save-p sc))
-		 (eq (sb-kind (sc-sb sc)) :unbounded))
+                 (eq (sb-kind (sc-sb sc)) :unbounded))
       (dolist (alt (sc-alternate-scs sc)
-		   (error "SC ~S has no :UNBOUNDED :SAVE-P NIL alternate SC."
-			  (sc-name sc)))
-	(when (and (not (sc-save-p alt))
-		   (eq (sb-kind (sc-sb alt)) :unbounded))
-	  (setf (tn-sc tn) alt)
-	  (return)))))
+                   (error "SC ~S has no :UNBOUNDED :SAVE-P NIL alternate SC."
+                          (sc-name sc)))
+        (when (and (not (sc-save-p alt))
+                   (eq (sb-kind (sc-sb alt)) :unbounded))
+          (setf (tn-sc tn) alt)
+          (return)))))
   (values))
 

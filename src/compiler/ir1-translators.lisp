@@ -28,13 +28,13 @@
   otherwise evaluate Else and return its values. Else defaults to NIL."
   (let* ((pred-ctran (make-ctran))
          (pred-lvar (make-lvar))
-	 (then-ctran (make-ctran))
-	 (then-block (ctran-starts-block then-ctran))
-	 (else-ctran (make-ctran))
-	 (else-block (ctran-starts-block else-ctran))
-	 (node (make-if :test pred-lvar
-			:consequent then-block
-			:alternative else-block)))
+         (then-ctran (make-ctran))
+         (then-block (ctran-starts-block then-ctran))
+         (else-ctran (make-ctran))
+         (else-block (ctran-starts-block else-ctran))
+         (node (make-if :test pred-lvar
+                        :consequent then-block
+                        :alternative else-block)))
     ;; IR1-CONVERT-MAYBE-PREDICATE requires DEST to be CIF, so the
     ;; order of the following two forms is important
     (setf (lvar-dest pred-lvar) node)
@@ -72,9 +72,9 @@
   (start-block start)
   (ctran-starts-block next)
   (let* ((dummy (make-ctran))
-	 (entry (make-entry))
-	 (cleanup (make-cleanup :kind :block
-				:mess-up entry)))
+         (entry (make-entry))
+         (cleanup (make-cleanup :kind :block
+                                :mess-up entry)))
     (push entry (lambda-entries (lexenv-lambda *lexenv*)))
     (setf (entry-cleanup entry) cleanup)
     (link-node-to-previous-ctran entry start)
@@ -82,7 +82,7 @@
 
     (let* ((env-entry (list entry next result))
            (*lexenv* (make-lexenv :blocks (list (cons name env-entry))
-				  :cleanup cleanup)))
+                                  :cleanup cleanup)))
       (ir1-convert-progn-body dummy next result forms))))
 
 (def-ir1-translator return-from ((name &optional value) start next result)
@@ -108,13 +108,13 @@
   (declare (ignore result))
   (ctran-starts-block next)
   (let* ((found (or (lexenv-find name blocks)
-		    (compiler-error "return for unknown block: ~S" name)))
+                    (compiler-error "return for unknown block: ~S" name)))
          (exit-ctran (second found))
-	 (value-ctran (make-ctran))
+         (value-ctran (make-ctran))
          (value-lvar (make-lvar))
-	 (entry (first found))
-	 (exit (make-exit :entry entry
-			  :value value-lvar)))
+         (entry (first found))
+         (exit (make-exit :entry entry
+                          :value value-lvar)))
     (when (ctran-deleted-p exit-ctran)
       (throw 'locall-already-let-converted exit-ctran))
     (push exit (entry-exits entry))
@@ -123,7 +123,7 @@
     (link-node-to-previous-ctran exit value-ctran)
     (let ((home-lambda (ctran-home-lambda-or-null start)))
       (when home-lambda
-	(push entry (lambda-calls-or-closes home-lambda))))
+        (push entry (lambda-calls-or-closes home-lambda))))
     (use-continuation exit exit-ctran (third found))))
 
 ;;; Return a list of the segments of a TAGBODY. Each segment looks
@@ -138,19 +138,19 @@
   (collect ((segments))
     (let ((current (cons nil body)))
       (loop
-	(let ((tag-pos (position-if (complement #'listp) current :start 1)))
-	  (unless tag-pos
-	    (segments `(,@current nil))
-	    (return))
-	  (let ((tag (elt current tag-pos)))
-	    (when (assoc tag (segments))
-	      (compiler-error
-	       "The tag ~S appears more than once in the tagbody."
-	       tag))
-	    (unless (or (symbolp tag) (integerp tag))
-	      (compiler-error "~S is not a legal tagbody statement." tag))
-	    (segments `(,@(subseq current 0 tag-pos) (go ,tag))))
-	  (setq current (nthcdr tag-pos current)))))
+        (let ((tag-pos (position-if (complement #'listp) current :start 1)))
+          (unless tag-pos
+            (segments `(,@current nil))
+            (return))
+          (let ((tag (elt current tag-pos)))
+            (when (assoc tag (segments))
+              (compiler-error
+               "The tag ~S appears more than once in the tagbody."
+               tag))
+            (unless (or (symbolp tag) (integerp tag))
+              (compiler-error "~S is not a legal tagbody statement." tag))
+            (segments `(,@(subseq current 0 tag-pos) (go ,tag))))
+          (setq current (nthcdr tag-pos current)))))
     (segments)))
 
 ;;; Set up the cleanup, emitting the entry node. Then make a block for
@@ -169,34 +169,34 @@
   (start-block start)
   (ctran-starts-block next)
   (let* ((dummy (make-ctran))
-	 (entry (make-entry))
-	 (segments (parse-tagbody statements))
-	 (cleanup (make-cleanup :kind :tagbody
-				:mess-up entry)))
+         (entry (make-entry))
+         (segments (parse-tagbody statements))
+         (cleanup (make-cleanup :kind :tagbody
+                                :mess-up entry)))
     (push entry (lambda-entries (lexenv-lambda *lexenv*)))
     (setf (entry-cleanup entry) cleanup)
     (link-node-to-previous-ctran entry start)
     (use-ctran entry dummy)
 
     (collect ((tags)
-	      (starts)
-	      (ctrans))
+              (starts)
+              (ctrans))
       (starts dummy)
       (dolist (segment (rest segments))
-	(let* ((tag-ctran (make-ctran))
+        (let* ((tag-ctran (make-ctran))
                (tag (list (car segment) entry tag-ctran)))
-	  (ctrans tag-ctran)
-	  (starts tag-ctran)
-	  (ctran-starts-block tag-ctran)
+          (ctrans tag-ctran)
+          (starts tag-ctran)
+          (ctran-starts-block tag-ctran)
           (tags tag)))
       (ctrans next)
 
       (let ((*lexenv* (make-lexenv :cleanup cleanup :tags (tags))))
-	(mapc (lambda (segment start end)
-		(ir1-convert-progn-body start end
+        (mapc (lambda (segment start end)
+                (ir1-convert-progn-body start end
                                         (when (eq end next) result)
                                         (rest segment)))
-	      segments (starts) (ctrans))))))
+              segments (starts) (ctrans))))))
 
 ;;; Emit an EXIT node without any value.
 (def-ir1-translator go ((tag) start next result)
@@ -206,15 +206,15 @@
   is constrained to be used only within the dynamic extent of the TAGBODY."
   (ctran-starts-block next)
   (let* ((found (or (lexenv-find tag tags :test #'eql)
-		    (compiler-error "attempt to GO to nonexistent tag: ~S"
-				    tag)))
-	 (entry (first found))
-	 (exit (make-exit :entry entry)))
+                    (compiler-error "attempt to GO to nonexistent tag: ~S"
+                                    tag)))
+         (entry (first found))
+         (exit (make-exit :entry entry)))
     (push exit (entry-exits entry))
     (link-node-to-previous-ctran exit start)
     (let ((home-lambda (ctran-home-lambda-or-null start)))
       (when home-lambda
-	(push entry (lambda-calls-or-closes home-lambda))))
+        (push entry (lambda-calls-or-closes home-lambda))))
     (use-ctran exit (second found))))
 
 ;;;; translators for compiler-magic special forms
@@ -247,9 +247,9 @@
 ;;; in-lexenv representation, stuff the results into *LEXENV*, and
 ;;; call FUN (with no arguments).
 (defun %funcall-in-foomacrolet-lexenv (definitionize-fun
-				       definitionize-keyword
-				       definitions
-				       fun)
+                                       definitionize-keyword
+                                       definitions
+                                       fun)
   (declare (type function definitionize-fun fun))
   (declare (type (member :vars :funs) definitionize-keyword))
   (declare (type list definitions))
@@ -271,9 +271,9 @@
 ;;; EVAL can likewise make use of it.
 (defun macrolet-definitionize-fun (context lexenv)
   (flet ((fail (control &rest args)
-	   (ecase context
-	     (:compile (apply #'compiler-error control args))
-	     (:eval (error 'simple-program-error
+           (ecase context
+             (:compile (apply #'compiler-error control args))
+             (:eval (error 'simple-program-error
                            :format-control control
                            :format-arguments args)))))
     (lambda (definition)
@@ -283,8 +283,8 @@
       (destructuring-bind (name arglist &body body) definition
         (unless (symbolp name)
           (fail "The local macro name ~S is not a symbol." name))
-	(when (fboundp name)
-	  (compiler-assert-symbol-home-package-unlocked
+        (when (fboundp name)
+          (compiler-assert-symbol-home-package-unlocked
            name "binding ~A as a local macro"))
         (unless (listp arglist)
           (fail "The local macro argument list ~S is not a list."
@@ -323,9 +323,9 @@
 
 (defun symbol-macrolet-definitionize-fun (context)
   (flet ((fail (control &rest args)
-	   (ecase context
-	     (:compile (apply #'compiler-error control args))
-	     (:eval (error 'simple-program-error
+           (ecase context
+             (:compile (apply #'compiler-error control args))
+             (:eval (error 'simple-program-error
                            :format-control control
                            :format-arguments args)))))
     (lambda (definition)
@@ -334,14 +334,14 @@
       (destructuring-bind (name expansion) definition
         (unless (symbolp name)
           (fail "The local symbol macro name ~S is not a symbol." name))
-	(when (or (boundp name) (eq (info :variable :kind name) :macro))
-	  (compiler-assert-symbol-home-package-unlocked
+        (when (or (boundp name) (eq (info :variable :kind name) :macro))
+          (compiler-assert-symbol-home-package-unlocked
            name "binding ~A as a local symbol-macro"))
         (let ((kind (info :variable :kind name)))
           (when (member kind '(:special :constant))
             (fail "Attempt to bind a ~(~A~) variable with SYMBOL-MACROLET: ~S"
                   kind name)))
-	;; A magical cons that MACROEXPAND-1 understands.
+        ;; A magical cons that MACROEXPAND-1 understands.
         `(,name . (macro . ,expansion))))))
 
 (defun funcall-in-symbol-macrolet-lexenv (definitions fun context)
@@ -374,7 +374,7 @@
   (handler-case (mapcar #'eval args)
     (error (condition)
       (compiler-error "Lisp error during evaluation of info args:~%~A"
-		      condition))))
+                      condition))))
 
 ;;; Convert to the %%PRIMITIVE funny function. The first argument is
 ;;; the template, the second is a list of the results of any
@@ -394,24 +394,24 @@
 (def-ir1-translator %primitive ((name &rest args) start next result)
   (declare (type symbol name))
   (let* ((template (or (gethash name *backend-template-names*)
-		       (bug "undefined primitive ~A" name)))
-	 (required (length (template-arg-types template)))
-	 (info (template-info-arg-count template))
-	 (min (+ required info))
-	 (nargs (length args)))
+                       (bug "undefined primitive ~A" name)))
+         (required (length (template-arg-types template)))
+         (info (template-info-arg-count template))
+         (min (+ required info))
+         (nargs (length args)))
     (if (template-more-args-type template)
-	(when (< nargs min)
-	  (bug "Primitive ~A was called with ~R argument~:P, ~
+        (when (< nargs min)
+          (bug "Primitive ~A was called with ~R argument~:P, ~
                 but wants at least ~R."
-	       name
-	       nargs
-	       min))
-	(unless (= nargs min)
-	  (bug "Primitive ~A was called with ~R argument~:P, ~
+               name
+               nargs
+               min))
+        (unless (= nargs min)
+          (bug "Primitive ~A was called with ~R argument~:P, ~
                 but wants exactly ~R."
-	       name
-	       nargs
-	       min)))
+               name
+               nargs
+               min)))
 
     (when (eq (template-result-types template) :conditional)
       (bug "%PRIMITIVE was used with a conditional template."))
@@ -420,11 +420,11 @@
       (bug "%PRIMITIVE was used with an unknown values template."))
 
     (ir1-convert start next result
-		 `(%%primitive ',template
-			       ',(eval-info-args
-				  (subseq args required min))
-			       ,@(subseq args 0 required)
-			       ,@(subseq args min)))))
+                 `(%%primitive ',template
+                               ',(eval-info-args
+                                  (subseq args required min))
+                               ,@(subseq args 0 required)
+                               ,@(subseq args min)))))
 
 ;;;; QUOTE
 
@@ -447,18 +447,18 @@
 (defun fun-name-leaf (thing)
   (if (consp thing)
       (cond
-	((member (car thing)
-		 '(lambda named-lambda instance-lambda lambda-with-lexenv))
-	 (values (ir1-convert-lambdalike
+        ((member (car thing)
+                 '(lambda named-lambda instance-lambda lambda-with-lexenv))
+         (values (ir1-convert-lambdalike
                   thing
                   :debug-name (name-lambdalike thing))
                  t))
-	((legal-fun-name-p thing)
-	 (values (find-lexically-apparent-fun
+        ((legal-fun-name-p thing)
+         (values (find-lexically-apparent-fun
                   thing "as the argument to FUNCTION")
                  nil))
-	(t
-	 (compiler-error "~S is not a legal function name." thing)))
+        (t
+         (compiler-error "~S is not a legal function name." thing)))
       (values (find-lexically-apparent-fun
                thing "as the argument to FUNCTION")
               nil)))
@@ -498,10 +498,10 @@
   (let ((arg-names (make-gensym-list (length args))))
     `(lambda (function ,@arg-names)
        (%funcall ,(if (csubtypep (lvar-type function)
-				 (specifier-type 'function))
-		      'function
-		      '(%coerce-callable-to-fun function))
-		 ,@arg-names))))
+                                 (specifier-type 'function))
+                      'function
+                      '(%coerce-callable-to-fun function))
+                 ,@arg-names))))
 
 (def-ir1-translator %funcall ((function &rest args) start next result)
   (if (and (consp function) (eq (car function) 'function))
@@ -539,35 +539,35 @@
 ;;; variables are marked as such. Context is the name of the form, for
 ;;; error reporting purposes.
 (declaim (ftype (function (list symbol) (values list list))
-		extract-let-vars))
+                extract-let-vars))
 (defun extract-let-vars (bindings context)
   (collect ((vars)
-	    (vals)
-	    (names))
+            (vals)
+            (names))
     (flet ((get-var (name)
-	     (varify-lambda-arg name
-				(if (eq context 'let*)
-				    nil
-				    (names)))))
+             (varify-lambda-arg name
+                                (if (eq context 'let*)
+                                    nil
+                                    (names)))))
       (dolist (spec bindings)
-	(cond ((atom spec)
-	       (let ((var (get-var spec)))
-		 (vars var)
-		 (names spec)
-		 (vals nil)))
-	      (t
-	       (unless (proper-list-of-length-p spec 1 2)
-		 (compiler-error "The ~S binding spec ~S is malformed."
-				 context
-				 spec))
-	       (let* ((name (first spec))
-		      (var (get-var name)))
-		 (vars var)
-		 (names name)
-		 (vals (second spec)))))))
+        (cond ((atom spec)
+               (let ((var (get-var spec)))
+                 (vars var)
+                 (names spec)
+                 (vals nil)))
+              (t
+               (unless (proper-list-of-length-p spec 1 2)
+                 (compiler-error "The ~S binding spec ~S is malformed."
+                                 context
+                                 spec))
+               (let* ((name (first spec))
+                      (var (get-var name)))
+                 (vars var)
+                 (names name)
+                 (vals (second spec)))))))
     (dolist (name (names))
       (when (eq (info :variable :kind name) :macro)
-	(compiler-assert-symbol-home-package-unlocked
+        (compiler-assert-symbol-home-package-unlocked
          name "lexically binding symbol-macro ~A")))
     (values (vars) (vals))))
 
@@ -587,11 +587,11 @@
                         (fun-lvar (make-lvar))
                         ((next result)
                          (processing-decls (decls vars nil next result
-						  post-binding-lexenv)
+                                                  post-binding-lexenv)
                            (let ((fun (ir1-convert-lambda-body
                                        forms
                                        vars
-				       :post-binding-lexenv post-binding-lexenv
+                                       :post-binding-lexenv post-binding-lexenv
                                        :debug-name (debug-name 'let bindings))))
                              (reference-leaf start ctran fun-lvar fun))
                            (values next result))))
@@ -600,7 +600,7 @@
          (compiler-error "Malformed LET bindings: ~S." bindings))))
 
 (def-ir1-translator let* ((bindings &body body)
-			  start next result)
+                          start next result)
   #!+sb-doc
   "LET* ({(Var [Value]) | Var}*) Declaration* Form*
   Similar to LET, but the variables are bound sequentially, allowing each Value
@@ -616,7 +616,7 @@
                                       forms
                                       vars
                                       values
-				      post-binding-lexenv))))
+                                      post-binding-lexenv))))
       (compiler-error "Malformed LET* bindings: ~S." bindings)))
 
 ;;; logic shared between IR1 translators for LOCALLY, MACROLET,
@@ -652,22 +652,22 @@
 (declaim (ftype (function (list symbol) (values list list)) extract-flet-vars))
 (defun extract-flet-vars (definitions context)
   (collect ((names)
-	    (defs))
+            (defs))
     (dolist (def definitions)
       (when (or (atom def) (< (length def) 2))
-	(compiler-error "The ~S definition spec ~S is malformed." context def))
+        (compiler-error "The ~S definition spec ~S is malformed." context def))
 
       (let ((name (first def)))
-	(check-fun-name name)
-	(when (fboundp name)
-	  (compiler-assert-symbol-home-package-unlocked
+        (check-fun-name name)
+        (when (fboundp name)
+          (compiler-assert-symbol-home-package-unlocked
            name "binding ~A as a local function"))
-	(names name)
-	(multiple-value-bind (forms decls) (parse-body (cddr def))
-	  (defs `(lambda ,(second def)
-		   ,@decls
-		   (block ,(fun-name-block-name name)
-		     . ,forms))))))
+        (names name)
+        (multiple-value-bind (forms decls) (parse-body (cddr def))
+          (defs `(lambda ,(second def)
+                   ,@decls
+                   (block ,(fun-name-block-name name)
+                     . ,forms))))))
     (values (names) (defs))))
 
 (defun ir1-convert-fbindings (start next result funs body)
@@ -694,7 +694,7 @@
           (t (ir1-convert-progn-body ctran next result body)))))
 
 (def-ir1-translator flet ((definitions &body body)
-			  start next result)
+                          start next result)
   #!+sb-doc
   "FLET ({(Name Lambda-List Declaration* Form*)}*) Declaration* Body-Form*
   Evaluate the Body-Forms with some local function definitions. The bindings
@@ -727,8 +727,8 @@
              (placeholder-funs (mapcar (lambda (name)
                                          (make-functional
                                           :%source-name name
-                                          :%debug-name (debug-name 
-                                                        'labels-placeholder 
+                                          :%debug-name (debug-name
+                                                        'labels-placeholder
                                                         name)))
                                        names))
              ;; (like PAIRLIS but guaranteed to preserve ordering:)
@@ -798,7 +798,7 @@
   ""
   #-nil
   (let ((type (coerce-to-values (compiler-values-specifier-type type)))
-	(old (when result (find-uses result))))
+        (old (when result (find-uses result))))
     (ir1-convert start next result value)
     (when result
       (do-uses (use result)
@@ -817,37 +817,37 @@
     (when (oddp len)
       (compiler-error "odd number of args to SETQ: ~S" source))
     (if (= len 2)
-	(let* ((name (first things))
-	       (leaf (or (lexenv-find name vars)
-			 (find-free-var name))))
-	  (etypecase leaf
-	    (leaf
-	     (when (constant-p leaf)
-	       (compiler-error "~S is a constant and thus can't be set." name))
-	     (when (lambda-var-p leaf)
-	       (let ((home-lambda (ctran-home-lambda-or-null start)))
-		 (when home-lambda
-		   (pushnew leaf (lambda-calls-or-closes home-lambda))))
-	       (when (lambda-var-ignorep leaf)
-		 ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
-		 ;; requires that this be a STYLE-WARNING, not a full warning.
-		 (compiler-style-warn
-		  "~S is being set even though it was declared to be ignored."
-		  name)))
-	     (setq-var start next result leaf (second things)))
-	    (cons
-	     (aver (eq (car leaf) 'macro))
+        (let* ((name (first things))
+               (leaf (or (lexenv-find name vars)
+                         (find-free-var name))))
+          (etypecase leaf
+            (leaf
+             (when (constant-p leaf)
+               (compiler-error "~S is a constant and thus can't be set." name))
+             (when (lambda-var-p leaf)
+               (let ((home-lambda (ctran-home-lambda-or-null start)))
+                 (when home-lambda
+                   (pushnew leaf (lambda-calls-or-closes home-lambda))))
+               (when (lambda-var-ignorep leaf)
+                 ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
+                 ;; requires that this be a STYLE-WARNING, not a full warning.
+                 (compiler-style-warn
+                  "~S is being set even though it was declared to be ignored."
+                  name)))
+             (setq-var start next result leaf (second things)))
+            (cons
+             (aver (eq (car leaf) 'macro))
              ;; FIXME: [Free] type declaration. -- APD, 2002-01-26
-	     (ir1-convert start next result
+             (ir1-convert start next result
                           `(setf ,(cdr leaf) ,(second things))))
-	    (heap-alien-info
-	     (ir1-convert start next result
-			  `(%set-heap-alien ',leaf ,(second things))))))
-	(collect ((sets))
-	  (do ((thing things (cddr thing)))
-	      ((endp thing)
-	       (ir1-convert-progn-body start next result (sets)))
-	    (sets `(setq ,(first thing) ,(second thing))))))))
+            (heap-alien-info
+             (ir1-convert start next result
+                          `(%set-heap-alien ',leaf ,(second things))))))
+        (collect ((sets))
+          (do ((thing things (cddr thing)))
+              ((endp thing)
+               (ir1-convert-progn-body start next result (sets)))
+            (sets `(setq ,(first thing) ,(second thing))))))))
 
 ;;; This is kind of like REFERENCE-LEAF, but we generate a SET node.
 ;;; This should only need to be called in SETQ.
@@ -877,7 +877,7 @@
   Do a non-local exit, return the values of Form from the CATCH whose tag
   evaluates to the same thing as Tag."
   (ir1-convert start next result-lvar
-	       `(multiple-value-call #'%throw ,tag ,result)))
+               `(multiple-value-call #'%throw ,tag ,result)))
 
 ;;; This is a special special form used to instantiate a cleanup as
 ;;; the current cleanup within the body. KIND is the kind of cleanup
@@ -889,13 +889,13 @@
 (def-ir1-translator %within-cleanup
     ((kind mess-up &body body) start next result)
   (let ((dummy (make-ctran))
-	(dummy2 (make-ctran)))
+        (dummy2 (make-ctran)))
     (ir1-convert start dummy nil mess-up)
     (let* ((mess-node (ctran-use dummy))
-	   (cleanup (make-cleanup :kind kind
-				  :mess-up mess-node))
-	   (old-cup (lexenv-cleanup *lexenv*))
-	   (*lexenv* (make-lexenv :cleanup cleanup)))
+           (cleanup (make-cleanup :kind kind
+                                  :mess-up mess-node))
+           (old-cup (lexenv-cleanup *lexenv*))
+           (*lexenv* (make-lexenv :cleanup cleanup)))
       (setf (entry-cleanup (cleanup-mess-up old-cup)) cleanup)
       (ir1-convert dummy dummy2 nil '(%cleanup-point))
       (ir1-convert-progn-body dummy2 next result body))))
@@ -943,9 +943,9 @@
    start next result
    (with-unique-names (exit-block)
      `(block ,exit-block
-	(%within-cleanup
-	 :catch (%catch (%escape-fun ,exit-block) ,tag)
-	 ,@body)))))
+        (%within-cleanup
+         :catch (%catch (%escape-fun ,exit-block) ,tag)
+         ,@body)))))
 
 (def-ir1-translator unwind-protect
     ((protected &body cleanup) start next result)
@@ -964,20 +964,20 @@
    start next result
    (with-unique-names (cleanup-fun drop-thru-tag exit-tag next start count)
      `(flet ((,cleanup-fun () ,@cleanup nil))
-	;; FIXME: If we ever get DYNAMIC-EXTENT working, then
-	;; ,CLEANUP-FUN should probably be declared DYNAMIC-EXTENT,
-	;; and something can be done to make %ESCAPE-FUN have
-	;; dynamic extent too.
-	(block ,drop-thru-tag
-	  (multiple-value-bind (,next ,start ,count)
-	      (block ,exit-tag
-		(%within-cleanup
-		    :unwind-protect
-		    (%unwind-protect (%escape-fun ,exit-tag)
-				     (%cleanup-fun ,cleanup-fun))
-		  (return-from ,drop-thru-tag ,protected)))
-	    (,cleanup-fun)
-	    (%continue-unwind ,next ,start ,count)))))))
+        ;; FIXME: If we ever get DYNAMIC-EXTENT working, then
+        ;; ,CLEANUP-FUN should probably be declared DYNAMIC-EXTENT,
+        ;; and something can be done to make %ESCAPE-FUN have
+        ;; dynamic extent too.
+        (block ,drop-thru-tag
+          (multiple-value-bind (,next ,start ,count)
+              (block ,exit-tag
+                (%within-cleanup
+                    :unwind-protect
+                    (%unwind-protect (%escape-fun ,exit-tag)
+                                     (%cleanup-fun ,cleanup-fun))
+                  (return-from ,drop-thru-tag ,protected)))
+            (,cleanup-fun)
+            (%continue-unwind ,next ,start ,count)))))))
 
 ;;;; multiple-value stuff
 
@@ -988,33 +988,33 @@
   values from the first VALUES-FORM making up the first argument, etc."
   (let* ((ctran (make-ctran))
          (fun-lvar (make-lvar))
-	 (node (if args
-		   ;; If there are arguments, MULTIPLE-VALUE-CALL
-		   ;; turns into an MV-COMBINATION.
-		   (make-mv-combination fun-lvar)
-		   ;; If there are no arguments, then we convert to a
-		   ;; normal combination, ensuring that a MV-COMBINATION
-		   ;; always has at least one argument. This can be
-		   ;; regarded as an optimization, but it is more
-		   ;; important for simplifying compilation of
-		   ;; MV-COMBINATIONS.
-		   (make-combination fun-lvar))))
+         (node (if args
+                   ;; If there are arguments, MULTIPLE-VALUE-CALL
+                   ;; turns into an MV-COMBINATION.
+                   (make-mv-combination fun-lvar)
+                   ;; If there are no arguments, then we convert to a
+                   ;; normal combination, ensuring that a MV-COMBINATION
+                   ;; always has at least one argument. This can be
+                   ;; regarded as an optimization, but it is more
+                   ;; important for simplifying compilation of
+                   ;; MV-COMBINATIONS.
+                   (make-combination fun-lvar))))
     (ir1-convert start ctran fun-lvar
-		 (if (and (consp fun) (eq (car fun) 'function))
-		     fun
-		     `(%coerce-callable-to-fun ,fun)))
+                 (if (and (consp fun) (eq (car fun) 'function))
+                     fun
+                     `(%coerce-callable-to-fun ,fun)))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
       (let ((this-start ctran))
-	(dolist (arg args)
-	  (let ((this-ctran (make-ctran))
+        (dolist (arg args)
+          (let ((this-ctran (make-ctran))
                 (this-lvar (make-lvar node)))
-	    (ir1-convert this-start this-ctran this-lvar arg)
-	    (setq this-start this-ctran)
-	    (arg-lvars this-lvar)))
-	(link-node-to-previous-ctran node this-start)
-	(use-continuation node next result)
-	(setf (basic-combination-args node) (arg-lvars))))))
+            (ir1-convert this-start this-ctran this-lvar arg)
+            (setq this-start this-ctran)
+            (arg-lvars this-lvar)))
+        (link-node-to-previous-ctran node this-start)
+        (use-continuation node next result)
+        (setf (basic-combination-args node) (arg-lvars))))))
 
 (def-ir1-translator multiple-value-prog1
     ((values-form &rest forms) start next result)
@@ -1045,5 +1045,5 @@
       ((null path) *current-path*)
     (let ((first (first path)))
       (when (or (eq first name)
-		(eq first 'original-source-start))
-	(return path)))))
+                (eq first 'original-source-start))
+        (return path)))))

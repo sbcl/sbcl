@@ -76,7 +76,7 @@
 (defun note-if-setf-fun-and-macro (name)
   (when (consp name)
     (when (or (info :setf :inverse name)
-	      (info :setf :expander name))
+              (info :setf :expander name))
       (compiler-style-warn
        "defining as a SETF function a name that already has a SETF macro:~
        ~%  ~S"
@@ -88,8 +88,8 @@
 (defun undefine-fun-name (name)
   (when name
     (macrolet ((frob (type &optional val)
-		 `(unless (eq (info :function ,type name) ,val)
-		    (setf (info :function ,type name) ,val))))
+                 `(unless (eq (info :function ,type name) ,val)
+                    (setf (info :function ,type name) ,val))))
       (frob :info)
       (frob :type (specifier-type 'function))
       (frob :where-from :assumed)
@@ -107,7 +107,7 @@
   (when (eq (info :function :where-from name) :assumed)
     (setf (info :function :where-from name) :defined)
     (if (info :function :assumed-type name)
-	(setf (info :function :assumed-type name) nil))))
+        (setf (info :function :assumed-type name) nil))))
 
 ;;; Decode any raw (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR FUN-NAME)
 ;;; value into a lambda expression, or return NIL if there is none.
@@ -115,8 +115,8 @@
 (defun fun-name-inline-expansion (fun-name)
   (let ((info (info :function :inline-expansion-designator fun-name)))
     (if (functionp info)
-	(funcall info)
-	info)))
+        (funcall info)
+        info)))
 
 ;;;; ANSI Common Lisp functions which are defined in terms of the info
 ;;;; database
@@ -152,15 +152,15 @@
    environment only."
   (declare (symbol symbol))
   (let* ((fenv (when env (sb!c::lexenv-funs env)))
-	 (local-def (cdr (assoc symbol fenv))))
+         (local-def (cdr (assoc symbol fenv))))
     (cond (local-def
-	   (if (and (consp local-def) (eq (car local-def) 'macro))
-	       (cdr local-def)
-	       nil))
-	  ((eq (info :function :kind symbol) :macro)
-	   (values (info :function :macro-function symbol)))
-	  (t
-	   nil))))
+           (if (and (consp local-def) (eq (car local-def) 'macro))
+               (cdr local-def)
+               nil))
+          ((eq (info :function :kind symbol) :macro)
+           (values (info :function :macro-function symbol)))
+          (t
+           nil))))
 
 (defun (setf sb!xc:macro-function) (function symbol &optional environment)
   (declare (symbol symbol) (type function function))
@@ -170,7 +170,7 @@
     ;; supplying a non-nil one are undefined, we don't allow it.
     ;; (Thus our implementation of this unspecified behavior is to
     ;; complain. SInce the behavior is unspecified, this is conforming.:-)
-    (error "Non-NIL environment argument in SETF of MACRO-FUNCTION ~S: ~S" 
+    (error "Non-NIL environment argument in SETF of MACRO-FUNCTION ~S: ~S"
            symbol environment))
   (when (eq (info :function :kind symbol) :special-form)
     (error "~S names a special form." symbol))
@@ -182,11 +182,11 @@
   ;; cross-compilation host's COMMON-LISP package.
   #-sb-xc-host
   (setf (symbol-function symbol)
-	(lambda (&rest args)
-	  (declare (ignore args))
-	  ;; (ANSI specification of FUNCALL says that this should be
-	  ;; an error of type UNDEFINED-FUNCTION, not just SIMPLE-ERROR.)
-	  (error 'undefined-function :name symbol)))
+        (lambda (&rest args)
+          (declare (ignore args))
+          ;; (ANSI specification of FUNCALL says that this should be
+          ;; an error of type UNDEFINED-FUNCTION, not just SIMPLE-ERROR.)
+          (error 'undefined-function :name symbol)))
   function)
 
 (defun sb!xc:compiler-macro-function (name &optional env)
@@ -205,13 +205,13 @@
   (values (info :function :compiler-macro-function name)))
 (defun (setf sb!xc:compiler-macro-function) (function name &optional env)
   (declare (type (or symbol list) name)
-	   (type (or function null) function))
+           (type (or function null) function))
   (when env
     ;; ANSI says this operation is undefined.
     (error "can't SETF COMPILER-MACRO-FUNCTION when ENV is non-NIL"))
   (when (eq (info :function :kind name) :special-form)
     (error "~S names a special form." name))
-  (with-single-package-locked-error 
+  (with-single-package-locked-error
       (:symbol name "setting the compiler-macro-function of ~A")
     (setf (info :function :compiler-macro-function name) function)
     function))
@@ -236,45 +236,45 @@
 ;;; and slamming them into PCL once PCL gets going.
 (defun fdocumentation (x doc-type)
   (flet ((try-cmucl-random-doc (x doc-type)
-	   (declare (symbol doc-type))
-	   (cdr (assoc doc-type
-		       (values (info :random-documentation :stuff x))))))
+           (declare (symbol doc-type))
+           (cdr (assoc doc-type
+                       (values (info :random-documentation :stuff x))))))
     (case doc-type
       (variable
        (typecase x
-	 (symbol (values (info :variable :documentation x)))))
+         (symbol (values (info :variable :documentation x)))))
       (function
        (cond ((functionp x)
-	      (%fun-doc x))
-	     ((legal-fun-name-p x)
-	      ;; FIXME: Is it really right to make
-	      ;; (DOCUMENTATION '(SETF FOO) 'FUNCTION) equivalent to
-	      ;; (DOCUMENTATION 'FOO 'FUNCTION)? That's what CMU CL
-	      ;; did, so we do it, but I'm not sure it's what ANSI wants.
-	      (values (info :function :documentation
-			    (fun-name-block-name x))))))
+              (%fun-doc x))
+             ((legal-fun-name-p x)
+              ;; FIXME: Is it really right to make
+              ;; (DOCUMENTATION '(SETF FOO) 'FUNCTION) equivalent to
+              ;; (DOCUMENTATION 'FOO 'FUNCTION)? That's what CMU CL
+              ;; did, so we do it, but I'm not sure it's what ANSI wants.
+              (values (info :function :documentation
+                            (fun-name-block-name x))))))
       (structure
        (typecase x
-	 (symbol (when (eq (info :type :kind x) :instance)
-		   (values (info :type :documentation x))))))
+         (symbol (when (eq (info :type :kind x) :instance)
+                   (values (info :type :documentation x))))))
       (type
        (typecase x
-	 (structure-class (values (info :type :documentation (class-name x))))
-	 (t (and (typep x 'symbol) (values (info :type :documentation x))))))
+         (structure-class (values (info :type :documentation (class-name x))))
+         (t (and (typep x 'symbol) (values (info :type :documentation x))))))
       (setf (values (info :setf :documentation x)))
       ((t)
        (typecase x
-	 (function (%fun-doc x))
-	 (package (package-doc-string x))
-	 (structure-class (values (info :type :documentation (class-name x))))
-	 (symbol (try-cmucl-random-doc x doc-type))))
+         (function (%fun-doc x))
+         (package (package-doc-string x))
+         (structure-class (values (info :type :documentation (class-name x))))
+         (symbol (try-cmucl-random-doc x doc-type))))
       (t
        (typecase x
-	 ;; FIXME: This code comes from CMU CL, but
-	 ;; TRY-CMUCL-RANDOM-DOC doesn't seem to be defined anywhere
-	 ;; in CMU CL. Perhaps it could be defined by analogy with the
-	 ;; corresponding SETF FDOCUMENTATION code.
-	 (symbol (try-cmucl-random-doc x doc-type)))))))
+         ;; FIXME: This code comes from CMU CL, but
+         ;; TRY-CMUCL-RANDOM-DOC doesn't seem to be defined anywhere
+         ;; in CMU CL. Perhaps it could be defined by analogy with the
+         ;; corresponding SETF FDOCUMENTATION code.
+         (symbol (try-cmucl-random-doc x doc-type)))))))
 (defun (setf fdocumentation) (string name doc-type)
   ;; FIXME: I think it should be possible to set documentation for
   ;; things (e.g. compiler macros) named (SETF FOO). fndb.lisp
@@ -284,14 +284,14 @@
     (variable (setf (info :variable :documentation name) string))
     (function (setf (info :function :documentation name) string))
     (structure (if (eq (info :type :kind name) :instance)
-		   (setf (info :type :documentation name) string)
-		   (error "~S is not the name of a structure type." name)))
+                   (setf (info :type :documentation name) string)
+                   (error "~S is not the name of a structure type." name)))
     (type (setf (info :type :documentation name) string))
     (setf (setf (info :setf :documentation name) string))
     (t
      (let ((pair (assoc doc-type (info :random-documentation :stuff name))))
        (if pair
-	   (setf (cdr pair) string)
-	   (push (cons doc-type string)
-		 (info :random-documentation :stuff name))))))
+           (setf (cdr pair) string)
+           (push (cons doc-type string)
+                 (info :random-documentation :stuff name))))))
   string)

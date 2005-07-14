@@ -20,29 +20,29 @@
       (give-up-ir1-transform)))
 
 (deftransform foreign-symbol-sap ((symbol &optional datap)
-				      (simple-string &optional boolean))
+                                      (simple-string &optional boolean))
     #!-linkage-table
     (if (null datap)
-	(give-up-ir1-transform)
-	`(foreign-symbol-sap symbol))
+        (give-up-ir1-transform)
+        `(foreign-symbol-sap symbol))
     #!+linkage-table
     (if (and (constant-lvar-p symbol) (constant-lvar-p datap))
-	(let ((name (lvar-value symbol))
-	      (datap (lvar-value datap)))
-	  (if (or #+sb-xc-host t ; only static symbols on host
+        (let ((name (lvar-value symbol))
+              (datap (lvar-value datap)))
+          (if (or #+sb-xc-host t ; only static symbols on host
                   (not datap)
-		  (find-foreign-symbol-in-table name *static-foreign-symbols*))
-	      `(foreign-symbol-sap ,name) ; VOP
-	      `(foreign-symbol-dataref-sap ,name))) ; VOP
-	(give-up-ir1-transform)))
+                  (find-foreign-symbol-in-table name *static-foreign-symbols*))
+              `(foreign-symbol-sap ,name) ; VOP
+              `(foreign-symbol-dataref-sap ,name))) ; VOP
+        (give-up-ir1-transform)))
 
 (defknown (sap< sap<= sap= sap>= sap>)
-	  (system-area-pointer system-area-pointer) boolean
+          (system-area-pointer system-area-pointer) boolean
   (movable flushable))
 
 (defknown sap+ (system-area-pointer integer) system-area-pointer
   (movable flushable))
-(defknown sap- (system-area-pointer system-area-pointer) 
+(defknown sap- (system-area-pointer system-area-pointer)
                (signed-byte #.sb!vm::n-word-bits)
   (movable flushable))
 
@@ -134,14 +134,14 @@
   (flushable))
 
 (defknown %set-sap-ref-single
-	  (system-area-pointer fixnum single-float) single-float
+          (system-area-pointer fixnum single-float) single-float
   ())
 (defknown %set-sap-ref-double
-	  (system-area-pointer fixnum double-float) double-float
+          (system-area-pointer fixnum double-float) double-float
   ())
 #!+long-float
 (defknown %set-sap-ref-long
-	  (system-area-pointer fixnum long-float) long-float
+          (system-area-pointer fixnum long-float) long-float
   ())
 
 ;;;; transforms for converting sap relation operators
@@ -159,12 +159,12 @@
 
 (deftransform sap+ ((sap offset))
   (cond ((and (constant-lvar-p offset)
-	      (eql (lvar-value offset) 0))
-	 'sap)
-	(t
-	 (extract-fun-args sap 'sap+ 2)
-	 '(lambda (sap offset1 offset2)
-	    (sap+ sap (+ offset1 offset2))))))
+              (eql (lvar-value offset) 0))
+         'sap)
+        (t
+         (extract-fun-args sap 'sap+ 2)
+         '(lambda (sap offset1 offset2)
+            (sap+ sap (+ offset1 offset2))))))
 
 (macrolet ((def (fun)
              `(deftransform ,fun ((sap offset) * *)
@@ -201,10 +201,10 @@
   #!+long-float (def %set-sap-ref-long))
 
 (macrolet ((def (fun args 32-bit 64-bit)
-	       `(deftransform ,fun (,args)
-		  (ecase sb!vm::n-word-bits
-		    (32 '(,32-bit ,@args))
-		    (64 '(,64-bit ,@args))))))
+               `(deftransform ,fun (,args)
+                  (ecase sb!vm::n-word-bits
+                    (32 '(,32-bit ,@args))
+                    (64 '(,64-bit ,@args))))))
   (def sap-ref-word (sap offset) sap-ref-32 sap-ref-64)
   (def signed-sap-ref-word (sap offset) signed-sap-ref-32 signed-sap-ref-64)
   (def %set-sap-ref-word (sap offset value)

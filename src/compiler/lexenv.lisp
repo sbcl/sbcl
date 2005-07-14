@@ -15,13 +15,13 @@
 ;;; (This is also what shows up as an ENVIRONMENT value in macroexpansion.)
 #!-sb-fluid (declaim (inline internal-make-lexenv)) ; only called in one place
 (def!struct (lexenv
-	     (:print-function print-lexenv)
-	     (:constructor make-null-lexenv ())	     
-	     (:constructor internal-make-lexenv
-			   (funs vars blocks tags
+             (:print-function print-lexenv)
+             (:constructor make-null-lexenv ())
+             (:constructor internal-make-lexenv
+                           (funs vars blocks tags
                                  type-restrictions
-				 lambda cleanup handled-conditions
-				 disabled-package-locks policy)))
+                                 lambda cleanup handled-conditions
+                                 disabled-package-locks policy)))
   ;; an alist of (NAME . WHAT), where WHAT is either a FUNCTIONAL (a
   ;; local function), a DEFINED-FUN, representing an
   ;; INLINE/NOTINLINE declaration, or a list (MACRO . <function>) (a
@@ -76,7 +76,7 @@
 (defun print-lexenv (lexenv stream level)
   (if (null-lexenv-p lexenv)
       (print-unreadable-object (lexenv stream)
-	(write-string "NULL-LEXENV" stream))
+        (write-string "NULL-LEXENV" stream))
       (default-structure-print lexenv stream level)))
 
 (defun maybe-inline-syntactic-closure (lambda lexenv)
@@ -94,66 +94,66 @@
   ;; unfriendly foreign lisp environments, would be good to support in
   ;; the target compiler. -- CSR, 2002-05-13 and 2002-11-02
   (let ((vars (lexenv-vars lexenv))
-	(funs (lexenv-funs lexenv)))
+        (funs (lexenv-funs lexenv)))
     (collect ((decls) (macros) (symbol-macros))
       (cond
-	((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
-	((and (null vars) (null funs)) `(lambda-with-lexenv
-					 nil nil nil
-					 ,@(cdr lambda)))
-	((dolist (x vars nil)
-	   #+sb-xc-host
-	   ;; KLUDGE: too complicated for cross-compilation
-	   (return t)
-	   #-sb-xc-host
-	   (let ((name (car x))
-		 (what (cdr x)))
-	     ;; only worry about the innermost binding
-	     (when (eq x (assoc name vars :test #'eq))
-	       (typecase what
-		 (cons
-		  (aver (eq (car what) 'macro))
-		  (symbol-macros x))
-		 (global-var
-		  ;; A global should not appear in the lexical
-		  ;; environment? Is this true? FIXME!
-		  (aver (eq (global-var-kind what) :special))
-		  (decls `(special ,name)))
-		 (t
-		  ;; we can't inline in the presence of this object
-		  (return t))))))
-	 nil)
-	((dolist (x funs nil)
-	   #+sb-xc-host
-	   ;; KLUDGE: too complicated for cross-compilation (and
-	   ;; failure of OAOO in comments, *sigh*)
-	   (return t)
-	   #-sb-xc-host
-	   (let ((name (car x))
-		 (what (cdr x)))
-	     ;; again, only worry about the innermost binding, but
-	     ;; functions can have name (SETF FOO) so we need to use
-	     ;; EQUAL for the test.
-	     (when (eq x (assoc name funs :test #'equal))
-	       (typecase what
-		 (cons
-		  (macros (cons name (function-lambda-expression (cdr what)))))
-		 ;; FIXME: Is there a good reason for this not to be
-		 ;; DEFINED-FUN (which :INCLUDEs GLOBAL-VAR, in case
-		 ;; you're wondering how this ever worked :-)? Maybe
-		 ;; in conjunction with an AVERrance that it's not an
-		 ;; (AND GLOBAL-VAR (NOT GLOBAL-FUN))? -- CSR,
-		 ;; 2002-07-08
-		 (global-var
-		  (when (defined-fun-p what)
-		    (decls `(,(car (rassoc (defined-fun-inlinep what)
-					   *inlinep-translations*))
+        ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
+        ((and (null vars) (null funs)) `(lambda-with-lexenv
+                                         nil nil nil
+                                         ,@(cdr lambda)))
+        ((dolist (x vars nil)
+           #+sb-xc-host
+           ;; KLUDGE: too complicated for cross-compilation
+           (return t)
+           #-sb-xc-host
+           (let ((name (car x))
+                 (what (cdr x)))
+             ;; only worry about the innermost binding
+             (when (eq x (assoc name vars :test #'eq))
+               (typecase what
+                 (cons
+                  (aver (eq (car what) 'macro))
+                  (symbol-macros x))
+                 (global-var
+                  ;; A global should not appear in the lexical
+                  ;; environment? Is this true? FIXME!
+                  (aver (eq (global-var-kind what) :special))
+                  (decls `(special ,name)))
+                 (t
+                  ;; we can't inline in the presence of this object
+                  (return t))))))
+         nil)
+        ((dolist (x funs nil)
+           #+sb-xc-host
+           ;; KLUDGE: too complicated for cross-compilation (and
+           ;; failure of OAOO in comments, *sigh*)
+           (return t)
+           #-sb-xc-host
+           (let ((name (car x))
+                 (what (cdr x)))
+             ;; again, only worry about the innermost binding, but
+             ;; functions can have name (SETF FOO) so we need to use
+             ;; EQUAL for the test.
+             (when (eq x (assoc name funs :test #'equal))
+               (typecase what
+                 (cons
+                  (macros (cons name (function-lambda-expression (cdr what)))))
+                 ;; FIXME: Is there a good reason for this not to be
+                 ;; DEFINED-FUN (which :INCLUDEs GLOBAL-VAR, in case
+                 ;; you're wondering how this ever worked :-)? Maybe
+                 ;; in conjunction with an AVERrance that it's not an
+                 ;; (AND GLOBAL-VAR (NOT GLOBAL-FUN))? -- CSR,
+                 ;; 2002-07-08
+                 (global-var
+                  (when (defined-fun-p what)
+                    (decls `(,(car (rassoc (defined-fun-inlinep what)
+                                           *inlinep-translations*))
                               ,name))))
-		 (t (return t))))))
-	 nil)
-	(t
-	 ;; if we get this far, we've successfully dealt with
-	 ;; everything in FUNS and VARS, so:
-	 `(lambda-with-lexenv ,(decls) ,(macros) ,(symbol-macros)
-	                      ,@(cdr lambda)))))))
+                 (t (return t))))))
+         nil)
+        (t
+         ;; if we get this far, we've successfully dealt with
+         ;; everything in FUNS and VARS, so:
+         `(lambda-with-lexenv ,(decls) ,(macros) ,(symbol-macros)
+                              ,@(cdr lambda)))))))
 
