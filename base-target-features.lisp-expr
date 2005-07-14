@@ -13,7 +13,7 @@
 ;;;; E.g. you can use code like this:
 ;;;;    (lambda (list)
 ;;;;      (flet ((enable (x) (pushnew x list))
-;;;;    	 (disable (x) (setf list (remove x list))))
+;;;;             (disable (x) (setf list (remove x list))))
 ;;;;        #+nil (enable :sb-show)
 ;;;;        (enable :sb-after-xc-core)
 ;;;;        #+nil (disable :sb-doc)
@@ -147,7 +147,7 @@
  ;; been either made unconditional, deleted, or rewritten into
  ;; unrecognizability, but some remains. What remains is not maintained
  ;; or tested in current SBCL, but I haven't gone out of my way to
- ;; break it, either. 
+ ;; break it, either.
  ;;
  ; :high-security
  ; :high-security-support
@@ -172,7 +172,7 @@
  ;; the Unicode consortium, rather than the classical 8-bit ISO-8859-1
  ;; character set.
  :sb-unicode
- 
+
  ;; This affects the definition of a lot of things in bignum.lisp. It
  ;; doesn't seem to be documented anywhere what systems it might apply
  ;; to. It doesn't seem to be needed for X86 systems anyway.
@@ -240,7 +240,7 @@
  ;; notes on local features (which are set automatically by the
  ;; configuration script, and should not be set here unless you
  ;; really, really know what you're doing):
- ;; 
+ ;;
  ;; machine architecture features:
  ;;   :x86
  ;;      any Intel 386 or better, or compatibles like the AMD K6 or K7
@@ -255,7 +255,7 @@
  ;;   :mips
  ;;      any MIPS CPU (in little-endian mode with :little-endian -- currently
  ;;      untested)
- ;;   
+ ;;
  ;; (CMU CL also had a :pentium feature, which affected the definition
  ;; of some floating point vops. It was present but not enabled or
  ;; documented in the CMU CL code that SBCL is derived from, and has

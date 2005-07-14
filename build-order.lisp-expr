@@ -23,7 +23,7 @@
 ;;; instead, so that we could do automated incremental recompilation.
 ;;; But the dependencies are varied and subtle, and it'd be extremely
 ;;; difficult to extract them automatically, and it'd be extremely
-;;; tedious and error-prone to extract them manually, so we don't 
+;;; tedious and error-prone to extract them manually, so we don't
 ;;; extract them. (It would be nice to fix this someday. The most
 ;;; feasible approach that I can think of would be to make the
 ;;; dependencies work on a package level, not an individual file
@@ -142,7 +142,7 @@
  ("src/code/defbangstruct")
 
  ("src/code/unportable-float")
- 
+
  ("src/code/funutils" :not-host)
 
  ;; This needs DEF!STRUCT, and is itself needed early so that structure
@@ -177,7 +177,7 @@
  ("src/code/toplevel"    :not-host)
  ("src/code/cold-error"  :not-host)
  ("src/code/fdefinition" :not-host)
- ;; FIXME: Figure out some way to make the compiler macro for INFO 
+ ;; FIXME: Figure out some way to make the compiler macro for INFO
  ;; available for compilation of "code/fdefinition".
 
  ;; In classic CMU CL, code/type was here. I've since split that into
@@ -226,7 +226,7 @@
  ;; debug-info.lisp.  Should it therefore be :not-host?  -- CSR,
  ;; 2002-02-05
  ("src/code/sc-offset")
- 
+
  ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
  ;; instead of a bunch of reader macros. -- WHN 19990308
  #!+sparc ("src/code/sparc-vm" :not-host)
@@ -357,7 +357,7 @@
  ;; The following two files trigger function/macro redefinition
  ;; warnings in clisp during make-host-2; as a workaround, we ignore
  ;; the failure values from COMPILE-FILE under clisp.
- 
+
  ;; for DEFSTRUCT ALIEN-TYPE, needed by host-type.lisp
  ("src/code/host-alieneval" #+clisp :ignore-failure-p)
 
@@ -392,7 +392,7 @@
  ("src/code/class-init")
  ("src/code/typecheckfuns")
 
- ;; The DEFSTRUCT machinery needs SB!XC:SUBTYPEP, defined in 
+ ;; The DEFSTRUCT machinery needs SB!XC:SUBTYPEP, defined in
  ;; "code/late-type", and SB!XC:TYPEP, defined in "code/cross-type",
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
  ;; and SB!XC:PROCLAIM, defined in "src/compiler/proclaim"
@@ -445,13 +445,13 @@
  ("src/compiler/bit-util")
 
  ;; This has ASSEMBLY-UNIT-related stuff needed by core.lisp.
- ("src/compiler/early-assem") 
+ ("src/compiler/early-assem")
 
  ;; core.lisp contains DEFSTRUCT CORE-OBJECT, and "compiler/main.lisp"
  ;; does lots of (TYPEP FOO 'CORE-OBJECT), so it's nice to compile this
  ;; before "compiler/main.lisp" so that those can be coded efficiently
  ;; (and so that they don't cause lots of annoying compiler warnings
- ;; about undefined types). 
+ ;; about undefined types).
  ("src/compiler/generic/core")
  ("src/code/thread")
  ("src/code/load")
@@ -664,8 +664,8 @@
  ("src/code/bit-bash"    :not-host) ; needs %NEGATE from assembly/target/arith
 
  ("src/code/target-load" :not-host) ; needs special vars from code/load.lisp
- ("src/compiler/target/sanctify" :not-host) 
- 
+ ("src/compiler/target/sanctify" :not-host)
+
  ;; FIXME: Does this really need stuff from compiler/dump.lisp?
  ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
 
@@ -683,7 +683,7 @@
  ;; FIXME: here? earlier?  can probably be as late as possible.  Also
  ;; maybe call it FORCE-DELAYED-PROCLAIMS?
  ("src/compiler/late-proclaim")
- 
+
  ;; fundamental target macros (e.g. CL:DO and CL:DEFUN) and support
  ;; for them
  ("src/code/defboot")

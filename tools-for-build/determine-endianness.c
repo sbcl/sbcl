@@ -11,7 +11,7 @@
  * While most of SBCL is derived from the CMU CL system, many
  * utilities for the build process (like this one) were written from
  * scratch after the fork from CMU CL.
- * 
+ *
  * This software is in the public domain and is provided with
  * absolutely no warranty. See the COPYING and CREDITS files for
  * more information.
@@ -24,27 +24,27 @@ int main (int argc, char *argv[]) {
     char *bar = (char *) &foo;
     switch(*bar) {
     case ' ':
-	/* Do nothing */
-	break;
+        /* Do nothing */
+        break;
     case '#':
-	printf(" :little-endian");
-	break;
+        printf(" :little-endian");
+        break;
     default:
-	/* FIXME: How do we do sane error processing in Unix?  This
-	   program will be called from a script, in a manner somewhat
-	   like:
+        /* FIXME: How do we do sane error processing in Unix?  This
+           program will be called from a script, in a manner somewhat
+           like:
 
-	       tools-for-build/determine-endianness >> $ltf
+               tools-for-build/determine-endianness >> $ltf
 
            but what if we have a too-smart C compiler that actually
-	   gets us down to this branch?  I suppose that if we have a C
-	   compiler that is that smart, we're doomed to miscompile the
-	   runtime anyway, so we won't get here.  Still, it might be
-	   good to have "set -e" in the various scripts so that we can
-	   exit with an error here and have it be caught by the build
-	   tools.  -- CSR, 2002-11-24
-	*/
-	exit(1);
+           gets us down to this branch?  I suppose that if we have a C
+           compiler that is that smart, we're doomed to miscompile the
+           runtime anyway, so we won't get here.  Still, it might be
+           good to have "set -e" in the various scripts so that we can
+           exit with an error here and have it be caught by the build
+           tools.  -- CSR, 2002-11-24
+        */
+        exit(1);
     }
-    exit(0); 
+    exit(0);
 }

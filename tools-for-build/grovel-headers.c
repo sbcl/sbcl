@@ -12,7 +12,7 @@
  * While most of SBCL is derived from the CMU CL system, many
  * utilities for the build process (like this one) were written from
  * scratch after the fork from CMU CL.
- * 
+ *
  * This software is in the public domain and is provided with
  * absolutely no warranty. See the COPYING and CREDITS files for
  * more information.
@@ -46,7 +46,7 @@ void
 defconstant(char* lisp_name, long unix_number)
 {
     printf("(defconstant %s %ld) ; #x%lx\n",
-	   lisp_name, unix_number, unix_number);
+           lisp_name, unix_number, unix_number);
 }
 
 void deferrno(char* lisp_name, long unix_number)
@@ -64,8 +64,8 @@ main(int argc, char *argv[])
 {
     /* don't need no steenking command line arguments */
     if (1 != argc) {
-	fprintf(stderr, "argh! command line argument(s)\n");
-	exit(1);
+        fprintf(stderr, "argh! command line argument(s)\n");
+        exit(1);
     }
 
     /* don't need no steenking hand-editing */
@@ -78,11 +78,11 @@ main(int argc, char *argv[])
     printf("(in-package \"SB!ALIEN\")\n\n");
 
     printf (";;;flags for dlopen()\n");
-    
+
     defconstant ("rtld-lazy", RTLD_LAZY);
     defconstant ("rtld-now", RTLD_NOW);
     defconstant ("rtld-global", RTLD_GLOBAL);
-    
+
     printf("(in-package \"SB!UNIX\")\n\n");
 
     printf(";;; langinfo\n");
@@ -126,7 +126,7 @@ main(int argc, char *argv[])
     defconstant("s-ifblk", S_IFBLK);
     defconstant("s-ifreg", S_IFREG);
     printf("\n");
-  
+
     defconstant("s-iflnk",  S_IFLNK);
     defconstant("s-ifsock", S_IFSOCK);
     printf("\n");
@@ -203,7 +203,7 @@ main(int argc, char *argv[])
     defsignal("sigstkflt", SIGSTKFLT);
 #endif
     defsignal("sigstop", SIGSTOP);
-#if (!((defined LISP_FEATURE_LINUX) && (defined LISP_FEATURE_X86))) 
+#if (!((defined LISP_FEATURE_LINUX) && (defined LISP_FEATURE_X86)))
     defsignal("sigsys", SIGSYS);
 #endif
     defsignal("sigterm", SIGTERM);

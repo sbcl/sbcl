@@ -1,4 +1,4 @@
-/* test to build and run so that we know if we have dladdr 
+/* test to build and run so that we know if we have dladdr
  */
 
 /* bloody FSF dlcfn.h won't give us dladdr without this */
