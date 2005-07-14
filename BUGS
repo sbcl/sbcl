@@ -2096,3 +2096,18 @@ WORKAROUND:
   instruction.  Either the VOP should be fixed or the compiler should be
   taught how to transform this case away, paying particular attention
   to side-effects that might occur in the arguments to ASH.
+
+384: Compiler runaway on very large character types
+
+  (compile nil '(lambda (x)
+                    (declare (type (member #\a 1) x))
+                    (the (member 1 nil) x)))
+
+  The types apparently normalize into a very large type, and the compiler
+  gets lost in REMOVE-DUPLICATES.  Perhaps the latter should use
+  a better algorithm (one based on hash tables, say) on very long lists
+  when :TEST has its default value?
+
+  A simpler example:
+
+  (compile nil '(lambda (x) (the (not (eql #\a)) x)))
