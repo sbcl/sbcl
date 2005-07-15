@@ -1013,6 +1013,7 @@
                            &aux (total-copied 0))
         (declare (type fd-stream stream))
         (declare (type index start requested total-copied))
+        (declare (type (simple-array character (#.+ansi-stream-in-buffer-length+)) buffer))
         (let ((unread (fd-stream-unread stream)))
           (when unread
             (setf (aref buffer start) unread)
@@ -1119,6 +1120,7 @@
                            &aux (total-copied 0))
         (declare (type fd-stream stream))
         (declare (type index start requested total-copied))
+        (declare (type (simple-array character (#.+ansi-stream-in-buffer-length+)) buffer))
         (let ((unread (fd-stream-unread stream)))
           (when unread
             (setf (aref buffer start) unread)
