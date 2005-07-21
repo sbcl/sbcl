@@ -159,7 +159,8 @@
 
 (defun truncate-to-unix-range (utime)
   (let ((unix-time (- utime unix-to-universal-time)))
-    (if (< unix-time (ash 1 31))
+    (if (and (>= unix-time 0)
+             (< unix-time (ash 1 31)))
         unix-time
         (multiple-value-bind (year offset) (years-since-mar-2000 utime)
           (declare (ignore year))
@@ -277,12 +278,12 @@
                                   (leap-years-before fake-year)))))))
             (let* ((secwest-guess
                     (sb!unix::unix-get-seconds-west
-                     (- (* hours 60 60) unix-to-universal-time)))
+                     (truncate-to-unix-range (* hours 60 60))))
                    (guess (+ second (* 60 (+ minute (* hours 60)))
                              secwest-guess))
                    (secwest
                     (sb!unix::unix-get-seconds-west
-                     (- guess unix-to-universal-time))))
+                     (truncate-to-unix-range guess))))
               (+ guess (- secwest secwest-guess)))))))
 
 ;;;; TIME
