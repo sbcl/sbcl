@@ -261,30 +261,15 @@
          (hours (+ hour (* days 24))))
     (if time-zone
         (+ second (* (+ minute (* (+ hours time-zone) 60)) 60))
-        ;; can't ask unix for times after 2037: this is only a problem
-        ;; if we need to query the system timezone
-        (if (> year 2037)
-            (labels ((leap-year-p (year)
-                       (cond ((zerop (mod year 400)) t)
-                             ((zerop (mod year 100)) nil)
-                             ((zerop (mod year 4)) t)
-                             (t nil))))
-              (let* ((fake-year (if (leap-year-p year) 2036 2037))
-                     (fake-time (encode-universal-time second minute hour
-                                                       date month fake-year)))
-                (+ fake-time
-                   (* 86400 (+ (* 365 (- year fake-year))
-                               (- (leap-years-before year)
-                                  (leap-years-before fake-year)))))))
-            (let* ((secwest-guess
-                    (sb!unix::unix-get-seconds-west
-                     (truncate-to-unix-range (* hours 60 60))))
-                   (guess (+ second (* 60 (+ minute (* hours 60)))
-                             secwest-guess))
-                   (secwest
-                    (sb!unix::unix-get-seconds-west
-                     (truncate-to-unix-range guess))))
-              (+ guess (- secwest secwest-guess)))))))
+        (let* ((secwest-guess
+                (sb!unix::unix-get-seconds-west
+                 (truncate-to-unix-range (* hours 60 60))))
+               (guess (+ second (* 60 (+ minute (* hours 60)))
+                         secwest-guess))
+               (secwest
+                (sb!unix::unix-get-seconds-west
+                 (truncate-to-unix-range guess))))
+          (+ guess (- secwest secwest-guess))))))
 
 ;;;; TIME
 
