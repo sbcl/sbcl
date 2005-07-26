@@ -128,8 +128,7 @@
     ;;
     ;; Some code (the hash table code) depends on this returning a
     ;; positive number so make sure it does.
-    (inst slwi res ptr 3)
-    (inst srwi res res 1)))
+    (inst rlwinm res ptr n-fixnum-tag-bits 1 n-positive-fixnum-bits)))
 
 (define-vop (make-other-immediate-type)
   (:args (val :scs (any-reg descriptor-reg))

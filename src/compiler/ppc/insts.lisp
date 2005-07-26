@@ -1828,6 +1828,12 @@
   (define-instruction-macro extlwi. (ra rs n b)
     `(inst rlwinm. ,ra ,rs ,b 0 (1- ,n)))
 
+  (define-instruction-macro extrwi (ra rs n b)
+    `(inst rlwinm ,ra ,rs (mod (+ ,b ,n) 32) (- 32 ,n) 31))
+
+  (define-instruction-macro extrwi. (ra rs n b)
+    `(inst rlwinm. ,ra ,rs (mod (+ ,b ,n) 32) (- 32 ,n) 31))
+
   (define-instruction-macro srwi (ra rs n)
     `(inst rlwinm ,ra ,rs (- 32 ,n) ,n 31))
 
