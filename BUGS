@@ -2111,3 +2111,7 @@ WORKAROUND:
   A simpler example:
 
   (compile nil '(lambda (x) (the (not (eql #\a)) x)))
+
+  (partially fixed in 0.9.3.1, but a better representation for these
+   types is needed.)
+

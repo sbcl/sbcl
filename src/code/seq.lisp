@@ -1548,40 +1548,69 @@
   (declare (fixnum start))
   (let* ((result (list ())) ; Put a marker on the beginning to splice with.
          (splice result)
-         (current list))
+         (current list)
+	 (hash (and test
+		    (not key)
+		    (not test-not)
+		    (or (eql test #'eql)
+			(eql test #'eq)
+			(eql test #'equal)
+			(eql test #'equalp))
+		    ; (> (if end (- end start) (- (length list) start)) 20)
+		    (make-hash-table :test test))))
     (do ((index 0 (1+ index)))
         ((= index start))
       (declare (fixnum index))
+      ;; (if hash (setf (gethash (car current) hash) splice))
       (setq splice (cdr (rplacd splice (list (car current)))))
       (setq current (cdr current)))
     (do ((index start (1+ index)))
         ((or (and end (= index (the fixnum end)))
              (atom current)))
       (declare (fixnum index))
-      (if (or (and from-end
-                   (not (if test-not
-                            (member (apply-key key (car current))
-                                    (nthcdr (1+ start) result)
-                                    :test-not test-not
-                                    :key key)
-                            (member (apply-key key (car current))
-                                    (nthcdr (1+ start) result)
-                                    :test test
-                                    :key key))))
-              (and (not from-end)
-                   (not (do ((it (apply-key key (car current)))
-                             (l (cdr current) (cdr l))
-                             (i (1+ index) (1+ i)))
-                            ((or (atom l) (and end (= i (the fixnum end))))
-                             ())
-                          (declare (fixnum i))
-                          (if (if test-not
-                                  (not (funcall test-not
-                                                it
-                                                (apply-key key (car l))))
-                                  (funcall test it (apply-key key (car l))))
-                              (return t))))))
-          (setq splice (cdr (rplacd splice (list (car current))))))
+      (cond
+       (hash
+	(let ((prev (gethash (car current) hash)))
+	  (cond
+	   ((not prev)
+	    (setf (gethash (car current) hash) splice)
+	    (setq splice (cdr (rplacd splice (list (car current))))))
+	   (from-end nil)
+	   (t
+	    (let ((old (cdr prev)))
+	      (let ((next (cdr old)))
+		(when next
+		  (let ((next-val (car next)))
+		    ;; (assert (eq (gethash next-val hash) old))
+		    (setf (cdr prev) next
+			  (gethash next-val hash) prev
+			  (gethash (car current) hash) splice
+			  splice (cdr (rplacd splice (list (car current)))))))))))))
+       (t
+	(if (or (and from-end
+		     (not (if test-not
+			      (member (apply-key key (car current))
+				      (nthcdr (1+ start) result)
+				      :test-not test-not
+				      :key key)
+			    (member (apply-key key (car current))
+				    (nthcdr (1+ start) result)
+				    :test test
+				    :key key))))
+		(and (not from-end)
+		     (not (do ((it (apply-key key (car current)))
+			       (l (cdr current) (cdr l))
+			       (i (1+ index) (1+ i)))
+			      ((or (atom l) (and end (= i (the fixnum end))))
+			       ())
+			    (declare (fixnum i))
+			    (if (if test-not
+				    (not (funcall test-not
+						  it
+						  (apply-key key (car l))))
+				  (funcall test it (apply-key key (car l))))
+				(return t))))))
+	    (setq splice (cdr (rplacd splice (list (car current))))))))
       (setq current (cdr current)))
     (do ()
         ((atom current))
