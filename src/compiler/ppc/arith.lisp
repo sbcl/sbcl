@@ -606,15 +606,13 @@
                (inst srawi result number amount))
              (inst slwi result number amount)))))))
 
-
-
 (define-vop (signed-byte-32-len)
   (:translate integer-length)
   (:note "inline (signed-byte 32) integer-length")
   (:policy :fast-safe)
   (:args (arg :scs (signed-reg)))
   (:arg-types signed-num)
-  (:results (res :scs (unsigned-reg)))
+  (:results (res :scs (unsigned-reg) :from :load))
   (:result-types unsigned-num)
   (:generator 6
     ; (integer-length arg) = (- 32 (cntlz (if (>= arg 0) arg (lognot arg))))
