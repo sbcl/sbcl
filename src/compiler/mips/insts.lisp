@@ -1012,10 +1012,6 @@
 (define-instruction-macro entry-point ()
   nil)
 
-#+nil
-(define-bitfield-emitter emit-break-inst 32
-  (byte 6 26) (byte 10 16) (byte 10 6) (byte 6 0))
-
 (defun snarf-error-junk (sap offset &optional length-only)
   (let* ((length (sb!sys:sap-ref-8 sap offset))
          (vector (make-array length :element-type '(unsigned-byte 8))))
@@ -1084,12 +1080,12 @@
    (emit-break-inst segment special-op code subcode #b001101)))
 
 (define-instruction syscall (segment)
-  (:printer register ((op special-op) (rd 0) (rt 0) (rs 0) (funct #b001100))
+  (:printer register ((op special-op) (rd 0) (rt 0) (rs 0) (funct #b001110))
             '(:name))
   :pinned
   (:delay 0)
   (:emitter
-   (emit-register-inst segment special-op 0 0 0 0 #b001100)))
+   (emit-register-inst segment special-op 0 0 0 0 #b001110)))
 
 (define-instruction nop (segment)
   (:printer register ((op 0) (rd 0) (rd 0) (rs 0) (funct 0)) '(:name))
