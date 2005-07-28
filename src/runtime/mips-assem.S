@@ -240,6 +240,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	.set	at
 	.set	reorder
 
+	/* Setup the lisp stack. */
 	move	reg_OCFP, reg_CFP
 	move	reg_CFP, reg_CSP
 	addu	reg_CSP, reg_CFP, 32
@@ -253,7 +254,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	/* Convert the return address to an offset and save it on the stack. */
 	subu	reg_NFP, reg_LIP, reg_CODE
 	addu	reg_NFP, OTHER_POINTER_LOWTAG
-	sw	reg_NFP, (reg_CFP)
+	sw	reg_LRA, (reg_CFP)
 	sw	reg_CODE, 4(reg_CFP)
 	sw	gp, 8(reg_CFP)
 
@@ -284,7 +285,11 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	move	reg_NL0, v0		# reg_CFUNC
 	move	reg_NL1, v1		# reg_NL4
 
-	/* Clear unsaved boxed descriptor regs before allowing an interrupt */
+	/*
+	 * Clear boxed descriptor registers before allowing an interrupt.
+	 * We can't rely on C saving some of those registers, they might
+	 * have been GCed in the meanwhile.
+	 */
 	li	reg_A0, 0		# t0
 	li	reg_A1, 0		# t1
 	li	reg_A2, 0		# t2
@@ -293,7 +298,14 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	li	reg_A5, 0		# t5
 	li	reg_FDEFN, 0		# t6
 	li	reg_LEXENV, 0		# t7
+	/*
+	 * reg_NFP and reg_OCFP are pointing to fixed locations and are
+	 * preserved by C.
+	 */
+	li	reg_LRA, 0		# s2
+	li	reg_L0, 0		# s3
 	li	reg_L1, 0		# t8
+	li	reg_CODE, 0		# s8
 	li	reg_LIP, 0		# ra
 
 	/* Turn on pseudo-atomic. */
@@ -312,9 +324,9 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	lw	reg_BSP, current_binding_stack_pointer
 
 	/* Restore LRA & CODE */
-	lw	reg_LIP, (reg_CFP)
+	lw	reg_LRA, (reg_CFP)
 	lw	reg_CODE, 4(reg_CFP)
-	subu	reg_LIP, OTHER_POINTER_LOWTAG
+	subu	reg_LIP, reg_NFP, OTHER_POINTER_LOWTAG
 	addu	reg_LIP, reg_CODE
 
 	/* Check for interrupt */
