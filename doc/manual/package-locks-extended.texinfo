@@ -7,9 +7,10 @@ None of the following sections apply to SBCL built without package
 locksing support.
 
 The interface described here is experimental: incompatible changes in
-future SBCL releases are possible, even expected: most notably the
-consept of implementation packages and the associated operators may be
-renamed.
+future SBCL releases are possible, even expected: the concept of
+``implementation packages'' and the associated operators may be renamed;
+more operations (such as naming restarts or catch tags) may be added to
+the the list of operations violating package locks.
 
 @menu
 * Package Lock Concepts::       
@@ -31,10 +32,10 @@ renamed.
 @comment  node-name,  next,  previous,  up
 @subsection Package Locking Overview
 
-Package locks protect against unintentional modifications of a
-package: they provide similar protection to user packages as is
-mandated to @code{common-lisp} package by the ANSI specification. They
-are not, and should not be used as a security measure.
+Package locks protect against unintentional modifications of a package:
+they provide similar protection to user packages as is mandated to
+@code{common-lisp} package by the ANSI specification. They are not, and
+should not be used as, a security measure.
 
 Newly created packages are by default unlocked (see the @code{:lock}
 option to @code{defpackage}).
@@ -48,6 +49,8 @@ but this is not currently done by default.
 
 @node Implementation Packages
 @subsection Implementation Packages
+@vindex *package*
+@findex defpackage
 
 Each package has a list of associated implementation packages. A
 locked package, and the symbols whose home package it is, can be
@@ -61,6 +64,13 @@ Unless explicitly altered by @code{defpackage},
 
 @node Package Lock Violations
 @subsection Package Lock Violations
+@tindex sb-ext:package-lock-violation
+@tindex sb-ext:package-locked-error
+@tindex sb-ext:symbol-package-locked-error
+@tindex package-lock-violation
+@tindex package-locked-error
+@tindex symbol-package-locked-error
+@tindex package-error
 
 If an operation violates a package lock, a continuable error that is
 of a subtype of @code{sb-ext:package-lock-violation} (subtype of
@@ -78,6 +88,18 @@ errors of type @code{sb-ext:symbol-package-locked-error}.
 @subsection Package Locks in Compiled Code
 
 @subsubsection Lexical bindings and declarations
+@findex let
+@findex let*
+@findex flet
+@findex labels
+@findex macrolet
+@findex symbol-macrolet
+@findex declare
+@cindex Declarations
+@findex sb-ext:disable-package-locks
+@findex sb-ext:enable-package-locks
+@findex disable-package-locks
+@findex enable-package-locks
 
 Compiling lexical binding constructs or lexical declarations that
 violate package locks causes a compile-time package-lock violation. A
@@ -107,9 +129,9 @@ Example:
 
 @subsubsection Interned symbols
 
-If compiled code contains interned symbols, then loading that code
+If file-compiled code contains interned symbols, then loading that code
 into an image without the said symbols will not cause a package lock
-violation even if the packages in question are locked.
+violation, even if the packages in question are locked.
 
 @subsubsection Other limitations on compiled code
 
@@ -123,7 +145,7 @@ runtime, and code compiled with packages locked may or may not signal
 spurious package-lock-violations at runtime even if the packages are
 unlocked.
 
-In practise all this means that package-locks have a neglible
+In practice all this means that package-locks have a neglible
 performance penalty in compiled code as long as they are not violated.
 
 @node Operations Violating Package Locks
@@ -131,12 +153,12 @@ performance penalty in compiled code as long as they are not violated.
 
 @subsubsection Operations on Packages
 
-Following actions cause a package lock violation if the package
+The following actions cause a package lock violation if the package
 operated on is locked, and @code{*package*} is not an implementation
 package of that package, and the action would cause a change in the
-state of the package (eg. exporting already external symbols is
-allowed). Package lock violations caused by these operations signal
-errors of type @code{sb-ext:package-locked-error}.
+state of the package (so e.g. exporting already external symbols is
+never a violation). Package lock violations caused by these operations
+signal errors of type @code{sb-ext:package-locked-error}.
 
 @enumerate
 @item
@@ -179,10 +201,10 @@ apparent violated package.
 Example:
 
 @lisp
-;; Packages FOO and BAR are locked.
-;;
-;; Two lexically apparent violated packages: exactly two
-;; package-locked-errors will be signalled.
+;;; Packages FOO and BAR are locked.
+;;;
+;;; Two lexically apparent violated packages: exactly two
+;;; package-locked-errors will be signalled.
 
 (defclass foo:point ()
   ((x :accessor bar:x)
@@ -285,17 +307,17 @@ has no effect.
 
 Syntax: @code{(sb-ext:enable-package-locks symbol*)}
 
-Re-enables package locks affecting the named symbols during
-compilation in the lexical scope of the declaration. Enabling locks
-that were not first disabled with @code{sb-ext:disable-package-locks}
-declararion, or enabling locks that are already enabled has no effect.
+Re-enables package locks affecting the named symbols during compilation
+in the lexical scope of the declaration. Enabling locks that were not
+first disabled with @code{sb-ext:disable-package-locks} declararion, or
+enabling locks that are already enabled has no effect.
 @end deftp
 
 @include condition-sb-ext-package-lock-violation.texinfo
 @include condition-sb-ext-package-locked-error.texinfo
 @include condition-sb-ext-symbol-package-locked-error.texinfo
 
-@defun sb-ext:package-locked-error-symbol @var{symbol-package-locked-error}
+@defun sb-ext:package-locked-error-symbol symbol-package-locked-error
 
 Returns the symbol that caused the @code{symbol-package-locked-error}
 condition.
@@ -311,7 +333,7 @@ condition.
 @include macro-sb-ext-without-package-locks.texinfo
 @include macro-sb-ext-with-unlocked-packages.texinfo
 
-@defmac defpackage name [[@var{option}]]* @result{} package
+@defmac defpackage name [[option]]* @result{} package
 
 Options are extended to include the following:
 

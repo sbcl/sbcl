@@ -271,16 +271,17 @@ steppers to maintain contextual information.")
   "Evaluate FORM, returning whatever it returns and adjusting ***, **, *,
    +++, ++, +, ///, //, /, and -."
   (setf - form)
-  (let ((results (multiple-value-list (eval form))))
-    (setf /// //
-          // /
-          / results
-          *** **
-          ** *
-          * (car results)))
-  (setf +++ ++
-        ++ +
-        + -)
+  (unwind-protect
+       (let ((results (multiple-value-list (eval form))))
+         (setf /// //
+               // /
+               / results
+               *** **
+               ** *
+               * (car results)))
+    (setf +++ ++
+          ++ +
+          + -))
   (unless (boundp '*)
     ;; The bogon returned an unbound marker.
     ;; FIXME: It would be safer to check every one of the values in RESULTS,
