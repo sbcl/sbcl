@@ -61,7 +61,8 @@
   (defreg l1 24) ; tagged temporary 1
   (defreg alloc 25) ; ALLOC pointer
   ;; 26 and 27 are used by the system kernel.
-  ;; 28 is the global pointer of our C runtime.
+  ;; 28 is the global pointer of our C runtime, and used for
+  ;; jump/branch relaxation in Lisp.
   (defreg nsp 29) ; number (native) stack pointer
   ;; C frame pointer, or additional saved register.
   (defreg code 30) ; current function object

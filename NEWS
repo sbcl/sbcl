@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.4 relative to sbcl-0.9.3:
+  * enhancement: SBCL on MIPS platforms now has a much larger dynamic
+    space for its heap.  (thanks to Thiemo Seufer)
   * optimizations: REMOVE-DUPLICATES now runs in linear time on
     lists in some cases.  This partially fixes bug 384.
 

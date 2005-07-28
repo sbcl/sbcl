@@ -57,18 +57,41 @@
 
 ;;;; Description of the target address space.
 
-;;; Where to put the different spaces.
-;;;
-(def!constant read-only-space-start #x01000000)
-(def!constant read-only-space-end   #x05000000)
+#!+irix
+(progn
+  ;; Where to put the different spaces.
+  ;; Old definitions, might be still relevant for an IRIX port.
+  ;;
+  (def!constant read-only-space-start #x01000000)
+  (def!constant read-only-space-end   #x05000000)
 
-(def!constant static-space-start    #x06000000)
-(def!constant static-space-end      #x08000000)
+  (def!constant static-space-start    #x06000000)
+  (def!constant static-space-end      #x08000000)
 
-(def!constant dynamic-0-space-start #x08000000)
-(def!constant dynamic-0-space-end   #x0c000000)
-(def!constant dynamic-1-space-start #x0c000000)
-(def!constant dynamic-1-space-end   #x10000000)
+  (def!constant dynamic-0-space-start #x08000000)
+  (def!constant dynamic-0-space-end   #x0c000000)
+  (def!constant dynamic-1-space-start #x0c000000)
+  (def!constant dynamic-1-space-end   #x10000000))
+
+#!+linux
+(progn
+  ;; Where to put the address spaces on Linux.
+  ;;
+  ;; C runtime executable segment starts at 0x00400000
+  (def!constant read-only-space-start #x01000000)
+  (def!constant read-only-space-end   #x08000000)
+
+  (def!constant static-space-start    #x08000000)
+  (def!constant static-space-end      #x10000000)
+  ;; C runtime read/write segment starts at 0x10000000, heap and DSOs
+  ;; start at 0x2a000000
+  (def!constant dynamic-0-space-start #x30000000)
+  (def!constant dynamic-0-space-end   #x50000000)
+  (def!constant dynamic-1-space-start #x50000000)
+  (def!constant dynamic-1-space-end   #x70000000)
+  ;; C stack grows downward from 0x80000000
+  )
+
 
 
 ;;;; Other non-type constants.
