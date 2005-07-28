@@ -2957,8 +2957,8 @@
     ((type= type (specifier-type 'standard-char)) 'standard-char)
     (t (let ((pairs (character-set-type-pairs type)))
         `(member ,@(loop for (low . high) in pairs
-                         append (loop for code from low upto high
-                                      collect (sb!xc:code-char code))))))))
+                         nconc (loop for code from low upto high
+				     collect (sb!xc:code-char code))))))))
 
 (!define-type-method (character-set :simple-=) (type1 type2)
   (let ((pairs1 (character-set-type-pairs type1))
