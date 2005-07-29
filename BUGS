@@ -2115,3 +2115,6 @@ WORKAROUND:
   (partially fixed in 0.9.3.1, but a better representation for these
    types is needed.)
 
+385:
+  (format nil "~4,1F" 0.001) => "0.00" (should be " 0.0");
+  (format nil "~4,1@F" 0.001) => "+.00" (should be "+0.0").
