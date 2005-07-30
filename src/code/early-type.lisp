@@ -341,9 +341,9 @@
   ;              (sort (mapcar #'car pairs) #'<)))
   ;; aver that the cars of the list elements are sorted into increasing order
   (aver (or (null pairs)
-	    (do ((p pairs (cdr p)))
-		((null (cdr p)) t)
-	      (when (> (caar p) (caadr p)) (return nil)))))
+            (do ((p pairs (cdr p)))
+                ((null (cdr p)) t)
+              (when (> (caar p) (caadr p)) (return nil)))))
   (let ((pairs (let (result)
                 (do ((pairs pairs (cdr pairs)))
                     ((null pairs) (nreverse result))
