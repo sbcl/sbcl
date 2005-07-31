@@ -2986,6 +2986,7 @@
 
 (!define-type-method (character-set :simple-intersection2) (type1 type2)
   ;; KLUDGE: brute force.
+#|
   (let (pairs)
     (dolist (pair1 (character-set-type-pairs type1)
             (make-character-set-type
@@ -2995,7 +2996,54 @@
          ((<= (car pair1) (car pair2) (cdr pair1))
           (push (cons (car pair2) (min (cdr pair1) (cdr pair2))) pairs))
          ((<= (car pair2) (car pair1) (cdr pair2))
-          (push (cons (car pair1) (min (cdr pair1) (cdr pair2))) pairs)))))))
+          (push (cons (car pair1) (min (cdr pair1) (cdr pair2))) pairs))))))
+|#
+  (make-character-set-type
+   :pairs (intersect-type-pairs
+           (character-set-type-pairs type1)
+           (character-set-type-pairs type2))))
+
+;;;
+;;; Intersect two ordered lists of pairs
+;;; Each list is of the form ((start1 . end1) ... (startn . endn)),
+;;; where start1 <= end1 < start2 <= end2 < ... < startn <= endn.
+;;; Each pair represents the integer interval start..end.
+;;;
+(defun intersect-type-pairs (alist1 alist2)
+  (if (and alist1 alist2)
+      (let ((res nil)
+            (pair1 (pop alist1))
+            (pair2 (pop alist2)))
+        (loop
+         (when (> (car pair1) (car pair2))
+           (rotatef pair1 pair2)
+           (rotatef alist1 alist2))
+         (let ((pair1-cdr (cdr pair1)))
+           (cond
+            ((> (car pair2) pair1-cdr)
+             ;; No over lap -- discard pair1
+             (unless alist1 (return))
+             (setq pair1 (pop alist1)))
+            ((<= (cdr pair2) pair1-cdr)
+             (push (cons (car pair2) (cdr pair2)) res)
+             (cond
+              ((= (cdr pair2) pair1-cdr)
+               (unless alist1 (return))
+               (unless alist2 (return))
+               (setq pair1 (pop alist1)
+                     pair2 (pop alist2)))
+              (t ;; (< (cdr pair2) pair1-cdr)
+               (unless alist2 (return))
+               (setq pair1 (cons (1+ (cdr pair2)) pair1-cdr))
+               (setq pair2 (pop alist2)))))
+            (t ;; (> (cdr pair2) (cdr pair1))
+             (push (cons (car pair2) pair1-cdr) res)
+             (unless alist1 (return))
+             (setq pair2 (cons (1+ pair1-cdr) (cdr pair2)))
+             (setq pair1 (pop alist1))))))
+        (nreverse res))
+    nil))
+
 
 ;;; Return the type that describes all objects that are in X but not
 ;;; in Y. If we can't determine this type, then return NIL.
