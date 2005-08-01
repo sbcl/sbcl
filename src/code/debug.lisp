@@ -471,28 +471,20 @@ is how many frames to show."
                 (nreverse (mapcar #'cdr *debug-print-variable-alist*))
               (apply fun rest)))))))
 
-;;; the ordinary ANSI case of INVOKE-DEBUGGER, when not suppressed by
-;;; command-line --disable-debugger option
 (defun invoke-debugger (condition)
   #!+sb-doc
   "Enter the debugger."
 
-  (let ((old-hook *debugger-hook*))
-    (when old-hook
-      (let ((*debugger-hook* nil))
-        (funcall old-hook condition old-hook))))
+  ;; call *INVOKE-DEBUGGER-HOOK* first, so that *DEBUGGER-HOOK* is not
+  ;; called when the debugger is disabled
   (let ((old-hook *invoke-debugger-hook*))
     (when old-hook
       (let ((*invoke-debugger-hook* nil))
         (funcall old-hook condition old-hook))))
-
-  ;; Note: CMU CL had (SB-UNIX:UNIX-SIGSETMASK 0) here, to reset the
-  ;; signal state in the case that we wind up in the debugger as a
-  ;; result of something done by a signal handler.  It's not
-  ;; altogether obvious that this is necessary, and indeed SBCL has
-  ;; not been doing it since 0.7.8.5.  But nobody seems altogether
-  ;; convinced yet
-  ;; -- dan 2003.11.11, based on earlier comment of WHN 2002-09-28
+  (let ((old-hook *debugger-hook*))
+    (when old-hook
+      (let ((*debugger-hook* nil))
+        (funcall old-hook condition old-hook))))
 
   ;; We definitely want *PACKAGE* to be of valid type.
   ;;
@@ -650,15 +642,15 @@ reset to ~S."
 ;;; noninteractive and interactive use respectively
 (defun disable-debugger ()
   (when (eql *invoke-debugger-hook* nil)
-    (setf *debug-io* *error-output*
-          *invoke-debugger-hook* 'debugger-disabled-hook)))
+    ;; *DEBUG-IO* used to be set here to *ERROR-OUTPUT* which is sort
+    ;; of unexpected but mostly harmless, but then ENABLE-DEBUGGER had
+    ;; to set it to a suitable value again and be very careful,
+    ;; especially if the user has also set it. -- MG 2005-07-15
+    (setf *invoke-debugger-hook* 'debugger-disabled-hook)))
 
 (defun enable-debugger ()
   (when (eql *invoke-debugger-hook* 'debugger-disabled-hook)
-    (setf *debug-io* *query-io*
-          *invoke-debugger-hook* nil)))
-
-(setf *debug-io* *query-io*)
+    (setf *invoke-debugger-hook* nil)))
 
 (defun show-restarts (restarts s)
   (cond ((null restarts)
@@ -718,6 +710,14 @@ reset to ~S."
   "When set, avoid calling INVOKE-DEBUGGER recursively when errors occur while
    executing in the debugger.")
 
+(defun debug-read (stream)
+  (declare (type stream stream))
+  (let* ((eof-marker (cons nil nil))
+         (form (read stream nil eof-marker)))
+    (if (eq form eof-marker)
+        (abort)
+        form)))
+
 (defun debug-loop-fun ()
   (let* ((*debug-command-level* (1+ *debug-command-level*))
          (*real-stack-top* (sb!di:top-frame))
@@ -732,38 +732,39 @@ reset to ~S."
       (terpri *debug-io*)
       (print-frame-call *current-frame* *debug-io* :verbosity 2)
       (loop
-        (catch 'debug-loop-catcher
-          (handler-bind ((error (lambda (condition)
-                                  (when *flush-debug-errors*
-                                    (clear-input *debug-io*)
-                                    (princ condition *debug-io*)
-                                    (format *debug-io*
-                                            "~&error flushed (because ~
+       (catch 'debug-loop-catcher
+         (handler-bind ((error (lambda (condition)
+                                 (when *flush-debug-errors*
+                                   (clear-input *debug-io*)
+                                   (princ condition *debug-io*)
+                                   (format *debug-io*
+                                           "~&error flushed (because ~
                                              ~S is set)"
-                                            '*flush-debug-errors*)
-                                    (/show0 "throwing DEBUG-LOOP-CATCHER")
-                                    (throw 'debug-loop-catcher nil)))))
-            ;; We have to bind LEVEL for the restart function created by
-            ;; WITH-SIMPLE-RESTART.
-            (let ((level *debug-command-level*)
-                  (restart-commands (make-restart-commands)))
-              (with-simple-restart (abort
-                                   "~@<Reduce debugger level (to debug level ~W).~@:>"
-                                    level)
-                (debug-prompt *debug-io*)
-                (force-output *debug-io*)
-                (let* ((exp (read *debug-io*))
-                       (cmd-fun (debug-command-p exp restart-commands)))
-                  (cond ((not cmd-fun)
-                         (debug-eval-print exp))
-                        ((consp cmd-fun)
-                         (format *debug-io*
-                                 "~&Your command, ~S, is ambiguous:~%"
-                                 exp)
-                         (dolist (ele cmd-fun)
-                           (format *debug-io* "   ~A~%" ele)))
-                        (t
-                         (funcall cmd-fun))))))))))))
+                                           '*flush-debug-errors*)
+                                   (/show0 "throwing DEBUG-LOOP-CATCHER")
+                                   (throw 'debug-loop-catcher nil)))))
+           ;; We have to bind LEVEL for the restart function created by
+           ;; WITH-SIMPLE-RESTART.
+           (let ((level *debug-command-level*)
+                 (restart-commands (make-restart-commands)))
+             (flush-standard-output-streams)
+             (debug-prompt *debug-io*)
+             (force-output *debug-io*)
+             (let* ((exp (debug-read *debug-io*))
+                    (cmd-fun (debug-command-p exp restart-commands)))
+               (with-simple-restart (abort
+                                     "~@<Reduce debugger level (to debug level ~W).~@:>"
+                                     level)
+                 (cond ((not cmd-fun)
+                        (debug-eval-print exp))
+                       ((consp cmd-fun)
+                        (format *debug-io*
+                                "~&Your command, ~S, is ambiguous:~%"
+                                exp)
+                        (dolist (ele cmd-fun)
+                          (format *debug-io* "   ~A~%" ele)))
+                       (t
+                        (funcall cmd-fun))))))))))))
 
 (defun debug-eval-print (expr)
   (/noshow "entering DEBUG-EVAL-PRINT" expr)
@@ -1095,8 +1096,8 @@ reset to ~S."
   (let ((num (read-if-available :prompt)))
     (when (eq num :prompt)
       (show-restarts *debug-restarts* *debug-io*)
-      (write-string "restart: ")
-      (force-output)
+      (write-string "restart: " *debug-io*)
+      (force-output *debug-io*)
       (setf num (read *debug-io*)))
     (let ((restart (typecase num
                      (unsigned-byte

@@ -298,8 +298,10 @@ steppers to maintain contextual information.")
                   *error-output*
                   *query-io*
                   *standard-output*
-                  *trace-output*))
-    (finish-output (symbol-value name)))
+                  *trace-output*
+                  *terminal-io*))
+    ;; FINISH-OUTPUT may block more easily than FORCE-OUTPUT
+    (force-output (symbol-value name)))
   (values))
 
 (defun process-init-file (truename)
@@ -586,6 +588,7 @@ steppers to maintain contextual information.")
           (scrub-control-stack)
           (sb!thread::get-foreground)
           (unless noprint
+            (flush-standard-output-streams)
             (funcall *repl-prompt-fun* *standard-output*)
             ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own
             ;; FORCE-OUTPUT? I can't imagine a valid reason for it not to

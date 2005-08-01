@@ -321,14 +321,12 @@ in trouble (by printing a debug prompt, then listening, on
 with no programmer available, and this option tries to set up more
 appropriate behavior for that situation. This is implemented by
 redefining INVOKE-DEBUGGER so that any call exits the process with a
-failure code after printing a backtrace, and by redefining *DEBUG-IO*
-to send its output to *ERROR-OUTPUT* and to raise an error if any
-input is requested from it. (Note that because it is implemented by
-modifying special variables and FDEFINITIONs, its effects persist in
-.core files created by SB-EXT:SAVE-LISP-AND-DIE. If you want to undo
-its effects, e.g. if you build a system unattended and then want to
-operate a derived system interactively, see the SB-EXT:ENABLE-DEBUGGER
-command.)
+failure code after printing a backtrace. (Note that because it is
+implemented by modifying special variables and FDEFINITIONs, its
+effects persist in .core files created by SB-EXT:SAVE-LISP-AND-DIE. If
+you want to undo its effects, e.g. if you build a system unattended
+and then want to operate a derived system interactively, see the
+SB-EXT:ENABLE-DEBUGGER command.)
 .PP
 
 Regardless of the order in which --sysinit, --userinit, and --eval
