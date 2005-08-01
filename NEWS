@@ -2,6 +2,10 @@
 changes in sbcl-0.9.4 relative to sbcl-0.9.3:
   * enhancement: SBCL on MIPS platforms now has a much larger dynamic
     space for its heap.  (thanks to Thiemo Seufer)
+  * bug fix: discriminating functions for generic function classes
+    with non-standard methods for COMPUTE-APPLICABLE-METHODS no longer
+    make invalid assumptions about method precedence order.  (reported
+    by Bruno Haible)
   * optimizations: REMOVE-DUPLICATES now runs in linear time on
     lists in some cases.  This partially fixes bug 384.
 

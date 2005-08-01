@@ -615,7 +615,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (defun use-dispatch-dfun-p (gf &optional (caching-p (use-caching-dfun-p gf)))
   (when (eq *boot-state* 'complete)
-    (unless (or caching-p (gf-requires-emf-keyword-checks gf))
+    (unless (or caching-p 
+                (gf-requires-emf-keyword-checks gf))
       ;; This should return T when almost all dispatching is by
       ;; eql specializers or built-in classes. In other words,
       ;; return NIL if we might ever need to do more than
