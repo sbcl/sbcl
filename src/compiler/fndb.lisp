@@ -671,6 +671,7 @@
 (defknown nth (unsigned-byte list) t (foldable flushable))
 (defknown nthcdr (unsigned-byte list) t (foldable unsafely-flushable))
 (defknown last (list &optional unsigned-byte) t (foldable flushable))
+(defknown sb!impl::last1 (list) t (foldable flushable))
 (defknown list (&rest t) list (movable flushable unsafe))
 (defknown list* (t &rest t) t (movable flushable unsafe))
 (defknown make-list (index &key (:initial-element t)) list
@@ -689,6 +690,7 @@
 ;;; express that in this syntax. The result must be LIST, but we do
 ;;; not check it now :-).
 (defknown nconc (&rest t) t ())
+(defknown sb!impl::nconc2 (list t) t ())
 
 (defknown nreconc (list t) t ())
 (defknown butlast (list &optional unsigned-byte) list (flushable))

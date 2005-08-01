@@ -18,8 +18,8 @@
 ;;;; -- WHN 20000127
 
 (declaim (maybe-inline
-          tree-equal nth %setnth nthcdr last make-list append
-          nconc member member-if member-if-not tailp adjoin union
+          tree-equal nth %setnth nthcdr last last1 make-list append
+          nconc nconc2 member member-if member-if-not tailp adjoin union
           nunion intersection nintersection set-difference nset-difference
           set-exclusive-or nset-exclusive-or subsetp acons assoc
           assoc-if assoc-if-not rassoc rassoc-if rassoc-if-not subst subst-if
@@ -230,18 +230,27 @@
               (fast-nthcdr (mod n i) r-i))
            (declare (type index i)))))))
 
+(defun last1 (list)
+  #!+sb-doc
+  "Return the last cons (not the last element) of a list"
+  (let ((rest list))
+    (loop (unless (consp rest) (return list))
+          (shiftf list rest (cdr rest)))))
+
 (defun last (list &optional (n 1))
   #!+sb-doc
   "Return the last N conses (not the last element!) of a list."
-  (if (typep n 'index)
-      (do ((checked-list list (cdr checked-list))
-           (returned-list list)
-           (index 0 (1+ index)))
-          ((atom checked-list) returned-list)
-        (declare (type index index))
-        (if (>= index n)
-            (pop returned-list)))
-      list))
+  (if (eql n 1)
+      (last1 list)
+    (if (typep n 'index)
+        (do ((checked-list list (cdr checked-list))
+             (returned-list list)
+             (index 0 (1+ index)))
+            ((atom checked-list) returned-list)
+          (declare (type index index))
+          (if (>= index n)
+              (pop returned-list)))
+      list)))
 
 (defun list (&rest args)
   #!+sb-doc
@@ -385,12 +394,12 @@
                  ((endp elements))
                (let ((ele (car elements)))
                  (typecase ele
-                   (cons (rplacd (last splice) ele)
+                   (cons (rplacd (last1 splice) ele)
                          (setf splice ele))
-                   (null (rplacd (last splice) nil))
+                   (null (rplacd (last1 splice) nil))
                    (atom (if (cdr elements)
                              (fail ele)
-                             (rplacd (last splice) ele)))
+                             (rplacd (last1 splice) ele)))
                    (t (fail ele)))))
              (return result)))
           (null)
@@ -399,6 +408,16 @@
                (fail top-of-top)
                (return top-of-top)))
           (t (fail top-of-top)))))))
+
+(defun nconc2 (x y)
+  (if (null x) y
+    (let ((z x)
+          (rest (cdr x)))
+      (loop
+       (unless (consp rest)
+         (rplacd z y)
+         (return x))
+       (shiftf z rest (cdr rest))))))
 
 (defun nreconc (x y)
   #!+sb-doc
@@ -1102,7 +1121,7 @@
           (setf (car l) (cdar l)))
         (setq res (apply fun (nreverse args)))
         (case accumulate
-          (:nconc (setq temp (last (nconc temp res))))
+          (:nconc (setq temp (last1 (nconc temp res))))
           (:list (rplacd temp (list res))
                  (setq temp (cdr temp))))))))
 

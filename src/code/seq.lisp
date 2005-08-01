@@ -1550,14 +1550,14 @@
          (splice result)
          (current list)
          (end (or end (length list)))
-         (hash (and test
+         (hash (and (> (- end start) 20)
+                    test
                     (not key)
                     (not test-not)
                     (or (eql test #'eql)
                         (eql test #'eq)
                         (eql test #'equal)
                         (eql test #'equalp))
-                    ; (> (- end start) 20)
                     (make-hash-table :test test :size (- end start)))))
     (do ((index 0 (1+ index)))
         ((= index start))
