@@ -9,7 +9,7 @@
 # While most of SBCL is derived from the CMU CL system, the test
 # files (like this one) were written from scratch after the fork
 # from CMU CL.
-# 
+#
 # This software is in the public domain and is provided with
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
@@ -38,7 +38,7 @@ build_so() {
   cc -c $1.c -o $1.o $CFLAGS
   ld $SO_FLAGS -o $1.so $1.o
 }
-    
+
 echo 'int summish(int x, int y) { return 1 + x + y; }' > $testfilestem.c
 echo 'int numberish = 42;' >> $testfilestem.c
 echo 'int nummish(int x) { return numberish + x; }' >> $testfilestem.c
@@ -89,7 +89,7 @@ cat > $testfilestem.def.lisp <<EOF
   (defvar *extern* (extern-alien "negative_short" short))
 
   ;; Test that loading an object file didn't screw up our records
-  ;; of variables visible in runtime. (This was a bug until 
+  ;; of variables visible in runtime. (This was a bug until
   ;; Nikodemus Siivola's patch in sbcl-0.8.5.50.)
   ;;
   ;; This cannot be tested in a saved core, as there is no guarantee
@@ -97,8 +97,9 @@ cat > $testfilestem.def.lisp <<EOF
   (assert (= (sb-sys:sap-int (alien-sap *environ*))
              (sb-sys:sap-int (alien-sap environ))))
 
+  (enable-debugger)
   ;; automagic restarts
-  (setf *debugger-hook* 
+  (setf *debugger-hook*
         (lambda (condition hook)
           (print (list :debugger-hook condition))
           (let ((cont (find-restart 'continue condition)))
@@ -173,7 +174,7 @@ if [ $RET = 22 ]; then
 elif [ $RET != 52 ]; then
     rm $testfilestem.*
     echo test failed: $?
-    exit 1 
+    exit 1
 fi
 
 echo load ok
@@ -220,4 +221,4 @@ echo missing ok
 rm -f $testfilestem.* $testfilestem-*
 
 # success convention for script
-exit 104 
+exit 104

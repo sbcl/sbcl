@@ -376,11 +376,15 @@
                                             (incf error-counter)))
                      :normal-exit))))))))
 
+(enable-debugger)
+
 (test-inifinite-error-protection)
 
 #+sb-thread
 (let ((thread (sb-thread:make-thread #'test-inifinite-error-protection)))
   (loop while (sb-thread:thread-alive-p thread)))
+
+(disable-debugger)
 
 ;;; success
 (quit :unix-status 104)
