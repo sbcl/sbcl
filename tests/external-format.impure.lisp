@@ -15,9 +15,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-sb-unicode
-(sb-ext:quit :unix-status 104)
-
 (defmacro do-external-formats ((xf &optional result) &body body)
   (let ((nxf (gensym)))
     `(dolist (,nxf sb-impl::*external-formats* ,result)
@@ -39,6 +36,10 @@
                      :external-format xf)
       (loop for character across standard-characters
             do (assert (eql (read-char s) character))))))
+
+(delete-file "external-format-test.txt")
+#-sb-unicode
+(sb-ext:quit :unix-status 104)
 
 ;;; Test UTF-8 writing and reading of 1, 2, 3 and 4 octet characters with
 ;;; all possible offsets. Tests for buffer edge bugs. fd-stream buffers are
@@ -134,6 +135,28 @@
       (when p
         (delete-file p)))))
 
-(delete-file "external-format-test.txt")
+
+;;;; KOI8-R external format
+(with-open-file (s "external-format-test.txt" :direction :output
+                 :if-exists :supersede :external-format :koi8-r)
+  (write-char (code-char #xB0) s)
+  (assert (eq
+           (handler-case
+               (progn
+                 (write-char (code-char #xBAAD) s)
+                 :bad)
+             (sb-int:character-encoding-error ()
+               :good))
+           :good)))
+(with-open-file (s "external-format-test.txt" :direction :input
+                 :element-type '(unsigned-byte 8))
+  (let ((byte (read-byte s)))
+    (assert (= (eval byte) #x9C))))
+(with-open-file (s "external-format-test.txt" :direction :input
+                 :external-format :koi8-r)
+  (let ((char (read-char s)))
+    (assert (= (char-code (eval char)) #xB0))))
 
+
+(delete-file "external-format-test.txt")
 (sb-ext:quit :unix-status 104)

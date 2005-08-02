@@ -190,12 +190,12 @@ one-past-the-end"
       (declare (optimize speed (safety 0))
                (type char-code code))
       (case code
-        (,(mapcar #'car exceptions) nil)
         ,@(mapcar (lambda (exception)
                     (destructuring-bind (byte code) exception
                       `(,code ,byte)))
                   exceptions)
-        (otherwise code)))))
+        (,(mapcar #'car exceptions) nil)
+        (otherwise (if (< code 256) code nil))))))
 
 #!+sb-unicode
 (define-unibyte-mapper
