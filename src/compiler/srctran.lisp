@@ -128,6 +128,13 @@
 
 (define-source-transform nth (n l) `(car (nthcdr ,n ,l)))
 
+;; (define-source-transform last (x) `(sb!impl::last1 ,x))
+(define-source-transform last (x)
+  `(let* ((x (the list ,x))
+          (r (cdr x)))
+     (do () ((atom r) x)
+       (shiftf x r (cdr r)))))
+
 (defvar *default-nthcdr-open-code-limit* 6)
 (defvar *extreme-nthcdr-open-code-limit* 20)
 

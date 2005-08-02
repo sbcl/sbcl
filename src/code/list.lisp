@@ -394,12 +394,12 @@
                  ((endp elements))
                (let ((ele (car elements)))
                  (typecase ele
-                   (cons (rplacd (last1 splice) ele)
+                   (cons (rplacd (last splice) ele)
                          (setf splice ele))
-                   (null (rplacd (last1 splice) nil))
+                   (null (rplacd (last splice) nil))
                    (atom (if (cdr elements)
                              (fail ele)
-                             (rplacd (last1 splice) ele)))
+                             (rplacd (last splice) ele)))
                    (t (fail ele)))))
              (return result)))
           (null)
@@ -1121,7 +1121,7 @@
           (setf (car l) (cdar l)))
         (setq res (apply fun (nreverse args)))
         (case accumulate
-          (:nconc (setq temp (last1 (nconc temp res))))
+          (:nconc (setq temp (last (nconc temp res))))
           (:list (rplacd temp (list res))
                  (setq temp (cdr temp))))))))
 
