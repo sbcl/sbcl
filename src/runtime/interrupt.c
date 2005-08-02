@@ -43,6 +43,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -740,9 +741,10 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
      * must obviously exist in reality.  That would be post_signal_tramp
      */
 
-    u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
+    uint32_t *sp=(uint32_t *)*os_context_register_addr(context,reg_ESP);
 
-    *(sp-15) = post_signal_tramp; /* return address for call_into_lisp */
+    /* return address for call_into_lisp: */
+    *(sp-15) = (uint32_t)post_signal_tramp;
     *(sp-14) = function;        /* args for call_into_lisp : function*/
     *(sp-13) = 0;               /*                           arg array */
     *(sp-12) = 0;               /*                           no. args */
@@ -763,8 +765,9 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *(sp-1)=*os_context_pc_addr(context);
 
 #elif defined(LISP_FEATURE_X86_64)
-    u64 *sp=(u64 *)*os_context_register_addr(context,reg_RSP);
-    *(sp-18) = post_signal_tramp;  /* return address for call_into_lisp */
+    uint64_t *sp=(uint64_t *)*os_context_register_addr(context,reg_RSP);
+    /* return address for call_into_lisp: */
+    *(sp-18) = (uint64_t)post_signal_tramp;
 
     *(sp-17)=*os_context_register_addr(context,reg_R15);
     *(sp-16)=*os_context_register_addr(context,reg_R14);
@@ -785,7 +788,8 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *(sp-2)=*os_context_register_addr(context,reg_RBP);
     *(sp-1)=*os_context_pc_addr(context);
 
-    *os_context_register_addr(context,reg_RDI) = function; /* function */
+    *os_context_register_addr(context,reg_RDI) =
+        (os_context_register_t)function; /* function */
     *os_context_register_addr(context,reg_RSI) = 0;        /* arg. array */
     *os_context_register_addr(context,reg_RDX) = 0;        /* no. args */
 #else
@@ -794,27 +798,28 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 #endif
 
 #ifdef LISP_FEATURE_X86
-    *os_context_pc_addr(context) = call_into_lisp;
+    *os_context_pc_addr(context) = (os_context_register_t)call_into_lisp;
     *os_context_register_addr(context,reg_ECX) = 0;
-    *os_context_register_addr(context,reg_EBP) = sp-2;
+    *os_context_register_addr(context,reg_EBP) = (os_context_register_t)(sp-2);
 #ifdef __NetBSD__
-    *os_context_register_addr(context,reg_UESP) = sp-15;
+    *os_context_register_addr(context,reg_UESP) =
+        (os_context_register_t)(sp-15);
 #else
-    *os_context_register_addr(context,reg_ESP) = sp-15;
+    *os_context_register_addr(context,reg_ESP) = (os_context_register_t)(sp-15);
 #endif
 #elif defined(LISP_FEATURE_X86_64)
-    *os_context_pc_addr(context) = call_into_lisp;
+    *os_context_pc_addr(context) = (os_context_register_t)call_into_lisp;
     *os_context_register_addr(context,reg_RCX) = 0;
-    *os_context_register_addr(context,reg_RBP) = sp-2;
-    *os_context_register_addr(context,reg_RSP) = sp-18;
+    *os_context_register_addr(context,reg_RBP) = (os_context_register_t)(sp-2);
+    *os_context_register_addr(context,reg_RSP) = (os_context_register_t)(sp-18);
 #else
     /* this much of the calling convention is common to all
        non-x86 ports */
-    *os_context_pc_addr(context) = code;
+    *os_context_pc_addr(context) = (os_context_register_t)code;
     *os_context_register_addr(context,reg_NARGS) = 0;
-    *os_context_register_addr(context,reg_LIP) = code;
+    *os_context_register_addr(context,reg_LIP) = (os_context_register_t)code;
     *os_context_register_addr(context,reg_CFP) =
-        current_control_frame_pointer;
+        (os_context_register_t)current_control_frame_pointer;
 #endif
 #ifdef ARCH_HAS_NPC_REGISTER
     *os_context_npc_addr(context) =
@@ -822,7 +827,7 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 #endif
 #ifdef LISP_FEATURE_SPARC
     *os_context_register_addr(context,reg_CODE) =
-        fun + FUN_POINTER_LOWTAG;
+        (os_context_register_t)(fun + FUN_POINTER_LOWTAG);
 #endif
 }
 
@@ -845,7 +850,7 @@ void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
     get_spinlock(&th->interrupt_fun_lock,(long)th);
     c=((struct cons *)native_pointer(th->interrupt_fun));
     arrange_return_to_lisp_function(context,c->car);
-    th->interrupt_fun=(lispobj *)(c->cdr);
+    th->interrupt_fun=c->cdr;
     release_spinlock(&th->interrupt_fun_lock);
 }
 
@@ -861,7 +866,8 @@ void undefined_alien_function() {
     funcall0(SymbolFunction(UNDEFINED_ALIEN_FUNCTION_ERROR));
 }
 
-boolean handle_guard_page_triggered(os_context_t *context,void *addr){
+boolean handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
+{
     struct thread *th=arch_os_get_current_thread();
 
     /* note the os_context hackery here.  When the signal handler returns,

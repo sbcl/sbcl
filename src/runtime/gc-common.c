@@ -649,7 +649,7 @@ scav_instance(lispobj *where, lispobj object)
 {
     lispobj nuntagged;
     long ntotal = HeaderValue(object);
-    lispobj layout = ((struct instance *)native_pointer(where))->slots[0];
+    lispobj layout = ((struct instance *)where)->slots[0];
 
     if (!layout)
         return 1;
@@ -1507,8 +1507,7 @@ size_weak_pointer(lispobj *where)
 void scan_weak_pointers(void)
 {
     struct weak_pointer *wp;
-    for (wp = weak_pointers; wp != NULL;
-         wp=(struct weak_pointer *)native_pointer(wp->next)) {
+    for (wp = weak_pointers; wp != NULL; wp=wp->next) {
         lispobj value = wp->value;
         lispobj *first_pointer;
         gc_assert(widetag_of(wp->header)==WEAK_POINTER_WIDETAG);

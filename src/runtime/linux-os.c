@@ -47,6 +47,11 @@
 
 #include "validate.h"
 #include "thread.h"
+#include "gc.h"
+#if defined LISP_FEATURE_GENCGC
+#include "gencgc-internal.h"
+#endif
+
 size_t os_vm_page_size;
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -68,9 +73,21 @@ _syscall4(int,sys_futex,
           int, op,
           int, val,
           struct timespec *, rel);
+
+int
+futex_wait(int *lock_word, int oldval)
+{
+    int t= sys_futex(lock_word,FUTEX_WAIT,oldval, 0);
+    return t;
+}
+
+int
+futex_wake(int *lock_word, int n)
+{
+    return sys_futex(lock_word,FUTEX_WAKE,n,0);
+}
 #endif
 
-#include "gc.h"
 
 int linux_sparc_siginfo_bug = 0;
 int linux_no_threads_p = 0;
@@ -275,18 +292,3 @@ os_install_interrupt_handlers(void)
                                                  sig_stop_for_gc_handler);
 #endif
 }
-
-#ifdef LISP_FEATURE_SB_THREAD
-int
-futex_wait(int *lock_word, int oldval)
-{
-    int t= sys_futex(lock_word,FUTEX_WAIT,oldval, 0);
-    return t;
-}
-
-int
-futex_wake(int *lock_word, int n)
-{
-    return sys_futex(lock_word,FUTEX_WAKE,n,0);
-}
-#endif

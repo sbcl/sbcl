@@ -14,8 +14,8 @@
  */
 
 #define LANGUAGE_ASSEMBLY
-#include "validate.h"
 #include "sbcl.h"
+#include "validate.h"
 #include "genesis/closure.h"
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"

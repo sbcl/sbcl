@@ -77,6 +77,11 @@ void check_sig_stop_for_gc_can_arrive_or_lose()
     }
 #endif
 
+
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+extern lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs);
+#endif
+
 int
 initial_thread_trampoline(struct thread *th)
 {
@@ -84,7 +89,6 @@ initial_thread_trampoline(struct thread *th)
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     lispobj *args = NULL;
 #endif
-
     function = th->unbound_marker;
     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) return 1;
@@ -272,6 +276,11 @@ void create_initial_thread(lispobj initial_function) {
 
 #ifdef LISP_FEATURE_SB_THREAD
 
+#ifndef __USE_XOPEN2K
+extern int pthread_attr_setstack (pthread_attr_t *__attr, void *__stackaddr,
+				  size_t __stacksize);
+#endif
+
 boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
 {
     /* The new thread inherits the restrictive signal mask set here,
@@ -330,7 +339,7 @@ struct thread *create_thread(lispobj initial_function) {
 void reap_dead_thread(struct thread *th)
 {
     if(th->state!=STATE_DEAD)
-        lose("thread %lx is not joinable, state=%d\n",th,th->state);
+        lose("thread %p is not joinable, state=%d\n",th,th->state);
 #ifdef LISP_FEATURE_GENCGC
     {
         sigset_t newset,oldset;
@@ -377,7 +386,7 @@ int interrupt_thread(struct thread *th, lispobj function)
          * interrupt_fun data for exactly as many signals as are
          * going to be received by the destination thread.
          */
-        struct cons *c=alloc_cons(function,NIL);
+        lispobj c=alloc_cons(function,NIL);
         int kill_status;
         /* interrupt_thread_handler locks this spinlock with
          * interrupts blocked and it does so for the sake of

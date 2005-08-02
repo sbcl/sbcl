@@ -124,7 +124,7 @@ int arch_os_thread_init(struct thread *thread) {
 struct thread *debug_get_fs() {
     register u32 fs;
     __asm__ __volatile__ ("movl %%fs,%0" : "=r" (fs)  : );
-    return fs;
+    return (struct thread *)fs;
 }
 
 /* free any arch/os-specific resources used by thread, which is now
@@ -213,4 +213,3 @@ void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
 }
-

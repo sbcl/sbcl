@@ -20,6 +20,8 @@
 
 #include "sbcl.h"
 #include "runtime.h"
+#include "parse.h"
+#include "vars.h"
 
 /* Almost all of this file can be skipped if we're not supporting LDB. */
 #if defined(LISP_FEATURE_SB_LDB)

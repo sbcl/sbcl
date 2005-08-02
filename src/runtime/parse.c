@@ -213,29 +213,30 @@ char *parse_addr(ptr)
 char **ptr;
 {
     char *token = parse_token(ptr);
-    long result;
+    lispobj result;
 
     if (token == NULL) {
         printf("expected an address\n");
         throw_to_monitor();
     }
     else if (token[0] == '$') {
-        if (!lookup_variable(token+1, (lispobj *)&result)) {
+        if (!lookup_variable(token+1, &result)) {
             printf("unknown variable: ``%s''\n", token);
             throw_to_monitor();
         }
         result &= ~7;
     }
     else {
-        if (!string_to_long(token, &result)) {
+        long value;
+        if (!string_to_long(token, &value)) {
             printf("invalid number: ``%s''\n", token);
             throw_to_monitor();
         }
-        result &= ~3;
+        result = (value & ~3);
     }
 
     if (!is_valid_lisp_addr((os_vm_address_t)result)) {
-        printf("invalid Lisp-level address: 0x%lx\n", result);
+        printf("invalid Lisp-level address: %p\n", (void *)result);
         throw_to_monitor();
     }
 
@@ -310,6 +311,7 @@ char **ptr;
     char *token = parse_token(ptr);
     long pointer;
     lispobj result;
+    long value;
 
     if (token == NULL) {
         printf("expected an object\n");
@@ -355,8 +357,8 @@ char **ptr;
             throw_to_monitor();
         }
     }
-    else if (string_to_long(token, (long *)&result))
-        ;
+    else if (string_to_long(token, &value))
+        result = value;
     else if (lookup_symbol(token, &result))
         ;
     else {

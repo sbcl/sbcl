@@ -1681,7 +1681,8 @@ trans_boxed_large(lispobj object)
     return copy_large_object(object, length);
 }
 
-
+/* Doesn't seem to be used, delete it after the grace period. */
+#if 0
 static lispobj
 trans_unboxed_large(lispobj object)
 {
@@ -1697,6 +1698,7 @@ trans_unboxed_large(lispobj object)
 
     return copy_large_unboxed_object(object, length);
 }
+#endif
 
 
 /*
@@ -1707,7 +1709,7 @@ trans_unboxed_large(lispobj object)
 /* FIXME: What does this mean? */
 int gencgc_hash = 1;
 
-static int
+static long
 scav_vector(lispobj *where, lispobj object)
 {
     unsigned long kv_length;
@@ -1744,7 +1746,7 @@ scav_vector(lispobj *where, lispobj object)
     if (!is_lisp_pointer(where[2])) {
         lose("no pointer at %x in hash table", where[2]);
     }
-    hash_table = (lispobj *)native_pointer(where[2]);
+    hash_table = (struct hash_table *)native_pointer(where[2]);
     /*FSHOW((stderr,"/hash_table = %x\n", hash_table));*/
     if (widetag_of(hash_table->header) != INSTANCE_HEADER_WIDETAG) {
         lose("hash table not instance (%x at %x)",
@@ -1768,7 +1770,8 @@ scav_vector(lispobj *where, lispobj object)
 
     /* Scavenge hash table, which will fix the positions of the other
      * needed objects. */
-    scavenge(hash_table, sizeof(struct hash_table) / sizeof(lispobj));
+    scavenge((lispobj *)hash_table,
+             sizeof(struct hash_table) / sizeof(lispobj));
 
     /* Cross-check the kv_vector. */
     if (where != (lispobj *)native_pointer(hash_table->table)) {
@@ -1785,7 +1788,8 @@ scav_vector(lispobj *where, lispobj object)
         if (is_lisp_pointer(index_vector_obj) &&
             (widetag_of(*(lispobj *)native_pointer(index_vector_obj)) ==
                  SIMPLE_ARRAY_WORD_WIDETAG)) {
-            index_vector = ((lispobj *)native_pointer(index_vector_obj)) + 2;
+            index_vector =
+                ((unsigned long *)native_pointer(index_vector_obj)) + 2;
             /*FSHOW((stderr, "/index_vector = %x\n",index_vector));*/
             length = fixnum_value(((lispobj *)native_pointer(index_vector_obj))[1]);
             /*FSHOW((stderr, "/length = %d\n", length));*/
@@ -1801,7 +1805,7 @@ scav_vector(lispobj *where, lispobj object)
         if (is_lisp_pointer(next_vector_obj) &&
             (widetag_of(*(lispobj *)native_pointer(next_vector_obj)) ==
              SIMPLE_ARRAY_WORD_WIDETAG)) {
-            next_vector = ((lispobj *)native_pointer(next_vector_obj)) + 2;
+            next_vector = ((unsigned long *)native_pointer(next_vector_obj)) + 2;
             /*FSHOW((stderr, "/next_vector = %x\n", next_vector));*/
             next_vector_length = fixnum_value(((lispobj *)native_pointer(next_vector_obj))[1]);
             /*FSHOW((stderr, "/next_vector_length = %d\n", next_vector_length));*/
@@ -1817,7 +1821,8 @@ scav_vector(lispobj *where, lispobj object)
         if (is_lisp_pointer(hash_vector_obj) &&
             (widetag_of(*(lispobj *)native_pointer(hash_vector_obj)) ==
              SIMPLE_ARRAY_WORD_WIDETAG)){
-            hash_vector = ((lispobj *)native_pointer(hash_vector_obj)) + 2;
+            hash_vector =
+                ((unsigned long *)native_pointer(hash_vector_obj)) + 2;
             /*FSHOW((stderr, "/hash_vector = %x\n", hash_vector));*/
             gc_assert(fixnum_value(((lispobj *)native_pointer(hash_vector_obj))[1])
                       == next_vector_length);
@@ -3573,14 +3578,17 @@ garbage_collect_generation(int generation, int raise)
 #ifdef LISP_FEATURE_SB_THREAD
         long i,free;
         if(th==arch_os_get_current_thread()) {
-            esp = (void **) &raise;
+            /* Somebody is going to burn in hell for this, but casting
+             * it in two steps shuts gcc up about strict aliasing. */
+            esp = (void **)((void *)&raise);
         } else {
             void **esp1;
             free=fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
             for(i=free-1;i>=0;i--) {
                 os_context_t *c=th->interrupt_contexts[i];
                 esp1 = (void **) *os_context_register_addr(c,reg_SP);
-                if(esp1>=th->control_stack_start&& esp1<th->control_stack_end){
+                if (esp1>=(void **)th->control_stack_start &&
+                    esp1<(void **)th->control_stack_end) {
                     if(esp1<esp) esp=esp1;
                     for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {
                         preserve_pointer(*ptr);
@@ -3589,7 +3597,7 @@ garbage_collect_generation(int generation, int raise)
             }
         }
 #else
-        esp = (void **) &raise;
+        esp = (void **)((void *)&raise);
 #endif
         for (ptr = (void **)th->control_stack_end; ptr > esp;  ptr--) {
             preserve_pointer(*ptr);
@@ -4060,7 +4068,7 @@ gencgc_pickup_dynamic(void)
         page_table[page].first_object_offset =
             (void *)prev - page_address(page);
         page++;
-    } while (page_address(page) < alloc_ptr);
+    } while ((long)page_address(page) < alloc_ptr);
 
     generations[0].bytes_allocated = PAGE_BYTES*page;
     bytes_allocated = PAGE_BYTES*page;
@@ -4255,4 +4263,3 @@ gc_set_region_empty(struct alloc_region *region)
     region->free_pointer = page_address(0);
     region->end_addr = page_address(0);
 }
-

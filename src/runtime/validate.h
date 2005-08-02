@@ -13,32 +13,39 @@
 #define _INCLUDE_VALIDATE_H_
 
 #ifndef LISP_FEATURE_GENCGC
+/* FIXME: genesis/constants.h also defines this with a constant value */
 #define DYNAMIC_SPACE_START current_dynamic_space
 #endif
 
-#define        BINDING_STACK_SIZE (1024*1024)   /* chosen at random */
-#define THREAD_CONTROL_STACK_SIZE (2*1024*1024) /* eventually choosable per-thread */
+#define BINDING_STACK_SIZE (1024*1024)   /* chosen at random */
+/* eventually choosable per-thread: */
+#define THREAD_CONTROL_STACK_SIZE (2*1024*1024)
 
 /* constants derived from the fundamental constants in passed by GENESIS */
 #ifdef LISP_FEATURE_GENCGC
-#define       DYNAMIC_SPACE_SIZE       (DYNAMIC_SPACE_END -       DYNAMIC_SPACE_START)
+#define DYNAMIC_SPACE_SIZE (DYNAMIC_SPACE_END - DYNAMIC_SPACE_START)
 #else
-#define       DYNAMIC_SPACE_SIZE     (DYNAMIC_0_SPACE_END -     DYNAMIC_0_SPACE_START)
+#define DYNAMIC_SPACE_SIZE (DYNAMIC_0_SPACE_END - DYNAMIC_0_SPACE_START)
 #endif
-#define     READ_ONLY_SPACE_SIZE     (READ_ONLY_SPACE_END -     READ_ONLY_SPACE_START)
-#define        STATIC_SPACE_SIZE        (STATIC_SPACE_END -        STATIC_SPACE_START)
+#define READ_ONLY_SPACE_SIZE (READ_ONLY_SPACE_END - READ_ONLY_SPACE_START)
+#define STATIC_SPACE_SIZE (STATIC_SPACE_END - STATIC_SPACE_START)
 #ifdef LISP_FEATURE_LINKAGE_TABLE
-#define LINKAGE_TABLE_SPACE_SIZE (LINKAGE_TABLE_SPACE_END - LINKAGE_TABLE_SPACE_START)
+#define LINKAGE_TABLE_SPACE_SIZE \
+    (LINKAGE_TABLE_SPACE_END - LINKAGE_TABLE_SPACE_START)
 #endif
 
 #if !defined(LANGUAGE_ASSEMBLY)
 #include <thread.h>
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
-#define CONTROL_STACK_GUARD_PAGE(th) ((void *)(th->control_stack_start))
-#define CONTROL_STACK_RETURN_GUARD_PAGE(th) (CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size)
+#define CONTROL_STACK_GUARD_PAGE(th) \
+    ((os_vm_address_t)(th->control_stack_start))
+#define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
+    (CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size)
 #else
-#define CONTROL_STACK_GUARD_PAGE(th) (((void *)(th->control_stack_end)) - os_vm_page_size)
-#define CONTROL_STACK_RETURN_GUARD_PAGE(th) (CONTROL_STACK_GUARD_PAGE(th) - os_vm_page_size)
+#define CONTROL_STACK_GUARD_PAGE(th) \
+    (((os_vm_address_t)(th->control_stack_end)) - os_vm_page_size)
+#define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
+    (CONTROL_STACK_GUARD_PAGE(th) - os_vm_page_size)
 #endif
 
 extern void validate(void);

@@ -182,17 +182,16 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
         case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
             if ((long)pointer != ((long)start_addr+FUN_POINTER_LOWTAG)) {
                 if (pointer_filter_verbose) {
-                    fprintf(stderr,"*Wf2: %x %x %x\n",
-                            (unsigned long) pointer,
-                            (unsigned long) start_addr, *start_addr);
+                    fprintf(stderr,"*Wf2: %p %p %p\n",
+                            pointer, start_addr, (void *)*start_addr);
                 }
                 return 0;
             }
             break;
         default:
             if (pointer_filter_verbose) {
-                fprintf(stderr,"*Wf3: %x %x %x\n", (unsigned long) pointer,
-                        (unsigned long) start_addr, *start_addr);
+                fprintf(stderr,"*Wf3: %p %p %p\n",
+                        pointer, start_addr, (void *)*start_addr);
             }
             return 0;
         }
@@ -200,8 +199,8 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
     case LIST_POINTER_LOWTAG:
         if ((long)pointer != ((long)start_addr+LIST_POINTER_LOWTAG)) {
             if (pointer_filter_verbose)
-                fprintf(stderr,"*Wl1: %x %x %x\n", (unsigned long) pointer,
-                        (unsigned long) start_addr, *start_addr);
+                fprintf(stderr,"*Wl1: %p %p %p\n",
+                        pointer, start_addr, (void *)*start_addr);
             return 0;
         }
         /* Is it plausible cons? */
@@ -222,23 +221,23 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
             break;
         } else {
             if (pointer_filter_verbose) {
-                fprintf(stderr,"*Wl2: %x %x %x\n", (unsigned long) pointer,
-                        (unsigned long) start_addr, *start_addr);
+                fprintf(stderr,"*Wl2: %p %p %p\n",
+                        pointer, start_addr, (void *)*start_addr);
             }
             return 0;
         }
     case INSTANCE_POINTER_LOWTAG:
         if ((long)pointer != ((long)start_addr+INSTANCE_POINTER_LOWTAG)) {
             if (pointer_filter_verbose) {
-                fprintf(stderr,"*Wi1: %x %x %x\n", (unsigned long) pointer,
-                        (unsigned long) start_addr, *start_addr);
+                fprintf(stderr,"*Wi1: %p %p %p\n",
+                        pointer, start_addr, (void *)*start_addr);
             }
             return 0;
         }
         if (widetag_of(start_addr[0]) != INSTANCE_HEADER_WIDETAG) {
             if (pointer_filter_verbose) {
-                fprintf(stderr,"*Wi2: %x %x %x\n", (unsigned long) pointer,
-                        (unsigned long) start_addr, *start_addr);
+                fprintf(stderr,"*Wi2: %p %p %p\n",
+                        pointer, start_addr, (void *)*start_addr);
             }
             return 0;
         }
@@ -246,16 +245,16 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
     case OTHER_POINTER_LOWTAG:
         if ((long)pointer != ((long)start_addr+OTHER_POINTER_LOWTAG)) {
             if (pointer_filter_verbose) {
-                fprintf(stderr,"*Wo1: %x %x %x\n", (unsigned long) pointer,
-                        (unsigned long) start_addr, *start_addr);
+                fprintf(stderr,"*Wo1: %p %p %p\n",
+                        pointer, start_addr, (void *)*start_addr);
             }
             return 0;
         }
         /* Is it plausible? Not a cons. XXX should check the headers. */
         if (is_lisp_pointer(start_addr[0]) || ((start_addr[0] & FIXNUM_TAG_MASK) == 0)) {
             if (pointer_filter_verbose) {
-                fprintf(stderr,"*Wo2: %x %x %x\n", (unsigned long) pointer,
-                        (unsigned long) start_addr, *start_addr);
+                fprintf(stderr,"*Wo2: %p %p %p\n",
+                        pointer, start_addr, (void *)*start_addr);
             }
             return 0;
         }
@@ -266,8 +265,8 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
         case SINGLE_FLOAT_WIDETAG:
 #endif
             if (pointer_filter_verbose) {
-                fprintf(stderr,"*Wo3: %x %x %x\n", (unsigned long) pointer,
-                        (unsigned long) start_addr, *start_addr);
+                fprintf(stderr,"*Wo3: %p %p %p\n",
+                        pointer, start_addr, (void *)*start_addr);
             }
             return 0;
 
@@ -275,15 +274,15 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
         case CLOSURE_HEADER_WIDETAG:
         case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
             if (pointer_filter_verbose) {
-                fprintf(stderr,"*Wo4: %x %x %x\n", (unsigned long) pointer,
-                        (unsigned long) start_addr, *start_addr);
+                fprintf(stderr,"*Wo4: %p %p %p\n",
+                        pointer, start_addr, (void *)*start_addr);
             }
             return 0;
 
         case INSTANCE_HEADER_WIDETAG:
             if (pointer_filter_verbose) {
-                fprintf(stderr,"*Wo5: %x %x %x\n", (unsigned long) pointer,
-                        (unsigned long) start_addr, *start_addr);
+                fprintf(stderr,"*Wo5: %p %p %p\n",
+                        pointer, start_addr, (void *)*start_addr);
             }
             return 0;
 
@@ -385,16 +384,16 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 
         default:
             if (pointer_filter_verbose) {
-                fprintf(stderr,"*Wo6: %x %x %x\n", (unsigned long) pointer,
-                        (unsigned long) start_addr, *start_addr);
+                fprintf(stderr,"*Wo6: %p %p %p\n",
+                        pointer, start_addr, (void *)*start_addr);
             }
             return 0;
         }
         break;
     default:
         if (pointer_filter_verbose) {
-            fprintf(stderr,"*W?: %x %x %x\n", (unsigned long) pointer,
-                    (unsigned long) start_addr, *start_addr);
+            fprintf(stderr,"*W?: %p %p %p\n",
+                    pointer, start_addr, (void *)*start_addr);
         }
         return 0;
     }
@@ -447,9 +446,9 @@ setup_i386_stack_scav(lispobj *lowaddr, lispobj *base)
         }
     }
     if (pointer_filter_verbose) {
-        fprintf(stderr, "number of valid stack pointers = %d\n",
+        fprintf(stderr, "number of valid stack pointers = %ld\n",
                 num_valid_stack_locations);
-        fprintf(stderr, "number of stack return addresses = %d\n",
+        fprintf(stderr, "number of stack return addresses = %ld\n",
                 num_valid_stack_ra_locations);
     }
 }
@@ -466,11 +465,12 @@ pscav_i386_stack(void)
         lispobj code_obj = (lispobj)valid_stack_ra_code_objects[i];
         pscav(&code_obj, 1, 0);
         if (pointer_filter_verbose) {
-            fprintf(stderr,"*C moved RA %x to %x; for code object %x to %x\n",
-                    *valid_stack_ra_locations[i],
-                    (long)(*valid_stack_ra_locations[i])
-                    - ((long)valid_stack_ra_code_objects[i] - (long)code_obj),
-                    (unsigned long) valid_stack_ra_code_objects[i], code_obj);
+            fprintf(stderr,"*C moved RA %p to %p; for code object %p to %p\n",
+                    (void *)*valid_stack_ra_locations[i],
+                    (void *)(*valid_stack_ra_locations[i]) -
+                    ((void *)valid_stack_ra_code_objects[i] -
+                     (void *)code_obj),
+                    valid_stack_ra_code_objects[i], (void *)code_obj);
         }
         *valid_stack_ra_locations[i] =
             ((long)(*valid_stack_ra_locations[i])
