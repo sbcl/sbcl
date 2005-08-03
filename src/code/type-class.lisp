@@ -212,55 +212,25 @@
                                       (default '(values nil t))
                                       (complex-arg1 :foo complex-arg1-p))
   (declare (type keyword simple complex-arg1 complex-arg2))
-  `(multiple-value-bind (result-a result-b valid-p)
-       (%invoke-type-method ',(class-fun-slot-or-lose simple)
-                            ',(class-fun-slot-or-lose
-                               (if complex-arg1-p
-                                   complex-arg1
-                                   complex-arg2))
-                            ',(class-fun-slot-or-lose complex-arg2)
-                            ,complex-arg1-p
-                            ,type1
-                            ,type2)
-     (if valid-p
-         (values result-a result-b)
-         ,default)))
-
-;;; most of the implementation of !INVOKE-TYPE-METHOD
-;;;
-;;; KLUDGE: This function must be INLINE in order for cold init to
-;;; work, because the first three arguments are TYPE-CLASS structure
-;;; accessor functions whose calls have to be compiled inline in order
-;;; to work in calls to this function early in cold init. So don't
-;;; conditionalize this INLINE declaration with #!-SB-FLUID or
-;;; anything, unless you also rearrange things to cause the full
-;;; function definitions of the relevant structure accessors to be
-;;; available sufficiently early in cold init. -- WHN 19991015
-(declaim (inline %invoke-type-method))
-(defun %invoke-type-method (simple cslot1 cslot2 complex-arg1-p type1 type2)
-  (declare (type symbol simple cslot1 cslot2))
-  (multiple-value-bind (result-a result-b)
-      (let ((class1 (type-class-info type1))
-            (class2 (type-class-info type2)))
-        (if (eq class1 class2)
-            (funcall (the function (funcall simple class1)) type1 type2)
-            (let ((complex2 (funcall cslot2 class2)))
-              (declare (type (or function null) complex2))
-              (if complex2
-                  (funcall complex2 type1 type2)
-                  (let ((complex1 (funcall cslot1 class1)))
-                    (declare (type (or function null) complex1))
-                    (if complex1
-                        (if complex-arg1-p
-                            (funcall complex1 type1 type2)
-                            (funcall complex1 type2 type1))
-                        ;; No meaningful result was found: the caller
-                        ;; should use the default value instead.
-                        (return-from %invoke-type-method
-                          (values nil nil nil))))))))
-    ;; If we get to here (without breaking out by calling RETURN-FROM)
-    ;; then a meaningful result was found, and we return it.
-    (values result-a result-b t)))
+  (let ((simple (class-fun-slot-or-lose simple))
+        (cslot1 (class-fun-slot-or-lose
+                 (if complex-arg1-p complex-arg1 complex-arg2)))
+        (cslot2 (class-fun-slot-or-lose complex-arg2)))
+    (once-only ((ntype1 type1)
+                (ntype2 type2))
+      (once-only ((class1 `(type-class-info ,ntype1))
+                  (class2 `(type-class-info ,ntype2)))
+        `(if (eq ,class1 ,class2)
+             (funcall (,simple ,class1) ,ntype1 ,ntype2)
+             ,(once-only ((complex2 `(,cslot2 ,class2)))
+                `(if ,complex2
+                     (funcall ,complex2 ,ntype1 ,ntype2)
+                     ,(once-only ((complex1 `(,cslot1 ,class1)))
+                        `(if ,complex1
+                             (if ,complex-arg1-p
+                                 (funcall ,complex1 ,ntype1 ,ntype2)
+                                 (funcall ,complex1 ,ntype2 ,ntype1))
+                          ,default)))))))))
 
 ;;; This is a very specialized implementation of CLOS-style
 ;;; CALL-NEXT-METHOD within our twisty little type class object
