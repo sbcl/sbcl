@@ -629,13 +629,35 @@ one-past-the-end"
 
 ;;;; external formats
 
+(defvar *default-external-format* nil)
+
 (defun default-external-format ()
-  (intern (or (sb!alien:alien-funcall
-               (extern-alien "nl_langinfo"
-                             (function c-string int))
-               sb!unix:codeset)
-              "LATIN-1")
-          "KEYWORD"))
+  (or *default-external-format*
+      (let ((external-format (intern (or (sb!alien:alien-funcall
+                                          (extern-alien
+                                           "nl_langinfo"
+                                           (function c-string int))
+                                          sb!unix:codeset)
+                                         "LATIN-1")
+                                     "KEYWORD")))
+        (/show0 "cold-printing defaulted external-format:")
+        #!+sb-show
+        (cold-print external-format)
+        (/show0 "matching to known aliases")
+        (dolist (entry *external-formats*
+                 (progn
+                   (warn "Invalid external-format ~A; using LATIN-1"
+                         external-format)
+                   (setf external-format :latin-1)))
+          (/show0 "cold printing known aliases:")
+          #!+sb-show
+          (dolist (alias (first entry)) (cold-print alias))
+          (/show0 "done cold-printing known aliases")
+          (when (member external-format (first entry))
+            (/show0 "matched")
+            (return)))
+        (/show0 "/default external format ok")
+        (setf *default-external-format* external-format))))
 
 ;;; FIXME: OAOOM here vrt. DEFINE-EXTERNAL-FORMAT in fd-stream.lisp
 (defparameter *external-format-functions*

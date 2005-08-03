@@ -283,6 +283,7 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
   (sb!thread::get-foreground))
 
 (defun reinit ()
+  (setf *default-external-format* nil)
   (without-interrupts
     (without-gcing
         (os-cold-init-or-reinit)

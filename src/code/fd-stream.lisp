@@ -1378,26 +1378,7 @@
     (when (and character-stream-p
                (eq external-format :default))
       (/show0 "/getting default external format")
-      (setf external-format (default-external-format))
-      (/show0 "cold-printing defaulted external-format:")
-      #!+sb-show
-      (cold-print external-format)
-      (/show0 "matching to known aliases")
-      (dolist (entry *external-formats*
-                     (restart-case
-                         (error "Invalid external-format ~A"
-                                external-format)
-                      (use-default ()
-                        :report "Set external format to LATIN-1"
-                        (setf external-format :latin-1))))
-        (/show0 "cold printing known aliases:")
-        #!+sb-show
-        (dolist (alias (first entry)) (cold-print alias))
-        (/show0 "done cold-printing known aliases")
-        (when (member external-format (first entry))
-          (/show0 "matched")
-          (return)))
-      (/show0 "/default external format ok"))
+      (setf external-format (default-external-format)))
 
     (when input-p
       (when (or (not character-stream-p) bivalent-stream-p)
@@ -2036,23 +2017,25 @@
 ;;; This is called whenever a saved core is restarted.
 (defun stream-reinit ()
   (setf *available-buffers* nil)
-  (setf *stdin*
-        (make-fd-stream 0 :name "standard input" :input t :buffering :line))
-  (setf *stdout*
-        (make-fd-stream 1 :name "standard output" :output t :buffering :line))
-  (setf *stderr*
-        (make-fd-stream 2 :name "standard error" :output t :buffering :line))
-  (let* ((ttyname #.(coerce "/dev/tty" 'simple-base-string))
-         (tty (sb!unix:unix-open ttyname sb!unix:o_rdwr #o666)))
-    (if tty
-        (setf *tty*
-              (make-fd-stream tty
-                              :name "the terminal"
-                              :input t
-                              :output t
-                              :buffering :line
-                              :auto-close t))
-        (setf *tty* (make-two-way-stream *stdin* *stdout*))))
+  (with-output-to-string (*error-output*)
+    (setf *stdin*
+          (make-fd-stream 0 :name "standard input" :input t :buffering :line))
+    (setf *stdout*
+          (make-fd-stream 1 :name "standard output" :output t :buffering :line))
+    (setf *stderr*
+          (make-fd-stream 2 :name "standard error" :output t :buffering :line))
+    (let* ((ttyname #.(coerce "/dev/tty" 'simple-base-string))
+           (tty (sb!unix:unix-open ttyname sb!unix:o_rdwr #o666)))
+      (if tty
+          (setf *tty*
+                (make-fd-stream tty
+                                :name "the terminal"
+                                :input t
+                                :output t
+                                :buffering :line
+                                :auto-close t))
+          (setf *tty* (make-two-way-stream *stdin* *stdout*))))
+    (princ (get-output-stream-string *error-output*) *stderr*))
   (values))
 
 ;;;; miscellany
