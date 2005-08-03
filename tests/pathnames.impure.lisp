@@ -339,5 +339,23 @@
 ;;; bug reported by Artem V. Andreev: :WILD not handled in unparsing
 ;;; directory lists.
 (assert (equal (namestring #p"/tmp/*/") "/tmp/*/"))
+
+;;; Printing of pathnames; see CLHS 22.1.3.1. This section was started
+;;; to confirm that pathnames are printed as their namestrings under
+;;; :escape nil :readably nil.
+(loop for (pathname expected . vars) in
+      `((#p"/foo" "#P\"/foo\"")
+        (#p"/foo" "#P\"/foo\"" :readably nil)
+        (#p"/foo" "#P\"/foo\"" :escape nil)
+        (#p"/foo" "/foo"       :readably nil :escape nil))
+      for actual = (with-standard-io-syntax
+                     (apply #'write-to-string pathname vars))
+      do (assert (string= expected actual)
+                 ()
+                 "~S should be ~S, was ~S"
+                 (list* 'write-to-string pathname vars)
+                 expected
+                 actual))
+
 ;;;; success
 (quit :unix-status 104)
