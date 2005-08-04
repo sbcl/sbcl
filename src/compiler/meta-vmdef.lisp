@@ -886,13 +886,13 @@
 
 (defvar *parse-vop-operand-count*)
 (defun make-operand-parse-temp ()
-  ;; FIXME: potentially causes breakage in contribs from locked
-  ;; packages.
-  (intern (format nil "OPERAND-PARSE-TEMP-~D" *parse-vop-operand-count*)
-          (symbol-package '*parse-vop-operand-count*)))
+  (without-package-locks
+   (intern (format nil "OPERAND-PARSE-TEMP-~D" *parse-vop-operand-count*)
+           (symbol-package '*parse-vop-operand-count*))))
 (defun make-operand-parse-load-tn ()
-  (intern (format nil "OPERAND-PARSE-LOAD-TN-~D" *parse-vop-operand-count*)
-          (symbol-package '*parse-vop-operand-count*)))
+  (without-package-locks
+   (intern (format nil "OPERAND-PARSE-LOAD-TN-~D" *parse-vop-operand-count*)
+           (symbol-package '*parse-vop-operand-count*))))
 
 ;;; Given a list of operand specifications as given to DEFINE-VOP,
 ;;; return a list of OPERAND-PARSE structures describing the fixed

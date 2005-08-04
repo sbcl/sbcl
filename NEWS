@@ -6,17 +6,19 @@ changes in sbcl-0.9.4 relative to sbcl-0.9.3:
     with non-standard methods for COMPUTE-APPLICABLE-METHODS no longer
     make invalid assumptions about method precedence order.  (reported
     by Bruno Haible)
-  * optimizations: REMOVE-DUPLICATES now runs in linear time on
-    lists in some cases.  This partially fixes bug 384.
-  * flush all standard streams before prompting in the REPL and the
-    debugger
-  * eof selects abort in the debugger
-  * minor incompatible change: *INVOKE-DEBUGGER-HOOK* is run before
-    *DEBUGGER-HOOK* => *DEBUGGER-HOOK* is not run when the debugger
-    is disabled
   * bug fix: degree sign (<U00B0>) could not be encoded in KOI8-R.
   * bug fix: correct pathname printing with printer escaping is on.
     (thanks to Kevin Reid)
+  * bug fix: complex VOP definitions in "user-space" no longer trigger
+    package locks.  (reported by Zach Beane)
+  * optimizations: REMOVE-DUPLICATES now runs in linear time on
+    lists in some cases.  This partially fixes bug 384.
+  * flush all standard streams before prompting in the REPL and the
+    debugger.
+  * minor incompatible change: eof selects abort in the debugger.
+  * minor incompatible change: *INVOKE-DEBUGGER-HOOK* is run before
+    *DEBUGGER-HOOK* => *DEBUGGER-HOOK* is not run when the debugger
+    is disabled.
   * threads
     ** bug fix: release-foreground doesn't choke on session lock if
        there is only one thread in the session
