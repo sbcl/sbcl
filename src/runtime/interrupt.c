@@ -43,7 +43,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -741,10 +740,10 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
      * must obviously exist in reality.  That would be post_signal_tramp
      */
 
-    uint32_t *sp=(uint32_t *)*os_context_register_addr(context,reg_ESP);
+    u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
 
     /* return address for call_into_lisp: */
-    *(sp-15) = (uint32_t)post_signal_tramp;
+    *(sp-15) = (u32)post_signal_tramp;
     *(sp-14) = function;        /* args for call_into_lisp : function*/
     *(sp-13) = 0;               /*                           arg array */
     *(sp-12) = 0;               /*                           no. args */
@@ -765,9 +764,9 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *(sp-1)=*os_context_pc_addr(context);
 
 #elif defined(LISP_FEATURE_X86_64)
-    uint64_t *sp=(uint64_t *)*os_context_register_addr(context,reg_RSP);
+    u64 *sp=(u64 *)*os_context_register_addr(context,reg_RSP);
     /* return address for call_into_lisp: */
-    *(sp-18) = (uint64_t)post_signal_tramp;
+    *(sp-18) = (u64)post_signal_tramp;
 
     *(sp-17)=*os_context_register_addr(context,reg_R15);
     *(sp-16)=*os_context_register_addr(context,reg_R14);

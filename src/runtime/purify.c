@@ -127,13 +127,13 @@ newspace_alloc(long nwords, int constantp)
     lispobj *ret;
     nwords=CEILING(nwords,2);
     if(constantp) {
-        if(read_only_free + nwords >= READ_ONLY_SPACE_END) {
+        if(read_only_free + nwords >= (lispobj *)READ_ONLY_SPACE_END) {
             lose("Ran out of read-only space while purifying!");
         }
         ret=read_only_free;
         read_only_free+=nwords;
     } else {
-        if(static_free + nwords >= STATIC_SPACE_END) {
+        if(static_free + nwords >= (lispobj *)STATIC_SPACE_END) {
             lose("Ran out of static space while purifying!");
         }
         ret=static_free;
