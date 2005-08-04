@@ -486,8 +486,7 @@ returns the thread exits."
                     (sb!kernel::*restart-clusters* nil)
                     (sb!kernel::*handler-clusters* nil)
                     (sb!kernel::*condition-restarts* nil)
-                    (sb!impl::*descriptor-handlers* nil) ; serve-event
-                    (sb!impl::*available-buffers* nil)) ;for fd-stream
+                    (sb!impl::*descriptor-handlers* nil)) ; serve-event
                 ;; can't use handling-end-of-the-world, because that flushes
                 ;; output streams, and we don't necessarily have any (or we
                 ;; could be sharing them)

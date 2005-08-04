@@ -20,6 +20,20 @@
   "List of available buffers. Each buffer is an sap pointing to
   bytes-per-buffer of memory.")
 
+#!+sb-thread
+(defvar *available-buffers-mutex* (sb!thread:make-mutex
+                                   :name "lock for *AVAILABLE-BUFFERS*")
+  #!+sb-doc
+  "Mutex for access to *AVAILABLE-BUFFERS*.")
+
+(defmacro with-available-buffers-lock ((&optional) &body body)
+  ;; WITHOUT-INTERRUPTS because streams are low-level enough to be
+  ;; async signal safe, and in particular a C-c that brings up the
+  ;; debugger while holding the mutex would lose badly
+  `(without-interrupts
+    (sb!thread:with-mutex (*available-buffers-mutex*)
+      ,@body)))
+
 (defconstant bytes-per-buffer (* 4 1024)
   #!+sb-doc
   "Number of bytes per buffer.")
@@ -27,9 +41,10 @@
 ;;; Return the next available buffer, creating one if necessary.
 #!-sb-fluid (declaim (inline next-available-buffer))
 (defun next-available-buffer ()
-  (if *available-buffers*
-      (pop *available-buffers*)
-      (allocate-system-memory bytes-per-buffer)))
+  (with-available-buffers-lock ()
+    (if *available-buffers*
+        (pop *available-buffers*)
+        (allocate-system-memory bytes-per-buffer))))
 
 ;;;; the FD-STREAM structure
 
@@ -177,7 +192,8 @@
                  (simple-stream-perror "couldn't write to ~S" stream errno)))
             ((eql count length) ; Hot damn, it worked.
              (when reuse-sap
-               (push base *available-buffers*)))
+               (with-available-buffers-lock ()
+                 (push base *available-buffers*))))
             ((not (null count)) ; sorta worked..
              (push (list base
                          (the index (+ start count))
@@ -1360,11 +1376,13 @@
 
     ;; drop buffers when direction changes
     (when (and (fd-stream-obuf-sap fd-stream) (not output-p))
-      (push (fd-stream-obuf-sap fd-stream) *available-buffers*)
-      (setf (fd-stream-obuf-sap fd-stream) nil))
+      (with-available-buffers-lock ()
+	(push (fd-stream-obuf-sap fd-stream) *available-buffers*)
+	(setf (fd-stream-obuf-sap fd-stream) nil)))
     (when (and (fd-stream-ibuf-sap fd-stream) (not input-p))
-      (push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
-      (setf (fd-stream-ibuf-sap fd-stream) nil))
+      (with-available-buffers-lock ()
+	(push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
+	(setf (fd-stream-ibuf-sap fd-stream) nil)))
     (when input-p
       (setf (fd-stream-ibuf-sap fd-stream) (next-available-buffer))
       (setf (fd-stream-ibuf-length fd-stream) bytes-per-buffer)
@@ -1571,11 +1589,13 @@
        (cancel-finalization fd-stream))
      (sb!unix:unix-close (fd-stream-fd fd-stream))
      (when (fd-stream-obuf-sap fd-stream)
-       (push (fd-stream-obuf-sap fd-stream) *available-buffers*)
-       (setf (fd-stream-obuf-sap fd-stream) nil))
+       (with-available-buffers-lock ()
+         (push (fd-stream-obuf-sap fd-stream) *available-buffers*)
+         (setf (fd-stream-obuf-sap fd-stream) nil)))
      (when (fd-stream-ibuf-sap fd-stream)
-       (push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
-       (setf (fd-stream-ibuf-sap fd-stream) nil))
+       (with-available-buffers-lock ()
+         (push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
+         (setf (fd-stream-ibuf-sap fd-stream) nil)))
      (sb!impl::set-closed-flame fd-stream))
     (:clear-input
      (setf (fd-stream-unread fd-stream) nil)
