@@ -17,6 +17,9 @@ changes in sbcl-0.9.4 relative to sbcl-0.9.3:
   * bug fix: degree sign (<U00B0>) could not be encoded in KOI8-R.
   * bug fix: correct pathname printing with printer escaping is on.
     (thanks to Kevin Reid)
+  * threads
+    ** bug fix: release-foreground doesn't choke on session lock if
+       there is only one thread in the session
 
 changes in sbcl-0.9.3 relative to sbcl-0.9.2:
   * New feature: Experimental support for bivalent streams: streams

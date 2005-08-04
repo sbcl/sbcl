@@ -418,13 +418,14 @@ interactive."
 (defun release-foreground (&optional next)
   #!+sb-doc
   "Background this thread.  If NEXT is supplied, arrange for it to
-have the foreground next"
+have the foreground next."
   #!-sb-thread (declare (ignore next))
   #!-sb-thread nil
   #!+sb-thread
   (with-session-lock (*session*)
-    (setf (session-interactive-threads *session*)
-          (delete *current-thread* (session-interactive-threads *session*)))
+    (when (rest (session-interactive-threads *session*))
+      (setf (session-interactive-threads *session*)
+            (delete *current-thread* (session-interactive-threads *session*))))
     (when next
       (setf (session-interactive-threads *session*)
             (list* next

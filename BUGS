@@ -1074,13 +1074,6 @@ WORKAROUND:
   around the same time regarding a call to LIST on sparc with 1000
   arguments) and other implementation limit constants.
 
-311: "Tokeniser not thread-safe"
-    (see also Robert Marlow sbcl-help "Multi threaded read chucking a
-    spak" 2004-04-19)
-  The tokenizer's use of *read-buffer* and *read-buffer-length* causes
-  spurious errors should two threads attempt to tokenise at the same
-  time.
-
 314: "LOOP :INITIALLY clauses and scope of initializers"
   reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
   test suite, originally by Thomas F. Burdick.
