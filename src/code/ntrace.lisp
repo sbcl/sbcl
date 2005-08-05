@@ -270,7 +270,8 @@
            (terpri)
            (trace-print frame (trace-info-print info))
            (write-sequence (get-output-stream-string *standard-output*)
-                           *trace-output*))
+                           *trace-output*)
+           (finish-output *trace-output*))
          (trace-maybe-break info (trace-info-break info) "before" frame)))
 
      (lambda (frame cookie)
@@ -311,7 +312,8 @@
           (terpri)
           (trace-print frame (trace-info-print-after info))
           (write-sequence (get-output-stream-string *standard-output*)
-                          *trace-output*))
+                          *trace-output*)
+          (finish-output *trace-output*))
         (trace-maybe-break info
                            (trace-info-break-after info)
                            "after"
