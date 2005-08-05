@@ -51,6 +51,9 @@
   ;; Index into the Next vector chaining together free slots in the KV
   ;; vector.
   (next-free-kv 0 :type index)
+  ;; A cache that is either nil or is an index into the hash table
+  ;; that should be checked first
+  (cache nil :type (or null index))
   ;; The index vector. This may be larger than the hash size to help
   ;; reduce collisions.
   (index-vector (missing-arg)
