@@ -761,6 +761,10 @@
 (defknown hash-table-p (t) boolean (movable foldable flushable))
 (defknown gethash (t hash-table &optional t) (values t boolean)
   (flushable unsafe)) ; not FOLDABLE, since hash table contents can change
+(defknown sb!impl::gethash2 (t hash-table) (values t boolean)
+  (flushable unsafe)) ; not FOLDABLE, since hash table contents can change
+(defknown sb!impl::gethash3 (t hash-table t) (values t boolean)
+  (flushable unsafe)) ; not FOLDABLE, since hash table contents can change
 (defknown %puthash (t hash-table t) t (unsafe))
 (defknown remhash (t hash-table) boolean ())
 (defknown maphash (callable hash-table) null (flushable call))

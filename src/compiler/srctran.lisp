@@ -129,11 +129,11 @@
 (define-source-transform nth (n l) `(car (nthcdr ,n ,l)))
 
 (define-source-transform last (x) `(sb!impl::last1 ,x))
-;; (define-source-transform last (x)
-;;  `(let* ((x (the list ,x))
-;;          (r (cdr x)))
-;;     (do () ((atom r) x)
-;;       (shiftf x r (cdr r)))))
+(define-source-transform gethash (&rest args)
+  (case (length args)
+   (2 `(sb!impl::gethash2 ,@args))
+   (3 `(sb!impl::gethash3 ,@args))
+   (t (values nil t))))
 
 (defvar *default-nthcdr-open-code-limit* 6)
 (defvar *extreme-nthcdr-open-code-limit* 20)

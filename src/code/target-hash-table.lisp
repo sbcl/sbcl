@@ -412,6 +412,20 @@
    such entry. Entries can be added using SETF."
   (declare (type hash-table hash-table)
            (values t (member t nil)))
+  (gethash3 key hash-table default))
+
+(defun gethash2 (key hash-table)
+  #!+sb-doc
+  "Two argument version of GETHASH"
+  (declare (type hash-table hash-table)
+           (values t (member t nil)))
+  (gethash3 key hash-table nil))
+
+(defun gethash3 (key hash-table default)
+  #!+sb-doc
+  "Three argument version of GETHASH"
+  (declare (type hash-table hash-table)
+           (values t (member t nil)))
   (without-gcing
    (cond ((= (get-header-data (hash-table-table hash-table))
              sb!vm:vector-must-rehash-subtype)
