@@ -156,6 +156,8 @@
 ;;;; from the "Symbols" chapter:
 
 (defknown get (symbol t &optional t) t (flushable))
+(defknown sb!impl::get2 (symbol t) t (flushable))
+(defknown sb!impl::get3 (symbol t t) t (flushable))
 (defknown remprop (symbol t) t)
 (defknown symbol-plist (symbol) list (flushable))
 (defknown getf (list t &optional t) t (foldable flushable))

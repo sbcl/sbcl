@@ -180,7 +180,7 @@
 (declaim (hash-table *info-classes*))
 #-sb-xc ; as per KLUDGE note above
 (eval-when (:compile-toplevel :execute)
-  (setf *info-classes* (make-hash-table)))
+  (setf *info-classes* (make-hash-table :test #'eq)))
 
 ;;; If NAME is the name of a type in CLASS, then return the TYPE-INFO,
 ;;; otherwise NIL.
@@ -197,8 +197,14 @@
   #+sb-xc (/noshow0 "entering CLASS-INFO-OR-LOSE, CLASS=..")
   #+sb-xc (/nohexstr class)
   (prog1
-      (or (gethash class *info-classes*)
-          (error "~S is not a defined info class." class))
+      (flet ((lookup (class)
+	       (or (gethash class *info-classes*)
+		   (error "~S is not a defined info class." class))))
+	(if (symbolp class)
+	    (or (get class 'class-info-or-lose-cache)
+		(setf (get class 'class-info-or-lose-cache)
+		      (lookup class)))
+	    (lookup class)))
     #+sb-xc (/noshow0 "returning from CLASS-INFO-OR-LOSE")))
 (declaim (ftype (function (keyword keyword) type-info) type-info-or-lose))
 (defun type-info-or-lose (class type)
@@ -1378,7 +1384,7 @@
 (!cold-init-forms
   (/show0 "beginning *INFO-CLASSES* init, calling MAKE-HASH-TABLE")
   (setf *info-classes*
-        (make-hash-table :size #.(hash-table-size *info-classes*)))
+        (make-hash-table :test 'eq :size #.(hash-table-size *info-classes*)))
   (/show0 "done with MAKE-HASH-TABLE in *INFO-CLASSES* init")
   (dolist (class-info-name '#.(let ((result nil))
                                 (maphash (lambda (key value)

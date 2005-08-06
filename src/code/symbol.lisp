@@ -15,7 +15,7 @@
 
 (in-package "SB!IMPL")
 
-(declaim (maybe-inline get %put getf remprop %putf get-properties keywordp))
+(declaim (maybe-inline get get2 get3 %put getf remprop %putf get-properties keywordp))
 
 (defun symbol-value (symbol)
   #!+sb-doc
@@ -94,13 +94,32 @@
   #!+sb-doc
   "Look on the property list of SYMBOL for the specified INDICATOR. If this
   is found, return the associated value, else return DEFAULT."
-  (do ((pl (symbol-plist symbol) (cddr pl)))
-      ((atom pl) default)
-    (cond ((atom (cdr pl))
-           (error "~S has an odd number of items in its property list."
-                   symbol))
-          ((eq (car pl) indicator)
-           (return (cadr pl))))))
+  (get3 symbol indicator default))
+
+(defun get2 (symbol indicator)
+  (get3 symbol indicator nil))
+#|
+  (let (cdr-pl)
+    (do ((pl (symbol-plist symbol) (cdr cdr-pl)))
+        ((atom pl) nil)
+      (setf cdr-pl (cdr pl))
+      (cond ((atom cdr-pl)
+             (error "~S has an odd number of items in its property list."
+                    symbol))
+            ((eq (car pl) indicator)
+             (return (car cdr-pl)))))))
+|#
+
+(defun get3 (symbol indicator default)
+  (let (cdr-pl)
+    (do ((pl (symbol-plist symbol) (cdr cdr-pl)))
+	((atom pl) default)
+      (setq cdr-pl (cdr pl))
+      (cond ((atom cdr-pl)
+	     (error "~S has an odd number of items in its property list."
+		    symbol))
+	    ((eq (car pl) indicator)
+	     (return (car cdr-pl)))))))
 
 (defun %put (symbol indicator value)
   #!+sb-doc
