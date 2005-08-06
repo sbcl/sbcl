@@ -128,7 +128,7 @@
   (when (or force-p (ctor-class ctor))
     (setf (ctor-class ctor) nil)
     (setf (funcallable-instance-fun ctor)
-          #'(instance-lambda (&rest args)
+          #'(lambda (&rest args)
               (install-optimized-constructor ctor)
               (apply ctor args)))
     (setf (%funcallable-instance-info ctor 1)
@@ -253,6 +253,8 @@
           ;;
           ;; (except maybe for optimization qualities? -- CSR,
           ;; 2004-07-12)
+          ;;
+          ;; FIXME: INSTANCE-LAMBDA is no more.  We could change this.
           (eval `(function ,(constructor-function-form ctor))))))
 
 (defun constructor-function-form (ctor)
@@ -351,7 +353,7 @@
 
 (defun fallback-generator (ctor ii-methods si-methods)
   (declare (ignore ii-methods si-methods))
-  `(instance-lambda ,(make-ctor-parameter-list ctor)
+  `(lambda ,(make-ctor-parameter-list ctor)
      ;; The CTOR MAKE-INSTANCE optimization only kicks in when the
      ;; first argument to MAKE-INSTANCE is a constant symbol: by
      ;; calling it with a class, as here, we inhibit the optimization,
@@ -362,7 +364,7 @@
 (defun optimizing-generator (ctor ii-methods si-methods)
   (multiple-value-bind (body before-method-p)
       (fake-initialization-emf ctor ii-methods si-methods)
-    `(instance-lambda ,(make-ctor-parameter-list ctor)
+    `(lambda ,(make-ctor-parameter-list ctor)
        (declare #.*optimize-speed*)
        ,(wrap-in-allocate-forms ctor body before-method-p))))
 

@@ -1359,9 +1359,7 @@
                         (make-dfun-lambda-list metatypes applyp)
                         (make-fast-method-call-lambda-list metatypes applyp))))
       (multiple-value-bind (cfunction constants)
-          (get-fun1 `(,(if function-p
-                           'instance-lambda
-                           'lambda)
+          (get-fun1 `(lambda
                       ,arglist
                       ,@(unless function-p
                           `((declare (ignore .pv-cell.

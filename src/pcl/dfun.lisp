@@ -789,7 +789,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (defun make-initial-dfun (gf)
   (let ((initial-dfun
-         #'(instance-lambda (&rest args)
+         #'(lambda (&rest args)
              (initial-dfun gf args))))
     (multiple-value-bind (dfun cache info)
         (cond
@@ -834,17 +834,17 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (let* ((methods (early-gf-methods gf))
          (slot-name (early-method-standard-accessor-slot-name (car methods))))
     (ecase type
-      (reader #'(instance-lambda (instance)
+      (reader #'(lambda (instance)
                   (let* ((class (class-of instance))
                          (class-name (!bootstrap-get-slot 'class class 'name)))
                     (!bootstrap-get-slot class-name instance slot-name))))
-      (boundp #'(instance-lambda (instance)
+      (boundp #'(lambda (instance)
                   (let* ((class (class-of instance))
                          (class-name (!bootstrap-get-slot 'class class 'name)))
                     (not (eq +slot-unbound+
                              (!bootstrap-get-slot class-name
                                                   instance slot-name))))))
-      (writer #'(instance-lambda (new-value instance)
+      (writer #'(lambda (new-value instance)
                   (let* ((class (class-of instance))
                          (class-name (!bootstrap-get-slot 'class class 'name)))
                     (!bootstrap-set-slot class-name instance slot-name new-value)))))))
@@ -938,7 +938,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
         specls all-same-p)
     (cond ((null methods)
            (values
-            #'(instance-lambda (&rest args)
+            #'(lambda (&rest args)
                 (apply #'no-applicable-method gf args))
             nil
             (no-methods-dfun-info)))
@@ -1670,7 +1670,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       (if function-p
           (lambda (method-alist wrappers)
             (declare (ignore method-alist wrappers))
-            #'(instance-lambda (&rest args)
+            #'(lambda (&rest args)
                 (apply #'no-applicable-method gf args)))
           (lambda (method-alist wrappers)
             (declare (ignore method-alist wrappers))

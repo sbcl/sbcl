@@ -1,3 +1,14 @@
+;;;; allocation VOPs for Mips
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
 
@@ -119,6 +130,7 @@
       (pseudo-atomic (pa-flag :extra (pad-data-block size))
         (inst or result alloc-tn fun-pointer-lowtag)
         (storew temp result 0 fun-pointer-lowtag))
+      (storew result result closure-self-slot fun-pointer-lowtag)
       (storew function result closure-fun-slot fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.

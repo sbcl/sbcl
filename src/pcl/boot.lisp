@@ -1852,10 +1852,10 @@ bootstrapping.
      fin
      (or function
          (if (eq spec 'print-object)
-             #'(instance-lambda (instance stream)
+             #'(lambda (instance stream)
                  (print-unreadable-object (instance stream :identity t)
                    (format stream "std-instance")))
-             #'(instance-lambda (&rest args)
+             #'(lambda (&rest args)
                  (declare (ignore args))
                  (error "The function of the funcallable-instance ~S~
                          has not been set." fin)))))

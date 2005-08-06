@@ -123,7 +123,7 @@
          (lambda `(lambda ,closure-variables
                     ,@(when (member 'miss-fn closure-variables)
                         `((declare (type function miss-fn))))
-                    #'(instance-lambda ,args
+                    #'(lambda ,args
                         (let ()
                           (declare #.*optimize-speed*)
                           ,form)))))

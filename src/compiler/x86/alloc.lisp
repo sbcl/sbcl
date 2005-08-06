@@ -216,6 +216,7 @@
              (make-ea :byte :base result :disp fun-pointer-lowtag))
        (storew (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
                result 0 fun-pointer-lowtag))
+    (storew result result closure-self-slot fun-pointer-lowtag)
     (loadw temp function closure-fun-slot fun-pointer-lowtag)
     (storew temp result closure-fun-slot fun-pointer-lowtag))))
 

@@ -1,4 +1,4 @@
-;;;; allocation VOPs
+;;;; allocation VOPs for the PPC
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -144,6 +144,7 @@
         (storew temp result 0 fun-pointer-lowtag)))
     ;(inst lis temp (ash 18 10))
     ;(storew temp result closure-jump-insn-slot function-pointer-type)
+    (storew result result closure-self-slot fun-pointer-lowtag)
     (storew function result closure-fun-slot fun-pointer-lowtag)))
 
 ;;; The compiler likes to be able to directly make value cells.

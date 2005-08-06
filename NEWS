@@ -2,6 +2,12 @@
 changes in sbcl-0.9.4 relative to sbcl-0.9.3:
   * enhancement: SBCL on MIPS platforms now has a much larger dynamic
     space for its heap.  (thanks to Thiemo Seufer)
+  * minor incompatible change: eof selects abort in the debugger.
+  * minor incompatible change: *INVOKE-DEBUGGER-HOOK* is run before
+    *DEBUGGER-HOOK* => *DEBUGGER-HOOK* is not run when the debugger
+    is disabled.
+  * minor incompatible change: SB-KERNEL:INSTANCE-LAMBDA is
+    deprecated, and will go away in a future revision of SBCL.
   * bug fix: discriminating functions for generic function classes
     with non-standard methods for COMPUTE-APPLICABLE-METHODS no longer
     make invalid assumptions about method precedence order.  (reported
@@ -11,14 +17,13 @@ changes in sbcl-0.9.4 relative to sbcl-0.9.3:
     (thanks to Kevin Reid)
   * bug fix: complex VOP definitions in "user-space" no longer trigger
     package locks.  (reported by Zach Beane)
+  * fixed bug 343: SB-KERNEL:INSTANCE-LAMBDA is no longer necessary
+    for funcallable-instance functions, and is no different from
+    regular LAMBDA.
   * optimizations: REMOVE-DUPLICATES now runs in linear time on
     lists in some cases.  This partially fixes bug 384.
   * flush all standard streams before prompting in the REPL and the
     debugger.
-  * minor incompatible change: eof selects abort in the debugger.
-  * minor incompatible change: *INVOKE-DEBUGGER-HOOK* is run before
-    *DEBUGGER-HOOK* => *DEBUGGER-HOOK* is not run when the debugger
-    is disabled.
   * threads
     ** bug fix: RELEASE-FOREGROUND doesn't choke on session lock if
        there is only one thread in the session

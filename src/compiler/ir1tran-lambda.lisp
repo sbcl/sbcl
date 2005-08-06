@@ -922,11 +922,10 @@
                          :source-name source-name
                          :debug-name debug-name))
     ((instance-lambda)
-     (let ((res (ir1-convert-lambda `(lambda ,@(cdr thing))
-                                    :source-name source-name
-                                    :debug-name debug-name)))
-       (setf (getf (functional-plist res) :fin-function) t)
-       res))
+     (deprecation-warning 'instance-lambda 'lambda)
+     (ir1-convert-lambda `(lambda ,@(cdr thing))
+                         :source-name source-name
+                         :debug-name debug-name))
     ((named-lambda)
      (let ((name (cadr thing))
            (lambda-expression `(lambda ,@(cddr thing))))

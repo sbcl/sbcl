@@ -69,9 +69,12 @@
      (case (first object)
        ((setf)
         (fdefinition object))
-       ((lambda instance-lambda)
+       ((lambda)
         ;; FIXME: If we go to a compiler-only implementation, this can
         ;; become COMPILE instead of EVAL, which seems nicer to me.
+        (eval `(function ,object)))
+       ((instance-lambda)
+        (deprecation-warning 'instance-lambda 'lambda)
         (eval `(function ,object)))
        (t
         (error 'simple-type-error

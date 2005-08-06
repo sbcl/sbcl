@@ -67,7 +67,7 @@
                                              (get-instance-hash-code))))
     (set-funcallable-instance-function
      fin
-     #'(instance-lambda (&rest args)
+     #'(lambda (&rest args)
          (declare (ignore args))
          (error "The function of the funcallable-instance ~S has not been set."
                 fin)))

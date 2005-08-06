@@ -1138,8 +1138,9 @@
       (if (ir2-physenv-closure env)
           (let ((closure (make-normal-tn *backend-t-primitive-type*)))
             (vop setup-closure-environment node block start-label closure)
-            (when (getf (functional-plist ef) :fin-function)
-              (vop funcallable-instance-lexenv node block closure closure))
+            ;; KLUDGE: see the comment around the definition of
+            ;; CLOSURE objects in src/compiler/objdef.lisp
+            (vop funcallable-instance-lexenv node block closure closure)
             (let ((n -1))
               (dolist (loc (ir2-physenv-closure env))
                 (vop closure-ref node block closure (incf n) (cdr loc)))))
