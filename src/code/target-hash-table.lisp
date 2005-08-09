@@ -436,7 +436,7 @@
    ;; First check the cache.  Use EQ here for speed.
    (let ((cache (hash-table-cache hash-table))
          (table (hash-table-table hash-table)))
-          
+
      (if (and cache (< cache (length table)) (eq (aref table cache) key))
          (values (aref table (1+ cache)) t)
 
@@ -510,11 +510,11 @@
                 (hash-vector (hash-table-hash-vector hash-table))
                 (test-fun (hash-table-test-fun hash-table)))
            (declare (type index index))
-           
+
            (cond ((or eq-based (not hash-vector))
                   (when eq-based
                     (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype))
-                  
+
                   ;; Search next-vector chain for a matching key.
                   (do ((next next (aref next-vector next)))
                       ((zerop next))
@@ -536,7 +536,7 @@
                       (setf (hash-table-cache hash-table) (* 2 next))
                       (setf (aref kv-vector (1+ (* 2 next))) value)
                       (return-from %puthash value)))))
-           
+
            ;; Pop a KV slot off the free list
            (let ((free-kv-slot (hash-table-next-free-kv hash-table)))
              ;; Double-check for overflow.
@@ -544,17 +544,17 @@
              (setf (hash-table-next-free-kv hash-table)
                    (aref next-vector free-kv-slot))
              (incf (hash-table-number-entries hash-table))
-             
+
              (setf (hash-table-cache hash-table) (* 2 free-kv-slot))
              (setf (aref kv-vector (* 2 free-kv-slot)) key)
              (setf (aref kv-vector (1+ (* 2 free-kv-slot))) value)
-             
+
              ;; Setup the hash-vector if necessary.
              (when hash-vector
                (if (not eq-based)
                    (setf (aref hash-vector free-kv-slot) hashing)
                  (aver (= (aref hash-vector free-kv-slot) +magic-hash-vector-value+))))
-             
+
              ;; Push this slot into the next chain.
              (setf (aref next-vector free-kv-slot) next)
              (setf (aref index-vector index) free-kv-slot)))))))
@@ -575,7 +575,7 @@
          ((not (zerop (hash-table-needing-rehash hash-table)))
           (flush-needing-rehash hash-table)))
 
-   ;; For now, just clear the cache   
+   ;; For now, just clear the cache
    (setf (hash-table-cache hash-table) nil)
 
    ;; Search for key in the hash table.

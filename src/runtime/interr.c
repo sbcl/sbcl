@@ -49,7 +49,7 @@ lose(char *fmt, ...)
     va_list ap;
     fprintf(stderr, "fatal error encountered in SBCL pid %d",getpid());
 #if defined(LISP_FEATURE_SB_THREAD)
-    fprintf(stderr, "(tid %ld)",thread_self());
+    fprintf(stderr, "(tid %lu)",thread_self());
 #endif
     if (fmt) {
         fprintf(stderr, ":\n");

@@ -113,13 +113,13 @@
 (defun get3 (symbol indicator default)
   (let (cdr-pl)
     (do ((pl (symbol-plist symbol) (cdr cdr-pl)))
-	((atom pl) default)
+        ((atom pl) default)
       (setq cdr-pl (cdr pl))
       (cond ((atom cdr-pl)
-	     (error "~S has an odd number of items in its property list."
-		    symbol))
-	    ((eq (car pl) indicator)
-	     (return (car cdr-pl)))))))
+             (error "~S has an odd number of items in its property list."
+                    symbol))
+            ((eq (car pl) indicator)
+             (return (car cdr-pl)))))))
 
 (defun %put (symbol indicator value)
   #!+sb-doc

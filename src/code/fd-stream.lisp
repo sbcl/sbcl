@@ -1377,12 +1377,12 @@
     ;; drop buffers when direction changes
     (when (and (fd-stream-obuf-sap fd-stream) (not output-p))
       (with-available-buffers-lock ()
-	(push (fd-stream-obuf-sap fd-stream) *available-buffers*)
-	(setf (fd-stream-obuf-sap fd-stream) nil)))
+        (push (fd-stream-obuf-sap fd-stream) *available-buffers*)
+        (setf (fd-stream-obuf-sap fd-stream) nil)))
     (when (and (fd-stream-ibuf-sap fd-stream) (not input-p))
       (with-available-buffers-lock ()
-	(push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
-	(setf (fd-stream-ibuf-sap fd-stream) nil)))
+        (push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
+        (setf (fd-stream-ibuf-sap fd-stream) nil)))
     (when input-p
       (setf (fd-stream-ibuf-sap fd-stream) (next-available-buffer))
       (setf (fd-stream-ibuf-length fd-stream) bytes-per-buffer)

@@ -346,4 +346,3 @@ main(int argc, char *argv[], char *envp[])
     lose("CATS.  CATS ARE NICE.");
     return 0;
 }
-

@@ -37,6 +37,12 @@
  * problem.. */
 #define QSHOW_SIGNALS 0
 
+#ifdef QSHOW_SIGNALS
+#define FSHOW_SIGNAL FSHOW
+#else
+#define FSHOW_SIGNAL(args)
+#endif
+
 /* KLUDGE: These are in theory machine-dependent and OS-dependent, but
  * in practice the "foo int" definitions work for all the machines
  * that SBCL runs on as of 0.6.7. If we port to the Alpha or some

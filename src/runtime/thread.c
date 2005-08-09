@@ -43,18 +43,12 @@ void check_sig_stop_for_gc_can_arrive_or_lose()
     sigemptyset(&empty);
     thread_sigmask(SIG_BLOCK, &empty, &current);
     if (sigismember(&current,SIG_STOP_FOR_GC))
-        lose("SIG_STOP_FOR_GC is blocked\n");
+        lose("SIG_STOP_FOR_GC cannot arrive: it is blocked\n");
     if (SymbolValue(INTERRUPTS_ENABLED,arch_os_get_current_thread()) == NIL)
-        lose("interrupts disabled\n");
+        lose("SIG_STOP_FOR_GC cannot arrive: interrupts disabled\n");
     if (arch_pseudo_atomic_atomic(NULL))
-        lose("n pseudo atomic\n");
+        lose("SIG_STOP_FOR_GC cannot arrive: in pseudo atomic\n");
 }
-
-#ifdef QSHOW_SIGNALS
-#define FSHOW_SIGNAL FSHOW
-#else
-#define FSHOW_SIGNAL(args)
-#endif
 
 #define GET_ALL_THREADS_LOCK(name) \
     { \
@@ -64,10 +58,10 @@ void check_sig_stop_for_gc_can_arrive_or_lose()
         sigdelset(&_newset,SIG_STOP_FOR_GC); \
         thread_sigmask(SIG_BLOCK, &_newset, &_oldset); \
         check_sig_stop_for_gc_can_arrive_or_lose(); \
-        FSHOW_SIGNAL((stderr,"/%s:waiting on lock=%ld, thread=%ld\n",name, \
+        FSHOW_SIGNAL((stderr,"/%s:waiting on lock=%ld, thread=%lu\n",name, \
                all_threads_lock,arch_os_get_current_thread()->os_thread)); \
         get_spinlock(&all_threads_lock,(long)arch_os_get_current_thread()); \
-        FSHOW_SIGNAL((stderr,"/%s:got lock, thread=%ld\n", \
+        FSHOW_SIGNAL((stderr,"/%s:got lock, thread=%lu\n", \
                name,arch_os_get_current_thread()->os_thread));
 
 #define RELEASE_ALL_THREADS_LOCK(name) \
@@ -278,7 +272,7 @@ void create_initial_thread(lispobj initial_function) {
 
 #ifndef __USE_XOPEN2K
 extern int pthread_attr_setstack (pthread_attr_t *__attr, void *__stackaddr,
-				  size_t __stacksize);
+                                  size_t __stacksize);
 #endif
 
 boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
@@ -352,7 +346,7 @@ void reap_dead_thread(struct thread *th)
     }
 #endif
     GET_ALL_THREADS_LOCK("reap_dead_thread")
-    FSHOW((stderr,"/reap_dead_thread: reaping %ld\n",th->os_thread));
+    FSHOW((stderr,"/reap_dead_thread: reaping %lu\n",th->os_thread));
     if(th->prev)
         th->prev->next=th->next;
     else all_threads=th->next;
@@ -389,9 +383,10 @@ int interrupt_thread(struct thread *th, lispobj function)
         lispobj c=alloc_cons(function,NIL);
         int kill_status;
         /* interrupt_thread_handler locks this spinlock with
-         * interrupts blocked and it does so for the sake of
-         * arrange_return_to_lisp_function, so we must also block
-         * them. */
+         * interrupts blocked (it does so for the sake of
+         * arrange_return_to_lisp_function), so we must also block
+         * them or else SIG_STOP_FOR_GC and all_threads_lock will find
+         * a way to deadlock. */
         sigset_t newset,oldset;
         sigemptyset(&newset);
         sigaddset_blockable(&newset);
@@ -422,23 +417,23 @@ int interrupt_thread(struct thread *th, lispobj function)
 void gc_stop_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
-    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock, thread=%ld\n",
+    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock, thread=%lu\n",
                   th->os_thread));
     /* keep threads from starting while the world is stopped. */
     get_spinlock(&all_threads_lock,(long)th);
-    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got lock, thread=%ld\n",
+    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got lock, thread=%lu\n",
                   th->os_thread));
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     for(p=all_threads; p; p=p->next) {
         while(p->state==STATE_STARTING) sched_yield();
         if((p!=th) && (p->state==STATE_RUNNING)) {
-            FSHOW_SIGNAL((stderr,"/gc_stop_the_world:sending sig_stop to %ld\n",
+            FSHOW_SIGNAL((stderr, "/gc_stop_the_world: suspending %lu\n",
                           p->os_thread));
             if(thread_kill(p->os_thread,SIG_STOP_FOR_GC)==-1) {
                 /* we can't kill the thread; assume because it died
                  * since we last checked */
                 p->state=STATE_DEAD;
-                FSHOW_SIGNAL((stderr,"/gc_stop_the_world:assuming %ld dead\n",
+                FSHOW_SIGNAL((stderr,"/gc_stop_the_world:assuming %lu dead\n",
                    p->os_thread));
             }
         }
@@ -468,13 +463,15 @@ void gc_start_the_world()
         gc_assert(p->os_thread!=0);
         if((p!=th) && (p->state!=STATE_DEAD)) {
             if(p->state!=STATE_SUSPENDED) {
-                lose("gc_start_the_world: wrong thread state is %ld\n",
+                lose("gc_start_the_world: wrong thread state is %d\n",
                      fixnum_value(p->state));
             }
+            FSHOW_SIGNAL((stderr, "/gc_start_the_world: resuming %lu\n",
+                          p->os_thread));
             thread_kill(p->os_thread,SIG_STOP_FOR_GC);
         }
     }
-    /* we must wait for all threads to leave stopped state else we
+    /* we must wait for all threads to leave suspended state else we
      * risk signal accumulation and lose any meaning of
      * thread->state */
     for(p=all_threads;p;) {

@@ -1043,22 +1043,22 @@
 
 (defun generate-discrimination-net (generic-function methods types sorted-p)
   (let* ((arg-info (gf-arg-info generic-function))
-	 (c-a-m-emf-std-p (gf-info-c-a-m-emf-std-p arg-info))
+         (c-a-m-emf-std-p (gf-info-c-a-m-emf-std-p arg-info))
          (precedence (arg-info-precedence arg-info)))
     (generate-discrimination-net-internal
      generic-function methods types
      (lambda (methods known-types)
        (if (or sorted-p
-	       (and c-a-m-emf-std-p
-		    (block one-order-p
-		      (let ((sorted-methods nil))
-			(map-all-orders
-			 (copy-list methods) precedence
-			 (lambda (methods)
-			   (when sorted-methods (return-from one-order-p nil))
-			   (setq sorted-methods methods)))
-			(setq methods sorted-methods))
-		      t)))
+               (and c-a-m-emf-std-p
+                    (block one-order-p
+                      (let ((sorted-methods nil))
+                        (map-all-orders
+                         (copy-list methods) precedence
+                         (lambda (methods)
+                           (when sorted-methods (return-from one-order-p nil))
+                           (setq sorted-methods methods)))
+                        (setq methods sorted-methods))
+                      t)))
            `(methods ,methods ,known-types)
            `(unordered-methods ,methods ,known-types)))
      (lambda (position type true-value false-value)

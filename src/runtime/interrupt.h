@@ -52,7 +52,7 @@ struct interrupt_data {
     /* signal information for pending signal.  pending_signal=0 when there
      * is no pending signal. */
     void (*pending_handler) (int, siginfo_t*, void*) ;
-    int pending_signal ;
+    int pending_signal;
     siginfo_t pending_info;
     sigset_t pending_mask;
 };

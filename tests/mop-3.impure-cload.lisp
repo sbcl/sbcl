@@ -32,7 +32,7 @@
   (let ((result '()))
     (dolist (method methods)
       (if (and (consp result)
-               (equal (method-qualifiers method) 
+               (equal (method-qualifiers method)
                       (method-qualifiers (caar result))))
           (push method (car result))
           (push (list method) result)))
@@ -40,19 +40,19 @@
 
 (defmethod compute-applicable-methods ((gf msl-generic-function) arguments)
   (reverse-method-list (call-next-method)))
-(defmethod compute-applicable-methods-using-classes 
+(defmethod compute-applicable-methods-using-classes
     ((gf msl-generic-function) classes)
   (reverse-method-list (call-next-method)))
 
-(defgeneric testgf07 (x) 
+(defgeneric testgf07 (x)
   (:generic-function-class msl-generic-function)
-  (:method ((x integer)) 
+  (:method ((x integer))
     (cons 'integer (if (next-method-p) (call-next-method))))
-  (:method ((x real)) 
+  (:method ((x real))
     (cons 'real (if (next-method-p) (call-next-method))))
-  (:method ((x number)) 
+  (:method ((x number))
     (cons 'number (if (next-method-p) (call-next-method))))
-  (:method :around ((x integer)) 
+  (:method :around ((x integer))
     (coerce (call-next-method) 'vector)))
 
 (assert (equalp (list (testgf07 5.0) (testgf07 17))
@@ -69,22 +69,22 @@
                          (sb-pcl:method-specializers method)))
              methods))
 
-(defmethod compute-applicable-methods 
+(defmethod compute-applicable-methods
     ((gf nonumber-generic-function) arguments)
   (nonumber-method-list (call-next-method)))
-(defmethod compute-applicable-methods-using-classes 
+(defmethod compute-applicable-methods-using-classes
     ((gf nonumber-generic-function) classes)
   (nonumber-method-list (call-next-method)))
 
-(defgeneric testgf08 (x) 
+(defgeneric testgf08 (x)
   (:generic-function-class nonumber-generic-function)
-  (:method ((x integer)) 
+  (:method ((x integer))
     (cons 'integer (if (next-method-p) (call-next-method))))
-  (:method ((x real)) 
+  (:method ((x real))
     (cons 'real (if (next-method-p) (call-next-method))))
-  (:method ((x number)) 
+  (:method ((x number))
     (cons 'number (if (next-method-p) (call-next-method))))
-  (:method :around ((x integer)) 
+  (:method :around ((x integer))
     (coerce (call-next-method) 'vector)))
 
 (assert (equalp (list (testgf08 5.0) (testgf08 17))

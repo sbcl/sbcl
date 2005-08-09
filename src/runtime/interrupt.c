@@ -406,11 +406,9 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
         fake_foreign_function_call(context);
     }
 
-#ifdef QSHOW_SIGNALS
-    FSHOW((stderr,
-           "/entering interrupt_handle_now(%d, info, context)\n",
-           signal));
-#endif
+    FSHOW_SIGNAL((stderr,
+                  "/entering interrupt_handle_now(%d, info, context)\n",
+                  signal));
 
     if (ARE_SAME_HANDLER(handler.c, SIG_DFL)) {
 
@@ -437,9 +435,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
         /* Allow signals again. */
         thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
-#ifdef QSHOW_SIGNALS
-        SHOW("calling Lisp-level handler");
-#endif
+        FSHOW_SIGNAL((stderr,"/calling Lisp-level handler\n"));
 
         funcall3(handler.lisp,
                  make_fixnum(signal),
@@ -447,9 +443,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
                  context_sap);
     } else {
 
-#ifdef QSHOW_SIGNALS
-        SHOW("calling C-level handler");
-#endif
+        FSHOW_SIGNAL((stderr,"/calling C-level handler\n"));
 
         /* Allow signals again. */
         thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
@@ -464,11 +458,9 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
         undo_fake_foreign_function_call(context); /* block signals again */
     }
 
-#ifdef QSHOW_SIGNALS
-    FSHOW((stderr,
-           "/returning from interrupt_handle_now(%d, info, context)\n",
-           signal));
-#endif
+    FSHOW_SIGNAL((stderr,
+                  "/returning from interrupt_handle_now(%d, info, context)\n",
+                  signal));
 }
 
 /* This is called at the end of a critical section if the indications
@@ -501,16 +493,15 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         lose("interrupt already pending");
     /* If interrupts are disabled then INTERRUPT_PENDING is set and
      * not PSEDUO_ATOMIC_INTERRUPTED. This is important for a pseudo
-     * atomic section inside a without-interrupts.
+     * atomic section inside a WITHOUT-INTERRUPTS.
      */
     if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) {
         store_signal_data_for_later(data,handler,signal,info,context);
         SetSymbolValue(INTERRUPT_PENDING, T,thread);
-#ifdef QSHOW_SIGNALS
-        FSHOW((stderr,
-               "/maybe_defer_handler(%x,%d),thread=%ld: deferred\n",
-               (unsigned int)handler,signal,thread->os_thread));
-#endif
+        FSHOW_SIGNAL((stderr,
+                      "/maybe_defer_handler(%x,%d),thread=%lu: deferred\n",
+                      (unsigned int)handler,signal,
+                      (unsigned long)thread->os_thread));
         return 1;
     }
     /* a slightly confusing test.  arch_pseudo_atomic_atomic() doesn't
@@ -523,18 +514,16 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         arch_pseudo_atomic_atomic(context)) {
         store_signal_data_for_later(data,handler,signal,info,context);
         arch_set_pseudo_atomic_interrupted(context);
-#ifdef QSHOW_SIGNALS
-        FSHOW((stderr,
-               "/maybe_defer_handler(%x,%d),thread=%ld: deferred(PA)\n",
-               (unsigned int)handler,signal,thread->os_thread));
-#endif
+        FSHOW_SIGNAL((stderr,
+                      "/maybe_defer_handler(%x,%d),thread=%lu: deferred(PA)\n",
+                      (unsigned int)handler,signal,
+                      (unsigned long)thread->os_thread));
         return 1;
     }
-#ifdef QSHOW_SIGNALS
-        FSHOW((stderr,
-               "/maybe_defer_handler(%x,%d),thread=%ld: not deferred\n",
-               (unsigned int)handler,signal,thread->os_thread));
-#endif
+    FSHOW_SIGNAL((stderr,
+                  "/maybe_defer_handler(%x,%d),thread=%lu: not deferred\n",
+                  (unsigned int)handler,signal,
+                  (unsigned long)thread->os_thread));
     return 0;
 }
 
@@ -621,6 +610,7 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
+
 void
 sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 {
@@ -835,7 +825,7 @@ void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 {
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
     /* The order of interrupt execution is peculiar. If thread A
-     * interrupts thread B with I1, I2 and B for some reason recieves
+     * interrupts thread B with I1, I2 and B for some reason receives
      * I1 when FUN2 is already on the list, then it is FUN2 that gets
      * to run first. But when FUN2 is run SIG_INTERRUPT_THREAD is
      * enabled again and I2 hits pretty soon in FUN2 and run
