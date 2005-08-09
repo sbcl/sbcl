@@ -107,6 +107,7 @@ int
 new_thread_trampoline(struct thread *th)
 {
     lispobj function;
+    int result;
     function = th->unbound_marker;
     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) return 1;
@@ -115,7 +116,9 @@ new_thread_trampoline(struct thread *th)
     while(th->os_thread<1) sched_yield();
 
     th->state=STATE_RUNNING;
-    return funcall0(function);
+    result = funcall0(function);
+    th->state=STATE_DEAD;
+    return result;
 }
 #endif /* LISP_FEATURE_SB_THREAD */
 
@@ -446,6 +449,8 @@ void gc_stop_the_world()
         if((p==th) || (p->state==STATE_SUSPENDED) ||
            (p->state==STATE_DEAD)) {
             p=p->next;
+        } else {
+            sched_yield();
         }
     }
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:end\n"));
@@ -468,15 +473,8 @@ void gc_start_the_world()
             }
             FSHOW_SIGNAL((stderr, "/gc_start_the_world: resuming %lu\n",
                           p->os_thread));
+            p->state=STATE_RUNNING;
             thread_kill(p->os_thread,SIG_STOP_FOR_GC);
-        }
-    }
-    /* we must wait for all threads to leave suspended state else we
-     * risk signal accumulation and lose any meaning of
-     * thread->state */
-    for(p=all_threads;p;) {
-        if((p==th) || (p->state!=STATE_SUSPENDED)) {
-            p=p->next;
         }
     }
     release_spinlock(&all_threads_lock);

@@ -50,17 +50,6 @@ in future versions."
       (#.(sb!vm:fixnumize 2) :suspended)
       (#.(sb!vm:fixnumize 3) :dead))))
 
-(defun %set-thread-state (thread state)
-  (setf (sb!sys:sap-ref-sap (thread-%sap thread)
-                            (* sb!vm::thread-state-slot
-                               sb!vm::n-word-bytes))
-        (sb!sys:int-sap
-          (ecase state
-            (:starting #.(sb!vm:fixnumize 0))
-            (:running #.(sb!vm:fixnumize 1))
-            (:suspended #.(sb!vm:fixnumize 2))
-            (:dead #.(sb!vm:fixnumize 3))))))
-
 (defun thread-alive-p (thread)
   #!+sb-doc
   "Check if THREAD is running."
@@ -506,9 +495,6 @@ returns the thread exits."
                              ;; we're going down, can't handle
                              ;; interrupts sanely anymore
                              (sb!unix::block-blockable-signals)))))
-                  ;; mark the thread dead, so that the gc does not
-                  ;; wait for it to handle sig-stop-for-gc
-                  (%set-thread-state thread :dead)
                   ;; and remove what can be the last reference to
                   ;; the thread object
                   (handle-thread-exit thread)

@@ -638,11 +638,10 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 
     sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
     sigwaitinfo(&ss,0);
-    if(thread->state!=STATE_SUSPENDED) {
+    if(thread->state!=STATE_RUNNING) {
         lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",
            fixnum_value(thread->state));
     }
-    thread->state=STATE_RUNNING;
 
     undo_fake_foreign_function_call(context);
 }
