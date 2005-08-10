@@ -266,3 +266,26 @@
 ACTUAL ~D DERIVED ~D~%"
                                               op a b c d minimize brute derived)
                                       (assert (= brute derived)))))))))))))
+
+;;; subtypep on CONS types wasn't taking account of the fact that a
+;;; CONS type could be the empty type (but no other non-CONS type) in
+;;; disguise.
+(multiple-value-bind (yes win)
+    (subtypep '(and function stream) 'nil)
+  (multiple-value-bind (cyes cwin)
+      (subtypep '(cons (and function stream) t)
+                '(cons nil t))
+    (assert (eq yes cyes))
+    (assert (eq win cwin))))
+
+;;; CONS type subtypep could be too enthusiastic about thinking it was
+;;; certain
+(multiple-value-bind (yes win)
+    (subtypep '(satisfies foo) '(satisfies bar))
+  (assert (null yes))
+  (assert (null win))
+  (multiple-value-bind (cyes cwin)
+      (subtypep '(cons (satisfies foo) t)
+                '(cons (satisfies bar) t))
+    (assert (null cyes))
+    (assert (null cwin))))

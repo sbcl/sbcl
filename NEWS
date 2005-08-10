@@ -22,6 +22,8 @@ changes in sbcl-0.9.4 relative to sbcl-0.9.3:
     regular LAMBDA.
   * bug fix: PARSE-INTEGER no longer depends on the whitespaceness of
     characters in the current readtable.  (reported by Nicholas Neuss)
+  * bug fix: SUBTYPEP on various CONS types returns more a more
+    accurate acknowledgment of its certainty.
   * optimizations: REMOVE-DUPLICATES now runs in linear time on
     lists in some cases.  This partially fixes bug 384.
   * flush all standard streams before prompting in the REPL and the

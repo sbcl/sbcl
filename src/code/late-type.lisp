@@ -1057,15 +1057,35 @@
   ;;(aver (not (eq type1 *wild-type*))) ; * isn't really a type.
   (values (eq type1 type2) t))
 
+(defun cons-type-might-be-empty-type (type)
+  (declare (type cons-type type))
+  (let ((car-type (cons-type-car-type type))
+        (cdr-type (cons-type-cdr-type type)))
+    (or
+     (if (cons-type-p car-type)
+         (cons-type-might-be-empty-type car-type)
+         (multiple-value-bind (yes surep)
+             (type= car-type *empty-type*)
+           (aver (not yes))
+           (not surep)))
+     (if (cons-type-p cdr-type)
+         (cons-type-might-be-empty-type cdr-type)
+         (multiple-value-bind (yes surep)
+             (type= cdr-type *empty-type*)
+           (aver (not yes))
+           (not surep))))))
+
 (!define-type-method (named :complex-=) (type1 type2)
   (cond
     ((and (eq type2 *empty-type*)
-          (intersection-type-p type1)
-          ;; not allowed to be unsure on these... FIXME: keep the list
-          ;; of CL types that are intersection types once and only
-          ;; once.
-          (not (or (type= type1 (specifier-type 'ratio))
-                   (type= type1 (specifier-type 'keyword)))))
+          (or (and (intersection-type-p type1)
+                   ;; not allowed to be unsure on these... FIXME: keep
+                   ;; the list of CL types that are intersection types
+                   ;; once and only once.
+                   (not (or (type= type1 (specifier-type 'ratio))
+                            (type= type1 (specifier-type 'keyword)))))
+              (and (cons-type-p type1)
+                   (cons-type-might-be-empty-type type1))))
      ;; things like (AND (EQL 0) (SATISFIES ODDP)) or (AND FUNCTION
      ;; STREAM) can get here.  In general, we can't really tell
      ;; whether these are equal to NIL or not, so
@@ -1116,7 +1136,9 @@
   (aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (cond ((eq type2 *universal-type*)
          (values t t))
-        ((type-might-contain-other-types-p type1)
+        ((or (type-might-contain-other-types-p type1)
+             (and (cons-type-p type1)
+                  (cons-type-might-be-empty-type type1)))
          ;; those types can be *EMPTY-TYPE* or *UNIVERSAL-TYPE* in
          ;; disguise.  So we'd better delegate.
          (invoke-complex-subtypep-arg1-method type1 type2))
@@ -2845,7 +2867,8 @@
         (csubtypep (cons-type-cdr-type type1) (cons-type-cdr-type type2))
       (if (and val-car val-cdr)
           (values t (and win-car win-cdr))
-          (values nil (or win-car win-cdr))))))
+          (values nil (or (and (not val-car) win-car)
+                          (and (not val-cdr) win-cdr)))))))
 
 ;;; Give up if a precise type is not possible, to avoid returning
 ;;; overly general types.
