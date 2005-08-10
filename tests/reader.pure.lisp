@@ -228,3 +228,13 @@
 (assert (equal '((0 . "A") (1 . "B"))
                (coerce (read-from-string "#((0 . \"A\") (1 . \"B\"))")
                        'list)))
+
+;;; parse-integer uses whitespace[1] not whitespace[2] as its
+;;; definition of whitespace to skip.
+(let ((*readtable* (copy-readtable)))
+  (set-syntax-from-char #\7 #\Space)
+  (assert (= 710 (parse-integer "710"))))
+
+(let ((*readtable* (copy-readtable)))
+  (set-syntax-from-char #\7 #\Space)
+  (assert (string= (format nil "~7D" 1) "      1")))

@@ -48,7 +48,7 @@
           ((eql ,peek-type t)
            (do ((,char-var ,char-var ,read-form))
                ((or (eql ,char-var ,read-eof)
-                    (not (whitespacep ,char-var)))
+                    (not (whitespace[2]p ,char-var)))
                 (cond ((eql ,char-var ,read-eof)
                        ,(if eof-detected-form
                             eof-detected-form

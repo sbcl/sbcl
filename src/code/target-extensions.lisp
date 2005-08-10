@@ -40,7 +40,7 @@ applications.")
   (do ((char (read-char-no-hang stream nil nil nil)
              (read-char-no-hang stream nil nil nil)))
       ((null char) nil)
-    (cond ((not (whitespacep char))
+    (cond ((not (whitespace[1]p char))
            (unread-char char stream)
            (return t)))))
 

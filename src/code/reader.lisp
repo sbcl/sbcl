@@ -114,8 +114,12 @@
 
 ;;; predicates for testing character attributes
 
-#!-sb-fluid (declaim (inline whitespacep))
-(defun whitespacep (char &optional (rt *readtable*))
+;;; the [1] and [2] here refer to ANSI glossary entries for
+;;; "whitespace".
+#!-sb-fluid (declaim (inline whitespace[1]p whitespace[2]p))
+(defun whitespace[1]p (char)
+  (test-attribute char +char-attr-whitespace+ *standard-readtable*))
+(defun whitespace[2]p (char &optional (rt *readtable*))
   (test-attribute char +char-attr-whitespace+ rt))
 
 (defmacro constituentp (char &optional (rt '*readtable*))
@@ -468,7 +472,7 @@ variables to allow for nested and thread safe reading."
       (loop
        (let ((char (read-char stream eof-error-p *eof-object*)))
          (cond ((eofp char) (return eof-value))
-               ((whitespacep char))
+               ((whitespace[2]p char))
                (t
                 (let* ((macrofun (get-coerced-cmt-entry char *readtable*))
                        (result (multiple-value-list
@@ -507,7 +511,7 @@ variables to allow for nested and thread safe reading."
     (unless (or (eql result eof-value) recursivep)
       (let ((next-char (read-char stream nil nil)))
         (unless (or (null next-char)
-                    (whitespacep next-char))
+                    (whitespace[2]p next-char))
           (unread-char next-char stream))))
     result))
 
@@ -569,7 +573,7 @@ variables to allow for nested and thread safe reading."
                               (%reader-error
                                stream
                                "Nothing appears before . in list.")))
-                           ((whitespacep nextchar)
+                           ((whitespace[2]p nextchar)
                             (setq nextchar (flush-whitespace stream))))
                      (rplacd listtail
                              ;; Return list containing last thing.
@@ -1534,7 +1538,7 @@ variables to allow for nested and thread safe reading."
                             (return-from parse-integer (values nil end))
                             (parse-error "no non-whitespace characters in string ~S.")))
                      (declare (fixnum i))
-                     (unless (whitespacep (char string i)) (return i))))
+                     (unless (whitespace[1]p (char string i)) (return i))))
             (minusp nil)
             (found-digit nil)
             (result 0))
@@ -1553,11 +1557,11 @@ variables to allow for nested and thread safe reading."
                   (setq result (+ weight (* result radix))
                         found-digit t))
                  (junk-allowed (return nil))
-                 ((whitespacep char)
+                 ((whitespace[1]p char)
                   (loop
                    (incf index)
                    (when (= index end) (return))
-                   (unless (whitespacep (char string index))
+                   (unless (whitespace[1]p (char string index))
                       (parse-error "junk in string ~S")))
                   (return nil))
                  (t

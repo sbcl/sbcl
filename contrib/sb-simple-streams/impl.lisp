@@ -273,7 +273,7 @@
                                                   eof-error-p
                                                   stream t)))
                  ((or (eq char stream)
-                      (not (sb-impl::whitespacep char)))
+                      (not (sb-impl::whitespace[2]p char)))
                   (unless (eq char stream)
                     (funcall-stm-handler j-unread-char encap t))
                   (if (eq char stream) eof-value char))))
@@ -805,7 +805,7 @@
              ((eq peek-type t)
               (do ((char (sb-gray:stream-read-char stream)
                          (sb-gray:stream-read-char stream)))
-                  ((or (eq char :eof) (not (sb-impl::whitespacep char)))
+                  ((or (eq char :eof) (not (sb-impl::whitespace[2]p char)))
                    (cond ((eq char :eof)
                           (sb-impl::eof-or-lose stream eof-error-p eof-value))
                          (t

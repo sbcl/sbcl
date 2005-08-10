@@ -293,3 +293,9 @@
 
 (with-standard-io-syntax
   (open "/dev/null"))
+
+;;; PEEK-CHAR T uses whitespace[2]
+(let ((*readtable* (copy-readtable)))
+  (assert (char= (peek-char t (make-string-input-stream " a")) #\a))
+  (set-syntax-from-char #\Space #\a)
+  (assert (char= (peek-char t (make-string-input-stream " a")) #\Space)))
