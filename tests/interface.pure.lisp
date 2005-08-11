@@ -129,6 +129,15 @@
   (test (* 86400 365) 0 (0 0 0 1 1 1901 1 0))
   (test (* 86400 365) 1/3600 (59 59 23 31 12 1900 0 1/3600)))
 
+;;; DECODE-UNIVERSAL-TIME shouldn't fail when the time is outside UNIX
+;;; 32-bit time_t and a timezone wasn't passed
+(decode-universal-time 0 nil)
+
+;;; ENCODE-UNIVERSAL-TIME should be able to encode the universal time
+;;; 0 when passed a representation in a timezone where the
+;;; representation of 0 as a decoded time is in 1899.
+(encode-universal-time 0 0 23 31 12 1899 1)
+
 ;;; DISASSEMBLE shouldn't fail on purified functions
 (disassemble 'cl:+)
 (disassemble 'sb-ext:run-program)

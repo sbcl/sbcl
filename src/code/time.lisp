@@ -106,6 +106,18 @@
 ;;; history (Perq time base?) could be cleaned up any on this basis.
 ;;; -- dan, 2003-08-08
 
+;;; In order to accomodate universal times between January 1st 1900
+;;; and sometime on December 13th 1901, I'm doing the same calculation
+;;; as described above in order to handle dates in that interval, by
+;;; normalizing them to March 1st 1903, which shares the same special
+;;; properties described above (except for the 400-year property, but
+;;; this isn't an issue for the limited range we need to handle).
+
+;;; One open issue is whether to pass UNIX a 64-bit time_t value on
+;;; 64-bit platforms. I don't know if time_t is always 64-bit on those
+;;; platforms, and looking at this file reveals a scary amount of
+;;; literal 31 and 32s.
+;;; -- bem, 2005-08-09
 
 ;;; Subtract from the returned Internal-Time to get the universal
 ;;; time. The offset between our time base and the Perq one is 2145
@@ -138,6 +150,8 @@
 (defconstant +mar-1-2000+ #.(encode-universal-time 0 0 0 1 3 2000 0))
 (defconstant +mar-1-2035+ #.(encode-universal-time 0 0 0 1 3 2035 0))
 
+(defconstant +mar-1-1903+ #.(encode-universal-time 0 0 0 1 3 1903 0))
+
 (defun years-since-mar-2000 (utime)
   "Returns number of complete years since March 1st 2000, and remainder in seconds"
   (let* ((days-in-year (* 86400 365))
@@ -159,13 +173,17 @@
 
 (defun truncate-to-unix-range (utime)
   (let ((unix-time (- utime unix-to-universal-time)))
-    (if (and (>= unix-time 0)
-             (< unix-time (ash 1 31)))
-        unix-time
-        (multiple-value-bind (year offset) (years-since-mar-2000 utime)
-          (declare (ignore year))
-          (+  +mar-1-2035+  (- unix-to-universal-time)  offset)))))
-
+    (cond
+      ((< unix-time (- (ash 1 31)))
+       (multiple-value-bind (year offset) (years-since-mar-2000 utime)
+	 (declare (ignore year))
+	 (+  +mar-1-1903+  (- unix-to-universal-time)  offset)))
+      ((>= unix-time (ash 1 31))
+       (multiple-value-bind (year offset) (years-since-mar-2000 utime)
+	 (declare (ignore year))
+	 (+  +mar-1-2035+  (- unix-to-universal-time)  offset)))
+      (t unix-time))))
+  
 (defun decode-universal-time (universal-time &optional time-zone)
   #!+sb-doc
   "Converts a universal-time to decoded time format returning the following
@@ -247,7 +265,11 @@
            (type (mod 24) hour)
            (type (integer 1 31) date)
            (type (integer 1 12) month)
-           (type (or (integer 0 99) (integer 1900)) year)
+           (type (or (integer 0 99) (integer 1899)) year)
+	   ;; that type used to say (integer 1900), but that's
+	   ;; incorrect when a time-zone is specified: we should be
+	   ;; able to encode to produce 0 when a non-zero timezone is
+	   ;; specified - bem, 2005-08-09
            (type (or null rational) time-zone))
   (let* ((year (if (< year 100)
                    (pick-obvious-year year)
@@ -258,9 +280,10 @@
                       (leap-years-before (1+ year))
                       (leap-years-before year))
                   (* (- year 1900) 365)))
-         (hours (+ hour (* days 24))))
+         (hours (+ hour (* days 24)))
+	 (encoded-time 0))
     (if time-zone
-        (+ second (* (+ minute (* (+ hours time-zone) 60)) 60))
+        (setf encoded-time (+ second (* (+ minute (* (+ hours time-zone) 60)) 60)))
         (let* ((secwest-guess
                 (sb!unix::unix-get-seconds-west
                  (truncate-to-unix-range (* hours 60 60))))
@@ -269,7 +292,9 @@
                (secwest
                 (sb!unix::unix-get-seconds-west
                  (truncate-to-unix-range guess))))
-          (+ guess (- secwest secwest-guess))))))
+          (setf encoded-time (+ guess (- secwest secwest-guess)))))
+    (assert (typep encoded-time '(integer 0)))
+    encoded-time))
 
 ;;;; TIME
 
