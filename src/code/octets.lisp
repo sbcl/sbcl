@@ -663,10 +663,10 @@ one-past-the-end"
 (defparameter *external-format-functions*
   '(((:ascii :us-ascii :ansi_x3.4-1968 :iso-646 :iso-646-us :|646|)
      ascii->string-aref string->ascii)
-    ((:latin1 :latin-1 :iso-8859-1)
+    ((:latin1 :latin-1 :iso-8859-1 :iso8859-1)
      latin1->string-aref string->latin1)
     #!+sb-unicode
-    ((:latin9 :latin-9 :iso-8859-15)
+    ((:latin9 :latin-9 :iso-8859-15 :iso8859-15)
      latin9->string-aref string->latin9)
     ((:utf8 :utf-8)
      utf8->string-aref string->utf8)))

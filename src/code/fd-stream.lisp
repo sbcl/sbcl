@@ -1216,7 +1216,10 @@
                ,resync-function)
         *external-formats*)))))
 
-(define-external-format (:latin-1 :latin1 :iso-8859-1)
+;;; Multiple names for the :ISO{,-}8859-* families are needed because on
+;;; FreeBSD (and maybe other BSD systems), nl_langinfo("LATIN-1") will
+;;; return "ISO8859-1" instead of "ISO-8859-1".
+(define-external-format (:latin-1 :latin1 :iso-8859-1 :iso8859-1)
     1 t
   (if (>= bits 256)
       (stream-encoding-error-and-handle stream bits)
@@ -1283,7 +1286,7 @@
       (latin-9-reverse-2 (make-array 16
                                      :element-type '(unsigned-byte 8)
                                      :initial-contents '(#xa6 #xa8 #xbc #xbd 0 0 0 0 #xbe 0 0 0 #xa4 #xb4 #xb8 0))))
-  (define-external-format (:latin-9 :latin9 :iso-8859-15)
+  (define-external-format (:latin-9 :latin9 :iso-8859-15 :iso8859-15)
       1 t
     (setf (sap-ref-8 sap tail)
           (if (< bits 256)
