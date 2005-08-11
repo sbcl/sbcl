@@ -199,7 +199,9 @@
     ;; interrupt handling
     *free-interrupt-context-index*
     sb!unix::*interrupts-enabled*
-    sb!unix::*interrupt-pending*))
+    sb!unix::*interrupt-pending*
+    *gc-inhibit*
+    *gc-pending*))
 
 (defparameter *static-funs*
   '(length

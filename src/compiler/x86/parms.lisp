@@ -296,6 +296,9 @@
     sb!unix::*interrupts-enabled*
     sb!unix::*interrupt-pending*
     *free-interrupt-context-index*
+    *gc-inhibit*
+    #!+sb-thread *stop-for-gc-pending*
+    *gc-pending*
 
     *free-tls-index*
 
@@ -304,8 +307,6 @@
     *binding-stack-start*
     *control-stack-start*
     *control-stack-end*
-
-    *need-to-collect-garbage*
 
     ;; the floating point constants
     *fp-constant-0d0*

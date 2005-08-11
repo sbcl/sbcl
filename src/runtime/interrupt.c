@@ -75,7 +75,7 @@ static void store_signal_data_for_later (struct interrupt_data *data,
                                          os_context_t *context);
 boolean interrupt_maybe_gc_int(int signal, siginfo_t *info, void *v_context);
 
-void sigaddset_blockable(sigset_t *s)
+void sigaddset_deferrable(sigset_t *s)
 {
     sigaddset(s, SIGHUP);
     sigaddset(s, SIGINT);
@@ -95,11 +95,20 @@ void sigaddset_blockable(sigset_t *s)
     sigaddset(s, SIGUSR1);
     sigaddset(s, SIGUSR2);
 #ifdef LISP_FEATURE_SB_THREAD
-    sigaddset(s, SIG_STOP_FOR_GC);
     sigaddset(s, SIG_INTERRUPT_THREAD);
 #endif
 }
 
+void sigaddset_blockable(sigset_t *s)
+{
+    sigaddset_deferrable(s);
+#ifdef LISP_FEATURE_SB_THREAD
+    sigaddset(s, SIG_STOP_FOR_GC);
+#endif
+}
+
+/* initialized in interrupt_init */
+static sigset_t deferrable_sigset;
 static sigset_t blockable_sigset;
 
 inline static void check_blockables_blocked_or_lose()
@@ -148,7 +157,17 @@ void reset_signal_mask ()
     thread_sigmask(SIG_SETMASK,&new,0);
 }
 
-void block_blockable_signals ()
+void block_deferrable_signals_and_inhibit_gc ()
+{
+    struct thread *thread=arch_os_get_current_thread();
+    sigset_t block;
+    sigemptyset(&block);
+    sigaddset_deferrable(&block);
+    thread_sigmask(SIG_BLOCK, &block, 0);
+    bind_variable(GC_INHIBIT,T,thread);
+}
+
+static void block_blockable_signals ()
 {
     sigset_t block;
     sigemptyset(&block);
@@ -328,34 +347,64 @@ interrupt_handle_pending(os_context_t *context)
     struct interrupt_data *data;
 
     check_blockables_blocked_or_lose();
-    check_interrupts_enabled_or_lose(context);
 
     thread=arch_os_get_current_thread();
     data=thread->interrupt_data;
 
-    /* Pseudo atomic may trigger several times for a single interrupt,
-     * and while without-interrupts should not, a false trigger by
-     * pseudo-atomic may eat a pending handler even from
-     * without-interrupts. */
-    if (data->pending_handler) {
+    if (SymbolValue(GC_INHIBIT,thread)==NIL) {
+#ifdef LISP_FEATURE_SB_THREAD
+        if (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL) {
+            /* another thread has already initiated a gc, this attempt
+             * might as well be cancelled */
+            SetSymbolValue(GC_PENDING,NIL,thread);
+            SetSymbolValue(STOP_FOR_GC_PENDING,NIL,thread);
+            sig_stop_for_gc_handler(SIG_STOP_FOR_GC,NULL,context);
+        } else
+#endif
+        if (SymbolValue(GC_PENDING,thread) != NIL) {
+            /* GC_PENDING is cleared in SUB-GC, or if another thread
+             * is doing a gc already we will get a SIG_STOP_FOR_GC and
+             * that will clear it. */
+            interrupt_maybe_gc_int(0,NULL,context);
+        }
+        check_blockables_blocked_or_lose();
+    }
 
-        /* If we're here as the result of a pseudo-atomic as opposed
-         * to WITHOUT-INTERRUPTS, then INTERRUPT_PENDING is already
-         * NIL, because maybe_defer_handler sets
-         * PSEUDO_ATOMIC_INTERRUPTED only if interrupts are enabled.*/
-        SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
+    /* we may be here only to do the gc stuff, if interrupts are
+     * enabled run the pending handler */
+    if (!((SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) ||
+          (
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+           (!foreign_function_call_active) &&
+#endif
+           arch_pseudo_atomic_atomic(context)))) {
 
-        /* restore the saved signal mask from the original signal (the
-         * one that interrupted us during the critical section) into the
-         * os_context for the signal we're currently in the handler for.
-         * This should ensure that when we return from the handler the
-         * blocked signals are unblocked */
-        sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
+        /* There may be no pending handler, because it was only a gc
+         * that had to be executed or because pseudo atomic triggered
+         * twice for a single interrupt. For the interested reader,
+         * that may happen if an interrupt hits after the interrupted
+         * flag is cleared but before pseduo-atomic is set and a
+         * pseudo atomic is interrupted in that interrupt. */
+        if (data->pending_handler) {
 
-        sigemptyset(&data->pending_mask);
-        /* This will break on sparc linux: the deferred handler really wants
-         * to be called with a void_context */
-        run_deferred_handler(data,(void *)context);
+            /* If we're here as the result of a pseudo-atomic as opposed
+             * to WITHOUT-INTERRUPTS, then INTERRUPT_PENDING is already
+             * NIL, because maybe_defer_handler sets
+             * PSEUDO_ATOMIC_INTERRUPTED only if interrupts are enabled.*/
+            SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
+
+            /* restore the saved signal mask from the original signal (the
+             * one that interrupted us during the critical section) into the
+             * os_context for the signal we're currently in the handler for.
+             * This should ensure that when we return from the handler the
+             * blocked signals are unblocked */
+            sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
+
+            sigemptyset(&data->pending_mask);
+            /* This will break on sparc linux: the deferred handler really wants
+             * to be called with a void_context */
+            run_deferred_handler(data,(void *)context);
+        }
     }
 }
 
@@ -471,11 +520,10 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 
 void
 run_deferred_handler(struct interrupt_data *data, void *v_context) {
-    /* The pending_handler may enable interrupts (see
-     * interrupt_maybe_gc_int) and then another interrupt may hit,
-     * overwrite interrupt_data, so reset the pending handler before
-     * calling it. Trust the handler to finish with the siginfo before
-     * enabling interrupts. */
+    /* The pending_handler may enable interrupts and then another
+     * interrupt may hit, overwrite interrupt_data, so reset the
+     * pending handler before calling it. Trust the handler to finish
+     * with the siginfo before enabling interrupts. */
     void (*pending_handler) (int, siginfo_t*, void*)=data->pending_handler;
     data->pending_handler=0;
     (*pending_handler)(data->pending_signal,&(data->pending_info), v_context);
@@ -509,6 +557,12 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
      * may succeed even when context is null (gencgc alloc()) */
     if (
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+        /* FIXME: this foreign_function_call_active test is dubious at
+         * best. If a foreign call is made in a pseudo atomic section
+         * (?) or more likely a pseudo atomic section is in a foreign
+         * call then an interrupt is executed immediately. Maybe it
+         * has to do with C code not maintaining pseudo atomic
+         * properly. MG - 2005-08-10 */
         (!foreign_function_call_active) &&
 #endif
         arch_pseudo_atomic_atomic(context)) {
@@ -548,7 +602,7 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
          * signals are added to the mask in the context so that we are
          * running with blocked signals when the handler returns */
         sigcopyset(&(data->pending_mask),os_context_sigmask_addr(context));
-        sigaddset_blockable(os_context_sigmask_addr(context));
+        sigaddset_deferrable(os_context_sigmask_addr(context));
     }
 }
 
@@ -619,31 +673,42 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     sigset_t ss;
     int i;
 
-    /* need the context stored so it can have registers scavenged */
-    fake_foreign_function_call(context);
+    if ((arch_pseudo_atomic_atomic(context) ||
+         SymbolValue(GC_INHIBIT,thread) != NIL)) {
+        SetSymbolValue(STOP_FOR_GC_PENDING,T,thread);
+        if (SymbolValue(GC_INHIBIT,thread) == NIL)
+            arch_set_pseudo_atomic_interrupted(context);
+        FSHOW_SIGNAL((stderr,"thread=%lu sig_stop_for_gc deferred\n",
+                      thread->os_thread));
+    } else {
+        /* need the context stored so it can have registers scavenged */
+        fake_foreign_function_call(context);
 
-    sigemptyset(&ss);
-    for(i=1;i<NSIG;i++) sigaddset(&ss,i); /* Block everything. */
-    thread_sigmask(SIG_BLOCK,&ss,0);
+        sigemptyset(&ss);
+        for(i=1;i<NSIG;i++) sigaddset(&ss,i); /* Block everything. */
+        thread_sigmask(SIG_BLOCK,&ss,0);
 
-    /* The GC can't tell if a thread is a zombie, so this would be a
-     * good time to let the kernel reap any of our children in that
-     * awful state, to stop them from being waited for indefinitely.
-     * Userland reaping is done later when GC is finished  */
-    if(thread->state!=STATE_RUNNING) {
-        lose("sig_stop_for_gc_handler: wrong thread state: %ld\n",
-             fixnum_value(thread->state));
+        /* The GC can't tell if a thread is a zombie, so this would be a
+         * good time to let the kernel reap any of our children in that
+         * awful state, to stop them from being waited for indefinitely.
+         * Userland reaping is done later when GC is finished  */
+        if(thread->state!=STATE_RUNNING) {
+            lose("sig_stop_for_gc_handler: wrong thread state: %ld\n",
+                 fixnum_value(thread->state));
+        }
+        thread->state=STATE_SUSPENDED;
+        FSHOW_SIGNAL((stderr,"thread=%lu suspended\n",thread->os_thread));
+
+        sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
+        sigwaitinfo(&ss,0);
+        FSHOW_SIGNAL((stderr,"thread=%lu resumed\n",thread->os_thread));
+        if(thread->state!=STATE_RUNNING) {
+            lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",
+                 fixnum_value(thread->state));
+        }
+
+        undo_fake_foreign_function_call(context);
     }
-    thread->state=STATE_SUSPENDED;
-
-    sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
-    sigwaitinfo(&ss,0);
-    if(thread->state!=STATE_RUNNING) {
-        lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",
-           fixnum_value(thread->state));
-    }
-
-    undo_fake_foreign_function_call(context);
 }
 #endif
 
@@ -907,12 +972,26 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
     struct interrupt_data *data=
         th ? th->interrupt_data : global_interrupt_data;
 
-    if(!data->pending_handler && !foreign_function_call_active &&
-       gc_trigger_hit(signal, info, context)){
+    if(!foreign_function_call_active && gc_trigger_hit(signal, info, context)){
+        struct thread *thread=arch_os_get_current_thread();
         clear_auto_gc_trigger();
-        if(!maybe_defer_handler(interrupt_maybe_gc_int,
-                                data,signal,info,void_context))
-            interrupt_maybe_gc_int(signal,info,void_context);
+        /* Don't flood the system with interrupts if the need to gc is
+         * already noted. This can happen for example when SUB-GC
+         * allocates or after a gc triggered in a WITHOUT-GCING. */
+        if (SymbolValue(GC_PENDING,thread) == NIL) {
+            if (SymbolValue(GC_INHIBIT,thread) == NIL) {
+                if (arch_pseudo_atomic_atomic(context)) {
+                    /* set things up so that GC happens when we finish
+                     * the PA section */
+                    SetSymbolValue(GC_PENDING,T,thread);
+                    arch_set_pseudo_atomic_interrupted(context);
+                } else {
+                    interrupt_maybe_gc_int(signal,info,void_context);
+                }
+            } else {
+                SetSymbolValue(GC_PENDING,T,thread);
+            }
+        }
         return 1;
     }
     return 0;
@@ -925,6 +1004,7 @@ boolean
 interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context=(os_context_t *) void_context;
+    struct thread *thread=arch_os_get_current_thread();
 
     check_blockables_blocked_or_lose();
     fake_foreign_function_call(context);
@@ -938,11 +1018,28 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
      * and signal a storage condition from there.
      */
 
-    /* restore the signal mask from the interrupted context before
-     * calling into Lisp */
-    if (context)
+    /* Restore the signal mask from the interrupted context before
+     * calling into Lisp if interrupts are enabled. Why not always?
+     *
+     * Suppose there is a WITHOUT-INTERRUPTS block far, far out. If an
+     * interrupt hits while in SUB-GC, it is deferred and the
+     * os_context_sigmask of that interrupt is set to block further
+     * deferrable interrupts (until the first one is
+     * handled). Unfortunately, that context refers to this place and
+     * when we return from here the signals will not be blocked.
+     *
+     * A kludgy alternative is to propagate the sigmask change to the
+     * outer context.
+     */
+    if(SymbolValue(INTERRUPTS_ENABLED,thread)!=NIL)
         thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
-
+#ifdef LISP_FEATURE_SB_THREAD
+    else {
+        sigset_t new;
+        sigaddset(&new,SIG_STOP_FOR_GC);
+        thread_sigmask(SIG_UNBLOCK,&new,0);
+    }
+#endif
     funcall0(SymbolFunction(SUB_GC));
 
     undo_fake_foreign_function_call(context);
@@ -969,7 +1066,7 @@ undoably_install_low_level_interrupt_handler (int signal,
         lose("bad signal number %d", signal);
     }
 
-    if (sigismember(&blockable_sigset,signal))
+    if (sigismember(&deferrable_sigset,signal))
         sa.sa_sigaction = low_level_maybe_now_maybe_later;
     else
         sa.sa_sigaction = handler;
@@ -1008,16 +1105,13 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     sigaddset(&new, signal);
     thread_sigmask(SIG_BLOCK, &new, &old);
 
-    sigemptyset(&new);
-    sigaddset_blockable(&new);
-
     FSHOW((stderr, "/data->interrupt_low_level_handlers[signal]=%x\n",
            (unsigned int)data->interrupt_low_level_handlers[signal]));
     if (data->interrupt_low_level_handlers[signal]==0) {
         if (ARE_SAME_HANDLER(handler, SIG_DFL) ||
             ARE_SAME_HANDLER(handler, SIG_IGN)) {
             sa.sa_sigaction = handler;
-        } else if (sigismember(&new, signal)) {
+        } else if (sigismember(&deferrable_sigset, signal)) {
             sa.sa_sigaction = maybe_now_maybe_later;
         } else {
             sa.sa_sigaction = interrupt_handle_now_handler;
@@ -1044,7 +1138,9 @@ interrupt_init()
 {
     int i;
     SHOW("entering interrupt_init()");
+    sigemptyset(&deferrable_sigset);
     sigemptyset(&blockable_sigset);
+    sigaddset_deferrable(&deferrable_sigset);
     sigaddset_blockable(&blockable_sigset);
 
     global_interrupt_data=calloc(sizeof(struct interrupt_data), 1);

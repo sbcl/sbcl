@@ -93,6 +93,9 @@ in future versions."
       system-area-pointer
     (lisp-fun-address unsigned-long))
 
+  (define-alien-routine "block_deferrable_signals_and_inhibit_gc"
+    void)
+
   (define-alien-routine reap-dead-thread void
     (thread-sap system-area-pointer))
 
@@ -494,9 +497,9 @@ returns the thread exits."
                                 (funcall real-function)
                              ;; we're going down, can't handle
                              ;; interrupts sanely anymore
-                             (sb!unix::block-blockable-signals)))))
-                  ;; and remove what can be the last reference to
-                  ;; the thread object
+                             (block-deferrable-signals-and-inhibit-gc)))))
+                  ;; and remove what can be the last reference to the
+                  ;; thread object
                   (handle-thread-exit thread)
                   0))
               (values))))))

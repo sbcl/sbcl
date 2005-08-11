@@ -1064,7 +1064,7 @@ retained, possibly temporariliy, because it might be used internally."
    ;; lots of stuff which currently uses the SB!KERNEL package which
    ;; doesn't actually use the type system stuff.) And maybe other
    ;; possible splits too:
-   ;;   * Pull GC stuff (*GC-INHIBIT*, *NEED-TO-COLLECT-GARBAGE*, etc.)
+   ;;   * Pull GC stuff (*GC-INHIBIT*, *GC-PENDING*, etc.)
    ;;     out into SB-GC.
    ;;   * Pull special case implementations of sequence functions (e.g.
    ;;     %MAP-TO-LIST-ARITY-1 and %FIND-POSITION-IF-NOT) and
@@ -1137,8 +1137,9 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%SXHASH-SIMPLE-SUBSTRING" "%TAN" "%TAN-QUICK" "%TANH"
                "%UNARY-ROUND" "%UNARY-TRUNCATE" "%UNARY-FTRUNCATE"
                "%WITH-ARRAY-DATA" "%WITH-ARRAY-DATA-MACRO"
-               "*ALREADY-MAYBE-GCING*" "*CURRENT-LEVEL-IN-PRINT*"
-               "*EMPTY-TYPE*" "*GC-INHIBIT*" "*NEED-TO-COLLECT-GARBAGE*"
+               "*CURRENT-LEVEL-IN-PRINT*"
+               "*EMPTY-TYPE*" "*GC-INHIBIT*" "*GC-PENDING*"
+               #!+sb-thread"*STOP-FOR-GC-PENDING*"
                "*CONTROL-STACK-EXHAUSTION-SAP*" "*UNIVERSAL-TYPE*"
                "*UNIVERSAL-FUN-TYPE*" "*UNPARSE-FUN-TYPE-SIMPLIFY*"
                "*WILD-TYPE*" "WORD-LOGICAL-AND" "WORD-LOGICAL-ANDC1"

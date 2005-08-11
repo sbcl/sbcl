@@ -44,8 +44,8 @@ void check_sig_stop_for_gc_can_arrive_or_lose()
     thread_sigmask(SIG_BLOCK, &empty, &current);
     if (sigismember(&current,SIG_STOP_FOR_GC))
         lose("SIG_STOP_FOR_GC cannot arrive: it is blocked\n");
-    if (SymbolValue(INTERRUPTS_ENABLED,arch_os_get_current_thread()) == NIL)
-        lose("SIG_STOP_FOR_GC cannot arrive: interrupts disabled\n");
+    if (SymbolValue(GC_INHIBIT,arch_os_get_current_thread()) != NIL)
+        lose("SIG_STOP_FOR_GC cannot arrive: gc is inhibited\n");
     if (arch_pseudo_atomic_atomic(NULL))
         lose("SIG_STOP_FOR_GC cannot arrive: in pseudo atomic\n");
 }
@@ -54,8 +54,7 @@ void check_sig_stop_for_gc_can_arrive_or_lose()
     { \
         sigset_t _newset,_oldset; \
         sigemptyset(&_newset); \
-        sigaddset_blockable(&_newset); \
-        sigdelset(&_newset,SIG_STOP_FOR_GC); \
+        sigaddset_deferrable(&_newset); \
         thread_sigmask(SIG_BLOCK, &_newset, &_oldset); \
         check_sig_stop_for_gc_can_arrive_or_lose(); \
         FSHOW_SIGNAL((stderr,"/%s:waiting on lock=%ld, thread=%lu\n",name, \
@@ -232,6 +231,10 @@ struct thread * create_thread_struct(lispobj initial_function) {
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,make_fixnum(0),th);
     bind_variable(INTERRUPT_PENDING, NIL,th);
     bind_variable(INTERRUPTS_ENABLED,T,th);
+    bind_variable(GC_PENDING,NIL,th);
+#ifdef LISP_FEATURE_SB_THREAD
+    bind_variable(STOP_FOR_GC_PENDING,NIL,th);
+#endif
 
     th->interrupt_data = (struct interrupt_data *)
         os_validate(0,(sizeof (struct interrupt_data)));
@@ -286,7 +289,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     sigset_t newset,oldset;
     boolean r=1;
     sigemptyset(&newset);
-    sigaddset_blockable(&newset);
+    sigaddset_deferrable(&newset);
     thread_sigmask(SIG_BLOCK, &newset, &oldset);
 
     if((pthread_attr_init(&attr)) ||

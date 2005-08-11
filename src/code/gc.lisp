@@ -70,7 +70,7 @@
   (format t
           "Control and binding stack usage is for the current thread only.~%")
   (format t "Garbage collection is currently ~:[enabled~;DISABLED~].~%"
-          (> *gc-inhibit* 0)))
+          *gc-inhibit*))
 
 (defun room-intermediate-info ()
   (room-minimal-info)
@@ -140,37 +140,6 @@ and submit it as a patch."
   "Called after each garbage collection. In a multithreaded
 environment these hooks may run in any thread.")
 
-;;;; The following specials are used to control when garbage
-;;;; collection occurs.
-
-;;; When the dynamic usage increases beyond this amount, the system
-;;; notes that a garbage collection needs to occur by setting
-;;; *NEED-TO-COLLECT-GARBAGE* to T. It starts out as NIL meaning
-;;; nobody has figured out what it should be yet.
-;;;
-;;; FIXME: *GC-TRIGGER* seems to be denominated in bytes, not words.
-;;; And limiting it to INDEX is fairly reasonable in order to avoid
-;;; bignum arithmetic on every allocation, and to minimize the need
-;;; for thought about weird gotchas of the GC-control mechanism itself
-;;; consing as it operates. But as of sbcl-0.7.5, 512Mbytes of memory
-;;; costs $54.95 at Fry's in Dallas but cheap consumer 64-bit machines
-;;; are still over the horizon, so gratuitously limiting our heap size
-;;; to FIXNUM bytes seems fairly stupid. It'd be reasonable to
-;;; (1) allow arbitrary UNSIGNED-BYTE values of *GC-TRIGGER*, or
-;;; (2) redenominate this variable in words instead of bytes, postponing
-;;;     the problem to heaps which exceed 50% of the machine's address
-;;;     space, or even
-;;; (3) redemoninate this variable in CONS-sized two-word units,
-;;;     allowing it to cover the entire memory space at the price of
-;;;     possible loss of clarity.
-;;; (And whatever is done, it'd also be good to rename the variable so
-;;; that it's clear what unit it's denominated in.)
-(declaim (type (or index null) *gc-trigger*))
-(defvar *gc-trigger* nil)
-
-;;; When T, indicates that a GC should have happened but did not due to
-;;; *GC-INHIBIT*.
-(defvar *need-to-collect-garbage* nil) ; initialized in cold init
 
 ;;;; internal GC
 
@@ -210,11 +179,11 @@ environment these hooks may run in any thread.")
 (defun sub-gc (&key (gen 0))
   (unless (eq sb!thread:*current-thread*
               (sb!thread::mutex-value *already-in-gc*))
-    ;; With gencgc, unless *NEED-TO-COLLECT-GARBAGE* every allocation
-    ;; in this function triggers another gc, potentially exceeding
-    ;; maximum interrupt nesting.
-    (setf *need-to-collect-garbage* t)
-    (when (zerop *gc-inhibit*)
+    ;; With gencgc, unless *GC-PENDING* every allocation in this
+    ;; function triggers another gc, potentially exceeding maximum
+    ;; interrupt nesting.
+    (setq *gc-pending* t)
+    (unless *gc-inhibit*
       (sb!thread:with-mutex (*already-in-gc*)
         (let ((old-usage (dynamic-usage))
               (new-usage 0))
@@ -224,7 +193,7 @@ environment these hooks may run in any thread.")
           (without-interrupts
             (gc-stop-the-world)
             (collect-garbage gen)
-            (setf *need-to-collect-garbage* nil
+            (setf *gc-pending* nil
                   new-usage (dynamic-usage))
             (gc-start-the-world))
           ;; Interrupts re-enabled, but still inside the mutex.
@@ -281,19 +250,20 @@ environment these hooks may run in any thread.")
                                (sb!alien:unsigned 32))
         val))
 
-;;; FIXME: Aren't these utterly wrong if called inside WITHOUT-GCING?
-;;; Unless something that works there too can be deviced this fact
-;;; should be documented.
+;;; These work both regardless of whether we're inside WITHOUT-GCING
+;;; or not.
 (defun gc-on ()
   #!+sb-doc
   "Enable the garbage collector."
-  (setq *gc-inhibit* 0)
-  (when *need-to-collect-garbage*
-    (sub-gc))
+  (setq *gc-inhibit* nil)
+  (when (and (not *gc-inhibit*)
+             (or #!+sb-thread *stop-for-gc-pending*
+                 *gc-pending*))
+    (sb!unix::receive-pending-interrupt))
   nil)
 
 (defun gc-off ()
   #!+sb-doc
   "Disable the garbage collector."
-  (setq *gc-inhibit* 1)
+  (setq *gc-inhibit* t)
   nil)

@@ -45,7 +45,6 @@
 ;;; listing the signals that were masked
 (sb!alien:define-alien-routine "reset_signal_mask" sb!alien:void)
 
-(sb!alien:define-alien-routine "block_blockable_signals" sb!alien:void)
 
 ;;;; C routines that actually do all the work of establishing signal handlers
 (sb!alien:define-alien-routine ("install_handler" install-handler)

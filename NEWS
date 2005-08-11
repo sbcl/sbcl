@@ -8,6 +8,9 @@ changes in sbcl-0.9.4 relative to sbcl-0.9.3:
     is disabled.
   * minor incompatible change: SB-KERNEL:INSTANCE-LAMBDA is
     deprecated, and will go away in a future revision of SBCL.
+  * minor incompatible change: GC-ON and GC-OFF are no longer
+    implemented with a counter, it does not matter how many times gc
+    is switched on or off
   * bug fix: discriminating functions for generic function classes
     with non-standard methods for COMPUTE-APPLICABLE-METHODS no longer
     make invalid assumptions about method precedence order.  (reported
@@ -28,12 +31,17 @@ changes in sbcl-0.9.4 relative to sbcl-0.9.3:
     lists in some cases.  This partially fixes bug 384.
   * flush all standard streams before prompting in the REPL and the
     debugger.
+  * bug fix: signal handling and triggering gc do not conflict
+    directly anymore, in particular a high frequency sb-sprof does
+    not prevent gc from running
   * threads
     ** bug fix: RELEASE-FOREGROUND doesn't choke on session lock if
        there is only one thread in the session
     ** bug fix: memory leak for streams created in one thread and
        written to in another
     ** bug fix: lockup when compiled with gcc4
+    ** bug fix: race that allows the gc to be triggered when gc is
+       inhibited
 
 changes in sbcl-0.9.3 relative to sbcl-0.9.2:
   * New feature: Experimental support for bivalent streams: streams

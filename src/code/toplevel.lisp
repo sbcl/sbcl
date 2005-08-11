@@ -25,9 +25,7 @@
 ;;; specials initialized by !COLD-INIT
 
 ;;; FIXME: These could be converted to DEFVARs.
-(declaim (special *gc-inhibit* *need-to-collect-garbage*
-                  *after-gc-hooks*
-                  #!+(or x86 x86-64) *pseudo-atomic-atomic*
+(declaim (special #!+(or x86 x86-64) *pseudo-atomic-atomic*
                   #!+(or x86 x86-64) *pseudo-atomic-interrupted*
                   sb!unix::*interrupts-enabled*
                   sb!unix::*interrupt-pending*

@@ -19,20 +19,32 @@
     (declare (optimize (safety 0) (speed 3)))
     (sb!vm::locked-symbol-global-value-add ',symbol-name ,delta)))
 
-;;; When >0, inhibits garbage collection.
-(declaim (type index *gc-inhibit*))
 (defvar *gc-inhibit*) ; initialized in cold init
+
+;;; When the dynamic usage increases beyond this amount, the system
+;;; notes that a garbage collection needs to occur by setting
+;;; *GC-PENDING* to T. It starts out as NIL meaning nobody has figured
+;;; out what it should be yet.
+(defvar *gc-pending* nil)
+
+#!+sb-thread
+(defvar *stop-for-gc-pending* nil)
 
 (defmacro without-gcing (&body body)
   #!+sb-doc
-  "Executes the forms in the body without doing a garbage collection."
+  "Executes the forms in the body without doing a garbage
+collection. It inhibits both automatically and explicitly triggered
+gcs. Finally, upon leaving the BODY if gc is not inhibited it runs the
+pending gc. Similarly, if gc is triggered in another thread then it
+waits until gc is enabled in this thread."
   `(unwind-protect
-    (progn
-      (atomic-incf/symbol *gc-inhibit*)
+    (let ((*gc-inhibit* t))
       ,@body)
-    (atomic-incf/symbol *gc-inhibit* -1)
-    (when (and *need-to-collect-garbage* (zerop *gc-inhibit*))
-      (sub-gc))))
+    ;; the test is racy, but it can err only on the overeager side
+    (when (and (not *gc-inhibit*)
+               (or #!+sb-thread *stop-for-gc-pending*
+                   *gc-pending*))
+      (sb!unix::receive-pending-interrupt))))
 
 
 ;;; EOF-OR-LOSE is a useful macro that handles EOF.

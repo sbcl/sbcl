@@ -4100,10 +4100,10 @@ gc_initialize_pointers(void)
 char *
 alloc(long nbytes)
 {
-    struct thread *th=arch_os_get_current_thread();
+    struct thread *thread=arch_os_get_current_thread();
     struct alloc_region *region=
 #ifdef LISP_FEATURE_SB_THREAD
-        th ? &(th->alloc_region) : &boxed_region;
+        thread ? &(thread->alloc_region) : &boxed_region;
 #else
         &boxed_region;
 #endif
@@ -4145,35 +4145,16 @@ alloc(long nbytes)
      * we should GC in the near future
      */
     if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
-        struct thread *thread=arch_os_get_current_thread();
+        gc_assert(fixnum_value(SymbolValue(PSEUDO_ATOMIC_ATOMIC,thread)));
         /* Don't flood the system with interrupts if the need to gc is
          * already noted. This can happen for example when SUB-GC
          * allocates or after a gc triggered in a WITHOUT-GCING. */
-        if (SymbolValue(NEED_TO_COLLECT_GARBAGE,thread) == NIL) {
+        if (SymbolValue(GC_PENDING,thread) == NIL) {
             /* set things up so that GC happens when we finish the PA
-             * section.  We only do this if there wasn't a pending
-             * handler already, in case it was a gc.  If it wasn't a
-             * GC, the next allocation will get us back to this point
-             * anyway, so no harm done
-             */
-            struct interrupt_data *data=th->interrupt_data;
-            sigset_t new_mask,old_mask;
-            sigemptyset(&new_mask);
-            sigaddset_blockable(&new_mask);
-            thread_sigmask(SIG_BLOCK,&new_mask,&old_mask);
-
-            if(!data->pending_handler) {
-                if(!maybe_defer_handler(interrupt_maybe_gc_int,data,0,0,0))
-                    lose("Not in atomic: %d.\n",
-                         SymbolValue(PSEUDO_ATOMIC_ATOMIC,thread));
-                /* Leave the signals blocked just as if it was
-                 * deferred the normal way and set the
-                 * pending_mask. */
-                sigcopyset(&(data->pending_mask),&old_mask);
-                SetSymbolValue(NEED_TO_COLLECT_GARBAGE,T,thread);
-            } else {
-                thread_sigmask(SIG_SETMASK,&old_mask,0);
-            }
+             * section */
+            SetSymbolValue(GC_PENDING,T,thread);
+            if (SymbolValue(GC_INHIBIT,thread) == NIL)
+                arch_set_pseudo_atomic_interrupted(0);
         }
     }
     new_obj = gc_alloc_with_region(nbytes,0,region,0);

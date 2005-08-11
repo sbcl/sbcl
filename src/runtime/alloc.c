@@ -29,13 +29,6 @@
 #include "genesis/bignum.h"
 #include "genesis/sap.h"
 
-#define GET_FREE_POINTER() dynamic_space_free_pointer
-#define SET_FREE_POINTER(new_value) \
-    (dynamic_space_free_pointer = (new_value))
-#define GET_GC_TRIGGER() current_auto_gc_trigger
-#define SET_GC_TRIGGER(new_value) \
-    clear_auto_gc_trigger(); set_auto_gc_trigger(new_value);
-
 #define ALIGNED_SIZE(n) (n+LOWTAG_MASK) & ~LOWTAG_MASK
 
 #if defined LISP_FEATURE_GENCGC
@@ -59,6 +52,16 @@ pa_alloc(int bytes)
 }
 
 #else
+
+#define GET_FREE_POINTER() dynamic_space_free_pointer
+#define SET_FREE_POINTER(new_value) \
+    (dynamic_space_free_pointer = (new_value))
+#define GET_GC_TRIGGER() current_auto_gc_trigger
+#define SET_GC_TRIGGER(new_value) \
+    clear_auto_gc_trigger(); set_auto_gc_trigger(new_value);
+
+/* FIXME: this is not pseudo atomic at all, but is called only from
+ * interrupt safe places like interrupt handlers. MG - 2005-08-09 */
 static lispobj *
 pa_alloc(int bytes)
 {
