@@ -421,7 +421,7 @@
   (prev :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   ;; starting, running, suspended, dead
-  (state)
+  (state :c-type "volatile lispobj")
   #!+(or x86 x86-64) (pseudo-atomic-atomic)
   #!+(or x86 x86-64) (pseudo-atomic-interrupted)
   (interrupt-fun)
