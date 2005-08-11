@@ -1495,7 +1495,7 @@
       (error "can't compile a lexical closure"))
     (compile nil lambda)))
 
-(defun compiled-fun-or-lose (thing &optional (name thing))
+(defun valid-extended-function-designator-for-disassemble-p (thing)
   (cond ((legal-fun-name-p thing)
          (compiled-fun-or-lose (fdefinition thing) thing))
         ((functionp thing)
@@ -1503,8 +1503,17 @@
         ((and (listp thing)
               (eq (car thing) 'lambda))
          (compile nil thing))
-        (t
-         (error "can't make a compiled function from ~S" name))))
+        (t nil)))
+
+(defun compiled-fun-or-lose (thing &optional (name thing))
+  (let ((fun (valid-extended-function-designator-for-disassemble-p thing)))
+    (if fun
+        fun
+        (error 'simple-type-error
+               :datum thing
+               :expected-type '(satisfies valid-extended-function-designator-for-disassemble-p)
+               :format-control "can't make a compiled function from ~S"
+               :format-arguments (list name)))))
 
 (defun disassemble (object &key
                            (stream *standard-output*)

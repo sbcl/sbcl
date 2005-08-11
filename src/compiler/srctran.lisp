@@ -308,6 +308,28 @@
 ;;; is open if either X or Y is open.
 ;;;
 ;;; FIXME: only used in this file, not needed in target runtime
+
+;;; ANSI contaigon specifies coercion to floating point if one of the
+;;; arguments is floating point. Here we should check to be sure that
+;;; the other argument is within the bounds of that floating point
+;;; type.
+
+(defmacro safely-binop (op x y)
+  `(cond
+    ((typep ,x 'single-float)
+     (if (<= most-negative-single-float ,y most-positive-single-float)
+         (,op ,x ,y)))
+    ((typep ,x 'double-float)
+     (if (<= most-negative-double-float ,y most-positive-double-float)
+         (,op ,x ,y)))
+    ((typep ,y 'single-float)
+     (if (<= most-negative-single-float ,x most-positive-single-float)
+         (,op ,x ,y)))
+    ((typep ,y 'double-float)
+     (if (<= most-negative-double-float ,x most-positive-double-float)
+         (,op ,x ,y)))
+    (t (,op ,x ,y))))
+
 (defmacro bound-binop (op x y)
   `(and ,x ,y
        (with-float-traps-masked (:underflow :overflow :inexact :divide-by-zero)

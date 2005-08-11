@@ -145,9 +145,7 @@
 (sb!xc:defmacro bad-sequence-type-error (type-spec)
   `(error 'simple-type-error
           :datum ,type-spec
-          ;; FIXME: This is actually wrong, and should be something
-          ;; like (SATISFIES IS-A-VALID-SEQUENCE-TYPE-SPECIFIER-P).
-          :expected-type 'sequence
+          :expected-type '(satisfies is-a-valid-sequence-type-specifier-p)
           :format-control "~S is a bad type specifier for sequences."
           :format-arguments (list ,type-spec)))
 
@@ -173,13 +171,18 @@
   ;; ANSI.  Essentially, we are justified in throwing this on
   ;; e.g. '(OR SIMPLE-VECTOR (VECTOR FIXNUM)), but maybe not (by ANSI)
   ;; on '(CONS * (CONS * NULL)) -- CSR, 2002-10-18
-  `(error 'simple-type-error
-          :datum ,type-spec
-          ;; FIXME: as in BAD-SEQUENCE-TYPE-ERROR, this is wrong.
-          :expected-type 'sequence
+
+  ;; On the other hand, I'm not sure it deserves to be a type-error,
+  ;; either. -- bem, 2005-08-10
+  `(error 'simple-program-error
           :format-control "~S is too hairy for sequence functions."
           :format-arguments (list ,type-spec)))
 ) ; EVAL-WHEN
+
+(defun is-a-valid-sequence-type-specifier-p (type)
+  (let ((type (specifier-type type)))
+    (or (csubtypep type (specifier-type 'list))
+        (csubtypep type (specifier-type 'vector)))))
 
 ;;; It's possible with some sequence operations to declare the length
 ;;; of a result vector, and to be safe, we really ought to verify that
