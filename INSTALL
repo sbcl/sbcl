@@ -4,7 +4,7 @@ INSTALLING SBCL
 
     1. BINARY DISTRIBUTION
     1.1. Quick start
-    1.2. Finding ancilliary files
+    1.2. Finding ancillary files
     1.3. Anatomy of SBCL
 
     2. SOURCE DISTRIBUTION
@@ -32,9 +32,9 @@ INSTALLING SBCL
   by the environment variable "INSTALL_ROOT".
 
   If you install SBCL from binary distribution in other location then
-  "/usr/local", see section 1.2, "Finding ancilliary files".
+  "/usr/local", see section 1.2, "Finding ancillary files".
 
-1.2. Finding ancilliary files
+1.2. Finding ancillary files
 
   The SBCL runtime needs to be able to find the ancillary files
   associated with it: the "sbcl.core" file, and the contrib modules.
@@ -94,7 +94,7 @@ INSTALLING SBCL
   passed their tests. If you need to install by hand, see "install.sh"
   for details.
 
-  Documentation concists of a man-page, the SBCL Manual (in info, pdf
+  Documentation consists of a man-page, the SBCL Manual (in info, pdf
   and html formats), and a few additional text files.
 
 2. SOURCE DISTRIBUTION
@@ -111,7 +111,7 @@ INSTALLING SBCL
 
   If you don't already have an SBCL binary installed as "sbcl" on your
   system, you'll need to tell make.sh what Lisp to use as the
-  cross-compilation host. For example, to use CMU CL (assuming has
+  cross-compilation host. For example, to use CMUCL (assuming has
   been installed under its default name "lisp") as the
   cross-compilation host:
 
@@ -185,8 +185,8 @@ INSTALLING SBCL
 
   Other
 
-    * Check that the host lisp you're building with is known to work
-      as an SBCL build host, and the your OS is supported.
+    * Check that the host lisp you're building with is known to work as
+      an SBCL build host, and that your operating system is supported.
       
     * Try to do a build without loading any initialization files
       for the cross-compilation host (for example
@@ -215,7 +215,7 @@ INSTALLING SBCL
 
   All of the following platforms are supported in the sense of "should
   work", but some things like loading foreign object files may lag
-  behind on less-used OS's.
+  behind on less-used operating systems.
 
   Supported toolchains:
 
@@ -245,8 +245,9 @@ INSTALLING SBCL
     Tru64                            X
     Darwin (Mac OS X)           X
 
-    Some OS's are more equal then others: most of the development and
-    testing is done on x86 Linux and *BSD, PPC Linux and Mac OS X.
+    Some operating systems are more equal then others: most of the
+    development and testing is done on x86 Linux and *BSD, PPC Linux
+    and Mac OS X.
 
     If an underprivileged platform is important to you, you can help
     by eg. testing during the monthly freeze periods, and most
