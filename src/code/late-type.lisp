@@ -196,7 +196,7 @@
 (!cold-init-forms (setq *unparse-fun-type-simplify* nil))
 
 (!define-type-method (function :negate) (type)
-  (error "NOT FUNCTION too confusing on ~S" (type-specifier type)))
+  (make-negation-type :type type))
 
 (!define-type-method (function :unparse) (type)
   (if *unparse-fun-type-simplify*
@@ -1739,55 +1739,51 @@
                  (if (csubtypep component-type (specifier-type '(eql 0)))
                      *empty-type*
                      (modified-numeric-type component-type
-                                            :complexp :complex))))
+                                            :complexp :complex)))
+               (do-complex (ctype)
+                 (cond
+                   ((eq ctype *empty-type*) *empty-type*)
+                   ((eq ctype *universal-type*) (not-real))
+                   ((typep ctype 'numeric-type) (complex1 ctype))
+                   ((typep ctype 'union-type)
+                    (apply #'type-union
+                           (mapcar #'do-complex (union-type-types ctype))))
+                   ((typep ctype 'member-type)
+                    (apply #'type-union
+                           (mapcar (lambda (x) (do-complex (ctype-of x)))
+                                   (member-type-members ctype))))
+                   ((and (typep ctype 'intersection-type)
+                         ;; FIXME: This is very much a
+                         ;; not-quite-worst-effort, but we are required to do
+                         ;; something here because of our representation of
+                         ;; RATIO as (AND RATIONAL (NOT INTEGER)): we must
+                         ;; allow users to ask about (COMPLEX RATIO).  This
+                         ;; will of course fail to work right on such types
+                         ;; as (AND INTEGER (SATISFIES ZEROP))...
+                         (let ((numbers (remove-if-not
+                                         #'numeric-type-p
+                                         (intersection-type-types ctype))))
+                           (and (car numbers)
+                                (null (cdr numbers))
+                                (eq (numeric-type-complexp (car numbers)) :real)
+                                (complex1 (car numbers))))))
+                   (t
+                    (multiple-value-bind (subtypep certainly)
+                        (csubtypep ctype (specifier-type 'real))
+                      (if (and (not subtypep) certainly)
+                          (not-real)
+                          ;; ANSI just says that TYPESPEC is any subtype of
+                          ;; type REAL, not necessarily a NUMERIC-TYPE. In
+                          ;; particular, at this point TYPESPEC could legally
+                          ;; be a hairy type like (AND NUMBER (SATISFIES
+                          ;; REALP) (SATISFIES ZEROP)), in which case we fall
+                          ;; through the logic above and end up here,
+                          ;; stumped.
+                          (bug "~@<(known bug #145): The type ~S is too hairy to be ~
+used for a COMPLEX component.~:@>"
+                               typespec)))))))
         (let ((ctype (specifier-type typespec)))
-          (cond
-            ((eq ctype *empty-type*) *empty-type*)
-            ((eq ctype *universal-type*) (not-real))
-            ((typep ctype 'numeric-type) (complex1 ctype))
-            ((typep ctype 'union-type)
-             (apply #'type-union
-                    ;; FIXME: This code could suffer from (admittedly
-                    ;; very obscure) cases of bug 145 e.g. when TYPE
-                    ;; is
-                    ;;   (OR (AND INTEGER (SATISFIES ODDP))
-                    ;;       (AND FLOAT (SATISFIES FOO))
-                    ;; and not even report the problem very well.
-                    (mapcar #'complex1 (union-type-types ctype))))
-            ((typep ctype 'member-type)
-             (apply #'type-union
-                    (mapcar (lambda (x) (complex1 (ctype-of x)))
-                            (member-type-members ctype))))
-            ((and (typep ctype 'intersection-type)
-                  ;; FIXME: This is very much a
-                  ;; not-quite-worst-effort, but we are required to do
-                  ;; something here because of our representation of
-                  ;; RATIO as (AND RATIONAL (NOT INTEGER)): we must
-                  ;; allow users to ask about (COMPLEX RATIO).  This
-                  ;; will of course fail to work right on such types
-                  ;; as (AND INTEGER (SATISFIES ZEROP))...
-                  (let ((numbers (remove-if-not
-                                  #'numeric-type-p
-                                  (intersection-type-types ctype))))
-                    (and (car numbers)
-                         (null (cdr numbers))
-                         (eq (numeric-type-complexp (car numbers)) :real)
-                         (complex1 (car numbers))))))
-            (t
-             (multiple-value-bind (subtypep certainly)
-                 (csubtypep ctype (specifier-type 'real))
-               (if (and (not subtypep) certainly)
-                   (not-real)
-                   ;; ANSI just says that TYPESPEC is any subtype of
-                   ;; type REAL, not necessarily a NUMERIC-TYPE. In
-                   ;; particular, at this point TYPESPEC could legally
-                   ;; be a hairy type like (AND NUMBER (SATISFIES
-                   ;; REALP) (SATISFIES ZEROP)), in which case we fall
-                   ;; through the logic above and end up here,
-                   ;; stumped.
-                   (bug "~@<(known bug #145): The type ~S is too hairy to be ~
-                         used for a COMPLEX component.~:@>"
-                        typespec)))))))))
+          (do-complex ctype)))))
 
 ;;; If X is *, return NIL, otherwise return the bound, which must be a
 ;;; member of TYPE or a one-element list of a member of TYPE.

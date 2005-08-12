@@ -371,14 +371,13 @@
       (done-with-fast-read-byte))))
 
 (defun read-byte (stream &optional (eof-error-p t) eof-value)
-  (let ((stream (in-synonym-of stream)))
-    (if (ansi-stream-p stream)
-        (ansi-stream-read-byte stream eof-error-p eof-value nil)
-        ;; must be Gray streams FUNDAMENTAL-STREAM
-        (let ((char (stream-read-byte stream)))
-          (if (eq char :eof)
-              (eof-or-lose stream eof-error-p eof-value)
-              char)))))
+  (if (ansi-stream-p stream)
+      (ansi-stream-read-byte stream eof-error-p eof-value nil)
+      ;; must be Gray streams FUNDAMENTAL-STREAM
+      (let ((char (stream-read-byte stream)))
+        (if (eq char :eof)
+            (eof-or-lose stream eof-error-p eof-value)
+            char))))
 
 ;;; Read NUMBYTES bytes into BUFFER beginning at START, and return the
 ;;; number of bytes read.
@@ -596,8 +595,8 @@
   nil)
 
 (defun write-byte (integer stream)
-  (with-out-stream stream (ansi-stream-bout integer)
-                   (stream-write-byte integer))
+  (with-out-stream/no-synonym stream (ansi-stream-bout integer)
+                              (stream-write-byte integer))
   integer)
 
 

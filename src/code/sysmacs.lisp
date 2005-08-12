@@ -99,8 +99,8 @@ waits until gc is enabled in this thread."
                        `(,function stream ,@args)))))
          `(funcall (,slot stream) stream ,@args))))
 
-(defmacro with-out-stream (stream (slot &rest args) &optional stream-dispatch)
-  `(let ((stream (out-synonym-of ,stream)))
+(defmacro with-out-stream/no-synonym (stream (slot &rest args) &optional stream-dispatch)
+  `(let ((stream ,stream))
     ,(if stream-dispatch
          `(if (ansi-stream-p stream)
               (funcall (,slot stream) stream ,@args)
@@ -108,6 +108,10 @@ waits until gc is enabled in this thread."
                   `(,(destructuring-bind (function &rest args) stream-dispatch
                                          `(,function stream ,@args)))))
          `(funcall (,slot stream) stream ,@args))))
+
+(defmacro with-out-stream (stream (slot &rest args) &optional stream-dispatch)
+  `(with-out-stream/no-synonym ,stream (,slot ,@args) ,stream-dispatch))
+
 
 ;;;; These are hacks to make the reader win.
 
