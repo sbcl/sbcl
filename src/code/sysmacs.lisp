@@ -110,7 +110,8 @@ waits until gc is enabled in this thread."
          `(funcall (,slot stream) stream ,@args))))
 
 (defmacro with-out-stream (stream (slot &rest args) &optional stream-dispatch)
-  `(with-out-stream/no-synonym ,stream (,slot ,@args) ,stream-dispatch))
+  `(with-out-stream/no-synonym (out-synonym-of ,stream)
+    (,slot ,@args) ,stream-dispatch))
 
 
 ;;;; These are hacks to make the reader win.
