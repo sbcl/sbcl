@@ -551,11 +551,14 @@ won't like the effect."
   #!+sb-thread
   (let ((function (coerce function 'function)))
     (multiple-value-bind (res err)
-        (sb!unix::syscall ("interrupt_thread"
-                           system-area-pointer sb!alien:unsigned-long)
-                          thread
-                          (thread-%sap thread)
-                          (sb!kernel:get-lisp-obj-address function))
+        ;; protect against gcing just when the ub32 address is ready
+        ;; to be passed to C
+        (sb!sys::with-pinned-objects (function)
+          (sb!unix::syscall ("interrupt_thread"
+                             system-area-pointer sb!alien:unsigned-long)
+                            thread
+                            (thread-%sap thread)
+                            (sb!kernel:get-lisp-obj-address function)))
       (unless res
         (error 'interrupt-thread-error :thread thread :errno err)))))
 
