@@ -142,13 +142,10 @@ os_vm_address_t
 os_validate(os_vm_address_t addr, os_vm_size_t len)
 {
     int flags =  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
-    os_vm_address_t actual ;
+    os_vm_address_t actual;
 
-    if (addr)
-        flags |= MAP_FIXED;
 #ifdef LISP_FEATURE_ALPHA
-    else {
-        flags |= MAP_FIXED;
+    if (!addr) {
         addr=under_2gb_free_pointer;
     }
 #endif
