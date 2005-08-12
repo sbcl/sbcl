@@ -55,7 +55,8 @@
 size_t os_vm_page_size;
 
 #ifdef LISP_FEATURE_SB_THREAD
-#include <linux/unistd.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 #include <errno.h>
 
 /* values taken from the kernel's linux/futex.h.  This header file
@@ -66,13 +67,11 @@ size_t os_vm_page_size;
 #define FUTEX_FD (2)
 #define FUTEX_REQUEUE (3)
 
-#define __NR_sys_futex __NR_futex
-
-_syscall4(int,sys_futex,
-          int *, futex,
-          int, op,
-          int, val,
-          struct timespec *, rel);
+#define sys_futex sbcl_sys_futex
+static inline int sys_futex (void *futex, int op, int val, struct timespec *rel)
+{
+    return syscall (SYS_futex, futex, op, val, rel);
+}
 
 int
 futex_wait(int *lock_word, int oldval)

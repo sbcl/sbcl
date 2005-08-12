@@ -40,7 +40,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <asm/ldt.h>
-#include <linux/unistd.h>
+#include <sys/syscall.h>
 #include <sys/mman.h>
 #include <linux/version.h>
 #include "thread.h"             /* dynamic_values_bytes */
@@ -49,7 +49,11 @@
 #define user_desc  modify_ldt_ldt_s
 #endif
 
-_syscall3(int, modify_ldt, int, func, void *, ptr, unsigned long, bytecount );
+#define modify_ldt sbcl_modify_ldt
+static inline int modify_ldt (int func, void *ptr, unsigned long bytecount)
+{
+  return syscall (SYS_modify_ldt, func, ptr, bytecount);
+}
 
 #include "validate.h"
 size_t os_vm_page_size;
