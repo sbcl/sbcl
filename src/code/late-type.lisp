@@ -2025,7 +2025,18 @@
                (if up-p (1+ cx) (1- cx))
                (if up-p (ceiling cx) (floor cx))))
           (float
-           (let ((res (if format (coerce cx format) (float cx))))
+           (let ((res
+                  (cond
+                    ((and format (subtypep format 'double-float))
+                     (if (<= most-negative-double-float cx most-positive-double-float)
+                         (coerce cx format)
+                         (if (< x most-negative-double-float)
+                             most-negative-double-float most-positive-double-float)))
+                    (t
+                     (if (<= most-negative-single-float cx most-positive-single-float)
+                         (coerce cx format)
+                         (if (< x most-negative-single-float)
+                             most-negative-single-float most-positive-single-float))))))
              (if (consp x) (list res) res)))))
       nil))
 

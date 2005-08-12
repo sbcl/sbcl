@@ -333,9 +333,40 @@
 (defmacro bound-binop (op x y)
   `(and ,x ,y
        (with-float-traps-masked (:underflow :overflow :inexact :divide-by-zero)
-         (set-bound (,op (type-bound-number ,x)
-                         (type-bound-number ,y))
+         (set-bound (safely-binop ,op (type-bound-number ,x)
+                                  (type-bound-number ,y))
                     (or (consp ,x) (consp ,y))))))
+
+(defun coerce-for-bound (val type)
+  (if (consp val)
+      (list (coerce-for-bound val))
+      (cond
+        ((subtypep type 'double-float)
+         (if (<= most-negative-double-float val most-positive-double-float)
+             (coerce val type)))
+        ((or (subtypep type 'single-float) (subtypep type 'float))
+         ;; coerce to float returns a single-float
+         (if (<= most-negative-single-float val most-positive-single-float)
+             (coerce val type)))
+        (t (coerce val type)))))
+
+(defun coerce-and-truncate-floats (val type)
+  (when val
+    (if (consp val)
+        (list (coerce-and-truncate-floats (car val) type))
+        (cond
+          ((subtypep type 'double-float)
+           (if (<= most-negative-double-float val most-positive-double-float)
+               (coerce val type)
+               (if (< val most-negative-double-float)
+                   most-negative-double-float most-positive-double-float)))
+          ((or (subtypep type 'single-float) (subtypep type 'float))
+           ;; coerce to float returns a single-float
+           (if (<= most-negative-single-float val most-positive-single-float)
+               (coerce val type)
+               (if (< val most-negative-single-float)
+                   most-negative-single-float most-positive-single-float)))
+          (t (coerce val type))))))
 
 ;;; Convert a numeric-type object to an interval object.
 (defun numeric-type->interval (x)
@@ -1229,8 +1260,8 @@
         (when (eq (numeric-type-class result-type) 'float)
           (setf result (interval-func
                         #'(lambda (x)
-                            (coerce x (or (numeric-type-format result-type)
-                                          'float)))
+                            (coerce-for-bound x (or (numeric-type-format result-type)
+                                                    'float)))
                         result)))
         (make-numeric-type
          :class (if (and (eq (numeric-type-class x) 'integer)
@@ -1262,8 +1293,8 @@
         (when (eq (numeric-type-class result-type) 'float)
           (setf result (interval-func
                         #'(lambda (x)
-                            (coerce x (or (numeric-type-format result-type)
-                                          'float)))
+                            (coerce-for-bound x (or (numeric-type-format result-type)
+                                                    'float)))
                         result)))
         (make-numeric-type
          :class (if (and (eq (numeric-type-class x) 'integer)
@@ -1295,8 +1326,8 @@
         (when (eq (numeric-type-class result-type) 'float)
           (setf result (interval-func
                         #'(lambda (x)
-                            (coerce x (or (numeric-type-format result-type)
-                                          'float)))
+                            (coerce-for-bound x (or (numeric-type-format result-type)
+                                                    'float)))
                         result)))
         (make-numeric-type
          :class (if (and (eq (numeric-type-class x) 'integer)
@@ -1331,8 +1362,8 @@
         (when (eq (numeric-type-class result-type) 'float)
           (setf result (interval-func
                         #'(lambda (x)
-                            (coerce x (or (numeric-type-format result-type)
-                                          'float)))
+                            (coerce-for-bound x (or (numeric-type-format result-type)
+                                                    'float)))
                         result)))
         (make-numeric-type :class (numeric-type-class result-type)
                            :format (numeric-type-format result-type)
@@ -1475,8 +1506,8 @@
             :class class
             :format format
             :complexp :real
-            :low (coerce-numeric-bound (interval-low abs-bnd) bound-type)
-            :high (coerce-numeric-bound
+            :low (coerce-and-truncate-floats (interval-low abs-bnd) bound-type)
+            :high (coerce-and-truncate-floats
                    (interval-high abs-bnd) bound-type))))))
 
 #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
@@ -1590,7 +1621,7 @@
              (when (member rem-type '(float single-float double-float
                                             #!+long-float long-float))
                (setf rem (interval-func #'(lambda (x)
-                                            (coerce x rem-type))
+                                            (coerce-for-bound x rem-type))
                                         rem)))
              (make-numeric-type :class class
                                 :format format
@@ -1700,7 +1731,7 @@
                    ;; Make sure that the limits on the interval have
                    ;; the right type.
                    (setf rem (interval-func (lambda (x)
-                                              (coerce x result-type))
+                                              (coerce-for-bound x result-type))
                                             rem)))
                  (make-numeric-type :class class
                                     :format format
