@@ -339,7 +339,7 @@
 
 (defun coerce-for-bound (val type)
   (if (consp val)
-      (list (coerce-for-bound val))
+      (list (coerce-for-bound (car val) type))
       (cond
         ((subtypep type 'double-float)
          (if (<= most-negative-double-float val most-positive-double-float)
