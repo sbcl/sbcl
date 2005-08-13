@@ -873,6 +873,15 @@
                      (duplicate-definition-name c))))
   (:default-initargs :references (list '(:ansi-cl :section (3 2 2 3)))))
 
+(define-condition constant-modified (reference-condition warning)
+  ((fun-name :initarg :fun-name :reader constant-modified-fun-name))
+  (:report (lambda (c s)
+             (format s "~@<Destructive function ~S called on ~
+                        constant data.~@:>"
+                     (constant-modified-fun-name c))))
+  (:default-initargs :references (list '(:ansi-cl :special-operator quote)
+                                       '(:ansi-cl :section (3 2 2 3)))))
+
 (define-condition package-at-variance (reference-condition simple-warning)
   ()
   (:default-initargs :references (list '(:ansi-cl :macro defpackage))))

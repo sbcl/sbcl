@@ -301,6 +301,49 @@ cat > $tmpfilename <<EOF
 EOF
 expect_warned_compile $tmpfilename
 
+# Tests that destructive-functions on known-constant data cause
+# compile-time warnings.
+cat > $tmpfilename <<EOF
+(let ((string "foo"))
+  (defun foo ()
+    (setf string "bar")))
+EOF
+expect_clean_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
+(defun foo ()
+  (let (result)
+    (nreverse result)))
+EOF
+expect_clean_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
+(defun bar ()
+  (let ((result ""))
+    (nreverse result)))  
+EOF
+expect_clean_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
+(let ((string "foo"))
+  (defun foo ()
+    (replace string "bar")))
+EOF
+expect_failed_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
+(defun foo ()
+  (setf (char "bar" 0) #\1))
+EOF
+expect_failed_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
+(let ((foo '(1 2 3)))
+  (defun foo ()
+    (nconc foo foo)))
+EOF
+expect_failed_compile $tmpfilename
+
 rm $tmpfilename
 rm $compiled_tmpfilename
 

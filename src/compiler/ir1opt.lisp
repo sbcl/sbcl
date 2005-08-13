@@ -661,6 +661,15 @@
          (when arg
            (setf (lvar-reoptimize arg) nil)))
        (when info
+         (let ((fun (fun-info-destroyed-constant-args info)))
+           (when fun
+             (let ((destroyed-constant-args (funcall fun args)))
+               (when destroyed-constant-args
+                 (warn 'constant-modified
+                       :fun-name (lvar-fun-name
+                                  (basic-combination-fun node)))
+                 (setf (basic-combination-kind node) :error)
+                 (return-from ir1-optimize-combination)))))
          (let ((fun (fun-info-derive-type info)))
            (when fun
              (let ((res (funcall fun node)))
@@ -672,6 +681,16 @@
        (dolist (arg args)
          (when arg
            (setf (lvar-reoptimize arg) nil)))
+
+       (let ((fun (fun-info-destroyed-constant-args info)))
+         (when fun
+           (let ((destroyed-constant-args (funcall fun args)))
+             (when destroyed-constant-args
+               (warn 'constant-modified
+                     :fun-name (lvar-fun-name
+                                (basic-combination-fun node)))
+                 (setf (basic-combination-kind node) :error)
+                 (return-from ir1-optimize-combination)))))
 
        (let ((attr (fun-info-attributes info)))
          (when (and (ir1-attributep attr foldable)

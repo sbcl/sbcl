@@ -434,7 +434,8 @@
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown nreverse (sequence) sequence ()
-  :derive-type #'result-type-first-arg)
+  :derive-type #'result-type-first-arg
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
 (defknown make-sequence (type-specifier index
                                         &key
@@ -463,7 +464,8 @@
 (defknown map-into (sequence callable &rest sequence)
   sequence
   (call)
-  :derive-type #'result-type-first-arg)
+  :derive-type #'result-type-first-arg
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
 ;;; returns the result from the predicate...
 (defknown some (callable sequence &rest sequence) t
@@ -486,7 +488,8 @@
 
 (defknown fill (sequence t &key (:start index) (:end sequence-end)) sequence
   (unsafe)
-  :derive-type #'result-type-first-arg)
+  :derive-type #'result-type-first-arg
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
 (defknown replace (sequence
                    sequence
@@ -496,7 +499,8 @@
                    (:start2 index)
                    (:end2 sequence-end))
   sequence ()
-  :derive-type #'result-type-first-arg)
+  :derive-type #'result-type-first-arg
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
 (defknown remove
   (t sequence &key (:from-end t) (:test callable)
@@ -534,7 +538,8 @@
      (:count sequence-count) (:key callable))
   sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 2))
+  :derive-type (sequence-result-nth-arg 2)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
 (defknown nsubstitute
   (t t sequence &key (:from-end t) (:test callable)
@@ -542,21 +547,24 @@
      (:count sequence-count) (:key callable))
   sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 3))
+  :derive-type (sequence-result-nth-arg 3)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 3))
 
 (defknown (delete-if delete-if-not)
   (callable sequence &key (:from-end t) (:start index) (:end sequence-end)
             (:count sequence-count) (:key callable))
   sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 2))
+  :derive-type (sequence-result-nth-arg 2)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
 (defknown (nsubstitute-if nsubstitute-if-not)
   (t callable sequence &key (:from-end t) (:start index) (:end sequence-end)
      (:count sequence-count) (:key callable))
   sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 3))
+  :derive-type (sequence-result-nth-arg 3)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 3))
 
 (defknown remove-duplicates
   (sequence &key (:test callable) (:test-not callable) (:start index)
@@ -570,7 +578,8 @@
             (:from-end t) (:end sequence-end) (:key callable))
   sequence
   (unsafely-flushable call)
-  :derive-type (sequence-result-nth-arg 1))
+  :derive-type (sequence-result-nth-arg 1)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
 (defknown find (t sequence &key (:test callable) (:test-not callable)
                   (:start index) (:from-end t) (:end sequence-end)
@@ -619,16 +628,19 @@
 ;;; not FLUSHABLE, since vector sort guaranteed in-place...
 (defknown (stable-sort sort) (sequence callable &key (:key callable)) sequence
   (call)
-  :derive-type (sequence-result-nth-arg 1))
+  :derive-type (sequence-result-nth-arg 1)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 (defknown sb!impl::sort-vector (vector index index function (or function null))
   * ; SORT-VECTOR works through side-effect
-  (call))
+  (call)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
 (defknown merge (type-specifier sequence sequence callable
                                 &key (:key callable))
   sequence
   (call)
-  :derive-type (creation-result-type-specifier-nth-arg 1))
+  :derive-type (creation-result-type-specifier-nth-arg 1)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 2 3))
 
 ;;; not FLUSHABLE, despite what CMU CL's DEFKNOWN said..
 (defknown read-sequence (sequence stream
@@ -691,26 +703,44 @@
 ;;; All but last must be of type LIST, but there seems to be no way to
 ;;; express that in this syntax. The result must be LIST, but we do
 ;;; not check it now :-).
-(defknown nconc (&rest t) t ())
-(defknown sb!impl::nconc2 (list t) t ())
+(defknown nconc (&rest t) t ()
+  :destroyed-constant-args (remove-non-constants-and-nils #'butlast))
+(defknown sb!impl::nconc2 (list t) t ()
+  :destroyed-constant-args (remove-non-constants-and-nils #'butlast))
 
-(defknown nreconc (list t) t ())
+(defknown nreconc (list t) t ()
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 (defknown butlast (list &optional unsigned-byte) list (flushable))
-(defknown nbutlast (list &optional unsigned-byte) list ())
+(defknown nbutlast (list &optional unsigned-byte) list ()
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
+
 (defknown ldiff (list t) list (flushable))
-(defknown (rplaca rplacd) (cons t) list (unsafe))
+(defknown (rplaca rplacd) (cons t) list (unsafe)
+  :destroyed-constant-args (nth-constant-args 1))
 
-(defknown (nsubst subst) (t t t &key (:key callable) (:test callable)
-                            (:test-not callable))
+(defknown subst (t t t &key (:key callable) (:test callable)
+                   (:test-not callable))
   t (flushable unsafe call))
+(defknown nsubst (t t t &key (:key callable) (:test callable)
+                    (:test-not callable))
+  t (unsafe call)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 3))
 
-(defknown (subst-if subst-if-not nsubst-if nsubst-if-not)
+(defknown (subst-if subst-if-not)
           (t callable t &key (:key callable))
   t (flushable unsafe call))
+(defknown (nsubst-if nsubst-if-not)
+          (t callable t &key (:key callable))
+  t (unsafe call)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 3))
 
-(defknown (sublis nsublis) (list t &key (:key callable) (:test callable)
-                                 (:test-not callable))
+(defknown sublis (list t &key (:key callable) (:test callable)
+                       (:test-not callable))
   t (flushable unsafe call))
+(defknown nsublis (list t &key (:key callable) (:test callable)
+                        (:test-not callable))
+  t (flushable unsafe call)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
 (defknown member (t list &key (:key callable) (:test callable)
                     (:test-not callable))
@@ -732,7 +762,8 @@
 (defknown (nunion nintersection nset-difference nset-exclusive-or)
   (list list &key (:key callable) (:test callable) (:test-not callable))
   list
-  (foldable flushable call))
+  (foldable flushable call)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1 2))
 
 (defknown subsetp
   (list list &key (:key callable) (:test callable) (:test-not callable))
@@ -749,7 +780,8 @@
           (callable list &key (:key callable)) list (foldable flushable call))
 
 (defknown (memq assq) (t list) list (foldable flushable unsafe))
-(defknown delq (t list) list (flushable unsafe))
+(defknown delq (t list) list (flushable unsafe)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
 ;;;; from the "Hash Tables" chapter:
 
@@ -767,10 +799,13 @@
   (flushable unsafe)) ; not FOLDABLE, since hash table contents can change
 (defknown sb!impl::gethash3 (t hash-table t) (values t boolean)
   (flushable unsafe)) ; not FOLDABLE, since hash table contents can change
-(defknown %puthash (t hash-table t) t (unsafe))
-(defknown remhash (t hash-table) boolean ())
+(defknown %puthash (t hash-table t) t (unsafe)
+  :destroyed-constant-args (nth-constant-args 2))
+(defknown remhash (t hash-table) boolean ()
+  :destroyed-constant-args (nth-constant-args 2))
 (defknown maphash (callable hash-table) null (flushable call))
-(defknown clrhash (hash-table) hash-table ())
+(defknown clrhash (hash-table) hash-table ()
+  :destroyed-constant-args (nth-constant-args 2))
 (defknown hash-table-count (hash-table) index (flushable))
 (defknown hash-table-rehash-size (hash-table) (or (integer 1) (float (1.0)))
   (foldable flushable))
@@ -815,6 +850,7 @@
 (defknown bit ((array bit) &rest index) bit (foldable flushable))
 (defknown sbit ((simple-array bit) &rest index) bit (foldable flushable))
 
+;;; FIXME: :DESTROYED-CONSTANT-ARGS for these is complicated.
 (defknown (bit-and bit-ior bit-xor bit-eqv bit-nand bit-nor bit-andc1 bit-andc2
                    bit-orc1 bit-orc2)
   ((array bit) (array bit) &optional (or (array bit) (member t nil)))
@@ -833,10 +869,14 @@
 (defknown array-has-fill-pointer-p (array) boolean
   (movable foldable flushable))
 (defknown fill-pointer (vector) index (foldable unsafely-flushable))
-(defknown vector-push (t vector) (or index null) ())
-(defknown vector-push-extend (t vector &optional index) index ())
-(defknown vector-pop (vector) t ())
+(defknown vector-push (t vector) (or index null) ()
+  :destroyed-constant-args (nth-constant-args 2))
+(defknown vector-push-extend (t vector &optional index) index ()
+  :destroyed-constant-args (nth-constant-args 2))
+(defknown vector-pop (vector) t ()
+  :destroyed-constant-args (nth-constant-args 1))
 
+;;; FIXME: complicated :DESTROYED-CONSTANT-ARGS
 (defknown adjust-array
   (array (or index list) &key (:element-type type-specifier)
          (:initial-element t) (:initial-contents t)
@@ -877,7 +917,8 @@
 
 (defknown (nstring-upcase nstring-downcase nstring-capitalize)
   (string &key (:start index) (:end sequence-end))
-  string ())
+  string ()
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
 (defknown string (string-designator) string
   (flushable explicit-check))
@@ -1080,6 +1121,7 @@
 (defknown write-byte (integer stream) integer
   (explicit-check))
 
+;;; FIXME: complicated :DESTROYED-CONSTANT-ARGS
 (defknown format ((or (member nil t) stream string)
                   (or string function) &rest t)
   (or string null)
@@ -1434,25 +1476,35 @@
 
 ;;;; SETF inverses
 
-(defknown %aset (array &rest t) t (unsafe))
-(defknown %set-row-major-aref (array index t) t (unsafe))
-(defknown %rplaca (cons t) t (unsafe))
-(defknown %rplacd (cons t) t (unsafe))
+(defknown %aset (array &rest t) t (unsafe)
+  :destroyed-constant-args (nth-constant-args 1))
+(defknown %set-row-major-aref (array index t) t (unsafe)
+  :destroyed-constant-args (nth-constant-args 1))
+(defknown (%rplaca %rplacd) (cons t) t (unsafe)
+  :destroyed-constant-args (nth-constant-args 1))
 (defknown %put (symbol t t) t (unsafe))
-(defknown %setelt (sequence index t) t (unsafe))
-(defknown %svset (simple-vector index t) t (unsafe))
-(defknown %bitset ((array bit) &rest index) bit (unsafe))
-(defknown %sbitset ((simple-array bit) &rest index) bit (unsafe))
-(defknown %charset (string index character) character (unsafe))
-(defknown %scharset (simple-string index character) character (unsafe))
+(defknown %setelt (sequence index t) t (unsafe)
+  :destroyed-constant-args (nth-constant-args 1))
+(defknown %svset (simple-vector index t) t (unsafe)
+  :destroyed-constant-args (nth-constant-args 1))
+(defknown %bitset ((array bit) &rest index) bit (unsafe)
+  :destroyed-constant-args (nth-constant-args 1))
+(defknown %sbitset ((simple-array bit) &rest index) bit (unsafe)
+  :destroyed-constant-args (nth-constant-args 1))
+(defknown %charset (string index character) character (unsafe)
+  :destroyed-constant-args (nth-constant-args 1))
+(defknown %scharset (simple-string index character) character (unsafe)
+  :destroyed-constant-args (nth-constant-args 1))
 (defknown %set-symbol-value (symbol t) t (unsafe))
 (defknown (setf symbol-function) (function symbol) function (unsafe))
 (defknown %set-symbol-plist (symbol t) t (unsafe))
 (defknown (setf fdocumentation) ((or string null) t symbol)
   (or string null)
   ())
-(defknown %setnth (unsigned-byte list t) t (unsafe))
-(defknown %set-fill-pointer (vector index) index (unsafe))
+(defknown %setnth (unsigned-byte list t) t (unsafe)
+  :destroyed-constant-args (nth-constant-args 2))
+(defknown %set-fill-pointer (vector index) index (unsafe)
+  :destroyed-constant-args (nth-constant-args 1))
 
 ;;;; ALIEN and call-out-to-C stuff
 

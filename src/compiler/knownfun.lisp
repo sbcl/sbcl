@@ -100,6 +100,9 @@
   ;; further optimiz'ns) is backwards from the return convention for
   ;; transforms. -- WHN 19990917
   (optimizer nil :type (or function null))
+  ;; a function computing the constant or literal arguments which are
+  ;; destructively modified by the call.
+  (destroyed-constant-args nil :type (or function null))
   ;; If true, a special-case LTN annotation method that is used in
   ;; place of the standard type/policy template selection. It may use
   ;; arbitrary code to choose a template, decide to do a full call, or
@@ -186,11 +189,12 @@
                                 (:optimizer (or function null)))
                           *)
                 %defknown))
-(defun %defknown (names type attributes &key derive-type optimizer)
+(defun %defknown (names type attributes &key derive-type optimizer destroyed-constant-args)
   (let ((ctype (specifier-type type))
         (info (make-fun-info :attributes attributes
                              :derive-type derive-type
-                             :optimizer optimizer))
+                             :optimizer optimizer
+                             :destroyed-constant-args destroyed-constant-args))
         (target-env *info-environment*))
     (dolist (name names)
       (let ((old-fun-info (info :function :info name)))
@@ -315,5 +319,45 @@
                            *universal-type*)
                      real-ctype)
                    ctype)))))))))
+
+(defun remove-non-constants-and-nils (fun)
+  (lambda (list)
+    (remove-if-not #'lvar-value
+                   (remove-if-not #'constant-lvar-p (funcall fun list)))))
+
+;;; FIXME: bad name (first because it uses 1-based indexing; second
+;;; because it doesn't get the nth constant arguments)
+(defun nth-constant-args (&rest indices)
+  (lambda (list)
+    (let (result)
+      (do ((i 1 (1+ i))
+           (list list (cdr list))
+           (indices indices))
+          ((null indices) (nreverse result))
+        (when (= i (car indices))
+          (when (constant-lvar-p (car list))
+            (push (car list) result))
+          (setf indices (cdr indices)))))))
+
+;;; FIXME: a number of the sequence functions not only do not destroy
+;;; their argument if it is empty, but also leave it alone if :start
+;;; and :end bound a null sequence, or if :count is 0.  This test is a
+;;; bit complicated to implement, verging on the impossible, but for
+;;; extra points (fill #\1 "abc" :start 0 :end 0) should not cause a
+;;; warning.
+(defun nth-constant-nonempty-sequence-args (&rest indices)
+  (lambda (list)
+    (let (result)
+      (do ((i 1 (1+ i))
+           (list list (cdr list))
+           (indices indices))
+          ((null indices) (nreverse result))
+        (when (= i (car indices))
+          (when (constant-lvar-p (car list))
+            (let ((value (lvar-value (car list))))
+              (unless (or (typep value 'null)
+                          (typep value '(vector * 0)))
+                (push (car list) result))))
+          (setf indices (cdr indices)))))))
 
 (/show0 "knownfun.lisp end of file")
