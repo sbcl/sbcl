@@ -265,3 +265,18 @@ architectures.  Certainly adding #!+/- magic in compiler/*.lisp could be
 done, but such a solution is somewhat inelegant.  Moving the relevant
 DEFTRANSFORMs to the architecture-specific compiler/* areas is also
 possible, but that would duplicate quite a bit of code.
+--------------------------------------------------------------------------------
+#30
+(defun foo (x y)
+  (< x y))
+
+FOO's IR1 representation is roughly:
+
+(defun foo (x y)
+  (if (< x y)
+      T
+      NIL))
+
+However, if a full call is generated for < (and similarly for other
+predicate functions), then the IF is unnecessary, since the return value
+of (< x y) is already T or NIL.

@@ -31,7 +31,7 @@ INSTALLING SBCL
   In other words, "install.sh" installs SBCL under the directory named
   by the environment variable "INSTALL_ROOT".
 
-  If you install SBCL from binary distribution in other location then
+  If you install SBCL from binary distribution in other location than
   "/usr/local", see section 1.2, "Finding ancillary files".
 
 1.2. Finding ancillary files

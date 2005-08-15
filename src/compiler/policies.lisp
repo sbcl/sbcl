@@ -27,7 +27,7 @@
           (t 3))
   ("no" "maybe" "yes" "yes"))
 
-(define-optimization-quality let-convertion
+(define-optimization-quality let-conversion
     (if (<= debug speed) 3 0)
   ("off" "maybe" "on" "on"))
 
