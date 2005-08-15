@@ -3657,6 +3657,10 @@
       (when (stringp x)
         (check-format-args x args 'format)))))
 
+;;; We disable this transform in the cross-compiler to save memory in
+;;; the target image; most of the uses of FORMAT in the compiler are for
+;;; error messages, and those don't need to be particularly fast.
+#+sb-xc
 (deftransform format ((dest control &rest args) (t simple-string &rest t) *
                       :policy (> speed space))
   (unless (constant-lvar-p control)
