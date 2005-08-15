@@ -255,7 +255,9 @@
           ;; 2004-07-12)
           ;;
           ;; FIXME: INSTANCE-LAMBDA is no more.  We could change this.
-          (eval `(function ,(constructor-function-form ctor))))))
+          (multiple-value-bind (form locations names)
+              (constructor-function-form ctor)
+            (apply (compile nil `(lambda ,names ,form)) locations)))))
 
 (defun constructor-function-form (ctor)
   (let* ((class (ctor-class ctor))
@@ -308,7 +310,7 @@
     ;; MAKE-INSTANCE and/or ALLOCATE-INSTANCE, these will show up
     ;; together with the system-defined ones in what
     ;; COMPUTE-APPLICABLE-METHODS returns.
-    (or (and (not (structure-class-p class))
+    (if (and (not (structure-class-p class))
              (not (condition-class-p class))
              (null (cdr make-instance-methods))
              (null (cdr allocate-instance-methods))
@@ -333,8 +335,8 @@
              ;; SLOT-BOUNDP-USING-CLASS), so if there are non-standard
              ;; applicable methods we can't shortcircuit them.
              (every (lambda (x) (= (length x) 1)) setf-svuc-slots-methods)
-             (every (lambda (x) (= (length x) 1)) sbuc-slots-methods)
-             (optimizing-generator ctor ii-methods si-methods))
+             (every (lambda (x) (= (length x) 1)) sbuc-slots-methods))
+        (optimizing-generator ctor ii-methods si-methods)
         (fallback-generator ctor ii-methods si-methods))))
 
 (defun around-or-nonstandard-primary-method-p
@@ -362,11 +364,14 @@
      (make-instance ,(ctor-class ctor) ,@(ctor-initargs ctor))))
 
 (defun optimizing-generator (ctor ii-methods si-methods)
-  (multiple-value-bind (body before-method-p)
+  (multiple-value-bind (locations names body before-method-p)
       (fake-initialization-emf ctor ii-methods si-methods)
-    `(lambda ,(make-ctor-parameter-list ctor)
+    (values 
+     `(lambda ,(make-ctor-parameter-list ctor)
        (declare #.*optimize-speed*)
-       ,(wrap-in-allocate-forms ctor body before-method-p))))
+       ,(wrap-in-allocate-forms ctor body before-method-p))
+     locations
+     names)))
 
 ;;; Return a form wrapped around BODY that allocates an instance
 ;;; constructed by CTOR.  BEFORE-METHOD-P set means we have to run
@@ -415,9 +420,11 @@
       (declare (ignore si-primary))
       (aver (and (null ii-around) (null si-around)))
       (let ((initargs (ctor-initargs ctor)))
-        (multiple-value-bind (bindings vars defaulting-initargs body)
+        (multiple-value-bind (locations names bindings vars defaulting-initargs body)
             (slot-init-forms ctor (or ii-before si-before))
         (values
+         locations
+         names
          `(let ,bindings
            (declare (ignorable ,@vars))
            (let (,@(when (or ii-before ii-after)
@@ -498,7 +505,12 @@
                (let ((ps #(.d0. .d1. .d2. .d3. .d4. .d5.)))
                  (if (array-in-bounds-p ps i)
                      (aref ps i)
-                     (format-symbol *pcl-package* ".D~D." i)))))
+                     (format-symbol *pcl-package* ".D~D." i))))
+             (location-var-name (i)
+               (let ((ls #(.l0. .l1. .l2. .l3. .l4. .l5.)))
+                 (if (array-in-bounds-p ls i)
+                     (aref ls i)
+                     (format-symbol *pcl-package* ".L~D." i)))))
       ;; Loop over supplied initargs and values and record which
       ;; instance and class slots they initialize.
       (loop for (key value) on initargs by #'cddr
@@ -579,22 +591,34 @@
                             `(setf (clos-slots-ref .slots. ,i)
                                    ',(eval value))))
                        (constant
-                        `(setf (clos-slots-ref .slots. ,i) ',(eval value))))))
-            (class-init-forms
-             (loop for (location type value) in class-inits collect
-                     `(setf (cdr ',location)
-                            ,(ecase type
-                               (constant `',(eval value))
-                               ((param var) `,value)
-                               (initfn `(funcall ,value)))))))
-        (multiple-value-bind (vars bindings)
-            (loop for (var . initfn) in (nreverse default-inits)
-                  collect var into vars
-                  collect `(,var (funcall ,initfn)) into bindings
-                  finally (return (values vars bindings)))
-          (values bindings vars (nreverse defaulting-initargs)
-                  `(,@(delete nil instance-init-forms)
-                    ,@class-init-forms)))))))
+                        `(setf (clos-slots-ref .slots. ,i) ',(eval value)))))))
+        ;; we are not allowed to modify QUOTEd locations, so we can't
+        ;; generate code like (setf (cdr ',location) arg).  Instead,
+        ;; we have to do (setf (cdr .L0.) arg) and arrange for .L0. to
+        ;; be bound to the location.
+        (multiple-value-bind (names locations class-init-forms)
+            (loop for (location type value) in class-inits
+                  for i upfrom 0
+                  for name = (location-var-name i)
+                  collect name into names
+                  collect location into locations
+                  collect `(setf (cdr ,name)
+                                 ,(case type
+                                    (constant `',(eval value))
+                                    ((param var) `,value)
+                                    (initfn `(funcall ,value)))) 
+                  into class-init-forms
+                  finally (return (values names locations class-init-forms)))
+          (multiple-value-bind (vars bindings)
+              (loop for (var . initfn) in (nreverse default-inits)
+                    collect var into vars
+                    collect `(,var (funcall ,initfn)) into bindings
+                    finally (return (values vars bindings)))
+            (values locations names 
+                    bindings vars 
+                    (nreverse defaulting-initargs)
+                    `(,@(delete nil instance-init-forms)
+                      ,@class-init-forms))))))))
 
 ;;; Return an alist of lists (KEY LOCATION ...) telling, for each
 ;;; key in INITKEYS, which locations the initarg initializes.

@@ -1169,5 +1169,14 @@
 
 (assert (null (r-c/c-m-1-gf)))
 
+(handler-bind ((warning #'error))
+  (eval '(defclass class-for-ctor/class-slot () 
+          ((class-slot :initarg :class-slot :allocation :class))))
+  (eval '(let ((c1 (make-instance 'class-for-ctor/class-slot))
+               (c2 (make-instance 'class-for-ctor/class-slot :class-slot 1)))
+          (assert (equal (list (slot-value c1 'class-slot)
+                               (slot-value c2 'class-slot))
+                   (list 1 1))))))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
