@@ -245,16 +245,6 @@
     (setf (ctor-class ctor) class)
     (pushnew ctor (plist-value class 'ctors))
     (setf (funcallable-instance-fun ctor)
-          ;; KLUDGE: Gerd here has the equivalent of (COMPILE NIL
-          ;; (CONSTRUCTOR-FUNCTION-FORM)), but SBCL's COMPILE doesn't
-          ;; deal with INSTANCE-LAMBDA expressions, only with LAMBDA
-          ;; expressions.  The below should be equivalent, since we
-          ;; have a compiler-only implementation.
-          ;;
-          ;; (except maybe for optimization qualities? -- CSR,
-          ;; 2004-07-12)
-          ;;
-          ;; FIXME: INSTANCE-LAMBDA is no more.  We could change this.
           (multiple-value-bind (form locations names)
               (constructor-function-form ctor)
             (apply (compile nil `(lambda ,names ,form)) locations)))))

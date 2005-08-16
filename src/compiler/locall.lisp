@@ -1017,11 +1017,11 @@
   (when (leaf-has-source-name-p clambda)
     ;; ANSI requires that explicit NOTINLINE be respected.
     (or (eq (lambda-inlinep clambda) :notinline)
-        ;; If (= LET-CONVERTION 0) we can guess that inlining
+        ;; If (= LET-CONVERSION 0) we can guess that inlining
         ;; generally won't be appreciated, but if the user
         ;; specifically requests inlining, that takes precedence over
         ;; our general guess.
-        (and (policy clambda (= let-convertion 0))
+        (and (policy clambda (= let-conversion 0))
              (not (eq (lambda-inlinep clambda) :inline))))))
 
 ;;; We also don't convert calls to named functions which appear in the

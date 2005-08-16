@@ -209,7 +209,7 @@
 (assert (raises-error? (bug231b 0 0) type-error))
 
 ;;; A bug appeared in flaky7_branch. Python got lost in unconverting
-;;; embedded tail calls during let-convertion.
+;;; embedded tail calls during let-conversion.
 (defun bug239 (bit-array-2 &optional result-bit-array)
   (declare (type (array bit) bit-array-2)
            (type (or (array bit) (member t nil)) result-bit-array))
