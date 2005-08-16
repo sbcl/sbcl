@@ -47,6 +47,11 @@
       (t
        `(typep (layout-of object) 'sb-pcl::wrapper)))))
 
+(defun sb-pcl::safe-code-p (&optional env)
+  (let* ((lexenv (or env (make-null-lexenv)))
+         (policy (lexenv-policy lexenv)))
+    (eql (cdr (assoc 'safety policy)) 3)))
+
 (define-source-context defmethod (name &rest stuff)
   (let ((arg-pos (position-if #'listp stuff)))
     (if arg-pos

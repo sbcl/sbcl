@@ -818,6 +818,10 @@ bootstrapping.
                       (,',next-methods (cdr ,',next-methods)))
                  .next-method. ,',next-methods
                  ,@body))
+              (check-cnm-args-body (&environment env method-name-declaration cnm-args)
+               (if (safe-code-p env)
+                   `(%check-cnm-args ,cnm-args ,',method-args ',method-name-declaration)
+                   nil))
               (call-next-method-body (method-name-declaration cnm-args)
                `(if .next-method.
                     (funcall (if (std-instance-p .next-method.)
@@ -1062,7 +1066,8 @@ bootstrapping.
      (apply emf args))))
 
 (defmacro bind-fast-lexical-method-macros ((args rest-arg next-method-call)
-                                           &body body)
+                                           &body body
+                                           &environment env)
   (let* ((all-params (append args (when rest-arg (list rest-arg))))
          (rebindings (mapcar (lambda (x) (list x x)) all-params)))
     `(macrolet ((narrowed-emf (emf)
@@ -1093,6 +1098,11 @@ bootstrapping.
                    ,emf))
                 (call-next-method-bind (&body body)
                  `(let () ,@body))
+                (check-cnm-args-body (&environment env method-name-declaration cnm-args)
+                 (if (safe-code-p env)
+                     `(%check-cnm-args ,cnm-args (list ,@',args)
+                       ',method-name-declaration)
+                     nil))
                 (call-next-method-body (method-name-declaration cnm-args)
                  `(if ,',next-method-call
                       ,(locally
@@ -1155,14 +1165,41 @@ bootstrapping.
          `(call-next-method-bind
             (flet (,@(and call-next-method-p
                           `((call-next-method (&rest cnm-args)
-                             (call-next-method-body
-                              ,method-name-declaration
-                              cnm-args))))
+                             (check-cnm-args-body ,method-name-declaration cnm-args)
+                             (call-next-method-body ,method-name-declaration cnm-args))))
                    ,@(and next-method-p-p
                           '((next-method-p ()
                              (next-method-p-body)))))
               (with-rebound-original-args (,call-next-method-p ,setq-p)
                 ,@body))))))
+
+;;; CMUCL comment (Gerd Moellmann):
+;;;
+;;; The standard says it's an error if CALL-NEXT-METHOD is called with
+;;; arguments, and the set of methods applicable to those arguments is
+;;; different from the set of methods applicable to the original
+;;; method arguments.  (According to Barry Margolin, this rule was
+;;; probably added to ensure that before and around methods are always
+;;; run before primary methods.)
+;;;
+;;; This could be optimized for the case that the generic function
+;;; doesn't have hairy methods, does have standard method combination,
+;;; is a standard generic function, there are no methods defined on it
+;;; for COMPUTE-APPLICABLE-METHODS and probably a lot more of such
+;;; preconditions.  That looks hairy and is probably not worth it,
+;;; because this check will never be fast.
+(defun %check-cnm-args (cnm-args orig-args method-name-declaration)
+  (when cnm-args
+    (let* ((gf (fdefinition (caar method-name-declaration)))
+           (omethods (compute-applicable-methods gf orig-args))
+           (nmethods (compute-applicable-methods gf cnm-args)))
+      (unless (equal omethods nmethods)
+        (error "~@<The set of methods ~S applicable to argument~P ~
+                ~{~S~^, ~} to call-next-method is different from ~
+                the set of methods ~S applicable to the original ~
+                method argument~P ~{~S~^, ~}.~@:>"
+               nmethods (length cnm-args) cnm-args omethods
+               (length orig-args) orig-args)))))
 
 (defmacro bind-args ((lambda-list args) &body body)
   (let ((args-tail '.args-tail.)
