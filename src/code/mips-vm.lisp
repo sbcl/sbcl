@@ -53,7 +53,6 @@
   ;; hacky pointer arithmetic thing.  -- CSR, 2002-09-01
   (int-sap (deref (context-pc-addr context)
                   #!-little-endian 1
-                  ;; Untested
                   #!+little-endian 0)))
 
 (define-alien-routine ("os_context_register_addr" context-register-addr)

@@ -35,7 +35,7 @@
       (make-restricted-tn *backend-t-primitive-type* register-arg-scn)))
 
 ;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
-;;; location to pass Old-FP in. This is (obviously) wired in the
+;;; location to pass OLD-FP in. This is (obviously) wired in the
 ;;; standard convention, but is totally unrestricted in non-standard
 ;;; conventions, since we can always fetch it off of the stack using
 ;;; the arg pointer.
@@ -208,7 +208,7 @@
 ;;; In the general case, we have to do three things:
 ;;;  -- Default unsupplied register values.  This need only be done when a
 ;;;     single value is returned, since register values are defaulted by the
-;;;     called in the non-single case.
+;;;     callee in the non-single case.
 ;;;  -- Default unsupplied stack values.  This needs to be done whenever there
 ;;;     are stack values.
 ;;;  -- Reset SP.  This must be done whenever other than 1 value is returned,
@@ -240,7 +240,7 @@ regs-defaulted
         ...
 
 defaulting-done
-        move sp ocfp                    ; Reset SP.
+        move csp ocfp                    ; Reset SP.
 <end of code>
 
 <elsewhere>
@@ -284,7 +284,7 @@ default-value-8
               (inst addu temp nargs-tn (fixnumize (- register-arg-count)))
               (move csp-tn ocfp-tn t)))
 
-        ;; Do the single value calse.
+        ;; Do the single value case.
         (do ((i 1 (1+ i))
              (val (tn-ref-across values) (tn-ref-across val)))
             ((= i (min nvals register-arg-count)))

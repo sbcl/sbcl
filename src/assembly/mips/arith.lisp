@@ -1,6 +1,15 @@
 (in-package "SB!VM")
 
 
+
+;;;; Addition and subtraction.
+
+;;; static-fun-offset returns the address of the raw_addr slot of
+;;; a static function's fdefn.
+
+;;; Note that there is only one use of static-fun-offset outside this
+;;; file (in genesis.lisp)
+
 (define-assembly-routine (generic-+
                           (:cost 10)
                           (:return-style :full-call)
@@ -99,6 +108,10 @@
   (inst sll res temp n-fixnum-tag-bits)
 
   DONE)
+
+
+
+;;;; Multiplication
 
 
 (define-assembly-routine (generic-*

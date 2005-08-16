@@ -795,7 +795,7 @@
 ;;; positions are known. Space is made in SEGMENT for at least SIZE
 ;;; bytes. When all output has been generated, the MAYBE-SHRINK
 ;;; functions for all choosers are called with three arguments: the
-;;; segment, the position, and a magic value. The MAYBE- SHRINK
+;;; segment, the position, and a magic value. The MAYBE-SHRINK
 ;;; decides if it can use a shorter sequence, and if so, emits that
 ;;; sequence to the segment and returns T. If it can't do better than
 ;;; the worst case, it should return NIL (without emitting anything).
@@ -814,8 +814,8 @@
 
 ;;; This is called in EMIT-CHOOSER and COMPRESS-SEGMENT in order to
 ;;; recompute the current alignment information in light of this
-;;; chooser. If the alignment guaranteed byte the chooser is less then
-;;; the segments current alignment, we have to adjust the segments
+;;; chooser. If the alignment guaranteed by the chooser is less than
+;;; the segment's current alignment, we have to adjust the segment's
 ;;; notion of the current alignment.
 ;;;
 ;;; The hard part is recomputing the sync posn, because it's not just
@@ -1051,7 +1051,7 @@
   (values))
 
 ;;; Grovel over segment, filling in any backpatches. If any choosers
-;;; are left over, we need to emit their worst case varient.
+;;; are left over, we need to emit their worst case variant.
 (defun process-back-patches (segment)
   (do* ((prev nil)
         (remaining (segment-annotations segment) next)
