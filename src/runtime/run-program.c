@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <sys/file.h>
 #include <sys/types.h>
+#include <signal.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -54,6 +55,7 @@ int spawn(char *program, char *argv[], char *envp[], char *pty_name,
 {
     int pid = fork();
     int fd;
+    sigset_t sset;
 
     if (pid != 0)
         return pid;
@@ -66,6 +68,10 @@ int spawn(char *program, char *argv[], char *envp[], char *pty_name,
 #else
     setpgrp(0, getpid());
 #endif
+
+    /* unblock signals */
+    sigemptyset(&sset);
+    sigprocmask(SIG_SETMASK, &sset, NULL);
 
     /* If we are supposed to be part of some other pty, go for it. */
     if (pty_name) {

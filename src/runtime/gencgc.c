@@ -1864,7 +1864,8 @@ scav_vector(lispobj *where, lispobj object)
 #endif
 
                 if ((old_index != new_index) &&
-                    ((!hash_vector) || (hash_vector[i] == 0x80000000)) &&
+                    ((!hash_vector) ||
+                     (hash_vector[i] == MAGIC_HASH_VECTOR_VALUE)) &&
                     ((new_key != empty_symbol) ||
                      (kv_vector[2*i] != empty_symbol))) {
 

@@ -1049,10 +1049,16 @@
                                namestring))
                      (sb!unix:unix-mkdir namestring mode)
                      (unless (probe-file namestring)
-                       (error 'simple-file-error
-                              :pathname pathspec
-                              :format-control "can't create directory ~A"
-                              :format-arguments (list namestring)))
+                       (restart-case (error 'simple-file-error
+                                            :pathname pathspec
+                                            :format-control "can't create directory ~A"
+                                            :format-arguments (list namestring))
+                         (retry ()
+                           :report "Retry directory creation."
+                           (ensure-directories-exist pathspec :verbose verbose :mode mode))
+                         (continue ()
+                           :report "Continue as if directory creation was successful."
+                           nil)))
                      (setf created-p t)))))
       (values pathname created-p))))
 

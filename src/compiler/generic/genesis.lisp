@@ -2699,6 +2699,15 @@ core and return a descriptor to it."
                   (symbol-value c)
                   nil)
             constants))
+    ;; One more symbol that doesn't fit into the code above.
+    (flet ((translate (name)
+             (delete #\+ (substitute #\_ #\- name))))
+      (let ((c 'sb!impl::+magic-hash-vector-value+))
+        (push (list (translate (symbol-name c))
+                    9
+                    (symbol-value c)
+                    nil)
+              constants)))
 
     (setf constants
           (sort constants

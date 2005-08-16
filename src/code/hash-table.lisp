@@ -66,10 +66,20 @@
   ;; This table parallels the KV table, and can be used to store the
   ;; hash associated with the key, saving recalculation. Could be
   ;; useful for EQL, and EQUAL hash tables. This table is not needed
-  ;; for EQ hash tables, and when present the value of #x80000000
-  ;; represents EQ-based hashing on the respective key.
+  ;; for EQ hash tables, and when present the value of
+  ;; +MAGIC-HASH-VECTOR-VALUE+ represents EQ-based hashing on the
+  ;; respective key.
   (hash-vector nil :type (or null (simple-array (unsigned-byte
                                                  #.sb!vm:n-word-bits) (*)))))
+
+;; as explained by pmai on openprojects #lisp IRC 2002-07-30: #x80000000
+;; is bigger than any possible nonEQ hash value, and thus indicates an
+;; empty slot; and EQ hash tables don't use HASH-TABLE-HASH-VECTOR.
+;; The previous sentence was written when SBCL was 32-bit only. The value
+;; now depends on the word size. It is propagated to C in genesis because
+;; the generational garbage collector needs to know it.
+(defconstant +magic-hash-vector-value+ (ash 1 (1- sb!vm:n-word-bits)))
+
 
 (defmacro-mundanely with-hash-table-iterator ((function hash-table) &body body)
   #!+sb-doc

@@ -82,10 +82,6 @@
 
 (defconstant +min-hash-table-size+ 16)
 (defconstant +min-hash-table-rehash-threshold+ (float 1/16 1.0))
-;; as explained by pmai on openprojects #lisp IRC 2002-07-30: #x80000000
-;; is bigger than any possible nonEQ hash value, and thus indicates an
-;; empty slot; and EQ hash tables don't use HASH-TABLE-HASH-VECTOR
-(defconstant +magic-hash-vector-value+ #x80000000)
 
 (defun make-hash-table (&key (test 'eql)
                              (size +min-hash-table-size+)
