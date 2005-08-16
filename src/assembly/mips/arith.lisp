@@ -186,12 +186,105 @@
 
   DONE)
 
+(macrolet
+    ((frob (name note cost type sc signed-p)
+       `(define-assembly-routine (,name
+                                  (:note ,note)
+                                  (:cost ,cost)
+                                  (:translate *)
+                                  (:policy :fast-safe)
+                                  (:arg-types ,type ,type)
+                                  (:result-types ,type))
+                                 ((:arg x ,sc nl0-offset)
+                                  (:arg y ,sc nl1-offset)
+                                  (:res res ,sc nl0-offset))
+          ,@(when (eq type 'tagged-num)
+              `((inst sra x 2)))
+          (inst ,(if signed-p 'mult 'multu) x y)
+          (inst mflo res))))
+  (frob unsigned-* "unsigned *" 40 unsigned-num unsigned-reg nil)
+  (frob signed-* "signed *" 41 signed-num signed-reg t)
+  (frob fixnum-* "fixnum *" 30 tagged-num any-reg t))
+
+
+
+;;;; Division.
+
+
+(define-assembly-routine (positive-fixnum-truncate
+                          (:note "unsigned fixnum truncate")
+                          (:cost 45)
+                          (:translate truncate)
+                          (:policy :fast-safe)
+                          (:arg-types positive-fixnum positive-fixnum)
+                          (:result-types positive-fixnum positive-fixnum))
+                         ((:arg dividend any-reg nl0-offset)
+                          (:arg divisor any-reg nl1-offset)
+
+                          (:res quo any-reg nl2-offset)
+                          (:res rem any-reg nl3-offset))
+  (let ((error (generate-error-code nil division-by-zero-error
+                                    dividend divisor)))
+    (inst beq divisor error)
+    (inst nop))
+
+    (inst divu dividend divisor)
+    (inst mflo quo)
+    (inst mfhi rem)
+    (inst sll quo 2))
+
+
+(define-assembly-routine (fixnum-truncate
+                          (:note "fixnum truncate")
+                          (:cost 50)
+                          (:policy :fast-safe)
+                          (:translate truncate)
+                          (:arg-types tagged-num tagged-num)
+                          (:result-types tagged-num tagged-num))
+                         ((:arg dividend any-reg nl0-offset)
+                          (:arg divisor any-reg nl1-offset)
+
+                          (:res quo any-reg nl2-offset)
+                          (:res rem any-reg nl3-offset))
+  (let ((error (generate-error-code nil division-by-zero-error
+                                    dividend divisor)))
+    (inst beq divisor error)
+    (inst nop))
+
+    (inst div dividend divisor)
+    (inst mflo quo)
+    (inst mfhi rem)
+    (inst sll quo 2))
+
+
+(define-assembly-routine (signed-truncate
+                          (:note "(signed-byte 32) truncate")
+                          (:cost 60)
+                          (:policy :fast-safe)
+                          (:translate truncate)
+                          (:arg-types signed-num signed-num)
+                          (:result-types signed-num signed-num))
+
+                         ((:arg dividend signed-reg nl0-offset)
+                          (:arg divisor signed-reg nl1-offset)
+
+                          (:res quo signed-reg nl2-offset)
+                          (:res rem signed-reg nl3-offset))
+  (let ((error (generate-error-code nil division-by-zero-error
+                                    dividend divisor)))
+    (inst beq divisor error)
+    (inst nop))
+
+    (inst div dividend divisor)
+    (inst mflo quo)
+    (inst mfhi rem))
+
 
 
 ;;;; Comparison routines.
 
 (macrolet
-    ((define-cond-assem-rtn (name translate static-fn cmp)
+    ((define-cond-assem-rtn (name translate static-fn cmp not-p)
        `(define-assembly-routine (,name
                                   (:cost 10)
                                   (:return-style :full-call)
@@ -220,14 +313,16 @@
           (move cfp-tn csp-tn t)
 
           DO-COMPARE
-          (inst beq temp DONE)
+          (inst ,(if not-p 'beq 'bne) temp DONE)
           (move res null-tn t)
           (load-symbol res t)
 
           DONE)))
 
-  (define-cond-assem-rtn generic-< < two-arg-< (inst slt temp x y))
-  (define-cond-assem-rtn generic-> > two-arg-> (inst slt temp y x)))
+  (define-cond-assem-rtn generic-< < two-arg-< (inst slt temp x y) t)
+  (define-cond-assem-rtn generic-<= <= two-arg-<= (inst slt temp x y) nil)
+  (define-cond-assem-rtn generic-> > two-arg-> (inst slt temp y x) t)
+  (define-cond-assem-rtn generic->= >= two-arg->= (inst slt temp y x) nil))
 
 
 (define-assembly-routine (generic-eql
