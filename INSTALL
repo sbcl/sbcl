@@ -245,12 +245,12 @@ INSTALLING SBCL
     Tru64                            X
     Darwin (Mac OS X)           X
 
-    Some operating systems are more equal then others: most of the
+    Some operating systems are more equal than others: most of the
     development and testing is done on x86 Linux and *BSD, PPC Linux
     and Mac OS X.
 
     If an underprivileged platform is important to you, you can help
-    by eg. testing during the monthly freeze periods, and most
+    by e.g. testing during the monthly freeze periods, and most
     importantly by reporting any problems.
 
     If you need support beyond what is available on the mailing lists,

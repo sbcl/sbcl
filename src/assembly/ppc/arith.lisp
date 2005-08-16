@@ -199,7 +199,7 @@
               `((inst srawi x x 2)))
           (inst mullw res x y))))
   (frob unsigned-* "unsigned *" 40 unsigned-num unsigned-reg)
-  (frob signed-* "unsigned *" 41 signed-num signed-reg)
+  (frob signed-* "signed *" 41 signed-num signed-reg)
   (frob fixnum-* "fixnum *" 30 tagged-num any-reg))
 
 

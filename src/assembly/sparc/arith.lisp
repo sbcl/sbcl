@@ -256,7 +256,7 @@
             (inst mulscc temp zero-tn)
            (inst rdy res))))))
   (frob unsigned-* "unsigned *" 40 unsigned-num unsigned-reg)
-  (frob signed-* "unsigned *" 41 signed-num signed-reg)
+  (frob signed-* "signed *" 41 signed-num signed-reg)
   (frob fixnum-* "fixnum *" 30 tagged-num any-reg))
 
 
