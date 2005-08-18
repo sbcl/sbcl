@@ -176,14 +176,14 @@
     (cond
       ((< unix-time (- (ash 1 31)))
        (multiple-value-bind (year offset) (years-since-mar-2000 utime)
-	 (declare (ignore year))
-	 (+  +mar-1-1903+  (- unix-to-universal-time)  offset)))
+         (declare (ignore year))
+         (+  +mar-1-1903+  (- unix-to-universal-time)  offset)))
       ((>= unix-time (ash 1 31))
        (multiple-value-bind (year offset) (years-since-mar-2000 utime)
-	 (declare (ignore year))
-	 (+  +mar-1-2035+  (- unix-to-universal-time)  offset)))
+         (declare (ignore year))
+         (+  +mar-1-2035+  (- unix-to-universal-time)  offset)))
       (t unix-time))))
-  
+
 (defun decode-universal-time (universal-time &optional time-zone)
   #!+sb-doc
   "Converts a universal-time to decoded time format returning the following
@@ -266,10 +266,10 @@
            (type (integer 1 31) date)
            (type (integer 1 12) month)
            (type (or (integer 0 99) (integer 1899)) year)
-	   ;; that type used to say (integer 1900), but that's
-	   ;; incorrect when a time-zone is specified: we should be
-	   ;; able to encode to produce 0 when a non-zero timezone is
-	   ;; specified - bem, 2005-08-09
+           ;; that type used to say (integer 1900), but that's
+           ;; incorrect when a time-zone is specified: we should be
+           ;; able to encode to produce 0 when a non-zero timezone is
+           ;; specified - bem, 2005-08-09
            (type (or null rational) time-zone))
   (let* ((year (if (< year 100)
                    (pick-obvious-year year)
@@ -281,7 +281,7 @@
                       (leap-years-before year))
                   (* (- year 1900) 365)))
          (hours (+ hour (* days 24)))
-	 (encoded-time 0))
+         (encoded-time 0))
     (if time-zone
         (setf encoded-time (+ second (* (+ minute (* (+ hours time-zone) 60)) 60)))
         (let* ((secwest-guess

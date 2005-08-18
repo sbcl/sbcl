@@ -93,7 +93,7 @@
 #!+linux
 (progn
   (def!constant dynamic-0-space-start #x40000000)
-  (def!constant dynamic-0-space-end   #x47fff000)  
+  (def!constant dynamic-0-space-end   #x47fff000)
   (def!constant dynamic-1-space-start #x48000000)
   (def!constant dynamic-1-space-end   #x4ffff000))
 

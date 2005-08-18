@@ -356,7 +356,7 @@
 (defun optimizing-generator (ctor ii-methods si-methods)
   (multiple-value-bind (locations names body before-method-p)
       (fake-initialization-emf ctor ii-methods si-methods)
-    (values 
+    (values
      `(lambda ,(make-ctor-parameter-list ctor)
        (declare #.*optimize-speed*)
        ,(wrap-in-allocate-forms ctor body before-method-p))
@@ -596,7 +596,7 @@
                                  ,(case type
                                     (constant `',(eval value))
                                     ((param var) `,value)
-                                    (initfn `(funcall ,value)))) 
+                                    (initfn `(funcall ,value))))
                   into class-init-forms
                   finally (return (values names locations class-init-forms)))
           (multiple-value-bind (vars bindings)
@@ -604,8 +604,8 @@
                     collect var into vars
                     collect `(,var (funcall ,initfn)) into bindings
                     finally (return (values vars bindings)))
-            (values locations names 
-                    bindings vars 
+            (values locations names
+                    bindings vars
                     (nreverse defaulting-initargs)
                     `(,@(delete nil instance-init-forms)
                       ,@class-init-forms))))))))
