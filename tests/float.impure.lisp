@@ -95,5 +95,24 @@
   (test atanh)
   (test exp))
 
+;;; Broken move-arg-double-float for non-rsp frame pointers on x86-64
+(defun test (y)
+  (declare (optimize speed))
+  (multiple-value-bind (x)
+      (labels ((aux (x)
+                 (declare (double-float x))
+                 (etypecase y
+                   (double-float
+                    nil)
+                   (fixnum
+                    (aux x))
+                   (complex
+                    (format t "y=~s~%" y)))
+                 (values x)))
+        (aux 2.0d0))
+    x))
+
+(assert (= (test 1.0d0) 2.0d0))
+
 ;;; success
 (quit :unix-status 104)

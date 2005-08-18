@@ -324,10 +324,7 @@
                                       (:double '((inst movsd ea x)))))
                            (let ((ea (make-ea
                                       :dword :base fp
-                                      :disp (- (* (+ (tn-offset y)
-                                                     ,(case format
-                                                            (:single 1)
-                                                            (:double 2) ))
+                                      :disp (- (* (1+ (tn-offset y))
                                                   n-word-bytes)))))
                              ,@(ecase format
                                  (:single '((inst movss ea x)))
