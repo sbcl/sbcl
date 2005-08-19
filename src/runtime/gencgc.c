@@ -3623,26 +3623,30 @@ garbage_collect_generation(int generation, int raise)
      * care to avoid SIG_DFL and SIG_IGN. */
     for_each_thread(th) {
         struct interrupt_data *data=th->interrupt_data;
-    for (i = 0; i < NSIG; i++) {
+        for (i = 0; i < NSIG; i++) {
             union interrupt_handler handler = data->interrupt_handlers[i];
-        if (!ARE_SAME_HANDLER(handler.c, SIG_IGN) &&
-            !ARE_SAME_HANDLER(handler.c, SIG_DFL)) {
+            if (!ARE_SAME_HANDLER(handler.c, SIG_IGN) &&
+                !ARE_SAME_HANDLER(handler.c, SIG_DFL)) {
                 scavenge((lispobj *)(data->interrupt_handlers + i), 1);
             }
         }
     }
+    /* Scavenge the function list for INTERRUPT-THREAD. */
+    for_each_thread(th) {
+        scavenge(&th->interrupt_fun,1);
+    }
     /* Scavenge the binding stacks. */
- {
-     struct thread *th;
-     for_each_thread(th) {
-         long len= (lispobj *)SymbolValue(BINDING_STACK_POINTER,th) -
-             th->binding_stack_start;
-         scavenge((lispobj *) th->binding_stack_start,len);
+    {
+        struct thread *th;
+        for_each_thread(th) {
+            long len= (lispobj *)SymbolValue(BINDING_STACK_POINTER,th) -
+                th->binding_stack_start;
+            scavenge((lispobj *) th->binding_stack_start,len);
 #ifdef LISP_FEATURE_SB_THREAD
-         /* do the tls as well */
-         len=fixnum_value(SymbolValue(FREE_TLS_INDEX,0)) -
-             (sizeof (struct thread))/(sizeof (lispobj));
-         scavenge((lispobj *) (th+1),len);
+            /* do the tls as well */
+            len=fixnum_value(SymbolValue(FREE_TLS_INDEX,0)) -
+                (sizeof (struct thread))/(sizeof (lispobj));
+            scavenge((lispobj *) (th+1),len);
 #endif
         }
     }

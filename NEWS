@@ -45,6 +45,7 @@ changes in sbcl-0.9.4 relative to sbcl-0.9.3:
     ** bug fix: lockup when compiled with gcc4
     ** bug fix: race that allows the gc to be triggered when gc is
        inhibited
+    ** buf fix: one less memory fault in INTERRUPT-THREAD, again
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** CALL-NEXT-METHOD signals an error (in safe code) when the call
        has arguments with a different set of applicable methods from
