@@ -227,7 +227,7 @@
                  (sb-thread:make-thread
                   (lambda ()
                     (loop repeat 25 do
-                          (sleep (random 2d0))
+                          (sleep (random 0.1d0))
                           (princ ".")
                           (force-output)
                           (sb-thread:interrupt-thread
@@ -244,7 +244,7 @@
   ;; pseudo-atomic atomicity
   (format t "new thread ~A~%" c)
   (dotimes (i 100)
-    (sleep (random 1d0))
+    (sleep (random 0.1d0))
     (interrupt-thread c
                       (lambda ()
                         (princ ".") (force-output)
@@ -276,10 +276,10 @@
                 (sb-impl::atomic-incf/symbol *interrupt-count*))))
     (setq *interrupt-count* 0)
     (dotimes (i 100)
-      (sleep (random 1d0))
+      (sleep (random 0.1d0))
       (interrupt-thread c func))
-    (sleep 1)
-    (assert (= 100 *interrupt-count*))
+    (format t "~&waiting for interrupts to arrive~%")
+    (loop until (= *interrupt-count* 100) do (sleep 0.1))
     (terminate-thread c)))
 
 (format t "~&interrupt count test done~%")
@@ -339,7 +339,7 @@
      (loop do
           (funcall fn)
           (let ((errno (sb-unix::get-errno)))
-            (sleep (random 1.0))
+            (sleep (random 0.1d0))
             (unless (eql errno reference-errno)
               (format t "Got errno: ~A (~A) instead of ~A~%"
                       errno

@@ -26,7 +26,7 @@
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
 
 int dynamic_values_bytes=4096*sizeof(lispobj);  /* same for all threads */
-struct thread *all_threads;
+struct thread * volatile all_threads;
 volatile lispobj all_threads_lock;
 extern struct interrupt_data * global_interrupt_data;
 extern int linux_no_threads_p;
@@ -109,10 +109,16 @@ new_thread_trampoline(struct thread *th)
     int result;
     function = th->unbound_marker;
     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
-    if(arch_os_thread_init(th)==0) return 1;
+    if(arch_os_thread_init(th)==0) {
+        /* FIXME: handle error */
+        lose("arch_os_thread_init failed\n");
+    }
 
     /* wait here until our thread is linked into all_threads: see below */
-    while(th->os_thread<1) sched_yield();
+    {
+        volatile os_thread_t *tid=&th->os_thread;
+        while(*tid<1) sched_yield();
+    }
 
     th->state=STATE_RUNNING;
     result = funcall0(function);
@@ -263,6 +269,7 @@ void link_thread(struct thread *th,os_thread_t kid_tid)
     protect_control_stack_guard_page(th,1);
     /* child will not start until this is set */
     th->os_thread=kid_tid;
+    FSHOW((stderr,"/created thread %lu\n",kid_tid));
 }
 
 void create_initial_thread(lispobj initial_function) {
@@ -289,6 +296,9 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     sigset_t newset,oldset;
     boolean r=1;
     sigemptyset(&newset);
+    /* Blocking deferrable signals is enough, since gc_stop_the_world
+     * waits until the child leaves STATE_STARTING. And why not let gc
+     * proceed as soon as possible? */
     sigaddset_deferrable(&newset);
     thread_sigmask(SIG_BLOCK, &newset, &oldset);
 
@@ -368,47 +378,78 @@ void reap_dead_thread(struct thread *th)
                   32*SIGSTKSZ);
 }
 
+/* Send the signo to os_thread, retry if the rt signal queue is
+ * full. */
+static int kill_thread_safely(os_thread_t os_thread, int signo)
+{
+    int r;
+    /* The man page does not mention EAGAIN as a valid return value
+     * for either pthread_kill or kill. But that's theory, this is
+     * practice. By waiting here we assume that the delivery of this
+     * signal is not necessary for the delivery of the signals in the
+     * queue. In other words, we _assume_ there are no deadlocks. */
+    while ((r=pthread_kill(os_thread,signo))==EAGAIN) {
+        /* wait a bit then try again in the hope of the rt signal
+         * queue not being full */
+        FSHOW_SIGNAL((stderr,"/rt signal queue full\n"));
+        /* FIXME: some kind of backoff (random, exponential) would be
+         * nice. */
+        sleep(1);
+    }
+    return r;
+}
+
 int interrupt_thread(struct thread *th, lispobj function)
 {
-    /* A thread may also become dead after this test. */
-    if ((th->state != STATE_DEAD)) {
-        /* In clone_threads, if A and B both interrupt C at
-         * approximately the same time, it does not matter: the
-         * second signal will be masked until the handler has
-         * returned from the first one.  In pthreads though, we
-         * can't put the knowledge of what function to call into
-         * the siginfo, so we have to store it in the destination
-         * thread, and do it in such a way that A won't clobber
-         * B's interrupt.  Hence this stupid linked list.
-         *
-         * This does depend on SIG_INTERRUPT_THREAD being queued
-         * (as POSIX RT signals are): we need to keep
-         * interrupt_fun data for exactly as many signals as are
-         * going to be received by the destination thread.
-         */
-        lispobj c=alloc_cons(function,NIL);
-        int kill_status;
-        /* interrupt_thread_handler locks this spinlock with
-         * interrupts blocked (it does so for the sake of
-         * arrange_return_to_lisp_function), so we must also block
-         * them or else SIG_STOP_FOR_GC and all_threads_lock will find
-         * a way to deadlock. */
-        sigset_t newset,oldset;
-        sigemptyset(&newset);
-        sigaddset_blockable(&newset);
-        thread_sigmask(SIG_BLOCK, &newset, &oldset);
-        get_spinlock(&th->interrupt_fun_lock,
-                     (long)arch_os_get_current_thread());
-        kill_status=thread_kill(th->os_thread,SIG_INTERRUPT_THREAD);
-        if(kill_status==0) {
-            ((struct cons *)native_pointer(c))->cdr=th->interrupt_fun;
-            th->interrupt_fun=c;
+    /* In clone_threads, if A and B both interrupt C at approximately
+     * the same time, it does not matter: the second signal will be
+     * masked until the handler has returned from the first one.  In
+     * pthreads though, we can't put the knowledge of what function to
+     * call into the siginfo, so we have to store it in the
+     * destination thread, and do it in such a way that A won't
+     * clobber B's interrupt.  Hence, this stupid linked list.
+     *
+     * This does depend on SIG_INTERRUPT_THREAD being queued (as POSIX
+     * RT signals are): we need to keep interrupt_fun data for exactly
+     * as many signals as are going to be received by the destination
+     * thread.
+     */
+    lispobj c=alloc_cons(function,NIL);
+    sigset_t newset,oldset;
+    sigemptyset(&newset);
+    /* interrupt_thread_handler locks this spinlock with blockables
+     * blocked (it does so for the sake of
+     * arrange_return_to_lisp_function), so we must also block them or
+     * else SIG_STOP_FOR_GC and all_threads_lock will find a way to
+     * deadlock. */
+    sigaddset_blockable(&newset);
+    thread_sigmask(SIG_BLOCK, &newset, &oldset);
+    if (th == arch_os_get_current_thread())
+        lose("cannot interrupt current thread");
+    get_spinlock(&th->interrupt_fun_lock,
+                 (long)arch_os_get_current_thread());
+    ((struct cons *)native_pointer(c))->cdr=th->interrupt_fun;
+    th->interrupt_fun=c;
+    release_spinlock(&th->interrupt_fun_lock);
+    thread_sigmask(SIG_SETMASK,&oldset,0);
+    /* Called from lisp with the thread object as a parameter. Thus,
+     * the object cannot be garbage collected and consequently reaped
+     * and joined. Because it's not joined, kill should work (even if
+     * the thread has died/exited). */
+    {
+        int status=kill_thread_safely(th->os_thread,SIG_INTERRUPT_THREAD);
+        if (status==0) {
+            return 0;
+        } else if (status==ESRCH) {
+            /* This thread has exited. */
+            th->interrupt_fun=NIL;
+            errno=ESRCH;
+            return -1;
+        } else {
+            lose("cannot send SIG_INTERRUPT_THREAD to thread=%lu: %d, %s",
+                 th->os_thread,status,strerror(status));
         }
-        release_spinlock(&th->interrupt_fun_lock);
-        thread_sigmask(SIG_SETMASK,&oldset,0);
-        return (kill_status ? -1 : 0);
     }
-    errno=EPERM; return -1;
 }
 
 /* stopping the world is a two-stage process.  From this thread we signal
@@ -423,6 +464,7 @@ int interrupt_thread(struct thread *th, lispobj function)
 void gc_stop_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
+    int status;
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock, thread=%lu\n",
                   th->os_thread));
     /* keep threads from starting while the world is stopped. */
@@ -433,14 +475,15 @@ void gc_stop_the_world()
     for(p=all_threads; p; p=p->next) {
         while(p->state==STATE_STARTING) sched_yield();
         if((p!=th) && (p->state==STATE_RUNNING)) {
-            FSHOW_SIGNAL((stderr, "/gc_stop_the_world: suspending %lu\n",
+            status=kill_thread_safely(p->os_thread,SIG_STOP_FOR_GC);
+            FSHOW_SIGNAL((stderr,"/gc_stop_the_world: suspending %lu\n",
                           p->os_thread));
-            if(thread_kill(p->os_thread,SIG_STOP_FOR_GC)==-1) {
-                /* we can't kill the thread; assume because it died
-                 * since we last checked */
-                p->state=STATE_DEAD;
-                FSHOW_SIGNAL((stderr,"/gc_stop_the_world:assuming %lu dead\n",
-                   p->os_thread));
+            if (status==ESRCH) {
+                /* This thread has exited. */
+                gc_assert(p->state==STATE_DEAD);
+            } else if (status) {
+                lose("cannot send suspend thread=%lu: %d, %s",
+                     p->os_thread,status,strerror(status));
             }
         }
     }
@@ -462,6 +505,7 @@ void gc_stop_the_world()
 void gc_start_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
+    int status;
     /* if a resumed thread creates a new thread before we're done with
      * this loop, the new thread will get consed on the front of
      * all_threads, but it won't have been stopped so won't need
@@ -477,9 +521,17 @@ void gc_start_the_world()
             FSHOW_SIGNAL((stderr, "/gc_start_the_world: resuming %lu\n",
                           p->os_thread));
             p->state=STATE_RUNNING;
-            thread_kill(p->os_thread,SIG_STOP_FOR_GC);
+            status=kill_thread_safely(p->os_thread,SIG_STOP_FOR_GC);
+            if (status) {
+                lose("cannot resume thread=%lu: %d, %s",
+                     p->os_thread,status,strerror(status));
+            }
         }
     }
+    /* If we waited here until all threads leave STATE_SUSPENDED, then
+     * SIG_STOP_FOR_GC wouldn't need to be a rt signal. That has some
+     * performance implications, but does away with the 'rt signal
+     * queue full' problem. */
     release_spinlock(&all_threads_lock);
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:end\n"));
 }

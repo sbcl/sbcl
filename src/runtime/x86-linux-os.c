@@ -98,7 +98,7 @@ int arch_os_thread_init(struct thread *thread) {
     if (modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) {
         modify_ldt_lock=0;
         /* modify_ldt call failed: something magical is not happening */
-        return -1;
+        return 0;
     }
     __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
                           ((n << 3) /* selector number */
@@ -117,10 +117,8 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_sp=((void *) thread)+dynamic_values_bytes;
     sigstack.ss_flags=0;
     sigstack.ss_size = 32*SIGSTKSZ;
-    sigaltstack(&sigstack,0);
-    if(sigaltstack(&sigstack,0)<0) {
+    if(sigaltstack(&sigstack,0)<0)
         lose("Cannot sigaltstack: %s\n",strerror(errno));
-    }
 #endif
     return 1;
 }

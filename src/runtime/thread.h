@@ -31,7 +31,7 @@ union per_thread_data {
     lispobj dynamic_values[1];  /* actually more like 4000 or so */
 };
 
-extern struct thread *all_threads;
+extern struct thread * volatile all_threads;
 extern int dynamic_values_bytes;
 
 #ifdef LISP_FEATURE_SB_THREAD
