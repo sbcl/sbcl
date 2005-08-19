@@ -341,7 +341,7 @@
 
 ;;; A list of TN's describing the register arguments.
 ;;;
-(defparameter register-arg-tns
+(defparameter *register-arg-tns*
   (mapcar #'(lambda (n)
               (make-random-tn :kind :normal
                               :sc (sc-or-lose 'descriptor-reg)

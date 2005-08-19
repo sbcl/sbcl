@@ -630,13 +630,15 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
     struct thread *thread=arch_os_get_current_thread();
+    struct interrupt_data *data=
+        thread ? thread->interrupt_data : global_interrupt_data;
 
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif
     check_blockables_blocked_or_lose();
     check_interrupts_enabled_or_lose(context);
-    (*thread->interrupt_data->interrupt_low_level_handlers[signal])
+    (*data->interrupt_low_level_handlers[signal])
         (signal, info, void_context);
 #ifdef LISP_FEATURE_DARWIN
     /* Work around G5 bug */
@@ -649,7 +651,8 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     struct thread *thread=arch_os_get_current_thread();
-    struct interrupt_data *data=thread->interrupt_data;
+    struct interrupt_data *data=
+        thread ? thread->interrupt_data : global_interrupt_data;
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif

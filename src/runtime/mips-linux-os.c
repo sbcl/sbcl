@@ -37,6 +37,9 @@
 /* for cacheflush() */
 #include <sys/cachectl.h>
 
+/* for BD_CAUSE */
+#include <asm/mipsregs.h>
+
 #include "validate.h"
 
 size_t os_vm_page_size;
@@ -82,6 +85,7 @@ unsigned int
 os_context_fp_control(os_context_t *context)
 {
     /* FIXME: Probably do something. */
+    return 0;
 }
 
 void
@@ -101,12 +105,34 @@ os_context_bd_cause(os_context_t *context)
        loop" where a (BREAK 16) not in a branch delay slot would have
        CAUSEF_BD filled. So, we comment
 
-        #include <asm/mipsregs.h>
-
         return (((struct sigcontext *) &(context->uc_mcontext))->sc_cause
                 & CAUSEF_BD);
 
        out and return 0 always.  -- CSR, 2002-09-02 */
+    /* Unfortunately, returning 0 fails for taken branches because
+       os_context_bd_cause is also used to find out if a branch
+       emulation is needed.  We work around that by checking if the
+       current instruction is a jump or a branch.  */
+    unsigned int inst = *((unsigned int *)(unsigned int)(*os_context_pc_addr(context)));
+
+    switch (inst >> 26) {
+    case 0x0: /* immediate jumps */
+        switch (inst & 0x3f) {
+        case 0x08:
+        case 0x09:
+            return CAUSEF_BD;
+        }
+        break;
+    /* branches and register jumps */
+    case 0x1:
+    case 0x2:
+    case 0x3:
+    case 0x4:
+    case 0x5:
+    case 0x6:
+    case 0x7:
+        return CAUSEF_BD;
+    }
     return 0;
 }
 

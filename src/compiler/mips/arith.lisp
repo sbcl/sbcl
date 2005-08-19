@@ -937,7 +937,7 @@
   (:generator 1
     (sc-case res
       (any-reg
-       (inst sll res digit 2))
+       (inst sll res digit n-fixnum-tag-bits))
       (signed-reg
        (move res digit)))))
 

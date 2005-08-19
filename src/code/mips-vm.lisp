@@ -1,6 +1,8 @@
 (in-package "SB!VM")
+
 
 (define-alien-type os-context-t (struct os-context-t-struct))
+
 
 ;;;; MACHINE-TYPE and MACHINE-VERSION
 
@@ -12,6 +14,7 @@
 (defun get-machine-version ()
   #!+little-endian "little-endian"
   #!-little-endian "big-endian")
+
 
 ;;;; FIXUP-CODE-OBJECT
 
@@ -100,36 +103,23 @@
   (let ((pc (context-pc context))
         (cause (context-bd-cause-int context)))
     (declare (type system-area-pointer pc))
-    (/show0 "got PC=..")
-    (/hexstr (sap-int pc))
     ;; KLUDGE: This exposure of the branch delay mechanism hurts.
     (when (logbitp 31 cause)
       (setf pc (sap+ pc 4)))
-    (when (= (sap-ref-8 pc 4) 255)
-      (setf pc (sap+ pc 1)))
-    (/show0 "now PC=..")
-    (/hexstr (sap-int pc))
-    (let* ((length (sap-ref-8 pc 4))
-           (vector (make-array length :element-type '(unsigned-byte 8))))
-      (declare (type (unsigned-byte 8) length)
-               (type (simple-array (unsigned-byte 8) (*)) vector))
-      (/show0 "LENGTH,VECTOR,ERROR-NUMBER=..")
-      (/hexstr length)
-      (/hexstr vector)
-      (copy-ub8-from-system-area pc 5 vector 0 length)
-      (let* ((index 0)
-             (error-number (sb!c:read-var-integer vector index)))
-        (/hexstr error-number)
-        (collect ((sc-offsets))
-         (loop
-          (/show0 "INDEX=..")
-          (/hexstr index)
-          (when (>= index length)
-            (return))
-          (sc-offsets (sb!c:read-var-integer vector index)))
-         (values error-number (sc-offsets)))))))
+    (args-for-unimp-inst pc)))
 
-
-
-
-
+(defun args-for-unimp-inst (pc)
+  (declare (type system-area-pointer pc))
+  (let* ((length (sap-ref-8 pc 4))
+         (vector (make-array length :element-type '(unsigned-byte 8))))
+    (declare (type (unsigned-byte 8) length)
+             (type (simple-array (unsigned-byte 8) (*)) vector))
+    (copy-ub8-from-system-area pc 5 vector 0 length)
+    (let* ((index 0)
+           (error-number (sb!c:read-var-integer vector index)))
+      (collect ((sc-offsets))
+               (loop
+                (when (>= index length)
+                  (return))
+                (sc-offsets (sb!c:read-var-integer vector index)))
+               (values error-number (sc-offsets))))))

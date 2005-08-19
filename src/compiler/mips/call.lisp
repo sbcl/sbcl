@@ -140,7 +140,7 @@
     (trace-table-entry trace-table-fun-prologue)
     (emit-label start-lab)
     ;; Allocate function header.
-    (inst fun-header-word)
+    (inst simple-fun-header-word)
     (dotimes (i (1- simple-fun-code-offset))
       (inst word 0))
     ;; The start of the actual code.
@@ -365,23 +365,25 @@ default-value-8
     (when lra-label
       (inst compute-code-from-lra code-tn code-tn lra-label temp))
     (inst addu csp-tn csp-tn 4)
-    (storew (first register-arg-tns) csp-tn -1)
+    (storew (first *register-arg-tns*) csp-tn -1)
     (inst addu start csp-tn -4)
     (inst li count (fixnumize 1))
 
     (emit-label done)
 
     (assemble (*elsewhere*)
+      (trace-table-entry trace-table-fun-prologue)
       (emit-label variable-values)
       (when lra-label
         (inst compute-code-from-lra code-tn code-tn lra-label temp))
-      (do ((arg register-arg-tns (rest arg))
+      (do ((arg *register-arg-tns* (rest arg))
            (i 0 (1+ i)))
           ((null arg))
         (storew (first arg) args i))
       (move start args)
       (inst b done)
-      (move count nargs t)))
+      (move count nargs t)
+      (trace-table-entry trace-table-normal)))
   (values))
 
 
@@ -1091,7 +1093,7 @@ default-value-8
           ;; Is this the last one?
           (inst beq count done)
           ;; Store it relative to the pointer saved at the start.
-          (storew (nth i register-arg-tns) result (- i fixed))
+          (storew (nth i *register-arg-tns*) result (- i fixed))
           ;; Decrement count.
           (inst subu count (fixnumize 1))))
       (emit-label done))))

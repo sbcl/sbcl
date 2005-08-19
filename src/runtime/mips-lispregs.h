@@ -51,6 +51,3 @@
     reg_A0, reg_A1, reg_A2, reg_A3, reg_A4, reg_A5, reg_FDEFN, reg_LEXENV, \
     reg_NFP, reg_OCFP, reg_LRA, reg_L0, reg_L1, reg_CODE \
 }
-
-#define SC_REG(sc, n) ((sc)->sc_regs[n])
-#define SC_PC(sc) ((sc)->sc_pc)

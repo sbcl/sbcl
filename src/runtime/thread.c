@@ -75,7 +75,7 @@ void check_sig_stop_for_gc_can_arrive_or_lose()
 extern lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs);
 #endif
 
-int
+static int
 initial_thread_trampoline(struct thread *th)
 {
     lispobj function;
@@ -256,7 +256,8 @@ struct thread * create_thread_struct(lispobj initial_function) {
     return th;
 }
 
-void link_thread(struct thread *th,os_thread_t kid_tid)
+static void
+link_thread(struct thread *th,os_thread_t kid_tid)
 {
     if (all_threads) all_threads->prev=th;
     th->next=all_threads;

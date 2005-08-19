@@ -48,7 +48,6 @@ lispobj *new_space_free_pointer;
 
 static void scavenge_newspace(void);
 static void scavenge_interrupt_contexts(void);
-extern struct interrupt_data * global_interrupt_data;
 
 extern unsigned long bytes_consed_between_gcs;
 
@@ -125,8 +124,7 @@ collect_garbage(unsigned ignore)
     unsigned long control_stack_size, binding_stack_size;
     sigset_t tmp, old;
     struct thread *th=arch_os_get_current_thread();
-    struct interrupt_data *data=
-        th ? th->interrupt_data : global_interrupt_data;
+    struct interrupt_data *data=th->interrupt_data;
 
 
 #ifdef PRINTNOISE

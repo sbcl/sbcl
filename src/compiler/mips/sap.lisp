@@ -15,9 +15,9 @@
 
 ;;; Move a tagged SAP to an untagged representation.
 (define-vop (move-to-sap)
-  (:args (x :scs (descriptor-reg)))
+  (:args (x :scs (any-reg descriptor-reg)))
   (:results (y :scs (sap-reg)))
-  (:note "system area pointer indirection")
+  (:note "pointer to SAP coercion")
   (:generator 1
     (loadw y x sap-pointer-slot other-pointer-lowtag)))
 
@@ -26,27 +26,26 @@
 
 ;;; Move an untagged SAP to a tagged representation.
 (define-vop (move-from-sap)
-  (:args (x :scs (sap-reg) :target sap))
-  (:temporary (:scs (sap-reg) :from (:argument 0)) sap)
+  (:args (sap :scs (sap-reg) :to :save))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
-  (:results (y :scs (descriptor-reg)))
-  (:note "system area pointer allocation")
+  (:results (res :scs (descriptor-reg)))
+  (:note "SAP to pointer coercion")
   (:generator 20
-    (move sap x)
-    (with-fixed-allocation (y pa-flag ndescr sap-widetag sap-size)
-      (storew sap y sap-pointer-slot other-pointer-lowtag))))
+    (with-fixed-allocation (res pa-flag ndescr sap-widetag sap-size)
+      (storew sap res sap-pointer-slot other-pointer-lowtag))))
 
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))
 
-;;; Move untagged sap values.
+;;; Move untagged SAP values.
 (define-vop (sap-move)
   (:args (x :target y
             :scs (sap-reg)
             :load-if (not (location= x y))))
   (:results (y :scs (sap-reg)
                :load-if (not (location= x y))))
+  (:note "SAP move")
   (:effects)
   (:affected)
   (:generator 0
@@ -55,13 +54,14 @@
 (define-move-vop sap-move :move
   (sap-reg) (sap-reg))
 
-;;; Move untagged sap arguments/return-values.
+;;; Move untagged SAP arguments/return-values.
 (define-vop (move-sap-arg)
   (:args (x :target y
             :scs (sap-reg))
          (fp :scs (any-reg)
              :load-if (not (sc-is y sap-reg))))
   (:results (y))
+  (:note "SAP argument move")
   (:generator 0
     (sc-case y
       (sap-reg
@@ -72,7 +72,7 @@
 (define-move-vop move-sap-arg :move-arg
   (descriptor-reg sap-reg) (sap-reg))
 
-;;; Use standard MOVE-ARG + coercion to move an untagged sap to a
+;;; Use standard MOVE-ARG + coercion to move an untagged SAP to a
 ;;; descriptor passing location.
 (define-move-vop move-arg :move-arg
   (sap-reg) (descriptor-reg))
@@ -323,31 +323,37 @@
   (deftransform sap-ref-64 ((sap offset) (* *))
     '(logior (sap-ref-32 sap offset)
              (ash (sap-ref-32 sap (+ offset 4)) 32)))
+
   (deftransform signed-sap-ref-64 ((sap offset) (* *))
     '(logior (sap-ref-32 sap offset)
              (ash (signed-sap-ref-32 sap (+ offset 4)) 32)))
+
   (deftransform %set-sap-ref-64 ((sap offset value) (* * *))
     '(progn
        (%set-sap-ref-32 sap offset (logand value #xffffffff))
        (%set-sap-ref-32 sap (+ offset 4) (ash value -32))))
+
   (deftransform %set-signed-sap-ref-64 ((sap offset value) (* * *))
     '(progn
        (%set-sap-ref-32 sap offset (logand value #xffffffff))
        (%set-signed-sap-ref-32 sap (+ offset 4) (ash value -32)))))
+
 #!-little-endian
 (progn
   (deftransform sap-ref-64 ((sap offset) (* *))
     '(logior (ash (sap-ref-32 sap offset) 32)
              (sap-ref-32 sap (+ offset 4))))
+
   (deftransform signed-sap-ref-64 ((sap offset) (* *))
     '(logior (ash (signed-sap-ref-32 sap offset) 32)
              (sap-ref-32 sap (+ 4 offset))))
+
   (deftransform %set-sap-ref-64 ((sap offset value) (* * *))
     '(progn
        (%set-sap-ref-32 sap offset (ash value -32))
        (%set-sap-ref-32 sap (+ offset 4) (logand value #xffffffff))))
+
   (deftransform %set-signed-sap-ref-64 ((sap offset value) (* * *))
     '(progn
        (%set-signed-sap-ref-32 sap offset (ash value -32))
        (%set-sap-ref-32 sap (+ 4 offset) (logand value #xffffffff)))))
-

@@ -35,9 +35,30 @@ arch_get_bad_addr(int signam, siginfo_t *siginfo, os_context_t *context)
     /* Classic CMUCL comment:
 
        Finding the bad address on the mips is easy. */
-    return (os_vm_address_t) siginfo->si_addr;
+    return (os_vm_address_t)siginfo->si_addr;
 }
 
+static inline unsigned int
+os_context_register(os_context_t *context, int offset)
+{
+    return (unsigned int)(*os_context_register_addr(context, offset));
+}
+
+static inline unsigned int
+os_context_pc(os_context_t *context)
+{
+    return (unsigned int)(*os_context_pc_addr(context));
+}
+
+static inline unsigned int
+os_context_insn(os_context_t *context)
+{
+    return *(unsigned int *)(os_context_pc(context));
+}
+
+/* This function is somewhat misnamed, it actually just jumps to the
+   correct target address without attempting to execute the delay slot.
+   For other instructions it just increments the returned PC value. */
 static unsigned int
 emulate_branch(os_context_t *context, unsigned int inst)
 {
@@ -46,64 +67,69 @@ emulate_branch(os_context_t *context, unsigned int inst)
     unsigned int r2 = (inst >> 16) & 0x1f;
     unsigned int r3 = (inst >> 11) & 0x1f;
     unsigned int disp = ((inst&(1<<15)) ? inst | (-1 << 16) : inst&0x7fff) << 2;
-    unsigned int jtgt = (*os_context_pc_addr(context) & ~0x0fffffff) | (inst&0x3ffffff) << 2;
-    unsigned int tgt = *os_context_pc_addr(context);
+    unsigned int jtgt = (os_context_pc(context) & ~0x0fffffff) | (inst&0x3ffffff) << 2;
+    unsigned int tgt = os_context_pc(context);
 
     switch(opcode) {
     case 0x0: /* jr, jalr */
         switch(inst & 0x3f) {
         case 0x08: /* jr */
-            tgt = *os_context_register_addr(context, r1);
+            tgt = os_context_register(context, r1);
             break;
         case 0x09: /* jalr */
-            tgt = *os_context_register_addr(context, r1);
+            tgt = os_context_register(context, r1);
             *os_context_register_addr(context, r3)
-                = *os_context_pc_addr(context) + 4;
+                = os_context_pc(context) + 4;
+            break;
+        default:
+            tgt += 4;
             break;
         }
         break;
     case 0x1: /* bltz, bgez, bltzal, bgezal */
         switch((inst >> 16) & 0x1f) {
         case 0x00: /* bltz */
-            if(*os_context_register_addr(context, r1) < 0)
+            if(os_context_register(context, r1) < 0)
                 tgt += disp;
             break;
         case 0x01: /* bgez */
-            if(*os_context_register_addr(context, r1) >= 0)
+            if(os_context_register(context, r1) >= 0)
                 tgt += disp;
             break;
         case 0x10: /* bltzal */
-            if(*os_context_register_addr(context, r1) < 0)
+            if(os_context_register(context, r1) < 0)
                 tgt += disp;
             *os_context_register_addr(context, 31)
-                = *os_context_pc_addr(context) + 4;
+                = os_context_pc(context) + 4;
             break;
         case 0x11: /* bgezal */
-            if(*os_context_register_addr(context, r1) >= 0)
+            if(os_context_register(context, r1) >= 0)
                 tgt += disp;
             *os_context_register_addr(context, 31)
-                = *os_context_pc_addr(context) + 4;
+                = os_context_pc(context) + 4;
+            break;
+	default: /* conditional branches/traps for > MIPS I, ignore for now. */
             break;
         }
         break;
     case 0x4: /* beq */
-        if(*os_context_register_addr(context, r1)
-           == *os_context_register_addr(context, r2))
+        if(os_context_register(context, r1)
+           == os_context_register(context, r2))
             tgt += disp;
         break;
     case 0x5: /* bne */
-        if(*os_context_register_addr(context, r1)
-           != *os_context_register_addr(context, r2))
+        if(os_context_register(context, r1)
+           != os_context_register(context, r2))
             tgt += disp;
         break;
     case 0x6: /* blez */
-        if(*os_context_register_addr(context, r1)
-           <= *os_context_register_addr(context, r2))
+        if(os_context_register(context, r1)
+           <= os_context_register(context, r2))
             tgt += disp;
         break;
     case 0x7: /* bgtz */
-        if(*os_context_register_addr(context, r1)
-           > *os_context_register_addr(context, r2))
+        if(os_context_register(context, r1)
+           > os_context_register(context, r2))
             tgt += disp;
         break;
     case 0x2: /* j */
@@ -112,7 +138,10 @@ emulate_branch(os_context_t *context, unsigned int inst)
     case 0x3: /* jal */
         tgt = jtgt;
         *os_context_register_addr(context, 31)
-            = *os_context_pc_addr(context) + 4;
+            = os_context_pc(context) + 4;
+        break;
+    default:
+        tgt += 4;
         break;
     }
     return tgt;
@@ -122,33 +151,23 @@ void
 arch_skip_instruction(os_context_t *context)
 {
     /* Skip the offending instruction */
-    if (os_context_bd_cause(context)) {
-        /* Currently, we never get here, because Linux' support for
-           bd_cause seems not terribly solid (c.f os_context_bd_cause
-           in mips-linux-os.c).  If a port to Irix comes along, this
-           code will be executed, because presumably Irix' support is
-           better (it can hardly be worse).  We lose() to remind the
-           porter to review this code.  -- CSR, 2002-09-06 */
-        lose("bd_cause branch taken; review code for new OS?\n");
-        *os_context_pc_addr(context)
-            = emulate_branch(context, *os_context_pc_addr(context));
-    } else
-        *os_context_pc_addr(context) += 4;
+      *os_context_pc_addr(context)
+            = emulate_branch(context, os_context_insn(context));
 }
 
 unsigned char *
 arch_internal_error_arguments(os_context_t *context)
 {
     if (os_context_bd_cause(context))
-        return (unsigned char *)(*os_context_pc_addr(context) + 8);
+        return (unsigned char *)(os_context_pc(context) + 8);
     else
-        return (unsigned char *)(*os_context_pc_addr(context) + 4);
+        return (unsigned char *)(os_context_pc(context) + 4);
 }
 
 boolean
 arch_pseudo_atomic_atomic(os_context_t *context)
 {
-    return *os_context_register_addr(context, reg_ALLOC) & 1;
+    return os_context_register(context, reg_ALLOC) & 1;
 }
 
 void
@@ -161,8 +180,29 @@ unsigned long
 arch_install_breakpoint(void *pc)
 {
     unsigned int *ptr = (unsigned int *)pc;
-    unsigned long result = (unsigned long) *ptr;
+    unsigned long result;
 
+    /* Don't install over a branch/jump.  */
+    switch (*ptr >> 26) {
+    case 0x0: /* immediate jumps */
+        switch (*ptr & 0x3f) {
+        case 0x08:
+        case 0x09:
+            ptr++;
+        }
+        break;
+    /* branches and register jumps */
+    case 0x1:
+    case 0x2:
+    case 0x3:
+    case 0x4:
+    case 0x5:
+    case 0x6:
+    case 0x7:
+        ptr++;
+    }
+
+    result = (unsigned long) *ptr;
     *ptr = (trap_Breakpoint << 16) | 0xd;
     os_flush_icache((os_vm_address_t)ptr, sizeof(unsigned int));
 
@@ -184,10 +224,9 @@ static sigset_t orig_sigmask;
 void
 arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
-    unsigned int *pc = (unsigned int *)*os_context_pc_addr(context);
+    unsigned int *pc = (unsigned int *)os_context_pc(context);
     unsigned int *break_pc, *next_pc;
     unsigned int next_inst;
-    int opcode;
 
     orig_sigmask = *os_context_sigmask_addr(context);
     sigaddset_blockable(os_context_sigmask_addr(context));
@@ -196,8 +235,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     if (os_context_bd_cause(context)) {
         break_pc = pc+1;
         next_inst = *pc;
-    }
-    else {
+    } else {
         break_pc = pc;
         next_inst = orig_inst;
     }
@@ -207,11 +245,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     skipped_break_addr = break_pc;
 
     /* Figure out where it goes. */
-    opcode = next_inst >> 26;
-    if (opcode == 1 || ((opcode & 0x3c) == 0x4) || ((next_inst & 0xf00e0000) == 0x80000000))
-        next_pc = (unsigned int *)emulate_branch(context, next_inst);
-    else
-        next_pc = pc+1;
+    next_pc = (unsigned int *)emulate_branch(context, next_inst);
 
     displaced_after_inst = arch_install_breakpoint(next_pc);
 }
@@ -229,9 +263,7 @@ static void
 sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    unsigned int code;
-
-    code = ((*(int *) (*os_context_pc_addr(context))) >> 16) & 0x1f;
+    unsigned int code = (os_context_insn(context) >> 16) & 0x1f;
 
     switch (code) {
     case trap_Halt:
@@ -245,7 +277,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 
     case trap_Error:
     case trap_Cerror:
-        interrupt_internal_error(signal, info, context, code==trap_Cerror);
+        interrupt_internal_error(signal, info, context, code == trap_Cerror);
         break;
 
     case trap_Breakpoint:
@@ -253,8 +285,9 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
         break;
 
     case trap_FunEndBreakpoint:
-        *os_context_pc_addr(context) = (int)handle_fun_end_breakpoint(signal, info, context);
-        os_flush_icache((os_vm_address_t)*os_context_pc_addr(context), sizeof(unsigned int));
+        *os_context_pc_addr(context)
+            = (os_context_register_t)(unsigned int)
+                handle_fun_end_breakpoint(signal, info, context);
         break;
 
     case trap_AfterBreakpoint:
@@ -284,13 +317,13 @@ sigfpe_handler(int signal, siginfo_t *info, void *void_context)
     unsigned int bad_inst;
     unsigned int op, rs, rt, rd, funct, dest = 32;
     int immed;
-    unsigned int result;
+    int result;
     os_context_t *context = arch_os_get_context(&void_context);
 
     if (os_context_bd_cause(context))
-        bad_inst = *(unsigned int *)(*os_context_pc_addr(context) + 4);
+        bad_inst = *(unsigned int *)(os_context_pc(context) + 4);
     else
-        bad_inst = *(unsigned int *)(*os_context_pc_addr(context));
+        bad_inst = os_context_insn(context);
 
     op = (bad_inst >> 26) & 0x3f;
     rs = (bad_inst >> 21) & 0x1f;
@@ -303,50 +336,43 @@ sigfpe_handler(int signal, siginfo_t *info, void *void_context)
     case 0x0: /* SPECIAL */
         switch (funct) {
         case 0x20: /* ADD */
-            /* FIXME: Hopefully, this whole section can just go away,
-               with the rewrite of pseudo-atomic and the deletion of
-               overflow VOPs */
-            /* Check to see if this is really a pa_interrupted hit */
-            if (rs == reg_ALLOC && rt == reg_NL4) {
-                *os_context_register_addr(context, reg_ALLOC)
-                    += *os_context_register_addr(context, reg_NL4) &= ~(-1LL<<31);
-                arch_skip_instruction(context);
-                interrupt_handle_pending(context);
-                return;
-            }
-            result = FIXNUM_VALUE(*os_context_register_addr(context, rs))
-                + FIXNUM_VALUE(*os_context_register_addr(context, rt));
+            result = FIXNUM_VALUE(os_context_register(context, rs))
+                + FIXNUM_VALUE(os_context_register(context, rt));
             dest = rd;
             break;
 
         case 0x22: /* SUB */
-            result = FIXNUM_VALUE(*os_context_register_addr(context, rs))
-                - FIXNUM_VALUE(*os_context_register_addr(context, rt));
+            result = FIXNUM_VALUE(os_context_register(context, rs))
+                - FIXNUM_VALUE(os_context_register(context, rt));
             dest = rd;
             break;
+
+        default:
+            interrupt_handle_now(signal, info, context);
+            return;
         }
         break;
 
     case 0x8: /* ADDI */
-        result = FIXNUM_VALUE(*os_context_register_addr(context,rs)) + (immed>>2);
+        result = FIXNUM_VALUE(os_context_register(context,rs))
+                    + (immed >> N_FIXNUM_TAG_BITS);
         dest = rt;
         break;
-    }
 
-    if (dest < 32) {
-        dynamic_space_free_pointer =
-            (lispobj *) *os_context_register_addr(context,reg_ALLOC);
-
-        *os_context_register_addr(context,dest) = alloc_number(result);
-
-        *os_context_register_addr(context, reg_ALLOC) =
-            (unsigned int) dynamic_space_free_pointer;
-
-        arch_skip_instruction(context);
-
-    }
-    else
+    default:
         interrupt_handle_now(signal, info, context);
+        return;
+    }
+
+    dynamic_space_free_pointer =
+        (lispobj *)(unsigned int)*os_context_register_addr(context,reg_ALLOC);
+
+    *os_context_register_addr(context,dest) = alloc_number(result);
+
+    *os_context_register_addr(context, reg_ALLOC) =
+        (unsigned int) dynamic_space_free_pointer;
+
+    arch_skip_instruction(context);
 }
 
 void

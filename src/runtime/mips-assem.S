@@ -358,19 +358,33 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	.word	NIL /* arglist */
 	.word	NIL /* type */
 	LEAF(undefined_tramp)
-        break	trap_Error
-        .byte	4
-        .byte	UNDEFINED_FUN_ERROR
-        .byte	254
-        .byte	(0xc0 + sc_DescriptorReg)
-        .byte	1
+	.set	noreorder
+	/* Continuable errors break here for some reason.
+	b	1f
+	 break	trap_Cerror */
+	break	trap_Error
+	/* Error data length. */
+	.byte	4
+	/* Error number. */
+	.byte	UNDEFINED_FUN_ERROR
+	/* Magic value 254 means a 16bit little endian value follows.
+	   See interr.c:describe_internal_error. */
+	.byte	254
+	/* reg_FDEFN is #14. */
+	.byte	((14 << 5) + sc_DescriptorReg) % 0x100
+	.byte	((14 << 5) + sc_DescriptorReg) / 0x100
 	.align	2
+	.set	reorder
+1:	lw	reg_LIP, FDEFN_RAW_ADDR_OFFSET(reg_FDEFN)
+	jr	reg_LIP
 	END(undefined_tramp)
 
 /*
  * The closure trampoline.
  */
- 	.align	2
+ 	.align	5 /* common MIPS cacheline size */
+	.word	0 /* pad 1 */
+	.word	0 /* pad 2 */
 	.word	SIMPLE_FUN_HEADER_WIDETAG /* header */
 	.word	closure_tramp - SIMPLE_FUN_CODE_OFFSET /* self */
 	.word	NIL /* next */
@@ -387,7 +401,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 /*
  * Function-end breakpoint magic.
  */
-	.align	3
+	.align	2
 	LEAF(fun_end_breakpoint_guts)
 	.set	noreorder
 	.word	RETURN_PC_HEADER_WIDETAG

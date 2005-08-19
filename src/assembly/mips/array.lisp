@@ -27,11 +27,11 @@
                           (:temp pa-flag non-descriptor-reg nl4-offset))
   ;; This is kinda sleezy, changing words like this.  But we can because
   ;; the vop thinks it is temporary.
-  (inst addu words (+ (1- (ash 1 n-lowtag-bits))
+  (inst addu words (+ lowtag-mask
                       (* vector-data-offset n-word-bytes)))
-  (inst li ndescr (lognot lowtag-mask))
-  (inst and words ndescr)
   (inst srl ndescr type word-shift)
+  (inst srl words n-lowtag-bits)
+  (inst sll words n-lowtag-bits)
 
   (pseudo-atomic (pa-flag)
     (inst or result alloc-tn other-pointer-lowtag)

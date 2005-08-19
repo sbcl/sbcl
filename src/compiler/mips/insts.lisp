@@ -1143,7 +1143,7 @@
                           (ash (+ posn (component-header-length))
                                (- n-widetag-bits word-shift)))))))
 
-(define-instruction fun-header-word (segment)
+(define-instruction simple-fun-header-word (segment)
   :pinned
   (:cost 0)
   (:delay 0)
@@ -1164,7 +1164,7 @@
    segment 12 3
    #'(lambda (segment posn delta-if-after)
        (let ((delta (funcall calc label posn delta-if-after)))
-          (when (<= (- (ash 1 15)) delta (1- (ash 1 15)))
+          (when (typep delta '(signed-byte 16))
             (emit-back-patch segment 4
                              #'(lambda (segment posn)
                                  (assemble (segment vop)
