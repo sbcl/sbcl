@@ -1,0 +1,140 @@
+@node Signal handling
+@comment  node-name,  next,  previous,  up
+@chapter Signal handling
+
+@menu
+* Groups of signals::           
+* The deferral mechanism::      
+* Implementation warts::        
+* Programming with signal handling in mind::  
+@end menu
+
+@node Groups of signals
+@section Groups of signals
+
+There are two distinct groups of signals.
+
+@subsection Semi-synchronous signals
+
+The first group, tentatively named ``semi-synchronous'', consists of
+signals that are raised on illegal instruction, hitting a protected
+page, or on a trap. Examples from this group are:
+@code{SIGBUS}/@code{SIGSEGV}, @code{SIGTRAP}, @code{SIGILL} and
+@code{SIGEMT}. The exact meaning and function of these signals varies
+by platform and OS. Understandably, because these signals are raised
+in a controllable manner they are never blocked or deferred.
+
+@subsection Blockable signals
+
+The other group is of blockable signals. Typically, signal handlers
+block them to protect against being interrupted at all. For example
+@code{SIGHUP}, @code{SIGINT}, @code{SIGQUIT} belong to this group.
+
+With the exception of @code{SIG_STOP_FOR_GC} all blockable signals are
+deferrable.
+
+@node The deferral mechanism
+@section The deferral mechanism
+
+@subsection Pseudo atomic sections
+
+Some operations, such as allocation, consist of several steps and
+temporarily break for instance gc invariants. Interrupting said
+operations is therefore dangerous to one's health. Blocking the
+signals for each allocation is out of question as the overhead of the
+two @code{sigsetmask} system calls would be enormous. Instead, pseudo
+atomic sections are implemented with a simple flag.
+
+When a deferrable signal is delivered to a thread within a pseudo
+atomic section the pseudo-atomic-interrupted flag is set, the signal
+and its context are stored, and all deferrable signals blocked. This
+is to guarantee that there is at most one pending handler in
+SBCL. While the signals are blocked, the responsibilty of keeping
+track of other pending signals lies with the OS.
+
+On leaving the pseudo atomic section, the pending handler is run and
+the signals are unblocked.
+
+@subsection @code{WITHOUT-INTERRUPTS}
+
+Similar to pseudo atomic, @code{WITHOUT-INTERRUPTS} defers deferrable
+signals in its thread until the end of its body, provided it is not
+nested in another @code{WITHOUT-INTERRUPTS}.
+
+Not so frequently used as pseudo atomic, @code{WITHOUT-INTERRUPTS}
+benefits less from the deferral mechanism.
+
+@subsection Stop the world
+
+Something of a special case, a signal that is blockable but not
+deferrable by @code{WITHOUT-INTERRUPTS} is @code{SIG_STOP_FOR_GC}. It
+is deferred by pseudo atomic and @code{WITHOUT-GCING}.
+
+@node Implementation warts
+@section Implementation warts
+
+@subsection RT signals
+
+Sending and receiving the same number of signals is crucial for
+@code{INTERRUPT-THREAD} and @code{sig_stop_for_gc}, hence they are
+real-time signals for which the kernel maintains a queue as opposed to
+just setting a flag for ``sigint pending''.
+
+Note, however, that the rt signal queue is finite and on current linux
+kernels a system wide resource. If the queue is full, SBCL tries to
+signal until it succeeds. This behaviour can lead to deadlocks, if a
+thread in a @code{WITHOUT-INTERRUPTS} is interrupted many times,
+filling up the queue and then a gc hits and tries to send
+@code{SIG_STOP_FOR_GC}.
+
+@subsection Miscellaneous issues
+
+Signal handlers should automatically restore errno and fp
+state. Currently, this is not the case.
+
+Furthormore, while @code{arrange_return_to_lisp_function} exits, most
+signal handlers invoke unsafe functions without hesitation: gc and all
+lisp level handlers think nothing of it.
+
+@node Programming with signal handling in mind
+@section Programming with signal handling in mind
+
+@subsection On reentrancy
+
+Since they might be invoked in the middle of just about anything,
+signal handlers must invoke only reentrant functions or async signal
+safe functions to be more precise. Functions passed to
+@code{INTERRUPT-THREAD} have the same restrictions and considerations
+as signal handlers.
+
+Destructive modification, and holding mutexes to protect desctructive
+modifications from interfering with each other are often the cause of
+non-reentrancy. Recursive locks are not likely to help, and while
+@code{WITHOUT-INTERRUPTS} is, it is considered untrendy to litter the
+code with it.
+
+Some basic functionality, such as streams and the debugger are
+intended to be reentrant, but not much effort has been spent on
+verifying it.
+
+@subsection More deadlocks
+
+If functions A and B directly or indirectly lock mutexes M and N, they
+should do so in the same order to avoid deadlocks.
+
+A less trivial scenario is where there is only one lock involved but
+it is acquired in a @code{WITHOUT-GCING} in thread A, and outside of
+@code{WITHOUT-GCING} in thread B. If thread A has entered
+@code{WITHOUT-GCING} but thread B has the lock when the gc hits, then
+A cannot leave @code{WITHOUT-GCING} because it is waiting for the lock
+the already suspended thread B has. From this scenario one can easily
+derive the rule: in a @code{WITHOUT-GCING} form (or pseudo atomic for
+that matter) never wait for another thread that's not in
+@code{WITHOUT-GCING}.
+
+@subsection Calling user code
+
+For the reasons above, calling user code, i.e. functions passed in, or
+in other words code that one cannot reason about, from non-reentrant
+code (holding locks), @code{WITHOUT-INTERRUPTS}, @code{WITHOUT-GCING}
+is dangerous and best avoided.

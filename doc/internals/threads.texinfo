@@ -1,0 +1,40 @@
+@node Threads
+@comment  node-name,  next,  previous,  up
+@chapter Threads
+
+@menu
+* Implementation (Linux x86)::  
+@end menu
+
+@node Implementation (Linux x86)
+@section Implementation (Linux x86/x86-64)
+
+Threading is implemented using pthreads and some Linux specific bits
+like futexes.
+
+On x86 the per-thread local bindings for special variables is achieved
+using the %fs segment register to point to a per-thread storage area.
+This may cause interesting results if you link to foreign code that
+expects threading or creates new threads, and the thread library in
+question uses %fs in an incompatible way. On x86-64 the r12 register
+has a similar role.
+
+Queues require the @code{sys_futex} system call to be available: this
+is the reason for the NPTL requirement.  We test at runtime that this
+system call exists.
+
+Garbage collection is done with the existing Conservative Generational
+GC.  Allocation is done in small (typically 8k) regions: each thread
+has its own region so this involves no stopping. However, when a
+region fills, a lock must be obtained while another is allocated, and
+when a collection is required, all processes are stopped.  This is
+achieved by sending them signals, which may make for interesting
+behaviour if they are interrupted in system calls.  The streams
+interface is believed to handle the required system call restarting
+correctly, but this may be a consideration when making other blocking
+calls e.g. from foreign library code.
+
+Large amounts of the SBCL library have not been inspected for
+thread-safety.  Some of the obviously unsafe areas have large locks
+around them, so compilation and fasl loading, for example, cannot be
+parallelized.  Work is ongoing in this area.
