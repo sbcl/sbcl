@@ -17,7 +17,22 @@
 #include "validate.h"
 #include "target-arch-os.h"
 
+#ifdef LISP_FEATURE_X86
+#include "genesis/static-symbols.h"
+#include "genesis/fdefn.h"
+#endif
+
+#ifdef LISP_FEATURE_GENCGC
+#include "gencgc-internal.h"
+#endif
+
+#if defined LISP_FEATURE_SPARC
 #define OS_VM_DEFAULT_PAGESIZE 8192
+#elif defined LISP_FEATURE_X86
+#define OS_VM_DEFAULT_PAGESIZE 4096
+#else
+#error "Don't know OS_VM_DEFAULT_PAGESIZE"
+#endif
 
 long os_vm_page_size=(-1);
 static long os_real_page_size=(-1);
@@ -161,8 +176,13 @@ boolean is_valid_lisp_addr(os_vm_address_t addr)
     struct thread *th;
     if(in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
        in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE) ||
+#ifdef LISP_FEATURE_GENCGC
+       in_range_p(addr, DYNAMIC_SPACE_START, DYNAMIC_SPACE_SIZE)
+#else
        in_range_p(addr, DYNAMIC_0_SPACE_START, DYNAMIC_SPACE_SIZE) ||
-       in_range_p(addr, DYNAMIC_1_SPACE_START, DYNAMIC_SPACE_SIZE))
+       in_range_p(addr, DYNAMIC_1_SPACE_START, DYNAMIC_SPACE_SIZE)
+#endif
+       )
         return 1;
     for_each_thread(th) {
         if((th->control_stack_start <= addr) && (addr < th->control_stack_end))
@@ -174,6 +194,30 @@ boolean is_valid_lisp_addr(os_vm_address_t addr)
 }
 
 
+#if defined LISP_FEATURE_GENCGC
+
+void
+sigsegv_handler(int signal, siginfo_t *info, void* void_context)
+{
+    os_context_t *context = arch_os_get_context(&void_context);
+    void* fault_addr = (void*)info->si_addr;
+    if(info->si_code == 1)
+    {
+        perror("error: SEGV_MAPERR\n");
+        exit(1);
+    }
+
+    if (!gencgc_handle_wp_violation(fault_addr))
+         if(!handle_guard_page_triggered(context, fault_addr))
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+            arrange_return_to_lisp_function(context,
+                                            SymbolFunction(MEMORY_FAULT_ERROR));
+#else
+    interrupt_handle_now(signal, info, context);
+#endif
+}
+
+#else
 
 static void
 sigsegv_handler(int signal, siginfo_t *info, void* void_context)
@@ -187,6 +231,8 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
             interrupt_handle_now(signal, info, context);
     }
 }
+
+#endif
 
 void
 os_install_interrupt_handlers()

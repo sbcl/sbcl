@@ -2111,3 +2111,8 @@ WORKAROUND:
 385:
   (format nil "~4,1F" 0.001) => "0.00" (should be " 0.0");
   (format nil "~4,1@F" 0.001) => "+.00" (should be "+0.0").
+
+386: SunOS/x86 stack exhaustion handling broken
+  According to <http://alfa.s145.xrea.com/sbcl/solaris-x86.html>, the
+  stack exhaustion checking (implemented with a write-protected guard
+  page) does not work on SunOS/x86.

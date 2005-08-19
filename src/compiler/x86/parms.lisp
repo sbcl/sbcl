@@ -161,6 +161,20 @@
   (def!constant linkage-table-space-start #x70000000)
   (def!constant linkage-table-space-end   #x7ffff000))
 
+#!+sunos
+(progn
+  (def!constant read-only-space-start     #x20000000)
+  (def!constant read-only-space-end       #x2ffff000)
+
+  (def!constant static-space-start        #x40000000)
+  (def!constant static-space-end          #x42fff000)
+
+  (def!constant dynamic-space-start       #x48000000)
+  (def!constant dynamic-space-end         #xA0000000)
+
+  (def!constant linkage-table-space-start #xA2000000)
+  (def!constant linkage-table-space-end   #xA3000000))
+
 #!+freebsd
 (progn
   (def!constant read-only-space-start     #x10000000)

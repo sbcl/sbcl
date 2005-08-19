@@ -65,7 +65,7 @@ static void  gencgc_pickup_dynamic(void);
 boolean enable_page_protection = 1;
 
 /* Should we unmap a page and re-mmap it to have it zero filled? */
-#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__sun)
 /* comment from cmucl-2.4.8: This can waste a lot of swap on FreeBSD
  * so don't unmap there.
  *
@@ -73,6 +73,8 @@ boolean enable_page_protection = 1;
  * old version of FreeBSD (pre-4.0), so this might no longer be true.
  * OTOH, if it is true, this behavior might exist on OpenBSD too, so
  * for now we don't unmap there either. -- WHN 2001-04-07 */
+/* Apparently this flag is required to be 0 for SunOS/x86, as there
+ * are reports of heap corruption otherwise. */
 boolean gencgc_unmap_zero = 0;
 #else
 boolean gencgc_unmap_zero = 1;

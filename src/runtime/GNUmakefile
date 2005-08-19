@@ -20,6 +20,7 @@ LD = ld
 LINKFLAGS = -g
 NM = nm -gp
 DEPEND_FLAGS = -MM
+GREP = grep
 
 CFLAGS = -g -Wall -O3
 ASFLAGS = $(CFLAGS)
@@ -52,7 +53,7 @@ sbcl: $(OBJS)
 	$(CC) ${LINKFLAGS} -o $@ $^ $(LIBS)
 
 sbcl.nm: sbcl
-	$(NM) sbcl | grep -v " F \| U " > ,$@
+	$(NM) sbcl | $(GREP) -v " F \| U " > ,$@
 	mv -f ,$@ $@
 
 sbcl.h: $(wildcard genesis/*.h)

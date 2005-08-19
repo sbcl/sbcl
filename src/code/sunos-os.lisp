@@ -62,4 +62,5 @@
   ;; FIXME: Or we could just get rid of this, since the uses of it look
   ;; disposable.
   ;; FIXME II: this could well be wrong
-  8192)
+  #!+sparc 8192
+  #!+x86 4096)

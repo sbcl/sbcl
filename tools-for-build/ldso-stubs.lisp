@@ -274,7 +274,7 @@ ldso_stub__ ## fct: ;                  \\
                    "dlsym")
                  #!+os-provides-dladdr
                  '("dladdr")
-                 #!-(and sparc sunos) ;; !defined(SVR4)
+                 #!-sunos ;; !defined(SVR4)
                  '("sigsetmask")))
 
 (with-open-file (f "src/runtime/ldso-stubs.S" :direction :output :if-exists :supersede)

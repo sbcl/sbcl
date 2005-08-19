@@ -583,6 +583,9 @@ Bruno Haible:
 Matthias Hoelzl:
   He reported and fixed COMPILE's misbehavior on macros.
 
+Daisuke Homma:
+  He added support for SunOS on x86 processors.
+
 Espen S Johnsen:
   He provided an ANSI-compliant version of CHANGE-CLASS for PCL.
 

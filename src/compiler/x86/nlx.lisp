@@ -214,6 +214,8 @@
     (inst movs :dword)
 
     DONE
+    ;; solaris requires DF being zero.
+    #!+sunos (inst cld)
     ;; Reset the CSP at last moved arg.
     (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))))
 

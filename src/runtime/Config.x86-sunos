@@ -1,0 +1,15 @@
+CC=gcc
+CFLAGS = -O2 -Wall -DSVR4
+ASFLAGS = -Wall -DSVR4
+LD = ld
+NM = nm -xgp
+GREP = ggrep
+
+ASSEM_SRC = x86-assem.S ldso-stubs.S
+ARCH_SRC = x86-arch.c
+
+OS_SRC = sunos-os.c x86-sunos-os.c os-common.c
+OS_LIBS= -ldl -lsocket -lnsl -lrt
+
+GC_SRC= gencgc.c
+

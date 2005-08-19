@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.4 relative to sbcl-0.9.3:
+  * new port: the Solaris operating system on x86 processors is now
+    mostly supported, though some rough edges in the environment
+    remain.  (thanks to Daisuke Homma)
   * enhancement: SBCL on MIPS platforms now has a much larger dynamic
     space for its heap.  (thanks to Thiemo Seufer)
   * minor incompatible change: eof selects abort in the debugger.

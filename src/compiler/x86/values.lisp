@@ -39,6 +39,8 @@
     (inst cmp esp-tn esi)
     (inst jmp :be loop)
     DONE
+    ;; solaris requires DF being zero.
+    #!+sunos (inst cld)
     (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))
     (inst sub edi esi)
     (loop for moved = moved-ptrs then (tn-ref-across moved)
@@ -147,5 +149,7 @@
     (inst push temp)
     (inst loop loop)
 
-    DONE))
+    DONE
+    ;; solaris requires DF being zero.
+    #!+sunos (inst cld)))
 

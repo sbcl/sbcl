@@ -55,6 +55,9 @@
   (inst rep)
   (inst movs :dword)
 
+  ;; solaris requires DF being zero.
+  #!+sunos (inst cld)
+
   ;; Restore the count.
   (inst mov ecx edx)
 
@@ -146,6 +149,9 @@
   (inst sub esi (fixnumize 1))
   (inst rep)
   (inst movs :dword)
+
+  ;; solaris requires DF being zero.
+  #!+sunos (inst cld)
 
   ;; Load the register arguments carefully.
   (loadw edx ebp-tn -1)
