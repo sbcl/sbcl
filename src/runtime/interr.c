@@ -43,7 +43,7 @@ set_lossage_handler(void handler(void))
     lossage_handler = handler;
 }
 
-never_returns
+void
 lose(char *fmt, ...)
 {
     va_list ap;

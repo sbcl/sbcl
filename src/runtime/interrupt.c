@@ -897,14 +897,18 @@ void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
      * thread interrupt execution is undefined. */
     struct thread *th=arch_os_get_current_thread();
     struct cons *c;
+    lispobj function;
     if (th->state != STATE_RUNNING)
-        lose("interrupt_thread_handler: thread %ld in wrong state: %d\n",
+        lose("interrupt_thread_handler: thread %lu in wrong state: %d\n",
              th->os_thread,fixnum_value(th->state));
     get_spinlock(&th->interrupt_fun_lock,(long)th);
     c=((struct cons *)native_pointer(th->interrupt_fun));
-    arrange_return_to_lisp_function(context,c->car);
+    function=c->car;
     th->interrupt_fun=c->cdr;
     release_spinlock(&th->interrupt_fun_lock);
+    if (function==NIL)
+        lose("interrupt_thread_handler: NIL function\n");
+    arrange_return_to_lisp_function(context,function);
 }
 
 #endif

@@ -16,7 +16,7 @@
  * here? (The answer wasn't obvious to me when merging the
  * architecture-abstracting patches for CSR's SPARC port. -- WHN 2002-02-15) */
 
-extern never_returns lose(char *fmt, ...);
+#include "interr.h"
 
 static inline void
 get_spinlock(volatile lispobj *word,long value)

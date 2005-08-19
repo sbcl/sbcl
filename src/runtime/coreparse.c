@@ -182,7 +182,7 @@ load_core_file(char *file)
 
                 FSHOW((stderr, "build_id[]=\"%s\"\n", build_id));
                 FSHOW((stderr, "remaining_len = %d\n", remaining_len));
-                if (remaining_len != strlen(build_id))
+                if (remaining_len != strlen((const char *)build_id))
                     goto losing_build_id;
                 for (i = 0; i < remaining_len; ++i) {
                     FSHOW((stderr, "ptr[%d] = char = %d, expected=%d\n",

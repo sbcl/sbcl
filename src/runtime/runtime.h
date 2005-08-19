@@ -148,11 +148,15 @@ typedef int boolean;
 
 /* KLUDGE: As far as I can tell there's no ANSI C way of saying
  * "this function never returns". This is the way that you do it
- * in GCC later than version 2.7 or so. If you are using some
- * compiler that doesn't understand this, you could could just
- * change it to "typedef void never_returns" and nothing would
- * break, though you might get a few more bytes of compiled code or
- * a few more compiler warnings. -- WHN 2000-10-21 */
-typedef volatile void never_returns;
+ * in GCC later than version 2.5 or so. */
+#if defined(__GNUC__)
+#if __GNUC_PREREQ(2,5)
+#define never_returns __attribute__ ((noreturn))
+#else
+#define never_returns
+#endif
+#else
+#define never_returns
+#endif
 
 #endif /* _SBCL_RUNTIME_H_ */

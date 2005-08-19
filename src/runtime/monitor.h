@@ -9,5 +9,5 @@
  * files for more information.
  */
 
-extern void throw_to_monitor(void);
-extern void monitor_or_something(void);
+extern void throw_to_monitor(void) never_returns;
+extern void monitor_or_something(void) never_returns;

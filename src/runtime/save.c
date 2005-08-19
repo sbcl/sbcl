@@ -131,10 +131,10 @@ save(char *filename, lispobj init_function)
     write_lispobj(/* (We're writing the word count of the entry here, and the 2
           * term is one word for the leading BUILD_ID_CORE_ENTRY_TYPE_CODE
           * word and one word where we store the count itself.) */
-         2 + strlen(build_id),
+         2 + strlen((const char *)build_id),
          file);
     {
-        char *p;
+        unsigned char *p;
         for (p = build_id; *p; ++p)
             write_lispobj(*p, file);
     }
