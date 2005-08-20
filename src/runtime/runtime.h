@@ -150,7 +150,7 @@ typedef int boolean;
  * "this function never returns". This is the way that you do it
  * in GCC later than version 2.5 or so. */
 #if defined(__GNUC__)
-#if __GNUC_PREREQ(2,5)
+#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 5)
 #define never_returns __attribute__ ((noreturn))
 #else
 #define never_returns
