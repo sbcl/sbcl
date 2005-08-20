@@ -416,12 +416,12 @@
   (alien-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (alien-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   #!+gencgc (alloc-region :c-type "struct alloc_region" :length 5)
-  (tls-cookie)                          ;  on x86, the LDT index
   (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (prev :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   ;; starting, running, suspended, dead
   (state :c-type "volatile lispobj")
+  (tls-cookie)                          ;  on x86, the LDT index
   #!+(or x86 x86-64) (pseudo-atomic-atomic)
   #!+(or x86 x86-64) (pseudo-atomic-interrupted)
   (interrupt-fun)

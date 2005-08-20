@@ -127,7 +127,6 @@
   (:info length stack-allocate-p)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (descriptor-reg)))
-  (:node-var node)
   (:generator 10
     (let* ((size (+ length closure-info-offset))
            (alloc-size (pad-data-block size)))
