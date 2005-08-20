@@ -196,7 +196,7 @@ cd $original_dir
 if [ "$sbcl_arch" = "x86" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
     printf ' :stack-allocatable-closures' >> $ltf
-    if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ] || [ "$sbcl_os" = "netbsd" ]; then
+    if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ] || [ "$sbcl_os" = "netbsd" ] || [ "$sbcl_os" = "sunos" ]; then
 	printf ' :linkage-table' >> $ltf
     fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
