@@ -16,6 +16,3 @@
 ;;; of SXHASH. The range of SXHASH is the non-negative fixnums.
 (assert (not (typep sb-impl::+magic-hash-vector-value+
                     '(and fixnum unsigned-byte))))
-
-;;; success
-(quit :unix-status 104)
