@@ -115,7 +115,7 @@ INSTALLING SBCL
   been installed under its default name "lisp") as the
   cross-compilation host:
 
-    $ sh make.sh 'lisp -batch'
+    $ sh make.sh 'lisp -batch -noinit'
 
   The build may take a long time, especially on older hardware. A
   successful build ends with a message beginning: "The build seems to
@@ -154,10 +154,8 @@ INSTALLING SBCL
                (pushnew x features))
              (disable (x)
                (setf features (remove x features))))
-        ;; Threading support, available on x86 Linux only.
-        (enable :sb-thread)
-        ;; Slightly smaller core
-        (disable :sb-doc)))
+        ;; Threading support, available on x86/x86-64 Linux only.
+        (enable :sb-thread)))
 
   This is the preferred way because it lets local changes interact
   cleanly with CVS changes to the main, global source tree.
@@ -176,7 +174,7 @@ INSTALLING SBCL
   Segfaults on Fedora
 
     Try disabling exec-shield. The easiest way is to use
-    setarch: "setarch i386 sbcl".
+    setarch: "setarch i386 -R sbcl".
 
   Build crashes mysteriously, machine becomes unstable, etc
 
@@ -211,7 +209,7 @@ INSTALLING SBCL
 
 2.5. Supported platforms 
 
-  Last updated for SBCL 0.8.10.61 (2004-05-28).
+  Last updated for SBCL 0.9.3.74 (2005-08-20).
 
   All of the following platforms are supported in the sense of "should
   work", but some things like loading foreign object files may lag
@@ -236,12 +234,12 @@ INSTALLING SBCL
 
   Supported operating systems and architectures:
 
-                           x86 PPC Alpha Sparc HPPA MIPS MIPSel
-    Linux 2.2, 2.4, 2.6     X   X    X     X    X    X     X 
+                           x86 PPC Alpha Sparc HPPA MIPS MIPSel x86-64
+    Linux 2.2, 2.4, 2.6     X   X    X     X    X    X     X      X
     FreeBSD                 X
     OpenBSD 3.4, 3.5        X
     NetBSD                  X
-    Solaris                                X
+    Solaris                 X              X
     Tru64                            X
     Darwin (Mac OS X)           X
 
