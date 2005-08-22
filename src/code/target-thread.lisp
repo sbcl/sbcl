@@ -498,9 +498,10 @@ returns the thread exits."
                              ;; we're going down, can't handle
                              ;; interrupts sanely anymore
                              (block-deferrable-signals-and-inhibit-gc)))))
-                  ;; and remove what can be the last reference to the
+                  ;; and remove what can be the last references to the
                   ;; thread object
                   (handle-thread-exit thread)
+                  (setq *current-thread* nil)
                   0))
               (values))))))
     (when (sb!sys:sap= thread-sap (sb!sys:int-sap 0))
