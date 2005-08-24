@@ -5,6 +5,8 @@ changes in sbcl-0.9.4 relative to sbcl-0.9.3:
     remain.  (thanks to Daisuke Homma)
   * enhancement: SBCL on MIPS platforms now has a much larger dynamic
     space for its heap.  (thanks to Thiemo Seufer)
+  * optimization: SBCL on MIPS platforms now supports dynamic-extent
+    closures.  (thanks to Thiemo Seufer)
   * minor incompatible change: eof selects abort in the debugger.
   * minor incompatible change: *INVOKE-DEBUGGER-HOOK* is run before
     *DEBUGGER-HOOK* => *DEBUGGER-HOOK* is not run when the debugger
@@ -18,6 +20,8 @@ changes in sbcl-0.9.4 relative to sbcl-0.9.3:
     with non-standard methods for COMPUTE-APPLICABLE-METHODS no longer
     make invalid assumptions about method precedence order.  (reported
     by Bruno Haible)
+  * bug fix: TRUNCATE now correctly signals division by zero on MIPS
+    platforms.  (thanks to Thiemo Seufer)
   * bug fix: degree sign (<U00B0>) could not be encoded in KOI8-R.
   * bug fix: correct pathname printing with printer escaping is on.
     (thanks to Kevin Reid)
