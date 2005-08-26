@@ -157,17 +157,7 @@ void reset_signal_mask ()
     thread_sigmask(SIG_SETMASK,&new,0);
 }
 
-void block_deferrable_signals_and_inhibit_gc ()
-{
-    struct thread *thread=arch_os_get_current_thread();
-    sigset_t block;
-    sigemptyset(&block);
-    sigaddset_deferrable(&block);
-    thread_sigmask(SIG_BLOCK, &block, 0);
-    bind_variable(GC_INHIBIT,T,thread);
-}
-
-static void block_blockable_signals ()
+void block_blockable_signals ()
 {
     sigset_t block;
     sigemptyset(&block);

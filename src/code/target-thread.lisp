@@ -93,7 +93,7 @@ in future versions."
       system-area-pointer
     (lisp-fun-address unsigned-long))
 
-  (define-alien-routine "block_deferrable_signals_and_inhibit_gc"
+  (define-alien-routine "block_blockable_signals"
     void)
 
   (define-alien-routine reap-dead-thread void
@@ -467,43 +467,47 @@ returns the thread exits."
          (setup-p nil)
          (real-function (coerce function 'function))
          (thread-sap
-          (%create-thread
-           (sb!kernel:get-lisp-obj-address
-            (lambda ()
-              ;; FIXME: use semaphores?
-              (loop until setup-p)
-              ;; in time we'll move some of the binding presently done in C
-              ;; here too
-              (let ((*current-thread* thread)
-                    (sb!kernel::*restart-clusters* nil)
-                    (sb!kernel::*handler-clusters* nil)
-                    (sb!kernel::*condition-restarts* nil)
-                    (sb!impl::*descriptor-handlers* nil)) ; serve-event
-                ;; can't use handling-end-of-the-world, because that flushes
-                ;; output streams, and we don't necessarily have any (or we
-                ;; could be sharing them)
-                (unwind-protect
-                     (catch 'sb!impl::toplevel-catcher
-                       (catch 'sb!impl::%end-of-the-world
-                         (with-simple-restart
-                             (terminate-thread
-                              (format nil "~~@<Terminate this thread (~A)~~@:>"
-                                      *current-thread*))
-                           ;; now that most things have a chance to work
-                           ;; properly without messing up other threads, it's
-                           ;; time to enable signals
-                           (sb!unix::reset-signal-mask)
-                           (unwind-protect
-                                (funcall real-function)
-                             ;; we're going down, can't handle
-                             ;; interrupts sanely anymore
-                             (block-deferrable-signals-and-inhibit-gc)))))
-                  ;; and remove what can be the last references to the
-                  ;; thread object
-                  (handle-thread-exit thread)
-                  (setq *current-thread* nil)
-                  0))
-              (values))))))
+          ;; don't let the child inherit *CURRENT-THREAD* because that
+          ;; can prevent gc'ing this thread while the child runs
+          (let ((*current-thread* nil))
+            (%create-thread
+             (sb!kernel:get-lisp-obj-address
+              (lambda ()
+                ;; FIXME: use semaphores?
+                (loop until setup-p)
+                ;; in time we'll move some of the binding presently done in C
+                ;; here too
+                (let ((*current-thread* thread)
+                      (sb!kernel::*restart-clusters* nil)
+                      (sb!kernel::*handler-clusters* nil)
+                      (sb!kernel::*condition-restarts* nil)
+                      (sb!impl::*descriptor-handlers* nil)) ; serve-event
+                  ;; can't use handling-end-of-the-world, because that flushes
+                  ;; output streams, and we don't necessarily have any (or we
+                  ;; could be sharing them)
+                  (unwind-protect
+                       (catch 'sb!impl::toplevel-catcher
+                         (catch 'sb!impl::%end-of-the-world
+                           (with-simple-restart
+                               (terminate-thread
+                                (format nil
+                                        "~~@<Terminate this thread (~A)~~@:>"
+                                        *current-thread*))
+                             ;; now that most things have a chance to
+                             ;; work properly without messing up other
+                             ;; threads, it's time to enable signals
+                             (sb!unix::reset-signal-mask)
+                             (unwind-protect
+                                  (funcall real-function)
+                               ;; we're going down, can't handle
+                               ;; interrupts sanely anymore
+                               (let ((sb!impl::*gc-inhibit* t))
+                                 (block-blockable-signals)
+                                 ;; and remove what can be the last
+                                 ;; reference to this thread
+                                 (handle-thread-exit thread))))))
+                    0))
+                (values)))))))
     (when (sb!sys:sap= thread-sap (sb!sys:int-sap 0))
       (error "Can't create a new thread"))
     (setf (thread-%sap thread) thread-sap)

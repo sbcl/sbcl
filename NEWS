@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-0.9.5 relative to sbcl-0.9.4:
+  * threads
+    ** bug fix: parent thread now can be gc'ed even with a live
+       child thread
+
 changes in sbcl-0.9.4 relative to sbcl-0.9.3:
   * new port: the Solaris operating system on x86 processors is now
     mostly supported, though some rough edges in the environment

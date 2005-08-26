@@ -27,11 +27,13 @@
 
 int dynamic_values_bytes=4096*sizeof(lispobj);  /* same for all threads */
 struct thread * volatile all_threads;
-volatile lispobj all_threads_lock;
 extern struct interrupt_data * global_interrupt_data;
 extern int linux_no_threads_p;
 
 #ifdef LISP_FEATURE_SB_THREAD
+
+pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
+
 /* When trying to get all_threads_lock one should make sure that
  * sig_stop_for_gc is not blocked. Else there would be a possible
  * deadlock: gc locks it, other thread blocks signals, gc sends stop
@@ -59,13 +61,13 @@ void check_sig_stop_for_gc_can_arrive_or_lose()
         check_sig_stop_for_gc_can_arrive_or_lose(); \
         FSHOW_SIGNAL((stderr,"/%s:waiting on lock=%ld, thread=%lu\n",name, \
                all_threads_lock,arch_os_get_current_thread()->os_thread)); \
-        get_spinlock(&all_threads_lock,(long)arch_os_get_current_thread()); \
+        pthread_mutex_lock(&all_threads_lock); \
         FSHOW_SIGNAL((stderr,"/%s:got lock, thread=%lu\n", \
                name,arch_os_get_current_thread()->os_thread));
 
 #define RELEASE_ALL_THREADS_LOCK(name) \
         FSHOW_SIGNAL((stderr,"/%s:released lock\n",name)); \
-        release_spinlock(&all_threads_lock); \
+        pthread_mutex_unlock(&all_threads_lock); \
         thread_sigmask(SIG_SETMASK,&_oldset,0); \
     }
 #endif
@@ -127,12 +129,27 @@ new_thread_trampoline(struct thread *th)
 }
 #endif /* LISP_FEATURE_SB_THREAD */
 
+#define THREAD_STRUCT_SIZE (THREAD_CONTROL_STACK_SIZE + BINDING_STACK_SIZE + \
+                            ALIEN_STACK_SIZE + dynamic_values_bytes + \
+                            32 * SIGSTKSZ)
+
+static void
+free_thread_struct(struct thread *th)
+{
+    if (th->interrupt_data)
+        os_invalidate((os_vm_address_t) th->interrupt_data,
+                      (sizeof (struct interrupt_data)));
+    os_invalidate((os_vm_address_t) th->control_stack_start,
+                  THREAD_STRUCT_SIZE);
+}
+
 /* this is called from any other thread to create the new one, and
  * initialize all parts of it that can be initialized from another
  * thread
  */
 
-struct thread * create_thread_struct(lispobj initial_function) {
+static struct thread *
+create_thread_struct(lispobj initial_function) {
     union per_thread_data *per_thread;
     struct thread *th=0;        /*  subdue gcc */
     void *spaces=0;
@@ -140,12 +157,7 @@ struct thread * create_thread_struct(lispobj initial_function) {
     /* may as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
      * succeed */
-    spaces=os_validate(0,
-                       THREAD_CONTROL_STACK_SIZE+
-                       BINDING_STACK_SIZE+
-                       ALIEN_STACK_SIZE+
-                       dynamic_values_bytes+
-                       32*SIGSTKSZ);
+    spaces=os_validate(0, THREAD_STRUCT_SIZE);
     if(!spaces)
          return NULL;
     per_thread=(union per_thread_data *)
@@ -244,6 +256,10 @@ struct thread * create_thread_struct(lispobj initial_function) {
 
     th->interrupt_data = (struct interrupt_data *)
         os_validate(0,(sizeof (struct interrupt_data)));
+    if (!th->interrupt_data) {
+        free_thread_struct(th);
+        return 0;
+    }
     if(all_threads)
         memcpy(th->interrupt_data,
                arch_os_get_current_thread()->interrupt_data,
@@ -332,11 +348,7 @@ struct thread *create_thread(lispobj initial_function) {
     if (success)
         link_thread(th,kid_tid);
     else
-        os_invalidate((os_vm_address_t) th->control_stack_start,
-                      ((sizeof (lispobj))
-                       * (th->control_stack_end-th->control_stack_start)) +
-                      BINDING_STACK_SIZE+ALIEN_STACK_SIZE+dynamic_values_bytes+
-                      32*SIGSTKSZ);
+        free_thread_struct(th);
 
     RELEASE_ALL_THREADS_LOCK("create_thread")
 
@@ -358,7 +370,6 @@ void reap_dead_thread(struct thread *th)
         sigaddset_blockable(&newset);
         thread_sigmask(SIG_BLOCK, &newset, &oldset);
         gc_alloc_update_page_tables(0, &th->alloc_region);
-        release_spinlock(&all_threads_lock);
         thread_sigmask(SIG_SETMASK,&oldset,0);
     }
 #endif
@@ -372,11 +383,7 @@ void reap_dead_thread(struct thread *th)
     RELEASE_ALL_THREADS_LOCK("reap_dead_thread")
     if(th->tls_cookie>=0) arch_os_thread_cleanup(th);
     gc_assert(pthread_join(th->os_thread,NULL)==0);
-    os_invalidate((os_vm_address_t) th->control_stack_start,
-                  ((sizeof (lispobj))
-                   * (th->control_stack_end-th->control_stack_start)) +
-                  BINDING_STACK_SIZE+ALIEN_STACK_SIZE+dynamic_values_bytes+
-                  32*SIGSTKSZ);
+    free_thread_struct(th);
 }
 
 /* Send the signo to os_thread, retry if the rt signal queue is
@@ -469,16 +476,16 @@ void gc_stop_the_world()
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock, thread=%lu\n",
                   th->os_thread));
     /* keep threads from starting while the world is stopped. */
-    get_spinlock(&all_threads_lock,(long)th);
+    pthread_mutex_lock(&all_threads_lock); \
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got lock, thread=%lu\n",
                   th->os_thread));
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     for(p=all_threads; p; p=p->next) {
         while(p->state==STATE_STARTING) sched_yield();
         if((p!=th) && (p->state==STATE_RUNNING)) {
-            status=kill_thread_safely(p->os_thread,SIG_STOP_FOR_GC);
             FSHOW_SIGNAL((stderr,"/gc_stop_the_world: suspending %lu\n",
                           p->os_thread));
+            status=kill_thread_safely(p->os_thread,SIG_STOP_FOR_GC);
             if (status==ESRCH) {
                 /* This thread has exited. */
                 gc_assert(p->state==STATE_DEAD);
@@ -533,7 +540,7 @@ void gc_start_the_world()
      * SIG_STOP_FOR_GC wouldn't need to be a rt signal. That has some
      * performance implications, but does away with the 'rt signal
      * queue full' problem. */
-    release_spinlock(&all_threads_lock);
+    pthread_mutex_unlock(&all_threads_lock); \
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:end\n"));
 }
 #endif

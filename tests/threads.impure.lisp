@@ -13,6 +13,9 @@
 
 (in-package "SB-THREAD") ; this is white-box testing, really
 
+(defun wait-for-threads (threads)
+  (loop while (some #'sb-thread:thread-alive-p threads) do (sleep 0.01)))
+
 (assert (eql 1 (length (list-all-threads))))
 
 (assert (eq *current-thread*
@@ -54,7 +57,8 @@
     ;; Start NTHREADS idle threads.
     (dotimes (i nthreads)
       (sb-thread:make-thread (lambda ()
-                               (sb-thread:condition-wait queue mutex)
+                               (with-mutex (mutex)
+                                 (sb-thread:condition-wait queue mutex))
                                (sb-ext:quit))))
     (let ((start-time (get-internal-run-time)))
       (funcall function)
@@ -176,7 +180,8 @@
                (format t "done ~A~%" *current-thread*))))
     (let ((kid1 (make-thread #'run))
           (kid2 (make-thread #'run)))
-      (format t "contention ~A ~A~%" kid1 kid2))))
+      (format t "contention ~A ~A~%" kid1 kid2)
+      (wait-for-threads (list kid1 kid2)))))
 
 (defun test-interrupt (function-to-interrupt &optional quit-p)
   (let ((child  (make-thread function-to-interrupt)))
@@ -199,7 +204,8 @@
 (test-interrupt #'loop-forever :quit)
 
 (let ((child (test-interrupt (lambda () (loop (sleep 2000))))))
-  (terminate-thread child))
+  (terminate-thread child)
+  (wait-for-threads (list child)))
 
 (let ((lock (make-mutex :name "loctite"))
       child)
@@ -214,7 +220,8 @@
     (sleep 5)
     (interrupt-thread child (lambda () (format t "l ~A~%" (mutex-value lock))))
     (format t "parent releasing lock~%"))
-  (terminate-thread child))
+  (terminate-thread child)
+  (wait-for-threads (list child)))
 
 (format t "~&locking test done~%")
 
@@ -230,11 +237,10 @@
                           (sleep (random 0.1d0))
                           (princ ".")
                           (force-output)
-                          (sb-thread:interrupt-thread
-                           thread
-                           (lambda ()))))))))
-      (loop while (some #'thread-alive-p killers) do (sleep 0.1))
-      (sb-thread:terminate-thread thread)))
+                          (sb-thread:interrupt-thread thread (lambda ()))))))))
+      (wait-for-threads killers)
+      (sb-thread:terminate-thread thread)
+      (wait-for-threads (list thread))))
   (sb-ext:gc :full t))
 
 (format t "~&multi interrupt test done~%")
@@ -242,7 +248,6 @@
 (let ((c (make-thread (lambda () (loop (alloc-stuff))))))
   ;; NB this only works on x86: other ports don't have a symbol for
   ;; pseudo-atomic atomicity
-  (format t "new thread ~A~%" c)
   (dotimes (i 100)
     (sleep (random 0.1d0))
     (interrupt-thread c
@@ -250,7 +255,8 @@
                         (princ ".") (force-output)
                         (assert (eq (thread-state *current-thread*) :running))
                         (assert (zerop SB-KERNEL:*PSEUDO-ATOMIC-ATOMIC*)))))
-  (terminate-thread c))
+  (terminate-thread c)
+  (wait-for-threads (list c)))
 
 (format t "~&interrupt test done~%")
 
@@ -278,9 +284,9 @@
     (dotimes (i 100)
       (sleep (random 0.1d0))
       (interrupt-thread c func))
-    (format t "~&waiting for interrupts to arrive~%")
     (loop until (= *interrupt-count* 100) do (sleep 0.1))
-    (terminate-thread c)))
+    (terminate-thread c)
+    (wait-for-threads (list c))))
 
 (format t "~&interrupt count test done~%")
 
@@ -393,6 +399,24 @@
   (loop while (thread-alive-p interruptor-thread)))
 
 (format t "~&session lock test done~%")
+
+(sb-ext:gc :full t)
+(loop repeat 20 do
+      (wait-for-threads
+       (loop for i below 100 collect
+             (sb-thread:make-thread (lambda ()))))
+      (sb-ext:gc :full t)
+      (princ "+")
+      (force-output))
+
+(format t "~&creation test done~%")
+
+;; watch out for *current-thread* being the parent thread after exit
+(let ((thread (sb-thread:make-thread (lambda ()))))
+  (wait-for-threads (list thread))
+  (assert (null (symbol-value-in-thread 'sb-thread:*current-thread*
+                                        thread))))
+
 #|  ;; a cll post from eric marsden
 | (defun crash ()
 |   (setq *debugger-hook*
