@@ -2821,7 +2821,9 @@ core and return a descriptor to it."
 
 (defun write-structure-object (dd)
   (flet ((cstring (designator)
-           (substitute #\_ #\- (string-downcase (string designator)))))
+           (substitute
+            #\_ #\%
+            (substitute #\_ #\- (string-downcase (string designator))))))
     (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
     (format t "struct ~A {~%" (cstring (dd-name dd)))
     (format t "    lispobj header;~%")
@@ -3289,7 +3291,11 @@ initially undefined function references:~2%")
                     (format t "~&#include \"~A.h\"~%"
                             (string-downcase
                              (string (sb!vm:primitive-object-name obj)))))))
-        (dolist (class '(hash-table layout))
+        (dolist (class '(hash-table
+                         layout
+                         sb!c::compiled-debug-info
+                         sb!c::compiled-debug-fun
+                         sb!xc:package))
           (out-to
            (string-downcase (string class))
            (write-structure-object

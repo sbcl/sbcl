@@ -22,7 +22,11 @@
 #include "interrupt.h"
 #include "lispregs.h"
 #ifdef LISP_FEATURE_GENCGC
+#include "arch.h"
 #include "gencgc-alloc-region.h"
+#include "genesis/compiled-debug-fun.h"
+#include "genesis/compiled-debug-info.h"
+#include "genesis/package.h"
 #endif
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
@@ -271,12 +275,221 @@ backtrace(int nframes)
 
 #else
 
+static int
+stack_pointer_p (void *p)
+{
+  return (p < (void *) arch_os_get_current_thread()->control_stack_end
+	  && p > (void *) &p
+	  && (((unsigned long) p) & 3) == 0);
+}
 
+static int
+ra_pointer_p (void *ra)
+{
+  return ((unsigned long) ra) > 4096 && !stack_pointer_p (ra);
+}
+
+static int
+x86_call_context (void *fp, void **ra, void **ocfp)
+{
+  void *lisp_ocfp;
+  void *lisp_ra;
+  void *c_ocfp;
+  void *c_ra;
+  int lisp_valid_p, c_valid_p;
+
+  if (!stack_pointer_p(fp))
+    return 0;
+
+  c_ocfp    = *((void **) fp);
+  c_ra      = *((void **) fp + 1);
+  lisp_ocfp = *((void **) fp - 1);
+  lisp_ra   = *((void **) fp - 2);
+
+  lisp_valid_p = (lisp_ocfp > fp
+		  && stack_pointer_p(lisp_ocfp)
+		  && ra_pointer_p(lisp_ra));
+  c_valid_p = (c_ocfp > fp
+	       && stack_pointer_p(c_ocfp)
+	       && ra_pointer_p(c_ra));
+
+  if (lisp_valid_p && c_valid_p) {
+    void *lisp_path_fp;
+    void *c_path_fp;
+    void *dummy;
+
+    int lisp_path_p = x86_call_context(lisp_ocfp, &lisp_path_fp, &dummy);
+    int c_path_p = x86_call_context(c_ocfp, &c_path_fp, &dummy);
+
+    if (lisp_path_p && c_path_p) {
+#if defined __FreeBSD__ && __FreeBSD_version > 400000
+      if (lisp_ocfp > c_ocfp)
+        *ra = lisp_ra, *ocfp = lisp_ocfp;
+      else
+        *ra = c_ra, *ocfp = c_ocfp;
+#else
+      *ra = lisp_ra, *ocfp = lisp_ocfp;
+#endif
+    }
+    else if (lisp_path_p)
+      *ra = lisp_ra, *ocfp = lisp_ocfp;
+    else if (c_path_p)
+      *ra = c_ra, *ocfp = c_ocfp;
+    else
+      return 0;
+  }
+  else if (lisp_valid_p)
+    *ra = lisp_ra, *ocfp = lisp_ocfp;
+  else if (c_valid_p)
+    *ra = c_ra, *ocfp = c_ocfp;
+  else
+    return 0;
+
+  return 1;
+}
+
+struct compiled_debug_fun *
+debug_function_from_pc (struct code* code, void *pc)
+{
+  unsigned long code_header_len = sizeof(lispobj) * HeaderValue(code->header);
+  unsigned long offset
+    = (unsigned long) pc - (unsigned long) code - code_header_len;
+  struct compiled_debug_fun *df;
+  struct compiled_debug_info *di;
+  struct vector *v;
+  int i, len;
+
+  if (lowtag_of(code->debug_info) != INSTANCE_POINTER_LOWTAG)
+    return 0;
+
+  di = (struct compiled_debug_info *) native_pointer(code->debug_info);
+  v = (struct vector *) native_pointer(di->fun_map);
+  len = fixnum_value(v->length);
+  df = (struct compiled_debug_fun *) native_pointer(v->data[0]);
+
+  if (len == 1)
+    return df;
+
+  for (i = 1;; i += 2) {
+    unsigned next_pc;
+		  
+    if (i == len)
+      return ((struct compiled_debug_fun *) native_pointer(v->data[i - 1]));
+
+    if (offset >= fixnum_value(df->elsewhere_pc)) {
+      struct compiled_debug_fun *p
+        = ((struct compiled_debug_fun *) native_pointer(v->data[i + 1]));
+      next_pc = fixnum_value(p->elsewhere_pc);
+    } else
+      next_pc = fixnum_value(v->data[i]);
+
+    if (offset < next_pc)
+      return ((struct compiled_debug_fun *) native_pointer(v->data[i - 1]));
+  }
+
+  return NULL;
+}
+
+static void
+print_entry_name (lispobj name)
+{
+  if (lowtag_of (name) == LIST_POINTER_LOWTAG) {
+    putchar('(');
+    while (name != NIL) {
+      struct cons *cons = (struct cons *) native_pointer(name);
+      print_entry_name(cons->car);
+      name = cons->cdr;
+      if (name != NIL)
+        putchar(' ');
+    }
+    putchar(')');
+  } else if (lowtag_of(name) == OTHER_POINTER_LOWTAG) {
+    lispobj *object = (lispobj *) native_pointer(name);
+
+    if (widetag_of(*object) == SYMBOL_HEADER_WIDETAG) {
+      struct symbol *symbol = (struct symbol *) object;
+      struct vector *string;
+
+      if (symbol->package != NIL) {
+        struct package *pkg
+          = (struct package *) native_pointer(symbol->package);
+        lispobj pkg_name = pkg->_name;
+        string = (struct vector *) native_pointer(pkg_name);
+        printf("%s::", (char *) string->data);
+      }
+
+      object = (lispobj *) native_pointer(symbol->name);
+      string = (struct vector *) object;
+      printf("%s", (char *) string->data);
+    } else if (widetag_of(*object) == SIMPLE_BASE_STRING_WIDETAG) {
+      struct vector *string = (struct vector *) object;
+      printf("\"%s\"", (char *) string->data);
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+    } else if (widetag_of(*object) == SIMPLE_CHARACTER_STRING_WIDETAG) {
+      struct vector *string = (struct vector *) object;
+      printf("<oops, a unicode string>");                           /* FIXME */
+#endif
+    } else
+      printf("<??? type %d>", (int) widetag_of(*object));
+  } else
+    printf("<??? lowtag %d>", (int) lowtag_of(name));
+}
+
+static void
+print_entry_points (struct code *code)
+{
+  lispobj function = code->entry_points;
+
+  while (function != NIL) {
+    struct simple_fun *header = (struct simple_fun *) native_pointer(function);
+    print_entry_name(header->name);
+      
+    function = header->next;
+    if (function != NIL)
+      printf (", ");
+  }
+}
 
 void
 backtrace(int nframes)
 {
-    printf("Can't backtrace on this hardware platform.\n");
+  void *fp;
+  int i;
+
+#if defined(LISP_FEATURE_X86)
+  asm("movl %%ebp,%0" : "=g" (fp));
+#elif defined (LISP_FEATURE_X86_64)
+  asm("movq %%rbp,%0" : "=g" (fp));
+#else
+#error "How did we get here?"
+#endif
+
+  for (i = 0; i < nframes; ++i) {
+    lispobj *p;
+    void *ra;
+    void *next_fp;
+      
+    if (!x86_call_context(fp, &ra, &next_fp))
+      break;
+
+    printf("%4d: ", i);
+
+    p = (lispobj *) component_ptr_from_pc((lispobj *) ra);
+    if (p) {
+      struct code *cp = (struct code *) p;
+      struct compiled_debug_fun *df = debug_function_from_pc(cp, ra);
+      if (df)
+        print_entry_name(df->name);
+      else
+        print_entry_points(cp);
+    } else
+      printf("Foreign fp = 0x%lx, ra = 0x%lx",
+             (unsigned long) next_fp,
+             (unsigned long) ra);
+
+    putchar('\n');
+    fp = next_fp;
+  }
 }
 
 #endif
