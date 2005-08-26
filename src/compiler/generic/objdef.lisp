@@ -405,9 +405,11 @@
 ;;; Hence the even-fixnum lowtag just so we don't get odd(sic) numbers
 ;;; added to the slot offsets
 (define-primitive-object (thread :lowtag even-fixnum-lowtag)
-  ;; unbound_marker is borrowed very briefly at thread startup to
-  ;; pass the address of initial-function into new_thread_trampoline
-  (unbound-marker :init :unbound) ; tls[0] = UNBOUND_MARKER_WIDETAG
+  ;; no_tls_value_marker is borrowed very briefly at thread startup to
+  ;; pass the address of initial-function into new_thread_trampoline.
+  ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
+  ;; of a symbol is initialized to zero
+  (no-tls-value-marker)
   (os-thread :c-type "os_thread_t")
   (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)

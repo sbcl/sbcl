@@ -585,6 +585,6 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
     (let* ((index (sb!vm::symbol-tls-index symbol))
            (tl-val (sb!sys:sap-ref-word thread-sap
                                         (* sb!vm:n-word-bytes index))))
-      (if (eql tl-val sb!vm::unbound-marker-widetag)
+      (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
           (sb!vm::symbol-global-value symbol)
           (sb!kernel:make-lisp-obj tl-val)))))

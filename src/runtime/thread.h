@@ -50,7 +50,7 @@ static inline lispobj SymbolValue(u64 tagged_symbol_pointer, void *thread) {
         lispobj r=
             ((union per_thread_data *)thread)
             ->dynamic_values[fixnum_value(sym->tls_index)];
-        if(r!=UNBOUND_MARKER_WIDETAG) return r;
+        if(r!=NO_TLS_VALUE_MARKER_WIDETAG) return r;
     }
 #endif
     return sym->value;
@@ -73,7 +73,7 @@ static inline void SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *t
     if(thread && sym->tls_index) {
         lispobj *pr= &(((union per_thread_data *)thread)
                        ->dynamic_values[fixnum_value(sym->tls_index)]);
-        if(*pr!= UNBOUND_MARKER_WIDETAG) {
+        if(*pr!=NO_TLS_VALUE_MARKER_WIDETAG) {
             *pr=val;
             return;
         }

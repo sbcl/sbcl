@@ -1726,6 +1726,7 @@ gc_init_tables(void)
     scavtab[CHARACTER_WIDETAG] = scav_immediate;
     scavtab[SAP_WIDETAG] = scav_unboxed;
     scavtab[UNBOUND_MARKER_WIDETAG] = scav_immediate;
+    scavtab[NO_TLS_VALUE_MARKER_WIDETAG] = scav_immediate;
     scavtab[INSTANCE_HEADER_WIDETAG] = scav_instance;
 #ifdef LISP_FEATURE_SPARC
     scavtab[FDEFN_WIDETAG] = scav_boxed;
@@ -1860,6 +1861,7 @@ gc_init_tables(void)
     transother[CHARACTER_WIDETAG] = trans_immediate;
     transother[SAP_WIDETAG] = trans_unboxed;
     transother[UNBOUND_MARKER_WIDETAG] = trans_immediate;
+    transother[NO_TLS_VALUE_MARKER_WIDETAG] = trans_immediate;
     transother[WEAK_POINTER_WIDETAG] = trans_weak_pointer;
     transother[INSTANCE_HEADER_WIDETAG] = trans_boxed;
     transother[FDEFN_WIDETAG] = trans_boxed;
@@ -1999,6 +2001,7 @@ gc_init_tables(void)
     sizetab[CHARACTER_WIDETAG] = size_immediate;
     sizetab[SAP_WIDETAG] = size_unboxed;
     sizetab[UNBOUND_MARKER_WIDETAG] = size_immediate;
+    sizetab[NO_TLS_VALUE_MARKER_WIDETAG] = size_immediate;
     sizetab[WEAK_POINTER_WIDETAG] = size_weak_pointer;
     sizetab[INSTANCE_HEADER_WIDETAG] = size_boxed;
     sizetab[FDEFN_WIDETAG] = size_boxed;

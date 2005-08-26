@@ -84,8 +84,8 @@ initial_thread_trampoline(struct thread *th)
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     lispobj *args = NULL;
 #endif
-    function = th->unbound_marker;
-    th->unbound_marker = UNBOUND_MARKER_WIDETAG;
+    function = th->no_tls_value_marker;
+    th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) return 1;
 
     if(th->os_thread < 1) lose("th->os_thread not set up right");
@@ -109,8 +109,8 @@ new_thread_trampoline(struct thread *th)
 {
     lispobj function;
     int result;
-    function = th->unbound_marker;
-    th->unbound_marker = UNBOUND_MARKER_WIDETAG;
+    function = th->no_tls_value_marker;
+    th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) {
         /* FIXME: handle error */
         lose("arch_os_thread_init failed\n");
@@ -173,7 +173,7 @@ create_thread_struct(lispobj initial_function) {
 #ifdef LISP_FEATURE_SB_THREAD
         int i;
         for(i=0;i<(dynamic_values_bytes/sizeof(lispobj));i++)
-            per_thread->dynamic_values[i]=UNBOUND_MARKER_WIDETAG;
+            per_thread->dynamic_values[i]=NO_TLS_VALUE_MARKER_WIDETAG;
         if(SymbolValue(FREE_TLS_INDEX,0)==UNBOUND_MARKER_WIDETAG)
             SetSymbolValue
                 (FREE_TLS_INDEX,
@@ -268,7 +268,7 @@ create_thread_struct(lispobj initial_function) {
         memcpy(th->interrupt_data,global_interrupt_data,
                sizeof (struct interrupt_data));
 
-    th->unbound_marker=initial_function;
+    th->no_tls_value_marker=initial_function;
     return th;
 }
 

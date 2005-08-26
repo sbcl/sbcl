@@ -145,7 +145,7 @@
   instance-header                   ; 01010010
   fdefn                             ; 01010110
 
-  unused00                          ; 01011010
+  no-tls-value-marker               ; 01011010
   unused01                          ; 01011110
   unused02                          ; 01100010
   unused03                          ; 01100110

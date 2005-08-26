@@ -2135,6 +2135,7 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
         }
         switch (widetag_of(start_addr[0])) {
         case UNBOUND_MARKER_WIDETAG:
+        case NO_TLS_VALUE_MARKER_WIDETAG:
         case CHARACTER_WIDETAG:
 #if N_WORD_BITS == 64
         case SINGLE_FLOAT_WIDETAG:

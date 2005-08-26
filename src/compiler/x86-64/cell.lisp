@@ -69,7 +69,7 @@
       (inst or tls tls)
       (inst jmp :z global-val)
       (inst cmp (make-ea :qword :base thread-base-tn :scale 1 :index tls)
-            unbound-marker-widetag)
+            no-tls-value-marker-widetag)
       (inst jmp :z global-val)
       (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls)
             value)
@@ -104,14 +104,16 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 9
-    (let* ((err-lab (generate-error-code vop unbound-symbol-error object))
+    (let* ((check-unbound-label (gen-label))
+           (err-lab (generate-error-code vop unbound-symbol-error object))
            (ret-lab (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst mov value (make-ea :qword :base thread-base-tn
                                :index value :scale 1))
-      (inst cmp value unbound-marker-widetag)
-      (inst jmp :ne ret-lab)
+      (inst cmp value no-tls-value-marker-widetag)
+      (inst jmp :ne check-unbound-label)
       (loadw value object symbol-value-slot other-pointer-lowtag)
+      (emit-label check-unbound-label)
       (inst cmp value unbound-marker-widetag)
       (inst jmp :e err-lab)
       (emit-label ret-lab))))
@@ -130,7 +132,7 @@
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst mov value
             (make-ea :qword :base thread-base-tn :index value :scale 1))
-      (inst cmp value unbound-marker-widetag)
+      (inst cmp value no-tls-value-marker-widetag)
       (inst jmp :ne ret-lab)
       (loadw value object symbol-value-slot other-pointer-lowtag)
       (emit-label ret-lab))))
@@ -183,24 +185,16 @@
   (:info target not-p)
   (:temporary (:sc descriptor-reg #+nil(:from (:argument 0))) value)
   (:generator 9
-    (if not-p
-        (let ((not-target (gen-label)))
-          (loadw value object symbol-value-slot other-pointer-lowtag)
-          (inst cmp value unbound-marker-widetag)
-          (inst jmp :ne not-target)
-          (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-          (inst cmp (make-ea :qword  :base thread-base-tn
-                             :index value :scale 1) unbound-marker-widetag)
-          (inst jmp  :e  target)
-          (emit-label not-target))
-        (progn
-          (loadw value object symbol-value-slot other-pointer-lowtag)
-          (inst cmp value unbound-marker-widetag)
-          (inst jmp :ne target)
-          (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-          (inst cmp (make-ea :qword :base thread-base-tn :index value :scale 1)
-                unbound-marker-widetag)
-          (inst jmp  :ne  target)))))
+    (let ((check-unbound-label (gen-label)))
+      (loadw value object symbol-tls-index-slot other-pointer-lowtag)
+      (inst mov value
+            (make-ea :qword :base thread-base-tn :index value :scale 1))
+      (inst cmp value no-tls-value-marker-widetag)
+      (inst jmp :ne check-unbound-label)
+      (loadw value object symbol-value-slot other-pointer-lowtag)
+      (emit-label check-unbound-label)
+      (inst cmp value unbound-marker-widetag)
+      (inst jmp (if not-p :e :ne) target))))
 
 #!-sb-thread
 (define-vop (boundp)

@@ -5,6 +5,9 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
   * threads
     ** bug fix: parent thread now can be gc'ed even with a live
        child thread
+    ** bug fix: binding a special with PROGV to no value is not
+       the same as that symbol not having been bound (thanks to
+       Hannu Koivisto)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** ENSURE-GENERIC-FUNCTION should take a method class object for
        the :method-class keyword argument.

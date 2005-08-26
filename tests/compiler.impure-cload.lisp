@@ -442,5 +442,12 @@
        (compiled-res (funcall (compile nil form)))
        (real-res (- 1 (aref (funcall (eval #'bit-not) v) 0))))
   (assert (equal compiled-res real-res)))
+
+;; bug reported on sbcl-devel by Hannu Koivisto on 2005-08-10
+(defvar *hannu-trap* nil)
+(progv '(*hannu-trap*) '()
+  (setq *hannu-trap* t))
+(assert (not *hannu-trap*))
+
 
 (sb-ext:quit :unix-status 104)
