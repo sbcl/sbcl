@@ -51,5 +51,3 @@
 (defparameter *counter* (make-counter :start 666))
 
 (assert (eq (funcall *counter*) *counter*))
-
-(sb-ext:quit :unix-status 104)

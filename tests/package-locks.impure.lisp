@@ -478,4 +478,3 @@
          package-lock-violation))
 
 ;;; WOOT! Done.
-(sb-ext:quit :unix-status 104)

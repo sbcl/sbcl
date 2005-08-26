@@ -126,4 +126,3 @@
   (assert (typep (funcall f "HOME") '(or string null))))
 
 ;;; success
-(quit :unix-status 104)

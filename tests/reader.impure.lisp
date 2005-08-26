@@ -103,4 +103,3 @@
 (assert (eq 'a (read (make-instance 'my-in-stream :last-char nil))))
 
 ;;; success
-(quit :unix-status 104)

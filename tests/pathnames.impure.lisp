@@ -358,4 +358,3 @@
                  actual))
 
 ;;;; success
-(quit :unix-status 104)

@@ -84,6 +84,3 @@
 ;; except on machines where addressable space is likely to be
 ;; much bigger than physical memory
 (test-big-bit-vectors)
-
-;;; success
-(sb-ext:quit :unix-status 104)

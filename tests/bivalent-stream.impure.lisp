@@ -34,4 +34,3 @@
 
 (delete-file "bivalent-stream-test.txt")
 
-(sb-ext:quit :unix-status 104)

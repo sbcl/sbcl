@@ -27,4 +27,3 @@
 (assert (typep 1 'key))
 (assert (typep 1 'key-singleton))
 
-(quit :unix-status 104)

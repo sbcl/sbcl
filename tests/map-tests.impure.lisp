@@ -109,4 +109,3 @@
          :arg-types (list list vector))
 
 ;;; success
-(quit :unix-status 104)

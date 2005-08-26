@@ -430,4 +430,3 @@
   (assert-nil-t (subtypep `(not ,t1) `(not ,t2))))
 
 ;;; success
-(quit :unix-status 104)

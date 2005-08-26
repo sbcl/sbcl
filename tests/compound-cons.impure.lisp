@@ -63,5 +63,3 @@
 (assert (not (subtypep 'cons '(cons structure-object number))))
 
 (assert (subtypep '(cons null fixnum) (type-of '(nil 44))))
-
-(sb-ext:quit :unix-status 104) ; success

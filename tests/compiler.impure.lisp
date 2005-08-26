@@ -1068,4 +1068,3 @@
       (assert (= e-count 4)))))
 
 ;;; success
-(quit :unix-status 104)

@@ -271,7 +271,3 @@
                      ((eq byte :eof))
                    (write-byte byte our-bin-to-char-output))))
              test-string))))
-
-;;;; Voila!
-
-(quit :unix-status 104) ; success

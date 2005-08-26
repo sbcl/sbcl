@@ -123,5 +123,3 @@
   (assert (not (eq *base-string* *character-string*)))
   (assert (typep *base-string* 'base-string))
   (assert (typep *character-string* '(vector character))))
-
-(sb-ext:quit :unix-status 104) ; success

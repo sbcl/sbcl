@@ -22,4 +22,3 @@
   (package-error (c) (princ c))
   (:no-error (&rest args) (error "(EXPORT :FOO) returned ~S" args)))
 
-(sb-ext:quit :unix-status 104)

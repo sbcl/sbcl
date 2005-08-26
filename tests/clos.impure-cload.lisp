@@ -164,6 +164,3 @@
   (make-instance 'class-with-symbol-initarg slot arg))
 (assert (eql (slot-value (make-thing 1) 'slot) 1))
 (assert (eql (slot-value (make-other-thing 'slot 2) 'slot) 2))
-
-;;; success
-(sb-ext:quit :unix-status 104)

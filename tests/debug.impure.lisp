@@ -125,7 +125,6 @@
   '(#+(or x86 x86-64) "bogus stack frame"
     #-(or x86 x86-64) "undefined function"))
 
-#-(or alpha) ; bug 346
 ;;; Test for "undefined function" (undefined_tramp) working properly.
 ;;; Try it with and without tail call elimination, since they can have
 ;;; different effects.  (Specifically, if undefined_tramp is incorrect
@@ -140,21 +139,21 @@
          (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
          (funcall fun)))
 
-  (assert (verify-backtrace
-           (lambda () (test #'optimized))
-           (list *undefined-function-frame*
-                 (list '(flet test) #'optimized))))
+  (with-test (:fails-on '(or :alpha))   ; bug 346
+    (assert (verify-backtrace
+             (lambda () (test #'optimized))
+             (list *undefined-function-frame*
+                   (list '(flet test) #'optimized)))))
 
   ;; bug 353: This test fails at least most of the time for x86/linux
   ;; ca. 0.8.20.16. -- WHN
-  #-(and x86 linux)
-  (assert (verify-backtrace
-           (lambda () (test #'not-optimized))
-           (list *undefined-function-frame*
-                 (list '(flet not-optimized))
-                 (list '(flet test) #'not-optimized)))))
+  (with-test (:fails-on '(or (and :x86 :linux) :alpha))
+    (assert (verify-backtrace
+             (lambda () (test #'not-optimized))
+             (list *undefined-function-frame*
+                   (list '(flet not-optimized))
+                   (list '(flet test) #'not-optimized))))))
 
-#-alpha ; bug 346
 ;;; Division by zero was a common error on PPC.  It depended on the
 ;;; return function either being before INTEGER-/-INTEGER in memory,
 ;;; or more than MOST-POSITIVE-FIXNUM bytes ahead.  It also depends on
@@ -176,19 +175,21 @@
        (test (fun)
          (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
          (funcall fun)))
-  (assert (verify-backtrace (lambda () (test #'optimized))
-                            (list '(/ 42 &rest)
-                                  (list '(flet test) #'optimized))))
-  (assert (verify-backtrace (lambda () (test #'not-optimized))
-                            (list '(/ 42 &rest)
-                                  '((flet not-optimized))
-                                  (list '(flet test) #'not-optimized)))))
+  (with-test (:fails-on '(or :alpha))   ; bug 346
+    (assert (verify-backtrace (lambda () (test #'optimized))
+                              (list '(/ 42 &rest)
+                                    (list '(flet test) #'optimized)))))
+  (with-test (:fails-on '(or :alpha))   ; bug 346
+    (assert (verify-backtrace (lambda () (test #'not-optimized))
+                              (list '(/ 42 &rest)
+                                    '((flet not-optimized))
+                                    (list '(flet test) #'not-optimized))))))
 
-#-(or alpha (and x86 linux)) ; bug 61
-(progn
-  (defun throw-test ()
-    (throw 'no-such-tag t))
-  (assert (verify-backtrace #'throw-test '((throw-test)))))
+(with-test (:fails-on '(or (and :x86 :linux) :alpha))
+  (progn
+    (defun throw-test ()
+      (throw 'no-such-tag t))
+    (assert (verify-backtrace #'throw-test '((throw-test))))))
 
 ;;; test entry point handling in backtraces
 
@@ -225,104 +226,104 @@
 (defbt 5 (&optional (opt (oops)))
   (list opt))
 
-#-(and x86 linux)
-(macrolet ((with-details (bool &body body)
-             `(let ((sb-debug:*show-entry-point-details* ,bool))
-                ,@body)))
+(with-test (:fails-on '(and :x86 :linux))
+  (macrolet ((with-details (bool &body body)
+               `(let ((sb-debug:*show-entry-point-details* ,bool))
+                 ,@body)))
 
-  ;; TL-XEP
-  (print :tl-xep)
-  (with-details t
-    (assert (verify-backtrace #'namestring
-                              '(((sb-c::tl-xep namestring) 0 ?)))))
-  (with-details nil
-    (assert (verify-backtrace #'namestring
-                              '((namestring)))))
+    ;; TL-XEP
+    (print :tl-xep)
+    (with-details t
+      (assert (verify-backtrace #'namestring
+                                '(((sb-c::tl-xep namestring) 0 ?)))))
+    (with-details nil
+      (assert (verify-backtrace #'namestring
+                                '((namestring)))))
 
 
-  ;; &MORE-PROCESSOR
-  (with-details t
-    (assert (verify-backtrace (lambda () (bt.1.1 :key))
-                              '(((sb-c::&more-processor bt.1.1) &rest))))
-    (assert (verify-backtrace (lambda () (bt.1.2 :key))
-                              '(((sb-c::&more-processor bt.1.2) &rest))))
-    (assert (verify-backtrace (lambda () (bt.1.3 :key))
-                              '(((sb-c::&more-processor bt.1.3) &rest)))))
-  (with-details nil
-    (assert (verify-backtrace (lambda () (bt.1.1 :key))
-                              '((bt.1.1 :key))))
-    (assert (verify-backtrace (lambda () (bt.1.2 :key))
-                              '((bt.1.2 &rest))))
-    (assert (verify-backtrace (lambda () (bt.1.3 :key))
-                              '((bt.1.3 &rest)))))
+    ;; &MORE-PROCESSOR
+    (with-details t
+      (assert (verify-backtrace (lambda () (bt.1.1 :key))
+                                '(((sb-c::&more-processor bt.1.1) &rest))))
+      (assert (verify-backtrace (lambda () (bt.1.2 :key))
+                                '(((sb-c::&more-processor bt.1.2) &rest))))
+      (assert (verify-backtrace (lambda () (bt.1.3 :key))
+                                '(((sb-c::&more-processor bt.1.3) &rest)))))
+    (with-details nil
+      (assert (verify-backtrace (lambda () (bt.1.1 :key))
+                                '((bt.1.1 :key))))
+      (assert (verify-backtrace (lambda () (bt.1.2 :key))
+                                '((bt.1.2 &rest))))
+      (assert (verify-backtrace (lambda () (bt.1.3 :key))
+                                '((bt.1.3 &rest)))))
 
-  ;; XEP
-  (print :xep)
-  (with-details t
-    (assert (verify-backtrace #'bt.2.1
-                              '(((sb-c::xep bt.2.1) 0 ?))))
-    (assert (verify-backtrace #'bt.2.2
-                              '(((sb-c::xep bt.2.2) &rest))))
-    (assert (verify-backtrace #'bt.2.3
-                              '(((sb-c::xep bt.2.3) &rest)))))
-  (with-details nil
-    (assert (verify-backtrace #'bt.2.1
-                              '((bt.2.1))))
-    (assert (verify-backtrace #'bt.2.2
-                              '((bt.2.2 &rest))))
-    (assert (verify-backtrace #'bt.2.3
-                              '((bt.2.3 &rest)))))
+    ;; XEP
+    (print :xep)
+    (with-details t
+      (assert (verify-backtrace #'bt.2.1
+                                '(((sb-c::xep bt.2.1) 0 ?))))
+      (assert (verify-backtrace #'bt.2.2
+                                '(((sb-c::xep bt.2.2) &rest))))
+      (assert (verify-backtrace #'bt.2.3
+                                '(((sb-c::xep bt.2.3) &rest)))))
+    (with-details nil
+      (assert (verify-backtrace #'bt.2.1
+                                '((bt.2.1))))
+      (assert (verify-backtrace #'bt.2.2
+                                '((bt.2.2 &rest))))
+      (assert (verify-backtrace #'bt.2.3
+                                '((bt.2.3 &rest)))))
 
-  ;; VARARGS-ENTRY
-  (print :varargs-entry)
-  (with-details t
-    (assert (verify-backtrace #'bt.3.1
-                             '(((sb-c::varargs-entry bt.3.1) :key nil))))
-    (assert (verify-backtrace #'bt.3.2
-                             '(((sb-c::varargs-entry bt.3.2) :key ?))))
-    (assert (verify-backtrace #'bt.3.3
-                             '(((sb-c::varargs-entry bt.3.3) &rest)))))
-  (with-details nil
-    (assert (verify-backtrace #'bt.3.1
-                              '((bt.3.1 :key nil))))
-    (assert (verify-backtrace #'bt.3.2
-                              '((bt.3.2 :key ?))))
-    (assert (verify-backtrace #'bt.3.3
-                              '((bt.3.3 &rest)))))
+    ;; VARARGS-ENTRY
+    (print :varargs-entry)
+    (with-details t
+      (assert (verify-backtrace #'bt.3.1
+                                '(((sb-c::varargs-entry bt.3.1) :key nil))))
+      (assert (verify-backtrace #'bt.3.2
+                                '(((sb-c::varargs-entry bt.3.2) :key ?))))
+      (assert (verify-backtrace #'bt.3.3
+                                '(((sb-c::varargs-entry bt.3.3) &rest)))))
+    (with-details nil
+      (assert (verify-backtrace #'bt.3.1
+                                '((bt.3.1 :key nil))))
+      (assert (verify-backtrace #'bt.3.2
+                                '((bt.3.2 :key ?))))
+      (assert (verify-backtrace #'bt.3.3
+                                '((bt.3.3 &rest)))))
 
-  ;; HAIRY-ARG-PROCESSOR
-  (print :hairy-args-processor)
-  (with-details t
-    (assert (verify-backtrace #'bt.4.1
-                              '(((sb-c::hairy-arg-processor bt.4.1) ?))))
-    (assert (verify-backtrace #'bt.4.2
-                              '(((sb-c::hairy-arg-processor bt.4.2) ?))))
-    (assert (verify-backtrace #'bt.4.3
-                              '(((sb-c::hairy-arg-processor bt.4.3) &rest)))))
-  (with-details nil
-    (assert (verify-backtrace #'bt.4.1
-                              '((bt.4.1 ?))))
-    (assert (verify-backtrace #'bt.4.2
-                              '((bt.4.2 ?))))
-    (assert (verify-backtrace #'bt.4.3
-                              '((bt.4.3 &rest)))))
+    ;; HAIRY-ARG-PROCESSOR
+    (print :hairy-args-processor)
+    (with-details t
+      (assert (verify-backtrace #'bt.4.1
+                                '(((sb-c::hairy-arg-processor bt.4.1) ?))))
+      (assert (verify-backtrace #'bt.4.2
+                                '(((sb-c::hairy-arg-processor bt.4.2) ?))))
+      (assert (verify-backtrace #'bt.4.3
+                                '(((sb-c::hairy-arg-processor bt.4.3) &rest)))))
+    (with-details nil
+      (assert (verify-backtrace #'bt.4.1
+                                '((bt.4.1 ?))))
+      (assert (verify-backtrace #'bt.4.2
+                                '((bt.4.2 ?))))
+      (assert (verify-backtrace #'bt.4.3
+                                '((bt.4.3 &rest)))))
 
-  ;; &OPTIONAL-PROCESSOR
-  (print :optional-processor)
-  (with-details t
-    (assert (verify-backtrace #'bt.5.1
-                              '(((sb-c::&optional-processor bt.5.1)))))
-    (assert (verify-backtrace #'bt.5.2
-                              '(((sb-c::&optional-processor bt.5.2) &rest))))
-    (assert (verify-backtrace #'bt.5.3
-                              '(((sb-c::&optional-processor bt.5.3) &rest)))))
-  (with-details nil
-    (assert (verify-backtrace #'bt.5.1
-                              '((bt.5.1))))
-    (assert (verify-backtrace #'bt.5.2
-                              '((bt.5.2 &rest))))
-    (assert (verify-backtrace #'bt.5.3
-                              '((bt.5.3 &rest))))))
+    ;; &OPTIONAL-PROCESSOR
+    (print :optional-processor)
+    (with-details t
+      (assert (verify-backtrace #'bt.5.1
+                                '(((sb-c::&optional-processor bt.5.1)))))
+      (assert (verify-backtrace #'bt.5.2
+                                '(((sb-c::&optional-processor bt.5.2) &rest))))
+      (assert (verify-backtrace #'bt.5.3
+                                '(((sb-c::&optional-processor bt.5.3) &rest)))))
+    (with-details nil
+      (assert (verify-backtrace #'bt.5.1
+                                '((bt.5.1))))
+      (assert (verify-backtrace #'bt.5.2
+                                '((bt.5.2 &rest))))
+      (assert (verify-backtrace #'bt.5.3
+                                '((bt.5.3 &rest)))))))
 
 ;;;; test TRACE
 
@@ -336,14 +337,14 @@
   (assert (search "TRACE-THIS" out))
   (assert (search "returned OK" out)))
 
-#-(and ppc darwin)
-;;; bug 379
-(let ((out (with-output-to-string (*trace-output*)
-             (trace trace-this :encapsulate nil)
-             (assert (eq 'ok (trace-this)))
-             (untrace))))
-  (assert (search "TRACE-THIS" out))
-  (assert (search "returned OK" out)))
+(with-test (:fails-on '(and :ppc :darwin))
+  ;;; bug 379
+  (let ((out (with-output-to-string (*trace-output*)
+               (trace trace-this :encapsulate nil)
+               (assert (eq 'ok (trace-this)))
+               (untrace))))
+    (assert (search "TRACE-THIS" out))
+    (assert (search "returned OK" out))))
 
 ;;;; test infinite error protection
 
@@ -385,6 +386,3 @@
   (loop while (sb-thread:thread-alive-p thread)))
 
 (disable-debugger)
-
-;;; success
-(quit :unix-status 104)

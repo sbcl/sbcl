@@ -1393,25 +1393,6 @@ WORKAROUND:
   method is applicable, and yet matches neither of the method group
   qualifier patterns.
 
-341: PPRINT-LOGICAL-BLOCK / PPRINT-FILL / PPRINT-LINEAR sharing detection.
-  (from Paul Dietz' test suite)
-
-  CLHS on PPRINT-LINEAR and PPRINT-FILL (and PPRINT-TABULAR, though
-  that's slightly different) states that these functions perform
-  circular and shared structure detection on their object.  Therefore,
-
-  a.(let ((*print-circle* t))
-      (pprint-linear *standard-output* (let ((x '(a))) (list x x))))
-    should print "(#1=(A) #1#)"
-
-  b.(let ((*print-circle* t))
-      (pprint-linear *standard-output* 
-                     (let ((x (cons nil nil))) (setf (cdr x) x) x)))
-    should print "#1=(NIL . #1#)"
-
-  (it is likely that the fault lies in PPRINT-LOGICAL-BLOCK, as
-  suggested by the suggested implementation of PPRINT-TABULAR)
-
 343: MOP:COMPUTE-DISCRIMINATING-FUNCTION overriding causes error
   Even the simplest possible overriding of
   COMPUTE-DISCRIMINATING-FUNCTION, suggested in the PCL implementation

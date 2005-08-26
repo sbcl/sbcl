@@ -52,4 +52,3 @@
   (assert (eq fun (macro-function 'nothing-at-all nil))))
 
 ;;; success
-(quit :unix-status 104)

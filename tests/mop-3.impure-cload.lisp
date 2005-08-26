@@ -90,5 +90,3 @@
 (assert (equalp (list (testgf08 5.0) (testgf08 17))
                 '((real) #(integer real))))
 |#
-
-(sb-ext:quit :unix-status 104)

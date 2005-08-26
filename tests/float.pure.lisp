@@ -91,12 +91,13 @@
            least-positive-double-float))
 (assert (= 0.0 (scale-float 1.0 most-negative-fixnum)))
 (assert (= 0.0d0 (scale-float 1.0d0 (1- most-negative-fixnum))))
-#-(or darwin) ;; bug 372
-(progn
-  (assert (raises-error? (scale-float 1.0 most-positive-fixnum)
-                         floating-point-overflow))
-  (assert (raises-error? (scale-float 1.0d0 (1+ most-positive-fixnum))
-                         floating-point-overflow)))
+
+(with-test (:fails-on '(or :darwin)) ;; bug 372
+  (progn
+    (assert (raises-error? (scale-float 1.0 most-positive-fixnum)
+                           floating-point-overflow))
+    (assert (raises-error? (scale-float 1.0d0 (1+ most-positive-fixnum))
+                           floating-point-overflow))))
 
 ;;; bug found by jsnell when nfroyd tried to implement better LOGAND
 ;;; type derivation.

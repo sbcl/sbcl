@@ -47,4 +47,3 @@
                '(and condition counted-condition)))
 
 ;;; success
-(sb-ext:quit :unix-status 104)

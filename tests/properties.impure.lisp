@@ -33,4 +33,3 @@
 (assert (not (cdr *nil-that-the-compiler-cannot-constant-fold*)))
 
 ;;; success
-(quit :unix-status 104)

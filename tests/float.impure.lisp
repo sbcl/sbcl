@@ -119,6 +119,3 @@
 (defun new-pu-label-from-pu-labels (array)
   (setf (aref (the myarraytype array) 0) 
         sb-ext:double-float-positive-infinity))
-
-;;; success
-(quit :unix-status 104)

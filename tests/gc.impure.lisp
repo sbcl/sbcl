@@ -70,4 +70,3 @@
     (setq gc-happend nil))
   (assert (not gc-happend)))
 
-(sb-ext:quit :unix-status 104)

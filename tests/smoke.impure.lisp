@@ -73,4 +73,3 @@
   (assert (equal (funcall fn 1 2 3) '(1 2 3))))
 
 ;;; success
-(quit :unix-status 104)

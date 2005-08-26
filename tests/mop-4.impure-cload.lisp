@@ -92,5 +92,3 @@ and
 ;;; from mop.tst in clisp's test suite
 
 |#
-
-(sb-ext:quit :unix-status 104)

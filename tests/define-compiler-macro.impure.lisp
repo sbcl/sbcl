@@ -39,4 +39,3 @@
                         '(funcall #'square x)
                         nil)))
 
-(quit :unix-status 104)

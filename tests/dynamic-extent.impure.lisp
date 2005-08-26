@@ -188,4 +188,3 @@
 (bdowning-2005-iv-16)
 
 
-(sb-ext:quit :unix-status 104)

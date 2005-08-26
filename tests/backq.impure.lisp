@@ -61,6 +61,3 @@
 (let ((a '`(1 ,@a ,@b ,.c ,.d)))
   (let ((*print-circle* t))
     (assert (equal (read-from-string (write-to-string a)) a))))
-
-;;; success
-(quit :unix-status 104)

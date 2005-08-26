@@ -664,4 +664,3 @@
 
 ;;; success
 (format t "~&/returning success~%")
-(quit :unix-status 104)

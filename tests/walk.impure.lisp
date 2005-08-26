@@ -969,4 +969,3 @@ Form: NIL   Context: EVAL; bound: NIL
 (defmethod #:foo ()
   (defun #:bar ()))
 
-(quit :unix-status 104)

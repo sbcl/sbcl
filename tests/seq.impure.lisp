@@ -996,4 +996,3 @@
      until (= i sb-vm:n-word-bits))
 
 ;;; success
-(sb-ext:quit :unix-status 104)

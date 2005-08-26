@@ -448,6 +448,3 @@
 (progv '(*hannu-trap*) '()
   (setq *hannu-trap* t))
 (assert (not *hannu-trap*))
-
-
-(sb-ext:quit :unix-status 104)

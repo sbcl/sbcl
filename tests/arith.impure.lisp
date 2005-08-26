@@ -152,4 +152,3 @@
 (assert (= (64-bit-logcount (1- (ash 1 48))) 48))
 (assert (= (64-bit-logcount (1- (ash 1 54))) 54))
 
-(sb-ext:quit :unix-status 104)

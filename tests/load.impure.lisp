@@ -68,4 +68,3 @@
            (assert (equal (merge-pathnames *tmp-filename*) *saved-load-pathname*)))
       (delete-file *tmp-filename*))))
 
-(quit :unix-status 104)

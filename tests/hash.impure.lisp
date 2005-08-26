@@ -257,4 +257,3 @@
                       nil))))
 
 ;;; success
-(quit :unix-status 104)

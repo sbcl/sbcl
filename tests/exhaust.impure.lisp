@@ -71,4 +71,3 @@
   (assert (= exhaust-count recurse-count *count*)))
 
 ;;; OK!
-(quit :unix-status 104)

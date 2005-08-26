@@ -180,4 +180,3 @@
 (loop for size from 2 to 40 do (bin-stream-test :size size :type 'signed-byte))
 
 ;;; success
-(quit :unix-status 104)

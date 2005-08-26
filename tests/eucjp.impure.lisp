@@ -84,4 +84,3 @@
                              'list)
                      (coerce o 'list))))))
 ;;; success
-(sb-ext:quit :unix-status 104)

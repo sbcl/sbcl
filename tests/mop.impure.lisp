@@ -430,4 +430,3 @@
 (assert (eq (slot-value (make-instance 'extra-initarg) 'slot) 'extra))
 
 ;;;; success
-(sb-ext:quit :unix-status 104)

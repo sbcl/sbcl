@@ -57,6 +57,3 @@
 
 
 (eval '(make-instance 'person :name t))
-
-;;; success
-(sb-ext:quit :unix-status 104)

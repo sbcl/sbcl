@@ -126,4 +126,3 @@
 
 (assert (= 26 (alien-funcall foo)))
 
-(quit :unix-status 104)

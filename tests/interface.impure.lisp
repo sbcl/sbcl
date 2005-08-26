@@ -44,4 +44,3 @@
 (disassemble 'disassemble-closure)
 
 ;;;; success
-(sb-ext:quit :unix-status 104)

@@ -238,5 +238,3 @@
   (find-class 'some-structure nil))
 (eval-when (:load-toplevel)
   (assert (typep (find-class 'some-structure) 'class)))
-
-(sb-ext:quit :unix-status 104) ; success

@@ -137,4 +137,3 @@
                  (eval '(progn (princ ".") (let ((x 42)) t) (princ "."))))))
 
 ;;; success
-(sb-ext:quit :unix-status 104)

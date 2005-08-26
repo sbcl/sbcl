@@ -11,4 +11,3 @@
                    saps
                    (mapcar #'sb-sys:vector-sap vectors)))))
 
-(quit :unix-status 104)

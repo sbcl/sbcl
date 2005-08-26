@@ -338,4 +338,3 @@
 (assert (string= (format nil "~@F" 1.23) "+1.23"))
 
 ;;; success
-(quit :unix-status 104)

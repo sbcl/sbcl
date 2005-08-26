@@ -39,7 +39,9 @@
 
 (delete-file "external-format-test.txt")
 #-sb-unicode
-(sb-ext:quit :unix-status 104)
+(progn
+  (test-util:report-test-status)
+  (sb-ext:quit :unix-status 104))
 
 ;;; Test UTF-8 writing and reading of 1, 2, 3 and 4 octet characters with
 ;;; all possible offsets. Tests for buffer edge bugs. fd-stream buffers are
@@ -159,4 +161,3 @@
 
 
 (delete-file "external-format-test.txt")
-(sb-ext:quit :unix-status 104)

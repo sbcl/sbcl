@@ -202,4 +202,3 @@
                      (write '#1=(#2=(#2# . #3=(#1# . #3#))) :stream s)))))
 
 ;;; success
-(quit :unix-status 104)

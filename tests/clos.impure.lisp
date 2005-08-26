@@ -1179,4 +1179,3 @@
                    (list 1 1))))))
 
 ;;;; success
-(sb-ext:quit :unix-status 104)
