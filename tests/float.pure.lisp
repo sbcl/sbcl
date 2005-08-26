@@ -115,3 +115,11 @@
       (phase (the (eql #c(1.0d0 2.0d0)) p1))))
    #c(1.0d0 2.0d0))
     'double-float))
+
+(assert (typep (nth-value
+                1
+                (ignore-errors
+                  (sb-sys:without-interrupts
+                    (loop repeat 2 summing most-positive-double-float)
+                    (sleep 2))))
+               'floating-point-overflow))

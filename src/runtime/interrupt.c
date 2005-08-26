@@ -83,7 +83,6 @@ void sigaddset_deferrable(sigset_t *s)
     sigaddset(s, SIGPIPE);
     sigaddset(s, SIGALRM);
     sigaddset(s, SIGURG);
-    sigaddset(s, SIGFPE);
     sigaddset(s, SIGTSTP);
     sigaddset(s, SIGCHLD);
     sigaddset(s, SIGIO);
@@ -423,7 +422,8 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #endif
     union interrupt_handler handler;
     check_blockables_blocked_or_lose();
-    check_interrupts_enabled_or_lose(context);
+    if (sigismember(&deferrable_sigset,signal))
+        check_interrupts_enabled_or_lose(context);
 
 #ifdef LISP_FEATURE_LINUX
     /* Under Linux on some architectures, we appear to have to restore
