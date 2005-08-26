@@ -41,7 +41,7 @@ changes in sbcl-0.9.4 relative to sbcl-0.9.3:
   * bug fix: signal handling and triggering gc do not conflict
     directly anymore, in particular a high frequency sb-sprof does
     not prevent gc from running
-  * bug fix: DECODE-UNIVERAL-TIME now uses a more reasonable
+  * bug fix: DECODE-UNIVERSAL-TIME now uses a more reasonable
     approximation for timezone and DST information between the
     universal time epoch and the smallest negative 32-bit time_t.
   * bug fix: ENCODE-UNIVERSAL-TIME no longer errors when passed the
