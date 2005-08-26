@@ -51,3 +51,17 @@
 (assert (= (ub32 5 1) 32))
 (assert (= (ub32 5 (ash 1 26)) (ash 1 31)))
 (assert (= (ub32 5 (ash 1 27)) 1))
+
+;;; test with (contrived) register pressure on the x86 to ensure that the
+;;; rotatee doesn't get clobbered by the count.
+
+(defun ub32-reg-pressure (count integer)
+  (declare (type (unsigned-byte 32) integer)
+           (type (integer -31 31) count))
+  (rotate-byte count (byte 32 0) (ldb (byte 32 0) (+ (* 67 count)
+                                                     integer))))
+
+(assert (= (ub32-reg-pressure 1 5) 144))
+(assert (= (ub32-reg-pressure 5 5) 10880))
+(assert (= (ub32-reg-pressure 5 (ash 1 26)) 2147494368))
+(assert (= (ub32-reg-pressure 5 (ash 1 27)) 10721))

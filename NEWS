@@ -46,6 +46,9 @@ changes in sbcl-0.9.4 relative to sbcl-0.9.3:
     universal time epoch and the smallest negative 32-bit time_t.
   * bug fix: ENCODE-UNIVERSAL-TIME no longer errors when passed the
     year 1899 so long as the encoded time is non-negative.
+  * bug fix: on the x86 platform, SB-ROTATE-BYTE:ROTATE-BYTE returns
+    the correct answer for non-constant rotate amounts when performing
+    an inline 32-bit rotation.
   * threads
     ** bug fix: RELEASE-FOREGROUND doesn't choke on session lock if
        there is only one thread in the session

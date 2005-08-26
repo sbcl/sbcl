@@ -46,7 +46,7 @@
                (:arg-types sb-vm::tagged-num ,arg-type)
                (:temporary (:sc sb-vm::signed-reg :offset sb-vm::ecx-offset)
                            ecx)
-               (:results (res :scs (sb-vm::unsigned-reg)))
+               (:results (res :scs (sb-vm::unsigned-reg) :from :load))
                (:result-types sb-vm::unsigned-byte-32)
                (:generator 10
                 (let ((label (gen-label))
