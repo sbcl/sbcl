@@ -96,6 +96,8 @@ void sigaddset_deferrable(sigset_t *s);
 /* Set all blockable signals into *s. */
 void sigaddset_blockable(sigset_t *s);
 
+extern void block_blockable_signals();
+
 /* The void* casting here avoids having to mess with the various types
  * of function argument lists possible for signal handlers:
  * SA_SIGACTION handlers have one signature, and the default old-style

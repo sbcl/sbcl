@@ -144,6 +144,7 @@
   (enable-interrupt sigsys #'sigsys-handler)
   (enable-interrupt sigpipe #'sigpipe-handler)
   (enable-interrupt sigalrm #'sigalrm-handler)
+  (sb!unix::reset-signal-mask)
   (values))
 
 ;;;; etc.

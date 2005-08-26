@@ -191,6 +191,9 @@ main(int argc, char *argv[], char *envp[])
 
     lispobj initial_function;
 
+    interrupt_init();
+    block_blockable_signals();
+
     setlocale(LC_ALL, "");
 
     /* KLUDGE: os_vm_page_size is set by os_init(), and on some
@@ -328,7 +331,6 @@ main(int argc, char *argv[], char *envp[])
 
     gc_initialize_pointers();
 
-    interrupt_init();
     arch_install_interrupt_handlers();
     os_install_interrupt_handlers();
 
@@ -336,10 +338,6 @@ main(int argc, char *argv[], char *envp[])
     SHOW("setting POSIX-ARGV symbol value");
     SetSymbolValue(POSIX_ARGV, alloc_base_string_list(sbcl_argv),0);
     free(sbcl_argv);
-
-    /* Install a handler to pick off SIGINT until the Lisp system gets
-     * far enough along to install its own handler. */
-    sigint_init();
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n", initial_function));
     create_initial_thread(initial_function);

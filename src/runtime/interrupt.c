@@ -605,8 +605,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif
-    if(maybe_defer_handler(interrupt_handle_now,data,
-                           signal,info,context))
+    if(maybe_defer_handler(interrupt_handle_now,data,signal,info,context))
         return;
     interrupt_handle_now(signal, info, context);
 #ifdef LISP_FEATURE_DARWIN
@@ -620,8 +619,7 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
     struct thread *thread=arch_os_get_current_thread();
-    struct interrupt_data *data=
-        thread ? thread->interrupt_data : global_interrupt_data;
+    struct interrupt_data *data=thread->interrupt_data;
 
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
@@ -641,8 +639,7 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     struct thread *thread=arch_os_get_current_thread();
-    struct interrupt_data *data=
-        thread ? thread->interrupt_data : global_interrupt_data;
+    struct interrupt_data *data=thread->interrupt_data;
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif
@@ -966,8 +963,7 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context=(os_context_t *) void_context;
     struct thread *th=arch_os_get_current_thread();
-    struct interrupt_data *data=
-        th ? th->interrupt_data : global_interrupt_data;
+    struct interrupt_data *data=th->interrupt_data;
 
     if(!foreign_function_call_active && gc_trigger_hit(signal, info, context)){
         struct thread *thread=arch_os_get_current_thread();
@@ -1056,6 +1052,7 @@ undoably_install_low_level_interrupt_handler (int signal,
 {
     struct sigaction sa;
     struct thread *th=arch_os_get_current_thread();
+    /* It may be before the initial thread is started. */
     struct interrupt_data *data=
         th ? th->interrupt_data : global_interrupt_data;
 
@@ -1093,6 +1090,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     sigset_t old, new;
     union interrupt_handler oldhandler;
     struct thread *th=arch_os_get_current_thread();
+    /* It may be before the initial thread is started. */
     struct interrupt_data *data=
         th ? th->interrupt_data : global_interrupt_data;
 

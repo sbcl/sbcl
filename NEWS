@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.5 relative to sbcl-0.9.4:
+  * bug fix: interrupts are disabled until startup is complete; no
+    more sigsegvs when receiving a signal to soon
   * threads
     ** bug fix: parent thread now can be gc'ed even with a live
        child thread
