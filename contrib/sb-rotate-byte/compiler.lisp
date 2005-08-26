@@ -56,3 +56,15 @@
   ;; FIXME: What happens when, as here, the two type specifiers for
   ;; COUNT overlap?  Which gets to run first?
   '(%unsigned-32-rotate-byte count integer))
+
+;; Generic implementation for platforms that don't supply VOPs for 32-bit
+;; rotate.
+#-(or x86 ppc)
+(deftransform %unsigned-32-rotate-byte ((.count. .integer.)
+                                        ((integer -31 31)
+                                         (unsigned-byte 32)) *)
+  '(if (< .count. 0)
+       (logior (ldb (byte 32 0) (ash .integer. (+ .count. 32)))
+               (ash .integer. .count.))
+       (logior (ldb (byte 32 0) (ash .integer. .count.))
+               (ash .integer. (- .count. 32)))))
