@@ -283,22 +283,40 @@
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
+  (:temporary (:sc descriptor-reg :offset rax-offset) rax)
   (:temporary (:sc unsigned-reg) tls-index temp bsp)
-  (:generator 5
-    (let ((tls-index-valid (gen-label)))
+  (:generator 10
+    (let ((tls-index-valid (gen-label))
+          (get-tls-index-lock (gen-label))
+          (release-tls-index-lock (gen-label)))
       (load-tl-symbol-value bsp *binding-stack-pointer*)
       (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
       (inst add bsp (* binding-size n-word-bytes))
       (store-tl-symbol-value bsp *binding-stack-pointer* temp)
-
       (inst or tls-index tls-index)
       (inst jmp :ne tls-index-valid)
-      ;; allocate a new tls-index
-      (load-symbol-value tls-index *free-tls-index*)
-      (inst add tls-index 8)            ;XXX surely we can do this more
-      (store-symbol-value tls-index *free-tls-index*) ;succintly
-      (inst sub tls-index 8)
-      (storew tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+
+      (pseudo-atomic
+       (emit-label get-tls-index-lock)
+       (inst mov temp 1)
+       (inst xor rax rax)
+       (inst lock)
+       (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*) temp)
+       (inst jmp :ne get-tls-index-lock)
+       ;; now with the lock held, see if the symbol's tls index has
+       ;; been set in the meantime
+       (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+       (inst or tls-index tls-index)
+       (inst jmp :ne release-tls-index-lock)
+       ;; allocate a new tls-index
+       (load-symbol-value tls-index *free-tls-index*)
+       (inst add tls-index 8)          ;XXX surely we can do this more
+       (store-symbol-value tls-index *free-tls-index*) ;succintly
+       (inst sub tls-index 8)
+       (storew tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+       (emit-label release-tls-index-lock)
+       (store-symbol-value 0 *tls-index-lock*))
+
       (emit-label tls-index-valid)
       (inst mov temp
             (make-ea :qword :base thread-base-tn :scale 1 :index tls-index))

@@ -52,32 +52,31 @@
 (defmacro load-symbol (reg symbol)
   `(inst mov ,reg (+ nil-value (static-symbol-offset ,symbol))))
 
+(defmacro make-ea-for-symbol-value (symbol)
+  `(make-ea :qword
+    :disp (+ nil-value
+           (static-symbol-offset ',symbol)
+           (ash symbol-value-slot word-shift)
+           (- other-pointer-lowtag))))
+
 (defmacro load-symbol-value (reg symbol)
-  `(inst mov ,reg
-         (make-ea :qword
-                  :disp (+ nil-value
-                           (static-symbol-offset ',symbol)
-                           (ash symbol-value-slot word-shift)
-                           (- other-pointer-lowtag)))))
+  `(inst mov ,reg (make-ea-for-symbol-value ,symbol)))
 
 (defmacro store-symbol-value (reg symbol)
-  `(inst mov
-         (make-ea :qword
-                  :disp (+ nil-value
-                           (static-symbol-offset ',symbol)
-                           (ash symbol-value-slot word-shift)
-                           (- other-pointer-lowtag)))
-         ,reg))
+  `(inst mov (make-ea-for-symbol-value ,symbol) ,reg))
+
+#!+sb-thread
+(defmacro make-ea-for-symbol-tls-index (symbol)
+  `(make-ea :qword
+    :disp (+ nil-value
+           (static-symbol-offset ',symbol)
+           (ash symbol-tls-index-slot word-shift)
+           (- other-pointer-lowtag))))
 
 #!+sb-thread
 (defmacro load-tl-symbol-value (reg symbol)
   `(progn
-    (inst mov ,reg
-     (make-ea :qword
-      :disp (+ nil-value
-               (static-symbol-offset ',symbol)
-               (ash symbol-tls-index-slot word-shift)
-               (- other-pointer-lowtag))))
+    (inst mov ,reg (make-ea-for-symbol-tls-index ,symbol))
     (inst mov ,reg (make-ea :qword :base thread-base-tn :scale 1 :index ,reg))))
 #!-sb-thread
 (defmacro load-tl-symbol-value (reg symbol) `(load-symbol-value ,reg ,symbol))
@@ -85,12 +84,7 @@
 #!+sb-thread
 (defmacro store-tl-symbol-value (reg symbol temp)
   `(progn
-    (inst mov ,temp
-     (make-ea :qword
-      :disp (+ nil-value
-               (static-symbol-offset ',symbol)
-               (ash symbol-tls-index-slot word-shift)
-               (- other-pointer-lowtag))))
+    (inst mov ,temp (make-ea-for-symbol-tls-index ,symbol))
     (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index ,temp) ,reg)))
 #!-sb-thread
 (defmacro store-tl-symbol-value (reg symbol temp)

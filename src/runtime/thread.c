@@ -174,12 +174,14 @@ create_thread_struct(lispobj initial_function) {
         int i;
         for(i=0;i<(dynamic_values_bytes/sizeof(lispobj));i++)
             per_thread->dynamic_values[i]=NO_TLS_VALUE_MARKER_WIDETAG;
-        if(SymbolValue(FREE_TLS_INDEX,0)==UNBOUND_MARKER_WIDETAG)
+        if(SymbolValue(FREE_TLS_INDEX,0)==UNBOUND_MARKER_WIDETAG) {
             SetSymbolValue
                 (FREE_TLS_INDEX,
                  make_fixnum(MAX_INTERRUPTS+
                              sizeof(struct thread)/sizeof(lispobj)),
                  0);
+            SetSymbolValue(TLS_INDEX_LOCK,make_fixnum(0),0);
+        }
 #define STATIC_TLS_INIT(sym,field) \
   ((struct symbol *)(sym-OTHER_POINTER_LOWTAG))->tls_index= \
   make_fixnum(THREAD_SLOT_OFFSET_WORDS(field))

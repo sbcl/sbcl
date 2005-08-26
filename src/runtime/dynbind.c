@@ -36,16 +36,27 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
     lispobj old_tl_value;
     struct binding *binding;
     struct thread *thread=(struct thread *)th;
-#ifdef LISP_FEATURE_SB_THREAD
-    struct symbol *sym=(struct symbol *)native_pointer(symbol);
-#endif
     binding = GetBSP();
     SetBSP(binding+1);
 #ifdef LISP_FEATURE_SB_THREAD
-    if(!sym->tls_index) {
-        sym->tls_index=SymbolValue(FREE_TLS_INDEX,0);
-        SetSymbolValue(FREE_TLS_INDEX,
-                       make_fixnum(fixnum_value(sym->tls_index)+1),0);
+    {
+        struct symbol *sym=(struct symbol *)native_pointer(symbol);
+        if(!sym->tls_index) {
+            lispobj *tls_index_lock=
+                &((struct symbol *)native_pointer(TLS_INDEX_LOCK))->value;
+            SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
+            SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);
+            get_spinlock(tls_index_lock,(long)th);
+            if(!sym->tls_index) {
+                sym->tls_index=SymbolValue(FREE_TLS_INDEX,0);
+                SetSymbolValue(FREE_TLS_INDEX,
+                               make_fixnum(fixnum_value(sym->tls_index)+1),0);
+            }
+            release_spinlock(tls_index_lock);
+            SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
+            if (fixnum_value(SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th)))
+                do_pending_interrupt();
+        }
     }
 #endif
     old_tl_value=SymbolTlValue(symbol,thread);

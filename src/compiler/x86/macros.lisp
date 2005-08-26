@@ -67,32 +67,31 @@
 (defmacro load-symbol (reg symbol)
   `(inst mov ,reg (+ nil-value (static-symbol-offset ,symbol))))
 
+(defmacro make-ea-for-symbol-value (symbol)
+  `(make-ea :dword
+    :disp (+ nil-value
+           (static-symbol-offset ',symbol)
+           (ash symbol-value-slot word-shift)
+           (- other-pointer-lowtag))))
+
 (defmacro load-symbol-value (reg symbol)
-  `(inst mov ,reg
-         (make-ea :dword
-                  :disp (+ nil-value
-                           (static-symbol-offset ',symbol)
-                           (ash symbol-value-slot word-shift)
-                           (- other-pointer-lowtag)))))
+  `(inst mov ,reg (make-ea-for-symbol-value ,symbol)))
 
 (defmacro store-symbol-value (reg symbol)
-  `(inst mov
-         (make-ea :dword
-                  :disp (+ nil-value
-                           (static-symbol-offset ',symbol)
-                           (ash symbol-value-slot word-shift)
-                           (- other-pointer-lowtag)))
-         ,reg))
+  `(inst mov (make-ea-for-symbol-value ,symbol) ,reg))
+
+#!+sb-thread
+(defmacro make-ea-for-symbol-tls-index (symbol)
+  `(make-ea :dword
+    :disp (+ nil-value
+           (static-symbol-offset ',symbol)
+           (ash symbol-tls-index-slot word-shift)
+           (- other-pointer-lowtag))))
 
 #!+sb-thread
 (defmacro load-tl-symbol-value (reg symbol)
   `(progn
-    (inst mov ,reg
-     (make-ea :dword
-      :disp (+ nil-value
-               (static-symbol-offset ',symbol)
-               (ash symbol-tls-index-slot word-shift)
-               (- other-pointer-lowtag))))
+    (inst mov ,reg (make-ea-for-symbol-tls-index ,symbol))
     (inst fs-segment-prefix)
     (inst mov ,reg (make-ea :dword :scale 1 :index ,reg))))
 #!-sb-thread
@@ -101,12 +100,7 @@
 #!+sb-thread
 (defmacro store-tl-symbol-value (reg symbol temp)
   `(progn
-    (inst mov ,temp
-     (make-ea :dword
-      :disp (+ nil-value
-               (static-symbol-offset ',symbol)
-               (ash symbol-tls-index-slot word-shift)
-               (- other-pointer-lowtag))))
+    (inst mov ,temp (make-ea-for-symbol-tls-index ,symbol))
     (inst fs-segment-prefix)
     (inst mov (make-ea :dword :scale 1 :index ,temp) ,reg)))
 #!-sb-thread

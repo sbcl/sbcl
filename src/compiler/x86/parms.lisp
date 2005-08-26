@@ -315,6 +315,7 @@
     *gc-pending*
 
     *free-tls-index*
+    *tls-index-lock*
 
     *allocation-pointer*
     *binding-stack-pointer*
