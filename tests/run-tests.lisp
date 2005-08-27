@@ -57,7 +57,7 @@
                           (ecase (first fail)
                             (:expected-failure "Expected failure:")
                             (:unexpected-failure "Failure:")
-                            (:unexpected-success "Unexcepted success:"))
+                            (:unexpected-success "Unexpected success:"))
                           (enough-namestring (second fail))
                           (third fail))))))
         (t

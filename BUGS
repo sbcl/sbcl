@@ -2097,3 +2097,13 @@ WORKAROUND:
   According to <http://alfa.s145.xrea.com/sbcl/solaris-x86.html>, the
   stack exhaustion checking (implemented with a write-protected guard
   page) does not work on SunOS/x86.
+
+387:
+  12:10 < jsnell> the package-lock test is basically due to a change in the test 
+                  behaviour when you install a handler for error around it. I 
+                  thought I'd disabled the test for now, but apparently that was 
+                  my imagination
+  12:19 < Xophe> jsnell: ah, I see the problem in the package-locks stuff
+  12:19 < Xophe> it's the same problem as we had with compiler-error conditions
+  12:19 < Xophe> the thing that's signalled up and down the stack is a subtype of
+                  ERROR, where it probably shouldn't be
