@@ -115,6 +115,17 @@
                                      (deref integer-array 1)))
     (assert (eql (deref enum-array 2) 'k-two))))
 
+;; enums used to allow values to be used only once
+;; C enums allow for multiple tags to point to the same value
+(define-alien-type enum.4
+    (enum nil (:key1 1) (:key2 2) (:keytwo 2)))
+(with-alien ((enum-array (array enum.4 3)))
+  (setf (deref enum-array 0) :key1)
+  (setf (deref enum-array 1) :key2)
+  (setf (deref enum-array 2) :keytwo)
+  (assert (and (eql (deref enum-array 1) (deref enum-array 2))
+               (eql (deref enum-array 1) :key2))))
+
 ;;; As reported by Baughn on #lisp, ALIEN-FUNCALL loops forever when
 ;;; compiled with (DEBUG 3).
 (sb-kernel::values-specifier-type-cache-clear)
