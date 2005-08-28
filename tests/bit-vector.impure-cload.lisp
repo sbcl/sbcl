@@ -69,14 +69,12 @@
     (assert (= (aref a 0) 1))
     (inform :aref-2)
     (assert (= (aref a (- array-dimension-limit 2)) 1))
-    #-darwin
-    (progn
-      (inform :bit-and)
-      (bit-and a b a)
-      (inform :aref-3)
-      (assert (= (aref a 0) 0))
-      (inform :aref-4)
-      (assert (= (aref a (- array-dimension-limit 2)) 0)))))
+    (inform :bit-and)
+    (bit-and a b a)
+    (inform :aref-3)
+    (assert (= (aref a 0) 0))
+    (inform :aref-4)
+    (assert (= (aref a (- array-dimension-limit 2)) 0))))
 
 (test-small-bit-vectors)
 

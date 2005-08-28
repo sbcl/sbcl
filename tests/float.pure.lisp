@@ -92,7 +92,7 @@
 (assert (= 0.0 (scale-float 1.0 most-negative-fixnum)))
 (assert (= 0.0d0 (scale-float 1.0d0 (1- most-negative-fixnum))))
 
-(with-test (:fails-on '(or :darwin)) ;; bug 372
+(with-test (:fails-on '(or :ppc)) ;; bug 372
   (progn
     (assert (raises-error? (scale-float 1.0 most-positive-fixnum)
                            floating-point-overflow))
@@ -117,10 +117,11 @@
    #c(1.0d0 2.0d0))
     'double-float))
 
-(assert (typep (nth-value
-                1
-                (ignore-errors
-                  (sb-sys:without-interrupts
-                    (loop repeat 2 summing most-positive-double-float)
-                    (sleep 2))))
-               'floating-point-overflow))
+(with-test (:fails-on '(or :ppc))
+  (assert (typep (nth-value
+                  1
+                  (ignore-errors
+                    (sb-sys:without-interrupts
+                     (loop repeat 2 summing most-positive-double-float)
+                     (sleep 2))))
+                 'floating-point-overflow)))

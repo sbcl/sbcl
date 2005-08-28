@@ -337,14 +337,14 @@
   (assert (search "TRACE-THIS" out))
   (assert (search "returned OK" out)))
 
-(with-test (:fails-on '(and :ppc :darwin))
-  ;;; bug 379
-  (let ((out (with-output-to-string (*trace-output*)
-               (trace trace-this :encapsulate nil)
-               (assert (eq 'ok (trace-this)))
-               (untrace))))
-    (assert (search "TRACE-THIS" out))
-    (assert (search "returned OK" out))))
+;;; bug 379
+#-(and ppc darwin)
+(let ((out (with-output-to-string (*trace-output*)
+             (trace trace-this :encapsulate nil)
+             (assert (eq 'ok (trace-this)))
+             (untrace))))
+  (assert (search "TRACE-THIS" out))
+  (assert (search "returned OK" out)))
 
 ;;;; test infinite error protection
 
