@@ -652,9 +652,15 @@
 
  ("src/code/octets" :not-host)
  #!+sb-unicode
- ("src/code/eucjp" :not-host)
+ ("src/code/external-formats/enc-cyr" :not-host)
  #!+sb-unicode
- ("src/code/koi8-r" :not-host)
+ ("src/code/external-formats/enc-dos" :not-host)
+ #!+sb-unicode
+ ("src/code/external-formats/enc-iso" :not-host)
+ #!+sb-unicode
+ ("src/code/external-formats/enc-win" :not-host)
+ #!+sb-unicode
+ ("src/code/external-formats/eucjp" :not-host)
 
  ;; The code here can't be compiled until CONDITION and
  ;; DEFINE-CONDITION are defined and SB!DEBUG:*STACK-TOP-HINT* is

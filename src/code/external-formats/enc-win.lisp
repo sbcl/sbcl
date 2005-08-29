@@ -1,0 +1,1110 @@
+(in-package #:sb!impl)
+
+(define-unibyte-mapper cp1250->code-mapper code->cp1250-mapper
+  (#x80 #x20AC) ; EURO SIGN
+  (#x81 nil)
+  (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
+  (#x83 nil)
+  (#x84 #x201E) ; DOUBLE LOW-9 QUOTATION MARK
+  (#x85 #x2026) ; HORIZONTAL ELLIPSIS
+  (#x86 #x2020) ; DAGGER
+  (#x87 #x2021) ; DOUBLE DAGGER
+  (#x88 nil)
+  (#x89 #x2030) ; PER MILLE SIGN
+  (#x8A #x0160) ; LATIN CAPITAL LETTER S WITH CARON
+  (#x8B #x2039) ; SINGLE LEFT-POINTING ANGLE QUOTATION MARK
+  (#x8C #x015A) ; LATIN CAPITAL LETTER S WITH ACUTE
+  (#x8D #x0164) ; LATIN CAPITAL LETTER T WITH CARON
+  (#x8E #x017D) ; LATIN CAPITAL LETTER Z WITH CARON
+  (#x8F #x0179) ; LATIN CAPITAL LETTER Z WITH ACUTE
+  (#x90 nil)
+  (#x91 #x2018) ; LEFT SINGLE QUOTATION MARK
+  (#x92 #x2019) ; RIGHT SINGLE QUOTATION MARK
+  (#x93 #x201C) ; LEFT DOUBLE QUOTATION MARK
+  (#x94 #x201D) ; RIGHT DOUBLE QUOTATION MARK
+  (#x95 #x2022) ; BULLET
+  (#x96 #x2013) ; EN DASH
+  (#x97 #x2014) ; EM DASH
+  (#x98 nil)
+  (#x99 #x2122) ; TRADE MARK SIGN
+  (#x9A #x0161) ; LATIN SMALL LETTER S WITH CARON
+  (#x9B #x203A) ; SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+  (#x9C #x015B) ; LATIN SMALL LETTER S WITH ACUTE
+  (#x9D #x0165) ; LATIN SMALL LETTER T WITH CARON
+  (#x9E #x017E) ; LATIN SMALL LETTER Z WITH CARON
+  (#x9F #x017A) ; LATIN SMALL LETTER Z WITH ACUTE
+  (#xA1 #x02C7) ; CARON
+  (#xA2 #x02D8) ; BREVE
+  (#xA3 #x0141) ; LATIN CAPITAL LETTER L WITH STROKE
+  (#xA5 #x0104) ; LATIN CAPITAL LETTER A WITH OGONEK
+  (#xAA #x015E) ; LATIN CAPITAL LETTER S WITH CEDILLA
+  (#xAF #x017B) ; LATIN CAPITAL LETTER Z WITH DOT ABOVE
+  (#xB2 #x02DB) ; OGONEK
+  (#xB3 #x0142) ; LATIN SMALL LETTER L WITH STROKE
+  (#xB9 #x0105) ; LATIN SMALL LETTER A WITH OGONEK
+  (#xBA #x015F) ; LATIN SMALL LETTER S WITH CEDILLA
+  (#xBC #x013D) ; LATIN CAPITAL LETTER L WITH CARON
+  (#xBD #x02DD) ; DOUBLE ACUTE ACCENT
+  (#xBE #x013E) ; LATIN SMALL LETTER L WITH CARON
+  (#xBF #x017C) ; LATIN SMALL LETTER Z WITH DOT ABOVE
+  (#xC0 #x0154) ; LATIN CAPITAL LETTER R WITH ACUTE
+  (#xC3 #x0102) ; LATIN CAPITAL LETTER A WITH BREVE
+  (#xC5 #x0139) ; LATIN CAPITAL LETTER L WITH ACUTE
+  (#xC6 #x0106) ; LATIN CAPITAL LETTER C WITH ACUTE
+  (#xC8 #x010C) ; LATIN CAPITAL LETTER C WITH CARON
+  (#xCA #x0118) ; LATIN CAPITAL LETTER E WITH OGONEK
+  (#xCC #x011A) ; LATIN CAPITAL LETTER E WITH CARON
+  (#xCF #x010E) ; LATIN CAPITAL LETTER D WITH CARON
+  (#xD0 #x0110) ; LATIN CAPITAL LETTER D WITH STROKE
+  (#xD1 #x0143) ; LATIN CAPITAL LETTER N WITH ACUTE
+  (#xD2 #x0147) ; LATIN CAPITAL LETTER N WITH CARON
+  (#xD5 #x0150) ; LATIN CAPITAL LETTER O WITH DOUBLE ACUTE
+  (#xD8 #x0158) ; LATIN CAPITAL LETTER R WITH CARON
+  (#xD9 #x016E) ; LATIN CAPITAL LETTER U WITH RING ABOVE
+  (#xDB #x0170) ; LATIN CAPITAL LETTER U WITH DOUBLE ACUTE
+  (#xDE #x0162) ; LATIN CAPITAL LETTER T WITH CEDILLA
+  (#xE0 #x0155) ; LATIN SMALL LETTER R WITH ACUTE
+  (#xE3 #x0103) ; LATIN SMALL LETTER A WITH BREVE
+  (#xE5 #x013A) ; LATIN SMALL LETTER L WITH ACUTE
+  (#xE6 #x0107) ; LATIN SMALL LETTER C WITH ACUTE
+  (#xE8 #x010D) ; LATIN SMALL LETTER C WITH CARON
+  (#xEA #x0119) ; LATIN SMALL LETTER E WITH OGONEK
+  (#xEC #x011B) ; LATIN SMALL LETTER E WITH CARON
+  (#xEF #x010F) ; LATIN SMALL LETTER D WITH CARON
+  (#xF0 #x0111) ; LATIN SMALL LETTER D WITH STROKE
+  (#xF1 #x0144) ; LATIN SMALL LETTER N WITH ACUTE
+  (#xF2 #x0148) ; LATIN SMALL LETTER N WITH CARON
+  (#xF5 #x0151) ; LATIN SMALL LETTER O WITH DOUBLE ACUTE
+  (#xF8 #x0159) ; LATIN SMALL LETTER R WITH CARON
+  (#xF9 #x016F) ; LATIN SMALL LETTER U WITH RING ABOVE
+  (#xFB #x0171) ; LATIN SMALL LETTER U WITH DOUBLE ACUTE
+  (#xFE #x0163) ; LATIN SMALL LETTER T WITH CEDILLA
+  (#xFF #x02D9) ; DOT ABOVE
+)
+
+(declaim (inline get-cp1250-bytes))
+(defun get-cp1250-bytes(string pos end)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range pos end))
+  (get-latin-bytes #'identity :cp1250 string pos end))
+
+(defun string->cp1250 (string sstart send null-padding)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range sstart send))
+  (values (string->latin% string sstart send #'get-cp1250-bytes null-padding)))
+
+(defmacro define-cp1250->string* (accessor type)
+  (declare (ignore type))
+  (let ((name (make-od-name 'cp1250->string* accessor)))
+    `(progn
+      (defun ,name (string sstart send array astart aend)
+	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+
+(instantiate-octets-definition define-cp1250->string*)
+
+(defmacro define-cp1250->string (accessor type)
+  (declare (ignore type))
+  `(defun ,(make-od-name 'cp1250->string accessor) (array astart aend)
+    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+
+(instantiate-octets-definition define-cp1250->string)
+
+(push '((:cp1250 :|cp1250| :windows-1250 :|windows-1250|)
+        cp1250->string-aref string->cp1250)
+      *external-format-functions*)
+
+(define-external-format (:cp1250 :|cp1250| :windows-1250 :|windows-1250|)
+    1 t
+    (let ((cp1250-byte (code->cp1250-mapper bits)))
+      (if cp1250-byte
+          (setf (sap-ref-8 sap tail) cp1250-byte)
+          (stream-encoding-error-and-handle stream bits)))
+    (let ((code (cp1250->code-mapper byte)))
+      (if code
+          (code-char code)
+          (stream-decoding-error stream byte)))) ;; TODO -- error check
+
+(define-unibyte-mapper cp1251->code-mapper code->cp1251-mapper
+  (#x80 #x0402) ; CYRILLIC CAPITAL LETTER DJE
+  (#x81 #x0403) ; CYRILLIC CAPITAL LETTER GJE
+  (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
+  (#x83 #x0453) ; CYRILLIC SMALL LETTER GJE
+  (#x84 #x201E) ; DOUBLE LOW-9 QUOTATION MARK
+  (#x85 #x2026) ; HORIZONTAL ELLIPSIS
+  (#x86 #x2020) ; DAGGER
+  (#x87 #x2021) ; DOUBLE DAGGER
+  (#x88 nil)
+  (#x89 #x2030) ; PER MILLE SIGN
+  (#x8A #x0409) ; CYRILLIC CAPITAL LETTER LJE
+  (#x8B #x2039) ; SINGLE LEFT-POINTING ANGLE QUOTATION MARK
+  (#x8C #x040A) ; CYRILLIC CAPITAL LETTER NJE
+  (#x8D #x040C) ; CYRILLIC CAPITAL LETTER KJE
+  (#x8E #x040B) ; CYRILLIC CAPITAL LETTER TSHE
+  (#x8F #x040F) ; CYRILLIC CAPITAL LETTER DZHE
+  (#x90 #x0452) ; CYRILLIC SMALL LETTER DJE
+  (#x91 #x2018) ; LEFT SINGLE QUOTATION MARK
+  (#x92 #x2019) ; RIGHT SINGLE QUOTATION MARK
+  (#x93 #x201C) ; LEFT DOUBLE QUOTATION MARK
+  (#x94 #x201D) ; RIGHT DOUBLE QUOTATION MARK
+  (#x95 #x2022) ; BULLET
+  (#x96 #x2013) ; EN DASH
+  (#x97 #x2014) ; EM DASH
+  (#x98 nil)
+  (#x99 #x2122) ; TRADE MARK SIGN
+  (#x9A #x0459) ; CYRILLIC SMALL LETTER LJE
+  (#x9B #x203A) ; SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+  (#x9C #x045A) ; CYRILLIC SMALL LETTER NJE
+  (#x9D #x045C) ; CYRILLIC SMALL LETTER KJE
+  (#x9E #x045B) ; CYRILLIC SMALL LETTER TSHE
+  (#x9F #x045F) ; CYRILLIC SMALL LETTER DZHE
+  (#xA1 #x040E) ; CYRILLIC CAPITAL LETTER SHORT U
+  (#xA2 #x045E) ; CYRILLIC SMALL LETTER SHORT U
+  (#xA3 #x0408) ; CYRILLIC CAPITAL LETTER JE
+  (#xA5 #x0490) ; CYRILLIC CAPITAL LETTER GHE WITH UPTURN
+  (#xA8 #x0401) ; CYRILLIC CAPITAL LETTER IO
+  (#xAA #x0404) ; CYRILLIC CAPITAL LETTER UKRAINIAN IE
+  (#xAF #x0407) ; CYRILLIC CAPITAL LETTER YI
+  (#xB2 #x0406) ; CYRILLIC CAPITAL LETTER BYELORUSSIAN-UKRAINIAN I
+  (#xB3 #x0456) ; CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I
+  (#xB4 #x0491) ; CYRILLIC SMALL LETTER GHE WITH UPTURN
+  (#xB8 #x0451) ; CYRILLIC SMALL LETTER IO
+  (#xB9 #x2116) ; NUMERO SIGN
+  (#xBA #x0454) ; CYRILLIC SMALL LETTER UKRAINIAN IE
+  (#xBC #x0458) ; CYRILLIC SMALL LETTER JE
+  (#xBD #x0405) ; CYRILLIC CAPITAL LETTER DZE
+  (#xBE #x0455) ; CYRILLIC SMALL LETTER DZE
+  (#xBF #x0457) ; CYRILLIC SMALL LETTER YI
+  (#xC0 #x0410) ; CYRILLIC CAPITAL LETTER A
+  (#xC1 #x0411) ; CYRILLIC CAPITAL LETTER BE
+  (#xC2 #x0412) ; CYRILLIC CAPITAL LETTER VE
+  (#xC3 #x0413) ; CYRILLIC CAPITAL LETTER GHE
+  (#xC4 #x0414) ; CYRILLIC CAPITAL LETTER DE
+  (#xC5 #x0415) ; CYRILLIC CAPITAL LETTER IE
+  (#xC6 #x0416) ; CYRILLIC CAPITAL LETTER ZHE
+  (#xC7 #x0417) ; CYRILLIC CAPITAL LETTER ZE
+  (#xC8 #x0418) ; CYRILLIC CAPITAL LETTER I
+  (#xC9 #x0419) ; CYRILLIC CAPITAL LETTER SHORT I
+  (#xCA #x041A) ; CYRILLIC CAPITAL LETTER KA
+  (#xCB #x041B) ; CYRILLIC CAPITAL LETTER EL
+  (#xCC #x041C) ; CYRILLIC CAPITAL LETTER EM
+  (#xCD #x041D) ; CYRILLIC CAPITAL LETTER EN
+  (#xCE #x041E) ; CYRILLIC CAPITAL LETTER O
+  (#xCF #x041F) ; CYRILLIC CAPITAL LETTER PE
+  (#xD0 #x0420) ; CYRILLIC CAPITAL LETTER ER
+  (#xD1 #x0421) ; CYRILLIC CAPITAL LETTER ES
+  (#xD2 #x0422) ; CYRILLIC CAPITAL LETTER TE
+  (#xD3 #x0423) ; CYRILLIC CAPITAL LETTER U
+  (#xD4 #x0424) ; CYRILLIC CAPITAL LETTER EF
+  (#xD5 #x0425) ; CYRILLIC CAPITAL LETTER HA
+  (#xD6 #x0426) ; CYRILLIC CAPITAL LETTER TSE
+  (#xD7 #x0427) ; CYRILLIC CAPITAL LETTER CHE
+  (#xD8 #x0428) ; CYRILLIC CAPITAL LETTER SHA
+  (#xD9 #x0429) ; CYRILLIC CAPITAL LETTER SHCHA
+  (#xDA #x042A) ; CYRILLIC CAPITAL LETTER HARD SIGN
+  (#xDB #x042B) ; CYRILLIC CAPITAL LETTER YERU
+  (#xDC #x042C) ; CYRILLIC CAPITAL LETTER SOFT SIGN
+  (#xDD #x042D) ; CYRILLIC CAPITAL LETTER E
+  (#xDE #x042E) ; CYRILLIC CAPITAL LETTER YU
+  (#xDF #x042F) ; CYRILLIC CAPITAL LETTER YA
+  (#xE0 #x0430) ; CYRILLIC SMALL LETTER A
+  (#xE1 #x0431) ; CYRILLIC SMALL LETTER BE
+  (#xE2 #x0432) ; CYRILLIC SMALL LETTER VE
+  (#xE3 #x0433) ; CYRILLIC SMALL LETTER GHE
+  (#xE4 #x0434) ; CYRILLIC SMALL LETTER DE
+  (#xE5 #x0435) ; CYRILLIC SMALL LETTER IE
+  (#xE6 #x0436) ; CYRILLIC SMALL LETTER ZHE
+  (#xE7 #x0437) ; CYRILLIC SMALL LETTER ZE
+  (#xE8 #x0438) ; CYRILLIC SMALL LETTER I
+  (#xE9 #x0439) ; CYRILLIC SMALL LETTER SHORT I
+  (#xEA #x043A) ; CYRILLIC SMALL LETTER KA
+  (#xEB #x043B) ; CYRILLIC SMALL LETTER EL
+  (#xEC #x043C) ; CYRILLIC SMALL LETTER EM
+  (#xED #x043D) ; CYRILLIC SMALL LETTER EN
+  (#xEE #x043E) ; CYRILLIC SMALL LETTER O
+  (#xEF #x043F) ; CYRILLIC SMALL LETTER PE
+  (#xF0 #x0440) ; CYRILLIC SMALL LETTER ER
+  (#xF1 #x0441) ; CYRILLIC SMALL LETTER ES
+  (#xF2 #x0442) ; CYRILLIC SMALL LETTER TE
+  (#xF3 #x0443) ; CYRILLIC SMALL LETTER U
+  (#xF4 #x0444) ; CYRILLIC SMALL LETTER EF
+  (#xF5 #x0445) ; CYRILLIC SMALL LETTER HA
+  (#xF6 #x0446) ; CYRILLIC SMALL LETTER TSE
+  (#xF7 #x0447) ; CYRILLIC SMALL LETTER CHE
+  (#xF8 #x0448) ; CYRILLIC SMALL LETTER SHA
+  (#xF9 #x0449) ; CYRILLIC SMALL LETTER SHCHA
+  (#xFA #x044A) ; CYRILLIC SMALL LETTER HARD SIGN
+  (#xFB #x044B) ; CYRILLIC SMALL LETTER YERU
+  (#xFC #x044C) ; CYRILLIC SMALL LETTER SOFT SIGN
+  (#xFD #x044D) ; CYRILLIC SMALL LETTER E
+  (#xFE #x044E) ; CYRILLIC SMALL LETTER YU
+  (#xFF #x044F) ; CYRILLIC SMALL LETTER YA
+)
+
+(declaim (inline get-cp1251-bytes))
+(defun get-cp1251-bytes(string pos end)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range pos end))
+  (get-latin-bytes #'identity :cp1251 string pos end))
+
+(defun string->cp1251 (string sstart send null-padding)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range sstart send))
+  (values (string->latin% string sstart send #'get-cp1251-bytes null-padding)))
+
+(defmacro define-cp1251->string* (accessor type)
+  (declare (ignore type))
+  (let ((name (make-od-name 'cp1251->string* accessor)))
+    `(progn
+      (defun ,name (string sstart send array astart aend)
+	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+
+(instantiate-octets-definition define-cp1251->string*)
+
+(defmacro define-cp1251->string (accessor type)
+  (declare (ignore type))
+  `(defun ,(make-od-name 'cp1251->string accessor) (array astart aend)
+    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+
+(instantiate-octets-definition define-cp1251->string)
+
+(push '((:cp1251 :|cp1251|  :windows-1251 :|windows-1251|)
+        cp1251->string-aref string->cp1251)
+      *external-format-functions*)
+
+(define-external-format (:cp1251 :|cp1251| :windows-1251 :|windows-1251|)
+    1 t
+    (let ((cp1251-byte (code->cp1251-mapper bits)))
+      (if cp1251-byte
+          (setf (sap-ref-8 sap tail) cp1251-byte)
+          (stream-encoding-error-and-handle stream bits)))
+    (let ((code (cp1251->code-mapper byte)))
+      (if code
+          (code-char code)
+          (stream-decoding-error stream byte)))) ;; TODO -- error check
+
+(define-unibyte-mapper cp1252->code-mapper code->cp1252-mapper
+  (#x80 #x20AC) ; EURO SIGN
+  (#x81 nil)
+  (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
+  (#x83 #x0192) ; LATIN SMALL LETTER F WITH HOOK
+  (#x84 #x201E) ; DOUBLE LOW-9 QUOTATION MARK
+  (#x85 #x2026) ; HORIZONTAL ELLIPSIS
+  (#x86 #x2020) ; DAGGER
+  (#x87 #x2021) ; DOUBLE DAGGER
+  (#x88 #x02C6) ; MODIFIER LETTER CIRCUMFLEX ACCENT
+  (#x89 #x2030) ; PER MILLE SIGN
+  (#x8A #x0160) ; LATIN CAPITAL LETTER S WITH CARON
+  (#x8B #x2039) ; SINGLE LEFT-POINTING ANGLE QUOTATION MARK
+  (#x8C #x0152) ; LATIN CAPITAL LIGATURE OE
+  (#x8D nil)
+  (#x8E #x017D) ; LATIN CAPITAL LETTER Z WITH CARON
+  (#x8F nil)
+  (#x90 nil)
+  (#x91 #x2018) ; LEFT SINGLE QUOTATION MARK
+  (#x92 #x2019) ; RIGHT SINGLE QUOTATION MARK
+  (#x93 #x201C) ; LEFT DOUBLE QUOTATION MARK
+  (#x94 #x201D) ; RIGHT DOUBLE QUOTATION MARK
+  (#x95 #x2022) ; BULLET
+  (#x96 #x2013) ; EN DASH
+  (#x97 #x2014) ; EM DASH
+  (#x98 #x02DC) ; SMALL TILDE
+  (#x99 #x2122) ; TRADE MARK SIGN
+  (#x9A #x0161) ; LATIN SMALL LETTER S WITH CARON
+  (#x9B #x203A) ; SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+  (#x9C #x0153) ; LATIN SMALL LIGATURE OE
+  (#x9D nil)
+  (#x9E #x017E) ; LATIN SMALL LETTER Z WITH CARON
+  (#x9F #x0178) ; LATIN CAPITAL LETTER Y WITH DIAERESIS
+)
+
+(declaim (inline get-cp1252-bytes))
+(defun get-cp1252-bytes(string pos end)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range pos end))
+  (get-latin-bytes #'identity :cp1252 string pos end))
+
+(defun string->cp1252 (string sstart send null-padding)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range sstart send))
+  (values (string->latin% string sstart send #'get-cp1252-bytes null-padding)))
+
+(defmacro define-cp1252->string* (accessor type)
+  (declare (ignore type))
+  (let ((name (make-od-name 'cp1252->string* accessor)))
+    `(progn
+      (defun ,name (string sstart send array astart aend)
+	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+
+(instantiate-octets-definition define-cp1252->string*)
+
+(defmacro define-cp1252->string (accessor type)
+  (declare (ignore type))
+  `(defun ,(make-od-name 'cp1252->string accessor) (array astart aend)
+    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+
+(instantiate-octets-definition define-cp1252->string)
+
+(push '((:cp1252 :|cp1252| :windows-1252 :|windows-1252|)
+        cp1252->string-aref string->cp1252)
+      *external-format-functions*)
+
+(define-external-format (:cp1252 :|cp1252| :windows-1252 :|windows-1252|)
+    1 t
+    (let ((cp1252-byte (code->cp1252-mapper bits)))
+      (if cp1252-byte
+          (setf (sap-ref-8 sap tail) cp1252-byte)
+          (stream-encoding-error-and-handle stream bits)))
+    (let ((code (cp1252->code-mapper byte)))
+      (if code
+          (code-char code)
+          (stream-decoding-error stream byte)))) ;; TODO -- error check
+
+(define-unibyte-mapper cp1253->code-mapper code->cp1253-mapper
+  (#x80 #x20AC) ; EURO SIGN
+  (#x81 nil)
+  (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
+  (#x83 #x0192) ; LATIN SMALL LETTER F WITH HOOK
+  (#x84 #x201E) ; DOUBLE LOW-9 QUOTATION MARK
+  (#x85 #x2026) ; HORIZONTAL ELLIPSIS
+  (#x86 #x2020) ; DAGGER
+  (#x87 #x2021) ; DOUBLE DAGGER
+  (#x88 nil)
+  (#x89 #x2030) ; PER MILLE SIGN
+  (#x8A nil)
+  (#x8B #x2039) ; SINGLE LEFT-POINTING ANGLE QUOTATION MARK
+  (#x8C nil)
+  (#x8D nil)
+  (#x8E nil)
+  (#x8F nil)
+  (#x90 nil)
+  (#x91 #x2018) ; LEFT SINGLE QUOTATION MARK
+  (#x92 #x2019) ; RIGHT SINGLE QUOTATION MARK
+  (#x93 #x201C) ; LEFT DOUBLE QUOTATION MARK
+  (#x94 #x201D) ; RIGHT DOUBLE QUOTATION MARK
+  (#x95 #x2022) ; BULLET
+  (#x96 #x2013) ; EN DASH
+  (#x97 #x2014) ; EM DASH
+  (#x98 nil)
+  (#x99 #x2122) ; TRADE MARK SIGN
+  (#x9A nil)
+  (#x9B #x203A) ; SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+  (#x9C nil)
+  (#x9D nil)
+  (#x9E nil)
+  (#x9F nil)
+  (#xA1 #x0385) ; GREEK DIALYTIKA TONOS
+  (#xA2 #x0386) ; GREEK CAPITAL LETTER ALPHA WITH TONOS
+  (#xAA nil)
+  (#xAF #x2015) ; HORIZONTAL BAR
+  (#xB4 #x0384) ; GREEK TONOS
+  (#xB8 #x0388) ; GREEK CAPITAL LETTER EPSILON WITH TONOS
+  (#xB9 #x0389) ; GREEK CAPITAL LETTER ETA WITH TONOS
+  (#xBA #x038A) ; GREEK CAPITAL LETTER IOTA WITH TONOS
+  (#xBC #x038C) ; GREEK CAPITAL LETTER OMICRON WITH TONOS
+  (#xBE #x038E) ; GREEK CAPITAL LETTER UPSILON WITH TONOS
+  (#xBF #x038F) ; GREEK CAPITAL LETTER OMEGA WITH TONOS
+  (#xC0 #x0390) ; GREEK SMALL LETTER IOTA WITH DIALYTIKA AND TONOS
+  (#xC1 #x0391) ; GREEK CAPITAL LETTER ALPHA
+  (#xC2 #x0392) ; GREEK CAPITAL LETTER BETA
+  (#xC3 #x0393) ; GREEK CAPITAL LETTER GAMMA
+  (#xC4 #x0394) ; GREEK CAPITAL LETTER DELTA
+  (#xC5 #x0395) ; GREEK CAPITAL LETTER EPSILON
+  (#xC6 #x0396) ; GREEK CAPITAL LETTER ZETA
+  (#xC7 #x0397) ; GREEK CAPITAL LETTER ETA
+  (#xC8 #x0398) ; GREEK CAPITAL LETTER THETA
+  (#xC9 #x0399) ; GREEK CAPITAL LETTER IOTA
+  (#xCA #x039A) ; GREEK CAPITAL LETTER KAPPA
+  (#xCB #x039B) ; GREEK CAPITAL LETTER LAMDA
+  (#xCC #x039C) ; GREEK CAPITAL LETTER MU
+  (#xCD #x039D) ; GREEK CAPITAL LETTER NU
+  (#xCE #x039E) ; GREEK CAPITAL LETTER XI
+  (#xCF #x039F) ; GREEK CAPITAL LETTER OMICRON
+  (#xD0 #x03A0) ; GREEK CAPITAL LETTER PI
+  (#xD1 #x03A1) ; GREEK CAPITAL LETTER RHO
+  (#xD2 nil)
+  (#xD3 #x03A3) ; GREEK CAPITAL LETTER SIGMA
+  (#xD4 #x03A4) ; GREEK CAPITAL LETTER TAU
+  (#xD5 #x03A5) ; GREEK CAPITAL LETTER UPSILON
+  (#xD6 #x03A6) ; GREEK CAPITAL LETTER PHI
+  (#xD7 #x03A7) ; GREEK CAPITAL LETTER CHI
+  (#xD8 #x03A8) ; GREEK CAPITAL LETTER PSI
+  (#xD9 #x03A9) ; GREEK CAPITAL LETTER OMEGA
+  (#xDA #x03AA) ; GREEK CAPITAL LETTER IOTA WITH DIALYTIKA
+  (#xDB #x03AB) ; GREEK CAPITAL LETTER UPSILON WITH DIALYTIKA
+  (#xDC #x03AC) ; GREEK SMALL LETTER ALPHA WITH TONOS
+  (#xDD #x03AD) ; GREEK SMALL LETTER EPSILON WITH TONOS
+  (#xDE #x03AE) ; GREEK SMALL LETTER ETA WITH TONOS
+  (#xDF #x03AF) ; GREEK SMALL LETTER IOTA WITH TONOS
+  (#xE0 #x03B0) ; GREEK SMALL LETTER UPSILON WITH DIALYTIKA AND TONOS
+  (#xE1 #x03B1) ; GREEK SMALL LETTER ALPHA
+  (#xE2 #x03B2) ; GREEK SMALL LETTER BETA
+  (#xE3 #x03B3) ; GREEK SMALL LETTER GAMMA
+  (#xE4 #x03B4) ; GREEK SMALL LETTER DELTA
+  (#xE5 #x03B5) ; GREEK SMALL LETTER EPSILON
+  (#xE6 #x03B6) ; GREEK SMALL LETTER ZETA
+  (#xE7 #x03B7) ; GREEK SMALL LETTER ETA
+  (#xE8 #x03B8) ; GREEK SMALL LETTER THETA
+  (#xE9 #x03B9) ; GREEK SMALL LETTER IOTA
+  (#xEA #x03BA) ; GREEK SMALL LETTER KAPPA
+  (#xEB #x03BB) ; GREEK SMALL LETTER LAMDA
+  (#xEC #x03BC) ; GREEK SMALL LETTER MU
+  (#xED #x03BD) ; GREEK SMALL LETTER NU
+  (#xEE #x03BE) ; GREEK SMALL LETTER XI
+  (#xEF #x03BF) ; GREEK SMALL LETTER OMICRON
+  (#xF0 #x03C0) ; GREEK SMALL LETTER PI
+  (#xF1 #x03C1) ; GREEK SMALL LETTER RHO
+  (#xF2 #x03C2) ; GREEK SMALL LETTER FINAL SIGMA
+  (#xF3 #x03C3) ; GREEK SMALL LETTER SIGMA
+  (#xF4 #x03C4) ; GREEK SMALL LETTER TAU
+  (#xF5 #x03C5) ; GREEK SMALL LETTER UPSILON
+  (#xF6 #x03C6) ; GREEK SMALL LETTER PHI
+  (#xF7 #x03C7) ; GREEK SMALL LETTER CHI
+  (#xF8 #x03C8) ; GREEK SMALL LETTER PSI
+  (#xF9 #x03C9) ; GREEK SMALL LETTER OMEGA
+  (#xFA #x03CA) ; GREEK SMALL LETTER IOTA WITH DIALYTIKA
+  (#xFB #x03CB) ; GREEK SMALL LETTER UPSILON WITH DIALYTIKA
+  (#xFC #x03CC) ; GREEK SMALL LETTER OMICRON WITH TONOS
+  (#xFD #x03CD) ; GREEK SMALL LETTER UPSILON WITH TONOS
+  (#xFE #x03CE) ; GREEK SMALL LETTER OMEGA WITH TONOS
+  (#xFF nil)
+)
+
+(declaim (inline get-cp1253-bytes))
+(defun get-cp1253-bytes(string pos end)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range pos end))
+  (get-latin-bytes #'identity :cp1253 string pos end))
+
+(defun string->cp1253 (string sstart send null-padding)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range sstart send))
+  (values (string->latin% string sstart send #'get-cp1253-bytes null-padding)))
+
+(defmacro define-cp1253->string* (accessor type)
+  (declare (ignore type))
+  (let ((name (make-od-name 'cp1253->string* accessor)))
+    `(progn
+      (defun ,name (string sstart send array astart aend)
+	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+
+(instantiate-octets-definition define-cp1253->string*)
+
+(defmacro define-cp1253->string (accessor type)
+  (declare (ignore type))
+  `(defun ,(make-od-name 'cp1253->string accessor) (array astart aend)
+    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+
+(instantiate-octets-definition define-cp1253->string)
+
+(push '((:cp1253 :|cp1253| :windows-1253 :|windows-1253|)
+        cp1253->string-aref string->cp1253)
+      *external-format-functions*)
+
+(define-external-format (:cp1253 :|cp1253| :windows-1253 :|windows-1253|)
+    1 t
+    (let ((cp1253-byte (code->cp1253-mapper bits)))
+      (if cp1253-byte
+          (setf (sap-ref-8 sap tail) cp1253-byte)
+          (stream-encoding-error-and-handle stream bits)))
+    (let ((code (cp1253->code-mapper byte)))
+      (if code
+          (code-char code)
+          (stream-decoding-error stream byte)))) ;; TODO -- error check
+
+(define-unibyte-mapper cp1254->code-mapper code->cp1254-mapper
+  (#x80 #x20AC) ; EURO SIGN
+  (#x81 nil)
+  (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
+  (#x83 #x0192) ; LATIN SMALL LETTER F WITH HOOK
+  (#x84 #x201E) ; DOUBLE LOW-9 QUOTATION MARK
+  (#x85 #x2026) ; HORIZONTAL ELLIPSIS
+  (#x86 #x2020) ; DAGGER
+  (#x87 #x2021) ; DOUBLE DAGGER
+  (#x88 #x02C6) ; MODIFIER LETTER CIRCUMFLEX ACCENT
+  (#x89 #x2030) ; PER MILLE SIGN
+  (#x8A #x0160) ; LATIN CAPITAL LETTER S WITH CARON
+  (#x8B #x2039) ; SINGLE LEFT-POINTING ANGLE QUOTATION MARK
+  (#x8C #x0152) ; LATIN CAPITAL LIGATURE OE
+  (#x8D nil)
+  (#x8E nil)
+  (#x8F nil)
+  (#x90 nil)
+  (#x91 #x2018) ; LEFT SINGLE QUOTATION MARK
+  (#x92 #x2019) ; RIGHT SINGLE QUOTATION MARK
+  (#x93 #x201C) ; LEFT DOUBLE QUOTATION MARK
+  (#x94 #x201D) ; RIGHT DOUBLE QUOTATION MARK
+  (#x95 #x2022) ; BULLET
+  (#x96 #x2013) ; EN DASH
+  (#x97 #x2014) ; EM DASH
+  (#x98 #x02DC) ; SMALL TILDE
+  (#x99 #x2122) ; TRADE MARK SIGN
+  (#x9A #x0161) ; LATIN SMALL LETTER S WITH CARON
+  (#x9B #x203A) ; SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+  (#x9C #x0153) ; LATIN SMALL LIGATURE OE
+  (#x9D nil)
+  (#x9E nil)
+  (#x9F #x0178) ; LATIN CAPITAL LETTER Y WITH DIAERESIS
+  (#xD0 #x011E) ; LATIN CAPITAL LETTER G WITH BREVE
+  (#xDD #x0130) ; LATIN CAPITAL LETTER I WITH DOT ABOVE
+  (#xDE #x015E) ; LATIN CAPITAL LETTER S WITH CEDILLA
+  (#xF0 #x011F) ; LATIN SMALL LETTER G WITH BREVE
+  (#xFD #x0131) ; LATIN SMALL LETTER DOTLESS I
+  (#xFE #x015F) ; LATIN SMALL LETTER S WITH CEDILLA
+)
+
+(declaim (inline get-cp1254-bytes))
+(defun get-cp1254-bytes(string pos end)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range pos end))
+  (get-latin-bytes #'identity :cp1254 string pos end))
+
+(defun string->cp1254 (string sstart send null-padding)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range sstart send))
+  (values (string->latin% string sstart send #'get-cp1254-bytes null-padding)))
+
+(defmacro define-cp1254->string* (accessor type)
+  (declare (ignore type))
+  (let ((name (make-od-name 'cp1254->string* accessor)))
+    `(progn
+      (defun ,name (string sstart send array astart aend)
+	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+
+(instantiate-octets-definition define-cp1254->string*)
+
+(defmacro define-cp1254->string (accessor type)
+  (declare (ignore type))
+  `(defun ,(make-od-name 'cp1254->string accessor) (array astart aend)
+    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+
+(instantiate-octets-definition define-cp1254->string)
+
+(push '((:cp1254 :|cp1254| :windows-1254 :|windows-1254|)
+        cp1254->string-aref string->cp1254)
+      *external-format-functions*)
+
+(define-external-format (:cp1254 :|cp1254|)
+    1 t
+    (let ((cp1254-byte (code->cp1254-mapper bits)))
+      (if cp1254-byte
+          (setf (sap-ref-8 sap tail) cp1254-byte)
+          (stream-encoding-error-and-handle stream bits)))
+    (let ((code (cp1254->code-mapper byte)))
+      (if code
+          (code-char code)
+          (stream-decoding-error stream byte)))) ;; TODO -- error check
+
+(define-unibyte-mapper cp1255->code-mapper code->cp1255-mapper
+  (#x80 #x20AC) ; EURO SIGN
+  (#x81 nil)
+  (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
+  (#x83 #x0192) ; LATIN SMALL LETTER F WITH HOOK
+  (#x84 #x201E) ; DOUBLE LOW-9 QUOTATION MARK
+  (#x85 #x2026) ; HORIZONTAL ELLIPSIS
+  (#x86 #x2020) ; DAGGER
+  (#x87 #x2021) ; DOUBLE DAGGER
+  (#x88 #x02C6) ; MODIFIER LETTER CIRCUMFLEX ACCENT
+  (#x89 #x2030) ; PER MILLE SIGN
+  (#x8A nil)
+  (#x8B #x2039) ; SINGLE LEFT-POINTING ANGLE QUOTATION MARK
+  (#x8C nil)
+  (#x8D nil)
+  (#x8E nil)
+  (#x8F nil)
+  (#x90 nil)
+  (#x91 #x2018) ; LEFT SINGLE QUOTATION MARK
+  (#x92 #x2019) ; RIGHT SINGLE QUOTATION MARK
+  (#x93 #x201C) ; LEFT DOUBLE QUOTATION MARK
+  (#x94 #x201D) ; RIGHT DOUBLE QUOTATION MARK
+  (#x95 #x2022) ; BULLET
+  (#x96 #x2013) ; EN DASH
+  (#x97 #x2014) ; EM DASH
+  (#x98 #x02DC) ; SMALL TILDE
+  (#x99 #x2122) ; TRADE MARK SIGN
+  (#x9A nil)
+  (#x9B #x203A) ; SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+  (#x9C nil)
+  (#x9D nil)
+  (#x9E nil)
+  (#x9F nil)
+  (#xA4 #x20AA) ; NEW SHEQEL SIGN
+  (#xAA #x00D7) ; MULTIPLICATION SIGN
+  (#xBA #x00F7) ; DIVISION SIGN
+  (#xC0 #x05B0) ; HEBREW POINT SHEVA
+  (#xC1 #x05B1) ; HEBREW POINT HATAF SEGOL
+  (#xC2 #x05B2) ; HEBREW POINT HATAF PATAH
+  (#xC3 #x05B3) ; HEBREW POINT HATAF QAMATS
+  (#xC4 #x05B4) ; HEBREW POINT HIRIQ
+  (#xC5 #x05B5) ; HEBREW POINT TSERE
+  (#xC6 #x05B6) ; HEBREW POINT SEGOL
+  (#xC7 #x05B7) ; HEBREW POINT PATAH
+  (#xC8 #x05B8) ; HEBREW POINT QAMATS
+  (#xC9 #x05B9) ; HEBREW POINT HOLAM
+  (#xCA nil)
+  (#xCB #x05BB) ; HEBREW POINT QUBUTS
+  (#xCC #x05BC) ; HEBREW POINT DAGESH OR MAPIQ
+  (#xCD #x05BD) ; HEBREW POINT METEG
+  (#xCE #x05BE) ; HEBREW PUNCTUATION MAQAF
+  (#xCF #x05BF) ; HEBREW POINT RAFE
+  (#xD0 #x05C0) ; HEBREW PUNCTUATION PASEQ
+  (#xD1 #x05C1) ; HEBREW POINT SHIN DOT
+  (#xD2 #x05C2) ; HEBREW POINT SIN DOT
+  (#xD3 #x05C3) ; HEBREW PUNCTUATION SOF PASUQ
+  (#xD4 #x05F0) ; HEBREW LIGATURE YIDDISH DOUBLE VAV
+  (#xD5 #x05F1) ; HEBREW LIGATURE YIDDISH VAV YOD
+  (#xD6 #x05F2) ; HEBREW LIGATURE YIDDISH DOUBLE YOD
+  (#xD7 #x05F3) ; HEBREW PUNCTUATION GERESH
+  (#xD8 #x05F4) ; HEBREW PUNCTUATION GERSHAYIM
+  (#xD9 nil)
+  (#xDA nil)
+  (#xDB nil)
+  (#xDC nil)
+  (#xDD nil)
+  (#xDE nil)
+  (#xDF nil)
+  (#xE0 #x05D0) ; HEBREW LETTER ALEF
+  (#xE1 #x05D1) ; HEBREW LETTER BET
+  (#xE2 #x05D2) ; HEBREW LETTER GIMEL
+  (#xE3 #x05D3) ; HEBREW LETTER DALET
+  (#xE4 #x05D4) ; HEBREW LETTER HE
+  (#xE5 #x05D5) ; HEBREW LETTER VAV
+  (#xE6 #x05D6) ; HEBREW LETTER ZAYIN
+  (#xE7 #x05D7) ; HEBREW LETTER HET
+  (#xE8 #x05D8) ; HEBREW LETTER TET
+  (#xE9 #x05D9) ; HEBREW LETTER YOD
+  (#xEA #x05DA) ; HEBREW LETTER FINAL KAF
+  (#xEB #x05DB) ; HEBREW LETTER KAF
+  (#xEC #x05DC) ; HEBREW LETTER LAMED
+  (#xED #x05DD) ; HEBREW LETTER FINAL MEM
+  (#xEE #x05DE) ; HEBREW LETTER MEM
+  (#xEF #x05DF) ; HEBREW LETTER FINAL NUN
+  (#xF0 #x05E0) ; HEBREW LETTER NUN
+  (#xF1 #x05E1) ; HEBREW LETTER SAMEKH
+  (#xF2 #x05E2) ; HEBREW LETTER AYIN
+  (#xF3 #x05E3) ; HEBREW LETTER FINAL PE
+  (#xF4 #x05E4) ; HEBREW LETTER PE
+  (#xF5 #x05E5) ; HEBREW LETTER FINAL TSADI
+  (#xF6 #x05E6) ; HEBREW LETTER TSADI
+  (#xF7 #x05E7) ; HEBREW LETTER QOF
+  (#xF8 #x05E8) ; HEBREW LETTER RESH
+  (#xF9 #x05E9) ; HEBREW LETTER SHIN
+  (#xFA #x05EA) ; HEBREW LETTER TAV
+  (#xFB nil)
+  (#xFC nil)
+  (#xFD #x200E) ; LEFT-TO-RIGHT MARK
+  (#xFE #x200F) ; RIGHT-TO-LEFT MARK
+  (#xFF nil)
+)
+
+(declaim (inline get-cp1255-bytes))
+(defun get-cp1255-bytes(string pos end)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range pos end))
+  (get-latin-bytes #'identity :cp1255 string pos end))
+
+(defun string->cp1255 (string sstart send null-padding)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range sstart send))
+  (values (string->latin% string sstart send #'get-cp1255-bytes null-padding)))
+
+(defmacro define-cp1255->string* (accessor type)
+  (declare (ignore type))
+  (let ((name (make-od-name 'cp1255->string* accessor)))
+    `(progn
+      (defun ,name (string sstart send array astart aend)
+	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+
+(instantiate-octets-definition define-cp1255->string*)
+
+(defmacro define-cp1255->string (accessor type)
+  (declare (ignore type))
+  `(defun ,(make-od-name 'cp1255->string accessor) (array astart aend)
+    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+
+(instantiate-octets-definition define-cp1255->string)
+
+(push '((:cp1255 :|cp1255| :windows-1255 :|windows-1255|)
+        cp1255->string-aref string->cp1255)
+      *external-format-functions*)
+
+(define-external-format (:cp1255 :|cp1255| :windows-1255 :|windows-1255|)
+    1 t
+    (let ((cp1255-byte (code->cp1255-mapper bits)))
+      (if cp1255-byte
+          (setf (sap-ref-8 sap tail) cp1255-byte)
+          (stream-encoding-error-and-handle stream bits)))
+    (let ((code (cp1255->code-mapper byte)))
+      (if code
+          (code-char code)
+          (stream-decoding-error stream byte)))) ;; TODO -- error check
+
+(define-unibyte-mapper cp1256->code-mapper code->cp1256-mapper
+  (#x80 #x20AC) ; EURO SIGN
+  (#x81 #x067E) ; ARABIC LETTER PEH
+  (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
+  (#x83 #x0192) ; LATIN SMALL LETTER F WITH HOOK
+  (#x84 #x201E) ; DOUBLE LOW-9 QUOTATION MARK
+  (#x85 #x2026) ; HORIZONTAL ELLIPSIS
+  (#x86 #x2020) ; DAGGER
+  (#x87 #x2021) ; DOUBLE DAGGER
+  (#x88 #x02C6) ; MODIFIER LETTER CIRCUMFLEX ACCENT
+  (#x89 #x2030) ; PER MILLE SIGN
+  (#x8A nil)
+  (#x8B #x2039) ; SINGLE LEFT-POINTING ANGLE QUOTATION MARK
+  (#x8C #x0152) ; LATIN CAPITAL LIGATURE OE
+  (#x8D #x0686) ; ARABIC LETTER TCHEH
+  (#x8E #x0698) ; ARABIC LETTER JEH
+  (#x8F nil)
+  (#x90 #x06AF) ; ARABIC LETTER GAF
+  (#x91 #x2018) ; LEFT SINGLE QUOTATION MARK
+  (#x92 #x2019) ; RIGHT SINGLE QUOTATION MARK
+  (#x93 #x201C) ; LEFT DOUBLE QUOTATION MARK
+  (#x94 #x201D) ; RIGHT DOUBLE QUOTATION MARK
+  (#x95 #x2022) ; BULLET
+  (#x96 #x2013) ; EN DASH
+  (#x97 #x2014) ; EM DASH
+  (#x98 nil)
+  (#x99 #x2122) ; TRADE MARK SIGN
+  (#x9A nil)
+  (#x9B #x203A) ; SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+  (#x9C #x0153) ; LATIN SMALL LIGATURE OE
+  (#x9D #x200C) ; ZERO WIDTH NON-JOINER
+  (#x9E #x200D) ; ZERO WIDTH JOINER
+  (#x9F nil)
+  (#xA1 #x060C) ; ARABIC COMMA
+  (#xAA nil)
+  (#xBA #x061B) ; ARABIC SEMICOLON
+  (#xBF #x061F) ; ARABIC QUESTION MARK
+  (#xC0 nil)
+  (#xC1 #x0621) ; ARABIC LETTER HAMZA
+  (#xC2 #x0622) ; ARABIC LETTER ALEF WITH MADDA ABOVE
+  (#xC3 #x0623) ; ARABIC LETTER ALEF WITH HAMZA ABOVE
+  (#xC4 #x0624) ; ARABIC LETTER WAW WITH HAMZA ABOVE
+  (#xC5 #x0625) ; ARABIC LETTER ALEF WITH HAMZA BELOW
+  (#xC6 #x0626) ; ARABIC LETTER YEH WITH HAMZA ABOVE
+  (#xC7 #x0627) ; ARABIC LETTER ALEF
+  (#xC8 #x0628) ; ARABIC LETTER BEH
+  (#xC9 #x0629) ; ARABIC LETTER TEH MARBUTA
+  (#xCA #x062A) ; ARABIC LETTER TEH
+  (#xCB #x062B) ; ARABIC LETTER THEH
+  (#xCC #x062C) ; ARABIC LETTER JEEM
+  (#xCD #x062D) ; ARABIC LETTER HAH
+  (#xCE #x062E) ; ARABIC LETTER KHAH
+  (#xCF #x062F) ; ARABIC LETTER DAL
+  (#xD0 #x0630) ; ARABIC LETTER THAL
+  (#xD1 #x0631) ; ARABIC LETTER REH
+  (#xD2 #x0632) ; ARABIC LETTER ZAIN
+  (#xD3 #x0633) ; ARABIC LETTER SEEN
+  (#xD4 #x0634) ; ARABIC LETTER SHEEN
+  (#xD5 #x0635) ; ARABIC LETTER SAD
+  (#xD6 #x0636) ; ARABIC LETTER DAD
+  (#xD8 #x0637) ; ARABIC LETTER TAH
+  (#xD9 #x0638) ; ARABIC LETTER ZAH
+  (#xDA #x0639) ; ARABIC LETTER AIN
+  (#xDB #x063A) ; ARABIC LETTER GHAIN
+  (#xDC #x0640) ; ARABIC TATWEEL
+  (#xDD #x0641) ; ARABIC LETTER FEH
+  (#xDE #x0642) ; ARABIC LETTER QAF
+  (#xDF #x0643) ; ARABIC LETTER KAF
+  (#xE1 #x0644) ; ARABIC LETTER LAM
+  (#xE3 #x0645) ; ARABIC LETTER MEEM
+  (#xE4 #x0646) ; ARABIC LETTER NOON
+  (#xE5 #x0647) ; ARABIC LETTER HEH
+  (#xE6 #x0648) ; ARABIC LETTER WAW
+  (#xEC #x0649) ; ARABIC LETTER ALEF MAKSURA
+  (#xED #x064A) ; ARABIC LETTER YEH
+  (#xF0 #x064B) ; ARABIC FATHATAN
+  (#xF1 #x064C) ; ARABIC DAMMATAN
+  (#xF2 #x064D) ; ARABIC KASRATAN
+  (#xF3 #x064E) ; ARABIC FATHA
+  (#xF5 #x064F) ; ARABIC DAMMA
+  (#xF6 #x0650) ; ARABIC KASRA
+  (#xF8 #x0651) ; ARABIC SHADDA
+  (#xFA #x0652) ; ARABIC SUKUN
+  (#xFD #x200E) ; LEFT-TO-RIGHT MARK
+  (#xFE #x200F) ; RIGHT-TO-LEFT MARK
+  (#xFF nil)
+)
+
+(declaim (inline get-cp1256-bytes))
+(defun get-cp1256-bytes(string pos end)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range pos end))
+  (get-latin-bytes #'identity :cp1256 string pos end))
+
+(defun string->cp1256 (string sstart send null-padding)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range sstart send))
+  (values (string->latin% string sstart send #'get-cp1256-bytes null-padding)))
+
+(defmacro define-cp1256->string* (accessor type)
+  (declare (ignore type))
+  (let ((name (make-od-name 'cp1256->string* accessor)))
+    `(progn
+      (defun ,name (string sstart send array astart aend)
+	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+
+(instantiate-octets-definition define-cp1256->string*)
+
+(defmacro define-cp1256->string (accessor type)
+  (declare (ignore type))
+  `(defun ,(make-od-name 'cp1256->string accessor) (array astart aend)
+    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+
+(instantiate-octets-definition define-cp1256->string)
+
+(push '((:cp1256 :|cp1256| :windows-1256 :|windows-1256|)
+        cp1256->string-aref string->cp1256)
+      *external-format-functions*)
+
+(define-external-format (:cp1256 :|cp1256|)
+    1 t
+    (let ((cp1256-byte (code->cp1256-mapper bits)))
+      (if cp1256-byte
+          (setf (sap-ref-8 sap tail) cp1256-byte)
+          (stream-encoding-error-and-handle stream bits)))
+    (let ((code (cp1256->code-mapper byte)))
+      (if code
+          (code-char code)
+          (stream-decoding-error stream byte)))) ;; TODO -- error check
+
+(define-unibyte-mapper cp1257->code-mapper code->cp1257-mapper
+  (#x80 #x20AC) ; EURO SIGN
+  (#x81 nil)
+  (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
+  (#x83 nil)
+  (#x84 #x201E) ; DOUBLE LOW-9 QUOTATION MARK
+  (#x85 #x2026) ; HORIZONTAL ELLIPSIS
+  (#x86 #x2020) ; DAGGER
+  (#x87 #x2021) ; DOUBLE DAGGER
+  (#x88 nil)
+  (#x89 #x2030) ; PER MILLE SIGN
+  (#x8A nil)
+  (#x8B #x2039) ; SINGLE LEFT-POINTING ANGLE QUOTATION MARK
+  (#x8C nil)
+  (#x8D #x00A8) ; DIAERESIS
+  (#x8E #x02C7) ; CARON
+  (#x8F #x00B8) ; CEDILLA
+  (#x90 nil)
+  (#x91 #x2018) ; LEFT SINGLE QUOTATION MARK
+  (#x92 #x2019) ; RIGHT SINGLE QUOTATION MARK
+  (#x93 #x201C) ; LEFT DOUBLE QUOTATION MARK
+  (#x94 #x201D) ; RIGHT DOUBLE QUOTATION MARK
+  (#x95 #x2022) ; BULLET
+  (#x96 #x2013) ; EN DASH
+  (#x97 #x2014) ; EM DASH
+  (#x98 nil)
+  (#x99 #x2122) ; TRADE MARK SIGN
+  (#x9A nil)
+  (#x9B #x203A) ; SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+  (#x9C nil)
+  (#x9D #x00AF) ; MACRON
+  (#x9E #x02DB) ; OGONEK
+  (#x9F nil)
+  (#xA1 nil)
+  (#xA5 nil)
+  (#xA8 #x00D8) ; LATIN CAPITAL LETTER O WITH STROKE
+  (#xAA #x0156) ; LATIN CAPITAL LETTER R WITH CEDILLA
+  (#xAF #x00C6) ; LATIN CAPITAL LETTER AE
+  (#xB8 #x00F8) ; LATIN SMALL LETTER O WITH STROKE
+  (#xBA #x0157) ; LATIN SMALL LETTER R WITH CEDILLA
+  (#xBF #x00E6) ; LATIN SMALL LETTER AE
+  (#xC0 #x0104) ; LATIN CAPITAL LETTER A WITH OGONEK
+  (#xC1 #x012E) ; LATIN CAPITAL LETTER I WITH OGONEK
+  (#xC2 #x0100) ; LATIN CAPITAL LETTER A WITH MACRON
+  (#xC3 #x0106) ; LATIN CAPITAL LETTER C WITH ACUTE
+  (#xC6 #x0118) ; LATIN CAPITAL LETTER E WITH OGONEK
+  (#xC7 #x0112) ; LATIN CAPITAL LETTER E WITH MACRON
+  (#xC8 #x010C) ; LATIN CAPITAL LETTER C WITH CARON
+  (#xCA #x0179) ; LATIN CAPITAL LETTER Z WITH ACUTE
+  (#xCB #x0116) ; LATIN CAPITAL LETTER E WITH DOT ABOVE
+  (#xCC #x0122) ; LATIN CAPITAL LETTER G WITH CEDILLA
+  (#xCD #x0136) ; LATIN CAPITAL LETTER K WITH CEDILLA
+  (#xCE #x012A) ; LATIN CAPITAL LETTER I WITH MACRON
+  (#xCF #x013B) ; LATIN CAPITAL LETTER L WITH CEDILLA
+  (#xD0 #x0160) ; LATIN CAPITAL LETTER S WITH CARON
+  (#xD1 #x0143) ; LATIN CAPITAL LETTER N WITH ACUTE
+  (#xD2 #x0145) ; LATIN CAPITAL LETTER N WITH CEDILLA
+  (#xD4 #x014C) ; LATIN CAPITAL LETTER O WITH MACRON
+  (#xD8 #x0172) ; LATIN CAPITAL LETTER U WITH OGONEK
+  (#xD9 #x0141) ; LATIN CAPITAL LETTER L WITH STROKE
+  (#xDA #x015A) ; LATIN CAPITAL LETTER S WITH ACUTE
+  (#xDB #x016A) ; LATIN CAPITAL LETTER U WITH MACRON
+  (#xDD #x017B) ; LATIN CAPITAL LETTER Z WITH DOT ABOVE
+  (#xDE #x017D) ; LATIN CAPITAL LETTER Z WITH CARON
+  (#xE0 #x0105) ; LATIN SMALL LETTER A WITH OGONEK
+  (#xE1 #x012F) ; LATIN SMALL LETTER I WITH OGONEK
+  (#xE2 #x0101) ; LATIN SMALL LETTER A WITH MACRON
+  (#xE3 #x0107) ; LATIN SMALL LETTER C WITH ACUTE
+  (#xE6 #x0119) ; LATIN SMALL LETTER E WITH OGONEK
+  (#xE7 #x0113) ; LATIN SMALL LETTER E WITH MACRON
+  (#xE8 #x010D) ; LATIN SMALL LETTER C WITH CARON
+  (#xEA #x017A) ; LATIN SMALL LETTER Z WITH ACUTE
+  (#xEB #x0117) ; LATIN SMALL LETTER E WITH DOT ABOVE
+  (#xEC #x0123) ; LATIN SMALL LETTER G WITH CEDILLA
+  (#xED #x0137) ; LATIN SMALL LETTER K WITH CEDILLA
+  (#xEE #x012B) ; LATIN SMALL LETTER I WITH MACRON
+  (#xEF #x013C) ; LATIN SMALL LETTER L WITH CEDILLA
+  (#xF0 #x0161) ; LATIN SMALL LETTER S WITH CARON
+  (#xF1 #x0144) ; LATIN SMALL LETTER N WITH ACUTE
+  (#xF2 #x0146) ; LATIN SMALL LETTER N WITH CEDILLA
+  (#xF4 #x014D) ; LATIN SMALL LETTER O WITH MACRON
+  (#xF8 #x0173) ; LATIN SMALL LETTER U WITH OGONEK
+  (#xF9 #x0142) ; LATIN SMALL LETTER L WITH STROKE
+  (#xFA #x015B) ; LATIN SMALL LETTER S WITH ACUTE
+  (#xFB #x016B) ; LATIN SMALL LETTER U WITH MACRON
+  (#xFD #x017C) ; LATIN SMALL LETTER Z WITH DOT ABOVE
+  (#xFE #x017E) ; LATIN SMALL LETTER Z WITH CARON
+  (#xFF #x02D9) ; DOT ABOVE
+)
+
+(declaim (inline get-cp1257-bytes))
+(defun get-cp1257-bytes(string pos end)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range pos end))
+  (get-latin-bytes #'identity :cp1257 string pos end))
+
+(defun string->cp1257 (string sstart send null-padding)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range sstart send))
+  (values (string->latin% string sstart send #'get-cp1257-bytes null-padding)))
+
+(defmacro define-cp1257->string* (accessor type)
+  (declare (ignore type))
+  (let ((name (make-od-name 'cp1257->string* accessor)))
+    `(progn
+      (defun ,name (string sstart send array astart aend)
+	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+
+(instantiate-octets-definition define-cp1257->string*)
+
+(defmacro define-cp1257->string (accessor type)
+  (declare (ignore type))
+  `(defun ,(make-od-name 'cp1257->string accessor) (array astart aend)
+    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+
+(instantiate-octets-definition define-cp1257->string)
+
+(push '((:cp1257 :|cp1257| :windows-1257 :|windows-1257|)
+        cp1257->string-aref string->cp1257)
+      *external-format-functions*)
+
+(define-external-format (:cp1257 :|cp1257| :windows-1257 :|windows-1257|)
+    1 t
+    (let ((cp1257-byte (code->cp1257-mapper bits)))
+      (if cp1257-byte
+          (setf (sap-ref-8 sap tail) cp1257-byte)
+          (stream-encoding-error-and-handle stream bits)))
+    (let ((code (cp1257->code-mapper byte)))
+      (if code
+          (code-char code)
+          (stream-decoding-error stream byte)))) ;; TODO -- error check
+
+(define-unibyte-mapper cp1258->code-mapper code->cp1258-mapper
+  (#x80 #x20AC) ; EURO SIGN
+  (#x81 nil)
+  (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
+  (#x83 #x0192) ; LATIN SMALL LETTER F WITH HOOK
+  (#x84 #x201E) ; DOUBLE LOW-9 QUOTATION MARK
+  (#x85 #x2026) ; HORIZONTAL ELLIPSIS
+  (#x86 #x2020) ; DAGGER
+  (#x87 #x2021) ; DOUBLE DAGGER
+  (#x88 #x02C6) ; MODIFIER LETTER CIRCUMFLEX ACCENT
+  (#x89 #x2030) ; PER MILLE SIGN
+  (#x8A nil)
+  (#x8B #x2039) ; SINGLE LEFT-POINTING ANGLE QUOTATION MARK
+  (#x8C #x0152) ; LATIN CAPITAL LIGATURE OE
+  (#x8D nil)
+  (#x8E nil)
+  (#x8F nil)
+  (#x90 nil)
+  (#x91 #x2018) ; LEFT SINGLE QUOTATION MARK
+  (#x92 #x2019) ; RIGHT SINGLE QUOTATION MARK
+  (#x93 #x201C) ; LEFT DOUBLE QUOTATION MARK
+  (#x94 #x201D) ; RIGHT DOUBLE QUOTATION MARK
+  (#x95 #x2022) ; BULLET
+  (#x96 #x2013) ; EN DASH
+  (#x97 #x2014) ; EM DASH
+  (#x98 #x02DC) ; SMALL TILDE
+  (#x99 #x2122) ; TRADE MARK SIGN
+  (#x9A nil)
+  (#x9B #x203A) ; SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+  (#x9C #x0153) ; LATIN SMALL LIGATURE OE
+  (#x9D nil)
+  (#x9E nil)
+  (#x9F #x0178) ; LATIN CAPITAL LETTER Y WITH DIAERESIS
+  (#xC3 #x0102) ; LATIN CAPITAL LETTER A WITH BREVE
+  (#xCC #x0300) ; COMBINING GRAVE ACCENT
+  (#xD0 #x0110) ; LATIN CAPITAL LETTER D WITH STROKE
+  (#xD2 #x0309) ; COMBINING HOOK ABOVE
+  (#xD5 #x01A0) ; LATIN CAPITAL LETTER O WITH HORN
+  (#xDD #x01AF) ; LATIN CAPITAL LETTER U WITH HORN
+  (#xDE #x0303) ; COMBINING TILDE
+  (#xE3 #x0103) ; LATIN SMALL LETTER A WITH BREVE
+  (#xEC #x0301) ; COMBINING ACUTE ACCENT
+  (#xF0 #x0111) ; LATIN SMALL LETTER D WITH STROKE
+  (#xF2 #x0323) ; COMBINING DOT BELOW
+  (#xF5 #x01A1) ; LATIN SMALL LETTER O WITH HORN
+  (#xFD #x01B0) ; LATIN SMALL LETTER U WITH HORN
+  (#xFE #x20AB) ; DONG SIGN
+)
+
+(declaim (inline get-cp1258-bytes))
+(defun get-cp1258-bytes(string pos end)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range pos end))
+  (get-latin-bytes #'identity :cp1258 string pos end))
+
+(defun string->cp1258 (string sstart send null-padding)
+  (declare (optimize speed (safety 0))
+	   (type simple-string string)
+	   (type array-range sstart send))
+  (values (string->latin% string sstart send #'get-cp1258-bytes null-padding)))
+
+(defmacro define-cp1258->string* (accessor type)
+  (declare (ignore type))
+  (let ((name (make-od-name 'cp1258->string* accessor)))
+    `(progn
+      (defun ,name (string sstart send array astart aend)
+	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+
+(instantiate-octets-definition define-cp1258->string*)
+
+(defmacro define-cp1258->string (accessor type)
+  (declare (ignore type))
+  `(defun ,(make-od-name 'cp1258->string accessor) (array astart aend)
+    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+
+(instantiate-octets-definition define-cp1258->string)
+
+(push '((:cp1258 :|cp1258| :windows-1258 :|windows-1258|)
+        cp1258->string-aref string->cp1258)
+      *external-format-functions*)
+
+(define-external-format (:cp1258 :|cp1258| :windows-1258 :|windows-1258|)
+    1 t
+    (let ((cp1258-byte (code->cp1258-mapper bits)))
+      (if cp1258-byte
+          (setf (sap-ref-8 sap tail) cp1258-byte)
+          (stream-encoding-error-and-handle stream bits)))
+    (let ((code (cp1258->code-mapper byte)))
+      (if code
+          (code-char code)
+          (stream-decoding-error stream byte)))) ;; TODO -- error check
