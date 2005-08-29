@@ -262,14 +262,7 @@ create_thread_struct(lispobj initial_function) {
         free_thread_struct(th);
         return 0;
     }
-    if(all_threads)
-        memcpy(th->interrupt_data,
-               arch_os_get_current_thread()->interrupt_data,
-               sizeof (struct interrupt_data));
-    else
-        memcpy(th->interrupt_data,global_interrupt_data,
-               sizeof (struct interrupt_data));
-
+    th->interrupt_data->pending_handler = 0;
     th->no_tls_value_marker=initial_function;
     return th;
 }

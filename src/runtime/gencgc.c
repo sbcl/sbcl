@@ -3622,14 +3622,11 @@ garbage_collect_generation(int generation, int raise)
 
     /* Scavenge the Lisp functions of the interrupt handlers, taking
      * care to avoid SIG_DFL and SIG_IGN. */
-    for_each_thread(th) {
-        struct interrupt_data *data=th->interrupt_data;
-        for (i = 0; i < NSIG; i++) {
-            union interrupt_handler handler = data->interrupt_handlers[i];
-            if (!ARE_SAME_HANDLER(handler.c, SIG_IGN) &&
-                !ARE_SAME_HANDLER(handler.c, SIG_DFL)) {
-                scavenge((lispobj *)(data->interrupt_handlers + i), 1);
-            }
+    for (i = 0; i < NSIG; i++) {
+        union interrupt_handler handler = interrupt_handlers[i];
+        if (!ARE_SAME_HANDLER(handler.c, SIG_IGN) &&
+            !ARE_SAME_HANDLER(handler.c, SIG_DFL)) {
+            scavenge((lispobj *)(interrupt_handlers + i), 1);
         }
     }
     /* Scavenge the function list for INTERRUPT-THREAD. */

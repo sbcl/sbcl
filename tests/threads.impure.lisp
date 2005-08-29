@@ -417,6 +417,12 @@
   (assert (null (symbol-value-in-thread 'sb-thread:*current-thread*
                                         thread))))
 
+;; interrupt handlers are per-thread with pthreads, make sure the
+;; handler installed in one thread is global
+(sb-thread:make-thread
+ (lambda ()
+   (sb-ext:run-program "sleep" '("1") :search t :wait nil)))
+
 #|  ;; a cll post from eric marsden
 | (defun crash ()
 |   (setq *debugger-hook*
@@ -429,8 +435,3 @@
 |     (mp:make-process #'roomy)
 |     (mp:make-process #'roomy)))
 |#
-
-;; give the other thread time to die before we leave, otherwise the
-;; overall exit status is 0, not 104
-(sleep 2)
-

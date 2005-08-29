@@ -124,8 +124,6 @@ collect_garbage(unsigned ignore)
     unsigned long control_stack_size, binding_stack_size;
     sigset_t tmp, old;
     struct thread *th=arch_os_get_current_thread();
-    struct interrupt_data *data=th->interrupt_data;
-
 
 #ifdef PRINTNOISE
     printf("[Collecting garbage ... \n");
@@ -177,8 +175,8 @@ collect_garbage(unsigned ignore)
     printf("Scavenging interrupt handlers (%d bytes) ...\n",
            (int)sizeof(interrupt_handlers));
 #endif
-    scavenge((lispobj *) data->interrupt_handlers,
-             sizeof(data->interrupt_handlers) / sizeof(lispobj));
+    scavenge((lispobj *) interrupt_handlers,
+             sizeof(interrupt_handlers) / sizeof(lispobj));
 
     /* _size quantities are in units of sizeof(lispobj) - i.e. 4 */
     control_stack_size =

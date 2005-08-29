@@ -143,7 +143,8 @@ inline static void check_interrupts_enabled_or_lose(os_context_t *context)
  * becomes 'yes'.) */
 boolean internal_errors_enabled = 0;
 
-struct interrupt_data * global_interrupt_data;
+static void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, void*);
+union interrupt_handler interrupt_handlers[NSIG];
 
 /* At the toplevel repl we routinely call this function.  The signal
  * mask ought to be clear anyway most of the time, but may be non-zero
@@ -416,7 +417,6 @@ void
 interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
-    struct thread *thread=arch_os_get_current_thread();
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
     boolean were_in_lisp;
 #endif
@@ -431,7 +431,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
        delivered we appear to have a null FPU control word. */
     os_restore_fp_control(context);
 #endif
-    handler = thread->interrupt_data->interrupt_handlers[signal];
+    handler = interrupt_handlers[signal];
 
     if (ARE_SAME_HANDLER(handler.c, SIG_IGN)) {
         return;
@@ -467,7 +467,10 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
          * because we're not in pseudoatomic and allocation shouldn't
          * be interrupted.  In which case it's no longer an issue as
          * all our allocation from C now goes through a PA wrapper,
-         * but still, doesn't hurt */
+         * but still, doesn't hurt.
+         *
+         * Yeah, but non-gencgc platforms that don't really wrap
+         * allocation in PA. MG - 2005-08-29  */
 
         lispobj info_sap,context_sap = alloc_sap(context);
         info_sap = alloc_sap(info);
@@ -618,16 +621,13 @@ static void
 low_level_interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
-    struct thread *thread=arch_os_get_current_thread();
-    struct interrupt_data *data=thread->interrupt_data;
 
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif
     check_blockables_blocked_or_lose();
     check_interrupts_enabled_or_lose(context);
-    (*data->interrupt_low_level_handlers[signal])
-        (signal, info, void_context);
+    interrupt_low_level_handlers[signal](signal, info, void_context);
 #ifdef LISP_FEATURE_DARWIN
     /* Work around G5 bug */
     DARWIN_FIX_CONTEXT(context);
@@ -1051,10 +1051,6 @@ undoably_install_low_level_interrupt_handler (int signal,
                                                            void*))
 {
     struct sigaction sa;
-    struct thread *th=arch_os_get_current_thread();
-    /* It may be before the initial thread is started. */
-    struct interrupt_data *data=
-        th ? th->interrupt_data : global_interrupt_data;
 
     if (0 > signal || signal >= NSIG) {
         lose("bad signal number %d", signal);
@@ -1078,7 +1074,7 @@ undoably_install_low_level_interrupt_handler (int signal,
 #endif
 
     sigaction(signal, &sa, NULL);
-    data->interrupt_low_level_handlers[signal] =
+    interrupt_low_level_handlers[signal] =
         (ARE_SAME_HANDLER(handler, SIG_DFL) ? 0 : handler);
 }
 
@@ -1089,10 +1085,6 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     struct sigaction sa;
     sigset_t old, new;
     union interrupt_handler oldhandler;
-    struct thread *th=arch_os_get_current_thread();
-    /* It may be before the initial thread is started. */
-    struct interrupt_data *data=
-        th ? th->interrupt_data : global_interrupt_data;
 
     FSHOW((stderr, "/entering POSIX install_handler(%d, ..)\n", signal));
 
@@ -1100,9 +1092,9 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     sigaddset(&new, signal);
     thread_sigmask(SIG_BLOCK, &new, &old);
 
-    FSHOW((stderr, "/data->interrupt_low_level_handlers[signal]=%x\n",
-           (unsigned int)data->interrupt_low_level_handlers[signal]));
-    if (data->interrupt_low_level_handlers[signal]==0) {
+    FSHOW((stderr, "/interrupt_low_level_handlers[signal]=%x\n",
+           (unsigned int)interrupt_low_level_handlers[signal]));
+    if (interrupt_low_level_handlers[signal]==0) {
         if (ARE_SAME_HANDLER(handler, SIG_DFL) ||
             ARE_SAME_HANDLER(handler, SIG_IGN)) {
             sa.sa_sigaction = handler;
@@ -1118,8 +1110,8 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
         sigaction(signal, &sa, NULL);
     }
 
-    oldhandler = data->interrupt_handlers[signal];
-    data->interrupt_handlers[signal].c = handler;
+    oldhandler = interrupt_handlers[signal];
+    interrupt_handlers[signal].c = handler;
 
     thread_sigmask(SIG_SETMASK, &old, 0);
 
@@ -1138,11 +1130,9 @@ interrupt_init()
     sigaddset_deferrable(&deferrable_sigset);
     sigaddset_blockable(&blockable_sigset);
 
-    global_interrupt_data=calloc(sizeof(struct interrupt_data), 1);
-
     /* Set up high level handler information. */
     for (i = 0; i < NSIG; i++) {
-        global_interrupt_data->interrupt_handlers[i].c =
+        interrupt_handlers[i].c =
             /* (The cast here blasts away the distinction between
              * SA_SIGACTION-style three-argument handlers and
              * signal(..)-style one-argument handlers, which is OK

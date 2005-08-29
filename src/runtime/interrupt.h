@@ -45,10 +45,9 @@ union interrupt_handler {
     void (*c)(int, siginfo_t*, void*);
 };
 
-struct interrupt_data {
-    void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, void*) ;
-    union interrupt_handler interrupt_handlers[NSIG];
+extern union interrupt_handler interrupt_handlers[NSIG];
 
+struct interrupt_data {
     /* signal information for pending signal.  pending_signal=0 when there
      * is no pending signal. */
     void (*pending_handler) (int, siginfo_t*, void*) ;
