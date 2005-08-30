@@ -96,6 +96,7 @@ clean:
 	rm -rf $(HTMLDIRS) $(DOCSTRINGDIR)
 	rm -f contrib-docs.texi-temp
 	rm -f package-locks.texi-temp
+	rm -f variables.texinfo
 	rm -f $(PSFILES) $(PDFFILES) html-stamp tempfiles-stamp
 	rm -f $(TMPFILES) $(INDEXFILES)
 	rm -f sbcl.info sbcl.info-* asdf.info

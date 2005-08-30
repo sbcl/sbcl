@@ -21,7 +21,8 @@ then
     if [ -e $sbclsystem ] && [ -e $sbclcore ]
     then
         SBCLRUNTIME="$sbclsystem --core $sbclcore"
-        SBCL_HOME=`pwd`/../../contrib; export SBCL_HOME
+        SBCL_HOME=`pwd`/../../contrib/; export SBCL_HOME
+        SBCL_BUILDING_CONTRIB="please asdf install your hook"; export SBCL_BUILDING_CONTRIB
     else
         SBCLRUNTIME="`which sbcl`"
     fi
@@ -54,6 +55,7 @@ DOCSTRINGDIR="${DOCSTRINGDIR:-docstrings/}"
 echo /creating docstring snippets from SBCL=\'$SBCLRUNTIME\' for packages \'$PACKAGES\'
 $SBCL <<EOF
 (load "docstrings.lisp") 
+(require :asdf)
 (dolist (module (quote ($MODULES))) 
   (require module)) 
 (sb-texinfo:generate-includes "$DOCSTRINGDIR" $PACKAGES) 
