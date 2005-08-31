@@ -141,7 +141,7 @@ os_init(char *argv[], char *envp[])
     futex_wait(futex,-1);
     if(errno==ENOSYS) {
        lose("This version of sbcl is compiled with threading support, but your kernel is too old to support this.\n\
-Please use a more recent kernel or a version of SBCL without threading support.\n");
+Please use a more recent kernel or a version of sbcl without threading support.\n");
     }
     if(! isnptl()) {
        lose("This version of sbcl only works correctly with the NPTL threading library. Please use a newer glibc, older sbcl or stop using LD_ASSUME_KERNEL");
@@ -169,7 +169,7 @@ Please use a more recent kernel or a version of SBCL without threading support.\
                * name of the process as "exe".
                */
               char runtime[PATH_MAX+1];
-              int i = readlink("/proc/self/exe", runtime, PATH_MAX) != -1;
+              int i = readlink("/proc/self/exe", runtime, PATH_MAX);
               if (i != -1) {
                   runtime[i] = '\0';
                   execve(runtime, argv, envp);
