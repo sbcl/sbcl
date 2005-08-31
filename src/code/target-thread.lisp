@@ -276,11 +276,13 @@ time we reacquire MUTEX and return to the caller."
       ;; better than nothing.
       (get-mutex mutex value))))
 
-(defun condition-notify (queue)
+(defun condition-notify (queue &optional (n 1))
   #!+sb-doc
-  "Notify one of the threads waiting on QUEUE."
-  #!-sb-thread (declare (ignore queue))
+  "Notify N threads waiting on QUEUE."
+  #!-sb-thread (declare (ignore queue n))
   #!-sb-thread (error "Not supported in unithread builds.")
+  #!+sb-thread
+  (declare (type (and fixnum (integer 1)) n))
   #!+sb-thread
   (let ((me *current-thread*))
     ;; no problem if >1 thread notifies during the comment in
@@ -289,17 +291,50 @@ time we reacquire MUTEX and return to the caller."
     ;; XXX we should do something to ensure that the result of this setf
     ;; is visible to all CPUs
     (setf (waitqueue-data queue) me)
-    (futex-wake (waitqueue-data-address queue) 1)))
+    (futex-wake (waitqueue-data-address queue) n)))
 
 (defun condition-broadcast (queue)
   #!+sb-doc
   "Notify all threads waiting on QUEUE."
-  #!-sb-thread (declare (ignore queue))
-  #!-sb-thread (error "Not supported in unithread builds.")
-  #!+sb-thread
-  (let ((me *current-thread*))
-    (setf (waitqueue-data queue) me)
-    (futex-wake (waitqueue-data-address queue) (ash 1 30))))
+  (condition-notify queue most-positive-fixnum))
+
+;;;; semaphores
+
+(defstruct (semaphore (:constructor %make-semaphore))
+  #!+sb-doc
+  "Semaphore type."
+  (name nil :type (or null simple-string))
+  (count 0 :type (integer 0))
+  (mutex (make-mutex))
+  (queue (make-waitqueue)))
+
+(defun make-semaphore (&key name (count 0))
+  #!+sb-doc
+  "Create a semaphore with the supplied COUNT."
+  (%make-semaphore :name name :count count))
+
+(setf (sb!kernel:fdocumentation 'semaphore-name 'function)
+      "The name of the semaphore. Setfable.")
+
+(defun wait-on-semaphore (sem)
+  #!+sb-doc
+  "Decrement the count of SEM if the count would not be negative. Else
+block until the semaphore can be decremented."
+  ;; a more direct implementation based directly on futexes should be
+  ;; possible
+  (with-mutex ((semaphore-mutex sem))
+    (loop until (> (semaphore-count sem) 0)
+          do (condition-wait (semaphore-queue sem) (semaphore-mutex sem))
+          finally (decf (semaphore-count sem)))))
+
+(defun signal-semaphore (sem &optional (n 1))
+  #!+sb-doc
+  "Increment the count of SEM by N. If there are threads waiting on
+this semaphore, then N of them is woken up."
+  (declare (type (and fixnum (integer 1)) n))
+  (with-mutex ((semaphore-mutex sem))
+    (when (= n (incf (semaphore-count sem) n))
+      (condition-notify (semaphore-queue sem) n))))
 
 ;;;; job control, independent listeners
 
@@ -464,7 +499,7 @@ returns the thread exits."
   #!-sb-thread (error "Not supported in unithread builds.")
   #!+sb-thread
   (let* ((thread (%make-thread :name name))
-         (setup-p nil)
+         (setup-sem (make-semaphore :name "Thread setup semaphore"))
          (real-function (coerce function 'function))
          (thread-sap
           ;; don't let the child inherit *CURRENT-THREAD* because that
@@ -473,8 +508,6 @@ returns the thread exits."
             (%create-thread
              (sb!kernel:get-lisp-obj-address
               (lambda ()
-                ;; FIXME: use semaphores?
-                (loop until setup-p)
                 ;; in time we'll move some of the binding presently done in C
                 ;; here too
                 (let ((*current-thread* thread)
@@ -482,6 +515,7 @@ returns the thread exits."
                       (sb!kernel::*handler-clusters* nil)
                       (sb!kernel::*condition-restarts* nil)
                       (sb!impl::*descriptor-handlers* nil)) ; serve-event
+                  (wait-on-semaphore setup-sem)
                   ;; can't use handling-end-of-the-world, because that flushes
                   ;; output streams, and we don't necessarily have any (or we
                   ;; could be sharing them)
@@ -515,7 +549,7 @@ returns the thread exits."
       (push thread *all-threads*))
     (with-session-lock (*session*)
       (push thread (session-threads *session*)))
-    (setq setup-p t)
+    (signal-semaphore setup-sem)
     (sb!impl::finalize thread (lambda () (reap-dead-thread thread-sap)))
     thread))
 

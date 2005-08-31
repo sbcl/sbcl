@@ -13,6 +13,8 @@
 
 (in-package "SB-THREAD") ; this is white-box testing, really
 
+(use-package :test-util)
+
 (defun wait-for-threads (threads)
   (loop while (some #'sb-thread:thread-alive-p threads) do (sleep 0.01)))
 
@@ -182,6 +184,64 @@
           (kid2 (make-thread #'run)))
       (format t "contention ~A ~A~%" kid1 kid2)
       (wait-for-threads (list kid1 kid2)))))
+
+;;; semaphores
+
+(defmacro raises-timeout-p (&body body)
+  `(handler-case (progn (progn ,@body) nil)
+    (sb-ext:timeout () t)))
+
+(with-test (:name (:semaphore :wait-forever))
+  (let ((sem (make-semaphore :count 0)))
+    (assert (raises-timeout-p
+              (sb-ext:with-timeout 0.1
+                (wait-on-semaphore sem))))))
+
+(with-test (:name (:semaphore :initial-count))
+  (let ((sem (make-semaphore :count 1)))
+    (sb-ext:with-timeout 0.1
+      (wait-on-semaphore sem))))
+
+(with-test (:name (:semaphore :wait-then-signal))
+  (let ((sem (make-semaphore))
+        (signalled-p nil))
+    (make-thread (lambda ()
+                   (sleep 0.1)
+                   (setq signalled-p t)
+                   (signal-semaphore sem)))
+    (wait-on-semaphore sem)
+    (assert signalled-p)))
+
+(with-test (:name (:semaphore :signal-then-wait))
+  (let ((sem (make-semaphore))
+        (signalled-p nil))
+    (make-thread (lambda ()
+                   (signal-semaphore sem)
+                   (setq signalled-p t)))
+    (loop until signalled-p)
+    (wait-on-semaphore sem)
+    (assert signalled-p)))
+
+(with-test (:name (:semaphore :multiple-signals))
+  (let* ((sem (make-semaphore :count 5))
+         (threads (loop repeat 20
+                        collect (make-thread (lambda ()
+                                               (wait-on-semaphore sem))))))
+    (flet ((count-live-threads ()
+             (count-if #'thread-alive-p threads)))
+      (sleep 0.5)
+      (assert (= 15 (count-live-threads)))
+      (signal-semaphore sem 10)
+      (sleep 0.5)
+      (assert (= 5 (count-live-threads)))
+      (signal-semaphore sem 3)
+      (sleep 0.5)
+      (assert (= 2 (count-live-threads)))
+      (signal-semaphore sem 4)
+      (sleep 0.5)
+      (assert (= 0 (count-live-threads))))))
+
+(format t "~&semaphore tests done~%")
 
 (defun test-interrupt (function-to-interrupt &optional quit-p)
   (let ((child  (make-thread function-to-interrupt)))
