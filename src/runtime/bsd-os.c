@@ -51,7 +51,8 @@ os_vm_size_t os_vm_page_size;
 static void netbsd_init();
 #endif /* __NetBSD__ */
 
-void os_init(void)
+void
+os_init(char *argv[], char *envp[])
 {
     os_vm_page_size = getpagesize();
 

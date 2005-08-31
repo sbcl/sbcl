@@ -52,6 +52,10 @@
 #include "gencgc-internal.h"
 #endif
 
+#ifdef LISP_FEATURE_LINUX
+#include <sys/personality.h>
+#endif
+
 size_t os_vm_page_size;
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -92,7 +96,7 @@ int linux_sparc_siginfo_bug = 0;
 int linux_no_threads_p = 0;
 
 void
-os_init(void)
+os_init(char *argv[], char *envp[])
 {
     /* Conduct various version checks: do we have enough mmap(), is
      * this a sparc running 2.2, can we do threads? */
@@ -125,6 +129,37 @@ os_init(void)
         fprintf(stderr,"Linux with NPTL support (e.g. kernel 2.6 or newer) required for \nthread-enabled SBCL.  Disabling thread support.\n\n");
 #endif
     os_vm_page_size = getpagesize();
+
+    /* KLUDGE: Disable memory randomization on new Linux kernels
+     * by setting a personality flag and re-executing. (We need
+     * to re-execute, since the memory maps that can conflict with
+     * the SBCL spaces have already been done at this point).
+     */
+#if defined(LISP_FEATURE_X86)
+    if ((major_version == 2 && minor_version >= 6)
+        || major_version >= 3)
+     {
+       long pers = personality(-1);
+       /* 0x40000 aka. ADDR_NO_RANDOMIZE */
+       if (!(pers & 0x40000)) {
+          if (personality(pers | 0x40000) != -1) {
+             char runtime[PATH_MAX+1];
+             /* Use /proc/self/exe instead of trying to figure out the
+              * executable path from PATH and argv[0], since that's
+              * unreliable.
+              */
+             if (readlink("/proc/self/exe", runtime, PATH_MAX) != -1) {
+                execve(runtime, argv, envp);
+             }
+          }
+          /* Either changing the personality or execve() failed. Either
+           * way we might as well continue, and hope that the random
+           * memory maps are ok this time around.
+           */
+          fprintf(stderr, "WARNING: Couldn't re-execute SBCL with the proper personality flags (maybe /proc isn't mounted?). Trying to continue anyway.\n");
+       }
+    }
+#endif
 }
 
 

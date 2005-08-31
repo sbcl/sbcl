@@ -53,7 +53,8 @@ static os_vm_size_t real_page_size_difference=0;
 int KLUDGE_MAYBE_MAP_ANON = 0x0;
 int kludge_mmap_fd = -1; /* default for MAP_ANON */
 
-void os_init(void)
+void
+os_init(char *argv[], char *envp[])
 {
     struct utsname name;
     int major_version;

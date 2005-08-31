@@ -199,7 +199,7 @@ main(int argc, char *argv[], char *envp[])
     /* KLUDGE: os_vm_page_size is set by os_init(), and on some
      * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so
      * it must follow os_init(). -- WHN 2000-01-26 */
-    os_init();
+    os_init(argv, envp);
     arch_init();
     gc_init();
     validate();

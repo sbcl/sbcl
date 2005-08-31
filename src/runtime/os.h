@@ -50,7 +50,7 @@ extern os_vm_size_t os_vm_page_size;
 
 /* Do anything we need to do when starting up the runtime environment
  * in this OS. */
-extern void os_init(void);
+extern void os_init(char *argv[], char *envp[]);
 
 /* Install any OS-dependent low-level signal handlers which are needed
  * by the runtime environment. E.g. the signals raised by a violation
