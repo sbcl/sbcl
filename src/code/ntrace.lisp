@@ -265,7 +265,8 @@
                ;; with DEFVAR.
                (locally
                  (declare (special basic-definition arg-list))
-                 (prin1 `(,(trace-info-what info) ,@arg-list)))
+                 (prin1 `(,(trace-info-what info)
+                          ,@(mapcar #'ensure-printable-object arg-list))))
                (print-frame-call frame *standard-output*))
            (terpri)
            (trace-print frame (trace-info-print info))
@@ -308,7 +309,7 @@
             (dolist (v *trace-values*)
               (write-char #\space)
               (pprint-newline :linear)
-              (prin1 v)))
+              (prin1 (ensure-printable-object v))))
           (terpri)
           (trace-print frame (trace-info-print-after info))
           (write-sequence (get-output-stream-string *standard-output*)
