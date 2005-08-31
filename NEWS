@@ -7,6 +7,8 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     iso-8859-8, iso-8859-9, iso-8859-10, iso-8859-11, iso-8859-13,
     iso-8859-14, cp1250, cp1251, cp1252, cp1253, cp1254,
     cp1255,cp1256, cp1257, cp1258 (contributed by Ivan Boldyrev)
+  * incompatible change: a threaded SBCL will no longer revert to 
+    non-threaded mode on non-NPTL systems, but refuse to start entirely.    
   * bug fix: interrupts are disabled until startup is complete; no
     more sigsegvs when receiving a signal to soon
   * optimization: Faster 32-bit SB-ROTATE-BYTE:ROTATE-BYTE on non-x86/ppc

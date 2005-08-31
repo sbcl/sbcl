@@ -95,6 +95,21 @@ futex_wake(int *lock_word, int n)
 int linux_sparc_siginfo_bug = 0;
 int linux_no_threads_p = 0;
 
+#ifdef LISP_FEATURE_SB_THREAD
+int isnptl (void)
+{
+  size_t n = confstr (_CS_GNU_LIBPTHREAD_VERSION, NULL, 0);
+  if (n > 0)
+    {
+      char *buf = alloca (n);
+      confstr (_CS_GNU_LIBPTHREAD_VERSION, buf, n);
+      if (strstr (buf, "NPTL"))
+        return 1;
+    }
+  return 0;
+}
+#endif
+
 void
 os_init(char *argv[], char *envp[])
 {
@@ -124,9 +139,13 @@ os_init(char *argv[], char *envp[])
     }
 #ifdef LISP_FEATURE_SB_THREAD
     futex_wait(futex,-1);
-    if(errno==ENOSYS)  linux_no_threads_p = 1;
-    if(linux_no_threads_p)
-        fprintf(stderr,"Linux with NPTL support (e.g. kernel 2.6 or newer) required for \nthread-enabled SBCL.  Disabling thread support.\n\n");
+    if(errno==ENOSYS) {
+       lose("This version of sbcl is compiled with threading support, but your kernel is too old to support this.\n\
+Please use a more recent kernel or a version of SBCL without threading support.\n");
+    }
+    if(! isnptl()) {
+       lose("This version of sbcl only works correctly with the NPTL threading library. Please use a newer glibc, older sbcl or stop using LD_ASSUME_KERNEL");
+    }
 #endif
     os_vm_page_size = getpagesize();
 
@@ -143,14 +162,18 @@ os_init(char *argv[], char *envp[])
        /* 0x40000 aka. ADDR_NO_RANDOMIZE */
        if (!(pers & 0x40000)) {
           if (personality(pers | 0x40000) != -1) {
-             char runtime[PATH_MAX+1];
-             /* Use /proc/self/exe instead of trying to figure out the
-              * executable path from PATH and argv[0], since that's
-              * unreliable.
-              */
-             if (readlink("/proc/self/exe", runtime, PATH_MAX) != -1) {
-                execve(runtime, argv, envp);
-             }
+              /* Use /proc/self/exe instead of trying to figure out the
+               * executable path from PATH and argv[0], since that's
+               * unreliable. We follow the symlink instead of executing
+               * the file directly to avoid top from displaying the
+               * name of the process as "exe".
+               */
+              char runtime[PATH_MAX+1];
+              int i = readlink("/proc/self/exe", runtime, PATH_MAX) != -1;
+              if (i != -1) {
+                  runtime[i] = '\0';
+                  execve(runtime, argv, envp);
+              }
           }
           /* Either changing the personality or execve() failed. Either
            * way we might as well continue, and hope that the random
