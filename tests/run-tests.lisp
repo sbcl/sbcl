@@ -115,9 +115,9 @@
   (setf *all-failures* (append failures *all-failures*)))
 
 (defun unexpected-failures ()
-  (remove-if (lambda (x) 
-                (or (eq (car x) :expected-failure) 
-		    (eq (car x) :unexpected-success)))
+  (remove-if (lambda (x)
+               (or (eq (car x) :expected-failure)
+                   (eq (car x) :unexpected-success)))
              *all-failures*))
 
 (defun setup-cl-user ()

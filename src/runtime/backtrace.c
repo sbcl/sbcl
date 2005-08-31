@@ -32,6 +32,12 @@
 #include "genesis/primitive-objects.h"
 #include "thread.h"
 
+#ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
+/* __USE_GNU needed if we want dladdr() and Dl_Info from glibc. */
+#define __USE_GNU
+#include "dlfcn.h"
+#endif
+
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 
 /* KLUDGE: Sigh ... I know what the call frame looks like and it had
@@ -481,10 +487,20 @@ backtrace(int nframes)
         print_entry_name(df->name);
       else
         print_entry_points(cp);
-    } else
-      printf("Foreign fp = 0x%lx, ra = 0x%lx",
-             (unsigned long) next_fp,
-             (unsigned long) ra);
+    } else {
+#ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
+        Dl_info info;
+        if (dladdr(ra, &info)) {
+            printf("Foreign function %s, fp = 0x%lx, ra = 0x%lx",
+                   info.dli_sname,
+                   (unsigned long) next_fp,
+                   (unsigned long) ra);
+        } else
+#endif
+        printf("Foreign fp = 0x%lx, ra = 0x%lx",
+               (unsigned long) next_fp,
+               (unsigned long) ra);
+    }
 
     putchar('\n');
     fp = next_fp;
