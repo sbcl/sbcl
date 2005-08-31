@@ -72,6 +72,9 @@ find_gnumake
 # and target machines.
 sh make-config.sh || exit 1
 
+# Enforce the source policy for no bogus whitespace
+tools-for-build/canonicalize-whitespace || exit 1
+
 # The make-host-*.sh scripts are run on the cross-compilation host,
 # and the make-target-*.sh scripts are run on the target machine. In
 # ordinary compilation, we just do these phases consecutively on the

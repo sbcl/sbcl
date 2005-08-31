@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  $Revision$
+;;; This is asdf: Another System Definition Facility.  1.87
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -95,6 +95,7 @@
            #:missing-component
            #:missing-dependency
            #:circular-dependency        ; errors
+           #:duplicate-names
 
            #:retry
            #:accept                     ; restarts
@@ -108,7 +109,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "$Revision$")
+(defvar *asdf-revision* (let* ((v "1.87")
                                (colon (or (position #\: v) -1))
                                (dot (position #\. v)))
                           (and v colon dot
@@ -156,6 +157,9 @@ and NIL NAME and TYPE components"
 
 (define-condition circular-dependency (system-definition-error)
   ((components :initarg :components :reader circular-dependency-components)))
+
+(define-condition duplicate-names (system-definition-error)
+  ((name :initarg :name :reader duplicate-names-name)))
 
 (define-condition missing-component (system-definition-error)
   ((requires :initform "(unnamed)" :reader missing-requires :initarg :requires)
@@ -930,6 +934,15 @@ Returns the new tree (which probably shares structure with the old one)"
               ;; list ends
               &allow-other-keys) options
     (check-component-input type name depends-on components in-order-to)
+
+    (when (and parent
+             (find-component parent name)
+             ;; ignore the same object when rereading the defsystem
+             (not
+              (typep (find-component parent name)
+                     (class-for-type parent type))))
+      (error 'duplicate-names :name name))
+
     (let* ((other-args (remove-keys
                         '(components pathname default-component-class
                           perform explain output-files operation-done-p
@@ -958,7 +971,19 @@ Returns the new tree (which probably shares structure with the old one)"
                       for c = (parse-component-form ret c-form)
                       collect c
                       if serial
-                      do (push (component-name c) *serial-depends-on*)))))
+                      do (push (component-name c) *serial-depends-on*))))
+
+        ;; check for duplicate names
+        (let ((name-hash (make-hash-table :test #'equalp)))
+          (loop for c in (module-components ret)
+                do
+                (if (gethash (component-name c)
+                             name-hash)
+                    (error 'duplicate-names
+                           :name (component-name c))
+                  (setf (gethash (component-name c)
+                                 name-hash)
+                        t)))))
 
       (setf (slot-value ret 'in-order-to)
             (union-of-dependencies
