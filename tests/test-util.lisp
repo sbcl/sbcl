@@ -24,7 +24,7 @@
          (fail-test :unexpected-failure ',name error)))))
 
 (defun report-test-status ()
-  (with-standard-io-syntax 
+  (with-standard-io-syntax
       (with-open-file (stream "test-status.lisp-expr"
                               :direction :output
                               :if-exists :supersede)
@@ -36,7 +36,7 @@
     (setf *test-count* 0))
   (incf *test-count*))
 
-(defun fail-test (type test-name condition)  
+(defun fail-test (type test-name condition)
   (push (list type *test-file* (or test-name *test-count*))
         *failures*)
   (when (or (and *break-on-failure*

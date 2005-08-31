@@ -279,8 +279,8 @@ static int
 stack_pointer_p (void *p)
 {
   return (p < (void *) arch_os_get_current_thread()->control_stack_end
-	  && p > (void *) &p
-	  && (((unsigned long) p) & 3) == 0);
+          && p > (void *) &p
+          && (((unsigned long) p) & 3) == 0);
 }
 
 static int
@@ -307,11 +307,11 @@ x86_call_context (void *fp, void **ra, void **ocfp)
   lisp_ra   = *((void **) fp - 2);
 
   lisp_valid_p = (lisp_ocfp > fp
-		  && stack_pointer_p(lisp_ocfp)
-		  && ra_pointer_p(lisp_ra));
+                  && stack_pointer_p(lisp_ocfp)
+                  && ra_pointer_p(lisp_ra));
   c_valid_p = (c_ocfp > fp
-	       && stack_pointer_p(c_ocfp)
-	       && ra_pointer_p(c_ra));
+               && stack_pointer_p(c_ocfp)
+               && ra_pointer_p(c_ra));
 
   if (lisp_valid_p && c_valid_p) {
     void *lisp_path_fp;
@@ -372,7 +372,7 @@ debug_function_from_pc (struct code* code, void *pc)
 
   for (i = 1;; i += 2) {
     unsigned next_pc;
-		  
+
     if (i == len)
       return ((struct compiled_debug_fun *) native_pointer(v->data[i - 1]));
 
@@ -426,7 +426,6 @@ print_entry_name (lispobj name)
       printf("\"%s\"", (char *) string->data);
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
     } else if (widetag_of(*object) == SIMPLE_CHARACTER_STRING_WIDETAG) {
-      struct vector *string = (struct vector *) object;
       printf("<oops, a unicode string>");                           /* FIXME */
 #endif
     } else
@@ -443,7 +442,7 @@ print_entry_points (struct code *code)
   while (function != NIL) {
     struct simple_fun *header = (struct simple_fun *) native_pointer(function);
     print_entry_name(header->name);
-      
+
     function = header->next;
     if (function != NIL)
       printf (", ");
@@ -468,7 +467,7 @@ backtrace(int nframes)
     lispobj *p;
     void *ra;
     void *next_fp;
-      
+
     if (!x86_call_context(fp, &ra, &next_fp))
       break;
 

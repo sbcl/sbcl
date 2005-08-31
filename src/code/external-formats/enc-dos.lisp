@@ -134,14 +134,14 @@
 (declaim (inline get-cp437-bytes))
 (defun get-cp437-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp437 string pos end))
 
 (defun string->cp437 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp437-bytes null-padding)))
 
 (defmacro define-cp437->string* (accessor type)
@@ -149,7 +149,7 @@
   (let ((name (make-od-name 'cp437->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp437->string*)
 
@@ -309,14 +309,14 @@
 (declaim (inline get-cp850-bytes))
 (defun get-cp850-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp850 string pos end))
 
 (defun string->cp850 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp850-bytes null-padding)))
 
 (defmacro define-cp850->string* (accessor type)
@@ -324,7 +324,7 @@
   (let ((name (make-od-name 'cp850->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp850->string*)
 
@@ -484,14 +484,14 @@
 (declaim (inline get-cp852-bytes))
 (defun get-cp852-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp852 string pos end))
 
 (defun string->cp852 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp852-bytes null-padding)))
 
 (defmacro define-cp852->string* (accessor type)
@@ -499,7 +499,7 @@
   (let ((name (make-od-name 'cp852->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp852->string*)
 
@@ -659,14 +659,14 @@
 (declaim (inline get-cp855-bytes))
 (defun get-cp855-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp855 string pos end))
 
 (defun string->cp855 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp855-bytes null-padding)))
 
 (defmacro define-cp855->string* (accessor type)
@@ -674,7 +674,7 @@
   (let ((name (make-od-name 'cp855->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp855->string*)
 
@@ -833,14 +833,14 @@
 (declaim (inline get-cp857-bytes))
 (defun get-cp857-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp857 string pos end))
 
 (defun string->cp857 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp857-bytes null-padding)))
 
 (defmacro define-cp857->string* (accessor type)
@@ -848,7 +848,7 @@
   (let ((name (make-od-name 'cp857->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp857->string*)
 
@@ -1008,14 +1008,14 @@
 (declaim (inline get-cp860-bytes))
 (defun get-cp860-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp860 string pos end))
 
 (defun string->cp860 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp860-bytes null-padding)))
 
 (defmacro define-cp860->string* (accessor type)
@@ -1023,7 +1023,7 @@
   (let ((name (make-od-name 'cp860->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp860->string*)
 
@@ -1183,14 +1183,14 @@
 (declaim (inline get-cp861-bytes))
 (defun get-cp861-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp861 string pos end))
 
 (defun string->cp861 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp861-bytes null-padding)))
 
 (defmacro define-cp861->string* (accessor type)
@@ -1198,7 +1198,7 @@
   (let ((name (make-od-name 'cp861->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp861->string*)
 
@@ -1358,14 +1358,14 @@
 (declaim (inline get-cp862-bytes))
 (defun get-cp862-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp862 string pos end))
 
 (defun string->cp862 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp862-bytes null-padding)))
 
 (defmacro define-cp862->string* (accessor type)
@@ -1373,7 +1373,7 @@
   (let ((name (make-od-name 'cp862->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp862->string*)
 
@@ -1533,14 +1533,14 @@
 (declaim (inline get-cp863-bytes))
 (defun get-cp863-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp863 string pos end))
 
 (defun string->cp863 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp863-bytes null-padding)))
 
 (defmacro define-cp863->string* (accessor type)
@@ -1548,7 +1548,7 @@
   (let ((name (make-od-name 'cp863->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp863->string*)
 
@@ -1705,14 +1705,14 @@
 (declaim (inline get-cp864-bytes))
 (defun get-cp864-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp864 string pos end))
 
 (defun string->cp864 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp864-bytes null-padding)))
 
 (defmacro define-cp864->string* (accessor type)
@@ -1720,7 +1720,7 @@
   (let ((name (make-od-name 'cp864->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp864->string*)
 
@@ -1880,14 +1880,14 @@
 (declaim (inline get-cp865-bytes))
 (defun get-cp865-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp865 string pos end))
 
 (defun string->cp865 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp865-bytes null-padding)))
 
 (defmacro define-cp865->string* (accessor type)
@@ -1895,7 +1895,7 @@
   (let ((name (make-od-name 'cp865->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp865->string*)
 
@@ -2055,14 +2055,14 @@
 (declaim (inline get-cp866-bytes))
 (defun get-cp866-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp866 string pos end))
 
 (defun string->cp866 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp866-bytes null-padding)))
 
 (defmacro define-cp866->string* (accessor type)
@@ -2070,7 +2070,7 @@
   (let ((name (make-od-name 'cp866->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp866->string*)
 
@@ -2230,14 +2230,14 @@
 (declaim (inline get-cp869-bytes))
 (defun get-cp869-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp869 string pos end))
 
 (defun string->cp869 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp869-bytes null-padding)))
 
 (defmacro define-cp869->string* (accessor type)
@@ -2245,7 +2245,7 @@
   (let ((name (make-od-name 'cp869->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp869->string*)
 
@@ -2404,14 +2404,14 @@
 (declaim (inline get-cp874-bytes))
 (defun get-cp874-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :cp874 string pos end))
 
 (defun string->cp874 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-cp874-bytes null-padding)))
 
 (defmacro define-cp874->string* (accessor type)
@@ -2419,7 +2419,7 @@
   (let ((name (make-od-name 'cp874->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-cp874->string*)
 

@@ -1407,7 +1407,7 @@ sniff_code_object(struct code *code, unsigned displacement)
 {
     long nheader_words, ncode_words, nwords;
     void *p;
-    void *constants_start_addr, *constants_end_addr;
+    void *constants_start_addr = NULL, *constants_end_addr;
     void *code_start_addr, *code_end_addr;
     int fixup_found = 0;
 

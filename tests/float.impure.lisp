@@ -114,8 +114,8 @@
 
 (assert (= (test 1.0d0) 2.0d0))
 
-(deftype myarraytype (&optional (length '*)) 
+(deftype myarraytype (&optional (length '*))
   `(simple-array double-float (,length)))
 (defun new-pu-label-from-pu-labels (array)
-  (setf (aref (the myarraytype array) 0) 
+  (setf (aref (the myarraytype array) 0)
         sb-ext:double-float-positive-infinity))

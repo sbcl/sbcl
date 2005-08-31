@@ -32,7 +32,7 @@
   (#x9C #x00B0) ; DEGREE SIGN
   (#x9D #x00B2) ; SUPERSCRIPT TWO
   (#x9E #x00B7) ; MIDDLE DOT
-  (#x9F #x00F7) ; DIVISION SIGN 
+  (#x9F #x00F7) ; DIVISION SIGN
   (#xA0 #x2550) ; BOX DRAWINGS DOUBLE HORIZONTAL
   (#xA1 #x2551) ; BOX DRAWINGS DOUBLE VERTICAL
   (#xA2 #x2552) ; BOX DRAWINGS DOWN SINGLE AND RIGHT DOUBLE
@@ -64,7 +64,7 @@
   (#xBC #x256A) ; BOX DRAWINGS VERTICAL SINGLE AND HORIZONTAL DOUBLE
   (#xBD #x256B) ; BOX DRAWINGS VERTICAL DOUBLE AND HORIZONTAL SINGLE
   (#xBE #x256C) ; BOX DRAWINGS DOUBLE VERTICAL AND HORIZONTAL
-  (#xBF #x00A9) ; COPYRIGHT SIGN 
+  (#xBF #x00A9) ; COPYRIGHT SIGN
   (#xC0 #x044E) ; CYRILLIC SMALL LETTER YU
   (#xC1 #x0430) ; CYRILLIC SMALL LETTER A
   (#xC2 #x0431) ; CYRILLIC SMALL LETTER BE
@@ -134,14 +134,14 @@
 (declaim (inline get-koi8-r-bytes))
 (defun get-koi8-r-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :koi8-r string pos end))
 
 (defun string->koi8-r (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-koi8-r-bytes null-padding)))
 
 (defmacro define-koi8-r->string* (accessor type)
@@ -149,7 +149,7 @@
   (let ((name (make-od-name 'koi8-r->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-koi8-r->string*)
 
@@ -309,14 +309,14 @@
 (declaim (inline get-koi8-u-bytes))
 (defun get-koi8-u-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :koi8-u string pos end))
 
 (defun string->koi8-u (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-koi8-u-bytes null-padding)))
 
 (defmacro define-koi8-u->string* (accessor type)
@@ -324,7 +324,7 @@
   (let ((name (make-od-name 'koi8-u->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-koi8-u->string*)
 
@@ -479,14 +479,14 @@
 (declaim (inline get-x-mac-cyrillic-bytes))
 (defun get-x-mac-cyrillic-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :x-mac-cyrillic string pos end))
 
 (defun string->x-mac-cyrillic (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-x-mac-cyrillic-bytes null-padding)))
 
 (defmacro define-x-mac-cyrillic->string* (accessor type)
@@ -494,7 +494,7 @@
   (let ((name (make-od-name 'x-mac-cyrillic->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-x-mac-cyrillic->string*)
 

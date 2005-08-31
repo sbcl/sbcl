@@ -63,14 +63,14 @@
 (declaim (inline get-iso-8859-2-bytes))
 (defun get-iso-8859-2-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :iso-8859-2 string pos end))
 
 (defun string->iso-8859-2 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-iso-8859-2-bytes null-padding)))
 
 (defmacro define-iso-8859-2->string* (accessor type)
@@ -78,7 +78,7 @@
   (let ((name (make-od-name 'iso-8859-2->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-iso-8859-2->string*)
 
@@ -145,14 +145,14 @@
 (declaim (inline get-iso-8859-3-bytes))
 (defun get-iso-8859-3-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :iso-8859-3 string pos end))
 
 (defun string->iso-8859-3 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-iso-8859-3-bytes null-padding)))
 
 (defmacro define-iso-8859-3->string* (accessor type)
@@ -160,7 +160,7 @@
   (let ((name (make-od-name 'iso-8859-3->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-iso-8859-3->string*)
 
@@ -242,14 +242,14 @@
 (declaim (inline get-iso-8859-4-bytes))
 (defun get-iso-8859-4-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :iso-8859-4 string pos end))
 
 (defun string->iso-8859-4 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-iso-8859-4-bytes null-padding)))
 
 (defmacro define-iso-8859-4->string* (accessor type)
@@ -257,7 +257,7 @@
   (let ((name (make-od-name 'iso-8859-4->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-iso-8859-4->string*)
 
@@ -383,14 +383,14 @@
 (declaim (inline get-iso-8859-5-bytes))
 (defun get-iso-8859-5-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :iso-8859-5 string pos end))
 
 (defun string->iso-8859-5 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-iso-8859-5-bytes null-padding)))
 
 (defmacro define-iso-8859-5->string* (accessor type)
@@ -398,7 +398,7 @@
   (let ((name (make-od-name 'iso-8859-5->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-iso-8859-5->string*)
 
@@ -523,14 +523,14 @@
 (declaim (inline get-iso-8859-6-bytes))
 (defun get-iso-8859-6-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :iso-8859-6 string pos end))
 
 (defun string->iso-8859-6 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-iso-8859-6-bytes null-padding)))
 
 (defmacro define-iso-8859-6->string* (accessor type)
@@ -538,7 +538,7 @@
   (let ((name (make-od-name 'iso-8859-6->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-iso-8859-6->string*)
 
@@ -650,14 +650,14 @@
 (declaim (inline get-iso-8859-7-bytes))
 (defun get-iso-8859-7-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :iso-8859-7 string pos end))
 
 (defun string->iso-8859-7 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-iso-8859-7-bytes null-padding)))
 
 (defmacro define-iso-8859-7->string* (accessor type)
@@ -665,7 +665,7 @@
   (let ((name (make-od-name 'iso-8859-7->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-iso-8859-7->string*)
 
@@ -766,14 +766,14 @@
 (declaim (inline get-iso-8859-8-bytes))
 (defun get-iso-8859-8-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :iso-8859-8 string pos end))
 
 (defun string->iso-8859-8 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-iso-8859-8-bytes null-padding)))
 
 (defmacro define-iso-8859-8->string* (accessor type)
@@ -781,7 +781,7 @@
   (let ((name (make-od-name 'iso-8859-8->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-iso-8859-8->string*)
 
@@ -819,14 +819,14 @@
 (declaim (inline get-iso-8859-9-bytes))
 (defun get-iso-8859-9-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :iso-8859-9 string pos end))
 
 (defun string->iso-8859-9 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-iso-8859-9-bytes null-padding)))
 
 (defmacro define-iso-8859-9->string* (accessor type)
@@ -834,7 +834,7 @@
   (let ((name (make-od-name 'iso-8859-9->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-iso-8859-9->string*)
 
@@ -912,14 +912,14 @@
 (declaim (inline get-iso-8859-10-bytes))
 (defun get-iso-8859-10-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :iso-8859-10 string pos end))
 
 (defun string->iso-8859-10 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-iso-8859-10-bytes null-padding)))
 
 (defmacro define-iso-8859-10->string* (accessor type)
@@ -927,7 +927,7 @@
   (let ((name (make-od-name 'iso-8859-10->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-iso-8859-10->string*)
 
@@ -1054,14 +1054,14 @@
 (declaim (inline get-iso-8859-11-bytes))
 (defun get-iso-8859-11-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :iso-8859-11 string pos end))
 
 (defun string->iso-8859-11 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-iso-8859-11-bytes null-padding)))
 
 (defmacro define-iso-8859-11->string* (accessor type)
@@ -1069,7 +1069,7 @@
   (let ((name (make-od-name 'iso-8859-11->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-iso-8859-11->string*)
 
@@ -1157,14 +1157,14 @@
 (declaim (inline get-iso-8859-13-bytes))
 (defun get-iso-8859-13-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :iso-8859-13 string pos end))
 
 (defun string->iso-8859-13 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-iso-8859-13-bytes null-padding)))
 
 (defmacro define-iso-8859-13->string* (accessor type)
@@ -1172,7 +1172,7 @@
   (let ((name (make-od-name 'iso-8859-13->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-iso-8859-13->string*)
 
@@ -1235,14 +1235,14 @@
 (declaim (inline get-iso-8859-14-bytes))
 (defun get-iso-8859-14-bytes(string pos end)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range pos end))
+           (type simple-string string)
+           (type array-range pos end))
   (get-latin-bytes #'identity :iso-8859-14 string pos end))
 
 (defun string->iso-8859-14 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
-	   (type simple-string string)
-	   (type array-range sstart send))
+           (type simple-string string)
+           (type array-range sstart send))
   (values (string->latin% string sstart send #'get-iso-8859-14-bytes null-padding)))
 
 (defmacro define-iso-8859-14->string* (accessor type)
@@ -1250,7 +1250,7 @@
   (let ((name (make-od-name 'iso-8859-14->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-	(,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
 
 (instantiate-octets-definition define-iso-8859-14->string*)
 

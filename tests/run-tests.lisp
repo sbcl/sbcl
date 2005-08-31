@@ -43,7 +43,7 @@
   (format t "Finished running tests.~%")
   (cond (*all-failures*
          (format t "Status:~%")
-         (dolist (fail (reverse *all-failures*))           
+         (dolist (fail (reverse *all-failures*))
            (cond ((eq (car fail) :unhandled-error)
                   (format t " ~20a ~a~%"
                           "Unhandled error"
@@ -79,7 +79,7 @@
                  (when *break-on-error*
                    (test-util:really-invoke-debugger error))))))
     (append-failures)))
-  
+
 (defun impure-runner (files test-fun)
   (format t "// Running impure tests (~a)~%" test-fun)
   (let ((*package* (find-package :cl-user)))
@@ -115,7 +115,10 @@
   (setf *all-failures* (append failures *all-failures*)))
 
 (defun unexpected-failures ()
-  (remove-if (lambda (x) (eq (car x) :expected-failure)) *all-failures*))  
+  (remove-if (lambda (x) 
+                (or (eq (car x) :expected-failure) 
+		    (eq (car x) :unexpected-success)))
+             *all-failures*))
 
 (defun setup-cl-user ()
   (use-package :test-util)
@@ -135,9 +138,9 @@
 
 (defun sh-test (file)
   ;; What? No SB-POSIX:EXECV?
-  (let ((process (sb-ext:run-program "/bin/sh" 
+  (let ((process (sb-ext:run-program "/bin/sh"
                                      (list (namestring file))
-                                     :output *error-output*))) 
+                                     :output *error-output*)))
     (sb-ext:quit :unix-status (process-exit-code process))))
 
 (defun accept-test-file (file)

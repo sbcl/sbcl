@@ -1987,9 +1987,9 @@ bootstrapping.
     (let ((method-class (getf ,all-keys :method-class '.shes-not-there.)))
       (unless (eq method-class '.shes-not-there.)
         (setf (getf ,all-keys :method-class)
-	      (cond ((classp method-class)
-		     method-class)
-		    (t (find-class method-class t ,env))))))))
+              (cond ((classp method-class)
+                     method-class)
+                    (t (find-class method-class t ,env))))))))
 
 (defun real-ensure-gf-using-class--generic-function
        (existing

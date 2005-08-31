@@ -108,7 +108,7 @@ emulate_branch(os_context_t *context, unsigned int inst)
             *os_context_register_addr(context, 31)
                 = os_context_pc(context) + 4;
             break;
-	default: /* conditional branches/traps for > MIPS I, ignore for now. */
+        default: /* conditional branches/traps for > MIPS I, ignore for now. */
             break;
         }
         break;

@@ -2594,7 +2594,7 @@ core and return a descriptor to it."
   (dolist (line
            '("This is a machine-generated file. Please do not edit it by hand."
              "(As of sbcl-0.8.14, it came from WRITE-CONFIG-H in genesis.lisp.)"
-             ""
+             nil
              "This file contains low-level information about the"
              "internals of a particular version and configuration"
              "of SBCL. It is used by the C compiler to create a runtime"
@@ -2602,7 +2602,7 @@ core and return a descriptor to it."
              "operating system's native format, which can then be used to"
              "load and run 'core' files, which are basically programs"
              "in SBCL's own format."))
-    (format t " * ~A~%" line))
+    (format t " *~@[ ~A~]~%" line))
   (format t " */~%"))
 
 (defun write-config-h ()
@@ -2746,7 +2746,7 @@ core and return a descriptor to it."
                           ((< value cutoff)
                            "~D")
                           (t
-                           "LISPOBJ(~D)")))
+                           "LISPOBJ(~DU)")))
                   value)
           (format t " /* 0x~X */~@[  /* ~A */~]~%" value doc))))
     (terpri))
