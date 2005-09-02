@@ -17,6 +17,9 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     Linux kernels >= 2.6.12 that interfere with SBCL's memory maps. This
     workaround will only be in effect on systems with the proc filesystem
     mounted.
+  * bug fix: printing objects of type HASH-TABLE signals a
+    PRINT-NOT-READABLE error when *READ-EVAL* is NIL.  (reported by
+    Faré Rideau)
   * threads
     ** bug fix: parent thread now can be gc'ed even with a live
        child thread

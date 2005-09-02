@@ -337,4 +337,14 @@
 ;;; Adam Warner's test case
 (assert (string= (format nil "~@F" 1.23) "+1.23"))
 
+(let ((table (make-hash-table)))
+  (setf (gethash 1 table) t)
+  (assert
+   (raises-error? (with-standard-io-syntax
+                    (let ((*read-eval* nil)
+                          (*print-readably* t))
+                      (with-output-to-string (*standard-output*)
+                        (prin1 table))))
+                  print-not-readable)))
+
 ;;; success

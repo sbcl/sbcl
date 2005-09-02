@@ -721,14 +721,12 @@
 
 (def!method print-object ((hash-table hash-table) stream)
   (declare (type stream stream))
-  (cond ((not *print-readably*)
+  (cond ((or (not *print-readably*) (not *read-eval*))
          (print-unreadable-object (hash-table stream :type t :identity t)
            (format stream
                    ":TEST ~S :COUNT ~S"
                    (hash-table-test hash-table)
                    (hash-table-count hash-table))))
-        ((not *read-eval*)
-         (error "can't print hash tables readably without *READ-EVAL*"))
         (t
          (with-standard-io-syntax
           (format stream
