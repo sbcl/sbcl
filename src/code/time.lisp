@@ -36,11 +36,9 @@
                           micro-seconds-per-internal-time-unit)))
       (declare (type (unsigned-byte 32) uint))
       (cond (base
-             (truly-the (unsigned-byte 32)
-                        (+ (the (unsigned-byte 32)
-                                (* (the (unsigned-byte 32) (- seconds base))
-                                   sb!xc:internal-time-units-per-second))
-                           uint)))
+             (+ (* (- seconds base)
+                   sb!xc:internal-time-units-per-second)
+                uint))
             (t
              (setq *internal-real-time-base-seconds* seconds)
              uint)))))
@@ -49,7 +47,6 @@
   #!+sb-doc
   "Return the run time in the internal time format. (See
   INTERNAL-TIME-UNITS-PER-SECOND.) This is useful for finding CPU usage."
-  (declare (values (unsigned-byte 32)))
   (multiple-value-bind (ignore utime-sec utime-usec stime-sec stime-usec)
       (sb!unix:unix-fast-getrusage sb!unix:rusage_self)
     (declare (ignore ignore)
@@ -59,9 +56,8 @@
              ;; documented anywhere and the observed behavior is to
              ;; sometimes return 1000000 exactly.)
              (type (integer 0 1000000) utime-usec stime-usec))
-    (let ((result (+ (the (unsigned-byte 32)
-                          (* (the (unsigned-byte 32) (+ utime-sec stime-sec))
-                             sb!xc:internal-time-units-per-second))
+    (let ((result (+ (* (+ utime-sec stime-sec)
+                        sb!xc:internal-time-units-per-second)
                      (floor (+ utime-usec
                                stime-usec
                                (floor micro-seconds-per-internal-time-unit 2))

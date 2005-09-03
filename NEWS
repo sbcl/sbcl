@@ -20,6 +20,8 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
   * bug fix: printing objects of type HASH-TABLE signals a
     PRINT-NOT-READABLE error when *READ-EVAL* is NIL.  (reported by
     Faré Rideau)
+  * bug fix: GET-INTERNAL-REAL-TIME now works even for processes that 
+    have been running for over 50 days. (reported by Gilbert Baumann)
   * threads
     ** bug fix: parent thread now can be gc'ed even with a live
        child thread

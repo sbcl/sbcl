@@ -11,11 +11,6 @@
 
 ;;;; reading internal run time with high resolution and low overhead
 
-;;; FIXME: It might make sense to replace this with something
-;;; with finer resolution, e.g. milliseconds or microseconds.
-;;; For that matter, maybe we should boost the internal clock
-;;; up to something faster, like milliseconds.
-
 (defconstant +ticks-per-second+ internal-time-units-per-second)
 
 (declaim (inline get-internal-ticks))
