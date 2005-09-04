@@ -121,7 +121,7 @@
 (defun sigalrm-handler (signal info context)
   (declare (ignore signal info context))
   (declare (type system-area-pointer context))
-  (cerror "Continue" 'sb!ext::timeout))
+  (sb!impl::run-expired-timers))
 
 (defun sigquit-handler (signal code context)
   (declare (ignore signal code context))

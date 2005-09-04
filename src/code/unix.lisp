@@ -782,28 +782,6 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
                         (slot (slot itvo 'it-value) 'tv-usec))
                 which (alien-sap (addr itvn))(alien-sap (addr itvo))))))
 
-(defmacro sb!ext:with-timeout (expires &body body)
-  "Execute the body, interrupting it with a SIGALRM after at least
-EXPIRES seconds have passed.  Uses Unix setitimer(), restoring any
-previous timer after the body has finished executing"
-  (with-unique-names (saved-seconds saved-useconds s u)
-    `(let (- ,saved-seconds ,saved-useconds)
-      (multiple-value-setq (- - - ,saved-seconds ,saved-useconds)
-        (unix-getitimer :real))
-      (multiple-value-bind (,s ,u) (floor ,expires)
-        (setf ,u (floor (* ,u 1000000)))
-        (if (and (> ,expires 0)
-                 (or (and (zerop ,saved-seconds) (zerop ,saved-useconds))
-                     (> ,saved-seconds ,s)
-                     (and (= ,saved-seconds ,s)
-                          (> ,saved-useconds ,u))))
-            (unwind-protect
-                 (progn
-                   (unix-setitimer :real 0 0 ,s ,u)
-                   ,@body)
-              (unix-setitimer :real 0 0 ,saved-seconds ,saved-useconds))
-            (progn
-              ,@body))))))
 
 ;;; FIXME: Many Unix error code definitions were deleted from the old
 ;;; CMU CL source code here, but not in the exports of SB-UNIX. I
@@ -1026,5 +1004,3 @@ previous timer after the body has finished executing"
   `(progn
      ,@(loop for index upfrom 0 below (/ fd-setsize sb!vm:n-machine-word-bits)
          collect `(setf (deref (slot ,fd-set 'fds-bits) ,index) 0))))
-
-

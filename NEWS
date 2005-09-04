@@ -33,6 +33,7 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     ** bug fix: interrupt handlers are now per-process, RUN-PROGRAM
        and SB-SPROF do not die with 'no handler for signal XX in
        interrupt_handle_now(..)' anymore
+    ** bug fix: WITH-TIMEOUT works with multiple running threads
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** ENSURE-GENERIC-FUNCTION should take a method class object for
        the :method-class keyword argument.

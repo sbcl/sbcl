@@ -277,6 +277,7 @@
 
  ("src/code/sort"  :not-host)
  ("src/code/time"  :not-host)
+ ("src/code/timer" :not-host)
  ("src/code/weak"  :not-host)
  ("src/code/final" :not-host)
 
