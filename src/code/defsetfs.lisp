@@ -52,6 +52,7 @@
 
 (defsetf %instance-layout %set-instance-layout)
 (defsetf %funcallable-instance-info %set-funcallable-instance-info)
+(defsetf %funcallable-instance-layout %set-funcallable-instance-layout)
 
 ;;; from early-setf.lisp
 (in-package "SB!IMPL")

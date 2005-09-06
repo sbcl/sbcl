@@ -101,17 +101,16 @@
   (declare (type function new-value))
   (aver (funcallable-instance-p fin))
   (setf (funcallable-instance-fun fin) new-value))
+;;; FIXME: these macros should just go away.  It's not clear whether
+;;; the inline functions defined by
+;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS are as efficient as they could
+;;; be; ordinary defstruct accessors are defined as source transforms.
 (defmacro fsc-instance-p (fin)
   `(funcallable-instance-p ,fin))
 (defmacro fsc-instance-wrapper (fin)
   `(%funcallable-instance-layout ,fin))
-;;; FIXME: This seems to bear no relation at all to the CLOS-SLOTS
-;;; slot in the FUNCALLABLE-INSTANCE structure, above, which
-;;; (bizarrely) seems to be set to the NAME of the
-;;; FUNCALLABLE-INSTANCE. At least, the index 1 seems to return the
-;;; NAME, and the index 2 NIL.  Weird.  -- CSR, 2002-11-07
 (defmacro fsc-instance-slots (fin)
-  `(%funcallable-instance-info ,fin 0))
+  `(%funcallable-instance-info ,fin 1))
 (defmacro fsc-instance-hash (fin)
   `(%funcallable-instance-info ,fin 3))
 
@@ -183,7 +182,7 @@
     (if (if (eq *boot-state* 'complete)
                  (typep fun 'generic-function)
                  (eq (class-of fun) *the-class-standard-generic-function*))
-             (setf (%funcallable-instance-info fun 1) new-name)
+             (setf (%funcallable-instance-info fun 2) new-name)
              (bug "unanticipated function type")))
   ;; Fixup name-to-function mappings in cases where the function
   ;; hasn't been defined by DEFUN.  (FIXME: is this right?  This logic

@@ -1506,11 +1506,13 @@
   (let* ((dd (make-defstruct-description class-name))
          (conc-name (concatenate 'string (symbol-name class-name) "-"))
          (dd-slots (let ((reversed-result nil)
-                         ;; The index starts at 1 for ordinary
-                         ;; named slots because slot 0 is
-                         ;; magical, used for LAYOUT in
-                         ;; CONDITIONs or for something (?) in
-                         ;; funcallable instances.
+                         ;; The index starts at 1 for ordinary named
+                         ;; slots because slot 0 is magical, used for
+                         ;; the LAYOUT in CONDITIONs and
+                         ;; FUNCALLABLE-INSTANCEs.  (This is the same
+                         ;; in ordinary structures too: see (INCF
+                         ;; DD-LENGTH) in
+                         ;; PARSE-DEFSTRUCT-NAME-AND-OPTIONS).
                          (index 1))
                      (dolist (slot-name slot-names)
                        (push (make-defstruct-slot-description
@@ -1569,8 +1571,11 @@
                       ,object-gensym)
                    '%instance-ref))
           (funcallable-structure
-           (values `(%make-funcallable-instance ,dd-length
-                                                ,delayed-layout-form)
+           (values `(let ((,object-gensym
+                           (%make-funcallable-instance ,dd-length)))
+                      (setf (%funcallable-instance-layout ,object-gensym)
+                            ,delayed-layout-form)
+                      ,object-gensym)
                    '%funcallable-instance-info)))
       `(progn
 

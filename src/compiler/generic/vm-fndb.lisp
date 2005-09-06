@@ -382,7 +382,7 @@
 (defknown %closure-index-ref (function index) t
   (flushable))
 
-(defknown %make-funcallable-instance (index layout) function
+(defknown %make-funcallable-instance (index) function
   (unsafe))
 
 (defknown %funcallable-instance-info (function index) t (flushable))

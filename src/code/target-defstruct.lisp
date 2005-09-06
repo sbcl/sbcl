@@ -131,8 +131,8 @@
 (defun %set-instance-layout (instance new-value)
   (%set-instance-layout instance new-value))
 
-(defun %make-funcallable-instance (len layout)
-   (%make-funcallable-instance len layout))
+(defun %make-funcallable-instance (len)
+  (%make-funcallable-instance len))
 
 (defun funcallable-instance-p (x) (funcallable-instance-p x))
 
@@ -145,13 +145,12 @@
 (defun funcallable-instance-fun (fin)
   (%funcallable-instance-lexenv fin))
 
-;;; The heart of the magic of funcallable instances ("FINs"). The
-;;; function for a FIN must be a magical INSTANCE-LAMBDA form. When
+;;; The heart of the magic of funcallable instances ("FINs").  When
 ;;; called (as with any other function), we grab the code pointer, and
 ;;; call it, leaving the original function object in LEXENV (in case
-;;; it was a closure). If it is actually a FIN, then we need to do an
+;;; it was a closure).  If it is actually a FIN, then we need to do an
 ;;; extra indirection with funcallable-instance-lexenv to get at any
-;;; closure environment. This extra indirection is set up when
+;;; closure environment.  This extra indirection is set up when
 ;;; accessing the closure environment of an INSTANCE-LAMBDA. Note that
 ;;; the original FIN pointer is lost, so if the called function wants
 ;;; to get at the original object to do some slot accesses, it must
@@ -159,15 +158,15 @@
 ;;;
 ;;; If we set the FIN function to be a FIN, we directly copy across
 ;;; both the code pointer and the lexenv, since that code pointer (for
-;;; an instance-lambda) is expecting that lexenv to be accessed. This
+;;; an instance-lambda) is expecting that lexenv to be accessed.  This
 ;;; effectively pre-flattens what would otherwise be a chain of
-;;; indirections. (That used to happen when PCL dispatch functions
+;;; indirections.  (That used to happen when PCL dispatch functions
 ;;; were byte-compiled; now that the byte compiler is gone, I can't
 ;;; think of another example offhand. -- WHN 2001-10-06)
 ;;;
 ;;; The only loss is that if someone accesses the
-;;; FUNCALLABLE-INSTANCE-FUN, then won't get a FIN back. This probably
-;;; doesn't matter, since PCL only sets the FIN function.
+;;; FUNCALLABLE-INSTANCE-FUN, then won't get a FIN back.  This
+;;; probably doesn't matter, since PCL only sets the FIN function.
 (defun (setf funcallable-instance-fun) (new-value fin)
   (setf (%funcallable-instance-fun fin)
         (%closure-fun new-value))

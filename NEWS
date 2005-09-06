@@ -22,6 +22,9 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     Faré Rideau)
   * bug fix: GET-INTERNAL-REAL-TIME now works even for processes that 
     have been running for over 50 days. (reported by Gilbert Baumann)
+  * bug fix: the logic for getting names of functions gets less
+    confused when confronded with alternate-metaclass
+    funcallable-instances.  (reported by Cyrus Harmon)
   * threads
     ** bug fix: parent thread now can be gc'ed even with a live
        child thread

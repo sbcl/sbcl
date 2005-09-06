@@ -293,9 +293,6 @@
    )
   (lexenv :ref-known (flushable) :ref-trans %funcallable-instance-lexenv
           :set-known (unsafe) :set-trans (setf %funcallable-instance-lexenv))
-  (layout :init :arg
-          :ref-known (flushable) :ref-trans %funcallable-instance-layout
-          :set-known (unsafe) :set-trans (setf %funcallable-instance-layout))
   (info :rest-p t))
 
 (define-primitive-object (value-cell :lowtag other-pointer-lowtag

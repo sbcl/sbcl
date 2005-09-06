@@ -53,7 +53,7 @@
     (#.sb!vm:closure-header-widetag
      (%closure-fun function))
     (#.sb!vm:funcallable-instance-header-widetag
-     (funcallable-instance-fun function))))
+     (%fun-fun (funcallable-instance-fun function)))))
 
 (defun %closure-values (object)
   (declare (function object))
