@@ -931,12 +931,16 @@
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS weirdosities
 (defun %compiler-set-up-layout (dd
                                 &optional
-                                ;; Several special cases (STRUCTURE-OBJECT
-                                ;; itself, and structures with alternate
-                                ;; metaclasses) call this function directly,
-                                ;; and they're all at the base of the
-                                ;; instance class structure, so this is
-                                ;; a handy default.
+                                ;; Several special cases
+                                ;; (STRUCTURE-OBJECT itself, and
+                                ;; structures with alternate
+                                ;; metaclasses) call this function
+                                ;; directly, and they're all at the
+                                ;; base of the instance class
+                                ;; structure, so this is a handy
+                                ;; default.  (But note
+                                ;; FUNCALLABLE-STRUCTUREs need
+                                ;; assistance here)
                                 (inherits (vector (find-layout t)
                                                   (find-layout 'instance))))
 
@@ -1522,6 +1526,15 @@
                              reversed-result)
                        (incf index))
                      (nreverse reversed-result))))
+    (case dd-type
+      ;; We don't support inheritance of alternate metaclass stuff,
+      ;; and it's not a general-purpose facility, so sanity check our
+      ;; own code.
+      (structure
+       (aver (eq superclass-name 'instance)))
+      (funcallable-structure
+       (aver (eq superclass-name 'funcallable-instance)))
+      (t (bug "Unknown DD-TYPE in ALTERNATE-METACLASS: ~S" dd-type)))
     (setf (dd-alternate-metaclass dd) (list superclass-name
                                             metaclass-name
                                             metaclass-constructor)
@@ -1580,7 +1593,7 @@
       `(progn
 
          (eval-when (:compile-toplevel :load-toplevel :execute)
-           (%compiler-set-up-layout ',dd))
+           (%compiler-set-up-layout ',dd ',(inherits-for-structure dd)))
 
          ;; slot readers and writers
          (declaim (inline ,@(mapcar #'dsd-accessor-name dd-slots)))

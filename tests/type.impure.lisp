@@ -11,6 +11,7 @@
 
 (load "assertoid.lisp")
 (use-package "ASSERTOID")
+(use-package "TEST-UTIL")
 
 (defmacro assert-nil-nil (expr)
   `(assert (equal '(nil nil) (multiple-value-list ,expr))))
@@ -428,5 +429,15 @@
   (assert-nil-t (subtypep t2 t1))
   (assert-t-t (subtypep `(not ,t2) `(not ,t1)))
   (assert-nil-t (subtypep `(not ,t1) `(not ,t2))))
+
+;;; not easily visible to user code, but this used to be very
+;;; confusing.
+(with-test (:name (:ctor :typep-function))
+  (assert (eval '(typep (sb-pcl::ensure-ctor
+                         (list 'sb-pcl::ctor (gensym)) nil nil)
+                        'function))))
+(with-test (:name (:ctor :functionp))
+  (assert (functionp (sb-pcl::ensure-ctor
+                      (list 'sb-pcl::ctor (gensym)) nil nil))))
 
 ;;; success
