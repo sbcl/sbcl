@@ -128,16 +128,37 @@
         (heap-extract contents i :key keyfun :test #'<=)
         i))))
 
+;;; thread utility
+
+(defun make-cancellable-interruptor (function)
+  ;; return a list of two functions: one that does the same as
+  ;; FUNCTION until the other is called, from when it does nothing.
+  (let ((mutex (sb!thread:make-mutex))
+        (cancelled-p nil))
+    (list
+     #'(lambda ()
+         (sb!thread:with-recursive-lock (mutex)
+           (unless cancelled-p
+             (funcall function))))
+     #'(lambda ()
+         (sb!thread:with-recursive-lock (mutex)
+           (setq cancelled-p t))))))
+
 ;;; timers
 
 (defstruct (timer
              (:conc-name %timer-)
              (:constructor %make-timer))
+  #!+sb-doc
+  "Timer type. Do not rely on timers being structs as it may change in
+future versions."
   name
   function
   expire-time
   repeat-interval
-  (thread nil :type (or sb!thread:thread (member t nil))))
+  (thread nil :type (or sb!thread:thread (member t nil)))
+  interrupt-function
+  cancel-function)
 
 (def!method print-object ((timer timer) stream)
   (let ((name (%timer-name timer)))
@@ -150,18 +171,29 @@
           ))))
 
 (defun make-timer (function &key name (thread sb!thread:*current-thread*))
+  #!+sb-doc
+  "Create a timer object that's when scheduled runs FUNCTION. If
+THREAD is a thread then that thread is to be interrupted with
+FUNCTION. If THREAD is T then a new thread is created each timer
+FUNCTION is run. If THREAD is NIL then FUNCTION can be run in any
+thread."
   (%make-timer :name name :function function :thread thread))
 
 (defun timer-name (timer)
+  #!+sb-doc
+  "Return the name of TIMER."
   (%timer-name timer))
 
-(defun timer-expired-p (timer &optional (delta 0))
+(defun timer-scheduled-p (timer &key (delta 0))
+  #!+sb-doc
+  "See if TIMER will still need to be triggered after DELTA seconds
+from now. For timers with a repeat interval it returns true."
   (symbol-macrolet ((expire-time (%timer-expire-time timer))
                     (repeat-interval (%timer-repeat-interval timer)))
-    (and (not (and repeat-interval (plusp repeat-interval)))
-         (or (null expire-time)
-             (< expire-time
-                (+ (get-internal-real-time) delta))))))
+      (or (and repeat-interval (plusp repeat-interval))
+          (and expire-time
+               (<= (+ (get-internal-real-time) delta)
+                   expire-time)))))
 
 ;;; The scheduler
 
@@ -174,9 +206,9 @@
       ,@body)))
 
 (defun under-scheduler-lock-p ()
-  #!-sb-thread
+  #!-sb!thread
   t
-  #!+sb-thread
+  #!+sb!thread
   (eq sb!thread:*current-thread* (sb!thread:mutex-value *scheduler-lock*)))
 
 (defparameter *schedule* (make-priority-queue :key #'%timer-expire-time))
@@ -195,16 +227,35 @@
 ;;; Public interface
 
 (defun %schedule-timer (timer)
-  (let ((changed-p nil))
-    (when (eql 0 (priority-queue-remove *schedule* timer))
+  (let ((changed-p nil)
+        (old-position (priority-queue-remove *schedule* timer)))
+    ;; Make sure interruptors are cancelled even if this timer was
+    ;; scheduled again since our last attempt.
+    (when old-position
+      (funcall (%timer-cancel-function timer)))
+    (when (eql 0 old-position)
       (setq changed-p t))
     (when (zerop (priority-queue-insert *schedule* timer))
       (setq changed-p t))
+    (setf (values (%timer-interrupt-function timer)
+                  (%timer-cancel-function timer))
+          (values-list (make-cancellable-interruptor
+                        (%timer-function timer))))
     (when changed-p
       (set-system-timer)))
   (values))
 
 (defun schedule-timer (timer time &key repeat-interval absolute-p)
+  #!+sb-doc
+  "Schedule TIMER to be triggered at TIME. If ABSOLUTE-P then TIME is
+universal time, but non-integral values are also allowed, else TIME is
+measured as the number of seconds from the current time. If
+REPEAT-INTERVAL is given, TIMER is automatically rescheduled upon
+expiry."
+  ;; CANCEL-FUNCTION may block until all interruptors finish, let's
+  ;; try to cancel without the scheduler lock first.
+  (when (%timer-cancel-function timer)
+    (funcall (%timer-cancel-function timer)))
   (with-scheduler-lock ()
     (setf (%timer-expire-time timer) (+ (get-internal-real-time)
                                         (delta->real
@@ -217,14 +268,26 @@
     (%schedule-timer timer)))
 
 (defun unschedule-timer (timer)
+  #!+sb-doc
+  "Cancel TIMER. Once this function returns it is guaranteed that
+TIMER shall not be triggered again and there are no unfinished
+triggers."
+  (let ((cancel-function (%timer-cancel-function timer)))
+    (when cancel-function
+      (funcall cancel-function)))
   (with-scheduler-lock ()
     (setf (%timer-expire-time timer) nil
           (%timer-repeat-interval timer) nil)
-    (when (eql 0 (priority-queue-remove *schedule* timer))
-      (set-system-timer)))
+    (let ((old-position (priority-queue-remove *schedule* timer)))
+      (when old-position
+        (funcall (%timer-cancel-function timer)))
+      (when (eql 0 old-position)
+        (set-system-timer))))
   (values))
 
 (defun list-all-timers ()
+  #!+sb-doc
+  "Return a list of all timers in the system."
   (with-scheduler-lock ()
     (concatenate 'list (%pqueue-contents *schedule*))))
 
@@ -291,12 +354,13 @@
       (set-system-timer))))
 
 (defmacro sb!ext:with-timeout (expires &body body)
+  #!+sb-doc
   "Execute the body, asynchronously interrupting it and signalling a
 TIMEOUT condition after at least EXPIRES seconds have passed."
   (with-unique-names (timer)
     `(let ((,timer (make-timer (lambda ()
                                  (cerror "Continue" 'sb!ext::timeout)))))
-       (schedule-timer ,timer ,expires)
-       (unwind-protect
-            (progn ,@body)
-         (unschedule-timer ,timer)))))
+      (schedule-timer ,timer ,expires)
+      (unwind-protect
+           (progn ,@body)
+        (unschedule-timer ,timer)))))

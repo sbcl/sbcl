@@ -1,0 +1,25 @@
+@node Timers
+@comment  node-name,  next,  previous,  up
+@chapter Timers
+
+SBCL supports a system-wide scheduler implemented on top of
+@code{setitimer} that also works with threads but does not require a
+separate schduler thread.
+
+@menu
+@end menu
+
+@lisp
+(schedule-timer (make-timer (lambda ()
+                              (write-line "Hello, world")
+                              (force-output)))
+                2)
+@end lisp
+
+@include struct-sb-ext-timer.texinfo
+@include fun-sb-ext-make-timer.texinfo
+@include fun-sb-ext-timer-name.texinfo
+@include fun-sb-ext-timer-scheduled-p.texinfo
+@include fun-sb-ext-schedule-timer.texinfo
+@include fun-sb-ext-unschedule-timer.texinfo
+@include fun-sb-ext-list-all-timers.texinfo

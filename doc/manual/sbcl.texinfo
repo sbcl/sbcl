@@ -62,6 +62,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 * Extensible Streams::          
 * Package Locks::               
 * Threading::
+* Timers::
 * Networking::
 * Profiling::                   
 * Contributed Modules::         
@@ -84,6 +85,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @include streams.texinfo
 @include package-locks.texi-temp
 @include threading.texinfo
+@include timers.texinfo
 @include sb-bsd-sockets/sb-bsd-sockets.texinfo
 @include profiling.texinfo
 @include contrib-modules.texinfo

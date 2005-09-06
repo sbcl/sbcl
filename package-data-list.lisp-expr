@@ -727,7 +727,11 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "PROCESS-STATUS-HOOK" "PROCESS-WAIT"
 
                ;; external-format support
-               "OCTETS-TO-STRING" "STRING-TO-OCTETS"))
+               "OCTETS-TO-STRING" "STRING-TO-OCTETS"
+
+               ;; timer
+               "TIMER" "MAKE-TIMER" "TIMER-NAME" "TIMER-SCHEDULED-P"
+               "SCHEDULE-TIMER" "UNSCHEDULE-TIMER" "LIST-ALL-TIMERS"))
 
    #s(sb-cold:package-data
       :name "SB!FORMAT"
