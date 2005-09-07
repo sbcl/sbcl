@@ -53,7 +53,10 @@ os_context_pc(os_context_t *context)
 static inline unsigned int
 os_context_insn(os_context_t *context)
 {
-    return *(unsigned int *)(os_context_pc(context));
+    if (os_context_bd_cause(context))
+        return *(unsigned int *)(os_context_pc(context) + 4);
+    else
+        return *(unsigned int *)(os_context_pc(context));
 }
 
 /* This function is somewhat misnamed, it actually just jumps to the
@@ -150,9 +153,12 @@ emulate_branch(os_context_t *context, unsigned int inst)
 void
 arch_skip_instruction(os_context_t *context)
 {
-    /* Skip the offending instruction */
+    /* Skip the offending instruction.  Don't use os_context_insn here,
+       since in case of a branch we want the branch insn, not the delay
+       slot.  */
       *os_context_pc_addr(context)
-            = emulate_branch(context, os_context_insn(context));
+          = emulate_branch(context,
+              *(unsigned int *)(os_context_pc(context)));
 }
 
 unsigned char *
@@ -314,16 +320,11 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 static void
 sigfpe_handler(int signal, siginfo_t *info, void *void_context)
 {
-    unsigned int bad_inst;
+    os_context_t *context = arch_os_get_context(&void_context);
+    unsigned int bad_inst = os_context_insn(context);
     unsigned int op, rs, rt, rd, funct, dest = 32;
     int immed;
     int result;
-    os_context_t *context = arch_os_get_context(&void_context);
-
-    if (os_context_bd_cause(context))
-        bad_inst = *(unsigned int *)(os_context_pc(context) + 4);
-    else
-        bad_inst = os_context_insn(context);
 
     op = (bad_inst >> 26) & 0x3f;
     rs = (bad_inst >> 21) & 0x1f;
