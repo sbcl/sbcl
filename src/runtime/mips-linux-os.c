@@ -69,6 +69,12 @@ os_context_register_addr(os_context_t *context, int offset)
 }
 
 os_context_register_t *
+os_context_fpregister_addr(os_context_t *context, int offset)
+{
+    return &(((struct sigcontext *)&(context->uc_mcontext))->sc_fpregs[offset]);
+}
+
+os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
     /* Why do I get all the silly ports? -- CSR, 2002-08-11 */
