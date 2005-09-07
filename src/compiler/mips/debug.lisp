@@ -27,7 +27,7 @@
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:generator 5
-    (inst add sap object offset)
+    (inst addu sap object offset)
     (inst lw result sap 0)
     (inst nop)))
 
@@ -54,7 +54,7 @@
   (:result-types *)
   (:temporary (:scs (sap-reg) :from (:argument 1)) sap)
   (:generator 2
-    (inst add sap object offset)
+    (inst addu sap object offset)
     (inst sw value sap 0)
     (move result value)))
 
