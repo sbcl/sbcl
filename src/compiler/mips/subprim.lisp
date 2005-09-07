@@ -17,31 +17,29 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 50
-    (move ptr object)
-    (move count zero-tn)
+    (let ((done (gen-label))
+          (loop (gen-label))
+          (not-list (gen-label)))
+      (move ptr object)
+      (move count zero-tn)
 
-    LOOP
+      (emit-label loop)
 
-    (inst beq ptr null-tn done)
-    (inst nop)
+      (inst beq ptr null-tn done)
+      (inst and temp ptr lowtag-mask)
+      (inst xor temp list-pointer-lowtag)
+      (inst bne temp zero-tn not-list)
+      (inst nop)
 
-    (inst and temp ptr lowtag-mask)
-    (inst xor temp list-pointer-lowtag)
-    (inst bne temp zero-tn not-list)
-    (inst nop)
+      (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
+      (inst b loop)
+      (inst addu count count (fixnumize 1))
 
-    (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
-    (inst b loop)
-    (inst addu count count (fixnumize 1))
+      (emit-label not-list)
+      (cerror-call vop done object-not-list-error ptr)
 
-    NOT-LIST
-    (cerror-call vop done object-not-list-error ptr)
-
-    DONE
-    (move result count)))
+      (emit-label done)
+      (move result count))))
 
 
 (define-static-fun length (object) :translate length)
-
-
-
