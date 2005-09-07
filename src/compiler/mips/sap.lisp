@@ -260,7 +260,7 @@
          (:info offset)
          (:results (result :scs (,sc)))
          (:result-types ,type)
-         (:generator 5
+         (:generator 4
            ,@(ecase size
                (:byte
                 '((inst sb value object offset)
