@@ -154,8 +154,8 @@
 
 (define-binop + 1 5 addu (signed-byte 14) (signed-byte 16))
 (define-binop - 1 5 subu
-  (integer #.(- (1- (ash 1 14))) #.(ash 1 14))
-  (integer #.(- (1- (ash 1 16))) #.(ash 1 16)))
+  (integer #.(- 1 (ash 1 13)) #.(ash 1 13))
+  (integer #.(- 1 (ash 1 15)) #.(ash 1 15)))
 (define-binop logior 1 3 or (unsigned-byte 14) (unsigned-byte 16))
 (define-binop logand 1 3 and (unsigned-byte 14) (unsigned-byte 16))
 (define-binop logxor 1 3 xor (unsigned-byte 14) (unsigned-byte 16))
