@@ -147,7 +147,7 @@
     ;; Compute CODE from the address of this entry point.
     (let ((entry-point (gen-label)))
       (emit-label entry-point)
-      (inst compute-code-from-fn code-tn lip-tn entry-point temp)
+      (inst compute-code-from-lip code-tn lip-tn entry-point temp)
       ;; ### We should also save it on the stack so that the garbage collector
       ;; won't forget about us if we call anyone else.
       )

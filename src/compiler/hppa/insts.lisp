@@ -1440,8 +1440,8 @@
             (inst ldo (ldb (byte 11 0) delta) temp temp)
             (inst add src temp dst))))))
 
-;; code = fn - header - label-offset + other-pointer-tag
-(define-instruction compute-code-from-fn (segment src label temp dst)
+;; code = lip - header - label-offset + other-pointer-tag
+(define-instruction compute-code-from-lip (segment src label temp dst)
   (:declare (type tn src dst temp)
             (type label label))
   (:vop-var vop)
@@ -1453,6 +1453,7 @@
                              (component-header-length))))))
 
 ;; code = lra - other-pointer-tag - header - label-offset + other-pointer-tag
+;;      = lra - (header + label-offset)
 (define-instruction compute-code-from-lra (segment src label temp dst)
   (:declare (type tn src dst temp)
             (type label label))
@@ -1464,6 +1465,7 @@
                                 (component-header-length)))))))
 
 ;; lra = code + other-pointer-tag + header + label-offset - other-pointer-tag
+;;     = code + header + label-offset
 (define-instruction compute-lra-from-code (segment src label temp dst)
   (:declare (type tn src dst temp)
             (type label label))

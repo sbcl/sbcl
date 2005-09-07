@@ -138,7 +138,7 @@
       (inst word 0))
     (let* ((entry-point (gen-label)))
       (emit-label entry-point)
-      (inst compute-code-from-fn code-tn lip-tn entry-point temp))
+      (inst compute-code-from-lip code-tn lip-tn entry-point temp))
       ;; FIXME alpha port has a ### note here saying we should "save it
       ;; on the stack" so that GC sees it. No idea what "it" is -dan 20020110
     ;; Build our stack frames.

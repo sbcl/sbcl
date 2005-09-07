@@ -1178,8 +1178,8 @@
                    (inst or temp (ldb (byte 16 0) delta))
                    (inst addu dst src temp))))))
 
-;; code = fn - header - label-offset + other-pointer-tag
-(define-instruction compute-code-from-fn (segment dst src label temp)
+;; code = lip - header - label-offset + other-pointer-lowtag
+(define-instruction compute-code-from-lip (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)
   (:dependencies (reads src) (writes dst) (writes temp))
@@ -1207,6 +1207,7 @@
                                 (component-header-length)))))))
 
 ;; lra = code + other-pointer-tag + header + label-offset - other-pointer-tag
+;;     = code + header + label-offset
 (define-instruction compute-lra-from-code (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)

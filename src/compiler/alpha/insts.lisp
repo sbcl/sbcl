@@ -627,8 +627,8 @@
                    (inst ldah dst extra dst)
                    (inst ldah dst high dst)))))))
 
-;; code = fn - header - label-offset + other-pointer-tag
-(define-instruction compute-code-from-fn (segment dst src label temp)
+;; code = lip - header - label-offset + other-pointer-tag
+(define-instruction compute-code-from-lip (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:vop-var vop)
   (:emitter
@@ -650,6 +650,7 @@
                               (component-header-length)))))))
 
 ;; lra = code + other-pointer-tag + header + label-offset - other-pointer-tag
+;;     = code + header + label-offset
 (define-instruction compute-lra-from-code (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:vop-var vop)

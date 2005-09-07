@@ -144,7 +144,7 @@
     ;; Fix CODE, cause the function object was passed in.
     (let ((entry-point (gen-label)))
       (emit-label entry-point)
-      (inst compute-code-from-fn lip-tn entry-point temp code-tn))
+      (inst compute-code-from-lip lip-tn entry-point temp code-tn))
     ;; Build our stack frames.
     (inst addi (* n-word-bytes (sb-allocated-size 'control-stack))
           cfp-tn csp-tn)

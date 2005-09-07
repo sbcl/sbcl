@@ -2083,10 +2083,8 @@
                    (inst ori temp temp (ldb (byte 16 0) delta))
                    (inst add dst src temp))))))
 
-;; this function is misnamed.  should be compute-code-from-lip,
-;; if the use in xep-allocate-frame is typical
-;; (someone says code = fn - header - label-offset + other-pointer-tag)
-(define-instruction compute-code-from-fn (segment dst src label temp)
+;; code = lip - header - label-offset + other-pointer-tag
+(define-instruction compute-code-from-lip (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)
   (:dependencies (reads src) (writes dst) (writes temp))
@@ -2101,6 +2099,7 @@
                              (component-header-length))))))
 
 ;; code = lra - other-pointer-tag - header - label-offset + other-pointer-tag
+;;      = lra - (header + label-offset)
 (define-instruction compute-code-from-lra (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)
@@ -2114,6 +2113,7 @@
                                 (component-header-length)))))))
 
 ;; lra = code + other-pointer-tag + header + label-offset - other-pointer-tag
+;;     = code + header + label-offset
 (define-instruction compute-lra-from-code (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)
