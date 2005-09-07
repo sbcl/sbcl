@@ -28,7 +28,8 @@
                   #!+sb-show *compiler-trace-output*
                   *last-source-context* *last-original-source*
                   *last-source-form* *last-format-string* *last-format-args*
-                  *last-message-count* *lexenv* *fun-names-in-this-file*
+                  *last-message-count* *last-error-context*
+                  *lexenv* *fun-names-in-this-file*
                   *allow-instrumenting*))
 
 ;;; Whether call of a function which cannot be defined causes a full
