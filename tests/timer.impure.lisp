@@ -110,6 +110,7 @@
             (sb-ext:with-timeout 2
               (sleep 2))))))
 
+#+sb-thread
 (with-test (:name (:with-timeout :many-at-the-same-time))
   (loop repeat 10 do
         (sb-thread:make-thread
