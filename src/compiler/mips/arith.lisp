@@ -396,7 +396,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:translate *)
   (:generator 4
-    (inst sra temp y 2)
+    (inst sra temp y n-fixnum-tag-bits)
     (inst mult x temp)
     (inst mflo r)))
 
@@ -428,7 +428,7 @@
     (inst nop)
     (inst div x y)
     (inst mflo temp)
-    (inst sll q temp 2)
+    (inst sll q temp n-fixnum-tag-bits)
     (inst mfhi r)))
 
 (define-vop (fast-truncate/unsigned fast-unsigned-binop)
@@ -893,7 +893,7 @@
   (:results (digit :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
-    (inst sra digit fixnum 2)))
+    (inst sra digit fixnum n-fixnum-tag-bits)))
 
 (define-vop (bignum-floor)
   (:translate sb!bignum:%floor)

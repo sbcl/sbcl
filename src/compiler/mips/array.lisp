@@ -30,7 +30,7 @@
     (inst addu header rank (fixnumize (1- array-dimensions-offset)))
     (inst sll header n-widetag-bits)
     (inst or header header type)
-    (inst srl header 2)
+    (inst srl header n-fixnum-tag-bits)
     (pseudo-atomic (pa-flag)
       (inst or result alloc-tn other-pointer-lowtag)
       (storew header result 0 other-pointer-lowtag)
@@ -55,7 +55,7 @@
     (loadw temp x 0 other-pointer-lowtag)
     (inst sra temp n-widetag-bits)
     (inst subu temp (1- array-dimensions-offset))
-    (inst sll res temp 2)))
+    (inst sll res temp n-fixnum-tag-bits)))
 
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
@@ -157,7 +157,7 @@
          (:temporary (:scs (non-descriptor-reg) :to (:result 0)) temp result)
          (:generator 20
            (inst srl temp index ,bit-shift)
-           (inst sll temp 2)
+           (inst sll temp n-fixnum-tag-bits)
            (inst addu lip object temp)
            (inst lw result lip
                  (- (* vector-data-offset n-word-bytes)
@@ -169,7 +169,7 @@
                `((inst sll temp ,(1- (integer-length bits)))))
            (inst srl result temp)
            (inst and result ,(1- (ash 1 bits)))
-           (inst sll value result 2)))
+           (inst sll value result n-fixnum-tag-bits)))
        (define-vop (,(symbolicate 'data-vector-ref-c/ type))
          (:translate data-vector-ref)
          (:policy :fast-safe)
@@ -210,7 +210,7 @@
          (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
          (:generator 25
            (inst srl temp index ,bit-shift)
-           (inst sll temp 2)
+           (inst sll temp n-fixnum-tag-bits)
            (inst addu lip object temp)
            (inst lw old lip
                  (- (* vector-data-offset n-word-bytes)
@@ -470,7 +470,7 @@
   (:temporary (:scs (interior-reg)) lip)
   (:temporary (:scs (any-reg) :from (:argument 1)) shift)
   (:generator 6
-    (inst sll shift index 2)
+    (inst sll shift index n-fixnum-tag-bits)
     (inst addu lip object shift)
     (let ((real-tn (complex-double-reg-real-tn value)))
       (ld-double real-tn lip (- (* vector-data-offset n-word-bytes)
@@ -494,7 +494,7 @@
   (:temporary (:scs (interior-reg)) lip)
   (:temporary (:scs (any-reg) :from (:argument 1)) shift)
   (:generator 6
-    (inst sll shift index 2)
+    (inst sll shift index n-fixnum-tag-bits)
     (inst addu lip object shift)
     (let ((value-real (complex-double-reg-real-tn value))
           (result-real (complex-double-reg-real-tn result)))
