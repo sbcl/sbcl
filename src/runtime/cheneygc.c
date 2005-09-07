@@ -584,34 +584,28 @@ gc_initialize_pointers(void)
 /* noise to manipulate the gc trigger stuff */
 
 /* Functions that substantially change the dynamic space free pointer
- * (collect_garbage, purify) are responsible also for resettting the
+ * (collect_garbage, purify) are responsible also for resetting the
  * auto_gc_trigger */
 void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
 {
-    os_vm_address_t addr=(os_vm_address_t)current_dynamic_space
-        + dynamic_usage;
-    long length = DYNAMIC_SPACE_SIZE - dynamic_usage;
+    os_vm_address_t addr;
+    os_vm_size_t length;
 
-    if (addr < (os_vm_address_t)dynamic_space_free_pointer) {
-        fprintf(stderr,
-           "set_auto_gc_trigger: tried to set gc trigger too low! (%ld < 0x%08lx)\n",
-                (unsigned long)dynamic_usage,
-                (unsigned long)((os_vm_address_t)dynamic_space_free_pointer
-                                - (os_vm_address_t)current_dynamic_space));
-        lose("lost");
-    }
-    else if (length < 0) {
-        fprintf(stderr,
-                "set_auto_gc_trigger: tried to set gc trigger too high! (0x%08lx)\n",
-                (unsigned long)dynamic_usage);
-        lose("lost");
-    }
+    addr = os_round_up_to_page((os_vm_address_t)current_dynamic_space
+                               + dynamic_usage);
+    if (addr < (os_vm_address_t)dynamic_space_free_pointer)
+        lose("set_auto_gc_trigger: tried to set gc trigger too low! (%ld < 0x%08lx)\n",
+             (unsigned long)dynamic_usage,
+             (unsigned long)((os_vm_address_t)dynamic_space_free_pointer
+                             - (os_vm_address_t)current_dynamic_space));
 
-    addr=os_round_up_to_page(addr);
-    length=os_trunc_size_to_page(length);
+    length = os_trunc_size_to_page(DYNAMIC_SPACE_SIZE - dynamic_usage);
+    if (length < 0)
+        lose("set_auto_gc_trigger: tried to set gc trigger too high! (0x%08lx)\n",
+             (unsigned long)dynamic_usage);
 
 #if defined(SUNOS) || defined(SOLARIS)
-    os_invalidate(addr,length);
+    os_invalidate(addr, length);
 #else
     os_protect(addr, length, 0);
 #endif
@@ -621,19 +615,21 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
 
 void clear_auto_gc_trigger(void)
 {
-    if (current_auto_gc_trigger!=NULL){
-#if defined(SUNOS) || defined(SOLARIS)/* don't want to force whole space into swapping mode... */
-        os_vm_address_t addr=(os_vm_address_t)current_auto_gc_trigger;
-        os_vm_size_t length=
-            DYNAMIC_SPACE_SIZE + (os_vm_address_t)current_dynamic_space - addr;
+    os_vm_address_t addr;
+    os_vm_size_t length;
 
-        os_validate(addr,length);
+    if (current_auto_gc_trigger == NULL)
+        return;
+
+    addr = (os_vm_address_t)current_auto_gc_trigger;
+    length = DYNAMIC_SPACE_SIZE + (os_vm_address_t)current_dynamic_space - addr;
+
+#if defined(SUNOS) || defined(SOLARIS)
+    /* don't want to force whole space into swapping mode... */
+    os_validate(addr, length);
 #else
-        os_protect((os_vm_address_t)current_dynamic_space,
-                   DYNAMIC_SPACE_SIZE,
-                   OS_VM_PROT_ALL);
+    os_protect(addr, length, OS_VM_PROT_ALL);
 #endif
 
-        current_auto_gc_trigger = NULL;
-    }
+    current_auto_gc_trigger = NULL;
 }
