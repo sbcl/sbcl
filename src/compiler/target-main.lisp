@@ -62,6 +62,7 @@
              (*last-format-string* nil)
              (*last-format-args* nil)
              (*last-message-count* 0)
+             (*last-error-context* nil)
              (*gensym-counter* 0)
              ;; KLUDGE: This rebinding of policy is necessary so that
              ;; forms such as LOCALLY at the REPL actually extend the
