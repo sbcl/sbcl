@@ -359,23 +359,22 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	.word	NIL /* type */
 	LEAF(undefined_tramp)
 	.set	noreorder
-	/* Continuable errors break here for some reason.
 	b	1f
-	 break	trap_Cerror */
-	break	trap_Error
+	 break	trap_Cerror
 	/* Error data length. */
 	.byte	4
 	/* Error number. */
 	.byte	UNDEFINED_FUN_ERROR
 	/* Magic value 254 means a 16bit little endian value follows.
-	   See interr.c:describe_internal_error. */
+	   See debug-var-io.lisp. */
 	.byte	254
 	/* reg_FDEFN is #14. */
 	.byte	((14 << 5) + sc_DescriptorReg) % 0x100
 	.byte	((14 << 5) + sc_DescriptorReg) / 0x100
 	.align	2
 	.set	reorder
-1:	lw	reg_LIP, FDEFN_RAW_ADDR_OFFSET(reg_FDEFN)
+1:	lw	reg_CODE, FDEFN_FUN_OFFSET(reg_FDEFN)
+	lw	reg_LIP, SIMPLE_FUN_CODE_OFFSET(reg_CODE)
 	jr	reg_LIP
 	END(undefined_tramp)
 
