@@ -1025,16 +1025,15 @@
   nil)
 
 (defun snarf-error-junk (sap offset &optional length-only)
-  (let* ((length (sb!sys:sap-ref-8 sap offset))
+  (let* ((length (sap-ref-8 sap offset))
          (vector (make-array length :element-type '(unsigned-byte 8))))
-    (declare (type sb!sys:system-area-pointer sap)
+    (declare (type system-area-pointer sap)
              (type (unsigned-byte 8) length)
              (type (simple-array (unsigned-byte 8) (*)) vector))
     (cond (length-only
            (values 0 (1+ length) nil nil))
           (t
-           (sb!kernel:copy-ub8-from-system-area sap (1+ offset)
-                                                vector 0 length)
+           (copy-ub8-from-system-area sap (1+ offset) vector 0 length)
            (collect ((sc-offsets)
                      (lengths))
              (lengths 1)                ; the length byte
@@ -1084,7 +1083,7 @@
   (:declare (type (unsigned-byte 10) code subcode))
   (:printer break ((op special-op) (funct #b001101))
             '(:name :tab code (:unless (:constant 0) subcode))
-            :control #'break-control )
+            :control #'break-control)
   :pinned
   (:cost 0)
   (:delay 0)
