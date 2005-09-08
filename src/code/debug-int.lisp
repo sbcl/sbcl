@@ -947,11 +947,6 @@
                       (- (get-lisp-obj-address code)
                          sb!vm:other-pointer-lowtag)
                       code-header-len)))
-             ;; Check to see whether we were executing in a branch
-             ;; delay slot.
-             #!+(or pmax sgi)          ; pmax only (and broken anyway)
-             (when (logbitp 31 (sb!alien:slot scp '%mips::sc-cause))
-               (incf pc-offset sb!vm:n-word-bytes))
              (let ((code-size (* (code-header-ref code
                                                   sb!vm:code-code-size-slot)
                                  sb!vm:n-word-bytes)))
