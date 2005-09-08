@@ -215,8 +215,9 @@
   "Cause a continuable error.  If the error is continued, execution resumes at
   LABEL."
   `(progn
-     (inst b ,label)
-     ,@(emit-error-break vop cerror-trap error-code values)))
+     (without-scheduling ()
+       (inst b ,label)
+       ,@(emit-error-break vop cerror-trap error-code values))))
 
 (defmacro generate-error-code (vop error-code &rest values)
   "Generate-Error-Code Error-code Value*
