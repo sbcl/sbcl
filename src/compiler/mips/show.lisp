@@ -1,24 +1,34 @@
+;;;; temporary printing utilities and similar noise
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
 
 (define-vop (print)
-  (:args (object :scs (descriptor-reg) :target a0))
+  (:args (object :scs (descriptor-reg any-reg) :target nl0))
   (:results (result :scs (descriptor-reg)))
   (:save-p t)
-  (:temporary (:sc any-reg :offset cfunc-offset :target result :to (:result 0))
-              cfunc)
-  (:temporary (:sc descriptor-reg :offset 4 :from (:argument 0)) a0)
+  (:temporary (:sc any-reg :offset nl0-offset :from (:argument 0)) nl0)
+  (:temporary (:sc any-reg :offset cfunc-offset) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:vop-var vop)
-  (:generator 0
+  (:generator 100
     (let ((cur-nfp (current-nfp-tn vop)))
-      (move a0 object)
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
+      (move nl0 object)
       (inst li cfunc (make-fixup "debug_print" :foreign))
       (inst jal (make-fixup "call_into_c" :foreign))
       (inst addu nsp-tn nsp-tn -16)
       (inst addu nsp-tn nsp-tn 16)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save))
-      (move result cfunc))))
+      (move result nl0))))
