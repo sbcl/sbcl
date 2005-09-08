@@ -392,8 +392,6 @@
 
 ;;;; INTERNAL-ERROR signal handler
 
-(defvar *internal-error-args*)
-
 (defun internal-error (context continuable)
   (declare (type system-area-pointer context))
   (declare (ignore continuable))
