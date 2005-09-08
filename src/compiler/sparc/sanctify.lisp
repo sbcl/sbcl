@@ -12,7 +12,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :sb!vm)
+(in-package "SB!VM")
 
 ;;; The comments in some of the cmucl source read that "the i and d
 ;;; caches are unified, and so there is no need to flush them."

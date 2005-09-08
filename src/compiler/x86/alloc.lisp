@@ -127,7 +127,8 @@
     (inst rep)
     (inst stos zero)))
 
-(in-package :sb!c)
+(in-package "SB!C")
+
 (defoptimizer (allocate-vector stack-allocate-result)
     ((type length words) node)
   (ecase (policy node stack-allocate-vector)
@@ -158,7 +159,8 @@
 
     (dolist (arg args)
       (annotate-1-value-lvar arg))))
-(in-package :sb!vm)
+
+(in-package "SB!VM")
 
 ;;;
 (define-vop (allocate-code-object)
