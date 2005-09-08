@@ -1,3 +1,5 @@
+;;; This file contains the MIPS specific runtime stuff.
+;;;
 (in-package "SB!VM")
 
 
@@ -19,6 +21,7 @@
 ;;;; FIXUP-CODE-OBJECT
 
 (defun fixup-code-object (code offset value kind)
+  (declare (type index offset))
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb!sys:without-gcing
