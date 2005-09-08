@@ -322,13 +322,15 @@ default-value-8
               (aver defaults)
               (assemble (*elsewhere*)
                 (emit-label default-stack-vals)
+                (trace-table-entry trace-table-fun-prologue)
                 (do ((remaining defaults (cdr remaining)))
                     ((null remaining))
                   (let ((def (car remaining)))
                     (emit-label (car def))
                     (when (null (cdr remaining))
                       (inst b defaulting-done))
-                    (store-stack-tn (cdr def) null-tn)))))))
+                    (store-stack-tn (cdr def) null-tn)))
+                (trace-table-entry trace-table-normal)))))
 
         (when lra-label
           (inst compute-code-from-lra code-tn code-tn lra-label temp))))
