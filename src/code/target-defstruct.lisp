@@ -550,9 +550,7 @@
   (when (layout-invalid layout)
     (error "An obsolete structure accessor function was called."))
   (/noshow0 "back from testing LAYOUT-INVALID LAYOUT")
-  ;; FIXME: CMU CL used (%INSTANCEP OBJ) here. Check that
-  ;; (TYPEP OBJ 'INSTANCE) is optimized to equally efficient code.
-  (and (typep obj 'instance)
+  (and (%instancep obj)
        (let ((obj-layout (%instance-layout obj)))
          (cond ((eq obj-layout layout)
                 ;; (In this case OBJ-LAYOUT can't be invalid, because

@@ -304,9 +304,7 @@
                                  ;; I'm not sure why these are removed from
                                  ;; the list, but that's what the original
                                  ;; CMU CL code did. -- WHN 20000715
-                                 '(t instance
-                                     funcallable-instance
-                                     function stream
+                                 '(t function stream
                                      file-stream string-stream)))
                        sb-kernel::*built-in-classes*))))
 (/noshow "done setting up SB-PCL::*BUILT-IN-CLASSES*")
@@ -316,16 +314,10 @@
 (defclass t () ()
   (:metaclass built-in-class))
 
-(defclass instance (t) ()
-  (:metaclass built-in-class))
-
 (defclass function (t) ()
   (:metaclass built-in-class))
 
-(defclass funcallable-instance (function) ()
-  (:metaclass built-in-class))
-
-(defclass stream (instance) ()
+(defclass stream (t) ()
   (:metaclass built-in-class))
 
 (defclass file-stream (stream) ()
@@ -337,10 +329,10 @@
 (defclass slot-object (t) ()
   (:metaclass slot-class))
 
-(defclass condition (slot-object instance) ()
+(defclass condition (slot-object) ()
   (:metaclass condition-class))
 
-(defclass structure-object (slot-object instance) ()
+(defclass structure-object (slot-object) ()
   (:metaclass structure-class))
 
 (defstruct (dead-beef-structure-object
@@ -350,9 +342,9 @@
 (defclass std-object (slot-object) ()
   (:metaclass std-class))
 
-(defclass standard-object (std-object instance) ())
+(defclass standard-object (std-object) ())
 
-(defclass funcallable-standard-object (std-object funcallable-instance)
+(defclass funcallable-standard-object (standard-object function)
   ()
   (:metaclass funcallable-standard-class))
 

@@ -567,9 +567,6 @@ position with the label if the label is a string."
 (defmethod inspected-description ((object standard-object))
   (format nil "~W" (class-of object)))
 
-(defmethod inspected-description ((object sb-kernel:funcallable-instance))
-  (format nil "a funcallable-instance of type ~S" (type-of object)))
-
 (defmethod inspected-description ((object function))
   (format nil "~S" object) nil)
 
@@ -804,10 +801,6 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 
 
 (defmethod inspected-parts ((object standard-object))
-  (let ((components (inspected-standard-object-parts object)))
-    (list components (length components) :named nil)))
-
-(defmethod inspected-parts ((object sb-kernel:funcallable-instance))
   (let ((components (inspected-standard-object-parts object)))
     (list components (length components) :named nil)))
 

@@ -354,7 +354,6 @@
                     (mapcar #'find-class '(simple-condition
                                            condition
                                            sb-pcl::slot-object
-                                           sb-kernel:instance
                                            t))))
 
      ;; stream classes
@@ -375,7 +374,6 @@
                                            sb-pcl::std-object
                                            sb-pcl::slot-object
                                            stream
-                                           sb-kernel:instance
                                            t))))
      (assert (equal (sb-pcl:class-precedence-list (find-class
                                                    'fundamental-stream))
@@ -383,7 +381,7 @@
                                            standard-object
                                            sb-pcl::std-object
                                            sb-pcl::slot-object stream
-                                           sb-kernel:instance t))))
+                                           t))))
      (assert (subtypep (find-class 'stream) (find-class t)))
      (assert (subtypep (find-class 'fundamental-stream) 'stream))
      (assert (not (subtypep 'stream 'fundamental-stream)))))

@@ -198,12 +198,6 @@ evaluated expressions.
           t
           (inspected-standard-object-elements object)))
 
-(defmethod inspected-parts ((object funcallable-instance))
-  (values (format nil "The object is a FUNCALLABLE-INSTANCE of type ~S.~%"
-                  (type-of object))
-          t
-          (inspected-standard-object-elements object)))
-
 (defmethod inspected-parts ((object condition))
   (values (format nil "The object is a CONDITION of type ~S.~%"
                   (type-of object))

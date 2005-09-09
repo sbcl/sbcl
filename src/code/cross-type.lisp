@@ -143,7 +143,6 @@
                          '(sb!alien:alien))
                  (member target-type
                          '(system-area-pointer
-                           funcallable-instance
                            sb!alien-internals:alien-value)))
              (values nil t))
             (;; special case when TARGET-TYPE isn't a type spec, but
@@ -164,13 +163,13 @@
               '(array simple-string simple-vector string vector))
              (values (typep host-object target-type) t))
             (;; general cases of vectors
-             (and (not (unknown-type-p (values-specifier-type target-type)))
+             (and (not (hairy-type-p (values-specifier-type target-type)))
                   (sb!xc:subtypep target-type 'cl:vector))
              (if (vectorp host-object)
                  (warn-and-give-up) ; general-case vectors being way too hard
                  (values nil t))) ; but "obviously not a vector" being easy
             (;; general cases of arrays
-             (and (not (unknown-type-p (values-specifier-type target-type)))
+             (and (not (hairy-type-p (values-specifier-type target-type)))
                   (sb!xc:subtypep target-type 'cl:array))
              (if (arrayp host-object)
                  (warn-and-give-up) ; general-case arrays being way too hard
@@ -208,7 +207,7 @@
                    (t
                     (values nil t))))
             (;; Complexes suffer the same kind of problems as arrays
-             (and (not (unknown-type-p (values-specifier-type target-type)))
+             (and (not (hairy-type-p (values-specifier-type target-type)))
                   (sb!xc:subtypep target-type 'cl:complex))
              (if (complexp host-object)
                  (warn-and-give-up) ; general-case complexes being way too hard

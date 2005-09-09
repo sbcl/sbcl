@@ -564,7 +564,7 @@
          (obj (svref *current-fop-table* obi))
          (idx (read-word-arg))
          (val (pop-stack)))
-    (if (typep obj 'instance)
+    (if (%instancep obj)
         (setf (%instance-ref obj idx) val)
         (setf (svref obj idx) val))))
 

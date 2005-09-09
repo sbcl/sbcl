@@ -875,6 +875,14 @@ NIL is returned when no such class exists."
          ;; uncertain, since a subclass of both might be defined
          nil)))
 
+;;; KLUDGE: we need this to deal with the special-case INSTANCE and
+;;; FUNCALLABLE-INSTANCE types (which used to be CLASSOIDs until CSR
+;;; discovered that this was incompatible with the MOP class
+;;; hierarchy).  See NAMED :COMPLEX-SUBTYPEP-ARG2
+(defvar *non-instance-classoid-types*
+  '(symbol system-area-pointer weak-pointer code-component
+    lra fdefn random-class))
+
 ;;; KLUDGE: we need this because of the need to represent
 ;;; intersections of two classes, even when empty at a given time, as
 ;;; uncanonicalized intersections because of the possibility of later
@@ -957,8 +965,6 @@ NIL is returned when no such class exists."
      (symbol :codes (#.sb!vm:symbol-header-widetag)
              :prototype-form '#:mu)
 
-     (instance :state :read-only)
-
      (system-area-pointer :codes (#.sb!vm:sap-widetag)
                           :prototype-form (sb!sys:int-sap 42))
      (weak-pointer :codes (#.sb!vm:weak-pointer-widetag)
@@ -974,9 +980,6 @@ NIL is returned when no such class exists."
               #.sb!vm:simple-fun-header-widetag)
       :state :read-only
       :prototype-form (function (lambda () 42)))
-     (funcallable-instance
-      :inherits (function)
-      :state :read-only)
 
      (number :translation number)
      (complex
@@ -1288,15 +1291,14 @@ NIL is returned when no such class exists."
       :prototype-form 'nil)
      (stream
       :state :read-only
-      :depth 3
-      :inherits (instance))
+      :depth 2)
      (file-stream
       :state :read-only
-      :depth 5
+      :depth 4
       :inherits (stream))
      (string-stream
       :state :read-only
-      :depth 5
+      :depth 4
       :inherits (stream)))))
 
 ;;; See also src/code/class-init.lisp where we finish setting up the
@@ -1363,15 +1365,15 @@ NIL is returned when no such class exists."
   (dolist (x '(;; Why is STREAM duplicated in this list? Because, when
                ;; the inherits-vector of FUNDAMENTAL-STREAM is set up,
                ;; a vector containing the elements of the list below,
-               ;; i.e. '(T INSTANCE STREAM STREAM), is created, and
+               ;; i.e. '(T STREAM STREAM), is created, and
                ;; this is what the function ORDER-LAYOUT-INHERITS
                ;; would do, too.
                ;;
                ;; So, the purpose is to guarantee a valid layout for
                ;; the FUNDAMENTAL-STREAM class, matching what
                ;; ORDER-LAYOUT-INHERITS would do.
-               ;; ORDER-LAYOUT-INHERITS would place STREAM at index 3
-               ;; in the INHERITS(-VECTOR). Index 2 would not be
+               ;; ORDER-LAYOUT-INHERITS would place STREAM at index 2
+               ;; in the INHERITS(-VECTOR). Index 1 would not be
                ;; filled, so STREAM is duplicated there (as
                ;; ORDER-LAYOUTS-INHERITS would do). Maybe the
                ;; duplicate definition could be removed (removing a
@@ -1379,7 +1381,7 @@ NIL is returned when no such class exists."
                ;; redefined after PCL is set up, anyway. But to play
                ;; it safely, we define the class with a valid INHERITS
                ;; vector.
-               (fundamental-stream (t instance stream stream))))
+               (fundamental-stream (t stream stream))))
     (/show0 "defining temporary STANDARD-CLASS")
     (let* ((name (first x))
            (inherits-list (second x))

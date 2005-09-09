@@ -37,13 +37,19 @@
 ;;; CL:STREAM.
 (deftype ansi-stream () 'stream)
 
-;;; In the target SBCL, the INSTANCE type refers to a base
-;;; implementation for compound types. There's no way to express
-;;; exactly that concept portably, but we can get essentially the same
-;;; effect by testing for any of the standard types which would, in
-;;; the target SBCL, be derived from INSTANCE:
 (deftype sb!kernel:instance ()
-  '(or condition standard-object structure-object))
+  '(or condition structure-object standard-object))
+(deftype sb!kernel:funcallable-instance ()
+  (error "not clear how to represent FUNCALLABLE-INSTANCE type"))
+
+;;; In the target SBCL, the INSTANCE type refers to a base
+;;; implementation for compound types with lowtag
+;;; INSTANCE-POINTER-LOWTAG. There's no way to express exactly that
+;;; concept portably, but we can get essentially the same effect by
+;;; testing for any of the standard types which would, in the target
+;;; SBCL, be derived from INSTANCE:
+(defun %instancep (x)
+  (typep x '(or condition structure-object standard-object)))
 
 ;;; There aren't any FUNCALLABLE-INSTANCEs in the cross-compilation
 ;;; host Common Lisp.

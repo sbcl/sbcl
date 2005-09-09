@@ -941,8 +941,7 @@
                                 ;; default.  (But note
                                 ;; FUNCALLABLE-STRUCTUREs need
                                 ;; assistance here)
-                                (inherits (vector (find-layout t)
-                                                  (find-layout 'instance))))
+                                (inherits (vector (find-layout t))))
 
   (multiple-value-bind (classoid layout old-layout)
       (multiple-value-bind (clayout clayout-p)
@@ -1531,9 +1530,9 @@
       ;; and it's not a general-purpose facility, so sanity check our
       ;; own code.
       (structure
-       (aver (eq superclass-name 'instance)))
+       (aver (eq superclass-name 't)))
       (funcallable-structure
-       (aver (eq superclass-name 'funcallable-instance)))
+       (aver (eq superclass-name 'function)))
       (t (bug "Unknown DD-TYPE in ALTERNATE-METACLASS: ~S" dd-type)))
     (setf (dd-alternate-metaclass dd) (list superclass-name
                                             metaclass-name
@@ -1657,7 +1656,7 @@
      ;; Note: This has an ALTERNATE-METACLASS only because of blind
      ;; clueless imitation of the CMU CL code -- dunno if or why it's
      ;; needed. -- WHN
-     (dd-alternate-metaclass dd) '(instance)
+     (dd-alternate-metaclass dd) '(t)
      (dd-slots dd) nil
      (dd-length dd) 1
      (dd-type dd) 'structure)

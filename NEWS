@@ -28,6 +28,8 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     funcallable-instances.  (reported by Cyrus Harmon)
   * bug fix: FUNCTIONP and (LAMBDA (X) (TYPEP X 'FUNCTION)) are now
     consistent, even on internal alternate-metaclass objects.
+  * bug fix: SB-MOP:FUNCALLABLE-STANDARD-OBJECT is now a subclass of
+    STANDARD-OBJECT, as required by AMOP.
   * threads
     ** bug fix: parent thread now can be gc'ed even with a live
        child thread

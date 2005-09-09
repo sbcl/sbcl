@@ -33,14 +33,14 @@
          named-type
          member-type
          array-type
-        character-set-type
+         character-set-type
          built-in-classoid
          cons-type)
      (values (%typep obj type) t))
     (classoid
-     (if (if (csubtypep type (specifier-type 'funcallable-instance))
+     (if (if (csubtypep type (specifier-type 'function))
              (funcallable-instance-p obj)
-             (typep obj 'instance))
+             (%instancep obj))
          (if (eq (classoid-layout type)
                  (info :type :compiler-layout (classoid-name type)))
              (values (sb!xc:typep obj type) t)
@@ -119,7 +119,7 @@
 #!-sb-fluid (declaim (inline layout-of))
 (defun layout-of (x)
   (declare (optimize (speed 3) (safety 0)))
-  (cond ((typep x 'instance) (%instance-layout x))
+  (cond ((%instancep x) (%instance-layout x))
         ((funcallable-instance-p x) (%funcallable-instance-layout x))
         ((null x)
          ;; Note: was #.((CLASS-LAYOUT (SB!XC:FIND-CLASS 'NULL))).

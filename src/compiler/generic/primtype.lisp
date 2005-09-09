@@ -321,19 +321,19 @@
                ;; have an exact primitive type.
                (return (part-of function)))
              (multiple-value-bind (ptype ptype-exact)
-                   (primitive-type type)
-                 (when ptype-exact
-                   ;; Apart from the previous kludge exact primitive
-                   ;; types should match, if indeed there are any. It
-                   ;; may be that this assumption isn't really safe,
-                   ;; but at least we'll see what breaks. -- NS 20041104
-                   (aver (or (not exact) (eq ptype res)))
-                   (setq exact t))
-                 (when (or ptype-exact (and (not exact) (eq res (any))))
-                   ;; Try to find a narrower representation then
-                   ;; (any). Takes care of undecidable types in
-                   ;; intersections with decidable ones.
-                   (setq res ptype))))))
+                 (primitive-type type)
+               (when ptype-exact
+                 ;; Apart from the previous kludge exact primitive
+                 ;; types should match, if indeed there are any. It
+                 ;; may be that this assumption isn't really safe,
+                 ;; but at least we'll see what breaks. -- NS 20041104
+                 (aver (or (not exact) (eq ptype res)))
+                 (setq exact t))
+               (when (or ptype-exact (and (not exact) (eq res (any))))
+                 ;; Try to find a narrower representation then
+                 ;; (any). Takes care of undecidable types in
+                 ;; intersections with decidable ones.
+                 (setq res ptype))))))
         (member-type
          (let* ((members (member-type-members type))
                 (res (primitive-type-of (first members))))
@@ -348,34 +348,33 @@
         (named-type
          (ecase (named-type-name type)
            ((t *) (values *backend-t-primitive-type* t))
+           ((instance) (exactly instance))
+           ((funcallable-instance) (part-of function))
            ((nil) (any))))
-       (character-set-type
-        (let ((pairs (character-set-type-pairs type)))
-          (if (and (= (length pairs) 1)
-                   (= (caar pairs) 0)
-                   (= (cdar pairs) (1- sb!xc:char-code-limit)))
-              (exactly character)
-              (part-of character))))
-       (built-in-classoid
-        (case (classoid-name type)
-          ((complex function instance
-                    system-area-pointer weak-pointer)
-           (values (primitive-type-or-lose (classoid-name type)) t))
-          (funcallable-instance
-           (part-of function))
-          (cons-type
-           (part-of list))
-          (t
-           (any))))
-       (fun-type
-        (exactly function))
-       (classoid
-        (if (csubtypep type (specifier-type 'function))
-            (part-of function)
-            (part-of instance)))
-       (ctype
-        (if (csubtypep type (specifier-type 'function))
-            (part-of function)
-            (any)))))))
+        (character-set-type
+         (let ((pairs (character-set-type-pairs type)))
+           (if (and (= (length pairs) 1)
+                    (= (caar pairs) 0)
+                    (= (cdar pairs) (1- sb!xc:char-code-limit)))
+               (exactly character)
+               (part-of character))))
+        (built-in-classoid
+         (case (classoid-name type)
+           ((complex function system-area-pointer weak-pointer)
+            (values (primitive-type-or-lose (classoid-name type)) t))
+           (cons-type
+            (part-of list))
+           (t
+            (any))))
+        (fun-type
+         (exactly function))
+        (classoid
+         (if (csubtypep type (specifier-type 'function))
+             (part-of function)
+             (part-of instance)))
+        (ctype
+         (if (csubtypep type (specifier-type 'function))
+             (part-of function)
+             (any)))))))
 
 (/show0 "primtype.lisp end of file")

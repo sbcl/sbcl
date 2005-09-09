@@ -37,6 +37,8 @@
     (named-type
      (ecase (named-type-name type)
        ((* t) t)
+       ((instance) (%instancep object))
+       ((funcallable-instance) (funcallable-instance-p object))
        ((nil) nil)))
     (numeric-type
      (and (numberp object)

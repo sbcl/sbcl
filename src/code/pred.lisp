@@ -139,7 +139,7 @@
     (t
      (let* ((classoid (layout-classoid (layout-of object)))
             (name (classoid-name classoid)))
-       (if (typep object 'instance)
+       (if (%instancep object)
            (case name
              (sb!alien-internals:alien-value
               `(sb!alien:alien
@@ -229,10 +229,10 @@
         ((hash-table-p x)
          (and (hash-table-p y)
               (hash-table-equalp x y)))
-        ((typep x 'instance)
+        ((%instancep x)
          (let* ((layout-x (%instance-layout x))
                 (len (layout-length layout-x)))
-           (and (typep y 'instance)
+           (and (%instancep y)
                 (eq layout-x (%instance-layout y))
                 (structure-classoid-p (layout-classoid layout-x))
                 (do ((i 1 (1+ i)))

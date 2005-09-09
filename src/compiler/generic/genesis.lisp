@@ -980,7 +980,7 @@ core and return a descriptor to it."
                           (number-to-core target-layout-length)
                           (vector-in-core)
                           ;; FIXME: hard-coded LAYOUT-DEPTHOID of LAYOUT..
-                          (number-to-core 4)
+                          (number-to-core 3)
                           ;; no raw slots in LAYOUT:
                           (number-to-core 0)))
   (write-wordindexed *layout-layout*
@@ -998,26 +998,19 @@ core and return a descriptor to it."
                             (vector-in-core)
                             (number-to-core 0)
                             (number-to-core 0)))
-         (i-layout
-          (make-cold-layout 'instance
-                            (number-to-core 0)
-                            (vector-in-core t-layout)
-                            (number-to-core 1)
-                            (number-to-core 0)))
          (so-layout
           (make-cold-layout 'structure-object
                             (number-to-core 1)
-                            (vector-in-core t-layout i-layout)
-                            (number-to-core 2)
+                            (vector-in-core t-layout)
+                            (number-to-core 1)
                             (number-to-core 0)))
          (bso-layout
           (make-cold-layout 'structure!object
                             (number-to-core 1)
-                            (vector-in-core t-layout i-layout so-layout)
-                            (number-to-core 3)
+                            (vector-in-core t-layout so-layout)
+                            (number-to-core 2)
                             (number-to-core 0)))
          (layout-inherits (vector-in-core t-layout
-                                          i-layout
                                           so-layout
                                           bso-layout)))
 

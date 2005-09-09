@@ -173,7 +173,7 @@
 ;;; the implementation of things like *PRINT-CIRCLE* and the dumper.)
 (defun compound-object-p (x)
   (or (consp x)
-      (typep x 'instance)
+      (%instancep x)
       (typep x '(array t *))))
 
 ;;;; the COLLECT macro

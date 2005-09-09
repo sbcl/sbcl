@@ -529,8 +529,8 @@
                (source-transform-array-typep object type))
               (cons-type
                (source-transform-cons-typep object type))
-             (character-set-type
-              (source-transform-character-set-typep object type))
+              (character-set-type
+               (source-transform-character-set-typep object type))
               (t nil))
             `(%typep ,object ,spec)))
       (values nil t)))

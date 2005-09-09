@@ -109,7 +109,7 @@
 (!defstruct-with-alternate-metaclass ctor
   :slot-names (function-name class-name class initargs)
   :boa-constructor %make-ctor
-  :superclass-name funcallable-instance
+  :superclass-name function
   :metaclass-name random-pcl-classoid
   :metaclass-constructor make-random-pcl-classoid
   :dd-type funcallable-structure

@@ -82,7 +82,7 @@
   ;; by puns based on absolute locations. Fun fun fun.. -- WHN 2001-10-30
   :slot-names (clos-slots name hash-code)
   :boa-constructor %make-pcl-funcallable-instance
-  :superclass-name funcallable-instance
+  :superclass-name function
   :metaclass-name random-pcl-classoid
   :metaclass-constructor make-random-pcl-classoid
   :dd-type funcallable-structure
@@ -222,7 +222,7 @@
 (!defstruct-with-alternate-metaclass standard-instance
   :slot-names (slots hash-code)
   :boa-constructor %make-standard-instance
-  :superclass-name instance
+  :superclass-name t
   :metaclass-name standard-classoid
   :metaclass-constructor make-standard-classoid
   :dd-type structure

@@ -238,7 +238,7 @@
          :operands (list this that)))
 
 (deferr object-not-type-error (object type)
-  (error (if (and (typep object 'instance)
+  (error (if (and (%instancep object)
                   (layout-invalid (%instance-layout object)))
              'layout-invalid
              'type-error)

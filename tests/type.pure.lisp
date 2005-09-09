@@ -289,3 +289,14 @@ ACTUAL ~D DERIVED ~D~%"
                 '(cons (satisfies bar) t))
     (assert (null cyes))
     (assert (null cwin))))
+
+(multiple-value-bind (yes win)
+    (subtypep 'generic-function 'function)
+  (assert yes)
+  (assert win))
+;; this would be in some internal test suite like type.before-xc.lisp
+;; except that generic functions don't exist at that stage.
+(multiple-value-bind (yes win)
+    (subtypep 'generic-function 'sb-kernel:funcallable-instance)
+  (assert yes)
+  (assert win))

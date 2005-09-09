@@ -164,3 +164,16 @@
   (make-instance 'class-with-symbol-initarg slot arg))
 (assert (eql (slot-value (make-thing 1) 'slot) 1))
 (assert (eql (slot-value (make-other-thing 'slot 2) 'slot) 2))
+
+;;; test that ctors can be used with the literal class
+(eval-when (:compile-toplevel)
+  (defclass ctor-literal-class () ())
+  (defclass ctor-literal-class2 () ()))
+(defun ctor-literal-class ()
+  (make-instance #.(find-class 'ctor-literal-class)))
+(defun ctor-literal-class2 ()
+  (make-instance '#.(find-class 'ctor-literal-class2)))
+(with-test (:name (:ctor :literal-class-unquoted))
+  (assert (typep (ctor-literal-class) 'ctor-literal-class)))
+(with-test (:name (:ctor :literal-class-quoted))
+  (assert (typep (ctor-literal-class2) 'ctor-literal-class2)))

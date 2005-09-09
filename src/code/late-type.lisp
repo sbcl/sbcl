@@ -1048,7 +1048,17 @@
    ;; In SBCL it also used to denote universal VALUES type.
    (frob * *wild-type*)
    (frob nil *empty-type*)
-   (frob t *universal-type*))
+   (frob t *universal-type*)
+   ;; new in sbcl-0.9.5: these used to be CLASSOID types, but that
+   ;; view of them was incompatible with requirements on the MOP
+   ;; metaobject class hierarchy: the INSTANCE and
+   ;; FUNCALLABLE-INSTANCE types are disjoint (instances have
+   ;; instance-pointer-lowtag; funcallable-instances have
+   ;; fun-pointer-lowtag), while FUNCALLABLE-STANDARD-OBJECT is
+   ;; required to be a subclass of STANDARD-OBJECT.  -- CSR,
+   ;; 2005-09-09
+   (frob instance *instance-type*)
+   (frob funcallable-instance *funcallable-instance-type*))
  (setf *universal-fun-type*
        (make-fun-type :wild-args t
                       :returns *wild-type*)))
@@ -1096,7 +1106,10 @@
 
 (!define-type-method (named :simple-subtypep) (type1 type2)
   (aver (not (eq type1 *wild-type*))) ; * isn't really a type.
-  (values (or (eq type1 *empty-type*) (eq type2 *wild-type*)) t))
+  (aver (not (eq type1 type2)))
+  (values (or (eq type1 *empty-type*)
+              (eq type2 *wild-type*)
+              (eq type2 *universal-type*)) t))
 
 (!define-type-method (named :complex-subtypep-arg1) (type1 type2)
   ;; This AVER causes problems if we write accurate methods for the
@@ -1122,14 +1135,14 @@
          ;; is a compound type which might contain a hairy type) by
          ;; returning uncertainty.
          (values nil nil))
+        ((eq type1 *funcallable-instance-type*)
+         (values (eq type2 (specifier-type 'function)) t))
         (t
-         ;; By elimination, TYPE1 is the universal type.
-         (aver (eq type1 *universal-type*))
          ;; This case would have been picked off by the SIMPLE-SUBTYPEP
          ;; method, and so shouldn't appear here.
-         (aver (not (eq type2 *universal-type*)))
-         ;; Since TYPE2 is not EQ *UNIVERSAL-TYPE* and is not the
-         ;; universal type in disguise, TYPE2 is not a superset of TYPE1.
+         (aver (not (named-type-p type2)))
+         ;; Since TYPE2 is not EQ *UNIVERSAL-TYPE* and is not another
+         ;; named type in disguise, TYPE2 is not a superset of TYPE1.
          (values nil t))))
 
 (!define-type-method (named :complex-subtypep-arg2) (type1 type2)
@@ -1137,35 +1150,112 @@
   (cond ((eq type2 *universal-type*)
          (values t t))
         ((or (type-might-contain-other-types-p type1)
+             ;; some CONS types can conceal danger
              (and (cons-type-p type1)
                   (cons-type-might-be-empty-type type1)))
-         ;; those types can be *EMPTY-TYPE* or *UNIVERSAL-TYPE* in
-         ;; disguise.  So we'd better delegate.
+         ;; those types can be other types in disguise.  So we'd
+         ;; better delegate.
          (invoke-complex-subtypep-arg1-method type1 type2))
+        ((and (eq type2 *instance-type*) (classoid-p type1))
+         (if (member type1 *non-instance-classoid-types* :key #'find-classoid)
+             (values nil t)
+             (let* ((layout (classoid-layout type1))
+                    (inherits (layout-inherits layout))
+                    (functionp (find (classoid-layout (find-classoid 'function))
+                                     inherits)))
+               (cond
+                 (functionp
+                  (values nil t))
+                 ((eq type1 (find-classoid 'function))
+                  (values nil t))
+                 ((or (basic-structure-classoid-p type1)
+                      #+nil
+                      (condition-classoid-p type1))
+                  (values t t))
+                 (t (values nil nil))))))
+        ((and (eq type2 *funcallable-instance-type*) (classoid-p type1))
+         (if (member type1 *non-instance-classoid-types* :key #'find-classoid)
+             (values nil t)
+             (let* ((layout (classoid-layout type1))
+                    (inherits (layout-inherits layout))
+                    (functionp (find (classoid-layout (find-classoid 'function))
+                                     inherits)))
+               (values (if functionp t nil) t))))
         (t
-         ;; FIXME: This seems to rely on there only being 2 or 3
+         ;; FIXME: This seems to rely on there only being 4 or 5
          ;; NAMED-TYPE values, and the exclusion of various
          ;; possibilities above. It would be good to explain it and/or
          ;; rewrite it so that it's clearer.
-         (values (not (eq type2 *empty-type*)) t))))
+         (values nil t))))
 
 (!define-type-method (named :complex-intersection2) (type1 type2)
   ;; FIXME: This assertion failed when I added it in sbcl-0.6.11.13.
   ;; Perhaps when bug 85 is fixed it can be reenabled.
   ;;(aver (not (eq type2 *wild-type*))) ; * isn't really a type.
-  (hierarchical-intersection2 type1 type2))
+  (cond
+    ((eq type2 *instance-type*)
+     (if (classoid-p type1)
+         (if (and (not (member type1 *non-instance-classoid-types*
+                               :key #'find-classoid))
+                  (not (find (classoid-layout (find-classoid 'function))
+                             (layout-inherits (classoid-layout type1)))))
+             type1
+             *empty-type*)
+         (if (type-might-contain-other-types-p type1)
+             nil
+             *empty-type*)))
+    ((eq type2 *funcallable-instance-type*)
+     (if (classoid-p type1)
+         (if (and (not (member type1 *non-instance-classoid-types*
+                               :key #'find-classoid))
+                  (find (classoid-layout (find-classoid 'function))
+                        (layout-inherits (classoid-layout type1))))
+             type1
+             (if (type= type1 (find-classoid 'function))
+                 type1
+                 nil))
+         (if (fun-type-p type1)
+             nil
+             (if (type-might-contain-other-types-p type1)
+                 nil
+                 *empty-type*))))
+    (t (hierarchical-intersection2 type1 type2))))
 
 (!define-type-method (named :complex-union2) (type1 type2)
   ;; Perhaps when bug 85 is fixed this can be reenabled.
   ;;(aver (not (eq type2 *wild-type*))) ; * isn't really a type.
-  (hierarchical-union2 type1 type2))
+  (cond
+    ((eq type2 *instance-type*)
+     (if (classoid-p type1)
+         (if (or (member type1 *non-instance-classoid-types*
+                         :key #'find-classoid)
+                 (find (classoid-layout (find-classoid 'function))
+                       (layout-inherits (classoid-layout type1))))
+             nil
+             type2)
+         nil))
+    ((eq type2 *funcallable-instance-type*)
+     (if (classoid-p type1)
+         (if (or (member type1 *non-instance-classoid-types*
+                         :key #'find-classoid)
+                 (not (find (classoid-layout (find-classoid 'function))
+                            (layout-inherits (classoid-layout type1)))))
+             nil
+             (if (eq type1 (specifier-type 'function))
+                 type1
+                 type2))
+         nil))
+    (t (hierarchical-union2 type1 type2))))
 
 (!define-type-method (named :negate) (x)
   (aver (not (eq x *wild-type*)))
   (cond
     ((eq x *universal-type*) *empty-type*)
     ((eq x *empty-type*) *universal-type*)
-    (t (bug "NAMED type not universal, wild or empty: ~S" x))))
+    ((or (eq x *instance-type*)
+         (eq x *funcallable-instance-type*))
+     (make-negation-type :type x))
+    (t (bug "NAMED type unexpected: ~S" x))))
 
 (!define-type-method (named :unparse) (x)
   (named-type-name x))

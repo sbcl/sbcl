@@ -69,7 +69,7 @@
 (!defstruct-with-alternate-metaclass condition
   :slot-names (actual-initargs assigned-slots)
   :boa-constructor %make-condition-object
-  :superclass-name instance
+  :superclass-name t
   :metaclass-name condition-classoid
   :metaclass-constructor make-condition-classoid
   :dd-type structure)

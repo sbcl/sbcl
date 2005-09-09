@@ -14,7 +14,7 @@
 (load "assertoid.lisp")
 
 (defpackage "CLOS-IMPURE"
-  (:use "CL" "ASSERTOID"))
+  (:use "CL" "ASSERTOID" "TEST-UTIL"))
 (in-package "CLOS-IMPURE")
 
 ;;; It should be possible to do DEFGENERIC and DEFMETHOD referring to
@@ -1177,5 +1177,28 @@
           (assert (equal (list (slot-value c1 'class-slot)
                                (slot-value c2 'class-slot))
                    (list 1 1))))))
-
+
+;;; tests of ctors on anonymous classes
+(defparameter *unnamed* (defclass ctor-unnamed-literal-class () ()))
+(setf (class-name *unnamed*) nil)
+(setf (find-class 'ctor-unnamed-literal-class) nil)
+(defparameter *unnamed2* (defclass ctor-unnamed-literal-class2 () ()))
+(defun ctor-unnamed-literal-class ()
+  (make-instance '#.*unnamed*))
+(compile 'ctor-unnamed-literal-class)
+(defun ctor-unnamed-literal-class2 ()
+  (make-instance '#.(find-class 'ctor-unnamed-literal-class2)))
+(compile 'ctor-unnamed-literal-class2)
+(defun ctor-unnamed-literal-class2/symbol ()
+  (make-instance 'ctor-unnamed-literal-class2))
+(compile 'ctor-unnamed-literal-class2/symbol)
+(setf (class-name *unnamed2*) nil)
+(setf (find-class 'ctor-unnamed-literal-class2) nil)
+(with-test (:name (:ctor :unnamed-before))
+  (assert (typep (ctor-unnamed-literal-class) *unnamed*)))
+(with-test (:name (:ctor :unnamed-after))
+  (assert (typep (ctor-unnamed-literal-class2) *unnamed2*)))
+(with-test (:name (:ctor :unnamed-after/symbol))
+  (assert (raises-error? (ctor-unnamed-literal-class2/symbol))))
+
 ;;;; success

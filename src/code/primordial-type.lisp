@@ -17,6 +17,8 @@
 (defvar *empty-type*)
 (defvar *universal-type*)
 (defvar *universal-fun-type*)
+(defvar *instance-type*)
+(defvar *funcallable-instance-type*)
 
 ;;; a vector that maps type codes to layouts, used for quickly finding
 ;;; the layouts of built-in classes
