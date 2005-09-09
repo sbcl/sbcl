@@ -339,36 +339,23 @@
             (:constructor |STRUCTURE-OBJECT class constructor|)
             (:copier nil)))
 
-(defclass std-object (slot-object) ()
-  (:metaclass std-class))
-
-(defclass standard-object (std-object) ())
+(defclass standard-object (slot-object) ())
 
 (defclass funcallable-standard-object (standard-object function)
   ()
   (:metaclass funcallable-standard-class))
 
 (defclass specializer (standard-object)
-  ((type
-    :initform nil
-    :reader specializer-type)))
+  ((type :initform nil :reader specializer-type)))
 
-(defclass definition-source-mixin (std-object)
-  ((source
-    :initform *load-pathname*
-    :reader definition-source
-    :initarg :definition-source))
-  (:metaclass std-class))
+(defclass definition-source-mixin (standard-object)
+  ((source :initform *load-pathname* :reader definition-source
+           :initarg :definition-source)))
 
-(defclass plist-mixin (std-object)
-  ((plist
-    :initform ()
-    :accessor object-plist))
-  (:metaclass std-class))
+(defclass plist-mixin (standard-object)
+  ((plist :initform () :accessor object-plist)))
 
-(defclass dependent-update-mixin (plist-mixin)
-  ()
-  (:metaclass std-class))
+(defclass dependent-update-mixin (plist-mixin) ())
 
 ;;; The class CLASS is a specified basic class. It is the common
 ;;; superclass of any kind of class. That is, any class that can be a

@@ -113,7 +113,6 @@
 
 (defun !bootstrap-meta-braid ()
   (let* ((*create-classes-from-internal-structure-definitions-p* nil)
-         std-class-wrapper std-class
          standard-class-wrapper standard-class
          funcallable-standard-class-wrapper funcallable-standard-class
          slot-class-wrapper slot-class
@@ -128,7 +127,7 @@
          standard-generic-function-wrapper standard-generic-function)
     (!initial-classes-and-wrappers
      standard-class funcallable-standard-class
-     slot-class built-in-class structure-class condition-class std-class
+     slot-class built-in-class structure-class condition-class
      standard-direct-slot-definition standard-effective-slot-definition
      class-eq-specializer standard-generic-function)
     ;; First, make a class metaobject for each of the early classes. For
@@ -139,7 +138,6 @@
              (meta (ecd-metaclass definition))
              (wrapper (ecase meta
                         (slot-class slot-class-wrapper)
-                        (std-class std-class-wrapper)
                         (standard-class standard-class-wrapper)
                         (funcallable-standard-class
                          funcallable-standard-class-wrapper)
@@ -163,8 +161,6 @@
             (let* ((class (find-class name))
                    (wrapper (cond ((eq class slot-class)
                                    slot-class-wrapper)
-                                  ((eq class std-class)
-                                   std-class-wrapper)
                                   ((eq class standard-class)
                                    standard-class-wrapper)
                                   ((eq class funcallable-standard-class)
@@ -214,7 +210,7 @@
                      standard-effective-slot-definition-wrapper t))
 
               (case meta
-                ((std-class standard-class funcallable-standard-class)
+                ((standard-class funcallable-standard-class)
                  (!bootstrap-initialize-class
                   meta
                   class name class-eq-specializer-wrapper source
@@ -302,7 +298,7 @@
                        `(default-initargs ,default-initargs))))
     (when (memq metaclass-name '(standard-class funcallable-standard-class
                                  structure-class condition-class
-                                 slot-class std-class))
+                                 slot-class))
       (set-slot 'direct-slots direct-slots)
       (set-slot 'slots slots))
 

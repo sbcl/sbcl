@@ -150,7 +150,7 @@
   (clos-slots-ref (fsc-instance-slots instance) location))
 
 (defmethod slot-value-using-class ((class std-class)
-                                   (object std-object)
+                                   (object standard-object)
                                    (slotd standard-effective-slot-definition))
   (check-obsolete-instance object)
   (let* ((location (slot-definition-location slotd))
@@ -176,7 +176,7 @@
 
 (defmethod (setf slot-value-using-class)
            (new-value (class std-class)
-                      (object std-object)
+                      (object standard-object)
                       (slotd standard-effective-slot-definition))
   (check-obsolete-instance object)
   (let ((location (slot-definition-location slotd)))
@@ -198,7 +198,7 @@
 
 (defmethod slot-boundp-using-class
            ((class std-class)
-            (object std-object)
+            (object standard-object)
             (slotd standard-effective-slot-definition))
   (check-obsolete-instance object)
   (let* ((location (slot-definition-location slotd))
@@ -222,7 +222,7 @@
 
 (defmethod slot-makunbound-using-class
            ((class std-class)
-            (object std-object)
+            (object standard-object)
             (slotd standard-effective-slot-definition))
   (check-obsolete-instance object)
   (let ((location (slot-definition-location slotd)))

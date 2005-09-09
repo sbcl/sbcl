@@ -68,9 +68,8 @@
   (apply #'shared-initialize instance nil initargs)
   instance)
 
-(defmethod update-instance-for-different-class ((previous std-object)
-                                                (current std-object)
-                                                &rest initargs)
+(defmethod update-instance-for-different-class
+    ((previous standard-object) (current standard-object) &rest initargs)
   ;; First we must compute the newly added slots. The spec defines
   ;; newly added slots as "those local slots for which no slot of
   ;; the same name exists in the previous class."
@@ -88,11 +87,9 @@
            (list* 'shared-initialize current added-slots initargs)))
     (apply #'shared-initialize current added-slots initargs)))
 
-(defmethod update-instance-for-redefined-class ((instance std-object)
-                                                added-slots
-                                                discarded-slots
-                                                property-list
-                                                &rest initargs)
+(defmethod update-instance-for-redefined-class
+    ((instance standard-object) added-slots discarded-slots property-list
+     &rest initargs)
   (check-initargs-1
    (class-of instance) initargs
    (list (list* 'update-instance-for-redefined-class

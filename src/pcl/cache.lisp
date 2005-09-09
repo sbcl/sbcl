@@ -557,7 +557,6 @@
 ;;;  STRUCTURE-CLASS  seen only structure classes
 (defun raise-metatype (metatype new-specializer)
   (let ((slot      (find-class 'slot-class))
-        (std       (find-class 'std-class))
         (standard  (find-class 'standard-class))
         (fsc       (find-class 'funcallable-standard-class))
         (condition (find-class 'condition-class))
@@ -570,7 +569,6 @@
                          (class-of x))))
                (cond
                  ((eq x *the-class-t*) t)
-                 ((*subtypep meta-specializer std) 'standard-instance)
                  ((*subtypep meta-specializer standard) 'standard-instance)
                  ((*subtypep meta-specializer fsc) 'standard-instance)
                  ((*subtypep meta-specializer condition) 'condition-instance)

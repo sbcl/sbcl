@@ -371,7 +371,6 @@
                                                    'fundamental-stream))
                     (mapcar #'find-class '(fundamental-stream
                                            standard-object
-                                           sb-pcl::std-object
                                            sb-pcl::slot-object
                                            stream
                                            t))))
@@ -379,7 +378,6 @@
                                                    'fundamental-stream))
                     (mapcar #'find-class '(fundamental-stream
                                            standard-object
-                                           sb-pcl::std-object
                                            sb-pcl::slot-object stream
                                            t))))
      (assert (subtypep (find-class 'stream) (find-class t)))

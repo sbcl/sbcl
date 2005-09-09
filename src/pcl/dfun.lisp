@@ -1261,7 +1261,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                       (if (consp meth)
                           (and (early-method-standard-accessor-p meth)
                                (early-method-standard-accessor-slot-name meth))
-                          (and (member *the-class-std-object*
+                          (and (member *the-class-standard-object*
                                        (if early-p
                                            (early-class-precedence-list
                                             accessor-class)
@@ -1311,7 +1311,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                             (early-class-precedence-list specl)
                             (and (class-finalized-p specl)
                                  (class-precedence-list specl))))
-             (so-p (member *the-class-std-object* specl-cpl))
+             (so-p (member *the-class-standard-object* specl-cpl))
              (slot-name (if (consp method)
                             (and (early-method-standard-accessor-p method)
                                  (early-method-standard-accessor-slot-name
@@ -1326,7 +1326,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                                   (class-precedence-list class))))
                      (when (memq specl cpl)
                        (unless (and (or so-p
-                                        (member *the-class-std-object* cpl))
+                                        (member *the-class-standard-object*
+                                                cpl))
                                     (or early-p
                                         (slot-accessor-std-p slotd type)))
                          (return-from make-accessor-table nil))

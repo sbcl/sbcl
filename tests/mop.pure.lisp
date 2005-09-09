@@ -21,5 +21,5 @@
               (sb-mop:class-direct-subclasses (find-class 'standard-object))))
 
 (assert (find (find-class 'standard-object)
-              (sb-mop:class-direct-superclasses 
+              (sb-mop:class-direct-superclasses
                (find-class 'sb-mop:funcallable-standard-object))))

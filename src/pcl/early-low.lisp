@@ -88,7 +88,6 @@
 
                   *the-class-slot-object*
                   *the-class-structure-object*
-                  *the-class-std-object*
                   *the-class-standard-object*
                   *the-class-funcallable-standard-object*
                   *the-class-class*

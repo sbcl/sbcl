@@ -39,11 +39,11 @@
 
 (deftransform sb-pcl::pcl-instance-p ((object))
   (let* ((otype (lvar-type object))
-         (std-obj (specifier-type 'sb-pcl::std-object)))
+         (standard-object (specifier-type 'standard-object)))
     (cond
       ;; Flush tests whose result is known at compile time.
-      ((csubtypep otype std-obj) t)
-      ((not (types-equal-or-intersect otype std-obj)) nil)
+      ((csubtypep otype standard-object) t)
+      ((not (types-equal-or-intersect otype standard-object)) nil)
       (t
        `(typep (layout-of object) 'sb-pcl::wrapper)))))
 

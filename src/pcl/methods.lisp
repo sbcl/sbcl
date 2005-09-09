@@ -909,7 +909,7 @@
                      (eq (pop specls) *the-class-t*))
                  (every #'classp specls))
         (cond ((and (eq (class-name (car specls)) 'std-class)
-                    (eq (class-name (cadr specls)) 'std-object)
+                    (eq (class-name (cadr specls)) 'standard-object)
                     (eq (class-name (caddr specls))
                         'standard-effective-slot-definition))
                (set-standard-svuc-method type method))
@@ -930,7 +930,6 @@
              precompute-p
              (not (or (eq spec *the-class-t*)
                       (eq spec *the-class-slot-object*)
-                      (eq spec *the-class-std-object*)
                       (eq spec *the-class-standard-object*)
                       (eq spec *the-class-structure-object*)))
              (let ((sc (class-direct-subclasses spec)))
@@ -994,19 +993,16 @@
       cache)))
 
 (defmacro class-test (arg class)
-  (cond ((eq class *the-class-t*)
-         t)
-        ((eq class *the-class-slot-object*)
-         `(not (typep (classoid-of ,arg)
-                      'built-in-classoid)))
-        ((eq class *the-class-std-object*)
-         `(or (std-instance-p ,arg) (fsc-instance-p ,arg)))
-        ((eq class *the-class-standard-object*)
-         `(std-instance-p ,arg))
-        ((eq class *the-class-funcallable-standard-object*)
-         `(fsc-instance-p ,arg))
-        (t
-         `(typep ,arg ',(class-name class)))))
+  (cond
+    ((eq class *the-class-t*) t)
+    ((eq class *the-class-slot-object*)
+     `(not (typep (classoid-of ,arg) 'built-in-classoid)))
+    ((eq class *the-class-standard-object*)
+     `(or (std-instance-p ,arg) (fsc-instance-p ,arg)))
+    ((eq class *the-class-funcallable-standard-object*)
+     `(fsc-instance-p ,arg))
+    (t
+     `(typep ,arg ',(class-name class)))))
 
 (defmacro class-eq-test (arg class)
   `(eq (class-of ,arg) ',class))

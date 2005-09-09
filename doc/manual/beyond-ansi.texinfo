@@ -50,12 +50,6 @@ the abstract @code{metaobject} class is not present in the class
 hierarchy;
   
 @item
-@tindex standard-object
-@tindex funcallable-standard-object
-the @code{standard-object} and @code{funcallable-standard-object}
-classes are disjoint;
-  
-@item
 @findex compute-effective-method
 @findex sb-mop:compute-effective-method
 @code{compute-effective-method} only returns one value, not two;
