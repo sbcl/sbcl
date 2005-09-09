@@ -179,7 +179,7 @@ regs_cmd(char **ptr)
     printf("CSP\t=\t0x%08lX\n", (unsigned long)current_control_stack_pointer);
     printf("FP\t=\t0x%08lX\n", (unsigned long)current_control_frame_pointer);
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-    printf("BSP\t=\t0x%08X\n", (unsigned long)current_binding_stack_pointer);
+    printf("BSP\t=\t0x%08lX\n", (unsigned long)current_binding_stack_pointer);
 #endif
 #if 0
 #if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
@@ -392,20 +392,18 @@ catchers_cmd(char **ptr)
         printf("There are no active catchers!\n");
     else {
         while (catch != NULL) {
-#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-            printf("0x%08lX:\n\tuwp: 0x%08lX\n\tfp: 0x%08lX\n\tcode: 0x%08lx\n\tentry: 0x%08lx\n\ttag: ",
-                   (unsigned long)catch, (unsigned long)(catch->current_uwp),
+            printf("0x%08lX:\n\tuwp: 0x%08lX\n\tfp: 0x%08lX\n\t"
+                   "code: 0x%08lX\n\tentry: 0x%08lX\n\ttag: ",
+                   (unsigned long)catch,
+                   (unsigned long)(catch->current_uwp),
                    (unsigned long)(catch->current_cont),
-                   catch->current_code,
-                   catch->entry_pc);
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+                   (unsigned long)component_ptr_from_pc((void*)catch->entry_pc)
+                       + OTHER_POINTER_LOWTAG,
 #else
-            printf("0x%08lX:\n\tuwp: 0x%08lX\n\tfp: 0x%08lX\n\tcode: 0x%08lx\n\tentry: 0x%08lx\n\ttag: ",
-                   (unsigned long)catch, (unsigned long)(catch->current_uwp),
-                   (unsigned long)(catch->current_cont),
-                   (unsigned long)component_ptr_from_pc((void*)catch->entry_pc) +
-                   OTHER_POINTER_LOWTAG,
-                   (unsigned long)catch->entry_pc);
+                   (unsigned long)(catch->current_code),
 #endif
+                   (unsigned long)(catch->entry_pc));
             brief_print((lispobj)catch->tag);
             catch = catch->previous_catch;
         }

@@ -20,6 +20,7 @@
 #include "runtime.h"
 #include "os.h"
 #include "globals.h"
+#include "interr.h"
 #include "validate.h"
 
 static void

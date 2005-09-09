@@ -1491,7 +1491,7 @@ trans_weak_pointer(lispobj object)
 
     gc_assert(widetag_of(wp->header)==WEAK_POINTER_WIDETAG);
     /* Push the weak pointer onto the list of weak pointers. */
-    wp->next = LOW_WORD(weak_pointers);
+    wp->next = (struct weak_pointer *)LOW_WORD(weak_pointers);
     weak_pointers = wp;
 #endif
     return copy;

@@ -180,8 +180,10 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
     /* Build a fake stack frame or frames */
 
     current_control_frame_pointer =
-        (lispobj *)(*os_context_register_addr(context, reg_CSP));
-    if ((lispobj *)(*os_context_register_addr(context, reg_CFP))
+        (lispobj *)(unsigned long)
+            (*os_context_register_addr(context, reg_CSP));
+    if ((lispobj *)(unsigned long)
+            (*os_context_register_addr(context, reg_CFP))
         == current_control_frame_pointer) {
         /* There is a small window during call where the callee's
          * frame isn't built yet. */
@@ -233,7 +235,8 @@ fake_foreign_function_call(os_context_t *context)
     /* Get current Lisp state from context. */
 #ifdef reg_ALLOC
     dynamic_space_free_pointer =
-        (lispobj *)(*os_context_register_addr(context, reg_ALLOC));
+        (lispobj *)(unsigned long)
+            (*os_context_register_addr(context, reg_ALLOC));
 #if defined(LISP_FEATURE_ALPHA)
     if ((long)dynamic_space_free_pointer & 1) {
         lose("dead in fake_foreign_function_call, context = %x", context);
@@ -242,7 +245,8 @@ fake_foreign_function_call(os_context_t *context)
 #endif
 #ifdef reg_BSP
     current_binding_stack_pointer =
-        (lispobj *)(*os_context_register_addr(context, reg_BSP));
+        (lispobj *)(unsigned long)
+            (*os_context_register_addr(context, reg_BSP));
 #endif
 
     build_fake_control_stack_frames(thread,context);
@@ -858,11 +862,12 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 #else
     /* this much of the calling convention is common to all
        non-x86 ports */
-    *os_context_pc_addr(context) = (os_context_register_t)code;
+    *os_context_pc_addr(context) = (os_context_register_t)(unsigned long)code;
     *os_context_register_addr(context,reg_NARGS) = 0;
-    *os_context_register_addr(context,reg_LIP) = (os_context_register_t)code;
+    *os_context_register_addr(context,reg_LIP) =
+        (os_context_register_t)(unsigned long)code;
     *os_context_register_addr(context,reg_CFP) =
-        (os_context_register_t)current_control_frame_pointer;
+        (os_context_register_t)(unsigned long)current_control_frame_pointer;
 #endif
 #ifdef ARCH_HAS_NPC_REGISTER
     *os_context_npc_addr(context) =
@@ -962,8 +967,6 @@ boolean
 interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context=(os_context_t *) void_context;
-    struct thread *th=arch_os_get_current_thread();
-    struct interrupt_data *data=th->interrupt_data;
 
     if(!foreign_function_call_active && gc_trigger_hit(signal, info, context)){
         struct thread *thread=arch_os_get_current_thread();

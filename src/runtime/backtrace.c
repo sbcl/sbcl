@@ -133,15 +133,16 @@ call_info_from_context(struct call_info *info, os_context_t *context)
         /* We tried to call a function, but crapped out before $CODE could
          * be fixed up. Probably an undefined function. */
         info->frame =
-            (struct call_frame *)(*os_context_register_addr(context,
-                                                            reg_OCFP));
+            (struct call_frame *)(unsigned long)
+                (*os_context_register_addr(context, reg_OCFP));
         info->lra = (lispobj)(*os_context_register_addr(context, reg_LRA));
         info->code = code_pointer(info->lra);
         pc = (unsigned long)native_pointer(info->lra);
     }
     else {
         info->frame =
-            (struct call_frame *)(*os_context_register_addr(context, reg_CFP));
+            (struct call_frame *)(unsigned long)
+                (*os_context_register_addr(context, reg_CFP));
         info->code =
             code_pointer(*os_context_register_addr(context, reg_CODE));
         info->lra = NIL;
@@ -184,8 +185,8 @@ previous_info(struct call_info *info)
         while (free-- > 0) {
             os_context_t *context =
                 thread->interrupt_contexts[free];
-            if ((struct call_frame *)(*os_context_register_addr(context,
-                                                                reg_CFP))
+            if ((struct call_frame *)(unsigned long)
+                    (*os_context_register_addr(context, reg_CFP))
                 == info->frame) {
                 call_info_from_context(info, context);
                 break;
