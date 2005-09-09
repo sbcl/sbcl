@@ -16,7 +16,7 @@
 ;;;; no regressions.
 
 (defpackage "MOP-TEST"
-  (:use "CL" "SB-MOP"))
+  (:use "CL" "SB-MOP" "ASSERTOID"))
 
 (in-package "MOP-TEST")
 
@@ -429,4 +429,37 @@
   (:metaclass custom-default-initargs-class))
 (assert (eq (slot-value (make-instance 'extra-initarg) 'slot) 'extra))
 
+;;; STANDARD-CLASS valid as a superclass for FUNCALLABLE-STANDARD-CLASS
+(defclass standard-class-for-fsc ()
+  ((scforfsc-slot :initarg :scforfsc-slot :accessor scforfsc-slot)))
+(defvar *standard-class-for-fsc*
+  (make-instance 'standard-class-for-fsc :scforfsc-slot 1))
+(defclass fsc-with-standard-class-superclass 
+    (standard-class-for-fsc funcallable-standard-object)
+  ((fsc-slot :initarg :fsc-slot :accessor fsc-slot))
+  (:metaclass funcallable-standard-class))
+(defvar *fsc/scs*
+  (make-instance 'fsc-with-standard-class-superclass
+                 :scforfsc-slot 2
+                 :fsc-slot 3))
+(assert (= (scforfsc-slot *standard-class-for-fsc*) 1))
+(assert (= (scforfsc-slot *fsc/scs*) 2))
+(assert (= (fsc-slot *fsc/scs*) 3))
+(assert (subtypep 'fsc-with-standard-class-superclass 'function))
+(assert (not (subtypep 'standard-class-for-fsc 'function)))
+
+;;; also check that our sanity check for functionness is good
+(assert (raises-error?
+         (progn
+           (defclass bad-standard-class (funcallable-standard-object)
+             ()
+             (:metaclass standard-class))
+           (make-instance 'bad-standard-class))))
+(assert (raises-error?
+         (progn
+           (defclass bad-funcallable-standard-class (standard-object)
+             ()
+             (:metaclass funcallable-standard-class))
+           (make-instance 'bad-funcallable-standard-class))))
+
 ;;;; success

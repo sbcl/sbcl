@@ -383,7 +383,7 @@
 
 (defgeneric update-gf-dfun (class gf))
 
-(defgeneric validate-superclass (fsc class))
+(defgeneric validate-superclass (class superclass))
 
 (defgeneric (setf documentation) (new-value slotd doc-type)
   (:argument-precedence-order doc-type slotd new-value))

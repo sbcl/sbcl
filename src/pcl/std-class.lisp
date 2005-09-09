@@ -123,7 +123,7 @@
 
 (defmethod class-prototype :before (class)
   (unless (class-finalized-p class)
-    (error "~S not yet finalized, cannot allocate a prototype." class)))
+    (error "~@<~S is not finalized.~:@>" class)))
 
 ;;; KLUDGE: For some reason factoring the common body into a function
 ;;; breaks PCL bootstrapping, so just generate it with a macrolet for
@@ -382,10 +382,10 @@
                              *the-class-standard-object*))))
          (dolist (superclass direct-superclasses)
            (unless (validate-superclass class superclass)
-             (error "The class ~S was specified as a~%
-                     super-class of the class ~S;~%~
-                     but the meta-classes ~S and~%~S are incompatible.~@
-                     Define a method for ~S to avoid this error."
+             (error "~@<The class ~S was specified as a ~
+                     super-class of the class ~S, ~
+                     but the meta-classes ~S and ~S are incompatible.  ~
+                     Define a method for ~S to avoid this error.~@:>"
                      superclass class (class-of superclass) (class-of class)
                      'validate-superclass)))
          (setf (slot-value class 'direct-superclasses) direct-superclasses))
@@ -818,9 +818,32 @@
      (update-initargs class (compute-default-initargs class))
      (update-ctors 'finalize-inheritance :class class))
    (unless finalizep
-     (dolist (sub (class-direct-subclasses class)) (update-class sub nil)))))
+     (dolist (sub (class-direct-subclasses class)) 
+       (update-class sub nil)))))
+
+(define-condition cpl-protocol-violation (reference-condition error)
+  ((class :initarg :class :reader cpl-protocol-violation-class)
+   (cpl :initarg :cpl :reader cpl-protocol-violation-cpl))
+  (:default-initargs :references (list '(:sbcl :node "Metaobject Protocol")))
+  (:report
+   (lambda (c s)
+     (format s "~@<Protocol violation: the ~S class ~S ~
+                ~:[has~;does not have~] the class ~S in its ~
+                class precedence list: ~S.~@:>"
+             (class-name (class-of (cpl-protocol-violation-class c)))
+             (cpl-protocol-violation-class c)
+             (eq (class-of (cpl-protocol-violation-class c))
+                 *the-class-funcallable-standard-class*)
+             (find-class 'function)
+             (cpl-protocol-violation-cpl c)))))
 
 (defun update-cpl (class cpl)
+  (when (eq (class-of class) *the-class-standard-class*)
+    (when (find (find-class 'function) cpl)
+      (error 'cpl-protocol-violation :class class :cpl cpl)))
+  (when (eq (class-of class) *the-class-funcallable-standard-class*)
+    (unless (find (find-class 'function) cpl)
+      (error 'cpl-protocol-violation :class class :cpl cpl)))
   (if (class-finalized-p class)
       (unless (and (equal (class-precedence-list class) cpl)
                    (dolist (c cpl t)
@@ -1218,14 +1241,13 @@
 (defmethod compatible-meta-class-change-p (class proto-new-class)
   (eq (class-of class) (class-of proto-new-class)))
 
-(defmethod validate-superclass ((class class) (new-super class))
-  (or (eq new-super *the-class-t*)
-      (eq (class-of class) (class-of new-super))))
-
-(defmethod validate-superclass ((class standard-class) (new-super std-class))
-  (let ((new-super-meta-class (class-of new-super)))
-    (or (eq new-super-meta-class *the-class-std-class*)
-        (eq (class-of class) new-super-meta-class))))
+(defmethod validate-superclass ((class class) (superclass class))
+  (or (eq superclass *the-class-t*)
+      (eq (class-of class) (class-of superclass))
+      (and (eq (class-of superclass) *the-class-standard-class*)
+           (eq (class-of class) *the-class-funcallable-standard-class*))
+      (and (eq (class-of superclass) *the-class-funcallable-standard-class*)
+           (eq (class-of class) *the-class-standard-class*))))
 
 ;;; What this does depends on which of the four possible values of
 ;;; LAYOUT-INVALID the PCL wrapper has; the simplest case is when it

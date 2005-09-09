@@ -42,12 +42,6 @@
 (defmethod raw-instance-allocator ((class funcallable-standard-class))
   'allocate-funcallable-instance)
 
-(defmethod validate-superclass ((fsc funcallable-standard-class)
-                                (new-super std-class))
-  (let ((new-super-meta-class (class-of new-super)))
-    (or (eq new-super-meta-class *the-class-std-class*)
-        (eq (class-of fsc) new-super-meta-class))))
-
 (defmethod allocate-instance
            ((class funcallable-standard-class) &rest initargs)
   (declare (ignore initargs))
