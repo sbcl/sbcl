@@ -45,11 +45,6 @@ are:
 @itemize
   
 @item
-@tindex metaobject
-the abstract @code{metaobject} class is not present in the class
-hierarchy;
-  
-@item
 @findex compute-effective-method
 @findex sb-mop:compute-effective-method
 @code{compute-effective-method} only returns one value, not two;

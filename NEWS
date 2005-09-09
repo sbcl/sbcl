@@ -30,6 +30,12 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     consistent, even on internal alternate-metaclass objects.
   * bug fix: SB-MOP:FUNCALLABLE-STANDARD-OBJECT is now a subclass of
     STANDARD-OBJECT, as required by AMOP.
+  * bug fix: the classes STANDARD-CLASS and
+    SB-MOP:FUNCALLABLE-STANDARD-CLASS are now compatible in the
+    SB-MOP:VALIDATE-SUPERCLASS sense; there remains a constraint about
+    finalized classes and the FUNCTION class.
+  * bug fix: the SB-MOP:METAOBJECT class is now implemented as
+    specified by AMOP.
   * threads
     ** bug fix: parent thread now can be gc'ed even with a live
        child thread

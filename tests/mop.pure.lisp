@@ -23,3 +23,10 @@
 (assert (find (find-class 'standard-object)
               (sb-mop:class-direct-superclasses
                (find-class 'sb-mop:funcallable-standard-object))))
+
+(dolist (name '(sb-mop:generic-function
+                sb-mop:method sb-mop:method-combination
+                sb-mop:slot-definition sb-mop:specializer))
+  (assert (find (find-class 'sb-mop:metaobject)
+                (sb-mop:class-direct-superclasses (find-class name))))
+  (assert (subtypep name 'sb-mop:metaobject)))

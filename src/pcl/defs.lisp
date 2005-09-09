@@ -345,150 +345,130 @@
   ()
   (:metaclass funcallable-standard-class))
 
-(defclass specializer (standard-object)
-  ((type :initform nil :reader specializer-type)))
+(defclass metaobject (standard-object) ())
 
-(defclass definition-source-mixin (standard-object)
-  ((source :initform *load-pathname* :reader definition-source
-           :initarg :definition-source)))
-
-(defclass plist-mixin (standard-object)
-  ((plist :initform () :accessor object-plist)))
-
-(defclass dependent-update-mixin (plist-mixin) ())
-
-;;; The class CLASS is a specified basic class. It is the common
-;;; superclass of any kind of class. That is, any class that can be a
-;;; metaclass must have the class CLASS in its class precedence list.
-(defclass class (dependent-update-mixin
-                 definition-source-mixin
-                 specializer)
-  ((name
-    :initform nil
-    :initarg  :name
-    :accessor class-name)
-   (class-eq-specializer
-    :initform nil
-    :reader class-eq-specializer)
-   (direct-superclasses
-    :initform ()
-    :reader class-direct-superclasses)
-   ;; Note: The (CLASS-)DIRECT-SUBCLASSES for STRUCTURE-CLASSes and
-   ;; CONDITION-CLASSes are lazily computed whenever the subclass info
-   ;; becomes available, i.e. when the PCL class is created.
-   (direct-subclasses
-    :initform ()
-    :reader class-direct-subclasses)
-   (direct-methods
-    :initform (cons nil nil))
-   (predicate-name
-    :initform nil
-    :reader class-predicate-name)
-   (documentation
+(defclass generic-function (dependent-update-mixin
+                            definition-source-mixin
+                            metaobject
+                            funcallable-standard-object)
+  ((documentation
     :initform nil
     :initarg :documentation)
-   (finalized-p
-    :initform nil
-    :reader class-finalized-p)))
-
-(def!method make-load-form ((class class) &optional env)
-  ;; FIXME: should we not instead pass ENV to FIND-CLASS?  Probably
-  ;; doesn't matter while all our environments are the same...
-  (declare (ignore env))
-  (let ((name (class-name class)))
-    (unless (and name (eq (find-class name nil) class))
-      (error "~@<Can't use anonymous or undefined class as constant: ~S~:@>"
-             class))
-    `(find-class ',name)))
-
-;;; The class PCL-CLASS is an implementation-specific common
-;;; superclass of all specified subclasses of the class CLASS.
-(defclass pcl-class (class)
-  ((class-precedence-list
-    :reader class-precedence-list)
-   ;; KLUDGE: see note in CPL-OR-NIL
-   (cpl-available-p
-    :reader cpl-available-p
-    :initform nil)
-   (can-precede-list
+   ;; We need to make a distinction between the methods initially set
+   ;; up by :METHOD options to DEFGENERIC and the ones set up later by
+   ;; DEFMETHOD, because ANSI specifies that executing DEFGENERIC on
+   ;; an already-DEFGENERICed function clears the methods set by the
+   ;; previous DEFGENERIC, but not methods set by DEFMETHOD. (Making
+   ;; this distinction seems a little kludgy, but it has the positive
+   ;; effect of making it so that loading a file a.lisp containing
+   ;; DEFGENERIC, then loading a second file b.lisp containing
+   ;; DEFMETHOD, then modifying and reloading a.lisp and/or b.lisp
+   ;; tends to leave the generic function in a state consistent with
+   ;; the most-recently-loaded state of a.lisp and b.lisp.)
+   (initial-methods
     :initform ()
-    :reader class-can-precede-list)
-   (incompatible-superclass-list
-    :initform ()
-    :accessor class-incompatible-superclass-list)
-   (wrapper
+    :accessor generic-function-initial-methods))
+  (:metaclass funcallable-standard-class))
+
+(defclass standard-generic-function (generic-function)
+  ((name
     :initform nil
-    :reader class-wrapper)
-   (prototype
-    :initform nil
-    :reader class-prototype)))
-
-(defclass slot-class (pcl-class)
-  ((direct-slots
+    :initarg :name
+    :accessor generic-function-name)
+   (methods
     :initform ()
-    :accessor class-direct-slots)
-   (slots
+    :accessor generic-function-methods
+    :type list)
+   (method-class
+    :initarg :method-class
+    :accessor generic-function-method-class)
+   (method-combination
+    :initarg :method-combination
+    :accessor generic-function-method-combination)
+   (declarations
+    ;; KLUDGE: AMOP specifies :DECLARATIONS, while ANSI specifies
+    ;; :DECLARE.  Allow either (but FIXME: maybe a note or a warning
+    ;; might be appropriate).
+    :initarg :declarations
+    :initarg :declare
     :initform ()
-    :accessor class-slots)))
+    :accessor generic-function-declarations)
+   (arg-info
+    :initform (make-arg-info)
+    :reader gf-arg-info)
+   (dfun-state
+    :initform ()
+    :accessor gf-dfun-state))
+  (:metaclass funcallable-standard-class)
+  (:default-initargs :method-class *the-class-standard-method*
+                     :method-combination *standard-method-combination*))
 
-;;; The class STD-CLASS is an implementation-specific common
-;;; superclass of the classes STANDARD-CLASS and
-;;; FUNCALLABLE-STANDARD-CLASS.
-(defclass std-class (slot-class)
-  ())
+(defclass method (metaobject) ())
 
-(defclass standard-class (std-class)
-  ())
-
-(defclass funcallable-standard-class (std-class)
-  ())
-
-(defclass forward-referenced-class (pcl-class) ())
-
-(defclass built-in-class (pcl-class) ())
-
-(defclass condition-class (slot-class) ())
-
-(defclass structure-class (slot-class)
-  ((defstruct-form
-     :initform ()
-     :accessor class-defstruct-form)
-   (defstruct-constructor
-     :initform nil
-     :accessor class-defstruct-constructor)
-   (from-defclass-p
+(defclass standard-method (definition-source-mixin plist-mixin method)
+  ((generic-function
     :initform nil
-    :initarg :from-defclass-p)))
+    :accessor method-generic-function)
+;;;     (qualifiers
+;;;     :initform ()
+;;;     :initarg  :qualifiers
+;;;     :reader method-qualifiers)
+   (specializers
+    :initform ()
+    :initarg  :specializers
+    :reader method-specializers)
+   (lambda-list
+    :initform ()
+    :initarg  :lambda-list
+    :reader method-lambda-list)
+   (function
+    :initform nil
+    :initarg :function)                 ;no writer
+   (fast-function
+    :initform nil
+    :initarg :fast-function             ;no writer
+    :reader method-fast-function)
+   (documentation
+    :initform nil
+    :initarg :documentation)))
 
-(defclass specializer-with-object (specializer) ())
+(defclass standard-accessor-method (standard-method)
+  ((slot-name :initform nil
+              :initarg :slot-name
+              :reader accessor-method-slot-name)
+   (slot-definition :initform nil
+                    :initarg :slot-definition
+                    :reader accessor-method-slot-definition)))
 
-(defclass exact-class-specializer (specializer) ())
+(defclass standard-reader-method (standard-accessor-method) ())
+(defclass standard-writer-method (standard-accessor-method) ())
+;;; an extension, apparently.
+(defclass standard-boundp-method (standard-accessor-method) ())
 
-(defclass class-eq-specializer (exact-class-specializer
-                                specializer-with-object)
-  ((object :initarg :class
-           :reader specializer-class
-           :reader specializer-object)))
+(defclass method-combination (metaobject)
+  ((documentation
+    :reader method-combination-documentation
+    :initform nil
+    :initarg :documentation)))
 
-(defclass class-prototype-specializer (specializer-with-object)
-  ((object :initarg :class
-           :reader specializer-class
-           :reader specializer-object)))
+(defclass standard-method-combination (definition-source-mixin
+                                       method-combination)
+  ((type
+    :reader method-combination-type
+    :initarg :type)
+   (options
+    :reader method-combination-options
+    :initarg :options)))
 
-(defclass eql-specializer (exact-class-specializer specializer-with-object)
-  ((object :initarg :object :reader specializer-object
-           :reader eql-specializer-object)))
+(defclass long-method-combination (standard-method-combination)
+  ((function
+    :initarg :function
+    :reader long-method-combination-function)
+   (args-lambda-list
+    :initarg :args-lambda-list
+    :reader long-method-combination-args-lambda-list)))
 
-(defvar *eql-specializer-table* (make-hash-table :test 'eql))
-
-(defun intern-eql-specializer (object)
-  (or (gethash object *eql-specializer-table*)
-      (setf (gethash object *eql-specializer-table*)
-            (make-instance 'eql-specializer :object object))))
-
-;;;; slot definitions
-
-(defclass slot-definition (standard-object)
+(defclass slot-definition (metaobject)
   ((name
     :initform nil
     :initarg :name
@@ -598,126 +578,143 @@
                                                effective-slot-definition)
   ())
 
-(defclass method (standard-object) ())
+(defclass specializer (metaobject)
+  ((type :initform nil :reader specializer-type)))
 
-(defclass standard-method (definition-source-mixin plist-mixin method)
-  ((generic-function
-    :initform nil
-    :accessor method-generic-function)
-;;;     (qualifiers
-;;;     :initform ()
-;;;     :initarg  :qualifiers
-;;;     :reader method-qualifiers)
-   (specializers
-    :initform ()
-    :initarg  :specializers
-    :reader method-specializers)
-   (lambda-list
-    :initform ()
-    :initarg  :lambda-list
-    :reader method-lambda-list)
-   (function
-    :initform nil
-    :initarg :function)                 ;no writer
-   (fast-function
-    :initform nil
-    :initarg :fast-function             ;no writer
-    :reader method-fast-function)
-   (documentation
-    :initform nil
-    :initarg :documentation)))
+(defclass specializer-with-object (specializer) ())
 
-(defclass standard-accessor-method (standard-method)
-  ((slot-name :initform nil
-              :initarg :slot-name
-              :reader accessor-method-slot-name)
-   (slot-definition :initform nil
-                    :initarg :slot-definition
-                    :reader accessor-method-slot-definition)))
+(defclass exact-class-specializer (specializer) ())
 
-(defclass standard-reader-method (standard-accessor-method) ())
+(defclass class-eq-specializer (exact-class-specializer
+                                specializer-with-object)
+  ((object :initarg :class
+           :reader specializer-class
+           :reader specializer-object)))
 
-(defclass standard-writer-method (standard-accessor-method) ())
+(defclass class-prototype-specializer (specializer-with-object)
+  ((object :initarg :class
+           :reader specializer-class
+           :reader specializer-object)))
 
-(defclass standard-boundp-method (standard-accessor-method) ())
+(defclass eql-specializer (exact-class-specializer specializer-with-object)
+  ((object :initarg :object :reader specializer-object
+           :reader eql-specializer-object)))
 
-(defclass generic-function (dependent-update-mixin
-                            definition-source-mixin
-                            funcallable-standard-object)
-  ((documentation
-    :initform nil
-    :initarg :documentation)
-   ;; We need to make a distinction between the methods initially set
-   ;; up by :METHOD options to DEFGENERIC and the ones set up later by
-   ;; DEFMETHOD, because ANSI specifies that executing DEFGENERIC on
-   ;; an already-DEFGENERICed function clears the methods set by the
-   ;; previous DEFGENERIC, but not methods set by DEFMETHOD. (Making
-   ;; this distinction seems a little kludgy, but it has the positive
-   ;; effect of making it so that loading a file a.lisp containing
-   ;; DEFGENERIC, then loading a second file b.lisp containing
-   ;; DEFMETHOD, then modifying and reloading a.lisp and/or b.lisp
-   ;; tends to leave the generic function in a state consistent with
-   ;; the most-recently-loaded state of a.lisp and b.lisp.)
-   (initial-methods
-    :initform ()
-    :accessor generic-function-initial-methods))
-  (:metaclass funcallable-standard-class))
+(defvar *eql-specializer-table* (make-hash-table :test 'eql))
 
-(defclass standard-generic-function (generic-function)
+(defun intern-eql-specializer (object)
+  (or (gethash object *eql-specializer-table*)
+      (setf (gethash object *eql-specializer-table*)
+            (make-instance 'eql-specializer :object object))))
+
+(defclass class (dependent-update-mixin
+                 definition-source-mixin
+                 specializer)
   ((name
     :initform nil
-    :initarg :name
-    :accessor generic-function-name)
-   (methods
-    :initform ()
-    :accessor generic-function-methods
-    :type list)
-   (method-class
-    :initarg :method-class
-    :accessor generic-function-method-class)
-   (method-combination
-    :initarg :method-combination
-    :accessor generic-function-method-combination)
-   (declarations
-    ;; KLUDGE: AMOP specifies :DECLARATIONS, while ANSI specifies
-    ;; :DECLARE.  Allow either (but FIXME: maybe a note or a warning
-    ;; might be appropriate).
-    :initarg :declarations
-    :initarg :declare
-    :initform ()
-    :accessor generic-function-declarations)
-   (arg-info
-    :initform (make-arg-info)
-    :reader gf-arg-info)
-   (dfun-state
-    :initform ()
-    :accessor gf-dfun-state))
-  (:metaclass funcallable-standard-class)
-  (:default-initargs :method-class *the-class-standard-method*
-                     :method-combination *standard-method-combination*))
-
-(defclass method-combination (standard-object)
-  ((documentation
-    :reader method-combination-documentation
+    :initarg  :name
+    :accessor class-name)
+   (class-eq-specializer
     :initform nil
-    :initarg :documentation)))
+    :reader class-eq-specializer)
+   (direct-superclasses
+    :initform ()
+    :reader class-direct-superclasses)
+   ;; Note: The (CLASS-)DIRECT-SUBCLASSES for STRUCTURE-CLASSes and
+   ;; CONDITION-CLASSes are lazily computed whenever the subclass info
+   ;; becomes available, i.e. when the PCL class is created.
+   (direct-subclasses
+    :initform ()
+    :reader class-direct-subclasses)
+   (direct-methods
+    :initform (cons nil nil))
+   (predicate-name
+    :initform nil
+    :reader class-predicate-name)
+   (documentation
+    :initform nil
+    :initarg :documentation)
+   (finalized-p
+    :initform nil
+    :reader class-finalized-p)))
 
-(defclass standard-method-combination (definition-source-mixin
-                                       method-combination)
-  ((type
-    :reader method-combination-type
-    :initarg :type)
-   (options
-    :reader method-combination-options
-    :initarg :options)))
+(def!method make-load-form ((class class) &optional env)
+  ;; FIXME: should we not instead pass ENV to FIND-CLASS?  Probably
+  ;; doesn't matter while all our environments are the same...
+  (declare (ignore env))
+  (let ((name (class-name class)))
+    (unless (and name (eq (find-class name nil) class))
+      (error "~@<Can't use anonymous or undefined class as constant: ~S~:@>"
+             class))
+    `(find-class ',name)))
 
-(defclass long-method-combination (standard-method-combination)
-  ((function
-    :initarg :function
-    :reader long-method-combination-function)
-   (args-lambda-list
-    :initarg :args-lambda-list
-    :reader long-method-combination-args-lambda-list)))
+;;; The class PCL-CLASS is an implementation-specific common
+;;; superclass of all specified subclasses of the class CLASS.
+(defclass pcl-class (class)
+  ((class-precedence-list
+    :reader class-precedence-list)
+   ;; KLUDGE: see note in CPL-OR-NIL
+   (cpl-available-p
+    :reader cpl-available-p
+    :initform nil)
+   (can-precede-list
+    :initform ()
+    :reader class-can-precede-list)
+   (incompatible-superclass-list
+    :initform ()
+    :accessor class-incompatible-superclass-list)
+   (wrapper
+    :initform nil
+    :reader class-wrapper)
+   (prototype
+    :initform nil
+    :reader class-prototype)))
+
+(defclass slot-class (pcl-class)
+  ((direct-slots
+    :initform ()
+    :accessor class-direct-slots)
+   (slots
+    :initform ()
+    :accessor class-slots)))
+
+;;; The class STD-CLASS is an implementation-specific common
+;;; superclass of the classes STANDARD-CLASS and
+;;; FUNCALLABLE-STANDARD-CLASS.
+(defclass std-class (slot-class)
+  ())
+
+(defclass standard-class (std-class)
+  ())
+
+(defclass funcallable-standard-class (std-class)
+  ())
+
+(defclass forward-referenced-class (pcl-class) ())
+
+(defclass built-in-class (pcl-class) ())
+
+(defclass condition-class (slot-class) ())
+
+(defclass structure-class (slot-class)
+  ((defstruct-form
+     :initform ()
+     :accessor class-defstruct-form)
+   (defstruct-constructor
+     :initform nil
+     :accessor class-defstruct-constructor)
+   (from-defclass-p
+    :initform nil
+    :initarg :from-defclass-p)))
+
+(defclass definition-source-mixin (standard-object)
+  ((source :initform *load-pathname* :reader definition-source
+           :initarg :definition-source)))
+
+(defclass plist-mixin (standard-object)
+  ((plist :initform () :accessor object-plist)))
+
+(defclass dependent-update-mixin (plist-mixin) ())
 
 (defparameter *early-class-predicates*
   '((specializer specializerp)

@@ -434,7 +434,7 @@
   ((scforfsc-slot :initarg :scforfsc-slot :accessor scforfsc-slot)))
 (defvar *standard-class-for-fsc*
   (make-instance 'standard-class-for-fsc :scforfsc-slot 1))
-(defclass fsc-with-standard-class-superclass 
+(defclass fsc-with-standard-class-superclass
     (standard-class-for-fsc funcallable-standard-object)
   ((fsc-slot :initarg :fsc-slot :accessor fsc-slot))
   (:metaclass funcallable-standard-class))

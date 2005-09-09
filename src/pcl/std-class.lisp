@@ -818,7 +818,7 @@
      (update-initargs class (compute-default-initargs class))
      (update-ctors 'finalize-inheritance :class class))
    (unless finalizep
-     (dolist (sub (class-direct-subclasses class)) 
+     (dolist (sub (class-direct-subclasses class))
        (update-class sub nil)))))
 
 (define-condition cpl-protocol-violation (reference-condition error)
