@@ -497,42 +497,43 @@
   ;; weird roundabout way. -- WHN 2001-03-18
   (if (and (consp spec) (eq (car spec) 'quote))
       (let ((type (careful-specifier-type (cadr spec))))
-        (or (when (not type)
-              (compiler-warn "illegal type specifier for TYPEP: ~S"
-                             (cadr spec))
-              `(%typep ,object ,spec))
-            (let ((pred (cdr (assoc type *backend-type-predicates*
-                                    :test #'type=))))
-              (when pred `(,pred ,object)))
-            (typecase type
-              (hairy-type
-               (source-transform-hairy-typep object type))
-              (negation-type
-               (source-transform-negation-typep object type))
-              (union-type
-               (source-transform-union-typep object type))
-              (intersection-type
-               (source-transform-intersection-typep object type))
-              (member-type
-               `(if (member ,object ',(member-type-members type)) t))
-              (args-type
-               (compiler-warn "illegal type specifier for TYPEP: ~S"
-                              (cadr spec))
-               `(%typep ,object ,spec))
-              (t nil))
-            (typecase type
-              (numeric-type
-               (source-transform-numeric-typep object type))
-              (classoid
-               `(%instance-typep ,object ,spec))
-              (array-type
-               (source-transform-array-typep object type))
-              (cons-type
-               (source-transform-cons-typep object type))
-              (character-set-type
-               (source-transform-character-set-typep object type))
-              (t nil))
-            `(%typep ,object ,spec)))
+        (block bail
+          (or (when (not type)
+                (compiler-warn "illegal type specifier for TYPEP: ~S"
+                               (cadr spec))
+                (return-from bail (values nil t)))
+              (let ((pred (cdr (assoc type *backend-type-predicates*
+                                      :test #'type=))))
+                (when pred `(,pred ,object)))
+              (typecase type
+                (hairy-type
+                 (source-transform-hairy-typep object type))
+                (negation-type
+                 (source-transform-negation-typep object type))
+                (union-type
+                 (source-transform-union-typep object type))
+                (intersection-type
+                 (source-transform-intersection-typep object type))
+                (member-type
+                 `(if (member ,object ',(member-type-members type)) t))
+                (args-type
+                 (compiler-warn "illegal type specifier for TYPEP: ~S"
+                                (cadr spec))
+                 (return-from bail (values nil t)))
+                (t nil))
+              (typecase type
+                (numeric-type
+                 (source-transform-numeric-typep object type))
+                (classoid
+                 `(%instance-typep ,object ,spec))
+                (array-type
+                 (source-transform-array-typep object type))
+                (cons-type
+                 (source-transform-cons-typep object type))
+                (character-set-type
+                 (source-transform-character-set-typep object type))
+                (t nil))
+              `(%typep ,object ,spec))))
       (values nil t)))
 
 ;;;; coercion
