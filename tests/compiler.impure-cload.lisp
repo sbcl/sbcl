@@ -448,3 +448,45 @@
 (progv '(*hannu-trap*) '()
   (setq *hannu-trap* t))
 (assert (not *hannu-trap*))
+
+;;; bug reported on sbcl-help by vrotaru
+(let* ((initial-size (expt 2 16))
+       (prime-table (make-array initial-size
+                                :element-type 'integer))
+       (first-primes #(5 7 11 13 17 19 23 29 31 37 41 43 47 53 59 61 67 71
+       73
+                      79 83 89 97 101 103 107 109 113 127 131 137 139 149
+                      151 157 163 167 173 179 181 191 193 197 199 211 223
+                      227 229 233 239 241 251 257 263 269 271 277 281))
+       (count 0)
+       (increment 2))
+  
+  (defun largest-prime-so-far ()
+    (aref prime-table (1- count)))
+  (defun add-prime (prime)
+    (setf (aref prime-table count) prime) (incf count))
+  (defun init-table ()
+    (map 'nil #'add-prime first-primes))
+  (defun next-candidate (candidate)
+    (prog1 (+ candidate increment)
+      (ecase increment
+        (2 (setf increment 4))
+        (4 (setf increment 2)))))
+  (defun prime-p (n)
+    (let ((sqrt-n (truncate (sqrt n))))
+      (dotimes (i count)
+        (let ((prime (aref prime-table i)))
+          (when (> prime sqrt-n)
+            (return-from prime-p t))
+          (when (zerop (mod n prime))
+            (return-from prime-p nil))))
+      (error "~&prime-table too small: ~A ~A~%" n
+      (largest-prime-so-far))))
+  (defun generate-primes (required)
+    (do ((candidate (next-candidate (largest-prime-so-far))
+                    (next-candidate candidate)))
+        ((> candidate required))
+      (when (prime-p candidate)
+        (add-prime candidate))))
+  ;;
+  (init-table))

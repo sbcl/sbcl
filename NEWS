@@ -12,7 +12,7 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     non-threaded mode on non-NPTL systems, but refuse to start entirely.
   * bug fix: interrupts are disabled until startup is complete; no
     more sigsegvs when receiving a signal to soon
-  * optimization: Faster 32-bit SB-ROTATE-BYTE:ROTATE-BYTE on non-x86/ppc
+  * optimization: faster 32-bit SB-ROTATE-BYTE:ROTATE-BYTE on non-x86/ppc
     platforms
   * bug fix: add a workaround for the memory randomization features in
     Linux kernels >= 2.6.12 that interfere with SBCL's memory maps. This
@@ -36,6 +36,9 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     finalized classes and the FUNCTION class.
   * bug fix: the SB-MOP:METAOBJECT class is now implemented as
     specified by AMOP.
+  * bug fix: flush closure information collected by physical
+    environment analysis prepass before the main pass. (bug reported
+    by vrotaru)
   * threads
     ** bug fix: parent thread now can be gc'ed even with a live
        child thread

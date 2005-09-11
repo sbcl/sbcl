@@ -88,18 +88,13 @@
           res))))
 
 ;;; If FUN has no physical environment, assign one, otherwise clean up
-;;; the old physical environment, removing/flagging variables that
-;;; have no sets or refs. If a var has no references, we remove it
-;;; from the closure. We always clear the INDIRECT flag. This is
-;;; necessary because pre-analysis is done before optimization.
+;;; the old physical environment and the INDIRECT flag on LAMBDA-VARs.
+;;; This is necessary because pre-analysis is done before
+;;; optimization.
 (defun reinit-lambda-physenv (fun)
   (let ((old (lambda-physenv (lambda-home fun))))
     (cond (old
-           (setf (physenv-closure old)
-                 (delete-if (lambda (x)
-                              (and (lambda-var-p x)
-                                   (null (leaf-refs x))))
-                            (physenv-closure old)))
+           (setf (physenv-closure old) nil)
            (flet ((clear (fun)
                     (dolist (var (lambda-vars fun))
                       (setf (lambda-var-indirect var) nil))))
