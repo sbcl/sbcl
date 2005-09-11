@@ -45,52 +45,64 @@
               (ldb (byte 16 0) value)))))))
 
 
-(define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-int)
+(define-alien-routine ("os_context_pc_addr" context-pc-addr)
+    (* unsigned-long-long)
   (context (* os-context-t)))
 
 (defun context-pc (context)
   (declare (type (alien (* os-context-t)) context))
-  ;; KLUDGE: this sucks, and furthermore will break on either of (a)
-  ;; porting back to IRIX or (b) running on proper 64-bit support.
-  ;; Linux on the MIPS defines its registers in the sigcontext as
-  ;; 64-bit quantities ("unsigned long long"), presumably to be
-  ;; binary-compatible with 64-bit mode.  Since there appears not to
-  ;; be ALIEN support for 64-bit return values, we have to do the
-  ;; hacky pointer arithmetic thing.  -- CSR, 2002-09-01
-  (int-sap (deref (context-pc-addr context)
-                  #!-little-endian 1
-                  #!+little-endian 0)))
+  (int-sap (deref (context-pc-addr context))))
 
 (define-alien-routine ("os_context_register_addr" context-register-addr)
-  (* unsigned-int)
+    (* unsigned-long-long)
   (context (* os-context-t))
   (index int))
 
 (define-alien-routine ("os_context_bd_cause" context-bd-cause-int)
-    (unsigned 32)
+    unsigned-int
   (context (* os-context-t)))
 
 ;;; FIXME: Should this and CONTEXT-PC be INLINE to reduce consing?
 ;;; (Are they used in anything time-critical, or just the debugger?)
 (defun context-register (context index)
   (declare (type (alien (* os-context-t)) context))
-  (deref (context-register-addr context index)
-         #!-little-endian 1
-         #!+little-endian 0))
+  (let ((addr (context-register-addr context index)))
+    (declare (type (alien (* unsigned-long-long)) addr))
+    (deref addr)))
 
 (defun %set-context-register (context index new)
   (declare (type (alien (* os-context-t)) context))
-  (setf (deref (context-register-addr context index)
-               #!-little-endian 1
-               #!+little-endian 0)
-        new))
+  (let ((addr (context-register-addr context index)))
+    (declare (type (alien (* unsigned-long-long)) addr))
+    (setf (deref addr) new)))
 
-#!+linux
-;;; For now.
-(defun context-floating-point-modes (context)
-  (declare (ignore context))
-  (warn "stub CONTEXT-FLOATING-POINT-MODES")
-  0)
+;;; This is like CONTEXT-REGISTER, but returns the value of a float
+;;; register. FORMAT is the type of float to return.
+
+;;; FIXME: Whether COERCE actually knows how to make a float out of a
+;;; long is another question. This stuff still needs testing.
+(define-alien-routine ("os_context_fpregister_addr" context-float-register-addr)
+    (* unsigned-long-long)
+  (context (* os-context-t))
+  (index int))
+
+(defun context-float-register (context index format)
+  (declare (type (alien (* os-context-t)) context))
+  (let ((addr (context-float-register-addr context index)))
+    (declare (type (alien (* unsigned-long-long)) addr))
+    (coerce (deref addr) format)))
+
+(defun %set-context-float-register (context index format new)
+  (declare (type (alien (* os-context-t)) context))
+  (let ((addr (context-float-register-addr context index)))
+    (declare (type (alien (* unsigned-long-long)) addr))
+    (setf (deref addr) (coerce new format))))
+
+;;; Given a signal context, return the floating point modes word in
+;;; the same format as returned by FLOATING-POINT-MODES.
+(define-alien-routine ("os_context_fp_control" context-floating-point-modes)
+    unsigned-int
+  (context (* os-context-t)))
 
 ;;;; Internal-error-arguments.
 
