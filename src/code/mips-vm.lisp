@@ -109,8 +109,11 @@
 ;;; INTERNAL-ERROR-ARGUMENTS -- interface.
 ;;;
 ;;; Given the sigcontext, extract the internal error arguments from the
-;;; instruction stream.
-;;;
+;;; instruction stream.  This is e.g.
+;;; 4       23      254     206     1       0       0       0
+;;; |       ~~~~~~~~~~~~~~~~~~~~~~~~~
+;;; length         data              (everything is an octet)
+;;; (pc + 4)
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
   (/show0 "entering INTERNAL-ERROR-ARGS, CONTEXT=..")
@@ -118,23 +121,8 @@
   (let ((pc (context-pc context))
         (cause (context-bd-cause-int context)))
     (declare (type system-area-pointer pc))
-    ;; KLUDGE: This exposure of the branch delay mechanism hurts.
-    (when (logbitp 31 cause)
-      (setf pc (sap+ pc 4)))
-    (args-for-unimp-inst pc)))
-
-(defun args-for-unimp-inst (pc)
-  (declare (type system-area-pointer pc))
-  (let* ((length (sap-ref-8 pc 4))
-         (vector (make-array length :element-type '(unsigned-byte 8))))
-    (declare (type (unsigned-byte 8) length)
-             (type (simple-array (unsigned-byte 8) (*)) vector))
-    (copy-ub8-from-system-area pc 5 vector 0 length)
-    (let* ((index 0)
-           (error-number (sb!c:read-var-integer vector index)))
-      (collect ((sc-offsets))
-               (loop
-                (when (>= index length)
-                  (return))
-                (sc-offsets (sb!c:read-var-integer vector index)))
-               (values error-number (sc-offsets))))))
+    (multiple-value-bind (error-number length sc-offsets)
+        ;; KLUDGE: This exposure of the branch delay mechanism hurts.
+        (snarf-error-junk pc (if (logbitp 31 cause) 8 4))
+      (declare (ignore length))
+      (values error-number sc-offsets))))
