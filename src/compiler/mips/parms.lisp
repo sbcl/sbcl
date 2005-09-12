@@ -107,7 +107,11 @@
   cerror
   breakpoint
   fun-end-breakpoint
-  after-breakpoint)
+  after-breakpoint
+  unused
+  pseudo-atomic
+  object-not-list
+  object-not-instance)
 
 (defenum (:prefix trace-table-)
   normal
