@@ -38,7 +38,7 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     specified by AMOP.
   * bug fix: flush closure information collected by physical
     environment analysis prepass before the main pass. (bug reported
-    by vrotaru)
+    by Vasile Rotaru)
   * threads
     ** bug fix: parent thread now can be gc'ed even with a live
        child thread

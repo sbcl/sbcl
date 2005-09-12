@@ -449,7 +449,7 @@
   (setq *hannu-trap* t))
 (assert (not *hannu-trap*))
 
-;;; bug reported on sbcl-help by vrotaru
+;;; bug reported on sbcl-help by Vasile Rotaru
 (let* ((initial-size (expt 2 16))
        (prime-table (make-array initial-size
                                 :element-type 'integer))
