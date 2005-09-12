@@ -460,7 +460,7 @@
                       227 229 233 239 241 251 257 263 269 271 277 281))
        (count 0)
        (increment 2))
-  
+
   (defun largest-prime-so-far ()
     (aref prime-table (1- count)))
   (defun add-prime (prime)
