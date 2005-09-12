@@ -23,6 +23,8 @@
 
 #include "genesis/constants.h"
 
+#define INSN_LEN    4
+
 void
 arch_init()
 {
@@ -54,9 +56,61 @@ static inline unsigned int
 os_context_insn(os_context_t *context)
 {
     if (os_context_bd_cause(context))
-        return *(unsigned int *)(os_context_pc(context) + 4);
+        return *(unsigned int *)(os_context_pc(context) + INSN_LEN);
     else
         return *(unsigned int *)(os_context_pc(context));
+}
+
+boolean
+arch_insn_with_bdelay_p(unsigned int insn)
+{
+    switch (insn >> 26) {
+    case 0x0:
+        switch (insn & 0x3f) {
+        /* register jumps */
+        case 0x08:
+        case 0x09:
+            return 1;
+        }
+        break;
+    /* branches and immediate jumps */
+    case 0x1:
+        switch ((insn >> 16) & 0x1f) {
+        case 0x00:
+        case 0x01:
+        case 0x02:
+        case 0x03:
+        case 0x10:
+        case 0x11:
+        case 0x12:
+        case 0x13:
+            return 1;
+        }
+        break;
+    case 0x2:
+    case 0x3:
+    case 0x4:
+    case 0x5:
+    case 0x6:
+    case 0x7:
+        return 1;
+    case 0x10:
+    case 0x11:
+    case 0x12:
+        switch ((insn >> 21) & 0x1f) {
+         /* CP0/CP1/CP2 branches */
+        case 0x08:
+            return 1;
+        }
+        break;
+    /* branch likely (MIPS II) */
+    case 0x14:
+    case 0x15:
+    case 0x16:
+    case 0x17:
+        return 1;
+    }
+    return 0;
 }
 
 /* This function is somewhat misnamed, it actually just jumps to the
@@ -82,10 +136,10 @@ emulate_branch(os_context_t *context, unsigned int inst)
         case 0x09: /* jalr */
             tgt = os_context_register(context, r1);
             *os_context_register_addr(context, r3)
-                = os_context_pc(context) + 4;
+                = os_context_pc(context) + INSN_LEN;
             break;
         default:
-            tgt += 4;
+            tgt += INSN_LEN;
             break;
         }
         break;
@@ -103,13 +157,13 @@ emulate_branch(os_context_t *context, unsigned int inst)
             if(os_context_register(context, r1) < 0)
                 tgt += disp;
             *os_context_register_addr(context, 31)
-                = os_context_pc(context) + 4;
+                = os_context_pc(context) + INSN_LEN;
             break;
         case 0x11: /* bgezal */
             if(os_context_register(context, r1) >= 0)
                 tgt += disp;
             *os_context_register_addr(context, 31)
-                = os_context_pc(context) + 4;
+                = os_context_pc(context) + INSN_LEN;
             break;
         default: /* conditional branches/traps for > MIPS I, ignore for now. */
             break;
@@ -141,7 +195,7 @@ emulate_branch(os_context_t *context, unsigned int inst)
     case 0x3: /* jal */
         tgt = jtgt;
         *os_context_register_addr(context, 31)
-            = os_context_pc(context) + 4;
+            = os_context_pc(context) + INSN_LEN;
         break;
     default:
         tgt += 4;
@@ -156,18 +210,18 @@ arch_skip_instruction(os_context_t *context)
     /* Skip the offending instruction.  Don't use os_context_insn here,
        since in case of a branch we want the branch insn, not the delay
        slot.  */
-      *os_context_pc_addr(context)
-          = emulate_branch(context,
-              *(unsigned int *)(os_context_pc(context)));
+    *os_context_pc_addr(context)
+        = emulate_branch(context,
+            *(unsigned int *)(os_context_pc(context)));
 }
 
 unsigned char *
 arch_internal_error_arguments(os_context_t *context)
 {
     if (os_context_bd_cause(context))
-        return (unsigned char *)(os_context_pc(context) + 8);
+        return (unsigned char *)(os_context_pc(context) + (INSN_LEN * 2));
     else
-        return (unsigned char *)(os_context_pc(context) + 4);
+        return (unsigned char *)(os_context_pc(context) + INSN_LEN);
 }
 
 boolean
@@ -186,31 +240,16 @@ unsigned long
 arch_install_breakpoint(void *pc)
 {
     unsigned int *ptr = (unsigned int *)pc;
+    unsigned int insn = *ptr;
     unsigned long result;
 
-    /* Don't install over a branch/jump.  */
-    switch (*ptr >> 26) {
-    case 0x0: /* immediate jumps */
-        switch (*ptr & 0x3f) {
-        case 0x08:
-        case 0x09:
+    /* Don't install over a branch/jump with delay slot.  */
+    if (arch_insn_with_bdelay_p(insn))
             ptr++;
-        }
-        break;
-    /* branches and register jumps */
-    case 0x1:
-    case 0x2:
-    case 0x3:
-    case 0x4:
-    case 0x5:
-    case 0x6:
-    case 0x7:
-        ptr++;
-    }
 
-    result = (unsigned long) *ptr;
+    result = (unsigned long)insn;
     *ptr = (trap_Breakpoint << 16) | 0xd;
-    os_flush_icache((os_vm_address_t)ptr, sizeof(unsigned int));
+    os_flush_icache((os_vm_address_t)ptr, INSN_LEN);
 
     return result;
 }
@@ -221,7 +260,7 @@ arch_remove_breakpoint(void *pc, unsigned long orig_inst)
     unsigned int *ptr = (unsigned int *)pc;
 
     *ptr = (unsigned int) orig_inst;
-    os_flush_icache((os_vm_address_t)ptr, sizeof(unsigned int));
+    os_flush_icache((os_vm_address_t)ptr, INSN_LEN);
 }
 
 static unsigned int *skipped_break_addr, displaced_after_inst;
@@ -254,15 +293,6 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     next_pc = (unsigned int *)emulate_branch(context, next_inst);
 
     displaced_after_inst = arch_install_breakpoint(next_pc);
-}
-
-static void
-sigill_handler(int signal, siginfo_t *info, void *void_context)
-{
-    os_context_t *context = arch_os_get_context(&void_context);
-
-    fake_foreign_function_call(context);
-    monitor_or_something();
 }
 
 static void
@@ -379,7 +409,6 @@ sigfpe_handler(int signal, siginfo_t *info, void *void_context)
 void
 arch_install_interrupt_handlers()
 {
-    undoably_install_low_level_interrupt_handler(SIGILL,sigill_handler);
     undoably_install_low_level_interrupt_handler(SIGTRAP,sigtrap_handler);
     undoably_install_low_level_interrupt_handler(SIGFPE,sigfpe_handler);
 }
