@@ -705,9 +705,9 @@
                    (let ((fp (frame-pointer frame)))
                      (when (control-stack-pointer-valid-p fp)
                        #!+(or x86 x86-64)
-                        (multiple-value-bind (ra ofp) (x86-call-context fp)
+                       (multiple-value-bind (ra ofp) (x86-call-context fp)
                          (and ra (compute-calling-frame ofp ra frame)))
-                        #!-(or x86 x86-64)
+                       #!-(or x86 x86-64)
                        (compute-calling-frame
                         #!-alpha
                         (sap-ref-sap fp (* ocfp-save-offset
@@ -725,7 +725,6 @@
 ;;; Get the old FP or return PC out of FRAME. STACK-SLOT is the
 ;;; standard save location offset on the stack. LOC is the saved
 ;;; SC-OFFSET describing the main location.
-#!-(or x86 x86-64)
 (defun get-context-value (frame stack-slot loc)
   (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
            (type sb!c:sc-offset loc))
@@ -733,15 +732,9 @@
         (escaped (compiled-frame-escaped frame)))
     (if escaped
         (sub-access-debug-var-slot pointer loc escaped)
-        (stack-ref pointer stack-slot))))
-#!+(or x86 x86-64)
-(defun get-context-value (frame stack-slot loc)
-  (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
-           (type sb!c:sc-offset loc))
-  (let ((pointer (frame-pointer frame))
-        (escaped (compiled-frame-escaped frame)))
-    (if escaped
-        (sub-access-debug-var-slot pointer loc escaped)
+        #!-(or x86 x86-64)
+        (stack-ref pointer stack-slot)
+        #!+(or x86 x86-64)
         (ecase stack-slot
           (#.ocfp-save-offset
            (stack-ref pointer stack-slot))
@@ -749,7 +742,6 @@
            (sap-ref-sap pointer (- (* (1+ stack-slot)
                                       sb!vm::n-word-bytes))))))))
 
-#!-(or x86 x86-64)
 (defun (setf get-context-value) (value frame stack-slot loc)
   (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
            (type sb!c:sc-offset loc))
@@ -757,16 +749,9 @@
         (escaped (compiled-frame-escaped frame)))
     (if escaped
         (sub-set-debug-var-slot pointer loc value escaped)
-        (setf (stack-ref pointer stack-slot) value))))
-
-#!+(or x86 x86-64)
-(defun (setf get-context-value) (value frame stack-slot loc)
-  (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
-           (type sb!c:sc-offset loc))
-  (let ((pointer (frame-pointer frame))
-        (escaped (compiled-frame-escaped frame)))
-    (if escaped
-        (sub-set-debug-var-slot pointer loc value escaped)
+        #!-(or x86 x86-64)
+        (setf (stack-ref pointer stack-slot) value)
+        #!+(or x86 x86-64)
         (ecase stack-slot
           (#.ocfp-save-offset
            (setf (stack-ref pointer stack-slot) value))
@@ -999,6 +984,7 @@ register."
 ;;; Find the code object corresponding to the object represented by
 ;;; bits and return it. We assume bogus functions correspond to the
 ;;; undefined-function.
+#!-(or x86 x86-64)
 (defun code-object-from-bits (bits)
   (declare (type (unsigned-byte 32) bits))
   (let ((object (make-lisp-obj bits)))
