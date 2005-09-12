@@ -160,8 +160,7 @@ void reset_signal_mask ()
 void block_blockable_signals ()
 {
     sigset_t block;
-    sigemptyset(&block);
-    sigaddset_blockable(&block);
+    sigcopyset(&block, &blockable_sigset);
     thread_sigmask(SIG_BLOCK, &block, 0);
 }
 
@@ -301,33 +300,31 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 {
     lispobj context_sap = 0;
 
-    check_blockables_blocked_or_lose();
     fake_foreign_function_call(context);
 
-    /* Allocate the SAP object while the interrupts are still
-     * disabled. */
-    if (internal_errors_enabled) {
-        context_sap = alloc_sap(context);
-    }
-
-    thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
-
-    if (internal_errors_enabled) {
-        SHOW("in interrupt_internal_error");
-#ifdef QSHOW
-        /* Display some rudimentary debugging information about the
-         * error, so that even if the Lisp error handler gets badly
-         * confused, we have a chance to determine what's going on. */
-        describe_internal_error(context);
-#endif
-        funcall2(SymbolFunction(INTERNAL_ERROR), context_sap,
-                 continuable ? T : NIL);
-    } else {
+    if (!internal_errors_enabled) {
         describe_internal_error(context);
         /* There's no good way to recover from an internal error
          * before the Lisp error handling mechanism is set up. */
         lose("internal error too early in init, can't recover");
     }
+
+    /* Allocate the SAP object while the interrupts are still
+     * disabled. */
+    context_sap = alloc_sap(context);
+
+    thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+
+    SHOW("in interrupt_internal_error");
+#ifdef QSHOW
+    /* Display some rudimentary debugging information about the
+     * error, so that even if the Lisp error handler gets badly
+     * confused, we have a chance to determine what's going on. */
+    describe_internal_error(context);
+#endif
+    funcall2(SymbolFunction(INTERNAL_ERROR), context_sap,
+             continuable ? T : NIL);
+
     undo_fake_foreign_function_call(context); /* blocks signals again */
     if (continuable) {
         arch_skip_instruction(context);
@@ -678,8 +675,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
         /* need the context stored so it can have registers scavenged */
         fake_foreign_function_call(context);
 
-        sigemptyset(&ss);
-        for(i=1;i<NSIG;i++) sigaddset(&ss,i); /* Block everything. */
+        sigfillset(&ss); /* Block everything. */
         thread_sigmask(SIG_BLOCK,&ss,0);
 
         /* The GC can't tell if a thread is a zombie, so this would be a
@@ -1002,7 +998,6 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
     os_context_t *context=(os_context_t *) void_context;
     struct thread *thread=arch_os_get_current_thread();
 
-    check_blockables_blocked_or_lose();
     fake_foreign_function_call(context);
 
     /* SUB-GC may return without GCing if *GC-INHIBIT* is set, in
@@ -1073,7 +1068,7 @@ undoably_install_low_level_interrupt_handler (int signal,
        || (signal==SIG_INTERRUPT_THREAD)
 #endif
        )
-        sa.sa_flags|= SA_ONSTACK;
+        sa.sa_flags |= SA_ONSTACK;
 #endif
 
     sigaction(signal, &sa, NULL);
