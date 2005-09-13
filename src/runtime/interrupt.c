@@ -150,14 +150,14 @@ union interrupt_handler interrupt_handlers[NSIG];
  * mask ought to be clear anyway most of the time, but may be non-zero
  * if we were interrupted e.g. while waiting for a queue.  */
 
-void reset_signal_mask ()
+void reset_signal_mask(void)
 {
     sigset_t new;
     sigemptyset(&new);
     thread_sigmask(SIG_SETMASK,&new,0);
 }
 
-void block_blockable_signals ()
+void block_blockable_signals(void)
 {
     sigset_t block;
     sigcopyset(&block, &blockable_sigset);
@@ -169,7 +169,7 @@ void block_blockable_signals ()
  * utility routines used by various signal handlers
  */
 
-void
+static void
 build_fake_control_stack_frames(struct thread *th,os_context_t *context)
 {
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
@@ -1059,8 +1059,7 @@ undoably_install_low_level_interrupt_handler (int signal,
     else
         sa.sa_sigaction = handler;
 
-    sigemptyset(&sa.sa_mask);
-    sigaddset_blockable(&sa.sa_mask);
+    sigcopyset(&sa.sa_mask, &blockable_sigset);
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     if((signal==SIG_MEMORY_FAULT)
@@ -1102,8 +1101,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
             sa.sa_sigaction = interrupt_handle_now_handler;
         }
 
-        sigemptyset(&sa.sa_mask);
-        sigaddset_blockable(&sa.sa_mask);
+        sigcopyset(&sa.sa_mask, &blockable_sigset);
         sa.sa_flags = SA_SIGINFO | SA_RESTART;
         sigaction(signal, &sa, NULL);
     }
