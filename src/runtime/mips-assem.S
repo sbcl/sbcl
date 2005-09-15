@@ -350,7 +350,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
  *
  * The undefined-function trampoline.
  */
-	.align	2
+	.align	3 /* minimum alignment for a lisp object */
 	.word	SIMPLE_FUN_HEADER_WIDETAG /* header */
 	.word	undefined_tramp - SIMPLE_FUN_CODE_OFFSET /* self */
 	.word	NIL /* next */
@@ -358,6 +358,12 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	.word	NIL /* arglist */
 	.word	NIL /* type */
 	LEAF(undefined_tramp)
+	/* Point reg_CODE to the header and tag it as function, since
+	   the debugger regards a function pointer in reg_CODE which
+	   doesn't point to a code object as undefined function.  */
+	lui	reg_CODE, %hi(undefined_tramp)
+	addiu	reg_CODE, %lo(undefined_tramp)
+	addiu	reg_CODE, - 24 + FUN_POINTER_LOWTAG
 	.set	noreorder
 	b	1f
 	 break	trap_Cerror
@@ -400,14 +406,15 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 /*
  * Function-end breakpoint magic.
  */
-	.align	2
-	LEAF(fun_end_breakpoint_guts)
+	.align	3 /* minimum alignment for a lisp object */
 	.set	noreorder
 	.word	RETURN_PC_HEADER_WIDETAG
-
+	LEAF(fun_end_breakpoint_guts)
 	b	multiple_value_return
 	 nop
 	.set	reorder
+
+	/* single value return */
 
 	move	reg_OCFP, reg_CSP
 	addu	reg_CSP, 4
