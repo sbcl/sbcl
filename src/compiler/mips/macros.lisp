@@ -190,7 +190,7 @@
       `((let ((vop ,vop))
           (when vop
             (note-this-location vop :internal-error)))
-        (inst break ,kind)
+        (inst break 0 ,kind)
         (with-adjustable-vector (,vector)
           (write-var-integer (error-number-or-lose ',code) ,vector)
           ,@(mapcar #'(lambda (tn)
@@ -257,7 +257,7 @@
        (let ((label (gen-label)))
          (inst bgez ,flag-tn label)
          (inst addu alloc-tn (1- ,extra))
-         (inst break 16)
+         (inst break 0 16)
          (emit-label label)))))
 
 ;;;; memory accessor vop generators

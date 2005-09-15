@@ -138,7 +138,7 @@ symbol:
         .set    noreorder
 	bgez	reg_NL4, 1f
 	 subu	reg_ALLOC, 1
-	break	0x10
+	break	0x0, 0x10
 1:	.set	reorder
 
 	/* Pass in args */
@@ -194,7 +194,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	.set	noreorder
 	bgez	reg_NL4, 1f
 	 subu	reg_ALLOC, 1
-	break	0x10
+	break	0x0, 0x10
 1:	.set	reorder
 
 	/* Pass one return value back to C land. For a 64bit value, we may
@@ -272,7 +272,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	.set	noreorder
 	bgez	reg_NL4, 1f
 	 subu	reg_ALLOC, 1
-	break	0x10
+	break	0x0, 0x10
 1:	.set	reorder
 
 	/* Into C land we go. */
@@ -333,7 +333,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	.set	noreorder
 	bgez	reg_NL4, 1f
 	 subu	reg_ALLOC, 1
-	break	0x10
+	break	0x0, 0x10
 1:	.set	reorder
 
 	/* Reset the lisp stack. */
@@ -366,7 +366,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	addiu	reg_CODE, - 24 + FUN_POINTER_LOWTAG
 	.set	noreorder
 	b	1f
-	 break	trap_Cerror
+	 break	0x0, trap_Cerror
 	/* Error data length. */
 	.byte	4
 	/* Error number. */

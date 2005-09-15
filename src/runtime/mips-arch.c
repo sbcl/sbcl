@@ -248,7 +248,7 @@ arch_install_breakpoint(void *pc)
             ptr++;
 
     result = (unsigned long)insn;
-    *ptr = (trap_Breakpoint << 16) | 0xd;
+    *ptr = (trap_Breakpoint << 6) | 0xd;
     os_flush_icache((os_vm_address_t)ptr, INSN_LEN);
 
     return result;
@@ -299,7 +299,7 @@ static void
 sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    unsigned int code = (os_context_insn(context) >> 16) & 0x1f;
+    unsigned int code = (os_context_insn(context) >> 6) & 0xfffff;
 
     switch (code) {
     case trap_Halt:

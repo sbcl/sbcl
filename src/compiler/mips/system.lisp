@@ -240,12 +240,12 @@
   (:policy :fast-safe)
   (:translate sb!unix::receive-pending-interrupt)
   (:generator 1
-    (inst break pending-interrupt-trap)))
+    (inst break 0 pending-interrupt-trap)))
 
 
 (define-vop (halt)
   (:generator 1
-    (inst break halt-trap)))
+    (inst break 0 halt-trap)))
 
 
 ;;;; Dynamic vop count collection support

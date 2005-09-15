@@ -1063,22 +1063,26 @@
   (declare (ignore inst))
   (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
     (case (break-code chunk dstate)
+      (#.halt-trap
+       (nt "Halt trap"))
+      (#.pending-interrupt-trap
+       (nt "Pending interrupt trap"))
       (#.error-trap
        (nt "Error trap")
        (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
       (#.cerror-trap
        (nt "Cerror trap")
        (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
-      (#.object-not-list-trap
-       (nt "Object not list trap"))
       (#.breakpoint-trap
        (nt "Breakpoint trap"))
-      (#.pending-interrupt-trap
-       (nt "Pending interrupt trap"))
-      (#.halt-trap
-       (nt "Halt trap"))
       (#.fun-end-breakpoint-trap
        (nt "Function end breakpoint trap"))
+      (#.after-breakpoint-trap
+       (nt "After breakpoint trap"))
+      (#.pseudo-atomic-trap
+       (nt "Pseudo atomic trap"))
+      (#.object-not-list-trap
+       (nt "Object not list trap"))
       (#.object-not-instance-trap
        (nt "Object not instance trap"))
     )))
