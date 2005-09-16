@@ -222,10 +222,10 @@
 
 (sb!disassem:define-instruction-format
     (break 32 :default-printer
-           '(:name :tab code (:unless (:constant 0) subcode)))
+           '(:name :tab code (:unless (:constant 0) ", " subcode)))
   (op :field (byte 6 26) :value special-op)
   (code :field (byte 10 16))
-  (subcode :field (byte 10 6) :value 0)
+  (subcode :field (byte 10 6))
   (funct :field (byte 6 0) :value #b001101))
 
 (sb!disassem:define-instruction-format
@@ -1062,35 +1062,35 @@
 (defun break-control (chunk inst stream dstate)
   (declare (ignore inst))
   (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
-    (case (break-code chunk dstate)
-      (#.halt-trap
-       (nt "Halt trap"))
-      (#.pending-interrupt-trap
-       (nt "Pending interrupt trap"))
-      (#.error-trap
-       (nt "Error trap")
-       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
-      (#.cerror-trap
-       (nt "Cerror trap")
-       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
-      (#.breakpoint-trap
-       (nt "Breakpoint trap"))
-      (#.fun-end-breakpoint-trap
-       (nt "Function end breakpoint trap"))
-      (#.after-breakpoint-trap
-       (nt "After breakpoint trap"))
-      (#.pseudo-atomic-trap
-       (nt "Pseudo atomic trap"))
-      (#.object-not-list-trap
-       (nt "Object not list trap"))
-      (#.object-not-instance-trap
-       (nt "Object not instance trap"))
-    )))
+    (when (= (break-code chunk dstate) 0)
+      (case (break-subcode chunk dstate)
+        (#.halt-trap
+         (nt "Halt trap"))
+        (#.pending-interrupt-trap
+         (nt "Pending interrupt trap"))
+        (#.error-trap
+         (nt "Error trap")
+         (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+        (#.cerror-trap
+         (nt "Cerror trap")
+         (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+        (#.breakpoint-trap
+         (nt "Breakpoint trap"))
+        (#.fun-end-breakpoint-trap
+         (nt "Function end breakpoint trap"))
+        (#.after-breakpoint-trap
+         (nt "After breakpoint trap"))
+        (#.pseudo-atomic-trap
+         (nt "Pseudo atomic trap"))
+        (#.object-not-list-trap
+         (nt "Object not list trap"))
+        (#.object-not-instance-trap
+         (nt "Object not instance trap"))))))
 
 (define-instruction break (segment code &optional (subcode 0))
   (:declare (type (unsigned-byte 10) code subcode))
   (:printer break ((op special-op) (funct #b001101))
-            '(:name :tab code (:unless (:constant 0) subcode))
+            '(:name :tab code (:unless (:constant 0) ", " subcode))
             :control #'break-control)
   :pinned
   (:cost 0)
