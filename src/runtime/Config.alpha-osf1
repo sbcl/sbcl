@@ -39,3 +39,7 @@ OS_SRC = osf1-os.c alpha-osf1-os.c
 OS_LIBS = #-ldl
 
 GC_SRC = cheneygc.c
+
+# Nothing to do for after-grovel-headers.
+.PHONY: after-grovel-headers
+after-grovel-headers:

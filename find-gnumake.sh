@@ -1,3 +1,4 @@
+#!/bin/false
 # Not a shell script, but something intended to be sourced from shell scripts
 find_gnumake() {
   # the GNU dialect of "make" -- easier to find or port it than to

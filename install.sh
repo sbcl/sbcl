@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # Install SBCL files into the usual places.
 

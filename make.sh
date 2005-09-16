@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # "When we build software, it's a good idea to have a reliable method
 # for getting an executable from it. We want any two reconstructions
@@ -54,8 +55,7 @@
 
 LANG=C
 LC_ALL=C
-export LANG
-export LC_ALL
+export LANG LC_ALL
 
 build_started=`date`
 echo "//starting build: $build_started"
@@ -70,10 +70,10 @@ find_gnumake
 # If you're cross-compiling, you should probably just walk through the
 # make-config.sh script by hand doing the right thing on both the host
 # and target machines.
-sh make-config.sh || exit 1
+sh make-config.sh
 
 # Enforce the source policy for no bogus whitespace
-tools-for-build/canonicalize-whitespace || exit 1
+tools-for-build/canonicalize-whitespace
 
 # The make-host-*.sh scripts are run on the cross-compilation host,
 # and the make-target-*.sh scripts are run on the target machine. In
@@ -102,11 +102,11 @@ tools-for-build/canonicalize-whitespace || exit 1
 # Or, if you can set up the files somewhere shared (with NFS, AFS, or
 # whatever) between the host machine and the target machine, the basic
 # procedure above should still work, but you can skip the "copy" steps.
-time sh make-host-1.sh   || exit 1
-time sh make-target-1.sh || exit 1
-time sh make-host-2.sh   || exit 1
-time sh make-target-2.sh || exit 1
-time sh make-target-contrib.sh || exit 1
+time sh make-host-1.sh
+time sh make-target-1.sh
+time sh make-host-2.sh
+time sh make-target-2.sh
+time sh make-target-contrib.sh
 
 NCONTRIBS=`find contrib -name Makefile -print | wc -l`
 NPASSED=`find contrib -name test-passed -print | wc -l`

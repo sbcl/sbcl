@@ -17,3 +17,7 @@ OS_SRC = bsd-os.c undefineds.c x86-bsd-os.c
 OS_LIBS = # -ldl
 
 GC_SRC = gencgc.c
+
+# Nothing to do for after-grovel-headers.
+.PHONY: after-grovel-headers
+after-grovel-headers:

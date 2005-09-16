@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # The make-config.sh script uses information about the target machine
 # to set things up for compilation. It's vaguely like a stripped-down
@@ -267,4 +268,3 @@ if [ `uname` = "SunOS" ] ; then
   PATH=/usr/xpg4/bin:$PATH
 fi
 echo '"'`hostname`-`id -un`-`date +%Y-%m-%d-%H-%M-%S`'"' > output/build-id.tmp
-

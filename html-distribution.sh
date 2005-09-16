@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # Create a distribution containing the HTML versions of system
 # documentation. (make-doc.sh needs to be run first, in order to

@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # How big is this project anyway? Crudely estimate non-comment source lines..
 

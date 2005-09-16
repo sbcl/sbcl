@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # This is a script to be run as part of make.sh. The only time you'd
 # want to run it by itself is if you're trying to cross-compile the
@@ -16,7 +17,8 @@
 echo //entering make-target-1.sh
 
 LANG=C
-export LANG
+LC_ALL=C
+export LANG LC_ALL
 
 # Build the runtime system and symbol table (.nm) file.
 #
@@ -26,21 +28,15 @@ export LANG
 # could come either before or after running the cross compiler; that
 # doesn't matter.)
 echo //building runtime system and symbol table file
-cd ./src/runtime
-$GNUMAKE clean  || exit 1
-$GNUMAKE depend || exit 1
-$GNUMAKE all    || exit 1
-cd ../..
+
+# The clean is needed for Darwin's readonlyspace hack.
+$GNUMAKE -C src/runtime clean
+# $GNUMAKE -C src/runtime depend
+$GNUMAKE -C src/runtime all
 
 # Use a little C program to grab stuff from the C header files and
 # smash it into Lisp source code.
-cd ./tools-for-build
-$GNUMAKE -I../src/runtime grovel-headers || exit 1
-cd ..
+$GNUMAKE -C tools-for-build -I../src/runtime grovel-headers
 tools-for-build/grovel-headers > output/stuff-groveled-from-headers.lisp
 
-# after-grovel-headers may not exist for all platforms (used for
-# Darwin hacks)
-cd ./src/runtime
-$GNUMAKE after-grovel-headers || true
-cd ..
+$GNUMAKE -C src/runtime after-grovel-headers

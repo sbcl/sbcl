@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # a quick and dirty way of partially rebuilding the system after a
 # change
@@ -105,12 +106,12 @@ export SBCL_XC_HOST
 . ./find-gnumake.sh
 find_gnumake
 
-sh make-target-1.sh || exit 1
+sh make-target-1.sh
 
 # Instead of doing the full make-host-2.sh, we (1) use after-xc.core
 # to rebuild only obviously-out-of-date Lisp files, then (2) run
 # GENESIS.
-$LISP $CORE output/after-xc.core $INIT <<'EOF' || exit 1
+$LISP $CORE output/after-xc.core $INIT <<'EOF'
   (load "src/cold/slam.lisp")
 EOF
 # (This ^ used to be
@@ -120,9 +121,9 @@ EOF
 # rebuild-this-stem requests on the command line to supplement
 # the rebuild-obviously-outdated-stems logic above.)
 #
-sh make-genesis-2.sh || exit 1 
+sh make-genesis-2.sh
 
-sh make-target-2.sh || exit 1
+sh make-target-2.sh
 
 echo //ordinary termination of slam.sh
 date

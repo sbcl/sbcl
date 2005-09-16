@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # This is a script to be run as part of make.sh. The only time you'd
 # want to run it by itself is if you're trying to cross-compile the
@@ -16,7 +17,8 @@
 echo //entering make-host-2.sh
 
 LANG=C
-export LANG
+LC_ALL=C
+export LANG LC_ALL
 
 # In some cases, a debugging build of the system will creates a core
 # file output/after-xc.core in the next step. In cases where it
@@ -43,7 +45,7 @@ rm -f output/after-xc.core
 # the fasl files into the new host Lisp, and that doesn't seem to be
 # an enormously important disadvantage, either.)
 echo //running cross-compiler to create target object files
-$SBCL_XC_HOST <<-'EOF' || exit 1
+$SBCL_XC_HOST <<-'EOF'
 
         ;;;
         ;;; Set up the cross-compiler.

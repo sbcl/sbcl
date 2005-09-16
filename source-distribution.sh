@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # Create a source distribution. (You should run clean.sh first.)
 

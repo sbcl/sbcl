@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # This is a script to be run as part of make.sh. The only time you'd
 # want to run it by itself is if you're trying to cross-compile the
@@ -16,7 +17,8 @@
 echo //entering make-target-2.sh
 
 LANG=C
-export LANG
+LC_ALL=C
+export LANG LC_ALL
 
 # Do warm init stuff, e.g. building and loading CLOS, and stuff which
 # can't be done until CLOS is running.
@@ -30,7 +32,7 @@ export LANG
 echo //doing warm init
 ./src/runtime/sbcl \
 --core output/cold-sbcl.core \
---sysinit /dev/null --userinit /dev/null <<-'EOF' || exit 1
+--sysinit /dev/null --userinit /dev/null <<-'EOF'
 	;; Now that we use the compiler for macros, interpreted
 	;; /SHOW doesn't work until later in init.
         #+sb-show (print "/hello, world!")

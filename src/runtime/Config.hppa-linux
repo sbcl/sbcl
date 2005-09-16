@@ -19,3 +19,7 @@ OS_SRC = linux-os.c hppa-linux-os.c
 OS_LIBS = -ldl
 
 GC_SRC = cheneygc.c
+
+# Nothing to do for after-grovel-headers.
+.PHONY: after-grovel-headers
+after-grovel-headers:

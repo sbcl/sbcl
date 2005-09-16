@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # Create a binary distribution. (make.sh should be run first to create
 # the various binary files, and make-doc.sh should also be run to

@@ -37,3 +37,7 @@ OS_LIBS += $(shell if grep LISP_FEATURE_SB_THREAD genesis/config.h \
 CFLAGS += -fno-omit-frame-pointer
 
 GC_SRC = gencgc.c
+
+# Nothing to do for after-grovel-headers.
+.PHONY: after-grovel-headers
+after-grovel-headers:

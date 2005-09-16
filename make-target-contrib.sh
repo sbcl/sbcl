@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # This is a script to be run as part of make.sh. The only time you'd
 # probably want to run it by itself is if you're cross-compiling the
@@ -14,7 +15,8 @@
 # files for more information.
 
 LANG=C
-export LANG
+LC_ALL=C
+export LANG LC_ALL
 
 . ./find-gnumake.sh
 find_gnumake

@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # This is a script to be run as part of make.sh. The only time you'd
 # want to run it by itself is if you're trying to cross-compile the
@@ -29,7 +30,7 @@ echo //entering make-genesis-2.sh
 # file at that time; but we needed to run it earlier in order to 
 # get to where we can write a .core file.)
 echo //loading and running GENESIS to create cold-sbcl.core
-$SBCL_XC_HOST <<-'EOF' || exit 1
+$SBCL_XC_HOST <<-'EOF'
 	(setf *print-level* 5 *print-length* 5)
 	(load "src/cold/shared.lisp")
 	(in-package "SB-COLD")

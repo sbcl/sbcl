@@ -13,3 +13,6 @@ OS_LIBS= -ldl -lsocket -lnsl -lrt
 
 GC_SRC= gencgc.c
 
+# Nothing to do for after-grovel-headers.
+.PHONY: after-grovel-headers
+after-grovel-headers:

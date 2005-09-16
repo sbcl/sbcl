@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # This is a script to be run as part of make.sh. The only time you'd
 # want to run it by itself is if you're trying to cross-compile the
@@ -16,7 +17,8 @@
 echo //entering make-host-1.sh
 
 LANG=C
-export LANG
+LC_ALL=C
+export LANG LC_ALL
 
 # Compile and load the cross-compiler. (We load it here not because we're
 # about to use it, but because it's written under the assumption that each

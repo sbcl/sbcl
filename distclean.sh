@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # a superset of clean.sh, cleaning up not only automatically 
 # generated files but other things (e.g. customization files)

@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # Remove everything in directories which are only used for output.
 # In most cases, we can remove the directories, too.
