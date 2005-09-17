@@ -39,6 +39,8 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
   * bug fix: flush closure information collected by physical
     environment analysis prepass before the main pass. (bug reported
     by Vasile Rotaru)
+  * bug fix: compiler pack phase does not modify a hashtable, which is
+    iterated. (reported by Bryan O'Connor, fixed by Rob MacLachlan)
   * threads
     ** bug fix: parent thread now can be gc'ed even with a live
        child thread

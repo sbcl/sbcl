@@ -1603,15 +1603,15 @@
                   (do-ir2-blocks (block component)
                     (emit-saves block)
                     (pack-load-tns block))))
-           (when *repack-blocks*
-             (loop
-                 (when (zerop (hash-table-count *repack-blocks*)) (return))
-                 (maphash (lambda (block v)
-                            (declare (ignore v))
-                            (remhash block *repack-blocks*)
-                            (event repack-block)
-                            (pack-load-tns block))
-                          *repack-blocks*))))
+           (loop
+              (unless *repack-blocks* (return))
+              (let ((orpb *repack-blocks*))
+                (setq *repack-blocks* nil)
+                (maphash (lambda (block v)
+                           (declare (ignore v))
+                           (event repack-block)
+                           (pack-load-tns block))
+                         orpb))))
 
          (values))
     (clean-up-pack-structures)))
