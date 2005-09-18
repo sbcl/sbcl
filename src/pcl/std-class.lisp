@@ -975,7 +975,7 @@
 ;;; the slots predictably, but maybe it would be good to compute some
 ;;; kind of optimal slot layout by looking at locations of slots in
 ;;; superclasses?
-(defmethod compute-slots ((class std-class))
+(defun std-compute-slots (class)
   ;; As specified, we must call COMPUTE-EFFECTIVE-SLOT-DEFINITION once
   ;; for each different slot name we find in our superclasses. Each
   ;; call receives the class and a list of the dslotds with that name.
@@ -995,11 +995,12 @@
             (nreverse name-dslotds-alist))))
 
 (defmethod compute-slots ((class standard-class))
-  (call-next-method))
+  (std-compute-slots class))
+(defmethod compute-slots ((class funcallable-standard-class))
+  (std-compute-slots class))
 
-(defmethod compute-slots :around ((class standard-class))
-  (let ((eslotds (call-next-method))
-        (location -1))
+(defun std-compute-slots-around (class eslotds)
+  (let ((location -1))
     (dolist (eslotd eslotds eslotds)
       (setf (slot-definition-location eslotd)
             (case (slot-definition-allocation eslotd)
@@ -1033,53 +1034,12 @@
         (setf (slot-definition-class eslotd) class))
       (initialize-internal-slot-functions eslotd))))
 
-(defmethod compute-slots ((class funcallable-standard-class))
-  (call-next-method))
-
+(defmethod compute-slots :around ((class standard-class))
+  (let ((eslotds (call-next-method)))
+    (std-compute-slots-around class eslotds)))
 (defmethod compute-slots :around ((class funcallable-standard-class))
-  (labels ((instance-slot-names (slotds)
-             (let (collect)
-               (dolist (slotd slotds (nreverse collect))
-                 (when (eq (slot-definition-allocation slotd) :instance)
-                   (push (slot-definition-name slotd) collect)))))
-           ;; This sorts slots so that slots of classes later in the CPL
-           ;; come before slots of other classes.  This is crucial for
-           ;; funcallable instances because it ensures that the slots of
-           ;; FUNCALLABLE-STANDARD-OBJECT, which includes the slots of
-           ;; KERNEL:FUNCALLABLE-INSTANCE, come first, which in turn
-           ;; makes it possible to treat FUNCALLABLE-STANDARD-OBJECT as
-           ;; a funcallable instance.
-           (compute-layout (eslotds)
-             (let ((first ())
-                   (names (instance-slot-names eslotds)))
-               (dolist (class
-                        (reverse (class-precedence-list class))
-                        (nreverse (nconc names first)))
-                 (dolist (ss (class-slots class))
-                   (let ((name (slot-definition-name ss)))
-                     (when (member name names)
-                       (push name first)
-                       (setq names (delete name names)))))))))
-    (let ((all-slotds (call-next-method))
-          (instance-slots ())
-          (class-slots ()))
-      (dolist (slotd all-slotds)
-        (case (slot-definition-allocation slotd)
-          (:instance (push slotd instance-slots))
-          (:class (push slotd class-slots))))
-      (let ((layout (compute-layout instance-slots)))
-        (dolist (slotd instance-slots)
-          (setf (slot-definition-location slotd)
-                (position (slot-definition-name slotd) layout))
-          (initialize-internal-slot-functions slotd)))
-      (dolist (slotd class-slots)
-        (let ((name (slot-definition-name slotd))
-              (from-class (slot-definition-allocation-class slotd)))
-          (setf (slot-definition-location slotd)
-                (assoc name (class-slot-cells from-class)))
-          (aver (consp (slot-definition-location slotd)))
-          (initialize-internal-slot-functions slotd)))
-      all-slotds)))
+  (let ((eslotds (call-next-method)))
+    (std-compute-slots-around class eslotds)))
 
 (defmethod compute-slots ((class structure-class))
   (mapcan (lambda (superclass)

@@ -47,17 +47,10 @@ are:
 @item
 @findex compute-effective-method
 @findex sb-mop:compute-effective-method
-@code{compute-effective-method} only returns one value, not two;
+@code{compute-effective-method} only returns one value, not two.
+There is no record of what the second return value was meant to
+indicate, and apparently no clients for it.
   
-@item
-@findex compute-slots
-@findex sb-mop:compute-slots
-@tindex funcallable-standard-class 
-@tindex sb-mop:funcallable-standard-class 
-the system-supplied @code{:around} method for @code{compute-slots}
-specialized on @code{funcallable-standard-class} does not respect the
-requested order from a user-supplied primary method.
-
 @item
 @findex ensure-generic-function
 @findex generic-function-declarations
@@ -75,12 +68,14 @@ argument defining the declarations to be stored and returned by
 @tindex standard-class
 @tindex funcallable-standard-class
 @tindex sb-mop:funcallable-standard-class
-although we obey the requirement in AMOP for @code{validate-superclass}
-for @code{standard-class} and @code{funcallable-standard-class} to be
-compatible metaclasses, we impose an additional requirement at class
-finalization time: a class of metaclass
-@code{funcallable-standard-class} must have @code{function} in its
-superclasses, and a class of metaclass @code{standard-class} must not.
+@tindex function
+although SBCL obeys the requirement in AMOP for
+@code{validate-superclass} for @code{standard-class} and
+@code{funcallable-standard-class} to be compatible metaclasses, we
+impose an additional requirement at class finalization time: a class
+of metaclass @code{funcallable-standard-class} must have
+@code{function} in its superclasses, and a class of metaclass
+@code{standard-class} must not.
 
 @end itemize
 

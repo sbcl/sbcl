@@ -40,7 +40,7 @@ echo /running tests on SBCL=\'$SBCL\'
 # magic can be done once and only once.). Not used in this file, but
 # exists for the benefit of the *.test.sh files that can be started by
 # run-tests.lisp
-SBCL_ALLOWING_CORE=${1:-$sbclstem}
+SBCL_ALLOWING_CORE=$sbclstem
 export SBCL_ALLOWING_CORE
 echo /with SBCL_ALLOWING_CORE=\'$SBCL_ALLOWING_CORE\'
 

@@ -28,14 +28,6 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     funcallable-instances.  (reported by Cyrus Harmon)
   * bug fix: FUNCTIONP and (LAMBDA (X) (TYPEP X 'FUNCTION)) are now
     consistent, even on internal alternate-metaclass objects.
-  * bug fix: SB-MOP:FUNCALLABLE-STANDARD-OBJECT is now a subclass of
-    STANDARD-OBJECT, as required by AMOP.
-  * bug fix: the classes STANDARD-CLASS and
-    SB-MOP:FUNCALLABLE-STANDARD-CLASS are now compatible in the
-    SB-MOP:VALIDATE-SUPERCLASS sense; there remains a constraint about
-    finalized classes and the FUNCTION class.
-  * bug fix: the SB-MOP:METAOBJECT class is now implemented as
-    specified by AMOP.
   * bug fix: flush closure information collected by physical
     environment analysis prepass before the main pass. (bug reported
     by Vasile Rotaru)
@@ -43,6 +35,19 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     iterated. (reported by Bryan O'Connor, fixed by Rob MacLachlan)
   * bug fix: backquote does not optimize (LIST* x y) to CONS when x
     may be expanded. (reported by Alexander <malishev> on c.l.l)
+  * fixed some incompatibilities between SBCL's MOP and the MOP
+    specified by AMOP:
+    ** the METAOBJECT class is now implemented;
+    ** FUNCALLABLE-STANDARD-OBJECT is now a subclass of
+       STANDARD-OBJECT, as required;
+    ** the classes STANDARD-CLASS and FUNCALLABLE-STANDARD-CLASS are
+       now compatible (as required by VALIDATE-SUPERCLASS); there
+       remains a consistency requirement over the presence or absence
+       of the FUNCTION class in the superclass list of finalized
+       classes; see the manual for more details;
+    ** the :AROUND method for COMPUTE-SLOTS on
+       FUNCALLABLE-STANDARD-CLASS now honours the primary method's
+       requested slot ordering.
   * threads
     ** bug fix: parent thread now can be gc'ed even with a live
        child thread
