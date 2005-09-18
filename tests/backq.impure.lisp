@@ -61,3 +61,6 @@
 (let ((a '`(1 ,@a ,@b ,.c ,.d)))
   (let ((*print-circle* t))
     (assert (equal (read-from-string (write-to-string a)) a))))
+
+(let ((s '``(,,@(list 1 2 3) 10)))
+  (assert (equal (eval (eval s)) '(1 2 3 10))))

@@ -175,6 +175,7 @@
          (list  'quote thing))
         ((eq flag 'list*)
          (cond ((and (null (cddr thing))
+                     (not (expandable-backq-expression-p (car thing)))
                      (not (expandable-backq-expression-p (cadr thing))))
                 (cons 'backq-cons thing))
                ((expandable-backq-expression-p (car (last thing)))

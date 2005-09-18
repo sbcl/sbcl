@@ -41,6 +41,8 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     by Vasile Rotaru)
   * bug fix: compiler pack phase does not modify a hashtable, which is
     iterated. (reported by Bryan O'Connor, fixed by Rob MacLachlan)
+  * bug fix: backquote does not optimize (LIST* x y) to CONS when x
+    may be expanded. (reported by Alexander <malishev> on c.l.l)
   * threads
     ** bug fix: parent thread now can be gc'ed even with a live
        child thread
