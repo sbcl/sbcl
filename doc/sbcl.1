@@ -40,12 +40,12 @@ CREDITS file in the distribution.
 
 To run SBCL, type "sbcl" at the command line with no arguments. (SBCL
 understands command line arguments, but you probably won't need to use
-them unless you're a fairly advanced user. If you are, you should
-read the COMMAND LINE SYNTAX section, below.) You should see some
-startup messages, then a prompt ("*"). Type a Lisp expression at the
-prompt, and SBCL will read it, execute it, print any values returned, 
-give you another prompt, and wait for your next input. E.g.
-
+them unless you're a fairly advanced user. If you are, you should read
+the COMMAND LINE SYNTAX section, below.) You should see some startup
+messages, then a prompt ("\f(CR*\fR").  Type a Lisp expression at the prompt,
+and SBCL will read it, execute it, print any values returned, give you
+another prompt, and wait for your next input.  For example,
+\f(CR
   * (+ 1 2 3)
 
   6
@@ -56,6 +56,7 @@ give you another prompt, and wait for your next input. E.g.
 
   "Hello World"
   *
+\fR
 
 Many people like to run SBCL, like other Lisp systems, as a subprocess
 under Emacs. The Emacs "Slime" and "ilisp" modes provide many
@@ -77,11 +78,13 @@ the BUGS section below.
 
 SBCL also includes various non-ANSI extensions, described more fully
 in the User Manual.  Some of these are in the base system and others
-are "contrib" modules loaded on request using REQUIRE.  For example,
-to load the SB\-BSD\-SOCKETS module that providces TCP/IP connectivity,
-
-   * (require 'asdf)
-   * (require 'sb\-bsd\-sockets)
+are "contrib" modules loaded on request using \f(CRREQUIRE\fR.  For
+example, to load the \f(CRSB\-BSD\-SOCKETS\fR module that providces
+TCP/IP connectivity,
+\f(CR
+   * (require \(aqasdf)
+   * (require \(aqsb\-bsd\-sockets)
+\fR
 
 Many Lispy extensions have been retained from CMU CL:
 .TP 3
@@ -105,7 +108,7 @@ whose instances can be used wherever ordinary ANSI streams can be used)
 .TP 3
 \--
 weak pointers and finalization (which have unfortunately
-suffered from at least some code rot, so that e.g. weak hash
+suffered from at least some code rot, so that \fIe.g.\fR weak hash
 tables don't work)
 .PP
 
@@ -116,8 +119,8 @@ calling out to C code (a.k.a. FFI, foreign function interface,
 with very nearly the same interface as CMU CL)
 .TP 3
 \--
-some simple support for operations with a "scripting language" 
-flavor, e.g. reading POSIX argc and argv, or executing a 
+some simple support for operations with a "scripting language" flavor,
+\fIe.g.\fR reading POSIX \f(CRargc\fR and \f(CRargv\fR, or executing a
 subprogram
 .PP
 
@@ -138,8 +141,8 @@ the two projects disagree about what would be an improvement.
 Most extensions supported by CMU CL have been unbundled from SBCL,
 including Motif support, the Hemlock editor, search paths, the
 low-level Unix interface, the WIRE protocol, various user-level macros
-and functions (e.g. LETF, ITERATE, MEMQ, REQUIRED\-ARGUMENT), and many
-others.
+and functions (\fIe.g.\fR \f(CRLETF\fR, \f(CRITERATE\fR, \f(CRMEMQ\fR,
+\f(CRREQUIRED\-ARGUMENT\fR), and many others.
 
 SBCL inplements multithreading, but in a completely different fashion
 from CMU CL: see the User Manual for details.  As of 0.8.5 this is
@@ -149,35 +152,36 @@ SBCL has retained some extensions from its parent CMU CL. Many of the
 retained extensions are in these categories:
 .TP 3
 \--
-things which might be in the new ANSI spec, e.g. safe type
+things which might be in the new ANSI spec, \fIe.g.\fR safe type
 declarations, weak pointers, finalization, foreign function
-interface to C, and Gray streams
+interface to C, and Gray streams;
 .TP 3
 \--
 things which are universally available in Unix scripting languages,
-e.g. RUN\-PROGRAM and POSIX argv and getenv
+\fIe.g.\fR \f(CRRUN\-PROGRAM\fR and POSIX \f(CRargv\fR and \f(CRgetenv\fR;
 .TP 3
 \--
 hooks into the low level workings of the system which can be useful
-for debugging, e.g. requesting that a particular function be executed
-whenever GC occurs, or tuning compiler diagnostic output
+for debugging, \fIe.g.\fR requesting that a particular function be executed
+whenever GC occurs, or tuning compiler diagnostic output;
 .TP 3
 \--
-unportable performance hacks, e.g. FREEZE\-TYPE and PURIFY. For more
-information about these, look at the online documentation for symbols
-in the SB\-EXT package, and look at the user manual.
+unportable performance hacks, \fIe.g.\fR \f(CRFREEZE\-TYPE\fR and
+\f(CRPURIFY\fR. For more information about these, look at the online
+documentation for symbols in the \f(CRSB\-EXT\fR package, and look at the user
+manual.
 .PP
 
 There are also a few retained extensions which don't fall into any
-particular category, e.g. the ability to save running Lisp images as
+particular category, \fIe.g.\fR the ability to save running Lisp images as
 executable files.
 
 Some of the retained extensions have new names and/or different
 options than their CMU CL counterparts. For example, the SBCL function
 which saves a Lisp image to disk and kills the running process is
-called SAVE\-LISP\-AND\-DIE instead of SAVE\-LISP, and SBCL's
-SAVE\-LISP\-AND\-DIE supports fewer keyword options than CMU CL's
-SAVE\-LISP does.
+called \f(CRSAVE\-LISP\-AND\-DIE\fR instead of \f(CRSAVE\-LISP\fR, and
+SBCL's \f(CRSAVE\-LISP\-AND\-DIE\fR supports fewer keyword options
+than CMU CL's \f(CRSAVE\-LISP\fR does.
 
 (Why doesn't SBCL support more extensions natively?  Why drop all
 those nice extensions from CMU CL when the code already exists? This
@@ -200,7 +204,7 @@ about understanding the type system of Common Lisp and using it to
 optimize code, and about producing notes to let the user know when the
 compiler doesn't have enough type information to produce efficient
 code. It also tries (almost always successfully) to follow the unusual
-but very useful principle that "declarations are assertions", i.e.
+but very useful principle that "declarations are assertions", \fIi.e.\fR
 type declarations should be checked at runtime unless the user
 explicitly tells the system that speed is more important than safety.
 
@@ -256,7 +260,7 @@ Supported runtime options are
 .B \-\-core <corefilename>
 Run the specified Lisp core file instead of the default. (See the FILES
 section for the standard core, or the system documentation for
-SB\-INT:SAVE\-LISP\-AND\-DIE for information about how to create a 
+\f(CRSB\-INT:SAVE\-LISP\-AND\-DIE\fR for information about how to create a 
 custom core.) Note that if the Lisp core file is a user-created core
 file, it may run a nonstandard toplevel which does not recognize the
 standard toplevel options.
@@ -302,59 +306,63 @@ given. More than one \-\-eval option can be used, and all will be read
 and executed, in the order they appear on the command line.
 .TP 3
 .B \-\-load <filename>
-This is equivalent to \-\-eval '(load "<filename>")'. The special
+This is equivalent to \-\-eval \(aq(load "<filename>")\(aq. The special
 syntax is intended to reduce quoting headaches when invoking SBCL
 from shell scripts.
 .TP 3
 .B \-\-noprint
 When ordinarily the toplevel "read-eval-print loop" would be executed,
-execute a "read-eval loop" instead, i.e. don't print a prompt and
+execute a "read-eval loop" instead, \fIi.e.\fR don't print a prompt and
 don't echo results. Combined with the \-\-noinform runtime option, this
 makes it easier to write Lisp "scripts" which work cleanly in Unix
 pipelines.
 .TP 3
 .B \-\-disable\-debugger
-This is equivalent to \-\-eval '(sb\-ext:disable\-debugger)'. By default,
-a Common Lisp system tries to ask the programmer for help when it gets
-in trouble (by printing a debug prompt, then listening, on
-*DEBUG\-IO*). However, this is not useful behavior for a system running
-with no programmer available, and this option tries to set up more
-appropriate behavior for that situation. This is implemented by
-redefining INVOKE\-DEBUGGER so that any call exits the process with a
+This is equivalent to \-\-eval \(aq(sb\-ext:disable\-debugger)\(aq. By
+default, a Common Lisp system tries to ask the programmer for help
+when it gets in trouble (by printing a debug prompt, then listening,
+on \f(CR*DEBUG\-IO*\fR). However, this is not useful behavior for a system
+running with no programmer available, and this option tries to set up
+more appropriate behavior for that situation. This is implemented by
+redefining \f(CRINVOKE\-DEBUGGER\fR so that any call exits the process with a
 failure code after printing a backtrace. (Note that because it is
-implemented by modifying special variables and FDEFINITIONs, its
-effects persist in .core files created by SB\-EXT:SAVE\-LISP\-AND\-DIE. If
-you want to undo its effects, e.g. if you build a system unattended
-and then want to operate a derived system interactively, see the
-SB\-EXT:ENABLE\-DEBUGGER command.)
+implemented by modifying special variables and \f(CRFDEFINITION\fRs, its
+effects persist in .core files created by
+\f(CRSB\-EXT:SAVE\-LISP\-AND\-DIE\fR.  If you want to undo its
+effects, \fIe.g.\fR if you build a system unattended and then want to
+operate a derived system interactively, see the
+\f(CRSB\-EXT:ENABLE\-DEBUGGER\fR command.)
 .PP
 
-Regardless of the order in which \-\-sysinit, \-\-userinit, and \-\-eval
-options appear on the command line, the sysinit file, if it exists, is
-loaded first; then the userinit file, if it exists, is loaded; then
-any \-\-eval commands are read and executed in sequence; then the
-read-eval-print loop is started on standard input. At any step, error
-conditions or commands such as SB\-EXT:QUIT can cause execution to be
-terminated before proceeding to subsequent steps.
+Regardless of the order in which \-\-sysinit, \-\-userinit, and
+\-\-eval options appear on the command line, the sysinit file, if it
+exists, is loaded first; then the userinit file, if it exists, is
+loaded; then any \-\-eval commands are read and executed in sequence;
+then the read-eval-print loop is started on standard input. At any
+step, error conditions or commands such as \f(CRSB\-EXT:QUIT\fR can
+cause execution to be terminated before proceeding to subsequent
+steps.
 
-Note that when running SBCL with the \-\-core option, using a core file
-created by a user call to the SB\-EXT:SAVE\-LISP\-AND\-DIE, the toplevel
-options may be under the control of user code passed as arguments to
-SB\-EXT:SAVE\-LISP\-AND\-DIE. For this purpose, the \-\-end\-toplevel\-options
-option itself can be considered a toplevel option, i.e. the user core,
-at its option, may not support it.
+Note that when running SBCL with the \-\-core option, using a core
+file created by a user call to the
+\f(CRSB\-EXT:SAVE\-LISP\-AND\-DIE\fR, the toplevel options may be
+under the control of user code passed as arguments to
+\f(CRSB\-EXT:SAVE\-LISP\-AND\-DIE\fR. For this purpose, the
+\-\-end\-toplevel\-options option itself can be considered a toplevel
+option, \fIi.e.\fR the user core, at its option, may not support it.
 
-In the standard SBCL startup sequence (i.e. with no user core
+In the standard SBCL startup sequence (\fIi.e.\fR with no user core
 involved) toplevel options and any \-\-end\-toplevel\-options option are
 stripped out of the command line argument list before user code gets a
 chance to see it.
 
 .SH SYSTEM REQUIREMENTS
 
-SBCL currently runs on X86 (Linux, FreeBSD, OpenBSD, and NetBSD), Alpha
-(Linux, Tru64), PPC (Linux, Darwin/MacOS X), SPARC (Linux and Solaris
-2.x), and MIPS (Linux).  For information on other ongoing and possible
-ports, see the sbcl\-devel mailing list, and/or the web site.
+SBCL currently runs on X86 (Linux, FreeBSD, OpenBSD, and NetBSD),
+X86-64 (Linux), Alpha (Linux, Tru64), PPC (Linux, Darwin/MacOS X),
+SPARC (Linux and Solaris 2.x), and MIPS (Linux).  For information on
+other ongoing and possible ports, see the sbcl\-devel mailing list,
+and/or the web site.
 
 SBCL requires on the order of 16Mb RAM to run on X86 systems, though
 all but the smallest programs would be happier with 32Mb or more.
@@ -373,14 +381,16 @@ processes tend to be killed randomly (!).
 
 The compiler's handling of function return values unnecessarily
 violates the "declarations are assertions" principle that it otherwise
-adheres to. Using PROCLAIM or DECLAIM to specify the return type of a
-function causes the compiler to believe you without checking. Thus
-compiling a file containing
-(DECLAIM (FTYPE (FUNCTION (T) NULL) SOMETIMES))
-(DEFUN SOMETIMES (X) (ODDP X))
-(DEFUN FOO (X) (IF (SOMETIMES X) 'THIS\-TIME 'NOT\-THIS\-TIME))
-then running (FOO 1) gives NOT\-THIS\-TIME, because the compiler
-relied on the truth of the DECLAIM without checking it.
+adheres to. Using \f(CRPROCLAIM\fR or \f(CRDECLAIM\fR to specify the
+return type of a function causes the compiler to believe you without
+checking. Thus compiling a file containing
+\f(CR
+  (DECLAIM (FTYPE (FUNCTION (T) NULL) SOMETIMES))
+  (DEFUN SOMETIMES (X) (ODDP X))
+  (DEFUN FOO (X) (IF (SOMETIMES X) \(aqTHIS\-TIME \(aqNOT\-THIS\-TIME))\fR
+.br
+then running \f(CR(FOO 1)\fR gives \f(CRNOT\-THIS\-TIME\fR, because
+the compiler relied on the truth of the \f(CRDECLAIM\fR without checking it.
 
 Some things are implemented very inefficiently.
 .TP 3
@@ -389,78 +399,48 @@ Multidimensional arrays are inefficient, especially
 multidimensional arrays of floating point numbers.
 .TP 3
 \--
-The DYNAMIC\-EXTENT declaration isn't implemented at all, not even
-for &REST lists or upward closures, so such constructs always allocate
-their temporary storage from the heap, causing GC overhead.
-.TP 3
-\--
 CLOS isn't particularly efficient. (In part, CLOS is so dynamic
 that it's slow for fundamental reasons, but beyond that, the
 SBCL implementation of CLOS doesn't do some important known
 optimizations.)
 .TP 3
 \--
-SBCL, like most (maybe all?) implementations of Common Lisp on 
-stock hardware, has trouble
-passing floating point numbers around efficiently, because a floating
-point number, plus a few extra bits to identify its type,
-is larger than a machine word. (Thus, they get "boxed" in
-heap-allocated storage, causing GC overhead.) Within
-a single compilation unit,
-or when doing built-in operations like SQRT and AREF,
-or some special operations like structure slot accesses,
-this is avoidable: see the user manual for some
-efficiency hints. But for general function calls across
-the boundaries of compilation units, passing the result of 
-a floating point calculation
-as a function argument (or returning a floating point
-result as a function value) is a fundamentally slow operation.
-.PP
-
-There are still some nagging pre-ANSIisms, notably
-.TP 3
---
-The ANSI-recommended idiom for creating a function which is only
-sometimes expanded inline,
-(DECLAIM (INLINE F))
-(DEFUN F ...)
-(DECLAIM (NOTINLINE F)),
-doesn't do what you'd expect. (Instead, you have to declare the
-function as SB\-EXT:MAYBE\-INLINE to get the desired effect.)
-.TP 3
-\--
-There are several nonconforming bits of type syntax. E.g. (1) The type
-FOO is strictly equivalent to (FOO), so e.g. the type OR is treated as
-the type (OR), i.e. the empty type. This is the way that the ancestral
-code worked, and even though ANSI specifically forbids it, it hasn't
-been fixed yet. (2) The symbol * is the name of a type similar to T.
-(It's used as part of the implementation of compound types like (ARRAY
-* 1) and (CONS * *). In a strict ANSI implementation, * would not be
-the name of a type, but instead just a symbol which is recognized and
-handled specially by certain type expanders.)
+SBCL, like most (maybe all?) implementations of Common Lisp on stock
+hardware, has trouble passing floating point numbers around
+efficiently, because a floating point number, plus a few extra bits to
+identify its type, is larger than a machine word. (Thus, they get
+"boxed" in heap-allocated storage, causing GC overhead.) Within a
+single compilation unit, or when doing built-in operations like
+\f(CRSQRT\fR and \f(CRAREF\fR, or some special operations like
+structure slot accesses, this is avoidable: see the user manual for
+some efficiency hints. But for general function calls across the
+boundaries of compilation units, passing the result of a floating
+point calculation as a function argument (or returning a floating
+point result as a function value) is a fundamentally slow operation.
 .PP
 
 .SH REPORTING BUGS
 
 To report a bug, please send mail to the mailing lists sbcl-help or
 sbcl-devel. You can find the complete mailing list addresses on the
-web pages at <http://sbcl.sourceforge.net/>. (You may also find fancy
-SourceForge bug-tracking machinery there, but don't be fooled. As of
-2002-07-25 anyway, we don't actively monitor that machinery, and it
-exists only because we haven't been able to figure out how to turn
-it off.)
+web pages at <\f(CRhttp://sbcl.sourceforge.net/\fR>.  (You may also
+find fancy SourceForge bug-tracking machinery there, but don't be
+fooled. As of 2002-07-25 anyway, we don't actively monitor that
+machinery, and it exists only because we haven't been able to figure
+out how to turn it off.)
 
 As with any software bug report, it's most helpful if you can provide
 enough information to reproduce the symptoms reliably, and if you say
-clearly what the symptoms are. E.g. "There seems to be something wrong
-with TAN of very small negative arguments. When I execute
-(TAN LEAST\-NEGATIVE\-SINGLE\-FLOAT) interactively on sbcl-1.2.3 on my
-Linux 4.5 X86 box, I get an UNBOUND\-VARIABLE error."
+clearly what the symptoms are.  For example, "There seems to be
+something wrong with TAN of very small negative arguments. When I
+execute \f(CR(TAN LEAST\-NEGATIVE\-SINGLE\-FLOAT)\fR interactively on
+sbcl-1.2.3 on my Linux 4.5 X86 box, I get an \f(CRUNBOUND\-VARIABLE\fR
+error."
 
 .SH SUPPORT
 
 Various information about SBCL is available at
-<http://ww.sbcl.org/>. The mailing lists there are the recommended
+<\f(CRhttp://www.sbcl.org/\fR>. The mailing lists there are the recommended
 place to look for support.
 
 .SH ENVIRONMENT
@@ -470,7 +450,7 @@ place to look for support.
 This variable controls where files like "sbclrc", "sbcl.core", and the
 add-on "contrib" systems are searched for.  If it is not set, then
 sbcl sets it from a compile-time default location which is usually
-/usr/local/lib/sbcl/ but may have been changed e.g. by a third-party
+/usr/local/lib/sbcl/ but may have been changed \fIe.g.\fR by a third-party
 packager.
 
 .SH FILES
@@ -482,17 +462,17 @@ a loader, used to read sbcl.core
 .TP
 .I sbcl.core
 dumped memory image containing most of SBCL, to be loaded by
-the 'sbcl' executable.  Looked for in $SBCL_HOME, 
-unless overridden by the \-\-core option.
+the `sbcl' executable.  Looked for in $\f(CRSBCL_HOME\fR,
+unless overridden by the \f(CR\-\-core\fR option.
 .TP
 .I sbclrc
-optional system-wide startup script, looked for in $SBCL_HOME/sbclrc
-then /etc/sbclrc, unless overridden by the \-\-sysinit command line
+optional system-wide startup script, looked for in $\f(CRSBCL_HOME\fR/sbclrc
+then /etc/sbclrc, unless overridden by the \f(CR\-\-sysinit\fR command line
 option.
 .TP
 .I .sbclrc
 optional per-user customizable startup script (in user's home
-directory, or as specified by  \-\-userinit)
+directory, or as specified by  \f(CR\-\-userinit\fR)
 
 .SH AUTHORS
 
@@ -514,7 +494,7 @@ installation it may also be available in HTML and PDF formats in eg.
 .PP
 See the SBCL homepage 
 .IP
-.B http://www.sbcl.org/
+.B <\f(CRhttp://www.sbcl.org/\fR>
 .PP
 for more information, including directions on how to subscribe to the
 sbcl\-devel and sbcl\-help mailing-lists.
