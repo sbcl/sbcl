@@ -48,6 +48,7 @@ are:
 @findex compute-effective-method
 @findex sb-mop:compute-effective-method
 @code{compute-effective-method} only returns one value, not two.
+
 There is no record of what the second return value was meant to
 indicate, and apparently no clients for it.
   
@@ -60,6 +61,10 @@ the arguments @code{:declare} and @code{:declarations} to
 argument defining the declarations to be stored and returned by
 @code{generic-function-declarations}.
 
+Where AMOP specifies @code{:declarations} as the keyword argument to
+@code{ensure-generic-function}, the Common Lisp standard specifies
+@code{:declare}.  Portable code should use @code{:declare}.
+
 @item
 @findex validate-superclass
 @findex finalize-inheritance
@@ -69,6 +74,8 @@ argument defining the declarations to be stored and returned by
 @tindex funcallable-standard-class
 @tindex sb-mop:funcallable-standard-class
 @tindex function
+@findex sb-mop:class-prototype
+@findex class-prototype
 although SBCL obeys the requirement in AMOP for
 @code{validate-superclass} for @code{standard-class} and
 @code{funcallable-standard-class} to be compatible metaclasses, we
@@ -76,6 +83,40 @@ impose an additional requirement at class finalization time: a class
 of metaclass @code{funcallable-standard-class} must have
 @code{function} in its superclasses, and a class of metaclass
 @code{standard-class} must not.
+
+@findex typep
+@findex class-of
+@findex subtypep
+At class finalization, a class prototype which is accessible by a
+standard mop function @code{sb-mop:class-prototype}.  The user can
+then ask whether this object is a @code{function} or not in several
+different ways: whether it is a function according to @code{typep};
+whether its @code{class-of} is @code{subtypep} @code{function}, or
+whether @code{function} appears in the superclasses of the class.  The
+additional consistency requirement comes from the desire to make all
+of these answers the same.
+
+The following class definitions are bad, and will lead to errors
+either immediately or if an instance is created:
+@lisp
+(defclass bad-object (funcallable-standard-object)
+  ()
+  (:metaclass standard-class))
+@end lisp
+@lisp
+(defclass bad-funcallable-object (standard-object)
+  ()
+  (:metaclass funcallable-standard-class))
+@end lisp
+The following definition is acceptable:
+@lisp
+(defclass mixin ()
+  ((slot :initarg slot)))
+(defclass funcallable-object (funcallable-standard-object mixin)
+  ()
+  (:metaclass funcallable-standard-class))
+@end lisp
+and leads to a class whose instances are funcallable and have one slot.
 
 @end itemize
 
