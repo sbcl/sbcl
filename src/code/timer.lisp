@@ -360,9 +360,13 @@ triggers."
   "Execute the body, asynchronously interrupting it and signalling a
 TIMEOUT condition after at least EXPIRES seconds have passed."
   (with-unique-names (timer)
-    `(let ((,timer (make-timer (lambda ()
-                                 (cerror "Continue" 'sb!ext::timeout)))))
-      (schedule-timer ,timer ,expires)
-      (unwind-protect
-           (progn ,@body)
-        (unschedule-timer ,timer)))))
+    ;; FIXME: a temporary compatibility workaround for CLX, if unsafe
+    ;; unwinds are handled revisit it.
+    `(if (> ,expires 0)
+         (let ((,timer (make-timer (lambda ()
+                                     (cerror "Continue" 'sb!ext::timeout)))))
+           (schedule-timer ,timer ,expires)
+           (unwind-protect
+                (progn ,@body)
+             (unschedule-timer ,timer)))
+         (progn ,@body))))

@@ -19,7 +19,7 @@
 (in-package "MOP-6")
 
 ;;; COMPUTE-SLOTS :AROUND respecting requested order
-(defclass slot-rearrangement-class (standard-class) 
+(defclass slot-rearrangement-class (standard-class)
   ())
 (defmethod compute-slots ((c slot-rearrangement-class))
   (reverse (call-next-method)))
@@ -34,7 +34,7 @@
 (with-test (:name (compute-slots standard-class :order))
   (let ((class (find-class 'rearranged-class)))
     (finalize-inheritance class)
-    (assert (equal (mapcar #'slot-definition-name (class-slots class)) 
+    (assert (equal (mapcar #'slot-definition-name (class-slots class))
                    '(b a)))))
 (with-test (:name (compute-slots standard-class :slots))
   (let ((r (make-instance 'rearranged-class))
@@ -59,7 +59,7 @@
 (with-test (:name (compute-slots funcallable-standard-class :order))
   (let ((class (find-class 'funcallable-rearranged-class)))
     (finalize-inheritance class)
-    (assert (equal (mapcar #'slot-definition-name (class-slots class)) 
+    (assert (equal (mapcar #'slot-definition-name (class-slots class))
                    '(b a)))))
 (with-test (:name (compute-slots funcallable-standard-class :slots))
   (let ((r (make-instance 'funcallable-rearranged-class))
