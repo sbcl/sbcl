@@ -134,10 +134,11 @@ static long compute_offset(os_context_t *context, lispobj code)
 
 void handle_breakpoint(int signal, siginfo_t* info, os_context_t *context)
 {
-    lispobj code, context_sap = alloc_sap(context);
+    lispobj code, context_sap;
 
     fake_foreign_function_call(context);
 
+    context_sap = alloc_sap(context);
     code = find_code(context);
 
     /* Don't disallow recursive breakpoint traps. Otherwise, we can't
@@ -186,11 +187,12 @@ void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
 void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
                                 os_context_t *context)
 {
-    lispobj code, context_sap = alloc_sap(context);
+    lispobj code, context_sap;
     struct code *codeptr;
 
     fake_foreign_function_call(context);
 
+    context_sap = alloc_sap(context);
     code = find_code(context);
     codeptr = (struct code *)native_pointer(code);
 
