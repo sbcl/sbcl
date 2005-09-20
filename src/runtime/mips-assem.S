@@ -404,15 +404,17 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	END(closure_tramp)
 
 /*
- * Function-end breakpoint magic.
+ * Function-end breakpoint magic. This is truely magic, the code is
+ * copied and has to be relocatable. It also needs a properly aligned
+ * header tag after the fun_end_breakpoint_guts symbol.
  */
-	.align	3 /* minimum alignment for a lisp object */
-	.set	noreorder
-	.word	RETURN_PC_HEADER_WIDETAG
+	.align  3 /* minimum alignment for a lisp object */
 	LEAF(fun_end_breakpoint_guts)
-	b	multiple_value_return
+	.set    noreorder
+	.word   RETURN_PC_HEADER_WIDETAG
+	b       multiple_value_return
 	 nop
-	.set	reorder
+	.set    reorder
 
 	/* single value return */
 
