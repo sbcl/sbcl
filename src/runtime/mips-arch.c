@@ -23,7 +23,7 @@
 
 #include "genesis/constants.h"
 
-#define INSN_LEN    4
+#define INSN_LEN sizeof(unsigned int)
 
 void
 arch_init()
@@ -113,11 +113,12 @@ arch_insn_with_bdelay_p(unsigned int insn)
     return 0;
 }
 
-/* This function is somewhat misnamed, it actually just jumps to the
-   correct target address without attempting to execute the delay slot.
-   For other instructions it just increments the returned PC value. */
+/* Find the next instruction in the control flow. For a instruction
+   with branch delay slot, this is the branch/jump target if the branch
+   is taken, and PC + 8 if it is not taken. For other instructions it
+   is PC + 4. */
 static unsigned int
-emulate_branch(os_context_t *context, unsigned int inst)
+next_insn_addr(os_context_t *context, unsigned int inst)
 {
     unsigned int opcode = inst >> 26;
     unsigned int r1 = (inst >> 21) & 0x1f;
@@ -143,51 +144,44 @@ emulate_branch(os_context_t *context, unsigned int inst)
             break;
         }
         break;
-    case 0x1: /* bltz, bgez, bltzal, bgezal */
-        switch((inst >> 16) & 0x1f) {
+    case 0x1: /* bltz, bgez, bltzal, bgezal, ... */
+        switch(r2) {
         case 0x00: /* bltz */
+        case 0x02: /* bltzl */
             if(os_context_register(context, r1) < 0)
                 tgt += disp;
+            else
+                tgt += INSN_LEN;
             break;
         case 0x01: /* bgez */
+        case 0x03: /* bgezl */
             if(os_context_register(context, r1) >= 0)
                 tgt += disp;
+            else
+                tgt += INSN_LEN;
             break;
         case 0x10: /* bltzal */
-            if(os_context_register(context, r1) < 0)
+        case 0x12: /* bltzall */
+            if(os_context_register(context, r1) < 0) {
                 tgt += disp;
-            *os_context_register_addr(context, 31)
-                = os_context_pc(context) + INSN_LEN;
+                *os_context_register_addr(context, 31)
+                    = os_context_pc(context) + INSN_LEN;
+            } else
+                tgt += INSN_LEN;
             break;
         case 0x11: /* bgezal */
-            if(os_context_register(context, r1) >= 0)
+        case 0x13: /* bgezall */
+            if(os_context_register(context, r1) >= 0) {
                 tgt += disp;
-            *os_context_register_addr(context, 31)
-                = os_context_pc(context) + INSN_LEN;
+                *os_context_register_addr(context, 31)
+                    = os_context_pc(context) + INSN_LEN;
+            } else
+                tgt += INSN_LEN;
             break;
-        default: /* conditional branches/traps for > MIPS I, ignore for now. */
+        default:
+            tgt += INSN_LEN;
             break;
         }
-        break;
-    case 0x4: /* beq */
-        if(os_context_register(context, r1)
-           == os_context_register(context, r2))
-            tgt += disp;
-        break;
-    case 0x5: /* bne */
-        if(os_context_register(context, r1)
-           != os_context_register(context, r2))
-            tgt += disp;
-        break;
-    case 0x6: /* blez */
-        if(os_context_register(context, r1)
-           <= os_context_register(context, r2))
-            tgt += disp;
-        break;
-    case 0x7: /* bgtz */
-        if(os_context_register(context, r1)
-           > os_context_register(context, r2))
-            tgt += disp;
         break;
     case 0x2: /* j */
         tgt = jtgt;
@@ -197,8 +191,51 @@ emulate_branch(os_context_t *context, unsigned int inst)
         *os_context_register_addr(context, 31)
             = os_context_pc(context) + INSN_LEN;
         break;
+    case 0x4: /* beq */
+    case 0x14: /* beql */
+        if(os_context_register(context, r1)
+           == os_context_register(context, r2))
+            tgt += disp;
+        else
+            tgt += INSN_LEN;
+        break;
+    case 0x5: /* bne */
+    case 0x15: /* bnel */
+        if(os_context_register(context, r1)
+           != os_context_register(context, r2))
+            tgt += disp;
+        else
+            tgt += INSN_LEN;
+        break;
+    case 0x6: /* blez */
+    case 0x16: /* blezl */
+        if(os_context_register(context, r1)
+           <= os_context_register(context, r2))
+            tgt += disp;
+        else
+            tgt += INSN_LEN;
+        break;
+    case 0x7: /* bgtz */
+    case 0x17: /* bgtzl */
+        if(os_context_register(context, r1)
+           > os_context_register(context, r2))
+            tgt += disp;
+        else
+            tgt += INSN_LEN;
+        break;
+    case 0x10:
+    case 0x11:
+    case 0x12:
+        switch (r1) {
+         /* CP0/CP1/CP2 branches */
+        case 0x08:
+            /* FIXME */
+            tgt += INSN_LEN;
+            break;
+        }
+        break;
     default:
-        tgt += 4;
+        tgt += INSN_LEN;
         break;
     }
     return tgt;
@@ -209,10 +246,11 @@ arch_skip_instruction(os_context_t *context)
 {
     /* Skip the offending instruction.  Don't use os_context_insn here,
        since in case of a branch we want the branch insn, not the delay
-       slot.  */
+       slot. */
     *os_context_pc_addr(context)
-        = emulate_branch(context,
-            *(unsigned int *)(os_context_pc(context)));
+        = (os_context_register_t)
+            next_insn_addr(context,
+                *(unsigned int *)(os_context_pc(context)));
 }
 
 unsigned char *
@@ -240,18 +278,34 @@ unsigned long
 arch_install_breakpoint(void *pc)
 {
     unsigned int *ptr = (unsigned int *)pc;
-    unsigned int insn = *ptr;
-    unsigned long result;
+    unsigned int insn;
 
     /* Don't install over a branch/jump with delay slot.  */
-    if (arch_insn_with_bdelay_p(insn))
-            ptr++;
+    if (arch_insn_with_bdelay_p(*ptr))
+        ptr++;
 
-    result = (unsigned long)insn;
+    insn = *ptr;
     *ptr = (trap_Breakpoint << 6) | 0xd;
     os_flush_icache((os_vm_address_t)ptr, INSN_LEN);
 
-    return result;
+    return (unsigned long)insn;
+}
+
+static inline unsigned int
+arch_install_after_breakpoint(void *pc)
+{
+    unsigned int *ptr = (unsigned int *)pc;
+    unsigned int insn;
+
+    /* Don't install over a branch/jump with delay slot. */
+    if (arch_insn_with_bdelay_p(*ptr))
+        ptr++;
+
+    insn = *ptr;
+    *ptr = (trap_AfterBreakpoint << 6) | 0xd;
+    os_flush_icache((os_vm_address_t)ptr, INSN_LEN);
+
+    return insn;
 }
 
 void
@@ -259,9 +313,29 @@ arch_remove_breakpoint(void *pc, unsigned long orig_inst)
 {
     unsigned int *ptr = (unsigned int *)pc;
 
-    *ptr = (unsigned int) orig_inst;
+    /* We may remove from a branch delay slot. */
+    if (arch_insn_with_bdelay_p(*ptr))
+        ptr++;
+
+    *ptr = (unsigned int)orig_inst;
     os_flush_icache((os_vm_address_t)ptr, INSN_LEN);
 }
+
+/* Perform the instruction that we overwrote with a breakpoint.  As we
+   don't have a single-step facility, this means we have to:
+   - put the instruction back
+   - put a second breakpoint at the following instruction,
+     set after_breakpoint and continue execution.
+
+   When the second breakpoint is hit (very shortly thereafter, we hope)
+   sigtrap_handler gets called again, but follows the AfterBreakpoint
+   arm, which
+   - puts a bpt back in the first breakpoint place (running across a
+     breakpoint shouldn't cause it to be uninstalled)
+   - replaces the second bpt with the instruction it was meant to be
+   - carries on
+
+   Clear? */
 
 static unsigned int *skipped_break_addr, displaced_after_inst;
 static sigset_t orig_sigmask;
@@ -270,29 +344,18 @@ void
 arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
     unsigned int *pc = (unsigned int *)os_context_pc(context);
-    unsigned int *break_pc, *next_pc;
-    unsigned int next_inst;
+    unsigned int *next_pc;
 
     orig_sigmask = *os_context_sigmask_addr(context);
     sigaddset_blockable(os_context_sigmask_addr(context));
 
-    /* Figure out where the breakpoint is, and what happens next. */
-    if (os_context_bd_cause(context)) {
-        break_pc = pc+1;
-        next_inst = *pc;
-    } else {
-        break_pc = pc;
-        next_inst = orig_inst;
-    }
-
     /* Put the original instruction back. */
-    arch_remove_breakpoint(break_pc, orig_inst);
-    skipped_break_addr = break_pc;
+    arch_remove_breakpoint(pc, orig_inst);
+    skipped_break_addr = pc;
 
     /* Figure out where it goes. */
-    next_pc = (unsigned int *)emulate_branch(context, next_inst);
-
-    displaced_after_inst = arch_install_breakpoint(next_pc);
+    next_pc = (unsigned int *)next_insn_addr(context, *pc);
+    displaced_after_inst = arch_install_after_breakpoint(next_pc);
 }
 
 static void
@@ -327,8 +390,9 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
         break;
 
     case trap_AfterBreakpoint:
-        arch_remove_breakpoint(os_context_pc_addr(context), displaced_after_inst);
-        displaced_after_inst = arch_install_breakpoint(skipped_break_addr);
+        arch_install_breakpoint(skipped_break_addr);
+        arch_remove_breakpoint((unsigned int *)os_context_pc(context),
+                               displaced_after_inst);
         *os_context_sigmask_addr(context) = orig_sigmask;
         break;
 
