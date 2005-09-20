@@ -428,7 +428,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 multiple_value_return:
 
 	FEXPORT(fun_end_breakpoint_trap)
-	break	trap_FunEndBreakpoint
+	break	0x0, trap_FunEndBreakpoint
 	b	multiple_value_return
 	EXPORT(fun_end_breakpoint_end)
 	END(fun_end_breakpoint_guts)
