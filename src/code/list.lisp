@@ -233,7 +233,8 @@
 (defun last1 (list)
   #!+sb-doc
   "Return the last cons (not the last element) of a list"
-  (let ((rest list))
+  (let ((rest list)
+        (list list))
     (loop (unless (consp rest) (return list))
           (shiftf list rest (cdr rest)))))
 

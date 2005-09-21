@@ -344,6 +344,14 @@ cat > $tmpfilename <<EOF
 EOF
 expect_failed_compile $tmpfilename
 
+cat > $tmpfilename <<EOF
+(declaim (optimize (speed 3) (space 0) (safety 0)))
+
+(defun foo (bar)
+  (last bar))
+EOF
+expect_clean_compile $tmpfilename
+
 rm $tmpfilename
 rm $compiled_tmpfilename
 

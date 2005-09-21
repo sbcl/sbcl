@@ -35,6 +35,9 @@ changes in sbcl-0.9.5 relative to sbcl-0.9.4:
     iterated. (reported by Bryan O'Connor, fixed by Rob MacLachlan)
   * bug fix: backquote does not optimize (LIST* x y) to CONS when x
     may be expanded. (reported by Alexander <malishev> on c.l.l)
+  * bug fix: no more style-warnings when compiling code using LAST
+    under high-SPEED low-SPACE settings.  (reported by David Wallin
+    aka froog on #lisp)
   * fixed some incompatibilities between SBCL's MOP and the MOP
     specified by AMOP:
     ** the METAOBJECT class is now implemented;
