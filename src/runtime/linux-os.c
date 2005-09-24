@@ -52,19 +52,10 @@
 #include "gencgc-internal.h"
 #endif
 
-#ifdef LISP_FEATURE_LINUX
-/* Linux "man personality" on Debian 3.1 doesn't say what Linux
- * version introduced support for #include <sys/personality.h>, but
- * judging from jesnell's code for sbcl-0.9.4, 'twas Linux 2.6. */
-#define PERSONALITY_SUPPORTED_AT_COMPILE_TIME \
-  (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
-#else
-/* Linux "man personality" on Debian 3.1 says that <sys/personality.h>
- * stuff is Linux-only. */
-#define PERSONALITY_SUPPORTED_AT_COMPILE_TIME 0
-#endif
-#if PERSONALITY_SUPPORTED_AT_COMPILE_TIME
-#include <sys/personality.h>
+#ifdef LISP_FEATURE_X86
+/* Prototype for personality(2). Done inline here since the header file
+ * for this isn't available on old versions of glibc. */
+int personality (unsigned long);
 #endif
 
 size_t os_vm_page_size;
@@ -160,56 +151,43 @@ Please use a more recent kernel or a version of SBCL without threading support.\
 #endif
     os_vm_page_size = getpagesize();
 
-#ifdef LISP_FEATURE_LINUX
     /* KLUDGE: Disable memory randomization on new Linux kernels
      * by setting a personality flag and re-executing. (We need
      * to re-execute, since the memory maps that can conflict with
      * the SBCL spaces have already been done at this point).
+     *
+     * Since randomization is currently implemented only on x86 kernels,
+     * don't do this trick on other platforms.
      */
+#ifdef LISP_FEATURE_X86
     if ((major_version == 2 && minor_version >= 6)
-        || major_version >= 3) { /* i.e., if running on Linux which is new
-                                  * enough to have <sys/personality.h> */
-#if PERSONALITY_SUPPORTED_AT_COMPILE_TIME
-        {
-            long pers = personality(-1);
-            /* 0x40000 aka. ADDR_NO_RANDOMIZE */
-            if (!(pers & 0x40000)) {
-                if (personality(pers | 0x40000) != -1) {
-                    /* Use /proc/self/exe instead of trying to figure out
-                     * the executable path from PATH and argv[0], since
-                     * that's unreliable. We follow the symlink instead of
-                     * executing the file directly in order to prevent top
-                     * from displaying the name of the process as "exe". */
-                    char runtime[PATH_MAX+1];
-                    int i = readlink("/proc/self/exe", runtime, PATH_MAX);
-                    if (i != -1) {
-                        runtime[i] = '\0';
-                        execve(runtime, argv, envp);
-                    }
+        || major_version >= 3)
+    {
+        long pers = personality(-1);
+        /* 0x40000 aka. ADDR_NO_RANDOMIZE */
+        if (!(pers & 0x40000)) {
+            if (personality(pers | 0x40000) != -1) {
+                /* Use /proc/self/exe instead of trying to figure out
+                 * the executable path from PATH and argv[0], since
+                 * that's unreliable. We follow the symlink instead of
+                 * executing the file directly in order to prevent top
+                 * from displaying the name of the process as "exe". */
+                char runtime[PATH_MAX+1];
+                int i = readlink("/proc/self/exe", runtime, PATH_MAX);
+                if (i != -1) {
+                    runtime[i] = '\0';
+                    execve(runtime, argv, envp);
                 }
-                /* Either changing the personality or execve() failed. Either
-                 * way we might as well continue, and hope that the random
-                 * memory maps are ok this time around.
-                 */
-                fprintf(stderr, "WARNING: Couldn't re-execute SBCL with the proper personality flags (maybe /proc isn't mounted?). Trying to continue anyway.\n");
             }
+            /* Either changing the personality or execve() failed. Either
+             * way we might as well continue, and hope that the random
+             * memory maps are ok this time around.
+             */
+            fprintf(stderr, "WARNING: Couldn't re-execute SBCL with the proper personality flags (maybe /proc isn't mounted?). Trying to continue anyway.\n");
         }
-#else
-	/* KLUDGE: This doesn't seem like a particularly clever thing
-	 * to do, but I can't think of anything better at the moment.
-	 * One rigorously-correct-seeming possibility would be to have
-	 * personality() stuff be suppressed only at the explicit
-	 * request of the builder (in customize-target-features.lisp),
-	 * and then simply continue here without error, on the theory
-	 * that the builder knew what he was doing. But even to me
-	 * that seems like a lot of trouble to put the user to in the
-	 * common case when he's building on the same system he's
-	 * running on. -- WHN */
-        lose("This SBCL executable was built on some system too old to have <sys/personality.h>, and running it on this newer system which has <sys/personality.h> is unsupported. Consider rebuilding SBCL from source on the new system.");
-#endif
     }
-}
 #endif
+}
 
 
 #ifdef LISP_FEATURE_ALPHA
