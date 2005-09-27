@@ -98,16 +98,17 @@ int linux_sparc_siginfo_bug = 0;
 int linux_no_threads_p = 0;
 
 #ifdef LISP_FEATURE_SB_THREAD
-int isnptl (void)
+int
+isnptl (void)
 {
   size_t n = confstr (_CS_GNU_LIBPTHREAD_VERSION, NULL, 0);
-  if (n > 0)
-    {
+  if (n > 0) {
       char *buf = alloca (n);
       confstr (_CS_GNU_LIBPTHREAD_VERSION, buf, n);
-      if (strstr (buf, "NPTL"))
-        return 1;
-    }
+      if (strstr (buf, "NPTL")) {
+          return 1;
+      }
+  }
   return 0;
 }
 #endif
@@ -163,10 +164,21 @@ Please use a more recent kernel or a version of SBCL without threading support.\
     if ((major_version == 2 && minor_version >= 6)
         || major_version >= 3)
     {
-        long pers = personality(-1);
+        int pers = personality(0xffffffffUL);
         /* 0x40000 aka. ADDR_NO_RANDOMIZE */
         if (!(pers & 0x40000)) {
-            if (personality(pers | 0x40000) != -1) {
+            int retval = personality(pers | 0x40000);
+            /* Allegedly some Linux kernels (the reported case was
+             * "hardened Linux 2.6.7") won't set the new personality,
+             * but nor will they return -1 for an error. So as a
+             * workaround query the new personality...
+             */
+            int newpers = personality(0xffffffffUL);
+            /* ... and don't re-execute if either the setting resulted
+             * in an error or if the value didn't change. Otherwise
+             * this might result in an infinite loop.
+             */
+            if (retval != -1 && newpers != pers) {        
                 /* Use /proc/self/exe instead of trying to figure out
                  * the executable path from PATH and argv[0], since
                  * that's unreliable. We follow the symlink instead of
