@@ -91,19 +91,19 @@ void arch_skip_instruction(os_context_t *context)
     ((char *) *os_context_npc_addr(context)) += 4;
 }
 
-unsigned long arch_install_breakpoint(void *pc)
+unsigned int arch_install_breakpoint(void *pc)
 {
-    unsigned long *ulpc = (unsigned long *)pc;
-    unsigned long orig_inst = *ulpc;
+    unsigned int *ulpc = (unsigned int *)pc;
+    unsigned int orig_inst = *ulpc;
 
     *ulpc = trap_Breakpoint;
     os_flush_icache((os_vm_address_t)pc, sizeof(*ulpc));
     return orig_inst;
 }
 
-void arch_remove_breakpoint(void *pc, unsigned long orig_inst)
+void arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 {
-    unsigned long *ulpc = (unsigned long *)pc;
+    unsigned int *ulpc = (unsigned int *)pc;
 
     *ulpc = orig_inst;
     os_flush_icache((os_vm_address_t)pc, sizeof(*ulpc));
@@ -117,14 +117,14 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     /* We change the next-pc to point to a breakpoint instruction, restore */
     /* the original instruction, and exit.  We would like to be able to */
     /* sigreturn, but we can't, because this is hpux. */
-    unsigned long *pc = (unsigned long *)(SC_PC(scp) & ~3);
+    unsigned int *pc = (unsigned int *)(SC_PC(scp) & ~3);
 
     NextPc = SC_NPC(scp);
-    SC_NPC(scp) = (unsigned)SingleStepTraps | (SC_NPC(scp)&3);
+    SC_NPC(scp) = (unsigned int)SingleStepTraps | (SC_NPC(scp)&3);
 
     BreakpointAddr = pc;
     *pc = orig_inst;
-    os_flush_icache((os_vm_address_t)pc, sizeof(unsigned long));
+    os_flush_icache((os_vm_address_t)pc, sizeof(unsigned int));
 #else
     /* We set the recovery counter to cover one instruction, put the */
     /* original instruction back in, and then resume.  We will then trap */
@@ -133,7 +133,7 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 
     ((struct hp800_thread_state *)scp->sc_ap)->cr0 = 1;
     scp->sc_ps |= 0x10;
-    *(unsigned long *)SC_PC(scp) = orig_inst;
+    *(unsigned int *)SC_PC(scp) = orig_inst;
 
     sigreturn(scp);
 #endif
@@ -150,10 +150,10 @@ static void restore_breakpoint(struct sigcontext *scp)
     if (NextPc == NULL)
         lose("SingleStepBreakpoint trap at strange time.");
 
-    if ((SC_PC(scp)&~3) == (unsigned long)SingleStepTraps) {
+    if ((SC_PC(scp)&~3) == (unsigned int)SingleStepTraps) {
         /* The next instruction was not nullified. */
         SC_PC(scp) = NextPc;
-        if ((SC_NPC(scp)&~3) == (unsigned long)SingleStepTraps + 4) {
+        if ((SC_NPC(scp)&~3) == (unsigned int)SingleStepTraps + 4) {
             /* The instruction we just stepped over was not a branch, so */
             /* we need to fix it up.  If it was a branch, it will point to */
             /* the correct place. */
@@ -170,7 +170,7 @@ static void restore_breakpoint(struct sigcontext *scp)
     if (BreakpointAddr) {
         *BreakpointAddr = trap_Breakpoint;
         os_flush_icache((os_vm_address_t)BreakpointAddr,
-                        sizeof(unsigned long));
+                        sizeof(unsigned int));
         BreakpointAddr = NULL;
     }
 }
@@ -179,14 +179,14 @@ static void restore_breakpoint(struct sigcontext *scp)
 static void sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    unsigned long bad_inst;
+    unsigned int bad_inst;
 
 #if 0
     printf("sigtrap_handler, pc=0x%08x, alloc=0x%08x\n", scp->sc_pcoqh,
            SC_REG(scp,reg_ALLOC));
 #endif
 
-    bad_inst = *(unsigned long *)(*os_context_pc_addr(context) & ~3);
+    bad_inst = *(unsigned int *)(*os_context_pc_addr(context) & ~3);
     if (bad_inst & 0xfc001fe0)
         interrupt_handle_now(signal, siginfo, context);
     else {
@@ -240,7 +240,7 @@ static void sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
 static void sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    unsigned long badinst;
+    unsigned int badinst;
     int opcode, r1, r2, t;
     long op1, op2, res;
 
@@ -251,7 +251,7 @@ static void sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
 
     switch (siginfo->si_code) {
     case FPE_INTOVF: /*I_OVFLO: */
-        badinst = *(unsigned long *)(*os_context_pc_addr(context) & ~3);
+        badinst = *(unsigned int *)(*os_context_pc_addr(context) & ~3);
         opcode = badinst >> 26;
 
         if (opcode == 2) {
@@ -301,7 +301,7 @@ static void sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
         break;
 
     case 0: /* I_COND: ?? Maybe tagged add?? FIXME */
-        badinst = *(unsigned long *)(*os_context_pc_addr(context) & ~3);
+        badinst = *(unsigned int *)(*os_context_pc_addr(context) & ~3);
         if ((badinst&0xfffff800) == (0xb000e000|reg_ALLOC<<21|reg_ALLOC<<16)) {
             /* It is an ADDIT,OD i,ALLOC,ALLOC instruction that trapped. */
             /* That means that it is the end of a pseudo-atomic.  So do the */
@@ -333,11 +333,11 @@ static void sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
 static void sigbus_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    unsigned long badinst;
+    unsigned int badinst;
     int opcode, r1, r2, t;
     long op1, op2, res;
 
-    badinst = *(unsigned long *)(*os_context_pc_addr(context) & ~3);
+    badinst = *(unsigned int *)(*os_context_pc_addr(context) & ~3);
     /* First, test for the pseudo-atomic instruction */
     if ((badinst & 0xfffff800) == (0xb000e000 |
                                    reg_ALLOC<<21 |

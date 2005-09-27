@@ -35,11 +35,11 @@ void arch_init(void)
 
 os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
-    unsigned long badinst;
-    unsigned long *pc;
+    unsigned int badinst;
+    unsigned int *pc;
     int rs1;
 
-    pc = (unsigned long *)(*os_context_pc_addr(context));
+    pc = (unsigned int *)(*os_context_pc_addr(context));
 
     /* On the sparc, we have to decode the instruction. */
 
@@ -105,30 +105,47 @@ void arch_set_pseudo_atomic_interrupted(os_context_t *context)
     *os_context_register_addr(context,reg_ALLOC) |=  1;
 }
 
-unsigned long arch_install_breakpoint(void *pc)
+unsigned int arch_install_breakpoint(void *pc)
 {
-    unsigned long *ptr = (unsigned long *)pc;
-    unsigned long result = *ptr;
+    unsigned int *ptr = (unsigned int *)pc;
+    unsigned int result = *ptr;
     *ptr = trap_Breakpoint;
 
-    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned long));
+    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
 
     return result;
 }
 
-void arch_remove_breakpoint(void *pc, unsigned long orig_inst)
+void arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 {
-    *(unsigned long *)pc = orig_inst;
-    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned long));
+    *(unsigned int *)pc = orig_inst;
+    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
 }
 
-static unsigned long *skipped_break_addr, displaced_after_inst;
+/*
+ * Perform the instruction that we overwrote with a breakpoint.  As we
+ * don't have a single-step facility, this means we have to:
+ * - put the instruction back
+ * - put a second breakpoint at the following instruction,
+ *   set after_breakpoint and continue execution.
+ *
+ * When the second breakpoint is hit (very shortly thereafter, we hope)
+ * sigtrap_handler gets called again, but follows the AfterBreakpoint
+ * arm, which
+ * - puts a bpt back in the first breakpoint place (running across a
+ *   breakpoint shouldn't cause it to be uninstalled)
+ * - replaces the second bpt with the instruction it was meant to be
+ * - carries on
+ *
+ * Clear?
+ */
+static unsigned int *skipped_break_addr, displaced_after_inst;
 static sigset_t orig_sigmask;
 
 void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
-    unsigned long *pc = (unsigned long *)(*os_context_pc_addr(context));
-    unsigned long *npc = (unsigned long *)(*os_context_npc_addr(context));
+    unsigned int *pc = (unsigned int *)(*os_context_pc_addr(context));
+    unsigned int *npc = (unsigned int *)(*os_context_npc_addr(context));
 
   /*  orig_sigmask = context->sigmask;
       sigemptyset(&context->sigmask); */
@@ -136,11 +153,11 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
   /* FILLBLOCKSET(&context->uc_sigmask);*/
 
     *pc = orig_inst;
-    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned long));
+    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
     skipped_break_addr = pc;
     displaced_after_inst = *npc;
     *npc = trap_AfterBreakpoint;
-    os_flush_icache((os_vm_address_t) npc, sizeof(unsigned long));
+    os_flush_icache((os_vm_address_t) npc, sizeof(unsigned int));
 
 }
 
@@ -227,10 +244,11 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
 
         case trap_AfterBreakpoint:
             *skipped_break_addr = trap_Breakpoint;
+            os_flush_icache(skipped_break_addr, sizeof(unsigned int));
             skipped_break_addr = NULL;
             *(unsigned long *) os_context_pc_addr(context) = displaced_after_inst;
             /* context->sigmask = orig_sigmask; */
-            os_flush_icache((os_vm_address_t) os_context_pc_addr(context), sizeof(unsigned long));
+            os_flush_icache((os_vm_address_t) os_context_pc_addr(context), sizeof(unsigned int));
             break;
 
         default:
@@ -263,7 +281,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
 
 static void sigemt_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
-    unsigned long badinst;
+    unsigned int badinst;
     boolean subtract, immed;
     int rd, rs1, op1, rs2, op2, result;
     os_context_t *context = arch_os_get_context(&void_context);
@@ -271,7 +289,7 @@ static void sigemt_handler(int signal, siginfo_t *siginfo, void *void_context)
     os_restore_fp_control(context);
 #endif
 
-    badinst = *(unsigned long *)os_context_pc_addr(context);
+    badinst = *(unsigned int *)os_context_pc_addr(context);
     if ((badinst >> 30) != 2 || ((badinst >> 20) & 0x1f) != 0x11) {
         /* It wasn't a tagged add.  Pass the signal into lisp. */
         interrupt_handle_now(signal, siginfo, context);

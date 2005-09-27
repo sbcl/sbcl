@@ -86,24 +86,41 @@ arch_set_pseudo_atomic_interrupted(os_context_t *context)
         += PSEUDO_ATOMIC_INTERRUPTED_BIAS;
 }
 
-unsigned long
+unsigned int
 arch_install_breakpoint(void *pc)
 {
-    unsigned long *ptr = (unsigned long *)pc;
-    unsigned long result = *ptr;
+    unsigned int *ptr = (unsigned int *)pc;
+    unsigned int result = *ptr;
     *ptr = (3<<26) | (5 << 21) | trap_Breakpoint;
-    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned long));
+    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
     return result;
 }
 
 void
-arch_remove_breakpoint(void *pc, unsigned long orig_inst)
+arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 {
-    *(unsigned long *)pc = orig_inst;
-    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned long));
+    *(unsigned int *)pc = orig_inst;
+    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
 }
 
-static unsigned long *skipped_break_addr, displaced_after_inst;
+/*
+ * Perform the instruction that we overwrote with a breakpoint.  As we
+ * don't have a single-step facility, this means we have to:
+ * - put the instruction back
+ * - put a second breakpoint at the following instruction,
+ *   set after_breakpoint and continue execution.
+ *
+ * When the second breakpoint is hit (very shortly thereafter, we hope)
+ * sigtrap_handler gets called again, but follows the AfterBreakpoint
+ * arm, which
+ * - puts a bpt back in the first breakpoint place (running across a
+ *   breakpoint shouldn't cause it to be uninstalled)
+ * - replaces the second bpt with the instruction it was meant to be
+ * - carries on
+ *
+ * Clear?
+ */
+static unsigned int *skipped_break_addr, displaced_after_inst;
 static sigset_t orig_sigmask;
 
 void
@@ -111,20 +128,20 @@ arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
 {
     /* not sure how we ensure that we get the breakpoint reinstalled
      * after doing this -dan */
-    unsigned long *pc = (unsigned long *)(*os_context_pc_addr(context));
+    unsigned int *pc = (unsigned int *)(*os_context_pc_addr(context));
 
     orig_sigmask = *os_context_sigmask_addr(context);
     sigaddset_blockable(os_context_sigmask_addr(context));
 
     *pc = orig_inst;
-    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned long));
+    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
     skipped_break_addr = pc;
 }
 
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    u32 code;
+    unsigned int code;
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif
@@ -173,12 +190,12 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
         case trap_AfterBreakpoint:
             *skipped_break_addr = trap_Breakpoint;
             skipped_break_addr = NULL;
-            *(unsigned long *)*os_context_pc_addr(context)
+            *(unsigned int *)*os_context_pc_addr(context)
                 = displaced_after_inst;
             *os_context_sigmask_addr(context)= orig_sigmask;
 
             os_flush_icache((os_vm_address_t) *os_context_pc_addr(context),
-                            sizeof(unsigned long));
+                            sizeof(unsigned int));
             break;
 
         default:

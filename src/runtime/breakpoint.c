@@ -43,19 +43,19 @@ static void *compute_pc(lispobj code_obj, int pc_offset)
                     + pc_offset);
 }
 
-unsigned long breakpoint_install(lispobj code_obj, int pc_offset)
+unsigned int breakpoint_install(lispobj code_obj, int pc_offset)
 {
     return arch_install_breakpoint(compute_pc(code_obj, pc_offset));
 }
 
 void breakpoint_remove(lispobj code_obj, int pc_offset,
-                       unsigned long orig_inst)
+                       unsigned int orig_inst)
 {
     arch_remove_breakpoint(compute_pc(code_obj, pc_offset), orig_inst);
 }
 
 void breakpoint_do_displaced_inst(os_context_t* context,
-                                  unsigned long orig_inst)
+                                  unsigned int orig_inst)
 {
     /* on platforms with sigreturn(), we go directly back from
      * arch_do_displaced_inst() to lisp code, so we need to clean up

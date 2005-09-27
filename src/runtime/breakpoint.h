@@ -12,12 +12,12 @@
 #ifndef _BREAKPOINT_H_
 #define _BREAKPOINT_H_
 
-extern unsigned long breakpoint_install(lispobj code_obj, int pc_offset);
+extern unsigned int breakpoint_install(lispobj code_obj, int pc_offset);
 extern void breakpoint_remove(lispobj code_obj,
                               int pc_offset,
-                              unsigned long orig_inst);
+                              unsigned int orig_inst);
 extern void breakpoint_do_displaced_inst(os_context_t *context,
-                                         unsigned long orig_inst);
+                                         unsigned int orig_inst);
 extern void handle_breakpoint(int signal, siginfo_t *info,
                               os_context_t *context);
 extern void *handle_fun_end_breakpoint(int signal, siginfo_t *info,

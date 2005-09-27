@@ -115,24 +115,22 @@ void arch_set_pseudo_atomic_interrupted(os_context_t *context)
     *os_context_register_addr(context,reg_ALLOC) |=  (1L<<63);
 }
 
-unsigned long arch_install_breakpoint(void *pc)
+unsigned int arch_install_breakpoint(void *pc)
 {
     unsigned int *ptr = (unsigned int *)pc;
-    unsigned long result = (unsigned long) *ptr;
+    unsigned int result = *ptr;
     *ptr = BREAKPOINT_INST;
 
-    os_flush_icache((os_vm_address_t)ptr, sizeof(unsigned long));
+    os_flush_icache((os_vm_address_t)ptr, sizeof(unsigned int));
 
     return result;
 }
 
-void arch_remove_breakpoint(void *pc, unsigned long orig_inst)
+void arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 {
-    /* was (unsigned int) but gcc complains.  Changed to mirror
-     * install_breakpoint() above */
-    unsigned long *ptr=(unsigned long *)pc;
+    unsigned int *ptr = (unsigned int *)pc;
     *ptr = orig_inst;
-    os_flush_icache((os_vm_address_t)pc, sizeof(unsigned long));
+    os_flush_icache((os_vm_address_t)pc, sizeof(unsigned int));
 }
 
 static unsigned int *skipped_break_addr, displaced_after_inst,
@@ -142,7 +140,7 @@ static unsigned int *skipped_break_addr, displaced_after_inst,
 /* This returns a PC value.  Lisp code is all in the 32-bit-addressable
  * space, so we should be ok with an unsigned int. */
 unsigned int
-emulate_branch(os_context_t *context,unsigned long orig_inst)
+emulate_branch(os_context_t *context, unsigned int orig_inst)
 {
     int op = orig_inst >> 26;
     int reg_a = (orig_inst >> 21) & 0x1f;
@@ -257,7 +255,7 @@ void arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
 
     /* Put the original instruction back. */
     *pc = orig_inst;
-    os_flush_icache((os_vm_address_t)pc, sizeof(unsigned long));
+    os_flush_icache((os_vm_address_t)pc, sizeof(unsigned int));
     skipped_break_addr = pc;
 
     /* Figure out where we will end up after running the displaced
@@ -272,7 +270,7 @@ void arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
     displaced_after_inst = *next_pc;
     *next_pc = BREAKPOINT_INST;
     after_breakpoint=1;
-    os_flush_icache((os_vm_address_t)next_pc, sizeof(unsigned long));
+    os_flush_icache((os_vm_address_t)next_pc, sizeof(unsigned int));
 }
 
 static void
@@ -298,11 +296,11 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
             *os_context_pc_addr(context) -=4;
             *skipped_break_addr = BREAKPOINT_INST;
             os_flush_icache((os_vm_address_t)skipped_break_addr,
-                            sizeof(unsigned long));
+                            sizeof(unsigned int));
             skipped_break_addr = NULL;
             *(unsigned int *)*os_context_pc_addr(context) =
                 displaced_after_inst;
-            os_flush_icache((os_vm_address_t)*os_context_pc_addr(context), sizeof(unsigned long));
+            os_flush_icache((os_vm_address_t)*os_context_pc_addr(context), sizeof(unsigned int));
             *os_context_sigmask_addr(context)= orig_sigmask;
             after_breakpoint=0; /* false */
             return;

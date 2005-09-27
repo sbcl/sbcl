@@ -274,7 +274,7 @@ arch_set_pseudo_atomic_interrupted(os_context_t *context)
     *os_context_register_addr(context, reg_NL4) |= -1LL<<31;
 }
 
-unsigned long
+unsigned int
 arch_install_breakpoint(void *pc)
 {
     unsigned int *ptr = (unsigned int *)pc;
@@ -288,7 +288,7 @@ arch_install_breakpoint(void *pc)
     *ptr = (trap_Breakpoint << 6) | 0xd;
     os_flush_icache((os_vm_address_t)ptr, INSN_LEN);
 
-    return (unsigned long)insn;
+    return insn;
 }
 
 static inline unsigned int
@@ -309,7 +309,7 @@ arch_install_after_breakpoint(void *pc)
 }
 
 void
-arch_remove_breakpoint(void *pc, unsigned long orig_inst)
+arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 {
     unsigned int *ptr = (unsigned int *)pc;
 
@@ -317,7 +317,7 @@ arch_remove_breakpoint(void *pc, unsigned long orig_inst)
     if (arch_insn_with_bdelay_p(*ptr))
         ptr++;
 
-    *ptr = (unsigned int)orig_inst;
+    *ptr = orig_inst;
     os_flush_icache((os_vm_address_t)ptr, INSN_LEN);
 }
 

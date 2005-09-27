@@ -3044,7 +3044,7 @@ register."
 ;;; returns the overwritten bits. You must call this in a context in
 ;;; which GC is disabled, so that Lisp doesn't move objects around
 ;;; that C is pointing to.
-(sb!alien:define-alien-routine "breakpoint_install" sb!alien:unsigned-long
+(sb!alien:define-alien-routine "breakpoint_install" sb!alien:unsigned-int
   (code-obj sb!alien:unsigned-long)
   (pc-offset sb!alien:int))
 
@@ -3054,11 +3054,11 @@ register."
 (sb!alien:define-alien-routine "breakpoint_remove" sb!alien:void
   (code-obj sb!alien:unsigned-long)
   (pc-offset sb!alien:int)
-  (old-inst sb!alien:unsigned-long))
+  (old-inst sb!alien:unsigned-int))
 
 (sb!alien:define-alien-routine "breakpoint_do_displaced_inst" sb!alien:void
   (scp (* os-context-t))
-  (orig-inst sb!alien:unsigned-long))
+  (orig-inst sb!alien:unsigned-int))
 
 ;;;; breakpoint handlers (layer between C and exported interface)
 

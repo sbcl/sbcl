@@ -131,10 +131,10 @@ arch_set_pseudo_atomic_interrupted(os_context_t *context)
  * This stuff seems to get called for TRACE and debug activity.
  */
 
-unsigned long
+unsigned int
 arch_install_breakpoint(void *pc)
 {
-    unsigned long result = *(unsigned long*)pc;
+    unsigned int result = *(unsigned int*)pc;
 
     *(char*)pc = BREAKPOINT_INST;               /* x86 INT3       */
     *((char*)pc+1) = trap_Breakpoint;           /* Lisp trap code */
@@ -143,7 +143,7 @@ arch_install_breakpoint(void *pc)
 }
 
 void
-arch_remove_breakpoint(void *pc, unsigned long orig_inst)
+arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 {
     *((char *)pc) = orig_inst & 0xff;
     *((char *)pc + 1) = (orig_inst & 0xff00) >> 8;
@@ -180,7 +180,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     *context_eflags_addr(context) |= 0x100;
 #endif
 
-    single_stepping = (unsigned int*)pc;
+    single_stepping = pc;
 
 #ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
     *os_context_pc_addr(context) = (char *)pc - 9;
