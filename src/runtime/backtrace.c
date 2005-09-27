@@ -22,6 +22,7 @@
 #include "interrupt.h"
 #include "lispregs.h"
 #ifdef LISP_FEATURE_GENCGC
+#include <wchar.h>
 #include "arch.h"
 #include "gencgc-alloc-region.h"
 #include "genesis/compiled-debug-fun.h"
@@ -285,14 +286,21 @@ backtrace(int nframes)
 static int
 stack_pointer_p (void *p)
 {
+  /* we are using sizeof(long) here, because that is the right value on both
+   * x86 and x86-64.  (But note that false positives would not cause much harm
+   * given the heuristical nature of x86_call_context.) */
+  unsigned long stack_alignment = sizeof(long);
   return (p < (void *) arch_os_get_current_thread()->control_stack_end
           && p > (void *) &p
-          && (((unsigned long) p) & 3) == 0);
+          && (((unsigned long) p) & (stack_alignment-1)) == 0);
 }
 
 static int
 ra_pointer_p (void *ra)
 {
+  /* the check against 4096 is still a mystery to everyone interviewed about
+   * it, but recent changes to sb-sprof seem to suggest that such values
+   * do occur sometimes. */ 
   return ((unsigned long) ra) > 4096 && !stack_pointer_p (ra);
 }
 
@@ -398,6 +406,40 @@ debug_function_from_pc (struct code* code, void *pc)
 }
 
 static void
+print_string (lispobj *object)
+{
+  int tag = widetag_of(*object);
+  struct vector *vector = (struct vector *) object;
+
+#define doit(TYPE)                              \
+  do {                                          \
+    int i;                                      \
+    int n = fixnum_value(vector->length);       \
+    TYPE *data = (TYPE *) vector->data;         \
+    for (i = 0; i < n; i++) {                   \
+      wchar_t c = (wchar_t) data[i];            \
+      if (c == '\\' || c == '"')                \
+        putchar('\\');                          \
+      putwc(c, stdout);                         \
+    }                                           \
+  } while (0)
+
+  switch (tag) {
+  case SIMPLE_BASE_STRING_WIDETAG:
+    doit(unsigned char);
+    break;
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+  case SIMPLE_CHARACTER_STRING_WIDETAG:
+    doit(unsigned int);
+    break;
+#endif
+  default:
+    printf("<??? type %d>", tag);
+  }
+#undef doit
+}
+
+static void
 print_entry_name (lispobj name)
 {
   if (lowtag_of (name) == LIST_POINTER_LOWTAG) {
@@ -412,33 +454,32 @@ print_entry_name (lispobj name)
     putchar(')');
   } else if (lowtag_of(name) == OTHER_POINTER_LOWTAG) {
     lispobj *object = (lispobj *) native_pointer(name);
-
     if (widetag_of(*object) == SYMBOL_HEADER_WIDETAG) {
       struct symbol *symbol = (struct symbol *) object;
-      struct vector *string;
-
       if (symbol->package != NIL) {
         struct package *pkg
           = (struct package *) native_pointer(symbol->package);
         lispobj pkg_name = pkg->_name;
-        string = (struct vector *) native_pointer(pkg_name);
-        printf("%s::", (char *) string->data);
+        print_string(native_pointer(pkg_name));
+        fputs("::", stdout);
       }
-
-      object = (lispobj *) native_pointer(symbol->name);
-      string = (struct vector *) object;
-      printf("%s", (char *) string->data);
+      print_string(native_pointer(symbol->name));
     } else if (widetag_of(*object) == SIMPLE_BASE_STRING_WIDETAG) {
-      struct vector *string = (struct vector *) object;
-      printf("\"%s\"", (char *) string->data);
+         putchar('"');
+         print_string(object);
+         putchar('"');
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-    } else if (widetag_of(*object) == SIMPLE_CHARACTER_STRING_WIDETAG) {
-      printf("<oops, a unicode string>");                           /* FIXME */
+      } else if (widetag_of(*object) == SIMPLE_CHARACTER_STRING_WIDETAG) {
+         putchar('"');
+         print_string(object);
+         putchar('"');
 #endif
-    } else
+    } else {
       printf("<??? type %d>", (int) widetag_of(*object));
-  } else
+    }
+  } else {
     printf("<??? lowtag %d>", (int) lowtag_of(name));
+  }
 }
 
 static void

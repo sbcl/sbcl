@@ -3,6 +3,8 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
   * bug fix: add a workaround to SBCL looping infinitely at startup on 
     Linux kernels with apparently buggy implementations of personality().
     (thanks to Svein Ove Aas)
+  * bug fix: Unicode symbols are correctly printed in LDB backtraces
+    (thanks to David Lichteblau)
 
 changes in sbcl-0.9.5 relative to sbcl-0.9.4:
   * new feature: timers based on Zach Beane's excellent timer package
