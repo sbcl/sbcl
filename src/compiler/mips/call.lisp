@@ -481,6 +481,7 @@ default-value-8
   (:ignore args save)
   (:vop-var vop)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 20
     (let ((label (gen-label))
           (cur-nfp (current-nfp-tn vop)))
@@ -947,19 +948,26 @@ default-value-8
       (when cur-nfp
         (inst addu nsp-tn cur-nfp
               (bytes-needed-for-non-descriptor-stack-frame))))
-    ;; Establish the values pointer and values count.
-    (move val-ptr cfp-tn)
-    (inst li nargs (fixnumize nvals))
-    ;; restore the frame pointer and clear as much of the control
-    ;; stack as possible.
-    (move cfp-tn ocfp)
-    (inst addu csp-tn val-ptr (* nvals n-word-bytes))
-    ;; pre-default any argument register that need it.
-    (when (< nvals register-arg-count)
-      (dolist (reg (subseq (list a0 a1 a2 a3 a4 a5) nvals))
-        (move reg null-tn)))
-    ;; And away we go.
-    (lisp-return return-pc lip)
+    (cond ((= nvals 1)
+           ;; Clear the control stack, and restore the frame pointer.
+           (move csp-tn cfp-tn)
+           (move cfp-tn ocfp)
+           ;; Out of here.
+           (lisp-return return-pc lip :offset 2))
+          (t
+           ;; Establish the values pointer and values count.
+           (move val-ptr cfp-tn)
+           (inst li nargs (fixnumize nvals))
+           ;; restore the frame pointer and clear as much of the control
+           ;; stack as possible.
+           (move cfp-tn ocfp)
+           (inst addu csp-tn val-ptr (* nvals n-word-bytes))
+           ;; pre-default any argument register that need it.
+           (when (< nvals register-arg-count)
+             (dolist (reg (subseq (list a0 a1 a2 a3 a4 a5) nvals))
+               (move reg null-tn)))
+           ;; And away we go.
+           (lisp-return return-pc lip)))
     (trace-table-entry trace-table-normal)))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed on the
@@ -1102,14 +1110,15 @@ default-value-8
       (emit-label done))))
 
 
-;;; More args are stored consequtively on the stack, starting immediately at
-;;; the context pointer.  The context pointer is not typed, so the lowtag is 0.
-;;;
+;;; More args are stored consecutively on the stack, starting
+;;; immediately at the context pointer.  The context pointer is not
+;;; typed, so the lowtag is 0.
 (define-full-reffer more-arg * 0 0 (descriptor-reg any-reg) * %more-arg)
 
-
 ;;; Turn more arg (context, count) into a list.
-;;;
+(defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))
+  t)
+
 (define-vop (listify-rest-args)
   (:args (context-arg :target context :scs (descriptor-reg))
          (count-arg :target count :scs (any-reg)))
@@ -1121,10 +1130,13 @@ default-value-8
   (:results (result :scs (descriptor-reg)))
   (:translate %listify-rest-args)
   (:policy :safe)
+  (:node-var node)
   (:generator 20
-    (let ((enter (gen-label))
-          (loop (gen-label))
-          (done (gen-label)))
+    (let* ((enter (gen-label))
+           (loop (gen-label))
+           (done (gen-label))
+           (dx-p (node-stack-allocate-p node))
+           (alloc-area-tn (if dx-p csp-tn alloc-tn)))
       (move context context-arg)
       (move count count-arg)
       ;; Check to see if there are any arguments.
@@ -1133,12 +1145,16 @@ default-value-8
 
       ;; We need to do this atomically.
       (pseudo-atomic (pa-flag)
+        (when dx-p
+          (align-csp temp))
         ;; Allocate a cons (2 words) for each item.
-        (inst or result alloc-tn list-pointer-lowtag)
+        (inst srl result alloc-area-tn n-lowtag-bits)
+        (inst sll result n-lowtag-bits)
+        (inst or result list-pointer-lowtag)
         (move dst result)
         (inst sll temp count 1)
         (inst b enter)
-        (inst addu alloc-tn alloc-tn temp)
+        (inst addu alloc-area-tn temp)
 
         ;; Store the current cons in the cdr of the previous cons.
         (emit-label loop)
@@ -1148,7 +1164,7 @@ default-value-8
         (emit-label enter)
         ;; Grab one value.
         (loadw temp context)
-        (inst addu context context n-word-bytes)
+        (inst addu context n-word-bytes)
 
         ;; Dec count, and if != zero, go back for more.
         (inst addu count count (fixnumize -1))

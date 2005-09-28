@@ -13,6 +13,10 @@
 
 
 ;;;; LIST and LIST*
+(defoptimizer (list stack-allocate-result) ((&rest args))
+  (not (null args)))
+(defoptimizer (list* stack-allocate-result) ((&rest args))
+  (not (null (rest args))))
 
 (define-vop (list-or-list*)
   (:args (things :more t))
@@ -25,6 +29,7 @@
   (:results (result :scs (descriptor-reg)))
   (:variant-vars star)
   (:policy :safe)
+  (:node-var node)
   (:generator 0
     (cond ((zerop num)
            (move result null-tn))
@@ -35,18 +40,23 @@
                ((store-car (tn list &optional (slot cons-car-slot))
                   `(let ((reg
                           (sc-case ,tn
-                            ((any-reg descriptor-reg) ,tn)
-                            (zero zero-tn)
-                            (null null-tn)
+                            ((any-reg descriptor-reg zero null)
+                             ,tn)
                             (control-stack
                              (load-stack-tn temp ,tn)
                              temp))))
                      (storew reg ,list ,slot list-pointer-lowtag))))
-             (let ((cons-cells (if star (1- num) num)))
-               (pseudo-atomic (pa-flag
-                               :extra (* (pad-data-block cons-size)
-                                         cons-cells))
-                 (inst or res alloc-tn list-pointer-lowtag)
+             (let* ((dx-p (node-stack-allocate-p node))
+                    (cons-cells (if star (1- num) num))
+                    (alloc (* (pad-data-block cons-size) cons-cells)))
+               (pseudo-atomic (pa-flag :extra (if dx-p 0 alloc))
+                 (when dx-p
+                   (align-csp res))
+                 (inst srl res (if dx-p csp-tn alloc-tn) n-lowtag-bits)
+                 (inst sll res n-lowtag-bits)
+                 (inst or res list-pointer-lowtag)
+                 (when dx-p
+                   (inst addu csp-tn alloc))
                  (move ptr res)
                  (dotimes (i (1- cons-cells))
                    (store-car (tn-ref-tn things) ptr)

@@ -208,6 +208,7 @@ elif [ "$sbcl_arch" = "mips" ]; then
     # cross-compilers!
     #
     # FIXME: integrate to grovel-features, mayhaps
+    printf ' :stack-allocatable-closures' >> $ltf
     $GNUMAKE -C tools-for-build determine-endianness -I src/runtime
     tools-for-build/determine-endianness >> $ltf
 elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then

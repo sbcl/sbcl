@@ -153,6 +153,16 @@
        (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)
        ,@body)))
 
+(defun align-csp (temp)
+  ;; is used for stack allocation of dynamic-extent objects
+  (let ((aligned (gen-label)))
+    (inst and temp csp-tn lowtag-mask)
+    (inst beq temp aligned)
+    (inst nop)
+    (inst addu csp-tn n-word-bytes)
+    (storew zero-tn csp-tn -1)
+    (emit-label aligned)))
+
 
 ;;;; Three Way Comparison
 (defun three-way-comparison (x y condition flavor not-p target temp)
