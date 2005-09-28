@@ -208,9 +208,9 @@ from now. For timers with a repeat interval it returns true."
       ,@body)))
 
 (defun under-scheduler-lock-p ()
-  #!-sb!thread
+  #!-sb-thread
   t
-  #!+sb!thread
+  #!+sb-thread
   (eq sb!thread:*current-thread* (sb!thread:mutex-value *scheduler-lock*)))
 
 (defparameter *schedule* (make-priority-queue :key #'%timer-expire-time))
