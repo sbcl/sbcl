@@ -300,7 +300,7 @@ ra_pointer_p (void *ra)
 {
   /* the check against 4096 is still a mystery to everyone interviewed about
    * it, but recent changes to sb-sprof seem to suggest that such values
-   * do occur sometimes. */ 
+   * do occur sometimes. */
   return ((unsigned long) ra) > 4096 && !stack_pointer_p (ra);
 }
 

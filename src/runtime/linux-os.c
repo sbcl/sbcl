@@ -178,7 +178,7 @@ Please use a more recent kernel or a version of SBCL without threading support.\
              * in an error or if the value didn't change. Otherwise
              * this might result in an infinite loop.
              */
-            if (retval != -1 && newpers != pers) {        
+            if (retval != -1 && newpers != pers) {
                 /* Use /proc/self/exe instead of trying to figure out
                  * the executable path from PATH and argv[0], since
                  * that's unreliable. We follow the symlink instead of
