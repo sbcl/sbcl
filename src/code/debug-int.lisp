@@ -823,6 +823,7 @@
                                                         escaped)
                                  (if up-frame (1+ (frame-number up-frame)) 0)
                                  escaped))))))
+
 #!+(or x86 x86-64)
 (defun compute-calling-frame (caller ra up-frame)
   (declare (type system-area-pointer caller ra))
@@ -992,14 +993,14 @@ register."
         (or (fun-code-header object)
             :undefined-function)
         (let ((lowtag (lowtag-of object)))
-          (if (= lowtag sb!vm:other-pointer-lowtag)
-              (let ((widetag (widetag-of object)))
-                (cond ((= widetag sb!vm:code-header-widetag)
-                       object)
-                      ((= widetag sb!vm:return-pc-header-widetag)
-                       (lra-code-header object))
-                      (t
-                       nil))))))))
+          (when (= lowtag sb!vm:other-pointer-lowtag)
+            (let ((widetag (widetag-of object)))
+              (cond ((= widetag sb!vm:code-header-widetag)
+                     object)
+                    ((= widetag sb!vm:return-pc-header-widetag)
+                     (lra-code-header object))
+                    (t
+                     nil))))))))
 
 ;;;; frame utilities
 
@@ -3136,19 +3137,19 @@ register."
   ;; no more breakpoints active at this location, then the normal
   ;; instruction has been put back, and we do not need to
   ;; DO-DISPLACED-INST.
-  (let ((data (breakpoint-data component offset nil)))
-    (when (and data (breakpoint-data-breakpoints data))
-      ;; The breakpoint is still active, so we need to execute the
-      ;; displaced instruction and leave the breakpoint instruction
-      ;; behind. The best way to do this is different on each machine,
-      ;; so we just leave it up to the C code.
-      (breakpoint-do-displaced-inst signal-context
-                                    (breakpoint-data-instruction data))
-      ;; Some platforms have no usable sigreturn() call.  If your
-      ;; implementation of arch_do_displaced_inst() _does_ sigreturn(),
-      ;; it's polite to warn here
-      #!+(and sparc solaris)
-      (error "BREAKPOINT-DO-DISPLACED-INST returned?"))))
+  (setf data (breakpoint-data component offset nil))
+  (when (and data (breakpoint-data-breakpoints data))
+    ;; The breakpoint is still active, so we need to execute the
+    ;; displaced instruction and leave the breakpoint instruction
+    ;; behind. The best way to do this is different on each machine,
+    ;; so we just leave it up to the C code.
+    (breakpoint-do-displaced-inst signal-context
+                                  (breakpoint-data-instruction data))
+    ;; Some platforms have no usable sigreturn() call.  If your
+    ;; implementation of arch_do_displaced_inst() _does_ sigreturn(),
+    ;; it's polite to warn here
+    #!+(and sparc solaris)
+    (error "BREAKPOINT-DO-DISPLACED-INST returned?")))
 
 (defun invoke-breakpoint-hooks (breakpoints component offset)
   (let* ((debug-fun (debug-fun-from-pc component offset))

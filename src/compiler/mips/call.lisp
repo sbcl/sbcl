@@ -53,6 +53,7 @@
    (make-wired-tn *fixnum-primitive-type*
                   control-stack-arg-scn
                   ocfp-save-offset)))
+
 (!def-vm-support-routine make-return-pc-save-location (env)
   (let ((ptype *backend-t-primitive-type*))
     (specify-save-tn
@@ -267,7 +268,7 @@ default-value-8
         ;; gets confused.
         (without-scheduling ()
           (note-this-location vop :single-value-return)
-          (inst move csp-tn ocfp-tn)
+          (move csp-tn ocfp-tn t)
           (inst nop))
         (when lra-label
           (inst compute-code-from-lra code-tn code-tn lra-label temp)))

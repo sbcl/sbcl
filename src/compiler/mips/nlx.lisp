@@ -232,8 +232,8 @@
       (emit-label loop)
       (loadw temp src)
       (inst addu src src n-word-bytes)
-      (storew temp dst)
       (inst addu num num (fixnumize -1))
+      (storew temp dst)
       (inst bne num zero-tn loop)
       (inst addu dst dst n-word-bytes)
 
