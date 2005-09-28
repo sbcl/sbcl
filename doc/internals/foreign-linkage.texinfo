@@ -84,7 +84,7 @@ Find a memory area for the linkage-table, and add it for the OS in
 @code{SB!VM:LINKAGE-TABLE-SPACE-END}. See existing ports and CMUCL for
 examples.
 
-@subsubsection Porting to new architextures 
+@subsubsection Porting to new architectures
 
 Write @code{arch_write_linkage_table_jmp} and  @code{arch_write_linkage_table_ref}.
 
