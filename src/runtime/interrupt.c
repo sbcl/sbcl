@@ -298,7 +298,7 @@ void
 interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
                          boolean continuable)
 {
-    lispobj context_sap = 0;
+    lispobj context_sap;
 
     fake_foreign_function_call(context);
 
@@ -326,9 +326,8 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
              continuable ? T : NIL);
 
     undo_fake_foreign_function_call(context); /* blocks signals again */
-    if (continuable) {
+    if (continuable)
         arch_skip_instruction(context);
-    }
 }
 
 void

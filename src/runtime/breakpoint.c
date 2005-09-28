@@ -71,7 +71,6 @@ void breakpoint_do_displaced_inst(os_context_t* context,
     arch_do_displaced_inst(context, orig_inst);
 }
 
-#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 static lispobj find_code(os_context_t *context)
 {
 #ifdef reg_CODE
@@ -88,22 +87,15 @@ static lispobj find_code(os_context_t *context)
     else
         return code - HeaderValue(header)*sizeof(lispobj);
 #else
-    return NIL;
-#endif
-}
-#else
-static lispobj find_code(os_context_t *context)
-{
     lispobj codeptr =
         (lispobj)component_ptr_from_pc((lispobj *)(*os_context_pc_addr(context)));
 
-    if (codeptr == 0) {
+    if (codeptr == 0)
         return NIL;
-    } else {
+    else
         return codeptr + OTHER_POINTER_LOWTAG;
-    }
-}
 #endif
+}
 
 static long compute_offset(os_context_t *context, lispobj code)
 {
@@ -153,41 +145,10 @@ void handle_breakpoint(int signal, siginfo_t* info, os_context_t *context)
     undo_fake_foreign_function_call(context);
 }
 
-#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
                                 os_context_t *context)
 {
-    lispobj code, lra;
-    struct code *codeptr;
-
-    fake_foreign_function_call(context);
-
-    code = find_code(context);
-    codeptr = (struct code *)native_pointer(code);
-
-    /* Don't disallow recursive breakpoint traps. Otherwise, we can't
-     * use debugger breakpoints anywhere in here. */
-    thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
-
-    funcall3(SymbolFunction(HANDLE_BREAKPOINT),
-             compute_offset(context, code),
-             code,
-             alloc_sap(context));
-
-    lra = codeptr->constants[REAL_LRA_SLOT];
-#ifdef reg_CODE
-    if (codeptr->constants[KNOWN_RETURN_P_SLOT] == NIL) {
-        *os_context_register_addr(context, reg_CODE) = lra;
-    }
-#endif
-    undo_fake_foreign_function_call(context);
-    return (void *)(lra-OTHER_POINTER_LOWTAG+sizeof(lispobj));
-}
-#else
-void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
-                                os_context_t *context)
-{
-    lispobj code, context_sap;
+    lispobj code, context_sap, lra;
     struct code *codeptr;
 
     fake_foreign_function_call(context);
@@ -205,9 +166,18 @@ void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
              code,
              context_sap);
 
+    lra = codeptr->constants[REAL_LRA_SLOT];
+
+#ifdef reg_CODE
+    if (codeptr->constants[KNOWN_RETURN_P_SLOT] == NIL)
+        *os_context_register_addr(context, reg_CODE) = lra;
+#endif
+
     undo_fake_foreign_function_call(context);
 
-    return compute_pc(codeptr->constants[REAL_LRA_SLOT],
-                      fixnum_value(codeptr->constants[REAL_LRA_SLOT+1]));
-}
+#ifdef reg_LRA
+    return (void *)(lra-OTHER_POINTER_LOWTAG+sizeof(lispobj));
+#else
+    return compute_pc(lra, fixnum_value(codeptr->constants[REAL_LRA_SLOT+1]));
 #endif
+}
