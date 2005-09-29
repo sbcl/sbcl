@@ -123,7 +123,7 @@ cat > $testfilestem.test.lisp <<EOF
 
   (print :stage-1)
 
-  ;; test realoading object file with new definitions
+  ;; test reloading object file with new definitions
   (assert (= 13 foo))
   (assert (= 42 (bar)))
   (rename-file "$testfilestem-b.so" "$testfilestem-b.bak")
@@ -137,17 +137,19 @@ cat > $testfilestem.test.lisp <<EOF
   (print :stage-2)
 
   ;; test late resolution
-  (define-alien-variable late-foo int)
-  (define-alien-routine late-bar int)
-  (multiple-value-bind (val err) (ignore-errors late-foo)
-    (assert (not val))
-    (assert (typep err 'undefined-alien-error)))
-  (multiple-value-bind (val err) (ignore-errors (late-bar))
-    (assert (not val))
-    (assert (typep err 'undefined-alien-error)))
-  (load-shared-object "$testfilestem-c.so")
-  (assert (= 43 late-foo))
-  (assert (= 14 (late-bar)))
+  #+linkage-table
+  (progn
+    (define-alien-variable late-foo int)
+    (define-alien-routine late-bar int)
+    (multiple-value-bind (val err) (ignore-errors late-foo)
+      (assert (not val))
+      (assert (typep err 'undefined-alien-error)))
+    (multiple-value-bind (val err) (ignore-errors (late-bar))
+      (assert (not val))
+      (assert (typep err 'undefined-alien-error)))
+    (load-shared-object "$testfilestem-c.so")
+    (assert (= 43 late-foo))
+    (assert (= 14 (late-bar))))
 
   (print :stage-3)
 
