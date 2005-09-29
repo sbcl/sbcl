@@ -5,6 +5,8 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
     (thanks to Svein Ove Aas)
   * bug fix: Unicode symbols are correctly printed in LDB backtraces
     (thanks to David Lichteblau)
+  * enhancement: saving cores with foreign code loaded is now supported
+    on MIPS/Linux in addition to the previously supported platforms.
 
 changes in sbcl-0.9.5 relative to sbcl-0.9.4:
   * new feature: timers based on Zach Beane's excellent timer package

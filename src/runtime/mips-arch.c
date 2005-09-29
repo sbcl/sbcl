@@ -244,7 +244,7 @@ next_insn_addr(os_context_t *context, unsigned int inst)
 void
 arch_skip_instruction(os_context_t *context)
 {
-    /* Skip the offending instruction.  Don't use os_context_insn here,
+    /* Skip the offending instruction. Don't use os_context_insn here,
        since in case of a branch we want the branch insn, not the delay
        slot. */
     *os_context_pc_addr(context)
@@ -280,7 +280,7 @@ arch_install_breakpoint(void *pc)
     unsigned int *ptr = (unsigned int *)pc;
     unsigned int insn;
 
-    /* Don't install over a branch/jump with delay slot.  */
+    /* Don't install over a branch/jump with delay slot. */
     if (arch_insn_with_bdelay_p(*ptr))
         ptr++;
 
@@ -321,7 +321,7 @@ arch_remove_breakpoint(void *pc, unsigned int orig_inst)
     os_flush_icache((os_vm_address_t)ptr, INSN_LEN);
 }
 
-/* Perform the instruction that we overwrote with a breakpoint.  As we
+/* Perform the instruction that we overwrote with a breakpoint. As we
    don't have a single-step facility, this means we have to:
    - put the instruction back
    - put a second breakpoint at the following instruction,
@@ -397,7 +397,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
         break;
 
     case 0x10:
-        /* Clear the pseudo-atomic flag */
+        /* Clear the pseudo-atomic flag. */
         *os_context_register_addr(context, reg_NL4) &= ~(-1LL<<31);
         arch_skip_instruction(context);
         interrupt_handle_pending(context);
@@ -522,3 +522,45 @@ funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
 
     return call_into_lisp(function, args, 3);
 }
+
+#ifdef LISP_FEATURE_LINKAGE_TABLE
+
+/* Linkage tables for MIPS
+
+   Linkage entry size is 16, because we need 4 instructions to implement
+   a jump. The entry size constant is defined in parms.lisp.
+
+   Define the register to use in the linkage jump table. For MIPS this
+   has to be the PIC call register $25 aka t9 aka reg_ALLOC. */
+#define LINKAGE_TEMP_REG        reg_ALLOC
+
+/* Insert the necessary jump instructions at the given address. */
+void
+arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
+{
+  /* Make JMP to function entry. The instruction sequence is:
+       lui    $25, 0, %hi(addr)
+       addiu  $25, $25, %lo(addr)
+       jr     $25
+        nop */
+  unsigned int *insn = (unsigned int *)reloc_addr;
+  unsigned int addr = (unsigned int)target_addr;
+  unsigned int hi = ((addr + 0x8000) >> 16) & 0xffff;
+  unsigned int lo = addr & 0xffff;
+
+  *insn++ = (15 << 26) | (LINKAGE_TEMP_REG << 16) | hi;
+  *insn++ = ((9 << 26) | (LINKAGE_TEMP_REG << 21)
+                 | (LINKAGE_TEMP_REG << 16) | lo);
+  *insn++ = (LINKAGE_TEMP_REG << 21) | 8;
+  *insn = 0;
+
+  os_flush_icache((os_vm_address_t)reloc_addr, LINKAGE_TABLE_ENTRY_SIZE);
+}
+
+void
+arch_write_linkage_table_ref(void *reloc_addr, void *target_addr)
+{
+    *(unsigned int *)reloc_addr = (unsigned int)target_addr;
+}
+
+#endif

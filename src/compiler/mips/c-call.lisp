@@ -236,6 +236,20 @@
   (:generator 2
     (inst li res (make-fixup foreign-symbol :foreign))))
 
+#!+linkage-table
+(define-vop (foreign-symbol-dataref-sap)
+  (:translate foreign-symbol-dataref-sap)
+  (:policy :fast-safe)
+  (:args)
+  (:arg-types (:constant simple-string))
+  (:info foreign-symbol)
+  (:results (res :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:temporary (:scs (non-descriptor-reg)) addr)
+  (:generator 2
+    (inst li addr (make-fixup foreign-symbol :foreign-dataref))
+    (loadw res addr)))
+
 (define-vop (call-out)
   (:args (function :scs (sap-reg) :target cfunc)
          (args :more t))

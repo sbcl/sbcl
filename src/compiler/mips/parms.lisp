@@ -89,6 +89,11 @@
   (def!constant dynamic-0-space-end   #x50000000)
   (def!constant dynamic-1-space-start #x50000000)
   (def!constant dynamic-1-space-end   #x70000000)
+
+  (def!constant linkage-table-space-start #x70000000)
+  (def!constant linkage-table-space-end   #x71000000)
+  (def!constant linkage-table-entry-size 16)
+
   ;; C stack grows downward from 0x80000000
   )
 

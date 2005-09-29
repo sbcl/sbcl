@@ -204,11 +204,12 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
+    printf ' :linkage-table' >> $ltf
+    printf ' :stack-allocatable-closures' >> $ltf
     # Use a little C program to try to guess the endianness.  Ware
     # cross-compilers!
     #
     # FIXME: integrate to grovel-features, mayhaps
-    printf ' :stack-allocatable-closures' >> $ltf
     $GNUMAKE -C tools-for-build determine-endianness -I src/runtime
     tools-for-build/determine-endianness >> $ltf
 elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
