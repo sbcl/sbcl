@@ -13,15 +13,18 @@
 (defvar *break-on-expected-failure* nil)
 
 (defmacro with-test ((&key fails-on name) &body body)
-  `(handler-case (progn
-                   (start-test)
-                   ,@body
-                   (when (expected-failure-p ,fails-on)
-                     (fail-test :unexpected-success ',name nil)))
-    (error (error)
-     (if (expected-failure-p ,fails-on)
-         (fail-test :expected-failure ',name error)
-         (fail-test :unexpected-failure ',name error)))))
+  (let ((block-name (gensym)))
+    `(block ,block-name
+       (handler-bind ((error (lambda (error)
+                               (if (expected-failure-p ,fails-on)
+                                   (fail-test :expected-failure ',name error)
+                                   (fail-test :unexpected-failure ',name error))
+                               (return-from ,block-name))))
+         (progn
+           (start-test)
+           ,@body
+           (when (expected-failure-p ,fails-on)
+             (fail-test :unexpected-success ',name nil)))))))
 
 (defun report-test-status ()
   (with-standard-io-syntax

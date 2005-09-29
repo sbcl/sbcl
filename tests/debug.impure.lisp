@@ -139,7 +139,8 @@
          (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
          (funcall fun)))
 
-  (with-test (:fails-on '(or :alpha))   ; bug 346
+  (with-test (:name (:undefined-function :bug-346)
+              :fails-on '(or :alpha))   ; bug 346
     (assert (verify-backtrace
              (lambda () (test #'optimized))
              (list *undefined-function-frame*
@@ -147,7 +148,8 @@
 
   ;; bug 353: This test fails at least most of the time for x86/linux
   ;; ca. 0.8.20.16. -- WHN
-  (with-test (:fails-on '(or (and :x86 :linux) :alpha))
+  (with-test (:name (:undefined-function :bug-356)
+              :fails-on '(or (and :x86 :linux) :alpha))
     (assert (verify-backtrace
              (lambda () (test #'not-optimized))
              (list *undefined-function-frame*
@@ -175,17 +177,20 @@
        (test (fun)
          (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
          (funcall fun)))
-  (with-test (:fails-on '(or :alpha))   ; bug 346
+  (with-test (:name (:divide-by-zero :bug-346)
+              :fails-on '(or :alpha))   ; bug 346
     (assert (verify-backtrace (lambda () (test #'optimized))
                               (list '(/ 42 &rest)
                                     (list '(flet test) #'optimized)))))
-  (with-test (:fails-on '(or :alpha))   ; bug 346
+  (with-test (:name (:divide-by-zero :bug-356)
+              :fails-on '(or :alpha))   ; bug 356
     (assert (verify-backtrace (lambda () (test #'not-optimized))
                               (list '(/ 42 &rest)
                                     '((flet not-optimized))
                                     (list '(flet test) #'not-optimized))))))
 
-(with-test (:fails-on '(or (and :x86 :linux) :alpha))
+(with-test (:name (:throw :no-such-tag)
+            :fails-on '(or (and :x86 :linux) :alpha))
   (progn
     (defun throw-test ()
       (throw 'no-such-tag t))
@@ -226,7 +231,9 @@
 (defbt 5 (&optional (opt (oops)))
   (list opt))
 
-(with-test (:fails-on '(and :x86 :linux))
+;;; FIXME: This test really should be broken into smaller pieces
+(with-test (:name (:backtrace :misc)
+            :fails-on '(and :x86 :linux))
   (macrolet ((with-details (bool &body body)
                `(let ((sb-debug:*show-entry-point-details* ,bool))
                  ,@body)))
@@ -338,6 +345,9 @@
   (assert (search "returned OK" out)))
 
 ;;; bug 379
+;;; This is not a WITH-TEST :FAILS-ON PPC DARWIN since there are
+;;; suspicions that the breakpoint trace might corrupt the whole image
+;;; on that platform.
 #-(and ppc darwin)
 (let ((out (with-output-to-string (*trace-output*)
              (trace trace-this :encapsulate nil)

@@ -437,7 +437,8 @@
 
 ;;;; Program-errors from lexical violations
 ;;;; In addition to that, this is also testing for bug 387
-(with-test (:fails-on :sbcl)
+(with-test (:name :program-error
+            :fails-on :sbcl)
   (reset-test)
   (set-test-locks t)
   (dolist (pair *illegal-compile-time-forms-alist*)

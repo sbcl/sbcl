@@ -92,7 +92,8 @@
 (assert (= 0.0 (scale-float 1.0 most-negative-fixnum)))
 (assert (= 0.0d0 (scale-float 1.0d0 (1- most-negative-fixnum))))
 
-(with-test (:fails-on '(or :ppc)) ;; bug 372
+(with-test (:name (:scale-float-overflow :bug-372)
+            :fails-on '(or :ppc)) ;; bug 372
   (progn
     (assert (raises-error? (scale-float 1.0 most-positive-fixnum)
                            floating-point-overflow))
@@ -117,7 +118,8 @@
    #c(1.0d0 2.0d0))
     'double-float))
 
-(with-test (:fails-on '(or :ppc))
+(with-test (:name (:addition-overflow :bug-372)
+            :fails-on '(or :ppc))
   (assert (typep (nth-value
                   1
                   (ignore-errors
