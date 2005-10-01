@@ -661,7 +661,6 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     struct thread *thread=arch_os_get_current_thread();
     sigset_t ss;
-    int i;
 
     if ((arch_pseudo_atomic_atomic(context) ||
          SymbolValue(GC_INHIBIT,thread) != NIL)) {
