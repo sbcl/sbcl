@@ -756,7 +756,8 @@ error if any of PACKAGES is not a valid package designator."
       :interactive
       (lambda ()
         (let* ((len (length symbols))
-               (nlen (length (write-to-string len :base 10))))
+               (nlen (length (write-to-string len :base 10)))
+               (*print-pretty* t))
           (format *query-io* "~&~@<Select a symbol to be made accessible in ~
                               package ~A:~2I~@:_~{~{~V,' D. ~S~}~@:_~}~@:>"
                 (package-name package)
