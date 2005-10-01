@@ -22,3 +22,5 @@ featurep() {
 featurep os-provides-dlopen
 
 featurep os-provides-dladdr
+
+featurep os-provides-putwc

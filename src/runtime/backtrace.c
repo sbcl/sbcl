@@ -406,6 +406,20 @@ debug_function_from_pc (struct code* code, void *pc)
 }
 
 static void
+sbcl_putwc(wchar_t c, FILE *file)
+{
+#ifdef LISP_FEATURE_OS_PROVIDES_PUTWC
+    putwc(c, file);
+#else
+    if (c < 256) {
+        fputc(c, file);
+    } else {
+        fputc('?', file);
+    }
+#endif
+}
+
+static void
 print_string (lispobj *object)
 {
   int tag = widetag_of(*object);
@@ -420,7 +434,7 @@ print_string (lispobj *object)
       wchar_t c = (wchar_t) data[i];            \
       if (c == '\\' || c == '"')                \
         putchar('\\');                          \
-      putwc(c, stdout);                         \
+      sbcl_putwc(c, stdout);                    \
     }                                           \
   } while (0)
 
