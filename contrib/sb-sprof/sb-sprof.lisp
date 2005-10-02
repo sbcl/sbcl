@@ -648,6 +648,7 @@
 ;;; Record the addresses of dynamic-space code objects in
 ;;; *DYNAMIC-SPACE-CODE-INFO*.  Call this with GC disabled.
 (defun record-dyninfo ()
+  (setf *dynamic-space-code-info* nil)
   (flet ((record-address (code size)
            (declare (ignore size))
            (multiple-value-bind (start end)

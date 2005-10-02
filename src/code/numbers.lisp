@@ -742,6 +742,7 @@
 (defun = (number &rest more-numbers)
   #!+sb-doc
   "Return T if all of its arguments are numerically equal, NIL otherwise."
+  (declare (dynamic-extent more-numbers))
   (the number number)
   (do ((nlist more-numbers (cdr nlist)))
       ((atom nlist) t)
@@ -751,6 +752,7 @@
 (defun /= (number &rest more-numbers)
   #!+sb-doc
   "Return T if no two of its arguments are numerically equal, NIL otherwise."
+  (declare (dynamic-extent more-numbers))
   (do* ((head (the number number) (car nlist))
         (nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
@@ -764,6 +766,7 @@
 (defun < (number &rest more-numbers)
   #!+sb-doc
   "Return T if its arguments are in strictly increasing order, NIL otherwise."
+  (declare (dynamic-extent more-numbers))
   (do* ((n (the number number) (car nlist))
         (nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
@@ -773,6 +776,7 @@
 (defun > (number &rest more-numbers)
   #!+sb-doc
   "Return T if its arguments are in strictly decreasing order, NIL otherwise."
+  (declare (dynamic-extent more-numbers))
   (do* ((n (the number number) (car nlist))
         (nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
@@ -782,6 +786,7 @@
 (defun <= (number &rest more-numbers)
   #!+sb-doc
   "Return T if arguments are in strictly non-decreasing order, NIL otherwise."
+  (declare (dynamic-extent more-numbers))
   (do* ((n (the number number) (car nlist))
         (nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
@@ -791,6 +796,7 @@
 (defun >= (number &rest more-numbers)
   #!+sb-doc
   "Return T if arguments are in strictly non-increasing order, NIL otherwise."
+  (declare (dynamic-extent more-numbers))
   (do* ((n (the number number) (car nlist))
         (nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
@@ -801,6 +807,7 @@
   #!+sb-doc
   "Return the greatest of its arguments; among EQUALP greatest, return
 the first."
+  (declare (dynamic-extent more-numbers))
   (do ((nlist more-numbers (cdr nlist))
        (result number))
       ((null nlist) (return result))
@@ -812,6 +819,7 @@ the first."
   #!+sb-doc
   "Return the least of its arguments; among EQUALP least, return
 the first."
+  (declare (dynamic-extent more-numbers))
   (do ((nlist more-numbers (cdr nlist))
        (result number))
       ((null nlist) (return result))

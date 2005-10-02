@@ -5,6 +5,9 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
     (thanks to Svein Ove Aas)
   * bug fix: Unicode symbols are correctly printed in LDB backtraces
     (thanks to David Lichteblau)
+  * optimization: non-open coded uses of numeric comparison operators
+    (e.g. >) no longer cons when called with more than one parameter
+    on platforms supporting dynamic-extent allocation.
   * enhancement: saving cores with foreign code loaded is now supported
     on MIPS/Linux in addition to the previously supported platforms.
 
