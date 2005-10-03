@@ -20,6 +20,7 @@
 
 #include <stdio.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <sys/ucontext.h>
 
 int main (int argc, char *argv[]) {
@@ -45,5 +46,6 @@ int main (int argc, char *argv[]) {
     }
     printf("\
 #endif /* PPC_LINUX_MCONTEXT_H */\n");
+    exit(0);
 }
 
