@@ -33,7 +33,7 @@
       (inst addi ndescr rank (fixnumize (1- array-dimensions-offset)))
       (inst slwi ndescr ndescr n-widetag-bits)
       (inst or ndescr ndescr type)
-      (inst srwi ndescr ndescr 2)
+      (inst srwi ndescr ndescr n-fixnum-tag-bits)
       (storew ndescr header 0 other-pointer-lowtag))
     (move result header)))
 
@@ -59,7 +59,7 @@
     (loadw temp x 0 other-pointer-lowtag)
     (inst srawi temp temp n-widetag-bits)
     (inst subi temp temp (1- array-dimensions-offset))
-    (inst slwi res temp 2)))
+    (inst slwi res temp n-fixnum-tag-bits)))
 
 ;;;; Bounds checking routine.
 
@@ -156,8 +156,8 @@
          (:result-types positive-fixnum)
          (:temporary (:scs (non-descriptor-reg) :to (:result 0)) temp result)
          (:generator 20
-           (inst srwi temp index ,bit-shift)
-           (inst slwi temp temp 2)
+           ;; temp = (index >> bit-shift) << 2)
+           (inst rlwinm temp index ,(- 32 (- bit-shift 2)) ,(- bit-shift 2) 29)
            (inst addi temp temp (- (* vector-data-offset n-word-bytes)
                                    other-pointer-lowtag))
            (inst lwzx result object temp)
@@ -167,7 +167,7 @@
                `((inst slwi temp temp ,(1- (integer-length bits)))))
            (inst srw result result temp)
            (inst andi. result result ,(1- (ash 1 bits)))
-           (inst slwi value result 2)))
+           (inst slwi value result n-fixnum-tag-bits)))
        (define-vop (,(symbolicate 'data-vector-ref-c/ type))
          (:translate data-vector-ref)
          (:policy :fast-safe)
@@ -206,8 +206,8 @@
          (:temporary (:scs (non-descriptor-reg)) temp old offset)
          (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
          (:generator 25
-           (inst srwi offset index ,bit-shift)
-           (inst slwi offset offset 2)
+           ;; offset = (index >> bit-shift) << 2)
+           (inst rlwinm offset index ,(- 32 (- bit-shift 2)) ,(- bit-shift 2) 29)
            (inst addi offset offset (- (* vector-data-offset n-word-bytes)
                                        other-pointer-lowtag))
            (inst lwzx old object offset)
@@ -219,8 +219,7 @@
                         (= (tn-value value) ,(1- (ash 1 bits))))
              (inst lr temp ,(1- (ash 1 bits)))
              (inst slw temp temp shift)
-             (inst not temp temp)
-             (inst and old old temp))
+             (inst andc old old temp))
            (unless (sc-is value zero)
              (sc-case value
                (immediate
@@ -259,8 +258,7 @@
                (unless (and (sc-is value immediate)
                             (= (tn-value value) ,(1- (ash 1 bits))))
                  (cond ((zerop extra)
-                        (inst slwi old old ,bits)
-                        (inst srwi old old ,bits))
+                        (clrlwi old old ,bits))
                        (t
                         (inst lr temp
                               (lognot (ash ,(1- (ash 1 bits))

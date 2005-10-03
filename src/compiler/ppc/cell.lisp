@@ -91,7 +91,7 @@
     ;; it is a fixnum.  The lowtag selection magic that is required to
     ;; ensure this is explained in the comment in objdef.lisp
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (inst clrrwi res res (1- n-lowtag-bits))))
+    (inst clrrwi res res n-fixnum-tag-bits)))
 
 ;;;; Fdefinition (fdefn) objects.
 
@@ -307,8 +307,8 @@
   (:result-types unsigned-num)
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
-    (inst srwi offset offset n-widetag-bits)
-    (inst slwi offset offset 2)
+    ;; offset = (offset >> n-widetag-bits) << 2
+    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
     (inst subf offset index offset)
     (inst addi
           offset
@@ -329,8 +329,8 @@
   (:result-types unsigned-num)
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
-    (inst srwi offset offset n-widetag-bits)
-    (inst slwi offset offset 2)
+    ;; offset = (offset >> n-widetag-bits) << 2
+    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
     (inst subf offset index offset)
     (inst addi
           offset
@@ -351,8 +351,8 @@
   (:result-types single-float)
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
-    (inst srwi offset offset n-widetag-bits)
-    (inst slwi offset offset 2)
+    ;; offset = (offset >> n-widetag-bits) << 2
+    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
     (inst subf offset index offset)
     (inst addi
           offset
@@ -373,8 +373,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
-    (inst srwi offset offset n-widetag-bits)
-    (inst slwi offset offset 2)
+    ;; offset = (offset >> n-widetag-bits) << 2
+    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
     (inst subf offset index offset)
     (inst addi
           offset
@@ -396,8 +396,8 @@
   (:result-types double-float)
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
-    (inst srwi offset offset n-widetag-bits)
-    (inst slwi offset offset 2)
+    ;; offset = (offset >> n-widetag-bits) << 2
+    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
     (inst subf offset index offset)
     (inst addi
           offset
@@ -418,8 +418,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
-    (inst srwi offset offset n-widetag-bits)
-    (inst slwi offset offset 2)
+    ;; offset = (offset >> n-widetag-bits) << 2
+    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
     (inst subf offset index offset)
     (inst addi
           offset
@@ -441,8 +441,8 @@
   (:result-types complex-single-float)
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
-    (inst srwi offset offset n-widetag-bits)
-    (inst slwi offset offset 2)
+    ;; offset = (offset >> n-widetag-bits) << 2
+    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
     (inst subf offset index offset)
     (inst addi
           offset
@@ -465,8 +465,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
-    (inst srwi offset offset n-widetag-bits)
-    (inst slwi offset offset 2)
+    ;; offset = (offset >> n-widetag-bits) << 2
+    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
     (inst subf offset index offset)
     (inst addi
           offset
@@ -496,8 +496,8 @@
   (:result-types complex-double-float)
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
-    (inst srwi offset offset n-widetag-bits)
-    (inst slwi offset offset 2)
+    ;; offset = (offset >> n-widetag-bits) << 2
+    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
     (inst subf offset index offset)
     (inst addi
           offset
@@ -520,8 +520,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
-    (inst srwi offset offset n-widetag-bits)
-    (inst slwi offset offset 2)
+    ;; offset = (offset >> n-widetag-bits) << 2
+    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
     (inst subf offset index offset)
     (inst addi
           offset
