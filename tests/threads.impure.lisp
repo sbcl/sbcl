@@ -313,7 +313,7 @@
     (interrupt-thread c
                       (lambda ()
                         (princ ".") (force-output)
-                        (assert (eq (thread-state *current-thread*) :running))
+                        (assert (thread-alive-p *current-thread*))
                         (assert (zerop SB-KERNEL:*PSEUDO-ATOMIC-ATOMIC*)))))
   (terminate-thread c)
   (wait-for-threads (list c)))
@@ -460,22 +460,21 @@
 
 (format t "~&session lock test done~%")
 
-(sb-ext:gc :full t)
-(loop repeat 20 do
-      (wait-for-threads
-       (loop for i below 100 collect
-             (sb-thread:make-thread (lambda ()))))
-      (sb-ext:gc :full t)
-      (princ "+")
-      (force-output))
+(wait-for-threads
+ (loop for i below 2000 collect
+       (sb-thread:make-thread (lambda ()))))
 
 (format t "~&creation test done~%")
 
 ;; watch out for *current-thread* being the parent thread after exit
-(let ((thread (sb-thread:make-thread (lambda ()))))
+(let* (sap
+       (thread (sb-thread:make-thread
+                (lambda ()
+                  (setq sap (thread-sap-for-id
+                             (thread-os-thread *current-thread*)))))))
   (wait-for-threads (list thread))
   (assert (null (symbol-value-in-thread 'sb-thread:*current-thread*
-                                        thread))))
+                                        sap))))
 
 ;; interrupt handlers are per-thread with pthreads, make sure the
 ;; handler installed in one thread is global

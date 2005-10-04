@@ -1269,7 +1269,8 @@ core and return a descriptor to it."
     (frob sb!kernel::undefined-alien-function-error)
     (frob sb!kernel::memory-fault-error)
     (frob sb!di::handle-breakpoint)
-    (frob sb!di::handle-fun-end-breakpoint))
+    (frob sb!di::handle-fun-end-breakpoint)
+    #!+sb-thread (frob sb!thread::run-interruption))
 
   (cold-set 'sb!vm::*current-catch-block*          (make-fixnum-descriptor 0))
   (cold-set 'sb!vm::*current-unwind-protect-block* (make-fixnum-descriptor 0))

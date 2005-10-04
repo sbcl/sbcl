@@ -43,4 +43,15 @@ release_spinlock(volatile lispobj *word)
     *word=0;
 }
 
+static inline lispobj
+swap_lispobjs(volatile lispobj *dest, lispobj value)
+{
+    lispobj old_value;
+    asm ("lock xchg %0,(%1)"
+         : "=r" (old_value)
+         : "r" (dest), "0" (value)
+         : "memory");
+    return old_value;
+}
+
 #endif /* _X86_64_ARCH_H */

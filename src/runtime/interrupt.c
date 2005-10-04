@@ -874,30 +874,13 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
+
+/* FIXME: this function can go away when all lisp handlers are invoked
+ * via arrange_return_to_lisp_function. */
 void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 {
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
-    /* The order of interrupt execution is peculiar. If thread A
-     * interrupts thread B with I1, I2 and B for some reason receives
-     * I1 when FUN2 is already on the list, then it is FUN2 that gets
-     * to run first. But when FUN2 is run SIG_INTERRUPT_THREAD is
-     * enabled again and I2 hits pretty soon in FUN2 and run
-     * FUN1. This is of course just one scenario, and the order of
-     * thread interrupt execution is undefined. */
-    struct thread *th=arch_os_get_current_thread();
-    struct cons *c;
-    lispobj function;
-    if (th->state != STATE_RUNNING)
-        lose("interrupt_thread_handler: thread %lu in wrong state: %d\n",
-             th->os_thread,fixnum_value(th->state));
-    get_spinlock(&th->interrupt_fun_lock,(long)th);
-    c=((struct cons *)native_pointer(th->interrupt_fun));
-    function=c->car;
-    th->interrupt_fun=c->cdr;
-    release_spinlock(&th->interrupt_fun_lock);
-    if (function==NIL)
-        lose("interrupt_thread_handler: NIL function\n");
-    arrange_return_to_lisp_function(context,function);
+    arrange_return_to_lisp_function(context, SymbolFunction(RUN_INTERRUPTION));
 }
 
 #endif
@@ -924,8 +907,8 @@ boolean handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * protection so the error handler has some headroom, protect the
          * previous page so that we can catch returns from the guard page
          * and restore it. */
-        protect_control_stack_guard_page(th,0);
-        protect_control_stack_return_guard_page(th,1);
+        protect_control_stack_guard_page(0);
+        protect_control_stack_return_guard_page(1);
 
         arrange_return_to_lisp_function
             (context, SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
@@ -937,8 +920,8 @@ boolean handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * unprotect this one. This works even if we somehow missed
          * the return-guard-page, and hit it on our way to new
          * exhaustion instead. */
-        protect_control_stack_guard_page(th,1);
-        protect_control_stack_return_guard_page(th,0);
+        protect_control_stack_guard_page(1);
+        protect_control_stack_return_guard_page(0);
         return 1;
     }
     else if (addr >= undefined_alien_address &&

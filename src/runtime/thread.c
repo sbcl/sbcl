@@ -25,6 +25,13 @@
 
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
 
+struct freeable_stack {
+    os_thread_t os_thread;
+    os_vm_address_t stack;
+};
+
+static struct freeable_stack * volatile freeable_stack = 0;
+
 int dynamic_values_bytes=4096*sizeof(lispobj);  /* same for all threads */
 struct thread * volatile all_threads;
 extern struct interrupt_data * global_interrupt_data;
@@ -34,47 +41,34 @@ extern int linux_no_threads_p;
 
 pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
 
-/* When trying to get all_threads_lock one should make sure that
- * sig_stop_for_gc is not blocked. Else there would be a possible
- * deadlock: gc locks it, other thread blocks signals, gc sends stop
- * request to other thread and waits, other thread blocks on lock. */
-void check_sig_stop_for_gc_can_arrive_or_lose()
-{
-    /* Get the current sigmask, by blocking the empty set. */
-    sigset_t empty,current;
-    sigemptyset(&empty);
-    thread_sigmask(SIG_BLOCK, &empty, &current);
-    if (sigismember(&current,SIG_STOP_FOR_GC))
-        lose("SIG_STOP_FOR_GC cannot arrive: it is blocked\n");
-    if (SymbolValue(GC_INHIBIT,arch_os_get_current_thread()) != NIL)
-        lose("SIG_STOP_FOR_GC cannot arrive: gc is inhibited\n");
-    if (arch_pseudo_atomic_atomic(NULL))
-        lose("SIG_STOP_FOR_GC cannot arrive: in pseudo atomic\n");
-}
-
-#define GET_ALL_THREADS_LOCK(name) \
-    { \
-        sigset_t _newset,_oldset; \
-        sigemptyset(&_newset); \
-        sigaddset_deferrable(&_newset); \
-        thread_sigmask(SIG_BLOCK, &_newset, &_oldset); \
-        check_sig_stop_for_gc_can_arrive_or_lose(); \
-        FSHOW_SIGNAL((stderr,"/%s:waiting on lock=%ld, thread=%lu\n",name, \
-               all_threads_lock,arch_os_get_current_thread()->os_thread)); \
-        pthread_mutex_lock(&all_threads_lock); \
-        FSHOW_SIGNAL((stderr,"/%s:got lock, thread=%lu\n", \
-               name,arch_os_get_current_thread()->os_thread));
-
-#define RELEASE_ALL_THREADS_LOCK(name) \
-        FSHOW_SIGNAL((stderr,"/%s:released lock\n",name)); \
-        pthread_mutex_unlock(&all_threads_lock); \
-        thread_sigmask(SIG_SETMASK,&_oldset,0); \
-    }
-#endif
-
-
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 extern lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs);
+#endif
+
+#endif
+
+static void
+link_thread(struct thread *th)
+{
+    th->os_thread=thread_self();
+    if (all_threads) all_threads->prev=th;
+    th->next=all_threads;
+    th->prev=0;
+    all_threads=th;
+    protect_control_stack_guard_page(1);
+}
+
+#ifdef LISP_FEATURE_SB_THREAD
+static void
+unlink_thread(struct thread *th)
+{
+    if (th->prev)
+        th->prev->next = th->next;
+    else
+        all_threads = th->next;
+    if (th->next)
+        th->next->prev = th->prev;
+}
 #endif
 
 static int
@@ -87,9 +81,8 @@ initial_thread_trampoline(struct thread *th)
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) return 1;
+    link_thread(th);
 
-    if(th->os_thread < 1) lose("th->os_thread not set up right");
-    th->state=STATE_RUNNING;
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     return call_into_lisp_first_time(function,args,0);
 #else
@@ -97,7 +90,37 @@ initial_thread_trampoline(struct thread *th)
 #endif
 }
 
+#define THREAD_STRUCT_SIZE (THREAD_CONTROL_STACK_SIZE + BINDING_STACK_SIZE + \
+                            ALIEN_STACK_SIZE + dynamic_values_bytes + \
+                            32 * SIGSTKSZ)
+
 #ifdef LISP_FEATURE_SB_THREAD
+
+static void
+free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
+{
+    struct freeable_stack *new_freeable_stack = 0;
+    if (thread_to_be_cleaned_up) {
+        new_freeable_stack = (struct freeable_stack *)
+            os_validate(0, sizeof(struct freeable_stack));
+        new_freeable_stack->os_thread = thread_to_be_cleaned_up->os_thread;
+        new_freeable_stack->stack = (os_vm_address_t)
+            thread_to_be_cleaned_up->control_stack_start;
+    }
+    new_freeable_stack = (struct freeable_stack *)
+        swap_lispobjs((lispobj *)(void *)&freeable_stack,
+                      (lispobj)new_freeable_stack);
+    if (new_freeable_stack) {
+        FSHOW((stderr,"/reaping %lu\n", new_freeable_stack->os_thread));
+        /* Under NPTL pthread_join really waits until the thread
+         * exists and the stack can be safely freed. This is sadly not
+         * mandated by the pthread spec. */
+        gc_assert(pthread_join(new_freeable_stack->os_thread, NULL) == 0);
+        os_invalidate(new_freeable_stack->stack, THREAD_STRUCT_SIZE);
+        os_invalidate((os_vm_address_t) new_freeable_stack,
+                      sizeof(struct freeable_stack));
+    }
+}
 
 /* this is the first thing that runs in the child (which is why the
  * silly calling convention).  Basically it calls the user's requested
@@ -109,6 +132,7 @@ new_thread_trampoline(struct thread *th)
 {
     lispobj function;
     int result;
+    FSHOW((stderr,"/creating thread %lu\n", thread_self()));
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) {
@@ -116,22 +140,32 @@ new_thread_trampoline(struct thread *th)
         lose("arch_os_thread_init failed\n");
     }
 
-    /* wait here until our thread is linked into all_threads: see below */
-    {
-        volatile os_thread_t *tid=&th->os_thread;
-        while(*tid<1) sched_yield();
-    }
+    /* Since GC can only know about this thread from the all_threads
+     * list and we're just adding this thread to it there is no danger
+     * of deadlocking even with SIG_STOP_FOR_GC blocked. */
+    pthread_mutex_lock(&all_threads_lock);
+    link_thread(th);
+    pthread_mutex_unlock(&all_threads_lock);
 
-    th->state=STATE_RUNNING;
     result = funcall0(function);
     th->state=STATE_DEAD;
+
+    /* SIG_STOP_FOR_GC is blocked and GC might be waiting for this
+     * thread, but since we are already dead it won't wait long. */
+    pthread_mutex_lock(&all_threads_lock);
+    unlink_thread(th);
+    pthread_mutex_unlock(&all_threads_lock);
+
+    gc_alloc_update_page_tables(0, &th->alloc_region);
+    if(th->tls_cookie>=0) arch_os_thread_cleanup(th);
+    os_invalidate((os_vm_address_t)th->interrupt_data,
+                  (sizeof (struct interrupt_data)));
+    free_thread_stack_later(th);
+    FSHOW((stderr,"/exiting thread %lu\n", thread_self()));
     return result;
 }
-#endif /* LISP_FEATURE_SB_THREAD */
 
-#define THREAD_STRUCT_SIZE (THREAD_CONTROL_STACK_SIZE + BINDING_STACK_SIZE + \
-                            ALIEN_STACK_SIZE + dynamic_values_bytes + \
-                            32 * SIGSTKSZ)
+#endif /* LISP_FEATURE_SB_THREAD */
 
 static void
 free_thread_struct(struct thread *th)
@@ -209,9 +243,7 @@ create_thread_struct(lispobj initial_function) {
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
     th->os_thread=0;
-    th->interrupt_fun=NIL;
-    th->interrupt_fun_lock=0;
-    th->state=STATE_STARTING;
+    th->state=STATE_RUNNING;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
                              + ALIEN_STACK_SIZE-N_WORD_BYTES);
@@ -267,29 +299,10 @@ create_thread_struct(lispobj initial_function) {
     return th;
 }
 
-static void
-link_thread(struct thread *th,os_thread_t kid_tid)
-{
-    if (all_threads) all_threads->prev=th;
-    th->next=all_threads;
-    th->prev=0;
-    all_threads=th;
-    /* note that th->os_thread is 0 at this time.  We rely on
-     * all_threads_lock to ensure that we don't have >1 thread with
-     * os_thread=0 on the list at once
-     */
-    protect_control_stack_guard_page(th,1);
-    /* child will not start until this is set */
-    th->os_thread=kid_tid;
-    FSHOW((stderr,"/created thread %lu\n",kid_tid));
-}
-
 void create_initial_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
-    os_thread_t kid_tid=thread_self();
-    if(th && kid_tid>0) {
-        link_thread(th,kid_tid);
-        initial_thread_trampoline(all_threads); /* no return */
+    if(th) {
+        initial_thread_trampoline(th); /* no return */
     } else lose("can't create initial thread");
 }
 
@@ -308,9 +321,9 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     sigset_t newset,oldset;
     boolean r=1;
     sigemptyset(&newset);
-    /* Blocking deferrable signals is enough, since gc_stop_the_world
-     * waits until the child leaves STATE_STARTING. And why not let gc
-     * proceed as soon as possible? */
+    /* Blocking deferrable signals is enough, no need to block
+     * SIG_STOP_FOR_GC because the child process is not linked onto
+     * all_threads until it's ready. */
     sigaddset_deferrable(&newset);
     thread_sigmask(SIG_BLOCK, &newset, &oldset);
 
@@ -324,61 +337,21 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     return r;
 }
 
-struct thread *create_thread(lispobj initial_function) {
+os_thread_t create_thread(lispobj initial_function) {
     struct thread *th;
-    os_thread_t kid_tid=0;
-    boolean success;
+    os_thread_t kid_tid;
 
     if(linux_no_threads_p) return 0;
 
     th=create_thread_struct(initial_function);
     if(th==0) return 0;
 
-    /* we must not be interrupted here after a successful
-     * create_os_thread, because the kid will be waiting for its
-     * thread struct to be linked */
-    GET_ALL_THREADS_LOCK("create_thread")
-
-    success=create_os_thread(th,&kid_tid);
-    if (success)
-        link_thread(th,kid_tid);
-    else
+    if (create_os_thread(th,&kid_tid)) {
+        return kid_tid;
+    } else {
         free_thread_struct(th);
-
-    RELEASE_ALL_THREADS_LOCK("create_thread")
-
-    if (success)
-        return th;
-    else
         return 0;
-}
-
-/* called from lisp from the thread object finalizer */
-void reap_dead_thread(struct thread *th)
-{
-    if(th->state!=STATE_DEAD)
-        lose("thread %p is not joinable, state=%d\n",th,th->state);
-#ifdef LISP_FEATURE_GENCGC
-    {
-        sigset_t newset,oldset;
-        sigemptyset(&newset);
-        sigaddset_blockable(&newset);
-        thread_sigmask(SIG_BLOCK, &newset, &oldset);
-        gc_alloc_update_page_tables(0, &th->alloc_region);
-        thread_sigmask(SIG_SETMASK,&oldset,0);
     }
-#endif
-    GET_ALL_THREADS_LOCK("reap_dead_thread")
-    FSHOW((stderr,"/reap_dead_thread: reaping %lu\n",th->os_thread));
-    if(th->prev)
-        th->prev->next=th->next;
-    else all_threads=th->next;
-    if(th->next)
-        th->next->prev=th->prev;
-    RELEASE_ALL_THREADS_LOCK("reap_dead_thread")
-    if(th->tls_cookie>=0) arch_os_thread_cleanup(th);
-    gc_assert(pthread_join(th->os_thread,NULL)==0);
-    free_thread_struct(th);
 }
 
 /* Send the signo to os_thread, retry if the rt signal queue is
@@ -402,56 +375,16 @@ static int kill_thread_safely(os_thread_t os_thread, int signo)
     return r;
 }
 
-int interrupt_thread(struct thread *th, lispobj function)
+int signal_interrupt_thread(os_thread_t os_thread)
 {
-    /* In clone_threads, if A and B both interrupt C at approximately
-     * the same time, it does not matter: the second signal will be
-     * masked until the handler has returned from the first one.  In
-     * pthreads though, we can't put the knowledge of what function to
-     * call into the siginfo, so we have to store it in the
-     * destination thread, and do it in such a way that A won't
-     * clobber B's interrupt.  Hence, this stupid linked list.
-     *
-     * This does depend on SIG_INTERRUPT_THREAD being queued (as POSIX
-     * RT signals are): we need to keep interrupt_fun data for exactly
-     * as many signals as are going to be received by the destination
-     * thread.
-     */
-    lispobj c=alloc_cons(function,NIL);
-    sigset_t newset,oldset;
-    sigemptyset(&newset);
-    /* interrupt_thread_handler locks this spinlock with blockables
-     * blocked (it does so for the sake of
-     * arrange_return_to_lisp_function), so we must also block them or
-     * else SIG_STOP_FOR_GC and all_threads_lock will find a way to
-     * deadlock. */
-    sigaddset_blockable(&newset);
-    thread_sigmask(SIG_BLOCK, &newset, &oldset);
-    if (th == arch_os_get_current_thread())
-        lose("cannot interrupt current thread");
-    get_spinlock(&th->interrupt_fun_lock,
-                 (long)arch_os_get_current_thread());
-    ((struct cons *)native_pointer(c))->cdr=th->interrupt_fun;
-    th->interrupt_fun=c;
-    release_spinlock(&th->interrupt_fun_lock);
-    thread_sigmask(SIG_SETMASK,&oldset,0);
-    /* Called from lisp with the thread object as a parameter. Thus,
-     * the object cannot be garbage collected and consequently reaped
-     * and joined. Because it's not joined, kill should work (even if
-     * the thread has died/exited). */
-    {
-        int status=kill_thread_safely(th->os_thread,SIG_INTERRUPT_THREAD);
-        if (status==0) {
-            return 0;
-        } else if (status==ESRCH) {
-            /* This thread has exited. */
-            th->interrupt_fun=NIL;
-            errno=ESRCH;
-            return -1;
-        } else {
-            lose("cannot send SIG_INTERRUPT_THREAD to thread=%lu: %d, %s",
-                 th->os_thread,status,strerror(status));
-        }
+    int status = kill_thread_safely(os_thread, SIG_INTERRUPT_THREAD);
+    if (status == 0) {
+        return 0;
+    } else if (status == ESRCH) {
+        return -1;
+    } else {
+        lose("cannot send SIG_INTERRUPT_THREAD to thread=%lu: %d, %s",
+             os_thread, status, strerror(status));
     }
 }
 
@@ -476,8 +409,7 @@ void gc_stop_the_world()
                   th->os_thread));
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     for(p=all_threads; p; p=p->next) {
-        while(p->state==STATE_STARTING) sched_yield();
-        if((p!=th) && (p->state==STATE_RUNNING)) {
+        if((p!=th) && ((p->state==STATE_RUNNING))) {
             FSHOW_SIGNAL((stderr,"/gc_stop_the_world: suspending %lu\n",
                           p->os_thread));
             status=kill_thread_safely(p->os_thread,SIG_STOP_FOR_GC);
@@ -494,7 +426,6 @@ void gc_stop_the_world()
     /* wait for the running threads to stop or finish */
     for(p=all_threads;p;) {
         gc_assert(p->os_thread!=0);
-        gc_assert(p->state!=STATE_STARTING);
         if((p==th) || (p->state==STATE_SUSPENDED) ||
            (p->state==STATE_DEAD)) {
             p=p->next;

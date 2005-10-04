@@ -3629,10 +3629,6 @@ garbage_collect_generation(int generation, int raise)
             scavenge((lispobj *)(interrupt_handlers + i), 1);
         }
     }
-    /* Scavenge the function list for INTERRUPT-THREAD. */
-    for_each_thread(th) {
-        scavenge(&th->interrupt_fun,1);
-    }
     /* Scavenge the binding stacks. */
     {
         struct thread *th;

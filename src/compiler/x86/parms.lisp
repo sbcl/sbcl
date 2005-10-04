@@ -313,6 +313,7 @@
     *gc-inhibit*
     #!+sb-thread *stop-for-gc-pending*
     *gc-pending*
+    #!+sb-thread sb!thread::run-interruption
 
     *free-tls-index*
     *tls-index-lock*

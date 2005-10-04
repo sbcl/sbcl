@@ -81,14 +81,16 @@ validate(void)
 }
 
 void
-protect_control_stack_guard_page(struct thread *th, int protect_p) {
+protect_control_stack_guard_page(int protect_p) {
+    struct thread *th = arch_os_get_current_thread();
     os_protect(CONTROL_STACK_GUARD_PAGE(th),
                os_vm_page_size,protect_p ?
                (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
 }
 
 void
-protect_control_stack_return_guard_page(struct thread *th, int protect_p) {
+protect_control_stack_return_guard_page(int protect_p) {
+    struct thread *th = arch_os_get_current_thread();
     os_protect(CONTROL_STACK_RETURN_GUARD_PAGE(th),
                os_vm_page_size,protect_p ?
                (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);

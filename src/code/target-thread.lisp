@@ -22,7 +22,10 @@
   "Thread type. Do not rely on threads being structs as it may change
 in future versions."
   name
-  %sap)
+  %alive-p
+  os-thread
+  interruptions
+  (interruptions-lock (make-mutex :name "thread interruptions lock")))
 
 #!+sb-doc
 (setf (sb!kernel:fdocumentation 'thread-name 'function)
@@ -38,22 +41,10 @@ in future versions."
         ))
   thread)
 
-(defun thread-state (thread)
-  (let ((state
-         (sb!sys:sap-int
-          (sb!sys:sap-ref-sap (thread-%sap thread)
-                              (* sb!vm::thread-state-slot
-                                 sb!vm::n-word-bytes)))))
-    (ecase state
-      (#.(sb!vm:fixnumize 0) :starting)
-      (#.(sb!vm:fixnumize 1) :running)
-      (#.(sb!vm:fixnumize 2) :suspended)
-      (#.(sb!vm:fixnumize 3) :dead))))
-
 (defun thread-alive-p (thread)
   #!+sb-doc
   "Check if THREAD is running."
-  (not (eq :dead (thread-state thread))))
+  (thread-%alive-p thread))
 
 ;; A thread is eligible for gc iff it has finished and there are no
 ;; more references to it. This list is supposed to keep a reference to
@@ -78,7 +69,8 @@ in future versions."
 
 (defun init-initial-thread ()
   (let ((initial-thread (%make-thread :name "initial thread"
-                                      :%sap (current-thread-sap))))
+                                      :%alive-p t
+                                      :os-thread (current-thread-sap-id))))
     (setq *current-thread* initial-thread)
     ;; Either *all-threads* is empty or it contains exactly one thread
     ;; in case we are in reinit since saving core with multiple
@@ -89,15 +81,18 @@ in future versions."
 
 #!+sb-thread
 (progn
+  ;; FIXME it would be good to define what a thread id is or isn't
+  ;; (our current assumption is that it's a fixnum).  It so happens
+  ;; that on Linux it's a pid, but it might not be on posix thread
+  ;; implementations.
   (define-alien-routine ("create_thread" %create-thread)
-      system-area-pointer
-    (lisp-fun-address unsigned-long))
+      unsigned-long (lisp-fun-address unsigned-long))
+
+  (define-alien-routine "signal_interrupt_thread"
+      integer (os-thread unsigned-long))
 
   (define-alien-routine "block_blockable_signals"
-    void)
-
-  (define-alien-routine reap-dead-thread void
-    (thread-sap system-area-pointer))
+      void)
 
   (declaim (inline futex-wait futex-wake))
 
@@ -501,57 +496,60 @@ returns the thread exits."
   (let* ((thread (%make-thread :name name))
          (setup-sem (make-semaphore :name "Thread setup semaphore"))
          (real-function (coerce function 'function))
-         (thread-sap
-          ;; don't let the child inherit *CURRENT-THREAD* because that
-          ;; can prevent gc'ing this thread while the child runs
-          (let ((*current-thread* nil))
-            (%create-thread
-             (sb!kernel:get-lisp-obj-address
-              (lambda ()
-                ;; in time we'll move some of the binding presently done in C
-                ;; here too
-                (let ((*current-thread* thread)
-                      (sb!kernel::*restart-clusters* nil)
-                      (sb!kernel::*handler-clusters* nil)
-                      (sb!kernel::*condition-restarts* nil)
-                      (sb!impl::*descriptor-handlers* nil)) ; serve-event
-                  (wait-on-semaphore setup-sem)
-                  ;; can't use handling-end-of-the-world, because that flushes
-                  ;; output streams, and we don't necessarily have any (or we
-                  ;; could be sharing them)
-                  (unwind-protect
-                       (catch 'sb!impl::toplevel-catcher
-                         (catch 'sb!impl::%end-of-the-world
-                           (with-simple-restart
-                               (terminate-thread
-                                (format nil
-                                        "~~@<Terminate this thread (~A)~~@:>"
-                                        *current-thread*))
-                             ;; now that most things have a chance to
-                             ;; work properly without messing up other
-                             ;; threads, it's time to enable signals
-                             (sb!unix::reset-signal-mask)
-                             (unwind-protect
-                                  (funcall real-function)
-                               ;; we're going down, can't handle
-                               ;; interrupts sanely anymore
-                               (let ((sb!impl::*gc-inhibit* t))
-                                 (block-blockable-signals)
-                                 ;; and remove what can be the last
-                                 ;; reference to this thread
-                                 (handle-thread-exit thread))))))
-                    0))
-                (values)))))))
-    (when (sb!sys:sap= thread-sap (sb!sys:int-sap 0))
-      (error "Can't create a new thread"))
-    (setf (thread-%sap thread) thread-sap)
-    (with-mutex (*all-threads-lock*)
-      (push thread *all-threads*))
-    (with-session-lock (*session*)
-      (push thread (session-threads *session*)))
-    (signal-semaphore setup-sem)
-    (sb!impl::finalize thread (lambda () (reap-dead-thread thread-sap)))
-    thread))
+         (initial-function
+          (lambda ()
+            ;; in time we'll move some of the binding presently done in C
+            ;; here too
+            (let ((*current-thread* thread)
+                  (sb!kernel::*restart-clusters* nil)
+                  (sb!kernel::*handler-clusters* nil)
+                  (sb!kernel::*condition-restarts* nil)
+                  (sb!impl::*descriptor-handlers* nil)) ; serve-event
+              (setf (thread-os-thread thread) (current-thread-sap-id))
+              (with-mutex (*all-threads-lock*)
+                (push thread *all-threads*))
+              (with-session-lock (*session*)
+                (push thread (session-threads *session*)))
+              (setf (thread-%alive-p thread) t)
+              (signal-semaphore setup-sem)
+              ;; can't use handling-end-of-the-world, because that flushes
+              ;; output streams, and we don't necessarily have any (or we
+              ;; could be sharing them)
+              (catch 'sb!impl::toplevel-catcher
+                (catch 'sb!impl::%end-of-the-world
+                  (with-simple-restart
+                      (terminate-thread
+                       (format nil
+                               "~~@<Terminate this thread (~A)~~@:>"
+                               *current-thread*))
+                    (unwind-protect
+                         (progn
+                           ;; now that most things have a chance to
+                           ;; work properly without messing up other
+                           ;; threads, it's time to enable signals
+                           (sb!unix::reset-signal-mask)
+                           (funcall real-function))
+                      ;; we're going down, can't handle
+                      ;; interrupts sanely anymore
+                      (let ((sb!impl::*gc-inhibit* t))
+                        (block-blockable-signals)
+                        (setf (thread-%alive-p thread) nil)
+                        (setf (thread-os-thread thread) nil)
+                        ;; and remove what can be the last
+                        ;; reference to this thread
+                        (handle-thread-exit thread)))))))
+            (values))))
+    (sb!sys:with-pinned-objects (initial-function)
+      (let ((os-thread
+             ;; don't let the child inherit *CURRENT-THREAD* because that
+             ;; can prevent gc'ing this thread while the child runs
+             (let ((*current-thread* nil))
+               (%create-thread
+                (sb!kernel:get-lisp-obj-address initial-function)))))
+        (when (zerop os-thread)
+          (error "Can't create a new thread"))
+        (wait-on-semaphore setup-sem)
+        thread))))
 
 (defun destroy-thread (thread)
   #!+sb-doc
@@ -559,15 +557,12 @@ returns the thread exits."
   (terminate-thread thread))
 
 (define-condition interrupt-thread-error (error)
-  ((thread :reader interrupt-thread-error-thread :initarg :thread)
-   (errno :reader interrupt-thread-error-errno :initarg :errno))
+  ((thread :reader interrupt-thread-error-thread :initarg :thread))
   #!+sb-doc
   (:documentation "Interrupting thread failed.")
   (:report (lambda (c s)
-             (format s "interrupt thread ~A failed (~A: ~A)"
-                     (interrupt-thread-error-thread c)
-                     (interrupt-thread-error-errno c)
-                     (strerror (interrupt-thread-error-errno c))))))
+             (format s "Interrupt thread failed: thread ~A has exited."
+                     (interrupt-thread-error-thread c)))))
 
 #!+sb-doc
 (setf (sb!kernel:fdocumentation 'interrupt-thread-error-thread 'function)
@@ -575,6 +570,24 @@ returns the thread exits."
       (sb!kernel:fdocumentation 'interrupt-thread-error-errno 'function)
       "The reason why the interruption failed.")
 
+(defmacro with-interruptions-lock ((thread) &body body)
+  `(sb!sys:without-interrupts
+     (with-mutex ((thread-interruptions-lock ,thread))
+       ,@body)))
+
+;; Called from the signal handler.
+(defun run-interruption ()
+  (let ((interruption (with-interruptions-lock (*current-thread*)
+                        (pop (thread-interruptions *current-thread*)))))
+    (funcall interruption)))
+
+;; The order of interrupt execution is peculiar. If thread A
+;; interrupts thread B with I1, I2 and B for some reason receives I1
+;; when FUN2 is already on the list, then it is FUN2 that gets to run
+;; first. But when FUN2 is run SIG_INTERRUPT_THREAD is enabled again
+;; and I2 hits pretty soon in FUN2 and run FUN1. This is of course
+;; just one scenario, and the order of thread interrupt execution is
+;; undefined.
 (defun interrupt-thread (thread function)
   #!+sb-doc
   "Interrupt the live THREAD and make it run FUNCTION. A moderate
@@ -590,18 +603,14 @@ won't like the effect."
   #!+sb-thread
   (if (eq thread *current-thread*)
       (funcall function)
-      (let ((function (coerce function 'function)))
-        (multiple-value-bind (res err)
-            ;; protect against gcing just when the ub32 address is
-            ;; just ready to be passed to C
-            (sb!sys::with-pinned-objects (function)
-              (sb!unix::syscall ("interrupt_thread"
-                                 system-area-pointer sb!alien:unsigned-long)
-                                thread
-                                (thread-%sap thread)
-                                (sb!kernel:get-lisp-obj-address function)))
-          (unless res
-            (error 'interrupt-thread-error :thread thread :errno err))))))
+      (let ((os-thread (thread-os-thread thread)))
+        (cond ((not os-thread)
+               (error 'interrupt-thread-error :thread thread))
+              (t
+               (with-interruptions-lock (thread)
+                 (push function (thread-interruptions thread)))
+               (when (minusp (signal-interrupt-thread os-thread))
+                 (error 'interrupt-thread-error :thread thread)))))))
 
 (defun terminate-thread (thread)
   #!+sb-doc
@@ -614,11 +623,24 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 ;;; with an SBCL developer first, or are doing something that you
 ;;; should probably discuss with a professional psychiatrist first
 #!+sb-thread
-(defun symbol-value-in-thread (symbol thread)
-  (let ((thread-sap (thread-%sap thread)))
-    (let* ((index (sb!vm::symbol-tls-index symbol))
-           (tl-val (sb!sys:sap-ref-word thread-sap
-                                        (* sb!vm:n-word-bytes index))))
-      (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
-          (sb!vm::symbol-global-value symbol)
-          (sb!kernel:make-lisp-obj tl-val)))))
+(defun thread-sap-for-id (id)
+  (let ((thread-sap (alien-sap (extern-alien "all_threads" (* t)))))
+    (loop
+     (when (sb!sys:sap= thread-sap (sb!sys:int-sap 0)) (return nil))
+     (let ((os-thread (sb!sys:sap-ref-word thread-sap
+                                           (* sb!vm:n-word-bytes
+                                              sb!vm::thread-os-thread-slot))))
+       (print os-thread)
+       (when (= os-thread id) (return thread-sap))
+       (setf thread-sap
+             (sb!sys:sap-ref-sap thread-sap (* sb!vm:n-word-bytes
+                                               sb!vm::thread-next-slot)))))))
+
+#!+sb-thread
+(defun symbol-value-in-thread (symbol thread-sap)
+  (let* ((index (sb!vm::symbol-tls-index symbol))
+         (tl-val (sb!sys:sap-ref-word thread-sap
+                                      (* sb!vm:n-word-bytes index))))
+    (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
+        (sb!vm::symbol-global-value symbol)
+        (sb!kernel:make-lisp-obj tl-val))))
