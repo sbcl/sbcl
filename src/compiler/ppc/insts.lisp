@@ -1840,6 +1840,12 @@
   (define-instruction-macro srwi. (ra rs n)
     `(inst rlwinm. ,ra ,rs (- 32 ,n) ,n 31))
 
+  (define-instruction-macro clrlwi (ra rs n)
+    `(inst rlwinm ,ra ,rs 0 ,n 31))
+
+  (define-instruction-macro clrlwi. (ra rs n)
+    `(inst rlwinm. ,ra ,rs 0 ,n 31))
+
   (define-instruction-macro clrrwi (ra rs n)
     `(inst rlwinm ,ra ,rs 0 0 (- 31 ,n)))
 
