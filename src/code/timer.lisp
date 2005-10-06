@@ -339,19 +339,21 @@ triggers."
              (sb!thread:interrupt-thread-error (c)
                (warn c)))))))
 
+;; Called from the signal handler.
 (defun run-expired-timers ()
   (unwind-protect
-       (let (timer)
-         (loop
-          (with-scheduler-lock ()
-            (setq timer (peek-schedule))
-            (unless (and timer
-                         (> (get-internal-real-time)
-                            (%timer-expire-time timer)))
-              (return-from run-expired-timers nil))
-            (assert (eq timer (priority-queue-extract-maximum *schedule*))))
-          ;; run the timer without the lock
-          (run-timer timer)))
+       (with-interrupts
+         (let (timer)
+           (loop
+            (with-scheduler-lock ()
+              (setq timer (peek-schedule))
+              (unless (and timer
+                           (> (get-internal-real-time)
+                              (%timer-expire-time timer)))
+                (return-from run-expired-timers nil))
+              (assert (eq timer (priority-queue-extract-maximum *schedule*))))
+            ;; run the timer without the lock
+            (run-timer timer))))
     (with-scheduler-lock ()
       (set-system-timer))))
 

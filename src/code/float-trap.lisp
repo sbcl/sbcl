@@ -161,23 +161,24 @@
                  (sb!alien:sap-alien context (* os-context-t))))
          (traps (logand (ldb float-exceptions-byte modes)
                         (ldb float-traps-byte modes))))
-    (cond ((not (zerop (logand float-divide-by-zero-trap-bit traps)))
-           (error 'division-by-zero))
-          ((not (zerop (logand float-invalid-trap-bit traps)))
-           (error 'floating-point-invalid-operation))
-          ((not (zerop (logand float-overflow-trap-bit traps)))
-           (error 'floating-point-overflow))
-          ((not (zerop (logand float-underflow-trap-bit traps)))
-           (error 'floating-point-underflow))
-          ((not (zerop (logand float-inexact-trap-bit traps)))
-           (error 'floating-point-inexact))
-          #!+freebsd
-          ((zerop (ldb float-exceptions-byte modes))
-           ;; I can't tell what caused the exception!!
-           (error 'floating-point-exception
-                  :traps (getf (get-floating-point-modes) :traps)))
-          (t
-           (error 'floating-point-exception)))))
+    (with-interrupts
+      (cond ((not (zerop (logand float-divide-by-zero-trap-bit traps)))
+             (error 'division-by-zero))
+            ((not (zerop (logand float-invalid-trap-bit traps)))
+             (error 'floating-point-invalid-operation))
+            ((not (zerop (logand float-overflow-trap-bit traps)))
+             (error 'floating-point-overflow))
+            ((not (zerop (logand float-underflow-trap-bit traps)))
+             (error 'floating-point-underflow))
+            ((not (zerop (logand float-inexact-trap-bit traps)))
+             (error 'floating-point-inexact))
+            #!+freebsd
+            ((zerop (ldb float-exceptions-byte modes))
+             ;; I can't tell what caused the exception!!
+             (error 'floating-point-exception
+                    :traps (getf (get-floating-point-modes) :traps)))
+            (t
+             (error 'floating-point-exception))))))
 
 ;;; Execute BODY with the floating point exceptions listed in TRAPS
 ;;; masked (disabled). TRAPS should be a list of possible exceptions

@@ -574,9 +574,10 @@
 #+(or x86 x86-64)
 (defun sigprof-handler (signal code scp)
   (declare (ignore signal code) (type system-area-pointer scp))
-  (when (and *sampling*
-             (< *samples-index* (length *samples*)))
-    (sb-sys:without-gcing
+  (sb-sys:with-interrupts
+    (when (and *sampling*
+               (< *samples-index* (length *samples*)))
+      (sb-sys:without-gcing
         (locally (declare (optimize (inhibit-warnings 2)))
           (with-alien ((scp (* os-context-t) :local scp))
             ;; For some reason completely bogus small values for the
@@ -604,25 +605,26 @@
                                      (sap-int ra)
                                      0)))
                         (t
-                         (record 0)))))))))))
+                         (record 0))))))))))))
 
 ;; FIXME: On non-x86 platforms we don't yet walk the call stack deeper
 ;; than one level.
 #-(or x86 x86-64)
 (defun sigprof-handler (signal code scp)
   (declare (ignore signal code))
-  (when (and *sampling*
-             (< *samples-index* (length *samples*)))
-    (sb-sys:without-gcing
-     (with-alien ((scp (* os-context-t) :local scp))
-       (locally (declare (optimize (inhibit-warnings 2)))
-         (let* ((pc-ptr (sb-vm:context-pc scp))
-                (fp (sb-vm::context-register scp #.sb-vm::cfp-offset))
-                (ra (sap-ref-word
-                     (int-sap fp)
-                     (* sb-vm::lra-save-offset sb-vm::n-word-bytes))))
-           (record (sap-int pc-ptr))
-           (record ra)))))))
+  (sb-sys:with-interrupts
+    (when (and *sampling*
+               (< *samples-index* (length *samples*)))
+      (sb-sys:without-gcing
+        (with-alien ((scp (* os-context-t) :local scp))
+          (locally (declare (optimize (inhibit-warnings 2)))
+            (let* ((pc-ptr (sb-vm:context-pc scp))
+                   (fp (sb-vm::context-register scp #.sb-vm::cfp-offset))
+                   (ra (sap-ref-word
+                        (int-sap fp)
+                        (* sb-vm::lra-save-offset sb-vm::n-word-bytes))))
+              (record (sap-int pc-ptr))
+              (record ra))))))))
 
 ;;; Map function FN over code objects in dynamic-space.  FN is called
 ;;; with two arguments, the object and its size in bytes.

@@ -64,7 +64,7 @@ in future versions."
 
 (declaim (inline current-thread-sap-id))
 (defun current-thread-sap-id ()
-  (sb!sys:sap-int
+  (sap-int
    (sb!vm::current-thread-offset-sap sb!vm::thread-os-thread-slot)))
 
 (defun init-initial-thread ()
@@ -107,7 +107,7 @@ in future versions."
 #!-sb-thread
 (defun sb!vm::current-thread-offset-sap (n)
   (declare (type (unsigned-byte 27) n))
-  (sb!sys:sap-ref-sap (alien-sap (extern-alien "all_threads" (* t)))
+  (sap-ref-sap (alien-sap (extern-alien "all_threads" (* t)))
                (* n sb!vm:n-word-bytes)))
 
 ;;;; spinlocks
@@ -349,7 +349,7 @@ this semaphore, then N of them is woken up."
   #!-sb-thread
   `(locally ,@body)
   #!+sb-thread
-  `(sb!sys:without-interrupts
+  `(without-interrupts
     (with-mutex ((session-lock ,session))
       ,@body)))
 
@@ -465,16 +465,16 @@ have the foreground next."
     (labels ((thread-repl ()
                (sb!unix::unix-setsid)
                (let* ((sb!impl::*stdin*
-                       (sb!sys:make-fd-stream in :input t :buffering :line
+                       (make-fd-stream in :input t :buffering :line
                                               :dual-channel-p t))
                       (sb!impl::*stdout*
-                       (sb!sys:make-fd-stream out :output t :buffering :line
+                       (make-fd-stream out :output t :buffering :line
                                               :dual-channel-p t))
                       (sb!impl::*stderr*
-                       (sb!sys:make-fd-stream err :output t :buffering :line
+                       (make-fd-stream err :output t :buffering :line
                                               :dual-channel-p t))
                       (sb!impl::*tty*
-                       (sb!sys:make-fd-stream err :input t :output t
+                       (make-fd-stream err :input t :output t
                                               :buffering :line
                                               :dual-channel-p t))
                       (sb!impl::*descriptor-handlers* nil))
@@ -539,7 +539,7 @@ returns the thread exits."
                         ;; reference to this thread
                         (handle-thread-exit thread)))))))
             (values))))
-    (sb!sys:with-pinned-objects (initial-function)
+    (with-pinned-objects (initial-function)
       (let ((os-thread
              ;; don't let the child inherit *CURRENT-THREAD* because that
              ;; can prevent gc'ing this thread while the child runs
@@ -569,15 +569,17 @@ returns the thread exits."
       "The thread that was not interrupted.")
 
 (defmacro with-interruptions-lock ((thread) &body body)
-  `(sb!sys:without-interrupts
+  `(without-interrupts
      (with-mutex ((thread-interruptions-lock ,thread))
        ,@body)))
 
 ;; Called from the signal handler.
 (defun run-interruption ()
-  (let ((interruption (with-interruptions-lock (*current-thread*)
-                        (pop (thread-interruptions *current-thread*)))))
-    (funcall interruption)))
+  (in-interruption ()
+   (let ((interruption (with-interruptions-lock (*current-thread*)
+                         (pop (thread-interruptions *current-thread*)))))
+     (with-interrupts
+       (funcall interruption)))))
 
 ;; The order of interrupt execution is peculiar. If thread A
 ;; interrupts thread B with I1, I2 and B for some reason receives I1
@@ -589,7 +591,7 @@ returns the thread exits."
 (defun interrupt-thread (thread function)
   #!+sb-doc
   "Interrupt the live THREAD and make it run FUNCTION. A moderate
-degree of care is expected for use of interrupt-thread, due to its
+degree of care is expected for use of INTERRUPT-THREAD, due to its
 nature: if you interrupt a thread that was holding important locks
 then do something that turns out to need those locks, you probably
 won't like the effect."
@@ -624,21 +626,21 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 (defun thread-sap-for-id (id)
   (let ((thread-sap (alien-sap (extern-alien "all_threads" (* t)))))
     (loop
-     (when (sb!sys:sap= thread-sap (sb!sys:int-sap 0)) (return nil))
-     (let ((os-thread (sb!sys:sap-ref-word thread-sap
-                                           (* sb!vm:n-word-bytes
-                                              sb!vm::thread-os-thread-slot))))
+     (when (sap= thread-sap (int-sap 0)) (return nil))
+     (let ((os-thread (sap-ref-word thread-sap
+                                    (* sb!vm:n-word-bytes
+                                       sb!vm::thread-os-thread-slot))))
        (print os-thread)
        (when (= os-thread id) (return thread-sap))
        (setf thread-sap
-             (sb!sys:sap-ref-sap thread-sap (* sb!vm:n-word-bytes
-                                               sb!vm::thread-next-slot)))))))
+             (sap-ref-sap thread-sap (* sb!vm:n-word-bytes
+                                        sb!vm::thread-next-slot)))))))
 
 #!+sb-thread
 (defun symbol-value-in-thread (symbol thread-sap)
   (let* ((index (sb!vm::symbol-tls-index symbol))
-         (tl-val (sb!sys:sap-ref-word thread-sap
-                                      (* sb!vm:n-word-bytes index))))
+         (tl-val (sap-ref-word thread-sap
+                               (* sb!vm:n-word-bytes index))))
     (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
         (sb!vm::symbol-global-value symbol)
         (sb!kernel:make-lisp-obj tl-val))))

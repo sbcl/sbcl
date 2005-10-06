@@ -1591,7 +1591,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 
    #s(sb-cold:package-data
       :name "SB!THREAD"
-      :use ("CL" "SB!ALIEN" "SB!INT")
+      :use ("CL" "SB!ALIEN" "SB!INT" "SB!SYS")
       :doc "public (but low-level): native thread support"
       :export ("*CURRENT-THREAD*" "THREAD" "MAKE-THREAD"
                "THREAD-NAME" "THREAD-ALIVE-P"
@@ -1883,7 +1883,11 @@ SB-KERNEL) have been undone, but probably more remain."
                "FOREIGN-SYMBOL-DATAREF-SAP"
                "GET-PAGE-SIZE" "GET-SYSTEM-INFO"
                "IGNORE-INTERRUPT"
-               "INT-SAP" "INVALIDATE-DESCRIPTOR" "IO-TIMEOUT"
+               "IN-INTERRUPTION"
+               "INT-SAP"
+               "INVALIDATE-DESCRIPTOR"
+               "INVOKE-INTERRUPTION"
+               "IO-TIMEOUT"
                "LIST-DYNAMIC-FOREIGN-SYMBOLS"
                "MACRO" "MAKE-FD-STREAM" "MAKE-OBJECT-SET" "MEMMOVE"
                "NATURALIZE-BOOLEAN" "NATURALIZE-INTEGER"

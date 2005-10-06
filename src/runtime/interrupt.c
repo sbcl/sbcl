@@ -68,7 +68,7 @@
 
 
 
-void run_deferred_handler(struct interrupt_data *data, void *v_context) ;
+void run_deferred_handler(struct interrupt_data *data, void *v_context);
 static void store_signal_data_for_later (struct interrupt_data *data,
                                          void *handler, int signal,
                                          siginfo_t *info,
@@ -474,8 +474,15 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 
         lispobj info_sap,context_sap = alloc_sap(context);
         info_sap = alloc_sap(info);
-        /* Allow signals again. */
-        thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+        /* Leave deferrable signals blocked, the handler itself will
+         * allow signals again when it sees fit. */
+#ifdef LISP_FEATURE_SB_THREAD
+        {
+            sigset_t unblock;
+            sigaddset(&unblock, SIG_STOP_FOR_GC);
+            thread_sigmask(SIG_UNBLOCK, &unblock, 0);
+        }
+#endif
 
         FSHOW_SIGNAL((stderr,"/calling Lisp-level handler\n"));
 
@@ -880,6 +887,8 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 {
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
+    /* let the handler enable interrupts again when it sees fit */
+    sigaddset_deferrable(os_context_sigmask_addr(context));
     arrange_return_to_lisp_function(context, SymbolFunction(RUN_INTERRUPTION));
 }
 

@@ -11,6 +11,16 @@
 
 (in-package "SB!UNIX")
 
+(defun invoke-interruption (function)
+  (without-interrupts
+    (sb!unix::reset-signal-mask)
+    (funcall function)))
+
+(defmacro in-interruption ((&rest args) &body body)
+  #!+sb-doc
+  "Convenience macro on top of INVOKE-INTERRUPTION."
+  `(invoke-interruption (lambda () ,@body) ,@args))
+
 ;;; These should probably be somewhere, but I don't know where.
 (defconstant sig_dfl 0)
 (defconstant sig_ign 1)
@@ -57,17 +67,21 @@
 (defun enable-interrupt (signal handler)
   (declare (type (or function fixnum (member :default :ignore)) handler))
   (/show0 "enable-interrupt")
-  (without-gcing
-   (let ((result (install-handler signal
-                                  (case handler
-                                    (:default sig_dfl)
-                                    (:ignore sig_ign)
-                                    (t
-                                     (sb!kernel:get-lisp-obj-address
-                                      handler))))))
-     (cond ((= result sig_dfl) :default)
-           ((= result sig_ign) :ignore)
-           (t (the (or function fixnum) (sb!kernel:make-lisp-obj result)))))))
+  (flet ((run-handler (&rest args)
+           (in-interruption ()
+             (apply handler args))))
+    (without-gcing
+      (let ((result (install-handler signal
+                                     (case handler
+                                       (:default sig_dfl)
+                                       (:ignore sig_ign)
+                                       (t
+                                        (sb!kernel:get-lisp-obj-address
+                                         #'run-handler))))))
+        (cond ((= result sig_dfl) :default)
+              ((= result sig_ign) :ignore)
+              (t (the (or function fixnum)
+                   (sb!kernel:make-lisp-obj result))))))))
 
 (defun default-interrupt (signal)
   (enable-interrupt signal :default))
@@ -84,15 +98,9 @@
 ;;; SIGINT in --disable-debugger mode will cleanly terminate the system
 ;;; (by respecting the *DEBUGGER-HOOK* established in that mode).
 (defun sigint-%break (format-string &rest format-arguments)
-  #!+sb-thread
-  (let ((foreground-thread (sb!thread::foreground-thread)))
-    (if (eq foreground-thread sb!thread:*current-thread*)
-        (apply #'%break 'sigint format-string format-arguments)
-        (sb!thread:interrupt-thread
-         foreground-thread
-         (lambda () (apply #'%break 'sigint format-string format-arguments)))))
-  #!-sb-thread
-  (apply #'%break 'sigint format-string format-arguments))
+  (flet ((break-it ()
+           (apply #'%break 'sigint format-string format-arguments)))
+    (sb!thread:interrupt-thread (sb!thread::foreground-thread) #'break-it)))
 
 (eval-when (:compile-toplevel :execute)
   (sb!xc:defmacro define-signal-handler (name
@@ -101,10 +109,12 @@
     `(defun ,name (signal info context)
        (declare (ignore signal info))
        (declare (type system-area-pointer context))
-       (/show "in Lisp-level signal handler" ,(symbol-name name) (sap-int context))
-       (,function ,(concatenate 'simple-string what " at #X~X")
-                  (with-alien ((context (* os-context-t) context))
-                    (sap-int (sb!vm:context-pc context)))))))
+       (/show "in Lisp-level signal handler" ,(symbol-name name)
+              (sap-int context))
+       (with-interrupts
+         (,function ,(concatenate 'simple-string what " at #X~X")
+                    (with-alien ((context (* os-context-t) context))
+                      (sap-int (sb!vm:context-pc context))))))))
 
 (define-signal-handler sigint-handler "interrupted" sigint-%break)
 (define-signal-handler sigill-handler "illegal instruction")
