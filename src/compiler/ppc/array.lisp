@@ -258,7 +258,7 @@
                (unless (and (sc-is value immediate)
                             (= (tn-value value) ,(1- (ash 1 bits))))
                  (cond ((zerop extra)
-                        (clrlwi old old ,bits))
+                        (inst clrlwi old old ,bits))
                        (t
                         (inst lr temp
                               (lognot (ash ,(1- (ash 1 bits))
