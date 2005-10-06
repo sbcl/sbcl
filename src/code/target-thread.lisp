@@ -566,9 +566,7 @@ returns the thread exits."
 
 #!+sb-doc
 (setf (sb!kernel:fdocumentation 'interrupt-thread-error-thread 'function)
-      "The thread that was not interrupted."
-      (sb!kernel:fdocumentation 'interrupt-thread-error-errno 'function)
-      "The reason why the interruption failed.")
+      "The thread that was not interrupted.")
 
 (defmacro with-interruptions-lock ((thread) &body body)
   `(sb!sys:without-interrupts

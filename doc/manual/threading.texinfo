@@ -36,7 +36,6 @@ backports.
 @include fun-sb-thread-list-all-threads.texinfo
 @include condition-sb-thread-interrupt-thread-error.texinfo
 @include fun-sb-thread-interrupt-thread-error-thread.texinfo
-@include fun-sb-thread-interrupt-thread-error-errno.texinfo
 @include fun-sb-thread-interrupt-thread.texinfo
 @include fun-sb-thread-terminate-thread.texinfo
 

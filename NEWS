@@ -12,6 +12,7 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
     on MIPS/Linux in addition to the previously supported platforms.
   * bug fix: threads stacks belonging to dead threads are freed by the
     next exiting thread, no need to gc to collect thread stacks anymore
+  * minor incompatible change: INTERRUPT-THREAD-ERROR-ERRNO removed
 
 changes in sbcl-0.9.5 relative to sbcl-0.9.4:
   * new feature: timers based on Zach Beane's excellent timer package
