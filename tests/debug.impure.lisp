@@ -190,7 +190,7 @@
                                     (list '(flet test) #'not-optimized))))))
 
 (with-test (:name (:throw :no-such-tag)
-            :fails-on '(or (and :x86 :linux) :alpha))
+            :fails-on '(or (and :x86 :linux) :alpha :mips))
   (progn
     (defun throw-test ()
       (throw 'no-such-tag t))

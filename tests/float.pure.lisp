@@ -119,7 +119,7 @@
     'double-float))
 
 (with-test (:name (:addition-overflow :bug-372)
-            :fails-on '(or :ppc))
+            :fails-on '(or :ppc :mips))
   (assert (typep (nth-value
                   1
                   (ignore-errors
