@@ -176,13 +176,14 @@ in future versions."
    (+ (sb!kernel:get-lisp-obj-address mutex)
       (- (* 3 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag))))
 
-(defun get-mutex (mutex &optional new-value (wait-p t))
+(defun get-mutex (mutex &optional (new-value *current-thread*) (wait-p t))
   #!+sb-doc
   "Acquire MUTEX, setting it to NEW-VALUE or some suitable default
 value if NIL.  If WAIT-P is non-NIL and the mutex is in use, sleep
 until it is available"
   (declare (type mutex mutex) (optimize (speed 3)))
-  (unless new-value (setf new-value *current-thread*))
+  (unless new-value
+    (setq new-value *current-thread*))
   #!-sb-thread
   (let ((old-value (mutex-value mutex)))
     (when (and old-value wait-p)

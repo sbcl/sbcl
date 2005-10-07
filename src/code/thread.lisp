@@ -11,19 +11,24 @@
 
 (in-package "SB!THREAD")
 
-(sb!xc:defmacro with-mutex ((mutex &key value (wait-p t)) &body body)
+(sb!xc:defmacro with-mutex ((mutex &key (value '*current-thread*) (wait-p t))
+                            &body body)
   #!+sb-doc
   "Acquire MUTEX for the dynamic scope of BODY, setting it to
 NEW-VALUE or some suitable default value if NIL.  If WAIT-P is non-NIL
 and the mutex is in use, sleep until it is available"
   #!-sb-thread (declare (ignore mutex value wait-p))
   #!+sb-thread
-  (with-unique-names (got)
-    `(let ((,got (get-mutex ,mutex ,value ,wait-p)))
-      (when ,got
-        (unwind-protect
-             (locally ,@body)
-          (release-mutex ,mutex)))))
+  (with-unique-names (got mutex1)
+    `(let ((,mutex1 ,mutex)
+           ,got)
+       (unwind-protect
+            ;; FIXME: async unwind in SETQ form
+            (when (setq ,got (get-mutex ,mutex1 ,value ,wait-p))
+              (locally
+                  ,@body))
+         (when ,got
+           (release-mutex ,mutex1)))))
   ;; KLUDGE: this separate expansion for (NOT SB-THREAD) is not
   ;; strictly necessary; GET-MUTEX and RELEASE-MUTEX are implemented.
   ;; However, there would be a (possibly slight) performance hit in
@@ -34,30 +39,21 @@ and the mutex is in use, sleep until it is available"
 (sb!xc:defmacro with-recursive-lock ((mutex) &body body)
   #!+sb-doc
   "Acquires MUTEX for the dynamic scope of BODY. Within that scope
-further recursive lock attempts for the same mutex succeed. However,
-it is an error to mix WITH-MUTEX and WITH-RECURSIVE-LOCK for the same
-mutex."
-  #!-sb-thread (declare (ignore mutex))
-  #!+sb-thread
-  (with-unique-names (cfp inner-lock)
-    `(let ((,cfp (sb!kernel:current-fp))
-           (,inner-lock
-            (and (mutex-value ,mutex)
-                 (sb!vm:control-stack-pointer-valid-p
-                  (sb!sys:int-sap
-                   (sb!kernel:get-lisp-obj-address (mutex-value ,mutex)))))))
-      (unless ,inner-lock
-        ;; this punning with MAKE-LISP-OBJ depends for its safety on
-        ;; the frame pointer being a lispobj-aligned integer.  While
-        ;; it is, then MAKE-LISP-OBJ will always return a FIXNUM, so
-        ;; we're safe to do that.  Should this ever change, this
-        ;; MAKE-LISP-OBJ could return something that looks like a
-        ;; pointer, but pointing into neverneverland, which will
-        ;; confuse GC completely.  -- CSR, 2003-06-03
-        (get-mutex ,mutex (sb!kernel:make-lisp-obj (sb!sys:sap-int ,cfp))))
-      (unwind-protect
-           (locally ,@body)
-        (unless ,inner-lock
-          (release-mutex ,mutex)))))
+further recursive lock attempts for the same mutex succeed. It is
+allowed to mix WITH-MUTEX and WITH-RECURSIVE-LOCK for the same mutex
+provided the default value is used for the mutex."
+  #!-sb-thread
+  (declare (ignore mutex)) #!+sb-thread
+  (with-unique-names (mutex1 inner-lock-p)
+    `(let* ((,mutex1 ,mutex)
+            (,inner-lock-p (eq (mutex-value ,mutex1) *current-thread*)))
+       (unwind-protect
+            (progn
+              (unless ,inner-lock-p
+                (get-mutex ,mutex1))
+              (locally
+                  ,@body))
+         (unless ,inner-lock-p
+           (release-mutex ,mutex1)))))
   #!-sb-thread
   `(locally ,@body))

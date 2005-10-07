@@ -99,8 +99,7 @@
   (assert (eql (mutex-value l) nil) nil "5"))
 
 (labels ((ours-p (value)
-           (sb-vm:control-stack-pointer-valid-p
-            (sb-sys:int-sap (sb-kernel:get-lisp-obj-address value)))))
+           (eq *current-thread* value)))
   (let ((l (make-mutex :name "rec")))
     (assert (eql (mutex-value l) nil) nil "1")
     (sb-thread:with-recursive-lock (l)
@@ -109,6 +108,11 @@
         (assert (ours-p (mutex-value l)) nil "4"))
       (assert (ours-p (mutex-value l)) nil "5"))
     (assert (eql (mutex-value l) nil) nil "6")))
+
+(with-test (:name (:mutex :nesting-mutex-and-recursive-lock))
+  (let ((l (make-mutex :name "a mutex")))
+    (with-mutex (l)
+      (with-recursive-lock (l)))))
 
 (let ((l (make-spinlock :name "spinlock"))
       (p *current-thread*))
@@ -151,8 +155,7 @@
 (let ((queue (make-waitqueue :name "queue"))
       (lock (make-mutex :name "lock")))
   (labels ((ours-p (value)
-             (sb-vm:control-stack-pointer-valid-p
-              (sb-sys:int-sap (sb-kernel:get-lisp-obj-address value))))
+             (eq *current-thread* value))
            (in-new-thread ()
              (with-recursive-lock (lock)
                (assert (ours-p (mutex-value lock)))

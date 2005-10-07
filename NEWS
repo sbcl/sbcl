@@ -14,9 +14,11 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
     on MIPS/Linux in addition to the previously supported platforms.
   * bug fix: division by zero in sb-sprof when no samples were collected
   * bug fix: a race when a slow to arrive sigprof signal killed sbcl
-  * bug fix: threads stacks belonging to dead threads are freed by the
-    next exiting thread, no need to gc to collect thread stacks anymore
-  * minor incompatible change: INTERRUPT-THREAD-ERROR-ERRNO removed
+  * threads
+    ** bug fix: threads stacks belonging to dead threads are freed by the
+       next exiting thread, no need to gc to collect thread stacks anymore
+    ** minor incompatible change: INTERRUPT-THREAD-ERROR-ERRNO removed
+    ** WITH-RECURSIVE-LOCK can be nested in a WITH-MUTEX for the same lock
 
 changes in sbcl-0.9.5 relative to sbcl-0.9.4:
   * new feature: timers based on Zach Beane's excellent timer package
