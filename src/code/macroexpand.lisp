@@ -58,6 +58,8 @@
            (cond ((and (consp local-def)
                        (eq (car local-def) 'macro))
                   (values (cdr local-def) t))
+                 (local-def
+                  (values form nil))
                  ((eq (info :variable :kind form) :macro)
                   (values (info :variable :macro-expansion form) t))
                  (t
