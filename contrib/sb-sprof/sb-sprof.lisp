@@ -647,8 +647,6 @@
          (end (+ start (sb-kernel:%code-code-size code))))
     (values start end)))
 
-;;; Record the addresses of dynamic-space code objects in
-;;; *DYNAMIC-SPACE-CODE-INFO*.  Call this with GC disabled.
 (defun record-dyninfo ()
   (setf *dynamic-space-code-info* nil)
   (flet ((record-address (code size)
@@ -777,7 +775,7 @@
       ;; (pushnew 'turn-off-sampling *before-gc-hooks*)
       (pushnew 'adjust-samples-for-address-changes *after-gc-hooks*)
       (record-dyninfo)
-      (sb-sys:enable-interrupt sb-unix::sigprof #'sigprof-handler)
+      (sb-sys:enable-interrupt sb-unix:sigprof #'sigprof-handler)
       (unix-setitimer :profile secs usecs secs usecs)
       (setq *profiling* t)))
   (values))
@@ -788,7 +786,9 @@
     (setq *after-gc-hooks*
           (delete 'adjust-samples-for-address-changes *after-gc-hooks*))
     (unix-setitimer :profile 0 0 0 0)
-    (sb-sys:enable-interrupt sb-unix::sigprof :default)
+    ;; Even with the timer shut down we cannot be sure that there is
+    ;; no undelivered sigprof. Besides, leaving the signal handler
+    ;; installed won't hurt.
     (setq *sampling* nil)
     (setq *profiling* nil))
   (values))
@@ -1004,7 +1004,9 @@
   (format t "~&~V,,,V<~>~%" length char))
 
 (defun samples-percent (call-graph count)
-  (* 100.0 (/ count (call-graph-nsamples call-graph))))
+  (if (> count 0)
+      (* 100.0 (/ count (call-graph-nsamples call-graph)))
+      0))
 
 (defun print-call-graph-header (call-graph)
   (let ((nsamples (call-graph-nsamples call-graph))
