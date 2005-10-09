@@ -104,29 +104,36 @@
 (defun url-connection (url)
   (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp))
         (host (url-host url))
-        (port (url-port url)))
+        (port (url-port url))
+	result)
     (declare (ignore port))
-    (socket-connect
-     s (car (host-ent-addresses (get-host-by-name (url-host (or *proxy* url)))))
-     (url-port (or  *proxy* url)))
-    (let ((stream (socket-make-stream s :input t :output t :buffering :full :external-format :iso-8859-1)))
-      ;; we are exceedingly unportable about proper line-endings here.
-      ;; Anyone wishing to run this under non-SBCL should take especial care
-      (format stream "GET ~A HTTP/1.0~%Host: ~A~%Cookie: CCLAN-SITE=~A~%~%"
-              url host *cclan-mirror*)
-      (force-output stream)
-      (list
-       (let* ((l (read-line stream))
-              (space (position #\Space l)))
-         (parse-integer l :start (1+ space) :junk-allowed t))
-       (loop for line = (read-line stream nil nil)
-             until (or (null line) (eql (elt line 0) (code-char 13)))
-             collect
-             (let ((colon (position #\: line)))
-               (cons (intern (string-upcase (subseq line 0 colon)) :keyword)
-                     (string-trim (list #\Space (code-char 13))
-                                  (subseq line (1+ colon))))))
-       stream))))
+    (unwind-protect
+	(progn 
+	  (socket-connect
+	   s (car (host-ent-addresses (get-host-by-name (url-host (or *proxy* url)))))
+	   (url-port (or  *proxy* url)))
+	  (let ((stream (socket-make-stream s :input t :output t :buffering :full :external-format :iso-8859-1)))
+	    ;; we are exceedingly unportable about proper line-endings here.
+	    ;; Anyone wishing to run this under non-SBCL should take especial care
+	    (format stream "GET ~A HTTP/1.0~c~%Host: ~A~c~%Cookie: CCLAN-SITE=~A~c~%~c~%"
+		    url #\Return host #\Return *cclan-mirror* #\Return #\Return)
+	    (force-output stream)
+	    (setf result
+		  (list
+		   (let* ((l (read-line stream))
+			  (space (position #\Space l)))
+		     (parse-integer l :start (1+ space) :junk-allowed t))
+		   (loop for line = (read-line stream nil nil)
+			 until (or (null line) (eql (elt line 0) (code-char 13)))
+			 collect
+			 (let ((colon (position #\: line)))
+			   (cons (intern (string-upcase (subseq line 0 colon)) :keyword)
+				 (string-trim (list #\Space (code-char 13))
+					      (subseq line (1+ colon))))))
+		   stream))))
+      (when (and (null result)
+		 (socket-open-p s))
+	(socket-close s)))))
 
 (defun download-files-for-package (package-name-or-url file-name)
   (let ((url
