@@ -2999,11 +2999,15 @@ used for a COMPLEX component.~:@>"
             ;; more general case of the above, but harder to compute
             ((progn
                (setf car-not1 (type-negation car-type1))
-               (not (csubtypep car-type2 car-not1)))
+               (multiple-value-bind (yes win)
+                   (csubtypep car-type2 car-not1)
+                 (and (not yes) win)))
              (frob-car car-type1 car-type2 cdr-type1 cdr-type2 car-not1))
             ((progn
                (setf car-not2 (type-negation car-type2))
-               (not (csubtypep car-type1 car-not2)))
+               (multiple-value-bind (yes win)
+                   (csubtypep car-type1 car-not2)
+                 (and (not yes) win)))
              (frob-car car-type2 car-type1 cdr-type2 cdr-type1 car-not2))
             ;; Don't put these in -- consider the effect of taking the
             ;; union of (CONS (INTEGER 0 2) (INTEGER 5 7)) and
