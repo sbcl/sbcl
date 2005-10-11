@@ -433,7 +433,7 @@
 (defknown reverse (sequence) consed-sequence (flushable)
   :derive-type (sequence-result-nth-arg 1))
 
-(defknown nreverse (sequence) sequence ()
+(defknown nreverse (sequence) sequence (important-result)
   :derive-type #'result-type-first-arg
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
@@ -537,7 +537,7 @@
      (:test-not callable) (:start index) (:end sequence-end)
      (:count sequence-count) (:key callable))
   sequence
-  (flushable call)
+  (flushable call important-result)
   :derive-type (sequence-result-nth-arg 2)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
@@ -554,7 +554,7 @@
   (callable sequence &key (:from-end t) (:start index) (:end sequence-end)
             (:count sequence-count) (:key callable))
   sequence
-  (flushable call)
+  (flushable call important-result)
   :derive-type (sequence-result-nth-arg 2)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
@@ -577,7 +577,7 @@
   (sequence &key (:test callable) (:test-not callable) (:start index)
             (:from-end t) (:end sequence-end) (:key callable))
   sequence
-  (unsafely-flushable call)
+  (unsafely-flushable call important-result)
   :derive-type (sequence-result-nth-arg 1)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
@@ -630,6 +630,9 @@
   (call)
   :derive-type (sequence-result-nth-arg 1)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
+(defknown sb!impl::stable-sort-list (list function function) list
+  (call important-result)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 (defknown sb!impl::sort-vector (vector index index function (or function null))
   * ; SORT-VECTOR works through side-effect
   (call)
@@ -638,7 +641,7 @@
 (defknown merge (type-specifier sequence sequence callable
                                 &key (:key callable))
   sequence
-  (call)
+  (call important-result)
   :derive-type (creation-result-type-specifier-nth-arg 1)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 2 3))
 
@@ -708,7 +711,7 @@
 (defknown sb!impl::nconc2 (list t) t ()
   :destroyed-constant-args (remove-non-constants-and-nils #'butlast))
 
-(defknown nreconc (list t) t ()
+(defknown nreconc (list t) t (important-result)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 (defknown butlast (list &optional unsigned-byte) list (flushable))
 (defknown nbutlast (list &optional unsigned-byte) list ()
@@ -762,7 +765,7 @@
 (defknown (nunion nintersection nset-difference nset-exclusive-or)
   (list list &key (:key callable) (:test callable) (:test-not callable))
   list
-  (foldable flushable call)
+  (foldable flushable call important-result)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1 2))
 
 (defknown subsetp
@@ -877,6 +880,8 @@
   :destroyed-constant-args (nth-constant-args 1))
 
 ;;; FIXME: complicated :DESTROYED-CONSTANT-ARGS
+;;; Also, an important-result warning could be provided if the array
+;;; is known to be not expressly adjustable.
 (defknown adjust-array
   (array (or index list) &key (:element-type type-specifier)
          (:initial-element t) (:initial-contents t)

@@ -637,6 +637,14 @@
 #!+sb-show
 (defvar *show-transforms-p* nil)
 
+(defun check-important-result (node info)
+  (when (and (null (node-lvar node))
+             (ir1-attributep (fun-info-attributes info) important-result))
+    (let ((*compiler-error-context* node))
+      (compiler-style-warn
+       "The return value of ~A should not be discarded."
+       (lvar-fun-name (basic-combination-fun node))))))
+
 ;;; Do IR1 optimizations on a COMBINATION node.
 (declaim (ftype (function (combination) (values)) ir1-optimize-combination))
 (defun ir1-optimize-combination (node)
@@ -661,6 +669,7 @@
          (when arg
            (setf (lvar-reoptimize arg) nil)))
        (when info
+         (check-important-result node info)
          (let ((fun (fun-info-destroyed-constant-args info)))
            (when fun
              (let ((destroyed-constant-args (funcall fun args)))
@@ -682,7 +691,7 @@
        (dolist (arg args)
          (when arg
            (setf (lvar-reoptimize arg) nil)))
-
+       (check-important-result node info)
        (let ((fun (fun-info-destroyed-constant-args info)))
          (when fun
            (let ((destroyed-constant-args (funcall fun args)))

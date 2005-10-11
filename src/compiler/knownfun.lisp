@@ -61,6 +61,10 @@
   ;; in the safe code. If a function MUST signal errors, then it is
   ;; not unsafely-flushable even if it is movable or foldable.
   unsafely-flushable
+  ;; return value is important, and ignoring it is probably a mistake.
+  ;; Unlike the other attributes, this is used only for style
+  ;; warnings and has no effect on optimization.
+  important-result
   ;; may be moved with impunity. Has no side effects except possibly
   ;; consing, and is affected only by its arguments.
   ;;

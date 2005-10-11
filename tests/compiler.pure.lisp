@@ -194,6 +194,71 @@
   (assert (not (eval `(locally (declare (optimize (safety 3)))
                         (ignore-errors (progn ,form t)))))))
 
+;;; feature: we shall complain if functions which are only useful for
+;;; their result are called and their result ignored.
+(loop for (form expected-des) in
+        '(((progn (nreverse (list 1 2)) t)
+           "The return value of NREVERSE should not be discarded.")
+          ((progn (nreconc (list 1 2) (list 3 4)) t)
+           "The return value of NRECONC should not be discarded.")
+          ((locally
+             (declare (inline sort))
+             (sort (list 1 2) #'<) t)
+           ;; FIXME: it would be nice if this warned on non-inlined sort
+           ;; but the current simple boolean function attribute
+           ;; can't express the condition that would be required.
+           "The return value of STABLE-SORT-LIST should not be discarded.")
+          ((progn (sort (vector 1 2) #'<) t)
+           ;; Apparently, SBCL (but not CL) guarantees in-place vector
+           ;; sort, so no warning.
+           nil)
+          ((progn (delete 2 (list 1 2)) t)
+           "The return value of DELETE should not be discarded.")
+          ((progn (delete-if #'evenp (list 1 2)) t)
+           ("The return value of DELETE-IF should not be discarded."))
+          ((progn (delete-if #'evenp (vector 1 2)) t)
+           ("The return value of DELETE-IF should not be discarded."))
+          ((progn (delete-if-not #'evenp (list 1 2)) t)
+           "The return value of DELETE-IF-NOT should not be discarded.")
+          ((progn (delete-duplicates (list 1 2)) t)
+           "The return value of DELETE-DUPLICATES should not be discarded.")
+          ((progn (merge 'list (list 1 3) (list 2 4) #'<) t)
+           "The return value of MERGE should not be discarded.")
+          ((progn (nreconc (list 1 3) (list 2 4)) t)
+           "The return value of NRECONC should not be discarded.")
+          ((progn (nunion (list 1 3) (list 2 4)) t)
+           "The return value of NUNION should not be discarded.")
+          ((progn (nintersection (list 1 3) (list 2 4)) t)
+           "The return value of NINTERSECTION should not be discarded.")
+          ((progn (nset-difference (list 1 3) (list 2 4)) t)
+           "The return value of NSET-DIFFERENCE should not be discarded.")
+          ((progn (nset-exclusive-or (list 1 3) (list 2 4)) t)
+           "The return value of NSET-EXCLUSIVE-OR should not be discarded."))
+      for expected = (if (listp expected-des)
+                       expected-des
+                       (list expected-des))
+      do
+  (multiple-value-bind (fun warnings-p failure-p)
+      (handler-bind ((style-warning (lambda (c)
+                      (if expected
+                        (let ((expect-one (pop expected)))
+                          (assert (search expect-one
+                                          (with-standard-io-syntax
+                                            (let ((*print-right-margin* nil))
+                                              (princ-to-string c))))
+                                  ()
+                                  "~S should have warned ~S, but instead warned: ~A"
+                                  form expect-one c))
+                        (error "~S shouldn't give a(nother) warning, but did: ~A" form c)))))
+        (compile nil `(lambda () ,form)))
+  (declare (ignore warnings-p))
+  (assert (functionp fun))
+  (assert (null expected)
+          ()
+          "~S should have warned ~S, but didn't."
+          form expected)
+  (assert (not failure-p))))
+
 ;;; a bug in the MAP deftransform caused non-VECTOR array specifiers
 ;;; to cause errors in the compiler.  Fixed by CSR in 0.7.8.10
 (assert (list (compile nil '(lambda (x) (map 'simple-array 'identity x)))))

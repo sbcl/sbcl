@@ -15,7 +15,10 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
   * bug fix: division by zero in sb-sprof when no samples were collected
   * bug fix: a race when a slow to arrive sigprof signal killed sbcl
   * bug fix: asdf-install uses CRLF as required by the HTTP spec.
-    (thanks to Alexander Kjeldaas)
+    (thanks to Alexander Kjeldaas)    
+  * new feature: ignoring the return values of destructive functions
+    like NREVERSE signals a compile-time style-warning.
+    (thanks to Kevin Reid)
   * threads
     ** bug fix: threads stacks belonging to dead threads are freed by the
        next exiting thread, no need to gc to collect thread stacks anymore
