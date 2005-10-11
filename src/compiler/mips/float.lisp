@@ -695,7 +695,8 @@
 
 ;;;; Float mode hackery:
 
-(sb!xc:deftype float-modes () '(unsigned-byte 24))
+;#|
+(sb!xc:deftype float-modes () '(unsigned-byte 32))
 (defknown floating-point-modes () float-modes (flushable))
 (defknown ((setf floating-point-modes)) (float-modes)
   float-modes)
@@ -717,9 +718,9 @@
   (:translate (setf floating-point-modes))
   (:policy :fast-safe)
   (:generator 3
-    (inst ctc1 res 31)
+    (inst ctc1 new 31)
     (move res new)))
-
+;|#
 
 ;;;; Complex float VOPs
 

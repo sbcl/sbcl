@@ -64,7 +64,6 @@
 (defconstant-eqx float-exceptions-byte (byte 5 12) #'equalp)
 (defconstant-eqx float-condition-bit (ash 1 23) #'equalp)
 (def!constant float-fast-bit (ash 1 24))
-;(def!constant float-fast-bit 0)
 
 ;;;; Description of the target address space.
 
