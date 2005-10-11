@@ -1,32 +1,15 @@
+;;;; MIPS VM definitions of various system hacking operations
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
-
-
-;;;; Random pointer comparison VOPs
-
-(define-vop (pointer-compare)
-  (:args (x :scs (sap-reg))
-         (y :scs (sap-reg)))
-  (:arg-types system-area-pointer system-area-pointer)
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:conditional)
-  (:info target not-p)
-  (:policy :fast-safe)
-  (:note "inline comparison")
-  (:variant-vars condition)
-  (:generator 3
-    (three-way-comparison x y condition :unsigned not-p target temp)))
-
-#+nil
-(macrolet ((frob (name cond)
-             `(progn
-                (def-primitive-translator ,name (x y) `(,',name ,x ,y))
-                (defknown ,name (t t) boolean (movable foldable flushable))
-                (define-vop (,name pointer-compare)
-                  (:translate ,name)
-                  (:variant ,cond)))))
-  (frob pointer< :lt)
-  (frob pointer> :gt))
-
 
 
 ;;;; Type frobbing VOPs

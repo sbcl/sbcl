@@ -92,10 +92,18 @@
 
 ;;; Comparison of characters.
 ;;;
-(define-vop (character-compare pointer-compare)
+(define-vop (character-compare)
   (:args (x :scs (character-reg))
          (y :scs (character-reg)))
-  (:arg-types character character))
+  (:arg-types character character)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:conditional)
+  (:info target not-p)
+  (:policy :fast-safe)
+  (:note "inline comparison")
+  (:variant-vars condition)
+  (:generator 3
+    (three-way-comparison x y condition :unsigned not-p target temp)))
 
 (define-vop (fast-char=/character character-compare)
   (:translate char=)
