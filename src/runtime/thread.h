@@ -124,10 +124,14 @@ static inline struct thread *arch_os_get_current_thread() {
 #define thread_self pthread_self
 #define thread_kill pthread_kill
 #define thread_sigmask pthread_sigmask
+#define thread_mutex_lock(l) pthread_mutex_lock(l)
+#define thread_mutex_unlock(l) pthread_mutex_unlock(l)
 #else
 #define thread_self getpid
 #define thread_kill kill
 #define thread_sigmask sigprocmask
+#define thread_mutex_lock(l)
+#define thread_mutex_unlock(l)
 #endif
 
 extern void create_initial_thread(lispobj);

@@ -265,7 +265,9 @@ static long  last_free_page;
  * seized before all accesses to generations[] or to parts of
  * page_table[] that other threads may want to see */
 
-static lispobj free_pages_lock=0;
+#ifdef LISP_FEATURE_SB_THREAD
+static pthread_mutex_t free_pages_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 
 /*
@@ -516,7 +518,7 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
     gc_assert((alloc_region->first_page == 0)
               && (alloc_region->last_page == -1)
               && (alloc_region->free_pointer == alloc_region->end_addr));
-    get_spinlock(&free_pages_lock,(long) alloc_region);
+    thread_mutex_lock(&free_pages_lock);
     if (unboxed) {
         first_page =
             generations[gc_alloc_generation].alloc_unboxed_start_page;
@@ -578,7 +580,7 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
                        (lispobj)(((char *)heap_base) + last_free_page*PAGE_BYTES),
                        0);
     }
-    release_spinlock(&free_pages_lock);
+    thread_mutex_unlock(&free_pages_lock);
 
     /* we can do this after releasing free_pages_lock */
     if (gencgc_zero_check) {
@@ -715,7 +717,7 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 
     next_page = first_page+1;
 
-    get_spinlock(&free_pages_lock,(long) alloc_region);
+    thread_mutex_lock(&free_pages_lock);
     if (alloc_region->free_pointer != alloc_region->start_addr) {
         /* some bytes were allocated in the region */
         orig_first_page_bytes_used = page_table[first_page].bytes_used;
@@ -819,7 +821,7 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
         page_table[next_page].allocated = FREE_PAGE_FLAG;
         next_page++;
     }
-    release_spinlock(&free_pages_lock);
+    thread_mutex_unlock(&free_pages_lock);
     /* alloc_region is per-thread, we're ok to do this unlocked */
     gc_set_region_empty(alloc_region);
 }
@@ -838,7 +840,7 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
     long bytes_used;
     long next_page;
 
-    get_spinlock(&free_pages_lock,(long) alloc_region);
+    thread_mutex_lock(&free_pages_lock);
 
     if (unboxed) {
         first_page =
@@ -939,7 +941,7 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
         SetSymbolValue(ALLOCATION_POINTER,
                        (lispobj)(((char *)heap_base) + last_free_page*PAGE_BYTES),0);
     }
-    release_spinlock(&free_pages_lock);
+    thread_mutex_unlock(&free_pages_lock);
 
     return((void *)(page_address(first_page)+orig_first_page_bytes_used));
 }
@@ -954,7 +956,7 @@ gc_find_freeish_pages(long *restart_page_ptr, long nbytes, int unboxed)
     long bytes_found;
     long num_pages;
     long large_p=(nbytes>=large_object_size);
-    gc_assert(free_pages_lock);
+    /* FIXME: assert(free_pages_lock is held); */
 
     /* Search for a contiguous free space of at least nbytes. If it's
      * a large object then align it on a page boundary by searching

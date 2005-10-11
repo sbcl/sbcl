@@ -110,7 +110,8 @@ void sigaddset_blockable(sigset_t *s)
 static sigset_t deferrable_sigset;
 static sigset_t blockable_sigset;
 
-inline static void check_blockables_blocked_or_lose()
+void
+check_blockables_blocked_or_lose()
 {
     /* Get the current sigmask, by blocking the empty set. */
     sigset_t empty,current;

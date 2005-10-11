@@ -69,20 +69,20 @@ void debug_get_ldt()
     printf("%d bytes in ldt: print/x local_ldt_copy\n", n);
 }
 
-volatile lispobj modify_ldt_lock;       /* protect all calls to modify_ldt */
+#ifdef LISP_FEATURE_SB_THREAD
+pthread_mutex_t modify_ldt_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;
 #ifdef LISP_FEATURE_SB_THREAD
-    /* FIXME Lock ordering rules: all_threads_lock must usually be
-     * held when getting modify_ldt_lock
-     */
     struct user_desc ldt_entry = {
         1, 0, 0, /* index, address, length filled in later */
         1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
     };
     int n;
-    get_spinlock(&modify_ldt_lock,(long)thread);
+    check_blockables_blocked_or_lose();
+    thread_mutex_lock(&modify_ldt_lock);
     n=modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy);
     /* get next free ldt entry */
 
@@ -96,7 +96,7 @@ int arch_os_thread_init(struct thread *thread) {
     ldt_entry.limit=dynamic_values_bytes;
     ldt_entry.limit_in_pages=0;
     if (modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) {
-        modify_ldt_lock=0;
+        thread_mutex_unlock(&modify_ldt_lock);
         /* modify_ldt call failed: something magical is not happening */
         return 0;
     }
@@ -105,7 +105,7 @@ int arch_os_thread_init(struct thread *thread) {
                            + (1 << 2) /* TI set = LDT */
                            + 3)); /* privilege level */
     thread->tls_cookie=n;
-    modify_ldt_lock=0;
+    pthread_mutex_unlock(&modify_ldt_lock);
 
     if(n<0) return 0;
     pthread_setspecific(specials,thread);
@@ -138,16 +138,14 @@ int arch_os_thread_cleanup(struct thread *thread) {
         0, 0, 0,
         0, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 0
     };
+    int result;
 
+    check_blockables_blocked_or_lose();
     ldt_entry.entry_number=thread->tls_cookie;
-    get_spinlock(&modify_ldt_lock,(long)thread);
-    if (modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) {
-        modify_ldt_lock=0;
-        /* modify_ldt call failed: something magical is not happening */
-        return 0;
-    }
-    modify_ldt_lock=0;
-    return 1;
+    thread_mutex_lock(&modify_ldt_lock);
+    result = modify_ldt(1, &ldt_entry, sizeof (ldt_entry));
+    thread_mutex_unlock(&modify_ldt_lock);
+    return result;
 }
 
 

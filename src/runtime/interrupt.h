@@ -25,6 +25,8 @@
 /* FIXME: do not rely on NSIG being a multiple of 8 */
 #define REAL_SIGSET_SIZE_BYTES ((NSIG/8))
 
+extern void check_blockables_blocked_or_lose();
+
 static inline void
 sigcopyset(sigset_t *new, sigset_t *old)
 {
