@@ -179,7 +179,7 @@
              (let ((me *current-thread*))
                (dotimes (i 100)
                  (with-mutex (mutex)
-                   (sleep .1)
+                   (sleep .03)
                    (assert (eql (mutex-value mutex) me)))
                  (assert (not (eql (mutex-value mutex) me))))
                (format t "done ~A~%" *current-thread*))))
@@ -463,9 +463,10 @@
 
 (format t "~&session lock test done~%")
 
-(wait-for-threads
- (loop for i below 2000 collect
-       (sb-thread:make-thread (lambda ()))))
+(loop repeat 20 do
+      (wait-for-threads
+       (loop for i below 100 collect
+             (sb-thread:make-thread (lambda ())))))
 
 (format t "~&creation test done~%")
 
@@ -484,6 +485,21 @@
 (sb-thread:make-thread
  (lambda ()
    (sb-ext:run-program "sleep" '("1") :search t :wait nil)))
+
+(with-test (:name (:thread-start :dynamic-values-and-gc))
+  (let ((gc-thread (sb-thread:make-thread (lambda ()
+                                            (loop (sleep (random 0.2))
+                                                  (sb-ext:gc :full t))))))
+    (wait-for-threads
+     (loop for i below 3000
+           when (zerop (mod i 30))
+           do (princ ".")
+           collect
+           (let ((*x* (lambda ())))
+             (declare (special *x*))
+             (sb-thread:make-thread (lambda () (functionp *x*))))))
+    (sb-thread:terminate-thread gc-thread)
+    (terpri)))
 
 #|  ;; a cll post from eric marsden
 | (defun crash ()

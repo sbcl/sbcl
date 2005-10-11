@@ -18,6 +18,7 @@ struct alloc_region { };
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
 
+#define STATE_STARTING (make_fixnum(0))
 #define STATE_RUNNING (make_fixnum(1))
 #define STATE_SUSPENDED (make_fixnum(2))
 #define STATE_DEAD (make_fixnum(3))

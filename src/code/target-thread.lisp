@@ -631,7 +631,6 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
      (let ((os-thread (sap-ref-word thread-sap
                                     (* sb!vm:n-word-bytes
                                        sb!vm::thread-os-thread-slot))))
-       (print os-thread)
        (when (= os-thread id) (return thread-sap))
        (setf thread-sap
              (sap-ref-sap thread-sap (* sb!vm:n-word-bytes

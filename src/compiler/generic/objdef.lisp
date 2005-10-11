@@ -407,7 +407,7 @@
   ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
   ;; of a symbol is initialized to zero
   (no-tls-value-marker)
-  (os-thread :c-type "os_thread_t")
+  (os-thread :c-type "volatile os_thread_t")
   (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)

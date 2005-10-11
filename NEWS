@@ -21,6 +21,7 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
        next exiting thread, no need to gc to collect thread stacks anymore
     ** minor incompatible change: INTERRUPT-THREAD-ERROR-ERRNO removed
     ** WITH-RECURSIVE-LOCK can be nested in a WITH-MUTEX for the same lock
+    ** bug fix: dynamic variable and thread start related gc lossage
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** SUBTYPEP is slightly more accurate on heinously complicated
        CONS types where some of the members have uncertain (in the
