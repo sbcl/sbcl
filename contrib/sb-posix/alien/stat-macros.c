@@ -9,37 +9,37 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-mode_t s_isreg(mode_t mode)
+int s_isreg(mode_t mode)
 {
     return S_ISREG(mode);
 }
 
 
-mode_t s_isdir(mode_t mode)
+int s_isdir(mode_t mode)
 {
     return S_ISDIR(mode);
 }
 
 
-mode_t s_ischr(mode_t mode)
+int s_ischr(mode_t mode)
 {
     return S_ISCHR(mode);
 }
 
 
-mode_t s_isblk(mode_t mode)
+int s_isblk(mode_t mode)
 {
     return S_ISBLK(mode);
 }
 
 
-mode_t s_isfifo(mode_t mode)
+int s_isfifo(mode_t mode)
 {
     return S_ISFIFO(mode);
 }
 
 
-mode_t s_islnk(mode_t mode)
+int s_islnk(mode_t mode)
 {
 #ifdef S_ISLNK
     return S_ISLNK(mode);
@@ -49,7 +49,7 @@ mode_t s_islnk(mode_t mode)
 }
 
 
-mode_t s_issock(mode_t mode)
+int s_issock(mode_t mode)
 {
 #ifdef S_ISSOCK
     return S_ISSOCK(mode);
