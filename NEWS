@@ -19,6 +19,8 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
   * new feature: ignoring the return values of destructive functions
     like NREVERSE signals a compile-time style-warning.
     (thanks to Kevin Reid)
+  * new feature: the alignment of alien structure fields can be 
+    explicitly specified. (thanks to Cyrus Harmon)
   * threads
     ** bug fix: threads stacks belonging to dead threads are freed by the
        next exiting thread, no need to gc to collect thread stacks anymore

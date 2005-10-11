@@ -196,8 +196,10 @@ variables. Dynamic arrays can only be allocated using
 The foreign type specifier @code{(sb-alien:struct @var{name} &rest
 @var{fields})} describes a structure type with the specified
 @var{name} and @var{fields}. Fields are allocated at the same offsets
-used by the implementation's C compiler. If @var{name} is @code{nil}
-then the structure is anonymous.
+used by the implementation's C compiler, as guessed by the SBCL
+internals. An optional @code{:alignment} keyword argument can be
+specified for each field to explicitly control the alignment of a
+field. If @var{name} is @code{nil} then the structure is anonymous.
 
 If a named foreign @code{struct} specifier is passed to
 @code{define-alien-type} or @code{with-alien}, then this defines,

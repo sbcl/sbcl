@@ -136,4 +136,31 @@
                          v)))))
   (assert (typep (funcall f "HOME") '(or string null))))
 
+
+;;; CLH: Test for non-standard alignment in alien structs
+;;;
+(sb-alien:define-alien-type align-test-struct
+    (sb-alien:union align-test-union
+                    (s (sb-alien:struct nil
+                                        (s1 sb-alien:unsigned-char)
+                                        (c1 sb-alien:unsigned-char :alignment 16)
+                                        (c2 sb-alien:unsigned-char :alignment 32)
+                                        (c3 sb-alien:unsigned-char :alignment 32)
+                                        (c4 sb-alien:unsigned-char :alignment 8)))
+                    (u (sb-alien:array sb-alien:unsigned-char 16))))
+
+(let ((a1 (sb-alien:make-alien align-test-struct)))
+  (declare (type (sb-alien:alien (* align-test-struct)) a1))
+  (setf (sb-alien:slot (sb-alien:slot a1 's) 's1) 1)
+  (setf (sb-alien:slot (sb-alien:slot a1 's) 'c1) 21)
+  (setf (sb-alien:slot (sb-alien:slot a1 's) 'c2) 41)
+  (setf (sb-alien:slot (sb-alien:slot a1 's) 'c3) 61)
+  (setf (sb-alien:slot (sb-alien:slot a1 's) 'c4) 81)
+  (assert (equal '(1 21 41 61 81)
+                 (list (sb-alien:deref (sb-alien:slot a1 'u) 0)
+                       (sb-alien:deref (sb-alien:slot a1 'u) 2)
+                       (sb-alien:deref (sb-alien:slot a1 'u) 4)
+                       (sb-alien:deref (sb-alien:slot a1 'u) 8)
+                       (sb-alien:deref (sb-alien:slot a1 'u) 9)))))
+
 ;;; success

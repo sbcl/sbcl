@@ -966,14 +966,14 @@
         (overall-alignment 1)
         (parsed-fields nil))
     (dolist (field fields)
-      (destructuring-bind (var type &optional bits) field
-        (declare (ignore bits))
+      (destructuring-bind (var type &key alignment) field
         (let* ((field-type (parse-alien-type type env))
                (bits (alien-type-bits field-type))
-               (alignment (alien-type-alignment field-type))
                (parsed-field
                 (make-alien-record-field :type field-type
                                          :name var)))
+          (unless alignment
+            (setf alignment (alien-type-alignment field-type)))
           (push parsed-field parsed-fields)
           (when (null bits)
             (error "unknown size: ~S" (unparse-alien-type field-type)))
