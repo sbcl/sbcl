@@ -3,7 +3,7 @@
 @chapter Foreign Function Interface
 
 This chapter describes SBCL's interface to C programs and
-libraries (and, since C interfaces are a sort of @emph{ingua
+libraries (and, since C interfaces are a sort of @emph{lingua
 franca} of the Unix world, to other programs and libraries in
 general.)
 

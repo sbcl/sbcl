@@ -565,7 +565,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; synthesize a nice consistent structure for us.
 ;;;
 ;;; Note that st-dev is a long, not a dev-t. This is because dev-t on
-;;; linux 32 bit archs is a 64 bit quantity, but alien doesn's support
+;;; linux 32 bit archs is a 64 bit quantity, but alien doesn't support
 ;;; those. We don't actually access that field anywhere, though, so
 ;;; until we can get 64 bit alien support it'll do. Also note that
 ;;; st_size is a long, not an off-t, because off-t is a 64-bit
