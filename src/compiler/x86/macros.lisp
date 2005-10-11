@@ -455,8 +455,12 @@ garbage collection"
   `(multiple-value-prog1
        (progn
          ,@(loop for p in objects
-                 collect `(push-word-on-c-stack
-                           (int-sap (sb!kernel:get-lisp-obj-address ,p))))
+                 collect
+                 ;; There is no race here wrt to gc, because at every
+                 ;; point during the execution there is a reference to
+                 ;; P on the stack or in a register.
+                 `(push-word-on-c-stack
+                   (int-sap (sb!kernel:get-lisp-obj-address ,p))))
          ,@body)
      ;; If the body returned normally, we should restore the stack pointer
      ;; for the benefit of any following code in the same function.  If

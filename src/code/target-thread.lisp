@@ -11,6 +11,12 @@
 
 (in-package "SB!THREAD")
 
+;;; Of the WITH-PINNED-OBJECTS in this file, not every single one is
+;;; necessary because threads are only supported with the conservative
+;;; gencgc and numbers on the stack (returned by GET-LISP-OBJ-ADDRESS)
+;;; are treated as references. In fact, I think there isn't one that's
+;;; truly important as of now.
+
 ;;; set the doc here because in early-thread FDOCUMENTATION is not
 ;;; available, yet
 #!+sb-doc
@@ -204,8 +210,9 @@ until it is available"
          (setf old (sb!vm::%instance-set-conditional mutex 2 nil new-value))
        (return t))
      (unless wait-p (return nil))
-     (futex-wait (mutex-value-address mutex)
-                 (sb!kernel:get-lisp-obj-address old)))))
+     (with-pinned-objects (mutex old)
+       (futex-wait (mutex-value-address mutex)
+                   (sb!kernel:get-lisp-obj-address old))))))
 
 (defun release-mutex (mutex)
   #!+sb-doc
@@ -264,8 +271,9 @@ time we reacquire MUTEX and return to the caller."
            ;; this comment, it will change queue->data, and so
            ;; futex-wait returns immediately instead of sleeping.
            ;; Ergo, no lost wakeup
-           (futex-wait (waitqueue-data-address queue)
-                       (sb!kernel:get-lisp-obj-address me)))
+           (with-pinned-objects (queue me)
+             (futex-wait (waitqueue-data-address queue)
+                         (sb!kernel:get-lisp-obj-address me))))
       ;; If we are interrupted while waiting, we should do these things
       ;; before returning.  Ideally, in the case of an unhandled signal,
       ;; we should do them before entering the debugger, but this is
@@ -287,7 +295,8 @@ time we reacquire MUTEX and return to the caller."
     ;; XXX we should do something to ensure that the result of this setf
     ;; is visible to all CPUs
     (setf (waitqueue-data queue) me)
-    (futex-wake (waitqueue-data-address queue) n)))
+    (with-pinned-objects (queue)
+      (futex-wake (waitqueue-data-address queue) n))))
 
 (defun condition-broadcast (queue)
   #!+sb-doc
@@ -540,17 +549,17 @@ returns the thread exits."
                         ;; reference to this thread
                         (handle-thread-exit thread)))))))
             (values))))
-    (with-pinned-objects (initial-function)
-      (let ((os-thread
-             ;; don't let the child inherit *CURRENT-THREAD* because that
-             ;; can prevent gc'ing this thread while the child runs
-             (let ((*current-thread* nil))
+    (let ((os-thread
+           ;; don't let the child inherit *CURRENT-THREAD* because that
+           ;; can prevent gc'ing this thread while the child runs
+           (let ((*current-thread* nil))
+             (with-pinned-objects (initial-function)
                (%create-thread
-                (sb!kernel:get-lisp-obj-address initial-function)))))
-        (when (zerop os-thread)
-          (error "Can't create a new thread"))
-        (wait-on-semaphore setup-sem)
-        thread))))
+                (sb!kernel:get-lisp-obj-address initial-function))))))
+      (when (zerop os-thread)
+        (error "Can't create a new thread"))
+      (wait-on-semaphore setup-sem)
+      thread)))
 
 (defun destroy-thread (thread)
   #!+sb-doc
