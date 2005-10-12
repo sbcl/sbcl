@@ -1,5 +1,8 @@
 #ifndef _GENCGC_ALLOC_REGION_H_
 #define _GENCGC_ALLOC_REGION_H_
+
+#include "gc.h"
+
 /* Abstract out the data for an allocation region allowing a single
  * routine to be used for allocation and closing. */
 struct alloc_region {
@@ -16,7 +19,7 @@ struct alloc_region {
 
 extern struct alloc_region  boxed_region;
 extern struct alloc_region  unboxed_region;
-extern long from_space, new_space;
+extern generation_index_t from_space, new_space;
 extern struct weak_pointer *weak_pointers;
 
 extern void *current_region_free_pointer;

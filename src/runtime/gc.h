@@ -15,10 +15,12 @@
 
 #ifndef _GC_H_
 #define _GC_H_
+typedef signed long page_index_t;
+typedef signed int generation_index_t;
 
 extern void gc_init(void);
 extern void gc_initialize_pointers(void);
-extern void collect_garbage(unsigned last_gen);
+extern void collect_garbage(generation_index_t last_gen);
 extern void gc_init_tables(void);
 
 
