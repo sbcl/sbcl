@@ -21,11 +21,13 @@
   (file c-string)
   (initial-fun (unsigned #.sb!vm:n-word-bits)))
 
-;;; FIXME: When this is run without the PURIFY option,
-;;; it seems to save memory all the way up to the high-water mark,
-;;; not just what's currently used; and then after loading the
-;;; image to make a running Lisp, the memory never gets reclaimed.
-;;; (But with the PURIFY option it seems to work OK.)
+#!+gencgc
+(define-alien-routine "gc_and_save" void
+  (file c-string))
+
+#!+gencgc
+(defvar sb!vm::*restart-lisp-function*)
+
 (defun save-lisp-and-die (core-file-name &key
                                          (toplevel #'toplevel-init)
                                          (purify t)
@@ -97,20 +99,30 @@ sufficiently motivated to do lengthy fixes."
   ;; function, and just do a GC :FULL T here? (Then if the user wanted
   ;; a PURIFYed image, he'd just run PURIFY immediately before calling
   ;; SAVE-LISP-AND-DIE.)
-  (if purify
-      (purify :root-structures root-structures
-              :environment-name environment-name)
-      #-gencgc (gc) #+gencgc (gc :full t))
-  (flet ((restart-lisp ()
-           (handling-end-of-the-world
-             (reinit)
-             (funcall toplevel))))
-    ;; FIXME: Perhaps WITHOUT-GCING should be wrapped around the
-    ;; LET as well, to avoid the off chance of an interrupt triggering
-    ;; GC and making our saved RESTART-LISP address invalid?
-    (without-gcing
-     (save (unix-namestring core-file-name nil)
-           (get-lisp-obj-address #'restart-lisp)))))
+  (labels ((restart-lisp ()
+             (handling-end-of-the-world
+               (reinit)
+               (funcall toplevel)))
+           (save-core (gc)
+             (when gc
+               #!-gencgc (gc)
+               ;; Do a destructive non-conservative GC, and then save a core.
+               ;; A normal GC will leave huge amounts of storage unreclaimed
+               ;; (over 50% on x86). This needs to be done by a single function
+               ;; since the GC will invalidate the stack.
+               #!+gencgc (gc-and-save (unix-namestring core-file-name nil)))
+             (without-gcing
+              (save (unix-namestring core-file-name nil)
+                    (get-lisp-obj-address #'restart-lisp)))))
+    ;; Save the restart function into a static symbol, to allow GC-AND-SAVE
+    ;; access to it even after the GC has moved it.
+    (setf sb!vm::*restart-lisp-function* #'restart-lisp)
+    (cond (purify
+           (purify :root-structures root-structures
+                   :environment-name environment-name)
+           (save-core nil))
+          (t
+           (save-core t)))))
 
 (defun deinit ()
   (dolist (hook *save-hooks*)

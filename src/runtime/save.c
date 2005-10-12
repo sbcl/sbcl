@@ -87,21 +87,20 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end)
     write_lispobj((bytes + os_vm_page_size - 1) / os_vm_page_size, file);
 }
 
-boolean
-save(char *filename, lispobj init_function)
+FILE *
+open_core_for_saving(char *filename)
 {
-    FILE *file;
-    struct thread *th;
-
     /* Open the output file. We don't actually need the file yet, but
      * the fopen() might fail for some reason, and we want to detect
      * that and back out before we do anything irreversible. */
     unlink(filename);
-    file = fopen(filename, "w");
-    if (!file) {
-        perror(filename);
-        return 1;
-    }
+    return fopen(filename, "w");
+}
+
+boolean
+save_to_filehandle(FILE *file, char *filename, lispobj init_function)
+{
+    struct thread *th;
 
     /* Smash the enclosing state. (Once we do this, there's no good
      * way to go back, which is a sufficient reason that this ends up
@@ -160,7 +159,7 @@ save(char *filename, lispobj init_function)
 #ifdef LISP_FEATURE_GENCGC
     /* Flush the current_region, updating the tables. */
     gc_alloc_update_all_page_tables();
-    update_x86_dynamic_space_free_pointer();
+    update_dynamic_space_free_pointer();
 #endif
     output_space(file,
                  DYNAMIC_CORE_SPACE_ID,
@@ -172,10 +171,43 @@ save(char *filename, lispobj init_function)
     write_lispobj(3, file);
     write_lispobj(init_function, file);
 
+#ifdef LISP_FEATURE_GENCGC
+    {
+        size_t size = (last_free_page*sizeof(long)+os_vm_page_size-1)
+            &~(os_vm_page_size-1);
+        long *data = calloc(size, 1);
+        if (data) {
+            long offset;
+            int i;
+            for (i = 0; i < last_free_page; i++) {
+                data[i] = page_table[i].first_object_offset;
+            }
+            write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
+            write_lispobj(4, file);
+            write_lispobj(size, file);
+            offset = write_bytes(file, (char *) data, size);
+            write_lispobj(offset, file);
+        }
+    }
+#endif
+
     write_lispobj(END_CORE_ENTRY_TYPE_CODE, file);
 
     fclose(file);
     printf("done]\n");
 
     exit(0);
+}
+
+boolean
+save(char *filename, lispobj init_function)
+{
+    FILE *file = open_core_for_saving(filename);
+
+    if (!file) {
+        perror(filename);
+        return 1;
+    }
+
+    return save_to_filehandle(file, filename, init_function);
 }

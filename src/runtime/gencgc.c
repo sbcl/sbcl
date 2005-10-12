@@ -61,7 +61,7 @@ page_index_t  gc_find_freeish_pages(long *restart_page_ptr, long nbytes,
  */
 enum {
     HIGHEST_NORMAL_GENERATION = 5,
-    PSEUDO_STATIC_GENERATION = 5,
+    PSEUDO_STATIC_GENERATION,
     SCRATCH_GENERATION,
     NUM_GENERATIONS
 };
@@ -93,8 +93,6 @@ unsigned long large_object_size = 4 * PAGE_BYTES;
 /*
  * debugging
  */
-
-
 
 /* the verbosity level. All non-error messages are disabled at level 0;
  * and only a few rare messages are printed at level 1. */
@@ -135,6 +133,12 @@ boolean gencgc_enable_verify_zero_fill = 0;
 /* Should we check that free pages are zero filled during gc_free_heap
  * called after Lisp PURIFY? */
 boolean gencgc_zero_check_during_free_heap = 0;
+
+/* When loading a core, don't do a full scan of the memory for the
+ * memory region boundaries. (Set to true by coreparse.c if the core
+ * contained a pagetable entry).
+ */
+boolean gencgc_partial_pickup = 0;
 
 /*
  * GC structures and variables
@@ -341,7 +345,7 @@ count_generation_bytes_allocated (generation_index_t gen)
 
 /* Return the average age of the memory in a generation. */
 static double
-gen_av_mem_age(int gen)
+gen_av_mem_age(generation_index_t gen)
 {
     if (generations[gen].bytes_allocated == 0)
         return 0.0;
@@ -358,7 +362,7 @@ void fpu_restore(int *);        /* defined in x86-assem.S */
 static void
 print_generation_stats(int verbose) /* FIXME: should take FILE argument */
 {
-    int i, gens;
+    generation_index_t i, gens;
     int fpu_state[27];
 
     /* This code uses the FP instructions which may be set up for Lisp
@@ -600,9 +604,8 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
                  * word sizes. -- WHN 19991129 */
                 lose("The new region at %x is not zero.", p);
             }
+        }
     }
-}
-
 }
 
 /* If the record_new_objects flag is 2 then all new regions created
@@ -952,8 +955,10 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
     return((void *)(page_address(first_page)+orig_first_page_bytes_used));
 }
 
-long
-gc_find_freeish_pages(long *restart_page_ptr, long nbytes, int unboxed)
+static page_index_t gencgc_alloc_start_page = -1;
+
+page_index_t
+gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
 {
     page_index_t first_page;
     page_index_t last_page;
@@ -967,6 +972,10 @@ gc_find_freeish_pages(long *restart_page_ptr, long nbytes, int unboxed)
     /* Search for a contiguous free space of at least nbytes. If it's
      * a large object then align it on a page boundary by searching
      * for a free page. */
+
+    if (gencgc_alloc_start_page != -1) {
+        restart_page = gencgc_alloc_start_page;
+    }
 
     do {
         first_page = restart_page;
@@ -1029,6 +1038,7 @@ gc_find_freeish_pages(long *restart_page_ptr, long nbytes, int unboxed)
         lose(NULL);
     }
     *restart_page_ptr=first_page;
+
     return last_page;
 }
 
@@ -1413,6 +1423,7 @@ static lispobj trans_boxed(lispobj object);
 void
 sniff_code_object(struct code *code, unsigned long displacement)
 {
+#ifdef LISP_FEATURE_X86
     long nheader_words, ncode_words, nwords;
     void *p;
     void *constants_start_addr = NULL, *constants_end_addr;
@@ -1578,11 +1589,14 @@ sniff_code_object(struct code *code, unsigned long displacement)
                "/code start = %x, end = %x\n",
                code_start_addr, code_end_addr));
     }
+#endif
 }
 
 void
 gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 {
+/* x86-64 uses pc-relative addressing instead of this kludge */
+#ifndef LISP_FEATURE_X86_64
     long nheader_words, ncode_words, nwords;
     void *constants_start_addr, *constants_end_addr;
     void *code_start_addr, *code_end_addr;
@@ -1673,6 +1687,7 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     if (check_code_fixups) {
         sniff_code_object(new_code,displacement);
     }
+#endif
 }
 
 
@@ -1698,7 +1713,6 @@ trans_unboxed_large(lispobj object)
 {
     lispobj header;
     unsigned long length;
-
 
     gc_assert(is_lisp_pointer(object));
 
@@ -3585,38 +3599,41 @@ garbage_collect_generation(generation_index_t generation, int raise)
     /* we assume that none of the preceding applies to the thread that
      * initiates GC.  If you ever call GC from inside an altstack
      * handler, you will lose. */
-    for_each_thread(th) {
-        void **ptr;
-        void **esp=(void **)-1;
+
+    /* And if we're saving a core, there's no point in being conservative. */
+    if (conservative_stack) {
+        for_each_thread(th) {
+            void **ptr;
+            void **esp=(void **)-1;
 #ifdef LISP_FEATURE_SB_THREAD
-        long i,free;
-        if(th==arch_os_get_current_thread()) {
-            /* Somebody is going to burn in hell for this, but casting
-             * it in two steps shuts gcc up about strict aliasing. */
-            esp = (void **)((void *)&raise);
-        } else {
-            void **esp1;
-            free=fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
-            for(i=free-1;i>=0;i--) {
-                os_context_t *c=th->interrupt_contexts[i];
-                esp1 = (void **) *os_context_register_addr(c,reg_SP);
-                if (esp1>=(void **)th->control_stack_start &&
-                    esp1<(void **)th->control_stack_end) {
-                    if(esp1<esp) esp=esp1;
-                    for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {
-                        preserve_pointer(*ptr);
+            long i,free;
+            if(th==arch_os_get_current_thread()) {
+                /* Somebody is going to burn in hell for this, but casting
+                 * it in two steps shuts gcc up about strict aliasing. */
+                esp = (void **)((void *)&raise);
+            } else {
+                void **esp1;
+                free=fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
+                for(i=free-1;i>=0;i--) {
+                    os_context_t *c=th->interrupt_contexts[i];
+                    esp1 = (void **) *os_context_register_addr(c,reg_SP);
+                    if (esp1>=(void **)th->control_stack_start &&
+                        esp1<(void **)th->control_stack_end) {
+                        if(esp1<esp) esp=esp1;
+                        for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {
+                            preserve_pointer(*ptr);
+                        }
                     }
                 }
             }
-        }
 #else
-        esp = (void **)((void *)&raise);
+            esp = (void **)((void *)&raise);
 #endif
-        for (ptr = (void **)th->control_stack_end; ptr > esp;  ptr--) {
-            preserve_pointer(*ptr);
+            for (ptr = (void **)th->control_stack_end; ptr > esp;  ptr--) {
+                preserve_pointer(*ptr);
+            }
         }
     }
-
 #ifdef QSHOW
     if (gencgc_verbose > 1) {
         long num_dont_move_pages = count_dont_move_pages();
@@ -4050,7 +4067,6 @@ gc_init(void)
     gc_set_region_empty(&unboxed_region);
 
     last_free_page = 0;
-
 }
 
 /*  Pick up the dynamic space from after a core load.
@@ -4064,24 +4080,34 @@ gencgc_pickup_dynamic(void)
     page_index_t page = 0;
     long alloc_ptr = SymbolValue(ALLOCATION_POINTER,0);
     lispobj *prev=(lispobj *)page_address(page);
+    generation_index_t gen = PSEUDO_STATIC_GENERATION;
 
     do {
         lispobj *first,*ptr= (lispobj *)page_address(page);
         page_table[page].allocated = BOXED_PAGE_FLAG;
-        page_table[page].gen = 0;
+        page_table[page].gen = gen;
         page_table[page].bytes_used = PAGE_BYTES;
         page_table[page].large_object = 0;
+        page_table[page].write_protected = 0;
+        page_table[page].write_protected_cleared = 0;
+        page_table[page].dont_move = 0;
 
-        first=gc_search_space(prev,(ptr+2)-prev,ptr);
-        if(ptr == first)  prev=ptr;
-        page_table[page].first_object_offset =
-            (void *)prev - page_address(page);
+        if (!gencgc_partial_pickup) {
+            first=gc_search_space(prev,(ptr+2)-prev,ptr);
+            if(ptr == first)  prev=ptr;
+            page_table[page].first_object_offset =
+                (void *)prev - page_address(page);
+        }
         page++;
     } while ((long)page_address(page) < alloc_ptr);
 
-    generations[0].bytes_allocated = PAGE_BYTES*page;
+    last_free_page = page;
+
+    generations[gen].bytes_allocated = PAGE_BYTES*page;
     bytes_allocated = PAGE_BYTES*page;
 
+    gc_alloc_update_all_page_tables();
+    write_protect_generation_pages(gen);
 }
 
 void
@@ -4254,3 +4280,64 @@ gc_set_region_empty(struct alloc_region *region)
     region->end_addr = page_address(0);
 }
 
+/* Things to do before doing a final GC before saving a core (without
+ * purify).
+ *
+ * + Pages in large_object pages aren't moved by the GC, so we need to
+ *   unset that flag from all pages.
+ * + The pseudo-static generation isn't normally collected, but it seems
+ *   reasonable to collect it at least when saving a core. So move the
+ *   pages to a normal generation.
+ */
+static void
+prepare_for_final_gc ()
+{
+    page_index_t i;
+    for (i = 0; i < last_free_page; i++) {
+        page_table[i].large_object = 0;
+        if (page_table[i].gen == PSEUDO_STATIC_GENERATION) {
+            int used = page_table[i].bytes_used;
+            page_table[i].gen = HIGHEST_NORMAL_GENERATION;
+            generations[PSEUDO_STATIC_GENERATION].bytes_allocated -= used;
+            generations[HIGHEST_NORMAL_GENERATION].bytes_allocated += used;
+        }
+    }
+}
+
+
+/* Do a non-conservative GC, and then save a core with the initial
+ * function being set to the value of the static symbol
+ * SB!VM:RESTART-LISP-FUNCTION */
+void
+gc_and_save(char *filename)
+{
+    FILE *file = open_core_for_saving(filename);
+    if (!file) {
+        perror(filename);
+        return;
+    }
+    conservative_stack = 0;
+
+    /* The filename might come from Lisp, and be moved by the now
+     * non-conservative GC. */
+    filename = strdup(filename);
+
+    /* Collect twice: once into relatively high memory, and then back
+     * into low memory. This compacts the retained data into the lower
+     * pages, minimizing the size of the core file.
+     */
+    prepare_for_final_gc();
+    gencgc_alloc_start_page = last_free_page;
+    collect_garbage(HIGHEST_NORMAL_GENERATION+1);
+
+    prepare_for_final_gc();
+    gencgc_alloc_start_page = -1;
+    collect_garbage(HIGHEST_NORMAL_GENERATION+1);
+
+    save_to_filehandle(file, filename, SymbolValue(RESTART_LISP_FUNCTION,0));
+    /* Oops. Save still managed to fail. Since we've mangled the stack
+     * beyond hope, there's not much we can do.
+     * (beyond FUNCALLing RESTART_LISP_FUNCTION, but I suspect that's
+     * going to be rather unsatisfactory too... */
+    lose("Attempt to save core after non-conservative GC failed.");
+}

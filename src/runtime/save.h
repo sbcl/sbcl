@@ -14,6 +14,8 @@
 
 #include "core.h"
 
+extern FILE* open_core_for_saving(char *filename);
+extern boolean save_to_filehandle(FILE *file, char *filename, lispobj initfun);
 extern boolean save(char *filename, lispobj initfun);
 
 #endif

@@ -210,6 +210,9 @@
     *fp-constant-0f0*
     *fp-constant-1f0*
 
+    ;; For GC-AND-SAVE
+    *restart-lisp-function*
+
     ;; The ..SLOT-UNBOUND.. symbol is static in order to optimise the
     ;; common slot unbound check.
     ;;

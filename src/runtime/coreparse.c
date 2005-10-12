@@ -36,6 +36,9 @@
 #include "interr.h"
 #include "thread.h"
 
+#include "validate.h"
+#include "gc-internal.h"
+
 unsigned char build_id[] =
 #include "../../output/build-id.tmp"
 ;
@@ -224,6 +227,30 @@ load_core_file(char *file)
             initial_function = (lispobj)*ptr;
             break;
 
+#ifdef LISP_FEATURE_GENCGC
+        case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:
+        {
+            size_t size = *ptr;
+            size_t fdoffset = (*(ptr+1) + 1) * (os_vm_page_size);
+            size_t offset = 0;
+            long bytes_read;
+            long data[4096];
+            lseek(fd, fdoffset, SEEK_SET);
+            while ((bytes_read = read(fd, data, (size < 4096 ? size : 4096 )))
+                    > 0)
+            {
+                int i = 0;
+                size -= bytes_read;
+                while (bytes_read) {
+                    bytes_read -= sizeof(long);
+                    page_table[offset++].first_object_offset = data[i++];
+                }
+            }
+
+            gencgc_partial_pickup = 1;
+            break;
+        }
+#endif
         default:
             lose("unknown core file entry: %ld", (long)val);
         }
