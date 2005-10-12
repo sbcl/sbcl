@@ -166,7 +166,7 @@
               (:file
                (format s "~&~A~@:_  Created: " (namestring name))
                (format-universal-time s (sb-c::debug-source-created source)))
-              (:lisp (format s "~&~S" name)))))))))
+              (:lisp (format s "~&  ~S" (aref name 0))))))))))
 
 ;;; Describe a compiled function. The closure case calls us to print
 ;;; the guts.
@@ -210,11 +210,10 @@
     (case (widetag-of x)
       (#.sb-vm:closure-header-widetag
        (%describe-fun-compiled (%closure-fun x) s kind name)
-       (format s "~@:_Its closure environment is:")
-       (pprint-logical-block (s nil)
-         (pprint-indent :current 8)
-         (dotimes (i (- (get-closure-length x) (1- sb-vm:closure-info-offset)))
-           (format s "~@:_~S: ~S" i (%closure-index-ref x i)))))
+       (format s "~&Its closure environment is:")
+       (loop for value in (%closure-values x)
+          for i = 0 then (1+ i)
+          do (format s "~&  ~S: ~S" i value)))
       (#.sb-vm:simple-fun-header-widetag
        (%describe-fun-compiled x s kind name))
       (#.sb-vm:funcallable-instance-header-widetag

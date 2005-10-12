@@ -57,9 +57,9 @@
 
 (defun %closure-values (object)
   (declare (function object))
-  (coerce (loop for index from 0 below (1- (get-closure-length object))
-                collect (%closure-index-ref object index))
-          'simple-vector))
+  (loop for index from 0
+     below (- (get-closure-length object) (1- sb!vm:closure-info-offset))
+     collect (%closure-index-ref object index)))
 
 (defun %fun-lambda-list (object)
   (%simple-fun-arglist (%fun-fun object)))

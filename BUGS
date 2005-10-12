@@ -94,6 +94,9 @@ WORKAROUND:
   And as long as we're wishing, it would be awfully nice if INSPECT could
   also report on closures, telling about the values of the bound variables.
 
+  Currently INSPECT and DESCRIBE do show the values, but showing the
+  names of the bindings would be even nicer.
+
 35:
   The compiler assumes that any time a function of declared FTYPE
   doesn't signal an error, its arguments were of the declared type.
