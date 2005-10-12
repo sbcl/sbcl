@@ -573,14 +573,23 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; longer than 32 bits anyway, right?":-|
 (define-alien-type nil
   (struct wrapped_stat
+    #!-mips
     (st-dev unsigned-int)              ; would be dev-t in a real stat
+    #!+mips
+    (st-dev unsigned-long)             ; this is _not_ a dev-t on mips
     (st-ino ino-t)
     (st-mode mode-t)
-    (st-nlink  nlink-t)
-    (st-uid  uid-t)
-    (st-gid  gid-t)
+    (st-nlink nlink-t)
+    (st-uid uid-t)
+    (st-gid gid-t)
+    #!-mips
     (st-rdev unsigned-int)             ; would be dev-t in a real stat
+    #!+mips
+    (st-rdev unsigned-long)             ; this is _not_ a dev-t on mips
+    #!-mips
     (st-size unsigned-int)              ; would be off-t in a real stat
+    #!+mips
+    (st-size off-t)
     (st-blksize unsigned-long)
     (st-blocks unsigned-long)
     (st-atime time-t)

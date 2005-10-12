@@ -155,9 +155,17 @@ wrapped_readlink(char *path)
  * actual 64-bit values instead.  In fact, we probably have by now
  * (2003-10-03) on all working platforms except MIPS and HPPA; if some
  * motivated spark would simply fix those, this hack could go away.
- * -- CSR, 2003-10-03 */
+ * -- CSR, 2003-10-03
+ *
+ * Some motivated spark fixed MIPS. -- ths, 2005-10-06 */
+
+#ifdef LISP_FEATURE_MIPS
+typedef unsigned long ffi_dev_t; /* Linux/MIPS struct stat doesn't use dev_t */
+typedef off_t ffi_off_t;
+#else
 typedef u32 ffi_dev_t; /* since Linux dev_t can be 64 bits */
 typedef u32 ffi_off_t; /* since OpenBSD 2.8 st_size is 64 bits */
+#endif
 
 /* a representation of stat(2) results which doesn't depend on CPU or OS */
 struct stat_wrapper {
