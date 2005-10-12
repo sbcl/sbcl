@@ -46,4 +46,15 @@
 (assert (typep (sb-mop:class-prototype (find-class 'counted-condition))
                '(and condition counted-condition)))
 
+(define-condition picky-condition () ())
+(restart-case
+    (handler-case
+        (error 'picky-condition)
+      (picky-condition (c)
+        (assert (eq (car (compute-restarts)) (car (compute-restarts c))))))
+  (picky-restart ()
+    :report "Do nothing."
+    :test (lambda (c) (typep c 'picky-condition))
+    'ok))
+
 ;;; success

@@ -12,6 +12,9 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
     on platforms supporting dynamic-extent allocation.
   * enhancement: saving cores with foreign code loaded is now supported
     on MIPS/Linux in addition to the previously supported platforms.
+  * bug fix: COMPUTE-RESTARTS returns all active restarts, including those
+    with :TEST, when called without a condition. (reported by Helmut Eller for
+    CMUCL)
   * bug fix: division by zero in sb-sprof when no samples were collected
   * bug fix: a race when a slow to arrive sigprof signal killed sbcl
   * bug fix: asdf-install uses CRLF as required by the HTTP spec.

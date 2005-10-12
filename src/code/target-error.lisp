@@ -51,8 +51,9 @@
           (when (and (or (not condition)
                          (member restart associated)
                          (not (member restart other)))
-                     (funcall (restart-test-function restart)
-                              condition))
+                     (or (not condition)
+                         (funcall (restart-test-function restart)
+                                  condition)))
             (res restart))))
       (res))))
 
