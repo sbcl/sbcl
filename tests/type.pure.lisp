@@ -294,9 +294,13 @@ ACTUAL ~D DERIVED ~D~%"
     (subtypep 'generic-function 'function)
   (assert yes)
   (assert win))
-;; this would be in some internal test suite like type.before-xc.lisp
-;; except that generic functions don't exist at that stage.
+;;; this would be in some internal test suite like type.before-xc.lisp
+;;; except that generic functions don't exist at that stage.
 (multiple-value-bind (yes win)
     (subtypep 'generic-function 'sb-kernel:funcallable-instance)
   (assert yes)
   (assert win))
+
+;;; all sorts of answers are right for this one, but it used to
+;;; trigger an AVER instead.
+(subtypep '(function ()) '(and (function ()) (satisfies identity)))

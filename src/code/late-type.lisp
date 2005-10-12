@@ -849,7 +849,6 @@
                             (eql yx :call-other-method))
                        *empty-type*)
                       (t
-                       (aver (and (not xy) (not yx))) ; else handled above
                        nil))))))))
 
 (defun-cached (type-intersection2 :hash-function type-cache-hash
