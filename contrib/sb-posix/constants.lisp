@@ -250,7 +250,10 @@
              ("struct stat"
               (mode-t mode "mode_t" "st_mode")
               (ino-t ino "ino_t" "st_ino")
+              #-mips
               (dev-t dev "dev_t" "st_dev")
+              #+mips
+              ((unsigned 32) dev "dev_t" "st_dev")
               (nlink-t nlink "nlink_t" "st_nlink")
               (uid-t uid "uid_t" "st_uid")
               (gid-t gid "gid_t" "st_gid")
