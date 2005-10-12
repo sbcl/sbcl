@@ -550,12 +550,9 @@ returns the thread exits."
                         (handle-thread-exit thread)))))))
             (values))))
     (let ((os-thread
-           ;; don't let the child inherit *CURRENT-THREAD* because that
-           ;; can prevent gc'ing this thread while the child runs
-           (let ((*current-thread* nil))
-             (with-pinned-objects (initial-function)
-               (%create-thread
-                (sb!kernel:get-lisp-obj-address initial-function))))))
+           (with-pinned-objects (initial-function)
+             (%create-thread
+              (sb!kernel:get-lisp-obj-address initial-function)))))
       (when (zerop os-thread)
         (error "Can't create a new thread"))
       (wait-on-semaphore setup-sem)

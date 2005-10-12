@@ -100,7 +100,16 @@
 (defun sigint-%break (format-string &rest format-arguments)
   (flet ((break-it ()
            (apply #'%break 'sigint format-string format-arguments)))
-    (sb!thread:interrupt-thread (sb!thread::foreground-thread) #'break-it)))
+    (let ((done-p nil))
+      (loop while (not done-p)
+            do
+            (setq done-p t)
+            ;; what if I type interrupt-thread at the debugger?
+            (handler-case
+                (sb!thread:interrupt-thread (sb!thread::foreground-thread)
+                                            #'break-it)
+              (sb!thread:interrupt-thread-error ()
+                (setq done-p nil)))))))
 
 (eval-when (:compile-toplevel :execute)
   (sb!xc:defmacro define-signal-handler (name

@@ -488,16 +488,31 @@
 
 (with-test (:name (:thread-start :dynamic-values-and-gc))
   (let ((gc-thread (sb-thread:make-thread (lambda ()
-                                            (loop (sleep (random 0.2))
+                                            (loop (sleep (random 0.01))
                                                   (sb-ext:gc :full t))))))
     (wait-for-threads
-     (loop for i below 3000
+     (loop for i below 30000000
            when (zerop (mod i 30))
-           do (princ ".")
+           do (princ ".") (force-output)
            collect
-           (let ((*x* (lambda ())))
-             (declare (special *x*))
-             (sb-thread:make-thread (lambda () (functionp *x*))))))
+           (let ((*a* (lambda ()))
+                 (*b* (lambda ()))
+                 (*c* (lambda ()))
+                 (*d* (lambda ()))
+                 (*e* (lambda ()))
+                 (*f* (lambda ()))
+                 (*g* (lambda ()))
+                 (*h* (lambda ())))
+             (declare (special *a* *b* *c* *d* *e* *f* *g* *h*))
+             (sb-thread:make-thread (lambda ()
+                                      (functionp *a*)
+                                      (functionp *b*)
+                                      (functionp *c*)
+                                      (functionp *d*)
+                                      (functionp *e*)
+                                      (functionp *f*)
+                                      (functionp *g*)
+                                      (functionp *h*))))))
     (sb-thread:terminate-thread gc-thread)
     (terpri)))
 

@@ -42,7 +42,8 @@ extern int dynamic_values_bytes;
 #define for_each_thread(th) for(th=all_threads;th;th=0)
 #endif
 
-static inline lispobj SymbolValue(u64 tagged_symbol_pointer, void *thread) {
+static inline lispobj
+SymbolValue(u64 tagged_symbol_pointer, void *thread) {
     struct symbol *sym= (struct symbol *)
         (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -55,7 +56,9 @@ static inline lispobj SymbolValue(u64 tagged_symbol_pointer, void *thread) {
 #endif
     return sym->value;
 }
-static inline lispobj SymbolTlValue(u64 tagged_symbol_pointer, void *thread) {
+
+static inline lispobj
+SymbolTlValue(u64 tagged_symbol_pointer, void *thread) {
     struct symbol *sym= (struct symbol *)
         (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -66,7 +69,8 @@ static inline lispobj SymbolTlValue(u64 tagged_symbol_pointer, void *thread) {
 #endif
 }
 
-static inline void SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread) {
+static inline void
+SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread) {
     struct symbol *sym= (struct symbol *)
         (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -81,7 +85,8 @@ static inline void SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *t
 #endif
     sym->value = val;
 }
-static inline void SetTlSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread) {
+static inline void
+SetTlSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread) {
 #ifdef LISP_FEATURE_SB_THREAD
     struct symbol *sym= (struct symbol *)
         (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
@@ -93,7 +98,8 @@ static inline void SetTlSymbolValue(u64 tagged_symbol_pointer,lispobj val, void 
 #endif
 }
 
-static inline os_context_t *get_interrupt_context_for_thread(struct thread *th)
+static inline
+os_context_t *get_interrupt_context_for_thread(struct thread *th)
 {
     return th->interrupt_contexts
         [fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th)-1)];
