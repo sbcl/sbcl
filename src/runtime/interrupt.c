@@ -696,7 +696,9 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
         FSHOW_SIGNAL((stderr,"thread=%lu suspended\n",thread->os_thread));
 
         sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
-        sigwaitinfo(&ss,0);
+        /* It is possible to get SIGCONT (and probably other
+         * non-blockable signals) here. */
+        while (sigwaitinfo(&ss,0) != SIG_STOP_FOR_GC);
         FSHOW_SIGNAL((stderr,"thread=%lu resumed\n",thread->os_thread));
         if(thread->state!=STATE_RUNNING) {
             lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",

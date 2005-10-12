@@ -470,16 +470,6 @@
 
 (format t "~&creation test done~%")
 
-;; watch out for *current-thread* being the parent thread after exit
-(let* (sap
-       (thread (sb-thread:make-thread
-                (lambda ()
-                  (setq sap (thread-sap-for-id
-                             (thread-os-thread *current-thread*)))))))
-  (wait-for-threads (list thread))
-  (assert (null (symbol-value-in-thread 'sb-thread:*current-thread*
-                                        sap))))
-
 ;; interrupt handlers are per-thread with pthreads, make sure the
 ;; handler installed in one thread is global
 (sb-thread:make-thread

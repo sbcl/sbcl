@@ -18,11 +18,11 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
   * bug fix: division by zero in sb-sprof when no samples were collected
   * bug fix: a race when a slow to arrive sigprof signal killed sbcl
   * bug fix: asdf-install uses CRLF as required by the HTTP spec.
-    (thanks to Alexander Kjeldaas)    
+    (thanks to Alexander Kjeldaas)
   * new feature: ignoring the return values of destructive functions
     like NREVERSE signals a compile-time style-warning.
     (thanks to Kevin Reid)
-  * new feature: the alignment of alien structure fields can be 
+  * new feature: the alignment of alien structure fields can be
     explicitly specified. (thanks to Cyrus Harmon)
   * threads
     ** bug fix: threads stacks belonging to dead threads are freed by the
@@ -30,6 +30,8 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
     ** minor incompatible change: INTERRUPT-THREAD-ERROR-ERRNO removed
     ** WITH-RECURSIVE-LOCK can be nested in a WITH-MUTEX for the same lock
     ** bug fix: dynamic variable and thread start related gc lossage
+    ** bug fix: job control (SIGSTOP/SIGCONT) no longer confuses threads
+       suspended for gc
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** SUBTYPEP is slightly more accurate on heinously complicated
        CONS types where some of the members have uncertain (in the
