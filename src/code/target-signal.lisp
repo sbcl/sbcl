@@ -133,15 +133,16 @@
   (declare (type system-area-pointer context))
   (sb!impl::run-expired-timers))
 
-(defun sigquit-handler (signal code context)
+(defun sigterm-handler (signal code context)
   (declare (ignore signal code context))
-  (throw 'toplevel-catcher nil))
+  (sb!thread::terminate-session)
+  (sb!ext:quit))
 
 (defun sb!kernel:signal-cold-init-or-reinit ()
   #!+sb-doc
   "Enable all the default signals that Lisp knows how to deal with."
   (enable-interrupt sigint #'sigint-handler)
-  (enable-interrupt sigquit #'sigquit-handler)
+  (enable-interrupt sigterm #'sigterm-handler)
   (enable-interrupt sigill #'sigill-handler)
   (enable-interrupt sigtrap #'sigtrap-handler)
   (enable-interrupt sigiot #'sigiot-handler)

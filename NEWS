@@ -24,6 +24,8 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
     (thanks to Kevin Reid)
   * new feature: the alignment of alien structure fields can be
     explicitly specified. (thanks to Cyrus Harmon)
+  * bug fix: run cleanup forms (in all threads) when receiving a SIGTERM
+    and dump core on SIGQUIT
   * threads
     ** bug fix: threads stacks belonging to dead threads are freed by the
        next exiting thread, no need to gc to collect thread stacks anymore
