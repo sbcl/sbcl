@@ -202,10 +202,10 @@ new_thread_trampoline(struct thread *th)
     /* SIG_STOP_FOR_GC is blocked and GC might be waiting for this
      * thread, but since we are already dead it won't wait long. */
     pthread_mutex_lock(&all_threads_lock);
+    gc_alloc_update_page_tables(0, &th->alloc_region);
     unlink_thread(th);
     pthread_mutex_unlock(&all_threads_lock);
 
-    gc_alloc_update_page_tables(0, &th->alloc_region);
     if(th->tls_cookie>=0) arch_os_thread_cleanup(th);
     os_invalidate((os_vm_address_t)th->interrupt_data,
                   (sizeof (struct interrupt_data)));
