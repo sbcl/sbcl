@@ -109,7 +109,7 @@ lispobj  copy_large_object(lispobj object, long nwords) {
  * last_generation argument. That's meaningless for us, since we're
  * not a generational GC. So we ignore it. */
 void
-collect_garbage(unsigned ignore)
+collect_garbage(generation_index_t ignore)
 {
 #ifdef PRINTNOISE
     struct timeval start_tv, stop_tv;
