@@ -36,6 +36,10 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
     ** SUBTYPEP is slightly more accurate on heinously complicated
        CONS types where some of the members have uncertain (in the
        NIL, NIL sense) type relationships to each other.
+  * GENCGC
+    ** Cores produced by SAVE-LISP-AND-DIE on GENCGC platforms are 
+       no longer purified unless :PURIFY T is explicitly specified.
+    ** Non-purified cores are significantly smaller than before
 
 changes in sbcl-0.9.5 relative to sbcl-0.9.4:
   * new feature: timers based on Zach Beane's excellent timer package

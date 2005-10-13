@@ -30,7 +30,8 @@
 
 (defun save-lisp-and-die (core-file-name &key
                                          (toplevel #'toplevel-init)
-                                         (purify t)
+                                         (purify #!+gencgc nil
+                                                 #!-gencgc t)
                                          (root-structures ())
                                          (environment-name "auxiliary"))
   #!+sb-doc
@@ -47,12 +48,14 @@ The following &KEY arguments are defined:
      not return.
 
   :PURIFY
-     If true (the default), do a purifying GC which moves all
+     If true (the default on cheneygc), do a purifying GC which moves all
      dynamically allocated objects into static space. This takes
      somewhat longer than the normal GC which is otherwise done, but
      it's only done once, and subsequent GC's will be done less often
      and will take less time in the resulting core file. See the PURIFY
-     function.
+     function. For platforms that use the generational garbage collector
+     (x86 and x86-64) purification generally results in a loss of
+     performance.
 
   :ROOT-STRUCTURES
      This should be a list of the main entry points in any newly loaded

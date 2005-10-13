@@ -96,5 +96,5 @@ echo //doing warm init
         ;; defined.
         (sb-kernel::ctype-of-cache-clear)
         (setq sb-c::*flame-on-necessarily-undefined-function* t)
-	(sb-ext:save-lisp-and-die "output/sbcl.core" :purify t)
+	(sb-ext:save-lisp-and-die "output/sbcl.core")
 	EOF
