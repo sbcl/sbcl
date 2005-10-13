@@ -2110,3 +2110,15 @@ WORKAROUND:
   12:19 < Xophe> it's the same problem as we had with compiler-error conditions
   12:19 < Xophe> the thing that's signalled up and down the stack is a subtype of
                   ERROR, where it probably shouldn't be
+
+388:
+  (found by Dmitry Bogomolov)
+
+    (defclass foo () ((x :type (unsigned-byte 8))))
+    (defclass bar () ((x :type symbol)))
+    (defclass baz (foo bar) ())
+
+  causes error
+
+    SB-PCL::SPECIALIZER-APPLICABLE-USING-TYPE-P cannot handle the second argument
+    (UNSIGNED-BYTE 8).
