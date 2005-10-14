@@ -119,6 +119,7 @@ sufficiently motivated to do lengthy fixes."
                     (get-lisp-obj-address #'restart-lisp)))))
     ;; Save the restart function into a static symbol, to allow GC-AND-SAVE
     ;; access to it even after the GC has moved it.
+    #!+gencgc
     (setf sb!vm::*restart-lisp-function* #'restart-lisp)
     (cond (purify
            (purify :root-structures root-structures
