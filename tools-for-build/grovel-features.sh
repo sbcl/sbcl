@@ -1,4 +1,4 @@
-# Automated platform feature testing 
+# Automated platform feature testing
 cd ./tools-for-build > /dev/null
 
 # FIXME: Use this to test for dlopen presence and hence
@@ -24,3 +24,5 @@ featurep os-provides-dlopen
 featurep os-provides-dladdr
 
 featurep os-provides-putwc
+
+featurep sigaction-sa-nodefer-works

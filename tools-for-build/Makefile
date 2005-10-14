@@ -12,7 +12,9 @@
 CPPFLAGS:=-I../src/runtime
 LDFLAGS:=$(LDFLAGS) $(OS_LIBS)
 
-all: grovel-headers determine-endianness where-is-mcontext modify-ldt-struct-name 
+all: grovel-headers determine-endianness where-is-mcontext \
+        modify-ldt-struct-name sigaction-sa-nodefer-works-test
 
-clean: 
-	rm -f *.o grovel-headers determine-endianness where-is-mcontext modify-ldt-structure-name
+clean:
+	rm -f *.o grovel-headers determine-endianness where-is-mcontext \
+                modify-ldt-structure-name sigaction-sa-nodefer-works-test

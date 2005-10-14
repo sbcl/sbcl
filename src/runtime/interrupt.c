@@ -118,7 +118,7 @@ check_blockables_blocked_or_lose()
     int i;
     sigemptyset(&empty);
     thread_sigmask(SIG_BLOCK, &empty, &current);
-    for(i=0;i<NSIG;i++) {
+    for(i = 1; i < NSIG; i++) {
         if (sigismember(&blockable_sigset, i) && !sigismember(&current, i))
             lose("blockable signal %d not blocked",i);
     }
@@ -160,9 +160,7 @@ void reset_signal_mask(void)
 
 void block_blockable_signals(void)
 {
-    sigset_t block;
-    sigcopyset(&block, &blockable_sigset);
-    thread_sigmask(SIG_BLOCK, &block, 0);
+    thread_sigmask(SIG_BLOCK, &blockable_sigset, 0);
 }
 
 
@@ -480,6 +478,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #ifdef LISP_FEATURE_SB_THREAD
         {
             sigset_t unblock;
+            sigemptyset(&unblock);
             sigaddset(&unblock, SIG_STOP_FOR_GC);
             thread_sigmask(SIG_UNBLOCK, &unblock, 0);
         }
@@ -1020,6 +1019,7 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
 #ifdef LISP_FEATURE_SB_THREAD
     else {
         sigset_t new;
+        sigemptyset(&new);
         sigaddset(&new,SIG_STOP_FOR_GC);
         thread_sigmask(SIG_UNBLOCK,&new,0);
     }
@@ -1029,6 +1029,28 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
     undo_fake_foreign_function_call(context);
     return 1;
 }
+
+#ifndef LISP_FEATURE_SIGACTION_NODEFER_WORKS
+
+/* In Linux 2.4 synchronous signals (sigtrap & co) can be delivered if
+ * they are blocked, in Linux 2.6 the default handler is invoked
+ * instead that usually coredumps. One might hastily think that adding
+ * SA_NODEFER helps, but until ~2.6.13 if SA_NODEFER is specified then
+ * the whole sa_mask is ignored and instead of not adding the signal
+ * in question to the mask. That means if it's not blockable the
+ * signal must be unblocked at the beginning of signal handlers.
+ */
+void
+unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
+{
+    sigset_t unblock;
+    sigemptyset(&unblock);
+    sigaddset(&unblock, signal);
+    thread_sigmask(SIG_UNBLOCK, &unblock, 0);
+    (*interrupt_low_level_handlers[signal])(signal, info, void_context);
+}
+
+#endif
 
 
 /*
@@ -1049,11 +1071,19 @@ undoably_install_low_level_interrupt_handler (int signal,
 
     if (sigismember(&deferrable_sigset,signal))
         sa.sa_sigaction = low_level_maybe_now_maybe_later;
+#ifndef LISP_FEATURE_SIGACTION_NODEFER_WORKS
+    else if (!sigismember(&blockable_sigset, signal))
+        sa.sa_sigaction = unblock_me_trampoline;
+#endif
     else
         sa.sa_sigaction = handler;
 
     sigcopyset(&sa.sa_mask, &blockable_sigset);
-    sa.sa_flags = SA_SIGINFO | SA_RESTART;
+    sa.sa_flags = SA_SIGINFO | SA_RESTART
+#ifdef LISP_FEATURE_SIGACTION_NODEFER_WORKS
+            | SA_NODEFER
+#endif
+        ;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     if((signal==SIG_MEMORY_FAULT)
 #ifdef SIG_INTERRUPT_THREAD
@@ -1095,7 +1125,11 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
         }
 
         sigcopyset(&sa.sa_mask, &blockable_sigset);
-        sa.sa_flags = SA_SIGINFO | SA_RESTART;
+        sa.sa_flags = SA_SIGINFO | SA_RESTART
+#ifdef LISP_FEATURE_SIGACTION_NODEFER_WORKS
+            | SA_NODEFER
+#endif
+            ;
         sigaction(signal, &sa, NULL);
     }
 
