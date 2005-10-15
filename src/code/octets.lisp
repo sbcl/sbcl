@@ -174,7 +174,7 @@ one-past-the-end"
 
 (defmacro define-unibyte-mapper (byte-char-name code-byte-name &rest exceptions)
   `(progn
-    (declaim (inline ,byte-char-name ,code-byte-name))
+    (declaim (inline ,byte-char-name))
     (defun ,byte-char-name (byte)
       (declare (optimize speed (safety 0))
                (type (unsigned-byte 8) byte))
@@ -186,9 +186,16 @@ one-past-the-end"
                                                         exception
                                                         byte))))
             byte))
+    ;; This used to be inlined, but it caused huge slowdowns in SBCL builds,
+    ;; bloated the core by about 700k on x86-64. Removing the inlining
+    ;; didn't seem to have any performance effect. -- JES, 2005-10-15
     (defun ,code-byte-name (code)
       (declare (optimize speed (safety 0))
                (type char-code code))
+      ;; FIXME: I'm not convinced doing this with CASE is a good idea as
+      ;; long as it's just macroexpanded into a stupid COND. Consider
+      ;; for example the output of (DISASSEMBLE 'SB-IMPL::CODE->CP1250-MAPPER)
+      ;; -- JES, 2005-10-15
       (case code
         ,@(mapcar (lambda (exception)
                     (destructuring-bind (byte code) exception
