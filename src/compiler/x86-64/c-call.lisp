@@ -190,15 +190,16 @@
 ;;; The ABI specifies that signed short/int's are returned as 32-bit
 ;;; values. Negative values need to be sign-extended to 64-bits (done
 ;;; in a :NATURALIZE-GEN alien-type-method).
-(defknown sign-extend (fixnum) fixnum (foldable flushable movable))
+(defknown sign-extend ((signed-byte 64)) (signed-byte 64)
+          (foldable flushable movable))
 
 (define-vop (sign-extend)
   (:translate sign-extend)
   (:policy :fast-safe)
-  (:args (val :scs (any-reg)))
-  (:arg-types fixnum)
-  (:results (res :scs (any-reg)))
-  (:result-types fixnum)
+  (:args (val :scs (signed-reg)))
+  (:arg-types signed-byte-64)
+  (:results (res :scs (signed-reg)))
+  (:result-types signed-byte-64)
   (:generator 1
    (inst movsxd res
          (make-random-tn :kind :normal
