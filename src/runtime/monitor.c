@@ -203,7 +203,8 @@ regs_cmd(char **ptr)
     printf("ALLOC\t=\t0x%08lx\n", (unsigned long)dynamic_space_free_pointer);
 #else
     printf("ALLOC\t=\t0x%08lx\n",
-           (unsigned long)SymbolValue(ALLOCATION_POINTER));
+           (unsigned long)SymbolValue(ALLOCATION_POINTER,
+                                      arch_os_get_current_thread()));
 #endif
 
 #ifndef LISP_FEATURE_GENCGC

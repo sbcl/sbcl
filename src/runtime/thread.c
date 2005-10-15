@@ -38,13 +38,11 @@ extern struct interrupt_data * global_interrupt_data;
 extern int linux_no_threads_p;
 
 #ifdef LISP_FEATURE_SB_THREAD
-
 pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 extern lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs);
-#endif
-
 #endif
 
 static void
