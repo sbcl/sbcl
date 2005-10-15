@@ -356,3 +356,107 @@
   (:generator 2
     (inst add rsp-tn (fixnumize number))))
 
+;;; Callbacks
+
+#-sb-xc-host
+(defun alien-callback-accessor-form (type sp offset)
+  `(deref (sap-alien (sap+ ,sp ,offset) (* ,type))))
+
+#-sb-xc-host
+(defun alien-callback-assembler-wrapper (index result-type argument-types)
+  (labels ((make-tn-maker (sc-name)
+             (lambda (offset)
+               (make-random-tn :kind :normal
+                               :sc (sc-or-lose sc-name)
+                               :offset offset)))
+           (out-of-registers-error ()
+             (error "Too many arguments in callback")))
+    (let* ((segment (make-segment))
+           (rax rax-tn)
+           (rcx rcx-tn)
+           (rdi rdi-tn)
+           (rsi rsi-tn)
+           (rdx rdx-tn)
+           (rbp rbp-tn)
+           (rsp rsp-tn)
+           (xmm0 float0-tn)
+           ([rsp] (make-ea :qword :base rsp :disp 0))
+           (words-processed 0)
+           (gprs (mapcar (make-tn-maker 'any-reg) *c-call-register-arg-offsets*))
+           (fprs (mapcar (make-tn-maker 'double-reg)
+                         ;; Only 8 first XMM registers are used for
+                         ;; passing arguments
+                         (subseq *float-regs* 0 8))))
+      (assemble (segment)
+        ;; Make room on the stack for arguments.
+        (inst sub rsp (* n-word-bytes (length argument-types)))
+        ;; Copy arguments from registers to stack
+        (dolist (type argument-types)
+          (let ((integerp (not (alien-float-type-p type)))
+                (stack-tn (make-ea :qword :base rsp
+                                   :disp (* words-processed
+                                            n-word-bytes))))
+            (incf words-processed)
+            (cond (integerp
+                   (let ((gpr (pop gprs)))
+                     (if gpr
+                         (inst mov stack-tn gpr)
+                         (out-of-registers-error))))
+                  ((or (alien-single-float-type-p type)
+                       (alien-double-float-type-p type))
+                   (let ((fpr (pop fprs)))
+                     (if fpr
+                         (inst movq stack-tn fpr)
+                         (out-of-registers-error))))
+                  (t
+                   (bug "Unknown alien floating point type: ~S" type)))))
+
+        ;; arg0 to FUNCALL3 (function)
+        (inst mov rdi (get-lisp-obj-address #'enter-alien-callback))
+        ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
+        (inst mov rsi (fixnumize index))
+        ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
+        (inst mov rdx rsp)
+        ;; add room on stack for return value
+        (inst sub rsp 8)
+        ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
+        (inst mov rcx rsp)
+
+        ;; Make new frame
+        (inst push rbp)
+        (inst mov  rbp rsp)
+
+        ;; Call
+        (inst mov  rax (foreign-symbol-address "funcall3"))
+        (inst call rax)
+
+        ;; Back! Restore frame
+        (inst mov rsp rbp)
+        (inst pop rbp)
+
+        ;; Result now on top of stack, put it in the right register
+        (cond
+          ((or (alien-integer-type-p result-type)
+               (alien-pointer-type-p result-type)
+               (alien-type-= #.(parse-alien-type 'system-area-pointer nil)
+                             result-type))
+           (inst mov rax [rsp]))
+          ((or (alien-single-float-type-p result-type)
+               (alien-double-float-type-p result-type))
+           (inst movq xmm0 [rsp]))
+          ((alien-void-type-p result-type))
+          (t
+           (error "unrecognized alien type: ~A" result-type)))
+
+        ;; Pop the arguments and the return value from the stack to get
+        ;; the return address at top of stack.
+        (inst add rsp (* (1+ (length argument-types)) n-word-bytes))
+        ;; Return
+        (inst ret))
+      (finalize-segment segment)
+      ;; Now that the segment is done, convert it to a static
+      ;; vector we can point foreign code to.
+      (let ((buffer (sb!assem::segment-buffer segment)))
+        (make-static-vector (length buffer)
+                            :element-type '(unsigned-byte 8)
+                            :initial-contents buffer)))))
