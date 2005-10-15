@@ -250,6 +250,7 @@
              ("struct stat"
               (mode-t mode "mode_t" "st_mode")
               (ino-t ino "ino_t" "st_ino")
+              ;; Linux/MIPS uses unsigned long instead of dev_t here.
               #-mips
               (dev-t dev "dev_t" "st_dev")
               #+mips
