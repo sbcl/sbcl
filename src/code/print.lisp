@@ -1517,7 +1517,7 @@
 ;;; The definition here is a simple temporary placeholder. It will be
 ;;; overwritten by a smarter version (capable of calling generic
 ;;; PRINT-OBJECT when appropriate) when CLOS is installed.
-(defun printed-as-clos-funcallable-standard-class (object stream)
+(defun printed-as-funcallable-standard-class (object stream)
   (declare (ignore object stream))
   nil)
 

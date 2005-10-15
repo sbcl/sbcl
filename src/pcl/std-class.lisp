@@ -693,7 +693,7 @@
             (unless (structure-type-p name) (eval defstruct-form))
             (mapc (lambda (dslotd reader-name writer-name)
                     (let* ((reader (gdefinition reader-name))
-                           (writer (when (gboundp writer-name)
+                           (writer (when (fboundp writer-name)
                                      (gdefinition writer-name))))
                       (setf (slot-value dslotd 'internal-reader-function)
                             reader)

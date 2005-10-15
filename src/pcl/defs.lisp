@@ -38,50 +38,18 @@
            has already been partially loaded. This may not work, you may~%~
            need to get a fresh lisp (reboot) and then load PCL."))
 
-;;; comments from CMU CL version of PCL:
-;;;     This is like fdefinition on the Lispm. If Common Lisp had
-;;;   something like function specs I wouldn't need this. On the other
-;;;   hand, I don't like the way this really works so maybe function
-;;;   specs aren't really right either?
-;;;     I also don't understand the real implications of a Lisp-1 on this
-;;;   sort of thing. Certainly some of the lossage in all of this is
-;;;   because these SPECs name global definitions.
-;;;     Note that this implementation is set up so that an implementation
-;;;   which has a 'real' function spec mechanism can use that instead
-;;;   and in that way get rid of setf generic function names.
-(defmacro parse-gspec (spec
-                       (non-setf-var . non-setf-case))
-  `(let ((,non-setf-var ,spec)) ,@non-setf-case))
-
-;;; If symbol names a function which is traced, return the untraced
-;;; definition. This lets us get at the generic function object even
-;;; when it is traced.
-(defun unencapsulated-fdefinition (symbol)
-  (fdefinition symbol))
-
-;;; If symbol names a function which is traced, redefine the `real'
-;;; definition without affecting the trace.
-(defun fdefine-carefully (name new-definition)
-  (progn
-    (sb-c::note-name-defined name :function)
-    new-definition)
-  (setf (fdefinition name) new-definition))
-
-(defun gboundp (spec)
-  (parse-gspec spec
-    (name (fboundp name))))
-
-(defun gmakunbound (spec)
-  (parse-gspec spec
-    (name (fmakunbound name))))
-
+#-sb-fluid (declaim (inline gdefinition))
 (defun gdefinition (spec)
-  (parse-gspec spec
-    (name (unencapsulated-fdefinition name))))
+  ;; This is null layer right now, but once FDEFINITION stops bypasssing
+  ;; fwrappers/encapsulations we can do that here.
+  (fdefinition spec))
 
 (defun (setf gdefinition) (new-value spec)
-  (parse-gspec spec
-    (name (fdefine-carefully name new-value))))
+  ;; This is almost a null layer right now, but once (SETF
+  ;; FDEFINITION) stops bypasssing fwrappers/encapsulations we can do
+  ;; that here.
+  (sb-c::note-name-defined spec :function) ; FIXME: do we need this? Why?
+  (setf (fdefinition spec) new-value))
 
 ;;;; type specifier hackery
 

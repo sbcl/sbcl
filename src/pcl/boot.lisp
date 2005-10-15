@@ -313,7 +313,7 @@ bootstrapping.
 (defun prototypes-for-make-method-lambda (name)
   (if (not (eq *boot-state* 'complete))
       (values nil nil)
-      (let ((gf? (and (gboundp name)
+      (let ((gf? (and (fboundp name)
                       (gdefinition name))))
         (if (or (null gf?)
                 (not (generic-function-p gf?)))
@@ -335,7 +335,7 @@ bootstrapping.
 ;;;
 ;;; Note: During bootstrapping, this function is allowed to return NIL.
 (defun method-prototype-for-gf (name)
-  (let ((gf? (and (gboundp name)
+  (let ((gf? (and (fboundp name)
                   (gdefinition name))))
     (cond ((neq *boot-state* 'complete) nil)
           ((or (null gf?)
@@ -1359,7 +1359,7 @@ bootstrapping.
 
 (defun generic-function-name-p (name)
   (and (legal-fun-name-p name)
-       (gboundp name)
+       (fboundp name)
        (if (eq *boot-state* 'complete)
            (standard-generic-function-p (gdefinition name))
            (funcallable-instance-p (gdefinition name)))))
@@ -1594,7 +1594,7 @@ bootstrapping.
                                 &key environment
                                 &allow-other-keys)
   (declare (ignore environment))
-  (let ((existing (and (gboundp fun-name)
+  (let ((existing (and (fboundp fun-name)
                        (gdefinition fun-name))))
     (if (and existing
              (eq *boot-state* 'complete)
@@ -2344,7 +2344,7 @@ bootstrapping.
                        (make-symbol (format nil "~S" method))))
         (multiple-value-bind (gf-spec quals specls)
             (parse-defmethod spec)
-          (and (setq gf (and (or errorp (gboundp gf-spec))
+          (and (setq gf (and (or errorp (fboundp gf-spec))
                              (gdefinition gf-spec)))
                (let ((nreq (compute-discriminating-function-arglist-info gf)))
                  (setq specls (append (parse-specializers specls)
