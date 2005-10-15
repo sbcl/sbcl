@@ -126,3 +126,19 @@
 
 (assert (= 26 (alien-funcall foo)))
 
+;;; callbacks with void return values
+
+(with-test (:name void-return)
+  (sb-alien::alien-lambda void ()
+    (values)))
+
+;;; tests for a sign extension problem in callback argument handling on x86-64
+
+(with-test (:name sign-extension :fails-on :x86-64)
+  (let ((*add-two-ints*
+         (sb-alien::alien-callback (function int int int) #'+)))
+    (assert (= (alien-funcall *add-two-ints* #x-80000000 1)
+               -2147483647))
+    (assert (= (alien-funcall *add-two-ints* #x-80000000 -1)
+               #x7fffffff))))
+
