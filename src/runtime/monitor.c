@@ -148,7 +148,14 @@ dump_cmd(char **ptr)
             unsigned short *sptr = (unsigned short *)addr;
             unsigned char *cptr = (unsigned char *)addr;
 
-            printf("0x%08lx   0x%04x 0x%04x   0x%02x 0x%02x 0x%02x 0x%02x    %c%c%c%c\n", lptr[0], sptr[0], sptr[1], cptr[0], cptr[1], cptr[2], cptr[3], visible(cptr[0]), visible(cptr[1]), visible(cptr[2]), visible(cptr[3]));
+            printf("0x%08lx   0x%04x 0x%04x   "
+                   "0x%02x 0x%02x 0x%02x 0x%02x    "
+                   "%c%c"
+                   "%c%c\n",
+                   lptr[0], sptr[0], sptr[1],
+                   cptr[0], cptr[1], cptr[2], cptr[3],
+                   visible(cptr[0]), visible(cptr[1]),
+                   visible(cptr[2]), visible(cptr[3]));
         }
         else
             printf("invalid Lisp-level address\n");
@@ -176,31 +183,39 @@ kill_cmd(char **ptr)
 static void
 regs_cmd(char **ptr)
 {
-    printf("CSP\t=\t0x%08lX\n", (unsigned long)current_control_stack_pointer);
-    printf("FP\t=\t0x%08lX\n", (unsigned long)current_control_frame_pointer);
-#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-    printf("BSP\t=\t0x%08lX\n", (unsigned long)current_binding_stack_pointer);
-#endif
-#if 0
-#if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-    printf("BSP\t=\t0x%08lx\n",
-           (unsigned long)SymbolValue(BINDING_STACK_POINTER));
+    printf("CSP\t=\t0x%08lx\n", (unsigned long)current_control_stack_pointer);
+    printf("CFP\t=\t0x%08lx\n", (unsigned long)current_control_frame_pointer);
+
+#ifdef reg_BSP
+    printf("BSP\t=\t0x%08lx\n", (unsigned long)current_binding_stack_pointer);
+#else
+    /* printf("BSP\t=\t0x%08lx\n",
+           (unsigned long)SymbolValue(BINDING_STACK_POINTER)); */
 #endif
 
-    printf("DYNAMIC\t=\t0x%08lx\n", (unsigned long)DYNAMIC_SPACE_START);
-#if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
+#ifdef LISP_FEATURE_GENCGC
+    /* printf("DYNAMIC\t=\t0x%08lx\n", DYNAMIC_SPACE_START); */
+#else
+    printf("DYNAMIC\t=\t0x%08lx\n", (unsigned long)current_dynamic_space);
+#endif
+
+#ifdef reg_ALLOC
+    printf("ALLOC\t=\t0x%08lx\n", (unsigned long)dynamic_space_free_pointer);
+#else
     printf("ALLOC\t=\t0x%08lx\n",
            (unsigned long)SymbolValue(ALLOCATION_POINTER));
-#else
-    printf("ALLOC\t=\t0x%08X\n",
-           (unsigned long)dynamic_space_free_pointer);
+#endif
+
+#ifndef LISP_FEATURE_GENCGC
     printf("TRIGGER\t=\t0x%08lx\n", (unsigned long)current_auto_gc_trigger);
 #endif
+
+#if 0
     printf("STATIC\t=\t0x%08lx\n",
            (unsigned long)SymbolValue(STATIC_SPACE_FREE_POINTER));
     printf("RDONLY\t=\t0x%08lx\n",
            (unsigned long)SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
-#endif /* 0 */
+#endif
 }
 
 static void
