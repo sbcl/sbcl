@@ -127,3 +127,26 @@
                      (loop repeat 2 summing most-positive-double-float)
                      (sleep 2))))
                  'floating-point-overflow)))
+
+;;; On x86-64 generating complex floats on the stack failed an aver in
+;;; the compiler if the stack slot was the same as the one containing
+;;; the real part of the complex. The following expression was able to
+;;; trigger this in 0.9.5.62.
+(with-test (:name :complex-float-stack)
+  (dolist (type '((complex double-float)
+                  (complex single-float)))
+    (compile nil
+             `(lambda (x0 x1 x2 x3 x4 x5 x6 x7)
+                (declare (type ,type x0 x1 x2 x3 x4 x5 x6 x7))
+                (let ((x0 (+ x0 x0))
+                      (x1 (+ x1 x1))
+                      (x2 (+ x2 x2))
+                      (x3 (+ x3 x3))
+                      (x4 (+ x4 x4))
+                      (x5 (+ x5 x5))
+                      (x6 (+ x6 x6))
+                      (x7 (+ x7 x7)))
+                  (* (+ x0 x1 x2 x3) (+ x4 x5 x6 x7)
+                     (+ x0 x2 x4 x6) (+ x1 x3 x5 x7)
+                     (+ x0 x3 x4 x7) (+ x1 x2 x5 x6)
+                     (+ x0 x1 x6 x7) (+ x2 x3 x4 x5)))))))

@@ -786,7 +786,8 @@
          (unless (location= imag r-imag)
            (inst movss r-imag imag))))
       (complex-single-stack
-       (inst movss (ea-for-csf-real-stack r) real)
+       (unless (location= real r)
+         (inst movss (ea-for-csf-real-stack r) real))
        (inst movss (ea-for-csf-imag-stack r) imag)))))
 
 (define-vop (make-complex-double-float)
@@ -810,7 +811,8 @@
          (unless (location= imag r-imag)
            (inst movsd r-imag imag))))
       (complex-double-stack
-       (inst movsd (ea-for-cdf-real-stack r) real)
+       (unless (location= real r)
+         (inst movsd (ea-for-cdf-real-stack r) real))
        (inst movsd (ea-for-cdf-imag-stack r) imag)))))
 
 (define-vop (complex-float-value)
