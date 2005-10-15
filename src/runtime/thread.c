@@ -190,7 +190,9 @@ create_thread_struct(lispobj initial_function) {
     union per_thread_data *per_thread;
     struct thread *th=0;        /*  subdue gcc */
     void *spaces=0;
+#ifdef LISP_FEATURE_SB_THREAD
     int i;
+#endif
 
     /* may as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
