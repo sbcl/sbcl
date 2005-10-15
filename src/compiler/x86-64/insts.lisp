@@ -1420,12 +1420,23 @@
      (cond ((register-p dst)
             (cond ((integerp src)
                    (maybe-emit-rex-prefix segment size nil nil dst)
-                   (emit-byte-with-reg segment
-                                       (if (eq size :byte)
-                                           #b10110
-                                           #b10111)
-                                       (reg-tn-encoding dst))
-                   (emit-sized-immediate segment size src (eq size :qword)))
+                   (cond ((and (eq size :qword)
+                               (typep src '(signed-byte 31)))
+                          ;; When loading small immediates to a qword register
+                          ;; using B8 wastes 3 bytes compared to C7.
+                          (emit-byte segment #b11000111)
+                          (emit-mod-reg-r/m-byte segment #b11
+                                                 #b000
+                                                 (reg-tn-encoding dst))
+                          (emit-sized-immediate segment :dword src nil))
+                         (t
+                          (emit-byte-with-reg segment
+                                              (if (eq size :byte)
+                                                  #b10110
+                                                  #b10111)
+                                              (reg-tn-encoding dst))
+                          (emit-sized-immediate segment size src
+                                                (eq size :qword)))))
                   (t
                    (maybe-emit-rex-for-ea segment src dst)
                    (emit-byte segment
