@@ -29,58 +29,48 @@
 #include "genesis/bignum.h"
 #include "genesis/sap.h"
 
-#define ALIGNED_SIZE(n) (n+LOWTAG_MASK) & ~LOWTAG_MASK
+#define ALIGNED_SIZE(n) ((n) + LOWTAG_MASK) & ~LOWTAG_MASK
 
-#if defined LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENCGC
 extern lispobj *alloc(int bytes);
-lispobj *
-pa_alloc(int bytes)
-{
-    lispobj *result=0;
-    struct thread *th=arch_os_get_current_thread();
-    /* FIXME: OOAO violation: see arch_pseudo_* */
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);
-    result=alloc(bytes);
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
-    if (fixnum_value(SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th)))
-        /* even if we gc at this point, the new allocation will be
-         * protected from being moved, because result is on the c stack
-         * and points to it */
-        do_pending_interrupt();
-    return result;
-}
+#endif
 
-#else
-
-#define GET_FREE_POINTER() dynamic_space_free_pointer
-#define SET_FREE_POINTER(new_value) \
-    (dynamic_space_free_pointer = (new_value))
-#define GET_GC_TRIGGER() current_auto_gc_trigger
-#define SET_GC_TRIGGER(new_value) \
-    clear_auto_gc_trigger(); set_auto_gc_trigger(new_value);
-
-/* FIXME: this is not pseudo atomic at all, but is called only from
- * interrupt safe places like interrupt handlers. MG - 2005-08-09 */
 static lispobj *
 pa_alloc(int bytes)
 {
-    char *result;
+    lispobj *result;
+#ifdef LISP_FEATURE_GENCGC
+    struct thread *th = arch_os_get_current_thread();
 
-    /* Round to dual word boundary. */
-    bytes = (bytes + LOWTAG_MASK) & ~LOWTAG_MASK;
+    /* FIXME: OOAO violation: see arch_pseudo_* */
+    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
+    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);
+    result = alloc(bytes);
+    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
+    if (fixnum_value(SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th)))
+        /* Even if we gc at this point, the new allocation will be
+         * protected from being moved, because result is on the c stack
+         * and points to it. */
+        do_pending_interrupt();
+#else
+    /* FIXME: this is not pseudo atomic at all, but is called only from
+     * interrupt safe places like interrupt handlers. MG - 2005-08-09 */
+    result = dynamic_space_free_pointer;
 
-    result = (char *)GET_FREE_POINTER();
+    /* Align up to next dual word boundary. */
+    bytes = ALIGNED_SIZE(bytes);
 
-    SET_FREE_POINTER((lispobj *)(result + bytes));
+    dynamic_space_free_pointer = (lispobj *)((char *)result + bytes);
 
-    if (GET_GC_TRIGGER() && GET_FREE_POINTER() > GET_GC_TRIGGER()) {
-        SET_GC_TRIGGER((char *)GET_FREE_POINTER()
-                       - (char *)current_dynamic_space);
+    if (current_auto_gc_trigger
+        && dynamic_space_free_pointer > current_auto_gc_trigger) {
+        clear_auto_gc_trigger();
+        set_auto_gc_trigger((char *)dynamic_space_free_pointer
+                            - (char *)current_dynamic_space);
     }
-    return (lispobj *) result;
-}
 #endif
+    return result;
+}
 
 
 lispobj *
