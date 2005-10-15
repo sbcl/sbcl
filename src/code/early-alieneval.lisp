@@ -17,3 +17,12 @@
 ;;; used to keep from outputting the slots again if the same structure
 ;;; shows up twice.
 (defvar *record-types-already-unparsed*)
+
+;;; not documented in CMU CL:-(
+;;;
+;;; reverse engineering observations:
+;;;   * seems to be set when translating return values
+;;;   * seems to enable the translation of (VALUES), which is the
+;;;     Lisp idiom for C's return type "void" (which is likely
+;;;     why it's set when when translating return values)
+(defvar *values-type-okay* nil)
