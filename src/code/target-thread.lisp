@@ -14,8 +14,7 @@
 ;;; Of the WITH-PINNED-OBJECTS in this file, not every single one is
 ;;; necessary because threads are only supported with the conservative
 ;;; gencgc and numbers on the stack (returned by GET-LISP-OBJ-ADDRESS)
-;;; are treated as references. In fact, I think there isn't one that's
-;;; truly important as of now.
+;;; are treated as references.
 
 ;;; set the doc here because in early-thread FDOCUMENTATION is not
 ;;; available, yet
@@ -549,14 +548,16 @@ returns the thread exits."
                         ;; reference to this thread
                         (handle-thread-exit thread)))))))
             (values))))
-    (let ((os-thread
-           (with-pinned-objects (initial-function)
+    ;; Keep INITIAL-FUNCTION pinned until the child thread is
+    ;; initialized properly.
+    (with-pinned-objects (initial-function)
+      (let ((os-thread
              (%create-thread
-              (sb!kernel:get-lisp-obj-address initial-function)))))
-      (when (zerop os-thread)
-        (error "Can't create a new thread"))
-      (wait-on-semaphore setup-sem)
-      thread)))
+              (sb!kernel:get-lisp-obj-address initial-function))))
+        (when (zerop os-thread)
+          (error "Can't create a new thread"))
+        (wait-on-semaphore setup-sem)
+        thread))))
 
 (defun destroy-thread (thread)
   #!+sb-doc

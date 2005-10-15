@@ -44,17 +44,16 @@ backports.
 @section Special Variables
 
 The interaction of special variables with multiple threads is mostly
-as one would expect, but users of other Lisps are warned that the
-behaviour of locally bound specials differs in places from what they
-may expect.
+as one would expect, with behaviour very similar to other
+implementations.
 
 @itemize
-@item 
+@item
 global special values are visible across all threads;
 @item
 bindings (e.g. using LET) are local to the thread;
 @item
-initial values in a new thread are taken from the thread that created it. 
+threads do not inherit dynamic bindings from the parent thread
 @end itemize
 
 The last point means that
@@ -65,8 +64,8 @@ The last point means that
   (sb-thread:make-thread (lambda () (print *x*))))
 @end lisp
 
-prints @code{1}.
-    
+prints @code{0} and not @code{1} as of 0.9.6.
+
 @node Mutex Support
 @comment  node-name,  next,  previous,  up
 @section Mutex Support

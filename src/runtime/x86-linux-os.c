@@ -81,7 +81,6 @@ int arch_os_thread_init(struct thread *thread) {
         1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
     };
     int n;
-    check_blockables_blocked_or_lose();
     thread_mutex_lock(&modify_ldt_lock);
     n=modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy);
     /* get next free ldt entry */
@@ -140,7 +139,6 @@ int arch_os_thread_cleanup(struct thread *thread) {
     };
     int result;
 
-    check_blockables_blocked_or_lose();
     ldt_entry.entry_number=thread->tls_cookie;
     thread_mutex_lock(&modify_ldt_lock);
     result = modify_ldt(1, &ldt_entry, sizeof (ldt_entry));

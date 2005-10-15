@@ -27,6 +27,8 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
   * bug fix: run cleanup forms (in all threads) when receiving a SIGTERM
     and dump core on SIGQUIT
   * threads
+    ** incompatible change: threads do not inherit values of specials
+       from their parents (see manual)
     ** bug fix: threads stacks belonging to dead threads are freed by the
        next exiting thread, no need to gc to collect thread stacks anymore
     ** minor incompatible change: INTERRUPT-THREAD-ERROR-ERRNO removed
@@ -39,7 +41,7 @@ changes in sbcl-0.9.6 relative to sbcl-0.9.5:
        CONS types where some of the members have uncertain (in the
        NIL, NIL sense) type relationships to each other.
   * GENCGC
-    ** Cores produced by SAVE-LISP-AND-DIE on GENCGC platforms are 
+    ** Cores produced by SAVE-LISP-AND-DIE on GENCGC platforms are
        no longer purified unless :PURIFY T is explicitly specified.
     ** Non-purified cores are significantly smaller than before
 

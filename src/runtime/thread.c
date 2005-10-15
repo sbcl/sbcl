@@ -41,43 +41,6 @@ extern int linux_no_threads_p;
 
 pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
 
-/* When trying to get all_threads_lock one should make sure that
- * SIG_STOP_FOR_GC is not blocked. Else there would be a possible
- * deadlock: gc locks it, other thread blocks signals, gc sends stop
- * request to other thread and waits, other thread blocks on lock. */
-void check_sig_stop_for_gc_can_arrive_or_lose()
-{
-    /* Get the current sigmask, by blocking the empty set. */
-    sigset_t empty,current;
-    sigemptyset(&empty);
-    thread_sigmask(SIG_BLOCK, &empty, &current);
-    if (sigismember(&current,SIG_STOP_FOR_GC))
-        lose("SIG_STOP_FOR_GC cannot arrive: it is blocked\n");
-    if (SymbolValue(GC_INHIBIT,arch_os_get_current_thread()) != NIL)
-        lose("SIG_STOP_FOR_GC cannot arrive: gc is inhibited\n");
-    if (arch_pseudo_atomic_atomic(NULL))
-        lose("SIG_STOP_FOR_GC cannot arrive: in pseudo atomic\n");
-}
-
-#define GET_ALL_THREADS_LOCK(name) \
-    { \
-        sigset_t _newset,_oldset; \
-        sigemptyset(&_newset); \
-        sigaddset_deferrable(&_newset); \
-        thread_sigmask(SIG_BLOCK, &_newset, &_oldset); \
-        check_sig_stop_for_gc_can_arrive_or_lose(); \
-        FSHOW_SIGNAL((stderr,"/%s:waiting on lock=%ld, thread=%lu\n",name, \
-               all_threads_lock,arch_os_get_current_thread()->os_thread)); \
-        pthread_mutex_lock(&all_threads_lock); \
-        FSHOW_SIGNAL((stderr,"/%s:got lock, thread=%lu\n", \
-               name,arch_os_get_current_thread()->os_thread));
-
-#define RELEASE_ALL_THREADS_LOCK(name) \
-        FSHOW_SIGNAL((stderr,"/%s:released lock\n",name)); \
-        pthread_mutex_unlock(&all_threads_lock); \
-        thread_sigmask(SIG_SETMASK,&_oldset,0); \
-    }
-
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 extern lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs);
 #endif
@@ -119,7 +82,6 @@ initial_thread_trampoline(struct thread *th)
     link_thread(th);
     th->os_thread=thread_self();
     protect_control_stack_guard_page(1);
-    th->state = STATE_RUNNING;
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     return call_into_lisp_first_time(function,args,0);
@@ -180,21 +142,13 @@ new_thread_trampoline(struct thread *th)
 
     th->os_thread=thread_self();
     protect_control_stack_guard_page(1);
-    /* This thread is in STATE_STARTING so the GC is not sending it
-     * SIG_STOP_FOR_GC => no danger of deadlocking even with
-     * SIG_STOP_FOR_GC blocked. The lock is acquired in order not to
-     * enter running state with the gc running. */
+    /* Since GC can only know about this thread from the all_threads
+     * list and we're just adding this thread to it there is no danger
+     * of deadlocking even with SIG_STOP_FOR_GC blocked (which it is
+     * not). */
     pthread_mutex_lock(&all_threads_lock);
-    th->state = STATE_RUNNING;
+    link_thread(th);
     pthread_mutex_unlock(&all_threads_lock);
-    /* Now that we entered STATE_RUNNING let the gc suspend this
-     * thread. */
-    {
-        sigset_t sigset;
-        sigemptyset(&sigset);
-        sigaddset(&sigset, SIG_STOP_FOR_GC);
-        thread_sigmask(SIG_UNBLOCK, &sigset, 0);
-    }
 
     result = funcall0(function);
     th->state=STATE_DEAD;
@@ -236,6 +190,7 @@ create_thread_struct(lispobj initial_function) {
     union per_thread_data *per_thread;
     struct thread *th=0;        /*  subdue gcc */
     void *spaces=0;
+    int i;
 
     /* may as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
@@ -249,14 +204,10 @@ create_thread_struct(lispobj initial_function) {
          BINDING_STACK_SIZE+
          ALIEN_STACK_SIZE);
 
-    if(all_threads) {
-        memcpy(per_thread,arch_os_get_current_thread(),
-               dynamic_values_bytes);
-    } else {
 #ifdef LISP_FEATURE_SB_THREAD
-        int i;
-        for(i=0;i<(dynamic_values_bytes/sizeof(lispobj));i++)
-            per_thread->dynamic_values[i]=NO_TLS_VALUE_MARKER_WIDETAG;
+    for(i = 0; i < (dynamic_values_bytes / sizeof(lispobj)); i++)
+        per_thread->dynamic_values[i] = NO_TLS_VALUE_MARKER_WIDETAG;
+    if (all_threads == 0) {
         if(SymbolValue(FREE_TLS_INDEX,0)==UNBOUND_MARKER_WIDETAG) {
             SetSymbolValue
                 (FREE_TLS_INDEX,
@@ -279,8 +230,8 @@ create_thread_struct(lispobj initial_function) {
         STATIC_TLS_INIT(PSEUDO_ATOMIC_INTERRUPTED,pseudo_atomic_interrupted);
 #endif
 #undef STATIC_TLS_INIT
-#endif
     }
+#endif
 
     th=&per_thread->thread;
     th->control_stack_start = spaces;
@@ -292,7 +243,7 @@ create_thread_struct(lispobj initial_function) {
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
     th->os_thread=0;
-    th->state=STATE_STARTING;
+    th->state=STATE_RUNNING;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
                              + ALIEN_STACK_SIZE-N_WORD_BYTES);
@@ -370,7 +321,10 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     sigset_t newset,oldset;
     boolean r=1;
     sigemptyset(&newset);
-    sigaddset_blockable(&newset);
+    /* Blocking deferrable signals is enough, no need to block
+     * SIG_STOP_FOR_GC because the child process is not linked onto
+     * all_threads until it's ready. */
+    sigaddset_deferrable(&newset);
     thread_sigmask(SIG_BLOCK, &newset, &oldset);
 
     if((pthread_attr_init(&attr)) ||
@@ -389,23 +343,16 @@ os_thread_t create_thread(lispobj initial_function) {
 
     if(linux_no_threads_p) return 0;
 
-    /* The new thread must be linked immediately onto all_threads for
-     * gc. */
-    GET_ALL_THREADS_LOCK("create_thread")
-    /* If it is too slow most of the allocation/initialization can
-     * be done without the lock. */
+    /* Assuming that a fresh thread struct has no lisp objects in it,
+     * linking it to all_threads can be left to the thread itself
+     * without fear of gc lossage. initial_function violates this
+     * assumption and must stay pinned until the child starts up. */
     th = create_thread_struct(initial_function);
-    if (th)
-        link_thread(th);
-    RELEASE_ALL_THREADS_LOCK("create_thread")
     if(th==0) return 0;
 
     if (create_os_thread(th,&kid_tid)) {
         return kid_tid;
     } else {
-        GET_ALL_THREADS_LOCK("create_thread")
-        unlink_thread(th);
-        RELEASE_ALL_THREADS_LOCK("create_thread")
         free_thread_struct(th);
         return 0;
     }
@@ -466,6 +413,7 @@ void gc_stop_the_world()
                   th->os_thread));
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     for(p=all_threads; p; p=p->next) {
+        gc_assert(p->os_thread != 0);
         if((p!=th) && ((p->state==STATE_RUNNING))) {
             FSHOW_SIGNAL((stderr,"/gc_stop_the_world: suspending %lu\n",
                           p->os_thread));
@@ -483,7 +431,6 @@ void gc_stop_the_world()
     /* wait for the running threads to stop or finish */
     for(p=all_threads;p;) {
         if((p!=th) && (p->state==STATE_RUNNING)) {
-            gc_assert(p->os_thread!=0);
             sched_yield();
         } else {
             p=p->next;
@@ -502,8 +449,8 @@ void gc_start_the_world()
      * restarting */
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:begin\n"));
     for(p=all_threads;p;p=p->next) {
-        if((p!=th) && (p->state!=STATE_STARTING) && (p->state!=STATE_DEAD)) {
-            gc_assert(p->os_thread!=0);
+        gc_assert(p->os_thread!=0);
+        if((p!=th) && (p->state!=STATE_DEAD)) {
             if(p->state!=STATE_SUSPENDED) {
                 lose("gc_start_the_world: wrong thread state is %d\n",
                      fixnum_value(p->state));
