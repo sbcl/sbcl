@@ -60,7 +60,8 @@
 ;;; 2: eliminated non-ANSI %DEFCONSTANT/%%DEFCONSTANT support,
 ;;;    deleted a slot from DEBUG-SOURCE structure
 ;;; 3: added build ID to cores to discourage sbcl/.core mismatch
-(defconstant sbcl-core-version-integer 3)
+;;; 4: added gc page table data
+(defconstant sbcl-core-version-integer 4)
 
 (defun round-up (number size)
   #!+sb-doc

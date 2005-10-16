@@ -134,11 +134,17 @@
 
 ;;; tests for a sign extension problem in callback argument handling on x86-64
 
-(with-test (:name sign-extension)
-  (let ((*add-two-ints*
-         (sb-alien::alien-callback (function int int int) #'+)))
-    (assert (= (alien-funcall *add-two-ints* #x-80000000 1)
-               -2147483647))
-    (assert (= (alien-funcall *add-two-ints* #x-80000000 -1)
-               #x7fffffff))))
+(defvar *add-two-ints* (sb-alien::alien-callback (function int int int) #'+))
+
+(with-test (:name :sign-extension)
+  (assert (= (alien-funcall *add-two-ints* #x-80000000 1) -2147483647)))
+
+;;; On x86 This'll signal a TYPE-ERROR "The value -2147483649 is not of type
+;;; (SIGNED-BYTE 32)". On x86-64 it'll wrap around to 2147483647, probably
+;;; due to the sign-extension done by the (INTEGER :NATURALIZE-GEN)
+;;; alien-type-method. I believe the former behaviour is the one we want.
+;;; -- JES, 2005-10-16
+
+(with-test (:name :underflow-detection :fails-on :x86-64)
+  (assert (raises-error? (alien-funcall *add-two-ints* #x-80000000 -1))))
 
