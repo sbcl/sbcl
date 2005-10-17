@@ -93,9 +93,9 @@ extern unsigned long install_handler(int signal,
 extern union interrupt_handler interrupt_handlers[NSIG];
 
 /* Set all deferrable signals into *s. */
-void sigaddset_deferrable(sigset_t *s);
+extern void sigaddset_deferrable(sigset_t *s);
 /* Set all blockable signals into *s. */
-void sigaddset_blockable(sigset_t *s);
+extern void sigaddset_blockable(sigset_t *s);
 
 extern void block_blockable_signals();
 

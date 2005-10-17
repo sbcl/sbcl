@@ -24,5 +24,3 @@ featurep os-provides-dlopen
 featurep os-provides-dladdr
 
 featurep os-provides-putwc
-
-featurep sigaction-sa-nodefer-works

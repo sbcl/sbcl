@@ -68,14 +68,15 @@
 
 
 
-void run_deferred_handler(struct interrupt_data *data, void *v_context);
+static void run_deferred_handler(struct interrupt_data *data, void *v_context);
 static void store_signal_data_for_later (struct interrupt_data *data,
                                          void *handler, int signal,
                                          siginfo_t *info,
                                          os_context_t *context);
 boolean interrupt_maybe_gc_int(int signal, siginfo_t *info, void *v_context);
 
-void sigaddset_deferrable(sigset_t *s)
+void
+sigaddset_deferrable(sigset_t *s)
 {
     sigaddset(s, SIGHUP);
     sigaddset(s, SIGINT);
@@ -98,7 +99,8 @@ void sigaddset_deferrable(sigset_t *s)
 #endif
 }
 
-void sigaddset_blockable(sigset_t *s)
+void
+sigaddset_blockable(sigset_t *s)
 {
     sigaddset_deferrable(s);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -124,7 +126,8 @@ check_blockables_blocked_or_lose()
     }
 }
 
-inline static void check_interrupts_enabled_or_lose(os_context_t *context)
+inline static void
+check_interrupts_enabled_or_lose(os_context_t *context)
 {
     struct thread *thread=arch_os_get_current_thread();
     if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL)
@@ -151,14 +154,16 @@ union interrupt_handler interrupt_handlers[NSIG];
  * mask ought to be clear anyway most of the time, but may be non-zero
  * if we were interrupted e.g. while waiting for a queue.  */
 
-void reset_signal_mask(void)
+void
+reset_signal_mask(void)
 {
     sigset_t new;
     sigemptyset(&new);
     thread_sigmask(SIG_SETMASK,&new,0);
 }
 
-void block_blockable_signals(void)
+void
+block_blockable_signals(void)
 {
     thread_sigmask(SIG_BLOCK, &blockable_sigset, 0);
 }
@@ -221,6 +226,8 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
 #endif
 }
 
+/* Stores the context for gc to scavange and builds fake stack
+ * frames. */
 void
 fake_foreign_function_call(os_context_t *context)
 {
@@ -270,7 +277,6 @@ fake_foreign_function_call(os_context_t *context)
 /* blocks all blockable signals.  If you are calling from a signal handler,
  * the usual signal mask will be restored from the context when the handler
  * finishes.  Otherwise, be careful */
-
 void
 undo_fake_foreign_function_call(os_context_t *context)
 {
@@ -468,8 +474,8 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
          * all our allocation from C now goes through a PA wrapper,
          * but still, doesn't hurt.
          *
-         * Yeah, but non-gencgc platforms that don't really wrap
-         * allocation in PA. MG - 2005-08-29  */
+         * Yeah, but non-gencgc platforms don't really wrap allocation
+         * in PA. MG - 2005-08-29  */
 
         lispobj info_sap,context_sap = alloc_sap(context);
         info_sap = alloc_sap(info);
@@ -517,8 +523,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
  * far as C or the kernel is concerned we dealt with the signal
  * already; we're just doing the Lisp-level processing now that we
  * put off then */
-
-void
+static void
 run_deferred_handler(struct interrupt_data *data, void *v_context) {
     /* The pending_handler may enable interrupts and then another
      * interrupt may hit, overwrite interrupt_data, so reset the
@@ -683,10 +688,6 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
         sigfillset(&ss); /* Block everything. */
         thread_sigmask(SIG_BLOCK,&ss,0);
 
-        /* The GC can't tell if a thread is a zombie, so this would be a
-         * good time to let the kernel reap any of our children in that
-         * awful state, to stop them from being waited for indefinitely.
-         * Userland reaping is done later when GC is finished  */
         if(thread->state!=STATE_RUNNING) {
             lose("sig_stop_for_gc_handler: wrong thread state: %ld\n",
                  fixnum_value(thread->state));
@@ -744,12 +745,13 @@ gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
  */
 
 #if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-int *context_eflags_addr(os_context_t *context);
+extern int *context_eflags_addr(os_context_t *context);
 #endif
 
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 extern void post_signal_tramp(void);
-void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
+void
+arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 {
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     void * fun=native_pointer(function);
@@ -886,7 +888,8 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 
 /* FIXME: this function can go away when all lisp handlers are invoked
  * via arrange_return_to_lisp_function. */
-void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
+void
+interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 {
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
     /* let the handler enable interrupts again when it sees fit */
@@ -902,11 +905,13 @@ void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
  * that has the added benefit of automatically discriminating between
  * functions and variables.
  */
-void undefined_alien_function() {
+void
+undefined_alien_function() {
     funcall0(SymbolFunction(UNDEFINED_ALIEN_FUNCTION_ERROR));
 }
 
-boolean handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
+boolean
+handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 {
     struct thread *th=arch_os_get_current_thread();
 
@@ -1030,7 +1035,10 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
     return 1;
 }
 
-#ifndef LISP_FEATURE_SIGACTION_NODEFER_WORKS
+
+/*
+ * noise to install handlers
+ */
 
 /* In Linux 2.4 synchronous signals (sigtrap & co) can be delivered if
  * they are blocked, in Linux 2.6 the default handler is invoked
@@ -1040,8 +1048,50 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
  * in question to the mask. That means if it's not blockable the
  * signal must be unblocked at the beginning of signal handlers.
  */
-void
+static volatile int sigaction_nodefer_works = -1;
+
+static void
+sigaction_nodefer_test_handler(int signal, siginfo_t *info, void *void_context)
+{
+    sigset_t empty, current;
+    int i;
+    sigemptyset(&empty);
+    sigprocmask(SIG_BLOCK, &empty, &current);
+    for(i = 1; i < NSIG; i++)
+        if (sigismember(&current, i) != ((i == SIGABRT) ? 1 : 0)) {
+            FSHOW_SIGNAL((stderr, "SA_NODEFER doesn't work, signal %d\n", i));
+            sigaction_nodefer_works = 0;
+        }
+    if (sigaction_nodefer_works == -1)
+        sigaction_nodefer_works = 1;
+}
+
+static void
+see_if_sigaction_nodefer_works()
+{
+    struct sigaction sa;
+
+    sa.sa_flags = SA_SIGINFO | SA_NODEFER;
+    sa.sa_sigaction = sigaction_nodefer_test_handler;
+    sigemptyset(&sa.sa_mask);
+    sigaddset(&sa.sa_mask, SIGABRT);
+    sigaction(SIGTRAP, &sa, NULL);
+    kill(getpid(), SIGTRAP);
+    while (sigaction_nodefer_works == -1);
+}
+
+static void
 unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
+{
+    sigset_t unblock;
+    sigemptyset(&unblock);
+    sigaddset(&unblock, signal);
+    thread_sigmask(SIG_UNBLOCK, &unblock, 0);
+    interrupt_handle_now_handler(signal, info, void_context);
+}
+
+static void
+low_level_unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 {
     sigset_t unblock;
     sigemptyset(&unblock);
@@ -1049,13 +1099,6 @@ unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
     thread_sigmask(SIG_UNBLOCK, &unblock, 0);
     (*interrupt_low_level_handlers[signal])(signal, info, void_context);
 }
-
-#endif
-
-
-/*
- * noise to install handlers
- */
 
 void
 undoably_install_low_level_interrupt_handler (int signal,
@@ -1069,21 +1112,19 @@ undoably_install_low_level_interrupt_handler (int signal,
         lose("bad signal number %d", signal);
     }
 
-    if (sigismember(&deferrable_sigset,signal))
+    if (ARE_SAME_HANDLER(handler, SIG_DFL))
+        sa.sa_sigaction = handler;
+    else if (sigismember(&deferrable_sigset,signal))
         sa.sa_sigaction = low_level_maybe_now_maybe_later;
-#ifndef LISP_FEATURE_SIGACTION_NODEFER_WORKS
-    else if (!sigismember(&blockable_sigset, signal))
-        sa.sa_sigaction = unblock_me_trampoline;
-#endif
+    else if (!sigaction_nodefer_works &&
+             !sigismember(&blockable_sigset, signal))
+        sa.sa_sigaction = low_level_unblock_me_trampoline;
     else
         sa.sa_sigaction = handler;
 
     sigcopyset(&sa.sa_mask, &blockable_sigset);
-    sa.sa_flags = SA_SIGINFO | SA_RESTART
-#ifdef LISP_FEATURE_SIGACTION_NODEFER_WORKS
-            | SA_NODEFER
-#endif
-        ;
+    sa.sa_flags = SA_SIGINFO | SA_RESTART |
+        (sigaction_nodefer_works ? SA_NODEFER : 0);
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     if((signal==SIG_MEMORY_FAULT)
 #ifdef SIG_INTERRUPT_THREAD
@@ -1116,20 +1157,19 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
            (unsigned int)interrupt_low_level_handlers[signal]));
     if (interrupt_low_level_handlers[signal]==0) {
         if (ARE_SAME_HANDLER(handler, SIG_DFL) ||
-            ARE_SAME_HANDLER(handler, SIG_IGN)) {
+            ARE_SAME_HANDLER(handler, SIG_IGN))
             sa.sa_sigaction = handler;
-        } else if (sigismember(&deferrable_sigset, signal)) {
+        else if (sigismember(&deferrable_sigset, signal))
             sa.sa_sigaction = maybe_now_maybe_later;
-        } else {
+        else if (!sigaction_nodefer_works &&
+                 !sigismember(&blockable_sigset, signal))
+            sa.sa_sigaction = unblock_me_trampoline;
+        else
             sa.sa_sigaction = interrupt_handle_now_handler;
-        }
 
         sigcopyset(&sa.sa_mask, &blockable_sigset);
-        sa.sa_flags = SA_SIGINFO | SA_RESTART
-#ifdef LISP_FEATURE_SIGACTION_NODEFER_WORKS
-            | SA_NODEFER
-#endif
-            ;
+        sa.sa_flags = SA_SIGINFO | SA_RESTART |
+            (sigaction_nodefer_works ? SA_NODEFER : 0);
         sigaction(signal, &sa, NULL);
     }
 
@@ -1148,6 +1188,7 @@ interrupt_init()
 {
     int i;
     SHOW("entering interrupt_init()");
+    see_if_sigaction_nodefer_works();
     sigemptyset(&deferrable_sigset);
     sigemptyset(&blockable_sigset);
     sigaddset_deferrable(&deferrable_sigset);

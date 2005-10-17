@@ -211,6 +211,7 @@ create_thread_struct(lispobj initial_function) {
         if(SymbolValue(FREE_TLS_INDEX,0)==UNBOUND_MARKER_WIDETAG) {
             SetSymbolValue
                 (FREE_TLS_INDEX,
+                 /* FIXME: should be MAX_INTERRUPTS -1 ? */
                  make_fixnum(MAX_INTERRUPTS+
                              sizeof(struct thread)/sizeof(lispobj)),
                  0);

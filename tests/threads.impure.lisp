@@ -476,21 +476,6 @@
  (lambda ()
    (sb-ext:run-program "sleep" '("1") :search t :wait nil)))
 
-(with-test (:name (:thread-start :dynamic-values-and-gc))
-  (let ((gc-thread (sb-thread:make-thread (lambda ()
-                                            (loop (sleep (random 0.2))
-                                                  (sb-ext:gc :full t))))))
-    (wait-for-threads
-     (loop for i below 3000
-           when (zerop (mod i 30))
-           do (princ ".")
-           collect
-           (let ((*x* (lambda ())))
-             (declare (special *x*))
-             (sb-thread:make-thread (lambda () (functionp *x*))))))
-    (sb-thread:terminate-thread gc-thread)
-    (terpri)))
-
 #|  ;; a cll post from eric marsden
 | (defun crash ()
 |   (setq *debugger-hook*
