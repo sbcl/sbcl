@@ -119,7 +119,6 @@
 (define-signal-handler sigint-handler "interrupted" sigint-%break)
 (define-signal-handler sigill-handler "illegal instruction")
 (define-signal-handler sigtrap-handler "breakpoint/trap")
-(define-signal-handler sigiot-handler "SIGIOT")
 #!-linux
 (define-signal-handler sigemt-handler "SIGEMT")
 (define-signal-handler sigbus-handler "bus error")
@@ -137,6 +136,11 @@
   (declare (ignore signal code context))
   (sb!thread::terminate-session)
   (sb!ext:quit))
+
+;; Also known as SIGABRT.
+(defun sigiot-handler (signal code context)
+  (declare (ignore signal code context))
+  (sb!impl::%halt))
 
 (defun sb!kernel:signal-cold-init-or-reinit ()
   #!+sb-doc
