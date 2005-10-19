@@ -339,7 +339,8 @@ main(int argc, char *argv[], char *envp[])
     SetSymbolValue(POSIX_ARGV, alloc_base_string_list(sbcl_argv),0);
     free(sbcl_argv);
 
-    FSHOW((stderr, "/funcalling initial_function=0x%lx\n", initial_function));
+    FSHOW((stderr, "/funcalling initial_function=0x%lx\n",
+          (unsigned long)initial_function));
     create_initial_thread(initial_function);
     lose("CATS.  CATS ARE NICE.");
     return 0;

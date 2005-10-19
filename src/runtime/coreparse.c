@@ -62,7 +62,7 @@ process_directory(int fd, u32 *ptr, int count)
         if (len != 0) {
             os_vm_address_t real_addr;
             FSHOW((stderr, "/mapping %ld(0x%lx) bytes at 0x%lx\n",
-                   (long)len, (long)len, addr));
+                   (long)len, (long)len, (unsigned long)addr));
             real_addr = os_map(fd, offset, addr, len);
             if (real_addr != addr) {
                 lose("file mapped in wrong place! "
@@ -72,8 +72,8 @@ process_directory(int fd, u32 *ptr, int count)
             }
         }
 
-        FSHOW((stderr, "/space id = %d, free pointer = 0x%08x\n",
-               id, (long)free_pointer));
+        FSHOW((stderr, "/space id = %ld, free pointer = 0x%lx\n",
+               id, (unsigned long)free_pointer));
 
         switch (id) {
         case DYNAMIC_CORE_SPACE_ID:
@@ -256,7 +256,7 @@ load_core_file(char *file)
         }
 
         ptr += remaining_len;
-        FSHOW((stderr, "/new ptr=%x\n", ptr));
+        FSHOW((stderr, "/new ptr=%lx\n", (unsigned long)ptr));
     }
     SHOW("about to free(header)");
     free(header);
