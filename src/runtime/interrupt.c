@@ -1075,8 +1075,17 @@ see_if_sigaction_nodefer_works()
     sa.sa_sigaction = sigaction_nodefer_test_handler;
     sigemptyset(&sa.sa_mask);
     sigaddset(&sa.sa_mask, SIGABRT);
-    sigaction(SIGTRAP, &sa, NULL);
-    kill(getpid(), SIGTRAP);
+    /* We can use any signal for which a handler will be installed
+     * later. Let's go with SIGINT because gdb barfs on SIGTRAP on
+     * Darwin. */
+    sigaction(SIGINT, &sa, NULL);
+    /* Make sure no signals are blocked. */
+    {
+        sigset_t empty;
+        sigemptyset(&empty);
+        sigprocmask(SIG_SETMASK, &empty, 0);
+    }
+    kill(getpid(), SIGINT);
     while (sigaction_nodefer_works == -1);
 }
 
