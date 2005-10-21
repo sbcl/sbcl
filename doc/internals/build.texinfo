@@ -1,0 +1,31 @@
+@node Build
+@comment  node-name,  next,  previous,  up
+@chapter Build
+
+@menu
+* Cold init::                   
+@end menu
+
+@node Cold init
+@comment  node-name,  next,  previous,  up
+@section Cold init
+
+At the start of cold init, the only thing the system can do is call
+functions, because @code{COLD-FSET} has arranged for that (and nothing
+else) to happen.
+
+The tricky bit of cold init is getting the system to the point that it
+can run top level forms. To do that, we need to set up basic
+structures like the things you look symbols up in the structures which
+make the type system work.
+
+So cold-init is the real bootstrap moment. Genesis dumps
+symbol<->package relationships but not the packages themselves, for
+instance. So we need to be able to make packages to fixup the system,
+but to do that we need to be able to make hash-tables, and to do that
+we need @code{RANDOM} to work, so we need to initialize the
+random-state and so on.
+
+We could do much of this at genesis time, but it would just end up
+being fragile in a different way (needing to know about memory layouts
+of non-fundamental objects like packages, etc).
