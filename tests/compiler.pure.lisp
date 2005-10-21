@@ -1883,3 +1883,8 @@
                      new)))
   (declare (ignore fun warnings failure))
   (assert (not failure)))
+
+;;; bug #389: "0.0 can't be converted to type NIL."  (Brian Rowe
+;;; sbcl-devel)
+(compile nil '(lambda (x y a b c)
+               (- y (* (signum x) (sqrt (abs (- (* b x) c)))))))

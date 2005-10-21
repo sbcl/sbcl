@@ -2122,3 +2122,15 @@ WORKAROUND:
 
     SB-PCL::SPECIALIZER-APPLICABLE-USING-TYPE-P cannot handle the second argument
     (UNSIGNED-BYTE 8).
+
+389:
+  (reported several times on sbcl-devel, by Rick Taube, Brian Rowe and
+  others)
+
+  ROUND-NUMERIC-BOUND assumes that float types always have a FORMAT
+  specifying whether they're SINGLE or DOUBLE.  This is true for types
+  computed by the type system itself, but the compiler type derivation
+  short-circuits this and constructs non-canonical types.  A temporary
+  fix was made to ROUND-NUMERIC-BOUND for the sbcl-0.9.6 release, but
+  the right fix is to remove the abstraction violation in the
+  compiler's type deriver.

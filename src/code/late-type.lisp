@@ -2118,7 +2118,8 @@ used for a COMPLEX component.~:@>"
                          nil))
                     (t
                      (if (<= most-negative-single-float cx most-positive-single-float)
-                         (coerce cx format)
+                         ;; FIXME: bug #389
+                         (coerce cx (or format 'single-float))
                          nil)))))
              (if (consp x) (list res) res)))))
       nil))
