@@ -36,6 +36,13 @@ unsigned long fast_random_state = 1;
 
 void arch_init(void)
 {}
+
+os_vm_address_t
+arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
+{
+    return (os_vm_address_t)code->si_addr;
+}
+
 
 /*
  * hacking signal contexts

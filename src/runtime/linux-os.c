@@ -305,34 +305,15 @@ is_valid_lisp_addr(os_vm_address_t addr)
  * any OS-dependent special low-level handling for signals
  */
 
-
-#if defined LISP_FEATURE_GENCGC
-
 /*
- * The GENCGC needs to be hooked into whatever signal is raised for
+ * The GC needs to be hooked into whatever signal is raised for
  * page fault on this OS.
  */
 static void
 sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    void* fault_addr = (void*)info->si_addr;
-    if (!gencgc_handle_wp_violation(fault_addr))
-        if(!handle_guard_page_triggered(context,fault_addr))
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-            arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
-#else
-            interrupt_handle_now(signal, info, context);
-#endif
-}
-
-#else
-
-static void
-sigsegv_handler(int signal, siginfo_t *info, void* void_context)
-{
-    os_context_t *context = arch_os_get_context(&void_context);
-    os_vm_address_t addr = arch_get_bad_addr(signal,info,context);
+    os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
 
 #ifdef LISP_FEATURE_ALPHA
     /* Alpha stuff: This is the end of a pseudo-atomic section during
@@ -343,18 +324,25 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
        At the end of the atomic section we tried to write to reg_ALLOC,
        got a SIGSEGV (there's nothing mapped there) so ended up here. */
     if (addr != NULL &&
-        *os_context_register_addr(context,reg_ALLOC) & (1L<<63)){
-        *os_context_register_addr(context,reg_ALLOC) -= (1L<<63);
+        *os_context_register_addr(context, reg_ALLOC) & (1L<<63)) {
+        *os_context_register_addr(context, reg_ALLOC) -= (1L<<63);
         interrupt_handle_pending(context);
         return;
     }
 #endif
 
-    if(!interrupt_maybe_gc(signal, info, context))
-        if(!handle_guard_page_triggered(context,addr))
-            interrupt_handle_now(signal, info, context);
-}
+#ifdef LISP_FEATURE_GENCGC
+    if (!gencgc_handle_wp_violation(addr))
+#else
+    if (!interrupt_maybe_gc(signal, info, context))
 #endif
+        if (!handle_guard_page_triggered(context, addr))
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+            arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
+#else
+            interrupt_handle_now(signal, info, context);
+#endif
+}
 
 void
 os_install_interrupt_handlers(void)
