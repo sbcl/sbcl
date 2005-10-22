@@ -54,7 +54,19 @@
         (assert (eq (car (compute-restarts)) (car (compute-restarts c))))))
   (picky-restart ()
     :report "Do nothing."
-    :test (lambda (c) (typep c 'picky-condition))
+    :test (lambda (c)
+            (typep c '(or null picky-condition)))
     'ok))
+
+;;; adapted from Helmut Eller on cmucl-imp
+(assert (eq 'it
+            (restart-case
+                (handler-case
+                    (error 'picky-condition)
+                  (picky-condition (c)
+                    (invoke-restart (find-restart 'give-it c))))
+              (give-it ()
+                :test (lambda (c) (typep c 'picky-condition))
+                'it))))
 
 ;;; success

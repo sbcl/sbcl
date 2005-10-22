@@ -35,10 +35,9 @@
 
 (defun compute-restarts (&optional condition)
   #!+sb-doc
-  "Return a list of all the currently active restarts ordered from most
-   recently established to less recently established. If CONDITION is
-   specified, then only restarts associated with CONDITION (or with no
-   condition) will be returned."
+  "Return a list of all the currently active restarts ordered from most recently
+established to less recently established. If CONDITION is specified, then only
+restarts associated with CONDITION (or with no condition) will be returned."
   (let ((associated ())
         (other ()))
     (dolist (alist *condition-restarts*)
@@ -51,9 +50,7 @@
           (when (and (or (not condition)
                          (member restart associated)
                          (not (member restart other)))
-                     (or (not condition)
-                         (funcall (restart-test-function restart)
-                                  condition)))
+                     (funcall (restart-test-function restart) condition))
             (res restart))))
       (res))))
 
@@ -69,19 +66,18 @@
                        (format stream "~S" restart)))))
            stream))
 
-(defun find-restart (name &optional condition)
+(defun find-restart (identifier &optional condition)
   #!+sb-doc
-  "Return the first restart named NAME. If NAME names a restart, the restart
-   is returned if it is currently active. If no such restart is found, NIL is
-   returned. It is an error to supply NIL as a name. If CONDITION is specified
-   and not NIL, then only restarts associated with that condition (or with no
-   condition) will be returned."
-  (let ((restarts (compute-restarts condition)))
-    (declare (type list restarts))
-    (find-if (lambda (x)
-               (or (eq x name)
-                   (eq (restart-name x) name)))
-             restarts)))
+  "Return the first restart identified by IDENTIFIER. If IDENTIFIER is a symbol,
+then the innermost applicable restart with that name is returned. If IDENTIFIER
+is a restart, it is returned if it is currently active. Otherwise NIL is
+returned. If CONDITION is specified and not NIL, then only restarts associated
+with that condition (or with no condition) will be returned."
+  ;; see comment above
+  (if (typep identifier 'restart)
+      (and (find-if (lambda (cluster) (find identifier cluster)) *restart-clusters*)
+           identifier)
+      (find identifier (compute-restarts condition) :key #'restart-name)))
 
 ;;; helper for the various functions which are ANSI-spec'ed to do
 ;;; something with a restart or signal CONTROL-ERROR if there is none
