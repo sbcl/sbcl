@@ -72,7 +72,7 @@ x:
 (NFPR_SAVE_BYTES(first_f)+ NGPR_SAVE_BYTES(first_g)+ FRAME_ARG_BYTES(out_arg_words))
 #define SAVE_FPR(n) stfd f##n,-8*(32- n)(r11)
 #define SAVE_GPR(n) stw r##n,-4*(32- n)(r11)
-#define FULL_FRAME_SIZE FRAME_SIZE(FIRST_SAVE_GPR,FIRST_SAVE_FPR,8,1)
+#define FULL_FRAME_SIZE (FRAME_SIZE(FIRST_SAVE_GPR,FIRST_SAVE_FPR,8,1)+15&~15)
 #define RESTORE_FPR(n) lfd f##n,-8*(32- n)(r11)
 #define RESTORE_GPR(n) lwz r##n,-4*(32- n)(r11)
 #else
