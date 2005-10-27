@@ -352,31 +352,31 @@ print_context(os_context_t *context)
 static void
 print_context_cmd(char **ptr)
 {
-    int free;
+    int free_ici;
     struct thread *thread=arch_os_get_current_thread();
 
-    free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)>>2;
+    free_ici = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
     if (more_p(ptr)) {
         int index;
 
         index = parse_number(ptr);
 
-        if ((index >= 0) && (index < free)) {
-            printf("There are %d interrupt contexts.\n", free);
+        if ((index >= 0) && (index < free_ici)) {
+            printf("There are %d interrupt contexts.\n", free_ici);
             printf("printing context %d\n", index);
             print_context(thread->interrupt_contexts[index]);
         } else {
             printf("There aren't that many/few contexts.\n");
-            printf("There are %d interrupt contexts.\n", free);
+            printf("There are %d interrupt contexts.\n", free_ici);
         }
     } else {
-        if (free == 0)
+        if (free_ici == 0)
             printf("There are no interrupt contexts!\n");
         else {
-            printf("There are %d interrupt contexts.\n", free);
-            printf("printing context %d\n", free - 1);
-            print_context(thread->interrupt_contexts[free - 1]);
+            printf("There are %d interrupt contexts.\n", free_ici);
+            printf("printing context %d\n", free_ici - 1);
+            print_context(thread->interrupt_contexts[free_ici - 1]);
         }
     }
 }

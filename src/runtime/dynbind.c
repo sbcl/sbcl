@@ -33,7 +33,6 @@
 
 void bind_variable(lispobj symbol, lispobj value, void *th)
 {
-    lispobj old_tl_value;
     struct binding *binding;
     struct thread *thread=(struct thread *)th;
     binding = GetBSP();
@@ -59,10 +58,9 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
         }
     }
 #endif
-    old_tl_value=SymbolTlValue(symbol,thread);
-    binding->value = old_tl_value;
+    binding->value = SymbolTlValue(symbol, thread);
     binding->symbol = symbol;
-    SetTlSymbolValue(symbol, value,thread);
+    SetTlSymbolValue(symbol, value, thread);
 }
 
 void

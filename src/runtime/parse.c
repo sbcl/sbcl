@@ -318,18 +318,18 @@ char **ptr;
         throw_to_monitor();
     } else if (token[0] == '$') {
         if (isalpha(token[1])) {
-            int free;
+            int free_ici;
             int regnum;
             os_context_t *context;
 
-            free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)>>2;
+            free_ici = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
-            if (free == 0) {
+            if (free_ici == 0) {
                 printf("Variable ``%s'' is not valid -- there is no current interrupt context.\n", token);
                 throw_to_monitor();
             }
 
-            context = thread->interrupt_contexts[free - 1];
+            context = thread->interrupt_contexts[free_ici - 1];
 
             regnum = parse_regnum(token);
             if (regnum < 0) {

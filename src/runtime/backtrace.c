@@ -165,7 +165,7 @@ previous_info(struct call_info *info)
 {
     struct call_frame *this_frame;
     struct thread *thread=arch_os_get_current_thread();
-    int free;
+    int free_ici;
 
     if (!cs_valid_pointer_p(info->frame)) {
         printf("Bogus callee value (0x%08lx).\n", (unsigned long)info->frame);
@@ -182,10 +182,10 @@ previous_info(struct call_info *info)
 
     if (info->lra == NIL) {
         /* We were interrupted. Find the correct signal context. */
-        free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)>>2;
-        while (free-- > 0) {
+        free_ici = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread));
+        while (free_ici-- > 0) {
             os_context_t *context =
-                thread->interrupt_contexts[free];
+                thread->interrupt_contexts[free_ici];
             if ((struct call_frame *)(unsigned long)
                     (*os_context_register_addr(context, reg_CFP))
                 == info->frame) {

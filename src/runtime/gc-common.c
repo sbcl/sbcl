@@ -127,8 +127,8 @@ scavenge(lispobj *start, long n_words)
     lispobj *end = start + n_words;
     lispobj *object_ptr;
     long n_words_scavenged;
-    for (object_ptr = start;
 
+    for (object_ptr = start;
          object_ptr < end;
          object_ptr += n_words_scavenged) {
 
