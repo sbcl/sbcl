@@ -1026,41 +1026,41 @@
               (tail (fd-stream-obuf-tail stream)))
           ,out-expr))
       (defun ,in-function (stream buffer start requested eof-error-p
-                           &aux (total-copied 0))
+                           &aux (index start) (end (+ start requested)))
         (declare (type fd-stream stream))
-        (declare (type index start requested total-copied))
+        (declare (type index start requested index end))
         (declare (type (simple-array character (#.+ansi-stream-in-buffer-length+)) buffer))
         (let ((unread (fd-stream-unread stream)))
           (when unread
-            (setf (aref buffer start) unread)
+            (setf (aref buffer index) unread)
             (setf (fd-stream-unread stream) nil)
             (setf (fd-stream-listen stream) nil)
-            (incf total-copied)))
+            (incf index)))
         (do ()
             (nil)
           (let* ((head (fd-stream-ibuf-head stream))
                  (tail (fd-stream-ibuf-tail stream))
                  (sap (fd-stream-ibuf-sap stream)))
-            (declare (type index head tail))
+            (declare (type index head tail)
+                     (type system-area-pointer sap))
             ;; Copy data from stream buffer into user's buffer.
-            (do ()
-                ((or (= tail head) (= requested total-copied)))
+            (dotimes (i (min (truncate (- tail head) ,size)
+                             (- end index)))
+              (declare (optimize speed))
               (let* ((byte (sap-ref-8 sap head)))
-                (when (> ,size (- tail head))
-                  (return))
-                (setf (aref buffer (+ start total-copied)) ,in-expr)
-                (incf total-copied)
+                (setf (aref buffer index) ,in-expr)
+                (incf index)
                 (incf head ,size)))
             (setf (fd-stream-ibuf-head stream) head)
             ;; Maybe we need to refill the stream buffer.
-            (cond ( ;; If there were enough data in the stream buffer, we're done.
-                   (= total-copied requested)
-                   (return total-copied))
+            (cond ( ;; If there was enough data in the stream buffer, we're done.
+                   (= index end)
+                   (return (- index start)))
                   ( ;; If EOF, we're done in another way.
                    (null (catch 'eof-input-catcher (refill-buffer/fd stream)))
                    (if eof-error-p
                        (error 'end-of-file :stream stream)
-                       (return total-copied)))
+                       (return (- index start))))
                   ;; Otherwise we refilled the stream buffer, so fall
                   ;; through into another pass of the loop.
                   ))))
