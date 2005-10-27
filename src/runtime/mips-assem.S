@@ -162,7 +162,7 @@ symbol:
 	addu	reg_LIP, reg_CODE, SIMPLE_FUN_CODE_OFFSET
 	jr	reg_LIP
 
-	.align	2
+	.align	3
 	.set	noreorder
 lra:	.word	RETURN_PC_HEADER_WIDETAG
 
