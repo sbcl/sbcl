@@ -223,33 +223,50 @@
 (defun ansi-stream-read-line (stream eof-error-p eof-value recursive-p)
   (declare (ignore recursive-p))
   (prepare-for-fast-read-char stream
-          (let ((res (make-string 80))
-                (len 80)
-                (index 0))
-            (loop
-             (let ((ch (fast-read-char nil nil)))
-               (cond (ch
-                      (when (char= ch #\newline)
-                        (done-with-fast-read-char)
-                        (return (values (shrink-vector res index) nil)))
-                      (when (= index len)
-                        (setq len (* len 2))
-                        (let ((new (make-string len)))
-                          (replace new res)
-                          (setq res new)))
-                      (setf (schar res index) ch)
-                      (incf index))
-                     ((zerop index)
-                      (done-with-fast-read-char)
-                      (return (values (eof-or-lose stream
-                                                   eof-error-p
-                                                   eof-value)
-                                      t)))
-                     ;; Since FAST-READ-CHAR already hit the eof char, we
-                     ;; shouldn't do another READ-CHAR.
-                     (t
-                      (done-with-fast-read-char)
-                      (return (values (shrink-vector res index) t)))))))))
+    ;; Check whether the FAST-READ-CHAR buffer contains a newline. If it
+    ;; does, we can do things quickly by just copying the line from the
+    ;; buffer instead of doing repeated calls to FAST-READ-CHAR.
+    (when %frc-buffer%
+      (locally
+          ;; For %FIND-POSITION transform
+          (declare (optimize (speed 2)))
+        (let ((pos (position #\Newline %frc-buffer%
+                             :test #'char=
+                             :start %frc-index%)))
+          (when pos
+            (let* ((len (- pos %frc-index%))
+                   (res (make-string len)))
+              (replace res %frc-buffer% :start2 %frc-index% :end2 pos)
+              (setf %frc-index% (1+ pos))
+              (done-with-fast-read-char)
+              (return-from ansi-stream-read-line res))))))
+    (let ((res (make-string 80))
+          (len 80)
+          (index 0))
+      (loop
+         (let ((ch (fast-read-char nil nil)))
+           (cond (ch
+                  (when (char= ch #\newline)
+                    (done-with-fast-read-char)
+                    (return (values (shrink-vector res index) nil)))
+                  (when (= index len)
+                    (setq len (* len 2))
+                    (let ((new (make-string len)))
+                      (replace new res)
+                      (setq res new)))
+                  (setf (schar res index) ch)
+                  (incf index))
+                 ((zerop index)
+                  (done-with-fast-read-char)
+                  (return (values (eof-or-lose stream
+                                               eof-error-p
+                                               eof-value)
+                                  t)))
+                 ;; Since FAST-READ-CHAR already hit the eof char, we
+                 ;; shouldn't do another READ-CHAR.
+                 (t
+                  (done-with-fast-read-char)
+                  (return (values (shrink-vector res index) t)))))))))
 
 (defun read-line (&optional (stream *standard-input*) (eof-error-p t) eof-value
                             recursive-p)

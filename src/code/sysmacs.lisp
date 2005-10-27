@@ -119,6 +119,9 @@ waits until gc is enabled in this thread."
 ;;; This macro sets up some local vars for use by the
 ;;; FAST-READ-CHAR macro within the enclosed lexical scope. The stream
 ;;; is assumed to be a ANSI-STREAM.
+;;;
+;;; KLUDGE: Some functions (e.g. ANSI-STREAM-READ-LINE) use these variables
+;;; directly, instead of indirecting through FAST-READ-CHAR.
 (defmacro prepare-for-fast-read-char (stream &body forms)
   `(let* ((%frc-stream% ,stream)
           (%frc-method% (ansi-stream-in %frc-stream%))
@@ -134,7 +137,7 @@ waits until gc is enabled in this thread."
   `(setf (ansi-stream-in-index %frc-stream%) %frc-index%))
 
 ;;; a macro with the same calling convention as READ-CHAR, to be used
-;;; within the scope of a PREPARE-FOR-FAST-READ-CHAR
+;;; within the scope of a PREPARE-FOR-FAST-READ-CHAR.
 (defmacro fast-read-char (&optional (eof-error-p t) (eof-value ()))
   `(cond
     ((not %frc-buffer%)
