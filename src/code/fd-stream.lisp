@@ -1205,9 +1205,7 @@
                       (error 'end-of-file :stream stream)
                       (return-from ,in-function total-copied)))
                 (setf head (fd-stream-ibuf-head stream))
-                (setf tail (fd-stream-ibuf-tail stream)))
-              (when (plusp total-copied)
-                (return-from ,in-function total-copied)))
+                (setf tail (fd-stream-ibuf-tail stream))))
             (setf (fd-stream-ibuf-head stream) head)
             ;; Maybe we need to refill the stream buffer.
             (cond ( ;; If there were enough data in the stream buffer, we're done.
