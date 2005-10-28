@@ -502,15 +502,26 @@
         (end (or end (length (the vector thing)))))
     (declare (fixnum start end))
     (if (stringp thing)
-        (let ((last-newline (and (find #\newline (the simple-string thing)
-                                       :start start :end end)
-                                 ;; FIXME why do we need both calls?
-                                 ;; Is find faster forwards than
-                                 ;; position is backwards?
-                                 (position #\newline (the simple-string thing)
-                                           :from-end t
-                                           :start start
-                                           :end end))))
+        (let ((last-newline
+               (flet ((do-it (string)
+                        (and (find #\newline string :start start :end end)
+                             ;; FIXME why do we need both calls?
+                             ;; Is find faster forwards than
+                             ;; position is backwards?
+                             (position #\newline string
+                                       :from-end t
+                                       :start start
+                                       :end end))))
+                 (declare (inline do-it))
+                 ;; Specialize the common cases
+                 (etypecase thing
+                   (simple-base-string
+                    (do-it (the simple-base-string thing)))
+                   #!+sb-unicode
+                   ((simple-array character)
+                    (do-it (the (simple-array character) thing)))
+                   (string
+                    (do-it thing))))))
           (if (and (typep thing 'base-string)
                    (eq (fd-stream-external-format stream) :latin-1))
               (ecase (fd-stream-buffering stream)
