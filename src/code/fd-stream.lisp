@@ -993,21 +993,37 @@
           (do ()
               ((= end start))
             (setf (fd-stream-obuf-tail stream)
-                  (do* ((len (fd-stream-obuf-length stream))
-                        (sap (fd-stream-obuf-sap stream))
-                        (tail (fd-stream-obuf-tail stream)))
-                       ((or (= start end) (< (- len tail) 4)) tail)
-                    ,(if output-restart
-                         `(catch 'output-nothing
-                            (let* ((byte (aref string start))
-                                   (bits (char-code byte)))
-                              ,out-expr
-                              (incf tail ,size)))
-                         `(let* ((byte (aref string start))
-                                  (bits (char-code byte)))
-                             ,out-expr
-                             (incf tail ,size)))
-                    (incf start)))
+                  (flet ((do-it (string)
+                           (do* ((len (fd-stream-obuf-length stream))
+                                 (sap (fd-stream-obuf-sap stream))
+                                 (tail (fd-stream-obuf-tail stream)))
+                                ((or (= start end) (< (- len tail) 4)) tail)
+                             ,(if output-restart
+                                  `(catch 'output-nothing
+                                     (let* ((byte (aref string start))
+                                            (bits (char-code byte)))
+                                       ,out-expr
+                                       (incf tail ,size)))
+                                  `(let* ((byte (aref string start))
+                                          (bits (char-code byte)))
+                                     ,out-expr
+                                     (incf tail ,size)))
+                             (incf start))))
+                    (declare (inline do-it))
+                    ;; Specialized versions for the common cases of
+                    ;; SIMPLE-BASE-STRING and (SIMPLE-ARRAY CHARACTER)
+                    ;; to avoid doing a generic AREF.
+                    (etypecase string
+                      (simple-base-string
+                       (do-it (the simple-base-string string)))
+                      #!+sb-unicode
+                      ((simple-array character)
+                       ;; For some reason the type information from the
+                       ;; etypecase doesn't propagate through here without
+                       ;; an explicit THE.
+                       (do-it (the (simple-array character) string)))
+                      (string
+                       (do-it string)))))
             (when (< start end)
               (flush-output-buffer stream)))
           (when flush-p
@@ -1097,23 +1113,39 @@
           (do ()
               ((= end start))
             (setf (fd-stream-obuf-tail stream)
-                  (do* ((len (fd-stream-obuf-length stream))
-                        (sap (fd-stream-obuf-sap stream))
-                        (tail (fd-stream-obuf-tail stream)))
-                       ((or (= start end) (< (- len tail) 4)) tail)
-                    ,(if output-restart
-                         `(catch 'output-nothing
-                            (let* ((byte (aref string start))
-                                   (bits (char-code byte))
-                                   (size ,out-size-expr))
-                              ,out-expr
-                              (incf tail size)))
-                         `(let* ((byte (aref string start))
-                                 (bits (char-code byte))
-                                 (size ,out-size-expr))
-                            ,out-expr
-                            (incf tail size)))
-                    (incf start)))
+                  (flet ((do-it (string)
+                           (do* ((len (fd-stream-obuf-length stream))
+                                 (sap (fd-stream-obuf-sap stream))
+                                 (tail (fd-stream-obuf-tail stream)))
+                                ((or (= start end) (< (- len tail) 4)) tail)
+                             ,(if output-restart
+                                  `(catch 'output-nothing
+                                     (let* ((byte (aref string start))
+                                            (bits (char-code byte))
+                                            (size ,out-size-expr))
+                                       ,out-expr
+                                       (incf tail size)))
+                                  `(let* ((byte (aref string start))
+                                          (bits (char-code byte))
+                                          (size ,out-size-expr))
+                                     ,out-expr
+                                     (incf tail size)))
+                             (incf start))))
+                    (declare (inline do-it))
+                    ;; Specialized versions for the common cases of
+                    ;; SIMPLE-BASE-STRING and (SIMPLE-ARRAY CHARACTER)
+                    ;; to avoid doing a generic AREF.
+                    (etypecase string
+                      (simple-base-string
+                       (do-it (the simple-base-string string)))
+                      #!+sb-unicode
+                      ((simple-array character)
+                       ;; For some reason the type information from the
+                       ;; etypecase doesn't propagate through here without
+                       ;; an explicit THE.
+                       (do-it (the (simple-array character) string)))
+                      (string
+                       (do-it string)))))
             (when (< start end)
               (flush-output-buffer stream)))
           (when flush-p
