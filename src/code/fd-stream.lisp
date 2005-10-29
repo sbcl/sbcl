@@ -1204,7 +1204,6 @@
           (let* ((head (fd-stream-ibuf-head stream))
                  (tail (fd-stream-ibuf-tail stream))
                  (sap (fd-stream-ibuf-sap stream))
-                 (head-start head)
                  (decode-break-reason nil))
             (declare (type index head tail))
             ;; Copy data from stream buffer into user's buffer.
@@ -1221,8 +1220,15 @@
                         (incf head size))
                       nil))
               (setf (fd-stream-ibuf-head stream) head)
-              (when (and decode-break-reason
-                         (= head head-start))
+              (when decode-break-reason
+                ;; If we've already read some characters on when the invalid
+                ;; code sequence is detected, we return immediately. The
+                ;; handling of the error is deferred until the next call
+                ;; (where this check will be false). This allows establishing
+                ;; high-level handlers for decode errors (for example
+                ;; automatically resyncing in Lisp comments).
+                (when (plusp total-copied)
+                  (return-from ,in-function total-copied))
                 (when (stream-decoding-error-and-handle
                        stream decode-break-reason)
                   (if eof-error-p

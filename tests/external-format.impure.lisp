@@ -89,6 +89,51 @@
     (assert (equal (read-line s nil s) "AB"))
     (assert (equal (read-line s nil s) s))))
 
+;;; And again with more data to account for buffering (this was briefly)
+;;; broken in early 0.9.6.
+(with-open-file (s "external-format-test.txt" :direction :output
+                 :if-exists :supersede :element-type '(unsigned-byte 8))
+  (let ((a (make-array 50
+                       :element-type '(unsigned-byte 64)
+                       :initial-contents (map 'list #'char-code
+                                              "1234567890123456789012345678901234567890123456789."))))
+    (setf (aref a 49) (char-code #\Newline))
+    (dotimes (i 40)
+      (write-sequence a s))
+    (write-byte #xe0 s)
+    (dotimes (i 40)
+      (write-sequence a s))))
+(with-test (:name (:character-decode-large :attempt-resync))
+  (with-open-file (s "external-format-test.txt" :direction :input
+                     :external-format :utf-8)
+    (handler-bind
+        ((sb-int:character-decoding-error #'(lambda (decoding-error)
+                                              (declare (ignore decoding-error))
+                                              (invoke-restart
+                                               'sb-int:attempt-resync)))
+         ;; The failure mode is an infinite loop, add a timeout to detetct it.
+         (sb-ext:timeout (lambda () (error "Timeout"))))
+      (sb-ext:with-timeout 5
+        (dotimes (i 80)
+          (assert (equal (read-line s nil s)
+                         "1234567890123456789012345678901234567890123456789")))))))
+(with-test (:name (:character-decode-large :force-end-of-file)
+            :fails-on :sbcl)
+  (with-open-file (s "external-format-test.txt" :direction :input
+                     :external-format :utf-8)
+    (handler-bind
+        ((sb-int:character-decoding-error #'(lambda (decoding-error)
+                                              (declare (ignore decoding-error))
+                                              (invoke-restart
+                                               'sb-int:force-end-of-file)))
+         ;; The failure mode is an infinite loop, add a timeout to detetct it.
+         (sb-ext:timeout (lambda () (error "Timeout"))))
+      (sb-ext:with-timeout 5
+        (dotimes (i 80)
+          (assert (equal (read-line s nil s)
+                         "1234567890123456789012345678901234567890123456789")))
+        (assert (equal (read-line s nil s) s))))))
+
 ;;; Test character encode restarts.
 (with-open-file (s "external-format-test.txt" :direction :output
                  :if-exists :supersede :external-format :latin-1)
