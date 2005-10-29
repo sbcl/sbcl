@@ -999,27 +999,34 @@
                      (> (fd-stream-ibuf-tail stream)
                         (fd-stream-ibuf-head stream)))
             (file-position stream (file-position stream)))
-          (when (< end start)
-            (error ":END before :START!"))
+          (unless (<= 0 start end (length string))
+            (signal-bounding-indices-bad-error string start end))
           (do ()
               ((= end start))
             (setf (fd-stream-obuf-tail stream)
                   (flet ((do-it (string)
-                           (do* ((len (fd-stream-obuf-length stream))
+                           (let ((len (fd-stream-obuf-length stream))
                                  (sap (fd-stream-obuf-sap stream))
                                  (tail (fd-stream-obuf-tail stream)))
-                                ((or (= start end) (< (- len tail) 4)) tail)
-                             ,(if output-restart
-                                  `(catch 'output-nothing
+                             (declare (type index tail)
+                                      ;; STRING bounds have already been checked.
+                                      (optimize (safety 0)))
+                             (loop
+                                (,@(if output-restart
+                                       `(catch 'output-nothing)
+                                       `(progn))
+                                   (do* ()
+                                        ((or (= start end) (< (- len tail) 4)))
                                      (let* ((byte (aref string start))
                                             (bits (char-code byte)))
                                        ,out-expr
-                                       (incf tail ,size)))
-                                  `(let* ((byte (aref string start))
-                                          (bits (char-code byte)))
-                                     ,out-expr
-                                     (incf tail ,size)))
-                             (incf start))))
+                                       (incf tail ,size)
+                                       (incf start)))
+                                   ;; Exited from the loop normally
+                                   (return-from do-it tail))
+                                ;; Exited via CATCH. Skip the current character
+                                ;; and try the inner loop again.
+                                (incf start)))))
                     (declare (inline do-it))
                     ;; Specialized versions for the common cases of
                     ;; SIMPLE-BASE-STRING and (SIMPLE-ARRAY CHARACTER)
@@ -1119,29 +1126,35 @@
                      (> (fd-stream-ibuf-tail stream)
                         (fd-stream-ibuf-head stream)))
             (file-position stream (file-position stream)))
-          (when (< end start)
-            (error ":END before :START!"))
+          (unless (<= 0 start end (length string))
+            (signal-bounding-indices-bad-error string start end))
           (do ()
               ((= end start))
             (setf (fd-stream-obuf-tail stream)
                   (flet ((do-it (string)
-                           (do* ((len (fd-stream-obuf-length stream))
+                           (let ((len (fd-stream-obuf-length stream))
                                  (sap (fd-stream-obuf-sap stream))
                                  (tail (fd-stream-obuf-tail stream)))
-                                ((or (= start end) (< (- len tail) 4)) tail)
-                             ,(if output-restart
-                                  `(catch 'output-nothing
+                             (declare (type index tail)
+                                      ;; STRING bounds have already been checked.
+                                      (optimize (safety 0)))
+                             (loop
+                                (,@(if output-restart
+                                       `(catch 'output-nothing)
+                                       `(progn))
+                                   (do* ()
+                                        ((or (= start end) (< (- len tail) 4)))
                                      (let* ((byte (aref string start))
                                             (bits (char-code byte))
                                             (size ,out-size-expr))
                                        ,out-expr
-                                       (incf tail size)))
-                                  `(let* ((byte (aref string start))
-                                          (bits (char-code byte))
-                                          (size ,out-size-expr))
-                                     ,out-expr
-                                     (incf tail size)))
-                             (incf start))))
+                                       (incf tail size)
+                                       (incf start)))
+                                   ;; Exited from the loop normally
+                                   (return-from do-it tail))
+                                ;; Exited via CATCH. Skip the current character
+                                ;; and try the inner loop again.
+                                (incf start)))))
                     (declare (inline do-it))
                     ;; Specialized versions for the common cases of
                     ;; SIMPLE-BASE-STRING and (SIMPLE-ARRAY CHARACTER)
