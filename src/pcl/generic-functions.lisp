@@ -166,8 +166,6 @@
 
 (defgeneric (setf class-incompatible-superclass-list) (new-value pcl-class))
 
-(defgeneric (setf class-name) (new-value class))
-
 (defgeneric (setf class-slots) (new-value slot-class))
 
 (defgeneric (setf generic-function-method-class) (new-value
@@ -181,8 +179,6 @@
 
 (defgeneric (setf generic-function-methods) (new-value
                                              standard-generic-function))
-
-(defgeneric (setf generic-function-name) (new-value standard-generic-function))
 
 (defgeneric (setf gf-dfun-state) (new-value standard-generic-function))
 

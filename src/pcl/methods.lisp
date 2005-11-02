@@ -1543,9 +1543,13 @@
              (set-dfun gf dfun cache info) ; lest the cache be freed twice
              (update-dfun gf dfun cache info))))))
 
-(defmethod (setf class-name) :before (new-value (class class))
-  (let ((classoid (find-classoid (class-name class))))
-    (setf (classoid-name classoid) new-value)))
+(defun (setf class-name) (new-value class)
+  (let ((classoid (%wrapper-classoid (class-wrapper class))))
+    (setf (classoid-name classoid) new-value))
+  (reinitialize-instance class :name new-value))
+
+(defun (setf generic-function-name) (new-value generic-function)
+  (reinitialize-instance generic-function :name new-value))
 
 (defmethod function-keywords ((method standard-method))
   (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p keywords)

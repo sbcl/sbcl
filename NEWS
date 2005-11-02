@@ -1,5 +1,11 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.7 relative to sbcl-0.9.6:
+  * minor incompatible change: (SETF CLASS-NAME) and (SETF
+    GENERIC-FUNCTION-NAME) are no longer generic functions, and
+    therefore are not customizeable by user code (as seems to be at
+    least permitted and maybe required by AMOP).  As a consolation,
+    however, the SBCL implementation of these functions now calls
+    REINITIALIZE-INSTANCE as specified by AMOP.
   * bug fix: it is now possible to have more than one subclass of
     STANDARD-GENERIC-FUNCTION without causing stack overflow.
     (reported by Bruno Haible, Pascal Costanza and others)

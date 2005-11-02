@@ -342,7 +342,7 @@
   ((name
     :initform nil
     :initarg :name
-    :accessor generic-function-name)
+    :reader generic-function-name)
    (methods
     :initform ()
     :accessor generic-function-methods
@@ -580,8 +580,8 @@
                  specializer)
   ((name
     :initform nil
-    :initarg  :name
-    :accessor class-name)
+    :initarg :name
+    :reader class-name)
    (class-eq-specializer
     :initform nil
     :reader class-eq-specializer)
