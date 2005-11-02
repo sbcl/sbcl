@@ -12,10 +12,7 @@
 ;;;; more information.
 
 ;;; This file contains tests for COMPUTE-DISCRIMINATING-FUNCTION on
-;;; subclasses of generic functions.  However, at present it is
-;;; impossible to have more than one of these in the same image,
-;;; because of a vicious metacircle.  Once the vicious metacircle is
-;;; dealt with, uncomment the test cases.
+;;; subclasses of generic functions.
 
 (defpackage "MOP-4"
   (:use "CL" "SB-MOP"))
@@ -38,19 +35,30 @@
 
 (assert (= (foo 5) 11))
 
-#|
-
 ;;; from PCL sources
 
-(defmethod compute-discriminating-function ((gf my-generic-function))
+(defclass my-generic-function-pcl1 (standard-generic-function) ()
+  (:metaclass funcallable-standard-class))
+
+(defmethod compute-discriminating-function ((gf my-generic-function-pcl1))
   (let ((std (call-next-method)))
     (lambda (arg)
       (print (list 'call-to-gf gf arg))
       (funcall std arg))))
 
-and
+(defgeneric pcl1 (x)
+  (:generic-function-class my-generic-function-pcl1))
 
-(defmethod compute-discriminating-function ((gf my-generic-function))
+(defmethod pcl1 ((x integer)) (1+ x))
+
+(let ((output (with-output-to-string (*standard-output*)
+                (pcl1 3))))
+  (assert (search "(CALL-TO-GF #<MY-GENERIC-FUNCTION-PCL1 PCL1 (1)> 3)" output)))
+
+#|
+(defclass my-generic-function-pcl2 (standard-generic-function) ()
+  (:metaclass funcallable-standard-class))
+(defmethod compute-discriminating-function ((gf my-generic-function-pcl2))
   (lambda (arg)
    (cond (<some condition>
           <store some info in the generic function>
@@ -60,23 +68,19 @@ and
           (funcall gf arg))
          (t
           <call-a-method-of-gf>))))
-
 |#
-
-#|
 
 ;;; from clisp's test suite
 
 (progn
   (defclass traced-generic-function (standard-generic-function)
     ()
-    (:metaclass clos:funcallable-standard-class))
+    (:metaclass funcallable-standard-class))
   (defvar *last-traced-arguments* nil)
   (defvar *last-traced-values* nil)
-  (defmethod clos:compute-discriminating-function ((gf traced-generic-function))    (let ((orig-df (call-next-method))
-          (name (clos:generic-function-name gf)))
+  (defmethod compute-discriminating-function ((gf traced-generic-function))    (let ((orig-df (call-next-method))
+          (name (generic-function-name gf)))
       #'(lambda (&rest arguments)
-          (declare (compile))
           (format *trace-output* "~%=> ~S arguments: ~:S" name arguments)
           (setq *last-traced-arguments* arguments)
           (let ((values (multiple-value-list (apply orig-df arguments))))
@@ -86,9 +90,8 @@ and
   (defgeneric testgf15 (x) (:generic-function-class traced-generic-function)
      (:method ((x number)) (values x (- x) (* x x) (/ x))))
   (testgf15 5)
-  (list *last-traced-arguments* *last-traced-values*))
+  (assert (equal (list *last-traced-arguments* *last-traced-values*)
+                 '((5) (5 -5 25 1/5)))))
 
 ;;; also we might be in a position to run the "application example"
 ;;; from mop.tst in clisp's test suite
-
-|#

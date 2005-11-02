@@ -2023,12 +2023,26 @@ bootstrapping.
     (when lambda-list-p
       (proclaim (defgeneric-declaration fun-name lambda-list)))))
 
+;;; FIXME: this function took on a slightly greater role than it
+;;; previously had around 2005-11-02, when CSR fixed the bug whereby
+;;; having more than one subclass of standard-generic-function caused
+;;; the whole system to die horribly through a metacircle in
+;;; GF-ARG-INFO.  The fix is to be slightly more disciplined about
+;;; calling accessor methods -- we call GET-GENERIC-FUN-INFO when
+;;; computing discriminating functions, so we need to be careful about
+;;; having a base case for the recursion, and we provide that with the
+;;; STANDARD-GENERIC-FUNCTION case below.  However, we are not (yet)
+;;; as disciplined as CLISP's CLOS/MOP, and it would be nice to get to
+;;; that stage, where all potentially dangerous cases are enumerated
+;;; and stopped.  -- CSR, 2005-11-02.
 (defun get-generic-fun-info (gf)
   ;; values   nreq applyp metatypes nkeys arg-info
   (multiple-value-bind (applyp metatypes arg-info)
       (let* ((arg-info (if (early-gf-p gf)
                            (early-gf-arg-info gf)
-                           (gf-arg-info gf)))
+                           (if (eq (class-of gf) *the-class-standard-generic-function*)
+                               (clos-slots-ref (fsc-instance-slots gf) *sgf-arg-info-index*)
+                               (gf-arg-info gf))))
              (metatypes (arg-info-metatypes arg-info)))
         (values (arg-info-applyp arg-info)
                 metatypes

@@ -470,7 +470,9 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (defun make-final-checking-dfun (generic-function function
                                                   classes-list new-class)
-  (let ((metatypes (arg-info-metatypes (gf-arg-info generic-function))))
+  (multiple-value-bind (nreq applyp metatypes nkeys)
+      (get-generic-fun-info generic-function)
+    (declare (ignore nreq applyp nkeys))
     (if (every (lambda (mt) (eq mt t)) metatypes)
         (values (lambda (&rest args)
                   (invoke-emf function args))
@@ -669,8 +671,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 (defparameter *secondary-dfun-call-cost* 1)
 
 (defun caching-dfun-cost (gf)
-  (let* ((arg-info (gf-arg-info gf))
-         (nreq (length (arg-info-metatypes arg-info))))
+  (let ((nreq (get-generic-fun-info gf)))
     (+ *cache-lookup-cost*
        (* *wrapper-of-cost* nreq)
        (if (methods-contain-eql-specializer-p
@@ -963,22 +964,29 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
           (t
            (make-final-caching-dfun gf classes-list new-class)))))
 
-(defun accessor-miss (gf new object dfun-info)
-  (let* ((ostate (type-of dfun-info))
-         (otype (dfun-info-accessor-type dfun-info))
-         oindex ow0 ow1 cache
-         (args (ecase otype
-                 ;; The congruence rules ensure that this is safe
-                 ;; despite not knowing the new type yet.
-                 ((reader boundp) (list object))
-                 (writer (list new object)))))
-    (dfun-miss (gf args wrappers invalidp nemf ntype nindex)
+(defvar *accessor-miss-history* nil)
 
-      ;; The following lexical functions change the state of the
-      ;; dfun to that which is their name. They accept arguments
-      ;; which are the parameters of the new state, and get other
-      ;; information from the lexical variables bound above.
-      (flet ((two-class (index w0 w1)
+(defun accessor-miss (gf new object dfun-info)
+  (let ((wrapper (wrapper-of object))
+	(previous-miss (assq gf *accessor-miss-history*)))
+    (when (eq wrapper (cdr previous-miss))
+      (error "~@<Vicious metacircle:  The computation of a ~
+              dfun of ~s for argument ~s uses the dfun being ~
+              computed.~@:>"
+	     gf object))
+    (let* ((*accessor-miss-history* (acons gf wrapper *accessor-miss-history*))
+	   (ostate (type-of dfun-info))
+	   (otype (dfun-info-accessor-type dfun-info))
+	   oindex ow0 ow1 cache
+	   (args (ecase otype
+		   ((reader boundp) (list object))
+		   (writer (list new object)))))
+      (dfun-miss (gf args wrappers invalidp nemf ntype nindex)
+	;; The following lexical functions change the state of the
+	;; dfun to that which is their name.  They accept arguments
+	;; which are the parameters of the new state, and get other
+	;; information from the lexical variables bound above.
+	(flet ((two-class (index w0 w1)
                (when (zerop (random 2)) (psetf w0 w1 w1 w0))
                (dfun-update gf
                             #'make-two-class-accessor-dfun
@@ -1040,7 +1048,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                   (setq cache (dfun-info-cache dfun-info))
                   (if (consp nindex)
                       (caching)
-                      (do-fill #'n-n))))))))))
+                      (do-fill #'n-n)))))))))))
 
 (defun checking-miss (generic-function args dfun-info)
   (let ((oemf (dfun-info-function dfun-info))
@@ -1361,7 +1369,11 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (let ((definite-p t) (possibly-applicable-methods nil))
     (dolist (method (if (early-gf-p generic-function)
                         (early-gf-methods generic-function)
-                        (generic-function-methods generic-function)))
+                        (if (eq (class-of generic-function)
+                                *the-class-standard-generic-function*)
+                            ;; KLUDGE: see comment by GET-GENERIC-FUN-INFO
+                            (clos-slots-ref (fsc-instance-slots generic-function) *sgf-methods-index*)
+                            (generic-function-methods generic-function))))
       (let ((specls (if (consp method)
                         (early-method-specializers method t)
                         (method-specializers method)))
@@ -1378,15 +1390,14 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
         (when possibly-applicable-p
           (unless applicable-p (setq definite-p nil))
           (push method possibly-applicable-methods))))
-    (let ((precedence (arg-info-precedence (if (early-gf-p generic-function)
-                                               (early-gf-arg-info
-                                                generic-function)
-                                               (gf-arg-info
-                                                generic-function)))))
-      (values (sort-applicable-methods precedence
-                                       (nreverse possibly-applicable-methods)
-                                       types)
-              definite-p))))
+    (multiple-value-bind (nreq applyp metatypes nkeys arg-info)
+        (get-generic-fun-info generic-function)
+      (declare (ignore nreq applyp metatypes nkeys))
+      (let* ((precedence (arg-info-precedence arg-info)))
+        (values (sort-applicable-methods precedence
+                                         (nreverse possibly-applicable-methods)
+                                         types)
+                definite-p)))))
 
 (defun sort-applicable-methods (precedence methods types)
   (sort-methods methods
@@ -1732,17 +1743,17 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
            (return t)))))
 
 (defun update-dfun (generic-function &optional dfun cache info)
-  (let* ((early-p (early-gf-p generic-function))
-         (gf-name (if early-p
-                      (!early-gf-name generic-function)
-                      (generic-function-name generic-function))))
+  (let* ((early-p (early-gf-p generic-function)))
     (set-dfun generic-function dfun cache info)
     (let ((dfun (if early-p
                     (or dfun (make-initial-dfun generic-function))
                     (compute-discriminating-function generic-function))))
       (set-funcallable-instance-function generic-function dfun)
-      (set-fun-name generic-function gf-name)
-      dfun)))
+      (let ((gf-name (if early-p
+                         (!early-gf-name generic-function)
+                         (generic-function-name generic-function))))
+        (set-fun-name generic-function gf-name)
+        dfun))))
 
 (defvar *dfun-count* nil)
 (defvar *dfun-list* nil)

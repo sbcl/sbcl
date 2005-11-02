@@ -12,10 +12,7 @@
 ;;;; more information.
 
 ;;; This file contains two tests for COMPUTE-APPLICABLE-METHODS on
-;;; subclasses of generic functions.  However, at present it is
-;;; impossible to have both of these in the same image, because of a
-;;; vicious metacircle.  Once the vicious metacircle is dealt with,
-;;; uncomment the second test case.
+;;; subclasses of generic functions.
 
 ;;; tests from Bruno Haible (sbcl-devel 2004-08-02)
 
@@ -58,7 +55,6 @@
 (assert (equalp (list (testgf07 5.0) (testgf07 17))
                 '((number real) #(number real integer))))
 
-#|
 (defclass nonumber-generic-function (standard-generic-function)
   ()
   (:metaclass funcallable-standard-class))
@@ -89,4 +85,3 @@
 
 (assert (equalp (list (testgf08 5.0) (testgf08 17))
                 '((real) #(integer real))))
-|#
