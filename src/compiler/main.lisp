@@ -743,7 +743,7 @@
 ;;; Given a pathname, return a SOURCE-INFO structure.
 (defun make-file-source-info (file external-format)
   (let ((file-info (make-file-info :name (truename file)
-                                   :untruename file
+                                   :untruename (merge-pathnames file)
                                    :external-format external-format
                                    :write-date (file-write-date file))))
 

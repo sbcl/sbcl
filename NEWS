@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.7 relative to sbcl-0.9.6:
+  * bug fix: *COMPILE-FILE-PATHNAME* now contains the user's pathname
+    merged with *DEFAULT-PATHNAME-DEFAULTS*.
   * optimization: performance improvements to IO on file streams of
     :ELEMENT-TYPE CHARACTER
 
