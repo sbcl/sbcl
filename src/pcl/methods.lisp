@@ -459,7 +459,9 @@
       (when (and (arg-info-valid-p (gf-arg-info gf))
                  (not (null args))
                  (or lambda-list-p (cddr args)))
-        (update-dfun gf)))))
+        (update-dfun gf))
+      (map-dependents gf (lambda (dependent)
+                           (apply #'update-dependent gf dependent args))))))
 
 (declaim (special *lazy-dfun-compute-p*))
 
@@ -548,6 +550,10 @@
                         :generic-function generic-function
                         :method method)
           (update-dfun generic-function))
+        (map-dependents generic-function
+                        (lambda (dep)
+                          (update-dependent generic-function
+                                            dep 'add-method method)))
         generic-function)))
 
 (defun real-remove-method (generic-function method)
@@ -564,8 +570,12 @@
       (update-ctors 'remove-method
                     :generic-function generic-function
                     :method method)
-      (update-dfun generic-function)))
-  generic-function)
+      (update-dfun generic-function)
+      (map-dependents generic-function
+                      (lambda (dep)
+                        (update-dependent generic-function
+                                          dep 'remove-method method)))
+      generic-function)))
 
 (defun compute-applicable-methods-function (generic-function arguments)
   (values (compute-applicable-methods-using-types
