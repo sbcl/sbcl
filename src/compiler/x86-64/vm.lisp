@@ -71,7 +71,7 @@
   (defreg r15b 30 :byte)
   (defregset *byte-regs*
       al cl dl bl sil dil r8b r9b r10b
-      r11b #+nil r12b #+nil r13b r14b r15b)
+      #+nil r11b #+nil r12b r13b r14b r15b)
 
   ;; word registers
   (defreg ax 0 :word)
@@ -116,8 +116,13 @@
   ;; list of qword registers.  However
   ;; <jsnell> r13 is already used as temporary [#lisp irc 2005/01/30]
   ;; and we're now going to use r12 for the struct thread*
+  ;;
+  ;; Except that now we use r11 instead of r13 as the temporary,
+  ;; since it's got a more compact encoding than r13, and experimentally
+  ;; the temporary gets used more than the other registers that are never
+  ;; wired. -- JES, 2005-11-02
   (defregset *qword-regs* rax rcx rdx rbx rsi rdi
-             r8 r9 r10 r11      r14 r15)
+             r8 r9 r10 #+nil r11 #+nil r12 r13  r14 r15)
 
   ;; floating point registers
   (defreg float0 0 :float)
@@ -382,14 +387,19 @@
                       `(progn ,@(forms)))))
 
   (def-misc-reg-tns unsigned-reg rax rbx rcx rdx rbp rsp rdi rsi
-                    r8 r9 r10 r11  r12 r13 r14 r15)
+                    r8 r9 r10 r11 r12 r13 r14 r15)
   (def-misc-reg-tns dword-reg eax ebx ecx edx ebp esp edi esi)
   (def-misc-reg-tns word-reg ax bx cx dx bp sp di si)
   (def-misc-reg-tns byte-reg al cl dl bl sil dil r8b r9b r10b
-                    r11b r14b r15b)
+                    r11b r12b r13b r14b r15b)
   (def-misc-reg-tns single-reg
       float0 float1 float2 float3 float4 float5 float6 float7
       float8 float9 float10 float11 float12 float13 float14 float15))
+
+;; A register that's never used by the code generator, and can therefore
+;; be used as an assembly temporary in cases where a VOP :TEMPORARY can't
+;; be used.
+(defparameter temp-reg-tn r11-tn)
 
 ;;; TNs for registers used to pass arguments
 (defparameter *register-arg-tns*

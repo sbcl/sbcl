@@ -130,9 +130,9 @@
 (defun allocation-tramp (alloc-tn size &optional ignored)
   (declare (ignore ignored))
   (inst push size)
-  (inst lea r13-tn (make-ea :qword
+  (inst lea temp-reg-tn (make-ea :qword
                             :disp (make-fixup "alloc_tramp" :foreign)))
-  (inst call r13-tn)
+  (inst call temp-reg-tn)
   (inst pop alloc-tn)
   (values))
 
@@ -168,12 +168,14 @@
     (cond (in-elsewhere
            (allocation-tramp alloc-tn size))
           (t
+           (inst mov temp-reg-tn free-pointer)
            (unless (and (tn-p size) (location= alloc-tn size))
              (inst mov alloc-tn size))
-           (inst add alloc-tn free-pointer)
+           (inst add alloc-tn temp-reg-tn)
            (inst cmp end-addr alloc-tn)
            (inst jmp :be NOT-INLINE)
-           (inst xchg free-pointer alloc-tn)
+           (inst mov free-pointer alloc-tn)
+           (inst mov alloc-tn temp-reg-tn)
            (emit-label DONE)
            (assemble (*elsewhere*)
              (emit-label NOT-INLINE)
@@ -189,9 +191,9 @@
 (defun allocation (alloc-tn size &optional ignored)
   (declare (ignore ignored))
   (inst push size)
-  (inst lea r13-tn (make-ea :qword
+  (inst lea temp-reg-tn (make-ea :qword
                             :disp (make-fixup "alloc_tramp" :foreign)))
-  (inst call r13-tn)
+  (inst call temp-reg-tn)
   (inst pop alloc-tn)
   (values))
 
