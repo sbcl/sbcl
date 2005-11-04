@@ -101,6 +101,13 @@
   (let ((port-start (position #\: url :start 7)))
     (if port-start (parse-integer url :start (1+ port-start) :junk-allowed t) 80)))
 
+(defun request-uri (url)
+  (assert (string-equal url "http://" :end1 7))
+  (if *proxy*
+      url
+      (let ((path-start (position #\/ url :start 7)))
+        (subseq url path-start))))
+
 (defun url-connection (url)
   (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp))
         (host (url-host url))
@@ -115,8 +122,12 @@
           (let ((stream (socket-make-stream s :input t :output t :buffering :full :external-format :iso-8859-1)))
             ;; we are exceedingly unportable about proper line-endings here.
             ;; Anyone wishing to run this under non-SBCL should take especial care
-            (format stream "GET ~A HTTP/1.0~c~%Host: ~A~c~%Cookie: CCLAN-SITE=~A~c~%~c~%"
-                    url #\Return host #\Return *cclan-mirror* #\Return #\Return)
+            (format stream "GET ~A HTTP/1.0~c~%~
+                            Host: ~A~c~%~
+                            Cookie: CCLAN-SITE=~A~c~%~c~%"
+                    (request-uri url) #\Return
+                    host #\Return
+                    *cclan-mirror* #\Return #\Return)
             (force-output stream)
             (setf result
                   (list
