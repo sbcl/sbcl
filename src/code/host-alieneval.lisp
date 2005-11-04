@@ -656,7 +656,7 @@
         (unless (and max (> max val)) (setq max val))
         (unless (and min (< min val)) (setq min val))
         (when (rassoc val from-alist)
-          (warn "The element value ~S is used more than once." val))
+          (style-warn "The element value ~S is used more than once." val))
         (when (assoc sym from-alist :test #'eq)
           (error "The enumeration element ~S is used more than once." sym))
         (push (cons sym val) from-alist)))
