@@ -6,6 +6,9 @@ changes in sbcl-0.9.7 relative to sbcl-0.9.6:
     least permitted and maybe required by AMOP).  As a consolation,
     however, the SBCL implementation of these functions now calls
     REINITIALIZE-INSTANCE as specified by AMOP.
+  * bug fix: REINITIALIZE-INSTANCE on generic functions calls
+    COMPUTE-DISCRIMINATING-FUNCTION (almost) unconditionally, as
+    specified by AMOP.
   * bug fix: it is now possible to have more than one subclass of
     STANDARD-GENERIC-FUNCTION without causing stack overflow.
     (reported by Bruno Haible, Pascal Costanza and others)
