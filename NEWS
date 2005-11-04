@@ -19,6 +19,8 @@ changes in sbcl-0.9.7 relative to sbcl-0.9.6:
     merged with *DEFAULT-PATHNAME-DEFAULTS*.
   * enhancement: the x86-64 disassembler is much better at
     disassembling SSE instructions.  (thanks to Lutz Euler)
+  * optimization: improved performance of EUC-JP external format.
+    (thanks to NIIMI Satoshi)
   * optimization: performance improvements to IO on file streams of
     :ELEMENT-TYPE CHARACTER
   * optimization: much faster memory allocation on x86-64
