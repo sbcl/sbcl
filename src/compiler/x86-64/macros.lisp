@@ -169,9 +169,13 @@
            (allocation-tramp alloc-tn size))
           (t
            (inst mov temp-reg-tn free-pointer)
-           (unless (and (tn-p size) (location= alloc-tn size))
-             (inst mov alloc-tn size))
-           (inst add alloc-tn temp-reg-tn)
+           (if (tn-p size)
+               (if (location= alloc-tn size)
+                   (inst add alloc-tn temp-reg-tn)
+                   (inst lea alloc-tn
+                         (make-ea :qword :base temp-reg-tn :index size)))
+               (inst lea alloc-tn
+                     (make-ea :qword :base temp-reg-tn :disp size)))
            (inst cmp end-addr alloc-tn)
            (inst jmp :be NOT-INLINE)
            (inst mov free-pointer alloc-tn)
