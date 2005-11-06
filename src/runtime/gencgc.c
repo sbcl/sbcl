@@ -3503,26 +3503,39 @@ verify_dynamic_space(void)
 static void
 write_protect_generation_pages(generation_index_t generation)
 {
-    page_index_t i;
+    page_index_t start;
 
     gc_assert(generation < SCRATCH_GENERATION);
 
-    for (i = 0; i < last_free_page; i++)
-        if ((page_table[i].allocated == BOXED_PAGE_FLAG)
-            && (page_table[i].bytes_used != 0)
-            && !page_table[i].dont_move
-            && (page_table[i].gen == generation))  {
+    for (start = 0; start < last_free_page; start++) {
+        if ((page_table[start].allocated == BOXED_PAGE_FLAG)
+            && (page_table[start].bytes_used != 0)
+            && !page_table[start].dont_move
+            && (page_table[start].gen == generation))  {
             void *page_start;
-
-            page_start = (void *)page_address(i);
-
-            os_protect(page_start,
-                       PAGE_BYTES,
-                       OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
+            page_index_t last;
 
             /* Note the page as protected in the page tables. */
-            page_table[i].write_protected = 1;
+            page_table[start].write_protected = 1;
+
+            for (last = start + 1; last < last_free_page; last++) {
+                if ((page_table[last].allocated != BOXED_PAGE_FLAG)
+                    || (page_table[last].bytes_used == 0)
+                    || page_table[last].dont_move
+                    || (page_table[last].gen != generation))
+                  break;
+                page_table[last].write_protected = 1;
+            }
+
+            page_start = (void *)page_address(start);
+
+            os_protect(page_start,
+                       PAGE_BYTES * (last - start),
+                       OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
+
+            start = last;
         }
+    }
 
     if (gencgc_verbose > 1) {
         FSHOW((stderr,
