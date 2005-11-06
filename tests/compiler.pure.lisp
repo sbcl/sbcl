@@ -1723,15 +1723,16 @@
       (error "bad RANDOM event"))))
 
 ;;; 0.8.17.28-sma.1 lost derived type information.
-(handler-bind ((sb-ext:compiler-note #'error))
-  (compile nil
-    '(lambda (x y v)
-      (declare (optimize (speed 3) (safety 0)))
-      (declare (type (integer 0 80) x)
-       (type (integer 0 11) y)
-       (type (simple-array (unsigned-byte 32) (*)) v))
-      (setf (aref v 0) (* (* x #.(floor (ash 1 32) (* 11 80))) y))
-      nil)))
+(with-test (:name "0.8.17.28-sma.1" :fails-on :sparc)
+  (handler-bind ((sb-ext:compiler-note (lambda (c) (error "~A" c))))
+    (compile nil
+      '(lambda (x y v)
+        (declare (optimize (speed 3) (safety 0)))
+        (declare (type (integer 0 80) x)
+         (type (integer 0 11) y)
+         (type (simple-array (unsigned-byte 32) (*)) v))
+        (setf (aref v 0) (* (* x #.(floor (ash 1 32) (* 11 80))) y))
+        nil))))
 
 ;;; Bug reported by Robert J. Macomber: instrumenting of more-entry
 ;;; prevented open coding of %LISTIFY-REST-ARGS.
