@@ -1078,6 +1078,8 @@
          (allocation nil)
          (allocation-class nil)
          (type t)
+         (documentation nil)
+         (documentationp nil)
          (namep  nil)
          (initp  nil)
          (allocp nil))
@@ -1092,6 +1094,10 @@
             (setq initform (slot-definition-initform slotd)
                   initfunction (slot-definition-initfunction slotd)
                   initp t)))
+        (unless documentationp
+          (when (%slot-definition-documentation slotd)
+            (setq documentation (%slot-definition-documentation slotd)
+                  documentationp t)))
         (unless allocp
           (setq allocation (slot-definition-allocation slotd)
                 allocation-class (slot-definition-class slotd)
@@ -1108,7 +1114,8 @@
           :allocation allocation
           :allocation-class allocation-class
           :type type
-          :class class)))
+          :class class
+          :documentation documentation)))
 
 (defmethod compute-effective-slot-definition-initargs :around
     ((class structure-class) direct-slotds)

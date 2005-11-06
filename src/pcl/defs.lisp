@@ -467,7 +467,9 @@
     :accessor slot-definition-type)
    (documentation
     :initform nil
-    :initarg :documentation)
+    :initarg :documentation
+    ;; FIXME: should we export this, as an extension?
+    :accessor %slot-definition-documentation)
    (class
     :initform nil
     :initarg :class

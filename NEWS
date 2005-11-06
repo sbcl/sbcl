@@ -6,6 +6,11 @@ changes in sbcl-0.9.7 relative to sbcl-0.9.6:
     least permitted and maybe required by AMOP).  As a consolation,
     however, the SBCL implementation of these functions now calls
     REINITIALIZE-INSTANCE as specified by AMOP.
+  * bug fix: slot-definition documentation is propagated as per ANSI
+    7.6.2 to EFFECTIVE-SLOT-DEFINITIONS.
+    COMPUTE-EFFECTIVE-SLOT-DEFINITION now receives a :DOCUMENTATION
+    argument, as do eslotd initialization methods.  (from Pascal
+    Costanza's "Closer" project)
   * bug fix: REINITIALIZE-INSTANCE on generic functions calls
     COMPUTE-DISCRIMINATING-FUNCTION (almost) unconditionally, as
     specified by AMOP.
