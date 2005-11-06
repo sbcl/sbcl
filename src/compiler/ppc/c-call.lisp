@@ -459,8 +459,11 @@
                  ;; FIXME: magic constant, and probably n-args-bytes
                  (args-size (* 3 n-word-bytes))
                  ;; FIXME: n-frame-bytes?
-                 (frame-size
-                  (+ n-foreign-linkage-area-bytes n-return-area-bytes args-size)))
+                 (frame-size (logandc2 (+ n-foreign-linkage-area-bytes
+                                          n-return-area-bytes
+                                          args-size
+                                          +stack-alignment-bytes+)
+                                       +stack-alignment-bytes+)))
             (destructuring-bind (sp r0 arg1 arg2 arg3 arg4)
                 (mapcar #'make-gpr '(1 0 3 4 5 6))
               (flet ((load-address-into (reg addr)
