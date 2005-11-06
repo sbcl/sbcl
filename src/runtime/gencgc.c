@@ -2675,11 +2675,9 @@ update_page_write_prot(page_index_t page)
     return (wp_it);
 }
 
-/* Scavenge a generation.
- *
- * This will not resolve all pointers when generation is the new
- * space, as new objects may be added which are not checked here - use
- * scavenge_newspace generation.
+/* Scavenge all generations from FROM to TO, inclusive, except for
+ * new_space which needs special handling, as new objects may be
+ * added which are not checked here - use scavenge_newspace generation.
  *
  * Write-protected pages should not have any pointers to the
  * from_space so do need scavenging; thus write-protected pages are
@@ -2707,7 +2705,7 @@ update_page_write_prot(page_index_t page)
  * pointers as the objects contain a link to the next and are written
  * if a weak pointer is scavenged. Still it's a useful check. */
 static void
-scavenge_generation(generation_index_t generation)
+scavenge_generations(generation_index_t from, generation_index_t to)
 {
     page_index_t i;
     int num_wp = 0;
@@ -2720,9 +2718,12 @@ scavenge_generation(generation_index_t generation)
 #endif
 
     for (i = 0; i < last_free_page; i++) {
+        generation_index_t generation = page_table[i].gen;
         if ((page_table[i].allocated & BOXED_PAGE_FLAG)
             && (page_table[i].bytes_used != 0)
-            && (page_table[i].gen == generation)) {
+            && (generation != new_space)
+            && (generation >= from)
+            && (generation <= to)) {
             page_index_t last_page,j;
             int write_protected=1;
 
@@ -3704,11 +3705,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     /* All generations but the generation being GCed need to be
      * scavenged. The new_space generation needs special handling as
      * objects may be moved in - it is handled separately below. */
-    for (i = 0; i <= PSEUDO_STATIC_GENERATION; i++) {
-        if ((i != generation) && (i != new_space)) {
-            scavenge_generation(i);
-        }
-    }
+    scavenge_generations(generation+1, PSEUDO_STATIC_GENERATION);
 
     /* Finally scavenge the new_space generation. Keep going until no
      * more objects are moved into the new generation */
