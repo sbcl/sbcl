@@ -1415,8 +1415,8 @@
 
 
 ;;; For add and sub with carry the sc of carry argument is any-reg so
-;;; the it may be passed as a fixnum or word and thus may be 0, 1, or
-;;; 4. This is easy to deal with and may save a fixnum-word
+;;; that it may be passed as a fixnum or word and thus may be 0, 1, or
+;;; 8. This is easy to deal with and may save a fixnum-word
 ;;; conversion.
 (define-vop (add-w/carry)
   (:translate sb!bignum:%add-with-carry)
@@ -1437,8 +1437,8 @@
     (inst mov carry 0)
     (inst adc carry carry)))
 
-;;; Note: the borrow is the oppostite of the x86 convention - 1 for no
-;;; borrow and 0 for a borrow.
+;;; Note: the borrow is 1 for no borrow and 0 for a borrow, the opposite
+;;; of the x86-64 convention.
 (define-vop (sub-w/borrow)
   (:translate sb!bignum:%subtract-with-borrow)
   (:policy :fast-safe)
@@ -1453,9 +1453,8 @@
     (inst cmp c 1) ; Set the carry flag to 1 if c=0 else to 0
     (move result a)
     (inst sbb result b)
-    (inst mov borrow 0)
-    (inst adc borrow borrow)
-    (inst xor borrow 1)))
+    (inst mov borrow 1)
+    (inst sbb borrow 0)))
 
 
 (define-vop (bignum-mult-and-add-3-arg)
