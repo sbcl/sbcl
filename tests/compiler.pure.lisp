@@ -1888,3 +1888,20 @@
 ;;; sbcl-devel)
 (compile nil '(lambda (x y a b c)
                (- y (* (signum x) (sqrt (abs (- (* b x) c)))))))
+
+;;; Type inference from CHECK-TYPE
+(let ((count0 0) (count1 0))
+  (handler-bind ((sb-ext:compiler-note (lambda (c) (incf count0))))
+    (compile nil '(lambda (x)
+                   (declare (optimize (speed 3)))
+                   (1+ x))))
+  ;; forced-to-do GENERIC-+, etc
+  (assert (= count0 4))
+  (handler-bind ((sb-ext:compiler-note (lambda (c) (incf count1))))
+    (compile nil '(lambda (x)
+                   (declare (optimize (speed 3)))
+                   (check-type x fixnum)
+                   (1+ x))))
+  (assert (= count1 0)))
+
+

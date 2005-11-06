@@ -56,17 +56,27 @@
 ;;;
 ;;; CHECK-TYPE-ERROR isn't defined until a later file because it uses
 ;;; the macro RESTART-CASE, which isn't defined until a later file.
-(defmacro-mundanely check-type (place type &optional type-string)
+(defmacro-mundanely check-type (place type &optional type-string
+                                &environment env)
   #!+sb-doc
-  "Signal a restartable error of type TYPE-ERROR if the value of PLACE is
-  not of the specified type. If an error is signalled and the restart is
-  used to return, this can only return if the STORE-VALUE restart is
-  invoked. In that case it will store into PLACE and start over."
-  (let ((place-value (gensym)))
-    `(do ((,place-value ,place ,place))
-         ((typep ,place-value ',type))
-       (setf ,place
-             (check-type-error ',place ,place-value ',type ,type-string)))))
+  "Signal a restartable error of type TYPE-ERROR if the value of PLACE
+is not of the specified type. If an error is signalled and the restart
+is used to return, this can only return if the STORE-VALUE restart is
+invoked. In that case it will store into PLACE and start over."
+  ;; KLUDGE: We use a simpler form of expansion if PLACE is just a
+  ;; variable to work around Python's blind spot in type derivation.
+  ;; For more complex places getting the type derived should not
+  ;; matter so much anyhow.
+  (let ((expanded (sb!xc:macroexpand place env)))
+    (if (symbolp expanded)
+        `(do ()
+             ((typep ,place ',type))
+          (setf ,place (check-type-error ',place ,place ',type ,type-string)))
+        (let ((value (gensym)))
+          `(do ((,value ,place))
+               ((typep ,value ',type))
+            (setf ,place
+                  (check-type-error ',place ,value ',type ,type-string)))))))
 
 ;;;; DEFINE-SYMBOL-MACRO
 
