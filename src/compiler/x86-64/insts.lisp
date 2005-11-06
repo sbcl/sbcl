@@ -2116,7 +2116,7 @@
    (maybe-emit-operand-size-prefix segment :dword)
    (emit-byte segment #b10011000)))
 
-;;; CDQE -- Convert Word To Double Word Extended. RAX <- sign_xtnd(EAX)
+;;; CDQE -- Convert Double Word To Quad Word Extended. RAX <- sign_xtnd(EAX)
 (define-instruction cdqe (segment)
   (:printer rex-byte ((op #b10011000)))
   (:emitter

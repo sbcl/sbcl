@@ -244,6 +244,8 @@
  ;; machine architecture features:
  ;;   :x86
  ;;      any Intel 386 or better, or compatibles like the AMD K6 or K7
+ ;;   :x86-64
+ ;;      any x86-64 CPU running in 64-bit mode
  ;;   :alpha
  ;;      DEC/Compaq Alpha CPU
  ;;   :sparc
@@ -285,12 +287,13 @@
  ;;   :freebsd = We're intended to run under FreeBSD.
  ;;   :openbsd = We're intended to run under OpenBSD.
  ;;   :netbsd  = We're intended to run under NetBSD.
+ ;;   :darwin  = We're intended to run under Darwin (including MacOS X).
  ;;   :sunos   = We're intended to run under Solaris user environment
  ;;              with the SunOS kernel.
  ;;   :osf1    = We're intended to run under Tru64 (aka Digital Unix
  ;;              aka OSF/1).
- ;; (No others are supported by SBCL as of 0.7.5, but :hpux or :irix
+ ;; (No others are supported by SBCL as of 0.9.6, but :hpux or :irix
  ;; support could be ported from CMU CL if anyone is sufficiently
  ;; motivated to do so, and it'd even be possible, though harder, to
- ;; port the system to Microsoft Windows or MacOS X.)
+ ;; port the system to Microsoft Windows.)
  )

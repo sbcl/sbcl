@@ -1087,7 +1087,7 @@
 ;;; This holds the current segment while assembling. Use ASSEMBLE to
 ;;; change it.
 ;;;
-;;; The double parens in the name are intended to suggest that this
+;;; The double asterisks in the name are intended to suggest that this
 ;;; isn't just any old special variable, it's an extra-special
 ;;; variable, because sometimes MACROLET is used to bind it. So be
 ;;; careful out there..

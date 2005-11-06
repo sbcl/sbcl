@@ -1190,10 +1190,9 @@
       (setf (dstate-output-state dstate)
             :block-boundary))))
 
-;;; Add hooks to track to track the source code in SEGMENT during
-;;; disassembly. SFCACHE can be either NIL or it can be a
-;;; SOURCE-FORM-CACHE structure, in which case it is used to cache
-;;; forms from files.
+;;; Add hooks to track the source code in SEGMENT during disassembly.
+;;; SFCACHE can be either NIL or it can be a SOURCE-FORM-CACHE
+;;; structure, in which case it is used to cache forms from files.
 (defun add-source-tracking-hooks (segment debug-fun &optional sfcache)
   (declare (type segment segment)
            (type (or null sb!di:debug-fun) debug-fun)
