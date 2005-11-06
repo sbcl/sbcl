@@ -142,7 +142,8 @@
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (%defpackage ,(stringify-name package "package") ',nicknames ',size
                     ',shadows ',shadowing-imports ',(if use-p use :default)
-                    ',imports ',interns ',exports ',implement ',lock ',doc))))
+                    ',imports ',interns ',exports ',implement ',lock ',doc
+                    (sb!c:source-location)))))
 
 (defun check-disjoint (&rest args)
   ;; An arg is (:key . set)
@@ -172,7 +173,8 @@
           names))
 
 (defun %defpackage (name nicknames size shadows shadowing-imports
-                    use imports interns exports implement lock doc-string)
+                    use imports interns exports implement lock doc-string
+                    source-location)
   (declare (type simple-string name)
            (type list nicknames shadows shadowing-imports
                  imports interns exports)
@@ -188,6 +190,8 @@
                                      :use nil
                                      :internal-symbols (or size 10)
                                      :external-symbols (length exports))))))
+    (sb!c:with-source-location (source-location)
+      (setf (package-source-location package) source-location))
     (unless (string= (the string (package-name package)) name)
       (error 'simple-package-error
              :package name

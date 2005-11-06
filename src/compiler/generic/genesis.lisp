@@ -854,7 +854,7 @@ core and return a descriptor to it."
 ;;; FIXME: This information should probably be pulled out of the
 ;;; cross-compiler's tables at genesis time instead of inserted by
 ;;; hand here as a bare numeric constant.
-(defconstant target-layout-length 17)
+(defconstant target-layout-length 18)
 
 ;;; Return a list of names created from the cold layout INHERITS data
 ;;; in X.

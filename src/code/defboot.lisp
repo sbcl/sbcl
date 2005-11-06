@@ -19,6 +19,7 @@
 ;;;; files for more information.
 
 (in-package "SB!IMPL")
+
 
 ;;;; IN-PACKAGE
 
@@ -200,10 +201,12 @@
                    #-sb-xc-host ,named-lambda
                    #+sb-xc-host (fdefinition ',name)
                    ,doc
-                   ',inline-lambda))))))
+                   ',inline-lambda
+                   (sb!c:source-location)))))))
 
 #-sb-xc-host
-(defun %defun (name def doc inline-lambda)
+(defun %defun (name def doc inline-lambda source-location)
+  (declare (ignore source-location))
   (declare (type function def))
   (declare (type (or null simple-string) doc))
   (aver (legal-fun-name-p name)) ; should've been checked by DEFMACRO DEFUN
@@ -235,7 +238,9 @@
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))
      (eval-when (:load-toplevel :execute)
-       (%defvar ',var (unless (boundp ',var) ,val) ',valp ,doc ',docp))))
+       (%defvar ',var (unless (boundp ',var) ,val)
+                ',valp ,doc ',docp
+                (sb!c:source-location)))))
 
 (defmacro-mundanely defparameter (var val &optional (doc nil docp))
   #!+sb-doc
@@ -248,27 +253,31 @@
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))
      (eval-when (:load-toplevel :execute)
-       (%defparameter ',var ,val ,doc ',docp))))
+       (%defparameter ',var ,val ,doc ',docp (sb!c:source-location)))))
 
 (defun %compiler-defvar (var)
   (sb!xc:proclaim `(special ,var)))
 
 #-sb-xc-host
-(defun %defvar (var val valp doc docp)
+(defun %defvar (var val valp doc docp source-location)
   (%compiler-defvar var)
   (when valp
     (unless (boundp var)
       (set var val)))
   (when docp
     (setf (fdocumentation var 'variable) doc))
+  (sb!c:with-source-location (source-location)
+    (setf (info :source-location :variable var) source-location))
   var)
 
 #-sb-xc-host
-(defun %defparameter (var val doc docp)
+(defun %defparameter (var val doc docp source-location)
   (%compiler-defvar var)
   (set var val)
   (when docp
     (setf (fdocumentation var 'variable) doc))
+  (sb!c:with-source-location (source-location)
+    (setf (info :source-location :variable var) source-location))
   var)
 
 ;;;; iteration constructs

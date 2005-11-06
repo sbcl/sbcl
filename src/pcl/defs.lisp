@@ -676,8 +676,10 @@
     :initarg :from-defclass-p)))
 
 (defclass definition-source-mixin (standard-object)
-  ((source :initform *load-pathname* :reader definition-source
-           :initarg :definition-source)))
+  ((source
+    :initform nil
+    :reader definition-source
+    :initarg :definition-source)))
 
 (defclass plist-mixin (standard-object)
   ((plist :initform () :accessor object-plist)))

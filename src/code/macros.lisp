@@ -72,15 +72,17 @@
 
 (defmacro-mundanely define-symbol-macro (name expansion)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-    (sb!c::%define-symbol-macro ',name ',expansion)))
+    (sb!c::%define-symbol-macro ',name ',expansion (sb!c:source-location))))
 
-(defun sb!c::%define-symbol-macro (name expansion)
+(defun sb!c::%define-symbol-macro (name expansion source-location)
   (unless (symbolp name)
     (error 'simple-type-error :datum name :expected-type 'symbol
            :format-control "Symbol macro name is not a symbol: ~S."
            :format-arguments (list name)))
   (with-single-package-locked-error
       (:symbol name "defining ~A as a symbol-macro"))
+  (sb!c:with-source-location (source-location)
+    (setf (info :source-location :symbol-macro name) source-location))
   (ecase (info :variable :kind name)
     ((:macro :global nil)
      (setf (info :variable :kind name) :macro)

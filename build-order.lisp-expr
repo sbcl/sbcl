@@ -39,6 +39,10 @@
  ;; This comes early because it's useful for debugging everywhere.
  ("src/code/show")
 
+ ;; This comes as early as possible, so that we catch the source locations
+ ;; for everything.
+ ("src/code/early-source-location")
+
  ;; This comes early because the cross-compilation host's backquote
  ;; logic can expand into something which can't be executed on the
  ;; target Lisp (e.g. in CMU CL where it expands into internal
@@ -474,6 +478,7 @@
  ("src/compiler/dump")
 
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
+ ("src/code/source-location")
  ("src/compiler/target-main" :not-host)
  ("src/compiler/ir1tran")
  ("src/compiler/ir1tran-lambda")

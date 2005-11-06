@@ -74,11 +74,11 @@
          (operator
            (getf (cddr whole) :operator type)))
     `(load-short-defcombin
-     ',type ',operator ',identity-with-one-arg ',documentation)))
+     ',type ',operator ',identity-with-one-arg ',documentation
+      (sb-c:source-location))))
 
-(defun load-short-defcombin (type operator ioa doc)
-  (let* ((pathname *load-pathname*)
-         (specializers
+(defun load-short-defcombin (type operator ioa doc source-location)
+  (let* ((specializers
            (list (find-class 'generic-function)
                  (intern-eql-specializer type)
                  *the-class-t*))
@@ -98,7 +98,7 @@
                            (short-combine-methods
                             type options operator ioa new-method doc))
                          args))
-            :definition-source `((define-method-combination ,type) ,pathname)))
+            :definition-source source-location))
     (when old-method
       (remove-method #'find-method-combination old-method))
     (add-method #'find-method-combination new-method)
@@ -226,11 +226,11 @@
           type lambda-list method-group-specifiers args-option gf-var
           body)
       `(load-long-defcombin ',type ',documentation #',function
-                            ',args-option))))
+                            ',args-option (sb-c:source-location)))))
 
 (defvar *long-method-combination-functions* (make-hash-table :test 'eq))
 
-(defun load-long-defcombin (type doc function args-lambda-list)
+(defun load-long-defcombin (type doc function args-lambda-list source-location)
   (let* ((specializers
            (list (find-class 'generic-function)
                  (intern-eql-specializer type)
@@ -253,8 +253,7 @@
                                            :args-lambda-list args-lambda-list
                                            :documentation doc))
                           args))
-             :definition-source `((define-method-combination ,type)
-                                  ,*load-pathname*))))
+             :definition-source source-location)))
     (setf (gethash type *long-method-combination-functions*) function)
     (when old-method (remove-method #'find-method-combination old-method))
     (add-method #'find-method-combination new-method)

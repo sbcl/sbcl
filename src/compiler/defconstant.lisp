@@ -16,10 +16,11 @@
   EQL to the new value, the code is not portable (undefined behavior). The
   third argument is an optional documentation string for the variable."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (sb!c::%defconstant ',name ,value ',documentation)))
+     (sb!c::%defconstant ',name ,value ',documentation
+      (sb!c:source-location))))
 
 ;;; the guts of DEFCONSTANT
-(defun sb!c::%defconstant (name value doc)
+(defun sb!c::%defconstant (name value doc source-location)
   (unless (symbolp name)
     (error "The constant name is not a symbol: ~S" name))
   (about-to-modify-symbol-value name)
@@ -27,6 +28,8 @@
     (style-warn "defining ~S as a constant, even though the name follows~@
 the usual naming convention (names like *FOO*) for special variables"
                 name))
+  (sb!c:with-source-location (source-location)
+    (setf (info :source-location :constant name) source-location))
   (let ((kind (info :variable :kind name)))
     (case kind
       (:constant

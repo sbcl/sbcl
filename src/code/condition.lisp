@@ -392,10 +392,14 @@
           (condition-writer-function condition new-value slot-name))))
 
 (defun %define-condition (name parent-types layout slots documentation
-                          report default-initargs all-readers all-writers)
+                          report default-initargs all-readers all-writers
+                          source-location)
   (with-single-package-locked-error
       (:symbol name "defining ~A as a condition")
     (%compiler-define-condition name parent-types layout all-readers all-writers)
+    (sb!c:with-source-location (source-location)
+      (setf (layout-source-location layout)
+            source-location))
     (let ((class (find-classoid name)))
       (setf (condition-classoid-slots class) slots)
       (setf (condition-classoid-report class) report)
@@ -564,7 +568,8 @@
                               ,report
                               (list ,@default-initargs)
                               ',(all-readers)
-                              ',(all-writers)))))))
+                              ',(all-writers)
+                              (sb!c:source-location)))))))
 
 ;;;; DESCRIBE on CONDITIONs
 

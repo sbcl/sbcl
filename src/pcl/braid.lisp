@@ -150,7 +150,7 @@
     (dolist (definition *early-class-definitions*)
       (let ((name (ecd-class-name definition))
             (meta (ecd-metaclass definition))
-            (source (ecd-source definition))
+            (source (ecd-source-location definition))
             (direct-supers (ecd-superclass-names definition))
             (direct-slots  (ecd-canonical-slots definition))
             (other-initargs (ecd-other-initargs definition)))
@@ -247,7 +247,7 @@
                                     smc
                                     name
                                     value)))
-        (set-slot 'source *load-pathname*)
+        (set-slot 'source nil)
         (set-slot 'type 'standard)
         (set-slot 'documentation "The standard method combination.")
         (set-slot 'options ()))

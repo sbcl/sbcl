@@ -199,7 +199,9 @@
   (pure nil :type (member t nil 0))
   ;; Number of raw words at the end.
   ;; This slot is known to the C runtime support code.
-  (n-untagged-slots 0 :type index))
+  (n-untagged-slots 0 :type index)
+  ;; Definition location
+  (source-location nil))
 
 (def!method print-object ((layout layout) stream)
   (print-unreadable-object (layout stream :type t :identity t)

@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 60)
+(def!constant +fasl-file-version+ 61)
 ;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
@@ -126,6 +126,8 @@
 ;;; 59: (2005-09-18) METAOBJECT implementation, removal of INSTANCE and
 ;;;     FUNCALLABLE-INSTANCE classes.
 ;;; 60: (2005-10-24) Bumped for 0.9.6
+;;; 61: (2005-11-06) Improved source location recording added extra parameters
+;;;     to multiple %DEFMUMBLE functions.
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

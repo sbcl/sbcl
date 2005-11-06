@@ -255,21 +255,8 @@
        (setf (debug-source-from res) name
              (debug-source-name res) (file-info-forms file-info)))
       (pathname
-       (let* ((untruename (file-info-untruename file-info))
-              (dir (pathname-directory untruename)))
-         (setf (debug-source-name res)
-               #+sb-xc-host
-               (let ((src (position "src" dir :test #'string= :from-end t)))
-                 (if src
-                     (format nil "SYS:~{~:@(~A~);~}~:@(~A~).LISP"
-                             (subseq dir src) (pathname-name untruename))
-                     ;; FIXME: just output/stuff-groveled-from-headers.lisp
-                     (namestring untruename)))
-               #-sb-xc-host
-               (namestring
-                (if (and dir (eq (first dir) :absolute))
-                    untruename
-                    name))))))
+       (setf (debug-source-name res)
+             (make-file-info-namestring name file-info))))
     res))
 
 ;;; Given an arbitrary sequence, coerce it to an unsigned vector if

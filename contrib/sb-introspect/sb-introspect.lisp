@@ -18,19 +18,16 @@
 ;;; TODO
 ;;; 1) structs don't have within-file location info.  problem for the
 ;;;   structure itself, accessors and the predicate
-;;; 2) what should find-definition-source on a symbol return?  there may be
-;;;   several definitions (class, function, etc)
 ;;; 3) error handling.  Signal random errors, or handle and resignal 'our'
 ;;;   error, or return NIL?
 ;;; 4) FIXMEs
-;;; 5) would be nice to have some interface to the compiler that lets us
-;;;   fake the filename and position, for use with C-M-x
 
 (defpackage :sb-introspect
   (:use "CL")
   (:export "FUNCTION-ARGLIST"
            "VALID-FUNCTION-NAME-P"
            "FIND-DEFINITION-SOURCE"
+           "FIND-DEFINITION-SOURCES-BY-NAME"
            "DEFINITION-SOURCE"
            "DEFINITION-SOURCE-PATHNAME"
            "DEFINITION-SOURCE-FORM-PATH"
@@ -104,29 +101,214 @@ include the pathname of the file and the position of the definition."
   ;; Null if not compiled from a file.
   (file-write-date nil :type (or null integer))
   ;; plist from WITH-COMPILATION-UNIT
-  (plist nil))
+  (plist nil)
+  ;; Any extra metadata that the caller might be interested in. For
+  ;; example the specializers of the method whose definition-source this
+  ;; is.
+  (description nil :type list))
+
+(defun find-definition-sources-by-name (name type)
+  "Returns a list of DEFINITION-SOURCEs for the objects of type TYPE
+defined with name NAME. NAME may be a symbol or a extended function
+name. Type can currently be one of the following:
+
+   (Public)
+   :CLASS
+   :COMPILER-MACRO
+   :CONDITION
+   :CONSTANT
+   :FUNCTION
+   :GENERIC-FUNCTION
+   :MACRO
+   :METHOD
+   :METHOD-COMBINATION
+   :PACKAGE
+   :SETF-EXPANDER
+   :STRUCTURE
+   :SYMBOL-MACRO
+   :TYPE
+   :VARIABLE
+
+   (Internal)
+   :OPTIMIZER
+   :SOURCE-TRANSFORM
+   :TRANSFORM
+   :VOP
+
+If an unsupported TYPE is requested, the function will return NIL.
+"
+  (flet ((listify (x)
+           (if (listp x)
+               x
+               (list x))))
+  (listify
+   (case type
+     ((:variable)
+      (when (eq (sb-int:info :variable :kind name) :special)
+        (translate-source-location (sb-int:info :source-location type name))))
+     ((:constant)
+      (when (eq (sb-int:info :variable :kind name) :constant)
+        (translate-source-location (sb-int:info :source-location type name))))
+     ((:symbol-macro)
+      (when (eq (sb-int:info :variable :kind name) :macro)
+        (translate-source-location (sb-int:info :source-location type name))))
+     ((:macro)
+      (when (and (symbolp name)
+                 (macro-function name))
+        (find-definition-source (macro-function name))))
+     ((:compiler-macro)
+      (when (compiler-macro-function name)
+        (find-definition-source (compiler-macro-function name))))
+     ((:function :generic-function)
+      (when (and (fboundp name)
+                 (or (not (symbolp name))
+                     (not (macro-function name))))
+        (let ((fun (fdefinition name)))
+          (when (eq (not (typep fun 'generic-function))
+                    (not (eq type :generic-function)))
+            (find-definition-source fun)))))
+     ((:type)
+      (let ((expander-fun (sb-int:info :type :expander name)))
+        (when expander-fun
+          (find-definition-source expander-fun))))
+     ((:method)
+      (when (and (fboundp name)
+                 (typep (fdefinition name) 'generic-function))
+        (loop for method in (sb-mop::generic-function-methods
+                             (fdefinition name))
+              for source = (find-definition-source method)
+              when source collect source)))
+     ((:setf-expander)
+      (when (and (consp name)
+                 (eq (car name) 'setf))
+        (setf name (cadr name)))
+      (let ((expander-fun (or (sb-int:info :setf :inverse name)
+                              (sb-int:info :setf :expander name))))
+        (when expander-fun
+          (sb-introspect:find-definition-source expander-fun))))
+     ((:structure)
+      (let ((class (ignore-errors (find-class name))))
+        (if class
+            (when (typep class 'sb-pcl::structure-class)
+              (find-definition-source class))
+            (when (sb-int:info :typed-structure :info name)
+              (translate-source-location
+               (sb-int:info :source-location :typed-structure name))))))
+     ((:condition :class)
+      (let ((class (ignore-errors (find-class name))))
+        (when class
+          (when (eq (not (typep class 'sb-pcl::condition-class))
+                    (not (eq type :condition)))
+            (find-definition-source class)))))
+     ((:method-combination)
+      (let ((combination-fun
+             (ignore-errors (find-method #'sb-mop:find-method-combination
+                                         nil
+                                         (list (find-class 'generic-function)
+                                               (list 'eql name)
+                                               t)))))
+        (when combination-fun
+          (find-definition-source combination-fun))))
+     ((:package)
+      (when (symbolp name)
+        (let ((package (find-package name)))
+          (when package
+            (find-definition-source package)))))
+     ;;; TRANSFORM and OPTIMIZER handling from swank-sbcl
+     ((:transform)
+      (let ((fun-info (sb-int:info :function :info name)))
+        (when fun-info
+          (loop for xform in (sb-c::fun-info-transforms fun-info)
+                for source = (find-definition-source
+                              (sb-c::transform-function xform))
+                for typespec = (sb-kernel:type-specifier
+                                (sb-c::transform-type xform))
+                for note = (sb-c::transform-note xform)
+                do (setf (definition-source-description source)
+                         (if (consp typespec)
+                             (list (second typespec) note)
+                             (list note)))
+                collect source))))
+     ((:optimizer)
+      (let ((fun-info (sb-int:info :function :info name)))
+        (when fun-info
+          (let ((otypes '((sb-c::fun-info-derive-type . sb-c:derive-type)
+                          (sb-c::fun-info-ltn-annotate . sb-c:ltn-annotate)
+                          (sb-c::fun-info-ltn-annotate . sb-c:ltn-annotate)
+                          (sb-c::fun-info-optimizer . sb-c:optimizer))))
+            (loop for (reader . name) in otypes
+                  for fn = (funcall reader fun-info)
+                  when fn collect
+                  (let ((source (find-definition-source fn)))
+                    (setf (definition-source-description source)
+                          (list name))
+                    source))))))
+     ((:vop)
+      (let ((fun-info (sb-int:info :function :info name)))
+        (when fun-info
+          (loop for vop in (sb-c::fun-info-templates fun-info)
+                for source = (find-definition-source
+                              (sb-c::vop-info-generator-function vop))
+                do (setf (definition-source-description source)
+                         (list (sb-c::template-name vop)
+                               (sb-c::template-note vop)))
+                collect source))))
+     ((:source-transform)
+      (let ((transform-fun (sb-int:info :function :source-transform name)))
+        (when transform-fun
+          (sb-introspect:find-definition-source transform-fun))))
+     (t
+      nil)))))
 
 (defun find-definition-source (object)
-  (etypecase object
+  (typecase object
+    ((or sb-pcl::condition-class sb-pcl::structure-class)
+     (let ((classoid (sb-impl::find-classoid (class-name object))))
+       (when classoid
+         (let ((layout (sb-impl::classoid-layout classoid)))
+           (when layout
+             (translate-source-location
+              (sb-kernel::layout-source-location layout)))))))
+    (method-combination
+     (car
+      (find-definition-sources-by-name (sb-pcl::method-combination-type object)
+                                       :method-combination)))
+    (package
+     (translate-source-location (sb-impl::package-source-location object)))
+    (class
+     (translate-source-location (sb-pcl::definition-source object)))
+    ;; Use the PCL definition location information instead of the function
+    ;; debug-info for methods and generic functions. Sometimes the
+    ;; debug-info would point into PCL internals instead of the proper
+    ;; location.
+    (generic-function
+     (let ((source (translate-source-location
+                    (sb-pcl::definition-source object))))
+       (when source
+         (setf (definition-source-description source)
+               (list (sb-mop:generic-function-lambda-list object))))
+       source))
     (method
-     (find-definition-source (or (sb-pcl::method-fast-function object)
-                                 (sb-pcl:method-function object))))
+     (let ((source (translate-source-location
+                    (sb-pcl::definition-source object))))
+       (when source
+         (setf (definition-source-description source)
+               (append (method-qualifiers object)
+                       (sb-pcl::unparse-specializers
+                        (sb-mop:method-specializers object)))))
+       source))
     (function
      (cond ((struct-accessor-p object)
-            (find-definition-source (struct-accessor-structure-class object)))
+            (find-definition-source
+             (struct-accessor-structure-class object)))
            ((struct-predicate-p object)
-            (find-definition-source (struct-predicate-structure-class object)))
-           (t (find-function-definition-source object))))
-    (structure-class
-     (let ((constructor
-            (sb-kernel::structure-classoid-constructor
-             (sb-kernel:classoid-cell-classoid
-              (sb-int:info :type :classoid (class-name object))))))
-       (find-definition-source constructor)))
+            (find-definition-source
+             (struct-predicate-structure-class object)))
+           (t
+            (find-function-definition-source object))))
     (t
-     (if (valid-function-name-p object)
-         (find-definition-source (or (macro-function object)
-                                     (fdefinition object)))))))
+     (error "Don't know how to retrive source location for a ~S~%"
+            (type-of object)))))
 
 (defun find-function-definition-source (function)
   (let* ((debug-info (function-debug-info function))
@@ -146,6 +328,20 @@ include the pathname of the file and the position of the definition."
      :form-path (if tlf (list tlf))
      :file-write-date (sb-c::debug-source-created debug-source)
      :plist (sb-c::debug-source-plist debug-source))))
+
+(defun translate-source-location (location)
+  (if location
+      (make-definition-source
+       :pathname (let ((n (sb-c:definition-source-location-namestring location)))
+                   (when n
+                     (parse-namestring n)))
+       :form-path
+       (let ((number (sb-c:definition-source-location-toplevel-form-number
+                         location)))
+         (when number
+           (list number)))
+       :plist (sb-c:definition-source-location-plist location))
+      (make-definition-source)))
 
 ;;; This is kludgey.  We expect these functions (the underlying functions,
 ;;; not the closures) to be in static space and so not move ever.

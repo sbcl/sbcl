@@ -71,7 +71,8 @@
                                                 canonical-options))
                                 ',*readers-for-this-defclass*
                                 ',*writers-for-this-defclass*
-                                ',*slot-names-for-this-defclass*))))
+                                ',*slot-names-for-this-defclass*
+                                (sb-c:source-location)))))
         (if defstruct-p
             (progn
               ;; FIXME: (YUK!) Why do we do this? Because in order
@@ -327,14 +328,14 @@
       (error "~S is not a class in *early-class-definitions*." class-name)))
 
 (defun make-early-class-definition
-       (name source metaclass
+       (name source-location metaclass
         superclass-names canonical-slots other-initargs)
   (list 'early-class-definition
-        name source metaclass
+        name source-location metaclass
         superclass-names canonical-slots other-initargs))
 
 (defun ecd-class-name        (ecd) (nth 1 ecd))
-(defun ecd-source            (ecd) (nth 2 ecd))
+(defun ecd-source-location   (ecd) (nth 2 ecd))
 (defun ecd-metaclass         (ecd) (nth 3 ecd))
 (defun ecd-superclass-names  (ecd) (nth 4 ecd))
 (defun ecd-canonical-slots   (ecd) (nth 5 ecd))
@@ -462,14 +463,14 @@
 
 (declaim (notinline load-defclass))
 (defun load-defclass (name metaclass supers canonical-slots canonical-options
-                      readers writers slot-names)
+                      readers writers slot-names source-location)
   (%compiler-defclass name readers writers slot-names)
   (setq supers  (copy-tree supers)
         canonical-slots   (copy-tree canonical-slots)
         canonical-options (copy-tree canonical-options))
   (let ((ecd
           (make-early-class-definition name
-                                       *load-pathname*
+                                       source-location
                                        metaclass
                                        supers
                                        canonical-slots

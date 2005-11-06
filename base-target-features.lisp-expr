@@ -173,6 +173,11 @@
  ;; character set.
  :sb-unicode
 
+ ;; Record source location information for variables, classes, conditions,
+ ;; packages, etc. Gives much better information on M-. in Slime, but
+ ;; increases core size by about 100kB.
+ :sb-source-locations
+
  ;; This affects the definition of a lot of things in bignum.lisp. It
  ;; doesn't seem to be documented anywhere what systems it might apply
  ;; to. It doesn't seem to be needed for X86 systems anyway.

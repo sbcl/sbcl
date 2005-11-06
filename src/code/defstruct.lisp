@@ -360,7 +360,7 @@
                 ;; class.
                 (with-single-package-locked-error
                     (:symbol ',name "defining ~A as a structure"))
-                (%defstruct ',dd ',inherits)
+                (%defstruct ',dd ',inherits (sb!c:source-location))
                 (eval-when (:compile-toplevel :load-toplevel :execute)
                   (%compiler-defstruct ',dd ',inherits))
                 ,@(unless expanding-into-code-for-xc-host-p
@@ -376,6 +376,9 @@
                   (:symbol ',name "defining ~A as a structure"))
               (eval-when (:compile-toplevel :load-toplevel :execute)
                 (setf (info :typed-structure :info ',name) ',dd))
+              (eval-when (:load-toplevel :execute)
+                (setf (info :source-location :typed-structure ',name)
+                      (sb!c:source-location)))
               ,@(unless expanding-into-code-for-xc-host-p
                   (append (typed-accessor-definitions dd)
                           (typed-predicate-definitions dd)
@@ -858,7 +861,7 @@
 ;;; incompatible redefinition. Define those functions which are
 ;;; sufficiently stereotyped that we can implement them as standard
 ;;; closures.
-(defun %defstruct (dd inherits)
+(defun %defstruct (dd inherits source-location)
   (declare (type defstruct-description dd))
 
   ;; We set up LAYOUTs even in the cross-compilation host.
@@ -877,6 +880,9 @@
            (%redefine-defstruct classoid old-layout layout)
            (setq layout (classoid-layout classoid))))
     (setf (find-classoid (dd-name dd)) classoid)
+
+    (sb!c:with-source-location (source-location)
+      (setf (layout-source-location layout) source-location))
 
     ;; Various other operations only make sense on the target SBCL.
     #-sb-xc-host

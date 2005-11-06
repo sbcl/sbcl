@@ -1376,6 +1376,33 @@
   :type-spec list
   :default ())
 
+;;; Used to record the source location of definitions.
+(define-info-class :source-location)
+
+(define-info-type
+  :class :source-location
+  :type :variable
+  :type-spec t
+  :default nil)
+
+(define-info-type
+  :class :source-location
+  :type :constant
+  :type-spec t
+  :default nil)
+
+(define-info-type
+  :class :source-location
+  :type :typed-structure
+  :type-spec t
+  :default nil)
+
+(define-info-type
+  :class :source-location
+  :type :symbol-macro
+  :type-spec t
+  :default nil)
+
 #!-sb-fluid (declaim (freeze-type info-env))
 
 ;;; Now that we have finished initializing *INFO-CLASSES* and

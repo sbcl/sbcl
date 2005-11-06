@@ -227,7 +227,8 @@ bootstrapping.
       `(progn
          (eval-when (:compile-toplevel :load-toplevel :execute)
            (compile-or-load-defgeneric ',fun-name))
-         (load-defgeneric ',fun-name ',lambda-list ,@initargs)
+         (load-defgeneric ',fun-name ',lambda-list
+                          (sb-c:source-location) ,@initargs)
         ,@(mapcar #'expand-method-definition methods)
         (fdefinition ',fun-name)))))
 
@@ -239,7 +240,7 @@ bootstrapping.
     (setf (info :function :type fun-name)
           (specifier-type 'function))))
 
-(defun load-defgeneric (fun-name lambda-list &rest initargs)
+(defun load-defgeneric (fun-name lambda-list source-location &rest initargs)
   (when (fboundp fun-name)
     (style-warn "redefining ~S in DEFGENERIC" fun-name)
     (let ((fun (fdefinition fun-name)))
@@ -250,7 +251,7 @@ bootstrapping.
   (apply #'ensure-generic-function
          fun-name
          :lambda-list lambda-list
-         :definition-source `((defgeneric ,fun-name) ,*load-pathname*)
+         :definition-source source-location
          initargs))
 
 (define-condition generic-function-lambda-list-error
@@ -464,7 +465,8 @@ bootstrapping.
     ;; addition to in the list. FIXME: We should no longer need to do
     ;; this, since the CLOS code is now SBCL-specific, and doesn't
     ;; need to be ported to every buggy compiler in existence.
-    ',pv-table-symbol))
+    ',pv-table-symbol
+    (sb-c:source-location)))
 
 (defmacro make-method-function (method-lambda &environment env)
   (make-method-function-internal method-lambda env))
@@ -1417,17 +1419,18 @@ bootstrapping.
   `(method-function-get ,method-function 'closure-generator))
 
 (defun load-defmethod
-    (class name quals specls ll initargs &optional pv-table-symbol)
+    (class name quals specls ll initargs pv-table-symbol source-location)
   (setq initargs (copy-tree initargs))
   (let ((method-spec (or (getf initargs :method-spec)
                          (make-method-spec name quals specls))))
     (setf (getf initargs :method-spec) method-spec)
     (load-defmethod-internal class name quals specls
-                             ll initargs pv-table-symbol)))
+                             ll initargs pv-table-symbol
+                             source-location)))
 
 (defun load-defmethod-internal
     (method-class gf-spec qualifiers specializers lambda-list
-                  initargs pv-table-symbol)
+                  initargs pv-table-symbol source-location)
   (when pv-table-symbol
     (setf (getf (getf initargs :plist) :pv-table-symbol)
           pv-table-symbol))
@@ -1445,10 +1448,7 @@ bootstrapping.
                     gf-spec qualifiers specializers))))
   (let ((method (apply #'add-named-method
                        gf-spec qualifiers specializers lambda-list
-                       :definition-source `((defmethod ,gf-spec
-                                                ,@qualifiers
-                                              ,specializers)
-                                            ,*load-pathname*)
+                       :definition-source source-location
                        initargs)))
     (unless (or (eq method-class 'standard-method)
                 (eq (find-class method-class nil) (class-of method)))
@@ -1591,7 +1591,7 @@ bootstrapping.
 
 (defun ensure-generic-function (fun-name
                                 &rest all-keys
-                                &key environment
+                                &key environment source-location
                                 &allow-other-keys)
   (declare (ignore environment))
   (let ((existing (and (fboundp fun-name)
@@ -1862,6 +1862,7 @@ bootstrapping.
                                             &key (lambda-list nil
                                                               lambda-list-p)
                                             argument-precedence-order
+                                            source-location
                                             &allow-other-keys)
   (declare (ignore keys))
   (cond ((and existing (early-gf-p existing))
@@ -1871,7 +1872,7 @@ bootstrapping.
         ((assoc spec *!generic-function-fixups* :test #'equal)
          (if existing
              (make-early-gf spec lambda-list lambda-list-p existing
-                            argument-precedence-order)
+                            argument-precedence-order source-location)
              (error "The function ~S is not already defined." spec)))
         (existing
          (error "~S should be on the list ~S."
@@ -1880,10 +1881,10 @@ bootstrapping.
         (t
          (pushnew spec *!early-generic-functions* :test #'equal)
          (make-early-gf spec lambda-list lambda-list-p nil
-                        argument-precedence-order))))
+                        argument-precedence-order source-location))))
 
 (defun make-early-gf (spec &optional lambda-list lambda-list-p
-                      function argument-precedence-order)
+                      function argument-precedence-order source-location)
   (let ((fin (allocate-funcallable-instance *sgf-wrapper* *sgf-slots-init*)))
     (set-funcallable-instance-function
      fin
@@ -1901,7 +1902,7 @@ bootstrapping.
     (!bootstrap-set-slot 'standard-generic-function
                          fin
                          'source
-                         *load-pathname*)
+                         source-location)
     (set-fun-name fin spec)
     (let ((arg-info (make-arg-info)))
       (setf (early-gf-arg-info fin) arg-info)

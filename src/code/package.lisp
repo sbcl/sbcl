@@ -104,7 +104,9 @@
   #!+sb-package-locks
   (lock nil :type boolean)
   #!+sb-package-locks
-  (%implementation-packages nil :type list))
+  (%implementation-packages nil :type list)
+  ;; Definition source location
+  (source-location nil :type (or null sb!c:definition-source-location)))
 
 ;;;; iteration macros
 
