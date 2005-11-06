@@ -1896,7 +1896,7 @@
                    (declare (optimize (speed 3)))
                    (1+ x))))
   ;; forced-to-do GENERIC-+, etc
-  (assert (= count0 4))
+  (assert (> count0 0))
   (handler-bind ((sb-ext:compiler-note (lambda (c) (incf count1))))
     (compile nil '(lambda (x)
                    (declare (optimize (speed 3)))

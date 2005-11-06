@@ -17,8 +17,12 @@ changes in sbcl-0.9.7 relative to sbcl-0.9.6:
     and Pascal Costanza)
   * bug fix: *COMPILE-FILE-PATHNAME* now contains the user's pathname
     merged with *DEFAULT-PATHNAME-DEFAULTS*.
+  * bug fix: callbacks on OS X now preserve stack-alignment.
+    (thanks to Cyrus Harmon)
   * enhancement: the x86-64 disassembler is much better at
     disassembling SSE instructions.  (thanks to Lutz Euler)
+  * enhancement: CHECK-TYPE on a variable now allows type-inference
+    (thanks to Vincent Arkesteijn)
   * optimization: improved performance of EUC-JP external format.
     (thanks to NIIMI Satoshi)
   * optimization: performance improvements to IO on file streams of
