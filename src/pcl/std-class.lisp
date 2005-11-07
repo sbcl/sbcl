@@ -1475,15 +1475,24 @@
 ;;;; But, there are other parts of the protocol we must follow and those
 ;;;; definitions appear here.
 
-(defmethod shared-initialize :before
-           ((class built-in-class) slot-names &rest initargs)
-  (declare (ignore slot-names initargs))
-  (error "attempt to initialize or reinitialize a built in class"))
+(macrolet ((def (name args control)
+               `(defmethod ,name ,args
+                 (declare (ignore initargs))
+                 (error 'metaobject-initialization-violation
+                  :format-control ,(format nil "~@<~A~@:>" control)
+                  :format-arguments (list ',name)
+                  :references (list '(:amop :initialization "Class"))))))
+  (def initialize-instance ((class built-in-class) &rest initargs)
+    "Cannot ~S an instance of BUILT-IN-CLASS.")
+  (def reinitialize-instance ((class built-in-class) &rest initargs)
+    "Cannot ~S an instance of BUILT-IN-CLASS."))
 
-(defmethod class-direct-slots       ((class built-in-class)) ())
-(defmethod class-slots             ((class built-in-class)) ())
-(defmethod class-direct-default-initargs ((class built-in-class)) ())
-(defmethod class-default-initargs       ((class built-in-class)) ())
+(macrolet ((def (name)
+               `(defmethod ,name ((class built-in-class)) nil)))
+  (def class-direct-slots)
+  (def class-slots)
+  (def class-direct-default-initargs)
+  (def class-default-initargs))
 
 (defmethod validate-superclass ((c class) (s built-in-class))
   (or (eq s *the-class-t*) (eq s *the-class-stream*)
