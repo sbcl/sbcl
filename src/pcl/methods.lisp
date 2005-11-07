@@ -53,12 +53,30 @@
 ;;;
 ;;; Methods are not reinitializable.
 
-(defmethod reinitialize-instance ((method standard-method) &rest initargs)
-  (declare (ignore initargs))
-  (error "An attempt was made to reinitialize the method ~S.~%~
-          Method objects cannot be reinitialized."
-         method))
+(define-condition metaobject-initialization-violation 
+    (reference-condition simple-condition)
+  ())  
 
+(macrolet ((def (name args control)
+               `(defmethod ,name ,args
+                 (declare (ignore initargs))
+                 (error 'metaobject-initialization-violation
+                  :format-control ,(format nil "~@<~A~@:>" control )
+                  :format-arguments (list ',name)
+                  :references (list '(:amop :initialization "Method"))))))
+  (def reinitialize-instance ((method method) &rest initargs)
+    "Method objects cannot be redefined by ~S.")
+  (def change-class ((method method) new &rest initargs)
+    "Method objects cannot be redefined by ~S.")
+  ;; FIXME: NEW being a subclass of METHOD.
+  (def update-instance-for-redefined-class ((method method) added discarded 
+                                            plist &rest initargs)
+    "No behaviour specified for ~S on method objects.")
+  (def update-instance-for-different-class (old (new method) &rest initargs)
+    "No behaviour specified for ~S on method objects.")
+  (def update-instance-for-different-class ((old method) new &rest initargs)
+    "No behaviour specified for ~S on method objects."))
+  
 (defmethod legal-documentation-p ((object standard-method) x)
   (if (or (null x) (stringp x))
       t

@@ -830,6 +830,8 @@
      (format stream ", ")
      (destructuring-bind (type data) (cdr reference)
        (ecase type
+         (:initialization
+          (format stream "Initialization of ~A Metaobjects" data))
          (:generic-function (format stream "Generic Function ~S" data))
          (:section (format stream "Section ~{~D~^.~}" data)))))
     (:ansi-cl
