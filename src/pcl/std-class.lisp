@@ -1437,9 +1437,14 @@
     (apply #'update-instance-for-different-class copy instance initargs)
     instance))
 
-(defmethod change-class ((instance standard-object)
-                         (new-class standard-class)
+(defmethod change-class ((instance standard-object) (new-class standard-class)
                          &rest initargs)
+  (let ((cpl (class-precedence-list new-class)))
+    (when (member (find-class 'method) cpl)
+      (error 'metaobject-initialization-violation
+             :format-control "~@<Cannot ~S objects into ~S metaobjects.~@:>"
+             :format-arguments (list 'change-class 'method)
+             :references (list '(:amop :initialization "Method")))))
   (change-class-internal instance new-class initargs))
 
 (defmethod change-class ((instance funcallable-standard-object)

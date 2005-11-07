@@ -68,7 +68,8 @@
     "Method objects cannot be redefined by ~S.")
   (def change-class ((method method) new &rest initargs)
     "Method objects cannot be redefined by ~S.")
-  ;; FIXME: NEW being a subclass of METHOD.
+  ;; NEW being a subclass of method is dealt with in the general
+  ;; method of CHANGE-CLASS
   (def update-instance-for-redefined-class ((method method) added discarded
                                             plist &rest initargs)
     "No behaviour specified for ~S on method objects.")
