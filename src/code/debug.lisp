@@ -520,7 +520,7 @@ reset to ~S."
         ;; the debugger does afterwards.)
         (format *error-output*
                 "~2&~@<debugger invoked on a ~S~@[ in thread ~A~]: ~
-                    ~2I~_~A~:>~%"
+                    ~2I~_~A~:@>~%"
                 (type-of *debug-condition*)
                 #!+sb-thread sb!thread:*current-thread*
                 #!-sb-thread nil
@@ -536,12 +536,12 @@ reset to ~S."
                   '*debug-condition*
                   ndc-type
                   '*nested-debug-condition*))
-        (when (typep condition 'cell-error)
+        (when (typep *nested-debug-condition* 'cell-error)
           ;; what we really want to know when it's e.g. an UNBOUND-VARIABLE:
           (format *error-output*
                   "~&(CELL-ERROR-NAME ~S) = ~S~%"
-                  '*debug-condition*
-                  (cell-error-name *debug-condition*)))))
+                  '*nested-debug-condition*
+                  (cell-error-name *nested-debug-condition*)))))
 
     (let ((background-p (sb!thread::debugger-wait-until-foreground-thread
                          *debug-io*)))
