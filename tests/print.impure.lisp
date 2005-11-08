@@ -322,7 +322,7 @@
 
 ;;; CSR inserted a bug into Burger & Dybvig's float printer.  Caught
 ;;; by Raymond Toy
-(assert (string= (format nil "~E" 1d23) "1.0d+23"))
+(assert (string= (format nil "~E" 1d23) "1.d+23"))
 
 ;;; Fixed-format bugs from CLISP's test suite (reported by Bruno
 ;;; Haible, bug 317)
@@ -336,6 +336,41 @@
 
 ;;; Adam Warner's test case
 (assert (string= (format nil "~@F" 1.23) "+1.23"))
+
+
+;;; New (2005-11-08, also known as CSR House day) float format test
+;;; cases.  Simon Alexander, Raymond Toy, and others
+(assert (string= (format nil "~9,4,,-7E" pi) ".00000003d+8"))
+(assert (string= (format nil "~9,4,,-5E" pi) ".000003d+6"))
+(assert (string= (format nil "~5,4,,7E" pi) "3141600.d-6"))
+(assert (string= (format nil "~11,4,,3E" pi) "  314.16d-2"))
+(assert (string= (format nil "~11,4,,5E" pi) "  31416.d-4"))
+(assert (string= (format nil "~11,4,,0E" pi) "  0.3142d+1"))
+(assert (string= (format nil "~9,,,-1E" pi) ".03142d+2"))
+(assert (string= (format nil "~,,,-2E" pi) "0.003141592653589793d+3"))
+(assert (string= (format nil "~,,,2E" pi) "31.41592653589793d-1"))
+(assert (string= (format nil "~E" pi) "3.141592653589793d+0"))
+(assert (string= (format nil "~9,5,,-1E" pi) ".03142d+2"))
+(assert (string= (format nil "~11,5,,-1E" pi) " 0.03142d+2"))
+(assert (string= (format nil "~G" pi) "3.141592653589793    "))
+(assert (string= (format nil "~9,5G" pi) "3.1416    "))
+(assert (string= (format nil "|~13,6,2,7E|" pi) "| 3141593.d-06|"))
+(assert (string= (format nil "~9,3,2,0,'%E" pi) "0.314d+01"))
+(assert (string= (format nil "~9,0,6f" pi) " 3141593."))
+(assert (string= (format nil "~6,2,1,'*F" pi) " 31.42"))
+(assert (string= (format nil "~6,2,1,'*F" (* 100 pi)) "******"))
+(assert (string= (format nil "~9,3,2,-2,'%@E" pi) "+.003d+03"))
+(assert (string= (format nil "~10,3,2,-2,'%@E" pi) "+0.003d+03"))
+(assert (string= (format nil "~15,3,2,-2,'%,'=@E" pi) "=====+0.003d+03"))
+(assert (string= (format nil "~9,3,2,-2,'%E" pi) "0.003d+03"))
+(assert (string= (format nil "~8,3,2,-2,'%@E" pi) "%%%%%%%%"))
+
+(assert (string= (format nil "~g" 1e0) "1.    "))
+(assert (string= (format nil "~g" 1.2d40) "12000000000000000000000000000000000000000.    "))
+
+(assert (string= (format nil "~e" 0) "0.0e+0"))
+(assert (string= (format nil "~e" 0d0) "0.0d+0"))
+(assert (string= (format nil "~9,,4e" 0d0) "0.0d+0000"))
 
 (let ((table (make-hash-table)))
   (setf (gethash 1 table) t)

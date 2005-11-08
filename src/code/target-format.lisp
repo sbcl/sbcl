@@ -589,49 +589,58 @@
         (let* ((expt (- expt k))
                (estr (decimal-string (abs expt)))
                (elen (if e (max (length estr) e) (length estr)))
-               (fdig (if d (if (plusp k) (1+ (- d k)) d) nil))
-               (fmin (if (minusp k) (- 1 k) nil))
-               (spaceleft (if w
-                              (- w 2 elen
-                                 (if (or atsign (minusp (float-sign number)))
-                                     1 0))
-                              nil)))
-          (if (and w ovf e (> elen e)) ;exponent overflow
+               spaceleft)
+          (when w
+            (setf spaceleft (- w 2 elen))
+            (when (or atsign (minusp (float-sign number)))
+              (decf spaceleft)))
+          (if (and w ovf e (> elen e))  ;exponent overflow
               (dotimes (i w) (write-char ovf stream))
-              (multiple-value-bind (fstr flen lpoint tpoint)
-                  (sb!impl::flonum-to-string num spaceleft fdig k fmin)
-                (when (and d (zerop d)) (setq tpoint nil))
-                (when w
-                  (decf spaceleft flen)
-                  (when lpoint
-                    (if (or (> spaceleft 0) tpoint)
-                        (decf spaceleft)
-                        (setq lpoint nil)))
-                  (when tpoint
-                    (if (> spaceleft 0)
-                        (decf spaceleft)
-                        (setq tpoint nil))))
-                (cond ((and w (< spaceleft 0) ovf)
-                       ;;significand overflow
-                       (dotimes (i w) (write-char ovf stream)))
-                      (t (when w
-                           (dotimes (i spaceleft) (write-char pad stream)))
-                         (if (minusp (float-sign number))
-                             (write-char #\- stream)
-                             (if atsign (write-char #\+ stream)))
-                         (when lpoint (write-char #\0 stream))
-                         (write-string fstr stream)
-                         (when tpoint (write-char #\0 stream))
-                         (write-char (if marker
-                                         marker
-                                         (format-exponent-marker number))
-                                     stream)
-                         (write-char (if (minusp expt) #\- #\+) stream)
-                         (when e
-                           ;;zero-fill before exponent if necessary
-                           (dotimes (i (- e (length estr)))
-                             (write-char #\0 stream)))
-                         (write-string estr stream)))))))))
+              (let* ((fdig (if d (if (plusp k) (1+ (- d k)) d) nil))
+                     (fmin (if (minusp k) 1 fdig)))
+                (multiple-value-bind (fstr flen lpoint tpoint)
+                    (sb!impl::flonum-to-string num spaceleft fdig k fmin)
+                  (when (and d (zerop d)) (setq tpoint nil))
+                  (when w
+                    (decf spaceleft flen)
+                    ;; See CLHS 22.3.3.2.  "If the parameter d is
+                    ;; omitted, ... [and] if the fraction to be
+                    ;; printed is zero then a single zero digit should
+                    ;; appear after the decimal point."  So we need to
+                    ;; subtract one from here because we're going to
+                    ;; add an extra 0 digit later. [rtoy]
+                    (when (and (zerop number) (null d))
+                      (decf spaceleft))
+                    (when lpoint
+                      (if (or (> spaceleft 0) tpoint)
+                          (decf spaceleft)
+                          (setq lpoint nil)))
+                    (when (and tpoint (<= spaceleft 0))
+                      (setq tpoint nil)))
+                  (cond ((and w (< spaceleft 0) ovf)
+                         ;;significand overflow
+                         (dotimes (i w) (write-char ovf stream)))
+                        (t (when w
+                             (dotimes (i spaceleft) (write-char pad stream)))
+                           (if (minusp (float-sign number))
+                               (write-char #\- stream)
+                               (if atsign (write-char #\+ stream)))
+                           (when lpoint (write-char #\0 stream))
+                           (write-string fstr stream)
+                           (when (and (zerop number) (null d))
+                             ;; It's later and we're adding the zero
+                             ;; digit.
+                             (write-char #\0 stream))
+                           (write-char (if marker
+                                           marker
+                                           (format-exponent-marker number))
+                                       stream)
+                           (write-char (if (minusp expt) #\- #\+) stream)
+                           (when e
+                             ;;zero-fill before exponent if necessary
+                             (dotimes (i (- e (length estr)))
+                               (write-char #\0 stream)))
+                           (write-string estr stream))))))))))
 
 (def-format-interpreter #\G (colonp atsignp params)
   (when colonp

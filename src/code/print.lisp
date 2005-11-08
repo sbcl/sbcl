@@ -1140,10 +1140,19 @@
         (t
          (multiple-value-bind (e string)
              (if fdigits
-                 (flonum-to-digits x (min (- fdigits) (- (or fmin 0))))
+                 (flonum-to-digits x (min (- (+ fdigits (or scale 0)))
+                                          (- (or fmin 0))))
                  (if (and width (> width 1))
-                     (let ((w (multiple-value-list (flonum-to-digits x (1- width) t)))
-                           (f (multiple-value-list (flonum-to-digits x (- (or fmin 0))))))
+                     (let ((w (multiple-value-list
+                               (flonum-to-digits x
+                                                 (max 1
+                                                      (+ (1- width)
+                                                         (if (and scale (minusp scale))
+                                                             scale 0)))
+                                                 t)))
+                           (f (multiple-value-list
+                               (flonum-to-digits x (- (+ (or fmin 0)
+                                                         (if scale scale 0)))))))
                        (cond
                          ((>= (length (cadr w)) (length (cadr f)))
                           (values-list w))
@@ -1153,11 +1162,13 @@
                  (stream (make-string-output-stream)))
              (if (plusp e)
                  (progn
-                   (write-string string stream :end (min (length string) e))
+                   (write-string string stream :end (min (length string)
+                                                         e))
                    (dotimes (i (- e (length string)))
                      (write-char #\0 stream))
                    (write-char #\. stream)
-                   (write-string string stream :start (min (length string) e))
+                   (write-string string stream :start (min (length
+                                                            string) e))
                    (when fdigits
                      (dotimes (i (- fdigits
                                     (- (length string)
@@ -1375,18 +1386,17 @@
 ;;; Print the appropriate exponent marker for X and the specified exponent.
 (defun print-float-exponent (x exp stream)
   (declare (type float x) (type integer exp) (type stream stream))
-  (let ((*print-radix* nil)
-        (plusp (plusp exp)))
+  (let ((*print-radix* nil))
     (if (typep x *read-default-float-format*)
         (unless (eql exp 0)
-          (format stream "e~:[~;+~]~D" plusp exp))
-        (format stream "~C~:[~;+~]~D"
+          (format stream "e~D" exp))
+        (format stream "~C~D"
                 (etypecase x
                   (single-float #\f)
                   (double-float #\d)
                   (short-float #\s)
                   (long-float #\L))
-                plusp exp))))
+                exp))))
 
 (defun output-float-infinity (x stream)
   (declare (float x) (stream stream))
@@ -1429,6 +1439,7 @@
         (print-float-exponent x 0 stream))
        (t
         (output-float-aux x stream -3 8)))))))
+
 (defun output-float-aux (x stream e-min e-max)
   (multiple-value-bind (e string)
       (flonum-to-digits x)
@@ -1453,8 +1464,6 @@
       (t (write-string string stream :end 1)
          (write-char #\. stream)
          (write-string string stream :start 1)
-         (when (= (length string) 1)
-           (write-char #\0 stream))
          (print-float-exponent x (1- e) stream)))))
 
 ;;;; other leaf objects
