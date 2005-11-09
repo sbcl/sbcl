@@ -63,7 +63,7 @@
                  (error 'metaobject-initialization-violation
                   :format-control ,(format nil "~@<~A~@:>" control)
                   :format-arguments (list ',name)
-                  :references (list '(:amop :initialization "Method"))))))
+                  :references (list '(:amop :initialization method))))))
   (def reinitialize-instance ((method method) &rest initargs)
     "Method objects cannot be redefined by ~S.")
   (def change-class ((method method) new &rest initargs)
