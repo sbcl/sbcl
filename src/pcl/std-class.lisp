@@ -1473,6 +1473,19 @@
 (defmethod change-class ((instance funcallable-standard-object)
                          (new-class funcallable-standard-class)
                          &rest initargs)
+  (let ((cpl (class-precedence-list new-class)))
+    (dolist (class cpl)
+      (macrolet
+          ((frob (class-name)
+             `(when (eq class (find-class ',class-name))
+               (error 'metaobject-initialization-violation
+                :format-control "~@<Cannot ~S objects into ~S metaobjects.~@:>"
+                :format-arguments (list 'change-class ',class-name)
+                :references (list '(:amop :initialization ,class-name))))))
+        (frob class)
+        (frob generic-function)
+        (frob method)
+        (frob slot-definition))))
   (change-class-internal instance new-class initargs))
 
 (defmethod change-class ((instance standard-object)
