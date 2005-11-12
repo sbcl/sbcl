@@ -125,19 +125,17 @@
 
 ;;;; allocation helpers
 
-;;; All allocation is done by calls to assembler routines that
-;;; eventually invoke the C alloc() function.  Once upon a time
-;;; (before threads) allocation within an alloc_region could also be
-;;; done inline, with the aid of two C symbols storing the current
-;;; allocation region boundaries; however, C symbols are global.
+;;; Allocation within alloc_region (which is thread local) can be done
+;;; inline.  If the alloc_region is overflown allocation is done by
+;;; calling the C alloc() function.
 
 ;;; C calls for allocation don't /seem/ to make an awful lot of
-;;; difference to speed.  Guessing from historical context, it looks
-;;; like inline allocation was introduced before pseudo-atomic, at
-;;; which time all calls to alloc() would have needed a syscall to
-;;; mask signals for the duration.  Now we have pseudoatomic there's
-;;; no need for that overhead.  Still, inline alloc would be a neat
-;;; addition someday (except see below).
+;;; difference to speed. On pure consing it's about a 25%
+;;; gain. Guessing from historical context, it looks like inline
+;;; allocation was introduced before pseudo-atomic, at which time all
+;;; calls to alloc() would have needed a syscall to mask signals for
+;;; the duration.  Now we have pseudoatomic there's no need for that
+;;; overhead.
 
 (defun allocation-dynamic-extent (alloc-tn size)
   (inst sub esp-tn size)
@@ -175,6 +173,7 @@
 
 (defun allocation-inline (alloc-tn size)
   (let ((ok (gen-label))
+        (done (gen-label))
         (free-pointer
          (make-ea :dword :disp
                   #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
@@ -191,7 +190,7 @@
     (inst add alloc-tn free-pointer)
     #!+sb-thread (inst fs-segment-prefix)
     (inst cmp alloc-tn end-addr)
-    (inst jmp :be OK)
+    (inst jmp :be ok)
     (let ((dst (ecase (tn-offset alloc-tn)
                  (#.eax-offset "alloc_overflow_eax")
                  (#.ecx-offset "alloc_overflow_ecx")
@@ -200,9 +199,23 @@
                  (#.esi-offset "alloc_overflow_esi")
                  (#.edi-offset "alloc_overflow_edi"))))
       (inst call (make-fixup dst :foreign)))
+    (inst jmp-short done)
     (emit-label ok)
-    #!+sb-thread (inst fs-segment-prefix)
-    (inst xchg free-pointer alloc-tn))
+    ;; Swap ALLOC-TN and FREE-POINTER
+    (cond ((and (tn-p size) (location= alloc-tn size))
+           ;; XCHG is extremely slow, use the xor swap trick
+           #!+sb-thread (inst fs-segment-prefix)
+           (inst xor alloc-tn free-pointer)
+           #!+sb-thread (inst fs-segment-prefix)
+           (inst xor free-pointer alloc-tn)
+           #!+sb-thread (inst fs-segment-prefix)
+           (inst xor alloc-tn free-pointer))
+          (t
+           ;; It's easier if SIZE is still available.
+           #!+sb-thread (inst fs-segment-prefix)
+           (inst mov free-pointer alloc-tn)
+           (inst sub alloc-tn size)))
+    (emit-label done))
   (values))
 
 
@@ -219,13 +232,7 @@
 (defun allocation (alloc-tn size &optional inline dynamic-extent)
   (cond
     (dynamic-extent (allocation-dynamic-extent alloc-tn size))
-    ;; FIXME: for reasons unknown, inline allocation is a speed win on
-    ;; non-P4s, and a speed loss on P4s (and probably other such
-    ;; high-spec high-cache machines).  :INLINE-ALLOCATION-IS-GOOD is
-    ;; a bit of a KLUDGE, really.  -- CSR, 2004-08-05 (following
-    ;; observations made by ASF and Juho Snellman)
-    ((and (member :inline-allocation-is-good *backend-subfeatures*)
-          (or (null inline) (policy inline (>= speed space))))
+    ((or (null inline) (policy inline (>= speed space)))
      (allocation-inline alloc-tn size))
     (t (allocation-notinline alloc-tn size)))
   (values))

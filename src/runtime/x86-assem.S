@@ -669,10 +669,8 @@ GNAME(alloc_16_to_edi):
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define START_REGION %fs:THREAD_ALLOC_REGION_OFFSET
-#define DISPLACEMENT $7
 #else
 #define START_REGION boxed_region
-#define DISPLACEMENT $6
 #endif
 		
 /* This routine handles an overflow with eax=crfp+size. So the
@@ -690,7 +688,6 @@ GNAME(alloc_overflow_eax):
         addl    $4,%esp # pop the size arg.
         popl    %edx    # Restore edx.
         popl    %ecx    # Restore ecx.
-	addl	DISPLACEMENT,(%esp) # Adjust the return address to skip the next inst.
         ret
         .size    GNAME(alloc_overflow_eax),.-GNAME(alloc_overflow_eax)
 
@@ -708,7 +705,6 @@ GNAME(alloc_overflow_ecx):
         movl    %eax,%ecx       # setup the destination.
         popl    %edx    # Restore edx.
         popl    %eax    # Restore eax.
-	addl	DISPLACEMENT,(%esp) # Adjust the return address to skip the next inst.
         ret
         .size    GNAME(alloc_overflow_ecx),.-GNAME(alloc_overflow_ecx)
 
@@ -726,7 +722,6 @@ GNAME(alloc_overflow_edx):
         movl    %eax,%edx       # setup the destination.
         popl    %ecx    # Restore ecx.
         popl    %eax    # Restore eax.
-	addl	DISPLACEMENT,(%esp) # Adjust the return address to skip the next inst.
         ret
         .size    GNAME(alloc_overflow_edx),.-GNAME(alloc_overflow_edx)
 
@@ -748,7 +743,6 @@ GNAME(alloc_overflow_ebx):
         popl    %edx    # Restore edx.
         popl    %ecx    # Restore ecx.
         popl    %eax    # Restore eax.
-	addl	DISPLACEMENT,(%esp) # Adjust the return address to skip the next inst.
         ret
         .size    GNAME(alloc_overflow_ebx),.-GNAME(alloc_overflow_ebx)
 
@@ -770,7 +764,6 @@ GNAME(alloc_overflow_esi):
         popl    %edx    # Restore edx.
         popl    %ecx    # Restore ecx.
         popl    %eax    # Restore eax.
-	addl	DISPLACEMENT,(%esp) # Adjust the return address to skip the next inst.
         ret
         .size    GNAME(alloc_overflow_esi),.-GNAME(alloc_overflow_esi)
 
@@ -790,7 +783,6 @@ GNAME(alloc_overflow_edi):
         popl    %edx    # Restore edx.
         popl    %ecx    # Restore ecx.
         popl    %eax    # Restore eax.
-	addl	DISPLACEMENT,(%esp) # Adjust the return address to skip the next inst.
         ret
         .size    GNAME(alloc_overflow_edi),.-GNAME(alloc_overflow_edi)
 
