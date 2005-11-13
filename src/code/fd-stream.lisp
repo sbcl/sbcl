@@ -503,25 +503,19 @@
     (declare (fixnum start end))
     (if (stringp thing)
         (let ((last-newline
-               (flet ((do-it (string)
-                        (and (find #\newline string :start start :end end)
-                             ;; FIXME why do we need both calls?
-                             ;; Is find faster forwards than
-                             ;; position is backwards?
-                             (position #\newline string
-                                       :from-end t
-                                       :start start
-                                       :end end))))
-                 (declare (inline do-it))
-                 ;; Specialize the common cases
-                 (etypecase thing
-                   (simple-base-string
-                    (do-it (the simple-base-string thing)))
-                   #!+sb-unicode
-                   ((simple-array character)
-                    (do-it (the (simple-array character) thing)))
-                   (string
-                    (do-it thing))))))
+               (string-dispatch (simple-base-string
+                                 #!+sb-unicode
+                                 (simple-array character)
+                                 string)
+                   thing
+                 (and (find #\newline thing :start start :end end)
+                      ;; FIXME why do we need both calls?
+                      ;; Is find faster forwards than
+                      ;; position is backwards?
+                      (position #\newline thing
+                                :from-end t
+                                :start start
+                                :end end)))))
           (if (and (typep thing 'base-string)
                    (eq (fd-stream-external-format stream) :latin-1))
               (ecase (fd-stream-buffering stream)
@@ -1004,44 +998,33 @@
           (do ()
               ((= end start))
             (setf (fd-stream-obuf-tail stream)
-                  (flet ((do-it (string)
-                           (let ((len (fd-stream-obuf-length stream))
-                                 (sap (fd-stream-obuf-sap stream))
-                                 (tail (fd-stream-obuf-tail stream)))
-                             (declare (type index tail)
-                                      ;; STRING bounds have already been checked.
-                                      (optimize (safety 0)))
-                             (loop
-                                (,@(if output-restart
-                                       `(catch 'output-nothing)
-                                       `(progn))
-                                   (do* ()
-                                        ((or (= start end) (< (- len tail) 4)))
-                                     (let* ((byte (aref string start))
-                                            (bits (char-code byte)))
-                                       ,out-expr
-                                       (incf tail ,size)
-                                       (incf start)))
-                                   ;; Exited from the loop normally
-                                   (return-from do-it tail))
-                                ;; Exited via CATCH. Skip the current character
-                                ;; and try the inner loop again.
-                                (incf start)))))
-                    (declare (inline do-it))
-                    ;; Specialized versions for the common cases of
-                    ;; SIMPLE-BASE-STRING and (SIMPLE-ARRAY CHARACTER)
-                    ;; to avoid doing a generic AREF.
-                    (etypecase string
-                      (simple-base-string
-                       (do-it (the simple-base-string string)))
-                      #!+sb-unicode
-                      ((simple-array character)
-                       ;; For some reason the type information from the
-                       ;; etypecase doesn't propagate through here without
-                       ;; an explicit THE.
-                       (do-it (the (simple-array character) string)))
-                      (string
-                       (do-it string)))))
+                  (string-dispatch (simple-base-string
+                                    #!+sb-unicode
+                                    (simple-array character)
+                                    string)
+                      string
+                    (let ((len (fd-stream-obuf-length stream))
+                          (sap (fd-stream-obuf-sap stream))
+                          (tail (fd-stream-obuf-tail stream)))
+                      (declare (type index tail)
+                               ;; STRING bounds have already been checked.
+                               (optimize (safety 0)))
+                      (loop
+                         (,@(if output-restart
+                                `(catch 'output-nothing)
+                                `(progn))
+                            (do* ()
+                                 ((or (= start end) (< (- len tail) 4)))
+                              (let* ((byte (aref string start))
+                                     (bits (char-code byte)))
+                                ,out-expr
+                                (incf tail ,size)
+                                (incf start)))
+                            ;; Exited from the loop normally
+                            (return tail))
+                         ;; Exited via CATCH. Skip the current character
+                         ;; and try the inner loop again.
+                         (incf start)))))
             (when (< start end)
               (flush-output-buffer stream)))
           (when flush-p
@@ -1131,45 +1114,34 @@
           (do ()
               ((= end start))
             (setf (fd-stream-obuf-tail stream)
-                  (flet ((do-it (string)
-                           (let ((len (fd-stream-obuf-length stream))
-                                 (sap (fd-stream-obuf-sap stream))
-                                 (tail (fd-stream-obuf-tail stream)))
-                             (declare (type index tail)
-                                      ;; STRING bounds have already been checked.
-                                      (optimize (safety 0)))
-                             (loop
-                                (,@(if output-restart
-                                       `(catch 'output-nothing)
-                                       `(progn))
-                                   (do* ()
-                                        ((or (= start end) (< (- len tail) 4)))
-                                     (let* ((byte (aref string start))
-                                            (bits (char-code byte))
-                                            (size ,out-size-expr))
-                                       ,out-expr
-                                       (incf tail size)
-                                       (incf start)))
-                                   ;; Exited from the loop normally
-                                   (return-from do-it tail))
-                                ;; Exited via CATCH. Skip the current character
-                                ;; and try the inner loop again.
-                                (incf start)))))
-                    (declare (inline do-it))
-                    ;; Specialized versions for the common cases of
-                    ;; SIMPLE-BASE-STRING and (SIMPLE-ARRAY CHARACTER)
-                    ;; to avoid doing a generic AREF.
-                    (etypecase string
-                      (simple-base-string
-                       (do-it (the simple-base-string string)))
-                      #!+sb-unicode
-                      ((simple-array character)
-                       ;; For some reason the type information from the
-                       ;; etypecase doesn't propagate through here without
-                       ;; an explicit THE.
-                       (do-it (the (simple-array character) string)))
-                      (string
-                       (do-it string)))))
+                  (string-dispatch (simple-base-string
+                                    #!+sb-unicode
+                                    (simple-array character)
+                                    string)
+                      string
+                    (let ((len (fd-stream-obuf-length stream))
+                          (sap (fd-stream-obuf-sap stream))
+                          (tail (fd-stream-obuf-tail stream)))
+                      (declare (type index tail)
+                               ;; STRING bounds have already been checked.
+                               (optimize (safety 0)))
+                      (loop
+                         (,@(if output-restart
+                                `(catch 'output-nothing)
+                                `(progn))
+                            (do* ()
+                                 ((or (= start end) (< (- len tail) 4)))
+                              (let* ((byte (aref string start))
+                                     (bits (char-code byte))
+                                     (size ,out-size-expr))
+                                ,out-expr
+                                (incf tail size)
+                                (incf start)))
+                            ;; Exited from the loop normally
+                            (return tail))
+                         ;; Exited via CATCH. Skip the current character
+                         ;; and try the inner loop again.
+                         (incf start)))))
             (when (< start end)
               (flush-output-buffer stream)))
           (when flush-p

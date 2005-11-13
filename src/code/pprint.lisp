@@ -75,12 +75,12 @@
   ;; Buffer holding the per-line prefix active at the buffer start.
   ;; Indentation is included in this. The length of this is stored
   ;; in the logical block stack.
-  (prefix (make-string initial-buffer-size) :type (simple-array character (*)))
+  (prefix (make-string initial-buffer-size) :type simple-string)
   ;; Buffer holding the total remaining suffix active at the buffer start.
   ;; The characters are right-justified in the buffer to make it easier
   ;; to output the buffer. The length is stored in the logical block
   ;; stack.
-  (suffix (make-string initial-buffer-size) :type (simple-array character (*)))
+  (suffix (make-string initial-buffer-size) :type simple-string)
   ;; Queue of pending operations. When empty, HEAD=TAIL=NIL. Otherwise,
   ;; TAIL holds the first (oldest) cons and HEAD holds the last (newest)
   ;; cons. Adding things to the queue is basically (setf (cdr head) (list
@@ -134,33 +134,48 @@
            (type simple-string string)
            (type index start)
            (type (or index null) end))
-  (let* ((string (if (typep string '(simple-array character (*)))
-                     string
-                     (coerce string '(simple-array character (*)))))
-         (end (or end (length string))))
+  (let* ((end (or end (length string))))
     (unless (= start end)
-      (let ((newline (position #\newline string :start start :end end)))
-        (cond
-         (newline
-          (pretty-sout stream string start newline)
-          (enqueue-newline stream :literal)
-          (pretty-sout stream string (1+ newline) end))
-         (t
-          (let ((chars (- end start)))
-            (loop
-              (let* ((available (ensure-space-in-buffer stream chars))
-                     (count (min available chars))
-                     (fill-pointer (pretty-stream-buffer-fill-pointer stream))
-                     (new-fill-ptr (+ fill-pointer count)))
-                (replace (pretty-stream-buffer stream)
-                         string
-                         :start1 fill-pointer :end1 new-fill-ptr
-                         :start2 start)
-                (setf (pretty-stream-buffer-fill-pointer stream) new-fill-ptr)
-                (decf chars count)
-                (when (zerop count)
-                  (return))
-                (incf start count))))))))))
+      (sb!impl::string-dispatch (simple-base-string
+                                 #!+sb-unicode
+                                 (simple-array character))
+          string
+        ;; For POSITION transform
+        (declare (optimize (speed 2)))
+        (let ((newline (position #\newline string :start start :end end)))
+          (cond
+            (newline
+             (pretty-sout stream string start newline)
+             (enqueue-newline stream :literal)
+             (pretty-sout stream string (1+ newline) end))
+            (t
+             (let ((chars (- end start)))
+               (loop
+                  (let* ((available (ensure-space-in-buffer stream chars))
+                         (count (min available chars))
+                         (fill-pointer (pretty-stream-buffer-fill-pointer
+                                        stream))
+                         (new-fill-ptr (+ fill-pointer count)))
+                    (if (typep string 'simple-base-string)
+                        ;; FIXME: Reimplementing REPLACE, since it
+                        ;; can't be inlined and we don't have a
+                        ;; generic "simple-array -> simple-array"
+                        ;; transform for it.
+                        (loop for i from fill-pointer below new-fill-ptr
+                              for j from start
+                              with target = (pretty-stream-buffer stream)
+                              do (setf (aref target i)
+                                       (aref string j)))
+                        (replace (pretty-stream-buffer stream)
+                                 string
+                                 :start1 fill-pointer :end1 new-fill-ptr
+                                 :start2 start))
+                    (setf (pretty-stream-buffer-fill-pointer stream)
+                          new-fill-ptr)
+                    (decf chars count)
+                    (when (zerop count)
+                      (return))
+                    (incf start count)))))))))))
 
 (defun pretty-misc (stream op &optional arg1 arg2)
   (declare (ignore stream op arg1 arg2)))
@@ -310,8 +325,8 @@
 (defstruct (block-start (:include section-start)
                         (:copier nil))
   (block-end nil :type (or null block-end))
-  (prefix nil :type (or null (simple-array character (*))))
-  (suffix nil :type (or null (simple-array character (*)))))
+  (prefix nil :type (or null simple-string))
+  (suffix nil :type (or null simple-string)))
 
 (defun start-logical-block (stream prefix per-line-p suffix)
   ;; (In the PPRINT-LOGICAL-BLOCK form which calls us,
@@ -322,19 +337,22 @@
   ;; trivial, so it should always be a string.)
   (declare (type string suffix))
   (when prefix
-    (setq prefix (coerce prefix '(simple-array character (*))))
+    (unless (typep prefix 'simple-string)
+      (setq prefix (coerce prefix '(simple-array character (*)))))
     (pretty-sout stream prefix 0 (length prefix)))
+  (unless (typep suffix 'simple-string)
+    (setq suffix (coerce suffix '(simple-array character (*)))))
   (let* ((pending-blocks (pretty-stream-pending-blocks stream))
          (start (enqueue stream block-start
                          :prefix (and per-line-p prefix)
-                         :suffix (coerce suffix '(simple-array character (*)))
+                         :suffix suffix
                          :depth (length pending-blocks))))
     (setf (pretty-stream-pending-blocks stream)
           (cons start pending-blocks))))
 
 (defstruct (block-end (:include queued-op)
                       (:copier nil))
-  (suffix nil :type (or null (simple-array character (*)))))
+  (suffix nil :type (or null simple-string)))
 
 (defun end-logical-block (stream)
   (let* ((start (pop (pretty-stream-pending-blocks stream)))

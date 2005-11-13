@@ -2387,3 +2387,12 @@
     (seq-dispatch sequence2
                   (list-search sequence2 sequence1)
                   (vector-search sequence2 sequence1))))
+
+(sb!xc:defmacro string-dispatch ((&rest types) var &body body)
+  (let ((fun (gensym "STRING-DISPATCH-FUN-")))
+    `(flet ((,fun (,var)
+              ,@body))
+       (declare (inline ,fun))
+       (etypecase ,var
+         ,@(loop for type in types
+                 collect `(,type (,fun (the ,type ,var))))))))
