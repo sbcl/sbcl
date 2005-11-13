@@ -133,6 +133,13 @@ arch_set_pseudo_atomic_interrupted(os_context_t *context)
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),
                    arch_os_get_current_thread());
 }
+
+void
+arch_clear_pseudo_atomic_interrupted(os_context_t *context)
+{
+    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),
+                   arch_os_get_current_thread());
+}
 
 /*
  * This stuff seems to get called for TRACE and debug activity.

@@ -346,6 +346,12 @@ interrupt_handle_pending(os_context_t *context)
     thread=arch_os_get_current_thread();
     data=thread->interrupt_data;
 
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+    /* If pseudo_atomic_interrupted is set then the interrupt is going
+     * to be handled now, ergo it's safe to clear it. */
+    arch_clear_pseudo_atomic_interrupted(context);
+#endif
+
     if (SymbolValue(GC_INHIBIT,thread)==NIL) {
 #ifdef LISP_FEATURE_SB_THREAD
         if (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL) {

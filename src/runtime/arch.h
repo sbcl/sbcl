@@ -24,6 +24,7 @@ extern void arch_init(void);
 extern void arch_skip_instruction(os_context_t*);
 extern boolean arch_pseudo_atomic_atomic(os_context_t*);
 extern void arch_set_pseudo_atomic_interrupted(os_context_t*);
+extern void arch_clear_pseudo_atomic_interrupted(os_context_t*);
 extern os_vm_address_t arch_get_bad_addr(int, siginfo_t*, os_context_t*);
 extern unsigned char *arch_internal_error_arguments(os_context_t*);
 extern unsigned int arch_install_breakpoint(void *pc);

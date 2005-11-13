@@ -2754,14 +2754,14 @@ scavenge_generations(generation_index_t from, generation_index_t to)
                         num_wp += update_page_write_prot(j);
                     }
                 }
+                if ((gencgc_verbose > 1) && (num_wp != 0)) {
+                    FSHOW((stderr,
+                           "/write protected %d pages within generation %d\n",
+                           num_wp, generation));
+                }
             }
             i = last_page;
         }
-    }
-    if ((gencgc_verbose > 1) && (num_wp != 0)) {
-        FSHOW((stderr,
-               "/write protected %d pages within generation %d\n",
-               num_wp, generation));
     }
 
 #if SC_GEN_CK
