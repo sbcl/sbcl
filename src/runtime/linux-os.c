@@ -124,12 +124,15 @@ os_init(char *argv[], char *envp[])
     struct utsname name;
     int major_version;
     int minor_version;
+    int patch_version;
     char *p;
     uname(&name);
     p=name.release;
     major_version = atoi(p);
     p=strchr(p,'.')+1;
     minor_version = atoi(p);
+    p=strchr(p,'.')+1;
+    patch_version = atoi(p);
     if (major_version<2) {
         lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)",
              major_version);
@@ -161,7 +164,11 @@ Please use a more recent kernel or a version of SBCL without threading support.\
      * don't do this trick on other platforms.
      */
 #ifdef LISP_FEATURE_X86
-    if ((major_version == 2 && minor_version >= 6)
+    if ((major_version == 2
+         /* Some old kernels will apparently lose unsupported personality flags
+          * on exec() */
+         && ((minor_version == 6 && patch_version >= 11)
+             || (minor_version > 6)))
         || major_version >= 3)
     {
         int pers = personality(0xffffffffUL);
