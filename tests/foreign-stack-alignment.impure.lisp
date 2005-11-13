@@ -33,7 +33,8 @@
 (defvar *required-alignment*
   #+(and ppc darwin) 16
   #+(and ppc linux) 16
-  #+(or mips x86-64) 8
+  #+x86-64 16
+  #+(or mips) 8
   #+x86 4
   #-(or x86 x86-64 mips (and ppc (or darwin linux))) (error "Unknown platform"))
 
@@ -41,7 +42,9 @@
 ;;;; fork/exec, so that no lisp is on the stack. This is our known-good
 ;;;; number.
 
-(run "cc" "stack-alignment-offset.c" "-o" "stack-alignment-offset")
+(run "cc"
+     #+x86-64 "-fPIC"
+     "stack-alignment-offset.c" "-o" "stack-alignment-offset")
 
 (defparameter *good-offset*
   (parse-integer (run "./stack-alignment-offset"
@@ -50,6 +53,7 @@
 ;;;; Build the tool again, this time as a shared object, and load it
 
 (run "cc" "stack-alignment-offset.c"
+     #+x86-64 "-fPIC"
      #+darwin "-bundle" #-darwin "-shared"
      "-o" "stack-alignment-offset.so")
 
@@ -61,9 +65,11 @@
 ;;;; Now get the offset by calling from lisp, first with a regular foreign function
 ;;;; call, then with an intervening callback.
 
-(assert (= *good-offset* (stack-alignment-offset *required-alignment*)))
+(with-test (:name :regular)
+  (assert (= *good-offset* (stack-alignment-offset *required-alignment*))))
 
-(assert (= *good-offset* (trampoline (alien-lambda int ()
-                                       (stack-alignment-offset *required-alignment*)))))
+(with-test (:name :callback)
+  (assert (= *good-offset* (trampoline (alien-lambda int ()
+                                       (stack-alignment-offset *required-alignment*))))))
 
 ;;;; success!
