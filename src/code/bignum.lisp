@@ -960,7 +960,7 @@
 
 (defun bignum-abs-buffer (bignum len)
   (unless (%bignum-0-or-plusp bignum len)
-    (negate-bignum-in-place bignum len)))
+    (negate-bignum-buffer-in-place bignum len)))
 
 ;;;; shifting
 
