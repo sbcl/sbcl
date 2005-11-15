@@ -63,7 +63,7 @@
 (define-vop (current-binding-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
-    (load-tl-symbol-value res *binding-stack-pointer*)))
+    (load-binding-stack-pointer res)))
 
 ;;;; unwind block hackery
 

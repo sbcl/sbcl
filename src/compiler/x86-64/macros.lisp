@@ -91,6 +91,21 @@
   (declare (ignore temp))
   `(store-symbol-value ,reg ,symbol))
 
+(defmacro load-binding-stack-pointer (reg)
+  #!+sb-thread
+  `(inst mov ,reg (make-ea :qword :base thread-base-tn
+                   :disp (* 8 thread-binding-stack-pointer-slot)))
+  #!-sb-thread
+  `(load-symbol-value ,reg *binding-stack-pointer*))
+
+(defmacro store-binding-stack-pointer (reg)
+  #!+sb-thread
+  `(inst mov (make-ea :qword :base thread-base-tn
+              :disp (* 8 thread-binding-stack-pointer-slot))
+    ,reg)
+  #!-sb-thread
+  `(store-symbol-value ,reg *binding-stack-pointer*))
+
 (defmacro load-type (target source &optional (offset 0))
   #!+sb-doc
   "Loads the type bits of a pointer into target independent of

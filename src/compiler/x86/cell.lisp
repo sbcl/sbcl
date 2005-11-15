@@ -293,10 +293,10 @@
     (let ((tls-index-valid (gen-label))
           (get-tls-index-lock (gen-label))
           (release-tls-index-lock (gen-label)))
-      (load-tl-symbol-value bsp *binding-stack-pointer*)
+      (load-binding-stack-pointer bsp)
       (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
       (inst add bsp (* binding-size n-word-bytes))
-      (store-tl-symbol-value bsp *binding-stack-pointer* temp)
+      (store-binding-stack-pointer bsp)
       (inst or tls-index tls-index)
       (inst jmp :ne tls-index-valid)
 
@@ -349,7 +349,7 @@
     ;; four temporaries?
   (:temporary (:sc unsigned-reg) symbol value bsp tls-index)
   (:generator 0
-    (load-tl-symbol-value bsp *binding-stack-pointer*)
+    (load-binding-stack-pointer bsp)
     (loadw symbol bsp (- binding-symbol-slot binding-size))
     (loadw value bsp (- binding-value-slot binding-size))
 
@@ -359,8 +359,7 @@
 
     (storew 0 bsp (- binding-symbol-slot binding-size))
     (inst sub bsp (* binding-size n-word-bytes))
-    ;; we're done with value, so we can use it as a temp here
-    (store-tl-symbol-value bsp *binding-stack-pointer* value)))
+    (store-binding-stack-pointer bsp)))
 
 #!-sb-thread
 (define-vop (unbind)
@@ -379,7 +378,7 @@
   (:args (where :scs (descriptor-reg any-reg)))
   (:temporary (:sc unsigned-reg) symbol value bsp #!+sb-thread tls-index)
   (:generator 0
-    (load-tl-symbol-value bsp *binding-stack-pointer*)
+    (load-binding-stack-pointer bsp)
     (inst cmp where bsp)
     (inst jmp :e done)
 
@@ -400,8 +399,7 @@
     (inst sub bsp (* binding-size n-word-bytes))
     (inst cmp where bsp)
     (inst jmp :ne loop)
-    ;; we're done with value, so can use it as a temporary
-    (store-tl-symbol-value bsp *binding-stack-pointer* value)
+    (store-binding-stack-pointer bsp)
 
     DONE))
 
