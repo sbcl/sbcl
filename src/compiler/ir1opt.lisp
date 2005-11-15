@@ -1226,20 +1226,28 @@
                       (eq (combination-kind set-use) :known)
                       (fun-info-p (combination-fun-info set-use))
                       (not (node-to-be-deleted-p set-use))
-                      (eq (combination-fun-source-name set-use) '+))
-               :exit-if-null)
+                      (or (eq (combination-fun-source-name set-use) '+)
+                          (eq (combination-fun-source-name set-use) '-)))
+              :exit-if-null)
+             (minusp (eq (combination-fun-source-name set-use) '-))
              (+-args (basic-combination-args set-use))
              (() (and (proper-list-of-length-p +-args 2 2)
                       (let ((first (principal-lvar-use
                                     (first +-args))))
                         (and (ref-p first)
                              (eq (ref-leaf first) var))))
-               :exit-if-null)
+              :exit-if-null)
              (step-type (lvar-type (second +-args)))
              (set-type (lvar-type (set-value set))))
     (when (and (numeric-type-p initial-type)
                (numeric-type-p step-type)
-               (numeric-type-equal initial-type step-type))
+               (or (numeric-type-equal initial-type step-type)
+                   ;; Detect cases like (LOOP FOR 1.0 to 5.0 ...), where
+                   ;; the initial and the step are of different types,
+                   ;; and the step is less contagious.
+                   (numeric-type-equal initial-type
+                                       (numeric-contagion initial-type
+                                                          step-type))))
       (labels ((leftmost (x y cmp cmp=)
                  (cond ((eq x nil) nil)
                        ((eq y nil) nil)
@@ -1256,22 +1264,27 @@
                        (t (if (funcall cmp x y) x y))))
                (max* (x y) (leftmost x y #'> #'>=))
                (min* (x y) (leftmost x y #'< #'<=)))
-        (declare (inline compare))
         (multiple-value-bind (low high)
-            (cond ((csubtypep step-type (specifier-type '(real 0 *)))
-                   (values (numeric-type-low initial-type)
-                           (when (and (numeric-type-p set-type)
-                                      (numeric-type-equal set-type initial-type))
-                             (max* (numeric-type-high initial-type)
-                                   (numeric-type-high set-type)))))
-                  ((csubtypep step-type (specifier-type '(real * 0)))
-                   (values (when (and (numeric-type-p set-type)
-                                      (numeric-type-equal set-type initial-type))
-                             (min* (numeric-type-low initial-type)
-                                   (numeric-type-low set-type)))
-                           (numeric-type-high initial-type)))
-                  (t
-                   (values nil nil)))
+            (let ((step-type-non-negative (csubtypep step-type (specifier-type
+                                                                '(real 0 *))))
+                  (step-type-non-positive (csubtypep step-type (specifier-type
+                                                                '(real * 0)))))
+              (cond ((or (and step-type-non-negative (not minusp))
+                         (and step-type-non-positive minusp))
+                     (values (numeric-type-low initial-type)
+                             (when (and (numeric-type-p set-type)
+                                        (numeric-type-equal set-type initial-type))
+                               (max* (numeric-type-high initial-type)
+                                     (numeric-type-high set-type)))))
+                    ((or (and step-type-non-positive (not minusp))
+                         (and step-type-non-negative minusp))
+                     (values (when (and (numeric-type-p set-type)
+                                        (numeric-type-equal set-type initial-type))
+                               (min* (numeric-type-low initial-type)
+                                     (numeric-type-low set-type)))
+                             (numeric-type-high initial-type)))
+                    (t
+                     (values nil nil))))
           (modified-numeric-type initial-type
                                  :low low
                                  :high high
