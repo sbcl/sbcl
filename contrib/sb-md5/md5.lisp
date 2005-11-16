@@ -416,11 +416,14 @@ bounded by start and end, which must be numeric bounding-indices."
         (declare (type (integer 0 63) amount))
         (copy-to-buffer sequence start amount buffer buffer-index)
         (setq start (the fixnum (+ start amount)))
-        (when (>= start end)
-          (setf (md5-state-buffer-index state) (+ buffer-index amount))
-          (return-from update-md5-state state)))
-      (fill-block-ub8 block buffer 0)
-      (update-md5-block regs block))
+        (let ((new-index (mod (+ buffer-index amount) 64)))
+          (when (zerop new-index)
+            (fill-block-ub8 block buffer 0)
+            (update-md5-block regs block))
+          (when (>= start end)
+            (setf (md5-state-buffer-index state) new-index)
+            (incf (md5-state-amount state) length)
+            (return-from update-md5-state state)))))
     ;; Handle main-part and new-rest
     (etypecase sequence
       ((simple-array (unsigned-byte 8) (*))
@@ -513,11 +516,19 @@ in SEQUENCE , which must be a vector with element-type (UNSIGNED-BYTE
     (let ((state (make-md5-state)))
       (declare (type md5-state state))
       #+cmu
-      (lisp::with-array-data ((data sequence) (real-start start) (real-end end))
-        (update-md5-state state data :start real-start :end real-end))
+      ;; respect the fill pointer
+      (let ((end (or end (length sequence))))
+        (lisp::with-array-data ((data sequence) (real-start start) (real-end end))
+          (declare (ignore real-end))
+          (update-md5-state state data :start real-start
+                            :end (+ real-start (- end start)))))
       #+sbcl
-      (sb-kernel:with-array-data ((data sequence) (real-start start) (real-end end))
-        (update-md5-state state data :start real-start :end real-end))
+      ;; respect the fill pointer
+      (let ((end (or end (length sequence))))
+        (sb-kernel:with-array-data ((data sequence) (real-start start) (real-end end))
+          (declare (ignore real-end))
+          (update-md5-state state data :start real-start
+                            :end (+ real-start (- end start)))))
       #-(or cmu sbcl)
       (let ((real-end (or end (length sequence))))
         (declare (type fixnum real-end))

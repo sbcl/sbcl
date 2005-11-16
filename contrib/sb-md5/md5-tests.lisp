@@ -2,18 +2,45 @@
   (:use #:sb-md5 #:cl #:sb-rt))
 (in-package #:sb-md5-tests)
 
+(defun byte-array-to-hex-string (bytevec)
+  (format nil "~(~{~2,'0X~}~)" (coerce bytevec 'list)))
+
+(defun one-shot-test (string)
+  (md5sum-string string :external-format :ascii))
+
+(defun incremental-test (string)
+  (let ((bytevec (sb-ext:string-to-octets string :external-format :ascii))
+        (state (sb-md5:make-md5-state)))
+    (dotimes (i (length bytevec) (sb-md5:finalize-md5-state state))
+      (sb-md5:update-md5-state state bytevec :start i :end (1+ i)))))
+
+(defun fill-pointer-test (string)
+  (let* ((bytevec (sb-ext:string-to-octets string :external-format :ascii))
+         (fillvec (let ((x (make-array (* 2 (length bytevec))
+                                       :fill-pointer 0
+                                       :element-type '(unsigned-byte 8))))
+                    (dotimes (i (length bytevec) x)
+                      (vector-push (aref bytevec i) x)))))
+    (sb-md5:md5sum-sequence fillvec)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defun tests-for-test-suite (basename index string expected-result)
+  (loop for (test-kind testfun) in '(("ONE-SHOT" one-shot-test)
+                                     ("INCREMENTAL" incremental-test)
+                                     ("FILL-POINTER" fill-pointer-test))
+     collect `(deftest ,(intern (format nil "~A.~A.~A" basename test-kind index))
+                  (string= (byte-array-to-hex-string (funcall ',testfun ,string))
+                           ,expected-result)
+                t) into test-forms
+       finally (return `(progn ,@test-forms))))
+) ; EVAL-WHEN
+    
 (macrolet
     ((define-rfc1321-tests (test-list)
          `(progn
            ,@(loop for i upfrom 0
                    for (string . expected-result) in test-list
-                   collect
-                   `(deftest ,(intern (format nil "SB-MD5.RFC1321.~A" i))
-                     (string= (format nil
-                               "~(~{~2,'0X~}~)"
-                               (coerce (md5sum-string ,string :external-format :ascii) 'list))
-                      ,expected-result)
-                     t)))))
+                   collect (tests-for-test-suite "SB-MD5.RFC1321" i string expected-result)))))
   (define-rfc1321-tests
       (("" . "d41d8cd98f00b204e9800998ecf8427e")
        ("a" ."0cc175b9c0f1b6a831c399e269772661")
@@ -28,13 +55,7 @@
          `(progn
            ,@(loop for i upfrom 0
                    for (string . expected-result) in test-list
-                   collect
-                   `(deftest ,(intern (format nil "SB-MD5.OTHER.~A" i))
-                     (string=
-                      (format nil "~(~{~2,'0X~}~)"
-                       (coerce (md5sum-string ,string :external-format :ascii) 'list))
-                      ,expected-result)
-                     t)))))
+                   collect (tests-for-test-suite "SB-MD5.OTHER" i string expected-result)))))
   (define-other-tests
       (;; From padding bug report by Edi Weitz
        ("1631901HERR BUCHHEISTERCITROEN NORD1043360796beckenbauer" . "d734945e5930bb28859ccd13c830358b")
