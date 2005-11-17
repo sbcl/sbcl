@@ -34,7 +34,7 @@
                 t) into test-forms
        finally (return `(progn ,@test-forms))))
 ) ; EVAL-WHEN
-    
+
 (macrolet
     ((define-rfc1321-tests (test-list)
          `(progn

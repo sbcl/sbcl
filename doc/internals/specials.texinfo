@@ -1,0 +1,55 @@
+@node Specials
+@comment  node-name,  next,  previous,  up
+@chapter Specials
+
+@menu
+* Overview::                    
+* Binding and unbinding::       
+@end menu
+
+@node Overview
+@section Overview
+
+Unithread SBCL uses a shallow binding scheme: the current value of a
+symbol is stored directly in its value slot. Accessing specials is
+pretty fast but it's still a lot slower than accessing lexicals.
+
+With multithreading it's slightly more complicated. The symbol's value
+slot contains the global value and each symbol has a @code{TLS-INDEX}
+slot that - when it's first bound - is set to a unique index of the
+thread local area reserved for this purpose. The tls index is
+initially zero and at index zero in the tls @code{NO-TLS-VALUE-MARKER}
+resides. @code{NO-TLS-VALUE-MARKER} is different from
+@code{UNBOUND-MARKER} to allow @code{PROGV} to bind a special to no
+value locally in a thread.
+
+@node Binding and unbinding
+@section Binding and unbinding
+
+Binding goes like this: the binding stack pointer (bsp) is bumped, old
+value and symbol are stored at bsp - 1, new value is stored in
+symbol's value slot or the tls.
+
+Unbinding: the symbol's value is restored from bsp - 1, value and
+symbol at bsp - 1 are set to zero, and finally bsp is decremented.
+
+The @code{UNBIND-TO-HERE} VOP assists in unwinding the stack. It
+iterates over the bindings on the binding stack until it reaches the
+prescribed point. For each binding with a non-zero symbol it does an
+@code{UNBIND}.
+
+How can a binding's symbol be zero? @code{BIND} is not pseudo atomic
+(for performance reasons) and it can be interrupted by a signal. If
+the signal hits after the bsp is incremented but before the values on
+the stack are set the symbol is zero because a thread starts with a
+zeroed tls plus @code{UNBIND} and @code{UNBIND-TO-HERE} both zero the
+binding being unbound.
+
+Zeroing the binding's symbol would not be enough as the binding's
+value can be moved or garbage collected and if the above interrupt
+initiates gc (or be @code{SIG_STOP_FOR_GC}) it will be greeted by a
+garbage pointer.
+
+Furthermore, @code{BIND} must always write the value to the binding
+stack first and the symbol second because the symbol being non-zero
+means validity to @code{UNBIND-TO-HERE}.

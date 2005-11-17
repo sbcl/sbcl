@@ -167,6 +167,7 @@
     (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
     (loadw value bsp-tn (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
+    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
     (inst addi (- (* binding-size n-word-bytes)) bsp-tn bsp-tn)))
 
@@ -181,6 +182,7 @@
     (inst comb := symbol zero-tn skip)
     (loadw value bsp-tn (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
+    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
     SKIP

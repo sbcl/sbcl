@@ -476,6 +476,65 @@
  (lambda ()
    (sb-ext:run-program "sleep" '("1") :search t :wait nil)))
 
+;;;; Binding stack safety
+
+(defparameter *x* nil)
+(defparameter *n-gcs-requested* 0)
+(defparameter *n-gcs-done* 0)
+
+(let ((counter 0))
+  (defun make-something-big ()
+    (let ((x (make-string 32000)))
+      (incf counter)
+      (let ((counter counter))
+        (sb-ext:finalize x (lambda () (format t " ~S" counter)
+                                   (force-output)))))))
+
+(defmacro wait-for-gc ()
+  `(progn
+     (incf *n-gcs-requested*)
+     (loop while (< *n-gcs-done* *n-gcs-requested*))))
+
+(defun send-gc ()
+  (loop until (< *n-gcs-done* *n-gcs-requested*))
+  (format t "G" *n-gcs-requested* *n-gcs-done*)
+  (force-output)
+  (sb-ext:gc)
+  (incf *n-gcs-done*))
+
+(defun exercise-binding ()
+  (loop
+   (let ((*x* (make-something-big)))
+     (let ((*x* 42))
+       ;; at this point the binding stack looks like this:
+       ;; NO-TLS-VALUE-MARKER, *x*, SOMETHING, *x*
+       t))
+   (wait-for-gc)
+   ;; sig_stop_for_gc_handler binds FREE_INTERRUPT_CONTEXT_INDEX. By
+   ;; now SOMETHING is gc'ed and the binding stack looks like this: 0,
+   ;; 0, SOMETHING, 0 (because the symbol slots are zeroed on
+   ;; unbinding but values are not).
+   (let ((*x* nil))
+     ;; bump bsp as if a BIND had just started
+     (incf sb-vm::*binding-stack-pointer* 2)
+     (wait-for-gc)
+     (decf sb-vm::*binding-stack-pointer* 2))))
+
+(with-test (:name (:binding-stack-gc-safety))
+  (let (threads)
+    (unwind-protect
+         (progn
+           (push (sb-thread:make-thread #'exercise-binding) threads)
+           (push (sb-thread:make-thread (lambda ()
+                                          (loop
+                                           (send-gc))))
+                 threads)
+           (sleep 4))
+      (mapc #'sb-thread:terminate-thread threads))))
+
+(format t "~&binding test done~%")
+
+
 #|  ;; a cll post from eric marsden
 | (defun crash ()
 |   (setq *debugger-hook*

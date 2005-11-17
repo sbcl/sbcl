@@ -357,6 +357,7 @@
     (inst fs-segment-prefix)
     (inst mov (make-ea :dword :scale 1 :index tls-index) value)
 
+    (storew 0 bsp (- binding-value-slot binding-size))
     (storew 0 bsp (- binding-symbol-slot binding-size))
     (inst sub bsp (* binding-size n-word-bytes))
     (store-binding-stack-pointer bsp)))
@@ -369,6 +370,7 @@
     (loadw symbol bsp (- binding-symbol-slot binding-size))
     (loadw value bsp (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
+    (storew 0 bsp (- binding-value-slot binding-size))
     (storew 0 bsp (- binding-symbol-slot binding-size))
     (inst sub bsp (* binding-size n-word-bytes))
     (store-symbol-value bsp *binding-stack-pointer*)))
@@ -393,6 +395,7 @@
                   tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
     #!+sb-thread (inst fs-segment-prefix)
     #!+sb-thread (inst mov (make-ea :dword :scale 1 :index tls-index) value)
+    (storew 0 bsp (- binding-value-slot binding-size))
     (storew 0 bsp (- binding-symbol-slot binding-size))
 
     SKIP
