@@ -382,6 +382,23 @@
 (let ((subs (sb-mop:class-direct-subclasses (find-class 'bug-331-super))))
   (assert (= 1 (length subs)))
   (assert (eq (car subs) (find-class 'bug-331-sub))))
+;;; (addendum to test for #331: conditions suffered the same problem)
+(define-condition condition-bug-331-super () ())
+(define-condition condition-bug-331-sub (condition-bug-331-super) ())
+(let ((subs (sb-mop:class-direct-subclasses 
+             (find-class 'condition-bug-331-super))))
+  (assert (= 1 (length subs)))
+  (assert (eq (car subs) (find-class 'condition-bug-331-sub))))
+;;; (addendum to the addendum: the fix for this revealed breakage in
+;;; REINITIALIZE-INSTANCE)
+(define-condition condition-bug-331a () ((slot331a :reader slot331a)))
+(reinitialize-instance (find-class 'condition-bug-331a))
+(let* ((gf #'slot331a)
+       (methods (sb-mop:generic-function-methods gf)))
+  (assert (= (length methods) 1))
+  (assert (eq (car methods) 
+              (find-method #'slot331a nil 
+                           (list (find-class 'condition-bug-331a))))))
 
 ;;; detection of multiple class options in defclass, reported by Bruno Haible
 (defclass option-class (standard-class)

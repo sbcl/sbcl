@@ -588,14 +588,15 @@
           (t
            (error "~@<~S is not the name of a class.~@:>" name)))))
 
-(defun ensure-defstruct-class (classoid)
+(defun ensure-deffoo-class (classoid)
   (let ((class (classoid-pcl-class classoid)))
     (cond (class
            (ensure-non-standard-class (class-name class) class))
           ((eq 'complete *boot-state*)
            (ensure-non-standard-class (classoid-name classoid))))))
 
-(pushnew 'ensure-defstruct-class sb-kernel::*defstruct-hooks*)
+(pushnew 'ensure-deffoo-class sb-kernel::*defstruct-hooks*)
+(pushnew 'ensure-deffoo-class sb-kernel::*define-condition-hooks*)
 
 (defun make-class-predicate (class name)
   (let* ((gf (ensure-generic-function name :lambda-list '(object)))

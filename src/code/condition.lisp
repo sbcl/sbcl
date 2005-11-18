@@ -391,6 +391,8 @@
         (lambda (new-value condition)
           (condition-writer-function condition new-value slot-name))))
 
+(defvar *define-condition-hooks* nil)
+
 (defun %define-condition (name parent-types layout slots documentation
                           report default-initargs all-readers all-writers
                           source-location)
@@ -440,7 +442,10 @@
                        (dolist (initarg (condition-slot-initargs slot) nil)
                          (when (functionp (getf e-def-initargs initarg))
                            (return t))))
-               (push slot (condition-classoid-hairy-slots class))))))))
+               (push slot (condition-classoid-hairy-slots class)))))))
+      (when (boundp '*define-condition-hooks*)
+        (dolist (fun *define-condition-hooks*)
+          (funcall fun class))))
     name))
 
 (defmacro define-condition (name (&rest parent-types) (&rest slot-specs)

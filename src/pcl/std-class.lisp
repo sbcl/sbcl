@@ -514,6 +514,21 @@
                   (lambda (dependent)
                     (apply #'update-dependent class dependent initargs))))
 
+(defmethod reinitialize-instance :after ((class condition-class) &key)
+  (let* ((name (class-name class))
+         (classoid (find-classoid name))
+         (slots (condition-classoid-slots classoid)))
+    ;; to balance the REMOVE-SLOT-ACCESSORS call in
+    ;; REINITIALIZE-INSTANCE :BEFORE (SLOT-CLASS).
+    (dolist (slot slots)
+      (let ((slot-name (condition-slot-name slot)))
+        (dolist (reader (condition-slot-readers slot))
+          ;; FIXME: see comment in SHARED-INITIALIZE :AFTER
+          ;; (CONDITION-CLASS T), below.  -- CSR, 2005-11-18
+          (sb-kernel::install-condition-slot-reader reader name slot-name))
+        (dolist (writer (condition-slot-writers slot))
+          (sb-kernel::install-condition-slot-writer writer name slot-name))))))
+
 (defmethod shared-initialize :after ((class condition-class) slot-names
                                      &key direct-slots direct-superclasses)
   (declare (ignore slot-names))
@@ -540,6 +555,14 @@
   ;; We don't ADD-SLOT-ACCESSORS here because we don't want to
   ;; override condition accessors with generic functions.  We do this
   ;; differently.
+  ;;
+  ;; ??? What does the above comment mean and why is it a good idea?
+  ;; CMUCL (which still as of 2005-11-18 uses this code and has this
+  ;; comment) loses slot information in its condition classes:
+  ;; DIRECT-SLOTS is always NIL.  We have the right information, so we
+  ;; remove slot accessors but never put them back.  I've added a
+  ;; REINITIALIZE-INSTANCE :AFTER (CONDITION-CLASS) method, but what
+  ;; was meant to happen?  -- CSR, 2005-11-18
   (update-pv-table-cache-info class))
 
 (defmethod direct-slot-definition-class ((class condition-class)

@@ -20,6 +20,9 @@ changes in sbcl-0.9.7 relative to sbcl-0.9.6:
   * bug fix: the dependent update protocol now works for generic
     functions.  (thanks to Gerd Moellmann; reported by Bruno Haible
     and Pascal Costanza)
+  * bug fix: condition-class instances corresponding to
+    DEFINE-CONDITION forms are now created eagerly.  (reported by
+    Kalle Olavi Niemitalo on comp.lang.lisp)
   * bug fix: floating point printing is more accurate in some
     circumstances.  (thanks to Simon Alexander)
   * bug fix: *COMPILE-FILE-PATHNAME* now contains the user's pathname
