@@ -114,11 +114,10 @@
     (with-mutex (l)
       (with-recursive-lock (l)))))
 
-(let ((l (make-spinlock :name "spinlock"))
-      (p *current-thread*))
+(let ((l (make-spinlock :name "spinlock")))
   (assert (eql (spinlock-value l) 0) nil "1")
   (with-spinlock (l)
-    (assert (eql (spinlock-value l) p) nil "2"))
+    (assert (eql (spinlock-value l) 1) nil "2"))
   (assert (eql (spinlock-value l) 0) nil "3"))
 
 ;; test that SLEEP actually sleeps for at least the given time, even
@@ -534,7 +533,31 @@
 
 (format t "~&binding test done~%")
 
+;; Try to corrupt the NEXT-VECTOR. Operations on a hash table with a
+;; cyclic NEXT-VECTOR can loop endlessly in a WITHOUT-GCING form
+;; causing the next gc hang SBCL.
+(with-test (:name (:hash-table-thread-safety))
+  (let* ((hash (make-hash-table))
+         (threads (list (sb-thread:make-thread
+                         (lambda ()
+                           (loop
+                            ;;(princ "1") (force-output)
+                            (setf (gethash (random 100) hash) 'h))))
+                        (sb-thread:make-thread
+                         (lambda ()
+                           (loop
+                            ;;(princ "2") (force-output)
+                            (remhash (random 100) hash))))
+                        (sb-thread:make-thread
+                         (lambda ()
+                           (loop
+                            (sleep (random 1.0))
+                            (sb-ext:gc :full t)))))))
+    (unwind-protect
+         (sleep 5)
+      (mapc #'sb-thread:terminate-thread threads))))
 
+(format t "~&hash table test done~%")
 #|  ;; a cll post from eric marsden
 | (defun crash ()
 |   (setq *debugger-hook*

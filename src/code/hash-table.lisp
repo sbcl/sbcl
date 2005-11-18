@@ -70,7 +70,9 @@
   ;; +MAGIC-HASH-VECTOR-VALUE+ represents EQ-based hashing on the
   ;; respective key.
   (hash-vector nil :type (or null (simple-array (unsigned-byte
-                                                 #.sb!vm:n-word-bits) (*)))))
+                                                 #.sb!vm:n-word-bits) (*))))
+  ;; This lock is acquired by %PUTHASH, REMHASH, CLRHASH and GETHASH.
+  (spinlock (sb!thread::make-spinlock)))
 
 ;; as explained by pmai on openprojects #lisp IRC 2002-07-30: #x80000000
 ;; is bigger than any possible nonEQ hash value, and thus indicates an

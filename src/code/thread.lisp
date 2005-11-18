@@ -11,6 +11,18 @@
 
 (in-package "SB!THREAD")
 
+(def!struct mutex
+  #!+sb-doc
+  "Mutex type."
+  (name nil :type (or null simple-string))
+  (value nil))
+
+(def!struct spinlock
+  #!+sb-doc
+  "Spinlock type."
+  (name nil :type (or null simple-string))
+  (value 0))
+
 (sb!xc:defmacro with-mutex ((mutex &key (value '*current-thread*) (wait-p t))
                             &body body)
   #!+sb-doc
@@ -43,7 +55,8 @@ further recursive lock attempts for the same mutex succeed. It is
 allowed to mix WITH-MUTEX and WITH-RECURSIVE-LOCK for the same mutex
 provided the default value is used for the mutex."
   #!-sb-thread
-  (declare (ignore mutex)) #!+sb-thread
+  (declare (ignore mutex))
+  #!+sb-thread
   (with-unique-names (mutex1 inner-lock-p)
     `(let* ((,mutex1 ,mutex)
             (,inner-lock-p (eq (mutex-value ,mutex1) *current-thread*)))

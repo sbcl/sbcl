@@ -23,5 +23,18 @@
   (declare (ignore mutex))
   `(locally ,@body))
 
+(defun make-spinlock (&key name value)
+  (declare (ignore name value))
+  nil)
 
+(defun get-spinlock (spinlock)
+  (declare (ignore spinlock))
+  nil)
 
+(defun release-spinlock (spinlock)
+  (declare (ignore spinlock))
+  nil)
+
+(defmacro with-spinlock ((spinlock) &body body)
+  (declare (ignore spinlock))
+  `(locally ,@body))

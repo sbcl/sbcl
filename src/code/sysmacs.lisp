@@ -38,13 +38,10 @@ gcs. Finally, upon leaving the BODY if gc is not inhibited it runs the
 pending gc. Similarly, if gc is triggered in another thread then it
 waits until gc is enabled in this thread."
   `(unwind-protect
-    (let ((*gc-inhibit* t))
-      ,@body)
-    ;; the test is racy, but it can err only on the overeager side
-    (when (and (not *gc-inhibit*)
-               (or #!+sb-thread *stop-for-gc-pending*
-                   *gc-pending*))
-      (sb!unix::receive-pending-interrupt))))
+        (let ((*gc-inhibit* t))
+          ,@body)
+     ;; the test is racy, but it can err only on the overeager side
+     (sb!kernel::maybe-handle-pending-gc)))
 
 
 ;;; EOF-OR-LOSE is a useful macro that handles EOF.

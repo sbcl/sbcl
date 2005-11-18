@@ -117,17 +117,11 @@ in future versions."
 
 ;;;; spinlocks
 
-(defstruct spinlock
-  #!+sb-doc
-  "Spinlock type."
-  (name nil :type (or null simple-string))
-  (value 0))
-
 (declaim (inline get-spinlock release-spinlock))
 
 ;;; The bare 2 here and below are offsets of the slots in the struct.
 ;;; There ought to be some better way to get these numbers
-(defun get-spinlock (spinlock new-value)
+(defun get-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0))
            #!-sb-thread
            (ignore spinlock new-value))
@@ -135,7 +129,7 @@ in future versions."
   ;; store any value
   #!+sb-thread
   (loop until
-        (eql (sb!vm::%instance-set-conditional spinlock 2 0 new-value) 0)))
+        (eql (sb!vm::%instance-set-conditional spinlock 2 0 1) 0)))
 
 (defun release-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0))
@@ -150,18 +144,12 @@ in future versions."
 (defmacro with-spinlock ((spinlock) &body body)
   (sb!int:with-unique-names (lock)
     `(let ((,lock ,spinlock))
-      (get-spinlock ,lock *current-thread*)
+      (get-spinlock ,lock)
       (unwind-protect
            (progn ,@body)
         (release-spinlock ,lock)))))
 
 ;;;; mutexes
-
-(defstruct mutex
-  #!+sb-doc
-  "Mutex type."
-  (name nil :type (or null simple-string))
-  (value nil))
 
 #!+sb-doc
 (setf (sb!kernel:fdocumentation 'make-mutex 'function)

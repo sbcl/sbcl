@@ -104,6 +104,7 @@
         *cold-init-complete-p* nil
         *type-system-initialized* nil)
 
+  (show-and-call thread-init-or-reinit)
   (show-and-call !typecheckfuns-cold-init)
 
   ;; Anyone might call RANDOM to initialize a hash value or something;
@@ -214,7 +215,6 @@
 
   (show-and-call os-cold-init-or-reinit)
 
-  (show-and-call thread-init-or-reinit)
   (show-and-call stream-cold-init-or-reset)
   (show-and-call !loader-cold-init)
   (show-and-call !foreign-cold-init)

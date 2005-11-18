@@ -14,6 +14,23 @@
 
 ;;;; utilities
 
+;; This stuff is performance critical and unwind-protect is too
+;; slow. And without the locking the next vector can get cyclic
+;; causing looping in a WITHOUT-GCING form, SHRINK-VECTOR can corrupt
+;; memory and who knows what else.
+(defmacro with-spinlock-and-without-gcing ((spinlock) &body body)
+  #!-sb-thread
+  (declare (ignore spinlock))
+  `(unwind-protect
+        (let ((*gc-inhibit* t))
+          #!+sb-thread
+          (sb!thread::get-spinlock ,spinlock)
+          ,@body)
+     #!+sb-thread
+     (sb!thread::release-spinlock ,spinlock)
+     ;; the test is racy, but it can err only on the overeager side
+     (sb!kernel::maybe-handle-pending-gc)))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant max-hash sb!xc:most-positive-fixnum))
 
@@ -181,7 +198,8 @@
                    :hash-vector (unless (eq test 'eq)
                                   (make-array size+1
                                               :element-type '(unsigned-byte #.sb!vm:n-word-bits)
-                                              :initial-element +magic-hash-vector-value+)))))
+                                              :initial-element +magic-hash-vector-value+))
+                   :spinlock (sb!thread::make-spinlock))))
       (declare (type index size+1 scaled-size length))
       ;; Set up the free list, all free. These lists are 0 terminated.
       (do ((i 1 (1+ i)))
@@ -422,7 +440,7 @@
   "Three argument version of GETHASH"
   (declare (type hash-table hash-table)
            (values t (member t nil)))
-  (without-gcing
+  (with-spinlock-and-without-gcing ((hash-table-spinlock hash-table))
    (cond ((= (get-header-data (hash-table-table hash-table))
              sb!vm:vector-must-rehash-subtype)
           (rehash-without-growing hash-table))
@@ -473,7 +491,7 @@
 (defun %puthash (key hash-table value)
   (declare (type hash-table hash-table))
   (aver (hash-table-index-vector hash-table))
-  (without-gcing
+  (with-spinlock-and-without-gcing ((hash-table-spinlock hash-table))
    ;; We need to rehash here so that a current key can be found if it
    ;; exists. Check that there is room for one more entry. May not be
    ;; needed if the key is already present.
@@ -549,7 +567,8 @@
              (when hash-vector
                (if (not eq-based)
                    (setf (aref hash-vector free-kv-slot) hashing)
-                 (aver (= (aref hash-vector free-kv-slot) +magic-hash-vector-value+))))
+                   (aver (= (aref hash-vector free-kv-slot)
+                            +magic-hash-vector-value+))))
 
              ;; Push this slot into the next chain.
              (setf (aref next-vector free-kv-slot) next)
@@ -562,7 +581,7 @@
    was such an entry, or NIL if not."
   (declare (type hash-table hash-table)
            (values (member t nil)))
-  (without-gcing
+  (with-spinlock-and-without-gcing ((hash-table-spinlock hash-table))
    ;; We need to rehash here so that a current key can be found if it
    ;; exists.
    (cond ((= (get-header-data (hash-table-table hash-table))
@@ -599,7 +618,8 @@
                       (hash-table-next-free-kv hash-table))
                 (setf (hash-table-next-free-kv hash-table) slot-location)
                 (when hash-vector
-                  (setf (aref hash-vector slot-location) +magic-hash-vector-value+))
+                  (setf (aref hash-vector slot-location)
+                        +magic-hash-vector-value+))
                 (decf (hash-table-number-entries hash-table))
                 t))
          (cond ((zerop next)
@@ -633,31 +653,32 @@
   "This removes all the entries from HASH-TABLE and returns the hash table
    itself."
   (declare (optimize speed))
-  (let* ((kv-vector (hash-table-table hash-table))
-         (next-vector (hash-table-next-vector hash-table))
-         (hash-vector (hash-table-hash-vector hash-table))
-         (size (length next-vector))
-         (index-vector (hash-table-index-vector hash-table)))
-    ;; Disable GC tricks.
-    (set-header-data kv-vector sb!vm:vector-normal-subtype)
-    ;; Mark all slots as empty by setting all keys and values to magic
-    ;; tag.
-    (aver (eq (aref kv-vector 0) hash-table))
-    (fill kv-vector +empty-ht-slot+ :start 2)
-    ;; Set up the free list, all free.
-    (do ((i 1 (1+ i)))
-        ((>= i (1- size)))
-      (setf (aref next-vector i) (1+ i)))
-    (setf (aref next-vector (1- size)) 0)
-    (setf (hash-table-next-free-kv hash-table) 1)
-    (setf (hash-table-needing-rehash hash-table) 0)
-    ;; Clear the index-vector.
-    (fill index-vector 0)
-    ;; Clear the hash-vector.
-    (when hash-vector
-      (fill hash-vector +magic-hash-vector-value+)))
-  (setf (hash-table-cache hash-table) nil)
-  (setf (hash-table-number-entries hash-table) 0)
+  (with-spinlock-and-without-gcing ((hash-table-spinlock hash-table))
+    (let* ((kv-vector (hash-table-table hash-table))
+           (next-vector (hash-table-next-vector hash-table))
+           (hash-vector (hash-table-hash-vector hash-table))
+           (size (length next-vector))
+           (index-vector (hash-table-index-vector hash-table)))
+      ;; Disable GC tricks.
+      (set-header-data kv-vector sb!vm:vector-normal-subtype)
+      ;; Mark all slots as empty by setting all keys and values to magic
+      ;; tag.
+      (aver (eq (aref kv-vector 0) hash-table))
+      (fill kv-vector +empty-ht-slot+ :start 2)
+      ;; Set up the free list, all free.
+      (do ((i 1 (1+ i)))
+          ((>= i (1- size)))
+          (setf (aref next-vector i) (1+ i)))
+      (setf (aref next-vector (1- size)) 0)
+      (setf (hash-table-next-free-kv hash-table) 1)
+      (setf (hash-table-needing-rehash hash-table) 0)
+      ;; Clear the index-vector.
+      (fill index-vector 0)
+      ;; Clear the hash-vector.
+      (when hash-vector
+        (fill hash-vector +magic-hash-vector-value+)))
+    (setf (hash-table-cache hash-table) nil)
+    (setf (hash-table-number-entries hash-table) 0))
   hash-table)
 
 ;;;; MAPHASH

@@ -250,16 +250,20 @@ environment these hooks may run in any thread.")
                                (sb!alien:unsigned 32))
         val))
 
+(declaim (inline maybe-handle-pending-gc))
+(defun maybe-handle-pending-gc ()
+  (when (and (not *gc-inhibit*)
+             (or #!+sb-thread *stop-for-gc-pending*
+                 *gc-pending*))
+    (sb!unix::receive-pending-interrupt)))
+
 ;;; These work both regardless of whether we're inside WITHOUT-GCING
 ;;; or not.
 (defun gc-on ()
   #!+sb-doc
   "Enable the garbage collector."
   (setq *gc-inhibit* nil)
-  (when (and (not *gc-inhibit*)
-             (or #!+sb-thread *stop-for-gc-pending*
-                 *gc-pending*))
-    (sb!unix::receive-pending-interrupt))
+  (maybe-handle-pending-gc)
   nil)
 
 (defun gc-off ()
