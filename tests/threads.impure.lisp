@@ -496,7 +496,7 @@
 
 (defun send-gc ()
   (loop until (< *n-gcs-done* *n-gcs-requested*))
-  (format t "G" *n-gcs-requested* *n-gcs-done*)
+  (format t "G")
   (force-output)
   (sb-ext:gc)
   (incf *n-gcs-done*))

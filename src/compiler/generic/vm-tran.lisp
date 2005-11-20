@@ -79,6 +79,8 @@
                 `(the ,(type-specifier declared-element-ctype)
                       ,bare-form)))))))
 
+;;; Transform multi-dimensional to one dimensional SIMPLE-ARRAY
+;;; access.
 (deftransform data-vector-ref ((array index)
                                (simple-array t))
   (let ((array-type (lvar-type array)))

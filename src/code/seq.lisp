@@ -1383,7 +1383,7 @@
             (= number-zapped count))
         (do ((index index (,bump index))
              (new-index new-index (,bump new-index)))
-            ((= index (the fixnum ,right)) (shrink-vector result new-index))
+            ((= index (the fixnum ,right)) (%shrink-vector result new-index))
           (declare (fixnum index new-index))
           (setf (aref result new-index) (aref sequence index))))
      (declare (fixnum index new-index number-zapped))
@@ -1665,7 +1665,7 @@
       (setf (aref result jndex) (aref vector index))
       (setq index (1+ index))
       (setq jndex (1+ jndex)))
-    (shrink-vector result jndex)))
+    (%shrink-vector result jndex)))
 
 (define-sequence-traverser remove-duplicates
     (sequence &key test test-not start end from-end key)

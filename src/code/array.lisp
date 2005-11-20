@@ -825,7 +825,8 @@ of specialized arrays is supported."
                (declare (fixnum old-length new-length))
                (with-array-data ((old-data array) (old-start)
                                  (old-end old-length))
-                 (cond ((or (%array-displaced-p array)
+                 (cond ((or (and (array-header-p array)
+                                 (%array-displaced-p array))
                             (< old-length new-length))
                         (setf new-data
                               (data-vector-from-inits
@@ -849,7 +850,8 @@ of specialized arrays is supported."
                (with-array-data ((old-data array) (old-start)
                                  (old-end old-length))
                  (declare (ignore old-end))
-                 (let ((new-data (if (or (%array-displaced-p array)
+                 (let ((new-data (if (or (and (array-header-p array)
+                                              (%array-displaced-p array))
                                          (> new-length old-length))
                                      (data-vector-from-inits
                                       dimensions new-length
@@ -900,8 +902,12 @@ of specialized arrays is supported."
                 fill-pointer))))
 
 ;;; Destructively alter VECTOR, changing its length to NEW-LENGTH,
-;;; which must be less than or equal to its current length.
-(defun shrink-vector (vector new-length)
+;;; which must be less than or equal to its current length. This can
+;;; be called on vectors without a fill pointer but it is extremely
+;;; dangerous to do so: shrinking the size of an object (as viewed by
+;;; the gc) makes bounds checking unreliable in the face of interrupts
+;;; or multi-threading. Call it only on provably local vectors.
+(defun %shrink-vector (vector new-length)
   (declare (vector vector))
   (unless (array-header-p vector)
     (macrolet ((frob (name &rest things)
@@ -915,6 +921,10 @@ of specialized arrays is supported."
                                           ,fill-value
                                           :start new-length))))
                               things))))
+      ;; Set the 'tail' of the vector to the appropriate type of zero,
+      ;; "because in some cases we'll scavenge larger areas in one go,
+      ;; like groups of pages that had triggered the write barrier, or
+      ;; the whole static space" according to jsnell.
       #.`(frob vector
           ,@(map 'list
                  (lambda (saetp)
@@ -931,6 +941,14 @@ of specialized arrays is supported."
   ;; parameter in the same place.
   (setf (%array-fill-pointer vector) new-length)
   vector)
+
+(defun shrink-vector (vector new-length)
+  (declare (vector vector))
+  (cond ((eq (length vector) new-length)
+         vector)
+        ((array-has-fill-pointer-p vector)
+         (setf (%array-fill-pointer vector) new-length))
+        (t (subseq vector 0 new-length))))
 
 ;;; Fill in array header with the provided information, and return the array.
 (defun set-array-header (array data length fill-pointer displacement dimensions

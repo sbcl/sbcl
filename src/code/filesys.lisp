@@ -75,7 +75,7 @@
              :complaint "backslash in a bad place"
              :namestring namestr
              :offset (1- end)))
-    (shrink-vector result dst)))
+    (%shrink-vector result dst)))
 
 (defvar *ignore-wildcards* nil)
 
@@ -652,7 +652,7 @@
               ((zerop q)
                (incf i)
                (replace res res :start2 i :end2 len)
-               (shrink-vector res (- len i)))
+               (%shrink-vector res (- len i)))
            (declare (simple-string res)
                     (fixnum len i r q))
            (multiple-value-setq (q r) (truncate q 10))

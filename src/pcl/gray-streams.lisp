@@ -229,10 +229,10 @@
     (loop
      (let ((ch (stream-read-char stream)))
        (cond ((eq ch :eof)
-              (return (values (shrink-vector res index) t)))
+              (return (values (%shrink-vector res index) t)))
              (t
               (when (char= ch #\newline)
-                (return (values (shrink-vector res index) nil)))
+                (return (values (%shrink-vector res index) nil)))
               (when (= index len)
                 (setq len (* len 2))
                 (let ((new (make-string len)))

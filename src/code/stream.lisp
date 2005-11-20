@@ -248,7 +248,7 @@
            (cond (ch
                   (when (char= ch #\newline)
                     (done-with-fast-read-char)
-                    (return (values (shrink-vector res index) nil)))
+                    (return (values (%shrink-vector res index) nil)))
                   (when (= index len)
                     (setq len (* len 2))
                     (let ((new (make-string len)))
@@ -266,7 +266,7 @@
                  ;; shouldn't do another READ-CHAR.
                  (t
                   (done-with-fast-read-char)
-                  (return (values (shrink-vector res index) t)))))))))
+                  (return (values (%shrink-vector res index) t)))))))))
 
 (defun read-line (&optional (stream *standard-input*) (eof-error-p t) eof-value
                             recursive-p)

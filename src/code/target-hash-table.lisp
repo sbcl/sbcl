@@ -343,11 +343,11 @@
     (setf (hash-table-next-vector table) new-next-vector)
     (setf (hash-table-hash-vector table) new-hash-vector)
     ;; Shrink the old vectors to 0 size to help the conservative GC.
-    (shrink-vector old-kv-vector 0)
-    (shrink-vector old-index-vector 0)
-    (shrink-vector old-next-vector 0)
+    (%shrink-vector old-kv-vector 0)
+    (%shrink-vector old-index-vector 0)
+    (%shrink-vector old-next-vector 0)
     (when old-hash-vector
-      (shrink-vector old-hash-vector 0))
+      (%shrink-vector old-hash-vector 0))
     (setf (hash-table-rehash-trigger table) new-size))
   (values))
 
