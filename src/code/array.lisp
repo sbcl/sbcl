@@ -944,11 +944,13 @@ of specialized arrays is supported."
 
 (defun shrink-vector (vector new-length)
   (declare (vector vector))
-  (cond ((eq (length vector) new-length)
-         vector)
-        ((array-has-fill-pointer-p vector)
-         (setf (%array-fill-pointer vector) new-length))
-        (t (subseq vector 0 new-length))))
+  (cond
+    ((eq (length vector) new-length)
+     vector)
+    ((array-has-fill-pointer-p vector)
+     (setf (%array-fill-pointer vector) new-length)
+     vector)
+    (t (subseq vector 0 new-length))))
 
 ;;; Fill in array header with the provided information, and return the array.
 (defun set-array-header (array data length fill-pointer displacement dimensions

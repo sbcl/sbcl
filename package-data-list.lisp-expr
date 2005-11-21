@@ -1385,7 +1385,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "SCALE-SINGLE-FLOAT" "SEQUENCE-COUNT" "SEQUENCE-END"
                "SEQUENCE-OF-CHECKED-LENGTH-GIVEN-TYPE"
                "SET-ARRAY-HEADER" "SET-HEADER-DATA" "SHIFT-TOWARDS-END"
-               "SHIFT-TOWARDS-START" "SHRINK-VECTOR"
+               "SHIFT-TOWARDS-START" "SHRINK-VECTOR" "%SHRINK-VECTOR"
                ;; FIXME: 32/64-bit issues
                "SIGNED-BYTE-32-P" "SIGNED-BYTE-64-P"
                "SIMPLE-ARRAY-COMPLEX-DOUBLE-FLOAT-P"

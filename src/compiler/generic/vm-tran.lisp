@@ -79,7 +79,7 @@
                 `(the ,(type-specifier declared-element-ctype)
                       ,bare-form)))))))
 
-;;; Transform multi-dimensional to one dimensional SIMPLE-ARRAY
+;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.
 (deftransform data-vector-ref ((array index)
                                (simple-array t))
