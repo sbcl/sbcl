@@ -1726,8 +1726,7 @@
        (do ((index index (1+ index))            ; copy the rest of the vector
             (jndex jndex (1+ jndex)))
            ((= index length)
-            (shrink-vector vector jndex)
-            vector)
+            (shrink-vector vector jndex))
          (setf (aref vector jndex) (aref vector index))))
     (declare (fixnum index jndex))
     (setf (aref vector jndex) (aref vector index))

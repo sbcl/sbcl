@@ -25,7 +25,7 @@
                    (compact-info-environment (first *info-environment*)
                                              :name name)
                    (rest *info-environment*)))
-      (shrink-vector (sb!c::volatile-info-env-table old-ie) 0)))
+      (%shrink-vector (sb!c::volatile-info-env-table old-ie) 0)))
    (t
     (compact-environment-aux name (1- n))
     n)))
