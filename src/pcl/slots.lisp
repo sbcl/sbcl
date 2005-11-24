@@ -28,9 +28,9 @@
 (define-condition unbound-slot (cell-error)
   ((instance :reader unbound-slot-instance :initarg :instance))
   (:report (lambda (condition stream)
-	     (format stream "The slot ~S is unbound in the object ~S."
-		     (cell-error-name condition)
-		     (unbound-slot-instance condition)))))
+             (format stream "The slot ~S is unbound in the object ~S."
+                     (cell-error-name condition)
+                     (unbound-slot-instance condition)))))
 
 (defmethod wrapper-fetcher ((class standard-class))
   'std-instance-wrapper)
@@ -50,30 +50,30 @@
 
 (defun set-wrapper (inst new)
   (cond ((std-instance-p inst)
-	 (setf (std-instance-wrapper inst) new))
-	((fsc-instance-p inst)
-	 (setf (fsc-instance-wrapper inst) new))
-	(t
-	 (error "unrecognized instance type"))))
+         (setf (std-instance-wrapper inst) new))
+        ((fsc-instance-p inst)
+         (setf (fsc-instance-wrapper inst) new))
+        (t
+         (error "unrecognized instance type"))))
 
 (defun swap-wrappers-and-slots (i1 i2)
-  (with-pcl-lock			;FIXME is this sufficient?
+  (with-pcl-lock                        ;FIXME is this sufficient?
    (cond ((std-instance-p i1)
-	  (let ((w1 (std-instance-wrapper i1))
-		(s1 (std-instance-slots i1)))
-	    (setf (std-instance-wrapper i1) (std-instance-wrapper i2))
-	    (setf (std-instance-slots i1) (std-instance-slots i2))
-	    (setf (std-instance-wrapper i2) w1)
-	    (setf (std-instance-slots i2) s1)))
-	 ((fsc-instance-p i1)
-	  (let ((w1 (fsc-instance-wrapper i1))
-		(s1 (fsc-instance-slots i1)))
-	    (setf (fsc-instance-wrapper i1) (fsc-instance-wrapper i2))
-	    (setf (fsc-instance-slots i1) (fsc-instance-slots i2))
-	    (setf (fsc-instance-wrapper i2) w1)
-	    (setf (fsc-instance-slots i2) s1)))
-	 (t
-	  (error "unrecognized instance type")))))
+          (let ((w1 (std-instance-wrapper i1))
+                (s1 (std-instance-slots i1)))
+            (setf (std-instance-wrapper i1) (std-instance-wrapper i2))
+            (setf (std-instance-slots i1) (std-instance-slots i2))
+            (setf (std-instance-wrapper i2) w1)
+            (setf (std-instance-slots i2) s1)))
+         ((fsc-instance-p i1)
+          (let ((w1 (fsc-instance-wrapper i1))
+                (s1 (fsc-instance-slots i1)))
+            (setf (fsc-instance-wrapper i1) (fsc-instance-wrapper i2))
+            (setf (fsc-instance-slots i1) (fsc-instance-slots i2))
+            (setf (fsc-instance-wrapper i2) w1)
+            (setf (fsc-instance-slots i2) s1)))
+         (t
+          (error "unrecognized instance type")))))
 
 (defun find-slot-definition (class slot-name)
   (dolist (slot (class-slots class) nil)
@@ -83,53 +83,53 @@
 (declaim (ftype (sfunction (t symbol) t) slot-value))
 (defun slot-value (object slot-name)
   (let* ((class (class-of object))
-	 (slot-definition (find-slot-definition class slot-name)))
+         (slot-definition (find-slot-definition class slot-name)))
     (if (null slot-definition)
-	(values (slot-missing class object slot-name 'slot-value))
-	(slot-value-using-class class object slot-definition))))
+        (values (slot-missing class object slot-name 'slot-value))
+        (slot-value-using-class class object slot-definition))))
 
 (define-compiler-macro slot-value (&whole form object slot-name)
   (if (and (constantp slot-name)
-	   (interned-symbol-p (eval slot-name)))
+           (interned-symbol-p (eval slot-name)))
       `(accessor-slot-value ,object ,slot-name)
       form))
 
 (defun set-slot-value (object slot-name new-value)
   (let* ((class (class-of object))
-	 (slot-definition (find-slot-definition class slot-name)))
+         (slot-definition (find-slot-definition class slot-name)))
     (if (null slot-definition)
-	(progn (slot-missing class object slot-name 'setf new-value)
-	       new-value)
-	(setf (slot-value-using-class class object slot-definition)
-	      new-value))))
+        (progn (slot-missing class object slot-name 'setf new-value)
+               new-value)
+        (setf (slot-value-using-class class object slot-definition)
+              new-value))))
 
 (define-compiler-macro set-slot-value (&whole form object slot-name new-value)
   (if (and (constantp slot-name)
-	   (interned-symbol-p (eval slot-name)))
+           (interned-symbol-p (eval slot-name)))
       `(accessor-set-slot-value ,object ,slot-name ,new-value)
       form))
 
 (defun slot-boundp (object slot-name)
   (let* ((class (class-of object))
-	 (slot-definition (find-slot-definition class slot-name)))
+         (slot-definition (find-slot-definition class slot-name)))
     (if (null slot-definition)
-	(not (not (slot-missing class object slot-name 'slot-boundp)))
-	(slot-boundp-using-class class object slot-definition))))
+        (not (not (slot-missing class object slot-name 'slot-boundp)))
+        (slot-boundp-using-class class object slot-definition))))
 
 (setf (gdefinition 'slot-boundp-normal) #'slot-boundp)
 
 (define-compiler-macro slot-boundp (&whole form object slot-name)
   (if (and (constantp slot-name)
-	   (interned-symbol-p (eval slot-name)))
+           (interned-symbol-p (eval slot-name)))
       `(accessor-slot-boundp ,object ,slot-name)
       form))
 
 (defun slot-makunbound (object slot-name)
   (let* ((class (class-of object))
-	 (slot-definition (find-slot-definition class slot-name)))
+         (slot-definition (find-slot-definition class slot-name)))
     (if (null slot-definition)
-	(slot-missing class object slot-name 'slot-makunbound)
-	(slot-makunbound-using-class class object slot-definition))
+        (slot-missing class object slot-name 'slot-makunbound)
+        (slot-makunbound-using-class class object slot-definition))
     object))
 
 (defun slot-exists-p (object slot-name)
@@ -150,97 +150,105 @@
   (clos-slots-ref (fsc-instance-slots instance) location))
 
 (defmethod slot-value-using-class ((class std-class)
-				   (object std-object)
-				   (slotd standard-effective-slot-definition))
+                                   (object standard-object)
+                                   (slotd standard-effective-slot-definition))
   (check-obsolete-instance object)
   (let* ((location (slot-definition-location slotd))
-	 (value
-	  (typecase location
-	    (fixnum
-	     (cond ((std-instance-p object)
-		    (clos-slots-ref (std-instance-slots object)
-				    location))
-		   ((fsc-instance-p object)
-		    (clos-slots-ref (fsc-instance-slots object)
-				    location))
-		   (t (bug "unrecognized instance type in ~S"
-			   'slot-value-using-class))))
-	    (cons
-	     (cdr location))
-	    (t
-	     (instance-structure-protocol-error slotd
-						'slot-value-using-class)))))
+         (value
+          (typecase location
+            (fixnum
+             (cond ((std-instance-p object)
+                    (clos-slots-ref (std-instance-slots object)
+                                    location))
+                   ((fsc-instance-p object)
+                    (clos-slots-ref (fsc-instance-slots object)
+                                    location))
+                   (t (bug "unrecognized instance type in ~S"
+                           'slot-value-using-class))))
+            (cons
+             (cdr location))
+            (t
+             (instance-structure-protocol-error slotd
+                                                'slot-value-using-class)))))
     (if (eq value +slot-unbound+)
-	(values (slot-unbound class object (slot-definition-name slotd)))
-	value)))
+        (values (slot-unbound class object (slot-definition-name slotd)))
+        value)))
 
 (defmethod (setf slot-value-using-class)
-	   (new-value (class std-class)
-		      (object std-object)
-		      (slotd standard-effective-slot-definition))
+           (new-value (class std-class)
+                      (object standard-object)
+                      (slotd standard-effective-slot-definition))
   (check-obsolete-instance object)
-  (let ((location (slot-definition-location slotd)))
-    (typecase location
-      (fixnum
-       (cond ((std-instance-p object)
-	      (setf (clos-slots-ref (std-instance-slots object) location)
-		    new-value))
-	     ((fsc-instance-p object)
-	      (setf (clos-slots-ref (fsc-instance-slots object) location)
-		    new-value))
-	     (t (bug "unrecognized instance type in ~S"
-		     '(setf slot-value-using-class)))))
-      (cons
-       (setf (cdr location) new-value))
-      (t
-       (instance-structure-protocol-error slotd
-					  '(setf slot-value-using-class))))))
+  (let ((location (slot-definition-location slotd))
+        (type (slot-definition-type slotd)))
+    (flet ((check (new-value type)
+             (cond
+               ((eq type t) new-value)
+               (t (if (typep new-value type)
+                      new-value
+                      (error 'type-error
+                             :datum new-value :expected-type type))))))
+      (typecase location
+        (fixnum
+         (cond ((std-instance-p object)
+                (setf (clos-slots-ref (std-instance-slots object) location)
+                      (check new-value type)))
+               ((fsc-instance-p object)
+                (setf (clos-slots-ref (fsc-instance-slots object) location)
+                      (check new-value type)))
+                (t (bug "unrecognized instance type in ~S"
+                        '(setf slot-value-using-class)))))
+        (cons
+         (setf (cdr location) (check new-value type)))
+        (t
+         (instance-structure-protocol-error
+          slotd '(setf slot-value-using-class)))))))
 
 (defmethod slot-boundp-using-class
-	   ((class std-class)
-	    (object std-object)
-	    (slotd standard-effective-slot-definition))
+           ((class std-class)
+            (object standard-object)
+            (slotd standard-effective-slot-definition))
   (check-obsolete-instance object)
   (let* ((location (slot-definition-location slotd))
-	 (value
-	  (typecase location
-	    (fixnum
-	     (cond ((std-instance-p object)
-			  (clos-slots-ref (std-instance-slots object)
-					  location))
-		   ((fsc-instance-p object)
-		    (clos-slots-ref (fsc-instance-slots object)
-				    location))
-		   (t (bug "unrecognized instance type in ~S"
-			   'slot-boundp-using-class))))
-	    (cons
-	     (cdr location))
-	    (t
-	     (instance-structure-protocol-error slotd
-						'slot-boundp-using-class)))))
+         (value
+          (typecase location
+            (fixnum
+             (cond ((std-instance-p object)
+                          (clos-slots-ref (std-instance-slots object)
+                                          location))
+                   ((fsc-instance-p object)
+                    (clos-slots-ref (fsc-instance-slots object)
+                                    location))
+                   (t (bug "unrecognized instance type in ~S"
+                           'slot-boundp-using-class))))
+            (cons
+             (cdr location))
+            (t
+             (instance-structure-protocol-error slotd
+                                                'slot-boundp-using-class)))))
     (not (eq value +slot-unbound+))))
 
 (defmethod slot-makunbound-using-class
-	   ((class std-class)
-	    (object std-object)
-	    (slotd standard-effective-slot-definition))
+           ((class std-class)
+            (object standard-object)
+            (slotd standard-effective-slot-definition))
   (check-obsolete-instance object)
   (let ((location (slot-definition-location slotd)))
     (typecase location
       (fixnum
        (cond ((std-instance-p object)
-	      (setf (clos-slots-ref (std-instance-slots object) location)
-		    +slot-unbound+))
-	     ((fsc-instance-p object)
-	      (setf (clos-slots-ref (fsc-instance-slots object) location)
-		    +slot-unbound+))
-	     (t (bug "unrecognized instance type in ~S"
-		     'slot-makunbound-using-class))))
+              (setf (clos-slots-ref (std-instance-slots object) location)
+                    +slot-unbound+))
+             ((fsc-instance-p object)
+              (setf (clos-slots-ref (fsc-instance-slots object) location)
+                    +slot-unbound+))
+             (t (bug "unrecognized instance type in ~S"
+                     'slot-makunbound-using-class))))
       (cons
        (setf (cdr location) +slot-unbound+))
       (t
        (instance-structure-protocol-error slotd
-					  'slot-makunbound-using-class))))
+                                          'slot-makunbound-using-class))))
   object)
 
 (defmethod slot-value-using-class
@@ -270,52 +278,52 @@
 
 (defmethod slot-makunbound-using-class ((class condition-class) object slot)
   (error "attempt to unbind slot ~S in condition object ~S."
-	 slot object))
+         slot object))
 
 (defmethod slot-value-using-class
     ((class structure-class)
      (object structure-object)
      (slotd structure-effective-slot-definition))
   (let* ((function (slot-definition-internal-reader-function slotd))
-	 (value (funcall function object)))
+         (value (funcall function object)))
     (declare (type function function))
     (if (eq value +slot-unbound+)
-	(values (slot-unbound class object (slot-definition-name slotd)))
-	value)))
+        (values (slot-unbound class object (slot-definition-name slotd)))
+        value)))
 
 (defmethod (setf slot-value-using-class)
     (new-value (class structure-class)
-	       (object structure-object)
-	       (slotd structure-effective-slot-definition))
+               (object structure-object)
+               (slotd structure-effective-slot-definition))
   (let ((function (slot-definition-internal-writer-function slotd)))
     (declare (type function function))
     (funcall function new-value object)))
 
 (defmethod slot-boundp-using-class
-	   ((class structure-class)
-	    (object structure-object)
-	    (slotd structure-effective-slot-definition))
+           ((class structure-class)
+            (object structure-object)
+            (slotd structure-effective-slot-definition))
   t)
 
 (defmethod slot-makunbound-using-class
-	   ((class structure-class)
-	    (object structure-object)
-	    (slotd structure-effective-slot-definition))
+           ((class structure-class)
+            (object structure-object)
+            (slotd structure-effective-slot-definition))
   (error "Structure slots can't be unbound."))
 
 (defmethod slot-missing
-	   ((class t) instance slot-name operation &optional new-value)
+           ((class t) instance slot-name operation &optional new-value)
   (error "~@<When attempting to ~A, the slot ~S is missing from the ~
           object ~S.~@:>"
-	 (ecase operation
-	   (slot-value "read the slot's value (slot-value)")
-	   (setf (format nil
-			 "set the slot's value to ~S (SETF of SLOT-VALUE)"
-			 new-value))
-	   (slot-boundp "test to see whether slot is bound (SLOT-BOUNDP)")
-	   (slot-makunbound "make the slot unbound (SLOT-MAKUNBOUND)"))
-	 slot-name
-	 instance))
+         (ecase operation
+           (slot-value "read the slot's value (slot-value)")
+           (setf (format nil
+                         "set the slot's value to ~S (SETF of SLOT-VALUE)"
+                         new-value))
+           (slot-boundp "test to see whether slot is bound (SLOT-BOUNDP)")
+           (slot-makunbound "make the slot unbound (SLOT-MAKUNBOUND)"))
+         slot-name
+         instance))
 
 (defmethod slot-unbound ((class t) instance slot-name)
   (error 'unbound-slot :name slot-name :instance instance))
@@ -336,7 +344,7 @@
 ;;; care of this for non-standard-classes.x
 (defmethod allocate-instance ((class standard-class) &rest initargs)
   (declare (ignore initargs))
-  (unless (class-finalized-p class) 
+  (unless (class-finalized-p class)
     (finalize-inheritance class))
   (allocate-standard-instance (class-wrapper class)))
 
@@ -344,7 +352,7 @@
   (declare (ignore initargs))
   (let ((constructor (class-defstruct-constructor class)))
     (if constructor
-	(funcall constructor)
+        (funcall constructor)
         (allocate-standard-instance (class-wrapper class)))))
 
 ;;; FIXME: It would be nicer to have allocate-instance return
