@@ -2141,3 +2141,13 @@ WORKAROUND:
     (DIRECTORY "/tmp/[P]*.*")
   gives a type error: 
     The value "P" is not of type CHARACTER.
+
+391:
+  Typed slots with moderately difficult types, combined with
+  subclassing, cause the computation of effective-slot-definitions to
+  go awry.
+    (defclass foo () ((x :type fixnum)))
+    (defclass bar (foo) ((x :type (integer 1 5))))
+  gives an error from SB-PCL::SPECIALIZER-APPLICABLE-USING-TYPE-P.  
+  This is probably because of an inappropriate use of *SUBTYPEP in
+  COMPUTE-EFFECTIVE-SLOT-DEFINITION-INITARGS.
