@@ -2134,3 +2134,10 @@ WORKAROUND:
   fix was made to ROUND-NUMERIC-BOUND for the sbcl-0.9.6 release, but
   the right fix is to remove the abstraction violation in the
   compiler's type deriver.
+
+390:
+  reported on sbcl-help by Tim Daly Jr.
+
+    (DIRECTORY "/tmp/[P]*.*")
+  gives a type error: 
+    The value "P" is not of type CHARACTER.
