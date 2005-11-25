@@ -42,6 +42,8 @@ changes in sbcl-0.9.7 relative to sbcl-0.9.6:
     on gencgc
   * optimization: faster bignum subtraction and division on x86 and x86-64 
     (thanks to Lutz Euler)
+  * optimization: more accurate type-inference for loops that use a
+    floating point index variable or a negative step.
 
 changes in sbcl-0.9.6 relative to sbcl-0.9.5:
   * bug fix: add a workaround to SBCL looping infinitely at startup on

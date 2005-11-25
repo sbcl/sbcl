@@ -198,19 +198,6 @@ WORKAROUND:
   holding... * is not equivalent to T in many cases, such as 
     (VECTOR *) /= (VECTOR T).
 
-95:
-  The facility for dumping a running Lisp image to disk gets confused
-  when run without the PURIFY option, and creates an unnecessarily large
-  core file (apparently representing memory usage up to the previous
-  high-water mark). Moreover, when the file is loaded, it confuses the
-  GC, so that thereafter memory usage can never be reduced below that
-  level.
-
-  (As of 0.8.7.3 it's likely that the latter half of this bug is fixed.
-  The interaction between gencgc and the variables used by
-  save-lisp-and-die is still nonoptimal, though, so no respite from
-  big core files yet)
-
 98:
   In sbcl-0.6.11.41 (and in all earlier SBCL, and in CMU
   CL), out-of-line structure slot setters are horribly inefficient
@@ -1120,20 +1107,6 @@ WORKAROUND:
     #(1 2 ((SB-IMPL::|,|) + 2 2) 4)
   which probably isn't intentional.
 
-323: "REPLACE, BIT-BASH and large strings"
-  The transform for REPLACE on simple-base-strings uses BIT-BASH, which
-  at present has an upper limit in size.  Consequently, in sbcl-0.8.10
-    (defun foo ()
-      (declare (optimize speed (safety 1)))
-      (let ((x (make-string 140000000))
-            (y (make-string 140000000)))
-        (length (replace x y))))
-    (foo)
-  gives 
-    debugger invoked on a TYPE-ERROR in thread 2412:
-      The value 1120000000 is not of type (MOD 536870911).
-  (see also "more and better sequence transforms" sbcl-devel 2004-05-10)
-
 324: "STREAMs and :ELEMENT-TYPE with large bytesize"
   In theory, (open foo :element-type '(unsigned-byte <x>)) should work
   for all positive integral <x>.  At present, it only works for <x> up
@@ -1982,12 +1955,6 @@ WORKAROUND:
  as the SCALE-FLOAT just returns 
  #.SB-EXT:SINGLE/DOUBLE-FLOAT-POSITIVE-INFINITY. These tests have been
  disabled on Darwin for now.
-
-374: BIT-AND problem on ppc/darwin:
-  The BIT-AND test in bit-vector.impure-cload.lisp results in
-    fatal error encountered in SBCL pid 8356:
-    GC invariant lost, file "gc-common.c", line 605
-  on ppc/darwin. Test disabled for the duration.
 
 375: MISC.555
     (compile nil '(lambda (p1)
