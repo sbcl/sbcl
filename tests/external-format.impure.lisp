@@ -203,6 +203,39 @@
                  :external-format :koi8-r)
   (let ((char (read-char s)))
     (assert (= (char-code (eval char)) #xB0))))
-
-
 (delete-file "external-format-test.txt")
+
+;;; tests of FILE-STRING-LENGTH
+(let ((standard-characters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!$\"'(),_-./:;?+<=>#%&*@[\\]{|}`^~"))
+  (do-external-formats (xf)
+    (with-open-file (s "external-format-test.txt" :direction :output
+                       :external-format xf)
+      (loop for x across standard-characters
+            for position = (file-position s)
+            for char-length = (file-string-length s x)
+            do (write-char x s)
+            do (assert (= (file-position s) (+ position char-length))))
+      (let ((position (file-position s))
+            (string-length (file-string-length s standard-characters)))
+        (write-string standard-characters s)
+        (assert (= (file-position s) (+ position string-length)))))
+    (delete-file "external-format-test.txt")))
+
+(let ((char-codes '(0 1 255 256 511 512 1023 1024 2047 2048 4095 4096
+                    8191 8192 16383 16384 32767 32768 65535 65536 131071
+                    131072 262143 262144)))
+  (with-open-file (s "external-format-test.txt" :direction :output
+                     :external-format :utf-8)
+    (dolist (code char-codes)
+      (let* ((char (code-char code))
+             (position (file-position s))
+             (char-length (file-string-length s char)))
+        (write-char char s)
+        (assert (= (file-position s) (+ position char-length)))))
+    (let* ((string (map 'string #'code-char char-codes))
+           (position (file-position s))
+           (string-length (file-string-length s string)))
+      (write-string string s)
+      (assert (= (file-position s) (+ position string-length))))))
+
+;;;; success

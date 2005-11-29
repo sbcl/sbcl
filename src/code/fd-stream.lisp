@@ -976,6 +976,20 @@
       (return-from fd-stream-resync
         (funcall (symbol-function (eighth entry)) stream)))))
 
+(defun get-fd-stream-character-sizer (stream)
+  (dolist (entry *external-formats*)
+    (when (member (fd-stream-external-format stream) (first entry))
+      (return-from get-fd-stream-character-sizer (ninth entry)))))
+
+(defun fd-stream-character-size (stream char)
+  (let ((sizer (get-fd-stream-character-sizer stream)))
+    (when sizer (funcall sizer char))))
+
+(defun fd-stream-string-size (stream string)
+  (let ((sizer (get-fd-stream-character-sizer stream)))
+    (when sizer
+      (loop for char across string summing (funcall sizer char)))))
+
 ;;; FIXME: OAOOM here vrt. *EXTERNAL-FORMAT-FUNCTIONS* in fd-stream.lisp
 (defmacro define-external-format (external-format size output-restart
                                   out-expr in-expr)
@@ -983,8 +997,12 @@
          (out-function (symbolicate "OUTPUT-BYTES/" name))
          (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" (string name)))
          (in-function (symbolicate "FD-STREAM-READ-N-CHARACTERS/" name))
-         (in-char-function (symbolicate "INPUT-CHAR/" name)))
+         (in-char-function (symbolicate "INPUT-CHAR/" name))
+         (size-function (symbolicate "BYTES-FOR-CHAR/" name)))
     `(progn
+      (defun ,size-function (byte)
+        (declare (ignore byte))
+        ,size)
       (defun ,out-function (stream string flush-p start end)
         (let ((start (or start 0))
               (end (or end (length string))))
@@ -1088,7 +1106,9 @@
        (cons '(,external-format ,in-function ,in-char-function ,out-function
                ,@(mapcar #'(lambda (buffering)
                              (intern (format nil format (string buffering))))
-                         '(:none :line :full)))
+                         '(:none :line :full))
+               nil ; no resync-function
+               ,size-function)
         *external-formats*)))))
 
 (defmacro define-external-format/variable-width
@@ -1099,8 +1119,11 @@
          (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" (string name)))
          (in-function (symbolicate "FD-STREAM-READ-N-CHARACTERS/" name))
          (in-char-function (symbolicate "INPUT-CHAR/" name))
-         (resync-function (symbolicate "RESYNC/" name)))
+         (resync-function (symbolicate "RESYNC/" name))
+         (size-function (symbolicate "BYTES-FOR-CHAR/" name)))
     `(progn
+      (defun ,size-function (byte)
+        ,out-size-expr)
       (defun ,out-function (stream string flush-p start end)
         (let ((start (or start 0))
               (end (or end (length string))))
@@ -1245,7 +1268,8 @@
                ,@(mapcar #'(lambda (buffering)
                              (intern (format nil format (string buffering))))
                          '(:none :line :full))
-               ,resync-function)
+               ,resync-function
+               ,size-function)
         *external-formats*)))))
 
 ;;; Multiple names for the :ISO{,-}8859-* families are needed because on
@@ -1691,12 +1715,10 @@
        (if (zerop mode)
            nil
            (truncate size (fd-stream-element-size fd-stream)))))
-    ;; FIXME: I doubt this is correct in the presence of Unicode,
-    ;; since fd-stream FILE-POSITION is measured in bytes.
     (:file-string-length
      (etypecase arg1
-       (character 1)
-       (string (length arg1))))
+       (character (fd-stream-character-size fd-stream arg1))
+       (string (fd-stream-string-size fd-stream arg1))))
     (:file-position
      (fd-stream-file-position fd-stream arg1))))
 
