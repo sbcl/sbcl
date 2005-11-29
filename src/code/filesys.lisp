@@ -130,7 +130,7 @@
                                   :complaint "#\\[ with no corresponding #\\]"
                                   :namestring namestr
                                   :offset index))
-                         (pattern (list :character-set
+                         (pattern (cons :character-set
                                         (subseq namestr
                                                 (1+ index)
                                                 close-bracket)))

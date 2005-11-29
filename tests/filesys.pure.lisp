@@ -35,6 +35,15 @@
                      (search "tests/filesys.pure.lisp"
                              (namestring pathname)))
                    dir)))
+;;; In sbcl-0.9.7 DIRECTORY failed on pathnames with character-set
+;;; components.
+(let ((dir (directory "[f]*.*")))
+  ;; We know a little bit about the structure of this result;
+  ;; let's test to make sure that this test file is in it.
+  (assert (find-if (lambda (pathname)
+                     (search "filesys.pure.lisp"
+                             (namestring pathname)))
+                   dir)))
 
 ;;; Set *default-pathname-defaults* to something other than the unix
 ;;; cwd, to catch functions which access the filesystem without
