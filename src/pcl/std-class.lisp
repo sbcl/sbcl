@@ -1127,9 +1127,14 @@
                 allocp t))
         (setq initargs (append (slot-definition-initargs slotd) initargs))
         (let ((slotd-type (slot-definition-type slotd)))
-          (setq type (cond ((eq type t) slotd-type)
-                           ((*subtypep type slotd-type) type)
-                           (t `(and ,type ,slotd-type)))))))
+          (setq type (cond
+                       ((eq type t) slotd-type)
+                       ;; This pairwise type intersection is perhaps a
+                       ;; little inefficient and inelegant, but it's
+                       ;; unlikely to lie on the critical path.  Shout
+                       ;; if I'm wrong.  -- CSR, 2005-11-24
+                       (t (type-specifier
+                           (specifier-type `(and ,type ,slotd-type)))))))))
     (list :name name
           :initform initform
           :initfunction initfunction

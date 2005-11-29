@@ -1201,4 +1201,12 @@
 (with-test (:name (:ctor :unnamed-after/symbol))
   (assert (raises-error? (ctor-unnamed-literal-class2/symbol))))
 
+;;; classes with slot types shouldn't break if the types don't name
+;;; classes (bug #391)
+(defclass slot-type-superclass () ((slot :type fixnum)))
+(defclass slot-type-subclass (slot-type-superclass)
+  ((slot :type (integer 1 5))))
+(let ((instance (make-instance 'slot-type-subclass)))
+  (setf (slot-value instance 'slot) 3))
+
 ;;;; success
