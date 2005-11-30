@@ -1795,6 +1795,27 @@ code to be loaded.
          (setq step-hack
                `(,variable ,step-hack)))
        (let ((first-test test) (remaining-tests test))
+         ;; As far as I can tell, the effect of the following code is
+         ;; to detect cases where we know statically whether the first
+         ;; iteration of the loop will be executed. Depending on the
+         ;; situation, we can either:
+         ;;  a) save one jump and one comparison per loop (not per iteration)
+         ;;     when it will get executed
+         ;;  b) remove the loop body completely when it won't be executed
+         ;;
+         ;; Noble goals. However, the code generated in case a) will
+         ;; fool the loop induction variable detection, and cause
+         ;; code like (LOOP FOR I TO 10 ...) to use generic addition
+         ;; (bug #278a).
+         ;;
+         ;; Since the gain in case a) is rather minimal and Python is
+         ;; generally smart enough to handle b) without any extra
+         ;; support from the loop macro, I've disabled this code for
+         ;; now. The code and the comment left here in case somebody
+         ;; extends the induction variable bound detection to work
+         ;; with code where the stepping precedes the test.
+         ;; -- JES 2005-11-30
+         #+nil
          (when (and stepby-constantp start-constantp limit-constantp
                     (realp start-value) (realp limit-value))
            (when (setq first-test
@@ -1815,22 +1836,6 @@ code to be loaded.
     '((:from :upfrom :downfrom) (:to :upto :downto :above :below) (:by))
     nil (list (list kwd val)))))
 
-(defun loop-sequence-elements-path (variable data-type prep-phrases
-                                    &key
-                                    fetch-function
-                                    size-function
-                                    sequence-type
-                                    element-type)
-  (multiple-value-bind (indexv) (loop-named-var 'index)
-    (let ((sequencev (loop-named-var 'sequence)))
-      (list* nil nil                            ; dummy bindings and prologue
-             (loop-sequencer
-              indexv 'fixnum
-              variable (or data-type element-type)
-              sequencev sequence-type
-              `(,fetch-function ,sequencev ,indexv)
-              `(,size-function ,sequencev)
-              prep-phrases)))))
 
 ;;;; builtin LOOP iteration paths
 

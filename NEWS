@@ -7,6 +7,8 @@ changes in sbcl-0.9.8 relative to sbcl-0.9.7:
   * bug fix: FILE-STRING-LENGTH is now external-format sensitive,
     returning the number of octets which would be written to the
     file-stream.  (thanks to Robert J. Macomber)
+  * optimization: improved type inference for arithmetic-for
+    index variables in LOOP
 
 changes in sbcl-0.9.7 relative to sbcl-0.9.6:
   * minor incompatible change: (SETF CLASS-NAME) and (SETF

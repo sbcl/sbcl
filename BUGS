@@ -878,17 +878,6 @@ WORKAROUND:
            (1+ *faa*))
      (faa 1d0) => type error
 
-278:
-  a.
-    (defun foo ()
-      (declare (optimize speed))
-      (loop for i of-type (integer 0) from 0 by 2 below 10
-            collect i))
-
-  uses generic arithmetic.
-
-  b. (fixed in 0.8.3.6)
-
 279: type propagation error -- correctly inferred type goes astray?
   In sbcl-0.8.3 and sbcl-0.8.1.47, the warning
        The binding of ABS-FOO is a (VALUES (INTEGER 0 0)
