@@ -1879,7 +1879,7 @@
 ;;; beginning with T specifies a default. If it appears, it must be
 ;;; last. If no default is specified, and no clause matches, then an
 ;;; error is signalled.
-(def!macro sc-case (tn &rest forms)
+(def!macro sc-case (tn &body forms)
   (let ((n-sc (gensym))
         (n-tn (gensym)))
     (collect ((clauses))

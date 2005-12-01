@@ -9,6 +9,7 @@ changes in sbcl-0.9.8 relative to sbcl-0.9.7:
     file-stream.  (thanks to Robert J. Macomber)
   * optimization: improved type inference for arithmetic-for
     index variables in LOOP
+  * optimization: faster floating-point SQRT on x86-64
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** DOCUMENTATION returns NIL instead of "" for method combinations
        that don't have a docstring

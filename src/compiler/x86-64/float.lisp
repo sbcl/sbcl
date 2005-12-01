@@ -64,8 +64,10 @@
 (define-move-fun (load-fp-zero 1) (vop x y)
   ((fp-single-zero) (single-reg)
    (fp-double-zero) (double-reg))
-  (identity x) ; KLUDGE: IDENTITY as IGNORABLE...
-  (inst movq y fp-double-zero-tn))
+  (identity x)
+  (sc-case y
+    (single-reg (inst xorps y y))
+    (double-reg (inst xorpd y y))))
 
 (define-move-fun (load-single 2) (vop x y)
   ((single-stack) (single-reg))
@@ -436,7 +438,19 @@
   (frob * mulss */single-float 4 mulsd */double-float 5 t)
   (frob / divss //single-float 12 divsd //double-float 19 nil))
 
-
+(define-vop (fsqrt)
+  (:args (x :scs (double-reg)))
+  (:results (y :scs (double-reg)))
+  (:translate %sqrt)
+  (:policy :fast-safe)
+  (:arg-types double-float)
+  (:result-types double-float)
+  (:note "inline float arithmetic")
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 1
+     (note-this-location vop :internal-error)
+     (inst sqrtsd y x)))
 
 (macrolet ((frob ((name translate sc type) &body body)
              `(define-vop (,name)

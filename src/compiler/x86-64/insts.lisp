@@ -3566,6 +3566,8 @@
   (define-regular-sse-inst mulss    #xf3 #x59)
   (define-regular-sse-inst subsd    #xf2 #x5c)
   (define-regular-sse-inst subss    #xf3 #x5c)
+  (define-regular-sse-inst sqrtsd   #xf2 #x51)
+  (define-regular-sse-inst sqrtss   #xf3 #x51)
   ;; conversion
   (define-regular-sse-inst cvtsd2ss #xf2 #x5a)
   (define-regular-sse-inst cvtss2sd #xf3 #x5a)

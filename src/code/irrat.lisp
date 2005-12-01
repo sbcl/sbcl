@@ -53,6 +53,11 @@
   (def %log (x))
   (def %exp (x)))
 
+#!+x86-64 ;; for constant folding
+(macrolet ((def (name ll)
+             `(defun ,name ,ll (,name ,@ll))))
+  (def %sqrt (x)))
+
 ;;;; stubs for the Unix math library
 ;;;;
 ;;;; Many of these are unnecessary on the X86 because they're built
@@ -78,7 +83,7 @@
 #!-x86 (def-math-rtn "log" 1)
 #!-x86 (def-math-rtn "log10" 1)
 (def-math-rtn "pow" 2)
-#!-x86 (def-math-rtn "sqrt" 1)
+#!-(or x86 x86-64) (def-math-rtn "sqrt" 1)
 (def-math-rtn "hypot" 2)
 #!-(or hpux x86) (def-math-rtn "log1p" 1)
 

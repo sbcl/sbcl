@@ -252,12 +252,7 @@
                                  'float-registers)))
     (inst call function)
     ;; To give the debugger a clue. XX not really internal-error?
-    (note-this-location vop :internal-error)
-    ;; FLOAT15 needs to contain FP zero in Lispland
-    (let ((float15 (make-random-tn :kind :normal
-                               :sc (sc-or-lose 'double-reg)
-                               :offset float15-offset)))
-      (inst xorpd float15 float15))))
+    (note-this-location vop :internal-error)))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)
