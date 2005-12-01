@@ -141,124 +141,133 @@ If an unsupported TYPE is requested, the function will return NIL.
            (if (listp x)
                x
                (list x))))
-  (listify
-   (case type
-     ((:variable)
-      (when (eq (sb-int:info :variable :kind name) :special)
-        (translate-source-location (sb-int:info :source-location type name))))
-     ((:constant)
-      (when (eq (sb-int:info :variable :kind name) :constant)
-        (translate-source-location (sb-int:info :source-location type name))))
-     ((:symbol-macro)
-      (when (eq (sb-int:info :variable :kind name) :macro)
-        (translate-source-location (sb-int:info :source-location type name))))
-     ((:macro)
-      (when (and (symbolp name)
-                 (macro-function name))
-        (find-definition-source (macro-function name))))
-     ((:compiler-macro)
-      (when (compiler-macro-function name)
-        (find-definition-source (compiler-macro-function name))))
-     ((:function :generic-function)
-      (when (and (fboundp name)
-                 (or (not (symbolp name))
-                     (not (macro-function name))))
-        (let ((fun (fdefinition name)))
-          (when (eq (not (typep fun 'generic-function))
-                    (not (eq type :generic-function)))
-            (find-definition-source fun)))))
-     ((:type)
-      (let ((expander-fun (sb-int:info :type :expander name)))
-        (when expander-fun
-          (find-definition-source expander-fun))))
-     ((:method)
-      (when (and (fboundp name)
-                 (typep (fdefinition name) 'generic-function))
-        (loop for method in (sb-mop::generic-function-methods
-                             (fdefinition name))
-              for source = (find-definition-source method)
-              when source collect source)))
-     ((:setf-expander)
-      (when (and (consp name)
-                 (eq (car name) 'setf))
-        (setf name (cadr name)))
-      (let ((expander-fun (or (sb-int:info :setf :inverse name)
-                              (sb-int:info :setf :expander name))))
-        (when expander-fun
-          (sb-introspect:find-definition-source expander-fun))))
-     ((:structure)
-      (let ((class (ignore-errors (find-class name))))
-        (if class
-            (when (typep class 'sb-pcl::structure-class)
-              (find-definition-source class))
-            (when (sb-int:info :typed-structure :info name)
-              (translate-source-location
-               (sb-int:info :source-location :typed-structure name))))))
-     ((:condition :class)
-      (let ((class (ignore-errors (find-class name))))
-        (when class
-          (when (eq (not (typep class 'sb-pcl::condition-class))
-                    (not (eq type :condition)))
-            (find-definition-source class)))))
-     ((:method-combination)
-      (let ((combination-fun
-             (ignore-errors (find-method #'sb-mop:find-method-combination
-                                         nil
-                                         (list (find-class 'generic-function)
-                                               (list 'eql name)
-                                               t)))))
-        (when combination-fun
-          (find-definition-source combination-fun))))
-     ((:package)
-      (when (symbolp name)
-        (let ((package (find-package name)))
-          (when package
-            (find-definition-source package)))))
-     ;;; TRANSFORM and OPTIMIZER handling from swank-sbcl
-     ((:transform)
-      (let ((fun-info (sb-int:info :function :info name)))
-        (when fun-info
-          (loop for xform in (sb-c::fun-info-transforms fun-info)
-                for source = (find-definition-source
-                              (sb-c::transform-function xform))
-                for typespec = (sb-kernel:type-specifier
-                                (sb-c::transform-type xform))
-                for note = (sb-c::transform-note xform)
-                do (setf (definition-source-description source)
-                         (if (consp typespec)
-                             (list (second typespec) note)
-                             (list note)))
-                collect source))))
-     ((:optimizer)
-      (let ((fun-info (sb-int:info :function :info name)))
-        (when fun-info
-          (let ((otypes '((sb-c::fun-info-derive-type . sb-c:derive-type)
-                          (sb-c::fun-info-ltn-annotate . sb-c:ltn-annotate)
-                          (sb-c::fun-info-ltn-annotate . sb-c:ltn-annotate)
-                          (sb-c::fun-info-optimizer . sb-c:optimizer))))
-            (loop for (reader . name) in otypes
-                  for fn = (funcall reader fun-info)
-                  when fn collect
-                  (let ((source (find-definition-source fn)))
-                    (setf (definition-source-description source)
-                          (list name))
-                    source))))))
-     ((:vop)
-      (let ((fun-info (sb-int:info :function :info name)))
-        (when fun-info
-          (loop for vop in (sb-c::fun-info-templates fun-info)
-                for source = (find-definition-source
-                              (sb-c::vop-info-generator-function vop))
-                do (setf (definition-source-description source)
-                         (list (sb-c::template-name vop)
-                               (sb-c::template-note vop)))
-                collect source))))
-     ((:source-transform)
-      (let ((transform-fun (sb-int:info :function :source-transform name)))
-        (when transform-fun
-          (sb-introspect:find-definition-source transform-fun))))
-     (t
-      nil)))))
+    (listify
+     (case type
+       ((:variable)
+        (when (and (symbolp name)
+                   (eq (sb-int:info :variable :kind name) :special))
+          (translate-source-location (sb-int:info :source-location type name))))
+       ((:constant)
+        (when (and (symbolp name)
+                   (eq (sb-int:info :variable :kind name) :constant))
+          (translate-source-location (sb-int:info :source-location type name))))
+       ((:symbol-macro)
+        (when (and (symbolp name)
+                   (eq (sb-int:info :variable :kind name) :macro))
+          (translate-source-location (sb-int:info :source-location type name))))
+       ((:macro)
+        (when (and (symbolp name)
+                   (macro-function name))
+          (find-definition-source (macro-function name))))
+       ((:compiler-macro)
+        (when (compiler-macro-function name)
+          (find-definition-source (compiler-macro-function name))))
+       ((:function :generic-function)
+        (when (and (fboundp name)
+                   (or (not (symbolp name))
+                       (not (macro-function name))))
+          (let ((fun (fdefinition name)))
+            (when (eq (not (typep fun 'generic-function))
+                      (not (eq type :generic-function)))
+              (find-definition-source fun)))))
+       ((:type)
+        (let ((expander-fun (sb-int:info :type :expander name)))
+          (when expander-fun
+            (find-definition-source expander-fun))))
+       ((:method)
+        (when (and (fboundp name)
+                   (typep (fdefinition name) 'generic-function))
+          (loop for method in (sb-mop::generic-function-methods
+                               (fdefinition name))
+                for source = (find-definition-source method)
+                when source collect source)))
+       ((:setf-expander)
+        (when (and (consp name)
+                   (eq (car name) 'setf))
+          (setf name (cadr name)))
+        (let ((expander (or (sb-int:info :setf :inverse name)
+                            (sb-int:info :setf :expander name))))
+          (when expander
+            (sb-introspect:find-definition-source (if (symbolp expander)
+                                                      (symbol-function expander)
+                                                      expander)))))
+       ((:structure)
+        (let ((class (find-class name nil)))
+          (if class
+              (when (typep class 'sb-pcl::structure-class)
+                (find-definition-source class))
+              (when (sb-int:info :typed-structure :info name)
+                (translate-source-location
+                 (sb-int:info :source-location :typed-structure name))))))
+       ((:condition :class)
+        (let ((class (find-class name nil)))
+          (when class
+            (when (eq (not (typep class 'sb-pcl::condition-class))
+                      (not (eq type :condition)))
+              (find-definition-source class)))))
+       ((:method-combination)
+        (let ((combination-fun
+               (ignore-errors (find-method #'sb-mop:find-method-combination
+                                           nil
+                                           (list (find-class 'generic-function)
+                                                 (list 'eql name)
+                                                 t)))))
+          (when combination-fun
+            (find-definition-source combination-fun))))
+       ((:package)
+        (when (symbolp name)
+          (let ((package (find-package name)))
+            (when package
+              (find-definition-source package)))))
+       ;; TRANSFORM and OPTIMIZER handling from swank-sbcl
+       ((:transform)
+        (when (symbolp name)
+          (let ((fun-info (sb-int:info :function :info name)))
+            (when fun-info
+              (loop for xform in (sb-c::fun-info-transforms fun-info)
+                    for source = (find-definition-source
+                                  (sb-c::transform-function xform))
+                    for typespec = (sb-kernel:type-specifier
+                                    (sb-c::transform-type xform))
+                    for note = (sb-c::transform-note xform)
+                    do (setf (definition-source-description source)
+                             (if (consp typespec)
+                                 (list (second typespec) note)
+                                 (list note)))
+                    collect source)))))
+       ((:optimizer)
+        (when (symbolp name)
+          (let ((fun-info (sb-int:info :function :info name)))
+            (when fun-info
+              (let ((otypes '((sb-c::fun-info-derive-type . sb-c:derive-type)
+                              (sb-c::fun-info-ltn-annotate . sb-c:ltn-annotate)
+                              (sb-c::fun-info-ltn-annotate . sb-c:ltn-annotate)
+                              (sb-c::fun-info-optimizer . sb-c:optimizer))))
+                (loop for (reader . name) in otypes
+                      for fn = (funcall reader fun-info)
+                      when fn collect
+                      (let ((source (find-definition-source fn)))
+                        (setf (definition-source-description source)
+                              (list name))
+                        source)))))))
+       ((:vop)
+        (when (symbolp name)
+          (let ((fun-info (sb-int:info :function :info name)))
+            (when fun-info
+              (loop for vop in (sb-c::fun-info-templates fun-info)
+                    for source = (find-definition-source
+                                  (sb-c::vop-info-generator-function vop))
+                    do (setf (definition-source-description source)
+                             (list (sb-c::template-name vop)
+                                   (sb-c::template-note vop)))
+                    collect source)))))
+       ((:source-transform)
+        (when (symbolp name)
+          (let ((transform-fun (sb-int:info :function :source-transform name)))
+            (when transform-fun
+              (sb-introspect:find-definition-source transform-fun)))))
+       (t
+        nil)))))
 
 (defun find-definition-source (object)
   (typecase object
