@@ -68,7 +68,7 @@
 (defun expand-short-defcombin (whole)
   (let* ((type (cadr whole))
          (documentation
-           (getf (cddr whole) :documentation ""))
+           (getf (cddr whole) :documentation))
          (identity-with-one-arg
            (getf (cddr whole) :identity-with-one-argument nil))
          (operator
