@@ -4,6 +4,7 @@ changes in sbcl-0.9.8 relative to sbcl-0.9.7:
     expected.  (reported by Tim Daly Jr)
   * fixed bug #391: complicated :TYPE intersections in slot
     definitions no longer cause an error in PCL internals.
+  * fixed bug #392: plugged a hole in the obsolete-instance protocol.
   * bug fix: FILE-STRING-LENGTH is now external-format sensitive,
     returning the number of octets which would be written to the
     file-stream.  (thanks to Robert J. Macomber)

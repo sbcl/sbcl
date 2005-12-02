@@ -2092,27 +2092,4 @@ WORKAROUND:
   compiler's type deriver.
 
 392: slot-accessor for subclass misses obsoleted superclass
-
-  (defclass super () 
-    ((x :initform 0 :accessor x-of)))
-  (defclass sub (super) ())
-
-  (defmethod shared-initialize :after ((i super) slots &rest init)
-    (incf (x-of i)))
-
-  (defvar *super* (make-instance 'super))
-  (defvar *sub* (make-instance 'sub))
-
-  (x-of *super*) ; => 1 ...ok
-  (x-of *sub*)   ; => 1 ...ok
-
-  (make-instances-obsolete 'super)
-
-  (x-of *sub*)   ; => 1 ...ooops! 
-  (x-of *super*) ; => 2 ...ok
-  (x-of *sub*)   ; => 2 ...got it now
-
-  (make-instances-obsolete 'super)
-
-  (x-of *sub*)          ; => 2 ...ooops, i did it again...
-  (slot-value *sub* 'x) ; => 3 ...ok but a bit late
+  (fixed in sbcl-0.9.7.9)

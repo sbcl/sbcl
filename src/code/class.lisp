@@ -145,6 +145,10 @@
   ;; LAYOUT-CLOS-HASH-MAX by the doc string of that constant,
   ;; generated as strictly positive in RANDOM-LAYOUT-CLOS-HASH..)
   ;;
+  ;; [ CSR notes, several years later (2005-11-30) that the value 0 is
+  ;;   special for these hash slots, indicating that the wrapper is
+  ;;   obsolete. ]
+  ;;
   ;; KLUDGE: The fact that the slots here start at offset 1 is known
   ;; to the LAYOUT-CLOS-HASH function and to the LAYOUT-dumping code
   ;; in GENESIS.
@@ -247,6 +251,9 @@
   ;; They're declared as INDEX.. Or is this a hack to try to avoid
   ;; having to use bignum arithmetic? Or what? An explanation would be
   ;; nice.
+  ;;
+  ;; an explanation is provided in Kiczales and Rodriguez, "Efficient
+  ;; Method Dispatch in PCL", 1990.  -- CSR, 2005-11-30
   (1+ (random layout-clos-hash-max
               (if (boundp '*layout-clos-hash-random-state*)
                   *layout-clos-hash-random-state*
@@ -1425,11 +1432,15 @@ NIL is returned when no such class exists."
 ;;; Mark LAYOUT as invalid. Setting DEPTHOID -1 helps cause unsafe
 ;;; structure type tests to fail. Remove class from all superclasses
 ;;; too (might not be registered, so might not be in subclasses of the
-;;; nominal superclasses.)
+;;; nominal superclasses.)  We set the layout-clos-hash slots to 0 to
+;;; invalidate the wrappers for specialized dispatch functions, which
+;;; use those slots as indexes into tables.
 (defun invalidate-layout (layout)
   (declare (type layout layout))
   (setf (layout-invalid layout) t
         (layout-depthoid layout) -1)
+  (dotimes (i layout-clos-hash-length)
+    (setf (layout-clos-hash layout i) 0))
   (let ((inherits (layout-inherits layout))
         (classoid (layout-classoid layout)))
     (modify-classoid classoid)

@@ -924,22 +924,17 @@ core and return a descriptor to it."
             ;; the target Lisp's (RANDOM-LAYOUT-CLOS-HASH) sequence
             ;; and show up as the CLOS-HASH value of some other
             ;; LAYOUT.
-            ;;
-            ;; FIXME: This expression here can generate a zero value,
-            ;; and the CMU CL code goes out of its way to generate
-            ;; strictly positive values (even though the field is
-            ;; declared as an INDEX). Check that it's really OK to
-            ;; have zero values in the CLOS-HASH slots.
-            (hash-value (mod (logxor (logand   (random-layout-clos-hash) 15253)
-                                     (logandc2 (random-layout-clos-hash) 15253)
-                                     1)
-                             ;; (The MOD here is defensive programming
-                             ;; to make sure we never write an
-                             ;; out-of-range value even if some joker
-                             ;; sets LAYOUT-CLOS-HASH-MAX to other
-                             ;; than 2^n-1 at some time in the
-                             ;; future.)
-                             (1+ sb!kernel:layout-clos-hash-max))))
+            (hash-value
+             (1+ (mod (logxor (logand   (random-layout-clos-hash) 15253)
+                              (logandc2 (random-layout-clos-hash) 15253)
+                              1)
+                      ;; (The MOD here is defensive programming
+                      ;; to make sure we never write an
+                      ;; out-of-range value even if some joker
+                      ;; sets LAYOUT-CLOS-HASH-MAX to other
+                      ;; than 2^n-1 at some time in the
+                      ;; future.)
+                      sb!kernel:layout-clos-hash-max))))
         (write-wordindexed result
                            (+ i sb!vm:instance-slots-offset 1)
                            (make-fixnum-descriptor hash-value))))

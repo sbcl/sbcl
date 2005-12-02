@@ -892,6 +892,28 @@
 (slot-boundp *obsoleted* 'a)
 (assert (= *obsoleted-counter* 1))
 
+;;; yet another MAKE-INSTANCES-OBSOLETE test, this time from Nikodemus
+;;; Siivola.  Not all methods for accessing slots are created equal...
+(defclass yet-another-obsoletion-super () ((obs :accessor obs-of :initform 0)))
+(defclass yet-another-obsoletion-sub (yet-another-obsoletion-super) ())
+(defmethod shared-initialize :after ((i yet-another-obsoletion-super) 
+                                     slots &rest init)
+  (incf (obs-of i)))
+
+(defvar *yao-super* (make-instance 'yet-another-obsoletion-super))
+(defvar *yao-sub* (make-instance 'yet-another-obsoletion-sub))
+
+(assert (= (obs-of *yao-super*) 1))
+(assert (= (obs-of *yao-sub*) 1))
+(make-instances-obsolete 'yet-another-obsoletion-super)
+(assert (= (obs-of *yao-sub*) 2))
+(assert (= (obs-of *yao-super*) 2))
+(make-instances-obsolete 'yet-another-obsoletion-super)
+(assert (= (obs-of *yao-super*) 3))
+(assert (= (obs-of *yao-sub*) 3))
+(assert (= (slot-value *yao-super* 'obs) 3))
+(assert (= (slot-value *yao-sub* 'obs) 3))
+
 ;;; shared -> local slot transfers of inherited slots, reported by
 ;;; Bruno Haible
 (let (i)

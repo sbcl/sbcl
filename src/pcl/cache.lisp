@@ -25,6 +25,13 @@
 
 (in-package "SB-PCL")
 
+;;; Ye olde CMUCL comment follows, but it seems likely that the paper
+;;; that would be inserted would resemble Kiczales and Rodruigez,
+;;; Efficient Method Dispatch in PCL, ACM 1990.  Some of the details
+;;; changed between that paper and "May Day PCL" of 1992; some other
+;;; details have changed since, but reading that paper gives the broad
+;;; idea.
+;;;
 ;;; The caching algorithm implemented:
 ;;;
 ;;; << put a paper here >>
