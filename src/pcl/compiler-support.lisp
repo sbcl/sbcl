@@ -69,13 +69,6 @@
      (define-function-name-syntax ,name ,@body)
      (pushnew ',name sb-pcl::*internal-pcl-generalized-fun-name-symbols*)))
 
-(define-internal-pcl-function-name-syntax sb-pcl::class-predicate (list)
-  (when (cdr list)
-    (destructuring-bind (name &rest rest) (cdr list)
-      (when (and (symbolp name)
-                 (null rest))
-        (values t name)))))
-
 (define-internal-pcl-function-name-syntax sb-pcl::slot-accessor (list)
   (when (= (length list) 4)
     (destructuring-bind (class slot rwb) (cdr list)

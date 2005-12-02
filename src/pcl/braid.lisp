@@ -288,8 +288,6 @@
     (set-slot 'direct-subclasses (classes direct-subclasses))
     (set-slot 'direct-methods (cons nil nil))
     (set-slot 'wrapper wrapper)
-    (set-slot 'predicate-name (or (cadr (assoc name *early-class-predicates*))
-                                  (make-class-predicate-name name)))
     (set-slot 'documentation nil)
     (set-slot 'plist
               `(,@(and direct-default-initargs
@@ -320,9 +318,6 @@
     (case metaclass-name
       (structure-class
        (let ((constructor-sym '|STRUCTURE-OBJECT class constructor|))
-         (set-slot 'predicate-name (or (cadr (assoc name
-                                                    *early-class-predicates*))
-                                       (make-class-predicate-name name)))
          (set-slot 'defstruct-form
                    `(defstruct (structure-object (:constructor
                                                   ,constructor-sym)
@@ -471,13 +466,13 @@
     (dolist (writer writers) (do-writer-definition writer))
     (dolist (boundp boundps) (do-boundp-definition boundp))))
 
+;;; FIXME: find a better name.
 (defun !bootstrap-class-predicates (early-p)
   (let ((*early-p* early-p))
-    (dolist (definition *early-class-definitions*)
-      (let* ((name (ecd-class-name definition))
-             (class (find-class name)))
-        (setf (find-class-predicate name)
-              (make-class-predicate class (class-predicate-name class)))))))
+    (dolist (ecp *early-class-predicates*)
+      (let ((class-name (car ecp))
+            (predicate-name (cadr ecp)))
+        (make-class-predicate (find-class class-name) predicate-name)))))
 
 (defun !bootstrap-built-in-classes ()
 
@@ -516,13 +511,7 @@
                                        name class-eq-wrapper nil
                                        supers subs
                                        (cons name cpl)
-                                       wrapper prototype)))))
-
-  (dolist (e *built-in-classes*)
-    (let* ((name (car e))
-           (class (find-class name)))
-      (setf (find-class-predicate name)
-            (make-class-predicate class (class-predicate-name class))))))
+                                       wrapper prototype))))))
 
 (defmacro wrapper-of-macro (x)
   `(layout-of ,x))

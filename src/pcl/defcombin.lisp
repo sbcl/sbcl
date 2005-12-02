@@ -56,15 +56,6 @@
 ;;;; method combination object just reads the parameters out of the object
 ;;;; and runs the same rule.
 
-(defclass short-method-combination (standard-method-combination)
-  ((operator
-    :reader short-combination-operator
-    :initarg :operator)
-   (identity-with-one-argument
-    :reader short-combination-identity-with-one-argument
-    :initarg :identity-with-one-argument))
-  (:predicate-name short-method-combination-p))
-
 (defun expand-short-defcombin (whole)
   (let* ((type (cadr whole))
          (documentation

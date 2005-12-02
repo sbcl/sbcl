@@ -113,11 +113,6 @@
             (t
              (error "~S is not a legal class name." symbol)))))
 
-(defun find-class-predicate-from-cell (symbol cell &optional (errorp t))
-  (unless (find-class-cell-class cell)
-    (find-class-from-cell symbol cell errorp))
-  (find-class-cell-predicate cell))
-
 (defun legal-class-name-p (x)
   (symbolp x))
 
@@ -127,11 +122,6 @@
                         (find-class-cell symbol errorp)
                         errorp))
 
-(defun find-class-predicate (symbol &optional (errorp t) environment)
-  (declare (ignore environment))
-  (find-class-predicate-from-cell symbol
-                                  (find-class-cell symbol errorp)
-                                  errorp))
 
 ;;; This DEFVAR was originally in defs.lisp, now moved here.
 ;;;
@@ -174,22 +164,12 @@
              (setf (find-classoid name) nil))
            (when (or (eq *boot-state* 'complete)
                      (eq *boot-state* 'braid))
-             (when (and new-value (class-wrapper new-value)
-                        (class-predicate-name new-value))
-               (setf (find-class-cell-predicate cell)
-                     (fdefinition (class-predicate-name new-value))))
              (update-ctors 'setf-find-class :class new-value :name name))
            new-value))
         (t
          (error "~S is not a legal class name." name))))
 
 (/show "pcl/macros.lisp 230")
-
-(defun (setf find-class-predicate)
-       (new-value symbol)
-  (if (legal-class-name-p symbol)
-    (setf (find-class-cell-predicate (find-class-cell symbol)) new-value)
-    (error "~S is not a legal class name." symbol)))
 
 (defun find-wrapper (symbol)
   (class-wrapper (find-class symbol)))

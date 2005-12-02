@@ -333,9 +333,6 @@
     (set-class-type-translation class name)
     class))
 
-(defmethod class-predicate-name ((class t))
-  'constantly-nil)
-
 (defun fix-super (s)
   (cond ((classp s) s)
         ((not (legal-class-name-p s))
@@ -367,12 +364,10 @@
 
 
 (defmethod shared-initialize :after
-           ((class std-class)
-            slot-names
-            &key (direct-superclasses nil direct-superclasses-p)
-                 (direct-slots nil direct-slots-p)
-                 (direct-default-initargs nil direct-default-initargs-p)
-                 (predicate-name nil predicate-name-p))
+    ((class std-class) slot-names &key 
+     (direct-superclasses nil direct-superclasses-p)
+     (direct-slots nil direct-slots-p)
+     (direct-default-initargs nil direct-default-initargs-p))
   (cond (direct-superclasses-p
          (setq direct-superclasses
                (or direct-superclasses
@@ -419,15 +414,7 @@
                       (push (cons name value) collect))
                     (push old collect)))))
           (nreverse collect)))
-  (setq predicate-name (if predicate-name-p
-                           (setf (slot-value class 'predicate-name)
-                                 (car predicate-name))
-                           (or (slot-value class 'predicate-name)
-                               (setf (slot-value class 'predicate-name)
-                                     (make-class-predicate-name (class-name
-                                                                 class))))))
   (add-direct-subclasses class direct-superclasses)
-  (make-class-predicate class predicate-name)
   (update-class class nil)
   (do* ((slots (slot-value class 'slots) (cdr slots))
         (dupes nil))
@@ -534,8 +521,7 @@
   (declare (ignore slot-names))
   (let ((classoid (find-classoid (class-name class))))
     (with-slots (wrapper class-precedence-list cpl-available-p
-                         prototype predicate-name
-                         (direct-supers direct-superclasses))
+                         prototype (direct-supers direct-superclasses))
         class
       (setf (slot-value class 'direct-slots)
             (mapcar (lambda (pl) (make-direct-slotd class pl))
@@ -547,8 +533,6 @@
       (setq class-precedence-list (compute-class-precedence-list class))
       (setq cpl-available-p t)
       (add-direct-subclasses class direct-superclasses)
-      (setq predicate-name (make-class-predicate-name (class-name class)))
-      (make-class-predicate class predicate-name)
       (setf (slot-value class 'slots) (compute-slots class))))
   ;; Comment from Gerd's PCL, 2003-05-15:
   ;;
@@ -676,12 +660,10 @@
        (sb-kernel::compiler-layout-or-lose (dd-name dd))))))
 
 (defmethod shared-initialize :after
-    ((class structure-class)
-     slot-names
-     &key (direct-superclasses nil direct-superclasses-p)
+    ((class structure-class) slot-names &key 
+     (direct-superclasses nil direct-superclasses-p)
      (direct-slots nil direct-slots-p)
-     direct-default-initargs
-     (predicate-name nil predicate-name-p))
+     direct-default-initargs)
   (declare (ignore slot-names direct-default-initargs))
   (if direct-superclasses-p
       (setf (slot-value class 'direct-superclasses)
@@ -736,14 +718,6 @@
       (setf (slot-value class 'wrapper) (classoid-layout lclass)))
     (setf (slot-value class 'finalized-p) t)
     (update-pv-table-cache-info class)
-    (setq predicate-name (if predicate-name-p
-                           (setf (slot-value class 'predicate-name)
-                                   (car predicate-name))
-                           (or (slot-value class 'predicate-name)
-                               (setf (slot-value class 'predicate-name)
-                                       (make-class-predicate-name
-                                        (class-name class))))))
-    (make-class-predicate class predicate-name)
     (add-slot-accessors class direct-slots)))
 
 (defmethod direct-slot-definition-class ((class structure-class) &rest initargs)
@@ -1041,9 +1015,9 @@
                       ;; do if we find that said user has added a slot
                       ;; with the same name as another slot...
                       (cell (or (assq name (class-slot-cells from-class))
-                                (setf (class-slot-cells from-class)
-                                      (cons (cons name +slot-unbound+)
-                                            (class-slot-cells from-class))))))
+                                (let ((c (cons name +slot-unbound+)))
+                                  (push c (class-slot-cells from-class))
+                                  c))))
                  (aver (consp cell))
                  (if (eq +slot-unbound+ (cdr cell))
                      ;; We may have inherited an initfunction

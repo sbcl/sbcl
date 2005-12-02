@@ -23,18 +23,10 @@
 (assert (string= (documentation #'(setf foo) 'function)
                  "(setf foo) documentation"))
 
-(defun (sb-pcl::class-predicate foo) (x)
-  "(class-predicate foo) documentation"
-  x)
-
 (assert (string= (documentation '(setf foo) 'function)
                  "(setf foo) documentation"))
 (assert (string= (documentation #'(setf foo) 'function)
                  "(setf foo) documentation"))
-(assert (string= (documentation '(sb-pcl::class-predicate foo) 'function)
-                 "(class-predicate foo) documentation"))
-(assert (string= (documentation #'(sb-pcl::class-predicate foo) 'function)
-                 "(class-predicate foo) documentation"))
 
 ;;; DISASSEMBLE shouldn't fail on closures or unpurified functions
 (defun disassemble-fun (x) x)

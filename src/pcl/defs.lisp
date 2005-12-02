@@ -204,9 +204,6 @@
 
 (defvar *standard-method-combination*)
 
-(defun make-class-predicate-name (name)
-  (list 'class-predicate name))
-
 (defun plist-value (object name)
   (getf (object-plist object) name))
 
@@ -436,6 +433,14 @@
     :initarg :args-lambda-list
     :reader long-method-combination-args-lambda-list)))
 
+(defclass short-method-combination (standard-method-combination)
+  ((operator
+    :reader short-combination-operator
+    :initarg :operator)
+   (identity-with-one-argument
+    :reader short-combination-identity-with-one-argument
+    :initarg :identity-with-one-argument)))
+
 (defclass slot-definition (metaobject)
   ((name
     :initform nil
@@ -598,9 +603,6 @@
     :reader class-direct-subclasses)
    (direct-methods
     :initform (cons nil nil))
-   (predicate-name
-    :initform nil
-    :reader class-predicate-name)
    (documentation
     :initform nil
     :initarg :documentation)
@@ -710,5 +712,5 @@
     (generic-function generic-function-p)
     (standard-generic-function standard-generic-function-p)
     (method-combination method-combination-p)
-    (long-method-combination long-method-combination-p)))
-
+    (long-method-combination long-method-combination-p)
+    (short-method-combination short-method-combination-p)))

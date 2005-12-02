@@ -76,8 +76,6 @@
 
 (defgeneric class-precedence-list (pcl-class))
 
-(defgeneric class-predicate-name (class))
-
 (defgeneric class-wrapper (pcl-class))
 
 (defgeneric definition-source (definition-source-mixin))
