@@ -896,7 +896,7 @@
 ;;; Siivola.  Not all methods for accessing slots are created equal...
 (defclass yet-another-obsoletion-super () ((obs :accessor obs-of :initform 0)))
 (defclass yet-another-obsoletion-sub (yet-another-obsoletion-super) ())
-(defmethod shared-initialize :after ((i yet-another-obsoletion-super) 
+(defmethod shared-initialize :after ((i yet-another-obsoletion-super)
                                      slots &rest init)
   (incf (obs-of i)))
 
