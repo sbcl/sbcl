@@ -46,18 +46,8 @@
  */
 static lispobj *dynamic_space_free_pointer;
 #endif
+
 extern unsigned long bytes_consed_between_gcs;
-
-#define gc_abort() \
-  lose("GC invariant lost, file \"%s\", line %d", __FILE__, __LINE__)
-
-#if 1
-#define gc_assert(ex) do { \
-        if (!(ex)) gc_abort(); \
-} while (0)
-#else
-#define gc_assert(ex)
-#endif
 
 
 /* These hold the original end of the read_only and static spaces so
