@@ -19,14 +19,24 @@
 /* disabling gc assertions made no discernable difference to GC speed,
  * last I tried it - dan 2003.12.21 */
 #if 1
-#define gc_assert(ex) do { \
-        if (!(ex)) gc_abort(); \
+# define gc_assert(ex)                                                 \
+do {                                                                   \
+    if (!(ex)) gc_abort();                                             \
+} while (0)
+# define gc_assert_verbose(ex, fmt, ...)                               \
+do {                                                                   \
+    if (!(ex)) {                                                       \
+        fprintf(stderr, fmt, ## __VA_ARGS__);                          \
+        gc_abort();                                                    \
+    }                                                                  \
 } while (0)
 #else
-#define gc_assert(ex)
+# define gc_assert(ex)
+# define gc_assert_verbose(ex, fmt, ...)
 #endif
-#define gc_abort() lose("GC invariant lost, file \"%s\", line %d", \
-                        __FILE__, __LINE__)
+
+#define gc_abort()                                                     \
+  lose("GC invariant lost, file \"%s\", line %d\n", __FILE__, __LINE__)
 
 #define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
 

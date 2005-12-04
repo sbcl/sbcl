@@ -187,7 +187,8 @@ scavenge(lispobj *start, long n_words)
                 (scavtab[widetag_of(object)])(object_ptr, object);
         }
     }
-    gc_assert(object_ptr == end);
+    gc_assert_verbose(object_ptr == end, "Final object pointer %p, end %p\n",
+		      object_ptr, end);
 }
 
 static lispobj trans_fun_header(lispobj object); /* forward decls */
@@ -344,7 +345,8 @@ scav_code_header(lispobj *where, lispobj object)
          entry_point != NIL;
          entry_point = function_ptr->next) {
 
-        gc_assert(is_lisp_pointer(entry_point));
+        gc_assert_verbose(is_lisp_pointer(entry_point), "Entry point %lx\n",
+			  (long)entry_point);
 
         function_ptr = (struct simple_fun *) native_pointer(entry_point);
         gc_assert(widetag_of(function_ptr->header)==SIMPLE_FUN_HEADER_WIDETAG);
