@@ -122,9 +122,6 @@ symbol:
 	li	reg_ALLOC, 1
         .set    reorder
 
-	/* Mark us as in Lisp land. */
-	sw	zero, foreign_function_call_active
-
 	/* Load the allocation pointer, preserving the low-bit of alloc */
 	lw	reg_BSP, dynamic_space_free_pointer
 	addu	reg_ALLOC, reg_BSP
@@ -158,8 +155,12 @@ symbol:
 	/* Indirect closure */
 	lw	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
 
-	/* Jump into lisp land. */
 	addu	reg_LIP, reg_CODE, SIMPLE_FUN_CODE_OFFSET
+
+	/* Mark us as in Lisp land. */
+	sw	zero, foreign_function_call_active
+
+	/* Jump into lisp land. */
 	jr	reg_LIP
 
 	.align	3
@@ -180,15 +181,15 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	addu	reg_ALLOC, 1
 	.set	reorder
 
+	/* Mark us as in C land. */
+	sw	reg_CSP, foreign_function_call_active
+
 	/* Save LISP state. */
 	subu	reg_NL0, reg_ALLOC, 1
 	sw	reg_NL0, dynamic_space_free_pointer
 	sw	reg_BSP, current_binding_stack_pointer
 	sw	reg_CSP, current_control_stack_pointer
 	sw	reg_CFP, current_control_frame_pointer
-
-	/* Mark us as in C land. */
-	sw	reg_CSP, foreign_function_call_active
 
 	/* Check for interrupt */
 	.set	noreorder
@@ -251,6 +252,9 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	addu	reg_ALLOC, 1
 	.set	reorder
 
+	/* Mark us as in C land. */
+	sw	reg_CSP, foreign_function_call_active
+
 	/* Convert the return address to an offset and save it on the stack. */
 	subu	reg_NFP, reg_LIP, reg_CODE
 	addu	reg_NFP, OTHER_POINTER_LOWTAG
@@ -264,9 +268,6 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	sw	reg_BSP, current_binding_stack_pointer
 	sw	reg_CSP, current_control_stack_pointer
 	sw	reg_CFP, current_control_frame_pointer
-
-	/* Mark us as in C land. */
-	sw	reg_CSP, foreign_function_call_active
 
 	/* Check for interrupt */
 	.set	noreorder
@@ -314,9 +315,6 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	li	reg_ALLOC, 1
 	.set	reorder
 
-	/* Mark us as in Lisp land. */
-	sw	zero, foreign_function_call_active
-
 	/* Load the allocation pointer, preserving the low-bit of alloc */
 	lw	reg_BSP, dynamic_space_free_pointer
 	addu	reg_ALLOC, reg_BSP
@@ -340,6 +338,9 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	/* Note: OCFP and CFP are in saved regs. */
 	move	reg_CSP, reg_CFP
 	move	reg_CFP, reg_OCFP
+
+	/* Mark us as in Lisp land. */
+	sw	zero, foreign_function_call_active
 
 	/* Return to LISP. */
 	jr	reg_LIP
