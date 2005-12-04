@@ -148,7 +148,7 @@ static void restore_breakpoint(struct sigcontext *scp)
     /* state so that we will continue as if nothing happened. */
 
     if (NextPc == NULL)
-        lose("SingleStepBreakpoint trap at strange time.");
+        lose("SingleStepBreakpoint trap at strange time.\n");
 
     if ((SC_PC(scp)&~3) == (unsigned int)SingleStepTraps) {
         /* The next instruction was not nullified. */

@@ -46,7 +46,7 @@ ensure_undefined_alien(void) {
         os_protect(start, os_vm_page_size, OS_VM_PROT_NONE);
         undefined_alien_address = start;
     } else {
-        lose("could not allocate guard page for undefined alien");
+        lose("could not allocate guard page for undefined alien\n");
     }
 }
 

@@ -93,7 +93,7 @@ successful_malloc(size_t size)
 {
     void* result = malloc(size);
     if (0 == result) {
-        lose("malloc failure");
+        lose("malloc failure\n");
     } else {
         return result;
     }
@@ -215,11 +215,11 @@ main(int argc, char *argv[], char *envp[])
                 ++argi;
             } else if (0 == strcmp(arg, "--core")) {
                 if (core) {
-                    lose("more than one core file specified");
+                    lose("more than one core file specified\n");
                 } else {
                     ++argi;
                     if (argi >= argc) {
-                        lose("missing filename for --core argument");
+                        lose("missing filename for --core argument\n");
                     }
                     core = copied_string(argv[argi]);
                     ++argi;
@@ -265,7 +265,7 @@ main(int argc, char *argv[], char *envp[])
                  * error. */
                 if (!end_runtime_options &&
                     0 == strcmp(arg, "--end-runtime-options")) {
-                    lose("bad runtime option \"%s\"", argi0);
+                    lose("bad runtime option \"%s\"\n", argi0);
                 }
                 sbcl_argv[argj++] = arg;
             }
@@ -287,7 +287,7 @@ main(int argc, char *argv[], char *envp[])
         core = copied_existing_filename_or_null(lookhere);
         free(lookhere);
         if (!core) {
-            lose("can't find core file");
+            lose("can't find core file\n");
         }
     }
     /* Make sure that SBCL_HOME is set, no matter where the core was
@@ -324,7 +324,7 @@ main(int argc, char *argv[], char *envp[])
 
     initial_function = load_core_file(core);
     if (initial_function == NIL) {
-        lose("couldn't find initial function");
+        lose("couldn't find initial function\n");
     }
     SHOW("freeing core");
     free(core);
@@ -342,6 +342,6 @@ main(int argc, char *argv[], char *envp[])
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n",
           (unsigned long)initial_function));
     create_initial_thread(initial_function);
-    lose("CATS.  CATS ARE NICE.");
+    lose("CATS.  CATS ARE NICE.\n");
     return 0;
 }

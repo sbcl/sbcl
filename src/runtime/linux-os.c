@@ -134,7 +134,7 @@ os_init(char *argv[], char *envp[])
     p=strchr(p,'.')+1;
     patch_version = atoi(p);
     if (major_version<2) {
-        lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)",
+        lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)\n",
              major_version);
     }
     if (!(major_version>2 || minor_version >= 4)) {
@@ -146,11 +146,14 @@ os_init(char *argv[], char *envp[])
 #ifdef LISP_FEATURE_SB_THREAD
     futex_wait(futex,-1);
     if(errno==ENOSYS) {
-       lose("This version of SBCL is compiled with threading support, but your kernel is too old to support this.\n\
-Please use a more recent kernel or a version of SBCL without threading support.\n");
+       lose("This version of SBCL is compiled with threading support, but your kernel\n"
+            "is too old to support this. Please use a more recent kernel or\n"
+            "a version of SBCL without threading support.\n");
     }
     if(! isnptl()) {
-       lose("This version of SBCL only works correctly with the NPTL threading library. Please use a newer glibc, use an older SBCL, or stop using LD_ASSUME_KERNEL");
+       lose("This version of SBCL only works correctly with the NPTL threading\n"
+            "library. Please use a newer glibc, use an older SBCL, or stop using\n"
+            "LD_ASSUME_KERNEL\n");
     }
 #endif
     os_vm_page_size = getpagesize();
@@ -267,7 +270,7 @@ os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
                   fd, (off_t) offset);
     if (actual == MAP_FAILED || (addr && (addr != actual))) {
         perror("mmap");
-        lose("unexpected mmap(..) failure");
+        lose("unexpected mmap(..) failure\n");
     }
 
     return actual;

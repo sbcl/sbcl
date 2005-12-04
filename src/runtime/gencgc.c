@@ -602,7 +602,7 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
                  * (long) in code like this, so that it is less likely to
                  * break randomly when running on a machine with different
                  * word sizes. -- WHN 19991129 */
-                lose("The new region at %x is not zero.", p);
+                lose("The new region at %x is not zero.\n", p);
             }
         }
     }
@@ -1004,7 +1004,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
                     "Argh! gc_find_free_space failed (first_page), nbytes=%ld.\n",
                     nbytes);
             print_generation_stats(1);
-            lose(NULL);
+            lose("\n");
         }
 
         gc_assert(page_table[first_page].write_protected == 0);
@@ -1035,7 +1035,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
                 "Argh! gc_find_freeish_pages failed (restart_page), nbytes=%ld.\n",
                 nbytes);
         print_generation_stats(1);
-        lose(NULL);
+        lose("\n");
     }
     *restart_page_ptr=first_page;
 
@@ -1768,12 +1768,12 @@ scav_vector(lispobj *where, lispobj object)
     /* Scavenge element 0, which may be a hash-table structure. */
     scavenge(where+2, 1);
     if (!is_lisp_pointer(where[2])) {
-        lose("no pointer at %x in hash table", where[2]);
+        lose("no pointer at %x in hash table\n", where[2]);
     }
     hash_table = (struct hash_table *)native_pointer(where[2]);
     /*FSHOW((stderr,"/hash_table = %x\n", hash_table));*/
     if (widetag_of(hash_table->header) != INSTANCE_HEADER_WIDETAG) {
-        lose("hash table not instance (%x at %x)",
+        lose("hash table not instance (%x at %x)\n",
              hash_table->header,
              hash_table);
     }
@@ -1782,13 +1782,13 @@ scav_vector(lispobj *where, lispobj object)
      * the hash table code reserves for marking empty slots. */
     scavenge(where+3, 1);
     if (!is_lisp_pointer(where[3])) {
-        lose("not empty-hash-table-slot symbol pointer: %x", where[3]);
+        lose("not empty-hash-table-slot symbol pointer: %x\n", where[3]);
     }
     empty_symbol = where[3];
     /* fprintf(stderr,"* empty_symbol = %x\n", empty_symbol);*/
     if (widetag_of(*(lispobj *)native_pointer(empty_symbol)) !=
         SYMBOL_HEADER_WIDETAG) {
-        lose("not a symbol where empty-hash-table-slot symbol expected: %x",
+        lose("not a symbol where empty-hash-table-slot symbol expected: %x\n",
              *(lispobj *)native_pointer(empty_symbol));
     }
 
@@ -1799,7 +1799,7 @@ scav_vector(lispobj *where, lispobj object)
 
     /* Cross-check the kv_vector. */
     if (where != (lispobj *)native_pointer(hash_table->table)) {
-        lose("hash_table table!=this table %x", hash_table->table);
+        lose("hash_table table!=this table %x\n", hash_table->table);
     }
 
     /* WEAK-P */
@@ -1818,7 +1818,7 @@ scav_vector(lispobj *where, lispobj object)
             length = fixnum_value(((lispobj *)native_pointer(index_vector_obj))[1]);
             /*FSHOW((stderr, "/length = %d\n", length));*/
         } else {
-            lose("invalid index_vector %x", index_vector_obj);
+            lose("invalid index_vector %x\n", index_vector_obj);
         }
     }
 
@@ -1834,7 +1834,7 @@ scav_vector(lispobj *where, lispobj object)
             next_vector_length = fixnum_value(((lispobj *)native_pointer(next_vector_obj))[1]);
             /*FSHOW((stderr, "/next_vector_length = %d\n", next_vector_length));*/
         } else {
-            lose("invalid next_vector %x", next_vector_obj);
+            lose("invalid next_vector %x\n", next_vector_obj);
         }
     }
 
@@ -2778,7 +2778,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
                     page_table[i].bytes_used,
                     page_table[i].first_object_offset,
                     page_table[i].dont_move));
-            lose("write to protected page %d in scavenge_generation()", i);
+            lose("write to protected page %d in scavenge_generation()\n", i);
         }
     }
 #endif
@@ -2994,7 +2994,7 @@ scavenge_newspace_generation(generation_index_t generation)
             && (page_table[i].gen == generation)
             && (page_table[i].write_protected_cleared != 0)
             && (page_table[i].dont_move == 0)) {
-            lose("write protected page %d written to in scavenge_newspace_generation\ngeneration=%d dont_move=%d",
+            lose("write protected page %d written to in scavenge_newspace_generation\ngeneration=%d dont_move=%d\n",
                  i, generation, page_table[i].dont_move);
         }
     }
@@ -3093,8 +3093,8 @@ free_oldspace(void)
             os_invalidate(page_start, PAGE_BYTES*(last_page-first_page));
             addr = os_validate(page_start, PAGE_BYTES*(last_page-first_page));
             if (addr == NULL || addr != page_start) {
-                lose("free_oldspace: page moved, 0x%08x ==> 0x%08x",page_start,
-                     addr);
+                lose("free_oldspace: page moved, 0x%08x ==> 0x%08x\n",
+                     page_start, addr);
             }
         } else {
             long *page_start;
@@ -3170,15 +3170,15 @@ verify_space(lispobj *start, size_t words)
                  * page. XX Could check the offset too. */
                 if ((page_table[page_index].allocated != FREE_PAGE_FLAG)
                     && (page_table[page_index].bytes_used == 0))
-                    lose ("Ptr %x @ %x sees free page.", thing, start);
+                    lose ("Ptr %x @ %x sees free page.\n", thing, start);
                 /* Check that it doesn't point to a forwarding pointer! */
                 if (*((lispobj *)native_pointer(thing)) == 0x01) {
-                    lose("Ptr %x @ %x sees forwarding ptr.", thing, start);
+                    lose("Ptr %x @ %x sees forwarding ptr.\n", thing, start);
                 }
                 /* Check that its not in the RO space as it would then be a
                  * pointer from the RO to the dynamic space. */
                 if (is_in_readonly_space) {
-                    lose("ptr to dynamic space %x from RO space %x",
+                    lose("ptr to dynamic space %x from RO space %x\n",
                          thing, start);
                 }
                 /* Does it point to a plausible object? This check slows
@@ -3192,14 +3192,14 @@ verify_space(lispobj *start, size_t words)
                  * dynamically. */
                 /*
                 if (!possibly_valid_dynamic_space_pointer((lispobj *)thing)) {
-                    lose("ptr %x to invalid object %x", thing, start);
+                    lose("ptr %x to invalid object %x\n", thing, start);
                 }
                 */
             } else {
                 /* Verify that it points to another valid space. */
                 if (!to_readonly_space && !to_static_space
                     && (thing != (unsigned long)&undefined_tramp)) {
-                    lose("Ptr %x @ %x sees junk.", thing, start);
+                    lose("Ptr %x @ %x sees junk.\n", thing, start);
                 }
             }
         } else {
@@ -3457,7 +3457,7 @@ verify_zero_fill(void)
             long i;
             for (i = 0; i < size; i++) {
                 if (start_addr[i] != 0) {
-                    lose("free page not zero at %x", start_addr + i);
+                    lose("free page not zero at %x\n", start_addr + i);
                 }
             }
         } else {
@@ -3469,7 +3469,7 @@ verify_zero_fill(void)
                 long i;
                 for (i = 0; i < size; i++) {
                     if (start_addr[i] != 0) {
-                        lose("free region not zero at %x", start_addr + i);
+                        lose("free region not zero at %x\n", start_addr + i);
                     }
                 }
             }
@@ -3747,7 +3747,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
         bytes_allocated = bytes_allocated - old_bytes_allocated;
 
         if (bytes_allocated != 0) {
-            lose("Rescan of new_space allocated %d more bytes.",
+            lose("Rescan of new_space allocated %d more bytes.\n",
                  bytes_allocated);
         }
     }
@@ -3921,7 +3921,7 @@ collect_garbage(generation_index_t last_gen)
         /* Check that they are all empty. */
         for (i = 0; i < gen_to_wp; i++) {
             if (generations[i].bytes_allocated)
-                lose("trying to write-protect gen. %d when gen. %d nonempty",
+                lose("trying to write-protect gen. %d when gen. %d nonempty\n",
                      gen_to_wp, i);
         }
         write_protect_generation_pages(gen_to_wp);
@@ -3976,7 +3976,7 @@ gc_free_heap(void)
             os_invalidate(page_start,PAGE_BYTES);
             addr = os_validate(page_start,PAGE_BYTES);
             if (addr == NULL || addr != page_start) {
-                lose("gc_free_heap: page moved, 0x%08x ==> 0x%08x",
+                lose("gc_free_heap: page moved, 0x%08x ==> 0x%08x\n",
                      page_start,
                      addr);
             }
@@ -3989,7 +3989,7 @@ gc_free_heap(void)
             page_start = (long *)page_address(page);
             for (i=0; i<1024; i++) {
                 if (page_start[i] != 0) {
-                    lose("free region not zero at %x", page_start + i);
+                    lose("free region not zero at %x\n", page_start + i);
                 }
             }
         }
@@ -4256,7 +4256,7 @@ gencgc_handle_wp_violation(void* fault_addr)
              * does this test after the first one has already set wp=0
              */
             if(page_table[page_index].write_protected_cleared != 1)
-                lose("fault in heap page not marked as write-protected");
+                lose("fault in heap page not marked as write-protected\n");
         }
         /* Don't worry, we can handle it. */
         return 1;
@@ -4349,5 +4349,5 @@ gc_and_save(char *filename)
      * beyond hope, there's not much we can do.
      * (beyond FUNCALLing RESTART_LISP_FUNCTION, but I suspect that's
      * going to be rather unsatisfactory too... */
-    lose("Attempt to save core after non-conservative GC failed.");
+    lose("Attempt to save core after non-conservative GC failed.\n");
 }

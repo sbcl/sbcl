@@ -122,7 +122,7 @@ check_blockables_blocked_or_lose()
     thread_sigmask(SIG_BLOCK, &empty, &current);
     for(i = 1; i < NSIG; i++) {
         if (sigismember(&blockable_sigset, i) && !sigismember(&current, i))
-            lose("blockable signal %d not blocked",i);
+            lose("blockable signal %d not blocked\n",i);
     }
 }
 
@@ -131,13 +131,13 @@ check_interrupts_enabled_or_lose(os_context_t *context)
 {
     struct thread *thread=arch_os_get_current_thread();
     if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL)
-        lose("interrupts not enabled");
+        lose("interrupts not enabled\n");
     if (
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
         (!foreign_function_call_active) &&
 #endif
         arch_pseudo_atomic_atomic(context))
-        lose ("in pseudo atomic section");
+        lose ("in pseudo atomic section\n");
 }
 
 /* When we catch an internal error, should we pass it back to Lisp to
@@ -244,7 +244,7 @@ fake_foreign_function_call(os_context_t *context)
             (*os_context_register_addr(context, reg_ALLOC));
 #if defined(LISP_FEATURE_ALPHA)
     if ((long)dynamic_space_free_pointer & 1) {
-        lose("dead in fake_foreign_function_call, context = %x", context);
+        lose("dead in fake_foreign_function_call, context = %x\n", context);
     }
 #endif
 #endif
@@ -262,7 +262,7 @@ fake_foreign_function_call(os_context_t *context)
         fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
     if (context_index >= MAX_INTERRUPTS) {
-        lose("maximum interrupt nesting depth (%d) exceeded", MAX_INTERRUPTS);
+        lose("maximum interrupt nesting depth (%d) exceeded\n", MAX_INTERRUPTS);
     }
 
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,
@@ -311,7 +311,7 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
         describe_internal_error(context);
         /* There's no good way to recover from an internal error
          * before the Lisp error handling mechanism is set up. */
-        lose("internal error too early in init, can't recover");
+        lose("internal error too early in init, can't recover\n");
     }
 
     /* Allocate the SAP object while the interrupts are still
@@ -465,7 +465,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
         /* This can happen if someone tries to ignore or default one
          * of the signals we need for runtime support, and the runtime
          * support decides to pass on it. */
-        lose("no handler for signal %d in interrupt_handle_now(..)", signal);
+        lose("no handler for signal %d in interrupt_handle_now(..)\n", signal);
 
     } else if (lowtag_of(handler.lisp) == FUN_POINTER_LOWTAG) {
         /* Once we've decided what to do about contexts in a
@@ -549,7 +549,7 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
     check_blockables_blocked_or_lose();
 
     if (SymbolValue(INTERRUPT_PENDING,thread) != NIL)
-        lose("interrupt already pending");
+        lose("interrupt already pending\n");
     /* If interrupts are disabled then INTERRUPT_PENDING is set and
      * not PSEDUO_ATOMIC_INTERRUPTED. This is important for a pseudo
      * atomic section inside a WITHOUT-INTERRUPTS.
@@ -1122,7 +1122,7 @@ undoably_install_low_level_interrupt_handler (int signal,
     struct sigaction sa;
 
     if (0 > signal || signal >= NSIG) {
-        lose("bad signal number %d", signal);
+        lose("bad signal number %d\n", signal);
     }
 
     if (ARE_SAME_HANDLER(handler, SIG_DFL))

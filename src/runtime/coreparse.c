@@ -66,7 +66,7 @@ process_directory(int fd, u32 *ptr, int count)
             real_addr = os_map(fd, offset, addr, len);
             if (real_addr != addr) {
                 lose("file mapped in wrong place! "
-                     "(0x%08x != 0x%08lx)",
+                     "(0x%08x != 0x%08lx)\n",
                      real_addr,
                      addr);
             }
@@ -81,7 +81,7 @@ process_directory(int fd, u32 *ptr, int count)
             if (addr != (os_vm_address_t)DYNAMIC_SPACE_START) {
                 fprintf(stderr, "in core: 0x%lx; in runtime: 0x%lx \n",
                         (long)addr, (long)DYNAMIC_SPACE_START);
-                lose("core/runtime address mismatch: DYNAMIC_SPACE_START");
+                lose("core/runtime address mismatch: DYNAMIC_SPACE_START\n");
             }
 #else
             if ((addr != (os_vm_address_t)DYNAMIC_0_SPACE_START) &&
@@ -90,7 +90,7 @@ process_directory(int fd, u32 *ptr, int count)
                         (long)addr,
                         (long)DYNAMIC_0_SPACE_START,
                         (long)DYNAMIC_1_SPACE_START);
-                lose("warning: core/runtime address mismatch: DYNAMIC_SPACE_START");
+                lose("warning: core/runtime address mismatch: DYNAMIC_SPACE_START\n");
             }
 #endif
 #if defined(ALLOCATION_POINTER)
@@ -108,18 +108,18 @@ process_directory(int fd, u32 *ptr, int count)
             if (addr != (os_vm_address_t)STATIC_SPACE_START) {
                 fprintf(stderr, "in core: 0x%lx - in runtime: 0x%lx\n",
                         (long)addr, (long)STATIC_SPACE_START);
-                lose("core/runtime address mismatch: STATIC_SPACE_START");
+                lose("core/runtime address mismatch: STATIC_SPACE_START\n");
             }
             break;
         case READ_ONLY_CORE_SPACE_ID:
             if (addr != (os_vm_address_t)READ_ONLY_SPACE_START) {
                 fprintf(stderr, "in core: 0x%lx - in runtime: 0x%lx\n",
                         (long)addr, (long)READ_ONLY_SPACE_START);
-                lose("core/runtime address mismatch: READ_ONLY_SPACE_START");
+                lose("core/runtime address mismatch: READ_ONLY_SPACE_START\n");
             }
             break;
         default:
-            lose("unknown space ID %ld addr 0x%p", id);
+            lose("unknown space ID %ld addr 0x%lx\n", id, (long)addr);
         }
     }
 }
@@ -142,7 +142,7 @@ load_core_file(char *file)
 
     count = read(fd, header, os_vm_page_size);
     if (count < os_vm_page_size) {
-        lose("premature end of core file");
+        lose("premature end of core file\n");
     }
     SHOW("successfully read first page of core");
 
@@ -150,7 +150,7 @@ load_core_file(char *file)
     val = *ptr++;
 
     if (val != CORE_MAGIC) {
-        lose("invalid magic number in core: 0x%lx should have been 0x%x.",
+        lose("invalid magic number in core: 0x%lx should have been 0x%x.\n",
              val,
              CORE_MAGIC);
     }
@@ -172,7 +172,7 @@ load_core_file(char *file)
         case VERSION_CORE_ENTRY_TYPE_CODE:
             SHOW("VERSION_CORE_ENTRY_TYPE_CODE case");
             if (*ptr != SBCL_CORE_VERSION_INTEGER) {
-                lose("core file version (%d) != runtime library version (%d)",
+                lose("core file version (%d) != runtime library version (%d)\n",
                      *ptr,
                      SBCL_CORE_VERSION_INTEGER);
             }
@@ -205,7 +205,7 @@ load_core_file(char *file)
                  * was changed, but people experimenting with patches
                  * don't necessarily update version.lisp-expr.) */
 
-                lose("can't load .core for different runtime, sorry");
+                lose("can't load .core for different runtime, sorry\n");
             }
 
         case NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE:
@@ -252,7 +252,7 @@ load_core_file(char *file)
         }
 #endif
         default:
-            lose("unknown core file entry: %ld", (long)val);
+            lose("unknown core file entry: %ld\n", (long)val);
         }
 
         ptr += remaining_len;

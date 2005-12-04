@@ -387,7 +387,7 @@ size_code_header(lispobj *where)
 static long
 scav_return_pc_header(lispobj *where, lispobj object)
 {
-    lose("attempted to scavenge a return PC header where=0x%08x object=0x%08x",
+    lose("attempted to scavenge a return PC header where=0x%08x object=0x%08x\n",
          (unsigned long) where,
          (unsigned long) object);
     return 0; /* bogus return value to satisfy static type checking */
@@ -442,7 +442,7 @@ scav_closure_header(lispobj *where, lispobj object)
 static long
 scav_fun_header(lispobj *where, lispobj object)
 {
-    lose("attempted to scavenge a function header where=0x%08x object=0x%08x",
+    lose("attempted to scavenge a function header where=0x%08x object=0x%08x\n",
          (unsigned long) where,
          (unsigned long) object);
     return 0; /* bogus return value to satisfy static type checking */
@@ -627,7 +627,7 @@ scav_immediate(lispobj *where, lispobj object)
 static lispobj
 trans_immediate(lispobj object)
 {
-    lose("trying to transport an immediate");
+    lose("trying to transport an immediate\n");
     return NIL; /* bogus return value to satisfy static type checking */
 }
 
@@ -1541,7 +1541,7 @@ void scan_weak_pointers(void)
 static long
 scav_lose(lispobj *where, lispobj object)
 {
-    lose("no scavenge function for object 0x%08x (widetag 0x%x)",
+    lose("no scavenge function for object 0x%08x (widetag 0x%x)\n",
          (unsigned long)object,
          widetag_of(*(lispobj*)native_pointer(object)));
 
@@ -1551,7 +1551,7 @@ scav_lose(lispobj *where, lispobj object)
 static lispobj
 trans_lose(lispobj object)
 {
-    lose("no transport function for object 0x%08x (widetag 0x%x)",
+    lose("no transport function for object 0x%08x (widetag 0x%x)\n",
          (unsigned long)object,
          widetag_of(*(lispobj*)native_pointer(object)));
     return NIL; /* bogus return value to satisfy static type checking */
@@ -1560,7 +1560,7 @@ trans_lose(lispobj object)
 static long
 size_lose(lispobj *where)
 {
-    lose("no size function for object at 0x%08x (widetag 0x%x)",
+    lose("no size function for object at 0x%08x (widetag 0x%x)\n",
          (unsigned long)where,
          widetag_of(LOW_WORD(where)));
     return 1; /* bogus return value to satisfy static type checking */

@@ -63,7 +63,7 @@ os_init(char *argv[], char *envp[])
     uname(&name);
     major_version = atoi(name.release);
     if (major_version != 5) {
-        lose("sunos major version=%d (which isn't 5!)", major_version);
+        lose("sunos major version=%d (which isn't 5!)\n", major_version);
     }
     minor_version = atoi(name.release+2);
     if ((minor_version == 8) ||
@@ -72,12 +72,12 @@ os_init(char *argv[], char *envp[])
         KLUDGE_MAYBE_MAP_ANON = 0x100;
     } else if (minor_version > 10) {
         FSHOW((stderr, "os_init: Solaris version greater than 9?\nUnknown MAP_ANON behaviour.\n"));
-        lose("Unknown mmap() interaction with MAP_ANON");
+        lose("Unknown mmap() interaction with MAP_ANON\n");
     } else { /* minor_version < 8 */
         kludge_mmap_fd = open("/dev/zero",O_RDONLY);
         if (kludge_mmap_fd < 0) {
             perror("open");
-            lose("Error in open(..)");
+            lose("Error in open(..)\n");
         }
     }
 
@@ -115,7 +115,7 @@ os_vm_address_t os_validate(os_vm_address_t addr, os_vm_size_t len)
 
     if (addr == MAP_FAILED) {
         perror("mmap");
-        lose ("Error in mmap(..)");
+        lose ("Error in mmap(..)\n");
     }
 
     return addr;
@@ -140,7 +140,7 @@ os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 
     if (addr == MAP_FAILED) {
         perror("mmap");
-        lose("Unexpedted mmap(..) failure");
+        lose("Unexpedted mmap(..) failure\n");
     }
 
     return addr;

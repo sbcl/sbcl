@@ -304,7 +304,7 @@ void create_initial_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
     if(th) {
         initial_thread_trampoline(th); /* no return */
-    } else lose("can't create initial thread");
+    } else lose("can't create initial thread\n");
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -388,7 +388,7 @@ int signal_interrupt_thread(os_thread_t os_thread)
     } else if (status == ESRCH) {
         return -1;
     } else {
-        lose("cannot send SIG_INTERRUPT_THREAD to thread=%lu: %d, %s",
+        lose("cannot send SIG_INTERRUPT_THREAD to thread=%lu: %d, %s\n",
              os_thread, status, strerror(status));
     }
 }
@@ -423,7 +423,7 @@ void gc_stop_the_world()
                 /* This thread has exited. */
                 gc_assert(p->state==STATE_DEAD);
             } else if (status) {
-                lose("cannot send suspend thread=%lu: %d, %s",
+                lose("cannot send suspend thread=%lu: %d, %s\n",
                      p->os_thread,status,strerror(status));
             }
         }
@@ -461,7 +461,7 @@ void gc_start_the_world()
             p->state=STATE_RUNNING;
             status=kill_thread_safely(p->os_thread,SIG_STOP_FOR_GC);
             if (status) {
-                lose("cannot resume thread=%lu: %d, %s",
+                lose("cannot resume thread=%lu: %d, %s\n",
                      p->os_thread,status,strerror(status));
             }
         }
