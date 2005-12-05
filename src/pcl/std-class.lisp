@@ -83,8 +83,7 @@
                               (writer '(setf slot-value-using-class))
                               (boundp 'slot-boundp-using-class)))
              (gf (gdefinition gf-name)))
-        (compute-slot-accessor-info slotd type gf)))
-    (initialize-internal-slot-gfs name)))
+        (compute-slot-accessor-info slotd type gf)))))
 
 ;;; CMUCL (Gerd PCL 2003-04-25) comment:
 ;;;
@@ -364,7 +363,7 @@
 
 
 (defmethod shared-initialize :after
-    ((class std-class) slot-names &key 
+    ((class std-class) slot-names &key
      (direct-superclasses nil direct-superclasses-p)
      (direct-slots nil direct-slots-p)
      (direct-default-initargs nil direct-default-initargs-p))
@@ -660,7 +659,7 @@
        (sb-kernel::compiler-layout-or-lose (dd-name dd))))))
 
 (defmethod shared-initialize :after
-    ((class structure-class) slot-names &key 
+    ((class structure-class) slot-names &key
      (direct-superclasses nil direct-superclasses-p)
      (direct-slots nil direct-slots-p)
      direct-default-initargs)

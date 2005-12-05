@@ -24,72 +24,27 @@
 (in-package "SB-PCL")
 
 (defun ensure-accessor (type fun-name slot-name)
-  (labels ((slot-missing-fun (slot-name type)
-             (let* ((method-type (ecase type
-                                   (slot-value 'reader-method)
-                                   (setf 'writer-method)
-                                   (slot-boundp 'boundp-method)))
-                    (initargs
-                     (copy-tree
-                      (ecase type
-                        (slot-value
-                         (make-method-function
-                          (lambda (obj)
-                            (values
-                             (slot-missing (class-of obj) obj slot-name
-                                           'slot-value)))))
-                        (slot-boundp
-                         (make-method-function
-                          (lambda (obj)
-                            (not (not
-                                  (slot-missing (class-of obj) obj slot-name
-                                                'slot-boundp))))))
-                        (setf
-                         (make-method-function
-                          (lambda (val obj)
-                            (slot-missing (class-of obj) obj slot-name
-                                          'setf val)
-                            val)))))))
-               (setf (getf (getf initargs :plist) :slot-name-lists)
-                     (list (list nil slot-name)))
-               (setf (getf (getf initargs :plist) :pv-table-symbol)
-                     (gensym))
-               (list* :method-spec (list method-type 'slot-object slot-name)
-                      initargs)))
-           (add-slot-missing-method (gf slot-name type)
-             (multiple-value-bind (class lambda-list specializers)
-                 (ecase type
-                   (slot-value
-                    (values 'standard-reader-method
-                            '(object)
-                            (list *the-class-slot-object*)))
-                   (slot-boundp
-                    (values 'standard-boundp-method
-                            '(object)
-                            (list *the-class-slot-object*)))
-                   (setf
-                    (values 'standard-writer-method
-                            '(new-value object)
-                            (list *the-class-t* *the-class-slot-object*))))
-               (add-method gf (make-a-method class
-                                             ()
-                                             lambda-list
-                                             specializers
-                                             (slot-missing-fun slot-name type)
-                                             "generated slot-missing method"
-                                             slot-name)))))
-    (unless (fboundp fun-name)
-      (let ((gf (ensure-generic-function
-                 fun-name
-                 :lambda-list (ecase type
-                                ((reader boundp) '(object))
-                                (writer '(new-value object))))))
+  (unless (fboundp fun-name)
+    (multiple-value-bind (lambda-list specializers method-class initargs doc)
         (ecase type
-          (reader (add-slot-missing-method gf slot-name 'slot-value))
-          (boundp (add-slot-missing-method gf slot-name 'slot-boundp))
-          (writer (add-slot-missing-method gf slot-name 'setf)))
-        (setf (plist-value gf 'slot-missing-method) t))
-      t)))
+          ;; FIXME: change SLOT-OBJECT here to T to get SLOT-MISSING
+          ;; behaviour for non-slot-objects too?
+          (reader 
+           (values '(object) '(slot-object) 'standard-reader-method
+                   (make-std-reader-method-function 'slot-object slot-name)
+                   "automatically-generated reader method"))
+          (writer
+           (values '(new-value object) '(t slot-object) 'standard-writer-method
+                   (make-std-writer-method-function 'slot-object slot-name)
+                   "automatically-generated writer method"))
+          (boundp
+           (values '(object) '(slot-object) 'standard-boundp-method
+                   (make-std-boundp-method-function 'slot-object slot-name)
+                   "automatically-generated boundp method")))
+      (let ((gf (ensure-generic-function fun-name :lambda-list lambda-list)))
+        (add-method gf (make-a-method method-class () lambda-list specializers
+                                      initargs doc slot-name)))))
+  t)
 
 (defmacro accessor-slot-value (object slot-name)
   (aver (constantp slot-name))
@@ -530,18 +485,3 @@
     (setf (getf (getf initargs :plist) :pv-table-symbol) pv-table-symbol)
     (list* :method-spec `(boundp-method ,class-name ,slot-name)
            initargs)))
-
-(defun initialize-internal-slot-gfs (slot-name &optional type)
-  (macrolet ((frob (type name-fun add-fun ll)
-               `(when (or (null type) (eq type ',type))
-                 (let* ((name (,name-fun slot-name))
-                        (gf (ensure-generic-function name
-                                                     :lambda-list ',ll))
-                        (methods (generic-function-methods gf)))
-                   (when (or (null methods)
-                             (plist-value gf 'slot-missing-method))
-                     (setf (plist-value gf 'slot-missing-method) nil)
-                     (,add-fun *the-class-slot-object* gf slot-name))))))
-    (frob reader slot-reader-name add-reader-method (object))
-    (frob writer slot-writer-name add-writer-method (new-value object))
-    (frob boundp slot-boundp-name add-boundp-method (object))))

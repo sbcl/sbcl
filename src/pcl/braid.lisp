@@ -399,13 +399,7 @@
                  slot-name
                  readers
                  writers
-                 nil)
-                (!bootstrap-accessor-definitions1
-                 'slot-object
-                 slot-name
-                 (list (slot-reader-name slot-name))
-                 (list (slot-writer-name slot-name))
-                 (list (slot-boundp-name slot-name)))))))))))
+                 nil)))))))))
 
 (defun !bootstrap-accessor-definition (class-name accessor-name slot-name type)
   (multiple-value-bind (accessor-class make-method-function arglist specls doc)
