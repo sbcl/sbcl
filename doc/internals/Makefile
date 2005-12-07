@@ -1,6 +1,6 @@
-.PHONY: top info clean all
+.PHONY: top clean html all
 
-all: info pdf
+all: sbcl-internals.pdf sbcl-internals.info
 
 top:
 	sh make-top.sh
@@ -8,10 +8,32 @@ top:
 info: top
 	makeinfo sbcl-internals.texinfo
 
-pdf: top
+%.eps: %.dot
+	dot -Tps -Gsize="5,5" -Gratio=compress -Gconcentrate=true $< > $@
+
+%.png: %.dot
+	dot -Tpng -Gsize="5,5" -Gratio=compress -Gconcentrate=true $< > $@
+
+%.txt: %.dot
+	# FIXME.
+	dot -Tcanon $< > $@
+
+%.pdf: %.eps
+	epstopdf $< > $@
+
+sbcl-internals.pdf: top $(patsubst %.dot,%.pdf,$(wildcard *.dot)) *.texinfo
 	texi2pdf sbcl-internals.texinfo
 
-clean: 
-	rm -f *.include *.info *.pdf *~ *.cp *.fn *.ky *.log *.pg *.toc \
-		*.tp *.vr *.aux
+sbcl-internals.info: top $(patsubst %.dot,%.txt,$(wildcard *.dot)) *.texinfo
 
+html: html-stamp
+
+html-stamp: top $(patsubst %.dot,%.png,$(wildcard *.dot)) *.texinfo
+	makeinfo --html sbcl-internals.texinfo 
+	# FIXME
+	cp -f *.png sbcl-internals
+	touch html-stamp
+clean: 
+	rm -rf *.include *.info *.pdf *~ *.cp *.fn *.ky *.log *.pg *.toc \
+		*.tp *.vr *.aux *.eps *.png *.dvi *.ps *.txt *.fns \
+		html-stamp sbcl-internals/

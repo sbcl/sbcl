@@ -1,0 +1,212 @@
+@node Discriminating Functions
+@comment  node-name,  next,  previous,  up
+@chapter Discriminating Functions
+
+@menu
+* The Initial Discriminating Function::
+* Method-Based Discriminating Functions::
+* Accessor Discriminating Functions::
+* Cacheing and Dispatch Functions::
+* The Cacheing Mechanism::
+@end menu
+
+The Common Lisp Object System specifies a great deal of run-time
+customizeability, such as class redefinition, generic function and
+method redefinition, addition and removal of methods and redefinitions
+of method combinations.  The additional flexibility defined by the
+Metaobject Protocol, specifying the generic functions called to achieve
+the effects of CLOS operations (and allowing many of them to be
+overridden by the user) makes any form of optimization seem intractable.
+And yet such optimization is necessary to achieve reasonable
+performance: the MOP specifies that a slot access looks up the class of
+the object, and the slot definition from that class and the slot name,
+and then invokes a generic function specialized on those three
+arguments.  This is clearly going to act against the user's intuition
+that a slot access given an instance should be relatively fast.
+
+The optimizations performed cannot be done wholly at compile-time,
+however, thanks to all of these possibilities for run-time redefinition
+and extensibility.  This section describes the optimizations performed
+in SBCL's CLOS implementation in computing and calling the effective
+method for generic functions.
+
+@node The Initial Discriminating Function
+@comment  node-name,  next,  previous,  up
+@section The Initial Discriminating Function
+
+@findex compute-discriminating-function
+@findex sb-mop:compute-discriminating-function
+
+The system method on @code{SB-MOP:COMPUTE-DISCRIMINATING-FUNCTION},
+under most circumstances, returns a function which closes over a
+structure of type @code{SB-PCL::INITIAL}, and which calls
+@code{SB-PCL::INITIAL-DFUN}.  This discriminating function is
+responsible for implementing the computation of the applicable methods,
+the effective method, and thence the result of the call to the generic
+function.  In addition, it implements optimization of these steps, based
+on the arguments it has been called with since the discriminating
+function was installed and the methods of the generic function.
+
+@float Figure,fig:dfun-transitions
+@image{discriminating-functions}
+@end float
+
+For each substantive change of the generic function (such as addition or
+removal of a method, or other reinitialization) the discriminating
+function is reset to its initial state.
+
+The initial discriminating function can transition into a discriminating
+function optimized for the methods on the generic function
+(@code{SB-PCL::NO-METHODS}, @code{SB-PCL::DEFAULT-METHOD-ONLY},
+@code{SB-PCL::CONSTANT-VALUE}), for slot access
+(@code{SB-PCL::ONE-CLASS}, @code{SB-PCL::TWO-CLASS},
+@code{SB-PCL::ONE-INDEX}, @code{SB-PCL::N-N}@footnote{Would be better
+named as @code{M-N}.}), or for dispatch based on its arguments
+(@code{SB-PCL::CACHING}, @code{SB-PCL::DISPATCH}).  Those in the second
+category can transition into the third, or into a
+@code{SB-PCL::CHECKING} state where the choice between
+@code{SB-PCL::CACHING} and @code{SB-PCL::DISPATCH} has not yet been
+made.
+
+The possible transitions are shown in @ref{fig:dfun-transitions}.
+
+@node Method-Based Discriminating Functions
+@comment  node-name,  next,  previous,  up
+@section Method-Based Discriminating Functions
+
+@findex no-applicable-method
+
+The method-based discriminating functions are used if all the methods of
+the generic function at the time of the first call are suitable:
+therefore, these discriminating function strategies do not transition
+into any of the other states unless the generic function is
+reinitialized.  Of these discriminating functions, the simplest is the
+@code{SB-PCL::NO-METHODS}, which is appropriate when the generic
+function has no methods.  In this case, the discriminating function
+simply performs an argument count check@footnote{Actually, this bit
+isn't currently done.  Oops.} and then calls
+@code{NO-APPLICABLE-METHOD} with the appropriate arguments.
+
+If all of the specializers in all methods of the generic function are
+the root of the class hierarchy, @code{t}, then no discrimination need
+be performed: all of the methods are applicable on every
+call@footnote{Hm, there might be another problem with argument count
+here.}.  In this case, the @code{SB-PCL::DEFAULT-METHOD-ONLY}
+discriminating function can call the effective method directly, as it
+will be the same for every generic function call.@footnote{I wonder if
+we're invalidating this right if we define a method on
+compute-applicable-methods...}
+
+If all methods of the generic function are known by the system to be
+side-effect-free and return constants, and the generic function has
+standard-method-combination and no eql-specialized methods, then the
+@code{SB-PCL::CONSTANT-VALUE} discriminating function can simply cache
+the return values for given argument types.  Though this may initially
+appear to have limited applicability, type predicates are usually of
+this form, as in @ref{ex:pred}@footnote{There is vestigial code in SBCL
+for a currently unused specialization of @code{SB-PCL::CONSTANT-VALUE}
+for boolean values only.}.
+
+@float Example,ex:pred
+@example
+(defgeneric foop (x))
+(defmethod foop ((foo foo)) t)
+(defmethod foop (object) nil)
+@end example
+@end float
+
+More details of the cacheing mechanism are given in @ref{The Cacheing
+Mechanism} below.
+
+@node Accessor Discriminating Functions
+@comment  node-name,  next,  previous,  up
+@section Accessor Discriminating Functions
+
+Accessor Discriminating Functions are used when the effective method of
+all calls is an access to a slot, either reading, writing or checking
+boundness@footnote{Although there is ordinarily no way for a user to
+define a boundp method, some automatically generated generic functions
+have them}; for this path to apply, there must be no non-standard
+methods on @code{SB-MOP:SLOT-VALUE-USING-CLASS} and its siblings.  The
+first state is @code{SB-PCL::ONE-CLASS}, entered when one class of
+instance has been accessed; the discriminating function here closes over
+the wrapper of the class and the slot index, and accesses the slot of
+the instance directly.  
+
+If a direct instance of another class is passed to the generic function
+for slot access, then another accessor discriminating function is
+created: if the index of the slot in the slots vector of each instance
+is the same, then a @code{SB-PCL::TWO-CLASS} function is created,
+closing over the two class wrappers and the index and performing the
+simple dispatch.  If the slot indexes are not the same, then we go to
+the @code{SB-PCL::N-N} state.
+
+For slot accesses for more than two classes with the same index, we move
+to the @code{SB-PCL::ONE-INDEX} state which maintains a cache of
+wrappers for which the slot index is the same.  If at any point the slot
+index for an instance is not the same, the state moves to
+@code{SB-PCL::N-N}, which maintains a cache of wrappers and their
+associated indexes; if at any point an effective method which is not a
+simple slot access is encountered, then the discriminating function
+moves into the @code{SB-PCL::CHECKING}, @code{SB-PCL::CACHING} or
+@code{SB-PCL::DISPATCH} states.
+
+@node Cacheing and Dispatch Functions
+@comment  node-name,  next,  previous,  up
+@section Cacheing and Dispatch Functions
+
+@code{SB-PCL::CACHING} functions simply cache effective methods as a
+function of argument wrappers, while @code{SB-PCL::DISPATCH} functions
+have code that computes the actual dispatch.  @code{SB-PCL::CHECKING}
+functions have a cache, but on cache misses will recompute whether or
+not to generate a @code{SB-PCL::CACHING} or @code{SB-PCL::DISPATCH}
+function.
+
+(FIXME: I'm actually not certain about the above paragraph.  Read the
+code again and see if it makes any more sense.)
+
+@node The Cacheing Mechanism
+@comment  node-name,  next,  previous,  up
+@section The Cacheing Mechanism
+
+In general, the cacheing mechanism works as follows: each class has an
+associated wrapper, with some number of uniformly-distributed random
+hash values associated with it; each cache has an associated index into
+this pseudovector of random hash values.  To look a value up from a
+cache from a single class, the hash corresponding to the cache's index
+is looked up and reduced to the size of the cache (by bitmasking, for
+cache sizes of a power of two); then the entry at that index is looked
+up and compared for indentity with the wrapper in question.  If it
+matches, this is a hit; otherwise the cache is walked sequentially from
+this index, skipping the 0th entry.  If the original index is reached,
+the cache does not contain the value sought@footnote{Actually, there's
+some kind of scope for overflow.}.
+
+To add an entry to a cache, much the same computation is executed.
+However, if there is a collision in hash values, before the cache is
+grown, an attempt is made to fill the cache using a different index into
+the wrappers' hash values.
+
+Wrappers are invalidated for caches by setting all of their hash values
+to zero.  (Additionally, they are invalidated by setting their
+@code{depthoid} to -1, to communicate to structure type testers, and
+their @code{invalid} to non-@code{nil}, communicating to
+@code{obsolete-instance-trap}.
+
+The hash value for multiple dispatch is computed by summing all of the
+individual hash values from each wrapper (excluding arguments for which
+all methods have @code{t} specializers, for which no dispatch
+computation needs to be done), jumping to the cache miss case if any
+wrapper has a zero hash index.
+
+(FIXME: As of sbcl-0.9.x.y, the generality of multiple hash values per
+wrapper was removed, as it appeared to do nothing in particular for
+performance in real-world situations.)
+
+References (O for working BibTeX):
+
+The CLOS standards proposal
+
+Kiczales and Rodruigez
+
+AMOP

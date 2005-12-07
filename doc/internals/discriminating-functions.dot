@@ -1,0 +1,53 @@
+strict digraph dfun {
+
+mclimit=2.0
+
+edge [color=gray40]
+
+oneclass [label="one-class"]
+twoclass [label="two-class"]
+oneindex [label="one-index"]
+nn [label="n-n"]
+default [label="default-method-only"]
+nomethods [label="no-methods"]
+constant [label="constant-value"]
+
+subgraph class {
+
+edge [color=black]
+
+oneclass -> twoclass -> oneindex -> nn
+oneclass -> nn
+twoclass -> nn
+
+}
+
+// oneclass -> caching
+// oneclass -> checking
+// oneclass -> dispatch
+// twoclass -> caching
+// twoclass -> checking
+// twoclass -> dispatch
+// oneindex -> caching
+// oneindex -> checking
+// oneindex -> dispatch
+// nn -> caching
+// nn -> checking
+// nn -> dispatch
+
+subgraph class -> caching
+subgraph class -> checking
+subgraph class -> dispatch
+
+initial -> oneclass
+
+initial -> default
+initial -> nomethods
+initial -> constant
+
+initial -> caching
+initial -> checking -> caching
+initial -> dispatch
+checking -> dispatch
+
+}
