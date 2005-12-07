@@ -908,3 +908,19 @@ Nothing to see here, move along.")
 (deftest string-simple-stream-1
     (values (subtypep 'string-simple-stream 'string-stream))
   T)
+
+;; don't break fd-stream external-format support:
+
+(deftest external-format-1
+    (progn
+      (with-open-file (s *test-file*
+                       :direction :output
+                       :if-exists :supersede
+                       :element-type '(unsigned-byte 8))
+        (write-byte 195 s)
+        (write-byte 132 s))
+      (with-open-file (s *test-file*
+                       :direction :input
+                       :external-format :utf-8)
+        (char-code (read-char s))))
+  196)

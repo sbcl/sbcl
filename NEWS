@@ -8,6 +8,9 @@ changes in sbcl-0.9.8 relative to sbcl-0.9.7:
   * bug fix: FILE-STRING-LENGTH is now external-format sensitive,
     returning the number of octets which would be written to the
     file-stream.  (thanks to Robert J. Macomber)
+  * bug fix: the SB-SIMPLE-STREAMS contrib passes external-format
+    arguments to the internal stream functions.  (thanks to David
+    Lichteblau)
   * optimization: improved type inference for arithmetic-for
     index variables in LOOP
   * optimization: faster floating-point SQRT on x86-64

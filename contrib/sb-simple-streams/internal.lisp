@@ -621,8 +621,7 @@
            (type (member :input :output :io :probe) direction)
            (type (member :error :new-version :rename :rename-and-delete
                          :overwrite :append :supersede nil) if-exists)
-           (type (member :error :create nil) if-does-not-exist)
-           (ignore external-format))
+           (type (member :error :create nil) if-does-not-exist))
   (let ((filespec (merge-pathnames pathname)))
     (multiple-value-bind (fd namestring original delete-original)
         (%fd-open filespec direction if-exists if-exists-given
@@ -640,7 +639,8 @@
                                   :pathname pathname
                                   :dual-channel-p nil
                                   :input-buffer-p t
-                                  :auto-close t))
+                                  :auto-close t
+                                  :external-format external-format))
           (:probe
            (let ((stream (sb-impl::%make-fd-stream :name namestring :fd fd
                                                    :pathname pathname
