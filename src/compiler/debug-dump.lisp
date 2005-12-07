@@ -496,7 +496,7 @@
 (defun compute-1-debug-fun (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (let* ((dfun (dfun-from-fun fun))
-         (actual-level (policy (lambda-bind fun) debug))
+         (actual-level (policy (lambda-bind fun) compute-debug-fun))
          (level (if #!+sb-dyncount *collect-dynamic-statistics*
                     #!-sb-dyncount nil
                     (max actual-level 2)

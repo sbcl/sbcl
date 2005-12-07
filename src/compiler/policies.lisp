@@ -76,3 +76,7 @@
         debug
         0)
   ("no" "no" "partial" "full"))
+
+(define-optimization-quality compute-debug-fun
+    debug
+  ("no" "minimal" "yes" "yes"))

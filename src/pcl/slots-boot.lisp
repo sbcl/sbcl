@@ -29,7 +29,7 @@
         (ecase type
           ;; FIXME: change SLOT-OBJECT here to T to get SLOT-MISSING
           ;; behaviour for non-slot-objects too?
-          (reader 
+          (reader
            (values '(object) '(slot-object) 'standard-reader-method
                    (make-std-reader-method-function 'slot-object slot-name)
                    "automatically-generated reader method"))
