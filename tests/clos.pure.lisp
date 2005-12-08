@@ -39,3 +39,10 @@
                             (simple-condition-format-arguments err)))
     (declare (ignore value))
     (assert (not format-err))))
+
+;;; another not (user-)observable behaviour: make sure that
+;;; sb-pcl::map-all-classes calls its function on each class once and
+;;; exactly once.
+(let (result)
+  (sb-pcl::map-all-classes (lambda (c) (push c result)))
+  (assert (equal result (remove-duplicates result))))

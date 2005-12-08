@@ -1645,15 +1645,18 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                            'specializer-applicable-using-type-p
                            type)))))
 
-(defun map-all-classes (function &optional (root t))
-  (let ((braid-p (or (eq *boot-state* 'braid)
+(defun map-all-classes (fun &optional (root t))
+  (let ((all-classes (make-hash-table :test 'eq))
+        (braid-p (or (eq *boot-state* 'braid)
                      (eq *boot-state* 'complete))))
     (labels ((do-class (class)
-               (mapc #'do-class
-                     (if braid-p
-                         (class-direct-subclasses class)
-                         (early-class-direct-subclasses class)))
-               (funcall function class)))
+               (unless (gethash class all-classes)
+                 (setf (gethash class all-classes) t)
+                 (funcall fun class)
+                 (mapc #'do-class
+                       (if braid-p
+                           (class-direct-subclasses class)
+                           (early-class-direct-subclasses class))))))
       (do-class (if (symbolp root)
                     (find-class root)
                     root)))))
