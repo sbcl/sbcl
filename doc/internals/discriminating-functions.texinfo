@@ -61,9 +61,10 @@ function optimized for the methods on the generic function
 @code{SB-PCL::CONSTANT-VALUE}), for slot access
 (@code{SB-PCL::ONE-CLASS}, @code{SB-PCL::TWO-CLASS},
 @code{SB-PCL::ONE-INDEX}, @code{SB-PCL::N-N}@footnote{Would be better
-named as @code{M-N}.}), or for dispatch based on its arguments
-(@code{SB-PCL::CACHING}, @code{SB-PCL::DISPATCH}).  Those in the second
-category can transition into the third, or into a
+named as @code{M-N}, as there is no requirement for the number of
+classes and number of indices to be the same.}), or for dispatch based
+on its arguments (@code{SB-PCL::CACHING}, @code{SB-PCL::DISPATCH}).
+Those in the second category can transition into the third, or into a
 @code{SB-PCL::CHECKING} state where the choice between
 @code{SB-PCL::CACHING} and @code{SB-PCL::DISPATCH} has not yet been
 made.
@@ -126,7 +127,7 @@ Accessor Discriminating Functions are used when the effective method of
 all calls is an access to a slot, either reading, writing or checking
 boundness@footnote{Although there is ordinarily no way for a user to
 define a boundp method, some automatically generated generic functions
-have them}; for this path to apply, there must be no non-standard
+have them.}; for this path to apply, there must be no non-standard
 methods on @code{SB-MOP:SLOT-VALUE-USING-CLASS} and its siblings.  The
 first state is @code{SB-PCL::ONE-CLASS}, entered when one class of
 instance has been accessed; the discriminating function here closes over

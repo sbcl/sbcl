@@ -1,0 +1,191 @@
+@node Slot-Value
+@comment  node-name,  next,  previous,  up
+@chapter Slot-Value
+
+@findex slot-value
+@findex (setf slot-value)
+@findex slot-boundp
+@findex slot-makunbound
+@findex slot-value-using-class
+@findex (setf slot-value-using-class)
+@findex slot-boundp-using-class
+@findex slot-makunbound-using-class
+
+@menu
+* Basic Implementation::
+* Compiler Transformations::
+* MOP Optimizations::
+@end menu
+
+The ANSI Common Lisp standard specifies @code{slot-value}, @code{(setf
+slot-value)}, @code{slot-boundp} and @code{slot-makunbound} for
+standard-objects, and furthermore suggests that these be implemented in
+terms of Metaobject generic functions @code{slot-value-using-class},
+@code{(setf slot-value-using-class)}, @code{slot-boundp-using-class} and
+@code{slot-makunbound-using-class}.  To make performance of these
+operators tolerable, a number of optimizations are performed, at both
+compile-time and run-time@footnote{Note that ,at present,
+@code{slot-makunbound} and @code{slot-makunbound-using-class} are not
+optimized in any of the ways mentioned below.}.
+
+@node Basic Implementation
+@comment  node-name,  next,  previous,  up
+@section Basic Implementation
+
+All of the following, while described in terms of @code{slot-value},
+also applies to @code{(setf slot-value)} and to @code{slot-boundp}, and
+could in principle be extended to @code{slot-makunbound}.
+
+The basic implementation of @code{slot-value}, following the suggestion
+in the standards document, is shown in @ref{ex:slot-value}; the
+implementation of the other slot operators is similar.  The work to be
+done simply to arrive at the generic function call is already
+substantial: we need to look up the object's class and iterate over the
+class' slots to find a slot of the right name, only then are we in a
+position to call the generic function which implements the slot access
+directly.
+
+@float Example,ex:slot-value
+@example
+(defun slot-value (object slot-name)
+  (let* ((class (class-of object))
+         (slot-definition (find-slot-definition class slot-name)))
+    (if (null slot-definition)
+        (values (slot-missing class object slot-name 'slot-value))
+        (slot-value-using-class class object slot-definition))))
+@end example
+@end float
+
+The basic implementation of @code{slot-value-using-class} specialized on
+the standard metaobject classes is shown in
+@ref{ex:slot-value-using-class}.  First, we check for an obsolete
+instance (that is, one whose class has been redefined since the object
+was last accessed; if it has, the object must be updated by
+@code{update-instance-for-redefined-class}); then, we acquire the slot's
+storage location from the slot definition, the value from the instance's
+slot vector, and then after checking the value against the internal unbound
+marker, we return it.
+
+@float Example,ex:slot-value-using-class
+@example
+(defmethod slot-value-using-class 
+    ((class std-class)
+     (object standard-object)
+     (slotd standard-effective-slot-definition))
+  (check-obsolete-instance object)
+  (let* ((location (slot-definition-location slotd))
+         (value
+          (etypecase location
+            (fixnum (clos-slots-ref (instance-slots object) location))
+            (cons (cdr location)))))
+    (if (eq value +slot-unbound+)
+        (values (slot-unbound class object (slot-definition-name slotd)))
+        value)))
+@end example
+@end float
+
+Clearly, all of this activity will cause the performance of clos slot
+access to compare poorly with structure slot access; while there will be
+of necessity a slowdown between the slot accesses because the structure
+class need not be redefineable (while redefinition of standard-object
+classes is extremely common), the overhead presented in the above
+implementation is excessive.
+
+@node Compiler Transformations
+@comment  node-name,  next,  previous,  up
+@section Compiler Transformations
+
+The compiler can assist in optimizing calls to @code{slot-value}: in
+particular, and despite the highly-dynamic nature of CLOS, compile-time
+knowledge of the name of the slot being accessed permits precomputation
+of much of the access (along with a branch to the slow path in case the
+parameters of the access change between compile-time and run-time).
+
+@subsection Within Methods
+
+@cindex permutation vector
+
+If the object being accessed is a required parameter to the method,
+where the parameter variable is unmodified in the method body, and the
+slot name is a compile-time constant, then fast slot access can be
+supported through @dfn{permutation vectors}.
+
+(FIXME: what about the metaclasses of the object?  Does it have to be
+standard-class, or can it be funcallable-standard-class?  Surely
+structure-class objects could be completely optimized if the class
+definition and slot name are both known at compile-time.)
+
+Permutation vectors are built up and maintained to associate a
+compile-time index associated with a slot name with an index into the
+slot vector for a class of objects.  The permutation vector applicable
+to a given method call (FIXME: or effective method? set of classes?
+something else?) is passed to the method body, and slots are accessed by
+looking up the index to the slot vector in the permutation vector, then
+looking up the value from the slot vector.  (FIXME: a diagram would
+help, if I understood this bit well enough to draw a diagram).
+
+Subsequent redefinitions of classes or of methods on
+@code{slot-value-using-class} cause an invalid index to be written into
+the permutation vector, and the call falls back to a full call to
+@code{slot-value}.
+
+If the conditions for (structure or) permutation vector slot access
+optimization are not met, optimization of @code{slot-value} within
+methods falls back to the same as for calls to @code{slot-value} outside
+of methods, below.
+
+@subsection Outside of Methods
+
+@findex load-time-value
+
+A call to @code{slot-value} with a compile-time constant slot
+@var{name} argument is compiled into a call to a generic function
+named @code{(sb-pcl::slot-accessor :global @var{name} sb-pcl::reader)},
+together with code providing load-time assurance (via
+@code{load-time-value}) that the generic function is bound and has a
+suitable accessor method.  This generic function then benefits from the
+same optimizations as ordinary accessors, described in
+@ref{Accessor Discriminating Functions}.
+
+(FIXME: how does this get invalidated if we later add methods on
+@code{slot-value-using-class}?  Hm, maybe it isn't.  I think this is
+probably a bug, and that adding methods to @code{slot-value-using-class}
+needs to invalidate accessor caches.  Bah, humbug.  Test code in
+@ref{ex:buggycache}, and note that I think that the analogous case
+involving adding or removing methods from
+@code{compute-applicable-methods} is handled correctly by
+@code{update-all-c-a-m-gf-info}.)
+
+@float Example,ex:buggycache
+@example
+(defclass foo () ((a :initform 0)))
+(defun foo (x) (slot-value x 'a))
+(foo (make-instance 'foo)) ; => 0
+(defmethod slot-value-using-class :after 
+  ((class std-class) (object foo)
+   (slotd standard-effective-slot-definition))
+  (print "hi"))
+(foo (make-instance 'foo)) ; => 0, no print
+(defclass bar (foo) ((a :initform 1)))
+(foo (make-instance 'bar)) ; => 1  and prints "hi"
+(foo (make-instance 'foo)) ; => 0, no print
+@end example
+@end float
+
+@node MOP Optimizations
+@comment  node-name,  next,  previous,  up
+@section MOP Optimizations
+
+Even when nothing is known at compile-time about the call to
+@code{slot-value}, it is possible to do marginally better than in
+@ref{ex:slot-value-using-class}.  Each effective slot definition
+metaobject can cache its own effective method, and the discriminating
+function for @code{slot-value-using-class} is set to simply call the
+function in its slot definition argument.
+
+(FIXME: I'm pretty sure this is a bad plan in general.  Or rather, it's
+probably a good plan, but the effective methods should probably be
+computed lazily rather than eagerly.  The default image has 8589
+closures implementing this optimization: 3 (@code{slot-value},
+@code{set-slot-value} and @code{slot-boundp}) for each of 2863 effective
+slots.)
