@@ -1563,10 +1563,12 @@
 (defmethod (setf class-name) (new-value class)
   (let ((classoid (%wrapper-classoid (class-wrapper class))))
     (setf (classoid-name classoid) new-value))
-  (reinitialize-instance class :name new-value))
+  (reinitialize-instance class :name new-value)
+  new-value)
 
 (defmethod (setf generic-function-name) (new-value generic-function)
-  (reinitialize-instance generic-function :name new-value))
+  (reinitialize-instance generic-function :name new-value)
+  new-value)
 
 (defmethod function-keywords ((method standard-method))
   (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p keywords)
