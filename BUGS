@@ -2093,3 +2093,13 @@ WORKAROUND:
 
 392: slot-accessor for subclass misses obsoleted superclass
   (fixed in sbcl-0.9.7.9)
+
+393: Wrong error from methodless generic function
+    (DEFGENERIC FOO (X))
+    (FOO 1 2)
+  gives NO-APPLICABLE-METHOD rather than an argument count error.
+
+394: (SETF CLASS-NAME)/REINITIALIZE-INSTANCE bug
+    (found by PFD ansi-tests)
+  in sbcl-0.9.7.15, (SETF (CLASS-NAME <class>) 'NIL) causes
+  (FIND-CLASS NIL) to return a #<STANDARD-CLASS NIL>.

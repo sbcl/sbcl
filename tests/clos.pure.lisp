@@ -46,3 +46,6 @@
 (let (result)
   (sb-pcl::map-all-classes (lambda (c) (push c result)))
   (assert (equal result (remove-duplicates result))))
+
+;;; this one's user-observable
+(assert (typep #'(setf class-name) 'generic-function))
