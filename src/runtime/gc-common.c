@@ -314,9 +314,12 @@ trans_code(struct code *code)
         fheaderl = fheaderp->next;
         prev_pointer = &nfheaderp->next;
     }
+#ifdef LISP_FEATURE_GENCGC
+    /* Cheneygc doesn't need this os_flush_icache, it flushes the whole
+       spaces once when all copying is done. */
     os_flush_icache((os_vm_address_t) (((long *)new_code) + nheader_words),
                     ncode_words * sizeof(long));
-#ifdef LISP_FEATURE_GENCGC
+
     gencgc_apply_code_fixups(code, new_code);
 #endif
     return new_code;
