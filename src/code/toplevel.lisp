@@ -329,7 +329,7 @@ steppers to maintain contextual information.")
   (flet ((process-1 (string)
            (multiple-value-bind (expr pos) (read-from-string string)
              (unless (eq string (read-from-string string nil string :start pos))
-               (error "More the one expression in ~S" string))
+               (error "More than one expression in ~S" string))
              (eval expr)
              (flush-standard-output-streams))))
     (restart-case

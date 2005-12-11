@@ -89,6 +89,14 @@
 
 ;;; where to put the different spaces.
 
+;;; Currently the read-only and static spaces must be located in low
+;;; memory (certainly under the 4GB limit, very probably under 2GB
+;;; limit). This is due to the inability of using immediate values of
+;;; more than 32 bits (31 bits if you take sign extension into
+;;; account) in any other instructions except MOV. Removing this limit
+;;; would be possible, but probably not worth the time and code bloat
+;;; it would cause. -- JES, 2005-12-11
+
 (def!constant read-only-space-start     #x20000000)
 (def!constant read-only-space-end       #x27ff0000)
 

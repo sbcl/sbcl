@@ -201,7 +201,8 @@ If an unsupported TYPE is requested, the function will return NIL.
                  (sb-int:info :source-location :typed-structure name))))))
        ((:condition :class)
         (let ((class (find-class name nil)))
-          (when class
+          (when (and class
+                     (not (typep class 'sb-pcl::structure-class)))
             (when (eq (not (typep class 'sb-pcl::condition-class))
                       (not (eq type :condition)))
               (find-definition-source class)))))

@@ -22,6 +22,10 @@
 ;;;             if policy favors.
 ;;; :MAYBE-INLINE
 ;;;             Retain expansion, but only use it opportunistically.
+;;;             :MAYBE-INLINE is quite different from :INLINE. As explained
+;;;             by APD on #lisp 2005-11-26: "MAYBE-INLINE lambda is
+;;;             instantiated once per component, INLINE - for all
+;;;             references (even under #'without FUNCALL)."
 (deftype inlinep () '(member :inline :maybe-inline :notinline nil))
 
 ;;;; source-hacking defining forms
