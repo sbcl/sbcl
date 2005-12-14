@@ -1576,7 +1576,7 @@
             (cond ((integerp src)
                    (maybe-emit-rex-prefix segment size nil nil dst)
                    (cond ((and (eq size :qword)
-                               (typep src '(signed-byte 31)))
+                               (typep src '(signed-byte 32)))
                           ;; When loading small immediates to a qword register
                           ;; using B8 wastes 3 bytes compared to C7.
                           (emit-byte segment #b11000111)
