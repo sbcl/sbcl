@@ -19,14 +19,12 @@
 #ifndef _GENCGC_INTERNAL_H_
 #define _GENCGC_INTERNAL_H_
 
+#include <limits.h>
 #include "gc.h"
 #include "gencgc-alloc-region.h"
 #include "genesis/code.h"
 
-/* Size of a page, in bytes. FIXME: needs to be conditionalized per
- * architecture, preferably by someone with a clue as to what page
- * sizes are on archs other than x86 and PPC - Patrik */
-#define PAGE_BYTES 4096
+#define PAGE_BYTES GENCGC_PAGE_SIZE
 
 void gc_free_heap(void);
 inline page_index_t find_page_index(void *);

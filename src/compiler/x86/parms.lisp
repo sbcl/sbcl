@@ -35,6 +35,10 @@
 ;;; addressable object
 (def!constant n-byte-bits 8)
 
+;;; The size in bytes of the GENCGC pages. Should be a multiple of the
+;;; architecture code size.
+(def!constant gencgc-page-size 4096)
+
 (def!constant float-sign-shift 31)
 
 ;;; comment from CMU CL:
