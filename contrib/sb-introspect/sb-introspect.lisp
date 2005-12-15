@@ -140,7 +140,10 @@ If an unsupported TYPE is requested, the function will return NIL.
   (flet ((listify (x)
            (if (listp x)
                x
-               (list x))))
+               (list x)))
+	 (get-class (name)
+	   (and (symbolp name)
+		(find-class name nil))))
     (listify
      (case type
        ((:variable)
@@ -192,7 +195,7 @@ If an unsupported TYPE is requested, the function will return NIL.
                                                       (symbol-function expander)
                                                       expander)))))
        ((:structure)
-        (let ((class (find-class name nil)))
+        (let ((class (get-class name)))
           (if class
               (when (typep class 'sb-pcl::structure-class)
                 (find-definition-source class))
@@ -200,7 +203,7 @@ If an unsupported TYPE is requested, the function will return NIL.
                 (translate-source-location
                  (sb-int:info :source-location :typed-structure name))))))
        ((:condition :class)
-        (let ((class (find-class name nil)))
+        (let ((class (get-class name)))
           (when (and class
                      (not (typep class 'sb-pcl::structure-class)))
             (when (eq (not (typep class 'sb-pcl::condition-class))
