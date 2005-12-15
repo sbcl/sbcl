@@ -233,7 +233,7 @@
      (declare (type system-area-pointer start end))
      (declare (optimize (speed 3) (safety 0)))
      (let ((current start)
-           (skip-tests-until-addr 0))
+           #!+gencgc (skip-tests-until-addr 0))
        (labels ((maybe-finish-mapping ()
                   (unless (sap< current end)
                     (aver (sap= current end))
