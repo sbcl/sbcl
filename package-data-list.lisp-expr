@@ -735,6 +735,11 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "PROCESS-PID" "PROCESS-PLIST" "PROCESS-PTY" "PROCESS-STATUS"
                "PROCESS-STATUS-HOOK" "PROCESS-WAIT"
 
+               ;; pathnames
+               "NATIVE-PATHNAME"
+               "PARSE-NATIVE-NAMESTRING"
+               "NATIVE-NAMESTRING"
+
                ;; external-format support
                "OCTETS-TO-STRING" "STRING-TO-OCTETS"
 

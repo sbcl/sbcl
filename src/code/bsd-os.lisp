@@ -36,12 +36,12 @@
 (defun os-cold-init-or-reinit ()
   (setf *software-version* nil)
   (setf *default-pathname-defaults*
-        ;; (temporary value, so that #'PATHNAME won't blow up when
+        ;; (temporary value, so that #'NATIVE-PATHNAME won't blow up when
         ;; we call it below:)
         (make-trivial-default-pathname)
         *default-pathname-defaults*
-        ;; (final value, constructed using #'PATHNAME:)
-        (pathname (sb!unix:posix-getcwd/))))
+        ;; (final value, constructed using #'NATIVE-PATHNAME:)
+        (native-pathname (sb!unix:posix-getcwd/))))
 
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()

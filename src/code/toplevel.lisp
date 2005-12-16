@@ -324,23 +324,29 @@ steppers to maintain contextual information.")
       (abort ()
         :report "Skip rest of initialization file."))))
 
-(defun process-eval-options (eval-strings)
+(defun process-eval-options (eval-strings-or-forms)
   (/show0 "handling --eval options")
-  (flet ((process-1 (string)
-           (multiple-value-bind (expr pos) (read-from-string string)
-             (unless (eq string (read-from-string string nil string :start pos))
-               (error "More than one expression in ~S" string))
-             (eval expr)
-             (flush-standard-output-streams))))
+  (flet ((process-1 (string-or-form)
+           (etypecase string-or-form
+             (string
+              (multiple-value-bind (expr pos) (read-from-string string-or-form)
+                (unless (eq string-or-form
+                            (read-from-string string-or-form nil string-or-form
+                                              :start pos))
+                  (error "More than one expression in ~S" string-or-form))
+                (eval expr)
+                (flush-standard-output-streams)))
+             (cons (eval string-or-form) (flush-standard-output-streams)))))
     (restart-case
-        (dolist (expr-as-string eval-strings)
+        (dolist (expr-as-string-or-form eval-strings-or-forms)
           (/show0 "handling one --eval option")
           (restart-case
-              (handler-bind ((error (lambda (e)
-                                      (error "Error during processing of --eval ~
-                                              option ~S:~%~%  ~A"
-                                             expr-as-string e))))
-                (process-1 expr-as-string))
+              (handler-bind
+                  ((error (lambda (e)
+                            (error "Error during processing of --eval ~
+                                    option ~S:~%~%  ~A"
+                                   expr-as-string-or-form e))))
+                (process-1 expr-as-string-or-form))
             (continue ()
               :report "Ignore and continue with next --eval option.")))
       (abort ()
@@ -359,7 +365,9 @@ steppers to maintain contextual information.")
         ;; The values are stored as strings, so that they can be
         ;; passed to READ only after their predecessors have been
         ;; EVALed, so that things work when e.g. REQUIRE in one EVAL
-        ;; form creates a package referred to in the next EVAL form.
+        ;; form creates a package referred to in the next EVAL form,
+        ;; except for forms transformed from syntactically-sugary
+        ;; switches like --load and --disable-debugger.
         (reversed-evals nil)
         ;; Has a --noprint option been seen?
         (noprint nil)
@@ -412,15 +420,14 @@ steppers to maintain contextual information.")
                       ((string= option "--load")
                        (pop-option)
                        (push
-                        ;; FIXME: see BUG 296
-                        (concatenate 'string "(|LOAD| \"" (pop-option) "\")")
+                        (list 'cl:load (native-pathname (pop-option)))
                         reversed-evals))
                       ((string= option "--noprint")
                        (pop-option)
                        (setf noprint t))
                       ((string= option "--disable-debugger")
                        (pop-option)
-                       (push "(|DISABLE-DEBUGGER|)" reversed-evals))
+                       (push (list 'sb!ext:disable-debugger) reversed-evals))
                       ((string= option "--end-toplevel-options")
                        (pop-option)
                        (return))

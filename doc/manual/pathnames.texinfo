@@ -1,0 +1,97 @@
+@node Pathnames
+@comment  node-name,  next,  previous,  up
+@chapter Pathnames
+
+@menu
+* Lisp Pathnames::
+* Native Filenames::
+@end menu
+
+@node Lisp Pathnames
+@comment  node-name,  next,  previous,  up
+@section Lisp Pathnames
+
+There are many aspects of ANSI Common Lisp's pathname support which are
+implementation-defined and so need documentation.
+
+@c FIXME: as a matter of ANSI conformance, we are required to document 
+@c implementation-defined stuff, which for pathnames (chapter 19 of CLtS) 
+@c includes:
+@c  
+@c * Otherwise, the parsing of thing is implementation-defined.
+@c   (PARSE-NAMESTRING)
+@c
+@c * If thing contains an explicit host name and no explicit device name, 
+@c   then it is implementation-defined whether parse-namestring will supply
+@c   the standard default device for that host as the device component of 
+@c   the resulting pathname.  (PARSE-NAMESTRING)
+@c
+@c * The specific nature of the search is implementation-defined.
+@c   (LOAD-LOGICAL-PATHNAME-TRANSLATIONS)
+@c
+@c * Any additional elements are implementation-defined.
+@c   (LOGICAL-PATHNAME-TRANSLATIONS)
+@c
+@c * The matching rules are implementation-defined but should be consistent 
+@c   with directory.  (PATHNAME-MATCH-P)
+@c
+@c * Any such additional translations are implementation-defined.
+@c   (TRANSLATE-LOGICAL-PATHNAMES)
+@c
+@c * ...or an implementation-defined portion of a component...
+@c   (TRANSLATE-PATHNAME)
+@c
+@c * The portion of source that is copied into the resulting pathname is 
+@c   implementation-defined.  (TRANSLATE-PATHNAME)
+@c
+@c * During the copying of a portion of source into the resulting 
+@c   pathname, additional implementation-defined translations of case or 
+@c   file naming conventions might occur.  (TRANSLATE-PATHNAME)
+@c
+@c * In general, the syntax of namestrings involves the use of 
+@c   implementation-defined conventions.  (19.1.1)
+@c
+@c * The nature of the mapping between structure imposed by pathnames and
+@c   the structure, if any, that is used by the underlying file system is 
+@c   implementation-defined.  (19.1.2)
+@c
+@c * The mapping of the pathname components into the concepts peculiar to 
+@c   each file system is implementation-defined.  (19.1.2)
+@c
+@c * Whether separator characters are permitted as part of a string in a 
+@c   pathname component is implementation-defined;  (19.2.2.1.1)
+@c
+@c * Whether a value of :unspecific is permitted for any component on any 
+@c   given file system accessible to the implementation is
+@c   implementation-defined.  (19.2.2.2.3)
+@c
+@c * Other symbols and integers have implementation-defined meaning.
+@c   (19.2.2.4.6)
+@c
+@c * The existence and meaning of SYS: logical pathnames is
+@c   implementation-defined.  (19.3.1.1.1)
+
+@node Native Filenames
+@comment  node-name,  next,  previous,  up
+@section Native Filenames
+
+In some circumstances, what is wanted is a Lisp pathname object which
+corresponds to a string produced by the Operating System.  In this case,
+some of the default parsing rules are inappropriate: most filesystems do
+not have a native understanding of wild pathnames; such functionality is
+often provided by shells above the OS, often in mutually-incompatible
+ways.
+
+To allow the user to deal with this, the following functions are
+provided: @code{parse-native-namestring} and @code{native-pathname}
+return the closest equivalent Lisp pathname to a given string
+(appropriate for the Operating System), while @code{native-namestring}
+converts a non-wild pathname designator to the equivalent native
+namestring, if possible.  Some Lisp pathname concepts (such as the
+@code{:back} directory component) have no direct equivalents in most
+Operating Systems; the behaviour of @code{native-namestring} is
+unspecified if an inappropriate pathname designator is passed to it.
+
+@include fun-sb-ext-parse-native-namestring.texinfo
+@include fun-sb-ext-native-pathname.texinfo
+@include fun-sb-ext-native-namestring.texinfo

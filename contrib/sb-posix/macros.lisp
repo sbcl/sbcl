@@ -1,34 +1,8 @@
 (in-package :sb-posix-internal)
 
-;;; some explanation may be necessary.  The namestring "[foo]"
-;;; denotes a wild pathname.  When there's a file on the disk whose
-;;; Unix name is "[foo]", the appropriate CL namestring for it is
-;;; "\\[foo]".  So, don't call NAMESTRING, instead call a function
-;;; that gets us the Unix name
-(defun native-filename (pathname)
-  (let ((directory (pathname-directory pathname))
-        (name (pathname-name pathname))
-        (type (pathname-type pathname)))
-    (with-output-to-string (s nil :element-type 'base-char)
-      (etypecase directory
-        (string (write-string directory s))
-        (list
-         (when (eq (car directory) :absolute)
-           (write-char #\/ s))
-         (dolist (piece (cdr directory))
-           (etypecase piece
-             (string (write-string piece s) (write-char #\/ s))
-             ((member :up) (write-string "../" s))))))
-      (etypecase name
-        (null)
-        (string (write-string name s)))
-      (etypecase type
-        (null)
-        (string (write-char #\. s) (write-string type s))))))
-
 (define-designator filename c-string
   (pathname
-   (native-filename (translate-logical-pathname filename)))
+   (sb-ext:native-namestring (translate-logical-pathname filename)))
   (string filename))
 
 (define-designator file-descriptor (integer 32)

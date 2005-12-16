@@ -191,18 +191,19 @@
           (setf start (1+ slash))))
       (values absolute (pieces)))))
 
-(defun parse-unix-namestring (namestr start end)
-  (declare (type simple-string namestr)
+(defun parse-unix-namestring (namestring start end)
+  (declare (type simple-string namestring)
            (type index start end))
-  (setf namestr (coerce namestr 'simple-base-string))
-  (multiple-value-bind (absolute pieces) (split-at-slashes namestr start end)
+  (setf namestring (coerce namestring 'simple-base-string))
+  (multiple-value-bind (absolute pieces)
+      (split-at-slashes namestring start end)
     (multiple-value-bind (name type version)
         (let* ((tail (car (last pieces)))
                (tail-start (car tail))
                (tail-end (cdr tail)))
           (unless (= tail-start tail-end)
             (setf pieces (butlast pieces))
-            (extract-name-type-and-version namestr tail-start tail-end)))
+            (extract-name-type-and-version namestring tail-start tail-end)))
 
       (when (stringp name)
         (let ((position (position-if (lambda (char)
@@ -212,7 +213,7 @@
           (when position
             (error 'namestring-parse-error
                    :complaint "can't embed #\\Nul or #\\/ in Unix namestring"
-                   :namestring namestr
+                   :namestring namestring
                    :offset position))))
       ;; Now we have everything we want. So return it.
       (values nil ; no host for Unix namestrings
@@ -222,16 +223,16 @@
                   (let ((piece-start (car piece))
                         (piece-end (cdr piece)))
                     (unless (= piece-start piece-end)
-                      (cond ((string= namestr ".."
+                      (cond ((string= namestring ".."
                                       :start1 piece-start
                                       :end1 piece-end)
                              (dirs :up))
-                            ((string= namestr "**"
+                            ((string= namestring "**"
                                       :start1 piece-start
                                       :end1 piece-end)
                              (dirs :wild-inferiors))
                             (t
-                             (dirs (maybe-make-pattern namestr
+                             (dirs (maybe-make-pattern namestring
                                                        piece-start
                                                        piece-end)))))))
                 (cond (absolute
@@ -243,6 +244,37 @@
               name
               type
               version))))
+
+(defun parse-native-unix-namestring (namestring start end)
+  (declare (type simple-string namestring)
+           (type index start end))
+  (setf namestring (coerce namestring 'simple-base-string))
+  (multiple-value-bind (absolute ranges)
+      (split-at-slashes namestring start end)
+    (let* ((components (loop for ((start . end) . rest) on ranges
+                             for piece = (subseq namestring start end)
+                             collect (if (and (string= piece "..") rest)
+                                         :up
+                                         piece)))
+           (name-and-type
+            (let* ((end (first (last components)))
+                   (dot (position #\. end :from-end t)))
+              ;; FIXME: can we get this dot-interpretation knowledge
+              ;; from existing code?  EXTRACT-NAME-TYPE-AND-VERSION
+              ;; does slightly more work than that.
+              (cond
+                ((string= end "")
+                 (list nil nil))
+                ((and dot (> dot 0))
+                 (list (subseq end 0 dot) (subseq end (1+ dot))))
+                (t
+                 (list end nil))))))
+      (values nil
+              nil
+              (cons (if absolute :absolute :relative) (butlast components))
+              (first name-and-type)
+              (second name-and-type)
+              nil))))
 
 (/show0 "filesys.lisp 300")
 
@@ -365,6 +397,33 @@
   (concatenate 'simple-base-string
                (unparse-unix-directory pathname)
                (unparse-unix-file pathname)))
+
+(defun unparse-native-unix-namestring (pathname)
+  (declare (type pathname pathname))
+  (let ((directory (pathname-directory pathname))
+        (name (pathname-name pathname))
+        (type (pathname-type pathname)))
+    (coerce
+     (with-output-to-string (s)
+       (ecase (car directory)
+         (:absolute (write-char #\/ s))
+         (:relative))
+       (dolist (piece (cdr directory))
+         (typecase piece
+           ((member :up) (write-string ".." s))
+           (string (write-string piece s))
+           (t (error "ungood piece in NATIVE-NAMESTRING: ~S" piece)))
+         (write-char #\/ s))
+       (when name
+         (unless (stringp name)
+           (error "non-STRING name in NATIVE-NAMESTRING: ~S" name))
+         (write-string name s)
+         (when type
+           (unless (stringp type)
+             (error "non-STRING type in NATIVE-NAMESTRING: ~S" name))
+           (write-char #\. s)
+           (write-string type s))))
+     'simple-base-string)))
 
 (defun unparse-unix-enough (pathname defaults)
   (declare (type pathname pathname defaults))

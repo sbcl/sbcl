@@ -19,7 +19,9 @@
              (:make-load-form-fun make-unix-host-load-form)
              (:include host
                        (parse #'parse-unix-namestring)
+                       (parse-native #'parse-native-unix-namestring)
                        (unparse #'unparse-unix-namestring)
+                       (unparse-native #'unparse-native-unix-namestring)
                        (unparse-host #'unparse-unix-host)
                        (unparse-directory #'unparse-unix-directory)
                        (unparse-file #'unparse-unix-file)
@@ -32,11 +34,13 @@
   (declare (ignore host))
   '*unix-host*)
 
+(defvar *physical-host* *unix-host*)
+
 ;;; Return a value suitable, e.g., for preinitializing
 ;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is
 ;;; initialized (at which time we can't safely call e.g. #'PATHNAME).
 (defun make-trivial-default-pathname ()
-  (%make-pathname *unix-host* nil nil nil nil :newest))
+  (%make-pathname *physical-host* nil nil nil nil :newest))
 
 ;;; pathname methods
 
@@ -81,7 +85,7 @@
                                 (upcase-maybe type)
                                 version)
         (progn
-          (aver (eq host *unix-host*))
+          (aver (eq host *physical-host*))
           (%make-pathname host device directory name type version)))))
 
 ;;; Hash table searching maps a logical pathname's host to its
@@ -271,26 +275,92 @@
                          (file-stream (file-name ,pd0)))))
        ,@body)))
 
-;;; Convert the var, a host or string name for a host, into a
-;;; LOGICAL-HOST structure or nil if not defined.
-;;;
-;;; pw notes 1/12/97 this potentially useful macro is not used anywhere
-;;; and 'find-host' is not defined. 'find-logical-host' seems to be needed.
-#|
-(defmacro with-host ((var expr) &body body)
-  `(let ((,var (let ((,var ,expr))
-                 (typecase ,var
-                   (logical-host ,var)
-                   (string (find-logical-host ,var nil))
-                   (t nil)))))
-     ,@body))
-|#
+(defmacro with-native-pathname ((pathname pathname-designator) &body body)
+  (let ((pd0 (gensym)))
+    `(let* ((,pd0 ,pathname-designator)
+            (,pathname (etypecase ,pd0
+                         (pathname ,pd0)
+                         (string (parse-native-namestring ,pd0))
+                         ;; FIXME
+                         #+nil
+                         (file-stream (file-name ,pd0)))))
+       ,@body)))
 
-(defun pathname (thing)
+(defmacro with-host ((host host-designator) &body body)
+  ;; Generally, redundant specification of information in software,
+  ;; whether in code or in comments, is bad. However, the ANSI spec
+  ;; for this is messy enough that it's hard to hold in short-term
+  ;; memory, so I've recorded these redundant notes on the
+  ;; implications of the ANSI spec.
+  ;;
+  ;; According to the ANSI spec, HOST can be a valid pathname host, or
+  ;; a logical host, or NIL.
+  ;;
+  ;; A valid pathname host can be a valid physical pathname host or a
+  ;; valid logical pathname host.
+  ;;
+  ;; A valid physical pathname host is "any of a string, a list of
+  ;; strings, or the symbol :UNSPECIFIC, that is recognized by the
+  ;; implementation as the name of a host". In SBCL as of 0.6.9.8,
+  ;; that means :UNSPECIFIC: though someday we might want to
+  ;; generalize it to allow strings like "RTFM.MIT.EDU" or lists like
+  ;; '("RTFM" "MIT" "EDU"), that's not supported now.
+  ;;
+  ;; A valid logical pathname host is a string which has been defined as
+  ;; the name of a logical host, as with LOAD-LOGICAL-PATHNAME-TRANSLATIONS.
+  ;;
+  ;; A logical host is an object of implementation-dependent nature. In
+  ;; SBCL, it's a member of the HOST class (a subclass of STRUCTURE-OBJECT).
+  (let ((hd0 (gensym)))
+    `(let* ((,hd0 ,host-designator)
+            (,host (etypecase ,hd0
+                     ((string 0)
+                      ;; This is a special host. It's not valid as a
+                      ;; logical host, so it is a sensible thing to
+                      ;; designate the physical host object. So we do
+                      ;; that.
+                      *physical-host*)
+                     (string
+                      ;; In general ANSI-compliant Common Lisps, a
+                      ;; string might also be a physical pathname
+                      ;; host, but ANSI leaves this up to the
+                      ;; implementor, and in SBCL we don't do it, so
+                      ;; it must be a logical host.
+                      (find-logical-host ,hd0))
+                     ((or null (member :unspecific))
+                      ;; CLHS says that HOST=:UNSPECIFIC has
+                      ;; implementation-defined behavior. We
+                      ;; just turn it into NIL.
+                      nil)
+                     (list
+                      ;; ANSI also allows LISTs to designate hosts,
+                      ;; but leaves its interpretation
+                      ;; implementation-defined. Our interpretation
+                      ;; is that it's unsupported.:-|
+                      (error "A LIST representing a pathname host is not ~
+                              supported in this implementation:~%  ~S"
+                             ,hd0))
+                     (host ,hd0))))
+      ,@body)))
+
+(defun find-host (host-designator &optional (errorp t))
+  (with-host (host host-designator)
+    (when (and errorp (not host))
+      (error "Couldn't find host: ~S" host-designator))
+    host))
+
+(defun pathname (pathspec)
   #!+sb-doc
-  "Convert thing (a pathname, string or stream) into a pathname."
-  (declare (type pathname-designator thing))
-  (with-pathname (pathname thing)
+  "Convert PATHSPEC (a pathname designator) into a pathname."
+  (declare (type pathname-designator pathspec))
+  (with-pathname (pathname pathspec)
+    pathname))
+
+(defun native-pathname (pathspec)
+  #!+sb-doc
+  "Convert PATHSPEC (a pathname designator) into a pathname, assuming
+the operating system native pathname conventions."
+  (with-native-pathname (pathname pathspec)
     pathname))
 
 ;;; Change the case of thing if DIDDLE-P.
@@ -485,11 +555,7 @@ a host-structure or string."
          ;; as the name of a logical host. ..."
          ;; HS is silent on what happens if the :HOST arg is NOT one of these.
          ;; It seems an error message is appropriate.
-         (host (typecase host
-                 (host host)            ; A valid host, use it.
-                 ((string 0) *unix-host*) ; "" cannot be a logical host
-                 (string (find-logical-host host t)) ; logical-host or lose.
-                 (t default-host)))     ; unix-host
+         (host (or (find-host host nil) default-host))
          (diddle-args (and (eq (host-customary-case host) :lower)
                            (eq case :common)))
          (diddle-defaults
@@ -670,7 +736,7 @@ a host-structure or string."
              ;; implementation-defined."
              ;;
              ;; Both clauses are handled here, as the default
-             ;; *DEFAULT-PATHNAME-DEFAULTS has a SB-IMPL::UNIX-HOST
+             ;; *DEFAULT-PATHNAME-DEFAULTS* has a SB-IMPL::UNIX-HOST
              ;; for a host.
              ((pathname-host defaults)
               (funcall (host-parse (pathname-host defaults))
@@ -726,90 +792,127 @@ a host-structure or string."
            (type (or index null) end)
            (type (or t null) junk-allowed)
            (values (or null pathname) (or null index)))
-  ;; Generally, redundant specification of information in software,
-  ;; whether in code or in comments, is bad. However, the ANSI spec
-  ;; for this is messy enough that it's hard to hold in short-term
-  ;; memory, so I've recorded these redundant notes on the
-  ;; implications of the ANSI spec.
-  ;;
-  ;; According to the ANSI spec, HOST can be a valid pathname host, or
-  ;; a logical host, or NIL.
-  ;;
-  ;; A valid pathname host can be a valid physical pathname host or a
-  ;; valid logical pathname host.
-  ;;
-  ;; A valid physical pathname host is "any of a string, a list of
-  ;; strings, or the symbol :UNSPECIFIC, that is recognized by the
-  ;; implementation as the name of a host". In SBCL as of 0.6.9.8,
-  ;; that means :UNSPECIFIC: though someday we might want to
-  ;; generalize it to allow strings like "RTFM.MIT.EDU" or lists like
-  ;; '("RTFM" "MIT" "EDU"), that's not supported now.
-  ;;
-  ;; A valid logical pathname host is a string which has been defined as
-  ;; the name of a logical host, as with LOAD-LOGICAL-PATHNAME-TRANSLATIONS.
-  ;;
-  ;; A logical host is an object of implementation-dependent nature. In
-  ;; SBCL, it's a member of the HOST class (a subclass of STRUCTURE-OBJECT).
-  (let ((found-host (etypecase host
-                      ((string 0)
-                       ;; This is a special host. It's not valid as a
-                       ;; logical host, so it is a sensible thing to
-                       ;; designate the physical Unix host object. So
-                       ;; we do that.
-                       *unix-host*)
+  (with-host (found-host host)
+    (let (;; According to ANSI defaults may be any valid pathname designator
+          (defaults (etypecase defaults
+                      (pathname
+                       defaults)
                       (string
-                       ;; In general ANSI-compliant Common Lisps, a
-                       ;; string might also be a physical pathname host,
-                       ;; but ANSI leaves this up to the implementor,
-                       ;; and in SBCL we don't do it, so it must be a
-                       ;; logical host.
-                       (find-logical-host host))
-                      ((or null (member :unspecific))
-                       ;; CLHS says that HOST=:UNSPECIFIC has
-                       ;; implementation-defined behavior. We
-                       ;; just turn it into NIL.
-                       nil)
-                      (list
-                       ;; ANSI also allows LISTs to designate hosts,
-                       ;; but leaves its interpretation
-                       ;; implementation-defined. Our interpretation
-                       ;; is that it's unsupported.:-|
-                       (error "A LIST representing a pathname host is not ~
-                              supported in this implementation:~%  ~S"
-                              host))
-                      (host
-                       host)))
-        ;; According to ANSI defaults may be any valid pathname designator
-        (defaults (etypecase defaults
-                    (pathname
-                     defaults)
-                    (string
-                     (aver (pathnamep *default-pathname-defaults*))
-                     (parse-namestring defaults))
-                    (stream
-                     (truename defaults)))))
-    (declare (type (or null host) found-host)
-             (type pathname defaults))
-    (etypecase thing
-      (simple-string
-       (%parse-namestring thing found-host defaults start end junk-allowed))
-      (string
-       (%parse-namestring (coerce thing 'simple-string)
-                          found-host defaults start end junk-allowed))
-      (pathname
-       (let ((defaulted-host (or found-host (%pathname-host defaults))))
-         (declare (type host defaulted-host))
-         (unless (eq defaulted-host (%pathname-host thing))
-           (error "The HOST argument doesn't match the pathname host:~%  ~
-                  ~S and ~S."
-                  defaulted-host (%pathname-host thing))))
-       (values thing start))
-      (stream
-       (let ((name (file-name thing)))
-         (unless name
-           (error "can't figure out the file associated with stream:~%  ~S"
-                  thing))
-         (values name nil))))))
+                       (aver (pathnamep *default-pathname-defaults*))
+                       (parse-namestring defaults))
+                      (stream
+                       (truename defaults)))))
+      (declare (type pathname defaults))
+      (etypecase thing
+        (simple-string
+         (%parse-namestring thing found-host defaults start end junk-allowed))
+        (string
+         (%parse-namestring (coerce thing 'simple-string)
+                            found-host defaults start end junk-allowed))
+        (pathname
+         (let ((defaulted-host (or found-host (%pathname-host defaults))))
+           (declare (type host defaulted-host))
+           (unless (eq defaulted-host (%pathname-host thing))
+             (error "The HOST argument doesn't match the pathname host:~%  ~
+                    ~S and ~S."
+                    defaulted-host (%pathname-host thing))))
+         (values thing start))
+        (stream
+         (let ((name (file-name thing)))
+           (unless name
+             (error "can't figure out the file associated with stream:~%  ~S"
+                    thing))
+           (values name nil)))))))
+
+(defun %parse-native-namestring (namestr host defaults start end junk-allowed)
+  (declare (type (or host null) host)
+           (type string namestr)
+           (type index start)
+           (type (or index null) end))
+  (cond
+    (junk-allowed
+     (handler-case
+         (%parse-namestring namestr host defaults start end nil)
+       (namestring-parse-error (condition)
+         (values nil (namestring-parse-error-offset condition)))))
+    (t
+     (let* ((end (%check-vector-sequence-bounds namestr start end)))
+       (multiple-value-bind (new-host device directory file type version)
+           (cond
+             (host (funcall (host-parse-native host) namestr start end))
+             ((pathname-host defaults)
+              (funcall (host-parse-native (pathname-host defaults))
+                       namestr
+                       start
+                       end))
+             ;; I don't think we should ever get here, as the default
+             ;; host will always have a non-null HOST, given that we
+             ;; can't create a new pathname without going through
+             ;; *DEFAULT-PATHNAME-DEFAULTS*, which has a non-null
+             ;; host...
+             (t (bug "Fallen through COND in %PARSE-NAMESTRING")))
+         (when (and host new-host (not (eq new-host host)))
+           (error 'simple-type-error
+                  :datum new-host
+                  :expected-type `(or null (eql ,host))
+                  :format-control
+                  "The host in the namestring, ~S,~@
+                   does not match the explicit HOST argument, ~S."
+                  :format-arguments (list new-host host)))
+         (let ((pn-host (or new-host host (pathname-host defaults))))
+           (values (%make-pathname
+                    pn-host device directory file type version)
+                   end)))))))
+
+(defun parse-native-namestring (thing
+                                &optional
+                                host
+                                (defaults *default-pathname-defaults*)
+                                &key (start 0) end junk-allowed)
+  #!+sb-doc
+  "Convert THING into a pathname, using the native conventions
+appropriate for the pathname host HOST, or if not specified the host
+of DEFAULTS.  If THING is a string, the parse is bounded by START and
+END, and error behaviour is controlled by JUNK-ALLOWED, as with
+PARSE-NAMESTRING."
+  (declare (type pathname-designator thing defaults)
+           (type (or list host string (member :unspecific)) host)
+           (type index start)
+           (type (or index null) end)
+           (type (or t null) junk-allowed)
+           (values (or null pathname) (or null index)))
+  (with-host (found-host host)
+    (let ((defaults (etypecase defaults
+                      (pathname
+                       defaults)
+                      (string
+                       (aver (pathnamep *default-pathname-defaults*))
+                       (parse-native-namestring defaults))
+                      (stream
+                       (truename defaults)))))
+      (declare (type pathname defaults))
+      (etypecase thing
+        (simple-string
+         (%parse-native-namestring
+          thing found-host defaults start end junk-allowed))
+        (string
+         (%parse-native-namestring (coerce thing 'simple-string)
+                                   found-host defaults start end junk-allowed))
+        (pathname
+         (let ((defaulted-host (or found-host (%pathname-host defaults))))
+           (declare (type host defaulted-host))
+           (unless (eq defaulted-host (%pathname-host thing))
+             (error "The HOST argument doesn't match the pathname host:~%  ~
+                     ~S and ~S."
+                    defaulted-host (%pathname-host thing))))
+         (values thing start))
+        (stream
+         ;; FIXME
+         (let ((name (file-name thing)))
+           (unless name
+             (error "can't figure out the file associated with stream:~%  ~S"
+                    thing))
+           (values name nil)))))))
 
 (defun namestring (pathname)
   #!+sb-doc
@@ -822,6 +925,18 @@ a host-structure or string."
           (error "can't determine the namestring for pathnames with no ~
                   host:~%  ~S" pathname))
         (funcall (host-unparse host) pathname)))))
+
+(defun native-namestring (pathname)
+  #!+sb-doc
+  "Construct the full native (name)string form of PATHNAME."
+  (declare (type pathname-designator pathname))
+  (with-native-pathname (pathname pathname)
+    (when pathname
+      (let ((host (%pathname-host pathname)))
+        (unless host
+          (error "can't determine the native namestring for pathnames with no ~
+                  host:~%  ~S" pathname))
+        (funcall (host-unparse-native host) pathname)))))
 
 (defun host-namestring (pathname)
   #!+sb-doc

@@ -327,22 +327,6 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 (defun posix-getcwd/ ()
   (concatenate 'string (posix-getcwd) "/"))
 
-;;; Convert at the UNIX level from a possibly relative filename to
-;;; an absolute filename.
-;;;
-;;; FIXME: Do we still need this even as we switch to
-;;; *DEFAULT-PATHNAME-DEFAULTS*? I think maybe we do, since it seems
-;;; to be valid for the user to set *DEFAULT-PATHNAME-DEFAULTS* to
-;;; have a NIL directory component, and then this'd be the only way to
-;;; interpret a relative directory specification. But I don't find the
-;;; ANSI pathname documentation to be a model of clarity. Maybe
-;;; someone who understands it better can take a look at this.. -- WHN
-(defun unix-maybe-prepend-current-directory (name)
-  (declare (simple-string name))
-  (if (and (> (length name) 0) (char= (schar name 0) #\/))
-      name
-      (concatenate 'simple-string (posix-getcwd/) name)))
-
 ;;; Duplicate an existing file descriptor (given as the argument) and
 ;;; return it. If FD is not a valid file descriptor, NIL and an error
 ;;; number are returned.

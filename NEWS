@@ -5,6 +5,8 @@ changes in sbcl-0.9.8 relative to sbcl-0.9.7:
     the change in the 0.9.7 release).  (SETF CLASS-NAME) is specified
     by ANSI as a generic function, and for consistency (SETF
     GENERIC-FUNCTION-NAME) is treated likewise.
+  * fixed bug #296: no more arbitrary behaviour from filenames with
+    odd characters as --load arguments.  (reported by Adam Warner)
   * fixed bug #390: :CHARACTER-SET pathname components now work as
     expected.  (reported by Tim Daly Jr)
   * fixed bug #391: complicated :TYPE intersections in slot

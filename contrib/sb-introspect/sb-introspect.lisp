@@ -141,9 +141,9 @@ If an unsupported TYPE is requested, the function will return NIL.
            (if (listp x)
                x
                (list x)))
-	 (get-class (name)
-	   (and (symbolp name)
-		(find-class name nil))))
+         (get-class (name)
+           (and (symbolp name)
+                (find-class name nil))))
     (listify
      (case type
        ((:variable)

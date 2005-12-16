@@ -84,3 +84,48 @@
 ;;; reported a fix for CMU CL, which was ported to sbcl-0.6.12.35.)
 (assert (typep (nth-value 1 (ignore-errors (file-length *terminal-io*)))
                'type-error))
+
+;;; Test for NATIVE-PATHNAME / NATIVE-NAMESTRING stuff
+;;;
+;;; given only safe characters in the namestring, NATIVE-PATHNAME will
+;;; never error, and NATIVE-NAMESTRING on the result will return the
+;;; original namestring.
+(let ((safe-chars
+       ;; for WIN32, we might want to remove #\: here
+       (coerce
+        (cons #\Newline
+              (loop for x from 32 to 127 collect (code-char x)))
+        'simple-base-string))
+      (tricky-sequences #("/../" "../" "/.." "." "/." "./" "/./"
+                          "[]" "*" "**" "/**" "**/" "/**/" "?"
+                          "\\*" "\\[]" "\\?" "\\*\\*" "*\\*")))
+  (loop repeat 1000
+        for length = (random 32)
+        for native-namestring = (coerce
+                                 (loop repeat length
+                                       collect
+                                       (char safe-chars
+                                             (random (length safe-chars))))
+                                 'simple-base-string)
+        for pathname = (native-pathname native-namestring)
+        for nnn = (native-namestring pathname)
+        do (assert (string= nnn native-namestring)))
+  (loop repeat 1000
+        for native-namestring = (with-output-to-string (s)
+                                  (loop
+                                   (let ((r (random 1.0)))
+                                     (cond
+                                       ((< r 1/20) (return))
+                                       ((< r 1/2)
+                                        (write-char
+                                         (char safe-chars
+                                               (random (length safe-chars)))
+                                         s))
+                                       (t (write-string
+                                           (aref tricky-sequences
+                                                 (random
+                                                  (length tricky-sequences)))
+                                           s))))))
+        for pathname = (native-pathname native-namestring)
+        for nnn = (native-namestring pathname)
+        do (assert (string= nnn native-namestring))))

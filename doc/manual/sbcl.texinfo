@@ -59,6 +59,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 * Efficiency::                  
 * Beyond the ANSI Standard::    
 * Foreign Function Interface::  
+* Pathnames::
 * Extensible Streams::          
 * Package Locks::               
 * Threading::
@@ -82,6 +83,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @include efficiency.texinfo
 @include beyond-ansi.texinfo
 @include ffi.texinfo
+@include pathnames.texinfo
 @include streams.texinfo
 @include package-locks.texi-temp
 @include threading.texinfo

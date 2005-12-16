@@ -18,7 +18,9 @@
 ;;; translation the inverse (unparse) functions.
 (def!struct (host (:constructor nil))
   (parse (missing-arg) :type function)
+  (parse-native (missing-arg) :type function)
   (unparse (missing-arg) :type function)
+  (unparse-native (missing-arg) :type function)
   (unparse-host (missing-arg) :type function)
   (unparse-directory (missing-arg) :type function)
   (unparse-file (missing-arg) :type function)
@@ -32,7 +34,15 @@
              (:make-load-form-fun make-logical-host-load-form-fun)
              (:include host
                        (parse #'parse-logical-namestring)
+                       (parse-native
+                        (lambda (x)
+                          (error "called PARSE-NATIVE-NAMESTRING using a ~
+                                  logical host: ~S" x)))
                        (unparse #'unparse-logical-namestring)
+                       (unparse-native
+                        (lambda (x)
+                          (error "called NATIVE-NAMESTRING using a ~
+                                  logical host: ~S" x)))
                        (unparse-host
                         (lambda (x)
                           (logical-host-name (%pathname-host x))))
