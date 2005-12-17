@@ -22,6 +22,8 @@ changes in sbcl-0.9.8 relative to sbcl-0.9.7:
     index variables in LOOP
   * optimization: faster floating-point SQRT on x86-64
   * bug fix: more accurate ROOM results on GENCGC platforms
+  * fixed bug #233.b: make constraint propagation notice when a variable
+    value is changed after it is referenced but before it is used
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** DOCUMENTATION returns NIL instead of "" for method combinations
        that don't have a docstring

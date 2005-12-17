@@ -653,15 +653,6 @@ WORKAROUND:
   (In 0.7.9.1 the result type is (FUNCTION * *), so Python does not
   produce invalid code, but type checking is not accurate.)
 
-233: bugs in constraint propagation
-  b.
-  (declaim (optimize (speed 2) (safety 3)))
-  (defun foo (x y)
-    (if (typep (prog1 x (setq x y)) 'double-float)
-        (+ x 1d0)
-        (+ x 2)))
-  (foo 1d0 5) => segmentation violation
-
 235: "type system and inline expansion"
   a.
   (declaim (ftype (function (cons) number) acc))

@@ -15,7 +15,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(load "test-util.lisp")
 (load "assertoid.lisp")
+(use-package "TEST-UTIL")
 (use-package "ASSERTOID")
 
 ;;; Old CMU CL code assumed that the names of "keyword" arguments are
@@ -1122,5 +1124,48 @@
                                (- ans)
                                ans)))))))
        (if (and (minusp nn) (oddp nn)) (- besn) besn))))
+
+
+;;; bug 233b: lvar lambda-var equality in constraint propagation
+
+;; Put this in a separate function.
+(defun test-constraint-propagation/ref ()
+  (let ((x nil))
+    (if (multiple-value-prog1 x (setq x t))
+        1
+        x)))
+
+(test-util:with-test (:name (:compiler :constraint-propagation :ref))
+  (assert (eq t (test-constraint-propagation/ref))))
+
+;; Put this in a separate function.
+(defun test-constraint-propagation/typep (x y)
+  (if (typep (multiple-value-prog1 x (setq x y))
+             'double-float)
+      (+ x 1d0)
+      (+ x 2)))
+
+(test-util:with-test (:name (:compiler :constraint-propagation :typep))
+  (assert (= 6.0d0 (test-constraint-propagation/typep 1d0 5))))
+
+(test-util:with-test (:name (:compiler :constraint-propagation :eq/eql))
+  (assert (eq :right (let ((c :wrong))
+                       (if (eq (let ((x c))
+                                 (setq c :right)
+                                 x)
+                               :wrong)
+                           c
+                           0)))))
+
+;; Put this in a separate function.
+(defun test-constraint-propagation/cast (x)
+  (when (the double-float (multiple-value-prog1
+                              x
+                            (setq x (1+ x))))
+    x))
+
+(test-util:with-test (:name (:compiler :constraint-propagation :cast))
+  (assert (assertoid:raises-error?
+           (test-constraint-propagation/cast 1) type-error)))
 
 ;;; success

@@ -47,6 +47,8 @@
 
 (in-package "SB!C")
 
+(deftype constraint-y () '(or ctype lvar lambda-var constant))
+
 (defstruct (constraint
             (:include sset-element)
             (:constructor make-constraint (number kind x y not-p))
@@ -62,48 +64,51 @@
   ;;     between X and some object of type Y.
   ;;
   ;; EQL
-  ;;     X is a LAMBDA-VAR Y is a LAMBDA-VAR or a CONSTANT. The
-  ;;     relation is asserted to hold.
+  ;;     X is a LAMBDA-VAR and Y is a LVAR, a LAMBDA-VAR or a CONSTANT.
+  ;;     The relation is asserted to hold.
   (kind nil :type (member typep < > eql))
   ;; The operands to the relation.
   (x nil :type lambda-var)
-  (y nil :type (or ctype lambda-var constant))
+  (y nil :type constraint-y)
   ;; If true, negates the sense of the constraint, so the relation
   ;; does *not* hold.
   (not-p nil :type boolean))
 
 (defvar *constraint-number*)
 
+(defun find-constraint (kind x y not-p)
+  (declare (type lambda-var x) (type constraint-y y) (type boolean not-p))
+  (etypecase y
+    (ctype
+     (do-sset-elements (con (lambda-var-constraints x) nil)
+       (when (and (eq (constraint-kind con) kind)
+                  (eq (constraint-not-p con) not-p)
+                  (type= (constraint-y con) y))
+         (return con))))
+    ((or lvar constant)
+     (do-sset-elements (con (lambda-var-constraints x) nil)
+       (when (and (eq (constraint-kind con) kind)
+                  (eq (constraint-not-p con) not-p)
+                  (eq (constraint-y con) y))
+         (return con))))
+    (lambda-var
+     (do-sset-elements (con (lambda-var-constraints x) nil)
+       (when (and (eq (constraint-kind con) kind)
+                  (eq (constraint-not-p con) not-p)
+                  (let ((cx (constraint-x con)))
+                    (eq (if (eq cx x)
+                            (constraint-y con)
+                            cx)
+                        y)))
+         (return con))))))
+
 ;;; Return a constraint for the specified arguments. We only create a
 ;;; new constraint if there isn't already an equivalent old one,
 ;;; guaranteeing that all equivalent constraints are EQ. This
 ;;; shouldn't be called on LAMBDA-VARs with no CONSTRAINTS set.
-(defun find-constraint (kind x y not-p)
-  (declare (type lambda-var x) (type (or constant lambda-var ctype) y)
-           (type boolean not-p))
-  (or (etypecase y
-        (ctype
-         (do-sset-elements (con (lambda-var-constraints x) nil)
-           (when (and (eq (constraint-kind con) kind)
-                      (eq (constraint-not-p con) not-p)
-                      (type= (constraint-y con) y))
-             (return con))))
-        (constant
-         (do-sset-elements (con (lambda-var-constraints x) nil)
-           (when (and (eq (constraint-kind con) kind)
-                      (eq (constraint-not-p con) not-p)
-                      (eq (constraint-y con) y))
-             (return con))))
-        (lambda-var
-         (do-sset-elements (con (lambda-var-constraints x) nil)
-           (when (and (eq (constraint-kind con) kind)
-                      (eq (constraint-not-p con) not-p)
-                      (let ((cx (constraint-x con)))
-                        (eq (if (eq cx x)
-                                (constraint-y con)
-                                cx)
-                            y)))
-             (return con)))))
+(defun find-or-create-constraint (kind x y not-p)
+  (declare (type lambda-var x) (type constraint-y y) (type boolean not-p))
+  (or (find-constraint kind x y not-p)
       (let ((new (make-constraint (incf *constraint-number*) kind x y not-p)))
         (sset-adjoin new (lambda-var-constraints x))
         (when (lambda-var-p y)
@@ -120,14 +125,17 @@
                (lambda-var-constraints leaf))
       leaf)))
 
-;;; If LVAR's USE is a REF, then return OK-REF-LAMBDA-VAR of the USE,
-;;; otherwise NIL.
-#!-sb-fluid (declaim (inline ok-lvar-lambda-var))
-(defun ok-lvar-lambda-var (lvar)
+;;; See if LVAR's single USE is a REF to a LAMBDA-VAR and they are EQL
+;;; according to CONSTRAINTS. Return LAMBDA-VAR if so.
+(defun ok-lvar-lambda-var (lvar constraints)
   (declare (type lvar lvar))
   (let ((use (lvar-uses lvar)))
     (when (ref-p use)
-      (ok-ref-lambda-var use))))
+      (let ((lambda-var (ok-ref-lambda-var use)))
+        (when lambda-var
+          (let ((constraint (find-constraint 'eql lambda-var lvar nil)))
+            (when (and constraint (sset-member constraint constraints))
+              lambda-var)))))))
 
 ;;;; Searching constraints
 
@@ -137,7 +145,7 @@
 ;;; predecessors, since it only holds on this particular path.
 (defun add-test-constraint (block fun x y not-p)
   (unless (rest (block-pred block))
-    (let ((con (find-constraint fun x y not-p))
+    (let ((con (find-or-create-constraint fun x y not-p))
           (old (or (block-test-constraint block)
                    (setf (block-test-constraint block) (make-sset)))))
       (when (sset-adjoin con old)
@@ -160,11 +168,12 @@
 
 ;;; Add test constraints to the consequent and alternative blocks of
 ;;; the test represented by USE.
-(defun add-test-constraints (use if)
+(defun add-test-constraints (use if constraints)
   (declare (type node use) (type cif if))
   (typecase use
     (ref
-     (add-complement-constraints if 'typep (ok-ref-lambda-var use)
+     (add-complement-constraints if 'typep (ok-lvar-lambda-var (ref-lvar use)
+                                                               constraints)
                                  (specifier-type 'null) t))
     (combination
      (unless (eq (combination-kind use)
@@ -178,15 +187,16 @@
               (when (constant-lvar-p type)
                 (let ((val (lvar-value type)))
                   (add-complement-constraints if 'typep
-                                              (ok-lvar-lambda-var (first args))
+                                              (ok-lvar-lambda-var (first args)
+                                                                  constraints)
                                               (if (ctype-p val)
                                                   val
                                                   (specifier-type val))
                                               nil)))))
            ((eq eql)
-            (let* ((var1 (ok-lvar-lambda-var (first args)))
+            (let* ((var1 (ok-lvar-lambda-var (first args) constraints))
                    (arg2 (second args))
-                   (var2 (ok-lvar-lambda-var arg2)))
+                   (var2 (ok-lvar-lambda-var arg2 constraints)))
               (cond ((not var1))
                     (var2
                      (add-complement-constraints if 'eql var1 var2 nil))
@@ -197,9 +207,9 @@
                                                  nil)))))
            ((< >)
             (let* ((arg1 (first args))
-                   (var1 (ok-lvar-lambda-var arg1))
+                   (var1 (ok-lvar-lambda-var arg1 constraints))
                    (arg2 (second args))
-                   (var2 (ok-lvar-lambda-var arg2)))
+                   (var2 (ok-lvar-lambda-var arg2 constraints)))
               (when var1
                 (add-complement-constraints if name var1 (lvar-type arg2)
                                             nil))
@@ -211,7 +221,8 @@
             (let ((ptype (gethash name *backend-predicate-types*)))
               (when ptype
                 (add-complement-constraints if 'typep
-                                            (ok-lvar-lambda-var (first args))
+                                            (ok-lvar-lambda-var (first args)
+                                                                constraints)
                                             ptype nil)))))))))
   (values))
 
@@ -223,9 +234,11 @@
     (when (if-p last)
       (let ((use (lvar-uses (if-test last))))
         (when (node-p use)
-          (add-test-constraints use last)))))
-
-  (setf (block-test-modified block) nil)
+          ;; BLOCK-OUT contains the (EQL LAMBDA-VAR LVAR)
+          ;; constraints valid at the end of the block. Since the
+          ;; IF node is last node in its block, it can be used to
+          ;; check LVAR LAMBDA-VAR equality.
+          (add-test-constraints use last (block-out block))))))
   (values))
 
 ;;;; Applying constraints
@@ -347,18 +360,20 @@
                  (setq not-res (type-union not-res other))
                  (setq res (type-approx-intersection2 res other))))
             (eql
-             (let ((other-type (leaf-type other)))
-               (if not-p
-                   (when (and (constant-p other)
-                              (member-type-p other-type))
-                     (setq not-res (type-union not-res other-type)))
-                   (let ((leaf-type (leaf-type leaf)))
-                     (when (or (constant-p other)
-                               (and (leaf-refs other) ; protect from deleted vars
-                                    (csubtypep other-type leaf-type)
-                                    (not (type= other-type leaf-type))))
-                       (change-ref-leaf ref other)
-                       (when (constant-p other) (return)))))))
+             (unless (lvar-p other)
+               (let ((other-type (leaf-type other)))
+                 (if not-p
+                     (when (and (constant-p other)
+                                (member-type-p other-type))
+                       (setq not-res (type-union not-res other-type)))
+                     (let ((leaf-type (leaf-type leaf)))
+                       (when (or (constant-p other)
+                                 (and (leaf-refs other) ; protect from
+                                                        ; deleted vars
+                                      (csubtypep other-type leaf-type)
+                                      (not (type= other-type leaf-type))))
+                         (change-ref-leaf ref other)
+                         (when (constant-p other) (return))))))))
             ((< >)
              (cond ((and (integer-type-p res) (integer-type-p y))
                     (let ((greater (eq kind '>)))
@@ -418,18 +433,21 @@
                            ;; fully performed by IR1 optimizer
                            (lambda-var-sets var))
                  do (let* ((type (lvar-type val))
-                           (con (find-constraint 'typep var type nil)))
+                           (con (find-or-create-constraint 'typep var type
+                                                           nil)))
                       (sset-adjoin con gen))))))
       (ref
-       (let ((var (ok-ref-lambda-var node)))
-         (when var
-           (when ref-preprocessor
-             (funcall ref-preprocessor node gen))
-           (let ((dest (and lvar (lvar-dest lvar))))
-             (when (cast-p dest)
-               (let* ((atype (single-value-type (cast-derived-type dest))) ; FIXME
-                      (con (find-constraint 'typep var atype nil)))
-                 (sset-adjoin con gen)))))))
+       (when (ok-ref-lambda-var node)
+         (maybe-add-eql-constraint-for-lvar node gen)
+         (when ref-preprocessor
+           (funcall ref-preprocessor node gen))))
+      (cast
+       (let ((lvar (cast-value node)))
+         (let ((var (ok-lvar-lambda-var lvar gen)))
+             (when var
+               (let* ((atype (single-value-type (cast-derived-type node))) ; FIXME
+                      (con (find-or-create-constraint 'typep var atype nil)))
+                 (sset-adjoin con gen))))))
       (cset
        (binding* ((var (set-var node))
                   (nil (lambda-var-p var) :exit-if-null)
@@ -438,7 +456,7 @@
            (funcall set-preprocessor var))
          (sset-difference gen cons)
          (let* ((type (single-value-type (node-derived-type node)))
-                (con (find-constraint 'typep var type nil)))
+                (con (find-or-create-constraint 'typep var type nil)))
            (sset-adjoin con gen))))))
 
   gen)
@@ -469,6 +487,25 @@
                    (sset-union kill-set con))))
              (sset-union-of-difference out in kill-set))))
     out))
+
+;; Add a (EQL LAMBDA-VAR LVAR) constraint, but only for LVAR's with a
+;; DEST that's an IF or a test for an IF.
+(defun maybe-add-eql-constraint-for-lvar (ref gen)
+  (let ((lvar (ref-lvar ref))
+        (leaf (ref-leaf ref)))
+    (when (and (lambda-var-p leaf) lvar
+               ;; This test avoids generating constraints for an LVAR
+               ;; for which EQLness to its referenced LAMBDA-VAR is
+               ;; not important because OK-LVAR-LAMBDA-VAR won't need
+               ;; it.
+               (or (cast-p (lvar-dest lvar))
+                   (if-p (lvar-dest lvar))
+                   (and (valued-node-p (lvar-dest lvar))
+                        (let ((lvar2 (node-lvar (lvar-dest lvar))))
+                          (when lvar2
+                            (if-p (lvar-dest lvar2)))))))
+      (sset-adjoin (find-or-create-constraint 'eql leaf lvar nil)
+                   gen))))
 
 ;;; Compute the initial flow analysis sets for BLOCK:
 ;;; -- Compute IN/OUT sets; if OUT of a predecessor is not yet
@@ -559,34 +596,40 @@
       (incf result))
     result))
 
-(defun constraint-propagate (component &aux (loop-p nil))
+(defun find-and-propagate-constraints (component)
+  (let ((loop-p nil))
+    (do-blocks (block component)
+      (when (find-block-type-constraints block)
+        (setq loop-p t)))
+    (when loop-p
+      ;; If we have to propagate changes more than this many times,
+      ;; something is wrong.
+      (let ((max-n-changes-remaining (component-n-blocks component)))
+        (declare (type fixnum max-n-changes-remaining))
+        (loop (aver (>= max-n-changes-remaining 0))
+              (decf max-n-changes-remaining)
+              (let ((did-something nil))
+                (do-blocks (block component)
+                  (when (flow-propagate-constraints block)
+                    (setq did-something t)))
+                (unless did-something
+                  (return))))))))
+
+(defun constraint-propagate (component)
   (declare (type component component))
   (init-var-constraints component)
-
-  (do-blocks (block component)
-    (when (block-test-modified block)
-      (find-test-constraints block)))
 
   (unless (block-out (component-head component))
     (setf (block-out (component-head component)) (make-sset)))
 
-  (do-blocks (block component)
-    (when (find-block-type-constraints block)
-      (setq loop-p t)))
+  (find-and-propagate-constraints component)
 
-  (when loop-p
-    (let (;; If we have to propagate changes more than this many times,
-          ;; something is wrong.
-          (max-n-changes-remaining (component-n-blocks component)))
-      (declare (type fixnum max-n-changes-remaining))
-      (loop (aver (>= max-n-changes-remaining 0))
-         (decf max-n-changes-remaining)
-         (let ((did-something nil))
-           (do-blocks (block component)
-             (when (flow-propagate-constraints block)
-               (setq did-something t)))
-           (unless did-something
-             (return))))))
+  (do-blocks (block component)
+    (when (block-test-modified block)
+      (find-test-constraints block)
+      (setf (block-test-modified block) nil)))
+
+  (find-and-propagate-constraints component)
 
   (do-blocks (block component)
     (unless (block-delete-p block)
