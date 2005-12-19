@@ -5,6 +5,8 @@ changes in sbcl-0.9.8 relative to sbcl-0.9.7:
     the change in the 0.9.7 release).  (SETF CLASS-NAME) is specified
     by ANSI as a generic function, and for consistency (SETF
     GENERIC-FUNCTION-NAME) is treated likewise.
+  * fixed bug #233.b: make constraint propagation notice when a variable
+    value is changed after it is referenced but before it is used
   * fixed bug #296: no more arbitrary behaviour from filenames with
     odd characters as --load arguments.  (reported by Adam Warner)
   * fixed bug #390: :CHARACTER-SET pathname components now work as
@@ -18,12 +20,12 @@ changes in sbcl-0.9.8 relative to sbcl-0.9.7:
   * bug fix: the SB-SIMPLE-STREAMS contrib passes external-format
     arguments to the internal stream functions.  (thanks to David
     Lichteblau)
+  * bug fix: stack exhaustion is now handled on the x86/SunOS
+    platform.  (thanks to Daisuke Homma)
+  * bug fix: more accurate ROOM results on GENCGC platforms
   * optimization: improved type inference for arithmetic-for
     index variables in LOOP
   * optimization: faster floating-point SQRT on x86-64
-  * bug fix: more accurate ROOM results on GENCGC platforms
-  * fixed bug #233.b: make constraint propagation notice when a variable
-    value is changed after it is referenced but before it is used
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** DOCUMENTATION returns NIL instead of "" for method combinations
        that don't have a docstring

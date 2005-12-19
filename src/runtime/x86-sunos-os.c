@@ -43,12 +43,13 @@ int arch_os_thread_cleanup(struct thread *thread) {
 os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
 {
+    /* Solaris x86 holds %esp value in UESP */
     switch(offset) {
     case reg_EAX: return &context->uc_mcontext.gregs[11];
     case reg_ECX: return &context->uc_mcontext.gregs[10];
     case reg_EDX: return &context->uc_mcontext.gregs[9];
     case reg_EBX: return &context->uc_mcontext.gregs[8];
-    case reg_ESP: return &context->uc_mcontext.gregs[7];
+    case reg_ESP: return &context->uc_mcontext.gregs[17]; /* REG_UESP */
     case reg_EBP: return &context->uc_mcontext.gregs[6];
     case reg_ESI: return &context->uc_mcontext.gregs[5];
     case reg_EDI: return &context->uc_mcontext.gregs[4];
