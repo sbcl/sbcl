@@ -2100,3 +2100,15 @@ WORKAROUND:
      instead errors.
 
      (reported on sbcl-help by "tichy")
+
+396: block-compilation bug
+    (let ((x 1))
+      (dotimes (y 10)
+        (let ((y y))
+          (when (funcall (eval #'(lambda (x) (eql x 2))) y)
+            (defun foo (z)
+              (incf x (incf y z))))))
+      (defun bar (z)
+        (foo z)
+        (values x)))
+  (bar 1) => 11, should be 4.

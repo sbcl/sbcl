@@ -88,7 +88,7 @@ determined using the library filename. Reloading may not work as
 expected if user or library-code has called dlopen on FILE.
 
 References to foreign symbols in loaded shared objects do not survive
-intact through SB-EXT:SAVE-LISP-AND die on all platforms. See
+intact through SB-EXT:SAVE-LISP-AND-DIE on all platforms. See
 SB-EXT:SAVE-LISP-AND-DIE for details."
   (sb!thread:with-mutex (*foreign-lock*)
     (let* ((filename (or (unix-namestring file) file))

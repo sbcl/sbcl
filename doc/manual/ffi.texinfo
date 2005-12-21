@@ -359,7 +359,7 @@ array type. @code{deref} can be set with @code{setf} to assign a new
 value.
 @end defun
 
-@defun sb-alien:slot @var{struct-or-union} &rest @var{slot-names}
+@defun sb-alien:slot @var{struct-or-union} @var{slot-name}
 @findex slot
 
 The @code{sb-alien:slot} function extracts the value of the slot named

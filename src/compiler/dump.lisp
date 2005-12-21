@@ -925,7 +925,7 @@
   (let ((code (sb!xc:char-code char)))
     (cond
       ((< code 256)
-  (dump-fop 'fop-short-character file)
+       (dump-fop 'fop-short-character file)
        (dump-byte code file))
       (t
        (dump-fop 'fop-character file)
