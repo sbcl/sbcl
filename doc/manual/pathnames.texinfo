@@ -2,6 +2,8 @@
 @comment  node-name,  next,  previous,  up
 @chapter Pathnames
 
+@cindex Pathnames
+
 @menu
 * Lisp Pathnames::
 * Native Filenames::
@@ -67,9 +69,23 @@ implementation-defined and so need documentation.
 @c
 @c * Other symbols and integers have implementation-defined meaning.
 @c   (19.2.2.4.6)
-@c
+
+@subsection The SYS Logical Pathname Host
+
+@cindex Logical pathnames
+@cindex Pathnames, logical
+@findex logical-pathname-translations
+@findex (setf logical-pathname-translations)
+
 @c * The existence and meaning of SYS: logical pathnames is
 @c   implementation-defined.  (19.3.1.1.1)
+
+The logical pathname host named by @code{"SYS"} exists in SBCL.  Its
+@code{logical-pathname-translations} may be set by the site or the user
+applicable to point to the locations of the system's sources; in
+particular, the core system's source files match the logical pathname
+@code{"SYS:SRC;**;*.*.*"}, and the contributed modules' source files
+match @code{"SYS:CONTRIB;**;*.*.*"}.
 
 @node Native Filenames
 @comment  node-name,  next,  previous,  up

@@ -125,7 +125,7 @@ controlled via the alist
 @comment  node-name,  next,  previous,  up
 @subsection Diagnostic Severity
 @cindex Severity of compiler messages
-@cindex compiler diagnostic severity
+@cindex Compiler Diagnostic Severity
 @tindex error
 @tindex warning
 @tindex style-warning
@@ -389,7 +389,7 @@ This message is not saying ``there is a problem somewhere in this
 @node The Processing Path
 @comment  node-name,  next,  previous,  up
 @subsubsection The Processing Path
-@cindex Processing path
+@cindex Processing Path
 @cindex Macroexpansion
 @cindex Source-to-source transformation
 
@@ -1016,8 +1016,8 @@ character position and gives up on the entire source file.
 @comment  node-name,  next,  previous,  up
 @section Open Coding and Inline Expansion
 @cindex Open-coding
-@cindex inline expansion
-@cindex static functions
+@cindex Inline expansion
+@cindex Static functions
 
 Since Common Lisp forbids the redefinition of standard functions, the
 compiler can have special knowledge of these standard functions
