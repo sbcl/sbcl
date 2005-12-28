@@ -246,10 +246,7 @@
   ;; entire initial component just to clear the flags.
   (flag nil)
   ;; some kind of info used by the back end
-  (info nil)
-  ;; constraints that hold in this block and its successors by merit
-  ;; of being tested by its IF predecessors.
-  (test-constraint nil :type (or sset null)))
+  (info nil))
 (def!method print-object ((cblock cblock) stream)
   (print-unreadable-object (cblock stream :type t :identity t)
     (format stream "~W :START c~W"
@@ -1143,7 +1140,9 @@
   ;; the blocks that we execute next in true and false case,
   ;; respectively (may be the same)
   (consequent (missing-arg) :type cblock)
-  (alternative (missing-arg) :type cblock))
+  (consequent-constraints nil :type (or null sset))
+  (alternative (missing-arg) :type cblock)
+  (alternative-constraints nil :type (or null sset)))
 (defprinter (cif :conc-name if- :identity t)
   (test :prin1 (lvar-uses test))
   consequent

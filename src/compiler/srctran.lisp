@@ -301,7 +301,7 @@
            (if (and (floatp y)
                     (float-infinity-p y))
                nil
-               (set-bound (funcall f (type-bound-number x)) (consp x)))))))
+               (set-bound y (consp x)))))))
 
 ;;; Apply a binary operator OP to two bounds X and Y. The result is
 ;;; NIL if either is NIL. Otherwise bound is computed and the result

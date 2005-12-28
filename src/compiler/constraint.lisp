@@ -37,13 +37,8 @@
 ;;; In this case CP cannot even infer that I is of class INTEGER.
 ;;;
 ;;; -- In the above example if we place the check after SETQ, CP will
-;;; fail to infer (< I FIXNUM): is does not understand that this
+;;; fail to infer (< I FIXNUM): it does not understand that this
 ;;; constraint follows from (TYPEP I (INTEGER 0 0)).
-
-;;; BUGS:
-;;;
-;;; -- this code does not check whether SET appears between REF and a
-;;; test (bug 233b)
 
 (in-package "SB!C")
 
@@ -75,6 +70,7 @@
   (not-p nil :type boolean))
 
 (defvar *constraint-number*)
+(declaim (type (integer 0) *constraint-number*))
 
 (defun find-constraint (kind x y not-p)
   (declare (type lambda-var x) (type constraint-y y) (type boolean not-p))
@@ -130,31 +126,54 @@
 (defun ok-lvar-lambda-var (lvar constraints)
   (declare (type lvar lvar))
   (let ((use (lvar-uses lvar)))
-    (when (ref-p use)
-      (let ((lambda-var (ok-ref-lambda-var use)))
-        (when lambda-var
-          (let ((constraint (find-constraint 'eql lambda-var lvar nil)))
-            (when (and constraint (sset-member constraint constraints))
-              lambda-var)))))))
+    (cond ((ref-p use)
+           (let ((lambda-var (ok-ref-lambda-var use)))
+             (when lambda-var
+               (let ((constraint (find-constraint 'eql lambda-var lvar nil)))
+                 (when (and constraint (sset-member constraint constraints))
+                   lambda-var)))))
+          ((cast-p use)
+           (ok-lvar-lambda-var (cast-value use) constraints)))))
+
+(defmacro do-eql-vars ((symbol (var constraints) &optional result) &body body)
+  (once-only ((var var))
+    `(let ((,symbol ,var))
+       (flet ((body-fun ()
+                ,@body))
+         (body-fun)
+         (do-sset-elements (con ,constraints ,result)
+           (let ((other (and (eq (constraint-kind con) 'eql)
+                             (eq (constraint-not-p con) nil)
+                             (cond ((eq ,var (constraint-x con))
+                                    (constraint-y con))
+                                   ((eq ,var (constraint-y con))
+                                    (constraint-x con))
+                                   (t
+                                    nil)))))
+             (when other
+               (setq ,symbol other)
+               (when (lambda-var-p ,symbol)
+                 (body-fun)))))))))
 
 ;;;; Searching constraints
 
-;;; Add the indicated test constraint to BLOCK, marking the block as
-;;; having a new assertion when the constriant was not already
-;;; present. We don't add the constraint if the block has multiple
-;;; predecessors, since it only holds on this particular path.
-(defun add-test-constraint (block fun x y not-p)
-  (unless (rest (block-pred block))
-    (let ((con (find-or-create-constraint fun x y not-p))
-          (old (or (block-test-constraint block)
-                   (setf (block-test-constraint block) (make-sset)))))
-      (when (sset-adjoin con old)
-        (setf (block-type-asserted block) t))))
+;;; Add the indicated test constraint to BLOCK. We don't add the
+;;; constraint if the block has multiple predecessors, since it only
+;;; holds on this particular path.
+(defun add-test-constraint (fun x y not-p constraints target)
+  (cond ((and (eq 'eql fun) (lambda-var-p y) (not not-p))
+         (add-eql-var-var-constraint x y constraints target))
+        (t
+         (do-eql-vars (x (x constraints))
+           (let ((con (find-or-create-constraint fun x y not-p)))
+             (sset-adjoin con target)))))
   (values))
 
 ;;; Add complementary constraints to the consequent and alternative
 ;;; blocks of IF. We do nothing if X is NIL.
-(defun add-complement-constraints (if fun x y not-p)
+(defun add-complement-constraints (if fun x y not-p constraints
+                                      consequent-constraints
+                                      alternative-constraints)
   (when (and x
              ;; Note: Even if we do (IF test exp exp) => (PROGN test exp)
              ;; optimization, the *MAX-OPTIMIZE-ITERATIONS* cutoff means
@@ -162,84 +181,68 @@
              ;; done, so we still need to avoid barfing on this case.
              (not (eq (if-consequent if)
                       (if-alternative if))))
-    (add-test-constraint (if-consequent if) fun x y not-p)
-    (add-test-constraint (if-alternative if) fun x y (not not-p)))
+    (add-test-constraint fun x y not-p constraints
+                         consequent-constraints)
+    (add-test-constraint fun x y (not not-p) constraints
+                         alternative-constraints))
   (values))
 
 ;;; Add test constraints to the consequent and alternative blocks of
 ;;; the test represented by USE.
 (defun add-test-constraints (use if constraints)
   (declare (type node use) (type cif if))
-  (typecase use
-    (ref
-     (add-complement-constraints if 'typep (ok-lvar-lambda-var (ref-lvar use)
-                                                               constraints)
-                                 (specifier-type 'null) t))
-    (combination
-     (unless (eq (combination-kind use)
-                 :error)
-       (let ((name (lvar-fun-name
-                    (basic-combination-fun use)))
-             (args (basic-combination-args use)))
-         (case name
-           ((%typep %instance-typep)
-            (let ((type (second args)))
-              (when (constant-lvar-p type)
-                (let ((val (lvar-value type)))
-                  (add-complement-constraints if 'typep
-                                              (ok-lvar-lambda-var (first args)
-                                                                  constraints)
-                                              (if (ctype-p val)
-                                                  val
-                                                  (specifier-type val))
-                                              nil)))))
-           ((eq eql)
-            (let* ((var1 (ok-lvar-lambda-var (first args) constraints))
-                   (arg2 (second args))
-                   (var2 (ok-lvar-lambda-var arg2 constraints)))
-              (cond ((not var1))
-                    (var2
-                     (add-complement-constraints if 'eql var1 var2 nil))
-                    ((constant-lvar-p arg2)
-                     (add-complement-constraints if 'eql var1
-                                                 (ref-leaf
-                                                  (principal-lvar-use arg2))
-                                                 nil)))))
-           ((< >)
-            (let* ((arg1 (first args))
-                   (var1 (ok-lvar-lambda-var arg1 constraints))
-                   (arg2 (second args))
-                   (var2 (ok-lvar-lambda-var arg2 constraints)))
-              (when var1
-                (add-complement-constraints if name var1 (lvar-type arg2)
-                                            nil))
-              (when var2
-                (add-complement-constraints if (if (eq name '<) '> '<)
-                                            var2 (lvar-type arg1)
-                                            nil))))
-           (t
-            (let ((ptype (gethash name *backend-predicate-types*)))
-              (when ptype
-                (add-complement-constraints if 'typep
-                                            (ok-lvar-lambda-var (first args)
-                                                                constraints)
-                                            ptype nil)))))))))
-  (values))
-
-;;; Set the TEST-CONSTRAINT in the successors of BLOCK according to
-;;; the condition it tests.
-(defun find-test-constraints (block)
-  (declare (type cblock block))
-  (let ((last (block-last block)))
-    (when (if-p last)
-      (let ((use (lvar-uses (if-test last))))
-        (when (node-p use)
-          ;; BLOCK-OUT contains the (EQL LAMBDA-VAR LVAR)
-          ;; constraints valid at the end of the block. Since the
-          ;; IF node is last node in its block, it can be used to
-          ;; check LVAR LAMBDA-VAR equality.
-          (add-test-constraints use last (block-out block))))))
-  (values))
+  (let ((consequent-constraints (make-sset))
+        (alternative-constraints (make-sset)))
+    (macrolet ((add (fun x y not-p)
+                 `(add-complement-constraints if ,fun ,x ,y ,not-p
+                   constraints
+                   consequent-constraints
+                   alternative-constraints)))
+      (typecase use
+        (ref
+         (add 'typep (ok-lvar-lambda-var (ref-lvar use) constraints)
+              (specifier-type 'null) t))
+        (combination
+         (unless (eq (combination-kind use)
+                     :error)
+           (let ((name (lvar-fun-name
+                        (basic-combination-fun use)))
+                 (args (basic-combination-args use)))
+             (case name
+               ((%typep %instance-typep)
+                (let ((type (second args)))
+                  (when (constant-lvar-p type)
+                    (let ((val (lvar-value type)))
+                      (add 'typep (ok-lvar-lambda-var (first args) constraints)
+                           (if (ctype-p val)
+                               val
+                               (specifier-type val))
+                           nil)))))
+               ((eq eql)
+                (let* ((var1 (ok-lvar-lambda-var (first args) constraints))
+                       (arg2 (second args))
+                       (var2 (ok-lvar-lambda-var arg2 constraints)))
+                  (cond ((not var1))
+                        (var2
+                         (add 'eql var1 var2 nil))
+                        ((constant-lvar-p arg2)
+                         (add 'eql var1 (ref-leaf (principal-lvar-use arg2))
+                              nil)))))
+               ((< >)
+                (let* ((arg1 (first args))
+                       (var1 (ok-lvar-lambda-var arg1 constraints))
+                       (arg2 (second args))
+                       (var2 (ok-lvar-lambda-var arg2 constraints)))
+                  (when var1
+                    (add name var1 (lvar-type arg2) nil))
+                  (when var2
+                    (add (if (eq name '<) '> '<) var2 (lvar-type arg1) nil))))
+               (t
+                (let ((ptype (gethash name *backend-predicate-types*)))
+                  (when ptype
+                    (add 'typep (ok-lvar-lambda-var (first args) constraints)
+                         ptype nil))))))))))
+    (values consequent-constraints alternative-constraints)))
 
 ;;;; Applying constraints
 
@@ -367,26 +370,29 @@
                                 (member-type-p other-type))
                        (setq not-res (type-union not-res other-type)))
                      (let ((leaf-type (leaf-type leaf)))
-                       (when (or (constant-p other)
-                                 (and (leaf-refs other) ; protect from
-                                                        ; deleted vars
-                                      (csubtypep other-type leaf-type)
-                                      (not (type= other-type leaf-type))))
-                         (change-ref-leaf ref other)
-                         (when (constant-p other) (return))))))))
+                       (cond
+                         ((or (constant-p other)
+                              (and (leaf-refs other) ; protect from
+                                        ; deleted vars
+                                   (csubtypep other-type leaf-type)
+                                   (not (type= other-type leaf-type))))
+                          (change-ref-leaf ref other)
+                          (when (constant-p other) (return)))
+                         (t
+                          (setq res (type-approx-intersection2
+                                     res other-type)))))))))
             ((< >)
-             (cond ((and (integer-type-p res) (integer-type-p y))
-                    (let ((greater (eq kind '>)))
-                      (let ((greater (if not-p (not greater) greater)))
-                        (setq res
-                              (constrain-integer-type res y greater not-p)))))
-                   ((and (float-type-p res) (float-type-p y))
-                    (let ((greater (eq kind '>)))
-                      (let ((greater (if not-p (not greater) greater)))
-                        (setq res
-                              (constrain-float-type res y greater not-p)))))
-                   )))))
-
+             (cond
+               ((and (integer-type-p res) (integer-type-p y))
+                (let ((greater (eq kind '>)))
+                  (let ((greater (if not-p (not greater) greater)))
+                    (setq res
+                          (constrain-integer-type res y greater not-p)))))
+               ((and (float-type-p res) (float-type-p y))
+                (let ((greater (eq kind '>)))
+                  (let ((greater (if not-p (not greater) greater)))
+                    (setq res
+                          (constrain-float-type res y greater not-p))))))))))
       (cond ((and (if-p (node-dest ref))
                   (csubtypep (specifier-type 'null) not-res))
              (setf (node-derived-type ref) *wild-type*)
@@ -402,22 +408,63 @@
 
 ;;;; Flow analysis
 
+(defun maybe-add-eql-var-lvar-constraint (ref gen)
+  (let ((lvar (ref-lvar ref))
+        (leaf (ref-leaf ref)))
+    (when (and (lambda-var-p leaf) lvar)
+      (sset-adjoin (find-or-create-constraint 'eql leaf lvar nil)
+                   gen))))
+
+;;; Copy all CONSTRAINTS involving FROM-VAR to VAR except the (EQL VAR
+;;; LVAR) ones.
+(defun inherit-constraints (var from-var constraints target)
+  (do-sset-elements (con constraints)
+    (let ((eq-x (eq from-var (constraint-x con)))
+          (eq-y (eq from-var (constraint-y con))))
+      ;; Constant substitution is controversial.
+      (unless (constant-p (constraint-y con))
+        (when (or (and eq-x (not (lvar-p (constraint-y con))))
+                  eq-y)
+          (sset-adjoin (find-or-create-constraint
+                        (constraint-kind con)
+                        (if eq-x var (constraint-x con))
+                        (if eq-y var (constraint-y con))
+                        (constraint-not-p con))
+                       target))))))
+
+;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR1 and VAR2 and
+;; inherit each other's constraints.
+(defun add-eql-var-var-constraint (var1 var2 constraints
+                                   &optional (target constraints))
+  (let ((con (find-or-create-constraint 'eql var1 var2 nil)))
+    (when (sset-adjoin con target)
+      (do-eql-vars (var2 (var2 constraints))
+        (inherit-constraints var1 var2 constraints target))
+      (do-eql-vars (var1 (var1 constraints))
+        (inherit-constraints var1 var2 constraints target))
+      t)))
+
+;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR and LVAR's
+;; LAMBDA-VAR if possible.
+(defun maybe-add-eql-var-var-constraint (var lvar constraints
+                                         &optional (target constraints))
+  (declare (type lambda-var var) (type lvar lvar))
+  (let ((lambda-var (ok-lvar-lambda-var lvar constraints)))
+    (when lambda-var
+      (add-eql-var-var-constraint var lambda-var constraints target))))
+
 ;;; Local propagation
 ;;; -- [TODO: For any LAMBDA-VAR ref with a type check, add that
 ;;;    constraint.]
 ;;; -- For any LAMBDA-VAR set, delete all constraints on that var; add
 ;;;    a type constraint based on the new value type.
 (declaim (ftype (function (cblock sset
-                           &key (:ref-preprocessor function)
-                                (:set-preprocessor function))
+                           &key (:ref-preprocessor (or null function))
+                                (:set-preprocessor (or null function)))
                           sset)
                 constraint-propagate-in-block))
 (defun constraint-propagate-in-block
     (block gen &key ref-preprocessor set-preprocessor)
-
-  (let ((test (block-test-constraint block)))
-    (when test
-      (sset-union gen test)))
 
   (do-nodes (node lvar block)
     (typecase node
@@ -427,27 +474,25 @@
            (loop with call = (lvar-dest (node-lvar (first (lambda-refs fun))))
                  for var in (lambda-vars fun)
                  and val in (combination-args call)
-                 when (and val
-                           (lambda-var-constraints var)
-                           ;; if VAR has no SETs, type inference is
-                           ;; fully performed by IR1 optimizer
-                           (lambda-var-sets var))
+                 when (and val (lambda-var-constraints var))
                  do (let* ((type (lvar-type val))
                            (con (find-or-create-constraint 'typep var type
                                                            nil)))
-                      (sset-adjoin con gen))))))
+                      (sset-adjoin con gen))
+                 (maybe-add-eql-var-var-constraint var val gen)))))
       (ref
        (when (ok-ref-lambda-var node)
-         (maybe-add-eql-constraint-for-lvar node gen)
+         (maybe-add-eql-var-lvar-constraint node gen)
          (when ref-preprocessor
            (funcall ref-preprocessor node gen))))
       (cast
        (let ((lvar (cast-value node)))
          (let ((var (ok-lvar-lambda-var lvar gen)))
-             (when var
-               (let* ((atype (single-value-type (cast-derived-type node))) ; FIXME
-                      (con (find-or-create-constraint 'typep var atype nil)))
-                 (sset-adjoin con gen))))))
+           (when var
+             (let ((atype (single-value-type (cast-derived-type node)))) ;FIXME
+               (do-eql-vars (var (var gen))
+                 (let ((con (find-or-create-constraint 'typep var atype nil)))
+                   (sset-adjoin con gen))))))))
       (cset
        (binding* ((var (set-var node))
                   (nil (lambda-var-p var) :exit-if-null)
@@ -457,119 +502,78 @@
          (sset-difference gen cons)
          (let* ((type (single-value-type (node-derived-type node)))
                 (con (find-or-create-constraint 'typep var type nil)))
-           (sset-adjoin con gen))))))
+           (sset-adjoin con gen))
+         (maybe-add-eql-var-var-constraint var (set-value node) gen)))))
 
   gen)
 
-;;; BLOCK-KILL is just a list of the LAMBDA-VARs killed, so we must
-;;; compute the kill set when there are any vars killed. We bum this a
-;;; bit by special-casing when only one var is killed, and just using
-;;; that var's constraints as the kill set. This set could possibly be
-;;; precomputed, but it would have to be invalidated whenever any
-;;; constraint is added, which would be a pain.
-(defun compute-block-out (block)
+(defun constraint-propagate-if (block gen)
+  (let ((node (block-last block)))
+    (when (if-p node)
+      (let ((use (lvar-uses (if-test node))))
+        (when (node-p use)
+          (add-test-constraints use node gen))))))
+
+(defun constrain-node (node cons)
+  (let* ((var (ref-leaf node))
+         (con (lambda-var-constraints var)))
+    (constrain-ref-type node con cons)))
+
+;;; Starting from IN compute OUT and (consequent/alternative
+;;; constraints if the block ends with and IF). Return the list of
+;;; successors that may need to be recomputed.
+(defun find-block-type-constraints (block &key final-pass-p)
   (declare (type cblock block))
-  (let ((in (block-in block))
-        (kill (block-kill block))
-        (out (copy-sset (block-gen block))))
-    (cond ((null kill)
-           (sset-union out in))
-          ((null (rest kill))
-           (let ((con (lambda-var-constraints (first kill))))
-             (if con
-                 (sset-union-of-difference out in con)
-                 (sset-union out in))))
-          (t
-           (let ((kill-set (make-sset)))
-             (dolist (var kill)
-               (let ((con (lambda-var-constraints var)))
-                 (when con
-                   (sset-union kill-set con))))
-             (sset-union-of-difference out in kill-set))))
-    out))
-
-;; Add a (EQL LAMBDA-VAR LVAR) constraint, but only for LVAR's with a
-;; DEST that's an IF or a test for an IF.
-(defun maybe-add-eql-constraint-for-lvar (ref gen)
-  (let ((lvar (ref-lvar ref))
-        (leaf (ref-leaf ref)))
-    (when (and (lambda-var-p leaf) lvar
-               ;; This test avoids generating constraints for an LVAR
-               ;; for which EQLness to its referenced LAMBDA-VAR is
-               ;; not important because OK-LVAR-LAMBDA-VAR won't need
-               ;; it.
-               (or (cast-p (lvar-dest lvar))
-                   (if-p (lvar-dest lvar))
-                   (and (valued-node-p (lvar-dest lvar))
-                        (let ((lvar2 (node-lvar (lvar-dest lvar))))
-                          (when lvar2
-                            (if-p (lvar-dest lvar2)))))))
-      (sset-adjoin (find-or-create-constraint 'eql leaf lvar nil)
-                   gen))))
-
-;;; Compute the initial flow analysis sets for BLOCK:
-;;; -- Compute IN/OUT sets; if OUT of a predecessor is not yet
-;;;    computed, assume it to be a universal set (this is only
-;;;    possible in a loop)
-;;;
-;;; Return T if we have found a loop.
-(defun find-block-type-constraints (block)
-  (declare (type cblock block))
-  (collect ((kill nil adjoin))
-    (let ((gen (constraint-propagate-in-block
-                block (make-sset)
-                :set-preprocessor (lambda (var)
-                                    (kill var)))))
-      (setf (block-gen block) gen)
-      (setf (block-kill block) (kill))
-      (setf (block-type-asserted block) nil)
-      (let* ((n (block-number block))
-             (pred (block-pred block))
-             (in nil)
-             (loop-p nil))
-        (dolist (b pred)
-          (cond ((> (block-number b) n)
-                 (if in
-                     (sset-intersection in (block-out b))
-                     (setq in (copy-sset (block-out b)))))
-                (t (setq loop-p t))))
-        (unless in
-          (bug "Unreachable code is found or flow graph is not ~
-                properly depth-first ordered."))
-        (setf (block-in block) in)
-        (setf (block-out block) (compute-block-out block))
-        loop-p))))
-
-;;; BLOCK-IN becomes the intersection of the OUT of the predecessors.
-;;; Our OUT is:
-;;;     gen U (in - kill)
-;;;
-;;; Return True if we have done something.
-(defun flow-propagate-constraints (block)
-  (let* ((pred (block-pred block))
-         (in (progn (aver pred)
-                    (let ((res (copy-sset (block-out (first pred)))))
-                      (dolist (b (rest pred))
-                        (sset-intersection res (block-out b)))
-                      res))))
-    (setf (block-in block) in)
-    (let ((out (compute-block-out block)))
-      (if (sset= out (block-out block))
-          nil
-          (setf (block-out block) out)))))
+  (let ((gen (constraint-propagate-in-block
+              block
+              (if final-pass-p
+                  (block-in block)
+                  (copy-sset (block-in block)))
+              :ref-preprocessor (if final-pass-p #'constrain-node nil))))
+    (setf (block-gen block) gen)
+    (multiple-value-bind (consequent-constraints alternative-constraints)
+        (constraint-propagate-if block gen)
+      (if consequent-constraints
+          (let* ((node (block-last block))
+                 (old-consequent-constraints (if-consequent-constraints node))
+                 (old-alternative-constraints (if-alternative-constraints node))
+                 (succ ()))
+            ;; Add the consequent and alternative constraints to GEN.
+            (cond ((sset-empty consequent-constraints)
+                   (setf (if-consequent-constraints node) gen)
+                   (setf (if-alternative-constraints node) gen))
+                  (t
+                   (setf (if-consequent-constraints node) (copy-sset gen))
+                   (sset-union (if-consequent-constraints node)
+                               consequent-constraints)
+                   (setf (if-alternative-constraints node) gen)
+                   (sset-union (if-alternative-constraints node)
+                               alternative-constraints)))
+            ;; Has the consequent been changed?
+            (unless (and old-consequent-constraints
+                         (sset= (if-consequent-constraints node)
+                                old-consequent-constraints))
+              (push (if-consequent node) succ))
+            ;; Has the alternative been changed?
+            (unless (and old-alternative-constraints
+                         (sset= (if-alternative-constraints node)
+                                old-alternative-constraints))
+              (push (if-alternative node) succ))
+            succ)
+          ;; There is no IF.
+          (unless (and (block-out block)
+                       (sset= gen (block-out block)))
+            (setf (block-out block) gen)
+            (block-succ block))))))
 
 ;;; Deliver the results of constraint propagation to REFs in BLOCK.
 ;;; During this pass, we also do local constraint propagation by
-;;; adding in constraints as we seem them during the pass through the
+;;; adding in constraints as we see them during the pass through the
 ;;; block.
 (defun use-result-constraints (block)
   (declare (type cblock block))
-  (constraint-propagate-in-block
-   block (block-in block)
-   :ref-preprocessor (lambda (node cons)
-                       (let* ((var (ref-leaf node))
-                              (con (lambda-var-constraints var)))
-                         (constrain-ref-type node con cons)))))
+  (constraint-propagate-in-block block (block-in block)
+                                 :ref-preprocessor #'constrain-node))
 
 ;;; Give an empty constraints set to any var that doesn't have one and
 ;;; isn't a set closure var. Since a var that we previously rejected
@@ -588,32 +592,113 @@
       (dolist (let (lambda-lets fun))
         (frob let)))))
 
-;;; How many blocks does COMPONENT have?
-(defun component-n-blocks (component)
-  (let ((result 0))
-    (declare (type index result))
-    (do-blocks (block component :both)
-      (incf result))
-    result))
+;;; Return the constraints that flow from PRED to SUCC. This is
+;;; BLOCK-OUT unless PRED ends with and IF and test constraints were
+;;; added.
+(defun block-out-for-successor (pred succ)
+  (declare (type cblock pred succ))
+  (let ((last (block-last pred)))
+    (or (when (if-p last)
+          (cond ((eq succ (if-consequent last))
+                 (if-consequent-constraints last))
+                ((eq succ (if-alternative last))
+                 (if-alternative-constraints last))))
+        (block-out pred))))
+
+(defun compute-block-in (block)
+  (let ((in nil))
+    (dolist (pred (block-pred block))
+      ;; If OUT has not been calculated, assume it to be the universal
+      ;; set.
+      (let ((out (block-out-for-successor pred block)))
+        (when out
+          (if in
+              (sset-intersection in out)
+              (setq in (copy-sset out))))))
+    (or in (make-sset))))
+
+(defun update-block-in (block)
+  (let ((in (compute-block-in block)))
+    (cond ((and (block-in block) (sset= in (block-in block)))
+           nil)
+          (t
+           (setf (block-in block) in)))))
+
+;;; Return two lists: one of blocks that precede all loops and
+;;; therefore require only one constraint propagation pass and the
+;;; rest. This implementation does not find all such blocks.
+;;;
+;;; A more complete implementation would be:
+;;;
+;;;     (do-blocks (block component)
+;;;       (if (every #'(lambda (pred)
+;;;                      (or (member pred leading-blocks)
+;;;                          (eq pred head)))
+;;;                  (block-pred block))
+;;;           (push block leading-blocks)
+;;;           (push block rest-of-blocks)))
+;;;
+;;; Trailing blocks that succeed all loops could be found and handled
+;;; similarly. In practice though, these more complex solutions are
+;;; slightly worse performancewise.
+(defun leading-component-blocks (component)
+  (declare (type component component))
+  (flet ((loopy-p (block)
+           (let ((n (block-number block)))
+             (dolist (pred (block-pred block))
+               (unless (< n (block-number pred))
+                 (return t))))))
+    (let ((leading-blocks ())
+          (rest-of-blocks ())
+          (seen-loop-p ()))
+      (do-blocks (block component)
+        (when (and (not seen-loop-p) (loopy-p block))
+          (setq seen-loop-p t))
+        (if seen-loop-p
+            (push block rest-of-blocks)
+            (push block leading-blocks)))
+      (values (nreverse leading-blocks) (nreverse rest-of-blocks)))))
+
+;;; Append OBJ to the end of LIST as if by NCONC but only if it is not
+;;; a member already.
+(defun nconc-new (obj list)
+  (do ((x list (cdr x))
+       (prev nil x))
+      ((endp x) (if prev
+                    (progn
+                      (setf (cdr prev) (list obj))
+                      list)
+                    (list obj)))
+    (when (eql (car x) obj)
+      (return-from nconc-new list))))
 
 (defun find-and-propagate-constraints (component)
-  (let ((loop-p nil))
-    (do-blocks (block component)
-      (when (find-block-type-constraints block)
-        (setq loop-p t)))
-    (when loop-p
-      ;; If we have to propagate changes more than this many times,
-      ;; something is wrong.
-      (let ((max-n-changes-remaining (component-n-blocks component)))
-        (declare (type fixnum max-n-changes-remaining))
-        (loop (aver (>= max-n-changes-remaining 0))
-              (decf max-n-changes-remaining)
-              (let ((did-something nil))
-                (do-blocks (block component)
-                  (when (flow-propagate-constraints block)
-                    (setq did-something t)))
-                (unless did-something
-                  (return))))))))
+  (let ((blocks-to-process ()))
+    (flet ((enqueue (blocks)
+             (dolist (block blocks)
+               (setq blocks-to-process (nconc-new block blocks-to-process)))))
+      (multiple-value-bind (leading-blocks rest-of-blocks)
+          (leading-component-blocks component)
+        ;; Update every block once to account for changes in the
+        ;; IR1. The constraints of the lead blocks cannot be changed
+        ;; after the first pass so we might as well use them and skip
+        ;; USE-RESULT-CONSTRAINTS later.
+        (dolist (block leading-blocks)
+          (setf (block-in block) (compute-block-in block))
+          (find-block-type-constraints block :final-pass-p t))
+        (setq blocks-to-process (copy-list rest-of-blocks))
+        ;; The rest of the blocks.
+        (dolist (block rest-of-blocks)
+          (aver (eq block (pop blocks-to-process)))
+          (setf (block-in block) (compute-block-in block))
+          (enqueue (find-block-type-constraints block)))
+        ;; Propagate constraints
+        (loop for block = (pop blocks-to-process)
+              while block do
+              (unless (eq block (component-tail component))
+                (when (update-block-in block)
+                  (enqueue (find-block-type-constraints block)))))
+        rest-of-blocks))))
 
 (defun constraint-propagate (component)
   (declare (type component component))
@@ -622,16 +707,7 @@
   (unless (block-out (component-head component))
     (setf (block-out (component-head component)) (make-sset)))
 
-  (find-and-propagate-constraints component)
-
-  (do-blocks (block component)
-    (when (block-test-modified block)
-      (find-test-constraints block)
-      (setf (block-test-modified block) nil)))
-
-  (find-and-propagate-constraints component)
-
-  (do-blocks (block component)
+  (dolist (block (find-and-propagate-constraints component))
     (unless (block-delete-p block)
       (use-result-constraints block)))
 
