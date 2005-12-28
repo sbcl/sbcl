@@ -453,14 +453,7 @@ sub_monitor(void)
         fflush(stdout);
         line = fgets(buf, sizeof(buf), ldb_in);
         if (line == NULL) {
-            if (isatty(ldb_in_fd)) {
-                putchar('\n');
-                continue;
-            }
-            else {
-                fprintf(stderr, "\nEOF on something other than a tty.\n");
-                exit(0);
-            }
+            exit(1);
         }
         ptr = line;
         if ((token = parse_token(&ptr)) == NULL)
