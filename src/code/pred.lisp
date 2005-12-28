@@ -160,6 +160,43 @@
   "Return T if OBJ1 and OBJ2 are the same object, otherwise NIL."
   (eq obj1 obj2))
 
+(declaim (inline %eql))
+(defun %eql (obj1 obj2)
+  #!+sb-doc
+  "Return T if OBJ1 and OBJ2 represent the same object, otherwise NIL."
+  (or (eq obj1 obj2)
+      (if (or (typep obj2 'fixnum)
+              (not (typep obj2 'number)))
+          nil
+          (macrolet ((foo (&rest stuff)
+                       `(typecase obj2
+                          ,@(mapcar (lambda (foo)
+                                      (let ((type (car foo))
+                                            (fn (cadr foo)))
+                                        `(,type
+                                          (and (typep obj1 ',type)
+                                               (,fn obj1 obj2)))))
+                                    stuff))))
+            (foo
+             (single-float eql)
+             (double-float eql)
+             #!+long-float
+             (long-float eql)
+             (bignum
+              (lambda (x y)
+                (zerop (bignum-compare x y))))
+             (ratio
+              (lambda (x y)
+                (and (eql (numerator x) (numerator y))
+                     (eql (denominator x) (denominator y)))))
+             (complex
+              (lambda (x y)
+                (and (eql (realpart x) (realpart y))
+                     (eql (imagpart x) (imagpart y))))))))))
+
+(defun eql (x y)
+  (%eql x y))
+
 (defun bit-vector-= (x y)
   (declare (type bit-vector x y))
   (if (and (simple-bit-vector-p x)
@@ -179,19 +216,23 @@
   whose elements are EQUAL. Strings and bit-vectors are EQUAL if they
   are the same length and have identical components. Other arrays must be
   EQ to be EQUAL."
-  (cond ((eql x y) t)
-        ((consp x)
-         (and (consp y)
-              (equal (car x) (car y))
-              (equal (cdr x) (cdr y))))
-        ((stringp x)
-         (and (stringp y) (string= x y)))
-        ((pathnamep x)
-         (and (pathnamep y) (pathname= x y)))
-        ((bit-vector-p x)
-         (and (bit-vector-p y)
-              (bit-vector-= x y)))
-        (t nil)))
+  (labels ((equal-aux (x y)
+             (cond ((%eql x y)
+                    t)
+                   ((consp x)
+                    (and (consp y)
+                         (equal-aux (car x) (car y))
+                         (equal-aux (cdr x) (cdr y))))
+                   ((stringp x)
+                    (and (stringp y) (string= x y)))
+                   ((pathnamep x)
+                    (and (pathnamep y) (pathname= x y)))
+                   ((bit-vector-p x)
+                    (and (bit-vector-p y)
+                         (bit-vector-= x y)))
+                   (t nil))))
+    (declare (maybe-inline equal-aux))
+    (equal-aux x y)))
 
 ;;; EQUALP comparison of HASH-TABLE values
 (defun hash-table-equalp (x y)

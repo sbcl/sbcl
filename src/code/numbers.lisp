@@ -969,39 +969,6 @@ the first."
     ((complex (or float rational))
      (and (= (realpart x) y)
           (zerop (imagpart x))))))
-
-(defun eql (obj1 obj2)
-  #!+sb-doc
-  "Return T if OBJ1 and OBJ2 represent the same object, otherwise NIL."
-  (or (eq obj1 obj2)
-      (if (or (typep obj2 'fixnum)
-              (not (typep obj2 'number)))
-          nil
-          (macrolet ((foo (&rest stuff)
-                       `(typecase obj2
-                          ,@(mapcar (lambda (foo)
-                                      (let ((type (car foo))
-                                            (fn (cadr foo)))
-                                        `(,type
-                                          (and (typep obj1 ',type)
-                                               (,fn obj1 obj2)))))
-                                    stuff))))
-            (foo
-              (single-float eql)
-              (double-float eql)
-              #!+long-float
-              (long-float eql)
-              (bignum
-               (lambda (x y)
-                 (zerop (bignum-compare x y))))
-              (ratio
-               (lambda (x y)
-                 (and (eql (numerator x) (numerator y))
-                      (eql (denominator x) (denominator y)))))
-              (complex
-               (lambda (x y)
-                 (and (eql (realpart x) (realpart y))
-                      (eql (imagpart x) (imagpart y))))))))))
 
 ;;;; logicals
 
