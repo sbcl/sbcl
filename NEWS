@@ -1,6 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.9 relative to sbcl-0.9.8:
   * optimization: faster implementation of EQUAL
+  * fixed segfaults on x86 FreeBSD 7-current (thanks to NIIMI Satoshi)
 
 changes in sbcl-0.9.8 relative to sbcl-0.9.7:
   * minor incompatible change: (SETF CLASS-NAME) and (SETF

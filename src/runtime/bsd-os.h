@@ -54,7 +54,16 @@ typedef ucontext_t os_context_t;
  * step flag bit by messing with the flags stored in a signal context,
  * so we need to implement single stepping in a more roundabout way. */
 #define CANNOT_GET_TO_SINGLE_STEP_FLAG
-#define SIG_MEMORY_FAULT SIGBUS
+#define SIG_MEMORY_FAULT SIGSEGV
+/* Sometime in late 2005 FreeBSD was changed to signal SIGSEGV instead
+ * of SIGBUS for memory faults, as required by POSIX. In order to
+ * support both new and old FreeBSD at the same time, both signals are
+ * hooked to the GC write barrier machinery. If you're reading this
+ * message in the far future where FreeBSD 6 and earlier are just
+ * quaint memories, feel free to delete this hack (and any code that's
+ * #ifdef SIG_MEMORY_FAULT2'ed). -- JES, 2005-12-30
+ */
+#define SIG_MEMORY_FAULT2 SIGBUS
 
 #elif defined __OpenBSD__
 

@@ -204,6 +204,10 @@ os_install_interrupt_handlers(void)
     SHOW("os_install_interrupt_handlers()/bsd-os/defined(GENCGC)");
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
                                                  memory_fault_handler);
+#ifdef SIG_MEMORY_FAULT2
+    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT2,
+                                                 memory_fault_handler);
+#endif
     SHOW("leaving os_install_interrupt_handlers()");
 }
 
@@ -230,6 +234,10 @@ os_install_interrupt_handlers(void)
     SHOW("os_install_interrupt_handlers()/bsd-os/!defined(GENCGC)");
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
                                                  sigsegv_handler);
+#ifdef SIG_MEMORY_FAULT2
+    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT2,
+                                                 sigsegv_handler);
+#endif
 }
 
 #endif /* defined GENCGC */
