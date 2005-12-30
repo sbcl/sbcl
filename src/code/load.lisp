@@ -114,6 +114,10 @@
   (declare (optimize (speed 0)))
   (read-arg #.sb!vm:n-word-bytes))
 
+(defun read-unsigned-byte-32-arg ()
+  (declare (optimize (speed 0)))
+  (read-arg 4))
+
 
 ;;;; the fop table
 
@@ -305,7 +309,7 @@
 
       ;; Read and validate version-specific compatibility stuff.
       (flet ((string-from-stream ()
-               (let* ((length (read-word-arg))
+               (let* ((length (read-unsigned-byte-32-arg))
                       (result (make-string length)))
                  (read-string-as-bytes stream result)
                  result)))

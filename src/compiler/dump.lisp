@@ -113,6 +113,14 @@
     (dotimes (i sb!vm:n-word-bytes)
       (write-byte (ldb (byte 8 (* 8 i)) num) stream))))
 
+;; Dump a 32-bit integer.
+(defun dump-unsigned-byte-32 (num fasl-output)
+  (declare (type sb!vm:word num))
+  (declare (type fasl-output fasl-output))
+  (let ((stream (fasl-output-stream fasl-output)))
+    (dotimes (i 4)
+      (write-byte (ldb (byte 8 (* 8 i)) num) stream))))
+
 ;;; Dump NUM to the fasl stream, represented by N bytes. This works
 ;;; for either signed or unsigned integers. There's no range checking
 ;;; -- if you don't specify enough bytes for the number to fit, this
@@ -314,7 +322,12 @@
     ;; Finish the header by outputting fasl file implementation,
     ;; version, and key *FEATURES*.
     (flet ((dump-counted-string (string)
-             (dump-word (length string) res)
+             ;; The count is dumped as a 32-bit unsigned-byte even on 64-bit
+             ;; platforms. This ensures that a x86-64 SBCL can gracefully
+             ;; detect an error when trying to read a x86 fasl, instead
+             ;; of choking on a ridiculously long counted string.
+             ;;  -- JES, 2005-12-30
+             (dump-unsigned-byte-32 (length string) res)
              (dotimes (i (length string))
                (dump-byte (char-code (aref string i)) res))))
       (dump-counted-string (symbol-name +backend-fasl-file-implementation+))
