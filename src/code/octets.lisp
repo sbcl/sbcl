@@ -640,7 +640,7 @@ one-past-the-end"
 
 (defun default-external-format ()
   (or *default-external-format*
-      (let ((external-format (intern (or (sb!alien:alien-funcall
+      (let ((external-format (intern (or #!-win32 (sb!alien:alien-funcall
                                           (extern-alien
                                            "nl_langinfo"
                                            (function c-string int))

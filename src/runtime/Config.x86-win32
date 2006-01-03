@@ -1,0 +1,39 @@
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+TARGET=sbcl.exe
+
+ASSEM_SRC = x86-assem.S
+ARCH_SRC = x86-arch.c
+
+OS_SRC = win32-os.c x86-win32-os.c os-common.c
+# The "--Wl,--export-dynamic" flags are here to help people
+# experimenting with callbacks from C to SBCL, by allowing linkage to
+# SBCL src/runtime/*.c symbols from C. Work on this is good, but it's
+# definitely bleeding edge and not particularly stable. In particular,
+# not only are the workarounds for the GC relocating Lisp code and
+# data unstable, but even the basic calling convention might end up
+# being unstable. Unless you want to do some masochistic maintenance
+# work when new releases of SBCL come out, please don't try to build
+# real code on this until a coherent stable interface has been added.
+# (You *are* encouraged to design and implement a coherent stable
+# interface, though.:-| As far as I (WHN 2002-05-19) know, no one is
+# working on one and it would be a nice thing to have.)
+OS_LINK_FLAGS = -Wl,--export-dynamic
+OS_LIBS =
+
+GC_SRC = gencgc.c
+
+CFLAGS =  -g -Wall -O3
+ASFLAGS = $(CFLAGS)
+
+CPP = /opt/xmingw/bin/i386-mingw32msvc-cpp
+CC = /opt/xmingw/bin/i386-mingw32msvc-gcc
+LD = /opt/xmingw/bin/i386-mingw32msvc-ld
+NM = /opt/xmingw/bin/i386-mingw32msvc-nm

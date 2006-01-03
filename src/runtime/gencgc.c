@@ -3966,6 +3966,7 @@ gc_free_heap(void)
             page_table[page].allocated = FREE_PAGE_FLAG;
             page_table[page].bytes_used = 0;
 
+#ifndef LISP_FEATURE_WIN32 /* Pages already zeroed on win32? Not sure about this change. */
             /* Zero the page. */
             page_start = (void *)page_address(page);
 
@@ -3980,6 +3981,9 @@ gc_free_heap(void)
                      page_start,
                      addr);
             }
+#else
+            page_table[page].write_protected = 0;
+#endif
         } else if (gencgc_zero_check_during_free_heap) {
             /* Double-check that the page is zero filled. */
             long *page_start;

@@ -17,16 +17,22 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifndef LISP_FEATURE_WIN32
 #include <libgen.h>
+#endif
 #include <sys/types.h>
+#ifndef LISP_FEATURE_WIN32
 #include <sys/wait.h>
+#endif
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/file.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <signal.h>
+#ifndef LISP_FEATURE_WIN32
 #include <sched.h>
+#endif
 #include <errno.h>
 #include <locale.h>
 
@@ -180,6 +186,11 @@ distribution for more information.\n\
 int
 main(int argc, char *argv[], char *envp[])
 {
+#ifdef LISP_FEATURE_WIN32
+    /* Exception handling support structure. Evil Win32 hack. */
+    struct lisp_exception_frame exception_frame;
+#endif
+
     /* the name of the core file we're to execute. Note that this is
      * a malloc'ed string which should be freed eventually. */
     char *core = 0;
@@ -296,7 +307,11 @@ main(int argc, char *argv[], char *envp[])
         char *envstring, *copied_core, *dir;
         char *stem = "SBCL_HOME=";
         copied_core = copied_string(core);
+#ifndef LISP_FEATURE_WIN32
         dir = dirname(copied_core);
+#else /* LISP_FEATURE_WIN32 */
+        dir = "";
+#endif
         envstring = (char *) calloc(strlen(stem) +
                                     strlen(dir) +
                                     1,
@@ -332,7 +347,12 @@ main(int argc, char *argv[], char *envp[])
     gc_initialize_pointers();
 
     arch_install_interrupt_handlers();
+#ifndef LISP_FEATURE_WIN32
     os_install_interrupt_handlers();
+#else
+/*     wos_install_interrupt_handlers(handler); */
+    wos_install_interrupt_handlers(&exception_frame);
+#endif
 
     /* Convert remaining argv values to something that Lisp can grok. */
     SHOW("setting POSIX-ARGV symbol value");
@@ -341,6 +361,13 @@ main(int argc, char *argv[], char *envp[])
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n",
           (unsigned long)initial_function));
+#ifdef LISP_FEATURE_WIN32
+    fprintf(stderr, "\n\
+This is experimental prerelease support for the Windows platform: use\n\
+at your own risk.  \"Your Kitten of Death awaits!\"\n");
+    fflush(stdout);
+    fflush(stderr);
+#endif
     create_initial_thread(initial_function);
     lose("CATS.  CATS ARE NICE.\n");
     return 0;

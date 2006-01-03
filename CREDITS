@@ -518,6 +518,9 @@ Daniel Barlow:
   asdf-install, sb-bsd-sockets, sb-executable, sb-grovel and sb-posix
   contrib packages.
 
+Alastair Bridgewater:
+  He contributed a port of the system to the Windows operating system.
+
 Robert E. Brown:
   He has reported various bugs and submitted several patches,
   especially improving removing gratuitous efficiencies in the

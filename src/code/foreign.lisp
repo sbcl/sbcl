@@ -11,13 +11,13 @@
 
 (in-package "SB!IMPL")
 
-#!-(or elf mach-o)
-(error "Not an ELF or Mach-O platform?")
+#!-(or elf mach-o win32)
+(error "Not an ELF, Mach-O, or Win32 platform?")
 
 (defun extern-alien-name (name)
   (handler-case
       #!+elf (coerce name 'base-string)
-      #!+mach-o (concatenate 'base-string "_" name)
+      #!+(or mach-o win32) (concatenate 'base-string "_" name)
     (error ()
       (error "invalid external alien name: ~S" name))))
 

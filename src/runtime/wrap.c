@@ -23,16 +23,19 @@
  * files for more information.
  */
 
+#include "sbcl.h"
+
 #include <sys/types.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifndef LISP_FEATURE_WIN32
 #include <pwd.h>
+#endif
 #include <stdio.h>
 
-#include "sbcl.h"
 #include "runtime.h"
 #include "util.h"
 
@@ -118,6 +121,7 @@ free_directory_lispy_filenames(char** directory_lispy_filenames)
  * readlink(2) stuff
  */
 
+#ifndef LISP_FEATURE_WIN32
 /* a wrapped version of readlink(2):
  *   -- If path isn't a symlink, or is a broken symlink, return 0.
  *   -- If path is a symlink, return a newly allocated string holding
@@ -141,6 +145,7 @@ wrapped_readlink(char *path)
         }
     }
 }
+#endif
 
 /*
  * stat(2) stuff
@@ -182,9 +187,15 @@ struct stat_wrapper {
     ffi_dev_t     wrapped_st_dev;         /* device */
     ino_t         wrapped_st_ino;         /* inode */
     mode_t        wrapped_st_mode;        /* protection */
+#ifndef LISP_FEATURE_WIN32
     nlink_t       wrapped_st_nlink;       /* number of hard links */
     uid_t         wrapped_st_uid;         /* user ID of owner */
     gid_t         wrapped_st_gid;         /* group ID of owner */
+#else
+    short         wrapped_st_nlink;       /* Win32 doesn't have nlink_t */
+    short         wrapped_st_uid;         /* Win32 doesn't have st_uid */
+    short         wrapped_st_gid;         /* Win32 doesn't have st_gid */
+#endif
     ffi_dev_t     wrapped_st_rdev;        /* device type (if inode device) */
     ffi_off_t     wrapped_st_size;        /* total size, in bytes */
     unsigned long wrapped_st_blksize;     /* blocksize for filesystem I/O */
@@ -198,16 +209,21 @@ static void
 copy_to_stat_wrapper(struct stat_wrapper *to, struct stat *from)
 {
 #define FROB(stem) to->wrapped_st_##stem = from->st_##stem
+#ifndef LISP_FEATURE_WIN32
+#define FROB2(stem) to->wrapped_st_##stem = from->st_##stem
+#else
+#define FROB2(stem) to->wrapped_st_##stem = 0;
+#endif
     FROB(dev);
-    FROB(ino);
+    FROB2(ino);
     FROB(mode);
     FROB(nlink);
-    FROB(uid);
-    FROB(gid);
+    FROB2(uid);
+    FROB2(gid);
     FROB(rdev);
     FROB(size);
-    FROB(blksize);
-    FROB(blocks);
+    FROB2(blksize);
+    FROB2(blocks);
     FROB(atime);
     FROB(mtime);
     FROB(ctime);
@@ -219,11 +235,25 @@ stat_wrapper(const char *file_name, struct stat_wrapper *buf)
 {
     struct stat real_buf;
     int ret;
+
+#ifdef LISP_FEATURE_WIN32
+    /*
+     * Windows won't match the last component of a pathname if there is
+     * a trailing #\/ character. So we do silly things like this:
+     */
+    char file_buf[MAX_PATH];
+    strcpy(file_buf, file_name);
+    int foo = strlen(file_name);
+    if (foo && (file_name[foo-1] == '/')) file_buf[foo-1] = 0;
+    file_name = file_buf;
+#endif
+
     if ((ret = stat(file_name,&real_buf)) >= 0)
         copy_to_stat_wrapper(buf, &real_buf);
     return ret;
 }
 
+#ifndef LISP_FEATURE_WIN32
 int
 lstat_wrapper(const char *file_name, struct stat_wrapper *buf)
 {
@@ -233,6 +263,13 @@ lstat_wrapper(const char *file_name, struct stat_wrapper *buf)
         copy_to_stat_wrapper(buf, &real_buf);
     return ret;
 }
+#else
+/* cleaner to do it here than in Lisp */
+int lstat_wrapper(const char *file_name, struct stat_wrapper *buf)
+{
+    return stat_wrapper(file_name, buf);
+}
+#endif
 
 int
 fstat_wrapper(int filedes, struct stat_wrapper *buf)
@@ -248,6 +285,7 @@ fstat_wrapper(int filedes, struct stat_wrapper *buf)
  * getpwuid() stuff
  */
 
+#ifndef LISP_FEATURE_WIN32
 /* Return a newly-allocated string holding the username for "uid", or
  * NULL if there's no such user.
  *
@@ -294,6 +332,7 @@ uid_homedir(uid_t uid)
         return 0;
     }
 }
+#endif /* !LISP_FEATURE_WIN32 */
 
 /*
  * functions to get miscellaneous C-level variables
@@ -308,3 +347,91 @@ wrapped_environ()
 {
     return environ;
 }
+
+#ifdef LISP_FEATURE_WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+/*
+ * faked-up implementation of select(). Right now just enough to get through
+ * second genesis.
+ */
+int select(int top_fd, DWORD *read_set, DWORD *write_set, DWORD *except_set, time_t *timeout)
+{
+    /*
+     * FIXME: Going forward, we may want to use MsgWaitForMultipleObjects
+     * in order to support a windows message loop inside serve-event.
+     */
+    HANDLE handles[MAXIMUM_WAIT_OBJECTS];
+    int fds[MAXIMUM_WAIT_OBJECTS];
+    int num_handles;
+    int i;
+    DWORD retval;
+    int polling_write;
+    DWORD win_timeout;
+
+    num_handles = 0;
+    polling_write = 0;
+    for (i = 0; i < top_fd; i++) {
+        if (except_set) except_set[i >> 5] = 0;
+        if (write_set && (write_set[i >> 5] & (1 << (i & 31)))) polling_write = 1;
+        if (read_set[i >> 5] & (1 << (i & 31))) {
+            read_set[i >> 5] &= ~(1 << (i & 31));
+            fds[num_handles] = i;
+            handles[num_handles++] = _get_osfhandle(i);
+        }
+    }
+
+    win_timeout = INFINITE;
+    if (timeout) win_timeout = (timeout[0] * 1000) + timeout[1];
+
+    /* Last parameter here is timeout in milliseconds. */
+    /* retval = WaitForMultipleObjects(num_handles, handles, 0, INFINITE); */
+    retval = WaitForMultipleObjects(num_handles, handles, 0, win_timeout);
+
+    if (retval < WAIT_ABANDONED) {
+        /* retval, at this point, is the index of the single live HANDLE/fd. */
+        read_set[fds[retval] >> 5] |= (1 << (fds[retval] & 31));
+        return 1;
+    }
+    return polling_write;
+}
+
+/*
+ * SBCL doesn't like backslashes in pathnames from getcwd for some reason.
+ * Probably because they don't happen in posix systems. Windows doesn't
+ * mind slashes, so we convert from one to the other. We also strip off
+ * the drive prefix while we're at it ("C:", or whatever).
+ *
+ * The real fix for this problem is to create a windows-host setup that
+ * parallels the unix-host in src/code/target-pathname.lisp and actually
+ * parse this junk properly, drive letter and everything.
+ *
+ * Also see POSIX-GETCWD in src/code/unix.lisp.
+ */
+char *wrap_getcwd(char *buf, size_t len)
+{
+    char *retval = _getcwd(buf, len);
+
+    if (retval[1] == ':') {
+        char *p;
+        for (p = retval; (*p = p[2]); p++)
+            if (*p == '\\') *p = '/';
+    }
+
+    return retval;
+}
+
+/*
+ * Windows doesn't have gettimeofday(), and we need it for the compiler,
+ * for serve-event, and for a couple other things. We don't need a timezone
+ * yet, however, and the closest we can easily get to a timeval is the
+ * seconds part. So that's what we do.
+ */
+int gettimeofday(long *timeval, long *timezone)
+{
+    timeval[0] = time(NULL);
+    timeval[1] = 0;
+
+    return 0;
+}
+#endif

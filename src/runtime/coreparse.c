@@ -128,7 +128,11 @@ lispobj
 load_core_file(char *file)
 {
     lispobj *header, val, len, *ptr, remaining_len;
+#ifndef LISP_FEATURE_WIN32
     int fd = open(file, O_RDONLY), count;
+#else
+    int fd = open(file, O_RDONLY | O_BINARY), count;
+#endif
 
     lispobj initial_function = NIL;
     FSHOW((stderr, "/entering load_core_file(%s)\n", file));

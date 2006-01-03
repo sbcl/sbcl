@@ -101,9 +101,36 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   `(let (,value ,errno)
      (loop (multiple-value-setq (,value ,errno)
              ,syscall-form)
-        (unless (eql ,errno sb!unix:eintr)
+        (unless #!-win32 (eql ,errno sb!unix:eintr) #!+win32 nil
           (return (values ,value ,errno))))
      ,@body))
+
+#!+win32
+(progn
+  (defconstant o_rdonly  0)
+  (defconstant o_wronly  1)
+  (defconstant o_rdwr    2)
+  (defconstant o_creat  #x100)
+  (defconstant o_trunc  #x200)
+  (defconstant o_append #x008)
+  (defconstant o_excl   #x400)
+  (defconstant enoent 2)
+  (defconstant eexist 17)
+  (defconstant espipe 29)
+  (defconstant o_binary #x8000)
+  (defconstant s-ifmt #xf000)
+  (defconstant s-ifdir #x4000)
+  (defconstant s-ifreg #x8000)
+  (define-alien-type ino-t short)
+  (define-alien-type time-t long)
+  (define-alien-type off-t long)
+  (define-alien-type size-t long)
+  (define-alien-type mode-t unsigned-short)
+
+  ;; For stat-wrapper hack (different-type or non-existing win32 fields).
+  (define-alien-type nlink-t short)
+  (define-alien-type uid-t short)
+  (define-alien-type gid-t short))
 
 ;;;; hacking the Unix environment
 
@@ -157,7 +184,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   (declare (type unix-pathname path)
            (type fixnum flags)
            (type unix-file-mode mode))
-  (int-syscall ("open" c-string int int) path flags mode))
+  (int-syscall ("open" c-string int int) path (logior #!+win32 o_binary flags) mode))
 
 ;;; UNIX-CLOSE accepts a file descriptor and attempts to close the file
 ;;; associated with it.
@@ -212,6 +239,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;;   w_ok     Write permission.
 ;;;   x_ok     Execute permission.
 ;;;   f_ok     Presence of file.
+#!-win32
 (defun unix-access (path mode)
   (declare (type unix-pathname path)
            (type (mod 8) mode))
@@ -275,16 +303,22 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; value is the pipe to be read from and the second is can be written
 ;;; to. If an error occurred the first value is NIL and the second the
 ;;; unix error code.
+#!-win32
 (defun unix-pipe ()
   (with-alien ((fds (array int 2)))
     (syscall ("pipe" (* int))
              (values (deref fds 0) (deref fds 1))
              (cast fds (* int)))))
 
+;; Windows mkdir() doesn't take the mode argument. It's cdecl, so we could
+;; actually call it passing the mode argument, but some sharp-eyed reader
+;; would put five and twenty-seven together and ask us about it, so...
+;;    -- AB, 2005-12-27
 (defun unix-mkdir (name mode)
   (declare (type unix-pathname name)
-           (type unix-file-mode mode))
-  (void-syscall ("mkdir" c-string int) name mode))
+           (type unix-file-mode mode)
+           #!+win32 (ignore mode))
+  (void-syscall ("mkdir" c-string #!-win32 int) name #!-win32 mode))
 
 ;;; Given a C char* pointer allocated by malloc(), free it and return a
 ;;; corresponding Lisp string (or return NIL if the pointer is a C NULL).
@@ -311,14 +345,23 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   ;; a constant. Going the grovel_headers route doesn't seem to be
   ;; helpful, either, as Solaris doesn't export PATH_MAX from
   ;; unistd.h.
-  #!-(or linux openbsd freebsd netbsd sunos osf1 darwin) (,stub,)
-  #!+(or linux openbsd freebsd netbsd sunos osf1 darwin)
-  (or (newcharstar-string (alien-funcall (extern-alien "getcwd"
+  ;;
+  ;; The Win32 damage here is explained in the comment above wrap_getcwd()
+  ;; in src/runtime/wrap.c. Short form: We need it now, it goes away later.
+  ;;
+  ;; FIXME: The (,stub,) nastiness produces an error message about a
+  ;; comma not inside a backquote. This error has absolutely nothing
+  ;; to do with the actual meaning of the error (and little to do with
+  ;; its location, either).
+  #!-(or linux openbsd freebsd netbsd sunos osf1 darwin win32) (,stub,)
+  #!+(or linux openbsd freebsd netbsd sunos osf1 darwin win32)
+  (or (newcharstar-string (alien-funcall (extern-alien #!-win32 "getcwd"
+                                                       #!+win32 "wrap_getcwd"
                                                        (function (* char)
                                                                  (* char)
                                                                  size-t))
                                          nil
-                                         #!+(or linux openbsd freebsd netbsd darwin) 0
+                                         #!+(or linux openbsd freebsd netbsd darwin win32) 0
                                          #!+(or sunos osf1) 1025))
       (simple-perror "getcwd")))
 
@@ -345,9 +388,11 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 (define-alien-routine ("getpid" unix-getpid) int)
 
 ;;; Return the real user id associated with the current process.
+#!-win32
 (define-alien-routine ("getuid" unix-getuid) int)
 
 ;;; Translate a user id into a login name.
+#!-win32
 (defun uid-username (uid)
   (or (newcharstar-string (alien-funcall (extern-alien "uid_username"
                                                        (function (* char) int))
@@ -356,6 +401,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 
 ;;; Return the namestring of the home directory, being careful to
 ;;; include a trailing #\/
+#!-win32
 (defun uid-homedir (uid)
   (or (newcharstar-string (alien-funcall (extern-alien "uid_homedir"
                                                        (function (* char) int))
@@ -365,6 +411,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; Invoke readlink(2) on the file name specified by PATH. Return
 ;;; (VALUES LINKSTRING NIL) on success, or (VALUES NIL ERRNO) on
 ;;; failure.
+#!-win32
 (defun unix-readlink (path)
   (declare (type unix-pathname path))
   (with-alien ((ptr (* char)
@@ -378,6 +425,12 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
             (values (with-alien ((c-string c-string ptr)) c-string)
                     nil)
           (free-alien ptr)))))
+#!+win32
+;; Win32 doesn't do links, but something likes to call this anyway.
+;; Something in this file, no less. But it only takes one result, so...
+(defun unix-readlink (path)
+  (declare (ignore path))
+  nil)
 
 ;;; UNIX-UNLINK accepts a name and deletes the directory entry for that
 ;;; name and the file if this is the last link.
@@ -386,12 +439,14 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   (void-syscall ("unlink" c-string) name))
 
 ;;; Return the name of the host machine as a string.
+#!-win32
 (defun unix-gethostname ()
   (with-alien ((buf (array char 256)))
     (syscall ("gethostname" (* char) int)
              (cast buf c-string)
              (cast buf (* char)) 256)))
 
+#!-win32
 (defun unix-setsid ()
   (int-syscall ("setsid")))
 
@@ -400,6 +455,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; UNIX-IOCTL performs a variety of operations on open i/o
 ;;; descriptors. See the UNIX Programmer's Manual for more
 ;;; information.
+#!-win32
 (defun unix-ioctl (fd cmd arg)
   (declare (type unix-fd fd)
            (type (signed-byte 32) cmd))
@@ -413,6 +469,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; user time, and returns the seconds and microseconds as separate
 ;;; values.
 #!-sb-fluid (declaim (inline unix-fast-getrusage))
+#!-win32
 (defun unix-fast-getrusage (who)
   (declare (values (member t)
                    (unsigned-byte 31) (integer 0 1000000)
@@ -431,6 +488,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; (rusage_self) or all of the terminated child processes
 ;;; (rusage_children). NIL and an error number is returned if the call
 ;;; fails.
+#!-win32
 (defun unix-getrusage (who)
   (with-alien ((usage (struct rusage)))
     (syscall ("getrusage" int (* (struct rusage)))
@@ -664,6 +722,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   (seconds-west sb!alien:int :out)
   (daylight-savings-p sb!alien:boolean :out))
 
+#!-win32
 (defun nanosleep (secs nsecs)
   (with-alien ((req (struct timespec))
                (rem (struct timespec)))
@@ -720,6 +779,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 (defconstant itimer-virtual 1)
 (defconstant itimer-prof 2)
 
+#!-win32
 (defun unix-getitimer (which)
   "Unix-getitimer returns the INTERVAL and VALUE slots of one of
    three system timers (:real :virtual or :profile). On success,
@@ -742,6 +802,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
                         (slot (slot itv 'it-value) 'tv-usec))
                 which (alien-sap (addr itv))))))
 
+#!-win32
 (defun unix-setitimer (which int-secs int-usec val-secs val-usec)
   " Unix-setitimer sets the INTERVAL and VALUE slots of one of
    three system timers (:real :virtual or :profile). A SIGALRM signal
@@ -797,6 +858,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
       (let ((kind (logand mode s-ifmt)))
         (cond ((eql kind s-ifdir) :directory)
               ((eql kind s-ifreg) :file)
+              #!-win32
               ((eql kind s-iflnk) :link)
               (t :special))))))
 

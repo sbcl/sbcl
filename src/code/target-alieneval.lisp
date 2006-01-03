@@ -587,6 +587,37 @@
       (t
        (error "~S is not an alien function." alien)))))
 
+(defun alien-funcall-stdcall (alien &rest args)
+  #!+sb-doc
+  "Call the foreign function ALIEN with the specified arguments. ALIEN's
+   type specifies the argument and result types."
+  (declare (type alien-value alien))
+  (let ((type (alien-value-type alien)))
+    (typecase type
+      (alien-pointer-type
+       (apply #'alien-funcall-stdcall (deref alien) args))
+      (alien-fun-type
+       (unless (= (length (alien-fun-type-arg-types type))
+                  (length args))
+         (error "wrong number of arguments for ~S~%expected ~W, got ~W"
+                type
+                (length (alien-fun-type-arg-types type))
+                (length args)))
+       (let ((stub (alien-fun-type-stub type)))
+         (unless stub
+           (setf stub
+                 (let ((fun (gensym))
+                       (parms (make-gensym-list (length args))))
+                   (compile nil
+                            `(lambda (,fun ,@parms)
+                               (declare (optimize (sb!c::insert-step-conditions 0)))
+                               (declare (type (alien ,type) ,fun))
+                               (alien-funcall-stdcall ,fun ,@parms)))))
+           (setf (alien-fun-type-stub type) stub))
+         (apply stub alien args)))
+      (t
+       (error "~S is not an alien function." alien)))))
+
 (defmacro define-alien-routine (name result-type
                                      &rest args
                                      &environment lexenv)

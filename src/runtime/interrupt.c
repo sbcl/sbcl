@@ -40,16 +40,18 @@
  *
  * - WHN 20000728, dan 20010128 */
 
+#include "sbcl.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
 #include <sys/types.h>
+#ifndef LISP_FEATURE_WIN32
 #include <sys/wait.h>
+#endif
 #include <errno.h>
 
-#include "sbcl.h"
 #include "runtime.h"
 #include "arch.h"
 #include "os.h"
@@ -69,6 +71,7 @@
 
 
 static void run_deferred_handler(struct interrupt_data *data, void *v_context);
+#ifndef LISP_FEATURE_WIN32
 static void store_signal_data_for_later (struct interrupt_data *data,
                                          void *handler, int signal,
                                          siginfo_t *info,
@@ -111,10 +114,12 @@ sigaddset_blockable(sigset_t *s)
 /* initialized in interrupt_init */
 static sigset_t deferrable_sigset;
 static sigset_t blockable_sigset;
+#endif
 
 void
 check_blockables_blocked_or_lose()
 {
+#ifndef LISP_FEATURE_WIN32
     /* Get the current sigmask, by blocking the empty set. */
     sigset_t empty,current;
     int i;
@@ -124,6 +129,7 @@ check_blockables_blocked_or_lose()
         if (sigismember(&blockable_sigset, i) && !sigismember(&current, i))
             lose("blockable signal %d not blocked\n",i);
     }
+#endif
 }
 
 inline static void
@@ -147,7 +153,9 @@ check_interrupts_enabled_or_lose(os_context_t *context)
  * becomes 'yes'.) */
 boolean internal_errors_enabled = 0;
 
+#ifndef LISP_FEATURE_WIN32
 static void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, void*);
+#endif
 union interrupt_handler interrupt_handlers[NSIG];
 
 /* At the toplevel repl we routinely call this function.  The signal
@@ -157,15 +165,19 @@ union interrupt_handler interrupt_handlers[NSIG];
 void
 reset_signal_mask(void)
 {
+#ifndef LISP_FEATURE_WIN32
     sigset_t new;
     sigemptyset(&new);
     thread_sigmask(SIG_SETMASK,&new,0);
+#endif
 }
 
 void
 block_blockable_signals(void)
 {
+#ifndef LISP_FEATURE_WIN32
     thread_sigmask(SIG_BLOCK, &blockable_sigset, 0);
+#endif
 }
 
 
@@ -318,7 +330,9 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
      * disabled. */
     context_sap = alloc_sap(context);
 
+#ifndef LISP_FEATURE_WIN32
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+#endif
 
     SHOW("in interrupt_internal_error");
 #ifdef QSHOW
@@ -394,6 +408,7 @@ interrupt_handle_pending(os_context_t *context)
              * PSEUDO_ATOMIC_INTERRUPTED only if interrupts are enabled.*/
             SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
 
+#ifndef LISP_FEATURE_WIN32
             /* restore the saved signal mask from the original signal (the
              * one that interrupted us during the critical section) into the
              * os_context for the signal we're currently in the handler for.
@@ -402,6 +417,7 @@ interrupt_handle_pending(os_context_t *context)
             sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
 
             sigemptyset(&data->pending_mask);
+#endif
             /* This will break on sparc linux: the deferred handler really wants
              * to be called with a void_context */
             run_deferred_handler(data,(void *)context);
@@ -433,8 +449,10 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #endif
     union interrupt_handler handler;
     check_blockables_blocked_or_lose();
+#ifndef LISP_FEATURE_WIN32
     if (sigismember(&deferrable_sigset,signal))
         check_interrupts_enabled_or_lose(context);
+#endif
 
 #ifdef LISP_FEATURE_LINUX
     /* Under Linux on some architectures, we appear to have to restore
@@ -506,8 +524,10 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 
         FSHOW_SIGNAL((stderr,"/calling C-level handler\n"));
 
+#ifndef LISP_FEATURE_WIN32
         /* Allow signals again. */
         thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+#endif
 
         (*handler.c)(signal, info, void_context);
     }
@@ -540,6 +560,7 @@ run_deferred_handler(struct interrupt_data *data, void *v_context) {
     (*pending_handler)(data->pending_signal,&(data->pending_info), v_context);
 }
 
+#ifndef LISP_FEATURE_WIN32
 boolean
 maybe_defer_handler(void *handler, struct interrupt_data *data,
                     int signal, siginfo_t *info, os_context_t *context)
@@ -670,6 +691,7 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     DARWIN_FIX_CONTEXT(context);
 #endif
 }
+#endif
 
 #ifdef LISP_FEATURE_SB_THREAD
 
@@ -999,7 +1021,9 @@ boolean
 interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context=(os_context_t *) void_context;
+#ifndef LISP_FEATURE_WIN32
     struct thread *thread=arch_os_get_current_thread();
+#endif
 
     fake_foreign_function_call(context);
 
@@ -1025,6 +1049,7 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
      * A kludgy alternative is to propagate the sigmask change to the
      * outer context.
      */
+#ifndef LISP_FEATURE_WIN32
     if(SymbolValue(INTERRUPTS_ENABLED,thread)!=NIL)
         thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -1034,6 +1059,7 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
         sigaddset(&new,SIG_STOP_FOR_GC);
         thread_sigmask(SIG_UNBLOCK,&new,0);
     }
+#endif
 #endif
     funcall0(SymbolFunction(SUB_GC));
 
@@ -1046,6 +1072,7 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
  * noise to install handlers
  */
 
+#ifndef LISP_FEATURE_WIN32
 /* In Linux 2.4 synchronous signals (sigtrap & co) can be delivered if
  * they are blocked, in Linux 2.6 the default handler is invoked
  * instead that usually coredumps. One might hastily think that adding
@@ -1154,11 +1181,13 @@ undoably_install_low_level_interrupt_handler (int signal,
     interrupt_low_level_handlers[signal] =
         (ARE_SAME_HANDLER(handler, SIG_DFL) ? 0 : handler);
 }
+#endif
 
 /* This is called from Lisp. */
 unsigned long
 install_handler(int signal, void handler(int, siginfo_t*, void*))
 {
+#ifndef LISP_FEATURE_WIN32
     struct sigaction sa;
     sigset_t old, new;
     union interrupt_handler oldhandler;
@@ -1197,11 +1226,16 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     FSHOW((stderr, "/leaving POSIX install_handler(%d, ..)\n", signal));
 
     return (unsigned long)oldhandler.lisp;
+#else
+    /* Probably-wrong Win32 hack */
+    return 0;
+#endif
 }
 
 void
 interrupt_init()
 {
+#ifndef LISP_FEATURE_WIN32
     int i;
     SHOW("entering interrupt_init()");
     see_if_sigaction_nodefer_works();
@@ -1222,4 +1256,5 @@ interrupt_init()
     }
 
     SHOW("returning from interrupt_init()");
+#endif
 }

@@ -1,14 +1,30 @@
+/*
+ * This software is part of the SBCL system. See the README file for
+ * more information.
+ *
+ * This software is derived from the CMU CL system, which was
+ * written at Carnegie Mellon University and released into the
+ * public domain. The software is in the public domain and is
+ * provided with absolutely no warranty. See the COPYING and CREDITS
+ * files for more information.
+ */
+
+#include "sbcl.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#ifndef LISP_FEATURE_WIN32
 #include <sched.h>
+#endif
 #include <signal.h>
 #include <stddef.h>
 #include <errno.h>
 #include <sys/types.h>
+#ifndef LISP_FEATURE_WIN32
 #include <sys/wait.h>
+#endif
 
-#include "sbcl.h"
 #include "runtime.h"
 #include "validate.h"           /* for CONTROL_STACK_SIZE etc */
 #include "alloc.h"
@@ -22,6 +38,14 @@
 #include "genesis/fdefn.h"
 #include "interr.h"             /* for lose() */
 #include "gc-internal.h"
+
+#ifdef LISP_FEATURE_WIN32
+/*
+ * Win32 doesn't have SIGSTKSZ, and we're not switching stacks anyway,
+ * so define it arbitrarily
+ */
+#define SIGSTKSZ 1024
+#endif
 
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
 

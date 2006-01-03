@@ -135,7 +135,7 @@ sufficiently motivated to do lengthy fixes."
   (dolist (hook *save-hooks*)
     (with-simple-restart (continue "Skip this save hook.")
       (funcall hook)))
-  (when (fboundp 'cancel-finalization)
+  #!-win32 (when (fboundp 'cancel-finalization)
     (cancel-finalization sb!sys:*tty*))
   (profile-deinit)
   (debug-deinit)

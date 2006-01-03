@@ -310,7 +310,7 @@
                                       (sb!alien:addr read-fds)
                                       (sb!alien:addr write-fds)
                                       nil to-sec to-usec)
-
+          #!+win32 (declare (ignorable err))
           ;; Now see what it was (if anything)
           (cond (value
                  (cond ((zerop value)
@@ -319,6 +319,7 @@
                           (funcall *periodic-polling-function*)))
                        (t
                         (call-fd-handler))))
+                #!-win32
                 ((eql err sb!unix:eintr)
                  ;; We did an interrupt.
                  t)

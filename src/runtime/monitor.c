@@ -9,16 +9,19 @@
  * files for more information.
  */
 
+#include "sbcl.h"
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <setjmp.h>
 #include <sys/time.h>
+#ifndef LISP_FEATURE_WIN32
 #include <sys/resource.h>
+#endif
 #include <signal.h>
 #include <unistd.h>
 
-#include "sbcl.h"
 #include "runtime.h"
 #include "parse.h"
 #include "vars.h"
@@ -177,7 +180,9 @@ print_cmd(char **ptr)
 static void
 kill_cmd(char **ptr)
 {
+#ifndef LISP_FEATURE_WIN32
     kill(getpid(), parse_number(ptr));
+#endif
 }
 
 static void
@@ -444,7 +449,11 @@ sub_monitor(void)
     int ambig;
 
     if (!ldb_in) {
+#ifndef LISP_FEATURE_WIN32
         ldb_in = fopen("/dev/tty","r+");
+#else
+        ldb_in = stdin;
+#endif
         ldb_in_fd = fileno(ldb_in);
     }
 

@@ -212,7 +212,7 @@
 
  ;; "src/code/unix.lisp" needs this. It's generated automatically by
  ;; grovel_headers.c, i.e. it's not in CVS.
- ("output/stuff-groveled-from-headers" :not-host)
+ #!-win32 ("output/stuff-groveled-from-headers" :not-host)
 
  ("src/code/unix" :not-host)
 
@@ -224,6 +224,7 @@
  #!+irix  ("src/code/irix-os"  :not-host)
  #!+bsd   ("src/code/bsd-os"   :not-host)
  #!+linux ("src/code/linux-os" :not-host)
+ #!+win32 ("src/code/win32-os" :not-host)
 
  ;; sparc-vm and ppc-vm need sc-offset defined to get at internal
  ;; error args. This file contains stuff previously in
@@ -244,7 +245,8 @@
  ;; FIXME: do we really want to keep this? -- CSR, 2002-08-31
  #!+rt    ("src/code/rt-vm"    :not-host)
 
- ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from x86-vm
+ #!-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from x86-vm
+ #!+win32 ("src/code/target-exception" :not-host)
 
  ("src/code/symbol"     :not-host)
  ("src/code/bignum"     :not-host)

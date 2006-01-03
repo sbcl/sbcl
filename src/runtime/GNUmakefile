@@ -9,9 +9,10 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-.PHONY: all clean TAGS tags
+.PHONY: all clean TAGS tags targets
 
-all: sbcl sbcl.nm
+all: targets
+TARGET=sbcl
 
 # Defaults which might be overridden or modified by values in the
 # Config file. Most of them are same on most systems right now.
@@ -49,11 +50,13 @@ OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o) ${OS_OBJS}
 
 LIBS = ${OS_LIBS} -lm
 
-sbcl: $(OBJS)
+targets: $(TARGET) sbcl.nm
+
+$(TARGET): $(OBJS)
 	$(CC) ${LINKFLAGS} -o $@ $^ $(LIBS)
 
-sbcl.nm: sbcl
-	$(NM) sbcl | $(GREP) -v " F \| U " > ,$@
+sbcl.nm: $(TARGET)
+	$(NM) $(TARGET) | $(GREP) -v " F \| U " > ,$@
 	mv -f ,$@ $@
 
 sbcl.h: $(wildcard genesis/*.h)
@@ -64,7 +67,7 @@ TAGS tags: $(SRCS)
 	etags $(SRCS)
 
 clean:
-	-rm -f *.[do] sbcl sbcl.nm sbcl.h core *.tmp $(OS_CLEAN_FILES)
+	-rm -f *.[do] $(TARGET) sbcl.nm sbcl.h core *.tmp $(OS_CLEAN_FILES)
 	# the depend file is obsolete
 	-rm -f depend
 

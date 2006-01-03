@@ -13,6 +13,10 @@
  * files for more information.
  */
 
+#include "sbcl.h"
+
+#ifndef LISP_FEATURE_WIN32
+
 #include <stdlib.h>
 #include <sys/file.h>
 #include <sys/types.h>
@@ -117,3 +121,4 @@ int spawn(char *program, char *argv[], char *envp[], char *pty_name,
     /* The exec didn't work, flame out. */
     exit(1);
 }
+#endif /* !LISP_FEATURE_WIN32 */

@@ -1260,6 +1260,7 @@ core and return a descriptor to it."
                           (cold-fdefinition-object (cold-intern ',symbol)))))
     (frob sub-gc)
     (frob internal-error)
+    #!+win32 (frob handle-win32-exception)
     (frob sb!kernel::control-stack-exhausted-error)
     (frob sb!kernel::undefined-alien-variable-error)
     (frob sb!kernel::undefined-alien-function-error)

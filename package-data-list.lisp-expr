@@ -43,6 +43,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "UNION"  "VALUES" "*")
     :export ("ADDR"
              "ALIEN"
+             #!+win32 "ALIEN-FUNCALL-STDCALL"
              "ALIEN-FUNCALL" "ALIEN-SAP" "ALIEN-SIZE"
              "CAST" "C-STRING"
              "DEFINE-ALIEN-ROUTINE" "DEFINE-ALIEN-TYPE" "DEFINE-ALIEN-VARIABLE"
@@ -196,6 +197,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                  "SB!KERNEL" "SB!SYS")
       :reexport ("SLOT" "CODE-INSTRUCTIONS" "FLUSHABLE")
       :export ("%ALIEN-FUNCALL"
+               #!+win32 "%ALIEN-FUNCALL-STDCALL"
                "%CATCH-BREAKUP" "%CONTINUE-UNWIND"
                "%LISTIFY-REST-ARGS" "%MORE-ARG" "%MORE-ARG-VALUES"
                "%UNWIND-PROTECT-BREAKUP"
@@ -1247,6 +1249,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "INTEGER-DECODE-DOUBLE-FLOAT"
                #!+long-float "INTEGER-DECODE-LONG-FLOAT"
                "INTEGER-DECODE-SINGLE-FLOAT" "INTERNAL-ERROR"
+               #!+win32 "HANDLE-WIN32-EXCEPTION"
                "INTERNAL-TIME" "INTERSECTION-TYPE" "INTERSECTION-TYPE-P"
                "INTERSECTION-TYPE-TYPES" "INVALID-ARG-COUNT-ERROR"
                "INVALID-ARRAY-INDEX-ERROR" "INVALID-UNWIND-ERROR"
@@ -2307,6 +2310,7 @@ structure representations"
                "WEAK-POINTER-VALUE-SLOT"
                "WORD" "N-WORD-BITS" "N-WORD-BYTES" "N-MACHINE-WORD-BITS"
                "WORD-REG-SC-NUMBER" "WORD-SHIFT"
+               #!+win32 "CONTEXT-RESTORE-TRAP"
                "ZERO-SC-NUMBER"))
 
    #s(sb-cold:package-data

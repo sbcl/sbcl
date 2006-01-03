@@ -129,7 +129,8 @@
 (defun machine-instance ()
   #!+sb-doc
   "Return a string giving the name of the local machine."
-  (sb!unix:unix-gethostname))
+  #!+win32 "some-random-windows-box"
+  #!-win32 (sb!unix:unix-gethostname))
 
 (defvar *machine-version*)
 

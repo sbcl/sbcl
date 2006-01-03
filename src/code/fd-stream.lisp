@@ -187,7 +187,7 @@
                             start
                             length)
       (cond ((not count)
-             (if (= errno sb!unix:ewouldblock)
+             (if #!-win32 (= errno sb!unix:ewouldblock) #!+win32 t #!-win32
                  (error "Write would have blocked, but SERVER told us to go.")
                  (simple-stream-perror "couldn't write to ~S" stream errno)))
             ((eql count length) ; Hot damn, it worked.
@@ -238,7 +238,7 @@
         (multiple-value-bind (count errno)
             (sb!unix:unix-write (fd-stream-fd stream) base start length)
           (cond ((not count)
-                 (if (= errno sb!unix:ewouldblock)
+                 (if #!-win32 (= errno sb!unix:ewouldblock) #!+win32 t #!-win32
                      (output-later stream base start end reuse-sap)
                      (simple-stream-perror "couldn't write to ~S"
                                            stream
@@ -687,7 +687,7 @@
                            (sb!sys:int-sap (+ (sb!sys:sap-int ibuf-sap) tail))
                            (- buflen tail))
       (cond ((null count)
-             (if (eql errno sb!unix:ewouldblock)
+             (if #!-win32 (eql errno sb!unix:ewouldblock) #!+win32 t #!-win32
                  (progn
                    (unless (sb!sys:wait-until-fd-usable
                             fd :input (fd-stream-timeout stream))
@@ -1879,6 +1879,7 @@
 ;;; Rename NAMESTRING to ORIGINAL. First, check whether we have write
 ;;; access, since we don't want to trash unwritable files even if we
 ;;; technically can. We return true if we succeed in renaming.
+#!-win32
 (defun rename-the-old-one (namestring original)
   (unless (sb!unix:unix-access namestring sb!unix:w_ok)
     (error "~@<The file ~2I~_~S ~I~_is not writable.~:>" namestring))

@@ -472,7 +472,7 @@ steppers to maintain contextual information.")
              (init-file-name (maybe-dir-name basename)
                (and maybe-dir-name
                     (concatenate 'string maybe-dir-name "/" basename))))
-        (let ((sysinit-truename
+        #!-win32 (let ((sysinit-truename
                (probe-init-files sysinit
                                  (init-file-name (posix-getenv "SBCL_HOME")
                                                  "sbclrc")
@@ -561,7 +561,7 @@ steppers to maintain contextual information.")
                  (with-simple-restart
                      (abort "~@<Exit debugger, returning to top level.~@:>")
                    (catch 'toplevel-catcher
-                     (sb!unix::reset-signal-mask)
+                     #!-win32 (sb!unix::reset-signal-mask)
                      ;; In the event of a control-stack-exhausted-error, we
                      ;; should have unwound enough stack by the time we get
                      ;; here that this is now possible.

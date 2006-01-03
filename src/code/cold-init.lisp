@@ -218,7 +218,7 @@
   (show-and-call stream-cold-init-or-reset)
   (show-and-call !loader-cold-init)
   (show-and-call !foreign-cold-init)
-  (show-and-call signal-cold-init-or-reinit)
+  #!-win32 (show-and-call signal-cold-init-or-reinit)
   (/show0 "enabling internal errors")
   (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
 
@@ -290,7 +290,7 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
         (os-cold-init-or-reinit)
       (thread-init-or-reinit)
       (stream-reinit)
-      (signal-cold-init-or-reinit)
+      #!-win32 (signal-cold-init-or-reinit)
       (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
       ;; PRINT seems not to like x86 NPX denormal floats like
       ;; LEAST-NEGATIVE-SINGLE-FLOAT, so the :UNDERFLOW exceptions are

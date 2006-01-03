@@ -43,6 +43,13 @@ write_bytes(FILE *file, char *addr, long bytes)
 
     bytes = (bytes+os_vm_page_size-1)&~(os_vm_page_size-1);
 
+#ifdef LISP_FEATURE_WIN32
+    /* touch every single page in the space to force it to be mapped. */
+    for (count = 0; count < bytes; count += 0x1000) {
+        volatile int temp = addr[count];
+    }
+#endif
+
     fflush(file);
     here = ftell(file);
     fseek(file, 0, 2);
@@ -94,7 +101,7 @@ open_core_for_saving(char *filename)
      * the fopen() might fail for some reason, and we want to detect
      * that and back out before we do anything irreversible. */
     unlink(filename);
-    return fopen(filename, "w");
+    return fopen(filename, "wb");
 }
 
 boolean

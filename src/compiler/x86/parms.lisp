@@ -151,6 +151,18 @@
 ;;;     set the top-down mmap allocation option in the kernel (not yet
 ;;;     the default), all bets are totally off!
 
+#!+win32
+(progn
+
+  (def!constant read-only-space-start #x01000000)
+  (def!constant read-only-space-end   #x037ff000)
+
+  (def!constant static-space-start    #x05000000)
+  (def!constant static-space-end      #x07fff000)
+
+  (def!constant dynamic-space-start   #x09000000)
+  (def!constant dynamic-space-end     #x29000000))
+
 #!+linux
 (progn
   (def!constant read-only-space-start     #x01000000)
@@ -240,7 +252,8 @@
   cerror
   breakpoint
   fun-end-breakpoint
-  single-step-breakpoint)
+  single-step-breakpoint
+  #!+win32 context-restore) ;; HACK: The Win32 exception handling system does wrong things with this.
 ;;; FIXME: It'd be nice to replace all the DEFENUMs with something like
 ;;;   (WITH-DEF-ENUM (:START 8)
 ;;;     (DEF-ENUM HALT-TRAP)
@@ -292,6 +305,7 @@
     sb!kernel::memory-fault-error
     sb!di::handle-breakpoint
     fdefinition-object
+    #!+win32 sb!kernel::handle-win32-exception
 
     ;; free pointers
     ;;

@@ -36,11 +36,13 @@ unsigned long fast_random_state = 1;
 void arch_init(void)
 {}
 
+#ifndef LISP_FEATURE_WIN32
 os_vm_address_t
 arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
     return (os_vm_address_t)code->si_addr;
 }
+#endif
 
 
 /*
@@ -66,6 +68,8 @@ context_eflags_addr(os_context_t *context)
     return &context->sc_eflags;
 #elif defined __NetBSD__
     return &(context->uc_mcontext.__gregs[_REG_EFL]);
+#elif defined LISP_FEATURE_WIN32
+    return (int *)&context->EFlags;
 #else
 #error unsupported OS
 #endif
@@ -204,10 +208,10 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 void
 sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 {
-    int code = info->si_code;
     os_context_t *context = (os_context_t*)void_context;
     unsigned int trap;
 
+#ifndef LISP_FEATURE_WIN32
     if (single_stepping && (signal==SIGTRAP))
     {
         /* fprintf(stderr,"* single step trap %x\n", single_stepping); */
@@ -231,6 +235,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
         single_stepping = NULL;
         return;
     }
+#endif
 
     /* This is just for info in case the monitor wants to print an
      * approximation. */
@@ -270,8 +275,8 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 
     case trap_Error:
     case trap_Cerror:
-        FSHOW((stderr, "<trap error/cerror %d>\n", code));
-        interrupt_internal_error(signal, info, context, code==trap_Cerror);
+        FSHOW((stderr, "<trap error/cerror %d>\n", trap));
+        interrupt_internal_error(signal, info, context, trap==trap_Cerror);
         break;
 
     case trap_Breakpoint:
@@ -287,7 +292,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 
     default:
         FSHOW((stderr,"/[C--trap default %d %d %x]\n",
-               signal, code, context));
+               signal, trap, context));
         interrupt_handle_now(signal, info, context);
         break;
     }
@@ -315,8 +320,10 @@ arch_install_interrupt_handlers()
      * OS I haven't tested on?) and we have to go back to the old CMU
      * CL way, I hope there will at least be a comment to explain
      * why.. -- WHN 2001-06-07 */
+#ifndef LISP_FEATURE_WIN32
     undoably_install_low_level_interrupt_handler(SIGILL , sigill_handler);
     undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
+#endif
 
     SHOW("returning from arch_install_interrupt_handlers()");
 }
