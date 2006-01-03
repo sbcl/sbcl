@@ -599,6 +599,7 @@ void scratch(void)
     LoadLibrary(0);
     GetProcAddress(0, 0);
     mkdir(0);
+    isatty(0);
 }
 
 /* EOF */
