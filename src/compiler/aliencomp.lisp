@@ -678,11 +678,16 @@
         (make-call-out-tns type)
       (vop alloc-number-stack-space call block stack-frame-size nsp)
       (dolist (tn arg-tns)
-        (let* ((arg (pop args))
-               (sc (tn-sc tn))
+        ;; On PPC, TN might be a list. This is used to indicate
+        ;; something special needs to happen. See below.
+        ;;
+        ;; FIXME: We should implement something better than this.
+        (let* ((first-tn (if (listp tn) (car tn) tn))
+               (arg (pop args))
+               (sc (tn-sc first-tn))
                (scn (sc-number sc))
-               #!-(or x86 x86-64) (temp-tn (make-representation-tn (tn-primitive-type tn)
-                                                       scn))
+               #!-(or x86 x86-64) (temp-tn (make-representation-tn
+                                            (tn-primitive-type first-tn) scn))
                (move-arg-vops (svref (sc-move-arg-vops sc) scn)))
           (aver arg)
           (unless (= (length move-arg-vops) 1)
@@ -692,7 +697,7 @@
                                          (first move-arg-vops)
                                          (lvar-tn call block arg)
                                          nsp
-                                         tn)
+                                         first-tn)
           #!-(or x86 x86-64) (progn
                    (emit-move call
                               block
@@ -703,14 +708,28 @@
                                            (first move-arg-vops)
                                            temp-tn
                                            nsp
-                                           tn))))
+                                           first-tn))
+          #+(and ppc darwin)
+          (when (listp tn)
+            ;; This means that we have a float arg that we need to
+            ;; also copy to some int regs. The list contains the TN
+            ;; for the float as well as the TNs to use for the int
+            ;; arg.
+            (destructuring-bind (float-tn i1-tn &optional i2-tn)
+                tn
+              (if i2-tn
+                  (vop sb!vm::move-double-to-int-arg call block
+                       float-tn i1-tn i2-tn)
+                  (vop sb!vm::move-single-to-int-arg call block
+                       float-tn i1-tn))))))
       (aver (null args))
       (unless (listp result-tns)
         (setf result-tns (list result-tns)))
-      (vop* call-out call block
-            ((lvar-tn call block function)
-             (reference-tn-list arg-tns nil))
-            ((reference-tn-list result-tns t)))
+      (let ((arg-tns (flatten-list arg-tns)))
+        (vop* call-out call block
+              ((lvar-tn call block function)
+               (reference-tn-list arg-tns nil))
+              ((reference-tn-list result-tns t))))
       (vop dealloc-number-stack-space call block stack-frame-size)
       (move-lvar-result call block result-tns lvar))))
 

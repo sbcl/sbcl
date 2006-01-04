@@ -82,18 +82,12 @@
   (let* ((fprs (arg-state-fpr-args state))
          (gprs (arg-state-gpr-args state)))
     (cond ((< gprs 8) ; and by implication also (< fprs 13)
-           ;; Corresponding GPR is kept empty for functions with fixed args
-           (incf (arg-state-gpr-args state))
            (incf (arg-state-fpr-args state))
            ;; Assign outgoing FPRs starting at FP1
-           (my-make-wired-tn 'single-float 'single-reg (1+ fprs)))
+           (list (my-make-wired-tn 'single-float 'single-reg (1+ fprs))
+                 (int-arg state 'signed-byte-32 'signed-reg 'signed-stack)))
           ((< fprs 13)
-           ;; According to PowerOpen ABI, we need to pass those both in the
-           ;; FPRs _and_ the stack.  However empiric testing on OS X/gcc
-           ;; shows they are only passed in FPRs, AFAICT.
-           ;;
-           ;; "I" in "AFAICT" probably refers to PRM.  -- CSR, still
-           ;; reverse-engineering comments in 2003 :-)
+           ;; See comments below for double-float.
            (incf (arg-state-fpr-args state))
            (incf (arg-state-stack-frame-size state))
            (my-make-wired-tn 'single-float 'single-reg (1+ fprs)))
@@ -123,22 +117,23 @@
   (let ((fprs (arg-state-fpr-args state))
         (gprs (arg-state-gpr-args state)))
     (cond ((< gprs 8) ; and by implication also (< fprs 13)
-           ;; Corresponding GPRs are also kept empty
-           (incf (arg-state-gpr-args state) 2)
-           (when (> (arg-state-gpr-args state) 8)
-             ;; Spill one word to stack
-             (decf (arg-state-gpr-args state))
-             (incf (arg-state-stack-frame-size state)))
            (incf (arg-state-fpr-args state))
            ;; Assign outgoing FPRs starting at FP1
-           (my-make-wired-tn 'double-float 'double-reg (1+ fprs)))
+           ;;
+           ;; The PowerOpen ABI says float values are stored in float
+           ;; regs.  But if we're calling a varargs function, we also
+           ;; need to put the float into some gprs.  We indicate this
+           ;; to %alien-funcall ir2-convert by making a list of the
+           ;; TNs for the float reg and for the int regs.
+           ;;
+           (list (my-make-wired-tn 'double-float 'double-reg (1+ fprs))
+                 (int-arg state 'signed-byte-32 'signed-reg 'signed-stack)
+                 (int-arg state 'unsigned-byte-32 'unsigned-reg 'unsigned-stack)))
           ((< fprs 13)
-           ;; According to PowerOpen ABI, we need to pass those both in the
-           ;; FPRs _and_ the stack.  However empiric testing on OS X/gcc
-           ;; shows they are only passed in FPRs, AFAICT.
-           (incf (arg-state-stack-frame-size state) 2)
            (incf (arg-state-fpr-args state))
-           (my-make-wired-tn 'double-float 'double-reg (1+ fprs)))
+           (list (my-make-wired-tn 'double-float 'double-reg (1+ fprs))
+                 (int-arg state 'signed-byte-32 'signed-reg 'signed-stack)
+                 (int-arg state 'unsigned-byte-32 'unsigned-reg 'unsigned-stack)))
           (t
            ;; Pass on stack only
            (let ((stack-offset (arg-state-stack-frame-size state)))
@@ -386,8 +381,23 @@
 #-sb-xc-host
 (progn
   (defun alien-callback-accessor-form (type sap offset)
-    ;; Unaligned access is slower, but possible, so this is nice and simple.
-    `(deref (sap-alien (sap+ ,sap ,offset) (* ,type))))
+    (let ((parsed-type
+           (sb!alien::parse-alien-type type (sb!kernel:make-null-lexenv))))
+      (cond ((sb!alien::alien-integer-type-p parsed-type)
+             ;; Unaligned access is slower, but possible, so this is nice and
+             ;; simple. Also, we're a big-endian machine, so we need to get
+             ;; byte offsets correct.
+             (let ((bits (sb!alien::alien-type-bits parsed-type)))
+               (let ((byte-offset
+                      (cond ((< bits n-word-bits)
+                             (- n-word-bytes
+                                (ceiling bits n-byte-bits)))
+                            (t 0))))
+                 `(deref (sap-alien (sap+ ,sap
+                                          ,(+ byte-offset offset))
+                                    (* ,type))))))
+            (t
+             `(deref (sap-alien (sap+ ,sap ,offset) (* ,type)))))))
 
   ;;; The "Mach-O Runtime Conventions" document for OS X almost specifies
   ;;; the calling convention (it neglects to mention that the linkage
@@ -405,40 +415,39 @@
         (assemble (segment)
           ;; To save our arguments, we follow the algorithm sketched in the
           ;; "PowerPC Calling Conventions" section of that document.
+          ;;
+          ;; CLH: There are a couple problems here. First, we bail if
+          ;; we run out of registers. AIUI, we can just ignore the extra
+          ;; args here and we will be ok...
           (let ((words-processed 0)
                 (gprs (mapcar #'make-gpr '(3 4 5 6 7 8 9 10)))
                 (fprs (mapcar #'make-fpr '(1 2 3 4 5 6 7 8 9 10 11 12 13)))
                 (stack-pointer (make-gpr 1)))
-            (labels ((out-of-registers-error ()
-                       (error "Too many arguments in callback"))
-                     (save-arg (type words)
+            (labels ((save-arg (type words)
                        (let ((integerp (not (alien-float-type-p type)))
                              (offset (+ (* words-processed n-word-bytes)
                                         n-foreign-linkage-area-bytes)))
                          (cond (integerp
-                                (loop repeat words
-                                   for gpr = (pop gprs)
-                                   do
-                                     (if gpr
-                                         (inst stw gpr stack-pointer offset)
-                                         (out-of-registers-error))
-                                     (incf words-processed)))
-                             ;; The handling of floats is a little ugly
-                             ;; because we hard-code the number of words
+                                (dotimes (k words)
+                                  (let ((gpr (pop gprs)))
+                                    (when gpr
+                                      (inst stw gpr stack-pointer offset))
+                                    (incf words-processed)
+                                    (incf offset n-word-bytes))))
+                               ;; The handling of floats is a little ugly
+                               ;; because we hard-code the number of words
                                ;; for single- and double-floats.
                                ((alien-single-float-type-p type)
                                 (pop gprs)
                                 (let ((fpr (pop fprs)))
-                                  (if fpr
-                                      (inst stfs fpr stack-pointer offset)
-                                      (out-of-registers-error)))
+                                  (when fpr
+                                    (inst stfs fpr stack-pointer offset)))
                                 (incf words-processed))
                                ((alien-double-float-type-p type)
                                 (setf gprs (cddr gprs))
                                 (let ((fpr (pop fprs)))
-                                  (if fpr
-                                      (inst stfd fpr stack-pointer offset)
-                                      (out-of-registers-error)))
+                                  (when fpr
+                                    (inst stfd fpr stack-pointer offset)))
                                 (incf words-processed 2))
                                (t
                                 (bug "Unknown alien floating point type: ~S" type))))))
@@ -466,15 +475,17 @@
                                        +stack-alignment-bytes+)))
             (destructuring-bind (sp r0 arg1 arg2 arg3 arg4)
                 (mapcar #'make-gpr '(1 0 3 4 5 6))
+              ;; FIXME: This is essentially the same code as LR in
+              ;; insts.lisp, but attempting to use (INST LR ...) instead
+              ;; of this function results in callbacks not working.  Why?
+              ;;   --njf, 2006-01-04
               (flet ((load-address-into (reg addr)
                        (let ((high (ldb (byte 16 16) addr))
                              (low (ldb (byte 16 0) addr)))
-                         (inst li reg high)
-                         (inst slwi reg reg 16)
+                         (inst lis reg high)
                          (inst ori reg reg low))))
                 ;; Setup the args
-                (load-address-into
-                 arg1 (get-lisp-obj-address #'enter-alien-callback))
+                (load-address-into arg1 (get-lisp-obj-address #'enter-alien-callback))
                 (inst li arg2 (fixnumize index))
                 (inst addi arg3 sp n-foreign-linkage-area-bytes)
                 ;; FIXME: This was (- (* RETURN-AREA-SIZE N-WORD-BYTES)), while
@@ -496,19 +507,39 @@
               (inst lwz sp sp 0)
               (inst lwz r0 sp (* 2 n-word-bytes))
               (inst mtlr r0)
-              (loop with gprs = (mapcar #'make-gpr '(3 4))
-                 repeat n-return-area-words
-                 for gpr = (pop gprs)
-                 for offset downfrom (- n-word-bytes) by n-word-bytes
-                 do
-                   (unless gpr
-                     (bug "Out of return registers in alien-callback trampoline."))
-                   (inst lwz gpr sp offset))
+              (cond
+                ((sb!alien::alien-single-float-type-p result-type)
+                 (let ((f1 (make-fpr 1)))
+                   (inst lfs f1 sp (- (* n-return-area-words n-word-bytes)))))
+                ((sb!alien::alien-double-float-type-p result-type)
+                 (let ((f1 (make-fpr 1)))
+                   (inst lfd f1 sp (- (* n-return-area-words n-word-bytes)))))
+                ((sb!alien::alien-void-type-p result-type)
+                 ;; Nothing to do
+                 )
+                (t
+                 (loop with gprs = (mapcar #'make-gpr '(3 4))
+                    repeat n-return-area-words
+                    for gpr = (pop gprs)
+                    for offset from (- (* n-return-area-words n-word-bytes))
+                    by n-word-bytes
+                    do
+                      (unless gpr
+                        (bug "Out of return registers in alien-callback trampoline."))
+                      (inst lwz gpr sp offset))))
               (inst blr))))
         (finalize-segment segment)
         ;; Now that the segment is done, convert it to a static
         ;; vector we can point foreign code to.
-        (let ((buffer (sb!assem::segment-buffer segment)))
-          (make-static-vector (length buffer)
-                              :element-type '(unsigned-byte 8)
-                              :initial-contents buffer))))))
+        (let* ((buffer (sb!assem::segment-buffer segment))
+               (vector (make-static-vector (length buffer)
+                                           :element-type '(unsigned-byte 8)
+                                           :initial-contents buffer))
+               (sap (sb!sys:vector-sap vector)))
+          (sb!alien:alien-funcall
+           (sb!alien:extern-alien "ppc_flush_icache"
+                                  (function void
+                                            system-area-pointer
+                                            unsigned-long))
+           sap (length buffer))
+          vector)))))

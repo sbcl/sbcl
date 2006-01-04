@@ -830,12 +830,12 @@ ENTER-ALIEN-CALLBACK pulls the corresponsing trampoline out and calls it.")
                        (sb!kernel:get-lisp-obj-address result-pointer))))
          (with-alien
              ,(loop
+                 with offset = 0
                  for spec in argument-specs
-                 for offset = 0 ; FIXME: Should this not be AND OFFSET ...?
-                 then (+ offset (alien-callback-argument-bytes spec env))
                  collect `(,(pop argument-names) ,spec
                             :local ,(alien-callback-accessor-form
-                                     spec 'args-sap offset)))
+                                     spec 'args-sap offset))
+                 do (incf offset (alien-callback-argument-bytes spec env)))
            ,(flet ((store (spec)
                           (if spec
                               `(setf (deref (sap-alien res-sap (* ,spec)))

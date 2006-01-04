@@ -148,3 +148,142 @@
 (with-test (:name :underflow-detection :fails-on :x86-64)
   (assert (raises-error? (alien-funcall *add-two-ints* #x-80000000 -1))))
 
+
+;;; test for callbacks of various arities
+;;; CLH 2005-12-21
+
+(defparameter *type-abbreviations*
+  '((sb-alien:int . "i")
+    (sb-alien:float . "f")
+    (sb-alien:double . "d")
+    (sb-alien:short . "h")
+    (sb-alien:char . "c")))
+
+(defun parse-callback-arg-spec (spec)
+  (let ((l (coerce spec 'list)))
+    (loop for g in l by #'cddr
+       collect (car (rassoc (string-downcase g) *type-abbreviations* :test #'equal)))))
+
+(macrolet ((define-callback-adder2 (return-type spec)
+             (let ((fname (format nil "*add-~A*" spec))
+                   (l (parse-callback-arg-spec spec)))
+               `(progn
+                  (defparameter ,(intern (string-upcase fname))
+                    (sb-alien::alien-callback
+                     (function ,return-type
+                               ,@l) '+))))))
+  (define-callback-adder2 int "i-i"))
+
+(macrolet ((define-callback-adder (&rest types)
+             (let ((fname (format nil "*add-~{~A~^-~}*"
+                                  (mapcar
+                                   #'(lambda (x)
+                                       (cdr (assoc x *type-abbreviations*)))
+                                   (mapcar
+                                    #'(lambda (y) (find-symbol (string-upcase y) 'sb-alien))
+                                    (cdr types))))))
+               `(progn
+                  (print ,fname)
+                  (defparameter ,(intern
+                                  (string-upcase fname))
+                    (sb-alien::alien-callback (function ,@types) '+))))))
+
+  (define-callback-adder int int int)
+  (define-callback-adder int int int int)
+  (define-callback-adder int int int int int)
+  (define-callback-adder int int int int int int)
+  (define-callback-adder int int int int int int int)
+  (define-callback-adder int int int int int int int int)
+  (define-callback-adder int int int int int int int int int)
+  (define-callback-adder int int int int int int int int int int)
+  (define-callback-adder int int int int int int int int int int int)
+  (define-callback-adder int int int int int int int int int int int int)
+  (define-callback-adder int int int int int int int int int int int int int)
+
+  (define-callback-adder float float float)
+  (define-callback-adder float float float float)
+  (define-callback-adder float float float float float)
+  (define-callback-adder float float float float float float)
+  (define-callback-adder float float float float float float float)
+  (define-callback-adder float float float float float float float float)
+  (define-callback-adder float float float float float float float float float)
+  (define-callback-adder float float float float float float float float float float)
+  (define-callback-adder float float float float float float float float float float float)
+  (define-callback-adder float float float float float float float float float float float float)
+  (define-callback-adder float float float float float float float float float float float float float)
+
+  (define-callback-adder double double double)
+  (define-callback-adder double double double double double)
+  (define-callback-adder double double double double double double)
+  (define-callback-adder double double double double double double double)
+  (define-callback-adder double double double double double double double double)
+  (define-callback-adder double double double double double double double double double)
+  (define-callback-adder double double double double double double double double double double)
+  (define-callback-adder double double double double double double double double double double double)
+  (define-callback-adder double double double double double double double double double double double double)
+  (define-callback-adder double double double double double double double double double double double double double)
+
+  (define-callback-adder float int float)
+  (define-callback-adder float float int)
+  (define-callback-adder float float int int int)
+
+  (define-callback-adder double double int)
+  (define-callback-adder double int double)
+
+  (define-callback-adder double double float)
+  (define-callback-adder double float double)
+
+  (define-callback-adder double double float int)
+  (define-callback-adder double int float double)
+  (define-callback-adder double int float double double)
+
+  (define-callback-adder double double int int int)
+  (define-callback-adder double double int int int double int int int)
+
+  (define-callback-adder double double double int int int int int int)
+
+  (define-callback-adder double double double int int)
+
+  (define-callback-adder double int double int double int double int double int double)
+
+  (define-callback-adder double short double)
+
+  (define-callback-adder double char double))
+
+
+(defmacro alien-apply-form (f args)
+  `(let ((a ,args))
+     `(alien-funcall ,,f ,@a)))
+
+(defmacro alien-apply (f &rest args)
+  `(eval (alien-apply-form ,f ,@args)))
+
+(defun iota (x) (if (equalp x 1) (list x) (cons x (iota (1- x)))))
+
+(alien-funcall *add-i-i* 1 2)
+(alien-funcall *add-f-f* 1.0s0 2.0s0)
+(alien-funcall *add-d-d* 2.0d0 4.0d0)
+
+(assert (= (alien-apply *add-i-i-i-i-i-i-i-i* (iota 8)) 36))
+(assert (= (alien-apply *add-i-i-i-i-i-i-i-i-i-i* (iota 10)) 55))
+(assert (= (alien-apply *add-i-i-i-i-i-i-i-i-i-i-i-i* (iota 12)) 78))
+
+(assert (= (alien-apply *add-f-f-f-f-f-f-f-f* (iota 8s0)) 36s0))
+(assert (= (alien-apply *add-f-f-f-f-f-f-f-f-f-f* (iota 10.0s0)) 55s0))
+
+(assert (= (alien-apply *add-d-d-d-d-d-d-d-d* (iota 8d0)) 36d0))
+(assert (= (alien-apply *add-d-d-d-d-d-d-d-d-d-d* (iota 10d0)) 55d0))
+
+(assert (= (alien-funcall *add-i-i* 2 3) 5))
+(assert (= (alien-funcall *add-d-d* 2d0 3d0) 5d0))
+(assert (= (alien-funcall *add-i-d* 2 3d0) 5d0))
+(assert (= (alien-funcall *add-d-i* 2d0 3) 5d0))
+(assert (= (alien-funcall *add-d-f* 2d0 3s0) 5d0))
+(assert (= (alien-funcall *add-f-d* 2s0 3d0) 5d0))
+
+(assert (= (alien-funcall *add-d-i-i-i-d-i-i-i* 1d0 2 3 4 5d0 6 7 8) 36d0))
+
+(assert (= (alien-apply *add-i-d-i-d-i-d-i-d-i-d*
+             (mapcan #'(lambda (x y) (list x y)) (iota 5) (iota 5.0d0)))
+           30d0))
+

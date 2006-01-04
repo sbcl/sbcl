@@ -583,6 +583,9 @@ Bruno Haible:
   RATIONALIZE, replacing a less-accurate version inherited from
   primordial CMUCL.
 
+Cyrus Harmon:
+  He fixed many PPC FFI and callback bugs.
+
 Matthias Hoelzl:
   He reported and fixed COMPILE's misbehavior on macros.
 
@@ -763,6 +766,7 @@ DTC  Douglas Crosher
 APD  Alexey Dejneka
 PFD  Paul F. Dietz
 NJF  Nathan Froyd
+CLH  Cyrus Harmon
 AL   Arthur Lemmens
 DFL  David Lichteblau
 RAM  Robert MacLachlan
