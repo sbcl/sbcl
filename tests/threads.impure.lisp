@@ -526,6 +526,7 @@
            (push (sb-thread:make-thread #'exercise-binding) threads)
            (push (sb-thread:make-thread (lambda ()
                                           (loop
+                                           (sleep 0.1)
                                            (send-gc))))
                  threads)
            (sleep 4))

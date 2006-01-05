@@ -2112,3 +2112,13 @@ WORKAROUND:
         (foo z)
         (values x)))
   (bar 1) => 11, should be 4.
+
+397: SLEEP accuracy
+  The more interrupts arrive the less accurate SLEEP's timing gets.
+    (time (sb-thread:terminate-thread
+            (prog1 (sb-thread:make-thread (lambda ()
+                                            (loop
+                                             (princ #\!)
+                                             (force-output)
+                                             (sb-ext:gc))))
+              (sleep 1))))
