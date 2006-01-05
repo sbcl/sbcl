@@ -887,7 +887,9 @@
                                  (policy *lexenv* (>= insert-debug-catch 2)))
                             `((catch (locally
                                          (declare (optimize (insert-step-conditions 0)))
-                                    (make-symbol "SB-DEBUG-CATCH-TAG"))
+                                       ;; Using MAKE-SYMBOL would lead
+                                       ;; to recursive disaster.
+                                       (%make-symbol "SB-DEBUG-CATCH-TAG"))
                                 ,@forms))
                             forms))
                  (forms (if (eq result-type *wild-type*)
