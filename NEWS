@@ -4,6 +4,8 @@ changes in sbcl-0.9.9 relative to sbcl-0.9.8:
     system has been added.  (thanks to Alastair Bridgewater)
   * fixed several bugs in and robustified the PPC FFI (including
     callbacks).  (thanks to Cyrus Harmon and Heiner Schwarte)
+  * bug fix: allow non-simple string symbol names (reported by Paul
+    Dietz)
   * optimization: faster implementation of EQUAL
   * fixed segfaults on x86 FreeBSD 7-current (thanks to NIIMI Satoshi)
 

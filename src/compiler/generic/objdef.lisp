@@ -356,7 +356,7 @@
 
 (define-primitive-object (symbol :lowtag other-pointer-lowtag
                                  :widetag symbol-header-widetag
-                                 :alloc-trans make-symbol)
+                                 :alloc-trans %make-symbol)
 
   ;; Beware when changing this definition.  NIL-the-symbol is defined
   ;; using this layout, and NIL-the-end-of-list-marker is the cons

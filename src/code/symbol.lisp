@@ -88,7 +88,10 @@
 (defun make-symbol (string)
   #!+sb-doc
   "Make and return a new symbol with the STRING as its print name."
-  (make-symbol string))
+  (declare (type string string))
+  (%make-symbol (if (simple-string-p string)
+                    string
+                    (subseq string 0))))
 
 (defun get (symbol indicator &optional (default nil))
   #!+sb-doc

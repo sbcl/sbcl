@@ -164,6 +164,7 @@
 (defknown get-properties (list list) (values t t list) (foldable flushable))
 (defknown symbol-name (symbol) simple-string (movable foldable flushable))
 (defknown make-symbol (string) symbol (flushable))
+(defknown %make-symbol (simple-string) symbol (flushable))
 (defknown copy-symbol (symbol &optional t) symbol (flushable))
 (defknown gensym (&optional (or string unsigned-byte)) symbol ())
 (defknown symbol-package (symbol) (or sb!xc:package null) (flushable))
@@ -1545,4 +1546,3 @@
   (values)
   ())
 (defknown style-warn (string &rest t) null ())
-

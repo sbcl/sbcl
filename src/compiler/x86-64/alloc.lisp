@@ -188,9 +188,9 @@
      (inst lea result (make-ea :byte :base result :disp lowtag))
      (storew header result 0 lowtag))))
 
-(define-vop (make-symbol)
+(define-vop (%make-symbol)
   (:policy :fast-safe)
-  (:translate make-symbol)
+  (:translate %make-symbol)
   (:args (name :scs (descriptor-reg) :to :eval))
   (:temporary (:sc unsigned-reg :from :eval) temp)
   (:results (result :scs (descriptor-reg) :from :argument))
