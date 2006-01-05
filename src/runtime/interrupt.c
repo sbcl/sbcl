@@ -1080,8 +1080,16 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
  * the whole sa_mask is ignored and instead of not adding the signal
  * in question to the mask. That means if it's not blockable the
  * signal must be unblocked at the beginning of signal handlers.
+ *
+ * It turns out that NetBSD's SA_NODEFER doesn't DTRT in a different
+ * way: if SA_NODEFER is set and the signal is in sa_mask, the signal
+ * will be unblocked in the sigmask during the signal handler.  -- RMK
+ * X-mas day, 2005
  */
 static volatile int sigaction_nodefer_works = -1;
+
+#define SA_NODEFER_TEST_BLOCK_SIGNAL SIGABRT
+#define SA_NODEFER_TEST_KILL_SIGNAL SIGUSR1
 
 static void
 sigaction_nodefer_test_handler(int signal, siginfo_t *info, void *void_context)
@@ -1090,8 +1098,14 @@ sigaction_nodefer_test_handler(int signal, siginfo_t *info, void *void_context)
     int i;
     sigemptyset(&empty);
     sigprocmask(SIG_BLOCK, &empty, &current);
+    /* There should be exactly two blocked signals: the two we added
+     * to sa_mask when setting up the handler.  NetBSD doesn't block
+     * the signal we're handling when SA_NODEFER is set; Linux before
+     * 2.6.13 or so also doesn't block the other signal when
+     * SA_NODEFER is set. */
     for(i = 1; i < NSIG; i++)
-        if (sigismember(&current, i) != ((i == SIGABRT) ? 1 : 0)) {
+        if (sigismember(&current, i) !=
+            (((i == SA_NODEFER_TEST_BLOCK_SIGNAL) || (i == signal)) ? 1 : 0)) {
             FSHOW_SIGNAL((stderr, "SA_NODEFER doesn't work, signal %d\n", i));
             sigaction_nodefer_works = 0;
         }
@@ -1107,18 +1121,22 @@ see_if_sigaction_nodefer_works()
     sa.sa_flags = SA_SIGINFO | SA_NODEFER;
     sa.sa_sigaction = sigaction_nodefer_test_handler;
     sigemptyset(&sa.sa_mask);
-    sigaddset(&sa.sa_mask, SIGABRT);
-    sigaction(SIGUSR1, &sa, &old_sa);
+    sigaddset(&sa.sa_mask, SA_NODEFER_TEST_BLOCK_SIGNAL);
+    sigaddset(&sa.sa_mask, SA_NODEFER_TEST_KILL_SIGNAL);
+    sigaction(SA_NODEFER_TEST_KILL_SIGNAL, &sa, &old_sa);
     /* Make sure no signals are blocked. */
     {
         sigset_t empty;
         sigemptyset(&empty);
         sigprocmask(SIG_SETMASK, &empty, 0);
     }
-    kill(getpid(), SIGUSR1);
+    kill(getpid(), SA_NODEFER_TEST_KILL_SIGNAL);
     while (sigaction_nodefer_works == -1);
-    sigaction(SIGUSR1, &old_sa, NULL);
+    sigaction(SA_NODEFER_TEST_KILL_SIGNAL, &old_sa, NULL);
 }
+
+#undef SA_NODEFER_TEST_BLOCK_SIGNAL
+#undef SA_NODEFER_TEST_KILL_SIGNAL
 
 static void
 unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
