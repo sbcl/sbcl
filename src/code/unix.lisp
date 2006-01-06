@@ -346,17 +346,13 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   ;; helpful, either, as Solaris doesn't export PATH_MAX from
   ;; unistd.h.
   ;;
-  ;; The Win32 damage here is explained in the comment above wrap_getcwd()
-  ;; in src/runtime/wrap.c. Short form: We need it now, it goes away later.
-  ;;
   ;; FIXME: The (,stub,) nastiness produces an error message about a
   ;; comma not inside a backquote. This error has absolutely nothing
   ;; to do with the actual meaning of the error (and little to do with
   ;; its location, either).
   #!-(or linux openbsd freebsd netbsd sunos osf1 darwin win32) (,stub,)
   #!+(or linux openbsd freebsd netbsd sunos osf1 darwin win32)
-  (or (newcharstar-string (alien-funcall (extern-alien #!-win32 "getcwd"
-                                                       #!+win32 "wrap_getcwd"
+  (or (newcharstar-string (alien-funcall (extern-alien "getcwd"
                                                        (function (* char)
                                                                  (* char)
                                                                  size-t))
@@ -876,6 +872,10 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; try to handle any more generality than that.
 (defun unix-resolve-links (pathname)
   (declare (type simple-base-string pathname))
+  ;; KLUDGE: The Win32 platform doesn't have symbolic links, so
+  ;; short-cut this computation (and the check for being an absolute
+  ;; unix pathname...)
+  #!+win32 (return-from unix-resolve-links pathname)
   (aver (not (relative-unix-pathname? pathname)))
   ;; KLUDGE: readlink and lstat are unreliable if given symlinks
   ;; ending in slashes -- fix the issue here instead of waiting for

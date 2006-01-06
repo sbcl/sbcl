@@ -640,7 +640,10 @@
  ("src/code/reader"            :not-host) ; needs "code/readtable"
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
  ("src/code/target-pathname"   :not-host) ; needs "code/pathname"
+ ("src/code/unix-pathname"      :not-host)
+ ("src/code/win32-pathname"     :not-host)
  ("src/code/filesys"           :not-host) ; needs HOST from "code/pathname"
+
  ("src/code/save"              :not-host) ; uses the definition of PATHNAME
                                           ;   from "code/pathname"
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"

@@ -397,31 +397,6 @@ int select(int top_fd, DWORD *read_set, DWORD *write_set, DWORD *except_set, tim
 }
 
 /*
- * SBCL doesn't like backslashes in pathnames from getcwd for some reason.
- * Probably because they don't happen in posix systems. Windows doesn't
- * mind slashes, so we convert from one to the other. We also strip off
- * the drive prefix while we're at it ("C:", or whatever).
- *
- * The real fix for this problem is to create a windows-host setup that
- * parallels the unix-host in src/code/target-pathname.lisp and actually
- * parse this junk properly, drive letter and everything.
- *
- * Also see POSIX-GETCWD in src/code/unix.lisp.
- */
-char *wrap_getcwd(char *buf, size_t len)
-{
-    char *retval = _getcwd(buf, len);
-
-    if (retval[1] == ':') {
-        char *p;
-        for (p = retval; (*p = p[2]); p++)
-            if (*p == '\\') *p = '/';
-    }
-
-    return retval;
-}
-
-/*
  * Windows doesn't have gettimeofday(), and we need it for the compiler,
  * for serve-event, and for a couple other things. We don't need a timezone
  * yet, however, and the closest we can easily get to a timeval is the

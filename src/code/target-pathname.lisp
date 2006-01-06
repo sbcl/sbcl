@@ -13,7 +13,7 @@
 
 #!-sb-fluid (declaim (freeze-type logical-pathname logical-host))
 
-;;;; UNIX-HOST stuff
+;;;; PHYSICAL-HOST stuff
 
 (def!struct (unix-host
              (:make-load-form-fun make-unix-host-load-form)
@@ -26,15 +26,34 @@
                        (unparse-directory #'unparse-unix-directory)
                        (unparse-file #'unparse-unix-file)
                        (unparse-enough #'unparse-unix-enough)
+                       (unparse-directory-separator "/")
                        (customary-case :lower))))
-
 (defvar *unix-host* (make-unix-host))
-
 (defun make-unix-host-load-form (host)
   (declare (ignore host))
   '*unix-host*)
 
-(defvar *physical-host* *unix-host*)
+(def!struct (win32-host
+             (:make-load-form-fun make-win32-host-load-form)
+             (:include host
+                       (parse #'parse-win32-namestring)
+                       (parse-native #'parse-native-win32-namestring)
+                       (unparse #'unparse-win32-namestring)
+                       (unparse-native #'unparse-native-win32-namestring)
+                       (unparse-host #'unparse-win32-host)
+                       (unparse-directory #'unparse-win32-directory)
+                       (unparse-file #'unparse-win32-file)
+                       (unparse-enough #'unparse-win32-enough)
+                       (unparse-directory-separator "\\")
+                       (customary-case :upper))))
+(defvar *win32-host* (make-win32-host))
+(defun make-win32-host-load-form (host)
+  (declare (ignore host))
+  '*win32-host*)
+
+(defvar *physical-host*
+  #!-win32 *unix-host*
+  #!+win32 *win32-host*)
 
 ;;; Return a value suitable, e.g., for preinitializing
 ;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is
