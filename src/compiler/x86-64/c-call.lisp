@@ -263,7 +263,7 @@
       (let ((delta (logandc2 (+ amount 7) 7)))
         (inst sub rsp-tn delta)))
     ;; C stack must be 16 byte aligned
-    (inst and rsp-tn #xfffffff0)
+    (inst and rsp-tn -16)
     (move result rsp-tn)))
 
 (define-vop (dealloc-number-stack-space)

@@ -326,7 +326,7 @@
                                index-reg))
                          (ash 1 index-scale))))))
             ((and (= mod #b00) (= r/m #b101))
-             (list 'rip (sb!disassem:read-signed-suffix 32 dstate)) )
+             (list 'rip (sb!disassem:read-signed-suffix 32 dstate)))
             ((= mod #b00)
              (list full-reg))
             ((= mod #b01)
@@ -1102,6 +1102,17 @@
 (define-bitfield-emitter emit-dword 32
   (byte 32 0))
 
+;;; Most uses of dwords are as displacements or as immediate values in
+;;; 64-bit operations. In these cases they are sign-extended to 64 bits.
+;;; EMIT-DWORD is unsuitable there because it accepts values of type
+;;; (OR (SIGNED-BYTE 32) (UNSIGNED-BYTE 32)), so we provide a more
+;;; restricted emitter here.
+(defun emit-signed-dword (segment value)
+  (declare (type segment segment)
+           (type (signed-byte 32) value))
+  (declare (inline emit-dword))
+  (emit-dword segment value))
+
 (define-bitfield-emitter emit-qword 64
   (byte 64 0))
 
@@ -1134,15 +1145,15 @@
                                                  0))
                                           other-pointer-lowtag)))
                              (if quad-p
-                                 (emit-qword segment val )
-                                 (emit-dword segment val )))))
+                                 (emit-qword segment val)
+                                 (emit-signed-dword segment val)))))
         (if quad-p
             (emit-qword segment (or offset 0))
-            (emit-dword segment (or offset 0))))))
+            (emit-signed-dword segment (or offset 0))))))
 
 (defun emit-relative-fixup (segment fixup)
   (note-fixup segment :relative fixup)
-  (emit-dword segment (or (fixup-offset fixup) 0)))
+  (emit-signed-dword segment (or (fixup-offset fixup) 0)))
 
 
 ;;;; the effective-address (ea) structure
@@ -1227,7 +1238,8 @@
                      (lambda (segment posn)
                        ;; The addressing is relative to end of instruction,
                        ;; i.e. the end of this dword. Hence the + 4.
-                       (emit-dword segment (+ 4 (- (+ offset posn)))))))
+                       (emit-signed-dword segment
+                                          (+ 4 (- (+ offset posn)))))))
   (values))
 
 (defun emit-label-rip (segment fixup reg)
@@ -1237,8 +1249,8 @@
     (emit-back-patch segment
                      4
                      (lambda (segment posn)
-                       (emit-dword segment (- (label-position label)
-                                              (+ posn 4))))))
+                       (emit-signed-dword segment (- (label-position label)
+                                                     (+ posn 4))))))
   (values))
 
 (defun emit-ea (segment thing reg &optional allow-constants)
@@ -1257,7 +1269,7 @@
                  (emit-byte segment disp))
                 (t
                  (emit-mod-reg-r/m-byte segment #b10 reg #b101)
-                 (emit-dword segment disp)))))
+                 (emit-signed-dword segment disp)))))
        (constant
         (unless allow-constants
           ;; Why?
@@ -1301,7 +1313,7 @@
              ((or (= mod #b10) (null base))
               (if (fixup-p disp)
                   (emit-absolute-fixup segment disp)
-                  (emit-dword segment disp))))))
+                  (emit-signed-dword segment disp))))))
     (fixup
      (typecase (fixup-offset thing)
        (label
@@ -1537,21 +1549,63 @@
             src-size
             (error "can't tell the size of either ~S or ~S" dst src)))))
 
-(defun emit-sized-immediate (segment size value &optional quad-p)
+;;; Except in a very few cases (MOV instructions A1, A3 and B8 - BF)
+;;; we expect dword data bytes even when 64 bit work is being done.
+;;; But A1 and A3 are currently unused and B8 - BF use EMIT-QWORD
+;;; directly, so we emit all quad constants as dwords, additionally
+;;; making sure that they survive the sign-extension to 64 bits
+;;; unchanged.
+(defun emit-sized-immediate (segment size value)
   (ecase size
     (:byte
      (emit-byte segment value))
     (:word
      (emit-word segment value))
-    ((:dword :qword)
-     ;; except in a very few cases (MOV instructions A1,A3,B8) we expect
-     ;; dword data bytes even when 64 bit work is being done.  So, mostly
-     ;; we treat quad constants as dwords.
-     (if (and quad-p (eq size :qword))
-         (emit-qword segment value)
-         (emit-dword segment value)))))
+    (:dword
+     (emit-dword segment value))
+    (:qword
+     (emit-signed-dword segment value))))
 
 ;;;; general data transfer
+
+;;; This is the part of the MOV instruction emitter that does moving
+;;; of an immediate value into a qword register. We go to some length
+;;; to achieve the shortest possible encoding.
+(defun emit-immediate-move-to-qword-register (segment dst src)
+  (declare (type integer src))
+  (cond ((typep src '(unsigned-byte 32))
+         ;; We use the B8 - BF encoding with an operand size of 32 bits
+         ;; here and let the implicit zero-extension fill the upper half
+         ;; of the 64-bit destination register. Instruction size: five
+         ;; or six bytes. (A REX prefix will be emitted only if the
+         ;; destination is an extended register.)
+         (maybe-emit-rex-prefix segment :dword nil nil dst)
+         (emit-byte-with-reg segment #b10111 (reg-tn-encoding dst))
+         (emit-dword segment src))
+        (t
+         (maybe-emit-rex-prefix segment :qword nil nil dst)
+         (cond ((typep src '(signed-byte 32))
+                ;; Use the C7 encoding that takes a 32-bit immediate and
+                ;; sign-extends it to 64 bits. Instruction size: seven
+                ;; bytes.
+                (emit-byte segment #b11000111)
+                (emit-mod-reg-r/m-byte segment #b11 #b000
+                                       (reg-tn-encoding dst))
+                (emit-signed-dword segment src))
+               ((typep src `(integer ,(- (expt 2 64) (expt 2 31))
+                                     (,(expt 2 64))))
+                ;; This triggers on positive integers of 64 bits length
+                ;; with the most significant 33 bits being 1. We use the
+                ;; same encoding as in the previous clause.
+                (emit-byte segment #b11000111)
+                (emit-mod-reg-r/m-byte segment #b11 #b000
+                                       (reg-tn-encoding dst))
+                (emit-signed-dword segment (- src (expt 2 64))))
+               (t
+                ;; We need a full 64-bit immediate. Instruction size:
+                ;; ten bytes.
+                (emit-byte-with-reg segment #b10111 (reg-tn-encoding dst))
+                (emit-qword segment src))))))
 
 (define-instruction mov (segment dst src)
   ;; immediate to register
@@ -1574,24 +1628,17 @@
      (maybe-emit-operand-size-prefix segment size)
      (cond ((register-p dst)
             (cond ((integerp src)
-                   (maybe-emit-rex-prefix segment size nil nil dst)
-                   (cond ((and (eq size :qword)
-                               (typep src '(signed-byte 32)))
-                          ;; When loading small immediates to a qword register
-                          ;; using B8 wastes 3 bytes compared to C7.
-                          (emit-byte segment #b11000111)
-                          (emit-mod-reg-r/m-byte segment #b11
-                                                 #b000
-                                                 (reg-tn-encoding dst))
-                          (emit-sized-immediate segment :dword src nil))
+                   (cond ((eq size :qword)
+                          (emit-immediate-move-to-qword-register segment
+                                                                 dst src))
                          (t
+                          (maybe-emit-rex-prefix segment size nil nil dst)
                           (emit-byte-with-reg segment
                                               (if (eq size :byte)
                                                   #b10110
                                                   #b10111)
                                               (reg-tn-encoding dst))
-                          (emit-sized-immediate segment size src
-                                                (eq size :qword)))))
+                          (emit-sized-immediate segment size src))))
                   (t
                    (maybe-emit-rex-for-ea segment src dst)
                    (emit-byte segment
@@ -1600,18 +1647,13 @@
                                   #b10001011))
                    (emit-ea segment src (reg-tn-encoding dst) t))))
            ((integerp src)
-            ;; C7 only deals with 32 bit immediates even if register is
-            ;; 64 bit: only b8-bf use 64 bit immediates
+            ;; C7 only deals with 32 bit immediates even if the
+            ;; destination is a 64-bit location. The value is
+            ;; sign-extended in this case.
             (maybe-emit-rex-for-ea segment dst nil)
-            (cond ((typep src '(or (signed-byte 32) (unsigned-byte 32)))
-                   (emit-byte segment
-                              (if (eq size :byte) #b11000110 #b11000111))
-                   (emit-ea segment dst #b000)
-                   (emit-sized-immediate segment
-                                         (case size (:qword :dword) (t size))
-                                         src))
-                  (t
-                   (aver nil))))
+            (emit-byte segment (if (eq size :byte) #b11000110 #b11000111))
+            (emit-ea segment dst #b000)
+            (emit-sized-immediate segment size src))
            ((register-p src)
             (maybe-emit-rex-for-ea segment dst src)
             (emit-byte segment (if (eq size :byte) #b10001000 #b10001001))
@@ -1736,10 +1778,10 @@
                  ;; defaults to 64 bits. The size of the immediate is 32
                  ;; bits and it is sign-extended.
                  (emit-byte segment #b01101000)
-                 (emit-dword segment src))))
+                 (emit-signed-dword segment src))))
          (t
           (let ((size (operand-size src)))
-            (aver (not (eq size :byte)))
+            (aver (or (eq size :qword) (eq size :word)))
             (maybe-emit-operand-size-prefix segment size)
             (maybe-emit-rex-for-ea segment src nil :operand-size :do-not-set)
             (cond ((register-p src)
@@ -1755,7 +1797,7 @@
   (:printer rex-reg/mem-default-qword ((op '(#b10001111 #b000))))
   (:emitter
    (let ((size (operand-size dst)))
-     (aver (not (eq size :byte)))
+     (aver (or (eq size :qword) (eq size :word)))
      (maybe-emit-operand-size-prefix segment size)
      (maybe-emit-rex-for-ea segment dst nil :operand-size :do-not-set)
      (cond ((register-p dst)
@@ -2506,9 +2548,9 @@
       (emit-back-patch segment
                        4
                        (lambda (segment posn)
-                         (emit-dword segment
-                                     (- (label-position where)
-                                        (+ posn 4))))))
+                         (emit-signed-dword segment
+                                            (- (label-position where)
+                                               (+ posn 4))))))
      (fixup
       (emit-byte segment #b11101000)
       (emit-relative-fixup segment where))
@@ -2531,7 +2573,7 @@
   (:printer near-cond-jump () '('j cc :tab label))
   ;; unconditional jumps
   (:printer short-jump ((op #b1011)))
-  (:printer near-jump ((op #b11101001)) )
+  (:printer near-jump ((op #b11101001)))
   (:printer reg/mem-default-qword ((op '(#b11111111 #b100))))
   (:printer rex-reg/mem-default-qword ((op '(#b11111111 #b100))))
   (:emitter
@@ -2555,7 +2597,7 @@
                           (dpb (conditional-opcode cond)
                                (byte 4 0)
                                #b10000000))
-               (emit-dword segment disp)))))
+               (emit-signed-dword segment disp)))))
          ((label-p (setq where cond))
           (emit-chooser
            segment 5 0
@@ -2569,13 +2611,13 @@
            (lambda (segment posn)
              (let ((disp (- (label-position where) (+ posn 5))))
                (emit-byte segment #b11101001)
-               (emit-dword segment disp)))))
+               (emit-signed-dword segment disp)))))
          ((fixup-p where)
           (emit-byte segment #b11101001)
           (emit-relative-fixup segment where))
          (t
           (unless (or (ea-p where) (tn-p where))
-                  (error "don't know what to do with ~A" where))
+            (error "don't know what to do with ~A" where))
           ;; near jump defaults to 64 bit
           ;; w-bit in rex prefix is unnecessary
           (maybe-emit-rex-for-ea segment where nil :operand-size :do-not-set)
@@ -2629,7 +2671,7 @@
   (:emitter
    (aver (register-p dst))
    (let ((size (matching-operand-size dst src)))
-     (aver (or (eq size :word) (eq size :dword) (eq size :qword) ))
+     (aver (or (eq size :word) (eq size :dword) (eq size :qword)))
      (maybe-emit-operand-size-prefix segment size))
    (maybe-emit-rex-for-ea segment src dst)
    (emit-byte segment #b00001111)
