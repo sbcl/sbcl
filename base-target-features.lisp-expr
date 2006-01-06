@@ -284,6 +284,9 @@
  ;;   :stack-allocatable-closures
  ;;     The compiler can allocate dynamic-extent closures on stack.
  ;;
+ ;;   :alien-callbacks
+ ;;     Alien callbacks have been implemented for this platform.
+ ;;
  ;; operating system features:
  ;;   :linux   = We're intended to run under some version of Linux.
  ;;   :bsd     = We're intended to run under some version of BSD Unix. (This

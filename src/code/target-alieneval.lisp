@@ -895,6 +895,11 @@ ENTER-ALIEN-CALLBACK pulls the corresponsing trampoline out and calls it.")
            return
            arguments))
 
+;;; To ensure that callback wrapper functions continue working even
+;;; if #'ENTER-ALIEN-CALLBACK moves in memory, access to it is indirected
+;;; through the *ENTER-ALIEN-CALLBACK* static symbol. -- JES, 2006-01-01
+(defvar *enter-alien-callback* #'enter-alien-callback)
+
 ;;;; interface (not public, yet) for alien callbacks
 
 (defmacro alien-callback (specifier function &environment env)

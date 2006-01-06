@@ -439,7 +439,16 @@ pointer to the arguments."
               (inst add  eax 16)                    ; arguments
               (inst push eax)                       ; arg1
               (inst push (ash index 2))             ; arg0
-              (inst push (get-lisp-obj-address #'enter-alien-callback)) ; function
+
+              ;; Indirect the access to ENTER-ALIEN-CALLBACK through
+              ;; the symbol-value slot of SB-ALIEN::*ENTER-ALIEN-CALLBACK*
+              ;; to ensure it'll work even if the GC moves ENTER-ALIEN-CALLBACK.
+              ;; Skip any SB-THREAD TLS magic, since we don't expecte anyone
+              ;; to rebind the variable. -- JES, 2006-01-01
+              (inst mov eax (+ nil-value (static-symbol-offset
+                                          'sb!alien::*enter-alien-callback*)))
+              (loadw eax eax symbol-value-slot other-pointer-lowtag)
+              (inst push eax) ; function
               (inst mov  eax (foreign-symbol-address "funcall3"))
               (inst call eax)
               ;; now put the result into the right register

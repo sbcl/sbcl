@@ -196,13 +196,13 @@ cd $original_dir
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 if [ "$sbcl_arch" = "x86" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
-    printf ' :stack-allocatable-closures' >> $ltf
+    printf ' :stack-allocatable-closures :alien-callbacks' >> $ltf
     if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ] || [ "$sbcl_os" = "netbsd" ] || [ "$sbcl_os" = "sunos" ]; then
 	printf ' :linkage-table' >> $ltf
     fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
-    printf ' :stack-allocatable-closures' >> $ltf
+    printf ' :stack-allocatable-closures :alien-callbacks' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures' >> $ltf
@@ -224,7 +224,7 @@ elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
 elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
     printf ' :stack-allocatable-closures' >> $ltf
     # We provide a dlopen shim, so a little lie won't hurt
-    printf " :os-provides-dlopen :linkage-table" >> $ltf
+    printf " :os-provides-dlopen :linkage-table :alien-callbacks" >> $ltf
     # The default stack ulimit under darwin is too small to run PURIFY.
     # Best we can do is complain and exit at this stage
     if [ "`ulimit -s`" = "512" ]; then

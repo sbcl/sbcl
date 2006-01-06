@@ -14,7 +14,7 @@
 (in-package :cl-user)
 
 ;;; callbacks only on a few platforms
-#-(or (and ppc darwin) x86 x86-64)
+#-alien-callbacks
 (quit :unix-status 104)
 
 ;;; simple callback for a function

@@ -39,6 +39,28 @@ else
     exit 1
 fi
 
+# In sbcl-0.9.8 saving cores with callbacks didn't work on gencgc platforms
+$SBCL <<EOF
+  (defun bar () 
+    (format t "~&Callbacks not supported, skipping~%")
+    (quit :unix-status 42))
+  #+alien-callbacks
+  (progn
+    (sb-alien::define-alien-callback foo int () 42)
+    (defun bar () (quit :unix-status (alien-funcall foo))))
+  (save-lisp-and-die "$tmpcore")
+EOF
+$SBCL_ALLOWING_CORE --core "$tmpcore" \
+--userinit /dev/null --sysinit /dev/null <<EOF
+  (bar)
+EOF
+if [ $? = 42 ]; then
+    echo "/Callbacks after SAVE-LISP-AND-DIE worked, good."
+else
+    echo "failure in basic SAVE-LISP-AND-DIE: $?"
+    exit 1
+fi
+
 rm -f $tmpcore
 echo "/returning success from core.test.sh"
 exit 104

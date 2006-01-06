@@ -225,6 +225,10 @@
     ;; For GC-AND-SAVE
     *restart-lisp-function*
 
+    ;; Needed for callbacks to work across saving cores. see
+    ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory details.
+    sb!alien::*enter-alien-callback*
+
     ;; The ..SLOT-UNBOUND.. symbol is static in order to optimise the
     ;; common slot unbound check.
     ;;
