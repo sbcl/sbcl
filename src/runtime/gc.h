@@ -16,7 +16,7 @@
 #ifndef _GC_H_
 #define _GC_H_
 typedef signed long page_index_t;
-typedef signed int generation_index_t;
+typedef signed char generation_index_t;
 
 extern void gc_init(void);
 extern void gc_initialize_pointers(void);

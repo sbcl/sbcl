@@ -32,8 +32,28 @@ inline void *page_address(page_index_t);
 int gencgc_handle_wp_violation(void *);
 
 struct page {
+    /* The name of this field is not well-chosen for its actual use.
+     * This is the offset from the start of the page to the start
+     * of the alloc_region which contains/contained it.  It's negative or 0
+     */
+    long  first_object_offset;
 
-    unsigned int
+    /* the number of bytes of this page that are used. This may be less
+     * than the actual bytes used for pages within the current
+     * allocation regions. It should be 0 for all unallocated pages (not
+     * hard to achieve).
+     *
+     * Currently declared as an unsigned short to make the struct size
+     * smaller. This means that GENCGC-PAGE-SIZE is constrained to fit
+     * inside a short.
+     */
+    unsigned short bytes_used;
+
+#if USHRT_MAX < PAGE_BYTES
+#error "PAGE_BYTES too large"
+#endif
+
+    unsigned
         /* This is set when the page is write-protected. This should
          * always reflect the actual write_protect status of a page.
          * (If the page is written into, we catch the exception, make
@@ -62,19 +82,8 @@ struct page {
      * allocation region pages - this allows the space of an object to
      * be easily determined. */
     generation_index_t gen;
-
-    /* the number of bytes of this page that are used. This may be less
-     * than the actual bytes used for pages within the current
-     * allocation regions. It should be 0 for all unallocated pages (not
-     * hard to achieve). */
-    int  bytes_used;
-
-    /* The name of this field is not well-chosen for its actual use.
-     * This is the offset from the start of the page to the start
-     * of the alloc_region which contains/contained it.  It's negative or 0
-     */
-    long  first_object_offset;
 };
+
 
 /* values for the page.allocated field */
 

@@ -208,12 +208,12 @@
 ;;; MAP-ALLOCATED-OBJECTS
 #!+gencgc
 (progn
-  (define-alien-type nil
+  (define-alien-type (struct page)
       (struct page
-              (flags unsigned-int)
-              (gen int)
-              (bytes-used int)
-              (start long)))
+              (start long)
+              (bytes-used (unsigned 16))
+              (flags (unsigned 8))
+              (gen (signed 8))))
   (declaim (inline find-page-index))
   (define-alien-routine "find_page_index" long (index long))
   (define-alien-variable "page_table"
@@ -265,7 +265,7 @@
                             ;; bitfields?
                             (let ((alloc-flag (ldb (byte 3 2)
                                                    (slot page 'flags)))
-                                   (bytes-used (slot page 'bytes-used)))
+                                  (bytes-used (slot page 'bytes-used)))
                               ;; If the page is not free and the current
                               ;; pointer is still below the allocation offset
                               ;; of the page
