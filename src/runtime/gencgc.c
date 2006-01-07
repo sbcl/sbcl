@@ -70,22 +70,6 @@ enum {
  * that don't have pointers to younger generations? */
 boolean enable_page_protection = 1;
 
-/* Should we unmap a page and re-mmap it to have it zero filled? */
-#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__sun)
-/* comment from cmucl-2.4.8: This can waste a lot of swap on FreeBSD
- * so don't unmap there.
- *
- * The CMU CL comment didn't specify a version, but was probably an
- * old version of FreeBSD (pre-4.0), so this might no longer be true.
- * OTOH, if it is true, this behavior might exist on OpenBSD too, so
- * for now we don't unmap there either. -- WHN 2001-04-07 */
-/* Apparently this flag is required to be 0 for SunOS/x86, as there
- * are reports of heap corruption otherwise. */
-boolean gencgc_unmap_zero = 0;
-#else
-boolean gencgc_unmap_zero = 1;
-#endif
-
 /* the minimum size (in bytes) for a large object*/
 unsigned long large_object_size = 4 * PAGE_BYTES;
 
@@ -139,6 +123,13 @@ boolean gencgc_zero_check_during_free_heap = 0;
  * contained a pagetable entry).
  */
 boolean gencgc_partial_pickup = 0;
+
+/* If defined, free pages are read-protected to ensure that nothing
+ * accesses them.
+ */
+
+/* #define READ_PROTECT_FREE_PAGES */
+
 
 /*
  * GC structures and variables
@@ -429,9 +420,60 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
     fpu_restore(fpu_state);
 }
 
-/*
- * allocation routines
+/* Zero the pages from START to END (inclusive), but use mmap/munmap instead
+ * if zeroing it ourselves, i.e. in practice give the memory back to the
+ * OS. Generally done after a large GC.
  */
+void zero_pages_with_mmap(page_index_t start, page_index_t end) {
+    int i;
+    void *addr = (void *) page_address(start), *new_addr;
+    size_t length = PAGE_BYTES*(1+end-start);
+
+    if (start > end)
+      return;
+
+    os_invalidate(addr, length);
+    new_addr = os_validate(addr, length);
+    if (new_addr == NULL || new_addr != addr) {
+        lose("remap_free_pages: page moved, 0x%08x ==> 0x%08x", start, new_addr);
+    }
+
+    for (i = start; i <= end; i++) {
+        page_table[i].need_to_zero = 0;
+    }
+}
+
+/* Zero the pages from START to END (inclusive). Generally done just after
+ * a new region has been allocated.
+ */
+static void
+zero_pages(page_index_t start, page_index_t end) {
+    if (start > end)
+      return;
+
+    memset(page_address(start), 0, PAGE_BYTES*(1+end-start));
+}
+
+/* Zero the pages from START to END (inclusive), except for those
+ * pages that are known to already zeroed. Mark all pages in the
+ * ranges as non-zeroed.
+ */
+static void
+zero_dirty_pages(page_index_t start, page_index_t end) {
+    page_index_t i;
+
+    for (i = start; i <= end; i++) {
+        if (page_table[i].need_to_zero == 1) {
+            zero_pages(start, end);
+            break;
+        }
+    }
+
+    for (i = start; i <= end; i++) {
+        page_table[i].need_to_zero = 1;
+    }
+}
+
 
 /*
  * To support quick and inline allocation, regions of memory can be
@@ -606,6 +648,22 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
             }
         }
     }
+
+#ifdef READ_PROTECT_FREE_PAGES
+    os_protect(page_address(first_page),
+               PAGE_BYTES*(1+last_page-first_page),
+               OS_VM_PROT_ALL);
+#endif
+
+    /* If the first page was only partial, don't check whether it's
+     * zeroed (it won't be) and don't zero it (since the parts that
+     * we're interested in are guaranteed to be zeroed).
+     */
+    if (page_table[first_page].bytes_used) {
+        first_page++;
+    }
+
+    zero_dirty_pages(first_page, last_page);
 }
 
 /* If the record_new_objects flag is 2 then all new regions created
@@ -952,7 +1010,15 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
     }
     thread_mutex_unlock(&free_pages_lock);
 
-    return((void *)(page_address(first_page)+orig_first_page_bytes_used));
+#ifdef READ_PROTECT_FREE_PAGES
+    os_protect(page_address(first_page),
+               PAGE_BYTES*(1+last_page-first_page),
+               OS_VM_PROT_ALL);
+#endif
+
+    zero_dirty_pages(first_page, last_page);
+
+    return page_address(first_page);
 }
 
 static page_index_t gencgc_alloc_start_page = -1;
@@ -3080,31 +3146,12 @@ free_oldspace(void)
                && (page_table[last_page].bytes_used != 0)
                && (page_table[last_page].gen == from_space));
 
-        /* Zero pages from first_page to (last_page-1).
-         *
-         * FIXME: Why not use os_zero(..) function instead of
-         * hand-coding this again? (Check other gencgc_unmap_zero
-         * stuff too. */
-        if (gencgc_unmap_zero) {
-            void *page_start, *addr;
-
-            page_start = (void *)page_address(first_page);
-
-            os_invalidate(page_start, PAGE_BYTES*(last_page-first_page));
-            addr = os_validate(page_start, PAGE_BYTES*(last_page-first_page));
-            if (addr == NULL || addr != page_start) {
-                lose("free_oldspace: page moved, 0x%08x ==> 0x%08x\n",
-                     page_start, addr);
-            }
-        } else {
-            long *page_start;
-
-            page_start = (long *)page_address(first_page);
-            memset(page_start, 0,PAGE_BYTES*(last_page-first_page));
-        }
-
+#ifdef READ_PROTECT_FREE_PAGES
+        os_protect(page_address(first_page),
+                   PAGE_BYTES*(last_page-first_page),
+                   OS_VM_PROT_NONE);
+#endif
         first_page = last_page;
-
     } while (first_page < last_free_page);
 
     bytes_allocated -= bytes_freed;
@@ -3816,6 +3863,32 @@ update_dynamic_space_free_pointer(void)
     return 0; /* dummy value: return something ... */
 }
 
+static void
+remap_free_pages (page_index_t from, page_index_t to)
+{
+    page_index_t first_page, last_page;
+
+    for (first_page = from; first_page <= to; first_page++) {
+        if (page_table[first_page].allocated != FREE_PAGE_FLAG ||
+            page_table[first_page].need_to_zero == 0) {
+            continue;
+        }
+
+        last_page = first_page + 1;
+        while (page_table[last_page].allocated == FREE_PAGE_FLAG &&
+               last_page < to &&
+               page_table[last_page].need_to_zero == 1) {
+            last_page++;
+        }
+
+        zero_pages_with_mmap(first_page, last_page-1);
+
+        first_page = last_page;
+    }
+}
+
+generation_index_t small_generation_limit = 1;
+
 /* GC all generations newer than last_gen, raising the objects in each
  * to the next older generation - we finish when all generations below
  * last_gen are empty.  Then if last_gen is due for a GC, or if
@@ -3824,13 +3897,15 @@ update_dynamic_space_free_pointer(void)
  *
  * We stop collecting at gencgc_oldest_gen_to_gc, even if this is less than
  * last_gen (oh, and note that by default it is NUM_GENERATIONS-1) */
-
 void
 collect_garbage(generation_index_t last_gen)
 {
     generation_index_t gen = 0, i;
     int raise;
     int gen_to_wp;
+    /* The largest value of last_free_page seen since the time
+     * remap_free_pages was called. */
+    static page_index_t high_water_mark = 0;
 
     FSHOW((stderr, "/entering collect_garbage(%d)\n", last_gen));
 
@@ -3932,11 +4007,25 @@ collect_garbage(generation_index_t last_gen)
     gc_assert((boxed_region.free_pointer - boxed_region.start_addr) == 0);
     gc_alloc_generation = 0;
 
+    /* Save the high-water mark before updating last_free_page */
+    if (last_free_page > high_water_mark)
+        high_water_mark = last_free_page;
     update_dynamic_space_free_pointer();
     auto_gc_trigger = bytes_allocated + bytes_consed_between_gcs;
     if(gencgc_verbose)
         fprintf(stderr,"Next gc when %ld bytes have been consed\n",
                 auto_gc_trigger);
+
+    /* If we did a big GC (arbitrarily defined as gen > 1), release memory
+     * back to the OS.
+     */
+    if (gen > small_generation_limit) {
+        if (last_free_page > high_water_mark)
+            high_water_mark = last_free_page;
+        remap_free_pages(0, high_water_mark);
+        high_water_mark = 0;
+    }
+
     SHOW("returning from collect_garbage");
 }
 
@@ -4105,6 +4194,7 @@ gencgc_pickup_dynamic(void)
         page_table[page].write_protected = 0;
         page_table[page].write_protected_cleared = 0;
         page_table[page].dont_move = 0;
+        page_table[page].need_to_zero = 1;
 
         if (!gencgc_partial_pickup) {
             first=gc_search_space(prev,(ptr+2)-prev,ptr);
@@ -4294,6 +4384,23 @@ gc_set_region_empty(struct alloc_region *region)
     region->end_addr = page_address(0);
 }
 
+static void
+zero_all_free_pages()
+{
+    page_index_t i;
+
+    for (i = 0; i < last_free_page; i++) {
+        if (page_table[i].allocated == FREE_PAGE_FLAG) {
+#ifdef READ_PROTECT_FREE_PAGES
+            os_protect(page_address(i),
+                       PAGE_BYTES,
+                       OS_VM_PROT_ALL);
+#endif
+            zero_pages(i, i);
+        }
+    }
+}
+
 /* Things to do before doing a final GC before saving a core (without
  * purify).
  *
@@ -4348,6 +4455,8 @@ gc_and_save(char *filename)
     gencgc_alloc_start_page = -1;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
 
+    /* The dumper doesn't know that pages need to be zeroed before use. */
+    zero_all_free_pages();
     save_to_filehandle(file, filename, SymbolValue(RESTART_LISP_FUNCTION,0));
     /* Oops. Save still managed to fail. Since we've mangled the stack
      * beyond hope, there's not much we can do.

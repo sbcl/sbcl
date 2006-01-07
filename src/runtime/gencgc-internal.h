@@ -75,7 +75,9 @@ struct page {
         /* If the page is part of a large object then this flag is
          * set. No other objects should be allocated to these pages.
          * This is only valid when the page is allocated. */
-        large_object :1;
+        large_object :1,
+        /* True if the page is known to contain only zeroes. */
+        need_to_zero :1;
 
     /* the generation that this page belongs to. This should be valid
      * for all pages that may have objects allocated, even current
