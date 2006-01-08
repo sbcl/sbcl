@@ -476,7 +476,6 @@ zero_dirty_pages(page_index_t start, page_index_t end) {
         page_table[i].need_to_zero = 1;
     }
 }
-'
 
 
 /*
