@@ -841,7 +841,7 @@ GNAME(sigtrap_trampoline):
 	int3
 	.byte 	trap_ContextRestore
 	hlt			# We should never return here.
-
+        
 	/*
 	 * This is part of the funky magic for exception handling on win32.
 	 * see handle_exception() in win32-os.c for details.
@@ -858,5 +858,140 @@ GNAME(exception_trampoline):
 	.byte 	trap_ContextRestore
 	hlt			# We should never return here.
 #endif
-	
+
+        /* fast_bzero implementations and code to detect which implementation
+         * to use.
+         */
+
+	.global GNAME(fast_bzero_pointer)
+	.data
+        .align 4
+GNAME(fast_bzero_pointer):
+        /* Variable containing a pointer to the bzero function to use.
+         * Initially points to a function that detects which implementation
+         * should be used, and then updates the variable. */
+        .long fast_bzero_detect        
+
+	.text
+	.align	align_8byte,0x90
+	.global GNAME(fast_bzero)
+	TYPE(GNAME(fast_bzero))
+GNAME(fast_bzero):        
+        /* Indirect function call */
+        jmp *fast_bzero_pointer
+	SIZE(GNAME(fast_bzero))
+        
+      
+	.text
+	.align	align_8byte,0x90
+	.global GNAME(fast_bzero_detect)
+	TYPE(GNAME(fast_bzero_detect))
+GNAME(fast_bzero_detect):
+        /* Decide whether to use SSE, MMX or REP version */
+        push %eax /* CPUID uses EAX-EDX */
+        push %ebx
+        push %ecx
+        push %edx
+        mov $1, %eax
+        cpuid
+        test $0x04000000, %edx    /* SSE2 needed for MOVNTDQ */
+        jnz Lsse2
+        /* Originally there was another case here for using the
+         * MOVNTQ instruction for processors that supported MMX but
+         * not SSE2. This turned out to be a loss especially on
+         * Athlons (where this instruction is apparently microcoded
+         * somewhat slowly). So for simplicity revert to REP STOSL
+         * for all non-SSE2 processors.
+         */
+Lbase:
+        movl $fast_bzero_base, fast_bzero_pointer
+        jmp Lrestore
+Lsse2:
+        movl $fast_bzero_sse, fast_bzero_pointer
+        jmp Lrestore
+        
+Lrestore:
+        pop %edx
+        pop %ecx
+        pop %ebx
+        pop %eax
+        jmp *fast_bzero_pointer
+        
+	SIZE(GNAME(fast_bzero_detect))
+        
+
+	.text
+	.align	align_8byte,0x90
+	.global GNAME(fast_bzero_sse)
+	TYPE(GNAME(fast_bzero_sse))
+        
+GNAME(fast_bzero_sse):
+        /* A fast routine for zero-filling blocks of memory that are
+         * guaranteed to start and end at a 4096-byte aligned address.
+         */        
+        push %esi                 /* Save temporary registers */
+        push %edi
+        mov 16(%esp), %esi        /* Parameter: amount of bytes to fill */
+        mov 12(%esp), %edi        /* Parameter: start address */
+        shr $6, %esi              /* Amount of 64-byte blocks to copy */
+        jz Lend_sse               /* If none, stop */
+        movups %xmm7, -16(%esp)   /* Save XMM register */
+        xorps  %xmm7, %xmm7       /* Zero the XMM register */
+        jmp Lloop_sse
+        .align 16
+Lloop_sse:
+
+        /* Copy the 16 zeroes from xmm7 to memory, 4 times. MOVNTDQ is the
+         * non-caching double-quadword moving variant, i.e. the memory areas
+         * we're touching are not fetched into the L1 cache, since we're just
+         * going to overwrite the memory soon anyway.
+         */
+        movntdq %xmm7, 0(%edi)
+        movntdq %xmm7, 16(%edi)
+        movntdq %xmm7, 32(%edi)
+        movntdq %xmm7, 48(%edi)
+ 
+        add $64, %edi /* Advance pointer */
+        dec %esi      /* Decrement 64-byte block count */
+        jnz Lloop_sse
+        movups -16(%esp), %xmm7 /* Restore the XMM register */
+        sfence        /* Ensure that weakly ordered writes are flushed. */
+Lend_sse:
+        mov 12(%esp), %esi      /* Parameter: start address */
+        prefetcht0 0(%esi)      /* Prefetch the start of the block into cache,
+                                 * since it's likely to be used immediately. */
+        pop %edi      /* Restore temp registers */
+        pop %esi
+	ret
+	SIZE(GNAME(fast_bzero_sse))
+                
+
+	.text
+	.align	align_8byte,0x90
+	.global GNAME(fast_bzero_base)
+	TYPE(GNAME(fast_bzero_base))
+        
+GNAME(fast_bzero_base):
+        /* A fast routine for zero-filling blocks of memory that are
+         * guaranteed to start and end at a 4096-byte aligned address.
+         */        
+        push %eax                 /* Save temporary registers */
+        push %ecx
+        push %edi
+        mov 20(%esp), %ecx        /* Parameter: amount of bytes to fill */
+        mov 16(%esp), %edi        /* Parameter: start address */
+        xor %eax, %eax            /* Zero EAX */
+        shr $2, %ecx              /* Amount of 4-byte blocks to copy */
+        jz  Lend_base
+        cld                       /* Set direction of STOSL to increment */
+        rep stosl                 /* Store EAX to *EDI, ECX times, incrementing
+                                   * EDI by 4 after each store */
+Lend_base:        
+        pop %edi                  /* Restore temp registers */
+        pop %ecx
+        pop %eax
+	ret
+	SIZE(GNAME(fast_bzero_base))
+        
+	
 	.end

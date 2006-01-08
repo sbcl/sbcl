@@ -344,4 +344,45 @@ GNAME(post_signal_tramp):
 	ret
 	.size GNAME(post_signal_tramp),.-GNAME(post_signal_tramp)
 
-	.end
+	.text
+	.align	align_8byte,0x90
+	.global GNAME(fast_bzero)
+	.type	GNAME(fast_bzero),@function
+        
+GNAME(fast_bzero):
+        /* A fast routine for zero-filling blocks of memory that are
+         * guaranteed to start and end at a 4096-byte aligned address.
+         */
+        shr $6, %rsi              /* Amount of 64-byte blocks to copy */
+        jz Lend                   /* If none, stop */
+        mov %rsi, %rcx            /* Save start address */
+        movups %xmm7, -16(%rsp)   /* Save XMM register */
+        xorps  %xmm7, %xmm7       /* Zero the XMM register */
+        jmp Lloop
+        .align 16                 
+Lloop:
+
+        /* Copy the 16 zeroes from xmm7 to memory, 4 times. MOVNTDQ is the
+         * non-caching double-quadword moving variant, i.e. the memory areas
+         * we're touching are not fetched into the L1 cache, since we're just
+         * going to overwrite the memory soon anyway.
+         */
+        movntdq %xmm7, 0(%rdi)
+        movntdq %xmm7, 16(%rdi)
+        movntdq %xmm7, 32(%rdi)
+        movntdq %xmm7, 48(%rdi)
+
+        add $64, %rdi  /* Advance pointer */
+        dec %rsi       /* Decrement 64-byte block count */
+        jnz Lloop
+        mfence         /* Ensure that the writes are globally visible, since
+                        * MOVNTDQ is weakly ordered */
+        movups -16(%rsp), %xmm7 /* Restore the XMM register */
+        prefetcht0 0(%rcx)      /* Prefetch the start of the block into cache,
+                                 * since it's likely to be used immediately. */
+Lend:        
+	ret
+	.size	GNAME(fast_bzero), .-GNAME(fast_bzero)
+
+
+        .end

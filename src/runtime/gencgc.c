@@ -420,6 +420,9 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
     fpu_restore(fpu_state);
 }
 
+
+void fast_bzero(void*, size_t); /* in <arch>-assem.S */
+
 /* Zero the pages from START to END (inclusive), but use mmap/munmap instead
  * if zeroing it ourselves, i.e. in practice give the memory back to the
  * OS. Generally done after a large GC.
@@ -451,7 +454,7 @@ zero_pages(page_index_t start, page_index_t end) {
     if (start > end)
       return;
 
-    memset(page_address(start), 0, PAGE_BYTES*(1+end-start));
+    fast_bzero(page_address(start), PAGE_BYTES*(1+end-start));
 }
 
 /* Zero the pages from START to END (inclusive), except for those
@@ -473,6 +476,7 @@ zero_dirty_pages(page_index_t start, page_index_t end) {
         page_table[i].need_to_zero = 1;
     }
 }
+'
 
 
 /*
