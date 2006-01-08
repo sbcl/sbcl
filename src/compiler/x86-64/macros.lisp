@@ -19,7 +19,13 @@
   (once-only ((n-dst dst)
               (n-src src))
     `(unless (location= ,n-dst ,n-src)
-       (inst mov ,n-dst ,n-src))))
+       (sc-case ,n-dst
+         (single-reg
+          (inst movss ,n-dst ,n-src))
+         (double-reg
+          (inst movsd ,n-dst ,n-src))
+         (t
+          (inst mov ,n-dst ,n-src))))))
 
 (defmacro make-ea-for-object-slot (ptr slot lowtag)
   `(make-ea :qword :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))

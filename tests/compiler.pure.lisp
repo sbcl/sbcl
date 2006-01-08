@@ -1905,4 +1905,13 @@
                    (1+ x))))
   (assert (= count1 0)))
 
+;;; Up to 0.9.8.22 x86-64 had broken return value handling in the
+;;; %SET-SAP-REF-DOUBLE/SINGLE VOPs.
+(with-test (:name :sap-ref-float)
+  (compile nil '(lambda (sap)
+                 (let ((x (setf (sb-vm::sap-ref-double sap 0) 1d0)))
+                   (1+ x))))
+  (compile nil '(lambda (sap)
+                 (let ((x (setf (sb-vm::sap-ref-single sap 0) 1d0)))
+                   (1+ x)))))
 
