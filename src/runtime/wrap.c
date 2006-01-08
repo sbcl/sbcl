@@ -30,6 +30,7 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <unistd.h>
 #ifndef LISP_FEATURE_WIN32
 #include <pwd.h>
@@ -238,13 +239,21 @@ stat_wrapper(const char *file_name, struct stat_wrapper *buf)
 
 #ifdef LISP_FEATURE_WIN32
     /*
-     * Windows won't match the last component of a pathname if there is
-     * a trailing #\/ character. So we do silly things like this:
+     * Windows won't match the last component of a pathname if there
+     * is a trailing #\/ or #\\, except if it's <drive>:\ or <drive>:/
+     * in which case it behaves the other way around. So we remove the
+     * trailing directory separator unless we are being passed just a
+     * drive name (e.g. "c:\\").  Some, but not all, of this
+     * strangeness is documented at Microsoft's support site (as of
+     * 2006-01-08, at
+     * <http://support.microsoft.com/default.aspx?scid=kb;en-us;168439>)
      */
     char file_buf[MAX_PATH];
     strcpy(file_buf, file_name);
-    int foo = strlen(file_name);
-    if (foo && (file_name[foo-1] == '/')) file_buf[foo-1] = 0;
+    int len = strlen(file_name);
+    if (len != 0 && (file_name[len-1] == '/' || file_name[len-1] == '\\') &&
+        !(len == 3 && file_name[1] == ':' && isalpha(file_name[0])))
+        file_buf[len-1] = '\0';
     file_name = file_buf;
 #endif
 
@@ -351,6 +360,7 @@ wrapped_environ()
 #ifdef LISP_FEATURE_WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <time.h>
 /*
  * faked-up implementation of select(). Right now just enough to get through
  * second genesis.
@@ -377,7 +387,7 @@ int select(int top_fd, DWORD *read_set, DWORD *write_set, DWORD *except_set, tim
         if (read_set[i >> 5] & (1 << (i & 31))) {
             read_set[i >> 5] &= ~(1 << (i & 31));
             fds[num_handles] = i;
-            handles[num_handles++] = _get_osfhandle(i);
+            handles[num_handles++] = (HANDLE) _get_osfhandle(i);
         }
     }
 
