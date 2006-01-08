@@ -377,7 +377,10 @@
            (rsp rsp-tn)
            (xmm0 float0-tn)
            ([rsp] (make-ea :qword :base rsp :disp 0))
-           (words-processed 0)
+           ;; How many arguments have been copied
+           (arg-count 0)
+           ;; How many arguments have been copied from the stack
+           (stack-argument-count 0)
            (gprs (mapcar (make-tn-maker 'any-reg) *c-call-register-arg-offsets*))
            (fprs (mapcar (make-tn-maker 'double-reg)
                          ;; Only 8 first XMM registers are used for
@@ -389,21 +392,44 @@
         ;; Copy arguments from registers to stack
         (dolist (type argument-types)
           (let ((integerp (not (alien-float-type-p type)))
-                (stack-tn (make-ea :qword :base rsp
-                                   :disp (* words-processed
-                                            n-word-bytes))))
-            (incf words-processed)
+                ;; A TN pointing to the stack location where the
+                ;; current argument should be stored for the purposes
+                ;; of ENTER-ALIEN-CALLBACK.
+                (target-tn (make-ea :qword :base rsp
+                                   :disp (* arg-count
+                                            n-word-bytes)))
+                ;; A TN pointing to the stack location that contains
+                ;; the next argument passed on the stack.
+                (stack-arg-tn (make-ea :qword :base rsp
+                                       :disp (* (+ 1
+                                                   (length argument-types)
+                                                   stack-argument-count)
+                                                n-word-bytes))))
+            (incf arg-count)
             (cond (integerp
                    (let ((gpr (pop gprs)))
-                     (if gpr
-                         (inst mov stack-tn gpr)
-                         (out-of-registers-error))))
+                     ;; Argument not in register, copy it from the old
+                     ;; stack location to a temporary register.
+                     (unless gpr
+                       (incf stack-argument-count)
+                       (setf gpr temp-reg-tn)
+                       (inst mov gpr stack-arg-tn))
+                     ;; Copy from either argument register or temporary
+                     ;; register to target.
+                     (inst mov target-tn gpr)))
                   ((or (alien-single-float-type-p type)
                        (alien-double-float-type-p type))
                    (let ((fpr (pop fprs)))
-                     (if fpr
-                         (inst movq stack-tn fpr)
-                         (out-of-registers-error))))
+                     (cond (fpr
+                            ;; Copy from float register to target location.
+                            (inst movq target-tn fpr))
+                           (t
+                            ;; Not in float register. Copy from stack to
+                            ;; temporary (general purpose) register, and
+                            ;; from there to the target location.
+                            (incf stack-argument-count)
+                            (inst mov temp-reg-tn stack-arg-tn)
+                            (inst mov target-tn temp-reg-tn)))))
                   (t
                    (bug "Unknown alien floating point type: ~S" type)))))
 
@@ -412,7 +438,7 @@
         ;; Indirect the access to ENTER-ALIEN-CALLBACK through
         ;; the symbol-value slot of SB-ALIEN::*ENTER-ALIEN-CALLBACK*
         ;; to ensure it'll work even if the GC moves ENTER-ALIEN-CALLBACK.
-        ;; Skip any SB-THREAD TLS magic, since we don't expecte anyone
+        ;; Skip any SB-THREAD TLS magic, since we don't expect anyone
         ;; to rebind the variable. -- JES, 2006-01-01
         (inst mov rdi (+ nil-value (static-symbol-offset
                                     'sb!alien::*enter-alien-callback*)))

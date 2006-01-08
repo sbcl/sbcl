@@ -237,46 +237,34 @@
 (with-test (:name :call-6-int-callback)
   (assert (= (alien-apply *add-i-i-i-i-i-i* (iota 6)) 21)))
 
-(with-test (:name :define-7-int-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-7-int-callback)
   (define-callback-adder int int int int int int int int))
-(with-test (:name :call-7-int-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-7-int-callback)
   (assert (= (alien-apply *add-i-i-i-i-i-i-i* (iota 7)) 28)))
 
-(with-test (:name :define-8-int-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-8-int-callback)
   (define-callback-adder int int int int int int int int int))
-(with-test (:name :call-8-int-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-8-int-callback)
   (assert (= (alien-apply *add-i-i-i-i-i-i-i-i* (iota 8)) 36)))
 
-(with-test (:name :define-9-int-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-9-int-callback)
   (define-callback-adder int int int int int int int int int int))
-(with-test (:name :call-9-int-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-9-int-callback)
   (assert (= (alien-apply *add-i-i-i-i-i-i-i-i-i* (iota 9)) 45)))
 
-(with-test (:name :define-10-int-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-10-int-callback)
   (define-callback-adder int int int int int int int int int int int))
-(with-test (:name :call-10-int-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-10-int-callback)
   (assert (= (alien-apply *add-i-i-i-i-i-i-i-i-i-i* (iota 10)) 55)))
 
-(with-test (:name :define-11-int-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-11-int-callback)
   (define-callback-adder int int int int int int int int int int int int))
-(with-test (:name :call-11-int-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-11-int-callback)
   (assert (= (alien-apply *add-i-i-i-i-i-i-i-i-i-i-i* (iota 11)) 66)))
 
-(with-test (:name :define-12-int-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-12-int-callback)
   (define-callback-adder int int int int int int int int int int int int int))
-(with-test (:name :call-12-int-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-12-int-callback)
   (assert (= (alien-apply *add-i-i-i-i-i-i-i-i-i-i-i-i* (iota 12)) 78)))
 
 (with-test (:name :define-2-float-callback)
@@ -314,32 +302,24 @@
 (with-test (:name :call-8-float-callback)
   (assert (= (alien-apply *add-f-f-f-f-f-f-f-f* (iota 8.0s0)) 36.0s0)))
 
-(with-test (:name :define-9-float-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-9-float-callback)
   (define-callback-adder float float float float float float float float float float))
-(with-test (:name :call-9-float-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-9-float-callback)
   (assert (= (alien-apply *add-f-f-f-f-f-f-f-f-f* (iota 9.0s0)) 45.0s0)))
 
-(with-test (:name :define-10-float-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-10-float-callback)
   (define-callback-adder float float float float float float float float float float float))
-(with-test (:name :call-10-float-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-10-float-callback)
   (assert (= (alien-apply *add-f-f-f-f-f-f-f-f-f-f* (iota 10.0s0)) 55.0s0)))
 
-(with-test (:name :define-11-float-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-11-float-callback)
   (define-callback-adder float float float float float float float float float float float float))
-(with-test (:name :call-11-float-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-11-float-callback)
   (assert (= (alien-apply *add-f-f-f-f-f-f-f-f-f-f-f* (iota 11.0s0)) 66.0s0)))
 
-(with-test (:name :define-12-float-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-12-float-callback)
   (define-callback-adder float float float float float float float float float float float float float))
-(with-test (:name :call-12-float-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-12-float-callback)
   (assert (= (alien-apply *add-f-f-f-f-f-f-f-f-f-f-f-f* (iota 12.0s0)) 78.0s0)))
 
 (with-test (:name :define-2-double-callback)
@@ -377,32 +357,24 @@
 (with-test (:name :call-8-double-callback)
   (assert (= (alien-apply *add-d-d-d-d-d-d-d-d* (iota 8.0d0)) 36.0d0)))
 
-(with-test (:name :define-9-double-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-9-double-callback)
   (define-callback-adder double double double double double double double double double double))
-(with-test (:name :call-9-double-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-9-double-callback)
   (assert (= (alien-apply *add-d-d-d-d-d-d-d-d-d* (iota 9.0d0)) 45.0d0)))
 
-(with-test (:name :define-10-double-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-10-double-callback)
   (define-callback-adder double double double double double double double double double double double))
-(with-test (:name :call-10-double-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-10-double-callback)
   (assert (= (alien-apply *add-d-d-d-d-d-d-d-d-d-d* (iota 10.0d0)) 55.0d0)))
 
-(with-test (:name :define-11-double-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-11-double-callback)
   (define-callback-adder double double double double double double double double double double double double))
-(with-test (:name :call-11-double-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-11-double-callback)
   (assert (= (alien-apply *add-d-d-d-d-d-d-d-d-d-d-d* (iota 11.0d0)) 66.0d0)))
 
-(with-test (:name :define-12-double-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :define-12-double-callback)
   (define-callback-adder double double double double double double double double double double double double double))
-(with-test (:name :call-12-double-callback
-                  :fails-on '(or :x86-64))
+(with-test (:name :call-12-double-callback)
   (assert (= (alien-apply *add-d-d-d-d-d-d-d-d-d-d-d-d* (iota 12.0d0)) 78.0d0)))
 
 (with-test (:name :define-int-float-callback)
