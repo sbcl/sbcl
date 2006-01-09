@@ -2787,21 +2787,6 @@
       (emit-byte segment #b11001101)
       (emit-byte segment number)))))
 
-(define-instruction into (segment)
-  (:printer byte ((op #b11001110)))
-  (:emitter
-   (emit-byte segment #b11001110)))
-
-(define-instruction bound (segment reg bounds)
-  (:emitter
-   (let ((size (matching-operand-size reg bounds)))
-     (when (eq size :byte)
-       (error "can't bounds-test bytes: ~S" reg))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment bounds reg)
-     (emit-byte segment #b01100010)
-     (emit-ea segment bounds (reg-tn-encoding reg)))))
-
 (define-instruction iret (segment)
   (:printer byte ((op #b11001111)))
   (:emitter
