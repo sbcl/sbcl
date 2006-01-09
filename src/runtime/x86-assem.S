@@ -870,7 +870,7 @@ GNAME(fast_bzero_pointer):
         /* Variable containing a pointer to the bzero function to use.
          * Initially points to a function that detects which implementation
          * should be used, and then updates the variable. */
-        .long fast_bzero_detect        
+        .long GNAME(fast_bzero_detect)
 
 	.text
 	.align	align_8byte,0x90
@@ -878,7 +878,7 @@ GNAME(fast_bzero_pointer):
 	TYPE(GNAME(fast_bzero))
 GNAME(fast_bzero):        
         /* Indirect function call */
-        jmp *fast_bzero_pointer
+        jmp *GNAME(fast_bzero_pointer)
 	SIZE(GNAME(fast_bzero))
         
       
@@ -904,10 +904,10 @@ GNAME(fast_bzero_detect):
          * for all non-SSE2 processors.
          */
 Lbase:
-        movl $fast_bzero_base, fast_bzero_pointer
+        movl $GNAME(fast_bzero_base), GNAME(fast_bzero_pointer)
         jmp Lrestore
 Lsse2:
-        movl $fast_bzero_sse, fast_bzero_pointer
+        movl $GNAME(fast_bzero_sse), GNAME(fast_bzero_pointer)
         jmp Lrestore
         
 Lrestore:
@@ -915,7 +915,7 @@ Lrestore:
         pop %ecx
         pop %ebx
         pop %eax
-        jmp *fast_bzero_pointer
+        jmp *GNAME(fast_bzero_pointer)
         
 	SIZE(GNAME(fast_bzero_detect))
         
