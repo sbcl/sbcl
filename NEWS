@@ -13,6 +13,7 @@ changes in sbcl-0.9.9 relative to sbcl-0.9.8:
   * optimization: faster implementation of EQUAL
   * optimization: emit more efficient opcodes for some common 
     immediate->register MOV instructions on x86-64.  (thanks to Lutz Euler)
+  * optimization: several other minor code-generation improvements on x86-64
   * fixed segfaults on x86 FreeBSD 7-current.  (thanks to NIIMI Satoshi)
 
 changes in sbcl-0.9.8 relative to sbcl-0.9.7:

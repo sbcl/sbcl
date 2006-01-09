@@ -193,62 +193,43 @@
     (inst shr tmp 61)
     (inst jmp (if not-p :nz :z) target)))
 
-(define-vop (signed-byte-32-p type-predicate)
-  (:translate signed-byte-32-p)
-  (:generator 7
-    ;; (and (fixnum) (or (no bits set >31) (all bits set >31))
-    (move rax-tn value)
-    (inst test rax-tn 7)
-    (inst jmp :ne (if not-p target NOT-TARGET))
-    (inst sar rax-tn (+ 32 3 -1))
-    (if not-p
-        (progn
-          (inst jmp :nz MAYBE)
-          (inst jmp NOT-TARGET))
-        (inst jmp :z target))
-    MAYBE
-    (inst cmp rax-tn -1)
-    (inst jmp (if not-p :ne :eq) target)
+;;; A (SIGNED-BYTE 64) can be represented with either fixnum or a bignum with
+;;; exactly one digit.
+
+(define-vop (signed-byte-64-p type-predicate)
+  (:translate signed-byte-64-p)
+  (:generator 45
+    (multiple-value-bind (yep nope)
+        (if not-p
+            (values not-target target)
+            (values target not-target))
+      (generate-fixnum-test value)
+      (inst jmp :e yep)
+      (move rax-tn value)
+      (inst and al-tn lowtag-mask)
+      (inst cmp al-tn other-pointer-lowtag)
+      (inst jmp :ne nope)
+      (loadw rax-tn value 0 other-pointer-lowtag)
+      (inst cmp rax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+      (inst jmp (if not-p :ne :e) target))
     NOT-TARGET))
 
-(define-vop (check-signed-byte-32 check-type)
-  (:generator 8
+(define-vop (check-signed-byte-64 check-type)
+  (:generator 45
     (let ((nope (generate-error-code vop
-                                     object-not-signed-byte-32-error
-                                     value))
-          (ok (gen-label)))
+                                     object-not-signed-byte-64-error
+                                     value)))
+      (generate-fixnum-test value)
+      (inst jmp :e yep)
       (move rax-tn value)
-      (inst test rax-tn 7)
+      (inst and al-tn lowtag-mask)
+      (inst cmp al-tn other-pointer-lowtag)
       (inst jmp :ne nope)
-      (inst sar rax-tn (+ 32 3 -1))
-      (inst jmp :z ok)
-      (inst cmp rax-tn -1)
-      (inst jmp :ne nope)
-      (emit-label ok)
-      (move result value))))
-
-
-(define-vop (unsigned-byte-32-p type-predicate)
-  (:translate unsigned-byte-32-p)
-  (:generator 7
-    ;; (and (fixnum) (no bits set >31))
-    (move rax-tn value)
-    (inst test rax-tn 7)
-    (inst jmp :ne (if not-p target NOT-TARGET))
-    (inst shr rax-tn (+ 32 sb!vm::n-fixnum-tag-bits))
-    (inst jmp (if not-p :nz :z) target)
-    NOT-TARGET))
-
-(define-vop (check-unsigned-byte-32 check-type)
-  (:generator 8
-    (let ((nope
-           (generate-error-code vop object-not-unsigned-byte-32-error value)))
-      (move rax-tn value)
-      (inst test rax-tn 7)
-      (inst jmp :ne nope)
-      (inst shr rax-tn (+ 32 sb!vm::n-fixnum-tag-bits))
-      (inst jmp :nz nope)
-      (move result value))))
+      (loadw rax-tn value 0 other-pointer-lowtag)
+      (inst cmp rax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+      (inst jmp :ne nope))
+    YEP
+    (move result value)))
 
 ;;; An (unsigned-byte 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with

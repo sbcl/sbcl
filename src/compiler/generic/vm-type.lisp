@@ -191,10 +191,18 @@
     (numeric-type
      (cond ((type= type (specifier-type 'fixnum))
             'sb!c:check-fixnum)
+           #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
            ((type= type (specifier-type '(signed-byte 32)))
             'sb!c:check-signed-byte-32)
+           #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
            ((type= type (specifier-type '(unsigned-byte 32)))
             'sb!c:check-unsigned-byte-32)
+           #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+           ((type= type (specifier-type '(signed-byte 64)))
+            'sb!c:check-signed-byte-64)
+           #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+           ((type= type (specifier-type '(unsigned-byte 64)))
+            'sb!c:check-unsigned-byte-64)
            (t nil)))
     (fun-type
      'sb!c:check-fun)

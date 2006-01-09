@@ -46,7 +46,15 @@
            ;; lemme know. -- WHN 2001-10-15
            #(t
              character
-             bit fixnum (unsigned-byte 32) (signed-byte 32)
+             bit fixnum
+             #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+             (unsigned-byte 32)
+             #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+             (unsigned-byte 64)
+             #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+             (signed-byte 32)
+             #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+             (signed-byte 64)
              single-float double-float)))
       (coerce (remove-duplicates
                (mapcar (lambda (typespec)
@@ -77,7 +85,10 @@
                           symbol
                           unsigned-byte
                           (unsigned-byte 8)
-                          (unsigned-byte 32))
+                          #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+                          (unsigned-byte 32)
+                          #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                          (unsigned-byte 64))
                         ;; systematic names for array types
                         (map 'list
                              (lambda (element-type)
