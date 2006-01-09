@@ -20,22 +20,27 @@
 
 #include <stdio.h>
 #include <sys/types.h>
-#include <sys/times.h>
+#ifdef _WIN32
+  #include <stdlib.h>
+#else
+  #include <sys/times.h>
+  #include <sys/wait.h>
+  #include <sys/ioctl.h>
+  #include <sys/termios.h>
+  #ifdef __APPLE_CC__
+    #include "../src/runtime/ppc-darwin-dlshim.h"
+    #include "../src/runtime/ppc-darwin-langinfo.h"
+  #else
+    #include <dlfcn.h>
+    #include <langinfo.h>
+  #endif
+#endif
+
 #include <sys/stat.h>
-#include <sys/wait.h>
-#include <sys/ioctl.h>
-#include <sys/termios.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
-#ifdef __APPLE_CC__
-  #include "../src/runtime/ppc-darwin-dlshim.h"
-  #include "../src/runtime/ppc-darwin-langinfo.h"
-#else
-  #include <dlfcn.h>
-  #include <langinfo.h>
-#endif
 
 #include "genesis/config.h"
 
@@ -74,7 +79,9 @@ main(int argc, char *argv[])
 ;;;; See the program \"grovel-headers.c\".\n\
 \n\
 ");
-
+#ifdef _WIN32
+    printf (";;; This file is presently unused for the Windows version of sbcl.\n");
+#else
     printf("(in-package \"SB!ALIEN\")\n\n");
 
     printf (";;;flags for dlopen()\n");
@@ -223,5 +230,6 @@ main(int argc, char *argv[])
     defsignal("sigxcpu", SIGXCPU);
     defsignal("sigxfsz", SIGXFSZ);
 #endif
+#endif // _WIN32
     return 0;
 }

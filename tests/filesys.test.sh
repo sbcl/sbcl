@@ -6,7 +6,7 @@
 # While most of SBCL is derived from the CMU CL system, the test
 # files (like this one) were written from scratch after the fork
 # from CMU CL.
-# 
+#
 # This software is in the public domain and is provided with
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
@@ -109,28 +109,28 @@ $SBCL <<EOF
 (defun absolutify (pathname)
   "Convert a possibly-relative pathname to absolute."
   (merge-pathnames pathname
-		   (make-pathname :directory
-				  (pathname-directory
-				   *default-pathname-defaults*))))
+                   (make-pathname :directory
+                                  (pathname-directory
+                                   *default-pathname-defaults*))))
 (defun sorted-truenamestrings (pathname-designators)
   "Convert a collection of pathname designators into canonical form
 using TRUENAME, NAMESTRING, and SORT."
   (sort (mapcar #'namestring
-		(mapcar #'truename
-			pathname-designators))
-	#'string<))
+                (mapcar #'truename
+                        pathname-designators))
+        #'string<))
 (defun need-match-1 (directory-pathname result-sorted-truenamestrings)
   "guts of NEED-MATCH"
   (let ((directory-sorted-truenamestrings (sorted-truenamestrings
-					   (directory directory-pathname))))
+                                           (directory directory-pathname))))
     (unless (equal directory-sorted-truenamestrings
-		   result-sorted-truenamestrings)
+                   result-sorted-truenamestrings)
       (format t "~&~@<DIRECTORY argument = ~_~2I~S~:>~%"
-	      directory-pathname)
+              directory-pathname)
       (format t "~&~@<DIRECTORY result = ~_~2I~S~:>~%"
-	      directory-sorted-truenamestrings)
+              directory-sorted-truenamestrings)
       (format t "~&~@<expected result = ~_~2I~S.~:>~%"
-	      result-sorted-truenamestrings)
+              result-sorted-truenamestrings)
       (error "mismatch between DIRECTORY and expected result"))))
 (defun need-match (directory-pathname result-pathnames)
   "Require that (DIRECTORY DIRECTORY-PATHNAME) return RESULT-PATHNAMES
@@ -156,34 +156,34 @@ Lisp filename syntax idiosyncrasies)."
   (need-match "./animal" '("animal/"))
   (need-match "animal/*.*" '("animal/invertebrate/" "animal/vertebrate/"))
   (need-match "animal/*/*.*"
-	      '("animal/vertebrate/bird/"
-		"animal/vertebrate/mammal/"
-		"animal/vertebrate/snake/"))
+              '("animal/vertebrate/bird/"
+                "animal/vertebrate/mammal/"
+                "animal/vertebrate/snake/"))
   (need-match "plant/*.*" '("plant/kingsfoil" "plant/pipeweed"))
   (need-match "plant/**/*.*" '("plant/kingsfoil" "plant/pipeweed"))
   (need-match "plant/**/**/*.*" '("plant/kingsfoil" "plant/pipeweed"))
   (let ((vertebrates (mapcar (lambda (stem)
-			       (concatenate 'string
-					    "animal/vertebrate/"
-					    stem))
-			     '("bird/"
-			       "mammal/"
-			       "mammal/bear/" "mammal/bear/grizzly"
-			       "mammal/mythical/" "mammal/mythical/mermaid"
-			       "mammal/mythical/unicorn"
-			       "mammal/platypus"
-			       "mammal/rodent/" "mammal/rodent/beaver"
-			       "mammal/rodent/mouse" "mammal/rodent/rabbit"
-			       "mammal/rodent/rat"
-			       "mammal/ruminant/" "mammal/ruminant/cow"
-			       "mammal/walrus"
-			       "snake/" "snake/python"))))
+                               (concatenate 'string
+                                            "animal/vertebrate/"
+                                            stem))
+                             '("bird/"
+                               "mammal/"
+                               "mammal/bear/" "mammal/bear/grizzly"
+                               "mammal/mythical/" "mammal/mythical/mermaid"
+                               "mammal/mythical/unicorn"
+                               "mammal/platypus"
+                               "mammal/rodent/" "mammal/rodent/beaver"
+                               "mammal/rodent/mouse" "mammal/rodent/rabbit"
+                               "mammal/rodent/rat"
+                               "mammal/ruminant/" "mammal/ruminant/cow"
+                               "mammal/walrus"
+                               "snake/" "snake/python"))))
     (need-match "animal/vertebrate/**/*.*" vertebrates)
     (need-match "animal/vertebrate/mammal/../**/*.*" vertebrates)
     (need-match "animal/vertebrate/mammal/../**/**/*.*" vertebrates)
     #+nil
     (need-match "animal/vertebrate/mammal/mythical/../**/../**/*.*"
-		vertebrates))
+                vertebrates))
   (need-match "animal/vertebrate/**/robot.*" nil)
   (need-match "animal/vertebrate/mammal/../**/*.robot" nil)
   (need-match "animal/vertebrate/mammal/../**/robot/*.*" nil)

@@ -6,7 +6,7 @@
 # While most of SBCL is derived from the CMU CL system, the test
 # files (like this one) were written from scratch after the fork
 # from CMU CL.
-# 
+#
 # This software is in the public domain and is provided with
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
@@ -39,11 +39,11 @@ expect_failed_compile $tmpfilename
 # having the same name.
 cat > $tmpfilename <<EOF
     (in-package :cl-user)
-    (defun foo (x) 
+    (defun foo (x)
       (flet ((baz (y) (load y)))
         (declare (notinline baz))
         (baz x)))
-    (defun bar (x) 
+    (defun bar (x)
       (flet ((baz (y) (load y)))
         (declare (notinline baz))
         (baz x)))
@@ -93,7 +93,7 @@ expect_clean_compile $tmpfilename
 cat > $tmpfilename <<EOF
     (in-package :cl-user)
     (defun foo (x) (list x))
-    (defun bar (x) 
+    (defun bar (x)
       (declare (notinline foo))
       (1+ (foo x)))
 EOF
@@ -162,12 +162,12 @@ fail_on_compiler_note $tmpfilename
 # been there
 cat > $tmpfilename <<EOF
     (eval-when (:compile-toplevel :load-toplevel :execute)
-      (defstruct buffer-state 
+      (defstruct buffer-state
         (output-index 0)))
-    
+
     (defclass buffered-stream-mixin ()
       ((buffer-state :initform (make-buffer-state))))
-    
+
     (defgeneric frob (stream))
     (defmethod frob ((stream t))
       nil)
@@ -320,7 +320,7 @@ expect_clean_compile $tmpfilename
 cat > $tmpfilename <<EOF
 (defun bar ()
   (let ((result ""))
-    (nreverse result)))  
+    (nreverse result)))
 EOF
 expect_clean_compile $tmpfilename
 
@@ -355,5 +355,5 @@ expect_clean_compile $tmpfilename
 rm $tmpfilename
 rm $compiled_tmpfilename
 
-# success 
+# success
 exit 104

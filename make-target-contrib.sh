@@ -51,7 +51,7 @@ done
 for i in contrib/*; do
     test -d $i && test -f $i/Makefile || continue;
     # export INSTALL_DIR=$SBCL_HOME/`basename $i `
-    test -f $i/test-passed && rm $i/test-passed 
+    test -f $i/test-passed && rm $i/test-passed
     $GNUMAKE -C $i test && touch $i/test-passed
 done
 
@@ -62,10 +62,10 @@ for dir in contrib/*
 do
   if [ -d "$dir" -a -f "$dir/Makefile" -a ! -f "$dir/test-passed" ]; then
       if $HEADER_HAS_BEEN_PRINTED; then
-	  echo > /dev/null
+          echo > /dev/null
       else
-	  echo "Failed contribs:"
-	  HEADER_HAS_BEEN_PRINTED=true
+          echo "Failed contribs:"
+          HEADER_HAS_BEEN_PRINTED=true
       fi
       echo "  `basename $dir`"
   fi

@@ -54,11 +54,11 @@ DOCSTRINGDIR="${DOCSTRINGDIR:-docstrings/}"
 
 echo /creating docstring snippets from SBCL=\'$SBCLRUNTIME\' for packages \'$PACKAGES\'
 $SBCL <<EOF
-(load "docstrings.lisp") 
+(load "docstrings.lisp")
 (require :asdf)
-(dolist (module (quote ($MODULES))) 
-  (require module)) 
-(sb-texinfo:generate-includes "$DOCSTRINGDIR" $PACKAGES) 
+(dolist (module (quote ($MODULES)))
+  (require module))
+(sb-texinfo:generate-includes "$DOCSTRINGDIR" $PACKAGES)
 (sb-ext:quit))
 EOF
 

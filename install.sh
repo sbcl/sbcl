@@ -3,10 +3,10 @@ set -e
 
 # Install SBCL files into the usual places.
 
-ensure_dirs () 
+ensure_dirs ()
 {
-    for j in $*; do 
-	test -d $j || mkdir -p $j
+    for j in $*; do
+        test -d $j || mkdir -p $j
     done;
 }
 
@@ -28,10 +28,10 @@ fi
 # Before doing anything else, make sure we have an SBCL to install
 if [ -f src/runtime/sbcl ]; then
     if [ -f output/sbcl.core ]; then
-	true
+        true
     else
-	echo "output/sbcl.core not found, aborting installation."
-	exit 1
+        echo "output/sbcl.core not found, aborting installation."
+        exit 1
     fi
 else
     echo "src/runtime/sbcl not found, aborting installation."
@@ -58,7 +58,7 @@ test -f $BUILD_ROOT$SBCL_HOME/sbcl.core && \
 cp src/runtime/sbcl $BUILD_ROOT$INSTALL_ROOT/bin/
 cp output/sbcl.core $BUILD_ROOT$SBCL_HOME/sbcl.core
 
-# installing contrib 
+# installing contrib
 
 SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --userinit /dev/null --sysinit /dev/null --disable-debugger"
 SBCL_BUILDING_CONTRIB=1

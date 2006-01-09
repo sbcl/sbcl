@@ -22,7 +22,7 @@ set -e
 # This script is not a reliable way to build the system, but it is
 # fast.:-| It can be useful if you are trying to debug a low-level
 # problem, e.g. a problem in src/runtime/*.c or in
-# src/code/cold-init.lisp. Soon, you'll find yourself wanting to 
+# src/code/cold-init.lisp. Soon, you'll find yourself wanting to
 # test a small change in a file compiled into cold-sbcl.core without
 # redoing the entire rebuild-the-system-from-scratch process. You may be
 # able to avoid a complete make-host-2.sh by just letting this script
@@ -57,10 +57,10 @@ set -e
 #    Mostly it looks as though such limitations aren't fixable without
 #    the aforementioned rearchitecting or solving the halting problem.
 #
-# To make this work, you need an after-xc.core file. To cause the 
+# To make this work, you need an after-xc.core file. To cause the
 # system to generate an after-xc.core file, you need
 # :SB-AFTER-XC-CORE in target features during an ordinary build.
-# See the comments in base-target-features.lisp-expr for the 
+# See the comments in base-target-features.lisp-expr for the
 # recommended way to make that happen.
 #######################################################################
 
@@ -89,9 +89,9 @@ case "$HOST_TYPE" in
            ;;
     openmcl)
            LISP="openmcl"
-	   INIT="-b"
-	   CORE="-I"
-	   ;;
+           INIT="-b"
+           CORE="-I"
+           ;;
     *)     echo unknown host type: "$HOST_TYPE"
            echo should be one of "sbcl", "cmucl", or "clisp"
            exit 1

@@ -24,7 +24,7 @@ export LANG LC_ALL
 #
 # (This C build has to come after the first genesis in order to get
 # the sbcl.h the C build needs, and come before the second genesis in
-# order to produce the symbol table file that second genesis needs. It 
+# order to produce the symbol table file that second genesis needs. It
 # could come either before or after running the cross compiler; that
 # doesn't matter.)
 echo //building runtime system and symbol table file

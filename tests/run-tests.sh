@@ -6,7 +6,7 @@
 #  --break-on-failure            Break into the debugger when a test fails
 #                                unexpectedly
 #  --break-on-expected-failure   Break into the debugger when any test fails
-#  
+#
 # If no test files are specified, runs all tests.
 
 # This software is part of the SBCL system. See the README file for
@@ -15,7 +15,7 @@
 # While most of SBCL is derived from the CMU CL system, the test
 # files (like this one) were written from scratch after the fork
 # from CMU CL.
-# 
+#
 # This software is in the public domain and is provided with
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.

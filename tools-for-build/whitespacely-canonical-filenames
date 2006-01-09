@@ -11,7 +11,7 @@
 # conservative syntax used in SBCL sources)
 source_extensions='.lisp .lisp-expr .c .h'
 # other candidates:
-#   .sh
+#   .sh: if ./make.sh is altered, Bad Things happen
 #   ?
 
 for source_extension in $source_extensions; do 

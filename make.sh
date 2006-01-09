@@ -33,7 +33,7 @@ set -e
 #                 endlessly for a programmer to help it out with input
 #                 on *DEBUG-IO*
 #   "lisp -batch" to use an existing CMU CL binary as a cross-compilation host
-#   "lisp -noinit -batch" 
+#   "lisp -noinit -batch"
 #                 to use an existing CMU CL binary as a cross-compilation host
 #                 when you have weird things in your .cmucl-init file
 #   "openmcl --batch"
@@ -50,7 +50,7 @@ set -e
 # optimizations (especially specializable arrays) that it doesn't
 # know how to implement how in a portable way. (Or maybe that wouldn't
 # require a second pass, just testing at build-the-cross-compiler time
-# whether the cross-compilation host returns suitable values from 
+# whether the cross-compilation host returns suitable values from
 # UPGRADED-ARRAY-ELEMENT-TYPE?)
 
 LANG=C
@@ -87,7 +87,7 @@ tools-for-build/canonicalize-whitespace
 #     identify the target architecture).
 #   On the host system:
 #     SBCL_XC_HOST=<whatever> sh make-host-1.sh
-#   Copy src/runtime/genesis/*.h from the host system to the target 
+#   Copy src/runtime/genesis/*.h from the host system to the target
 #     system.
 #   On the target system:
 #     sh make-target-1.sh
@@ -112,7 +112,7 @@ NCONTRIBS=`find contrib -name Makefile -print | wc -l`
 NPASSED=`find contrib -name test-passed -print | wc -l`
 echo
 echo "The build seems to have finished successfully, including $NPASSED (out of $NCONTRIBS)"
-echo "contributed modules. If you would like to run more extensive tests on" 
+echo "contributed modules. If you would like to run more extensive tests on"
 echo "the new SBCL, you can try:"
 echo
 echo "  cd tests && sh ./run-tests.sh"
@@ -127,7 +127,7 @@ echo "  cd doc/manual && make"
 echo
 echo "To install SBCL (more information in INSTALL):"
 echo
-echo "  sh install.sh" 
+echo "  sh install.sh"
 
 build_finished=`date`
 echo

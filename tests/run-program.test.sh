@@ -8,7 +8,7 @@
 # While most of SBCL is derived from the CMU CL system, the test
 # files (like this one) were written from scratch after the fork
 # from CMU CL.
-# 
+#
 # This software is in the public domain and is provided with
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
@@ -22,10 +22,10 @@ export PATH
 
 ${SBCL:-sbcl} <<EOF
   ;; test that $PATH is searched
-  (assert (zerop (sb-ext:process-exit-code 
-	          (sb-ext:run-program "true" () :search t :wait t))))
-  (assert (not (zerop (sb-ext:process-exit-code 
-	               (sb-ext:run-program "false" () :search t :wait t)))))
+  (assert (zerop (sb-ext:process-exit-code
+                  (sb-ext:run-program "true" () :search t :wait t))))
+  (assert (not (zerop (sb-ext:process-exit-code
+                       (sb-ext:run-program "false" () :search t :wait t)))))
   (let ((string (with-output-to-string (stream)
                   (sb-ext:run-program "/bin/echo"
                                       '("foo" "bar")
@@ -36,8 +36,8 @@ ${SBCL:-sbcl} <<EOF
   ;; (instead of CMU CL alist-of-keywords convention).
   (let ((string (with-output-to-string (stream)
                   (sb-ext:run-program "/usr/bin/env" ()
-		                      :output stream
-				      :environment '("FEEFIE=foefum")))))
+                                      :output stream
+                                      :environment '("FEEFIE=foefum")))))
     (assert (string= string "FEEFIE=foefum
 ")))
   ;; The default Unix environment for the subprocess is the same as
@@ -45,13 +45,13 @@ ${SBCL:-sbcl} <<EOF
   ;; other programs, but not like CMU CL.)
   (let ((string (with-output-to-string (stream)
                   (sb-ext:run-program "/usr/bin/env" ()
-		                      :output stream)))
-	(expected (apply #'concatenate
-	                 'string
-			 (mapcar (lambda (environ-string)
-			           (concatenate 'string
-				                environ-string
-						(string #\newline)))
+                                      :output stream)))
+        (expected (apply #'concatenate
+                         'string
+                         (mapcar (lambda (environ-string)
+                                   (concatenate 'string
+                                                environ-string
+                                                (string #\newline)))
                                  (sb-ext:posix-environ)))))
     (assert (string= string expected)))
   ;; That's not just because POSIX-ENVIRON is having a bad hair

@@ -18,8 +18,8 @@ tar -cf $b-binary.tar \
     $b/pubring.pgp \
     $b/contrib/asdf-module.mk \
     $b/contrib/vanilla-module.mk \
-    `for dir in $b/contrib/*; do 
-         if test -d $dir && test -f $dir/test-passed; then 
+    `for dir in $b/contrib/*; do
+         if test -d $dir && test -f $dir/test-passed; then
              echo $dir
          fi
      done`

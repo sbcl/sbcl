@@ -27,7 +27,7 @@ echo //entering make-genesis-2.sh
 # symbol table data on the C runtime. And we can get that symbol
 # data only after the C runtime has been built. Therefore, even
 # though we ran GENESIS earlier, we couldn't get it to make a .core
-# file at that time; but we needed to run it earlier in order to 
+# file at that time; but we needed to run it earlier in order to
 # get to where we can write a .core file.)
 echo //loading and running GENESIS to create cold-sbcl.core
 $SBCL_XC_HOST < make-genesis-2.lisp

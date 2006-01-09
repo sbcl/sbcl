@@ -6,7 +6,7 @@
 # While most of SBCL is derived from the CMU CL system, the test
 # files (like this one) were written from scratch after the fork
 # from CMU CL.
-# 
+#
 # This software is in the public domain and is provided with
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
@@ -61,7 +61,7 @@ expect_load_error $tmpfilename
 # succession.
 cat > $tmpfilename <<EOF
     (in-package :cl-user)
-    (defclass another-class-with-slots () 
+    (defclass another-class-with-slots ()
       (a-new-slot-name))
     (defun foo (x)
       (values (setf (slot-value x 'a-new-slot-name) 2)
@@ -72,5 +72,5 @@ expect_clean_compile $tmpfilename
 rm $tmpfilename
 rm $compiled_tmpfilename
 
-# success 
+# success
 exit 104

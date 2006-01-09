@@ -17,6 +17,74 @@ set -e
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+case `uname` in
+    Linux)
+        sbcl_os="linux"
+        ;;
+    OSF1)
+        # it's changed name twice since it was called OSF/1: clearly
+        # the marketers forgot to tell the engineers about Digital Unix
+        # _or_ OSF/1 ...
+        sbcl_os="osf1"
+        ;;
+    *BSD)
+        case `uname` in
+            FreeBSD)
+                sbcl_os="freebsd"
+                ;;
+            OpenBSD)
+                sbcl_os="openbsd"
+                ;;
+            NetBSD)
+                sbcl_os="netbsd"
+                ;;
+            *)
+                echo unsupported BSD variant: `uname`
+                exit 1
+                ;;
+        esac
+        ;;
+    Darwin)
+        sbcl_os="darwin"
+        ;;
+    SunOS)
+        sbcl_os="sunos"
+        ;;
+    CYGWIN* | WindowsNT | MINGW*)
+        sbcl_os="win32"
+        ;;
+    *)
+        echo unsupported OS type: `uname`
+        exit 1
+        ;;
+esac
+
+link_or_copy() {
+   if [ "$sbcl_os" = "win32" ] ; then
+       cp -r "$1" "$2"
+   else
+        ln -s "$1" "$2"
+   fi
+}
+
+remove_dir_safely() {
+   if [ "$sbcl_os" = "win32" ] ; then
+        if [ -d "$1" ] ; then
+            rm -rf "$1"
+        elif [ -e "$1" ] ; then
+            echo "I'm afraid to remove non-directory $1."
+            exit 1
+        fi
+    else
+        if [ -h "$1" ] ; then
+            rm "$1"
+        elif [ -w "$1" ] ; then
+            echo "I'm afraid to replace non-symlink $1 with a symlink."
+            exit 1
+        fi
+    fi
+}
+
 echo //entering make-config.sh
 
 echo //ensuring the existence of output/ directory
@@ -30,10 +98,10 @@ echo ';;;; See make-config.sh.' >> $ltf
 printf '(' >> $ltf
 
 echo //guessing default target CPU architecture from host architecture
-case `uname -m` in 
-    *86) guessed_sbcl_arch=x86 ;; 
+case `uname -m` in
+    *86) guessed_sbcl_arch=x86 ;;
     i86pc) guessed_sbcl_arch=x86 ;;
-    *x86_64) guessed_sbcl_arch=x86-64 ;; 
+    *x86_64) guessed_sbcl_arch=x86-64 ;;
     [Aa]lpha) guessed_sbcl_arch=alpha ;;
     sparc*) guessed_sbcl_arch=sparc ;;
     sun*) guessed_sbcl_arch=sparc ;;
@@ -43,10 +111,10 @@ case `uname -m` in
     mips*) guessed_sbcl_arch=mips ;;
     *)
         # If we're not building on a supported target architecture, we
-	# we have no guess, but it's not an error yet, since maybe
-	# target architecture will be specified explicitly below.
-	guessed_sbcl_arch=''
-	;;
+        # we have no guess, but it's not an error yet, since maybe
+        # target architecture will be specified explicitly below.
+        guessed_sbcl_arch=''
+        ;;
 esac
 
 echo //setting up CPU-architecture-dependent information
@@ -56,35 +124,28 @@ if [ "$sbcl_arch" = "" ] ; then
     echo "can't guess target SBCL architecture, need SBCL_ARCH environment var"
     exit 1
 fi
-printf ":%s" "$sbcl_arch" >> $ltf 
+printf ":%s" "$sbcl_arch" >> $ltf
 
 for d in src/compiler src/assembly; do
     echo //setting up symlink $d/target
     original_dir=`pwd`
+    remove_dir_safely "$d/target"
     cd ./$d
-    if [ -h target ] ; then
-	rm target
-    elif [ -w target ] ; then
-	echo "I'm afraid to replace non-symlink $d/target with a symlink."
-	exit 1
-    fi
     if [ -d $sbcl_arch ] ; then
-	ln -s $sbcl_arch target
+        link_or_copy $sbcl_arch target
     else
-	echo "missing sbcl_arch directory $PWD/$sbcl_arch"
-	exit 1
+        echo "missing sbcl_arch directory $PWD/$sbcl_arch"
+        exit 1
     fi
     cd $original_dir
 done
 
 echo //setting up symlink src/compiler/assembly
-if [ -h src/compiler/assembly ] ; then
-    rm src/compiler/assembly
-elif [ -w src/compiler/assembly ] ; then
-    echo "I'm afraid to replace non-symlink compiler/assembly with a symlink."
-    exit 1
-fi
-ln -s ../assembly src/compiler/assembly
+remove_dir_safely src/compiler/assembly
+original_dir=`pwd`
+cd src/compiler
+link_or_copy ../assembly assembly
+cd $original_dir
 
 echo //setting up OS-dependent information
 original_dir=`pwd`
@@ -93,82 +154,78 @@ rm -f Config target-arch-os.h target-arch.h target-os.h target-lispregs.h
 # KLUDGE: these two logically belong in the previous section
 # ("architecture-dependent"); it seems silly to enforce this in terms
 # of the shell script, though. -- CSR, 2002-02-03
-ln -s $sbcl_arch-arch.h target-arch.h
-ln -s $sbcl_arch-lispregs.h target-lispregs.h
-case `uname` in 
-    Linux)
-	printf ' :elf' >> $ltf
-	printf ' :linux' >> $ltf
-	sbcl_os="linux"
-	if [ $sbcl_arch = "x86-64" ]; then
-            ln -s Config.x86_64-linux Config                                    
-	else                                                                    
-            ln -s Config.$sbcl_arch-linux Config                                
-	fi 
-	ln -s $sbcl_arch-linux-os.h target-arch-os.h
-	ln -s linux-os.h target-os.h
-	;;
-    OSF1)			
-        # it's changed name twice since it was called OSF/1: clearly
-        # the marketers forgot to tell the engineers about Digital Unix
-        # _or_ OSF/1 ...
-	printf ' :elf' >> $ltf
-	printf ' :osf1' >> $ltf
-	sbcl_os="osf1"
-        ln -s Config.$sbcl_arch-osf1 Config
-	ln -s $sbcl_arch-osf1-os.h target-arch-os.h
-	ln -s osf1-os.h target-os.h
-	;;
-    *BSD)
-	printf ' :bsd' >> $ltf
-	ln -s $sbcl_arch-bsd-os.h target-arch-os.h
-	ln -s bsd-os.h target-os.h
-	case `uname` in
-	    FreeBSD)
-		printf ' :elf' >> $ltf
-		printf ' :freebsd' >> $ltf
-		sbcl_os="freebsd"
-		ln -s Config.$sbcl_arch-freebsd Config
-		;;
-	    OpenBSD)
-		printf ' :elf' >> $ltf
-		printf ' :openbsd' >> $ltf
-		sbcl_os="openbsd"
-		ln -s Config.$sbcl_arch-openbsd Config
-		;;
-	    NetBSD)
+link_or_copy $sbcl_arch-arch.h target-arch.h
+link_or_copy $sbcl_arch-lispregs.h target-lispregs.h
+case "$sbcl_os" in
+    linux)
+        printf ' :elf' >> $ltf
+        printf ' :linux' >> $ltf
+        if [ $sbcl_arch = "x86-64" ]; then
+            link_or_copy Config.x86_64-linux Config
+        else
+            link_or_copy Config.$sbcl_arch-linux Config
+        fi
+        link_or_copy $sbcl_arch-linux-os.h target-arch-os.h
+        link_or_copy linux-os.h target-os.h
+        ;;
+    osf1)
+        printf ' :elf' >> $ltf
+        printf ' :osf1' >> $ltf
+        link_or_copy Config.$sbcl_arch-osf1 Config
+        link_or_copy $sbcl_arch-osf1-os.h target-arch-os.h
+        link_or_copy osf1-os.h target-os.h
+        ;;
+    *bsd)
+        printf ' :bsd' >> $ltf
+        link_or_copy $sbcl_arch-bsd-os.h target-arch-os.h
+        link_or_copy bsd-os.h target-os.h
+        case "$sbcl_os" in
+            freebsd)
+                printf ' :elf' >> $ltf
+                printf ' :freebsd' >> $ltf
+                link_or_copy Config.$sbcl_arch-freebsd Config
+                ;;
+            openbsd)
+                printf ' :elf' >> $ltf
+                printf ' :openbsd' >> $ltf
+                link_or_copy Config.$sbcl_arch-openbsd Config
+                ;;
+            netbsd)
                 printf ' :netbsd' >> $ltf
-		printf ' :elf' >> $ltf
-		sbcl_os="netbsd"
-		ln -s Config.$sbcl_arch-netbsd Config
-		;;
-	    *)
-		echo unsupported BSD variant: `uname`
-		exit 1
-		;;
-	esac
-	;;
-    Darwin)
-	printf ' :mach-o' >> $ltf
-	printf ' :bsd' >> $ltf
-	sbcl_os="darwin"
-	ln -s $sbcl_arch-darwin-os.h target-arch-os.h
-	ln -s bsd-os.h target-os.h
-	printf ' :darwin' >> $ltf
-	ln -s Config.$sbcl_arch-darwin Config
-	;;
-    SunOS)
-	printf ' :elf' >> $ltf
+                printf ' :elf' >> $ltf
+                link_or_copy Config.$sbcl_arch-netbsd Config
+                ;;
+            *)
+                echo unsupported BSD variant: `uname`
+                exit 1
+                ;;
+        esac
+        ;;
+    darwin)
+        printf ' :mach-o' >> $ltf
+        printf ' :bsd' >> $ltf
+        link_or_copy $sbcl_arch-darwin-os.h target-arch-os.h
+        link_or_copy bsd-os.h target-os.h
+        printf ' :darwin' >> $ltf
+        link_or_copy Config.$sbcl_arch-darwin Config
+        ;;
+    sunos)
+        printf ' :elf' >> $ltf
         printf ' :sunos' >> $ltf
-	sbcl_os="sunos"
-	ln -s Config.$sbcl_arch-sunos Config
-	ln -s $sbcl_arch-sunos-os.h target-arch-os.h
-	ln -s sunos-os.h target-os.h
-	;;
+        link_or_copy Config.$sbcl_arch-sunos Config
+        link_or_copy $sbcl_arch-sunos-os.h target-arch-os.h
+        link_or_copy sunos-os.h target-os.h
+        ;;
+    win32)
+        printf ' :win32' >> $ltf
+        link_or_copy Config.$sbcl_arch-win32 Config
+        link_or_copy $sbcl_arch-win32-os.h target-arch-os.h
+        link_or_copy win32-os.h target-os.h
+        ;;
     *)
-	echo unsupported OS type: `uname`
-	exit 1
-	;;
+        echo unsupported OS type: `uname`
+        exit 1
+        ;;
 esac
 cd $original_dir
 
@@ -198,7 +255,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
     printf ' :stack-allocatable-closures :alien-callbacks' >> $ltf
     if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ] || [ "$sbcl_os" = "netbsd" ] || [ "$sbcl_os" = "sunos" ]; then
-	printf ' :linkage-table' >> $ltf
+        printf ' :linkage-table' >> $ltf
     fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
@@ -233,13 +290,13 @@ elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
         exit 1
     fi
 elif [ "$sbcl_arch" = "sparc" ]; then
-    # Test the compiler in order to see if we are building on Sun 
+    # Test the compiler in order to see if we are building on Sun
     # toolchain as opposed to GNU binutils, and write the appropriate
-    # FUNCDEF macro for assembler. No harm in running this on sparc-linux 
+    # FUNCDEF macro for assembler. No harm in running this on sparc-linux
     # as well.
     sh tools-for-build/sparc-funcdef.sh > src/runtime/sparc-funcdef.h
     if [ "$sbcl_os" = "sunos" ] || [ "$sbcl_os" = "linux" ]; then
-	printf ' :linkage-table' >> $ltf
+        printf ' :linkage-table' >> $ltf
     fi
     printf ' :stack-allocatable-closures' >> $ltf
 elif [ "$sbcl_arch" = "alpha" ]; then

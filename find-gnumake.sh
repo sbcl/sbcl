@@ -11,7 +11,7 @@ find_gnumake() {
     GNUMAKE=gmake
   elif [ -x "`which gnumake`" ] ; then
     # MacOS X aka Darwin
-    GNUMAKE=gnumake  
+    GNUMAKE=gnumake
   elif [ "GNU Make" = "`make -v | head -n 1 | cut -b 0-8`" ]; then
     GNUMAKE=make
   else

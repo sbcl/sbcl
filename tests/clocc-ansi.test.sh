@@ -20,7 +20,7 @@
 # While most of SBCL is derived from the CMU CL system, the test
 # files (like this one) were written from scratch after the fork
 # from CMU CL.
-# 
+#
 # This software is in the public domain and is provided with
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
@@ -32,7 +32,7 @@ originalpwd=`pwd`
 if [ "$SBCL_CLOCC_ANSI_TEST" = "" ] ; then
     echo //punting clocc ansi-test because SBCL_CLOCC_ANSI_TEST is undefined
     exit 104
-else 
+else
     echo //going on to run clocc ansi-test in $SBCL_CLOCC_ANSI_TEST
     cd $SBCL_CLOCC_ANSI_TEST
 fi

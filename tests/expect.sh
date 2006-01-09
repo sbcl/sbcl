@@ -7,36 +7,36 @@ expect_load_error ()
 {
     # Test compiling and loading.
     $SBCL <<EOF
-	(compile-file "$1")
-	;;; But loading the file should fail.
-	(multiple-value-bind (value0 value1) (ignore-errors (load *))
-	    (assert (null value0))
-	    (format t "VALUE1=~S (~A)~%" value1 value1)
-	    (assert (typep value1 'error)))
-	(sb-ext:quit :unix-status 52)
+        (compile-file "$1")
+        ;;; But loading the file should fail.
+        (multiple-value-bind (value0 value1) (ignore-errors (load *))
+            (assert (null value0))
+            (format t "VALUE1=~S (~A)~%" value1 value1)
+            (assert (typep value1 'error)))
+        (sb-ext:quit :unix-status 52)
 EOF
     if [ $? != 52 ]; then
-	echo compile-and-load $1 test failed: $?
-	exit 1
+        echo compile-and-load $1 test failed: $?
+        exit 1
     fi
 
     # Test loading into the interpreter.
     $SBCL <<EOF
-	(multiple-value-bind (value0 value1) (ignore-errors (load "$1"))
-	    (assert (null value0))
-	    (format t "VALUE1=~S (~A)~%" value1 value1)
-	    (assert (typep value1 'error)))
-	(sb-ext:quit :unix-status 52)
+        (multiple-value-bind (value0 value1) (ignore-errors (load "$1"))
+            (assert (null value0))
+            (format t "VALUE1=~S (~A)~%" value1 value1)
+            (assert (typep value1 'error)))
+        (sb-ext:quit :unix-status 52)
 EOF
     if [ $? != 52 ]; then
-	echo load-into-interpreter $1 test failed: $?
-	exit 1
+        echo load-into-interpreter $1 test failed: $?
+        exit 1
     fi
 }
 
 # Test that a file compiles cleanly, with no ERRORs, WARNINGs or
 # STYLE-WARNINGs.
-expect_clean_compile () 
+expect_clean_compile ()
 {
     $SBCL <<EOF
         (multiple-value-bind (pathname warnings-p failure-p)
@@ -105,7 +105,7 @@ expect_compiler_note ()
           (compile-file "$1"))
 EOF
     if [ $? != 52 ]; then
-	echo expect-compiler-note $1 test failed: $?
-	exit 1
+        echo expect-compiler-note $1 test failed: $?
+        exit 1
     fi
 }

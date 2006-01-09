@@ -8,7 +8,7 @@
 # While most of SBCL is derived from the CMU CL system, the test
 # files (like this one) were written from scratch after the fork
 # from CMU CL.
-# 
+#
 # This software is in the public domain and is provided with
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
@@ -41,7 +41,7 @@ fi
 
 # In sbcl-0.9.8 saving cores with callbacks didn't work on gencgc platforms
 $SBCL <<EOF
-  (defun bar () 
+  (defun bar ()
     (format t "~&Callbacks not supported, skipping~%")
     (quit :unix-status 42))
   #+alien-callbacks

@@ -19,12 +19,12 @@ ${SBCL:-sbcl} <<EOF > /dev/null &
 (let ((junk (mapcar (lambda (_)
                       (declare (ignore _))
                       (let ((x (gensym)))
-			  (finalize x (lambda ()
-					;; cons in finalizer
+                          (finalize x (lambda ()
+                                        ;; cons in finalizer
                                         (setf *tmp* (make-list 10000))
-					(incf *count*)))
-			  x))
-		     (make-list 10000))))
+                                        (incf *count*)))
+                          x))
+                     (make-list 10000))))
     (setf junk (foo junk))
     (foo junk))
 
@@ -46,21 +46,21 @@ WAITED=0
 echo "Waiting for SBCL to finish stress-testing finalizers"
 while true; do
     if [ -f finalize-test-passed ]; then
-	echo "OK"
-	rm finalize-test-passed
-	exit 104 # Success
+        echo "OK"
+        rm finalize-test-passed
+        exit 104 # Success
     elif [ -f finalize-test-failed ]; then
-	echo "Failed"
-	rm finalize-test-failed
-	exit 1 # Failure
+        echo "Failed"
+        rm finalize-test-failed
+        exit 1 # Failure
     fi
     sleep 1
     WAITED=$(($WAITED+1))
     if (($WAITED>60)); then
-	echo
-	echo "timeout, killing SBCL"
-	kill -9 $SBCL_PID
-	exit 1 # Failure, SBCL probably hanging in GC
+        echo
+        echo "timeout, killing SBCL"
+        kill -9 $SBCL_PID
+        exit 1 # Failure, SBCL probably hanging in GC
     fi
 done
 

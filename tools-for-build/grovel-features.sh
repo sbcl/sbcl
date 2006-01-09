@@ -12,7 +12,7 @@ featurep() {
     $GNUMAKE $bin -I ../src/runtime > /dev/null 2>&1 && ./$bin > /dev/null 2>&1
     if [ "$?" = 104 ]
     then
-	printf " :$1"
+        printf " :$1"
     fi
     rm -f $bin
 }
