@@ -1879,7 +1879,6 @@
 ;;; Rename NAMESTRING to ORIGINAL. First, check whether we have write
 ;;; access, since we don't want to trash unwritable files even if we
 ;;; technically can. We return true if we succeed in renaming.
-#!-win32
 (defun rename-the-old-one (namestring original)
   (unless (sb!unix:unix-access namestring sb!unix:w_ok)
     (error "~@<The file ~2I~_~S ~I~_is not writable.~:>" namestring))

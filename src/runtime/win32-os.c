@@ -600,6 +600,7 @@ void scratch(void)
     GetProcAddress(0, 0);
     mkdir(0);
     isatty(0);
+    access(0,0)
 }
 
 /* EOF */

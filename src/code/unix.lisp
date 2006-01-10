@@ -239,7 +239,16 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;;   w_ok     Write permission.
 ;;;   x_ok     Execute permission.
 ;;;   f_ok     Presence of file.
-#!-win32
+
+;;; In Windows, the MODE argument to access is defined in terms of
+;;; literal magic numbers---there are no constants to grovel.  X_OK
+;;; is not defined.
+#!+win32
+(progn
+  (defconstant f_ok 0)
+  (defconstant w_ok 2)
+  (defconstant r_ok 4))
+
 (defun unix-access (path mode)
   (declare (type unix-pathname path)
            (type (mod 8) mode))
