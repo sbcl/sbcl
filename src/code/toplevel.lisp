@@ -472,15 +472,15 @@ steppers to maintain contextual information.")
              (init-file-name (maybe-dir-name basename)
                (and maybe-dir-name
                     (concatenate 'string maybe-dir-name "/" basename))))
-        #!-win32 (let ((sysinit-truename
-               (probe-init-files sysinit
-                                 (init-file-name (posix-getenv "SBCL_HOME")
-                                                 "sbclrc")
-                                 "/etc/sbclrc"))
+        (let ((sysinit-truename
+               #!-win32 (probe-init-files sysinit
+                                          (init-file-name (posix-getenv "SBCL_HOME")
+                                                          "sbclrc")
+                                          "/etc/sbclrc"))
                (userinit-truename
-                (probe-init-files userinit
-                                  (init-file-name (posix-getenv "HOME")
-                                                  ".sbclrc"))))
+                #!-win32 (probe-init-files userinit
+                                           (init-file-name (posix-getenv "HOME")
+                                                           ".sbclrc"))))
 
           ;; This CATCH is needed for the debugger command TOPLEVEL to
           ;; work.
