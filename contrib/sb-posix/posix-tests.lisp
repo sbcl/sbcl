@@ -387,3 +387,13 @@
                finally (return t)))
       (sb-posix:closedir dir)))
   t)
+
+(deftest pwent.1
+  ;; make sure that we found something
+  (not (sb-posix:getpwuid 0))
+  nil)
+
+(deftest pwent.2
+  ;; make sure that we found something
+  (not (sb-posix:getpwnam "root"))
+  nil)

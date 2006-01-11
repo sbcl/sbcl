@@ -1,4 +1,5 @@
-(defpackage :sb-posix (:use)
+(defpackage :sb-posix (:use #:sb-alien #:cl)
+  (:shadow close open ftruncate truncate)
   (:export #:syscall-error #:syscall-errno
 
            ;; grovel structure accessors
@@ -7,9 +8,9 @@
 
            ;; wrapper class accessors
 
+           #:passwd-name #:passwd-passwd #:passwd-uid #:passwd-gid
+           #:passwd-gecos #:passwd-dir #:passwd-shell
            #:stat-mode #:stat-ino #:stat-dev #:stat-nlink #:stat-uid
            #:stat-gid #:stat-size #:stat-atime #:stat-mtime #:stat-ctime
            #:termios-iflag #:termios-oflag #:termios-cflag
            #:termios-lflag #:termios-cc))
-
-(defpackage :sb-posix-internal (:use #:sb-alien #:cl))

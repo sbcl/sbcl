@@ -1,4 +1,4 @@
-(in-package :sb-posix-internal)
+(in-package :sb-posix)
 (defvar *designator-types* (make-hash-table :test #'equal))
 
 (defmacro define-designator (name result &body conversions)

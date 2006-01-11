@@ -1,4 +1,4 @@
-(in-package :sb-posix-internal)
+(in-package :sb-posix)
 
 (define-designator filename c-string
   (pathname

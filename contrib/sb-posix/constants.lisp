@@ -12,6 +12,7 @@
  "fcntl.h"
  "netdb.h" "errno.h"
  "dirent.h" "signal.h"
+ "pwd.h"
  "unistd.h"
 
  "termios.h")
@@ -245,6 +246,27 @@
              ("struct dirent"
               (:c-string name "char *" "d_name"
                          :distrust-length #+sunos t #-sunos nil)) t)
+
+ ;; password database
+ (:structure alien-passwd
+             ("struct passwd"
+              (c-string-pointer name "char *" "pw_name")
+              (c-string-pointer passwd "char *" "pw_passwd")
+              (uid-t uid "uid_t" "pw_uid")
+              (gid-t gid "gid_t" "pw_gid")
+              ;; 'change', 'class', and 'expire' are not supported on Linux
+              #+nil
+              (time-t change "time_t" "pw_change")
+              #+nil
+              (c-string-pointer class "char *" "pw_class")
+              (c-string-pointer gecos "char *" "pw_gecos")
+              (c-string-pointer dir "char *" "pw_dir")
+              (c-string-pointer shell "char *" "pw_shell")
+              #+nil
+              (time-t expire "time_t" "pw_expire")
+              ;; OS X manpages say this exists.  they lie!
+              #+nil
+              (:integer fields "int" "pw_fields")))
 
  (:structure alien-stat
              ("struct stat"
