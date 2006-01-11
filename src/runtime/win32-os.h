@@ -48,3 +48,5 @@ struct lisp_exception_frame {
 };
 
 void wos_install_interrupt_handlers(struct lisp_exception_frame *handler);
+char *dirname(char *path);
+

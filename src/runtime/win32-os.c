@@ -581,6 +581,28 @@ void *memcpy(void *dest, const void *src, size_t n)
     return dest;
 }
 
+char *dirname(char *path)
+{
+    static char buf[PATH_MAX + 1];
+    size_t pathlen = strlen(path);
+    int i;
+
+    if (pathlen >= sizeof(buf)) {
+        lose("Pathname too long in dirname.\n");
+        return NULL;
+    }
+
+    strcpy(buf, path);
+    for (i = pathlen; i >= 0; --i) {
+        if (buf[i] == '/' || buf[i] == '\\') {
+            buf[i] = '\0';
+            break;
+        }
+    }
+
+    return buf;
+}
+
 /* This is a manually-maintained version of ldso_stubs.S. */
 
 void scratch(void)

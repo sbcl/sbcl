@@ -307,11 +307,7 @@ main(int argc, char *argv[], char *envp[])
         char *envstring, *copied_core, *dir;
         char *stem = "SBCL_HOME=";
         copied_core = copied_string(core);
-#ifndef LISP_FEATURE_WIN32
         dir = dirname(copied_core);
-#else /* LISP_FEATURE_WIN32 */
-        dir = "";
-#endif
         envstring = (char *) calloc(strlen(stem) +
                                     strlen(dir) +
                                     1,
