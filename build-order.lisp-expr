@@ -464,7 +464,8 @@
  ("src/code/load")
 
  #!+linkage-table ("src/code/linkage-table" :not-host)
- #!+os-provides-dlopen ("src/code/foreign-load" :not-host)
+ #!+(and os-provides-dlopen (not win32)) ("src/code/foreign-load" :not-host)
+ #!+(and os-provides-dlopen win32) ("src/code/win32-foreign-load" :not-host)
  ("src/code/foreign")
 
  ("src/code/fop") ; needs macros from code/load.lisp

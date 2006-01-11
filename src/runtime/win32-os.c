@@ -620,6 +620,7 @@ void scratch(void)
     dup(0);
     LoadLibrary(0);
     GetProcAddress(0, 0);
+    FreeLibrary(0);
     mkdir(0);
     isatty(0);
     access(0,0);

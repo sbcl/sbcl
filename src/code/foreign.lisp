@@ -151,9 +151,10 @@ if the symbol isn't found."
 (defun !foreign-cold-init ()
   (dolist (symbol *!initial-foreign-symbols*)
     (setf (gethash (car symbol) *static-foreign-symbols*) (cdr symbol)))
+  #!+(and os-provides-dlopen (not win32))
+  (setf *runtime-dlhandle* (dlopen-or-lose))
   #!+os-provides-dlopen
-  (setf *runtime-dlhandle* (dlopen-or-lose)
-        *shared-objects* nil))
+  (setf *shared-objects* nil))
 
 #!-os-provides-dlopen
 (define-unsupported-fun load-shared-object)

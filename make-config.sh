@@ -257,6 +257,11 @@ if [ "$sbcl_arch" = "x86" ]; then
     if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ] || [ "$sbcl_os" = "netbsd" ] || [ "$sbcl_os" = "sunos" ]; then
         printf ' :linkage-table' >> $ltf
     fi
+    if [ "$sbcl_os" = "win32" ]; then
+        # of course it doesn't provide dlopen, but there is
+        # roughly-equivalent magic nevertheless.
+        printf ' :os-provides-dlopen' >> $ltf
+    fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures :alien-callbacks' >> $ltf
