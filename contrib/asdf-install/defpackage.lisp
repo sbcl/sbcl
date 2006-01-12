@@ -4,8 +4,7 @@
   (:export
    ;; customizable variables
    #:*proxy* #:*cclan-mirror* #:*sbcl-home*
-   #:*verify-gpg-signatures* #:*locations*
-   #:*safe-url-prefixes*
+   #:*locations*
    ;; external entry points
    #:uninstall #:install))
 

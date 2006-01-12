@@ -7,17 +7,28 @@
 (cl:in-package :sb-executable)
 
 (defvar *stream-buffer-size* 8192)
-(defun copy-stream (from to)
+(defun copy-stream (from to &key (element-type (stream-element-type from) element-type-passed-p))
   "Copy into TO from FROM until end of the input stream, in blocks of
-*stream-buffer-size*.  The streams should have the same element type."
-  (unless (subtypep (stream-element-type to) (stream-element-type from))
-    (error "Incompatible streams ~A and ~A." from to))
+*stream-buffer-size*.  The streams should have the same element type.
+
+The argument :element-type indicates the element type of the
+buffer used to copy data from FROM to TO.
+
+If one of the streams has an element type that is different from
+what (stream-element-type stream) reports, that is, if it was
+opened with :element-type :default, the argument :element-type is
+required in order to select the correct stream decoding/encoding
+strategy."
+  (unless (or element-type-passed-p
+              (subtypep (stream-element-type to) element-type))
+    (error "Incompatible streams ~A and ~A:" from to))
   (let ((buf (make-array *stream-buffer-size*
-                         :element-type (stream-element-type from))))
+                         :element-type element-type)))
     (loop
-     (let ((pos (read-sequence buf from)))
-       (when (zerop pos) (return))
-       (write-sequence buf to :end pos)))))
+      (let ((pos (read-sequence buf from)))
+        (when (zerop pos) (return))
+        (write-sequence buf to :end pos)))))
+
 
 (defvar *exec-header*
   "#!/bin/sh --

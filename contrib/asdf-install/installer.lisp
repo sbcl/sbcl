@@ -23,19 +23,6 @@
 
 (defparameter *trusted-uids* nil)
 
-
-(defun verify-gpg-signatures-p (url)
-  (labels ((prefixp (prefix string)
-             (let ((m (mismatch prefix string)))
-               (or (not m) (>= m (length prefix))))))
-    (case *verify-gpg-signatures*
-      (nil nil)
-      (:unknown-locations
-       (notany
-        (lambda (x) (prefixp x url))
-        (cons *cclan-mirror* *safe-url-prefixes*)))
-      (t t))))
-
 (defvar *locations*
   `((,(merge-pathnames "site/" *sbcl-home*)
      ,(merge-pathnames "site-systems/" *sbcl-home*)
@@ -66,7 +53,7 @@
 (define-condition gpg-error (error)
   ((message :initarg :message :reader gpg-error-message))
   (:report (lambda (c s)
-             (format t "GPG failed with error status:~%~S"
+             (format s "GPG failed with error status:~%~S"
                      (gpg-error-message c)))))
 
 (define-condition no-signature (gpg-error) ())
@@ -119,7 +106,8 @@
           (socket-connect
            s (car (host-ent-addresses (get-host-by-name (url-host (or *proxy* url)))))
            (url-port (or  *proxy* url)))
-          (let ((stream (socket-make-stream s :input t :output t :buffering :full :external-format :iso-8859-1)))
+          (let ((stream (socket-make-stream s :input t :output t :buffering :full
+                                            :element-type :default :external-format :iso-8859-1)))
             ;; we are exceedingly unportable about proper line-endings here.
             ;; Anyone wishing to run this under non-SBCL should take especial care
             (format stream "GET ~A HTTP/1.0~c~%~
@@ -168,19 +156,19 @@
         (format t "Downloading ~A bytes from ~A ..."
                 (if length length "some unknown number of") url)
         (force-output)
-        (with-open-file (o file-name :direction :output :external-format :iso-8859-1)
+        (with-open-file (o file-name :direction :output :element-type '(unsigned-byte 8))
           (if length
               (let ((buf (make-array length
                                      :element-type
-                                     (stream-element-type stream))))
+                                     '(unsigned-byte 8))))
                 (read-sequence buf stream)
                 (write-sequence buf o))
-              (sb-executable:copy-stream stream o))))
+              (sb-executable:copy-stream stream o :element-type '(unsigned-byte 8)))))
       (close stream)
       (terpri)
       (restart-case
           (verify-gpg-signature/url url file-name)
-        (skip-gpg-check (&rest rest)
+        (skip-gpg-check ()
           :report "Don't check GPG signature for this package"
           nil)))))
 
@@ -197,13 +185,13 @@
             (namestring file-name))
            :output :stream :error :stream :search t
            :input (make-string-input-stream string) :wait t))
-         (ret (process-exit-code proc))
          (err (read-until-eof (process-error proc)))
          tags)
     (loop for l = (read-line (process-output proc) nil nil)
           while l
           when (> (mismatch l "[GNUPG:]") 6)
           do (destructuring-bind (_ tag &rest data) (asdf::split l)
+               (declare (ignore _))
                (pushnew (cons (intern tag :keyword)
                               data) tags)))
     ;; test for obvious key/sig problems
@@ -228,7 +216,7 @@
                    (error 'author-not-trusted
                           :key-user-name name
                           :key-id id :gpg-err nil))
-             (add-key (&rest rest)
+             (add-key ()
                :report "Add to package supplier list"
                (pushnew (list id name) *trusted-uids*)))
          (return))))))
@@ -313,6 +301,7 @@
              (with-open-file (f p) (read f))))))
     (unwind-protect
          (destructuring-bind (source system name) (where)
+           (declare (ignore name))
            (labels ((one-iter (packages)
                       (dolist (asd
                                 (loop for p in (mapcar 'string packages)
@@ -342,6 +331,7 @@
                                (with-simple-restart
                                    (retry "Retry installation")
                                  (asdf:operate 'asdf:load-op asd))
+                             (declare (ignore ret))
                              (unless restart-p (return))))))))
              (one-iter packages)))
       (let ((p (merge-pathnames "trusted-uids.lisp" *dot-sbcl*)))
