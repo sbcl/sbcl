@@ -537,8 +537,9 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
 static lispobj
 ptrans_instance(lispobj thing, lispobj header, boolean /* ignored */ constant)
 {
-    lispobj layout = ((struct instance *)native_pointer(thing))->slots[0];
-    lispobj pure = ((struct instance *)native_pointer(layout))->slots[15];
+    struct layout *layout =
+      (struct layout *) native_pointer(((struct instance *)native_pointer(thing))->slots[0]);
+    lispobj pure = layout->pure;
 
     switch (pure) {
     case T:
