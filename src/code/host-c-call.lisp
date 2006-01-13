@@ -36,7 +36,32 @@
   `(etypecase ,value
      (null (int-sap 0))
      ((alien (* char)) (alien-sap ,value))
+     ;; FIXME: GC safety alert! These SAPs are not safe, since the
+     ;; Lisp string can move. This is not hard to arrange, for example
+     ;; the following will fail very quickly on a SB-UNICODE build:
+     ;;
+     ;;   (setf (bytes-consed-between-gcs) 4096)
+     ;;   (define-alien-routine "strcmp" int (s1 c-string) (s2 c-string))
+     ;;
+     ;;   (loop
+     ;;     (let ((string "hello, world"))
+     ;;       (assert (zerop (strcmp string string)))))
+     ;;
+     ;; (This will appear to work on post-0.9.8.19 GENCGC, since
+     ;;  the GC no longer zeroes memory immediately after releasing
+     ;;  it after a minor GC. Either enabling the READ_PROTECT_FREE_PAGES
+     ;;  #define in gencgc.c or modifying the example so that a major
+     ;;  GC will occasionally be triggered would unmask the bug).
+     ;;
+     ;; The SIMPLE-BASE-STRING case will generally be very hard to
+     ;; trigger on GENCGC (even when threaded) thanks to GC
+     ;; conservativeness. It's mostly a problem on cheneygc.
+     ;; -- JES, 2006-01-13
      (simple-base-string (vector-sap ,value))
+     ;; This case, on the other hand, will cause trouble on GENCGC, since
+     ;; we're taking the SAP of a immediately discarded temporary -> the
+     ;; conservativeness doesn't protect us.
+     ;; -- JES, 2006-01-13
      (simple-string (vector-sap (coerce ,value 'simple-base-string)))))
 
 (/show0 "host-c-call.lisp 42")
@@ -66,6 +91,7 @@
   `(etypecase ,value
      (null (int-sap 0))
      ((alien (* char)) (alien-sap ,value))
+     ;; See the C-STRING :DEPORT-GEN comments for GC safety issues.
      (simple-base-string (vector-sap ,value))
      (simple-string (vector-sap (%deport-utf8-string ,value)))))
 

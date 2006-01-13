@@ -41,6 +41,11 @@
 ;;; appear to be vulnerable to the lisp string moving from underneath
 ;;; them if the world undergoes a GC, possibly triggered by another
 ;;; thread.  Ugh.
+;;;
+;;; Actually the above shouldn't happen; x86 and x86-64 use GENCGC,
+;;; so the string can't move by virtue of pointers to it from
+;;; outside the heap. Other platforms will access the lisp string
+;;; through the GC-safe interior pointer. -- JES, 2006-01-13
 (defun %naturalize-c-string (sap)
   (declare (type system-area-pointer sap))
   (locally
