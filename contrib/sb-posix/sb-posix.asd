@@ -1,5 +1,6 @@
 ;;; -*-  Lisp -*-
-(require :sb-grovel)
+(cl:eval-when (:compile-toplevel :load-toplevel :execute)
+  (asdf:oos 'asdf:load-op :sb-grovel))
 (defpackage #:sb-posix-system (:use #:asdf #:cl #:sb-grovel))
 (in-package #:sb-posix-system)
 
