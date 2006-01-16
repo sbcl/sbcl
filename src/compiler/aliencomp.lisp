@@ -68,9 +68,6 @@
 
 (defknown alien-funcall (alien-value &rest *) *
   (any recursive))
-#!+win32
-(defknown alien-funcall-stdcall (alien-value &rest *) *
-  (any recursive))
 
 ;;;; cosmetic transforms
 
@@ -667,15 +664,22 @@
   (dolist (arg args)
     (annotate-ordinary-lvar arg)))
 
+;;; We support both the stdcall and cdecl calling conventions on win32 by
+;;; resetting ESP after the foreign function returns. This way it works
+;;; correctly whether the party that is supposed to pop arguments from
+;;; the stack is the caller (cdecl) or the callee (stdcall).
 (defoptimizer (%alien-funcall ir2-convert)
               ((function type &rest args) call block)
   (let ((type (if (constant-lvar-p type)
                   (lvar-value type)
                   (error "Something is broken.")))
         (lvar (node-lvar call))
-        (args args))
+        (args args)
+        #!+win32 (stack-pointer (make-stack-pointer-tn)))
     (multiple-value-bind (nsp stack-frame-size arg-tns result-tns)
         (make-call-out-tns type)
+      #!+x86 (vop set-fpu-word-for-c call block)
+      #!+win32 (vop current-stack-pointer call block stack-pointer)
       (vop alloc-number-stack-space call block stack-frame-size nsp)
       (dolist (tn arg-tns)
         ;; On PPC, TN might be a list. This is used to indicate
@@ -730,124 +734,7 @@
               ((lvar-tn call block function)
                (reference-tn-list arg-tns nil))
               ((reference-tn-list result-tns t))))
-      (vop dealloc-number-stack-space call block stack-frame-size)
-      (move-lvar-result call block result-tns lvar))))
-
-;;;; ALIEN-FUNCALL-STDCALL support
-
-#!+win32
-(deftransform alien-funcall-stdcall ((function &rest args)
-                             ((alien (* t)) &rest *) *
-                             :important t)
-  (let ((names (make-gensym-list (length args))))
-    (/noshow "entering first DEFTRANSFORM ALIEN-FUNCALL-STDCALL" function args)
-    `(lambda (function ,@names)
-       (alien-funcall-stdcall (deref function) ,@names))))
-
-#!+win32
-(deftransform alien-funcall-stdcall ((function &rest args) * * :important t)
-  (let ((type (lvar-type function)))
-    (unless (alien-type-type-p type)
-      (give-up-ir1-transform "can't tell function type at compile time"))
-    (/noshow "entering second DEFTRANSFORM ALIEN-FUNCALL-STDCALL" function)
-    (let ((alien-type (alien-type-type-alien-type type)))
-      (unless (alien-fun-type-p alien-type)
-        (give-up-ir1-transform))
-      (let ((arg-types (alien-fun-type-arg-types alien-type)))
-        (unless (= (length args) (length arg-types))
-          (abort-ir1-transform
-           "wrong number of arguments; expected ~W, got ~W"
-           (length arg-types)
-           (length args)))
-        (collect ((params) (deports))
-          (dolist (arg-type arg-types)
-            (let ((param (gensym)))
-              (params param)
-              (deports `(deport ,param ',arg-type))))
-          (let ((return-type (alien-fun-type-result-type alien-type))
-                (body `(%alien-funcall-stdcall (deport function ',alien-type)
-                                       ',alien-type
-                                       ,@(deports))))
-            (if (alien-values-type-p return-type)
-                (collect ((temps) (results))
-                  (dolist (type (alien-values-type-values return-type))
-                    (let ((temp (gensym)))
-                      (temps temp)
-                      (results `(naturalize ,temp ',type))))
-                  (setf body
-                        `(multiple-value-bind ,(temps) ,body
-                           (values ,@(results)))))
-                (setf body `(naturalize ,body ',return-type)))
-            (/noshow "returning from DEFTRANSFORM ALIEN-FUNCALL-STDCALL" (params) body)
-            `(lambda (function ,@(params))
-               ,body)))))))
-
-#!+win32
-(defoptimizer (%alien-funcall-stdcall derive-type) ((function type &rest args))
-  (declare (ignore function args))
-  (unless (constant-lvar-p type)
-    (error "Something is broken."))
-  (let ((type (lvar-value type)))
-    (unless (alien-fun-type-p type)
-      (error "Something is broken."))
-    (values-specifier-type
-     (compute-alien-rep-type
-      (alien-fun-type-result-type type)))))
-
-#!+win32
-(defoptimizer (%alien-funcall-stdcall ltn-annotate)
-              ((function type &rest args) node ltn-policy)
-  (setf (basic-combination-info node) :funny)
-  (setf (node-tail-p node) nil)
-  (annotate-ordinary-lvar function)
-  (dolist (arg args)
-    (annotate-ordinary-lvar arg)))
-
-#!+win32
-(defoptimizer (%alien-funcall-stdcall ir2-convert)
-              ((function type &rest args) call block)
-  (let ((type (if (constant-lvar-p type)
-                  (lvar-value type)
-                  (error "Something is broken.")))
-        (lvar (node-lvar call))
-        (args args))
-    (multiple-value-bind (nsp stack-frame-size arg-tns result-tns)
-        (make-call-out-tns type)
-      (vop alloc-number-stack-space call block stack-frame-size nsp)
-      (dolist (tn arg-tns)
-        (let* ((arg (pop args))
-               (sc (tn-sc tn))
-               (scn (sc-number sc))
-               #!-x86 (temp-tn (make-representation-tn (tn-primitive-type tn)
-                                                       scn))
-               (move-arg-vops (svref (sc-move-arg-vops sc) scn)))
-          (aver arg)
-          (unless (= (length move-arg-vops) 1)
-            (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
-          #!+x86 (emit-move-arg-template call
-                                         block
-                                         (first move-arg-vops)
-                                         (lvar-tn call block arg)
-                                         nsp
-                                         tn)
-          #!-x86 (progn
-                   (emit-move call
-                              block
-                              (lvar-tn call block arg)
-                              temp-tn)
-                   (emit-move-arg-template call
-                                           block
-                                           (first move-arg-vops)
-                                           temp-tn
-                                           nsp
-                                           tn))))
-      (aver (null args))
-      (unless (listp result-tns)
-        (setf result-tns (list result-tns)))
-      (vop* call-out call block
-            ((lvar-tn call block function)
-             (reference-tn-list arg-tns nil))
-            ((reference-tn-list result-tns t)))
-      ;; This is the stdcall magic: Callee clears args.
-      #+nil (vop dealloc-number-stack-space call block stack-frame-size)
+      #!-win32 (vop dealloc-number-stack-space call block stack-frame-size)
+      #!+win32 (vop reset-stack-pointer call block stack-pointer)
+      #!+x86 (vop set-fpu-word-for-lisp call block)
       (move-lvar-result call block result-tns lvar))))

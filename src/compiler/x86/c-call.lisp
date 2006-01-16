@@ -181,63 +181,6 @@
                                     ,@(new-args))))))
         (sb!c::give-up-ir1-transform))))
 
-#!+win32
-(deftransform %alien-funcall-stdcall ((function type &rest args) * * :node node)
-  (aver (sb!c::constant-lvar-p type))
-  (let* ((type (sb!c::lvar-value type))
-         (env (sb!c::node-lexenv node))
-         (arg-types (alien-fun-type-arg-types type))
-         (result-type (alien-fun-type-result-type type)))
-    (aver (= (length arg-types) (length args)))
-    (if (or (some #'(lambda (type)
-                      (and (alien-integer-type-p type)
-                           (> (sb!alien::alien-integer-type-bits type) 32)))
-                  arg-types)
-            (and (alien-integer-type-p result-type)
-                 (> (sb!alien::alien-integer-type-bits result-type) 32)))
-        (collect ((new-args) (lambda-vars) (new-arg-types))
-          (dolist (type arg-types)
-            (let ((arg (gensym)))
-              (lambda-vars arg)
-              (cond ((and (alien-integer-type-p type)
-                          (> (sb!alien::alien-integer-type-bits type) 32))
-                     (new-args `(logand ,arg #xffffffff))
-                     (new-args `(ash ,arg -32))
-                     (new-arg-types (parse-alien-type '(unsigned 32) env))
-                     (if (alien-integer-type-signed type)
-                         (new-arg-types (parse-alien-type '(signed 32) env))
-                         (new-arg-types (parse-alien-type '(unsigned 32) env))))
-                    (t
-                     (new-args arg)
-                     (new-arg-types type)))))
-          (cond ((and (alien-integer-type-p result-type)
-                      (> (sb!alien::alien-integer-type-bits result-type) 32))
-                 (let ((new-result-type
-                        (let ((sb!alien::*values-type-okay* t))
-                          (parse-alien-type
-                           (if (alien-integer-type-signed result-type)
-                               '(values (unsigned 32) (signed 32))
-                               '(values (unsigned 32) (unsigned 32)))
-                           env))))
-                   `(lambda (function type ,@(lambda-vars))
-                      (declare (ignore type))
-                      (multiple-value-bind (low high)
-                          (%alien-funcall function
-                                          ',(make-alien-fun-type
-                                             :arg-types (new-arg-types)
-                                             :result-type new-result-type)
-                                          ,@(new-args))
-                        (logior low (ash high 32))))))
-                (t
-                 `(lambda (function type ,@(lambda-vars))
-                    (declare (ignore type))
-                    (%alien-funcall function
-                                    ',(make-alien-fun-type
-                                       :arg-types (new-arg-types)
-                                       :result-type result-type)
-                                    ,@(new-args))))))
-        (sb!c::give-up-ir1-transform))))
-
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
   (:policy :fast-safe)
@@ -302,31 +245,24 @@
                (inst fldz)) ; insure no regs are empty
            ))))
 
-(define-vop (alloc-number-stack-space)
-  (:info amount)
-  (:results (result :scs (sap-reg any-reg)))
+;;; While SBCL uses the FPU in 53-bit mode, most C libraries assume that
+;;; the FPU is in 64-bit mode. So we change the FPU mode to 64-bit with
+;;; the SET-FPU-WORD-FOR-C VOP before calling out to C and set it back
+;;; to 53-bit mode after coming back using the SET-FPU-WORD-FOR-LISP VOP.
+(define-vop (set-fpu-word-for-c)
   (:node-var node)
   (:generator 0
-    (aver (location= result esp-tn))
     (when (policy node (= sb!c::float-accuracy 3))
       (inst sub esp-tn 4)
       (inst fnstcw (make-ea :word :base esp-tn))
       (inst wait)
       (inst or (make-ea :word :base esp-tn) #x300)
       (inst fldcw (make-ea :word :base esp-tn))
-      (inst wait))
-    (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
-        (inst sub esp-tn delta)))
-    (move result esp-tn)))
+      (inst wait))))
 
-(define-vop (dealloc-number-stack-space)
-  (:info amount)
+(define-vop (set-fpu-word-for-lisp)
   (:node-var node)
   (:generator 0
-    (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
-        (inst add esp-tn delta)))
     (when (policy node (= sb!c::float-accuracy 3))
       (inst fnstcw (make-ea :word :base esp-tn))
       (inst wait)
@@ -334,6 +270,23 @@
       (inst fldcw (make-ea :word :base esp-tn))
       (inst wait)
       (inst add esp-tn 4))))
+
+(define-vop (alloc-number-stack-space)
+  (:info amount)
+  (:results (result :scs (sap-reg any-reg)))
+  (:generator 0
+    (aver (location= result esp-tn))
+    (unless (zerop amount)
+      (let ((delta (logandc2 (+ amount 3) 3)))
+        (inst sub esp-tn delta)))
+    (move result esp-tn)))
+
+(define-vop (dealloc-number-stack-space)
+  (:info amount)
+  (:generator 0
+    (unless (zerop amount)
+      (let ((delta (logandc2 (+ amount 3) 3)))
+        (inst add esp-tn delta)))))
 
 (define-vop (alloc-alien-stack-space)
   (:info amount)
