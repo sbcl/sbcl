@@ -624,6 +624,15 @@ void scratch(void)
     mkdir(0);
     isatty(0);
     access(0,0);
+    GetLastError();
+    FormatMessageA(0, 0, 0, 0, 0, 0, 0);
+    _get_osfhandle(0);
+    ReadFile(0, 0, 0, 0, 0);
+    WriteFile(0, 0, 0, 0, 0);
+    PeekNamedPipe(0, 0, 0, 0, 0, 0);
+    FlushConsoleInputBuffer(0);
+    PeekConsoleInput(0, 0, 0, 0);
+    Sleep(0);
 }
 
 /* EOF */

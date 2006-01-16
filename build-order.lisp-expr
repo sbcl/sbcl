@@ -212,9 +212,10 @@
 
  ;; "src/code/unix.lisp" needs this. It's generated automatically by
  ;; grovel_headers.c, i.e. it's not in CVS.
- #!-win32 ("output/stuff-groveled-from-headers" :not-host)
+ ("output/stuff-groveled-from-headers" :not-host)
 
  ("src/code/unix" :not-host)
+ #!+win32 ("src/code/win32" :not-host)
 
  #!+mach  ("src/code/mach"     :not-host)
  #!+mach  ("src/code/mach-os"  :not-host)

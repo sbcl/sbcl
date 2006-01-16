@@ -2327,4 +2327,18 @@ structure representations"
                ;; These were exported from the original PCL version of this
                ;; package, but aren't used in SBCL.
                ;;"NESTED-WALK-FORM" "MACROEXPAND-ALL"
-               )))
+               ))
+
+   #!+win32
+   #s(sb-cold:package-data
+      :name "SB!WIN32"
+      :doc "private: a wrapper layer for Win32 functions needed by
+SBCL itself"
+      :use ("CL" "SB!ALIEN" "SB!EXT" "SB!INT" "SB!SYS")
+      :export ("BOOL"
+               "DWORD" "FD-CLEAR-INPUT" "FD-LISTEN"
+               "FLUSH-CONSOLE-INPUT-BUFFER" "FORMAT-MESSAGE"
+               "GET-LAST-ERROR" "GET-OSFHANDLE" "HANDLE"
+               "HANDLE-CLEAR-INPUT" "HANDLE-LISTEN" "INT-PTR"
+               "INVALID-HANDLE" "MILLISLEEP" "PEEK-CONSOLE-INPUT"
+               "PEEK-NAMED-PIPE" "READ-FILE" "WRITE-FILE")))

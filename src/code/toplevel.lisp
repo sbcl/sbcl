@@ -145,6 +145,7 @@ steppers to maintain contextual information.")
            :format-arguments (list n)
            :datum n
            :expected-type '(real 0)))
+  #!-win32
   (multiple-value-bind (sec nsec)
       (if (integerp n)
           (values n 0)
@@ -152,6 +153,8 @@ steppers to maintain contextual information.")
               (truncate n)
             (values sec (truncate frac 1e-9))))
     (sb!unix:nanosleep sec nsec))
+  #!+win32
+  (sb!win32:millisleep (truncate (* n 1000)))
   nil)
 
 ;;;; SCRUB-CONTROL-STACK

@@ -21,6 +21,8 @@
 #include <stdio.h>
 #include <sys/types.h>
 #ifdef _WIN32
+  #define WIN32_LEAN_AND_MEAN
+  #include <windows.h>
   #include <stdlib.h>
 #else
   #include <sys/times.h>
@@ -80,7 +82,9 @@ main(int argc, char *argv[])
 \n\
 ");
 #ifdef _WIN32
-    printf (";;; This file is presently unused for the Windows version of sbcl.\n");
+    printf("(in-package \"SB!WIN32\")\n\n");
+
+    defconstant ("input-record-size", sizeof (INPUT_RECORD));
 #else
     printf("(in-package \"SB!ALIEN\")\n\n");
 

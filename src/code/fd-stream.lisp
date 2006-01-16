@@ -659,6 +659,12 @@
              (setf (fd-stream-ibuf-head stream) 0)
              (setf (fd-stream-ibuf-tail stream) tail))))
     (setf (fd-stream-listen stream) nil)
+    #!+win32
+    (unless (sb!win32:fd-listen fd)
+      (unless (sb!sys:wait-until-fd-usable
+               fd :input (fd-stream-timeout stream))
+        (error 'io-timeout :stream stream :direction :read)))
+    #!-win32
     (sb!unix:with-restarted-syscall (count errno)
       ;; FIXME: Judging from compiler warnings, this WITH-ALIEN form expands
       ;; into something which uses the not-yet-defined type
@@ -1571,6 +1577,10 @@
      (or (not (eql (fd-stream-ibuf-head fd-stream)
                    (fd-stream-ibuf-tail fd-stream)))
          (fd-stream-listen fd-stream)
+         #!+win32
+         (setf (fd-stream-listen fd-stream)
+               (sb!win32:fd-listen (fd-stream-fd fd-stream)))
+         #!-win32
          (setf (fd-stream-listen fd-stream)
                (eql (sb!unix:with-restarted-syscall ()
                       (sb!alien:with-alien ((read-fds (sb!alien:struct
@@ -1660,6 +1670,11 @@
      (setf (fd-stream-unread fd-stream) nil)
      (setf (fd-stream-ibuf-head fd-stream) 0)
      (setf (fd-stream-ibuf-tail fd-stream) 0)
+     #!+win32
+     (progn
+       (sb!win32:fd-clear-input (fd-stream-fd fd-stream))
+       (setf (fd-stream-listen fd-stream) nil))
+     #!-win32
      (catch 'eof-input-catcher
        (loop
         (let ((count (sb!unix:with-restarted-syscall ()
