@@ -1922,14 +1922,21 @@ bootstrapping.
                        (list* dfun cache info)
                        dfun)))
     (if (eq *boot-state* 'complete)
-        (setf (gf-dfun-state gf) new-state)
+        (if (eq (class-of gf) *the-class-standard-generic-function*)
+            ;; break metacircles: see sbcl-devel 2006-01-15 and #lisp
+            ;; IRC logs 2006-01-16 for the hilarity.
+            (setf (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*)
+                  new-state)
+            (setf (gf-dfun-state gf) new-state))
         (setf (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*)
               new-state)))
   dfun)
 
 (defun gf-dfun-cache (gf)
   (let ((state (if (eq *boot-state* 'complete)
-                   (gf-dfun-state gf)
+                   (if (eq (class-of gf) *the-class-standard-generic-function*)
+                       (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*)
+                       (gf-dfun-state gf))
                    (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*))))
     (typecase state
       (function nil)
@@ -1937,7 +1944,9 @@ bootstrapping.
 
 (defun gf-dfun-info (gf)
   (let ((state (if (eq *boot-state* 'complete)
-                   (gf-dfun-state gf)
+                   (if (eq (class-of gf) *the-class-standard-generic-function*)
+                       (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*)
+                       (gf-dfun-state gf))
                    (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*))))
     (typecase state
       (function nil)
