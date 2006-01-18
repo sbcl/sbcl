@@ -1,3 +1,4 @@
+-*- coding: utf-8; mode: text; -*-
 
       The programmers of old were mysterious and profound.  We
    cannot fathom their thoughts, so all we do is describe their
@@ -518,6 +519,9 @@ Daniel Barlow:
   asdf-install, sb-bsd-sockets, sb-executable, sb-grovel and sb-posix
   contrib packages.
 
+James Bielman:
+  He assisted in work on the port to the Windows operating system.
+
 Alastair Bridgewater:
   He contributed a port of the system to the Windows operating system.
 
@@ -671,6 +675,10 @@ Patrik Nordebo:
   He contributed to the port of SBCL to MacOS X, finding solutions for
   ABI and assembly syntax differences between Darwin and Linux.
 
+Luís Oliveira:
+  He contributed to the port of SBCL to the Windows operating system,
+  particuarly in the area of FFI.
+
 Scott Parish:
   He ported SBCL to OpenBSD-with-ELF.
 
@@ -690,7 +698,7 @@ Christophe Rhodes:
   optimizations to compiler output, and contributed in other ways as
   well.
 
-Stig Erik Sandoe:
+Stig Erik Sandø:
   He showed how to convince the GNU toolchain to build SBCL in a way
   which supports callbacks from C code into SBCL.
 
