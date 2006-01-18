@@ -889,8 +889,12 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   ;; KLUDGE: readlink and lstat are unreliable if given symlinks
   ;; ending in slashes -- fix the issue here instead of waiting for
   ;; libc to change...
+  ;;
+  ;; but be careful!  Must not strip the final slash from "/".  (This
+  ;; adjustment might be a candidate for being transferred into the C
+  ;; code in a wrap_readlink() function, too.) CSR, 2006-01-18
   (let ((len (length pathname)))
-    (when (and (plusp len) (eql #\/ (schar pathname (1- len))))
+    (when (and (> len 1) (eql #\/ (schar pathname (1- len))))
       (setf pathname (subseq pathname 0 (1- len)))))
   (/noshow "entering UNIX-RESOLVE-LINKS")
   (loop with previous-pathnames = nil do

@@ -356,5 +356,11 @@
                  (list* 'write-to-string pathname vars)
                  expected
                  actual))
+
+;;; we got (truename "/") wrong for about 6 months.  Check that it's
+;;; still right.
+(let ((pathname (truename "/")))
+  (assert (equalp pathname #p"/"))
+  (assert (equal (pathname-directory pathname) '(:absolute))))
 
 ;;;; success
