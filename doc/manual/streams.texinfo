@@ -2,16 +2,46 @@
 @comment  node-name,  next,  previous,  up
 @chapter Extensible Streams
 
-SBCL supports @dfn{Gray streams}, user-overloadable CLOS classes whose
-instances can be used as Lisp streams (e.g. passed as the first
-argument to @code{format}).  Additionally, the bundled contrib module
-@dfn{sb-simple-streams} implements a subset of the Franz Allegro
-simple-streams proposal.
+SBCL supports various extensions of ANSI Common Lisp streams.
+
+@table @strong
+@item Bivalent Streams
+A type of stream that can read and write both @code{character} and
+@code{(unsigned-byte 8)} values.
+
+@item Gray Streams
+User-overloadable CLOS classes whose instances can be used as Lisp
+streams (e.g. passed as the first argument to @code{format}).
+
+@item Simple Streams
+The bundled contrib module @dfn{sb-simple-streams} implements a subset
+of the Franz Allegro simple-streams proposal.
+
+@end table
 
 @menu
+* Bivalent Streams::
 * Gray Streams::                
 * Simple Streams::              
 @end menu
+
+@node Bivalent Streams
+@section Bivalent Streams
+
+A @dfn{bivalent stream} can be used to read and write both
+@code{character} and @code{(unsigned-byte 8)} values.  A bivalent
+stream is created by calling @code{open} with the argument @code{:element-type
+:default}.  On such a stream, both binary and character data can be
+read and written with the usual input and output functions.
+
+@c Horrible visual markup
+@quotation
+Streams are @emph{not} created bivalent by default for performance
+reasons.  Bivalent streams are incompatible with
+@code{fast-read-char}, an internal optimization in sbcl's stream
+machinery that bulk-converts octets to characters and implements a
+fast path through @code{read-char}.
+@end quotation
 
 @node Gray Streams
 @section Gray Streams
