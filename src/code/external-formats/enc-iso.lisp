@@ -89,11 +89,11 @@
 
 (instantiate-octets-definition define-iso-8859-2->string)
 
-(push '((:iso-8859-2 :|iso-8859-2|)
+(push '((:iso-8859-2 :|iso-8859-2| :latin-2 :|latin-2|)
         iso-8859-2->string-aref string->iso-8859-2)
       *external-format-functions*)
 
-(define-external-format (:iso-8859-2 :|iso-8859-2|)
+(define-external-format (:iso-8859-2 :|iso-8859-2| :latin-2 :|latin-2|)
     1 t
     (let ((iso-8859-2-byte (code->iso-8859-2-mapper bits)))
       (if iso-8859-2-byte
@@ -171,11 +171,11 @@
 
 (instantiate-octets-definition define-iso-8859-3->string)
 
-(push '((:iso-8859-3 :|iso-8859-3|)
+(push '((:iso-8859-3 :|iso-8859-3| :latin-3 :|latin-3|)
         iso-8859-3->string-aref string->iso-8859-3)
       *external-format-functions*)
 
-(define-external-format (:iso-8859-3 :|iso-8859-3|)
+(define-external-format (:iso-8859-3 :|iso-8859-3| :latin-3 :|latin-3|)
     1 t
     (let ((iso-8859-3-byte (code->iso-8859-3-mapper bits)))
       (if iso-8859-3-byte
@@ -268,11 +268,11 @@
 
 (instantiate-octets-definition define-iso-8859-4->string)
 
-(push '((:iso-8859-4 :|iso-8859-4|)
+(push '((:iso-8859-4 :|iso-8859-4| :latin-4 :|latin-4|)
         iso-8859-4->string-aref string->iso-8859-4)
       *external-format-functions*)
 
-(define-external-format (:iso-8859-4 :|iso-8859-4|)
+(define-external-format (:iso-8859-4 :|iso-8859-4| :latin-4 :|latin-4|)
     1 t
     (let ((iso-8859-4-byte (code->iso-8859-4-mapper bits)))
       (if iso-8859-4-byte
@@ -845,11 +845,11 @@
 
 (instantiate-octets-definition define-iso-8859-9->string)
 
-(push '((:iso-8859-9 :|iso-8859-9|)
+(push '((:iso-8859-9 :|iso-8859-9| :latin-5 :|latin-5|)
         iso-8859-9->string-aref string->iso-8859-9)
       *external-format-functions*)
 
-(define-external-format (:iso-8859-9 :|iso-8859-9|)
+(define-external-format (:iso-8859-9 :|iso-8859-9| :latin-5 :|latin-5|)
     1 t
     (let ((iso-8859-9-byte (code->iso-8859-9-mapper bits)))
       (if iso-8859-9-byte
@@ -938,11 +938,11 @@
 
 (instantiate-octets-definition define-iso-8859-10->string)
 
-(push '((:iso-8859-10 :|iso-8859-10|)
+(push '((:iso-8859-10 :|iso-8859-10| :latin-6 :|latin-6|)
         iso-8859-10->string-aref string->iso-8859-10)
       *external-format-functions*)
 
-(define-external-format (:iso-8859-10 :|iso-8859-10|)
+(define-external-format (:iso-8859-10 :|iso-8859-10| :latin-6 :|latin-6|)
     1 t
     (let ((iso-8859-10-byte (code->iso-8859-10-mapper bits)))
       (if iso-8859-10-byte
@@ -1183,11 +1183,11 @@
 
 (instantiate-octets-definition define-iso-8859-13->string)
 
-(push '((:iso-8859-13 :|iso-8859-13|)
+(push '((:iso-8859-13 :|iso-8859-13| :latin-7 :|latin-7|)
         iso-8859-13->string-aref string->iso-8859-13)
       *external-format-functions*)
 
-(define-external-format (:iso-8859-13 :|iso-8859-13|)
+(define-external-format (:iso-8859-13 :|iso-8859-13| :latin-7 :|latin-7|)
     1 t
     (let ((iso-8859-13-byte (code->iso-8859-13-mapper bits)))
       (if iso-8859-13-byte
@@ -1261,11 +1261,11 @@
 
 (instantiate-octets-definition define-iso-8859-14->string)
 
-(push '((:iso-8859-14 :|iso-8859-14|)
+(push '((:iso-8859-14 :|iso-8859-14| :latin-8 :|latin-8|)
         iso-8859-14->string-aref string->iso-8859-14)
       *external-format-functions*)
 
-(define-external-format (:iso-8859-14 :|iso-8859-14|)
+(define-external-format (:iso-8859-14 :|iso-8859-14| :latin-8 :|latin-8|)
     1 t
     (let ((iso-8859-14-byte (code->iso-8859-14-mapper bits)))
       (if iso-8859-14-byte
