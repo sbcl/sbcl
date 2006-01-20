@@ -242,6 +242,8 @@
   (:vop-var vop)
   (:save-p t)
   (:generator 0
+    ;; ABI: Direction flag must be clear on function entry. -- JES, 2006-01-20
+    (inst cld)
     ;; ABI: AL contains amount of arguments passed in XMM registers
     ;; for vararg calls.
     (move-immediate rax

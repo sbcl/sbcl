@@ -13,6 +13,9 @@ changes in sbcl-0.9.9 relative to sbcl-0.9.8:
     grounding in the PCL implementation of CLOS.
   * bug fix: TRUENAME on "/" no longer returns a relative pathname.
     (reported by tomppa on #lisp)
+  * bug fix: clear the direction flag on Lisp -> C transitions, as 
+    required by the x86-64 ABI. Fixes mysterious GC crashes on SuSE.
+    (reported by Andrej Grozin and Hendrik Maryns)
   * optimization: major improvements to GC efficiency on GENCGC platforms
   * optimization: faster implementation of EQUAL
   * optimization: emit more efficient opcodes for some common 

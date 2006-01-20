@@ -60,6 +60,10 @@
 	.global GNAME(call_into_c)
 	.type	GNAME(call_into_c),@function
 GNAME(call_into_c):
+        /* ABI requires that the direction flag be clear on function
+         * entry and exit. */
+        cld
+        
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
 
@@ -179,6 +183,10 @@ Lcall:
 	pop	%r12
 	pop	%rbx
 
+        /* ABI requires that the direction flag be clear on function
+         * entry and exit. */
+        cld
+        
 /* FIXME Restore the NPX state. */
 
 	/* return value is already in rax where lisp expects it */
@@ -384,5 +392,4 @@ Lend:
 	ret
 	.size	GNAME(fast_bzero), .-GNAME(fast_bzero)
 
-
         .end
