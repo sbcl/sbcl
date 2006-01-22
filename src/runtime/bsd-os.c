@@ -51,6 +51,12 @@ os_vm_size_t os_vm_page_size;
 static void netbsd_init();
 #endif /* __NetBSD__ */
 
+#ifdef __FreeBSD__
+#include <sys/sysctl.h>
+
+static void freebsd_init();
+#endif /* __FreeBSD__ */
+
 void
 os_init(char *argv[], char *envp[])
 {
@@ -59,6 +65,9 @@ os_init(char *argv[], char *envp[])
 #ifdef __NetBSD__
     netbsd_init();
 #endif /* __NetBSD__ */
+#ifdef __FreeBSD__
+    freebsd_init();
+#endif /* __FreeBSD__ */
 }
 
 int *os_context_pc_addr(os_context_t *context)
@@ -279,6 +288,31 @@ The system may fail to start.\n",
     }
 }
 #endif /* __NetBSD__ */
+
+#ifdef __FreeBSD__
+static void freebsd_init()
+{
+    /* Quote from sbcl-devel (NIIMI Satoshi): "Some OSes, like FreeBSD
+     * 4.x with GENERIC kernel, does not enable SSE support even on
+     * SSE capable CPUs". Detect this situation and skip the
+     * fast_bzero sse/base selection logic that's normally done in
+     * x86-assem.S.
+     */
+#ifdef LISP_FEATURE_X86
+    extern void fast_bzero_base(void *, size_t);
+    extern void (*fast_bzero_pointer)(void *, size_t);
+    size_t len;
+    int instruction_sse;
+
+    len = sizeof(instruction_sse);
+    if (sysctlbyname("hw.instruction_sse", &instruction_sse, &len, NULL, 0) != 0
+        || instruction_sse == 0) {
+        /* Use the non-SSE version*/
+        fast_bzero_pointer = fast_bzero_base;
+    }
+#endif /* LISP_FEATURE_X86 */
+}
+#endif /* __FreeBSD__ */
 
 /* threads */
 
