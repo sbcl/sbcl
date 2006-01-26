@@ -12,6 +12,22 @@
   (equalp (make-inet-address "242.1.211.3")  #(242 1 211 3))
   t)
 
+(deftest get-protocol-by-name/tcp
+    (integerp (get-protocol-by-name "tcp"))
+  t)
+
+(deftest get-protocol-by-name/udp
+  (integerp (get-protocol-by-name "udp"))
+  t)
+
+(deftest get-protocol-by-name/error
+  (handler-case (get-protocol-by-name "nonexistent-protocol")
+    (unknown-protocol ()
+      t)
+    (:no-error ()
+      nil))
+  t)
+
 (deftest make-inet-socket
   ;; make a socket
   (let ((s (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "tcp"))))

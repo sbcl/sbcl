@@ -50,6 +50,8 @@
            try-again-error
            no-recovery-error
 
+           unknown-protocol
+
            ;; all socket options are also exported, by code in
            ;; sockopt.lisp
 

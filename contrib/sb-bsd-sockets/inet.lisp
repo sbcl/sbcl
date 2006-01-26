@@ -27,6 +27,13 @@ Examples:
        #'parse-integer
        (split dotted-quads nil '(#\.))))
 
+(define-condition unknown-protocol ()
+  ((name :initarg :name
+         :reader unknown-protocol-name))
+  (:report (lambda (c s)
+             (format s "Protocol not found: ~a" (prin1-to-string
+                                                 (unknown-protocol-name c))))))
+
 ;;; getprotobyname only works in the internet domain, which is why this
 ;;; is here
 (defun get-protocol-by-name (name)      ;exported
@@ -35,6 +42,8 @@ using getprotobyname(2) which typically looks in NIS or /etc/protocols"
   ;; for extra brownie points, could return canonical protocol name
   ;; and aliases as extra values
   (let ((ent (sockint::getprotobyname name)))
+    (if (sb-grovel::foreign-nullp ent)
+        (error 'unknown-protocol :name name))
     (sockint::protoent-proto ent)))
 
 ;;; our protocol provides make-sockaddr-for, size-of-sockaddr,
