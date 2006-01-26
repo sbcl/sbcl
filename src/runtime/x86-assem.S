@@ -868,9 +868,9 @@ GNAME(exception_trampoline):
         .align 4
 GNAME(fast_bzero_pointer):
         /* Variable containing a pointer to the bzero function to use.
-         * Initially points to a function that detects which implementation
-         * should be used, and then updates the variable. */
-        .long GNAME(fast_bzero_detect)
+         * Initially points to a basic function.  Change this variable
+         * to fast_bzero_detect if OS supports SSE.  */
+        .long GNAME(fast_bzero_base)
 
 	.text
 	.align	align_8byte,0x90

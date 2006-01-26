@@ -56,4 +56,7 @@ swap_lispobjs(volatile lispobj *dest, lispobj value)
     return old_value;
 }
 
+extern void fast_bzero_detect(void *, size_t);
+extern void (*fast_bzero_pointer)(void *, size_t);
+
 #endif /* _X86_ARCH_H */

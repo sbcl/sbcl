@@ -299,16 +299,14 @@ static void freebsd_init()
      * x86-assem.S.
      */
 #ifdef LISP_FEATURE_X86
-    extern void fast_bzero_base(void *, size_t);
-    extern void (*fast_bzero_pointer)(void *, size_t);
     size_t len;
     int instruction_sse;
 
     len = sizeof(instruction_sse);
-    if (sysctlbyname("hw.instruction_sse", &instruction_sse, &len, NULL, 0) != 0
-        || instruction_sse == 0) {
-        /* Use the non-SSE version*/
-        fast_bzero_pointer = fast_bzero_base;
+    if (sysctlbyname("hw.instruction_sse", &instruction_sse, &len, NULL, 0) == 0
+        && instruction_sse != 0) {
+        /* Use the SSE detector */
+        fast_bzero_pointer = fast_bzero_detect;
     }
 #endif /* LISP_FEATURE_X86 */
 }

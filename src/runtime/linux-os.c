@@ -208,6 +208,10 @@ os_init(char *argv[], char *envp[])
             fprintf(stderr, "WARNING: Couldn't re-execute SBCL with the proper personality flags (maybe /proc isn't mounted?). Trying to continue anyway.\n");
         }
     }
+    /* Use SSE detector.  Recent versions of Linux enable SSE support
+     * on SSE capable CPUs.  */
+    /* FIXME: Are there any old versions that does not support SSE?  */
+    fast_bzero_pointer = fast_bzero_detect;
 #endif
 }
 
