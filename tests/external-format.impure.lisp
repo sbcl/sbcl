@@ -117,8 +117,15 @@
         (dotimes (i 80)
           (assert (equal (read-line s nil s)
                          "1234567890123456789012345678901234567890123456789")))))))
+
 (with-test (:name (:character-decode-large :force-end-of-file)
             :fails-on :sbcl)
+  (error "We can't reliably test this due to WITH-TIMEOUT race condition")
+  ;; This test will currently fail. But sometimes it will fail in
+  ;; ungracefully due to the WITH-TIMEOUT race mentioned above. This
+  ;; rightfully confuses some people, so we'll skip running the code
+  ;; for now. -- JES, 2006-01-27
+  #+nil
   (with-open-file (s "external-format-test.txt" :direction :input
                      :external-format :utf-8)
     (handler-bind

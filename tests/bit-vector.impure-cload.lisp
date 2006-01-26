@@ -78,7 +78,17 @@
 
 (test-small-bit-vectors)
 
-#-x86-64
-;; except on machines where addressable space is likely to be
-;; much bigger than physical memory
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun dynamic-space-size ()
+    #+gencgc
+    (- sb-vm:dynamic-space-end sb-vm:dynamic-space-start)
+    #-gencgc
+    (- sb-vm:dynamic-space-0-end sb-vm:dynamic-space-0-start)))
+
+;; except on machines where the arrays won't fit into the dynamic space.
+#+#.(cl:if (cl:> (cl-user::dynamic-space-size)
+                 (cl:truncate (cl:1- cl:array-dimension-limit)
+                              sb-vm:n-word-bits))
+           '(and)
+           '(or))
 (test-big-bit-vectors)

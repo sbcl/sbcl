@@ -190,7 +190,7 @@
                                     (list '(flet test) #'not-optimized))))))
 
 (with-test (:name (:throw :no-such-tag)
-            :fails-on '(or (and :x86 :linux) :alpha :mips))
+            :fails-on '(or (and :x86 :linux) (and :x86 :freebsd) :alpha :mips))
   (progn
     (defun throw-test ()
       (throw 'no-such-tag t))
@@ -349,12 +349,14 @@
 ;;; suspicions that the breakpoint trace might corrupt the whole image
 ;;; on that platform.
 #-(and ppc darwin)
-(let ((out (with-output-to-string (*trace-output*)
-             (trace trace-this :encapsulate nil)
-             (assert (eq 'ok (trace-this)))
-             (untrace))))
-  (assert (search "TRACE-THIS" out))
-  (assert (search "returned OK" out)))
+(with-test (:name (trace :encapsulate nil)
+            :fails-on '(or ppc sparc))
+  (let ((out (with-output-to-string (*trace-output*)
+               (trace trace-this :encapsulate nil)
+               (assert (eq 'ok (trace-this)))
+               (untrace))))
+    (assert (search "TRACE-THIS" out))
+    (assert (search "returned OK" out))))
 
 ;;;; test infinite error protection
 
