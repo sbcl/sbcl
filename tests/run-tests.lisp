@@ -71,8 +71,10 @@
     (dolist (file files)
       (when (accept-test-file file)
         (format t "// Running ~a~%" file)
-        (handler-bind ((error (make-error-handler file)))
-          (funcall test-fun file))))
+        (restart-case
+            (handler-bind ((error (make-error-handler file)))
+              (funcall test-fun file))
+          (skip-file ()))))
     (append-failures)))
 
 (defun impure-runner (files test-fun)
@@ -85,8 +87,11 @@
         (let ((pid (sb-posix:fork)))
           (cond ((= pid 0)
                  (format t "// Running ~a~%" file)
-                 (handler-bind ((error (make-error-handler file)))
-                   (funcall test-fun file))
+                 (restart-case
+                     (handler-bind ((error (make-error-handler file)))
+                       (funcall test-fun file))
+                   (skip-file ()
+                     (format t ">>>~a<<<~%" *failures*)))
                  (report-test-status)
                  (sb-ext:quit :unix-status 104))
                 (t
@@ -104,14 +109,14 @@
 
 (defun make-error-handler (file)
   (lambda (condition)
-    (push (list :unhandled-error file)
-          *all-failures*)
+    (push (list :unhandled-error file) *failures*)
     (cond (*break-on-error*
            (test-util:really-invoke-debugger condition))
           (t
            (format *error-output* "~&Unhandled ~a: ~a~%"
                    (type-of condition) condition)
-           (sb-debug:backtrace)))))
+           (sb-debug:backtrace)))
+    (invoke-restart 'skip-file)))
 
 (defun append-failures (&optional (failures *failures*))
   (setf *all-failures* (append failures *all-failures*)))
