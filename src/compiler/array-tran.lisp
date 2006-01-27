@@ -28,18 +28,33 @@
 ;;; type is going to be the array upgraded element type.
 (defun extract-upgraded-element-type (array)
   (let ((type (lvar-type array)))
-    ;; Note that this IF mightn't be satisfied even if the runtime
-    ;; value is known to be a subtype of some specialized ARRAY, because
-    ;; we can have values declared e.g. (AND SIMPLE-VECTOR UNKNOWN-TYPE),
-    ;; which are represented in the compiler as INTERSECTION-TYPE, not
-    ;; array type.
-    (if (array-type-p type)
-        (array-type-specialized-element-type type)
-        ;; KLUDGE: there is no good answer here, but at least
-        ;; *wild-type* won't cause HAIRY-DATA-VECTOR-{REF,SET} to be
-        ;; erroneously optimized (see generic/vm-tran.lisp) -- CSR,
-        ;; 2002-08-21
-        *wild-type*)))
+    (cond
+      ;; Note that this IF mightn't be satisfied even if the runtime
+      ;; value is known to be a subtype of some specialized ARRAY, because
+      ;; we can have values declared e.g. (AND SIMPLE-VECTOR UNKNOWN-TYPE),
+      ;; which are represented in the compiler as INTERSECTION-TYPE, not
+      ;; array type.
+      ((array-type-p type) (array-type-specialized-element-type type))
+      ;; fix for bug #396.  This type logic corresponds to the special
+      ;; case for strings in HAIRY-DATA-VECTOR-REF
+      ;; (generic/vm-tran.lisp)
+      ((csubtypep type (specifier-type 'simple-string))
+       (cond
+         ((csubtypep type (specifier-type '(simple-array character (*))))
+          (specifier-type 'character))
+         #!+sb-unicode
+         ((csubtypep type (specifier-type '(simple-array base-char (*))))
+          (specifier-type 'base-char))
+         ((csubtypep type (specifier-type '(simple-array nil (*))))
+          *empty-type*)
+         ;; see KLUDGE below.
+         (t *wild-type*)))
+      (t
+       ;; KLUDGE: there is no good answer here, but at least
+       ;; *wild-type* won't cause HAIRY-DATA-VECTOR-{REF,SET} to be
+       ;; erroneously optimized (see generic/vm-tran.lisp) -- CSR,
+       ;; 2002-08-21
+       *wild-type*))))
 
 (defun extract-declared-element-type (array)
   (let ((type (lvar-type array)))

@@ -1157,7 +1157,7 @@
                            c
                            0)))))
 
-;; Put this in a separate function.
+;;; Put this in a separate function.
 (defun test-constraint-propagation/cast (x)
   (when (the double-float (multiple-value-prog1
                               x
@@ -1167,5 +1167,38 @@
 (test-util:with-test (:name (:compiler :constraint-propagation :cast))
   (assert (assertoid:raises-error?
            (test-constraint-propagation/cast 1) type-error)))
+
+;;; bug #399
+(let ((result (make-array 50000 :fill-pointer 0 :adjustable t)))
+  (defun string->html (string &optional (max-length nil))
+    (when (and (numberp max-length)
+               (> max-length (array-dimension result 0)))
+      (setf result (make-array max-length :fill-pointer 0 :adjustable t)))
+    (let ((index 0)
+          (left-quote? t))
+      (labels ((add-char (it)
+                 (setf (aref result index) it)
+                 (incf index))
+               (add-string (it)
+                 (loop for ch across it do
+                       (add-char ch))))
+        (loop for char across string do
+              (cond ((char= char #\<)
+                     (add-string "&lt;"))
+                    ((char= char #\>)
+                     (add-string "&gt;"))
+                    ((char= char #\&)
+                     (add-string "&amp;"))
+                    ((char= char #\')
+                     (add-string "&#39;"))
+                    ((char= char #\newline)
+                     (add-string "<br>"))
+                    ((char= char #\")
+                     (if left-quote? (add-string "&#147;") (add-string "&#148;"))
+                     (setf left-quote? (not left-quote?)))
+                    (t
+                     (add-char char))))
+        (setf (fill-pointer result) index)
+        (coerce result 'string)))))
 
 ;;; success

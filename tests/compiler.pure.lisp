@@ -1915,3 +1915,9 @@
                  (let ((x (setf (sb-vm::sap-ref-single sap 0) 1d0)))
                    (1+ x)))))
 
+;;; bug #399
+(with-test (:name :string-union-types)
+  (compile nil '(lambda (x)
+                 (declare (type (or (simple-array character (6))
+                                    (simple-array character (5))) x))
+                 (aref x 0))))

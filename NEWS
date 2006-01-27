@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-0.9.10 relative to sbcl-0.9.9:
+  * fixed bug #399: full call to DATA-VECTOR-REF in accesses to
+    certain complicated string types.  (reported by Gary King)
+
 changes in sbcl-0.9.9 relative to sbcl-0.9.8:
   * new platform: experimental support for the Windows operating
     system has been added.  (thanks to Alastair Bridgewater)
