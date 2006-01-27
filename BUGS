@@ -2150,3 +2150,20 @@ WORKAROUND:
 
   For some more details see comments for (define-alien-type-method
   (c-string :deport-gen) ...)  in host-c-call.lisp.
+
+399: LOOP FOR ACROSS and full call to DATA-VECTOR-REF
+  The following is a simplified version of code that Gary King posted
+  to #lisp which triggers a BUG on a full call to DATA-VECTOR-REF:
+
+  (defun foo (x)
+    (declare (type (or (simple-array character (6))
+                       (simple-array character (5))) x))
+    (aref x 0))
+
+  The similar code:
+
+  (defun foo (x)
+    (declare (type (simple-array character (5)) x))
+    (aref x 0))
+
+  does not trigger the full call.
