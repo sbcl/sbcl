@@ -132,19 +132,10 @@
   ;; The control stack.  (Scanned by GC)
   (control-stack control-stack)
 
-  ;; The non-descriptor stacks.
-  (signed-stack non-descriptor-stack) ; (signed-byte 32)
-  (unsigned-stack non-descriptor-stack) ; (unsigned-byte 32)
-  (character-stack non-descriptor-stack) ; non-descriptor characters.
-  (sap-stack non-descriptor-stack) ; System area pointers.
-  (single-stack non-descriptor-stack) ; single-floats
-  (double-stack non-descriptor-stack
-                :element-size 2 :alignment 2) ; double floats.
-  (complex-single-stack non-descriptor-stack :element-size 2)
-  (complex-double-stack non-descriptor-stack :element-size 4 :alignment 2)
-
-
-  ;; **** Things that can go in the integer registers.
+  ;; We put ANY-REG and DESCRIPTOR-REG early so that their SC-NUMBER
+  ;; is small and therefore the error trap information is smaller.
+  ;; Moving them up here from their previous place down below saves
+  ;; ~250K in core file size.  --njf, 2006-01-27
 
   ;; Immediate descriptor objects.  Don't have to be seen by GC, but nothing
   ;; bad will happen if they are.  (fixnums, characters, header values, etc).
@@ -161,6 +152,20 @@
    :constant-scs (constant null immediate)
    :save-p t
    :alternate-scs (control-stack))
+
+  ;; The non-descriptor stacks.
+  (signed-stack non-descriptor-stack) ; (signed-byte 32)
+  (unsigned-stack non-descriptor-stack) ; (unsigned-byte 32)
+  (character-stack non-descriptor-stack) ; non-descriptor characters.
+  (sap-stack non-descriptor-stack) ; System area pointers.
+  (single-stack non-descriptor-stack) ; single-floats
+  (double-stack non-descriptor-stack
+                :element-size 2 :alignment 2) ; double floats.
+  (complex-single-stack non-descriptor-stack :element-size 2)
+  (complex-double-stack non-descriptor-stack :element-size 4 :alignment 2)
+
+
+  ;; **** Things that can go in the integer registers.
 
   ;; Non-Descriptor characters
   (character-reg registers

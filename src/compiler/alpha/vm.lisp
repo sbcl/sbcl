@@ -139,6 +139,27 @@
   ;; The control stack.  (Scanned by GC)
   (control-stack control-stack)
 
+  ;; We put ANY-REG and DESCRIPTOR-REG early so that their SC-NUMBER
+  ;; is small and therefore the error trap information is smaller.
+  ;; Moving them up here from their previous place down below saves
+  ;; ~250K in core file size.  --njf, 2006-01-27
+
+  ;; Immediate descriptor objects.  Don't have to be seen by GC, but nothing
+  ;; bad will happen if they are.  (fixnums, characters, header values, etc).
+  (any-reg
+   registers
+   :locations #.(append non-descriptor-regs descriptor-regs)
+   :constant-scs (zero immediate)
+   :save-p t
+   :alternate-scs (control-stack))
+
+  ;; Pointer descriptor objects.  Must be seen by GC.
+  (descriptor-reg registers
+   :locations #.descriptor-regs
+   :constant-scs (constant null immediate)
+   :save-p t
+   :alternate-scs (control-stack))
+
   ;; The non-descriptor stacks.
   (signed-stack non-descriptor-stack
                 :element-size 2 :alignment 2) ; (signed-byte 64)
@@ -155,23 +176,6 @@
 
 
   ;; **** Things that can go in the integer registers.
-
-  ;; Immediate descriptor objects.  Don't have to be seen by GC, but nothing
-  ;; bad will happen if they are.  (fixnums, characters, header values, etc).
-  (any-reg
-   registers
-   :locations #.(append non-descriptor-regs descriptor-regs)
-;   :locations #.non-descriptor-regs
-   :constant-scs (zero immediate)
-   :save-p t
-   :alternate-scs (control-stack))
-
-  ;; Pointer descriptor objects.  Must be seen by GC.
-  (descriptor-reg registers
-                  :locations #.descriptor-regs
-                  :constant-scs (constant null immediate)
-                  :save-p t
-                  :alternate-scs (control-stack))
 
   ;; Non-Descriptor characters
   (character-reg registers
