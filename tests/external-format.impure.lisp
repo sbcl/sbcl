@@ -211,6 +211,16 @@
   (let ((char (read-char s)))
     (assert (= (char-code (eval char)) #xB0))))
 (delete-file "external-format-test.txt")
+
+(let* ((koi8-r-codes (coerce '(240 210 201 215 197 212 33) '(vector (unsigned-byte 8))))
+       (uni-codes #(1055 1088 1080 1074 1077 1090 33))
+
+       (string (octets-to-string koi8-r-codes :external-format :koi8-r))
+       (uni-decoded (map 'vector #'char-code string)))
+  (assert (equalp (map 'vector #'char-code (octets-to-string koi8-r-codes :external-format :koi8-r))
+                  uni-codes))
+  (assert (equalp (string-to-octets (map 'string #'code-char uni-codes) :external-format :koi8-r)
+                  koi8-r-codes)))
 
 ;;; tests of FILE-STRING-LENGTH
 (let ((standard-characters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!$\"'(),_-./:;?+<=>#%&*@[\\]{|}`^~"))

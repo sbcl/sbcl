@@ -136,7 +136,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp437 string pos end))
+  (get-latin-bytes #'code->cp437-mapper :cp437 string pos end))
 
 (defun string->cp437 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -149,14 +149,14 @@
   (let ((name (make-od-name 'cp437->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp437->code-mapper)))))
 
 (instantiate-octets-definition define-cp437->string*)
 
 (defmacro define-cp437->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp437->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp437->code-mapper)))
 
 (instantiate-octets-definition define-cp437->string)
 
@@ -311,7 +311,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp850 string pos end))
+  (get-latin-bytes #'code->cp850-mapper :cp850 string pos end))
 
 (defun string->cp850 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -324,14 +324,14 @@
   (let ((name (make-od-name 'cp850->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp850->code-mapper)))))
 
 (instantiate-octets-definition define-cp850->string*)
 
 (defmacro define-cp850->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp850->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp850->code-mapper)))
 
 (instantiate-octets-definition define-cp850->string)
 
@@ -486,7 +486,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp852 string pos end))
+  (get-latin-bytes #'code->cp852-mapper :cp852 string pos end))
 
 (defun string->cp852 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -499,14 +499,14 @@
   (let ((name (make-od-name 'cp852->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp852->code-mapper)))))
 
 (instantiate-octets-definition define-cp852->string*)
 
 (defmacro define-cp852->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp852->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp852->code-mapper)))
 
 (instantiate-octets-definition define-cp852->string)
 
@@ -661,7 +661,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp855 string pos end))
+  (get-latin-bytes #'code->cp855-mapper :cp855 string pos end))
 
 (defun string->cp855 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -674,14 +674,14 @@
   (let ((name (make-od-name 'cp855->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp855->code-mapper)))))
 
 (instantiate-octets-definition define-cp855->string*)
 
 (defmacro define-cp855->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp855->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp855->code-mapper)))
 
 (instantiate-octets-definition define-cp855->string)
 
@@ -835,7 +835,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp857 string pos end))
+  (get-latin-bytes #'code->cp857-mapper :cp857 string pos end))
 
 (defun string->cp857 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -848,14 +848,14 @@
   (let ((name (make-od-name 'cp857->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp857->code-mapper)))))
 
 (instantiate-octets-definition define-cp857->string*)
 
 (defmacro define-cp857->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp857->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp857->code-mapper)))
 
 (instantiate-octets-definition define-cp857->string)
 
@@ -1010,7 +1010,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp860 string pos end))
+  (get-latin-bytes #'code->cp860-mapper :cp860 string pos end))
 
 (defun string->cp860 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1023,14 +1023,14 @@
   (let ((name (make-od-name 'cp860->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp860->code-mapper)))))
 
 (instantiate-octets-definition define-cp860->string*)
 
 (defmacro define-cp860->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp860->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp860->code-mapper)))
 
 (instantiate-octets-definition define-cp860->string)
 
@@ -1185,7 +1185,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp861 string pos end))
+  (get-latin-bytes #'code->cp861-mapper :cp861 string pos end))
 
 (defun string->cp861 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1198,14 +1198,14 @@
   (let ((name (make-od-name 'cp861->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp861->code-mapper)))))
 
 (instantiate-octets-definition define-cp861->string*)
 
 (defmacro define-cp861->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp861->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp861->code-mapper)))
 
 (instantiate-octets-definition define-cp861->string)
 
@@ -1360,7 +1360,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp862 string pos end))
+  (get-latin-bytes #'code->cp862-mapper :cp862 string pos end))
 
 (defun string->cp862 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1373,14 +1373,14 @@
   (let ((name (make-od-name 'cp862->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp862->code-mapper)))))
 
 (instantiate-octets-definition define-cp862->string*)
 
 (defmacro define-cp862->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp862->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp862->code-mapper)))
 
 (instantiate-octets-definition define-cp862->string)
 
@@ -1535,7 +1535,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp863 string pos end))
+  (get-latin-bytes #'code->cp863-mapper :cp863 string pos end))
 
 (defun string->cp863 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1548,14 +1548,14 @@
   (let ((name (make-od-name 'cp863->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp863->code-mapper)))))
 
 (instantiate-octets-definition define-cp863->string*)
 
 (defmacro define-cp863->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp863->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp863->code-mapper)))
 
 (instantiate-octets-definition define-cp863->string)
 
@@ -1707,7 +1707,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp864 string pos end))
+  (get-latin-bytes #'code->cp864-mapper :cp864 string pos end))
 
 (defun string->cp864 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1720,14 +1720,14 @@
   (let ((name (make-od-name 'cp864->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp864->code-mapper)))))
 
 (instantiate-octets-definition define-cp864->string*)
 
 (defmacro define-cp864->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp864->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp864->code-mapper)))
 
 (instantiate-octets-definition define-cp864->string)
 
@@ -1882,7 +1882,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp865 string pos end))
+  (get-latin-bytes #'code->cp865-mapper :cp865 string pos end))
 
 (defun string->cp865 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1895,14 +1895,14 @@
   (let ((name (make-od-name 'cp865->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp865->code-mapper)))))
 
 (instantiate-octets-definition define-cp865->string*)
 
 (defmacro define-cp865->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp865->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp865->code-mapper)))
 
 (instantiate-octets-definition define-cp865->string)
 
@@ -2057,7 +2057,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp866 string pos end))
+  (get-latin-bytes #'code->cp866-mapper :cp866 string pos end))
 
 (defun string->cp866 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -2070,14 +2070,14 @@
   (let ((name (make-od-name 'cp866->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp866->code-mapper)))))
 
 (instantiate-octets-definition define-cp866->string*)
 
 (defmacro define-cp866->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp866->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp866->code-mapper)))
 
 (instantiate-octets-definition define-cp866->string)
 
@@ -2232,7 +2232,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp869 string pos end))
+  (get-latin-bytes #'code->cp869-mapper :cp869 string pos end))
 
 (defun string->cp869 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -2245,14 +2245,14 @@
   (let ((name (make-od-name 'cp869->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp869->code-mapper)))))
 
 (instantiate-octets-definition define-cp869->string*)
 
 (defmacro define-cp869->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp869->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp869->code-mapper)))
 
 (instantiate-octets-definition define-cp869->string)
 
@@ -2406,7 +2406,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :cp874 string pos end))
+  (get-latin-bytes #'code->cp874-mapper :cp874 string pos end))
 
 (defun string->cp874 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -2419,14 +2419,14 @@
   (let ((name (make-od-name 'cp874->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp874->code-mapper)))))
 
 (instantiate-octets-definition define-cp874->string*)
 
 (defmacro define-cp874->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'cp874->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'cp874->code-mapper)))
 
 (instantiate-octets-definition define-cp874->string)
 

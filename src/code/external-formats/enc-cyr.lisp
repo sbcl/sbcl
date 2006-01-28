@@ -136,7 +136,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :koi8-r string pos end))
+  (get-latin-bytes #'code->koi8-r-mapper :koi8-r string pos end))
 
 (defun string->koi8-r (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -149,14 +149,14 @@
   (let ((name (make-od-name 'koi8-r->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'koi8-r->code-mapper)))))
 
 (instantiate-octets-definition define-koi8-r->string*)
 
 (defmacro define-koi8-r->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'koi8-r->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'koi8-r->code-mapper)))
 
 (instantiate-octets-definition define-koi8-r->string)
 
@@ -311,7 +311,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :koi8-u string pos end))
+  (get-latin-bytes #'code->koi8-u-mapper :koi8-u string pos end))
 
 (defun string->koi8-u (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -324,14 +324,14 @@
   (let ((name (make-od-name 'koi8-u->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'koi8-u->code-mapper)))))
 
 (instantiate-octets-definition define-koi8-u->string*)
 
 (defmacro define-koi8-u->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'koi8-u->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'koi8-u->code-mapper)))
 
 (instantiate-octets-definition define-koi8-u->string)
 
@@ -481,7 +481,7 @@
   (declare (optimize speed (safety 0))
            (type simple-string string)
            (type array-range pos end))
-  (get-latin-bytes #'identity :x-mac-cyrillic string pos end))
+  (get-latin-bytes #'code->x-mac-cyrillic-mapper :x-mac-cyrillic string pos end))
 
 (defun string->x-mac-cyrillic (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -494,14 +494,14 @@
   (let ((name (make-od-name 'x-mac-cyrillic->string* accessor)))
     `(progn
       (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'identity)))))
+        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'x-mac-cyrillic->code-mapper)))))
 
 (instantiate-octets-definition define-x-mac-cyrillic->string*)
 
 (defmacro define-x-mac-cyrillic->string (accessor type)
   (declare (ignore type))
   `(defun ,(make-od-name 'x-mac-cyrillic->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'identity)))
+    (,(make-od-name 'latin->string accessor) array astart aend #'x-mac-cyrillic->code-mapper)))
 
 (instantiate-octets-definition define-x-mac-cyrillic->string)
 
