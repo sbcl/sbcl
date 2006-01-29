@@ -1231,4 +1231,17 @@
 (let ((instance (make-instance 'slot-type-subclass)))
   (setf (slot-value instance 'slot) 3))
 
+;;; ctors where there's a non-standard SHARED-INITIALIZE method and an
+;;; initarg which isn't self-evaluating (kpreid on #lisp 2006-01-29)
+(defclass kpreid-enode ()
+  ((slot :initarg not-a-keyword)))
+(defmethod shared-initialize ((o kpreid-enode) slots &key &allow-other-keys)
+  (call-next-method))
+(defun make-kpreid-enode ()
+  (make-instance 'kpreid-enode 'not-a-keyword 3))
+(with-test (:name (:ctor :non-keyword-initarg))
+  (let ((x (make-kpreid-enode))
+        (y (make-kpreid-enode)))
+    (= (slot-value x 'slot) (slot-value y 'slot))))
+
 ;;;; success

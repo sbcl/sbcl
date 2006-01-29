@@ -351,7 +351,8 @@
      ;; calling it with a class, as here, we inhibit the optimization,
      ;; so removing the possibility of endless recursion.  -- CSR,
      ;; 2004-07-12
-     (make-instance ,(ctor-class ctor) ,@(ctor-initargs ctor))))
+     (make-instance ,(ctor-class ctor)
+      ,@(quote-plist-keys (ctor-initargs ctor)))))
 
 (defun optimizing-generator (ctor ii-methods si-methods)
   (multiple-value-bind (locations names body before-method-p)

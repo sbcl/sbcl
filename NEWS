@@ -7,6 +7,10 @@ changes in sbcl-0.9.10 relative to sbcl-0.9.9:
   * fixed bug: DOCUMENTATION on structures no longer signals an 
     error if no structure type of the right name exists.  (reported by
     Glenn Ehrlich)
+  * fixed bug: compiled calls to MAKE-INSTANCE where there is an
+    applicable non-standard primary or :AROUND method on
+    INITIALIZE-INSTANCE or SHARED-INITIALIZE and a non-keyword initarg
+    no longer cause unbound variable errors.  (reported by Kevin Reid)
 
 changes in sbcl-0.9.9 relative to sbcl-0.9.8:
   * new platform: experimental support for the Windows operating
