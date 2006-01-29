@@ -4,6 +4,9 @@ changes in sbcl-0.9.10 relative to sbcl-0.9.9:
     certain complicated string types.  (reported by Gary King)
   * fixed bug: STRING-TO-OCTETS and OCTETS-TO-STRING did not convert
     character codes.  (thanks to Yaroslav Kavenchuk and Ivan Boldyrev)
+  * fixed bug: DOCUMENTATION on structures no longer signals an 
+    error if no structure type of the right name exists.  (reported by
+    Glenn Ehrlich)
 
 changes in sbcl-0.9.9 relative to sbcl-0.9.8:
   * new platform: experimental support for the Windows operating

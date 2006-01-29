@@ -149,7 +149,7 @@
         ((info :typed-structure :info x)
          (values (info :typed-structure :documentation x)))
         (t
-         (error "~S is not the name of a structure type." x))))
+         nil)))
 
 (defmethod (setf documentation) (new-value
                                  (x structure-class)
@@ -187,7 +187,7 @@
         ((info :typed-structure :info x)
          (setf (info :typed-structure :documentation x) new-value))
         (t
-         (error "~S is not the name of a structure type." x))))
+         nil)))
 
 
 ;;; variables

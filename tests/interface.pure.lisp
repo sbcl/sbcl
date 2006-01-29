@@ -66,6 +66,7 @@
 (documentation 'fixnum 'type)
 (documentation 'class 'type)
 (documentation (find-class 'class) 'type)
+(documentation 'foo 'structure)
 
 ;;; DECODE-UNIVERSAL-TIME should accept second-resolution time-zones.
 (macrolet ((test (ut time-zone list)
