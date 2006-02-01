@@ -23,4 +23,3 @@ test: all
 
 install: $(EXTRA_INSTALL_TARGETS)
 	tar cf - . | ( cd $(BUILD_ROOT)$(INSTALL_DIR) && tar xpvf - )
-	( cd  $(BUILD_ROOT)$(SBCL_HOME)/systems && ln -fs ../$(SYSTEM)/$(SYSTEM).asd . )

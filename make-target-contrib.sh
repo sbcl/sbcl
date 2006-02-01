@@ -41,13 +41,6 @@ export SBCL SBCL_BUILDING_CONTRIB
 find contrib/ \( -name '*.fasl' -o -name 'foo.c' -o -name 'a.out' -o -name 'alien.so' -o -name '*.o' \) \
   -print | xargs rm -f
 
-mkdir -p contrib/systems
-rm -f contrib/systems/*
-
-for i in contrib/*/*.asd; do
-    ln -sf ../../$i contrib/systems/
-done
-
 for i in contrib/*; do
     test -d $i && test -f $i/Makefile || continue;
     # export INSTALL_DIR=$SBCL_HOME/`basename $i `

@@ -45,7 +45,7 @@ ensure_dirs $BUILD_ROOT$INSTALL_ROOT $BUILD_ROOT$INSTALL_ROOT/bin \
     $BUILD_ROOT$MAN_DIR $BUILD_ROOT$MAN_DIR/man1 \
     $BUILD_ROOT$INFO_DIR $BUILD_ROOT$DOC_DIR \
     $BUILD_ROOT$DOC_DIR/html \
-    $BUILD_ROOT$SBCL_HOME $BUILD_ROOT$SBCL_HOME/systems \
+    $BUILD_ROOT$SBCL_HOME \
     $BUILD_ROOT$SBCL_HOME/site-systems
 
 # move old versions out of the way.  Safer than copying: don't want to
