@@ -242,13 +242,15 @@
                    (coerce #(0 0 0 1 1 1) `(,@type-stub 6))))
     (assert-type-error (concatenate `(,@type-stub 5) #(0 0 0) #*111))
     ;; MERGE
-    (assert (= (length (merge `(,@type-stub) #(0 1 0) #*111 #'>)) 6))
-    (assert (equalp (merge `(,@type-stub) #(0 1 0) #*111 #'>)
-                   (coerce #(1 1 1 0 1 0) `(,@type-stub))))
-    (assert (= (length (merge `(,@type-stub 6) #(0 1 0) #*111 #'>)) 6))
-    (assert (equalp (merge `(,@type-stub 6) #(0 1 0) #*111 #'>)
-                   (coerce #(1 1 1 0 1 0) `(,@type-stub 6))))
-    (assert-type-error (merge `(,@type-stub 4) #(0 1 0) #*111 #'>))
+    (macrolet ((test (type)
+                 `(merge ,type (copy-seq #(0 1 0)) (copy-seq #*111) #'>)))
+      (assert (= (length (test `(,@type-stub))) 6))
+      (assert (equalp (test `(,@type-stub))
+                      (coerce #(1 1 1 0 1 0) `(,@type-stub))))
+      (assert (= (length (test `(,@type-stub 6))) 6))
+      (assert (equalp (test `(,@type-stub 6))
+                      (coerce #(1 1 1 0 1 0) `(,@type-stub 6))))
+      (assert-type-error (test `(,@type-stub 4))))
     ;; MAP
     (assert (= (length (map `(,@type-stub) #'logxor #(0 0 1 1) '(0 1 0 1))) 4))
     (assert (equalp (map `(,@type-stub) #'logxor #(0 0 1 1) '(0 1 0 1))
@@ -274,7 +276,7 @@
     (assert (equalp #(11 13)
                     (map '(simple-array fixnum (*)) #'+ '(1 2 3) '(10 11))))
     (assert-type-error (coerce '(1 2 3) 'simple-array))
-    (assert-type-error (merge 'simple-array '(1 3) '(2 4) '<))
+    (assert-type-error (merge 'simple-array (list 1 3) (list 2 4) '<))
     (assert (equalp #(3 2 1) (coerce '(3 2 1) '(vector fixnum))))
     (assert-type-error (map 'array #'identity '(1 2 3)))
     (assert-type-error (map '(array fixnum) #'identity '(1 2 3)))
@@ -287,9 +289,9 @@
 ;;; As pointed out by Raymond Toy on #lisp IRC, MERGE had some issues
 ;;; with user-defined types until sbcl-0.7.8.11
 (deftype list-typeoid () 'list)
-(assert (equal '(1 2 3 4) (merge 'list-typeoid '(1 3) '(2 4) '<)))
+(assert (equal '(1 2 3 4) (merge 'list-typeoid (list 1 3) (list 2 4) '<)))
 ;;; and also with types that weren't precicely LIST
-(assert (equal '(1 2 3 4) (merge 'cons '(1 3) '(2 4) '<)))
+(assert (equal '(1 2 3 4) (merge 'cons (list 1 3) (list 2 4) '<)))
 
 ;;; but wait, there's more! The NULL and CONS types also have implicit
 ;;; length requirements:
@@ -322,12 +324,14 @@
     (assert (= (length (coerce #(1) '(cons t null))) 1))
     (assert-type-error (coerce #() 'nil))
     ;; MERGE
-    (assert-type-error (merge 'null '(1 3) '(2 4) '<))
+    (assert-type-error (merge 'null (list 1 3) (list 2 4) '<))
     (assert-type-error (merge 'cons () () '<))
     (assert (null (merge 'null () () '<)))
-    (assert (= (length (merge 'cons '(1 3) '(2 4) '<)) 4))
+    (assert (= (length (merge 'cons (list 1 3) (list 2 4) '<)) 4))
     (assert (= (length (merge '(cons t (cons t (cons t (cons t null))))
-                              '(1 3) '(2 4) '<)) 4))
+                              (list 1 3) (list 2 4)
+                              '<))
+               4))
     (assert-type-error (merge 'nil () () '<))
     ;; CONCATENATE
     (assert-type-error (concatenate 'null '(1) "2"))

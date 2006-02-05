@@ -81,7 +81,7 @@
   (loop for (args result) in tests
      do (assert (equal (apply 'nconc (copy-tree args)) result))
      do (let ((exp `(nconc ,@ (mapcar (lambda (arg)
-                                        `',(copy-tree arg))
+                                        `(copy-tree ',arg))
                                       args))))
           (assert (equal (funcall (compile nil `(lambda () ,exp))) result)))))
 
@@ -97,7 +97,7 @@
     (loop for (args fail) in tests
        do (check-error (apply #'nconc (copy-tree args)) fail)
        do (let ((exp `(nconc ,@ (mapcar (lambda (arg)
-                                          `',(copy-tree arg))
+                                          `(copy-tree ',arg))
                                         args))))
             (check-error (funcall (compile nil `(lambda () ,exp))) fail)))))
 

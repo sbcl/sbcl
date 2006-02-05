@@ -169,7 +169,7 @@
   (assert s2)
   (assert (string= s2 "zzzzz")))
 
-;;; POSITION on dispaced arrays with non-zero offset has been broken
+;;; POSITION on displaced arrays with non-zero offset has been broken
 ;;; for quite a while...
 (let ((fn (compile nil '(lambda (x) (position x)))))
   (let* ((x #(1 2 3))
@@ -180,7 +180,7 @@
 (let ((a (make-sequence '(simple-string) 5))
       (b (concatenate '(simple-string) "a" "bdec"))
       (c (map '(simple-string) 'identity "abcde"))
-      (d (merge '(simple-string) "acd" "be" 'char>))
+      (d (merge '(simple-string) (copy-seq "acd") (copy-seq "be") 'char>))
       (e (coerce '(#\a #\b #\c #\e #\d) '(simple-string))))
   (assert (= (length a) 5))
   (assert (string= b "abdec"))
