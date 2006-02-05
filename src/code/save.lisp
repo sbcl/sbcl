@@ -19,11 +19,13 @@
 
 (define-alien-routine "save" (boolean)
   (file c-string)
-  (initial-fun (unsigned #.sb!vm:n-word-bits)))
+  (initial-fun (unsigned #.sb!vm:n-word-bits))
+  (prepend-runtime int))
 
 #!+gencgc
 (define-alien-routine "gc_and_save" void
-  (file c-string))
+  (file c-string)
+  (prepend-runtime int))
 
 #!+gencgc
 (defvar sb!vm::*restart-lisp-function*)
@@ -33,7 +35,8 @@
                                          (purify #!+gencgc nil
                                                  #!-gencgc t)
                                          (root-structures ())
-                                         (environment-name "auxiliary"))
+                                         (environment-name "auxiliary")
+                                         (executable nil))
   #!+sb-doc
   "Save a \"core image\", i.e. enough information to restart a Lisp
 process later in the same state, in the file of the specified name.
@@ -46,6 +49,11 @@ The following &KEY arguments are defined:
      default function handles command line toplevel option processing
      and runs the top level read-eval-print loop. This function should
      not return.
+
+  :EXECUTABLE
+     If true, arrange to combine the SBCL runtime and the core image
+     to create a standalone executable.  If false (the default), the
+     core image will not be executable on its own.
 
   :PURIFY
      If true (the default on cheneygc), do a purifying GC which moves all
@@ -113,10 +121,12 @@ sufficiently motivated to do lengthy fixes."
                ;; A normal GC will leave huge amounts of storage unreclaimed
                ;; (over 50% on x86). This needs to be done by a single function
                ;; since the GC will invalidate the stack.
-               #!+gencgc (gc-and-save (unix-namestring core-file-name nil)))
+               #!+gencgc (gc-and-save (unix-namestring core-file-name nil)
+                                      (if executable 1 0)))
              (without-gcing
               (save (unix-namestring core-file-name nil)
-                    (get-lisp-obj-address #'restart-lisp)))))
+                    (get-lisp-obj-address #'restart-lisp)
+                    (if executable 1 0)))))
     ;; Save the restart function into a static symbol, to allow GC-AND-SAVE
     ;; access to it even after the GC has moved it.
     #!+gencgc

@@ -38,6 +38,7 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
+#include "runtime.h"
 #include "monitor.h"
 #include "alloc.h"
 #include "genesis/primitive-objects.h"
@@ -633,6 +634,21 @@ void scratch(void)
     FlushConsoleInputBuffer(0);
     PeekConsoleInput(0, 0, 0, 0);
     Sleep(0);
+}
+
+char *
+os_get_runtime_executable_path()
+{
+    char path[MAX_PATH + 1];
+    DWORD bufsize = sizeof(path);
+    DWORD size;
+
+    if ((size = GetModuleFileNameA(NULL, path, bufsize)) == 0)
+        return NULL;
+    else if (size == bufsize && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+        return NULL;
+
+    return copied_string(path);
 }
 
 /* EOF */

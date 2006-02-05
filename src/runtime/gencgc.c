@@ -4433,13 +4433,16 @@ prepare_for_final_gc ()
  * function being set to the value of the static symbol
  * SB!VM:RESTART-LISP-FUNCTION */
 void
-gc_and_save(char *filename)
+gc_and_save(char *filename, int prepend_runtime)
 {
-    FILE *file = open_core_for_saving(filename);
-    if (!file) {
-        perror(filename);
-        return;
-    }
+    FILE *file;
+    void *runtime_bytes = NULL;
+    size_t runtime_size;
+
+    file = prepare_to_save(filename, prepend_runtime, &runtime_bytes, &runtime_size);
+    if (file == NULL)
+       return;
+
     conservative_stack = 0;
 
     /* The filename might come from Lisp, and be moved by the now
@@ -4458,9 +4461,13 @@ gc_and_save(char *filename)
     gencgc_alloc_start_page = -1;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
 
+    if (prepend_runtime)
+        save_runtime_to_filehandle(file, runtime_bytes, runtime_size);
+
     /* The dumper doesn't know that pages need to be zeroed before use. */
     zero_all_free_pages();
-    save_to_filehandle(file, filename, SymbolValue(RESTART_LISP_FUNCTION,0));
+    save_to_filehandle(file, filename, SymbolValue(RESTART_LISP_FUNCTION,0),
+                       prepend_runtime);
     /* Oops. Save still managed to fail. Since we've mangled the stack
      * beyond hope, there's not much we can do.
      * (beyond FUNCALLing RESTART_LISP_FUNCTION, but I suspect that's

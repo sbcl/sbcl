@@ -370,3 +370,18 @@ os_install_interrupt_handlers(void)
                                                  sig_stop_for_gc_handler);
 #endif
 }
+
+char *
+os_get_runtime_executable_path()
+{
+    char path[PATH_MAX + 1];
+    int size;
+
+    size = readlink("/proc/self/exe", path, sizeof(path));
+    if (size < 0)
+        return NULL;
+    else
+        path[size] = '\0';
+
+    return copied_string(path);
+}

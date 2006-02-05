@@ -241,3 +241,9 @@ os_install_interrupt_handlers()
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
                                                  sigsegv_handler);
 }
+
+char *
+os_get_runtime_executable_path()
+{
+    return NULL;
+}

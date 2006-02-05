@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.10 relative to sbcl-0.9.9:
+  * new feature: new SAVE-LISP-AND-DIE keyword argument :EXECUTABLE can
+    be used for bundling the runtime and the core file into one 
+    executable binary. This feature is not currently supported on all SBCL
+    platforms.  (thanks to James Bielman)
   * minor incompatible change: the method by which SBCL finds its
     contributed modules has changed; it no longer relies on symbolic
     links from an $SBCL_HOME/systems directory, but searches directly

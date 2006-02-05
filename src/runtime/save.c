@@ -9,6 +9,10 @@
  * files for more information.
  */
 
+#ifndef LISP_FEATURE_WIN32
+#include <sys/types.h>
+#include <sys/stat.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -37,7 +41,7 @@ write_lispobj(lispobj obj, FILE *file)
 }
 
 static long
-write_bytes(FILE *file, char *addr, long bytes)
+write_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file_offset)
 {
     long count, here, data;
 
@@ -52,9 +56,9 @@ write_bytes(FILE *file, char *addr, long bytes)
 
     fflush(file);
     here = ftell(file);
-    fseek(file, 0, 2);
+    fseek(file, 0, SEEK_END);
     data = (ftell(file)+os_vm_page_size-1)&~(os_vm_page_size-1);
-    fseek(file, data, 0);
+    fseek(file, data, SEEK_SET);
 
     while (bytes > 0) {
         count = fwrite(addr, 1, bytes, file);
@@ -68,12 +72,12 @@ write_bytes(FILE *file, char *addr, long bytes)
         }
     }
     fflush(file);
-    fseek(file, here, 0);
-    return data/os_vm_page_size - 1;
+    fseek(file, here, SEEK_SET);
+    return ((data - file_offset) / os_vm_page_size) - 1;
 }
 
 static void
-output_space(FILE *file, int id, lispobj *addr, lispobj *end)
+output_space(FILE *file, int id, lispobj *addr, lispobj *end, os_vm_offset_t file_offset)
 {
     int words, bytes, data;
     static char *names[] = {NULL, "dynamic", "static", "read-only"};
@@ -87,7 +91,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end)
     printf("writing %d bytes from the %s space at 0x%08lx\n",
            bytes, names[id], (unsigned long)addr);
 
-    data = write_bytes(file, (char *)addr, bytes);
+    data = write_bytes(file, (char *)addr, bytes, file_offset);
 
     write_lispobj(data, file);
     write_lispobj((long)addr / os_vm_page_size, file);
@@ -105,9 +109,11 @@ open_core_for_saving(char *filename)
 }
 
 boolean
-save_to_filehandle(FILE *file, char *filename, lispobj init_function)
+save_to_filehandle(FILE *file, char *filename, lispobj init_function,
+                   boolean make_executable)
 {
     struct thread *th;
+    os_vm_offset_t core_start_pos, core_end_pos, core_size;
 
     /* Smash the enclosing state. (Once we do this, there's no good
      * way to go back, which is a sufficient reason that this ends up
@@ -127,6 +133,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function)
     printf("[saving current Lisp image into %s:\n", filename);
     fflush(stdout);
 
+    core_start_pos = ftell(file);
     write_lispobj(CORE_MAGIC, file);
 
     write_lispobj(VERSION_CORE_ENTRY_TYPE_CODE, file);
@@ -152,16 +159,19 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function)
     output_space(file,
                  READ_ONLY_CORE_SPACE_ID,
                  (lispobj *)READ_ONLY_SPACE_START,
-                 (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
+                 (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0),
+                 core_start_pos);
     output_space(file,
                  STATIC_CORE_SPACE_ID,
                  (lispobj *)STATIC_SPACE_START,
-                 (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0));
+                 (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0),
+                 core_start_pos);
 #ifdef reg_ALLOC
     output_space(file,
                  DYNAMIC_CORE_SPACE_ID,
                  (lispobj *)current_dynamic_space,
-                 dynamic_space_free_pointer);
+                 dynamic_space_free_pointer,
+                 core_start_pos);
 #else
 #ifdef LISP_FEATURE_GENCGC
     /* Flush the current_region, updating the tables. */
@@ -171,7 +181,8 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function)
     output_space(file,
                  DYNAMIC_CORE_SPACE_ID,
                  (lispobj *)DYNAMIC_SPACE_START,
-                 (lispobj *)SymbolValue(ALLOCATION_POINTER,0));
+                 (lispobj *)SymbolValue(ALLOCATION_POINTER,0),
+                 core_start_pos);
 #endif
 
     write_lispobj(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);
@@ -192,7 +203,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function)
             write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
             write_lispobj(4, file);
             write_lispobj(size, file);
-            offset = write_bytes(file, (char *) data, size);
+            offset = write_bytes(file, (char *) data, size, core_start_pos);
             write_lispobj(offset, file);
         }
     }
@@ -200,21 +211,133 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function)
 
     write_lispobj(END_CORE_ENTRY_TYPE_CODE, file);
 
-    fclose(file);
-    printf("done]\n");
+    /* Write a trailing header, ignored when parsing the core normally.
+     * This is used to locate the start of the core when the runtime is
+     * prepended to it. */
+    fseek(file, 0, SEEK_END);
+    core_end_pos = ftell(file);
+    core_size = core_end_pos - core_start_pos;
 
+    fwrite(&core_size, sizeof(os_vm_offset_t), 1, file);
+    write_lispobj(CORE_MAGIC, file);
+    fclose(file);
+
+#ifndef LISP_FEATURE_WIN32
+    if (make_executable)
+        chmod (filename, 0755);
+#endif
+
+    printf("done]\n");
     exit(0);
 }
 
-boolean
-save(char *filename, lispobj init_function)
+/* Slurp the executable portion of the runtime into a malloced buffer
+ * and return it.  Places the size in bytes of the runtime into
+ * 'size_out'.  Returns NULL if the runtime cannot be loaded from
+ * 'runtime_path'. */
+void *
+load_runtime(char *runtime_path, size_t *size_out)
 {
-    FILE *file = open_core_for_saving(filename);
+    void *buf = NULL;
+    FILE *input = NULL;
+    size_t size, count;
+    os_vm_offset_t core_offset;
 
-    if (!file) {
-        perror(filename);
-        return 1;
+    core_offset = search_for_embedded_core (runtime_path);
+    if ((input = fopen(runtime_path, "rb")) == NULL) {
+        fprintf(stderr, "Unable to open runtime: %s\n", runtime_path);
+        goto lose;
     }
 
-    return save_to_filehandle(file, filename, init_function);
+    fseek(input, 0, SEEK_END);
+    size = (size_t) ftell(input);
+    fseek(input, 0, SEEK_SET);
+
+    if (core_offset != -1 && size > core_offset)
+        size = core_offset;
+
+    buf = successful_malloc(size);
+    if ((count = fread(buf, 1, size, input)) != size) {
+        fprintf(stderr, "Premature EOF while reading runtime.\n");
+        goto lose;
+    }
+
+    fclose(input);
+    *size_out = size;
+    return buf;
+
+lose:
+    if (input != NULL)
+        fclose(input);
+    if (buf != NULL)
+        free(buf);
+    return NULL;
+}
+
+boolean
+save_runtime_to_filehandle(FILE *output, void *runtime, size_t runtime_size)
+{
+    size_t padding;
+    void *padbytes;
+
+    fwrite(runtime, 1, runtime_size, output);
+
+    padding = (os_vm_page_size - (runtime_size % os_vm_page_size)) & ~os_vm_page_size;
+    if (padding > 0) {
+        padbytes = successful_malloc(padding);
+        memset(padbytes, 0, padding);
+        fwrite(padbytes, 1, padding, output);
+        free(padbytes);
+    }
+
+    return 1;
+}
+
+FILE *
+prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
+                size_t *runtime_size)
+{
+    FILE *file;
+    char *runtime_path;
+
+    if (prepend_runtime) {
+        runtime_path = os_get_runtime_executable_path();
+
+        if (runtime_path == NULL) {
+            fprintf(stderr, "Unable to get default runtime path.\n");
+            return NULL;
+        }
+
+        *runtime_bytes = load_runtime(runtime_path, runtime_size);
+        free(runtime_path);
+
+        if (*runtime_bytes == NULL)
+            return 0;
+    }
+
+    file = open_core_for_saving(filename);
+    if (file == NULL) {
+        free(*runtime_bytes);
+        perror(filename);
+        return NULL;
+    }
+
+    return file;
+}
+
+boolean
+save(char *filename, lispobj init_function, boolean prepend_runtime)
+{
+    FILE *file;
+    void *runtime_bytes = NULL;
+    size_t runtime_size;
+
+    file = prepare_to_save(filename, prepend_runtime, &runtime_bytes, &runtime_size);
+    if (file == NULL)
+        return 1;
+
+    if (prepend_runtime)
+        save_runtime_to_filehandle(file, runtime_bytes, runtime_size);
+
+    return save_to_filehandle(file, filename, init_function, prepend_runtime);
 }

@@ -182,7 +182,33 @@ distribution for more information.\n\
 ", SBCL_VERSION_STRING);
 }
 
-
+/* Look for a core file to load, first in the directory named by the
+ * SBCL_HOME environment variable, then in a hardcoded default
+ * location.  Returns a malloced copy of the core filename. */
+char *
+search_for_core ()
+{
+    char *sbcl_home = getenv("SBCL_HOME");
+    char *lookhere;
+    char *stem = "/sbcl.core";
+    char *core;
+
+    if(!sbcl_home) sbcl_home = SBCL_HOME;
+    lookhere = (char *) calloc(strlen(sbcl_home) +
+                               strlen(stem) +
+                               1,
+                               sizeof(char));
+    sprintf(lookhere, "%s%s", sbcl_home, stem);
+    core = copied_existing_filename_or_null(lookhere);
+    free(lookhere);
+    if (!core) {
+        lose("can't find core file\n");
+    }
+
+    return core;
+}
+
+ 
 int
 main(int argc, char *argv[], char *envp[])
 {
@@ -195,6 +221,7 @@ main(int argc, char *argv[], char *envp[])
      * a malloc'ed string which should be freed eventually. */
     char *core = 0;
     char **sbcl_argv = 0;
+    os_vm_offset_t embedded_core_offset = 0;
 
     /* other command line options */
     boolean noinform = 0;
@@ -286,24 +313,25 @@ main(int argc, char *argv[], char *envp[])
 
     /* If no core file was specified, look for one. */
     if (!core) {
-        char *sbcl_home = getenv("SBCL_HOME");
-        char *lookhere;
-        char *stem = "/sbcl.core";
-        if(!sbcl_home) sbcl_home = SBCL_HOME;
-        lookhere = (char *) calloc(strlen(sbcl_home) +
-                                   strlen(stem) +
-                                   1,
-                                   sizeof(char));
-        sprintf(lookhere, "%s%s", sbcl_home, stem);
-        core = copied_existing_filename_or_null(lookhere);
-        free(lookhere);
-        if (!core) {
-            lose("can't find core file\n");
-        }
+       char *runtime_path = os_get_runtime_executable_path();
+
+       if (runtime_path) {
+          os_vm_offset_t offset = search_for_embedded_core(runtime_path);
+
+          if (offset != -1) {
+             embedded_core_offset = offset;
+             core = runtime_path;
+          } else {
+             free(runtime_path);
+             core = search_for_core();
+          }
+       } else {
+          core = search_for_core();
+       }
     }
-    /* Make sure that SBCL_HOME is set, no matter where the core was
-     * found */
-    if (!getenv("SBCL_HOME")) {
+
+    /* Make sure that SBCL_HOME is set, unless loading an embedded core. */
+    if (!getenv("SBCL_HOME") && embedded_core_offset == 0) {
         char *envstring, *copied_core, *dir;
         char *stem = "SBCL_HOME=";
         copied_core = copied_string(core);
@@ -333,7 +361,7 @@ main(int argc, char *argv[], char *envp[])
 
     globals_init();
 
-    initial_function = load_core_file(core);
+    initial_function = load_core_file(core, embedded_core_offset);
     if (initial_function == NIL) {
         lose("couldn't find initial function\n");
     }

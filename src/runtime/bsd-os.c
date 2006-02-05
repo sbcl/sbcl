@@ -335,3 +335,11 @@ int arch_os_thread_cleanup(struct thread *thread) {
     return 1;                  /* success */
 }
 #endif
+
+#ifndef LISP_FEATURE_DARWIN   /* defined in ppc-darwin-os.c instead */
+char *
+os_get_runtime_executable_path()
+{
+    return NULL;
+}
+#endif

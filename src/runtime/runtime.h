@@ -159,4 +159,7 @@ typedef int boolean;
 #define never_returns
 #endif
 
+extern void *successful_malloc (size_t size);
+extern char *copied_string (char *string);
+
 #endif /* _SBCL_RUNTIME_H_ */

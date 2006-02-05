@@ -179,4 +179,9 @@ extern void os_deallocate(os_vm_address_t addr, os_vm_size_t len);
  * to return the value in a way that Lisp can understand. */
 int os_get_errno(void);
 
+/* Return an absolute path to the runtime executable, or NULL if this
+ * information is unavailable.  If a non-null pathname is returned, it
+ * must be 'free'd. */
+extern char *os_get_runtime_executable_path();
+
 #endif

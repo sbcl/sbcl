@@ -43,8 +43,69 @@ unsigned char build_id[] =
 #include "../../output/build-id.tmp"
 ;
 
+int
+open_binary(char *filename, int mode)
+{
+#ifdef LISP_FEATURE_WIN32
+    mode |= O_BINARY;
+#endif
+
+    return open(filename, mode);
+}
+
+/* Search 'filename' for an embedded core.  An SBCL core has, at the
+ * end of the file, a trailer containing the size of the core (an
+ * os_vm_offset_t) and a final signature word (the lispobj
+ * CORE_MAGIC).  If this trailer is found at the end of the file, the
+ * start of the core can be determined from the core size.
+ *
+ * If an embedded core is present, this returns the offset into the
+ * file to load the core from, or -1 if no core is present. */
+os_vm_offset_t
+search_for_embedded_core(char *filename)
+{
+    lispobj header;
+    os_vm_offset_t lispobj_size = sizeof(lispobj);
+    os_vm_offset_t trailer_size = lispobj_size + sizeof(os_vm_offset_t);
+    os_vm_offset_t core_size, pos;
+    int fd = -1;
+
+    if ((fd = open_binary(filename, O_RDONLY)) < 0)
+        goto lose;
+    if (lseek(fd, -lispobj_size, SEEK_END) < 0)
+        goto lose;
+    if (read(fd, &header, (size_t)lispobj_size) < lispobj_size)
+        goto lose;
+
+    if (header == CORE_MAGIC) {
+        if (lseek(fd, -trailer_size, SEEK_END) < 0)
+            goto lose;
+        if (read(fd, &core_size, sizeof(os_vm_offset_t)) < 0)
+            goto lose;
+
+        if (lseek(fd, -(core_size + trailer_size), SEEK_END) < 0)
+            goto lose;
+        pos = lseek(fd, 0, SEEK_CUR);
+
+        if (read(fd, &header, (size_t)lispobj_size) < lispobj_size)
+            goto lose;
+
+        if (header != CORE_MAGIC)
+            goto lose;
+
+        close(fd);
+        return pos;
+    }
+
+lose:
+    if (fd != -1)
+        close(fd);
+
+    return -1;
+}
+
 static void
-process_directory(int fd, u32 *ptr, int count)
+process_directory(int fd, u32 *ptr, int count, os_vm_offset_t file_offset)
 {
     struct ndir_entry *entry;
 
@@ -63,7 +124,7 @@ process_directory(int fd, u32 *ptr, int count)
             os_vm_address_t real_addr;
             FSHOW((stderr, "/mapping %ld(0x%lx) bytes at 0x%lx\n",
                    (long)len, (long)len, (unsigned long)addr));
-            real_addr = os_map(fd, offset, addr, len);
+            real_addr = os_map(fd, offset + file_offset, addr, len);
             if (real_addr != addr) {
                 lose("file mapped in wrong place! "
                      "(0x%08x != 0x%08lx)\n",
@@ -125,14 +186,10 @@ process_directory(int fd, u32 *ptr, int count)
 }
 
 lispobj
-load_core_file(char *file)
+load_core_file(char *file, os_vm_offset_t file_offset)
 {
     lispobj *header, val, len, *ptr, remaining_len;
-#ifndef LISP_FEATURE_WIN32
-    int fd = open(file, O_RDONLY), count;
-#else
-    int fd = open(file, O_RDONLY | O_BINARY), count;
-#endif
+    int fd = open_binary(file, O_RDONLY), count;
 
     lispobj initial_function = NIL;
     FSHOW((stderr, "/entering load_core_file(%s)\n", file));
@@ -142,6 +199,7 @@ load_core_file(char *file)
         exit(1);
     }
 
+    lseek(fd, file_offset, SEEK_SET);
     header = calloc(os_vm_page_size / sizeof(u32), sizeof(u32));
 
     count = read(fd, header, os_vm_page_size);
@@ -218,12 +276,12 @@ load_core_file(char *file)
                               ptr,
 #ifndef LISP_FEATURE_ALPHA
                               remaining_len / (sizeof(struct ndir_entry) /
-                                               sizeof(long))
+                                               sizeof(long)),
 #else
                               remaining_len / (sizeof(struct ndir_entry) /
-                                               sizeof(u32))
+                                               sizeof(u32)),
 #endif
-                              );
+                              file_offset);
             break;
 
         case INITIAL_FUN_CORE_ENTRY_TYPE_CODE:
@@ -239,7 +297,7 @@ load_core_file(char *file)
             size_t offset = 0;
             long bytes_read;
             long data[4096];
-            lseek(fd, fdoffset, SEEK_SET);
+            lseek(fd, fdoffset + file_offset, SEEK_SET);
             while ((bytes_read = read(fd, data, (size < 4096 ? size : 4096 )))
                     > 0)
             {
@@ -267,3 +325,4 @@ load_core_file(char *file)
     SHOW("returning from load_core_file(..)");
     return initial_function;
 }
+

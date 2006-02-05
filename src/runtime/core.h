@@ -31,7 +31,8 @@ struct ndir_entry {
 #endif
 };
 
-extern lispobj load_core_file(char *file);
+extern lispobj load_core_file(char *file, os_vm_offset_t offset);
+extern os_vm_offset_t search_for_embedded_core(char *file);
 
 /* arbitrary string identifying this build, embedded in .core files to
  * prevent people mismatching a runtime built e.g. with :SB-SHOW
