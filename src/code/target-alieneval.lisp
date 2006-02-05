@@ -797,6 +797,7 @@ ENTER-ALIEN-CALLBACK pulls the corresponsing trampoline out and calls it.")
                         (sb!kernel:get-lisp-obj-address args-pointer)))
              (res-sap (int-sap
                        (sb!kernel:get-lisp-obj-address result-pointer))))
+         (declare (ignorable args-sap res-sap))
          (with-alien
              ,(loop
                  with offset = 0
