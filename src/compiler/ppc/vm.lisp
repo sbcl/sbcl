@@ -337,3 +337,45 @@
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed"))))
 
+(!def-vm-support-routine combination-implementation-style (node)
+  (declare (type sb!c::combination node))
+  (flet ((valid-funtype (args result)
+           (sb!c::valid-fun-use node
+                                (sb!c::specifier-type
+                                 `(function ,args ,result)))))
+    (case (sb!c::combination-fun-source-name node)
+      (logtest
+       (cond
+         ((or (valid-funtype '(fixnum fixnum) '*)
+              (valid-funtype '((signed-byte 32) (signed-byte 32)) '*)
+              (valid-funtype '((unsigned-byte 32) (unsigned-byte 32)) '*))
+          (values :direct nil))
+         (t (values :default nil))))
+      (logbitp
+       (cond
+         ((or (valid-funtype '((constant-arg (integer 0 29)) fixnum) '*)
+              (valid-funtype '((constant-arg (integer 0 31)) (signed-byte 32)) '*)
+              (valid-funtype '((constant-arg (integer 0 31)) (unsigned-byte 32)) '*))
+          (values :transform '(lambda (index integer)
+                               (%logbitp integer index))))
+         (t (values :default nil))))
+      ;; FIXME: can handle MIN and MAX here
+      (sb!kernel:%ldb
+       (cond
+         ((or (valid-funtype '((constant-arg (integer 1 29))
+                               (constant-arg (integer 0 29))
+                               fixnum)
+                             'fixnum)
+              (valid-funtype '((constant-arg (integer 1 29))
+                               (constant-arg (integer 0 29))
+                               (signed-byte 32))
+                             'fixnum)
+              (valid-funtype '((constant-arg (integer 1 29))
+                               (constant-arg (integer 0 29))
+                               (unsigned-byte 32))
+                             'fixnum))
+          (values :transform
+                  '(lambda (size posn integer)
+                    (%%ldb integer size posn))))
+         (t (values :default nil))))
+      (t (values :default nil)))))

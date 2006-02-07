@@ -188,7 +188,12 @@
   #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
   (deffrob ceiling))
 
-(define-source-transform logtest (x y) `(not (zerop (logand ,x ,y))))
+;;; This used to be a source transform (hence the lack of restrictions
+;;; on the argument types), but we make it a regular transform so that
+;;; the VM has a chance to see the bare LOGTEST and potentiall choose
+;;; to implement it differently.  --njf, 06-02-2006
+(deftransform logtest ((x y) * *)
+  `(not (zerop (logand x y))))
 
 (deftransform logbitp
     ((index integer) (unsigned-byte (or (signed-byte #.sb!vm:n-word-bits)

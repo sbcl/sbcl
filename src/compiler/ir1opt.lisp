@@ -724,17 +724,30 @@
 
        (let ((fun (fun-info-optimizer info)))
          (unless (and fun (funcall fun node))
-           (dolist (x (fun-info-transforms info))
-             #!+sb-show
-             (when *show-transforms-p*
-               (let* ((lvar (basic-combination-fun node))
-                      (fname (lvar-fun-name lvar t)))
-                 (/show "trying transform" x (transform-function x) "for" fname)))
-             (unless (ir1-transform node x)
-               #!+sb-show
-               (when *show-transforms-p*
-                 (/show "quitting because IR1-TRANSFORM result was NIL"))
-               (return))))))))
+           ;; First give the VM a peek at the call
+           (multiple-value-bind (style transform)
+               (combination-implementation-style node)
+             (ecase style
+               (:direct
+                ;; The VM knows how to handle this.
+                )
+               (:transform
+                ;; The VM mostly knows how to handle this.  We need
+                ;; to massage the call slightly, though.
+                (transform-call node transform (combination-fun-source-name node)))
+               (:default
+                ;; Let transforms have a crack at it.
+                (dolist (x (fun-info-transforms info))
+                  #!+sb-show
+                  (when *show-transforms-p*
+                    (let* ((lvar (basic-combination-fun node))
+                           (fname (lvar-fun-name lvar t)))
+                      (/show "trying transform" x (transform-function x) "for" fname)))
+                  (unless (ir1-transform node x)
+                    #!+sb-show
+                    (when *show-transforms-p*
+                      (/show "quitting because IR1-TRANSFORM result was NIL"))
+                    (return)))))))))))
 
   (values))
 

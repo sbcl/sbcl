@@ -1039,6 +1039,57 @@
   (:arg-types unsigned-num (:constant (unsigned-byte 32)))
   (:info target not-p y))
 
+(macrolet ((define-logtest-vops ()
+             `(progn
+               ,@(loop for suffix in '(/fixnum -c/fixnum
+                                       /signed -c/signed
+                                       /unsigned -c/unsigned)
+                       for cost in '(4 3 6 5 6 5)
+                       collect
+                       `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
+                                     ,(symbolicate "FAST-CONDITIONAL" suffix))
+                         (:translate logtest)
+                         (:generator ,cost
+                          (inst test x ,(if (eq suffix '-c/fixnum)
+                                            '(fixnumize y)
+                                            'y))
+                          (inst jmp (if not-p :e :ne) target)))))))
+  (define-logtest-vops))
+
+(defknown %logbitp (integer unsigned-byte) boolean
+  (movable foldable flushable))
+
+;;; too much work to do the non-constant case (maybe?)
+(define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
+  (:translate %logbitp)
+  (:generator 4
+    (aver (< y 29))
+    (inst bt x (+ y n-fixnum-tag-bits))
+    (inst jmp (if not-p :nc :c) target)))
+
+(define-vop (fast-logbitp/signed fast-conditional/signed)
+  (:translate %logbitp)
+  (:generator 6
+    (inst bt x y)
+    (inst jmp (if not-p :nc :c) target)))
+
+(define-vop (fast-logbitp-c/signed fast-conditional-c/signed)
+  (:translate %logbitp)
+  (:generator 5
+    (inst bt x y)
+    (inst jmp (if not-p :nc :c) target)))
+
+(define-vop (fast-logbitp/unsigned fast-conditional/unsigned)
+  (:translate %logbitp)
+  (:generator 6
+    (inst bt x y)
+    (inst jmp (if not-p :nc :c) target)))
+
+(define-vop (fast-logbitp-/unsigned fast-conditional-c/unsigned)
+  (:translate %logbitp)
+  (:generator 5
+    (inst bt x y)
+    (inst jmp (if not-p :nc :c) target)))
 
 (macrolet ((define-conditional-vop (tran cond unsigned not-cond not-unsigned)
              `(progn

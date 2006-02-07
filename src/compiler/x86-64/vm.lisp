@@ -495,3 +495,6 @@
 
 (def!constant cfp-offset rbp-offset) ; pfw - needed by stuff in /code
 
+(!def-vm-support-routine combination-implementation-style (node)
+  (declare (type sb!c::combination node) (ignore node))
+  (values :default nil))

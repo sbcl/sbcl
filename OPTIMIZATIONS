@@ -241,30 +241,22 @@ Python's aggressiveness would make it easier to effect changes such as
 x86-64:
 * direct MIN/MAX on {SINGLE,DOUBLE}-FLOATs ({MIN,MAX}S{S,D})
 
-x86{,-64}:
+x86-64:
 * direct LOGBITP on word-sized integers and fixnums (BT + JC)
 
 x86{,-64}/PPC:
-* branch-free MIN/MAX on word-sized integers and fixnums
-* efficient LOGTESTs on word-sized integers and fixnums (TEST / AND.)
+* branch-free MIN/MAX on word-sized integers and fixnums (floats could
+  be handled too, modulo safety considerations on the PPC)
 
-PPC:
-* efficient LDB on word-sized integers and fixnums (RLWINM)
+x86-64:
+* efficient LOGTESTs on word-sized integers and fixnums (TEST)
 
 etc., etc.
 
-The "easier" part claimed above would come about because the functions
-would be available for :TRANSLATE through a VOP or similar, whereas with
-the current architecture, one would have to pattern-match IR1.  While
-IR1 pattern-matching would be useful in other contexts, it seems better
-here to attempt the direct :TRANSLATE route.
-
-I (NJF) don't know how to implement such architecture-specific
-optimizations whilst keeping the high->low transformations for other
-architectures.  Certainly adding #!+/- magic in compiler/*.lisp could be
-done, but such a solution is somewhat inelegant.  Moving the relevant
-DEFTRANSFORMs to the architecture-specific compiler/* areas is also
-possible, but that would duplicate quite a bit of code.
+(The framework for this has been implemented as of 0.9.9.18; see the
+vm-support-routine COMBINATION-IMPLEMENTATION-STYLE and its use in
+src/compiler/ir1opt.lisp, IR1-OPTIMIZE-COMBINATION.  The above
+optimizations are left as an exercise for the reader.)
 --------------------------------------------------------------------------------
 #30
 (defun foo (x y)

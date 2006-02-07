@@ -371,4 +371,6 @@
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed"))))
 
-
+(!def-vm-support-routine combination-implementation-style (node)
+  (declare (type sb!c::combination node) (ignore node))
+  (values :default nil))

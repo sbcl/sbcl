@@ -661,6 +661,54 @@
       (emit-label done))))
 
 
+;;;; %LDB
+
+(defknown %%ldb (integer unsigned-byte unsigned-byte) unsigned-byte
+  (movable foldable flushable))
+
+(define-vop (ldb-c/fixnum)
+  (:translate %%ldb)
+  (:args (x :scs (any-reg)))
+  (:arg-types tagged-num (:constant (integer 1 29)) (:constant (integer 0 29)))
+  (:info size posn)
+  (:results (res :scs (any-reg)))
+  (:result-types tagged-num)
+  (:policy :fast-safe)
+  (:generator 2
+    (inst rlwinm res x
+          (mod (- 32 posn) 32)          ; effectively rotate right
+          (- 32 size n-fixnum-tag-bits)
+          (- 31 n-fixnum-tag-bits))))
+
+(define-vop (ldb-c/signed)
+  (:translate %%ldb)
+  (:args (x :scs (signed-reg)))
+  (:arg-types signed-num (:constant (integer 1 29)) (:constant (integer 0 29)))
+  (:info size posn)
+  (:results (res :scs (any-reg)))
+  (:result-types tagged-num)
+  (:policy :fast-safe)
+  (:generator 3
+    (inst rlwinm res x
+          (mod (- (+ 32 n-fixnum-tag-bits) posn) 32)
+          (- 32 size n-fixnum-tag-bits)
+          (- 31 n-fixnum-tag-bits))))
+
+(define-vop (ldb-c/unsigned)
+  (:translate %%ldb)
+  (:args (x :scs (unsigned-reg)))
+  (:arg-types unsigned-num (:constant (integer 1 29)) (:constant (integer 0 29)))
+  (:info size posn)
+  (:results (res :scs (any-reg)))
+  (:result-types tagged-num)
+  (:policy :fast-safe)
+  (:generator 3
+    (inst rlwinm res x
+          (mod (- (+ 32 n-fixnum-tag-bits) posn) 32)
+          (- 32 size n-fixnum-tag-bits)
+          (- 31 n-fixnum-tag-bits))))
+
+
 ;;;; Modular functions:
 (define-modular-fun lognot-mod32 (x) lognot :unsigned 32)
 (define-vop (lognot-mod32/unsigned=>unsigned)
@@ -752,6 +800,64 @@
   (:args (x :scs (unsigned-reg zero)))
   (:arg-types unsigned-num (:constant (unsigned-byte 16)))
   (:info target not-p y))
+
+(macrolet ((define-logtest-vops ()
+             `(progn
+               ,@(loop for suffix in '(/fixnum -c/fixnum
+                                       /signed -c/signed
+                                       /unsigned -c/unsigned)
+                       for sc in '(any-reg any-reg
+                                   signed-reg signed-reg
+                                   unsigned-reg unsigned-reg)
+                       for cost in '(4 3 6 5 6 5)
+                       collect
+                       `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
+                                     ,(symbolicate "FAST-CONDITIONAL" suffix))
+                         (:translate logtest)
+                         (:temporary (:scs (,sc) :to (:result 0)) test)
+                         (:generator ,cost
+                          ;; We could be a lot more sophisticated here and
+                          ;; check for possibilities with ANDIS..
+                          ,(if (string= "-C" suffix :end2 2)
+                               `(inst andi. test x ,(if (eq suffix '-c/fixnum)
+                                                        '(fixnumize y)
+                                                        'y))
+                               `(inst and. test x y))
+                          (inst b? (if not-p :eq :ne) target)))))))
+  (define-logtest-vops))
+
+(defknown %logbitp (integer unsigned-byte) boolean
+  (movable foldable flushable))
+
+;;; We only handle the constant cases because those are the only ones
+;;; guaranteed to make it past COMBINATION-IMPLEMENTATION-STYLE.
+;;;  --njf, 06-02-2006
+(define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
+  (:translate %logbitp)
+  (:temporary (:scs (any-reg) :to (:result 0)) test)
+  (:generator 4
+    (if (< y 14)
+        (inst andi. test x (ash 1 (+ y n-fixnum-tag-bits)))
+        (inst andis. test x (ash 1 (- y 14))))
+    (inst b? (if not-p :eq :ne) target)))
+
+(define-vop (fast-logbitp-c/signed fast-conditional-c/signed)
+  (:translate %logbitp)
+  (:temporary (:scs (signed-reg) :to (:result 0)) test)
+  (:generator 4
+    (if (< y 16)
+        (inst andi. test x (ash 1 y))
+        (inst andis. test x (ash 1 (- y 16))))
+    (inst b? (if not-p :eq :ne) target)))
+
+(define-vop (fast-logbitp-c/unsigned fast-conditional-c/unsigned)
+  (:translate %logbitp)
+  (:temporary (:scs (unsigned-reg) :to (:result 0)) test)
+  (:generator 4
+    (if (< y 16)
+        (inst andi. test x (ash 1 y))
+        (inst andis. test x (ash 1 (- y 16))))
+    (inst b? (if not-p :eq :ne) target)))
 
 (define-vop (fast-if-</fixnum fast-conditional/fixnum)
   (:translate <)
