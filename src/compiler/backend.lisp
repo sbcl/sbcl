@@ -167,6 +167,7 @@
     ;; from vm.lisp
     immediate-constant-sc
     location-print-name
+    combination-implementation-style
 
     ;; from primtype.lisp
     primitive-type-of
