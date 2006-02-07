@@ -666,6 +666,9 @@
 (defknown %%ldb (integer unsigned-byte unsigned-byte) unsigned-byte
   (movable foldable flushable))
 
+(defun %%ldb (integer size posn)
+  (sb-kernel::%ldb size posn integer))
+
 (define-vop (ldb-c/fixnum)
   (:translate %%ldb)
   (:args (x :scs (any-reg)))
@@ -828,6 +831,9 @@
 
 (defknown %logbitp (integer unsigned-byte) boolean
   (movable foldable flushable))
+
+(defun %logbitp (index integer)
+  (logbitp index integer))
 
 ;;; We only handle the constant cases because those are the only ones
 ;;; guaranteed to make it past COMBINATION-IMPLEMENTATION-STYLE.

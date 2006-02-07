@@ -1921,3 +1921,37 @@
                  (declare (type (or (simple-array character (6))
                                     (simple-array character (5))) x))
                  (aref x 0))))
+
+;;; MISC.623: missing functions for constant-folding
+(assert (eql 0
+             (funcall
+              (compile
+               nil
+               '(lambda ()
+                 (declare (optimize (space 2) (speed 0) (debug 2)
+                           (compilation-speed 3) (safety 0)))
+                 (loop for lv3 below 1
+                    count (minusp
+                           (loop for lv2 below 2
+                              count (logbitp 0
+                                             (bit #*1001101001001
+                                                  (min 12 (max 0 lv3))))))))))))
+
+;;; MISC.624: erronous AVER in x86's %LOGBITP VOPs
+(assert (eql 0
+             (funcall
+              (compile
+               nil
+               '(lambda (a)
+                 (declare (type (integer 21 28) a))
+                 (declare	(optimize (compilation-speed 1) (safety 2)
+                                 (speed 0) (debug 0) (space 1)))
+                 (let* ((v7 (flet ((%f3 (f3-1 f3-2)
+                                     (loop for lv2 below 1
+                                        count
+                                        (logbitp 29
+                                                 (sbit #*10101111
+                                                       (min 7 (max 0 (eval '0))))))))
+                              (%f3 0 a))))
+                   0)))
+              22)))

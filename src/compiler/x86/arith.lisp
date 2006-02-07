@@ -1059,11 +1059,14 @@
 (defknown %logbitp (integer unsigned-byte) boolean
   (movable foldable flushable))
 
+(defun %logbitp (index integer)
+  (logbitp index integer))
+
 ;;; too much work to do the non-constant case (maybe?)
 (define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
   (:translate %logbitp)
   (:generator 4
-    (aver (< y 29))
+    (aver (<= y 29))
     (inst bt x (+ y n-fixnum-tag-bits))
     (inst jmp (if not-p :nc :c) target)))
 
@@ -1085,7 +1088,7 @@
     (inst bt x y)
     (inst jmp (if not-p :nc :c) target)))
 
-(define-vop (fast-logbitp-/unsigned fast-conditional-c/unsigned)
+(define-vop (fast-logbitp-c/unsigned fast-conditional-c/unsigned)
   (:translate %logbitp)
   (:generator 5
     (inst bt x y)
