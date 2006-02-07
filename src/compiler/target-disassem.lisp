@@ -483,7 +483,7 @@
       (multiple-value-bind (words bytes)
           (truncate alignment sb!vm:n-word-bytes)
         (when (> words 0)
-          (print-words words stream dstate))
+          (print-inst (* words sb!vm:n-word-bytes) stream dstate))
         (when (> bytes 0)
           (print-inst bytes stream dstate)))
       (print-bytes alignment stream dstate))
