@@ -8,6 +8,8 @@ changes in sbcl-0.9.10 relative to sbcl-0.9.9:
     contributed modules has changed; it no longer relies on symbolic
     links from an $SBCL_HOME/systems directory, but searches directly
     in the subdirectories of $SBCL_HOME.
+  * enhancement: the dynamic heap size on the Linux/PPC platform is
+    markedly larger.
   * fixed bug #399: full call to DATA-VECTOR-REF in accesses to
     certain complicated string types.  (reported by Gary King)
   * fixed bug: STRING-TO-OCTETS and OCTETS-TO-STRING did not convert

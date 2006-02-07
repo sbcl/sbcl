@@ -92,10 +92,14 @@
 
 #!+linux
 (progn
-  (def!constant dynamic-0-space-start #x40000000)
-  (def!constant dynamic-0-space-end   #x47fff000)
-  (def!constant dynamic-1-space-start #x48000000)
-  (def!constant dynamic-1-space-end   #x4ffff000))
+  (def!constant dynamic-0-space-start #x20000000)
+  (def!constant dynamic-0-space-end   #x3ffff000)
+  (def!constant dynamic-1-space-start #x50000000)
+  (def!constant dynamic-1-space-end   #x6ffff000)
+
+  (def!constant linkage-table-space-start #x0a000000)
+  (def!constant linkage-table-space-end   #x0b000000)
+  (def!constant linkage-table-entry-size 16))
 
 #!+darwin
 (progn

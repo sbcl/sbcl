@@ -106,6 +106,7 @@ case `uname -m` in
     sparc*) guessed_sbcl_arch=sparc ;;
     sun*) guessed_sbcl_arch=sparc ;;
     ppc) guessed_sbcl_arch=ppc ;;
+    ppc64) guessed_sbcl_arch=ppc ;;
     Power*Macintosh) guessed_sbcl_arch=ppc ;;
     parisc) guessed_sbcl_arch=hppa ;;
     mips*) guessed_sbcl_arch=mips ;;
@@ -280,7 +281,7 @@ elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
     # versions 2.3.1 and 2.3.2
     #
     # FIXME: integrate to grovel-features., maypahps
-    printf ' :stack-allocatable-closures' >> $ltf
+    printf ' :stack-allocatable-closures :linkage-table' >> $ltf
     $GNUMAKE -C tools-for-build where-is-mcontext -I src/runtime
     tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h
 elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
