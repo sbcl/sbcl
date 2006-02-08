@@ -832,7 +832,7 @@
 (defknown %logbitp (integer unsigned-byte) boolean
   (movable foldable flushable))
 
-(defun %logbitp (index integer)
+(defun %logbitp (integer index)
   (logbitp index integer))
 
 ;;; We only handle the constant cases because those are the only ones
@@ -840,6 +840,7 @@
 ;;;  --njf, 06-02-2006
 (define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
   (:translate %logbitp)
+  (:arg-types tagged-num (:constant (integer 0 29)))
   (:temporary (:scs (any-reg) :to (:result 0)) test)
   (:generator 4
     (if (< y 14)
@@ -849,6 +850,7 @@
 
 (define-vop (fast-logbitp-c/signed fast-conditional-c/signed)
   (:translate %logbitp)
+  (:arg-types signed-num (:constant (integer 0 31)))
   (:temporary (:scs (signed-reg) :to (:result 0)) test)
   (:generator 4
     (if (< y 16)
@@ -858,6 +860,7 @@
 
 (define-vop (fast-logbitp-c/unsigned fast-conditional-c/unsigned)
   (:translate %logbitp)
+  (:arg-types unsigned-num (:constant (integer 0 31)))
   (:temporary (:scs (unsigned-reg) :to (:result 0)) test)
   (:generator 4
     (if (< y 16)
