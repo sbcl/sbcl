@@ -667,7 +667,7 @@
   (movable foldable flushable))
 
 (defun %%ldb (integer size posn)
-  (sb-kernel::%ldb size posn integer))
+  (sb!kernel::%ldb size posn integer))
 
 (define-vop (ldb-c/fixnum)
   (:translate %%ldb)

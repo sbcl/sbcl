@@ -1944,7 +1944,7 @@
                nil
                '(lambda (a)
                  (declare (type (integer 21 28) a))
-                 (declare	(optimize (compilation-speed 1) (safety 2)
+                 (declare       (optimize (compilation-speed 1) (safety 2)
                                  (speed 0) (debug 0) (space 1)))
                  (let* ((v7 (flet ((%f3 (f3-1 f3-2)
                                      (loop for lv2 below 1
@@ -1958,22 +1958,22 @@
 
 ;;; MISC.626: bandaged AVER was still wrong
 (assert (eql -829253
-	     (funcall
-	      (compile
-	       nil
-	       '(lambda (a)
-		  (declare (type (integer -902970 2) a))
-		  (declare (optimize (space 2) (debug 0) (compilation-speed 1)
-				     (speed 0) (safety 3)))
-		  (prog2 (if (logbitp 30 a) 0 (block b3 0)) a)))
-	      -829253)))
+             (funcall
+              (compile
+               nil
+               '(lambda (a)
+                  (declare (type (integer -902970 2) a))
+                  (declare (optimize (space 2) (debug 0) (compilation-speed 1)
+                                     (speed 0) (safety 3)))
+                  (prog2 (if (logbitp 30 a) 0 (block b3 0)) a)))
+              -829253)))
 
 ;; MISC.628: constant-folding %LOGBITP was buggy
 (assert (eql t
-	     (funcall
-	      (compile
-	       nil
-	       '(lambda ()
-		  (declare (optimize (safety 3) (space 3) (compilation-speed 3)
-				     (speed 0) (debug 1)))
-		  (not (not (logbitp 0 (floor 2147483651 (min -23 0))))))))))
+             (funcall
+              (compile
+               nil
+               '(lambda ()
+                  (declare (optimize (safety 3) (space 3) (compilation-speed 3)
+                                     (speed 0) (debug 1)))
+                  (not (not (logbitp 0 (floor 2147483651 (min -23 0))))))))))
