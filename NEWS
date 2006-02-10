@@ -21,6 +21,9 @@ changes in sbcl-0.9.10 relative to sbcl-0.9.9:
     applicable non-standard primary or :AROUND method on
     INITIALIZE-INSTANCE or SHARED-INITIALIZE and a non-keyword initarg
     no longer cause unbound variable errors.  (reported by Kevin Reid)
+  * fixed bug: metacircle resolution in cases where methods have slots
+    added before the slots from STANDARD-METHOD.  (reported by Jean
+    Bresson)
 
 changes in sbcl-0.9.9 relative to sbcl-0.9.8:
   * new platform: experimental support for the Windows operating

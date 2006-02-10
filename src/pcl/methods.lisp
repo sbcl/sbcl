@@ -724,8 +724,8 @@
 (defun value-for-caching (gf classes)
   (let ((methods (compute-applicable-methods-using-types
                    gf (mapcar #'class-eq-type classes))))
-    (method-function-get (or (method-fast-function (car methods))
-                             (method-function (car methods)))
+    (method-function-get (or (safe-method-fast-function (car methods))
+                             (safe-method-function (car methods)))
                          :constant-value)))
 
 (defun default-secondary-dispatch-function (generic-function)

@@ -492,7 +492,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (some (lambda (method)
           (let ((fmf (if (listp method)
                          (third method)
-                         (method-fast-function method))))
+                         (safe-method-fast-function method))))
             (method-function-get fmf :slot-name-lists)))
         ;; KLUDGE: As of sbcl-0.6.4, it's very important for
         ;; efficiency to know the type of the sequence argument to
@@ -581,14 +581,14 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
            (dolist (method methods t)
              (when (eq *boot-state* 'complete)
                (when (or (some #'eql-specializer-p
-                               (method-specializers method))
-                         (method-qualifiers method))
+                               (safe-method-specializers method))
+                         (safe-method-qualifiers method))
                  (return nil)))
              (let ((value (method-function-get
                            (if early-p
                                (or (third method) (second method))
-                               (or (method-fast-function method)
-                                   (method-function method)))
+                               (or (safe-method-fast-function method)
+                                   (safe-method-function method)))
                            :constant-value default)))
                (when (or (eq value default)
                          (and boolean-values-p
@@ -1369,14 +1369,10 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (let ((definite-p t) (possibly-applicable-methods nil))
     (dolist (method (if (early-gf-p generic-function)
                         (early-gf-methods generic-function)
-                        (if (eq (class-of generic-function)
-                                *the-class-standard-generic-function*)
-                            ;; KLUDGE: see comment by GET-GENERIC-FUN-INFO
-                            (clos-slots-ref (fsc-instance-slots generic-function) *sgf-methods-index*)
-                            (generic-function-methods generic-function))))
+                        (safe-generic-function-methods generic-function)))
       (let ((specls (if (consp method)
                         (early-method-specializers method t)
-                        (method-specializers method)))
+                        (safe-method-specializers method)))
             (types types)
             (possibly-applicable-p t) (applicable-p t))
         (dolist (specl specls)

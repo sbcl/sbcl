@@ -1636,6 +1636,11 @@ bootstrapping.
 (defmacro early-gf-methods (gf)
   `(clos-slots-ref (get-slots ,gf) *sgf-methods-index*))
 
+(defun safe-generic-function-methods (generic-function)
+  (if (eq (class-of generic-function) *the-class-standard-generic-function*)
+      (clos-slots-ref (get-slots generic-function) *sgf-methods-index*)
+      (generic-function-methods generic-function)))
+
 (defvar *sgf-arg-info-index*
   (!bootstrap-slot-index 'standard-generic-function 'arg-info))
 
@@ -1770,6 +1775,67 @@ bootstrapping.
                    ~S."
                   gf-keywords)))))))
 
+(defvar *sm-specializers-index*
+  (!bootstrap-slot-index 'standard-method 'specializers))
+(defvar *sm-fast-function-index*
+  (!bootstrap-slot-index 'standard-method 'fast-function))
+(defvar *sm-function-index*
+  (!bootstrap-slot-index 'standard-method 'function))
+(defvar *sm-plist-index*
+  (!bootstrap-slot-index 'standard-method 'plist))
+
+;;; FIXME: we don't actually need this; we could test for the exact
+;;; class and deal with it as appropriate.  In fact we probably don't
+;;; need it anyway because we only use this for METHOD-SPECIALIZERS on
+;;; the standard reader method for METHOD-SPECIALIZERS.  Probably.
+(dolist (s '(specializers fast-function function plist))
+  (aver (= (symbol-value (intern (format nil "*SM-~A-INDEX*" s)))
+           (!bootstrap-slot-index 'standard-reader-method s)
+           (!bootstrap-slot-index 'standard-writer-method s)
+           (!bootstrap-slot-index 'standard-boundp-method s))))
+
+(defun safe-method-specializers (method)
+  (let ((standard-method-classes 
+         (list *the-class-standard-method*
+               *the-class-standard-reader-method*
+               *the-class-standard-writer-method*
+               *the-class-standard-boundp-method*))
+        (class (class-of method)))
+    (if (member class standard-method-classes)
+        (clos-slots-ref (get-slots method) *sm-specializers-index*)
+        (method-specializers method))))
+(defun safe-method-fast-function (method)
+  (let ((standard-method-classes 
+         (list *the-class-standard-method*
+               *the-class-standard-reader-method*
+               *the-class-standard-writer-method*
+               *the-class-standard-boundp-method*))
+        (class (class-of method)))
+    (if (member class standard-method-classes)
+        (clos-slots-ref (get-slots method) *sm-fast-function-index*)
+        (method-fast-function method))))
+(defun safe-method-function (method)
+  (let ((standard-method-classes 
+         (list *the-class-standard-method*
+               *the-class-standard-reader-method*
+               *the-class-standard-writer-method*
+               *the-class-standard-boundp-method*))
+        (class (class-of method)))
+    (if (member class standard-method-classes)
+        (clos-slots-ref (get-slots method) *sm-function-index*)
+        (method-function method))))
+(defun safe-method-qualifiers (method)
+  (let ((standard-method-classes 
+         (list *the-class-standard-method*
+               *the-class-standard-reader-method*
+               *the-class-standard-writer-method*
+               *the-class-standard-boundp-method*))
+        (class (class-of method)))
+    (if (member class standard-method-classes)
+        (let ((plist (clos-slots-ref (get-slots method) *sm-plist-index*)))
+          (getf plist 'qualifiers))
+        (method-qualifiers method))))
+
 (defun set-arg-info1 (gf arg-info new-method methods was-valid-p first-p)
   (let* ((existing-p (and methods (cdr methods) new-method))
          (nreq (length (arg-info-metatypes arg-info)))
@@ -1783,7 +1849,7 @@ bootstrapping.
       (dolist (method (if new-method (list new-method) methods))
         (let* ((specializers (if (or (eq *boot-state* 'complete)
                                      (not (consp method)))
-                                 (method-specializers method)
+                                 (safe-method-specializers method)
                                  (early-method-specializers method t)))
                (class (if (or (eq *boot-state* 'complete) (not (consp method)))
                           (class-of method)
@@ -1915,6 +1981,17 @@ bootstrapping.
             (set-arg-info fin :lambda-list lambda-list))))
     fin))
 
+(defun safe-gf-dfun-state (generic-function)
+  (if (eq (class-of generic-function) *the-class-standard-generic-function*)
+      (clos-slots-ref (get-slots generic-function) *sgf-dfun-state-index*)
+      (gf-dfun-state generic-function)))
+(defun (setf safe-gf-dfun-state) (new-value generic-function)
+  (if (eq (class-of generic-function) *the-class-standard-generic-function*)
+      (setf (clos-slots-ref (get-slots generic-function) 
+                            *sgf-dfun-state-index*)
+            new-value)
+      (setf (gf-dfun-state generic-function) new-value)))
+
 (defun set-dfun (gf &optional dfun cache info)
   (when cache
     (setf (cache-owner cache) gf))
@@ -1922,21 +1999,14 @@ bootstrapping.
                        (list* dfun cache info)
                        dfun)))
     (if (eq *boot-state* 'complete)
-        (if (eq (class-of gf) *the-class-standard-generic-function*)
-            ;; break metacircles: see sbcl-devel 2006-01-15 and #lisp
-            ;; IRC logs 2006-01-16 for the hilarity.
-            (setf (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*)
-                  new-state)
-            (setf (gf-dfun-state gf) new-state))
+        (setf (safe-gf-dfun-state gf) new-state)
         (setf (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*)
               new-state)))
   dfun)
 
 (defun gf-dfun-cache (gf)
   (let ((state (if (eq *boot-state* 'complete)
-                   (if (eq (class-of gf) *the-class-standard-generic-function*)
-                       (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*)
-                       (gf-dfun-state gf))
+                   (safe-gf-dfun-state gf)
                    (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*))))
     (typecase state
       (function nil)
@@ -1944,9 +2014,7 @@ bootstrapping.
 
 (defun gf-dfun-info (gf)
   (let ((state (if (eq *boot-state* 'complete)
-                   (if (eq (class-of gf) *the-class-standard-generic-function*)
-                       (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*)
-                       (gf-dfun-state gf))
+                   (safe-gf-dfun-state gf)
                    (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*))))
     (typecase state
       (function nil)
@@ -2033,6 +2101,12 @@ bootstrapping.
     (when lambda-list-p
       (proclaim (defgeneric-declaration fun-name lambda-list)))))
 
+(defun safe-gf-arg-info (generic-function)
+  (if (eq (class-of generic-function) *the-class-standard-generic-function*)
+      (clos-slots-ref (fsc-instance-slots generic-function) 
+                      *sgf-arg-info-index*)
+      (gf-arg-info generic-function)))
+
 ;;; FIXME: this function took on a slightly greater role than it
 ;;; previously had around 2005-11-02, when CSR fixed the bug whereby
 ;;; having more than one subclass of standard-generic-function caused
@@ -2050,9 +2124,7 @@ bootstrapping.
   (multiple-value-bind (applyp metatypes arg-info)
       (let* ((arg-info (if (early-gf-p gf)
                            (early-gf-arg-info gf)
-                           (if (eq (class-of gf) *the-class-standard-generic-function*)
-                               (clos-slots-ref (fsc-instance-slots gf) *sgf-arg-info-index*)
-                               (gf-arg-info gf))))
+                           (safe-gf-arg-info gf)))
              (metatypes (arg-info-metatypes arg-info)))
         (values (arg-info-applyp arg-info)
                 metatypes

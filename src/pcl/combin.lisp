@@ -30,7 +30,7 @@
         (multiple-value-bind (mf fmf)
             (if (listp method)
                 (early-method-function method)
-                (values nil (method-fast-function method)))
+                (values nil (safe-method-fast-function method)))
           (let* ((pv-table (and fmf (method-function-pv-table fmf))))
             (if (and fmf (or (null pv-table) wrappers))
                 (let* ((pv-wrappers (when pv-table
@@ -81,7 +81,7 @@
                   (multiple-value-bind (mf fmf)
                       (if (listp method)
                           (early-method-function method)
-                          (values nil (method-fast-function method)))
+                          (values nil (safe-method-fast-function method)))
                     (declare (ignore mf))
                     (let* ((pv-table (and fmf (method-function-pv-table fmf))))
                       (if (and fmf (or (null pv-table) wrappers-p))
