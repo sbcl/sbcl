@@ -1795,7 +1795,7 @@ bootstrapping.
            (!bootstrap-slot-index 'standard-boundp-method s))))
 
 (defun safe-method-specializers (method)
-  (let ((standard-method-classes 
+  (let ((standard-method-classes
          (list *the-class-standard-method*
                *the-class-standard-reader-method*
                *the-class-standard-writer-method*
@@ -1805,7 +1805,7 @@ bootstrapping.
         (clos-slots-ref (get-slots method) *sm-specializers-index*)
         (method-specializers method))))
 (defun safe-method-fast-function (method)
-  (let ((standard-method-classes 
+  (let ((standard-method-classes
          (list *the-class-standard-method*
                *the-class-standard-reader-method*
                *the-class-standard-writer-method*
@@ -1815,7 +1815,7 @@ bootstrapping.
         (clos-slots-ref (get-slots method) *sm-fast-function-index*)
         (method-fast-function method))))
 (defun safe-method-function (method)
-  (let ((standard-method-classes 
+  (let ((standard-method-classes
          (list *the-class-standard-method*
                *the-class-standard-reader-method*
                *the-class-standard-writer-method*
@@ -1825,7 +1825,7 @@ bootstrapping.
         (clos-slots-ref (get-slots method) *sm-function-index*)
         (method-function method))))
 (defun safe-method-qualifiers (method)
-  (let ((standard-method-classes 
+  (let ((standard-method-classes
          (list *the-class-standard-method*
                *the-class-standard-reader-method*
                *the-class-standard-writer-method*
@@ -1987,7 +1987,7 @@ bootstrapping.
       (gf-dfun-state generic-function)))
 (defun (setf safe-gf-dfun-state) (new-value generic-function)
   (if (eq (class-of generic-function) *the-class-standard-generic-function*)
-      (setf (clos-slots-ref (get-slots generic-function) 
+      (setf (clos-slots-ref (get-slots generic-function)
                             *sgf-dfun-state-index*)
             new-value)
       (setf (gf-dfun-state generic-function) new-value)))
@@ -2103,7 +2103,7 @@ bootstrapping.
 
 (defun safe-gf-arg-info (generic-function)
   (if (eq (class-of generic-function) *the-class-standard-generic-function*)
-      (clos-slots-ref (fsc-instance-slots generic-function) 
+      (clos-slots-ref (fsc-instance-slots generic-function)
                       *sgf-arg-info-index*)
       (gf-arg-info generic-function)))
 

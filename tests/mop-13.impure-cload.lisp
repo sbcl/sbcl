@@ -35,7 +35,7 @@
 
 (defvar *count1* 0)
 
-(defmethod myfun1 (a b) 
+(defmethod myfun1 (a b)
   (incf *count1*))
 
 (myfun1 2 3)
@@ -64,7 +64,7 @@
 
 (defvar *count2* 0)
 
-(defmethod myfun2 (a b) 
+(defmethod myfun2 (a b)
   (incf *count2*))
 
 (myfun2 2 3)
