@@ -104,7 +104,7 @@
 
 (defgeneric method-combination-options (standard-method-combination))
 
-(defgeneric method-combination-type (standard-method-combination))
+(defgeneric method-combination-type-name (standard-method-combination))
 
 (defgeneric method-fast-function (standard-method))
 

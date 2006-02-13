@@ -316,9 +316,7 @@
                             definition-source-mixin
                             metaobject
                             funcallable-standard-object)
-  ((documentation
-    :initform nil
-    :initarg :documentation)
+  ((%documentation :initform nil :initarg :documentation)
    ;; We need to make a distinction between the methods initially set
    ;; up by :METHOD options to DEFGENERIC and the ones set up later by
    ;; DEFMETHOD, because ANSI specifies that executing DEFGENERIC on
@@ -330,9 +328,8 @@
    ;; DEFMETHOD, then modifying and reloading a.lisp and/or b.lisp
    ;; tends to leave the generic function in a state consistent with
    ;; the most-recently-loaded state of a.lisp and b.lisp.)
-   (initial-methods
-    :initform ()
-    :accessor generic-function-initial-methods))
+   (initial-methods :initform ()
+                    :accessor generic-function-initial-methods))
   (:metaclass funcallable-standard-class))
 
 (defclass standard-generic-function (generic-function)
@@ -347,7 +344,7 @@
    (method-class
     :initarg :method-class
     :accessor generic-function-method-class)
-   (method-combination
+   (%method-combination
     :initarg :method-combination
     :accessor generic-function-method-combination)
    (declarations
@@ -371,13 +368,14 @@
 (defclass method (metaobject) ())
 
 (defclass standard-method (definition-source-mixin plist-mixin method)
-  ((generic-function
+  ((%generic-function
     :initform nil
     :accessor method-generic-function)
-;;;     (qualifiers
-;;;     :initform ()
-;;;     :initarg  :qualifiers
-;;;     :reader method-qualifiers)
+   #+nil ; implemented by PLIST
+   (qualifiers
+    :initform ()
+    :initarg  :qualifiers
+    :reader method-qualifiers)
    (specializers
     :initform ()
     :initarg  :specializers
@@ -386,24 +384,18 @@
     :initform ()
     :initarg  :lambda-list
     :reader method-lambda-list)
-   (function
-    :initform nil
-    :initarg :function)                 ;no writer
+   (%function :initform nil :initarg :function)
    (fast-function
     :initform nil
     :initarg :fast-function             ;no writer
     :reader method-fast-function)
-   (documentation
-    :initform nil
-    :initarg :documentation)))
+   (%documentation :initform nil :initarg :documentation)))
 
 (defclass standard-accessor-method (standard-method)
-  ((slot-name :initform nil
-              :initarg :slot-name
+  ((slot-name :initform nil :initarg :slot-name
               :reader accessor-method-slot-name)
-   (slot-definition :initform nil
-                    :initarg :slot-definition
-                    :reader accessor-method-slot-definition)))
+   (%slot-definition :initform nil :initarg :slot-definition
+                     :reader accessor-method-slot-definition)))
 
 (defclass standard-reader-method (standard-accessor-method) ())
 (defclass standard-writer-method (standard-accessor-method) ())
@@ -411,16 +403,13 @@
 (defclass standard-boundp-method (standard-accessor-method) ())
 
 (defclass method-combination (metaobject)
-  ((documentation
-    :reader method-combination-documentation
-    :initform nil
-    :initarg :documentation)))
+  ((%documentation :initform nil :initarg :documentation)))
 
 (defclass standard-method-combination (definition-source-mixin
                                        method-combination)
-  ((type
-    :reader method-combination-type
-    :initarg :type)
+  ((type-name
+    :reader method-combination-type-name
+    :initarg :type-name)
    (options
     :reader method-combination-options
     :initarg :options)))
@@ -466,19 +455,13 @@
     :initform nil
     :initarg :initargs
     :accessor slot-definition-initargs)
-   (type
-    :initform t
-    :initarg :type
-    :accessor slot-definition-type)
-   (documentation
-    :initform nil
-    :initarg :documentation
-    ;; FIXME: should we export this, as an extension?
-    :accessor %slot-definition-documentation)
-   (class
-    :initform nil
-    :initarg :class
-    :accessor slot-definition-class)))
+   (%type :initform t :initarg :type :accessor slot-definition-type)
+   (%documentation 
+    :initform nil :initarg :documentation
+    ;; KLUDGE: we need a reader for bootstrapping purposes, in
+    ;; COMPUTE-EFFECTIVE-SLOT-DEFINITION-INITARGS.
+    :reader %slot-definition-documentation)
+   (%class :initform nil :initarg :class :accessor slot-definition-class)))
 
 (defclass standard-slot-definition (slot-definition)
   ((allocation
@@ -603,7 +586,7 @@
     :reader class-direct-subclasses)
    (direct-methods
     :initform (cons nil nil))
-   (documentation
+   (%documentation
     :initform nil
     :initarg :documentation)
    (finalized-p
@@ -623,7 +606,7 @@
 ;;; The class PCL-CLASS is an implementation-specific common
 ;;; superclass of all specified subclasses of the class CLASS.
 (defclass pcl-class (class)
-  ((class-precedence-list
+  ((%class-precedence-list
     :reader class-precedence-list)
    ;; KLUDGE: see note in CPL-OR-NIL
    (cpl-available-p

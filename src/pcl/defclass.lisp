@@ -436,7 +436,7 @@
   (!bootstrap-get-slot 'class class 'name))
 
 (defun early-class-precedence-list (class)
-  (!bootstrap-get-slot 'pcl-class class 'class-precedence-list))
+  (!bootstrap-get-slot 'pcl-class class '%class-precedence-list))
 
 (defun early-class-name-of (instance)
   (early-class-name (class-of instance)))

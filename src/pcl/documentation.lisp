@@ -14,12 +14,12 @@
 ;;; functions, macros, and special forms
 (defmethod documentation ((x function) (doc-type (eql 't)))
   (if (typep x 'generic-function)
-      (slot-value x 'documentation)
+      (slot-value x '%documentation)
       (%fun-doc x)))
 
 (defmethod documentation ((x function) (doc-type (eql 'function)))
   (if (typep x 'generic-function)
-      (slot-value x 'documentation)
+      (slot-value x '%documentation)
       (%fun-doc x)))
 
 (defmethod documentation ((x list) (doc-type (eql 'function)))
@@ -43,7 +43,7 @@
 
 (defmethod (setf documentation) (new-value (x function) (doc-type (eql 't)))
   (if (typep x 'generic-function)
-      (setf (slot-value x 'documentation) new-value)
+      (setf (slot-value x '%documentation) new-value)
       (let ((name (%fun-name x)))
         (when (and name (typep name '(or symbol cons)))
           (setf (info :function :documentation name) new-value))))
@@ -52,7 +52,7 @@
 (defmethod (setf documentation)
     (new-value (x function) (doc-type (eql 'function)))
   (if (typep x 'generic-function)
-      (setf (slot-value x 'documentation) new-value)
+      (setf (slot-value x '%documentation) new-value)
       (let ((name (%fun-name x)))
         (when (and name (typep name '(or symbol cons)))
           (setf (info :function :documentation name) new-value))))
@@ -79,22 +79,22 @@
 
 ;;; method combinations
 (defmethod documentation ((x method-combination) (doc-type (eql 't)))
-  (slot-value x 'documentation))
+  (slot-value x '%documentation))
 
 (defmethod documentation
     ((x method-combination) (doc-type (eql 'method-combination)))
-  (slot-value x 'documentation))
+  (slot-value x '%documentation))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'method-combination)))
   (random-documentation x 'method-combination))
 
 (defmethod (setf documentation)
     (new-value (x method-combination) (doc-type (eql 't)))
-  (setf (slot-value x 'documentation) new-value))
+  (setf (slot-value x '%documentation) new-value))
 
 (defmethod (setf documentation)
     (new-value (x method-combination) (doc-type (eql 'method-combination)))
-  (setf (slot-value x 'documentation) new-value))
+  (setf (slot-value x '%documentation) new-value))
 
 (defmethod (setf documentation)
     (new-value (x symbol) (doc-type (eql 'method-combination)))
@@ -102,11 +102,11 @@
 
 ;;; methods
 (defmethod documentation ((x standard-method) (doc-type (eql 't)))
-  (slot-value x 'documentation))
+  (slot-value x '%documentation))
 
 (defmethod (setf documentation)
     (new-value (x standard-method) (doc-type (eql 't)))
-  (setf (slot-value x 'documentation) new-value))
+  (setf (slot-value x '%documentation) new-value))
 
 ;;; packages
 
@@ -132,16 +132,16 @@
   (values (info :type :documentation (class-name x))))
 
 (defmethod documentation ((x standard-class) (doc-type (eql 't)))
-  (slot-value x 'documentation))
+  (slot-value x '%documentation))
 
 (defmethod documentation ((x standard-class) (doc-type (eql 'type)))
-  (slot-value x 'documentation))
+  (slot-value x '%documentation))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'type)))
   (or (values (info :type :documentation x))
       (let ((class (find-class x nil)))
         (when class
-          (slot-value class 'documentation)))))
+          (slot-value class '%documentation)))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'structure)))
   (cond ((eq (info :type :kind x) :instance)
@@ -164,19 +164,19 @@
 (defmethod (setf documentation) (new-value
                                  (x standard-class)
                                  (doc-type (eql 't)))
-  (setf (slot-value x 'documentation) new-value))
+  (setf (slot-value x '%documentation) new-value))
 
 (defmethod (setf documentation) (new-value
                                  (x standard-class)
                                  (doc-type (eql 'type)))
-  (setf (slot-value x 'documentation) new-value))
+  (setf (slot-value x '%documentation) new-value))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'type)))
   (if (or (structure-type-p x) (condition-type-p x))
       (setf (info :type :documentation x) new-value)
       (let ((class (find-class x nil)))
         (if class
-            (setf (slot-value class 'documentation) new-value)
+            (setf (slot-value class '%documentation) new-value)
             (setf (info :type :documentation x) new-value)))))
 
 (defmethod (setf documentation) (new-value
@@ -219,12 +219,12 @@
 ;;; extra-standard methods, for getting at slot documentation
 (defmethod documentation ((slotd standard-slot-definition) (doc-type (eql 't)))
   (declare (ignore doc-type))
-  (slot-value slotd 'documentation))
+  (slot-value slotd '%documentation))
 
 (defmethod (setf documentation)
     (new-value (slotd standard-slot-definition) (doc-type (eql 't)))
   (declare (ignore doc-type))
-  (setf (slot-value slotd 'documentation) new-value))
+  (setf (slot-value slotd '%documentation) new-value))
 
 ;;; Now that we have created the machinery for setting documentation, we can
 ;;; set the documentation for the machinery for setting documentation.

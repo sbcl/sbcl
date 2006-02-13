@@ -33,11 +33,11 @@
 ;;;   METHOD-FUNCTION       ??
 
 (defmethod method-function ((method standard-method))
-  (or (slot-value method 'function)
+  (or (slot-value method '%function)
       (let ((fmf (slot-value method 'fast-function)))
         (unless fmf ; The :BEFORE SHARED-INITIALIZE method prevents this.
           (error "~S doesn't seem to have a METHOD-FUNCTION." method))
-        (setf (slot-value method 'function)
+        (setf (slot-value method '%function)
               (method-function-from-fast-function fmf)))))
 
 (defmethod accessor-method-class ((method standard-accessor-method))
@@ -182,21 +182,20 @@
   (setf (plist-value method 'qualifiers) qualifiers)
   #+ignore
   (setf (slot-value method 'closure-generator)
-        (method-function-closure-generator (slot-value method 'function))))
+        (method-function-closure-generator (slot-value method '%function))))
 
 (defmethod shared-initialize :after ((method standard-accessor-method)
                                      slot-names
                                      &key)
   (declare (ignore slot-names))
-  (with-slots (slot-name slot-definition)
-    method
-    (unless slot-definition
+  (with-slots (slot-name %slot-definition) method
+    (unless %slot-definition
       (let ((class (accessor-method-class method)))
         (when (slot-class-p class)
-          (setq slot-definition (find slot-name (class-direct-slots class)
+          (setq %slot-definition (find slot-name (class-direct-slots class)
                                       :key #'slot-definition-name)))))
-    (when (and slot-definition (null slot-name))
-      (setq slot-name (slot-definition-name slot-definition)))))
+    (when (and %slot-definition (null slot-name))
+      (setq slot-name (slot-definition-name %slot-definition)))))
 
 (defmethod method-qualifiers ((method standard-method))
   (plist-value method 'qualifiers))
@@ -248,7 +247,7 @@
              (initarg-error :method-combination
                             method-combination
                             "a method combination object")))
-          ((slot-boundp generic-function 'method-combination))
+          ((slot-boundp generic-function '%method-combination))
           (t
            (initarg-error :method-combination
                           "not supplied"
@@ -276,9 +275,9 @@
 ;                :argument-precedence-order
 ;                'argument-precedence-order)
 ;   (add-initarg declarations :declarations 'declarations)
-;   (add-initarg documentation :documentation 'documentation)
+;   (add-initarg documentation :documentation '%documentation)
 ;   (add-initarg method-class :method-class 'method-class)
-;   (add-initarg method-combination :method-combination 'method-combination)
+;   (add-initarg method-combination :method-combination '%method-combination)
     (apply #'call-next-method generic-function initargs)))
 ||#
 
@@ -553,7 +552,7 @@
                       in method ~S:~2I~_~S.~@:>"
                      method qualifiers)))
             ((short-method-combination-p mc)
-             (let ((mc-name (method-combination-type mc)))
+             (let ((mc-name (method-combination-type-name mc)))
                (when (or (null qualifiers)
                          (cdr qualifiers)
                          (and (neq (car qualifiers) :around)

@@ -67,7 +67,7 @@
 
 (defmethod print-object ((method standard-method) stream)
   (print-unreadable-object (method stream :type t :identity t)
-    (if (slot-boundp method 'generic-function)
+    (if (slot-boundp method '%generic-function)
         (let ((generic-function (method-generic-function method)))
           (format stream "~S ~{~S ~}~:S"
                   (and generic-function
@@ -80,7 +80,7 @@
 
 (defmethod print-object ((method standard-accessor-method) stream)
   (print-unreadable-object (method stream :type t :identity t)
-    (if (slot-boundp method 'generic-function)
+    (if (slot-boundp method '%generic-function)
         (let ((generic-function (method-generic-function method)))
           (format stream "~S, slot:~S, ~:S"
                   (and generic-function
@@ -93,7 +93,7 @@
   (print-unreadable-object (mc stream :type t :identity t)
     (format stream
             "~S ~S"
-            (slot-value-or-default mc 'type)
+            (slot-value-or-default mc 'type-name)
             (slot-value-or-default mc 'options))))
 
 (defun named-object-print-function (instance stream

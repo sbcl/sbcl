@@ -1779,8 +1779,8 @@ bootstrapping.
   (!bootstrap-slot-index 'standard-method 'specializers))
 (defvar *sm-fast-function-index*
   (!bootstrap-slot-index 'standard-method 'fast-function))
-(defvar *sm-function-index*
-  (!bootstrap-slot-index 'standard-method 'function))
+(defvar *sm-%function-index*
+  (!bootstrap-slot-index 'standard-method '%function))
 (defvar *sm-plist-index*
   (!bootstrap-slot-index 'standard-method 'plist))
 
@@ -1788,7 +1788,7 @@ bootstrapping.
 ;;; class and deal with it as appropriate.  In fact we probably don't
 ;;; need it anyway because we only use this for METHOD-SPECIALIZERS on
 ;;; the standard reader method for METHOD-SPECIALIZERS.  Probably.
-(dolist (s '(specializers fast-function function plist))
+(dolist (s '(specializers fast-function %function plist))
   (aver (= (symbol-value (intern (format nil "*SM-~A-INDEX*" s)))
            (!bootstrap-slot-index 'standard-reader-method s)
            (!bootstrap-slot-index 'standard-writer-method s)
@@ -1822,7 +1822,7 @@ bootstrapping.
                *the-class-standard-boundp-method*))
         (class (class-of method)))
     (if (member class standard-method-classes)
-        (clos-slots-ref (get-slots method) *sm-function-index*)
+        (clos-slots-ref (get-slots method) *sm-%function-index*)
         (method-function method))))
 (defun safe-method-qualifiers (method)
   (let ((standard-method-classes

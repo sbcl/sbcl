@@ -72,7 +72,7 @@
 (defmethod initialize-internal-slot-functions ((slotd
                                                 effective-slot-definition))
   (let* ((name (slot-value slotd 'name))
-         (class (slot-value slotd 'class)))
+         (class (slot-value slotd '%class)))
     (let ((table (or (gethash name *name->class->slotd-table*)
                      (setf (gethash name *name->class->slotd-table*)
                            (make-hash-table :test 'eq :size 5)))))
@@ -102,7 +102,7 @@
 (defmethod compute-slot-accessor-info ((slotd effective-slot-definition)
                                        type gf)
   (let* ((name (slot-value slotd 'name))
-         (class (slot-value slotd 'class))
+         (class (slot-value slotd '%class))
          (old-slotd (find-slot-definition class name))
          (old-std-p (and old-slotd (slot-accessor-std-p old-slotd 'all))))
     (multiple-value-bind (function std-p)
@@ -519,7 +519,7 @@
                                      &key direct-slots direct-superclasses)
   (declare (ignore slot-names))
   (let ((classoid (find-classoid (class-name class))))
-    (with-slots (wrapper class-precedence-list cpl-available-p
+    (with-slots (wrapper %class-precedence-list cpl-available-p
                          prototype (direct-supers direct-superclasses))
         class
       (setf (slot-value class 'direct-slots)
@@ -529,7 +529,7 @@
       (setf (classoid-pcl-class classoid) class)
       (setq direct-supers direct-superclasses)
       (setq wrapper (classoid-layout classoid))
-      (setq class-precedence-list (compute-class-precedence-list class))
+      (setq %class-precedence-list (compute-class-precedence-list class))
       (setq cpl-available-p t)
       (add-direct-subclasses class direct-superclasses)
       (setf (slot-value class 'slots) (compute-slots class))))
@@ -589,7 +589,7 @@
                       (compute-effective-slot-definition
                        class (slot-definition-name dslotd) (list dslotd)))
                     (class-direct-slots superclass)))
-          (reverse (slot-value class 'class-precedence-list))))
+          (reverse (slot-value class '%class-precedence-list))))
 
 (defmethod compute-slots :around ((class condition-class))
   (let ((eslotds (call-next-method)))
@@ -708,7 +708,7 @@
         (setf (slot-value class 'defstruct-constructor)
               (make-defstruct-allocation-function class)))
     (add-direct-subclasses class direct-superclasses)
-    (setf (slot-value class 'class-precedence-list)
+    (setf (slot-value class '%class-precedence-list)
           (compute-class-precedence-list class))
     (setf (slot-value class 'cpl-available-p) t)
     (setf (slot-value class 'slots) (compute-slots class))
@@ -848,11 +848,11 @@
         ;; comment from the old CMU CL sources:
         ;;   Need to have the cpl setup before update-lisp-class-layout
         ;;   is called on CMU CL.
-        (setf (slot-value class 'class-precedence-list) cpl)
+        (setf (slot-value class '%class-precedence-list) cpl)
         (setf (slot-value class 'cpl-available-p) t)
         (force-cache-flushes class))
       (progn
-        (setf (slot-value class 'class-precedence-list) cpl)
+        (setf (slot-value class '%class-precedence-list) cpl)
         (setf (slot-value class 'cpl-available-p) t)))
   (update-class-can-precede-p cpl))
 
@@ -1044,7 +1044,7 @@
                        (slot-definition-name dslotd)
                        (list dslotd)))
                     (class-direct-slots superclass)))
-          (reverse (slot-value class 'class-precedence-list))))
+          (reverse (slot-value class '%class-precedence-list))))
 
 (defmethod compute-slots :around ((class structure-class))
   (let ((eslotds (call-next-method)))

@@ -22,7 +22,7 @@
             '(time-slot-value m 'plist 10000))
       *tests*)
 (push (cons "Time unoptimized slot-value. This is case (1) from notes.text. (standard)"
-            '(time-slot-value m 'generic-function 10000))
+            '(time-slot-value m '%generic-function 10000))
       *tests*)
 (push (cons "Time unoptimized slot-value. This is case (1) from notes.text. (structure)"
             '(time-slot-value str 'slot 10000))
@@ -34,7 +34,7 @@
             '(time-slot-value-function m 10000))
       *tests*)
 (defun time-slot-value-function (object n)
-  (time (dotimes-fixnum (i n) (slot-value object 'function))))
+  (time (dotimes-fixnum (i n) (slot-value object '%function))))
 
 (push (cons "Time optimized slot-value outside of a defmethod. Case (2). (structure)"
             '(time-slot-value-slot str 10000))
@@ -129,14 +129,14 @@
             '(pprint (expand-all-macros
                      (expand-defmethod-internal 'meth-standard-slot-value
                       nil '((object standard-method))
-                      '((lambda () (slot-value object 'function)))
+                      '((lambda () (slot-value object '%function)))
                       nil))))
       *tests*)
 (push (cons "Show code for slot-value inside a defmethod for a standard-class. Case (4)."
             '(disassemble (meth-standard-slot-value m)))
       *tests*)
 (defmethod meth-standard-slot-value ((object standard-method))
-  (lambda () (slot-value object 'function)))
+  (lambda () (slot-value object '%function)))
 ||#
 
 (defun run-tests ()

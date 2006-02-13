@@ -1224,7 +1224,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;; function GF which reads/writes instances of class CLASS.
 ;;; TYPE is one of the symbols READER or WRITER.
 (defun find-standard-class-accessor-method (gf class type)
-  (let ((cpl (standard-slot-value/class class 'class-precedence-list))
+  (let ((cpl (standard-slot-value/class class '%class-precedence-list))
         (found-specializer *the-class-t*)
         (found-method nil))
     (dolist (method (standard-slot-value/gf gf 'methods) found-method)
@@ -1655,7 +1655,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                            (early-class-direct-subclasses class))))))
       (do-class (if (symbolp root)
                     (find-class root)
-                    root)))))
+                    root)))
+    nil))
 
 (defvar *effective-method-cache* (make-hash-table :test 'eq))
 

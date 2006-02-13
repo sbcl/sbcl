@@ -248,8 +248,8 @@
                                     name
                                     value)))
         (set-slot 'source nil)
-        (set-slot 'type 'standard)
-        (set-slot 'documentation "The standard method combination.")
+        (set-slot 'type-name 'standard)
+        (set-slot '%documentation "The standard method combination.")
         (set-slot 'options ()))
       (setq *standard-method-combination* smc))))
 
@@ -280,7 +280,7 @@
                 (!bootstrap-set-slot 'class-eq-specializer spec 'object
                                      class)
                 spec))
-    (set-slot 'class-precedence-list (classes cpl))
+    (set-slot '%class-precedence-list (classes cpl))
     (set-slot 'cpl-available-p t)
     (set-slot 'can-precede-list (classes (cdr cpl)))
     (set-slot 'incompatible-superclass-list nil)
@@ -288,7 +288,7 @@
     (set-slot 'direct-subclasses (classes direct-subclasses))
     (set-slot 'direct-methods (cons nil nil))
     (set-slot 'wrapper wrapper)
-    (set-slot 'documentation nil)
+    (set-slot '%documentation nil)
     (set-slot 'plist
               `(,@(and direct-default-initargs
                        `(direct-default-initargs ,direct-default-initargs))
@@ -358,9 +358,9 @@
       (set-val 'readers      (get-val :readers))
       (set-val 'writers      (get-val :writers))
       (set-val 'allocation   :instance)
-      (set-val 'type         (or (get-val :type) t))
-      (set-val 'documentation (or (get-val :documentation) ""))
-      (set-val 'class   class)
+      (set-val '%type        (or (get-val :type) t))
+      (set-val '%documentation (or (get-val :documentation) ""))
+      (set-val '%class   class)
       (when effective-p
         (set-val 'location index)
         (let ((fsc-p nil))
