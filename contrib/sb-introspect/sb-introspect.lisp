@@ -284,8 +284,8 @@ If an unsupported TYPE is requested, the function will return NIL.
               (sb-kernel::layout-source-location layout)))))))
     (method-combination
      (car
-      (find-definition-sources-by-name (sb-pcl::method-combination-type object)
-                                       :method-combination)))
+      (find-definition-sources-by-name
+       (sb-pcl::method-combination-type-name object) :method-combination)))
     (package
      (translate-source-location (sb-impl::package-source-location object)))
     (class
