@@ -221,6 +221,7 @@ one-past-the-end"
 (defun get-latin-bytes (mapper external-format string pos end)
   (declare (ignore end))
   (let ((code (funcall mapper (char-code (char string pos)))))
+    (declare (type (or null char-code) code))
     (values (cond
               ((and code (< code 256)) code)
               (t
