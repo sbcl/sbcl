@@ -456,7 +456,7 @@
     :initarg :initargs
     :accessor slot-definition-initargs)
    (%type :initform t :initarg :type :accessor slot-definition-type)
-   (%documentation 
+   (%documentation
     :initform nil :initarg :documentation
     ;; KLUDGE: we need a reader for bootstrapping purposes, in
     ;; COMPUTE-EFFECTIVE-SLOT-DEFINITION-INITARGS.

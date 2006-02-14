@@ -221,7 +221,7 @@
 
 (defvar *long-method-combination-functions* (make-hash-table :test 'eq))
 
-(defun load-long-defcombin 
+(defun load-long-defcombin
     (type-name doc function args-lambda-list source-location)
   (let* ((specializers
            (list (find-class 'generic-function)

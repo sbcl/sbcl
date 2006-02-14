@@ -2246,23 +2246,25 @@ used for a COMPLEX component.~:@>"
       (array-type-element-type type)))
 
 (!define-type-method (array :simple-=) (type1 type2)
-  (if (or (unknown-type-p (array-type-element-type type1))
-          (unknown-type-p (array-type-element-type type2)))
-      (multiple-value-bind (equalp certainp)
-          (type= (array-type-element-type type1)
-                 (array-type-element-type type2))
-        ;; By its nature, the call to TYPE= should never return NIL,
-        ;; T, as we don't know what the UNKNOWN-TYPE will grow up to
-        ;; be.  -- CSR, 2002-08-19
-        (aver (not (and (not equalp) certainp)))
-        (values equalp certainp))
-      (values (and (equal (array-type-dimensions type1)
+  (cond ((not (and (equal (array-type-dimensions type1)
                           (array-type-dimensions type2))
                    (eq (array-type-complexp type1)
-                       (array-type-complexp type2))
-                   (type= (specialized-element-type-maybe type1)
-                          (specialized-element-type-maybe type2)))
-              t)))
+                       (array-type-complexp type2))))
+         (values nil t))
+        ((or (unknown-type-p (array-type-element-type type1))
+             (unknown-type-p (array-type-element-type type2)))
+         (multiple-value-bind (equalp certainp)
+             (type= (array-type-element-type type1)
+                    (array-type-element-type type2))
+           ;; By its nature, the call to TYPE= should never return
+           ;; NIL, T, as we don't know what the UNKNOWN-TYPE will grow
+           ;; up to be.  -- CSR, 2002-08-19
+           (aver (not (and (not equalp) certainp)))
+           (values equalp certainp)))
+        (t
+         (values (type= (specialized-element-type-maybe type1)
+                        (specialized-element-type-maybe type2))
+                 t))))
 
 (!define-type-method (array :negate) (type)
   ;; FIXME (and hint to PFD): we're vulnerable here to attacks of the
@@ -2334,12 +2336,15 @@ used for a COMPLEX component.~:@>"
           ;; if the TYPE2 element type is wild.
           ((eq (array-type-element-type type2) *wild-type*)
            (values t t))
-          (;; Since we didn't match any of the special cases above, we
-           ;; can't give a good answer unless both the element types
-           ;; have been defined.
+          (;; Since we didn't match any of the special cases above, if
+           ;; either element type is unknown we can only give a good
+           ;; answer if they are the same.
            (or (unknown-type-p (array-type-element-type type1))
                (unknown-type-p (array-type-element-type type2)))
-           (values nil nil))
+           (if (type= (array-type-element-type type1)
+                      (array-type-element-type type2))
+               (values t t)
+               (values nil nil)))
           (;; Otherwise, the subtype relationship holds iff the
            ;; types are equal, and they're equal iff the specialized
            ;; element types are identical.

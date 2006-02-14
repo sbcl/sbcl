@@ -304,3 +304,29 @@ ACTUAL ~D DERIVED ~D~%"
 ;;; all sorts of answers are right for this one, but it used to
 ;;; trigger an AVER instead.
 (subtypep '(function ()) '(and (function ()) (satisfies identity)))
+
+(assert (sb-kernel:unknown-type-p (sb-kernel:specifier-type 'an-unkown-type)))
+
+(assert
+ (sb-kernel:type=
+  (sb-kernel:specifier-type '(or (simple-array an-unkown-type (*))
+                              (simple-array an-unkown-type)))
+  (sb-kernel:specifier-type '(or (simple-array an-unkown-type (*))
+                              (simple-array an-unkown-type)))))
+
+(assert
+ (sb-kernel:type=
+  (sb-kernel:specifier-type '(simple-array an-unkown-type (*)))
+  (sb-kernel:specifier-type '(simple-array an-unkown-type (*)))))
+
+(assert
+ (not
+  (sb-kernel:type=
+   (sb-kernel:specifier-type '(simple-array an-unkown-type (*)))
+   (sb-kernel:specifier-type '(array an-unkown-type (*))))))
+
+(assert
+ (not
+  (sb-kernel:type=
+   (sb-kernel:specifier-type '(simple-array an-unkown-type (7)))
+   (sb-kernel:specifier-type '(simple-array an-unkown-type (8))))))
