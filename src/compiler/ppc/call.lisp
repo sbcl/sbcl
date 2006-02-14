@@ -1043,11 +1043,9 @@ default-value-8
 
       (emit-label loop)
       ;; *--dst = *--src, --count
-      (inst addi src src (- n-word-bytes))
       (inst addic. count count (- (fixnumize 1)))
-      (loadw temp src)
-      (inst addi dst dst (- n-word-bytes))
-      (storew temp dst)
+      (inst lwzu temp src (- n-word-bytes))
+      (inst stwu temp dst (- n-word-bytes))
       (inst bgt loop)
 
       (emit-label do-regs)
