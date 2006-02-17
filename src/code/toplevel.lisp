@@ -185,7 +185,7 @@ steppers to maintain contextual information.")
   (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
          (initial-offset (logand csp (1- bytes-per-scrub-unit)))
          (end-of-stack
-          (- (sb!vm:fixnumize sb!vm:*control-stack-end*)
+          (- (sap-int (sb!di::descriptor-sap sb!vm:*control-stack-end*))
              sb!c:*backend-page-size*)))
     (labels
         ((scrub (ptr offset count)
@@ -218,7 +218,7 @@ steppers to maintain contextual information.")
 
   #!+stack-grows-downward-not-upward
   (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
-         (end-of-stack (+ (sb!vm:fixnumize sb!vm:*control-stack-start*)
+         (end-of-stack (+ (sap-int (sb!di::descriptor-sap sb!vm:*control-stack-start*))
                           sb!c:*backend-page-size*))
          (initial-offset (logand csp (1- bytes-per-scrub-unit))))
     (labels

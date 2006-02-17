@@ -30,6 +30,9 @@ changes in sbcl-0.9.10 relative to sbcl-0.9.9:
     manifest itself in a segmentation violation while building PCL.
     (reported by Kevin Rosenberg, Eric Marsden, Lars Brinkhoff and
     many others over the years)
+  * fixed bug: ROOM no longer reports silly numbers for stack usage if
+    the stack pointer (treated as a signed integer) is negative.
+    (thanks to Peter van Eynde)
 
 changes in sbcl-0.9.9 relative to sbcl-0.9.8:
   * new platform: experimental support for the Windows operating

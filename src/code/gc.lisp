@@ -49,14 +49,14 @@
 (defun control-stack-usage ()
   #!-stack-grows-downward-not-upward
   (- (sb!sys:sap-int (sb!c::control-stack-pointer-sap))
-     (sb!vm:fixnumize sb!vm:*control-stack-start*))
+     (sb!sys:sap-int (sb!di::descriptor-sap sb!vm:*control-stack-start*)))
   #!+stack-grows-downward-not-upward
-  (- (sb!vm:fixnumize sb!vm:*control-stack-end*)
+  (- (sb!sys:sap-int (sb!di::descriptor-sap sb!vm:*control-stack-end*))
      (sb!sys:sap-int (sb!c::control-stack-pointer-sap))))
 
 (defun binding-stack-usage ()
   (- (sb!sys:sap-int (sb!c::binding-stack-pointer-sap))
-     (sb!vm:fixnumize sb!vm:*binding-stack-start*)))
+     (sb!sys:sap-int (sb!di::descriptor-sap sb!vm:*binding-stack-start*))))
 
 ;;;; ROOM
 
