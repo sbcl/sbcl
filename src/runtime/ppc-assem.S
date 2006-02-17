@@ -339,7 +339,7 @@ x:
 	addi reg_LRA,reg_LRA,lo16(lra)
 #else
 	lis reg_LRA,lra@h
-	addi reg_LRA,reg_LRA,lra@l
+	ori reg_LRA,reg_LRA,lra@l
 #endif
 	addi reg_LRA,reg_LRA,OTHER_POINTER_LOWTAG
 

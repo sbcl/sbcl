@@ -24,6 +24,12 @@ changes in sbcl-0.9.10 relative to sbcl-0.9.9:
   * fixed bug: metacircle resolution in cases where methods have slots
     added before the slots from STANDARD-METHOD.  (reported by Jean
     Bresson)
+  * fixed bug: the Power PC assembly code for calling into lisp
+    sometimes computed its return address wrongly (depending on the
+    15th bit of the address, fixed at link time).  This used to
+    manifest itself in a segmentation violation while building PCL.
+    (reported by Kevin Rosenberg, Eric Marsden, Lars Brinkhoff and
+    many others over the years)
 
 changes in sbcl-0.9.9 relative to sbcl-0.9.8:
   * new platform: experimental support for the Windows operating
