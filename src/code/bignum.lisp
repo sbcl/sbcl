@@ -377,13 +377,13 @@
 ;;; results, such as GCD, use this. It assumes Result is big enough for the
 ;;; result.
 (defun subtract-bignum-buffers-with-len (a len-a b len-b result len-res)
-  (declare (type bignum-type a b)
-           (type bignum-index len-a len-b))
+  (declare (type bignum-type a b result)
+           (type bignum-index len-a len-b len-res))
   (subtract-bignum-loop a len-a b len-b result len-res
                         %normalize-bignum-buffer))
 
 (defun subtract-bignum-buffers (a len-a b len-b result)
-  (declare (type bignum-type a b)
+  (declare (type bignum-type a b result)
            (type bignum-index len-a len-b))
   (subtract-bignum-loop a len-a b len-b result (max len-a len-b)
                         %normalize-bignum-buffer))
