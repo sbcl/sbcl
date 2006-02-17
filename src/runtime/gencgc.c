@@ -46,6 +46,8 @@
 #include "genesis/simple-fun.h"
 #include "save.h"
 #include "genesis/hash-table.h"
+#include "genesis/instance.h"
+#include "genesis/layout.h"
 
 /* forward declarations */
 page_index_t  gc_find_freeish_pages(long *restart_page_ptr, long nbytes,
@@ -3279,11 +3281,24 @@ verify_space(lispobj *start, size_t words)
                 case SINGLE_FLOAT_WIDETAG:
 #endif
                 case UNBOUND_MARKER_WIDETAG:
-                case INSTANCE_HEADER_WIDETAG:
                 case FDEFN_WIDETAG:
                     count = 1;
                     break;
 
+                case INSTANCE_HEADER_WIDETAG:
+                    {
+                        lispobj nuntagged;
+                        long ntotal = HeaderValue(thing);
+                        lispobj layout = ((struct instance *)start)->slots[0];
+                        if (!layout) {
+                            count = 1;
+                            break;
+                        }
+                        nuntagged = ((struct layout *)native_pointer(layout))->n_untagged_slots;
+                        verify_space(start + 1, ntotal - fixnum_value(nuntagged));
+                        count = ntotal + 1;
+                        break;
+                    }
                 case CODE_HEADER_WIDETAG:
                     {
                         lispobj object = *start;
