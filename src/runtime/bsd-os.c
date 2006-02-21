@@ -53,6 +53,7 @@ static void netbsd_init();
 
 #ifdef __FreeBSD__
 #include <sys/sysctl.h>
+#include <osreldate.h>
 
 static void freebsd_init();
 #endif /* __FreeBSD__ */
@@ -339,35 +340,35 @@ int arch_os_thread_cleanup(struct thread *thread) {
 #ifdef LISP_FEATURE_DARWIN
 /* defined in ppc-darwin-os.c instead */
 #elif defined(LISP_FEATURE_FREEBSD)
+#ifndef KERN_PROC_PATHNAME
+#define KERN_PROC_PATHNAME 12
+#endif
+
 char *
 os_get_runtime_executable_path()
 {
     char path[PATH_MAX + 1];
-    /* Defined on FreeBSD 6 and later. -- JES, 2006-02-06. */
-#ifdef KERN_PROC_PATHNAME
-    size_t len = PATH_MAX + 1;
-    int mib[4];
 
-    mib[0] = CTL_KERN;
-    mib[1] = KERN_PROC;
-    mib[2] = KERN_PROC_PATHNAME;
-    mib[3] = -1;
-    if (sysctl(mib, 4, &path, &len, NULL, 0) != 0)
-        /* FIXME: Should we rather fall back into the /proc/-based
-         * code below, so that an SBCL executable core made on
-         * FreeBSD 6 would have at least some chance of working on
-         * FreeBSD 4? -- JES, 2006-02-06.
-         */
-        return NULL;
-#else
-    int size;
-    size = readlink("/proc/curproc/file", path, sizeof(path) - 1);
-    if (size < 0)
-        return NULL;
-    path[size] = '\0';
+    if (getosreldate() >= 600024) {
+        /* KERN_PROC_PATHNAME is available */
+        size_t len = PATH_MAX + 1;
+        int mib[4];
+
+        mib[0] = CTL_KERN;
+        mib[1] = KERN_PROC;
+        mib[2] = KERN_PROC_PATHNAME;
+        mib[3] = -1;
+        if (sysctl(mib, 4, &path, &len, NULL, 0) != 0)
+            return NULL;
+    } else {
+        int size;
+        size = readlink("/proc/curproc/file", path, sizeof(path) - 1);
+        if (size < 0)
+            return NULL;
+        path[size] = '\0';
+    }
     if (strcmp(path, "unknown") == 0)
         return NULL;
-#endif
     return copied_string(path);
 }
 #else /* Not DARWIN or FREEBSD */

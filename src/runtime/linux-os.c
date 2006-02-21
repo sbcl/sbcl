@@ -377,7 +377,7 @@ os_get_runtime_executable_path()
     char path[PATH_MAX + 1];
     int size;
 
-    size = readlink("/proc/self/exe", path, sizeof(path));
+    size = readlink("/proc/self/exe", path, sizeof(path)-1);
     if (size < 0)
         return NULL;
     else
