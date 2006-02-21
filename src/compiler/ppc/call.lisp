@@ -1043,9 +1043,11 @@ default-value-8
 
       (emit-label loop)
       ;; *--dst = *--src, --count
+      (inst addi src src (- n-word-bytes))
       (inst addic. count count (- (fixnumize 1)))
-      (inst lwzu temp src (- n-word-bytes))
-      (inst stwu temp dst (- n-word-bytes))
+      (loadw temp src)
+      (inst addi dst dst (- n-word-bytes))
+      (storew temp dst)
       (inst bgt loop)
 
       (emit-label do-regs)
@@ -1090,8 +1092,7 @@ default-value-8
     (let* ((enter (gen-label))
            (loop (gen-label))
            (done (gen-label))
-           (dx-p (node-stack-allocate-p node))
-           (alloc-area-tn (if dx-p csp-tn alloc-tn)))
+           (dx-p (node-stack-allocate-p node)))
       (move context context-arg)
       (move count count-arg)
       ;; Check to see if there are any arguments.
@@ -1101,14 +1102,21 @@ default-value-8
 
     ;; We need to do this atomically.
     (pseudo-atomic (pa-flag)
-      (when dx-p
-        (align-csp temp))
       ;; Allocate a cons (2 words) for each item.
-      (inst clrrwi result alloc-area-tn n-lowtag-bits)
-      (inst ori result result list-pointer-lowtag)
-      (move dst result)
-      (inst slwi temp count 1)
-      (inst add alloc-area-tn alloc-area-tn temp)
+      (if dx-p
+          (progn
+            (align-csp temp)
+            (inst clrrwi result csp-tn n-lowtag-bits)
+            (inst ori result result list-pointer-lowtag)
+            (move dst result)
+            (inst slwi temp count 1)
+            (inst add csp-tn csp-tn temp))
+          (progn
+            (inst slwi temp count 1)
+            (allocation result temp list-pointer-lowtag
+                        :temp-tn dst
+                        :flag-tn pa-flag)
+            (move dst result)))
       (inst b enter)
 
       ;; Compute the next cons and store it in the current one.

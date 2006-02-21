@@ -311,7 +311,6 @@ x:
 #endif
 	/* Turn on pseudo-atomic */
 
-	li reg_NL3,-4
 	li reg_ALLOC,4
 	store(reg_ZERO,reg_NL4,CSYMBOL(foreign_function_call_active))
 	load(reg_NL4,CSYMBOL(dynamic_space_free_pointer))
@@ -321,8 +320,9 @@ x:
 	load(reg_OCFP,CSYMBOL(current_control_frame_pointer))
 
 	/* No longer atomic, and check for interrupt */
-	add reg_ALLOC,reg_ALLOC,reg_NL3
-	twlti reg_ALLOC,0
+	andi. reg_NL3, reg_ALLOC, 1
+	subi reg_ALLOC,reg_ALLOC,4
+	twnei reg_NL3, 0
 
 	/* Pass in the arguments */
 
@@ -363,7 +363,6 @@ lra:
 	mr REG(3),reg_A0
 
 	/* Turn on  pseudo-atomic */
-	li reg_NL3,-4
 	la reg_ALLOC,4(reg_ALLOC)
 
 	/* Store lisp state */
@@ -380,9 +379,10 @@ lra:
 	store(reg_NL1,reg_NL2,CSYMBOL(foreign_function_call_active))
 
 	/* Check for interrupt */
-	add reg_ALLOC,reg_ALLOC,reg_NL3
-	twlti reg_ALLOC,0
-
+	andi. reg_NL3, reg_ALLOC, 1
+	subi reg_ALLOC, reg_ALLOC, 4
+	twnei reg_NL3,0
+	
 	/* Back to C */
 	C_FULL_EPILOG
 	blr
@@ -411,7 +411,6 @@ lra:
 	mr reg_NARGS,reg_NL3
 
 	/* Turn on pseudo-atomic */
-	li reg_NL3,-4
 	la reg_ALLOC,4(reg_ALLOC)
 
 	/* Convert the return address to an offset and save it on the stack. */
@@ -432,8 +431,10 @@ lra:
 	store(reg_CSP,reg_CFUNC,CSYMBOL(foreign_function_call_active))
 	/* load(reg_POLL,saver2) */
 	/* Disable pseudo-atomic; check pending interrupt */
-	add reg_ALLOC,reg_ALLOC,reg_NL3
-	twlti reg_ALLOC,0
+	andi. reg_NL3, reg_ALLOC, 1
+	subi reg_ALLOC, reg_ALLOC, 4
+	twnei reg_NL3, 0
+
 	mr reg_NL3,reg_NARGS
 
 #ifdef LISP_FEATURE_DARWIN
@@ -474,7 +475,7 @@ lra:
 	li reg_LIP,0
 
 	/* Atomic ... */
-	li reg_NL3,-4
+        li reg_NL3,-4        
 	li reg_ALLOC,4
 
 	/* No long in foreign function call. */
@@ -497,8 +498,10 @@ lra:
 	la reg_LIP,-OTHER_POINTER_LOWTAG(reg_LIP)
 
 	/* No longer atomic */
-	add reg_ALLOC,reg_ALLOC,reg_NL3
-	twlti reg_ALLOC,0
+	andi. reg_NL3, reg_ALLOC, 1
+	subi reg_ALLOC, reg_ALLOC, 4
+	twnei reg_NL3, 0
+
 	mtlr reg_LIP
 	
 	/* Reset the lisp stack. */
@@ -579,3 +582,82 @@ CSYMBOL(closure_tramp):
 	blr
 	SET_SIZE(ppc_flush_cache_line)
 
+        GFUNCDEF(do_pending_interrupt)
+	twllei	reg_ZERO, trap_PendingInterrupt
+	blr
+/* King Nato's branch has a nop here. Do we need this? */
+	SET_SIZE(do_pending_interrupt)
+	
+#if defined LISP_FEATURE_GENCGC
+
+        GFUNCDEF(fpu_save)
+        stfd	FREG(1), 0(REG(3))
+	stfd	FREG(2), 8(REG(3))
+	stfd	FREG(3), 16(REG(3))
+	stfd	FREG(4), 24(REG(3))
+	stfd	FREG(5), 32(REG(3))
+	stfd	FREG(6), 40(REG(3))
+	stfd	FREG(7), 48(REG(3))
+	stfd	FREG(8), 56(REG(3))
+	stfd	FREG(9), 64(REG(3))
+	stfd	FREG(10), 72(REG(3))
+	stfd	FREG(11), 80(REG(3))
+	stfd	FREG(12), 88(REG(3))
+	stfd	FREG(13), 96(REG(3))
+	stfd	FREG(14), 104(REG(3))
+	stfd	FREG(15), 112(REG(3))
+	stfd	FREG(16), 120(REG(3))
+	stfd	FREG(17), 128(REG(3))
+	stfd	FREG(18), 136(REG(3))
+	stfd	FREG(19), 144(REG(3))
+	stfd	FREG(20), 152(REG(3))
+	stfd	FREG(21), 160(REG(3))
+	stfd	FREG(22), 168(REG(3))
+	stfd	FREG(23), 176(REG(3))
+	stfd	FREG(24), 184(REG(3))
+	stfd	FREG(25), 192(REG(3))
+	stfd	FREG(26), 200(REG(3))
+	stfd	FREG(27), 208(REG(3))
+	stfd	FREG(28), 216(REG(3))
+	stfd	FREG(29), 224(REG(3))
+	stfd	FREG(30), 232(REG(3))
+	stfd	FREG(31), 240(REG(3))
+	blr
+	SET_SIZE(fpu_save)
+	
+	GFUNCDEF(fpu_restore)
+	lfd	FREG(1), 0(REG(3))
+	lfd	FREG(2), 8(REG(3))
+	lfd	FREG(3), 16(REG(3))
+	lfd	FREG(4), 24(REG(3))
+	lfd	FREG(5), 32(REG(3))
+	lfd	FREG(6), 40(REG(3))
+	lfd	FREG(7), 48(REG(3))
+	lfd	FREG(8), 56(REG(3))
+	lfd	FREG(9), 64(REG(3))
+	lfd	FREG(10), 72(REG(3))
+	lfd	FREG(11), 80(REG(3))
+	lfd	FREG(12), 88(REG(3))
+	lfd	FREG(13), 96(REG(3))
+	lfd	FREG(14), 104(REG(3))
+	lfd	FREG(15), 112(REG(3))
+	lfd	FREG(16), 120(REG(3))
+	lfd	FREG(17), 128(REG(3))
+	lfd	FREG(18), 136(REG(3))
+	lfd	FREG(19), 144(REG(3))
+	lfd	FREG(20), 152(REG(3))
+	lfd	FREG(21), 160(REG(3))
+	lfd	FREG(22), 168(REG(3))
+	lfd	FREG(23), 176(REG(3))
+	lfd	FREG(24), 184(REG(3))
+	lfd	FREG(25), 192(REG(3))
+	lfd	FREG(26), 200(REG(3))
+	lfd	FREG(27), 208(REG(3))
+	lfd	FREG(28), 216(REG(3))
+	lfd	FREG(29), 224(REG(3))
+	lfd	FREG(30), 232(REG(3))
+	lfd	FREG(31), 240(REG(3))
+        blr
+	SET_SIZE(fpu_restore)
+	
+#endif	

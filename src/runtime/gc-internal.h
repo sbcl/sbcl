@@ -69,7 +69,11 @@ NWORDS(unsigned long x, unsigned long n_bits)
  * for SPARC users in that bit
  */
 
+#if defined(LISP_FEATURE_SPARC)
+#define FUN_RAW_ADDR_OFFSET 0
+#else
 #define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - FUN_POINTER_LOWTAG)
+#endif
 
 /* values for the *_alloc_* parameters */
 #define FREE_PAGE_FLAG 0
@@ -90,6 +94,7 @@ extern long (*sizetab[256])(lispobj *where);
 extern struct weak_pointer *weak_pointers; /* in gc-common.c */
 
 extern void scavenge(lispobj *start, long n_words);
+extern void scavenge_interrupt_contexts(void);
 extern void scan_weak_pointers(void);
 
 lispobj  copy_large_unboxed_object(lispobj object, long nwords);

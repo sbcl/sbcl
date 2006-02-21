@@ -132,21 +132,113 @@
 
 
 ;;;; Storage allocation:
-(defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size)
+
+;;; This is the main mechanism for allocating memory in the lisp heap.
+;;;
+;;; The allocated space is stored in RESULT-TN with the lowtag LOWTAG
+;;; applied.  The amount of space to be allocated is SIZE bytes (which
+;;; must be a multiple of the lisp object size).
+;;;
+;;; On other platforms (Non-PPC), if STACK-P is given, then allocation
+;;; occurs on the control stack (for dynamic-extent).  In this case,
+;;; you MUST also specify NODE, so that the appropriate compiler
+;;; policy can be used, and TEMP-TN, which is needed for work-space.
+;;; TEMP-TN MUST be a non-descriptor reg. FIXME: This is not yet
+;;; implemented on PPC. We should implement this and replace the
+;;; inline stack-based allocation that presently occurs in the
+;;; VOPs. The stack-p argument is ignored on PPC.
+;;;
+;;; If generational GC is enabled, you MUST supply a value for TEMP-TN
+;;; because a temp register is needed to do inline allocation.
+;;; TEMP-TN, in this case, can be any register, since it holds a
+;;; double-word aligned address (essentially a fixnum).
+(defmacro allocation (result-tn size lowtag &key stack-p node temp-tn flag-tn)
+  ;; We assume we're in a pseudo-atomic so the pseudo-atomic bit is
+  ;; set.  If the lowtag also has a 1 bit in the same position, we're all
+  ;; set.  Otherwise, we need to zap out the lowtag from alloc-tn, and
+  ;; then or in the lowtag.
+  ;; Normal allocation to the heap.
+  (declare (ignore stack-p node)
+           #!-gencgc
+           (ignore temp-tn flag-tn))
+    #!-gencgc
+    (let ((alloc-size (gensym)))
+      `(let ((,alloc-size ,size))
+         (if (logbitp (1- n-lowtag-bits) ,lowtag)
+             (progn
+               (inst ori ,result-tn alloc-tn ,lowtag))
+             (progn
+               (inst clrrwi ,result-tn alloc-tn n-lowtag-bits)
+               (inst ori ,result-tn ,result-tn ,lowtag)))
+         (if (numberp ,alloc-size)
+             (inst addi alloc-tn alloc-tn ,alloc-size)
+             (inst add alloc-tn alloc-tn ,alloc-size))))
+    #!+gencgc
+    (let ((fix-addr (gensym))
+          (inline-alloc (gensym)))
+      `(let ((,fix-addr (gen-label))
+             (,inline-alloc (gen-label)))
+         ;; Make temp-tn be the size
+         (cond ((numberp ,size)
+                (inst lr ,temp-tn ,size))
+               (t
+                (move ,temp-tn ,size)))
+
+         (inst lr ,flag-tn (make-fixup "boxed_region" :foreign))
+         (inst lwz ,result-tn ,flag-tn 0)
+
+         ;; we can optimize this to only use one fixup here, once we get
+         ;; it working
+         ;; (inst lr ,flag-tn (make-fixup "boxed_region" :foreign 4))
+         ;; (inst lwz ,flag-tn ,flag-tn 0)
+         (inst lwz ,flag-tn ,flag-tn 4)
+
+         (without-scheduling ()
+           ;; CAUTION: The C code depends on the exact order of
+           ;; instructions here.  In particular, three instructions before
+           ;; the TW instruction must be an ADD or ADDI instruction, so it
+           ;; can figure out the size of the desired allocation.
+           ;; Now make result-tn point at the end of the object, to
+           ;; figure out if we overflowed the current region.
+           (inst add ,result-tn ,result-tn ,temp-tn)
+           ;; result-tn points to the new end of the region.  Did we go past
+           ;; the actual end of the region?  If so, we need a full alloc.
+           ;; The C code depends on this exact form of instruction.  If
+           ;; either changes, you have to change the other appropriately!
+           (inst cmpw ,result-tn ,flag-tn)
+
+           (inst bng ,inline-alloc)
+           (inst tw :lge ,result-tn ,flag-tn))
+         (inst b ,fix-addr)
+
+         (emit-label ,inline-alloc)
+         (inst lr ,flag-tn (make-fixup "boxed_region" :foreign))
+         (inst stw ,result-tn ,flag-tn 0)
+
+         (emit-label ,fix-addr)
+         ;; At this point, result-tn points at the end of the object.
+         ;; Adjust to point to the beginning.
+         (inst sub ,result-tn ,result-tn ,temp-tn)
+         ;; Set the lowtag appropriately
+         (inst ori ,result-tn ,result-tn ,lowtag))))
+
+(defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size
+                                            &key (lowtag other-pointer-lowtag))
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
   word header having the specified Type-Code.  The result is placed in
   Result-TN, and Temp-TN is a non-descriptor temp (which may be randomly used
   by the body.)  The body is placed inside the PSEUDO-ATOMIC, and presumably
   initializes the object."
-  (unless body
-    (bug "empty &body in WITH-FIXED-ALLOCATION"))
   (once-only ((result-tn result-tn) (temp-tn temp-tn) (flag-tn flag-tn)
-              (type-code type-code) (size size))
-    `(pseudo-atomic (,flag-tn :extra (pad-data-block ,size))
-       (inst ori ,result-tn alloc-tn other-pointer-lowtag)
-       (inst lr ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
-       (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)
+              (type-code type-code) (size size) (lowtag lowtag))
+    `(pseudo-atomic (,flag-tn)
+       (allocation ,result-tn (pad-data-block ,size) ,lowtag
+                   :temp-tn ,temp-tn
+                   :flag-tn ,flag-tn)
+       (when ,type-code
+         (inst lr ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
+         (storew ,temp-tn ,result-tn 0 ,lowtag))
        ,@body)))
 
 (defun align-csp (temp)
@@ -227,26 +319,26 @@
 ;;; aligns ALLOC-TN again and (b) makes ALLOC-TN go negative. We then
 ;;; trap if ALLOC-TN's negative (handling the deferred interrupt) and
 ;;; using FLAG-TN - minus the large constant - to correct ALLOC-TN.
-(defmacro pseudo-atomic ((flag-tn &key (extra 0)) &body forms)
-  (let ((n-extra (gensym)))
-    `(let ((,n-extra ,extra))
-       (without-scheduling ()
-        ;; Extra debugging stuff:
-        #+debug
-        (progn
-          (inst andi. ,flag-tn alloc-tn 7)
-          (inst twi :ne ,flag-tn 0))
-        (inst lr ,flag-tn (- ,n-extra 4))
-        (inst addi alloc-tn alloc-tn 4))
-      ,@forms
-      (without-scheduling ()
-       (inst add alloc-tn alloc-tn ,flag-tn)
-       (inst twi :lt alloc-tn 0))
-      #+debug
-      (progn
-        (inst andi. ,flag-tn alloc-tn 7)
-        (inst twi :ne ,flag-tn 0)))))
-
+(defmacro pseudo-atomic ((flag-tn) &body forms)
+  `(progn
+     (without-scheduling ()
+       ;; Extra debugging stuff:
+       #+debug
+       (progn
+         (inst andi. ,flag-tn alloc-tn 7)
+         (inst twi :ne ,flag-tn 0))
+       (inst ori alloc-tn alloc-tn 4))
+     ,@forms
+     (without-scheduling ()
+       (inst li ,flag-tn -5)
+       (inst and alloc-tn alloc-tn ,flag-tn)
+       ;; Now test to see if the pseudo-atomic interrupted bit is set.
+       (inst andi. ,flag-tn alloc-tn 1)
+       (inst twi :ne ,flag-tn 0))
+     #+debug
+     (progn
+       (inst andi. ,flag-tn alloc-tn 7)
+       (inst twi :ne ,flag-tn 0))))
 
 
 

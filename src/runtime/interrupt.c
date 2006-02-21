@@ -254,6 +254,7 @@ fake_foreign_function_call(os_context_t *context)
     dynamic_space_free_pointer =
         (lispobj *)(unsigned long)
             (*os_context_register_addr(context, reg_ALLOC));
+    /* fprintf(stderr,"dynamic_space_free_pointer: %p\n", dynamic_space_free_pointer); */
 #if defined(LISP_FEATURE_ALPHA)
     if ((long)dynamic_space_free_pointer & 1) {
         lose("dead in fake_foreign_function_call, context = %x\n", context);
@@ -305,7 +306,13 @@ undo_fake_foreign_function_call(os_context_t *context)
 #ifdef reg_ALLOC
     /* Put the dynamic space free pointer back into the context. */
     *os_context_register_addr(context, reg_ALLOC) =
-        (unsigned long) dynamic_space_free_pointer;
+        (unsigned long) dynamic_space_free_pointer
+        | (*os_context_register_addr(context, reg_ALLOC)
+           & LOWTAG_MASK);
+    /*
+      ((unsigned long)(*os_context_register_addr(context, reg_ALLOC)) & ~LOWTAG_MASK)
+      | ((unsigned long) dynamic_space_free_pointer & LOWTAG_MASK);
+    */
 #endif
 }
 
@@ -360,11 +367,13 @@ interrupt_handle_pending(os_context_t *context)
     thread=arch_os_get_current_thread();
     data=thread->interrupt_data;
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     /* If pseudo_atomic_interrupted is set then the interrupt is going
      * to be handled now, ergo it's safe to clear it. */
+
+    /* CLH: 20060220 FIXME This sould probably be arch_clear_p_a_i but
+     * the behavior of arch_clear_p_a_i and clear_p_a_i are slightly
+     * different on PPC. */
     arch_clear_pseudo_atomic_interrupted(context);
-#endif
 
     if (SymbolValue(GC_INHIBIT,thread)==NIL) {
 #ifdef LISP_FEATURE_SB_THREAD

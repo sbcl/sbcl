@@ -25,18 +25,27 @@
 
      (:temp ndescr non-descriptor-reg nl0-offset)
      (:temp pa-flag non-descriptor-reg nl3-offset)
-     (:temp vector descriptor-reg a3-offset))
+     (:temp vector descriptor-reg a3-offset)
+     (:temp temp non-descriptor-reg nl2-offset))
   (pseudo-atomic (pa-flag)
-    (inst ori vector alloc-tn other-pointer-lowtag)
     ;; boxed words == unboxed bytes
     (inst addi ndescr words (* (1+ vector-data-offset) n-word-bytes))
     (inst clrrwi ndescr ndescr n-lowtag-bits)
-    (inst add alloc-tn alloc-tn ndescr)
+    (allocation vector ndescr other-pointer-lowtag
+                :temp-tn temp
+                :flag-tn pa-flag)
     (inst srwi ndescr type word-shift)
     (storew ndescr vector 0 other-pointer-lowtag)
     (storew length vector vector-length-slot other-pointer-lowtag))
   ;; This makes sure the zero byte at the end of a string is paged in so
   ;; the kernel doesn't bitch if we pass it the string.
-  (storew zero-tn alloc-tn 0)
+  ;;
+  ;; rtoy says to turn this off as it causes problems with CMUCL.
+  ;;
+  ;; I don't think we need to do this anymore. It looks like this
+  ;; inherited from the SPARC port and does not seem to be
+  ;; necessary. Turning this on worked at some point, but I have not
+  ;; tested with the final GENGC-related changes. CLH 20060221
+  ;;
+  ;;  (storew zero-tn alloc-tn 0)
   (move result vector))
-

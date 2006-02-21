@@ -34,9 +34,18 @@ extern lispobj *current_control_frame_pointer;
 extern lispobj *current_binding_stack_pointer;
 # endif
 
-# ifndef LISP_FEATURE_GENCGC
-/* Beware! gencgc has also a (non-global) dynamic_space_free_pointer. */
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+/* This is unused on X86 and X86_64, but is used as the global
+ *  allocation pointer by the cheney GC, and, in some instances, as
+ *  the global allocation pointer on PPC/GENCGC. This should probably
+ *  be cleaned up such that it only needs to exist on cheney. At the
+ *  moment, it is also used by the GENCGC, to hold the pseudo_atomic
+ *  bits, and is tightly coupled to reg_ALLOC by the assembly
+ *  routines. */
 extern lispobj *dynamic_space_free_pointer;
+#endif
+
+# ifndef LISP_FEATURE_GENCGC
 extern lispobj *current_auto_gc_trigger;
 # endif
 

@@ -274,6 +274,12 @@ arch_set_pseudo_atomic_interrupted(os_context_t *context)
     *os_context_register_addr(context, reg_NL4) |= -1LL<<31;
 }
 
+void
+arch_clear_pseudo_atomic_interrupted(os_context_t *context)
+{
+    *os_context_register_addr(context, reg_NL4) &= ~(-1LL<<31);
+}
+
 unsigned int
 arch_install_breakpoint(void *pc)
 {
@@ -397,8 +403,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
         break;
 
     case 0x10:
-        /* Clear the pseudo-atomic flag. */
-        *os_context_register_addr(context, reg_NL4) &= ~(-1LL<<31);
+	arch_clear_pseudo_atomic_interrupted(context)
         arch_skip_instruction(context);
         interrupt_handle_pending(context);
         return;

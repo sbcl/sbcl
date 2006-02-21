@@ -166,18 +166,26 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  (lispobj *)STATIC_SPACE_START,
                  (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0),
                  core_start_pos);
-#ifdef reg_ALLOC
-    output_space(file,
-                 DYNAMIC_CORE_SPACE_ID,
-                 (lispobj *)current_dynamic_space,
-                 dynamic_space_free_pointer,
-                 core_start_pos);
-#else
 #ifdef LISP_FEATURE_GENCGC
     /* Flush the current_region, updating the tables. */
     gc_alloc_update_all_page_tables();
     update_dynamic_space_free_pointer();
 #endif
+#ifdef reg_ALLOC
+#ifdef LISP_FEATURE_GENCGC
+    output_space(file,
+                 DYNAMIC_CORE_SPACE_ID,
+                 (lispobj *)DYNAMIC_SPACE_START,
+                 dynamic_space_free_pointer,
+                 core_start_pos);
+#else
+    output_space(file,
+                 DYNAMIC_CORE_SPACE_ID,
+                 (lispobj *)current_dynamic_space,
+                 dynamic_space_free_pointer,
+                 core_start_pos);
+#endif
+#else
     output_space(file,
                  DYNAMIC_CORE_SPACE_ID,
                  (lispobj *)DYNAMIC_SPACE_START,

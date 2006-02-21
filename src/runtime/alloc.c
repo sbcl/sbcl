@@ -43,15 +43,33 @@ pa_alloc(int bytes)
     struct thread *th = arch_os_get_current_thread();
 
     /* FIXME: OOAO violation: see arch_pseudo_* */
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);
+    clear_pseudo_atomic_interrupted(th);
+    set_pseudo_atomic_atomic(th);
     result = alloc(bytes);
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
-    if (fixnum_value(SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th)))
-        /* Even if we gc at this point, the new allocation will be
-         * protected from being moved, because result is on the c stack
-         * and points to it. */
+    clear_pseudo_atomic_atomic(th);
+
+    if (get_pseudo_atomic_interrupted(th)) {
+        /* WARNING KLUDGE FIXME: pa_alloc() is not pseudo-atomic on
+         * anything but x86[-64]. maybe_defer_handler doesn't defer
+         * interrupts if foreign_function_call_active
+         *
+         * If the C stack is not scavenged during GC, result needs to
+         * be protected against not being referred to by any roots, so
+         * we push it onto the lisp control stack, and read it back
+         * off after any potential GC has finished */
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+#ifdef LISP_FEATURE_STACK_GROWS_DOWNARD_NOT_UPWARD
+#error "!C_STACK_IS_CONTROL_STACK and STACK_GROWS_DOWNWARD_NOT_UPWARD is not supported"
+#endif
+        current_control_stack_pointer += 1;
+        *current_control_stack_pointer = result;
+#endif
         do_pending_interrupt();
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+        result = *current_control_stack_pointer;
+        current_control_stack_pointer -= 1;
+#endif
+    }
 #else
     /* FIXME: this is not pseudo atomic at all, but is called only from
      * interrupt safe places like interrupt handlers. MG - 2005-08-09 */

@@ -105,6 +105,11 @@ void arch_set_pseudo_atomic_interrupted(os_context_t *context)
     *os_context_register_addr(context,reg_ALLOC) |=  1;
 }
 
+void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
+{
+    *os_context_register_addr(context,reg_ALLOC) &= ~1;
+}
+
 unsigned int arch_install_breakpoint(void *pc)
 {
     unsigned int *ptr = (unsigned int *)pc;
@@ -266,7 +271,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
                to fixup up alloc-tn to remove the interrupted flag,
                skip over the trap instruction, and then handle the
                pending interrupt(s). */
-            *os_context_register_addr(context, reg_ALLOC) &= ~7;
+	    arch_clear_pseudo_atomic_interrupted(context);
             arch_skip_instruction(context);
             interrupt_handle_pending(context);
         }
@@ -314,6 +319,8 @@ static void sigemt_handler(int signal, siginfo_t *siginfo, void *void_context)
             result = op1 - op2;
         else
             result = op1 + op2;
+	/* KLUDGE: this & ~7 is a little bit magical but basically
+	   clears pseudo_atomic bits if any */
         *os_context_register_addr(context, reg_ALLOC) = result & ~7;
         arch_skip_instruction(context);
         interrupt_handle_pending(context);

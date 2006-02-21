@@ -115,6 +115,11 @@ void arch_set_pseudo_atomic_interrupted(os_context_t *context)
     *os_context_register_addr(context,reg_ALLOC) |=  (1L<<63);
 }
 
+void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
+{
+    *os_context_register_addr(context, reg_ALLOC) &= ~(1L<<63);
+}
+
 unsigned int arch_install_breakpoint(void *pc)
 {
     unsigned int *ptr = (unsigned int *)pc;

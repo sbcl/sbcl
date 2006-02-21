@@ -28,7 +28,10 @@ CPPFLAGS += -no-cpp-precomp
 # out of this range.
 LINKFLAGS += -dynamic `cat ppc-darwin-link-flags` -twolevel_namespace -bind_at_load
 
-GC_SRC = cheneygc.c
+GC_SRC = $(shell if grep LISP_FEATURE_GENCGC genesis/config.h \
+                      > /dev/null 2>&1; \
+                   then echo "gencgc.c"; \
+                   else echo "cheneygc.c" ; fi)
 
 OS_CLEAN_FILES += ppc-darwin-mkrospace ppc-darwin-fix-rospace ppc-darwin-link-flags
 

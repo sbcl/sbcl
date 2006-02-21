@@ -43,4 +43,7 @@ extern lispobj funcall3(lispobj function, lispobj arg0, lispobj arg1,
                         lispobj arg2);
 extern lispobj *component_ptr_from_pc(lispobj *pc);
 
+extern void fpu_save(void *);
+extern void fpu_restore(void *);
+
 #endif /* __ARCH_H__ */

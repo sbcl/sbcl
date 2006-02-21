@@ -4,12 +4,16 @@ changes in sbcl-0.9.10 relative to sbcl-0.9.9:
     be used for bundling the runtime and the core file into one 
     executable binary. This feature is not currently supported on all SBCL
     platforms.  (thanks to James Bielman and NIIMI Satoshi)
+  * new feature: a generational or ephemeral garbage collector is now
+    the default on the PowerPC platform (both Linux and Darwin).  The
+    old Cheney (stop and copy) collector is a build-time option.
+    (thanks to Cyrus Harmon, after Raymond Toy)
   * minor incompatible change: the method by which SBCL finds its
     contributed modules has changed; it no longer relies on symbolic
     links from an $SBCL_HOME/systems directory, but searches directly
     in the subdirectories of $SBCL_HOME.
   * enhancement: the dynamic heap size on the Linux/PPC platform is
-    markedly larger.
+    markedly larger, even using the older Cheney garbage collector.
   * fixed bug #399: full call to DATA-VECTOR-REF in accesses to
     certain complicated string types.  (reported by Gary King)
   * fixed bug: STRING-TO-OCTETS and OCTETS-TO-STRING did not convert

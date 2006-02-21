@@ -588,7 +588,9 @@ Bruno Haible:
   primordial CMUCL.
 
 Cyrus Harmon:
-  He fixed many PPC FFI and callback bugs.
+  He fixed many PPC FFI and callback bugs.  He ported Raymond Toy's
+  work on the generational garbage collector for PPC to Linux, finding
+  and fixing other SBCL bugs in the process.
 
 Matthias Hoelzl:
   He reported and fixed COMPILE's misbehavior on macros.

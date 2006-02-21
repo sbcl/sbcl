@@ -179,5 +179,3 @@
                 (sc-offsets (sb!c:read-var-integer vector index)))
                (values error-number (sc-offsets))))))
 
-
-

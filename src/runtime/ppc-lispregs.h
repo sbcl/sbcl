@@ -1,11 +1,14 @@
 #if defined LISP_FEATURE_DARWIN
 #if defined LANGUAGE_ASSEMBLY
 #define REG(num) r##num
+#define FREG(num) f##num
 #else
 #define REG(num) num
+#define FREG(num) num
 #endif
 #else
 #define REG(num) num
+#define FREG(num) num
 #endif
 
 #define NREGS 32

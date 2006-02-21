@@ -25,6 +25,14 @@
 (def!constant n-byte-bits 8)
 
 
+;;; The size in bytes of the GENCGC pages. Should be a multiple of the
+;;; architecture code size.
+(def!constant gencgc-page-size 4096)
+
+;;; flags for the generational garbage collector
+(def!constant pseudo-atomic-interrupted-flag 1)
+(def!constant pseudo-atomic-flag 4)
+
 (def!constant float-sign-shift 31)
 
 (def!constant single-float-bias 126)
@@ -92,10 +100,16 @@
 
 #!+linux
 (progn
-  (def!constant dynamic-0-space-start #x50000000)
-  (def!constant dynamic-0-space-end   #x67fff000)
-  (def!constant dynamic-1-space-start #x68000000)
-  (def!constant dynamic-1-space-end   #x7ffff000)
+  #!+gencgc
+  (progn
+    (def!constant dynamic-space-start #x50000000)
+    (def!constant dynamic-space-end   #x7ffff000))
+  #!-gencgc
+  (progn
+    (def!constant dynamic-0-space-start #x50000000)
+    (def!constant dynamic-0-space-end   #x67fff000)
+    (def!constant dynamic-1-space-start #x68000000)
+    (def!constant dynamic-1-space-end   #x7ffff000))
 
   (def!constant linkage-table-space-start #x0a000000)
   (def!constant linkage-table-space-end   #x0b000000)
@@ -103,11 +117,18 @@
 
 #!+darwin
 (progn
-  ;;; nothing _seems_ to be using these addresses
-  (def!constant dynamic-0-space-start #x10000000)
-  (def!constant dynamic-0-space-end   #x3ffff000)
-  (def!constant dynamic-1-space-start #x40000000)
-  (def!constant dynamic-1-space-end   #x6ffff000)
+  #!+gencgc
+  (progn
+    (def!constant dynamic-space-start #x10000000)
+    (def!constant dynamic-space-end   #x6ffff000))
+  #!-gencgc
+  (progn
+    (def!constant dynamic-0-space-start #x10000000)
+    (def!constant dynamic-0-space-end   #x3ffff000)
+
+    (def!constant dynamic-1-space-start #x40000000)
+    (def!constant dynamic-1-space-end   #x6ffff000))
+
 
   (def!constant linkage-table-space-start #x0a000000)
   (def!constant linkage-table-space-end   #x0b000000)
@@ -180,7 +201,15 @@
     sb!unix::*interrupts-enabled*
     sb!unix::*interrupt-pending*
     *gc-inhibit*
-    *gc-pending*))
+    *gc-pending*
+
+    *restart-lisp-function*
+
+    ;; CLH: 20060210 Taken from x86-64/parms.lisp per JES' suggestion
+    ;; Needed for callbacks to work across saving cores. see
+    ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
+    ;; details.
+    sb!alien::*enter-alien-callback*))
 
 (defparameter *static-funs*
   '(length

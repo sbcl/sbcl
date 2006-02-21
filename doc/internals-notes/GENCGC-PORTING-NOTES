@@ -1,0 +1,639 @@
+
+====================================================
+OPEN GENGC BUGS
+====================================================
+
+7. OPEN. This isn't really a GENGC bug, but, for completeness, we
+   should fix ppc-vm.lisp so that the fixup can take an offset a la
+   x86-64. This was done in generic.lisp, but needs corresponding
+   changes in pcc-vm.lisp
+
+====================================================
+CLOSED GENGC BUGS
+====================================================
+
+1. FIXED. Occasional inline allocation failures? I'm guessing that's
+   what we're seeing here. Certain operations take a long time and
+   involve a lot kernel_task CPU activity. It's possible that this is
+   just I/O, but I don't think so. This seems to have gotten worse
+   recently. Changing the allocation macro to not use a fixup with an
+   offset fixes this.
+
+2. FIXED. Purify fails. Running the core-test.sh test causes a BUS
+   ERROR. The problem was that calling alien-callbacks loaded from a
+   saved core was failing. See note in
+   c-call.lisp/alien-assembler-callback-wrapper for details.
+
+3. FIXED! cons-madly test (gc.impure.lisp) fails and
+   drops into LDB. My hunch is that this is related to the
+   allocation/moving of large objects in gencgc.c.
+
+4. FIXED. PPC/Linux gencgc fails with a BUS ERROR (SIGSEGV maybe?)
+   after the first GC.
+
+5. FIXED. sb-md5 and cltl2 often (but not always) fail to build out of
+   contrib. Latest gencgc fixes seem to have fixed this. Keep an eye
+   out for it though. I think the allocation macro fixup changes fixed
+   this one.
+
+6. FIXED. finalize-test.sh fails. finalizers weren't being run
+   properly. removed #ifdef LISP_FEATURE_X86[_64] in
+   gencgc.c/scav_weak_pointer and now things seem to work.
+
+8. NOT A BUG. In insts.lisp, we do a lis/addi to load the address of a
+   fixup. This should really be lis/ori, but the ori instruction
+   doesn't deal with fixups. This should be fixed, but doesn't seem to
+   be rearing its ugly head at the moment. This is wrong. The fixup
+   deals with adjusting the high word such that the the lis/addi
+   sequence functions correctly here.
+
+9. FIXED. x86-64 builds busted. they build ok, but then can't do a
+   full rebuild of themselves. They die after the first purify.
+   GENCGC_RUNS_1 works, GENCGC_CANDIDATE_1 breaks. Wrongly #ifdef'ed
+   out an os_zero call in purify.c. Restoring this fixes things.
+
+
+
+====================================================
+CVS tag: ALLOCATION_CLEANUP_1
+====================================================
+
+File: src/assembly/ppc/arith.lisp
+================
+
+* Fixed allocation for CONS-BIGNUM. Note that we now always cons 2 words
+  instead of trying to fit into 1 word first
+
+File: src/compiler/ppc/alloc.lisp
+================
+
+* Fixed vop for list-or-list*. Uses the allocation macro instead of
+  setting alloc-tn directly. Note that the (relatively) recent dynamic
+  extent support should still work here. In this case, we directly
+  allocate this by adjusting csp-tn.
+
+* Fixed vop for make-closure. See note above. Dynamic extent should
+  still work.
+
+* TODO: [FUTURE] add stack allocation to the allocate macro.
+
+File: src/compiler/ppc/macros.lisp
+
+* Added allocation macro. Note that this is using king nato's version
+  and may not do everything we need to do for GENCGC.
+
+* with-fixed-allocation changes. Now takes a keyword argument (:lowtag
+  other-pointer-lowtag). Removed restriction on having a non-empty
+  body as we can use this macro just for allocating data. Now uses the
+  allocation macro instead of adjusting alloc-tn directly.
+
+* Removed the :extra keyword argument from pseudo-atomic. Don't use
+  this for allocating memory anymore! Removed the corresponding gensym
+  and let. This is still King Nato's pseudo-atomic. At some point we
+  should better understand the differences between rtoy's version and
+  king nato's version.
+
+
+File: move.lisp
+===============
+
+* move-from-unsigned vop now uses with-fixed allocation instead of
+  setting alloc-tn directly. We always allocate two words now instead
+  of trying to get away with one first.
+
+
+====================================================
+CVS tag: ALLOCATION_CLEANUP_2
+====================================================
+
+File: src/assembly/ppc/array.lisp
+=============================
+
+* Fixed allocate-vector assembly-routine to use allocate macro instead
+  of adjusting alloc-tn directly.
+
+File: src/compiler/ppc/array.lisp
+=============================
+
+* make-array-header vop now uses allocation macro instead of setting
+  alloc-tn directly
+
+File: src/compiler/ppc/call.lisp
+============================
+
+* listify-rest-args now uses the allocation macro instead of adjusting
+  alloc-tn directly.  For dynamic extent args, we still allocate
+  directly by adjusting csp-tn. We should implement stack allocation
+  in the allocation macro.
+
+
+====================================================
+CVS tag: BUILD_CLEANUP_1
+====================================================
+
+File: src/code/ppc-vm.lisp
+
+* Add flag disabling scavenging of read-only space (to be used later)
+
+File: src/compiler/ppc/parms.lisp
+
+* Add gencgc-page-size variable. Currently 4096. Bump to 32k later.
+
+* Added dynamic-space-start and dynamic-space-end constants for linux
+  and darwin #!+gencgc. Conditionalized dynamic-0 and dynamic-1
+  constants for#!-gencgc.
+
+* Added *restart-lisp-function*, *current-region-end-addr* and
+  *scavenge-read-only-space* static-symbols.
+
+File: src/runtime/Config.ppc-darwin
+
+* Make GC_SRC shell commands that search for LISP_FEATURE_GENCGC in
+  genesis/config.h and set GC_SRC to gencgc.c or cheneygc.c as
+  appropriate
+
+File: src/runtime/Config.ppc-linux
+
+* Make GC_SRC shell commands that search for LISP_FEATURE_GENCGC in
+  genesis/config.h and set GC_SRC to gencgc.c or cheneygc.c as
+  appropriate
+
+====================================================
+CVS tag: GENCGC_PREP_1
+====================================================
+
+File: src/runtime/arch.h
+
+* Moved extern fpu_save and fpu_restore defintions here
+
+File: src/runtime/cheneygc.c
+
+* removed static scavenge_interrupt_contexts prototype
+
+File: gc-common.c
+
+* Instead of #ifndef LISP_FEATURE_SPARC for scav_fdefn, use
+  defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+
+* Instead of #ifndef LISP_FEATURE_GENCGC for scav_fun_header and
+  scav_return_pc_header scavtab entries, use #if
+  !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+
+* set scav_tab[FDEFN_WIDETAG] to scav_fdefn on X86 and X86_64 and
+  scav_boxed for everything else.
+
+File: gc-internal.h
+
+* added prototype for scavenge_interrupt_contexts
+
+====================================================
+CVS tag: GENCGC_PREP_2
+====================================================
+
+File: gc-common.c
+
+* Reverted gc-common.c changes from GENCGC_PREP_1. The problem was
+  that I was mimicing rtoy's FDEFN changes for PPC, superficially,
+  without changing the underlying code. He changed the way fdefn's
+  work on ppc to look more like they do on SPARC. I think we can get
+  away with leaving this alone, at least for now.
+
+File: ppc-arch.c
+
+* Moved PSEUDO_ATOMIC_INTERRUPTED_BIAS to ppc-arch.h
+
+File: ppc-arch.h
+
+* Moved PSEUDO_ATOMIC_INTERRUPTED_BIAS to ppc-arch.h
+
+File: ppc-assem.S
+
+* Added do_pending_interrupt, fpu_save and fpu_restore.
+
+File: ppc-darwin-spacelist.h
+
+* Adjust spaces for #+gencgc and #-gencgc
+
+File: purify.c
+
+* #ifdef LISP_FEATURE_GENCGC -> X86{_64}
+
+File: gencgc.c
+
+* Remove fpu_save and fpu_restore prototypes
+
+====================================================
+CVS tag: GENCGC_PREP_3
+====================================================
+
+File: src/runtime/gc.h
+
+* Added xxx_pseudo_atomic_xxx and xxx_alloc_pointer #defines
+
+File: src/runtime/alloc.c
+
+* Start using xxx_pseudo_atomic_xxx
+
+====================================================
+CVS tag: GENCGC_PREP_4
+====================================================
+
+File: src/runtime/globals.c
+
+* Cleaning up GENCGC/X86[_64] ifdefs
+
+File: src/runtime/globals.h
+
+* Cleaning up GENCGC/X86[_64] ifdefs
+
+File: src/runtime/parse.c
+
+* Use get_alloc_pointer instead of arch specific ways of doing so
+
+====================================================
+CVS tag: PSEUDO_ATOMIC_REG_ALLOC
+====================================================
+
+File: compiler/ppc/macros.lisp
+
+* Pseudo-atomic now uses bits 3 and 1 of reg_ALLOC insetead of using
+  reg_NL3 for the interrutped part.
+
+File: src/runtime/gc.h
+
+* Pseudo-atomic now uses bits 3 and 1 of reg_ALLOC insetead of using
+  reg_NL3 for the interrutped part.
+
+File: src/runtime/ppc-arch.c
+
+* Pseudo-atomic now uses bits 3 and 1 of reg_ALLOC insetead of using
+  reg_NL3 for the interrutped part.
+
+* Brought the allocation trap stuff along, but this is untested.
+
+File: src/runtime/ppc-assem.S
+
+* Pseudo-atomic now uses bits 3 and 1 of reg_ALLOC insetead of using
+  reg_NL3 for the interrutped part.
+
+====================================================
+CVS tag: GENCGC_BUILDS_1
+====================================================
+
+File: src/runtime/gencgc.c
+
+* The big kahuna...
+
+* Ok, lots of little changes to get things working. Had to fix up the
+  allocation macro, the uses of it, etc... 
+
+
+====================================================
+CVS tag: GENCGC_RUNS_1
+====================================================
+
+* Ok, it runs now, but we seem to trap on every allocation. Trying to
+  figure out why. Works -gencgc/ppc and works on x86-64.
+
+====================================================
+CVS tag: GENCGC_RUNS_INLINE_ALLOCATION_1
+====================================================
+
+File: src/compiler/generic/genesis.lisp
+
+* do-cold-fixup now looks at the SI portion of PPC instructions in :ha
+  and :l fixups and uses these as offsets in calculating the address.
+
+File: src/compiler/ppc/insts.lisp
+
+* in define-d-si-instruction we now stick the fikup-offset into the si
+  portion of the opcode instead of always using 0. This allows us to
+  pass this information on to do-cold-fixup in genesis.lisp.
+
+File: src/compiler/ppc/macros.lisp
+
+* gencgc allocation macro now uses fixups to boxed_region.free_pointer
+  and boxed_region.end_addr to get these values instead of pulling
+  them out of registers. This removes the need to keep these registers
+  in sync with the C struct values. And it is more like what we will
+  eventually need to do if we ever do PPC threads.
+
+File: src/runtime/gc.h
+
+* removed set_current_region_free, get_current_free, and
+  set_current_region_end.
+
+File: src/runtime/gencgc.c
+
+* In gc_alloc_new_region, use page_address(last_page) + PAGE_BYTES to
+  get the end_addr instead of start_addr + bytes_found.
+
+* removed set_current_region_end calls.
+
+File: src/runtime/ppc-arch.c
+
+* include gencgc-alloc-region.h
+
+* look back 3 instructions instead of 2 to match the new allocation
+  macro
+
+* added end_addr variable for debugging.
+
+* no longer adjust dynamic_space_free_pointer
+
+====================================================
+CVS TAG: GENCGC_MOSTLY_WORKING_1
+====================================================
+
+* Making purify and loading callbacks from cores work for ppc/gengc.
+
+* Remove *scavenge-read-only-space*
+
+File: src/compiler/ppc/c-call.lisp
+
+* Fixed alien-callback-assembler-wrapper to get the address for
+  enter-alien-callback from the symbol-value slot of
+  SB-ALIEN::*ENTER-ALIEN-CALLBACK* to ensure that this works even if
+  the GC moves ENTER-ALIEN-CALLBACK. Thanks to JES for the suggestion
+  on the fix. callback.impure.lisp now passes.
+
+File: src/runtime/gencgc.c
+
+* Removed #ifdef LISP_FEATURE_X86[_64] in
+  gengcc.c/scav_weak_pointer. Definitely some OOAO violations here,
+  but now finalize.test.sh passes.
+
+====================================================
+CVS TAG: GENCGC_MOSTLY_WORKING_2
+====================================================
+
+* New allocation macro. Seems to make things better.
+
+====================================================
+CVS TAG: GENCGC_MOSTLY_WORKING_3
+====================================================
+
+* Trying to undo damage done along the way. Lots of little
+  changes. Please document these in the morning.
+
+====================================================
+CVS TAG: This stuff never got tagged. I backed it out before I tagged
+         it.
+====================================================
+
+* Added ARCH_HAS_CTR_REGISTER and friends. Now we fixup the CTR in
+  scavenge_interrupt_context. Whoops. Backed this out as it seemed to
+  be messing things up.
+
+====================================================
+CVS TAG: GENCGC_ALL_TESTS_PASSED
+====================================================
+
+File: src/runtime/gc.h
+
+* set_alloc_pointer now just sets the high bits and leaves the p-a
+  flags alone.
+
+File: src/runtime/interrupt.c
+
+* interrupt_handle_pending clears the p-a-interrupted flag
+
+* undo_fake_foreign_function_call doesn't zap the p-a bits in
+  reg_ALLOC
+
+File: src/runtime/ppc-arch.c
+
+* handle_allocation_trap doesn't zap the p-a bits in reg_ALLOC
+
+====================================================
+CVS TAG: GENCGC_ALL_0_9_9_27_MERGE
+====================================================
+
+* Forward ported to 0.9.9.27
+
+====================================================
+CVS TAG: GENCGC_CANDIDATE_1
+====================================================
+
+File: src/runtime/ppc-assem.S
+
+* Massive props to Xophe for finding this. For a long time now, we had
+  been using lis, addi to load the address of NIL. Turns out this
+  fails when the high bit of the low word is set. I have no idea how
+  we missed this for so long, but changing the instruction sequence to
+  lis, ori fixes the problem of linux/ppc gencgc not working.
+
+File: src/runtime/ppc-arch.c
+
+* Turn off the address checking in arch_get_bad_addr. The pointer
+  arithmetic was wrong and was causing problems. We don't really need
+  this check (right?).
+
+File: src/code/toplevel.lisp
+
+* Fix the way we compute the end-of-stack in scrub-control-stack.
+
+File: src/runtime/bsd-os.c
+
+* Use arch_get_bad_addr to get fault address
+
+====================================================
+CVS TAG: GENCGC_SBCL_0_9_9_34_MERGE
+====================================================
+
+* Forward ported to 0.9.9.34
+
+====================================================
+CVS TAG: GENCGC_CANDIDATE_2
+====================================================
+
+File: src/compiler/ppc/macros.lisp
+
+* cleaned up comments for allocation macro
+
+* removed commented code that used to throw an error for empty
+  allocation macro body. Now we call this for its side effect of
+  allocating memory
+
+File: src/compiler/ppc/parms.lisp
+
+* gencgc-page-size -> 4096
+
+* added pseudo-atomic-interrupted-flag and pseudo-atomic-flag
+
+File: src/runtime/alloc.c
+
+* clr_pseudo_atomic -> clear_pseudo_atomic
+
+File: src/runtime/gc.h
+
+* clr_pseudo_atomic -> clear_pseudo_atomic
+
+* PSEUDO_ATOMIC_[INTERRUPTED_]VALUE -> flag_PseudoAtomic[Interrupted]
+
+File: src/runtime/interrupt.c
+
+* clr_pseudo_atomic -> clear_pseudo_atomic
+
+File: src/runtime/ppc-arch.c
+
+* whitespace fix
+
+File: package-data-list.lisp-expr
+
+* added PSEUDO-ATOMIC-INTERRUPTED-FLAG and PSEUDO-ATOMIC-FLAG to sb-vm
+  exports
+
+====================================================
+CVS TAG: GENCGC_SBCL_0_9_9_35_MERGE
+====================================================
+
+* Forward parted to 0.9.9.35
+
+====================================================
+CVS TAG: GENCGC_CANDIDATE_3
+====================================================
+
+NOTE: This includes the fix for the problem where x86-64 couldn't
+build itself. I erroneously removed an os_zero in purify.c. This has
+been restored.
+
+File: src/runtime/purify.c
+
+* remove ifndef GENCGC check around os_zero call
+* undo recent change to add back in a bit setting the
+  dynamic_space_free_pointer on x86[_64]. I don't think we need this
+
+File: src/runtime/parse.c
+
+* dunamic_space_free_ptr -> dynamic_space_free_pointer
+
+File: src/runtime/ppc-arch.c
+
+* Fixing comment text in allocation_trap_p
+* arch_clr_pseudo_atomic_interrupted ->
+    arch_clear_pseudo_atomic_interrupted
+
+File: src/runtime/gc-common.c
+
+* restore workaround behvaior for !GENCGC, not !X86[_64]
+
+* whitespace fix
+
+File :src/runtime/gencgc.c
+
+* undoing gratuitous spacing changes and fixing whitespace
+* remove bogus comment
+
+====================================================
+CVS TAG: GENCGC_CANDIDATE_4
+====================================================
+
+File: src/runtime/purify.c
+
+* Use dynamic_space_purify_pointer instead of
+  dynamic_space_free_pointer to mark the end of the dynamic_space
+  that we purify
+* call gc_free_heap in purify when using GENCGC
+
+File: src/runtime/interrupt.c
+
+clear_psuedo_atomic_interrupted -> arch_clear_pseudo_atomic_interrupted
+
+====================================================
+CVS TAG: GENCGC_CANDIDATE_5
+** Note: not tagged, but patch made
+====================================================
+
+File: src/runtime/assembly/ppc/array.lisp
+
+* cleaning up comment
+
+File: src/code/ppc-vm.lisp
+
+* removed unused commented-out chunk
+
+File: src/compiler/generic/genesis.lisp
+
+* Added FIXME about ppc offset fixups only being half-done
+
+File: src/compiler/ppc/c-call.lisp
+
+* Comment cleanup
+
+File: src/compiler/ppc/macros.lisp
+
+* Allocation macro comment cleanup
+
+File: src/runtime/gc.h
+
+* Whitespace
+
+* #ifdef GENCGC for the p_a macros
+
+File: src/runtime/gencgc.c
+
+* whitespace
+
+* removed bogus comment
+
+* restore gc_assert for alignment check on PPC
+
+File: src/runtime/globals.h
+
+* updated comment about dyanmic_space_free_pointer
+
+File: src/runtime/interrupt.c
+
+* whitespace
+
+File: src/runtime/ppc-arch.c
+
+* Remove pc checking stuff
+
+* remove SIGILL handling and adjust comment
+
+* whitespace
+
+* updated comment aboud dynamic_space_free_pointer
+
+File: src/runtime/ppc-arch.h
+
+* removed bogus comment
+
+File: src/runtime/ppc-darwin-spacelist.h
+
+* removed extraneous space
+
+====================================================
+CVS TAG: GENCGC_CANDIDATE_6
+====================================================
+
+File: src/runtime/ppc-arch.c
+
+* Removed enable_some_signals and call to it. We don't need these
+  signals on when we call alloc, but CMUCL does.
+
+File: src/runtime/alloc.c
+
+* Put in Xophe's fix against GC moving a newly pointer from moving out
+  from under us when we handle a pending interrupt. If the C stack is
+  not scavenged during GC, result needs to be protected against not
+  being referred to by any roots, so we push it onto the lisp control
+  stack, and read it back off after any potential GC has finished
+ 
+====================================================
+CVS TAG: GENCGC_CANDIDATE_7
+====================================================
+
+* Fix mismatched } and #endif in bsd-os.c/memory_fault_handler
+
+====================================================
+Untagged Changes
+====================================================
+
+
+====================================================
+Uncommited Changes
+====================================================
+

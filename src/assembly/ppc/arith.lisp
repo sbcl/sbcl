@@ -153,17 +153,14 @@
 
   CONS-BIGNUM
   ;; Allocate a BIGNUM for the result.
-  (pseudo-atomic (pa-flag :extra (pad-data-block (1+ bignum-digits-offset)))
+  (with-fixed-allocation (res pa-flag temp bignum-widetag
+                              (+ bignum-digits-offset 2))
     (let ((one-word (gen-label)))
-      (inst ori res alloc-tn other-pointer-lowtag)
       ;; We start out assuming that we need one word.  Is that correct?
       (inst srawi temp lo 31)
       (inst xor. temp temp hi)
       (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
       (inst beq one-word)
-      ;; Nope, we need two, so allocate the additional space.
-      (inst addi alloc-tn alloc-tn (- (pad-data-block (+ 2 bignum-digits-offset))
-                                      (pad-data-block (1+ bignum-digits-offset))))
       (inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))
       (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag)
       (emit-label one-word)

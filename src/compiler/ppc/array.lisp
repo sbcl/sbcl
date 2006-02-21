@@ -23,13 +23,16 @@
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result) header)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:temporary (:scs (non-descriptor-reg)) gc-temp)
+  #!-gencgc (:ignore gc-temp)
   (:results (result :scs (descriptor-reg)))
   (:generator 0
     (pseudo-atomic (pa-flag)
-      (inst ori header alloc-tn other-pointer-lowtag)
       (inst addi ndescr rank (* (1+ array-dimensions-offset) n-word-bytes))
       (inst clrrwi ndescr ndescr n-lowtag-bits)
-      (inst add alloc-tn alloc-tn ndescr)
+      (allocation header ndescr other-pointer-lowtag
+                  :temp-tn gc-temp
+                  :flag-tn pa-flag)
       (inst addi ndescr rank (fixnumize (1- array-dimensions-offset)))
       (inst slwi ndescr ndescr n-widetag-bits)
       (inst or ndescr ndescr type)

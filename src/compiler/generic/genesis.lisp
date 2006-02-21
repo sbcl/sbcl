@@ -1765,20 +1765,29 @@ core and return a descriptor to it."
                 (logior (mask-field (byte 16 16)
                                     (bvref-32 gspace-bytes gspace-byte-offset))
                         (ldb (byte 16 0) value))))))
+       ;; FIXME: PowerPC Fixups are not fully implemented. The bit
+       ;; here starts to set things up to work properly, but there
+       ;; needs to be corresponding code in ppc-vm.lisp
        (:ppc
-       (ecase kind
-         (:ba
-          (setf (bvref-32 gspace-bytes gspace-byte-offset)
-                (dpb (ash value -2) (byte 24 2)
-                     (bvref-32 gspace-bytes gspace-byte-offset))))
-         (:ha
-          (let* ((h (ldb (byte 16 16) value))
-                 (l (ldb (byte 16 0) value)))
-            (setf (bvref-16 gspace-bytes (+ gspace-byte-offset 2))
-                  (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
-         (:l
-          (setf (bvref-16 gspace-bytes (+ gspace-byte-offset 2))
-                (ldb (byte 16 0) value)))))
+        (ecase kind
+          (:ba
+           (setf (bvref-32 gspace-bytes gspace-byte-offset)
+                 (dpb (ash value -2) (byte 24 2)
+                      (bvref-32 gspace-bytes gspace-byte-offset))))
+          (:ha
+           (let* ((un-fixed-up (bvref-16 gspace-bytes
+                                         (+ gspace-byte-offset 2)))
+                  (fixed-up (+ un-fixed-up value))
+                  (h (ldb (byte 16 16) fixed-up))
+                  (l (ldb (byte 16 0) fixed-up)))
+             (setf (bvref-16 gspace-bytes (+ gspace-byte-offset 2))
+                   (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
+          (:l
+           (let* ((un-fixed-up (bvref-16 gspace-bytes
+                                         (+ gspace-byte-offset 2)))
+                  (fixed-up (+ un-fixed-up value)))
+             (setf (bvref-16 gspace-bytes (+ gspace-byte-offset 2))
+                   (ldb (byte 16 0) fixed-up))))))
       (:sparc
        (ecase kind
          (:call

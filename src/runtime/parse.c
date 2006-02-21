@@ -259,13 +259,14 @@ static boolean lookup_symbol(char *name, lispobj *result)
     }
 
     /* Search dynamic space. */
-#ifndef LISP_FEATURE_GENCGC
+#if defined(LISP_FEATURE_GENCGC)
+    headerptr = (lispobj *)DYNAMIC_SPACE_START;
+    count = (lispobj *)get_alloc_pointer() - headerptr;
+#else
     headerptr = (lispobj *)current_dynamic_space;
     count = dynamic_space_free_pointer - headerptr;
-#else
-    headerptr = (lispobj *)DYNAMIC_SPACE_START;
-    count = ((lispobj *)SymbolValue(ALLOCATION_POINTER,0)) - headerptr;
 #endif
+
     if (search_for_symbol(name, &headerptr, &count)) {
         *result = make_lispobj(headerptr, OTHER_POINTER_LOWTAG);
         return 1;

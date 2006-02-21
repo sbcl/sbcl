@@ -187,8 +187,8 @@ scavenge(lispobj *start, long n_words)
                 (scavtab[widetag_of(object)])(object_ptr, object);
         }
     }
-    gc_assert_verbose(object_ptr == end, "Final object pointer %p, end %p\n",
-                      object_ptr, end);
+    gc_assert_verbose(object_ptr == end, "Final object pointer %p, start %p, end %p\n",
+                      object_ptr, start, end);
 }
 
 static lispobj trans_fun_header(lispobj object); /* forward decls */
@@ -320,8 +320,12 @@ trans_code(struct code *code)
     os_flush_icache((os_vm_address_t) (((long *)new_code) + nheader_words),
                     ncode_words * sizeof(long));
 
+#endif
+
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     gencgc_apply_code_fixups(code, new_code);
 #endif
+
     return new_code;
 }
 
@@ -698,7 +702,7 @@ size_boxed(lispobj *where)
 
 /* Note: on the sparc we don't have to do anything special for fdefns, */
 /* 'cause the raw-addr has a function lowtag. */
-#ifndef LISP_FEATURE_SPARC
+#if !defined(LISP_FEATURE_SPARC)
 static long
 scav_fdefn(lispobj *where, lispobj object)
 {
@@ -1715,7 +1719,7 @@ gc_init_tables(void)
     scavtab[COMPLEX_VECTOR_WIDETAG] = scav_boxed;
     scavtab[COMPLEX_ARRAY_WIDETAG] = scav_boxed;
     scavtab[CODE_HEADER_WIDETAG] = scav_code_header;
-#ifndef LISP_FEATURE_GENCGC     /* FIXME ..._X86 ? */
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
     scavtab[SIMPLE_FUN_HEADER_WIDETAG] = scav_fun_header;
     scavtab[RETURN_PC_HEADER_WIDETAG] = scav_return_pc_header;
 #endif
@@ -1733,7 +1737,7 @@ gc_init_tables(void)
     scavtab[UNBOUND_MARKER_WIDETAG] = scav_immediate;
     scavtab[NO_TLS_VALUE_MARKER_WIDETAG] = scav_immediate;
     scavtab[INSTANCE_HEADER_WIDETAG] = scav_instance;
-#ifdef LISP_FEATURE_SPARC
+#if defined(LISP_FEATURE_SPARC)
     scavtab[FDEFN_WIDETAG] = scav_boxed;
 #else
     scavtab[FDEFN_WIDETAG] = scav_fdefn;

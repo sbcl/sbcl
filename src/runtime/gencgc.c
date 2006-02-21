@@ -348,15 +348,20 @@ gen_av_mem_age(generation_index_t gen)
         / ((double)generations[gen].bytes_allocated);
 }
 
-void fpu_save(int *);           /* defined in x86-assem.S */
-void fpu_restore(int *);        /* defined in x86-assem.S */
 /* The verbose argument controls how much to print: 0 for normal
  * level of detail; 1 for debugging. */
 static void
 print_generation_stats(int verbose) /* FIXME: should take FILE argument */
 {
     generation_index_t i, gens;
-    int fpu_state[27];
+
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#define FPU_STATE_SIZE 27
+    int fpu_state[FPU_STATE_SIZE];
+#elif defined(LISP_FEATURE_PPC)
+#define FPU_STATE_SIZE 32
+    long long fpu_state[FPU_STATE_SIZE];
+#endif
 
     /* This code uses the FP instructions which may be set up for Lisp
      * so they need to be saved and reset for C. */
@@ -370,7 +375,7 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
 
     /* Print the heap stats. */
     fprintf(stderr,
-            "   Gen Boxed Unboxed LB   LUB  !move  Alloc  Waste   Trig    WP  GCs Mem-age\n");
+            " Gen StaPg UbSta LaSta LUbSt Boxed Unboxed LB   LUB  !move  Alloc  Waste   Trig    WP  GCs Mem-age\n");
 
     for (i = 0; i < gens; i++) {
         page_index_t j;
@@ -405,8 +410,12 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
         gc_assert(generations[i].bytes_allocated
                   == count_generation_bytes_allocated(i));
         fprintf(stderr,
-                "   %1d: %5ld %5ld %5ld %5ld %5ld %8ld %5ld %8ld %4ld %3d %7.4f\n",
+                "   %1d: %5ld %5ld %5ld %5ld %5ld %5ld %5ld %5ld %8ld %5ld %8ld %4ld %3d %7.4f\n",
                 i,
+                generations[i].alloc_start_page,
+                generations[i].alloc_unboxed_start_page,
+                generations[i].alloc_large_start_page,
+                generations[i].alloc_large_unboxed_start_page,
                 boxed_cnt, unboxed_cnt, large_boxed_cnt, large_unboxed_cnt,
                 pinned_cnt,
                 generations[i].bytes_allocated,
@@ -423,7 +432,9 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
 }
 
 
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 void fast_bzero(void*, size_t); /* in <arch>-assem.S */
+#endif
 
 /* Zero the pages from START to END (inclusive), but use mmap/munmap instead
  * if zeroing it ourselves, i.e. in practice give the memory back to the
@@ -456,7 +467,12 @@ zero_pages(page_index_t start, page_index_t end) {
     if (start > end)
       return;
 
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     fast_bzero(page_address(start), PAGE_BYTES*(1+end-start));
+#else
+    bzero(page_address(start), PAGE_BYTES*(1+end-start));
+#endif
+
 }
 
 /* Zero the pages from START to END (inclusive), except for those
@@ -633,9 +649,8 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
     /* Bump up last_free_page. */
     if (last_page+1 > last_free_page) {
         last_free_page = last_page+1;
-        SetSymbolValue(ALLOCATION_POINTER,
-                       (lispobj)(((char *)heap_base) + last_free_page*PAGE_BYTES),
-                       0);
+        /* do we only want to call this on special occasions? like for boxed_region? */
+        set_alloc_pointer((lispobj)(((char *)heap_base) + last_free_page*PAGE_BYTES));
     }
     thread_mutex_unlock(&free_pages_lock);
 
@@ -1010,8 +1025,7 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
     /* Bump up last_free_page */
     if (last_page+1 > last_free_page) {
         last_free_page = last_page+1;
-        SetSymbolValue(ALLOCATION_POINTER,
-                       (lispobj)(((char *)heap_base) + last_free_page*PAGE_BYTES),0);
+        set_alloc_pointer((lispobj)(((char *)heap_base) + last_free_page*PAGE_BYTES));
     }
     thread_mutex_unlock(&free_pages_lock);
 
@@ -1804,6 +1818,8 @@ trans_unboxed_large(lispobj object)
 /* FIXME: What does this mean? */
 int gencgc_hash = 1;
 
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+
 static long
 scav_vector(lispobj *where, lispobj object)
 {
@@ -2010,6 +2026,19 @@ scav_vector(lispobj *where, lispobj object)
     return (CEILING(kv_length + 2, 2));
 }
 
+#else
+
+static long
+scav_vector(lispobj *where, lispobj object)
+{
+    if (HeaderValue(object) == subtype_VectorValidHashing) {
+        *where =
+            (subtype_VectorMustRehash<<N_WIDETAG_BITS) | SIMPLE_VECTOR_WIDETAG;
+    }
+    return 1;
+}
+
+#endif
 
 
 /*
@@ -2371,6 +2400,8 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
     return 1;
 }
 
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+
 /* Adjust large bignum and vector objects. This will adjust the
  * allocated region if the size has shrunk, and move unboxed objects
  * into unboxed pages. The pages are not promoted here, and the
@@ -2545,6 +2576,8 @@ maybe_adjust_large_object(lispobj *where)
     return;
 }
 
+#endif
+
 /* Take a possible pointer to a Lisp object and mark its page in the
  * page_table so that it will not be relocated during a GC.
  *
@@ -2557,6 +2590,9 @@ maybe_adjust_large_object(lispobj *where)
  *
  * It is also assumed that the current gc_alloc() region has been
  * flushed and the tables updated. */
+
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+
 static void
 preserve_pointer(void *addr)
 {
@@ -2672,6 +2708,9 @@ preserve_pointer(void *addr)
     /* Check that the page is now static. */
     gc_assert(page_table[addr_page_index].dont_move != 0);
 }
+
+#endif
+
 
 /* If the given page is not write-protected, then scan it for pointers
  * to younger generations or the top temp. generation, if no
@@ -3193,7 +3232,12 @@ print_ptr(lispobj *addr)
 }
 #endif
 
-extern long undefined_tramp;
+#if defined(LISP_FEATURE_PPC)
+extern int closure_tramp;
+extern int undefined_tramp;
+#else
+extern int undefined_tramp;
+#endif
 
 static void
 verify_space(lispobj *start, size_t words)
@@ -3249,8 +3293,14 @@ verify_space(lispobj *start, size_t words)
                 */
             } else {
                 /* Verify that it points to another valid space. */
-                if (!to_readonly_space && !to_static_space
-                    && (thing != (unsigned long)&undefined_tramp)) {
+                if (!to_readonly_space && !to_static_space &&
+#if defined(LISP_FEATURE_PPC)
+                    !((thing == &closure_tramp) ||
+                      (thing == &undefined_tramp))
+#else
+                    thing != (unsigned long)&undefined_tramp
+#endif
+                    ) {
                     lose("Ptr %x @ %x sees junk.\n", thing, start);
                 }
             }
@@ -3435,6 +3485,10 @@ verify_space(lispobj *start, size_t words)
                     break;
 
                 default:
+                    FSHOW((stderr,
+                           "/Unhandled widetag 0x%x at 0x%x\n",
+                           widetag_of(*start), start));
+                    fflush(stderr);
                     gc_abort();
                 }
             }
@@ -3462,7 +3516,7 @@ verify_gc(void)
     struct thread *th;
     for_each_thread(th) {
     long binding_stack_size =
-            (lispobj*)SymbolValue(BINDING_STACK_POINTER,th)
+        (lispobj*)get_binding_stack_pointer(th)
             - (lispobj*)th->binding_stack_start;
         verify_space(th->binding_stack_start, binding_stack_size);
     }
@@ -3611,6 +3665,158 @@ write_protect_generation_pages(generation_index_t generation)
     }
 }
 
+static void
+scavenge_control_stack()
+{
+    unsigned long control_stack_size;
+
+    /* This is going to be a big problem when we try to port threads
+     * to PPC... CLH */
+    struct thread *th = arch_os_get_current_thread();
+    lispobj *control_stack =
+        (lispobj *)(th->control_stack_start);
+
+    control_stack_size = current_control_stack_pointer - control_stack;
+    scavenge(control_stack, control_stack_size);
+}
+
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+/* Scavenging Interrupt Contexts */
+
+static int boxed_registers[] = BOXED_REGISTERS;
+
+static void
+scavenge_interrupt_context(os_context_t * context)
+{
+    int i;
+
+#ifdef reg_LIP
+    unsigned long lip;
+    unsigned long lip_offset;
+    int lip_register_pair;
+#endif
+    unsigned long pc_code_offset;
+
+#ifdef ARCH_HAS_LINK_REGISTER
+    unsigned long lr_code_offset;
+#endif
+#ifdef ARCH_HAS_NPC_REGISTER
+    unsigned long npc_code_offset;
+#endif
+
+#ifdef reg_LIP
+    /* Find the LIP's register pair and calculate it's offset */
+    /* before we scavenge the context. */
+
+    /*
+     * I (RLT) think this is trying to find the boxed register that is
+     * closest to the LIP address, without going past it.  Usually, it's
+     * reg_CODE or reg_LRA.  But sometimes, nothing can be found.
+     */
+    lip = *os_context_register_addr(context, reg_LIP);
+    lip_offset = 0x7FFFFFFF;
+    lip_register_pair = -1;
+    for (i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
+        unsigned long reg;
+        long offset;
+        int index;
+
+        index = boxed_registers[i];
+        reg = *os_context_register_addr(context, index);
+        if ((reg & ~((1L<<N_LOWTAG_BITS)-1)) <= lip) {
+            offset = lip - reg;
+            if (offset < lip_offset) {
+                lip_offset = offset;
+                lip_register_pair = index;
+            }
+        }
+    }
+#endif /* reg_LIP */
+
+    /* Compute the PC's offset from the start of the CODE */
+    /* register. */
+    pc_code_offset = *os_context_pc_addr(context) - *os_context_register_addr(context, reg_CODE);
+#ifdef ARCH_HAS_NPC_REGISTER
+    npc_code_offset = *os_context_npc_addr(context) - *os_context_register_addr(context, reg_CODE);
+#endif /* ARCH_HAS_NPC_REGISTER */
+
+#ifdef ARCH_HAS_LINK_REGISTER
+    lr_code_offset =
+        *os_context_lr_addr(context) -
+        *os_context_register_addr(context, reg_CODE);
+#endif
+
+    /* Scanvenge all boxed registers in the context. */
+    for (i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
+        int index;
+        lispobj foo;
+
+        index = boxed_registers[i];
+        foo = *os_context_register_addr(context, index);
+        scavenge(&foo, 1);
+        *os_context_register_addr(context, index) = foo;
+
+        scavenge((lispobj*) &(*os_context_register_addr(context, index)), 1);
+    }
+
+#ifdef reg_LIP
+    /* Fix the LIP */
+
+    /*
+     * But what happens if lip_register_pair is -1?  *os_context_register_addr on Solaris
+     * (see solaris_register_address in solaris-os.c) will return
+     * &context->uc_mcontext.gregs[2].  But gregs[2] is REG_nPC.  Is
+     * that what we really want?  My guess is that that is not what we
+     * want, so if lip_register_pair is -1, we don't touch reg_LIP at
+     * all.  But maybe it doesn't really matter if LIP is trashed?
+     */
+    if (lip_register_pair >= 0) {
+        *os_context_register_addr(context, reg_LIP) =
+            *os_context_register_addr(context, lip_register_pair) + lip_offset;
+    }
+#endif /* reg_LIP */
+
+    /* Fix the PC if it was in from space */
+    if (from_space_p(*os_context_pc_addr(context)))
+        *os_context_pc_addr(context) = *os_context_register_addr(context, reg_CODE) + pc_code_offset;
+
+#ifdef ARCH_HAS_LINK_REGISTER
+    /* Fix the LR ditto; important if we're being called from
+     * an assembly routine that expects to return using blr, otherwise
+     * harmless */
+    if (from_space_p(*os_context_lr_addr(context)))
+        *os_context_lr_addr(context) =
+            *os_context_register_addr(context, reg_CODE) + lr_code_offset;
+#endif
+
+#ifdef ARCH_HAS_NPC_REGISTER
+    if (from_space_p(*os_context_npc_addr(context)))
+        *os_context_npc_addr(context) = *os_context_register_addr(context, reg_CODE) + npc_code_offset;
+#endif /* ARCH_HAS_NPC_REGISTER */
+}
+
+void
+scavenge_interrupt_contexts(void)
+{
+    int i, index;
+    os_context_t *context;
+
+    struct thread *th=arch_os_get_current_thread();
+
+    index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,0));
+
+#if defined(DEBUG_PRINT_CONTEXT_INDEX)
+    printf("Number of active contexts: %d\n", index);
+#endif
+
+    for (i = 0; i < index; i++) {
+        context = th->interrupt_contexts[i];
+        scavenge_interrupt_context(context);
+    }
+}
+
+#endif
+
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void
@@ -3679,6 +3885,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * initiates GC.  If you ever call GC from inside an altstack
      * handler, you will lose. */
 
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     /* And if we're saving a core, there's no point in being conservative. */
     if (conservative_stack) {
         for_each_thread(th) {
@@ -3713,6 +3920,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
             }
         }
     }
+#endif
+
 #ifdef QSHOW
     if (gencgc_verbose > 1) {
         long num_dont_move_pages = count_dont_move_pages();
@@ -3724,6 +3933,15 @@ garbage_collect_generation(generation_index_t generation, int raise)
 #endif
 
     /* Scavenge all the rest of the roots. */
+
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+    /*
+     * If not x86, we need to scavenge the interrupt context(s) and the
+     * control stack.
+     */
+    scavenge_interrupt_contexts();
+    scavenge_control_stack();
+#endif
 
     /* Scavenge the Lisp functions of the interrupt handlers, taking
      * care to avoid SIG_DFL and SIG_IGN. */
@@ -3738,7 +3956,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     {
         struct thread *th;
         for_each_thread(th) {
-            long len= (lispobj *)SymbolValue(BINDING_STACK_POINTER,th) -
+            long len= (lispobj *)get_binding_stack_pointer(th) -
                 th->binding_stack_start;
             scavenge((lispobj *) th->binding_stack_start,len);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -3876,8 +4094,7 @@ update_dynamic_space_free_pointer(void)
 
     last_free_page = last_page+1;
 
-    SetSymbolValue(ALLOCATION_POINTER,
-                   (lispobj)(((char *)heap_base) + last_free_page*PAGE_BYTES),0);
+    set_alloc_pointer((lispobj)(((char *)heap_base) + last_free_page*PAGE_BYTES));
     return 0; /* dummy value: return something ... */
 }
 
@@ -4028,7 +4245,9 @@ collect_garbage(generation_index_t last_gen)
     /* Save the high-water mark before updating last_free_page */
     if (last_free_page > high_water_mark)
         high_water_mark = last_free_page;
+
     update_dynamic_space_free_pointer();
+
     auto_gc_trigger = bytes_allocated + bytes_consed_between_gcs;
     if(gencgc_verbose)
         fprintf(stderr,"Next gc when %ld bytes have been consed\n",
@@ -4130,7 +4349,7 @@ gc_free_heap(void)
     gc_set_region_empty(&unboxed_region);
 
     last_free_page = 0;
-    SetSymbolValue(ALLOCATION_POINTER, (lispobj)((char *)heap_base),0);
+    set_alloc_pointer((lispobj)((char *)heap_base));
 
     if (verify_after_free_heap) {
         /* Check whether purify has left any bad pointers. */
@@ -4199,7 +4418,7 @@ static void
 gencgc_pickup_dynamic(void)
 {
     page_index_t page = 0;
-    long alloc_ptr = SymbolValue(ALLOCATION_POINTER,0);
+    long alloc_ptr = get_alloc_pointer();
     lispobj *prev=(lispobj *)page_address(page);
     generation_index_t gen = PSEUDO_STATIC_GENERATION;
 
@@ -4266,16 +4485,18 @@ alloc(long nbytes)
     void *new_obj;
     void *new_free_pointer;
     gc_assert(nbytes>0);
+
     /* Check for alignment allocation problems. */
     gc_assert((((unsigned long)region->free_pointer & LOWTAG_MASK) == 0)
               && ((nbytes & LOWTAG_MASK) == 0));
+
 #if 0
     if(all_threads)
         /* there are a few places in the C code that allocate data in the
          * heap before Lisp starts.  This is before interrupts are enabled,
          * so we don't need to check for pseudo-atomic */
 #ifdef LISP_FEATURE_SB_THREAD
-        if(!SymbolValue(PSEUDO_ATOMIC_ATOMIC,th)) {
+        if(!get_psuedo_atomic_atomic(th)) {
             register u32 fs;
             fprintf(stderr, "fatal error in thread 0x%x, tid=%ld\n",
                     th,th->os_thread);
@@ -4285,7 +4506,7 @@ alloc(long nbytes)
             lose("If you see this message before 2004.01.31, mail details to sbcl-devel\n");
         }
 #else
-    gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th));
+    gc_assert(get_pseudo_atomic_atomic(th));
 #endif
 #endif
 
@@ -4301,7 +4522,7 @@ alloc(long nbytes)
      * we should GC in the near future
      */
     if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
-        gc_assert(fixnum_value(SymbolValue(PSEUDO_ATOMIC_ATOMIC,thread)));
+        gc_assert(get_pseudo_atomic_atomic(thread));
         /* Don't flood the system with interrupts if the need to gc is
          * already noted. This can happen for example when SUB-GC
          * allocates or after a gc triggered in a WITHOUT-GCING. */
@@ -4310,7 +4531,7 @@ alloc(long nbytes)
              * section */
             SetSymbolValue(GC_PENDING,T,thread);
             if (SymbolValue(GC_INHIBIT,thread) == NIL)
-                arch_set_pseudo_atomic_interrupted(0);
+              set_pseudo_atomic_interrupted(0);
         }
     }
     new_obj = gc_alloc_with_region(nbytes,0,region,0);
@@ -4368,7 +4589,8 @@ gencgc_handle_wp_violation(void* fault_addr)
              * does this test after the first one has already set wp=0
              */
             if(page_table[page_index].write_protected_cleared != 1)
-                lose("fault in heap page not marked as write-protected\n");
+                lose("fault in heap page %d not marked as write-protected\nboxed_region.first_page: %d, boxed_region.last_page %d\n",
+                     page_index, boxed_region.first_page, boxed_region.last_page);
         }
         /* Don't worry, we can handle it. */
         return 1;

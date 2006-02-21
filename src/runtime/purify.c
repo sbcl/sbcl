@@ -37,17 +37,9 @@
 
 #define PRINTNOISE
 
-#if defined(LISP_FEATURE_GENCGC)
-/* this is another artifact of the poor integration between gencgc and
- * the rest of the runtime: on cheney gc there is a global
- * dynamic_space_free_pointer which is valid whenever foreign function
- * call is active, but in gencgc there's no such variable and we have
- * to keep our own
- */
-static lispobj *dynamic_space_free_pointer;
-#endif
-
 extern unsigned long bytes_consed_between_gcs;
+
+static lispobj *dynamic_space_purify_pointer;
 
 
 /* These hold the original end of the read_only and static spaces so
@@ -102,12 +94,12 @@ dynamic_pointer_p(lispobj ptr)
 #ifndef LISP_FEATURE_GENCGC
     return (ptr >= (lispobj)current_dynamic_space
             &&
-            ptr < (lispobj)dynamic_space_free_pointer);
+            ptr < (lispobj)dynamic_space_purify_pointer);
 #else
     /* Be more conservative, and remember, this is a maybe. */
     return (ptr >= (lispobj)DYNAMIC_SPACE_START
             &&
-            ptr < (lispobj)dynamic_space_free_pointer);
+            ptr < (lispobj)dynamic_space_purify_pointer);
 #endif
 }
 
@@ -1453,8 +1445,14 @@ purify(lispobj static_roots, lispobj read_only_roots)
     }
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-    dynamic_space_free_pointer =
+    dynamic_space_purify_pointer =
       (lispobj*)SymbolValue(ALLOCATION_POINTER,0);
+#else
+#if defined(LISP_FEATURE_GENCGC)
+    dynamic_space_purify_pointer = get_alloc_pointer();
+#else
+    dynamic_space_purify_pointer = dynamic_space_free_pointer;
+#endif
 #endif
 
     read_only_end = read_only_free =
@@ -1597,15 +1595,11 @@ purify(lispobj static_roots, lispobj read_only_roots)
     SetSymbolValue(READ_ONLY_SPACE_FREE_POINTER, (lispobj)read_only_free,0);
     SetSymbolValue(STATIC_SPACE_FREE_POINTER, (lispobj)static_free,0);
 
-#if !defined(ALLOCATION_POINTER)
-    dynamic_space_free_pointer = current_dynamic_space;
-    set_auto_gc_trigger(bytes_consed_between_gcs);
-#else
 #if defined LISP_FEATURE_GENCGC
     gc_free_heap();
 #else
-#error unsupported case /* in CMU CL, was "ibmrt using GC" */
-#endif
+    dynamic_space_free_pointer = current_dynamic_space;
+    set_auto_gc_trigger(bytes_consed_between_gcs);
 #endif
 
     /* Blast away instruction cache */

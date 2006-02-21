@@ -24,11 +24,13 @@
   (:temporary (:scs (descriptor-reg) :type list :to (:result 0) :target result)
               res)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
+  (:temporary (:scs (non-descriptor-reg)) alloc-temp)
   (:info num)
   (:results (result :scs (descriptor-reg)))
   (:variant-vars star)
   (:policy :safe)
   (:node-var node)
+  #!-gencgc (:ignore alloc-temp)
   (:generator 0
     (cond ((zerop num)
            (move result null-tn))
@@ -47,14 +49,15 @@
              (let* ((dx-p (node-stack-allocate-p node))
                     (cons-cells (if star (1- num) num))
                     (alloc (* (pad-data-block cons-size) cons-cells)))
-               (pseudo-atomic (pa-flag :extra (if dx-p 0 alloc))
-                 (let ((allocation-area-tn (if dx-p csp-tn alloc-tn)))
-                   (when dx-p
-                     (align-csp res))
-                   (inst clrrwi res allocation-area-tn n-lowtag-bits)
-                   (inst ori res res list-pointer-lowtag)
-                   (when dx-p
-                     (inst addi csp-tn csp-tn alloc)))
+               (pseudo-atomic (pa-flag)
+                 (if dx-p
+                     (progn
+                       (align-csp res)
+                       (inst clrrwi res csp-tn n-lowtag-bits)
+                       (inst ori res res list-pointer-lowtag)
+                       (inst addi csp-tn csp-tn alloc))
+                     (allocation res alloc list-pointer-lowtag :temp-tn alloc-temp
+                                 :flag-tn pa-flag))
                  (move ptr res)
                  (dotimes (i (1- cons-cells))
                    (storew (maybe-load (tn-ref-tn things)) ptr
@@ -86,6 +89,7 @@
          (unboxed-arg :scs (any-reg)))
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:temporary (:scs (non-descriptor-reg)) size)
   (:temporary (:scs (any-reg) :from (:argument 0)) boxed)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) unboxed)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
@@ -99,9 +103,8 @@
       ;; Note: we don't have to subtract off the 4 that was added by
       ;; pseudo-atomic, because oring in other-pointer-lowtag just adds
       ;; it right back.
-      (inst ori result alloc-tn other-pointer-lowtag)
-      (inst add alloc-tn alloc-tn boxed)
-      (inst add alloc-tn alloc-tn unboxed)
+      (inst add size boxed unboxed)
+      (allocation result size other-pointer-lowtag :temp-tn ndescr :flag-tn pa-flag)
       (inst slwi ndescr boxed (- n-widetag-bits word-shift))
       (inst ori ndescr ndescr code-header-widetag)
       (storew ndescr result 0 other-pointer-lowtag)
@@ -131,21 +134,23 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (let* ((size (+ length closure-info-offset))
-           (alloc-size (pad-data-block size))
-           (allocation-area-tn (if stack-allocate-p csp-tn alloc-tn)))
-      (pseudo-atomic (pa-flag :extra (if stack-allocate-p 0 alloc-size))
-        (when stack-allocate-p
-          (align-csp result))
-        (inst clrrwi. result allocation-area-tn n-lowtag-bits)
-        (when stack-allocate-p
-          (inst addi csp-tn csp-tn alloc-size))
-        (inst ori result result fun-pointer-lowtag)
-        (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag))
-        (storew temp result 0 fun-pointer-lowtag)))
-    ;(inst lis temp (ash 18 10))
-    ;(storew temp result closure-jump-insn-slot function-pointer-type)
-    (storew result result closure-self-slot fun-pointer-lowtag)
-    (storew function result closure-fun-slot fun-pointer-lowtag)))
+           (alloc-size (pad-data-block size)))
+      (pseudo-atomic (pa-flag)
+        (if stack-allocate-p
+            (progn
+              (align-csp result)
+              (inst clrrwi. result csp-tn n-lowtag-bits)
+              (inst addi csp-tn csp-tn alloc-size)
+              (inst ori result result fun-pointer-lowtag)
+              (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag)))
+            (progn
+              (allocation result (pad-data-block size)
+                          fun-pointer-lowtag :temp-tn temp :flag-tn pa-flag)
+              (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag))))
+        ;;; should this be closure-fun-slot instead of 0?
+        (storew temp result 0 fun-pointer-lowtag)
+        (storew result result closure-self-slot fun-pointer-lowtag)
+        (storew function result closure-fun-slot fun-pointer-lowtag)))))
 
 ;;; The compiler likes to be able to directly make value cells.
 ;;;
@@ -176,24 +181,18 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:generator 4
-    (pseudo-atomic (pa-flag :extra (pad-data-block words))
-      (cond ((logbitp 2 lowtag)
-             (inst ori result alloc-tn lowtag))
-            (t
-             (inst clrrwi result alloc-tn n-lowtag-bits)
-             (inst ori result  result lowtag)))
-      (when type
-        (inst lr temp (logior (ash (1- words) n-widetag-bits) type))
-        (storew temp result 0 lowtag)))))
+    (with-fixed-allocation (result pa-flag temp type words :lowtag lowtag)
+      )))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
   (:arg-types positive-fixnum)
   (:info name words type lowtag)
-  (:ignore name)
+  (:ignore name #!-gencgc temp)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (any-reg)) bytes)
   (:temporary (:scs (non-descriptor-reg)) header)
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:generator 6
     (inst addi bytes extra (* (1+ words) n-word-bytes))
@@ -201,10 +200,5 @@
     (inst addi header header (+ (ash -2 n-widetag-bits) type))
     (inst clrrwi bytes bytes n-lowtag-bits)
     (pseudo-atomic (pa-flag)
-      (cond ((logbitp 2 lowtag)
-             (inst ori result alloc-tn lowtag))
-            (t
-             (inst clrrwi result alloc-tn n-lowtag-bits)
-             (inst ori result result lowtag)))
-      (storew header result 0 lowtag)
-      (inst add alloc-tn alloc-tn bytes))))
+      (allocation result bytes lowtag :temp-tn temp :flag-tn pa-flag)
+      (storew header result 0 lowtag))))

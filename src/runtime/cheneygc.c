@@ -47,7 +47,6 @@ lispobj *new_space;
 lispobj *new_space_free_pointer;
 
 static void scavenge_newspace(void);
-static void scavenge_interrupt_contexts(void);
 
 extern unsigned long bytes_consed_between_gcs;
 

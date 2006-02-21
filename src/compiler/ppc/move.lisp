@@ -224,20 +224,16 @@
   (:generator 20
     (move x arg)
     (let ((done (gen-label))
-          (one-word (gen-label))
-          (initial-alloc (pad-data-block (1+ bignum-digits-offset))))
+          (one-word (gen-label)))
       (inst srawi. temp x 29)
       (inst slwi y x 2)
       (inst beq done)
 
-      (pseudo-atomic (pa-flag :extra initial-alloc)
+      (with-fixed-allocation
+          (y pa-flag temp bignum-widetag (+ 2 bignum-digits-offset))
         (inst cmpwi x 0)
-        (inst ori y alloc-tn other-pointer-lowtag)
         (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
         (inst bge one-word)
-        (inst addi alloc-tn alloc-tn
-              (- (pad-data-block (+ bignum-digits-offset 2))
-                 (pad-data-block (+ bignum-digits-offset 1))))
         (inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))
         (emit-label one-word)
         (storew temp y 0 other-pointer-lowtag)

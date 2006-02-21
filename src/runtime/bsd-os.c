@@ -188,25 +188,25 @@ is_valid_lisp_addr(os_vm_address_t addr)
 static void
 memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
-    /* The way that we extract low level information like the fault
-     * address is not specified by POSIX. */
-#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
-    void *fault_addr = siginfo->si_addr;
-#elif defined LISP_FEATURE_DARWIN
-    void *fault_addr = siginfo->si_addr;
-#else
-#error unsupported BSD variant
-#endif
-
     os_context_t *context = arch_os_get_context(&void_context);
+    void *fault_addr = arch_get_bad_addr(signal, siginfo, context);
+
     if (!gencgc_handle_wp_violation(fault_addr))
-        if(!handle_guard_page_triggered(context,fault_addr))
+        if(!handle_guard_page_triggered(context,fault_addr)) {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
 #else
-            interrupt_handle_now(signal, siginfo, context);
+            if (!interrupt_maybe_gc_int(signal, siginfo, context)) {
+                interrupt_handle_now(signal, siginfo, context);
+            }
+#if defined(LISP_FEATURE_DARWIN)
+            /* Work around G5 bug; fix courtesy gbyers */
+            DARWIN_FIX_CONTEXT(context);
 #endif
+#endif
+        }
 }
+
 void
 os_install_interrupt_handlers(void)
 {

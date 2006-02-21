@@ -10,6 +10,10 @@
 #include "interrupt.h"
 #include "interr.h"
 
+#if defined(LISP_FEATURE_GENCGC)
+#include "gencgc-alloc-region.h"
+#endif
+
   /* The header files may not define PT_DAR/PT_DSISR.  This definition
      is correct for all versions of ppc linux >= 2.0.30
 
@@ -37,19 +41,8 @@ void arch_init() {
 os_vm_address_t
 arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
-    unsigned int *pc =  (unsigned int *)(*os_context_pc_addr(context));
+    unsigned long pc =  (unsigned long)(*os_context_pc_addr(context));
     os_vm_address_t addr;
-
-
-    /* Make sure it's not the pc thats bogus, and that it was lisp code */
-    /* that caused the fault. */
-    if ((((unsigned long)pc) & 3) != 0 ||
-        ((pc < READ_ONLY_SPACE_START ||
-          pc >= READ_ONLY_SPACE_START+READ_ONLY_SPACE_SIZE) &&
-         ((lispobj *)pc < current_dynamic_space ||
-          (lispobj *)pc >= current_dynamic_space + DYNAMIC_SPACE_SIZE)))
-        return 0;
-
 
     addr = (os_vm_address_t) (*os_context_register_addr(context,PT_DAR));
     return addr;
@@ -77,13 +70,16 @@ arch_pseudo_atomic_atomic(os_context_t *context)
     return ((*os_context_register_addr(context,reg_ALLOC)) & 4);
 }
 
-#define PSEUDO_ATOMIC_INTERRUPTED_BIAS 0x7f000000
-
 void
 arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    *os_context_register_addr(context,reg_NL3)
-        += PSEUDO_ATOMIC_INTERRUPTED_BIAS;
+    *os_context_register_addr(context,reg_ALLOC) |= 1;
+}
+
+void
+arch_clear_pseudo_atomic_interrupted(os_context_t *context)
+{
+    *os_context_register_addr(context,reg_ALLOC) &= ~1;
 }
 
 unsigned int
@@ -138,25 +134,263 @@ arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
     skipped_break_addr = pc;
 }
 
+#ifdef LISP_FEATURE_GENCGC
+/*
+ * Return non-zero if the current instruction is an allocation trap
+ */
+static int
+allocation_trap_p(os_context_t * context)
+{
+    int result;
+    unsigned int *pc;
+    unsigned inst;
+    unsigned opcode;
+    unsigned src;
+    unsigned dst;
+
+    result = 0;
+
+    /*
+     * First, the instruction has to be a TWLGE temp, NL3, which has the
+     * format.
+     * | 6| 5| 5 | 5 | 10|1|  width
+     * |31|5 |dst|src|  4|0|  field
+     */
+    pc = (unsigned int *) (*os_context_pc_addr(context));
+    inst = *pc;
+
+#if 0
+    fprintf(stderr, "allocation_trap_p at %p:  inst = 0x%08x\n", pc, inst);
+#endif
+
+    opcode = inst >> 26;
+    src = (inst >> 11) & 0x1f;
+    dst = (inst >> 16) & 0x1f;
+    if ((opcode == 31) && (src == reg_NL3) && (5 == ((inst >> 21) & 0x1f))
+        && (4 == ((inst >> 1) & 0x3ff))) {
+        /*
+         * We got the instruction.  Now, look back to make sure it was
+         * proceeded by what we expected.  2 instructions back should be
+         * an ADD or ADDI instruction.
+         */
+        unsigned int add_inst;
+
+        add_inst = pc[-3];
+#if 0
+        fprintf(stderr, "   add inst at %p:  inst = 0x%08x\n",
+                pc - 3, add_inst);
+#endif
+        opcode = add_inst >> 26;
+        if ((opcode == 31) && (266 == ((add_inst >> 1) & 0x1ff))) {
+            return 1;
+        } else if ((opcode == 14)) {
+            return 1;
+        } else {
+            fprintf(stderr,
+                    "Whoa! Got allocation trap but could not find ADD or ADDI instruction: 0x%08x in the proper place\n",
+                    add_inst);
+        }
+    }
+    return 0;
+}
+
+extern struct alloc_region boxed_region;
+
+void
+handle_allocation_trap(os_context_t * context)
+{
+    unsigned int *pc;
+    unsigned int inst;
+    unsigned int or_inst;
+    unsigned int target, target_ptr, end_addr;
+    unsigned int opcode;
+    int size;
+    int immed;
+    boolean were_in_lisp;
+    char *memory;
+    sigset_t block;
+
+    target = 0;
+    size = 0;
+
+#if 0
+    fprintf(stderr, "In handle_allocation_trap\n");
+#endif
+
+    /*
+     * I don't think it's possible for us NOT to be in lisp when we get
+     * here.  Remove this later?
+     */
+    were_in_lisp = !foreign_function_call_active;
+
+    if (were_in_lisp) {
+        fake_foreign_function_call(context);
+    } else {
+        fprintf(stderr, "**** Whoa! allocation trap and we weren't in lisp!\n");
+    }
+
+    /*
+     * Look at current instruction: TWNE temp, NL3. We're here because
+     * temp > NL3 and temp is the end of the allocation, and NL3 is
+     * current-region-end-addr.
+     *
+     * We need to adjust temp and alloc-tn.
+     */
+
+    pc = (unsigned int *) (*os_context_pc_addr(context));
+    inst = pc[0];
+    end_addr = (inst >> 11) & 0x1f;
+    target = (inst >> 16) & 0x1f;
+
+    target_ptr = *os_context_register_addr(context, target);
+
+#if 0
+    fprintf(stderr, "handle_allocation_trap at %p:\n", pc);
+    fprintf(stderr, "boxed_region.free_pointer: %p\n", boxed_region.free_pointer);
+    fprintf(stderr, "boxed_region.end_addr: %p\n", boxed_region.end_addr);
+    fprintf(stderr, "target reg: %d, end_addr reg: %d\n", target, end_addr);
+    fprintf(stderr, "target: %x\n", *os_context_register_addr(context, target));
+    fprintf(stderr, "end_addr: %x\n", *os_context_register_addr(context, end_addr));
+#endif
+
+#if 0
+    fprintf(stderr, "handle_allocation_trap at %p:\n", pc);
+    fprintf(stderr, "  trap inst = 0x%08x\n", inst);
+    fprintf(stderr, "  target reg = %s\n", lisp_register_names[target]);
+#endif
+
+    /*
+     * Go back and look at the add/addi instruction.  The second src arg
+     * is the size of the allocation.  Get it and call alloc to allocate
+     * new space.
+     */
+    inst = pc[-3];
+    opcode = inst >> 26;
+#if 0
+    fprintf(stderr, "  add inst  = 0x%08x, opcode = %d\n", inst, opcode);
+#endif
+    if (opcode == 14) {
+        /*
+         * ADDI temp-tn, alloc-tn, size
+         *
+         * Extract the size
+         */
+        size = (inst & 0xffff);
+    } else if (opcode == 31) {
+        /*
+         * ADD temp-tn, alloc-tn, size-tn
+         *
+         * Extract the size
+         */
+        int reg;
+
+        reg = (inst >> 11) & 0x1f;
+#if 0
+        fprintf(stderr, "  add, reg = %s\n", lisp_register_names[reg]);
+#endif
+        size = *os_context_register_addr(context, reg);
+
+    }
+
+#if 0
+    fprintf(stderr, "Alloc %d to %s\n", size, lisp_register_names[target]);
+#endif
+
+#if INLINE_ALLOC_DEBUG
+    if ((((unsigned long)boxed_region.end_addr + size) / PAGE_SIZE) ==
+        (((unsigned long)boxed_region.end_addr) / PAGE_SIZE)) {
+      fprintf(stderr,"*** possibly bogus trap allocation of %d bytes at %p\n",
+              size, target_ptr);
+      fprintf(stderr, "    dynamic_space_free_pointer: %p, boxed_region.end_addr %p\n",
+              dynamic_space_free_pointer, boxed_region.end_addr);
+    }
+#endif
+
+#if 0
+    fprintf(stderr, "Ready to alloc\n");
+    fprintf(stderr, "free_pointer = 0x%08x\n",
+            dynamic_space_free_pointer);
+#endif
+
+    /*
+     * alloc-tn was incremented by size.  Need to decrement it by size
+     * to restore its original value. This is not true on GENCGC
+     * anymore. d_s_f_p and reg_alloc get out of sync, but the p_a
+     * bits stay intact and we set it to the proper value when it
+     * needs to be. Keep this comment here for the moment in case
+     * somebody tries to figure out what happened here.
+     */
+    /*    dynamic_space_free_pointer =
+        (lispobj *) ((long) dynamic_space_free_pointer - size);
+    */
+#if 0
+    fprintf(stderr, "free_pointer = 0x%08x new\n",
+            dynamic_space_free_pointer);
+#endif
+
+    memory = (char *) alloc(size);
+
+#if 0
+    fprintf(stderr, "alloc returned %p\n", memory);
+    fprintf(stderr, "free_pointer = 0x%08x\n",
+            dynamic_space_free_pointer);
+#endif
+
+    /*
+     * The allocation macro wants the result to point to the end of the
+     * object!
+     */
+    memory += size;
+
+#if 0
+    fprintf(stderr, "object end at %p\n", memory);
+#endif
+
+    *os_context_register_addr(context, target) = (unsigned long) memory;
+    *os_context_register_addr(context, reg_ALLOC) =
+      (unsigned long) dynamic_space_free_pointer
+      | (*os_context_register_addr(context, reg_ALLOC)
+         & LOWTAG_MASK);
+
+    if (were_in_lisp) {
+        undo_fake_foreign_function_call(context);
+    }
+
+
+}
+#endif
+
+
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
     unsigned int code;
+
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif
     code=*((u32 *)(*os_context_pc_addr(context)));
-    if (code == ((3 << 26) | (16 << 21) | (reg_ALLOC << 16))) {
-        /* twlti reg_ALLOC,0 - check for deferred interrupt */
-        *os_context_register_addr(context,reg_ALLOC)
-            -= PSEUDO_ATOMIC_INTERRUPTED_BIAS;
+    if (code == ((3 << 26) | (0x18 << 21) | (reg_NL3 << 16))) {
+        arch_clear_pseudo_atomic_interrupted(context);
         arch_skip_instruction(context);
         /* interrupt or GC was requested in PA; now we're done with the
            PA section we may as well get around to it */
         interrupt_handle_pending(context);
         return;
-
     }
+
+#ifdef LISP_FEATURE_GENCGC
+    /* Is this an allocation trap? */
+    if (allocation_trap_p(context)) {
+        handle_allocation_trap(context);
+        arch_skip_instruction(context);
+#ifdef LISP_FEATURE_DARWIN
+        DARWIN_FIX_CONTEXT(context);
+#endif
+        return;
+    }
+#endif
+
     if ((code >> 16) == ((3 << 10) | (6 << 5))) {
         /* twllei reg_ZERO,N will always trap if reg_ZERO = 0 */
         int trap = code & 0x1f;

@@ -85,6 +85,12 @@ void arch_set_pseudo_atomic_interrupted(os_context_t *context)
     *os_context_register_addr(context,reg_ALLOC) |=  1;
 }
 
+/* FIXME: untested */
+void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
+{
+    *os_context_register_addr(context,reg_ALLOC) &= ~1;
+}
+
 void arch_skip_instruction(os_context_t *context)
 {
     ((char *) *os_context_pc_addr(context)) = ((char *) *os_context_npc_addr(context));
