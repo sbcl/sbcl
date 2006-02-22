@@ -403,7 +403,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
         break;
 
     case 0x10:
-	arch_clear_pseudo_atomic_interrupted(context)
+        arch_clear_pseudo_atomic_interrupted(context)
         arch_skip_instruction(context);
         interrupt_handle_pending(context);
         return;

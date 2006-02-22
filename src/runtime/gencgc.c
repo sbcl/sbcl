@@ -4531,7 +4531,7 @@ alloc(long nbytes)
              * section */
             SetSymbolValue(GC_PENDING,T,thread);
             if (SymbolValue(GC_INHIBIT,thread) == NIL)
-              set_pseudo_atomic_interrupted(0);
+              set_pseudo_atomic_interrupted(thread);
         }
     }
     new_obj = gc_alloc_with_region(nbytes,0,region,0);

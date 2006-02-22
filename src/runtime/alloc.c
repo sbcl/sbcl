@@ -58,16 +58,16 @@ pa_alloc(int bytes)
          * we push it onto the lisp control stack, and read it back
          * off after any potential GC has finished */
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-#ifdef LISP_FEATURE_STACK_GROWS_DOWNARD_NOT_UPWARD
+#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
 #error "!C_STACK_IS_CONTROL_STACK and STACK_GROWS_DOWNWARD_NOT_UPWARD is not supported"
 #endif
-        current_control_stack_pointer += 1;
         *current_control_stack_pointer = result;
+        current_control_stack_pointer += 1;
 #endif
         do_pending_interrupt();
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-        result = *current_control_stack_pointer;
         current_control_stack_pointer -= 1;
+        result = *current_control_stack_pointer;
 #endif
     }
 #else
