@@ -798,6 +798,10 @@ retained, possibly temporariliy, because it might be used internally."
                "INFO"
                "MAKE-INFO-ENVIRONMENT"
 
+               ;; Constant form evaluation
+               "CONSTANT-FORM-VALUE"
+               "CONSTANT-TYPEP"
+
                ;; stepping control
                "*STEPPING*" "*STEP*"
 
@@ -1576,6 +1580,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "!VM-TYPE-COLD-INIT" "!BACKQ-COLD-INIT"
                "!SHARPM-COLD-INIT" "!EARLY-PROCLAIM-COLD-INIT"
                "!LATE-PROCLAIM-COLD-INIT" "!CLASS-FINALIZE"
+               "!CONSTANTP-COLD-INIT"
 
                "GC-REINIT"
                "SIGNAL-COLD-INIT-OR-REINIT"

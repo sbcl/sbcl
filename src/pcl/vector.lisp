@@ -586,7 +586,7 @@
                  (when (and class-name (not (eq class-name t)))
                    (position parameter-or-nil slots :key #'car))))))
       (if (constantp form)
-          (let ((form (eval form)))
+          (let ((form (constant-form-value form)))
             (if (symbolp form)
                 form
                 *unspecific-arg*))
@@ -630,8 +630,9 @@
 ;;; It is safe for these two functions to be wrong. They just try to
 ;;; guess what the most likely case will be.
 (defun generate-fast-class-slot-access-p (class-form slot-name-form)
-  (let ((class (and (constantp class-form) (eval class-form)))
-        (slot-name (and (constantp slot-name-form) (eval slot-name-form))))
+  (let ((class (and (constantp class-form) (constant-form-value class-form)))
+        (slot-name (and (constantp slot-name-form)
+                        (constant-form-value slot-name-form))))
     (and (eq *boot-state* 'complete)
          (standard-class-p class)
          (not (eq class *the-class-t*)) ; shouldn't happen, though.
@@ -639,8 +640,9 @@
            (and slotd (eq :class (slot-definition-allocation slotd)))))))
 
 (defun skip-fast-slot-access-p (class-form slot-name-form type)
-  (let ((class (and (constantp class-form) (eval class-form)))
-        (slot-name (and (constantp slot-name-form) (eval slot-name-form))))
+  (let ((class (and (constantp class-form) (constant-form-value class-form)))
+        (slot-name (and (constantp slot-name-form)
+                        (constant-form-value slot-name-form))))
     (and (eq *boot-state* 'complete)
          (standard-class-p class)
          (not (eq class *the-class-t*)) ; shouldn't happen, though.

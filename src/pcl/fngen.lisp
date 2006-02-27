@@ -60,8 +60,7 @@
           (compute-constants lambda constant-converter)))
 
 (defun default-constantp (form)
-  (and (constantp form)
-       (not (typep (eval form) '(or symbol fixnum)))))
+  (constant-typep form '(not (or symbol fixnum))))
 
 (defun default-test-converter (form)
   (if (default-constantp form)
@@ -75,7 +74,7 @@
 
 (defun default-constant-converter (form)
   (if (default-constantp form)
-      (list (eval form))
+      (list (constant-form-value form))
       nil))
 
 ;;; *FGENS* is a list of all the function generators we have so far. Each

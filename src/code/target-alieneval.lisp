@@ -235,7 +235,7 @@
                 (when (constantp size)
                   (setf alien-type (copy-alien-array-type alien-type))
                   (setf (alien-array-type-dimensions alien-type)
-                        (cons (eval size) (cdr dims)))))
+                        (cons (constant-form-value size) (cdr dims)))))
                (dims
                 (setf size (car dims)))
                (t

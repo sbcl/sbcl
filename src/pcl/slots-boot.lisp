@@ -48,7 +48,7 @@
 
 (defmacro accessor-slot-value (object slot-name)
   (aver (constantp slot-name))
-  (let* ((slot-name (eval slot-name))
+  (let* ((slot-name (constant-form-value slot-name))
          (reader-name (slot-reader-name slot-name)))
     `(let ((.ignore. (load-time-value
                       (ensure-accessor 'reader ',reader-name ',slot-name))))
@@ -60,7 +60,7 @@
   (aver (constantp slot-name))
   (setq object (macroexpand object env))
   (setq slot-name (macroexpand slot-name env))
-  (let* ((slot-name (eval slot-name))
+  (let* ((slot-name (constant-form-value slot-name))
          (bindings (unless (or (constantp new-value) (atom new-value))
                      (let ((object-var (gensym)))
                        (prog1 `((,object-var ,object))
@@ -80,7 +80,7 @@
 
 (defmacro accessor-slot-boundp (object slot-name)
   (aver (constantp slot-name))
-  (let* ((slot-name (eval slot-name))
+  (let* ((slot-name (constant-form-value slot-name))
          (boundp-name (slot-boundp-name slot-name)))
     `(let ((.ignore. (load-time-value
                       (ensure-accessor 'boundp ',boundp-name ',slot-name))))

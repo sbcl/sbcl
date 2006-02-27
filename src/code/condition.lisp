@@ -529,8 +529,8 @@
                      :initform-p ',initform-p
                      :documentation ',documentation
                      :initform
-                     ,(if (constantp initform)
-                          `',(eval initform)
+                     ,(if (sb!xc:constantp initform)
+                          `',(constant-form-value initform)
                           `#'(lambda () ,initform)))))))
 
       (dolist (option options)
@@ -553,8 +553,8 @@
              (let ((val (second initargs)))
                (setq default-initargs
                      (list* `',(first initargs)
-                            (if (constantp val)
-                                `',(eval val)
+                            (if (sb!xc:constantp val)
+                                `',(constant-form-value val)
                                 `#'(lambda () ,val))
                             default-initargs)))))
           (t

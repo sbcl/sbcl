@@ -389,6 +389,7 @@
 
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
  ("src/compiler/knownfun")
+ ("src/compiler/constantp")
 
  ;; needs FUN-INFO structure slot setters, defined in knownfun.lisp
  ("src/compiler/fun-info-funs")

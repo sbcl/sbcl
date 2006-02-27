@@ -90,7 +90,7 @@
 
 (define-compiler-macro slot-value (&whole form object slot-name)
   (if (and (constantp slot-name)
-           (interned-symbol-p (eval slot-name)))
+           (interned-symbol-p (constant-form-value slot-name)))
       `(accessor-slot-value ,object ,slot-name)
       form))
 
@@ -105,7 +105,7 @@
 
 (define-compiler-macro set-slot-value (&whole form object slot-name new-value)
   (if (and (constantp slot-name)
-           (interned-symbol-p (eval slot-name)))
+           (interned-symbol-p (constant-form-value slot-name)))
       `(accessor-set-slot-value ,object ,slot-name ,new-value)
       form))
 
@@ -120,7 +120,7 @@
 
 (define-compiler-macro slot-boundp (&whole form object slot-name)
   (if (and (constantp slot-name)
-           (interned-symbol-p (eval slot-name)))
+           (interned-symbol-p (constant-form-value slot-name)))
       `(accessor-slot-boundp ,object ,slot-name)
       form))
 

@@ -499,14 +499,11 @@
   (with-fun-name-leaf (leaf thing start :global t)
     (reference-leaf start next result leaf)))
 
-(defun constant-global-fun-name-p (thing)
-  ;; FIXME: Once we have a marginally better CONSTANTP and
-  ;; CONSTANT-VALUE we can use those instead.
-  (and (consp thing)
-       (eq 'quote (car thing))
-       (null (cddr thing))
-       (legal-fun-name-p (cadr thing))
-       t))
+(defun constant-global-fun-name (thing)
+  (let ((constantp (sb!xc:constantp thing)))
+    (and constantp
+         (let ((name (constant-form-value thing)))
+           (and (legal-fun-name-p name) name)))))
 
 ;;;; FUNCALL
 
@@ -540,12 +537,12 @@
 ;;; directly to %FUNCALL, instead of waiting around for type
 ;;; inference.
 (define-source-transform funcall (function &rest args)
-  (cond ((and (consp function) (eq (car function) 'function))
-         `(%funcall ,function ,@args))
-        ((constant-global-fun-name-p function)
-         `(%funcall (global-function ,(second function)) ,@args))
-        (t
-         (values nil t))))
+  (if (and (consp function) (eq (car function) 'function))
+      `(%funcall ,function ,@args)
+      (let ((name (constant-global-fun-name function)))
+        (if name
+            `(%funcall (global-function ,name) ,@args)
+            (values nil t)))))
 
 (deftransform %coerce-callable-to-fun ((thing) (function) *)
   "optimize away possible call to FDEFINITION at runtime"
@@ -1026,12 +1023,12 @@
                    ;; MV-COMBINATIONS.
                    (make-combination fun-lvar))))
     (ir1-convert start ctran fun-lvar
-                 (cond ((and (consp fun) (eq (car fun) 'function))
-                        fun)
-                       ((constant-global-fun-name-p fun)
-                        `(global-function ,(second fun)))
-                       (t
-                        `(%coerce-callable-to-fun ,fun))))
+                 (if (and (consp fun) (eq (car fun) 'function))
+                     fun
+                     (let ((name (constant-global-fun-name fun)))
+                       (if name
+                           `(global-function ,name)
+                           `(%coerce-callable-to-fun ,fun)))))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
       (let ((this-start ctran))

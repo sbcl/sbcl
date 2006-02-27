@@ -503,27 +503,21 @@ code to be loaded.
 ;;;; code analysis stuff
 
 (defun loop-constant-fold-if-possible (form &optional expected-type)
-  (let ((new-form form) (constantp nil) (constant-value nil))
-    (when (setq constantp (constantp new-form))
-      (setq constant-value (eval new-form)))
+  (let* ((constantp (sb!xc:constantp form))
+         (value (and constantp (sb!int:constant-form-value form))))
     (when (and constantp expected-type)
-      (unless (sb!xc:typep constant-value expected-type)
+      (unless (sb!xc:typep value expected-type)
         (loop-warn "~@<The form ~S evaluated to ~S, which was not of ~
                     the anticipated type ~S.~:@>"
-                   form constant-value expected-type)
-        (setq constantp nil constant-value nil)))
-    (values new-form constantp constant-value)))
-
-(defun loop-constantp (form)
-  (constantp form))
+                   form value expected-type)
+        (setq constantp nil value nil)))
+    (values form constantp value)))
 
 ;;;; LOOP iteration optimization
 
-(defvar *loop-duplicate-code*
-        nil)
+(defvar *loop-duplicate-code* nil)
 
-(defvar *loop-iteration-flag-var*
-        (make-symbol "LOOP-NOT-FIRST-TIME"))
+(defvar *loop-iteration-flag-var* (make-symbol "LOOP-NOT-FIRST-TIME"))
 
 (defun loop-code-duplication-threshold (env)
   (declare (ignore env))
@@ -1067,7 +1061,7 @@ code to be loaded.
         (t (error "invalid LOOP variable passed in: ~S" name))))
 
 (defun loop-maybe-bind-form (form data-type)
-  (if (loop-constantp form)
+  (if (constantp form)
       form
       (loop-make-var (gensym "LOOP-BIND-") form data-type)))
 

@@ -406,7 +406,7 @@ bootstrapping.
                       (if (consp s)
                           (and (eq (car s) 'eql)
                                (constantp (cadr s))
-                               (let ((sv (eval (cadr s))))
+                               (let ((sv (constant-form-value (cadr s))))
                                  (or (interned-symbol-p sv)
                                      (integerp sv)
                                      (and (characterp sv)
@@ -713,7 +713,7 @@ bootstrapping.
                (constant-value-p (and (null (cdr real-body))
                                       (constantp (car real-body))))
                (constant-value (and constant-value-p
-                                    (eval (car real-body))))
+                                    (constant-form-value (car real-body))))
                (plist (and constant-value-p
                            (or (typep constant-value
                                       '(or number character))
@@ -953,7 +953,7 @@ bootstrapping.
   ;; broken if RESTP evaluates to a non-self-evaluating form. E.g. if
   ;;   (INVOKE-EFFECTIVE-METHOD-FUNCTION EMF '(ERROR "gotcha") ...)
   ;; then TRACE-EMF-CALL-CALL-INTERNAL might die on a gotcha error.
-  (setq restp (eval restp))
+  (setq restp (constant-form-value restp))
   `(progn
      (trace-emf-call ,emf ,restp (list ,@required-args+rest-arg))
      (cond ((typep ,emf 'fast-method-call)

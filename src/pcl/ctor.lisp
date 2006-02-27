@@ -86,7 +86,7 @@
 
 (defun constant-symbol-p (form)
   (and (constantp form)
-       (let ((constant (eval form)))
+       (let ((constant (constant-form-value form)))
          (and (symbolp constant)
               (not (null (symbol-package constant)))))))
 
@@ -183,7 +183,7 @@
              (loop for (key . more) on args by #'cddr do
                      (when (or (null more)
                                (not (constant-symbol-p key))
-                               (eq :allow-other-keys (eval key)))
+                               (eq :allow-other-keys (constant-form-value key)))
                        (return-from make-instance->constructor-call nil)))))
       (check-class)
       (check-args)
@@ -192,7 +192,7 @@
       ;; VALUE-FORMS.
       (multiple-value-bind (initargs value-forms)
           (loop for (key value) on args by #'cddr and i from 0
-                collect (eval key) into initargs
+                collect (constant-form-value key) into initargs
                 if (constantp value)
                   collect value into initargs
                 else
@@ -200,7 +200,7 @@
                   and collect value into value-forms
                 finally
                   (return (values initargs value-forms)))
-        (let* ((class-name (eval class-name))
+        (let* ((class-name (constant-form-value class-name))
                (function-name (make-ctor-function-name class-name initargs)))
           ;; Prevent compiler warnings for calling the ctor.
           (proclaim-as-fun-name function-name)
@@ -578,11 +578,12 @@
                             `(when (eq (clos-slots-ref .slots. ,i)
                                        +slot-unbound+)
                                (setf (clos-slots-ref .slots. ,i)
-                                     ',(eval value)))
+                                     ',(constant-form-value value)))
                             `(setf (clos-slots-ref .slots. ,i)
-                                   ',(eval value))))
+                                   ',(constant-form-value value))))
                        (constant
-                        `(setf (clos-slots-ref .slots. ,i) ',(eval value)))))))
+                        `(setf (clos-slots-ref .slots. ,i)
+                               ',(constant-form-value value)))))))
         ;; we are not allowed to modify QUOTEd locations, so we can't
         ;; generate code like (setf (cdr ',location) arg).  Instead,
         ;; we have to do (setf (cdr .L0.) arg) and arrange for .L0. to
@@ -595,7 +596,7 @@
                   collect location into locations
                   collect `(setf (cdr ,name)
                                  ,(case type
-                                    (constant `',(eval value))
+                                    (constant `',(constant-form-value value))
                                     ((param var) `,value)
                                     (initfn `(funcall ,value))))
                   into class-init-forms

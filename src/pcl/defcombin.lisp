@@ -343,7 +343,8 @@
                           :format-arguments (list ',name))))
                     required-checks))
             (loop (unless (and (constantp order)
-                               (neq order (setq order (eval order))))
+                               (neq order (setq order
+                                                (constant-form-value order))))
                     (return t)))
             (push (cond ((eq order :most-specific-first)
                          `(setq ,name (nreverse ,name)))

@@ -8,6 +8,9 @@ changes in sbcl-0.9.11 relative to sbcl-0.9.10:
   * optimization: calling functions via constant symbols -- as in 
     (FUNCALL 'FOO) -- is now roughly as efficient as calling them
     via the function object as in (FUNCALL #'FOO).
+  * enhancement: CONSTANTP is now able to determine constantness of
+    more complex forms, including calls to constant-foldable standardized
+    functions and some special forms beyond QUOTE.
 
 changes in sbcl-0.9.10 relative to sbcl-0.9.9:
   * new feature: new SAVE-LISP-AND-DIE keyword argument :EXECUTABLE can

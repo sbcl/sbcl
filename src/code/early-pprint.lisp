@@ -76,17 +76,16 @@
                (let ((,count-name 0))
                  (declare (type index ,count-name) (ignorable ,count-name))
                  ,@(when (and (or prefixp per-line-prefix-p)
-                              (not (and (sb!xc:constantp (or prefix per-line-prefix) env)
-                                        ;; KLUDGE: EVAL-IN-ENV would
-                                        ;; be useful here.
-                                        (typep (eval (or prefix per-line-prefix)) 'string))))
+                              (not (sb!int:constant-typep
+                                    (or prefix per-line-prefix)
+                                    'string
+                                    env)))
                      `((unless (typep ,(or prefix per-line-prefix) 'string)
                          (error 'type-error
                                 :datum ,(or prefix per-line-prefix)
                                 :expected-type 'string))))
                  ,@(when (and suffixp
-                              (not (and (sb!xc:constantp suffix env)
-                                        (typep (eval suffix) 'string))))
+                              (not (sb!int:constant-typep suffix 'string env)))
                      `((unless (typep ,suffix 'string)
                          (error 'type-error
                                 :datum ,suffix

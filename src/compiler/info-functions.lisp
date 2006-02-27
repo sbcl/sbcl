@@ -121,30 +121,6 @@
 ;;;; ANSI Common Lisp functions which are defined in terms of the info
 ;;;; database
 
-(defun sb!xc:constantp (object &optional environment)
-  #!+sb-doc
-  "True of any Lisp object that has a constant value: types that eval to
-  themselves, keywords, constants, and list whose car is QUOTE."
-  ;; FIXME: Someday it would be nice to make the code recognize foldable
-  ;; functions and call itself recursively on their arguments, so that
-  ;; more of the examples in the ANSI CL definition are recognized.
-  ;; (e.g. (+ 3 2), (SQRT PI), and (LENGTH '(A B C)))
-  (declare (ignore environment))
-  (typecase object
-    ;; (Note that the following test on INFO catches KEYWORDs as well as
-    ;; explicitly DEFCONSTANT symbols.)
-    (symbol (eq (info :variable :kind object) :constant))
-    (list (and (eq (car object) 'quote)
-               (consp (cdr object))))
-    (t t)))
-
-(defun constant-form-value (form)
-  (typecase form
-    (symbol (info :variable :constant-value form))
-    ((cons (eql quote) cons)
-     (second form))
-    (t form)))
-
 (defun sb!xc:macro-function (symbol &optional env)
   #!+sb-doc
   "If SYMBOL names a macro in ENV, returns the expansion function,
