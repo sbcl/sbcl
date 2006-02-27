@@ -471,15 +471,18 @@
       (dolist (lambda lambdas)
         (setf (functional-allocator lambda) allocator)))))
 
-(defmacro with-fun-name-leaf ((leaf thing start) &body body)
-  `(multiple-value-bind (,leaf allocate-p) (fun-name-leaf ,thing)
+(defmacro with-fun-name-leaf ((leaf thing start &key global) &body body)
+  `(multiple-value-bind (,leaf allocate-p)
+       (if ,global
+           (find-global-fun ,thing t)
+           (fun-name-leaf ,thing))
      (if allocate-p
-       (let ((.new-start. (make-ctran)))
-         (ir1-convert ,start .new-start. nil `(%%allocate-closures ,leaf))
-         (let ((,start .new-start.))
-           ,@body))
-       (locally
-           ,@body))))
+         (let ((.new-start. (make-ctran)))
+           (ir1-convert ,start .new-start. nil `(%%allocate-closures ,leaf))
+           (let ((,start .new-start.))
+             ,@body))
+         (locally
+             ,@body))))
 
 (def-ir1-translator function ((thing) start next result)
   #!+sb-doc
@@ -488,6 +491,22 @@
   be a lambda expression."
   (with-fun-name-leaf (leaf thing start)
     (reference-leaf start next result leaf)))
+
+;;; Like FUNCTION, but ignores local definitions and inline
+;;; expansions, and doesn't nag about undefined functions.
+;;; Used for optimizing things like (FUNCALL 'FOO).
+(def-ir1-translator global-function ((thing) start next result)
+  (with-fun-name-leaf (leaf thing start :global t)
+    (reference-leaf start next result leaf)))
+
+(defun constant-global-fun-name-p (thing)
+  ;; FIXME: Once we have a marginally better CONSTANTP and
+  ;; CONSTANT-VALUE we can use those instead.
+  (and (consp thing)
+       (eq 'quote (car thing))
+       (null (cddr thing))
+       (legal-fun-name-p (cadr thing))
+       t))
 
 ;;;; FUNCALL
 
@@ -504,22 +523,29 @@
                  ,@arg-names))))
 
 (def-ir1-translator %funcall ((function &rest args) start next result)
-  (if (and (consp function) (eq (car function) 'function))
-      (with-fun-name-leaf (leaf (second function) start)
-        (ir1-convert start next result `(,leaf ,@args)))
-      (let ((ctran (make-ctran))
-            (fun-lvar (make-lvar)))
-        (ir1-convert start ctran fun-lvar `(the function ,function))
-        (ir1-convert-combination-args fun-lvar ctran next result args))))
+  (cond ((and (consp function) (eq (car function) 'function))
+         (with-fun-name-leaf (leaf (second function) start)
+           (ir1-convert start next result `(,leaf ,@args))))
+        ((and (consp function) (eq (car function) 'global-function))
+         (with-fun-name-leaf (leaf (second function) start :global t)
+           (ir1-convert start next result `(,leaf ,@args))))
+        (t
+         (let ((ctran (make-ctran))
+               (fun-lvar (make-lvar)))
+           (ir1-convert start ctran fun-lvar `(the function ,function))
+           (ir1-convert-combination-args fun-lvar ctran next result args)))))
 
 ;;; This source transform exists to reduce the amount of work for the
 ;;; compiler. If the called function is a FUNCTION form, then convert
 ;;; directly to %FUNCALL, instead of waiting around for type
 ;;; inference.
 (define-source-transform funcall (function &rest args)
-  (if (and (consp function) (eq (car function) 'function))
-      `(%funcall ,function ,@args)
-      (values nil t)))
+  (cond ((and (consp function) (eq (car function) 'function))
+         `(%funcall ,function ,@args))
+        ((constant-global-fun-name-p function)
+         `(%funcall (global-function ,(second function)) ,@args))
+        (t
+         (values nil t))))
 
 (deftransform %coerce-callable-to-fun ((thing) (function) *)
   "optimize away possible call to FDEFINITION at runtime"
@@ -1000,9 +1026,12 @@
                    ;; MV-COMBINATIONS.
                    (make-combination fun-lvar))))
     (ir1-convert start ctran fun-lvar
-                 (if (and (consp fun) (eq (car fun) 'function))
-                     fun
-                     `(%coerce-callable-to-fun ,fun)))
+                 (cond ((and (consp fun) (eq (car fun) 'function))
+                        fun)
+                       ((constant-global-fun-name-p fun)
+                        `(global-function ,(second fun)))
+                       (t
+                        `(%coerce-callable-to-fun ,fun))))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
       (let ((this-start ctran))

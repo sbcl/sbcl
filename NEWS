@@ -5,6 +5,9 @@ changes in sbcl-0.9.11 relative to sbcl-0.9.10:
   * bug fix: as implied by AMOP, standardized classes no longer have
     slots named by external symbols of public packages.  (reported by
     Pascal Costanza)
+  * optimization: calling functions via constant symbols -- as in 
+    (FUNCALL 'FOO) -- is now roughly as efficient as calling them
+    via the function object as in (FUNCALL #'FOO).
 
 changes in sbcl-0.9.10 relative to sbcl-0.9.9:
   * new feature: new SAVE-LISP-AND-DIE keyword argument :EXECUTABLE can

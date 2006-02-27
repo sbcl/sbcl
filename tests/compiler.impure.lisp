@@ -1201,4 +1201,32 @@
         (setf (fill-pointer result) index)
         (coerce result 'string)))))
 
+;;; Callign thru constant symbols
+(require :sb-introspect)
+
+(declaim (inline target-fun))
+(defun target-fun (arg0 arg1)
+  (+ arg0 arg1))
+(declaim (notinline target-fun))
+
+(defun test-target-fun-called (fun res)
+  (assert (member #'target-fun
+                  (sb-introspect:find-function-callees #'caller-fun-1)))
+  (assert (equal (funcall fun) res)))
+
+(defun caller-fun-1 ()
+  (funcall 'target-fun 1 2))
+(test-target-fun-called #'caller-fun-1 3)
+
+(defun caller-fun-2 ()
+  (declare (inline target-fun))
+  (apply 'target-fun 1 '(3)))
+(test-target-fun-called #'caller-fun-2 4)
+
+(defun caller-fun-3 ()
+  (flet ((target-fun (a b)
+           (- a b)))
+    (list (funcall #'target-fun 1 4) (funcall 'target-fun 1 4))))
+(test-target-fun-called #'caller-fun-3 (list -3 5))
+
 ;;; success

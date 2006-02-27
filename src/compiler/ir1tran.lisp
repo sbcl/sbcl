@@ -64,7 +64,7 @@
 
 ;;; Return a GLOBAL-VAR structure usable for referencing the global
 ;;; function NAME.
-(defun find-free-really-fun (name)
+(defun find-global-fun (name latep)
   (unless (info :function :kind name)
     (setf (info :function :kind name) :function)
     (setf (info :function :where-from name) :assumed))
@@ -75,15 +75,22 @@
                ;; running Lisp. But at cross-compile time, the current
                ;; definedness of a function is irrelevant to the
                ;; definedness at runtime, which is what matters.
-               #-sb-xc-host (not (fboundp name)))
+               #-sb-xc-host (not (fboundp name))
+               ;; LATEP is true when the user has indicated that
+               ;; late-late binding is desired by using eg. a quoted
+               ;; symbol -- in which case it makes little sense to
+               ;; complain about undefined functions.
+               (not latep))
       (note-undefined-reference name :function))
     (make-global-var
      :kind :global-function
      :%source-name name
-     :type (if (or *derive-function-types*
-                   (eq where :declared)
-                   (and (member name *fun-names-in-this-file* :test #'equal)
-                        (not (fun-lexically-notinline-p name))))
+     :type (if (and (not latep)
+                    (or *derive-function-types*
+                        (eq where :declared)
+                        (and (member name *fun-names-in-this-file*
+                                     :test #'equal)
+                             (not (fun-lexically-notinline-p name)))))
                (info :function :type name)
                (specifier-type 'function))
      :where-from where)))
@@ -165,7 +172,7 @@
                       :type (if (eq inlinep :notinline)
                                 (specifier-type 'function)
                                 (info :function :type name)))
-                     (find-free-really-fun name))))))))
+                     (find-global-fun name nil))))))))
 
 ;;; Return the LEAF structure for the lexically apparent function
 ;;; definition of NAME.
@@ -1066,6 +1073,8 @@
             (defined-fun-inline-expansion var))
       (setf (defined-fun-functional res)
             (defined-fun-functional var)))
+    ;; FIXME: Is this really right? Needs we not set the FUNCTIONAL
+    ;; to the original global-var?
     res))
 
 ;;; Parse an inline/notinline declaration. If it's a local function we're
