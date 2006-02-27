@@ -30,3 +30,52 @@
   (assert (find (find-class 'sb-mop:metaobject)
                 (sb-mop:class-direct-superclasses (find-class name))))
   (assert (subtypep name 'sb-mop:metaobject)))
+
+;;; No portable class Cp may inherit, by virtue of being a direct or
+;;; indirect subclass of a specified class, any slot for which the
+;;; name is a symbol accessible in the common-lisp-user package or
+;;; exported by any package defined in the ANSI Common Lisp standard.
+(let ((specified-class-names
+       '(sb-mop:built-in-class
+         sb-mop:class
+         sb-mop:direct-slot-definition
+         sb-mop:effective-slot-definition
+         sb-mop:eql-specializer
+         sb-mop:forward-referenced-class
+         sb-mop:funcallable-standard-class
+         sb-mop:funcallable-standard-object
+         sb-mop:generic-function
+         sb-mop:metaobject
+         sb-mop:method
+         sb-mop:method-combination
+         sb-mop:slot-definition
+         sb-mop:specializer
+         sb-mop:standard-accessor-method
+         sb-mop:standard-class
+         sb-mop:standard-direct-slot-definition
+         sb-mop:standard-effective-slot-definition
+         sb-mop:standard-generic-function
+         sb-mop:standard-method
+         sb-mop:standard-object
+         sb-mop:standard-reader-method
+         sb-mop:standard-slot-definition
+         sb-mop:standard-writer-method)))
+  (labels ((slot-name-ok (name)
+             (dolist (package (mapcar #'find-package
+                                      '("CL" "CL-USER" "KEYWORD" "SB-MOP"))
+                      t)
+               (when (multiple-value-bind (symbol status)
+                         (find-symbol (symbol-name name) package)
+                       (and (eq symbol name)
+                            (or (eq package (find-package "CL-USER"))
+                                (eq status :external))))
+                 (return nil))))
+           (test-class-slots (class)
+             (loop for slot in (sb-mop:class-slots class)
+                   for slot-name = (sb-mop:slot-definition-name slot)
+                   unless (slot-name-ok slot-name)
+                   collect (cons class slot-name))))
+    (loop for class-name in specified-class-names
+          for class = (find-class class-name)
+          for results = (test-class-slots class)
+          when results do (cerror "continue" "~A" results))))

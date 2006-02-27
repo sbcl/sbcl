@@ -280,11 +280,11 @@
                                      slot-names
                                      &key)
   (declare (ignore slot-names))
-  (setf (slot-value specl 'type) `(class-eq ,(specializer-class specl))))
+  (setf (slot-value specl '%type) `(class-eq ,(specializer-class specl))))
 
 (defmethod shared-initialize :after ((specl eql-specializer) slot-names &key)
   (declare (ignore slot-names))
-  (setf (slot-value specl 'type)
+  (setf (slot-value specl '%type)
         `(eql ,(specializer-object specl)))
   (setf (info :type :translator specl)
         (constantly (make-member-type :members (list (specializer-object specl))))))
@@ -484,7 +484,7 @@
   (declare (ignore slot-names name))
   ;; FIXME: Could this just be CLASS instead of `(CLASS ,CLASS)? If not,
   ;; why not? (See also similar expression in !BOOTSTRAP-INITIALIZE-CLASS.)
-  (setf (slot-value class 'type) `(class ,class))
+  (setf (slot-value class '%type) `(class ,class))
   (setf (slot-value class 'class-eq-specializer)
         (make-instance 'class-eq-specializer :class class)))
 

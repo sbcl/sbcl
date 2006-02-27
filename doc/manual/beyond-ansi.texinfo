@@ -118,6 +118,20 @@ The following definition is acceptable:
 @end lisp
 and leads to a class whose instances are funcallable and have one slot.
 
+@item
+the requirement that ``No portable class @math{C_p} may inherit, by
+virtue of being a direct or indirect subclass of a specified class, any
+slot for which the name is a symbol accessible in the
+@code{common-lisp-user} package or exported by any package defined in
+the ANSI Common Lisp standard.'' is interpreted to mean that the
+standardized classes themselves should not have slots named by external
+symbols of public packages.
+
+The rationale behind the restriction is likely to be similar to the ANSI
+Common Lisp restriction on defining functions, variables and types named
+by symbols in the Common Lisp package: preventing two independent pieces
+of software from colliding with each other.
+
 @end itemize
 
 @node  Support For Unix

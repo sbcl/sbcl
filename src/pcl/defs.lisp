@@ -537,7 +537,15 @@
   ())
 
 (defclass specializer (metaobject)
-  ((type :initform nil :reader specializer-type)))
+  ;; KLUDGE: in sbcl-0.9.10.2 this was renamed from TYPE, which was an
+  ;; external symbol of the CL package and hence potentially collides
+  ;; with user code.  Renaming this to %TYPE, however, is the coward's
+  ;; way out, because the objects that PCL puts in this slot aren't
+  ;; (quite) types: they are closer to kinds of specializer.  However,
+  ;; the wholesale renaming and disentangling of specializers didn't
+  ;; appeal.  (See also message <sqd5hrclb2.fsf@cam.ac.uk> and
+  ;; responses in comp.lang.lisp).  -- CSR, 2006-02-27
+  ((%type :initform nil :reader specializer-type)))
 
 (defclass specializer-with-object (specializer) ())
 

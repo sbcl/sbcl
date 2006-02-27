@@ -266,16 +266,16 @@
     (set-slot 'name name)
     (set-slot 'finalized-p t)
     (set-slot 'source source)
-    (set-slot 'type (if (eq class (find-class t))
-                        t
-                        ;; FIXME: Could this just be CLASS instead
-                        ;; of `(CLASS ,CLASS)? If not, why not?
-                        ;; (See also similar expression in
-                        ;; SHARED-INITIALIZE :BEFORE (CLASS).)
-                        `(class ,class)))
+    (set-slot '%type (if (eq class (find-class t))
+                         t
+                         ;; FIXME: Could this just be CLASS instead
+                         ;; of `(CLASS ,CLASS)? If not, why not?
+                         ;; (See also similar expression in
+                         ;; SHARED-INITIALIZE :BEFORE (CLASS).)
+                         `(class ,class)))
     (set-slot 'class-eq-specializer
               (let ((spec (allocate-standard-instance class-eq-wrapper)))
-                (!bootstrap-set-slot 'class-eq-specializer spec 'type
+                (!bootstrap-set-slot 'class-eq-specializer spec '%type
                                      `(class-eq ,class))
                 (!bootstrap-set-slot 'class-eq-specializer spec 'object
                                      class)

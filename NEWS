@@ -1,4 +1,11 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-0.9.11 relative to sbcl-0.9.10:
+  * new feature: Unicode character names are now known to the system
+    (through CHAR-NAME and NAME-CHAR).
+  * bug fix: as implied by AMOP, standardized classes no longer have
+    slots named by external symbols of public packages.  (reported by
+    Pascal Costanza)
+
 changes in sbcl-0.9.10 relative to sbcl-0.9.9:
   * new feature: new SAVE-LISP-AND-DIE keyword argument :EXECUTABLE can
     be used for bundling the runtime and the core file into one 
