@@ -34,6 +34,24 @@ reserved for user and applications.")
 order when a saved core image starts up, after the system itself has
 been initialized. Unused by SBCL itself: reserved for user and
 applications.")
+
+
+;;; Binary search for simple vectors
+(defun binary-search (value seq &key (key #'identity))
+  (declare (simple-vector seq))
+  (labels ((recurse (start end)
+             (when (< start end)
+               (let* ((i (+ start (truncate (- end start) 2)))
+                      (elt (svref seq i))
+                      (key-value (funcall key elt)))
+                 (cond ((< value key-value)
+                        (recurse start i))
+                       ((> value key-value)
+                        (recurse (1+ i) end))
+                       (t
+                        elt))))))
+    (recurse 0 (length seq))))
+
 
 ;;; like LISTEN, but any whitespace in the input stream will be flushed
 (defun listen-skip-whitespace (&optional (stream *standard-input*))
@@ -62,3 +80,4 @@ applications.")
          :format-control "~@<~A: ~2I~_~A~:>"
          :format-arguments (list prefix-string (strerror errno))
          other-condition-args))
+

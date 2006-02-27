@@ -36,6 +36,16 @@
       (let ((coded-char-name (char-name coded-char)))
         (assert (string= name coded-char-name))))))
 
+;;; Trivial tests for some unicode names
+#+sb-unicode
+(dolist (d '(("LATIN_CAPITAL_LETTER_A" 65)
+             ("LATIN_SMALL_LETTER_A" 97)
+             ("LATIN_SMALL_LETTER_CLOSED_OPEN_E" 666)
+             ("DIGRAM_FOR_GREATER_YIN" 9871)))
+  (destructuring-bind (name code) d
+    (assert (eql (code-char code) (name-char (string-downcase name))))
+    (assert (equal name (char-name (code-char code))))))
+
 ;;; bug 230: CHAR= didn't check types of &REST arguments
 (dolist (form '((code-char char-code-limit)
                 (standard-char-p "a")

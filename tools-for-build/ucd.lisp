@@ -17,10 +17,13 @@
 
 ;;; Generator
 
+(defstruct ucd misc transform)
+
 (defparameter *unicode-character-database*
   (make-pathname :directory (pathname-directory *load-truename*)))
 
 (defparameter *ucd-base* nil)
+(defparameter *unicode-names* (make-hash-table))
 
 (defparameter *last-uppercase* nil)
 (defparameter *uppercase-transition-count* 0)
@@ -138,6 +141,12 @@
 
 (defparameter *block-first* nil)
 
+(defun normalize-character-name (name)
+  (when (find #\_ name)
+    (error "Bad name for a character: ~A" name))
+  (unless (or (zerop (length name)) (find #\< name) (find #\> name))
+    (substitute #\_ #\Space name)))
+
 ;;;   3400  --  4DB5  : cjk ideograph extension a ;Lo;0;L;;;;;N;;;;;
 ;;;   AC00  --  D7A3  : hangul syllables ;Lo;0;L;;;;;N;;;;;
 ;;;   D800  --  F8FF  : surrogates and private use
@@ -215,7 +224,8 @@
              (setq *last-uppercase* nil)))
           (when (> ccc-index 255)
             (error "canonical combining class too large ~A" ccc-index))
-          (let ((result (vector misc-index (or upper-index lower-index 0))))
+          (let ((result (make-ucd :misc misc-index
+                                  :transform (or upper-index lower-index 0))))
             (when (and (> (length name) 7)
                        (string= ", Last>" name :start2 (- (length name) 7)))
               (let ((page-start (ash (+ *block-first*
@@ -237,7 +247,7 @@
                       do (setf (aref (aref *ucd-base* (cp-high point))
                                      (cp-low point))
                                result))))
-            result)))))
+            (values result (normalize-character-name name)))))))
 
 (defun slurp-ucd-line (line)
   (let* ((split-line (split-string line #\;))
@@ -248,8 +258,10 @@
       (setf (aref *ucd-base* code-high)
             (make-array (ash 1 *page-size-exponent*)
                         :initial-element nil)))
-    (setf (aref (aref *ucd-base* code-high) code-low)
-          (encode-ucd-line (cdr split-line) code-point))))
+    (multiple-value-bind (encoding name)
+        (encode-ucd-line (cdr split-line) code-point)
+      (setf (aref (aref *ucd-base* code-high) code-low) encoding
+            (gethash code-point *unicode-names*) name))))
 
 (defun second-pass ()
   (loop for i from 0 below (length *ucd-base*)
@@ -257,23 +269,23 @@
         do (loop for j from 0 below (length (aref *ucd-base* i))
                  for result = (aref (aref *ucd-base* i) j)
                  when result
-                 when (let* ((transform-point (aref result 1))
+                 when (let* ((transform-point (ucd-transform result))
                              (transform-high (ash transform-point
                                                   (- *page-size-exponent*)))
                              (transform-low (ldb (byte *page-size-exponent* 0)
                                                  transform-point)))
                         (and (plusp transform-point)
-                             (/= (aref (aref (aref *ucd-base* transform-high)
-                                             transform-low)
-                                       1)
+                             (/= (ucd-transform
+                                  (aref (aref *ucd-base* transform-high)
+                                        transform-low))
                                  (+ (ash i *page-size-exponent*) j))))
                  do (destructuring-bind (gc-index bidi-index ccc-index
                                          decimal-digit digit bidi-mirrored
                                          cl-both-case-p)
-                        (aref *misc-table* (aref result 0))
+                        (aref *misc-table* (ucd-misc result))
                       (declare (ignore cl-both-case-p))
                       (format t "~A~%" (+ (ash i *page-size-exponent*) j))
-                      (setf (aref result 0)
+                      (setf (ucd-misc result)
                             (hash-misc gc-index bidi-index ccc-index
                                        decimal-digit digit bidi-mirrored
                                        nil))))))
@@ -321,15 +333,28 @@
               do (write-byte 0 stream)
               do (write-byte 0 stream))
         (loop for page across *ucd-base*
-              do (write-byte (if page (gethash page hash) 0) stream))
+           do (write-byte (if page (gethash page hash) 0) stream))
         (loop for page across array
-              do (loop for entry across page
-                       do (write-byte (if entry
-                                          (aref *misc-mapping* (aref entry 0))
-                                          255)
-                                      stream)
-                       do (write-3-byte (if entry (aref entry 1) 0)
-                                        stream))))))
+           do (loop for entry across page
+                 do (write-byte (if entry
+                                    (aref *misc-mapping* (ucd-misc entry))
+                                    255)
+                                stream)
+                 do (write-3-byte (if entry (ucd-transform entry) 0)
+                                  stream))))))
+  (with-open-file (f (make-pathname :name "ucd-names" :type "lisp-expr"
+                                    :defaults *output-directory*)
+                     :direction :output
+                     :if-exists :supersede
+                     :if-does-not-exist :create)
+    (with-standard-io-syntax
+      (write-string ";;; Do not edit by hand: generated by ucd.lisp" f)
+      (maphash (lambda (code name)
+                 (when name
+                  (print code f)
+                  (prin1 name f)))
+               *unicode-names*))
+    (setf *unicode-names* nil))
   (with-open-file (*standard-output*
                    (make-pathname :name "numerics"
                                   :type "lisp-expr"

@@ -35,106 +35,138 @@
 (defvar *character-database*)
 (declaim (type (simple-array (unsigned-byte 8) (*)) *character-database*))
 
+#!+sb-unicode
+(progn
+ (defvar *unicode-character-name-database*)
+ (defvar *unicode-character-name-huffman-tree*))
+
 (macrolet ((frob ()
-             (with-open-file (stream (merge-pathnames
-                                      (make-pathname
-                                       :directory
-                                       '(:relative :up :up "output")
-                                       :name "ucd"
-                                       :type "dat")
-                                      sb!xc:*compile-file-truename*)
-                                     :direction :input
-                                     :element-type '(unsigned-byte 8))
-               (let* ((length (file-length stream))
-                      (array (make-array length
-                                         :element-type '(unsigned-byte 8))))
-                 (read-sequence array stream)
-                 `(defun !character-database-cold-init ()
-                    (setq *character-database* ',array))))))
+             (flet ((file (name type)
+                      (merge-pathnames (make-pathname
+                                        :directory
+                                        '(:relative :up :up "output")
+                                        :name name :type type)
+                                       sb!xc:*compile-file-truename*)))
+               `(progn
+                  ,(with-open-file (stream (file "ucd" "dat")
+                                           :direction :input
+                                           :element-type '(unsigned-byte 8))
+                     (let* ((length (file-length stream))
+                            (array (make-array
+                                    length :element-type '(unsigned-byte 8))))
+                       (read-sequence array stream)
+                       `(defun !character-database-cold-init ()
+                          (setq *character-database* ',array))))
+                  ,(with-open-file (stream (file "ucd-names" "lisp-expr")
+                                           :direction :input
+                                           :element-type 'character)
+                     (let ((names (make-hash-table)))
+                       #!+sb-unicode
+                       (loop
+                          for code-point = (read stream nil nil)
+                          for char-name = (string-upcase (read stream nil nil))
+                          while code-point
+                          do (setf (gethash code-point names) char-name))
+                       (let ((tree (make-huffman-tree
+                                    (let (list)
+                                      (maphash (lambda (code name)
+                                                 (declare (ignore code))
+                                                 (push name list))
+                                               names)
+                                      list)))
+                             (code->name
+                              (make-array (hash-table-count names)
+                                          :fill-pointer 0))
+                             (name->code nil))
+                         (maphash (lambda (code name)
+                                    (vector-push
+                                     (cons code (huffman-encode name tree))
+                                     code->name))
+                                   names)
+                         (setf name->code
+                               (sort (copy-seq code->name) #'< :key #'cdr))
+                         (setf code->name
+                               (sort (copy-seq name->code) #'< :key #'car))
+                         (setf names nil)
+                         `(defun !character-name-database-cold-init ()
+                            #!+sb-unicode
+                            (setq *unicode-character-name-database*
+                                  (cons ',code->name ',name->code)
+                                  *unicode-character-name-huffman-tree* ',tree)))))))))
   (frob))
 #+sb-xc-host (!character-database-cold-init)
+#+sb-xc-host (!character-name-database-cold-init)
 
-;;; This is the alist of (character-name . character) for characters
-;;; with long names. The first name in this list for a given character
-;;; is used on typeout and is the preferred form for input.
-(macrolet ((frob (char-names-list)
-             (collect ((results))
-               (dolist (code char-names-list)
-                 (destructuring-bind (ccode names) code
-                   (dolist (name names)
-                     (results (cons name ccode)))))
-               `(defparameter *char-name-alist*
-                 (mapcar (lambda (x) (cons (car x) (code-char (cdr x))))
-                         ',(results))))))
+(defparameter *base-char-name-alist*
   ;; Note: The *** markers here indicate character names which are
   ;; required by the ANSI specification of #'CHAR-NAME. For the others,
   ;; we prefer the ASCII standard name.
-  (frob ((#x00 ("Nul" "Null" "^@"))
-         (#x01 ("Soh" "^a"))
-         (#x02 ("Stx" "^b"))
-         (#x03 ("Etx" "^c"))
-         (#x04 ("Eot" "^d"))
-         (#x05 ("Enq" "^e"))
-         (#x06 ("Ack" "^f"))
-         (#x07 ("Bel" "Bell" "^g"))
-         (#x08 ("Backspace" "^h" "Bs")) ; *** See Note above.
-         (#x09 ("Tab" "^i" "Ht")) ; *** See Note above.
-         (#x0A ("Newline" "Linefeed" "^j" "Lf" "Nl" )) ; *** See Note above.
-         (#x0B ("Vt" "^k"))
-         (#x0C ("Page" "^l" "Form" "Formfeed" "Ff" "Np")) ; *** See Note above.
-         (#x0D ("Return" "^m" "Cr")) ; *** See Note above.
-         (#x0E ("So" "^n"))
-         (#x0F ("Si" "^o"))
-         (#x10 ("Dle" "^p"))
-         (#x11 ("Dc1" "^q"))
-         (#x12 ("Dc2" "^r"))
-         (#x13 ("Dc3" "^s"))
-         (#x14 ("Dc4" "^t"))
-         (#x15 ("Nak" "^u"))
-         (#x16 ("Syn" "^v"))
-         (#x17 ("Etb" "^w"))
-         (#x18 ("Can" "^x"))
-         (#x19 ("Em" "^y"))
-         (#x1A ("Sub" "^z"))
-         (#x1B ("Esc" "Escape" "^[" "Altmode" "Alt"))
-         (#x1C ("Fs" "^\\"))
-         (#x1D ("Gs" "^]"))
-         (#x1E ("Rs" "^^"))
-         (#x1F ("Us" "^_"))
-         (#x20 ("Space" "Sp")) ; *** See Note above.
-         (#x7f ("Rubout" "Delete" "Del"))
-         (#x80 ("C80"))
-         (#x81 ("C81"))
-         (#x82 ("Break-Permitted"))
-         (#x83 ("No-Break-Permitted"))
-         (#x84 ("C84"))
-         (#x85 ("Next-Line"))
-         (#x86 ("Start-Selected-Area"))
-         (#x87 ("End-Selected-Area"))
-         (#x88 ("Character-Tabulation-Set"))
-         (#x89 ("Character-Tabulation-With-Justification"))
-         (#x8A ("Line-Tabulation-Set"))
-         (#x8B ("Partial-Line-Forward"))
-         (#x8C ("Partial-Line-Backward"))
-         (#x8D ("Reverse-Linefeed"))
-         (#x8E ("Single-Shift-Two"))
-         (#x8F ("Single-Shift-Three"))
-         (#x90 ("Device-Control-String"))
-         (#x91 ("Private-Use-One"))
-         (#x92 ("Private-Use-Two"))
-         (#x93 ("Set-Transmit-State"))
-         (#x94 ("Cancel-Character"))
-         (#x95 ("Message-Waiting"))
-         (#x96 ("Start-Guarded-Area"))
-         (#x97 ("End-Guarded-Area"))
-         (#x98 ("Start-String"))
-         (#x99 ("C99"))
-         (#x9A ("Single-Character-Introducer"))
-         (#x9B ("Control-Sequence-Introducer"))
-         (#x9C ("String-Terminator"))
-         (#x9D ("Operating-System-Command"))
-         (#x9E ("Privacy-Message"))
-         (#x9F ("Application-Program-Command"))))) ; *** See Note above.
+  '((#x00 "Nul" "Null" "^@")
+    (#x01 "Soh" "^a")
+    (#x02 "Stx" "^b")
+    (#x03 "Etx" "^c")
+    (#x04 "Eot" "^d")
+    (#x05 "Enq" "^e")
+    (#x06 "Ack" "^f")
+    (#x07 "Bel" "Bell" "^g")
+    (#x08 "Backspace" "^h" "Bs") ; *** See Note above
+    (#x09 "Tab" "^i" "Ht") ; *** See Note above
+    (#x0A "Newline" "Linefeed" "^j" "Lf" "Nl") ; *** See Note above
+    (#x0B "Vt" "^k")
+    (#x0C "Page" "^l" "Form" "Formfeed" "Ff" "Np") ; *** See Note above
+    (#x0D "Return" "^m" "Cr") ; *** See Note above
+    (#x0E "So" "^n")
+    (#x0F "Si" "^o")
+    (#x10 "Dle" "^p")
+    (#x11 "Dc1" "^q")
+    (#x12 "Dc2" "^r")
+    (#x13 "Dc3" "^s")
+    (#x14 "Dc4" "^t")
+    (#x15 "Nak" "^u")
+    (#x16 "Syn" "^v")
+    (#x17 "Etb" "^w")
+    (#x18 "Can" "^x")
+    (#x19 "Em" "^y")
+    (#x1A "Sub" "^z")
+    (#x1B "Esc" "Escape" "^[" "Altmode" "Alt")
+    (#x1C "Fs" "^\\")
+    (#x1D "Gs" "^]")
+    (#x1E "Rs" "^^")
+    (#x1F "Us" "^_")
+    (#x20 "Space" "Sp") ; *** See Note above
+    (#x7f "Rubout" "Delete" "Del")
+    (#x80 "C80")
+    (#x81 "C81")
+    (#x82 "Break-Permitted")
+    (#x83 "No-Break-Permitted")
+    (#x84 "C84")
+    (#x85 "Next-Line")
+    (#x86 "Start-Selected-Area")
+    (#x87 "End-Selected-Area")
+    (#x88 "Character-Tabulation-Set")
+    (#x89 "Character-Tabulation-With-Justification")
+    (#x8A "Line-Tabulation-Set")
+    (#x8B "Partial-Line-Forward")
+    (#x8C "Partial-Line-Backward")
+    (#x8D "Reverse-Linefeed")
+    (#x8E "Single-Shift-Two")
+    (#x8F "Single-Shift-Three")
+    (#x90 "Device-Control-String")
+    (#x91 "Private-Use-One")
+    (#x92 "Private-Use-Two")
+    (#x93 "Set-Transmit-State")
+    (#x94 "Cancel-Character")
+    (#x95 "Message-Waiting")
+    (#x96 "Start-Guarded-Area")
+    (#x97 "End-Guarded-Area")
+    (#x98 "Start-String")
+    (#x99 "C99")
+    (#x9A "Single-Character-Introducer")
+    (#x9B "Control-Sequence-Introducer")
+    (#x9C "String-Terminator")
+    (#x9D "Operating-System-Command")
+    (#x9E "Privacy-Message")
+    (#x9F "Application-Program-Command"))) ; *** See Note above
 
 ;;;; accessor functions
 
@@ -210,13 +242,34 @@
 (defun char-name (char)
   #!+sb-doc
   "Return the name (a STRING) for a CHARACTER object."
-  (car (rassoc char *char-name-alist*)))
+  (let ((char-code (char-code char)))
+    (or (second (assoc char-code *base-char-name-alist*))
+        #!+sb-unicode
+        (let ((h-code (cdr (binary-search char-code
+                                          (car *unicode-character-name-database*)
+                                          :key #'car))))
+          (when h-code
+            (huffman-decode h-code *unicode-character-name-huffman-tree*))))))
 
 (defun name-char (name)
   #!+sb-doc
   "Given an argument acceptable to STRING, NAME-CHAR returns a character
   whose name is that string, if one exists. Otherwise, NIL is returned."
-  (cdr (assoc (string name) *char-name-alist* :test #'string-equal)))
+  (or (let ((char-code (car (rassoc-if (lambda (names)
+                                         (member name names :test #'string-equal))
+                                       *base-char-name-alist*))))
+        (when char-code
+          (code-char char-code)))
+      #!+sb-unicode
+      (let ((encoding (huffman-encode (string-upcase name)
+                                       *unicode-character-name-huffman-tree*)))
+        (when encoding
+          (let ((char-code
+                 (car (binary-search encoding
+                                     (cdr *unicode-character-name-database*)
+                                     :key #'cdr))))
+            (when char-code
+              (code-char char-code)))))))
 
 ;;;; predicates
 
