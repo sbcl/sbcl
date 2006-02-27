@@ -128,12 +128,14 @@
                      '(x)
                      '(1)
                    (1+ x))              t         2)
-		((unwind-protect 1 nil) t         1)
-		((unwind-protect 1
-		   (xxx))               nil)
-		((the integer 1)        t         1)
-		((the integer (+ 1 1))  t         2)
-		((the integer (foo))    nil)
+		((progv '(x) '(t)
+		   (if x 1 2))          t         1)
+                ((unwind-protect 1 nil) t         1)
+                ((unwind-protect 1
+                   (xxx))               nil)
+                ((the integer 1)        t         1)
+                ((the integer (+ 1 1))  t         2)
+                ((the integer (foo))    nil)
                 ((+ 1 2)                t         3)))
   (destructuring-bind (form c &optional v) test
     (assert (eql (constantp form) c))

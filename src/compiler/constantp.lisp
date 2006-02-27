@@ -200,10 +200,13 @@ constantness of the FORM in ENVIRONMENT."
  (defconstantp progv (symbols values &body forms)
    :test (and (constantp* symbols)
               (constantp* values)
-              (let ((*special-constant-variables*
-                     (append (constant-form-value* symbols)
-                              *special-constant-variables*)))
-                (every #'constantp* forms)))
+              (let* ((symbol-values (constant-form-value* symbols))
+                     (*special-constant-variables*
+                      (append symbol-values *special-constant-variables*)))
+                (progv
+                    symbol-values
+                    (constant-form-value* values)
+                  (every #'constantp* forms))))
    :eval (progv
              (constant-form-value* symbols)
              (constant-form-value* values)
