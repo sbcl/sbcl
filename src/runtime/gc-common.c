@@ -156,25 +156,28 @@ scavenge(lispobj *start, long n_words)
                 n_words_scavenged = 1;
             }
         }
-#ifndef LISP_FEATURE_GENCGC
-        /* this workaround is probably not necessary for gencgc; at least, the
-         * behaviour it describes has never been reported */
-        else if (n_words==1) {
-            /* there are some situations where an
-               other-immediate may end up in a descriptor
-               register.  I'm not sure whether this is
-               supposed to happen, but if it does then we
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+	/* This workaround is probably not needed for those ports
+	   which don't have a partitioned register set (and therefore
+	   scan the stack conservatively for roots). */
+        else if (n_words == 1) {
+            /* there are some situations where an other-immediate may
+               end up in a descriptor register.  I'm not sure whether
+               this is supposed to happen, but if it does then we
                don't want to (a) barf or (b) scavenge over the
-               data-block, because there isn't one.  So, if
-               we're checking a single word and it's anything
-               other than a pointer, just hush it up */
-            int type=widetag_of(object);
-            n_words_scavenged=1;
+               data-block, because there isn't one.  So, if we're
+               checking a single word and it's anything other than a
+               pointer, just hush it up */
+            int widetag = widetag_of(object);
+            n_words_scavenged = 1;
 
-            if ((scavtab[type]==scav_lose) ||
-                (((scavtab[type])(start,object))>1)) {
-                fprintf(stderr,"warning: attempted to scavenge non-descriptor value %x at %p.  If you can\nreproduce this warning, send a bug report (see manual page for details)\n",
-                        object,start);
+            if ((scavtab[widetag] == scav_lose) ||
+                (((sizetab[widetag])(object_ptr)) > 1)) {
+                fprintf(stderr,"warning: \
+attempted to scavenge non-descriptor value %x at %p.\n\n\
+If you can reproduce this warning, please send a bug report\n\
+(see manual page for details).\n",
+                        object, object_ptr);
             }
         }
 #endif

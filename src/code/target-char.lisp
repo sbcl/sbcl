@@ -68,9 +68,9 @@
                           while code-point
                           do (setf (gethash code-point names) char-name))
                        (let ((tree
-			      #!+sb-unicode
-			       (make-huffman-tree
-				(let (list)
+                              #!+sb-unicode
+                               (make-huffman-tree
+                                (let (list)
                                       (maphash (lambda (code name)
                                                  (declare (ignore code))
                                                  (push name list))
