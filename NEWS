@@ -11,6 +11,7 @@ changes in sbcl-0.9.11 relative to sbcl-0.9.10:
   * enhancement: CONSTANTP is now able to determine constantness of
     more complex forms, including calls to constant-foldable standardized
     functions and some special forms beyond QUOTE.
+  * fixed bug: occasional GC crashes on Solaris/x86
 
 changes in sbcl-0.9.10 relative to sbcl-0.9.9:
   * new feature: new SAVE-LISP-AND-DIE keyword argument :EXECUTABLE can

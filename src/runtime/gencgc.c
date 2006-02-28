@@ -4116,7 +4116,15 @@ remap_free_pages (page_index_t from, page_index_t to)
             last_page++;
         }
 
+        /* There's a mysterious Solaris/x86 problem with using mmap
+         * tricks for memory zeroing. See sbcl-devel thread
+         * "Re: patch: standalone executable redux".
+         */
+#if defined(LISP_FEATURE_SUNOS)
+        zero_pages(first_page, last_page-1);
+#else
         zero_pages_with_mmap(first_page, last_page-1);
+#endif
 
         first_page = last_page;
     }
