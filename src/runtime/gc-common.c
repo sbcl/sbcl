@@ -157,9 +157,9 @@ scavenge(lispobj *start, long n_words)
             }
         }
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
-	/* This workaround is probably not needed for those ports
-	   which don't have a partitioned register set (and therefore
-	   scan the stack conservatively for roots). */
+        /* This workaround is probably not needed for those ports
+           which don't have a partitioned register set (and therefore
+           scan the stack conservatively for roots). */
         else if (n_words == 1) {
             /* there are some situations where an other-immediate may
                end up in a descriptor register.  I'm not sure whether
