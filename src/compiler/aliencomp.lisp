@@ -713,7 +713,7 @@
                                            temp-tn
                                            nsp
                                            first-tn))
-          #+(and ppc darwin)
+          #!+(and ppc darwin)
           (when (listp tn)
             ;; This means that we have a float arg that we need to
             ;; also copy to some int regs. The list contains the TN
