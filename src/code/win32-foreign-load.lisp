@@ -50,7 +50,7 @@
          (handle (loadlibrary file)))
     (aver file)
     (when (zerop handle)
-      (setf (shared-object-sap obj) nil)
+      (setf (shared-object-handle obj) nil)
       (error "Error opening shared object ~S:~%  ~A."
              file (getlasterror)))
     (setf (shared-object-handle obj) handle)
