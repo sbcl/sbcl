@@ -24,7 +24,9 @@
               (make-ea :qword :disp (make-fixup ',name :assembly-routine)))
         (inst call temp-reg-tn)
         (note-this-location ,vop :single-value-return)
-        (move rsp-tn rbx-tn))
+        (inst jmp :nc single-value)
+        (move rsp-tn rbx-tn)
+        single-value)
       '((:save-p :compute-only))))
     (:none
      (values
@@ -38,9 +40,6 @@
     (:raw
      `(inst ret))
     (:full-call
-     `(
-       (inst pop rax-tn)
-
-       (inst add rax-tn 3)
-       (inst jmp rax-tn)))
+     `((inst clc)
+       (inst ret)))
     (:none)))

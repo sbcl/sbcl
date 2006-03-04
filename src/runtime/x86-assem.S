@@ -264,7 +264,9 @@ Ldone:
 	
 	/* If the function returned multiple values, it will return to
 	   this point.  Lose them */
+	jnc	LsingleValue
 	mov	%ebx, %esp
+LsingleValue:
 	/* A singled value function returns here */
 
 /* Restore the stack, in case there was a stack change. */
@@ -348,7 +350,7 @@ GNAME(closure_tramp):
 	.align	align_4byte
 GNAME(fun_end_breakpoint_guts):
 	/* Multiple Value return */
-	jmp	multiple_value_return
+	jc	multiple_value_return
 	/* Single value return: The eventual return will now use the
 	   multiple values return convention but with a return values
 	   count of one. */

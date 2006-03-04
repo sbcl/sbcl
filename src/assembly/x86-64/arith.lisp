@@ -197,23 +197,15 @@
 
                 INLINE-FIXNUM-COMPARE
                 (inst cmp x y)
-                (inst jmp ,test RETURN-TRUE)
                 (inst mov res nil-value)
-                ;; FIXME: A note explaining this return convention, or a
-                ;; symbolic name for it, would be nice. (It looks as though we
-                ;; should be hand-crafting the same return sequence as would be
-                ;; produced by GENERATE-RETURN-SEQUENCE, but in that case it's
-                ;; not clear why we don't just jump to the end of this function
-                ;; to share the return sequence there.
-                (inst pop eax)
-                (inst add eax 3)
-                (inst jmp eax)
-
+                (inst jmp ,test RETURN-FALSE)
                 RETURN-TRUE
-                (load-symbol res t))))
+                (load-symbol res t)
+                RETURN-FALSE
+                DONE)))
 
-  (define-cond-assem-rtn generic-< < two-arg-< :l)
-  (define-cond-assem-rtn generic-> > two-arg-> :g))
+  (define-cond-assem-rtn generic-< < two-arg-< :ge)
+  (define-cond-assem-rtn generic-> > two-arg-> :le))
 
 (define-assembly-routine (generic-eql
                           (:cost 10)
@@ -237,9 +229,7 @@
 
   RETURN-NIL
   (inst mov res nil-value)
-  (inst pop eax)
-  (inst add eax 3)
-  (inst jmp eax)
+  (inst jmp DONE)
 
   DO-STATIC-FN
   (inst pop eax)
@@ -253,8 +243,7 @@
 
   RETURN-T
   (load-symbol res t)
-  ;; FIXME: I don't understand how we return from here..
-  )
+  DONE)
 
 (define-assembly-routine (generic-=
                           (:cost 10)
@@ -278,9 +267,7 @@
   (inst jmp :e RETURN-T)                ; ok
 
   (inst mov res nil-value)
-  (inst pop eax)
-  (inst add eax 3)
-  (inst jmp eax)
+  (inst jmp DONE)
 
   DO-STATIC-FN
   (inst pop eax)
@@ -293,6 +280,7 @@
                      :disp (+ nil-value (static-fun-offset 'two-arg-=))))
 
   RETURN-T
-  (load-symbol res t))
+  (load-symbol res t)
+  DONE)
 
 

@@ -170,8 +170,9 @@ Lcall:
 	
 	/* If the function returned multiple values, it will return to
 	   this point.  Lose them */
+	jnc	LsingleValue	
 	mov	%rbx, %rsp
-	/* A singled value function returns here */
+LsingleValue:	
 
 /* Restore the stack, in case there was a stack change. */
 	pop	%rsp		# c-sp
@@ -290,11 +291,7 @@ GNAME(closure_tramp):
 	.align	align_8byte
 GNAME(fun_end_breakpoint_guts):
 	/* Multiple Value return */
-	jmp	multiple_value_return
-	/* the above jmp is only 2 bytes long, we need to add a nop for 
-	 * padding since the single value return convention jumps to original
-	 * return address + 3 bytes */
-	nop
+	jc	multiple_value_return
 	/* Single value return: The eventual return will now use the
 	   multiple values return convention but with a return values
 	   count of one. */

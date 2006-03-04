@@ -200,11 +200,14 @@
   (cond
    ((<= nvals 1)
     (note-this-location vop :single-value-return)
-    (inst mov esp-tn ebx-tn))
+    (let ((single-value (gen-label)))
+      (inst jmp :nc single-value)
+      (inst mov esp-tn ebx-tn)
+      (emit-label single-value)))
    ((<= nvals register-arg-count)
     (let ((regs-defaulted (gen-label)))
       (note-this-location vop :unknown-return)
-      (inst jmp-short regs-defaulted)
+      (inst jmp :c regs-defaulted)
       ;; Default the unsuppled registers.
       (let* ((2nd-tn-ref (tn-ref-across values))
              (2nd-tn (tn-ref-tn 2nd-tn-ref)))
@@ -228,7 +231,7 @@
           (default-stack-slots (gen-label)))
       (note-this-location vop :unknown-return)
       ;; Branch off to the MV case.
-      (inst jmp-short regs-defaulted)
+      (inst jmp :c regs-defaulted)
       ;; Do the single value case.
       ;; Default the register args
       (inst mov eax-tn nil-value)
@@ -286,7 +289,7 @@
           (count-okay (gen-label)))
       (note-this-location vop :unknown-return)
       ;; Branch off to the MV case.
-      (inst jmp-short regs-defaulted)
+      (inst jmp :c regs-defaulted)
 
       ;; Default the register args, and set up the stack as if we
       ;; entered the MV return point.
@@ -389,7 +392,7 @@
   (declare (type tn args nargs start count))
   (let ((variable-values (gen-label))
         (done (gen-label)))
-    (inst jmp-short variable-values)
+    (inst jmp :c variable-values)
 
     (cond ((location= start (first *register-arg-tns*))
            (inst push (first *register-arg-tns*))
@@ -955,25 +958,69 @@
 ;;;
 ;;; pfw--get wired-tn conflicts sometimes if register sc specd for args
 ;;; having problems targeting args to regs -- using temps instead.
+;;;
+;;; First off, modifying the return-pc defeats the branch-prediction
+;;; optimizations on modern CPUs quite handily. Second, we can do all
+;;; this without needing a temp register. Fixed the latter, at least.
+;;; -- AB 2006/Feb/04
 (define-vop (return-single)
   (:args (old-fp)
          (return-pc)
          (value))
-  (:temporary (:sc unsigned-reg) ofp)
-  (:temporary (:sc unsigned-reg) ret)
   (:ignore value)
   (:generator 6
     (trace-table-entry trace-table-fun-epilogue)
-    (move ret return-pc)
-    ;; Clear the control stack
-    (move ofp old-fp)
-    ;; Adjust the return address for the single value return.
-    (inst add ret 2)
-    ;; Restore the frame pointer.
-    (move esp-tn ebp-tn)
-    (move ebp-tn ofp)
-    ;; Out of here.
-    (inst jmp ret)))
+    ;; Code structure lifted from known-return.
+    (sc-case return-pc
+      ((sap-reg)
+       ;; return PC in register for some reason (local call?)
+       ;; we jmp to the return pc after fixing the stack and frame.
+       (sc-case old-fp
+         ((control-stack)
+          ;; ofp on stack must be in slot 0 (the traditional storage place).
+          ;; Drop the stack above it and pop it off.
+          (cond ((zerop (tn-offset old-fp))
+                 (inst lea esp-tn (make-ea :dword :base ebp-tn
+                                           :disp (- (* (1+ ocfp-save-offset)
+                                                       n-word-bytes))))
+                 (inst pop ebp-tn))
+                (t
+                 ;; Should this ever happen, we do the same as above, but
+                 ;; using (tn-offset old-fp) instead of ocfp-save-offset
+                 ;; (which is 0 anyway, see src/compiler/x86/vm.lisp) and
+                 ;; then lea esp again against itself with a displacement
+                 ;; of (* (tn-offset old-fp) n-word-bytes) to clear the
+                 ;; rest of the stack.
+                 (cerror "Continue anyway"
+                         "VOP return-single doesn't work if old-fp (in slot ~S) is not in slot 0" (tn-offset old-fp)))))
+         ((any-reg descriptor-reg)
+          ;; ofp in reg, drop the stack and load the real fp.
+          (move esp-tn ebp-tn)
+          (move ebp-tn old-fp)))
+
+       ;; Set single-value-return flag
+       (inst clc)
+       ;; And return
+       (inst jmp return-pc))
+
+      ((sap-stack)
+       ;; Note that this will only work right if, when old-fp is on
+       ;; the stack, it has a lower tn-offset than return-pc. One of
+       ;; the comments in known-return indicate that this is the case
+       ;; (in that it will be in its save location), but we may wish
+       ;; to assert that (in either the weaker or stronger forms).
+       ;; Should this ever not be the case, we should load old-fp
+       ;; into a temp reg while we fix the stack.
+       ;; Drop stack above return-pc
+       (inst lea esp-tn (make-ea :dword :base ebp-tn
+                                 :disp (- (* (1+ (tn-offset return-pc))
+                                             n-word-bytes))))
+       ;; Set single-value return flag
+       (inst clc)
+       ;; Restore the old frame pointer
+       (move ebp-tn old-fp)
+       ;; And return, dropping the rest of the stack as we go.
+       (inst ret (* (tn-offset return-pc) n-word-bytes))))))
 
 ;;; Do unknown-values return of a fixed (other than 1) number of
 ;;; values. The VALUES are required to be set up in the standard
@@ -1024,6 +1071,8 @@
         (inst mov first nil-value)
         (dolist (tn (cdr arg-tns))
           (inst mov tn first))))
+    ;; Set multi-value return flag.
+    (inst stc)
     ;; And away we go. Except that return-pc is still on the
     ;; stack and we've changed the stack pointer. So we have to
     ;; tell it to index off of EBX instead of EBP.
@@ -1084,8 +1133,8 @@
         (move old-fp-temp old-fp)
         (move esp-tn ebp-tn)
         (move ebp-tn old-fp-temp)
-        ;; Fix the return-pc to point at the single-value entry point.
-        (inst add eax 2)
+        ;; Set the single-value return flag.
+        (inst clc)
         ;; Out of here.
         (inst jmp eax)
 

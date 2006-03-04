@@ -67,6 +67,7 @@
   (loadw esi ebx -3)
 
   ;; And back we go.
+  (inst stc)
   (inst jmp eax)
 
   ;; Handle the register arg cases.
@@ -75,13 +76,14 @@
   (inst mov edx nil-value)
   (inst mov edi edx)
   (inst mov esi edx)
+  (inst stc)
   (inst jmp eax)
 
   ONE-VALUE ; Note: we can get this, because the return-multiple vop
             ; doesn't check for this case when size > speed.
   (loadw edx esi -1)
   (inst mov rsp-tn ebx)
-  (inst add eax 3)
+  (inst clc)
   (inst jmp eax)
 
   TWO-VALUES
@@ -89,6 +91,7 @@
   (loadw edi esi -2)
   (inst mov esi nil-value)
   (inst lea rsp-tn (make-ea :qword :base ebx :disp (* -2 n-word-bytes)))
+  (inst stc)
   (inst jmp eax)
 
   THREE-VALUES
@@ -96,6 +99,7 @@
   (loadw edi esi -2)
   (loadw esi esi -3)
   (inst lea rsp-tn (make-ea :qword :base ebx :disp (* -3 n-word-bytes)))
+  (inst stc)
   (inst jmp eax))
 
 ;;;; TAIL-CALL-VARIABLE
