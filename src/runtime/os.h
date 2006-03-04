@@ -144,16 +144,9 @@ sigset_t *os_context_sigmask_addr(os_context_t *context);
 /* These are not architecture-specific functions, but are instead
  * general utilities defined in terms of the architecture-specific
  * function os_validate(..) and os_invalidate(..).
- *
- * FIXME: os_reallocate(..) is complicated and seems no longer to be
- * used for anything. Perhaps we could delete it? */
+ */
 extern os_vm_address_t os_allocate(os_vm_size_t len);
-extern os_vm_address_t os_allocate_at(os_vm_address_t addr, os_vm_size_t len);
-extern os_vm_address_t os_reallocate(os_vm_address_t addr,
-                                     os_vm_size_t old_len,
-                                     os_vm_size_t len);
 extern void os_deallocate(os_vm_address_t addr, os_vm_size_t len);
-
 
 /* FIXME: The os_trunc_foo(..) and os_round_foo(..) macros here could
  * be functions. */

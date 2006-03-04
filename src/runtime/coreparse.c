@@ -23,10 +23,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#ifdef irix
-#include <fcntl.h>
-#endif
-
 #include "sbcl.h"
 #include "os.h"
 #include "runtime.h"
