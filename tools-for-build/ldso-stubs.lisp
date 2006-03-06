@@ -57,7 +57,7 @@ ldso_stub__~A: ;                                \\
 #endif
         .text"
 
-#!+(or x86 x86-64) "
+#!+(or (and x86 (not darwin)) x86-64) "
 #define LDSO_STUBIFY(fct)                       \\
         .align 16 ;                             \\
 .globl ldso_stub__ ## fct ;                     \\
@@ -111,6 +111,24 @@ ldso_stub___ ## fct:                            @\\
 ldso_stub__ ## fct ## $lazy_ptr:                @\\
         .indirect_symbol _ ## fct               @\\
         .long dyld_stub_binding_helper"
+
+;;; darwin x86 assembler is weird and follows the ppc assembler syntax
+#!+(and darwin x86) "
+#define LDSO_STUBIFY(fct)                       \\
+.text                           ;               \\
+        .align 4 ;                              \\
+.globl ldso_stub___ ## fct ;                    \\
+ldso_stub___ ## fct: ;                          \\
+        jmp L ## fct ## $stub ;                 \\
+        .section __IMPORT,__jump_table,symbol_stubs,self_modifying_code+pure_instructions,5 ;   \\
+L ## fct ## $stub: ;                    \\
+        .indirect_symbol _ ## fct ;     \\
+        hlt                       ;     \\
+        hlt                       ;     \\
+        hlt                       ;     \\
+        hlt                       ;     \\
+        hlt                       ;     \\
+        .subsections_via_symbols  ;    "
 
 ;;; KLUDGE: set up the vital fifth argument, passed on the
 ;;; stack.  Do this unconditionally, even if the stub is for a

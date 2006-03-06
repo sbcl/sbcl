@@ -236,6 +236,21 @@
   (def!constant linkage-table-space-start #xA0000000)
   (def!constant linkage-table-space-end   #xA1000000))
 
+
+#!+darwin
+(progn
+  (def!constant read-only-space-start #x01000000)
+  (def!constant read-only-space-end   #x04ff8000)
+
+  (def!constant static-space-start    #x08000000)
+  (def!constant static-space-end      #x097fff00)
+
+  (def!constant dynamic-space-start #x10000000)
+  (def!constant dynamic-space-end   #x6ffff000)
+
+  (def!constant linkage-table-space-start #x0a000000)
+  (def!constant linkage-table-space-end   #x0b000000))
+
 ;;; Size of one linkage-table entry in bytes.
 (def!constant linkage-table-entry-size 8)
 

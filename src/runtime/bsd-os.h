@@ -84,8 +84,15 @@ typedef ucontext_t os_context_t;
      If Apple is going to break ucontext_t out of spite, I'm going
      to be cross with them ;) -- PRM */
 
+#if defined(LISP_FEATURE_X86)
+#include <sys/ucontext.h>
+#include <sys/_types.h>
+typedef struct ucontext os_context_t;
+#else
 #include <ucontext.h>
 typedef ucontext_t os_context_t;
+#endif
+
 #define SIG_MEMORY_FAULT SIGBUS
 
 #else

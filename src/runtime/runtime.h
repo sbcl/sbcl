@@ -37,7 +37,7 @@
  * problem.. */
 #define QSHOW_SIGNALS 0
 
-#ifdef QSHOW_SIGNALS
+#if QSHOW_SIGNALS
 #define FSHOW_SIGNAL FSHOW
 #else
 #define FSHOW_SIGNAL(args)

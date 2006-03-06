@@ -279,6 +279,8 @@
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
         (inst sub esp-tn delta)))
+    ;; C stack should probably be 16 byte aligned on Darwin
+    #!+darwin (inst and esp-tn -16)
     (move result esp-tn)))
 
 (define-vop (dealloc-number-stack-space)

@@ -93,7 +93,7 @@
 (assert (= 0.0d0 (scale-float 1.0d0 (1- most-negative-fixnum))))
 
 (with-test (:name (:scale-float-overflow :bug-372)
-            :fails-on '(or :ppc :freebsd)) ;; bug 372
+            :fails-on '(or :ppc :darwin :freebsd)) ;; bug 372
   (progn
     (assert (raises-error? (scale-float 1.0 most-positive-fixnum)
                            floating-point-overflow))
@@ -119,7 +119,7 @@
     'double-float))
 
 (with-test (:name (:addition-overflow :bug-372)
-            :fails-on '(or :ppc :mips :freebsd))
+            :fails-on '(or :ppc :darwin :mips :freebsd))
   (assert (typep (nth-value
                   1
                   (ignore-errors

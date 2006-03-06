@@ -58,6 +58,10 @@ static void netbsd_init();
 static void freebsd_init();
 #endif /* __FreeBSD__ */
 
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+static void x86_darwin_init();
+#endif
+
 void
 os_init(char *argv[], char *envp[])
 {
@@ -69,6 +73,9 @@ os_init(char *argv[], char *envp[])
 #ifdef __FreeBSD__
     freebsd_init();
 #endif /* __FreeBSD__ */
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+    x86_darwin_init();
+#endif
 }
 
 int *os_context_pc_addr(os_context_t *context)
@@ -79,6 +86,8 @@ int *os_context_pc_addr(os_context_t *context)
     return CONTEXT_ADDR_FROM_STEM(pc);
 #elif defined __NetBSD__
     return CONTEXT_ADDR_FROM_STEM(EIP);
+#elif defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+    return CONTEXT_ADDR_FROM_STEM(eip);
 #elif defined LISP_FEATURE_DARWIN
     return &context->uc_mcontext->ss.srr0;
 #else
@@ -92,9 +101,9 @@ os_context_sigmask_addr(os_context_t *context)
     /* (Unlike most of the other context fields that we access, the
      * signal mask field is a field of the basic, outermost context
      * struct itself both in FreeBSD 4.0 and in OpenBSD 2.6.) */
-#if defined __FreeBSD__  || __NetBSD__ || defined LISP_FEATURE_DARWIN
+#if defined(__FreeBSD__)  || defined(__NetBSD__) || defined(LISP_FEATURE_DARWIN)
     return &context->uc_sigmask;
-#elif defined __OpenBSD__
+#elif defined (__OpenBSD__)
     return &context->sc_mask;
 #else
 #error unsupported BSD variant
@@ -191,6 +200,13 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     void *fault_addr = arch_get_bad_addr(signal, siginfo, context);
+
+#if defined(MEMORY_FAULT_DEBUG)
+    fprintf(stderr, "Memory fault at: %p, PC: %x\n", fault_addr, *os_context_pc_addr(context));
+#if defined(ARCH_HAS_STACK_POINTER)
+    fprintf(stderr, "Stack pointer: %x\n", *os_context_sp_addr(context));
+#endif
+#endif
 
     if (!gencgc_handle_wp_violation(fault_addr))
         if(!handle_guard_page_triggered(context,fault_addr)) {
@@ -334,6 +350,19 @@ int arch_os_thread_init(struct thread *thread) {
 }
 int arch_os_thread_cleanup(struct thread *thread) {
     return 1;                  /* success */
+}
+#endif
+
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+static void x86_darwin_init()
+{
+    struct sigaltstack sigstack;
+    sigstack.ss_sp = os_allocate(32*SIGSTKSZ);
+    if (sigstack.ss_sp) {
+        sigstack.ss_flags=0;
+        sigstack.ss_size = 32*SIGSTKSZ;
+        sigaltstack(&sigstack,0);
+    }
 }
 #endif
 

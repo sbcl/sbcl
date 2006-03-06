@@ -114,16 +114,3 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
     ppc_flush_icache(address,length);
 }
 
-char *
-os_get_runtime_executable_path()
-{
-    char path[PATH_MAX + 1];
-    uint32_t size = sizeof(path);
-
-    if (_NSGetExecutablePath(path, &size) == -1)
-        return NULL;
-    else
-        path[size] = '\0';
-
-    return copied_string(path);
-}

@@ -66,6 +66,8 @@ context_eflags_addr(os_context_t *context)
     return &context->uc_mcontext.mc_eflags;
 #elif defined __OpenBSD__
     return &context->sc_eflags;
+#elif defined LISP_FEATURE_DARWIN
+    return &context->uc_mcontext->ss.eflags;
 #elif defined __NetBSD__
     return &(context->uc_mcontext.__gregs[_REG_EFL]);
 #elif defined LISP_FEATURE_WIN32
@@ -257,6 +259,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
      * number of bytes will follow, the first is the length of the byte
      * arguments to follow. */
     trap = *(unsigned char *)(*os_context_pc_addr(context));
+    /* FSHOW((stderr, "/<sigtrap trap %d at pc_addr: %p>\n", trap, *os_context_pc_addr(context))); */
     switch (trap) {
 
     case trap_PendingInterrupt:

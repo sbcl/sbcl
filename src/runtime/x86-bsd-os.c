@@ -14,7 +14,7 @@
  * entails; unfortunately, currently the situation is worse, not
  * better, than in the above paragraph. */
 
-#if defined(__FreeBSD__) || defined(__OpenBSD__)
+#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(LISP_FEATURE_DARWIN)
 int *
 os_context_register_addr(os_context_t *context, int offset)
 {

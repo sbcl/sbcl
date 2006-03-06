@@ -37,6 +37,18 @@
 #define GNAME(var) _##var
 #endif
 
+#if defined __linux__  || defined __FreeBSD__ || defined __NetBSD__ || defined __OpenBSD__ || defined __sun
+#define GNAMEDOLLAR(var) $##var
+#else
+#define GNAMEDOLLAR(var) $_##var
+#endif
+
+#if defined __linux__  || defined __FreeBSD__ || defined __NetBSD__ || defined __OpenBSD__ || defined __sun
+#define DOLLARLITERAL(var) $##var
+#else
+#define DOLLARLITERAL(var) $##(var)
+#endif
+
 /* Get the right type of alignment. Linux, FreeBSD and NetBSD (but not OpenBSD)
  * want alignment in bytes. 
  *
@@ -62,7 +74,7 @@
  * that are defined to be no-ops on win32. Hopefully this still works on
  * other platforms.
  */
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) && !defined(LISP_FEATURE_DARWIN)
 #define TYPE(name) .type name,@function
 #define SIZE(name) .size name,.-name
 #else
@@ -70,9 +82,15 @@
 #define SIZE(name)
 #endif
 
+#if defined(LISP_FEATURE_DARWIN)
+#define END()
+#else
+#define END() .end
+#endif
+
 	.text
-	.global	GNAME(foreign_function_call_active)
-	.global	GNAME(all_threads)
+	.globl	GNAME(foreign_function_call_active)
+	.globl	GNAME(all_threads)
 
 /*
  * A call to call_into_c preserves esi, edi, and ebp.	
@@ -87,7 +105,7 @@
  */
 	.text
 	.align	align_16byte,0x90
-	.global GNAME(call_into_c)
+	.globl GNAME(call_into_c)
 	TYPE(GNAME(call_into_c))
 GNAME(call_into_c):
 	movl	$1,GNAME(foreign_function_call_active)
@@ -109,6 +127,9 @@ GNAME(call_into_c):
 	cld
 #endif
 
+#ifdef LISP_FEATURE_DARWIN
+        andl	$0xfffffff0,%esp        # align stack to 16-byte boundary before calling C
+#endif
 	call	*%eax		# normal callout using Lisp stack
 
 	movl	%eax,%ecx	# remember integer return value
@@ -160,7 +181,7 @@ Lfp_rtn_value:
 
 
 	.text	
-	.global GNAME(call_into_lisp_first_time)
+	.globl GNAME(call_into_lisp_first_time)
 	TYPE(GNAME(call_into_lisp_first_time))
 		
 /* The *ALIEN-STACK* pointer is set up on the first call_into_lisp when
@@ -178,7 +199,7 @@ GNAME(call_into_lisp_first_time):
 	movl    THREAD_CONTROL_STACK_START_OFFSET(%eax) ,%esp
 	/* don't think too hard about what happens if we get interrupted
 	* here */
-	addl 	$THREAD_CONTROL_STACK_SIZE-4,%esp
+	addl 	DOLLARLITERAL(THREAD_CONTROL_STACK_SIZE),%esp
 #else
 /* Win32 -really- doesn't like you switching stacks out from under it. */
 	movl	GNAME(all_threads),%eax
@@ -186,7 +207,7 @@ GNAME(call_into_lisp_first_time):
 	jmp     Lstack
 
 	.text	
-	.global GNAME(call_into_lisp)
+	.globl GNAME(call_into_lisp)
 	TYPE(GNAME(call_into_lisp))
 		
 /* The C conventions require that ebx, esi, edi, and ebp be preserved
@@ -288,7 +309,7 @@ LsingleValue:
 
 /* support for saving and restoring the NPX state from C */
 	.text
-	.global	GNAME(fpu_save)
+	.globl	GNAME(fpu_save)
 	TYPE(GNAME(fpu_save))
 	.align	2,0x90
 GNAME(fpu_save):
@@ -297,7 +318,7 @@ GNAME(fpu_save):
 	ret
 	SIZE(GNAME(fpu_save))
 
-	.global	GNAME(fpu_restore)
+	.globl	GNAME(fpu_restore)
 	TYPE(GNAME(fpu_restore))
 	.align	2,0x90
 GNAME(fpu_restore):
@@ -311,7 +332,7 @@ GNAME(fpu_restore):
  */
 	.text
 	.align	align_4byte,0x90
-	.global GNAME(undefined_tramp)
+	.globl GNAME(undefined_tramp)
 	TYPE(GNAME(undefined_tramp))
         .byte   0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
 GNAME(undefined_tramp):
@@ -328,7 +349,7 @@ GNAME(undefined_tramp):
  */
 	.text
 	.align	align_4byte,0x90
-	.global GNAME(closure_tramp)
+	.globl GNAME(closure_tramp)
 	TYPE(GNAME(closure_tramp))
         .byte   0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
 GNAME(closure_tramp):
@@ -346,7 +367,7 @@ GNAME(closure_tramp):
  * fun-end breakpoint magic
  */
 	.text
-	.global	GNAME(fun_end_breakpoint_guts)
+	.globl	GNAME(fun_end_breakpoint_guts)
 	.align	align_4byte
 GNAME(fun_end_breakpoint_guts):
 	/* Multiple Value return */
@@ -357,22 +378,22 @@ GNAME(fun_end_breakpoint_guts):
 	movl	%esp,%ebx	# Setup ebx - the ofp.
 	subl	$4,%esp		# Allocate one stack slot for the return value
 	movl	$4,%ecx		# Setup ecx for one return value.
-	movl	$NIL,%edi	# default second value
-	movl	$NIL,%esi	# default third value
+	movl	DOLLARLITERAL(NIL),%edi	# default second value
+	movl	DOLLARLITERAL(NIL),%esi	# default third value
 		
 multiple_value_return:
 	
-	.global GNAME(fun_end_breakpoint_trap)
+	.globl GNAME(fun_end_breakpoint_trap)
 GNAME(fun_end_breakpoint_trap):
 	int3
 	.byte 	trap_FunEndBreakpoint
 	hlt			# We should never return here.
 
-	.global GNAME(fun_end_breakpoint_end)
+	.globl GNAME(fun_end_breakpoint_end)
 GNAME(fun_end_breakpoint_end):
 
 
-	.global	GNAME(do_pending_interrupt)
+	.globl	GNAME(do_pending_interrupt)
 	TYPE(GNAME(do_pending_interrupt))
 	.align	align_4byte,0x90
 GNAME(do_pending_interrupt):
@@ -832,7 +853,7 @@ GNAME(post_signal_tramp):
 	 * This is part of the funky magic for exception handling on win32.
 	 * see sigtrap_emulator() in win32-os.c for details.
 	 */
-	.global GNAME(sigtrap_trampoline)
+	.globl GNAME(sigtrap_trampoline)
 GNAME(sigtrap_trampoline):
 	pushl	%eax
 	pushl	%ebp
@@ -848,7 +869,7 @@ GNAME(sigtrap_trampoline):
 	 * This is part of the funky magic for exception handling on win32.
 	 * see handle_exception() in win32-os.c for details.
 	 */
-	.global GNAME(exception_trampoline)
+	.globl GNAME(exception_trampoline)
 GNAME(exception_trampoline):
 	pushl	%eax
 	pushl	%ebp
@@ -865,9 +886,9 @@ GNAME(exception_trampoline):
          * to use.
          */
 
-	.global GNAME(fast_bzero_pointer)
+	.globl GNAME(fast_bzero_pointer)
 	.data
-        .align 4
+        .align  align_4byte
 GNAME(fast_bzero_pointer):
         /* Variable containing a pointer to the bzero function to use.
          * Initially points to a basic function.  Change this variable
@@ -876,7 +897,7 @@ GNAME(fast_bzero_pointer):
 
 	.text
 	.align	align_8byte,0x90
-	.global GNAME(fast_bzero)
+	.globl GNAME(fast_bzero)
 	TYPE(GNAME(fast_bzero))
 GNAME(fast_bzero):        
         /* Indirect function call */
@@ -886,7 +907,7 @@ GNAME(fast_bzero):
       
 	.text
 	.align	align_8byte,0x90
-	.global GNAME(fast_bzero_detect)
+	.globl GNAME(fast_bzero_detect)
 	TYPE(GNAME(fast_bzero_detect))
 GNAME(fast_bzero_detect):
         /* Decide whether to use SSE, MMX or REP version */
@@ -906,10 +927,10 @@ GNAME(fast_bzero_detect):
          * for all non-SSE2 processors.
          */
 Lbase:
-        movl $GNAME(fast_bzero_base), GNAME(fast_bzero_pointer)
+        movl GNAMEDOLLAR(fast_bzero_base), GNAME(fast_bzero_pointer)
         jmp Lrestore
 Lsse2:
-        movl $GNAME(fast_bzero_sse), GNAME(fast_bzero_pointer)
+        movl GNAMEDOLLAR(fast_bzero_sse), GNAME(fast_bzero_pointer)
         jmp Lrestore
         
 Lrestore:
@@ -924,7 +945,7 @@ Lrestore:
 
 	.text
 	.align	align_8byte,0x90
-	.global GNAME(fast_bzero_sse)
+	.globl GNAME(fast_bzero_sse)
 	TYPE(GNAME(fast_bzero_sse))
         
 GNAME(fast_bzero_sse):
@@ -940,7 +961,7 @@ GNAME(fast_bzero_sse):
         movups %xmm7, -16(%esp)   /* Save XMM register */
         xorps  %xmm7, %xmm7       /* Zero the XMM register */
         jmp Lloop_sse
-        .align 16
+        .align align_16byte
 Lloop_sse:
 
         /* Copy the 16 zeroes from xmm7 to memory, 4 times. MOVNTDQ is the
@@ -970,7 +991,7 @@ Lend_sse:
 
 	.text
 	.align	align_8byte,0x90
-	.global GNAME(fast_bzero_base)
+	.globl GNAME(fast_bzero_base)
 	TYPE(GNAME(fast_bzero_base))
         
 GNAME(fast_bzero_base):
@@ -986,8 +1007,11 @@ GNAME(fast_bzero_base):
         shr $2, %ecx              /* Amount of 4-byte blocks to copy */
         jz  Lend_base
         cld                       /* Set direction of STOSL to increment */
-        rep stosl                 /* Store EAX to *EDI, ECX times, incrementing
+
+        rep
+        stosl                     /* Store EAX to *EDI, ECX times, incrementing
                                    * EDI by 4 after each store */
+        
 Lend_base:        
         pop %edi                  /* Restore temp registers */
         pop %ecx
@@ -996,4 +1020,5 @@ Lend_base:
 	SIZE(GNAME(fast_bzero_base))
         
 	
-	.end
+        END()
+        

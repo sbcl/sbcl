@@ -11,7 +11,7 @@ static inline os_context_t *arch_os_get_context(void **void_context) {
  * can share a fair amount of code between different variants. */
 #if defined __FreeBSD__
 #define CONTEXT_ADDR_FROM_STEM(stem) &context->uc_mcontext.mc_ ## stem
-#elif defined __OpenBSD__
+#elif defined(__OpenBSD__)
 #define CONTEXT_ADDR_FROM_STEM(stem) &context->sc_ ## stem
 #elif defined __NetBSD__
 #define CONTEXT_ADDR_FROM_STEM(stem) &((context)->uc_mcontext.__gregs[_REG_ ## stem])
