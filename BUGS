@@ -2153,3 +2153,7 @@ WORKAROUND:
 
 399: LOOP FOR ACROSS and full call to DATA-VECTOR-REF
   (fixed in sbcl-0.9.9.x)
+
+400: "aggressive constant folding"
+    (compile '(lambda () (the integer (/ 1 0))))
+  signals an error.

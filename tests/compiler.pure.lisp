@@ -1978,4 +1978,13 @@
                                      (speed 0) (debug 1)))
                   (not (not (logbitp 0 (floor 2147483651 (min -23 0))))))))))
 
-
+;; mistyping found by random-tester
+(assert (zerop
+  (funcall
+   (compile
+    nil
+    '(lambda ()
+      (declare (optimize (speed 1) (debug 0)
+                (space 2) (safety 0) (compilation-speed 0)))
+      (unwind-protect 0
+        (* (/ (multiple-value-prog1 -29457482 -5602513511) 1))))))))

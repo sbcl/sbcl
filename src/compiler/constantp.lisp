@@ -195,7 +195,7 @@ constantness of the FORM in ENVIRONMENT."
 
  (defconstantp multiple-value-prog1 (first-form &body forms)
    :test (every #'constantp* (cons first-form forms))
-   :test (constant-form-value* first-form))
+   :eval (constant-form-value* first-form))
 
  (defconstantp progv (symbols values &body forms)
    :test (and (constantp* symbols)
