@@ -81,9 +81,16 @@
          (let ((info (info :function :info name)))
            (and info (ir1-attributep (fun-info-attributes info)
                                      foldable)))
-         (every (lambda (arg)
-                  (%constantp arg environment envp))
-                (cdr form)))))
+         (and (every (lambda (arg)
+                       (%constantp arg environment envp))
+                     (cdr form))
+              ;; Even though the function may be marked as foldable
+              ;; the call may still signal an error -- eg: (CAR 1).
+              (handler-case
+                  (progn
+                    (constant-function-call-value form environment envp)
+                    t)
+                (error () nil))))))
 
 (defun constant-function-call-value (form environment envp)
   (apply (fdefinition (car form))
@@ -172,14 +179,13 @@ constantness of the FORM in ENVIRONMENT."
    :test (every #'constantp* (cons protected-form cleanup-forms))
    :eval (constant-form-value* protected-form))
 
- (defconstantp the (value-type form)
-   :test (constantp* form)
-   :eval (let ((value (constant-form-value* form)))
-           (if (typep value value-type)
-               value
-               (error 'type-error
-                      :datum value
-                      :expected-type value-type))))
+ (defconstantp the (type form)
+   :test (and (constantp* form)
+              (handler-case
+                  ;; in case the type-spec is malformed!
+                  (typep (constant-form-value* form) type)
+                (error () nil)))
+   :eval (constant-form-value* form))
 
  (defconstantp block (name &body forms)
    ;; We currently fail to detect cases like

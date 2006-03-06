@@ -1988,3 +1988,7 @@
                 (space 2) (safety 0) (compilation-speed 0)))
       (unwind-protect 0
         (* (/ (multiple-value-prog1 -29457482 -5602513511) 1))))))))
+
+;; aggressive constant folding (bug #400)
+(assert
+ (eq t (funcall (compile nil '(lambda () (or t (the integer (/ 1 0))))))))

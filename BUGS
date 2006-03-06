@@ -2074,9 +2074,6 @@ WORKAROUND:
   the right fix is to remove the abstraction violation in the
   compiler's type deriver.
 
-392: slot-accessor for subclass misses obsoleted superclass
-  (fixed in sbcl-0.9.7.9)
-
 393: Wrong error from methodless generic function
     (DEFGENERIC FOO (X))
     (FOO 1 2)
@@ -2151,9 +2148,6 @@ WORKAROUND:
   For some more details see comments for (define-alien-type-method
   (c-string :deport-gen) ...)  in host-c-call.lisp.
 
-399: LOOP FOR ACROSS and full call to DATA-VECTOR-REF
-  (fixed in sbcl-0.9.9.x)
-
 400: "aggressive constant folding"
-    (compile nil '(lambda () (or t (the integer (/ 1 0)))))
-  signals an error.
+  (fixed in sbcl-0.9.10.17)
+

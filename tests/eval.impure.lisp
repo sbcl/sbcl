@@ -136,6 +136,16 @@
                 ((the integer 1)        t         1)
                 ((the integer (+ 1 1))  t         2)
                 ((the integer (foo))    nil)
+                ((the symbol 1)         nil)
+                ((the "bad type" 1)     nil)
+                ((multiple-value-prog1
+                     (+ 1 1)
+                   :nada)               t         2)
+                ((multiple-value-prog1
+                     :nada
+                   (/ 1 0))             nil)
+                ((/ 1 0)                nil)
+                ((/ 1 1)                t         1)
                 ((+ 1 2)                t         3)))
   (destructuring-bind (form c &optional v) test
     (assert (eql (constantp form) c))
