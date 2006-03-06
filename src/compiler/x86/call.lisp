@@ -201,9 +201,13 @@
    ((<= nvals 1)
     (note-this-location vop :single-value-return)
     (let ((single-value (gen-label)))
-      (inst jmp :nc single-value)
-      (inst mov esp-tn ebx-tn)
-      (emit-label single-value)))
+      (cond
+       ((member :cmov *backend-subfeatures*)
+        (inst cmov :c esp-tn ebx-tn))
+       (t
+        (inst jmp :nc single-value)
+        (inst mov esp-tn ebx-tn)
+        (emit-label single-value)))))
    ((<= nvals register-arg-count)
     (let ((regs-defaulted (gen-label)))
       (note-this-location vop :unknown-return)

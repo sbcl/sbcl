@@ -200,10 +200,7 @@
   (cond
    ((<= nvals 1)
     (note-this-location vop :single-value-return)
-    (let ((single-value (gen-label)))
-      (inst jmp :nc single-value)
-      (inst mov rsp-tn rbx-tn)
-      (emit-label single-value)))
+    (inst cmov :c rsp-tn rbx-tn))
    ((<= nvals register-arg-count)
     (let ((regs-defaulted (gen-label)))
       (note-this-location vop :unknown-return)
