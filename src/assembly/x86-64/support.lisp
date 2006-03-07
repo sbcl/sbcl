@@ -24,9 +24,7 @@
               (make-ea :qword :disp (make-fixup ',name :assembly-routine)))
         (inst call temp-reg-tn)
         (note-this-location ,vop :single-value-return)
-        (inst jmp :nc single-value)
-        (move rsp-tn rbx-tn)
-        single-value)
+        (inst cmov :c rsp-tn rbx-tn))
       '((:save-p :compute-only))))
     (:none
      (values

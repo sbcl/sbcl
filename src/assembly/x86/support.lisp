@@ -34,9 +34,14 @@
       `((note-this-location ,vop :call-site)
         (inst call (make-fixup ',name :assembly-routine))
         (note-this-location ,vop :single-value-return)
-        (inst jmp :nc single-value)
-        (move esp-tn ebx-tn)
-        single-value)
+        (cond
+          ((member :cmov *backend-subfeatures*)
+           (inst cmov :c esp-tn ebx-tn))
+          (t
+           (let ((single-value (gen-label)))
+             (inst jmp :nc single-value)
+             (move esp-tn ebx-tn)
+             (emit-label single-value)))))
       '((:save-p :compute-only))))))
 
 (!def-vm-support-routine generate-return-sequence (style)
