@@ -448,18 +448,6 @@
     (loadw res struct 0 instance-pointer-lowtag)
     (inst shr res n-widetag-bits)))
 
-(define-vop (instance-ref slot-ref)
-  (:variant instance-slots-offset instance-pointer-lowtag)
-  (:policy :fast-safe)
-  (:translate %instance-ref)
-  (:arg-types instance (:constant index)))
-
-(define-vop (instance-set slot-set)
-  (:policy :fast-safe)
-  (:translate %instance-set)
-  (:variant instance-slots-offset instance-pointer-lowtag)
-  (:arg-types instance (:constant index) *))
-
 (define-full-reffer instance-index-ref * instance-slots-offset
   instance-pointer-lowtag (any-reg descriptor-reg) * %instance-ref)
 

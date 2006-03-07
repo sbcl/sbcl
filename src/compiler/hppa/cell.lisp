@@ -242,20 +242,6 @@
     (loadw res struct 0 instance-pointer-lowtag)
     (inst srl res n-widetag-bits res)))
 
-(define-vop (instance-ref slot-ref)
-  (:variant instance-slots-offset instance-pointer-lowtag)
-  (:policy :fast-safe)
-  (:translate %instance-ref)
-  (:arg-types instance (:constant index)))
-
-#+nil ; As per usual (cf sbcl-devel discussion about this VOP which
-      ; appears to return no values)
-(define-vop (instance-set slot-set)
-  (:policy :fast-safe)
-  (:translate %instance-set)
-  (:variant instance-slots-offset instance-pointer-lowtag)
-  (:arg-types instance (:constant index) *))
-
 (define-full-reffer instance-index-ref * instance-slots-offset
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-ref)
 

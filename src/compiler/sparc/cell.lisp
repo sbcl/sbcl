@@ -246,25 +246,6 @@
     (loadw temp struct 0 instance-pointer-lowtag)
     (inst srl res temp n-widetag-bits)))
 
-(define-vop (instance-ref slot-ref)
-  (:variant instance-slots-offset instance-pointer-lowtag)
-  (:policy :fast-safe)
-  (:translate %instance-ref)
-  (:arg-types * (:constant index)))
-
-;;; This VOP has no :results; however, %instance-set must return a
-;;; value. This caused, in the forward port to 0.7.x, an error in
-;;; !fdefn-cold-init: "argument X is not a REAL: NIL". This VOP is
-;;; commented out for now, pending the addition of checking code to
-;;; the define-vop machinery to ascertain that this was indeed the
-;;; problem. -- CSR, 2002-02-12
-#+nil
-(define-vop (instance-set slot-set)
-  (:policy :fast-safe)
-  (:translate %instance-set)
-  (:variant instance-slots-offset instance-pointer-lowtag)
-  (:arg-types * (:constant index) *))
-
 (define-vop (instance-index-ref word-index-ref)
   (:policy :fast-safe)
   (:translate %instance-ref)
