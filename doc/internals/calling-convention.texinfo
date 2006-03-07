@@ -1,0 +1,203 @@
+@node Calling Convention
+@comment  node-name,  next,  previous,  up
+@chapter Calling Convention
+
+@menu
+* Assembly Routines::           
+* Local Calls::                 
+* Full Calls::                  
+* Unknown-Values Returns::      
+* IR2 Conversion::              
+* Additional Notes::            
+@end menu
+
+The calling convention used within Lisp code on SBCL/x86 was,
+for the longest time, really bad. If it weren't for the fact
+that it predates modern x86 CPUs, one might almost believe it to
+have been designed explicitly to defeat the branch-prediction
+hardware therein. This chapter is somewhat of a brain-dump of
+information that might be useful when attempting to improve the
+situation further, mostly written immediately after having made
+a dent in the problem.
+
+Assumptions about the calling convention are embedded throughout
+the system. The runtime knows how to call in to Lisp and receive
+a value from Lisp, the assembly-routines have intimate knowledge
+of what registers are involved in a call situation,
+@file{src/compiler/target/call.lisp} contains the VOPs involved in
+implementing function call/return, and @file{src/compiler/ir2tran.lisp} has
+assumptions about frame allocation and argument/return-value
+passing locations.
+
+The current round of changes has been limited to VOPs, assembly-routines,
+related support functions, and the required support in the runtime.
+
+Note that most of this documentation also applies to other CPUs,
+modulo the actual registers involved, the displacement used
+in the single-value return convention, and the fact that they
+use the ``old'' convention anywhere it is mentioned.
+
+
+@node Assembly Routines
+@comment  node-name,  next,  previous,  up
+@section Assembly Routines
+
+@example
+;;; The :full-call assembly-routines must use the same full-call
+;;; unknown-values return convention as a normal call, as some
+;;; of the routines will tail-chain to a static-function. The
+;;; routines themselves, however, take all of their arguments
+;;; in registers (this will typically be one or two arguments,
+;;; and is one of the lower bounds on the number of argument-
+;;; passing registers), and thus don't need a call frame, which
+;;; simplifies things for the normal call/return case. When it
+;;; is neccessary for one of the assembly-functions to call a
+;;; static-function it will construct the required call frame.
+;;; Also, none of the assembly-routines return other than one
+;;; value, which again simplifies the return path.
+;;;    -- AB, 2006/Feb/05.
+@end example
+
+There are a couple of assembly-routines that implement parts of
+the process of returning or tail-calling with a variable number
+of values. These are @code{return-multiple} and @code{tail-call-variable} in
+@file{src/assembly/x86/assem-rtns.lisp}. They have their own calling
+convention for invocation from a VOP, but implement various
+block-move operations on the stack contents followed by a return
+or tail-call operation.
+
+That's about all I have to say about the assembly-routines.
+
+
+@node Local Calls
+@comment  node-name,  next,  previous,  up
+@section Local Calls
+
+Calls within a block, whatever a block is, can use a local
+calling convention in which the compiler knows where all of the
+values are to be stored, and thus can elide the check for number
+of return values, stack-pointer restoration, etc. Alternately,
+they can use the full unknown-values return convention while
+trying to short-circuit the call convention. There is probably
+some low-hanging fruit here in terms of CPU branch-prediction.
+
+The local (known-values) calling convention is implemented by
+the @code{known-call-local} and @code{known-return} VOPs.
+
+Local unknown-values calls are handled at the call site by the
+@code{call-local} and @code{mutiple-call-local} VOPs. The main difference
+between the full call and local call protocols here is that
+local calls use a different frame setup protocol, and will tend
+to not use the normal frame layout for the old frame-pointer and
+return-address.
+
+
+@node Full Calls
+@comment  node-name,  next,  previous,  up
+@section Full Calls
+
+@example
+;;; There is something of a cross-product effect with full calls.
+;;; Different versions are used depending on whether we know the
+;;; number of arguments or the name of the called function, and
+;;; whether we want fixed values, unknown values, or a tail call.
+;;;
+;;; In full call, the arguments are passed creating a partial frame on
+;;; the stack top and storing stack arguments into that frame. On
+;;; entry to the callee, this partial frame is pointed to by FP.
+@end example
+
+Basically, we use caller-allocated frames, pass an fdefinition,
+function, or closure in @code{EAX},
+argcount in @code{ECX}, and first three args in @code{EDX}, @code{EDI},
+and @code{ESI}. @code{EBP} points to just past the start of the frame
+(the first frame slot is at @code{[EBP-4]}, not the traditional @code{[EBP]},
+due in part to how the frame allocation works). The caller stores the
+link for the old frame at @code{[EBP-4]} and reserved space for a
+return address at @code{[EBP-8]}. @code{[EBP-12]} appears to be an
+empty slot available to the compiler within a function, it
+may-or-may-not be used by some of the call/return junk. The first stack
+argument is at @code{[EBP-16]}. The callee then reallocates the
+frame to include sufficient space for its local variables, after
+possibly converting any @code{&rest} arguments to a proper list.
+
+
+@node Unknown-Values Returns
+@comment  node-name,  next,  previous,  up
+@section Unknown-Values Returns
+
+The unknown-values return convention consists of two parts. The
+first part is that of returning a single value. The second is
+that of returning a different number of values. We also changed
+the convention here recently, so we should describe both the old
+and new versions. The three interesting VOPs here are @code{return-single},
+@code{return}, and @code{return-multiple}.
+
+For a single-value return, we load the return value in the first
+argument-passing register (@code{A0}, or @code{EDI}), reload the old frame
+pointer, burn the stack frame, and return. The old convention
+was to increment the return address by two before returning,
+typically via a @code{JMP}, which was guaranteed to screw up branch-
+prediction hardware. The new convention is to return with the
+carry flag clear.
+
+For a multiple-value return, we pass the first three values in
+the argument-passing registers, and the remainder on the stack.
+@code{ECX} contains the total number of values as a fixnum, @code{EBX} points
+to where the callee frame was, @code{EBP} has been restored to point to
+the caller frame, and the first of the values on the stack (the
+fourth overall) is at @code{[EBP-16]}. The old convention was just to
+jump to the return address at this point. The newer one has us
+setting the carry flag first.
+
+The code at the call site for accepting some number of unknown-
+values is fairly well boilerplated. If we are expecting zero or
+one values, then we need to reset the stack pointer if we are in
+a multiple-value return. In the old convention we just encoded a
+@code{MOV ESP, EBX} instruction, which neatly fit in the two byte gap
+that was skipped by a single-value return. In the new convention
+we have to explicitly check the carry flag with a conditional
+jump around the @code{MOV ESP, EBX} instruction. When expecting more
+than one value, we need to arrange to set up default values when
+a single-value return happens, so we encode a jump around a
+stub of code which fakes up the register use convention of a
+multiple-value return. Again, in the old convention this was a
+two-byte unconditionl jump, and in the new convention this is
+a conditional jump based on the carry flag.
+
+
+@node IR2 Conversion
+@comment  node-name,  next,  previous,  up
+@section IR2 Conversion
+
+The actual selection of VOPs for implementing call/return for a
+given function is handled in ir2tran.lisp. Returns are handled
+by @code{ir2-convert-return}, calls are handled by @code{ir2-convert-local-call},
+@code{ir2-convert-full-call}, and @code{ir2-convert-mv-call}, and
+function prologues are handled by @code{ir2-convert-bind} (which calls
+@code{init-xep-environment} for the case of an entry point for a full
+call).
+
+
+@node Additional Notes
+@comment  node-name,  next,  previous,  up
+@section Additional Notes
+
+The low-hanging fruit here is going to be changing every call
+and return to use @code{CALL} and @code{RETURN} instructions
+instead of @code{JMP} instructions.
+
+A more involved change would be to reduce the number of argument
+passing registers from three to two, which may be beneficial in
+terms of our quest to free up a GPR for use on Win32 boxes for a
+thread structure.
+
+Another possible win could be to store multiple return-values
+somewhere other than the stack, such as a dedicated area of the
+thread structure. The main concern here in terms of clobbering
+would be to make sure that interrupts (and presumably the
+internal-error machinery) know to save the area and that the
+compiler knows that the area cannot be live across a function
+call. Actually implementing this would involve hacking the IR2
+conversion, since as it stands now the same argument conventions
+are used for both call and return value storage (same TNs).
