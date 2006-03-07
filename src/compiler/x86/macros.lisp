@@ -399,27 +399,21 @@
            `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg)))
+              (index :scs (any-reg immediate)))
        (:arg-types ,type tagged-num)
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 3                    ; pw was 5
-         (inst mov value (make-ea :dword :base object :index index
-                                  :disp (- (* ,offset n-word-bytes)
-                                           ,lowtag)))))
-     (define-vop (,(symbolicate name "-C"))
-       ,@(when translate
-           `((:translate ,translate)))
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg)))
-       (:info index)
-       (:arg-types ,type (:constant (signed-byte 30)))
-       (:results (value :scs ,scs))
-       (:result-types ,el-type)
-       (:generator 2                    ; pw was 5
-         (inst mov value (make-ea :dword :base object
-                                  :disp (- (* (+ ,offset index) n-word-bytes)
-                                           ,lowtag)))))))
+         (sc-case index
+           (immediate
+            (inst mov value (make-ea :dword :base object
+                                     :disp (- (* (+ ,offset (tn-value index))
+                                                 n-word-bytes)
+                                              ,lowtag))))
+           (t
+            (inst mov value (make-ea :dword :base object :index index
+                                     :disp (- (* ,offset n-word-bytes)
+                                              ,lowtag)))))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
   `(progn
@@ -428,32 +422,24 @@
            `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg))
+              (index :scs (any-reg immediate))
               (value :scs ,scs :target result))
        (:arg-types ,type tagged-num ,el-type)
        (:results (result :scs ,scs))
        (:result-types ,el-type)
        (:generator 4                    ; was 5
-         (inst mov (make-ea :dword :base object :index index
-                            :disp (- (* ,offset n-word-bytes) ,lowtag))
-               value)
-         (move result value)))
-     (define-vop (,(symbolicate name "-C"))
-       ,@(when translate
-           `((:translate ,translate)))
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg))
-              (value :scs ,scs :target result))
-       (:info index)
-       (:arg-types ,type (:constant (signed-byte 30)) ,el-type)
-       (:results (result :scs ,scs))
-       (:result-types ,el-type)
-       (:generator 3                    ; was 5
-         (inst mov (make-ea :dword :base object
-                            :disp (- (* (+ ,offset index) n-word-bytes)
-                                     ,lowtag))
-               value)
-         (move result value)))))
+         (sc-case index
+           (immediate
+            (inst mov (make-ea :dword :base object
+                               :disp (- (* (+ ,offset (tn-value index))
+                                           n-word-bytes)
+                                        ,lowtag))
+                  value))
+           (t
+            (inst mov (make-ea :dword :base object :index index
+                               :disp (- (* ,offset n-word-bytes) ,lowtag))
+                  value)))
+        (move result value)))))
 
 ;;; helper for alien stuff.
 (defmacro with-pinned-objects ((&rest objects) &body body)
