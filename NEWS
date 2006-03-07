@@ -1,9 +1,13 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.11 relative to sbcl-0.9.10:
-  * new port: SBCL now works on x86/Darwin, including MacOS X 10.4.5
-    on Intel.
+  * new platform: experimental support for SBCL x86/Darwin, including
+    MacOS X 10.4.5 on Intel.
   * new feature: Unicode character names are now known to the system
     (through CHAR-NAME and NAME-CHAR).
+  * minor incompatible change: the contrib modules SB-POSIX and
+    SB-BSD-SOCKETS no longer depend on stub C libraries; the intent of
+    this change is to make it easier to distribute
+    location-independent binaries.
   * bug fix: as implied by AMOP, standardized classes no longer have
     slots named by external symbols of public packages.  (reported by
     Pascal Costanza)

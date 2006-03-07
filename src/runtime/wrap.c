@@ -1,6 +1,6 @@
 /*
  * wrappers around low-level operations to provide a simpler interface
- * to the operations that Lisp needs
+ * to the operations that Lisp (and some contributed modules) needs.
  *
  * The functions in this file are typically called directly from Lisp.
  * Thus, when their signature changes, they don't need updates in a .h
@@ -34,6 +34,8 @@
 #include <unistd.h>
 #ifndef LISP_FEATURE_WIN32
 #include <pwd.h>
+#include <sys/wait.h>
+#include <netdb.h>
 #endif
 #include <stdio.h>
 
@@ -420,3 +422,75 @@ int gettimeofday(long *timeval, long *timezone)
     return 0;
 }
 #endif
+
+
+/* We will need to define these things or their equivalents for Win32
+   eventually, but for now let's get it working for everyone else. */
+#ifndef LISP_FEATURE_WIN32
+/* From SB-BSD-SOCKETS, to get h_errno */
+int get_h_errno()
+{
+    return h_errno;
+}
+
+/* From SB-POSIX, wait-macros */
+int wifexited(int status) {
+    return WIFEXITED(status);
+}
+int wexitstatus(int status) {
+    return WEXITSTATUS(status);
+}
+int wifsignaled(int status) {
+    return WIFSIGNALED(status);
+}
+int wtermsig(int status) {
+    return WTERMSIG(status);
+}
+int wifstopped(int status) {
+    return WIFSTOPPED(status);
+}
+int wstopsig(int status) {
+    return WSTOPSIG(status);
+}
+
+/* FIXME: POSIX also defines WIFCONTINUED, but that appears not to
+   exist on at least Linux... */
+
+/* From SB-POSIX, stat-macros */
+int s_isreg(mode_t mode)
+{
+    return S_ISREG(mode);
+}
+int s_isdir(mode_t mode)
+{
+    return S_ISDIR(mode);
+}
+int s_ischr(mode_t mode)
+{
+    return S_ISCHR(mode);
+}
+int s_isblk(mode_t mode)
+{
+    return S_ISBLK(mode);
+}
+int s_isfifo(mode_t mode)
+{
+    return S_ISFIFO(mode);
+}
+int s_islnk(mode_t mode)
+{
+#ifdef S_ISLNK
+    return S_ISLNK(mode);
+#else
+    return ((mode & S_IFMT) == S_IFLNK);
+#endif
+}
+int s_issock(mode_t mode)
+{
+#ifdef S_ISSOCK
+    return S_ISSOCK(mode);
+#else
+    return ((mode & S_IFMT) == S_IFSOCK);
+#endif
+}
+#endif /* !LISP_FEATURE_WIN32 */
