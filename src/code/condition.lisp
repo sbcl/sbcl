@@ -41,7 +41,7 @@
 
 (/show0 "condition.lisp 24")
 
-(def!struct (condition-classoid (:include slot-classoid)
+(def!struct (condition-classoid (:include classoid)
                                 (:constructor make-condition-classoid))
   ;; list of CONDITION-SLOT structures for the direct slots of this
   ;; class

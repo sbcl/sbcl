@@ -1167,7 +1167,7 @@
                   (values nil t))
                  ((eq type1 (find-classoid 'function))
                   (values nil t))
-                 ((or (basic-structure-classoid-p type1)
+                 ((or (structure-classoid-p type1)
                       #+nil
                       (condition-classoid-p type1))
                   (values t t))
@@ -1196,9 +1196,15 @@
      (if (classoid-p type1)
          (if (and (not (member type1 *non-instance-classoid-types*
                                :key #'find-classoid))
+                  (not (eq type1 (find-classoid 'function)))
                   (not (find (classoid-layout (find-classoid 'function))
                              (layout-inherits (classoid-layout type1)))))
-             type1
+             (if (or (structure-classoid-p type1)
+                     (and (not (eq type1 (find-classoid 'stream)))
+                          (not (find (classoid-layout (find-classoid 'stream))
+                                     (layout-inherits (classoid-layout type1))))))
+                 type1
+                 nil)
              *empty-type*)
          (if (type-might-contain-other-types-p type1)
              nil
@@ -1211,7 +1217,7 @@
                         (layout-inherits (classoid-layout type1))))
              type1
              (if (type= type1 (find-classoid 'function))
-                 type1
+                 type2
                  nil))
          (if (fun-type-p type1)
              nil

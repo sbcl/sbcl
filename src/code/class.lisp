@@ -677,29 +677,13 @@
   ;; during cold-load.
   (translation nil :type (or ctype (member nil :initializing))))
 
-;;; FIXME: In CMU CL, this was a class with a print function, but not
-;;; necessarily a structure class (e.g. CONDITIONs). In SBCL,
-;;; we let CLOS handle our print functions, so that is no longer needed.
-;;; Is there any need for this class any more?
-(def!struct (slot-classoid (:include classoid)
-                           (:constructor nil)))
-
 ;;; STRUCTURE-CLASS represents what we need to know about structure
 ;;; classes. Non-structure "typed" defstructs are a special case, and
 ;;; don't have a corresponding class.
-(def!struct (basic-structure-classoid (:include slot-classoid)
-                                      (:constructor nil)))
-
-(def!struct (structure-classoid (:include basic-structure-classoid)
+(def!struct (structure-classoid (:include classoid)
                                 (:constructor make-structure-classoid))
   ;; If true, a default keyword constructor for this structure.
   (constructor nil :type (or function null)))
-
-;;; FUNCALLABLE-STRUCTURE-CLASS is used to represent funcallable
-;;; structures, which are used to implement generic functions.
-(def!struct (funcallable-structure-classoid
-             (:include basic-structure-classoid)
-             (:constructor make-funcallable-structure-classoid)))
 
 ;;;; classoid namespace
 
@@ -870,8 +854,8 @@ NIL is returned when no such class exists."
         ;; Otherwise, we can't in general be sure that the
         ;; intersection is empty, since a subclass of both might be
         ;; defined. But we can eliminate it for some special cases.
-        ((or (basic-structure-classoid-p class1)
-             (basic-structure-classoid-p class2))
+        ((or (structure-classoid-p class1)
+             (structure-classoid-p class2))
          ;; No subclass of both can be defined.
          *empty-type*)
         ((eq (classoid-state class1) :sealed)

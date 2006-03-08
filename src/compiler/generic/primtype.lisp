@@ -316,17 +316,9 @@
                (res (any))
                (exact nil))
            (dolist (type types (values res exact))
-             (when (eq type (specifier-type 'function))
-               ;; KLUDGE: Deal with (and function instance), both of which
-               ;; have an exact primitive type.
-               (return (part-of function)))
              (multiple-value-bind (ptype ptype-exact)
                  (primitive-type type)
                (when ptype-exact
-                 ;; Apart from the previous kludge exact primitive
-                 ;; types should match, if indeed there are any. It
-                 ;; may be that this assumption isn't really safe,
-                 ;; but at least we'll see what breaks. -- NS 20041104
                  (aver (or (not exact) (eq ptype res)))
                  (setq exact t))
                (when (or ptype-exact (and (not exact) (eq res (any))))

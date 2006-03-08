@@ -25,4 +25,8 @@
                                 *empty-type*)))
 (assert (member-type-p (specifier-type '(or float-format null))))
 
+(let ((fd-stream (specifier-type 'fd-stream)))
+  (assert (type= fd-stream (type-intersection (specifier-type 'instance)
+                                              fd-stream))))
+
 (/show "done with tests/type.after-xc.lisp")

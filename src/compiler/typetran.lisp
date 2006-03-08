@@ -433,7 +433,7 @@
                               `((when (layout-invalid ,n-layout)
                                   (%layout-invalid-error object ',layout))))
                       (eq ,n-layout ',layout)))))
-           ((and (typep class 'basic-structure-classoid) layout)
+           ((and (typep class 'structure-classoid) layout)
             ;; structure type tests; hierarchical layout depths
             (let ((depthoid (layout-depthoid layout))
                   (n-layout (gensym)))
