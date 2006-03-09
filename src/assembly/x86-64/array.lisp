@@ -12,28 +12,8 @@
 
 (in-package "SB!VM")
 
-;;;; allocation
+;;;; Note: On other platforms ALLOCATE-VECTOR is an assembly routine,
+;;;; but on X86-64 it is a VOP.
 
-(define-assembly-routine (allocate-vector
-                          (:policy :fast-safe)
-                          (:translate allocate-vector)
-                          (:arg-types positive-fixnum
-                                      positive-fixnum
-                                      positive-fixnum))
-                         ((:arg type unsigned-reg eax-offset)
-                          (:arg length any-reg ebx-offset)
-                          (:arg words any-reg ecx-offset)
-                          (:res result descriptor-reg edx-offset))
-  (inst mov result (+ (1- (ash 1 n-lowtag-bits))
-                      (* vector-data-offset n-word-bytes)))
-  (inst add result words)
-  (inst and result (lognot lowtag-mask))
-  (pseudo-atomic
-   (allocation result result)
-   (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
-   (storew type result 0 other-pointer-lowtag)
-   (storew length result vector-length-slot other-pointer-lowtag))
-  (inst ret))
-
 ;;;; Note: CMU CL had assembly language primitives for hashing strings,
 ;;;; but SBCL doesn't.
