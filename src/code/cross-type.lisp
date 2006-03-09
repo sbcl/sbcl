@@ -341,10 +341,23 @@
 ;;; cross-compile time only.
 (defun ctypep (obj ctype)
   (check-type ctype ctype)
-  (let (;; the Common Lisp type specifier corresponding to CTYPE
-        (type (type-specifier ctype)))
-    (check-type type (or symbol cons))
-    (cross-typep obj type)))
+  ;; There is at least one possible endless recursion in the
+  ;; cross-compiler type system: (SUBTYPEP NULL (OR UNKOWN0 UNKNOWN1)
+  ;; runs out of stack. The right way would probably be to not
+  ;; implement CTYPEP in terms of TYPE-SPECIFIER (:UNPARSE, that may
+  ;; call TYPE=, that in turn may call CTYPEP). Until then, pick a few
+  ;; cherries off.
+  (cond ((member-type-p ctype)
+         (if (member obj (member-type-members ctype))
+             (values t t)
+             (values nil t)))
+        ((union-type-p ctype)
+         (any/type #'ctypep obj (union-type-types ctype)))
+        (t
+         (let ( ;; the Common Lisp type specifier corresponding to CTYPE
+               (type (type-specifier ctype)))
+           (check-type type (or symbol cons))
+           (cross-typep obj type)))))
 
 (defun ctype-of (x)
   (typecase x

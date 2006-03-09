@@ -283,6 +283,11 @@
     (sb-xc:subtypep '(function) '(function (t &rest t)))
   (assert (not yes))
   (assert win))
+;; Used to run out of stack.
+(multiple-value-bind (yes win)
+    (sb-xc:subtypep 'null '(or unk0 unk1))
+  (assert (not yes))
+  (assert (not win)))
 
 (multiple-value-bind (yes win)
     (sb-xc:subtypep '(and function instance) nil)
