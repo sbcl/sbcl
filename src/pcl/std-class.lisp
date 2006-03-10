@@ -812,9 +812,8 @@
      (update-gfs-of-class class)
      (update-initargs class (compute-default-initargs class))
      (update-ctors 'finalize-inheritance :class class))
-   (unless finalizep
-     (dolist (sub (class-direct-subclasses class))
-       (update-class sub nil)))))
+   (dolist (sub (class-direct-subclasses class))
+     (update-class sub nil))))
 
 (define-condition cpl-protocol-violation (reference-condition error)
   ((class :initarg :class :reader cpl-protocol-violation-class)

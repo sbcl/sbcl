@@ -1244,4 +1244,16 @@
         (y (make-kpreid-enode)))
     (= (slot-value x 'slot) (slot-value y 'slot))))
 
+;;; defining a class hierarchy shouldn't lead to spurious classoid
+;;; errors on TYPEP questions (reported by Tim Moore on #lisp
+;;; 2006-03-10)
+(defclass backwards-2 (backwards-1) (a b))
+(defclass backwards-3 (backwards-2) ())
+(defun typep-backwards-3 (x)
+  (typep x 'backwards-3))
+(defclass backwards-1 () (a b))
+(assert (not (typep-backwards-3 1)))
+(assert (not (typep-backwards-3 (make-instance 'backwards-2))))
+(assert (typep-backwards-3 (make-instance 'backwards-3)))
+
 ;;;; success
