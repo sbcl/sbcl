@@ -162,6 +162,8 @@
   plist               ; a place for clients to stash things
   cookie)             ; list of the number of pipes from the subproc
 
+
+
 (defmethod print-object ((process process) stream)
   (print-unreadable-object (process stream :type t)
     (format stream
@@ -170,25 +172,57 @@
             (process-status process)))
   process)
 
-(defun process-status (proc)
-  "Return the current status of process.  The result is one of :RUNNING,
+(setf (documentation 'process-p 'function)
+      "T if OBJECT is a PROCESS, NIL otherwise.")
+
+(setf (documentation 'process-pid 'function) "The pid of the child process.")
+
+(defun process-status (process)
+  "Return the current status of PROCESS.  The result is one of :RUNNING,
    :STOPPED, :EXITED, or :SIGNALED."
   (get-processes-status-changes)
-  (process-%status proc))
+  (process-%status process))
 
-(defun process-wait (proc &optional check-for-stopped)
-  "Wait for PROC to quit running for some reason.  Returns PROC."
+(setf (documentation 'process-exit-code 'function)
+      "The exit code or the signal of a stopped process.")
+
+(setf (documentation 'process-core-dumped 'function)
+      "T if a core image was dumped by the process.")
+
+(setf (documentation 'process-pty 'function)
+      "The pty stream of the process or NIL.")
+
+(setf (documentation 'process-input 'function)
+      "The input stream of the process or NIL.")
+
+(setf (documentation 'process-output 'function)
+      "The output stream of the process or NIL.")
+
+(setf (documentation 'process-error 'function)
+      "The error stream of the process or NIL.")
+
+(setf (documentation 'process-status-hook  'function)
+      "A function that is called when PROCESS changes its status.
+The function is called with PROCESS as its only argument.")
+
+(setf (documentation 'process-plist  'function)
+      "A place for clients to stash things.")
+
+(defun process-wait (process &optional check-for-stopped)
+  "Wait for PROCESS to quit running for some reason.
+   When CHECK-FOR-STOPPED is T, also returns when PROCESS is
+   stopped.  Returns PROCESS."
   (loop
-      (case (process-status proc)
+      (case (process-status process)
         (:running)
         (:stopped
          (when check-for-stopped
            (return)))
         (t
-         (when (zerop (car (process-cookie proc)))
+         (when (zerop (car (process-cookie process)))
            (return))))
       (sb-sys:serve-all-events 1))
-  proc)
+  process)
 
 #-hpux
 ;;; Find the current foreground process group id.
@@ -204,23 +238,23 @@
       result))
   (process-pid proc))
 
-(defun process-kill (proc signal &optional (whom :pid))
-  "Hand SIGNAL to PROC. If WHOM is :PID, use the kill Unix system call. If
+(defun process-kill (process signal &optional (whom :pid))
+  "Hand SIGNAL to PROCESS. If WHOM is :PID, use the kill Unix system call. If
    WHOM is :PROCESS-GROUP, use the killpg Unix system call. If WHOM is
    :PTY-PROCESS-GROUP deliver the signal to whichever process group is
    currently in the foreground."
   (let ((pid (ecase whom
                ((:pid :process-group)
-                (process-pid proc))
+                (process-pid process))
                (:pty-process-group
                 #-hpux
-                (find-current-foreground-process proc)))))
+                (find-current-foreground-process process)))))
     (multiple-value-bind
           (okay errno)
         (case whom
           #+hpux
           (:pty-process-group
-           (sb-unix:unix-ioctl (sb-sys:fd-stream-fd (process-pty proc))
+           (sb-unix:unix-ioctl (sb-sys:fd-stream-fd (process-pty process))
                                sb-unix:TIOCSIGSEND
                                (sb-sys:int-sap
                                 signal)))
@@ -230,35 +264,35 @@
            (sb-unix:unix-kill pid signal)))
       (cond ((not okay)
              (values nil errno))
-            ((and (eql pid (process-pid proc))
+            ((and (eql pid (process-pid process))
                   (= signal sb-unix:sigcont))
-             (setf (process-%status proc) :running)
-             (setf (process-exit-code proc) nil)
-             (when (process-status-hook proc)
-               (funcall (process-status-hook proc) proc))
+             (setf (process-%status process) :running)
+             (setf (process-exit-code process) nil)
+             (when (process-status-hook process)
+               (funcall (process-status-hook process) process))
              t)
             (t
              t)))))
 
-(defun process-alive-p (proc)
-  "Return T if the process is still alive, NIL otherwise."
-  (let ((status (process-status proc)))
+(defun process-alive-p (process)
+  "Return T if PROCESS is still alive, NIL otherwise."
+  (let ((status (process-status process)))
     (if (or (eq status :running)
             (eq status :stopped))
         t
         nil)))
 
-(defun process-close (proc)
-  "Close all streams connected to PROC and stop maintaining the status slot."
+(defun process-close (process)
+  "Close all streams connected to PROCESS and stop maintaining the status slot."
   (macrolet ((frob (stream abort)
                `(when ,stream (close ,stream :abort ,abort))))
-    (frob (process-pty    proc)   t) ; Don't FLUSH-OUTPUT to dead process, ..
-    (frob (process-input  proc)   t) ; .. 'cause it will generate SIGPIPE.
-    (frob (process-output proc) nil)
-    (frob (process-error  proc) nil))
+    (frob (process-pty    process)   t) ; Don't FLUSH-OUTPUT to dead process, ..
+    (frob (process-input  process)   t) ; .. 'cause it will generate SIGPIPE.
+    (frob (process-output process) nil)
+    (frob (process-error  process) nil))
   (with-active-processes-lock ()
-   (setf *active-processes* (delete proc *active-processes*)))
-  proc)
+   (setf *active-processes* (delete process *active-processes*)))
+  process)
 
 ;;; the handler for SIGCHLD signals that RUN-PROGRAM establishes
 (defun sigchld-handler (ignore1 ignore2 ignore3)
@@ -484,72 +518,76 @@
    arguments that can be passed to a Unix program. For no arguments, use NIL
    (which means that just the name of the program is passed as arg 0).
 
-   RUN-PROGRAM will either return NIL or a PROCESS structure.  See the CMU
-   Common Lisp Users Manual for details about the PROCESS structure.
+   RUN-PROGRAM will return a PROCESS structure or NIL on failure.
+   See the CMU Common Lisp Users Manual for details about the
+   PROCESS structure.
 
-   notes about Unix environments (as in the :ENVIRONMENT and :ENV args):
-     1. The SBCL implementation of RUN-PROGRAM, like Perl and many other
-        programs, but unlike the original CMU CL implementation, copies
-        the Unix environment by default.
-     2. Running Unix programs from a setuid process, or in any other
-        situation where the Unix environment is under the control of someone
-        else, is a mother lode of security problems. If you are contemplating
-        doing this, read about it first. (The Perl community has a lot of good
-        documentation about this and other security issues in script-like
-        programs.)
+   Notes about Unix environments (as in the :ENVIRONMENT and :ENV args):
+
+   - The SBCL implementation of RUN-PROGRAM, like Perl and many other
+     programs, but unlike the original CMU CL implementation, copies
+     the Unix environment by default.
+
+   - Running Unix programs from a setuid process, or in any other
+     situation where the Unix environment is under the control of someone
+     else, is a mother lode of security problems. If you are contemplating
+     doing this, read about it first. (The Perl community has a lot of good
+     documentation about this and other security issues in script-like
+     programs.)
 
    The &KEY arguments have the following meanings:
-     :ENVIRONMENT
-        a list of SIMPLE-BASE-STRINGs describing the new Unix environment
-        (as in \"man environ\"). The default is to copy the environment of
-        the current process.
-     :ENV
-        an alternative lossy representation of the new Unix environment,
-        for compatibility with CMU CL
-     :SEARCH
-        Look for PROGRAM in each of the directories along the $PATH
-        environment variable.  Otherwise an absolute pathname is required.
-        (See also FIND-EXECUTABLE-IN-SEARCH-PATH)
-     :WAIT
-        If non-NIL (default), wait until the created process finishes.  If
-        NIL, continue running Lisp until the program finishes.
-     :PTY
-        Either T, NIL, or a stream.  Unless NIL, the subprocess is established
-        under a PTY.  If :pty is a stream, all output to this pty is sent to
-        this stream, otherwise the PROCESS-PTY slot is filled in with a stream
-        connected to pty that can read output and write input.
-     :INPUT
-        Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
-        input for the current process is inherited.  If NIL, /dev/null
-        is used.  If a pathname, the file so specified is used.  If a stream,
-        all the input is read from that stream and send to the subprocess.  If
-        :STREAM, the PROCESS-INPUT slot is filled in with a stream that sends
-        its output to the process. Defaults to NIL.
-     :IF-INPUT-DOES-NOT-EXIST (when :INPUT is the name of a file)
-        can be one of:
-           :ERROR to generate an error
-           :CREATE to create an empty file
-           NIL (the default) to return NIL from RUN-PROGRAM
-     :OUTPUT
-        Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
-        output for the current process is inherited.  If NIL, /dev/null
-        is used.  If a pathname, the file so specified is used.  If a stream,
-        all the output from the process is written to this stream. If
-        :STREAM, the PROCESS-OUTPUT slot is filled in with a stream that can
-        be read to get the output. Defaults to NIL.
-     :IF-OUTPUT-EXISTS (when :OUTPUT is the name of a file)
-        can be one of:
-           :ERROR (the default) to generate an error
-           :SUPERSEDE to supersede the file with output from the program
-           :APPEND to append output from the program to the file
-           NIL to return NIL from RUN-PROGRAM, without doing anything
-     :ERROR and :IF-ERROR-EXISTS
-        Same as :OUTPUT and :IF-OUTPUT-EXISTS, except that :ERROR can also be
-        specified as :OUTPUT in which case all error output is routed to the
-        same place as normal output.
-     :STATUS-HOOK
-        This is a function the system calls whenever the status of the
-        process changes.  The function takes the process as an argument."
+
+   :ENVIRONMENT
+      a list of SIMPLE-BASE-STRINGs describing the new Unix environment
+      (as in \"man environ\"). The default is to copy the environment of
+      the current process.
+   :ENV
+      an alternative lossy representation of the new Unix environment,
+      for compatibility with CMU CL
+   :SEARCH
+      Look for PROGRAM in each of the directories along the $PATH
+      environment variable.  Otherwise an absolute pathname is required.
+      (See also FIND-EXECUTABLE-IN-SEARCH-PATH)
+   :WAIT
+      If non-NIL (default), wait until the created process finishes.  If
+      NIL, continue running Lisp until the program finishes.
+   :PTY
+      Either T, NIL, or a stream.  Unless NIL, the subprocess is established
+      under a PTY.  If :pty is a stream, all output to this pty is sent to
+      this stream, otherwise the PROCESS-PTY slot is filled in with a stream
+      connected to pty that can read output and write input.
+   :INPUT
+      Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
+      input for the current process is inherited.  If NIL, /dev/null
+      is used.  If a pathname, the file so specified is used.  If a stream,
+      all the input is read from that stream and send to the subprocess.  If
+      :STREAM, the PROCESS-INPUT slot is filled in with a stream that sends
+      its output to the process. Defaults to NIL.
+   :IF-INPUT-DOES-NOT-EXIST (when :INPUT is the name of a file)
+      can be one of:
+         :ERROR to generate an error
+         :CREATE to create an empty file
+         NIL (the default) to return NIL from RUN-PROGRAM
+   :OUTPUT
+      Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
+      output for the current process is inherited.  If NIL, /dev/null
+      is used.  If a pathname, the file so specified is used.  If a stream,
+      all the output from the process is written to this stream. If
+      :STREAM, the PROCESS-OUTPUT slot is filled in with a stream that can
+      be read to get the output. Defaults to NIL.
+   :IF-OUTPUT-EXISTS (when :OUTPUT is the name of a file)
+      can be one of:
+         :ERROR (the default) to generate an error
+         :SUPERSEDE to supersede the file with output from the program
+         :APPEND to append output from the program to the file
+         NIL to return NIL from RUN-PROGRAM, without doing anything
+   :ERROR and :IF-ERROR-EXISTS
+      Same as :OUTPUT and :IF-OUTPUT-EXISTS, except that :ERROR can also be
+      specified as :OUTPUT in which case all error output is routed to the
+      same place as normal output.
+   :STATUS-HOOK
+      This is a function the system calls whenever the status of the
+      process changes.  The function takes the process as an argument."
 
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))

@@ -144,6 +144,31 @@ the @code{sb-ext:posix-getenv} function.
 
 @include fun-sb-ext-posix-getenv.texinfo
 
+External programs can be run with @code{sb-ext:run-program}.
+
+@include fun-sb-ext-run-program.texinfo
+
+@include fun-sb-ext-process-p.texinfo
+
+@include fun-sb-ext-process-input.texinfo
+
+@include fun-sb-ext-process-output.texinfo
+
+@include fun-sb-ext-process-error.texinfo
+
+@include fun-sb-ext-process-alive-p.texinfo
+
+@include fun-sb-ext-process-status.texinfo
+
+@include fun-sb-ext-process-wait.texinfo
+
+@include fun-sb-ext-process-exit-code.texinfo
+
+@include fun-sb-ext-process-core-dumped.texinfo
+
+@include fun-sb-ext-process-close.texinfo
+
+@include fun-sb-ext-process-kill.texinfo
 
 @node  Customization Hooks for Users
 @comment  node-name,  next,  previous,  up

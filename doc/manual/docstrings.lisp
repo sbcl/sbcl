@@ -82,7 +82,7 @@ you deserve to lose.")
   "Characters that might start an itemization in docstrings when
   at the start of a line.")
 
-(defparameter *symbol-characters* "ABCDEFGHIJKLMNOPQRSTUVWXYZ*:-+"
+(defparameter *symbol-characters* "ABCDEFGHIJKLMNOPQRSTUVWXYZ*:-+&"
   "List of characters that make up symbols in a docstring.")
 
 (defparameter *symbol-delimiters* " ,.!?;")
