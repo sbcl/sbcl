@@ -161,7 +161,10 @@
   (def!constant static-space-end      #x07fff000)
 
   (def!constant dynamic-space-start   #x09000000)
-  (def!constant dynamic-space-end     #x29000000))
+  (def!constant dynamic-space-end     #x29000000)
+
+  (def!constant linkage-table-space-start #x30000000)
+  (def!constant linkage-table-space-end   #x40000000))
 
 #!+linux
 (progn

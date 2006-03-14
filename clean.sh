@@ -62,7 +62,7 @@ done
 #     The system doc sources are mostly texinfo, plus various odds
 #     and ends like docstrings embedded in .lisp sources; any HTML is
 #     automatically-generated output.
-#   depend
+#   depend, *.d
 #     made by "make depend" (or "gmake depend" or some such thing)
 #   *.lisp-obj, *.fasl, *.x86f, *.axpf, *.lbytef, *.lib
 #     typical extensions for fasl files (not just from SBCL, but
@@ -84,6 +84,7 @@ find . \( \
         -name '?*.axpf' -o \
         -name '?*.lbytef' -o \
         -name '?*.fasl' -o \
+        -name '?*.FASL' -o \
         -name 'core' -o \
         -name '?*.core' -o \
         -name '*.map' -o \
@@ -96,6 +97,7 @@ find . \( \
         -name '*.lisp-temp' -o \
         -name '*.o' -o \
         -name '*.so' -o \
+        -name '*.d' -o \
         -name 'a.out' -o \
         -name 'sbcl' -o \
         -name 'sbcl.h' -o \

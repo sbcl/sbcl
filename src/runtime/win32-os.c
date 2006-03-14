@@ -414,7 +414,12 @@ EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *exception_record,
         return sigtrap_emulator(context, exception_frame);
 
     } else if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
-               is_valid_lisp_addr(fault_address)) {
+               (is_valid_lisp_addr(fault_address) ||
+                /* the linkage table does not contain valid lisp
+                 * objects, but is also committed on-demand here
+                 */
+                in_range_p(fault_address, LINKAGE_TABLE_SPACE_START,
+                           LINKAGE_TABLE_SPACE_END))) {
         /* Pick off GC-related memory fault next. */
         MEMORY_BASIC_INFORMATION mem_info;
 
