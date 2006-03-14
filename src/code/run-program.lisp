@@ -98,7 +98,7 @@
   (rusage sb-alien:int))
 
 (defun wait3 (&optional do-not-hang check-for-stopped)
-  #!+sb-doc
+  #+sb-doc
   "Return any available status information on child process. "
   (multiple-value-bind (pid status)
       (c-wait3 (logior (if do-not-hang
@@ -137,7 +137,7 @@
 ;;;; process control stuff
 
 (defvar *active-processes* nil
-  #!+sb-doc
+  #+sb-doc
   "List of process structures for all active processes.")
 
 (defvar *active-processes-lock*
@@ -174,55 +174,55 @@
             (process-status process)))
   process)
 
-#!+sb-doc
+#+sb-doc
 (setf (documentation 'process-p 'function)
       "T if OBJECT is a PROCESS, NIL otherwise.")
 
-#!+sb-doc
+#+sb-doc
 (setf (documentation 'process-pid 'function) "The pid of the child process.")
 
 (defun process-status (process)
-  #!+sb-doc
+  #+sb-doc
   "Return the current status of PROCESS.  The result is one of :RUNNING,
    :STOPPED, :EXITED, or :SIGNALED."
   (get-processes-status-changes)
   (process-%status process))
 
-#!+sb-doc
+#+sb-doc
 (setf (documentation 'process-exit-code 'function)
       "The exit code or the signal of a stopped process.")
 
-#!+sb-doc
+#+sb-doc
 (setf (documentation 'process-core-dumped 'function)
       "T if a core image was dumped by the process.")
 
-#!+sb-doc
+#+sb-doc
 (setf (documentation 'process-pty 'function)
       "The pty stream of the process or NIL.")
 
-#!+sb-doc
+#+sb-doc
 (setf (documentation 'process-input 'function)
       "The input stream of the process or NIL.")
 
-#!+sb-doc
+#+sb-doc
 (setf (documentation 'process-output 'function)
       "The output stream of the process or NIL.")
 
-#!+sb-doc
+#+sb-doc
 (setf (documentation 'process-error 'function)
       "The error stream of the process or NIL.")
 
-#!+sb-doc
+#+sb-doc
 (setf (documentation 'process-status-hook  'function)
       "A function that is called when PROCESS changes its status.
 The function is called with PROCESS as its only argument.")
 
-#!+sb-doc
+#+sb-doc
 (setf (documentation 'process-plist  'function)
       "A place for clients to stash things.")
 
 (defun process-wait (process &optional check-for-stopped)
-  #!+sb-doc
+  #+sb-doc
   "Wait for PROCESS to quit running for some reason.
    When CHECK-FOR-STOPPED is T, also returns when PROCESS is
    stopped.  Returns PROCESS."
@@ -253,7 +253,7 @@ The function is called with PROCESS as its only argument.")
   (process-pid proc))
 
 (defun process-kill (process signal &optional (whom :pid))
-  #!+sb-doc
+  #+sb-doc
   "Hand SIGNAL to PROCESS. If WHOM is :PID, use the kill Unix system call. If
    WHOM is :PROCESS-GROUP, use the killpg Unix system call. If WHOM is
    :PTY-PROCESS-GROUP deliver the signal to whichever process group is
@@ -290,7 +290,7 @@ The function is called with PROCESS as its only argument.")
              t)))))
 
 (defun process-alive-p (process)
-  #!+sb-doc
+  #+sb-doc
   "Return T if PROCESS is still alive, NIL otherwise."
   (let ((status (process-status process)))
     (if (or (eq status :running)
@@ -299,7 +299,7 @@ The function is called with PROCESS as its only argument.")
         nil)))
 
 (defun process-close (process)
-  #!+sb-doc
+  #+sb-doc
   "Close all streams connected to PROCESS and stop maintaining the status slot."
   (macrolet ((frob (stream abort)
                `(when ,stream (close ,stream :abort ,abort))))
@@ -457,7 +457,7 @@ The function is called with PROCESS as its only argument.")
 (defun find-executable-in-search-path (pathname
                                        &optional
                                        (search-path (posix-getenv "PATH")))
-  #!+sb-doc
+  #+sb-doc
   "Find the first executable file matching PATHNAME in any of the
 colon-separated list of pathnames SEARCH-PATH"
   (loop for end =  (position #\: search-path :start (if end (1+ end) 0))
@@ -532,7 +532,7 @@ colon-separated list of pathnames SEARCH-PATH"
                     (error :output)
                     (if-error-exists :error)
                     status-hook)
-  #!+sb-doc
+  #+sb-doc
   "RUN-PROGRAM creates a new Unix process running the Unix program found in
    the file specified by the PROGRAM argument.  ARGS are the standard
    arguments that can be passed to a Unix program. For no arguments, use NIL
