@@ -384,6 +384,7 @@ The function is called with PROCESS as its only argument.")
           (copy-descriptor-to-stream new-fd pty cookie)))
       (values name
               (sb-sys:make-fd-stream master :input t :output t
+                                     :element-type :default
                                      :dual-channel-p t)))))
 
 (defmacro round-bytes-to-words (n)
@@ -777,12 +778,14 @@ colon-separated list of pathnames SEARCH-PATH"
              (:input
               (push read-fd *close-in-parent*)
               (push write-fd *close-on-error*)
-              (let ((stream (sb-sys:make-fd-stream write-fd :output t)))
+              (let ((stream (sb-sys:make-fd-stream write-fd :output t
+                                                   :element-type :default)))
                 (values read-fd stream)))
              (:output
               (push read-fd *close-on-error*)
               (push write-fd *close-in-parent*)
-              (let ((stream (sb-sys:make-fd-stream read-fd :input t)))
+              (let ((stream (sb-sys:make-fd-stream read-fd :input t
+                                                   :element-type :default)))
                 (values write-fd stream)))
              (t
               (sb-unix:unix-close read-fd)

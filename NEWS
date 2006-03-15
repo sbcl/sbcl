@@ -25,6 +25,9 @@ changes in sbcl-0.9.11 relative to sbcl-0.9.10:
   * fixed bug: occasional GC crashes on Solaris/x86
   * optimization: x86-64 supports stack allocation of results of simple
     calls of MAKE-ARRAY, bound to variables, declared DYNAMIC-EXTENT
+  * enchancement: the PROCESS-INPUT and -OUTPUT streams created by 
+    SB-EXT:RUN-PROGRAM can be used for both character and byte IO
+    (thanks to James Bielman)
 
 changes in sbcl-0.9.10 relative to sbcl-0.9.9:
   * new feature: new SAVE-LISP-AND-DIE keyword argument :EXECUTABLE can
