@@ -1591,23 +1591,29 @@
          #!-win32
          (setf (fd-stream-listen fd-stream)
                (if (sysread-may-block-p fd-stream)
-                 nil
-                 ;; select(2) and CL:LISTEN have slightly different
-                 ;; semantics.  The former returns that an FD is
-                 ;; readable when a read operation wouldn't block.
-                 ;; That includes EOF.  However, LISTEN must return
-                 ;; NIL at EOF.
-                 (progn (catch 'eof-input-catcher
-                          ;; r-b/f too calls select, but it shouldn't
-                          ;; block as long as read can return once w/o
-                          ;; blocking
-                          (refill-buffer/fd fd-stream))
-                        (fd-stream-listen fd-stream))))))
+                   nil
+                   ;; select(2) and CL:LISTEN have slightly different
+                   ;; semantics.  The former returns that an FD is
+                   ;; readable when a read operation wouldn't block.
+                   ;; That includes EOF.  However, LISTEN must return
+                   ;; NIL at EOF.
+                   (progn (catch 'eof-input-catcher
+                            ;; r-b/f too calls select, but it shouldn't
+                            ;; block as long as read can return once w/o
+                            ;; blocking
+                            (refill-buffer/fd fd-stream))
+                          ;; If REFILL-BUFFER/FD set the FD-STREAM-LISTEN
+                          ;; slot to a non-nil value (i.e. :EOF), keep
+                          ;; that value.
+                          (or (fd-stream-listen fd-stream)
+                              ;; Otherwise we have data -> set the slot
+                              ;; to T.
+                              t))))))
     (:unread
      (setf (fd-stream-unread fd-stream) arg1)
      (setf (fd-stream-listen fd-stream) t))
     (:close
-     (cond (arg1 ; We got us an abort on our hands.
+     (cond (arg1                    ; We got us an abort on our hands.
             (when (fd-stream-handler fd-stream)
               (sb!sys:remove-fd-handler (fd-stream-handler fd-stream))
               (setf (fd-stream-handler fd-stream) nil))
@@ -1688,11 +1694,11 @@
        (setf (fd-stream-listen fd-stream) nil))
      #!-win32
      (catch 'eof-input-catcher
-       (loop
-          until (sysread-may-block-p fd-stream)
-          do (refill-buffer/fd fd-stream)
-            (setf (fd-stream-ibuf-head fd-stream) 0)
-            (setf (fd-stream-ibuf-tail fd-stream) 0))
+       (loop until (sysread-may-block-p fd-stream)
+             do
+             (refill-buffer/fd fd-stream)
+             (setf (fd-stream-ibuf-head fd-stream) 0)
+             (setf (fd-stream-ibuf-tail fd-stream) 0))
        t))
     (:force-output
      (flush-output-buffer fd-stream))
@@ -1724,7 +1730,7 @@
               :format-control "~S is not a stream associated with a file."
               :format-arguments (list fd-stream)))
      (multiple-value-bind (okay dev ino mode nlink uid gid rdev size
-                           atime mtime ctime blksize blocks)
+                                atime mtime ctime blksize blocks)
          (sb!unix:unix-fstat (fd-stream-fd fd-stream))
        (declare (ignore ino nlink uid gid rdev
                         atime mtime ctime blksize blocks))
