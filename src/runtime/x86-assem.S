@@ -37,18 +37,6 @@
 #define GNAME(var) _##var
 #endif
 
-#if defined __linux__  || defined __FreeBSD__ || defined __NetBSD__ || defined __OpenBSD__ || defined __sun
-#define GNAMEDOLLAR(var) $##var
-#else
-#define GNAMEDOLLAR(var) $_##var
-#endif
-
-#if defined __linux__  || defined __FreeBSD__ || defined __NetBSD__ || defined __OpenBSD__ || defined __sun
-#define DOLLARLITERAL(var) $##var
-#else
-#define DOLLARLITERAL(var) $##(var)
-#endif
-
 /* Get the right type of alignment. Linux, FreeBSD and NetBSD (but not OpenBSD)
  * want alignment in bytes. 
  *
@@ -209,7 +197,7 @@ GNAME(call_into_lisp_first_time):
 	movl    THREAD_CONTROL_STACK_START_OFFSET(%eax) ,%esp
 	/* don't think too hard about what happens if we get interrupted
 	* here */
-	addl 	DOLLARLITERAL(THREAD_CONTROL_STACK_SIZE),%esp
+	addl 	$(THREAD_CONTROL_STACK_SIZE),%esp
 #else
 /* Win32 -really- doesn't like you switching stacks out from under it. */
 	movl	GNAME(all_threads),%eax
@@ -388,8 +376,8 @@ GNAME(fun_end_breakpoint_guts):
 	movl	%esp,%ebx	# Setup ebx - the ofp.
 	subl	$4,%esp		# Allocate one stack slot for the return value
 	movl	$4,%ecx		# Setup ecx for one return value.
-	movl	DOLLARLITERAL(NIL),%edi	# default second value
-	movl	DOLLARLITERAL(NIL),%esi	# default third value
+	movl	$(NIL),%edi	# default second value
+	movl	$(NIL),%esi	# default third value
 		
 multiple_value_return:
 	
@@ -937,10 +925,10 @@ GNAME(fast_bzero_detect):
          * for all non-SSE2 processors.
          */
 Lbase:
-        movl GNAMEDOLLAR(fast_bzero_base), GNAME(fast_bzero_pointer)
+        movl $(GNAME(fast_bzero_base)), GNAME(fast_bzero_pointer)
         jmp Lrestore
 Lsse2:
-        movl GNAMEDOLLAR(fast_bzero_sse), GNAME(fast_bzero_pointer)
+        movl $(GNAME(fast_bzero_sse)), GNAME(fast_bzero_pointer)
         jmp Lrestore
         
 Lrestore:
