@@ -632,8 +632,8 @@
 ;;; Two byte instruction with an immediate byte argument.
 ;;;
 (sb!disassem:define-instruction-format (word-imm 24
-                                                 :default-printer '(:name :tab code))
-    (op :field (byte 16 0))
+                                     :default-printer '(:name :tab code))
+  (op :field (byte 16 0))
   (code :field (byte 8 16)))
 
 
@@ -1941,7 +1941,8 @@
     ;; Lisp (with (DESCRIBE 'BYTE-IMM-CODE)) than to definitively deduce
     ;; from first principles whether it's defined in some way that genesis
     ;; can't grok.
-    (case (byte-imm-code chunk dstate)
+    (case #-darwin (byte-imm-code chunk dstate)
+          #+darwin (word-imm-code chunk dstate)
       (#.error-trap
        (nt "error trap")
        (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
