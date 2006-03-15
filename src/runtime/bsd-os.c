@@ -58,10 +58,6 @@ static void netbsd_init();
 static void freebsd_init();
 #endif /* __FreeBSD__ */
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
-static void x86_darwin_init();
-#endif
-
 void
 os_init(char *argv[], char *envp[])
 {
@@ -73,9 +69,6 @@ os_init(char *argv[], char *envp[])
 #ifdef __FreeBSD__
     freebsd_init();
 #endif /* __FreeBSD__ */
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
-    x86_darwin_init();
-#endif
 }
 
 int *os_context_pc_addr(os_context_t *context)
@@ -350,19 +343,6 @@ int arch_os_thread_init(struct thread *thread) {
 }
 int arch_os_thread_cleanup(struct thread *thread) {
     return 1;                  /* success */
-}
-#endif
-
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
-static void x86_darwin_init()
-{
-    struct sigaltstack sigstack;
-    sigstack.ss_sp = os_allocate(32*SIGSTKSZ);
-    if (sigstack.ss_sp) {
-        sigstack.ss_flags=0;
-        sigstack.ss_size = 32*SIGSTKSZ;
-        sigaltstack(&sigstack,0);
-    }
 }
 #endif
 

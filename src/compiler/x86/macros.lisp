@@ -276,7 +276,15 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun emit-error-break (vop kind code values)
     (let ((vector (gensym)))
-      `((inst int 3)                            ; i386 breakpoint instruction
+      `((progn
+          #-darwin (inst int 3)         ; i386 breakpoint instruction
+          ;; CLH 20060314
+          ;; On Darwin, we need to use #x0b0f instead of int3 in order
+          ;; to generate a SIGILL instead of a SIGTRAP as darwin/x86
+          ;; doesn't seem to be reliably firing SIGTRAP
+          ;; handlers. Hopefully this will be fixed by Apple at a
+          ;; later date.
+          #+darwin (inst word #x0b0f))
         ;; The return PC points here; note the location for the debugger.
         (let ((vop ,vop))
           (when vop

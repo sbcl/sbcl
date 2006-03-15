@@ -82,10 +82,20 @@
 #define SIZE(name)
 #endif
 
+/*
+ * x86/darwin (as of MacOS X 10.4.5) doesn't reliably file signal
+ * handlers (SIGTRAP or Mach exception handlers) for 0xCC, wo we have
+ * to use ud2 instead. ud2 is an undefined opcode, #x0b0f, or
+ * 0F 0B in low-endian notation, that causes SIGILL to fire. We check
+ * for this instruction in the SIGILL handler and if we see it, we
+ * advance the EIP by two bytes to skip over ud2 instruction and
+ * call sigtrap_handler. */
 #if defined(LISP_FEATURE_DARWIN)
 #define END()
+#define TRAP ud2
 #else
 #define END() .end
+#define TRAP int3
 #endif
 
 	.text
@@ -336,7 +346,7 @@ GNAME(fpu_restore):
 	TYPE(GNAME(undefined_tramp))
         .byte   0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
 GNAME(undefined_tramp):
-	int3
+	TRAP
 	.byte	trap_Error
         .byte   2
         .byte   UNDEFINED_FUN_ERROR
@@ -385,7 +395,7 @@ multiple_value_return:
 	
 	.globl GNAME(fun_end_breakpoint_trap)
 GNAME(fun_end_breakpoint_trap):
-	int3
+	TRAP
 	.byte 	trap_FunEndBreakpoint
 	hlt			# We should never return here.
 
@@ -397,7 +407,7 @@ GNAME(fun_end_breakpoint_end):
 	TYPE(GNAME(do_pending_interrupt))
 	.align	align_4byte,0x90
 GNAME(do_pending_interrupt):
-	int3
+	TRAP
 	.byte 	trap_PendingInterrupt
 	ret
 	SIZE(GNAME(do_pending_interrupt))
@@ -861,7 +871,7 @@ GNAME(sigtrap_trampoline):
 	call	GNAME(sigtrap_wrapper)
 	pop	%eax
 	pop	%eax
-	int3
+	TRAP
 	.byte 	trap_ContextRestore
 	hlt			# We should never return here.
         
@@ -877,7 +887,7 @@ GNAME(exception_trampoline):
 	call	GNAME(handle_win32_exception_wrapper)
 	pop	%eax
 	pop	%eax
-	int3
+	TRAP
 	.byte 	trap_ContextRestore
 	hlt			# We should never return here.
 #endif

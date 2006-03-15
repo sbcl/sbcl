@@ -304,6 +304,14 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 static void
 sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
     os_context_t *context = (os_context_t*)void_context;
+
+#if defined(LISP_FEATURE_DARWIN)
+    if (*((unsigned short *)*os_context_pc_addr(context)) == 0x0b0f) {
+        *os_context_pc_addr(context) += 2;
+        return sigtrap_handler(signal, siginfo, void_context);
+    }
+#endif
+
     fake_foreign_function_call(context);
     monitor_or_something();
 }
