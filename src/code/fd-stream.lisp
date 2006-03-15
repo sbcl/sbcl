@@ -635,6 +635,33 @@
 ;;; per element.
 (defvar *input-routines* ())
 
+;;; Return whether a primitive partial read operation on STREAM's FD
+;;; would (probably) block.  Signal a `simple-stream-error' if the
+;;; system call implementing this operation fails.
+;;;
+;;; It is "may" instead of "would" because "would" is not quite
+;;; correct on win32.  However, none of the places that use it require
+;;; further assurance than "may" versus "will definitely not".
+(defun sysread-may-block-p (stream)
+  #+win32
+  ;; This answers T at EOF on win32, I think.
+  (not (sb!win32:fd-listen (fd-stream-fd stream)))
+  #-win32
+  (sb!unix:with-restarted-syscall (count errno)
+    (sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set)))
+      (sb!unix:fd-zero read-fds)
+      (sb!unix:fd-set (fd-stream-fd stream) read-fds)
+      (sb!unix:unix-fast-select (1+ (fd-stream-fd stream))
+                                (sb!alien:addr read-fds)
+                                nil nil 0 0))
+    (case count
+      ((1) nil)
+      ((0) t)
+      (otherwise
+       (simple-stream-perror "couldn't check whether ~S is readable"
+                             stream
+                             errno)))))
+
 ;;; Fill the input buffer, and return the number of bytes read. Throw
 ;;; to EOF-INPUT-CATCHER if the eof was reached. Drop into
 ;;; SYSTEM:SERVER if necessary.
@@ -659,35 +686,13 @@
              (setf (fd-stream-ibuf-head stream) 0)
              (setf (fd-stream-ibuf-tail stream) tail))))
     (setf (fd-stream-listen stream) nil)
-    #!+win32
-    (unless (sb!win32:fd-listen fd)
+    ;;This isn't quite the same on win32.  Then again, neither was
+    ;;(not (sb!win32:fd-listen fd)), as was originally here.  See
+    ;;comment in `sysread-may-block-p'.
+    (when (sysread-may-block-p stream)
       (unless (sb!sys:wait-until-fd-usable
                fd :input (fd-stream-timeout stream))
         (error 'io-timeout :stream stream :direction :read)))
-    #!-win32
-    (sb!unix:with-restarted-syscall (count errno)
-      ;; FIXME: Judging from compiler warnings, this WITH-ALIEN form expands
-      ;; into something which uses the not-yet-defined type
-      ;;   (SB!ALIEN-INTERNALS:ALIEN (* (SB!ALIEN:STRUCT SB!UNIX:FD-SET))).
-      ;; This is probably inefficient and unsafe and generally bad, so
-      ;; try to find some way to make that type known before
-      ;; this is compiled.
-      (sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set)))
-        (sb!unix:fd-zero read-fds)
-        (sb!unix:fd-set fd read-fds)
-        (sb!unix:unix-fast-select (1+ fd)
-                                  (sb!alien:addr read-fds)
-                                  nil nil 0 0))
-      (case count
-        (1)
-        (0
-         (unless (sb!sys:wait-until-fd-usable
-                  fd :input (fd-stream-timeout stream))
-           (error 'io-timeout :stream stream :direction :read)))
-        (t
-         (simple-stream-perror "couldn't check whether ~S is readable"
-                               stream
-                               errno))))
     (multiple-value-bind (count errno)
         (sb!unix:unix-read fd
                            (sb!sys:int-sap (+ (sb!sys:sap-int ibuf-sap) tail))
@@ -1585,15 +1590,19 @@
                (sb!win32:fd-listen (fd-stream-fd fd-stream)))
          #!-win32
          (setf (fd-stream-listen fd-stream)
-               (eql (sb!unix:with-restarted-syscall ()
-                      (sb!alien:with-alien ((read-fds (sb!alien:struct
-                                                       sb!unix:fd-set)))
-                        (sb!unix:fd-zero read-fds)
-                        (sb!unix:fd-set (fd-stream-fd fd-stream) read-fds)
-                        (sb!unix:unix-fast-select (1+ (fd-stream-fd fd-stream))
-                                                  (sb!alien:addr read-fds)
-                                                  nil nil 0 0)))
-                    1))))
+               (if (sysread-may-block-p fd-stream)
+                 nil
+                 ;; select(2) and CL:LISTEN have slightly different
+                 ;; semantics.  The former returns that an FD is
+                 ;; readable when a read operation wouldn't block.
+                 ;; That includes EOF.  However, LISTEN must return
+                 ;; NIL at EOF.
+                 (progn (catch 'eof-input-catcher
+                          ;; r-b/f too calls select, but it shouldn't
+                          ;; block as long as read can return once w/o
+                          ;; blocking
+                          (refill-buffer/fd fd-stream))
+                        (fd-stream-listen fd-stream))))))
     (:unread
      (setf (fd-stream-unread fd-stream) arg1)
      (setf (fd-stream-listen fd-stream) t))
@@ -1680,20 +1689,11 @@
      #!-win32
      (catch 'eof-input-catcher
        (loop
-        (let ((count (sb!unix:with-restarted-syscall ()
-                       (sb!alien:with-alien ((read-fds (sb!alien:struct
-                                                        sb!unix:fd-set)))
-                         (sb!unix:fd-zero read-fds)
-                         (sb!unix:fd-set (fd-stream-fd fd-stream) read-fds)
-                         (sb!unix:unix-fast-select (1+ (fd-stream-fd fd-stream))
-                                                   (sb!alien:addr read-fds)
-                                                   nil nil 0 0)))))
-          (cond ((eql count 1)
-                 (refill-buffer/fd fd-stream)
-                 (setf (fd-stream-ibuf-head fd-stream) 0)
-                 (setf (fd-stream-ibuf-tail fd-stream) 0))
-                (t
-                 (return t)))))))
+          until (sysread-may-block-p fd-stream)
+          do (refill-buffer/fd fd-stream)
+            (setf (fd-stream-ibuf-head fd-stream) 0)
+            (setf (fd-stream-ibuf-tail fd-stream) 0))
+       t))
     (:force-output
      (flush-output-buffer fd-stream))
     (:finish-output

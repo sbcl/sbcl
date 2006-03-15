@@ -299,3 +299,36 @@
   (assert (char= (peek-char t (make-string-input-stream " a")) #\a))
   (set-syntax-from-char #\Space #\a)
   (assert (char= (peek-char t (make-string-input-stream " a")) #\Space)))
+
+;;; It is actually easier to run into the problem exercised by this
+;;; test with sockets, due to their delays between availabilities of
+;;; data.  However edgy the case may be for normal files, however,
+;;; there is still a case to be found in which CL:LISTEN answers
+;;; improperly.
+;;;
+;;; This test assumes that buffering is still done until a buffer of
+;;; SB-IMPL::BYTES-PER-BUFFER bytes is filled up, that the buffer may
+;;; immediately be completely filled for normal files, and that the
+;;; buffer-fill routine is responsible for figuring out when we've
+;;; reached EOF.
+(with-test (:name (stream listen-vs-select))
+  (let ((listen-testfile-name "stream.impure.lisp.testqfile")
+        ;; If non-NIL, size (in bytes) of the file that will exercise
+        ;; the LISTEN problem.
+        (bytes-per-buffer-sometime
+         (and (boundp 'sb-impl::bytes-per-buffer)
+              (symbol-value 'sb-impl::bytes-per-buffer))))
+    (when bytes-per-buffer-sometime
+      (unwind-protect
+           (progn
+             (with-open-file (stream listen-testfile-name
+                                     :direction :output :if-exists :error
+                                     :element-type '(unsigned-byte 8))
+               (dotimes (n bytes-per-buffer-sometime)
+                 (write-byte 113 stream)))
+             (with-open-file (stream listen-testfile-name
+                                     :direction :input :element-type '(unsigned-byte 8))
+               (dotimes (n bytes-per-buffer-sometime)
+                 (read-byte stream))
+               (assert (not (listen stream)))))
+        (ignore-errors (delete-file listen-testfile-name))))))
