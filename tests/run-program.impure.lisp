@@ -1,4 +1,4 @@
-;;;; various run-program tests without side effects
+;;;; various RUN-PROGRAM tests with side effects
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -12,6 +12,12 @@
 ;;;; more information.
 
 (cl:in-package :cl-user)
+
+;; Actually there's no real side-effect here. The impurity we're
+;; avoiding is the sigchld handler that RUN-PROGRAM sets up, which
+;; interfers with the manual unix process control done by the test
+;; framework (sometimes the handler will manage to WAIT3 a process
+;; before run-tests WAITPIDs it).
 
 (let* ((process (sb-ext:run-program "/bin/cat" '() :wait nil
                                     :output :stream :input :stream))
