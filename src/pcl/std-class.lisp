@@ -73,10 +73,6 @@
                                                 effective-slot-definition))
   (let* ((name (slot-value slotd 'name))
          (class (slot-value slotd '%class)))
-    (let ((table (or (gethash name *name->class->slotd-table*)
-                     (setf (gethash name *name->class->slotd-table*)
-                           (make-hash-table :test 'eq :size 5)))))
-      (setf (gethash class table) slotd))
     (dolist (type '(reader writer boundp))
       (let* ((gf-name (ecase type
                               (reader 'slot-value-using-class)

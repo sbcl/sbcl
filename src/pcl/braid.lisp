@@ -370,11 +370,7 @@
                                      fsc-p nil slot-name index))
           (set-val 'boundp-function (make-optimized-std-boundp-method-function
                                      fsc-p nil slot-name index)))
-        (set-val 'accessor-flags 7)
-        (let ((table (or (gethash slot-name *name->class->slotd-table*)
-                         (setf (gethash slot-name *name->class->slotd-table*)
-                               (make-hash-table :test 'eq :size 5)))))
-          (setf (gethash class table) slotd)))
+        (set-val 'accessor-flags 7))
       (when (and (eq name 'standard-class)
                  (eq slot-name 'slots) effective-p)
         (setq *the-eslotd-standard-class-slots* slotd))

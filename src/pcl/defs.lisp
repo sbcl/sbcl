@@ -200,8 +200,6 @@
 (defun variable-class (var env)
   (caddr (var-declaration 'class var env)))
 
-(defvar *name->class->slotd-table* (make-hash-table))
-
 (defvar *standard-method-combination*)
 
 (defun plist-value (object name)

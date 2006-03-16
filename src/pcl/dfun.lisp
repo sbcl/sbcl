@@ -1326,21 +1326,26 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                                   method))
                             (accessor-method-slot-name method))))
         (when (or (null specl-cpl)
+                  (null so-p)
                   (member *the-class-structure-object* specl-cpl))
           (return-from make-accessor-table nil))
-        (maphash (lambda (class slotd)
-                   (let ((cpl (if early-p
-                                  (early-class-precedence-list class)
-                                  (class-precedence-list class))))
-                     (when (memq specl cpl)
-                       (unless (and (or so-p
-                                        (member *the-class-standard-object*
-                                                cpl))
-                                    (or early-p
-                                        (slot-accessor-std-p slotd type)))
+        ;; Collect all the slot-definitions for SLOT-NAME from SPECL and
+        ;; all of its subclasses. If either SPECL or one of the subclasses
+        ;; is not a standard-class, bail out.
+        (labels ((aux (class)
+                   ;; FIND-SLOT-DEFINITION might not be defined yet
+                   (let ((slotd (find-if (lambda (x)
+                                           (eq (sb-pcl::slot-definition-name x)
+                                               slot-name))
+                                         (sb-pcl::class-slots class))))
+                     (when slotd
+                       (unless (or early-p
+                                   (slot-accessor-std-p slotd type))
                          (return-from make-accessor-table nil))
-                       (push (cons specl slotd) (gethash class table)))))
-                 (gethash slot-name *name->class->slotd-table*))))
+                       (push (cons specl slotd) (gethash class table))))
+                   (dolist (subclass (sb-pcl::class-direct-subclasses class))
+                     (aux subclass))))
+          (aux specl))))
     (maphash (lambda (class specl+slotd-list)
                (dolist (sclass (if early-p
                                    (early-class-precedence-list class)
