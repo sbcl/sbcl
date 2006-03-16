@@ -1514,10 +1514,12 @@ purify(lispobj static_roots, lispobj read_only_roots)
                (lispobj *)SymbolValue(BINDING_STACK_POINTER,thread) -
                (lispobj *)thread->binding_stack_start,
           0);
+#ifdef LISP_FEATURE_SB_THREAD
         pscav( (lispobj *) (thread+1),
                fixnum_value(SymbolValue(FREE_TLS_INDEX,0)) -
                (sizeof (struct thread))/(sizeof (lispobj)),
           0);
+#endif
     }
 
 
