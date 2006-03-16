@@ -105,6 +105,7 @@
 
  ;; for various constants e.g. SB!XC:MOST-POSITIVE-FIXNUM and
  ;; SB!VM:N-LOWTAG-BITS, needed by "early-objdef" and others
+ ("src/compiler/generic/parms")
  ("src/compiler/target/parms")
  ("src/compiler/generic/early-vm")
  ("src/compiler/generic/early-objdef")
@@ -216,8 +217,9 @@
 
  ("src/code/unix" :not-host)
  #!+win32 ("src/code/win32" :not-host)
-
  #!+mach  ("src/code/mach"     :not-host)
+
+ ("src/code/common-os" :not-host)
  #!+mach  ("src/code/mach-os"  :not-host)
  #!+sunos ("src/code/sunos-os" :not-host)
  #!+hpux  ("src/code/hpux-os"  :not-host)

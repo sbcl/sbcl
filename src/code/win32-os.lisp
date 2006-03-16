@@ -20,8 +20,6 @@
   "Return a string describing the supporting software."
   (values "Win32"))
 
-(defvar *software-version* nil)
-
 (defun software-version ()
   #!+sb-doc
   "Return a string describing version of the supporting software, or NIL
@@ -33,19 +31,6 @@
                          (with-output-to-string (stream)
                            (sb!ext:run-program "/bin/uname" `("-r")
                                                :output stream))))))
-
-(defun os-cold-init-or-reinit () ; KLUDGE: don't know what to do here
-  (/show0 "entering win32-os.lisp OS-COLD-INIT-OR-REINIT")
-  (setf *software-version* nil)
-  (/show0 "setting *DEFAULT-PATHNAME-DEFAULTS*")
-  (setf *default-pathname-defaults*
-        ;; (temporary value, so that #'NATIVE-PATHNAME won't blow up when
-        ;; we call it below:)
-        (make-trivial-default-pathname)
-        *default-pathname-defaults*
-        ;; (final value, constructed using #'NATIVE-PATHNAME:)
-        (native-pathname (sb!unix:posix-getcwd/)))
-  (/show0 "leaving linux-os.lisp OS-COLD-INIT-OR-REINIT"))
 
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()

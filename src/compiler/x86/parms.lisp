@@ -305,90 +305,47 @@
 (defvar *allocation-pointer*)
 (defvar *binding-stack-pointer*)
 
-;;; FIXME: !COLD-INIT probably doesn't need
-;;; to be in the static symbols table any more.
 (defparameter *static-symbols*
-  '(t
+  (append
+   *common-static-symbols*
+   *c-callable-static-symbols*
+   '(*alien-stack*
 
-    ;; The C startup code must fill these in.
-    *posix-argv*
+     ;; interrupt handling
+     *pseudo-atomic-atomic*
+     *pseudo-atomic-interrupted*
+     #!+sb-thread *stop-for-gc-pending*
+     #!+sb-thread *free-tls-index*
+     #!+sb-thread *tls-index-lock*
 
-    ;; functions that the C code needs to call.  When adding to this list,
-    ;; also add a `frob' form in genesis.lisp finish-symbols.
-    sub-gc
-    sb!kernel::internal-error
-    sb!kernel::control-stack-exhausted-error
-    sb!kernel::undefined-alien-variable-error
-    sb!kernel::undefined-alien-function-error
-    sb!kernel::memory-fault-error
-    sb!di::handle-breakpoint
-    fdefinition-object
-    #!+win32 sb!kernel::handle-win32-exception
+     *allocation-pointer*
+     *binding-stack-pointer*
 
-    ;; free pointers
-    ;;
-    ;; Note that these are FIXNUM word counts, not (as one might
-    ;; expect) byte counts or SAPs. The reason seems to be that by
-    ;; representing them this way, we can avoid consing bignums.
-    ;; -- WHN 2000-10-02
-    *read-only-space-free-pointer*
-    *static-space-free-pointer*
-    *initial-dynamic-space-free-pointer*
+     ;; the floating point constants
+     *fp-constant-0d0*
+     *fp-constant-1d0*
+     *fp-constant-0f0*
+     *fp-constant-1f0*
+     ;; The following are all long-floats.
+     *fp-constant-0l0*
+     *fp-constant-1l0*
+     *fp-constant-pi*
+     *fp-constant-l2t*
+     *fp-constant-l2e*
+     *fp-constant-lg2*
+     *fp-constant-ln2*
 
-    ;; things needed for non-local exit
-    *current-catch-block*
-    *current-unwind-protect-block*
-    *alien-stack*
+     ;; For GC-AND-SAVE
+     *restart-lisp-function*
 
-    ;; interrupt handling
-    *pseudo-atomic-atomic*
-    *pseudo-atomic-interrupted*
-    sb!unix::*interrupts-enabled*
-    sb!unix::*interrupt-pending*
-    *free-interrupt-context-index*
-    *gc-inhibit*
-    #!+sb-thread *stop-for-gc-pending*
-    *gc-pending*
-    #!+sb-thread sb!thread::run-interruption
+     ;; Needed for callbacks to work across saving cores. see
+     ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
+     ;; details.
+     sb!alien::*enter-alien-callback*
 
-    *free-tls-index*
-    *tls-index-lock*
-
-    *allocation-pointer*
-    *binding-stack-pointer*
-    *binding-stack-start*
-    *control-stack-start*
-    *control-stack-end*
-
-    ;; the floating point constants
-    *fp-constant-0d0*
-    *fp-constant-1d0*
-    *fp-constant-0f0*
-    *fp-constant-1f0*
-    ;; The following are all long-floats.
-    *fp-constant-0l0*
-    *fp-constant-1l0*
-    *fp-constant-pi*
-    *fp-constant-l2t*
-    *fp-constant-l2e*
-    *fp-constant-lg2*
-    *fp-constant-ln2*
-
-    ;; For GC-AND-SAVE
-    *restart-lisp-function*
-
-    ;; Needed for callbacks to work across saving cores. see
-    ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory details.
-    sb!alien::*enter-alien-callback*
-
-    ;; The ..SLOT-UNBOUND.. symbol is static in order to optimise the
-    ;; common slot unbound check.
-    ;;
-    ;; FIXME: In SBCL, the CLOS code has become sufficiently tightly
-    ;; integrated into the system that it'd probably make sense to use
-    ;; the ordinary unbound marker for this.
-    sb!pcl::..slot-unbound..
-    ))
+     ;; see comments in ../x86-64/parms.lisp
+     sb!pcl::..slot-unbound..
+     )))
 
 (defparameter *static-funs*
   '(length

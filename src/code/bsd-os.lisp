@@ -1,4 +1,4 @@
-;;;; OS interface functions for CMU CL under BSD Unix.
+;;;; OS interface functions for SBCL under BSD Unix.
 
 ;;;; This code was written as part of the CMU Common Lisp project at
 ;;;; Carnegie Mellon University, and has been placed in the public
@@ -8,8 +8,9 @@
 
 ;;;; Check that target machine features are set up consistently with
 ;;;; this file.
-#!-bsd (eval-when (:compile-toplevel :load-toplevel :execute)
-         (error "The :BSD feature is missing, we shouldn't be doing this code."))
+#!-bsd
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (error "The :BSD feature is missing, we shouldn't be doing this code."))
 
 (defun software-type ()
   #!+sb-doc
@@ -19,8 +20,6 @@
        #!+OpenBSD "OpenBSD"
        #!+NetBSD "NetBSD"
        #!+Darwin "Darwin"))
-
-(defvar *software-version* nil)
 
 (defun software-version ()
   #!+sb-doc
@@ -33,16 +32,6 @@
                            (sb!ext:run-program "/usr/bin/uname" `("-r")
                                                :output stream))))))
 
-(defun os-cold-init-or-reinit ()
-  (setf *software-version* nil)
-  (setf *default-pathname-defaults*
-        ;; (temporary value, so that #'NATIVE-PATHNAME won't blow up when
-        ;; we call it below:)
-        (make-trivial-default-pathname)
-        *default-pathname-defaults*
-        ;; (final value, constructed using #'NATIVE-PATHNAME:)
-        (native-pathname (sb!unix:posix-getcwd/))))
-
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()
   (multiple-value-bind (err? utime stime maxrss ixrss idrss

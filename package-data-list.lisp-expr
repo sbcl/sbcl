@@ -564,7 +564,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
       :use ("CL" "SB!ALIEN" "SB!INT" "SB!SYS" "SB!GRAY")
       :export ( ;; Information about how the program was invoked is
                ;; nonstandard but very useful.
-               "*POSIX-ARGV*"
+               "*POSIX-ARGV*" "*CORE-PATHNAME*"
                "POSIX-GETENV" "POSIX-ENVIRON"
 
                ;; People have various good reasons to mess with the GC.
@@ -787,6 +787,9 @@ retained, possibly temporariliy, because it might be used internally."
       :use ("CL" "SB!ALIEN" "SB!GRAY" "SB!FASL" "SB!SYS")
       :export (;; lambda list keyword extensions
                "&MORE"
+
+               ;; communication between the runtime and Lisp
+               "*CORE-STRING*"
 
                ;; INFO stuff doesn't belong in a user-visible package, we
                ;; should be able to change it without apology.

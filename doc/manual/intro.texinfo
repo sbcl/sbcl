@@ -123,8 +123,13 @@ standardization process.
 
 @item Executable Fasl Packaging
 @code{sb-executable} can be used to concatenate multiple fasls into a
-single executable (though the presense of an SBCL runtime and core
-image is still required to run it).
+single executable (though the presense of an SBCL runtime and core image
+is still required to run it).
+
+The @code{:executable} argument to @ref{Function
+sb-ext:save-lisp-and-die} can produce a `standalone' executable
+containing both an image of the current Lisp session and an SBCL
+runtime.
 
 @item Bitwise Rotation
 @code{sb-rotate-byte} provides an efficient primitive for bitwise

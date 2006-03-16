@@ -169,47 +169,17 @@
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
 (defparameter *static-symbols*
-  '(t
+  (append
+   *common-static-symbols*
+   *c-callable-static-symbols*
+   '(
+     #!+gencgc *restart-lisp-function*
 
-    ;; The C startup code must fill these in.
-    *posix-argv*
-
-    ;; functions that the C code needs to call
-    sb!impl::sub-gc
-    sb!kernel::internal-error
-    sb!kernel::control-stack-exhausted-error
-    sb!kernel::undefined-alien-variable-error
-    sb!kernel::undefined-alien-function-error
-    sb!di::handle-breakpoint
-    sb!impl::fdefinition-object
-
-    ;; free pointers
-    *read-only-space-free-pointer*
-    *static-space-free-pointer*
-    *initial-dynamic-space-free-pointer*
-
-    ;; things needed for non-local exit
-    *current-catch-block*
-    *current-unwind-protect-block*
-
-    *binding-stack-start*
-    *control-stack-start*
-    *control-stack-end*
-
-    ;; interrupt handling
-    *free-interrupt-context-index*
-    sb!unix::*interrupts-enabled*
-    sb!unix::*interrupt-pending*
-    *gc-inhibit*
-    *gc-pending*
-
-    *restart-lisp-function*
-
-    ;; CLH: 20060210 Taken from x86-64/parms.lisp per JES' suggestion
-    ;; Needed for callbacks to work across saving cores. see
-    ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
-    ;; details.
-    sb!alien::*enter-alien-callback*))
+     ;; CLH: 20060210 Taken from x86-64/parms.lisp per JES' suggestion
+     ;; Needed for callbacks to work across saving cores. see
+     ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
+     ;; details.
+     sb!alien::*enter-alien-callback*)))
 
 (defparameter *static-funs*
   '(length

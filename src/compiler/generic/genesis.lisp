@@ -1255,19 +1255,8 @@ core and return a descriptor to it."
   ;; the names to highlight that something weird is going on. Perhaps
   ;; *MAYBE-GC-FUN*, *INTERNAL-ERROR-FUN*, *HANDLE-BREAKPOINT-FUN*,
   ;; and *HANDLE-FUN-END-BREAKPOINT-FUN*...
-  (macrolet ((frob (symbol)
-               `(cold-set ',symbol
-                          (cold-fdefinition-object (cold-intern ',symbol)))))
-    (frob sub-gc)
-    (frob internal-error)
-    #!+win32 (frob handle-win32-exception)
-    (frob sb!kernel::control-stack-exhausted-error)
-    (frob sb!kernel::undefined-alien-variable-error)
-    (frob sb!kernel::undefined-alien-function-error)
-    (frob sb!kernel::memory-fault-error)
-    (frob sb!di::handle-breakpoint)
-    (frob sb!di::handle-fun-end-breakpoint)
-    #!+sb-thread (frob sb!thread::run-interruption))
+  (dolist (symbol sb!vm::*c-callable-static-symbols*)
+    (cold-set symbol (cold-fdefinition-object (cold-intern symbol))))
 
   (cold-set 'sb!vm::*current-catch-block*          (make-fixnum-descriptor 0))
   (cold-set 'sb!vm::*current-unwind-protect-block* (make-fixnum-descriptor 0))

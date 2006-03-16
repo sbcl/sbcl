@@ -365,8 +365,6 @@ main(int argc, char *argv[], char *envp[])
     if (initial_function == NIL) {
         lose("couldn't find initial function\n");
     }
-    SHOW("freeing core");
-    free(core);
 
     gc_initialize_pointers();
 
@@ -377,6 +375,11 @@ main(int argc, char *argv[], char *envp[])
 /*     wos_install_interrupt_handlers(handler); */
     wos_install_interrupt_handlers(&exception_frame);
 #endif
+
+    /* Pass core filename into Lisp */
+    SetSymbolValue(CORE_STRING, alloc_base_string(core),0);
+    SHOW("freeing core");
+    free(core);
 
     /* Convert remaining argv values to something that Lisp can grok. */
     SHOW("setting POSIX-ARGV symbol value");

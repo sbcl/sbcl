@@ -4,6 +4,8 @@ changes in sbcl-0.9.11 relative to sbcl-0.9.10:
     MacOS X 10.4.5 on Intel.
   * new feature: Unicode character names are now known to the system
     (through CHAR-NAME and NAME-CHAR).
+  * new feature: the filesystem location of SBCL's core file is
+    exposed to lisp through the variable SB-EXT:*CORE-PATHNAME*.
   * minor incompatible change: the contrib modules SB-POSIX and
     SB-BSD-SOCKETS no longer depend on stub C libraries; the intent of
     this change is to make it easier to distribute

@@ -159,83 +159,47 @@
 (defvar *allocation-pointer*)
 (defvar *binding-stack-pointer*)
 
-;;; FIXME: !COLD-INIT probably doesn't need
-;;; to be in the static symbols table any more.
-;;;
-;;; FIXME: some of these symbols are shared by all backends,
-;;; and should be factored out into a common file.
 (defparameter *static-symbols*
-  '(t
+  (append
+   *common-static-symbols*
+   *c-callable-static-symbols*
+   '(*alien-stack*
 
-    ;; The C startup code must fill these in.
-    *posix-argv*
+     ;; interrupt handling
+     *pseudo-atomic-atomic*
+     *pseudo-atomic-interrupted*
 
-    ;; functions that the C code needs to call.  When adding to this list,
-    ;; also add a `frob' form in genesis.lisp finish-symbols.
-    sub-gc
-    sb!kernel::internal-error
-    sb!kernel::control-stack-exhausted-error
-    sb!kernel::undefined-alien-variable-error
-    sb!kernel::undefined-alien-function-error
-    sb!kernel::memory-fault-error
-    sb!di::handle-breakpoint
-    fdefinition-object
+     #!+sb-thread *stop-for-gc-pending*
 
-    ;; free pointers
-    ;;
-    ;; Note that these are FIXNUM word counts, not (as one might
-    ;; expect) byte counts or SAPs. The reason seems to be that by
-    ;; representing them this way, we can avoid consing bignums.
-    ;; -- WHN 2000-10-02
-    *read-only-space-free-pointer*
-    *static-space-free-pointer*
-    *initial-dynamic-space-free-pointer*
+     #!+sb-thread *free-tls-index*
+     #!+sb-thread *tls-index-lock*
 
-    ;; things needed for non-local exit
-    *current-catch-block*
-    *current-unwind-protect-block*
-    *alien-stack*
+     *allocation-pointer*
+     *binding-stack-pointer*
 
-    ;; interrupt handling
-    *pseudo-atomic-atomic*
-    *pseudo-atomic-interrupted*
-    sb!unix::*interrupts-enabled*
-    sb!unix::*interrupt-pending*
-    *free-interrupt-context-index*
-    *gc-inhibit*
-    #!+sb-thread *stop-for-gc-pending*
-    *gc-pending*
-    #!+sb-thread sb!thread::run-interruption
+     ;; the floating point constants
+     *fp-constant-0d0*
+     *fp-constant-1d0*
+     *fp-constant-0f0*
+     *fp-constant-1f0*
 
-    *free-tls-index*
-    *tls-index-lock*
+     ;; For GC-AND-SAVE
+     *restart-lisp-function*
 
-    *allocation-pointer*
-    *binding-stack-pointer*
-    *binding-stack-start*
-    *control-stack-start*
-    *control-stack-end*
+     ;; Needed for callbacks to work across saving cores. see
+     ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
+     ;; details.
+     sb!alien::*enter-alien-callback*
 
-    ;; the floating point constants
-    *fp-constant-0d0*
-    *fp-constant-1d0*
-    *fp-constant-0f0*
-    *fp-constant-1f0*
-
-    ;; For GC-AND-SAVE
-    *restart-lisp-function*
-
-    ;; Needed for callbacks to work across saving cores. see
-    ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory details.
-    sb!alien::*enter-alien-callback*
-
-    ;; The ..SLOT-UNBOUND.. symbol is static in order to optimise the
-    ;; common slot unbound check.
-    ;;
-    ;; FIXME: In SBCL, the CLOS code has become sufficiently tightly
-    ;; integrated into the system that it'd probably make sense to use
-    ;; the ordinary unbound marker for this.
-    sb!pcl::..slot-unbound..))
+     ;; The ..SLOT-UNBOUND.. symbol is static in order to optimise the
+     ;; common slot unbound check.
+     ;;
+     ;; FIXME: In SBCL, the CLOS code has become sufficiently tightly
+     ;; integrated into the system that it'd probably make sense to
+     ;; use the ordinary unbound marker for this.
+     ;;
+     ;; FIXME II: if it doesn't make sense, why is this X86-ish only?
+     sb!pcl::..slot-unbound..)))
 
 (defparameter *static-funs*
   '(length

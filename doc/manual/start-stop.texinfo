@@ -112,6 +112,12 @@ process, and is also provided as an extension to the user.
 
 @include fun-sb-ext-save-lisp-and-die.texinfo
 
+To facilitate distribution of SBCL applications using external
+resources, the filesystem location of the SBCL core file being used is
+available from Lisp.
+
+@include var-sb-ext-star-core-pathname-star.texinfo
+
 @node Exit on Errors
 @comment  node-name,  next,  previous,  up
 @subsection Exit on Errors

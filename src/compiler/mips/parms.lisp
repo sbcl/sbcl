@@ -144,39 +144,11 @@
 ;;; The fdefn objects for the static functions are loaded into static
 ;;; space directly after the static symbols.  That way, the raw-addr
 ;;; can be loaded directly out of them by indirecting relative to NIL.
-;;;
 (defparameter *static-symbols*
-  '(t
-
-    *posix-argv*
-
-    sb!impl::sub-gc
-    sb!kernel::internal-error
-    sb!kernel::control-stack-exhausted-error
-    sb!kernel::undefined-alien-variable-error
-    sb!kernel::undefined-alien-function-error
-    sb!di::handle-breakpoint
-    sb!impl::fdefinition-object
-
-    ;; Free Pointers
-    *read-only-space-free-pointer*
-    *static-space-free-pointer*
-    *initial-dynamic-space-free-pointer*
-
-    ;; Things needed for non-local-exit.
-    *current-catch-block*
-    *current-unwind-protect-block*
-
-    *binding-stack-start*
-    *control-stack-start*
-    *control-stack-end*
-
-    ;; Interrupt Handling
-    *free-interrupt-context-index*
-    sb!unix::*interrupts-enabled*
-    sb!unix::*interrupt-pending*
-    *gc-inhibit*
-    *gc-pending*))
+  (append
+   *common-static-symbols*
+   *c-callable-static-symbols*
+   '()))
 
 (defparameter *static-funs*
   '(sb!kernel:two-arg-+
