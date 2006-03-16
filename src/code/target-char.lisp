@@ -250,8 +250,13 @@
         (let ((h-code (cdr (binary-search char-code
                                           (car *unicode-character-name-database*)
                                           :key #'car))))
-          (when h-code
-            (huffman-decode h-code *unicode-character-name-huffman-tree*))))))
+          (cond
+            (h-code
+             (huffman-decode h-code *unicode-character-name-huffman-tree*))
+            ((< char-code #x10000)
+             (format nil "U~4,'0X" char-code))
+            (t
+             (format nil "U~8,'0X" char-code)))))))
 
 (defun name-char (name)
   #!+sb-doc
@@ -269,9 +274,19 @@
           (let ((char-code
                  (car (binary-search encoding
                                      (cdr *unicode-character-name-database*)
-                                     :key #'cdr))))
-            (when char-code
-              (code-char char-code)))))))
+                                     :key #'cdr)))
+                (name-length (length name)))
+            (cond
+              (char-code
+               (code-char char-code))
+              ((and (or (= name-length 9)
+                        (= name-length 5))
+                    (char-equal (char name 0) #\U)
+                    (loop for i from 1 below name-length
+                          always (digit-char-p (char name i) 16)))
+               (code-char (parse-integer name :start 1 :radix 16)))
+              (t
+               nil)))))))
 
 ;;;; predicates
 

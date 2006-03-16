@@ -382,4 +382,32 @@
                         (prin1 table))))
                   print-not-readable)))
 
+;; Test that we can print characters readably regardless of the external format
+;; of the stream.
+
+(defun test-readable-character (character external-format)
+  (let ((file "print.impure.tmp"))
+    (unwind-protect
+         (progn
+           (with-open-file (stream file
+                                   :direction :output
+                                   :external-format external-format
+                                   :if-exists :supersede)
+             (write character :stream stream :readably t))
+           (with-open-file (stream file
+                                   :direction :input
+                                   :external-format external-format
+                                   :if-does-not-exist :error)
+             (assert (char= (read stream) character))))
+      (ignore-errors
+        (delete-file file)))))
+
+#+sb-unicode
+(with-test (:name (:print-readable :character :utf-8))
+  (test-readable-character (code-char #xfffe) :utf-8))
+
+#+sb-unicode
+(with-test (:name (:print-readable :character :iso-8859-1))
+  (test-readable-character (code-char #xfffe) :iso-8859-1))
+
 ;;; success
