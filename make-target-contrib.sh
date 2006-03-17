@@ -38,7 +38,16 @@ export SBCL SBCL_BUILDING_CONTRIB
 # as SB-RT and SB-GROVEL, but FIXME: there's probably a better
 # solution.  -- CSR, 2003-05-30
 
-find contrib/ \( -name '*.fasl' -o -name 'foo.c' -o -name 'a.out' -o -name 'alien.so' -o -name '*.o' \) \
+find contrib/ \( -name '*.fasl' -o \
+                 -name '*.FASL' -o \
+                 -name 'foo.c' -o \
+                 -name 'FOO.C' -o \
+                 -name 'a.out' -o \
+                 -name 'A.OUT' -o \
+                 -name 'alien.so' -o \
+                 -name 'ALIEN.SO' -o \
+                 -name '*.o' -o \
+                 -name '*.O' \) \
   -print | xargs rm -f
 
 for i in contrib/*; do
