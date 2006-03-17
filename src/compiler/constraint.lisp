@@ -171,16 +171,10 @@
 
 ;;; Add complementary constraints to the consequent and alternative
 ;;; blocks of IF. We do nothing if X is NIL.
-(defun add-complement-constraints (if fun x y not-p constraints
-                                      consequent-constraints
-                                      alternative-constraints)
-  (when (and x
-             ;; Note: Even if we do (IF test exp exp) => (PROGN test exp)
-             ;; optimization, the *MAX-OPTIMIZE-ITERATIONS* cutoff means
-             ;; that we can't guarantee that the optimization will be
-             ;; done, so we still need to avoid barfing on this case.
-             (not (eq (if-consequent if)
-                      (if-alternative if))))
+(defun add-complement-constraints (fun x y not-p constraints
+                                   consequent-constraints
+                                   alternative-constraints)
+  (when x
     (add-test-constraint fun x y not-p constraints
                          consequent-constraints)
     (add-test-constraint fun x y (not not-p) constraints
@@ -191,58 +185,80 @@
 ;;; the test represented by USE.
 (defun add-test-constraints (use if constraints)
   (declare (type node use) (type cif if))
-  (let ((consequent-constraints (make-sset))
-        (alternative-constraints (make-sset)))
-    (macrolet ((add (fun x y not-p)
-                 `(add-complement-constraints if ,fun ,x ,y ,not-p
-                   constraints
-                   consequent-constraints
-                   alternative-constraints)))
-      (typecase use
-        (ref
-         (add 'typep (ok-lvar-lambda-var (ref-lvar use) constraints)
-              (specifier-type 'null) t))
-        (combination
-         (unless (eq (combination-kind use)
-                     :error)
-           (let ((name (lvar-fun-name
-                        (basic-combination-fun use)))
-                 (args (basic-combination-args use)))
-             (case name
-               ((%typep %instance-typep)
-                (let ((type (second args)))
-                  (when (constant-lvar-p type)
-                    (let ((val (lvar-value type)))
+  ;; Note: Even if we do (IF test exp exp) => (PROGN test exp)
+  ;; optimization, the *MAX-OPTIMIZE-ITERATIONS* cutoff means that we
+  ;; can't guarantee that the optimization will be done, so we still
+  ;; need to avoid barfing on this case.
+  (unless (eq (if-consequent if) (if-alternative if))
+    (let ((consequent-constraints (make-sset))
+          (alternative-constraints (make-sset)))
+      (macrolet ((add (fun x y not-p)
+                   `(add-complement-constraints ,fun ,x ,y ,not-p
+                     constraints
+                     consequent-constraints
+                     alternative-constraints)))
+        (typecase use
+          (ref
+           (add 'typep (ok-lvar-lambda-var (ref-lvar use) constraints)
+                (specifier-type 'null) t))
+          (combination
+           (unless (eq (combination-kind use)
+                       :error)
+             (let ((name (lvar-fun-name
+                          (basic-combination-fun use)))
+                   (args (basic-combination-args use)))
+               (case name
+                 ((%typep %instance-typep)
+                  (let ((type (second args)))
+                    (when (constant-lvar-p type)
+                      (let ((val (lvar-value type)))
+                        (add 'typep
+                             (ok-lvar-lambda-var (first args) constraints)
+                             (if (ctype-p val)
+                                 val
+                                 (specifier-type val))
+                             nil)))))
+                 ((eq eql)
+                  (let* ((arg1 (first args))
+                         (var1 (ok-lvar-lambda-var arg1 constraints))
+                         (arg2 (second args))
+                         (var2 (ok-lvar-lambda-var arg2 constraints)))
+                    ;; The code below assumes that the constant is the
+                    ;; second argument in case of variable to constant
+                    ;; comparision which is sometimes true (see source
+                    ;; transformations for EQ, EQL and CHAR=). Fixing
+                    ;; that would result in more constant substitutions
+                    ;; which is not a universally good thing, thus the
+                    ;; unnatural asymmetry of the tests.
+                    (cond ((not var1)
+                           (when var2
+                             (add-test-constraint 'typep var2 (lvar-type arg1)
+                                                  nil constraints
+                                                  consequent-constraints)))
+                          (var2
+                           (add 'eql var1 var2 nil))
+                          ((constant-lvar-p arg2)
+                           (add 'eql var1 (ref-leaf (principal-lvar-use arg2))
+                                nil))
+                          (t
+                           (add-test-constraint 'typep var1 (lvar-type arg2)
+                                                nil constraints
+                                                consequent-constraints)))))
+                 ((< >)
+                  (let* ((arg1 (first args))
+                         (var1 (ok-lvar-lambda-var arg1 constraints))
+                         (arg2 (second args))
+                         (var2 (ok-lvar-lambda-var arg2 constraints)))
+                    (when var1
+                      (add name var1 (lvar-type arg2) nil))
+                    (when var2
+                      (add (if (eq name '<) '> '<) var2 (lvar-type arg1) nil))))
+                 (t
+                  (let ((ptype (gethash name *backend-predicate-types*)))
+                    (when ptype
                       (add 'typep (ok-lvar-lambda-var (first args) constraints)
-                           (if (ctype-p val)
-                               val
-                               (specifier-type val))
-                           nil)))))
-               ((eq eql)
-                (let* ((var1 (ok-lvar-lambda-var (first args) constraints))
-                       (arg2 (second args))
-                       (var2 (ok-lvar-lambda-var arg2 constraints)))
-                  (cond ((not var1))
-                        (var2
-                         (add 'eql var1 var2 nil))
-                        ((constant-lvar-p arg2)
-                         (add 'eql var1 (ref-leaf (principal-lvar-use arg2))
-                              nil)))))
-               ((< >)
-                (let* ((arg1 (first args))
-                       (var1 (ok-lvar-lambda-var arg1 constraints))
-                       (arg2 (second args))
-                       (var2 (ok-lvar-lambda-var arg2 constraints)))
-                  (when var1
-                    (add name var1 (lvar-type arg2) nil))
-                  (when var2
-                    (add (if (eq name '<) '> '<) var2 (lvar-type arg1) nil))))
-               (t
-                (let ((ptype (gethash name *backend-predicate-types*)))
-                  (when ptype
-                    (add 'typep (ok-lvar-lambda-var (first args) constraints)
-                         ptype nil))))))))))
-    (values consequent-constraints alternative-constraints)))
+                           ptype nil))))))))))
+      (values consequent-constraints alternative-constraints))))
 
 ;;;; Applying constraints
 

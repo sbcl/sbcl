@@ -1992,3 +1992,23 @@
 ;; aggressive constant folding (bug #400)
 (assert
  (eq t (funcall (compile nil '(lambda () (or t (the integer (/ 1 0))))))))
+
+(with-test (:name (:compiler :constraint-propagation :var-eql-to-non-var-1))
+  (assert
+   (handler-case
+       (compile nil '(lambda (x y)
+                       (when (eql x (length y))
+                         (locally
+                             (declare (optimize (speed 3)))
+                           (1+ x)))))
+     (compiler-note () (error "The code is not optimized.")))))
+
+(with-test (:name (:compiler :constraint-propagation :var-eql-to-non-var-2))
+  (assert
+   (handler-case
+       (compile nil '(lambda (x y)
+                       (when (eql (length y) x)
+                         (locally
+                             (declare (optimize (speed 3)))
+                           (1+ x)))))
+     (compiler-note () (error "The code is not optimized.")))))
