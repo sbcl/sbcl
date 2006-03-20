@@ -102,14 +102,14 @@
 (progn
   #!+gencgc
   (progn
-    (def!constant dynamic-space-start #x50000000)
-    (def!constant dynamic-space-end   #x7ffff000))
+    (def!constant dynamic-space-start #x4f000000)
+    (def!constant dynamic-space-end   #x7efff000))
   #!-gencgc
   (progn
-    (def!constant dynamic-0-space-start #x50000000)
-    (def!constant dynamic-0-space-end   #x67fff000)
-    (def!constant dynamic-1-space-start #x68000000)
-    (def!constant dynamic-1-space-end   #x7ffff000))
+    (def!constant dynamic-0-space-start #x4f000000)
+    (def!constant dynamic-0-space-end   #x66fff000)
+    (def!constant dynamic-1-space-start #x67000000)
+    (def!constant dynamic-1-space-end   #x7efff000))
 
   (def!constant linkage-table-space-start #x0a000000)
   (def!constant linkage-table-space-end   #x0b000000)
