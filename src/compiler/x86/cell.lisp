@@ -72,11 +72,10 @@
       (inst or tls tls)
       (inst jmp :z global-val)
       (inst fs-segment-prefix)
-      (inst cmp (make-ea :dword :scale 1 :index tls)
-            no-tls-value-marker-widetag)
+      (inst cmp (make-ea :dword :base tls) no-tls-value-marker-widetag)
       (inst jmp :z global-val)
       (inst fs-segment-prefix)
-      (inst mov (make-ea :dword :scale 1 :index tls) value)
+      (inst mov (make-ea :dword :base tls) value)
       (inst jmp done)
       (emit-label global-val)
       (storew value symbol symbol-value-slot other-pointer-lowtag)
@@ -113,7 +112,7 @@
            (ret-lab (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst fs-segment-prefix)
-      (inst mov value (make-ea :dword :index value :scale 1))
+      (inst mov value (make-ea :dword :base value))
       (inst cmp value no-tls-value-marker-widetag)
       (inst jmp :ne check-unbound-label)
       (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -135,7 +134,7 @@
     (let ((ret-lab (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst fs-segment-prefix)
-      (inst mov value (make-ea :dword :index value :scale 1))
+      (inst mov value (make-ea :dword :base value))
       (inst cmp value no-tls-value-marker-widetag)
       (inst jmp :ne ret-lab)
       (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -192,7 +191,7 @@
     (let ((check-unbound-label (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst fs-segment-prefix)
-      (inst mov value (make-ea :dword :index value :scale 1))
+      (inst mov value (make-ea :dword :base value))
       (inst cmp value no-tls-value-marker-widetag)
       (inst jmp :ne check-unbound-label)
       (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -323,11 +322,11 @@
 
       (emit-label tls-index-valid)
       (inst fs-segment-prefix)
-      (inst mov temp (make-ea :dword :scale 1 :index tls-index))
+      (inst mov temp (make-ea :dword :base tls-index))
       (storew temp bsp (- binding-value-slot binding-size))
       (storew symbol bsp (- binding-symbol-slot binding-size))
       (inst fs-segment-prefix)
-      (inst mov (make-ea :dword :scale 1 :index tls-index) val))))
+      (inst mov (make-ea :dword :base tls-index) val))))
 
 #!-sb-thread
 (define-vop (bind)
@@ -355,7 +354,7 @@
 
     (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
     (inst fs-segment-prefix)
-    (inst mov (make-ea :dword :scale 1 :index tls-index) value)
+    (inst mov (make-ea :dword :base tls-index) value)
 
     (storew 0 bsp (- binding-value-slot binding-size))
     (storew 0 bsp (- binding-symbol-slot binding-size))
@@ -394,7 +393,7 @@
     #!+sb-thread (loadw
                   tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
     #!+sb-thread (inst fs-segment-prefix)
-    #!+sb-thread (inst mov (make-ea :dword :scale 1 :index tls-index) value)
+    #!+sb-thread (inst mov (make-ea :dword :base tls-index) value)
     (storew 0 bsp (- binding-value-slot binding-size))
     (storew 0 bsp (- binding-symbol-slot binding-size))
 

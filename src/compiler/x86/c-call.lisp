@@ -306,7 +306,7 @@
                                 (ash symbol-tls-index-slot word-shift)
                                 (- other-pointer-lowtag))))
         (inst fs-segment-prefix)
-        (inst sub (make-ea :dword :scale 1 :index temp) delta)))
+        (inst sub (make-ea :dword :base temp) delta)))
     (load-tl-symbol-value result *alien-stack*))
   #!-sb-thread
   (:generator 0
@@ -330,12 +330,12 @@
       (let ((delta (logandc2 (+ amount 3) 3)))
         (inst mov temp
               (make-ea :dword
-                           :disp (+ nil-value
-                                    (static-symbol-offset '*alien-stack*)
+                       :disp (+ nil-value
+                                (static-symbol-offset '*alien-stack*)
                                 (ash symbol-tls-index-slot word-shift)
                                 (- other-pointer-lowtag))))
         (inst fs-segment-prefix)
-        (inst add (make-ea :dword :scale 1 :index temp) delta))))
+        (inst add (make-ea :dword :base temp) delta))))
   #!-sb-thread
   (:generator 0
     (unless (zerop amount)

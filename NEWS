@@ -21,6 +21,9 @@ changes in sbcl-0.9.11 relative to sbcl-0.9.10:
     to be friendlier to the prediction heuristics implemented,
     particularly with reference to CALL and RET pairing.  (thanks to
     Alastair Bridgewater)
+  * optimization: on x86, the code for access to thread-local symbol
+    values and binding/unbinding of thread-local symbols is smaller.
+    (thanks to Alastair Bridgewater)
   * enhancement: CONSTANTP is now able to determine constantness of
     more complex forms, including calls to constant-foldable standardized
     functions and some special forms beyond QUOTE.

@@ -93,7 +93,7 @@
   `(progn
     (inst mov ,reg (make-ea-for-symbol-tls-index ,symbol))
     (inst fs-segment-prefix)
-    (inst mov ,reg (make-ea :dword :scale 1 :index ,reg))))
+    (inst mov ,reg (make-ea :dword :base ,reg))))
 #!-sb-thread
 (defmacro load-tl-symbol-value (reg symbol) `(load-symbol-value ,reg ,symbol))
 
@@ -102,7 +102,7 @@
   `(progn
     (inst mov ,temp (make-ea-for-symbol-tls-index ,symbol))
     (inst fs-segment-prefix)
-    (inst mov (make-ea :dword :scale 1 :index ,temp) ,reg)))
+    (inst mov (make-ea :dword :base ,temp) ,reg)))
 #!-sb-thread
 (defmacro store-tl-symbol-value (reg symbol temp)
   (declare (ignore temp))
