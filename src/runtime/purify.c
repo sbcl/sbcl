@@ -368,6 +368,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 #endif
         case SAP_WIDETAG:
         case WEAK_POINTER_WIDETAG:
+        case LUTEX_WIDETAG:
             break;
 
         default:
@@ -961,6 +962,7 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 
       case VALUE_CELL_HEADER_WIDETAG:
       case WEAK_POINTER_WIDETAG:
+      case LUTEX_WIDETAG:
         return ptrans_boxed(thing, header, 0);
 
       case SYMBOL_HEADER_WIDETAG:
@@ -1374,6 +1376,11 @@ pscav(lispobj *addr, long nwords, boolean constant)
                  * don't feel like figuring out how to break them. */
                 pscav(addr+1, 2, constant);
                 count = 4;
+                break;
+
+              case LUTEX_WIDETAG:
+                pscav(addr+1, 1, constant);
+                count = 2;
                 break;
 
               case FDEFN_WIDETAG:
