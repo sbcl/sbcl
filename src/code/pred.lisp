@@ -73,6 +73,8 @@
   (def-type-predicate-wrapper integerp)
   (def-type-predicate-wrapper listp)
   (def-type-predicate-wrapper long-float-p)
+  #!+(and sb-thread sb-lutex)
+  (def-type-predicate-wrapper lutexp)
   (def-type-predicate-wrapper lra-p)
   (def-type-predicate-wrapper null)
   (def-type-predicate-wrapper numberp)

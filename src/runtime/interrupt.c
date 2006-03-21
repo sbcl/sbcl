@@ -362,10 +362,20 @@ interrupt_handle_pending(os_context_t *context)
     struct thread *thread;
     struct interrupt_data *data;
 
+    FSHOW_SIGNAL((stderr,
+                  "/entering interrupt_handle_pending\n"));
     check_blockables_blocked_or_lose();
 
+    FSHOW_SIGNAL((stderr,
+                  "/interrupt_handle_pending 1a\n"));
     thread=arch_os_get_current_thread();
+
+    FSHOW_SIGNAL((stderr,
+                  "/interrupt_handle_pending 1b\n"));
     data=thread->interrupt_data;
+
+    FSHOW_SIGNAL((stderr,
+                  "/interrupt_handle_pending 2\n"));
 
     /* If pseudo_atomic_interrupted is set then the interrupt is going
      * to be handled now, ergo it's safe to clear it. */
@@ -378,6 +388,8 @@ interrupt_handle_pending(os_context_t *context)
     if (SymbolValue(GC_INHIBIT,thread)==NIL) {
 #ifdef LISP_FEATURE_SB_THREAD
         if (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL) {
+            FSHOW_SIGNAL((stderr,
+                          "/interrupt_handle_pending 3\n"));
             /* another thread has already initiated a gc, this attempt
              * might as well be cancelled */
             SetSymbolValue(GC_PENDING,NIL,thread);
@@ -458,6 +470,12 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #endif
     union interrupt_handler handler;
     check_blockables_blocked_or_lose();
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+    FSHOW_SIGNAL((stderr, " sigtrap handler restoring fs: %x\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
+    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
+                          (*CONTEXT_ADDR_FROM_STEM(fs))); /* privilege level */
+#endif
 #ifndef LISP_FEATURE_WIN32
     if (sigismember(&deferrable_sigset,signal))
         check_interrupts_enabled_or_lose(context);
@@ -469,6 +487,8 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
        delivered we appear to have a null FPU control word. */
     os_restore_fp_control(context);
 #endif
+
+
     handler = interrupt_handlers[signal];
 
     if (ARE_SAME_HANDLER(handler.c, SIG_IGN)) {
@@ -651,11 +671,24 @@ static void
 maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    struct thread *thread=arch_os_get_current_thread();
-    struct interrupt_data *data=thread->interrupt_data;
+
+    struct thread *thread;
+    struct interrupt_data *data;
+
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+    FSHOW_SIGNAL((stderr, " sigtrap handler restoring fs: %x\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
+    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
+                          (*CONTEXT_ADDR_FROM_STEM(fs))); /* privilege level */
+#endif
+
+    thread=arch_os_get_current_thread();
+    data=thread->interrupt_data;
+
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif
+
     if(maybe_defer_handler(interrupt_handle_now,data,signal,info,context))
         return;
     interrupt_handle_now(signal, info, context);
@@ -673,6 +706,14 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif
+
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+    FSHOW_SIGNAL((stderr, " sigtrap handler restoring fs: %x\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
+    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
+                          (*CONTEXT_ADDR_FROM_STEM(fs))); /* privilege level */
+#endif
+
     check_blockables_blocked_or_lose();
     check_interrupts_enabled_or_lose(context);
     interrupt_low_level_handlers[signal](signal, info, void_context);
@@ -686,11 +727,23 @@ static void
 low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    struct thread *thread=arch_os_get_current_thread();
-    struct interrupt_data *data=thread->interrupt_data;
+    struct thread *thread;
+    struct interrupt_data *data;
+
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+    FSHOW_SIGNAL((stderr, " sigtrap handler restoring fs: %x\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
+    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
+                          (*CONTEXT_ADDR_FROM_STEM(fs))); /* privilege level */
+#endif
+
+    thread=arch_os_get_current_thread();
+    data=thread->interrupt_data;
+
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif
+
     if(maybe_defer_handler(low_level_interrupt_handle_now,data,
                            signal,info,context))
         return;
@@ -704,6 +757,8 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 
 #ifdef LISP_FEATURE_SB_THREAD
 
+#define SIG_STOP_FOR_GC_MASK 1 << (SIG_STOP_FOR_GC - 1)
+
 void
 sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 {
@@ -711,7 +766,10 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     struct thread *thread=arch_os_get_current_thread();
     sigset_t ss;
 
-    if ((arch_pseudo_atomic_atomic(context) ||
+    FSHOW_SIGNAL((stderr,"CLH: DEBUG!!! thread=%lu sig_stop_for_gc\n",
+                  thread->os_thread));
+
+   if ((arch_pseudo_atomic_atomic(context) ||
          SymbolValue(GC_INHIBIT,thread) != NIL)) {
         SetSymbolValue(STOP_FOR_GC_PENDING,T,thread);
         if (SymbolValue(GC_INHIBIT,thread) == NIL)
@@ -735,7 +793,12 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
         sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
         /* It is possible to get SIGCONT (and probably other
          * non-blockable signals) here. */
+#ifdef LISP_FEATURE_DARWIN
+        while (sigpending(&ss), !(ss & SIG_STOP_FOR_GC_MASK));
+#else
         while (sigwaitinfo(&ss,0) != SIG_STOP_FOR_GC);
+#endif
+
         FSHOW_SIGNAL((stderr,"thread=%lu resumed\n",thread->os_thread));
         if(thread->state!=STATE_RUNNING) {
             lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",

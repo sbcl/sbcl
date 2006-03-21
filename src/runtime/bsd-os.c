@@ -58,6 +58,12 @@ static void netbsd_init();
 static void freebsd_init();
 #endif /* __FreeBSD__ */
 
+#ifdef LISP_FEATURE_DARWIN
+#include <architecture/i386/table.h>
+#include <i386/user_ldt.h>
+#include <mach/mach_init.h>
+#endif /* LISP_FEATURE_DARWIN */
+
 void
 os_init(char *argv[], char *envp[])
 {
@@ -321,16 +327,41 @@ static void freebsd_init()
 #endif /* LISP_FEATURE_X86 */
 }
 #endif /* __FreeBSD__ */
-
-/* threads */
 
-/* no threading in any *BSD variant on any CPU (yet? in sbcl-0.8.0 anyway) */
-#ifdef LISP_FEATURE_SB_THREAD
-#error "Define threading support functions"
-#else
 int arch_os_thread_init(struct thread *thread) {
-  stack_t sigstack;
+
+#ifdef LISP_FEATURE_SB_THREAD
+
+#if defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_DARWIN)
+    int n;
+    data_desc_t ldt_entry = { 0, 0, 0, DESC_DATA_WRITE,
+                              3, 1, 0, DESC_DATA_32B, DESC_GRAN_BYTE, 0 };
+
+    set_data_desc_addr(&ldt_entry, (unsigned long) thread);
+    set_data_desc_size(&ldt_entry, dynamic_values_bytes);
+
+    n = i386_set_ldt(LDT_AUTO_ALLOC, (union ldt_entry*) &ldt_entry, 1);
+
+    if (n < 0) {
+        return 0;
+    }
+
+    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
+                          ((n << 3) /* selector number */
+                           + (1 << 2) /* TI set = LDT */
+                           + 3)); /* privilege level */
+    thread->tls_cookie=n;
+
+    pthread_setspecific(specials,thread);
+#else
+#error "Define threading support functions"
+#endif
+
+#endif
+
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    stack_t sigstack;
+
     /* Signal handlers are run on the control stack, so if it is exhausted
      * we had better use an alternate stack for whatever signal tells us
      * we've exhausted it */
@@ -339,12 +370,13 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_size = 32*SIGSTKSZ;
     sigaltstack(&sigstack,0);
 #endif
+
     return 1;                  /* success */
 }
+
 int arch_os_thread_cleanup(struct thread *thread) {
     return 1;                  /* success */
 }
-#endif
 
 #ifdef LISP_FEATURE_DARWIN
 /* defined in ppc-darwin-os.c instead */

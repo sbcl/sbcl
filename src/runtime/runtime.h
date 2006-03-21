@@ -35,7 +35,7 @@
  * necessarily reentrant. But it can still be very convenient for
  * figuring out what's going on when you have a signal handling
  * problem.. */
-#define QSHOW_SIGNALS 0
+#define QSHOW_SIGNALS 1
 
 #if QSHOW_SIGNALS
 #define FSHOW_SIGNAL FSHOW
@@ -63,6 +63,7 @@ typedef unsigned long pointer_sized_uint_t ;
 
 #if defined(LISP_FEATURE_SB_THREAD)
 #include <pthread.h>
+#include <semaphore.h>
 typedef pthread_t os_thread_t;
 #else
 typedef pid_t os_thread_t;

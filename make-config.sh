@@ -263,6 +263,9 @@ if [ "$sbcl_arch" = "x86" ]; then
         # roughly-equivalent magic nevertheless.
         printf ' :os-provides-dlopen' >> $ltf
     fi
+    if [ "$sbcl_os" = "darwin" ]; then
+        printf ' :mach-semaphores' >> $ltf
+    fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures :alien-callbacks' >> $ltf

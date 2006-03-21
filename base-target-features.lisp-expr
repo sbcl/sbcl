@@ -162,6 +162,17 @@
  ;; so caveat executor.
  ; :sb-thread
 
+ ;; lutex support
+ ;;
+ ;; While on linux we are able to use futexes for our locking
+ ;; primitive, on other platforms we don't have this luxury. NJF's
+ ;; lutexes present a locking API compatible with the futex-based API
+ ;; that allows for sb-thread support on MacOS X on Intel. Other
+ ;; platforms are untested, but this could server as a starting point
+ ;; for implementing threads on other OSes and architectures.
+ ;;
+ ; :sb-lutex
+
  ;; Support for detection of unportable code (when applied to the
  ;; COMMON-LISP package, or SBCL-internal pacakges) or bad-neighbourly
  ;; code (when applied to user-level packages), relating to material

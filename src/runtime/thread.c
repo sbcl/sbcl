@@ -59,7 +59,10 @@ static struct freeable_stack * volatile freeable_stack = 0;
 int dynamic_values_bytes=4096*sizeof(lispobj);  /* same for all threads */
 struct thread * volatile all_threads;
 extern struct interrupt_data * global_interrupt_data;
+
+#ifdef LISP_FEATURE_LINUX
 extern int linux_no_threads_p;
+#endif
 
 #ifdef LISP_FEATURE_SB_THREAD
 pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -345,6 +348,10 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     pthread_attr_t attr;
     sigset_t newset,oldset;
     boolean r=1;
+    int retcode, initcode, sizecode, addrcode;
+
+    FSHOW_SIGNAL((stderr,"/create_os_thread: creating new thread\n"));
+
     sigemptyset(&newset);
     /* Blocking deferrable signals is enough, no need to block
      * SIG_STOP_FOR_GC because the child process is not linked onto
@@ -352,12 +359,30 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     sigaddset_deferrable(&newset);
     thread_sigmask(SIG_BLOCK, &newset, &oldset);
 
-    if((pthread_attr_init(&attr)) ||
+    if((initcode = pthread_attr_init(&attr)) ||
+       /* don't ask */
+#if defined(LISP_FEATURE_DARWIN)
+       /* Darwin apparently wants the stack size to be evenly divisible
+          by the page size... */
+       (sizecode = pthread_attr_setstacksize(&attr, THREAD_CONTROL_STACK_SIZE-4096)) ||
+       (addrcode = pthread_attr_setstackaddr(&attr, th->control_stack_start)) ||
+#else
        (pthread_attr_setstack(&attr,th->control_stack_start,
                               THREAD_CONTROL_STACK_SIZE-16)) ||
-       (pthread_create
-        (kid_tid,&attr,(void *(*)(void *))new_thread_trampoline,th)))
+#endif
+       (retcode = pthread_create
+        (kid_tid,&attr,(void *(*)(void *))new_thread_trampoline,th))) {
+        FSHOW_SIGNAL((stderr, "attr signature %lx\n", attr.__sig));
+        FSHOW_SIGNAL((stderr, "init, size, addr = %d, %d, %d\n", initcode, sizecode, addrcode));
+        FSHOW_SIGNAL((stderr, printf("pthread_create returned %d, errno %d\n", retcode, errno)));
+        FSHOW_SIGNAL((stderr, "wanted stack size %d, min stack size %d\n",
+                      THREAD_CONTROL_STACK_SIZE-16, PTHREAD_STACK_MIN));
+        if(retcode < 0) {
+            perror("create_os_thread");
+        }
+
         r=0;
+    }
     thread_sigmask(SIG_SETMASK,&oldset,0);
     return r;
 }
@@ -366,7 +391,9 @@ os_thread_t create_thread(lispobj initial_function) {
     struct thread *th;
     os_thread_t kid_tid;
 
+#ifdef LISP_FEATURE_LINUX
     if(linux_no_threads_p) return 0;
+#endif
 
     /* Assuming that a fresh thread struct has no lisp objects in it,
      * linking it to all_threads can be left to the thread itself

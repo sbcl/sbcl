@@ -1478,6 +1478,34 @@ size_vector_complex_long_float(lispobj *where)
 }
 #endif
 
+/* lutex support */
+#if defined(LISP_FEATURE_SB_LUTEX)
+static long
+scav_lutex(lispobj *where, lispobj object)
+{
+    /* scavenge the sap */
+    scavenge(where + 1, 1);
+
+    return sizeof(struct lutex)/sizeof(lispobj);
+}
+
+static lispobj
+trans_lutex(lispobj object)
+{
+    lispobj copied;
+    gc_assert(is_lisp_pointer(object));
+    copied = copy_object(object, sizeof(struct lutex)/sizeof(lispobj));
+
+    return copied;
+}
+
+static long
+size_lutex(lispobj *where)
+{
+    return sizeof(struct lutex)/sizeof(lispobj);
+}
+#endif
+
 #define WEAK_POINTER_NWORDS \
         CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
 
@@ -1745,6 +1773,9 @@ gc_init_tables(void)
 #else
     scavtab[FDEFN_WIDETAG] = scav_fdefn;
 #endif
+#ifdef LISP_FEATURE_SB_LUTEX
+    scavtab[LUTEX_WIDETAG] = scav_lutex;
+#endif
 
     /* transport other table, initialized same way as scavtab */
     for (i = 0; i < ((sizeof transother)/(sizeof transother[0])); i++)
@@ -1877,6 +1908,9 @@ gc_init_tables(void)
     transother[WEAK_POINTER_WIDETAG] = trans_weak_pointer;
     transother[INSTANCE_HEADER_WIDETAG] = trans_boxed;
     transother[FDEFN_WIDETAG] = trans_boxed;
+#ifdef LISP_FEATURE_SB_LUTEX
+    transother[LUTEX_WIDETAG] = trans_lutex;
+#endif
 
     /* size table, initialized the same way as scavtab */
     for (i = 0; i < ((sizeof sizetab)/(sizeof sizetab[0])); i++)
@@ -2017,6 +2051,9 @@ gc_init_tables(void)
     sizetab[WEAK_POINTER_WIDETAG] = size_weak_pointer;
     sizetab[INSTANCE_HEADER_WIDETAG] = size_boxed;
     sizetab[FDEFN_WIDETAG] = size_boxed;
+#ifdef LISP_FEATURE_SB_LUTEX
+    sizetab[LUTEX_WIDETAG] = size_lutex;
+#endif
 }
 
 

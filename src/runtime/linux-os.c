@@ -34,6 +34,9 @@
 #include "runtime.h"
 #include "genesis/static-symbols.h"
 #include "genesis/fdefn.h"
+#ifdef LISP_FEATURE_SB_THREAD
+#include "genesis/futex.h"
+#endif
 #include <sys/socket.h>
 #include <sys/utsname.h>
 
@@ -60,7 +63,34 @@ int personality (unsigned long);
 
 size_t os_vm_page_size;
 
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined(LISP_FEATURE_SB_THREAD)
+#if defined(LISP_FEATURE_SB_LUTEX)
+
+int futex_init(os_sem_t *semaphore)
+{
+  printf("Initializing semaphore @ %p\n", semaphore);
+
+  return sem_init(semaphore, 0, 1);
+}
+
+int futex_wait(os_sem_t *semaphore)
+{
+  printf("Waiting on semaphore %p\n", semaphore);
+  return sem_wait(semaphore);
+}
+
+int futex_wake(os_sem_t *semaphore)
+{
+  printf("Waking on semaphore %p\n", semaphore);
+  return sem_post(semaphore);
+}
+
+int futex_destroy(os_sem_t *semaphore)
+{
+  return sem_destroy(semaphore);
+}
+
+#else
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <errno.h>
@@ -91,6 +121,7 @@ futex_wake(int *lock_word, int n)
 {
     return sys_futex(lock_word,FUTEX_WAKE,n,0);
 }
+#endif
 #endif
 
 
@@ -144,12 +175,14 @@ os_init(char *argv[], char *envp[])
 #endif
     }
 #ifdef LISP_FEATURE_SB_THREAD
+#if !defined(LISP_FEATURE_SB_LUTEX)
     futex_wait(futex,-1);
     if(errno==ENOSYS) {
        lose("This version of SBCL is compiled with threading support, but your kernel\n"
             "is too old to support this. Please use a more recent kernel or\n"
             "a version of SBCL without threading support.\n");
     }
+#endif
     if(! isnptl()) {
        lose("This version of SBCL only works correctly with the NPTL threading\n"
             "library. Please use a newer glibc, use an older SBCL, or stop using\n"

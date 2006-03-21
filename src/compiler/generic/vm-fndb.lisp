@@ -216,6 +216,13 @@
 (defknown make-value-cell (t) t
   (flushable movable))
 
+;;;; threading
+
+#!+(and sb-thread sb-lutex)
+(progn
+  (defknown sb!vm::%make-lutex (sb!sys:system-area-pointer) sb!vm::lutex ())
+  (defknown sb!vm::lutexp (t) boolean (foldable flushable)))
+
 (defknown (dynamic-space-free-pointer binding-stack-pointer-sap
                                       control-stack-pointer-sap)  ()
   system-area-pointer

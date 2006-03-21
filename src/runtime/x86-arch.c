@@ -213,6 +213,14 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     os_context_t *context = (os_context_t*)void_context;
     unsigned int trap;
 
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+    FSHOW_SIGNAL((stderr, " sigtrap handler restoring fs: %x\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
+    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
+                          (*CONTEXT_ADDR_FROM_STEM(fs))); /* privilege level */
+#endif
+
+
 #ifndef LISP_FEATURE_WIN32
     if (single_stepping && (signal==SIGTRAP))
     {
@@ -304,6 +312,13 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 static void
 sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
     os_context_t *context = (os_context_t*)void_context;
+
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+    FSHOW_SIGNAL((stderr, " sigill handler restoring fs: %x\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
+    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
+                          (*CONTEXT_ADDR_FROM_STEM(fs))); /* privilege level */
+#endif
 
 #if defined(LISP_FEATURE_DARWIN)
     if (*((unsigned short *)*os_context_pc_addr(context)) == 0x0b0f) {

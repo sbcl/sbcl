@@ -35,6 +35,9 @@
 #include "validate.h"
 #include "gc-internal.h"
 
+/* lutex stuff */
+#include "genesis/sap.h"
+
 unsigned char build_id[] =
 #include "../../output/build-id.tmp"
 ;
@@ -284,6 +287,42 @@ load_core_file(char *file, os_vm_offset_t file_offset)
             SHOW("INITIAL_FUN_CORE_ENTRY_TYPE_CODE case");
             initial_function = (lispobj)*ptr;
             break;
+
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
+        case LUTEX_TABLE_CORE_ENTRY_TYPE_CODE:
+            SHOW("LUTEX_TABLE_CORE_ENTRY_TYPE_CODE case");
+            {
+                size_t n_lutexes = *ptr;
+                size_t fdoffset = (*(ptr + 1) + 1) * (os_vm_page_size);
+                size_t data_length = n_lutexes * sizeof(struct sap *);
+                struct sap **lutexes_to_resurrect = malloc(data_length);
+                long bytes_read;
+
+                lseek(fd, fdoffset + file_offset, SEEK_SET);
+
+                FSHOW((stderr, "attempting to read %ld lutexes from core\n", n_lutexes));
+                bytes_read = read(fd, lutexes_to_resurrect, data_length);
+
+                /* XXX */
+                if (bytes_read != data_length) {
+                    lose("Could not read the lutex table");
+                }
+                else {
+                    int i;
+
+                    for (i=0; i<n_lutexes; ++i) {
+                        struct sap *lutex = lutexes_to_resurrect[i];
+
+                        FSHOW((stderr, "re-init'ing lutex @ %p\n", lutex));
+                        lutex->pointer = malloc(sizeof(os_sem_t));
+                        futex_init((os_sem_t *)lutex->pointer);
+                    }
+
+                    free(lutexes_to_resurrect);
+                }
+                break;
+            }
+#endif
 
 #ifdef LISP_FEATURE_GENCGC
         case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:

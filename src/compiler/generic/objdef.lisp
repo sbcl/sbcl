@@ -395,6 +395,19 @@
   (real :c-type "double" :length #!-x86-64 2 #!+x86-64 1)
   (imag :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
 
+#!+(and sb-thread sb-lutex)
+(define-primitive-object (lutex
+                          :lowtag other-pointer-lowtag
+                          :widetag lutex-widetag
+                          :alloc-trans %make-lutex)
+  (semaphore :ref-trans %lutex-semaphore
+             :ref-known (flushable)
+             :set-trans (setf %lutex-semaphore)
+             :set-known (unsafe)
+             :init :arg
+             :type sb!sys:system-area-pointer
+             :c-type "os_sem_t *"))
+
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
 ;;; it makes sense to define it here anyway, so that the GENESIS machinery

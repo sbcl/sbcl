@@ -15,7 +15,9 @@
   #!+sb-doc
   "Mutex type."
   (name nil :type (or null simple-string))
-  (value nil))
+  (value nil)
+  #!+sb-lutex
+  (lutex (make-lutex)))
 
 (def!struct spinlock
   #!+sb-doc
@@ -34,6 +36,7 @@ and the mutex is in use, sleep until it is available"
   (with-unique-names (got mutex1)
     `(let ((,mutex1 ,mutex)
            ,got)
+       (/show0 "WITH-MUTEX")
        (unwind-protect
             ;; FIXME: async unwind in SETQ form
             (when (setq ,got (get-mutex ,mutex1 ,value ,wait-p))
