@@ -639,6 +639,8 @@ void scratch(void)
     FlushConsoleInputBuffer(0);
     PeekConsoleInput(0, 0, 0, 0);
     Sleep(0);
+    GetACP();
+    GetOEMCP();
 }
 
 char *

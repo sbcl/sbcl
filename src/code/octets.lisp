@@ -641,13 +641,16 @@ one-past-the-end"
 
 (defun default-external-format ()
   (or *default-external-format*
-      (let ((external-format (intern (or #!-win32 (sb!alien:alien-funcall
-                                          (extern-alien
-                                           "nl_langinfo"
-                                           (function c-string int))
-                                          sb!unix:codeset)
-                                         "LATIN-1")
-                                     "KEYWORD")))
+      (let ((external-format #!-win32 (intern (or (sb!alien:alien-funcall
+                                                    (extern-alien
+                                                      "nl_langinfo"
+                                                      (function c-string int))
+                                                    sb!unix:codeset)
+                                                  "LATIN-1")
+                                              "KEYWORD")
+                             #!+win32
+                               #!+sb-unicode (sb!win32::ansi-cp)
+                               #!-sb-unicode :LATIN-1))
         (/show0 "cold-printing defaulted external-format:")
         #!+sb-show
         (cold-print external-format)
