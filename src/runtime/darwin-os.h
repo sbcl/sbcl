@@ -1,3 +1,5 @@
+#ifndef _DARWIN_OS_H
+#define _DARWIN_OS_H
 
 /* this is meant to be included from bsd-os.h */
 
@@ -37,3 +39,4 @@ typedef ucontext_t os_context_t;
 #define SIG_INTERRUPT_THREAD (SIGWINCH)
 #define SIG_STOP_FOR_GC (SIGINFO)
 
+#endif /* _DARWIN_OS_H */

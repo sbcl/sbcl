@@ -200,6 +200,10 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     void *fault_addr = arch_get_bad_addr(signal, siginfo, context);
 
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+    os_restore_tls_segment_register(context);
+#endif
+
 #if defined(MEMORY_FAULT_DEBUG)
     fprintf(stderr, "Memory fault at: %p, PC: %x\n", fault_addr, *os_context_pc_addr(context));
 #if defined(ARCH_HAS_STACK_POINTER)
@@ -233,6 +237,14 @@ os_install_interrupt_handlers(void)
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT2,
                                                  memory_fault_handler);
 #endif
+
+#ifdef LISP_FEATURE_SB_THREAD
+    undoably_install_low_level_interrupt_handler(SIG_INTERRUPT_THREAD,
+                                                 interrupt_thread_handler);
+    undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
+                                                 sig_stop_for_gc_handler);
+#endif
+
     SHOW("leaving os_install_interrupt_handlers()");
 }
 
@@ -334,6 +346,8 @@ int arch_os_thread_init(struct thread *thread) {
 
 #if defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_DARWIN)
     int n;
+    sel_t sel;
+
     data_desc_t ldt_entry = { 0, 0, 0, DESC_DATA_WRITE,
                               3, 1, 0, DESC_DATA_32B, DESC_GRAN_BYTE, 0 };
 
@@ -346,10 +360,12 @@ int arch_os_thread_init(struct thread *thread) {
         return 0;
     }
 
-    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
-                          ((n << 3) /* selector number */
-                           + (1 << 2) /* TI set = LDT */
-                           + 3)); /* privilege level */
+    sel.index = n;
+    sel.rpl = USER_PRIV;
+    sel.ti = SEL_LDT;
+
+    __asm__ __volatile__ ("mov %0, %%fs" : : "r"(sel));
+
     thread->tls_cookie=n;
 
     pthread_setspecific(specials,thread);
@@ -375,6 +391,23 @@ int arch_os_thread_init(struct thread *thread) {
 }
 
 int arch_os_thread_cleanup(struct thread *thread) {
+
+#if defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_DARWIN)
+    sel_t sel;
+    int n = thread->tls_cookie;
+    data_desc_t ldt_entry = { 0, 0, 0, DESC_DATA_WRITE,
+                              0, 0, 0, DESC_DATA_32B, DESC_GRAN_BYTE, 0 };
+
+    n = i386_set_ldt(n, (union ldt_entry*) &ldt_entry, 1);
+
+    /*
+    sel.index = n;
+    sel.rpl = USER_PRIV;
+    sel.ti = SEL_LDT;
+    __asm__ __volatile__ ("mov %0, %%fs" : : "r"(sel));
+    */
+#endif
+
     return 1;                  /* success */
 }
 

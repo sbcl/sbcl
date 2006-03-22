@@ -214,12 +214,8 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     unsigned int trap;
 
 #if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
-    FSHOW_SIGNAL((stderr, " sigtrap handler restoring fs: %x\n",
-                  *CONTEXT_ADDR_FROM_STEM(fs)));
-    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
-                          (*CONTEXT_ADDR_FROM_STEM(fs))); /* privilege level */
+    os_restore_tls_segment_register(context);
 #endif
-
 
 #ifndef LISP_FEATURE_WIN32
     if (single_stepping && (signal==SIGTRAP))

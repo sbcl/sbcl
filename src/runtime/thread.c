@@ -137,6 +137,7 @@ free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
                       (lispobj)new_freeable_stack);
     if (new_freeable_stack) {
         FSHOW((stderr,"/reaping %lu\n", new_freeable_stack->os_thread));
+        /* #if !defined(LISP_FEATURE_DARWIN) */
         /* Under NPTL pthread_join really waits until the thread
          * exists and the stack can be safely freed. This is sadly not
          * mandated by the pthread spec. */
@@ -144,6 +145,7 @@ free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
         os_invalidate(new_freeable_stack->stack, THREAD_STRUCT_SIZE);
         os_invalidate((os_vm_address_t) new_freeable_stack,
                       sizeof(struct freeable_stack));
+        /* #endif */
     }
 }
 
@@ -466,9 +468,10 @@ void gc_stop_the_world()
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     for(p=all_threads; p; p=p->next) {
         gc_assert(p->os_thread != 0);
+        FSHOW_SIGNAL((stderr,"/gc_stop_the_world: p->state: %x\n", p->state));
         if((p!=th) && ((p->state==STATE_RUNNING))) {
-            FSHOW_SIGNAL((stderr,"/gc_stop_the_world: suspending %lu\n",
-                          p->os_thread));
+            FSHOW_SIGNAL((stderr,"/gc_stop_the_world: suspending %x, os_thread %x\n",
+                          p, p->os_thread));
             status=kill_thread_safely(p->os_thread,SIG_STOP_FOR_GC);
             if (status==ESRCH) {
                 /* This thread has exited. */
@@ -482,6 +485,7 @@ void gc_stop_the_world()
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:signals sent\n"));
     /* wait for the running threads to stop or finish */
     for(p=all_threads;p;) {
+        FSHOW_SIGNAL((stderr,"/gc_stop_the_world: th: %p, p: %p\n", th, p));
         if((p!=th) && (p->state==STATE_RUNNING)) {
             sched_yield();
         } else {

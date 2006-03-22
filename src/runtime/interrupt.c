@@ -324,6 +324,10 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 {
     lispobj context_sap;
 
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+    os_restore_tls_segment_register(context);
+#endif
+
     fake_foreign_function_call(context);
 
     if (!internal_errors_enabled) {
@@ -362,34 +366,19 @@ interrupt_handle_pending(os_context_t *context)
     struct thread *thread;
     struct interrupt_data *data;
 
-    FSHOW_SIGNAL((stderr,
-                  "/entering interrupt_handle_pending\n"));
+    FSHOW_SIGNAL((stderr, "/entering interrupt_handle_pending\n"));
+
     check_blockables_blocked_or_lose();
-
-    FSHOW_SIGNAL((stderr,
-                  "/interrupt_handle_pending 1a\n"));
     thread=arch_os_get_current_thread();
-
-    FSHOW_SIGNAL((stderr,
-                  "/interrupt_handle_pending 1b\n"));
     data=thread->interrupt_data;
-
-    FSHOW_SIGNAL((stderr,
-                  "/interrupt_handle_pending 2\n"));
 
     /* If pseudo_atomic_interrupted is set then the interrupt is going
      * to be handled now, ergo it's safe to clear it. */
-
-    /* CLH: 20060220 FIXME This sould probably be arch_clear_p_a_i but
-     * the behavior of arch_clear_p_a_i and clear_p_a_i are slightly
-     * different on PPC. */
     arch_clear_pseudo_atomic_interrupted(context);
 
     if (SymbolValue(GC_INHIBIT,thread)==NIL) {
 #ifdef LISP_FEATURE_SB_THREAD
         if (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL) {
-            FSHOW_SIGNAL((stderr,
-                          "/interrupt_handle_pending 3\n"));
             /* another thread has already initiated a gc, this attempt
              * might as well be cancelled */
             SetSymbolValue(GC_PENDING,NIL,thread);
@@ -469,13 +458,14 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
     boolean were_in_lisp;
 #endif
     union interrupt_handler handler;
-    check_blockables_blocked_or_lose();
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
-    FSHOW_SIGNAL((stderr, " sigtrap handler restoring fs: %x\n",
-                  *CONTEXT_ADDR_FROM_STEM(fs)));
-    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
-                          (*CONTEXT_ADDR_FROM_STEM(fs))); /* privilege level */
+
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+    os_restore_tls_segment_register(context);
 #endif
+
+    check_blockables_blocked_or_lose();
+
+
 #ifndef LISP_FEATURE_WIN32
     if (sigismember(&deferrable_sigset,signal))
         check_interrupts_enabled_or_lose(context);
@@ -675,11 +665,8 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     struct thread *thread;
     struct interrupt_data *data;
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
-    FSHOW_SIGNAL((stderr, " sigtrap handler restoring fs: %x\n",
-                  *CONTEXT_ADDR_FROM_STEM(fs)));
-    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
-                          (*CONTEXT_ADDR_FROM_STEM(fs))); /* privilege level */
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+    os_restore_tls_segment_register(context);
 #endif
 
     thread=arch_os_get_current_thread();
@@ -707,11 +694,8 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
     os_restore_fp_control(context);
 #endif
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
-    FSHOW_SIGNAL((stderr, " sigtrap handler restoring fs: %x\n",
-                  *CONTEXT_ADDR_FROM_STEM(fs)));
-    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
-                          (*CONTEXT_ADDR_FROM_STEM(fs))); /* privilege level */
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+    os_restore_tls_segment_register(context);
 #endif
 
     check_blockables_blocked_or_lose();
@@ -730,11 +714,8 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     struct thread *thread;
     struct interrupt_data *data;
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
-    FSHOW_SIGNAL((stderr, " sigtrap handler restoring fs: %x\n",
-                  *CONTEXT_ADDR_FROM_STEM(fs)));
-    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
-                          (*CONTEXT_ADDR_FROM_STEM(fs))); /* privilege level */
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+    os_restore_tls_segment_register(context);
 #endif
 
     thread=arch_os_get_current_thread();
@@ -763,6 +744,11 @@ void
 sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
+
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+    os_restore_tls_segment_register(context);
+#endif
+
     struct thread *thread=arch_os_get_current_thread();
     sigset_t ss;
 
@@ -794,7 +780,13 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
         /* It is possible to get SIGCONT (and probably other
          * non-blockable signals) here. */
 #ifdef LISP_FEATURE_DARWIN
-        while (sigpending(&ss), !(ss & SIG_STOP_FOR_GC_MASK));
+        {
+            int sigret;
+            do { sigwait(&ss, &sigret); }
+            while (sigret != SIG_STOP_FOR_GC);
+        }
+        /* do { sigpending(&ss); } while(!sigismember(&ss, SIG_STOP_FOR_GC)); */
+        /*        while (sigpending(&ss), !(ss & SIG_STOP_FOR_GC_MASK)); */
 #else
         while (sigwaitinfo(&ss,0) != SIG_STOP_FOR_GC);
 #endif
@@ -992,6 +984,11 @@ void
 interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 {
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
+
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+    os_restore_tls_segment_register(context);
+#endif
+
     /* let the handler enable interrupts again when it sees fit */
     sigaddset_deferrable(os_context_sigmask_addr(context));
     arrange_return_to_lisp_function(context, SymbolFunction(RUN_INTERRUPTION));
