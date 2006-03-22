@@ -641,6 +641,8 @@ void scratch(void)
     Sleep(0);
     GetACP();
     GetOEMCP();
+    GetConsoleCP();
+    GetConsoleOutputCP();
 }
 
 char *

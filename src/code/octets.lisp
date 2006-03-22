@@ -649,7 +649,7 @@ one-past-the-end"
                                                   "LATIN-1")
                                               "KEYWORD")
                              #!+win32
-                               #!+sb-unicode (sb!win32::ansi-cp)
+                               #!+sb-unicode (sb!win32::ansi-codepage)
                                #!-sb-unicode :LATIN-1))
         (/show0 "cold-printing defaulted external-format:")
         #!+sb-show

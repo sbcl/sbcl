@@ -151,11 +151,11 @@
 (define-alien-routine ("Sleep@4" millisleep) void
   (milliseconds dword))
 
-#!+sb-unicode (defvar *ANSI-CP* nil)
-#!+sb-unicode (defvar *OEM-CP* nil)
+#!+sb-unicode (defvar *ANSI-CODEPAGE* nil)
+#!+sb-unicode (defvar *OEM-CODEPAGE* nil)
 
 #!+sb-unicode
-(defparameter *cp-to-external-format* (make-hash-table))
+(defparameter *codepage-to-external-format* (make-hash-table))
 
 #!+sb-unicode
 (dolist (cp
@@ -309,26 +309,42 @@
     ;;57011     ISCII Punjabi
     ;;65000     Unicode UTF-7
     (65001 :UTF8))) ;; Unicode UTF-8
-  (setf (gethash (car cp) *cp-to-external-format*) (cadr cp)))
+  (setf (gethash (car cp) *codepage-to-external-format*) (cadr cp)))
 
 #!+sb-unicode
-(declaim (ftype (function () keyword) ansi-cp))
+(declaim (ftype (function () keyword) ansi-codepage))
 #!+sb-unicode
-(defun ansi-cp ()
-  (or *ANSI-CP*
-      (setq *ANSI-CP*
+(defun ansi-codepage ()
+  (or *ANSI-CODEPAGE*
+      (setq *ANSI-CODEPAGE*
         (or
           (gethash (alien-funcall (extern-alien "GetACP@0" (function UINT)))
-                   *cp-to-external-format*)
+                   *codepage-to-external-format*)
           :LATIN-1))))
 
 #!+sb-unicode
-(declaim (ftype (function () keyword) oem-cp))
+(declaim (ftype (function () keyword) oem-codepage))
 #!+sb-unicode
-(defun oem-cp ()
-  (or *OEM-CP*
-      (setq *OEM-CP*
+(defun oem-codepage ()
+  (or *OEM-CODEPAGE*
+      (setq *OEM-CODEPAGE*
         (or
           (gethash (alien-funcall (extern-alien "GetOEMCP@0" (function UINT)))
-                   *cp-to-external-format*)
+                   *codepage-to-external-format*)
           :LATIN-1))))
+
+;; http://msdn.microsoft.com/library/en-us/dllproc/base/getconsolecp.asp
+(declaim (ftype (function () keyword) console-input-codepage))
+(defun console-input-codepage ()
+  (or #!+sb-unicode
+      (gethash (alien-funcall (extern-alien "GetConsoleCP@0" (function UINT)))
+               *codepage-to-external-format*)
+      :LATIN-1))
+
+;; http://msdn.microsoft.com/library/en-us/dllproc/base/getconsoleoutputcp.asp
+(declaim (ftype (function () keyword) console-output-codepage))
+(defun console-output-codepage ()
+  (or #!+sb-unicode
+      (gethash (alien-funcall (extern-alien "GetConsoleOutputCP@0" (function UINT)))
+               *codepage-to-external-format*)
+      :LATIN-1))

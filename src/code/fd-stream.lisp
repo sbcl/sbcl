@@ -2120,11 +2120,14 @@
   (setf *available-buffers* nil)
   (with-output-to-string (*error-output*)
     (setf *stdin*
-          (make-fd-stream 0 :name "standard input" :input t :buffering :line))
+          (make-fd-stream 0 :name "standard input" :input t :buffering :line
+                            #!+win32 :external-format #!+win32 (sb!win32::console-input-codepage)))
     (setf *stdout*
-          (make-fd-stream 1 :name "standard output" :output t :buffering :line))
+          (make-fd-stream 1 :name "standard output" :output t :buffering :line
+                            #!+win32 :external-format #!+win32 (sb!win32::console-output-codepage)))
     (setf *stderr*
-          (make-fd-stream 2 :name "standard error" :output t :buffering :line))
+          (make-fd-stream 2 :name "standard error" :output t :buffering :line
+                            #!+win32 :external-format #!+win32 (sb!win32::console-output-codepage)))
     (let* ((ttyname #.(coerce "/dev/tty" 'simple-base-string))
            (tty (sb!unix:unix-open ttyname sb!unix:o_rdwr #o666)))
       (if tty
