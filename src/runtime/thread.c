@@ -125,6 +125,7 @@ static void
 free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
 {
     struct freeable_stack *new_freeable_stack = 0;
+
     if (thread_to_be_cleaned_up) {
         new_freeable_stack = (struct freeable_stack *)
             os_validate(0, sizeof(struct freeable_stack));
@@ -135,6 +136,7 @@ free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
     new_freeable_stack = (struct freeable_stack *)
         swap_lispobjs((lispobj *)(void *)&freeable_stack,
                       (lispobj)new_freeable_stack);
+
     if (new_freeable_stack) {
         FSHOW((stderr,"/reaping %lu\n", new_freeable_stack->os_thread));
         /* #if !defined(LISP_FEATURE_DARWIN) */
@@ -362,16 +364,15 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     thread_sigmask(SIG_BLOCK, &newset, &oldset);
 
     if((initcode = pthread_attr_init(&attr)) ||
-       /* don't ask */
+       /* FIXME: why do we even have this in the first place? */
 #if defined(LISP_FEATURE_DARWIN)
-       /* Darwin apparently wants the stack size to be evenly divisible
-          by the page size... */
-       (sizecode = pthread_attr_setstacksize(&attr, THREAD_CONTROL_STACK_SIZE-4096)) ||
-       (addrcode = pthread_attr_setstackaddr(&attr, th->control_stack_start)) ||
+#define CONTROL_STACK_ADJUST 4096 /* darwin wants page-aligned stacks */
 #else
-       (pthread_attr_setstack(&attr,th->control_stack_start,
-                              THREAD_CONTROL_STACK_SIZE-16)) ||
+#define CONTROL_STACK_ADJUST 16
 #endif
+       (pthread_attr_setstack(&attr,th->control_stack_start,
+                              THREAD_CONTROL_STACK_SIZE-CONTROL_STACK_ADJUST)) ||
+#undef CONTROL_STACK_ADJUST
        (retcode = pthread_create
         (kid_tid,&attr,(void *(*)(void *))new_thread_trampoline,th))) {
         FSHOW_SIGNAL((stderr, "attr signature %lx\n", attr.__sig));
