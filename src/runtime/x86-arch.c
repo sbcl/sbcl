@@ -312,8 +312,7 @@ sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
 #if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
     FSHOW_SIGNAL((stderr, " sigill handler restoring fs: %x\n",
                   *CONTEXT_ADDR_FROM_STEM(fs)));
-    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
-                          (*CONTEXT_ADDR_FROM_STEM(fs))); /* privilege level */
+    os_restore_tls_segment_register(context);
 #endif
 
 #if defined(LISP_FEATURE_DARWIN)
