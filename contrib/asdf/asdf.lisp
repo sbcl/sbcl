@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  1.92
+;;; This is asdf: Another System Definition Facility.  1.93
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -109,7 +109,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "1.92")
+(defvar *asdf-revision* (let* ((v "1.93")
                                (colon (or (position #\: v) -1))
                                (dot (position #\. v)))
                           (and v colon dot
@@ -359,6 +359,14 @@ and NIL NAME and TYPE components"
           (if (and file (probe-file file))
               (return file)))))))
 
+(defun make-temporary-package ()
+  (flet ((try (counter)
+           (ignore-errors
+                   (make-package (format nil "ASDF~D" counter)
+                                 :use '(:cl :asdf)))))
+    (do* ((counter 0 (+ counter 1))
+          (package (try counter) (try counter)))
+         (package package))))
 
 (defun find-system (name &optional (error-p t))
   (let* ((name (coerce-name name))
@@ -367,15 +375,18 @@ and NIL NAME and TYPE components"
     (when (and on-disk
                (or (not in-memory)
                    (< (car in-memory) (file-write-date on-disk))))
-      (let ((*package* (make-package (gensym #.(package-name *package*))
-                                     :use '(:cl :asdf))))
-        (format *verbose-out*
+      (let ((package (make-temporary-package)))
+        (unwind-protect
+             (let ((*package* package))
+               (format
+                *verbose-out*
                 "~&~@<; ~@;loading system definition from ~A into ~A~@:>~%"
                 ;; FIXME: This wants to be (ENOUGH-NAMESTRING
                 ;; ON-DISK), but CMUCL barfs on that.
                 on-disk
                 *package*)
-        (load on-disk)))
+               (load on-disk))
+          (delete-package package))))
     (let ((in-memory (gethash name *defined-systems*)))
       (if in-memory
           (progn (if on-disk (setf (car in-memory) (file-write-date on-disk)))
@@ -429,17 +440,17 @@ system."))
 (defmethod source-file-type ((c static-file) (s module)) nil)
 
 (defmethod component-relative-pathname ((component source-file))
-  (let* ((*default-pathname-defaults* (component-parent-pathname component))
-         (name-type
-          (make-pathname
-           :name (component-name component)
-           :type (source-file-type component
-                                   (component-system component)))))
-    (if (slot-value component 'relative-pathname)
-        (merge-pathnames
-         (slot-value component 'relative-pathname)
-         name-type)
-        name-type)))
+  (let ((relative-pathname (slot-value component 'relative-pathname)))
+    (if relative-pathname
+        relative-pathname
+        (let* ((*default-pathname-defaults*
+                (component-parent-pathname component))
+               (name-type
+                (make-pathname
+                 :name (component-name component)
+                 :type (source-file-type component
+                                         (component-system component)))))
+          name-type))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; operations
