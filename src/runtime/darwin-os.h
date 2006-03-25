@@ -11,7 +11,7 @@
 #include <sys/semaphore.h>
 #endif
 
-#if defined(LISP_FEATURE_CARBON_SEMPAHORES)
+#if defined(LISP_FEATURE_CARBON_SEMAPHORES)
 #include <CoreServices/CoreServices.h>
 #endif
 
