@@ -396,19 +396,13 @@ int arch_os_thread_init(struct thread *thread) {
 int arch_os_thread_cleanup(struct thread *thread) {
 
 #if defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_SB_THREAD)
-    sel_t sel;
     int n = thread->tls_cookie;
-    data_desc_t ldt_entry = { 0, 0, 0, DESC_DATA_WRITE,
-                              0, 0, 0, DESC_DATA_32B, DESC_GRAN_BYTE, 0 };
-
-    n = i386_set_ldt(n, NULL, 1);
-
-    /*
-    sel.index = n;
-    sel.rpl = USER_PRIV;
-    sel.ti = SEL_LDT;
-    __asm__ __volatile__ ("mov %0, %%fs" : : "r"(sel));
-    */
+    
+    /* Set the %%fs register back to 0 and free the the ldt
+     * by setting it to NULL.
+     */
+    __asm__ __volatile__ ("mov %0, %%fs" : : "r"(0));
+    i386_set_ldt(n, NULL, 1); 
 #endif
 
     return 1;                  /* success */
