@@ -238,7 +238,7 @@ until it is available"
        (return t))
      (unless wait-p (return nil))
      #!+sb-lutex
-     (with-pinned-objects (mutex)
+     (with-pinned-objects (mutex (mutex-lutex mutex))
        (futex-wait (sb!vm::%lutex-semaphore (mutex-lutex mutex))))
      #!-sb-lutex
      (with-pinned-objects (mutex old)
@@ -255,7 +255,8 @@ this mutex."
   #!+sb-thread
   (progn
     #!+sb-lutex
-    (futex-wake (sb!vm::%lutex-semaphore (mutex-lutex mutex)))
+    (with-pinned-objects (mutex (mutex-lutex mutex))
+      (futex-wake (sb!vm::%lutex-semaphore (mutex-lutex mutex))))
     #!-sb-lutex
     (futex-wake (mutex-value-address mutex) 1)))
 
@@ -319,7 +320,7 @@ time we reacquire MUTEX and return to the caller."
            ;; futex-wait returns immediately instead of sleeping.
            ;; Ergo, no lost wakeup
            #!+sb-lutex
-           (with-pinned-objects (queue)
+           (with-pinned-objects (queue (waitqueue-lutex queue))
              (futex-wait (sb!vm::%lutex-semaphore (waitqueue-lutex queue))))
            #!-sb-lutex
            (with-pinned-objects (queue me)
@@ -349,7 +350,7 @@ time we reacquire MUTEX and return to the caller."
     ;; XXX we should do something to ensure that the result of this setf
     ;; is visible to all CPUs
     #!+sb-lutex
-    (with-pinned-objects (queue)
+    (with-pinned-objects (queue (waitqueue-lutex queue))
       (futex-wake (sb!vm::%lutex-semaphore (waitqueue-lutex queue))))
     #!-sb-lutex
     (progn
@@ -453,6 +454,12 @@ this semaphore, then N of them is woken up."
 #!+sb-thread
 (defun handle-thread-exit (thread)
   (with-mutex (*all-threads-lock*)
+    (/show0 "HANDLING THREAD EXIT")
+      #!+sb-lutex
+    (when (thread-interruptions-lock thread)
+      (/show0 "FREEING MUTEX LUTEX")
+      (futex-destroy (sb!vm::%lutex-semaphore
+                      (mutex-lutex (thread-interruptions-lock thread)))))
     (setq *all-threads* (delete thread *all-threads*)))
   (when *session*
     (%delete-thread-from-session thread *session*)))
