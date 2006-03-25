@@ -458,8 +458,9 @@ this semaphore, then N of them is woken up."
       #!+sb-lutex
     (when (thread-interruptions-lock thread)
       (/show0 "FREEING MUTEX LUTEX")
-      (futex-destroy (sb!vm::%lutex-semaphore
-                      (mutex-lutex (thread-interruptions-lock thread)))))
+      (with-pinned-objects ((thread-interruptions-lock thread))
+        (futex-destroy (sb!vm::%lutex-semaphore
+                        (mutex-lutex (thread-interruptions-lock thread))))))
     (setq *all-threads* (delete thread *all-threads*)))
   (when *session*
     (%delete-thread-from-session thread *session*)))

@@ -1,0 +1,131 @@
+
+This document describes the state of threads on Darwin (MacOS X) on
+Intel. Currently things build and run, but there are some underlying
+problems that cause the build to be unstable.
+
+====================================
+OPEN BUGS
+====================================
+
+1. Threaded builds cannont run slam.sh on themselves. A build with a
+   threaded host will build from sources, but slam.sh does not work. A
+   non-threaded host can run slam.sh fine.
+
+2. Occasional Illegal Instruction Errors
+
+3. threads.impure.lisp and timer.impure.lisp fail. The odd thing is
+   that semaphore_signal, and friends, occasionally fail with an error
+   KERN_INVALID_NAME or KERN_INVALID_RIGHT. This is bad. It's possible
+   the OS is doing something very wrong here, it's also possible we're
+   trashing the semaphore before we hand it off to the OS.
+
+4. Leaking semaphores? (Perhaps same as 3) I think we leak semaphores
+   at the moment.
+
+====================================
+FIXED BUGS
+====================================
+
+(note that this section is, almost by definition, rather incomplete,
+but rather should serve as a reminder to anyone looking at this what
+some of the issues we had to deal with where)
+
+* Need to pin the mutex and the lutex before calling futex-wake,
+  futex-wait, etc... Orignally we either weren't pinning anything or
+  were just pinning the mutex. We need to make sure the lutex doesn't
+  move out from under us as well.
+
+* Set %fs to 0 when freeing the LDT
+
+====================================
+Lutexes
+====================================
+
+[NJF to describe lutexes, with a pointer to the lutex API in the SBCL
+internals documentation]
+
+====================================
+Semaphores
+====================================
+
+We have a number of options for semaphores: POSIX/BSD semaphores
+(sem_wait and friends), Mach semaphores, and Carbon semaphores. The
+problem with POSIX semaphores on Darwin is that sem_init is not
+supported. The only way to create a semaphore is with sem_open, which
+means named semaphores. This might not be horrible, but sounds
+somewhat expensive. Mach semaphores have an API similar to the POSIX
+semaphores and a semaphore_create routine that seems similar in spirit
+to sem_init. These sound good, except that user programs aren't
+supposed to call semaphore_create and semaphore_destroy for some
+reason. Finally, this leaves Carbon semaphores, which appear to be a
+thin veneer on top of the mach semaphores. The choice of which
+semaphore type to use is a build-time option, with posix being the
+default (WHICH DOESN'T WORK ON OS X!), and :mach-semaphores and
+:carbon-semaphores specifying Mach or Carbon semaphores,
+respectively. If we ever expect any support on semaphore problems from
+Apple, we should use Carbon semaphores. If we want to maximize speed,
+at the expense of violating Apple's do-not-use edict, we should use
+Mach semaphores.
+
+Currently, both Mach and Carbon semaphores exhibit similar problems at
+the same place in the code in excuting threads.impure.lisp and
+timer.impure.lisp.
+
+
+====================================
+Signalling
+====================================
+
+We added a new signal, SIG_RESUME_FROM_GC in hopes of getting better
+behavior from Darwin's not-RT signalling mechanism. The non-darwin way
+of doing things uses the same signal, STOP_STOP_FOR_GC to signal to
+threads both that the should suspend and resume. First, a
+SIG_STOP_FOR_GC is sent to the thread to tell it to suspend itself and
+then a second SIG_STOP_FOR_GC is sent to telll the tread to begin
+running again. The problem for Darwin is that, in the absence of POSIX
+Real-Time (RT) threads, if we were handling the first SIG_STOP_FOR_GC
+and the second signal was issued, the signal was being dropped on the
+floor. We have now way of knowing when the signal handler finishes
+running, so we can't know when it is safe to send the second
+signal. Using another signal, SIG_RESUME_FROM_GC, causes the signal to
+be queued and dispatched appropriately after the first handler
+finishes.
+
+====================================
+Thread Local Storage
+====================================
+
+We use the %fs register for setting up segments for TLS, this allows
+for much more efficient access of thread local variables than having
+to use pthread_special everywhere.
+
+Darwin supports %fs with the i386_set_ldt. We set this up in
+arch_os_thread_cleanup, which is wrongly in bsd-os.c. This should get
+moved to x86-bsd-os.c, but we'll save this for an arch-os cleanup at
+some point.
+
+The ldt gets freed in arch_os_thread_cleanup by setting the %fs to 0
+and then setting the ldt to NULL. Make sure to set %fs to 0 here or
+bad things happen on the way to destroying the thread!
+
+====================================
+Build Features
+====================================
+
+:mach-semaphores
+:carbon-semaphores
+
+Choose one on of :mach-semaphores or :carbon-semaphores. Choosing
+neither gives you posix Semaphores which fail as Darwin doesn't have
+sem_init. Note: we should be able to make this work with sem_open, but
+haven't done so yet.
+
+:restore-tls-segment-register-from-context
+
+The :restore-tls-segment-register-from-context feature indicates that
+we need to restore %fs from the signal handler context. On Linux, the
+%fs register comes preloaded with the threads appropriate %fs value,
+on Darwin we need to load it from the context. It's a reasonable
+approach that Apple has taken here and other OSes may require this as
+well, therefore it's a feature rather than an arch/os specific ifdef.
+

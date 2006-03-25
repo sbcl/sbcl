@@ -63,7 +63,7 @@ int futex_init(os_sem_t *semaphore)
 {
     kern_return_t ret;
     FSHOW_SIGNAL((stderr, "/initializing semaphore @ %p\n", semaphore));
-    ret = semaphore_create(current_task(), semaphore, SYNC_POLICY_FIFO, 1);
+    ret = semaphore_create(current_task(), semaphore, SYNC_POLICY_FIFO, 0);
     FSHOW_SIGNAL((stderr, "/semaphore_create said %d\n", ret));
     return ret;
 }
@@ -101,8 +101,8 @@ int futex_init(os_sem_t *semaphore)
 {
     OSStatus ret;
     FSHOW_SIGNAL((stderr, "/initializing semaphore @ %p\n", semaphore));
-    ret = MPCreateSemaphore(255, 1, semaphore);
-    FSHOW_SIGNAL((stderr, "/MP said %d\n", ret));
+    ret = MPCreateSemaphore(0xffff, 0, semaphore);
+    FSHOW_SIGNAL((stderr, "/MPCreateSemaphore said %d\n", ret));
     return ret;
 }
 
