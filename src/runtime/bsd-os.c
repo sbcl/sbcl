@@ -200,7 +200,7 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     void *fault_addr = arch_get_bad_addr(signal, siginfo, context);
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     os_restore_tls_segment_register(context);
 #endif
 
@@ -242,6 +242,8 @@ os_install_interrupt_handlers(void)
     undoably_install_low_level_interrupt_handler(SIG_INTERRUPT_THREAD,
                                                  interrupt_thread_handler);
     undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
+                                                 sig_stop_for_gc_handler);
+    undoably_install_low_level_interrupt_handler(SIG_RESUME_FROM_GC,
                                                  sig_stop_for_gc_handler);
 #endif
 
@@ -357,7 +359,8 @@ int arch_os_thread_init(struct thread *thread) {
     n = i386_set_ldt(LDT_AUTO_ALLOC, (union ldt_entry*) &ldt_entry, 1);
 
     if (n < 0) {
-        return 0;
+        perror("i386_set_ldt");
+        lose("unexpected i386_set_ldt(..) failure\n");
     }
 
     sel.index = n;
@@ -392,13 +395,13 @@ int arch_os_thread_init(struct thread *thread) {
 
 int arch_os_thread_cleanup(struct thread *thread) {
 
-#if defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_DARWIN)
+#if defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_SB_THREAD)
     sel_t sel;
     int n = thread->tls_cookie;
     data_desc_t ldt_entry = { 0, 0, 0, DESC_DATA_WRITE,
                               0, 0, 0, DESC_DATA_32B, DESC_GRAN_BYTE, 0 };
 
-    n = i386_set_ldt(n, (union ldt_entry*) &ldt_entry, 1);
+    n = i386_set_ldt(n, NULL, 1);
 
     /*
     sel.index = n;

@@ -49,6 +49,8 @@
 
 #if defined(LISP_FEATURE_MACH_SEMAPHORES)
   #include <mach/semaphore.h>
+#elif defined(LISP_FEATURE_CARBON_SEMAPHORES)
+  #include <CoreServices/CoreServices.h>
 #endif
 
 #define DEFTYPE(lispname,cname) { cname foo; \
@@ -98,6 +100,8 @@ main(int argc, char *argv[])
     printf(";;; C-land sizes\n");
 #if defined(LISP_FEATURE_MACH_SEMAPHORES)
     defconstant ("semaphore-length", sizeof(semaphore_t));
+#elif defined(LISP_FEATURE_CARBON_SEMAPHORES)
+    defconstant ("semaphore-length", sizeof(MPSemaphoreID));
 #else
     defconstant ("semaphore-length", sizeof(sem_t));
 #endif

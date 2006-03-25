@@ -28,6 +28,10 @@
 #include <sys/semaphore.h>
 #endif
 
+#if defined(LISP_FEATURE_CARBON_THREADS)
+#include <CoreServices/CoreServices.h>
+#endif
+
 char *
 os_get_runtime_executable_path()
 {
@@ -76,9 +80,9 @@ int futex_wait(os_sem_t *semaphore)
 int futex_wake(os_sem_t *semaphore)
 {
     kern_return_t ret;
-    FSHOW_SIGNAL((stderr, "/waking semaphore @ %p\n", semaphore));
+    FSHOW_SIGNAL((stderr, "/waking semaphore @ %p, *semaphore=%p\n", semaphore, (void*)*semaphore));
     ret = semaphore_signal(*semaphore);
-    FSHOW_SIGNAL((stderr, "/semaphore_wake said %d\n", ret));
+    FSHOW_SIGNAL((stderr, "/semaphore_signal said %d\n", ret));
     return ret;
 }
 
@@ -88,6 +92,44 @@ int futex_destroy(os_sem_t *semaphore)
     FSHOW_SIGNAL((stderr, "/destroying semaphore @ %p\n", semaphore));
     ret = semaphore_destroy(current_task(), *semaphore);
     FSHOW_SIGNAL((stderr, "/semaphore_destroy said %d\n", ret));
+    return ret;
+}
+
+#elif defined(LISP_FEATURE_CARBON_SEMAPHORES)
+
+int futex_init(os_sem_t *semaphore)
+{
+    OSStatus ret;
+    FSHOW_SIGNAL((stderr, "/initializing semaphore @ %p\n", semaphore));
+    ret = MPCreateSemaphore(255, 1, semaphore);
+    FSHOW_SIGNAL((stderr, "/MP said %d\n", ret));
+    return ret;
+}
+
+int futex_wait(os_sem_t *semaphore)
+{
+    kern_return_t ret;
+    FSHOW_SIGNAL((stderr, "/waiting on semaphore @ %p\n", semaphore));
+    ret = MPWaitOnSemaphore(*semaphore, kDurationForever);
+    FSHOW_SIGNAL((stderr, "/MPWaitOnSemaphore said %d\n", ret));
+    return ret;
+}
+
+int futex_wake(os_sem_t *semaphore)
+{
+    kern_return_t ret;
+    FSHOW_SIGNAL((stderr, "/waking semaphore @ %p, *semaphore=%p\n", semaphore, (void*)*semaphore));
+    ret = MPSignalSemaphore(*semaphore);
+    FSHOW_SIGNAL((stderr, "/MPSignalSemaphore said %d\n", ret));
+    return ret;
+}
+
+int futex_destroy(os_sem_t *semaphore)
+{
+    kern_return_t ret;
+    FSHOW_SIGNAL((stderr, "/destroying semaphore @ %p\n", semaphore));
+    ret = MPDeleteSemaphore(*semaphore);
+    FSHOW_SIGNAL((stderr, "/MPDeleteSemaphore said %d\n", ret));
     return ret;
 }
 
@@ -125,7 +167,7 @@ int futex_destroy(os_sem_t *semaphore)
     return sem_destroy(semaphore);
 }
 
-#endif /* MACH_SEMAPHORES */
+#endif
 
 #endif
 

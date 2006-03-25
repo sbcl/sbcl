@@ -95,8 +95,12 @@ sigaddset_deferrable(sigset_t *s)
     sigaddset(s, SIGVTALRM);
     sigaddset(s, SIGPROF);
     sigaddset(s, SIGWINCH);
+
+#if !(defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_SB_THREAD))
     sigaddset(s, SIGUSR1);
     sigaddset(s, SIGUSR2);
+#endif
+
 #ifdef LISP_FEATURE_SB_THREAD
     sigaddset(s, SIG_INTERRUPT_THREAD);
 #endif
@@ -107,6 +111,9 @@ sigaddset_blockable(sigset_t *s)
 {
     sigaddset_deferrable(s);
 #ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_DARWIN
+    sigaddset(s, SIG_RESUME_FROM_GC);
+#endif
     sigaddset(s, SIG_STOP_FOR_GC);
 #endif
 }
@@ -324,7 +331,7 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 {
     lispobj context_sap;
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     os_restore_tls_segment_register(context);
 #endif
 
@@ -459,7 +466,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #endif
     union interrupt_handler handler;
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     os_restore_tls_segment_register(context);
 #endif
 
@@ -529,6 +536,9 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
             sigset_t unblock;
             sigemptyset(&unblock);
             sigaddset(&unblock, SIG_STOP_FOR_GC);
+#ifdef LISP_FEATURE_DARWIN
+            sigaddset(&unblock, SIG_RESUME_FROM_GC);
+#endif
             thread_sigmask(SIG_UNBLOCK, &unblock, 0);
         }
 #endif
@@ -665,7 +675,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     struct thread *thread;
     struct interrupt_data *data;
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     os_restore_tls_segment_register(context);
 #endif
 
@@ -694,7 +704,7 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
     os_restore_fp_control(context);
 #endif
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     os_restore_tls_segment_register(context);
 #endif
 
@@ -714,7 +724,7 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     struct thread *thread;
     struct interrupt_data *data;
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     os_restore_tls_segment_register(context);
 #endif
 
@@ -738,14 +748,12 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 
 #ifdef LISP_FEATURE_SB_THREAD
 
-#define SIG_STOP_FOR_GC_MASK 1 << (SIG_STOP_FOR_GC - 1)
-
 void
 sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     os_restore_tls_segment_register(context);
 #endif
 
@@ -776,17 +784,20 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
         thread->state=STATE_SUSPENDED;
         FSHOW_SIGNAL((stderr,"thread=%lu suspended\n",thread->os_thread));
 
+#if defined(LISP_FEATURE_DARWIN)
+        sigemptyset(&ss); sigaddset(&ss,SIG_RESUME_FROM_GC);
+#else
         sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
+#endif
+
         /* It is possible to get SIGCONT (and probably other
          * non-blockable signals) here. */
 #ifdef LISP_FEATURE_DARWIN
         {
             int sigret;
             do { sigwait(&ss, &sigret); }
-            while (sigret != SIG_STOP_FOR_GC);
+            while (sigret != SIG_RESUME_FROM_GC);
         }
-        /* do { sigpending(&ss); } while(!sigismember(&ss, SIG_STOP_FOR_GC)); */
-        /*        while (sigpending(&ss), !(ss & SIG_STOP_FOR_GC_MASK)); */
 #else
         while (sigwaitinfo(&ss,0) != SIG_STOP_FOR_GC);
 #endif
@@ -985,7 +996,7 @@ interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 {
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     os_restore_tls_segment_register(context);
 #endif
 
@@ -1125,6 +1136,9 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
     else {
         sigset_t new;
         sigemptyset(&new);
+#if defined(LISP_FEATURE_DARWIN)
+        sigaddset(&new,SIG_RESUME_FROM_GC);
+#endif
         sigaddset(&new,SIG_STOP_FOR_GC);
         thread_sigmask(SIG_UNBLOCK,&new,0);
     }

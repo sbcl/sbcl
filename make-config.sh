@@ -263,8 +263,11 @@ if [ "$sbcl_arch" = "x86" ]; then
         # roughly-equivalent magic nevertheless.
         printf ' :os-provides-dlopen' >> $ltf
     fi
+    # For Darwin builds choose one of :mach-semaphores or :carbon-semaphores.
+    # By not selecting either of these we end up with posix semaphores
+    # which currently do not work as there is no sem_init on Darwin.
     if [ "$sbcl_os" = "darwin" ]; then
-        printf ' :mach-semaphores' >> $ltf
+        printf ' :mach-semaphores :restore-tls-segment-register-from-context' >> $ltf
     fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf

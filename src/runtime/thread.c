@@ -363,13 +363,14 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     sigaddset_deferrable(&newset);
     thread_sigmask(SIG_BLOCK, &newset, &oldset);
 
-    if((initcode = pthread_attr_init(&attr)) ||
-       /* FIXME: why do we even have this in the first place? */
 #if defined(LISP_FEATURE_DARWIN)
 #define CONTROL_STACK_ADJUST 4096 /* darwin wants page-aligned stacks */
 #else
 #define CONTROL_STACK_ADJUST 16
 #endif
+
+    if((initcode = pthread_attr_init(&attr)) ||
+       /* FIXME: why do we even have this in the first place? */
        (pthread_attr_setstack(&attr,th->control_stack_start,
                               THREAD_CONTROL_STACK_SIZE-CONTROL_STACK_ADJUST)) ||
 #undef CONTROL_STACK_ADJUST
@@ -515,7 +516,12 @@ void gc_start_the_world()
             FSHOW_SIGNAL((stderr, "/gc_start_the_world: resuming %lu\n",
                           p->os_thread));
             p->state=STATE_RUNNING;
+
+#if defined(LISP_FEATURE_DARWIN)
+            status=kill_thread_safely(p->os_thread,SIG_RESUME_FROM_GC);
+#else
             status=kill_thread_safely(p->os_thread,SIG_STOP_FOR_GC);
+#endif
             if (status) {
                 lose("cannot resume thread=%lu: %d, %s\n",
                      p->os_thread,status,strerror(status));
@@ -526,7 +532,21 @@ void gc_start_the_world()
      * SIG_STOP_FOR_GC wouldn't need to be a rt signal. That has some
      * performance implications, but does away with the 'rt signal
      * queue full' problem. */
-    pthread_mutex_unlock(&all_threads_lock); \
+
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_SB_THREAD)
+    /* we must wait for all threads to leave suspended state else we
+     * risk signal accumulation and lose any meaning of
+     * thread->state */
+    for(p=all_threads;p;) {
+        if((p!=th) && (p->state==STATE_SUSPENDED)) {
+            sched_yield();
+        } else {
+            p=p->next;
+        }
+    }
+#endif
+
+    pthread_mutex_unlock(&all_threads_lock);
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:end\n"));
 }
 #endif

@@ -11,6 +11,10 @@
 #include <sys/semaphore.h>
 #endif
 
+#if defined(LISP_FEATURE_CARBON_SEMPAHORES)
+#include <CoreServices/CoreServices.h>
+#endif
+
 /* man pages claim that the third argument is a sigcontext struct,
    but ucontext_t is defined, matches sigcontext where sensible,
    offers better access to mcontext, and is of course the SUSv2-
@@ -25,6 +29,8 @@ typedef struct ucontext os_context_t;
 
 #if defined(LISP_FEATURE_MACH_SEMAPHORES)
 typedef semaphore_t os_sem_t;
+#elif defined(LISP_FEATURE_CARBON_SEMAPHORES)
+typedef MPSemaphoreID os_sem_t;
 #else
 typedef sem_t os_sem_t;
 #endif
@@ -36,7 +42,8 @@ typedef ucontext_t os_context_t;
 
 #define SIG_MEMORY_FAULT SIGBUS
 
-#define SIG_INTERRUPT_THREAD (SIGWINCH)
-#define SIG_STOP_FOR_GC (SIGINFO)
+#define SIG_INTERRUPT_THREAD (SIGINFO)
+#define SIG_STOP_FOR_GC (SIGUSR1)
+#define SIG_RESUME_FROM_GC (SIGUSR2)
 
 #endif /* _DARWIN_OS_H */

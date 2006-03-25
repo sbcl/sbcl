@@ -213,7 +213,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     os_context_t *context = (os_context_t*)void_context;
     unsigned int trap;
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     os_restore_tls_segment_register(context);
 #endif
 
@@ -309,7 +309,7 @@ static void
 sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
     os_context_t *context = (os_context_t*)void_context;
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     FSHOW_SIGNAL((stderr, " sigill handler restoring fs: %x\n",
                   *CONTEXT_ADDR_FROM_STEM(fs)));
     os_restore_tls_segment_register(context);
