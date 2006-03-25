@@ -83,6 +83,7 @@
 (sb-ext:run-program
  "cc"
  (or #+linux '("-shared" "-o" "threads-foreign.so" "threads-foreign.c")
+     #+darwin '("-dynamiclib" "-o" "threads-foreign.so" "threads-foreign.c")
      (error "Missing shared library compilation options for this platform"))
  :search t)
 (sb-alien:load-shared-object "threads-foreign.so")
