@@ -36,7 +36,10 @@
 #include "gc-internal.h"
 
 /* lutex stuff */
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
 #include "genesis/sap.h"
+#endif
+
 
 unsigned char build_id[] =
 #include "../../output/build-id.tmp"

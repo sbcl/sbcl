@@ -344,6 +344,9 @@ time we reacquire MUTEX and return to the caller."
   #!+sb-thread
   (let ((me *current-thread*))
     #!+sb-lutex (declare (ignorable me))
+    ;; FIXME We can probably do away with the ignore by moving the let
+    ;; inside the #!-sb-lutex block!
+    ;;
     ;; no problem if >1 thread notifies during the comment in
     ;; condition-wait: as long as the value in queue-data isn't the
     ;; waiting thread's id, it matters not what it is

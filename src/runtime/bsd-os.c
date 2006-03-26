@@ -397,12 +397,12 @@ int arch_os_thread_cleanup(struct thread *thread) {
 
 #if defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_SB_THREAD)
     int n = thread->tls_cookie;
-    
+
     /* Set the %%fs register back to 0 and free the the ldt
      * by setting it to NULL.
      */
     __asm__ __volatile__ ("mov %0, %%fs" : : "r"(0));
-    i386_set_ldt(n, NULL, 1); 
+    i386_set_ldt(n, NULL, 1);
 #endif
 
     return 1;                  /* success */

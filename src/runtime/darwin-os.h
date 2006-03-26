@@ -27,12 +27,14 @@
 #include <sys/_types.h>
 typedef struct ucontext os_context_t;
 
+#if defined(LISP_FEATURE_SB_THREAD)
 #if defined(LISP_FEATURE_MACH_SEMAPHORES)
 typedef semaphore_t os_sem_t;
 #elif defined(LISP_FEATURE_CARBON_SEMAPHORES)
 typedef MPSemaphoreID os_sem_t;
 #else
 typedef sem_t os_sem_t;
+#endif
 #endif
 
 #else

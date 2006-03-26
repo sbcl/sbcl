@@ -141,4 +141,8 @@ static inline struct thread *arch_os_get_current_thread() {
 
 extern void create_initial_thread(lispobj);
 
+#if defined(LISP_FEATURE_SB_THREAD)
+extern int futex_init(os_sem_t *semaphore);
+#endif
+
 #endif /* _INCLUDE_THREAD_H_ */

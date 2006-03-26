@@ -173,6 +173,17 @@
  ;;
  ; :sb-lutex
 
+ ;; IMPORTANT!!!!! When building on darwin with lutexes we need to
+ ;; enable one (and only one!) of these features!!!! FIXME!
+ ;
+ ; :mach-semaphores
+ ; :carbon-semaphores
+
+ ;; IMPORTANT!!!!! When building on darwin with lutexes we MUST turn
+ ;; this on!!! FIXME!
+ ;
+ ; :restore-tls-segment-register-from-context
+
  ;; Support for detection of unportable code (when applied to the
  ;; COMMON-LISP package, or SBCL-internal pacakges) or bad-neighbourly
  ;; code (when applied to user-level packages), relating to material
