@@ -125,7 +125,6 @@ static void
 free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
 {
     struct freeable_stack *new_freeable_stack = 0;
-
     if (thread_to_be_cleaned_up) {
         new_freeable_stack = (struct freeable_stack *)
             os_validate(0, sizeof(struct freeable_stack));
@@ -136,9 +135,8 @@ free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
     new_freeable_stack = (struct freeable_stack *)
         swap_lispobjs((lispobj *)(void *)&freeable_stack,
                       (lispobj)new_freeable_stack);
-
     if (new_freeable_stack) {
-        FSHOW((stderr,"/reaping %lu\n", new_freeable_stack->os_thread));
+        FSHOW((stderr,"/reaping %p\n", (void*) new_freeable_stack->os_thread));
         /* #if !defined(LISP_FEATURE_DARWIN) */
         /* Under NPTL pthread_join really waits until the thread
          * exists and the stack can be safely freed. This is sadly not
@@ -193,7 +191,7 @@ new_thread_trampoline(struct thread *th)
     os_invalidate((os_vm_address_t)th->interrupt_data,
                   (sizeof (struct interrupt_data)));
     free_thread_stack_later(th);
-    FSHOW((stderr,"/exiting thread %lu\n", thread_self()));
+    FSHOW((stderr,"/exiting thread %p\n", thread_self()));
     return result;
 }
 

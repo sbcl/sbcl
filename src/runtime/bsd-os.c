@@ -190,6 +190,8 @@ is_valid_lisp_addr(os_vm_address_t addr)
 
 #if defined LISP_FEATURE_GENCGC
 
+#define MEMORY_FAULT_DEBUG
+
 /*
  * The GENCGC needs to be hooked into whatever signal is raised for
  * page fault on this OS.
@@ -201,6 +203,8 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
     void *fault_addr = arch_get_bad_addr(signal, siginfo, context);
 
 #if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in memory_fault_handler\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
     os_restore_tls_segment_register(context);
 #endif
 
@@ -243,14 +247,16 @@ os_install_interrupt_handlers(void)
                                                  interrupt_thread_handler);
     undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
                                                  sig_stop_for_gc_handler);
+#ifdef LISP_FEATURE_DARWIN
     undoably_install_low_level_interrupt_handler(SIG_RESUME_FROM_GC,
                                                  sig_stop_for_gc_handler);
+#endif
 #endif
 
     SHOW("leaving os_install_interrupt_handlers()");
 }
 
-#else /* Currently Darwin only */
+#else /* Currently PPC/Darwin/Cheney only */
 
 static void
 sigsegv_handler(int signal, siginfo_t *info, void* void_context)
@@ -363,6 +369,7 @@ int arch_os_thread_init(struct thread *thread) {
         lose("unexpected i386_set_ldt(..) failure\n");
     }
 
+    FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", n));
     sel.index = n;
     sel.rpl = USER_PRIV;
     sel.ti = SEL_LDT;
@@ -401,6 +408,8 @@ int arch_os_thread_cleanup(struct thread *thread) {
     /* Set the %%fs register back to 0 and free the the ldt
      * by setting it to NULL.
      */
+    FSHOW_SIGNAL((stderr, "/ TLS: Freeing LDT %x\n", n));
+
     __asm__ __volatile__ ("mov %0, %%fs" : : "r"(0));
     i386_set_ldt(n, NULL, 1);
 #endif

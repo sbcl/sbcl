@@ -842,6 +842,10 @@ GNAME(post_signal_tramp):
 	addl $12,%esp  	/* clear call_into_lisp args from stack */
 	popal           /* restore registers */
         popfl
+#ifdef LISP_FEATURE_DARWIN
+        /* skip two padding words */
+        addl $8,%esp
+#endif
 	leave
 	ret
 	SIZE(GNAME(post_signal_tramp))

@@ -332,6 +332,8 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
     lispobj context_sap;
 
 #if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in interrupt_internal_error\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
     os_restore_tls_segment_register(context);
 #endif
 
@@ -467,6 +469,8 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
     union interrupt_handler handler;
 
 #if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in interrupt_handle_now\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
     os_restore_tls_segment_register(context);
 #endif
 
@@ -585,6 +589,11 @@ run_deferred_handler(struct interrupt_data *data, void *v_context) {
      * pending handler before calling it. Trust the handler to finish
      * with the siginfo before enabling interrupts. */
     void (*pending_handler) (int, siginfo_t*, void*)=data->pending_handler;
+    os_context_t *context = arch_os_get_context(&v_context);
+
+    FSHOW_SIGNAL((stderr, "/run_deferred_handler: signal %d context fs is: %p\n",
+                  data->pending_signal,
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
     data->pending_handler=0;
     (*pending_handler)(data->pending_signal,&(data->pending_info), v_context);
 }
@@ -608,9 +617,10 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         store_signal_data_for_later(data,handler,signal,info,context);
         SetSymbolValue(INTERRUPT_PENDING, T,thread);
         FSHOW_SIGNAL((stderr,
-                      "/maybe_defer_handler(%x,%d),thread=%lu: deferred\n",
+                      "/maybe_defer_handler(%x,%d),thread=%lu, fs=%p: deferred\n",
                       (unsigned int)handler,signal,
-                      (unsigned long)thread->os_thread));
+                      (unsigned long)thread->os_thread,
+                      *CONTEXT_ADDR_FROM_STEM(fs)));
         return 1;
     }
     /* a slightly confusing test.  arch_pseudo_atomic_atomic() doesn't
@@ -630,9 +640,10 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         store_signal_data_for_later(data,handler,signal,info,context);
         arch_set_pseudo_atomic_interrupted(context);
         FSHOW_SIGNAL((stderr,
-                      "/maybe_defer_handler(%x,%d),thread=%lu: deferred(PA)\n",
+                      "/maybe_defer_handler(%x,%d),thread=%lu, fs=%p: deferred(PA)\n",
                       (unsigned int)handler,signal,
-                      (unsigned long)thread->os_thread));
+                      (unsigned long)thread->os_thread,
+                      *CONTEXT_ADDR_FROM_STEM(fs)));
         return 1;
     }
     FSHOW_SIGNAL((stderr,
@@ -656,6 +667,9 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
     data->pending_signal = signal;
     if(info)
         memcpy(&(data->pending_info), info, sizeof(siginfo_t));
+
+    FSHOW_SIGNAL((stderr, "/store_signal_data_for_later: signal: %d\n", signal));
+
     if(context) {
         /* the signal mask in the context (from before we were
          * interrupted) is copied to be restored when
@@ -676,6 +690,8 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     struct interrupt_data *data;
 
 #if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in maybe_now_maybe_later\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
     os_restore_tls_segment_register(context);
 #endif
 
@@ -705,6 +721,8 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #endif
 
 #if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in low_level_interrupt_handle_now\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
     os_restore_tls_segment_register(context);
 #endif
 
@@ -725,6 +743,8 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     struct interrupt_data *data;
 
 #if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in low_level_maybe_now_maybe_later\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
     os_restore_tls_segment_register(context);
 #endif
 
@@ -754,6 +774,8 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     os_context_t *context = arch_os_get_context(&void_context);
 
 #if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in sig_stop_for_gc_handler\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
     os_restore_tls_segment_register(context);
 #endif
 
@@ -898,6 +920,35 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 
     u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
 
+    FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: preparing to go back\n"));
+
+#if defined(LISP_FEATURE_DARWIN)
+
+    /* return address for call_into_lisp: */
+    *(sp-17) = (u32)post_signal_tramp;
+    *(sp-16) = function;        /* args for call_into_lisp : function*/
+    *(sp-15) = 0;               /*                           arg array */
+    *(sp-14) = 0;               /*                           no. args */
+    /* this order matches that used in POPAD */
+    *(sp-13)=*os_context_register_addr(context,reg_EDI);
+    *(sp-12)=*os_context_register_addr(context,reg_ESI);
+
+    *(sp-11)=*os_context_register_addr(context,reg_ESP)-10;
+    /* POPAD ignores the value of ESP:  */
+    *(sp-10)=0;
+    *(sp-9)=*os_context_register_addr(context,reg_EBX);
+
+    *(sp-8)=*os_context_register_addr(context,reg_EDX);
+    *(sp-7)=*os_context_register_addr(context,reg_ECX);
+    *(sp-6)=*os_context_register_addr(context,reg_EAX);
+    *(sp-5)=*context_eflags_addr(context);
+    *(sp-4)=0;
+    *(sp-3)=0;
+    *(sp-2)=*os_context_register_addr(context,reg_EBP);
+    *(sp-1)=*os_context_pc_addr(context);
+
+#else
+
     /* return address for call_into_lisp: */
     *(sp-15) = (u32)post_signal_tramp;
     *(sp-14) = function;        /* args for call_into_lisp : function*/
@@ -918,6 +969,8 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *(sp-3)=*context_eflags_addr(context);
     *(sp-2)=*os_context_register_addr(context,reg_EBP);
     *(sp-1)=*os_context_pc_addr(context);
+
+#endif
 
 #elif defined(LISP_FEATURE_X86_64)
     u64 *sp=(u64 *)*os_context_register_addr(context,reg_RSP);
@@ -953,6 +1006,13 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 #endif
 
 #ifdef LISP_FEATURE_X86
+
+#if defined(LISP_FEATURE_DARWIN)
+    *os_context_pc_addr(context) = (os_context_register_t)call_into_lisp;
+    *os_context_register_addr(context,reg_ECX) = 0;
+    *os_context_register_addr(context,reg_EBP) = (os_context_register_t)(sp-4);
+    *os_context_register_addr(context,reg_ESP) = (os_context_register_t)(sp-17);
+#else
     *os_context_pc_addr(context) = (os_context_register_t)call_into_lisp;
     *os_context_register_addr(context,reg_ECX) = 0;
     *os_context_register_addr(context,reg_EBP) = (os_context_register_t)(sp-2);
@@ -961,7 +1021,9 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
         (os_context_register_t)(sp-15);
 #else
     *os_context_register_addr(context,reg_ESP) = (os_context_register_t)(sp-15);
-#endif
+#endif /* __NETBSD__ */
+#endif /* LISP_FEATURE_DARWIN */
+
 #elif defined(LISP_FEATURE_X86_64)
     *os_context_pc_addr(context) = (os_context_register_t)call_into_lisp;
     *os_context_register_addr(context,reg_RCX) = 0;
@@ -997,6 +1059,8 @@ interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
 
 #if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in interrupt_thread_handler\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
     os_restore_tls_segment_register(context);
 #endif
 
@@ -1101,6 +1165,11 @@ boolean
 interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context=(os_context_t *) void_context;
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in interrupt_maybe_gc_int\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
+    os_restore_tls_segment_register(context);
+#endif
 #ifndef LISP_FEATURE_WIN32
     struct thread *thread=arch_os_get_current_thread();
 #endif
@@ -1225,6 +1294,13 @@ static void
 unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 {
     sigset_t unblock;
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    os_context_t *context = (os_context_t*)void_context;
+    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in unblock_me_trampoline\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
+    os_restore_tls_segment_register(context);
+#endif
+
     sigemptyset(&unblock);
     sigaddset(&unblock, signal);
     thread_sigmask(SIG_UNBLOCK, &unblock, 0);
@@ -1235,6 +1311,14 @@ static void
 low_level_unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 {
     sigset_t unblock;
+
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    os_context_t *context = (os_context_t*)void_context;
+    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in low_level_unblock_me_trampoline\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
+    os_restore_tls_segment_register(context);
+#endif
+
     sigemptyset(&unblock);
     sigaddset(&unblock, signal);
     thread_sigmask(SIG_UNBLOCK, &unblock, 0);

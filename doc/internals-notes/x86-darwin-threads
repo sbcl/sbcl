@@ -13,11 +13,7 @@ OPEN BUGS
 
 2. Occasional Illegal Instruction Errors
 
-3. threads.impure.lisp and timer.impure.lisp fail. The odd thing is
-   that semaphore_signal, and friends, occasionally fail with an error
-   KERN_INVALID_NAME or KERN_INVALID_RIGHT. This is bad. It's possible
-   the OS is doing something very wrong here, it's also possible we're
-   trashing the semaphore before we hand it off to the OS.
+3. threads.impure.lisp and timer.impure.lisp fail.
 
 4. Leaking semaphores? (Perhaps same as 3) I think we leak semaphores
    at the moment.
@@ -36,6 +32,12 @@ some of the issues we had to deal with where)
   move out from under us as well.
 
 * Set %fs to 0 when freeing the LDT
+
+* semaphore_signal, and friends, occasionally fail with an error
+  KERN_INVALID_NAME or KERN_INVALID_RIGHT. This is bad. It's possible
+  the OS is doing something very wrong here, it's also possible we're
+  trashing the semaphore before we hand it off to the OS. Using carbon
+  semaphores seems to fix this problem.
 
 ====================================
 Lutexes
@@ -128,4 +130,120 @@ we need to restore %fs from the signal handler context. On Linux, the
 on Darwin we need to load it from the context. It's a reasonable
 approach that Apple has taken here and other OSes may require this as
 well, therefore it's a feature rather than an arch/os specific ifdef.
+
+====================================
+DEBUGGING NOTES
+====================================
+
+The two tests that stress threads, timer.impure.lisp and
+threads.impure.lisp both fail.
+
+1. threads.impure.lisp
+
+this test currently fails in one of two ways
+
+1A. sometimes we get a SIGILL
+and the process terminates while trying to free a thread
+
+1B. if we make it through 1A we later catch a SIGSEGV:
+
+interrupting child #<THREAD {1222A701}>
+/WITH-MUTEX
+/Entering RELEASE-MUTEX
+/waking semaphore @ 0x3f8000, *semaphore=0x100080
+/MPSignalSemaphore said 0
+/ TLS: restoring fs: 0x1a7 in low_level_maybe_now_maybe_later
+/maybe_defer_handler(5d42,29),thread=117460480: not deferred
+/ TLS: restoring fs: 0x1a7 in low_level_interrupt_handle_now
+/ TLS: restoring fs: 0x1a7 in interrupt_thread_handler
+/arrange_return_to_lisp_function: preparing to go back
+/WITH-MUTEX
+/Entering RELEASE-MUTEX
+/waking semaphore @ 0x3f8000, *semaphore=0x100080
+/MPSignalSemaphore said 0
+child pid #<THREAD {1222A701}>
+/ TLS: restoring fs: 0x1a7 in interrupt_handle_now
+/entering interrupt_handle_now(11, info, context)
+/calling Lisp-level handler
+/entering ERROR, argument list=..
+0x1222cc5b
+/cold-printing ERROR arguments one by one..
+0x1222cc4f
+/done cold-printing ERROR arguments
+/entering INFINITE-ERROR-PROTECTOR, *CURRENT-ERROR-DEPTH*=..
+0x00000000
+/returning normally from INFINITE-ERROR-PROTECTOR
+/back from INFINITE-ERROR-PROTECTOR
+/in INFINITE-ERROR-PROTECT, incremented error depth
+/ TLS: restoring fs: 0x1a7 in memory_fault_handler
+Memory fault at: 0x10012fac, PC: 10b8868b
+Stack pointer: da12400
+heap WP violation? fault_addr=10012fac, page_index=18
+0: (BACKTRACE 8 #<SYNONYM-STREAM :SYMBOL *TERMINAL-IO* {10143539}>)
+1: (ERROR "segmentation violation at #X~X")
+2: ((FLET #:G188))
+3: (SB-UNIX::SIGSEGV-HANDLER
+    #<unused argument>
+    #<unused argument>
+    #.(SB-SYS:INT-SAP #X0DA12BFA))
+4: (SB-SYS:INVOKE-INTERRUPTION #<CLOSURE (LAMBDA #) {1222C8AD}>)
+5: ("foreign function: call_into_lisp")
+6: ("foreign function: funcall3")
+7: ("foreign function: interrupt_handle_now")
+/done coercing DATUM to CONDITION
+/signalling CONDITION from within ERROR
+/done signalling CONDITION within ERROR
+/ TLS: restoring fs: 0x1a7 in memory_fault_handler
+Memory fault at: 0x100fbfd0, PC: 1048b8ed
+Stack pointer: da12608
+heap WP violation? fault_addr=100fbfd0, page_index=251
+/ TLS: restoring fs: 0x1a7 in memory_fault_handler
+Memory fault at: 0x10220758, PC: 1048b96e
+Stack pointer: da12608
+heap WP violation? fault_addr=10220758, page_index=544
+/ TLS: restoring fs: 0x1a7 in memory_fault_handler
+Memory fault at: 0x1021f778, PC: 1048b9f1
+Stack pointer: da12608
+heap WP violation? fault_addr=1021f778, page_index=543
+
+debugger invoked on a SIMPLE-ERROR in thread #<THREAD {1222A701}>:
+  segmentation violation at #X7F270DA1
+
+
+2. timer.impure.lisp
+
+this test fails with a segmentation violation:
+
+/Entering RELEASE-MUTEX
+/waking semaphore @ 0x601100, *semaphore=0x100004
+/ TLS: restoring fs: 0x97 in memory_fault_handler
+/MPSignalSemaphore said 0
+Memory fault at: 0x10297d14, PC: 102d6613
+/returning from interrupt_handle_now(14, info, context)
+Stack pointer: 6a06668
+heap WP violation? fault_addr=10297d14, page_index=663
+0: (BACKTRACE 8 #<SYNONYM-STREAM :SYMBOL *TERMINAL-IO* {10143539}>)
+/ TLS: restoring fs: 0x97 in memory_fault_handler
+Memory fault at: 0x11d45598, PC: 102927a9
+Stack pointer: 6a06668
+heap WP violation? fault_addr=11d45598, page_index=7493
+1: (ERROR "segmentation violation at #X~X")
+2: ((FLET #:G188))
+3: (SB-UNIX::SIGSEGV-HANDLER
+    #<unused argument>
+    #<unused argument>
+    #.(SB-SYS:INT-SAP #X06A06C3A))
+4: (SB-SYS:INVOKE-INTERRUPTION #<CLOSURE (LAMBDA #) {1243D0C5}>)
+5: ("foreign function: call_into_lisp")
+6: ("foreign function: funcall3")
+7: ("foreign function: interrupt_handle_now")
+/done coercing DATUM to CONDITION
+/signalling CONDITION from within ERROR
+/done signalling CONDITION within ERROR
+unhandled SIMPLE-ERROR in thread #<SB-THREAD:THREAD {1243CD71}>:
+  segmentation violation at #X7F2706A0
+
+reducing the number of timer alarms in the timer streams test from 200
+to 20 or so makes the situation better, but we still occasionally
+fail, so there's some underlying problem we need to address.
 
