@@ -1155,6 +1155,12 @@
          ;; those types can be other types in disguise.  So we'd
          ;; better delegate.
          (invoke-complex-subtypep-arg1-method type1 type2))
+        ((and (or (eq type2 *instance-type*)
+                  (eq type2 *funcallable-instance-type*))
+              (member-type-p type1))
+         ;; member types can be subtypep INSTANCE and
+         ;; FUNCALLABLE-INSTANCE in surprising ways.
+         (invoke-complex-subtypep-arg1-method type1 type2))
         ((and (eq type2 *instance-type*) (classoid-p type1))
          (if (member type1 *non-instance-classoid-types* :key #'find-classoid)
              (values nil t)
@@ -1206,7 +1212,8 @@
                  type1
                  nil)
              *empty-type*)
-         (if (type-might-contain-other-types-p type1)
+         (if (or (type-might-contain-other-types-p type1)
+                 (member-type-p type1))
              nil
              *empty-type*)))
     ((eq type2 *funcallable-instance-type*)
@@ -1221,7 +1228,8 @@
                  nil))
          (if (fun-type-p type1)
              nil
-             (if (type-might-contain-other-types-p type1)
+             (if (or (type-might-contain-other-types-p type1)
+                     (member-type-p type1))
                  nil
                  *empty-type*))))
     (t (hierarchical-intersection2 type1 type2))))
