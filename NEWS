@@ -5,6 +5,8 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
        the method is not one of the generic functions' methods.
     ** objects declared as MEMBER types can be admissible arguments to 
        structure accessors.
+    ** printing characters should simply be printed by the FORMAT ~:C
+       directive.
 
 changes in sbcl-0.9.11 relative to sbcl-0.9.10:
   * new platform: experimental support for SBCL x86/Darwin, including
