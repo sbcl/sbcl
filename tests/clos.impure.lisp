@@ -1256,4 +1256,16 @@
 (assert (not (typep-backwards-3 (make-instance 'backwards-2))))
 (assert (typep-backwards-3 (make-instance 'backwards-3)))
 
+(defgeneric remove-method-1 (x)
+  (:method ((x integer)) (1+ x)))
+(defgeneric remove-method-2 (x)
+  (:method ((x integer)) (1- x)))
+(assert (eq #'remove-method-1
+            (remove-method #'remove-method-1
+                           (find-method #'remove-method-2
+                                        nil
+                                        (list (find-class 'integer))))))
+(assert (= (remove-method-1 3) 4))
+(assert (= (remove-method-2 3) 2))
+
 ;;;; success

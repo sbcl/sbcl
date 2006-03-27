@@ -573,7 +573,7 @@
         generic-function)))
 
 (defun real-remove-method (generic-function method)
-  (when  (eq generic-function (method-generic-function method))
+  (when (eq generic-function (method-generic-function method))
     (let* ((name (generic-function-name generic-function))
            (specializers (method-specializers method))
            (methods (generic-function-methods generic-function))
@@ -590,8 +590,8 @@
       (map-dependents generic-function
                       (lambda (dep)
                         (update-dependent generic-function
-                                          dep 'remove-method method)))
-      generic-function)))
+                                          dep 'remove-method method)))))
+  generic-function)
 
 (defun compute-applicable-methods-function (generic-function arguments)
   (values (compute-applicable-methods-using-types
