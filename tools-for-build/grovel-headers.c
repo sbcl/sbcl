@@ -47,10 +47,12 @@
 
 #include "genesis/config.h"
 
-#if defined(LISP_FEATURE_MACH_SEMAPHORES)
-  #include <mach/semaphore.h>
-#elif defined(LISP_FEATURE_CARBON_SEMAPHORES)
-  #include <CoreServices/CoreServices.h>
+#if defined(LISP_FEATURE_SB_MUTEX)
+#if defined(LISP_FEATURE_CARBON_SEMAPHORES)
+#include <CoreServices/CoreServices.h>
+#else
+#include <mach/semaphore.h>
+#endif
 #endif
 
 #define DEFTYPE(lispname,cname) { cname foo; \

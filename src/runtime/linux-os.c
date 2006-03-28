@@ -34,9 +34,15 @@
 #include "runtime.h"
 #include "genesis/static-symbols.h"
 #include "genesis/fdefn.h"
+
 #ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_SB_LUTEX
+#include "genesis/lutex.h"
+#else
 #include "genesis/futex.h"
 #endif
+#endif
+
 #include <sys/socket.h>
 #include <sys/utsname.h>
 
@@ -68,26 +74,26 @@ size_t os_vm_page_size;
 
 int futex_init(os_sem_t *semaphore)
 {
-  printf("Initializing semaphore @ %p\n", semaphore);
-
-  return sem_init(semaphore, 0, 1);
+    FSHOW_SIGNAL((stderr, "/initializing semaphore @ %p\n", semaphore));
+    return sem_init(semaphore, 0, 1);
 }
 
 int futex_wait(os_sem_t *semaphore)
 {
-  printf("Waiting on semaphore %p\n", semaphore);
-  return sem_wait(semaphore);
+    FSHOW_SIGNAL((stderr, "/waiting on semaphore @ %p\n", semaphore));
+    return sem_wait(semaphore);
 }
 
 int futex_wake(os_sem_t *semaphore)
 {
-  printf("Waking on semaphore %p\n", semaphore);
-  return sem_post(semaphore);
+    FSHOW_SIGNAL((stderr, "/waking semaphore @ %p, *semaphore=%p\n", semaphore, (void*)*semaphore));
+    return sem_post(semaphore);
 }
 
 int futex_destroy(os_sem_t *semaphore)
 {
-  return sem_destroy(semaphore);
+    FSHOW_SIGNAL((stderr, "/destroying semaphore @ %p\n", semaphore));
+    return sem_destroy(semaphore);
 }
 
 #else
@@ -149,7 +155,7 @@ os_init(char *argv[], char *envp[])
 {
     /* Conduct various version checks: do we have enough mmap(), is
      * this a sparc running 2.2, can we do threads? */
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_LUTEX)
     int *futex=0;
 #endif
     struct utsname name;
