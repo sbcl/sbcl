@@ -2012,3 +2012,23 @@
                              (declare (optimize (speed 3)))
                            (1+ x)))))
      (compiler-note () (error "The code is not optimized.")))))
+
+(with-test (:name (:compiler :constraint-propagation :float-bounds-1))
+  (handler-case
+      (compile nil '(lambda (x)
+                      (declare (type (single-float * (3.0)) x))
+                      (when (<= x 2.0)
+                        (when (<= 2.0 x)
+                          x))))
+    (compiler-note () (error "Deleted reachable code."))))
+
+(with-test (:name (:compiler :constraint-propagation :float-bounds-2))
+  (catch :note
+    (handler-case
+        (compile nil '(lambda (x)
+                        (declare (type single-float x))
+                        (when (< 1.0 x)
+                          (when (<= x 1.0)
+                            (error "This is unreachable.")))))
+      (compiler-note () (throw :note nil)))
+    (error "Unreachable code undetected.")))
