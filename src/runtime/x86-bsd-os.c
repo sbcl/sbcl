@@ -15,6 +15,10 @@
 #endif /* LISP_FEATURE_DARWIN */
 #endif
 
+#if defined(LISP_FEATURE_FREEBSD)
+#include "machine/npx.h"
+#endif
+
 /* KLUDGE: There is strong family resemblance in the signal context
  * stuff in FreeBSD and OpenBSD, but in detail they're different in
  * almost every line of code. It would be nice to find some way to
@@ -185,3 +189,10 @@ int arch_os_thread_cleanup(struct thread *thread) {
 }
 
 #endif /* !LISP_FEATURE_DARWIN */
+
+void
+os_restore_fp_control(os_context_t *context)
+{
+    struct envxmm *ex = (struct envxmm*)(&context->uc_mcontext.mc_fpstate);
+    asm ("fldcw %0" : : "m" (ex->en_cw));
+}

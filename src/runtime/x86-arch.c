@@ -256,7 +256,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
        single-stepping (as far as I can tell) this is somewhat moot,
        but it might be worth either moving this code up or deleting
        the single-stepping code entirely.  -- CSR, 2002-07-15 */
-#ifdef LISP_FEATURE_LINUX
+#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
 #endif
 

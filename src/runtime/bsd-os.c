@@ -465,33 +465,36 @@ int futex_destroy(os_sem_t *semaphore)
 int futex_init(os_sem_t *semaphore)
 {
     int ret;
-    printf("Initializing semaphore @ %p\n", semaphore);
+    FSHOW_SIGNAL((stderr, "/initializing semaphore @ %p\n", semaphore));
     ret = sem_init(semaphore, 0, 0);
-    printf("sem_init said %d, errno: %d\n", ret, errno);
+    FSHOW_SIGNAL((stderr, "/sem_init said %d\n", ret));
     return ret;
 }
 
 int futex_wait(os_sem_t *semaphore)
 {
     int ret;
-    printf("Waiting on semaphore %p\n", semaphore);
+    FSHOW_SIGNAL((stderr, "/waiting on semaphore @ %p\n", semaphore));
     ret = sem_wait(semaphore);
-    printf("sem_wait said %d, errno: %d\n", ret, errno);
+    FSHOW_SIGNAL((stderr, "/sem_wait said %d\n", ret));
     return ret;
 }
 
 int futex_wake(os_sem_t *semaphore)
 {
     int ret;
-    printf("Waking on semaphore %p\n", semaphore);
+    FSHOW_SIGNAL((stderr, "/waking semaphore @ %p\n", semaphore));
     ret = sem_post(semaphore);
-    printf("sem_post said %d, errno: %d\n", ret, errno);
+    FSHOW_SIGNAL((stderr, "/sem_post said %d\n", ret));
     return ret;
 }
 
 int futex_destroy(os_sem_t *semaphore)
 {
-    return sem_destroy(semaphore);
+    int ret;
+    FSHOW_SIGNAL((stderr, "/waking semaphore @ %p\n", semaphore));
+    ret = sem_destroy(semaphore);
+    FSHOW_SIGNAL((stderr, "/sem_destroy said %d\n", ret));
 }
 
 #endif

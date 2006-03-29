@@ -482,7 +482,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
         check_interrupts_enabled_or_lose(context);
 #endif
 
-#ifdef LISP_FEATURE_LINUX
+#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     /* Under Linux on some architectures, we appear to have to restore
        the FPU control word from the context, as after the signal is
        delivered we appear to have a null FPU control word. */
@@ -698,7 +698,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     thread=arch_os_get_current_thread();
     data=thread->interrupt_data;
 
-#ifdef LISP_FEATURE_LINUX
+#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
 #endif
 
@@ -716,7 +716,7 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
 
-#ifdef LISP_FEATURE_LINUX
+#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
 #endif
 
@@ -751,7 +751,7 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     thread=arch_os_get_current_thread();
     data=thread->interrupt_data;
 
-#ifdef LISP_FEATURE_LINUX
+#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
 #endif
 
