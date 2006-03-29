@@ -1,10 +1,12 @@
 
+
 #ifdef LISP_FEATURE_SB_THREAD
 #include <architecture/i386/table.h>
 #include <i386/user_ldt.h>
 #include <mach/mach_init.h>
 #endif
 
+#include "thread.h"
 #include "x86-darwin-os.h"
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -51,6 +53,7 @@ int arch_os_thread_init(struct thread *thread) {
 
     thread->tls_cookie=n;
     pthread_setspecific(specials,thread);
+#endif
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     stack_t sigstack;

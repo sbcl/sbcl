@@ -212,6 +212,7 @@ in future versions."
 value if NIL.  If WAIT-P is non-NIL and the mutex is in use, sleep
 until it is available"
   (declare (type mutex mutex) (optimize (speed 3)))
+  (/show0 "Entering GET-MUTEX")
   (unless new-value
     (setq new-value *current-thread*))
   #!-sb-thread
@@ -231,9 +232,6 @@ until it is available"
       (force-output *debug-io*))
     (loop
      (unless
-         ;; CLH: is the intent of this to overwrite the lutex or the
-         ;; value slot when +sb-lutex? try to fix by reordering the slots in
-         ;; thread.lisp:mutex
          (setf old (sb!vm::%instance-set-conditional mutex 2 nil new-value))
        (return t))
      (unless wait-p (return nil))
@@ -342,11 +340,7 @@ time we reacquire MUTEX and return to the caller."
            #!+sb-lutex (ignorable n))
   (/show0 "Entering CONDITION-NOTIFY")
   #!+sb-thread
-  (let ((me *current-thread*))
-    #!+sb-lutex (declare (ignorable me))
-    ;; FIXME We can probably do away with the ignore by moving the let
-    ;; inside the #!-sb-lutex block!
-    ;;
+  (progn
     ;; no problem if >1 thread notifies during the comment in
     ;; condition-wait: as long as the value in queue-data isn't the
     ;; waiting thread's id, it matters not what it is
@@ -356,10 +350,11 @@ time we reacquire MUTEX and return to the caller."
     (with-pinned-objects (queue (waitqueue-lutex queue))
       (futex-wake (sb!vm::%lutex-semaphore (waitqueue-lutex queue))))
     #!-sb-lutex
-    (progn
-      (setf (waitqueue-data queue) me)
-      (with-pinned-objects (queue)
-        (futex-wake (waitqueue-data-address queue) n)))))
+    (let ((me *current-thread*))
+      (progn
+        (setf (waitqueue-data queue) me)
+        (with-pinned-objects (queue)
+          (futex-wake (waitqueue-data-address queue) n))))))
 
 (defun condition-broadcast (queue)
   #!+sb-doc

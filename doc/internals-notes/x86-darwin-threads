@@ -15,8 +15,12 @@ OPEN BUGS
 
 3. threads.impure.lisp and timer.impure.lisp fail.
 
-4. Leaking semaphores? (Perhaps same as 3) I think we leak semaphores
-   at the moment.
+4. Leaking semaphores? I think we leak semaphores at the moment.
+
+5. Currently we'll die after 8192 total threads have been created. We
+   need to manage our own LDT to fix this until Apple fixes their
+   OS. i386_set_ldt LDT_AUTO_ALLOC doesn't reuse freed LDT's
+   (radar:4492548).
 
 ====================================
 FIXED BUGS
@@ -72,7 +76,6 @@ Mach semaphores.
 Currently, both Mach and Carbon semaphores exhibit similar problems at
 the same place in the code in excuting threads.impure.lisp and
 timer.impure.lisp.
-
 
 ====================================
 Signalling
@@ -247,3 +250,19 @@ reducing the number of timer alarms in the timer streams test from 200
 to 20 or so makes the situation better, but we still occasionally
 fail, so there's some underlying problem we need to address.
 
+====================================
+OTHER RANDOM NOTES
+====================================
+
+1. Are we sure we're getting the stack alignment right deferred
+   signals? Could this be causing a problem for us?
+
+2. It's really too bad we can't step across an
+   EXC_BAD_ACCESS. (radar:4480172, closed, duplicate, who knows what
+   the non-duplicate bug number is)
+
+3. I'm not sure I get why lutexes work at all. What is the problem
+   that going to futexes (as opposed to just posix semaphores) solves
+   in the first place? It seems as though all we have is a wrapper
+   around posix sempahores. Is this good enough? Does it case
+   performance problems? Does it cause correctness problems?

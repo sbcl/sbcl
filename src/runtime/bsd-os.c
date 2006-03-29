@@ -205,6 +205,8 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
     os_restore_tls_segment_register(context);
 #endif
 
+    FSHOW((stderr, "Memory fault at: %p, PC: %x\n", fault_addr, *os_context_pc_addr(context)));
+
     if (!gencgc_handle_wp_violation(fault_addr))
         if(!handle_guard_page_triggered(context,fault_addr)) {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
