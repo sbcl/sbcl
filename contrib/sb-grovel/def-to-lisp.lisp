@@ -155,7 +155,8 @@ code:
               (translate-logical-pathname output-file)
               (pathname output-file)))
          (tmp-c-source (merge-pathnames #p"foo.c" real-output-file))
-         (tmp-a-dot-out (merge-pathnames #p"a.out" real-output-file))
+         (tmp-a-dot-out (merge-pathnames #-win32 #p"a.out" #+win32 #p"a.exe"
+                                         real-output-file))
          (tmp-constants (merge-pathnames #p"constants.lisp-temp"
                                          real-output-file)))
     (princ (list filename output-file real-output-file
