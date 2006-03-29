@@ -50,7 +50,7 @@
 #if defined(LISP_FEATURE_SB_LUTEX)
 #if defined(LISP_FEATURE_CARBON_SEMAPHORES)
 #include <CoreServices/CoreServices.h>
-#else
+#elif defined(LISP_FEATURE_MACH_SEMAPHORES)
 #include <mach/semaphore.h>
 #endif
 #endif

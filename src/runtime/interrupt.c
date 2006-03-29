@@ -96,7 +96,7 @@ sigaddset_deferrable(sigset_t *s)
     sigaddset(s, SIGPROF);
     sigaddset(s, SIGWINCH);
 
-#if !(defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_SB_THREAD))
+#if !((defined(LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_FREEBSD)) && defined(LISP_FEATURE_SB_THREAD))
     sigaddset(s, SIGUSR1);
     sigaddset(s, SIGUSR2);
 #endif
