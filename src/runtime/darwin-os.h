@@ -44,6 +44,8 @@ typedef ucontext_t os_context_t;
 
 #define SIG_MEMORY_FAULT SIGBUS
 
+#define SIG_RESUME_FROM_GC
+
 #define SIG_INTERRUPT_THREAD (SIGINFO)
 #define SIG_STOP_FOR_GC (SIGUSR1)
 #define SIG_RESUME_FROM_GC (SIGUSR2)

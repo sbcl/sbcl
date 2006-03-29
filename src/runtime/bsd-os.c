@@ -23,6 +23,7 @@
 #include <sys/file.h>
 #include <unistd.h>
 #include <assert.h>
+#include <errno.h>
 #include "sbcl.h"
 #include "./signal.h"
 #include "os.h"
@@ -58,11 +59,9 @@ static void netbsd_init();
 static void freebsd_init();
 #endif /* __FreeBSD__ */
 
-#ifdef LISP_FEATURE_DARWIN
-#include <architecture/i386/table.h>
-#include <i386/user_ldt.h>
-#include <mach/mach_init.h>
-#endif /* LISP_FEATURE_DARWIN */
+#if defined(LISP_FEATURE_CARBON_SEMAPHORES)
+#include <CoreServices/CoreServices.h>
+#endif
 
 void
 os_init(char *argv[], char *envp[])
@@ -190,8 +189,6 @@ is_valid_lisp_addr(os_vm_address_t addr)
 
 #if defined LISP_FEATURE_GENCGC
 
-#define MEMORY_FAULT_DEBUG
-
 /*
  * The GENCGC needs to be hooked into whatever signal is raised for
  * page fault on this OS.
@@ -206,13 +203,6 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
     FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in memory_fault_handler\n",
                   *CONTEXT_ADDR_FROM_STEM(fs)));
     os_restore_tls_segment_register(context);
-#endif
-
-#if defined(MEMORY_FAULT_DEBUG)
-    fprintf(stderr, "Memory fault at: %p, PC: %x\n", fault_addr, *os_context_pc_addr(context));
-#if defined(ARCH_HAS_STACK_POINTER)
-    fprintf(stderr, "Stack pointer: %x\n", *os_context_sp_addr(context));
-#endif
 #endif
 
     if (!gencgc_handle_wp_violation(fault_addr))
@@ -247,7 +237,7 @@ os_install_interrupt_handlers(void)
                                                  interrupt_thread_handler);
     undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
                                                  sig_stop_for_gc_handler);
-#ifdef LISP_FEATURE_DARWIN
+#ifdef SIG_RESUME_FROM_GC
     undoably_install_low_level_interrupt_handler(SIG_RESUME_FROM_GC,
                                                  sig_stop_for_gc_handler);
 #endif
@@ -348,75 +338,6 @@ static void freebsd_init()
 }
 #endif /* __FreeBSD__ */
 
-int arch_os_thread_init(struct thread *thread) {
-
-#ifdef LISP_FEATURE_SB_THREAD
-
-#if defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_DARWIN)
-    int n;
-    sel_t sel;
-
-    data_desc_t ldt_entry = { 0, 0, 0, DESC_DATA_WRITE,
-                              3, 1, 0, DESC_DATA_32B, DESC_GRAN_BYTE, 0 };
-
-    set_data_desc_addr(&ldt_entry, (unsigned long) thread);
-    set_data_desc_size(&ldt_entry, dynamic_values_bytes);
-
-    n = i386_set_ldt(LDT_AUTO_ALLOC, (union ldt_entry*) &ldt_entry, 1);
-
-    if (n < 0) {
-        perror("i386_set_ldt");
-        lose("unexpected i386_set_ldt(..) failure\n");
-    }
-
-    FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", n));
-    sel.index = n;
-    sel.rpl = USER_PRIV;
-    sel.ti = SEL_LDT;
-
-    __asm__ __volatile__ ("mov %0, %%fs" : : "r"(sel));
-
-    thread->tls_cookie=n;
-
-    pthread_setspecific(specials,thread);
-#else
-#error "Define threading support functions"
-#endif
-
-#endif
-
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    stack_t sigstack;
-
-    /* Signal handlers are run on the control stack, so if it is exhausted
-     * we had better use an alternate stack for whatever signal tells us
-     * we've exhausted it */
-    sigstack.ss_sp=((void *) thread)+dynamic_values_bytes;
-    sigstack.ss_flags=0;
-    sigstack.ss_size = 32*SIGSTKSZ;
-    sigaltstack(&sigstack,0);
-#endif
-
-    return 1;                  /* success */
-}
-
-int arch_os_thread_cleanup(struct thread *thread) {
-
-#if defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_SB_THREAD)
-    int n = thread->tls_cookie;
-
-    /* Set the %%fs register back to 0 and free the the ldt
-     * by setting it to NULL.
-     */
-    FSHOW_SIGNAL((stderr, "/ TLS: Freeing LDT %x\n", n));
-
-    __asm__ __volatile__ ("mov %0, %%fs" : : "r"(0));
-    i386_set_ldt(n, NULL, 1);
-#endif
-
-    return 1;                  /* success */
-}
-
 #ifdef LISP_FEATURE_DARWIN
 /* defined in ppc-darwin-os.c instead */
 #elif defined(LISP_FEATURE_FREEBSD)
@@ -458,3 +379,120 @@ os_get_runtime_executable_path()
     return NULL;
 }
 #endif
+
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
+
+#if defined(LISP_FEATURE_MACH_SEMAPHORES)
+
+int futex_init(os_sem_t *semaphore)
+{
+    kern_return_t ret;
+    FSHOW_SIGNAL((stderr, "/initializing semaphore @ %p\n", semaphore));
+    ret = semaphore_create(current_task(), semaphore, SYNC_POLICY_FIFO, 0);
+    FSHOW_SIGNAL((stderr, "/semaphore_create said %d\n", ret));
+    return ret;
+}
+
+int futex_wait(os_sem_t *semaphore)
+{
+    kern_return_t ret;
+    FSHOW_SIGNAL((stderr, "/waiting on semaphore @ %p\n", semaphore));
+    ret = semaphore_wait(*semaphore);
+    FSHOW_SIGNAL((stderr, "/semaphore_wait said %d\n", ret));
+    return ret;
+}
+
+int futex_wake(os_sem_t *semaphore)
+{
+    kern_return_t ret;
+    FSHOW_SIGNAL((stderr, "/waking semaphore @ %p, *semaphore=%p\n", semaphore, (void*)*semaphore));
+    ret = semaphore_signal(*semaphore);
+    FSHOW_SIGNAL((stderr, "/semaphore_signal said %d\n", ret));
+    return ret;
+}
+
+int futex_destroy(os_sem_t *semaphore)
+{
+    kern_return_t ret;
+    FSHOW_SIGNAL((stderr, "/destroying semaphore @ %p\n", semaphore));
+    ret = semaphore_destroy(current_task(), *semaphore);
+    FSHOW_SIGNAL((stderr, "/semaphore_destroy said %d\n", ret));
+    return ret;
+}
+
+#elif defined(LISP_FEATURE_CARBON_SEMAPHORES)
+
+int futex_init(os_sem_t *semaphore)
+{
+    OSStatus ret;
+    FSHOW_SIGNAL((stderr, "/initializing semaphore @ %p\n", semaphore));
+    ret = MPCreateSemaphore(0xffff, 0, semaphore);
+    FSHOW_SIGNAL((stderr, "/MPCreateSemaphore said %d\n", ret));
+    return ret;
+}
+
+int futex_wait(os_sem_t *semaphore)
+{
+    kern_return_t ret;
+    FSHOW_SIGNAL((stderr, "/waiting on semaphore @ %p\n", semaphore));
+    ret = MPWaitOnSemaphore(*semaphore, kDurationForever);
+    FSHOW_SIGNAL((stderr, "/MPWaitOnSemaphore said %d\n", ret));
+    return ret;
+}
+
+int futex_wake(os_sem_t *semaphore)
+{
+    kern_return_t ret;
+    FSHOW_SIGNAL((stderr, "/waking semaphore @ %p, *semaphore=%p\n", semaphore, (void*)*semaphore));
+    ret = MPSignalSemaphore(*semaphore);
+    FSHOW_SIGNAL((stderr, "/MPSignalSemaphore said %d\n", ret));
+    return ret;
+}
+
+int futex_destroy(os_sem_t *semaphore)
+{
+    kern_return_t ret;
+    FSHOW_SIGNAL((stderr, "/destroying semaphore @ %p\n", semaphore));
+    ret = MPDeleteSemaphore(*semaphore);
+    FSHOW_SIGNAL((stderr, "/MPDeleteSemaphore said %d\n", ret));
+    return ret;
+}
+
+#else
+
+int futex_init(os_sem_t *semaphore)
+{
+    int ret;
+    printf("Initializing semaphore @ %p\n", semaphore);
+    ret = sem_init(semaphore, 0, 0);
+    printf("sem_init said %d, errno: %d\n", ret, errno);
+    return ret;
+}
+
+int futex_wait(os_sem_t *semaphore)
+{
+    int ret;
+    printf("Waiting on semaphore %p\n", semaphore);
+    ret = sem_wait(semaphore);
+    printf("sem_wait said %d, errno: %d\n", ret, errno);
+    return ret;
+}
+
+int futex_wake(os_sem_t *semaphore)
+{
+    int ret;
+    printf("Waking on semaphore %p\n", semaphore);
+    ret = sem_post(semaphore);
+    printf("sem_post said %d, errno: %d\n", ret, errno);
+    return ret;
+}
+
+int futex_destroy(os_sem_t *semaphore)
+{
+    return sem_destroy(semaphore);
+}
+
+#endif
+
+#endif
+

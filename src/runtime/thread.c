@@ -515,7 +515,7 @@ void gc_start_the_world()
                           p->os_thread));
             p->state=STATE_RUNNING;
 
-#if defined(LISP_FEATURE_DARWIN)
+#if defined(SIG_RESUME_FROM_GC)
             status=kill_thread_safely(p->os_thread,SIG_RESUME_FROM_GC);
 #else
             status=kill_thread_safely(p->os_thread,SIG_STOP_FOR_GC);

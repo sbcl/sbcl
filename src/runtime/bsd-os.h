@@ -21,6 +21,14 @@
 #include <mach/mach_types.h>
 #endif
 
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
+#ifdef LISP_FEATURE_DARWIN
+#include <sys/semaphore.h>
+#else
+#include <semaphore.h>
+#endif
+#endif
+
 typedef caddr_t os_vm_address_t;
 #if defined __NetBSD__
 typedef vsize_t os_vm_size_t;
@@ -32,6 +40,12 @@ typedef vm_size_t os_vm_size_t;
 typedef off_t os_vm_offset_t;
 typedef int os_vm_prot_t;
 typedef int os_context_register_t;
+
+#if !defined(LISP_FEATURE_DARWIN)
+#if defined(LISP_FEATURE_SB_THREAD)
+typedef sem_t os_sem_t;
+#endif
+#endif
 
 #if defined __OpenBSD__
 /* name defined for compatibility between OpenBSD 3.1 sigaltstack(2) and
@@ -64,6 +78,10 @@ typedef ucontext_t os_context_t;
  * #ifdef SIG_MEMORY_FAULT2'ed). -- JES, 2005-12-30
  */
 #define SIG_MEMORY_FAULT2 SIGBUS
+
+#define SIG_INTERRUPT_THREAD (SIGINFO)
+#define SIG_STOP_FOR_GC (SIGUSR1)
+#define SIG_RESUME_FROM_GC (SIGUSR2)
 
 #elif defined __OpenBSD__
 

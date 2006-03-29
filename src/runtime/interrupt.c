@@ -111,7 +111,7 @@ sigaddset_blockable(sigset_t *s)
 {
     sigaddset_deferrable(s);
 #ifdef LISP_FEATURE_SB_THREAD
-#ifdef LISP_FEATURE_DARWIN
+#ifdef SIG_RESUME_FROM_GC
     sigaddset(s, SIG_RESUME_FROM_GC);
 #endif
     sigaddset(s, SIG_STOP_FOR_GC);
@@ -540,7 +540,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
             sigset_t unblock;
             sigemptyset(&unblock);
             sigaddset(&unblock, SIG_STOP_FOR_GC);
-#ifdef LISP_FEATURE_DARWIN
+#ifdef SIG_RESUME_FROM_GC
             sigaddset(&unblock, SIG_RESUME_FROM_GC);
 #endif
             thread_sigmask(SIG_UNBLOCK, &unblock, 0);
@@ -806,7 +806,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
         thread->state=STATE_SUSPENDED;
         FSHOW_SIGNAL((stderr,"thread=%lu suspended\n",thread->os_thread));
 
-#if defined(LISP_FEATURE_DARWIN)
+#if defined(SIG_RESUME_FROM_GC)
         sigemptyset(&ss); sigaddset(&ss,SIG_RESUME_FROM_GC);
 #else
         sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
@@ -814,7 +814,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 
         /* It is possible to get SIGCONT (and probably other
          * non-blockable signals) here. */
-#ifdef LISP_FEATURE_DARWIN
+#ifdef SIG_RESUME_FROM_GC
         {
             int sigret;
             do { sigwait(&ss, &sigret); }
@@ -1205,7 +1205,7 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
     else {
         sigset_t new;
         sigemptyset(&new);
-#if defined(LISP_FEATURE_DARWIN)
+#if defined(SIG_RESUME_FROM_GC)
         sigaddset(&new,SIG_RESUME_FROM_GC);
 #endif
         sigaddset(&new,SIG_STOP_FOR_GC);
