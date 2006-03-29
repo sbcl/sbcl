@@ -179,8 +179,8 @@
  ; :mach-semaphores
  ; :carbon-semaphores
 
- ;; IMPORTANT!!!!! When building on darwin with lutexes we MUST turn
- ;; this on!!! FIXME!
+ ;; IMPORTANT!!!!! When building on darwin or freebsd with lutexes we
+ ;; MUST turn this on!!! FIXME!
  ;
  ; :restore-tls-segment-register-from-context
 

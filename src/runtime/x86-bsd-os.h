@@ -19,4 +19,11 @@ static inline os_context_t *arch_os_get_context(void **void_context) {
 #error unsupported BSD variant
 #endif
 
+#if defined(LISP_FEATURE_SB_THREAD)
+static inline void os_restore_tls_segment_register(os_context_t *context) {
+    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
+                          (*CONTEXT_ADDR_FROM_STEM(fs)));
+}
+#endif
+
 #endif /* _X86_BSD_OS_H */
