@@ -374,7 +374,6 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
 #undef CONTROL_STACK_ADJUST
        (retcode = pthread_create
         (kid_tid,&attr,(void *(*)(void *))new_thread_trampoline,th))) {
-        FSHOW_SIGNAL((stderr, "attr signature %lx\n", attr.__sig));
         FSHOW_SIGNAL((stderr, "init, size, addr = %d, %d, %d\n", initcode, sizecode, addrcode));
         FSHOW_SIGNAL((stderr, printf("pthread_create returned %d, errno %d\n", retcode, errno)));
         FSHOW_SIGNAL((stderr, "wanted stack size %d, min stack size %d\n",
