@@ -47,7 +47,7 @@
 
 #include "genesis/config.h"
 
-#if defined(LISP_FEATURE_SB_MUTEX)
+#if defined(LISP_FEATURE_SB_LUTEX)
 #if defined(LISP_FEATURE_CARBON_SEMAPHORES)
 #include <CoreServices/CoreServices.h>
 #else
