@@ -919,31 +919,36 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
      */
 
     u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
+    
+#if defined(LISP_FEATURE_DARWIN)
+    /* On Darwin, we probably need an ABI-aligned stack here, so
+     * make one by anding off the low 4 bits */
+    u32 *asp = (unsigned int)(sp - 3) & 0xfffffff0;
+#endif
 
-    FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: preparing to go back\n"));
+    FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: preparing to go to function %x, sp: %x\n", function, sp));
 
 #if defined(LISP_FEATURE_DARWIN)
-
+    
     /* return address for call_into_lisp: */
-    *(sp-17) = (u32)post_signal_tramp;
-    *(sp-16) = function;        /* args for call_into_lisp : function*/
-    *(sp-15) = 0;               /*                           arg array */
-    *(sp-14) = 0;               /*                           no. args */
+    *(asp-16) = (u32)post_signal_tramp;
+    *(asp-15) = function;        /* args for call_into_lisp : function*/
+    *(asp-14) = 0;               /*                           arg array */
+    *(asp-13) = 0;               /*                           no. args */
     /* this order matches that used in POPAD */
-    *(sp-13)=*os_context_register_addr(context,reg_EDI);
-    *(sp-12)=*os_context_register_addr(context,reg_ESI);
+    *(asp-12)=*os_context_register_addr(context,reg_EDI);
+    *(asp-11)=*os_context_register_addr(context,reg_ESI);
 
-    *(sp-11)=*os_context_register_addr(context,reg_ESP)-10;
+    *(asp-10)=*os_context_register_addr(context,reg_ESP)-8;
     /* POPAD ignores the value of ESP:  */
-    *(sp-10)=0;
-    *(sp-9)=*os_context_register_addr(context,reg_EBX);
+    *(asp-9)=0;
+    *(asp-8)=*os_context_register_addr(context,reg_EBX);
 
-    *(sp-8)=*os_context_register_addr(context,reg_EDX);
-    *(sp-7)=*os_context_register_addr(context,reg_ECX);
-    *(sp-6)=*os_context_register_addr(context,reg_EAX);
-    *(sp-5)=*context_eflags_addr(context);
-    *(sp-4)=0;
-    *(sp-3)=0;
+    *(asp-7)=*os_context_register_addr(context,reg_EDX);
+    *(asp-6)=*os_context_register_addr(context,reg_ECX);
+    *(asp-5)=*os_context_register_addr(context,reg_EAX);
+    *(asp-4)=*context_eflags_addr(context);
+
     *(sp-2)=*os_context_register_addr(context,reg_EBP);
     *(sp-1)=*os_context_pc_addr(context);
 
@@ -1010,8 +1015,8 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 #if defined(LISP_FEATURE_DARWIN)
     *os_context_pc_addr(context) = (os_context_register_t)call_into_lisp;
     *os_context_register_addr(context,reg_ECX) = 0;
-    *os_context_register_addr(context,reg_EBP) = (os_context_register_t)(sp-4);
-    *os_context_register_addr(context,reg_ESP) = (os_context_register_t)(sp-17);
+    *os_context_register_addr(context,reg_EBP) = (os_context_register_t)(sp-2);
+    *os_context_register_addr(context,reg_ESP) = (os_context_register_t)(asp-16);
 #else
     *os_context_pc_addr(context) = (os_context_register_t)call_into_lisp;
     *os_context_register_addr(context,reg_ECX) = 0;

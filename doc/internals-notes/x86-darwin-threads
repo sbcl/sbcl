@@ -1,7 +1,29 @@
 
-This document describes the state of threads on Darwin (MacOS X) on
-Intel. Currently things build and run, but there are some underlying
-problems that cause the build to be unstable.
+This document describes the state of threads and lutexes, primarly on
+Darwin (MacOS X) on Intel, but I have also begin to try to make this
+work on FreeBSD and linux. Currently things build and run, but there
+are some underlying problems that cause the build to be unstable.
+
+====================================
+CURRENT STATUS
+====================================
+
+ * x86/darwin - builds and runs, both threads.impure.lisp and
+   timer.impure.lisp fail. gc.impure.lisp works, which is good, but
+   the other two tests indicate that there are still significant
+   problems.
+ 
+ * x86-64/linux - builds and runs, but threads.impure.lisp (SEMAPHORE
+   MUTIPLE-SIGNALS) fails. It does, however, get farther than it does
+   in the x86/darwin case. This failure suggests that there may be
+   correctness problems in the lutex logic, in addition to platform
+   specific bugs.
+
+ * x86/freebsd - like the darwin case, this builds and runs, but fails
+   even more severely than in the Darwin case. This has even caused a
+   kernel panic on my only freebsd machine (which also happens to be
+   my mailserver). I'm planning to upgarde to freebsd to 6.0 and will
+   investigate if this helps the situation.
 
 ====================================
 OPEN BUGS
@@ -13,7 +35,8 @@ OPEN BUGS
 
 2. Occasional Illegal Instruction Errors
 
-3. threads.impure.lisp and timer.impure.lisp fail.
+3. threads.impure.lisp and timer.impure.lisp fail. See 8 (fixed) and 9
+   (fixed).
 
 4. Leaking semaphores? I think we leak semaphores at the moment.
 
@@ -21,6 +44,18 @@ OPEN BUGS
    need to manage our own LDT to fix this until Apple fixes their
    OS. i386_set_ldt LDT_AUTO_ALLOC doesn't reuse freed LDT's
    (radar:4492548).
+
+6. sb-threads/sb-lutex/x86-64/linux builds hang in the
+   threads.impure.lisp. This suggests that, in addition to whatever
+   platform specific problems we're seeing on Darwin, there may be
+   some flaws in the lutex logic that need to be addressed.
+
+7. sb-threads/sb-lutex/x86/freebsd builds build and run and simple
+   thread creation tests work, but threads.impure.lisp and
+   timer.impure.lisp fail. The failure mode is rather severe,
+   including a kernel panic in one instance.
+
+10. Failure after handling a deferred(PA) signal
 
 ====================================
 FIXED BUGS
@@ -30,18 +65,23 @@ FIXED BUGS
 but rather should serve as a reminder to anyone looking at this what
 some of the issues we had to deal with where)
 
-* Need to pin the mutex and the lutex before calling futex-wake,
-  futex-wait, etc... Orignally we either weren't pinning anything or
-  were just pinning the mutex. We need to make sure the lutex doesn't
-  move out from under us as well.
+ * Need to pin the mutex and the lutex before calling futex-wake,
+   futex-wait, etc... Orignally we either weren't pinning anything or
+   were just pinning the mutex. We need to make sure the lutex doesn't
+   move out from under us as well.
 
-* Set %fs to 0 when freeing the LDT
+ * Set %fs to 0 when freeing the LDT
 
-* semaphore_signal, and friends, occasionally fail with an error
-  KERN_INVALID_NAME or KERN_INVALID_RIGHT. This is bad. It's possible
-  the OS is doing something very wrong here, it's also possible we're
-  trashing the semaphore before we hand it off to the OS. Using carbon
-  semaphores seems to fix this problem.
+ * semaphore_signal, and friends, occasionally fail with an error
+   KERN_INVALID_NAME or KERN_INVALID_RIGHT. This is bad. It's possible
+   the OS is doing something very wrong here, it's also possible we're
+   trashing the semaphore before we hand it off to the OS. Using
+   carbon semaphores seems to fix this problem.
+
+8. Misaligned stack in arrange_return_to_lisp
+
+9. Bogus decrement value for EBP in arrange_return_to_lisp, should have
+   remained 8, not been set to 10.
 
 ====================================
 Lutexes
@@ -148,71 +188,6 @@ this test currently fails in one of two ways
 1A. sometimes we get a SIGILL
 and the process terminates while trying to free a thread
 
-1B. if we make it through 1A we later catch a SIGSEGV:
-
-interrupting child #<THREAD {1222A701}>
-/WITH-MUTEX
-/Entering RELEASE-MUTEX
-/waking semaphore @ 0x3f8000, *semaphore=0x100080
-/MPSignalSemaphore said 0
-/ TLS: restoring fs: 0x1a7 in low_level_maybe_now_maybe_later
-/maybe_defer_handler(5d42,29),thread=117460480: not deferred
-/ TLS: restoring fs: 0x1a7 in low_level_interrupt_handle_now
-/ TLS: restoring fs: 0x1a7 in interrupt_thread_handler
-/arrange_return_to_lisp_function: preparing to go back
-/WITH-MUTEX
-/Entering RELEASE-MUTEX
-/waking semaphore @ 0x3f8000, *semaphore=0x100080
-/MPSignalSemaphore said 0
-child pid #<THREAD {1222A701}>
-/ TLS: restoring fs: 0x1a7 in interrupt_handle_now
-/entering interrupt_handle_now(11, info, context)
-/calling Lisp-level handler
-/entering ERROR, argument list=..
-0x1222cc5b
-/cold-printing ERROR arguments one by one..
-0x1222cc4f
-/done cold-printing ERROR arguments
-/entering INFINITE-ERROR-PROTECTOR, *CURRENT-ERROR-DEPTH*=..
-0x00000000
-/returning normally from INFINITE-ERROR-PROTECTOR
-/back from INFINITE-ERROR-PROTECTOR
-/in INFINITE-ERROR-PROTECT, incremented error depth
-/ TLS: restoring fs: 0x1a7 in memory_fault_handler
-Memory fault at: 0x10012fac, PC: 10b8868b
-Stack pointer: da12400
-heap WP violation? fault_addr=10012fac, page_index=18
-0: (BACKTRACE 8 #<SYNONYM-STREAM :SYMBOL *TERMINAL-IO* {10143539}>)
-1: (ERROR "segmentation violation at #X~X")
-2: ((FLET #:G188))
-3: (SB-UNIX::SIGSEGV-HANDLER
-    #<unused argument>
-    #<unused argument>
-    #.(SB-SYS:INT-SAP #X0DA12BFA))
-4: (SB-SYS:INVOKE-INTERRUPTION #<CLOSURE (LAMBDA #) {1222C8AD}>)
-5: ("foreign function: call_into_lisp")
-6: ("foreign function: funcall3")
-7: ("foreign function: interrupt_handle_now")
-/done coercing DATUM to CONDITION
-/signalling CONDITION from within ERROR
-/done signalling CONDITION within ERROR
-/ TLS: restoring fs: 0x1a7 in memory_fault_handler
-Memory fault at: 0x100fbfd0, PC: 1048b8ed
-Stack pointer: da12608
-heap WP violation? fault_addr=100fbfd0, page_index=251
-/ TLS: restoring fs: 0x1a7 in memory_fault_handler
-Memory fault at: 0x10220758, PC: 1048b96e
-Stack pointer: da12608
-heap WP violation? fault_addr=10220758, page_index=544
-/ TLS: restoring fs: 0x1a7 in memory_fault_handler
-Memory fault at: 0x1021f778, PC: 1048b9f1
-Stack pointer: da12608
-heap WP violation? fault_addr=1021f778, page_index=543
-
-debugger invoked on a SIMPLE-ERROR in thread #<THREAD {1222A701}>:
-  segmentation violation at #X7F270DA1
-
-
 2. timer.impure.lisp
 
 this test fails with a segmentation violation:
@@ -266,3 +241,117 @@ OTHER RANDOM NOTES
    in the first place? It seems as though all we have is a wrapper
    around posix sempahores. Is this good enough? Does it case
    performance problems? Does it cause correctness problems?
+
+
+====================================
+NOTES FROM SOLVED PROBLEMS
+====================================
+
+
+1B. if we make it through 1A we later catch a SIGSEGV:
+
+interrupting child #<THREAD {1222A701}>
+/WITH-MUTEX
+/Entering RELEASE-MUTEX
+/waking semaphore @ 0x3f8000, *semaphore=0x100080
+/MPSignalSemaphore said 0
+/ TLS: restoring fs: 0x1a7 in low_level_maybe_now_maybe_later
+/maybe_defer_handler(5d42,29),thread=117460480: not deferred
+/ TLS: restoring fs: 0x1a7 in low_level_interrupt_handle_now
+/ TLS: restoring fs: 0x1a7 in interrupt_thread_handler
+/arrange_return_to_lisp_function: preparing to go back
+/WITH-MUTEX
+/Entering RELEASE-MUTEX
+/waking semaphore @ 0x3f8000, *semaphore=0x100080
+/MPSignalSemaphore said 0
+child pid #<THREAD {1222A701}>
+/ TLS: restoring fs: 0x1a7 in interrupt_handle_now
+/entering interrupt_handle_now(11, info, context)
+/calling Lisp-level handler
+/entering ERROR, argument list=..
+0x1222cc5b
+/cold-printing ERROR arguments one by one..
+0x1222cc4f
+/done cold-printing ERROR arguments
+/entering INFINITE-ERROR-PROTECTOR, *CURRENT-ERROR-DEPTH*=..
+0x00000000
+/returning normally from INFINITE-ERROR-PROTECTOR
+/back from INFINITE-ERROR-PROTECTOR
+/in INFINITE-ERROR-PROTECT, incremented error depth
+c/ TLS: restoring fs: 0x1a7 in memory_fault_handler
+Memory fault at: 0x10012fac, PC: 10b8868b
+Stack pointer: da12400
+heap WP violation? fault_addr=10012fac, page_index=18
+0: (BACKTRACE 8 #<SYNONYM-STREAM :SYMBOL *TERMINAL-IO* {10143539}>)
+1: (ERROR "segmentation violation at #X~X")
+2: ((FLET #:G188))
+3: (SB-UNIX::SIGSEGV-HANDLER
+    #<unused argument>
+    #<unused argument>
+    #.(SB-SYS:INT-SAP #X0DA12BFA))
+4: (SB-SYS:INVOKE-INTERRUPTION #<CLOSURE (LAMBDA #) {1222C8AD}>)
+5: ("foreign function: call_into_lisp")
+6: ("foreign function: funcall3")
+7: ("foreign function: interrupt_handle_now")
+/done coercing DATUM to CONDITION
+/signalling CONDITION from within ERROR
+/done signalling CONDITION within ERROR
+/ TLS: restoring fs: 0x1a7 in memory_fault_handler
+Memory fault at: 0x100fbfd0, PC: 1048b8ed
+Stack pointer: da12608
+heap WP violation? fault_addr=100fbfd0, page_index=251
+/ TLS: restoring fs: 0x1a7 in memory_fault_handler
+Memory fault at: 0x10220758, PC: 1048b96e
+Stack pointer: da12608
+heap WP violation? fault_addr=10220758, page_index=544
+/ TLS: restoring fs: 0x1a7 in memory_fault_handler
+Memory fault at: 0x1021f778, PC: 1048b9f1
+Stack pointer: da12608
+heap WP violation? fault_addr=1021f778, page_index=543
+
+debugger invoked on a SIMPLE-ERROR in thread #<THREAD {1222A701}>:
+  segmentation violation at #X7F270DA1
+
+The locking tests are failing. A mimimal-ish test case for this is:
+
+
+(in-package sb-thread)
+
+(defun test-interrupt (function-to-interrupt &optional quit-p)
+  (let ((child  (make-thread function-to-interrupt)))
+    ;;(format t "gdb ./src/runtime/sbcl ~A~%attach ~A~%" child child)
+    (sleep 2)
+    (format t "interrupting child ~A~%" child)
+    (interrupt-thread child
+                      (lambda ()
+                        (format t "child pid ~A~%" *current-thread*)
+                        (when quit-p (sb-ext:quit))))
+    (sleep 1)
+    child))
+
+(progn
+  (let ((child (test-interrupt (lambda () (loop)))))  (terminate-thread child))
+  (let ((child (test-interrupt (lambda () (loop)))))  (terminate-thread child))
+  (let ((child (test-interrupt (lambda () (loop)))))  (terminate-thread child))
+  (let ((child (test-interrupt (lambda () (loop)))))  (terminate-thread child)))
+
+This usually fails with a segmentation fault. Interstingy, if one
+comments out the interrupt-thread form, things seem ok, so the problem
+may lie within interrupt-thread. There was a major problem here before
+which was that the stack that gets created in
+arrange_return_to_lisp_function was not properly ABI-aligned (it was
+not guaranteed to be on a 16-byte boundary). I have tried to fix
+this in interrupt.c:arrange_return_to_lisp_function and in
+x86-assem.S:post_signal_tramp, but it's possible that there are more
+lurking bugs here, or, of course, that they're entirely
+elsewhere. More investigation needed.
+
+RESOLUTION: It turns out that the stack was not properly ABI-aligned
+(16-bytes) and we were trying to build a fake stack frame for use by
+the signal handling mechanism to return control to post_signal_tramp
+which would then call function. Aligning the stack to 16-bytes made
+things better, but there was still this SIGSEGV problem. I made the
+mistake of bumping the amount by which we were decrementing EBP to 10
+from 8, thinking this was the number, in words, by which we needed to
+displace EBP. Turns out this is in fact bytes, and we wanted to stay
+at 8 bytes. Leaving this at 8 fixes the SIGSEGV.
