@@ -1957,9 +1957,9 @@
   (unless (typep address 'address)
     (return-from maybe-note-assembler-routine nil))
   (let ((name (or
+               (find-assembler-routine address)
                #!+linkage-table
-               (sb!sys:sap-foreign-symbol (sb!sys:int-sap address))
-               (find-assembler-routine address))))
+               (sb!sys:sap-foreign-symbol (sb!sys:int-sap address)))))
     (unless (null name)
       (note (lambda (stream)
               (if note-address-p
