@@ -148,7 +148,7 @@ start it and work with the customary Lisp READ-EVAL-PRINT loop.\n\
 \n\
 One option idiom which is sometimes useful interactively (e.g. when\n\
 exercising a test case for a bug report) is\n\
-  sbcl --sysinit /dev/null --userinit /dev/null\n\
+  sbcl --no-sysinit --no-userinit\n\
 to keep SBCL from reading any initialization files at startup. And some\n\
 people like to suppress the default startup message:\n\
   sbcl --noinform\n\

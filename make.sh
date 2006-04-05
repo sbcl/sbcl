@@ -60,7 +60,11 @@ export LANG LC_ALL
 build_started=`date`
 echo "//starting build: $build_started"
 
-SBCL_XC_HOST="${1:-sbcl --disable-debugger --userinit /dev/null --sysinit /dev/null}"
+if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
+    SBCL_XC_HOST="${1:-sbcl --disable-debugger --userinit NUL --sysinit NUL}"
+else
+    SBCL_XC_HOST="${1:-sbcl --disable-debugger --userinit /dev/null --sysinit /dev/null}"
+fi
 export SBCL_XC_HOST
 echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
 

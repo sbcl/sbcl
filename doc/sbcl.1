@@ -289,15 +289,19 @@ The toplevel options supported by the standard SBCL core are
 .TP 3
 .B \-\-sysinit <filename>
 Load filename instead of the default system-wide initialization file.
-(See the FILES section.) There is no special option to cause no
-system-wide initialization file to be read, but on a Unix system
-"\-\-sysinit /dev/null" can be used to achieve the same effect.
+(See the FILES section.)
+.TP 3
+.B \-\-no\-sysinit
+Do not load a system-wide initialization file. If this option is
+given, the \-\-sysinit option is ignored.
 .TP 3
 .B \-\-userinit <filename>
 Load filename instead of the default user initialization file. (See
-the FILES section.) There is no special option to cause no user
-initialization file to be read, but on a Unix system "\-\-userinit
-/dev/null" can be used to achieve the same effect.
+the FILES section.)
+.TP 3
+.B \-\-no\-userinit
+Do not load a user initialization file. If this option is
+given, the \-\-userinit option is ignored.
 .TP 3
 .B \-\-eval <command>
 After executing any initialization file, but before starting the

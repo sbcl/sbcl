@@ -34,7 +34,7 @@ SBCL_HOME=$SBCL_BASE/contrib
 export SBCL_HOME
 
 
-SBCL="$SBCL_BASE/src/runtime/sbcl --noinform --core $SBCL_BASE/output/sbcl.core --disable-debugger"
+SBCL="$SBCL_BASE/src/runtime/sbcl --noinform --core $SBCL_BASE/output/sbcl.core --disable-debugger --no-sysinit --no-userinit"
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB
 

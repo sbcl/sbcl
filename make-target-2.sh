@@ -32,4 +32,4 @@ export LANG LC_ALL
 echo //doing warm init
 ./src/runtime/sbcl \
 --core output/cold-sbcl.core \
---sysinit /dev/null --userinit /dev/null < make-target-2.lisp
+--no-sysinit --no-userinit < make-target-2.lisp
