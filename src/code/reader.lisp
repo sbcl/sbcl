@@ -215,12 +215,11 @@
     really-to-readtable))
 
 (defun set-syntax-from-char (to-char from-char &optional
-                                     (to-readtable *readtable*)
-                                     (from-readtable ()))
+                             (to-readtable *readtable*) (from-readtable ()))
   #!+sb-doc
-  "Causes the syntax of TO-CHAR to be the same as FROM-CHAR in the
-  optional readtable (defaults to the current readtable). The
-  FROM-TABLE defaults to the standard Lisp readtable when NIL."
+  "Causes the syntax of TO-CHAR to be the same as FROM-CHAR in the optional
+readtable (defaults to the current readtable). The FROM-TABLE defaults to the
+standard Lisp readtable when NIL."
   (let ((really-from-readtable (or from-readtable *standard-readtable*)))
     (let ((att (get-cat-entry from-char really-from-readtable))
           (mac (get-raw-cmt-entry from-char really-from-readtable))
