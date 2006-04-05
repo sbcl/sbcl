@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.12 relative to sbcl-0.9.11:
+  * bug fix: LISTEN sometimes returned T even in cases where no data was
+    immediately available from the stream
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** REMOVE-METHOD returns its generic function argument even when
        the method is not one of the generic functions' methods.

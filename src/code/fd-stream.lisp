@@ -1582,33 +1582,36 @@
   (declare (ignore arg2))
   (case operation
     (:listen
-     (or (not (eql (fd-stream-ibuf-head fd-stream)
-                   (fd-stream-ibuf-tail fd-stream)))
-         (fd-stream-listen fd-stream)
-         #!+win32
-         (setf (fd-stream-listen fd-stream)
-               (sb!win32:fd-listen (fd-stream-fd fd-stream)))
-         #!-win32
-         (setf (fd-stream-listen fd-stream)
-               (if (sysread-may-block-p fd-stream)
-                   nil
-                   ;; select(2) and CL:LISTEN have slightly different
-                   ;; semantics.  The former returns that an FD is
-                   ;; readable when a read operation wouldn't block.
-                   ;; That includes EOF.  However, LISTEN must return
-                   ;; NIL at EOF.
-                   (progn (catch 'eof-input-catcher
-                            ;; r-b/f too calls select, but it shouldn't
-                            ;; block as long as read can return once w/o
-                            ;; blocking
-                            (refill-buffer/fd fd-stream))
-                          ;; If REFILL-BUFFER/FD set the FD-STREAM-LISTEN
-                          ;; slot to a non-nil value (i.e. :EOF), keep
-                          ;; that value.
-                          (or (fd-stream-listen fd-stream)
-                              ;; Otherwise we have data -> set the slot
-                              ;; to T.
-                              t))))))
+     (labels ((do-listen ()
+                (or (not (eql (fd-stream-ibuf-head fd-stream)
+                              (fd-stream-ibuf-tail fd-stream)))
+                    (fd-stream-listen fd-stream)
+                    #!+win32
+                    (sb!win32:fd-listen (fd-stream-fd fd-stream))
+                    #!-win32
+                    ;; If the read can block, LISTEN will certainly return NIL.
+                    (if (sysread-may-block-p fd-stream)
+                        nil
+                        ;; Otherwise select(2) and CL:LISTEN have slightly
+                        ;; different semantics.  The former returns that an FD
+                        ;; is readable when a read operation wouldn't block.
+                        ;; That includes EOF.  However, LISTEN must return NIL
+                        ;; at EOF.
+                        (progn (catch 'eof-input-catcher
+                                 ;; r-b/f too calls select, but it shouldn't
+                                 ;; block as long as read can return once w/o
+                                 ;; blocking
+                                 (refill-buffer/fd fd-stream))
+                               ;; At this point either IBUF-HEAD != IBUF-TAIL
+                               ;; and FD-STREAM-LISTEN is NIL, in which case
+                               ;; we should return T, or IBUF-HEAD ==
+                               ;; IBUF-TAIL and FD-STREAM-LISTEN is :EOF, in
+                               ;; which case we should return :EOF for this
+                               ;; call and all future LISTEN call on this stream.
+                               ;; Call ourselves again to determine which case
+                               ;; applies.
+                               (do-listen))))))
+       (do-listen)))
     (:unread
      (setf (fd-stream-unread fd-stream) arg1)
      (setf (fd-stream-listen fd-stream) t))
