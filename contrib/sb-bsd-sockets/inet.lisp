@@ -42,7 +42,7 @@ using getprotobyname(2) which typically looks in NIS or /etc/protocols"
   ;; for extra brownie points, could return canonical protocol name
   ;; and aliases as extra values
   (let ((ent (sockint::getprotobyname name)))
-    (if (sb-grovel::foreign-nullp ent)
+    (if (sb-alien::null-alien ent)
         (error 'unknown-protocol :name name))
     (sockint::protoent-proto ent)))
 

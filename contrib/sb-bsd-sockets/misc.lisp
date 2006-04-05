@@ -12,6 +12,7 @@
 (defgeneric non-blocking-mode (socket)
   (:documentation "Is SOCKET in non-blocking mode?"))
 
+#-win32
 (defmethod non-blocking-mode ((socket socket))
   (let ((fd (socket-file-descriptor socket)))
     (sb-alien:with-alien ((arg integer))
@@ -20,9 +21,13 @@
                              sockint::o-nonblock)
                             0))))
 
+#+win32
+(defmethod non-blocking-mode ((socket socket)) 0)
+
 (defgeneric (setf non-blocking-mode) (non-blocking-p socket)
   (:documentation "Put SOCKET in non-blocking mode - or not, according to NON-BLOCKING-P"))
 
+#-win32
 (defmethod (setf non-blocking-mode) (non-blocking-p (socket socket))
   (declare (optimize (speed 3)))
   (let* ((fd (socket-file-descriptor socket))
@@ -37,4 +42,9 @@
       (socket-error "fcntl"))
     non-blocking-p))
 
+#+win32
+(defmethod (setf non-blocking-mode) (non-blocking-p (socket socket)) 0)
+;;  (sb-alien:with-alien ((mode (unsigned 32)))
+;;    (if non-blocking-p (setf mode 1))
+;;	 (ioctlsocket socket FIONBIO mode)))
 

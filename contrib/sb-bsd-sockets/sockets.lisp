@@ -4,6 +4,11 @@
 ;;;; is deferred to inet.lisp, unix.lisp, etc
 
 (eval-when (:load-toplevel :compile-toplevel :execute)
+
+#+win32 
+(defvar *wsa-startup-call*
+  (sockint::wsa-startup (sockint::make-wsa-version 2 2)))
+
 (defclass socket ()
   ((file-descriptor :initarg :descriptor
                     :reader socket-file-descriptor)

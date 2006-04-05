@@ -1,3 +1,9 @@
+#+(and sbcl win32)
+(defpackage "SB-WIN32-SOCKETS-INTERNAL"
+  (:nicknames "WIN32SOCKINT")
+  (:shadow close listen)
+  (:use "COMMON-LISP" "SB-ALIEN" "SB-EXT" "SB-C-CALL"))
+
 (defpackage "SB-BSD-SOCKETS-INTERNAL"
   (:nicknames "SOCKINT")
   (:shadow close listen)

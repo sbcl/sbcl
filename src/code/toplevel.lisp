@@ -489,10 +489,20 @@ steppers to maintain contextual information.")
                #!-win32 (probe-init-files sysinit
                                           (init-file-name (posix-getenv "SBCL_HOME")
                                                           "sbclrc")
-                                          "/etc/sbclrc"))
+                                          "/etc/sbclrc")
+               #!+win32 (probe-init-files sysinit
+					  (init-file-name (posix-getenv "SBCL_HOME")
+                                                          "sbclrc")
+					  (concatenate 'string
+						       (sb!win32::get-folder-path 35) ;;SB-WIN32::CSIDL_COMMON_APPDATA
+						       "\\sbcl\\sbclrc")))
+
                (userinit-truename
                 #!-win32 (probe-init-files userinit
                                            (init-file-name (posix-getenv "HOME")
+                                                           ".sbclrc"))
+                #!+win32 (probe-init-files userinit
+                                           (init-file-name (namestring (user-homedir-pathname))
                                                            ".sbclrc"))))
 
           ;; This CATCH is needed for the debugger command TOPLEVEL to

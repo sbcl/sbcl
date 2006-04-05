@@ -121,4 +121,83 @@ int spawn(char *program, char *argv[], char *envp[], char *pty_name,
     /* The exec didn't work, flame out. */
     exit(1);
 }
+#else  /* !LISP_FEATURE_WIN32 */
+
+#  include <windows.h>
+#  include <process.h>
+#  include <stdio.h>
+#  include <stdlib.h>
+#  include <fcntl.h>
+#  include <io.h>
+
+#define   READ_HANDLE  0
+#define   WRITE_HANDLE 1
+
+/* These functions do not attempt to deal with wchar_t variations. */
+
+/* Get the value of _environ maintained by MSVCRT */
+char **msvcrt_environ ( void ) {
+    return ( _environ );
+}
+
+/* Set up in, out, err pipes and spawn a program, waiting or otherwise. */
+HANDLE spawn (
+    const char *program,
+    const char *const *argv,
+    int in,
+    int out,
+    int err,
+    int wait
+    )
+{
+    int fdOut, fdIn, fdErr, fdInPipe[2], fdOutPipe[2], fdErrPipe[2], wait_mode;
+    HANDLE hProcess;
+
+    /* Make pipes to be passed to the spawned process as in/out/err */
+    if ( _pipe ( fdOutPipe, 512, O_TEXT | O_NOINHERIT ) == -1 ) return (HANDLE)-1;
+    if ( _pipe ( fdInPipe,  512, O_TEXT | O_NOINHERIT ) == -1 ) return (HANDLE)-1;
+    if ( _pipe ( fdErrPipe, 512, O_TEXT | O_NOINHERIT ) == -1 ) return (HANDLE)-1;
+
+    /* Duplicate and save original in/out/err handles */
+    fdOut = _dup ( out );
+    fdIn  = _dup ( in );
+    fdErr = _dup ( err );
+
+    /* Duplicate write end of new pipes to current out/err handles,
+     * read to in */
+    if ( _dup2 ( fdOutPipe[WRITE_HANDLE], out ) != 0 ) return (HANDLE)-1;
+    if ( _dup2 ( fdInPipe[READ_HANDLE],   in  ) != 0 ) return (HANDLE)-1;
+    if ( _dup2 ( fdErrPipe[WRITE_HANDLE], err ) != 0 ) return (HANDLE)-1;
+
+
+    /* Close the duplicated handles to the new pipes */
+    close ( fdOutPipe[WRITE_HANDLE] );
+    close ( fdInPipe[READ_HANDLE] );
+    close ( fdErrPipe[WRITE_HANDLE] );
+
+    /* Set the wait mode. */
+    if ( 0 == wait ) {
+        wait_mode = P_NOWAIT;
+    } else {
+        wait_mode = P_WAIT;
+    }
+    
+    /* Spawn process given on the command line*/
+    hProcess = (HANDLE) spawnvp ( wait_mode, program, argv );
+    
+    /* Now that the process is launched, replace the original
+     * in/out/err handles */
+    if ( _dup2 ( fdOut, out ) != 0 ) return (HANDLE)-1;
+    if ( _dup2 ( fdIn,  in )  != 0 ) return (HANDLE)-1;
+    if ( _dup2 ( fdErr, err ) != 0 ) return (HANDLE)-1;
+
+    /* Close duplicates */
+    close(fdOut);
+    close(fdIn);
+    close(fdErr);
+
+    return ( hProcess );
+}
+
+
 #endif /* !LISP_FEATURE_WIN32 */

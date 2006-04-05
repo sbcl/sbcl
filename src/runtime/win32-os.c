@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <sys/param.h>
 #include <sys/file.h>
+#include <io.h>
 #include "sbcl.h"
 #include "./signal.h"
 #include "os.h"
@@ -48,6 +49,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <shlobj.h>
 
 #include <excpt.h>
 
@@ -621,17 +623,33 @@ void scratch(void)
     hypot(0, 0);
     write(0, 0, 0);
     close(0);
-    rename(0,0);
-    getcwd(0,0);
+    #ifndef LISP_FEATURE_SB_UNICODE
+      MoveFileA(0,0);
+    #else
+      MoveFileW(0,0);
+    #endif
+    #ifndef LISP_FEATURE_SB_UNICODE
+      GetCurrentDirectoryA(0,0);
+    #else
+      GetCurrentDirectoryW(0,0);
+    #endif
     dup(0);
     LoadLibrary(0);
     GetProcAddress(0, 0);
     FreeLibrary(0);
-    mkdir(0);
+    #ifndef LISP_FEATURE_SB_UNICODE
+      CreateDirectoryA(0,0);
+    #else
+      CreateDirectoryW(0,0);
+    #endif
+    _pipe(0,0,0);
     isatty(0);
     access(0,0);
     GetLastError();
     FormatMessageA(0, 0, 0, 0, 0, 0, 0);
+    #ifdef LISP_FEATURE_SB_UNICODE
+      FormatMessageW(0, 0, 0, 0, 0, 0, 0);
+    #endif
     _get_osfhandle(0);
     ReadFile(0, 0, 0, 0, 0);
     WriteFile(0, 0, 0, 0, 0);
@@ -639,8 +657,19 @@ void scratch(void)
     FlushConsoleInputBuffer(0);
     PeekConsoleInput(0, 0, 0, 0);
     Sleep(0);
+    #ifndef LISP_FEATURE_SB_UNICODE
+      SHGetFolderPathA(0, 0, 0, 0, 0);
+    #else
+      SHGetFolderPathW(0, 0, 0, 0, 0);
+    #endif
     GetACP();
     GetOEMCP();
+    LocalFree(0);
+    #ifndef LISP_FEATURE_SB_UNICODE
+      GetEnvironmentVariableA(0,0,0);
+    #else
+      GetEnvironmentVariableW(0,0,0);
+    #endif
     GetConsoleCP();
     GetConsoleOutputCP();
 }

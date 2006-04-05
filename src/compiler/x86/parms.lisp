@@ -154,8 +154,8 @@
 #!+win32
 (progn
 
-  (def!constant read-only-space-start #x01000000)
-  (def!constant read-only-space-end   #x037ff000)
+  (def!constant read-only-space-start #x02000000)
+  (def!constant read-only-space-end   #x047ff000)
 
   (def!constant static-space-start    #x05000000)
   (def!constant static-space-end      #x07fff000)
