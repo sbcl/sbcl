@@ -26,7 +26,7 @@ find_gnumake
 # between contrib packages, we want the _uninstalled_ versions to be
 # found
 if [ "$OSTYPE" = "cygwin" ] ; then
-    SBCL_BASE=$(cygpath -m $(pwd))
+    SBCL_BASE=`cygpath -m $(pwd)`
 else
     SBCL_BASE=`pwd`
 fi
