@@ -875,6 +875,7 @@ extern int *context_eflags_addr(os_context_t *context);
 
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 extern void post_signal_tramp(void);
+extern void call_into_lisp_tramp(void);
 void
 arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 {
@@ -921,37 +922,32 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
     
 #if defined(LISP_FEATURE_DARWIN)
-    /* On Darwin, we probably need an ABI-aligned stack here, so
-     * make one by anding off the low 4 bits */
-    u32 *asp = (unsigned int)(sp - 3) & 0xfffffff0;
-#endif
+    u32 *register_save_area = (u32 *)os_validate(0, 0x40);
 
     FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: preparing to go to function %x, sp: %x\n", function, sp));
-
-#if defined(LISP_FEATURE_DARWIN)
+    FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: context: %x, &context %x\n", context, &context));
     
-    /* return address for call_into_lisp: */
-    *(asp-16) = (u32)post_signal_tramp;
-    *(asp-15) = function;        /* args for call_into_lisp : function*/
-    *(asp-14) = 0;               /*                           arg array */
-    *(asp-13) = 0;               /*                           no. args */
-    /* this order matches that used in POPAD */
-    *(asp-12)=*os_context_register_addr(context,reg_EDI);
-    *(asp-11)=*os_context_register_addr(context,reg_ESI);
+    /* 1. os_validate (malloc/mmap) register_save_block
+     * 2. copy register state into register_save_block
+     * 3. put a pointer to register_save_block in a register in the context
+     * 4. set the context's EIP to point to a trampoline which:
+     *    a. builds the fake stack frame from the block
+     *    b. frees the block
+     *    c. calls the function
+     */
 
-    *(asp-10)=*os_context_register_addr(context,reg_ESP)-8;
-    /* POPAD ignores the value of ESP:  */
-    *(asp-9)=0;
-    *(asp-8)=*os_context_register_addr(context,reg_EBX);
+    *register_save_area = *os_context_pc_addr(context);
+    *(register_save_area + 1) = function;
+    *(register_save_area + 2) = *os_context_register_addr(context,reg_EDI);
+    *(register_save_area + 3) = *os_context_register_addr(context,reg_ESI);
+    *(register_save_area + 4) = *os_context_register_addr(context,reg_EDX);
+    *(register_save_area + 5) = *os_context_register_addr(context,reg_ECX);
+    *(register_save_area + 6) = *os_context_register_addr(context,reg_EBX);
+    *(register_save_area + 7) = *os_context_register_addr(context,reg_EAX);
+    *(register_save_area + 8) = *context_eflags_addr(context);
 
-    *(asp-7)=*os_context_register_addr(context,reg_EDX);
-    *(asp-6)=*os_context_register_addr(context,reg_ECX);
-    *(asp-5)=*os_context_register_addr(context,reg_EAX);
-    *(asp-4)=*context_eflags_addr(context);
-
-    *(sp-2)=*os_context_register_addr(context,reg_EBP);
-    *(sp-1)=*os_context_pc_addr(context);
-
+    *os_context_pc_addr(context) = call_into_lisp_tramp;
+    *os_context_register_addr(context,reg_ECX) = register_save_area;
 #else
 
     /* return address for call_into_lisp: */
@@ -1012,12 +1008,7 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 
 #ifdef LISP_FEATURE_X86
 
-#if defined(LISP_FEATURE_DARWIN)
-    *os_context_pc_addr(context) = (os_context_register_t)call_into_lisp;
-    *os_context_register_addr(context,reg_ECX) = 0;
-    *os_context_register_addr(context,reg_EBP) = (os_context_register_t)(sp-2);
-    *os_context_register_addr(context,reg_ESP) = (os_context_register_t)(asp-16);
-#else
+#if !defined(LISP_FEATURE_DARWIN)
     *os_context_pc_addr(context) = (os_context_register_t)call_into_lisp;
     *os_context_register_addr(context,reg_ECX) = 0;
     *os_context_register_addr(context,reg_EBP) = (os_context_register_t)(sp-2);
