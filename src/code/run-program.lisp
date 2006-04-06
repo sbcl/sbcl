@@ -803,25 +803,25 @@ colon-separated list of pathnames SEARCH-PATH"
                                            :if-exists if-error-exists))
                     (with-c-strvec (args-vec simple-args)
                         (let ((iwait (if wait 1 0)))
-			  (declare (type fixnum iwait))
-			  (let ((child-pid
-				 (without-gcing
-				  (spawn pfile args-vec 
-					 stdin stdout stderr
-					 iwait))))
-			    (when (< child-pid 0)
-			      (error "couldn't spawn program: ~A"
-				     (strerror)))
-			    (setf proc
-				  (if wait
-				      nil
-				    (make-process :pid child-pid
-						  :%status :running
-						  :input input-stream
-						  :output output-stream
-						  :error error-stream
-						  :status-hook status-hook
-						  :cookie cookie)))))))))))
+                          (declare (type fixnum iwait))
+                          (let ((child-pid
+                                 (without-gcing
+                                  (spawn pfile args-vec
+                                         stdin stdout stderr
+                                         iwait))))
+                            (when (< child-pid 0)
+                              (error "couldn't spawn program: ~A"
+                                     (strerror)))
+                            (setf proc
+                                  (if wait
+                                      nil
+                                    (make-process :pid child-pid
+                                                  :%status :running
+                                                  :input input-stream
+                                                  :output output-stream
+                                                  :error error-stream
+                                                  :status-hook status-hook
+                                                  :cookie cookie)))))))))))
     proc))
 
 ;;; Install a handler for any input that shows up on the file
@@ -858,10 +858,10 @@ colon-separated list of pathnames SEARCH-PATH"
                            (sb-unix:unix-read descriptor
                                               (alien-sap buf)
                                               256)
-			   (cond (#-win32(or (and (null count)
-						  (eql errno sb-unix:eio))
-					     (eql count 0))
-					 #+win32(<= count 0)
+                           (cond (#-win32(or (and (null count)
+                                                  (eql errno sb-unix:eio))
+                                             (eql count 0))
+                                         #+win32(<= count 0)
                                 (sb-sys:remove-fd-handler handler)
                                 (setf handler nil)
                                 (decf (car cookie))
@@ -899,7 +899,7 @@ colon-separated list of pathnames SEARCH-PATH"
          (multiple-value-bind
                (fd errno)
              (sb-unix:unix-open #-win32 #.(coerce "/dev/null" 'base-string)
-				#+win32 #.(coerce "nul" 'base-string)
+                                #+win32 #.(coerce "nul" 'base-string)
                                 (case direction
                                   (:input sb-unix:o_rdonly)
                                   (:output sb-unix:o_wronly)

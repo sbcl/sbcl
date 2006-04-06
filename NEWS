@@ -12,6 +12,9 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
     immediately available from the stream
   * fixed bug: types of the last two arguments to SET-SYNTAX-FROM-CHAR
     were reversed. (reported by Levente Mészáros)
+  * fixed bug: Tests for the (VECTOR T) type gave the wrong answer
+    when given a vector displaced to an adjustable array.  (reported
+    by Utz-Uwe Haus)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** REMOVE-METHOD returns its generic function argument even when
        the method is not one of the generic functions' methods.

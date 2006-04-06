@@ -563,13 +563,13 @@
   (pathname (sb!unix:uid-homedir (sb!unix:unix-getuid)))
   #!+win32
   (pathname (if (posix-getenv "HOME")
-		(let* ((path (posix-getenv "HOME"))
+                (let* ((path (posix-getenv "HOME"))
                        (last-char (char path (1- (length path)))))
-		  (if (or (char= last-char #\/)
-                          (char= last-char #\\)) 
-		      path
-		    (concatenate 'string path "/")))
-	      (sb!win32::get-folder-path 40)))) ;;SB-WIN32::CSIDL_PROFILE
+                  (if (or (char= last-char #\/)
+                          (char= last-char #\\))
+                      path
+                    (concatenate 'string path "/")))
+              (sb!win32::get-folder-path 40)))) ;;SB-WIN32::CSIDL_PROFILE
 
 (defun file-write-date (file)
   #!+sb-doc

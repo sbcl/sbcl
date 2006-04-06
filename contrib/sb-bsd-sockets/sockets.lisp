@@ -5,7 +5,7 @@
 
 (eval-when (:load-toplevel :compile-toplevel :execute)
 
-#+win32 
+#+win32
 (defvar *wsa-startup-call*
   (sockint::wsa-startup (sockint::make-wsa-version 2 2)))
 

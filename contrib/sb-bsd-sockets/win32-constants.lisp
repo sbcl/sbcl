@@ -46,7 +46,7 @@
 (defconstant EPERM 1)
 
 ;; basic socket errors
-(defconstant WSABASEERR	10000)
+(defconstant WSABASEERR 10000)
 (defconstant EINTR (+ WSABASEERR 4))
 (defconstant EBADF (+ WSABASEERR 9))
 (defconstant EACCES (+ WSABASEERR 13))

@@ -181,10 +181,10 @@ HANDLE spawn (
     } else {
         wait_mode = P_WAIT;
     }
-    
+
     /* Spawn process given on the command line*/
     hProcess = (HANDLE) spawnvp ( wait_mode, program, argv );
-    
+
     /* Now that the process is launched, replace the original
      * in/out/err handles */
     if ( _dup2 ( fdOut, out ) != 0 ) return (HANDLE)-1;

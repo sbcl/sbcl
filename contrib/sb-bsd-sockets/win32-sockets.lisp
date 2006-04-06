@@ -16,42 +16,42 @@
 
 (sb-alien:define-alien-type nil
   (struct WSADATA
-	  (wVersion (unsigned 16))
-	  (wHighVersion (unsigned 16))
-	  (szDescription (array char 257))
-	  (szSystemStatus (array char 129))
-	  (iMaxSockets (unsigned 16))
-	  (iMaxUdpDg (unsigned 16))
-	  (lpVendorInfo sb-alien:c-string)))
+          (wVersion (unsigned 16))
+          (wHighVersion (unsigned 16))
+          (szDescription (array char 257))
+          (szSystemStatus (array char 129))
+          (iMaxSockets (unsigned 16))
+          (iMaxUdpDg (unsigned 16))
+          (lpVendorInfo sb-alien:c-string)))
 
 (sb-alien:define-alien-type nil
   (struct s_un_byte
-	  (s_b1 (unsigned 8))
-	  (s_b2 (unsigned 8))
-	  (s_b3 (unsigned 8))
-	  (s_b4 (unsigned 8))))
+          (s_b1 (unsigned 8))
+          (s_b2 (unsigned 8))
+          (s_b3 (unsigned 8))
+          (s_b4 (unsigned 8))))
 
 (sb-alien:define-alien-type nil
   (struct s_un_wide
-	  (s_w1 (unsigned 16))
-	  (s_w2 (unsigned 16))))
+          (s_w1 (unsigned 16))
+          (s_w2 (unsigned 16))))
 
 (sb-alien:define-alien-type nil
   (union s_union
-	 (s_un_b (struct s_un_byte))
-	 (s_un_w (struct s_un_wide))
-	 (s_addr (unsigned 32))))
+         (s_un_b (struct s_un_byte))
+         (s_un_w (struct s_un_wide))
+         (s_addr (unsigned 32))))
 
 (sb-alien:define-alien-type nil
   (struct in_addr
-	  (s_union (union s_union))))
+          (s_union (union s_union))))
 
 (sb-alien:define-alien-type nil
   (struct sockaddr_in
-	  (sin_family (signed 16))
-	  (sin_port (array (unsigned 8) 2))
-	  (sin_addr (array (unsigned 8) 4))
-	  (sin_zero (array char 8))))
+          (sin_family (signed 16))
+          (sin_port (array (unsigned 8) 2))
+          (sin_addr (array (unsigned 8) 4))
+          (sin_zero (array char 8))))
 
 (defconstant size-of-sockaddr-in 16)
 
@@ -59,49 +59,49 @@
 
 (sb-alien:define-alien-type nil
   (struct sockaddr
-	  (sa_family (unsigned 16))
-	  (sa_data (array char 14))))
+          (sa_family (unsigned 16))
+          (sa_data (array char 14))))
 
 (sb-alien:define-alien-type nil
   (struct hostent
-	  (h_name sb-alien:c-string)
-	  (h_aliases (* sb-alien:c-string))
-	  (h_addrtype sb-alien:short)
-	  (h_length sb-alien:short)
-	  (h_addr_list (* (* (unsigned 8))))))
+          (h_name sb-alien:c-string)
+          (h_aliases (* sb-alien:c-string))
+          (h_addrtype sb-alien:short)
+          (h_length sb-alien:short)
+          (h_addr_list (* (* (unsigned 8))))))
 
 (sb-alien:define-alien-type nil
   (struct  protoent
-	(pname sb-alien:c-string)
-	(p_aliases (* sb-alien:c-string))
-	(p_proto (signed 16))))
+        (pname sb-alien:c-string)
+        (p_aliases (* sb-alien:c-string))
+        (p_proto (signed 16))))
 
 (sb-alien:define-alien-type socklen-t
-			    (unsigned 32))
+                            (unsigned 32))
 
 
 ;;; these are all non-HANDLE using, so are safe to have here
 (sb-alien:define-alien-routine "gethostbyaddr" (struct hostent)
-			       (addr sb-alien:c-string)
-			       (len int)
-			       (type int))
+                               (addr sb-alien:c-string)
+                               (len int)
+                               (type int))
 
 (sb-alien:define-alien-routine "gethostbyname" (struct hostent)
-			       (addr sb-alien:c-string))
+                               (addr sb-alien:c-string))
 
 (sb-alien:define-alien-routine "getservbyport" (struct servent)
-			       (port int)
-			       (proto sb-alien:c-string))
+                               (port int)
+                               (proto sb-alien:c-string))
 
 (sb-alien:define-alien-routine "getservbyname" (struct servent)
-			       (name sb-alien:c-string)
-			       (proto sb-alien:c-string))
+                               (name sb-alien:c-string)
+                               (proto sb-alien:c-string))
 
 (sb-alien:define-alien-routine "getprotobynumber" (struct protoent)
-			       (number int))
+                               (number int))
 
 (sb-alien:define-alien-routine "getprotobyname" (struct protoent)
-			       (name sb-alien:c-string))
+                               (name sb-alien:c-string))
 
 ;;; these are the alien references to the
 ;;; winsock calls
@@ -141,50 +141,50 @@
   (addrlen int :in-out))
 
 (sb-alien:define-alien-routine "recv" int
-			       (s int)
-			       (buf (* t))
-			       (len int)
-			       (flags int))
+                               (s int)
+                               (buf (* t))
+                               (len int)
+                               (flags int))
 
 (sb-alien:define-alien-routine "recvfrom" int
-			       (s int)
-			       (buf (* t))
-			       (len int)
-			       (flags int)
-			       (from (* (struct sockint::sockaddr_in)))
-			       (fromlen (* sockint::socklen-t)))
+                               (s int)
+                               (buf (* t))
+                               (len int)
+                               (flags int)
+                               (from (* (struct sockint::sockaddr_in)))
+                               (fromlen (* sockint::socklen-t)))
 
 (sb-alien:define-alien-routine ("closesocket" close) int
-			       (s int))
+                               (s int))
 
 (sb-alien:define-alien-routine "connect" int
-			       (s int)
-			       (name (* (struct sockint::sockaddr_in)))
-			       (namelen int))
+                               (s int)
+                               (name (* (struct sockint::sockaddr_in)))
+                               (namelen int))
 
 (sb-alien:define-alien-routine "getpeername" int
-			       (s int)
-			       (name (* (struct sockint::sockaddr_in)))
-			       (namelen int :in-out))
+                               (s int)
+                               (name (* (struct sockint::sockaddr_in)))
+                               (namelen int :in-out))
 
 (sb-alien:define-alien-routine "getsockopt" int
-			       (s int)
-			       (level int)
-			       (optname int)
-			       (optval sb-alien:c-string)
-			       (optlen int :in-out))
+                               (s int)
+                               (level int)
+                               (optname int)
+                               (optval sb-alien:c-string)
+                               (optlen int :in-out))
 
 (sb-alien:define-alien-routine ("ioctlsocket" ioctl) int
-			       (s int)
-			       (cmd int)
-			       (argp (unsigned 32) :in-out))
+                               (s int)
+                               (cmd int)
+                               (argp (unsigned 32) :in-out))
 
 (sb-alien:define-alien-routine "setsockopt" int
-			       (s int)
-			       (level int)
-			       (optname int)
-			       (optval (* t))
-			       (optlen int))
+                               (s int)
+                               (level int)
+                               (optname int)
+                               (optval (* t))
+                               (optlen int))
 
 
 ;;;; we are now going back to the normal sockint
@@ -194,15 +194,15 @@
 (in-package :sockint)
 
 (sb-alien:define-alien-routine ("_get_osfhandle" fd->handle) sb-alien:long
-			       (fd int))
+                               (fd int))
 
 (sb-alien:define-alien-routine ("_open_osfhandle" handle->fd) int
-			       (osfhandle int)
-			       (flags int))
+                               (osfhandle int)
+                               (flags int))
 
 (defun socket (af type proto)
   (let* ((handle (win32sockint::wsa-socket af type proto nil 0 0))
-	 (fd (handle->fd handle 0)))
+         (fd (handle->fd handle 0)))
     fd))
 
 (defun bind (fd &rest options)
@@ -247,7 +247,7 @@
 (defmacro with-in-addr (name init &rest body)
   (declare (ignore init))
   `(with-alien ((,name (struct in_addr)))
-	       ,@body))
+               ,@body))
 
 (defun in-addr-addr (addr)
   (sb-alien:slot (sb-alien:slot addr 's_union) 's_addr))

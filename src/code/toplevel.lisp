@@ -491,11 +491,11 @@ steppers to maintain contextual information.")
                                                           "sbclrc")
                                           "/etc/sbclrc")
                #!+win32 (probe-init-files sysinit
-					  (init-file-name (posix-getenv "SBCL_HOME")
+                                          (init-file-name (posix-getenv "SBCL_HOME")
                                                           "sbclrc")
-					  (concatenate 'string
-						       (sb!win32::get-folder-path 35) ;;SB-WIN32::CSIDL_COMMON_APPDATA
-						       "\\sbcl\\sbclrc")))
+                                          (concatenate 'string
+                                                       (sb!win32::get-folder-path 35) ;;SB-WIN32::CSIDL_COMMON_APPDATA
+                                                       "\\sbcl\\sbclrc")))
 
                (userinit-truename
                 #!-win32 (probe-init-files userinit

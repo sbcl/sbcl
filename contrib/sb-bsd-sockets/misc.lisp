@@ -46,5 +46,5 @@
 (defmethod (setf non-blocking-mode) (non-blocking-p (socket socket)) 0)
 ;;  (sb-alien:with-alien ((mode (unsigned 32)))
 ;;    (if non-blocking-p (setf mode 1))
-;;	 (ioctlsocket socket FIONBIO mode)))
+;;       (ioctlsocket socket FIONBIO mode)))
 

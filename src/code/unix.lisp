@@ -325,7 +325,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
              (cast fds (* int)) size mode))
 #!+win32(defun unix-pipe ()
   (with-alien ((fds (array int 2)))
-	      (msvcrt-raw-pipe fds 256 o_binary)))
+              (msvcrt-raw-pipe fds 256 o_binary)))
 
 ;; Windows mkdir() doesn't take the mode argument. It's cdecl, so we could
 ;; actually call it passing the mode argument, but some sharp-eyed reader

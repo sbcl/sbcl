@@ -41,8 +41,8 @@
                                (loop for i from 0 below length
                                      do (setf (elt addr i) (sb-alien:deref ad i)))
                                addr))
-                          #-win32 
-			  (#.sockint::af-local
+                          #-win32
+                          (#.sockint::af-local
                            (sb-alien:cast ad sb-alien:c-string))))))
     (make-instance 'host-ent
                    :name (sockint::hostent-name h)
@@ -113,7 +113,7 @@ GET-NAME-SERVICE-ERRNO")
 
 #-win32
 (define-name-service-condition sockint::NETDB-INTERNAL netdb-internal-error)
-#-win32 
+#-win32
 (define-name-service-condition sockint::NETDB-SUCCESS netdb-success-error)
 (define-name-service-condition sockint::HOST-NOT-FOUND host-not-found-error)
 (define-name-service-condition sockint::TRY-AGAIN try-again-error)
@@ -129,10 +129,10 @@ GET-NAME-SERVICE-ERRNO")
 (defun get-name-service-errno ()
   (setf *name-service-errno*
         (sb-alien:alien-funcall
-	 #-win32
+         #-win32
          (sb-alien:extern-alien "get_h_errno" (function integer))
-	 #+win32
-	 (sb-alien:extern-alien "WSAGetLastError" (function integer)))))
+         #+win32
+         (sb-alien:extern-alien "WSAGetLastError" (function integer)))))
 
 #-(and cmu solaris)
 (progn
