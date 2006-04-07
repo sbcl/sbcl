@@ -231,8 +231,11 @@
                             (fun-name-block-name x))))))
       (structure
        (typecase x
-         (symbol (when (eq (info :type :kind x) :instance)
-                   (values (info :type :documentation x))))))
+         (symbol (cond
+                   ((eq (info :type :kind x) :instance)
+                    (values (info :type :documentation x)))
+                   ((info :typed-structure :info x)
+                    (values (info :typed-structure :documentation x)))))))
       (type
        (typecase x
          (structure-class (values (info :type :documentation (class-name x))))
@@ -259,9 +262,13 @@
   (case doc-type
     (variable (setf (info :variable :documentation name) string))
     (function (setf (info :function :documentation name) string))
-    (structure (if (eq (info :type :kind name) :instance)
-                   (setf (info :type :documentation name) string)
-                   (error "~S is not the name of a structure type." name)))
+    (structure (cond
+                 ((eq (info :type :kind name) :instance)
+                  (setf (info :type :documentation name) string))
+                 ((info :typed-structure :info name)
+                  (setf (info :typed-structure :documentation name) string))
+                 (t
+                  (error "~S is not a structure name." name))))
     (type (setf (info :type :documentation name) string))
     (setf (setf (info :setf :documentation name) string))
     (t

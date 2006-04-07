@@ -383,7 +383,10 @@
                   (append (typed-accessor-definitions dd)
                           (typed-predicate-definitions dd)
                           (typed-copier-definitions dd)
-                          (constructor-definitions dd)))
+                          (constructor-definitions dd)
+                          (when (dd-doc dd)
+                            `((setf (fdocumentation ',(dd-name dd) 'structure)
+                               ',(dd-doc dd))))))
               ',name)))))
 
 (sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions)
