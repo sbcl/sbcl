@@ -44,34 +44,45 @@ size_t os_vm_page_size;
 
 int arch_os_thread_init(struct thread *thread) {
     {
-        //unsigned long cur_stack_base;
-        //unsigned long cur_stack_end;
+	void *top_exception_frame;
         void *cur_stack_end;
+	void *cur_stack_start;
 
-        //asm volatile ("movl %%fs:8,%0": "=r" (cur_stack_base));
-        //      asm volatile ("movl %%fs:4,%0": "=r" (cur_stack_end));
+        asm volatile ("movl %%fs:0,%0": "=r" (top_exception_frame));
+        asm volatile ("movl %%fs:4,%0": "=r" (cur_stack_end));
 
-        asm volatile ("movl %%fs:0,%0": "=r" (cur_stack_end));
+	/*
+	 * Can't pull stack start from fs:4 or fs:8 or whatever,
+	 * because that's only what currently has memory behind
+	 * it from being used. Our basic options are to know,
+	 * a priori, what the stack size is (1 meg by default)
+	 * or to grub the default size out of the executable
+	 * header in memory by means of hardcoded addresses and
+	 * offsets.
+	 *
+	 * We'll just assume it's 1 megabyte. Easiest that way.
+	 */
+	cur_stack_start = cur_stack_end - 0x100000;
 
-        //      fprintf(stderr, "#x%08lx #x%08lx.\n", cur_stack_base, cur_stack_end);
+	/*
+	 * We use top_exception_frame rather than cur_stack_end
+	 * to elide the last few (boring) stack entries at the
+	 * bottom of the backtrace.
+	 */
+	thread->control_stack_start = cur_stack_start;
+        thread->control_stack_end = top_exception_frame;
 
-        //if (cur_stack_base > thread->control_stack_start) {
-        //    cur_stack_base = thread->control_stack_start;
-        //}
-
-        //if (cur_stack_end < thread->control_stack_end) {
-        //    cur_stack_end = thread->control_stack_end;
-        //}
-
-        //      fprintf(stderr, "#x%08lx #x%08lx.\n", cur_stack_base, cur_stack_end);
-        //fflush(stderr);
-
-        //getchar();
-
-        //asm volatile ("movl %0,%%fs:8": : "r" (cur_stack_base));
-        //asm volatile ("movl %0,%%fs:4": : "r" (cur_stack_end));
-
-        thread->control_stack_end = cur_stack_end;
+#ifndef LISP_FEATURE_SB_THREAD
+	/*
+	 * Theoretically, threaded SBCL binds directly against
+	 * the thread structure for these values. We don't do
+	 * threads yet, but we'll probably do the same. We do
+	 * need to reset these, though, because they were
+	 * initialized based on the wrong stack space.
+	 */
+	SetSymbolValue(CONTROL_STACK_START,(lispobj)thread->control_stack_start,thread);
+	SetSymbolValue(CONTROL_STACK_END,(lispobj)thread->control_stack_end,thread);
+#endif
     }
 
 #ifdef LISP_FEATURE_SB_THREAD
