@@ -2032,3 +2032,40 @@
                             (error "This is unreachable.")))))
       (compiler-note () (throw :note nil)))
     (error "Unreachable code undetected.")))
+
+;; Reported by John Wiseman, sbcl-devel
+;; Subject: [Sbcl-devel] float type derivation bug?
+;; Date: Tue, 4 Apr 2006 15:28:15 -0700
+(with-test (:name (:type-derivation :float-bounds)
+                  :fails-on :sbcl)
+  (compile nil '(lambda (bits)
+                 (let* ((s (if (= (ash bits -31) 0) 1 -1))
+                        (e (logand (ash bits -23) #xff))
+                        (m (if (= e 0)
+                               (ash (logand bits #x7fffff) 1)
+                               (logior (logand bits #x7fffff) #x800000))))
+                   (float (* s m (expt 2 (- e 150))))))))
+
+;; Reported by James Knight
+;; Subject: [Sbcl-devel] AVER: "(EQ (SB-NAME (SC-SB (TN-SC TN))) 'REGISTERS)"
+;; Date: Fri, 24 Mar 2006 19:30:00 -0500
+(with-test (:name (:compiler :type-derivation :float-bounds)
+                  :fails-on :x86)
+  (compile nil
+           '(lambda (days shift)
+             (declare (type fixnum shift days))
+             (let* ((result 0)
+                    (canonicalized-shift (+ shift 1))
+                    (first-wrapping-day (- 1 canonicalized-shift)))
+               (declare (type fixnum result))
+               (dotimes (source-day 7)
+                 (declare (type (integer 0 6) source-day))
+                 (when (logbitp source-day days)
+                   (setf result
+                         (logior result
+                                 (the fixnum
+                                   (if (< source-day first-wrapping-day)
+                                       (+ source-day canonicalized-shift)
+                                       (- (+ source-day
+                                             canonicalized-shift) 7)))))))
+               result))))
