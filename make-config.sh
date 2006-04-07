@@ -273,7 +273,7 @@ elif [ "$sbcl_arch" = "mips" ]; then
     # cross-compilers!
     #
     # FIXME: integrate to grovel-features, mayhaps
-    $GNUMAKE -C tools-for-build determine-endianness -I src/runtime
+    $GNUMAKE -C tools-for-build determine-endianness -I ../src/runtime
     tools-for-build/determine-endianness >> $ltf
 elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
     # Use a C program to detect which kind of glibc we're building on,
@@ -282,8 +282,8 @@ elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
     #
     # FIXME: integrate to grovel-features., maypahps
     printf ' :gencgc :stack-allocatable-closures :linkage-table' >> $ltf
-    $GNUMAKE -C tools-for-build where-is-mcontext -I src/runtime
-    tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h
+    $GNUMAKE -C tools-for-build where-is-mcontext -I ../src/runtime
+    tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h || (echo "error running where-is-mcontext"; exit 1)
 elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
     printf ' :gencgc :stack-allocatable-closures' >> $ltf
     # We provide a dlopen shim, so a little lie won't hurt
