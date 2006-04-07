@@ -23,20 +23,20 @@ PUNT=104
 
 testfilestem=${TMPDIR:-/tmp}/sbcl-foreign-test-$$
 
-## Make a little shared object files to test with.
+## Make some shared object files to test with.
 
 build_so() {
   echo building $1.so
-  if [ "$(uname -m)" = x86_64 ]; then
+  if [ "`uname -m`" = x86_64 ]; then
     CFLAGS="$CFLAGS -fPIC"
   fi
-  if [ "$(uname)" = Darwin ]; then
+  if [ "`uname`" = Darwin ]; then
     SO_FLAGS="-bundle"
   else
     SO_FLAGS="-shared"
   fi
   cc -c $1.c -o $1.o $CFLAGS
-  ld $SO_FLAGS -o $1.so $1.o
+  ld $SO_FLAGS -o $1.so $1.o  
 }
 
 echo 'int summish(int x, int y) { return 1 + x + y; }' > $testfilestem.c

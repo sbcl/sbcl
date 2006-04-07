@@ -41,7 +41,7 @@ ${SBCL:-sbcl} <<EOF > /dev/null &
 EOF
 
 SBCL_PID=$!
-WAITED=0
+WAITED=x
 
 echo "Waiting for SBCL to finish stress-testing finalizers"
 while true; do
@@ -55,8 +55,8 @@ while true; do
         exit 1 # Failure
     fi
     sleep 1
-    WAITED=$(($WAITED+1))
-    if (($WAITED>60)); then
+    WAITED="x$WAITED"
+    if [ $WAITED = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" ]; then
         echo
         echo "timeout, killing SBCL"
         kill -9 $SBCL_PID

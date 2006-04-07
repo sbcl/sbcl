@@ -190,7 +190,10 @@
                                     (list '(flet test) #'not-optimized))))))
 
 (with-test (:name (:throw :no-such-tag)
-            :fails-on '(or (and :x86 :linux) (and :x86 :freebsd) :alpha :mips))
+            :fails-on '(or
+                        (and :x86 (or :linux :freebsd sunos))
+                        :alpha
+                        :mips))
   (progn
     (defun throw-test ()
       (throw 'no-such-tag t))
@@ -233,7 +236,7 @@
 
 ;;; FIXME: This test really should be broken into smaller pieces
 (with-test (:name (:backtrace :misc)
-            :fails-on '(and :x86 :linux))
+            :fails-on '(and :x86 (or :linux :sunos)))
   (macrolet ((with-details (bool &body body)
                `(let ((sb-debug:*show-entry-point-details* ,bool))
                  ,@body)))

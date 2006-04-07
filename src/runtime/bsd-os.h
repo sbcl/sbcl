@@ -49,11 +49,6 @@ typedef struct sigaltstack stack_t;
 
 #include <sys/ucontext.h>
 typedef ucontext_t os_context_t;
-/* As the sbcl-devel message from Raymond Wiker 2000-12-01, FreeBSD
- * (unlike Linux and OpenBSD) doesn't let us tweak the CPU's single
- * step flag bit by messing with the flags stored in a signal context,
- * so we need to implement single stepping in a more roundabout way. */
-#define CANNOT_GET_TO_SINGLE_STEP_FLAG
 #define SIG_MEMORY_FAULT SIGSEGV
 /* Sometime in late 2005 FreeBSD was changed to signal SIGSEGV instead
  * of SIGBUS for memory faults, as required by POSIX. In order to

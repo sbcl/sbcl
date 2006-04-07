@@ -79,3 +79,14 @@ os_context_sigmask_addr(os_context_t *context)
 void os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
 }
+
+unsigned long
+os_context_fp_control(os_context_t *context)
+{
+    int *state = context->uc_mcontext.fpregs.fp_reg_set.fpchip_state.state;
+    /* The STATE array is in the format used by the x86 instruction FNSAVE,
+     * so the FPU control word is in the first 16 bits */
+    int cw = (state[0] & 0xffff);
+    int sw = context->uc_mcontext.fpregs.fp_reg_set.fpchip_state.status;
+    return (cw ^ 0x3f) | (sw << 16);
+}

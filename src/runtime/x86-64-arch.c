@@ -162,14 +162,6 @@ arch_remove_breakpoint(void *pc, unsigned int orig_inst)
     *((char *)pc + 1) = (orig_inst & 0xff00) >> 8;
 }
 
-/* When single stepping, single_stepping holds the original instruction
- * PC location. */
-unsigned int *single_stepping = NULL;
-#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
-unsigned long  single_step_save1;
-unsigned long  single_step_save2;
-unsigned long  single_step_save3;
-#endif
 
 void
 arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
@@ -179,25 +171,6 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     /* Put the original instruction back. */
     *((char *)pc) = orig_inst & 0xff;
     *((char *)pc + 1) = (orig_inst & 0xff00) >> 8;
-
-#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
-    /* Install helper instructions for the single step:
-     * pushf; or [esp],0x100; popf. */
-    single_step_save1 = *(pc-3);
-    single_step_save2 = *(pc-2);
-    single_step_save3 = *(pc-1);
-    *(pc-3) = 0x9c909090;
-    *(pc-2) = 0x00240c81;
-    *(pc-1) = 0x9d000001;
-#else
-    *context_eflags_addr(context) |= 0x100;
-#endif
-
-    single_stepping = pc;
-
-#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
-    *os_context_pc_addr(context) = (char *)pc - 9;
-#endif
 }
 
 void
@@ -207,41 +180,11 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     os_context_t *context = (os_context_t*)void_context;
     unsigned int trap;
 
-    if (single_stepping && (signal==SIGTRAP))
-    {
-        /* fprintf(stderr,"* single step trap %x\n", single_stepping); */
-
-#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
-        /* Un-install single step helper instructions. */
-        *(single_stepping-3) = single_step_save1;
-        *(single_stepping-2) = single_step_save2;
-        *(single_stepping-1) = single_step_save3;
-#else
-        *context_eflags_addr(context) ^= 0x100;
-#endif
-        /* Re-install the breakpoint if possible. */
-        if (*os_context_pc_addr(context) == (int)single_stepping + 1) {
-            fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
-        } else {
-            *((char *)single_stepping) = BREAKPOINT_INST;       /* x86 INT3 */
-            *((char *)single_stepping+1) = trap_Breakpoint;
-        }
-
-        single_stepping = NULL;
-        return;
-    }
-
     /* This is just for info in case the monitor wants to print an
      * approximation. */
     current_control_stack_pointer =
         (lispobj *)*os_context_sp_addr(context);
 
-    /* FIXME: CMUCL puts the float control restoration code here.
-       Thus, it seems to me that single-stepping won't restore the
-       float control.  Since SBCL currently doesn't support
-       single-stepping (as far as I can tell) this is somewhat moot,
-       but it might be worth either moving this code up or deleting
-       the single-stepping code entirely.  -- CSR, 2002-07-15 */
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif
