@@ -16,6 +16,8 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
   * fixed bug: Tests for the (VECTOR T) type gave the wrong answer
     when given a vector displaced to an adjustable array.  (reported
     by Utz-Uwe Haus)
+  * bug fix: derivation of float boundaries from numbers outside the
+    appropriate float range (reported by John Wiseman)
   * improvements to DOCUMENTATION for TYPE and STRUCTURE doc-types:
     allow condition class objects as arguments to DOCUMENTATION and
     (SETF DOCUMENTATION); only find and set documentation for

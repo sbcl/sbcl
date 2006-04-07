@@ -2036,8 +2036,7 @@
 ;; Reported by John Wiseman, sbcl-devel
 ;; Subject: [Sbcl-devel] float type derivation bug?
 ;; Date: Tue, 4 Apr 2006 15:28:15 -0700
-(with-test (:name (:type-derivation :float-bounds)
-                  :fails-on :sbcl)
+(with-test (:name (:type-derivation :float-bounds))
   (compile nil '(lambda (bits)
                  (let* ((s (if (= (ash bits -31) 0) 1 -1))
                         (e (logand (ash bits -23) #xff))

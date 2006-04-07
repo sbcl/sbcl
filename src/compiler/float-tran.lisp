@@ -267,24 +267,30 @@
 ;;; defined range. Quite useful if we want to convert some type of
 ;;; bounded integer into a float.
 (macrolet
-    ((frob (fun type)
+    ((frob (fun type most-negative most-positive)
        (let ((aux-name (symbolicate fun "-DERIVE-TYPE-AUX")))
          `(progn
-           (defun ,aux-name (num)
-             ;; When converting a number to a float, the limits are
-             ;; the same.
-             (let* ((lo (bound-func (lambda (x)
-                                      (coerce x ',type))
-                                    (numeric-type-low num)))
-                    (hi (bound-func (lambda (x)
-                                      (coerce x ',type))
-                                    (numeric-type-high num))))
-               (specifier-type `(,',type ,(or lo '*) ,(or hi '*)))))
+            (defun ,aux-name (num)
+              ;; When converting a number to a float, the limits are
+              ;; the same.
+              (let* ((lo (bound-func (lambda (x)
+                                       (if (< x ,most-negative)
+                                           ,most-negative
+                                           (coerce x ',type)))
+                                     (numeric-type-low num)))
+                     (hi (bound-func (lambda (x)
+                                       (if (< ,most-positive x )
+                                           ,most-positive
+                                           (coerce x ',type)))
+                                     (numeric-type-high num))))
+                (specifier-type `(,',type ,(or lo '*) ,(or hi '*)))))
 
-           (defoptimizer (,fun derive-type) ((num))
-             (one-arg-derive-type num #',aux-name #',fun))))))
-  (frob %single-float single-float)
-  (frob %double-float double-float))
+            (defoptimizer (,fun derive-type) ((num))
+              (one-arg-derive-type num #',aux-name #',fun))))))
+  (frob %single-float single-float
+        most-negative-single-float most-positive-single-float)
+  (frob %double-float double-float
+        most-negative-double-float most-positive-double-float))
 ) ; PROGN
 
 ;;;; float contagion
