@@ -2048,7 +2048,7 @@
 ;; Reported by James Knight
 ;; Subject: [Sbcl-devel] AVER: "(EQ (SB-NAME (SC-SB (TN-SC TN))) 'REGISTERS)"
 ;; Date: Fri, 24 Mar 2006 19:30:00 -0500
-(with-test (:name :logbitp-vop :fails-on :x86)
+(with-test (:name :logbitp-vop)
   (compile nil
            '(lambda (days shift)
              (declare (type fixnum shift days))

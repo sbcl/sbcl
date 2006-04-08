@@ -1071,6 +1071,8 @@
     (inst jmp (if not-p :nc :c) target)))
 
 (define-vop (fast-logbitp/signed fast-conditional/signed)
+  (:args (x :scs (signed-reg signed-stack))
+         (y :scs (signed-reg)))
   (:translate %logbitp)
   (:generator 6
     (inst bt x y)
@@ -1084,6 +1086,8 @@
     (inst jmp (if not-p :nc :c) target)))
 
 (define-vop (fast-logbitp/unsigned fast-conditional/unsigned)
+  (:args (x :scs (unsigned-reg unsigned-stack))
+         (y :scs (unsigned-reg)))
   (:translate %logbitp)
   (:generator 6
     (inst bt x y)
