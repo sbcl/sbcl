@@ -18,12 +18,93 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "validate.h"
 #ifdef LISP_FEATURE_SB_THREAD
-#error "Define threading support functions"
-#else
+#include <sys/segment.h>
+#include <sys/sysi86.h>
+#endif
+
+#include "validate.h"
+
+#ifdef LISP_FEATURE_SB_THREAD
+pthread_mutex_t modify_ldt_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
+
+static int
+ldt_index_selector (int index) {
+  return index << 3 | 7;
+}
+
+static int
+find_free_ldt_index () {
+  struct ssd ssd;
+  int usage[65536/sizeof(int)];
+  int i;
+  FILE *fp;
+
+  memset(usage, 0, sizeof(usage));
+
+  fp = fopen("/proc/self/ldt", "r");
+
+  if (fp == NULL) {
+    lose("Couldn't open /proc/self/ldt");
+  }
+
+  while (fread(&ssd, sizeof(ssd), 1, fp) == 1) {
+    int index = ssd.sel >> 3;
+    if (index >= 65536) {
+      lose("segment selector index too large: %d", index);
+    }
+
+    usage[index / sizeof(int)] |= 1 << (index & (sizeof(int)-1));
+  }
+
+  fclose(fp);
+
+  /* Magic number 7 is the first LDT index that Solaris leaves free. */
+  for (i = 7; i < 65536; i++) {
+    if (~usage[i / sizeof(int)] & (1 << (i & (sizeof(int)-1)))) {
+      return i;
+    }
+  }
+
+  lose("Couldn't find a free LDT index");
+}
+
+static int
+install_segment (unsigned long start, unsigned long size) {
+    int selector;
+
+    thread_mutex_lock(&modify_ldt_lock);
+
+    selector = ldt_index_selector(find_free_ldt_index());
+    struct ssd ssd = { selector,
+                       start,
+                       size,
+                       0xf2,
+                       0x4};
+    // printf(" installing segment at %lx of size %lx\n", start, size);
+    if (sysi86(SI86DSCR, &ssd) < 0) {
+        lose("Couldn't install segment for thread-local data");
+    }
+
+    thread_mutex_unlock(&modify_ldt_lock);
+
+    return selector;
+}
+
 int arch_os_thread_init(struct thread *thread) {
   stack_t sigstack;
+
+#ifdef LISP_FEATURE_SB_THREAD
+  int sel = install_segment((unsigned long) thread, dynamic_values_bytes);
+
+  FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", sel));
+  __asm__ __volatile__ ("mov %0, %%fs" : : "r"(sel));
+
+  thread->tls_cookie = sel;
+  pthread_setspecific(specials,thread);
+#endif
+
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     /* Signal handlers are run on the control stack, so if it is exhausted
      * we had better use an alternate stack for whatever signal tells us
@@ -35,10 +116,27 @@ int arch_os_thread_init(struct thread *thread) {
 #endif
      return 1;                   /* success */
 }
+
 int arch_os_thread_cleanup(struct thread *thread) {
+#if defined(LISP_FEATURE_SB_THREAD)
+    int n = thread->tls_cookie;
+    struct ssd delete = { n, 0, 0, 0, 0};
+
+    /* Set the %%fs register back to 0 and free the the ldt
+     * by setting it to NULL.
+     */
+    FSHOW_SIGNAL((stderr, "/ TLS: Freeing LDT %x\n", n));
+
+    __asm__ __volatile__ ("mov %0, %%fs" : : "r"(0));
+
+    thread_mutex_lock(&modify_ldt_lock);
+    if (sysi86(SI86DSCR, &delete) < 0) {
+      lose("Couldn't remove segment\n");
+    }
+    thread_mutex_unlock(&modify_ldt_lock);
+#endif
     return 1;                   /* success */
 }
-#endif
 
 os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)

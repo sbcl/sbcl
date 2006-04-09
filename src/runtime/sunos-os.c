@@ -202,11 +202,6 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     void* fault_addr = (void*)info->si_addr;
-    if(info->si_code == 1)
-    {
-        perror("error: SEGV_MAPERR\n");
-        exit(1);
-    }
 
     if (!gencgc_handle_wp_violation(fault_addr))
          if(!handle_guard_page_triggered(context, fault_addr))
@@ -214,7 +209,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
             arrange_return_to_lisp_function(context,
                                             SymbolFunction(MEMORY_FAULT_ERROR));
 #else
-    interrupt_handle_now(signal, info, context);
+            interrupt_handle_now(signal, info, context);
 #endif
 }
 
@@ -240,6 +235,13 @@ os_install_interrupt_handlers()
 {
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
                                                  sigsegv_handler);
+
+#ifdef LISP_FEATURE_SB_THREAD
+    undoably_install_low_level_interrupt_handler(SIG_INTERRUPT_THREAD,
+                                                 interrupt_thread_handler);
+    undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
+                                                 sig_stop_for_gc_handler);
+#endif
 }
 
 char *
@@ -254,3 +256,44 @@ os_get_runtime_executable_path()
 
     return copied_string(path);
 }
+
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
+
+int futex_init(os_sem_t *semaphore)
+{
+    int ret;
+    FSHOW_SIGNAL((stderr, "/initializing semaphore @ %p\n", semaphore));
+    ret = sem_init(semaphore, 0, 0);
+    FSHOW_SIGNAL((stderr, "/sem_init said %d\n", ret));
+    return ret;
+}
+
+int futex_wait(os_sem_t *semaphore)
+{
+    int ret;
+    FSHOW_SIGNAL((stderr, "/waiting on semaphore @ %p\n", semaphore));
+    ret = sem_wait(semaphore);
+    FSHOW_SIGNAL((stderr, "/sem_wait said %d\n", ret));
+    return ret;
+}
+
+int futex_wake(os_sem_t *semaphore)
+{
+    int ret;
+    FSHOW_SIGNAL((stderr, "/waking semaphore @ %p\n", semaphore));
+    ret = sem_post(semaphore);
+    FSHOW_SIGNAL((stderr, "/sem_post said %d\n", ret));
+    return ret;
+}
+
+int futex_destroy(os_sem_t *semaphore)
+{
+    int ret;
+    FSHOW_SIGNAL((stderr, "/waking semaphore @ %p\n", semaphore));
+    ret = sem_destroy(semaphore);
+    FSHOW_SIGNAL((stderr, "/sem_destroy said %d\n", ret));
+    return ret;
+}
+
+#endif
+

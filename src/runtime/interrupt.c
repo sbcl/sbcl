@@ -920,13 +920,13 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
      */
 
     u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
-    
+
 #if defined(LISP_FEATURE_DARWIN)
     u32 *register_save_area = (u32 *)os_validate(0, 0x40);
 
     FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: preparing to go to function %x, sp: %x\n", function, sp));
     FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: context: %x, &context %x\n", context, &context));
-    
+
     /* 1. os_validate (malloc/mmap) register_save_block
      * 2. copy register state into register_save_block
      * 3. put a pointer to register_save_block in a register in the context
