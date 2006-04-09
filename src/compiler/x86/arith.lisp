@@ -614,7 +614,7 @@
                   ;; at the low five bits of the result.
                   (inst sar result (min 31 (- amount)))
                   ;; Fixnum correction.
-                  (inst and result #xfffffffc)))))))
+                  (inst and result (lognot fixnum-tag-mask))))))))
 
 (define-vop (fast-ash-left/fixnum=>fixnum)
   (:translate ash)
