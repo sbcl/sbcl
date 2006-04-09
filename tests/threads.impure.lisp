@@ -81,8 +81,8 @@
 (with-open-file (o "threads-foreign.c" :direction :output :if-exists :supersede)
   (format o "void loop_forever() { while(1) ; }~%"))
 (sb-ext:run-program
- "cc"
- (or #+(or linux freebsd) '("-shared" "-o" "threads-foreign.so" "threads-foreign.c")
+ #-sunos "cc" #+sunos "gcc"
+ (or #+(or linux freebsd sunos) '("-shared" "-o" "threads-foreign.so" "threads-foreign.c")
      #+darwin '("-dynamiclib" "-o" "threads-foreign.so" "threads-foreign.c")
      (error "Missing shared library compilation options for this platform"))
  :search t)
@@ -572,3 +572,43 @@
 |     (mp:make-process #'roomy)
 |     (mp:make-process #'roomy)))
 |#
+
+(with-test (:name (:condition-variable :notify-multiple)
+                  :fails-on (or :sb-lutex :x86-64))
+  (flet ((tester (notify-fun)
+           (let ((queue (make-waitqueue :name "queue"))
+                 (lock (make-mutex :name "lock"))
+                 (data nil))
+             (labels ((test (x)
+                        (loop
+                           (with-mutex (lock)
+                             (format t "condition-wait ~a~%" x)
+                             (condition-wait queue lock)
+                             (format t "woke up ~a~%" x)
+                             (push x data)))))
+               (let ((threads (loop for x from 1 to 10
+                                    collect
+                                    (let ((x x))
+                                      (sb-thread:make-thread (lambda ()
+                                                               (test x)))))))
+                 (sleep 5)
+                 (with-mutex (lock)
+                   (funcall notify-fun queue))
+                 (sleep 5)
+                 (mapcar #'terminate-thread threads)
+                 ;; Check that all threads woke up at least once
+                 (assert (= (length (remove-duplicates data)) 10)))))))
+    (tester (lambda (queue)
+              (format t "~&(condition-notify queue 10)~%")
+              (condition-notify queue 10)))
+    (tester (lambda (queue)
+              (format t "~&(condition-broadcast queue)~%")
+              (condition-broadcast queue)))))
+
+(with-test (:name (:mutex :finalization)
+            :fails-on :sb-lutex)
+  (let ((a nil))
+    (dotimes (i 500000)
+      (setf a (make-mutex)))))
+
+
