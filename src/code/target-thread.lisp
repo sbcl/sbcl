@@ -266,6 +266,8 @@ this mutex."
   (name nil :type (or null simple-string))
   #!+sb-lutex
   (lutex (make-lutex))
+  #!+sb-lutex
+  (waiters 0 :type fixnum)
   #!-sb-lutex
   (data nil))
 
@@ -311,6 +313,8 @@ time we reacquire MUTEX and return to the caller."
            ;; XXX do lutexes handle this?
            #!-sb-lutex
            (setf (waitqueue-data queue) me)
+           #!+sb-lutex
+           (incf (waitqueue-waiters queue))
            (release-mutex mutex)
            ;; Now we go to sleep using futex-wait.  If anyone else
            ;; manages to grab MUTEX and call CONDITION-NOTIFY during
@@ -328,7 +332,9 @@ time we reacquire MUTEX and return to the caller."
       ;; before returning.  Ideally, in the case of an unhandled signal,
       ;; we should do them before entering the debugger, but this is
       ;; better than nothing.
-      (get-mutex mutex value))))
+      (get-mutex mutex value)
+      #!+sb-lutex
+      (decf (waitqueue-waiters queue)))))
 
 (defun condition-notify (queue &optional (n 1))
   #!+sb-doc
@@ -336,8 +342,7 @@ time we reacquire MUTEX and return to the caller."
   #!-sb-thread (declare (ignore queue n))
   #!-sb-thread (error "Not supported in unithread builds.")
   #!+sb-thread
-  (declare (type (and fixnum (integer 1)) n)
-           #!+sb-lutex (ignorable n))
+  (declare (type (and fixnum (integer 1)) n))
   (/show0 "Entering CONDITION-NOTIFY")
   #!+sb-thread
   (progn
@@ -348,7 +353,8 @@ time we reacquire MUTEX and return to the caller."
     ;; is visible to all CPUs
     #!+sb-lutex
     (with-pinned-objects (queue (waitqueue-lutex queue))
-      (futex-wake (sb!vm::%lutex-semaphore (waitqueue-lutex queue))))
+     (dotimes (i (min n (waitqueue-waiters queue)))
+       (futex-wake (sb!vm::%lutex-semaphore (waitqueue-lutex queue)))))
     #!-sb-lutex
     (let ((me *current-thread*))
       (progn
@@ -418,8 +424,8 @@ this semaphore, then N of them is woken up."
   `(locally ,@body)
   #!+sb-thread
   `(without-interrupts
-    (with-mutex ((session-lock ,session))
-      ,@body)))
+     (with-mutex ((session-lock ,session))
+       ,@body)))
 
 (defun new-session ()
   (make-session :threads (list *current-thread*)
@@ -653,10 +659,13 @@ returns the thread exits."
 ;; Called from the signal handler.
 (defun run-interruption ()
   (in-interruption ()
-   (let ((interruption (with-interruptions-lock (*current-thread*)
-                         (pop (thread-interruptions *current-thread*)))))
-     (with-interrupts
-       (funcall interruption)))))
+    (loop
+       (let ((interruption (with-interruptions-lock (*current-thread*)
+                             (pop (thread-interruptions *current-thread*)))))
+         (if interruption
+             (with-interrupts
+               (funcall interruption))
+             (return))))))
 
 ;; The order of interrupt execution is peculiar. If thread A
 ;; interrupts thread B with I1, I2 and B for some reason receives I1
