@@ -161,7 +161,7 @@
           (process-vector `(array-dimension ,into 0))))
       (when found-vector-p
         (bindings `(length (min ,@(vector-lengths))))
-        (tests `(= index length)))
+        (tests `(>= index length)))
       `(do (,@(bindings))
            ((or ,@(tests)) ,result)
          (declare ,@(declarations))
