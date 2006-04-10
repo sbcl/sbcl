@@ -1,3 +1,4 @@
+
 ;;;; miscellaneous tests of thread stuff
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -573,8 +574,7 @@
 |     (mp:make-process #'roomy)))
 |#
 
-(with-test (:name (:condition-variable :notify-multiple)
-                  :fails-on :x86-64)
+(with-test (:name (:condition-variable :notify-multiple))
   (flet ((tester (notify-fun)
            (let ((queue (make-waitqueue :name "queue"))
                  (lock (make-mutex :name "lock"))
