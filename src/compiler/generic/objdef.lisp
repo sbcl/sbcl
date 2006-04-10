@@ -400,13 +400,10 @@
                           :lowtag other-pointer-lowtag
                           :widetag lutex-widetag
                           :alloc-trans %make-lutex)
-  (semaphore :ref-trans %lutex-semaphore
-             :ref-known (flushable)
-             :set-trans (setf %lutex-semaphore)
-             :set-known (unsafe)
-             :init :arg
-             :type sb!sys:system-area-pointer
-             :c-type "os_sem_t *"))
+  (mutex :c-type "pthread_mutex_t *"
+         :length 1)
+  (condition-variable :c-type "pthread_cond_t *"
+                      :length 1))
 
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that

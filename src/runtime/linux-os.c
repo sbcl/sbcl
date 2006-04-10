@@ -36,11 +36,7 @@
 #include "genesis/fdefn.h"
 
 #ifdef LISP_FEATURE_SB_THREAD
-#ifdef LISP_FEATURE_SB_LUTEX
-#include "genesis/lutex.h"
-#else
 #include "genesis/futex.h"
-#endif
 #endif
 
 #include <sys/socket.h>
@@ -69,34 +65,7 @@ int personality (unsigned long);
 
 size_t os_vm_page_size;
 
-#if defined(LISP_FEATURE_SB_THREAD)
-#if defined(LISP_FEATURE_SB_LUTEX)
-
-int futex_init(os_sem_t *semaphore)
-{
-    FSHOW_SIGNAL((stderr, "/initializing semaphore @ %p\n", semaphore));
-    return sem_init(semaphore, 0, 1);
-}
-
-int futex_wait(os_sem_t *semaphore)
-{
-    FSHOW_SIGNAL((stderr, "/waiting on semaphore @ %p\n", semaphore));
-    return sem_wait(semaphore);
-}
-
-int futex_wake(os_sem_t *semaphore)
-{
-    FSHOW_SIGNAL((stderr, "/waking semaphore @ %p, *semaphore=%p\n", semaphore, (void*)*semaphore));
-    return sem_post(semaphore);
-}
-
-int futex_destroy(os_sem_t *semaphore)
-{
-    FSHOW_SIGNAL((stderr, "/destroying semaphore @ %p\n", semaphore));
-    return sem_destroy(semaphore);
-}
-
-#else
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_LUTEX)
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <errno.h>
@@ -127,7 +96,6 @@ futex_wake(int *lock_word, int n)
 {
     return sys_futex(lock_word,FUTEX_WAKE,n,0);
 }
-#endif
 #endif
 
 

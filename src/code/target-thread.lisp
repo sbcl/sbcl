@@ -100,36 +100,50 @@ in future versions."
   (define-alien-routine "block_blockable_signals"
       void)
 
-  ;; njf's attempt at POSIX semaphores
   #!+sb-lutex
   (progn
-    (declaim (inline futex-init futex-wait futex-wake))
+    (declaim (inline %lutex-init %lutex-wait %lutex-wake
+                     %lutex-lock %lutex-unlock))
 
-    (sb!alien:define-alien-routine "futex_init"
-        int (word system-area-pointer))
+    (sb!alien:define-alien-routine ("lutex_init" %lutex-init)
+        int (lutex unsigned-long))
 
-    (sb!alien:define-alien-routine "futex_wait"
-        int (word system-area-pointer))
+    (sb!alien:define-alien-routine ("lutex_wait" %lutex-wait)
+        int (lutex unsigned-long))
 
-    (sb!alien:define-alien-routine "futex_wake"
-        int (word system-area-pointer))
+    (sb!alien:define-alien-routine ("lutex_wake" %lutex-wake)
+        int (lutex unsigned-long) (n int))
+
+    (sb!alien:define-alien-routine ("lutex_lock" %lutex-lock)
+        int (lutex unsigned-long))
+
+    (sb!alien:define-alien-routine ("lutex_unlock" %lutex-unlock)
+        int (lutex unsigned-long))
 
     ;; FIXME: still need to figure out how finalization works...
-    (sb!alien:define-alien-routine "futex_destroy"
-        int (word system-area-pointer))
+    (sb!alien:define-alien-routine ("lutex_destroy" %lutex-destroy)
+        int (lutex unsigned-long))
+
+    ;; FIXME: Defining a whole bunch of alien-type machinery just for
+    ;; passing primitive lutex objects directly to foreign functions
+    ;; doesn't seem like fun right now. So instead we just manually
+    ;; pin the lutex, get its address, and let the callee untag it.
+    (defmacro with-lutex-address ((name lutex) &body body)
+      `(let ((,name ,lutex))
+         (with-pinned-objects (,name)
+           (let ((,name (sb!kernel:get-lisp-obj-address ,name)))
+             ,@body))))
 
     (defun make-lutex ()
       (/show0 "Entering MAKE-LUTEX")
-      (let ((semaphore-pointer (sb!sys:allocate-system-memory sb!thread::semaphore-length)))
-        (declare (type sb!sys:system-area-pointer semaphore-pointer))
-        (futex-init semaphore-pointer)
-        ;; FIXME: need to register a finalizer here, but the finalizer
-        ;; code depends on lutexes...
-        (let ((lutex (sb!vm::%make-lutex semaphore-pointer)))
-          (/show0 "LUTEX=..")
-          (/hexstr lutex)
-          lutex)))
-    )
+      ;; FIXME: need to register a finalizer here, but the finalizer
+      ;; code depends on lutexes...
+      (let ((lutex (sb!vm::%make-lutex)))
+        (/show0 "LUTEX=..")
+        (/hexstr lutex)
+        (with-lutex-address (lutex lutex)
+          (%lutex-init lutex))
+        lutex)))
 
   #!-sb-lutex
   (progn
@@ -236,8 +250,8 @@ until it is available"
        (return t))
      (unless wait-p (return nil))
      #!+sb-lutex
-     (with-pinned-objects (mutex (mutex-lutex mutex))
-       (futex-wait (sb!vm::%lutex-semaphore (mutex-lutex mutex))))
+     (with-lutex-address (lutex (mutex-lutex mutex))
+       (%lutex-lock lutex))
      #!-sb-lutex
      (with-pinned-objects (mutex old)
        (futex-wait (mutex-value-address mutex)
@@ -253,8 +267,8 @@ this mutex."
   #!+sb-thread
   (progn
     #!+sb-lutex
-    (with-pinned-objects (mutex (mutex-lutex mutex))
-      (futex-wake (sb!vm::%lutex-semaphore (mutex-lutex mutex))))
+    (with-lutex-address (lutex (mutex-lutex mutex))
+      (%lutex-unlock lutex))
     #!-sb-lutex
     (futex-wake (mutex-value-address mutex) 1)))
 
@@ -266,8 +280,6 @@ this mutex."
   (name nil :type (or null simple-string))
   #!+sb-lutex
   (lutex (make-lutex))
-  #!+sb-lutex
-  (waiters 0 :type fixnum)
   #!-sb-lutex
   (data nil))
 
@@ -313,8 +325,6 @@ time we reacquire MUTEX and return to the caller."
            ;; XXX do lutexes handle this?
            #!-sb-lutex
            (setf (waitqueue-data queue) me)
-           #!+sb-lutex
-           (incf (waitqueue-waiters queue))
            (release-mutex mutex)
            ;; Now we go to sleep using futex-wait.  If anyone else
            ;; manages to grab MUTEX and call CONDITION-NOTIFY during
@@ -322,8 +332,8 @@ time we reacquire MUTEX and return to the caller."
            ;; futex-wait returns immediately instead of sleeping.
            ;; Ergo, no lost wakeup
            #!+sb-lutex
-           (with-pinned-objects (queue (waitqueue-lutex queue))
-             (futex-wait (sb!vm::%lutex-semaphore (waitqueue-lutex queue))))
+           (with-lutex-address (lutex (waitqueue-lutex queue))
+             (%lutex-wait lutex))
            #!-sb-lutex
            (with-pinned-objects (queue me)
              (futex-wait (waitqueue-data-address queue)
@@ -332,9 +342,7 @@ time we reacquire MUTEX and return to the caller."
       ;; before returning.  Ideally, in the case of an unhandled signal,
       ;; we should do them before entering the debugger, but this is
       ;; better than nothing.
-      (get-mutex mutex value)
-      #!+sb-lutex
-      (decf (waitqueue-waiters queue)))))
+      (get-mutex mutex value))))
 
 (defun condition-notify (queue &optional (n 1))
   #!+sb-doc
@@ -346,15 +354,14 @@ time we reacquire MUTEX and return to the caller."
   (/show0 "Entering CONDITION-NOTIFY")
   #!+sb-thread
   (progn
+    #!+sb-lutex
+    (with-lutex-address (lutex (waitqueue-lutex queue))
+      (%lutex-wake lutex n))
     ;; no problem if >1 thread notifies during the comment in
     ;; condition-wait: as long as the value in queue-data isn't the
     ;; waiting thread's id, it matters not what it is
     ;; XXX we should do something to ensure that the result of this setf
     ;; is visible to all CPUs
-    #!+sb-lutex
-    (with-pinned-objects (queue (waitqueue-lutex queue))
-     (dotimes (i (min n (waitqueue-waiters queue)))
-       (futex-wake (sb!vm::%lutex-semaphore (waitqueue-lutex queue)))))
     #!-sb-lutex
     (let ((me *current-thread*))
       (progn
@@ -365,7 +372,12 @@ time we reacquire MUTEX and return to the caller."
 (defun condition-broadcast (queue)
   #!+sb-doc
   "Notify all threads waiting on QUEUE."
-  (condition-notify queue most-positive-fixnum))
+  (condition-notify queue
+                    #+sb-lutex -1
+                    ;; On a 64-bit platform truncating M-P-F to an int results
+                    ;; in -1, which wakes up only one thread.
+                    #-sb-lutex (ldb (byte 29 0)
+                                    most-positive-fixnum)))
 
 ;;;; semaphores
 
@@ -459,12 +471,11 @@ this semaphore, then N of them is woken up."
 (defun handle-thread-exit (thread)
   (with-mutex (*all-threads-lock*)
     (/show0 "HANDLING THREAD EXIT")
-      #!+sb-lutex
+    #!+sb-lutex
     (when (thread-interruptions-lock thread)
       (/show0 "FREEING MUTEX LUTEX")
-      (with-pinned-objects ((thread-interruptions-lock thread))
-        (futex-destroy (sb!vm::%lutex-semaphore
-                        (mutex-lutex (thread-interruptions-lock thread))))))
+      (with-lutex-address (lutex (mutex-lutex (thread-interruptions-lock thread)))
+        (%lutex-destroy lutex)))
     (setq *all-threads* (delete thread *all-threads*)))
   (when *session*
     (%delete-thread-from-session thread *session*)))
@@ -550,7 +561,7 @@ have the foreground next."
                (sb!unix::unix-setsid)
                (let* ((sb!impl::*stdin*
                        (make-fd-stream in :input t :buffering :line
-                                              :dual-channel-p t))
+                                       :dual-channel-p t))
                       (sb!impl::*stdout*
                        (make-fd-stream out :output t :buffering :line
                                               :dual-channel-p t))

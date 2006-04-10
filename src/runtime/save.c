@@ -35,7 +35,6 @@
 #include "genesis/symbol.h"
 
 #ifdef LISP_FEATURE_SB_LUTEX
-#include "genesis/sap.h"
 #include "genesis/lutex.h"
 #endif
 
@@ -102,12 +101,7 @@ lutex_scan_action(lispobj *obj)
         lutex_addresses = realloc(lutex_addresses, max_lutexes * sizeof(void *));
     }
 
-    {
-        struct lutex *lutex = (struct lutex *) obj;
-        struct sap *semaphore = (struct sap *) native_pointer(lutex->semaphore);
-        lutex_addresses[n_lutexes] = semaphore;
-        n_lutexes++;
-    }
+    lutex_addresses[n_lutexes++] = obj;
 
     return (*sizetab[widetag_of(*obj)])(obj);
 }

@@ -574,7 +574,7 @@
 |#
 
 (with-test (:name (:condition-variable :notify-multiple)
-                  :fails-on (or :sb-lutex :x86-64))
+                  :fails-on :x86-64)
   (flet ((tester (notify-fun)
            (let ((queue (make-waitqueue :name "queue"))
                  (lock (make-mutex :name "lock"))
@@ -583,8 +583,10 @@
                         (loop
                            (with-mutex (lock)
                              (format t "condition-wait ~a~%" x)
+                             (force-output)
                              (condition-wait queue lock)
                              (format t "woke up ~a~%" x)
+                             (force-output)
                              (push x data)))))
                (let ((threads (loop for x from 1 to 10
                                     collect
@@ -600,9 +602,11 @@
                  (assert (= (length (remove-duplicates data)) 10)))))))
     (tester (lambda (queue)
               (format t "~&(condition-notify queue 10)~%")
+              (force-output)
               (condition-notify queue 10)))
     (tester (lambda (queue)
               (format t "~&(condition-broadcast queue)~%")
+              (force-output)
               (condition-broadcast queue)))))
 
 (with-test (:name (:mutex :finalization)
@@ -610,5 +614,7 @@
   (let ((a nil))
     (dotimes (i 500000)
       (setf a (make-mutex)))))
+
+
 
 

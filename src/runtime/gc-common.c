@@ -1483,18 +1483,16 @@ size_vector_complex_long_float(lispobj *where)
 static long
 scav_lutex(lispobj *where, lispobj object)
 {
-    /* scavenge the sap */
-    scavenge(where + 1, 1);
-
-    return sizeof(struct lutex)/sizeof(lispobj);
+    return CEILING(sizeof(struct lutex)/sizeof(lispobj), 2);
 }
 
 static lispobj
 trans_lutex(lispobj object)
 {
     lispobj copied;
+    size_t words = CEILING(sizeof(struct lutex)/sizeof(lispobj), 2);
     gc_assert(is_lisp_pointer(object));
-    copied = copy_object(object, sizeof(struct lutex)/sizeof(lispobj));
+    copied = copy_object(object, words);
 
     return copied;
 }
@@ -1502,7 +1500,7 @@ trans_lutex(lispobj object)
 static long
 size_lutex(lispobj *where)
 {
-    return sizeof(struct lutex)/sizeof(lispobj);
+    return CEILING(sizeof(struct lutex)/sizeof(lispobj), 2);
 }
 #endif
 

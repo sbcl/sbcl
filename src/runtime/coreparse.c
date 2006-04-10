@@ -298,7 +298,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
                 size_t n_lutexes = *ptr;
                 size_t fdoffset = (*(ptr + 1) + 1) * (os_vm_page_size);
                 size_t data_length = n_lutexes * sizeof(struct sap *);
-                struct sap **lutexes_to_resurrect = malloc(data_length);
+                struct lutex **lutexes_to_resurrect = malloc(data_length);
                 long bytes_read;
 
                 lseek(fd, fdoffset + file_offset, SEEK_SET);
@@ -314,11 +314,10 @@ load_core_file(char *file, os_vm_offset_t file_offset)
                     int i;
 
                     for (i=0; i<n_lutexes; ++i) {
-                        struct sap *lutex = lutexes_to_resurrect[i];
+                        struct lutex *lutex = lutexes_to_resurrect[i];
 
                         FSHOW((stderr, "re-init'ing lutex @ %p\n", lutex));
-                        lutex->pointer = malloc(sizeof(os_sem_t));
-                        futex_init((os_sem_t *)lutex->pointer);
+                        lutex_init(lutex);
                     }
 
                     free(lutexes_to_resurrect);
