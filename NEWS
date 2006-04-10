@@ -9,6 +9,8 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
     ** better backtrace support (thanks to Alastair Bridgewater)
   * new feature: command line options --no-sysinit, --no-userinit to
     inhibit loading the corresponding init files
+  * minor incompatible change: SIGPIPE is ignored and "Broken pipe"
+    error is signalled instead (thanks to François-René Rideau)
   * bug fix: LISTEN sometimes returned T even in cases where no data was
     immediately available from the stream
   * fixed bug: types of the last two arguments to SET-SYNTAX-FROM-CHAR

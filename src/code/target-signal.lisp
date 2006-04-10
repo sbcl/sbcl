@@ -125,7 +125,6 @@
 (define-signal-handler sigsegv-handler "segmentation violation")
 #!-linux
 (define-signal-handler sigsys-handler "bad argument to a system call")
-(define-signal-handler sigpipe-handler "SIGPIPE")
 
 (defun sigalrm-handler (signal info context)
   (declare (ignore signal info context))
@@ -157,7 +156,7 @@
   (enable-interrupt sigsegv #'sigsegv-handler)
   #!-linux
   (enable-interrupt sigsys #'sigsys-handler)
-  (enable-interrupt sigpipe #'sigpipe-handler)
+  (ignore-interrupt sigpipe)
   (enable-interrupt sigalrm #'sigalrm-handler)
   (sb!unix::reset-signal-mask)
   (values))
