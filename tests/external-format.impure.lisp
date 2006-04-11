@@ -255,4 +255,30 @@
       (write-string string s)
       (assert (= (file-position s) (+ position string-length))))))
 
+
+;;; See sbcl-devel "Subject: Bug in FILE-POSITION on UTF-8-encoded files"
+;;; by Lutz Euler on 2006-03-05 for more details.
+(with-test (:name (:file-position :utf-8)
+                  :fails-on :sbcl)
+  (let ((path "external-format-test.txt"))
+    (with-open-file (s path
+                       :direction :output
+                       :if-exists :supersede
+                       :element-type '(unsigned-byte 8))
+      ;; Write #\*, encoded in UTF-8, to the file.
+      (write-byte 42 s)
+      ;; Append #\adiaeresis, encoded in UTF-8, to the file.
+      (write-sequence '(195 164) s))
+    (with-open-file (s path :external-format :utf-8)
+      (read-char s)
+      (let ((pos (file-position s))
+            (char (read-char s)))
+        (format t "read character with code ~a successfully from file position ~a~%"
+                (char-code char) pos)
+        (file-position s pos)
+        (format t "set file position back to ~a, trying to read-char again~%" pos)
+        (let ((new-char (read-char s)))
+          (assert (char= char new-char)))))
+    (values)))
+
 ;;;; success
