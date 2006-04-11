@@ -27,6 +27,10 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
     (SETF DOCUMENTATION); only find and set documentation for
     structure names for the STRUCTURE doc-type.  (suggested by Gary
     King)
+  * improvements to the Solaris/x86 port:
+    ** works on Solaris 11/Solaris Express
+    ** floating-point exception handling support
+    ** support for the breakpoint-based TRACE :ENCAPSULATE NIL facility
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** REMOVE-METHOD returns its generic function argument even when
        the method is not one of the generic functions' methods.
