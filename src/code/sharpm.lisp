@@ -311,14 +311,9 @@
 ;;;; conditional compilation: the #+ and #- readmacros
 
 (flet ((guts (stream not-p)
-         (unless (if (handler-case
-                         (let ((*package* *keyword-package*)
-                               (*read-suppress* nil))
-                           (featurep (read stream t nil t)))
-                       (reader-package-error
-                        (condition)
-                        (declare (ignore condition))
-                        nil))
+         (unless (if (let ((*package* *keyword-package*)
+                           (*read-suppress* nil))
+                       (featurep (read stream t nil t)))
                      (not not-p)
                      not-p)
            (let ((*read-suppress* t))

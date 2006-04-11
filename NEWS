@@ -7,6 +7,8 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
     ** run-program is implemented (thanks to Mike Thomas)
     ** sockets support (thanks to Timothy Ritchey)
     ** better backtrace support (thanks to Alastair Bridgewater)
+  * minor incompatible change: The reader no longer ignores errors
+    regarding non-existent packages in #+ and #- feature tests.
   * new feature: command line options --no-sysinit, --no-userinit to
     inhibit loading the corresponding init files
   * minor incompatible change: SIGPIPE is ignored and "Broken pipe"
