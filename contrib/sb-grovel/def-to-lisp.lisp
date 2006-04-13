@@ -17,7 +17,7 @@
   (format *default-c-stream* "~A~{ ~A~}~%" (first args) (rest args)))
 
 (defun printf (formatter &rest args)
-  "Emit C code to printf the quoted code, via FORMAT.
+  "Emit C code to fprintf the quoted code, via FORMAT.
 The first argument is the C string that should be passed to
 printf.
 
@@ -33,7 +33,7 @@ code:
          printf-arg-1 printf-arg-2)"
   (let ((*print-pretty* nil))
     (apply #'format *default-c-stream*
-           "    printf (\"~@?\\n\"~@{, ~A~});~%"
+           "    fprintf (out, \"~@?\\n\"~@{, ~A~});~%"
            (c-escape formatter)
            args)))
 
@@ -80,7 +80,17 @@ code:
           do (format stream "#include <~A>~%" i))
     (as-c "#define SIGNEDP(x) (((x)-1)<0)")
     (as-c "#define SIGNED_(x) (SIGNEDP(x)?\"\":\"un\")")
-    (as-c "int main() {")
+    (as-c "int main(int argc, char *argv[]) {")
+    (as-c "    FILE *out;")
+    (as-c "    if (argc != 2) {")
+    (as-c "        printf(\"Invalid argcount!\");")
+    (as-c "        return 1;")
+    (as-c "    } else")
+    (as-c "        out = fopen(argv[1], \"w\");")
+    (as-c "    if (!out) {")
+    (as-c "        printf(\"Error opening output file!\");")
+    (as-c "        return 1;")
+    (as-c "    }")
     (printf "(cl:in-package #:~A)" package-name)
     (printf "(cl:eval-when (:compile-toplevel)")
     (printf "  (cl:defparameter *integer-sizes* (cl:make-hash-table))")
@@ -164,21 +174,28 @@ code:
     (terpri)
     (funcall (intern "C-CONSTANTS-EXTRACT" (find-package "SB-GROVEL"))
              filename tmp-c-source (constants-package component))
-    (let ((code (run-shell-command "gcc ~A -o ~S ~S"
-                                   (if (sb-ext:posix-getenv "EXTRA_CFLAGS")
-                                       (sb-ext:posix-getenv "EXTRA_CFLAGS")
-                                       "")
-                                   (namestring tmp-a-dot-out)
-                                   (namestring tmp-c-source))))
+    (let ((code (sb-ext:process-exit-code
+                 (sb-ext:run-program "gcc"
+                                     (append
+                                      (sb-ext:posix-getenv "EXTRA_CFLAGS")
+                                      (list "-o"
+                                            (namestring tmp-a-dot-out)
+                                            (namestring tmp-c-source)))
+                                     :search t
+                                     :input nil
+                                     :output *trace-output*))))
       (unless (= code 0)
         (case (operation-on-failure op)
           (:warn (warn "~@<C compiler failure when performing ~A on ~A.~@:>"
                        op component))
           (:error
            (error 'c-compile-failed :operation op :component component)))))
-    (let ((code (run-shell-command "~A >~A"
-                                   (namestring tmp-a-dot-out)
-                                   (namestring tmp-constants))))
+    (let ((code (sb-ext:process-exit-code
+                 (sb-ext:run-program (namestring tmp-a-dot-out)
+                                     (list (namestring tmp-constants))
+                                     :search nil
+                                     :input nil
+                                     :output *trace-output*))))
       (unless (= code 0)
         (case (operation-on-failure op)
           (:warn (warn "~@<a.out failure when performing ~A on ~A.~@:>"

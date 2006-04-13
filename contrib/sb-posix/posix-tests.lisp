@@ -14,11 +14,15 @@
 (defvar *this-file* *load-truename*)
 
 (eval-when (:compile-toplevel :load-toplevel)
-  (defconstant +mode-rwx-all+ (logior sb-posix::s-irusr sb-posix::s-iwusr sb-posix::s-ixusr
-                                      sb-posix::s-irgrp sb-posix::s-iwgrp sb-posix::s-ixgrp
-                                      sb-posix::s-iroth sb-posix::s-iwoth sb-posix::s-ixoth)))
+  (defconstant +mode-rwx-all+
+    (logior sb-posix::s-irusr sb-posix::s-iwusr sb-posix::s-ixusr
+            #-win32
+            (logior
+             sb-posix::s-irgrp sb-posix::s-iwgrp sb-posix::s-ixgrp            
+             sb-posix::s-iroth sb-posix::s-iwoth sb-posix::s-ixoth))))
 
 (defmacro define-eacces-test (name form &rest values)
+  #-win32
   `(deftest ,name
     (block ,name
       (when (= (sb-posix:geteuid) 0)
@@ -31,19 +35,19 @@
   0)
 
 (deftest chdir.2
-  (sb-posix:chdir (namestring *test-directory*))
+    (sb-posix:chdir (namestring *test-directory*))
   0)
 
 (deftest chdir.3
-  (sb-posix:chdir "/")
+    (sb-posix:chdir "/")
   0)
 
 (deftest chdir.4
-  (sb-posix:chdir #p"/")
+    (sb-posix:chdir #p"/")
   0)
 
 (deftest chdir.5
-  (sb-posix:chdir *current-directory*)
+    (sb-posix:chdir *current-directory*)
   0)
 
 (deftest chdir.6
@@ -71,7 +75,10 @@
       (sb-posix:chdir *this-file*)
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
-  #.sb-posix::enotdir)
+  #-win32
+  #.sb-posix:enotdir
+  #+win32
+  #.sb-posix:einval)
 
 (deftest mkdir.1
   (let ((dne (make-pathname :directory '(:relative "mkdir.does-not-exist.1"))))
@@ -98,10 +105,13 @@
 
 (deftest mkdir.error.2
   (handler-case
-      (sb-posix:mkdir "/" 0)
+      (sb-posix:mkdir #-win32 "/" #+win32 "C:/" 0)
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
-  #.sb-posix::eexist)
+  #-win32
+  #.sb-posix::eexist
+  #+win32
+  #.sb-posix:eacces)
 
 (define-eacces-test mkdir.error.3
   (let* ((dir (merge-pathnames
@@ -147,14 +157,20 @@
       (sb-posix:rmdir *this-file*)
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
-  #.sb-posix::enotdir)
+  #-win32
+  #.sb-posix::enotdir
+  #+win32
+  #.sb-posix::einval)
 
 (deftest rmdir.error.3
   (handler-case
-      (sb-posix:rmdir "/")
+      (sb-posix:rmdir #-win32 "/" #+win32 "C:/")
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
-  #.sb-posix::ebusy)
+  #-win32
+  #.sb-posix::ebusy
+  #+win32
+  #.sb-posix::eacces)
 
 (deftest rmdir.error.4
   (let* ((dir (ensure-directories-exist
@@ -162,7 +178,7 @@
                 (make-pathname :directory '(:relative "rmdir.error.4"))
                 *test-directory*)))
          (file (make-pathname :name "foo" :defaults dir)))
-    (with-open-file (s file :direction :output)
+    (with-open-file (s file :direction :output :if-exists nil)
       (write "" :stream s))
     (handler-case
         (sb-posix:rmdir dir)
@@ -204,6 +220,7 @@
     (logand mode (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec)))
   #.(logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
 
+#-win32
 (deftest stat.2
   (let* ((stat (sb-posix:stat "/"))
          (mode (sb-posix::stat-mode stat)))
@@ -223,6 +240,7 @@
     (< (- atime unix-now) 10))
   t)
 
+#-win32
 (deftest stat.4
   (let* ((stat (sb-posix:stat (make-pathname :directory '(:absolute :up))))
          (mode (sb-posix::stat-mode stat)))
@@ -304,11 +322,13 @@
     (sb-posix:s-isfifo mode))
   nil)
 
+#-win32
 (deftest stat-mode.6
   (with-stat-mode (mode *test-directory*)
     (sb-posix:s-issock mode))
   nil)
 
+#-win32
 (deftest stat-mode.7
   (let ((link-pathname (make-pathname :name "stat-mode.7"
                                       :defaults *test-directory*)))
@@ -332,11 +352,14 @@
       (ignore-errors (delete-file pathname))))
   t)
 
+(defvar *test-directory* (merge-pathnames "test-lab/"))
 ;;; see comment in filename's designator definition, in macros.lisp
 (deftest filename-designator.1
   (let ((file (format nil "~A/[foo].txt" (namestring *test-directory*))))
     ;; creat() with a string as argument
-    (sb-posix:creat file 0)
+    (let ((fd (sb-posix:creat file sb-posix:s-iwrite)))
+      #+win32
+      (sb-posix:close fd))
     ;; if this test fails, it will probably be with
     ;; "System call error 2 (No such file or directory)"
     (let ((*default-pathname-defaults* *test-directory*))
@@ -344,18 +367,26 @@
   0)
 
 (deftest open.1
-  (let ((fd (sb-posix:open *test-directory* sb-posix::o-rdonly)))
-    (ignore-errors (sb-posix:close fd))
-    (< fd 0))
+    (let ((name (merge-pathnames "open-test.txt" *test-directory*)))
+      (unwind-protect
+           (progn
+             (sb-posix:close (sb-posix:creat name sb-posix:s-iwrite))
+             (let ((fd (sb-posix:open name sb-posix::o-rdonly)))
+               (ignore-errors (sb-posix:close fd))
+               (< fd 0)))
+        (ignore-errors (sb-posix:unlink name))))
   nil)
 
 (deftest open.error.1
   (handler-case (sb-posix:open *test-directory* sb-posix::o-wronly)
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
-  #.sb-posix::eisdir)
+  #-win32
+  #.sb-posix::eisdir
+  #+win32
+  #.sb-posix:eacces)
 
-#-(and x86-64 linux)
+#-(or (and x86-64 linux) win32)
 (deftest fcntl.1
   (let ((fd (sb-posix:open "/dev/null" sb-posix::o-nonblock)))
     (= (sb-posix:fcntl fd sb-posix::f-getfl) sb-posix::o-nonblock))
@@ -388,11 +419,13 @@
       (sb-posix:closedir dir)))
   t)
 
+#-win32
 (deftest pwent.1
   ;; make sure that we found something
   (not (sb-posix:getpwuid 0))
   nil)
 
+#-win32
 (deftest pwent.2
   ;; make sure that we found something
   (not (sb-posix:getpwnam "root"))

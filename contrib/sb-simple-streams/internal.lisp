@@ -332,7 +332,7 @@
                     (tagbody
                      again
                        ;; Avoid CMUCL gengc write barrier
-                       (do ((i start (+ i (the fixnum #.(sb-posix:getpagesize)))))
+                       (do ((i start (+ i #.(sb-posix:getpagesize))))
                            ((>= i end))
                          (declare (type fixnum i))
                          (setf (bref buffer i) 0))

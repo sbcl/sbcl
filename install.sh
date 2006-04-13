@@ -48,10 +48,20 @@ ensure_dirs $BUILD_ROOT$INSTALL_ROOT $BUILD_ROOT$INSTALL_ROOT/bin \
     $BUILD_ROOT$SBCL_HOME \
     $BUILD_ROOT$SBCL_HOME/site-systems
 
+if [ "$OSTYPE" = "msys" ]
+then 
+    RUNTIME=sbcl.exe
+    OLD_RUNTIME=sbcl_old.exe
+else
+    RUNTIME=sbcl
+    OLD_RUNTIME=sbcl.old
+fi
+
 # move old versions out of the way.  Safer than copying: don't want to
 # break any running instances that have these files mapped
-test -f $BUILD_ROOT$INSTALL_ROOT/bin/sbcl && \
-    mv $BUILD_ROOT$INSTALL_ROOT/bin/sbcl $BUILD_ROOT$INSTALL_ROOT/bin/sbcl.old
+test -f $BUILD_ROOT$INSTALL_ROOT/bin/$RUNTIME && \
+ mv $BUILD_ROOT$INSTALL_ROOT/bin/$RUNTIME \
+    $BUILD_ROOT$INSTALL_ROOT/bin/$OLD_RUNTIME
 test -f $BUILD_ROOT$SBCL_HOME/sbcl.core && \
     mv $BUILD_ROOT$SBCL_HOME/sbcl.core $BUILD_ROOT$SBCL_HOME/sbcl.core.old
 

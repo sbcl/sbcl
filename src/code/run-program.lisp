@@ -45,10 +45,12 @@
 ;;;; which (at least in sbcl-0.6.10 on Red Hat Linux 6.2) is not
 ;;;; visible at GENESIS time.
 
-#-win32 (define-alien-routine wrapped-environ (* c-string))
-#-win32 (defun posix-environ ()
-  "Return the Unix environment (\"man environ\") as a list of SIMPLE-STRINGs."
-  (c-strings->string-list (wrapped-environ)))
+#-win32
+(progn
+  (define-alien-routine wrapped-environ (* c-string))
+  (defun posix-environ ()
+    "Return the Unix environment (\"man environ\") as a list of SIMPLE-STRINGs."
+    (c-strings->string-list (wrapped-environ))))
 
 ;#+win32 (sb-alien:define-alien-routine msvcrt-environ (* c-string))
 
@@ -157,7 +159,6 @@
     (sb-thread:with-mutex (*active-processes-lock*)
       ,@body)))
 
-
 (defstruct (process (:copier nil))
   pid                 ; PID of child process
   %status             ; either :RUNNING, :STOPPED, :EXITED, or :SIGNALED
@@ -171,15 +172,13 @@
   plist               ; a place for clients to stash things
   cookie)             ; list of the number of pipes from the subproc
 
-
-
-#-win32 (defmethod print-object ((process process) stream)
+(defmethod print-object ((process process) stream)
   (print-unreadable-object (process stream :type t)
-    (format stream
-            "~W ~S"
-            (process-pid process)
-            (process-status process)))
-  process)
+    (let ((status (process-status process)))
+     (if (eq :exited status)
+         (format stream "~S ~S" status (process-exit-code process))
+         (format stream "~S ~S" (process-pid process) status)))
+    process))
 
 #+sb-doc
 (setf (documentation 'process-p 'function)
@@ -188,12 +187,12 @@
 #+sb-doc
 (setf (documentation 'process-pid 'function) "The pid of the child process.")
 
-#-win32
 (defun process-status (process)
   #+sb-doc
   "Return the current status of PROCESS.  The result is one of :RUNNING,
    :STOPPED, :EXITED, or :SIGNALED."
-  (get-processes-status-changes)
+  #-win32
+  (get-processes-status-changes)  
   (process-%status process))
 
 #+sb-doc
@@ -324,11 +323,13 @@ The function is called with PROCESS as its only argument.")
   process)
 
 ;;; the handler for SIGCHLD signals that RUN-PROGRAM establishes
-#-win32 (defun sigchld-handler (ignore1 ignore2 ignore3)
+#-win32
+(defun sigchld-handler (ignore1 ignore2 ignore3)
   (declare (ignore ignore1 ignore2 ignore3))
   (get-processes-status-changes))
 
-#-win32 (defun get-processes-status-changes ()
+#-win32
+(defun get-processes-status-changes ()
   (loop
       (multiple-value-bind (pid what code core)
           (wait3 t t)
@@ -356,12 +357,14 @@ The function is called with PROCESS as its only argument.")
 (defvar *close-in-parent* nil)
 
 ;;; list of handlers installed by RUN-PROGRAM
-#-win32 (defvar *handlers-installed* nil)
+#-win32
+(defvar *handlers-installed* nil)
 
 ;;; Find an unused pty. Return three values: the file descriptor for
 ;;; the master side of the pty, the file descriptor for the slave side
 ;;; of the pty, and the name of the tty device for the slave side.
-#-win32 (defun find-a-pty ()
+#-win32
+(defun find-a-pty ()
   (dolist (char '(#\p #\q))
     (dotimes (digit 16)
       (let* ((master-name (coerce (format nil "/dev/pty~C~X" char digit) 'base-string))
@@ -381,7 +384,8 @@ The function is called with PROCESS as its only argument.")
             (sb-unix:unix-close master-fd))))))
   (error "could not find a pty"))
 
-#-win32 (defun open-pty (pty cookie)
+#-win32
+(defun open-pty (pty cookie)
   (when pty
     (multiple-value-bind
           (master slave name)
@@ -451,7 +455,8 @@ The function is called with PROCESS as its only argument.")
              ,@body)
         (sb-sys:deallocate-system-memory ,sap ,size)))))
 
-#-win32 (sb-alien:define-alien-routine spawn sb-alien:int
+#-win32
+(sb-alien:define-alien-routine spawn sb-alien:int
   (program sb-alien:c-string)
   (argv (* sb-alien:c-string))
   (envp (* sb-alien:c-string))
@@ -460,7 +465,8 @@ The function is called with PROCESS as its only argument.")
   (stdout sb-alien:int)
   (stderr sb-alien:int))
 
-#+win32 (sb-alien:define-alien-routine spawn sb-win32::handle
+#+win32
+(sb-alien:define-alien-routine spawn sb-win32::handle
   (program sb-alien:c-string)
   (argv (* sb-alien:c-string))
   (stdin sb-alien:int)
@@ -469,30 +475,31 @@ The function is called with PROCESS as its only argument.")
   (wait sb-alien:int))
 
 ;;; Is UNIX-FILENAME the name of a file that we can execute?
-#-win32 (defun unix-filename-is-executable-p (unix-filename)
-  (declare (type simple-string unix-filename))
-  (setf unix-filename (coerce unix-filename 'base-string))
-  (values (and (eq (sb-unix:unix-file-kind unix-filename) :file)
-               (sb-unix:unix-access unix-filename sb-unix:x_ok))))
+(defun unix-filename-is-executable-p (unix-filename)
+  (let ((filename (coerce unix-filename 'base-string)))
+    (values (and (eq (sb-unix:unix-file-kind filename) :file)
+                 #-win32
+                 (sb-unix:unix-access filename sb-unix:x_ok)))))
 
-(defun find-executable-in-search-path (pathname
-                                       &optional
+(defun find-executable-in-search-path (pathname &optional
                                        (search-path (posix-getenv "PATH")))
   #+sb-doc
   "Find the first executable file matching PATHNAME in any of the
 colon-separated list of pathnames SEARCH-PATH"
-  (loop for end =  (position #-win32 #\: #+win32 #\; search-path :start (if end (1+ end) 0))
-        and start = 0 then (and end (1+ end))
-        while start
-        ;; <Krystof> the truename of a file naming a directory is the
-        ;; directory, at least until pfdietz comes along and says why
-        ;; that's noncompliant  -- CSR, c. 2003-08-10
-        for truename = (probe-file (subseq search-path start end))
-        for fullpath = (when truename (merge-pathnames pathname truename))
-        when #-win32 (and fullpath
-                  (unix-filename-is-executable-p (namestring fullpath)))
-             #+win32 t
-        return fullpath))
+  (let ((program #-win32 pathname
+                 #+win32 (merge-pathnames pathname (make-pathname :type "exe"))))
+   (loop for end =  (position #-win32 #\: #+win32 #\; search-path
+                              :start (if end (1+ end) 0))
+         and start = 0 then (and end (1+ end))
+         while start
+         ;; <Krystof> the truename of a file naming a directory is the
+         ;; directory, at least until pfdietz comes along and says why
+         ;; that's noncompliant  -- CSR, c. 2003-08-10
+         for truename = (probe-file (subseq search-path start end))
+         for fullpath = (when truename
+                          (unix-namestring (merge-pathnames program truename)))
+         when (and fullpath (unix-filename-is-executable-p fullpath))
+         return fullpath)))
 
 ;;; FIXME: There shouldn't be two semiredundant versions of the
 ;;; documentation. Since this is a public extension function, the
@@ -538,7 +545,8 @@ colon-separated list of pathnames SEARCH-PATH"
 ;;; RUN-PROGRAM returns a PROCESS structure for the process if
 ;;; the fork worked, and NIL if it did not.
 
-#-win32 (defun run-program (program args
+#-win32
+(defun run-program (program args
                     &key
                     (env nil env-p)
                     (environment (if env-p
@@ -556,14 +564,14 @@ colon-separated list of pathnames SEARCH-PATH"
                     (if-error-exists :error)
                     status-hook)
   #+sb-doc
-  "RUN-PROGRAM creates a new Unix process running the Unix program found in
-   the file specified by the PROGRAM argument.  ARGS are the standard
-   arguments that can be passed to a Unix program. For no arguments, use NIL
-   (which means that just the name of the program is passed as arg 0).
+  "RUN-PROGRAM creates a new Unix process running the Unix program
+found in the file specified by the PROGRAM argument. ARGS are the
+standard arguments that can be passed to a Unix program. For no
+arguments, use NIL (which means that just the name of the program is
+passed as arg 0).
 
-   RUN-PROGRAM will return a PROCESS structure or NIL on failure.
-   See the CMU Common Lisp Users Manual for details about the
-   PROCESS structure.
+RUN-PROGRAM will return a PROCESS structure. See the CMU Common Lisp
+Users Manual for details about the PROCESS structure.
 
    Notes about Unix environments (as in the :ENVIRONMENT and :ENV args):
 
@@ -631,7 +639,6 @@ colon-separated list of pathnames SEARCH-PATH"
    :STATUS-HOOK
       This is a function the system calls whenever the status of the
       process changes.  The function takes the process as an argument."
-
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   ;; Make sure that the interrupt handler is installed.
@@ -651,9 +658,8 @@ colon-separated list of pathnames SEARCH-PATH"
     (unwind-protect
          (let ((pfile
                 (if search
-                    (let ((p (find-executable-in-search-path program)))
-                      (and p (unix-namestring p t)))
-                    (unix-namestring program t)))
+                    (find-executable-in-search-path program)
+                    (unix-namestring program)))
                (cookie (list 0)))
            (unless pfile
              (error "no such program: ~S" program))
@@ -708,7 +714,8 @@ colon-separated list of pathnames SEARCH-PATH"
       (process-wait proc))
     proc))
 
-#+win32 (defun run-program (program args
+#+win32
+(defun run-program (program args
                     &key
                     (wait t)
                     search
@@ -719,13 +726,13 @@ colon-separated list of pathnames SEARCH-PATH"
                     (error :output)
                     (if-error-exists :error)
                     status-hook)
-  "RUN-PROGRAM creates a new process specified by the PROGRAM argument.
-   ARGS are the standard arguments that can be passed to a program. For no
-   arguments, use NIL (which means that just the name of the program is
-   passed as arg 0).
+  "RUN-PROGRAM creates a new process specified by the PROGRAM
+argument. ARGS are the standard arguments that can be passed to a
+program. For no arguments, use NIL (which means that just the name of
+the program is passed as arg 0).
 
-   RUN-PROGRAM will either return NIL or a PROCESS structure.  See the CMU
-   Common Lisp Users Manual for details about the PROCESS structure.
+RUN-PROGRAM will either return a PROCESS structure. See the CMU
+Common Lisp Users Manual for details about the PROCESS structure.
 
    The &KEY arguments have the following meanings:
      :SEARCH
@@ -767,7 +774,6 @@ colon-separated list of pathnames SEARCH-PATH"
      :STATUS-HOOK
         This is a function the system calls whenever the status of the
         process changes.  The function takes the process as an argument."
-
   ;; Prepend the program to the argument list.
   (push (namestring program) args)
   (let (;; Clear various specials used by GET-DESCRIPTOR-FOR to
@@ -782,11 +788,13 @@ colon-separated list of pathnames SEARCH-PATH"
     (unwind-protect
          (let ((pfile
                 (if search
-                    (namestring (find-executable-in-search-path program))
-                    (namestring program)))
+                    (find-executable-in-search-path program)
+                    (unix-namestring program)))
                (cookie (list 0)))
            (unless pfile
-             (error "no such program: ~S" program))
+             (error "No such program: ~S" program))
+           (unless (unix-filename-is-executable-p pfile)
+             (error "Not an executable: ~S" program))
            (multiple-value-bind (stdin input-stream)
                (get-descriptor-for input cookie
                                    :direction :input
@@ -802,26 +810,23 @@ colon-separated list of pathnames SEARCH-PATH"
                                            :direction :output
                                            :if-exists if-error-exists))
                     (with-c-strvec (args-vec simple-args)
-                        (let ((iwait (if wait 1 0)))
-                          (declare (type fixnum iwait))
-                          (let ((child-pid
-                                 (without-gcing
-                                  (spawn pfile args-vec
-                                         stdin stdout stderr
-                                         iwait))))
-                            (when (< child-pid 0)
-                              (error "couldn't spawn program: ~A"
-                                     (strerror)))
+                          (let ((handle (without-gcing
+                                         (spawn pfile args-vec
+                                                stdin stdout stderr
+                                                (if wait 1 0)))))
+                            (when (< handle 0)
+                              (error "Couldn't spawn program: ~A" (strerror)))
                             (setf proc
                                   (if wait
-                                      nil
-                                    (make-process :pid child-pid
-                                                  :%status :running
-                                                  :input input-stream
-                                                  :output output-stream
-                                                  :error error-stream
-                                                  :status-hook status-hook
-                                                  :cookie cookie)))))))))))
+                                      (make-process :%status :exited
+                                                    :exit-code handle)
+                                      (make-process :pid handle
+                                                    :%status :running
+                                                    :input input-stream
+                                                    :output output-stream
+                                                    :error error-stream
+                                                    :status-hook status-hook
+                                                    :cookie cookie))))))))))
     proc))
 
 ;;; Install a handler for any input that shows up on the file
@@ -953,7 +958,8 @@ colon-separated list of pathnames SEARCH-PATH"
             (dotimes (count
                        256
                       (error "could not open a temporary file in /tmp"))
-              (let* ((name (coerce (format nil "/tmp/.run-program-~D" count) 'base-string))
+              (let* ((name (coerce (format nil "/tmp/.run-program-~D" count)
+                                   'base-string))
                      (fd (sb-unix:unix-open name
                                             (logior sb-unix:o_rdwr
                                                     sb-unix:o_creat

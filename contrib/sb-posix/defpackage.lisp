@@ -14,3 +14,6 @@
            #:stat-gid #:stat-size #:stat-atime #:stat-mtime #:stat-ctime
            #:termios-iflag #:termios-oflag #:termios-cflag
            #:termios-lflag #:termios-cc))
+
+#+win32
+(load-shared-object "msvcrt.dll")

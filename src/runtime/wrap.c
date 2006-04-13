@@ -452,9 +452,9 @@ int wifstopped(int status) {
 int wstopsig(int status) {
     return WSTOPSIG(status);
 }
-
 /* FIXME: POSIX also defines WIFCONTINUED, but that appears not to
    exist on at least Linux... */
+#endif  /* !LISP_FEATURE_WIN32 */
 
 /* From SB-POSIX, stat-macros */
 int s_isreg(mode_t mode)
@@ -477,6 +477,7 @@ int s_isfifo(mode_t mode)
 {
     return S_ISFIFO(mode);
 }
+#ifndef LISP_FEATURE_WIN32
 int s_islnk(mode_t mode)
 {
 #ifdef S_ISLNK

@@ -1065,8 +1065,10 @@ output to *verbose-out*.  Returns the shell's exit code."
     #+sbcl
     (sb-impl::process-exit-code
      (sb-ext:run-program
-      "/bin/sh"
+      #-win32 "/bin/sh"
+      #+win32 "sh"
       (list  "-c" command)
+      :search #-win32 nil #+win32 t
       :input nil :output *verbose-out*))
 
     #+(or cmu scl)
