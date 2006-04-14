@@ -225,6 +225,12 @@
                            (values sb!c:*lexenv* vars))
                          :eval))
                     (eval-locally `(locally ,@body) lexenv :vars vars))))
+               ((if)
+                (destructuring-bind (test then &optional else) (rest exp)
+                  (eval-in-lexenv (if (eval-in-lexenv test lexenv)
+                                      then
+                                      else)
+                                  lexenv)))
                (t
                 (if (and (symbolp name)
                          (eq (info :function :kind name) :function))
