@@ -331,7 +331,7 @@
     (declare (type index flags))
     (when minimal
       (setq flags (logior flags compiled-debug-var-minimal-p))
-      (unless tn
+      (unless (and tn (tn-offset tn))
         (setq flags (logior flags compiled-debug-var-deleted-p))))
     (when (and (or (eq kind :environment)
                    (and (eq kind :debug-environment)
@@ -349,7 +349,7 @@
       (vector-push-extend name buffer)
       (unless (zerop id)
         (vector-push-extend id buffer)))
-    (if tn
+    (if (and tn (tn-offset tn))
         (vector-push-extend (tn-sc-offset tn) buffer)
         (aver minimal))
     (when save-tn
