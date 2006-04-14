@@ -16,9 +16,6 @@
 (load "assertoid.lisp")
 (use-package "ASSERTOID")
 
-#-sb-package-locks
-(sb-ext:quit :unix-status 104)
-
 ;;;; Our little labrats and a few utilities
 
 (defpackage :test-used)
@@ -71,7 +68,7 @@
           (sb-ext:lock-package p)
           (sb-ext:unlock-package p)))))
 
-(defun reset-test ()
+(defun reset-test (lock)
   "Reset TEST package to a known state, ensure that TEST-DELETE exists."
   (unless (find-package :test-delete)
     (make-package :test-delete))
@@ -106,7 +103,8 @@
     (defun test:numfun (n) n)
     (defun test:car (cons) (cl:car cons))
     (defun (setf test:cdr) (obj cons) (setf (cl:cdr cons) obj))
-    (assert (not (find-symbol *uninterned* :test)))))
+    (assert (not (find-symbol *uninterned* :test))))
+  (set-test-locks lock))
 
 (defun tmp-fmakunbound (x)
   "FMAKUNDBOUND x, then restore the original binding."
@@ -271,7 +269,7 @@
 ;;; violations on TEST, and will not signal an error on LOAD if first
 ;;; compiled by COMPILE-FILE with test unlocked. CAR is the affected
 ;;; symbol, CDR the form affecting it.
-(defvar *illegal-compile-time-forms-alist*
+(defvar *illegal-lexical-forms-alist*
   '(;; binding
 
     ;; binding as a function
@@ -315,68 +313,74 @@
                        (declare (ftype (function (fixnum) fixnum) test:numfun))
                      (cons t t)))))
 
-(defvar *illegal-compile-time-forms* (mapcar #'cdr *illegal-compile-time-forms-alist*))
+(defvar *illegal-lexical-forms*
+  (mapcar #'cdr *illegal-lexical-forms-alist*))
 
 (defvar *illegal-forms* (append *illegal-runtime-forms*
-                                *illegal-compile-time-forms*
+                                *illegal-lexical-forms*
                                 *illegal-double-forms*))
 
 ;;;; Running the tests
 
 ;;; Unlocked. No errors nowhere.
-(reset-test)
-(set-test-locks nil)
+(reset-test nil)
+
 (dolist (form (append *legal-forms* *illegal-forms*))
   (with-error-info ("~Unlocked form: ~S~%" form)
     (eval form)))
 
 ;;; Locked. Errors for all illegal forms, none for legal.
-(reset-test)
-(set-test-locks t)
+(reset-test t)
+
 (dolist (form *legal-forms*)
   (with-error-info ("locked legal form: ~S~%" form)
     (eval form)))
-(reset-test)
-(set-test-locks t)
+
 (dolist (form (append *illegal-runtime-forms* *illegal-double-forms*))
   (with-error-info ("locked illegal runtime form: ~S~%" form)
     (let ((fun (compile nil `(lambda () ,form))))
-      (assert (raises-error? (funcall fun) sb-ext:package-lock-violation)))))
-(dolist (pair *illegal-compile-time-forms-alist*)
-  (let ((form (cdr pair)))
-    (with-error-info ("locked illegal compile-time form: ~S~%" form)
-      (assert (raises-error? (compile nil `(lambda () ,form)) sb-ext:package-lock-violation)))))
+      (assert (raises-error? (funcall fun) sb-ext:package-lock-violation)))
+    (assert (raises-error? (eval form) sb-ext:package-lock-violation))))
 
-;;; Locked, WITHOUT-PACKAGE-LOCKS for runtime errors.
-(reset-test)
-(set-test-locks t)
+(dolist (pair *illegal-lexical-forms-alist*)
+  (let ((form (cdr pair)))
+    (with-error-info ("compile locked illegal lexical form: ~S~%" form)
+      (let ((fun (compile nil `(lambda () ,form))))
+        (assert (raises-error? (funcall fun) program-error)))
+      (assert (raises-error? (eval form) program-error)))))
+
+;;; Locked, WITHOUT-PACKAGE-LOCKS
+(reset-test t)
+
 (dolist (form *illegal-runtime-forms*)
   (with-error-info ("without-package-locks illegal runtime form: ~S~%" form)
     (funcall (compile nil `(lambda () (without-package-locks ,form))))))
 
-;;; Locked, WITHOUT-PACKAGE-LOCKS & DISABLE-PACKAGE-LOCKS for compile-time errors.
-(reset-test)
-(set-test-locks t)
-(dolist (pair *illegal-compile-time-forms-alist*)
+(dolist (form *illegal-lexical-forms*)
+  (let ((fun (without-package-locks (compile nil `(lambda () ,form)))))
+    (funcall fun))
+  (without-package-locks (eval form)))
+
+;;; Locked, DISABLE-PACKAGE-LOCKS
+(reset-test t)
+
+(dolist (pair *illegal-lexical-forms-alist*)
   (destructuring-bind (sym . form) pair
-    (with-error-info ("without-package-locks illegal compile-time form: ~S~%" form)
-      (let ((fun (without-package-locks (compile nil `(lambda () ,form)))))
-        (funcall fun)))))
-(reset-test)
-(set-test-locks t)
-(dolist (pair *illegal-compile-time-forms-alist*)
-  (destructuring-bind (sym . form) pair
-    (with-error-info ("disable-package-locks illegal compile-time form: ~S~%" form)
+    (with-error-info ("disable-package-locks on illegal form: ~S~%"
+                      form)
       (funcall (compile nil `(lambda ()
                               (declare (disable-package-locks ,sym))
-                              ,form))))))
+                              ,form)))
+      (eval `(locally
+                 (declare (disable-package-locks ,sym))
+               ,form)))))
 
 ;;; Locked, one error per "lexically apparent violated package", also
 ;;; test restarts.
-(reset-test)
-(set-test-locks t)
-(dolist (form (append *illegal-runtime-forms* *illegal-compile-time-forms*))
-  (with-error-info ("one error per form: ~S~%" form)
+(reset-test t)
+
+(dolist (form *illegal-runtime-forms*)
+  (with-error-info ("one error per form ~S~%" form)
     (let ((errorp nil))
       (handler-bind ((package-lock-violation (lambda (e)
                                                (when errorp
@@ -384,6 +388,7 @@
                                                (setf errorp t)
                                                (continue e))))
         (eval form)))))
+
 (dolist (form *illegal-double-forms*)
   (with-error-info ("two errors per form: ~S~%" form)
     (let ((error-count 0))
@@ -398,55 +403,43 @@
                  error-count form))))))
 
 ;;; COMPILE-FILE when unlocked, LOAD locked -- *illegal-runtime-forms* only
+;;;
+;;; This is not part of the interface, but it is the behaviour we want
 (let* ((tmp "package-locks.tmp.lisp")
        (fasl (compile-file-pathname tmp))
        (n 0))
   (dolist (form *illegal-runtime-forms*)
     (unwind-protect
          (with-simple-restart (next "~S failed, continue with next test" form)
-           (reset-test)
-           (set-test-locks nil)
+           (reset-test nil)
            (with-open-file (f tmp :direction :output)
              (prin1 form f))
            (multiple-value-bind (file warnings failure-p) (compile-file tmp)
              (set-test-locks t)
-             (assert (raises-error? (load fasl) sb-ext:package-lock-violation))))
+             (assert (raises-error? (load fasl)
+                                    sb-ext:package-lock-violation))))
       (when (probe-file tmp)
         (delete-file tmp))
       (when (probe-file fasl)
         (delete-file fasl)))))
 
 ;;;; Tests for enable-package-locks declarations
-(reset-test)
-(set-test-locks t)
-(dolist (pair *illegal-compile-time-forms-alist*)
+(reset-test t)
+
+(dolist (pair *illegal-lexical-forms-alist*)
   (destructuring-bind (sym . form) pair
-    (assert (raises-error?
-             (compile nil `(lambda ()
-                            (declare (disable-package-locks ,sym))
-                            ,form
-                            (locally (declare (enable-package-locks ,sym))
-                              ,form)))
-             package-lock-violation))
+    (let ((fun (compile nil `(lambda ()
+                               (declare (disable-package-locks ,sym))
+                               ,form
+                               (locally (declare (enable-package-locks ,sym))
+                                 ,form)))))
+      (assert (raises-error? (funcall fun) program-error)))
     (assert (raises-error?
              (eval `(locally (declare (disable-package-locks ,sym))
-                     ,form
-                     (locally (declare (enable-package-locks ,sym))
-                       ,form)))
-             package-lock-violation))))
-
-;;;; Program-errors from lexical violations
-;;;; In addition to that, this is also testing for bug 387
-(with-test (:name :program-error
-            :fails-on :sbcl)
-  (reset-test)
-  (set-test-locks t)
-  (dolist (pair *illegal-compile-time-forms-alist*)
-    (destructuring-bind (sym . form) pair
-      (declare (ignore sym))
-      (let ((fun (compile nil `(lambda ()
-                                 ,form))))
-        (assert (raises-error? (funcall fun) program-error))))))
+                      ,form
+                      (locally (declare (enable-package-locks ,sym))
+                        ,form)))
+             program-error))))
 
 ;;;; See that trace on functions in locked packages doesn't break
 ;;;; anything.
@@ -457,10 +450,11 @@
 (assert (package-locked-p :sb-gray))
 (multiple-value-bind (fun compile-errors)
     (ignore-errors
-      (compile nil
-               '(lambda ()
-                 (defclass fare-class ()
-                   ((line-column :initform 0 :reader sb-gray:stream-line-column))))))
+      (compile
+       nil
+       '(lambda ()
+         (defclass fare-class ()
+           ((line-column :initform 0 :reader sb-gray:stream-line-column))))))
   (assert (not compile-errors))
   (assert fun)
   (multiple-value-bind (class run-errors) (ignore-errors (funcall fun))
@@ -469,15 +463,16 @@
 
 ;;;; No bogus violations from DECLARE's done by PCL behind the
 ;;;; scenes. Reported by David Wragg on sbcl-help.
-(reset-test)
-(set-test-locks t)
+(reset-test t)
+
 (defmethod pcl-type-declaration-method-bug ((test:*special* stream))
   test:*special*)
 (assert (eq *terminal-io* (pcl-type-declaration-method-bug *terminal-io*)))
 (assert (raises-error?
-         (eval '(defmethod pcl-type-declaration-method-bug ((test:*special* stream))
-                 (declare (type stream test:*special*))
-                 test:*special*))
-         package-lock-violation))
+         (eval
+          '(defmethod pcl-type-declaration-method-bug ((test:*special* stream))
+            (declare (type stream test:*special*))
+            test:*special*))
+         program-error))
 
 ;;; WOOT! Done.

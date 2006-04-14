@@ -70,7 +70,8 @@
              (sb!c::process-decls decls
                                   vars
                                   nil
-                                  :lexenv lexenv))))
+                                  :lexenv lexenv
+                                  :context :eval))))
       (eval-progn-body body lexenv))))
 
 (defun eval (original-exp)
@@ -78,6 +79,16 @@
   "Evaluate the argument in a null lexical environment, returning the
   result or results."
   (eval-in-lexenv original-exp (make-null-lexenv)))
+
+;;;; EVAL-ERROR
+;;;;
+;;;; Analogous to COMPILER-ERROR, but simpler.
+
+(define-condition eval-error (encapsulated-condition) ())
+
+(defun eval-error (condition)
+  (signal 'eval-error :condition condition)
+  (bug "Unhandled EVAL-ERROR"))
 
 ;;; Pick off a few easy cases, and the various top level EVAL-WHEN
 ;;; magical cases, and call %EVAL for the rest.
@@ -98,125 +109,132 @@
               ;; error straight away.
               (invoke-restart 'sb!c::signal-error)))))
     (let ((exp (macroexpand original-exp lexenv)))
-      (typecase exp
-        (symbol
-         (ecase (info :variable :kind exp)
-           (:constant
-            (values (info :variable :constant-value exp)))
-           ((:special :global)
-            (symbol-value exp))
-           ;; FIXME: This special case here is a symptom of non-ANSI
-           ;; weirdness in SBCL's ALIEN implementation, which could
-           ;; cause problems for e.g. code walkers. It'd probably be
-           ;; good to ANSIfy it by making alien variable accessors
-           ;; into ordinary forms, e.g. (SB-UNIX:ENV) and (SETF
-           ;; SB-UNIX:ENV), instead of magical symbols, e.g. plain
-           ;; SB-UNIX:ENV. Then if the old magical-symbol syntax is to
-           ;; be retained for compatibility, it can be implemented
-           ;; with DEFINE-SYMBOL-MACRO, keeping the code walkers
-           ;; happy.
-           (:alien
-            (%eval original-exp lexenv))))
-        (list
-         (let ((name (first exp))
-               (n-args (1- (length exp))))
-           (case name
-             ((function)
-              (unless (= n-args 1)
-                (error "wrong number of args to FUNCTION:~% ~S" exp))
-              (let ((name (second exp)))
-                (if (and (legal-fun-name-p name)
-                         (not (consp (let ((sb!c:*lexenv* lexenv))
-                                       (sb!c:lexenv-find name funs)))))
-                    (%coerce-name-to-fun name)
-                    (%eval original-exp lexenv))))
-             ((quote)
-              (unless (= n-args 1)
-                (error "wrong number of args to QUOTE:~% ~S" exp))
-              (second exp))
-             (setq
-              (unless (evenp n-args)
-                (error "odd number of args to SETQ:~% ~S" exp))
-              (unless (zerop n-args)
-                (do ((name (cdr exp) (cddr name)))
-                    ((null name)
-                     (do ((args (cdr exp) (cddr args)))
-                         ((null (cddr args))
-                          ;; We duplicate the call to SET so that the
-                          ;; correct value gets returned.
-                          (set (first args) (eval-in-lexenv (second args) lexenv)))
-                       (set (first args) (eval-in-lexenv (second args) lexenv))))
-                  (let ((symbol (first name)))
-                    (case (info :variable :kind symbol)
-                      (:special)
-                      (t (return (%eval original-exp lexenv))))
-                    (unless (type= (info :variable :type symbol)
-                                   *universal-type*)
-                      ;; let the compiler deal with type checking
-                      (return (%eval original-exp lexenv)))))))
-             ((progn)
-              (eval-progn-body (rest exp) lexenv))
-             ((eval-when)
-              ;; FIXME: DESTRUCTURING-BIND returns ARG-COUNT-ERROR
-              ;; instead of PROGRAM-ERROR when there's something wrong
-              ;; with the syntax here (e.g. missing SITUATIONS). This
-              ;; could be fixed by hand-crafting clauses to catch and
-              ;; report each possibility, but it would probably be
-              ;; cleaner to write a new macro
-              ;; DESTRUCTURING-BIND-PROGRAM-SYNTAX which does
-              ;; DESTRUCTURING-BIND and promotes any mismatch to
-              ;; PROGRAM-ERROR, then to use it here and in (probably
-              ;; dozens of) other places where the same problem
-              ;; arises.
-              (destructuring-bind (eval-when situations &rest body) exp
-                (declare (ignore eval-when))
-                (multiple-value-bind (ct lt e)
-                    (sb!c:parse-eval-when-situations situations)
-                  ;; CLHS 3.8 - Special Operator EVAL-WHEN: The use of
-                  ;; the situation :EXECUTE (or EVAL) controls whether
-                  ;; evaluation occurs for other EVAL-WHEN forms; that
-                  ;; is, those that are not top level forms, or those
-                  ;; in code processed by EVAL or COMPILE. If the
-                  ;; :EXECUTE situation is specified in such a form,
-                  ;; then the body forms are processed as an implicit
-                  ;; PROGN; otherwise, the EVAL-WHEN form returns NIL.
-                  (declare (ignore ct lt))
-                  (when e
-                    (eval-progn-body body lexenv)))))
-             ((locally)
-              (eval-locally exp lexenv))
-             ((macrolet)
-              (destructuring-bind (definitions &rest body)
-                  (rest exp)
-                (let ((lexenv
-                       (let ((sb!c:*lexenv* lexenv))
-                         (sb!c::funcall-in-macrolet-lexenv
-                          definitions
-                          (lambda (&key funs)
-                            (declare (ignore funs))
-                            sb!c:*lexenv*)
-                          :eval))))
-                  (eval-locally `(locally ,@body) lexenv))))
-             ((symbol-macrolet)
-              (destructuring-bind (definitions &rest body) (rest exp)
-                (multiple-value-bind (lexenv vars)
-                    (let ((sb!c:*lexenv* lexenv))
-                      (sb!c::funcall-in-symbol-macrolet-lexenv
-                       definitions
-                       (lambda (&key vars)
-                         (values sb!c:*lexenv* vars))
-                       :eval))
-                  (eval-locally `(locally ,@body) lexenv :vars vars))))
-             (t
-              (if (and (symbolp name)
-                       (eq (info :function :kind name) :function))
-                  (collect ((args))
-                    (dolist (arg (rest exp))
-                      (args (eval-in-lexenv arg lexenv)))
-                    (apply (symbol-function name) (args)))
-                  (%eval exp lexenv))))))
-        (t
-         exp)))))
+      (handler-bind ((eval-error
+                      (lambda (condition)
+                        (error 'interpreted-program-error
+                               :condition (encapsulated-condition condition)
+                               :form exp))))
+        (typecase exp
+          (symbol
+           (ecase (info :variable :kind exp)
+             (:constant
+              (values (info :variable :constant-value exp)))
+             ((:special :global)
+              (symbol-value exp))
+             ;; FIXME: This special case here is a symptom of non-ANSI
+             ;; weirdness in SBCL's ALIEN implementation, which could
+             ;; cause problems for e.g. code walkers. It'd probably be
+             ;; good to ANSIfy it by making alien variable accessors
+             ;; into ordinary forms, e.g. (SB-UNIX:ENV) and (SETF
+             ;; SB-UNIX:ENV), instead of magical symbols, e.g. plain
+             ;; SB-UNIX:ENV. Then if the old magical-symbol syntax is to
+             ;; be retained for compatibility, it can be implemented
+             ;; with DEFINE-SYMBOL-MACRO, keeping the code walkers
+             ;; happy.
+             (:alien
+              (%eval original-exp lexenv))))
+          (list
+           (let ((name (first exp))
+                 (n-args (1- (length exp))))
+             (case name
+               ((function)
+                (unless (= n-args 1)
+                  (error "wrong number of args to FUNCTION:~% ~S" exp))
+                (let ((name (second exp)))
+                  (if (and (legal-fun-name-p name)
+                           (not (consp (let ((sb!c:*lexenv* lexenv))
+                                         (sb!c:lexenv-find name funs)))))
+                      (%coerce-name-to-fun name)
+                      (%eval original-exp lexenv))))
+               ((quote)
+                (unless (= n-args 1)
+                  (error "wrong number of args to QUOTE:~% ~S" exp))
+                (second exp))
+               (setq
+                (unless (evenp n-args)
+                  (error "odd number of args to SETQ:~% ~S" exp))
+                (unless (zerop n-args)
+                  (do ((name (cdr exp) (cddr name)))
+                      ((null name)
+                       (do ((args (cdr exp) (cddr args)))
+                           ((null (cddr args))
+                            ;; We duplicate the call to SET so that the
+                            ;; correct value gets returned.
+                            (set (first args)
+                                 (eval-in-lexenv (second args) lexenv)))
+                         (set (first args)
+                              (eval-in-lexenv (second args) lexenv))))
+                    (let ((symbol (first name)))
+                      (case (info :variable :kind symbol)
+                        (:special)
+                        (t (return (%eval original-exp lexenv))))
+                      (unless (type= (info :variable :type symbol)
+                                     *universal-type*)
+                        ;; let the compiler deal with type checking
+                        (return (%eval original-exp lexenv)))))))
+               ((progn)
+                (eval-progn-body (rest exp) lexenv))
+               ((eval-when)
+                ;; FIXME: DESTRUCTURING-BIND returns ARG-COUNT-ERROR
+                ;; instead of PROGRAM-ERROR when there's something wrong
+                ;; with the syntax here (e.g. missing SITUATIONS). This
+                ;; could be fixed by hand-crafting clauses to catch and
+                ;; report each possibility, but it would probably be
+                ;; cleaner to write a new macro
+                ;; DESTRUCTURING-BIND-PROGRAM-SYNTAX which does
+                ;; DESTRUCTURING-BIND and promotes any mismatch to
+                ;; PROGRAM-ERROR, then to use it here and in (probably
+                ;; dozens of) other places where the same problem
+                ;; arises.
+                (destructuring-bind (eval-when situations &rest body) exp
+                  (declare (ignore eval-when))
+                  (multiple-value-bind (ct lt e)
+                      (sb!c:parse-eval-when-situations situations)
+                    ;; CLHS 3.8 - Special Operator EVAL-WHEN: The use of
+                    ;; the situation :EXECUTE (or EVAL) controls whether
+                    ;; evaluation occurs for other EVAL-WHEN forms; that
+                    ;; is, those that are not top level forms, or those
+                    ;; in code processed by EVAL or COMPILE. If the
+                    ;; :EXECUTE situation is specified in such a form,
+                    ;; then the body forms are processed as an implicit
+                    ;; PROGN; otherwise, the EVAL-WHEN form returns NIL.
+                    (declare (ignore ct lt))
+                    (when e
+                      (eval-progn-body body lexenv)))))
+               ((locally)
+                (eval-locally exp lexenv))
+               ((macrolet)
+                (destructuring-bind (definitions &rest body)
+                    (rest exp)
+                  (let ((lexenv
+                         (let ((sb!c:*lexenv* lexenv))
+                           (sb!c::funcall-in-macrolet-lexenv
+                            definitions
+                            (lambda (&key funs)
+                              (declare (ignore funs))
+                              sb!c:*lexenv*)
+                            :eval))))
+                    (eval-locally `(locally ,@body) lexenv))))
+               ((symbol-macrolet)
+                (destructuring-bind (definitions &rest body) (rest exp)
+                  (multiple-value-bind (lexenv vars)
+                      (let ((sb!c:*lexenv* lexenv))
+                        (sb!c::funcall-in-symbol-macrolet-lexenv
+                         definitions
+                         (lambda (&key vars)
+                           (values sb!c:*lexenv* vars))
+                         :eval))
+                    (eval-locally `(locally ,@body) lexenv :vars vars))))
+               (t
+                (if (and (symbolp name)
+                         (eq (info :function :kind name) :function))
+                    (collect ((args))
+                      (dolist (arg (rest exp))
+                        (args (eval-in-lexenv arg lexenv)))
+                      (apply (symbol-function name) (args)))
+                    (%eval exp lexenv))))))
+          (t
+           exp))))))
 
 ;;; miscellaneous full function definitions of things which are
 ;;; ordinarily handled magically by the compiler

@@ -18,6 +18,9 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
     for sending data through UDP sockets (thanks to François-René Rideau)
   * minor incompatible change: SIGPIPE is ignored and "Broken pipe"
     error is signalled instead (thanks to François-René Rideau)
+  * minor incompatible change: Error signalling behaviour of lexical
+    operations violating package locks has changed slightly. Refer to
+    documentation on package locks for details.
   * bug fix: LISTEN sometimes returned T even in cases where no data was
     immediately available from the stream
   * fixed bug: types of the last two arguments to SET-SYNTAX-FROM-CHAR

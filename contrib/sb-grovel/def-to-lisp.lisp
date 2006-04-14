@@ -5,6 +5,15 @@
 (defun escape-for-string (string)
   (c-escape string))
 
+(defun split-cflags (string)
+  (remove-if (lambda (flag)
+               (zerop (length flag)))
+             (loop
+                for start = 0 then (if end (1+ end) nil)
+                for end = (and start (position #\Space string :start start))
+                while start
+                collect (subseq string start end))))
+
 (defun c-escape (string &optional (dangerous-chars '(#\")) (escape-char #\\))
   "Escape DANGEROUS-CHARS in STRING, with ESCAPE-CHAR."
   (coerce (loop for c across string
@@ -178,9 +187,7 @@ code:
                  (sb-ext:run-program
                   "gcc"
                   (append
-                   (let ((cf (sb-ext:posix-getenv "EXTRA_CFLAGS")))
-                     (when (plusp (length cf))
-                       (list cf)))
+                   (split-cflags (sb-ext:posix-getenv "EXTRA_CFLAGS"))
                    (list "-o"
                          (namestring tmp-a-dot-out)
                          (namestring tmp-c-source)))

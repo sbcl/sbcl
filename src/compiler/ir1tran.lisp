@@ -929,15 +929,15 @@
 ;;; If a LAMBDA-VAR being bound, we intersect the type with the var's
 ;;; type, otherwise we add a type restriction on the var. If a symbol
 ;;; macro, we just wrap a THE around the expansion.
-(defun process-type-decl (decl res vars)
+(defun process-type-decl (decl res vars context)
   (declare (list decl vars) (type lexenv res))
   (let ((type (compiler-specifier-type (first decl))))
     (collect ((restr nil cons)
              (new-vars nil cons))
       (dolist (var-name (rest decl))
         (when (boundp var-name)
-          (compiler-assert-symbol-home-package-unlocked
-           var-name "declaring the type of ~A"))
+          (program-assert-symbol-home-package-unlocked
+           context var-name "declaring the type of ~A"))
         (let* ((bound-var (find-in-bindings vars var-name))
                (var (or bound-var
                         (lexenv-find var-name vars)
@@ -992,15 +992,15 @@
 ;;; declarations for functions being bound, we must also deal with
 ;;; declarations that constrain the type of lexically apparent
 ;;; functions.
-(defun process-ftype-decl (spec res names fvars)
+(defun process-ftype-decl (spec res names fvars context)
   (declare (type list names fvars)
            (type lexenv res))
   (let ((type (compiler-specifier-type spec)))
     (collect ((res nil cons))
       (dolist (name names)
         (when (fboundp name)
-          (compiler-assert-symbol-home-package-unlocked
-           name "declaring the ftype of ~A"))
+          (program-assert-symbol-home-package-unlocked
+           context name "declaring the ftype of ~A"))
         (let ((found (find name fvars :key #'leaf-source-name :test #'equal)))
           (cond
            (found
@@ -1020,11 +1020,12 @@
 ;;; special declaration is instantiated by throwing a special variable
 ;;; into the variables if BINDING-FORM-P is NIL, or otherwise into
 ;;; *POST-BINDING-VARIABLE-LEXENV*.
-(defun process-special-decl (spec res vars binding-form-p)
+(defun process-special-decl (spec res vars binding-form-p context)
   (declare (list spec vars) (type lexenv res))
   (collect ((new-venv nil cons))
     (dolist (name (cdr spec))
-      (compiler-assert-symbol-home-package-unlocked name "declaring ~A special")
+      (program-assert-symbol-home-package-unlocked
+       context name "declaring ~A special")
       (let ((var (find-in-bindings vars name)))
         (etypecase var
           (cons
@@ -1201,18 +1202,18 @@
 ;;; Process a single declaration spec, augmenting the specified LEXENV
 ;;; RES. Return RES and result type. VARS and FVARS are as described
 ;;; PROCESS-DECLS.
-(defun process-1-decl (raw-spec res vars fvars binding-form-p)
+(defun process-1-decl (raw-spec res vars fvars binding-form-p context)
   (declare (type list raw-spec vars fvars))
   (declare (type lexenv res))
   (let ((spec (canonized-decl-spec raw-spec))
         (result-type *wild-type*))
     (values
      (case (first spec)
-       (special (process-special-decl spec res vars binding-form-p))
+       (special (process-special-decl spec res vars binding-form-p context))
        (ftype
         (unless (cdr spec)
           (compiler-error "no type specified in FTYPE declaration: ~S" spec))
-        (process-ftype-decl (second spec) res (cddr spec) fvars))
+        (process-ftype-decl (second spec) res (cddr spec) fvars context))
        ((inline notinline maybe-inline)
         (process-inline-decl spec res fvars))
        ((ignore ignorable)
@@ -1233,7 +1234,7 @@
          :handled-conditions (process-unmuffle-conditions-decl
                               spec (lexenv-handled-conditions res))))
        (type
-        (process-type-decl (cdr spec) res vars))
+        (process-type-decl (cdr spec) res vars context))
        (values
         (unless *suppress-values-declaration*
           (let ((types (cdr spec)))
@@ -1268,8 +1269,8 @@
 ;;;
 ;;; This is also called in main.lisp when PROCESS-FORM handles a use
 ;;; of LOCALLY.
-(defun process-decls (decls vars fvars &key (lexenv *lexenv*)
-                                            (binding-form-p nil))
+(defun process-decls (decls vars fvars &key
+                      (lexenv *lexenv*) (binding-form-p nil) (context :compile))
   (declare (list decls vars fvars))
   (let ((result-type *wild-type*)
         (*post-binding-variable-lexenv* nil))
@@ -1278,7 +1279,7 @@
         (unless (consp spec)
           (compiler-error "malformed declaration specifier ~S in ~S" spec decl))
         (multiple-value-bind (new-env new-result-type)
-            (process-1-decl spec lexenv vars fvars binding-form-p)
+            (process-1-decl spec lexenv vars fvars binding-form-p context)
           (setq lexenv new-env)
           (unless (eq new-result-type *wild-type*)
             (setq result-type

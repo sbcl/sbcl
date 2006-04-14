@@ -77,9 +77,20 @@
   (:report (lambda (condition stream)
              (format stream "Execution of a form compiled with errors.~%~
                              Form:~%  ~A~%~
-                             Compile-time-error:~%  ~A"
+                             Compile-time error:~%  ~A"
                        (program-error-source condition)
                        (program-error-message condition)))))
+
+(define-condition interpreted-program-error
+    (program-error encapsulated-condition)
+  ;; Unlike COMPILED-PROGRAM-ERROR, we don't need to dump these, so
+  ;; storing the original condition and form is OK.
+  ((form :initarg :form :reader program-error-form))
+  (:report (lambda (condition stream)
+             (format stream "~&Evaluation of~%  ~S~%~
+                             caused error:~%  ~A~%"
+                     (program-error-form condition)
+                     (encapsulated-condition condition)))))
 
 (define-condition simple-control-error (simple-condition control-error) ())
 (define-condition simple-file-error    (simple-condition file-error)    ())
