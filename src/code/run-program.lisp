@@ -192,7 +192,7 @@
   "Return the current status of PROCESS.  The result is one of :RUNNING,
    :STOPPED, :EXITED, or :SIGNALED."
   #-win32
-  (get-processes-status-changes)  
+  (get-processes-status-changes)
   (process-%status process))
 
 #+sb-doc

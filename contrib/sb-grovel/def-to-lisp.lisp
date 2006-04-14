@@ -175,15 +175,18 @@ code:
     (funcall (intern "C-CONSTANTS-EXTRACT" (find-package "SB-GROVEL"))
              filename tmp-c-source (constants-package component))
     (let ((code (sb-ext:process-exit-code
-                 (sb-ext:run-program "gcc"
-                                     (append
-                                      (sb-ext:posix-getenv "EXTRA_CFLAGS")
-                                      (list "-o"
-                                            (namestring tmp-a-dot-out)
-                                            (namestring tmp-c-source)))
-                                     :search t
-                                     :input nil
-                                     :output *trace-output*))))
+                 (sb-ext:run-program
+                  "gcc"
+                  (append
+                   (let ((cf (sb-ext:posix-getenv "EXTRA_CFLAGS")))
+                     (when (plusp (length cf))
+                       (list cf)))
+                   (list "-o"
+                         (namestring tmp-a-dot-out)
+                         (namestring tmp-c-source)))
+                  :search t
+                  :input nil
+                  :output *trace-output*))))
       (unless (= code 0)
         (case (operation-on-failure op)
           (:warn (warn "~@<C compiler failure when performing ~A on ~A.~@:>"

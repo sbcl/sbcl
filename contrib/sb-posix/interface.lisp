@@ -169,7 +169,7 @@
   (define-call "setfsuid" int minusp (uid uid-t))
   (define-call "setreuid" int minusp (ruid uid-t) (euid uid-t))
   (define-call "setresuid" int minusp (ruid uid-t) (euid uid-t) (suid uid-t))
-  (define-call "setuid" int minusp (uid uid-t))  
+  (define-call "setuid" int minusp (uid uid-t))
   (define-call "getegid" gid-t never-fails)
   (define-call "getgid" gid-t never-fails)
   (define-call "getresgid" gid-t never-fails)

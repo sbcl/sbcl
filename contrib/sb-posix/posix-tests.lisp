@@ -18,7 +18,7 @@
     (logior sb-posix::s-irusr sb-posix::s-iwusr sb-posix::s-ixusr
             #-win32
             (logior
-             sb-posix::s-irgrp sb-posix::s-iwgrp sb-posix::s-ixgrp            
+             sb-posix::s-irgrp sb-posix::s-iwgrp sb-posix::s-ixgrp
              sb-posix::s-iroth sb-posix::s-iwoth sb-posix::s-ixoth))))
 
 (defmacro define-eacces-test (name form &rest values)
@@ -370,7 +370,8 @@
     (let ((name (merge-pathnames "open-test.txt" *test-directory*)))
       (unwind-protect
            (progn
-             (sb-posix:close (sb-posix:creat name sb-posix:s-iwrite))
+             (sb-posix:close
+              (sb-posix:creat name (logior sb-posix:s-iwrite sb-posix:s-iread)))
              (let ((fd (sb-posix:open name sb-posix::o-rdonly)))
                (ignore-errors (sb-posix:close fd))
                (< fd 0)))

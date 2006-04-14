@@ -32,7 +32,7 @@
  (:type uid-t   #-win32 "uid_t"   #+win32 "short")
  (:type gid-t   #-win32 "gid_t"   #+win32 "short")
  (:type nlink-t #-win32 "nlink_t" #+win32 "short")
- 
+
  (:type pid-t "pid_t")
  (:type ino-t "ino_t")
 
@@ -277,7 +277,7 @@
               ;; OS X manpages say this exists.  they lie!
               #+nil
               (:integer fields "int" "pw_fields")))
- 
+
  (:structure alien-stat
              ("struct stat"
               (mode-t mode "mode_t" "st_mode")
