@@ -216,6 +216,76 @@ small"))
                                                  (bits-of-sockaddr socket sockaddr)))))))
           (sb-alien:free-alien copy-buffer))))))
 
+(defmacro with-vector-sap ((name vector) &body body)
+  `(sb-sys:with-pinned-objects (,vector)
+     (let ((,name (sb-sys:vector-sap ,vector)))
+       ,@body)))
+
+(defgeneric socket-send (socket buffer length
+                                &key
+                                address
+                                external-format
+                                oob eor dontroute dontwait nosignal
+                                #+linux confirm #+linux more)
+  (:documentation
+   "Send LENGTH octets from BUFFER into SOCKET, using sendto(2). If BUFFER
+is a string, it will converted to octets according to EXTERNAL-FORMAT. If
+LENGTH is NIL, the length of the octet buffer is used. The format of ADDRESS
+depends on the socket type (for example for INET domain sockets it would
+be a list of an IP address and a port). If no socket address is provided,
+send(2) will be called instead. Returns the number of octets written."))
+
+(defmethod socket-send ((socket socket) buffer length
+                        &key
+                        address
+                        (external-format :default)
+                        oob eor dontroute dontwait nosignal
+                        #+linux confirm #+linux more)
+  (let* ((flags
+          (logior (if oob sockint::MSG-OOB 0)
+                  (if eor sockint::MSG-EOR 0)
+                  (if dontroute sockint::MSG-DONTROUTE 0)
+                  (if dontwait sockint::MSG-DONTWAIT 0)
+                  (if nosignal sockint::MSG-NOSIGNAL 0)
+                  #+linux (if confirm sockint::MSG-CONFIRM 0)
+                  #+linux (if more sockint::MSG-MORE 0)))
+         (buffer (etypecase buffer
+                   (string
+                    (sb-ext:string-to-octets buffer
+                                             :external-format external-format
+                                             :null-terminate nil))
+                   ((simple-array (unsigned-byte 8))
+                    buffer)
+                   ((array (unsigned-byte 8))
+                    (make-array (length buffer)
+                                :element-type '(unsigned-byte 8)
+                                :initial-contents buffer))))
+         (len (with-vector-sap (buffer-sap buffer)
+                (unless length
+                  (setf length (length buffer)))
+                (if address
+                    (with-sockaddr-for (socket sockaddr address)
+                      (sb-alien:with-alien ((sa-len sockint::socklen-t
+                                                    (size-of-sockaddr socket)))
+                        (sockint::sendto (socket-file-descriptor socket)
+                                         buffer-sap
+                                         length
+                                         flags
+                                         sockaddr
+                                         sa-len)))
+                    (sockint::send (socket-file-descriptor socket)
+                                   buffer-sap
+                                   length
+                                   flags)))))
+    (cond
+      ((and (= len -1)
+            (member (sb-unix::get-errno)
+                    '(sockint::EAGAIN sockint::EINTR)))
+       nil)
+      ((= len -1)
+       (socket-error "sendto"))
+      (t len))))
+
 (defgeneric socket-listen (socket backlog)
   (:documentation "Mark SOCKET as willing to accept incoming connections.  BACKLOG
 defines the maximum length that the queue of pending connections may

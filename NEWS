@@ -14,6 +14,8 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
     regarding non-existent packages in #+ and #- feature tests.
   * new feature: command line options --no-sysinit, --no-userinit to
     inhibit loading the corresponding init files
+  * new feature: add a generic function SOCKET-SEND to SB-BSD-SOCKETS, 
+    for sending data through UDP sockets (thanks to François-René Rideau)
   * minor incompatible change: SIGPIPE is ignored and "Broken pipe"
     error is signalled instead (thanks to François-René Rideau)
   * bug fix: LISTEN sometimes returned T even in cases where no data was
