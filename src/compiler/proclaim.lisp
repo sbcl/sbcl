@@ -172,7 +172,7 @@
        (dolist (name args)
          (unless (symbolp name)
            (error "can't declare a non-symbol as SPECIAL: ~S" name))
-         (when (constantp name)
+         (when (sb!xc:constantp name)
            (error "can't declare a constant as SPECIAL: ~S" name))
          (with-single-package-locked-error
              (:symbol name "globally declaring ~A special"))

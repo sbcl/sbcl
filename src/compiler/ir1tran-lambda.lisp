@@ -463,22 +463,27 @@
     ;; problems: hidden references should not be established to
     ;; lambdas of kind NIL should not have (otherwise the compiler
     ;; might let-convert or delete them) and to variables.
-    (let ((name (or debug-name source-name))
-          (defaults (if supplied-p (list default nil) (list default))))
+    (let ((name (or debug-name source-name)))
       (if (or force
               supplied-p-p ; this entry will be of kind NIL
               (and (lambda-p ep) (eq (lambda-kind ep) nil)))
           (convert-optional-entry ep
                                   default-vars default-vals
-                                  defaults
+                                  (if supplied-p (list default nil) (list default))
                                   name)
-          (delay
-           (register-entry-point
-            (convert-optional-entry (force ep)
-                                    default-vars default-vals
-                                    defaults
-                                    name)
-            res))))))
+          (let* ((default `',(constant-form-value default))
+                 (defaults (if supplied-p (list default nil) (list default))))
+            ;; DEFAULT can contain a reference to a
+            ;; to-be-optimized-away function/block/tag, so better to
+            ;; reduce code now (but we possibly lose syntax checking
+            ;; in an unreachable code).
+            (delay
+             (register-entry-point
+              (convert-optional-entry (force ep)
+                                      default-vars default-vals
+                                      defaults
+                                      name)
+              res)))))))
 
 ;;; Create the MORE-ENTRY function for the OPTIONAL-DISPATCH RES.
 ;;; ENTRY-VARS and ENTRY-VALS describe the fixed arguments. REST is

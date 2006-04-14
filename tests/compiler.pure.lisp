@@ -2067,3 +2067,14 @@
                                        (- (+ source-day
                                              canonicalized-shift) 7)))))))
                result))))
+
+;;; MISC.637: incorrect delaying of conversion of optional entries
+;;; with hairy constant defaults
+(let ((f '(lambda ()
+  (labels ((%f11 (f11-2 &key key1)
+             (labels ((%f8 (f8-2 &optional (f8-5 (if nil (return-from %f11 0) 0)))
+                        :bad1))
+               (%f8 (%f8 0)))
+             :bad2))
+    :good))))
+  (assert (eq (funcall (compile nil f)) :good)))
