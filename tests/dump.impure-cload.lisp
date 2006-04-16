@@ -89,6 +89,17 @@
 (assert (eql (savable-structure-c *savable-structure*) 1))
 (assert (eql (savable-structure-d *savable-structure*) 39))
 (assert (eql (savable-structure-e *savable-structure*) 19))
+
+;;; null :SLOT-NAMES /= unsupplied
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass savable-class ()
+    ((a :initform t :initarg :a)))
+  (defmethod make-load-form ((s savable-class) &optional env)
+    (make-load-form-saving-slots s :environment env :slot-names '())))
+(defparameter *savable-class*
+  #.(make-instance 'savable-class :a 3))
+(assert (not (slot-boundp *savable-class* 'a)))
+
 
 ;;; ensure that we can dump and reload specialized arrays whose element
 ;;; size is smaller than a byte (caused a few problems circa SBCL

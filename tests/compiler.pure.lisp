@@ -2078,3 +2078,11 @@
              :bad2))
     :good))))
   (assert (eq (funcall (compile nil f)) :good)))
+
+;;; MISC.555: new reference to an already-optimized local function
+(let* ((l '(lambda (p1)
+    (declare (optimize (speed 1) (safety 2) (debug 2) (space 0)) (type keyword p1))
+    (keywordp p1)))
+       (f (compile nil l)))
+  (assert (funcall f :good))
+  (assert (nth-value 1 (ignore-errors (funcall f 42)))))

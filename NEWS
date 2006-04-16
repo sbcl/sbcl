@@ -32,6 +32,8 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
     by Utz-Uwe Haus)
   * bug fix: derivation of float boundaries from numbers outside the
     appropriate float range (reported by John Wiseman)
+  * bug fix: MAKE-LOAD-FORM-SAVING-SLOTS accepts en empty slot name
+    list.
   * improvements to DOCUMENTATION for TYPE and STRUCTURE doc-types:
     allow condition class objects as arguments to DOCUMENTATION and
     (SETF DOCUMENTATION); only find and set documentation for
@@ -50,6 +52,8 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
        directive.
     ** compiler failure when compiling functions with hairy constant
        defaults for optional parameters.
+    ** compiler produces wrong code when MAYBE-INLINE-expanding a
+       function, which is already optimized.
 
 changes in sbcl-0.9.11 relative to sbcl-0.9.10:
   * new platform: experimental support for SBCL x86/Darwin, including
