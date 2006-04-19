@@ -23,6 +23,9 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
     documentation on package locks for details.
   * enhancement: EVAL can process IF-expressions without resorting to the
     compiler.
+  * bug fix: Some operations involving SIN, COS, or TAN weren't being
+    constant-folded properly due to missing out-of-line functions.
+    (reported by Mika Pihlajamäki)
   * bug fix: LISTEN sometimes returned T even in cases where no data was
     immediately available from the stream
   * fixed bug: types of the last two arguments to SET-SYNTAX-FROM-CHAR
