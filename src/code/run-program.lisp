@@ -141,7 +141,6 @@
                      (not (zerop (ldb (byte 1 7) status)))))))))
 
 ;;;; process control stuff
-#-win32
 (defvar *active-processes* nil
   #+sb-doc
   "List of process structures for all active processes.")
@@ -153,11 +152,12 @@
 ;;; *ACTIVE-PROCESSES* can be accessed from multiple threads so a
 ;;; mutex is needed. More importantly the sigchld signal handler also
 ;;; accesses it, that's why we need without-interrupts.
-#-win32
 (defmacro with-active-processes-lock (() &body body)
+  #-win32
   `(without-interrupts
     (sb-thread:with-mutex (*active-processes-lock*)
-      ,@body)))
+      ,@body))
+  `(progn ,@body))
 
 (defstruct (process (:copier nil))
   pid                 ; PID of child process
@@ -187,11 +187,15 @@
 #+sb-doc
 (setf (documentation 'process-pid 'function) "The pid of the child process.")
 
+#+win32
+(define-alien-routine ("GetExitCodeProcess@8" get-exit-code-process)
+    int
+  (handle unsigned) (exit-code unsigned :out))
+
 (defun process-status (process)
   #+sb-doc
   "Return the current status of PROCESS.  The result is one of :RUNNING,
    :STOPPED, :EXITED, or :SIGNALED."
-  #-win32
   (get-processes-status-changes)
   (process-%status process))
 
@@ -228,12 +232,11 @@ The function is called with PROCESS as its only argument.")
 (setf (documentation 'process-plist  'function)
       "A place for clients to stash things.")
 
-#-win32
 (defun process-wait (process &optional check-for-stopped)
   #+sb-doc
-  "Wait for PROCESS to quit running for some reason.
-   When CHECK-FOR-STOPPED is T, also returns when PROCESS is
-   stopped.  Returns PROCESS."
+  "Wait for PROCESS to quit running for some reason. When
+CHECK-FOR-STOPPED is T, also returns when PROCESS is stopped. Returns
+PROCESS."
   (loop
       (case (process-status process)
         (:running)
@@ -298,7 +301,6 @@ The function is called with PROCESS as its only argument.")
             (t
              t)))))
 
-#-win32
 (defun process-alive-p (process)
   #+sb-doc
   "Return T if PROCESS is still alive, NIL otherwise."
@@ -308,16 +310,19 @@ The function is called with PROCESS as its only argument.")
         t
         nil)))
 
-#-win32
 (defun process-close (process)
   #+sb-doc
-  "Close all streams connected to PROCESS and stop maintaining the status slot."
+  "Close all streams connected to PROCESS and stop maintaining the
+status slot."
   (macrolet ((frob (stream abort)
                `(when ,stream (close ,stream :abort ,abort))))
-    (frob (process-pty    process)   t) ; Don't FLUSH-OUTPUT to dead process, ..
-    (frob (process-input  process)   t) ; .. 'cause it will generate SIGPIPE.
+    #-win32
+    (frob (process-pty process) t)   ; Don't FLUSH-OUTPUT to dead process,
+    (frob (process-input process) t) ; .. 'cause it will generate SIGPIPE.
     (frob (process-output process) nil)
-    (frob (process-error  process) nil))
+    (frob (process-error process) nil))
+  ;; FIXME: Given that the status-slot is no longer updated,
+  ;; maybe it should be set to :CLOSED, or similar?
   (with-active-processes-lock ()
    (setf *active-processes* (delete process *active-processes*)))
   process)
@@ -328,25 +333,47 @@ The function is called with PROCESS as its only argument.")
   (declare (ignore ignore1 ignore2 ignore3))
   (get-processes-status-changes))
 
-#-win32
 (defun get-processes-status-changes ()
+  #-win32
   (loop
-      (multiple-value-bind (pid what code core)
-          (wait3 t t)
-        (unless pid
-          (return))
-        (let ((proc (with-active-processes-lock ()
-                      (find pid *active-processes* :key #'process-pid))))
-          (when proc
-            (setf (process-%status proc) what)
-            (setf (process-exit-code proc) code)
-            (setf (process-core-dumped proc) core)
-            (when (process-status-hook proc)
-              (funcall (process-status-hook proc) proc))
-            (when (position what #(:exited :signaled))
-              (with-active-processes-lock ()
-                (setf *active-processes*
-                      (delete proc *active-processes*)))))))))
+   (multiple-value-bind (pid what code core)
+       (wait3 t t)
+     (unless pid
+       (return))
+     (let ((proc (with-active-processes-lock ()
+                   (find pid *active-processes* :key #'process-pid))))
+       (when proc
+         (setf (process-%status proc) what)
+         (setf (process-exit-code proc) code)
+         (setf (process-core-dumped proc) core)
+         (when (process-status-hook proc)
+           (funcall (process-status-hook proc) proc))
+         (when (position what #(:exited :signaled))
+           (with-active-processes-lock ()
+             (setf *active-processes*
+                   (delete proc *active-processes*))))))))
+  #+win32
+  (let (exited)
+    (with-active-processes-lock ()
+      (setf *active-processes*
+            (delete-if (lambda (proc)
+                         (multiple-value-bind (ok code)
+                             (get-exit-code-process (process-pid proc))
+                           (when (and (plusp ok) (/= code 259))
+                             (setf (process-%status proc) :exited
+                                   (process-exit-code proc) code)
+                             (when (process-status-hook proc)
+                               (push proc exited))
+                             t)))
+                       *active-processes*)))
+    ;; Can't call the hooks before all the processes have been deal
+    ;; with, as calling a hook may cause re-entry to
+    ;; GET-PROCESS-STATUS-CHANGES. That may be OK when using wait3,
+    ;; but in the Windows implementation is would be deeply bad.
+    (dolist (proc exited)
+      (let ((hook (process-status-hook proc)))
+        (when hook
+          (funcall hook proc))))))
 
 ;;;; RUN-PROGRAM and close friends
 
@@ -827,6 +854,12 @@ Common Lisp Users Manual for details about the PROCESS structure.
                                                     :error error-stream
                                                     :status-hook status-hook
                                                     :cookie cookie))))))))))
+    ;; FIXME: this should probably use PROCESS-WAIT instead instead
+    ;; of special argument to SPAWN.
+    (unless wait
+      (push proc *active-processes*))
+    (when (and wait status-hook)
+      (funcall status-hook proc))
     proc))
 
 ;;; Install a handler for any input that shows up on the file

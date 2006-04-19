@@ -666,12 +666,13 @@ void scratch(void)
     GetOEMCP();
     LocalFree(0);
     #ifndef LISP_FEATURE_SB_UNICODE
-      GetEnvironmentVariableA(0,0,0);
+      GetEnvironmentVariableA(0, 0, 0);
     #else
-      GetEnvironmentVariableW(0,0,0);
+      GetEnvironmentVariableW(0, 0, 0);
     #endif
     GetConsoleCP();
     GetConsoleOutputCP();
+    GetExitCodeProcess(0, 0);
 }
 
 char *
