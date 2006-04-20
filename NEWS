@@ -1,15 +1,10 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.12 relative to sbcl-0.9.11:
-  * Enhancements for sbcl running on the Windows operating system:
-    ** (user-homedir-pathname) and default initialization file
-       locations now know about the user's "Documents and Settings"
-       directory (thanks to Yaroslav Kavenchuk)
-    ** run-program is implemented (thanks to Mike Thomas)
-    ** sockets support (thanks to Timothy Ritchey)
-    ** better backtrace support (thanks to Alastair Bridgewater)
-    ** sb-grovel supported
-    ** asdf-install and sb-posix work somewhat
-    ** capable of running Slime using SWANK:*COMMUNICATION-STYLE* NIL
+  * minor incompatible change: in sbcl-0.9.11 (but not earlier
+    versions) SB-MOP:FINALIZE-INHERITANCE would recursively descend
+    into subclasses of the finalized class.  Now user calls to
+    FINALIZE-INHERITANCE finalize just the one class, and calls by the
+    system return before any subclasses are finalized.
   * minor incompatible change: The reader no longer ignores errors
     regarding non-existent packages in #+ and #- feature tests.
   * new feature: command line options --no-sysinit, --no-userinit to
@@ -46,6 +41,16 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
     (SETF DOCUMENTATION); only find and set documentation for
     structure names for the STRUCTURE doc-type.  (suggested by Gary
     King)
+  * improvements to the Win32/x86 port:
+    ** (user-homedir-pathname) and default initialization file
+       locations now know about the user's "Documents and Settings"
+       directory (thanks to Yaroslav Kavenchuk)
+    ** run-program is implemented (thanks to Mike Thomas)
+    ** sockets support (thanks to Timothy Ritchey)
+    ** better backtrace support (thanks to Alastair Bridgewater)
+    ** sb-grovel supported
+    ** asdf-install and sb-posix work somewhat
+    ** capable of running Slime using SWANK:*COMMUNICATION-STYLE* NIL
   * improvements to the Solaris/x86 port:
     ** works on Solaris 11/Solaris Express
     ** floating-point exception handling support
