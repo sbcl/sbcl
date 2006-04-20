@@ -157,6 +157,7 @@
   `(without-interrupts
     (sb-thread:with-mutex (*active-processes-lock*)
       ,@body))
+  #+win32
   `(progn ,@body))
 
 (defstruct (process (:copier nil))
