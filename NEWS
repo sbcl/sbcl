@@ -37,6 +37,10 @@ changes in sbcl-0.9.12 relative to sbcl-0.9.11:
     appropriate float range (reported by John Wiseman)
   * bug fix: MAKE-LOAD-FORM-SAVING-SLOTS accepts en empty slot name
     list.
+  * bug fix: precomputing cache entries for generic functions with
+    some subclasses of specializers as yet invalid does not attempt to
+    fill a cache line with a negative offset.  (reported by Levente
+    Mészároz)
   * improvements to DOCUMENTATION for TYPE and STRUCTURE doc-types:
     allow condition class objects as arguments to DOCUMENTATION and
     (SETF DOCUMENTATION); only find and set documentation for
