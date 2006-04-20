@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  1.93
+;;; This is asdf: Another System Definition Facility.  1.94
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -109,7 +109,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "1.93")
+(defvar *asdf-revision* (let* ((v "1.94")
                                (colon (or (position #\: v) -1))
                                (dot (position #\. v)))
                           (and v colon dot
@@ -442,7 +442,10 @@ system."))
 (defmethod component-relative-pathname ((component source-file))
   (let ((relative-pathname (slot-value component 'relative-pathname)))
     (if relative-pathname
-        relative-pathname
+        (merge-pathnames
+         relative-pathname
+         (make-pathname
+          :type (source-file-type component (component-system component))))
         (let* ((*default-pathname-defaults*
                 (component-parent-pathname component))
                (name-type
@@ -1065,10 +1068,9 @@ output to *verbose-out*.  Returns the shell's exit code."
     #+sbcl
     (sb-impl::process-exit-code
      (sb-ext:run-program
-      #-win32 "/bin/sh"
-      #+win32 "sh"
+      #+win32 "sh" #-win32 "/bin/sh"
       (list  "-c" command)
-      :search #-win32 nil #+win32 t
+      #+win32 #+win32 :search t
       :input nil :output *verbose-out*))
 
     #+(or cmu scl)
