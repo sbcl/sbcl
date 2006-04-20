@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  1.94
+;;; This is asdf: Another System Definition Facility.  1.96
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -109,7 +109,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "1.94")
+(defvar *asdf-revision* (let* ((v "1.96")
                                (colon (or (position #\: v) -1))
                                (dot (position #\. v)))
                           (and v colon dot
@@ -583,26 +583,40 @@ system."))
 (defmethod input-files ((operation operation) (c module)) nil)
 
 (defmethod operation-done-p ((o operation) (c component))
-  (let ((out-files (output-files o c))
-        (in-files (input-files o c)))
-    (cond ((and (not in-files) (not out-files))
-           ;; arbitrary decision: an operation that uses nothing to
-           ;; produce nothing probably isn't doing much
-           t)
-          ((not out-files)
-           (let ((op-done
-                  (gethash (type-of o)
-                           (component-operation-times c))))
-             (and op-done
-                  (>= op-done
-                      (or (apply #'max
-                                 (mapcar #'file-write-date in-files)) 0)))))
-          ((not in-files) nil)
-          (t
-           (and
-            (every #'probe-file out-files)
-            (> (apply #'min (mapcar #'file-write-date out-files))
-               (apply #'max (mapcar #'file-write-date in-files)) ))))))
+  (flet ((fwd-or-return-t (file)
+           ;; if FILE-WRITE-DATE returns NIL, it's possible that the
+           ;; user or some other agent has deleted an input file.  If
+           ;; that's the case, well, that's not good, but as long as
+           ;; the operation is otherwise considered to be done we
+           ;; could continue and survive.
+           (let ((date (file-write-date file)))
+             (cond
+               (date)
+               (t
+                (warn "~@<Missing FILE-WRITE-DATE for ~S: treating ~
+                       operation ~S on component ~S as done.~@:>"
+                      file o c)
+                (return-from operation-done-p t))))))
+    (let ((out-files (output-files o c))
+          (in-files (input-files o c)))
+      (cond ((and (not in-files) (not out-files))
+             ;; arbitrary decision: an operation that uses nothing to
+             ;; produce nothing probably isn't doing much
+             t)
+            ((not out-files)
+             (let ((op-done
+                    (gethash (type-of o)
+                             (component-operation-times c))))
+               (and op-done
+                    (>= op-done
+                        (apply #'max
+                               (mapcar #'fwd-or-return-t in-files))))))
+            ((not in-files) nil)
+            (t
+             (and
+              (every #'probe-file out-files)
+              (> (apply #'min (mapcar #'file-write-date out-files))
+                 (apply #'max (mapcar #'fwd-or-return-t in-files)))))))))
 
 ;;; So you look at this code and think "why isn't it a bunch of
 ;;; methods".  And the answer is, because standard method combination
@@ -1062,11 +1076,11 @@ Returns the new tree (which probably shares structure with the old one)"
 (defun run-shell-command (control-string &rest args)
   "Interpolate ARGS into CONTROL-STRING as if by FORMAT, and
 synchronously execute the result using a Bourne-compatible shell, with
-output to *verbose-out*.  Returns the shell's exit code."
+output to *VERBOSE-OUT*.  Returns the shell's exit code."
   (let ((command (apply #'format nil control-string args)))
     (format *verbose-out* "; $ ~A~%" command)
     #+sbcl
-    (sb-impl::process-exit-code
+    (sb-ext:process-exit-code
      (sb-ext:run-program
       #+win32 "sh" #-win32 "/bin/sh"
       (list  "-c" command)
