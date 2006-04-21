@@ -66,7 +66,9 @@ lutex_wake (tagged_lutex_t tagged_lutex, int n)
     struct lutex *lutex = (struct lutex*) native_pointer(tagged_lutex);
 
     pthread_mutex_lock(lutex->mutex);
-    if (-1) {
+
+    /* (ldb (byte 29 0) most-positive-fixnum) */
+    if (n >= ((1 << 29) - 1)) {
         /* CONDITION-BROADCAST */
         ret = pthread_cond_broadcast(lutex->condition_variable);
     } else{

@@ -373,11 +373,10 @@ time we reacquire MUTEX and return to the caller."
   #!+sb-doc
   "Notify all threads waiting on QUEUE."
   (condition-notify queue
-                    #+sb-lutex -1
                     ;; On a 64-bit platform truncating M-P-F to an int results
                     ;; in -1, which wakes up only one thread.
-                    #-sb-lutex (ldb (byte 29 0)
-                                    most-positive-fixnum)))
+                    (ldb (byte 29 0)
+                         most-positive-fixnum)))
 
 ;;;; semaphores
 
