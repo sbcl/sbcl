@@ -59,10 +59,6 @@ static void netbsd_init();
 static void freebsd_init();
 #endif /* __FreeBSD__ */
 
-#if defined(LISP_FEATURE_CARBON_SEMAPHORES)
-#include <CoreServices/CoreServices.h>
-#endif
-
 void
 os_init(char *argv[], char *envp[])
 {

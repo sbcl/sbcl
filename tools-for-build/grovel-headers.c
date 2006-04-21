@@ -43,17 +43,8 @@
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
-#include <semaphore.h>
 
 #include "genesis/config.h"
-
-#if defined(LISP_FEATURE_SB_LUTEX)
-#if defined(LISP_FEATURE_CARBON_SEMAPHORES)
-#include <CoreServices/CoreServices.h>
-#elif defined(LISP_FEATURE_MACH_SEMAPHORES)
-#include <mach/semaphore.h>
-#endif
-#endif
 
 #define DEFTYPE(lispname,cname) { cname foo; \
     printf("(define-alien-type " lispname " (%s %d))\n", (((foo=-1)<0) ? "sb!alien:signed" : "unsigned"), (8 * (sizeof foo))); }
@@ -95,21 +86,6 @@ main(int argc, char *argv[])
 
     defconstant ("input-record-size", sizeof (INPUT_RECORD));
 #else
-
-#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
-    printf("(in-package \"SB!THREAD\")\n\n");
-
-    printf(";;; C-land sizes\n");
-#if defined(LISP_FEATURE_MACH_SEMAPHORES)
-    defconstant ("semaphore-length", sizeof(semaphore_t));
-#elif defined(LISP_FEATURE_CARBON_SEMAPHORES)
-    defconstant ("semaphore-length", sizeof(MPSemaphoreID));
-#else
-    defconstant ("semaphore-length", sizeof(sem_t));
-#endif
-
-#endif
-
     printf("(in-package \"SB!ALIEN\")\n\n");
 
     printf (";;;flags for dlopen()\n");
