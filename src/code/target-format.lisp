@@ -228,12 +228,16 @@
             (prin1 (next-arg) stream)
             (write-char (next-arg) stream)))))
 
+;;; "printing" as defined in the ANSI CL glossary, which is normative.
+(defun char-printing-p (char)
+  (and (not (eql char #\Space))
+       (graphic-char-p char)))
+
 (defun format-print-named-character (char stream)
-  (let* ((name (char-name char)))
-    (cond (name
-           (write-string (string-capitalize name) stream))
-          (t
-           (write-char char stream)))))
+  (cond ((not (char-printing-p char))
+         (write-string (string-capitalize (char-name char)) stream))
+        (t
+         (write-char char stream))))
 
 (def-format-interpreter #\W (colonp atsignp params)
   (interpret-bind-defaults () params

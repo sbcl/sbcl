@@ -1229,4 +1229,14 @@
     (list (funcall #'target-fun 1 4) (funcall 'target-fun 1 4))))
 (test-target-fun-called #'caller-fun-3 (list -3 5))
 
+;; Reported by NIIMI Satoshi
+;; Subject: [Sbcl-devel] compilation error with optimization
+;; Date: Sun, 09 Apr 2006 17:36:05 +0900
+(defun test-minimal-debug-info-for-unstored-but-used-parameter (n a)
+  (declare (optimize (speed 3)
+                     (debug 1)))
+  (if (= n 0)
+      0
+      (test-minimal-debug-info-for-unstored-but-used-parameter (1- n) a)))
+
 ;;; success

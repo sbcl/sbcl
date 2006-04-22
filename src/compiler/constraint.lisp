@@ -310,49 +310,39 @@
 
   (aver (eql (numeric-type-class x) 'float))
   (aver (eql (numeric-type-class y) 'float))
-  #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
+  #+sb-xc-host                    ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
   x
-  #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
+  #-sb-xc-host                    ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
   (labels ((exclude (x)
              (cond ((not x) nil)
                    (or-equal x)
-                   (greater
-                    (if (consp x)
-                        (car x)
-                        x))
                    (t
                     (if (consp x)
                         x
                         (list x)))))
            (bound (x)
              (if greater (numeric-type-low x) (numeric-type-high x)))
-           (max-lower-bound (x y)
-             ;; Both X and Y are not null. Find the max.
-             (let ((res (max (type-bound-number x) (type-bound-number y))))
-               ;; An open lower bound is greater than a close
-               ;; lower bound because the open bound doesn't
-               ;; contain the bound, so choose an open lower
-               ;; bound.
-               (set-bound res (or (consp x) (consp y)))))
-           (min-upper-bound (x y)
-             ;; Same as above, but for the min of upper bounds
-             ;; Both X and Y are not null. Find the min.
-             (let ((res (min (type-bound-number x) (type-bound-number y))))
-               ;; An open upper bound is less than a closed
-               ;; upper bound because the open bound doesn't
-               ;; contain the bound, so choose an open lower
-               ;; bound.
-               (set-bound res (or (consp x) (consp y))))))
+           (tighter-p (x ref)
+             (cond ((null x) nil)
+                   ((null ref) t)
+                   ((and or-equal
+                         (= (type-bound-number x) (type-bound-number ref)))
+                    ;; X is tighter if REF is not an open bound and X is
+                    (and (not (consp ref)) (consp x)))
+                   (greater
+                    (< (type-bound-number ref) (type-bound-number x)))
+                   (t
+                    (> (type-bound-number ref) (type-bound-number x))))))
     (let* ((x-bound (bound x))
            (y-bound (exclude (bound y)))
            (new-bound (cond ((not x-bound)
                              y-bound)
                             ((not y-bound)
                              x-bound)
-                            (greater
-                             (max-lower-bound x-bound y-bound))
+                            ((tighter-p y-bound x-bound)
+                             y-bound)
                             (t
-                             (min-upper-bound x-bound y-bound)))))
+                             x-bound))))
       (if greater
           (modified-numeric-type x :low new-bound)
           (modified-numeric-type x :high new-bound)))))

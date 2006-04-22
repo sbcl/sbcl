@@ -188,4 +188,13 @@
                (with-output-to-string (*standard-output*)
                  (eval '(progn (princ ".") (let ((x 42)) t) (princ "."))))))
 
+;;; IF
+(defun true () t)
+(defun false () nil)
+(defmacro oops () (throw :oops (list)))
+(defun test-eval (ok form) (assert (eq ok (catch :oops (eval form)))))
+(test-eval t '(if (false) (oops) t))
+(test-eval t '(if (true) t (oops)))
+(test-eval nil '(if (not (if (false) t)) (oops)))
+
 ;;; success

@@ -94,9 +94,17 @@
  (:integer msg-peek "MSG_PEEK")
  (:integer msg-trunc "MSG_TRUNC")
  (:integer msg-waitall "MSG_WAITALL")
+ (:integer msg-eor "MSG_EOR")
+ (:integer msg-dontroute "MSG_DONTROUTE")
+ (:integer msg-dontwait "MSG_DONTWAIT")
+ (:integer msg-nosignal "MSG_NOSIGNAL")
+#+linux (:integer msg-confirm "MSG_CONFIRM")
+#+linux (:integer msg-more "MSG_MORE")
 
  ;; for socket-receive
  (:type socklen-t "socklen_t")
+ (:type size-t "size_t")
+ (:type ssize-t "ssize_t")
 
  #|
  ;;; stat is nothing to do with sockets, but I keep it around for testing
@@ -114,6 +122,8 @@
                        (integer proto "int" "p_proto")))
  (:function getprotobyname ("getprotobyname" (* protoent)
                                              (name c-string)))
+ (:function getprotobynumber ("getprotobynumber" (* protoent)
+                                                 (proto int)))
  (:integer inaddr-any "INADDR_ANY")
  (:structure in-addr ("struct in_addr"
                       ((array (unsigned 8)) addr "u_int32_t" "s_addr")))
@@ -134,6 +144,14 @@
                       (integer type "int" "h_addrtype")
                       (integer length "int" "h_length")
                       ((* (* (unsigned 8))) addresses "char **" "h_addr_list")))
+ (:structure msghdr ("struct msghdr"
+                      (c-string-pointer name "void *" "msg_name")
+                      (integer namelen "socklen_t" "msg_namelen")
+                      ((* t) iov "struct iovec" "msg_iov")
+                      (integer iovlen "size_t" "msg_iovlen")
+                      ((* t) control "void *" "msg_control")
+                      (integer controllen "socklen_t" "msg_controllen")
+                      (integer flags "int" "msg_flags")))
  (:function socket ("socket" int
                     (domain int)
                     (type int)
@@ -141,47 +159,67 @@
  (:function bind ("bind" int
                   (sockfd int)
                   (my-addr (* t))  ; KLUDGE: sockaddr-in or sockaddr-un?
-                  (addrlen int)))
+                  (addrlen socklen-t)))
  (:function listen ("listen" int
                     (socket int)
                     (backlog int)))
  (:function accept ("accept" int
                     (socket int)
                     (my-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-                    (addrlen int :in-out)))
+                    (addrlen socklen-t :in-out)))
  (:function getpeername ("getpeername" int
                          (socket int)
                          (her-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-                         (addrlen int :in-out)))
+                         (addrlen socklen-t :in-out)))
  (:function getsockname ("getsockname" int
                          (socket int)
                          (my-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-                         (addrlen int :in-out)))
+                         (addrlen socklen-t :in-out)))
  (:function connect ("connect" int
                     (socket int)
                     (his-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-                    (addrlen int )))
-
+                    (addrlen socklen-t)))
  (:function close ("close" int
                    (fd int)))
- (:function recvfrom ("recvfrom" int
+ (:function recvfrom ("recvfrom" ssize-t
                                  (socket int)
                                  (buf (* t))
                                  (len integer)
                                  (flags int)
                                  (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                                  (socklen (* socklen-t))))
+ (:function recvmsg ("recvmsg" ssize-t
+                               (socket int)
+                               (msg (* msghdr))
+                               (flags int)))
+ (:function send ("send" ssize-t
+                         (socket int)
+                         (buf (* t))
+                         (len size-t)
+                         (flags int)))
+ (:function sendto ("sendto" int
+                             (socket int)
+                             (buf (* t))
+                             (len size-t)
+                             (flags int)
+                             (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
+                             (socklen socklen-t)))
+ (:function sendmsg ("sendmsg" int
+                               (socket int)
+                               (msg (* msghdr))
+                               (flags int)))
  (:function gethostbyname ("gethostbyname" (* hostent) (name c-string)))
  (:function gethostbyaddr ("gethostbyaddr" (* hostent)
                                            (addr (* t))
                                            (len int)
                                            (af int)))
+;;; should be using getaddrinfo instead?
  (:function setsockopt ("setsockopt" int
                         (socket int)
                         (level int)
                         (optname int)
                         (optval (* t))
-                        (optlen int)))
+                        (optlen int))) ;;; should be socklen-t!
  (:function fcntl ("fcntl" int
                    (fd int)
                    (cmd int)
@@ -191,5 +229,5 @@
                         (level int)
                         (optname int)
                         (optval (* t))
-                        (optlen (* int)))))
+                        (optlen (* int))))) ;;; should be socklen-t!
 )

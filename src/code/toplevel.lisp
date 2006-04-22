@@ -360,8 +360,12 @@ steppers to maintain contextual information.")
   (/show0 "entering TOPLEVEL-INIT")
   (let (;; value of --sysinit option
         (sysinit nil)
+        ;; t if --no-sysinit option given
+        (no-sysinit nil)
         ;; value of --userinit option
         (userinit nil)
+        ;; t if --no-userinit option given
+        (no-userinit nil)
         ;; values of --eval options, in reverse order; and also any
         ;; other options (like --load) which're translated into --eval
         ;;
@@ -412,11 +416,17 @@ steppers to maintain contextual information.")
                        (if sysinit
                            (startup-error "multiple --sysinit options")
                            (setf sysinit (pop-option))))
+                      ((string= option "--no-sysinit")
+                       (pop-option)
+                       (setf no-sysinit t))
                       ((string= option "--userinit")
                        (pop-option)
                        (if userinit
                            (startup-error "multiple --userinit options")
                            (setf userinit (pop-option))))
+                      ((string= option "--no-userinit")
+                       (pop-option)
+                       (setf no-userinit t))
                       ((string= option "--eval")
                        (pop-option)
                        (push (pop-option) reversed-evals))
@@ -479,10 +489,20 @@ steppers to maintain contextual information.")
                #!-win32 (probe-init-files sysinit
                                           (init-file-name (posix-getenv "SBCL_HOME")
                                                           "sbclrc")
-                                          "/etc/sbclrc"))
+                                          "/etc/sbclrc")
+               #!+win32 (probe-init-files sysinit
+                                          (init-file-name (posix-getenv "SBCL_HOME")
+                                                          "sbclrc")
+                                          (concatenate 'string
+                                                       (sb!win32::get-folder-path 35) ;;SB-WIN32::CSIDL_COMMON_APPDATA
+                                                       "\\sbcl\\sbclrc")))
+
                (userinit-truename
                 #!-win32 (probe-init-files userinit
                                            (init-file-name (posix-getenv "HOME")
+                                                           ".sbclrc"))
+                #!+win32 (probe-init-files userinit
+                                           (init-file-name (namestring (user-homedir-pathname))
                                                            ".sbclrc"))))
 
           ;; This CATCH is needed for the debugger command TOPLEVEL to
@@ -502,8 +522,8 @@ steppers to maintain contextual information.")
             ;; figure out what's going on.)
             (restart-case
                 (progn
-                  (process-init-file sysinit-truename)
-                  (process-init-file userinit-truename)
+                  (unless no-sysinit (process-init-file sysinit-truename))
+                  (unless no-userinit (process-init-file userinit-truename))
                   (process-eval-options (reverse reversed-evals)))
               (abort ()
                 :report "Skip to toplevel READ/EVAL/PRINT loop."

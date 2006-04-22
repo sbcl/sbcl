@@ -981,7 +981,7 @@
 (defknown readtablep (t) boolean (movable foldable flushable))
 
 (defknown set-syntax-from-char
-  (character character &optional (or readtable null) readtable) (eql t)
+  (character character &optional readtable (or readtable null)) (eql t)
   ())
 
 (defknown set-macro-character (character callable &optional t readtable)

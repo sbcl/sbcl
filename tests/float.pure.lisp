@@ -118,6 +118,12 @@
    #c(1.0d0 2.0d0))
     'double-float))
 
+;;; More out of line functions (%COS, %SIN, %TAN) for constant folding,
+;;; reported by Mika Pihlajamäki
+(funcall (compile nil '(lambda () (cos (tan (round 0))))))
+(funcall (compile nil '(lambda () (sin (tan (round 0))))))
+(funcall (compile nil '(lambda () (tan (tan (round 0))))))
+
 (with-test (:name (:addition-overflow :bug-372)
             :fails-on '(or :ppc :darwin :mips :freebsd))
   (assert (typep (nth-value

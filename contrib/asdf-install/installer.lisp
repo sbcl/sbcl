@@ -134,6 +134,13 @@
                  (socket-open-p s))
         (socket-close s)))))
 
+
+(defun copy-stream (in out)
+  (let ((buf (make-array 8192 :element-type (stream-element-type in))))
+    (loop for pos = (read-sequence buf in)
+          until (zerop pos)
+          do (write-sequence buf out :end pos))))
+
 (defun download-files-for-package (package-name-or-url file-name)
   (let ((url
          (if (= (mismatch package-name-or-url "http://") 7)
@@ -156,14 +163,13 @@
         (format t "Downloading ~A bytes from ~A ..."
                 (if length length "some unknown number of") url)
         (force-output)
-        (with-open-file (o file-name :direction :output :element-type '(unsigned-byte 8))
+        (with-open-file (out file-name :direction :output
+                             :element-type '(unsigned-byte 8))
           (if length
-              (let ((buf (make-array length
-                                     :element-type
-                                     '(unsigned-byte 8))))
+              (let ((buf (make-array length :element-type '(unsigned-byte 8))))
                 (read-sequence buf stream)
-                (write-sequence buf o))
-              (sb-executable:copy-stream stream o :element-type '(unsigned-byte 8)))))
+                (write-sequence buf out))
+              (copy-stream stream out))))
       (close stream)
       (terpri)
       (restart-case
@@ -174,7 +180,7 @@
 
 (defun read-until-eof (stream)
   (with-output-to-string (o)
-    (sb-executable:copy-stream stream o)))
+    (copy-stream stream o)))
 
 (defun verify-gpg-signature/string (string file-name)
   (let* ((proc
@@ -250,8 +256,8 @@
 
 (defun install-package (source system packagename)
   "Returns a list of asdf system names for installed asdf systems"
-  (ensure-directories-exist source )
-    (ensure-directories-exist system )
+  (ensure-directories-exist source)
+    (ensure-directories-exist system)
   (let* ((tar
           (with-output-to-string (o)
             (or
@@ -279,6 +285,7 @@
                             system)))
                (when (probe-file target)
                  (sb-posix:unlink target))
+               #-win32
                (sb-posix:symlink asd target))
           collect (pathname-name asd))))
 

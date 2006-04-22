@@ -1515,8 +1515,9 @@
                 (emit-mod-reg-r/m-byte segment #b11 #b000
                                        (reg-tn-encoding dst))
                 (emit-signed-dword segment src))
-               ((typep src `(integer ,(- (expt 2 64) (expt 2 31))
-                                     (,(expt 2 64))))
+               ((<= (- (expt 2 64) (expt 2 31))
+                    src
+                    (1- (expt 2 64)))
                 ;; This triggers on positive integers of 64 bits length
                 ;; with the most significant 33 bits being 1. We use the
                 ;; same encoding as in the previous clause.

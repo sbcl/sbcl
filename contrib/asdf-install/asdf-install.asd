@@ -4,7 +4,6 @@
   (:use #:cl #:asdf))
 
 (in-package #:asdf-install-system)
-(require 'sb-executable)
 
 (defsystem asdf-install
   :depends-on (sb-posix sb-bsd-sockets)

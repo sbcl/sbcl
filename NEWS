@@ -1,4 +1,72 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-0.9.12 relative to sbcl-0.9.11:
+  * minor incompatible change: in sbcl-0.9.11 (but not earlier
+    versions) SB-MOP:FINALIZE-INHERITANCE would recursively descend
+    into subclasses of the finalized class.  Now user calls to
+    FINALIZE-INHERITANCE finalize just the one class, and calls by the
+    system return before any subclasses are finalized.
+  * minor incompatible change: The reader no longer ignores errors
+    regarding non-existent packages in #+ and #- feature tests.
+  * new feature: command line options --no-sysinit, --no-userinit to
+    inhibit loading the corresponding init files
+  * new feature: add a generic function SOCKET-SEND to SB-BSD-SOCKETS, 
+    for sending data through UDP sockets (thanks to François-René Rideau)
+  * minor incompatible change: SIGPIPE is ignored and "Broken pipe"
+    error is signalled instead (thanks to François-René Rideau)
+  * minor incompatible change: Error signalling behaviour of lexical
+    operations violating package locks has changed slightly. Refer to
+    documentation on package locks for details.
+  * enhancement: EVAL can process IF-expressions without resorting to the
+    compiler.
+  * bug fix: Some operations involving SIN, COS, or TAN weren't being
+    constant-folded properly due to missing out-of-line functions.
+    (reported by Mika Pihlajamäki)
+  * bug fix: LISTEN sometimes returned T even in cases where no data was
+    immediately available from the stream
+  * fixed bug: types of the last two arguments to SET-SYNTAX-FROM-CHAR
+    were reversed. (reported by Levente Mészáros)
+  * fixed bug: Tests for the (VECTOR T) type gave the wrong answer
+    when given a vector displaced to an adjustable array.  (reported
+    by Utz-Uwe Haus)
+  * bug fix: derivation of float boundaries from numbers outside the
+    appropriate float range (reported by John Wiseman)
+  * bug fix: MAKE-LOAD-FORM-SAVING-SLOTS accepts en empty slot name
+    list.
+  * bug fix: precomputing cache entries for generic functions with
+    some subclasses of specializers as yet invalid does not attempt to
+    fill a cache line with a negative offset.  (reported by Levente
+    Mészároz)
+  * improvements to DOCUMENTATION for TYPE and STRUCTURE doc-types:
+    allow condition class objects as arguments to DOCUMENTATION and
+    (SETF DOCUMENTATION); only find and set documentation for
+    structure names for the STRUCTURE doc-type.  (suggested by Gary
+    King)
+  * improvements to the Win32/x86 port:
+    ** (user-homedir-pathname) and default initialization file
+       locations now know about the user's "Documents and Settings"
+       directory (thanks to Yaroslav Kavenchuk)
+    ** run-program is implemented (thanks to Mike Thomas)
+    ** sockets support (thanks to Timothy Ritchey)
+    ** better backtrace support (thanks to Alastair Bridgewater)
+    ** sb-grovel supported
+    ** asdf-install and sb-posix work somewhat
+    ** capable of running Slime using SWANK:*COMMUNICATION-STYLE* NIL
+  * improvements to the Solaris/x86 port:
+    ** works on Solaris 11/Solaris Express
+    ** floating-point exception handling support
+    ** support for the breakpoint-based TRACE :ENCAPSULATE NIL facility
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** REMOVE-METHOD returns its generic function argument even when
+       the method is not one of the generic functions' methods.
+    ** objects declared as MEMBER types can be admissible arguments to 
+       structure accessors.
+    ** printing characters should simply be printed by the FORMAT ~:C
+       directive.
+    ** compiler failure when compiling functions with hairy constant
+       defaults for optional parameters.
+    ** compiler produces wrong code when MAYBE-INLINE-expanding a
+       function, which is already optimized.
+
 changes in sbcl-0.9.11 relative to sbcl-0.9.10:
   * new platform: experimental support for SBCL x86/Darwin, including
     MacOS X 10.4.5 on Intel.

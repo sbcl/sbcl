@@ -21,6 +21,10 @@
 (define-alien-type dword unsigned-long)
 (define-alien-type bool int)
 (define-alien-type UINT unsigned-int)
+(define-alien-type tchar #!+sb-unicode (sb!alien:unsigned 16)
+                         #!-sb-unicode char)
+
+(defconstant default-environment-length 1024)
 
 ;;; HANDLEs are actually pointers, but an invalid handle is -1 cast
 ;;; to a pointer.
@@ -151,11 +155,11 @@
 (define-alien-routine ("Sleep@4" millisleep) void
   (milliseconds dword))
 
-#!+sb-unicode (defvar *ANSI-CP* nil)
-#!+sb-unicode (defvar *OEM-CP* nil)
+#!+sb-unicode (defvar *ANSI-CODEPAGE* nil)
+#!+sb-unicode (defvar *OEM-CODEPAGE* nil)
 
 #!+sb-unicode
-(defparameter *cp-to-external-format* (make-hash-table))
+(defparameter *codepage-to-external-format* (make-hash-table))
 
 #!+sb-unicode
 (dolist (cp
@@ -309,26 +313,164 @@
     ;;57011     ISCII Punjabi
     ;;65000     Unicode UTF-7
     (65001 :UTF8))) ;; Unicode UTF-8
-  (setf (gethash (car cp) *cp-to-external-format*) (cadr cp)))
+  (setf (gethash (car cp) *codepage-to-external-format*) (cadr cp)))
 
 #!+sb-unicode
-(declaim (ftype (function () keyword) ansi-cp))
+(declaim (ftype (function () keyword) ansi-codepage))
 #!+sb-unicode
-(defun ansi-cp ()
-  (or *ANSI-CP*
-      (setq *ANSI-CP*
+(defun ansi-codepage ()
+  (or *ANSI-CODEPAGE*
+      (setq *ANSI-CODEPAGE*
         (or
           (gethash (alien-funcall (extern-alien "GetACP@0" (function UINT)))
-                   *cp-to-external-format*)
+                   *codepage-to-external-format*)
           :LATIN-1))))
 
 #!+sb-unicode
-(declaim (ftype (function () keyword) oem-cp))
+(declaim (ftype (function () keyword) oem-codepage))
 #!+sb-unicode
-(defun oem-cp ()
-  (or *OEM-CP*
-      (setq *OEM-CP*
+(defun oem-codepage ()
+  (or *OEM-CODEPAGE*
+      (setq *OEM-CODEPAGE*
         (or
           (gethash (alien-funcall (extern-alien "GetOEMCP@0" (function UINT)))
-                   *cp-to-external-format*)
+                   *codepage-to-external-format*)
           :LATIN-1))))
+
+;; http://msdn.microsoft.com/library/en-us/dllproc/base/getconsolecp.asp
+(declaim (ftype (function () keyword) console-input-codepage))
+(defun console-input-codepage ()
+  (or #!+sb-unicode
+      (gethash (alien-funcall (extern-alien "GetConsoleCP@0" (function UINT)))
+               *codepage-to-external-format*)
+      :LATIN-1))
+
+;; http://msdn.microsoft.com/library/en-us/dllproc/base/getconsoleoutputcp.asp
+(declaim (ftype (function () keyword) console-output-codepage))
+(defun console-output-codepage ()
+  (or #!+sb-unicode
+      (gethash (alien-funcall (extern-alien "GetConsoleOutputCP@0" (function UINT)))
+               *codepage-to-external-format*)
+      :LATIN-1))
+
+;;;; FIXME (rudi 2006-03-29): this should really be (octets-to-string
+;;;; :external-format :ucs2), except that we do not have an
+;;;; implementation of ucs2 yet.
+(defmacro ucs2->string (astr &optional size)
+  #!-sb-unicode
+  (declare (ignore size))
+  #!-sb-unicode
+  `(cast ,astr c-string)
+  #!+sb-unicode
+  (let ((str-len (or size `(do ((i 0 (1+ i))) ((zerop (deref ,astr i)) i)))))
+    `(let* ((l ,str-len)
+            (s (make-string l)))
+      (dotimes (i l) (setf (aref s i) (code-char (deref ,astr i))))
+      s)))
+
+(defmacro ucs2->string&free (astr &optional size)
+  `(prog1 (ucs2->string ,astr ,size) (free-alien ,astr)))
+
+(define-alien-routine ("LocalFree@4" local-free) void
+  (lptr (* t)))
+
+(defun get-last-error-message (err)
+  "http://msdn.microsoft.com/library/default.asp?url=/library/en-us/debug/base/retrieving_the_last_error_code.asp"
+  (with-alien ((amsg (* tchar)))
+    (let ((nchars
+            (alien-funcall
+              (extern-alien #!+sb-unicode "FormatMessageW@28"
+                            #!-sb-unicode "FormatMessageA@28"
+                            (function dword
+                                      dword dword dword dword (* (* tchar)) dword dword))
+              (logior FORMAT_MESSAGE_ALLOCATE_BUFFER FORMAT_MESSAGE_FROM_SYSTEM)
+              0 err 0 (addr amsg) 0 0)))
+      (prog1 (ucs2->string amsg nchars)
+        (local-free amsg)))))
+
+(defmacro win32-error (func-name)
+  `(let ((err-code (sb!win32::get-last-error)))
+     (error "~%Win32 Error [~A] - ~A~%~A"
+            ,func-name
+            err-code
+            (sb!win32::get-last-error-message err-code))))
+
+(defun get-folder-path (CSIDL)
+  "http://msdn.microsoft.com/library/en-us/shellcc/platform/shell/reference/functions/shgetfolderpath.asp"
+  (with-alien ((apath (* tchar) (make-alien tchar (1+ MAX_PATH))))
+    (alien-funcall
+      (extern-alien #!-sb-unicode "SHGetFolderPathA@20"
+                    #!+sb-unicode "SHGetFolderPathW@20"
+                    (function int handle int handle dword (* tchar)))
+      0 CSIDL 0 0 apath)
+    (concatenate 'string (ucs2->string&free apath) "\\")))
+
+(defun sb!unix:posix-getcwd ()
+  (with-alien ((apath (* tchar) (make-alien tchar (1+ MAX_PATH)))
+               (afunc (function dword dword (* tchar))
+                      :extern #!-sb-unicode "GetCurrentDirectoryA@8"
+                              #!+sb-unicode "GetCurrentDirectoryW@8"))
+    (let ((ret (alien-funcall afunc (1+ MAX_PATH) apath)))
+      (when (zerop ret)
+        (win32-error "GetCurrentDirectory"))
+      (when (> ret (1+ MAX_PATH))
+        (free-alien apath)
+        (setf apath (make-alien tchar ret))
+        (alien-funcall afunc ret apath))
+      (ucs2->string&free apath ret))))
+
+(defun sb!unix:unix-mkdir (name mode)
+  (declare (type sb!unix:unix-pathname name)
+           (type sb!unix:unix-file-mode mode)
+           (ignore mode))
+  (let ((name-length (length name)))
+    (with-alien ((apath (* tchar) (make-alien tchar (1+ name-length))))
+      (dotimes (i name-length) (setf (deref apath i) (char-code (aref name i))))
+      (setf (deref apath name-length) 0)
+      (when
+        (zerop (alien-funcall
+                 (extern-alien #!-sb-unicode "CreateDirectoryA@8"
+                               #!+sb-unicode "CreateDirectoryW@8"
+                               (function bool (* tchar) dword))
+                 apath 0))
+        (win32-error "CreateDirectory"))
+      (values t 0))))
+
+(defun sb!unix:unix-rename (name1 name2)
+  (declare (type sb!unix:unix-pathname name1 name2))
+  (let ((name-length1 (length name1))
+        (name-length2 (length name2)))
+    (with-alien ((apath1 (* tchar) (make-alien tchar (1+ name-length1)))
+                 (apath2 (* tchar) (make-alien tchar (1+ name-length2))))
+      (dotimes (i name-length1) (setf (deref apath1 i) (char-code (aref name1 i))))
+      (setf (deref apath1 name-length1) 0)
+      (dotimes (i name-length2) (setf (deref apath2 i) (char-code (aref name2 i))))
+      (setf (deref apath2 name-length2) 0)
+      (when
+        (zerop (alien-funcall
+                 (extern-alien #!-sb-unicode "MoveFileA@8"
+                               #!+sb-unicode "MoveFileW@8"
+                               (function bool (* tchar) (* tchar)))
+                 apath1 apath2))
+        (win32-error "MoveFile"))
+      (values t 0))))
+
+
+(defun sb!unix::posix-getenv (name)
+  (declare (type simple-string name))
+  (let ((name-length (length name)))
+    (with-alien ((aname (* tchar) (make-alien tchar (1+ name-length)))
+                 (aenv (* tchar) (make-alien tchar default-environment-length))
+                 (afunc (function dword (* tchar) (* tchar) dword)
+                        :extern #!-sb-unicode "GetEnvironmentVariableA@12"
+                        #!+sb-unicode "GetEnvironmentVariableW@12"))
+                (dotimes (i name-length) (setf (deref aname i) (char-code (aref name i))))
+                (setf (deref aname name-length) 0)
+                (let ((ret (alien-funcall afunc aname aenv default-environment-length)))
+                  (when (> ret default-environment-length)
+                    (free-alien aenv)
+                    (setf aenv (make-alien tchar ret))
+                    (alien-funcall afunc aname aenv ret))
+                  (if (> ret 0)
+                      (ucs2->string&free aenv ret)
+                    nil)))))

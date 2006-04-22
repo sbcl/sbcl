@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 64)
+(def!constant +fasl-file-version+ 65)
 ;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
@@ -134,6 +134,7 @@
 ;;;     trap information size on RISCy platforms.
 ;;; 64: (2006-03-24) New calling convention for unknown-values on x86 and
 ;;;     x86-64.  Also (belatedly) PPC/gencgc, including :gencgc on FPAFF.
+;;; 65: (2006-04-11) Package locking interface changed.
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

@@ -230,7 +230,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
         *(single_stepping-2) = single_step_save2;
         *(single_stepping-1) = single_step_save3;
 #else
-        *context_eflags_addr(context) ^= 0x100;
+        *context_eflags_addr(context) &= ~0x100;
 #endif
         /* Re-install the breakpoint if possible. */
         if (*os_context_pc_addr(context) == (int)single_stepping + 1) {
@@ -258,6 +258,18 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
        the single-stepping code entirely.  -- CSR, 2002-07-15 */
 #if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
+#endif
+
+
+#ifdef LISP_FEATURE_SUNOS
+    /* For some reason the breakpoints that :ENCAPSULATE NIL tracing sets up
+     * cause a trace trap (i.e. processor single-stepping trap) on the following
+     * instruction on Solaris 10/x86. -- JES, 2006-04-07
+     */
+    if (info->si_code == TRAP_TRACE) {
+        lose("foo");
+        return;
+    }
 #endif
 
     /* On entry %eip points just after the INT3 byte and aims at the

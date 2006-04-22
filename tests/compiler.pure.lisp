@@ -2012,3 +2012,77 @@
                              (declare (optimize (speed 3)))
                            (1+ x)))))
      (compiler-note () (error "The code is not optimized.")))))
+
+(with-test (:name (:compiler :constraint-propagation :float-bounds-1))
+  (handler-case
+      (compile nil '(lambda (x)
+                      (declare (type (single-float * (3.0)) x))
+                      (when (<= x 2.0)
+                        (when (<= 2.0 x)
+                          x))))
+    (compiler-note () (error "Deleted reachable code."))))
+
+(with-test (:name (:compiler :constraint-propagation :float-bounds-2))
+  (catch :note
+    (handler-case
+        (compile nil '(lambda (x)
+                        (declare (type single-float x))
+                        (when (< 1.0 x)
+                          (when (<= x 1.0)
+                            (error "This is unreachable.")))))
+      (compiler-note () (throw :note nil)))
+    (error "Unreachable code undetected.")))
+
+;; Reported by John Wiseman, sbcl-devel
+;; Subject: [Sbcl-devel] float type derivation bug?
+;; Date: Tue, 4 Apr 2006 15:28:15 -0700
+(with-test (:name (:type-derivation :float-bounds))
+  (compile nil '(lambda (bits)
+                 (let* ((s (if (= (ash bits -31) 0) 1 -1))
+                        (e (logand (ash bits -23) #xff))
+                        (m (if (= e 0)
+                               (ash (logand bits #x7fffff) 1)
+                               (logior (logand bits #x7fffff) #x800000))))
+                   (float (* s m (expt 2 (- e 150))))))))
+
+;; Reported by James Knight
+;; Subject: [Sbcl-devel] AVER: "(EQ (SB-NAME (SC-SB (TN-SC TN))) 'REGISTERS)"
+;; Date: Fri, 24 Mar 2006 19:30:00 -0500
+(with-test (:name :logbitp-vop)
+  (compile nil
+           '(lambda (days shift)
+             (declare (type fixnum shift days))
+             (let* ((result 0)
+                    (canonicalized-shift (+ shift 1))
+                    (first-wrapping-day (- 1 canonicalized-shift)))
+               (declare (type fixnum result))
+               (dotimes (source-day 7)
+                 (declare (type (integer 0 6) source-day))
+                 (when (logbitp source-day days)
+                   (setf result
+                         (logior result
+                                 (the fixnum
+                                   (if (< source-day first-wrapping-day)
+                                       (+ source-day canonicalized-shift)
+                                       (- (+ source-day
+                                             canonicalized-shift) 7)))))))
+               result))))
+
+;;; MISC.637: incorrect delaying of conversion of optional entries
+;;; with hairy constant defaults
+(let ((f '(lambda ()
+  (labels ((%f11 (f11-2 &key key1)
+             (labels ((%f8 (f8-2 &optional (f8-5 (if nil (return-from %f11 0) 0)))
+                        :bad1))
+               (%f8 (%f8 0)))
+             :bad2))
+    :good))))
+  (assert (eq (funcall (compile nil f)) :good)))
+
+;;; MISC.555: new reference to an already-optimized local function
+(let* ((l '(lambda (p1)
+    (declare (optimize (speed 1) (safety 2) (debug 2) (space 0)) (type keyword p1))
+    (keywordp p1)))
+       (f (compile nil l)))
+  (assert (funcall f :good))
+  (assert (nth-value 1 (ignore-errors (funcall f 42)))))

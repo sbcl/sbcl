@@ -21,7 +21,8 @@
 (defun vector-t-p (x)
   (or (simple-vector-p x)
       (and (complex-vector-p x)
-           (simple-vector-p (%array-data-vector x)))))
+           (do ((data (%array-data-vector x) (%array-data-vector data)))
+               ((not (array-header-p data)) (simple-vector-p data))))))
 
 ;;;; primitive predicates. These must be supported directly by the
 ;;;; compiler.

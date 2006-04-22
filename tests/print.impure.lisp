@@ -410,4 +410,6 @@
 (with-test (:name (:print-readable :character :iso-8859-1))
   (test-readable-character (code-char #xfffe) :iso-8859-1))
 
+(assert (string= (eval '(format nil "~:C" #\a)) "a"))
+(assert (string= (format nil (formatter "~:C") #\a) "a"))
 ;;; success

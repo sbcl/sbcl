@@ -943,7 +943,7 @@
 
 (defun fill-cache (cache wrappers value)
   ;; FILL-CACHE won't return if WRAPPERS is nil, might as well check..
-  (assert wrappers)
+  (aver wrappers)
 
   (or (fill-cache-p nil cache wrappers value)
       (and (< (ceiling (* (cache-count cache) *cache-expand-threshold*))
@@ -982,10 +982,7 @@
 
 (defun probe-cache (cache wrappers &optional default limit-fn)
   ;;(declare (values value))
-  (unless wrappers
-    ;; FIXME: This and another earlier test on a WRAPPERS arg can
-    ;; be compact assertoids.
-    (error "WRAPPERS arg is NIL!"))
+  (aver wrappers)
   (with-local-cache-functions (cache)
     (let* ((location (compute-primary-cache-location (field) (mask) wrappers))
            (limit (funcall (or limit-fn (limit-fn)) (nlines))))
@@ -1041,6 +1038,13 @@
     (let* ((location (compute-primary-cache-location (field) (mask) wrappers))
            (primary (location-line location)))
       (declare (fixnum location primary))
+      ;; FIXME: I tried (aver (> location 0)) and (aver (not
+      ;; (location-reserved-p location))) here, on the basis that
+      ;; particularly passing a LOCATION of 0 for a cache with more
+      ;; than one key would cause PRIMARY to be -1.  However, the
+      ;; AVERs triggered during the bootstrap, and removing them
+      ;; didn't cause anything to break, so I've left them removed.
+      ;; I'm still confused as to what is right.  -- CSR, 2006-04-20
       (multiple-value-bind (free emptyp)
           (find-free-cache-line primary cache wrappers)
         (when (or forcep emptyp)

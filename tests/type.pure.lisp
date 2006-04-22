@@ -330,3 +330,6 @@ ACTUAL ~D DERIVED ~D~%"
   (sb-kernel:type=
    (sb-kernel:specifier-type '(simple-array an-unkown-type (7)))
    (sb-kernel:specifier-type '(simple-array an-unkown-type (8))))))
+
+(assert (typep #p"" 'sb-kernel:instance))
+(assert (subtypep '(member #p"") 'sb-kernel:instance))

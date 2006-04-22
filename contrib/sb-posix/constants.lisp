@@ -6,27 +6,36 @@
 (#||#
  "sys/types.h"
  "sys/stat.h"
-
- "sys/socket.h" "sys/un.h" "netinet/in.h" "netinet/in_systm.h"
- "netinet/ip.h" "net/if.h" "netinet/tcp.h" "sys/mman.h" "sys/wait.h"
+ #-win32 "sys/socket.h"
+ #-win32 "sys/un.h"
+ #-win32 "netinet/in.h"
+ #-win32 "netinet/in_systm.h"
+ #-win32 "netinet/ip.h"
+ #-win32 "net/if.h"
+ #-win32 "netinet/tcp.h"
+ #-win32 "sys/mman.h"
+ #-win32 "sys/wait.h"
  "fcntl.h"
- "netdb.h" "errno.h"
+ #-win32 "netdb.h"
+ "errno.h"
  "dirent.h" "signal.h"
- "pwd.h"
+ #-win32 "pwd.h"
  "unistd.h"
-
- "termios.h")
+ #-win32 "termios.h")
 
 ;;; then the stuff we're looking for
 ((:integer af-inet "AF_INET" "IP Protocol family" t)
 
- (:type uid-t "uid_t")
- (:type gid-t "gid_t")
+ ;; KLUDGE: These types simply do not seem to exist on Windows,
+ ;; but we'll provide these anyways -- at least in a way that should
+ ;; match with stat.
+ (:type uid-t   #-win32 "uid_t"   #+win32 "short")
+ (:type gid-t   #-win32 "gid_t"   #+win32 "short")
+ (:type nlink-t #-win32 "nlink_t" #+win32 "short")
 
  (:type pid-t "pid_t")
  (:type ino-t "ino_t")
 
- (:type nlink-t "nlink_t")
  (:type time-t "time_t")
  (:type dev-t "dev_t")
 
@@ -248,6 +257,7 @@
                          :distrust-length #+sunos t #-sunos nil)) t)
 
  ;; password database
+ #-win32
  (:structure alien-passwd
              ("struct passwd"
               (c-string-pointer name "char *" "pw_name")
@@ -323,11 +333,14 @@
  (:integer f-setown "F_SETOWN" nil t)
 
  ;; tcgetattr(), tcsetattr()
+ #-win32
  (:type cc-t "cc_t")
+ #-win32
  (:type speed-t "speed_t" nil t)
+ #-win32
  (:type tcflag-t "tcflag_t" nil t)
  (:integer nccs "NCCS" nil t)
-
+ #-win32
  (:structure alien-termios
              ("struct termios"
               (tcflag-t iflag "tcflag_t" "c_iflag")

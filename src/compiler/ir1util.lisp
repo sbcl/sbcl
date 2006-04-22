@@ -1015,6 +1015,17 @@
 
   (values))
 
+(defun note-local-functional (fun)
+  (declare (type functional fun))
+  (when (and (leaf-has-source-name-p fun)
+             (eq (leaf-source-name fun) (functional-debug-name fun)))
+    (let ((name (leaf-source-name fun)))
+      (let ((defined-fun (gethash name *free-funs*)))
+        (when (and defined-fun
+                   (defined-fun-p defined-fun)
+                   (eq (defined-fun-functional defined-fun) fun))
+          (remhash name *free-funs*))))))
+
 ;;; Do stuff to delete the semantic attachments of a REF node. When
 ;;; this leaves zero or one reference, we do a type dispatch off of
 ;;; the leaf to determine if a special action is appropriate.

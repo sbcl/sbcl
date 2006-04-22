@@ -79,4 +79,51 @@
       (error "misbehavior in DESCRIBE of ~S" i))))
 
 
+;;; Tests of documentation on types and classes
+(defclass foo ()
+  ()
+  (:documentation "FOO"))
+(defstruct bar "BAR")
+(define-condition baz ()
+  ()
+  (:documentation "BAZ"))
+(deftype quux ()
+  "QUUX"
+  't)
+(defstruct (frob (:type vector)) "FROB")
+(macrolet
+    ((do-class (name expected &optional structurep)
+       `(progn
+         (assert (string= (documentation ',name 'type) ,expected))
+         (assert (string= (documentation (find-class ',name) 'type) ,expected))
+         (assert (string= (documentation (find-class ',name) 't) ,expected))
+         ,@(when structurep
+            `((assert (string= (documentation ',name 'structure) ,expected))))
+         (let ((new1 (symbol-name (gensym "NEW1")))
+               (new2 (symbol-name (gensym "NEW2")))
+               (new3 (symbol-name (gensym "NEW3")))
+               (new4 (symbol-name (gensym "NEW4"))))
+           (declare (ignorable new4))
+           (setf (documentation ',name 'type) new1)
+           (assert (string= (documentation (find-class ',name) 'type) new1))
+           (setf (documentation (find-class ',name) 'type) new2)
+           (assert (string= (documentation (find-class ',name) 't) new2))
+           (setf (documentation (find-class ',name) 't) new3)
+           (assert (string= (documentation ',name 'type) new3))
+           ,@(when structurep
+              `((assert (string= (documentation ',name 'structure) new3))
+                (setf (documentation ',name 'structure) new4)
+                (assert (string= (documentation ',name 'structure) new4))))))))
+  (do-class foo "FOO")
+  (do-class bar "BAR" t)
+  (do-class baz "BAZ"))
+
+(assert (string= (documentation 'quux 'type) "QUUX"))
+(setf (documentation 'quux 'type) "NEW4")
+(assert (string= (documentation 'quux 'type) "NEW4"))
+
+(assert (string= (documentation 'frob 'structure) "FROB"))
+(setf (documentation 'frob 'structure) "NEW5")
+(assert (string= (documentation 'frob 'structure) "NEW5"))
+
 ;;;; success

@@ -190,7 +190,10 @@
                                     (list '(flet test) #'not-optimized))))))
 
 (with-test (:name (:throw :no-such-tag)
-            :fails-on '(or (and :x86 :linux) (and :x86 :freebsd) :alpha :mips))
+            :fails-on '(or
+                        (and :x86 (or :linux :freebsd sunos))
+                        :alpha
+                        :mips))
   (progn
     (defun throw-test ()
       (throw 'no-such-tag t))
@@ -233,7 +236,7 @@
 
 ;;; FIXME: This test really should be broken into smaller pieces
 (with-test (:name (:backtrace :misc)
-            :fails-on '(and :x86 :linux))
+            :fails-on '(and :x86 (or :linux :sunos)))
   (macrolet ((with-details (bool &body body)
                `(let ((sb-debug:*show-entry-point-details* ,bool))
                  ,@body)))
@@ -337,6 +340,11 @@
 (defun trace-this ()
   'ok)
 
+(defun trace-fact (n)
+  (if (zerop n)
+      1
+      (* n (trace-fact (1- n)))))
+
 (let ((out (with-output-to-string (*trace-output*)
              (trace trace-this)
              (assert (eq 'ok (trace-this)))
@@ -357,6 +365,17 @@
                (untrace))))
     (assert (search "TRACE-THIS" out))
     (assert (search "returned OK" out))))
+
+#-(and (or ppc x86) darwin)
+(with-test (:name (trace-recursive :encapsulate nil)
+            :fails-on '(or ppc sparc))
+  (let ((out (with-output-to-string (*trace-output*)
+               (trace trace-fact :encapsulate nil)
+               (assert (= 120 (trace-fact 5)))
+               (untrace))))
+    (assert (search "TRACE-FACT" out))
+    (assert (search "returned 1" out))
+    (assert (search "returned 120" out))))
 
 ;;;; test infinite error protection
 

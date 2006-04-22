@@ -3128,7 +3128,7 @@ register."
   (unless (member data *executing-breakpoint-hooks*)
     (let ((*executing-breakpoint-hooks* (cons data
                                               *executing-breakpoint-hooks*)))
-      (invoke-breakpoint-hooks breakpoints component offset)))
+      (invoke-breakpoint-hooks breakpoints signal-context)))
   ;; At this point breakpoints may not hold the same list as
   ;; BREAKPOINT-DATA-BREAKPOINTS since invoking hooks may have allowed
   ;; a breakpoint deactivation. In fact, if all breakpoints were
@@ -3151,10 +3151,8 @@ register."
     #!+(and sparc solaris)
     (error "BREAKPOINT-DO-DISPLACED-INST returned?")))
 
-(defun invoke-breakpoint-hooks (breakpoints component offset)
-  (let* ((debug-fun (debug-fun-from-pc component offset))
-         (frame (do ((f (top-frame) (frame-down f)))
-                    ((eq debug-fun (frame-debug-fun f)) f))))
+(defun invoke-breakpoint-hooks (breakpoints signal-context)
+  (let* ((frame (signal-context-frame signal-context)))
     (dolist (bpt breakpoints)
       (funcall (breakpoint-hook-fun bpt)
                frame
@@ -3165,6 +3163,16 @@ register."
                (if (eq (breakpoint-kind bpt) :unknown-return-partner)
                    (breakpoint-unknown-return-partner bpt)
                    bpt)))))
+
+(defun signal-context-frame (signal-context)
+  (let* ((scp
+          (locally
+            (declare (optimize (inhibit-warnings 3)))
+            (sb!alien:sap-alien signal-context (* os-context-t))))
+         (cfp (int-sap (sb!vm:context-register scp sb!vm::cfp-offset))))
+    (compute-calling-frame cfp
+                           (sb!vm:context-pc scp)
+                           nil)))
 
 (defun handle-fun-end-breakpoint (offset component context)
   (let ((data (breakpoint-data component offset nil)))
@@ -3186,10 +3194,7 @@ register."
           (locally
             (declare (optimize (inhibit-warnings 3)))
             (sb!alien:sap-alien signal-context (* os-context-t))))
-         (frame (do ((cfp (sb!vm:context-register scp sb!vm::cfp-offset))
-                     (f (top-frame) (frame-down f)))
-                    ((= cfp (sap-int (frame-pointer f))) f)
-                  (declare (type (unsigned-byte #.sb!vm:n-word-bits) cfp))))
+         (frame (signal-context-frame signal-context))
          (component (breakpoint-data-component data))
          (cookie (gethash component *fun-end-cookies*)))
     (remhash component *fun-end-cookies*)

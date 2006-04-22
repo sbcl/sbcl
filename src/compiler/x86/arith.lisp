@@ -614,7 +614,7 @@
                   ;; at the low five bits of the result.
                   (inst sar result (min 31 (- amount)))
                   ;; Fixnum correction.
-                  (inst and result #xfffffffc)))))))
+                  (inst and result (lognot fixnum-tag-mask))))))))
 
 (define-vop (fast-ash-left/fixnum=>fixnum)
   (:translate ash)
@@ -1071,6 +1071,8 @@
     (inst jmp (if not-p :nc :c) target)))
 
 (define-vop (fast-logbitp/signed fast-conditional/signed)
+  (:args (x :scs (signed-reg signed-stack))
+         (y :scs (signed-reg)))
   (:translate %logbitp)
   (:generator 6
     (inst bt x y)
@@ -1084,6 +1086,8 @@
     (inst jmp (if not-p :nc :c) target)))
 
 (define-vop (fast-logbitp/unsigned fast-conditional/unsigned)
+  (:args (x :scs (unsigned-reg unsigned-stack))
+         (y :scs (unsigned-reg)))
   (:translate %logbitp)
   (:generator 6
     (inst bt x y)

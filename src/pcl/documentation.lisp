@@ -137,6 +137,16 @@
 (defmethod documentation ((x standard-class) (doc-type (eql 'type)))
   (slot-value x '%documentation))
 
+;;; although the CLHS doesn't mention this, it is reasonable to assume
+;;; that parallel treatment of condition-class was intended (if
+;;; condition-class is in fact not implemented as a standard-class or
+;;; structure-class).
+(defmethod documentation ((x condition-class) (doc-type (eql 't)))
+  (values (info :type :documentation (class-name x))))
+
+(defmethod documentation ((x condition-class) (doc-type (eql 'type)))
+  (values (info :type :documentation (class-name x))))
+
 (defmethod documentation ((x symbol) (doc-type (eql 'type)))
   (or (values (info :type :documentation x))
       (let ((class (find-class x nil)))
@@ -144,12 +154,12 @@
           (slot-value class '%documentation)))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'structure)))
-  (cond ((eq (info :type :kind x) :instance)
-         (values (info :type :documentation x)))
-        ((info :typed-structure :info x)
-         (values (info :typed-structure :documentation x)))
-        (t
-         nil)))
+  (cond
+    ((structure-type-p x)
+     (values (info :type :documentation x)))
+    ((info :typed-structure :info x)
+     (values (info :typed-structure :documentation x)))
+    (t nil)))
 
 (defmethod (setf documentation) (new-value
                                  (x structure-class)
@@ -170,6 +180,16 @@
                                  (x standard-class)
                                  (doc-type (eql 'type)))
   (setf (slot-value x '%documentation) new-value))
+
+(defmethod (setf documentation) (new-value
+                                 (x condition-class)
+                                 (doc-type (eql 't)))
+  (setf (info :type :documentation (class-name x)) new-value))
+
+(defmethod (setf documentation) (new-value
+                                 (x condition-class)
+                                 (doc-type (eql 'type)))
+  (setf (info :type :documentation (class-name x)) new-value))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'type)))
   (if (or (structure-type-p x) (condition-type-p x))
@@ -182,13 +202,12 @@
 (defmethod (setf documentation) (new-value
                                  (x symbol)
                                  (doc-type (eql 'structure)))
-  (cond ((eq (info :type :kind x) :instance)
-         (setf (info :type :documentation x) new-value))
-        ((info :typed-structure :info x)
-         (setf (info :typed-structure :documentation x) new-value))
-        (t
-         nil)))
-
+  (cond
+    ((structure-type-p x)
+     (setf (info :type :documentation x) new-value))
+    ((info :typed-structure :info x)
+     (setf (info :typed-structure :documentation x) new-value))
+    (t new-value)))
 
 ;;; variables
 (defmethod documentation ((x symbol) (doc-type (eql 'variable)))

@@ -155,8 +155,8 @@
   (declare (ignore kind thing format))
   `(progn ,@body))
 
-(defun compiler-assert-symbol-home-package-unlocked (symbol control)
-  (declare (ignore control))
+(defun program-assert-symbol-home-package-unlocked (context symbol control)
+  (declare (ignore context control))
   symbol)
 
 (defun assert-package-unlocked (package &optional control &rest args)

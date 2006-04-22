@@ -18,7 +18,8 @@
   ((alien (* t)) alien-pointer-to-anything-or-nil))
 
 (defun lisp-for-c-symbol (s)
-  (intern (substitute #\- #\_ (string-upcase s)) :sb-posix))
+  (let ((root (if (eql #\_ (char s 0)) (subseq s 1) s)))
+    (intern (substitute #\- #\_ (string-upcase root)) :sb-posix)))
 
 (defmacro define-call-internally (lisp-name c-name return-type error-predicate
                                   &rest arguments)

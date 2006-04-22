@@ -168,7 +168,7 @@
                 "SRC;CODE;PROFILE"
                 "SRC;CODE;NTRACE"
                 "SRC;CODE;STEP"
-                #-win32 "SRC;CODE;RUN-PROGRAM"
+                "SRC;CODE;RUN-PROGRAM"
 
                 ;; Code derived from PCL's pre-ANSI DESCRIBE-OBJECT
                 ;; facility is still used in our ANSI DESCRIBE

@@ -5,6 +5,15 @@
 (defun escape-for-string (string)
   (c-escape string))
 
+(defun split-cflags (string)
+  (remove-if (lambda (flag)
+               (zerop (length flag)))
+             (loop
+                for start = 0 then (if end (1+ end) nil)
+                for end = (and start (position #\Space string :start start))
+                while start
+                collect (subseq string start end))))
+
 (defun c-escape (string &optional (dangerous-chars '(#\")) (escape-char #\\))
   "Escape DANGEROUS-CHARS in STRING, with ESCAPE-CHAR."
   (coerce (loop for c across string
@@ -17,7 +26,7 @@
   (format *default-c-stream* "~A~{ ~A~}~%" (first args) (rest args)))
 
 (defun printf (formatter &rest args)
-  "Emit C code to printf the quoted code, via FORMAT.
+  "Emit C code to fprintf the quoted code, via FORMAT.
 The first argument is the C string that should be passed to
 printf.
 
@@ -33,7 +42,7 @@ code:
          printf-arg-1 printf-arg-2)"
   (let ((*print-pretty* nil))
     (apply #'format *default-c-stream*
-           "    printf (\"~@?\\n\"~@{, ~A~});~%"
+           "    fprintf (out, \"~@?\\n\"~@{, ~A~});~%"
            (c-escape formatter)
            args)))
 
@@ -80,7 +89,17 @@ code:
           do (format stream "#include <~A>~%" i))
     (as-c "#define SIGNEDP(x) (((x)-1)<0)")
     (as-c "#define SIGNED_(x) (SIGNEDP(x)?\"\":\"un\")")
-    (as-c "int main() {")
+    (as-c "int main(int argc, char *argv[]) {")
+    (as-c "    FILE *out;")
+    (as-c "    if (argc != 2) {")
+    (as-c "        printf(\"Invalid argcount!\");")
+    (as-c "        return 1;")
+    (as-c "    } else")
+    (as-c "        out = fopen(argv[1], \"w\");")
+    (as-c "    if (!out) {")
+    (as-c "        printf(\"Error opening output file!\");")
+    (as-c "        return 1;")
+    (as-c "    }")
     (printf "(cl:in-package #:~A)" package-name)
     (printf "(cl:eval-when (:compile-toplevel)")
     (printf "  (cl:defparameter *integer-sizes* (cl:make-hash-table))")
@@ -155,7 +174,8 @@ code:
               (translate-logical-pathname output-file)
               (pathname output-file)))
          (tmp-c-source (merge-pathnames #p"foo.c" real-output-file))
-         (tmp-a-dot-out (merge-pathnames #p"a.out" real-output-file))
+         (tmp-a-dot-out (merge-pathnames #-win32 #p"a.out" #+win32 #p"a.exe"
+                                         real-output-file))
          (tmp-constants (merge-pathnames #p"constants.lisp-temp"
                                          real-output-file)))
     (princ (list filename output-file real-output-file
@@ -163,21 +183,29 @@ code:
     (terpri)
     (funcall (intern "C-CONSTANTS-EXTRACT" (find-package "SB-GROVEL"))
              filename tmp-c-source (constants-package component))
-    (let ((code (run-shell-command "gcc ~A -o ~S ~S"
-                                   (if (sb-ext:posix-getenv "EXTRA_CFLAGS")
-                                       (sb-ext:posix-getenv "EXTRA_CFLAGS")
-                                       "")
-                                   (namestring tmp-a-dot-out)
-                                   (namestring tmp-c-source))))
+    (let ((code (sb-ext:process-exit-code
+                 (sb-ext:run-program
+                  "gcc"
+                  (append
+                   (split-cflags (sb-ext:posix-getenv "EXTRA_CFLAGS"))
+                   (list "-o"
+                         (namestring tmp-a-dot-out)
+                         (namestring tmp-c-source)))
+                  :search t
+                  :input nil
+                  :output *trace-output*))))
       (unless (= code 0)
         (case (operation-on-failure op)
           (:warn (warn "~@<C compiler failure when performing ~A on ~A.~@:>"
                        op component))
           (:error
            (error 'c-compile-failed :operation op :component component)))))
-    (let ((code (run-shell-command "~A >~A"
-                                   (namestring tmp-a-dot-out)
-                                   (namestring tmp-constants))))
+    (let ((code (sb-ext:process-exit-code
+                 (sb-ext:run-program (namestring tmp-a-dot-out)
+                                     (list (namestring tmp-constants))
+                                     :search nil
+                                     :input nil
+                                     :output *trace-output*))))
       (unless (= code 0)
         (case (operation-on-failure op)
           (:warn (warn "~@<a.out failure when performing ~A on ~A.~@:>"

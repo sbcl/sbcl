@@ -47,7 +47,7 @@
 
 ;;;; Lisp types used by syscalls
 
-(deftype unix-pathname () 'simple-base-string)
+(deftype unix-pathname () #!-win32 'simple-base-string #!+win32 'simple-string)
 (deftype unix-fd () `(integer 0 ,most-positive-fixnum))
 
 (deftype unix-file-mode () '(unsigned-byte 32))
@@ -134,6 +134,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 
 ;;;; hacking the Unix environment
 
+#!-win32
 (define-alien-routine ("getenv" posix-getenv) c-string
   "Return the \"value\" part of the environment string \"name=value\" which
    corresponds to NAME, or NIL if there is none."
@@ -143,6 +144,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 
 ;;; Rename the file with string NAME1 to the string NAME2. NIL and an
 ;;; error code is returned if an error occurs.
+#!-win32
 (defun unix-rename (name1 name2)
   (declare (type unix-pathname name1 name2))
   (void-syscall ("rename" c-string c-string) name1 name2))
@@ -312,17 +314,24 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; value is the pipe to be read from and the second is can be written
 ;;; to. If an error occurred the first value is NIL and the second the
 ;;; unix error code.
-#!-win32
-(defun unix-pipe ()
+#!-win32(defun unix-pipe ()
   (with-alien ((fds (array int 2)))
     (syscall ("pipe" (* int))
              (values (deref fds 0) (deref fds 1))
              (cast fds (* int)))))
+#!+win32(defun msvcrt-raw-pipe (fds size mode)
+    (syscall ("_pipe" (* int) int int)
+             (values (deref fds 0) (deref fds 1))
+             (cast fds (* int)) size mode))
+#!+win32(defun unix-pipe ()
+  (with-alien ((fds (array int 2)))
+              (msvcrt-raw-pipe fds 256 o_binary)))
 
 ;; Windows mkdir() doesn't take the mode argument. It's cdecl, so we could
 ;; actually call it passing the mode argument, but some sharp-eyed reader
 ;; would put five and twenty-seven together and ask us about it, so...
 ;;    -- AB, 2005-12-27
+#!-win32
 (defun unix-mkdir (name mode)
   (declare (type unix-pathname name)
            (type unix-file-mode mode)
@@ -341,6 +350,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 
 ;;; Return the Unix current directory as a SIMPLE-STRING, in the
 ;;; style returned by getcwd() (no trailing slash character).
+#!-win32
 (defun posix-getcwd ()
   ;; This implementation relies on a BSD/Linux extension to getcwd()
   ;; behavior, automatically allocating memory when a null buffer

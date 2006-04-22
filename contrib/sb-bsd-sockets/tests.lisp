@@ -155,6 +155,7 @@
 ;;; the message ended up
 
 (deftest simple-local-client
+    #-win32
     (progn
       ;; SunOS (Solaris) and Darwin systems don't have a socket at
       ;; /dev/log.  We might also be building in a chroot or

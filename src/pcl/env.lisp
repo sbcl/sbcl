@@ -157,14 +157,14 @@
   (error "~@<don't know how to dump ~S (default ~S method called).~@>"
          object 'make-load-form))
 
-(defun make-load-form-saving-slots (object &key slot-names environment)
+(defun make-load-form-saving-slots (object &key (slot-names nil slot-names-p) environment)
   (declare (ignore environment))
   (let ((class (class-of object)))
     (collect ((inits))
       (dolist (slot (class-slots class))
         (let ((slot-name (slot-definition-name slot)))
           (when (or (memq slot-name slot-names)
-                    (and (null slot-names)
+                    (and (not slot-names-p)
                          (eq :instance (slot-definition-allocation slot))))
             (if (slot-boundp-using-class class object slot)
                 (let ((value (slot-value-using-class class object slot)))

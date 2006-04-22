@@ -25,10 +25,16 @@ find_gnumake
 # build directory.  Right now, however, where there are dependencies
 # between contrib packages, we want the _uninstalled_ versions to be
 # found
-SBCL_HOME=`pwd`/contrib
+if [ "$OSTYPE" = "cygwin" ] ; then
+    SBCL_BASE=`cygpath -m $(pwd)`
+else
+    SBCL_BASE=`pwd`
+fi
+SBCL_HOME=$SBCL_BASE/contrib
 export SBCL_HOME
 
-SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --userinit /dev/null --sysinit /dev/null --disable-debugger"
+
+SBCL="$SBCL_BASE/src/runtime/sbcl --noinform --core $SBCL_BASE/output/sbcl.core --disable-debugger --no-sysinit --no-userinit"
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB
 

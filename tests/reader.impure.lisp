@@ -102,4 +102,11 @@
 
 (assert (eq 'a (read (make-instance 'my-in-stream :last-char nil))))
 
+;;; NIL as the last argument to SET-SYNTAX-FROM-CHAR in compiled code,
+;;; reported by Levente Mészáros
+(let ((fun (compile nil '(lambda ()
+                          (set-syntax-from-char #\{ #\( *readtable* nil)))))
+  (funcall fun)
+  (assert (equal '(:ok) (read-from-string "{:ok)"))))
+
 ;;; success

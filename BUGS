@@ -1928,25 +1928,6 @@ WORKAROUND:
  #.SB-EXT:SINGLE/DOUBLE-FLOAT-POSITIVE-INFINITY. These tests have been
  disabled on Darwin for now.
 
-375: MISC.555
-    (compile nil '(lambda (p1)
-		    (declare (optimize (speed 1) (safety 2) (debug 2) (space 0))
-			     (type keyword p1))
-		    (keywordp p1)))
-
-  fails on hairy type check in IR2.
-
-  1. KEYWORDP is MAYBE-INLINE expanded (before TYPEP-like
-     transformation could eliminate it).
-
-  2. From the only call of KEYWORDP the type of its argument is
-     derived to be KEYWORD.
-
-  2. Type check for P1 is generated; it uses KEYWORDP to perform the
-     check, and so references the local function; from the KEYWORDP
-     argument type new CAST to KEYWORD is generated. The compiler
-     loops forever.
-
 377: Memory fault error reporting
   On those architectures where :C-STACK-IS-CONTROL-STACK is in
   *FEATURES*, we handle SIG_MEMORY_FAULT (SEGV or BUS) on an altstack,

@@ -132,7 +132,7 @@
        ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" . "ab75504250558b788f99d1ebd219abf2"))))
 
 (deftest sb-md5.md5sum-file.0
-    (string= (format nil "~(~{~2,'0X~}~)" (coerce (md5sum-file "/dev/null") 'list))
+    (string= (format nil "~(~{~2,'0X~}~)" (coerce (md5sum-file #-win32 "/dev/null" #+win32 "nul") 'list))
              "d41d8cd98f00b204e9800998ecf8427e")
   t)
 

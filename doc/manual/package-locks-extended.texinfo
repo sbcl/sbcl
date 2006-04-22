@@ -4,7 +4,7 @@
 @cindex Packages, locked
 
 None of the following sections apply to SBCL built without package
-locksing support.
+locking support.
 
 The interface described here is experimental: incompatible changes in
 future SBCL releases are possible, even expected: the concept of
@@ -72,22 +72,7 @@ Unless explicitly altered by @code{defpackage},
 @tindex symbol-package-locked-error
 @tindex package-error
 
-If an operation violates a package lock, a continuable error that is
-of a subtype of @code{sb-ext:package-lock-violation} (subtype of
-@code{package-error}) is signalled when the operation is attempted.
-
-Additional restarts may be established for continuable package lock
-violations for interactive use.
-
-The actual type of the error depends on circumstances that caused the
-violation: operations on packages signal errors of type
-@code{sb-ext:package-locked-error}, and operations on symbols signal
-errors of type @code{sb-ext:symbol-package-locked-error}.
-
-@node Package Locks in Compiled Code
-@subsection Package Locks in Compiled Code
-
-@subsubsection Lexical bindings and declarations
+@subsubsection Lexical Bindings and Declarations
 @findex let
 @findex let*
 @findex flet
@@ -101,17 +86,17 @@ errors of type @code{sb-ext:symbol-package-locked-error}.
 @findex disable-package-locks
 @findex enable-package-locks
 
-Compiling lexical binding constructs or lexical declarations that
-violate package locks causes a compile-time package-lock violation. A
-complete listing of operators affect by this is: @code{let},
+Lexical bindings or declarations that violate package locks cause
+result in a @code{program-error} being signalled at when the form that
+violates package locks would be executed.
+
+A complete listing of operators affect by this is: @code{let},
 @code{let*}, @code{flet}, @code{labels}, @code{macrolet}, and
 @code{symbol-macrolet}, @code{declare}.
 
 Package locks affecting both lexical bindings and declarations can be
-disabled at compile-time with @code{sb-ext:disable-package-locks}
-declaration, and re-enabled with @code{sb-ext:enable-package-locks}
-declaration. Constructs compiled with package locks thusly disabled
-are guaranteed not to signal package lock violation errors at runtime.
+disabled locally with @code{sb-ext:disable-package-locks} declaration,
+and re-enabled with @code{sb-ext:enable-package-locks} declaration.
 
 Example:
 
@@ -127,17 +112,36 @@ Example:
        ,@@body)))
 @end lisp
 
-@subsubsection Interned symbols
+@subsubsection Other Operations
+
+If an non-lexical operation violates a package lock, a continuable
+error that is of a subtype of @code{sb-ext:package-lock-violation}
+(subtype of @code{package-error}) is signalled when the operation is
+attempted.
+
+Additional restarts may be established for continuable package lock
+violations for interactive use.
+
+The actual type of the error depends on circumstances that caused the
+violation: operations on packages signal errors of type
+@code{sb-ext:package-locked-error}, and operations on symbols signal
+errors of type @code{sb-ext:symbol-package-locked-error}.
+
+
+@node Package Locks in Compiled Code
+@subsection Package Locks in Compiled Code
+
+@subsubsection Interned Symbols
 
 If file-compiled code contains interned symbols, then loading that code
 into an image without the said symbols will not cause a package lock
 violation, even if the packages in question are locked.
 
-@subsubsection Other limitations on compiled code
+@subsubsection Other Limitations on Compiled Code
 
-With the exception of the aforementioned contructs, and interned
-symbols, behaviour is unspecified if package locks affecting compiled
-code are not the same during loading of the code or execution.
+With the exception of interned symbols, behaviour is unspecified if
+package locks affecting compiled code are not the same during loading
+of the code or execution.
 
 Specifically, code compiled with packages unlocked may or may not fail
 to signal package-lock-violations even if the packages are locked at

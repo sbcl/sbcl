@@ -43,7 +43,7 @@ Code for options that not every system has should be conditionalised:
          (if (numberp (eval level))
              level
              `(get-protocol-by-name ,(string-downcase (symbol-name level)))))
-        (supportedp (or (null features) (featurep features))))
+        (supportedp (or (null features) (sb-int:featurep features))))
     `(progn
       (export ',lisp-name)
       (defun ,lisp-name (socket)

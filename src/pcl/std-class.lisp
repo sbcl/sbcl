@@ -794,6 +794,8 @@
               (not (class-finalized-p class))
               (not (class-has-a-forward-referenced-superclass-p class)))
      (finalize-inheritance class)
+     (dolist (sub (class-direct-subclasses class))
+       (update-class sub nil))
      (return-from update-class))
    (when (or finalizep (class-finalized-p class)
              (not (class-has-a-forward-referenced-superclass-p class)))
@@ -808,8 +810,9 @@
      (update-gfs-of-class class)
      (update-initargs class (compute-default-initargs class))
      (update-ctors 'finalize-inheritance :class class))
-   (dolist (sub (class-direct-subclasses class))
-     (update-class sub nil))))
+   (unless finalizep
+     (dolist (sub (class-direct-subclasses class))
+       (update-class sub nil)))))
 
 (define-condition cpl-protocol-violation (reference-condition error)
   ((class :initarg :class :reader cpl-protocol-violation-class)

@@ -208,16 +208,19 @@ chance to see it.
 
 @item --sysinit @var{filename}
 Load filename instead of the default system initialization file
-(@pxref{System Initialization File}.) There is no special option to
-cause no system initialization file to be read, but on a Unix
-system ``@code{"--sysinit /dev/null}'' can be used to achieve the same
-effect.
+(@pxref{System Initialization File}.)
+
+@item --no-sysinit
+Don't load a system-wide initialization file.  If this option is given,
+the @code{--sysinit} option is ignored.
 
 @item --userinit @var{filename}
 Load filename instead of the default user initialization file
-(@pxref{User Initialization File}.) There is no special option to
-cause no user initialization file to be read, but ``@code{--userinit
-/dev/null}'' can be used to achieve the same effect.
+(@pxref{User Initialization File}.)
+
+@item --no-userinit
+Don't load a user initialization file.  If this option is given,
+the @code{--userinit} option is ignored.
 
 @item --eval @var{command}
 After executing any initialization file, but before starting the

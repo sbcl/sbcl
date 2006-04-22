@@ -632,8 +632,8 @@
            ((lambda-var-arg-info arg)
             (let* ((info (lambda-var-arg-info arg))
                    (default (arg-info-default info))
-                   (def-type (when (constantp default)
-                               (ctype-of (eval default)))))
+                   (def-type (when (sb!xc:constantp default)
+                               (ctype-of (constant-form-value default)))))
               (ecase (arg-info-kind info)
                 (:keyword
                  (let* ((key (arg-info-key info))

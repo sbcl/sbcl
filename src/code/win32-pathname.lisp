@@ -266,18 +266,25 @@
        (when device
          (write-string device s)
          (write-char #\: s))
-       (ecase (car directory)
-         (:absolute (write-char #\\ s))
-         (:relative))
-       (dolist (piece (cdr directory))
-         (typecase piece
-           ((member :up) (write-string ".." s))
-           (string (write-string piece s))
-           (t (error "ungood piece in NATIVE-NAMESTRING: ~S" piece)))
-         (write-char #\\ s))
+       (tagbody
+          (ecase (pop directory)
+            (:absolute (write-char #\\ s))
+            (:relative))
+          (unless directory (go :done))
+        :subdir
+          (let ((piece (pop directory)))
+            (typecase piece
+              ((member :up) (write-string ".." s))
+              (string (write-string piece s))
+              (t (error "ungood piece in NATIVE-NAMESTRING: ~S" piece))))
+          (when directory
+            (write-char #\\ s)
+            (go :subdir))
+        :done)
        (when name
          (unless (stringp name)
            (error "non-STRING name in NATIVE-NAMESTRING: ~S" name))
+         (write-char #\\ s)
          (write-string name s)
          (when type
            (unless (stringp type)

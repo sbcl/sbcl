@@ -24,7 +24,7 @@
 ;(define-condition try-again-error (socket-error)) ; temporary
 
 (defun make-host-ent (h)
-  (if (sb-grovel::foreign-nullp h) (name-service-error "gethostbyname"))
+  (if (sb-alien:null-alien h) (name-service-error "gethostbyname"))
   (let* ((length (sockint::hostent-length h))
          (aliases (loop for i = 0 then (1+ i)
                         for al = (sb-alien:deref (sockint::hostent-aliases h) i)
@@ -41,6 +41,7 @@
                                (loop for i from 0 below length
                                      do (setf (elt addr i) (sb-alien:deref ad i)))
                                addr))
+                          #-win32
                           (#.sockint::af-local
                            (sb-alien:cast ad sb-alien:c-string))))))
     (make-instance 'host-ent
@@ -81,6 +82,7 @@ GET-NAME-SERVICE-ERRNO")
   (get-name-service-errno)
   ;; Comment next to NETDB_INTERNAL in netdb.h says "See errno.".
   ;; This special case treatment hasn't actually been tested yet.
+  #-win32
   (if (= *name-service-errno* sockint::NETDB-INTERNAL)
       (socket-error where)
     (let ((condition
@@ -109,7 +111,9 @@ GET-NAME-SERVICE-ERRNO")
 
 (defparameter *conditions-for-name-service-errno* nil)
 
+#-win32
 (define-name-service-condition sockint::NETDB-INTERNAL netdb-internal-error)
+#-win32
 (define-name-service-condition sockint::NETDB-SUCCESS netdb-success-error)
 (define-name-service-condition sockint::HOST-NOT-FOUND host-not-found-error)
 (define-name-service-condition sockint::TRY-AGAIN try-again-error)
@@ -122,16 +126,17 @@ GET-NAME-SERVICE-ERRNO")
   (or (cdr (assoc err *conditions-for-name-service-errno* :test #'eql))
       'name-service))
 
-
-
 (defun get-name-service-errno ()
   (setf *name-service-errno*
         (sb-alien:alien-funcall
-         (sb-alien:extern-alien "get_h_errno" (function integer)))))
+         #-win32
+         (sb-alien:extern-alien "get_h_errno" (function integer))
+         #+win32
+         (sb-alien:extern-alien "WSAGetLastError" (function integer)))))
 
 #-(and cmu solaris)
 (progn
-  #+sbcl
+  #+(and sbcl (not win32))
   (sb-alien:define-alien-routine "hstrerror"
       sb-c-call:c-string
     (errno integer))
@@ -142,3 +147,7 @@ GET-NAME-SERVICE-ERRNO")
   (defun get-name-service-error-message (num)
   (hstrerror num))
 )
+
+;;; placeholder for hstrerror on windows
+#+(and sbcl win32)
+(defun hstrerror () 0)

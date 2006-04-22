@@ -24,6 +24,7 @@
   #define WIN32_LEAN_AND_MEAN
   #include <windows.h>
   #include <stdlib.h>
+  #include <shlobj.h>
 #else
   #include <sys/times.h>
   #include <sys/wait.h>
@@ -85,6 +86,78 @@ main(int argc, char *argv[])
     printf("(in-package \"SB!WIN32\")\n\n");
 
     defconstant ("input-record-size", sizeof (INPUT_RECORD));
+
+    defconstant ("MAX_PATH", MAX_PATH);
+
+    printf(";;; CSIDL\n");
+
+    defconstant ("CSIDL_DESKTOP", CSIDL_DESKTOP);
+    defconstant ("CSIDL_INTERNET", CSIDL_INTERNET);
+    defconstant ("CSIDL_PROGRAMS", CSIDL_PROGRAMS);
+    defconstant ("CSIDL_CONTROLS", CSIDL_CONTROLS);
+    defconstant ("CSIDL_PRINTERS", CSIDL_PRINTERS);
+    defconstant ("CSIDL_PERSONAL", CSIDL_PERSONAL);
+    defconstant ("CSIDL_FAVORITES", CSIDL_FAVORITES);
+    defconstant ("CSIDL_STARTUP", CSIDL_STARTUP);
+    defconstant ("CSIDL_RECENT", CSIDL_RECENT);
+    defconstant ("CSIDL_SENDTO", CSIDL_SENDTO);
+    defconstant ("CSIDL_BITBUCKET", CSIDL_BITBUCKET);
+    defconstant ("CSIDL_STARTMENU", CSIDL_STARTMENU);
+    defconstant ("CSIDL_DESKTOPDIRECTORY", CSIDL_DESKTOPDIRECTORY);
+    defconstant ("CSIDL_DRIVES", CSIDL_DRIVES);
+    defconstant ("CSIDL_NETWORK", CSIDL_NETWORK);
+    defconstant ("CSIDL_NETHOOD", CSIDL_NETHOOD);
+    defconstant ("CSIDL_FONTS", CSIDL_FONTS);
+    defconstant ("CSIDL_TEMPLATES", CSIDL_TEMPLATES);
+    defconstant ("CSIDL_COMMON_STARTMENU", CSIDL_COMMON_STARTMENU);
+    defconstant ("CSIDL_COMMON_PROGRAMS", CSIDL_COMMON_PROGRAMS);
+    defconstant ("CSIDL_COMMON_STARTUP", CSIDL_COMMON_STARTUP);
+    defconstant ("CSIDL_COMMON_DESKTOPDIRECTORY", CSIDL_COMMON_DESKTOPDIRECTORY);
+    defconstant ("CSIDL_APPDATA", CSIDL_APPDATA);
+    defconstant ("CSIDL_PRINTHOOD", CSIDL_PRINTHOOD);
+    defconstant ("CSIDL_LOCAL_APPDATA", CSIDL_LOCAL_APPDATA);
+    defconstant ("CSIDL_ALTSTARTUP", CSIDL_ALTSTARTUP);
+    defconstant ("CSIDL_COMMON_ALTSTARTUP", CSIDL_COMMON_ALTSTARTUP);
+    defconstant ("CSIDL_COMMON_FAVORITES", CSIDL_COMMON_FAVORITES);
+    defconstant ("CSIDL_INTERNET_CACHE", CSIDL_INTERNET_CACHE);
+    defconstant ("CSIDL_COOKIES", CSIDL_COOKIES);
+    defconstant ("CSIDL_HISTORY", CSIDL_HISTORY);
+    defconstant ("CSIDL_COMMON_APPDATA", CSIDL_COMMON_APPDATA);
+    defconstant ("CSIDL_WINDOWS", CSIDL_WINDOWS);
+    defconstant ("CSIDL_SYSTEM", CSIDL_SYSTEM);
+    defconstant ("CSIDL_PROGRAM_FILES", CSIDL_PROGRAM_FILES);
+    defconstant ("CSIDL_MYPICTURES", CSIDL_MYPICTURES);
+    defconstant ("CSIDL_PROFILE", CSIDL_PROFILE);
+    defconstant ("CSIDL_SYSTEMX86", CSIDL_SYSTEMX86);
+    defconstant ("CSIDL_PROGRAM_FILESX86", CSIDL_PROGRAM_FILESX86);
+    defconstant ("CSIDL_PROGRAM_FILES_COMMON", CSIDL_PROGRAM_FILES_COMMON);
+    defconstant ("CSIDL_PROGRAM_FILES_COMMONX86", CSIDL_PROGRAM_FILES_COMMONX86);
+    defconstant ("CSIDL_COMMON_TEMPLATES", CSIDL_COMMON_TEMPLATES);
+    defconstant ("CSIDL_COMMON_DOCUMENTS", CSIDL_COMMON_DOCUMENTS);
+    defconstant ("CSIDL_COMMON_ADMINTOOLS", CSIDL_COMMON_ADMINTOOLS);
+    defconstant ("CSIDL_ADMINTOOLS", CSIDL_ADMINTOOLS);
+    defconstant ("CSIDL_CONNECTIONS", CSIDL_CONNECTIONS);
+    defconstant ("CSIDL_COMMON_MUSIC", CSIDL_COMMON_MUSIC);
+    defconstant ("CSIDL_COMMON_PICTURES", CSIDL_COMMON_PICTURES);
+    defconstant ("CSIDL_COMMON_VIDEO", CSIDL_COMMON_VIDEO);
+    defconstant ("CSIDL_RESOURCES", CSIDL_RESOURCES);
+    defconstant ("CSIDL_RESOURCES_LOCALIZED", CSIDL_RESOURCES_LOCALIZED);
+    defconstant ("CSIDL_COMMON_OEM_LINKS", CSIDL_COMMON_OEM_LINKS);
+    defconstant ("CSIDL_CDBURN_AREA", CSIDL_CDBURN_AREA);
+    defconstant ("CSIDL_COMPUTERSNEARME", CSIDL_COMPUTERSNEARME);
+    defconstant ("CSIDL_FLAG_DONT_VERIFY", CSIDL_FLAG_DONT_VERIFY);
+    defconstant ("CSIDL_FLAG_CREATE", CSIDL_FLAG_CREATE);
+    defconstant ("CSIDL_FLAG_MASK", CSIDL_FLAG_MASK);
+
+    printf(";;; FormatMessage\n");
+
+    defconstant ("FORMAT_MESSAGE_ALLOCATE_BUFFER", FORMAT_MESSAGE_ALLOCATE_BUFFER);
+    defconstant ("FORMAT_MESSAGE_FROM_SYSTEM", FORMAT_MESSAGE_FROM_SYSTEM);
+
+    printf(";;; Errors\n");
+
+    defconstant ("ERROR_ENVVAR_NOT_FOUND", ERROR_ENVVAR_NOT_FOUND);
+
 #else
     printf("(in-package \"SB!ALIEN\")\n\n");
 

@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  1.92
+;;; This is asdf: Another System Definition Facility.  1.96
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -109,7 +109,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "1.92")
+(defvar *asdf-revision* (let* ((v "1.96")
                                (colon (or (position #\: v) -1))
                                (dot (position #\. v)))
                           (and v colon dot
@@ -359,6 +359,14 @@ and NIL NAME and TYPE components"
           (if (and file (probe-file file))
               (return file)))))))
 
+(defun make-temporary-package ()
+  (flet ((try (counter)
+           (ignore-errors
+                   (make-package (format nil "ASDF~D" counter)
+                                 :use '(:cl :asdf)))))
+    (do* ((counter 0 (+ counter 1))
+          (package (try counter) (try counter)))
+         (package package))))
 
 (defun find-system (name &optional (error-p t))
   (let* ((name (coerce-name name))
@@ -367,15 +375,18 @@ and NIL NAME and TYPE components"
     (when (and on-disk
                (or (not in-memory)
                    (< (car in-memory) (file-write-date on-disk))))
-      (let ((*package* (make-package (gensym #.(package-name *package*))
-                                     :use '(:cl :asdf))))
-        (format *verbose-out*
+      (let ((package (make-temporary-package)))
+        (unwind-protect
+             (let ((*package* package))
+               (format
+                *verbose-out*
                 "~&~@<; ~@;loading system definition from ~A into ~A~@:>~%"
                 ;; FIXME: This wants to be (ENOUGH-NAMESTRING
                 ;; ON-DISK), but CMUCL barfs on that.
                 on-disk
                 *package*)
-        (load on-disk)))
+               (load on-disk))
+          (delete-package package))))
     (let ((in-memory (gethash name *defined-systems*)))
       (if in-memory
           (progn (if on-disk (setf (car in-memory) (file-write-date on-disk)))
@@ -429,17 +440,20 @@ system."))
 (defmethod source-file-type ((c static-file) (s module)) nil)
 
 (defmethod component-relative-pathname ((component source-file))
-  (let* ((*default-pathname-defaults* (component-parent-pathname component))
-         (name-type
-          (make-pathname
-           :name (component-name component)
-           :type (source-file-type component
-                                   (component-system component)))))
-    (if (slot-value component 'relative-pathname)
+  (let ((relative-pathname (slot-value component 'relative-pathname)))
+    (if relative-pathname
         (merge-pathnames
-         (slot-value component 'relative-pathname)
-         name-type)
-        name-type)))
+         relative-pathname
+         (make-pathname
+          :type (source-file-type component (component-system component))))
+        (let* ((*default-pathname-defaults*
+                (component-parent-pathname component))
+               (name-type
+                (make-pathname
+                 :name (component-name component)
+                 :type (source-file-type component
+                                         (component-system component)))))
+          name-type))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; operations
@@ -569,26 +583,40 @@ system."))
 (defmethod input-files ((operation operation) (c module)) nil)
 
 (defmethod operation-done-p ((o operation) (c component))
-  (let ((out-files (output-files o c))
-        (in-files (input-files o c)))
-    (cond ((and (not in-files) (not out-files))
-           ;; arbitrary decision: an operation that uses nothing to
-           ;; produce nothing probably isn't doing much
-           t)
-          ((not out-files)
-           (let ((op-done
-                  (gethash (type-of o)
-                           (component-operation-times c))))
-             (and op-done
-                  (>= op-done
-                      (or (apply #'max
-                                 (mapcar #'file-write-date in-files)) 0)))))
-          ((not in-files) nil)
-          (t
-           (and
-            (every #'probe-file out-files)
-            (> (apply #'min (mapcar #'file-write-date out-files))
-               (apply #'max (mapcar #'file-write-date in-files)) ))))))
+  (flet ((fwd-or-return-t (file)
+           ;; if FILE-WRITE-DATE returns NIL, it's possible that the
+           ;; user or some other agent has deleted an input file.  If
+           ;; that's the case, well, that's not good, but as long as
+           ;; the operation is otherwise considered to be done we
+           ;; could continue and survive.
+           (let ((date (file-write-date file)))
+             (cond
+               (date)
+               (t
+                (warn "~@<Missing FILE-WRITE-DATE for ~S: treating ~
+                       operation ~S on component ~S as done.~@:>"
+                      file o c)
+                (return-from operation-done-p t))))))
+    (let ((out-files (output-files o c))
+          (in-files (input-files o c)))
+      (cond ((and (not in-files) (not out-files))
+             ;; arbitrary decision: an operation that uses nothing to
+             ;; produce nothing probably isn't doing much
+             t)
+            ((not out-files)
+             (let ((op-done
+                    (gethash (type-of o)
+                             (component-operation-times c))))
+               (and op-done
+                    (>= op-done
+                        (apply #'max
+                               (mapcar #'fwd-or-return-t in-files))))))
+            ((not in-files) nil)
+            (t
+             (and
+              (every #'probe-file out-files)
+              (> (apply #'min (mapcar #'file-write-date out-files))
+                 (apply #'max (mapcar #'fwd-or-return-t in-files)))))))))
 
 ;;; So you look at this code and think "why isn't it a bunch of
 ;;; methods".  And the answer is, because standard method combination
@@ -1048,14 +1076,15 @@ Returns the new tree (which probably shares structure with the old one)"
 (defun run-shell-command (control-string &rest args)
   "Interpolate ARGS into CONTROL-STRING as if by FORMAT, and
 synchronously execute the result using a Bourne-compatible shell, with
-output to *verbose-out*.  Returns the shell's exit code."
+output to *VERBOSE-OUT*.  Returns the shell's exit code."
   (let ((command (apply #'format nil control-string args)))
     (format *verbose-out* "; $ ~A~%" command)
     #+sbcl
-    (sb-impl::process-exit-code
+    (sb-ext:process-exit-code
      (sb-ext:run-program
-      "/bin/sh"
+      #+win32 "sh" #-win32 "/bin/sh"
       (list  "-c" command)
+      #+win32 #+win32 :search t
       :input nil :output *verbose-out*))
 
     #+(or cmu scl)

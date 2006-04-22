@@ -380,12 +380,13 @@ If an unsupported TYPE is requested, the function will return NIL.
 
 ;;; FIXME: maybe this should be renamed as FUNCTION-LAMBDA-LIST?
 (defun function-arglist (function)
-  "Describe the lambda list for the function designator FUNCTION.
+  "Describe the lambda list for the extended function designator FUNCTION.
 Works for special-operators, macros, simple functions and generic
 functions.  Signals error if not found"
   (cond ((valid-function-name-p function)
-         (function-arglist
-          (or (macro-function function) (fdefinition function))))
+         (function-arglist (or (and (symbolp function)
+                                    (macro-function function))
+                               (fdefinition function))))
         ((typep function 'generic-function)
          (sb-pcl::generic-function-pretty-arglist function))
         (t (sb-impl::%simple-fun-arglist
