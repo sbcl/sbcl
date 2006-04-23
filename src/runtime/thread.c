@@ -103,7 +103,9 @@ initial_thread_trampoline(struct thread *th)
     if(arch_os_thread_init(th)==0) return 1;
     link_thread(th);
     th->os_thread=thread_self();
+#ifndef LISP_FEATURE_WIN32
     protect_control_stack_guard_page(1);
+#endif
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     return call_into_lisp_first_time(function,args,0);
