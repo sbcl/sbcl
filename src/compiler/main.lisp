@@ -1185,7 +1185,9 @@
                  ;; sequence of steps in ANSI's "3.2.3.1 Processing of
                  ;; Top Level Forms".
                  #-sb-xc-host
-                 (let ((expanded (preprocessor-macroexpand-1 form)))
+                 (let ((expanded
+                        (let ((*current-path* path))
+                          (preprocessor-macroexpand-1 form))))
                    (cond ((eq expanded form)
                           (when compile-time-too
                             (eval-in-lexenv form *lexenv*))
