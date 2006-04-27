@@ -987,7 +987,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
         ;; which are the parameters of the new state, and get other
         ;; information from the lexical variables bound above.
         (flet ((two-class (index w0 w1)
-               (when (zerop (random 2)) (psetf w0 w1 w1 w0))
+               (when (zerop (random 2 *pcl-misc-random-state*))
+                 (psetf w0 w1 w1 w0))
                (dfun-update gf
                             #'make-two-class-accessor-dfun
                             ntype

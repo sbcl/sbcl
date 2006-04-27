@@ -2,6 +2,7 @@
 changes in sbcl-0.9.13 relative to sbcl-0.9.12:
   * new feature: source path information is generated for macro-expansion
     errors for use in IDE's like Slime (thanks to Helmut Eller)
+  * bug fix: calls to the compiler no longer modify *RANDOM-STATE*
 
 changes in sbcl-0.9.12 relative to sbcl-0.9.11:
   * minor incompatible change: in sbcl-0.9.11 (but not earlier
