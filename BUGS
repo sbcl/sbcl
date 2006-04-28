@@ -2129,6 +2129,22 @@ WORKAROUND:
   For some more details see comments for (define-alien-type-method
   (c-string :deport-gen) ...)  in host-c-call.lisp.
 
-400: "aggressive constant folding"
-  (fixed in sbcl-0.9.10.17)
-
+401: "optimizer runaway on bad constant type specifiers in TYPEP"
+  In 0.9.12.3 (and probably many earlier versions), COMPILE-FILE on
+    (defun ouch401 ()
+      (etypecase (signum (- x y))
+        ((-1 nil))
+         ((0 1) (oops "shouldn't happen"))))
+  or just
+    (defun foo401 (x)
+      (typep x '(-1 nil)))
+  spins emitting what seems to be an endless series of compiler 
+  warnings like
+    ; --> TYPEP TYPEP TYPEP TYPEP TYPEP TYPEP TYPEP TYPEP TYPEP TYPEP 
+    ; --> TYPEP TYPEP TYPEP TYPEP TYPEP TYPEP TYPEP TYPEP TYPEP TYPEP 
+    ; --> TYPEP 
+    ; ==>
+    ;   (TYPEP SB-C::OBJECT '(-1 NIL))
+    ; 
+    ; caught WARNING:
+    ;   illegal type specifier for TYPEP: (-1 NIL)
