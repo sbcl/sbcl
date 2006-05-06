@@ -1102,21 +1102,27 @@
           (declare (ignorable .pv-cell. .next-method-call.))
           ,@outer-decls
           (declare (disable-package-locks pv-env))
-           (macrolet ((pv-env ((pv calls pv-table-symbol pv-parameters)
-                               &rest forms)
-                        (declare (ignore pv-table-symbol
-                                         pv-parameters))
-                        (declare (enable-package-locks pv-env))
-                        `(let ((,pv (car .pv-cell.))
-                               (,calls (cdr .pv-cell.)))
-                           (declare ,(make-pv-type-declaration pv)
-                                    ,(make-calls-type-declaration calls))
-                           ,pv ,calls
-                           ,@forms)))
-             (declare (enable-package-locks pv-env))
-             (fast-lexical-method-functions
-              (,(car lmf-params) .next-method-call. ,req-args ,rest-arg
-                ,@(cdddr lmf-params))
+          (macrolet (;; If :PV-TABLE-SYMBOL isn't in the plist, the PV-ENV
+                     ;; macro defined here will never get expanded.  To
+                     ;; speed up compilation of CLOS code, don't emit it
+                     ;; in the first place.
+                     ,@(when (getf (cdr lmf-params) :pv-env-p)
+                        `((pv-env
+                           ((pv calls pv-table-symbol pv-parameters)
+                            &rest forms)
+                           (declare (ignore pv-table-symbol
+                                            pv-parameters))
+                           (declare (enable-package-locks pv-env))
+                           `(let ((,pv (car .pv-cell.))
+                                  (,calls (cdr .pv-cell.)))
+                              (declare ,(make-pv-type-declaration pv)
+                                          ,(make-calls-type-declaration calls))
+                              ,pv ,calls
+                              ,@forms)))))
+            (declare (enable-package-locks pv-env))
+            (fast-lexical-method-functions
+                (,(car lmf-params) .next-method-call. ,req-args ,rest-arg
+                  ,@(cdddr lmf-params))
               ,@inner-decls
               ,@body-sans-decls)))
         ',initargs))))
