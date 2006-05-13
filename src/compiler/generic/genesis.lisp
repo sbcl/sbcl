@@ -1747,8 +1747,7 @@ core and return a descriptor to it."
           (setf (bvref-32 gspace-bytes gspace-byte-offset)
                 (logior (mask-field (byte 16 16)
                                     (bvref-32 gspace-bytes gspace-byte-offset))
-                        (+ (ash value -16)
-                           (if (logbitp 15 value) 1 0)))))
+                        (ash (1+ (ldb (byte 17 15) value)) -1))))
          (:addi
           (setf (bvref-32 gspace-bytes gspace-byte-offset)
                 (logior (mask-field (byte 16 16)
