@@ -39,7 +39,7 @@ stack_alignment_offset (int alignment)
 }
 
 extern int
-trampoline (int(*callback)())
+trampoline (int(*callback)(void))
 {
     return callback();
 }
