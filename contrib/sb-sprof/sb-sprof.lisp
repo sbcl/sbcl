@@ -818,6 +818,10 @@
             (end-offset (sb-c::compiled-debug-fun-elsewhere-pc cdf))
             (component (sb-di::compiled-debug-fun-component info))
             (start-pc (code-start component)))
+       ;; Call graphs are mostly useless unless we somehow
+       ;; distinguish a gazillion different (LAMBDA ())'s.
+       (when (equal name '(lambda ()))
+         (setf name (format nil "Unknown component: #x~x" start-pc)))
        (%make-node :name name
                    :start-pc (+ start-pc start-offset)
                    :end-pc (+ start-pc end-offset))))
@@ -888,7 +892,9 @@
       (let ((info (debug-info pc)))
         (when info
           (let* ((new (make-node info))
-                 (found (gethash (node-name new) *name->node*)))
+                 (key (cons (node-name new)
+                            (node-start-pc new)))
+                 (found (gethash key *name->node*)))
             (cond (found
                    (setf (node-start-pc found)
                          (min (node-start-pc found) (node-start-pc new)))
@@ -896,7 +902,7 @@
                          (max (node-end-pc found) (node-end-pc new)))
                    found)
                   (t
-                   (setf (gethash (node-name new) *name->node*) new)
+                   (setf (gethash key *name->node*) new)
                    (tree-insert new)
                    new)))))))
 
