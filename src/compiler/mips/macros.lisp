@@ -296,9 +296,8 @@
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 5
-         (inst add lip object index)
-         (inst lw value lip (- (* ,offset n-word-bytes) ,lowtag))
-         (inst nop)))
+         (inst addu lip object index)
+         (loadw value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
@@ -311,8 +310,7 @@
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 4
-         (inst lw value object (- (* (+ ,offset index) n-word-bytes) ,lowtag))
-         (inst nop)))))
+         (loadw value object (+ ,offset index) ,lowtag)))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type
                                    &optional translate)
@@ -329,8 +327,8 @@
        (:results (result :scs ,scs))
        (:result-types ,el-type)
        (:generator 2
-         (inst add lip object index)
-         (inst sw value lip (- (* ,offset n-word-bytes) ,lowtag))
+         (inst addu lip object index)
+         (storew value lip ,offset ,lowtag)
          (move result value)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
@@ -346,7 +344,7 @@
        (:results (result :scs ,scs))
        (:result-types ,el-type)
        (:generator 1
-         (inst sw value object (- (* (+ ,offset index) n-word-bytes) ,lowtag))
+         (storew value object (+ ,offset index) ,lowtag)
          (move result value)))))
 
 

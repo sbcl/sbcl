@@ -167,8 +167,8 @@
                             ;; 64-bit long long types are stored in
                             ;; consecutive locations, endian word order,
                             ;; aligned to 8 bytes.
-                            (if (oddp (length (new-args)))
-                                    (new-args nil))
+                            (when (oddp (length (new-args)))
+                              (new-args nil))
                             #!-little-endian
                             (progn (new-args `(ash ,arg -32))
                                    (new-args `(logand ,arg #xffffffff))
