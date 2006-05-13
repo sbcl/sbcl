@@ -57,10 +57,14 @@
 ;;; constant. At worst, it will convert to %TYPEP, which will prevent
 ;;; spurious attempts at transformation (and possible repeated
 ;;; warnings.)
-(deftransform typep ((object type))
+(deftransform typep ((object type) * * :node node)
   (unless (constant-lvar-p type)
     (give-up-ir1-transform "can't open-code test of non-constant type"))
-  `(typep object ',(lvar-value type)))
+  (multiple-value-bind (expansion fail-p)
+      (source-transform-typep 'object (lvar-value type))
+    (if fail-p
+        (abort-ir1-transform)
+        expansion)))
 
 ;;; If the lvar OBJECT definitely is or isn't of the specified
 ;;; type, then return T or NIL as appropriate. Otherwise quietly
@@ -488,6 +492,43 @@
 ;;; to that predicate. Otherwise, we dispatch off of the type's type.
 ;;; These transformations can increase space, but it is hard to tell
 ;;; when, so we ignore policy and always do them.
+(defun source-transform-typep (object type)
+  (let ((ctype (careful-specifier-type type)))
+    (or (when (not ctype)
+          (compiler-warn "illegal type specifier for TYPEP: ~S" type)
+          (return-from source-transform-typep (values nil t)))
+        (let ((pred (cdr (assoc ctype *backend-type-predicates*
+                                :test #'type=))))
+          (when pred `(,pred ,object)))
+        (typecase ctype
+          (hairy-type
+           (source-transform-hairy-typep object ctype))
+          (negation-type
+           (source-transform-negation-typep object ctype))
+          (union-type
+           (source-transform-union-typep object ctype))
+          (intersection-type
+           (source-transform-intersection-typep object ctype))
+          (member-type
+           `(if (member ,object ',(member-type-members ctype)) t))
+          (args-type
+           (compiler-warn "illegal type specifier for TYPEP: ~S" type)
+           (return-from source-transform-typep (values nil t)))
+          (t nil))
+        (typecase ctype
+          (numeric-type
+           (source-transform-numeric-typep object ctype))
+          (classoid
+           `(%instance-typep ,object ',type))
+          (array-type
+           (source-transform-array-typep object ctype))
+          (cons-type
+           (source-transform-cons-typep object ctype))
+          (character-set-type
+           (source-transform-character-set-typep object ctype))
+          (t nil))
+        `(%typep ,object ',type))))
+
 (define-source-transform typep (object spec)
   ;; KLUDGE: It looks bad to only do this on explicitly quoted forms,
   ;; since that would overlook other kinds of constants. But it turns
@@ -496,44 +537,7 @@
   ;; source transform another chance, so it all works out OK, in a
   ;; weird roundabout way. -- WHN 2001-03-18
   (if (and (consp spec) (eq (car spec) 'quote))
-      (let ((type (careful-specifier-type (cadr spec))))
-        (block bail
-          (or (when (not type)
-                (compiler-warn "illegal type specifier for TYPEP: ~S"
-                               (cadr spec))
-                (return-from bail (values nil t)))
-              (let ((pred (cdr (assoc type *backend-type-predicates*
-                                      :test #'type=))))
-                (when pred `(,pred ,object)))
-              (typecase type
-                (hairy-type
-                 (source-transform-hairy-typep object type))
-                (negation-type
-                 (source-transform-negation-typep object type))
-                (union-type
-                 (source-transform-union-typep object type))
-                (intersection-type
-                 (source-transform-intersection-typep object type))
-                (member-type
-                 `(if (member ,object ',(member-type-members type)) t))
-                (args-type
-                 (compiler-warn "illegal type specifier for TYPEP: ~S"
-                                (cadr spec))
-                 (return-from bail (values nil t)))
-                (t nil))
-              (typecase type
-                (numeric-type
-                 (source-transform-numeric-typep object type))
-                (classoid
-                 `(%instance-typep ,object ,spec))
-                (array-type
-                 (source-transform-array-typep object type))
-                (cons-type
-                 (source-transform-cons-typep object type))
-                (character-set-type
-                 (source-transform-character-set-typep object type))
-                (t nil))
-              `(%typep ,object ,spec))))
+      (source-transform-typep object (cadr spec))
       (values nil t)))
 
 ;;;; coercion

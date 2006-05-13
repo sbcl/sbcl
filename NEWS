@@ -3,6 +3,8 @@ changes in sbcl-0.9.13 relative to sbcl-0.9.12:
   * new feature: source path information is generated for macro-expansion
     errors for use in IDE's like Slime (thanks to Helmut Eller)
   * bug fix: calls to the compiler no longer modify *RANDOM-STATE*
+  * bug fix: compiler does not loop forever on an invalid type in
+    TYPEP.
   * improvement: compilation of most CLOS applications is significantly
     faster
 
