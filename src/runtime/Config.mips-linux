@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-LINKFLAGS += -v -O2
+LINKFLAGS += -v -O2 -Wl,--export-dynamic
 NM = ./linux-nm
 
 ASSEM_SRC = mips-assem.S ldso-stubs.S
