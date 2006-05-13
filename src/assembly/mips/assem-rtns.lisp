@@ -31,36 +31,36 @@
   ;; Note, because of the way the return-multiple vop is written, we can
   ;; assume that we are never called with nvals == 1 and that a0 has already
   ;; been loaded.
-  (inst blez nvals default-a0-and-on)
+  (inst blez nvals DEFAULT-A0-AND-ON)
   (inst subu count nvals (fixnumize 2))
-  (inst blez count default-a2-and-on)
+  (inst blez count DEFAULT-A2-AND-ON)
   (inst lw a1 vals (* 1 n-word-bytes))
   (inst subu count (fixnumize 1))
-  (inst blez count default-a3-and-on)
+  (inst blez count DEFAULT-A3-AND-ON)
   (inst lw a2 vals (* 2 n-word-bytes))
   (inst subu count (fixnumize 1))
-  (inst blez count default-a4-and-on)
+  (inst blez count DEFAULT-A4-AND-ON)
   (inst lw a3 vals (* 3 n-word-bytes))
   (inst subu count (fixnumize 1))
-  (inst blez count default-a5-and-on)
+  (inst blez count DEFAULT-A5-AND-ON)
   (inst lw a4 vals (* 4 n-word-bytes))
   (inst subu count (fixnumize 1))
   (inst blez count done)
   (inst lw a5 vals (* 5 n-word-bytes))
 
   ;; Copy the remaining args to the top of the stack.
-  (inst addu vals vals (* 6 n-word-bytes))
-  (inst addu dst cfp-tn (* 6 n-word-bytes))
+  (inst addu vals (fixnumize register-arg-count))
+  (inst addu dst cfp-tn (fixnumize register-arg-count))
 
   LOOP
   (inst lw temp vals)
   (inst addu vals n-word-bytes)
-  (inst sw temp dst)
   (inst subu count (fixnumize 1))
-  (inst bne count zero-tn loop)
+  (inst sw temp dst)
+  (inst bne count LOOP)
   (inst addu dst n-word-bytes)
 
-  (inst b done)
+  (inst b DONE)
   (inst nop)
 
   DEFAULT-A0-AND-ON
@@ -102,7 +102,7 @@
      ;; These are needed by the blitting code.
      (:temp src any-reg nl1-offset)
      (:temp dst any-reg nl2-offset)
-     (:temp count any-reg cfunc-offset)
+     (:temp count any-reg nl3-offset)
      (:temp temp descriptor-reg l0-offset)
 
      ;; Needed for the jump
@@ -130,19 +130,19 @@
   (inst lw a5 args (* 5 n-word-bytes))
 
   ;; Calc SRC, DST, and COUNT
-  (inst addu count nargs (fixnumize (- register-arg-count)))
+  (inst subu count nargs (fixnumize register-arg-count))
   (inst blez count done)
-  (inst addu src args (* n-word-bytes register-arg-count))
-  (inst addu dst cfp-tn (* n-word-bytes register-arg-count))
+  (inst addu src args (fixnumize register-arg-count))
+  (inst addu dst cfp-tn (fixnumize register-arg-count))
 
   LOOP
   ;; Copy one arg.
   (inst lw temp src)
-  (inst addu src src n-word-bytes)
+  (inst addu src n-word-bytes)
+  (inst subu count (fixnumize 1))
   (inst sw temp dst)
-  (inst addu count (fixnumize -1))
-  (inst bgtz count loop)
-  (inst addu dst dst n-word-bytes)
+  (inst bgtz count LOOP)
+  (inst addu dst n-word-bytes)
 
   DONE
   ;; We are done.  Do the jump.
@@ -168,27 +168,25 @@
   (declare (ignore start count))
 
   (let ((error (generate-error-code nil invalid-unwind-error)))
-    (inst beq block zero-tn error)
+    (inst beq block error)
     (inst nop))
 
   (load-symbol-value cur-uwp *current-unwind-protect-block*)
   (loadw target-uwp block unwind-block-current-uwp-slot)
-  (inst bne cur-uwp target-uwp do-uwp)
+  (inst bne cur-uwp target-uwp DO-UWP)
   (inst nop)
 
   (move cur-uwp block)
 
   DO-EXIT
-
   (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
   (loadw code-tn cur-uwp unwind-block-current-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
   (lisp-return lra lip :frob-code nil)
 
   DO-UWP
-
   (loadw next-uwp cur-uwp unwind-block-current-uwp-slot)
-  (inst b do-exit)
+  (inst b DO-EXIT)
   (store-symbol-value next-uwp *current-unwind-protect-block*))
 
 (define-assembly-routine
@@ -205,18 +203,16 @@
   (load-symbol-value catch *current-catch-block*)
 
   LOOP
-
   (let ((error (generate-error-code nil unseen-throw-tag-error target)))
-    (inst beq catch zero-tn error)
+    (inst beq catch error)
     (inst nop))
 
   (loadw tag catch catch-block-tag-slot)
-  (inst beq tag target exit)
+  (inst beq tag target EXIT)
   (inst nop)
-  (inst b loop)
+  (inst b LOOP)
   (loadw catch catch catch-block-previous-catch-slot)
 
   EXIT
-
   (inst j (make-fixup 'unwind :assembly-routine))
   (move target catch t))
