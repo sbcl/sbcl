@@ -136,14 +136,15 @@ in future versions."
 
     (defun make-lutex ()
       (/show0 "Entering MAKE-LUTEX")
-      ;; FIXME: need to register a finalizer here, but the finalizer
-      ;; code depends on lutexes...
-      (let ((lutex (sb!vm::%make-lutex)))
-        (/show0 "LUTEX=..")
-        (/hexstr lutex)
-        (with-lutex-address (lutex lutex)
-          (%lutex-init lutex))
-        lutex)))
+      ;; Suppress GC until the lutex has been properly registered with
+      ;; the GC.
+      (without-gcing
+        (let ((lutex (sb!vm::%make-lutex)))
+          (/show0 "LUTEX=..")
+          (/hexstr lutex)
+          (with-lutex-address (lutex lutex)
+            (%lutex-init lutex))
+          lutex))))
 
   #!-sb-lutex
   (progn

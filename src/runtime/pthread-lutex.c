@@ -28,6 +28,8 @@ typedef unsigned long tagged_lutex_t;
 
 /* FIXME: Add some real error checking. */
 
+pthread_mutex_t lutex_register_lock = PTHREAD_MUTEX_INITIALIZER;
+
 int
 lutex_init (tagged_lutex_t tagged_lutex)
 {
@@ -36,6 +38,10 @@ lutex_init (tagged_lutex_t tagged_lutex)
 
     lutex->mutex = malloc(sizeof(pthread_mutex_t));
     ret = pthread_mutex_init(lutex->mutex, NULL);
+
+    thread_mutex_lock(&lutex_register_lock);
+    gencgc_register_lutex(lutex);
+    thread_mutex_unlock(&lutex_register_lock);
 
     if (ret)
         return ret;
@@ -67,7 +73,7 @@ lutex_wake (tagged_lutex_t tagged_lutex, int n)
 
     pthread_mutex_lock(lutex->mutex);
 
-    /* (ldb (byte 29 0) most-positive-fixnum) */
+    /* The lisp-side code passes N=2**29-1 for a broadcast. */
     if (n >= ((1 << 29) - 1)) {
         /* CONDITION-BROADCAST */
         ret = pthread_cond_broadcast(lutex->condition_variable);
@@ -109,11 +115,17 @@ lutex_destroy (tagged_lutex_t tagged_lutex)
 {
     struct lutex *lutex = (struct lutex*) native_pointer(tagged_lutex);
 
-    pthread_cond_destroy(lutex->condition_variable);
-    free(lutex->condition_variable);
+    if (lutex->condition_variable) {
+        pthread_cond_destroy(lutex->condition_variable);
+        free(lutex->condition_variable);
+        lutex->condition_variable = NULL;
+    }
 
-    pthread_mutex_destroy(lutex->mutex);
-    free(lutex->mutex);
+    if (lutex->mutex) {
+        pthread_mutex_destroy(lutex->mutex);
+        free(lutex->mutex);
+        lutex->mutex = NULL;
+    }
 
     return 0;
 }

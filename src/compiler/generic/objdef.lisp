@@ -400,6 +400,10 @@
                           :lowtag other-pointer-lowtag
                           :widetag lutex-widetag
                           :alloc-trans %make-lutex)
+  (gen :c-type "long" :length 1)
+  (live :c-type "long" :length 1)
+  (next :c-type "struct lutex *" :length 1)
+  (prev :c-type "struct lutex *" :length 1)
   (mutex :c-type "pthread_mutex_t *"
          :length 1)
   (condition-variable :c-type "pthread_cond_t *"
