@@ -912,20 +912,32 @@
        (declare (ignorable ,@(mapcar #'identity slot-vars)))
        ,@body)))
 
-;;; This gets used only when the default MAKE-METHOD-LAMBDA is
+;;; This will only be visible in PV-ENV when the default MAKE-METHOD-LAMBDA is
 ;;; overridden.
-(defmacro pv-env ((pv calls pv-table-symbol pv-parameters)
+(define-symbol-macro pv-env-environment overridden)
+
+(defmacro pv-env (&environment env
+                  (pv calls pv-table-symbol pv-parameters)
                   &rest forms)
-  `(let* ((.pv-table. ,pv-table-symbol)
-          (.pv-cell. (pv-table-lookup-pv-args .pv-table. ,@pv-parameters))
-          (,pv (car .pv-cell.))
-          (,calls (cdr .pv-cell.)))
-     (declare ,(make-pv-type-declaration pv))
-     (declare ,(make-calls-type-declaration calls))
-     ,@(when (symbolp pv-table-symbol)
-         `((declare (special ,pv-table-symbol))))
-     ,pv ,calls
-     ,@forms))
+  ;; Decide which expansion to use based on the state of the PV-ENV-ENVIRONMENT
+  ;; symbol-macrolet.
+  (if (eq (macroexpand 'pv-env-environment env) 'default)
+      `(let ((,pv (car .pv-cell.))
+             (,calls (cdr .pv-cell.)))
+         (declare ,(make-pv-type-declaration pv)
+                  ,(make-calls-type-declaration calls))
+         ,pv ,calls
+         ,@forms)
+      `(let* ((.pv-table. ,pv-table-symbol)
+              (.pv-cell. (pv-table-lookup-pv-args .pv-table. ,@pv-parameters))
+              (,pv (car .pv-cell.))
+              (,calls (cdr .pv-cell.)))
+         (declare ,(make-pv-type-declaration pv))
+         (declare ,(make-calls-type-declaration calls))
+         ,@(when (symbolp pv-table-symbol)
+                 `((declare (special ,pv-table-symbol))))
+         ,pv ,calls
+         ,@forms)))
 
 (defvar *non-var-declarations*
   ;; FIXME: VALUES was in this list, conditionalized with #+CMU, but I
@@ -1099,27 +1111,10 @@
                   (list (cons 'fast-method (body-method-name body))))
           (.pv-cell. .next-method-call. ,@args+rest-arg) ; function args
           ;; body of the function
-          (declare (ignorable .pv-cell. .next-method-call.))
+          (declare (ignorable .pv-cell. .next-method-call.)
+                   (disable-package-locks pv-env-environment))
           ,@outer-decls
-          (declare (disable-package-locks pv-env))
-          (macrolet (;; If :PV-TABLE-SYMBOL isn't in the plist, the PV-ENV
-                     ;; macro defined here will never get expanded.  To
-                     ;; speed up compilation of CLOS code, don't emit it
-                     ;; in the first place.
-                     ,@(when (getf (cdr lmf-params) :pv-env-p)
-                        `((pv-env
-                           ((pv calls pv-table-symbol pv-parameters)
-                            &rest forms)
-                           (declare (ignore pv-table-symbol
-                                            pv-parameters))
-                           (declare (enable-package-locks pv-env))
-                           `(let ((,pv (car .pv-cell.))
-                                  (,calls (cdr .pv-cell.)))
-                              (declare ,(make-pv-type-declaration pv)
-                                          ,(make-calls-type-declaration calls))
-                              ,pv ,calls
-                              ,@forms)))))
-            (declare (enable-package-locks pv-env))
+          (symbol-macrolet ((pv-env-environment default))
             (fast-lexical-method-functions
                 (,(car lmf-params) .next-method-call. ,req-args ,rest-arg
                   ,@(cdddr lmf-params))
