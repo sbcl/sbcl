@@ -190,7 +190,7 @@ convention (names like *FOO*) for special variables" symbol))
                    ((or symbol number string)
                     x)
                    (t
-                    (format nil "#<~S>" (type-of x))))
+                    (list 'of-type (type-of x))))
                  "#<...>")))
     ;; FIXME: It might be nice to put markers in the tree instead of
     ;; this #<...> business, so that they would evantually be printed

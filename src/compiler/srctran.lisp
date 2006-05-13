@@ -4039,3 +4039,17 @@
     (give-up-ir1-transform "not a real transform"))
   (defun /report-lvar (x message)
     (declare (ignore x message))))
+
+
+;;;; Transforms for internal compiler utilities
+
+;;; If QUALITY-NAME is constant and a valid name, don't bother
+;;; checking that it's still valid at run-time.
+(deftransform policy-quality ((policy quality-name)
+                              (t symbol))
+  (unless (and (constant-lvar-p quality-name)
+               (policy-quality-name-p (lvar-value quality-name)))
+    (give-up-ir1-transform))
+  `(let* ((acons (assoc quality-name policy))
+          (result (or (cdr acons) 1)))
+     result))
