@@ -7,6 +7,8 @@ changes in sbcl-0.9.13 relative to sbcl-0.9.12:
     TYPEP.
   * improvement: compilation of most CLOS applications is significantly
     faster
+  * optimization: added a limited bytecode compiler for simple toplevel
+    forms, speeding up compilation and FASL loading
 
 changes in sbcl-0.9.12 relative to sbcl-0.9.11:
   * minor incompatible change: in sbcl-0.9.11 (but not earlier

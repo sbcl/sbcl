@@ -231,6 +231,11 @@
                                       then
                                       else)
                                   lexenv)))
+               ((let let*)
+                (destructuring-bind (definitions &rest body) (rest exp)
+                  (if (null definitions)
+                      (eval-locally `(locally ,@body) lexenv)
+                      (%eval exp lexenv))))
                (t
                 (if (and (symbolp name)
                          (eq (info :function :kind name) :function))

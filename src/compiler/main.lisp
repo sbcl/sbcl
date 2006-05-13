@@ -115,6 +115,8 @@
 
 (defvar *compile-object* nil)
 (declaim (type object *compile-object*))
+
+(defvar *fopcompile-label-counter*)
 
 ;;;; WITH-COMPILATION-UNIT and WITH-COMPILATION-VALUES
 
@@ -852,16 +854,19 @@
 ;;; *TOPLEVEL-LAMBDAS* instead.
 (defun convert-and-maybe-compile (form path)
   (declare (list path))
-  (let* ((*top-level-form-noted* (note-top-level-form form t))
-         (*lexenv* (make-lexenv
-                    :policy *policy*
-                    :handled-conditions *handled-conditions*
-                    :disabled-package-locks *disabled-package-locks*))
-         (tll (ir1-toplevel form path nil)))
-    (if (eq *block-compile* t)
-        (push tll *toplevel-lambdas*)
-        (compile-toplevel (list tll) nil))
-    nil))
+  (if (fopcompilable-p form)
+      (let ((*fopcompile-label-counter* 0))
+        (fopcompile form path nil))
+      (let* ((*top-level-form-noted* (note-top-level-form form t))
+             (*lexenv* (make-lexenv
+                        :policy *policy*
+                        :handled-conditions *handled-conditions*
+                        :disabled-package-locks *disabled-package-locks*))
+             (tll (ir1-toplevel form path nil)))
+        (if (eq *block-compile* t)
+            (push tll *toplevel-lambdas*)
+            (compile-toplevel (list tll) nil))
+        nil)))
 
 ;;; Macroexpand FORM in the current environment with an error handler.
 ;;; We only expand one level, so that we retain all the intervening

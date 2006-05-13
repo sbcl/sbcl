@@ -174,9 +174,12 @@
   (aver (member pushp '(nil t :nope)))
   (with-unique-names (fop-stack)
     `(let ((,fop-stack *fop-stack*))
-       (declare (type (vector t) ,fop-stack))
+       (declare (type (vector t) ,fop-stack)
+                (ignorable ,fop-stack))
        (macrolet ((pop-stack ()
                     `(vector-pop ,',fop-stack))
+                  (push-stack (value)
+                    `(vector-push-extend ,value ,',fop-stack))
                   (call-with-popped-args (fun n)
                     `(%call-with-popped-args ,fun ,n ,',fop-stack)))
          ,(if pushp
@@ -365,10 +368,11 @@
 (defun load-fasl-group (stream)
   (when (check-fasl-header stream)
     (catch 'fasl-group-end
-      (let ((*current-fop-table-index* 0))
+      (let ((*current-fop-table-index* 0)
+            (*skip-until* nil))
+        (declare (special *skip-until*))
         (loop
           (let ((byte (read-byte stream)))
-
             ;; Do some debugging output.
             #!+sb-show
             (when *show-fops-p*

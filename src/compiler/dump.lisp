@@ -1241,7 +1241,6 @@
   (declare (type component component) (list trace-table))
   (declare (type fasl-output file))
 
-  (dump-fop 'fop-verify-empty-stack file)
   (dump-fop 'fop-verify-table-size file)
   (dump-word (fasl-output-table-free file) file)
 
@@ -1257,7 +1256,6 @@
                                        fixups
                                        file))
         (2comp (component-info component)))
-    (dump-fop 'fop-verify-empty-stack file)
 
     (dolist (entry (sb!c::ir2-component-entries 2comp))
       (let ((entry-handle (dump-one-entry entry code-handle file)))

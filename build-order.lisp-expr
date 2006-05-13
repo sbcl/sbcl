@@ -519,6 +519,8 @@
 
  ("src/compiler/debug-dump")
  ("src/compiler/generic/utils")
+ ("src/compiler/fopcompile")
+
  ("src/assembly/assemfile")
 
  ;; Compiling this file requires the macros SB!ASSEM:EMIT-LABEL and
