@@ -10,7 +10,16 @@ ensure_dirs ()
     done;
 }
 
-INSTALL_ROOT=${INSTALL_ROOT-/usr/local}
+if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
+    DEFAULT_INSTALL_ROOT="$PROGRAMFILES/sbcl"
+    RUNTIME=sbcl.exe
+    OLD_RUNTIME=sbcl_old.exe
+else
+    DEFAULT_INSTALL_ROOT=/usr/local
+    RUNTIME=sbcl
+    OLD_RUNTIME=sbcl.old
+fi
+INSTALL_ROOT=${INSTALL_ROOT-$DEFAULT_INSTALL_ROOT}
 MAN_DIR=${MAN_DIR-$INSTALL_ROOT/share/man}
 INFO_DIR=${INFO_DIR-$INSTALL_ROOT/share/info}
 DOC_DIR=${DOC_DIR-$INSTALL_ROOT/share/doc/sbcl}
@@ -26,7 +35,7 @@ if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
 fi
 
 # Before doing anything else, make sure we have an SBCL to install
-if [ -f src/runtime/sbcl ]; then
+if [ -f src/runtime/$RUNTIME ]; then
     if [ -f output/sbcl.core ]; then
         true
     else
@@ -34,7 +43,7 @@ if [ -f src/runtime/sbcl ]; then
         exit 1
     fi
 else
-    echo "src/runtime/sbcl not found, aborting installation."
+    echo "src/runtime/$RUNTIME not found, aborting installation."
     exit 1
 fi
 
@@ -47,15 +56,6 @@ ensure_dirs $BUILD_ROOT$INSTALL_ROOT $BUILD_ROOT$INSTALL_ROOT/bin \
     $BUILD_ROOT$DOC_DIR/html \
     $BUILD_ROOT$SBCL_HOME \
     $BUILD_ROOT$SBCL_HOME/site-systems
-
-if [ "$OSTYPE" = "msys" ]
-then 
-    RUNTIME=sbcl.exe
-    OLD_RUNTIME=sbcl_old.exe
-else
-    RUNTIME=sbcl
-    OLD_RUNTIME=sbcl.old
-fi
 
 # move old versions out of the way.  Safer than copying: don't want to
 # break any running instances that have these files mapped
@@ -70,7 +70,7 @@ cp output/sbcl.core $BUILD_ROOT$SBCL_HOME/sbcl.core
 
 # installing contrib
 
-SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --userinit /dev/null --sysinit /dev/null --disable-debugger"
+SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --no-userinit --no-sysinit --disable-debugger"
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB
 
@@ -86,7 +86,7 @@ done
 
 echo
 echo "SBCL has been installed:"
-echo " binary $BUILD_ROOT$INSTALL_ROOT/bin/sbcl"
+echo " binary $BUILD_ROOT$INSTALL_ROOT/bin/$RUNTIME"
 echo " core and contribs in $BUILD_ROOT$INSTALL_ROOT/lib/sbcl/"
 
 # Installing manual & misc bits of documentation
