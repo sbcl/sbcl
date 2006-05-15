@@ -1160,6 +1160,8 @@
           (do-one-fill wrappers value))
         (maybe-check-cache ncache)))))
 
+(defvar *pcl-misc-random-state* (make-random-state))
+
 ;;; This is the heart of the cache filling mechanism. It implements
 ;;; the decisions about where entries are placed.
 ;;;
@@ -1196,7 +1198,8 @@
              (when (>= osep limit)
                (return-from find-free-cache-line (values primary nil)))
              (when (cond ((= nsep limit) t)
-                         ((= nsep osep) (zerop (random 2)))
+                         ((= nsep osep)
+                          (zerop (random 2 *pcl-misc-random-state*)))
                          ((> nsep osep) t)
                          (t nil))
                ;; See whether we can displace what is in this line so that we

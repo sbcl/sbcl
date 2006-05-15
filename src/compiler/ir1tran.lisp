@@ -470,7 +470,8 @@
                                        ,@body
                                        (return-from ,skip nil)))))
                    (ir1-convert ,start ,next ,result
-                                (make-compiler-error-form ,condition ,form)))))))
+                                (make-compiler-error-form ,condition
+                                                          ,form)))))))
 
   ;; Translate FORM into IR1. The code is inserted as the NEXT of the
   ;; CTRAN START. RESULT is the LVAR which receives the value of the
@@ -516,8 +517,9 @@
                              (aver (and (consp lexical-def)
                                         (eq (car lexical-def) 'macro)))
                              (ir1-convert start next result
-                                          (careful-expand-macro (cdr lexical-def)
-                                                                form))))))
+                                          (careful-expand-macro
+                                           (cdr lexical-def)
+                                           form))))))
                        ((or (atom opname) (not (eq (car opname) 'lambda)))
                         (compiler-error "illegal function call"))
                        (t

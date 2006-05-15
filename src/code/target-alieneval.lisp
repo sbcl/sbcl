@@ -933,8 +933,8 @@ callback signal an error."
       (setf (callback-info-function info) nil)
       t)))
 
-;;; FIXME: This calls assembles a new callback for every closure,
-;;; which suck hugely. ...not that I can think of an obvious
+;;; FIXME: This call assembles a new callback for every closure,
+;;; which sucks hugely. ...not that I can think of an obvious
 ;;; solution. Possibly maybe we could write a generalized closure
 ;;; callback analogous to closure_tramp, and share the actual wrapper?
 ;;;

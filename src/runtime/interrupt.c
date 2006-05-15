@@ -1337,15 +1337,21 @@ undoably_install_low_level_interrupt_handler (int signal,
         sa.sa_sigaction = handler;
     else if (sigismember(&deferrable_sigset,signal))
         sa.sa_sigaction = low_level_maybe_now_maybe_later;
+    /* The use of a trampoline appears to break the
+       arch_os_get_context() workaround for SPARC/Linux.  For now,
+       don't use the trampoline (and so be vulnerable to the problems
+       that SA_NODEFER is meant to solve. */
+#if !(defined(LISP_FEATURE_SPARC) && defined(LISP_FEATURE_LINUX))
     else if (!sigaction_nodefer_works &&
              !sigismember(&blockable_sigset, signal))
         sa.sa_sigaction = low_level_unblock_me_trampoline;
+#endif
     else
         sa.sa_sigaction = handler;
 
     sigcopyset(&sa.sa_mask, &blockable_sigset);
-    sa.sa_flags = SA_SIGINFO | SA_RESTART |
-        (sigaction_nodefer_works ? SA_NODEFER : 0);
+    sa.sa_flags = SA_SIGINFO | SA_RESTART
+        | (sigaction_nodefer_works ? SA_NODEFER : 0);
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     if((signal==SIG_MEMORY_FAULT)
 #ifdef SIG_MEMORY_FAULT2

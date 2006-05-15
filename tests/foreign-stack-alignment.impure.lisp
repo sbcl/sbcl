@@ -34,7 +34,7 @@
   #+(and ppc darwin) 16
   #+(and ppc linux) 16
   #+x86-64 16
-  #+(or mips) 8
+  #+mips 8
   #+x86 4
   #-(or x86 x86-64 mips (and ppc (or darwin linux))) (error "Unknown platform"))
 

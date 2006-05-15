@@ -1,1 +1,4 @@
 threads-foreign-code.c
+external-format-test.txt
+stack-alignment-offset
+test-status.lisp-expr

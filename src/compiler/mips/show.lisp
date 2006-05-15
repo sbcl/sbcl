@@ -27,8 +27,8 @@
       (move nl0 object)
       (inst li cfunc (make-fixup "debug_print" :foreign))
       (inst jal (make-fixup "call_into_c" :foreign))
-      (inst addu nsp-tn nsp-tn -16)
-      (inst addu nsp-tn nsp-tn 16)
+      (inst subu nsp-tn 16)
+      (inst addu nsp-tn 16)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save))
       (move result nl0))))

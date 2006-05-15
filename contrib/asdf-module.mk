@@ -7,7 +7,11 @@ CC=gcc
 # directly via ASDF from a non-C-aware module which has these tricky
 # ones as dependencies.
 
-UNAME:=$(shell uname -m)
+UNAME:=$(shell uname -s)
+
+ifeq (SunOS,$(UNAME))
+  EXTRA_CFLAGS=-D_XOPEN_SOURCE=500 -D__EXTENSIONS__
+endif
 
 export CC SBCL EXTRA_CFLAGS EXTRA_LDFLAGS
 

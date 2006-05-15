@@ -23,9 +23,10 @@
 
 ;;;; IN-PACKAGE
 
-(defmacro-mundanely in-package (package-designator)
-  `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (setq *package* (find-undeleted-package-or-lose ',package-designator))))
+(defmacro-mundanely in-package (string-designator)
+  (let ((string (string string-designator)))
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
+       (setq *package* (find-undeleted-package-or-lose ,string)))))
 
 ;;;; MULTIPLE-VALUE-FOO
 

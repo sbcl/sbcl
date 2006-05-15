@@ -2086,3 +2086,16 @@
        (f (compile nil l)))
   (assert (funcall f :good))
   (assert (nth-value 1 (ignore-errors (funcall f 42)))))
+
+;;; Check that the compiler doesn't munge *RANDOM-STATE*.
+(let* ((state (make-random-state))
+       (*random-state* (make-random-state state))
+       (a (random most-positive-fixnum)))
+  (setf *random-state* state)
+  (compile nil `(lambda (x a)
+                  (declare (single-float x)
+                           (type (simple-array double-float) a))
+                  (+ (loop for i across a
+                           summing i)
+                     x)))
+  (assert (= a (random most-positive-fixnum))))

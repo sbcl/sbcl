@@ -1,8 +1,19 @@
+;;;; MIPS compiler support for the debugger
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
 
 (define-vop (debug-cur-sp)
-  (:translate current-sp)
+  (:translate sb!di::current-sp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
@@ -10,7 +21,7 @@
     (move res csp-tn)))
 
 (define-vop (debug-cur-fp)
-  (:translate current-fp)
+  (:translate sb!di::current-fp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
@@ -18,7 +29,7 @@
     (move res cfp-tn)))
 
 (define-vop (read-control-stack)
-  (:translate stack-ref)
+  (:translate sb!kernel:stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg) :target sap)
          (offset :scs (any-reg)))
@@ -32,7 +43,7 @@
     (inst nop)))
 
 (define-vop (read-control-stack-c)
-  (:translate stack-ref)
+  (:translate sb!kernel:stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg)))
   (:info offset)
@@ -44,7 +55,7 @@
     (inst nop)))
 
 (define-vop (write-control-stack)
-  (:translate %set-stack-ref)
+  (:translate sb!kernel:%set-stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg) :target sap)
          (offset :scs (any-reg))
@@ -95,16 +106,16 @@
         (move code null-tn t)))))
 
 (define-vop (code-from-lra code-from-mumble)
-  (:translate lra-code-header)
+  (:translate sb!di::lra-code-header)
   (:variant other-pointer-lowtag))
 
 (define-vop (code-from-fun code-from-mumble)
-  (:translate fun-code-header)
+  (:translate sb!di::fun-code-header)
   (:variant fun-pointer-lowtag))
 
 (define-vop (make-lisp-obj)
   (:policy :fast-safe)
-  (:translate make-lisp-obj)
+  (:translate sb!di::make-lisp-obj)
   (:args (value :scs (unsigned-reg) :target result))
   (:arg-types unsigned-num)
   (:results (result :scs (descriptor-reg)))
@@ -113,7 +124,7 @@
 
 (define-vop (get-lisp-obj-address)
   (:policy :fast-safe)
-  (:translate get-lisp-obj-address)
+  (:translate sb!di::get-lisp-obj-address)
   (:args (thing :scs (descriptor-reg) :target result))
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
@@ -122,7 +133,7 @@
 
 (define-vop (fun-word-offset)
   (:policy :fast-safe)
-  (:translate fun-word-offset)
+  (:translate sb!di::fun-word-offset)
   (:args (fun :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)

@@ -30,12 +30,12 @@
   (name "unnamed" :type simple-string)
   ;; Ordinarily this is a vector where instructions are written. If
   ;; the segment is made invalid (e.g. by APPEND-SEGMENT) then the
-  ;; vector can be replaced by NIL.
-  (buffer (make-array 0
-                      :fill-pointer 0
-                      :adjustable t
-                      :element-type 'assembly-unit)
-          :type (or null (vector assembly-unit)))
+  ;; vector can be replaced by NIL. This used to be an adjustable
+  ;; array, but we now do the array size management manually for
+  ;; performance reasons (as of 2006-05-13 hairy array operations
+  ;; are rather slow compared to simple ones).
+  (buffer (make-array 0 :element-type 'assembly-unit)
+          :type (or null (simple-array assembly-unit)))
   ;; whether or not to run the scheduler. Note: if the instruction
   ;; definitions were not compiled with the scheduler turned on, this
   ;; has no effect.
@@ -48,6 +48,7 @@
   ;; indexes are the same, but after we start collapsing choosers,
   ;; positions can change while indexes stay the same.
   (current-posn 0 :type index)
+  (%current-index 0 :type index)
   ;; a list of all the annotations that have been output to this segment
   (annotations nil :type list)
   ;; a pointer to the last cons cell in the annotations list. This is
@@ -108,11 +109,13 @@
 (sb!c::defprinter (segment)
   name)
 
-;;; where the next byte of output goes
-#!-sb-fluid (declaim (inline segment-current-index))
+(declaim (inline segment-current-index))
 (defun segment-current-index (segment)
-  (fill-pointer (segment-buffer segment)))
+  (segment-%current-index segment))
+
 (defun (setf segment-current-index) (new-value segment)
+  (declare (type index new-value)
+           (type segment segment))
   ;; FIXME: It would be lovely to enforce this, but first FILL-IN will
   ;; need to be convinced to stop rolling SEGMENT-CURRENT-INDEX
   ;; backwards.
@@ -121,19 +124,26 @@
   ;; about what's going on in the (legacy) code: The segment never
   ;; shrinks. -- WHN the reverse engineer
   #+nil (aver (>= new-value (segment-current-index segment)))
-  (let ((buffer (segment-buffer segment)))
-    ;; Make sure that the array is big enough.
-    (do ()
-        ((>= (array-dimension buffer 0) new-value))
-      ;; When we have to increase the size of the array, we want to
-      ;; roughly double the vector length: that way growing the array
-      ;; to size N conses only O(N) bytes in total. But just doubling
-      ;; the length would leave a zero-length vector unchanged. Hence,
-      ;; take the MAX with 1..
-      (adjust-array buffer (max 1 (* 2 (array-dimension buffer 0)))))
+  (let* ((buffer (segment-buffer segment))
+         (new-buffer-size (length buffer)))
+    (declare (type (simple-array (unsigned-byte 8)) buffer)
+             (type index new-buffer-size))
+    ;; Make sure the array is big enough.
+    (when (<= new-buffer-size new-value)
+      (do ()
+          ((> new-buffer-size new-value))
+        ;; When we have to increase the size of the array, we want to
+        ;; roughly double the vector length: that way growing the array
+        ;; to size N conses only O(N) bytes in total. But just doubling
+        ;; the length would leave a zero-length vector unchanged. Hence,
+        ;; take the MAX with 1..
+        (setf new-buffer-size (max 1 (* 2 new-buffer-size))))
+      (let ((new-buffer (make-array new-buffer-size
+                                    :element-type '(unsigned-byte 8))))
+        (replace new-buffer buffer)
+        (setf (segment-buffer segment) new-buffer)))
     ;; Now that the array has the intended next free byte, we can point to it.
-    (setf (fill-pointer buffer) new-value)))
-
+    (setf (segment-%current-index segment) new-value)))
 
 ;;; Various functions (like BACK-PATCH-FUN or CHOOSER-WORST-CASE-FUN)
 ;;; aren't cleanly parameterized, but instead use
@@ -748,8 +758,10 @@
 (defun emit-byte (segment byte)
   (declare (type segment segment))
   (declare (type possibly-signed-assembly-unit byte))
-  (vector-push-extend (logand byte assembly-unit-mask)
-                      (segment-buffer segment))
+  (let ((old-index (segment-current-index segment)))
+    (incf (segment-current-index segment))
+    (setf (aref (segment-buffer segment) old-index)
+          (logand byte assembly-unit-mask)))
   (incf (segment-current-posn segment))
   (values))
 
@@ -1340,6 +1352,7 @@
   (declare (type function function))
   (let ((buffer (segment-buffer segment))
         (i0 0))
+    (declare (type (simple-array (unsigned-byte 8)) buffer))
     (flet ((frob (i0 i1)
              (when (< i0 i1)
                (funcall function (subseq buffer i0 i1)))))

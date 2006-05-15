@@ -167,8 +167,8 @@
                             ;; 64-bit long long types are stored in
                             ;; consecutive locations, endian word order,
                             ;; aligned to 8 bytes.
-                            (if (oddp (length (new-args)))
-                                    (new-args nil))
+                            (when (oddp (length (new-args)))
+                              (new-args nil))
                             #!-little-endian
                             (progn (new-args `(ash ,arg -32))
                                    (new-args `(logand ,arg #xffffffff))
@@ -295,3 +295,162 @@
               (t
                (inst li temp delta)
                (inst addu nsp-tn temp)))))))
+
+#-sb-xc-host
+(defun alien-callback-accessor-form (type sap offset)
+  (let ((parsed-type type))
+    (if (alien-integer-type-p parsed-type)
+        (let ((bits (sb!alien::alien-integer-type-bits parsed-type)))
+               (let ((byte-offset
+                      (cond ((< bits n-word-bits)
+                             (- n-word-bytes
+                                (ceiling bits n-byte-bits)))
+                            (t 0))))
+                 `(deref (sap-alien (sap+ ,sap
+                                          ,(+ byte-offset offset))
+                                    (* ,type)))))
+        `(deref (sap-alien (sap+ ,sap ,offset) (* ,type))))))
+
+;;; Returns a vector in static space containing machine code for the
+;;; callback wrapper
+#-sb-xc-host
+(defun alien-callback-assembler-wrapper (index result-type argument-types)
+  "Cons up a piece of code which calls enter-alien-callback with INDEX
+and a pointer to the arguments."
+  (flet ((make-gpr (n)
+           (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset n))
+         (make-fpr (n)
+           (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg) :offset n)))
+    (let* ((segment (make-segment))
+           (n-argument-words
+             (mapcar (lambda (arg) (ceiling (alien-type-bits arg) n-word-bits))
+                     argument-types))
+           (n-linkage-area-bytes 8)
+           (n-return-area-words
+             (ceiling (or (alien-type-bits result-type) 0) n-word-bits))
+           (n-return-area-bytes (* n-return-area-words n-word-bytes))
+           (n-callee-register-args-bytes 16)
+           (n-frame-bytes (logandc2 (+ n-linkage-area-bytes
+                                       n-return-area-bytes
+                                       n-callee-register-args-bytes
+                                       7)
+                                    7))
+           (words-processed 0)
+           (int-seen)
+           (gprs (mapcar #'make-gpr '(4 5 6 7)))
+           (fprs (mapcar #'make-fpr '(12 14))))
+      (flet ((save-arg (type words)
+             (let ((offset (* words-processed n-word-bytes)))
+               (cond ((not (alien-float-type-p type))
+                      (when (and (alien-integer-type-p type)
+                                 (> (sb!alien::alien-integer-type-bits type)
+                                    n-word-bits)
+                                 (oddp words-processed))
+                        (pop gprs)
+                        (incf words-processed)
+                        (incf offset n-word-bytes))
+                      (when gprs
+                        (loop repeat words
+                          for gpr = (pop gprs)
+                          when gpr do
+                            (inst sw gpr nsp-tn offset)
+                          do
+                            (setf int-seen t)
+                            (incf words-processed)
+                            (incf offset n-word-bytes))))
+                     ((alien-single-float-type-p type)
+                      (when gprs
+                        (let ((gpr (pop gprs))
+                              (fpr (pop fprs)))
+                          (if int-seen
+                              (when gpr (inst sw gpr nsp-tn offset))
+                              (when fpr (inst swc1 fpr nsp-tn offset))))
+                        (incf words-processed)))
+                     ((alien-double-float-type-p type)
+                      (when (oddp words-processed)
+                        (pop gprs)
+                        (incf words-processed)
+                        (incf offset n-word-bytes))
+                      (when gprs
+                        (let* ((gpr1 (pop gprs))
+                               (gpr2 (pop gprs))
+                               (fpr (pop fprs)))
+                          (if int-seen
+                            (when gpr1
+                              (ecase *backend-byte-order*
+                                (:big-endian
+                                 (inst sw gpr1 nsp-tn offset)
+                                 (inst sw gpr2 nsp-tn (+ offset n-word-bytes)))
+                                (:little-endian
+                                 (inst sw gpr2 nsp-tn offset)
+                                 (inst sw gpr1 nsp-tn (+ offset n-word-bytes)))))
+                            (when fpr
+                              (ecase *backend-byte-order*
+                                (:big-endian
+                                 (inst swc1 fpr nsp-tn offset)
+                                 (inst swc1-odd fpr nsp-tn (+ offset n-word-bytes)))
+                                (:little-endian
+                                 (inst swc1-odd fpr nsp-tn offset)
+                                 (inst swc1 fpr nsp-tn (+ offset n-word-bytes)))))))
+                        (incf words-processed 2)))
+                     (t
+                      (bug "Unknown alien floating point type: ~S" type))))))
+        (assemble (segment)
+          (mapc #'save-arg argument-types n-argument-words)
+          ;; funcall3 (enter-alien-callback, index, args, return-area)
+          ;;
+          ;; INDEX is fixnumized, ARGS and RETURN-AREA don't need to be
+          ;; because they're word-aligned. Kinda gross, but hey ...
+          (destructuring-bind (v0 v1 a0 a1 a2 a3 t9 gp sp ra)
+              (mapcar #'make-gpr '(2 3 4 5 6 7 25 28 29 31))
+            ;; Allocate stack frame.
+            (inst subu sp n-frame-bytes)
+
+            ;; Save GP and RA.
+            (inst sw gp sp (- n-frame-bytes (* 2 n-word-bytes)))
+            (inst sw ra sp (- n-frame-bytes n-word-bytes))
+
+            ;; Setup the args and make the call.
+            (inst li a0 (get-lisp-obj-address #'enter-alien-callback))
+            (inst li t9 (foreign-symbol-address "funcall3"))
+            (inst li a1 (fixnumize index))
+            (inst addu a2 sp n-frame-bytes)
+            (inst jal t9)
+            (inst addu a3 sp n-callee-register-args-bytes)
+
+            ;; We're back! Restore GP.
+            (inst lw gp sp (- n-frame-bytes (* 2 n-word-bytes)))
+
+            ;; Load the return value.
+            (cond
+              ((alien-single-float-type-p result-type)
+               (inst lwc1 (make-fpr 0) sp n-callee-register-args-bytes))
+              ((alien-double-float-type-p result-type)
+               (inst lwc1 (make-fpr 0) sp n-callee-register-args-bytes)
+               (inst lwc1 (make-fpr 1) sp (+ n-callee-register-args-bytes
+                                             n-word-bytes)))
+              ((and (alien-integer-type-p result-type)
+                    (> (sb!alien::alien-integer-type-bits result-type)
+                       n-word-bits))
+               (inst lw v0 sp n-callee-register-args-bytes)
+               (inst lw v1 sp (+ n-callee-register-args-bytes n-word-bytes)))
+              ((or (alien-integer-type-p result-type)
+                   (alien-pointer-type-p result-type)
+                   (alien-type-= #.(parse-alien-type 'system-area-pointer nil)
+                                   result-type))
+               (inst lw v0 sp n-callee-register-args-bytes))
+              ((alien-void-type-p result-type))
+              (t
+               (error "unrecognized alien type: ~A" result-type)))
+
+            ;; Restore RA, free stack frame, and return.
+            (inst lw ra sp (- n-frame-bytes n-word-bytes))
+            (inst j ra)
+            (inst addu sp n-frame-bytes))))
+      (finalize-segment segment)
+      ;; Now that the segment is done, convert it to a static
+      ;; vector we can point foreign code to.
+      (let ((buffer (sb!assem::segment-buffer segment)))
+        (make-static-vector (length buffer)
+                            :element-type '(unsigned-byte 8)
+                            :initial-contents buffer)))))

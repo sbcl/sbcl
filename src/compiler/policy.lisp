@@ -102,16 +102,15 @@
                         *policy-qualities*))
          (dependent-binds
           (loop for (name . info) in *policy-dependent-qualities*
-               collect `(,name (policy-quality ,n-policy ',name))
-               collect `(,name (if (= ,name 1)
-                                   ,(policy-dependent-quality-expression info)
-                                   ,name)))))
-    `(let* ((,n-policy (%coerce-to-policy ,thing))
-            ,@binds
-            ,@dependent-binds)
-       (declare (ignorable ,@*policy-qualities*
-                           ,@(mapcar #'car *policy-dependent-qualities*)))
-       ,expr)))
+               collect `(,name (let ((,name (policy-quality ,n-policy ',name)))
+                                 (if (= ,name 1)
+                                     ,(policy-dependent-quality-expression info)
+                                     ,name))))))
+    `(let* ((,n-policy (%coerce-to-policy ,thing)))
+       (declare (ignorable ,n-policy))
+       (symbol-macrolet (,@binds
+                         ,@dependent-binds)
+         ,expr))))
 
 ;;; Dependent qualities
 (defmacro define-optimization-quality

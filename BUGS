@@ -2129,6 +2129,5 @@ WORKAROUND:
   For some more details see comments for (define-alien-type-method
   (c-string :deport-gen) ...)  in host-c-call.lisp.
 
-400: "aggressive constant folding"
-  (fixed in sbcl-0.9.10.17)
-
+401: "optimizer runaway on bad constant type specifiers in TYPEP"
+  (fixed in 0.9.12.12)

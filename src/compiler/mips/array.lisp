@@ -138,13 +138,13 @@
   (def-full-data-vector-frobs simple-array-signed-byte-32 signed-num
     signed-reg))
 
-;;; Integer vectors whos elements are smaller than a byte.  I.e. bit, 2-bit,
+;;; Integer vectors whose elements are smaller than a byte.  I.e. bit, 2-bit,
 ;;; and 4-bit vectors.
 (macrolet ((def-small-data-vector-frobs (type bits)
   (let* ((elements-per-word (floor n-word-bits bits))
          (bit-shift (1- (integer-length elements-per-word))))
     `(progn
-       (define-vop (,(symbolicate 'data-vector-ref/ type))
+       (define-vop (,(symbolicate 'DATA-VECTOR-REF/ type))
          (:note "inline array access")
          (:translate data-vector-ref)
          (:policy :fast-safe)
@@ -170,7 +170,7 @@
            (inst srl result temp)
            (inst and result ,(1- (ash 1 bits)))
            (inst sll value result n-fixnum-tag-bits)))
-       (define-vop (,(symbolicate 'data-vector-ref-c/ type))
+       (define-vop (,(symbolicate 'DATA-VECTOR-REF-C/ type))
          (:translate data-vector-ref)
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg)))
@@ -195,7 +195,7 @@
                (inst srl result (* extra ,bits)))
              (unless (= extra ,(1- elements-per-word))
                (inst and result ,(1- (ash 1 bits)))))))
-       (define-vop (,(symbolicate 'data-vector-set/ type))
+       (define-vop (,(symbolicate 'DATA-VECTOR-SET/ type))
          (:note "inline array store")
          (:translate data-vector-set)
          (:policy :fast-safe)
@@ -244,7 +244,7 @@
               (move result zero-tn))
              (unsigned-reg
               (move result value)))))
-       (define-vop (,(symbolicate 'data-vector-set-c/ type))
+       (define-vop (,(symbolicate 'DATA-VECTOR-SET-C/ type))
          (:translate data-vector-set)
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))

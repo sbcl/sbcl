@@ -588,6 +588,7 @@ steppers to maintain contextual information.")
                      ;; In the event of a control-stack-exhausted-error, we
                      ;; should have unwound enough stack by the time we get
                      ;; here that this is now possible.
+                     #!-win32
                      (sb!kernel::protect-control-stack-guard-page 1)
                      (funcall repl-fun noprint)
                      (critically-unreachable "after REPL"))))))))))

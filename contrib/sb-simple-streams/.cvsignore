@@ -2,3 +2,4 @@ a.out
 *.lisp-temp
 foo.c
 test-passed
+test-data.tmp

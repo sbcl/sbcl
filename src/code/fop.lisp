@@ -2,6 +2,12 @@
 
 (in-package "SB!FASL")
 
+;;; Sometimes we want to skip over any FOPs with side-effects (like
+;;; function calls) while executing other FOPs. *SKIP-UNTIL* will
+;;; either contain the position where the skipping will stop, or
+;;; NIL if we're executing normally.
+(defvar *skip-until* nil)
+
 ;;; Define NAME as a fasl operation, with op-code FOP-CODE. PUSHP
 ;;; describes what the body does to the fop stack:
 ;;;   T
@@ -507,43 +513,53 @@
       res)))
 
 (define-fop (fop-eval 53)
-  (let ((result (eval (pop-stack))))
-    ;; FIXME: CMU CL had this code here:
-    ;;   (when *load-print*
-    ;;     (load-fresh-line)
-    ;;     (prin1 result)
-    ;;     (terpri))
-    ;; Unfortunately, this dependence on the *LOAD-PRINT* global
-    ;; variable is non-ANSI, so for now we've just punted printing in
-    ;; fasl loading.
-    result))
+  (if *skip-until*
+      (pop-stack)
+      (let ((result (eval (pop-stack))))
+        ;; FIXME: CMU CL had this code here:
+        ;;   (when *load-print*
+        ;;     (load-fresh-line)
+        ;;     (prin1 result)
+        ;;     (terpri))
+        ;; Unfortunately, this dependence on the *LOAD-PRINT* global
+        ;; variable is non-ANSI, so for now we've just punted printing in
+        ;; fasl loading.
+        result)))
 
 (define-fop (fop-eval-for-effect 54 :pushp nil)
-  (let ((result (eval (pop-stack))))
-    ;; FIXME: See the comment about *LOAD-PRINT* in FOP-EVAL.
-    (declare (ignore result))
-    #+nil (when *load-print*
-            (load-fresh-line)
-            (prin1 result)
-            (terpri))))
+  (if *skip-until*
+      (pop-stack)
+      (let ((result (eval (pop-stack))))
+        ;; FIXME: See the comment about *LOAD-PRINT* in FOP-EVAL.
+        (declare (ignore result))
+        #+nil (when *load-print*
+                (load-fresh-line)
+                (prin1 result)
+                (terpri)))))
 
 (define-fop (fop-funcall 55)
   (let ((arg (read-byte-arg)))
-    (if (zerop arg)
-        (funcall (pop-stack))
-        (do ((args () (cons (pop-stack) args))
-             (n arg (1- n)))
-            ((zerop n) (apply (pop-stack) args))
-          (declare (type index n))))))
+    (if *skip-until*
+        (dotimes (i (1+ arg))
+          (pop-stack))
+        (if (zerop arg)
+            (funcall (pop-stack))
+            (do ((args () (cons (pop-stack) args))
+                 (n arg (1- n)))
+                ((zerop n) (apply (pop-stack) args))
+              (declare (type index n)))))))
 
 (define-fop (fop-funcall-for-effect 56 :pushp nil)
   (let ((arg (read-byte-arg)))
-    (if (zerop arg)
-        (funcall (pop-stack))
-        (do ((args () (cons (pop-stack) args))
-             (n arg (1- n)))
-            ((zerop n) (apply (pop-stack) args))
-          (declare (type index n))))))
+    (if *skip-until*
+        (dotimes (i (1+ arg))
+          (pop-stack))
+        (if (zerop arg)
+            (funcall (pop-stack))
+            (do ((args () (cons (pop-stack) args))
+                 (n arg (1- n)))
+                ((zerop n) (apply (pop-stack) args))
+              (declare (type index n)))))))
 
 ;;;; fops for fixing up circularities
 
@@ -718,3 +734,46 @@ bug.~:@>")
                              (foreign-symbol-address sym t)
                              kind)
     code-object))
+
+;;; FOPs needed for implementing an IF operator in a FASL
+
+;;; Skip until a FOP-MAYBE-STOP-SKIPPING with the same POSITION is
+;;; executed. While skipping, we execute most FOPs normally, except
+;;; for ones that a) funcall/eval b) start skipping. This needs to
+;;; be done to ensure that the fop table gets populated correctly
+;;; regardless of the execution path.
+(define-fop (fop-skip 151 :pushp nil)
+  (let ((position (pop-stack)))
+    (unless *skip-until*
+      (setf *skip-until* position)))
+  (values))
+
+;;; As before, but only start skipping if the top of the FOP stack is NIL.
+(define-fop (fop-skip-if-false 152 :pushp nil)
+  (let ((condition (pop-stack))
+        (position (pop-stack)))
+    (unless (or condition
+                *skip-until*)
+      (setf *skip-until* position)))
+  (values))
+
+;;; If skipping, pop the top of the stack and discard it. Needed for
+;;; ensuring that the stack stays balanced when skipping.
+(define-fop (fop-drop-if-skipping 153 :pushp nil)
+  (when *skip-until*
+    (pop-stack))
+  (values))
+
+;;; If skipping, push a dummy value on the stack. Needed for
+;;; ensuring that the stack stays balanced when skipping.
+(define-fop (fop-push-nil-if-skipping 154 :pushp nil)
+  (when *skip-until*
+    (push-stack nil))
+  (values))
+
+;;; Stop skipping if the top of the stack matches *SKIP-UNTIL*
+(define-fop (fop-maybe-stop-skipping 155 :pushp nil)
+  (let ((label (pop-stack)))
+    (when (eql *skip-until* label)
+      (setf *skip-until* nil)))
+  (values))
