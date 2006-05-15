@@ -3272,15 +3272,17 @@
 ;;; -- If both args are characters, convert to CHAR=. This is better than
 ;;;    just converting to EQ, since CHAR= may have special compilation
 ;;;    strategies for non-standard representations, etc.
-;;; -- If either arg is definitely a fixnum we punt and let the backend
-;;;    deal with it.
+;;; -- If either arg is definitely a fixnum, we check to see if X is
+;;;    constant and if so, put X second. Doing this results in better
+;;;    code from the backend, since the backend assumes that any constant
+;;;    argument comes second.
 ;;; -- If either arg is definitely not a number or a fixnum, then we
 ;;;    can compare with EQ.
 ;;; -- Otherwise, we try to put the arg we know more about second. If X
 ;;;    is constant then we put it second. If X is a subtype of Y, we put
 ;;;    it second. These rules make it easier for the back end to match
 ;;;    these interesting cases.
-(deftransform eql ((x y) * *)
+(deftransform eql ((x y) * * :node node)
   "convert to simpler equality predicate"
   (let ((x-type (lvar-type x))
         (y-type (lvar-type y))
@@ -3297,7 +3299,7 @@
               (csubtypep y-type char-type))
          '(char= x y))
         ((or (fixnum-type-p x-type) (fixnum-type-p y-type))
-         (give-up-ir1-transform))
+         (commutative-arg-swap node))
         ((or (simple-type-p x-type) (simple-type-p y-type))
          '(eq x y))
         ((and (not (constant-lvar-p y))
