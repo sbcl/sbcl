@@ -203,10 +203,10 @@
   (:args (object :scs (descriptor-reg)))
   (:conditional)
   (:info target not-p)
-  (:temporary (:sc descriptor-reg :from (:argument 0)) value)
   (:generator 9
-    (loadw value object symbol-value-slot other-pointer-lowtag)
-    (inst cmp value unbound-marker-widetag)
+    (inst cmp (make-ea-for-object-slot object symbol-value-slot
+                                       other-pointer-lowtag)
+          unbound-marker-widetag)
     (inst jmp (if not-p :e :ne) target)))
 
 
