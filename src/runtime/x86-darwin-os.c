@@ -11,6 +11,8 @@
 
 #ifdef LISP_FEATURE_SB_THREAD
 
+pthread_mutex_t modify_ldt_lock = PTHREAD_MUTEX_INITIALIZER;
+
 void set_data_desc_size(data_desc_t* desc, unsigned long size)
 {
     desc->limit00 = (size - 1) & 0xffff;
@@ -37,12 +39,14 @@ int arch_os_thread_init(struct thread *thread) {
     set_data_desc_addr(&ldt_entry, (unsigned long) thread);
     set_data_desc_size(&ldt_entry, dynamic_values_bytes);
 
+    thread_mutex_lock(&modify_ldt_lock);
     n = i386_set_ldt(LDT_AUTO_ALLOC, (union ldt_entry*) &ldt_entry, 1);
 
     if (n < 0) {
         perror("i386_set_ldt");
         lose("unexpected i386_set_ldt(..) failure\n");
     }
+    thread_mutex_unlock(&modify_ldt_lock);
 
     FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", n));
     sel.index = n;
@@ -79,7 +83,9 @@ int arch_os_thread_cleanup(struct thread *thread) {
     FSHOW_SIGNAL((stderr, "/ TLS: Freeing LDT %x\n", n));
 
     __asm__ __volatile__ ("mov %0, %%fs" : : "r"(0));
+    thread_mutex_lock(&modify_ldt_lock);
     i386_set_ldt(n, NULL, 1);
+    thread_mutex_unlock(&modify_ldt_lock);
 #endif
     return 1;                  /* success */
 }
