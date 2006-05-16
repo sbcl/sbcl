@@ -47,14 +47,28 @@
 #define SIGSTKSZ 1024
 #endif
 
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_SB_THREAD)
+#define QUEUE_FREEABLE_THREAD_STACKS
+#endif
+
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
 
 struct freeable_stack {
+#ifdef QUEUE_FREEABLE_THREAD_STACKS
+    struct freeable_stack *next;
+#endif
     os_thread_t os_thread;
     os_vm_address_t stack;
 };
 
+
+#ifdef QUEUE_FREEABLE_THREAD_STACKS
+static struct freeable_stack * volatile freeable_stack_queue = 0;
+static int freeable_stack_count = 0;
+pthread_mutex_t freeable_stack_lock = PTHREAD_MUTEX_INITIALIZER;
+#else
 static struct freeable_stack * volatile freeable_stack = 0;
+#endif
 
 int dynamic_values_bytes=4096*sizeof(lispobj);  /* same for all threads */
 struct thread * volatile all_threads;
@@ -123,6 +137,58 @@ initial_thread_trampoline(struct thread *th)
 
 #ifdef LISP_FEATURE_SB_THREAD
 
+#ifdef QUEUE_FREEABLE_THREAD_STACKS
+
+queue_freeable_thread_stack(struct thread *thread_to_be_cleaned_up)
+{
+     if (thread_to_be_cleaned_up) {
+        pthread_mutex_lock(&freeable_stack_lock);
+        if (freeable_stack_queue) {
+            struct freeable_stack *new_freeable_stack = 0, *next;
+            next = freeable_stack_queue;
+            while (next->next) {
+                next = next->next;
+            }
+            new_freeable_stack = (struct freeable_stack *)
+                os_validate(0, sizeof(struct freeable_stack));
+            new_freeable_stack->next = NULL;
+            new_freeable_stack->os_thread = thread_to_be_cleaned_up->os_thread;
+            new_freeable_stack->stack = (os_vm_address_t)
+                thread_to_be_cleaned_up->control_stack_start;
+            next->next = new_freeable_stack;
+            freeable_stack_count++;
+        } else {
+            struct freeable_stack *new_freeable_stack = 0;
+            new_freeable_stack = (struct freeable_stack *)
+                os_validate(0, sizeof(struct freeable_stack));
+            new_freeable_stack->next = NULL;
+            new_freeable_stack->os_thread = thread_to_be_cleaned_up->os_thread;
+            new_freeable_stack->stack = (os_vm_address_t)
+                thread_to_be_cleaned_up->control_stack_start;
+            freeable_stack_queue = new_freeable_stack;
+            freeable_stack_count++;
+        }
+        pthread_mutex_unlock(&freeable_stack_lock);
+    }
+}
+
+static void
+free_freeable_stacks() {
+    if (freeable_stack_queue && (freeable_stack_count > 8)) {
+        struct freeable_stack* old;
+        pthread_mutex_lock(&freeable_stack_lock);
+        old = freeable_stack_queue;
+        freeable_stack_queue = old->next;
+        freeable_stack_count--;
+        gc_assert(pthread_join(old->os_thread, NULL) == 0);
+        fprintf(stderr, "freeing thread %x stack\n", old->os_thread);
+        os_invalidate(old->stack, THREAD_STRUCT_SIZE);
+        os_invalidate((os_vm_address_t)old, sizeof(struct freeable_stack));
+        pthread_mutex_unlock(&freeable_stack_lock);
+    }
+}
+
+#else
 static void
 free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
 {
@@ -150,6 +216,7 @@ free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
         /* #endif */
     }
 }
+#endif
 
 /* this is the first thing that runs in the child (which is why the
  * silly calling convention).  Basically it calls the user's requested
@@ -192,7 +259,13 @@ new_thread_trampoline(struct thread *th)
     if(th->tls_cookie>=0) arch_os_thread_cleanup(th);
     os_invalidate((os_vm_address_t)th->interrupt_data,
                   (sizeof (struct interrupt_data)));
+
+#ifdef QUEUE_FREEABLE_THREAD_STACKS
+    queue_freeable_thread_stack(th);
+#else
     free_thread_stack_later(th);
+#endif
+
     FSHOW((stderr,"/exiting thread %p\n", thread_self()));
     return result;
 }
@@ -364,7 +437,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     thread_sigmask(SIG_BLOCK, &newset, &oldset);
 
 #if defined(LISP_FEATURE_DARWIN)
-#define CONTROL_STACK_ADJUST 4096 /* darwin wants page-aligned stacks */
+#define CONTROL_STACK_ADJUST 8192 /* darwin wants page-aligned stacks */
 #else
 #define CONTROL_STACK_ADJUST 16
 #endif
