@@ -181,7 +181,7 @@ free_freeable_stacks() {
         freeable_stack_queue = old->next;
         freeable_stack_count--;
         gc_assert(pthread_join(old->os_thread, NULL) == 0);
-        fprintf(stderr, "freeing thread %x stack\n", old->os_thread);
+        FSHOW((stderr, "freeing thread %x stack\n", old->os_thread));
         os_invalidate(old->stack, THREAD_STRUCT_SIZE);
         os_invalidate((os_vm_address_t)old, sizeof(struct freeable_stack));
         pthread_mutex_unlock(&freeable_stack_lock);
@@ -456,9 +456,9 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
         if(retcode < 0) {
             perror("create_os_thread");
         }
-
         r=0;
     }
+    free_freeable_stacks();
     thread_sigmask(SIG_SETMASK,&oldset,0);
     return r;
 }
