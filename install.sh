@@ -13,7 +13,7 @@ ensure_dirs ()
 if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
     DEFAULT_INSTALL_ROOT="$PROGRAMFILES/sbcl"
     RUNTIME=sbcl.exe
-    OLD_RUNTIME=sbcl_old.exe
+    OLD_RUNTIME=sbcl.exe.old
 else
     DEFAULT_INSTALL_ROOT=/usr/local
     RUNTIME=sbcl
@@ -65,7 +65,7 @@ test -f $BUILD_ROOT$INSTALL_ROOT/bin/$RUNTIME && \
 test -f $BUILD_ROOT$SBCL_HOME/sbcl.core && \
     mv $BUILD_ROOT$SBCL_HOME/sbcl.core $BUILD_ROOT$SBCL_HOME/sbcl.core.old
 
-cp src/runtime/sbcl $BUILD_ROOT$INSTALL_ROOT/bin/
+cp src/runtime/$RUNTIME $BUILD_ROOT$INSTALL_ROOT/bin/
 cp output/sbcl.core $BUILD_ROOT$SBCL_HOME/sbcl.core
 
 # installing contrib
