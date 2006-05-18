@@ -109,7 +109,7 @@ in future versions."
         int (lutex unsigned-long))
 
     (sb!alien:define-alien-routine ("lutex_wait" %lutex-wait)
-        int (lutex unsigned-long))
+        int (queue-lutex unsigned-long) (mutex-lutex unsigned-long))
 
     (sb!alien:define-alien-routine ("lutex_wake" %lutex-wake)
         int (lutex unsigned-long) (n int))
@@ -239,24 +239,29 @@ until it is available"
     (setf (mutex-value mutex) new-value)
     t)
   #!+sb-thread
-  (let (old)
+  (progn
     (when (eql new-value (mutex-value mutex))
       (warn "recursive lock attempt ~S~%" mutex)
       (format *debug-io* "Thread: ~A~%" *current-thread*)
       (sb!debug:backtrace most-positive-fixnum *debug-io*)
       (force-output *debug-io*))
-    (loop
-     (unless
-         (setf old (sb!vm::%instance-set-conditional mutex 2 nil new-value))
-       (return t))
-     (unless wait-p (return nil))
-     #!+sb-lutex
-     (with-lutex-address (lutex (mutex-lutex mutex))
-       (%lutex-lock lutex))
-     #!-sb-lutex
-     (with-pinned-objects (mutex old)
-       (futex-wait (mutex-value-address mutex)
-                   (sb!kernel:get-lisp-obj-address old))))))
+    ;; FIXME: sb-lutex and (not wait-p)
+    #!+sb-lutex
+    (when wait-p
+      (with-lutex-address (lutex (mutex-lutex mutex))
+        (%lutex-lock lutex))
+      (setf (mutex-value mutex) new-value))
+    #!-sb-lutex
+    (let (old)
+      (loop
+         (unless
+             (setf old (sb!vm::%instance-set-conditional mutex 2 nil
+                                                         new-value))
+           (return t))
+         (unless wait-p (return nil))
+         (with-pinned-objects (mutex old)
+           (futex-wait (mutex-value-address mutex)
+                       (sb!kernel:get-lisp-obj-address old)))))))
 
 (defun release-mutex (mutex)
   #!+sb-doc
@@ -316,15 +321,19 @@ time we reacquire MUTEX and return to the caller."
   #!-sb-thread (error "Not supported in unithread builds.")
   #!+sb-thread
   (let ((value (mutex-value mutex)))
+    (/show0 "CONDITION-WAITing")
+    #!+sb-lutex
+    (progn
+      (setf (mutex-value mutex) nil)
+      (with-lutex-address (queue-lutex-address (waitqueue-lutex queue))
+        (with-lutex-address (mutex-lutex-address (mutex-lutex mutex))
+          (%lutex-wait queue-lutex-address mutex-lutex-address)))
+      (setf (mutex-value mutex) value))
+    #!-sb-lutex
     (unwind-protect
          (let ((me *current-thread*))
-           #!+sb-lutex (declare (ignore me))
-           (/show0 "CONDITION-WAITing")
            ;; XXX we should do something to ensure that the result of this setf
            ;; is visible to all CPUs
-           ;;
-           ;; XXX do lutexes handle this?
-           #!-sb-lutex
            (setf (waitqueue-data queue) me)
            (release-mutex mutex)
            ;; Now we go to sleep using futex-wait.  If anyone else
@@ -332,10 +341,6 @@ time we reacquire MUTEX and return to the caller."
            ;; this comment, it will change queue->data, and so
            ;; futex-wait returns immediately instead of sleeping.
            ;; Ergo, no lost wakeup
-           #!+sb-lutex
-           (with-lutex-address (lutex (waitqueue-lutex queue))
-             (%lutex-wait lutex))
-           #!-sb-lutex
            (with-pinned-objects (queue me)
              (futex-wait (waitqueue-data-address queue)
                          (sb!kernel:get-lisp-obj-address me))))

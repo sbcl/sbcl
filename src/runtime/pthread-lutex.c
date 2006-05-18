@@ -53,14 +53,13 @@ lutex_init (tagged_lutex_t tagged_lutex)
 }
 
 int
-lutex_wait (tagged_lutex_t tagged_lutex)
+lutex_wait (tagged_lutex_t tagged_queue_lutex, tagged_lutex_t tagged_mutex_lutex)
 {
     int ret;
-    struct lutex *lutex = (struct lutex*) native_pointer(tagged_lutex);
+    struct lutex *queue_lutex = (struct lutex*) native_pointer(tagged_queue_lutex);
+    struct lutex *mutex_lutex = (struct lutex*) native_pointer(tagged_mutex_lutex);
 
-    pthread_mutex_lock(lutex->mutex);
-    ret = pthread_cond_wait(lutex->condition_variable, lutex->mutex);
-    pthread_mutex_unlock(lutex->mutex);
+    ret = pthread_cond_wait(queue_lutex->condition_variable, mutex_lutex->mutex);
 
     return ret;
 }
@@ -70,8 +69,6 @@ lutex_wake (tagged_lutex_t tagged_lutex, int n)
 {
     int ret = 0;
     struct lutex *lutex = (struct lutex*) native_pointer(tagged_lutex);
-
-    pthread_mutex_lock(lutex->mutex);
 
     /* The lisp-side code passes N=2**29-1 for a broadcast. */
     if (n >= ((1 << 29) - 1)) {
@@ -89,7 +86,6 @@ lutex_wake (tagged_lutex_t tagged_lutex, int n)
                 return ret;
         }
     }
-    pthread_mutex_unlock(lutex->mutex);
 
     return ret;
 }
