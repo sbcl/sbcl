@@ -458,7 +458,9 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
         }
         r=0;
     }
+#ifdef QUEUE_FREEABLE_THREAD_STACKS
     free_freeable_stacks();
+#endif
     thread_sigmask(SIG_SETMASK,&oldset,0);
     return r;
 }
