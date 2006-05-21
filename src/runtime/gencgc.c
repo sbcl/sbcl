@@ -588,6 +588,7 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
     page_index_t last_page;
     long bytes_found;
     page_index_t i;
+    int ret;
 
     /*
     FSHOW((stderr,
@@ -599,7 +600,8 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
     gc_assert((alloc_region->first_page == 0)
               && (alloc_region->last_page == -1)
               && (alloc_region->free_pointer == alloc_region->end_addr));
-    thread_mutex_lock(&free_pages_lock);
+    ret = thread_mutex_lock(&free_pages_lock);
+    gc_assert(ret == 0);
     if (unboxed) {
         first_page =
             generations[gc_alloc_generation].alloc_unboxed_start_page;
@@ -660,7 +662,8 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
         /* do we only want to call this on special occasions? like for boxed_region? */
         set_alloc_pointer((lispobj)(((char *)heap_base) + last_free_page*PAGE_BYTES));
     }
-    thread_mutex_unlock(&free_pages_lock);
+    ret = thread_mutex_unlock(&free_pages_lock);
+    gc_assert(ret == 0);
 
     /* we can do this after releasing free_pages_lock */
     if (gencgc_zero_check) {
@@ -802,6 +805,7 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
     long orig_first_page_bytes_used;
     long region_size;
     long byte_cnt;
+    int ret;
 
 
     first_page = alloc_region->first_page;
@@ -812,7 +816,8 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 
     next_page = first_page+1;
 
-    thread_mutex_lock(&free_pages_lock);
+    ret = thread_mutex_lock(&free_pages_lock);
+    gc_assert(ret == 0);
     if (alloc_region->free_pointer != alloc_region->start_addr) {
         /* some bytes were allocated in the region */
         orig_first_page_bytes_used = page_table[first_page].bytes_used;
@@ -916,7 +921,9 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
         page_table[next_page].allocated = FREE_PAGE_FLAG;
         next_page++;
     }
-    thread_mutex_unlock(&free_pages_lock);
+    ret = thread_mutex_unlock(&free_pages_lock);
+    gc_assert(ret == 0);
+
     /* alloc_region is per-thread, we're ok to do this unlocked */
     gc_set_region_empty(alloc_region);
 }
@@ -934,8 +941,10 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
     int more;
     long bytes_used;
     page_index_t next_page;
+    int ret;
 
-    thread_mutex_lock(&free_pages_lock);
+    ret = thread_mutex_lock(&free_pages_lock);
+    gc_assert(ret == 0);
 
     if (unboxed) {
         first_page =
@@ -1035,7 +1044,8 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
         last_free_page = last_page+1;
         set_alloc_pointer((lispobj)(((char *)heap_base) + last_free_page*PAGE_BYTES));
     }
-    thread_mutex_unlock(&free_pages_lock);
+    ret = thread_mutex_unlock(&free_pages_lock);
+    gc_assert(ret == 0);
 
 #ifdef READ_PROTECT_FREE_PAGES
     os_protect(page_address(first_page),
@@ -4093,9 +4103,24 @@ garbage_collect_generation(generation_index_t generation, int raise)
                     if (esp1>=(void **)th->control_stack_start &&
                         esp1<(void **)th->control_stack_end) {
                         if(esp1<esp) esp=esp1;
+                        /* Ok, so the problem here is that on linux
+                           the registers are on the stack. My hunch is
+                           that on Darwin, while the context is on the
+                           stack, the registers are actually elsewhere
+                           in the ss struct. */
+#if defined(LISP_FEATURE_DARWIN)
+                        preserve_pointer((void*)*os_context_register_addr(c,reg_EAX));
+                        preserve_pointer((void*)*os_context_register_addr(c,reg_ECX));
+                        preserve_pointer((void*)*os_context_register_addr(c,reg_EDX));
+                        preserve_pointer((void*)*os_context_register_addr(c,reg_EBX));
+                        preserve_pointer((void*)*os_context_register_addr(c,reg_ESI));
+                        preserve_pointer((void*)*os_context_register_addr(c,reg_EDI));
+                        preserve_pointer((void*)*os_context_pc_addr(c));
+#else
                         for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {
                             preserve_pointer(*ptr);
                         }
+#endif
                     }
                 }
             }

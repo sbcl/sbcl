@@ -33,11 +33,6 @@ OPEN BUGS
    threaded host will build from sources, but slam.sh does not work. A
    non-threaded host can run slam.sh fine.
 
-2. Occasional Illegal Instruction Errors
-
-3. threads.impure.lisp and timer.impure.lisp fail. See 8 (fixed) and 9
-   (fixed).
-
 4. Leaking semaphores? I think we leak semaphores at the moment.
 
 5. Currently we'll die after 8192 total threads have been created. We
@@ -45,17 +40,10 @@ OPEN BUGS
    OS. i386_set_ldt LDT_AUTO_ALLOC doesn't reuse freed LDT's
    (radar:4492548).
 
-6. sb-threads/sb-lutex/x86-64/linux builds hang in the
-   threads.impure.lisp. This suggests that, in addition to whatever
-   platform specific problems we're seeing on Darwin, there may be
-   some flaws in the lutex logic that need to be addressed.
-
 7. sb-threads/sb-lutex/x86/freebsd builds build and run and simple
    thread creation tests work, but threads.impure.lisp and
    timer.impure.lisp fail. The failure mode is rather severe,
    including a kernel panic in one instance.
-
-10. Failure after handling a deferred(PA) signal
 
 ====================================
 FIXED BUGS
@@ -82,6 +70,26 @@ some of the issues we had to deal with where)
 
 9. Bogus decrement value for EBP in arrange_return_to_lisp, should have
    remained 8, not been set to 10.
+
+2. Occasional Illegal Instruction Errors. These seem to be caused by
+   the way were freeing the thread structs. If we queue the thread
+   structs for later deletion, instead of having the next created
+   thread delete the previously freed on, the problem seems to go
+   away.
+
+3. threads.impure.lisp and timer.impure.lisp fail. See 8 (fixed) and 9
+   (fixed).
+
+6. sb-threads/sb-lutex/x86-64/linux builds hang in the
+   threads.impure.lisp. This suggests that, in addition to whatever
+   platform specific problems we're seeing on Darwin, there may be
+   some flaws in the lutex logic that need to be addressed.
+
+10. Failure after handling a deferred(PA) signal. I think this is
+    fixed.
+
+11. Memory Corruption
+
 
 ====================================
 Lutexes
@@ -355,3 +363,58 @@ mistake of bumping the amount by which we were decrementing EBP to 10
 from 8, thinking this was the number, in words, by which we needed to
 displace EBP. Turns out this is in fact bytes, and we wanted to stay
 at 8 bytes. Leaving this at 8 fixes the SIGSEGV.
+
+
+====================================
+LUTEX CONDITION-WAIT/CONDITION-NOTIFY
+====================================
+
+
+jsnell> we need to use the pthread_mutex of the lutex of the mutex
+        that's passed to sb-thread:condition-wait in lutex_wait and
+        lutex_wake
+
+jsnell> I think it doesn't need to be done for -notify, and the mutex
+        manipulations in lutex_wake and lutex_wait can be removed. and
+        the lutex condition-wait should just consist of calling to
+        lutex_wait
+
+slyrus> so we keep the cond_ calls in lutex_wait and _wake, but remove
+        the mutex calls?
+
+jsnell> hmm... though I haven't really thought of what should happen
+        with mutex-value for lutexes
+
+jsnell> no, obviously you need to pass the lutex of the queue to lutex_wake
+
+jsnell> you need to pass the lutex of both queue and mutex and use
+	pthread_cond_wait(queue_lutex->condition_variable,
+	mutex_lutex->mutex)
+
+jsnell> blech. after this, get-mutex will need to be changed too, to
+        unconditionally call %lutex-lock, instead of trying to take
+        the fast path with%instance-set-condit ional
+
+jsnell> and the lutex condition-wait should then be something like
+        (let ((old-value (mutex-value mutex)) (%lutex-wait ...) (setf
+        (mutex-value mutex) old-value))), to ensure that the
+        mutex-value slot is consistent with cond_wait
+        releasing/acquiring the lock
+
+Ok, all of this is in place, but we occasionally stil don't wake from waiting.
+
+====================================
+GC THREADS BUG
+====================================
+
+1) walking the registers in the context
+2) figuring out if the point to dynamic space
+3) getting the page
+4) checking dont_move == 1?
+
+On Darwin, the machine context does not contain the actual register
+values, but rather a pointer to an i386_thread_state (or
+ppc_thread_state on PPC) which contains the actual register
+values. When scavenging the interrupt context, we need to make sure
+that these values are preseved, instead of the values in the context
+itself.

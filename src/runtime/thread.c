@@ -172,9 +172,11 @@ queue_freeable_thread_stack(struct thread *thread_to_be_cleaned_up)
     }
 }
 
+#define FREEABLE_STACK_QUEUE_SIZE 4
+
 static void
 free_freeable_stacks() {
-    if (freeable_stack_queue && (freeable_stack_count > 8)) {
+    if (freeable_stack_queue && (freeable_stack_count > FREEABLE_STACK_QUEUE_SIZE)) {
         struct freeable_stack* old;
         pthread_mutex_lock(&freeable_stack_lock);
         old = freeable_stack_queue;
@@ -227,7 +229,7 @@ int
 new_thread_trampoline(struct thread *th)
 {
     lispobj function;
-    int result;
+    int result, lock_ret;
     FSHOW((stderr,"/creating thread %lu\n", thread_self()));
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
@@ -242,19 +244,24 @@ new_thread_trampoline(struct thread *th)
      * list and we're just adding this thread to it there is no danger
      * of deadlocking even with SIG_STOP_FOR_GC blocked (which it is
      * not). */
-    pthread_mutex_lock(&all_threads_lock);
+    lock_ret = pthread_mutex_lock(&all_threads_lock);
+    gc_assert(lock_ret == 0);
     link_thread(th);
-    pthread_mutex_unlock(&all_threads_lock);
+    lock_ret = pthread_mutex_unlock(&all_threads_lock);
+    gc_assert(lock_ret == 0);
 
     result = funcall0(function);
     th->state=STATE_DEAD;
 
     /* SIG_STOP_FOR_GC is blocked and GC might be waiting for this
      * thread, but since we are already dead it won't wait long. */
-    pthread_mutex_lock(&all_threads_lock);
+    lock_ret = pthread_mutex_lock(&all_threads_lock);
+    gc_assert(lock_ret == 0);
+    
     gc_alloc_update_page_tables(0, &th->alloc_region);
     unlink_thread(th);
     pthread_mutex_unlock(&all_threads_lock);
+    gc_assert(lock_ret == 0);
 
     if(th->tls_cookie>=0) arch_os_thread_cleanup(th);
     os_invalidate((os_vm_address_t)th->interrupt_data,
@@ -534,11 +541,13 @@ int signal_interrupt_thread(os_thread_t os_thread)
 void gc_stop_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
-    int status;
+    int status, lock_ret;
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock, thread=%lu\n",
                   th->os_thread));
     /* keep threads from starting while the world is stopped. */
-    pthread_mutex_lock(&all_threads_lock); \
+    lock_ret = pthread_mutex_lock(&all_threads_lock);      \
+    gc_assert(lock_ret == 0);
+    
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got lock, thread=%lu\n",
                   th->os_thread));
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
@@ -574,7 +583,7 @@ void gc_stop_the_world()
 void gc_start_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
-    int status;
+    int status, lock_ret;
     /* if a resumed thread creates a new thread before we're done with
      * this loop, the new thread will get consed on the front of
      * all_threads, but it won't have been stopped so won't need
@@ -620,7 +629,9 @@ void gc_start_the_world()
     }
 #endif
 
-    pthread_mutex_unlock(&all_threads_lock);
+    lock_ret = pthread_mutex_unlock(&all_threads_lock);
+    gc_assert(lock_ret == 0);
+
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:end\n"));
 }
 #endif
