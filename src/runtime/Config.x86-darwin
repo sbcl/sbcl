@@ -14,10 +14,6 @@ OS_SRC = bsd-os.c x86-bsd-os.c darwin-os.c x86-darwin-os.c ppc-darwin-dlshim.c x
 OS_LIBS = -lSystem -lc -ldl
 OS_OBJS = x86-darwin-rospace.o
 
-OS_LIBS += $(shell if grep LISP_FEATURE_CARBON_SEMAPHORES genesis/config.h \
-                      > /dev/null 2>&1; \
-                   then echo "-framework CoreServices"; fi)
-
 CC = gcc
 
 ASSEM_SRC = x86-assem.S ldso-stubs.S

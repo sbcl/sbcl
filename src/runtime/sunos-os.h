@@ -39,6 +39,3 @@ typedef int os_vm_prot_t;
 /* Yaargh?! */
 typedef int os_context_register_t ;
 
-#if defined(LISP_FEATURE_SB_THREAD)
-typedef sem_t os_sem_t;
-#endif

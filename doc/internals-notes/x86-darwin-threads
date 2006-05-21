@@ -26,14 +26,16 @@ CURRENT STATUS
    investigate if this helps the situation.
 
 ====================================
+NEXT BUG NUMBER: 14
+====================================
+
+====================================
 OPEN BUGS
 ====================================
 
 1. Threaded builds cannont run slam.sh on themselves. A build with a
    threaded host will build from sources, but slam.sh does not work. A
    non-threaded host can run slam.sh fine.
-
-4. Leaking semaphores? I think we leak semaphores at the moment.
 
 5. Currently we'll die after 8192 total threads have been created. We
    need to manage our own LDT to fix this until Apple fixes their
@@ -44,6 +46,10 @@ OPEN BUGS
    thread creation tests work, but threads.impure.lisp and
    timer.impure.lisp fail. The failure mode is rather severe,
    including a kernel panic in one instance.
+
+12. Ocassionally we don't wake from lutex_wait on MacOS.
+
+13. Compiling swank from slime fails with a TYPE-ERROR
 
 ====================================
 FIXED BUGS
@@ -89,6 +95,10 @@ some of the issues we had to deal with where)
     fixed.
 
 11. Memory Corruption
+
+4. Leaking semaphores? We don't use semaphores at the moment, so this
+   is fixed.
+
 
 
 ====================================

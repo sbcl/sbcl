@@ -63,7 +63,6 @@ typedef unsigned long pointer_sized_uint_t ;
 
 #if defined(LISP_FEATURE_SB_THREAD)
 #include <pthread.h>
-#include <semaphore.h>
 typedef pthread_t os_thread_t;
 #else
 typedef pid_t os_thread_t;

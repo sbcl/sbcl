@@ -23,10 +23,6 @@
 #include <asm/unistd.h>
 #include <linux/version.h>
 
-#ifdef LISP_FEATURE_SB_THREAD
-#include <semaphore.h>
-#endif
-
 #include "target-arch-os.h"
 #include "target-arch.h"
 #define linuxversion(a, b, c) (((a)<<16)+((b)<<8)+(c))
@@ -35,10 +31,6 @@ typedef caddr_t os_vm_address_t;
 typedef size_t os_vm_size_t;
 typedef off_t os_vm_offset_t;
 typedef int os_vm_prot_t;
-
-#ifdef LISP_FEATURE_SB_THREAD
-typedef sem_t os_sem_t;
-#endif
 
 #define OS_VM_PROT_READ    PROT_READ
 #define OS_VM_PROT_WRITE   PROT_WRITE

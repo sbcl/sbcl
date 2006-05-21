@@ -4116,11 +4116,10 @@ garbage_collect_generation(generation_index_t generation, int raise)
                         preserve_pointer((void*)*os_context_register_addr(c,reg_ESI));
                         preserve_pointer((void*)*os_context_register_addr(c,reg_EDI));
                         preserve_pointer((void*)*os_context_pc_addr(c));
-#else
+#endif
                         for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {
                             preserve_pointer(*ptr);
                         }
-#endif
                     }
                 }
             }
