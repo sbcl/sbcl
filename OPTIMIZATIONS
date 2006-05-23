@@ -272,3 +272,79 @@ FOO's IR1 representation is roughly:
 However, if a full call is generated for < (and similarly for other
 predicate functions), then the IF is unnecessary, since the return value
 of (< x y) is already T or NIL.
+--------------------------------------------------------------------------------
+#31
+The typecheck generated for a declaration like (integer 0 45) on x86 looks
+like:
+
+;      12B:       F6C203           TEST DL, 3
+;      12E:       753B             JNE L1
+;      130:       8BC2             MOV EAX, EDX
+;      132:       83F800           CMP EAX, 0
+;      135:       7C34             JL L1
+;      137:       8BC2             MOV EAX, EDX
+;      139:       3DB4000000       CMP EAX, 180
+;      13E:       7F2B             JNLE L1
+
+A better code sequence for this would be:
+
+  TEST DL, 3
+  JNE L1
+  MOV EAX, EDX
+  CMP EAX, 180
+  JBE L1
+
+Doing an unsigned comparison means that, similarly to %CHECK-BOUND, we can
+combine the <0 and >=bound tests.  This sort of test is generated often
+in SBCL and any array-based code that's serious about type-checking its
+indices.
+--------------------------------------------------------------------------------
+#32
+The code for a vector bounds check on x86 (similarly on x86-64) where
+the vector is in EDX and the index in EAX looks like:
+
+;       49: L0:   8B5AFD           MOV EBX, [EDX-3]
+;       4C:       39C3             CMP EBX, EAX
+;       4E:       7632             JBE L2
+
+because %CHECK-BOUND is used for bounds-checking any array dimension.
+A more efficient specialization (%CHECK-BOUND/VECTOR) would produce:
+
+  CMP [EDX-3], EAX
+  JBE L2
+
+Which is slightly shorter and avoids using a register.
+--------------------------------------------------------------------------------
+#33
+Reports from the Java camp indicate that using an SSE2-based
+floating-point backend on x86 when possible is highly preferable to
+using the x86 FP stack.  It would be nice if SBCL included an SSE2-based
+floating point backend with a compile-time option to switch between the
+two.
+--------------------------------------------------------------------------------
+#34
+Compiling
+
+(defun foo (x y)
+  (declare (type (integer 0 45) x y))
+  (+ x y))
+
+results in the following error trapping code for type-checking the
+arguments:
+
+;      424: L0:   8B058CE31812     MOV EAX, [#x1218E38C]      ; '(MOD 46)
+;      42A:       0F0B0A           BREAK 10                   ; error trap
+;      42D:       05               BYTE #X05
+;      42E:       1F               BYTE #X1F                  ; OBJECT-NOT-TYPE-ERROR
+;      42F:       FECE01           BYTE #XFE, #XCE, #X01      ; EDI
+;      432:       0E               BYTE #X0E                  ; EAX
+;      433: L1:   8B0590E31812     MOV EAX, [#x1218E390]      ; '(MOD 46)
+;      439:       0F0B0A           BREAK 10                   ; error trap
+;      43C:       03               BYTE #X03
+;      43D:       1F               BYTE #X1F                  ; OBJECT-NOT-TYPE-ERROR
+;      43E:       8E               BYTE #X8E                  ; EDX
+;      43F:       0E               BYTE #X0E                  ; EAX
+
+Notice that '(MOD 46) has two entries in the constant vector.  Having
+one would be preferable.
+
