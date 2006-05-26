@@ -89,16 +89,16 @@
   ;;
   ;; C runtime executable segment starts at 0x00400000
   (def!constant read-only-space-start #x01000000)
-  (def!constant read-only-space-end   #x08000000)
+  (def!constant read-only-space-end   #x07ff0000)
 
   (def!constant static-space-start    #x08000000)
-  (def!constant static-space-end      #x10000000)
+  (def!constant static-space-end      #x0fff0000)
   ;; C runtime read/write segment starts at 0x10000000, heap and DSOs
   ;; start at 0x2a000000
   (def!constant dynamic-0-space-start #x30000000)
-  (def!constant dynamic-0-space-end   #x50000000)
+  (def!constant dynamic-0-space-end   #x4fff0000)
   (def!constant dynamic-1-space-start #x50000000)
-  (def!constant dynamic-1-space-end   #x70000000)
+  (def!constant dynamic-1-space-end   #x6fff0000)
 
   (def!constant linkage-table-space-start #x70000000)
   (def!constant linkage-table-space-end   #x71000000)
