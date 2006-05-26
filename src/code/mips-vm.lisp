@@ -4,6 +4,7 @@
 
 
 (define-alien-type os-context-t (struct os-context-t-struct))
+(define-alien-type os-context-register-t unsigned-long-long)
 
 
 ;;;; MACHINE-TYPE and MACHINE-VERSION
@@ -33,47 +34,42 @@
         (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
               (ash value -2)))
        (:lui
-        (setf (sap-ref-16 sap
-                          #!+little-endian offset
-                          #!-little-endian (+ offset 2))
-              (+ (ash value -16)
-                 (if (logbitp 15 value) 1 0))))
+        (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
+              (ash (1+ (ash value -15)) -1)))
        (:addi
-        (setf (sap-ref-16 sap
-                          #!+little-endian offset
-                          #!-little-endian (+ offset 2))
+        (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
               (ldb (byte 16 0) value)))))))
 
 
 (define-alien-routine ("os_context_pc_addr" context-pc-addr)
-    (* unsigned-long-long)
-  (context (* os-context-t)))
+    (* os-context-register-t)
+  (context (* os-context-t) :in))
 
 (defun context-pc (context)
   (declare (type (alien (* os-context-t)) context))
   (int-sap (deref (context-pc-addr context))))
 
 (define-alien-routine ("os_context_register_addr" context-register-addr)
-    (* unsigned-long-long)
-  (context (* os-context-t))
-  (index int))
+    (* os-context-register-t)
+  (context (* os-context-t) :in)
+  (index int :in))
 
 (define-alien-routine ("os_context_bd_cause" context-bd-cause-int)
     unsigned-int
-  (context (* os-context-t)))
+  (context (* os-context-t) :in))
 
 ;;; FIXME: Should this and CONTEXT-PC be INLINE to reduce consing?
 ;;; (Are they used in anything time-critical, or just the debugger?)
 (defun context-register (context index)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-register-addr context index)))
-    (declare (type (alien (* unsigned-long-long)) addr))
+    (declare (type (alien (* os-context-register-t)) addr))
     (deref addr)))
 
 (defun %set-context-register (context index new)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-register-addr context index)))
-    (declare (type (alien (* unsigned-long-long)) addr))
+    (declare (type (alien (* os-context-register-t)) addr))
     (setf (deref addr) new)))
 
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float
@@ -82,20 +78,20 @@
 ;;; FIXME: Whether COERCE actually knows how to make a float out of a
 ;;; long is another question. This stuff still needs testing.
 (define-alien-routine ("os_context_fpregister_addr" context-float-register-addr)
-    (* unsigned-long-long)
+    (* os-context-register-t)
   (context (* os-context-t))
   (index int))
 
 (defun context-float-register (context index format)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-float-register-addr context index)))
-    (declare (type (alien (* unsigned-long-long)) addr))
+    (declare (type (alien (* os-context-register-t)) addr))
     (coerce (deref addr) format)))
 
 (defun %set-context-float-register (context index format new)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-float-register-addr context index)))
-    (declare (type (alien (* unsigned-long-long)) addr))
+    (declare (type (alien (* os-context-register-t)) addr))
     (setf (deref addr) (coerce new format))))
 
 ;;; Given a signal context, return the floating point modes word in
