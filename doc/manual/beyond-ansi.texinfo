@@ -132,6 +132,30 @@ Common Lisp restriction on defining functions, variables and types named
 by symbols in the Common Lisp package: preventing two independent pieces
 of software from colliding with each other.
 
+@item
+@findex slot-value-using-class
+@findex sb-mop:slot-value-using-class
+@findex (setf slot-value-using-class)
+@findex (setf sb-mop:slot-value-using-class)
+@findex slot-boundp-using-class
+@findex sb-mop:slot-boundp-using-class
+specializations of the @code{new-value} argument to @code{(setf
+sb-mop:slot-value-using-class)} are not allowed: all user-defined
+methods must have a specializer of the class @code{t}.
+
+This prohibition is motivated by a separation of layers: the
+@code{slot-value-using-class} family of functions is intended for use in
+implementing different and new slot allocation strategies, rather than
+in performing application-level dispatching.  Additionally, with this
+requirement, there is a one-to-one mapping between metaclass, class and
+slot-definition-class tuples and effective methods of @code{(setf
+slot-value-using-class)}, which permits optimization of @code{(setf
+slot-value-using-class)}'s discriminating function in the same manner as
+for @code{slot-value-using-class} and @code{slot-boundp-using-class}.
+
+Note that application code may specialize on the @code{new-value}
+argument of slot accessors.
+
 @end itemize
 
 @node  Support For Unix

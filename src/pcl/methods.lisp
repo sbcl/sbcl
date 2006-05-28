@@ -54,7 +54,7 @@
 ;;; Methods are not reinitializable.
 
 (define-condition metaobject-initialization-violation
-    (reference-condition simple-condition)
+    (reference-condition simple-error)
   ())
 
 (macrolet ((def (name args control)
@@ -486,6 +486,18 @@
   (loop (when (null methods) (return gf))
         (real-add-method gf (pop methods) methods)))
 
+(define-condition new-value-specialization (reference-condition error)
+  ((%method :initarg :method :reader new-value-specialization-method))
+  (:report
+   (lambda (c s)
+     (format s "~@<Cannot add method ~S to ~S, as it specializes the ~
+                new-value argument.~@:>"
+             (new-value-specialization-method c)
+             #'(setf slot-value-using-class))))
+  (:default-initargs :references
+      (list '(:sbcl :node "Metaobject Protocol")
+            '(:amop :generic-function (setf slot-value-using-class)))))
+
 (defun real-add-method (generic-function method &optional skip-dfun-update-p)
   (when (method-generic-function method)
     (error "~@<The method ~S is already part of the generic ~
@@ -515,6 +527,17 @@
         ;; some internal way.
         (when (and existing (similar-lambda-lists-p existing method))
           (remove-method generic-function existing))
+
+        ;; KLUDGE: We have a special case here, as we disallow
+        ;; specializations of the NEW-VALUE argument to (SETF
+        ;; SLOT-VALUE-USING-CLASS).  GET-ACCESSOR-METHOD-FUNCTION is
+        ;; the optimizing function here: it precomputes the effective
+        ;; method, assuming that there is no dispatch to be done on
+        ;; the new-value argument.
+        (when (and (eq generic-function #'(setf slot-value-using-class))
+                   (not (eq *the-class-t* (first specializers))))
+          (error 'new-value-specialization
+                 :method method))
 
         (setf (method-generic-function method) generic-function)
         (pushnew method (generic-function-methods generic-function))
@@ -1520,45 +1543,50 @@
   (declare (ignore class))
   (function-funcall (slot-definition-boundp-function slotd) object))
 
+(defun special-case-for-compute-discriminating-function-p (gf)
+  (or (eq gf #'slot-value-using-class)
+      (eq gf #'(setf slot-value-using-class))
+      (eq gf #'slot-boundp-using-class)))
+
 (defmethod compute-discriminating-function ((gf standard-generic-function))
   (with-slots (dfun-state arg-info) gf
+    (when (special-case-for-compute-discriminating-function-p gf)
+      ;; if we have a special case for
+      ;; COMPUTE-DISCRIMINATING-FUNCTION, then (at least for the
+      ;; special cases implemented as of 2006-05-09) any information
+      ;; in the cache is misplaced.
+      (aver (null dfun-state)))
     (typecase dfun-state
-      (null (let ((name (generic-function-name gf)))
-              (when (eq name 'compute-applicable-methods)
-                (update-all-c-a-m-gf-info gf))
-              (cond ((eq name 'slot-value-using-class)
-                     (update-slot-value-gf-info gf 'reader)
-                     #'slot-value-using-class-dfun)
-                    ((equal name '(setf slot-value-using-class))
-                     (update-slot-value-gf-info gf 'writer)
-                     #'setf-slot-value-using-class-dfun)
-                    ((eq name 'slot-boundp-using-class)
-                     (update-slot-value-gf-info gf 'boundp)
-                     #'slot-boundp-using-class-dfun)
-                    ((gf-precompute-dfun-and-emf-p arg-info)
-                     (make-final-dfun gf))
-                    (t
-                     (make-initial-dfun gf)))))
+      (null
+       (when (eq gf #'compute-applicable-methods)
+         (update-all-c-a-m-gf-info gf))
+       (cond
+         ((eq gf #'slot-value-using-class)
+          (update-slot-value-gf-info gf 'reader)
+          #'slot-value-using-class-dfun)
+         ((eq gf #'(setf slot-value-using-class))
+          (update-slot-value-gf-info gf 'writer)
+          #'setf-slot-value-using-class-dfun)
+         ((eq gf #'slot-boundp-using-class)
+          (update-slot-value-gf-info gf 'boundp)
+          #'slot-boundp-using-class-dfun)
+         ((gf-precompute-dfun-and-emf-p arg-info)
+          (make-final-dfun gf))
+         (t
+          (make-initial-dfun gf))))
       (function dfun-state)
       (cons (car dfun-state)))))
 
 (defmethod update-gf-dfun ((class std-class) gf)
   (let ((*new-class* class)
-        #|| (name (generic-function-name gf)) ||#
         (arg-info (gf-arg-info gf)))
-    (cond #||
-          ((eq name 'slot-value-using-class)
-           (update-slot-value-gf-info gf 'reader))
-          ((equal name '(setf slot-value-using-class))
-           (update-slot-value-gf-info gf 'writer))
-          ((eq name 'slot-boundp-using-class)
-           (update-slot-value-gf-info gf 'boundp))
-          ||#
-          ((gf-precompute-dfun-and-emf-p arg-info)
-           (multiple-value-bind (dfun cache info)
-               (make-final-dfun-internal gf)
-             (set-dfun gf dfun cache info) ; lest the cache be freed twice
-             (update-dfun gf dfun cache info))))))
+    (cond
+      ((special-case-for-compute-discriminating-function-p gf))
+      ((gf-precompute-dfun-and-emf-p arg-info)
+       (multiple-value-bind (dfun cache info)
+           (make-final-dfun-internal gf)
+         (set-dfun gf dfun cache info) ; lest the cache be freed twice
+         (update-dfun gf dfun cache info))))))
 
 (defmethod (setf class-name) (new-value class)
   (let ((classoid (%wrapper-classoid (class-wrapper class))))

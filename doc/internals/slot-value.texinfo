@@ -189,3 +189,7 @@ computed lazily rather than eagerly.  The default image has 8589
 closures implementing this optimization: 3 (@code{slot-value},
 @code{set-slot-value} and @code{slot-boundp}) for each of 2863 effective
 slots.)
+
+(Also note that this optimization depends on not being able to
+specialize the @code{new-value} argument to @{(setf
+slot-value-using-class)}.)
