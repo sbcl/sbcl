@@ -158,46 +158,28 @@
                     (:translate ,ref-name)
                     (:policy :fast-safe)
                     (:args (sap :scs (sap-reg))
-                           (offset :scs (signed-reg)))
+                           (offset :scs (signed-reg immediate)))
                     (:arg-types system-area-pointer signed-num)
-                    ,@(unless (eq size :dword)
-                        `((:temporary (:sc ,temp-sc
-                                       :from (:eval 0)
-                                       :to (:eval 1))
-                                      temp)))
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
                     (:generator 5
-                                (inst mov ,(if (eq size :dword) 'result 'temp)
-                                      (make-ea ,size :base sap :index offset))
-                                ,@(unless (eq size :dword)
-                                    `((inst ,(if signed 'movsx 'movzx)
-                                            result temp)))))
-                  (define-vop (,ref-name-c)
-                    (:translate ,ref-name)
-                    (:policy :fast-safe)
-                    (:args (sap :scs (sap-reg)))
-                    (:arg-types system-area-pointer
-                                (:constant (signed-byte 32)))
-                    (:info offset)
-                    ,@(unless (eq size :dword)
-                        `((:temporary (:sc ,temp-sc
-                                       :from (:eval 0)
-                                       :to (:eval 1))
-                                      temp)))
-                    (:results (result :scs (,sc)))
-                    (:result-types ,type)
-                    (:generator 4
-                                (inst mov ,(if (eq size :dword) 'result 'temp)
-                                      (make-ea ,size :base sap :disp offset))
-                                ,@(unless (eq size :dword)
-                                    `((inst ,(if signed 'movsx 'movzx)
-                                            result temp)))))
+                      ,(let ((mov-inst (cond
+                                         ((eq size :dword) 'mov)
+                                         (signed 'movsx)
+                                         (t 'movzx))))
+                         `(sc-case offset
+                            (immediate
+                             (inst ,mov-inst result
+                                   (make-ea ,size :base sap
+                                            :disp (tn-value offset))))
+                            (t (inst ,mov-inst result
+                                     (make-ea ,size :base sap
+                                              :index offset)))))))
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
                     (:args (sap :scs (sap-reg) :to (:eval 0))
-                           (offset :scs (signed-reg) :to (:eval 0))
+                           (offset :scs (signed-reg immediate) :to (:eval 0))
                            (value :scs (,sc)
                                   :target ,(if (eq size :dword)
                                                'result
@@ -213,39 +195,16 @@
                     (:generator 5
                                 ,@(unless (eq size :dword)
                                     `((move eax-tn value)))
-                                (inst mov (make-ea ,size
-                                                   :base sap
-                                                   :index offset)
+                                (inst mov (sc-case offset
+                                            (immediate
+                                             (make-ea ,size :base sap
+                                                      :disp (tn-value offset)))
+                                            (t (make-ea ,size
+                                                        :base sap
+                                                        :index offset)))
                                       ,(if (eq size :dword) 'value 'temp))
                                 (move result
-                                      ,(if (eq size :dword) 'value 'eax-tn))))
-                  (define-vop (,set-name-c)
-                    (:translate ,set-name)
-                    (:policy :fast-safe)
-                    (:args (sap :scs (sap-reg) :to (:eval 0))
-                           (value :scs (,sc)
-                                  :target ,(if (eq size :dword)
-                                               'result
-                                               'temp)))
-                    (:arg-types system-area-pointer
-                                (:constant (signed-byte 32)) ,type)
-                    (:info offset)
-                    ,@(unless (eq size :dword)
-                        `((:temporary (:sc ,temp-sc :offset eax-offset
-                                           :from (:argument 2) :to (:result 0)
-                                           :target result)
-                                      temp)))
-                    (:results (result :scs (,sc)))
-                    (:result-types ,type)
-                    (:generator 4
-                                ,@(unless (eq size :dword)
-                                    `((move eax-tn value)))
-                                (inst mov
-                                      (make-ea ,size :base sap :disp offset)
-                                      ,(if (eq size :dword) 'value 'temp))
-                                (move result ,(if (eq size :dword)
-                                                  'value
-                                                  'eax-tn))))))))
+                                      ,(if (eq size :dword) 'value 'eax-tn))))))))
 
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8
     unsigned-reg positive-fixnum :byte nil)
