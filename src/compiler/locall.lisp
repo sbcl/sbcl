@@ -832,7 +832,8 @@
   (depart-from-tail-set clambda)
 
   (let* ((home (node-home-lambda call))
-         (home-physenv (lambda-physenv home)))
+         (home-physenv (lambda-physenv home))
+         (physenv (lambda-physenv clambda)))
 
     (aver (not (eq home clambda)))
 
@@ -840,6 +841,11 @@
     (push clambda (lambda-lets home))
     (setf (lambda-home clambda) home)
     (setf (lambda-physenv clambda) home-physenv)
+
+    (when physenv
+      (setf (physenv-nlx-info home-physenv)
+            (nconc (physenv-nlx-info physenv)
+                   (physenv-nlx-info home-physenv))))
 
     ;; All of CLAMBDA's LETs belong to HOME now.
     (let ((lets (lambda-lets clambda)))

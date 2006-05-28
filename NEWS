@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-0.9.14 relative to sbcl-0.9.13:
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** MISC.641: LET-conversion were not supposed to work in late
+       compilation stages.
+
 changes in sbcl-0.9.13 relative to sbcl-0.9.12:
   * new feature: source path information is generated for macro-expansion
     errors for use in IDE's like Slime (thanks to Helmut Eller)

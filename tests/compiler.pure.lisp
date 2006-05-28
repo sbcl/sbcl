@@ -2099,3 +2099,12 @@
                            summing i)
                      x)))
   (assert (= a (random most-positive-fixnum))))
+
+;;; MISC.641: LET-conversion after physical environment analysis lost NLX-INFOs
+(let ((form '(lambda ()
+              (declare (optimize (speed 1) (space 0) (debug 2)
+                           (compilation-speed 0) (safety 1)))
+              (flet ((%f3 (f3-1 &key (key1 (count (floor 0 (min -74 0)) #())))
+                          0))
+                   (apply #'%f3 0 nil)))))
+  (assert (zerop (funcall (compile nil form)))))
