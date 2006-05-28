@@ -362,5 +362,12 @@
 (let ((pathname (truename "/")))
   (assert (equalp pathname #p"/"))
   (assert (equal (pathname-directory pathname) '(:absolute))))
+
+;;; we failed to unparse logical pathnames with :NAME :WILD :TYPE NIL.
+;;; (Reported by Pascal Bourguignon.
+(let ((pathname (make-pathname :host "SYS" :directory '(:absolute :wild-inferiors)
+                               :name :wild :type nil)))
+  (assert (string= (namestring pathname) "SYS:**;*"))
+  (assert (string= (write-to-string pathname :readably t) "#P\"SYS:**;*\"")))
 
 ;;;; success

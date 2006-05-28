@@ -1551,13 +1551,15 @@ PARSE-NAMESTRING."
            (version-supplied (not (or (null version)
                                       (eq version :unspecific)))))
       (when name
-        (when (and (null type) (position #\. name :start 1))
+        (when (and (null type)
+                   (typep name 'string)
+                   (position #\. name :start 1))
           (error "too many dots in the name: ~S" pathname))
         (strings (unparse-logical-piece name)))
       (when type-supplied
         (unless name
           (error "cannot specify the type without a file: ~S" pathname))
-        (when (typep type 'simple-string)
+        (when (typep type 'string)
           (when (position #\. type)
             (error "type component can't have a #\. inside: ~S" pathname)))
         (strings ".")

@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.14 relative to sbcl-0.9.13:
+  * bug fix: unparsing logical pathnames with :NAME :WILD :TYPE NIL
+    failed with a type error.  (reported by Pascal Bourguignon)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.641: LET-conversion were not supposed to work in late
        compilation stages.
