@@ -23,7 +23,7 @@
    It is used by PROVIDE and REQUIRE.")
 
 (defvar *module-provider-functions* (list 'module-provide-contrib)
-  "See function documentation for REQUIRE")
+  "See function documentation for REQUIRE.")
 
 ;;;; PROVIDE and REQUIRE
 
