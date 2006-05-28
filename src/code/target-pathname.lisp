@@ -459,7 +459,7 @@ the operating system native pathname conventions."
                  (if (and (eq dir :back)
                           results
                           (not (member (car results)
-                                       '(:back :wild-inferiors))))
+                                       '(:back :wild-inferiors :relative :absolute))))
                      (pop results)
                      (push dir results))))
           (dolist (dir (maybe-diddle-case dir2 diddle-case))

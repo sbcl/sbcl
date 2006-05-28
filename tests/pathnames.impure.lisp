@@ -369,5 +369,11 @@
                                :name :wild :type nil)))
   (assert (string= (namestring pathname) "SYS:**;*"))
   (assert (string= (write-to-string pathname :readably t) "#P\"SYS:**;*\"")))
-
+
+;;; reported by James Y Knight on sbcl-devel 2006-05-17
+(let ((p1 (make-pathname :directory '(:relative "bar")))
+      (p2 (make-pathname :directory '(:relative :back "foo"))))
+  (assert (equal (merge-pathnames p1 p2)
+                 (make-pathname :directory '(:relative :back "foo" "bar")))))
+
 ;;;; success

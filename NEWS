@@ -8,6 +8,9 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
     the other three SLOT-VALUEish functions, but not for the setter).
   * bug fix: unparsing logical pathnames with :NAME :WILD :TYPE NIL
     failed with a type error.  (reported by Pascal Bourguignon)
+  * bug fix: merging pathnames against defaults with :DIRECTORY
+    starting with '(:RELATIVE :BACK) should preserve the :BACK.
+    (reported by James Y Knight)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.641: LET-conversion were not supposed to work in late
        compilation stages.
