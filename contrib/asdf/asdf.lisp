@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  1.96
+;;; This is asdf: Another System Definition Facility.  1.97
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -109,7 +109,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "1.96")
+(defvar *asdf-revision* (let* ((v "1.97")
                                (colon (or (position #\: v) -1))
                                (dot (position #\. v)))
                           (and v colon dot
@@ -828,37 +828,37 @@ system."))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; invoking operations
 
-(defun operate (operation-class system &rest args)
+(defun operate (operation-class system &rest args &key (verbose t) version)
   (let* ((op (apply #'make-instance operation-class
-                    :original-initargs args args))
-         (*verbose-out*
-          (if (getf args :verbose t)
-              *trace-output*
-              (make-broadcast-stream)))
-         (system (if (typep system 'component) system (find-system system)))
-         (steps (traverse op system)))
-    (with-compilation-unit ()
-      (loop for (op . component) in steps do
-            (loop
-             (restart-case
-                 (progn (perform op component)
-                        (return))
-               (retry ()
-                 :report
-                 (lambda (s)
-                   (format s "~@<Retry performing ~S on ~S.~@:>"
-                           op component)))
-               (accept ()
-                 :report
-                 (lambda (s)
-                   (format s
-                           "~@<Continue, treating ~S on ~S as ~
-                            having been successful.~@:>"
-                           op component))
-                 (setf (gethash (type-of op)
-                                (component-operation-times component))
-                       (get-universal-time))
-                 (return))))))))
+                    :original-initargs args
+                    args))
+         (*verbose-out* (if verbose *trace-output* (make-broadcast-stream)))
+         (system (if (typep system 'component) system (find-system system))))
+    (unless (version-satisfies system version)
+      (error 'missing-component :requires system :version version))
+    (let ((steps (traverse op system)))
+      (with-compilation-unit ()
+        (loop for (op . component) in steps do
+             (loop
+                (restart-case
+                    (progn (perform op component)
+                           (return))
+                  (retry ()
+                    :report
+                    (lambda (s)
+                      (format s "~@<Retry performing ~S on ~S.~@:>"
+                              op component)))
+                  (accept ()
+                    :report
+                    (lambda (s)
+                      (format s
+                              "~@<Continue, treating ~S on ~S as ~
+                               having been successful.~@:>"
+                              op component))
+                    (setf (gethash (type-of op)
+                                   (component-operation-times component))
+                          (get-universal-time))
+                    (return)))))))))
 
 (defun oos (&rest args)
   "Alias of OPERATE function"
