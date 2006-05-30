@@ -1,145 +1,234 @@
-(in-package :sockint)
+;;; -*- Lisp -*-
 
-(defconstant af-unix 1)
-(defconstant af-inet 2)
-(defconstant af-local af-unix)
-(defconstant msg-oob 1)
-(defconstant msg-peek 2)
-(defconstant msg-trunc #x8000)
-(defconstant msg-waitall 0)
+;;; This isn't really lisp, but it's definitely a source file.  we
+;;; name it thus to avoid having to mess with the clc lpn translations
 
-(defconstant ip-options 1)
-(defconstant so-debug 1)
-(defconstant so-acceptconn 2)
-(defconstant so-reuseaddr 4)
-(defconstant so-keepalive 8)
-(defconstant so-dontroute 16)
-(defconstant so-broadcast 32)
-(defconstant so-useloopback 64)
-(defconstant so-linger 128)
-(defconstant so-oobinline 256)
-(defconstant so-dontlinger (lognot so-linger))
-(defconstant so-excludiveaddruse (lognot so-reuseaddr))
-(defconstant so-sndbuf #x1001)
-(defconstant so-rcvbuf #x1002)
-(defconstant so-sndlowat #x1003)
-(defconstant so-rcvlowat #x1004)
-(defconstant so-sndtimeo #x1005)
-(defconstant so-rcvtimeo #x1006)
-(defconstant so-error #x1007)
-(defconstant so-type #x1008)
+;;; first, the headers necessary to find definitions of everything
+("winsock2.h")
 
-(defconstant socket-error -1)
-(defconstant sock-stream 1)
-(defconstant sock-dgram 2)
-(defconstant sock-raw 3)
-(defconstant sock-rdm 4)
-(defconstant sock-seqpacket 5)
-(defconstant tcp-nodelay #x0001)
-(defconstant o-append #x0008)
+;;; then the stuff we're looking for
+((:integer af-inet "AF_INET" "IP Protocol family")
+ (:integer af-unspec "AF_UNSPEC" "Unspecified")
+ (:integer sock-stream "SOCK_STREAM"
+           "Sequenced, reliable, connection-based byte streams.")
+ (:integer sock-dgram "SOCK_DGRAM"
+           "Connectionless, unreliable datagrams of fixed maximum length.")
+ (:integer sock-raw "SOCK_RAW"
+           "Raw protocol interface.")
+ (:integer sock-rdm "SOCK_RDM"
+           "Reliably-delivered messages.")
+ (:integer sock-seqpacket "SOCK_SEQPACKET"
+           "Sequenced, reliable, connection-based, datagrams of fixed maximum length.")
 
-;; some other windows error code
-(defconstant ERROR_NOT_ENOUGH_MEMORY 8)
+ (:integer sol-socket "SOL_SOCKET")
 
-;; misc unixy error codes
-(defconstant ENOMEM ERROR_NOT_ENOUGH_MEMORY)
-(defconstant EPERM 1)
+ ;; some of these may be linux-specific
+ (:integer so-debug "SO_DEBUG"
+   "Enable debugging in underlying protocol modules")
+ (:integer so-reuseaddr "SO_REUSEADDR" "Enable local address reuse")
+ (:integer so-type "SO_TYPE")                  ;get only
+ (:integer so-error "SO_ERROR")                 ;get only (also clears)
+ (:integer so-dontroute "SO_DONTROUTE"
+           "Bypass routing facilities: instead send direct to appropriate network interface for the network portion of the destination address")
+ (:integer so-broadcast "SO_BROADCAST" "Request permission to send broadcast datagrams")
+ (:integer so-sndbuf "SO_SNDBUF")
+ (:integer so-rcvbuf "SO_RCVBUF")
+ (:integer so-keepalive "SO_KEEPALIVE"
+           "Send periodic keepalives: if peer does not respond, we get SIGPIPE")
+ (:integer so-oobinline "SO_OOBINLINE"
+           "Put out-of-band data into the normal input queue when received")
+ (:integer so-linger "SO_LINGER"
+           "For reliable streams, pause a while on closing when unsent messages are queued")
+ (:integer so-sndlowat "SO_SNDLOWAT")
+ (:integer so-rcvlowat "SO_RCVLOWAT")
+ (:integer so-sndtimeo "SO_SNDTIMEO")
+ (:integer so-rcvtimeo "SO_RCVTIMEO")
 
-;; basic socket errors
-(defconstant WSABASEERR 10000)
-(defconstant EINTR (+ WSABASEERR 4))
-(defconstant EBADF (+ WSABASEERR 9))
-(defconstant EACCES (+ WSABASEERR 13))
-(defconstant EFAULT (+ WSABASEERR 14))
-(defconstant EINVAL (+ WSABASEERR 22))
-(defconstant EMFILE (+ WSABASEERR 24))
-(defconstant EWOULDBLOCK (+ WSABASEERR 35))
-(defconstant EAGAIN EWOULDBLOCK)
-(defconstant EINPROGRESS (+ WSABASEERR 36))
-(defconstant EALREADY (+ WSABASEERR 37))
-(defconstant ENOTSOCK (+ WSABASEERR 38))
-(defconstant EDESTADDRREQ (+ WSABASEERR 39))
-(defconstant EMSGSIZE (+ WSABASEERR 40))
-(defconstant EPROTOTYPE (+ WSABASEERR 41))
-(defconstant ENOPROTOOPT (+ WSABASEERR 42))
-(defconstant EPROTONOSUPPORT (+ WSABASEERR 43))
-(defconstant ESOCKTNOSUPPORT (+ WSABASEERR 44))
-(defconstant EOPNOTSUPP (+ WSABASEERR 45))
-(defconstant EPFNOSUPPORT (+ WSABASEERR 46))
-(defconstant EAFNOSUPPORT (+ WSABASEERR 47))
-(defconstant EADDRINUSE (+ WSABASEERR 48))
-(defconstant EADDRNOTAVAIL (+ WSABASEERR 49))
-(defconstant ENETDOWN (+ WSABASEERR 50))
-(defconstant ENETUNREACH (+ WSABASEERR 51))
-(defconstant ENETRESET (+ WSABASEERR 52))
-(defconstant ECONNABORTED (+ WSABASEERR 53))
-(defconstant ECONNRESET (+ WSABASEERR 54))
-(defconstant ENOBUFS (+ WSABASEERR 55))
-(defconstant EISCONN (+ WSABASEERR 56))
-(defconstant ENOTCONN (+ WSABASEERR 57))
-(defconstant ESHUTDOWN (+ WSABASEERR 58))
-(defconstant ETOOMANYREFS (+ WSABASEERR 59))
-(defconstant ETIMEDOUT (+ WSABASEERR 60))
-(defconstant ECONNREFUSED (+ WSABASEERR 61))
-(defconstant ELOOP (+ WSABASEERR 62))
-(defconstant ENAMETOOLONG (+ WSABASEERR 63))
-(defconstant EHOSTDOWN (+ WSABASEERR 64))
-(defconstant EHOSTUNREACH (+ WSABASEERR 65))
-(defconstant ENOTEMPTY (+ WSABASEERR 66))
-(defconstant EPROCLIM (+ WSABASEERR 67))
-(defconstant EUSERS (+ WSABASEERR 68))
-(defconstant EDQUOT (+ WSABASEERR 69))
-(defconstant ESTALE (+ WSABASEERR 70))
-(defconstant EREMOTE (+ WSABASEERR 71))
-(defconstant EDISCON (+ WSABASEERR 101))
-(defconstant SYSNOTREADY (+ WSABASEERR 91))
-(defconstant VERNOTSUPPORTED (+ WSABASEERR 92))
-(defconstant NOTINITIALISED (+ WSABASEERR 93))
-(defconstant HOST_NOT_FOUND (+ WSABASEERR 1001))
-(defconstant TRY_AGAIN (+ WSABASEERR 1002))
-(defconstant NO_RECOVERY (+ WSABASEERR 1003))
-(defconstant NO_DATA (+ WSABASEERR 1004))
-(defconstant WSAENOMORE (+ WSABASEERR 102))
-(defconstant WSAECANCELLED (+ WSABASEERR 103))
-(defconstant WSAEINVALIDPROCTABLE (+ WSABASEERR 104))
-(defconstant WSAEINVALIDPROVIDER (+ WSABASEERR 105))
-(defconstant WSAEPROVIDERFAILEDINIT (+ WSABASEERR 106))
-(defconstant WSASYSCALLFAILURE (+ WSABASEERR 107))
-(defconstant WSASERVICE_NOT_FOUND (+ WSABASEERR 108))
-(defconstant WSATYPE_NOT_FOUND (+ WSABASEERR 109))
-(defconstant WSA_E_NO_MORE (+ WSABASEERR 110))
-(defconstant WSA_E_CANCELLED (+ WSABASEERR 111))
-(defconstant WSAEREFUSED (+ WSABASEERR 112))
-(defconstant WSA_QOS_RECEIVERS (+ WSABASEERR 1005))
-(defconstant WSA_QOS_SENDERS (+ WSABASEERR 1006))
-(defconstant WSA_QOS_NO_SENDERS (+ WSABASEERR 1007))
-(defconstant WSA_QOS_NO_RECEIVERS (+ WSABASEERR 1008))
-(defconstant WSA_QOS_REQUEST_CONFIRMED (+ WSABASEERR 1009))
-(defconstant WSA_QOS_ADMISSION_FAILURE (+ WSABASEERR 1010))
-(defconstant WSA_QOS_POLICY_FAILURE (+ WSABASEERR 1011))
-(defconstant WSA_QOS_BAD_STYLE (+ WSABASEERR 1012))
-(defconstant WSA_QOS_BAD_OBJECT (+ WSABASEERR 1013))
-(defconstant WSA_QOS_TRAFFIC_CTRL_ERROR (+ WSABASEERR 1014))
-(defconstant WSA_QOS_GENERIC_ERROR (+ WSABASEERR 1015))
-(defconstant WSA_QOS_ESERVICETYPE (+ WSABASEERR 1016))
-(defconstant WSA_QOS_EFLOWSPEC (+ WSABASEERR 1017))
-(defconstant WSA_QOS_EPROVSPECBUF (+ WSABASEERR 1018))
-(defconstant WSA_QOS_EFILTERSTYLE (+ WSABASEERR 1019))
-(defconstant WSA_QOS_EFILTERTYPE (+ WSABASEERR 1020))
-(defconstant WSA_QOS_EFILTERCOUNT (+ WSABASEERR 1021))
-(defconstant WSA_QOS_EOBJLENGTH (+ WSABASEERR 1022))
-(defconstant WSA_QOS_EFLOWCOUNT (+ WSABASEERR 1023))
-(defconstant WSA_QOS_EUNKOWNPSOBJ (+ WSABASEERR 1024))
-(defconstant WSA_QOS_EPOLICYOBJ (+ WSABASEERR 1025))
-(defconstant WSA_QOS_EFLOWDESC (+ WSABASEERR 1026))
-(defconstant WSA_QOS_EPSFLOWSPEC (+ WSABASEERR 1027))
-(defconstant WSA_QOS_EPSFILTERSPEC (+ WSABASEERR 1028))
-(defconstant WSA_QOS_ESDMODEOBJ (+ WSABASEERR 1029))
-(defconstant WSA_QOS_ESHAPERATEOBJ (+ WSABASEERR 1030))
-(defconstant WSA_QOS_RESERVED_PETYPE (+ WSABASEERR 1031))
+ (:integer tcp-nodelay "TCP_NODELAY")
 
-(defconstant HOST-NOT-FOUND (+ WSABASEERR 1001))
-(defconstant TRY-AGAIN (+ WSABASEERR 1002))
-(defconstant NO-RECOVERY (+ WSABASEERR 1003))
-(defconstant NO-ADDRESS NO_DATA)
-(defconstant SOL-SOCKET #xffff)
+ (:integer HOST-NOT-FOUND "HOST_NOT_FOUND" "Authoritative Answer Host not found.")
+ (:integer TRY-AGAIN "TRY_AGAIN" "Non-Authoritative Host not found, or SERVERFAIL.")
+ (:integer NO-RECOVERY "NO_RECOVERY" "Non recoverable errors, FORMERR, REFUSED, NOTIMP.")
+ (:integer NO-DATA "NO_DATA" "Valid name, no data record of requested type.")
+ (:integer NO-ADDRESS "NO_ADDRESS" "No address, look for MX record.")
+
+ (:integer msg-oob "MSG_OOB")
+ (:integer msg-peek "MSG_PEEK")
+ (:integer msg-dontroute "MSG_DONTROUTE")
+
+
+ (:integer EADDRINUSE "WSAEADDRINUSE")
+ (:integer EAGAIN "WSAEWOULDBLOCK")
+ (:integer EBADF "WSAEBADF")
+ (:integer ECONNREFUSED "WSAECONNREFUSED")
+ (:integer ETIMEDOUT "WSAETIMEDOUT")
+ (:integer EINTR "WSAEINTR")
+ (:integer EINVAL "WSAEINVAL")
+ (:integer ENOBUFS "WSAENOBUFS")
+ (:integer ENOMEM "WSAENOBUFS")
+ (:integer EOPNOTSUPP "WSAEOPNOTSUPP")
+ (:integer EPERM "WSAENETDOWN")
+ (:integer EPROTONOSUPPORT "WSAEPROTONOSUPPORT")
+ (:integer ESOCKTNOSUPPORT "WSAESOCKTNOSUPPORT")
+ (:integer ENETUNREACH "WSAENETUNREACH")
+ (:integer ENOTCONN "WSAENOTCONN")
+ (:integer inaddr-any "INADDR_ANY")
+
+
+ ;; for socket-receive
+ (:type socklen-t "int")
+ (:type size-t "size_t")
+ (:type ssize-t "ssize_t")
+
+ (:structure in-addr ("struct in_addr"
+                      ((array (unsigned 8)) addr "u_int32_t" "s_addr")))
+
+ (:structure sockaddr-in ("struct sockaddr_in"
+                          (integer family "sa_family_t" "sin_family")
+                          ;; These two could be in-port-t and
+                          ;; in-addr-t, but then we'd throw away the
+                          ;; convenience (and byte-order agnosticism)
+                          ;; of the old sb-grovel scheme.
+                          ((array (unsigned 8)) port "u_int16_t" "sin_port")
+                          ((array (unsigned 8)) addr "struct in_addr" "sin_addr")))
+
+ (:structure hostent ("struct hostent"
+                      (c-string-pointer name "char *" "h_name")
+                      ((* c-string) aliases "char **" "h_aliases")
+                      (integer type "int" "h_addrtype")
+                      (integer length "int" "h_length")
+                      ((* (* (unsigned 8))) addresses "char **" "h_addr_list")))
+
+ (:structure protoent ("struct protoent"
+                       (c-string-pointer name "char *" "p_name")
+                       ((* (* t)) aliases "char **" "p_aliases")
+                       (integer proto "int" "p_proto")))
+
+ (:function getprotobyname ("getprotobyname" (* protoent)
+                                             (name c-string)))
+
+ (:function getprotobynumber ("getprotobynumber" (* protoent)
+                                                 (proto int)))
+
+ (:function win32-bind
+            ("bind" int
+             (sockfd int)
+             (my-addr (* t))  ; KLUDGE: sockaddr-in or sockaddr-un?
+             (addrlen socklen-t)))
+
+ (:function win32-listen ("listen" int
+                    (socket int)
+                    (backlog int)))
+
+ (:function win32-accept ("accept" int
+                    (socket int)
+                    (my-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
+                    (addrlen int :in-out)))
+
+ (:function win32-getpeername ("getpeername" int
+                         (socket int)
+                         (her-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
+                         (addrlen socklen-t :in-out)))
+
+ (:function win32-getsockname ("getsockname" int
+                         (socket int)
+                         (my-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
+                         (addrlen socklen-t :in-out)))
+
+ (:function win32-connect ("connect" int
+                           (socket int)
+                           (his-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
+                           (addrlen socklen-t)))
+
+ (:function win32-close ("closesocket" int
+                         (fd int)))
+
+ (:function win32-recvfrom ("recvfrom" ssize-t
+                            (socket int)
+                            (buf (* t))
+                            (len integer)
+                            (flags int)
+                            (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
+                            (socklen (* socklen-t))))
+
+ (:function win32-recv ("recv" int
+                        (socket int)
+                        (buf (* t))
+                        (len integer)
+                        (flags integer)))
+
+ (:function win32-send ("send" ssize-t
+                        (socket int)
+                        (buf (* t))
+                        (len size-t)
+                        (flags int)))
+
+ (:function win32-sendto ("sendto" int
+                          (socket int)
+                          (buf (* t))
+                          (len size-t)
+                          (flags int)
+                          (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
+                          (socklen socklen-t)))
+
+ (:function gethostbyname ("gethostbyname" (* hostent) (name c-string)))
+
+ (:function gethostbyaddr ("gethostbyaddr" (* hostent)
+                                           (addr (* t))
+                                           (len int)
+                                           (af int)))
+
+;;; should be using getaddrinfo instead?
+
+ (:function win32-setsockopt ("setsockopt" int
+                        (socket int)
+                        (level int)
+                        (optname int)
+                        (optval (* t))
+                        (optlen int))) ;;; should be socklen-t!
+
+ (:function win32-getsockopt ("getsockopt" int
+                        (socket int)
+                        (level int)
+                        (optname int)
+                        (optval (* t))
+                        (optlen int :in-out))) ;;; should be socklen-t!
+
+ (:function win32-ioctl ("ioctlsocket"  int
+                         (socket int)
+                         (cmd int)
+                         (argp (unsigned 32) :in-out)))
+
+
+;;; Win32 specific cruft
+ (:function wsa-socket ("WSASocketA" int
+                        (af int)
+                        (type int)
+                        (protocol int)
+                        (lpProtocolInfo (* t))
+                        (g int)
+                        (flags int)))
+
+ (:function fd->handle ("_get_osfhandle" int
+                        (fd int)))
+
+ (:function handle->fd ("_open_osfhandle" int
+                        (osfhandle int)
+                        (flags int)))
+
+ (:structure wsa-data ("struct WSAData"
+                       (integer version "u_int16_t" "wVersion")
+                       (integer high-version "u_int16_t" "wHighVersion")
+                       (c-string description "char" "szDescription")
+                       (c-string system-status "char" "szSystemStatus")
+                       (integer max-sockets "unsigned short" "iMaxSockets")
+                       (integer max-udp-dg "unsigned short" "iMaxUdpDg")
+                       (c-string-pointer vendor-info "char *" "lpVendorInfo")))
+
+ (:function wsa-startup ("WSAStartup" int
+                        (wVersionRequested (unsigned 16))
+                        (lpWSAData wsa-data :out)))
+
+ (:function wsa-get-last-error ("WSAGetLastError" int))
+
+)

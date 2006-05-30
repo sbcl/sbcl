@@ -1,30 +1,36 @@
 ;;; -*-  Lisp -*-
-#-win32 (eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (:compile-toplevel :load-toplevel :execute)
           (require :sb-grovel))
-(defpackage #:sb-bsd-sockets-system (:use #:asdf #-win32 #:sb-grovel #:cl))
+(defpackage #:sb-bsd-sockets-system (:use #:asdf #:sb-grovel #:cl))
 (in-package #:sb-bsd-sockets-system)
 
 (defsystem sb-bsd-sockets
     :version "0.58"
-    :depends-on #-win32 (sb-grovel) #+win32 ()
+    :depends-on (sb-grovel) 
     #+sb-building-contrib :pathname
     #+sb-building-contrib "SYS:CONTRIB;SB-BSD-SOCKETS;"
     :components ((:file "defpackage")
-                 #+win32 (:file "win32-constants" :depends-on ("defpackage"))
-                 #+win32 (:file "win32-sockets" :depends-on ("win32-constants"))
 		 (:file "split" :depends-on ("defpackage"))
 		 (:file "malloc" :depends-on ("defpackage"))
+                 #+win32
+		 (:file "win32-lib")
 		 #-win32 (sb-grovel:grovel-constants-file
-		  "constants"
-		  :package :sockint
-		  :depends-on  ("defpackage"))
+			  "constants"
+			  :package :sockint
+			  :depends-on  ("defpackage"))
+		 #+win32 (sb-grovel:grovel-constants-file
+			  "win32-constants"
+			  :package :sockint
+			  :depends-on  ("defpackage" "win32-lib"))
+                 #+win32 (:file "win32-sockets" 
+				:depends-on ("win32-constants"))
 		 (:file "sockets"
                         :depends-on #-win32 ("constants") 
                                     #+win32 ("win32-sockets"))
 		 (:file "sockopt" :depends-on ("sockets"))
                  (:file "inet" :depends-on ("sockets" "split"))
                  (:file "local" :depends-on ("sockets" "split"))
-                 (:file "name-service" :depends-on ("sockets" #-win32 "constants"))
+                 (:file "name-service" :depends-on ("sockets"))
                  (:file "misc" :depends-on ("sockets"))
 
 		 (:static-file "NEWS")
@@ -51,3 +57,4 @@
 (defmethod perform ((o test-op) (c (eql (find-system :sb-bsd-sockets-tests))))
   (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
       (error "test-op failed")))
+
