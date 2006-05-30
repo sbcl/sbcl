@@ -61,10 +61,12 @@ build_started=`date`
 echo "//starting build: $build_started"
 
 if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
-    SBCL_XC_HOST="${1:-sbcl --disable-debugger --userinit NUL --sysinit NUL}"
+    DEVNULL=NUL
 else
-    SBCL_XC_HOST="${1:-sbcl --disable-debugger --userinit /dev/null --sysinit /dev/null}"
+    DEVNULL=/dev/null
 fi
+SBCL_XC_HOST="${1:-sbcl --disable-debugger --userinit $DEVNULL --sysinit $DEVNULL}"
+export DEVNULL
 export SBCL_XC_HOST
 echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
 
