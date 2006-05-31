@@ -67,7 +67,8 @@
   "A list of symbols accepted as second argument of `documentation'")
 
 (defparameter *character-replacements*
-  '((#\* . "star") (#\/ . "slash") (#\+ . "plus"))
+  '((#\* . "star") (#\/ . "slash") (#\+ . "plus")
+    (#\< . "lt") (#\> . "gt"))
   "Characters and their replacement names that `alphanumize' uses. If
 the replacements contain any of the chars they're supposed to replace,
 you deserve to lose.")
@@ -270,6 +271,10 @@ symbols or lists of symbols."))
    (children :initarg :children :initform nil :reader get-children)
    (package :initform *documentation-package* :reader get-package)))
 
+(defmethod print-object ((documentation documentation) stream)
+  (print-unreadable-object (documentation stream :type t)
+    (princ (list (get-kind documentation) (get-name documentation)) stream)))
+
 (defgeneric make-documentation (x doc-type string))
 
 (defmethod make-documentation ((x package) doc-type string)
@@ -290,11 +295,11 @@ symbols or lists of symbols."))
                      ((typep fdef 'generic-function)
                       (assert (or (symbolp name) (setf-name-p name)))
                       'generic-function)
-                     (t
+                     (fdef
                       (assert (or (symbolp name) (setf-name-p name)))
                       'function)))
          (children (when (eq kind 'generic-function)
-                             (collect-gf-documentation fdef))))
+                     (collect-gf-documentation fdef))))
     (make-instance 'documentation
                    :name (name x)
                    :string string
@@ -348,10 +353,10 @@ there is no corresponding docstring."
 
 (defun lambda-list (doc)
   (case (get-kind doc)
-    ((package constant variable type structure class condition)
+    ((package constant variable type structure class condition nil)
      nil)
     (method
-     (third (get-name doc)))
+     (third (get-name doc)))    
     (t
      ;; KLUDGE: Eugh.
      ;;
