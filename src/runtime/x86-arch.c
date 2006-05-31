@@ -213,12 +213,6 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     os_context_t *context = (os_context_t*)void_context;
     unsigned int trap;
 
-#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
-    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in sigtrap_handler\n",
-                  *CONTEXT_ADDR_FROM_STEM(fs)));
-    os_restore_tls_segment_register(context);
-#endif
-
 #ifndef LISP_FEATURE_WIN32
     if (single_stepping && (signal==SIGTRAP))
     {
@@ -323,12 +317,9 @@ static void
 sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
     os_context_t *context = (os_context_t*)void_context;
 
-#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
-    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in sigill_handler\n",
-                  *CONTEXT_ADDR_FROM_STEM(fs)));
-    os_restore_tls_segment_register(context);
-#endif
-
+    /* Triggering SIGTRAP using int3 is unreliable on OS X/x86, so
+     * we need to use illegal instructions for traps.
+     */
 #if defined(LISP_FEATURE_DARWIN)
     if (*((unsigned short *)*os_context_pc_addr(context)) == 0x0b0f) {
         *os_context_pc_addr(context) += 2;

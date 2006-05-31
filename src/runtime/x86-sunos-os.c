@@ -82,7 +82,6 @@ install_segment (unsigned long start, unsigned long size) {
                        size,
                        0xf2,
                        0x4};
-    // printf(" installing segment at %lx of size %lx\n", start, size);
     if (sysi86(SI86DSCR, &ssd) < 0) {
         lose("Couldn't install segment for thread-local data");
     }

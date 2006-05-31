@@ -35,7 +35,7 @@
  * necessarily reentrant. But it can still be very convenient for
  * figuring out what's going on when you have a signal handling
  * problem.. */
-#define QSHOW_SIGNALS 1
+#define QSHOW_SIGNALS 0
 
 #if QSHOW_SIGNALS
 #define FSHOW_SIGNAL FSHOW

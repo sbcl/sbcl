@@ -21,16 +21,12 @@ static inline os_context_t *arch_os_get_context(void **void_context) {
 
 #if defined(LISP_FEATURE_SB_THREAD)
 
-
 #if defined LISP_FEATURE_FREEBSD
+/* FIXME: why is this only done for SB-THREAD? */
 #define RESTORE_FP_CONTROL_FROM_CONTEXT
 void os_restore_fp_control(os_context_t *context);
 #endif
 
-static inline void os_restore_tls_segment_register(os_context_t *context) {
-    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
-                          (*CONTEXT_ADDR_FROM_STEM(fs)));
-}
 #endif
 
 #endif /* _X86_BSD_OS_H */

@@ -100,7 +100,6 @@ futex_wake(int *lock_word, int n)
 
 
 int linux_sparc_siginfo_bug = 0;
-int linux_no_threads_p = 0;
 
 #ifdef LISP_FEATURE_SB_THREAD
 int

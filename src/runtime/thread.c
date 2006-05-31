@@ -74,10 +74,6 @@ int dynamic_values_bytes=4096*sizeof(lispobj);  /* same for all threads */
 struct thread * volatile all_threads;
 extern struct interrupt_data * global_interrupt_data;
 
-#ifdef LISP_FEATURE_LINUX
-extern int linux_no_threads_p;
-#endif
-
 #ifdef LISP_FEATURE_SB_THREAD
 pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
@@ -207,7 +203,6 @@ free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
                       (lispobj)new_freeable_stack);
     if (new_freeable_stack) {
         FSHOW((stderr,"/reaping %p\n", (void*) new_freeable_stack->os_thread));
-        /* #if !defined(LISP_FEATURE_DARWIN) */
         /* Under NPTL pthread_join really waits until the thread
          * exists and the stack can be safely freed. This is sadly not
          * mandated by the pthread spec. */
@@ -215,7 +210,6 @@ free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
         os_invalidate(new_freeable_stack->stack, THREAD_STRUCT_SIZE);
         os_invalidate((os_vm_address_t) new_freeable_stack,
                       sizeof(struct freeable_stack));
-        /* #endif */
     }
 }
 #endif
@@ -257,7 +251,7 @@ new_thread_trampoline(struct thread *th)
      * thread, but since we are already dead it won't wait long. */
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
-    
+
     gc_alloc_update_page_tables(0, &th->alloc_region);
     unlink_thread(th);
     pthread_mutex_unlock(&all_threads_lock);
@@ -476,10 +470,6 @@ os_thread_t create_thread(lispobj initial_function) {
     struct thread *th;
     os_thread_t kid_tid;
 
-#ifdef LISP_FEATURE_LINUX
-    if(linux_no_threads_p) return 0;
-#endif
-
     /* Assuming that a fresh thread struct has no lisp objects in it,
      * linking it to all_threads can be left to the thread itself
      * without fear of gc lossage. initial_function violates this
@@ -547,7 +537,7 @@ void gc_stop_the_world()
     /* keep threads from starting while the world is stopped. */
     lock_ret = pthread_mutex_lock(&all_threads_lock);      \
     gc_assert(lock_ret == 0);
-    
+
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got lock, thread=%lu\n",
                   th->os_thread));
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
@@ -615,19 +605,6 @@ void gc_start_the_world()
      * SIG_STOP_FOR_GC wouldn't need to be a rt signal. That has some
      * performance implications, but does away with the 'rt signal
      * queue full' problem. */
-
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_SB_THREAD)
-    /* we must wait for all threads to leave suspended state else we
-     * risk signal accumulation and lose any meaning of
-     * thread->state */
-    for(p=all_threads;p;) {
-        if((p!=th) && (p->state==STATE_SUSPENDED)) {
-            sched_yield();
-        } else {
-            p=p->next;
-        }
-    }
-#endif
 
     lock_ret = pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);

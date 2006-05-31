@@ -99,6 +99,7 @@ lutex_scan_action(lispobj *obj)
     if(n_lutexes >= max_lutexes) {
         max_lutexes *= 2;
         lutex_addresses = realloc(lutex_addresses, max_lutexes * sizeof(void *));
+        gc_assert(lutex_addresses);
     }
 
     lutex_addresses[n_lutexes++] = obj;
@@ -126,19 +127,26 @@ scan_objects(lispobj *start, long n_words, scan_table table)
 static void
 scan_for_lutexes(lispobj *addr, long n_words)
 {
-    int i;
-    scan_table lutex_scan_table;
+    static int initialized = 0;
+    static scan_table lutex_scan_table;
 
-    /* allocate a little space to get started */
-    lutex_addresses = malloc(16*sizeof(void *));
-    max_lutexes = 16;
+    if (!initialized) {
+        int i;
 
-    /* initialize the mapping table */
-    for(i = 0; i < ((sizeof lutex_scan_table)/(sizeof lutex_scan_table[0])); ++i) {
-        lutex_scan_table[i] = default_scan_action;
+        /* allocate a little space to get started */
+        lutex_addresses = malloc(16*sizeof(void *));
+        gc_assert(lutex_addresses);
+        max_lutexes = 16;
+
+        /* initialize the mapping table */
+        for(i = 0; i < ((sizeof lutex_scan_table)/(sizeof lutex_scan_table[0])); ++i) {
+            lutex_scan_table[i] = default_scan_action;
+        }
+
+        lutex_scan_table[LUTEX_WIDETAG] = lutex_scan_action;
+
+        initialized = 1;
     }
-
-    lutex_scan_table[LUTEX_WIDETAG] = lutex_scan_action;
 
     /* do the scan */
     scan_objects(addr, n_words, lutex_scan_table);
@@ -302,7 +310,9 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         write_lispobj(n_lutexes, file);
         /* save the lutexes */
         offset = write_bytes(file, (char *) lutex_addresses,
-                             n_lutexes * sizeof(*lutex_addresses), core_start_pos);
+                             n_lutexes * sizeof(*lutex_addresses),
+                             core_start_pos);
+
         write_lispobj(offset, file);
     }
 #endif

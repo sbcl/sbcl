@@ -47,8 +47,6 @@ do {                                                                   \
   lose("Lutex assertion failure, file \"%s\", line %d\n", __FILE__, __LINE__)
 
 
-/* FIXME: Add some real error checking. */
-
 pthread_mutex_t lutex_register_lock = PTHREAD_MUTEX_INITIALIZER;
 
 int
@@ -63,20 +61,17 @@ lutex_init (tagged_lutex_t tagged_lutex)
     ret = pthread_mutex_init(lutex->mutex, NULL);
     lutex_assert(ret == 0);
 
-    ret = thread_mutex_lock(&lutex_register_lock);
-    lutex_assert(ret == 0);
-
-    gencgc_register_lutex(lutex);
-    lutex_assert(ret == 0);
-    
-    ret = thread_mutex_unlock(&lutex_register_lock);
-    lutex_assert(ret == 0);
-
     lutex->condition_variable = malloc(sizeof(pthread_cond_t));
-    lutex_assert(ret == 0);
+    lutex_assert(lutex->condition_variable != 0);
 
     ret = pthread_cond_init(lutex->condition_variable, NULL);
     lutex_assert(ret == 0);
+
+    ret = thread_mutex_lock(&lutex_register_lock); lutex_assert(ret == 0);
+
+    gencgc_register_lutex(lutex);
+
+    ret = thread_mutex_unlock(&lutex_register_lock); lutex_assert(ret == 0);
 
     return ret;
 }
@@ -106,10 +101,10 @@ lutex_wake (tagged_lutex_t tagged_lutex, int n)
         ret = pthread_cond_broadcast(lutex->condition_variable);
         lutex_assert(ret == 0);
     } else{
-        /* We're holding the lutex mutex, so a thread we're waking can't
-         * re-enter the wait between to calls to pthread_cond_signal. Thus
-         * we'll wake N different threads, instead of the same thread
-         * N times.
+        /* We're holding the condition variable mutex, so a thread
+         * we're waking can't re-enter the wait between to calls to
+         * pthread_cond_signal. Thus we'll wake N different threads,
+         * instead of the same thread N times.
          */
         while (n--) {
             ret = pthread_cond_signal(lutex->condition_variable);
@@ -125,7 +120,7 @@ lutex_lock (tagged_lutex_t tagged_lutex)
 {
     int ret = 0;
     struct lutex *lutex = (struct lutex*) native_pointer(tagged_lutex);
-    
+
     ret = thread_mutex_lock(lutex->mutex);
     lutex_assert(ret == 0);
 

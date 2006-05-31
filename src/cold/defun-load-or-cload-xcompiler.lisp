@@ -174,6 +174,9 @@
   ;; (in the ordinary build procedure anyway) essentially everything
   ;; which is reachable at this point will remain reachable for the
   ;; entire run.
-  #+sbcl (sb-ext:purify)
+  ;;
+  ;; (Except that purifying actually slows down GENCGC). -- JES, 2006-05-30
+  #+(and sbcl (not gencgc))
+  (sb-ext:purify)
 
   (values))

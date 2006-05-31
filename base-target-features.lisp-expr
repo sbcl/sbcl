@@ -166,23 +166,17 @@
  ;;
  ;; While on linux we are able to use futexes for our locking
  ;; primitive, on other platforms we don't have this luxury. NJF's
- ;; lutexes present a locking API compatible with the futex-based API
- ;; that allows for sb-thread support on MacOS X on Intel. Other
- ;; platforms are untested, but this could server as a starting point
- ;; for implementing threads on other OSes and architectures.
+ ;; lutexes present a locking API similar to the futex-based API that
+ ;; allows for sb-thread support on x86 OS X, Solaris and
+ ;; FreeBSD.
  ;;
  ; :sb-lutex
 
- ;; IMPORTANT!!!!! When building on darwin with lutexes we need to
- ;; enable one (and only one!) of these features!!!! FIXME!
- ;
- ; :mach-semaphores
- ; :carbon-semaphores
-
- ;; IMPORTANT!!!!! When building on darwin or freebsd with lutexes we
- ;; MUST turn this on!!! FIXME!
- ;
- ; :restore-tls-segment-register-from-context
+ ;; On some operating systems the FS segment register (used for SBCL's
+ ;; thread local storage) is not reliably preserved in signal
+ ;; handlers, so we need to restore its value from the pthread thread
+ ;; local storage.
+ ; :restore-tls-segment-register-from-tls
 
  ;; Support for detection of unportable code (when applied to the
  ;; COMMON-LISP package, or SBCL-internal pacakges) or bad-neighbourly

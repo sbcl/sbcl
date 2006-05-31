@@ -609,8 +609,7 @@
               (force-output)
               (condition-broadcast queue)))))
 
-(with-test (:name (:mutex :finalization)
-            :fails-on :sb-lutex)
+(with-test (:name (:mutex :finalization))
   (let ((a nil))
     (dotimes (i 500000)
       (setf a (make-mutex)))))

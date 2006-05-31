@@ -2079,7 +2079,11 @@ gencgc_register_lutex (struct lutex *lutex) {
     generation_index_t gen;
     struct lutex *head;
 
-    gc_assert(index != -1);
+    /* This lutex is in static space, so we don't need to worry about
+     * finalizing it.
+     */
+    if (index == -1)
+        return;
 
     gen = page_table[index].gen;
 
@@ -4010,6 +4014,31 @@ scavenge_interrupt_contexts(void)
 
 #endif
 
+static void
+preserve_context_registers (os_context_t *c)
+{
+    void **ptr;
+    /* On Darwin the signal context isn't a contiguous block of memory,
+     * so just preserve_pointering its contents won't be sufficient.
+     */
+#if defined(LISP_FEATURE_DARWIN)
+#if defined LISP_FEATURE_X86
+    preserve_pointer((void*)*os_context_register_addr(c,reg_EAX));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_ECX));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_EDX));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_EBX));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_ESI));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_EDI));
+    preserve_pointer((void*)*os_context_pc_addr(c));
+#else
+    #error "preserve_context_registers needs to be tweaked for non-x86 Darwin"
+#endif
+#endif
+    for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {
+        preserve_pointer(*ptr);
+    }
+}
+
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void
@@ -4103,23 +4132,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
                     if (esp1>=(void **)th->control_stack_start &&
                         esp1<(void **)th->control_stack_end) {
                         if(esp1<esp) esp=esp1;
-                        /* Ok, so the problem here is that on linux
-                           the registers are on the stack. My hunch is
-                           that on Darwin, while the context is on the
-                           stack, the registers are actually elsewhere
-                           in the ss struct. */
-#if defined(LISP_FEATURE_DARWIN)
-                        preserve_pointer((void*)*os_context_register_addr(c,reg_EAX));
-                        preserve_pointer((void*)*os_context_register_addr(c,reg_ECX));
-                        preserve_pointer((void*)*os_context_register_addr(c,reg_EDX));
-                        preserve_pointer((void*)*os_context_register_addr(c,reg_EBX));
-                        preserve_pointer((void*)*os_context_register_addr(c,reg_ESI));
-                        preserve_pointer((void*)*os_context_register_addr(c,reg_EDI));
-                        preserve_pointer((void*)*os_context_pc_addr(c));
-#endif
-                        for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {
-                            preserve_pointer(*ptr);
-                        }
+                        preserve_context_registers(c);
                     }
                 }
             }

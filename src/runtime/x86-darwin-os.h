@@ -16,9 +16,4 @@ void set_data_desc_addr(data_desc_t* desc, void* addr);
 #define CONTEXT_ADDR_FROM_STEM(stem) &context->uc_mcontext->ss.stem
 #define DARWIN_FIX_CONTEXT(context)
 
-static inline void os_restore_tls_segment_register(os_context_t *context) {
-    __asm__ __volatile__ ("movw %w0, %%fs" : : "q"
-                          (*CONTEXT_ADDR_FROM_STEM(fs)));
-}
-
 #endif /* _X86_DARWIN_OS_H */

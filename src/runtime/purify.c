@@ -368,7 +368,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 #endif
         case SAP_WIDETAG:
         case WEAK_POINTER_WIDETAG:
-#ifdef LISP_FEATURE_SB_LUTEX
+#ifdef LUTEX_WIDETAG
         case LUTEX_WIDETAG:
 #endif
             break;
@@ -948,6 +948,11 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 #endif
       case SAP_WIDETAG:
           return ptrans_unboxed(thing, header);
+#ifdef LUTEX_WIDETAG
+      case LUTEX_WIDETAG:
+          gencgc_unregister_lutex(native_pointer(thing));
+          return ptrans_unboxed(thing, header);
+#endif
 
       case RATIO_WIDETAG:
       case COMPLEX_WIDETAG:
@@ -964,9 +969,6 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 
       case VALUE_CELL_HEADER_WIDETAG:
       case WEAK_POINTER_WIDETAG:
-#ifdef LISP_FEATURE_SB_LUTEX
-      case LUTEX_WIDETAG:
-#endif
         return ptrans_boxed(thing, header, 0);
 
       case SYMBOL_HEADER_WIDETAG:
@@ -1381,13 +1383,6 @@ pscav(lispobj *addr, long nwords, boolean constant)
                 pscav(addr+1, 2, constant);
                 count = 4;
                 break;
-
-#ifdef LISP_FEATURE_SB_LUTEX
-              case LUTEX_WIDETAG:
-                pscav(addr+1, 1, constant);
-                count = 2;
-                break;
-#endif
 
               case FDEFN_WIDETAG:
                 /* We have to handle fdefn objects specially, so we
