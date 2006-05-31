@@ -6,14 +6,14 @@ find_gnumake() {
   if [ "$GNUMAKE" != "" ] ; then
     # The user is evidently trying to tell us something.
     GNUMAKE="$GNUMAKE"
+  elif [ "GNU Make" = "`make -v | head -n 1 | cut -b 0-8`" ]; then
+    GNUMAKE=make
   elif [ -x "`which gmake`" ] ; then
     # "gmake" is the preferred name in *BSD.
     GNUMAKE=gmake
   elif [ -x "`which gnumake`" ] ; then
     # MacOS X aka Darwin
     GNUMAKE=gnumake
-  elif [ "GNU Make" = "`make -v | head -n 1 | cut -b 0-8`" ]; then
-    GNUMAKE=make
   else
     echo "GNU Make not found. Try setting the environment variable GNUMAKE."
     exit 1
