@@ -18,6 +18,7 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
     constant index and a (simple-array (signed-byte 32)) array
   * bug fix: NAME-CHAR on an invalid symbol no longer signals an
     error (patch by Robert J. Macomber)
+  * feature: TIME now displays the amount of run-time spent in GC
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.641: LET-conversion were not supposed to work in late
        compilation stages.

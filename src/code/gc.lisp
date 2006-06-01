@@ -192,7 +192,10 @@ environment these hooks may run in any thread.")
           ;; to run as little as possible without them.
           (without-interrupts
             (gc-stop-the-world)
-            (collect-garbage gen)
+            (let ((start-time (get-internal-run-time)))
+              (collect-garbage gen)
+              (incf *gc-run-time*
+                    (- (get-internal-run-time) start-time)))
             (setf *gc-pending* nil
                   new-usage (dynamic-usage))
             (gc-start-the-world))

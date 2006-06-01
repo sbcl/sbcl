@@ -354,29 +354,29 @@
       (time-get-sys-info))
     (setq old-real-time (get-internal-real-time))
     (let ((start-gc-run-time *gc-run-time*))
-    (multiple-value-prog1
-        ;; Execute the form and return its values.
-        (funcall fun)
-      (multiple-value-setq
-          (new-run-utime new-run-stime new-page-faults new-bytes-consed)
-        (time-get-sys-info))
-      (setq new-real-time (- (get-internal-real-time) real-time-overhead))
-      (let ((gc-run-time (max (- *gc-run-time* start-gc-run-time) 0)))
-        (format *trace-output*
-                "~&Evaluation took:~%  ~
+      (multiple-value-prog1
+          ;; Execute the form and return its values.
+          (funcall fun)
+        (multiple-value-setq
+            (new-run-utime new-run-stime new-page-faults new-bytes-consed)
+          (time-get-sys-info))
+        (setq new-real-time (- (get-internal-real-time) real-time-overhead))
+        (let ((gc-run-time (max (- *gc-run-time* start-gc-run-time) 0)))
+          (format *trace-output*
+                  "~&Evaluation took:~%  ~
                  ~S second~:P of real time~%  ~
                  ~S second~:P of user run time~%  ~
                  ~S second~:P of system run time~%  ~
-~@[                 [Run times include ~S second~:P GC run time.]~%  ~]~
+                ~@[[Run times include ~S second~:P GC run time.]~%  ~]~
                  ~S page fault~:P and~%  ~
                  ~:D bytes consed.~%"
-                (max (/ (- new-real-time old-real-time)
-                        (float sb!xc:internal-time-units-per-second))
-                     0.0)
-                (max (/ (- new-run-utime old-run-utime) 1000000.0) 0.0)
-                (max (/ (- new-run-stime old-run-stime) 1000000.0) 0.0)
-                (unless (zerop gc-run-time)
-                  (/ (float gc-run-time)
-                     (float sb!xc:internal-time-units-per-second)))
-                (max (- new-page-faults old-page-faults) 0)
-                (max (- new-bytes-consed old-bytes-consed) 0)))))))
+                  (max (/ (- new-real-time old-real-time)
+                          (float sb!xc:internal-time-units-per-second))
+                       0.0)
+                  (max (/ (- new-run-utime old-run-utime) 1000000.0) 0.0)
+                  (max (/ (- new-run-stime old-run-stime) 1000000.0) 0.0)
+                  (unless (zerop gc-run-time)
+                    (/ (float gc-run-time)
+                       (float sb!xc:internal-time-units-per-second)))
+                  (max (- new-page-faults old-page-faults) 0)
+                  (max (- new-bytes-consed old-bytes-consed) 0)))))))
