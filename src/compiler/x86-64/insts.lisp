@@ -257,6 +257,14 @@
     (sb!disassem:dstate-put-inst-prop dstate 'operand-size-8))
   value)
 
+;;; This prefilter is used solely for its side effect, namely to put
+;;; the property OPERAND-SIZE-16 into the DSTATE.
+(defun prefilter-x66 (value dstate)
+  (declare (type (eql #x66) value)
+           (ignore value)
+           (type sb!disassem:disassem-state dstate))
+  (sb!disassem:dstate-put-inst-prop dstate 'operand-size-16))
+
 ;;; A register field that can be extended by REX.R.
 (defun prefilter-reg-r (value dstate)
   (declare (type reg value)
@@ -359,6 +367,10 @@
              (declare (ignore value))
              (princ (schar (symbol-name (inst-operand-size dstate)) 0)
                     stream)))
+
+;;; Used to capture the effect of the #x66 operand size override prefix.
+(sb!disassem:define-arg-type x66
+  :prefilter #'prefilter-x66)
 
 (sb!disassem:define-arg-type displacement
   :sign-extend t
@@ -692,6 +704,34 @@
                                           ,(swap-if 'dir 'reg/mem ", " 'reg)))
   (op  :field (byte 6 10))
   (dir :field (byte 1 9)))
+
+(sb!disassem:define-instruction-format (x66-reg-reg/mem-dir 24
+                                        :default-printer
+                                        `(:name
+                                          :tab
+                                          ,(swap-if 'dir 'reg/mem ", " 'reg)))
+  (x66     :field (byte 8 0)    :type 'x66 :value #x66)
+  (op      :field (byte 6 10))
+  (dir     :field (byte 1 9))
+  (width   :field (byte 1 8)    :type 'width)
+  (reg/mem :fields (list (byte 2 22) (byte 3 16))
+                                :type 'reg/mem)
+  (reg     :field (byte 3 19)   :type 'reg))
+
+(sb!disassem:define-instruction-format (x66-rex-reg-reg/mem-dir 32
+                                        :default-printer
+                                        `(:name
+                                          :tab
+                                          ,(swap-if 'dir 'reg/mem ", " 'reg)))
+  (x66     :field (byte 8 0)    :type 'x66 :value #x66)
+  (rex     :field (byte 4 12)   :value #b0100)
+  (wrxb    :field (byte 4 8)    :type 'wrxb)
+  (op      :field (byte 6 18))
+  (dir     :field (byte 1 17))
+  (width   :field (byte 1 16)   :type 'width)
+  (reg/mem :fields (list (byte 2 30) (byte 3 24))
+                                :type 'reg/mem)
+  (reg     :field (byte 3 27)   :type 'reg))
 
 ;;; Same as reg-reg/mem, but uses the reg field as a second op code.
 (sb!disassem:define-instruction-format (reg/mem 16
@@ -1543,6 +1583,8 @@
   ;; register to/from register/memory
   (:printer reg-reg/mem-dir ((op #b100010)))
   (:printer rex-reg-reg/mem-dir ((op #b100010)))
+  (:printer x66-reg-reg/mem-dir ((op #b100010)))
+  (:printer x66-rex-reg-reg/mem-dir ((op #b100010)))
   ;; immediate to register/memory
   (:printer reg/mem-imm ((op '(#b1100011 #b000))))
   (:printer rex-reg/mem-imm ((op '(#b1100011 #b000))))
