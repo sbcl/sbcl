@@ -114,7 +114,7 @@ static inline struct thread *arch_os_get_current_thread() {
 #if defined(LISP_FEATURE_X86)
     register struct thread *me=0;
     if(all_threads) {
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_RESTORE_SEGMENT_REGISTER_FROM_TLS)
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_RESTORE_FS_SEGMENT_REGISTER_FROM_TLS)
         sel_t sel;
         struct thread *th = pthread_getspecific(specials);
         sel.index = th->tls_cookie;
