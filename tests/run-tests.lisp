@@ -32,7 +32,7 @@
   (pure-runner (pure-cload-files) #'cload-test)
   (impure-runner (impure-load-files) #'load-test)
   (impure-runner (impure-cload-files) #'cload-test)
-  (impure-runner (sh-files) #'sh-test)
+  #-win32 (impure-runner (sh-files) #'sh-test)
   (report)
   (sb-ext:quit :unix-status (if (unexpected-failures)
                                 1
@@ -73,9 +73,70 @@
         (format t "// Running ~a~%" file)
         (restart-case
             (handler-bind ((error (make-error-handler file)))
-              (funcall test-fun file))
+              (eval (funcall test-fun file)))
           (skip-file ()))))
     (append-failures)))
+
+(defun run-in-child-sbcl (load-forms forms)
+  (declare (ignorable load-forms))
+  #-win32
+  (let ((pid (sb-posix:fork)))
+    (cond ((= pid 0)
+           (dolist (form forms)
+             (eval form)))
+          (t
+           (let ((status (make-array 1 :element-type '(signed-byte 32))))
+             (sb-posix:waitpid pid 0 status)
+             (if (sb-posix:wifexited (aref status 0))
+                 (sb-posix:wexitstatus (aref status 0))
+                 1)))))
+  #+win32
+  (process-exit-code
+   (sb-ext:run-program
+    (first *POSIX-ARGV*)
+    (append
+     (list "--core" SB-INT:*CORE-STRING*
+           "--noinform"
+           "--no-sysinit"
+           "--no-userinit")
+     (loop for form in (append load-forms forms)
+           collect "--eval"
+           collect (write-to-string form)))
+    :output sb-sys:*stdout*
+    :input sb-sys:*stdin*)))
+
+(defun run-impure-in-child-sbcl (test-file test-code)
+  (run-in-child-sbcl
+    `((load "test-util")
+      (load "assertoid")
+      (defpackage :run-tests
+        (:use :cl :test-util :sb-ext)))
+
+    `((in-package :cl-user)
+      (use-package :test-util)
+      (use-package :assertoid)
+      (setf test-util:*break-on-failure* ,test-util:*break-on-failure*)
+      (setf test-util:*break-on-expected-failure*
+            ,test-util:*break-on-expected-failure*)
+      (let ((file ,test-file)
+            (*break-on-error* ,run-tests::*break-on-error*))
+        (format t "// Running ~a~%" file)
+        (restart-case
+            (handler-bind
+  	        ((error (lambda (condition)
+                          (push (list :unhandled-error cl-user::file) test-util::*failures*)
+		  	  (cond (*break-on-error*
+			         (test-util:really-invoke-debugger condition))
+			        (t
+			         (format *error-output* "~&Unhandled ~a: ~a~%"
+				         (type-of condition) condition)
+			         (funcall (symbol-function (intern "BACKTRACE" :sb-debug)))))
+			  (invoke-restart 'skip-file))))
+              ,test-code)
+	  (skip-file ()
+	    (format t ">>>~a<<<~%" test-util::*failures*)))
+        (test-util:report-test-status)
+        (sb-ext:quit :unix-status 104)))))
 
 (defun impure-runner (files test-fun)
   (format t "// Running impure tests (~a)~%" test-fun)
@@ -84,28 +145,15 @@
     (dolist (file files)
       (when (accept-test-file file)
         (force-output)
-        (let ((pid (sb-posix:fork)))
-          (cond ((= pid 0)
-                 (format t "// Running ~a~%" file)
-                 (restart-case
-                     (handler-bind ((error (make-error-handler file)))
-                       (funcall test-fun file))
-                   (skip-file ()
-                     (format t ">>>~a<<<~%" *failures*)))
-                 (report-test-status)
-                 (sb-ext:quit :unix-status 104))
-                (t
-                 (let ((status (make-array 1 :element-type '(signed-byte 32))))
-                   (sb-posix:waitpid pid 0 status)
-                   (if (and (sb-posix:wifexited (aref status 0))
-                            (= (sb-posix:wexitstatus (aref status 0))
-                               104))
-                       (with-open-file (stream "test-status.lisp-expr"
-                                               :direction :input
-                                               :if-does-not-exist :error)
-                         (append-failures (read stream)))
-                       (push (list :invalid-exit-status file)
-                             *all-failures*))))))))))
+	(let ((exit-code (run-impure-in-child-sbcl file
+                                                   (funcall test-fun file))))
+          (if (= exit-code 104)
+              (with-open-file (stream "test-status.lisp-expr"
+                                      :direction :input
+                                      :if-does-not-exist :error)
+                (append-failures (read stream)))
+              (push (list :invalid-exit-status file)
+                    *all-failures*)))))))
 
 (defun make-error-handler (file)
   (lambda (condition)
@@ -132,23 +180,23 @@
   (use-package :assertoid))
 
 (defun load-test (file)
-  (load file))
+  `(load ,file))
 
 (defun cload-test (file)
-  (let ((compile-name (compile-file-pathname file)))
-    (unwind-protect
-         (progn
-           (compile-file file)
-           (load compile-name))
-      (ignore-errors
-        (delete-file compile-name)))))
+  `(let ((compile-name (compile-file-pathname ,file)))
+     (unwind-protect
+	  (progn
+	    (compile-file ,file)
+	    (load compile-name))
+       (ignore-errors
+	 (delete-file compile-name)))))
 
 (defun sh-test (file)
   ;; What? No SB-POSIX:EXECV?
-  (let ((process (sb-ext:run-program "/bin/sh"
-                                     (list (namestring file))
-                                     :output *error-output*)))
-    (sb-ext:quit :unix-status (process-exit-code process))))
+  `(let ((process (sb-ext:run-program "/bin/sh"
+				      (list (namestring ,file))
+				      :output *error-output*)))
+     (sb-ext:quit :unix-status (process-exit-code process))))
 
 (defun accept-test-file (file)
   (if *accept-files*
