@@ -2108,3 +2108,8 @@
                           0))
                    (apply #'%f3 0 nil)))))
   (assert (zerop (funcall (compile nil form)))))
+
+;;;  size mismatch: #<SB-VM::EA :DWORD base=#<SB-C:TN t1[RDX]> disp=1> is a :DWORD and #<SB-C:TN t2[RAX]> is a :QWORD. on x86-64
+(compile nil '(lambda ()
+               (let ((x (make-array '(1) :element-type '(signed-byte 32))))
+                 (setf (aref x 0) 1))))

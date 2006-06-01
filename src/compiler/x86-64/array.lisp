@@ -1311,7 +1311,7 @@
                    :disp (- (+ (* vector-data-offset n-word-bytes)
                                (* 4 index))
                             other-pointer-lowtag))
-          rax-tn)
+          eax-tn)
     (move result eax)))
 
 ;;; These VOPs are used for implementing float slots in structures (whose raw

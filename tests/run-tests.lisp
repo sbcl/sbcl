@@ -123,18 +123,18 @@
         (format t "// Running ~a~%" file)
         (restart-case
             (handler-bind
-  	        ((error (lambda (condition)
+                ((error (lambda (condition)
                           (push (list :unhandled-error cl-user::file) test-util::*failures*)
-		  	  (cond (*break-on-error*
-			         (test-util:really-invoke-debugger condition))
-			        (t
-			         (format *error-output* "~&Unhandled ~a: ~a~%"
-				         (type-of condition) condition)
-			         (funcall (symbol-function (intern "BACKTRACE" :sb-debug)))))
-			  (invoke-restart 'skip-file))))
+                          (cond (*break-on-error*
+                                 (test-util:really-invoke-debugger condition))
+                                (t
+                                 (format *error-output* "~&Unhandled ~a: ~a~%"
+                                         (type-of condition) condition)
+                                 (funcall (symbol-function (intern "BACKTRACE" :sb-debug)))))
+                          (invoke-restart 'skip-file))))
               ,test-code)
-	  (skip-file ()
-	    (format t ">>>~a<<<~%" test-util::*failures*)))
+          (skip-file ()
+            (format t ">>>~a<<<~%" test-util::*failures*)))
         (test-util:report-test-status)
         (sb-ext:quit :unix-status 104)))))
 
@@ -145,7 +145,7 @@
     (dolist (file files)
       (when (accept-test-file file)
         (force-output)
-	(let ((exit-code (run-impure-in-child-sbcl file
+        (let ((exit-code (run-impure-in-child-sbcl file
                                                    (funcall test-fun file))))
           (if (= exit-code 104)
               (with-open-file (stream "test-status.lisp-expr"
@@ -185,17 +185,17 @@
 (defun cload-test (file)
   `(let ((compile-name (compile-file-pathname ,file)))
      (unwind-protect
-	  (progn
-	    (compile-file ,file)
-	    (load compile-name))
+          (progn
+            (compile-file ,file)
+            (load compile-name))
        (ignore-errors
-	 (delete-file compile-name)))))
+         (delete-file compile-name)))))
 
 (defun sh-test (file)
   ;; What? No SB-POSIX:EXECV?
   `(let ((process (sb-ext:run-program "/bin/sh"
-				      (list (namestring ,file))
-				      :output *error-output*)))
+                                      (list (namestring ,file))
+                                      :output *error-output*)))
      (sb-ext:quit :unix-status (process-exit-code process))))
 
 (defun accept-test-file (file)

@@ -14,6 +14,8 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
   * improved SB-BSD-SOCKETS support on Windows. (thanks to Timothy
     Ritchey)
   * bug fix: saving large (>2GB) cores on x86-64 now works
+  * bug fix: a x86-64 backend bug when compiling (setf aref) with a 
+    constant index and a (simple-array (signed-byte 32)) array
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.641: LET-conversion were not supposed to work in late
        compilation stages.
