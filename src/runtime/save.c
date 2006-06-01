@@ -79,7 +79,7 @@ write_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file_offset)
 static void
 output_space(FILE *file, int id, lispobj *addr, lispobj *end, os_vm_offset_t file_offset)
 {
-    int words, bytes, data;
+    size_t words, bytes, data;
     static char *names[] = {NULL, "dynamic", "static", "read-only"};
 
     write_lispobj(id, file);
@@ -88,7 +88,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end, os_vm_offset_t fil
 
     bytes = words * sizeof(lispobj);
 
-    printf("writing %d bytes from the %s space at 0x%08lx\n",
+    printf("writing %ld bytes from the %s space at 0x%08lx\n",
            bytes, names[id], (unsigned long)addr);
 
     data = write_bytes(file, (char *)addr, bytes, file_offset);

@@ -13,6 +13,7 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
     (reported by James Y Knight)
   * improved SB-BSD-SOCKETS support on Windows. (thanks to Timothy
     Ritchey)
+  * bug fix: saving large (>2GB) cores on x86-64 now works
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.641: LET-conversion were not supposed to work in late
        compilation stages.
