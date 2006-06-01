@@ -208,18 +208,15 @@ in future versions."
       (sb!kernel:fdocumentation 'mutex-value 'function)
       "The value of the mutex. NIL if the mutex is free. Setfable.")
 
-#!-sb-lutex
+#!+(and sb-thread (not sb-lutex))
 (progn
-#!+sb-thread
-(declaim (inline mutex-value-address))
-#!+sb-thread
-(defun mutex-value-address (mutex)
-  (declare (optimize (speed 3)))
-  (sb!ext:truly-the
-   sb!vm:word
-   (+ (sb!kernel:get-lisp-obj-address mutex)
-      (- (* 3 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag))))
-)
+  (declaim (inline mutex-value-address))
+  (defun mutex-value-address (mutex)
+    (declare (optimize (speed 3)))
+    (sb!ext:truly-the
+     sb!vm:word
+     (+ (sb!kernel:get-lisp-obj-address mutex)
+        (- (* 3 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag)))))
 
 (defun get-mutex (mutex &optional (new-value *current-thread*) (wait-p t))
   #!+sb-doc
@@ -284,7 +281,7 @@ this mutex."
   #!+sb-doc
   "Waitqueue type."
   (name nil :type (or null simple-string))
-  #!+sb-lutex
+  #!+(and sb-lutex sb-thread)
   (lutex (make-lutex))
   #!-sb-lutex
   (data nil))
@@ -298,18 +295,15 @@ this mutex."
 (setf (sb!kernel:fdocumentation 'waitqueue-name 'function)
       "The name of the waitqueue. Setfable.")
 
-#!-sb-lutex
+#!+(and sb-thread (not sb-lutex))
 (progn
-#!+sb-thread
-(declaim (inline waitqueue-data-address))
-#!+sb-thread
-(defun waitqueue-data-address (waitqueue)
-  (declare (optimize (speed 3)))
-  (sb!ext:truly-the
-   sb!vm:word
-   (+ (sb!kernel:get-lisp-obj-address waitqueue)
-      (- (* 3 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag))))
-)
+  (declaim (inline waitqueue-data-address))
+  (defun waitqueue-data-address (waitqueue)
+    (declare (optimize (speed 3)))
+    (sb!ext:truly-the
+     sb!vm:word
+     (+ (sb!kernel:get-lisp-obj-address waitqueue)
+        (- (* 3 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag)))))
 
 (defun condition-wait (queue mutex)
   #!+sb-doc

@@ -16,7 +16,7 @@
   "Mutex type."
   (name nil :type (or null simple-string))
   (value nil)
-  #!+sb-lutex
+  #!+(and sb-lutex sb-thread)
   (lutex (make-lutex)))
 
 (def!struct spinlock
