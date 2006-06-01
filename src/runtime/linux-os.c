@@ -36,6 +36,7 @@
 #include "genesis/fdefn.h"
 #include <sys/socket.h>
 #include <sys/utsname.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <signal.h>
@@ -284,7 +285,14 @@ void
 os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {
     if (mprotect(address, length, prot) == -1) {
-        perror("mprotect");
+        if (errno == ENOMEM) {
+            lose("An mprotect call failed with ENOMEM. This probably means that the maximum amount\n"
+                 "of separate memory mappings was exceeded. To fix the problem, either increase\n"
+                 "the maximum with e.g. 'echo 262144 > /proc/sys/vm/max_map_count' or recompile\n"
+                 "SBCL with a larger value for GENCGC-PAGE-SIZE in 'src/target/parms.lisp'.");
+        } else {
+            perror("mprotect");
+        }
     }
 }
 
