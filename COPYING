@@ -1,3 +1,6 @@
+Steel Bank Common Lisp (SBCL) is free software, and comes with
+absolutely no warranty.
+
 SBCL is derived from CMU CL, which was released into the public
 domain, subject only to the BSD-style "free, but credit must be given
 and copyright notices must be retained" licenses in the LOOP macro

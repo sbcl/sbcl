@@ -26,10 +26,14 @@
 # pathname, but now we take care to bind it to an absolute pathname (still
 # generated relative to `pwd` in the tests/ directory) so that tests
 # can chdir before invoking SBCL and still work.
-SBCL_HOME=`pwd`/../contrib
+. ../sbcl-pwd.sh
+sbcl_pwd
+
+SBCL_HOME=$SBCL_PWD/../contrib
 export SBCL_HOME
-sbclstem=`pwd`/../src/runtime/sbcl
-SBCL="$sbclstem --core `pwd`/../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger"
+sbclstem=$SBCL_PWD/../src/runtime/sbcl
+
+SBCL="$sbclstem --core $SBCL_PWD/../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger"
 export SBCL
 echo /running tests on SBCL=\'$SBCL\'
 # more or less like SBCL, but without enough grot removed that appending

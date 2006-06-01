@@ -5,3 +5,4 @@ customize-backend-subfeatures.lisp
 customize-target-features.lisp
 local-target-features.lisp-expr
 TAGS
+.svn

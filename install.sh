@@ -25,7 +25,6 @@ INFO_DIR=${INFO_DIR-$INSTALL_ROOT/share/info}
 DOC_DIR=${DOC_DIR-$INSTALL_ROOT/share/doc/sbcl}
 
 # Does the environment look sane?
-SBCL_SOURCE=`pwd`
 if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
    echo SBCL_HOME environment variable is set, and conflicts with INSTALL_ROOT.
    echo Aborting installation.  Unset one or reset the other, then try again
@@ -70,7 +69,10 @@ cp output/sbcl.core $BUILD_ROOT$SBCL_HOME/sbcl.core
 
 # installing contrib
 
-SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --no-userinit --no-sysinit --disable-debugger"
+. ./sbcl-pwd.sh
+sbcl_pwd
+
+SBCL="$SBCL_PWD/src/runtime/sbcl --noinform --core $SBCL_PWD/output/sbcl.core --no-userinit --no-sysinit --disable-debugger"
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB
 
