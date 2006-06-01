@@ -16,6 +16,8 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
   * bug fix: saving large (>2GB) cores on x86-64 now works
   * bug fix: a x86-64 backend bug when compiling (setf aref) with a 
     constant index and a (simple-array (signed-byte 32)) array
+  * bug fix: NAME-CHAR on an invalid symbol no longer signals an
+    error (patch by Robert J. Macomber)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.641: LET-conversion were not supposed to work in late
        compilation stages.

@@ -71,3 +71,5 @@
          (name (char-name char)))
     (unless graphicp
       (assert name))))
+
+(assert (null (name-char 'foo)))

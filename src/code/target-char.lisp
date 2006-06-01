@@ -271,20 +271,21 @@
       (let ((encoding (huffman-encode (string-upcase name)
                                        *unicode-character-name-huffman-tree*)))
         (when encoding
-          (let ((char-code
-                 (car (binary-search encoding
-                                     (cdr *unicode-character-name-database*)
-                                     :key #'cdr)))
-                (name-length (length name)))
+          (let* ((char-code
+                  (car (binary-search encoding
+                                      (cdr *unicode-character-name-database*)
+                                      :key #'cdr)))
+                 (name-string (string name))
+                 (name-length (length name-string)))
             (cond
               (char-code
                (code-char char-code))
               ((and (or (= name-length 9)
                         (= name-length 5))
-                    (char-equal (char name 0) #\U)
+                    (char-equal (char name-string 0) #\U)
                     (loop for i from 1 below name-length
-                          always (digit-char-p (char name i) 16)))
-               (code-char (parse-integer name :start 1 :radix 16)))
+                          always (digit-char-p (char name-string i) 16)))
+               (code-char (parse-integer name-string :start 1 :radix 16)))
               (t
                nil)))))))
 
