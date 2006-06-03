@@ -356,7 +356,7 @@ there is no corresponding docstring."
     ((package constant variable type structure class condition nil)
      nil)
     (method
-     (third (get-name doc)))    
+     (third (get-name doc)))
     (t
      ;; KLUDGE: Eugh.
      ;;
