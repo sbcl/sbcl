@@ -96,7 +96,9 @@ values"))
                                sockaddr
                                (size-of-sockaddr socket))))
       (cond
-        ((and (= fd -1) (= sockint::EAGAIN (sb-unix::get-errno)))
+        ((and (= fd -1)
+              (member (sb-unix::get-errno)
+                      (list sockint::EAGAIN sockint::EINTR)))
          nil)
         ((= fd -1) (socket-error "accept"))
         (t (apply #'values
@@ -200,7 +202,10 @@ small"))
                                         sockaddr
                                         (sb-alien:addr sa-len))))
                 (cond
-                  ((and (= len -1) (= sockint::EAGAIN (sb-unix::get-errno))) nil)
+                  ((and (= len -1)
+                        (member (sb-unix::get-errno)
+                                (list sockint::EAGAIN sockint::EINTR)))
+                   nil)
                   ((= len -1) (socket-error "recvfrom"))
                   (t (loop for i from 0 below len
                            do (setf (elt buffer i)
@@ -276,7 +281,7 @@ send(2) will be called instead. Returns the number of octets written."))
     (cond
       ((and (= len -1)
             (member (sb-unix::get-errno)
-                    '(sockint::EAGAIN sockint::EINTR)))
+                    (list sockint::EAGAIN sockint::EINTR)))
        nil)
       ((= len -1)
        (socket-error "sendto"))
