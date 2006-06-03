@@ -35,10 +35,6 @@
 #include "genesis/static-symbols.h"
 #include "genesis/fdefn.h"
 
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_LUTEX)
-#include "genesis/futex.h"
-#endif
-
 #include <sys/socket.h>
 #include <sys/utsname.h>
 
