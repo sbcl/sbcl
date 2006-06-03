@@ -49,6 +49,10 @@
 #include "genesis/instance.h"
 #include "genesis/layout.h"
 
+#ifdef LUTEX_WIDETAG
+#include "genesis/lutex.h"
+#endif
+
 /* forward declarations */
 page_index_t  gc_find_freeish_pages(long *restart_page_ptr, long nbytes,
                                     int unboxed);
@@ -234,6 +238,14 @@ struct generation {
      * prevent a GC when a large number of new live objects have been
      * added, in which case a GC could be a waste of time */
     double min_av_mem_age;
+
+    /* A linked list of lutex structures in this generation, used for
+     * implementing lutex finalization. */
+#ifdef LUTEX_WIDETAG
+    struct lutex *lutexes;
+#else
+    void *lutexes;
+#endif
 };
 
 /* an array of generation structures. There needs to be one more
@@ -580,6 +592,7 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
     page_index_t last_page;
     long bytes_found;
     page_index_t i;
+    int ret;
 
     /*
     FSHOW((stderr,
@@ -591,7 +604,8 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
     gc_assert((alloc_region->first_page == 0)
               && (alloc_region->last_page == -1)
               && (alloc_region->free_pointer == alloc_region->end_addr));
-    thread_mutex_lock(&free_pages_lock);
+    ret = thread_mutex_lock(&free_pages_lock);
+    gc_assert(ret == 0);
     if (unboxed) {
         first_page =
             generations[gc_alloc_generation].alloc_unboxed_start_page;
@@ -652,7 +666,8 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
         /* do we only want to call this on special occasions? like for boxed_region? */
         set_alloc_pointer((lispobj)(((char *)heap_base) + last_free_page*PAGE_BYTES));
     }
-    thread_mutex_unlock(&free_pages_lock);
+    ret = thread_mutex_unlock(&free_pages_lock);
+    gc_assert(ret == 0);
 
     /* we can do this after releasing free_pages_lock */
     if (gencgc_zero_check) {
@@ -794,6 +809,7 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
     long orig_first_page_bytes_used;
     long region_size;
     long byte_cnt;
+    int ret;
 
 
     first_page = alloc_region->first_page;
@@ -804,7 +820,8 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 
     next_page = first_page+1;
 
-    thread_mutex_lock(&free_pages_lock);
+    ret = thread_mutex_lock(&free_pages_lock);
+    gc_assert(ret == 0);
     if (alloc_region->free_pointer != alloc_region->start_addr) {
         /* some bytes were allocated in the region */
         orig_first_page_bytes_used = page_table[first_page].bytes_used;
@@ -908,7 +925,9 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
         page_table[next_page].allocated = FREE_PAGE_FLAG;
         next_page++;
     }
-    thread_mutex_unlock(&free_pages_lock);
+    ret = thread_mutex_unlock(&free_pages_lock);
+    gc_assert(ret == 0);
+
     /* alloc_region is per-thread, we're ok to do this unlocked */
     gc_set_region_empty(alloc_region);
 }
@@ -926,8 +945,10 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
     int more;
     long bytes_used;
     page_index_t next_page;
+    int ret;
 
-    thread_mutex_lock(&free_pages_lock);
+    ret = thread_mutex_lock(&free_pages_lock);
+    gc_assert(ret == 0);
 
     if (unboxed) {
         first_page =
@@ -1027,7 +1048,8 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
         last_free_page = last_page+1;
         set_alloc_pointer((lispobj)(((char *)heap_base) + last_free_page*PAGE_BYTES));
     }
-    thread_mutex_unlock(&free_pages_lock);
+    ret = thread_mutex_unlock(&free_pages_lock);
+    gc_assert(ret == 0);
 
 #ifdef READ_PROTECT_FREE_PAGES
     os_protect(page_address(first_page),
@@ -2042,6 +2064,179 @@ scav_vector(lispobj *where, lispobj object)
 
 
 /*
+ * Lutexes. Using the normal finalization machinery for finalizing
+ * lutexes is tricky, since the finalization depends on working lutexes.
+ * So we track the lutexes in the GC and finalize them manually.
+ */
+
+#if defined(LUTEX_WIDETAG)
+
+/*
+ * Start tracking LUTEX in the GC, by adding it to the linked list of
+ * lutexes in the nursery generation. The caller is responsible for
+ * locking, and GCs must be inhibited until the registration is
+ * complete.
+ */
+void
+gencgc_register_lutex (struct lutex *lutex) {
+    int index = find_page_index(lutex);
+    generation_index_t gen;
+    struct lutex *head;
+
+    /* This lutex is in static space, so we don't need to worry about
+     * finalizing it.
+     */
+    if (index == -1)
+        return;
+
+    gen = page_table[index].gen;
+
+    gc_assert(gen >= 0);
+    gc_assert(gen < NUM_GENERATIONS);
+
+    head = generations[gen].lutexes;
+
+    lutex->gen = gen;
+    lutex->next = head;
+    lutex->prev = NULL;
+    if (head)
+        head->prev = lutex;
+    generations[gen].lutexes = lutex;
+}
+
+/*
+ * Stop tracking LUTEX in the GC by removing it from the appropriate
+ * linked lists. This will only be called during GC, so no locking is
+ * needed.
+ */
+void
+gencgc_unregister_lutex (struct lutex *lutex) {
+    if (lutex->prev) {
+        lutex->prev->next = lutex->next;
+    } else {
+        generations[lutex->gen].lutexes = lutex->next;
+    }
+
+    if (lutex->next) {
+        lutex->next->prev = lutex->prev;
+    }
+
+    lutex->next = NULL;
+    lutex->prev = NULL;
+    lutex->gen = -1;
+}
+
+/*
+ * Mark all lutexes in generation GEN as not live.
+ */
+static void
+unmark_lutexes (generation_index_t gen) {
+    struct lutex *lutex = generations[gen].lutexes;
+
+    while (lutex) {
+        lutex->live = 0;
+        lutex = lutex->next;
+    }
+}
+
+/*
+ * Finalize all lutexes in generation GEN that have not been marked live.
+ */
+static void
+reap_lutexes (generation_index_t gen) {
+    struct lutex *lutex = generations[gen].lutexes;
+
+    while (lutex) {
+        struct lutex *next = lutex->next;
+        if (!lutex->live) {
+            lutex_destroy(lutex);
+            gencgc_unregister_lutex(lutex);
+        }
+        lutex = next;
+    }
+}
+
+/*
+ * Mark LUTEX as live.
+ */
+static void
+mark_lutex (lispobj tagged_lutex) {
+    struct lutex *lutex = (struct lutex*) native_pointer(tagged_lutex);
+
+    lutex->live = 1;
+}
+
+/*
+ * Move all lutexes in generation FROM to generation TO.
+ */
+static void
+move_lutexes (generation_index_t from, generation_index_t to) {
+    struct lutex *tail = generations[from].lutexes;
+
+    /* Nothing to move */
+    if (!tail)
+        return;
+
+    /* Change the generation of the lutexes in FROM. */
+    while (tail->next) {
+        tail->gen = to;
+        tail = tail->next;
+    }
+    tail->gen = to;
+
+    /* Link the last lutex in the FROM list to the start of the TO list */
+    tail->next = generations[to].lutexes;
+
+    /* And vice versa */
+    if (generations[to].lutexes) {
+        generations[to].lutexes->prev = tail;
+    }
+
+    /* And update the generations structures to match this */
+    generations[to].lutexes = generations[from].lutexes;
+    generations[from].lutexes = NULL;
+}
+
+static long
+scav_lutex(lispobj *where, lispobj object)
+{
+    mark_lutex((lispobj) where);
+
+    return CEILING(sizeof(struct lutex)/sizeof(lispobj), 2);
+}
+
+static lispobj
+trans_lutex(lispobj object)
+{
+    struct lutex *lutex = native_pointer(object);
+    lispobj copied;
+    size_t words = CEILING(sizeof(struct lutex)/sizeof(lispobj), 2);
+    gc_assert(is_lisp_pointer(object));
+    copied = copy_object(object, words);
+
+    /* Update the links, since the lutex moved in memory. */
+    if (lutex->next) {
+        lutex->next->prev = native_pointer(copied);
+    }
+
+    if (lutex->prev) {
+        lutex->prev->next = native_pointer(copied);
+    } else {
+        generations[lutex->gen].lutexes = native_pointer(copied);
+    }
+
+    return copied;
+}
+
+static long
+size_lutex(lispobj *where)
+{
+    return CEILING(sizeof(struct lutex)/sizeof(lispobj), 2);
+}
+#endif /* LUTEX_WIDETAG */
+
+
+/*
  * weak pointers
  */
 
@@ -2378,6 +2573,9 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 #endif
         case SAP_WIDETAG:
         case WEAK_POINTER_WIDETAG:
+#ifdef LUTEX_WIDETAG
+        case LUTEX_WIDETAG:
+#endif
             break;
 
         default:
@@ -3481,6 +3679,9 @@ verify_space(lispobj *start, size_t words)
 #endif
                 case SAP_WIDETAG:
                 case WEAK_POINTER_WIDETAG:
+#ifdef LUTEX_WIDETAG
+                case LUTEX_WIDETAG:
+#endif
                     count = (sizetab[widetag_of(*start)])(start);
                     break;
 
@@ -3817,6 +4018,31 @@ scavenge_interrupt_contexts(void)
 
 #endif
 
+static void
+preserve_context_registers (os_context_t *c)
+{
+    void **ptr;
+    /* On Darwin the signal context isn't a contiguous block of memory,
+     * so just preserve_pointering its contents won't be sufficient.
+     */
+#if defined(LISP_FEATURE_DARWIN)
+#if defined LISP_FEATURE_X86
+    preserve_pointer((void*)*os_context_register_addr(c,reg_EAX));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_ECX));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_EDX));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_EBX));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_ESI));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_EDI));
+    preserve_pointer((void*)*os_context_pc_addr(c));
+#else
+    #error "preserve_context_registers needs to be tweaked for non-x86 Darwin"
+#endif
+#endif
+    for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {
+        preserve_pointer(*ptr);
+    }
+}
+
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void
@@ -3833,6 +4059,10 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Initialize the weak pointer list. */
     weak_pointers = NULL;
+
+#ifdef LUTEX_WIDETAG
+    unmark_lutexes(generation);
+#endif
 
     /* When a generation is not being raised it is transported to a
      * temporary generation (NUM_GENERATIONS), and lowered when
@@ -3906,9 +4136,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
                     if (esp1>=(void **)th->control_stack_start &&
                         esp1<(void **)th->control_stack_end) {
                         if(esp1<esp) esp=esp1;
-                        for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {
-                            preserve_pointer(*ptr);
-                        }
+                        preserve_context_registers(c);
                     }
                 }
             }
@@ -4079,6 +4307,12 @@ garbage_collect_generation(generation_index_t generation, int raise)
         generations[generation].num_gc = 0;
     else
         ++generations[generation].num_gc;
+
+#ifdef LUTEX_WIDETAG
+    reap_lutexes(generation);
+    if (raise)
+        move_lutexes(generation, generation+1);
+#endif
 }
 
 /* Update last_free_page, then SymbolValue(ALLOCATION_POINTER). */
@@ -4345,6 +4579,7 @@ gc_free_heap(void)
         generations[page].gc_trigger = 2000000;
         generations[page].num_gc = 0;
         generations[page].cum_sum_bytes_allocated = 0;
+        generations[page].lutexes = NULL;
     }
 
     if (gencgc_verbose > 1)
@@ -4377,6 +4612,12 @@ gc_init(void)
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
     transother[SIMPLE_ARRAY_WIDETAG] = trans_boxed_large;
 
+#ifdef LUTEX_WIDETAG
+    scavtab[LUTEX_WIDETAG] = scav_lutex;
+    transother[LUTEX_WIDETAG] = trans_lutex;
+    sizetab[LUTEX_WIDETAG] = size_lutex;
+#endif
+
     heap_base = (void*)DYNAMIC_SPACE_START;
 
     /* Initialize each page structure. */
@@ -4407,6 +4648,7 @@ gc_init(void)
         generations[i].bytes_consed_between_gc = 2000000;
         generations[i].trigger_age = 1;
         generations[i].min_av_mem_age = 0.75;
+        generations[i].lutexes = NULL;
     }
 
     /* Initialize gc_alloc. */
@@ -4449,6 +4691,13 @@ gencgc_pickup_dynamic(void)
         }
         page++;
     } while ((long)page_address(page) < alloc_ptr);
+
+#ifdef LUTEX_WIDETAG
+    /* Lutexes have been registered in generation 0 by coreparse, and
+     * need to be moved to the right one manually.
+     */
+    move_lutexes(0, PSEUDO_STATIC_GENERATION);
+#endif
 
     last_free_page = page;
 

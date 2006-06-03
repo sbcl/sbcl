@@ -95,8 +95,12 @@ sigaddset_deferrable(sigset_t *s)
     sigaddset(s, SIGVTALRM);
     sigaddset(s, SIGPROF);
     sigaddset(s, SIGWINCH);
+
+#if !((defined(LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_FREEBSD)) && defined(LISP_FEATURE_SB_THREAD))
     sigaddset(s, SIGUSR1);
     sigaddset(s, SIGUSR2);
+#endif
+
 #ifdef LISP_FEATURE_SB_THREAD
     sigaddset(s, SIG_INTERRUPT_THREAD);
 #endif
@@ -107,6 +111,9 @@ sigaddset_blockable(sigset_t *s)
 {
     sigaddset_deferrable(s);
 #ifdef LISP_FEATURE_SB_THREAD
+#ifdef SIG_RESUME_FROM_GC
+    sigaddset(s, SIG_RESUME_FROM_GC);
+#endif
     sigaddset(s, SIG_STOP_FOR_GC);
 #endif
 }
@@ -362,17 +369,14 @@ interrupt_handle_pending(os_context_t *context)
     struct thread *thread;
     struct interrupt_data *data;
 
-    check_blockables_blocked_or_lose();
+    FSHOW_SIGNAL((stderr, "/entering interrupt_handle_pending\n"));
 
+    check_blockables_blocked_or_lose();
     thread=arch_os_get_current_thread();
     data=thread->interrupt_data;
 
     /* If pseudo_atomic_interrupted is set then the interrupt is going
      * to be handled now, ergo it's safe to clear it. */
-
-    /* CLH: 20060220 FIXME This sould probably be arch_clear_p_a_i but
-     * the behavior of arch_clear_p_a_i and clear_p_a_i are slightly
-     * different on PPC. */
     arch_clear_pseudo_atomic_interrupted(context);
 
     if (SymbolValue(GC_INHIBIT,thread)==NIL) {
@@ -457,18 +461,23 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
     boolean were_in_lisp;
 #endif
     union interrupt_handler handler;
+
     check_blockables_blocked_or_lose();
+
+
 #ifndef LISP_FEATURE_WIN32
     if (sigismember(&deferrable_sigset,signal))
         check_interrupts_enabled_or_lose(context);
 #endif
 
-#ifdef LISP_FEATURE_LINUX
+#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     /* Under Linux on some architectures, we appear to have to restore
        the FPU control word from the context, as after the signal is
        delivered we appear to have a null FPU control word. */
     os_restore_fp_control(context);
 #endif
+
+
     handler = interrupt_handlers[signal];
 
     if (ARE_SAME_HANDLER(handler.c, SIG_IGN)) {
@@ -519,6 +528,9 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
             sigset_t unblock;
             sigemptyset(&unblock);
             sigaddset(&unblock, SIG_STOP_FOR_GC);
+#ifdef SIG_RESUME_FROM_GC
+            sigaddset(&unblock, SIG_RESUME_FROM_GC);
+#endif
             thread_sigmask(SIG_UNBLOCK, &unblock, 0);
         }
 #endif
@@ -565,6 +577,8 @@ run_deferred_handler(struct interrupt_data *data, void *v_context) {
      * pending handler before calling it. Trust the handler to finish
      * with the siginfo before enabling interrupts. */
     void (*pending_handler) (int, siginfo_t*, void*)=data->pending_handler;
+    os_context_t *context = arch_os_get_context(&v_context);
+
     data->pending_handler=0;
     (*pending_handler)(data->pending_signal,&(data->pending_info), v_context);
 }
@@ -636,6 +650,9 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
     data->pending_signal = signal;
     if(info)
         memcpy(&(data->pending_info), info, sizeof(siginfo_t));
+
+    FSHOW_SIGNAL((stderr, "/store_signal_data_for_later: signal: %d\n", signal));
+
     if(context) {
         /* the signal mask in the context (from before we were
          * interrupted) is copied to be restored when
@@ -651,11 +668,17 @@ static void
 maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    struct thread *thread=arch_os_get_current_thread();
-    struct interrupt_data *data=thread->interrupt_data;
-#ifdef LISP_FEATURE_LINUX
+
+    struct thread *thread;
+    struct interrupt_data *data;
+
+    thread=arch_os_get_current_thread();
+    data=thread->interrupt_data;
+
+#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
 #endif
+
     if(maybe_defer_handler(interrupt_handle_now,data,signal,info,context))
         return;
     interrupt_handle_now(signal, info, context);
@@ -670,9 +693,10 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
 
-#ifdef LISP_FEATURE_LINUX
+#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
 #endif
+
     check_blockables_blocked_or_lose();
     check_interrupts_enabled_or_lose(context);
     interrupt_low_level_handlers[signal](signal, info, void_context);
@@ -686,11 +710,16 @@ static void
 low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    struct thread *thread=arch_os_get_current_thread();
-    struct interrupt_data *data=thread->interrupt_data;
-#ifdef LISP_FEATURE_LINUX
+    struct thread *thread;
+    struct interrupt_data *data;
+
+    thread=arch_os_get_current_thread();
+    data=thread->interrupt_data;
+
+#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
 #endif
+
     if(maybe_defer_handler(low_level_interrupt_handle_now,data,
                            signal,info,context))
         return;
@@ -708,10 +737,11 @@ void
 sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
+
     struct thread *thread=arch_os_get_current_thread();
     sigset_t ss;
 
-    if ((arch_pseudo_atomic_atomic(context) ||
+   if ((arch_pseudo_atomic_atomic(context) ||
          SymbolValue(GC_INHIBIT,thread) != NIL)) {
         SetSymbolValue(STOP_FOR_GC_PENDING,T,thread);
         if (SymbolValue(GC_INHIBIT,thread) == NIL)
@@ -732,10 +762,24 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
         thread->state=STATE_SUSPENDED;
         FSHOW_SIGNAL((stderr,"thread=%lu suspended\n",thread->os_thread));
 
+#if defined(SIG_RESUME_FROM_GC)
+        sigemptyset(&ss); sigaddset(&ss,SIG_RESUME_FROM_GC);
+#else
         sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
+#endif
+
         /* It is possible to get SIGCONT (and probably other
          * non-blockable signals) here. */
+#ifdef SIG_RESUME_FROM_GC
+        {
+            int sigret;
+            do { sigwait(&ss, &sigret); }
+            while (sigret != SIG_RESUME_FROM_GC);
+        }
+#else
         while (sigwaitinfo(&ss,0) != SIG_STOP_FOR_GC);
+#endif
+
         FSHOW_SIGNAL((stderr,"thread=%lu resumed\n",thread->os_thread));
         if(thread->state!=STATE_RUNNING) {
             lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",
@@ -787,6 +831,7 @@ extern int *context_eflags_addr(os_context_t *context);
 
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 extern void post_signal_tramp(void);
+extern void call_into_lisp_tramp(void);
 void
 arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 {
@@ -832,6 +877,35 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 
     u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
 
+#if defined(LISP_FEATURE_DARWIN)
+    u32 *register_save_area = (u32 *)os_validate(0, 0x40);
+
+    FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: preparing to go to function %x, sp: %x\n", function, sp));
+    FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: context: %x, &context %x\n", context, &context));
+
+    /* 1. os_validate (malloc/mmap) register_save_block
+     * 2. copy register state into register_save_block
+     * 3. put a pointer to register_save_block in a register in the context
+     * 4. set the context's EIP to point to a trampoline which:
+     *    a. builds the fake stack frame from the block
+     *    b. frees the block
+     *    c. calls the function
+     */
+
+    *register_save_area = *os_context_pc_addr(context);
+    *(register_save_area + 1) = function;
+    *(register_save_area + 2) = *os_context_register_addr(context,reg_EDI);
+    *(register_save_area + 3) = *os_context_register_addr(context,reg_ESI);
+    *(register_save_area + 4) = *os_context_register_addr(context,reg_EDX);
+    *(register_save_area + 5) = *os_context_register_addr(context,reg_ECX);
+    *(register_save_area + 6) = *os_context_register_addr(context,reg_EBX);
+    *(register_save_area + 7) = *os_context_register_addr(context,reg_EAX);
+    *(register_save_area + 8) = *context_eflags_addr(context);
+
+    *os_context_pc_addr(context) = call_into_lisp_tramp;
+    *os_context_register_addr(context,reg_ECX) = register_save_area;
+#else
+
     /* return address for call_into_lisp: */
     *(sp-15) = (u32)post_signal_tramp;
     *(sp-14) = function;        /* args for call_into_lisp : function*/
@@ -852,6 +926,8 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *(sp-3)=*context_eflags_addr(context);
     *(sp-2)=*os_context_register_addr(context,reg_EBP);
     *(sp-1)=*os_context_pc_addr(context);
+
+#endif
 
 #elif defined(LISP_FEATURE_X86_64)
     u64 *sp=(u64 *)*os_context_register_addr(context,reg_RSP);
@@ -887,6 +963,8 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 #endif
 
 #ifdef LISP_FEATURE_X86
+
+#if !defined(LISP_FEATURE_DARWIN)
     *os_context_pc_addr(context) = (os_context_register_t)call_into_lisp;
     *os_context_register_addr(context,reg_ECX) = 0;
     *os_context_register_addr(context,reg_EBP) = (os_context_register_t)(sp-2);
@@ -895,7 +973,9 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
         (os_context_register_t)(sp-15);
 #else
     *os_context_register_addr(context,reg_ESP) = (os_context_register_t)(sp-15);
-#endif
+#endif /* __NETBSD__ */
+#endif /* LISP_FEATURE_DARWIN */
+
 #elif defined(LISP_FEATURE_X86_64)
     *os_context_pc_addr(context) = (os_context_register_t)call_into_lisp;
     *os_context_register_addr(context,reg_RCX) = 0;
@@ -929,6 +1009,7 @@ void
 interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 {
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
+
     /* let the handler enable interrupts again when it sees fit */
     sigaddset_deferrable(os_context_sigmask_addr(context));
     arrange_return_to_lisp_function(context, SymbolFunction(RUN_INTERRUPTION));
@@ -1065,6 +1146,9 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
     else {
         sigset_t new;
         sigemptyset(&new);
+#if defined(SIG_RESUME_FROM_GC)
+        sigaddset(&new,SIG_RESUME_FROM_GC);
+#endif
         sigaddset(&new,SIG_STOP_FOR_GC);
         thread_sigmask(SIG_UNBLOCK,&new,0);
     }
@@ -1151,6 +1235,7 @@ static void
 unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 {
     sigset_t unblock;
+
     sigemptyset(&unblock);
     sigaddset(&unblock, signal);
     thread_sigmask(SIG_UNBLOCK, &unblock, 0);
@@ -1161,6 +1246,7 @@ static void
 low_level_unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 {
     sigset_t unblock;
+
     sigemptyset(&unblock);
     sigaddset(&unblock, signal);
     thread_sigmask(SIG_UNBLOCK, &unblock, 0);

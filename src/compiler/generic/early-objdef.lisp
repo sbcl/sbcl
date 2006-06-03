@@ -146,7 +146,10 @@
   fdefn                             ; 01010110
 
   no-tls-value-marker               ; 01011010
-  unused01                          ; 01011110
+  #!-sb-lutex
+  unused01
+  #!+sb-lutex
+  lutex                             ; 01011110
   unused02                          ; 01100010
   unused03                          ; 01100110
   unused04                          ; 01101010

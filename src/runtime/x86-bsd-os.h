@@ -19,4 +19,14 @@ static inline os_context_t *arch_os_get_context(void **void_context) {
 #error unsupported BSD variant
 #endif
 
+#if defined(LISP_FEATURE_SB_THREAD)
+
+#if defined LISP_FEATURE_FREEBSD
+/* FIXME: why is this only done for SB-THREAD? */
+#define RESTORE_FP_CONTROL_FROM_CONTEXT
+void os_restore_fp_control(os_context_t *context);
+#endif
+
+#endif
+
 #endif /* _X86_BSD_OS_H */

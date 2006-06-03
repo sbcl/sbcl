@@ -368,6 +368,9 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 #endif
         case SAP_WIDETAG:
         case WEAK_POINTER_WIDETAG:
+#ifdef LUTEX_WIDETAG
+        case LUTEX_WIDETAG:
+#endif
             break;
 
         default:
@@ -945,6 +948,11 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 #endif
       case SAP_WIDETAG:
           return ptrans_unboxed(thing, header);
+#ifdef LUTEX_WIDETAG
+      case LUTEX_WIDETAG:
+          gencgc_unregister_lutex(native_pointer(thing));
+          return ptrans_unboxed(thing, header);
+#endif
 
       case RATIO_WIDETAG:
       case COMPLEX_WIDETAG:

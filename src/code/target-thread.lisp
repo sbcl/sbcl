@@ -73,6 +73,7 @@ in future versions."
    (sb!vm::current-thread-offset-sap sb!vm::thread-os-thread-slot)))
 
 (defun init-initial-thread ()
+  (/show0 "Entering INIT-INITIAL-THREAD")
   (let ((initial-thread (%make-thread :name "initial thread"
                                       :%alive-p t
                                       :os-thread (current-thread-sap-id))))
@@ -99,13 +100,60 @@ in future versions."
   (define-alien-routine "block_blockable_signals"
       void)
 
-  (declaim (inline futex-wait futex-wake))
+  #!+sb-lutex
+  (progn
+    (declaim (inline %lutex-init %lutex-wait %lutex-wake
+                     %lutex-lock %lutex-unlock))
 
-  (sb!alien:define-alien-routine "futex_wait"
-      int (word unsigned-long) (old-value unsigned-long))
+    (sb!alien:define-alien-routine ("lutex_init" %lutex-init)
+        int (lutex unsigned-long))
 
-  (sb!alien:define-alien-routine "futex_wake"
-      int (word unsigned-long) (n unsigned-long)))
+    (sb!alien:define-alien-routine ("lutex_wait" %lutex-wait)
+        int (queue-lutex unsigned-long) (mutex-lutex unsigned-long))
+
+    (sb!alien:define-alien-routine ("lutex_wake" %lutex-wake)
+        int (lutex unsigned-long) (n int))
+
+    (sb!alien:define-alien-routine ("lutex_lock" %lutex-lock)
+        int (lutex unsigned-long))
+
+    (sb!alien:define-alien-routine ("lutex_unlock" %lutex-unlock)
+        int (lutex unsigned-long))
+
+    (sb!alien:define-alien-routine ("lutex_destroy" %lutex-destroy)
+        int (lutex unsigned-long))
+
+    ;; FIXME: Defining a whole bunch of alien-type machinery just for
+    ;; passing primitive lutex objects directly to foreign functions
+    ;; doesn't seem like fun right now. So instead we just manually
+    ;; pin the lutex, get its address, and let the callee untag it.
+    (defmacro with-lutex-address ((name lutex) &body body)
+      `(let ((,name ,lutex))
+         (with-pinned-objects (,name)
+           (let ((,name (sb!kernel:get-lisp-obj-address ,name)))
+             ,@body))))
+
+    (defun make-lutex ()
+      (/show0 "Entering MAKE-LUTEX")
+      ;; Suppress GC until the lutex has been properly registered with
+      ;; the GC.
+      (without-gcing
+        (let ((lutex (sb!vm::%make-lutex)))
+          (/show0 "LUTEX=..")
+          (/hexstr lutex)
+          (with-lutex-address (lutex lutex)
+            (%lutex-init lutex))
+          lutex))))
+
+  #!-sb-lutex
+  (progn
+    (declaim (inline futex-wait futex-wake))
+
+    (sb!alien:define-alien-routine "futex_wait"
+        int (word unsigned-long) (old-value unsigned-long))
+
+    (sb!alien:define-alien-routine "futex_wake"
+        int (word unsigned-long) (n unsigned-long))))
 
 ;;; used by debug-int.lisp to access interrupt contexts
 #!-(and sb-fluid sb-thread) (declaim (inline sb!vm::current-thread-offset-sap))
@@ -159,15 +207,15 @@ in future versions."
       (sb!kernel:fdocumentation 'mutex-value 'function)
       "The value of the mutex. NIL if the mutex is free. Setfable.")
 
-#!+sb-thread
-(declaim (inline mutex-value-address))
-#!+sb-thread
-(defun mutex-value-address (mutex)
-  (declare (optimize (speed 3)))
-  (sb!ext:truly-the
-   sb!vm:word
-   (+ (sb!kernel:get-lisp-obj-address mutex)
-      (- (* 3 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag))))
+#!+(and sb-thread (not sb-lutex))
+(progn
+  (declaim (inline mutex-value-address))
+  (defun mutex-value-address (mutex)
+    (declare (optimize (speed 3)))
+    (sb!ext:truly-the
+     sb!vm:word
+     (+ (sb!kernel:get-lisp-obj-address mutex)
+        (- (* 3 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag)))))
 
 (defun get-mutex (mutex &optional (new-value *current-thread*) (wait-p t))
   #!+sb-doc
@@ -175,6 +223,7 @@ in future versions."
 value if NIL.  If WAIT-P is non-NIL and the mutex is in use, sleep
 until it is available"
   (declare (type mutex mutex) (optimize (speed 3)))
+  (/show0 "Entering GET-MUTEX")
   (unless new-value
     (setq new-value *current-thread*))
   #!-sb-thread
@@ -186,29 +235,44 @@ until it is available"
     (setf (mutex-value mutex) new-value)
     t)
   #!+sb-thread
-  (let (old)
+  (progn
     (when (eql new-value (mutex-value mutex))
       (warn "recursive lock attempt ~S~%" mutex)
       (format *debug-io* "Thread: ~A~%" *current-thread*)
       (sb!debug:backtrace most-positive-fixnum *debug-io*)
       (force-output *debug-io*))
-    (loop
-     (unless
-         (setf old (sb!vm::%instance-set-conditional mutex 2 nil new-value))
-       (return t))
-     (unless wait-p (return nil))
-     (with-pinned-objects (mutex old)
-       (futex-wait (mutex-value-address mutex)
-                   (sb!kernel:get-lisp-obj-address old))))))
+    ;; FIXME: sb-lutex and (not wait-p)
+    #!+sb-lutex
+    (when wait-p
+      (with-lutex-address (lutex (mutex-lutex mutex))
+        (%lutex-lock lutex))
+      (setf (mutex-value mutex) new-value))
+    #!-sb-lutex
+    (let (old)
+      (loop
+         (unless
+             (setf old (sb!vm::%instance-set-conditional mutex 2 nil
+                                                         new-value))
+           (return t))
+         (unless wait-p (return nil))
+         (with-pinned-objects (mutex old)
+           (futex-wait (mutex-value-address mutex)
+                       (sb!kernel:get-lisp-obj-address old)))))))
 
 (defun release-mutex (mutex)
   #!+sb-doc
   "Release MUTEX by setting it to NIL. Wake up threads waiting for
 this mutex."
   (declare (type mutex mutex))
+  (/show0 "Entering RELEASE-MUTEX")
   (setf (mutex-value mutex) nil)
   #!+sb-thread
-  (futex-wake (mutex-value-address mutex) 1))
+  (progn
+    #!+sb-lutex
+    (with-lutex-address (lutex (mutex-lutex mutex))
+      (%lutex-unlock lutex))
+    #!-sb-lutex
+    (futex-wake (mutex-value-address mutex) 1)))
 
 ;;;; waitqueues/condition variables
 
@@ -216,6 +280,9 @@ this mutex."
   #!+sb-doc
   "Waitqueue type."
   (name nil :type (or null simple-string))
+  #!+(and sb-lutex sb-thread)
+  (lutex (make-lutex))
+  #!-sb-lutex
   (data nil))
 
 (defun make-waitqueue (&key name)
@@ -227,15 +294,15 @@ this mutex."
 (setf (sb!kernel:fdocumentation 'waitqueue-name 'function)
       "The name of the waitqueue. Setfable.")
 
-#!+sb-thread
-(declaim (inline waitqueue-data-address))
-#!+sb-thread
-(defun waitqueue-data-address (waitqueue)
-  (declare (optimize (speed 3)))
-  (sb!ext:truly-the
-   sb!vm:word
-   (+ (sb!kernel:get-lisp-obj-address waitqueue)
-      (- (* 3 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag))))
+#!+(and sb-thread (not sb-lutex))
+(progn
+  (declaim (inline waitqueue-data-address))
+  (defun waitqueue-data-address (waitqueue)
+    (declare (optimize (speed 3)))
+    (sb!ext:truly-the
+     sb!vm:word
+     (+ (sb!kernel:get-lisp-obj-address waitqueue)
+        (- (* 3 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag)))))
 
 (defun condition-wait (queue mutex)
   #!+sb-doc
@@ -247,6 +314,15 @@ time we reacquire MUTEX and return to the caller."
   #!-sb-thread (error "Not supported in unithread builds.")
   #!+sb-thread
   (let ((value (mutex-value mutex)))
+    (/show0 "CONDITION-WAITing")
+    #!+sb-lutex
+    (progn
+      (setf (mutex-value mutex) nil)
+      (with-lutex-address (queue-lutex-address (waitqueue-lutex queue))
+        (with-lutex-address (mutex-lutex-address (mutex-lutex mutex))
+          (%lutex-wait queue-lutex-address mutex-lutex-address)))
+      (setf (mutex-value mutex) value))
+    #!-sb-lutex
     (unwind-protect
          (let ((me *current-thread*))
            ;; XXX we should do something to ensure that the result of this setf
@@ -274,21 +350,32 @@ time we reacquire MUTEX and return to the caller."
   #!-sb-thread (error "Not supported in unithread builds.")
   #!+sb-thread
   (declare (type (and fixnum (integer 1)) n))
+  (/show0 "Entering CONDITION-NOTIFY")
   #!+sb-thread
-  (let ((me *current-thread*))
+  (progn
+    #!+sb-lutex
+    (with-lutex-address (lutex (waitqueue-lutex queue))
+      (%lutex-wake lutex n))
     ;; no problem if >1 thread notifies during the comment in
     ;; condition-wait: as long as the value in queue-data isn't the
     ;; waiting thread's id, it matters not what it is
     ;; XXX we should do something to ensure that the result of this setf
     ;; is visible to all CPUs
-    (setf (waitqueue-data queue) me)
-    (with-pinned-objects (queue)
-      (futex-wake (waitqueue-data-address queue) n))))
+    #!-sb-lutex
+    (let ((me *current-thread*))
+      (progn
+        (setf (waitqueue-data queue) me)
+        (with-pinned-objects (queue)
+          (futex-wake (waitqueue-data-address queue) n))))))
 
 (defun condition-broadcast (queue)
   #!+sb-doc
   "Notify all threads waiting on QUEUE."
-  (condition-notify queue most-positive-fixnum))
+  (condition-notify queue
+                    ;; On a 64-bit platform truncating M-P-F to an int results
+                    ;; in -1, which wakes up only one thread.
+                    (ldb (byte 29 0)
+                         most-positive-fixnum)))
 
 ;;;; semaphores
 
@@ -347,15 +434,17 @@ this semaphore, then N of them is woken up."
   `(locally ,@body)
   #!+sb-thread
   `(without-interrupts
-    (with-mutex ((session-lock ,session))
-      ,@body)))
+     (with-mutex ((session-lock ,session))
+       ,@body)))
 
 (defun new-session ()
   (make-session :threads (list *current-thread*)
                 :interactive-threads (list *current-thread*)))
 
 (defun init-job-control ()
-  (setf *session* (new-session)))
+  (/show0 "Entering INIT-JOB-CONTROL")
+  (setf *session* (new-session))
+  (/show0 "Exiting INIT-JOB-CONTROL"))
 
 (defun %delete-thread-from-session (thread session)
   (with-session-lock (session)
@@ -379,6 +468,12 @@ this semaphore, then N of them is woken up."
 #!+sb-thread
 (defun handle-thread-exit (thread)
   (with-mutex (*all-threads-lock*)
+    (/show0 "HANDLING THREAD EXIT")
+    #!+sb-lutex
+    (when (thread-interruptions-lock thread)
+      (/show0 "FREEING MUTEX LUTEX")
+      (with-lutex-address (lutex (mutex-lutex (thread-interruptions-lock thread)))
+        (%lutex-destroy lutex)))
     (setq *all-threads* (delete thread *all-threads*)))
   (when *session*
     (%delete-thread-from-session thread *session*)))
@@ -420,6 +515,7 @@ interactive."
   #!+sb-thread
   (let ((was-foreground t))
     (loop
+     (/show0 "Looping in GET-FOREGROUND")
      (with-session-lock (*session*)
        (let ((int-t (session-interactive-threads *session*)))
          (when (eq (car int-t) *current-thread*)
@@ -463,7 +559,7 @@ have the foreground next."
                (sb!unix::unix-setsid)
                (let* ((sb!impl::*stdin*
                        (make-fd-stream in :input t :buffering :line
-                                              :dual-channel-p t))
+                                       :dual-channel-p t))
                       (sb!impl::*stdout*
                        (make-fd-stream out :output t :buffering :line
                                               :dual-channel-p t))
@@ -572,10 +668,13 @@ returns the thread exits."
 ;; Called from the signal handler.
 (defun run-interruption ()
   (in-interruption ()
-   (let ((interruption (with-interruptions-lock (*current-thread*)
-                         (pop (thread-interruptions *current-thread*)))))
-     (with-interrupts
-       (funcall interruption)))))
+    (loop
+       (let ((interruption (with-interruptions-lock (*current-thread*)
+                             (pop (thread-interruptions *current-thread*)))))
+         (if interruption
+             (with-interrupts
+               (funcall interruption))
+             (return))))))
 
 ;; The order of interrupt execution is peculiar. If thread A
 ;; interrupts thread B with I1, I2 and B for some reason receives I1

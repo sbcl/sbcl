@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.14 relative to sbcl-0.9.13:
+  * feature: thread support on Solaris/x86, and experimental thread support
+    on OS X/x86.
   * minor incompatible change: prevent the user from specializing the
     new-value argument to SB-MOP:SLOT-VALUE-USING-CLASS.  It's
     somewhat counter to the intent of the protocol, I (CSR) think, and

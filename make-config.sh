@@ -184,6 +184,9 @@ case "$sbcl_os" in
             freebsd)
                 printf ' :elf' >> $ltf
                 printf ' :freebsd' >> $ltf
+                if [ $sbcl_arch = "x86" ]; then
+                    printf ' :sb-lutex :restore-tls-segment-register-from-tls' >> $ltf
+                fi
                 link_or_copy Config.$sbcl_arch-freebsd Config
                 ;;
             openbsd)
@@ -205,14 +208,20 @@ case "$sbcl_os" in
     darwin)
         printf ' :mach-o' >> $ltf
         printf ' :bsd' >> $ltf
+        printf ' :darwin' >> $ltf
+        if [ $sbcl_arch = "x86" ]; then
+            printf ' :sb-lutex :restore-fs-segment-register-from-tls' >> $ltf
+        fi
         link_or_copy $sbcl_arch-darwin-os.h target-arch-os.h
         link_or_copy bsd-os.h target-os.h
-        printf ' :darwin' >> $ltf
         link_or_copy Config.$sbcl_arch-darwin Config
         ;;
     sunos)
         printf ' :elf' >> $ltf
         printf ' :sunos' >> $ltf
+        if [ $sbcl_arch = "x86" ]; then
+            printf ' :sb-lutex' >> $ltf
+        fi
         link_or_copy Config.$sbcl_arch-sunos Config
         link_or_copy $sbcl_arch-sunos-os.h target-arch-os.h
         link_or_copy sunos-os.h target-os.h

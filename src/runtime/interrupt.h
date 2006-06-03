@@ -13,6 +13,7 @@
 #define _INCLUDE_INTERRUPT_H_
 
 #include <signal.h>
+#include <string.h>
 
 /*
  * This is a workaround for some slightly silly Linux/GNU Libc

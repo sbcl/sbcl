@@ -113,9 +113,18 @@ static inline struct thread *arch_os_get_current_thread() {
 #if defined(LISP_FEATURE_SB_THREAD)
 #if defined(LISP_FEATURE_X86)
     register struct thread *me=0;
-    if(all_threads)
+    if(all_threads) {
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_RESTORE_FS_SEGMENT_REGISTER_FROM_TLS)
+        sel_t sel;
+        struct thread *th = pthread_getspecific(specials);
+        sel.index = th->tls_cookie;
+        sel.rpl = USER_PRIV;
+        sel.ti = SEL_LDT;
+        __asm__ __volatile__ ("movw %w0, %%fs" : : "r"(sel));
+#endif
         __asm__ __volatile__ ("movl %%fs:%c1,%0" : "=r" (me)
                  : "i" (offsetof (struct thread,this)));
+    }
     return me;
 #else
     return pthread_getspecific(specials);
@@ -135,8 +144,8 @@ static inline struct thread *arch_os_get_current_thread() {
 #define thread_self getpid
 #define thread_kill kill
 #define thread_sigmask sigprocmask
-#define thread_mutex_lock(l)
-#define thread_mutex_unlock(l)
+#define thread_mutex_lock(l) 0
+#define thread_mutex_unlock(l) 0
 #endif
 
 extern void create_initial_thread(lispobj);

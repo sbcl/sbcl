@@ -395,6 +395,20 @@
   (real :c-type "double" :length #!-x86-64 2 #!+x86-64 1)
   (imag :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
 
+#!+(and sb-thread sb-lutex)
+(define-primitive-object (lutex
+                          :lowtag other-pointer-lowtag
+                          :widetag lutex-widetag
+                          :alloc-trans %make-lutex)
+  (gen :c-type "long" :length 1)
+  (live :c-type "long" :length 1)
+  (next :c-type "struct lutex *" :length 1)
+  (prev :c-type "struct lutex *" :length 1)
+  (mutex :c-type "pthread_mutex_t *"
+         :length 1)
+  (condition-variable :c-type "pthread_cond_t *"
+                      :length 1))
+
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
 ;;; it makes sense to define it here anyway, so that the GENESIS machinery

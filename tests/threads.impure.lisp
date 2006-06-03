@@ -1,3 +1,4 @@
+
 ;;;; miscellaneous tests of thread stuff
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -81,8 +82,9 @@
 (with-open-file (o "threads-foreign.c" :direction :output :if-exists :supersede)
   (format o "void loop_forever() { while(1) ; }~%"))
 (sb-ext:run-program
- "cc"
- (or #+linux '("-shared" "-o" "threads-foreign.so" "threads-foreign.c")
+ #-sunos "cc" #+sunos "gcc"
+ (or #+(or linux freebsd sunos) '("-shared" "-o" "threads-foreign.so" "threads-foreign.c")
+     #+darwin '("-dynamiclib" "-o" "threads-foreign.so" "threads-foreign.c")
      (error "Missing shared library compilation options for this platform"))
  :search t)
 (sb-alien:load-shared-object "threads-foreign.so")
@@ -571,3 +573,47 @@
 |     (mp:make-process #'roomy)
 |     (mp:make-process #'roomy)))
 |#
+
+(with-test (:name (:condition-variable :notify-multiple))
+  (flet ((tester (notify-fun)
+           (let ((queue (make-waitqueue :name "queue"))
+                 (lock (make-mutex :name "lock"))
+                 (data nil))
+             (labels ((test (x)
+                        (loop
+                           (with-mutex (lock)
+                             (format t "condition-wait ~a~%" x)
+                             (force-output)
+                             (condition-wait queue lock)
+                             (format t "woke up ~a~%" x)
+                             (force-output)
+                             (push x data)))))
+               (let ((threads (loop for x from 1 to 10
+                                    collect
+                                    (let ((x x))
+                                      (sb-thread:make-thread (lambda ()
+                                                               (test x)))))))
+                 (sleep 5)
+                 (with-mutex (lock)
+                   (funcall notify-fun queue))
+                 (sleep 5)
+                 (mapcar #'terminate-thread threads)
+                 ;; Check that all threads woke up at least once
+                 (assert (= (length (remove-duplicates data)) 10)))))))
+    (tester (lambda (queue)
+              (format t "~&(condition-notify queue 10)~%")
+              (force-output)
+              (condition-notify queue 10)))
+    (tester (lambda (queue)
+              (format t "~&(condition-broadcast queue)~%")
+              (force-output)
+              (condition-broadcast queue)))))
+
+(with-test (:name (:mutex :finalization))
+  (let ((a nil))
+    (dotimes (i 500000)
+      (setf a (make-mutex)))))
+
+
+
+

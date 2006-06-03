@@ -106,6 +106,10 @@
 (!define-type-vops fdefn-p nil nil nil
   (fdefn-widetag))
 
+#!+(and sb-thread sb-lutex)
+(!define-type-vops lutexp nil nil nil
+  (lutex-widetag))
+
 (!define-type-vops funcallable-instance-p nil nil nil
   (funcallable-instance-header-widetag))
 

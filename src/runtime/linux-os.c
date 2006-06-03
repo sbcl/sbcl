@@ -34,6 +34,7 @@
 #include "runtime.h"
 #include "genesis/static-symbols.h"
 #include "genesis/fdefn.h"
+
 #include <sys/socket.h>
 #include <sys/utsname.h>
 #include <errno.h>
@@ -61,7 +62,7 @@ int personality (unsigned long);
 
 size_t os_vm_page_size;
 
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_LUTEX)
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <errno.h>
@@ -96,7 +97,6 @@ futex_wake(int *lock_word, int n)
 
 
 int linux_sparc_siginfo_bug = 0;
-int linux_no_threads_p = 0;
 
 #ifdef LISP_FEATURE_SB_THREAD
 int
@@ -119,7 +119,7 @@ os_init(char *argv[], char *envp[])
 {
     /* Conduct various version checks: do we have enough mmap(), is
      * this a sparc running 2.2, can we do threads? */
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_LUTEX)
     int *futex=0;
 #endif
     struct utsname name;
@@ -145,12 +145,14 @@ os_init(char *argv[], char *envp[])
 #endif
     }
 #ifdef LISP_FEATURE_SB_THREAD
+#if !defined(LISP_FEATURE_SB_LUTEX)
     futex_wait(futex,-1);
     if(errno==ENOSYS) {
        lose("This version of SBCL is compiled with threading support, but your kernel\n"
             "is too old to support this. Please use a more recent kernel or\n"
             "a version of SBCL without threading support.\n");
     }
+#endif
     if(! isnptl()) {
        lose("This version of SBCL only works correctly with the NPTL threading\n"
             "library. Please use a newer glibc, use an older SBCL, or stop using\n"

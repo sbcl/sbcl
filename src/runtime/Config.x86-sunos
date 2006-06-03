@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS = -O2 -Wall -DSVR4
-ASFLAGS = -Wall -DSVR4
+CFLAGS = -g3 -O2 -Wall -D__EXTENSIONS__ -D_POSIX_C_SOURCE=199506L -DSVR4
+ASFLAGS = -Wall
 LD = ld
 NM = nm -xgp
 GREP = ggrep

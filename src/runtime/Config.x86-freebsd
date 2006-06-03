@@ -18,3 +18,6 @@ ASSEM_SRC += ldso-stubs.S
 # dlopen() etc., which in turn depend on dynamic linking of the
 # runtime.
 LINKFLAGS += -dynamic -export-dynamic
+LINKFLAGS += $(shell if grep LISP_FEATURE_SB_THREAD genesis/config.h \
+                      > /dev/null 2>&1; \
+                   then echo "-lpthread"; fi)

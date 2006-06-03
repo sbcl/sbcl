@@ -23,6 +23,7 @@
 #include <sys/file.h>
 #include <unistd.h>
 #include <assert.h>
+#include <errno.h>
 #include "sbcl.h"
 #include "./signal.h"
 #include "os.h"
@@ -194,12 +195,13 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     void *fault_addr = arch_get_bad_addr(signal, siginfo, context);
 
-#if defined(MEMORY_FAULT_DEBUG)
-    fprintf(stderr, "Memory fault at: %p, PC: %x\n", fault_addr, *os_context_pc_addr(context));
-#if defined(ARCH_HAS_STACK_POINTER)
-    fprintf(stderr, "Stack pointer: %x\n", *os_context_sp_addr(context));
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in memory_fault_handler\n",
+                  *CONTEXT_ADDR_FROM_STEM(fs)));
+    os_restore_tls_segment_register(context);
 #endif
-#endif
+
+    FSHOW((stderr, "Memory fault at: %p, PC: %x\n", fault_addr, *os_context_pc_addr(context)));
 
     if (!gencgc_handle_wp_violation(fault_addr))
         if(!handle_guard_page_triggered(context,fault_addr)) {
@@ -227,10 +229,22 @@ os_install_interrupt_handlers(void)
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT2,
                                                  memory_fault_handler);
 #endif
+
+#ifdef LISP_FEATURE_SB_THREAD
+    undoably_install_low_level_interrupt_handler(SIG_INTERRUPT_THREAD,
+                                                 interrupt_thread_handler);
+    undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
+                                                 sig_stop_for_gc_handler);
+#ifdef SIG_RESUME_FROM_GC
+    undoably_install_low_level_interrupt_handler(SIG_RESUME_FROM_GC,
+                                                 sig_stop_for_gc_handler);
+#endif
+#endif
+
     SHOW("leaving os_install_interrupt_handlers()");
 }
 
-#else /* Currently Darwin only */
+#else /* Currently PPC/Darwin/Cheney only */
 
 static void
 sigsegv_handler(int signal, siginfo_t *info, void* void_context)
@@ -321,30 +335,6 @@ static void freebsd_init()
 #endif /* LISP_FEATURE_X86 */
 }
 #endif /* __FreeBSD__ */
-
-/* threads */
-
-/* no threading in any *BSD variant on any CPU (yet? in sbcl-0.8.0 anyway) */
-#ifdef LISP_FEATURE_SB_THREAD
-#error "Define threading support functions"
-#else
-int arch_os_thread_init(struct thread *thread) {
-  stack_t sigstack;
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    /* Signal handlers are run on the control stack, so if it is exhausted
-     * we had better use an alternate stack for whatever signal tells us
-     * we've exhausted it */
-    sigstack.ss_sp=((void *) thread)+dynamic_values_bytes;
-    sigstack.ss_flags=0;
-    sigstack.ss_size = 32*SIGSTKSZ;
-    sigaltstack(&sigstack,0);
-#endif
-    return 1;                  /* success */
-}
-int arch_os_thread_cleanup(struct thread *thread) {
-    return 1;                  /* success */
-}
-#endif
 
 #ifdef LISP_FEATURE_DARWIN
 /* defined in ppc-darwin-os.c instead */

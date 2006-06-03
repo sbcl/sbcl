@@ -162,6 +162,22 @@
  ;; so caveat executor.
  ; :sb-thread
 
+ ;; lutex support
+ ;;
+ ;; While on linux we are able to use futexes for our locking
+ ;; primitive, on other platforms we don't have this luxury. NJF's
+ ;; lutexes present a locking API similar to the futex-based API that
+ ;; allows for sb-thread support on x86 OS X, Solaris and
+ ;; FreeBSD.
+ ;;
+ ; :sb-lutex
+
+ ;; On some operating systems the FS segment register (used for SBCL's
+ ;; thread local storage) is not reliably preserved in signal
+ ;; handlers, so we need to restore its value from the pthread thread
+ ;; local storage.
+ ; :restore-tls-segment-register-from-tls
+
  ;; Support for detection of unportable code (when applied to the
  ;; COMMON-LISP package, or SBCL-internal pacakges) or bad-neighbourly
  ;; code (when applied to user-level packages), relating to material

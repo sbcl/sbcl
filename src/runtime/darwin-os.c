@@ -22,6 +22,7 @@
 #include <limits.h>
 #include <mach-o/dyld.h>
 #include "bsd-os.h"
+#include <errno.h>
 
 char *
 os_get_runtime_executable_path()
@@ -36,3 +37,4 @@ os_get_runtime_executable_path()
 
     return copied_string(path);
 }
+

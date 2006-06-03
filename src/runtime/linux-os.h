@@ -22,9 +22,9 @@
 #include <sys/syscall.h>
 #include <asm/unistd.h>
 #include <linux/version.h>
+
 #include "target-arch-os.h"
 #include "target-arch.h"
-
 #define linuxversion(a, b, c) (((a)<<16)+((b)<<8)+(c))
 
 typedef caddr_t os_vm_address_t;
