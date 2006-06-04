@@ -71,8 +71,11 @@
   (defun %raw-instance-set/complex-double (instance index new-value)
     (declare (type index index)
              (type (complex double-float) new-value))
-    (%raw-instance-set/complex-double instance index new-value)))
+    (%raw-instance-set/complex-double instance index new-value))
+) ; #!-HPPA
 
+#!+hppa
+(progn
 (defun %raw-ref-single (vec index)
   (declare (type index index))
   (%raw-ref-single vec index))
@@ -124,6 +127,7 @@
 (defun %raw-set-complex-long (vec index val)
   (declare (type index index))
   (%raw-set-complex-long vec index val))
+) ; #!+HPPA
 
 (defun %instance-layout (instance)
   (%instance-layout instance))

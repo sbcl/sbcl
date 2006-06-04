@@ -121,6 +121,8 @@
   (unsafe))
 (defknown %layout-invalid-error (t layout) nil)
 
+#!-hppa
+(progn
 (defknown %raw-instance-ref/word (instance index) sb!vm:word
   (flushable))
 (defknown %raw-instance-set/word (instance index sb!vm:word) sb!vm:word
@@ -147,13 +149,20 @@
     (instance index (complex double-float))
   (complex double-float)
   (unsafe))
-
-(sb!xc:deftype raw-vector () '(simple-array sb!vm:word (*)))
+)
 
 ;;; %RAW-{REF,SET}-FOO VOPs should be declared as taking a RAW-VECTOR
 ;;; as their first argument (clarity and to match these DEFKNOWNs).
 ;;; We declare RAW-VECTOR as a primitive type so the VOP machinery
 ;;; will accept our VOPs as legitimate.  --njf, 2004-08-10
+;;;
+;;; These are only used on HPPA, since on HPPA implements raw slots in
+;;; structures with an indirection vector; all other ports implement
+;;; raw slots directly in the structure.  --njf, 2006-06-02
+#!+hppa
+(progn
+(sb!xc:deftype raw-vector () '(simple-array sb!vm:word (*)))
+
 (sb!vm::!def-primitive-type-alias raw-vector
                                   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
                                   sb!vm::simple-array-unsigned-byte-32
@@ -186,7 +195,7 @@
 (defknown %raw-set-complex-double (raw-vector index (complex double-float))
   (complex double-float)
   (unsafe))
-
+)
 
 (defknown %raw-bits (t fixnum) sb!vm:word
   (foldable flushable))
