@@ -43,6 +43,7 @@
 #include "thread.h"
 #include "genesis/vector.h"
 #include "genesis/weak-pointer.h"
+#include "genesis/fdefn.h"
 #include "genesis/simple-fun.h"
 #include "save.h"
 #include "genesis/hash-table.h"
@@ -150,6 +151,9 @@ unsigned long auto_gc_trigger = 0;
  * scavenging. */
 generation_index_t from_space;
 generation_index_t new_space;
+
+/* Set to 1 when in GC */
+boolean gc_active_p = 0;
 
 /* should the GC be conservative on stack. If false (only right before
  * saving a core), don't scan the stack / mark pages dont_move. */
@@ -313,7 +317,7 @@ count_generation_pages(generation_index_t generation)
     long count = 0;
 
     for (i = 0; i < last_free_page; i++)
-        if ((page_table[i].allocated != 0)
+        if ((page_table[i].allocated != FREE_PAGE_FLAG)
             && (page_table[i].gen == generation))
             count++;
     return count;
@@ -326,7 +330,8 @@ count_dont_move_pages(void)
     page_index_t i;
     long count = 0;
     for (i = 0; i < last_free_page; i++) {
-        if ((page_table[i].allocated != 0) && (page_table[i].dont_move != 0)) {
+        if ((page_table[i].allocated != FREE_PAGE_FLAG)
+            && (page_table[i].dont_move != 0)) {
             ++count;
         }
     }
@@ -342,7 +347,8 @@ count_generation_bytes_allocated (generation_index_t gen)
     page_index_t i;
     long result = 0;
     for (i = 0; i < last_free_page; i++) {
-        if ((page_table[i].allocated != 0) && (page_table[i].gen == gen))
+        if ((page_table[i].allocated != FREE_PAGE_FLAG)
+            && (page_table[i].gen == gen))
             result += page_table[i].bytes_used;
     }
     return result;
@@ -422,17 +428,19 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
         gc_assert(generations[i].bytes_allocated
                   == count_generation_bytes_allocated(i));
         fprintf(stderr,
-                "   %1d: %5ld %5ld %5ld %5ld %5ld %5ld %5ld %5ld %8ld %5ld %8ld %4ld %3d %7.4f\n",
+                "   %1d: %5ld %5ld %5ld %5ld %5ld %5ld %5ld %5ld %5ld %8ld %5ld %8ld %4ld %3d %7.4f\n",
                 i,
                 generations[i].alloc_start_page,
                 generations[i].alloc_unboxed_start_page,
                 generations[i].alloc_large_start_page,
                 generations[i].alloc_large_unboxed_start_page,
-                boxed_cnt, unboxed_cnt, large_boxed_cnt, large_unboxed_cnt,
+                boxed_cnt,
+                unboxed_cnt,
+                large_boxed_cnt,
+                large_unboxed_cnt,
                 pinned_cnt,
                 generations[i].bytes_allocated,
-                (count_generation_pages(i)*PAGE_BYTES
-                 - generations[i].bytes_allocated),
+                (count_generation_pages(i)*PAGE_BYTES - generations[i].bytes_allocated),
                 generations[i].gc_trigger,
                 count_write_protect_generation_pages(i),
                 generations[i].num_gc,
@@ -1064,6 +1072,32 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
 
 static page_index_t gencgc_alloc_start_page = -1;
 
+void
+gc_heap_exhausted_error_or_lose (long available, long requested)
+{
+    /* Write basic information before doing anything else: if we don't
+     * call to lisp this is a must, and even if we do there is always the
+     * danger that we bounce back here before the error has been handled,
+     * or indeed even printed.
+     */
+    fprintf(stderr, "Heap exhausted during %s: %ld bytes available, %ld requested.\n",
+            gc_active_p ? "garbage collection" : "allocation", available, requested);
+    if (gc_active_p || (available == 0)) {
+        /* If we are in GC, or totally out of memory there is no way
+         * to sanely transfer control to the lisp-side of things.
+         */
+        print_generation_stats(1);
+        lose("Heap exhausted, game over.");
+    }
+    else {
+        /* FIXME: assert free_pages_lock held */
+        thread_mutex_unlock(&free_pages_lock);
+        funcall2(SymbolFunction(HEAP_EXHAUSTED_ERROR),
+                 make_fixnum(available), make_fixnum(requested));
+        lose("HEAP-EXHAUSTED-ERROR fell through");
+    }
+}
+
 page_index_t
 gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
 {
@@ -1106,13 +1140,8 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
                 first_page++;
             }
 
-        if (first_page >= NUM_PAGES) {
-            fprintf(stderr,
-                    "Argh! gc_find_free_space failed (first_page), nbytes=%ld.\n",
-                    nbytes);
-            print_generation_stats(1);
-            lose("\n");
-        }
+        if (first_page >= NUM_PAGES)
+            gc_heap_exhausted_error_or_lose(0, nbytes);
 
         gc_assert(page_table[first_page].write_protected == 0);
 
@@ -1137,13 +1166,9 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
     } while ((restart_page < NUM_PAGES) && (bytes_found < nbytes));
 
     /* Check for a failure */
-    if ((restart_page >= NUM_PAGES) && (bytes_found < nbytes)) {
-        fprintf(stderr,
-                "Argh! gc_find_freeish_pages failed (restart_page), nbytes=%ld.\n",
-                nbytes);
-        print_generation_stats(1);
-        lose("\n");
-    }
+    if ((restart_page >= NUM_PAGES) && (bytes_found < nbytes))
+        gc_heap_exhausted_error_or_lose(bytes_found, nbytes);
+
     *restart_page_ptr=first_page;
 
     return last_page;
@@ -4386,6 +4411,8 @@ collect_garbage(generation_index_t last_gen)
 
     FSHOW((stderr, "/entering collect_garbage(%d)\n", last_gen));
 
+    gc_active_p = 1;
+
     if (last_gen > HIGHEST_NORMAL_GENERATION+1) {
         FSHOW((stderr,
                "/collect_garbage: last_gen = %d, doing a level 0 GC\n",
@@ -4504,6 +4531,8 @@ collect_garbage(generation_index_t last_gen)
         remap_free_pages(0, high_water_mark);
         high_water_mark = 0;
     }
+
+    gc_active_p = 0;
 
     SHOW("returning from collect_garbage");
 }

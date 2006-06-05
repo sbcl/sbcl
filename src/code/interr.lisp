@@ -454,6 +454,20 @@
              "Control stack guard page temporarily disabled: proceed with caution~%")
      (error 'control-stack-exhausted))))
 
+;;; KLUDGE: we keep a single HEAP-EXHAUSTED-ERROR object around, so
+;;; that we don't need to allocate it when running out of memory. Similarly
+;;; we pass the amounts in special variables as there may be multiple threads
+;;; running into trouble at the same time. The condition is created by GC-REINIT.
+(defvar *heap-exhausted-error-condition*)
+(defvar *heap-exhausted-error-available-bytes*)
+(defvar *heap-exhausted-error-requested-bytes*)
+
+(defun heap-exhausted-error (available requested)
+  (infinite-error-protect
+   (let ((*heap-exhausted-error-available-bytes* available)
+         (*heap-exhausted-error-requested-bytes* requested))
+     (error *heap-exhausted-error-condition*))))
+
 (defun undefined-alien-variable-error ()
   (error 'undefined-alien-variable-error))
 

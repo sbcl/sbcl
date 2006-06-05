@@ -120,7 +120,9 @@
 (defun gc-reinit ()
   (gc-on)
   (gc)
-  (setf *n-bytes-freed-or-purified* 0))
+  (setf *n-bytes-freed-or-purified* 0
+        ;; See comment in interr.lisp
+        *heap-exhausted-error-condition* (make-condition 'heap-exhausted-error)))
 
 (declaim (ftype (function () unsigned-byte) get-bytes-consed))
 (defun get-bytes-consed ()
@@ -211,6 +213,9 @@ environment these hooks may run in any thread.")
       ;; Outside the mutex, these may cause another GC. FIXME: it can
       ;; potentially exceed maximum interrupt nesting by triggering
       ;; GCs.
+      ;;
+      ;; Can that be avoided by having the finalizers and hooks run only
+      ;; from the outermost SUB-GC?
       (run-pending-finalizers)
       (dolist (hook *after-gc-hooks*)
         (handler-case

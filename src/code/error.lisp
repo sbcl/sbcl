@@ -132,6 +132,21 @@
       (format stream
              "Control stack exhausted (no more space for function call frames).  This is probably due to heavily nested or infinitely recursive function calls, or a tail call that SBCL cannot or has not optimized away."))))
 
+(define-condition heap-exhausted-error (storage-condition)
+  ()
+  (:report
+   (lambda (condition stream)
+     (declare (special *heap-exhausted-error-available-bytes*
+                       *heap-exhausted-error-requested-bytes*))
+     ;; See comments in interr.lisp -- there is a method to this madness.
+     (if (and (boundp '*heap-exhausted-error-available-bytes*)
+              (boundp '*heap-exhausted-error-requested-bytes*))
+         (format stream
+                 "Heap exhausted: ~D bytes available, ~D requested. PROCEED WITH CAUTION!"
+                 *heap-exhausted-error-available-bytes*
+                 *heap-exhausted-error-requested-bytes*)
+         (print-unreadable-object (condition stream))))))
+
 (define-condition memory-fault-error (error)
   ()
   (:report
