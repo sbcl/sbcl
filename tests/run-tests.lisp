@@ -124,13 +124,14 @@
         (restart-case
             (handler-bind
                 ((error (lambda (condition)
-                          (push (list :unhandled-error cl-user::file) test-util::*failures*)
+                          (push (list :unhandled-error file)
+                                test-util::*failures*)
                           (cond (*break-on-error*
                                  (test-util:really-invoke-debugger condition))
                                 (t
                                  (format *error-output* "~&Unhandled ~a: ~a~%"
                                          (type-of condition) condition)
-                                 (funcall (symbol-function (intern "BACKTRACE" :sb-debug)))))
+                                 (sb-debug:backtrace)))
                           (invoke-restart 'skip-file))))
               ,test-code)
           (skip-file ()
