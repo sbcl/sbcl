@@ -116,39 +116,39 @@
 (defknown %instance-length (instance) index
   (foldable flushable))
 (defknown %instance-ref (instance index) t
-  (flushable))
+  (flushable always-translatable))
 (defknown %instance-set (instance index t) t
-  (unsafe))
+  (unsafe always-translatable))
 (defknown %layout-invalid-error (t layout) nil)
 
 #!-hppa
 (progn
 (defknown %raw-instance-ref/word (instance index) sb!vm:word
-  (flushable))
+  (flushable always-translatable))
 (defknown %raw-instance-set/word (instance index sb!vm:word) sb!vm:word
-  (unsafe))
+  (unsafe always-translatable))
 (defknown %raw-instance-ref/single (instance index) single-float
-  (flushable))
+  (flushable always-translatable))
 (defknown %raw-instance-set/single (instance index single-float) single-float
-  (unsafe))
+  (unsafe always-translatable))
 (defknown %raw-instance-ref/double (instance index) double-float
-  (flushable))
+  (flushable always-translatable))
 (defknown %raw-instance-set/double (instance index double-float) double-float
-  (unsafe))
+  (unsafe always-translatable))
 (defknown %raw-instance-ref/complex-single (instance index)
   (complex single-float)
-  (flushable))
+  (flushable always-translatable))
 (defknown %raw-instance-set/complex-single
     (instance index (complex single-float))
   (complex single-float)
-  (unsafe))
+  (unsafe always-translatable))
 (defknown %raw-instance-ref/complex-double (instance index)
   (complex double-float)
-  (flushable))
+  (flushable always-translatable))
 (defknown %raw-instance-set/complex-double
     (instance index (complex double-float))
   (complex double-float)
-  (unsafe))
+  (unsafe always-translatable))
 )
 
 ;;; %RAW-{REF,SET}-FOO VOPs should be declared as taking a RAW-VECTOR
@@ -170,31 +170,31 @@
                                   sb!vm::simple-array-unsigned-byte-64)
 
 (defknown %raw-ref-single (raw-vector index) single-float
-  (foldable flushable))
+  (foldable flushable always-translatable))
 (defknown %raw-ref-double (raw-vector index) double-float
-  (foldable flushable))
+  (foldable flushable always-translatable))
 #!+long-float
 (defknown %raw-ref-long (raw-vector index) long-float
-  (foldable flushable))
+  (foldable flushable always-translatable))
 (defknown %raw-set-single (raw-vector index single-float) single-float
-  (unsafe))
+  (unsafe always-translatable))
 (defknown %raw-set-double (raw-vector index double-float) double-float
-  (unsafe))
+  (unsafe always-translatable))
 #!+long-float
 (defknown %raw-set-long (raw-vector index long-float) long-float
-  (unsafe))
+  (unsafe always-translatable))
 
 (defknown %raw-ref-complex-single (raw-vector index) (complex single-float)
-  (foldable flushable))
+  (foldable flushable always-translatable))
 (defknown %raw-ref-complex-double (raw-vector index) (complex double-float)
-  (foldable flushable))
+  (foldable flushable always-translatable))
 
 (defknown %raw-set-complex-single (raw-vector index (complex single-float))
   (complex single-float)
-  (unsafe))
+  (unsafe always-translatable))
 (defknown %raw-set-complex-double (raw-vector index (complex double-float))
   (complex double-float)
-  (unsafe))
+  (unsafe always-translatable))
 )
 
 (defknown %raw-bits (t fixnum) sb!vm:word
@@ -227,7 +227,7 @@
 
 ;;;; threading
 
-#!+(and sb-thread sb-lutex)
+#!+sb-lutex
 (progn
   (defknown sb!vm::%make-lutex () sb!vm::lutex ())
   (defknown sb!vm::lutexp (t) boolean (foldable flushable)))
