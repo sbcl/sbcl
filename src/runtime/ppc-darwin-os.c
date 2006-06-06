@@ -23,6 +23,17 @@
 #include <mach-o/dyld.h>
 #include "bsd-os.h"
 
+#ifdef LISP_FEATURE_SB_THREAD
+#error "Define threading support functions"
+#else
+int arch_os_thread_init(struct thread *thread) {
+    return 1;                   /* success */
+}
+int arch_os_thread_cleanup(struct thread *thread) {
+    return 1;                   /* success */
+}
+#endif
+
 os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
 {

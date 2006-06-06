@@ -4043,6 +4043,7 @@ scavenge_interrupt_contexts(void)
 
 #endif
 
+#if defined(LISP_FEATURE_SB_THREAD)
 static void
 preserve_context_registers (os_context_t *c)
 {
@@ -4067,6 +4068,7 @@ preserve_context_registers (os_context_t *c)
         preserve_pointer(*ptr);
     }
 }
+#endif
 
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
