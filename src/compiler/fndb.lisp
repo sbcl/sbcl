@@ -1438,8 +1438,9 @@
 (defknown %negate (number) number (movable foldable flushable explicit-check))
 (defknown %check-bound (array index fixnum) index (movable foldable flushable))
 (defknown data-vector-ref (simple-array index) t
-  (foldable explicit-check))
-(defknown data-vector-set (array index t) t (unsafe explicit-check))
+  (foldable explicit-check always-translatable))
+(defknown data-vector-set (array index t) t
+  (unsafe explicit-check always-translatable))
 (defknown hairy-data-vector-ref (array index) t
   (foldable explicit-check))
 (defknown hairy-data-vector-set (array index t) t (unsafe explicit-check))

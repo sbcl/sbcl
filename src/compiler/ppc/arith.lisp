@@ -664,8 +664,9 @@
 ;;;; %LDB
 
 (defknown %%ldb (integer unsigned-byte unsigned-byte) unsigned-byte
-  (movable foldable flushable))
+  (movable foldable flushable always-translatable))
 
+;;; only for constant folding within the compiler
 (defun %%ldb (integer size posn)
   (sb!kernel::%ldb size posn integer))
 
@@ -830,8 +831,9 @@
   (define-logtest-vops))
 
 (defknown %logbitp (integer unsigned-byte) boolean
-  (movable foldable flushable))
+  (movable foldable flushable always-translatable))
 
+;;; only for constant folding within the compiler
 (defun %logbitp (integer index)
   (logbitp index integer))
 

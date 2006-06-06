@@ -85,7 +85,12 @@
   ;; The function does explicit argument type checking, so the
   ;; declared type should not be asserted when a definition is
   ;; compiled.
-  explicit-check)
+  explicit-check
+  ;; The function should always be translated by a VOP (i.e. it should
+  ;; should never be converted into a full call).  This is used strictly
+  ;; as a consistency checking mechanism inside the compiler during IR2
+  ;; transformation.
+  always-translatable)
 
 (defstruct (fun-info #-sb-xc-host (:pure t))
   ;; boolean attributes of this function.

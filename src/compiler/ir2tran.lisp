@@ -1023,27 +1023,6 @@
 
 ;;; stuff to check in PONDER-FULL-CALL
 ;;;
-;;; There are some things which are intended always to be optimized
-;;; away by DEFTRANSFORMs and such, and so never compiled into full
-;;; calls. This has been a source of bugs so many times that it seems
-;;; worth listing some of them here so that we can check the list
-;;; whenever we compile a full call.
-;;;
-;;; FIXME: It might be better to represent this property by setting a
-;;; flag in DEFKNOWN, instead of representing it by membership in this
-;;; list.
-(defvar *always-optimized-away*
-  '(;; This should always be DEFTRANSFORMed away, but wasn't in a bug
-    ;; reported to cmucl-imp 2000-06-20.
-    %instance-ref
-    ;; These should always turn into VOPs, but wasn't in a bug which
-    ;; appeared when LTN-POLICY stuff was being tweaked in
-    ;; sbcl-0.6.9.16. in sbcl-0.6.0
-    data-vector-set
-    data-vector-ref))
-
-;;; more stuff to check in PONDER-FULL-CALL
-;;;
 ;;; These came in handy when troubleshooting cold boot after making
 ;;; major changes in the package structure: various transforms and
 ;;; VOPs and stuff got attached to the wrong symbol, so that
@@ -1087,10 +1066,14 @@
     ;; functions are actually optimized away. Thus, we skip the check
     ;; in that case.
     (unless *failure-p*
-      (when (memq fname *always-optimized-away*)
-        (/show (policy node speed) (policy node safety))
-        (/show (policy node compilation-speed))
-        (bug "full call to ~S" fname)))
+      ;; check to see if we know anything about the function
+      (let ((info (info :function :info fname)))
+        ;; if we know something, check to see if the full call was valid
+        (when (and info (ir1-attributep (fun-info-attributes info)
+                                        always-translatable))
+          (/show (policy node speed) (policy node safety))
+          (/show (policy node compilation-speed))
+          (bug "full call to ~S" fname))))
 
     (when (consp fname)
       (aver (legal-fun-name-p fname))

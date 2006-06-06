@@ -1057,8 +1057,9 @@
   (define-logtest-vops))
 
 (defknown %logbitp (integer unsigned-byte) boolean
-  (movable foldable flushable))
+  (movable foldable flushable always-translatable))
 
+;;; only for constant folding within the compiler
 (defun %logbitp (integer index)
   (logbitp index integer))
 
