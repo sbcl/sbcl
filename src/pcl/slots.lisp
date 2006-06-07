@@ -318,7 +318,16 @@
          instance))
 
 (defmethod slot-unbound ((class t) instance slot-name)
-  (error 'unbound-slot :name slot-name :instance instance))
+  (restart-case
+      (error 'unbound-slot :name slot-name :instance instance)
+    (use-value (v)
+      :report "Return a value as the slot-value."
+      :interactive read-evaluated-form
+      v)
+    (store-value (v)
+      :report "Store and return a value as the slot-value."
+      :interactive read-evaluated-form
+      (setf (slot-value instance slot-name) v))))
 
 (defun slot-unbound-internal (instance position)
   (values

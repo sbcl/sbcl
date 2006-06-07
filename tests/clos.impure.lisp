@@ -1267,5 +1267,18 @@
                                         (list (find-class 'integer))))))
 (assert (= (remove-method-1 3) 4))
 (assert (= (remove-method-2 3) 2))
+
+;;; ANSI doesn't require these restarts, but now that we have them we
+;;; better test them too.
+(defclass slot-unbound-restart-test () ((x)))
+(let ((test (make-instance 'slot-unbound-restart-test)))
+  (assert (not (slot-boundp test 'x)))
+  (assert (= 42 (handler-bind ((unbound-slot (lambda (c) (use-value 42 c))))
+                  (slot-value test 'x))))
+  (assert (not (slot-boundp test 'x)))
+  (assert (= 13 (handler-bind ((unbound-slot (lambda (c) (store-value 13 c))))
+                  (slot-value test 'x))))
+  (assert (= 13 (slot-value test 'x))))
+
 
 ;;;; success

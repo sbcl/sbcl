@@ -889,6 +889,7 @@ retained, possibly temporariliy, because it might be used internally."
                "NTH-BUT-WITH-SANE-ARG-ORDER"
                "DEPRECATION-WARNING"
                "BIT-VECTOR-="
+               "READ-EVALUATED-FORM"
 
                ;; ..and macros..
                "COLLECT"

@@ -4,12 +4,16 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
     on OS X/x86.
   * feature: SBCL now tries to signal a STORAGE-CONDITION when running out
     of heap.
+  * feature: SBCL now provides USE-VALUE and STORE-VALUE restarts in the
+    default method for SLOT-UNBOUND.
   * minor incompatible change: prevent the user from specializing the
     new-value argument to SB-MOP:SLOT-VALUE-USING-CLASS.  It's
     somewhat counter to the intent of the protocol, I (CSR) think, and
     additionally it just doesn't work in SBCL as currently
     implemented, thanks to optimizations (that are always valid for
     the other three SLOT-VALUEish functions, but not for the setter).
+  * bug fix: native unparsing of pathnames with :DIRECTORY NIL failed
+    with a type error. (reported by blitz_ on #lisp)
   * bug fix: unparsing logical pathnames with :NAME :WILD :TYPE NIL
     failed with a type error.  (reported by Pascal Bourguignon)
   * bug fix: merging pathnames against defaults with :DIRECTORY
