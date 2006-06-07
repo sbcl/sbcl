@@ -245,9 +245,10 @@
         (type (pathname-type pathname)))
     (coerce
      (with-output-to-string (s)
-       (ecase (car directory)
-         (:absolute (write-char #\/ s))
-         (:relative))
+       (when directory
+         (ecase (car directory)
+           (:absolute (write-char #\/ s))
+           (:relative)))
        (dolist (piece (cdr directory))
          (typecase piece
            ((member :up) (write-string ".." s))

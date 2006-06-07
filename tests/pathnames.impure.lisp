@@ -375,5 +375,17 @@
       (p2 (make-pathname :directory '(:relative :back "foo"))))
   (assert (equal (merge-pathnames p1 p2)
                  (make-pathname :directory '(:relative :back "foo" "bar")))))
+
+;;; construct native namestrings even if the directory is empty (means
+;;; that same as if (:relative))
+(assert (equal (sb-ext:native-namestring (make-pathname :directory '(:relative)
+                                                        :name "foo"
+                                                        :type "txt"))
+               (sb-ext:native-namestring (let ((p (make-pathname :directory nil
+                                                                 :name "foo"
+                                                                 :type "txt")))
+                                           (assert (not (pathname-directory p)))
+                                           p))))
+
 
 ;;;; success
