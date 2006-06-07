@@ -28,7 +28,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"
-#include "monitor.h"
 
 extern char call_into_lisp_LRA[], call_into_lisp_end[];
 

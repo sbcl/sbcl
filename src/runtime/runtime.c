@@ -51,7 +51,6 @@
 #include "arch.h"
 #include "gc.h"
 #include "interr.h"
-#include "monitor.h"
 #include "validate.h"
 #include "core.h"
 #include "save.h"
@@ -357,7 +356,7 @@ main(int argc, char *argv[], char *envp[])
     define_var("nil", NIL, 1);
     define_var("t", T, 1);
 
-    set_lossage_handler(monitor_or_something);
+    enable_lossage_handler();
 
     globals_init();
 

@@ -23,7 +23,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"
-#include "monitor.h"
 #include "thread.h"
 
 #include "genesis/static-symbols.h"
@@ -328,7 +327,7 @@ sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
 #endif
 
     fake_foreign_function_call(context);
-    monitor_or_something();
+    lose("fake_foreign_call fell through");
 }
 
 void

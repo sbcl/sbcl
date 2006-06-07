@@ -13,7 +13,8 @@
 #define _INTERR_H_
 
 extern void lose(char *fmt, ...) never_returns;
-extern void set_lossage_handler(void fun(void));
+extern void enable_lossage_handler(void);
+extern void disable_lossage_handler(void);
 extern void describe_internal_error(os_context_t *context);
 
 extern lispobj debug_print(lispobj string);

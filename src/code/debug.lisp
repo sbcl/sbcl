@@ -641,16 +641,21 @@ reset to ~S."
 ;;; halt-on-failures and prompt-on-failures modes, suitable for
 ;;; noninteractive and interactive use respectively
 (defun disable-debugger ()
+  ;; Why conditionally? Why not disable it even if user has frobbed
+  ;; this hook? We could just save the old value in case of a later
+  ;; ENABLE-DEBUGGER.
   (when (eql *invoke-debugger-hook* nil)
     ;; *DEBUG-IO* used to be set here to *ERROR-OUTPUT* which is sort
     ;; of unexpected but mostly harmless, but then ENABLE-DEBUGGER had
     ;; to set it to a suitable value again and be very careful,
     ;; especially if the user has also set it. -- MG 2005-07-15
-    (setf *invoke-debugger-hook* 'debugger-disabled-hook)))
+    (setf *invoke-debugger-hook* 'debugger-disabled-hook)
+    (sb!alien:alien-funcall (sb!alien:extern-alien "disable_lossage_handler" (function sb!alien:void)))))
 
 (defun enable-debugger ()
   (when (eql *invoke-debugger-hook* 'debugger-disabled-hook)
-    (setf *invoke-debugger-hook* nil)))
+    (setf *invoke-debugger-hook* nil)
+    (sb!alien:alien-funcall (sb!alien:extern-alien "enable_lossage_handler" (function sb!alien:void)))))
 
 (defun show-restarts (restarts s)
   (cond ((null restarts)

@@ -28,6 +28,7 @@
 #include "genesis/static-symbols.h"
 #include "genesis/vector.h"
 #include "thread.h"
+#include "monitor.h"
 
 /* the way that we shut down the system on a fatal error */
 
@@ -37,10 +38,14 @@ default_lossage_handler(void)
     exit(1);
 }
 static void (*lossage_handler)(void) = default_lossage_handler;
-void
-set_lossage_handler(void handler(void))
+
+void enable_lossage_handler(void)
 {
-    lossage_handler = handler;
+    lossage_handler = monitor_or_something;
+}
+void disable_lossage_handler(void)
+{
+    lossage_handler = default_lossage_handler;
 }
 
 void

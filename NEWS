@@ -12,6 +12,9 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
     additionally it just doesn't work in SBCL as currently
     implemented, thanks to optimizations (that are always valid for
     the other three SLOT-VALUEish functions, but not for the setter).
+  * minor incompatibale change: the :SB-LDB feature is now enabled by
+    default, and DISABLE-DEBUGGER and ENABLE-DEBUGGER also affect
+    the low-level debugger.
   * bug fix: native unparsing of pathnames with :DIRECTORY NIL failed
     with a type error. (reported by blitz_ on #lisp)
   * bug fix: unparsing logical pathnames with :NAME :WILD :TYPE NIL

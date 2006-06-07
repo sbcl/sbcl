@@ -40,7 +40,6 @@
 #include "interr.h"
 #include "lispregs.h"
 #include "runtime.h"
-#include "monitor.h"
 #include "alloc.h"
 #include "genesis/primitive-objects.h"
 
@@ -521,8 +520,9 @@ EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *exception_record,
     fflush(stderr);
 
     fake_foreign_function_call(context);
-    monitor_or_something();
+    lose("fake_foreign_function_call fell through");
 
+    /* FIXME: WTF? How are we supposed to end up here? */
     return ExceptionContinueSearch;
 }
 

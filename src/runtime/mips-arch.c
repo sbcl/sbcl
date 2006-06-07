@@ -19,7 +19,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"
-#include "monitor.h"
 
 #include "genesis/constants.h"
 

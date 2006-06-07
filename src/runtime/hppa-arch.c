@@ -23,7 +23,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"
-#include "monitor.h"
 
 void arch_init(void)
 {

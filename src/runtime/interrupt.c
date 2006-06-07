@@ -59,7 +59,6 @@
 #include "globals.h"
 #include "lispregs.h"
 #include "validate.h"
-#include "monitor.h"
 #include "gc.h"
 #include "alloc.h"
 #include "dynbind.h"
