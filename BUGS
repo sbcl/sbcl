@@ -2131,3 +2131,20 @@ WORKAROUND:
 
 401: "optimizer runaway on bad constant type specifiers in TYPEP"
   (fixed in 0.9.12.12)
+
+402: "DECLAIM DECLARATION does not inform the PCL code-walker"
+  reported by Vincent Arkesteijn:
+
+  (declaim (declaration foo))
+  (defgeneric bar (x))
+  (defmethod bar (x)
+    (declare (foo x))
+    x)
+
+  ==> WARNING: The declaration FOO is not understood by
+      SB-PCL::SPLIT-DECLARATIONS.
+      Please put FOO on one of the lists SB-PCL::*NON-VAR-DECLARATIONS*,
+      SB-PCL::*VAR-DECLARATIONS-WITH-ARG*, or
+      SB-PCL::*VAR-DECLARATIONS-WITHOUT-ARG*.
+      (Assuming it is a variable declaration without argument).
+

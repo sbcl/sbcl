@@ -1280,5 +1280,16 @@
                   (slot-value test 'x))))
   (assert (= 13 (slot-value test 'x))))
 
+;;; Using class instances as specializers, reported by Pascal Costanza, ref CLHS 7.6.2
+(defclass class-as-specializer-test ()
+   ())
+(eval `(defmethod class-as-specializer-test1 ((x ,(find-class 'class-as-specializer-test)))
+          'foo))
+(assert (eq 'foo (class-as-specializer-test1 (make-instance 'class-as-specializer-test))))
+(funcall (compile nil `(lambda ()
+                         (defmethod class-as-specializer-test2 ((x ,(find-class 'class-as-specializer-test)))
+                           'bar))))
+(assert (eq 'bar (class-as-specializer-test2 (make-instance 'class-as-specializer-test))))
+
 
 ;;;; success

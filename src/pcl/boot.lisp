@@ -604,39 +604,58 @@ bootstrapping.
          '(ignorable))
         (t
          ;; Otherwise, we can usually make Python very happy.
-         (let ((kind (info :type :kind specializer)))
-           (ecase kind
-             ((:primitive) `(type ,specializer ,parameter))
-             ((:defined)
-              (let ((class (find-class specializer nil)))
-                ;; CLASS can be null here if the user has erroneously
-                ;; tried to use a defined type as a specializer; it
-                ;; can be a non-BUILT-IN-CLASS if the user defines a
-                ;; type and calls (SETF FIND-CLASS) in a consistent
-                ;; way.
-                (when (and class (typep class 'built-in-class))
-                  `(type ,specializer ,parameter))))
-             ((:instance nil)
-              (let ((class (find-class specializer nil)))
-                (cond
-                  (class
-                   (if (typep class '(or built-in-class structure-class))
-                       `(type ,specializer ,parameter)
-                       ;; don't declare CLOS classes as parameters;
-                       ;; it's too expensive.
-                       '(ignorable)))
-                  (t
-                   ;; we can get here, and still not have a failure
-                   ;; case, by doing MOP programming like (PROGN
-                   ;; (ENSURE-CLASS 'FOO) (DEFMETHOD BAR ((X FOO))
-                   ;; ...)).  Best to let the user know we haven't
-                   ;; been able to extract enough information:
-                   (style-warn
-                    "~@<can't find type for presumed class ~S in ~S.~@:>"
-                    specializer
-                    'parameter-specializer-declaration-in-defmethod)
-                   '(ignorable)))))
-             ((:forthcoming-defclass-type) '(ignorable)))))))
+         ;;
+         ;; KLUDGE: Since INFO doesn't work right for class objects here,
+         ;; and they are valid specializers, see if the specializer is
+         ;; a named class, and use the name in that case -- otherwise
+         ;; the class instance is ok, since info will just return NIL, NIL.
+         ;;
+         ;; We still need to deal with the class case too, but at
+         ;; least #.(find-class 'integer) and integer as equivalent
+         ;; specializers with this.
+         (let* ((specializer (if (and (typep specializer 'class)
+                                      (eq specializer (find-class (class-name specializer))))
+                                 (class-name specializer)
+                                 specializer))
+                (kind (info :type :kind specializer)))
+
+           (flet ((specializer-class ()
+                    (if (typep specializer 'class)
+                        specializer
+                        (find-class specializer nil))))
+             (ecase kind
+               ((:primitive) `(type ,specializer ,parameter))
+               ((:defined)
+                (let ((class (specializer-class)))
+                  ;; CLASS can be null here if the user has erroneously
+                 ;; tried to use a defined type as a specializer; it
+                 ;; can be a non-BUILT-IN-CLASS if the user defines a
+                 ;; type and calls (SETF FIND-CLASS) in a consistent
+                 ;; way.
+                 (when (and class (typep class 'built-in-class))
+                   `(type ,specializer ,parameter))))
+              ((:instance nil)
+               (let ((class (specializer-class)))
+                 (cond
+                   (class
+                    (if (typep class '(or built-in-class structure-class))
+                        `(type ,specializer ,parameter)
+                        ;; don't declare CLOS classes as parameters;
+                        ;; it's too expensive.
+                        '(ignorable)))
+                   (t
+                    ;; we can get here, and still not have a failure
+                    ;; case, by doing MOP programming like (PROGN
+                    ;; (ENSURE-CLASS 'FOO) (DEFMETHOD BAR ((X FOO))
+                    ;; ...)).  Best to let the user know we haven't
+                    ;; been able to extract enough information:
+                    (style-warn
+                     "~@<can't find type for presumed class ~S in ~S.~@:>"
+                     specializer
+                     'parameter-specializer-declaration-in-defmethod)
+                    '(ignorable)))))
+              ((:forthcoming-defclass-type)
+               '(ignorable))))))))
 
 (defun make-method-lambda-internal (method-lambda &optional env)
   (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
