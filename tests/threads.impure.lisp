@@ -83,7 +83,8 @@
   (format o "void loop_forever() { while(1) ; }~%"))
 (sb-ext:run-program
  #-sunos "cc" #+sunos "gcc"
- (or #+(or linux freebsd sunos) '("-shared" "-o" "threads-foreign.so" "threads-foreign.c")
+ (or #+(or linux freebsd sunos) '(#+x86-64 "-fPIC"
+                                  "-shared" "-o" "threads-foreign.so" "threads-foreign.c")
      #+darwin '("-dynamiclib" "-o" "threads-foreign.so" "threads-foreign.c")
      (error "Missing shared library compilation options for this platform"))
  :search t)
