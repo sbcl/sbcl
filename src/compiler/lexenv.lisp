@@ -21,7 +21,7 @@
                            (funs vars blocks tags
                                  type-restrictions
                                  lambda cleanup handled-conditions
-                                 disabled-package-locks policy)))
+                                 disabled-package-locks %policy)))
   ;; an alist of (NAME . WHAT), where WHAT is either a FUNCTIONAL (a
   ;; local function), a DEFINED-FUN, representing an
   ;; INLINE/NOTINLINE declaration, or a list (MACRO . <function>) (a
@@ -60,8 +60,17 @@
   (handled-conditions *handled-conditions*)
   ;; lexically disabled package locks (list of symbols)
   (disabled-package-locks *disabled-package-locks*)
-  ;; the current OPTIMIZE policy
-  (policy *policy* :type policy))
+  ;; the current OPTIMIZE policy. this is null in the null environment,
+  ;; and the global policy is stored in *POLICY*. (Because we want to
+  ;; be able to affect it from :WITH-COMPILATION-UNIT.) NIL here also
+  ;; works as a convenient null-lexenv identifier.
+  (%policy nil :type policy))
+
+(defun lexenv-policy (lexenv)
+  (or (lexenv-%policy lexenv) *policy*))
+
+(defun null-lexenv-p (lexenv)
+  (not (lexenv-%policy lexenv)))
 
 ;;; support for the idiom (in MACROEXPAND and elsewhere) that NIL is
 ;;; to be taken as a null lexical environment
@@ -69,9 +78,6 @@
   (etypecase x
     (null (make-null-lexenv))
     (lexenv x)))
-
-(defun null-lexenv-p (lexenv)
-  (equalp (coerce-to-lexenv lexenv) (make-null-lexenv)))
 
 (defun print-lexenv (lexenv stream level)
   (if (null-lexenv-p lexenv)

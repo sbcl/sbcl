@@ -107,11 +107,13 @@
  ;; readtable configured so that the system sources can be read.
  ; :sb-show
 
- ;; Build SBCL with the old CMU CL low level debugger, "ldb". If are
- ;; aren't messing with SBCL at a very low level (e.g., trying to
- ;; diagnose GC problems, or trying to debug assembly code for a port
- ;; to a new CPU) you shouldn't need this.
- ; :sb-ldb
+ ;; Build SBCL with the old CMU CL low level debugger, "ldb". In the
+ ;; ideal world you would not need this unless you are messing with
+ ;; SBCL at a very low level (e.g., trying to diagnose GC problems, or
+ ;; trying to debug assembly code for a port to a new CPU). However,
+ ;; experience shows that sooner or later everyone lose()'s, in which
+ ;; case SB-LDB can at least provide an informative backtrace.
+ :sb-ldb
 
  ;; This isn't really a target Lisp feature at all, but controls
  ;; whether the build process produces an after-xc.core file. This
