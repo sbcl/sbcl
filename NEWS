@@ -12,7 +12,7 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
     additionally it just doesn't work in SBCL as currently
     implemented, thanks to optimizations (that are always valid for
     the other three SLOT-VALUEish functions, but not for the setter).
-  * minor incompatibale change: the :SB-LDB feature is now enabled by
+  * minor incompatible change: the :SB-LDB feature is now enabled by
     default, and DISABLE-DEBUGGER and ENABLE-DEBUGGER also affect
     the low-level debugger.
   * bug fix: class objects can be used as specializers in methods.
@@ -35,6 +35,10 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.641: LET-conversion were not supposed to work in late
        compilation stages.
+  * bug fix: The debugger now does a better job of respecting 
+    (PUSH '(*PRINT-CIRCLE* . T) SB-DEBUG:*DEBUG-PRINT-VARIABLE-ALIST*)
+    when printing SB-DEBUG:*DEBUG-CONDITION*. (This is a debugger-only
+    workaround for bug 403.) 
 
 changes in sbcl-0.9.13 relative to sbcl-0.9.12:
   * new feature: source path information is generated for macro-expansion

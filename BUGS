@@ -2129,9 +2129,6 @@ WORKAROUND:
   For some more details see comments for (define-alien-type-method
   (c-string :deport-gen) ...)  in host-c-call.lisp.
 
-401: "optimizer runaway on bad constant type specifiers in TYPEP"
-  (fixed in 0.9.12.12)
-
 402: "DECLAIM DECLARATION does not inform the PCL code-walker"
   reported by Vincent Arkesteijn:
 
@@ -2148,3 +2145,34 @@ WORKAROUND:
       SB-PCL::*VAR-DECLARATIONS-WITHOUT-ARG*.
       (Assuming it is a variable declaration without argument).
 
+403: FORMAT/PPRINT-LOGICAL-BLOCK of CONDITIONs ignoring *PRINT-CIRCLE*
+  In sbcl-0.9.13.34,
+    (defparameter *c*
+      (make-condition 'simple-error
+                      :format-control "ow... ~S"
+                      :format-arguments '(#1=(#1#))))
+    (setf *print-circle* t *print-level* 4)
+    (format nil "~@<~A~:@>" *c*)
+  gives
+    "ow... (((#)))"
+  where I (WHN) believe the correct result is "ow... #1=(#1#)",
+  like the result from (PRINC-TO-STRING *C*). The question of 
+  what the correct result is is complicated by the hairy text in 
+  the Hyperspec "22.3.5.2 Tilde Less-Than-Sign: Logical Block",
+    Other than the difference in its argument, ~@<...~:> is 
+    exactly the same as ~<...~:> except that circularity detection 
+    is not applied if ~@<...~:> is encountered at top level in a 
+    format string.
+  But because the odd behavior happens even without the at-sign, 
+    (format nil "~<~A~:@>" (list *c*)) ; => "ow... (((#)))"
+  and because something seemingly similar can happen even in 
+  PPRINT-LOGICAL-BLOCK invoked directly without FORMAT, 
+    (pprint-logical-block (*standard-output* '(some nonempty list))
+      (format *standard-output* "~A" '#1=(#1#)))
+  (which prints "(((#)))" to *STANDARD-OUTPUT*), I don't think 
+  that the 22.3.5.2 trickiness is fundamental to the problem.
+
+  My guess is that the problem is related to the logic around the MODE
+  argument to CHECK-FOR-CIRCULARITY, but I haven't reverse-engineered
+  enough of the intended meaning of the different MODE values to be
+  confident of this.

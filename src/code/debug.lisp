@@ -507,6 +507,21 @@ reset to ~S."
 
   (funcall-with-debug-io-syntax #'%invoke-debugger condition))
 
+(defun %print-debugger-invocation-reason (condition stream)
+  (format stream "~2&")
+  ;; Note: Ordinarily it's only a matter of taste whether to use
+  ;; FORMAT "~<...~:>" or to use PPRINT-LOGICAL-BLOCK directly, but
+  ;; until bug 403 is fixed, PPRINT-LOGICAL-BLOCK (STREAM NIL) is
+  ;; definitely preferred, because the FORMAT alternative was acting odd.
+  (pprint-logical-block (stream nil)
+    (format stream
+            "debugger invoked on a ~S~@[ in thread ~A~]: ~2I~_~A"
+            (type-of condition)
+            #!+sb-thread sb!thread:*current-thread*
+            #!-sb-thread nil
+            condition))
+  (terpri stream))
+
 (defun %invoke-debugger (condition)
 
   (let ((*debug-condition* condition)
@@ -518,13 +533,7 @@ reset to ~S."
         ;; when people redirect *ERROR-OUTPUT*, they could reasonably
         ;; expect to see error messages logged there, regardless of what
         ;; the debugger does afterwards.)
-        (format *error-output*
-                "~2&~@<debugger invoked on a ~S~@[ in thread ~A~]: ~
-                    ~2I~_~A~:@>~%"
-                (type-of *debug-condition*)
-                #!+sb-thread sb!thread:*current-thread*
-                #!-sb-thread nil
-                *debug-condition*)
+        (%print-debugger-invocation-reason condition *error-output*)
       (error (condition)
         (setf *nested-debug-condition* condition)
         (let ((ndc-type (type-of *nested-debug-condition*)))
