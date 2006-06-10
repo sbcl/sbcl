@@ -622,18 +622,6 @@
                                         :default-printer '(:name :tab reg))
   (reg     :type 'reg-b-default-qword))
 
-(sb!disassem:define-instruction-format (modrm-reg-no-width 24
-                                     :default-printer '(:name :tab reg))
-  (rex     :field (byte 4 4)    :value #b0100)
-  (wrxb    :field (byte 4 0)    :type 'wrxb)
-  (ff   :field (byte 8 8)  :value #b11111111)
-  (mod   :field (byte 2 22))
-  (modrm-reg :field (byte 3 19))
-  (reg     :field (byte 3 16)   :type 'reg-b)
-  ;; optional fields
-  (accum :type 'accum)
-  (imm))
-
 ;;; Adds a width field to reg-no-width. Note that we can't use
 ;;; :INCLUDE 'REG-NO-WIDTH here to save typing because that would put
 ;;; the WIDTH field last, but the prefilter for WIDTH must run before
@@ -1980,38 +1968,27 @@
   (:printer-list (arith-inst-printer-list #b111))
   (:emitter (emit-random-arith-inst "CMP" segment dst src #b111 t)))
 
+;;; The one-byte encodings for INC and DEC are used as REX prefixes
+;;; in 64-bit mode so we always use the two-byte form.
 (define-instruction inc (segment dst)
-  ;; Register
-  (:printer modrm-reg-no-width ((modrm-reg #b000)))
-  ;; Register/Memory
-  ;; (:printer rex-reg/mem ((op '(#b11111111 #b001))))
   (:printer reg/mem ((op '(#b1111111 #b000))))
+  (:printer rex-reg/mem ((op '(#b1111111 #b000))))
   (:emitter
    (let ((size (operand-size dst)))
      (maybe-emit-operand-size-prefix segment size)
-     (cond #+nil ; these opcodes become REX prefixes in x86-64
-           ((and (not (eq size :byte)) (register-p dst))
-            (emit-byte-with-reg segment #b01000 (reg-tn-encoding dst)))
-           (t
-            (maybe-emit-rex-for-ea segment dst nil)
-            (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
-            (emit-ea segment dst #b000))))))
+     (maybe-emit-rex-for-ea segment dst nil)
+     (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
+     (emit-ea segment dst #b000))))
 
 (define-instruction dec (segment dst)
-  ;; Register.
-  (:printer modrm-reg-no-width ((modrm-reg #b001)))
-  ;; Register/Memory
   (:printer reg/mem ((op '(#b1111111 #b001))))
+  (:printer rex-reg/mem ((op '(#b1111111 #b001))))
   (:emitter
    (let ((size (operand-size dst)))
      (maybe-emit-operand-size-prefix segment size)
-     (cond #+nil
-           ((and (not (eq size :byte)) (register-p dst))
-            (emit-byte-with-reg segment #b01001 (reg-tn-encoding dst)))
-           (t
-            (maybe-emit-rex-for-ea segment dst nil)
-            (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
-            (emit-ea segment dst #b001))))))
+     (maybe-emit-rex-for-ea segment dst nil)
+     (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
+     (emit-ea segment dst #b001))))
 
 (define-instruction neg (segment dst)
   (:printer reg/mem ((op '(#b1111011 #b011))))
