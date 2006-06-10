@@ -395,7 +395,7 @@
   (real :c-type "double" :length #!-x86-64 2 #!+x86-64 1)
   (imag :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
 
-#!+sb-lutex
+#!+(and sb-lutex sb-thread)
 (define-primitive-object (lutex
                           :lowtag other-pointer-lowtag
                           :widetag lutex-widetag

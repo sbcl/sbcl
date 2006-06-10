@@ -2925,7 +2925,7 @@ initially undefined function references:~2%")
 (defconstant new-directory-core-entry-type-code 3861)
 (defconstant initial-fun-core-entry-type-code 3863)
 (defconstant page-table-core-entry-type-code 3880)
-#!+sb-lutex
+#!+(and sb-lutex sb-thread)
 (defconstant lutex-table-core-entry-type-code 3887)
 (defconstant end-core-entry-type-code 3840)
 

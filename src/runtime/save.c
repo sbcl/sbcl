@@ -34,7 +34,7 @@
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 
-#ifdef LISP_FEATURE_SB_LUTEX
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
 #include "genesis/lutex.h"
 #endif
 

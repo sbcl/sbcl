@@ -44,12 +44,12 @@
 
 (defun make-pipe ()
   (multiple-value-bind (in out) (sb-posix:pipe)
-    (let ((input (sb-sys:make-fd-stream in 
-                                        :input t 
+    (let ((input (sb-sys:make-fd-stream in
+                                        :input t
                                         :external-format :ascii
                                         :buffering :none :name "in"))
-          (output (sb-sys:make-fd-stream out 
-                                         :output t 
+          (output (sb-sys:make-fd-stream out
+                                         :output t
                                          :external-format :ascii
                                          :buffering :none :name "out")))
       (make-two-way-stream input output))))
@@ -59,7 +59,7 @@
 (defvar *out-pipe* (make-pipe))
 (defvar *out* (make-synonym-stream '*out-pipe*))
 
-(defvar *ed* 
+(defvar *ed*
   (run-program "/bin/ed" (list *tmpfile*) :input *in* :output *out* :wait nil))
 
 (defun real-input (stream)
