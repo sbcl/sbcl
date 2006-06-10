@@ -98,6 +98,21 @@ futex_wake(int *lock_word, int n)
 
 int linux_sparc_siginfo_bug = 0;
 
+/* This variable was in real use for a few months, basically for
+ * storing autodetected information about whether the Linux
+ * installation was recent enough to support SBCL threads, and make
+ * some run-time decisions based on that. But this turned out to be
+ * unstable, so now we just flat-out refuse to start on the old installations
+ * when thread support has been compiled in.
+ *
+ * Unfortunately, in the meanwhile Slime started depending on this
+ * variable for deciding which communication style to use. So even
+ * though this variable looks unused, it shouldn't be deleted until
+ * it's no longer used in the versions of Slime that people are
+ * likely to download first. -- JES, 2006-06-07
+ */
+int linux_no_threads_p = 0;
+
 #ifdef LISP_FEATURE_SB_THREAD
 int
 isnptl (void)
