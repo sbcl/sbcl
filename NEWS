@@ -15,6 +15,11 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
   * minor incompatible change: the :SB-LDB feature is now enabled by
     default, and DISABLE-DEBUGGER and ENABLE-DEBUGGER also affect
     the low-level debugger.
+  * enchancement: RUN-PROGRAM is now able to extract the file-descriptor
+    from SYNONYM-STREAM and TWO-WAY-STEAMS provided they can be decomposed
+    down to an SB-SYS:FD-STREAM, allowing direct communication in
+    more cases. Temporary files and pipes are still used as a fallback
+    strategy.
   * bug fix: global optimization policy was not visible in LOCALLY and 
     MACROLET forms.
   * bug fix: class objects can be used as specializers in methods.

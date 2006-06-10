@@ -922,6 +922,19 @@ Common Lisp Users Manual for details about the PROCESS structure.
                                 (write-string string stream
                                               :end count)))))))))))
 
+(defun get-stream-fd (stream direction)
+  (typecase stream
+    (sb-sys:fd-stream
+     (values (sb-sys:fd-stream-fd stream) nil))
+    (synonym-stream
+     (get-stream-fd (symbol-value (synonym-stream-symbol stream)) direction))
+    (two-way-stream
+     (ecase direction
+       (:input
+        (get-stream-fd (two-way-stream-input-stream stream) direction))
+       (:output
+        (get-stream-fd (two-way-stream-output-stream stream) direction))))))
+
 ;;; Find a file descriptor to use for object given the direction.
 ;;; Returns the descriptor. If object is :STREAM, returns the created
 ;;; stream as the second value.
@@ -982,56 +995,56 @@ Common Lisp Users Manual for details about the PROCESS structure.
                    (t
                     (error "couldn't duplicate file descriptor: ~A"
                            (strerror errno)))))))
-        ((sb-sys:fd-stream-p object)
-         (values (sb-sys:fd-stream-fd object) nil))
         ((streamp object)
          (ecase direction
            (:input
-            ;; FIXME: We could use a better way of setting up
-            ;; temporary files, both here and in LOAD-FOREIGN.
-            (dotimes (count
-                       256
-                      (error "could not open a temporary file in /tmp"))
-              (let* ((name (coerce (format nil "/tmp/.run-program-~D" count)
-                                   'base-string))
-                     (fd (sb-unix:unix-open name
-                                            (logior sb-unix:o_rdwr
-                                                    sb-unix:o_creat
-                                                    sb-unix:o_excl)
-                                            #o666)))
-                (sb-unix:unix-unlink name)
-                (when fd
-                  (let ((newline (string #\Newline)))
-                    (loop
-                        (multiple-value-bind
-                              (line no-cr)
-                            (read-line object nil nil)
-                          (unless line
-                            (return))
-                          (sb-unix:unix-write
-                           fd
-                           ;; FIXME: this really should be
-                           ;; (STRING-TO-OCTETS :EXTERNAL-FORMAT ...).
-                           ;; RUN-PROGRAM should take an
-                           ;; external-format argument, which should
-                           ;; be passed down to here.  Something
-                           ;; similar should happen on :OUTPUT, too.
-                           (map '(vector (unsigned-byte 8)) #'char-code line)
-                           0 (length line))
-                          (if no-cr
-                              (return)
-                              (sb-unix:unix-write fd newline 0 1)))))
-                  (sb-unix:unix-lseek fd 0 sb-unix:l_set)
-                  (push fd *close-in-parent*)
-                  (return (values fd nil))))))
+            (or (get-stream-fd object :input)
+                ;; FIXME: We could use a better way of setting up
+                ;; temporary files
+                (dotimes (count
+                           256
+                          (error "could not open a temporary file in /tmp"))
+                  (let* ((name (coerce (format nil "/tmp/.run-program-~D" count)
+                                       'base-string))
+                         (fd (sb-unix:unix-open name
+                                                (logior sb-unix:o_rdwr
+                                                        sb-unix:o_creat
+                                                        sb-unix:o_excl)
+                                                #o666)))
+                    (sb-unix:unix-unlink name)
+                    (when fd
+                      (let ((newline (string #\Newline)))
+                        (loop
+                           (multiple-value-bind
+                                 (line no-cr)
+                               (read-line object nil nil)
+                             (unless line
+                               (return))
+                             (sb-unix:unix-write
+                              fd
+                              ;; FIXME: this really should be
+                              ;; (STRING-TO-OCTETS :EXTERNAL-FORMAT ...).
+                              ;; RUN-PROGRAM should take an
+                              ;; external-format argument, which should
+                              ;; be passed down to here.  Something
+                              ;; similar should happen on :OUTPUT, too.
+                              (map '(vector (unsigned-byte 8)) #'char-code line)
+                              0 (length line))
+                             (if no-cr
+                                 (return)
+                                 (sb-unix:unix-write fd newline 0 1)))))
+                      (sb-unix:unix-lseek fd 0 sb-unix:l_set)
+                      (push fd *close-in-parent*)
+                      (return (values fd nil)))))))
            (:output
-            (multiple-value-bind (read-fd write-fd)
-                (sb-unix:unix-pipe)
-              (unless read-fd
-                (error "couldn't create pipe: ~S" (strerror write-fd)))
-              (copy-descriptor-to-stream read-fd object cookie)
-              (push read-fd *close-on-error*)
-              (push write-fd *close-in-parent*)
-              (values write-fd nil)))))
+            (or (get-stream-fd object :output)
+                (multiple-value-bind (read-fd write-fd)
+                    (sb-unix:unix-pipe)
+                  (unless read-fd
+                    (error "couldn't create pipe: ~S" (strerror write-fd)))
+                  (copy-descriptor-to-stream read-fd object cookie)
+                  (push read-fd *close-on-error*)
+                  (push write-fd *close-in-parent*)
+                  (values write-fd nil))))))
         (t
          (error "invalid option to RUN-PROGRAM: ~S" object))))
