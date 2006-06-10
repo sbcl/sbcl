@@ -34,13 +34,16 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
   * bug fix: NAME-CHAR on an invalid symbol no longer signals an
     error (patch by Robert J. Macomber)
   * feature: TIME now displays the amount of run-time spent in GC
-  * fixed some bugs revealed by Paul Dietz' test suite:
-    ** MISC.641: LET-conversion were not supposed to work in late
-       compilation stages.
   * bug fix: The debugger now does a better job of respecting 
     (PUSH '(*PRINT-CIRCLE* . T) SB-DEBUG:*DEBUG-PRINT-VARIABLE-ALIST*)
     when printing SB-DEBUG:*DEBUG-CONDITION*. (This is a debugger-only
     workaround for bug 403.) 
+  * bug fix: floating point exception handling now works on FreeBSD
+    (thanks to NIIMI Satoshi)
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** MISC.641: LET-conversion were not supposed to work in late
+       compilation stages.
+  
 
 changes in sbcl-0.9.13 relative to sbcl-0.9.12:
   * new feature: source path information is generated for macro-expansion

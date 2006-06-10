@@ -194,7 +194,12 @@ int arch_os_thread_cleanup(struct thread *thread) {
 void
 os_restore_fp_control(os_context_t *context)
 {
+    /* FPU state is saved per context on post-KSE systems.
+     * On earlier systems, it is shared in a whole process.
+     */
+#if defined(__FreeBSD_version) && __FreeBSD_version >= 500040
     struct envxmm *ex = (struct envxmm*)(&context->uc_mcontext.mc_fpstate);
     asm ("fldcw %0" : : "m" (ex->en_cw));
+#endif
 }
 #endif
