@@ -108,7 +108,7 @@ echo "Documentation:"
 cp doc/sbcl.1 $BUILD_ROOT$MAN_DIR/man1/ && echo " man $BUILD_ROOT$MAN_DIR/man1/sbcl.1"
 
 # info
-for info in doc/manual/*.info
+for info in doc/manual/*.info doc/manual/*.info-*
 do
   cp $info $BUILD_ROOT$INFO_DIR/ \
       && echo -n " info $BUILD_ROOT$INFO_DIR/`basename $info` $BUILD_ROOT$INFO_DIR/dir" \
