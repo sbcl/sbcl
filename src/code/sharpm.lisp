@@ -303,9 +303,14 @@
   (let ((entry (assoc label *sharp-equal-alist*)))
     (if entry
         (third entry)
-        (let ((pair (assoc label *sharp-sharp-alist*)))
+        (let (;; Has this label been defined previously? (Don't read
+              ;; ANSI "2.4.8.15 Sharpsign Equal-Sign" and worry that
+              ;; it requires you to implement forward references,
+              ;; because forward references are disallowed in
+              ;; "2.4.8.16 Sharpsign Sharpsign".)
+              (pair (assoc label *sharp-sharp-alist*)))
           (unless pair
-            (%reader-error stream "object is not labelled #~S#" label))
+            (%reader-error stream "reference to undefined label #~D#" label))
           (cdr pair)))))
 
 ;;;; conditional compilation: the #+ and #- readmacros
