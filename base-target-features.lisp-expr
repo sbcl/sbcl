@@ -7,10 +7,13 @@
 ;;;;
 ;;;; Note that the recommended way to customize the features of a
 ;;;; local build of SBCL is not to edit this file, but instead to
-;;;; tweak customize-target-features.lisp. If you define a function
-;;;; in customize-target-features.lisp, it will be used to transform
-;;;; the target features list after it's read and before it's used.
-;;;; E.g. you can use code like this:
+;;;; tweak customize-target-features.lisp. (You must create this file
+;;;; first; it is not in the SBCL distribution, and is in fact
+;;;; explicitly excluded from the distribution in places like
+;;;; .cvsignore.) If you define a function in
+;;;; customize-target-features.lisp, it will be used to transform the
+;;;; target features list after it's read and before it's used. E.g.,
+;;;; you can use code like this:
 ;;;;    (lambda (list)
 ;;;;      (flet ((enable (x) (pushnew x list))
 ;;;;             (disable (x) (setf list (remove x list))))
