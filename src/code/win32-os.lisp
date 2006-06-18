@@ -24,23 +24,16 @@
   #!+sb-doc
   "Return a string describing version of the supporting software, or NIL
   if not available."
-  nil ;; FIXME: Implement.
-  #+nil(or *software-version*
-      (setf *software-version*
-            (string-trim '(#\newline)
-                         (with-output-to-string (stream)
-                           (sb!ext:run-program "/bin/uname" `("-r")
-                                               :output stream))))))
+  ;; FIXME: Implement.
+  nil)
 
-;;; Return system time, user time and number of page faults.
+;;; Return user time, system time, and number of page faults.
 (defun get-system-info ()
-#+nil  (multiple-value-bind
-      (err? utime stime maxrss ixrss idrss isrss minflt majflt)
-      (sb!unix:unix-getrusage sb!unix:rusage_self)
-    (declare (ignore maxrss ixrss idrss isrss minflt))
-    (unless err? ; FIXME: nonmnemonic (reversed) name for ERR?
-      (error "Unix system call getrusage failed: ~A." (strerror utime)))
-    (values utime stime majflt)))
+  ;; FIXME: number of page faults is always zero
+  (multiple-value-bind (creation-time exit-time kernel-time user-time)
+      (sb!win32:get-process-times)
+    (declare (ignore creation-time exit-time))
+    (values (floor user-time 10) (floor kernel-time 10) 0)))
 
 ;;; Return the system page size.
 (defun get-page-size ()

@@ -31,8 +31,6 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
   * bug fix: merging pathnames against defaults with :DIRECTORY
     starting with '(:RELATIVE :BACK) should preserve the :BACK.
     (reported by James Y Knight)
-  * improved SB-BSD-SOCKETS support on Windows. (thanks to Timothy
-    Ritchey)
   * bug fix: saving large (>2GB) cores on x86-64 now works
   * bug fix: a x86-64 backend bug when compiling (setf aref) with a 
     constant index and a (simple-array (signed-byte 32)) array
@@ -48,7 +46,9 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.641: LET-conversion were not supposed to work in late
        compilation stages.
-  
+  * improvements to the Win32/x86 port:
+    ** GET-INTERNAL-RUN-TIME implemented, thanks to Frank Buss.
+    ** improved SB-BSD-SOCKETS support, thanks to Timothy Ritchey.
 
 changes in sbcl-0.9.13 relative to sbcl-0.9.12:
   * new feature: source path information is generated for macro-expansion

@@ -673,6 +673,8 @@ void scratch(void)
     GetConsoleCP();
     GetConsoleOutputCP();
     GetExitCodeProcess(0, 0);
+    GetCurrentProcess();
+    GetProcessTimes(0, 0, 0, 0, 0);
 }
 
 char *

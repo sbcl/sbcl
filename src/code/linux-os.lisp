@@ -33,7 +33,7 @@
                            (sb!ext:run-program "/bin/uname" `("-r")
                                                :output stream))))))
 
-;;; Return system time, user time and number of page faults.
+;;; Return user time, system time, and number of page faults.
 (defun get-system-info ()
   (multiple-value-bind
       (err? utime stime maxrss ixrss idrss isrss minflt majflt)

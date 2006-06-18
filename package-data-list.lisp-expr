@@ -2358,4 +2358,6 @@ SBCL itself"
                "GET-LAST-ERROR" "GET-OSFHANDLE" "HANDLE"
                "HANDLE-CLEAR-INPUT" "HANDLE-LISTEN" "INT-PTR"
                "INVALID-HANDLE" "MILLISLEEP" "PEEK-CONSOLE-INPUT"
-               "PEEK-NAMED-PIPE" "READ-FILE" "WRITE-FILE")))
+               "PEEK-NAMED-PIPE" "READ-FILE" "WRITE-FILE"
+
+               "GET-PROCESS-TIMES")))

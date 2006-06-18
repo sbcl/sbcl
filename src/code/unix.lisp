@@ -107,26 +107,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 
 #!+win32
 (progn
-  (defconstant o_rdonly  0)
-  (defconstant o_wronly  1)
-  (defconstant o_rdwr    2)
-  (defconstant o_creat  #x100)
-  (defconstant o_trunc  #x200)
-  (defconstant o_append #x008)
-  (defconstant o_excl   #x400)
-  (defconstant enoent 2)
-  (defconstant eexist 17)
   (defconstant espipe 29)
-  (defconstant o_binary #x8000)
-  (defconstant s-ifmt #xf000)
-  (defconstant s-ifdir #x4000)
-  (defconstant s-ifreg #x8000)
-  (define-alien-type ino-t short)
-  (define-alien-type time-t long)
-  (define-alien-type off-t long)
-  (define-alien-type size-t long)
-  (define-alien-type mode-t unsigned-short)
-
   ;; For stat-wrapper hack (different-type or non-existing win32 fields).
   (define-alien-type nlink-t short)
   (define-alien-type uid-t short)
@@ -314,18 +295,21 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; value is the pipe to be read from and the second is can be written
 ;;; to. If an error occurred the first value is NIL and the second the
 ;;; unix error code.
-#!-win32(defun unix-pipe ()
+#!-win32
+(defun unix-pipe ()
   (with-alien ((fds (array int 2)))
     (syscall ("pipe" (* int))
              (values (deref fds 0) (deref fds 1))
              (cast fds (* int)))))
-#!+win32(defun msvcrt-raw-pipe (fds size mode)
-    (syscall ("_pipe" (* int) int int)
-             (values (deref fds 0) (deref fds 1))
-             (cast fds (* int)) size mode))
-#!+win32(defun unix-pipe ()
+#!+win32
+(defun msvcrt-raw-pipe (fds size mode)
+  (syscall ("_pipe" (* int) int int)
+           (values (deref fds 0) (deref fds 1))
+           (cast fds (* int)) size mode))
+#!+win32
+(defun unix-pipe ()
   (with-alien ((fds (array int 2)))
-              (msvcrt-raw-pipe fds 256 o_binary)))
+    (msvcrt-raw-pipe fds 256 o_binary)))
 
 ;; Windows mkdir() doesn't take the mode argument. It's cdecl, so we could
 ;; actually call it passing the mode argument, but some sharp-eyed reader

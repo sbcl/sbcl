@@ -18,6 +18,9 @@
 
 (defconstant micro-seconds-per-internal-time-unit
   (/ 1000000 sb!xc:internal-time-units-per-second))
+
+(defconstant 100ns-per-internal-time-unit
+  (/ 10000000 internal-time-units-per-second))
 
 ;;; The base number of seconds for our internal "epoch". We initialize
 ;;; this to the time of the first call to GET-INTERNAL-REAL-TIME, and
@@ -47,6 +50,12 @@
   #!+sb-doc
   "Return the run time in the internal time format. (See
   INTERNAL-TIME-UNITS-PER-SECOND.) This is useful for finding CPU usage."
+  ;; FIXME: This is yet another creeping malaise: instead of #+/-win32
+  ;; conditionals things like these need to be split into wholly separate
+  ;; implementations of get-internal-run-time, probably one in
+  ;; unix.lisp and one in win32.lisp -- that however requires also
+  ;; cleaning up unix.lisp sufficiently to remove it from the Windows build.
+  #-win32
   (multiple-value-bind (ignore utime-sec utime-usec stime-sec stime-usec)
       (sb!unix:unix-fast-getrusage sb!unix:rusage_self)
     (declare (ignore ignore)
@@ -62,7 +71,13 @@
                                stime-usec
                                (floor micro-seconds-per-internal-time-unit 2))
                             micro-seconds-per-internal-time-unit))))
-      result)))
+      result))
+  #!+win32
+  (multiple-value-bind
+        (creation-time exit-time kernel-time user-time)
+      (sb!win32:get-process-times)
+    (declare (ignore creation-time exit-time))
+    (values (floor (+ user-time kernel-time) 100ns-per-internal-time-unit))))
 
 ;;;; Encode and decode universal times.
 

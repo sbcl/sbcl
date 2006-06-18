@@ -158,6 +158,37 @@ main(int argc, char *argv[])
 
     defconstant ("ERROR_ENVVAR_NOT_FOUND", ERROR_ENVVAR_NOT_FOUND);
 
+    printf(";;; Windows Types\n");
+    DEFTYPE("int-ptr", INT_PTR);
+    DEFTYPE("dword",   DWORD);
+    DEFTYPE("bool",    BOOL);
+    DEFTYPE("uint",    UINT);
+
+    /* FIXME: SB-UNIX and SB-WIN32 really need to be untangled. */
+    printf("(in-package \"SB!UNIX\")\n\n");
+    printf(";;; Unix-like constants and types on Windows\n");
+    defconstant("o_rdonly", _O_RDONLY);
+    defconstant("o_wronly", _O_WRONLY);
+    defconstant("o_rdwr",   _O_RDWR);
+    defconstant("o_creat",  _O_CREAT);
+    defconstant("o_trunc",  _O_TRUNC);
+    defconstant("o_append", _O_APPEND);
+    defconstant("o_excl",   _O_EXCL);
+    defconstant("o_binary", _O_BINARY);
+
+    defconstant("enoent", ENOENT);
+    defconstant("eexist", EEXIST);
+    
+    defconstant("s-ifmt",  S_IFMT);
+    defconstant("s-ifdir", S_IFDIR);
+    defconstant("s-ifreg", S_IFREG);
+
+    DEFTYPE("ino-t",  ino_t);
+    DEFTYPE("time-t", time_t);
+    DEFTYPE("off-t",  off_t);
+    DEFTYPE("size-t", size_t);
+    DEFTYPE("mode-t", mode_t);
+
 #else
     printf("(in-package \"SB!ALIEN\")\n\n");
 
