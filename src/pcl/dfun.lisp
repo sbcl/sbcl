@@ -633,9 +633,9 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       (let ((cdc  (caching-dfun-cost gf))) ; fast
         (> cdc (dispatch-dfun-cost gf cdc))))))
 
-(defparameter *non-built-in-typep-cost* 1)
-(defparameter *structure-typep-cost* 1)
-(defparameter *built-in-typep-cost* 0)
+(defparameter *non-built-in-typep-cost* 100)
+(defparameter *structure-typep-cost*  15)
+(defparameter *built-in-typep-cost* 5)
 
 ;;; According to comments in the original CMU CL version of PCL,
 ;;; the cost LIMIT is important to cut off exponential growth for
@@ -666,9 +666,9 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
        max-cost-so-far))
    #'identity))
 
-(defparameter *cache-lookup-cost* 1)
-(defparameter *wrapper-of-cost* 0)
-(defparameter *secondary-dfun-call-cost* 1)
+(defparameter *cache-lookup-cost*  30)
+(defparameter *wrapper-of-cost* 15)
+(defparameter *secondary-dfun-call-cost* 30)
 
 (defun caching-dfun-cost (gf)
   (let ((nreq (get-generic-fun-info gf)))
@@ -678,13 +678,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
             (generic-function-methods gf))
            *secondary-dfun-call-cost*
            0))))
-
-(setq *non-built-in-typep-cost* 100)
-(setq *structure-typep-cost* 15)
-(setq *built-in-typep-cost* 5)
-(setq *cache-lookup-cost* 30)
-(setq *wrapper-of-cost* 15)
-(setq *secondary-dfun-call-cost* 30)
 
 (declaim (inline make-callable))
 (defun make-callable (gf methods generator method-alist wrappers)

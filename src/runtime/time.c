@@ -23,8 +23,8 @@ void get_timezone(time_t when, int *secwest, boolean *dst)
     struct tm ltm, gtm;
     int sw;
 
-    ltm = *localtime(&when);
-    gtm = *gmtime(&when);
+    ltm = *localtime_r(&when, &ltm);
+    gtm = *gmtime_r(&when, &gtm);
 
     sw = (((gtm.tm_hour*60)+gtm.tm_min)*60+gtm.tm_sec) - (((ltm.tm_hour*60)+ltm.tm_min)*60+ltm.tm_sec);
     if ((gtm.tm_wday + 1) % 7 == ltm.tm_wday)

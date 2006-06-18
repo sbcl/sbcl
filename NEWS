@@ -20,6 +20,8 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
     down to an SB-SYS:FD-STREAM, allowing direct communication in
     more cases. Temporary files and pipes are still used as a fallback
     strategy.
+  * thread-safety: DECODE-UNIVERSAL-TIME & GET-DECODED-TIME depended
+    on the non-reentrant C functions localtime(3) and gmtime(3).
   * bug fix: global optimization policy was not visible in LOCALLY and 
     MACROLET forms.
   * bug fix: class objects can be used as specializers in methods.

@@ -47,15 +47,18 @@
 
 #-sb-fluid (declaim (sb-ext:freeze-type pv-table))
 
-(defvar *initial-pv-table* (make-pv-table-internal nil nil))
+;;; FIXME: The comment below seem to indicate that this was intended
+;;; to be actually used, however, it isn't anymore, and was commented
+;;; out at 0.9.13.47. Also removed was code in MAKE-PV-TABLE that
+;;; pushed each new PV-TABLE onto this list. --NS 2006-06-18
+;;;
+;;;   help new slot-value-using-class methods affect fast iv access
+;;;
+;;;  (defvar *all-pv-table-list* nil)
 
-; help new slot-value-using-class methods affect fast iv access
-(defvar *all-pv-table-list* nil)
-
+(declaim (inline make-pv-table))
 (defun make-pv-table (&key slot-name-lists call-list)
-  (let ((pv-table (make-pv-table-internal slot-name-lists call-list)))
-    (push pv-table *all-pv-table-list*)
-    pv-table))
+  (make-pv-table-internal slot-name-lists call-list))
 
 (defun make-pv-table-type-declaration (var)
   `(type pv-table ,var))
@@ -79,18 +82,19 @@
                          (setq new-p t)
                          (make-pv-table :slot-name-lists snl
                                         :call-list cl))))))
-    (let ((pv-table (outer (mapcar #'inner (cons call-list slot-name-lists)))))
-      (when new-p
-        (let ((pv-index 1))
-          (dolist (slot-name-list slot-name-lists)
-            (dolist (slot-name (cdr slot-name-list))
-              (note-pv-table-reference slot-name pv-index pv-table)
-              (incf pv-index)))
-          (dolist (gf-call call-list)
-            (note-pv-table-reference gf-call pv-index pv-table)
-            (incf pv-index))
-          (setf (pv-table-pv-size pv-table) pv-index)))
-      pv-table))))
+      (let ((pv-table
+             (outer (mapcar #'inner (cons call-list slot-name-lists)))))
+        (when new-p
+          (let ((pv-index 1))
+            (dolist (slot-name-list slot-name-lists)
+              (dolist (slot-name (cdr slot-name-list))
+                (note-pv-table-reference slot-name pv-index pv-table)
+                (incf pv-index)))
+            (dolist (gf-call call-list)
+              (note-pv-table-reference gf-call pv-index pv-table)
+              (incf pv-index))
+            (setf (pv-table-pv-size pv-table) pv-index)))
+        pv-table))))
 
 (defun note-pv-table-reference (ref pv-offset pv-table)
   (let ((entry (gethash ref *pv-key-to-pv-table-table*)))
@@ -237,8 +241,6 @@
 
 (defun make-pv-type-declaration (var)
   `(type simple-vector ,var))
-
-(defvar *empty-pv* #())
 
 (defmacro pvref (pv index)
   `(svref ,pv ,index))

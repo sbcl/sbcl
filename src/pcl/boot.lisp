@@ -1363,37 +1363,12 @@ bootstrapping.
            (funcallable-instance-p (gdefinition name)))))
 
 (defvar *method-function-plist* (make-hash-table :test 'eq))
-(defvar *mf1* nil)
-(defvar *mf1p* nil)
-(defvar *mf1cp* nil)
-(defvar *mf2* nil)
-(defvar *mf2p* nil)
-(defvar *mf2cp* nil)
 
 (defun method-function-plist (method-function)
-  (unless (eq method-function *mf1*)
-    (rotatef *mf1* *mf2*)
-    (rotatef *mf1p* *mf2p*)
-    (rotatef *mf1cp* *mf2cp*))
-  (unless (or (eq method-function *mf1*) (null *mf1cp*))
-    (setf (gethash *mf1* *method-function-plist*) *mf1p*))
-  (unless (eq method-function *mf1*)
-    (setf *mf1* method-function
-          *mf1cp* nil
-          *mf1p* (gethash method-function *method-function-plist*)))
-  *mf1p*)
+  (gethash method-function *method-function-plist*))
 
-(defun (setf method-function-plist)
-    (val method-function)
-  (unless (eq method-function *mf1*)
-    (rotatef *mf1* *mf2*)
-    (rotatef *mf1cp* *mf2cp*)
-    (rotatef *mf1p* *mf2p*))
-  (unless (or (eq method-function *mf1*) (null *mf1cp*))
-    (setf (gethash *mf1* *method-function-plist*) *mf1p*))
-  (setf *mf1* method-function
-        *mf1cp* t
-        *mf1p* val))
+(defun (setf method-function-plist) (val method-function)
+  (setf (gethash method-function *method-function-plist*) val))
 
 (defun method-function-get (method-function key &optional default)
   (getf (method-function-plist method-function) key default))

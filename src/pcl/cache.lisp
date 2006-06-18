@@ -1238,4 +1238,3 @@
     ((8 16)  4)
     (otherwise 6)))
 
-(defvar *empty-cache* (make-cache)) ; for defstruct slot initial value forms

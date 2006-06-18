@@ -121,7 +121,7 @@
     (unless (zerop (peek-named-pipe handle nil 0 nil (addr avail) nil))
       (return-from handle-listen (plusp avail)))
 
-    (unless (zerop (peek-console-input handle 
+    (unless (zerop (peek-console-input handle
                                        (cast buf (* t))
                                        input-record-size (addr avail)))
       (return-from handle-listen (plusp avail)))
@@ -170,7 +170,7 @@
   (defvar *codepage-to-external-format* (make-hash-table)))
 
 #+sb-unicode
-(dolist 
+(dolist
     (cp '(;;037       IBM EBCDIC - U.S./Canada
           (437 :CP437) ;; OEM - United States
           ;;500       IBM EBCDIC - International
@@ -334,7 +334,7 @@
               (gethash (alien-funcall (extern-alien "GetACP@0" (function UINT)))
                        *codepage-to-external-format*
                        :latin-1))))
-  
+
   (declaim (ftype (function () keyword) oem-codepage))
   (defun oem-codepage ()
     (or *oem-codepage*
@@ -345,7 +345,7 @@
 
 ;; http://msdn.microsoft.com/library/en-us/dllproc/base/getconsolecp.asp
 (declaim (ftype (function () keyword) console-input-codepage))
-(defun console-input-codepage ()  
+(defun console-input-codepage ()
   (or #!+sb-unicode
       (gethash (alien-funcall (extern-alien "GetConsoleCP@0" (function UINT)))
                *codepage-to-external-format*)
@@ -355,7 +355,7 @@
 (declaim (ftype (function () keyword) console-output-codepage))
 (defun console-output-codepage ()
   (or #!+sb-unicode
-      (gethash (alien-funcall 
+      (gethash (alien-funcall
                 (extern-alien "GetConsoleOutputCP@0" (function UINT)))
                *codepage-to-external-format*)
       :latin-1))
@@ -415,7 +415,7 @@
 (defun sb!unix:posix-getcwd ()
   (with-alien ((apath (* tchar) (make-alien tchar (1+ MAX_PATH)))
                (afunc (function dword dword (* tchar))
-                      :extern 
+                      :extern
                       #!-sb-unicode "GetCurrentDirectoryA@8"
                       #!+sb-unicode "GetCurrentDirectoryW@8"))
     (let ((ret (alien-funcall afunc (1+ MAX_PATH) apath)))
@@ -469,7 +469,7 @@
     (with-alien ((aname (* tchar) (make-alien tchar (1+ name-length)))
                  (aenv (* tchar) (make-alien tchar default-environment-length))
                  (afunc (function dword (* tchar) (* tchar) dword)
-                        :extern 
+                        :extern
                         #!-sb-unicode "GetEnvironmentVariableA@12"
                         #!+sb-unicode "GetEnvironmentVariableW@12"))
       (dotimes (i name-length)
