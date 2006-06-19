@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  1.97
+;;; This is asdf: Another System Definition Facility.  1.99
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -78,6 +78,7 @@
            #:system-author
            #:system-maintainer
            #:system-license
+           #:system-licence
 
            #:operation-on-warnings
            #:operation-on-failure
@@ -109,7 +110,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "1.97")
+(defvar *asdf-revision* (let* ((v "1.99")
                                (colon (or (position #\: v) -1))
                                (dot (position #\. v)))
                           (and v colon dot
@@ -285,7 +286,8 @@ and NIL NAME and TYPE components"
     :accessor system-long-description :initarg :long-description)
    (author :accessor system-author :initarg :author)
    (maintainer :accessor system-maintainer :initarg :maintainer)
-   (licence :accessor system-licence :initarg :licence)))
+   (licence :accessor system-licence :initarg :licence
+            :accessor system-license :initarg :license)))
 
 ;;; version-satisfies
 
@@ -828,7 +830,8 @@ system."))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; invoking operations
 
-(defun operate (operation-class system &rest args &key (verbose t) version)
+(defun operate (operation-class system &rest args &key (verbose t) version
+                                &allow-other-keys)
   (let* ((op (apply #'make-instance operation-class
                     :original-initargs args
                     args))
