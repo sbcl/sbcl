@@ -2176,3 +2176,22 @@ WORKAROUND:
   argument to CHECK-FOR-CIRCULARITY, but I haven't reverse-engineered
   enough of the intended meaning of the different MODE values to be
   confident of this.
+
+404: nonstandard DWIMness in LOOP with unportably-ordered clauses
+  In sbcl-0.9.13, the code
+    (loop with stack = (make-array 2 :fill-pointer 2 :initial-element t)
+          for length = (length stack)
+          while (plusp length)
+          for element = (vector-pop stack)
+          collect element)
+  compiles without error or warning and returns (T T). Unfortunately, 
+  it is inconsistent with the ANSI definition of the LOOP macro, 
+  because it mixes up VARIABLE-CLAUSEs with MAIN-CLAUSEs. Furthermore,
+  SBCL's interpretation of the intended meaning is only one possible,
+  unportable interpretation of the noncompliant code; in CLISP 2.33.2, 
+  the code compiles with a warning
+    LOOP: FOR clauses should occur before the loop's main body
+  and then fails at runtime with 
+    VECTOR-POP: #() has length zero
+  perhaps because CLISP has shuffled the clauses into an 
+  ANSI-compliant order before proceeding.
