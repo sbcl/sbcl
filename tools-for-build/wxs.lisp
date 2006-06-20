@@ -78,13 +78,18 @@
   (loop for flag in (directory "../contrib/*/test-passed")
         collect (car (last (pathname-directory flag)))))
 
+(defvar *id-char-substitutions* '((#\\ . #\_)
+                                  (#\/ . #\_)
+                                  (#\: . #\.)
+                                  (#\- . #\.)))
+
 (defun id (string)
   ;; Mangle a string till it can be used as an Id. A-Z, a-z, 0-9, and
   ;; _ are ok, nothing else is.
-  (nsubstitute #\_ #\-
-               (nsubstitute #\. #\:
-                            (nsubstitute #\. #\/
-                                         (substitute #\. #\\ string)))))
+  (map 'string (lambda (c)
+                 (or (cdr (assoc c *id-char-substitutions*))
+                     c))
+       string))
 
 (defun directory-id (name)
   (id (format nil "Directory_~A" (enough-namestring name))))

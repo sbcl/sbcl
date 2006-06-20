@@ -23,9 +23,14 @@ cd output
   --eval '(progn 
             (write-rtf (read-text "../COPYING") "License.rtf")
             (write-wxs "sbcl.wxs")
+            (with-open-file (f "version.txt" 
+                               :direction :output
+                               :if-exists :supersede)
+             (write-line (lisp-implementation-version) f))
             (quit))'
 
 "$WIX_PATH/candle" sbcl.wxs
 "$WIX_PATH/light" sbcl.wixobj "$WIX_PATH/wixui.wixlib" \
    -loc "$WIX_PATH/WixUI_en-us.wxl" \
-   -out sbcl.msi
+   -out sbcl-`cat version.txt`.msi
+
