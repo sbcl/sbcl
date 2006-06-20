@@ -475,7 +475,7 @@ steppers to maintain contextual information.")
                (declare (type list default-init-file-names))
                (if explicitly-specified-init-file-name
                    (or (probe-file
-                        (parse-native-pathname
+                        (parse-native-namestring
                          explicitly-specified-init-file-name))
                        (startup-error "The file ~S was not found."
                                       explicitly-specified-init-file-name))

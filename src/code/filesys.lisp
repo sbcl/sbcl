@@ -569,10 +569,10 @@
 
 ;;; (This is an ANSI Common Lisp function.)
 (defun user-homedir-pathname (&optional host)
-  "Return the home directory of the user as a pathname. If the
-HOME environment variable has be specified, returns the directory
-is designated, otherwise obtains the home directory from the
-operating system."
+  "Return the home directory of the user as a pathname. If the HOME
+environment variable has been specified, the directory it designates
+is returned; otherwise obtains the home directory from the operating
+system."
   (declare (ignore host))
   (parse-native-namestring
    (ensure-trailing-slash
