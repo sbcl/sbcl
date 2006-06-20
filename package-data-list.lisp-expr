@@ -859,6 +859,7 @@ retained, possibly temporariliy, because it might be used internally."
                "MAKE-TRIVIAL-DEFAULT-PATHNAME"
                "PHYSICALIZE-PATHNAME"
                "SANE-DEFAULT-PATHNAME-DEFAULTS"
+               "SBCL-HOMEDIR-PATHNAME"
 
                ;; PCOUNTERs
                "FASTBIG-INCF-PCOUNTER-OR-FIXNUM"

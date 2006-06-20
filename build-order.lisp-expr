@@ -172,6 +172,10 @@
  ("src/code/target-error" :not-host)
 
  ("src/compiler/early-backend")
+ ;; "src/code/toplevel.lisp" si the first to need this. It's generated
+ ;; automatically by grovel_headers.c, i.e. it's not in CVS.
+ ("output/stuff-groveled-from-headers" :not-host)
+
  ;; a comment from classic CMU CL:
  ;;   "These guys can supposedly come in any order, but not really.
  ;;    Some are put at the end so that macros don't run interpreted
@@ -210,10 +214,6 @@
 
  ("src/code/string"     :not-host)
  ("src/code/mipsstrops" :not-host)
-
- ;; "src/code/unix.lisp" needs this. It's generated automatically by
- ;; grovel_headers.c, i.e. it's not in CVS.
- ("output/stuff-groveled-from-headers" :not-host)
 
  ("src/code/unix" :not-host)
  #!+win32 ("src/code/win32" :not-host)

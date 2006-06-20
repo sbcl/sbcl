@@ -402,26 +402,27 @@
             err-code
             (sb!win32::get-last-error-message err-code))))
 
-(defun get-folder-path (CSIDL)
+(defun get-folder-pathname (csidl)
   "http://msdn.microsoft.com/library/en-us/shellcc/platform/shell/reference/functions/shgetfolderpath.asp"
-  (with-alien ((apath (* tchar) (make-alien tchar (1+ MAX_PATH))))
+  (with-alien ((apath (* tchar) (make-alien tchar (1+ max_path))))
     (alien-funcall
      (extern-alien #!-sb-unicode "SHGetFolderPathA@20"
                    #!+sb-unicode "SHGetFolderPathW@20"
                    (function int handle int handle dword (* tchar)))
-     0 CSIDL 0 0 apath)
-    (concatenate 'string (ucs2->string&free apath) "\\")))
+     0 csidl 0 0 apath)
+    (parse-native-namestring
+     (concatenate 'string (ucs2->string&free apath) "\\"))))
 
 (defun sb!unix:posix-getcwd ()
-  (with-alien ((apath (* tchar) (make-alien tchar (1+ MAX_PATH)))
+  (with-alien ((apath (* tchar) (make-alien tchar (1+ max_path)))
                (afunc (function dword dword (* tchar))
                       :extern
                       #!-sb-unicode "GetCurrentDirectoryA@8"
                       #!+sb-unicode "GetCurrentDirectoryW@8"))
-    (let ((ret (alien-funcall afunc (1+ MAX_PATH) apath)))
+    (let ((ret (alien-funcall afunc (1+ max_path) apath)))
       (when (zerop ret)
         (win32-error "GetCurrentDirectory"))
-      (when (> ret (1+ MAX_PATH))
+      (when (> ret (1+ max_path))
         (free-alien apath)
         (setf apath (make-alien tchar ret))
         (alien-funcall afunc ret apath))

@@ -24,6 +24,13 @@
 extern int foreign_function_call_active;
 extern boolean stop_the_world;
 
+#ifdef LISP_FEATURE_WIN32
+#define ENVIRON _environ
+#else
+#define ENVIRON environ
+#endif
+extern char **ENVIRON;
+
 #if defined(LISP_FEATURE_SB_THREAD)
 extern pthread_key_t specials;
 #endif

@@ -23,8 +23,17 @@ void get_timezone(time_t when, int *secwest, boolean *dst)
     struct tm ltm, gtm;
     int sw;
 
+#ifdef LISP_FEATURE_WIN32
+    /* No _r versions on Windows, but the API documentation also
+     * doesn't warn them about being non-reentrant... So here's
+     * hoping they actually are -- once Windows grows threads
+     * this better be checked, though. */
+    ltm = *localtime(&when);
+    gtm = *gmtime(&when);
+#else
     ltm = *localtime_r(&when, &ltm);
     gtm = *gmtime_r(&when, &gtm);
+#endif
 
     sw = (((gtm.tm_hour*60)+gtm.tm_min)*60+gtm.tm_sec) - (((ltm.tm_hour*60)+ltm.tm_min)*60+ltm.tm_sec);
     if ((gtm.tm_wday + 1) % 7 == ltm.tm_wday)

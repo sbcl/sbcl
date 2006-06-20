@@ -555,21 +555,35 @@
         (simple-file-perror "couldn't delete ~A" namestring err))))
   t)
 
+(defun ensure-trailing-slash (string)
+  (let ((last-char (char string (1- (length string)))))
+         (if (or (eql last-char #\/)
+                 #!+win32
+                 (eql last-char #\\))
+             string
+             (concatenate 'string string "/"))))
+
+(defun sbcl-homedir-pathname ()
+  (parse-native-namestring
+   (ensure-trailing-slash (posix-getenv "SBCL_HOME"))))
+
 ;;; (This is an ANSI Common Lisp function.)
 (defun user-homedir-pathname (&optional host)
-  "Return the home directory of the user as a pathname."
+  "Return the home directory of the user as a pathname. If the
+HOME environment variable has be specified, returns the directory
+is designated, otherwise obtains the home directory from the
+operating system."
   (declare (ignore host))
-  #!-win32
-  (pathname (sb!unix:uid-homedir (sb!unix:unix-getuid)))
-  #!+win32
-  (pathname (if (posix-getenv "HOME")
-                (let* ((path (posix-getenv "HOME"))
-                       (last-char (char path (1- (length path)))))
-                  (if (or (char= last-char #\/)
-                          (char= last-char #\\))
-                      path
-                    (concatenate 'string path "/")))
-              (sb!win32::get-folder-path 40)))) ;;SB-WIN32::CSIDL_PROFILE
+  (parse-native-namestring
+   (ensure-trailing-slash
+    (if (posix-getenv "HOME")
+        (posix-getenv "HOME")
+        #!-win32
+        (sb!unix:uid-homedir (sb!unix:unix-getuid))
+        #!+win32
+        ;; Needs to bypass PARSE-NATIVE-NAMESTRING & ENSURE-TRAILING-SLASH
+        (return-from user-homedir-pathname
+          (sb!win32::get-folder-pathname sb!win32::csidl_profile))))))
 
 (defun file-write-date (file)
   #!+sb-doc

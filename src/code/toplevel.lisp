@@ -474,37 +474,29 @@ steppers to maintain contextual information.")
                                 &rest default-init-file-names)
                (declare (type list default-init-file-names))
                (if explicitly-specified-init-file-name
-                   (or (probe-file explicitly-specified-init-file-name)
-                        (startup-error "The file ~S was not found."
-                                       explicitly-specified-init-file-name))
+                   (or (probe-file
+                        (parse-native-pathname
+                         explicitly-specified-init-file-name))
+                       (startup-error "The file ~S was not found."
+                                      explicitly-specified-init-file-name))
                    (find-if (lambda (x)
-                              (and (stringp x) (probe-file x)))
-                            default-init-file-names)))
-             ;; shared idiom for creating default names for
-             ;; SYSINITish and USERINITish files
-             (init-file-name (maybe-dir-name basename)
-               (and maybe-dir-name
-                    (concatenate 'string maybe-dir-name "/" basename))))
+                              (and (pathnamep x) (probe-file x)))
+                            default-init-file-names))))
         (let ((sysinit-truename
-               #!-win32 (probe-init-files sysinit
-                                          (init-file-name (posix-getenv "SBCL_HOME")
-                                                          "sbclrc")
-                                          "/etc/sbclrc")
-               #!+win32 (probe-init-files sysinit
-                                          (init-file-name (posix-getenv "SBCL_HOME")
-                                                          "sbclrc")
-                                          (concatenate 'string
-                                                       (sb!win32::get-folder-path 35) ;;SB-WIN32::CSIDL_COMMON_APPDATA
-                                                       "\\sbcl\\sbclrc")))
-
-               (userinit-truename
-                #!-win32 (probe-init-files userinit
-                                           (init-file-name (posix-getenv "HOME")
-                                                           ".sbclrc"))
-                #!+win32 (probe-init-files userinit
-                                           (init-file-name (namestring (user-homedir-pathname))
-                                                           ".sbclrc"))))
-
+               (probe-init-files sysinit
+                                 (merge-pathnames (sbcl-homedir-pathname)
+                                                  "sbclrc")
+                                 #!-win32
+                                 "/etc/sbclrc"
+                                 #!+win32
+                                 (merge-pathnames
+                                  (sb!win32::get-folder-pathname
+                                   sb!win32::csidl_common_appdata)
+                                  "\\sbcl\\sbclrc")))
+              (userinit-truename
+               (probe-init-files userinit
+                                 (merge-pathnames (user-homedir-pathname)
+                                                  ".sbclrc"))))
           ;; This CATCH is needed for the debugger command TOPLEVEL to
           ;; work.
           (catch 'toplevel-catcher
