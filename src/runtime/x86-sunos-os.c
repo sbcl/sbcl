@@ -27,7 +27,6 @@
 
 #ifdef LISP_FEATURE_SB_THREAD
 pthread_mutex_t modify_ldt_lock = PTHREAD_MUTEX_INITIALIZER;
-#endif
 
 static int
 ldt_index_selector (int index) {
@@ -90,6 +89,7 @@ install_segment (unsigned long start, unsigned long size) {
 
     return selector;
 }
+#endif
 
 int arch_os_thread_init(struct thread *thread) {
   stack_t sigstack;
