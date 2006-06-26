@@ -271,20 +271,20 @@ main(int argc, char *argv[], char *envp[])
                 /* As in "--help" case, I think this is expected. */
                 print_version();
                 exit(0);
-	    } else if (0 == strcmp(arg, "--debug-environment")) {
-		int n = 0;
-		printf("; Commandline arguments:\n");
-		while (n < argc) {
-		    printf(";  %2d: \"%s\"\n", n, argv[n]);
-		    ++n;
-		}
-		n = 0;
-		printf(";\n; Environment:\n");
-		while (ENVIRON[n]) {
-		    printf(";  %2d: \"%s\"\n", n, ENVIRON[n]);
-		    ++n;
-		}
-		++argi;
+            } else if (0 == strcmp(arg, "--debug-environment")) {
+                int n = 0;
+                printf("; Commandline arguments:\n");
+                while (n < argc) {
+                    printf(";  %2d: \"%s\"\n", n, argv[n]);
+                    ++n;
+                }
+                n = 0;
+                printf(";\n; Environment:\n");
+                while (ENVIRON[n]) {
+                    printf(";  %2d: \"%s\"\n", n, ENVIRON[n]);
+                    ++n;
+                }
+                ++argi;
             } else if (0 == strcmp(arg, "--end-runtime-options")) {
                 end_runtime_options = 1;
                 ++argi;
