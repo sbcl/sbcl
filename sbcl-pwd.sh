@@ -5,7 +5,7 @@
 
 sbcl_pwd() {
     if [ "$OSTYPE" = "cygwin" ] ; then
-	SBCL_PWD=`cygpath -m $a(pwd)`
+	SBCL_PWD=`cygpath -m $(pwd)`
     else
 	SBCL_PWD=`pwd`
     fi
