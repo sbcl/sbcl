@@ -1282,9 +1282,13 @@
 
 (defun pprint-fun-call (stream list &rest noise)
   (declare (ignore noise))
-  (funcall (formatter "~:<~^~W~^ ~:_~:I~@{~W~^ ~_~}~:>")
+  (funcall (formatter "~:<~^~W~^ ~:_~:I~@{~W~^ ~:_~}~:>")
            stream
            list))
+
+(defun pprint-data-list (stream list &rest noise)
+  (declare (ignore noise))
+  (funcall (formatter "~:<~@{~W~^ ~:_~}~:>") stream list))
 
 ;;;; the interface seen by regular (ugly) printer and initialization routines
 
@@ -1302,8 +1306,10 @@
     ;; printers for regular types
     (/show0 "doing SET-PPRINT-DISPATCH for regular types")
     (set-pprint-dispatch 'array #'pprint-array)
-    (set-pprint-dispatch '(cons symbol)
+    (set-pprint-dispatch '(cons (and symbol (satisfies fboundp)))
                          #'pprint-fun-call -1)
+    (set-pprint-dispatch '(cons symbol)
+                         #'pprint-data-list -2)
     (set-pprint-dispatch 'cons #'pprint-fill -2)
     ;; cons cells with interesting things for the car
     (/show0 "doing SET-PPRINT-DISPATCH for CONS with interesting CAR")

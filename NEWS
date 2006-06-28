@@ -1,4 +1,10 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-0.9.15 relative to sbcl-0.9.14:
+  * minor incompatible change: pretty printing of objects of type
+    (cons symbol) is, in the default pprint-dispatch-table, now
+    sensitive to whether the symbol satisfies FBOUNDP.  (thanks to
+    Marcus Pearce)
+
 changes in sbcl-0.9.14 relative to sbcl-0.9.13:
   * feature: thread support on Solaris/x86, and experimental thread support
     on OS X/x86.
