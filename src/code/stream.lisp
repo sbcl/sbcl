@@ -157,9 +157,24 @@
     (t
      (let ((res (funcall (ansi-stream-misc stream) stream :file-position nil)))
        (when res
+         #!-sb-unicode
          (- res
             (- +ansi-stream-in-buffer-length+
-               (ansi-stream-in-index stream))))))))
+               (ansi-stream-in-index stream)))
+         #!+sb-unicode
+         (let* ((external-format (stream-external-format stream))
+                (ef-entry (find-external-format external-format))
+                (variable-width-p (variable-width-external-format-p ef-entry))
+                (char-len (bytes-for-char-fun ef-entry)))
+           (- res
+              (if variable-width-p
+                  (loop with buffer = (ansi-stream-cin-buffer stream)
+                        with start = (ansi-stream-in-index stream)
+                        for i from start below +ansi-stream-in-buffer-length+
+                        sum (funcall char-len (aref buffer i)))
+                  (* (funcall char-len #\x)  ; arbitrary argument
+                     (- +ansi-stream-in-buffer-length+
+                        (ansi-stream-in-index stream)))))))))))
 
 
 (defun file-position (stream &optional position)

@@ -4,6 +4,8 @@ changes in sbcl-0.9.15 relative to sbcl-0.9.14:
     (cons symbol) is, in the default pprint-dispatch-table, now
     sensitive to whether the symbol satisfies FBOUNDP.  (thanks to
     Marcus Pearce)
+  * fixed bug: FILE-POSITION sometimes returned inconsistent results
+    for multibyte external-format streams (thanks to "vbzoli")
 
 changes in sbcl-0.9.14 relative to sbcl-0.9.13:
   * feature: thread support on Solaris/x86, and experimental thread support

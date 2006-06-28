@@ -258,8 +258,7 @@
 
 ;;; See sbcl-devel "Subject: Bug in FILE-POSITION on UTF-8-encoded files"
 ;;; by Lutz Euler on 2006-03-05 for more details.
-(with-test (:name (:file-position :utf-8)
-                  :fails-on :sbcl)
+(with-test (:name (:file-position :utf-8))
   (let ((path "external-format-test.txt"))
     (with-open-file (s path
                        :direction :output

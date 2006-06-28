@@ -1001,6 +1001,16 @@
     (when sizer
       (loop for char across string summing (funcall sizer char)))))
 
+(defun find-external-format (external-format)
+  (when external-format
+    (find external-format *external-formats* :test #'member :key #'car)))
+
+(defun variable-width-external-format-p (ef-entry)
+  (when (eighth ef-entry) t))
+
+(defun bytes-for-char-fun (ef-entry)
+  (if ef-entry (symbol-function (ninth ef-entry)) (constantly 1)))
+
 ;;; FIXME: OAOOM here vrt. *EXTERNAL-FORMAT-FUNCTIONS* in fd-stream.lisp
 (defmacro define-external-format (external-format size output-restart
                                   out-expr in-expr)
