@@ -13,7 +13,7 @@ b=${1:?"missing base directory name argument"}
 tar -cf $b-binary.tar \
     $b/output/sbcl.core $b/src/runtime/sbcl \
     $b/BUGS $b/COPYING $b/CREDITS $b/INSTALL $b/NEWS $b/README $b/SUPPORT \
-    $b/install.sh $b/find-gnumake.sh \
+    $b/install.sh $b/find-gnumake.sh $b/sbcl-pwd.sh \
     $b/doc/sbcl.1 \
     $b/pubring.pgp \
     $b/contrib/asdf-module.mk \
