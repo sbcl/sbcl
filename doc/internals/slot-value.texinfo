@@ -191,5 +191,5 @@ closures implementing this optimization: 3 (@code{slot-value},
 slots.)
 
 (Also note that this optimization depends on not being able to
-specialize the @code{new-value} argument to @{(setf
+specialize the @code{new-value} argument to @code{(setf
 slot-value-using-class)}.)
