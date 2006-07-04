@@ -216,6 +216,8 @@
 ;;; debugger is having a bad day
 (defvar *instance*)
 
+(declaim (optimize (debug 2)))
+
 (defmacro test-variant (defstructname &key colontype boa-constructor-p)
   `(progn
 
@@ -644,8 +646,8 @@
 (catch :ok
   (handler-bind ((error (lambda (c)
                           ;; Used to cause stack-exhaustion
-                          (unless (typep c 'storege-condition)
-                            (throw :ok)))))
+                          (unless (typep c 'storage-condition)
+                            (throw :ok t)))))
     (eval '(progn
             (defstruct foo a)
             (setf (find-class 'foo) nil)
