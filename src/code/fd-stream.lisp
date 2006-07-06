@@ -325,6 +325,7 @@
                      (intern (format nil name-fmt (string (car buffering))))))
                 `(progn
                    (defun ,function (stream byte)
+                     (declare (ignorable byte))
                      (output-wrapper/variable-width (stream ,size ,buffering ,restart)
                        ,@body))
                    (setf *output-routines*
@@ -752,6 +753,7 @@
                                                       ,stream-var)
                                                      (fd-stream-ibuf-head
                                                       ,stream-var))))
+                               (declare (ignorable byte))
                                (setq size ,bytes)
                                (input-at-least ,stream-var size)
                                (setq ,element-var (locally ,@read-forms))
@@ -1144,6 +1146,7 @@
          (size-function (symbolicate "BYTES-FOR-CHAR/" name)))
     `(progn
       (defun ,size-function (byte)
+        (declare (ignorable byte))
         ,out-size-expr)
       (defun ,out-function (stream string flush-p start end)
         (let ((start (or start 0))
@@ -1228,6 +1231,7 @@
               (setf decode-break-reason
                     (block decode-break-reason
                       (let ((byte (sap-ref-8 sap head)))
+                        (declare (ignorable byte))
                         (setq size ,in-size-expr)
                         (when (> size (- tail head))
                           (return))
@@ -1272,6 +1276,7 @@
                                                            ,in-size-expr
                                                            sap head)
         (let ((byte (sap-ref-8 sap head)))
+          (declare (ignorable byte))
           ,in-expr))
       (defun ,resync-function (stream)
         (loop (input-at-least stream 2)
@@ -1281,6 +1286,7 @@
                                (head (fd-stream-ibuf-head stream))
                                (byte (sap-ref-8 sap head))
                                (size ,in-size-expr))
+                          (declare (ignorable byte))
                           (input-at-least stream size)
                           (let ((sap (fd-stream-ibuf-sap stream))
                                 (head (fd-stream-ibuf-head stream)))

@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.15 relative to sbcl-0.9.14:
+  * added support for the ucs-2 external format (contributed by Ivan     Boldyrev)
   * minor incompatible change: pretty printing of objects of type
     (cons symbol) is, in the default pprint-dispatch-table, now
     sensitive to whether the symbol satisfies FBOUNDP.  (thanks to
