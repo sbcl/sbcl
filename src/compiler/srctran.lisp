@@ -114,6 +114,20 @@
 (define-source-transform ninth (x) `(nth 8 ,x))
 (define-source-transform tenth (x) `(nth 9 ,x))
 
+;;; LIST with one arg is an extremely common operation (at least inside
+;;; SBCL itself); translate it to CONS to take advantage of common
+;;; allocation routines.
+(define-source-transform list (&rest args)
+  (case (length args)
+    (1 `(cons ,(first args) nil))
+    (t (values nil t))))
+
+;;; And similarly for LIST*.
+(define-source-transform list* (&rest args)
+  (case (length args)
+    (2 `(cons ,(first args) ,(second args)))
+    (t (values nil t))))
+
 ;;; Translate RPLACx to LET and SETF.
 (define-source-transform rplaca (x y)
   (once-only ((n-x x))

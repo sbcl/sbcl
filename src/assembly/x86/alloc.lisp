@@ -65,3 +65,23 @@
   (with-fixed-allocation (ebx bignum-widetag (+ bignum-digits-offset 1))
     (storew eax ebx bignum-digits-offset other-pointer-lowtag))
   (inst ret))
+
+#+sb-assembling
+(defun frob-allocation-assembly-routine (obj lowtag arg-tn)
+  `(define-assembly-routine (,(intern (format nil "ALLOCATE-~A-TO-~A" obj arg-tn)))
+     ((:temp ,arg-tn descriptor-reg ,(intern (format nil "~A-OFFSET" arg-tn))))
+     (pseudo-atomic
+      (allocation ,arg-tn (pad-data-block ,(intern (format nil "~A-SIZE" obj))))
+      (inst lea ,arg-tn (make-ea :byte :base ,arg-tn :disp ,lowtag))
+      (inst ret))))
+
+#+sb-assembling
+(macrolet ((frob-cons-routines ()
+             (let ((routines nil))
+               (dolist (tn-offset *dword-regs*
+                        `(progn ,@routines))
+                 (push (frob-allocation-assembly-routine 'cons
+                                                         list-pointer-lowtag
+                                                         (intern (aref *dword-register-names* tn-offset)))
+                       routines)))))
+  (frob-cons-routines))

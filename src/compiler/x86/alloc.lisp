@@ -247,14 +247,32 @@
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 50
-    (pseudo-atomic
-     (allocation result (pad-data-block words) node)
-     (inst lea result (make-ea :byte :base result :disp lowtag))
-     (when type
-       (storew (logior (ash (1- words) n-widetag-bits) type)
-               result
-               0
-               lowtag)))))
+    ;; We special case the allocation of conses, because they're
+    ;; extremely common and because the pseudo-atomic sequence on x86
+    ;; is relatively heavyweight.  However, if the user asks for top
+    ;; speed, we accomodate him.  The primary reason that we don't
+    ;; also check for (< SPEED SPACE) is because we want the space
+    ;; savings that these out-of-line allocation routines bring whilst
+    ;; compiling SBCL itself.  --njf, 2006-07-08
+    (if (and (= lowtag list-pointer-lowtag) (policy node (< speed 3)))
+        (let ((dst
+               #.(loop for offset in *dword-regs*
+                    collect `(,offset
+                              ',(intern (format nil "ALLOCATE-CONS-TO-~A"
+                                                (svref *dword-register-names*
+                                                       offset)))) into cases
+                    finally (return `(case (tn-offset result)
+                                       ,@cases)))))
+          (aver (null type))
+          (inst call (make-fixup dst :assembly-routine)))
+        (pseudo-atomic
+         (allocation result (pad-data-block words) node)
+         (inst lea result (make-ea :byte :base result :disp lowtag))
+         (when type
+           (storew (logior (ash (1- words) n-widetag-bits) type)
+                   result
+                   0
+                   lowtag))))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
@@ -277,5 +295,3 @@
      (allocation result bytes node)
      (inst lea result (make-ea :byte :base result :disp lowtag))
      (storew header result 0 lowtag))))
-
-
