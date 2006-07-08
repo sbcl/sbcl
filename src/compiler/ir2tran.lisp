@@ -46,13 +46,8 @@
 
 ;;; Allocate an indirect value cell. Maybe do some clever stack
 ;;; allocation someday.
-;;;
-;;; FIXME: DO-MAKE-VALUE-CELL is a bad name, since it doesn't make
-;;; clear what's the distinction between it and the MAKE-VALUE-CELL
-;;; VOP, and since the DO- further connotes iteration, which has
-;;; nothing to do with this. Clearer, more systematic names, anyone?
 (defevent make-value-cell-event "Allocate heap value cell for lexical var.")
-(defun do-make-value-cell (node block value res)
+(defun emit-make-value-cell (node block value res)
   (event make-value-cell-event node)
   (vop make-value-cell node block value res))
 
@@ -714,7 +709,7 @@
             (let ((src (lvar-tn node block arg))
                   (dest (leaf-info var)))
               (if (lambda-var-indirect var)
-                  (do-make-value-cell node block src dest)
+                  (emit-make-value-cell node block src dest)
                   (emit-move node block src dest)))))
         (lambda-vars fun) (basic-combination-args node))
   (values))
@@ -748,7 +743,7 @@
              ((lambda-var-indirect var)
               (let ((temp
                      (make-normal-tn *backend-t-primitive-type*)))
-                (do-make-value-cell node block actual temp)
+                (emit-make-value-cell node block actual temp)
                 (temps temp)))
              ((member actual (locs))
               (let ((temp (make-normal-tn (tn-primitive-type loc))))
@@ -1140,7 +1135,7 @@
             (let ((pass (standard-arg-location n))
                   (home (leaf-info arg)))
               (if (lambda-var-indirect arg)
-                  (do-make-value-cell node block pass home)
+                  (emit-make-value-cell node block pass home)
                   (emit-move node block pass home))))
           (incf n))))
 
@@ -1261,7 +1256,7 @@
             (when (leaf-refs var)
               (let ((dest (leaf-info var)))
                 (if (lambda-var-indirect var)
-                    (do-make-value-cell node block src dest)
+                    (emit-make-value-cell node block src dest)
                     (emit-move node block src dest)))))
           (lvar-tns node block lvar
                             (mapcar (lambda (x)
@@ -1520,7 +1515,7 @@
     (ecase kind
       ((:block :tagbody)
        (if (nlx-info-safe-p info)
-           (do-make-value-cell node block res (ir2-nlx-info-home 2info))
+           (emit-make-value-cell node block res (ir2-nlx-info-home 2info))
            (emit-move node block res (ir2-nlx-info-home 2info))))
       (:unwind-protect
        (vop set-unwind-protect node block block-tn))

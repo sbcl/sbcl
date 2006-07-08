@@ -32,7 +32,7 @@
          name offset lowtag)
     (move-lvar-result node block (list value-tn) (node-lvar node))))
 
-(defun do-inits (node block name result lowtag inits args)
+(defun emit-inits (node block name result lowtag inits args)
   (let ((unbound-marker-tn nil))
     (dolist (init inits)
       (let ((kind (car init))
@@ -55,7 +55,7 @@
              name slot lowtag))))
   (aver (null args)))
 
-(defun do-fixed-alloc (node block name words type lowtag result)
+(defun emit-fixed-alloc (node block name words type lowtag result)
   (vop fixed-alloc node block name words type lowtag result))
 
 (defoptimizer ir2-convert-fixed-allocation
@@ -64,8 +64,8 @@
          (locs (lvar-result-tns lvar
                                         (list *backend-t-primitive-type*)))
          (result (first locs)))
-    (do-fixed-alloc node block name words type lowtag result)
-    (do-inits node block name result lowtag inits args)
+    (emit-fixed-alloc node block name words type lowtag result)
+    (emit-inits node block name result lowtag inits args)
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-variable-allocation
@@ -76,10 +76,10 @@
          (result (first locs)))
     (if (constant-lvar-p extra)
         (let ((words (+ (lvar-value extra) words)))
-          (do-fixed-alloc node block name words type lowtag result))
+          (emit-fixed-alloc node block name words type lowtag result))
         (vop var-alloc node block (lvar-tn node block extra) name words
              type lowtag result))
-    (do-inits node block name result lowtag inits args)
+    (emit-inits node block name result lowtag inits args)
     (move-lvar-result node block locs lvar)))
 
 ;;; :SET-TRANS (in objdef.lisp DEFINE-PRIMITIVE-OBJECT) doesn't quite
