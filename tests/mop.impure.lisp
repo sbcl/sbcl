@@ -198,6 +198,7 @@
                                :name 'y
                                :allocation :instance))))
 (defclass dummy-ctais () ((x :allocation :class)))
+(finalize-inheritance (find-class 'class-to-add-instance-slot))
 (assert (equal (mapcar #'slot-definition-allocation
                        (class-slots (find-class 'class-to-add-instance-slot)))
                ;; FIXME: is the order really guaranteed?
@@ -225,6 +226,7 @@
                                :name 'y
                                :allocation :class))))
 (defclass dummy-ctacs () ((x :allocation :class)))
+(finalize-inheritance (find-class 'class-to-add-class-slot))
 (assert (equal (mapcar #'slot-definition-allocation
                        (class-slots (find-class 'class-to-add-class-slot)))
                '(:class :class)))
