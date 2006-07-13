@@ -1290,6 +1290,15 @@
                          (defmethod class-as-specializer-test2 ((x ,(find-class 'class-as-specializer-test)))
                            'bar))))
 (assert (eq 'bar (class-as-specializer-test2 (make-instance 'class-as-specializer-test))))
-
+
+;;; CHANGE-CLASS and tricky allocation.
+(defclass foo ()
+  ((a :allocation :class :initform 1)))
+(defclass bar (foo) ())
+(defvar *bar* (make-instance 'bar))
+(defclass baz ()
+  ((a :allocation :instance :initform 2)))
+(change-class *bar* 'baz)
+(assert (= (slot-value *bar* 'a) 1))
 
 ;;;; success

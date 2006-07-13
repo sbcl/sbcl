@@ -1,12 +1,16 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.15 relative to sbcl-0.9.14:
-  * added support for the ucs-2 external format (contributed by Ivan     Boldyrev)
+  * added support for the ucs-2 external format.  (contributed by Ivan
+    Boldyrev)
   * minor incompatible change: pretty printing of objects of type
     (cons symbol) is, in the default pprint-dispatch-table, now
     sensitive to whether the symbol satisfies FBOUNDP.  (thanks to
     Marcus Pearce)
   * fixed bug: FILE-POSITION sometimes returned inconsistent results
-    for multibyte external-format streams (thanks to "vbzoli")
+    for multibyte external-format streams.  (thanks to "vbzoli")
+  * fixed bug: CHANGE-CLASS would fail to preserve the values of slots
+    with :ALLOCATION :CLASS inherited from superclasses of the
+    original class.
 
 changes in sbcl-0.9.14 relative to sbcl-0.9.13:
   * feature: thread support on Solaris/x86, and experimental thread support
