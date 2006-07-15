@@ -1660,6 +1660,20 @@
     (move ecx count)
     (inst sar result :cl)))
 
+(define-vop (digit-ashr/c)
+  (:translate sb!bignum:%ashr)
+  (:policy :fast-safe)
+  (:args (digit :scs (unsigned-reg unsigned-stack) :target result))
+  (:arg-types unsigned-num (:constant (integer 0 31)))
+  (:info count)
+  (:results (result :scs (unsigned-reg) :from (:argument 0)
+                    :load-if (not (and (sc-is result unsigned-stack)
+                                       (location= digit result)))))
+  (:result-types unsigned-num)
+  (:generator 1
+    (move result digit)
+    (inst sar result count)))
+
 (define-vop (digit-lshr digit-ashr)
   (:translate sb!bignum:%digit-logical-shift-right)
   (:generator 1
