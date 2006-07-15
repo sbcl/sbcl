@@ -591,12 +591,26 @@ returns the thread exits."
          (real-function (coerce function 'function))
          (initial-function
           (lambda ()
-            ;; in time we'll move some of the binding presently done in C
-            ;; here too
+            ;; In time we'll move some of the binding presently done in C
+            ;; here too.
+            ;;
+            ;; KLUDGE: Here we have a magic list of variables that are
+            ;; not thread-safe for one reason or another.  As people
+            ;; report problems with the thread safety of certain
+            ;; variables, (e.g. "*print-case* in multiple threads
+            ;; broken", sbcl-devel 2006-07-14), we add a few more
+            ;; bindings here.  The Right Thing is probably some variant
+            ;; of Allegro's *cl-default-special-bindings*, as that is at
+            ;; least accessible to users to secure their own libraries.
+            ;;   --njf, 2006-07-15
             (let ((*current-thread* thread)
                   (sb!kernel::*restart-clusters* nil)
                   (sb!kernel::*handler-clusters* nil)
                   (sb!kernel::*condition-restarts* nil)
+                  ;; internal printer variables
+                  (sb!impl::*previous-case* nil)
+                  (sb!impl::*previous-readtable-case* nil)
+                  (sb!impl::*internal-symbol-output-fun* nil)
                   (sb!impl::*descriptor-handlers* nil)) ; serve-event
               (setf (thread-os-thread thread) (current-thread-sap-id))
               (with-mutex (*all-threads-lock*)
