@@ -280,11 +280,15 @@
      (let ((bignum (gen-label))
            (done (gen-label)))
        (inst mov y x)
-       (inst shl y 1)
-       (inst jmp :o bignum)
-       (inst shl y 1)
-       (inst jmp :o bignum)
-       (inst shl y 1)
+       ;; We can't do the overflow check with SHL Y, 3, since the
+       ;; state of the overflow flag is only reliably set when
+       ;; shifting by 1. There used to be code here for doing "shift
+       ;; by one, check whether it overflowed" three times. But on all
+       ;; x86-64 processors IMUL is a reasonably fast instruction, so
+       ;; we can just do a straight multiply instead of trying to
+       ;; optimize it to a shift. This is both faster and smaller.
+       ;; -- JES, 2006-07-08
+       (inst imul y 8)
        (inst jmp :o bignum)
        (emit-label done)
 
