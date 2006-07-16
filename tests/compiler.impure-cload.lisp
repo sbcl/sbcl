@@ -490,3 +490,12 @@
         (add-prime candidate))))
   ;;
   (init-table))
+
+;;; Bug in the fopcompiler's handling of LOCALLY pre-0.9.14.8
+
+(defvar *a* 1)
+
+(setf *a*
+      (locally
+          (declare)
+        2))

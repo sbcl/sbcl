@@ -108,7 +108,7 @@
                            (every #'fopcompilable-p (cdr args))))
                      ;; Likewise for LOCALLY
                      ((locally)
-                      (every #'fopcompilable-p (cdr args)))
+                      (every #'fopcompilable-p args))
                      (otherwise
                       ;; ordinary function calls
                       (and (symbolp operator)
