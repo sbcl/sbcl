@@ -1473,6 +1473,10 @@ NIL is returned when no such class exists."
               (let ((layout (classoid-layout (find-classoid name))))
                 (dolist (code codes)
                   (setf (svref res code) layout)))))))
+  (setq *null-classoid-layout*
+        (locally
+            (declare (notinline find-classoid))
+          (classoid-layout (find-classoid 'null))))
   #-sb-xc-host (/show0 "done setting *BUILT-IN-CLASS-CODES*"))
 
 (!defun-from-collected-cold-init-forms !classes-cold-init)

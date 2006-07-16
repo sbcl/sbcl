@@ -125,13 +125,16 @@
          ;; Note: was #.((CLASS-LAYOUT (SB!XC:FIND-CLASS 'NULL))).
          ;; I (WHN 19990209) replaced this with an expression evaluated at
          ;; run time in order to make it easier to build the cross-compiler.
-         ;; If it doesn't work, something else will be needed..
-         (locally
-           ;; KLUDGE: In order to really make this run at run time
-           ;; (instead of doing some weird broken thing at cold load
-           ;; time), we need to suppress a DEFTRANSFORM.. -- WHN 19991004
-           (declare (notinline find-classoid))
-           (classoid-layout (find-classoid 'null))))
+         ;;
+         ;; KLUDGE: Since there's a DEFTRANSFORM for FIND-CLASSOID on
+         ;; constant names which creates non-cold-loadable code, we
+         ;; can't just use (CLASSOID-LAYOUT (FIND-CLASSOID 'NULL))
+         ;; here. The original (WHN 19991004) solution was to locally
+         ;; notinline FIND-CLASSOID. However, the full call to
+         ;; FIND-CLASSOID caused suboptimal register allocation in PCL
+         ;; dfuns. So instead we now use a special variable which is
+         ;; initialized during cold init. -- JES, 2006-07-04
+         *null-classoid-layout*)
         (t (svref *built-in-class-codes* (widetag-of x)))))
 
 #!-sb-fluid (declaim (inline classoid-of))
