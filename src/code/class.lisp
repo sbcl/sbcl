@@ -1474,8 +1474,11 @@ NIL is returned when no such class exists."
                 (dolist (code codes)
                   (setf (svref res code) layout)))))))
   (setq *null-classoid-layout*
-        (locally
-            (declare (notinline find-classoid))
+        ;; KLUDGE: we use (LET () ...) instead of a LOCALLY here to
+        ;; work around a bug in the LOCALLY handling in the fopcompiler
+        ;; (present in 0.9.13-0.9.14.18). -- JES, 2006-07-16
+        (let ()
+          (declare (notinline find-classoid))
           (classoid-layout (find-classoid 'null))))
   #-sb-xc-host (/show0 "done setting *BUILT-IN-CLASS-CODES*"))
 
