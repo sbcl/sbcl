@@ -247,11 +247,11 @@
              (unsigned-reg
               (inst or old value)))
            (inst rol old :cl)
-           (mov (make-ea :qword :base object :index word-index
-                          :scale n-word-bytes
-                          :disp (- (* vector-data-offset n-word-bytes)
-                                   other-pointer-lowtag))
-                old)
+           (inst mov (make-ea :qword :base object :index word-index
+                              :scale n-word-bytes
+                              :disp (- (* vector-data-offset n-word-bytes)
+                                       other-pointer-lowtag))
+                 old)
            (sc-case value
              (immediate
               (inst mov result (tn-value value)))
