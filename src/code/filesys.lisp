@@ -564,8 +564,11 @@
              (concatenate 'string string "/"))))
 
 (defun sbcl-homedir-pathname ()
-  (parse-native-namestring
-   (ensure-trailing-slash (posix-getenv "SBCL_HOME"))))
+  (let ((sbcl-home (posix-getenv "SBCL_HOME")))
+    ;; SBCL_HOME isn't set for :EXECUTABLE T embedded cores
+    (when sbcl-home
+      (parse-native-namestring
+       (ensure-trailing-slash sbcl-home)))))
 
 ;;; (This is an ANSI Common Lisp function.)
 (defun user-homedir-pathname (&optional host)

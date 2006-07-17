@@ -484,8 +484,9 @@ steppers to maintain contextual information.")
                             default-init-file-names))))
         (let ((sysinit-truename
                (probe-init-files sysinit
-                                 (merge-pathnames (sbcl-homedir-pathname)
-                                                  "sbclrc")
+                                 (let ((sbcl-homedir (sbcl-homedir-pathname)))
+                                   (when sbcl-homedir
+                                     (merge-pathnames sbcl-homedir "sbclrc")))
                                  #!-win32
                                  "/etc/sbclrc"
                                  #!+win32
