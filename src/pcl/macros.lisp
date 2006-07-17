@@ -157,21 +157,39 @@
          (with-single-package-locked-error
              (:symbol name "using ~A as the class-name argument in ~
                            (SETF FIND-CLASS)"))
-         (let ((cell (find-class-cell name)))
+         (let* ((cell (find-class-cell name))
+                (class (find-class-cell-class cell)))
            (setf (find-class-cell-class cell) new-value)
-           (when (and (eq *boot-state* 'complete) (null new-value))
-             (setf (find-classoid name) nil))
+           (when (eq *boot-state* 'complete)
+             (if (null new-value)
+                 (progn
+                   (setf (find-classoid name) new-value)
+                   (when class
+                     ;; KLUDGE: This horror comes about essentially
+                     ;; because we use the proper name of a classoid
+                     ;; to do TYPEP, which needs to be available
+                     ;; early, and also to determine whether TYPE-OF
+                     ;; should return the name or the class (using
+                     ;; CLASSOID-PROPER-NAME).  So if we are removing
+                     ;; proper nameness, arrange for
+                     ;; CLASSOID-PROPER-NAME to do the right thing
+                     ;; too.  (This is almost certainly not the right
+                     ;; solution; instead, CLASSOID-NAME and
+                     ;; FIND-CLASSOID should be direct parallels to
+                     ;; CLASS-NAME and FIND-CLASS, and TYPEP on
+                     ;; not-yet-final classes should be compileable.
+                     (let ((classoid (layout-classoid (slot-value class 'wrapper))))
+                       (setf (classoid-name classoid) nil))))
+
+                 (let ((classoid (layout-classoid (slot-value new-value 'wrapper))))
+                   (setf (find-classoid name) classoid)
+                   (set-class-type-translation new-value classoid))))
            (when (or (eq *boot-state* 'complete)
                      (eq *boot-state* 'braid))
              (update-ctors 'setf-find-class :class new-value :name name))
            new-value))
         (t
          (error "~S is not a legal class name." name))))
-
-(/show "pcl/macros.lisp 230")
-
-(defun find-wrapper (symbol)
-  (class-wrapper (find-class symbol)))
 
 (/show "pcl/macros.lisp 241")
 

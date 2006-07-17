@@ -1064,14 +1064,18 @@
 (load "package-ctor-bug.lisp")
 (assert (= (package-ctor-bug:test) 3))
 
-(deftype defined-type () 'integer)
-(assert (raises-error?
-         (defmethod method-on-defined-type ((x defined-type)) x)))
-(deftype defined-type-and-class () 'integer)
-(setf (find-class 'defined-type-and-class) (find-class 'integer))
-(defmethod method-on-defined-type-and-class ((x defined-type-and-class))
-  (1+ x))
-(assert (= (method-on-defined-type-and-class 3) 4))
+(with-test (:name (:defmethod (setf find-class) integer))
+  (mapcar #'eval
+          '(
+            (deftype defined-type () 'integer)
+            (assert (raises-error?
+                     (defmethod method-on-defined-type ((x defined-type)) x)))
+            (deftype defined-type-and-class () 'integer)
+            (setf (find-class 'defined-type-and-class) (find-class 'integer))
+            (defmethod method-on-defined-type-and-class
+                ((x defined-type-and-class))
+              (1+ x))
+            (assert (= (method-on-defined-type-and-class 3) 4)))))
 
 ;; bug 281
 (let ((sb-pcl::*max-emf-precomputation-methods* 0))
@@ -1292,13 +1296,28 @@
 (assert (eq 'bar (class-as-specializer-test2 (make-instance 'class-as-specializer-test))))
 
 ;;; CHANGE-CLASS and tricky allocation.
-(defclass foo ()
+(defclass foo-to-be-changed ()
   ((a :allocation :class :initform 1)))
-(defclass bar (foo) ())
-(defvar *bar* (make-instance 'bar))
-(defclass baz ()
+(defclass bar-to-be-changed (foo-to-be-changed) ())
+(defvar *bar-to-be-changed* (make-instance 'bar-to-be-changed))
+(defclass baz-to-be-changed ()
   ((a :allocation :instance :initform 2)))
-(change-class *bar* 'baz)
-(assert (= (slot-value *bar* 'a) 1))
+(change-class *bar-to-be-changed* 'baz-to-be-changed)
+(assert (= (slot-value *bar-to-be-changed* 'a) 1))
+
+;;; proper name and class redefinition
+(defvar *to-be-renamed1* (defclass to-be-renamed1 () ()))
+(defvar *to-be-renamed2* (defclass to-be-renamed2 () ()))
+(setf (find-class 'to-be-renamed1) (find-class 'to-be-renamed2))
+(defvar *renamed1* (defclass to-be-renamed1 () ()))
+(assert (not (eq *to-be-renamed1* *to-be-renamed2*)))
+(assert (not (eq *to-be-renamed1* *renamed1*)))
+(assert (not (eq *to-be-renamed2* *renamed1*)))
+
+;;; CLASS-NAME (and various other standardized generic functions) have
+;;; their effective methods precomputed; in the process of rearranging
+;;; (SETF FIND-CLASS) and FINALIZE-INHERITANCE, this broke.
+(defclass class-with-odd-class-name-method ()
+  ((a :accessor class-name)))
 
 ;;;; success

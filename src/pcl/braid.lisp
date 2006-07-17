@@ -613,38 +613,43 @@
 ;;; Set the inherits from CPL, and register the layout. This actually
 ;;; installs the class in the Lisp type system.
 (defun update-lisp-class-layout (class layout)
-  (let ((lclass (layout-classoid layout)))
-    (unless (eq (classoid-layout lclass) layout)
+  (let ((classoid (layout-classoid layout))
+        (olayout (class-wrapper class)))
+    (unless (eq (classoid-layout classoid) layout)
       (setf (layout-inherits layout)
-              (order-layout-inherits
-               (map 'simple-vector #'class-wrapper
-                    (reverse (rest (class-precedence-list class))))))
+            (order-layout-inherits
+             (map 'simple-vector #'class-wrapper
+                  (reverse (rest (class-precedence-list class))))))
       (register-layout layout :invalidate t)
 
-      ;; Subclasses of formerly forward-referenced-class may be
-      ;; unknown to CL:FIND-CLASS and also anonymous. This
-      ;; functionality moved here from (SETF FIND-CLASS).
+      ;; FIXME: I don't think this should be necessary, but without it
+      ;; we are unable to compile (TYPEP foo '<class-name>) in the
+      ;; same file as the class is defined.  If we had environments,
+      ;; then I think the classsoid whould only be associated with the
+      ;; name in that environment...  Alternatively, fix the compiler
+      ;; so that TYPEP foo '<class-name> is slow but compileable.
       (let ((name (class-name class)))
-        (setf (find-classoid name) lclass
-              (classoid-name lclass) name)))))
+        (when (and name (symbolp name) (eq name (classoid-name classoid)))
+          (setf (find-classoid name) classoid))))))
 
-(defun set-class-type-translation (class name)
-  (let ((classoid (find-classoid name nil)))
-    (etypecase classoid
-      (null)
-      (built-in-classoid
-       (let ((translation (built-in-classoid-translation classoid)))
-         (cond
-           (translation
-            (aver (ctype-p translation))
-            (setf (info :type :translator class)
-                  (lambda (spec) (declare (ignore spec)) translation)))
-           (t
-            (setf (info :type :translator class)
-                  (lambda (spec) (declare (ignore spec)) classoid))))))
-      (classoid
-       (setf (info :type :translator class)
-             (lambda (spec) (declare (ignore spec)) classoid))))))
+(defun set-class-type-translation (class classoid)
+  (when (not (typep classoid 'classoid))
+    (setq classoid (find-classoid classoid nil)))
+  (etypecase classoid
+    (null)
+    (built-in-classoid
+     (let ((translation (built-in-classoid-translation classoid)))
+       (cond
+         (translation
+          (aver (ctype-p translation))
+          (setf (info :type :translator class)
+                (lambda (spec) (declare (ignore spec)) translation)))
+         (t
+          (setf (info :type :translator class)
+                (lambda (spec) (declare (ignore spec)) classoid))))))
+    (classoid
+     (setf (info :type :translator class)
+           (lambda (spec) (declare (ignore spec)) classoid)))))
 
 (clrhash *find-class*)
 (!bootstrap-meta-braid)

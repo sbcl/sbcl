@@ -480,5 +480,10 @@
              ()
              (:metaclass funcallable-standard-class))
            (make-instance 'bad-funcallable-standard-class))))
-
+
+;;; we should be able to make classes with silly names
+(make-instance 'standard-class :name 3)
+(defclass foo () ())
+(reinitialize-instance (find-class 'foo) :name '(a b))
+
 ;;;; success

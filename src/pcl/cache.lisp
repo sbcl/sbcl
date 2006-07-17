@@ -268,7 +268,9 @@
                         (aver (eq (classoid-pcl-class found) class))
                         found))
                      (t
-                      (make-standard-classoid :pcl-class class))))
+                      (let ((name (slot-value class 'name)))
+                        (make-standard-classoid :pcl-class class
+                                                :name (and (symbolp name) name))))))
               (t
                (make-random-pcl-classoid :pcl-class class))))))
     (t

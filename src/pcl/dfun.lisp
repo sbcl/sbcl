@@ -1509,21 +1509,30 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (defun cpl-or-nil (class)
   (if (eq *boot-state* 'complete)
-      ;; KLUDGE: why not use (slot-boundp class
-      ;; 'class-precedence-list)?  Well, unfortunately, CPL-OR-NIL is
-      ;; used within COMPUTE-APPLICABLE-METHODS, including for
-      ;; SLOT-BOUNDP-USING-CLASS... and the available mechanism for
-      ;; breaking such nasty cycles in effective method computation
-      ;; only works for readers and writers, not boundps.  It might
-      ;; not be too hard to make it work for BOUNDP accessors, but in
-      ;; the meantime we use an extra slot for exactly the result of
-      ;; the SLOT-BOUNDP that we want.  (We cannot use
-      ;; CLASS-FINALIZED-P, because in the process of class
-      ;; finalization we need to use the CPL which has been computed
-      ;; to cache effective methods for slot accessors.) -- CSR,
-      ;; 2004-09-19.
-      (when (cpl-available-p class)
-        (class-precedence-list class))
+      (progn
+        ;; KLUDGE: why not use (slot-boundp class
+        ;; 'class-precedence-list)?  Well, unfortunately, CPL-OR-NIL is
+        ;; used within COMPUTE-APPLICABLE-METHODS, including for
+        ;; SLOT-BOUNDP-USING-CLASS... and the available mechanism for
+        ;; breaking such nasty cycles in effective method computation
+        ;; only works for readers and writers, not boundps.  It might
+        ;; not be too hard to make it work for BOUNDP accessors, but in
+        ;; the meantime we use an extra slot for exactly the result of
+        ;; the SLOT-BOUNDP that we want.  (We cannot use
+        ;; CLASS-FINALIZED-P, because in the process of class
+        ;; finalization we need to use the CPL which has been computed
+        ;; to cache effective methods for slot accessors.) -- CSR,
+        ;; 2004-09-19.
+
+        (when (cpl-available-p class)
+          (return-from cpl-or-nil (class-precedence-list class)))
+
+        ;; if we can finalize an unfinalized class, then do so
+        (when (and (not (class-finalized-p class))
+                   (not (class-has-a-forward-referenced-superclass-p class)))
+          (finalize-inheritance class)
+          (class-precedence-list class)))
+
       (early-class-precedence-list class)))
 
 (defun saut-and (specl type)

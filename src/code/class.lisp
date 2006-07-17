@@ -772,7 +772,18 @@ NIL is returned when no such class exists."
 
      (remhash name *forward-referenced-layouts*)
      (%note-type-defined name)
-     (setf (info :type :kind name) :instance)
+     ;; we need to handle things like
+     ;;   (setf (find-class 'foo) (find-class 'integer))
+     ;; and
+     ;;   (setf (find-class 'integer) (find-class 'integer))
+     (cond
+       ((built-in-classoid-p new-value)
+        (setf (info :type :kind name) (or (info :type :kind name) :defined))
+        (let ((translation (built-in-classoid-translation new-value)))
+          (when translation
+            (setf (info :type :translator name)
+                  (lambda (c) (declare (ignore c)) translation)))))
+       (t (setf (info :type :kind name) :instance)))
      (setf (classoid-cell-classoid (find-classoid-cell name)) new-value)
      (unless (eq (info :type :compiler-layout name)
                  (classoid-layout new-value))
@@ -809,6 +820,33 @@ NIL is returned when no such class exists."
 
 (!define-type-class classoid)
 
+;;; We might be passed classoids with invalid layouts; in any pairwise
+;;; class comparison, we must ensure that both are valid before
+;;; proceeding.
+(defun ensure-classoid-valid (classoid layout)
+  (aver (eq classoid (layout-classoid layout)))
+  (when (layout-invalid layout)
+    (if (typep classoid 'standard-classoid)
+        (let ((class (classoid-pcl-class classoid)))
+          (cond
+            ((sb!pcl:class-finalized-p class)
+             (sb!pcl::force-cache-flushes class))
+            ((sb!pcl::class-has-a-forward-referenced-superclass-p class)
+             (error "Invalid, unfinalizeable class ~S (classoid ~S)."
+                    class classoid))
+            (t (sb!pcl:finalize-inheritance class))))
+        (error "Don't know how to ensure validity of ~S (not ~
+                a STANDARD-CLASSOID)." classoid))))
+
+(defun ensure-both-classoids-valid (class1 class2)
+  (do ((layout1 (classoid-layout class1) (classoid-layout class1))
+       (layout2 (classoid-layout class2) (classoid-layout class2))
+       (i 0 (+ i 1)))
+      ((and (not (layout-invalid layout1)) (not (layout-invalid layout2))))
+    (aver (< i 2))
+    (ensure-classoid-valid class1 layout1)
+    (ensure-classoid-valid class2 layout2)))
+
 ;;; Simple methods for TYPE= and SUBTYPEP should never be called when
 ;;; the two classes are equal, since there are EQ checks in those
 ;;; operations.
@@ -818,6 +856,7 @@ NIL is returned when no such class exists."
 
 (!define-type-method (classoid :simple-subtypep) (class1 class2)
   (aver (not (eq class1 class2)))
+  (ensure-both-classoids-valid class1 class2)
   (let ((subclasses (classoid-subclasses class2)))
     (if (and subclasses (gethash class1 subclasses))
         (values t t)
@@ -841,6 +880,7 @@ NIL is returned when no such class exists."
 
 (!define-type-method (classoid :simple-intersection2) (class1 class2)
   (declare (type classoid class1 class2))
+  (ensure-both-classoids-valid class1 class2)
   (cond ((eq class1 class2)
          class1)
         ;; If one is a subclass of the other, then that is the

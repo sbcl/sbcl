@@ -176,21 +176,23 @@
 ;;; Test whether OBJ-LAYOUT is from an instance of CLASSOID.
 (defun classoid-typep (obj-layout classoid object)
   (declare (optimize speed))
-  (when (layout-invalid obj-layout)
-    (if (and (typep (classoid-of object) 'standard-classoid) object)
-        (setq obj-layout (sb!pcl::check-wrapper-validity object))
-        (error "TYPEP was called on an obsolete object (was class ~S)."
-               (classoid-proper-name (layout-classoid obj-layout)))))
-  (let ((layout (classoid-layout classoid))
-        (obj-inherits (layout-inherits obj-layout)))
-    (when (layout-invalid layout)
-      (error "The class ~S is currently invalid." classoid))
-    (or (eq obj-layout layout)
-        (dotimes (i (length obj-inherits) nil)
-          (when (eq (svref obj-inherits i) layout)
-            (return t))))))
-
-;;; This implementation is a placeholder to use until PCL is set up,
-;;; at which time it will be overwritten by a real implementation.
-(defun sb!pcl::check-wrapper-validity (object)
-  object)
+  (multiple-value-bind (obj-layout layout)
+      (do ((layout (classoid-layout classoid) (classoid-layout classoid))
+           (i 0 (+ i 1))
+           (obj-layout obj-layout))
+          ((and (not (layout-invalid obj-layout))
+                (not (layout-invalid layout)))
+           (values obj-layout layout))
+        (aver (< i 2))
+        (when (layout-invalid obj-layout)
+          (if (typep (classoid-of object) 'standard-classoid)
+              (setq obj-layout (sb!pcl::check-wrapper-validity object))
+              (error "~S was called on an obsolete object (classoid ~S)."
+                     'typep
+                     (classoid-proper-name (layout-classoid obj-layout)))))
+        (ensure-classoid-valid classoid layout))
+    (let ((obj-inherits (layout-inherits obj-layout)))
+      (or (eq obj-layout layout)
+          (dotimes (i (length obj-inherits) nil)
+            (when (eq (svref obj-inherits i) layout)
+              (return t)))))))

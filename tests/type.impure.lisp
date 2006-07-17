@@ -486,5 +486,18 @@
   (assert-t-t (subtypep `(and (member ,misc-629c)
                           sb-kernel:instance)
                         nil)))
-
+
+;;; this was broken during the FINALIZE-INHERITANCE rearrangement; the
+;;; MAKE-INSTANCE finalizes the superclass, thus invalidating the
+;;; subclass, so SUBTYPEP must be prepared to deal with
+(defclass ansi-tests-defclass1 () ())
+(defclass ansi-tests-defclass3 (ansi-tests-defclass1) ())
+(make-instance 'ansi-tests-defclass1)
+(assert-t-t (subtypep 'ansi-tests-defclass3 'standard-object))
+
+;;; so was this
+(let ((class (eval '(defclass to-be-type-ofed () ()))))
+  (setf (find-class 'to-be-type-ofed) nil)
+  (assert (eq (type-of (make-instance class)) class)))
+
 ;;; success

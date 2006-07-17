@@ -45,7 +45,8 @@
 (defmethod allocate-instance
            ((class funcallable-standard-class) &rest initargs)
   (declare (ignore initargs))
-  (unless (class-finalized-p class) (finalize-inheritance class))
+  (unless (class-finalized-p class)
+    (finalize-inheritance class))
   (allocate-funcallable-instance (class-wrapper class)))
 
 (defmethod make-reader-method-function ((class funcallable-standard-class)

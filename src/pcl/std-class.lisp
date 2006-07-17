@@ -310,6 +310,7 @@
 (defmethod ensure-class-using-class ((class null) name &rest args &key)
   (multiple-value-bind (meta initargs)
       (ensure-class-values class args)
+    #+nil
     (set-class-type-translation (class-prototype meta) name)
     (setf class (apply #'make-instance meta :name name initargs))
     (without-package-locks
@@ -334,8 +335,7 @@
          (error "~S is not a class or a legal class name." s))
         (t
          (or (find-class s nil)
-             (make-instance 'forward-referenced-class
-                            :name s)))))
+             (ensure-class s :metaclass 'forward-referenced-class)))))
 
 (defun ensure-class-values (class initargs)
   (let (metaclass metaclassp reversed-plist)
@@ -450,19 +450,18 @@
     (without-package-locks
      (unless (class-finalized-p class)
        (let ((name (class-name class)))
-         (setf (find-class name) class)
          ;; KLUDGE: This is fairly horrible.  We need to make a
          ;; full-fledged CLASSOID here, not just tell the compiler that
          ;; some class is forthcoming, because there are legitimate
          ;; questions one can ask of the type system, implemented in
          ;; terms of CLASSOIDs, involving forward-referenced classes. So.
-         (when (and (eq *boot-state* 'complete)
-                    (null (find-classoid name nil)))
-           (setf (find-classoid name)
-                 (make-standard-classoid :name name)))
-         (set-class-type-translation class name)
-         (let ((layout (make-wrapper 0 class))
-               (classoid (find-classoid name)))
+         (let ((classoid (or (let ((layout (slot-value class 'wrapper)))
+                               (when layout (layout-classoid layout)))
+                             #+nil
+                             (find-classoid name nil)
+                             (make-standard-classoid
+                              :name (if (symbolp name) name nil))))
+               (layout (make-wrapper 0 class)))
            (setf (layout-classoid layout) classoid)
            (setf (classoid-pcl-class classoid) class)
            (setf (slot-value class 'wrapper) layout)
@@ -472,8 +471,8 @@
                     (map 'simple-vector #'class-wrapper
                          (reverse (rest cpl))))))
            (register-layout layout :invalidate t)
-           (setf (classoid-layout classoid) layout)
-           (mapc #'make-preliminary-layout (class-direct-subclasses class))))))))
+           (setf (classoid-layout classoid) layout))))
+     (mapc #'make-preliminary-layout (class-direct-subclasses class)))))
 
 
 (defmethod shared-initialize :before ((class class) slot-names &key name)
@@ -784,35 +783,17 @@
 ;;; This is called by :after shared-initialize whenever a class is initialized
 ;;; or reinitialized. The class may or may not be finalized.
 (defun update-class (class finalizep)
-  ;; Comment from Gerd Moellmann:
-  ;;
-  ;; Note that we can't simply delay the finalization when CLASS has
-  ;; no forward referenced superclasses because that causes bootstrap
-  ;; problems.
   (without-package-locks
-   (when (and (not finalizep)
-              (not (class-finalized-p class))
-              (not (class-has-a-forward-referenced-superclass-p class)))
-     (finalize-inheritance class)
-     (dolist (sub (class-direct-subclasses class))
-       (update-class sub nil))
-     (return-from update-class))
-   (when (or finalizep (class-finalized-p class)
-             (not (class-has-a-forward-referenced-superclass-p class)))
-     (setf (find-class (class-name class)) class)
+   (when (or finalizep (class-finalized-p class))
      (update-cpl class (compute-class-precedence-list class))
      ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
-     ;; class.  The hoops above are to ensure that FINALIZE-INHERITANCE
-     ;; is called at finalization, so that MOP programmers can hook
-     ;; into the system as described in "Class Finalization Protocol"
-     ;; (section 5.5.2 of AMOP).
+     ;; class.
      (update-slots class (compute-slots class))
      (update-gfs-of-class class)
      (update-initargs class (compute-default-initargs class))
      (update-ctors 'finalize-inheritance :class class))
-   (unless finalizep
-     (dolist (sub (class-direct-subclasses class))
-       (update-class sub nil)))))
+   (dolist (sub (class-direct-subclasses class))
+     (update-class sub nil))))
 
 (define-condition cpl-protocol-violation (reference-condition error)
   ((class :initarg :class :reader cpl-protocol-violation-class)
@@ -1276,15 +1257,19 @@
   (let* ((owrapper (class-wrapper class))
          (nwrapper (make-wrapper (wrapper-no-of-instance-slots owrapper)
                                  class)))
-      (setf (wrapper-instance-slots-layout nwrapper)
-            (wrapper-instance-slots-layout owrapper))
-      (setf (wrapper-class-slots nwrapper)
-            (wrapper-class-slots owrapper))
-      (with-pcl-lock
+    (unless (class-finalized-p class)
+      (if (class-has-a-forward-referenced-superclass-p class)
+          (return-from make-instances-obsolete class)
+          (update-cpl class (compute-class-precedence-list class))))
+    (setf (wrapper-instance-slots-layout nwrapper)
+          (wrapper-instance-slots-layout owrapper))
+    (setf (wrapper-class-slots nwrapper)
+          (wrapper-class-slots owrapper))
+    (with-pcl-lock
         (update-lisp-class-layout class nwrapper)
-        (setf (slot-value class 'wrapper) nwrapper)
-        (invalidate-wrapper owrapper :obsolete nwrapper)
-        class)))
+      (setf (slot-value class 'wrapper) nwrapper)
+      (invalidate-wrapper owrapper :obsolete nwrapper)
+      class)))
 
 (defmethod make-instances-obsolete ((class symbol))
   (make-instances-obsolete (find-class class))
@@ -1430,6 +1415,8 @@
 
 (defmethod change-class ((instance standard-object) (new-class standard-class)
                          &rest initargs)
+  (unless (class-finalized-p new-class)
+    (finalize-inheritance new-class))
   (let ((cpl (class-precedence-list new-class)))
     (dolist (class cpl)
       (macrolet

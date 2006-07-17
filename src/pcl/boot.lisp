@@ -2025,6 +2025,12 @@ bootstrapping.
             (error "The :GENERIC-FUNCTION-CLASS argument (~S) was neither a~%~
                     class nor a symbol that names a class."
                    ,gf-class)))
+     (unless (class-finalized-p ,gf-class)
+       (if (class-has-a-forward-referenced-superclass-p ,gf-class)
+           ;; FIXME: reference MOP documentation -- this is an
+           ;; additional requirement on our users
+           (error "The generic function class ~S is not finalizeable" ,gf-class)
+           (finalize-inheritance ,gf-class)))
      (remf ,all-keys :generic-function-class)
      (remf ,all-keys :environment)
      (let ((combin (getf ,all-keys :method-combination '.shes-not-there.)))

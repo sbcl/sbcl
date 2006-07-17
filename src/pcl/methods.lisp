@@ -974,19 +974,20 @@
                (set-structure-svuc-method type method)))))))
 
 (defun mec-all-classes-internal (spec precompute-p)
-  (unless (invalid-wrapper-p (class-wrapper (specializer-class spec)))
-    (cons (specializer-class spec)
-          (and (classp spec)
-               precompute-p
-               (not (or (eq spec *the-class-t*)
-                        (eq spec *the-class-slot-object*)
-                        (eq spec *the-class-standard-object*)
-                        (eq spec *the-class-structure-object*)))
-               (let ((sc (class-direct-subclasses spec)))
-                 (when sc
-                   (mapcan (lambda (class)
-                             (mec-all-classes-internal class precompute-p))
-                           sc)))))))
+  (let ((wrapper (class-wrapper (specializer-class spec))))
+    (unless (or (not wrapper) (invalid-wrapper-p wrapper))
+      (cons (specializer-class spec)
+            (and (classp spec)
+                 precompute-p
+                 (not (or (eq spec *the-class-t*)
+                          (eq spec *the-class-slot-object*)
+                          (eq spec *the-class-standard-object*)
+                          (eq spec *the-class-structure-object*)))
+                 (let ((sc (class-direct-subclasses spec)))
+                   (when sc
+                     (mapcan (lambda (class)
+                               (mec-all-classes-internal class precompute-p))
+                             sc))))))))
 
 (defun mec-all-classes (spec precompute-p)
   (let ((classes (mec-all-classes-internal spec precompute-p)))
@@ -1023,17 +1024,22 @@
          (default '(default)))
     (flet ((add-class-list (classes)
              (when (or (null new-class) (memq new-class classes))
-               (let ((wrappers (get-wrappers-from-classes
-                                nkeys wrappers classes metatypes)))
-                 (when (and wrappers
-                            (eq default (probe-cache cache wrappers default)))
+               (let ((%wrappers (get-wrappers-from-classes
+                                 nkeys wrappers classes metatypes)))
+                 (when (and %wrappers
+                            (eq default (probe-cache cache %wrappers default)))
                    (let ((value (cond ((eq valuep t)
                                        (sdfun-for-caching generic-function
                                                           classes))
                                       ((eq valuep :constant-value)
                                        (value-for-caching generic-function
                                                           classes)))))
-                     (setq cache (fill-cache cache wrappers value))))))))
+                     ;; need to get them again, as finalization might
+                     ;; have happened in between, which would
+                     ;; invalidate wrappers.
+                     (let ((wrappers (get-wrappers-from-classes
+                                      nkeys wrappers classes metatypes)))
+                       (setq cache (fill-cache cache wrappers value)))))))))
       (if classes-list
           (mapc #'add-class-list classes-list)
           (dolist (method (generic-function-methods generic-function))
@@ -1590,7 +1596,9 @@
 
 (defmethod (setf class-name) (new-value class)
   (let ((classoid (%wrapper-classoid (class-wrapper class))))
-    (setf (classoid-name classoid) new-value))
+    (if (and new-value (symbolp new-value))
+        (setf (classoid-name classoid) new-value)
+        (setf (classoid-name classoid) nil)))
   (reinitialize-instance class :name new-value)
   new-value)
 
