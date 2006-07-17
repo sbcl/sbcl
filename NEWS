@@ -6,11 +6,19 @@ changes in sbcl-0.9.15 relative to sbcl-0.9.14:
     (cons symbol) is, in the default pprint-dispatch-table, now
     sensitive to whether the symbol satisfies FBOUNDP.  (thanks to
     Marcus Pearce)
+  * minor incompatible change: SB-MOP:FINALIZE-INHERITANCE is now
+    called later in a class's lifetime, possibly as late as when the
+    first instance of the class is created.  Previously,
+    SB-MOP:FINALIZE-INHERITANCE was called by the system as soon as a
+    class became finalizeable.
   * fixed bug: FILE-POSITION sometimes returned inconsistent results
     for multibyte external-format streams.  (thanks to "vbzoli")
   * fixed bug: CHANGE-CLASS would fail to preserve the values of slots
     with :ALLOCATION :CLASS inherited from superclasses of the
     original class.
+  * fixed bug: anonymous classes can now be created using the :NAME
+    initarg and MAKE-INSTANCE / REINITIALIZE-INSTANCE, as specified by
+    AMOP.  (reported by Leonid Slobodov on comp.lang.lisp)
 
 changes in sbcl-0.9.14 relative to sbcl-0.9.13:
   * feature: thread support on Solaris/x86, and experimental thread support
