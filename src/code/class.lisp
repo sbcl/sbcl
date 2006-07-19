@@ -939,11 +939,15 @@ NIL is returned when no such class exists."
 
 ;;;; PCL stuff
 
-(def!struct (std-classoid (:include classoid)
-                          (:constructor nil)))
-(def!struct (standard-classoid (:include std-classoid)
+;;; the CLASSOID that we use to represent type information for
+;;; STANDARD-CLASS and FUNCALLABLE-STANDARD-CLASS.  The type system
+;;; side does not need to distinguish between STANDARD-CLASS and
+;;; FUNCALLABLE-STANDARD-CLASS.
+(def!struct (standard-classoid (:include classoid)
                                (:constructor make-standard-classoid)))
-(def!struct (random-pcl-classoid (:include std-classoid)
+;;; a metaclass for miscellaneous PCL structure-like objects (at the
+;;; moment, only CTOR objects).
+(def!struct (random-pcl-classoid (:include classoid)
                                  (:constructor make-random-pcl-classoid)))
 
 ;;;; built-in classes

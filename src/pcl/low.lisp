@@ -83,8 +83,8 @@
   :slot-names (clos-slots name hash-code)
   :boa-constructor %make-pcl-funcallable-instance
   :superclass-name function
-  :metaclass-name random-pcl-classoid
-  :metaclass-constructor make-random-pcl-classoid
+  :metaclass-name standard-classoid
+  :metaclass-constructor make-standard-classoid
   :dd-type funcallable-structure
   ;; Only internal implementation code will access these, and these
   ;; accesses (slot readers in particular) could easily be a

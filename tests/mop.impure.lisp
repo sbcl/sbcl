@@ -489,15 +489,22 @@
 ;;; classes (including anonymous ones) and eql-specializers should be
 ;;; allowed to be specializers.
 (defvar *anonymous-class*
-  (make-instance 'standard-class 
+  (make-instance 'standard-class
                  :direct-superclasses (list (find-class 'standard-object))))
 (defvar *object-of-anonymous-class*
   (make-instance *anonymous-class*))
 (eval `(defmethod method-on-anonymous-class ((obj ,*anonymous-class*)) 41))
 (assert (eql (method-on-anonymous-class *object-of-anonymous-class*) 41))
-(eval `(defmethod method-on-anonymous-class 
-        ((obj ,(intern-eql-specializer *object-of-anonymous-class*))) 
+(eval `(defmethod method-on-anonymous-class
+        ((obj ,(intern-eql-specializer *object-of-anonymous-class*)))
         42))
 (assert (eql (method-on-anonymous-class *object-of-anonymous-class*) 42))
+
+;;; accessors can cause early finalization, which caused confusion in
+;;; the system, leading to uncompileable TYPEP problems.
+(defclass funcallable-class-for-typep ()
+  ((some-slot-with-accessor :accessor some-slot-with-accessor))
+  (:metaclass funcallable-standard-class))
+(compile nil '(lambda (x) (typep x 'funcallable-class-for-typep)))
 
 ;;;; success

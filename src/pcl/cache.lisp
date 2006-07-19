@@ -258,6 +258,7 @@
         (cond (owrap
                (layout-classoid owrap))
               ((or (*subtypep (class-of class) *the-class-standard-class*)
+                   (*subtypep (class-of class) *the-class-funcallable-standard-class*)
                    (typep class 'forward-referenced-class))
                (cond ((and *pcl-class-boot*
                            (eq (slot-value class 'name) *pcl-class-boot*))
@@ -272,7 +273,7 @@
                         (make-standard-classoid :pcl-class class
                                                 :name (and (symbolp name) name))))))
               (t
-               (make-random-pcl-classoid :pcl-class class))))))
+               (bug "Got to T branch in ~S" 'make-wrapper))))))
     (t
      (let* ((found (find-classoid (slot-value class 'name)))
             (layout (classoid-layout found)))

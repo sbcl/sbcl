@@ -455,23 +455,14 @@
          ;; some class is forthcoming, because there are legitimate
          ;; questions one can ask of the type system, implemented in
          ;; terms of CLASSOIDs, involving forward-referenced classes. So.
-         (let ((classoid (or (let ((layout (slot-value class 'wrapper)))
-                               (when layout (layout-classoid layout)))
-                             #+nil
-                             (find-classoid name nil)
-                             (make-standard-classoid
-                              :name (if (symbolp name) name nil))))
-               (layout (make-wrapper 0 class)))
-           (setf (layout-classoid layout) classoid)
-           (setf (classoid-pcl-class classoid) class)
+         (let ((layout (make-wrapper 0 class)))
            (setf (slot-value class 'wrapper) layout)
            (let ((cpl (compute-preliminary-cpl class)))
              (setf (layout-inherits layout)
                    (order-layout-inherits
                     (map 'simple-vector #'class-wrapper
                          (reverse (rest cpl))))))
-           (register-layout layout :invalidate t)
-           (setf (classoid-layout classoid) layout))))
+           (register-layout layout :invalidate t))))
      (mapc #'make-preliminary-layout (class-direct-subclasses class)))))
 
 
