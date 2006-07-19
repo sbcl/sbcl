@@ -582,7 +582,7 @@ bootstrapping.
                  ;; SB-KERNEL:INSTANCE. In an effort to sweep such
                  ;; problems under the rug, we exclude these problem
                  ;; cases by blacklisting them here. -- WHN 2001-01-19
-                 '(slot-object))
+                 (list 'slot-object #+nil (find-class 'slot-object)))
          '(ignorable))
         ((not (eq *boot-state* 'complete))
          ;; KLUDGE: PCL, in its wisdom, sometimes calls methods with
@@ -591,6 +591,8 @@ bootstrapping.
          ;; second argument.) Hopefully it only does this kind of
          ;; weirdness when bootstrapping.. -- WHN 20000610
          '(ignorable))
+        ((typep specializer 'eql-specializer)
+         `(type (eql ,(eql-specializer-object specializer)) ,parameter))
         ((var-globally-special-p parameter)
          ;; KLUDGE: Don't declare types for global special variables
          ;; -- our rebinding magic for SETQ cases don't work right
@@ -614,7 +616,9 @@ bootstrapping.
          ;; least #.(find-class 'integer) and integer as equivalent
          ;; specializers with this.
          (let* ((specializer (if (and (typep specializer 'class)
-                                      (eq specializer (find-class (class-name specializer))))
+                                      (let ((name (class-name specializer)))
+                                        (and name (symbolp name)
+                                             (eq specializer (find-class name nil)))))
                                  (class-name specializer)
                                  specializer))
                 (kind (info :type :kind specializer)))

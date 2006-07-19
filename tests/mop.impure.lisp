@@ -486,4 +486,18 @@
 (defclass foo () ())
 (reinitialize-instance (find-class 'foo) :name '(a b))
 
+;;; classes (including anonymous ones) and eql-specializers should be
+;;; allowed to be specializers.
+(defvar *anonymous-class*
+  (make-instance 'standard-class 
+                 :direct-superclasses (list (find-class 'standard-object))))
+(defvar *object-of-anonymous-class*
+  (make-instance *anonymous-class*))
+(eval `(defmethod method-on-anonymous-class ((obj ,*anonymous-class*)) 41))
+(assert (eql (method-on-anonymous-class *object-of-anonymous-class*) 41))
+(eval `(defmethod method-on-anonymous-class 
+        ((obj ,(intern-eql-specializer *object-of-anonymous-class*))) 
+        42))
+(assert (eql (method-on-anonymous-class *object-of-anonymous-class*) 42))
+
 ;;;; success

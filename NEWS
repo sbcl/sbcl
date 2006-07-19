@@ -27,6 +27,9 @@ changes in sbcl-0.9.15 relative to sbcl-0.9.14:
     values of *print-case* could cause invalid output, due to 
     some internal special variables of the printer not being bound
     thread-locally (reported by Max Mikhanosha)
+  * fixed bug: SPECIALIZER metaobjects (including anonymous classes
+    and EQL-SPECIALIZERs) can be used as specializers to DEFMETHOD.
+    (reported by Pascal Costanza)
   * minor code generation optimizations:
     * better register allocation in CLOS dispatching functions
     * overflow detection when coercing signed bytes to fixnums on x86-64 
