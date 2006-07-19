@@ -866,6 +866,6 @@ system."
                            :report "Continue as if directory creation was successful."
                            nil)))
                      (setf created-p t)))))
-      (values pathname created-p))))
+      (values pathspec created-p))))
 
 (/show0 "filesys.lisp 1000")

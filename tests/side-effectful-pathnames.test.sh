@@ -71,8 +71,8 @@ $SBCL <<EOF
 (let ((rel-name #p"foo/bar/")
       (abs-name (merge-pathnames #p"baz/quux/" (truename "."))))
   (and
-   (ensure-directories-exist abs-name)
-   (ensure-directories-exist rel-name)
+   (equalp (ensure-directories-exist abs-name) abs-name)
+   (equalp (ensure-directories-exist rel-name) rel-name)
    (sb-ext:quit :unix-status 52)))
 EOF
 if [ $? != 52 ]; then

@@ -31,11 +31,14 @@ changes in sbcl-0.9.15 relative to sbcl-0.9.14:
     and EQL-SPECIALIZERs) can be used as specializers to DEFMETHOD.
     (reported by Pascal Costanza)
   * minor code generation optimizations:
-    * better register allocation in CLOS dispatching functions
-    * overflow detection when coercing signed bytes to fixnums on x86-64 
-      is now implemented with one IMUL instruction instead of three shifts
-    * more efficient bit-vector access on x86 and x86-64
-    * more efficient access to raw structure slots on x86 and x86-64
+    ** better register allocation in CLOS dispatching functions
+    ** overflow detection when coercing signed bytes to fixnums on x86-64 
+    ** is now implemented with one IMUL instruction instead of three shifts
+    ** more efficient bit-vector access on x86 and x86-64
+    ** more efficient access to raw structure slots on x86 and x86-64
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** ENSURE-DIRECTORIES-EXIST.8: ENSURE-DIRECTORIES-EXIST must
+       return its argument.
 
 changes in sbcl-0.9.14 relative to sbcl-0.9.13:
   * feature: thread support on Solaris/x86, and experimental thread support
