@@ -72,8 +72,8 @@
      ((:temp ,arg-tn descriptor-reg ,(intern (format nil "~A-OFFSET" arg-tn))))
      (pseudo-atomic
       (allocation ,arg-tn (pad-data-block ,(intern (format nil "~A-SIZE" obj))))
-      (inst lea ,arg-tn (make-ea :byte :base ,arg-tn :disp ,lowtag))
-      (inst ret))))
+      (inst lea ,arg-tn (make-ea :byte :base ,arg-tn :disp ,lowtag)))
+     (inst ret)))
 
 #+sb-assembling
 (macrolet ((frob-cons-routines ()
