@@ -507,4 +507,10 @@
   (:metaclass funcallable-standard-class))
 (compile nil '(lambda (x) (typep x 'funcallable-class-for-typep)))
 
+;;; even anonymous classes should be valid types
+(let* ((class1 (make-instance 'standard-class :direct-superclasses (list (find-class 'standard-object))))
+       (class2 (make-instance 'standard-class :direct-superclasses (list class1))))
+  (assert (subtypep class2 class1))
+  (assert (typep (make-instance class2) class1)))
+
 ;;;; success

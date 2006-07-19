@@ -310,8 +310,6 @@
 (defmethod ensure-class-using-class ((class null) name &rest args &key)
   (multiple-value-bind (meta initargs)
       (ensure-class-values class args)
-    #+nil
-    (set-class-type-translation (class-prototype meta) name)
     (setf class (apply #'make-instance meta :name name initargs))
     (without-package-locks
       (setf (find-class name) class))
@@ -462,7 +460,8 @@
                    (order-layout-inherits
                     (map 'simple-vector #'class-wrapper
                          (reverse (rest cpl))))))
-           (register-layout layout :invalidate t))))
+           (register-layout layout :invalidate t)
+           (set-class-type-translation class (layout-classoid layout)))))
      (mapc #'make-preliminary-layout (class-direct-subclasses class)))))
 
 
