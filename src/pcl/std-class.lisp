@@ -408,27 +408,10 @@
                     (push old collect)))))
           (nreverse collect)))
   (add-direct-subclasses class direct-superclasses)
-  (update-class class nil)
-  (do* ((slots (slot-value class 'slots) (cdr slots))
-        (dupes nil))
-       ((null slots) (when dupes
-                       (style-warn
-                        ;; FIXME: the indentation request ("~4I")
-                        ;; below appears not to do anything.  Finding
-                        ;; out why would be nice.  -- CSR, 2003-04-24
-                        "~@<slot names with the same SYMBOL-NAME but ~
-                         different SYMBOL-PACKAGE (possible package problem) ~
-                         for class ~S:~@:_~4I~<~@{~S~^~:@_~}~:>~@:>"
-                        class
-                        dupes)))
-    (let* ((slot (car slots))
-           (oslots (remove (slot-definition-name slot) (cdr slots)
-                           :test #'string/= :key #'slot-definition-name)))
-      (when oslots
-        (pushnew (cons (slot-definition-name slot)
-                       (mapcar #'slot-definition-name oslots))
-                 dupes
-                 :test #'string= :key #'car))))
+  (if (class-finalized-p class)
+      ;; required by AMOP, "Reinitialization of Class Metaobjects"
+      (finalize-inheritance class)
+      (update-class class nil))
   (add-slot-accessors class direct-slots)
   (make-preliminary-layout class))
 
@@ -880,7 +863,25 @@
               (wrapper-instance-slots-layout nwrapper) nlayout
               (wrapper-class-slots nwrapper) nwrapper-class-slots
               (wrapper-no-of-instance-slots nwrapper) nslots
-              wrapper nwrapper))
+              wrapper nwrapper)
+        (do* ((slots (slot-value class 'slots) (cdr slots))
+              (dupes nil))
+             ((null slots) 
+              (when dupes
+                (style-warn
+                 "~@<slot names with the same SYMBOL-NAME but ~
+                  different SYMBOL-PACKAGE (possible package problem) ~
+                  for class ~S:~4I~@:_~<~@{~S~^~:@_~}~:>~@:>"
+                  class dupes)))
+          (let* ((slot (car slots))
+                 (oslots (remove (slot-definition-name slot) (cdr slots)
+                                 :test #'string/= 
+                                 :key #'slot-definition-name)))
+            (when oslots
+              (pushnew (cons (slot-definition-name slot)
+                             (mapcar #'slot-definition-name oslots))
+                       dupes
+                       :test #'string= :key #'car)))))
       (setf (slot-value class 'finalized-p) t)
       (unless (eq owrapper nwrapper)
         (update-pv-table-cache-info class)

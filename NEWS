@@ -30,6 +30,9 @@ changes in sbcl-0.9.15 relative to sbcl-0.9.14:
   * fixed bug: SPECIALIZER metaobjects (including anonymous classes
     and EQL-SPECIALIZERs) can be used as specializers to DEFMETHOD.
     (reported by Pascal Costanza)
+  * fixed bug: FINALIZE-INHERITANCE is called from
+    REINITIALIZE-INSTANCE on classes when the class has previously
+    been finalized, as required by AMOP.
   * minor code generation optimizations:
     ** better register allocation in CLOS dispatching functions
     ** overflow detection when coercing signed bytes to fixnums on x86-64 
