@@ -28,7 +28,10 @@
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate) (signed-reg unsigned-reg))
-  (inst mov y (tn-value x)))
+  (let ((val (tn-value x)))
+    (if (zerop val)
+        (inst xor y y)
+        (inst mov y val))))
 
 (define-move-fun (load-character 1) (vop x y)
   ((immediate) (character-reg))

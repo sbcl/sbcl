@@ -1,4 +1,4 @@
-;;;; the x86 VM definition of operand loading/saving and the MOVE vop
+;;;; the x86-64 VM definition of operand loading/saving and the MOVE vop
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -28,7 +28,10 @@
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate) (signed-reg unsigned-reg))
-  (inst mov y (tn-value x)))
+  (let ((val (tn-value x)))
+    (if (zerop val)
+        (inst xor y y)
+        (inst mov y val))))
 
 (define-move-fun (load-character 1) (vop x y)
   ((immediate) (character-reg))

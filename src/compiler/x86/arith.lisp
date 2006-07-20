@@ -1655,7 +1655,7 @@
                     :load-if (not (and (sc-is result unsigned-stack)
                                        (location= digit result)))))
   (:result-types unsigned-num)
-  (:generator 1
+  (:generator 2
     (move result digit)
     (move ecx count)
     (inst sar result :cl)))
