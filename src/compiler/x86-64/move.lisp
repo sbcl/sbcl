@@ -282,7 +282,6 @@
      (aver (not (location= x y)))
      (let ((bignum (gen-label))
            (done (gen-label)))
-       (inst mov y x)
        ;; We can't do the overflow check with SHL Y, 3, since the
        ;; state of the overflow flag is only reliably set when
        ;; shifting by 1. There used to be code here for doing "shift
@@ -291,7 +290,7 @@
        ;; we can just do a straight multiply instead of trying to
        ;; optimize it to a shift. This is both faster and smaller.
        ;; -- JES, 2006-07-08
-       (inst imul y 8)
+       (inst imul y x (ash 1 n-fixnum-tag-bits))
        (inst jmp :o bignum)
        (emit-label done)
 
