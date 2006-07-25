@@ -1039,7 +1039,11 @@
                      ;; invalidate wrappers.
                      (let ((wrappers (get-wrappers-from-classes
                                       nkeys wrappers classes metatypes)))
-                       (setq cache (fill-cache cache wrappers value)))))))))
+                       (when (if (atom wrappers)
+                                 (not (invalid-wrapper-p wrappers))
+                                 (every (complement #'invalid-wrapper-p)
+                                        wrappers))
+                         (setq cache (fill-cache cache wrappers value))))))))))
       (if classes-list
           (mapc #'add-class-list classes-list)
           (dolist (method (generic-function-methods generic-function))

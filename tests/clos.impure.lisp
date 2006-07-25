@@ -1320,4 +1320,30 @@
 (defclass class-with-odd-class-name-method ()
   ((a :accessor class-name)))
 
+;;; another case where precomputing (this time on PRINT-OBJET) and
+;;; lazily-finalized classes caused problems.  (report from James Y
+;;; Knight sbcl-devel 20-07-2006)
+
+(defclass base-print-object () ())
+;;; this has the side-effect of finalizing BASE-PRINT-OBJECT, and
+;;; additionally the second specializer (STREAM) changes the cache
+;;; structure to require two keys, not just one.
+(defmethod print-object ((o base-print-object) (s stream))
+  nil)
+
+;;; unfinalized as yet
+(defclass sub-print-object (base-print-object) ())
+;;; the accessor causes an eager finalization
+(defclass subsub-print-object (sub-print-object)
+  ((a :accessor a)))
+
+;;; triggers a discriminating function (and so cache) recomputation.
+;;; The method on BASE-PRINT-OBJECT will cause the system to attempt
+;;; to fill the cache for all subclasses of BASE-PRINT-OBJECT which
+;;; have valid wrappers; however, in the course of doing so, the
+;;; SUB-PRINT-OBJECT class gets finalized, which invalidates the
+;;; SUBSUB-PRINT-OBJECT wrapper; if an invalid wrapper gets into a
+;;; cache with more than one key, then failure ensues.
+(reinitialize-instance #'print-object)
+
 ;;;; success

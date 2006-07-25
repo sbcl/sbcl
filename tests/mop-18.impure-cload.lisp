@@ -32,7 +32,7 @@
   (when *in-reinitialize-instance*
     (setf *finalized-class* class)))
 
-(defmethod reinitialize-instance :around 
+(defmethod reinitialize-instance :around
     ((class test-standard-class) &key &allow-other-keys)
   (let ((*in-reinitialize-instance* t))
     (call-next-method)))
@@ -52,16 +52,16 @@
 (defclass test-funcallable-standard-class (funcallable-standard-class) ())
 
 (defmethod validate-superclass
-    ((class test-funcallable-standard-class) 
+    ((class test-funcallable-standard-class)
      (superclass funcallable-standard-class))
   t)
 
-(defmethod finalize-inheritance :before 
+(defmethod finalize-inheritance :before
     ((class test-funcallable-standard-class))
   (when *in-reinitialize-instance*
     (setf *finalized-class* class)))
 
-(defmethod reinitialize-instance :around 
+(defmethod reinitialize-instance :around
     ((class test-funcallable-standard-class) &key &allow-other-keys)
   (let ((*in-reinitialize-instance* t))
     (call-next-method)))
@@ -74,7 +74,7 @@
 
 (assert (class-slots (find-class 'test-funcallable-standard-object)))
 (assert (eq *finalized-class* (find-class 'test-standard-object)))
-(reinitialize-instance (find-class 'test-funcallable-standard-object) 
+(reinitialize-instance (find-class 'test-funcallable-standard-object)
                        :direct-slots nil)
 (assert (eq *finalized-class* (find-class 'test-funcallable-standard-object)))
 (assert (null (class-slots (find-class 'test-funcallable-standard-object))))

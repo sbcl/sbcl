@@ -866,7 +866,7 @@
               wrapper nwrapper)
         (do* ((slots (slot-value class 'slots) (cdr slots))
               (dupes nil))
-             ((null slots) 
+             ((null slots)
               (when dupes
                 (style-warn
                  "~@<slot names with the same SYMBOL-NAME but ~
@@ -875,7 +875,7 @@
                   class dupes)))
           (let* ((slot (car slots))
                  (oslots (remove (slot-definition-name slot) (cdr slots)
-                                 :test #'string/= 
+                                 :test #'string/=
                                  :key #'slot-definition-name)))
             (when oslots
               (pushnew (cons (slot-definition-name slot)
