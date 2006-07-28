@@ -236,7 +236,7 @@
                                        (or (find-package package)
                                            (error 'simple-package-error
                                                   ;; could be a character
-                                                  :name (string package)
+                                                  :package (string package)
                                                   :format-control "~@<~S does not name a package ~:>"
                                                   :format-arguments (list package)))))
                                  (if (consp ,these-packages)
