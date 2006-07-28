@@ -264,3 +264,29 @@
            (funcall (lambda ()
                       (declare (notinline logxor))
                       (min (logxor 0 0 0 286142502))))))
+
+;; Small bugs in LOGCOUNT can still allow SBCL to be built and thus go
+;; unnoticed, so check more thoroughly here.
+(with-test (:name :logcount)
+  (flet ((test (x n)
+           (unless (= (logcount x) n)
+             (error "logcount failure for ~a" x))))
+    ;; Test with some patterns with well known number of ones/zeroes ...
+    (dotimes (i 128)
+      (let ((x (ash 1 i)))
+        (test x 1)
+        (test (- x) i)
+        (test (1- x) i)))
+    ;; ... and with some random integers of varying length.
+    (flet ((test-logcount (x)
+             (declare (type integer x))
+             (do ((result 0 (1+ result))
+                  (x (if (minusp x)
+                         (lognot x)
+                         x)
+                     (logand x (1- x))))
+                 ((zerop x) result))))
+      (dotimes (i 200)
+        (let ((x (random (ash 1 i))))
+          (test x (test-logcount x))
+          (test (- x) (test-logcount (- x))))))))

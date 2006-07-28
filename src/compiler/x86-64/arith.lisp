@@ -947,86 +947,60 @@
     (inst xor res res)
     DONE))
 
-
 (define-vop (unsigned-byte-64-count)
   (:translate logcount)
   (:note "inline (unsigned-byte 64) logcount")
   (:policy :fast-safe)
-  (:args (arg :scs (unsigned-reg)))
+  (:args (arg :scs (unsigned-reg) :target result))
   (:arg-types unsigned-num)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
-  (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
-  (:temporary (:sc unsigned-reg :from (:argument 0)) t1)
-  (:generator 60
+  (:temporary (:sc unsigned-reg) temp)
+  (:temporary (:sc unsigned-reg) mask)
+  (:generator 14
+    ;; See the comments below for how the algorithm works. The tricks
+    ;; used can be found for example in AMD's software optimization
+    ;; guide or at "http://www.hackersdelight.org/HDcode/pop.cc" in the
+    ;; function "pop1", for 32-bit words. The extension to 64 bits is
+    ;; straightforward.
+    ;; Calculate 2-bit sums. Note that the value of a two-digit binary
+    ;; number is the sum of the right digit and twice the left digit.
+    ;; Thus we can calculate the sum of the two digits by shifting the
+    ;; left digit to the right position and doing a two-bit subtraction.
+    ;; This subtraction will never create a borrow and thus can be made
+    ;; on all 32 2-digit numbers at once.
     (move result arg)
-    (move t1 arg)
-
-    (inst mov temp result)
-    (inst shr temp 1)
-    (inst and result #x55555555)        ; note these masks will restrict the
-    (inst and temp #x55555555)          ; count to the lower half of arg
-    (inst add result temp)
-
-    (inst mov temp result)
+    (move temp arg)
+    (inst shr result 1)
+    (inst mov mask #x5555555555555555)
+    (inst and result mask)
+    (inst sub temp result)
+    ;; Calculate 4-bit sums by straightforward shift, mask and add.
+    ;; Note that we shift the source operand of the MOV and not its
+    ;; destination so that the SHR and the MOV can execute in the same
+    ;; clock cycle.
+    (inst mov result temp)
     (inst shr temp 2)
-    (inst and result #x33333333)
-    (inst and temp #x33333333)
+    (inst mov mask #x3333333333333333)
+    (inst and result mask)
+    (inst and temp mask)
     (inst add result temp)
-
+    ;; Calculate 8-bit sums. Since each sum is at most 8, which fits
+    ;; into 4 bits, we can apply the mask after the addition, saving one
+    ;; instruction.
     (inst mov temp result)
-    (inst shr temp 4)
-    (inst and result #x0f0f0f0f)
-    (inst and temp #x0f0f0f0f)
+    (inst shr result 4)
     (inst add result temp)
-
-    (inst mov temp result)
-    (inst shr temp 8)
-    (inst and result #x00ff00ff)
-    (inst and temp #x00ff00ff)
-    (inst add result temp)
-
-    (inst mov temp result)
-    (inst shr temp 16)
-    (inst and result #x0000ffff)
-    (inst and temp #x0000ffff)
-    (inst add result temp)
-
-    ;;; now do the upper half
-    (inst shr t1 32)
-
-    (inst mov temp t1)
-    (inst shr temp 1)
-    (inst and t1 #x55555555)
-    (inst and temp #x55555555)
-    (inst add t1 temp)
-
-    (inst mov temp t1)
-    (inst shr temp 2)
-    (inst and t1 #x33333333)
-    (inst and temp #x33333333)
-    (inst add t1 temp)
-
-    (inst mov temp t1)
-    (inst shr temp 4)
-    (inst and t1 #x0f0f0f0f)
-    (inst and temp #x0f0f0f0f)
-    (inst add t1 temp)
-
-    (inst mov temp t1)
-    (inst shr temp 8)
-    (inst and t1 #x00ff00ff)
-    (inst and temp #x00ff00ff)
-    (inst add t1 temp)
-
-    (inst mov temp t1)
-    (inst shr temp 16)
-    (inst and t1 #x0000ffff)
-    (inst and temp #x0000ffff)
-    (inst add t1 temp)
-    (inst add result t1)))
-
-
+    (inst mov mask #x0f0f0f0f0f0f0f0f)
+    (inst and result mask)
+    ;; Add all 8 bytes at once by multiplying with #256r11111111.
+    ;; We need to calculate only the lower 8 bytes of the product.
+    ;; Of these the most significant byte contains the final result.
+    ;; Note that there can be no overflow from one byte to the next
+    ;; as the sum is at most 64 which needs only 7 bits.
+    (inst mov mask #x0101010101010101)
+    (inst imul result mask)
+    (inst shr result 56)))
 
 ;;;; binary conditional VOPs
 

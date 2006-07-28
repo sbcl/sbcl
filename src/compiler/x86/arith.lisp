@@ -953,43 +953,53 @@
   (:translate logcount)
   (:note "inline (unsigned-byte 32) logcount")
   (:policy :fast-safe)
-  (:args (arg :scs (unsigned-reg)))
+  (:args (arg :scs (unsigned-reg) :target result))
   (:arg-types unsigned-num)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
-  (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
-  (:generator 30
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 14
+    ;; See the comments below for how the algorithm works. The tricks
+    ;; used can be found for example in AMD's software optimization
+    ;; guide or at "http://www.hackersdelight.org/HDcode/pop.cc" in the
+    ;; function "pop1".
+    ;; Calculate 2-bit sums. Note that the value of a two-digit binary
+    ;; number is the sum of the right digit and twice the left digit.
+    ;; Thus we can calculate the sum of the two digits by shifting the
+    ;; left digit to the right position and doing a two-bit subtraction.
+    ;; This subtraction will never create a borrow and thus can be made
+    ;; on all 16 2-digit numbers at once.
     (move result arg)
-
-    (inst mov temp result)
-    (inst shr temp 1)
+    (move temp arg)
+    (inst shr result 1)
     (inst and result #x55555555)
-    (inst and temp #x55555555)
-    (inst add result temp)
-
-    (inst mov temp result)
+    (inst sub temp result)
+    ;; Calculate 4-bit sums by straightforward shift, mask and add.
+    ;; Note that we shift the source operand of the MOV and not its
+    ;; destination so that the SHR and the MOV can execute in the same
+    ;; clock cycle.
+    (inst mov result temp)
     (inst shr temp 2)
     (inst and result #x33333333)
     (inst and temp #x33333333)
     (inst add result temp)
-
+    ;; Calculate 8-bit sums. Since each sum is at most 8, which fits
+    ;; into 4 bits, we can apply the mask after the addition, saving one
+    ;; instruction.
     (inst mov temp result)
-    (inst shr temp 4)
+    (inst shr result 4)
+    (inst add result temp)
     (inst and result #x0f0f0f0f)
-    (inst and temp #x0f0f0f0f)
-    (inst add result temp)
-
+    ;; Calculate the two 16-bit sums and the 32-bit sum. No masking is
+    ;; necessary inbetween since the final sum is at most 32 which fits
+    ;; into 6 bits.
     (inst mov temp result)
-    (inst shr temp 8)
-    (inst and result #x00ff00ff)
-    (inst and temp #x00ff00ff)
+    (inst shr result 8)
     (inst add result temp)
-
     (inst mov temp result)
-    (inst shr temp 16)
-    (inst and result #x0000ffff)
-    (inst and temp #x0000ffff)
-    (inst add result temp)))
+    (inst shr result 16)
+    (inst add result temp)
+    (inst and result #xff)))
 
 ;;;; binary conditional VOPs
 

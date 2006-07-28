@@ -1320,16 +1320,18 @@
 
 (defun bignum-logcount (bignum)
   (declare (type bignum-type bignum))
-  (let* ((length (%bignum-length bignum))
-         (plusp (%bignum-0-or-plusp bignum length))
-         (result 0))
+  (let ((length (%bignum-length bignum))
+        (result 0))
     (declare (type bignum-index length)
              (fixnum result))
     (do ((index 0 (1+ index)))
-        ((= index length) result)
+        ((= index length)
+         (if (%bignum-0-or-plusp bignum length)
+             result
+             (- (* length digit-size) result)))
       (let ((digit (%bignum-ref bignum index)))
         (declare (type bignum-element-type digit))
-        (incf result (logcount (if plusp digit (%lognot digit))))))))
+        (incf result (logcount digit))))))
 
 ;;;; logical operations
 
