@@ -67,7 +67,7 @@
 #endif
 
 #ifndef SBCL_HOME
-#define SBCL_HOME "/usr/local/lib/sbcl/"
+#define SBCL_HOME "/opt/packages/sbcl/0.9.15.1/lib/sbcl/"
 #endif
 
 
@@ -199,10 +199,12 @@ search_for_core ()
                                sizeof(char));
     sprintf(lookhere, "%s%s", sbcl_home, stem);
     core = copied_existing_filename_or_null(lookhere);
-    free(lookhere);
+
     if (!core) {
-        lose("can't find core file\n");
+        lose("can't find core file at %s\n", lookhere);
     }
+
+    free(lookhere);
 
     return core;
 }
