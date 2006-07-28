@@ -30,20 +30,21 @@
           ;; FIXME: change SLOT-OBJECT here to T to get SLOT-MISSING
           ;; behaviour for non-slot-objects too?
           (reader
-           (values '(object) '(slot-object) 'standard-reader-method
+           (values '(object) '(slot-object) 'global-reader-method
                    (make-std-reader-method-function 'slot-object slot-name)
                    "automatically-generated reader method"))
           (writer
-           (values '(new-value object) '(t slot-object) 'standard-writer-method
+           (values '(new-value object) '(t slot-object) 'global-writer-method
                    (make-std-writer-method-function 'slot-object slot-name)
                    "automatically-generated writer method"))
           (boundp
-           (values '(object) '(slot-object) 'standard-boundp-method
+           (values '(object) '(slot-object) 'global-boundp-method
                    (make-std-boundp-method-function 'slot-object slot-name)
                    "automatically-generated boundp method")))
       (let ((gf (ensure-generic-function fun-name :lambda-list lambda-list)))
-        (add-method gf (make-a-method method-class () lambda-list specializers
-                                      initargs doc slot-name)))))
+        (add-method gf (make-a-method method-class
+                                      () lambda-list specializers
+                                      initargs doc :slot-name slot-name)))))
   t)
 
 (defmacro accessor-slot-value (object slot-name)

@@ -757,16 +757,16 @@
 ;;; or reinitialized. The class may or may not be finalized.
 (defun update-class (class finalizep)
   (without-package-locks
-   (when (or finalizep (class-finalized-p class))
-     (update-cpl class (compute-class-precedence-list class))
-     ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
-     ;; class.
-     (update-slots class (compute-slots class))
-     (update-gfs-of-class class)
-     (update-initargs class (compute-default-initargs class))
-     (update-ctors 'finalize-inheritance :class class))
-   (dolist (sub (class-direct-subclasses class))
-     (update-class sub nil))))
+    (when (or finalizep (class-finalized-p class))
+      (update-cpl class (compute-class-precedence-list class))
+      ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
+      ;; class.
+      (update-slots class (compute-slots class))
+      (update-gfs-of-class class)
+      (update-initargs class (compute-default-initargs class))
+      (update-ctors 'finalize-inheritance :class class))
+    (dolist (sub (class-direct-subclasses class))
+      (update-class sub nil))))
 
 (define-condition cpl-protocol-violation (reference-condition error)
   ((class :initarg :class :reader cpl-protocol-violation-class)
@@ -1115,7 +1115,9 @@
                              (list class)
                              (make-reader-method-function class slot-name)
                              "automatically generated reader method"
-                             slot-name)))
+                             :slot-name slot-name
+                             :object-class class
+                             :method-class-function #'reader-method-class)))
 
 (defmethod writer-method-class ((class slot-class) direct-slot &rest initargs)
   (declare (ignore direct-slot initargs))
@@ -1129,11 +1131,14 @@
                              (list *the-class-t* class)
                              (make-writer-method-function class slot-name)
                              "automatically generated writer method"
-                             slot-name)))
+                             :slot-name slot-name
+                             :object-class class
+                             :method-class-function #'writer-method-class)))
 
 (defmethod add-boundp-method ((class slot-class) generic-function slot-name)
   (add-method generic-function
-              (make-a-method 'standard-boundp-method
+              (make-a-method (constantly (find-class 'standard-boundp-method))
+                             class
                              ()
                              (list (or (class-name class) 'object))
                              (list class)

@@ -40,12 +40,6 @@
         (setf (slot-value method '%function)
               (method-function-from-fast-function fmf)))))
 
-(defmethod accessor-method-class ((method standard-accessor-method))
-  (car (slot-value method 'specializers)))
-
-(defmethod accessor-method-class ((method standard-writer-method))
-  (cadr (slot-value method 'specializers)))
-
 ;;; initialization
 ;;;
 ;;; Error checking is done in before methods. Because of the simplicity of
@@ -183,19 +177,6 @@
   #+ignore
   (setf (slot-value method 'closure-generator)
         (method-function-closure-generator (slot-value method '%function))))
-
-(defmethod shared-initialize :after ((method standard-accessor-method)
-                                     slot-names
-                                     &key)
-  (declare (ignore slot-names))
-  (with-slots (slot-name %slot-definition) method
-    (unless %slot-definition
-      (let ((class (accessor-method-class method)))
-        (when (slot-class-p class)
-          (setq %slot-definition (find slot-name (class-direct-slots class)
-                                      :key #'slot-definition-name)))))
-    (when (and %slot-definition (null slot-name))
-      (setq slot-name (slot-definition-name %slot-definition)))))
 
 (defmethod method-qualifiers ((method standard-method))
   (plist-value method 'qualifiers))
@@ -827,16 +808,17 @@
     (setf (gf-info-simple-accessor-type arg-info)
           (let* ((methods (generic-function-methods gf))
                  (class (and methods (class-of (car methods))))
-                 (type (and class
-                            (cond ((eq class
-                                       *the-class-standard-reader-method*)
-                                   'reader)
-                                  ((eq class
-                                       *the-class-standard-writer-method*)
-                                   'writer)
-                                  ((eq class
-                                       *the-class-standard-boundp-method*)
-                                   'boundp)))))
+                 (type
+                  (and class
+                       (cond ((or (eq class *the-class-standard-reader-method*)
+                                  (eq class *the-class-global-reader-method*))
+                              'reader)
+                             ((or (eq class *the-class-standard-writer-method*)
+                                  (eq class *the-class-global-writer-method*))
+                              'writer)
+                             ((or (eq class *the-class-standard-boundp-method*)
+                                  (eq class *the-class-global-boundp-method*))
+                              'boundp)))))
             (when (and (gf-info-c-a-m-emf-std-p arg-info)
                        type
                        (dolist (method (cdr methods) t)

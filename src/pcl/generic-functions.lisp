@@ -233,8 +233,6 @@
 
 ;;;; 1 argument
 
-(defgeneric accessor-method-class (method))
-
 (defgeneric accessor-method-slot-name (m))
 
 (defgeneric class-default-initargs (class))

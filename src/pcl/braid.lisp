@@ -430,7 +430,9 @@
                                      (funcall make-method-function
                                               class-name slot-name)
                                      doc
-                                     slot-name))))))
+                                     :slot-name slot-name
+                                     :object-class class-name
+                                     :method-class-function (constantly (find-class accessor-class))))))))
 
 (defun !bootstrap-accessor-definitions1 (class-name
                                         slot-name

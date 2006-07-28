@@ -885,23 +885,29 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                      (generic-function-methods gf))))
     (cond ((every (lambda (method)
                     (if (consp method)
-                        (eq *the-class-standard-reader-method*
-                            (early-method-class method))
-                        (standard-reader-method-p method)))
+                        (let ((class (early-method-class method)))
+                          (or (eq class *the-class-standard-reader-method*)
+                              (eq class *the-class-global-reader-method*)))
+                        (or (standard-reader-method-p method)
+                            (global-reader-method-p method))))
                   methods)
            'reader)
           ((every (lambda (method)
                     (if (consp method)
-                        (eq *the-class-standard-boundp-method*
-                            (early-method-class method))
-                        (standard-boundp-method-p method)))
+                        (let ((class (early-method-class method)))
+                          (or (eq class *the-class-standard-boundp-method*)
+                              (eq class *the-class-global-boundp-method*)))
+                        (or (standard-boundp-method-p method)
+                            (global-boundp-method-p method))))
                   methods)
            'boundp)
           ((every (lambda (method)
                     (if (consp method)
-                        (eq *the-class-standard-writer-method*
-                            (early-method-class method))
-                        (standard-writer-method-p method)))
+                        (let ((class (early-method-class method)))
+                          (or (eq class *the-class-standard-writer-method*)
+                              (eq class *the-class-global-writer-method*)))
+                        (or (standard-writer-method-p method)
+                            (global-writer-method-p method))))
                   methods)
            'writer))))
 
@@ -1272,7 +1278,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                                (if early-p
                                    (not (eq *the-class-standard-method*
                                             (early-method-class meth)))
-                                   (standard-accessor-method-p meth))
+                                   (accessor-method-p meth))
                                (if early-p
                                    (early-accessor-method-slot-name meth)
                                    (accessor-method-slot-name meth))))))

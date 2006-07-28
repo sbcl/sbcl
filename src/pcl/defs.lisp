@@ -389,16 +389,25 @@
     :reader method-fast-function)
    (%documentation :initform nil :initarg :documentation)))
 
-(defclass standard-accessor-method (standard-method)
+(defclass accessor-method (standard-method)
   ((slot-name :initform nil :initarg :slot-name
-              :reader accessor-method-slot-name)
-   (%slot-definition :initform nil :initarg :slot-definition
+              :reader accessor-method-slot-name)))
+
+(defclass standard-accessor-method (accessor-method)
+  ((%slot-definition :initform nil :initarg :slot-definition
                      :reader accessor-method-slot-definition)))
 
 (defclass standard-reader-method (standard-accessor-method) ())
 (defclass standard-writer-method (standard-accessor-method) ())
 ;;; an extension, apparently.
 (defclass standard-boundp-method (standard-accessor-method) ())
+
+;;; for (SLOT-VALUE X 'FOO) / ACCESSOR-SLOT-VALUE optimization, which
+;;; can't be STANDARD-READER-METHOD because there is no associated
+;;; slot definition.
+(defclass global-reader-method (accessor-method) ())
+(defclass global-writer-method (accessor-method) ())
+(defclass global-boundp-method (accessor-method) ())
 
 (defclass method-combination (metaobject)
   ((%documentation :initform nil :initarg :documentation)))
@@ -694,10 +703,14 @@
     (forward-referenced-class forward-referenced-class-p)
     (method method-p)
     (standard-method standard-method-p)
+    (accessor-method accessor-method-p)
     (standard-accessor-method standard-accessor-method-p)
     (standard-reader-method standard-reader-method-p)
     (standard-writer-method standard-writer-method-p)
     (standard-boundp-method standard-boundp-method-p)
+    (global-reader-method global-reader-method-p)
+    (global-writer-method global-writer-method-p)
+    (global-boundp-method global-boundp-method-p)
     (generic-function generic-function-p)
     (standard-generic-function standard-generic-function-p)
     (method-combination method-combination-p)

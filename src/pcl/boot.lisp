@@ -1829,16 +1829,20 @@ bootstrapping.
                (class (if (or (eq *boot-state* 'complete) (not (consp method)))
                           (class-of method)
                           (early-method-class method)))
-               (new-type (when (and class
-                                    (or (not (eq *boot-state* 'complete))
-                                        (eq (generic-function-method-combination gf)
-                                            *standard-method-combination*)))
-                           (cond ((eq class *the-class-standard-reader-method*)
-                                  'reader)
-                                 ((eq class *the-class-standard-writer-method*)
-                                  'writer)
-                                 ((eq class *the-class-standard-boundp-method*)
-                                  'boundp)))))
+               (new-type
+                (when (and class
+                           (or (not (eq *boot-state* 'complete))
+                               (eq (generic-function-method-combination gf)
+                                   *standard-method-combination*)))
+                  (cond ((or (eq class *the-class-standard-reader-method*)
+                             (eq class *the-class-global-reader-method*))
+                         'reader)
+                        ((or (eq class *the-class-standard-writer-method*)
+                             (eq class *the-class-global-writer-method*))
+                         'writer)
+                        ((or (eq class *the-class-standard-boundp-method*)
+                             (eq class *the-class-global-boundp-method*))
+                         'boundp)))))
           (setq metatypes (mapcar #'raise-metatype metatypes specializers))
           (setq type (cond ((null type) new-type)
                            ((eq type new-type) type)
@@ -2115,7 +2119,7 @@ bootstrapping.
             arg-info)))
 
 (defun early-make-a-method (class qualifiers arglist specializers initargs doc
-                            &optional slot-name)
+                            &key slot-name object-class method-class-function)
   (initialize-method-function initargs)
   (let ((parsed ())
         (unparsed ()))
@@ -2145,26 +2149,40 @@ bootstrapping.
                                   ;into play when there is more than one
                                   ;early method on an early gf.
 
-          (list class        ;A list to which real-make-a-method
-                qualifiers      ;can be applied to make a real method
-                arglist    ;corresponding to this early one.
-                unparsed
-                initargs
-                doc
-                slot-name))))
+          (append
+           (list class        ;A list to which real-make-a-method
+                 qualifiers      ;can be applied to make a real method
+                 arglist    ;corresponding to this early one.
+                 unparsed
+                 initargs
+                 doc)
+           (when slot-name
+             (list :slot-name slot-name :object-class object-class
+                   :method-class-function method-class-function))))))
 
 (defun real-make-a-method
        (class qualifiers lambda-list specializers initargs doc
-        &optional slot-name)
+        &rest args &key slot-name object-class method-class-function)
   (setq specializers (parse-specializers specializers))
-  (apply #'make-instance class
-         :qualifiers qualifiers
-         :lambda-list lambda-list
-         :specializers specializers
-         :documentation doc
-         :slot-name slot-name
-         :allow-other-keys t
-         initargs))
+  (if method-class-function
+      (let* ((object-class (if (classp object-class) object-class
+                               (find-class object-class)))
+             (slots (class-direct-slots object-class))
+             (slot-definition (find slot-name slots
+                                    :key #'slot-definition-name)))
+        (aver slot-name)
+        (aver slot-definition)
+        (let ((initargs (list* :qualifiers qualifiers :lambda-list lambda-list
+                               :specializers specializers :documentation doc
+                               :slot-definition slot-definition
+                               :slot-name slot-name initargs)))
+          (apply #'make-instance
+                 (apply method-class-function object-class slot-definition
+                        initargs)
+                 initargs)))
+      (apply #'make-instance class :qualifiers qualifiers
+             :lambda-list lambda-list :specializers specializers
+             :documentation doc (append args initargs))))
 
 (defun early-method-function (early-method)
   (values (cadr early-method) (caddr early-method)))
@@ -2179,7 +2197,7 @@ bootstrapping.
         (eq class 'standard-boundp-method))))
 
 (defun early-method-standard-accessor-slot-name (early-method)
-  (seventh (fifth early-method)))
+  (eighth (fifth early-method)))
 
 ;;; Fetch the specializers of an early method. This is basically just
 ;;; a simple accessor except that when the second argument is t, this
@@ -2203,14 +2221,14 @@ bootstrapping.
                  (setf (fourth early-method)
                        (mapcar #'find-class (cadddr (fifth early-method))))))
             (t
-             (cadddr (fifth early-method))))
+             (fourth (fifth early-method))))
       (error "~S is not an early-method." early-method)))
 
 (defun early-method-qualifiers (early-method)
-  (cadr (fifth early-method)))
+  (second (fifth early-method)))
 
 (defun early-method-lambda-list (early-method)
-  (caddr (fifth early-method)))
+  (third (fifth early-method)))
 
 (defun early-add-named-method (generic-function-name
                                qualifiers
