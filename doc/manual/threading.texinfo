@@ -91,7 +91,7 @@ if you want a bounded wait.
   (with-mutex (*a-mutex*)
     (format t "Thread ~A got the lock~%" *current-thread*)
     (sleep (random 5)))
-  (format t "Thread ~A dropped lock, dying now~%" *current-thread*)))
+  (format t "Thread ~A dropped lock, dying now~%" *current-thread*))
 
 (make-thread #'thread-fn)
 (make-thread #'thread-fn)
