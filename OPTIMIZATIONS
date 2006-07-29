@@ -347,4 +347,59 @@ arguments:
 
 Notice that '(MOD 46) has two entries in the constant vector.  Having
 one would be preferable.
+--------------------------------------------------------------------------------
+#35
+Compiling
 
+(defun foo (a i)
+  (declare (type simple-vector a))
+  (aref a i))
+
+results in the following x86 code:
+
+; 115886E9:       F7C703000000     TEST EDI, 3                ; no-arg-parsing entry point
+;      6EF:       7510             JNE L0
+;      6F1:       8BC7             MOV EAX, EDI
+;      6F3:       83F800           CMP EAX, 0
+;      6F6:       7C09             JL L0
+;      6F8:       8BC7             MOV EAX, EDI
+;      6FA:       3DF8FFFF7F       CMP EAX, 2147483640
+;      6FF:       7E0F             JLE L1
+;      701: L0:   8B057C865811     MOV EAX, [#x1158867C]      ; '(MOD
+                                                              ;   536870911)
+;      707:       0F0B0A           BREAK 10                   ; error trap
+;      70A:       05               BYTE #X05
+;      70B:       1F               BYTE #X1F                  ; OBJECT-NOT-TYPE-ERROR
+;      70C:       FECE01           BYTE #XFE, #XCE, #X01      ; EDI
+;      70F:       0E               BYTE #X0E                  ; EAX
+;      710: L1:   8B42FD           MOV EAX, [EDX-3]
+;      713:       8BCF             MOV ECX, EDI
+;      715:       39C8             CMP EAX, ECX
+;      717:       7620             JBE L2
+;      719:       8B540A01         MOV EDX, [EDX+ECX+1]
+
+... plus the standard return sequence and some error blocks.  The
+`TEST EDI, 3' and associated comparisons are to ensure that `I' is a
+positive fixnum.  The associated comparisons are unnecessary, as the
+%CHECK-BOUND VOP only requires its tested index to be a fixnum and takes
+care of the negative fixnum case itself.
+
+{HAIRY-,}DATA-VECTOR-REF are DEFKNOWN'd with EXPLICIT-CHECK, which would
+seem to take care of this, but EXPLICIT-CHECK only seems to be used when
+compiling calls to unknown functions or similar.  Furthermore,
+EXPLICIT-CHECK, as NJF understands it, doesn't have the right
+semantics--it suppresses all type checking of arguments, whereas what we
+really want is to ensure that the argument is a fixnum, but not check
+its positiveness.
+--------------------------------------------------------------------------------
+#36
+
+In #35, the CMP EAX, $foo instructions are all preceded by a MOV.  They
+appear to be unnecessary, but are necessary because in IR2, EDI is a
+DESCRIPTOR-REG, whereas EAX is an ANY-REG--and the comparison VOPs only
+accept ANY-REGs.  Therefore, the MOVs are "necessary" to ensure that the
+comparison VOP receives an TN of the appropriate storage class.
+
+Obviously, it would be better if a) we only performed one MOV prior to
+all three comparisons or b) eliminated the necessity of the MOV(s)
+altogether.  The former option is probably easier than the latter.
