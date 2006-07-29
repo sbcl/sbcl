@@ -67,7 +67,7 @@
 #endif
 
 #ifndef SBCL_HOME
-#define SBCL_HOME "/opt/packages/sbcl/0.9.15.1/lib/sbcl/"
+#define SBCL_HOME "/usr/local/lib/sbcl/"
 #endif
 
 
