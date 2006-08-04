@@ -41,6 +41,8 @@
 
 ;;; actually using a callback with foreign code
 
+#+win32 (sb-alien:load-shared-object "ntdll.dll")
+
 (define-alien-routine qsort void
   (base (* t))
   (nmemb int)

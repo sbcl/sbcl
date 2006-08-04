@@ -22,7 +22,7 @@
          ,@body))))
 
 (do-external-formats (xf)
-  (with-open-file (s "/dev/null" :direction :input :external-format xf)
+  (with-open-file (s #-win32 "/dev/null" #+win32 "nul" :direction :input :external-format xf)
     (assert (eq (read-char s nil s) s))))
 
 ;;; Test standard character read-write equivalency over all external formats.

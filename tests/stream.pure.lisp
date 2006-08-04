@@ -261,7 +261,7 @@
   (frob 'base-char)
   (frob 'nil))
 
-(with-open-file (s "/dev/null" :element-type '(signed-byte 48))
+(with-open-file (s #-win32 "/dev/null" #+win32 "nul" :element-type '(signed-byte 48))
   (assert (eq :eof (read-byte s nil :eof))))
 
 (let* ((is (make-string-input-stream "foo"))
@@ -292,7 +292,7 @@
   (assert (string= (get-output-stream-string os) "foo")))
 
 (with-standard-io-syntax
-  (open "/dev/null"))
+  (open #-win32 "/dev/null" #+win32 "nul" ))
 
 ;;; PEEK-CHAR T uses whitespace[2]
 (let ((*readtable* (copy-readtable)))
