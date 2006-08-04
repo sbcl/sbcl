@@ -647,24 +647,30 @@ reset to ~S."
                      "Argh! error within --disable-debugger error handling"))
         (failure-quit :recklessly-p t)))))
 
+(defvar *old-debugger-hook* nil)
+
 ;;; halt-on-failures and prompt-on-failures modes, suitable for
 ;;; noninteractive and interactive use respectively
 (defun disable-debugger ()
-  ;; Why conditionally? Why not disable it even if user has frobbed
-  ;; this hook? We could just save the old value in case of a later
-  ;; ENABLE-DEBUGGER.
-  (when (eql *invoke-debugger-hook* nil)
-    ;; *DEBUG-IO* used to be set here to *ERROR-OUTPUT* which is sort
-    ;; of unexpected but mostly harmless, but then ENABLE-DEBUGGER had
-    ;; to set it to a suitable value again and be very careful,
-    ;; especially if the user has also set it. -- MG 2005-07-15
-    (setf *invoke-debugger-hook* 'debugger-disabled-hook)
-    (sb!alien:alien-funcall (sb!alien:extern-alien "disable_lossage_handler" (function sb!alien:void)))))
+  ;; *DEBUG-IO* used to be set here to *ERROR-OUTPUT* which is sort
+  ;; of unexpected but mostly harmless, but then ENABLE-DEBUGGER had
+  ;; to set it to a suitable value again and be very careful,
+  ;; especially if the user has also set it. -- MG 2005-07-15
+  (unless (eq *invoke-debugger-hook* 'debugger-disabled-hook)
+    (setf *old-debugger-hook* *invoke-debugger-hook*
+          *invoke-debugger-hook* 'debugger-disabled-hook))
+  ;; This is not inside the UNLESS to ensure that LDB is disabled
+  ;; regardless of what the old value of *INVOKE-DEBUGGER-HOOK* was.
+  ;; This might matter for example when restoring a core.
+  (sb!alien:alien-funcall (sb!alien:extern-alien "disable_lossage_handler"
+                                                 (function sb!alien:void))))
 
 (defun enable-debugger ()
   (when (eql *invoke-debugger-hook* 'debugger-disabled-hook)
-    (setf *invoke-debugger-hook* nil)
-    (sb!alien:alien-funcall (sb!alien:extern-alien "enable_lossage_handler" (function sb!alien:void)))))
+    (setf *invoke-debugger-hook* *old-debugger-hook*
+          *old-debugger-hook* nil))
+  (sb!alien:alien-funcall (sb!alien:extern-alien "enable_lossage_handler"
+                                                 (function sb!alien:void))))
 
 (defun show-restarts (restarts s)
   (cond ((null restarts)
