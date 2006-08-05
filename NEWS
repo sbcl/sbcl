@@ -8,6 +8,9 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
   * bug fix: improved the handling of type declarations and the
     detection of violations for keyword arguments with non-constant
     defaults.
+  * bug fix: use of MAKE-METHOD in method combination now works even
+    in the presence of user-defined method classes.  (reported by
+    Bruno Haible and Pascal Costanza)
 
 changes in sbcl-0.9.15 relative to sbcl-0.9.14:
   * added support for the ucs-2 external format.  (contributed by Ivan

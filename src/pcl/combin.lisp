@@ -135,8 +135,39 @@
                                  :next-method-call next
                                  :arg-info arg-info))
         (if real-mf-p
-            (make-method-call :function mf
-                              :call-method-args cm-args)
+            (flet ((frob-cm-arg (arg)
+                     (if (if (listp arg)
+                             (eq (car arg) :early-method)
+                             (method-p arg))
+                         arg
+                         (if (and (consp arg) (eq (car arg) 'make-method))
+                             (make-instance 'standard-method
+                                            :specializers nil ; XXX
+                                            :qualifiers nil
+                                            :fast-function (fast-method-call-function
+                                                            (make-effective-method-function
+                                                             gf (cadr arg) method-alist wrappers)))
+                             arg))))
+              (make-method-call :function mf
+                                ;; FIXME: this is wrong.  Very wrong.
+                                ;; It assumes that the only place that
+                                ;; can have make-method calls is in
+                                ;; the list structure of the second
+                                ;; argument to CALL-METHOD, but AMOP
+                                ;; says that CALL-METHOD can be more
+                                ;; complicated if
+                                ;; COMPUTE-EFFECTIVE-METHOD (and
+                                ;; presumably MAKE-METHOD-LAMBDA) is
+                                ;; adjusted to match.
+                                ;;
+                                ;; On the other hand, it's a start,
+                                ;; because without this calls to
+                                ;; MAKE-METHOD in method combination
+                                ;; where one of the methods is of a
+                                ;; user-defined class don't work at
+                                ;; all.  -- CSR, 2006-08-05
+                                :call-method-args (cons (mapcar #'frob-cm-arg (car cm-args))
+                                                        (cdr cm-args))))
             mf))))
 
 (defun make-effective-method-function-simple1
