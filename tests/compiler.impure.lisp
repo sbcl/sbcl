@@ -1229,14 +1229,37 @@
     (list (funcall #'target-fun 1 4) (funcall 'target-fun 1 4))))
 (test-target-fun-called #'caller-fun-3 (list -3 5))
 
-;; Reported by NIIMI Satoshi
-;; Subject: [Sbcl-devel] compilation error with optimization
-;; Date: Sun, 09 Apr 2006 17:36:05 +0900
+;;; Reported by NIIMI Satoshi
+;;; Subject: [Sbcl-devel] compilation error with optimization
+;;; Date: Sun, 09 Apr 2006 17:36:05 +0900
 (defun test-minimal-debug-info-for-unstored-but-used-parameter (n a)
   (declare (optimize (speed 3)
                      (debug 1)))
   (if (= n 0)
       0
       (test-minimal-debug-info-for-unstored-but-used-parameter (1- n) a)))
+
+;;; &KEY arguments with non-constant defaults.
+(declaim (notinline opaque-identity))
+(defun opaque-identity (x) x)
+(defstruct tricky-defaults
+  (fun #'identity :type function)
+  (num (opaque-identity 3) :type fixnum))
+(macrolet ((frob (form expected-expected-type)
+             `(handler-case ,form
+               (type-error (c) (assert (eq (type-error-expected-type c)
+                                           ',expected-expected-type)))
+               (:no-error (&rest vals) (error "~S returned values: ~S" ',form vals)))))
+  (frob (make-tricky-defaults :fun 3) function)
+  (frob (make-tricky-defaults :num #'identity) fixnum))
+
+(let ((fun (compile nil '(lambda (&key (key (opaque-identity 3)))
+                          (declare (optimize safety) (type integer key))
+                          key))))
+  (assert (= (funcall fun) 3))
+  (assert (= (funcall fun :key 17) 17))
+  (handler-case (funcall fun :key t)
+    (type-error (c) (assert (eq (type-error-expected-type c) 'integer)))
+    (:no-error (&rest vals) (error "no error"))))
 
 ;;; success

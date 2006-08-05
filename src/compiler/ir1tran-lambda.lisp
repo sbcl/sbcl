@@ -661,12 +661,7 @@
              (n-val (make-symbol (format nil
                                          "~A-DEFAULTING-TEMP"
                                          (leaf-source-name key))))
-             (key-type (leaf-type key))
-             (val-temp (make-lambda-var
-                        :%source-name n-val
-                        :type (if hairy-default
-                                  (type-union key-type (specifier-type 'null))
-                                  key-type))))
+             (val-temp (make-lambda-var :%source-name n-val)))
         (main-vars val-temp)
         (bind-vars key)
         (cond ((or hairy-default supplied-p)

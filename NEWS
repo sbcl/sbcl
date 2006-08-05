@@ -5,6 +5,9 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
     as specified by AMOP.
   * optimization: faster LOGCOUNT implementation on x86 and x86-64
     (thanks to Lutz Euler)
+  * bug fix: improved the handling of type declarations and the
+    detection of violations for keyword arguments with non-constant
+    defaults.
 
 changes in sbcl-0.9.15 relative to sbcl-0.9.14:
   * added support for the ucs-2 external format.  (contributed by Ivan
