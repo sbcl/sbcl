@@ -387,5 +387,8 @@
                                            (assert (not (pathname-directory p)))
                                            p))))
 
+;;; reported by Richard Kreuter: PATHNAME used to be unsafely-flushable
+(assert (eq :false (if (ignore-errors (pathname nil)) :true :false)))
+
 
 ;;;; success

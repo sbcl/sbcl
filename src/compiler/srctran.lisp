@@ -3708,6 +3708,12 @@
        (funcall control *standard-output* ,@arg-names)
        nil)))
 
+(deftransform pathname ((pathspec) (pathname) *)
+  'pathspec)
+
+(deftransform pathname ((pathspec) (string) *)
+  '(values (parse-namestring pathspec)))
+
 (macrolet
     ((def (name)
          `(defoptimizer (,name optimizer) ((control &rest args))
@@ -4069,3 +4075,4 @@
   `(let* ((acons (assoc quality-name policy))
           (result (or (cdr acons) 1)))
      result))
+

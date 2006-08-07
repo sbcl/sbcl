@@ -1165,7 +1165,7 @@
 (defknown load-logical-pathname-translations (string) t ())
 (defknown logical-pathname-translations (logical-host-designator) list ())
 
-(defknown pathname (pathname-designator) pathname (unsafely-flushable))
+(defknown pathname (pathname-designator) pathname ())
 (defknown truename (pathname-designator) pathname ())
 
 (defknown parse-namestring
