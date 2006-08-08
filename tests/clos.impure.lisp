@@ -1346,4 +1346,27 @@
 ;;; cache with more than one key, then failure ensues.
 (reinitialize-instance #'print-object)
 
+;;; bug in long-form method combination: if there's an applicable
+;;; method not part of any method group, we need to call
+;;; INVALID-METHOD-ERROR.  (MC27 test case from Bruno Haible)
+(define-method-combination mc27 ()
+  ((normal ())
+   (ignored (:ignore :unused)))
+  `(list 'result
+    ,@(mapcar #'(lambda (method) `(call-method ,method)) normal)))
+(defgeneric test-mc27 (x)
+  (:method-combination mc27)
+  (:method :ignore ((x number)) (/ 0)))
+(assert (raises-error? (test-mc27 7)))
+
+(define-method-combination mc27prime ()
+  ((normal ())
+   (ignored (:ignore)))
+  `(list 'result ,@(mapcar (lambda (m) `(call-method ,m)) normal)))
+(defgeneric test-mc27prime (x)
+  (:method-combination mc27prime)
+  (:method :ignore ((x number)) (/ 0)))
+(assert (equal '(result) (test-mc27prime 3)))
+(assert (raises-error? (test-mc27 t))) ; still no-applicable-method
+
 ;;;; success

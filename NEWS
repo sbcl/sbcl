@@ -5,14 +5,19 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
     as specified by AMOP.
   * optimization: faster LOGCOUNT implementation on x86 and x86-64
     (thanks to Lutz Euler)
+  * fixed bug #337: use of MAKE-METHOD in method combination now works
+    even in the presence of user-defined method classes.  (reported by
+    Bruno Haible and Pascal Costanza)
+  * fixed bug #339(c): if there are applicable methods not part of any
+    long-form method-combination group, call INVALID-METHOD-ERROR.
+    (reported by Bruno Haible)
   * bug fix: improved the handling of type declarations and the
     detection of violations for keyword arguments with non-constant
     defaults.
-  * bug fix: use of MAKE-METHOD in method combination now works even
-    in the presence of user-defined method classes.  (reported by
-    Bruno Haible and Pascal Costanza)
   * bug fix: erronous calls to PATHNAME were being optimized away.
     (reported by Richard Kreuter)
+  * bug fix: compiled calls to TYPEP were mishandling obsolete
+    instances.  (reported by James Bielman and Attila Lendvai)
 
 changes in sbcl-0.9.15 relative to sbcl-0.9.14:
   * added support for the ucs-2 external format.  (contributed by Ivan

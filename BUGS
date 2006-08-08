@@ -1228,21 +1228,7 @@ WORKAROUND:
    iii. supplied-p variables for &optional and &key arguments are not
         bound.
 
-  c. qualifier matching incorrect
-  (progn
-    (define-method-combination mc27 () 
-        ((normal ()) 
-         (ignored (:ignore :unused)))
-      `(list 'result 
-             ,@(mapcar #'(lambda (method) `(call-method ,method)) normal)))
-    (defgeneric test-mc27 (x)
-      (:method-combination mc27)
-      (:method :ignore ((x number)) (/ 0)))
-    (test-mc27 7))
-
-  should signal an invalid-method-error, as the :IGNORE (NUMBER)
-  method is applicable, and yet matches neither of the method group
-  qualifier patterns.
+  c. (fixed in sbcl-0.9.15.15)
 
 344: more (?) ROOM T problems (possibly part of bug 108)
   In sbcl-0.8.12.51, and off and on leading up to it, the

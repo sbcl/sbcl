@@ -324,7 +324,12 @@
     (method-group-specifiers declarations real-body)
   (let (names specializer-caches cond-clauses required-checks order-cleanups)
     (let ((nspecifiers (length method-group-specifiers)))
-      (dolist (method-group-specifier method-group-specifiers)
+      (dolist (method-group-specifier method-group-specifiers
+               (push `(t (return-from .long-method-combination-function.
+                           `(invalid-method-error , .method.
+                             "~@<is applicable, but does not belong ~
+                              to any method group~@:>")))
+                     cond-clauses))
         (multiple-value-bind (name tests description order required)
             (parse-method-group-specifier method-group-specifier)
           (declare (ignore description))
