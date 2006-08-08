@@ -1369,4 +1369,18 @@
 (assert (equal '(result) (test-mc27prime 3)))
 (assert (raises-error? (test-mc27 t))) ; still no-applicable-method
 
+;;; more invalid wrappers.  This time for a long-standing bug in the
+;;; compiler's expansion for TYPEP on various class-like things, with
+;;; user-visible consequences.
+(defclass obsolete-again () ())
+(defvar *obsolete-again* (make-instance 'obsolete-again))
+(defvar *obsolete-again-hash* (sxhash *obsolete-again*))
+(make-instances-obsolete (find-class 'obsolete-again))
+(assert (not (streamp *obsolete-again*)))
+(make-instances-obsolete (find-class 'obsolete-again))
+(assert (= (sxhash *obsolete-again*) *obsolete-again-hash*))
+(compile (defun is-a-structure-object-p (x) (typep x 'structure-object)))
+(make-instances-obsolete (find-class 'obsolete-again))
+(assert (not (is-a-structure-object-p *obsolete-again*)))
+
 ;;;; success

@@ -1463,6 +1463,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "UNKNOWN-TYPE-SPECIFIER" "UNSEEN-THROW-TAG-ERROR"
                ;; FIXME: 32/64-bit issues
                "UNSIGNED-BYTE-32-P" "UNSIGNED-BYTE-64-P"
+               "UPDATE-OBJECT-LAYOUT-OR-INVALID"
                "VALUE-CELL-REF" "VALUE-CELL-SET" "VALUES-SPECIFIER-TYPE"
                "VALUES-SPECIFIER-TYPE-CACHE-CLEAR" "VALUES-SUBTYPEP"
                "VALUES-TYPE" "VALUES-TYPE-ERROR" "VALUES-TYPE-IN"

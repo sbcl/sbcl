@@ -847,6 +847,11 @@ NIL is returned when no such class exists."
     (ensure-classoid-valid class1 layout1)
     (ensure-classoid-valid class2 layout2)))
 
+(defun update-object-layout-or-invalid (object layout)
+  (if (typep (classoid-of object) 'standard-classoid)
+      (sb!pcl::check-wrapper-validity object)
+      (%layout-invalid-error object layout)))
+
 ;;; Simple methods for TYPE= and SUBTYPEP should never be called when
 ;;; the two classes are equal, since there are EQ checks in those
 ;;; operations.

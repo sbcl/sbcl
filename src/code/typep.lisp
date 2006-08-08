@@ -185,11 +185,7 @@
            (values obj-layout layout))
         (aver (< i 2))
         (when (layout-invalid obj-layout)
-          (if (typep (classoid-of object) 'standard-classoid)
-              (setq obj-layout (sb!pcl::check-wrapper-validity object))
-              (error "~S was called on an obsolete object (classoid ~S)."
-                     'typep
-                     (classoid-proper-name (layout-classoid obj-layout)))))
+          (setq obj-layout (update-object-layout-or-invalid object layout)))
         (ensure-classoid-valid classoid layout))
     (let ((obj-inherits (layout-inherits obj-layout)))
       (or (eq obj-layout layout)

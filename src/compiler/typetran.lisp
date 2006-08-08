@@ -443,9 +443,13 @@
                   (n-layout (gensym)))
               `(and (,pred object)
                     (let ((,n-layout (,get-layout object)))
-                      ,@(when (policy *lexenv* (>= safety speed))
-                              `((when (layout-invalid ,n-layout)
-                                  (%layout-invalid-error object ',layout))))
+                      ;; we used to check for invalid layouts here,
+                      ;; but in fact that's both unnecessary and
+                      ;; wrong; it's unnecessary because structure
+                      ;; classes can't be redefined, and it's wrong
+                      ;; because it is quite legitimate to pass an
+                      ;; object with an invalid layout to a structure
+                      ;; type test.
                       (if (eq ,n-layout ',layout)
                           t
                           (and (> (layout-depthoid ,n-layout)
@@ -456,15 +460,15 @@
                                      ',layout))))))))
            ((and layout (>= (layout-depthoid layout) 0))
             ;; hierarchical layout depths for other things (e.g.
-            ;; CONDITIONs)
+            ;; CONDITION, STREAM)
             (let ((depthoid (layout-depthoid layout))
                   (n-layout (gensym))
                   (n-inherits (gensym)))
               `(and (,pred object)
                     (let ((,n-layout (,get-layout object)))
-                      ,@(when (policy *lexenv* (>= safety speed))
-                          `((when (layout-invalid ,n-layout)
-                              (%layout-invalid-error object ',layout))))
+                      (when (layout-invalid ,n-layout)
+                        (setq ,n-layout (update-object-layout-or-invalid
+                                         object ',layout)))
                       (if (eq ,n-layout ',layout)
                           t
                           (let ((,n-inherits (layout-inherits ,n-layout)))
