@@ -26,8 +26,6 @@
 
 (defgeneric generic-function-p (object))
 
-(defgeneric legal-lambda-list-p (object x))
-
 (defgeneric method-combination-p (object))
 
 (defgeneric method-p (object))
@@ -331,20 +329,6 @@
 (defgeneric direct-slot-definition-class (class &rest initargs))
 
 (defgeneric effective-slot-definition-class (class &rest initargs))
-
-(defgeneric legal-documentation-p (object x))
-
-(defgeneric legal-method-function-p (object x))
-
-(defgeneric legal-qualifier-p (object x))
-
-(defgeneric legal-qualifiers-p (object x))
-
-(defgeneric legal-slot-name-p (object x))
-
-(defgeneric legal-specializer-p (object x))
-
-(defgeneric legal-specializers-p (object x))
 
 (defgeneric make-boundp-method-function (class slot-name))
 

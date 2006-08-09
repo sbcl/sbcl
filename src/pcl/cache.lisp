@@ -557,21 +557,26 @@
         (logand mask result)
         (the fixnum (1+ (logand mask result))))))
 
-;;;  NIL              means nothing so far, no actual arg info has NILs
-;;;                in the metatype
-;;;  CLASS          seen all sorts of metaclasses
-;;;                (specifically, more than one of the next 4 values)
-;;;  T          means everything so far is the class T
-;;;  STANDARD-CLASS   seen only standard classes
-;;;  BUILT-IN-CLASS   seen only built in classes
-;;;  STRUCTURE-CLASS  seen only structure classes
+;;;  NIL: means nothing so far, no actual arg info has NILs in the
+;;;  metatype
+;;;
+;;;  CLASS: seen all sorts of metaclasses (specifically, more than one
+;;;  of the next 5 values) or else have seen something which doesn't
+;;;  fall into a single category (SLOT-INSTANCE, FORWARD).
+;;;
+;;;  T: means everything so far is the class T
+;;;  STANDARD-INSTANCE: seen only standard classes
+;;;  BUILT-IN-INSTANCE: seen only built in classes
+;;;  STRUCTURE-INSTANCE: seen only structure classes
+;;;  CONDITION-INSTANCE: seen only condition classes
 (defun raise-metatype (metatype new-specializer)
   (let ((slot      (find-class 'slot-class))
         (standard  (find-class 'standard-class))
         (fsc       (find-class 'funcallable-standard-class))
         (condition (find-class 'condition-class))
         (structure (find-class 'structure-class))
-        (built-in  (find-class 'built-in-class)))
+        (built-in  (find-class 'built-in-class))
+        (frc       (find-class 'forward-referenced-class)))
     (flet ((specializer->metatype (x)
              (let ((meta-specializer
                      (if (eq *boot-state* 'complete)
@@ -585,18 +590,19 @@
                  ((*subtypep meta-specializer structure) 'structure-instance)
                  ((*subtypep meta-specializer built-in) 'built-in-instance)
                  ((*subtypep meta-specializer slot) 'slot-instance)
+                 ((*subtypep meta-specializer frc) 'forward)
                  (t (error "~@<PCL cannot handle the specializer ~S ~
                             (meta-specializer ~S).~@:>"
-                           new-specializer
-                           meta-specializer))))))
+                           new-specializer meta-specializer))))))
       ;; We implement the following table. The notation is
       ;; that X and Y are distinct meta specializer names.
       ;;
-      ;;   NIL    <anything>    ===>  <anything>
-      ;;    X      X        ===>      X
-      ;;    X      Y        ===>    CLASS
+      ;;    NIL    <anything>    ===>  <anything>
+      ;;    X      X             ===>  X
+      ;;    X      Y             ===>  CLASS
       (let ((new-metatype (specializer->metatype new-specializer)))
         (cond ((eq new-metatype 'slot-instance) 'class)
+              ((eq new-metatype 'forward) 'class)
               ((null metatype) new-metatype)
               ((eq metatype new-metatype) new-metatype)
               (t 'class))))))

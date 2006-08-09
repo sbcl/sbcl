@@ -72,101 +72,94 @@
   (def update-instance-for-different-class ((old method) new &rest initargs)
     "No behaviour specified for ~S on method objects."))
 
-(defmethod legal-documentation-p ((object standard-method) x)
-  (if (or (null x) (stringp x))
-      t
-      "a string or NULL"))
+(define-condition invalid-method-initarg (simple-program-error)
+  ((method :initarg :method :reader invalid-method-initarg-method))
+  (:report
+   (lambda (c s)
+     (format s "~@<In initialization of ~S:~2I~_~?~@:>"
+             (invalid-method-initarg-method c)
+             (simple-condition-format-control c)
+             (simple-condition-format-arguments c)))))
 
-(defmethod legal-lambda-list-p ((object standard-method) x)
-  (declare (ignore x))
-  t)
+(defun invalid-method-initarg (method format-control &rest args)
+  (error 'invalid-method-initarg :method method
+         :format-control format-control :format-arguments args))
 
-(defmethod legal-method-function-p ((object standard-method) x)
-  (if (functionp x)
-      t
-      "a function"))
+(defun check-documentation (method doc)
+  (unless (or (null doc) (stringp doc))
+    (invalid-method-initarg method "~@<~S of ~S is neither ~S nor a ~S.~@:>"
+                            :documentation doc 'null 'string)))
+(defun check-lambda-list (method ll)
+  nil)
 
-(defmethod legal-qualifiers-p ((object standard-method) x)
+(defun check-method-function (method fun)
+  (unless (functionp fun)
+    (invalid-method-initarg method "~@<~S of ~S is not a ~S.~@:>"
+                            :function fun 'function)))
+
+(defun check-qualifiers (method qualifiers)
   (flet ((improper-list ()
-           (return-from legal-qualifiers-p "Is not a proper list.")))
-    (dolist-carefully (q x improper-list)
-      (let ((ok (legal-qualifier-p object q)))
-        (unless (eq ok t)
-          (return-from legal-qualifiers-p
-            (format nil "Contains ~S which ~A" q ok)))))
-    t))
+           (invalid-method-initarg method
+                                   "~@<~S of ~S is an improper list.~@:>"
+                                   :qualifiers qualifiers)))
+    (dolist-carefully (q qualifiers improper-list)
+      (unless (and q (atom q))
+        (invalid-method-initarg method
+                                "~@<~S, in ~S ~S, is not a non-~S atom.~@:>"
+                                q :qualifiers qualifiers 'null)))))
 
-(defmethod legal-qualifier-p ((object standard-method) x)
-  (if (and x (atom x))
-      t
-      "is not a non-null atom"))
+(defun check-slot-name (method name)
+  (unless (symbolp name)
+    (invalid-method-initarg "~@<~S of ~S is not a ~S.~@:>"
+                            :slot-name name 'symbol)))
 
-(defmethod legal-slot-name-p ((object standard-method) x)
-  (cond ((not (symbolp x)) "is not a symbol")
-        (t t)))
-
-(defmethod legal-specializers-p ((object standard-method) x)
+(defun check-specializers (method specializers)
   (flet ((improper-list ()
-           (return-from legal-specializers-p "Is not a proper list.")))
-    (dolist-carefully (s x improper-list)
-      (let ((ok (legal-specializer-p object s)))
-        (unless (eq ok t)
-          (return-from legal-specializers-p
-            (format nil "Contains ~S which ~A" s ok)))))
-    t))
+           (invalid-method-initarg method
+                                   "~@<~S of ~S is an improper list.~@:>"
+                                   :specializers specializers)))
+    (dolist-carefully (s specializers improper-list)
+      (unless (specializerp s)
+        (invalid-method-initarg method
+                                "~@<~S, in ~S ~S, is not a ~S.~@:>"
+                                s :specializers specializers 'specializer)))
+    ;; KLUDGE: ANSI says that it's not valid to have methods
+    ;; specializing on classes which are "not defined", leaving
+    ;; unclear what the definedness of a class is; AMOP suggests that
+    ;; forward-referenced-classes, since they have proper names and
+    ;; all, are at least worthy of some level of definition.  We allow
+    ;; methods specialized on forward-referenced-classes, but it's
+    ;; non-portable and potentially dubious, so
+    (let ((frcs (remove-if-not #'forward-referenced-class-p specializers)))
+      (unless (null frcs)
+        (style-warn "~@<Defining a method using ~
+                     ~V[~;~1{~S~}~;~1{~S and ~S~}~:;~{~#[~;and ~]~S~^, ~}~] ~
+                     as ~2:*~V[~;a specializer~:;specializers~].~@:>"
+                    (length frcs) frcs)))))
 
-(defvar *allow-experimental-specializers-p* nil)
-
-(defmethod legal-specializer-p ((object standard-method) x)
-  (if (if *allow-experimental-specializers-p*
-          (specializerp x)
-          (or (classp x)
-              (eql-specializer-p x)))
-      t
-      "is neither a class object nor an EQL specializer"))
-
-(defmethod shared-initialize :before ((method standard-method)
-                                      slot-names
-                                      &key qualifiers
-                                           lambda-list
-                                           specializers
-                                           function
-                                           fast-function
-                                           documentation)
+(defmethod shared-initialize :before
+    ((method standard-method) slot-names &key
+     qualifiers lambda-list specializers function fast-function documentation)
   (declare (ignore slot-names))
-  (flet ((lose (initarg value string)
-           (error "when initializing the method ~S:~%~
-                   The ~S initialization argument was: ~S.~%~
-                   which ~A."
-                  method initarg value string)))
-    (let ((check-qualifiers    (legal-qualifiers-p method qualifiers))
-          (check-lambda-list   (legal-lambda-list-p method lambda-list))
-          (check-specializers  (legal-specializers-p method specializers))
-          (check-fun (legal-method-function-p method
-                                              (or function
-                                                  fast-function)))
-          (check-documentation (legal-documentation-p method documentation)))
-      (unless (eq check-qualifiers t)
-        (lose :qualifiers qualifiers check-qualifiers))
-      (unless (eq check-lambda-list t)
-        (lose :lambda-list lambda-list check-lambda-list))
-      (unless (eq check-specializers t)
-        (lose :specializers specializers check-specializers))
-      (unless (eq check-fun t)
-        (lose :function function check-fun))
-      (unless (eq check-documentation t)
-        (lose :documentation documentation check-documentation)))))
+  ;; FIXME: it's not clear to me (CSR, 2006-08-09) why methods get
+  ;; this extra paranoia and nothing else does; either everything
+  ;; should be aggressively checking initargs, or nothing much should.
+  ;; In either case, it would probably be better to have :type
+  ;; declarations in slots, which would then give a suitable type
+  ;; error (if we implement type-checking for slots...) rather than
+  ;; this hand-crafted thing.
+  (check-qualifiers method qualifiers)
+  (check-lambda-list method lambda-list)
+  (check-specializers method specializers)
+  (check-method-function method (or function fast-function))
+  (check-documentation method documentation))
 
-(defmethod shared-initialize :before ((method standard-accessor-method)
-                                      slot-names
-                                      &key slot-name slot-definition)
+(defmethod shared-initialize :before
+    ((method standard-accessor-method) slot-names &key
+     slot-name slot-definition)
   (declare (ignore slot-names))
   (unless slot-definition
-    (let ((legalp (legal-slot-name-p method slot-name)))
-      ;; FIXME: nasty convention; should be renamed to ILLEGAL-SLOT-NAME-P and
-      ;; ILLEGALP, and the convention redone to be less twisty
-      (unless (eq legalp t)
-        (error "The value of the :SLOT-NAME initarg ~A." legalp)))))
+    (check-slot-name method slot-name)))
 
 (defmethod shared-initialize :after ((method standard-method) slot-names
                                      &rest initargs
