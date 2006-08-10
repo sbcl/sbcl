@@ -40,14 +40,14 @@
   'fsc-instance-slots)
 
 (defmethod raw-instance-allocator ((class funcallable-standard-class))
-  'allocate-funcallable-instance)
+  'allocate-standard-funcallable-instance)
 
 (defmethod allocate-instance
            ((class funcallable-standard-class) &rest initargs)
   (declare (ignore initargs))
   (unless (class-finalized-p class)
     (finalize-inheritance class))
-  (allocate-funcallable-instance (class-wrapper class)))
+  (allocate-standard-funcallable-instance (class-wrapper class)))
 
 (defmethod make-reader-method-function ((class funcallable-standard-class)
                                         slot-name)

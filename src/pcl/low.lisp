@@ -76,12 +76,12 @@
 
 ;;;; PCL's view of funcallable instances
 
-(!defstruct-with-alternate-metaclass pcl-funcallable-instance
+(!defstruct-with-alternate-metaclass standard-funcallable-instance
   ;; KLUDGE: Note that neither of these slots is ever accessed by its
   ;; accessor name as of sbcl-0.pre7.63. Presumably everything works
   ;; by puns based on absolute locations. Fun fun fun.. -- WHN 2001-10-30
   :slot-names (clos-slots name hash-code)
-  :boa-constructor %make-pcl-funcallable-instance
+  :boa-constructor %make-standard-funcallable-instance
   :superclass-name function
   :metaclass-name standard-classoid
   :metaclass-constructor make-standard-classoid

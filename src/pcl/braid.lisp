@@ -52,28 +52,38 @@
                              :initial-element +slot-unbound+))))
     instance))
 
-(defmacro allocate-funcallable-instance-slots (wrapper &optional
-                                                       slots-init-p slots-init)
+(defmacro allocate-standard-funcallable-instance-slots
+    (wrapper &optional slots-init-p slots-init)
   `(let ((no-of-slots (wrapper-no-of-instance-slots ,wrapper)))
-     ,(if slots-init-p
-          `(if ,slots-init-p
-               (make-array no-of-slots :initial-contents ,slots-init)
-               (make-array no-of-slots :initial-element +slot-unbound+))
-          `(make-array no-of-slots :initial-element +slot-unbound+))))
+    ,(if slots-init-p
+         `(if ,slots-init-p
+           (make-array no-of-slots :initial-contents ,slots-init)
+           (make-array no-of-slots :initial-element +slot-unbound+))
+         `(make-array no-of-slots :initial-element +slot-unbound+))))
 
-(defun allocate-funcallable-instance (wrapper &optional
-                                              (slots-init nil slots-init-p))
-  (let ((fin (%make-pcl-funcallable-instance nil nil
-                                             (get-instance-hash-code))))
+(define-condition unset-funcallable-instance-function
+    (reference-condition simple-error)
+  ()
+  (:default-initargs
+   :references (list '(:amop :generic-function allocate-instance)
+                     '(:amop :function set-funcallable-instance-function))))
+
+(defun allocate-standard-funcallable-instance
+    (wrapper &optional (slots-init nil slots-init-p))
+  (let ((fin (%make-standard-funcallable-instance
+              nil nil (get-instance-hash-code))))
     (set-funcallable-instance-function
      fin
      #'(lambda (&rest args)
          (declare (ignore args))
-         (error "The function of the funcallable-instance ~S has not been set."
-                fin)))
+         (error 'unset-funcallable-instance-function
+                :format-control "~@<The function of funcallable instance ~
+                                 ~S has not been set.~@:>"
+                :format-arguments (list fin))))
     (setf (fsc-instance-wrapper fin) wrapper
-          (fsc-instance-slots fin) (allocate-funcallable-instance-slots
-                                    wrapper slots-init-p slots-init))
+          (fsc-instance-slots fin)
+          (allocate-standard-funcallable-instance-slots
+           wrapper slots-init-p slots-init))
     fin))
 
 (defun allocate-structure-instance (wrapper &optional
@@ -197,7 +207,7 @@
                       ()))
 
               (setq proto (if (eq meta 'funcallable-standard-class)
-                              (allocate-funcallable-instance wrapper)
+                              (allocate-standard-funcallable-instance wrapper)
                               (allocate-standard-instance wrapper)))
 
               (setq direct-slots
