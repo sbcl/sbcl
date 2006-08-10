@@ -1708,13 +1708,14 @@ SPEED and COMPILATION-SPEED optimization values, and the
 ;;; -- WHN 2000-12-09
 (defun sb!xc:compile-file-pathname (input-file
                                     &key
-                                    (output-file (cfp-output-file-default
-                                                  input-file))
+                                    (output-file nil output-file-p)
                                     &allow-other-keys)
   #!+sb-doc
   "Return a pathname describing what file COMPILE-FILE would write to given
    these arguments."
-  (merge-pathnames output-file (merge-pathnames input-file)))
+  (if output-file-p
+      (merge-pathnames output-file (cfp-output-file-default input-file))
+      (cfp-output-file-default input-file)))
 
 ;;;; MAKE-LOAD-FORM stuff
 

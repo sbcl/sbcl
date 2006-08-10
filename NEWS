@@ -26,6 +26,9 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
   * bug fix: format strings with ~> without matching ~< no longer
     trigger an AVER, but signal an understandable error instead.
     (reported by Antonio Martinez)
+  * bug fix: specifying an output-file without a pathname-type for
+    COMPILE-FILE or COMPILE-FILE-PATHNAME resulted in using the type
+    of input-file instead of "fasl". (reported by Robert Dodier)
 
 changes in sbcl-0.9.15 relative to sbcl-0.9.14:
   * added support for the ucs-2 external format.  (contributed by Ivan

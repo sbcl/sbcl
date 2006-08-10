@@ -400,5 +400,12 @@
 (assert (eq :false
             (if (ignore-errors (merge-pathnames sb-sys::*tty*)) :true :false)))
 
+;;; This used to return "quux/bar.lisp"
+(assert (equal #p"quux/bar.fasl"
+               (let ((*default-pathname-defaults* #p"quux/"))
+                 (compile-file-pathname "foo.lisp" :output-file "bar"))))
+(assert (equal #p"quux/bar.fasl"
+               (let ((*default-pathname-defaults* #p"quux/"))
+                 (compile-file-pathname "bar.lisp"))))
 
 ;;;; success
