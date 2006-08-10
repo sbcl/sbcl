@@ -1182,7 +1182,7 @@
 (defknown merge-pathnames
   (pathname-designator &optional pathname-designator pathname-version)
   pathname
-  (unsafely-flushable))
+  ())
 
 (defknown make-pathname
  (&key (:defaults pathname-designator)

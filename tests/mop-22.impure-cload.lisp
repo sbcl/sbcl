@@ -48,8 +48,8 @@
 
 (assert (eq (incomplete/1 (make-instance 'incomplete)) 'incomplete))
 (assert (eq (forward/1 (make-instance 'forward)) 'forward))
-(assert (eq (incomplete/7 (make-instance 'incomplete) 
+(assert (eq (incomplete/7 (make-instance 'incomplete)
                           (make-instance 'incomplete)
-                          t 1 (make-condition 'error) 
+                          t 1 (make-condition 'error)
                           (find-class 'incomplete) 3)
             t))

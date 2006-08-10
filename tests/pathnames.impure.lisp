@@ -387,8 +387,18 @@
                                            (assert (not (pathname-directory p)))
                                            p))))
 
-;;; reported by Richard Kreuter: PATHNAME used to be unsafely-flushable
-(assert (eq :false (if (ignore-errors (pathname nil)) :true :false)))
+;;; reported by Richard Kreuter: PATHNAME and MERGE-PATHNAMES used to
+;;; be unsafely-flushable. Since they are known to return non-nil values
+;;; only, the test-node of the IF is flushed, and since the function
+;;; is unsafely-flushable, out it goes, and bad pathname designators
+;;; breeze through.
+;;;
+;;; These tests rely on using a stream that appears as a file-stream
+;;; but isn't a valid pathname-designator.
+(assert (eq :false
+            (if (ignore-errors (pathname sb-sys::*tty*)) :true :false)))
+(assert (eq :false
+            (if (ignore-errors (merge-pathnames sb-sys::*tty*)) :true :false)))
 
 
 ;;;; success
