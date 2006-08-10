@@ -7,6 +7,8 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
     (thanks to Lutz Euler)
   * optimization: hashing of general arrays and vectors has been
     improved. (reported by Any Fingerhut)
+  * enhancement: SB-INTROSPECT is now able to find definitions of
+    profiled functions. (thanks to Troels Henriksen)
   * fixed bug #337: use of MAKE-METHOD in method combination now works
     even in the presence of user-defined method classes.  (reported by
     Bruno Haible and Pascal Costanza)

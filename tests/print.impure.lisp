@@ -412,4 +412,8 @@
 
 (assert (string= (eval '(format nil "~:C" #\a)) "a"))
 (assert (string= (format nil (formatter "~:C") #\a) "a"))
+
+;;; This used to trigger an AVER instead.
+(assert (raises-error? (format t "~>") sb-format:format-error))
+
 ;;; success

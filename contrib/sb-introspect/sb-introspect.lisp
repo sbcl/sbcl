@@ -143,7 +143,14 @@ If an unsupported TYPE is requested, the function will return NIL.
                (list x)))
          (get-class (name)
            (and (symbolp name)
-                (find-class name nil))))
+                (find-class name nil)))
+         (real-fdefinition (name)
+           ;; for getting the real function object, even if the
+           ;; function is being profiled
+           (let ((profile-info (gethash name sb-profile::*profiled-fun-name->info*)))
+             (if profile-info
+                 (sb-profile::profile-info-encapsulated-fun profile-info)
+                 (fdefinition name)))))
     (listify
      (case type
        ((:variable)
@@ -169,7 +176,7 @@ If an unsupported TYPE is requested, the function will return NIL.
         (when (and (fboundp name)
                    (or (not (symbolp name))
                        (not (macro-function name))))
-          (let ((fun (fdefinition name)))
+          (let ((fun (real-fdefinition name)))
             (when (eq (not (typep fun 'generic-function))
                       (not (eq type :generic-function)))
               (find-definition-source fun)))))
@@ -178,12 +185,13 @@ If an unsupported TYPE is requested, the function will return NIL.
           (when expander-fun
             (find-definition-source expander-fun))))
        ((:method)
-        (when (and (fboundp name)
-                   (typep (fdefinition name) 'generic-function))
-          (loop for method in (sb-mop::generic-function-methods
-                               (fdefinition name))
+        (when (fboundp name)
+          (let ((fun (real-fdefinition name)))
+           (when (typep fun 'generic-function)
+             (loop for method in (sb-mop::generic-function-methods
+                                  fun)
                 for source = (find-definition-source method)
-                when source collect source)))
+                when source collect source)))))
        ((:setf-expander)
         (when (and (consp name)
                    (eq (car name) 'setf))

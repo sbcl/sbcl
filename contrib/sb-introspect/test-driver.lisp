@@ -68,6 +68,9 @@
 (assert (matchp-name :method-combination 'cl-user::r 26))
 (assert (matchp-name :setf-expander 'cl-user::s 27))
 
+(sb-profile:profile cl-user::one)
+(assert (matchp-name :function 'cl-user::one 2))
+(sb-profile:unprofile cl-user::one)
 
 ;;; Unix success convention for exit codes
 (sb-ext:quit :unix-status 0)
