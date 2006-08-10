@@ -78,7 +78,11 @@
             ((and block (char= char #\;) (format-directive-colonp directive))
              (setf semicolon directive))
             ((char= char #\>)
-             (aver block)
+             (unless block
+               (error 'format-error
+                      :complaint "~~> without a matching ~~<"
+                      :control-string string
+                      :offset next-directive))
              (cond
                ((format-directive-colonp directive)
                 (unless pprint

@@ -21,6 +21,9 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
     (reported by Richard Kreuter)
   * bug fix: compiled calls to TYPEP were mishandling obsolete
     instances.  (reported by James Bielman and Attila Lendvai)
+  * bug fix: format strings with ~> without matching ~< no longer
+    trigger an AVER, but signal an understandable error instead.
+    (reported by Antonio Martinez)
 
 changes in sbcl-0.9.15 relative to sbcl-0.9.14:
   * added support for the ucs-2 external format.  (contributed by Ivan
