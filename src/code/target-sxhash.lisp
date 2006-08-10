@@ -143,6 +143,20 @@
 (declaim (ftype (sfunction (t) (integer 0 #.sb!xc:most-positive-fixnum))
                 sxhash-instance))
 
+(defmacro hash-array-using (recurse array depthoid)
+  ;; Any other array can be hashed by working with its underlying
+  ;; one-dimensional physical representation. Used by both SXHASH and
+  ;; PSXHASH.
+  (once-only ((array array) (depthoid depthoid))
+    `(let ((result 60828123))
+       (declare (type fixnum result))
+       (dotimes (i (min ,depthoid (array-rank ,array)))
+         (mixf result (array-dimension ,array i)))
+       (dotimes (i (min ,depthoid (array-total-size ,array)))
+         (mixf result
+               (,recurse (row-major-aref ,array i) (- ,depthoid 1 i))))
+       result)))
+
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go
   ;; fast, in case it is the bottleneck somwhere.  -- CSR, 2003-03-14
@@ -201,7 +215,8 @@
                    ;; work needs to be done using the %RAW-BITS
                    ;; approach.  This will probably do for now.
                    (sxhash-recurse (copy-seq x) depthoid))
-                  (t (logxor 191020317 (sxhash (array-rank x))))))
+                  (t
+                   (hash-array-using sxhash-recurse x depthoid))))
                (character
                 (logxor 72185131
                         (sxhash (char-code x)))) ; through DEFTRANSFORM
@@ -266,18 +281,8 @@
           ;;(format t "~&SIMPLE-VECTOR special case~%")
           (frob))
          (t (frob)))))
-    ;; Any other array can be hashed by working with its underlying
-    ;; one-dimensional physical representation.
     (t
-     (let ((result 60828))
-       (declare (type fixnum result))
-       (dotimes (i (min depthoid (array-rank key)))
-         (mixf result (array-dimension key i)))
-       (dotimes (i (min depthoid (array-total-size key)))
-         (mixf result
-               (psxhash (row-major-aref key i)
-                        (- depthoid 1 i))))
-       result))))
+     (hash-array-using psxhash key depthoid))))
 
 (defun structure-object-psxhash (key depthoid)
   (declare (optimize speed))

@@ -5,6 +5,8 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
     as specified by AMOP.
   * optimization: faster LOGCOUNT implementation on x86 and x86-64
     (thanks to Lutz Euler)
+  * optimization: hashing of general arrays and vectors has been
+    improved. (reported by Any Fingerhut)
   * fixed bug #337: use of MAKE-METHOD in method combination now works
     even in the presence of user-defined method classes.  (reported by
     Bruno Haible and Pascal Costanza)
