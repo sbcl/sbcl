@@ -1262,7 +1262,12 @@
     (type-error (c) (assert (eq (type-error-expected-type c) 'integer)))
     (:no-error (&rest vals) (error "no error"))))
 
-;;; FUNCALL forms in compiler macros
+;;; Basic compiler-macro expansion
+(define-compiler-macro test-cmacro-0 () ''expanded)
+
+(assert (eq 'expanded (funcall (lambda () (test-cmacro-0)))))
+
+;;; FUNCALL forms in compiler macros, lambda-list parsing
 (define-compiler-macro test-cmacro-1
     (&whole whole a &optional b &rest c &key d)
   (list whole a b c d))
@@ -1278,5 +1283,39 @@
                   (assert (eql d ,d))))) )
   (test (funcall 'test-cmacro-1 1 2 :d 3) 1 2 '(:d 3) 3)
   (test (test-cmacro-1 11 12 :d 13) 11 12 '(:d 13) 13))
+
+;;; FUNCALL forms in compiler macros, expansions
+(define-compiler-macro test-cmacro-2 () ''ok)
+
+(assert (eq 'ok (funcall (lambda () (funcall 'test-cmacro-2)))))
+(assert (eq 'ok (funcall (lambda () (funcall #'test-cmacro-2)))))
+
+;;; Shadowing of compiler-macros by local functions
+(define-compiler-macro test-cmacro-3 () ''global)
+
+(defmacro find-cmacro-3 (&environment env)
+  (compiler-macro-function 'test-cmacro-3 env))
+
+(assert (funcall (lambda () (find-cmacro-3))))
+(assert (not (funcall (lambda () (flet ((test-cmacro-3 ()))
+                                   (find-cmacro-3))))))
+(assert (eq 'local (funcall (lambda () (flet ((test-cmacro-3 () 'local))
+                                         (test-cmacro-3))))))
+(assert (eq 'local (funcall (lambda () (flet ((test-cmacro-3 () 'local))
+                                         (funcall #'test-cmacro-3))))))
+(assert (eq 'global (funcall (lambda () (flet ((test-cmacro-3 () 'local))
+                                          (funcall 'test-cmacro-3))))))
+
+;;; Local NOTINLINE & INLINE
+(defun test-cmacro-4 () 'fun)
+(define-compiler-macro test-cmacro-4 () ''macro)
+
+(assert (eq 'fun (funcall (lambda ()
+                            (declare (notinline test-cmacro-4))
+                            (test-cmacro-4)))))
+
+(assert (eq 'macro (funcall (lambda ()
+                              (declare (inline test-cmacro-4))
+                              (test-cmacro-4)))))
 
 ;;; success

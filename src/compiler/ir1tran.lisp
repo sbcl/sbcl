@@ -497,41 +497,7 @@
                      (t
                       (reference-constant start next result form))))
               (t
-               (let ((opname (car form)))
-                 (cond ((or (symbolp opname) (leaf-p opname))
-                        (let ((lexical-def (if (leaf-p opname)
-                                               opname
-                                               (lexenv-find opname funs))))
-                          (typecase lexical-def
-                            (null
-                             (ir1-convert-global-functoid start next result
-                                                          form))
-                            (functional
-                             (ir1-convert-local-combination start next result
-                                                            form
-                                                            lexical-def))
-                            (global-var
-                             (ir1-convert-srctran start next result
-                                                  lexical-def form))
-                            (t
-                             (aver (and (consp lexical-def)
-                                        (eq (car lexical-def) 'macro)))
-                             (ir1-convert start next result
-                                          (careful-expand-macro
-                                           (cdr lexical-def)
-                                           form))))))
-                       ((or (atom opname) (not (eq (car opname) 'lambda)))
-                        (compiler-error "illegal function call"))
-                       (t
-                        ;; implicitly (LAMBDA ..) because the LAMBDA
-                        ;; expression is the CAR of an executed form
-                        (ir1-convert-combination start next result
-                                                 form
-                                                 (ir1-convert-lambda
-                                                  opname
-                                                  :debug-name (debug-name
-                                                               'lambda-car
-                                                               opname))))))))))
+               (ir1-convert-functoid start next result form)))))
     (values))
 
   ;; Generate a reference to a manifest constant, creating a new leaf
@@ -649,43 +615,88 @@
        (ir1-convert start next result `(%heap-alien ',var)))))
   (values))
 
-;;; Convert anything that looks like a special form, global function
-;;; or compiler-macro call.
-(defun ir1-convert-global-functoid (start next result form)
-  (declare (type ctran start next) (type (or lvar null) result) (list form))
-  (let* ((fun-name (first form))
-         (translator (info :function :ir1-convert fun-name))
-         (cmacro-fun (sb!xc:compiler-macro-function fun-name *lexenv*)))
+;;; Find a compiler-macro for a form, taking FUNCALL into account.
+(defun find-compiler-macro (opname form)
+  (if (eq opname 'funcall)
+      (let ((fun-form (cadr form)))
+        (cond ((and (consp fun-form) (eq 'function (car fun-form)))
+               (let ((real-fun (cadr fun-form)))
+                 (if (legal-fun-name-p real-fun)
+                     (values (sb!xc:compiler-macro-function real-fun *lexenv*)
+                             real-fun)
+                     (values nil nil))))
+              ((sb!xc:constantp fun-form *lexenv*)
+               (let ((fun (constant-form-value fun-form *lexenv*)))
+                 (if (legal-fun-name-p fun)
+                     ;; CLHS tells us that local functions must shadow
+                     ;; compiler-macro-functions, but since the call is
+                     ;; through a name, we are obviously interested
+                     ;; in the global function.
+                     (values (sb!xc:compiler-macro-function fun nil) fun)
+                     (values nil nil))))
+              (t
+               (values nil nil))))
+      (if (legal-fun-name-p opname)
+          (values (sb!xc:compiler-macro-function opname *lexenv*) opname)
+          (values nil nil))))
+
+;;; Picks of special forms and compiler-macro expansions, and hands
+;;; the rest to IR1-CONVERT-COMMON-FUNCTOID
+(defun ir1-convert-functoid (start next result form)
+  (let* ((op (car form))
+         (translator (and (symbolp op) (info :function :ir1-convert op))))
     (cond (translator
-           (when cmacro-fun
+           (when (sb!xc:compiler-macro-function op *lexenv*)
              (compiler-warn "ignoring compiler macro for special form"))
            (funcall translator start next result form))
-          ((and cmacro-fun
-                ;; gotcha: If you look up the DEFINE-COMPILER-MACRO
-                ;; macro in the ANSI spec, you might think that
-                ;; suppressing compiler-macro expansion when NOTINLINE
-                ;; is some pre-ANSI hack. However, if you look up the
-                ;; NOTINLINE declaration, you'll find that ANSI
-                ;; requires this behavior after all.
-                (not (eq (info :function :inlinep fun-name) :notinline)))
-           (let ((res (careful-expand-macro cmacro-fun form)))
-             (if (eq res form)
-                 (ir1-convert-global-functoid-no-cmacro
-                  start next result form fun-name)
-                 (ir1-convert start next result res))))
           (t
-           (ir1-convert-global-functoid-no-cmacro start next result
-                                                  form fun-name)))))
+           (multiple-value-bind (cmacro-fun cmacro-fun-name)
+               (find-compiler-macro op form)
+             (if (and cmacro-fun
+                      ;; CLHS 3.2.2.1.3 specifies that NOTINLINE
+                      ;; suppresses compiler-macros.
+                      (not (fun-lexically-notinline-p cmacro-fun-name)))
+                 (let ((res (careful-expand-macro cmacro-fun form)))
+                   (if (eq res form)
+                       (ir1-convert-common-functoid start next result form
+                                                    op)
+                       (ir1-convert start next result res)))
+                 (ir1-convert-common-functoid start next result form op)))))))
 
-;;; Handle the case of where the call was not a compiler macro, or was
-;;; a compiler macro and passed.
-(defun ir1-convert-global-functoid-no-cmacro (start next result form fun)
+;;; Handles the "common" cases: any other forms except special forms
+;;; and compiler-macros.
+(defun ir1-convert-common-functoid (start next result form op)
+  (cond ((or (symbolp op) (leaf-p op))
+         (let ((lexical-def (if (leaf-p op) op (lexenv-find op funs))))
+           (typecase lexical-def
+             (null
+              (ir1-convert-global-functoid start next result form op))
+             (functional
+              (ir1-convert-local-combination start next result form
+                                             lexical-def))
+             (global-var
+              (ir1-convert-srctran start next result lexical-def form))
+             (t
+              (aver (and (consp lexical-def) (eq (car lexical-def) 'macro)))
+              (ir1-convert start next result
+                           (careful-expand-macro (cdr lexical-def) form))))))
+        ((or (atom op) (not (eq (car op) 'lambda)))
+         (compiler-error "illegal function call"))
+        (t
+         ;; implicitly (LAMBDA ..) because the LAMBDA expression is
+         ;; the CAR of an executed form.
+         (ir1-convert-combination
+          start next result form
+          (ir1-convert-lambda op
+                              :debug-name (debug-name 'inline-lambda op))))))
+
+;;; Convert anything that looks like a global function call.
+(defun ir1-convert-global-functoid (start next result form fun)
   (declare (type ctran start next) (type (or lvar null) result)
            (list form))
   ;; FIXME: Couldn't all the INFO calls here be converted into
-  ;; standard CL functions, like MACRO-FUNCTION or something?
-  ;; And what happens with lexically-defined (MACROLET) macros
-  ;; here, anyway?
+  ;; standard CL functions, like MACRO-FUNCTION or something? And what
+  ;; happens with lexically-defined (MACROLET) macros here, anyway?
   (ecase (info :function :kind fun)
     (:macro
      (ir1-convert start next result

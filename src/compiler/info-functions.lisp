@@ -124,10 +124,10 @@
 (defun sb!xc:macro-function (symbol &optional env)
   #!+sb-doc
   "If SYMBOL names a macro in ENV, returns the expansion function,
-   else returns NIL. If ENV is unspecified or NIL, use the global
-   environment only."
+else returns NIL. If ENV is unspecified or NIL, use the global environment
+only."
   (declare (symbol symbol))
-  (let* ((fenv (when env (sb!c::lexenv-funs env)))
+  (let* ((fenv (when env (lexenv-funs env)))
          (local-def (cdr (assoc symbol fenv))))
     (cond (local-def
            (if (and (consp local-def) (eq (car local-def) 'macro))
@@ -165,20 +165,30 @@
           (error 'undefined-function :name symbol)))
   function)
 
+(defun fun-locally-defined-p (name env)
+  (and env
+       (let ((fun (cdr (assoc name (lexenv-funs env) :test #'equal))))
+         (and fun (not (global-var-p fun))))))
+
 (defun sb!xc:compiler-macro-function (name &optional env)
   #!+sb-doc
   "If NAME names a compiler-macro in ENV, return the expansion function, else
-   return NIL. Can be set with SETF when ENV is NIL."
-  (declare (ignore env))
+return NIL. Can be set with SETF when ENV is NIL."
   (legal-fun-name-or-type-error name)
-  ;; Note: CMU CL used to return NIL here when a NOTINLINE declaration
-  ;; was in force. That's fairly logical, given the specified effect
-  ;; of NOTINLINE declarations on compiler-macro expansion. However,
-  ;; (1) it doesn't seem to be consistent with the ANSI spec for
-  ;; COMPILER-MACRO-FUNCTION, and (2) it would give surprising
-  ;; behavior for (SETF (COMPILER-MACRO-FUNCTION FOO) ...) in the
-  ;; presence of a (PROCLAIM '(NOTINLINE FOO)). So we don't do it.
-  (values (info :function :compiler-macro-function name)))
+  ;; CLHS 3.2.2.1: Creating a lexical binding for the function name
+  ;; not only creates a new local function or macro definition, but
+  ;; also shadows[2] the compiler macro.
+  (unless (fun-locally-defined-p name env)
+    ;; Note: CMU CL used to return NIL here when a NOTINLINE
+    ;; declaration was in force. That's fairly logical, given the
+    ;; specified effect of NOTINLINE declarations on compiler-macro
+    ;; expansion. However, (1) it doesn't seem to be consistent with
+    ;; the ANSI spec for COMPILER-MACRO-FUNCTION, and (2) it would
+    ;; give surprising behavior for (SETF (COMPILER-MACRO-FUNCTION
+    ;; FOO) ...) in the presence of a (PROCLAIM '(NOTINLINE FOO)). So
+    ;; we don't do it.
+    (values (info :function :compiler-macro-function name))))
+
 (defun (setf sb!xc:compiler-macro-function) (function name &optional env)
   (declare (type (or symbol list) name)
            (type (or function null) function))

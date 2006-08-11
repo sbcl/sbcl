@@ -947,6 +947,8 @@
 ;;; function and smashes it to a :CLEANUP function, as well as
 ;;; referencing it.
 (def-ir1-translator %cleanup-fun ((name) start next result)
+  ;; FIXME: Should this not be :TEST #'EQUAL? What happens to
+  ;; (SETF FOO) here?
   (let ((fun (lexenv-find name funs)))
     (aver (lambda-p fun))
     (setf (functional-kind fun) :cleanup)
