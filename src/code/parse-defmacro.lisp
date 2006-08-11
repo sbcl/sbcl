@@ -31,14 +31,14 @@
 ;;; Return, as multiple values, a body, possibly a DECLARE form to put
 ;;; where this code is inserted, the documentation for the parsed
 ;;; body, and bounds on the number of arguments.
-(defun parse-defmacro (lambda-list arg-list-name body name context
-                                   &key
-                                   (anonymousp nil)
-                                   (doc-string-allowed t)
-                                   ((:environment env-arg-name))
-                                   ((:default-default *default-default*))
-                                   (error-fun 'error)
-                                   (wrap-block t))
+(defun parse-defmacro (lambda-list whole-var body name context
+                       &key
+                       (anonymousp nil)
+                       (doc-string-allowed t)
+                       ((:environment env-arg-name))
+                       ((:default-default *default-default*))
+                       (error-fun 'error)
+                       (wrap-block t))
   (multiple-value-bind (forms declarations documentation)
       (parse-body body :doc-string-allowed doc-string-allowed)
     (let ((*arg-tests* ())
@@ -47,9 +47,9 @@
           (*ignorable-vars* ())
           (*env-var* nil))
       (multiple-value-bind (env-arg-used minimum maximum)
-          (parse-defmacro-lambda-list lambda-list arg-list-name name
-                                      context error-fun (not anonymousp)
-                                      nil)
+          (parse-defmacro-lambda-list lambda-list whole-var name context
+                                      :error-fun error-fun
+                                      :anonymousp anonymousp)
         (values `(let* (,@(when env-arg-used
                             `((,*env-var* ,env-arg-name)))
                         ,@(nreverse *system-lets*))
@@ -68,25 +68,21 @@
                 minimum
                 maximum)))))
 
-;;; partial reverse-engineered documentation:
-;;;   TOPLEVEL is true for calls through PARSE-DEFMACRO from DEFSETF and
-;;;     DESTRUCTURING-BIND, false otherwise.
-;;; -- WHN 19990620
 (defun parse-defmacro-lambda-list (possibly-dotted-lambda-list
-                                   arg-list-name
+                                   whole-var
                                    name
                                    context
+                                   &key
                                    error-fun
-                                   &optional
-                                   toplevel
-                                   env-illegal)
+                                   anonymousp
+                                   env-illegal
+                                   sublist)
   (let* (;; PATH is a sort of pointer into the part of the lambda list we're
          ;; considering at this point in the code. PATH-0 is the root of the
          ;; lambda list, which is the initial value of PATH.
-         (path-0 (if toplevel
-                     `(cdr ,arg-list-name)
-                     arg-list-name))
-         (path path-0) ; (will change below)
+         (path-0 (if (or anonymousp sublist) whole-var `(cdr ,whole-var)))
+         (path path-0) ; will change below
+         (compiler-macro-whole (gensym "CMACRO-&WHOLE"))
          (now-processing :required)
          (maximum 0)
          (minimum 0)
@@ -108,39 +104,57 @@
          rest-name restp allow-other-keys-p env-arg-used)
     (when (member '&whole (rest lambda-list))
       (error "&WHOLE may only appear first in ~S lambda-list." context))
-    (do ((rest-of-args lambda-list (cdr rest-of-args)))
-        ((null rest-of-args))
-      (macrolet ((process-sublist (var sublist-name path)
+    ;; Special case compiler-macros: if car of the form is FUNCALL,
+    ;; skip over it for destructuring, pretending cdr of the form is
+    ;; the actual form. Save original for &whole
+    (when (eq context 'define-compiler-macro)
+      (push-let-binding compiler-macro-whole whole-var :system t)
+      (push compiler-macro-whole *ignorable-vars*)
+      (push-let-binding whole-var whole-var
+                        :system t
+                        :when `(not (eq 'funcall (car ,whole-var)))
+                        ;; do we need to SETF too?
+                        :else `(setf ,whole-var (cdr ,whole-var))))
+    (do ((rest-of-lambda-list lambda-list (cdr rest-of-lambda-list)))
+        ((null rest-of-lambda-list))
+      (macrolet ((process-sublist (var kind path)
                    (once-only ((var var))
                      `(if (listp ,var)
-                          (let ((sub-list-name (gensym ,sublist-name)))
-                            (push-sub-list-binding sub-list-name ,path ,var
-                                                   name context error-fun)
-                            (parse-defmacro-lambda-list ,var sub-list-name name
-                                                        context error-fun))
-                          (push-let-binding ,var ,path nil))))
+                          (let ((sublist-name (gensym ,kind)))
+                            (push-sublist-binding sublist-name ,path ,var
+                                                  name context error-fun)
+                            (parse-defmacro-lambda-list ,var sublist-name name
+                                                        context
+                                                        :error-fun error-fun
+                                                        :sublist t))
+                          (push-let-binding ,var ,path))))
                  (normalize-singleton (var)
                    `(when (null (cdr ,var))
                      (setf (cdr ,var) (list *default-default*)))))
-        (let ((var (car rest-of-args)))
+        (let ((var (car rest-of-lambda-list)))
           (typecase var
             (list
              (case now-processing
                ((:required)
                 (when restp
-                  (defmacro-error (format nil "required argument after ~A" restp)
+                  (defmacro-error (format nil "required argument after ~A"
+                                          restp)
                       context name))
-                (process-sublist var "SUBLIST-" `(car ,path))
+                (process-sublist var "REQUIRED-" `(car ,path))
                 (setq path `(cdr ,path)
                       minimum (1+ minimum)
                       maximum (1+ maximum)))
                ((:optionals)
                 (normalize-singleton var)
-                (destructuring-bind (varname &optional initform supplied-p)
+                (destructuring-bind
+                      (varname &optional default-form suppliedp-name)
                     var
-                  (push-optional-binding varname initform supplied-p
-                                         `(not (null ,path)) `(car ,path)
-                                         name context error-fun))
+                  (push-optional-binding varname default-form suppliedp-name
+                                         :is-supplied-p `(not (null ,path))
+                                         :path `(car ,path)
+                                         :name name
+                                         :context context
+                                         :error-fun error-fun))
                 (setq path `(cdr ,path)
                       maximum (1+ maximum)))
                ((:keywords)
@@ -152,64 +166,63 @@
                        (keyword (if keyword-given
                                     (caar var)
                                     (keywordicate variable)))
-                       (supplied-p (caddr var)))
-                  (push-optional-binding variable (cadr var) supplied-p
+                       (default-form (cadr var))
+                       (suppliedp-name (caddr var)))
+                  (push-optional-binding variable default-form suppliedp-name
+                                         :is-supplied-p
                                          `(keyword-supplied-p ',keyword
                                                               ,rest-name)
-                                         `(lookup-keyword ',keyword
-                                                          ,rest-name)
-                                         name context error-fun)
+                                         :path
+                                         `(lookup-keyword ',keyword ,rest-name)
+                                         :name name
+                                         :context context
+                                         :error-fun error-fun)
                   (push keyword keys)))
                ((:auxs)
-                (push-let-binding (car var) (cadr var) nil))))
+                (push-let-binding (car var) (cadr var)))))
             ((and symbol (not (eql nil)))
              (case var
                (&whole
-                (cond ((cdr rest-of-args)
-                       (setq rest-of-args (cdr rest-of-args))
-                       ;; Special case for compiler-macros: if car of
-                       ;; the form is FUNCALL skip over it for
-                       ;; destructuring, pretending cdr of the form is
-                       ;; the actual form.
-                       (when (eq context 'define-compiler-macro)
-                         (push-let-binding
-                          arg-list-name
-                          arg-list-name
-                          t
-                          `(not (and (listp ,arg-list-name)
-                                     (eq 'funcall (car ,arg-list-name))))
-                          `(setf ,arg-list-name (cdr ,arg-list-name))))
-                       (process-sublist (car rest-of-args)
-                                        "WHOLE-LIST-" arg-list-name))
+                (cond ((cdr rest-of-lambda-list)
+                       (pop rest-of-lambda-list)
+                       (process-sublist (car rest-of-lambda-list)
+                                        "WHOLE-LIST-"
+                                        (if (eq 'define-compiler-macro context)
+                                            compiler-macro-whole
+                                            whole-var)))
                       (t
                        (defmacro-error "&WHOLE" context name))))
                (&environment
                 (cond (env-illegal
                        (error "&ENVIRONMENT is not valid with ~S." context))
-                      ((not toplevel)
+                      (sublist
                        (error "&ENVIRONMENT is only valid at top level of ~
                              lambda-list."))
                       (env-arg-used
                        (error "Repeated &ENVIRONMENT.")))
-                (cond ((and (cdr rest-of-args) (symbolp (cadr rest-of-args)))
-                       (setq rest-of-args (cdr rest-of-args))
-                       (check-defmacro-arg (car rest-of-args))
-                       (setq *env-var* (car rest-of-args)
+                (cond ((and (cdr rest-of-lambda-list)
+                            (symbolp (cadr rest-of-lambda-list)))
+                       (setq rest-of-lambda-list (cdr rest-of-lambda-list))
+                       (check-defmacro-arg (car rest-of-lambda-list))
+                       (setq *env-var* (car rest-of-lambda-list)
                              env-arg-used t))
                       (t
                        (defmacro-error "&ENVIRONMENT" context name))))
                ((&rest &body)
                 (cond ((or key-seen aux-seen)
-                       (error "~A after ~A in ~A" var (or key-seen aux-seen) context))
-                      ((and (not restp) (cdr rest-of-args))
-                       (setq rest-of-args (cdr rest-of-args)
+                       (error "~A after ~A in ~A"
+                              var (or key-seen aux-seen) context))
+                      ((and (not restp) (cdr rest-of-lambda-list))
+                       (setq rest-of-lambda-list (cdr rest-of-lambda-list)
                              restp var)
-                       (process-sublist (car rest-of-args) "REST-LIST-" path))
+                       (process-sublist (car rest-of-lambda-list)
+                                        "REST-LIST-" path))
                       (t
                        (defmacro-error (symbol-name var) context name))))
                (&optional
                 (when (or key-seen aux-seen restp)
-                  (error "~A after ~A in ~A lambda-list." var (or key-seen aux-seen restp) context))
+                  (error "~A after ~A in ~A lambda-list."
+                         var (or key-seen aux-seen restp) context))
                 (when optional-seen
                   (error "Multiple ~A in ~A lambda list." var context))
                 (setq now-processing :optionals
@@ -224,10 +237,11 @@
                       restp var
                       key-seen var)
                 (push rest-name *ignorable-vars*)
-                (push-let-binding rest-name path t))
+                (push-let-binding rest-name path :system t))
                (&allow-other-keys
                 (unless (eq now-processing :keywords)
-                  (error "~A outside ~A section of lambda-list in ~A." var '&key context))
+                  (error "~A outside ~A section of lambda-list in ~A."
+                         var '&key context))
                 (when allow-other-keys-p
                   (error "Multiple ~A in ~A lambda-list." var context))
                 (setq allow-other-keys-p t))
@@ -241,14 +255,16 @@
                 (case now-processing
                   ((:required)
                    (when restp
-                     (defmacro-error (format nil "required argument after ~A" restp)
+                     (defmacro-error (format nil "required argument after ~A"
+                                             restp)
                          context name))
-                   (push-let-binding var `(car ,path) nil)
+                   (push-let-binding var `(car ,path))
                    (setq minimum (1+ minimum)
                          maximum (1+ maximum)
                          path `(cdr ,path)))
                   ((:optionals)
-                   (push-let-binding var `(car ,path) nil `(not (null ,path)))
+                   (push-let-binding var `(car ,path)
+                                     :when `(not (null ,path)))
                    (setq path `(cdr ,path)
                          maximum (1+ maximum)))
                   ((:keywords)
@@ -256,11 +272,10 @@
                      (push-let-binding
                       var
                       `(lookup-keyword ,key ,rest-name)
-                      nil
-                      `(keyword-supplied-p ,key ,rest-name))
+                      :when `(keyword-supplied-p ,key ,rest-name))
                      (push key keys)))
                   ((:auxs)
-                   (push-let-binding var nil nil))))))
+                   (push-let-binding var nil))))))
             (t
              (error "non-symbol in lambda-list: ~S" var))))))
     (let (;; common subexpression, suitable for passing to functions
@@ -269,23 +284,32 @@
           ;; (expecting MAXIMUM=NIL when there is no maximum)
           (explicit-maximum (and (not restp) maximum)))
       (unless (and restp (zerop minimum))
-        (push `(unless ,(if restp
-                            ;; (If RESTP, then the argument list might be
-                            ;; dotted, in which case ordinary LENGTH won't
-                            ;; work.)
-                            `(list-of-length-at-least-p ,path-0 ,minimum)
-                            `(proper-list-of-length-p ,path-0 ,minimum ,maximum))
-                 ,(if (eq error-fun 'error)
-                      `(arg-count-error ',context ',name ,path-0
-                                        ',lambda-list ,minimum
-                                        ,explicit-maximum)
-                      `(,error-fun 'arg-count-error
-                                   :kind ',context
-                                   ,@(when name `(:name ',name))
-                                   :args ,path-0
-                                   :lambda-list ',lambda-list
-                                   :minimum ,minimum
-                                   :maximum ,explicit-maximum)))
+        (push (let ((args-form (if (eq 'define-compiler-macro context)
+                                   `(if (eq 'funcall (car ,whole-var))
+                                        (cdr ,path-0)
+                                        ,path-0)
+                                   path-0)))
+                (with-unique-names (args)
+                  `(let ((,args ,args-form))
+                     (unless ,(if restp
+                                  ;; (If RESTP, then the argument list
+                                  ;; might be dotted, in which case
+                                  ;; ordinary LENGTH won't work.)
+                                  `(list-of-length-at-least-p ,args ,minimum)
+                                  `(proper-list-of-length-p ,args
+                                                            ,minimum
+                                                            ,maximum))
+                       ,(if (eq error-fun 'error)
+                            `(arg-count-error ',context ',name ,args
+                                              ',lambda-list ,minimum
+                                              ,explicit-maximum)
+                            `(,error-fun 'arg-count-error
+                                         :kind ',context
+                                         ,@(when name `(:name ',name))
+                                         :args ,args
+                                         :lambda-list ',lambda-list
+                                         :minimum ,minimum
+                                         :maximum ,explicit-maximum))))))
               *arg-tests*))
       (when key-seen
         (let ((problem (gensym "KEY-PROBLEM-"))
@@ -316,7 +340,7 @@
            :minimum minimum
            :maximum maximum)))
 
-(defun push-sub-list-binding (variable path object name context error-fun)
+(defun push-sublist-binding (variable path object name context error-fun)
   (check-defmacro-arg variable)
   (let ((var (gensym "TEMP-")))
     (push `(,variable
@@ -330,30 +354,32 @@
                             :lambda-list ',object))))
           *system-lets*)))
 
-(defun push-let-binding (variable path systemp &optional condition
-                                  (init-form *default-default*))
+(defun push-let-binding (variable form
+                         &key system when (else *default-default*))
   (check-defmacro-arg variable)
-  (let ((let-form (if condition
-                      `(,variable (if ,condition ,path ,init-form))
-                      `(,variable ,path))))
-    (if systemp
-      (push let-form *system-lets*)
-      (push let-form *user-lets*))))
+  (let ((let-form (if when
+                      `(,variable (if ,when ,form ,else))
+                      `(,variable ,form))))
+    (if system
+        (push let-form *system-lets*)
+        (push let-form *user-lets*))))
 
-(defun push-optional-binding (value-var init-form supplied-var condition path
-                                        name context error-fun)
-  (unless supplied-var
-    (setq supplied-var (gensym "SUPPLIEDP-")))
-  (push-let-binding supplied-var condition t)
+(defun push-optional-binding (value-var init-form suppliedp-name
+                              &key is-supplied-p path name context error-fun)
+  (unless suppliedp-name
+    (setq suppliedp-name (gensym "SUPPLIEDP-")))
+  (push-let-binding suppliedp-name is-supplied-p :system t)
   (cond ((consp value-var)
          (let ((whole-thing (gensym "OPTIONAL-SUBLIST-")))
-           (push-sub-list-binding whole-thing
-                                  `(if ,supplied-var ,path ,init-form)
-                                  value-var name context error-fun)
+           (push-sublist-binding whole-thing
+                                 `(if ,suppliedp-name ,path ,init-form)
+                                 value-var name context error-fun)
            (parse-defmacro-lambda-list value-var whole-thing name
-                                       context error-fun)))
+                                       context
+                                       :error-fun error-fun
+                                       :sublist t)))
         ((symbolp value-var)
-         (push-let-binding value-var path nil supplied-var init-form))
+         (push-let-binding value-var path :when suppliedp-name :else init-form))
         (t
          (error "illegal optional variable name: ~S" value-var))))
 

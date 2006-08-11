@@ -1262,4 +1262,21 @@
     (type-error (c) (assert (eq (type-error-expected-type c) 'integer)))
     (:no-error (&rest vals) (error "no error"))))
 
+;;; FUNCALL forms in compiler macros
+(define-compiler-macro test-cmacro-1
+    (&whole whole a &optional b &rest c &key d)
+  (list whole a b c d))
+
+(macrolet ((test (form a b c d)
+             `(let ((form ',form))
+                (destructuring-bind (whole a b c d)
+                    (funcall (compiler-macro-function 'test-cmacro-1) form nil)
+                  (assert (equal whole form))
+                  (assert (eql a ,a))
+                  (assert (eql b ,b))
+                  (assert (equal c ,c))
+                  (assert (eql d ,d))))) )
+  (test (funcall 'test-cmacro-1 1 2 :d 3) 1 2 '(:d 3) 3)
+  (test (test-cmacro-1 11 12 :d 13) 11 12 '(:d 13) 13))
+
 ;;; success

@@ -1683,10 +1683,7 @@
 (defmacro define-instruction-macro (name lambda-list &body body)
   (with-unique-names (whole env)
     (multiple-value-bind (body local-defs)
-        (sb!kernel:parse-defmacro lambda-list
-                                  whole
-                                  body
-                                  name
+        (sb!kernel:parse-defmacro lambda-list whole body name
                                   'instruction-macro
                                   :environment env)
       `(eval-when (:compile-toplevel :load-toplevel :execute)

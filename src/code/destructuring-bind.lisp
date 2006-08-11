@@ -9,15 +9,16 @@
 
 (in-package "SB!IMPL")
 
-(defmacro-mundanely destructuring-bind (lambda-list arg-list &rest body)
+(defmacro-mundanely destructuring-bind (lambda-list expression &rest body)
   #!+sb-doc
-  "Bind the variables in LAMBDA-LIST to the contents of ARG-LIST."
-  (let ((arg-list-name (gensym "ARG-LIST-")))
+  "Bind the variables in LAMBDA-LIST to the corresponding values in the
+tree structure resulting from the evaluation of EXPRESSION."
+  (let ((whole-name (gensym "WHOLE")))
     (multiple-value-bind (body local-decls)
-        (parse-defmacro lambda-list arg-list-name body nil 'destructuring-bind
+        (parse-defmacro lambda-list whole-name body nil 'destructuring-bind
                         :anonymousp t
                         :doc-string-allowed nil
                         :wrap-block nil)
-      `(let ((,arg-list-name ,arg-list))
+      `(let ((,whole-name ,expression))
          ,@local-decls
          ,body))))

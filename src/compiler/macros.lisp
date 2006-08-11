@@ -40,42 +40,41 @@
 ;;; kind to associate with NAME.
 (defmacro def-ir1-translator (name (lambda-list start-var next-var result-var)
                               &body body)
-  (let ((fn-name (symbolicate "IR1-CONVERT-" name))
-        (n-form (gensym))
-        (n-env (gensym)))
-    (multiple-value-bind (body decls doc)
-        (parse-defmacro lambda-list n-form body name "special form"
-                        :environment n-env
-                        :error-fun 'compiler-error
-                        :wrap-block nil)
-      `(progn
-         (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
-                         ,fn-name))
-         (defun ,fn-name (,start-var ,next-var ,result-var ,n-form
-                          &aux (,n-env *lexenv*))
-           (declare (ignorable ,start-var ,next-var ,result-var))
-           ,@decls
-           ,body
-           (values))
-         ,@(when doc
-             `((setf (fdocumentation ',name 'function) ,doc)))
-         ;; FIXME: Evidently "there can only be one!" -- we overwrite any
-         ;; other :IR1-CONVERT value. This deserves a warning, I think.
-         (setf (info :function :ir1-convert ',name) #',fn-name)
-         ;; FIXME: rename this to SPECIAL-OPERATOR, to update it to
-         ;; the 1990s?
-         (setf (info :function :kind ',name) :special-form)
-         ;; It's nice to do this for error checking in the target
-         ;; SBCL, but it's not nice to do this when we're running in
-         ;; the cross-compilation host Lisp, which owns the
-         ;; SYMBOL-FUNCTION of its COMMON-LISP symbols.
-         #-sb-xc-host
-         (let ((fun (lambda (&rest rest)
-                      (declare (ignore rest))
-                      (error 'special-form-function :name ',name))))
-           (setf (%simple-fun-arglist fun) ',lambda-list)
-           (setf (symbol-function ',name) fun))
-         ',name))))
+  (let ((fn-name (symbolicate "IR1-CONVERT-" name)))
+    (with-unique-names (whole-var n-env)
+      (multiple-value-bind (body decls doc)
+          (parse-defmacro lambda-list whole-var body name "special form"
+                          :environment n-env
+                          :error-fun 'compiler-error
+                          :wrap-block nil)
+        `(progn
+           (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
+                           ,fn-name))
+           (defun ,fn-name (,start-var ,next-var ,result-var ,whole-var
+                            &aux (,n-env *lexenv*))
+             (declare (ignorable ,start-var ,next-var ,result-var))
+             ,@decls
+             ,body
+             (values))
+           ,@(when doc
+                   `((setf (fdocumentation ',name 'function) ,doc)))
+           ;; FIXME: Evidently "there can only be one!" -- we overwrite any
+           ;; other :IR1-CONVERT value. This deserves a warning, I think.
+           (setf (info :function :ir1-convert ',name) #',fn-name)
+           ;; FIXME: rename this to SPECIAL-OPERATOR, to update it to
+           ;; the 1990s?
+           (setf (info :function :kind ',name) :special-form)
+           ;; It's nice to do this for error checking in the target
+           ;; SBCL, but it's not nice to do this when we're running in
+           ;; the cross-compilation host Lisp, which owns the
+           ;; SYMBOL-FUNCTION of its COMMON-LISP symbols.
+           #-sb-xc-host
+           (let ((fun (lambda (&rest rest)
+                        (declare (ignore rest))
+                        (error 'special-form-function :name ',name))))
+             (setf (%simple-fun-arglist fun) ',lambda-list)
+             (setf (symbol-function ',name) fun))
+           ',name)))))
 
 ;;; (This is similar to DEF-IR1-TRANSLATOR, except that we pass if the
 ;;; syntax is invalid.)
@@ -97,18 +96,16 @@
 ;;; OPTIMIZE parameters, then the POLICY macro should be used to
 ;;; determine when to pass.
 (defmacro source-transform-lambda (lambda-list &body body)
-  (let ((n-form (gensym))
-        (n-env (gensym))
-        (name (gensym)))
+  (with-unique-names (whole-var n-env name)
     (multiple-value-bind (body decls)
-        (parse-defmacro lambda-list n-form body "source transform" "form"
+        (parse-defmacro lambda-list whole-var body "source transform" "form"
                         :environment n-env
                         :error-fun `(lambda (&rest stuff)
                                       (declare (ignore stuff))
                                       (return-from ,name
                                         (values nil t)))
                         :wrap-block nil)
-      `(lambda (,n-form &aux (,n-env *lexenv*))
+      `(lambda (,whole-var &aux (,n-env *lexenv*))
          ,@decls
          (block ,name
            ,body)))))

@@ -393,12 +393,12 @@ GET-SETF-EXPANSION directly."
          (destructuring-bind
              (lambda-list (&rest store-variables) &body body)
              rest
-           (let ((arglist-var (gensym "ARGS-"))
+           (let ((whole-var (gensym "WHOLE-"))
                  (access-form-var (gensym "ACCESS-FORM-"))
                  (env-var (gensym "ENVIRONMENT-")))
              (multiple-value-bind (body local-decs doc)
                  (parse-defmacro `(,lambda-list ,@store-variables)
-                                 arglist-var body access-fn 'defsetf
+                                 whole-var body access-fn 'defsetf
                                  :anonymousp t)
                `(eval-when (:compile-toplevel :load-toplevel :execute)
                   (assign-setf-macro
@@ -406,7 +406,7 @@ GET-SETF-EXPANSION directly."
                    (lambda (,access-form-var ,env-var)
                      (declare (ignore ,env-var))
                      (%defsetf ,access-form-var ,(length store-variables)
-                               (lambda (,arglist-var)
+                               (lambda (,whole-var)
                                  ,@local-decs
                                  ,body)))
                    nil
