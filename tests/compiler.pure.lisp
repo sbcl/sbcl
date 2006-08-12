@@ -2113,3 +2113,12 @@
 (compile nil '(lambda ()
                (let ((x (make-array '(1) :element-type '(signed-byte 32))))
                  (setf (aref x 0) 1))))
+
+;;; step instrumentation confusing the compiler, reported by Faré
+(handler-bind ((warning #'error))
+  (compile nil '(lambda () 
+                 (declare (optimize (debug 2))) ; not debug 3!
+                 (let ((val "foobar"))
+                   (map-into (make-array (list (length val)) 
+                                         :element-type '(unsigned-byte 8))
+                             #'char-code val)))))

@@ -955,9 +955,11 @@
 ;;; current compilation policy. Note that FUN may be a
 ;;; LAMBDA-WITH-LEXENV, so we may have to augment the environment to
 ;;; reflect the state at the definition site.
-(defun ir1-convert-inline-lambda (fun &key
-                                      (source-name '.anonymous.)
-                                      debug-name)
+(defun ir1-convert-inline-lambda (fun 
+                                  &key
+                                  (source-name '.anonymous.)
+                                  debug-name
+                                  system-lambda)
   (destructuring-bind (decls macros symbol-macros &rest body)
                       (if (eq (car fun) 'lambda-with-lexenv)
                           (cdr fun)
@@ -970,7 +972,8 @@
                                      `(,(car x) .
                                        (macro . ,(coerce (cdr x) 'function))))
                                    macros)
-                     :policy (lexenv-policy *lexenv*))))
+                     :policy (lexenv-policy *lexenv*)))
+          (*allow-instrumenting* (and (not system-lambda) *allow-instrumenting*)))
       (ir1-convert-lambda `(lambda ,@body)
                           :source-name source-name
                           :debug-name debug-name))))
@@ -1031,41 +1034,31 @@
                 "previous declaration"
                 "previous definition"))))
 
-;;; Convert a lambda doing all the basic stuff we would do if we were
-;;; converting a DEFUN. In the old CMU CL system, this was used both
-;;; by the %DEFUN translator and for global inline expansion, but
-;;; since sbcl-0.pre7.something %DEFUN does things differently.
-;;; FIXME: And now it's probably worth rethinking whether this
-;;; function is a good idea.
-;;;
-;;; Unless a :INLINE function, we temporarily clobber the inline
-;;; expansion. This prevents recursive inline expansion of
-;;; opportunistic pseudo-inlines.
-(defun ir1-convert-lambda-for-defun (lambda var expansion converter)
-  (declare (cons lambda) (function converter) (type defined-fun var))
-  (let ((var-expansion (defined-fun-inline-expansion var)))
-    (unless (eq (defined-fun-inlinep var) :inline)
-      (setf (defined-fun-inline-expansion var) nil))
-    (let* ((name (leaf-source-name var))
-           (fun (funcall converter lambda
-                         :source-name name))
-           (fun-info (info :function :info name)))
-      (setf (functional-inlinep fun) (defined-fun-inlinep var))
-      (assert-new-definition var fun)
-      (setf (defined-fun-inline-expansion var) var-expansion)
-      ;; If definitely not an interpreter stub, then substitute for
-      ;; any old references.
-      (unless (or (eq (defined-fun-inlinep var) :notinline)
-                  (not *block-compile*)
-                  (and fun-info
-                       (or (fun-info-transforms fun-info)
-                           (fun-info-templates fun-info)
-                           (fun-info-ir2-convert fun-info))))
-        (substitute-leaf fun var)
-        ;; If in a simple environment, then we can allow backward
-        ;; references to this function from following top level forms.
-        (when expansion (setf (defined-fun-functional var) fun)))
-      fun)))
+;;; Used for global inline expansion. Earlier something like this was
+;;; used by %DEFUN too. FIXME: And now it's probably worth rethinking
+;;; whether this function is a good idea at all.
+(defun ir1-convert-inline-expansion (name expansion var inlinep info)
+  ;; Unless a :INLINE function, we temporarily clobber the inline
+  ;; expansion. This prevents recursive inline expansion of
+  ;; opportunistic pseudo-inlines.
+  (unless (eq inlinep :inline)
+    (setf (defined-fun-inline-expansion var) nil))
+  (let ((fun (ir1-convert-inline-lambda expansion
+                                        :source-name name 
+                                        ;; prevent instrumentation of
+                                        ;; known function expansions
+                                        :system-lambda (and info t))))
+    (setf (functional-inlinep fun) inlinep)
+    (assert-new-definition var fun)
+    (setf (defined-fun-inline-expansion var) expansion)
+    ;; substitute for any old references
+    (unless (or (not *block-compile*)
+                (and info
+                     (or (fun-info-transforms info)
+                         (fun-info-templates info)
+                         (fun-info-ir2-convert info))))
+      (substitute-leaf fun var))
+    fun))
 
 ;;; the even-at-compile-time part of DEFUN
 ;;;
