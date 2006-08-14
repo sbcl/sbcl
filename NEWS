@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.16 relative to sbcl-0.9.15:
+  * bug fix: fixed input, output and error redirection in RUN-PROGRAM
+    for win32. (thanks to Mike Thomas and Yaroslav Kavenchuk)
   * feature: implemented the READER-METHOD-CLASS and
     WRITER-METHOD-CLASS portion of the Class Initialization Protocol
     as specified by AMOP.
