@@ -955,7 +955,7 @@
 ;;; current compilation policy. Note that FUN may be a
 ;;; LAMBDA-WITH-LEXENV, so we may have to augment the environment to
 ;;; reflect the state at the definition site.
-(defun ir1-convert-inline-lambda (fun 
+(defun ir1-convert-inline-lambda (fun
                                   &key
                                   (source-name '.anonymous.)
                                   debug-name
@@ -1044,7 +1044,7 @@
   (unless (eq inlinep :inline)
     (setf (defined-fun-inline-expansion var) nil))
   (let ((fun (ir1-convert-inline-lambda expansion
-                                        :source-name name 
+                                        :source-name name
                                         ;; prevent instrumentation of
                                         ;; known function expansions
                                         :system-lambda (and info t))))

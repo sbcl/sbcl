@@ -930,16 +930,17 @@
                   ,(make-calls-type-declaration calls))
          ,pv ,calls
          ,@forms)
-      `(let* ((.pv-table. ,pv-table-symbol)
-              (.pv-cell. (pv-table-lookup-pv-args .pv-table. ,@pv-parameters))
-              (,pv (car .pv-cell.))
-              (,calls (cdr .pv-cell.)))
-         (declare ,(make-pv-type-declaration pv))
-         (declare ,(make-calls-type-declaration calls))
-         ,@(when (symbolp pv-table-symbol)
-                 `((declare (special ,pv-table-symbol))))
-         ,pv ,calls
-         ,@forms)))
+      `(locally
+        ,@(when (symbolp pv-table-symbol)
+                `((declare (special ,pv-table-symbol))))
+        (let* ((.pv-table. ,pv-table-symbol)
+               (.pv-cell. (pv-table-lookup-pv-args .pv-table. ,@pv-parameters))
+               (,pv (car .pv-cell.))
+               (,calls (cdr .pv-cell.)))
+          (declare ,(make-pv-type-declaration pv))
+          (declare ,(make-calls-type-declaration calls))
+          ,pv ,calls
+          ,@forms))))
 
 (defvar *non-var-declarations*
   ;; FIXME: VALUES was in this list, conditionalized with #+CMU, but I

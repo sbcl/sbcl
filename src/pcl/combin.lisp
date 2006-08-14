@@ -141,12 +141,19 @@
                              (method-p arg))
                          arg
                          (if (and (consp arg) (eq (car arg) 'make-method))
-                             (make-instance 'standard-method
-                                            :specializers nil ; XXX
-                                            :qualifiers nil
-                                            :fast-function (fast-method-call-function
-                                                            (make-effective-method-function
-                                                             gf (cadr arg) method-alist wrappers)))
+                             (let ((emf (make-effective-method-function
+                                         gf (cadr arg) method-alist wrappers)))
+                               (etypecase emf
+                                 (method-call
+                                  (make-instance 'standard-method
+                                                 :specializers nil ; XXX
+                                                 :qualifiers nil ; XXX
+                                                 :function (method-call-function emf)))
+                                 (fast-method-call
+                                  (make-instance 'standard-method
+                                                 :specializers nil ; XXX
+                                                 :qualifiers nil
+                                                 :fast-function (fast-method-call-function emf)))))
                              arg))))
               (make-method-call :function mf
                                 ;; FIXME: this is wrong.  Very wrong.

@@ -388,16 +388,14 @@ bootstrapping.
                                 (if proto-method
                                     (class-name (class-of proto-method))
                                     'standard-method)
-                                initargs-form
-                                (getf (getf initargs :plist)
-                                      :pv-table-symbol)))))))
+                                initargs-form))))))
 
 (defun interned-symbol-p (x)
   (and (symbolp x) (symbol-package x)))
 
-(defun make-defmethod-form (name qualifiers specializers
-                                 unspecialized-lambda-list method-class-name
-                                 initargs-form &optional pv-table-symbol)
+(defun make-defmethod-form
+    (name qualifiers specializers unspecialized-lambda-list
+     method-class-name initargs-form)
   (let (fn
         fn-lambda)
     (if (and (interned-symbol-p (fun-name-block-name name))
@@ -436,8 +434,7 @@ bootstrapping.
                unspecialized-lambda-list method-class-name
                `(list* ,(cadr initargs-form)
                        #',mname
-                       ,@(cdddr initargs-form))
-               pv-table-symbol)))
+                       ,@(cdddr initargs-form)))))
         (make-defmethod-form-internal
          name qualifiers
          `(list ,@(mapcar (lambda (specializer)
@@ -448,12 +445,11 @@ bootstrapping.
                           specializers))
          unspecialized-lambda-list
          method-class-name
-         initargs-form
-         pv-table-symbol))))
+         initargs-form))))
 
 (defun make-defmethod-form-internal
     (name qualifiers specializers-form unspecialized-lambda-list
-     method-class-name initargs-form &optional pv-table-symbol)
+     method-class-name initargs-form)
   `(load-defmethod
     ',method-class-name
     ',name
@@ -461,11 +457,6 @@ bootstrapping.
     ,specializers-form
     ',unspecialized-lambda-list
     ,initargs-form
-    ;; Paper over a bug in KCL by passing the cache-symbol here in
-    ;; addition to in the list. FIXME: We should no longer need to do
-    ;; this, since the CLOS code is now SBCL-specific, and doesn't
-    ;; need to be ported to every buggy compiler in existence.
-    ',pv-table-symbol
     (sb-c:source-location)))
 
 (defmacro make-method-function (method-lambda &environment env)
@@ -1394,21 +1385,17 @@ bootstrapping.
   `(method-function-get ,method-function 'closure-generator))
 
 (defun load-defmethod
-    (class name quals specls ll initargs pv-table-symbol source-location)
+    (class name quals specls ll initargs source-location)
   (setq initargs (copy-tree initargs))
   (let ((method-spec (or (getf initargs :method-spec)
                          (make-method-spec name quals specls))))
     (setf (getf initargs :method-spec) method-spec)
     (load-defmethod-internal class name quals specls
-                             ll initargs pv-table-symbol
-                             source-location)))
+                             ll initargs source-location)))
 
 (defun load-defmethod-internal
     (method-class gf-spec qualifiers specializers lambda-list
-                  initargs pv-table-symbol source-location)
-  (when pv-table-symbol
-    (setf (getf (getf initargs :plist) :pv-table-symbol)
-          pv-table-symbol))
+                  initargs source-location)
   (when (and (eq *boot-state* 'complete)
              (fboundp gf-spec))
     (let* ((gf (fdefinition gf-spec))

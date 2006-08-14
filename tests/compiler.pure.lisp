@@ -2116,9 +2116,9 @@
 
 ;;; step instrumentation confusing the compiler, reported by Faré
 (handler-bind ((warning #'error))
-  (compile nil '(lambda () 
+  (compile nil '(lambda ()
                  (declare (optimize (debug 2))) ; not debug 3!
                  (let ((val "foobar"))
-                   (map-into (make-array (list (length val)) 
+                   (map-into (make-array (list (length val))
                                          :element-type '(unsigned-byte 8))
                              #'char-code val)))))

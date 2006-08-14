@@ -17,6 +17,9 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
   * fixed bug #339(c): if there are applicable methods not part of any
     long-form method-combination group, call INVALID-METHOD-ERROR.
     (reported by Bruno Haible)
+  * bug fix: extensions of MAKE-METHOD-LAMBDA which wrap the
+    system-provided lambda expression no longer cause warnings about
+    unbound #:|pv-table| symbols.
   * bug fix: improved the handling of type declarations and the
     detection of violations for keyword arguments with non-constant
     defaults.
