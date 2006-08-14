@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 67)
+(def!constant +fasl-file-version+ 68)
 ;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
@@ -138,6 +138,7 @@
 ;;; 66: (2006-05-13) Fopcompiler
 ;;; 67: (2006-07-25) Reports on #lisp about 0.9.13 fasls being invalid on
 ;;;     0.9.14.something
+;;; 68: (2006-08-14) changed number of arguments of LOAD-DEFMETHOD
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))
