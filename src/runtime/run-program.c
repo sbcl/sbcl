@@ -150,30 +150,29 @@ HANDLE spawn (
     int wait
     )
 {
-    int fdOut, fdIn, fdErr, fdInPipe[2], fdOutPipe[2], fdErrPipe[2], wait_mode;
+    int stdout_backup, stdin_backup, stderr_backup, wait_mode;
     HANDLE hProcess;
+    
+    /* Duplicate and save the original stdin/out/err handles. */
+    stdout_backup = _dup (  _fileno ( stdout ) );
+    stdin_backup  = _dup (  _fileno ( stdin  ) );
+    stderr_backup = _dup (  _fileno ( stderr ) );
 
-    /* Make pipes to be passed to the spawned process as in/out/err */
-    if ( _pipe ( fdOutPipe, 512, O_TEXT | O_NOINHERIT ) == -1 ) return (HANDLE)-1;
-    if ( _pipe ( fdInPipe,  512, O_TEXT | O_NOINHERIT ) == -1 ) return (HANDLE)-1;
-    if ( _pipe ( fdErrPipe, 512, O_TEXT | O_NOINHERIT ) == -1 ) return (HANDLE)-1;
+    /* If we are not using stdin/out/err
+     * then duplicate the new pipes to current stdin/out/err handles.
+     *
+     * Default std fds are used if in, out or err parameters
+     * are -1. */
 
-    /* Duplicate and save original in/out/err handles */
-    fdOut = _dup ( out );
-    fdIn  = _dup ( in );
-    fdErr = _dup ( err );
-
-    /* Duplicate write end of new pipes to current out/err handles,
-     * read to in */
-    if ( _dup2 ( fdOutPipe[WRITE_HANDLE], out ) != 0 ) return (HANDLE)-1;
-    if ( _dup2 ( fdInPipe[READ_HANDLE],   in  ) != 0 ) return (HANDLE)-1;
-    if ( _dup2 ( fdErrPipe[WRITE_HANDLE], err ) != 0 ) return (HANDLE)-1;
-
-
-    /* Close the duplicated handles to the new pipes */
-    close ( fdOutPipe[WRITE_HANDLE] );
-    close ( fdInPipe[READ_HANDLE] );
-    close ( fdErrPipe[WRITE_HANDLE] );
+    if ( ( out >= 0 ) && ( out != _fileno ( stdout ) ) ) {
+        if ( _dup2 ( out, _fileno ( stdout ) ) != 0 ) return (HANDLE)-1;
+    }
+    if ( ( in >= 0 ) && ( in != _fileno ( stdout ) ) ) {
+        if ( _dup2 ( in,  _fileno ( stdin )  ) != 0 ) return (HANDLE)-1;
+    }
+    if ( ( err >= 0 ) && ( err != _fileno ( stdout ) ) ) {
+        if ( _dup2 ( err, _fileno ( stderr ) ) != 0 ) return (HANDLE)-1;
+    }
 
     /* Set the wait mode. */
     if ( 0 == wait ) {
@@ -186,17 +185,18 @@ HANDLE spawn (
     hProcess = (HANDLE) spawnvp ( wait_mode, program, argv );
 
     /* Now that the process is launched, replace the original
-     * in/out/err handles */
-    if ( _dup2 ( fdOut, out ) != 0 ) return (HANDLE)-1;
-    if ( _dup2 ( fdIn,  in )  != 0 ) return (HANDLE)-1;
-    if ( _dup2 ( fdErr, err ) != 0 ) return (HANDLE)-1;
+     * in/out/err handles and close the backups. */
 
-    /* Close duplicates */
-    close(fdOut);
-    close(fdIn);
-    close(fdErr);
+    if ( _dup2 ( stdout_backup, _fileno ( stdout ) ) != 0 ) return (HANDLE)-1;
+    if ( _dup2 ( stdin_backup,  _fileno ( stdin )  ) != 0 ) return (HANDLE)-1;
+    if ( _dup2 ( stderr_backup, _fileno ( stderr ) ) != 0 ) return (HANDLE)-1;
+
+    close ( stdout_backup );
+    close ( stdin_backup  );
+    close ( stderr_backup );
 
     return ( hProcess );
+    
 }
 
 

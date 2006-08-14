@@ -759,7 +759,7 @@ argument. ARGS are the standard arguments that can be passed to a
 program. For no arguments, use NIL (which means that just the name of
 the program is passed as arg 0).
 
-RUN-PROGRAM will either return a PROCESS structure. See the CMU
+RUN-PROGRAM will return a PROCESS structure. See the CMU
 Common Lisp Users Manual for details about the PROCESS structure.
 
    The &KEY arguments have the following meanings:
@@ -772,7 +772,7 @@ Common Lisp Users Manual for details about the PROCESS structure.
         NIL, continue running Lisp until the program finishes.
      :INPUT
         Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
-        input for the current process is inherited.  If NIL, /dev/null
+        input for the current process is inherited.  If NIL, nul
         is used.  If a pathname, the file so specified is used.  If a stream,
         all the input is read from that stream and send to the subprocess.  If
         :STREAM, the PROCESS-INPUT slot is filled in with a stream that sends
@@ -784,7 +784,7 @@ Common Lisp Users Manual for details about the PROCESS structure.
            NIL (the default) to return NIL from RUN-PROGRAM
      :OUTPUT
         Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
-        output for the current process is inherited.  If NIL, /dev/null
+        output for the current process is inherited.  If NIL, nul
         is used.  If a pathname, the file so specified is used.  If a stream,
         all the output from the process is written to this stream. If
         :STREAM, the PROCESS-OUTPUT slot is filled in with a stream that can
@@ -845,22 +845,29 @@ Common Lisp Users Manual for details about the PROCESS structure.
                             (when (< handle 0)
                               (error "Couldn't spawn program: ~A" (strerror)))
                             (setf proc
-                                  (if wait
-                                      (make-process :%status :exited
-                                                    :exit-code handle)
-                                      (make-process :pid handle
-                                                    :%status :running
-                                                    :input input-stream
-                                                    :output output-stream
-                                                    :error error-stream
-                                                    :status-hook status-hook
-                                                    :cookie cookie))))))))))
-    ;; FIXME: this should probably use PROCESS-WAIT instead instead
-    ;; of special argument to SPAWN.
-    (unless wait
-      (push proc *active-processes*))
-    (when (and wait status-hook)
-      (funcall status-hook proc))
+				  (if wait 
+				      (make-process :pid handle
+						    :%status :exited
+						    :input input-stream
+						    :output output-stream
+						    :error error-stream
+						    :status-hook status-hook
+						    :cookie cookie
+						    :exit-code handle)
+				      (make-process :pid handle
+						    :%status :running
+						    :input input-stream
+						    :output output-stream
+						    :error error-stream
+						    :status-hook status-hook
+						    :cookie cookie)))
+			    (push proc *active-processes*)))))))
+      (dolist (fd *close-in-parent*)
+	(sb-unix:unix-close fd)))
+    (unless proc
+      (dolist (fd *close-on-error*)
+	(sb-unix:unix-close fd)))
+
     proc))
 
 ;;; Install a handler for any input that shows up on the file
@@ -958,7 +965,8 @@ Common Lisp Users Manual for details about the PROCESS structure.
                                   (t sb-unix:o_rdwr))
                                 #o666)
            (unless fd
-             (error "~@<couldn't open \"/dev/null\": ~2I~_~A~:>"
+             (error #-win32 "~@<couldn't open \"/dev/null\": ~2I~_~A~:>"
+		    #+win32 "~@<couldn't open \"nul\" device: ~2I~_~A~:>"
                     (strerror errno)))
            (push fd *close-in-parent*)
            (values fd nil)))
