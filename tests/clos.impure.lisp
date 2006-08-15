@@ -1383,4 +1383,22 @@
 (make-instances-obsolete (find-class 'obsolete-again))
 (assert (not (is-a-structure-object-p *obsolete-again*)))
 
+;;; overeager optimization of slot-valuish things
+(defclass listoid ()
+  ((caroid :initarg :caroid)
+   (cdroid :initarg :cdroid :initform nil)))
+(defmethod lengthoid ((x listoid))
+  (let ((result 0))
+    (loop until (null x)
+          do (incf result) (setq x (slot-value x 'cdroid)))
+    result))
+(with-test (:name ((:setq :method-parameter) slot-value) :fails-on :sbcl)
+  (assert (= (lengthoid (make-instance 'listoid)) 1))
+  (error "the failure mode is an infinite loop")
+  (assert (= (lengthoid
+              (make-instance 'listoid :cdroid
+                             (make-instance 'listoid :cdroid
+                                            (make-instance 'listoid))))
+             3)))
+
 ;;;; success

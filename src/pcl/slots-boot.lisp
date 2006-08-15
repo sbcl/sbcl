@@ -437,52 +437,46 @@
                   (slot-value instance slot-name)))))))
 
 (defun make-std-reader-method-function (class-name slot-name)
-  (let* ((pv-table-symbol (gensym))
-         (initargs (copy-tree
+  (let* ((initargs (copy-tree
                     (make-method-function
                      (lambda (instance)
                        (pv-binding1 (.pv. .calls.
-                                          (symbol-value pv-table-symbol)
+                                          (bug "Please report this")
                                           (instance) (instance-slots))
                          (instance-read-internal
-                          .pv. instance-slots 1
+                          .pv. instance-slots 0
                           (slot-value instance slot-name))))))))
     (setf (getf (getf initargs :plist) :slot-name-lists)
           (list (list nil slot-name)))
-    (setf (getf (getf initargs :plist) :pv-table-symbol) pv-table-symbol)
     (list* :method-spec `(reader-method ,class-name ,slot-name)
            initargs)))
 
 (defun make-std-writer-method-function (class-name slot-name)
-  (let* ((pv-table-symbol (gensym))
-         (initargs (copy-tree
+  (let* ((initargs (copy-tree
                     (make-method-function
                      (lambda (nv instance)
                        (pv-binding1 (.pv. .calls.
-                                          (symbol-value pv-table-symbol)
+                                          (bug "Please report this")
                                           (instance) (instance-slots))
                          (instance-write-internal
-                          .pv. instance-slots 1 nv
+                          .pv. instance-slots 0 nv
                           (setf (slot-value instance slot-name) nv))))))))
     (setf (getf (getf initargs :plist) :slot-name-lists)
           (list nil (list nil slot-name)))
-    (setf (getf (getf initargs :plist) :pv-table-symbol) pv-table-symbol)
     (list* :method-spec `(writer-method ,class-name ,slot-name)
            initargs)))
 
 (defun make-std-boundp-method-function (class-name slot-name)
-  (let* ((pv-table-symbol (gensym))
-         (initargs (copy-tree
+  (let* ((initargs (copy-tree
                     (make-method-function
                      (lambda (instance)
                        (pv-binding1 (.pv. .calls.
-                                          (symbol-value pv-table-symbol)
+                                          (bug "Please report this")
                                           (instance) (instance-slots))
                           (instance-boundp-internal
-                           .pv. instance-slots 1
+                           .pv. instance-slots 0
                            (slot-boundp instance slot-name))))))))
     (setf (getf (getf initargs :plist) :slot-name-lists)
           (list (list nil slot-name)))
-    (setf (getf (getf initargs :plist) :pv-table-symbol) pv-table-symbol)
     (list* :method-spec `(boundp-method ,class-name ,slot-name)
            initargs)))

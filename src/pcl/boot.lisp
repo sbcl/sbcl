@@ -757,19 +757,20 @@ bootstrapping.
               (when (some #'cdr slots)
                 (multiple-value-bind (slot-name-lists call-list)
                     (slot-name-lists-from-slots slots calls)
-                  (let ((pv-table-symbol (make-symbol "pv-table")))
-                    (setq plist
-                          `(,@(when slot-name-lists
-                                    `(:slot-name-lists ,slot-name-lists))
-                              ,@(when call-list
-                                      `(:call-list ,call-list))
-                              :pv-table-symbol ,pv-table-symbol
-                              ,@plist))
-                    (setq walked-lambda-body
-                          `((pv-binding (,required-parameters
-                                         ,slot-name-lists
-                                         ,pv-table-symbol)
-                              ,@walked-lambda-body))))))
+                  (setq plist
+                        `(,@(when slot-name-lists
+                                  `(:slot-name-lists ,slot-name-lists))
+                          ,@(when call-list
+                                  `(:call-list ,call-list))
+                          ,@plist))
+                  (setq walked-lambda-body
+                        `((pv-binding (,required-parameters
+                                       ,slot-name-lists
+                                       (load-time-value
+                                        (intern-pv-table
+                                         :slot-name-lists ',slot-name-lists
+                                         :call-list ',call-list)))
+                           ,@walked-lambda-body)))))
               (when (and (memq '&key lambda-list)
                          (not (memq '&allow-other-keys lambda-list)))
                 (let ((aux (memq '&aux lambda-list)))
@@ -1432,7 +1433,6 @@ bootstrapping.
   (let* ((mf (getf initargs :function))
          (method-spec (getf initargs :method-spec))
          (plist (getf initargs :plist))
-         (pv-table-symbol (getf plist :pv-table-symbol))
          (pv-table nil)
          (mff (getf initargs :fast-function)))
     (flet ((set-mf-property (p v)
@@ -1454,7 +1454,6 @@ bootstrapping.
           (when (or snl cl)
             (setq pv-table (intern-pv-table :slot-name-lists snl
                                             :call-list cl))
-            (when pv-table (set pv-table-symbol pv-table))
             (set-mf-property :pv-table pv-table)))
         (loop (when (null plist) (return nil))
               (set-mf-property (pop plist) (pop plist)))

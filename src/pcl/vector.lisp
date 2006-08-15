@@ -85,7 +85,7 @@
       (let ((pv-table
              (outer (mapcar #'inner (cons call-list slot-name-lists)))))
         (when new-p
-          (let ((pv-index 1))
+          (let ((pv-index 0))
             (dolist (slot-name-list slot-name-lists)
               (dolist (slot-name (cdr slot-name-list))
                 (note-pv-table-reference slot-name pv-index pv-table)
@@ -132,60 +132,43 @@
         (maphash function entry)))
   ref)
 
-(defvar *pvs* (make-hash-table :test 'equal))
-
 (defun optimize-slot-value-by-class-p (class slot-name type)
   (or (not (eq *boot-state* 'complete))
       (let ((slotd (find-slot-definition class slot-name)))
         (and slotd
              (slot-accessor-std-p slotd type)))))
 
-(defun compute-pv-slot (slot-name wrapper class class-slots class-slot-p-cell)
+(defun compute-pv-slot (slot-name wrapper class class-slots)
   (if (symbolp slot-name)
       (when (optimize-slot-value-by-class-p class slot-name 'all)
         (or (instance-slot-index wrapper slot-name)
-            (let ((cell (assq slot-name class-slots)))
-              (when cell
-                (setf (car class-slot-p-cell) t)
-                cell))))
+            (assq slot-name class-slots)))
       (when (consp slot-name)
-        (dolist (type '(reader writer) nil)
-          (when (eq (car slot-name) type)
-            (return
-              (let* ((gf-name (cadr slot-name))
-                     (gf (gdefinition gf-name))
-                     (location (when (eq *boot-state* 'complete)
-                                 (accessor-values1 gf type class))))
-                (when (consp location)
-                  (setf (car class-slot-p-cell) t))
-                location)))))))
+        (case (first slot-name)
+          ((reader writer)
+           (when (eq *boot-state* 'complete)
+             (let ((gf (gdefinition (second slot-name))))
+               (when (generic-function-p gf)
+                 (accessor-values1 gf (first slot-name) class)))))
+          (t (bug "Don't know how to deal with ~S in ~S"
+                  slot-name 'compute-pv-slots))))))
 
 (defun compute-pv (slot-name-lists wrappers)
-  (unless (listp wrappers) (setq wrappers (list wrappers)))
-  (let* ((not-simple-p-cell (list nil))
-         (elements
-          (let ((elements nil))
-            (dolist (slot-names slot-name-lists)
-              (when slot-names
-                (let* ((wrapper     (pop wrappers))
-                       (std-p (typep wrapper 'wrapper))
-                       (class       (wrapper-class* wrapper))
-                       (class-slots (and std-p (wrapper-class-slots wrapper))))
-                  (dolist (slot-name (cdr slot-names))
-                    ;; Original PCL code had this idiom.  why not:
-                    ;;
-                    ;; (WHEN STD-P
-                    ;;   (PUSH ...)) ?
-                    (push (when std-p
-                            (compute-pv-slot slot-name wrapper class
-                                             class-slots not-simple-p-cell))
-                          elements)))))
-            (nreverse elements))))
-    (if (car not-simple-p-cell)
-        (make-permutation-vector (cons t elements))
-        (or (gethash elements *pvs*)
-            (setf (gethash elements *pvs*)
-                  (make-permutation-vector (cons nil elements)))))))
+  (unless (listp wrappers)
+    (setq wrappers (list wrappers)))
+  (let (elements)
+    (dolist (slot-names slot-name-lists
+             (make-permutation-vector (nreverse elements)))
+      (when slot-names
+        (let* ((wrapper (pop wrappers))
+               (std-p (typep wrapper 'wrapper))
+               (class (wrapper-class* wrapper))
+               (class-slots (and std-p (wrapper-class-slots wrapper))))
+          (dolist (slot-name (cdr slot-names))
+            (push (if std-p
+                      (compute-pv-slot slot-name wrapper class class-slots)
+                      nil)
+                  elements)))))))
 
 (defun compute-calls (call-list wrappers)
   (declare (ignore call-list wrappers))
@@ -271,14 +254,14 @@
   (let* ((cwrapper (class-wrapper class))
          (std-p (typep cwrapper 'wrapper))
          (class-slots (and std-p (wrapper-class-slots cwrapper)))
-         (class-slot-p-cell (list nil))
-         (new-values (mapcar (lambda (slot-name)
-                               (cons slot-name
-                                     (when std-p
-                                       (compute-pv-slot
-                                        slot-name cwrapper class
-                                        class-slots class-slot-p-cell))))
-                             slot-names))
+         (new-values
+          (mapcar
+           (lambda (slot-name)
+             (cons slot-name
+                   (if std-p
+                       (compute-pv-slot slot-name cwrapper class class-slots)
+                       nil)))
+           slot-names))
          (pv-tables nil))
     (dolist (slot-name slot-names)
       (map-pv-table-references-of
@@ -291,7 +274,7 @@
              (slot-name-lists (pv-table-slot-name-lists pv-table))
              (pv-size (pv-table-pv-size pv-table))
              (pv-map (make-array pv-size :initial-element nil)))
-        (let ((map-index 1) (param-index 0))
+        (let ((map-index 0) (param-index 0))
           (dolist (slot-name-list slot-name-lists)
             (dolist (slot-name (cdr slot-name-list))
               (let ((a (assoc slot-name new-values)))
@@ -301,48 +284,27 @@
             (incf param-index)))
         (when cache
           (map-cache (lambda (wrappers pv-cell)
-                       (setf (car pv-cell)
-                             (update-slots-in-pv wrappers (car pv-cell)
-                                                 cwrapper pv-size pv-map)))
+                       (update-slots-in-pv wrappers (car pv-cell)
+                                           cwrapper pv-size pv-map))
                      cache))))))
 
 (defun update-slots-in-pv (wrappers pv cwrapper pv-size pv-map)
-  (if (not (if (atom wrappers)
-               (eq cwrapper wrappers)
-               (dolist (wrapper wrappers nil)
-                 (when (eq wrapper cwrapper)
-                   (return t)))))
-      pv
-      (let* ((old-intern-p (listp (pvref pv 0)))
-             (new-pv (if old-intern-p
-                         (copy-pv pv)
-                         pv))
-             (new-intern-p t))
-        (if (atom wrappers)
-            (dotimes-fixnum (i pv-size)
-              (when (consp (let ((map (svref pv-map i)))
-                             (if map
-                                 (setf (pvref new-pv i) (cdr map))
-                                 (pvref new-pv i))))
-                (setq new-intern-p nil)))
-            (let ((param 0))
-              (dolist (wrapper wrappers)
-                (when (eq wrapper cwrapper)
-                  (dotimes-fixnum (i pv-size)
-                    (when (consp (let ((map (svref pv-map i)))
-                                   (if (and map (= (car map) param))
-                                       (setf (pvref new-pv i) (cdr map))
-                                       (pvref new-pv i))))
-                      (setq new-intern-p nil))))
-                (incf param))))
-        (when new-intern-p
-          (setq new-pv (let ((list-pv (coerce pv 'list)))
-                         (or (gethash (cdr list-pv) *pvs*)
-                             (setf (gethash (cdr list-pv) *pvs*)
-                                   (if old-intern-p
-                                       new-pv
-                                       (make-permutation-vector list-pv)))))))
-        new-pv)))
+  (if (atom wrappers)
+      (when (eq cwrapper wrappers)
+        (dotimes-fixnum (i pv-size)
+          (let ((map (svref pv-map i)))
+            (when map
+              (aver (= (car map) 0))
+              (setf (pvref pv i) (cdr map))))))
+      (when (memq cwrapper wrappers)
+        (let ((param 0))
+          (dolist (wrapper wrappers)
+            (when (eq wrapper cwrapper)
+              (dotimes-fixnum (i pv-size)
+                (let ((map (svref pv-map i)))
+                  (when (and map (= (car map) param))
+                    (setf (pvref pv i) (cdr map))))))
+            (incf param))))))
 
 (defun maybe-expand-accessor-form (form required-parameters slots env)
   (let* ((fname (car form))
@@ -830,7 +792,7 @@
 (defun mutate-slots-and-calls (slots calls)
   (let ((sorted-slots (sort-slots slots))
         (sorted-calls (sort-calls (cdr calls)))
-        (pv-offset 0))  ; index 0 is for info
+        (pv-offset -1))
     (dolist (parameter-entry sorted-slots)
       (dolist (slot-entry (cdr parameter-entry))
         (incf pv-offset)
@@ -893,7 +855,7 @@
 ;;;; Automatically generated reader and writer functions use this
 ;;;; stuff too.
 
-(defmacro pv-binding ((required-parameters slot-name-lists pv-table-symbol)
+(defmacro pv-binding ((required-parameters slot-name-lists pv-table-form)
                       &body body)
   (let (slot-vars pv-parameters)
     (loop for slots in slot-name-lists
@@ -902,13 +864,13 @@
           do (when slots
                (push required-parameter pv-parameters)
                (push (slot-vector-symbol i) slot-vars)))
-    `(pv-binding1 (.pv. .calls. ,pv-table-symbol
+    `(pv-binding1 (.pv. .calls. ,pv-table-form
                    ,(nreverse pv-parameters) ,(nreverse slot-vars))
        ,@body)))
 
-(defmacro pv-binding1 ((pv calls pv-table-symbol pv-parameters slot-vars)
+(defmacro pv-binding1 ((pv calls pv-table-form pv-parameters slot-vars)
                        &body body)
-  `(pv-env (,pv ,calls ,pv-table-symbol ,pv-parameters)
+  `(pv-env (,pv ,calls ,pv-table-form ,pv-parameters)
      (let (,@(mapcar (lambda (slot-var p) `(,slot-var (get-slots-or-nil ,p)))
                      slot-vars pv-parameters))
        (declare (ignorable ,@(mapcar #'identity slot-vars)))
@@ -919,7 +881,7 @@
 (define-symbol-macro pv-env-environment overridden)
 
 (defmacro pv-env (&environment env
-                  (pv calls pv-table-symbol pv-parameters)
+                  (pv calls pv-table-form pv-parameters)
                   &rest forms)
   ;; Decide which expansion to use based on the state of the PV-ENV-ENVIRONMENT
   ;; symbol-macrolet.
@@ -930,17 +892,14 @@
                   ,(make-calls-type-declaration calls))
          ,pv ,calls
          ,@forms)
-      `(locally
-        ,@(when (symbolp pv-table-symbol)
-                `((declare (special ,pv-table-symbol))))
-        (let* ((.pv-table. ,pv-table-symbol)
-               (.pv-cell. (pv-table-lookup-pv-args .pv-table. ,@pv-parameters))
-               (,pv (car .pv-cell.))
-               (,calls (cdr .pv-cell.)))
-          (declare ,(make-pv-type-declaration pv))
-          (declare ,(make-calls-type-declaration calls))
-          ,pv ,calls
-          ,@forms))))
+      `(let* ((.pv-table. ,pv-table-form)
+              (.pv-cell. (pv-table-lookup-pv-args .pv-table. ,@pv-parameters))
+              (,pv (car .pv-cell.))
+              (,calls (cdr .pv-cell.)))
+        (declare ,(make-pv-type-declaration pv))
+        (declare ,(make-calls-type-declaration calls))
+        ,pv ,calls
+        ,@forms)))
 
 (defvar *non-var-declarations*
   ;; FIXME: VALUES was in this list, conditionalized with #+CMU, but I

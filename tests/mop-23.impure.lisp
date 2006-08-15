@@ -53,3 +53,12 @@
                    (assert (equal (foo (make-instance 'sub :a 4))
                                   '(4 nil))))
                  "Called a method!Called a method!"))
+
+(defclass super () 
+  ((b :initform 3) 
+   (a :initarg :a)))
+
+(assert (string= (with-output-to-string (*trace-output*)
+                   (assert (equal (foo (make-instance 'sub :a 5))
+                                  '(5 t))))
+                 "Called a method!Called a method!"))
