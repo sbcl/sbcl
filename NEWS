@@ -45,6 +45,8 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
   * bug fix: inline expansions of known functions were subject to
     step-instrumentation in high debug policies, leading to problems
     with type-inference.
+  * bug fix: compiler failed to differentiate between different CONS
+    types in some cases.
 
 changes in sbcl-0.9.15 relative to sbcl-0.9.14:
   * added support for the ucs-2 external format.  (contributed by Ivan

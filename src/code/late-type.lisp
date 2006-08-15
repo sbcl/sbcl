@@ -2970,8 +2970,11 @@ used for a COMPLEX component.~:@>"
 
 (!define-type-method (cons :simple-=) (type1 type2)
   (declare (type cons-type type1 type2))
-  (and (type= (cons-type-car-type type1) (cons-type-car-type type2))
-       (type= (cons-type-cdr-type type1) (cons-type-cdr-type type2))))
+  (multiple-value-bind (match win)
+      (type= (cons-type-car-type type1) (cons-type-car-type type2))
+    (if (and match win)
+        (type= (cons-type-cdr-type type1) (cons-type-cdr-type type2))
+        (values nil win))))
 
 (!define-type-method (cons :simple-subtypep) (type1 type2)
   (declare (type cons-type type1 type2))
