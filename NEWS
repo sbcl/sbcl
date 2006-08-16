@@ -13,6 +13,9 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
     profiled functions. (thanks to Troels Henriksen)
   * enhancement: compiler-macro expansion applies now to FUNCALL forms
     as well.
+  * enhancement: step-instrumentation no longer wraps known
+    single-value functions with multiple-value context, allowing
+    better type inference.
   * fixed bug #337: use of MAKE-METHOD in method combination now works
     even in the presence of user-defined method classes.  (reported by
     Bruno Haible and Pascal Costanza)

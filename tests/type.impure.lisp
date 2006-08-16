@@ -511,7 +511,7 @@
   (assert win))
 
 ;; See FIXME in type method for CONS :SIMPLE-TYPE-=
-#+nil 
+#+nil
 (multiple-value-bind (ok win)
     (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach1 integer))
                      (sb-kernel:specifier-type '(cons goldbach1 single-float)))

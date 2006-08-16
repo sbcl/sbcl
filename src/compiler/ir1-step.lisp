@@ -37,13 +37,11 @@
 
 (defun step-variable (symbol value)
   (when *step*
-    (signal 'step-variable-condition :form symbol :result value))
-  value)
+    (signal 'step-variable-condition :form symbol :result value)))
 
 (defun step-values (form values)
   (when *step*
-    (signal 'step-values-condition :form form :result values))
-  (values-list values))
+    (signal 'step-values-condition :form form :result values)))
 
 (defun insert-step-conditions (form)
   `(locally (declare
@@ -54,31 +52,49 @@
 ;;; Flag to control instrumentation function call arguments.
 (defvar *step-arguments-p* nil)
 
+(defun known-single-value-fun-p (fun)
+  (and (legal-fun-name-p fun)
+       (info :function :info fun)
+       (let ((type (info :function :type fun)))
+         (and (and (fun-type-p type))
+              (type-single-value-p (fun-type-returns type))))))
+
 (defun ir1-convert-step (start next result form)
   (let ((form-string (let ((*print-pretty* t)
                            (*print-readably* nil))
                        (prin1-to-string form))))
     (etypecase form
       (symbol
-       (ir1-convert start next result
-                    `(locally (declare (optimize (insert-step-conditions 0)))
-                      (step-variable ,form-string ,form))))
+       (let ((ctran (make-ctran))
+             (*allow-instrumenting* nil))
+         (ir1-convert start ctran nil `(step-variable ,form-string ,form))
+         (ir1-convert ctran next result form)))
       (list
        (let* ((*step-arguments-p* (and *allow-instrumenting*
                                        (policy *lexenv* (= insert-step-conditions 3))))
               (step-form `(step-form ,form-string
                                      ',(source-path-original-source *current-path*)
                                      *compile-file-pathname*))
-              (values-form `(,(car form)
+              (fun (car form))
+              (values-form `(,fun
                              ,@(if *step-arguments-p*
                                    (mapcar #'insert-step-conditions (cdr form))
                                    (cdr form)))))
          (ir1-convert start next result
                       `(locally (declare (optimize (insert-step-conditions 0)))
-                        ,(if *step-arguments-p*
-                             `(let ((*step* ,step-form))
-                                (step-values ,form-string (multiple-value-list ,values-form)))
-                             `(progn ,step-form ,values-form)))))))))
+                         ,(if *step-arguments-p*
+                              `(let ((*step* ,step-form))
+                                 ,(if (known-single-value-fun-p fun)
+                                      `((lambda (value)
+                                          (step-values ,form-string (list value))
+                                          value)
+                                        ,values-form)
+                                      `(multiple-value-call
+                                           (lambda (&rest values)
+                                             (step-values ,form-string values)
+                                             (values-list values))
+                                         ,values-form)))
+                              `(progn ,step-form ,values-form)))))))))
 
 (defun step-form-p (form)
   #+sb-xc-host (declare (ignore form))

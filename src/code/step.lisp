@@ -22,6 +22,7 @@ stepper's prompt:
  N: Evaluate the current expression without stepping.
  C: Evaluate to finish without stepping.
  Q: Abort evaluation.
+ B: Backtrace.
  ?: Display this message.
 ")
 
@@ -46,6 +47,8 @@ stepper's prompt:
      (let ((line (read-line *debug-io*)))
        (if (plusp (length line))
            (case (char-upcase (schar line 0))
+             (#\B
+              (backtrace))
              (#\Q
               (abort condition))
              (#\C
@@ -57,7 +60,7 @@ stepper's prompt:
              (#\?
               (write-line *step-help* *debug-io*))))))))
 
-(defvar *stepper-hook* #'single-step
+(defvar *stepper-hook* 'single-step
   #+sb-doc "Customization hook for alternative single-steppers.
 *STEPPER-HOOK* is bound to NIL prior to calling the bound function
 with the STEP-CONDITION as argument.")

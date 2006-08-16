@@ -1318,4 +1318,13 @@
                               (declare (inline test-cmacro-4))
                               (test-cmacro-4)))))
 
+;;; Step instrumentation breaking type-inference
+(handler-bind ((warning #'error))
+  (assert (= 42 (funcall (compile nil '(lambda (v x)
+                                        (declare (optimize sb-c:insert-step-conditions))
+                                        (if (typep (the function x) 'fixnum)
+                                            (svref v (the function x))
+                                            (funcall x))))
+                         nil (constantly 42)))))
+
 ;;; success

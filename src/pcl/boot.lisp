@@ -964,8 +964,8 @@ bootstrapping.
      (trace-emf-call ,emf ,restp (list ,@required-args+rest-arg))
      (invoke-fast-method-call ,emf ,@required-args+rest-arg)))
 
-(defmacro invoke-effective-method-function (emf restp
-                                                &rest required-args+rest-arg)
+(defmacro invoke-effective-method-function (emf-form restp
+                                            &rest required-args+rest-arg)
   (unless (constantp restp)
     (error "The RESTP argument is not constant."))
   ;; FIXME: The RESTP handling here is confusing and maybe slightly
@@ -973,49 +973,50 @@ bootstrapping.
   ;;   (INVOKE-EFFECTIVE-METHOD-FUNCTION EMF '(ERROR "gotcha") ...)
   ;; then TRACE-EMF-CALL-CALL-INTERNAL might die on a gotcha error.
   (setq restp (constant-form-value restp))
-  `(progn
-     (trace-emf-call ,emf ,restp (list ,@required-args+rest-arg))
-     (cond ((typep ,emf 'fast-method-call)
-            (invoke-fast-method-call ,emf ,@required-args+rest-arg))
-           ;; "What," you may wonder, "do these next two clauses do?"
-           ;; In that case, you are not a PCL implementor, for they
-           ;; considered this to be self-documenting.:-| Or CSR, for
-           ;; that matter, since he can also figure it out by looking
-           ;; at it without breaking stride. For the rest of us,
-           ;; though: From what the code is doing with .SLOTS. and
-           ;; whatnot, evidently it's implementing SLOT-VALUEish and
-           ;; GET-SLOT-VALUEish things. Then we can reason backwards
-           ;; and conclude that setting EMF to a FIXNUM is an
-           ;; optimized way to represent these slot access operations.
-           ,@(when (and (null restp) (= 1 (length required-args+rest-arg)))
-               `(((typep ,emf 'fixnum)
-                  (let* ((.slots. (get-slots-or-nil
-                                   ,(car required-args+rest-arg)))
-                         (value (when .slots. (clos-slots-ref .slots. ,emf))))
-                    (if (eq value +slot-unbound+)
-                        (slot-unbound-internal ,(car required-args+rest-arg)
-                                               ,emf)
-                        value)))))
-           ,@(when (and (null restp) (= 2 (length required-args+rest-arg)))
-               `(((typep ,emf 'fixnum)
-                  (let ((.new-value. ,(car required-args+rest-arg))
-                        (.slots. (get-slots-or-nil
-                                  ,(cadr required-args+rest-arg))))
-                    (when .slots.
-                      (setf (clos-slots-ref .slots. ,emf) .new-value.))))))
-           ;; (In cmucl-2.4.8 there was a commented-out third ,@(WHEN
-           ;; ...) clause here to handle SLOT-BOUNDish stuff. Since
-           ;; there was no explanation and presumably the code is 10+
-           ;; years stale, I simply deleted it. -- WHN)
-           (t
-            (etypecase ,emf
-              (method-call
-               (invoke-method-call ,emf ,restp ,@required-args+rest-arg))
-              (function
-               ,(if restp
-                    `(apply (the function ,emf) ,@required-args+rest-arg)
-                    `(funcall (the function ,emf)
-                              ,@required-args+rest-arg))))))))
+  (with-unique-names (emf)
+    `(let ((,emf ,emf-form))
+      (trace-emf-call ,emf ,restp (list ,@required-args+rest-arg))
+      (cond ((typep ,emf 'fast-method-call)
+             (invoke-fast-method-call ,emf ,@required-args+rest-arg))
+            ;; "What," you may wonder, "do these next two clauses do?"
+            ;; In that case, you are not a PCL implementor, for they
+            ;; considered this to be self-documenting.:-| Or CSR, for
+            ;; that matter, since he can also figure it out by looking
+            ;; at it without breaking stride. For the rest of us,
+            ;; though: From what the code is doing with .SLOTS. and
+            ;; whatnot, evidently it's implementing SLOT-VALUEish and
+            ;; GET-SLOT-VALUEish things. Then we can reason backwards
+            ;; and conclude that setting EMF to a FIXNUM is an
+            ;; optimized way to represent these slot access operations.
+            ,@(when (and (null restp) (= 1 (length required-args+rest-arg)))
+                    `(((typep ,emf 'fixnum)
+                       (let* ((.slots. (get-slots-or-nil
+                                        ,(car required-args+rest-arg)))
+                              (value (when .slots. (clos-slots-ref .slots. ,emf))))
+                         (if (eq value +slot-unbound+)
+                             (slot-unbound-internal ,(car required-args+rest-arg)
+                                                    ,emf)
+                             value)))))
+            ,@(when (and (null restp) (= 2 (length required-args+rest-arg)))
+                    `(((typep ,emf 'fixnum)
+                       (let ((.new-value. ,(car required-args+rest-arg))
+                             (.slots. (get-slots-or-nil
+                                       ,(cadr required-args+rest-arg))))
+                         (when .slots.
+                           (setf (clos-slots-ref .slots. ,emf) .new-value.))))))
+            ;; (In cmucl-2.4.8 there was a commented-out third ,@(WHEN
+            ;; ...) clause here to handle SLOT-BOUNDish stuff. Since
+            ;; there was no explanation and presumably the code is 10+
+            ;; years stale, I simply deleted it. -- WHN)
+            (t
+             (etypecase ,emf
+               (method-call
+                (invoke-method-call ,emf ,restp ,@required-args+rest-arg))
+               (function
+                ,(if restp
+                     `(apply (the function ,emf) ,@required-args+rest-arg)
+                     `(funcall (the function ,emf)
+                               ,@required-args+rest-arg)))))))))
 
 (defun invoke-emf (emf args)
   (trace-emf-call emf t args)
