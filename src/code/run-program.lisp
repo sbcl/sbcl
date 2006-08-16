@@ -845,28 +845,28 @@ Common Lisp Users Manual for details about the PROCESS structure.
                             (when (< handle 0)
                               (error "Couldn't spawn program: ~A" (strerror)))
                             (setf proc
-				  (if wait 
-				      (make-process :pid handle
-						    :%status :exited
-						    :input input-stream
-						    :output output-stream
-						    :error error-stream
-						    :status-hook status-hook
-						    :cookie cookie
-						    :exit-code handle)
-				      (make-process :pid handle
-						    :%status :running
-						    :input input-stream
-						    :output output-stream
-						    :error error-stream
-						    :status-hook status-hook
-						    :cookie cookie)))
-			    (push proc *active-processes*)))))))
+                                  (if wait 
+                                      (make-process :pid handle
+                                                    :%status :exited
+                                                    :input input-stream
+                                                    :output output-stream
+                                                    :error error-stream
+                                                    :status-hook status-hook
+                                                    :cookie cookie
+                                                    :exit-code handle)
+                                      (make-process :pid handle
+                                                    :%status :running
+                                                    :input input-stream
+                                                    :output output-stream
+                                                    :error error-stream
+                                                    :status-hook status-hook
+                                                    :cookie cookie)))
+                            (push proc *active-processes*)))))))
       (dolist (fd *close-in-parent*)
-	(sb-unix:unix-close fd)))
+        (sb-unix:unix-close fd)))
     (unless proc
       (dolist (fd *close-on-error*)
-	(sb-unix:unix-close fd)))
+        (sb-unix:unix-close fd)))
 
     proc))
 
@@ -966,7 +966,7 @@ Common Lisp Users Manual for details about the PROCESS structure.
                                 #o666)
            (unless fd
              (error #-win32 "~@<couldn't open \"/dev/null\": ~2I~_~A~:>"
-		    #+win32 "~@<couldn't open \"nul\" device: ~2I~_~A~:>"
+                    #+win32 "~@<couldn't open \"nul\" device: ~2I~_~A~:>"
                     (strerror errno)))
            (push fd *close-in-parent*)
            (values fd nil)))

@@ -54,8 +54,8 @@
                                   '(4 nil))))
                  "Called a method!Called a method!"))
 
-(defclass super () 
-  ((b :initform 3) 
+(defclass super ()
+  ((b :initform 3)
    (a :initarg :a)))
 
 (assert (string= (with-output-to-string (*trace-output*)

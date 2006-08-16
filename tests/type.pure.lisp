@@ -332,11 +332,11 @@ ACTUAL ~D DERIVED ~D~%"
    (sb-kernel:specifier-type '(simple-array an-unkown-type (8))))))
 
 (assert
- (sb-kernel:type/= (sb-kernel:specifier-type 'cons) 
+ (sb-kernel:type/= (sb-kernel:specifier-type 'cons)
                    (sb-kernel:specifier-type '(cons single-float single-float))))
 
 (multiple-value-bind (match win)
-    (sb-kernel:type= (sb-kernel:specifier-type '(cons integer)) 
+    (sb-kernel:type= (sb-kernel:specifier-type '(cons integer))
                      (sb-kernel:specifier-type '(cons)))
   (assert (and (not match) win)))
 

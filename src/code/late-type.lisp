@@ -2970,11 +2970,23 @@ used for a COMPLEX component.~:@>"
 
 (!define-type-method (cons :simple-=) (type1 type2)
   (declare (type cons-type type1 type2))
-  (multiple-value-bind (match win)
+  (multiple-value-bind (car-match car-win)
       (type= (cons-type-car-type type1) (cons-type-car-type type2))
-    (if (and match win)
+    (multiple-value-bind (cdr-match cdr-win)
         (type= (cons-type-cdr-type type1) (cons-type-cdr-type type2))
-        (values nil win))))
+      (cond ((and car-match cdr-match)
+             (aver (and car-win cdr-win))
+             (values t t))
+            (t
+             (values nil
+                     ;; FIXME: Ideally we would like to detect and handle
+                     ;;  (CONS UNKNOWN INTEGER) (CONS UNKNOWN SYMBOL) => NIL, T
+                     ;; but just returning a secondary true on (and car-win cdr-win)
+                     ;; unfortunately breaks other things. --NS 2006-08-16
+                     (and (or (and (not car-match) car-win)
+                              (and (not cdr-match) cdr-win))
+                          (not (and (cons-type-might-be-empty-type type1)
+                                    (cons-type-might-be-empty-type type2))))))))))
 
 (!define-type-method (cons :simple-subtypep) (type1 type2)
   (declare (type cons-type type1 type2))
