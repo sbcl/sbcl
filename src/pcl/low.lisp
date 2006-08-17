@@ -179,11 +179,15 @@
   (when (valid-function-name-p fun)
     (setq fun (fdefinition fun)))
   (when (funcallable-instance-p fun)
-    (if (if (eq *boot-state* 'complete)
-                 (typep fun 'generic-function)
-                 (eq (class-of fun) *the-class-standard-generic-function*))
-             (setf (%funcallable-instance-info fun 2) new-name)
-             (bug "unanticipated function type")))
+    ;; HACK
+    (case (classoid-name (classoid-of fun))
+      (%method-function (setf (%method-function-name fun) new-name))
+      (t ;; KLUDGE: probably a generic function...
+       (if (if (eq *boot-state* 'complete)
+               (typep fun 'generic-function)
+               (eq (class-of fun) *the-class-standard-generic-function*))
+           (setf (%funcallable-instance-info fun 2) new-name)
+           (bug "unanticipated function type")))))
   ;; Fixup name-to-function mappings in cases where the function
   ;; hasn't been defined by DEFUN.  (FIXME: is this right?  This logic
   ;; comes from CMUCL).  -- CSR, 2004-12-31
@@ -335,7 +339,35 @@
 
 (defun structure-slotd-init-form (slotd)
   (dsd-default slotd))
-
+
+;;; method function stuff.
+;;;
+;;; PCL historically included a so-called method-fast-function, which
+;;; is essentially a method function but with (a) a precomputed
+;;; continuation for CALL-NEXT-METHOD and (b) a permutation vector for
+;;; slot access.  [ FIXME: see if we can understand these two
+;;; optimizations before commit. ]  However, the presence of the
+;;; fast-function meant that we violated AMOP and the effect of the
+;;; :FUNCTION initarg, and furthermore got to potentially confusing
+;;; situations where the function and the fast-function got out of
+;;; sync, so that calling (method-function method) with the defined
+;;; protocol would do different things from (call-method method) in
+;;; method combination.
+;;;
+;;; So we define this internal method function structure, which we use
+;;; when we create a method function ourselves.  This means that we
+;;; can hang the various bits of information that we want off the
+;;; method function itself, and also that if a user overrides method
+;;; function creation there is no danger of having the system get
+;;; confused.
+(!defstruct-with-alternate-metaclass %method-function
+  :slot-names (fast-function name)
+  :boa-constructor %make-method-function
+  :superclass-name function
+  :metaclass-name random-pcl-classoid
+  :metaclass-constructor make-random-pcl-classoid
+  :dd-type funcallable-structure)
+
 ;;; WITH-PCL-LOCK is used around some forms that were previously
 ;;; protected by WITHOUT-INTERRUPTS, but in a threaded SBCL we don't
 ;;; have a useful WITHOUT-INTERRUPTS.  In an unthreaded SBCL I'm not

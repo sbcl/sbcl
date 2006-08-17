@@ -597,8 +597,8 @@
     (unless mlist
       (unless (eq class *the-class-t*)
         (let* ((default-method-function #'constantly-nil)
-               (default-method-initargs (list :function
-                                              default-method-function))
+               (default-method-initargs (list :function default-method-function
+                                              'plist '(:constant-value nil)))
                (default-method (make-a-method
                                 'standard-method
                                 ()
@@ -606,19 +606,16 @@
                                 (list *the-class-t*)
                                 default-method-initargs
                                 "class predicate default method")))
-          (setf (method-function-get default-method-function :constant-value)
-                nil)
           (add-method gf default-method)))
       (let* ((class-method-function #'constantly-t)
-             (class-method-initargs (list :function
-                                          class-method-function))
+             (class-method-initargs (list :function class-method-function
+                                          'plist '(:constant-value t)))
              (class-method (make-a-method 'standard-method
                                           ()
                                           (list 'object)
                                           (list class)
                                           class-method-initargs
                                           "class predicate class method")))
-        (setf (method-function-get class-method-function :constant-value) t)
         (add-method gf class-method)))
     gf))
 

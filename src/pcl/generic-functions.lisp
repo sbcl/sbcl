@@ -104,8 +104,6 @@
 
 (defgeneric method-combination-type-name (standard-method-combination))
 
-(defgeneric method-fast-function (standard-method))
-
 (defgeneric method-generic-function (standard-method))
 
 (defgeneric object-plist (plist-mixin))

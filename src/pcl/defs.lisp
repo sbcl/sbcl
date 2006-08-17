@@ -365,11 +365,10 @@
 
 (defclass method (metaobject) ())
 
-(defclass standard-method (definition-source-mixin plist-mixin method)
+(defclass standard-method (plist-mixin definition-source-mixin method)
   ((%generic-function
     :initform nil
     :accessor method-generic-function)
-   #+nil ; implemented by PLIST
    (qualifiers
     :initform ()
     :initarg  :qualifiers
@@ -382,11 +381,7 @@
     :initform ()
     :initarg  :lambda-list
     :reader method-lambda-list)
-   (%function :initform nil :initarg :function)
-   (fast-function
-    :initform nil
-    :initarg :fast-function             ;no writer
-    :reader method-fast-function)
+   (%function :initform nil :initarg :function :reader method-function)
    (%documentation :initform nil :initarg :documentation)))
 
 (defclass accessor-method (standard-method)
@@ -684,7 +679,7 @@
     :initarg :definition-source)))
 
 (defclass plist-mixin (standard-object)
-  ((plist :initform () :accessor object-plist)))
+  ((plist :initform () :accessor object-plist :initarg plist)))
 
 (defclass dependent-update-mixin (plist-mixin) ())
 

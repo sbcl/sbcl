@@ -1,7 +1,5 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.16 relative to sbcl-0.9.15:
-  * bug fix: fixed input, output and error redirection in RUN-PROGRAM
-    for win32. (thanks to Mike Thomas and Yaroslav Kavenchuk)
   * feature: implemented the READER-METHOD-CLASS and
     WRITER-METHOD-CLASS portion of the Class Initialization Protocol
     as specified by AMOP.
@@ -22,6 +20,10 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
   * fixed bug #339(c): if there are applicable methods not part of any
     long-form method-combination group, call INVALID-METHOD-ERROR.
     (reported by Bruno Haible)
+  * fixed bug #361: the :FUNCTION initarg in the protocol for
+    initialization of methods can now be used to override
+    internally-produced optimized functions.  (reported by Bruno
+    Haible)
   * bug fix: extensions of MAKE-METHOD-LAMBDA which wrap the
     system-provided lambda expression no longer cause warnings about
     unbound #:|pv-table| symbols.
@@ -50,6 +52,8 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
     with type-inference.
   * bug fix: compiler failed to differentiate between different CONS
     types in some cases.
+  * bug fix: fixed input, output and error redirection in RUN-PROGRAM
+    for win32. (thanks to Mike Thomas and Yaroslav Kavenchuk)
 
 changes in sbcl-0.9.15 relative to sbcl-0.9.14:
   * added support for the ucs-2 external format.  (contributed by Ivan

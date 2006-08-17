@@ -403,38 +403,6 @@
        (boundp (lambda (instance)
                  (emf-funcall sdfun class instance slotd))))
      `(,name ,(class-name class) ,(slot-definition-name slotd)))))
-
-(defun make-internal-reader-method-function (class-name slot-name)
-  (list* :method-spec `(internal-reader-method ,class-name ,slot-name)
-         (make-method-function
-          (lambda (instance)
-            (let ((wrapper (get-instance-wrapper-or-nil instance)))
-              (if wrapper
-                  (let* ((class (wrapper-class* wrapper))
-                         (index (or (instance-slot-index wrapper slot-name)
-                                    (assq slot-name
-                                          (wrapper-class-slots wrapper)))))
-                    (typecase index
-                      (fixnum
-                       (let ((value (clos-slots-ref (get-slots instance)
-                                                    index)))
-                         (if (eq value +slot-unbound+)
-                             (values (slot-unbound (class-of instance)
-                                                   instance
-                                                   slot-name))
-                             value)))
-                      (cons
-                       (let ((value (cdr index)))
-                         (if (eq value +slot-unbound+)
-                             (values (slot-unbound (class-of instance)
-                                                   instance
-                                                   slot-name))
-                             value)))
-                      (t
-                       (error "~@<The wrapper for class ~S does not have ~
-                               the slot ~S~@:>"
-                              class slot-name))))
-                  (slot-value instance slot-name)))))))
 
 (defun make-std-reader-method-function (class-name slot-name)
   (let* ((initargs (copy-tree
@@ -446,10 +414,9 @@
                          (instance-read-internal
                           .pv. instance-slots 0
                           (slot-value instance slot-name))))))))
-    (setf (getf (getf initargs :plist) :slot-name-lists)
+    (setf (getf (getf initargs 'plist) :slot-name-lists)
           (list (list nil slot-name)))
-    (list* :method-spec `(reader-method ,class-name ,slot-name)
-           initargs)))
+    initargs))
 
 (defun make-std-writer-method-function (class-name slot-name)
   (let* ((initargs (copy-tree
@@ -461,10 +428,9 @@
                          (instance-write-internal
                           .pv. instance-slots 0 nv
                           (setf (slot-value instance slot-name) nv))))))))
-    (setf (getf (getf initargs :plist) :slot-name-lists)
+    (setf (getf (getf initargs 'plist) :slot-name-lists)
           (list nil (list nil slot-name)))
-    (list* :method-spec `(writer-method ,class-name ,slot-name)
-           initargs)))
+    initargs))
 
 (defun make-std-boundp-method-function (class-name slot-name)
   (let* ((initargs (copy-tree
@@ -476,7 +442,6 @@
                           (instance-boundp-internal
                            .pv. instance-slots 0
                            (slot-boundp instance slot-name))))))))
-    (setf (getf (getf initargs :plist) :slot-name-lists)
+    (setf (getf (getf initargs 'plist) :slot-name-lists)
           (list (list nil slot-name)))
-    (list* :method-spec `(boundp-method ,class-name ,slot-name)
-           initargs)))
+    initargs))

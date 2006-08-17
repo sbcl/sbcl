@@ -1051,7 +1051,7 @@
             (incf nreq)
             (push arg args))
           (setq args (nreverse args))
-          (setf (getf (getf initargs :plist) :arg-info) (cons nreq restp))
+          (setf (getf (getf initargs 'plist) :arg-info) (cons nreq restp))
           (make-method-initargs-form-internal1
            initargs (cddr lmf) args lmf-params restp)))))
 
@@ -1066,22 +1066,26 @@
                               (append req-args (list rest-arg))
                               req-args)))
       `(list*
-        :fast-function
-        (,(if (body-method-name body) 'named-lambda 'lambda)
-          ,@(when (body-method-name body)
-                  ;; function name
-                  (list (cons 'fast-method (body-method-name body))))
-          (.pv-cell. .next-method-call. ,@args+rest-arg) ; function args
-          ;; body of the function
-          (declare (ignorable .pv-cell. .next-method-call.)
-                   (disable-package-locks pv-env-environment))
-          ,@outer-decls
-          (symbol-macrolet ((pv-env-environment default))
-            (fast-lexical-method-functions
-                (,(car lmf-params) .next-method-call. ,req-args ,rest-arg
-                  ,@(cdddr lmf-params))
-              ,@inner-decls
-              ,@body-sans-decls)))
+        :function
+        (let* ((fmf (,(if (body-method-name body) 'named-lambda 'lambda)
+                     ,@(when (body-method-name body)
+                         ;; function name
+                         (list (cons 'fast-method (body-method-name body))))
+                     (.pv-cell. .next-method-call. ,@args+rest-arg) ; function args
+                     ;; body of the function
+                     (declare (ignorable .pv-cell. .next-method-call.)
+                              (disable-package-locks pv-env-environment))
+                     ,@outer-decls
+                     (symbol-macrolet ((pv-env-environment default))
+                         (fast-lexical-method-functions
+                          (,(car lmf-params) .next-method-call. ,req-args ,rest-arg
+                            ,@(cdddr lmf-params))
+                          ,@inner-decls
+                          ,@body-sans-decls))))
+              (mf (%make-method-function fmf nil)))
+          (set-funcallable-instance-function
+           mf (method-function-from-fast-function fmf ',(getf initargs 'plist)))
+          mf)
         ',initargs))))
 
 ;;; Use arrays and hash tables and the fngen stuff to make this much
@@ -1089,19 +1093,20 @@
 ;;; returned by this will get called only when the user explicitly
 ;;; funcalls a result of method-function. BUT, this is needed to make
 ;;; early methods work.
-(defun method-function-from-fast-function (fmf)
+(defun method-function-from-fast-function (fmf plist)
   (declare (type function fmf))
-  (let* ((method-function nil) (pv-table nil)
-         (arg-info (method-function-get fmf :arg-info))
+  (let* ((method-function nil)
+         (calls (getf plist :call-list))
+         (snl (getf plist :slot-name-lists))
+         (pv-table (when (or calls snl)
+                     (intern-pv-table :call-list calls :slot-name-lists snl)))
+         (arg-info (getf plist :arg-info))
          (nreq (car arg-info))
          (restp (cdr arg-info)))
     (setq method-function
           (lambda (method-args next-methods)
-            (unless pv-table
-              (setq pv-table (method-function-pv-table fmf)))
             (let* ((pv-cell (when pv-table
-                              (get-method-function-pv-cell
-                               method-function method-args pv-table)))
+                              (get-pv-cell method-args pv-table)))
                    (nm (car next-methods))
                    (nms (cdr next-methods))
                    (nmc (when nm
@@ -1115,20 +1120,41 @@
                          (args (ldiff method-args rest)))
                     (apply fmf pv-cell nmc (nconc args (list rest))))
                   (apply fmf pv-cell nmc method-args)))))
-    (let* ((fname (method-function-get fmf :name))
-           (name (cons 'slow-method (cdr fname))))
-      (set-fun-name method-function name))
-    (setf (method-function-get method-function :fast-function) fmf)
+    ;; FIXME: this looks dangerous.
+    (let* ((fname (%fun-name fmf)))
+      (when (and fname (eq (car fname) 'fast-method))
+        (set-fun-name method-function (cons 'slow-method (cdr fname)))))
     method-function))
 
-(defun get-method-function-pv-cell (method-function
-                                    method-args
-                                    &optional pv-table)
-  (let ((pv-table (or pv-table (method-function-pv-table method-function))))
-    (when pv-table
-      (let ((pv-wrappers (pv-wrappers-from-all-args pv-table method-args)))
-        (when pv-wrappers
-          (pv-table-lookup pv-table pv-wrappers))))))
+;;; this is similar to the above, only not quite.  Only called when
+;;; the MOP is heavily involved.  Not quite parallel to
+;;; METHOD-FUNCTION-FROM-FAST-METHOD-FUNCTION, because we can close
+;;; over the actual PV-CELL in this case.
+(defun method-function-from-fast-method-call (fmc)
+  (let* ((fmf (fast-method-call-function fmc))
+         (pv-cell (fast-method-call-pv-cell fmc))
+         (arg-info (fast-method-call-arg-info fmc))
+         (nreq (car arg-info))
+         (restp (cdr arg-info)))
+    (lambda (method-args next-methods)
+      (let* ((nm (car next-methods))
+             (nms (cdr next-methods))
+             (nmc (when nm
+                    (make-method-call
+                     :function (if (std-instance-p nm)
+                                   (method-function nm)
+                                   nm)
+                     :call-method-args (list nms)))))
+        (if restp
+            (let* ((rest (nthcdr nreq method-args))
+                   (args (ldiff method-args rest)))
+              (apply fmf pv-cell nmc (nconc args (list rest))))
+            (apply fmf pv-cell nmc method-args))))))
+
+(defun get-pv-cell (method-args pv-table)
+  (let ((pv-wrappers (pv-wrappers-from-all-args pv-table method-args)))
+    (when pv-wrappers
+      (pv-table-lookup pv-table pv-wrappers))))
 
 (defun pv-table-lookup-pv-args (pv-table &rest pv-parameters)
   (pv-table-lookup pv-table (pv-wrappers-from-pv-args pv-parameters)))

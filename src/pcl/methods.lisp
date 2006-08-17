@@ -23,23 +23,13 @@
 
 (in-package "SB-PCL")
 
-
 ;;; methods
 ;;;
 ;;; Methods themselves are simple inanimate objects. Most properties of
 ;;; methods are immutable, methods cannot be reinitialized. The following
 ;;; properties of methods can be changed:
 ;;;   METHOD-GENERIC-FUNCTION
-;;;   METHOD-FUNCTION       ??
-
-(defmethod method-function ((method standard-method))
-  (or (slot-value method '%function)
-      (let ((fmf (slot-value method 'fast-function)))
-        (unless fmf ; The :BEFORE SHARED-INITIALIZE method prevents this.
-          (error "~S doesn't seem to have a METHOD-FUNCTION." method))
-        (setf (slot-value method '%function)
-              (method-function-from-fast-function fmf)))))
-
+
 ;;; initialization
 ;;;
 ;;; Error checking is done in before methods. Because of the simplicity of
@@ -139,7 +129,7 @@
 
 (defmethod shared-initialize :before
     ((method standard-method) slot-names &key
-     qualifiers lambda-list specializers function fast-function documentation)
+     qualifiers lambda-list specializers function documentation)
   (declare (ignore slot-names))
   ;; FIXME: it's not clear to me (CSR, 2006-08-09) why methods get
   ;; this extra paranoia and nothing else does; either everything
@@ -151,7 +141,7 @@
   (check-qualifiers method qualifiers)
   (check-lambda-list method lambda-list)
   (check-specializers method specializers)
-  (check-method-function method (or function fast-function))
+  (check-method-function method function)
   (check-documentation method documentation))
 
 (defmethod shared-initialize :before
@@ -162,17 +152,10 @@
     (check-slot-name method slot-name)))
 
 (defmethod shared-initialize :after ((method standard-method) slot-names
-                                     &rest initargs
-                                     &key qualifiers method-spec plist)
-  (declare (ignore slot-names method-spec plist))
-  (initialize-method-function initargs nil method)
-  (setf (plist-value method 'qualifiers) qualifiers)
-  #+ignore
-  (setf (slot-value method 'closure-generator)
-        (method-function-closure-generator (slot-value method '%function))))
+                                     &rest initargs &key)
+  (declare (ignore slot-names))
+  (initialize-method-function initargs method))
 
-(defmethod method-qualifiers ((method standard-method))
-  (plist-value method 'qualifiers))
 
 (defvar *the-class-generic-function*
   (find-class 'generic-function))
@@ -666,15 +649,6 @@
 (defmethod specializer-class ((specializer eql-specializer))
   (class-of (slot-value specializer 'object)))
 
-(defvar *in-gf-arg-info-p* nil)
-(setf (gdefinition 'arg-info-reader)
-      (let ((mf (initialize-method-function
-                 (make-internal-reader-method-function
-                  'standard-generic-function 'arg-info)
-                 t)))
-        (lambda (&rest args) (funcall mf args nil))))
-
-
 (defun error-need-at-least-n-args (function n)
   (error 'simple-program-error
          :format-control "~@<The function ~2I~_~S ~I~_requires ~
@@ -720,9 +694,7 @@
 (defun value-for-caching (gf classes)
   (let ((methods (compute-applicable-methods-using-types
                    gf (mapcar #'class-eq-type classes))))
-    (method-function-get (or (safe-method-fast-function (car methods))
-                             (safe-method-function (car methods)))
-                         :constant-value)))
+    (method-plist-value (car methods) :constant-value)))
 
 (defun default-secondary-dispatch-function (generic-function)
   (lambda (&rest args)

@@ -413,7 +413,7 @@ bootstrapping.
                     specializers)
              (consp initargs-form)
              (eq (car initargs-form) 'list*)
-             (memq (cadr initargs-form) '(:function :fast-function))
+             (memq (cadr initargs-form) '(:function))
              (consp (setq fn (caddr initargs-form)))
              (eq (car fn) 'function)
              (consp (setq fn-lambda (cadr fn)))
@@ -752,8 +752,6 @@ bootstrapping.
                                   walked-documentation)
                 (parse-body (cddr walked-lambda))
               (declare (ignore walked-documentation))
-              (when (or next-method-p-p call-next-method-p)
-                (setq plist (list* :needs-next-methods-p t plist)))
               (when (some #'cdr slots)
                 (multiple-value-bind (slot-name-lists call-list)
                     (slot-name-lists-from-slots slots calls)
@@ -797,7 +795,7 @@ bootstrapping.
                            ,@walked-declarations
                            ,@walked-lambda-body))
                       `(,@(when plist
-                                `(:plist ,plist))
+                                `(plist ,plist))
                           ,@(when documentation
                                   `(:documentation ,documentation)))))))))))
 
@@ -876,6 +874,8 @@ bootstrapping.
 (defstruct (method-call (:copier nil))
   (function #'identity :type function)
   call-method-args)
+(defstruct (constant-method-call (:copier nil) (:include method-call))
+  value)
 
 #-sb-fluid (declaim (sb-ext:freeze-type method-call))
 
@@ -899,6 +899,9 @@ bootstrapping.
   pv-cell
   next-method-call
   arg-info)
+(defstruct (constant-fast-method-call
+             (:copier nil) (:include fast-method-call))
+  value)
 
 #-sb-fluid (declaim (sb-ext:freeze-type fast-method-call))
 
@@ -1359,41 +1362,25 @@ bootstrapping.
            (standard-generic-function-p (gdefinition name))
            (funcallable-instance-p (gdefinition name)))))
 
-(defvar *method-function-plist* (make-hash-table :test 'eq))
+(defun method-plist-value (method key &optional default)
+  (let ((plist (if (consp method)
+                   (getf (early-method-initargs method) 'plist)
+                   (object-plist method))))
+    (getf plist key default)))
 
-(defun method-function-plist (method-function)
-  (gethash method-function *method-function-plist*))
-
-(defun (setf method-function-plist) (val method-function)
-  (setf (gethash method-function *method-function-plist*) val))
-
-(defun method-function-get (method-function key &optional default)
-  (getf (method-function-plist method-function) key default))
-
-(defun (setf method-function-get)
-    (val method-function key)
-  (setf (getf (method-function-plist method-function) key) val))
-
-(defun method-function-pv-table (method-function)
-  (method-function-get method-function :pv-table))
-
-(defun method-function-method (method-function)
-  (method-function-get method-function :method))
-
-(defun method-function-needs-next-methods-p (method-function)
-  (method-function-get method-function :needs-next-methods-p t))
+(defun (setf method-plist-value) (new-value method key &optional default)
+  (if (consp method)
+      (setf (getf (getf (early-method-initargs method) 'plist) key default)
+            new-value)
+      (setf (getf (object-plist method) key default) new-value)))
 
-(defmacro method-function-closure-generator (method-function)
-  `(method-function-get ,method-function 'closure-generator))
-
 (defun load-defmethod
     (class name quals specls ll initargs source-location)
   (setq initargs (copy-tree initargs))
-  (let ((method-spec (or (getf initargs :method-spec)
-                         (make-method-spec name quals specls))))
-    (setf (getf initargs :method-spec) method-spec)
-    (load-defmethod-internal class name quals specls
-                             ll initargs source-location)))
+  (setf (getf (getf initargs 'plist) :name)
+        (make-method-spec name quals specls))
+  (load-defmethod-internal class name quals specls
+                           ll initargs source-location))
 
 (defun load-defmethod-internal
     (method-class gf-spec qualifiers specializers lambda-list
@@ -1430,38 +1417,25 @@ bootstrapping.
 (defun make-method-spec (gf-spec qualifiers unparsed-specializers)
   `(slow-method ,gf-spec ,@qualifiers ,unparsed-specializers))
 
-(defun initialize-method-function (initargs &optional return-function-p method)
+(defun initialize-method-function (initargs method)
   (let* ((mf (getf initargs :function))
-         (method-spec (getf initargs :method-spec))
-         (plist (getf initargs :plist))
-         (pv-table nil)
-         (mff (getf initargs :fast-function)))
-    (flet ((set-mf-property (p v)
-             (when mf
-               (setf (method-function-get mf p) v))
-             (when mff
-               (setf (method-function-get mff p) v))))
-      (when method-spec
-        (when mf
-          (setq mf (set-fun-name mf method-spec)))
-        (when mff
-          (let ((name `(fast-method ,@(cdr method-spec))))
-            (set-fun-name mff name)
-            (unless mf
-              (set-mf-property :name name)))))
-      (when plist
+         (mff (and (typep mf '%method-function)
+                   (%method-function-fast-function mf)))
+         (plist (getf initargs 'plist))
+         (name (getf plist :name)))
+    (when name
+      (when mf
+        (setq mf (set-fun-name mf name)))
+      (when (and mff (consp name) (eq (car name) 'slow-method))
+        (let ((fast-name `(fast-method ,@(cdr name))))
+          (set-fun-name mff fast-name))))
+    (when plist
+      (let ((plist plist))
         (let ((snl (getf plist :slot-name-lists))
               (cl (getf plist :call-list)))
           (when (or snl cl)
-            (setq pv-table (intern-pv-table :slot-name-lists snl
-                                            :call-list cl))
-            (set-mf-property :pv-table pv-table)))
-        (loop (when (null plist) (return nil))
-              (set-mf-property (pop plist) (pop plist)))
-        (when method
-          (set-mf-property :method method))
-        (when return-function-p
-          (or mf (method-function-from-fast-function mff)))))))
+            (setf (method-plist-value method :pv-table)
+                  (intern-pv-table :slot-name-lists snl :call-list cl))))))))
 
 (defun analyze-lambda-list (lambda-list)
   (flet (;; FIXME: Is this redundant with SB-C::MAKE-KEYWORD-FOR-ARG?
@@ -1739,10 +1713,10 @@ bootstrapping.
 
 (defvar *sm-specializers-index*
   (!bootstrap-slot-index 'standard-method 'specializers))
-(defvar *sm-fast-function-index*
-  (!bootstrap-slot-index 'standard-method 'fast-function))
 (defvar *sm-%function-index*
   (!bootstrap-slot-index 'standard-method '%function))
+(defvar *sm-qualifiers-index*
+  (!bootstrap-slot-index 'standard-method 'qualifiers))
 (defvar *sm-plist-index*
   (!bootstrap-slot-index 'standard-method 'plist))
 
@@ -1750,7 +1724,7 @@ bootstrapping.
 ;;; class and deal with it as appropriate.  In fact we probably don't
 ;;; need it anyway because we only use this for METHOD-SPECIALIZERS on
 ;;; the standard reader method for METHOD-SPECIALIZERS.  Probably.
-(dolist (s '(specializers fast-function %function plist))
+(dolist (s '(specializers %function plist))
   (aver (= (symbol-value (intern (format nil "*SM-~A-INDEX*" s)))
            (!bootstrap-slot-index 'standard-reader-method s)
            (!bootstrap-slot-index 'standard-writer-method s)
@@ -1767,15 +1741,9 @@ bootstrapping.
         (clos-slots-ref (get-slots method) *sm-specializers-index*)
         (method-specializers method))))
 (defun safe-method-fast-function (method)
-  (let ((standard-method-classes
-         (list *the-class-standard-method*
-               *the-class-standard-reader-method*
-               *the-class-standard-writer-method*
-               *the-class-standard-boundp-method*))
-        (class (class-of method)))
-    (if (member class standard-method-classes)
-        (clos-slots-ref (get-slots method) *sm-fast-function-index*)
-        (method-fast-function method))))
+  (let ((mf (safe-method-function method)))
+    (and (typep mf '%method-function)
+         (%method-function-fast-function mf))))
 (defun safe-method-function (method)
   (let ((standard-method-classes
          (list *the-class-standard-method*
@@ -1794,8 +1762,7 @@ bootstrapping.
                *the-class-standard-boundp-method*))
         (class (class-of method)))
     (if (member class standard-method-classes)
-        (let ((plist (clos-slots-ref (get-slots method) *sm-plist-index*)))
-          (getf plist 'qualifiers))
+        (clos-slots-ref (get-slots method) *sm-qualifiers-index*)
         (method-qualifiers method))))
 
 (defun set-arg-info1 (gf arg-info new-method methods was-valid-p first-p)
@@ -2108,7 +2075,6 @@ bootstrapping.
 
 (defun early-make-a-method (class qualifiers arglist specializers initargs doc
                             &key slot-name object-class method-class-function)
-  (initialize-method-function initargs)
   (let ((parsed ())
         (unparsed ()))
     ;; Figure out whether we got class objects or class names as the
@@ -2126,27 +2092,32 @@ bootstrapping.
                                specializers))
         (setq unparsed specializers
               parsed ()))
-    (list :early-method           ;This is an early method dammit!
+    (let ((result
+           (list :early-method
 
-          (getf initargs :function)
-          (getf initargs :fast-function)
+                 (getf initargs :function)
+                 (let ((mf (getf initargs :function)))
+                   (aver mf)
+                   (and (typep mf '%method-function)
+                        (%method-function-fast-function mf)))
 
-          parsed                  ;The parsed specializers. This is used
-                                  ;by early-method-specializers to cache
-                                  ;the parse. Note that this only comes
-                                  ;into play when there is more than one
-                                  ;early method on an early gf.
+                 ;; the parsed specializers. This is used by
+                 ;; EARLY-METHOD-SPECIALIZERS to cache the parse.
+                 ;; Note that this only comes into play when there is
+                 ;; more than one early method on an early gf.
+                 parsed
 
-          (append
-           (list class        ;A list to which real-make-a-method
-                 qualifiers      ;can be applied to make a real method
-                 arglist    ;corresponding to this early one.
-                 unparsed
-                 initargs
-                 doc)
-           (when slot-name
-             (list :slot-name slot-name :object-class object-class
-                   :method-class-function method-class-function))))))
+                 ;; A list to which REAL-MAKE-A-METHOD can be applied
+                 ;; to make a real method corresponding to this early
+                 ;; one.
+                 (append
+                  (list class qualifiers arglist unparsed
+                        initargs doc)
+                  (when slot-name
+                    (list :slot-name slot-name :object-class object-class
+                          :method-class-function method-class-function))))))
+      (initialize-method-function initargs result)
+      result)))
 
 (defun real-make-a-method
        (class qualifiers lambda-list specializers initargs doc
@@ -2217,6 +2188,12 @@ bootstrapping.
 
 (defun early-method-lambda-list (early-method)
   (third (fifth early-method)))
+
+(defun early-method-initargs (early-method)
+  (fifth (fifth early-method)))
+
+(defun (setf early-method-initargs) (new-value early-method)
+  (setf (fifth (fifth early-method)) new-value))
 
 (defun early-add-named-method (generic-function-name
                                qualifiers

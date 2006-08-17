@@ -31,7 +31,7 @@
             (if (listp method)
                 (early-method-function method)
                 (values nil (safe-method-fast-function method)))
-          (let* ((pv-table (and fmf (method-function-pv-table fmf))))
+          (let* ((pv-table (and fmf (method-plist-value method :pv-table))))
             (if (and fmf (or (null pv-table) wrappers))
                 (let* ((pv-wrappers (when pv-table
                                       (pv-wrappers-from-all-wrappers
@@ -41,8 +41,7 @@
                   (values mf t fmf pv-cell))
                 (values
                  (or mf (if (listp method)
-                            (setf (cadr method)
-                                  (method-function-from-fast-function fmf))
+                            (bug "early method with no method-function")
                             (method-function method)))
                  t nil nil)))))))
 
@@ -83,7 +82,7 @@
                           (early-method-function method)
                           (values nil (safe-method-fast-function method)))
                     (declare (ignore mf))
-                    (let* ((pv-table (and fmf (method-function-pv-table fmf))))
+                    (let* ((pv-table (and fmf (method-plist-value method :pv-table))))
                       (if (and fmf (or (null pv-table) wrappers-p))
                           'fast-method-call
                           'method-call))))
@@ -129,11 +128,15 @@
                       gf (car next-methods)
                       (list* (cdr next-methods) (cdr cm-args))
                       fmf-p method-alist wrappers))
-               (arg-info (method-function-get fmf :arg-info)))
-          (make-fast-method-call :function fmf
-                                 :pv-cell pv-cell
-                                 :next-method-call next
-                                 :arg-info arg-info))
+               (arg-info (method-plist-value method :arg-info))
+               (default (cons nil nil))
+               (value (method-plist-value method :constant-value default)))
+          (if (eq value default)
+              (make-fast-method-call :function fmf :pv-cell pv-cell
+                                     :next-method-call next :arg-info arg-info)
+              (make-constant-fast-method-call
+               :function fmf :pv-cell pv-cell :next-method-call next
+               :arg-info arg-info :value value)))
         (if real-mf-p
             (flet ((frob-cm-arg (arg)
                      (if (if (listp arg)
@@ -150,31 +153,37 @@
                                                  :qualifiers nil ; XXX
                                                  :function (method-call-function emf)))
                                  (fast-method-call
-                                  (make-instance 'standard-method
-                                                 :specializers nil ; XXX
-                                                 :qualifiers nil
-                                                 :fast-function (fast-method-call-function emf)))))
+                                  (let* ((fmf (fast-method-call-function emf))
+                                         (fun (method-function-from-fast-method-call emf))
+                                         (mf (%make-method-function fmf nil)))
+                                    (set-funcallable-instance-function mf fun)
+                                    (make-instance 'standard-method
+                                                   :specializers nil ; XXX
+                                                   :qualifiers nil
+                                                   :function mf)))))
                              arg))))
-              (make-method-call :function mf
-                                ;; FIXME: this is wrong.  Very wrong.
-                                ;; It assumes that the only place that
-                                ;; can have make-method calls is in
-                                ;; the list structure of the second
-                                ;; argument to CALL-METHOD, but AMOP
-                                ;; says that CALL-METHOD can be more
-                                ;; complicated if
-                                ;; COMPUTE-EFFECTIVE-METHOD (and
-                                ;; presumably MAKE-METHOD-LAMBDA) is
-                                ;; adjusted to match.
-                                ;;
-                                ;; On the other hand, it's a start,
-                                ;; because without this calls to
-                                ;; MAKE-METHOD in method combination
-                                ;; where one of the methods is of a
-                                ;; user-defined class don't work at
-                                ;; all.  -- CSR, 2006-08-05
-                                :call-method-args (cons (mapcar #'frob-cm-arg (car cm-args))
-                                                        (cdr cm-args))))
+              (let* ((default (cons nil nil))
+                     (value
+                      (method-plist-value method :constant-value default))
+                     ;; FIXME: this is wrong.  Very wrong.  It assumes
+                     ;; that the only place that can have make-method
+                     ;; calls is in the list structure of the second
+                     ;; argument to CALL-METHOD, but AMOP says that
+                     ;; CALL-METHOD can be more complicated if
+                     ;; COMPUTE-EFFECTIVE-METHOD (and presumably
+                     ;; MAKE-METHOD-LAMBDA) is adjusted to match.
+                     ;;
+                     ;; On the other hand, it's a start, because
+                     ;; without this calls to MAKE-METHOD in method
+                     ;; combination where one of the methods is of a
+                     ;; user-defined class don't work at all.  -- CSR,
+                     ;; 2006-08-05
+                     (args (cons (mapcar #'frob-cm-arg (car cm-args))
+                                 (cdr cm-args))))
+                (if (eq value default)
+                    (make-method-call :function mf :call-method-args args)
+                    (make-constant-method-call :function mf :value value
+                                               :call-method-args args))))
             mf))))
 
 (defun make-effective-method-function-simple1

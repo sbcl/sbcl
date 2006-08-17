@@ -489,11 +489,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
     (every (lambda (mt) (eq mt t)) metatypes)))
 
 (defun use-caching-dfun-p (generic-function)
-  (some (lambda (method)
-          (let ((fmf (if (listp method)
-                         (third method)
-                         (safe-method-fast-function method))))
-            (method-function-get fmf :slot-name-lists)))
+  (some (lambda (method) (method-plist-value method :slot-name-lists))
         ;; KLUDGE: As of sbcl-0.6.4, it's very important for
         ;; efficiency to know the type of the sequence argument to
         ;; quantifiers (SOME/NOTANY/etc.) at compile time, but
@@ -584,12 +580,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                                (safe-method-specializers method))
                          (safe-method-qualifiers method))
                  (return nil)))
-             (let ((value (method-function-get
-                           (if early-p
-                               (or (third method) (second method))
-                               (or (safe-method-fast-function method)
-                                   (safe-method-function method)))
-                           :constant-value default)))
+             (let ((value (method-plist-value method :constant-value default)))
                (when (or (eq value default)
                          (and boolean-values-p
                               (not (member value '(t nil)))))
@@ -1077,14 +1068,13 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (let ((ocache (dfun-info-cache dfun-info)))
     (dfun-miss (generic-function args wrappers invalidp emf nil nil t)
       (unless invalidp
-        (let* ((function
+        (let* ((value
                 (typecase emf
-                  (fast-method-call (fast-method-call-function emf))
-                  (method-call (method-call-function emf))))
-               (value (let ((val (method-function-get
-                                  function :constant-value '.not-found.)))
-                        (aver (not (eq val '.not-found.)))
-                        val))
+                  (constant-fast-method-call
+                   (constant-fast-method-call-value emf))
+                  (constant-method-call (constant-method-call-value emf))
+                  (t (bug "~S with non-constant EMF ~S"
+                          'constant-value-miss emf))))
                (ncache (fill-cache ocache wrappers value)))
           (unless (eq ncache ocache)
             (dfun-update generic-function
@@ -1229,7 +1219,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
         (found-method nil))
     (dolist (method (standard-slot-value/gf gf 'methods) found-method)
       (let ((specializers (standard-slot-value/method method 'specializers))
-            (qualifiers (plist-value method 'qualifiers)))
+            (qualifiers (standard-slot-value/method method 'qualifiers)))
         (when (and (null qualifiers)
                    (let ((subcpl (member (ecase type
                                            (reader (car specializers))
@@ -1261,7 +1251,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (dolist (meth methods)
     (when (if (consp meth)
               (early-method-qualifiers meth)
-              (method-qualifiers meth))
+              (safe-method-qualifiers meth))
       (return-from accessor-values-internal (values nil nil))))
   (let* ((meth (car methods))
          (early-p (not (eq *boot-state* 'complete)))

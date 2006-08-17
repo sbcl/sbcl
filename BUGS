@@ -1407,54 +1407,6 @@ WORKAROUND:
   Expected: #<SB-MOP:FUNCALLABLE-STANDARD-CLASS STANDARD-GENERIC-FUNCTION>
   Got:      #<SB-MOP:FUNCALLABLE-STANDARD-CLASS MY-GENERIC-FUNCTION>
 
-361: initialize-instance of standard-reader-method ignores :function argument
-    (reported by Bruno Haible)
-  Pass a custom :function argument to initialize-instance of a
-  standard-reader-method instance, but it has no effect.
-  ;; Check that it's possible to define reader methods that do typechecking.
-  (progn
-    (defclass typechecking-reader-method (sb-pcl:standard-reader-method)
-      ())
-    (defmethod initialize-instance ((method typechecking-reader-method) &rest initargs
-                                    &key slot-definition)
-      (let ((name (sb-pcl:slot-definition-name slot-definition))
-            (type (sb-pcl:slot-definition-type slot-definition)))
-        (apply #'call-next-method method
-               :function #'(lambda (args next-methods)
-                             (declare (ignore next-methods))
-                             (apply #'(lambda (instance)
-                                        (let ((value (slot-value instance name)))
-                                          (unless (typep value type)
-                                            (error "Slot ~S of ~S is not of type ~S: ~S"
-                                                   name instance type value))
-                                          value))
-                                    args))
-               initargs)))
-    (defclass typechecking-reader-class (standard-class)
-      ())
-    (defmethod sb-pcl:validate-superclass ((c1 typechecking-reader-class) (c2 standard-class))
-      t)
-    (defmethod reader-method-class ((class typechecking-reader-class) direct-slot &rest args)
-      (find-class 'typechecking-reader-method))
-    (defclass testclass25 ()
-      ((pair :type (cons symbol (cons symbol null)) :initarg :pair :accessor testclass25-pair))
-      (:metaclass typechecking-reader-class))
-   (macrolet ((succeeds (form)
-                 `(not (nth-value 1 (ignore-errors ,form)))))
-      (let ((p (list 'abc 'def))
-            (x (make-instance 'testclass25)))
-        (list (succeeds (make-instance 'testclass25 :pair '(seventeen 17)))
-              (succeeds (setf (testclass25-pair x) p))
-              (succeeds (setf (second p) 456))
-              (succeeds (testclass25-pair x))
-              (succeeds (slot-value x 'pair))))))
-  Expected: (t t t nil t)
-  Got:      (t t t t t)
-
-  (inspect (first (sb-pcl:generic-function-methods #'testclass25-pair)))
-  shows that the method was created with a FAST-FUNCTION slot but with a
-  FUNCTION slot of NIL.
-
 362: missing error when a slot-definition is created without a name
     (reported by Bruno Haible)
   The MOP says about slot-definition initialization:
