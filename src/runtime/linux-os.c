@@ -84,7 +84,18 @@ static inline int sys_futex (void *futex, int op, int val, struct timespec *rel)
 int
 futex_wait(int *lock_word, int oldval)
 {
-    int t= sys_futex(lock_word,FUTEX_WAIT,oldval, 0);
+    int t;
+  again:
+    t = sys_futex(lock_word,FUTEX_WAIT,oldval, 0);
+
+    /* Interrupted FUTEX_WAIT calls may return early. 
+     *
+     * If someone manages to wake the futex while we're spinning
+     * around it, we will just return with -1 and errno EWOULDBLOCK,
+     * because the value has changed, so that's ok. */
+    if (t != 0 && errno == EINTR)
+	goto again;
+
     return t;
 }
 

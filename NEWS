@@ -54,6 +54,8 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
     types in some cases.
   * bug fix: fixed input, output and error redirection in RUN-PROGRAM
     for win32. (thanks to Mike Thomas and Yaroslav Kavenchuk)
+  * bug fix: CONDITION-WAIT could return early on Linux, if the thread was
+    interrupted and subsequently continued with SIGCONT.
 
 changes in sbcl-0.9.15 relative to sbcl-0.9.14:
   * added support for the ucs-2 external format.  (contributed by Ivan
