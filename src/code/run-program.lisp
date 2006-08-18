@@ -845,7 +845,7 @@ Common Lisp Users Manual for details about the PROCESS structure.
                             (when (< handle 0)
                               (error "Couldn't spawn program: ~A" (strerror)))
                             (setf proc
-                                  (if wait 
+                                  (if wait
                                       (make-process :pid handle
                                                     :%status :exited
                                                     :input input-stream

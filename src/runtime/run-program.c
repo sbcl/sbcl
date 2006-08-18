@@ -152,7 +152,8 @@ HANDLE spawn (
 {
     int stdout_backup, stdin_backup, stderr_backup, wait_mode;
     HANDLE hProcess;
-    
+    HANDLE hReturn;
+
     /* Duplicate and save the original stdin/out/err handles. */
     stdout_backup = _dup (  _fileno ( stdout ) );
     stdin_backup  = _dup (  _fileno ( stdin  ) );
@@ -164,14 +165,16 @@ HANDLE spawn (
      * Default std fds are used if in, out or err parameters
      * are -1. */
 
+    hReturn = (HANDLE)-1;
+    hProcess = (HANDLE)-1;
     if ( ( out >= 0 ) && ( out != _fileno ( stdout ) ) ) {
-        if ( _dup2 ( out, _fileno ( stdout ) ) != 0 ) return (HANDLE)-1;
+        if ( _dup2 ( out, _fileno ( stdout ) ) != 0 ) goto error_exit;
     }
-    if ( ( in >= 0 ) && ( in != _fileno ( stdout ) ) ) {
-        if ( _dup2 ( in,  _fileno ( stdin )  ) != 0 ) return (HANDLE)-1;
+    if ( ( in >= 0 ) && ( in != _fileno ( stdin ) ) ) {
+        if ( _dup2 ( in,  _fileno ( stdin )  ) != 0 ) goto error_exit_out;
     }
-    if ( ( err >= 0 ) && ( err != _fileno ( stdout ) ) ) {
-        if ( _dup2 ( err, _fileno ( stderr ) ) != 0 ) return (HANDLE)-1;
+    if ( ( err >= 0 ) && ( err != _fileno ( stderr ) ) ) {
+        if ( _dup2 ( err, _fileno ( stderr ) ) != 0 ) goto error_exit_in;
     }
 
     /* Set the wait mode. */
@@ -187,16 +190,21 @@ HANDLE spawn (
     /* Now that the process is launched, replace the original
      * in/out/err handles and close the backups. */
 
-    if ( _dup2 ( stdout_backup, _fileno ( stdout ) ) != 0 ) return (HANDLE)-1;
-    if ( _dup2 ( stdin_backup,  _fileno ( stdin )  ) != 0 ) return (HANDLE)-1;
-    if ( _dup2 ( stderr_backup, _fileno ( stderr ) ) != 0 ) return (HANDLE)-1;
+    if ( _dup2 ( stderr_backup, _fileno ( stderr ) ) != 0 ) goto error_exit;
+ error_exit_in:
+    if ( _dup2 ( stdin_backup,  _fileno ( stdin )  ) != 0 ) goto error_exit;
+ error_exit_out:
+    if ( _dup2 ( stdout_backup, _fileno ( stdout ) ) != 0 ) goto error_exit;
 
+    hReturn = hProcess;
+
+ error_exit:
     close ( stdout_backup );
     close ( stdin_backup  );
     close ( stderr_backup );
 
-    return ( hProcess );
-    
+    return hReturn;
+
 }
 
 
