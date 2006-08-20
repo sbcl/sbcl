@@ -975,7 +975,13 @@ of specialized arrays is supported."
 ;;;; ZAP-ARRAY-DATA for ADJUST-ARRAY
 
 ;;; a temporary to be used when OLD-DATA and NEW-DATA are EQ.
-;;; KLUDGE: Boy, DYNAMIC-EXTENT would be nice.
+;;; KLUDGE: Boy, DYNAMIC-EXTENT would be nice. This is rebound
+;;; to length zero array in each new thread.
+;;;
+;;; DX is probably a bad idea, because a with a big array it would
+;;; be fairly easy to blow the stack.
+;;;
+;;; Rebound per thread.
 (defvar *zap-array-data-temp* (make-array 1000 :initial-element t))
 
 (defun zap-array-data-temp (length element-type initial-element

@@ -70,9 +70,9 @@
               :format-control "~S is not a sequence."
               :format-arguments (list sequence))))))
   
-;;; APPLY-KEYED-PRED saves us a function call sometimes.
+;;; FUNCALL-USING-KEY saves us a function call sometimes.
 (eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro apply-keyed-pred (one two pred key)
+  (sb!xc:defmacro funcall2-using-key (pred key one two)
     `(if ,key
          (funcall ,pred (funcall ,key ,one)
                   (funcall ,key  ,two))
@@ -222,9 +222,9 @@
                      (incf ,target-i)
                      (incf ,i))
                (return))
-              ((apply-keyed-pred (,source-ref ,source ,j)
-                                 (,source-ref ,source ,i)
-                                 ,pred ,key)
+              ((funcall2-using-key ,pred ,key
+                                   (,source-ref ,source ,j)
+                                   (,source-ref ,source ,i))
                (setf (,target-ref ,target ,target-i)
                      (,source-ref ,source ,j))
                (incf ,j))
@@ -238,75 +238,77 @@
 ;;; are merging into the temporary (T) or back into the given vector
 ;;; (NIL).
 (sb!xc:defmacro vector-merge-sort (vector pred key vector-ref)
-  (let ((vector-len (gensym)) (n (gensym))
-        (direction (gensym))  (unsorted (gensym))
-        (start-1 (gensym))    (end-1 (gensym))
-        (end-2 (gensym))      (temp-len (gensym))
-        (i (gensym)))
-    `(let ((,vector-len (length (the vector ,vector)))
-           (,n 1)        ; bottom-up size of contiguous runs to be merged
-           (,direction t) ; t vector --> temp    nil temp --> vector
-           (,temp-len (length (the simple-vector *merge-sort-temp-vector*)))
-           (,unsorted 0)  ; unsorted..vector-len are the elements that need
-                          ; to be merged for a given n
-           (,start-1 0))  ; one n-len subsequence to be merged with the next
-       (declare (fixnum ,vector-len ,n ,temp-len ,unsorted ,start-1))
+  (with-unique-names
+      (vector-len n direction unsorted start-1 end-1 end-2 temp temp-len i)
+    `(let* ((,vector-len (length (the vector ,vector)))
+            (,n 1)        ; bottom-up size of contiguous runs to be merged
+            (,direction t) ; t vector --> temp    nil temp --> vector
+            (,temp *merge-sort-temp-vector*)
+            (,temp-len (length ,temp))
+            (,unsorted 0)  ; unsorted..vector-len are the elements that need
+                           ; to be merged for a given n
+            (,start-1 0))  ; one n-len subsequence to be merged with the next
+       (declare (fixnum ,vector-len ,n ,temp-len ,unsorted ,start-1)
+                (simple-vector ,temp))
        (if (> ,vector-len ,temp-len)
-           (setf *merge-sort-temp-vector*
-                 (make-array (max ,vector-len (+ ,temp-len ,temp-len)))))
-       (loop
-        ;; for each n, we start taking n-runs from the start of the vector
-        (setf ,unsorted 0)
-        (loop
-         (setf ,start-1 ,unsorted)
-         (let ((,end-1 (+ ,start-1 ,n)))
-           (declare (fixnum ,end-1))
-           (cond ((< ,end-1 ,vector-len)
-                  ;; there are enough elements for a second run
-                  (let ((,end-2 (+ ,end-1 ,n)))
-                    (declare (fixnum ,end-2))
-                    (if (> ,end-2 ,vector-len) (setf ,end-2 ,vector-len))
-                    (setf ,unsorted ,end-2)
-                    (if ,direction
-                        (stable-sort-merge-vectors*
-                         ,vector *merge-sort-temp-vector*
-                         ,start-1 ,end-1 ,end-2 ,pred ,key ,vector-ref svref)
-                        (stable-sort-merge-vectors*
-                         *merge-sort-temp-vector* ,vector
-                         ,start-1 ,end-1 ,end-2 ,pred ,key svref ,vector-ref))
-                    (if (= ,unsorted ,vector-len) (return))))
-                 ;; if there is only one run, copy those elements to the end
-                 (t (if ,direction
-                        (do ((,i ,start-1 (1+ ,i)))
-                            ((= ,i ,vector-len))
-                          (declare (fixnum ,i))
-                          (setf (svref *merge-sort-temp-vector* ,i)
-                                (,vector-ref ,vector ,i)))
-                        (do ((,i ,start-1 (1+ ,i)))
-                            ((= ,i ,vector-len))
-                          (declare (fixnum ,i))
-                          (setf (,vector-ref ,vector ,i)
-                                (svref *merge-sort-temp-vector* ,i))))
-                    (return)))))
-        ;; If the inner loop only executed once, then there were only enough
-        ;; elements for two subsequences given n, so all the elements have
-        ;; been merged into one list. Start-1 will have remained 0 upon exit.
-        (when (zerop ,start-1)
-          (if ,direction
-              ;; if we just merged into the temporary, copy it all back
-              ;; to the given vector.
-              (dotimes (,i ,vector-len)
-                (setf (,vector-ref ,vector ,i)
-                      (svref *merge-sort-temp-vector* ,i))))
-          (return ,vector))
-        (setf ,n (ash ,n 1)) ; (* 2 n)
-        (setf ,direction (not ,direction))))))
+           (setf ,temp (make-array (max ,vector-len
+                                        (min most-positive-fixnum
+                                             (+ ,temp-len ,temp-len))))
+                 *merge-sort-temp-vector* ,temp))
+       ;; rebind, in case PRED or KEY calls STABLE-SORT
+       (let ((*merge-sort-temp-vector* (vector)))
+         (loop
+            ;; for each n, we start taking n-runs from the start of the vector
+            (setf ,unsorted 0)
+            (loop
+               (setf ,start-1 ,unsorted)
+               (let ((,end-1 (+ ,start-1 ,n)))
+                 (declare (fixnum ,end-1))
+                 (cond ((< ,end-1 ,vector-len)
+                        ;; there are enough elements for a second run
+                        (let ((,end-2 (+ ,end-1 ,n)))
+                          (declare (fixnum ,end-2))
+                          (if (> ,end-2 ,vector-len) (setf ,end-2 ,vector-len))
+                          (setf ,unsorted ,end-2)
+                          (if ,direction
+                              (stable-sort-merge-vectors*
+                               ,vector ,temp
+                               ,start-1 ,end-1 ,end-2 ,pred ,key ,vector-ref svref)
+                              (stable-sort-merge-vectors*
+                               ,temp ,vector
+                               ,start-1 ,end-1 ,end-2 ,pred ,key svref ,vector-ref))
+                          (if (= ,unsorted ,vector-len) (return))))
+                       ;; if there is only one run, copy those elements to the end
+                       (t (if ,direction
+                              (do ((,i ,start-1 (1+ ,i)))
+                                  ((= ,i ,vector-len))
+                                (declare (fixnum ,i))
+                               (setf (svref ,temp ,i)
+                                     (,vector-ref ,vector ,i)))
+                             (do ((,i ,start-1 (1+ ,i)))
+                                 ((= ,i ,vector-len))
+                               (declare (fixnum ,i))
+                               (setf (,vector-ref ,vector ,i)
+                                     (svref ,temp ,i))))
+                         (return)))))
+           ;; If the inner loop only executed once, then there were only enough
+           ;; elements for two subsequences given n, so all the elements have
+           ;; been merged into one list. Start-1 will have remained 0 upon exit.
+           (when (zerop ,start-1)
+             (if ,direction
+                 ;; if we just merged into the temporary, copy it all back
+                 ;; to the given vector.
+                 (dotimes (,i ,vector-len)
+                   (setf (,vector-ref ,vector ,i)
+                         (svref ,temp ,i))))
+             (return ,vector))
+           (setf ,n (ash ,n 1))         ; (* 2 n)
+           (setf ,direction (not ,direction)))))))
 
 ) ; EVAL-when
 
-;;; temporary vector for stable sorting vectors
-(defvar *merge-sort-temp-vector*
-  (make-array 50))
+;;; temporary vector for stable sorting vectors, allocated for each new thread
+(defvar *merge-sort-temp-vector* (make-array 50))
 
 (declaim (simple-vector *merge-sort-temp-vector*))
 
@@ -353,8 +355,8 @@
                      (incf ,result-i)
                      (incf ,i))
                (return ,result-vector))
-              ((apply-keyed-pred (,access ,vector-2 ,j) (,access ,vector-1 ,i)
-                                 ,pred ,key)
+              ((funcall2-using-key ,pred ,key
+                                   (,access ,vector-2 ,j) (,access ,vector-1 ,i))
                (setf (,access ,result-vector ,result-i)
                      (,access ,vector-2 ,j))
                (incf ,j))
