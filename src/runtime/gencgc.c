@@ -1,5 +1,5 @@
 /*
- * GENerational Conservative Garbage Collector for SBCL x86
+ * GENerational Conservative Garbage Collector for SBCL
  */
 
 /*
@@ -1861,39 +1861,166 @@ trans_unboxed_large(lispobj object)
  * vector-like objects
  */
 
-
-/* FIXME: What does this mean? */
-int gencgc_hash = 1;
-
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+
+#if N_WORD_BITS == 32
+#define EQ_HASH_MASK 0x1fffffff
+#elif N_WORD_BITS == 64
+#define EQ_HASH_MASK 0x1fffffffffffffff
+#endif
+
+/* Compute the EQ-hash of KEY. This must match POINTER-HASH in
+ * target-hash-table.lisp.  */
+#define EQ_HASH(key) ((key) & EQ_HASH_MASK)
+
+/* Return the beginning of data in ARRAY (skipping the header and the
+ * length) or NULL if it isn't an array of the specified widetag after
+ * all. */
+static inline lispobj *
+get_array_data (lispobj array, int widetag, unsigned long *length)
+{
+    if (is_lisp_pointer(array) &&
+        (widetag_of(*(lispobj *)native_pointer(array)) == widetag)) {
+        if (length != NULL)
+            *length = fixnum_value(((lispobj *)native_pointer(array))[1]);
+        return ((lispobj *)native_pointer(array)) + 2;
+    } else {
+        return NULL;
+    }
+}
+
+/* Only need to worry about scavenging the _real_ entries in the
+ * table. Phantom entries such as the hash table itself at index 0 and
+ * the empty marker at index 1 were scavenged by scav_vector that
+ * either called this function directly or arranged for it to be
+ * called later by pushing the hash table onto weak_hash_tables. */
+static void
+scav_hash_table_entries (struct hash_table *hash_table)
+{
+    lispobj *kv_vector;
+    unsigned long kv_length;
+    lispobj *index_vector;
+    unsigned long length;
+    lispobj *next_vector;
+    unsigned long next_vector_length;
+    lispobj *hash_vector;
+    unsigned long hash_vector_length;
+    lispobj empty_symbol;
+    long i;
+
+    kv_vector = get_array_data(hash_table->table,
+                               SIMPLE_VECTOR_WIDETAG, &kv_length);
+    if (kv_vector == NULL)
+        lose("invalid kv_vector %x\n", hash_table->table);
+
+    index_vector = get_array_data(hash_table->index_vector,
+                                  SIMPLE_ARRAY_WORD_WIDETAG, &length);
+    if (index_vector == NULL)
+        lose("invalid index_vector %x\n", hash_table->index_vector);
+
+    next_vector = get_array_data(hash_table->next_vector,
+                                 SIMPLE_ARRAY_WORD_WIDETAG,
+                                 &next_vector_length);
+    if (next_vector == NULL)
+        lose("invalid next_vector %x\n", hash_table->next_vector);
+
+    hash_vector = get_array_data(hash_table->hash_vector,
+                                 SIMPLE_ARRAY_WORD_WIDETAG,
+                                 &hash_vector_length);
+    if (hash_vector != NULL)
+        gc_assert(hash_vector_length == next_vector_length);
+
+    /* These lengths could be different as the index_vector can be a
+     * different length from the others, a larger index_vector could help
+     * reduce collisions. */
+    gc_assert(next_vector_length*2 == kv_length);
+
+    empty_symbol = kv_vector[1];
+    /* fprintf(stderr,"* empty_symbol = %x\n", empty_symbol);*/
+    if (widetag_of(*(lispobj *)native_pointer(empty_symbol)) !=
+        SYMBOL_HEADER_WIDETAG) {
+        lose("not a symbol where empty-hash-table-slot symbol expected: %x\n",
+             *(lispobj *)native_pointer(empty_symbol));
+    }
+
+    /* Work through the KV vector. */
+    for (i = 1; i < next_vector_length; i++) {
+        lispobj old_key = kv_vector[2*i];
+        {
+            unsigned long old_index = EQ_HASH(old_key)%length;
+            lispobj new_key;
+            unsigned long new_index;
+
+            /* Scavenge the key and value. */
+            scavenge(&kv_vector[2*i],2);
+
+            /* Check whether the key has moved and is EQ based. */
+            new_key = kv_vector[2*i];
+            new_index = EQ_HASH(new_key)%length;
+
+            if ((old_index != new_index) &&
+                ((!hash_vector) ||
+                 (hash_vector[i] == MAGIC_HASH_VECTOR_VALUE)) &&
+                ((new_key != empty_symbol) ||
+                 (kv_vector[2*i+1] != empty_symbol))) {
+
+                /*FSHOW((stderr,
+                  "* EQ key %d moved from %x to %x; index %d to %d\n",
+                  i, old_key, new_key, old_index, new_index));*/
+
+                if (index_vector[old_index] != 0) {
+                    /*FSHOW((stderr, "/P1 %d\n", index_vector[old_index]));*/
+
+                    /* Unlink the key from the old_index chain. */
+                    if (index_vector[old_index] == i) {
+                        /*FSHOW((stderr, "/P2a %d\n", next_vector[i]));*/
+                        index_vector[old_index] = next_vector[i];
+                        /* Link it into the needing rehash chain. */
+                        next_vector[i] =
+                            fixnum_value(hash_table->needing_rehash);
+                        hash_table->needing_rehash = make_fixnum(i);
+                        /*SHOW("P2");*/
+                    } else {
+                        unsigned long prior = index_vector[old_index];
+                        unsigned long next = next_vector[prior];
+
+                        /*FSHOW((stderr, "/P3a %d %d\n", prior, next));*/
+
+                        while (next != 0) {
+                            /*FSHOW((stderr, "/P3b %d %d\n", prior, next));*/
+                            if (next == i) {
+                                /* Unlink it. */
+                                next_vector[prior] = next_vector[next];
+                                /* Link it into the needing rehash
+                                 * chain. */
+                                next_vector[next] =
+                                    fixnum_value(hash_table->needing_rehash);
+                                hash_table->needing_rehash = make_fixnum(next);
+                                /*SHOW("/P3");*/
+                                break;
+                            }
+                            prior = next;
+                            next = next_vector[next];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 static long
 scav_vector(lispobj *where, lispobj object)
 {
     unsigned long kv_length;
     lispobj *kv_vector;
-    unsigned long length = 0; /* (0 = dummy to stop GCC warning) */
     struct hash_table *hash_table;
-    lispobj empty_symbol;
-    unsigned long *index_vector = NULL; /* (NULL = dummy to stop GCC warning) */
-    unsigned long *next_vector = NULL; /* (NULL = dummy to stop GCC warning) */
-    unsigned long *hash_vector = NULL; /* (NULL = dummy to stop GCC warning) */
-    lispobj weak_p_obj;
-    unsigned long next_vector_length = 0;
 
     /* FIXME: A comment explaining this would be nice. It looks as
      * though SB-VM:VECTOR-VALID-HASHING-SUBTYPE is set for EQ-based
      * hash tables in the Lisp HASH-TABLE code, and nowhere else. */
     if (HeaderValue(object) != subtype_VectorValidHashing)
         return 1;
-
-    if (!gencgc_hash) {
-        /* This is set for backward compatibility. FIXME: Do we need
-         * this any more? */
-        *where =
-            (subtype_VectorMustRehash<<N_WIDETAG_BITS) | SIMPLE_VECTOR_WIDETAG;
-        return 1;
-    }
 
     kv_length = fixnum_value(where[1]);
     kv_vector = where + 2;  /* Skip the header and length. */
@@ -1918,13 +2045,6 @@ scav_vector(lispobj *where, lispobj object)
     if (!is_lisp_pointer(where[3])) {
         lose("not empty-hash-table-slot symbol pointer: %x\n", where[3]);
     }
-    empty_symbol = where[3];
-    /* fprintf(stderr,"* empty_symbol = %x\n", empty_symbol);*/
-    if (widetag_of(*(lispobj *)native_pointer(empty_symbol)) !=
-        SYMBOL_HEADER_WIDETAG) {
-        lose("not a symbol where empty-hash-table-slot symbol expected: %x\n",
-             *(lispobj *)native_pointer(empty_symbol));
-    }
 
     /* Scavenge hash table, which will fix the positions of the other
      * needed objects. */
@@ -1936,140 +2056,8 @@ scav_vector(lispobj *where, lispobj object)
         lose("hash_table table!=this table %x\n", hash_table->table);
     }
 
-    /* WEAK-P */
-    weak_p_obj = hash_table->weak_p;
+    scav_hash_table_entries(hash_table);
 
-    /* index vector */
-    {
-        lispobj index_vector_obj = hash_table->index_vector;
-
-        if (is_lisp_pointer(index_vector_obj) &&
-            (widetag_of(*(lispobj *)native_pointer(index_vector_obj)) ==
-                 SIMPLE_ARRAY_WORD_WIDETAG)) {
-            index_vector =
-                ((unsigned long *)native_pointer(index_vector_obj)) + 2;
-            /*FSHOW((stderr, "/index_vector = %x\n",index_vector));*/
-            length = fixnum_value(((lispobj *)native_pointer(index_vector_obj))[1]);
-            /*FSHOW((stderr, "/length = %d\n", length));*/
-        } else {
-            lose("invalid index_vector %x\n", index_vector_obj);
-        }
-    }
-
-    /* next vector */
-    {
-        lispobj next_vector_obj = hash_table->next_vector;
-
-        if (is_lisp_pointer(next_vector_obj) &&
-            (widetag_of(*(lispobj *)native_pointer(next_vector_obj)) ==
-             SIMPLE_ARRAY_WORD_WIDETAG)) {
-            next_vector = ((unsigned long *)native_pointer(next_vector_obj)) + 2;
-            /*FSHOW((stderr, "/next_vector = %x\n", next_vector));*/
-            next_vector_length = fixnum_value(((lispobj *)native_pointer(next_vector_obj))[1]);
-            /*FSHOW((stderr, "/next_vector_length = %d\n", next_vector_length));*/
-        } else {
-            lose("invalid next_vector %x\n", next_vector_obj);
-        }
-    }
-
-    /* maybe hash vector */
-    {
-        lispobj hash_vector_obj = hash_table->hash_vector;
-
-        if (is_lisp_pointer(hash_vector_obj) &&
-            (widetag_of(*(lispobj *)native_pointer(hash_vector_obj)) ==
-             SIMPLE_ARRAY_WORD_WIDETAG)){
-            hash_vector =
-                ((unsigned long *)native_pointer(hash_vector_obj)) + 2;
-            /*FSHOW((stderr, "/hash_vector = %x\n", hash_vector));*/
-            gc_assert(fixnum_value(((lispobj *)native_pointer(hash_vector_obj))[1])
-                      == next_vector_length);
-        } else {
-            hash_vector = NULL;
-            /*FSHOW((stderr, "/no hash_vector: %x\n", hash_vector_obj));*/
-        }
-    }
-
-    /* These lengths could be different as the index_vector can be a
-     * different length from the others, a larger index_vector could help
-     * reduce collisions. */
-    gc_assert(next_vector_length*2 == kv_length);
-
-    /* now all set up.. */
-
-    /* Work through the KV vector. */
-    {
-        long i;
-        for (i = 1; i < next_vector_length; i++) {
-            lispobj old_key = kv_vector[2*i];
-
-#if N_WORD_BITS == 32
-            unsigned long old_index = (old_key & 0x1fffffff)%length;
-#elif N_WORD_BITS == 64
-            unsigned long old_index = (old_key & 0x1fffffffffffffff)%length;
-#endif
-
-            /* Scavenge the key and value. */
-            scavenge(&kv_vector[2*i],2);
-
-            /* Check whether the key has moved and is EQ based. */
-            {
-                lispobj new_key = kv_vector[2*i];
-#if N_WORD_BITS == 32
-                unsigned long new_index = (new_key & 0x1fffffff)%length;
-#elif N_WORD_BITS == 64
-                unsigned long new_index = (new_key & 0x1fffffffffffffff)%length;
-#endif
-
-                if ((old_index != new_index) &&
-                    ((!hash_vector) ||
-                     (hash_vector[i] == MAGIC_HASH_VECTOR_VALUE)) &&
-                    ((new_key != empty_symbol) ||
-                     (kv_vector[2*i] != empty_symbol))) {
-
-                     /*FSHOW((stderr,
-                            "* EQ key %d moved from %x to %x; index %d to %d\n",
-                            i, old_key, new_key, old_index, new_index));*/
-
-                    if (index_vector[old_index] != 0) {
-                         /*FSHOW((stderr, "/P1 %d\n", index_vector[old_index]));*/
-
-                        /* Unlink the key from the old_index chain. */
-                        if (index_vector[old_index] == i) {
-                            /*FSHOW((stderr, "/P2a %d\n", next_vector[i]));*/
-                            index_vector[old_index] = next_vector[i];
-                            /* Link it into the needing rehash chain. */
-                            next_vector[i] = fixnum_value(hash_table->needing_rehash);
-                            hash_table->needing_rehash = make_fixnum(i);
-                            /*SHOW("P2");*/
-                        } else {
-                            unsigned long prior = index_vector[old_index];
-                            unsigned long next = next_vector[prior];
-
-                            /*FSHOW((stderr, "/P3a %d %d\n", prior, next));*/
-
-                            while (next != 0) {
-                                 /*FSHOW((stderr, "/P3b %d %d\n", prior, next));*/
-                                if (next == i) {
-                                    /* Unlink it. */
-                                    next_vector[prior] = next_vector[next];
-                                    /* Link it into the needing rehash
-                                     * chain. */
-                                    next_vector[next] =
-                                        fixnum_value(hash_table->needing_rehash);
-                                    hash_table->needing_rehash = make_fixnum(next);
-                                    /*SHOW("/P3");*/
-                                    break;
-                                }
-                                prior = next;
-                                next = next_vector[next];
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
     return (CEILING(kv_length + 2, 2));
 }
 
@@ -3281,8 +3269,8 @@ scavenge_newspace_generation(generation_index_t generation)
             if (gencgc_verbose)
                 SHOW("new_areas overflow, doing full scavenge");
 
-            /* Don't need to record new areas that get scavenge anyway
-             * during scavenge_newspace_generation_one_scan. */
+            /* Don't need to record new areas that get scavenged
+             * anyway during scavenge_newspace_generation_one_scan. */
             record_new_objects = 1;
 
             scavenge_newspace_generation_one_scan(generation);
@@ -3891,6 +3879,8 @@ write_protect_generation_pages(generation_index_t generation)
     }
 }
 
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+
 static void
 scavenge_control_stack()
 {
@@ -3906,7 +3896,6 @@ scavenge_control_stack()
     scavenge(control_stack, control_stack_size);
 }
 
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
 /* Scavenging Interrupt Contexts */
 
 static int boxed_registers[] = BOXED_REGISTERS;
@@ -4964,7 +4953,8 @@ gc_and_save(char *filename, int prepend_runtime)
     void *runtime_bytes = NULL;
     size_t runtime_size;
 
-    file = prepare_to_save(filename, prepend_runtime, &runtime_bytes, &runtime_size);
+    file = prepare_to_save(filename, prepend_runtime, &runtime_bytes,
+                           &runtime_size);
     if (file == NULL)
        return;
 

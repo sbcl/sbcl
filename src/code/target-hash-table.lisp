@@ -199,10 +199,12 @@
                    :weak-p weak-p
                    :index-vector index-vector
                    :next-vector next-vector
-                   :hash-vector (unless (eq test 'eq)
-                                  (make-array size+1
-                                              :element-type '(unsigned-byte #.sb!vm:n-word-bits)
-                                              :initial-element +magic-hash-vector-value+))
+                   :hash-vector
+                   (unless (eq test 'eq)
+                     (make-array size+1
+                                 :element-type '(unsigned-byte
+                                                 #.sb!vm:n-word-bits)
+                                 :initial-element +magic-hash-vector-value+))
                    :spinlock (sb!thread::make-spinlock))))
       (declare (type index size+1 scaled-size length))
       ;; Set up the free list, all free. These lists are 0 terminated.
@@ -265,20 +267,23 @@
                (the index (truncate (* rehash-size old-size)))))))
          (new-kv-vector (make-array (* 2 new-size)
                                     :initial-element +empty-ht-slot+))
-         (new-next-vector (make-array new-size
-                                      :element-type '(unsigned-byte #.sb!vm:n-word-bits)
-                                      :initial-element 0))
-         (new-hash-vector (when old-hash-vector
-                            (make-array new-size
-                                        :element-type '(unsigned-byte #.sb!vm:n-word-bits)
-                                        :initial-element +magic-hash-vector-value+)))
+         (new-next-vector
+          (make-array new-size
+                      :element-type '(unsigned-byte #.sb!vm:n-word-bits)
+                      :initial-element 0))
+         (new-hash-vector
+          (when old-hash-vector
+            (make-array new-size
+                        :element-type '(unsigned-byte #.sb!vm:n-word-bits)
+                        :initial-element +magic-hash-vector-value+)))
          (old-index-vector (hash-table-index-vector table))
          (new-length (almost-primify
                       (truncate (/ (float new-size)
                                 (hash-table-rehash-threshold table)))))
-         (new-index-vector (make-array new-length
-                                       :element-type '(unsigned-byte #.sb!vm:n-word-bits)
-                                       :initial-element 0)))
+         (new-index-vector
+          (make-array new-length
+                      :element-type '(unsigned-byte #.sb!vm:n-word-bits)
+                      :initial-element 0)))
     (declare (type index new-size new-length old-size))
 
     ;; Disable GC tricks on the OLD-KV-VECTOR.
@@ -315,7 +320,8 @@
                      (hash-table-next-free-kv table))
                (setf (hash-table-next-free-kv table) i))
               ((and new-hash-vector
-                    (not (= (aref new-hash-vector i) +magic-hash-vector-value+)))
+                    (not (= (aref new-hash-vector i)
+                            +magic-hash-vector-value+)))
                ;; Can use the existing hash value (not EQ based)
                (let* ((hashing (aref new-hash-vector i))
                       (index (rem hashing new-length))
@@ -382,7 +388,8 @@
                ;; Slot is empty, push it onto free list.
                (setf (aref next-vector i) (hash-table-next-free-kv table))
                (setf (hash-table-next-free-kv table) i))
-              ((and hash-vector (not (= (aref hash-vector i) +magic-hash-vector-value+)))
+              ((and hash-vector (not (= (aref hash-vector i)
+                                        +magic-hash-vector-value+)))
                ;; Can use the existing hash value (not EQ based)
                (let* ((hashing (aref hash-vector i))
                       (index (rem hashing length))
@@ -511,7 +518,8 @@
          (kv-vector (hash-table-table hash-table)))
 
      ;; Check the cache
-     (if (and cache (< cache (length kv-vector)) (eq (aref kv-vector cache) key))
+     (if (and cache (< cache (length kv-vector))
+              (eq (aref kv-vector cache) key))
          ;; If cached, just store here
          (setf (aref kv-vector (1+ cache)) value)
 
@@ -531,7 +539,8 @@
 
            (cond ((or eq-based (not hash-vector))
                   (when eq-based
-                    (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype))
+                    (set-header-data kv-vector
+                                     sb!vm:vector-valid-hashing-subtype))
 
                   ;; Search next-vector chain for a matching key.
                   (do ((next next (aref next-vector next)))
@@ -650,7 +659,8 @@
                   (declare (type index next))
                   (when (and (= hashing (aref hash-vector next))
                              (funcall test-fun key (aref table (* 2 next))))
-                    (return-from remhash (clear-slot next-vector prior next)))))))))))
+                    (return-from remhash
+                      (clear-slot next-vector prior next)))))))))))
 
 (defun clrhash (hash-table)
   #!+sb-doc
