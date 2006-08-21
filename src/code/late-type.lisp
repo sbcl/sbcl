@@ -30,18 +30,6 @@
 (define-condition parse-unknown-type (condition)
   ((specifier :reader parse-unknown-type-specifier :initarg :specifier)))
 
-;;; FIXME: This really should go away. Alas, it doesn't seem to be so
-;;; simple to make it go away.. (See bug 123 in BUGS file.)
-(defvar *use-implementation-types* t ; actually initialized in cold init
-  #!+sb-doc
-  "*USE-IMPLEMENTATION-TYPES* is a semi-public flag which determines how
-   restrictive we are in determining type membership. If two types are the
-   same in the implementation, then we will consider them them the same when
-   this switch is on. When it is off, we try to be as restrictive as the
-   language allows, allowing us to detect more errors. Currently, this only
-   affects array types.")
-(!cold-init-forms (setq *use-implementation-types* t))
-
 ;;; These functions are used as method for types which need a complex
 ;;; subtypep method to handle some superclasses, but cover a subtree
 ;;; of the type graph (i.e. there is no simple way for any other type
@@ -2250,15 +2238,6 @@ used for a COMPLEX component.~:@>"
 
 (!define-type-class array)
 
-;;; What this does depends on the setting of the
-;;; *USE-IMPLEMENTATION-TYPES* switch. If true, return the specialized
-;;; element type, otherwise return the original element type.
-(defun specialized-element-type-maybe (type)
-  (declare (type array-type type))
-  (if *use-implementation-types*
-      (array-type-specialized-element-type type)
-      (array-type-element-type type)))
-
 (!define-type-method (array :simple-=) (type1 type2)
   (cond ((not (and (equal (array-type-dimensions type1)
                           (array-type-dimensions type2))
@@ -2276,8 +2255,8 @@ used for a COMPLEX component.~:@>"
            (aver (not (and (not equalp) certainp)))
            (values equalp certainp)))
         (t
-         (values (type= (specialized-element-type-maybe type1)
-                        (specialized-element-type-maybe type2))
+         (values (type= (array-type-specialized-element-type type1)
+                        (array-type-specialized-element-type type2))
                  t))))
 
 (!define-type-method (array :negate) (type)
@@ -2363,8 +2342,8 @@ used for a COMPLEX component.~:@>"
            ;; types are equal, and they're equal iff the specialized
            ;; element types are identical.
            t
-           (values (type= (specialized-element-type-maybe type1)
-                          (specialized-element-type-maybe type2))
+           (values (type= (array-type-specialized-element-type type1)
+                          (array-type-specialized-element-type type2))
                    t)))))
 
 ;;; FIXME: is this dead?
@@ -2414,8 +2393,8 @@ used for a COMPLEX component.~:@>"
           ;; do with a rethink and/or a rewrite.  -- CSR, 2002-08-21
           ((or (eq (array-type-specialized-element-type type1) *wild-type*)
                (eq (array-type-specialized-element-type type2) *wild-type*)
-               (type= (specialized-element-type-maybe type1)
-                      (specialized-element-type-maybe type2)))
+               (type= (array-type-specialized-element-type type1)
+                      (array-type-specialized-element-type type2)))
 
            (values t t))
           (t
@@ -2429,19 +2408,27 @@ used for a COMPLEX component.~:@>"
             (complexp1 (array-type-complexp type1))
             (complexp2 (array-type-complexp type2))
             (eltype1 (array-type-element-type type1))
-            (eltype2 (array-type-element-type type2)))
-        (specialize-array-type
-         (make-array-type
-          :dimensions (cond ((eq dims1 '*) dims2)
-                            ((eq dims2 '*) dims1)
-                            (t
-                             (mapcar (lambda (x y) (if (eq x '*) y x))
-                                     dims1 dims2)))
-          :complexp (if (eq complexp1 :maybe) complexp2 complexp1)
-          :element-type (cond
-                          ((eq eltype1 *wild-type*) eltype2)
-                          ((eq eltype2 *wild-type*) eltype1)
-                          (t (type-intersection eltype1 eltype2))))))
+            (eltype2 (array-type-element-type type2))
+            (stype1 (array-type-specialized-element-type type1))
+            (stype2 (array-type-specialized-element-type type2)))
+        (flet ((intersect ()
+                 (make-array-type
+                  :dimensions (cond ((eq dims1 '*) dims2)
+                                    ((eq dims2 '*) dims1)
+                                    (t
+                                     (mapcar (lambda (x y) (if (eq x '*) y x))
+                                             dims1 dims2)))
+                  :complexp (if (eq complexp1 :maybe) complexp2 complexp1)
+                  :element-type (cond
+                                  ((eq eltype1 *wild-type*) eltype2)
+                                  ((eq eltype2 *wild-type*) eltype1)
+                                  (t (type-intersection eltype1 eltype2))))))
+          (if (or (eq stype1 *wild-type*) (eq stype2 *wild-type*))
+              (specialize-array-type (intersect))
+              (let ((type (intersect)))
+                (aver (type= stype1 stype2))
+                (setf (array-type-specialized-element-type type) stype1)
+                type))))
       *empty-type*))
 
 ;;; Check a supplied dimension list to determine whether it is legal,

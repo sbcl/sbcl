@@ -1327,4 +1327,32 @@
                                             (funcall x))))
                          nil (constantly 42)))))
 
+;;; bug 368: array type intersections in the compiler
+(defstruct e368)
+(defstruct i368)
+(defstruct g368
+  (i368s (make-array 0 :fill-pointer t) :type (or (vector i368) null)))
+(defstruct s368
+  (g368 (error "missing :G368") :type g368 :read-only t))
+(declaim (ftype (function (fixnum (vector i368) e368) t) r368))
+(declaim (ftype (function (fixnum (vector e368)) t) h368))
+(defparameter *h368-was-called-p* nil)
+(defun nsu (vertices e368)
+  (let ((i368s (g368-i368s (make-g368))))
+    (let ((fuis (r368 0 i368s e368)))
+      (format t "~&FUIS=~S~%" fuis)
+      (or fuis (h368 0 i368s)))))
+(defun r368 (w x y)
+  (declare (ignore w x y))
+  nil)
+(defun h368 (w x)
+  (declare (ignore w x))
+  (setf *h368-was-called-p* t)
+  (make-s368 :g368 (make-g368)))
+(let ((nsu (nsu #() (make-e368))))
+  (format t "~&NSU returned ~S~%" nsu)
+  (format t "~&*H368-WAS-CALLED-P*=~S~%" *h368-was-called-p*)
+  (assert (s368-p nsu))
+  (assert *h368-was-called-p*))
+
 ;;; success

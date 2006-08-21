@@ -654,7 +654,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 
                ;; ..and variables to control compiler policy
                "*INLINE-EXPANSION-LIMIT*"
-               "*USE-IMPLEMENTATION-TYPES*"
                "*DERIVE-FUNCTION-TYPES*"
 
                ;; ..and inspector of compiler policy

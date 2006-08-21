@@ -3,6 +3,8 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
   * feature: implemented the READER-METHOD-CLASS and
     WRITER-METHOD-CLASS portion of the Class Initialization Protocol
     as specified by AMOP.
+  * incompatible change: variable SB-EXT:*USE-IMPLEMENTATION-TYPES*
+    no longer exists.
   * optimization: faster LOGCOUNT implementation on x86 and x86-64
     (thanks to Lutz Euler)
   * optimization: hashing of general arrays and vectors has been
@@ -54,6 +56,8 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
     types in some cases.
   * bug fix: fixed input, output and error redirection in RUN-PROGRAM
     for win32. (thanks to Mike Thomas and Yaroslav Kavenchuk)
+  * bug fix: #368: incorrect use of expressed vs. upgraded array
+    element type.
   * thread-safety improvements:
     ** CONDITION-WAIT could return early on Linux, if the thread was
        interrupted and subsequently continued with SIGCONT.
