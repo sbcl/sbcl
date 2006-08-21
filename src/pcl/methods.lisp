@@ -844,13 +844,13 @@
   (unless *new-class*
     (update-std-or-str-methods gf type))
   (when (and (standard-svuc-method type) (structure-svuc-method type))
-    (flet ((update-class (class)
+    (flet ((update-accessor-info (class)
              (when (class-finalized-p class)
                (dolist (slotd (class-slots class))
                  (compute-slot-accessor-info slotd type gf)))))
       (if *new-class*
-          (update-class *new-class*)
-          (map-all-classes #'update-class 'slot-object)))))
+          (update-accessor-info *new-class*)
+          (map-all-classes #'update-accessor-info 'slot-object)))))
 
 (defvar *standard-slot-value-using-class-method* nil)
 (defvar *standard-setf-slot-value-using-class-method* nil)
