@@ -1,4 +1,4 @@
-README,v 1.38 2004/07/19 21:18:07 crhodes Exp         -*- Text -*-
+README,v 1.39 2006/08/21 10:52:32 crhodes Exp         -*- Text -*-
 
 The canonical documentation for asdf is in the file asdf.texinfo.  
 The significant overlap between this file and that will one day be
@@ -117,9 +117,10 @@ the grunt work.
 
 asdf is extensible to new operations and to new component types.  This
 allows the addition of behaviours: for example, a new component could
-be added for Java JAR archives, and methods specialised on
-compile-op added for it that would accomplish the relevant
-actions.
+be added for Java JAR archives, and methods specialised on compile-op
+added for it that would accomplish the relevant actions.  Users
+defining their own operations and component types should inherit from
+the asdf base classes asdf:operation and asdf:component respectively.
 
 * Inspiration
 
@@ -478,7 +479,9 @@ package is created for them to load into, so that different systems do
 not overwrite each others operations.  The user may also wish to (and
 is recommended to) include defpackage and in-package forms in his
 system definition files, however, so that they can be loaded manually
-if need be.
+if need be.  It is not recommended to use the CL-USER package for this
+purpose, as definitions made in this package will affect the parsing
+of asdf systems.
 
 For convenience in the normal case, and for backward compatibility
 with the spirit of mk-defsystem, the default contents of

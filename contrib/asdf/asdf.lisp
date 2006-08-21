@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  1.99
+;;; This is asdf: Another System Definition Facility.  1.101
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -101,6 +101,8 @@
            #:retry
            #:accept                     ; restarts
 
+           #:preference-file-for-system/operation
+           #:load-preferences
            )
   (:use :cl))
 
@@ -110,7 +112,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "1.99")
+(defvar *asdf-revision* (let* ((v "1.101")
                                (colon (or (position #\: v) -1))
                                (dot (position #\. v)))
                           (and v colon dot
@@ -732,7 +734,8 @@ system."))
 
 (defmethod perform :after ((operation operation) (c component))
   (setf (gethash (type-of operation) (component-operation-times c))
-        (get-universal-time)))
+        (get-universal-time))
+  (load-preferences c operation))
 
 ;;; perform is required to check output-files to find out where to put
 ;;; its answers, in case it has been overridden for site policy
@@ -741,8 +744,8 @@ system."))
   (let ((source-file (component-pathname c))
         (output-file (car (output-files operation c))))
     (multiple-value-bind (output warnings-p failure-p)
-        (compile-file source-file
-                      :output-file output-file)
+                         (compile-file source-file
+                                       :output-file output-file)
       ;(declare (ignore output))
       (when warnings-p
         (case (operation-on-warnings operation)
@@ -773,7 +776,9 @@ system."))
 
 ;;; load-op
 
-(defclass load-op (operation) ())
+(defclass basic-load-op (operation) ())
+
+(defclass load-op (basic-load-op) ())
 
 (defmethod perform ((o load-op) (c cl-source-file))
   (mapcar #'load (input-files o c)))
@@ -792,7 +797,7 @@ system."))
 
 ;;; load-source-op
 
-(defclass load-source-op (operation) ())
+(defclass load-source-op (basic-load-op) ())
 
 (defmethod perform ((o load-source-op) (c cl-source-file))
   (let ((source (component-pathname c)))
@@ -826,6 +831,38 @@ system."))
 
 (defmethod perform ((operation test-op) (c component))
   nil)
+
+(defgeneric load-preferences (system operation)
+  (:documentation "Called to load system preferences after <perform operation system>. Typical uses are to set parameters that don't exist until after the system has been loaded."))
+
+(defgeneric preference-file-for-system/operation (system operation)
+  (:documentation "Returns the pathname of the preference file for this system. Called by 'load-preferences to determine what file to load."))
+
+(defmethod load-preferences ((s t) (operation t))
+  ;; do nothing
+  (values))
+
+(defmethod load-preferences ((s system) (operation basic-load-op))
+  (let* ((*package* (find-package :common-lisp))
+         (file (probe-file (preference-file-for-system/operation s operation))))
+    (when file
+      (when *verbose-out*
+        (format *verbose-out*
+                "~&~@<; ~@;loading preferences for ~A/~(~A~) from ~A~@:>~%"
+                (component-name s)
+                (type-of operation) file))
+      (load file))))
+
+(defmethod preference-file-for-system/operation ((system t) (operation t))
+  ;; cope with anything other than systems
+  (preference-file-for-system/operation (find-system system t) operation))
+
+(defmethod preference-file-for-system/operation ((s system) (operation t))
+  (merge-pathnames
+   (make-pathname :name (component-name s)
+                  :type "lisp"
+                  :directory '(:relative ".asdf"))
+   (truename (user-homedir-pathname))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; invoking operations
@@ -909,11 +946,16 @@ system."))
 
 
 (defun class-for-type (parent type)
-  (let ((class
-         (find-class
-          (or (find-symbol (symbol-name type) *package*)
-              (find-symbol (symbol-name type) #.(package-name *package*)))
-          nil)))
+  (let* ((extra-symbols (list (find-symbol (symbol-name type) *package*)
+                              (find-symbol (symbol-name type)
+                                           #.(package-name *package*))))
+         (class (dolist (symbol (if (keywordp type)
+                                    extra-symbols
+                                    (cons type extra-symbols)))
+                  (when (and symbol
+                             (find-class symbol nil)
+                             (subtypep symbol 'component))
+                    (return (find-class symbol))))))
     (or class
         (and (eq type :file)
              (or (module-default-component-class parent)
@@ -1173,3 +1215,4 @@ output to *VERBOSE-OUT*.  Returns the shell's exit code."
   (pushnew 'contrib-sysdef-search *system-definition-search-functions*))
 
 (provide 'asdf)
+
