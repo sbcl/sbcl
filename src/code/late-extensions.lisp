@@ -35,3 +35,13 @@
 ;;;      ;;     be doing him a favor by printing the object here.
 ;;;      ;; -- WHN 2002-10-19
 ;;;      (error "can't calculate length of cyclic list")))
+
+;;; This is used in constructing arg lists for debugger printing,
+;;; and when needing to print unbound slots in PCL.
+(defstruct (unprintable-object
+            (:constructor make-unprintable-object (string))
+            (:print-object (lambda (x s)
+                             (print-unreadable-object (x s)
+                               (write-string (unprintable-object-string x) s))))
+            (:copier nil))
+  string)

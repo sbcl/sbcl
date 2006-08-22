@@ -890,6 +890,7 @@ retained, possibly temporariliy, because it might be used internally."
                "DEPRECATION-WARNING"
                "BIT-VECTOR-="
                "READ-EVALUATED-FORM"
+               "MAKE-UNPRINTABLE-OBJECT"
 
                ;; ..and macros..
                "COLLECT"

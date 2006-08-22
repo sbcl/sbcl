@@ -136,9 +136,12 @@
   (let ((class (class-of object)))
     (not (null (find-slot-definition class slot-name)))))
 
+(defvar *unbound-slot-value-marker* (make-unprintable-object "unbound slot"))
+
 ;;; This isn't documented, but is used within PCL in a number of print
 ;;; object methods. (See NAMED-OBJECT-PRINT-FUNCTION.)
-(defun slot-value-or-default (object slot-name &optional (default "unbound"))
+(defun slot-value-or-default (object slot-name &optional
+                              (default *unbound-slot-value-marker*))
   (if (slot-boundp object slot-name)
       (slot-value object slot-name)
       default))

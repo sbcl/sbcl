@@ -229,7 +229,7 @@
   (let* ((existing-gf (find-generic-function generic-function-name nil))
          (generic-function
           (if existing-gf
-              (ensure-generic-function 
+              (ensure-generic-function
                generic-function-name
                :generic-function-class (class-of existing-gf))
               (ensure-generic-function generic-function-name)))

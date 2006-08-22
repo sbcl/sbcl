@@ -188,8 +188,8 @@
   (multiple-value-bind (name options)
       (if (atom name&options)
           (values name&options nil)
-        (values (car name&options)
-                (cdr name&options)))
+          (values (car name&options)
+                  (cdr name&options)))
     (let ((regs (mapcar (lambda (var) (apply #'parse-reg-spec var)) vars)))
       (if *emit-assembly-code-not-vops-p*
           (emit-assemble name options regs code)

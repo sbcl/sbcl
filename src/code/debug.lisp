@@ -223,17 +223,6 @@ is how many frames to show."
 
 ) ; EVAL-WHEN
 
-;;; This is used in constructing arg lists for debugger printing when
-;;; the arg list is unavailable, some arg is unavailable or unused, etc.
-(defstruct (unprintable-object
-            (:constructor make-unprintable-object (string))
-            (:print-object (lambda (x s)
-                             (print-unreadable-object (x s)
-                               (write-string (unprintable-object-string x)
-                                             s))))
-            (:copier nil))
-  string)
-
 ;;; Extract the function argument values for a debug frame.
 (defun frame-args-as-list (frame)
   (let ((debug-fun (sb!di:frame-debug-fun frame))

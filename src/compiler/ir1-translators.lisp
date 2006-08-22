@@ -16,16 +16,18 @@
 
 (def-ir1-translator progn ((&rest forms) start next result)
   #!+sb-doc
-  "Progn Form*
-  Evaluates each Form in order, returning the values of the last form. With no
-  forms, returns NIL."
+  "PROGN form*
+
+Evaluates each FORM in order, returning the values of the last form. With no
+forms, returns NIL."
   (ir1-convert-progn-body start next result forms))
 
 (def-ir1-translator if ((test then &optional else) start next result)
   #!+sb-doc
-  "If Predicate Then [Else]
-  If Predicate evaluates to non-null, evaluate Then and returns its values,
-  otherwise evaluate Else and return its values. Else defaults to NIL."
+  "IF predicate then [else]
+
+If PREDICATE evaluates to false, evaluate THEN and return its values,
+otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
   (let* ((pred-ctran (make-ctran))
          (pred-lvar (make-lvar))
          (then-ctran (make-ctran))
@@ -63,10 +65,10 @@
 ;;; environment.
 (def-ir1-translator block ((name &rest forms) start next result)
   #!+sb-doc
-  "Block Name Form*
-  Evaluate the Forms as a PROGN. Within the lexical scope of the body,
-  (RETURN-FROM Name Value-Form) can be used to exit the form, returning the
-  result of Value-Form."
+  "BLOCK name form*
+
+Evaluate the FORMS as a PROGN. Within the lexical scope of the body,
+RETURN-FROM can be used to exit the form."
   (unless (symbolp name)
     (compiler-error "The block name ~S is not a symbol." name))
   (start-block start)
@@ -87,10 +89,11 @@
 
 (def-ir1-translator return-from ((name &optional value) start next result)
   #!+sb-doc
-  "Return-From Block-Name Value-Form
-  Evaluate the Value-Form, returning its values from the lexically enclosing
-  BLOCK Block-Name. This is constrained to be used only within the dynamic
-  extent of the BLOCK."
+  "RETURN-FROM block-name value-form
+
+Evaluate the VALUE-FORM, returning its values from the lexically enclosing
+block BLOCK-NAME. This is constrained to be used only within the dynamic
+extent of the block."
   ;; old comment:
   ;;   We make NEXT start a block just so that it will have a block
   ;;   assigned. People assume that when they pass a ctran into
@@ -159,13 +162,13 @@
 ;;; values.
 (def-ir1-translator tagbody ((&rest statements) start next result)
   #!+sb-doc
-  "Tagbody {Tag | Statement}*
-  Define tags for used with GO. The Statements are evaluated in order
-  (skipping Tags) and NIL is returned. If a statement contains a GO to a
-  defined Tag within the lexical scope of the form, then control is transferred
-  to the next statement following that tag. A Tag must an integer or a
-  symbol. A statement must be a list. Other objects are illegal within the
-  body."
+  "TAGBODY {tag | statement}*
+
+Define tags for use with GO. The STATEMENTS are evaluated in order ,skipping
+TAGS, and NIL is returned. If a statement contains a GO to a defined TAG
+within the lexical scope of the form, then control is transferred to the next
+statement following that tag. A TAG must an integer or a symbol. A STATEMENT
+must be a list. Other objects are illegal within the body."
   (start-block start)
   (ctran-starts-block next)
   (let* ((dummy (make-ctran))
@@ -201,9 +204,10 @@
 ;;; Emit an EXIT node without any value.
 (def-ir1-translator go ((tag) start next result)
   #!+sb-doc
-  "Go Tag
-  Transfer control to the named Tag in the lexically enclosing TAGBODY. This
-  is constrained to be used only within the dynamic extent of the TAGBODY."
+  "GO tag
+
+Transfer control to the named TAG in the lexically enclosing TAGBODY. This is
+constrained to be used only within the dynamic extent of the TAGBODY."
   (ctran-starts-block next)
   (let* ((found (or (lexenv-find tag tags :test #'eql)
                     (compiler-error "attempt to GO to nonexistent tag: ~S"
@@ -233,9 +237,10 @@
 ;;;   form; otherwise, the forms in the body are ignored.
 (def-ir1-translator eval-when ((situations &rest forms) start next result)
   #!+sb-doc
-  "EVAL-WHEN (Situation*) Form*
-  Evaluate the Forms in the specified Situations (any of :COMPILE-TOPLEVEL,
-  :LOAD-TOPLEVEL, or :EXECUTE, or (deprecated) COMPILE, LOAD, or EVAL)."
+  "EVAL-WHEN (situation*) form*
+
+Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
+:LOAD-TOPLEVEL, or :EXECUTE, or (deprecated) COMPILE, LOAD, or EVAL)."
   (multiple-value-bind (ct lt e) (parse-eval-when-situations situations)
     (declare (ignore ct lt))
     (ir1-convert-progn-body start next result (and e forms)))
@@ -310,10 +315,11 @@
 
 (def-ir1-translator macrolet ((definitions &rest body) start next result)
   #!+sb-doc
-  "MACROLET ({(Name Lambda-List Form*)}*) Body-Form*
-  Evaluate the Body-Forms in an environment with the specified local macros
-  defined. Name is the local macro name, Lambda-List is the DEFMACRO style
-  destructuring lambda list, and the Forms evaluate to the expansion.."
+  "MACROLET ({(name lambda-list form*)}*) body-form*
+
+Evaluate the BODY-FORMS in an environment with the specified local macros
+defined. Name is the local macro name, LAMBDA-LIST is a DEFMACRO style
+destructuring lambda list, and the FORMS evaluate to the expansion."
   (funcall-in-macrolet-lexenv
    definitions
    (lambda (&key funs)
@@ -354,9 +360,10 @@
 (def-ir1-translator symbol-macrolet
     ((macrobindings &body body) start next result)
   #!+sb-doc
-  "SYMBOL-MACROLET ({(Name Expansion)}*) Decl* Form*
-  Define the Names as symbol macros with the given Expansions. Within the
-  body, references to a Name will effectively be replaced with the Expansion."
+  "SYMBOL-MACROLET ({(name expansion)}*) decl* form*
+
+Define the NAMES as symbol macros with the given EXPANSIONS. Within the
+body, references to a NAME will effectively be replaced with the EXPANSION."
   (funcall-in-symbol-macrolet-lexenv
    macrobindings
    (lambda (&key vars)
@@ -430,8 +437,9 @@
 
 (def-ir1-translator quote ((thing) start next result)
   #!+sb-doc
-  "QUOTE Value
-  Return Value without evaluating it."
+  "QUOTE value
+
+Return VALUE without evaluating it."
   (reference-constant start next result thing))
 
 ;;;; FUNCTION and NAMED-LAMBDA
@@ -486,9 +494,10 @@
 
 (def-ir1-translator function ((thing) start next result)
   #!+sb-doc
-  "FUNCTION Name
-  Return the lexically apparent definition of the function Name. Name may also
-  be a lambda expression."
+  "FUNCTION name
+
+Return the lexically apparent definition of the function NAME. NAME may also
+be a lambda expression."
   (with-fun-name-leaf (leaf thing start)
     (reference-leaf start next result leaf)))
 
@@ -596,10 +605,11 @@
 
 (def-ir1-translator let ((bindings &body body) start next result)
   #!+sb-doc
-  "LET ({(Var [Value]) | Var}*) Declaration* Form*
-  During evaluation of the Forms, bind the Vars to the result of evaluating the
-  Value forms. The variables are bound in parallel after all of the Values are
-  evaluated."
+  "LET ({(var [value]) | var}*) declaration* form*
+
+During evaluation of the FORMS, bind the VARS to the result of evaluating the
+VALUE forms. The variables are bound in parallel after all of the VALUES forms
+have been evaluated."
   (cond ((null bindings)
          (ir1-translate-locally body start next result))
         ((listp bindings)
@@ -625,9 +635,10 @@
 (def-ir1-translator let* ((bindings &body body)
                           start next result)
   #!+sb-doc
-  "LET* ({(Var [Value]) | Var}*) Declaration* Form*
-  Similar to LET, but the variables are bound sequentially, allowing each Value
-  form to reference any of the previous Vars."
+  "LET* ({(var [value]) | var}*) declaration* form*
+
+Similar to LET, but the variables are bound sequentially, allowing each VALUE
+form to reference any of the previous VARS."
   (if (listp bindings)
       (multiple-value-bind (forms decls)
           (parse-body body :doc-string-allowed nil)
@@ -658,10 +669,11 @@
 
 (def-ir1-translator locally ((&body body) start next result)
   #!+sb-doc
-  "LOCALLY Declaration* Form*
-  Sequentially evaluate the Forms in a lexical environment where the
-  the Declarations have effect. If LOCALLY is a top level form, then
-  the Forms are also processed as top level forms."
+  "LOCALLY declaration* form*
+
+Sequentially evaluate the FORMS in a lexical environment where the the
+DECLARATIONS have effect. If LOCALLY is a top level form, then the FORMS are
+also processed as top level forms."
   (ir1-translate-locally body start next result))
 
 ;;;; FLET and LABELS
@@ -719,10 +731,11 @@
 (def-ir1-translator flet ((definitions &body body)
                           start next result)
   #!+sb-doc
-  "FLET ({(Name Lambda-List Declaration* Form*)}*) Declaration* Body-Form*
-  Evaluate the Body-Forms with some local function definitions. The bindings
-  do not enclose the definitions; any use of Name in the Forms will refer to
-  the lexically apparent function definition in the enclosing environment."
+  "FLET ({(name lambda-list declaration* form*)}*) declaration* body-form*
+
+Evaluate the BODY-FORMS with local function definitions. The bindings do
+not enclose the definitions; any use of NAME in the FORMS will refer to the
+lexically apparent function definition in the enclosing environment."
   (multiple-value-bind (forms decls)
       (parse-body body :doc-string-allowed nil)
     (multiple-value-bind (names defs)
@@ -738,10 +751,11 @@
 
 (def-ir1-translator labels ((definitions &body body) start next result)
   #!+sb-doc
-  "LABELS ({(Name Lambda-List Declaration* Form*)}*) Declaration* Body-Form*
-  Evaluate the Body-Forms with some local function definitions. The bindings
-  enclose the new definitions, so the defined functions can call themselves or
-  each other."
+  "LABELS ({(name lambda-list declaration* form*)}*) declaration* body-form*
+
+Evaluate the BODY-FORMS with local function definitions. The bindings enclose
+the new definitions, so the defined functions can call themselves or each
+other."
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
     (multiple-value-bind (names defs)
         (extract-flet-vars definitions 'labels)
@@ -896,9 +910,10 @@
 ;;; properties other than receiving multiple-values.
 (def-ir1-translator throw ((tag result) start next result-lvar)
   #!+sb-doc
-  "Throw Tag Form
-  Do a non-local exit, return the values of Form from the CATCH whose tag
-  evaluates to the same thing as Tag."
+  "THROW tag form
+
+Do a non-local exit, return the values of FORM from the CATCH whose tag is EQ
+to TAG."
   (ir1-convert start next result-lvar
                `(multiple-value-call #'%throw ,tag ,result)))
 
@@ -956,11 +971,12 @@
 
 (def-ir1-translator catch ((tag &body body) start next result)
   #!+sb-doc
-  "Catch Tag Form*
-  Evaluate TAG and instantiate it as a catcher while the body forms are
-  evaluated in an implicit PROGN. If a THROW is done to TAG within the dynamic
-  scope of the body, then control will be transferred to the end of the body
-  and the thrown values will be returned."
+  "CATCH tag form*
+
+Evaluate TAG and instantiate it as a catcher while the body forms are
+evaluated in an implicit PROGN. If a THROW is done to TAG within the dynamic
+scope of the body, then control will be transferred to the end of the body and
+the thrown values will be returned."
   ;; We represent the possibility of the control transfer by making an
   ;; "escape function" that does a lexical exit, and instantiate the
   ;; cleanup using %WITHIN-CLEANUP.
@@ -975,10 +991,11 @@
 (def-ir1-translator unwind-protect
     ((protected &body cleanup) start next result)
   #!+sb-doc
-  "Unwind-Protect Protected Cleanup*
-  Evaluate the form PROTECTED, returning its values. The CLEANUP forms are
-  evaluated whenever the dynamic scope of the PROTECTED form is exited (either
-  due to normal completion or a non-local exit such as THROW)."
+  "UNWIND-PROTECT protected cleanup*
+
+Evaluate the form PROTECTED, returning its values. The CLEANUP forms are
+evaluated whenever the dynamic scope of the PROTECTED form is exited (either
+due to normal completion or a non-local exit such as THROW)."
   ;; UNWIND-PROTECT is similar to CATCH, but hairier. We make the
   ;; cleanup forms into a local function so that they can be referenced
   ;; both in the case where we are unwound and in any local exits. We
@@ -1008,9 +1025,10 @@
 
 (def-ir1-translator multiple-value-call ((fun &rest args) start next result)
   #!+sb-doc
-  "MULTIPLE-VALUE-CALL Function Values-Form*
-  Call FUNCTION, passing all the values of each VALUES-FORM as arguments,
-  values from the first VALUES-FORM making up the first argument, etc."
+  "MULTIPLE-VALUE-CALL function values-form*
+
+Call FUNCTION, passing all the values of each VALUES-FORM as arguments,
+values from the first VALUES-FORM making up the first argument, etc."
   (let* ((ctran (make-ctran))
          (fun-lvar (make-lvar))
          (node (if args
@@ -1047,9 +1065,10 @@
 (def-ir1-translator multiple-value-prog1
     ((values-form &rest forms) start next result)
   #!+sb-doc
-  "MULTIPLE-VALUE-PROG1 Values-Form Form*
-  Evaluate Values-Form and then the Forms, but return all the values of
-  Values-Form."
+  "MULTIPLE-VALUE-PROG1 values-form form*
+
+Evaluate VALUES-FORM and then the FORMS, but return all the values of
+VALUES-FORM."
   (let ((dummy (make-ctran)))
     (ctran-starts-block dummy)
     (ir1-convert start dummy result values-form)

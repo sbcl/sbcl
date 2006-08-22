@@ -2202,9 +2202,9 @@ bootstrapping.
                                arglist
                                &rest initargs)
   (let* (;; we don't need to deal with the :generic-function-class
-	 ;; argument here because the default,
-	 ;; STANDARD-GENERIC-FUNCTION, is right for all early generic
-	 ;; functions.  (See REAL-ADD-NAMED-METHOD)
+         ;; argument here because the default,
+         ;; STANDARD-GENERIC-FUNCTION, is right for all early generic
+         ;; functions.  (See REAL-ADD-NAMED-METHOD)
          (gf (ensure-generic-function generic-function-name))
          (existing
            (dolist (m (early-gf-methods gf))

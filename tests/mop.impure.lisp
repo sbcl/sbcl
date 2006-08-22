@@ -515,7 +515,7 @@
 
 ;;; ensure-class got its treatment of :metaclass wrong.
 (ensure-class 'better-be-standard-class :direct-superclasses '(standard-object)
-              :metaclass 'standard-class 
+              :metaclass 'standard-class
               :metaclass 'funcallable-standard-class)
 (assert (eq (class-of (find-class 'better-be-standard-class))
             (find-class 'standard-class)))
