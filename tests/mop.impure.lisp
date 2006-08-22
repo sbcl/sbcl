@@ -513,4 +513,11 @@
   (assert (subtypep class2 class1))
   (assert (typep (make-instance class2) class1)))
 
+;;; ensure-class got its treatment of :metaclass wrong.
+(ensure-class 'better-be-standard-class :direct-superclasses '(standard-object)
+              :metaclass 'standard-class 
+              :metaclass 'funcallable-standard-class)
+(assert (eq (class-of (find-class 'better-be-standard-class))
+            (find-class 'standard-class)))
+
 ;;;; success

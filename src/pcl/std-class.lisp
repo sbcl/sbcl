@@ -309,7 +309,7 @@
 
 (defmethod ensure-class-using-class ((class null) name &rest args &key)
   (multiple-value-bind (meta initargs)
-      (ensure-class-values class args)
+      (frob-ensure-class-args args)
     (setf class (apply #'make-instance meta :name name initargs))
     (without-package-locks
       (setf (find-class name) class))
@@ -318,7 +318,7 @@
 
 (defmethod ensure-class-using-class ((class pcl-class) name &rest args &key)
   (multiple-value-bind (meta initargs)
-      (ensure-class-values class args)
+      (frob-ensure-class-args args)
     (unless (eq (class-of class) meta)
       (apply #'change-class class meta initargs))
     (apply #'reinitialize-instance class initargs)
@@ -327,34 +327,29 @@
     (set-class-type-translation class name)
     class))
 
-(defun fix-super (s)
-  (cond ((classp s) s)
-        ((not (legal-class-name-p s))
-         (error "~S is not a class or a legal class name." s))
-        (t
-         (or (find-class s nil)
-             (ensure-class s :metaclass 'forward-referenced-class)))))
-
-(defun ensure-class-values (class initargs)
+(defun frob-ensure-class-args (args)
   (let (metaclass metaclassp reversed-plist)
-    (doplist (key val) initargs
-      (cond ((eq key :metaclass)
-             (setf metaclass val
-                   metaclassp key))
-            (t
-             (when (eq key :direct-superclasses)
-               (setf val (mapcar #'fix-super val)))
-             (setf reversed-plist (list* val key reversed-plist)))))
-    (values (cond (metaclassp
-                   (if (classp metaclass)
-                       metaclass
-                       (find-class metaclass)))
-                  ((or (null class) (forward-referenced-class-p class))
-                   *the-class-standard-class*)
-                  (t
-                   (class-of class)))
-            (nreverse reversed-plist))))
-
+    (flet ((frob-superclass (s)
+             (cond
+               ((classp s) s)
+               ((legal-class-name-p s)
+                (or (find-class s nil)
+                    (ensure-class s :metaclass 'forward-referenced-class)))
+               (t (error "Not a class or a legal class name: ~S." s)))))
+      (doplist (key val) args
+        (cond ((eq key :metaclass)
+               (unless metaclassp
+                 (setf metaclass val metaclassp key)))
+              (t
+               (when (eq key :direct-superclasses)
+                 (setf val (mapcar #'frob-superclass val)))
+               (setf reversed-plist (list* val key reversed-plist)))))
+      (values (cond (metaclassp
+                     (if (classp metaclass)
+                         metaclass
+                         (find-class metaclass)))
+                    (t *the-class-standard-class*))
+              (nreverse reversed-plist)))))
 
 (defmethod shared-initialize :after
     ((class std-class) slot-names &key
@@ -703,17 +698,13 @@
 (defun fix-slot-accessors (class dslotds add/remove)
   (flet ((fix (gfspec name r/w)
            (let ((gf (cond ((eq add/remove 'add)
-                            (if (fboundp gfspec)
-                                (without-package-locks
-                                  (ensure-generic-function gfspec))
+                            (or (find-generic-function gfspec nil)
                                 (ensure-generic-function
                                  gfspec :lambda-list (case r/w
                                                        (r '(object))
                                                        (w '(new-value object))))))
-                           ((generic-function-p (and (fboundp gfspec)
-                                                     (fdefinition gfspec)))
-                            (without-package-locks
-                              (ensure-generic-function gfspec))))))
+                           (t
+                            (find-generic-function gfspec nil)))))
              (when gf
                (case r/w
                  (r (if (eq add/remove 'add)

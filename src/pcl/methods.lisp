@@ -209,36 +209,14 @@
            (initarg-error :method-combination
                           "not supplied"
                           "a method combination object")))))
-
-#||
-(defmethod reinitialize-instance ((generic-function standard-generic-function)
-                                  &rest initargs
-                                  &key name
-                                       lambda-list
-                                       argument-precedence-order
-                                       declarations
-                                       documentation
-                                       method-class
-                                       method-combination)
-  (declare (ignore documentation declarations argument-precedence-order
-                   lambda-list name method-class method-combination))
-  (macrolet ((add-initarg (check name slot-name)
-               `(unless ,check
-                  (push (slot-value generic-function ,slot-name) initargs)
-                  (push ,name initargs))))
-;   (add-initarg name :name 'name)
-;   (add-initarg lambda-list :lambda-list 'lambda-list)
-;   (add-initarg argument-precedence-order
-;                :argument-precedence-order
-;                'argument-precedence-order)
-;   (add-initarg declarations :declarations 'declarations)
-;   (add-initarg documentation :documentation '%documentation)
-;   (add-initarg method-class :method-class 'method-class)
-;   (add-initarg method-combination :method-combination '%method-combination)
-    (apply #'call-next-method generic-function initargs)))
-||#
 
-;;; These two are scheduled for demolition.
+(defun find-generic-function (name &optional (errorp t))
+  (let ((fun (and (fboundp name) (fdefinition name))))
+    (cond
+      ((and fun (typep fun 'generic-function)) fun)
+      (errorp (error "No generic function named ~S." name))
+      (t nil))))
+
 (defun real-add-named-method (generic-function-name
                               qualifiers
                               specializers
@@ -248,11 +226,13 @@
                (typep (fdefinition generic-function-name) 'generic-function))
     (style-warn "implicitly creating new generic function ~S"
                 generic-function-name))
-  ;; XXX What about changing the class of the generic function if
-  ;; there is one? Whose job is that, anyway? Do we need something
-  ;; kind of like CLASS-FOR-REDEFINITION?
-  (let* ((generic-function
-           (ensure-generic-function generic-function-name))
+  (let* ((existing-gf (find-generic-function generic-function-name nil))
+         (generic-function
+          (if existing-gf
+              (ensure-generic-function 
+               generic-function-name
+               :generic-function-class (class-of existing-gf))
+              (ensure-generic-function generic-function-name)))
          (specs (parse-specializers specializers))
          (proto (method-prototype-for-gf generic-function-name))
          (new (apply #'make-instance (class-of proto)

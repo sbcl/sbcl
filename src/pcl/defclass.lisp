@@ -87,7 +87,7 @@
               ;; then use CLASS-DIRECT-SLOTS. -- CSR, 2002-06-07
               (eval defclass-form)
               (let* ((include (or (and direct-superclasses
-                                       (fix-super (car direct-superclasses)))
+                                       (find-class (car direct-superclasses) nil))
                                   (and (not (eq name 'structure-object))
                                        *the-class-structure-object*)))
                      (defstruct-form (make-structure-class-defstruct-form

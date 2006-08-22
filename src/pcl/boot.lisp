@@ -2014,11 +2014,12 @@ bootstrapping.
         fun-name
         &rest all-keys
         &key environment (lambda-list nil lambda-list-p)
-             (generic-function-class 'standard-generic-function gf-class-p)
+        (generic-function-class 'standard-generic-function)
         &allow-other-keys)
   (real-ensure-gf-internal generic-function-class all-keys environment)
-  (unless (or (null gf-class-p)
-              (eq (class-of existing) generic-function-class))
+  ;; KLUDGE: the above macro does SETQ on GENERIC-FUNCTION-CLASS,
+  ;; which is what makes the next line work
+  (unless (eq (class-of existing) generic-function-class)
     (change-class existing generic-function-class))
   (prog1
       (apply #'reinitialize-instance existing all-keys)
@@ -2200,7 +2201,11 @@ bootstrapping.
                                specializers
                                arglist
                                &rest initargs)
-  (let* ((gf (ensure-generic-function generic-function-name))
+  (let* (;; we don't need to deal with the :generic-function-class
+	 ;; argument here because the default,
+	 ;; STANDARD-GENERIC-FUNCTION, is right for all early generic
+	 ;; functions.  (See REAL-ADD-NAMED-METHOD)
+         (gf (ensure-generic-function generic-function-name))
          (existing
            (dolist (m (early-gf-methods gf))
              (when (and (equal (early-method-specializers m) specializers)

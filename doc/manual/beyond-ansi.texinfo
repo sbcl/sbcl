@@ -118,6 +118,13 @@ The following definition is acceptable:
 @end lisp
 and leads to a class whose instances are funcallable and have one slot.
 
+@tindex funcallable-standard-object
+@tindex sb-mop:funcallable-standard-object
+Note that this requirement also applies to the class
+@code{sb-mop:funcallable-standard-object}, which has metaclass
+@code{sb-mop:funcallable-standard-class} rather than
+@code{standard-class} as AMOP specifies.
+
 @item
 the requirement that ``No portable class @math{C_p} may inherit, by
 virtue of being a direct or indirect subclass of a specified class, any
@@ -155,6 +162,24 @@ for @code{slot-value-using-class} and @code{slot-boundp-using-class}.
 
 Note that application code may specialize on the @code{new-value}
 argument of slot accessors.
+
+@item
+@findex defclass
+@findex ensure-class
+@findex ensure-class-using-class
+@findex sb-mop:ensure-class
+@findex sb-mop:ensure-class-using-class
+@findex find-class
+@findex class-name
+the class named by the @code{name} argument to @code{ensure-class}, if
+any, is only redefined if it is the proper name of that class;
+otherwise, a new class is created.
+
+This is consistent with the description of @code{ensure-class} in AMOP
+as the functional version of @code{defclass}, which has this behaviour;
+however, it is not consistent with the weaker requirement in AMOP, which
+states that any class found by @code{find-class}, no matter what its
+@code{class-name}, is redefined.
 
 @end itemize
 

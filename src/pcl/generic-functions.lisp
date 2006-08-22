@@ -450,6 +450,8 @@
 
 ;;;; &KEY arguments
 
+;;; FIXME: make the declared &KEY arguments here agree with those that
+;;; AMOP specifies.
 (defgeneric allocate-instance (class &rest initargs))
 
 (defgeneric ensure-class-using-class (class
