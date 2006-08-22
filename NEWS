@@ -12,7 +12,7 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
   * enhancement: SB-INTROSPECT is now able to find definitions of
     profiled functions. (thanks to Troels Henriksen)
   * enhancement: compiler-macro expansion applies now to FUNCALL forms
-    as well.
+    as well, allowing compiler-macros for SETF-functions to expand.
   * enhancement: step-instrumentation no longer wraps known
     single-value functions with multiple-value context, allowing
     better type inference.

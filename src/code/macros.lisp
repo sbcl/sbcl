@@ -113,22 +113,6 @@ invoked. In that case it will store into PLACE and start over."
   #!+sb-doc
   "Define a compiler-macro for NAME."
   (legal-fun-name-or-type-error name)
-  (when (consp name)
-    ;; It's fairly clear that the user intends the compiler macro to
-    ;; expand when he does (SETF (FOO ...) X). And that's even a
-    ;; useful and reasonable thing to want. Unfortunately,
-    ;; (SETF (FOO ...) X) macroexpands into (FUNCALL (SETF FOO) X ...),
-    ;; and it's not at all clear that it's valid to expand a FUNCALL form,
-    ;; and the ANSI standard doesn't seem to say anything else which
-    ;; would justify us expanding the compiler macro the way the user
-    ;; wants. So instead we rely on 3.2.2.1.3 "When Compiler Macros Are
-    ;; Used" which says they never have to be used, so by ignoring such
-    ;; macros we're erring on the safe side. But any user who does
-    ;; (DEFINE-COMPILER-MACRO (SETF FOO) ...) could easily be surprised
-    ;; by this way of complying with a rather screwy aspect of the ANSI
-    ;; spec, so at least we can warn him...
-    (sb!c::compiler-style-warn
-     "defining compiler macro of (SETF ...), which will not be expanded"))
   (when (and (symbolp name) (special-operator-p name))
     (error 'simple-program-error
            :format-control "cannot define a compiler-macro for a special operator: ~S"

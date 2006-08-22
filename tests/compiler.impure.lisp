@@ -1318,6 +1318,12 @@
                               (declare (inline test-cmacro-4))
                               (test-cmacro-4)))))
 
+;;; SETF function compiler macros
+(define-compiler-macro (setf test-cmacro-4) (&whole form value) ''ok)
+
+(assert (eq 'ok (funcall (lambda () (setf (test-cmacro-4) 'zot)))))
+(assert (eq 'ok (funcall (lambda () (funcall #'(setf test-cmacro-4) 'zot)))))
+
 ;;; Step instrumentation breaking type-inference
 (handler-bind ((warning #'error))
   (assert (= 42 (funcall (compile nil '(lambda (v x)
