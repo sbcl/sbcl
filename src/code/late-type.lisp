@@ -792,19 +792,25 @@
   ;; e.g. fading away in favor of some CLOS solution) the shared logic
   ;; should probably become shared code. -- WHN 2001-03-16
   (declare (type ctype type1 type2))
-  (cond ((eq type1 type2)
-         type1)
-        ((csubtypep type1 type2) type2)
-        ((csubtypep type2 type1) type1)
-        ((or (union-type-p type1)
-             (union-type-p type2))
-         ;; Unions of UNION-TYPE should have the UNION-TYPE-TYPES
-         ;; values broken out and united separately. The full TYPE-UNION
-         ;; function knows how to do this, so let it handle it.
-         (type-union type1 type2))
-        (t
-         ;; the ordinary case: we dispatch to type methods
-         (%type-union2 type1 type2))))
+  (let ((t2 nil))
+    (cond ((eq type1 type2)
+           type1)
+          ;; CSUBTYPEP for array-types answers questions about the
+          ;; specialized type, yet for union we want to take the
+          ;; expressed type in account too.
+          ((and (not (and (array-type-p type1) (array-type-p type2)))
+                (or (setf t2 (csubtypep type1 type2))
+                    (csubtypep type2 type1)))
+           (if t2 type2 type1))
+         ((or (union-type-p type1)
+              (union-type-p type2))
+          ;; Unions of UNION-TYPE should have the UNION-TYPE-TYPES
+          ;; values broken out and united separately. The full TYPE-UNION
+          ;; function knows how to do this, so let it handle it.
+          (type-union type1 type2))
+         (t
+          ;; the ordinary case: we dispatch to type methods
+          (%type-union2 type1 type2)))))
 
 ;;; the type method dispatch case of TYPE-INTERSECTION2
 (defun %type-intersection2 (type1 type2)
@@ -2400,6 +2406,41 @@ used for a COMPLEX component.~:@>"
           (t
            (values nil t)))))
 
+(!define-type-method (array :simple-union2) (type1 type2)
+   (let* ((dims1 (array-type-dimensions type1))
+          (dims2 (array-type-dimensions type2))
+          (complexp1 (array-type-complexp type1))
+          (complexp2 (array-type-complexp type2))
+          (eltype1 (array-type-element-type type1))
+          (eltype2 (array-type-element-type type2))
+          (stype1 (array-type-specialized-element-type type1))
+          (stype2 (array-type-specialized-element-type type2))
+          (wild1 (eq eltype1 *wild-type*))
+          (wild2 (eq eltype2 *wild-type*))
+          (e2 nil))
+     ;; This is possibly a bit more conservative then it needs to be:
+     ;; it seems that wild eltype in either should lead to wild eltype
+     ;; in result, but the rest of the type-system doesn't seem too
+     ;; happy about that. --NS 2006-08-23
+     (when (and (or (and wild1 wild2)
+                    (and (not (or wild1 wild2))
+                         (or (setf e2 (csubtypep eltype1 eltype2))
+                             (csubtypep eltype2 eltype1))))
+                (type= stype1 stype2))
+       (make-array-type
+        :dimensions (cond ((or (eq dims1 '*) (eq dims2 '*))
+                           '*)
+                          ((equal dims1 dims2)
+                           dims1)
+                          ((= (length dims1) (length dims2))
+                           (mapcar (lambda (x y) (if (eq x y) x '*))
+                                   dims1 dims2))
+                          (t
+                           '*))
+        :complexp (if (eq complexp1 complexp2) complexp1 :maybe)
+        :element-type (if (or wild2 e2) eltype2 eltype1)
+        :specialized-element-type stype1))))
+
 (!define-type-method (array :simple-intersection2) (type1 type2)
   (declare (type array-type type1 type2))
   (if (array-types-intersect type1 type2)
@@ -2815,40 +2856,40 @@ used for a COMPLEX component.~:@>"
   (union-complex-subtypep-arg1 type1 type2))
 
 (defun union-complex-subtypep-arg2 (type1 type2)
+  ;; At this stage, we know that type2 is a union type and type1
+  ;; isn't. We might as well check this, though:
+  (aver (union-type-p type2))
+  (aver (not (union-type-p type1)))
+  ;; was: (any/type #'csubtypep type1 (union-type-types type2)), which
+  ;; turns out to be too restrictive, causing bug 91.
+  ;;
+  ;; the following reimplementation might look dodgy. It is dodgy. It
+  ;; depends on the union :complex-= method not doing very much work
+  ;; -- certainly, not using subtypep. Reasoning:
+  ;;
+  ;;     A is a subset of (B1 u B2)
+  ;; <=> A n (B1 u B2) = A
+  ;; <=> (A n B1) u (A n B2) = A
+  ;;
+  ;; But, we have to be careful not to delegate this type= to
+  ;; something that could invoke subtypep, which might get us back
+  ;; here -> stack explosion. We therefore ensure that the second type
+  ;; (which is the one that's dispatched on) is either a union type
+  ;; (where we've ensured that the complex-= method will not call
+  ;; subtypep) or something with no union types involved, in which
+  ;; case we'll never come back here.
+  ;;
+  ;; If we don't do this, then e.g.
+  ;; (SUBTYPEP '(MEMBER 3) '(OR (SATISFIES FOO) (SATISFIES BAR)))
+  ;; would loop infinitely, as the member :complex-= method is
+  ;; implemented in terms of subtypep.
+  ;;
+  ;; Ouch. - CSR, 2002-04-10
   (multiple-value-bind (sub-value sub-certain?)
-      ;; was: (any/type #'csubtypep type1 (union-type-types type2)),
-      ;; which turns out to be too restrictive, causing bug 91.
-      ;;
-      ;; the following reimplementation might look dodgy.  It is
-      ;; dodgy. It depends on the union :complex-= method not doing
-      ;; very much work -- certainly, not using subtypep. Reasoning:
-      (progn
-        ;; At this stage, we know that type2 is a union type and type1
-        ;; isn't. We might as well check this, though:
-        (aver (union-type-p type2))
-        (aver (not (union-type-p type1)))
-        ;;     A is a subset of (B1 u B2)
-        ;; <=> A n (B1 u B2) = A
-        ;; <=> (A n B1) u (A n B2) = A
-        ;;
-        ;; But, we have to be careful not to delegate this type= to
-        ;; something that could invoke subtypep, which might get us
-        ;; back here -> stack explosion. We therefore ensure that the
-        ;; second type (which is the one that's dispatched on) is
-        ;; either a union type (where we've ensured that the complex-=
-        ;; method will not call subtypep) or something with no union
-        ;; types involved, in which case we'll never come back here.
-        ;;
-        ;; If we don't do this, then e.g.
-        ;; (SUBTYPEP '(MEMBER 3) '(OR (SATISFIES FOO) (SATISFIES BAR)))
-        ;; would loop infinitely, as the member :complex-= method is
-        ;; implemented in terms of subtypep.
-        ;;
-        ;; Ouch. - CSR, 2002-04-10
-        (type= type1
-               (apply #'type-union
-                      (mapcar (lambda (x) (type-intersection type1 x))
-                              (union-type-types type2)))))
+      (type= type1
+             (apply #'type-union
+                    (mapcar (lambda (x) (type-intersection type1 x))
+                            (union-type-types type2))))
     (if sub-certain?
         (values sub-value sub-certain?)
         ;; The ANY/TYPE expression above is a sufficient condition for

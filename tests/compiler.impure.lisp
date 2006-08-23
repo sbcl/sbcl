@@ -1361,4 +1361,26 @@
   (assert (s368-p nsu))
   (assert *h368-was-called-p*))
 
+;;; bug 367: array type intersections in the compiler
+(defstruct e367)
+(defstruct i367)
+(defstruct g367
+  (i367s (make-array 0 :fill-pointer t) :type (or (vector i367) null)))
+(defstruct s367
+  (g367 (error "missing :G367") :type g367 :read-only t))
+(declaim (ftype (function ((vector i367) e367) (or s367 null)) r367))
+(declaim (ftype (function ((vector e367)) (values)) h367))
+(defun frob-367 (v w)
+  (let ((x (g367-i367s (make-g367))))
+    (let* ((y (or (r367 x w)
+                  (h367 x)))
+           (z (s367-g367 y)))
+      (format t "~&Y=~S Z=~S~%" y z)
+      (g367-i367s z))))
+(defun r367 (x y) (declare (ignore x y)) nil)
+(defun h367 (x) (declare (ignore x)) (values))
+(multiple-value-bind (res err) (ignore-errors (frob-367 0 (make-e367)))
+  (assert (not res))
+  (assert (typep err 'type-error)))
+
 ;;; success

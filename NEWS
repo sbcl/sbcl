@@ -58,6 +58,7 @@ changes in sbcl-0.9.16 relative to sbcl-0.9.15:
     for win32. (thanks to Mike Thomas and Yaroslav Kavenchuk)
   * bug fix: #368: incorrect use of expressed vs. upgraded array
     element type.
+  * bug fix: #306a: more precise unions of array types.
   * thread-safety improvements:
     ** CONDITION-WAIT could return early on Linux, if the thread was
        interrupted and subsequently continued with SIGCONT.

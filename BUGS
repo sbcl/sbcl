@@ -988,13 +988,8 @@ WORKAROUND:
   The problem is that both EVALs sequentially write to the same LVAR.
 
 306: "Imprecise unions of array types"
-  a.(defun foo (x)
-      (declare (optimize speed)
-               (type (or (array cons) (array vector)) x))
-      (elt (aref x 0) 0))
-    (foo #((0))) => TYPE-ERROR
 
-  relatedly,
+  a. fixed in SBCL 0.9.15.48
 
   b.(subtypep 
      'array
@@ -1409,42 +1404,6 @@ WORKAROUND:
   Expected: ERROR
   Got: #<SB-MOP:STANDARD-DIRECT-SLOT-DEFINITION FOO>
 
-367: TYPE-ERROR at compile time, undetected TYPE-ERROR at runtime
-  This test program
-    (declaim (optimize (safety 3) (debug 2) (speed 2) (space 1)))
-    (defstruct e367)
-    (defstruct i367)
-    (defstruct g367
-      (i367s (make-array 0 :fill-pointer t) :type (or (vector i367) null)))
-    (defstruct s367
-      (g367 (error "missing :G367") :type g367 :read-only t))
-    ;;; In sbcl-0.8.18, commenting out this (DECLAIM (FTYPE ... R367))
-    ;;; gives an internal error at compile time:
-    ;;;    The value #<SB-KERNEL:NAMED-TYPE NIL> is not of
-    ;;;    type SB-KERNEL:VALUES-TYPE.
-    (declaim (ftype (function ((vector i367) e367) (or s367 null)) r367))
-    (declaim (ftype (function ((vector e367)) (values)) h367))
-    (defun frob (v w)
-      (let ((x (g367-i367s (make-g367))))
-        (let* ((y (or (r367 x w)
-                      (h367 x)))
-               (z (s367-g367 y)))
-          (format t "~&Y=~S Z=~S~%" y z)
-          (g367-i367s z))))
-    (defun r367 (x y) (declare (ignore x y)) nil)
-    (defun h367 (x) (declare (ignore x)) (values))
-    ;;; In sbcl-0.8.18, executing this form causes an low-level error
-    ;;;   segmentation violation at #X9B0E1F4
-    ;;; (instead of the TYPE-ERROR that one might like).
-    (frob 0 (make-e367))
-  can be made to cause two different problems, as noted in the comments:
-    bug 367a: Compile and load the file. No TYPE-ERROR is signalled at 
-      run time (in the (S367-G367 Y) form of FROB, when Y is NIL 
-      instead of an instance of S367). Instead (on x86/Linux at least)
-      we end up with a segfault.
-    bug 367b: Comment out the (DECLAIM (FTYPE ... R367)), and compile 
-      the file. The compiler fails with TYPE-ERROR at compile time.
-
 369: unlike-an-intersection behavior of VALUES-TYPE-INTERSECTION
   In sbcl-0.8.18.2, the identity $(x \cap y \cap y)=(x \cap y)$ 
   does not hold for VALUES-TYPE-INTERSECTION, even for types which
@@ -1581,16 +1540,6 @@ WORKAROUND:
   According to <http://alfa.s145.xrea.com/sbcl/solaris-x86.html>, the
   stack exhaustion checking (implemented with a write-protected guard
   page) does not work on SunOS/x86.
-
-387:
-  12:10 < jsnell> the package-lock test is basically due to a change in the test 
-                  behaviour when you install a handler for error around it. I 
-                  thought I'd disabled the test for now, but apparently that was 
-                  my imagination
-  12:19 < Xophe> jsnell: ah, I see the problem in the package-locks stuff
-  12:19 < Xophe> it's the same problem as we had with compiler-error conditions
-  12:19 < Xophe> the thing that's signalled up and down the stack is a subtype of
-                  ERROR, where it probably shouldn't be
 
 388:
   (found by Dmitry Bogomolov)

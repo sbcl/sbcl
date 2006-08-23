@@ -523,4 +523,12 @@
                      (sb-kernel:specifier-type '(cons goldbach2 single-float)))
   (assert (not ok))
   (assert (not win)))
+
+;;; precice unions of array types (was bug 306a)
+(defun bug-306-a (x)
+  (declare (optimize speed)
+           (type (or (array cons) (array vector)) x))
+  (elt (aref x 0) 0))
+(assert (= 0 (bug-306-a #((0)))))
+
 ;;; success
