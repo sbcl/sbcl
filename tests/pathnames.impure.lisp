@@ -408,4 +408,6 @@
                (let ((*default-pathname-defaults* #p"quux/"))
                  (compile-file-pathname "bar.lisp"))))
 
+(enough-namestring #p".a*")
+
 ;;;; success

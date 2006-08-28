@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.15:
+  * bug fix: ENOUGH-NAMESTRING on pathnames with no name and a pattern
+    for a type now works.
+
 changes in sbcl-0.9.16 relative to sbcl-0.9.15:
   * feature: implemented the READER-METHOD-CLASS and
     WRITER-METHOD-CLASS portion of the Class Initialization Protocol
