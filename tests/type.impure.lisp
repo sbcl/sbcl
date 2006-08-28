@@ -524,11 +524,24 @@
   (assert (not ok))
   (assert (not win)))
 
-;;; precice unions of array types (was bug 306a)
+;;; precise unions of array types (was bug 306a)
 (defun bug-306-a (x)
   (declare (optimize speed)
            (type (or (array cons) (array vector)) x))
   (elt (aref x 0) 0))
 (assert (= 0 (bug-306-a #((0)))))
+
+;;; FUNCALLABLE-INSTANCE is a subtype of function.
+(assert-t-t (subtypep '(and pathname function) nil))
+(assert-t-t (subtypep '(and pathname sb-kernel:funcallable-instance) nil))
+(assert (not (subtypep '(and stream function) nil)))
+(assert (not (subtypep '(and stream sb-kernel:funcallable-instance) nil)))
+(assert (not (subtypep '(and function standard-object) nil)))
+(assert (not (subtypep '(and sb-kernel:funcallable-instance standard-object) nil)))
 
+;;; also, intersections of classes with INSTANCE should not be too
+;;; general
+(assert (not (typep #'print-object '(and standard-object sb-kernel:instance))))
+(assert (not (subtypep 'standard-object '(and standard-object sb-kernel:instance))))
+
 ;;; success

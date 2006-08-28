@@ -1193,39 +1193,39 @@
   ;;(aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (cond
     ((eq type2 *instance-type*)
-     (if (classoid-p type1)
-         (if (and (not (member type1 *non-instance-classoid-types*
-                               :key #'find-classoid))
-                  (not (eq type1 (find-classoid 'function)))
-                  (not (find (classoid-layout (find-classoid 'function))
-                             (layout-inherits (classoid-layout type1)))))
-             (if (or (structure-classoid-p type1)
-                     (and (not (eq type1 (find-classoid 'stream)))
-                          (not (find (classoid-layout (find-classoid 'stream))
-                                     (layout-inherits (classoid-layout type1))))))
-                 type1
-                 nil)
-             *empty-type*)
-         (if (or (type-might-contain-other-types-p type1)
-                 (member-type-p type1))
-             nil
-             *empty-type*)))
+     (typecase type1
+       (structure-classoid type1)
+       (classoid
+        (if (and (not (member type1 *non-instance-classoid-types*
+                              :key #'find-classoid))
+                 (not (eq type1 (find-classoid 'function)))
+                 (not (find (classoid-layout (find-classoid 'function))
+                            (layout-inherits (classoid-layout type1)))))
+            nil
+            *empty-type*))
+       (t
+        (if (or (type-might-contain-other-types-p type1)
+                (member-type-p type1))
+            nil
+            *empty-type*))))
     ((eq type2 *funcallable-instance-type*)
-     (if (classoid-p type1)
-         (if (and (not (member type1 *non-instance-classoid-types*
-                               :key #'find-classoid))
-                  (find (classoid-layout (find-classoid 'function))
-                        (layout-inherits (classoid-layout type1))))
-             type1
-             (if (type= type1 (find-classoid 'function))
-                 type2
-                 nil))
-         (if (fun-type-p type1)
-             nil
-             (if (or (type-might-contain-other-types-p type1)
-                     (member-type-p type1))
-                 nil
-                 *empty-type*))))
+     (typecase type1
+       (structure-classoid *empty-type*)
+       (classoid
+        (if (and (not (member type1 *non-instance-classoid-types*
+                              :key #'find-classoid))
+                 (find (classoid-layout (find-classoid 'function))
+                       (layout-inherits (classoid-layout type1))))
+            type1
+            (if (type= type1 (find-classoid 'function))
+                type2
+                nil)))
+       (fun-type nil)
+       (t
+        (if (or (type-might-contain-other-types-p type1)
+                (member-type-p type1))
+            nil
+            *empty-type*))))
     (t (hierarchical-intersection2 type1 type2))))
 
 (!define-type-method (named :complex-union2) (type1 type2)
