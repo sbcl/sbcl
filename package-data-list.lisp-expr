@@ -571,7 +571,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 
                ;; People have various good reasons to mess with the GC.
                "*AFTER-GC-HOOKS*"
-               "*GC-NOTIFY-AFTER*" "*GC-NOTIFY-BEFORE*" "*GC-NOTIFY-STREAM*"
                "BYTES-CONSED-BETWEEN-GCS"
                "GC" "GC-OFF" "GC-ON" "GET-BYTES-CONSED"
                "*GC-RUN-TIME*"
@@ -641,12 +640,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; was deprecated in sbcl-0.pre7, ca. 2001-12-12. After
                ;; a year or so it can go away completely.
                "DEF-SOURCE-CONTEXT"
-
-               ;; FIXME: These seem like the right thing, but are they
-               ;; consistent with ANSI? (And actually maybe they're not
-               ;; quite the right thing; it might be better to also do
-               ;; WITH-STANDARD-IO-SYNTAX or something.)
-               "*ERROR-PRINT-LENGTH*" "*ERROR-PRINT-LEVEL*" "*ERROR-PRINT-LINES*"
 
                ;; extended declarations..
                "FREEZE-TYPE" "INHIBIT-WARNINGS"
