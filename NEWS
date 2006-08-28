@@ -2,6 +2,8 @@
 changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.15:
   * bug fix: ENOUGH-NAMESTRING on pathnames with no name and a pattern
     for a type now works.
+  * bug fix: loading of default sysinit file works. (thanks to Leonid
+    Slobodov)
 
 changes in sbcl-0.9.16 relative to sbcl-0.9.15:
   * feature: implemented the READER-METHOD-CLASS and

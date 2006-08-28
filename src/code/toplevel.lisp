@@ -37,10 +37,40 @@
 (defvar *maximum-error-depth*)
 (defvar *current-error-depth*)
 
+;;;; default initfiles
+
+(defun sysinit-pathname ()
+  (or (let ((sbcl-homedir (sbcl-homedir-pathname)))
+        (when sbcl-homedir
+          (probe-file (merge-pathnames sbcl-homedir "sbclrc"))))
+      #!+win32
+      (merge-pathnames (sb!win32::get-folder-pathname
+                        sb!win32::csidl_common_appdata)
+                       "\\sbcl\\sbclrc")
+      #!-win32
+      "/etc/sbclrc"))
+
+(defun userinit-pathname ()
+  (merge-pathnames ".sbclrc" (user-homedir-pathname)))
+
+(defvar *sysinit-pathname-function* #'sysinit-pathname
+  #!+sb-doc
+  "Designator for a function of zero arguments called to obtain a pathname
+designator for the default sysinit file, or NIL. If the function returns NIL,
+no sysinit file is used unless one has been specified on the command-line.")
+
+(defvar *userinit-pathname-function* #'userinit-pathname
+  #!+sb-doc
+  "Designator for a function of zero arguments called to obtain a pathname
+designator or a stream for the default userinit file, or NIL. If the function
+returns NIL, no userinit file is used unless one has been specified on the
+command-line.")
+
 ;;;; stepping control
 (defvar *step*)
 (defvar *stepping*)
 (defvar *step-form-stack* nil
+  #!+sb-doc
   "A place for single steppers to push information about
 STEP-FORM-CONDITIONS avaiting the corresponding
 STEP-VALUES-CONDITIONS. The system is guaranteed to empty the stack
@@ -269,8 +299,9 @@ steppers to maintain contextual information.")
 (defvar -   nil #!+sb-doc "the form currently being evaluated")
 
 (defun interactive-eval (form)
+  #!+sb-doc
   "Evaluate FORM, returning whatever it returns and adjusting ***, **, *,
-   +++, ++, +, ///, //, /, and -."
++++, ++, +, ///, //, /, and -."
   (setf - form)
   (unwind-protect
        (let ((results (multiple-value-list (eval form))))
@@ -305,27 +336,37 @@ steppers to maintain contextual information.")
     (force-output (symbol-value name)))
   (values))
 
-(defun process-init-file (truename)
-  (when truename
-    (restart-case
-        (with-open-file (s truename :if-does-not-exist nil)
-          (flet ((next ()
-                   (let ((form (read s nil s)))
-                     (if (eq s form)
-                         (return-from process-init-file nil)
-                         (eval form)))))
-            (loop
-               (restart-case
-                   (handler-bind ((error (lambda (e)
-                                           (error
-                                            "Error during processing of ~
-                                            initialization file ~A:~%~%  ~A"
-                                            truename e))))
-                     (next))
-                 (continue ()
-                   :report "Ignore and continue processing.")))))
-      (abort ()
-        :report "Skip rest of initialization file."))))
+(defun process-init-file (specified-pathname default-function)
+  (restart-case
+      (let ((cookie (list)))
+        (flet ((process-stream (stream &optional pathname)
+                 (loop
+                    (restart-case
+                        (handler-bind
+                            ((error (lambda (e)
+                                      (error "Error during processing of ~
+                                             initialization file ~A:~%~%  ~A"
+                                             (or pathname stream) e))))
+                          (let ((form (read stream nil cookie)))
+                            (if (eq cookie form)
+                                (return-from process-init-file nil)
+                                (eval form))))
+                      (continue ()
+                        :report "Ignore and continue processing.")))))
+          (if specified-pathname
+              (with-open-file (stream (parse-native-namestring specified-pathname)
+                                      :if-does-not-exist nil)
+                (if stream
+                    (process-stream stream (pathname stream))
+                    (error "The specified init file ~S was not found."
+                           specified-pathname)))
+              (let ((default (funcall default-function)))
+                (when default
+                  (with-open-file (stream (pathname default) :if-does-not-exist nil)
+                    (when stream
+                      (process-stream stream (pathname stream)))))))))
+    (abort ()
+      :report "Skip this initialization file.")))
 
 (defun process-eval-options (eval-strings-or-forms)
   (/show0 "handling --eval options")
@@ -355,10 +396,22 @@ steppers to maintain contextual information.")
       (abort ()
         :report "Skip rest of --eval options."))))
 
+;; Errors while processing the command line cause the system to QUIT,
+;; instead of trying to go into the Lisp debugger, because trying to
+;; go into the Lisp debugger would get into various annoying issues of
+;; where we should go after the user tries to return from the
+;; debugger.
+(defun startup-error (control-string &rest args)
+  (format *error-output*
+          "fatal error before reaching READ-EVAL-PRINT loop: ~%  ~?~%"
+          control-string
+          args)
+  (quit :unix-status 1))
+
 ;;; the default system top level function
 (defun toplevel-init ()
   (/show0 "entering TOPLEVEL-INIT")
-  (let (;; value of --sysinit option
+  (let ( ;; value of --sysinit option
         (sysinit nil)
         ;; t if --no-sysinit option given
         (no-sysinit nil)
@@ -391,168 +444,130 @@ steppers to maintain contextual information.")
     ;; reasonably.
 
     ;; Process command line options.
-    (flet (;; Errors while processing the command line cause the system
-           ;; to QUIT, instead of trying to go into the Lisp debugger,
-           ;; because trying to go into the Lisp debugger would get
-           ;; into various annoying issues of where we should go after
-           ;; the user tries to return from the debugger.
-           (startup-error (control-string &rest args)
-             (format
-              *error-output*
-              "fatal error before reaching READ-EVAL-PRINT loop: ~%  ~?~%"
-              control-string
-              args)
-             (quit :unix-status 1)))
-      (loop while options do
-            (/show0 "at head of LOOP WHILE OPTIONS DO in TOPLEVEL-INIT")
-            (let ((option (first options)))
-              (flet ((pop-option ()
-                       (if options
-                           (pop options)
-                           (startup-error
-                            "unexpected end of command line options"))))
-                (cond ((string= option "--sysinit")
-                       (pop-option)
-                       (if sysinit
-                           (startup-error "multiple --sysinit options")
-                           (setf sysinit (pop-option))))
-                      ((string= option "--no-sysinit")
-                       (pop-option)
-                       (setf no-sysinit t))
-                      ((string= option "--userinit")
-                       (pop-option)
-                       (if userinit
-                           (startup-error "multiple --userinit options")
-                           (setf userinit (pop-option))))
-                      ((string= option "--no-userinit")
-                       (pop-option)
-                       (setf no-userinit t))
-                      ((string= option "--eval")
-                       (pop-option)
-                       (push (pop-option) reversed-evals))
-                      ((string= option "--load")
-                       (pop-option)
-                       (push
-                        (list 'cl:load (native-pathname (pop-option)))
-                        reversed-evals))
-                      ((string= option "--noprint")
-                       (pop-option)
-                       (setf noprint t))
-                      ((string= option "--disable-debugger")
-                       (pop-option)
-                       (push (list 'sb!ext:disable-debugger) reversed-evals))
-                      ((string= option "--end-toplevel-options")
-                       (pop-option)
-                       (return))
-                      (t
-                       ;; Anything we don't recognize as a toplevel
-                       ;; option must be the start of user-level
-                       ;; options.. except that if we encounter
-                       ;; "--end-toplevel-options" after we gave up
-                       ;; because we didn't recognize an option as a
-                       ;; toplevel option, then the option we gave up on
-                       ;; must have been an error. (E.g. in
-                       ;;  "sbcl --eval '(a)' --eval'(b)' --end-toplevel-options"
-                       ;; this test will let us detect that the string
-                       ;; "--eval(b)" is an error.)
-                       (if (find "--end-toplevel-options" options
-                                 :test #'string=)
-                           (startup-error "bad toplevel option: ~S"
-                                          (first options))
-                           (return)))))))
-      (/show0 "done with LOOP WHILE OPTIONS DO in TOPLEVEL-INIT")
+    (loop while options do
+         (/show0 "at head of LOOP WHILE OPTIONS DO in TOPLEVEL-INIT")
+         (let ((option (first options)))
+           (flet ((pop-option ()
+                    (if options
+                        (pop options)
+                        (startup-error
+                         "unexpected end of command line options"))))
+             (cond ((string= option "--sysinit")
+                    (pop-option)
+                    (if sysinit
+                        (startup-error "multiple --sysinit options")
+                        (setf sysinit (pop-option))))
+                   ((string= option "--no-sysinit")
+                    (pop-option)
+                    (setf no-sysinit t))
+                   ((string= option "--userinit")
+                    (pop-option)
+                    (if userinit
+                        (startup-error "multiple --userinit options")
+                        (setf userinit (pop-option))))
+                   ((string= option "--no-userinit")
+                    (pop-option)
+                    (setf no-userinit t))
+                   ((string= option "--eval")
+                    (pop-option)
+                    (push (pop-option) reversed-evals))
+                   ((string= option "--load")
+                    (pop-option)
+                    (push
+                     (list 'cl:load (native-pathname (pop-option)))
+                     reversed-evals))
+                   ((string= option "--noprint")
+                    (pop-option)
+                    (setf noprint t))
+                   ((string= option "--disable-debugger")
+                    (pop-option)
+                    (push (list 'sb!ext:disable-debugger) reversed-evals))
+                   ((string= option "--end-toplevel-options")
+                    (pop-option)
+                    (return))
+                   (t
+                    ;; Anything we don't recognize as a toplevel
+                    ;; option must be the start of user-level
+                    ;; options.. except that if we encounter
+                    ;; "--end-toplevel-options" after we gave up
+                    ;; because we didn't recognize an option as a
+                    ;; toplevel option, then the option we gave up on
+                    ;; must have been an error. (E.g. in
+                    ;;  "sbcl --eval '(a)' --eval'(b)' --end-toplevel-options"
+                    ;; this test will let us detect that the string
+                    ;; "--eval(b)" is an error.)
+                    (if (find "--end-toplevel-options" options
+                              :test #'string=)
+                        (startup-error "bad toplevel option: ~S"
+                                       (first options))
+                        (return)))))))
+    (/show0 "done with LOOP WHILE OPTIONS DO in TOPLEVEL-INIT")
 
-      ;; Delete all the options that we processed, so that only
-      ;; user-level options are left visible to user code.
-      (setf (rest *posix-argv*) options)
+    ;; Delete all the options that we processed, so that only
+    ;; user-level options are left visible to user code.
+    (setf (rest *posix-argv*) options)
 
-      ;; Handle initialization files.
-      (/show0 "handling initialization files in TOPLEVEL-INIT")
-      (flet (;; shared idiom for searching for SYSINITish and
-             ;; USERINITish files
-             (probe-init-files (explicitly-specified-init-file-name
-                                &rest default-init-file-names)
-               (declare (type list default-init-file-names))
-               (if explicitly-specified-init-file-name
-                   (or (probe-file
-                        (parse-native-namestring
-                         explicitly-specified-init-file-name))
-                       (startup-error "The file ~S was not found."
-                                      explicitly-specified-init-file-name))
-                   (find-if (lambda (x)
-                              (and (pathnamep x) (probe-file x)))
-                            default-init-file-names))))
-        (let ((sysinit-truename
-               (probe-init-files sysinit
-                                 (let ((sbcl-homedir (sbcl-homedir-pathname)))
-                                   (when sbcl-homedir
-                                     (merge-pathnames sbcl-homedir "sbclrc")))
-                                 #!-win32
-                                 "/etc/sbclrc"
-                                 #!+win32
-                                 (merge-pathnames
-                                  (sb!win32::get-folder-pathname
-                                   sb!win32::csidl_common_appdata)
-                                  "\\sbcl\\sbclrc")))
-              (userinit-truename
-               (probe-init-files userinit
-                                 (merge-pathnames (user-homedir-pathname)
-                                                  ".sbclrc"))))
-          ;; This CATCH is needed for the debugger command TOPLEVEL to
-          ;; work.
-          (catch 'toplevel-catcher
-            ;; We wrap all the pre-REPL user/system customized startup
-            ;; code in a restart.
-            ;;
-            ;; (Why not wrap everything, even the stuff above, in this
-            ;; restart? Errors above here are basically command line
-            ;; or Unix environment errors, e.g. a missing file or a
-            ;; typo on the Unix command line, and you don't need to
-            ;; get into Lisp to debug them, you should just start over
-            ;; and do it right at the Unix level. Errors below here
-            ;; are generally errors in user Lisp code, and it might be
-            ;; helpful to let the user reach the REPL in order to help
-            ;; figure out what's going on.)
-            (restart-case
-                (progn
-                  (unless no-sysinit (process-init-file sysinit-truename))
-                  (unless no-userinit (process-init-file userinit-truename))
-                  (process-eval-options (reverse reversed-evals)))
-              (abort ()
-                :report "Skip to toplevel READ/EVAL/PRINT loop."
-                (/show0 "CONTINUEing from pre-REPL RESTART-CASE")
-                (values))                 ; (no-op, just fall through)
-              (quit ()
-                :report "Quit SBCL (calling #'QUIT, killing the process)."
-                (/show0 "falling through to QUIT from pre-REPL RESTART-CASE")
-                (quit)))))
+    ;; Handle initialization files.
+    (/show0 "handling initialization files in TOPLEVEL-INIT")
+    ;; This CATCH is needed for the debugger command TOPLEVEL to
+    ;; work.
+    (catch 'toplevel-catcher
+      ;; We wrap all the pre-REPL user/system customized startup
+      ;; code in a restart.
+      ;;
+      ;; (Why not wrap everything, even the stuff above, in this
+      ;; restart? Errors above here are basically command line
+      ;; or Unix environment errors, e.g. a missing file or a
+      ;; typo on the Unix command line, and you don't need to
+      ;; get into Lisp to debug them, you should just start over
+      ;; and do it right at the Unix level. Errors below here
+      ;; are generally errors in user Lisp code, and it might be
+      ;; helpful to let the user reach the REPL in order to help
+      ;; figure out what's going on.)
+      (restart-case
+          (progn
+            (unless no-sysinit
+              (process-init-file sysinit *sysinit-pathname-function*))
+            (unless no-userinit
+              (process-init-file userinit *userinit-pathname-function*))
+            (process-eval-options (nreverse reversed-evals)))
+        (abort ()
+          :report "Skip to toplevel READ/EVAL/PRINT loop."
+          (/show0 "CONTINUEing from pre-REPL RESTART-CASE")
+          (values))                     ; (no-op, just fall through)
+        (quit ()
+          :report "Quit SBCL (calling #'QUIT, killing the process)."
+          (/show0 "falling through to QUIT from pre-REPL RESTART-CASE")
+          (quit :unix-status 1))))
 
-        ;; one more time for good measure, in case we fell out of the
-        ;; RESTART-CASE above before one of the flushes in the ordinary
-        ;; flow of control had a chance to operate
-        (flush-standard-output-streams)
+    ;; one more time for good measure, in case we fell out of the
+    ;; RESTART-CASE above before one of the flushes in the ordinary
+    ;; flow of control had a chance to operate
+    (flush-standard-output-streams)
 
-        (/show0 "falling into TOPLEVEL-REPL from TOPLEVEL-INIT")
-        (toplevel-repl noprint)
-        ;; (classic CMU CL error message: "You're certainly a clever child.":-)
-        (critically-unreachable "after TOPLEVEL-REPL")))))
+    (/show0 "falling into TOPLEVEL-REPL from TOPLEVEL-INIT")
+    (toplevel-repl noprint)
+    ;; (classic CMU CL error message: "You're certainly a clever child.":-)
+    (critically-unreachable "after TOPLEVEL-REPL")))
 
 ;;; hooks to support customized toplevels like ACL-style toplevel from
 ;;; KMR on sbcl-devel 2002-12-21.  Altered by CSR 2003-11-16 for
 ;;; threaded operation: altered *REPL-FUN* to *REPL-FUN-GENERATOR*.
 (defvar *repl-read-form-fun* #'repl-read-form-fun
-  "a function of two stream arguments IN and OUT for the toplevel REPL to
-  call: Return the next Lisp form to evaluate (possibly handling other
-  magic -- like ACL-style keyword commands -- which precede the next
-  Lisp form). The OUT stream is there to support magic which requires
-  issuing new prompts.")
+  #!+sb-doc
+  "A function of two stream arguments IN and OUT for the toplevel REPL to
+call: Return the next Lisp form to evaluate (possibly handling other magic --
+like ACL-style keyword commands -- which precede the next Lisp form). The OUT
+stream is there to support magic which requires issuing new prompts.")
 (defvar *repl-prompt-fun* #'repl-prompt-fun
-  "a function of one argument STREAM for the toplevel REPL to call: Prompt
-  the user for input.")
+  #!+sb-doc
+  "A function of one argument STREAM for the toplevel REPL to call: Prompt
+the user for input.")
 (defvar *repl-fun-generator* (constantly #'repl-fun)
-  "a function of no arguments returning a function of one argument
-  NOPRINT that provides the REPL for the system.  Assumes that
-  *STANDARD-INPUT* and *STANDARD-OUTPUT* are set up.")
+  #!+sb-doc
+  "A function of no arguments returning a function of one argument NOPRINT
+that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
+*STANDARD-OUTPUT* are set up.")
 
 ;;; read-eval-print loop for the default system toplevel
 (defun toplevel-repl (noprint)
