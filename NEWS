@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
-changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.15:
+changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
+  * incompatible change: SB-EXT package no longer contains the
+    following unused symbols: *GC-NOTIFY-AFTER*, *GC-NOTIFY-BEFORE*,
+    *GC-NOTIFY-STREAM*, *ERROR-PRINT-LENGTH*, *ERROR-PRINT-LEVEL*,
+    *ERROR-PRINT-LINES*
   * bug fix: ENOUGH-NAMESTRING on pathnames with no name and a pattern
     for a type now works.
   * bug fix: loading of default sysinit file works. (thanks to Leonid

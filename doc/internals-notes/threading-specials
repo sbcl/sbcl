@@ -539,13 +539,10 @@ SB-THREAD::*BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* ; intentionally global
 *PRINT-LINES* 
 *PRINT-ESCAPE* 
 *PRINT-LEVEL* 
-*ERROR-PRINT-LENGTH*
-*ERROR-PRINT-LINES*
 *READ-EVAL* 
 *PRINT-ESCAPE* 
 *TRACE-OUTPUT* 
 SB-IMPL::*INSPECT-LENGTH* 
-*ERROR-PRINT-LEVEL*
 SB-IMPL::*DRIBBLE-STREAM*         ; what to do with dribble in threaded lisp?
 SB-IMPL::*HELP-FOR-INSPECT*       ; read-only
 *PRINT-ARRAY*                     
@@ -853,11 +850,7 @@ SB-VM::*ALIEN-STACK*  ; bound in create_thread_struct()
 
 SB-IMPL::*OBJECTS-PENDING-FINALIZATION*  ; needs locking for writers
 
-*GC-NOTIFY-STREAM*   ; going away
-*BEFORE-GC-HOOKS*    ; must be global
-*AFTER-GC-HOOKS*     ; ditto
-*GC-NOTIFY-AFTER*    ; going away
-*GC-NOTIFY-BEFORE*   ; going away
+*AFTER-GC-HOOKS*     ; must be global
 *GC-RUN-TIME*        
 SB-INT:*N-BYTES-FREED-OR-PURIFIED* 
 
