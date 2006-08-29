@@ -1383,4 +1383,9 @@
   (assert (not res))
   (assert (typep err 'type-error)))
 
+(handler-case
+    (delete-file (compile-file "circ-tree-test.lisp"))
+  (storage-condition (e)
+    (error e)))
+
 ;;; success

@@ -127,16 +127,39 @@
 
 ;;;; type-ish predicates
 
-;;; Is X a list containing a cycle?
-(defun cyclic-list-p (x)
+;;; X may contain cycles -- a conservative approximation. This
+;;; occupies a somewhat uncomfortable niche between being fast for
+;;; common cases (we don't want to allocate a hash-table), and not
+;;; falling down to exponential behaviour for large trees (so we set
+;;; an arbitrady depth limit beyond which we punt).
+(defun maybe-cyclic-p (x &optional (depth-limit 12))
   (and (listp x)
-       (labels ((safe-cddr (x) (if (listp (cdr x)) (cddr x))))
-         (do ((y x (safe-cddr y))
-              (started-p nil t)
-              (z x (cdr z)))
-             ((not (and (consp z) (consp y))) nil)
-           (when (and started-p (eq y z))
-             (return t))))))
+       (labels ((safe-cddr (cons)
+                  (let ((cdr (cdr cons)))
+                    (when (consp cdr)
+                      (cdr cdr))))
+                (check-cycle (object seen depth)
+                  (when (and (consp object)
+                             (or (> depth depth-limit)
+                                 (member object seen)
+                                 (circularp object seen depth)))
+                    (return-from maybe-cyclic-p t)))
+                (circularp (list seen depth)
+                  ;; Almost regular circular list detection, with a twist:
+                  ;; we also check each element of the list for upward
+                  ;; references using CHECK-CYCLE.
+                  (do ((fast (cons (car list) (cdr list)) (safe-cddr fast))
+                       (slow list (cdr slow)))
+                      ((not (consp fast))
+                       ;; Not CDR-circular, need to check remaining CARs yet
+                       (do ((tail slow (and (cdr tail))))
+                           ((not (consp tail))
+                            nil)
+                         (check-cycle (car tail) (cons tail seen) (1+ depth))))
+                    (check-cycle (car slow) (cons slow seen) (1+ depth))
+                    (when (eq fast slow)
+                      (return t)))))
+         (circularp x (list x) 0))))
 
 ;;; Is X a (possibly-improper) list of at least N elements?
 (declaim (ftype (function (t index)) list-of-length-at-least-p))

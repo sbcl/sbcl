@@ -384,7 +384,7 @@
               ;;   take a little more care while dumping these.
               ;; So if better list coalescing is needed, start here.
               ;; -- WHN 2000-11-07
-              (if (cyclic-list-p x)
+              (if (maybe-cyclic-p x)
                   (progn
                     (dump-list x file)
                     (eq-save-object x file))

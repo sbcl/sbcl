@@ -221,10 +221,9 @@
 
 (defun equal (x y)
   #!+sb-doc
-  "Return T if X and Y are EQL or if they are structured components
-  whose elements are EQUAL. Strings and bit-vectors are EQUAL if they
-  are the same length and have identical components. Other arrays must be
-  EQ to be EQUAL."
+  "Return T if X and Y are EQL or if they are structured components whose
+elements are EQUAL. Strings and bit-vectors are EQUAL if they are the same
+length and have identical components. Other arrays must be EQ to be EQUAL."
   ;; Non-tail self-recursion implemented with a local auxiliary function
   ;; is a lot faster than doing it the straightforward way (at least
   ;; on x86oids) due to calling convention differences. -- JES, 2005-12-30
