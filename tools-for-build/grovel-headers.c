@@ -31,8 +31,8 @@
   #include <sys/ioctl.h>
   #include <sys/termios.h>
   #ifdef __APPLE_CC__
-    #include "../src/runtime/ppc-darwin-dlshim.h"
-    #include "../src/runtime/ppc-darwin-langinfo.h"
+    #include "../src/runtime/darwin-dlshim.h"
+    #include "../src/runtime/darwin-langinfo.h"
   #else
     #include <dlfcn.h>
     #include <langinfo.h>

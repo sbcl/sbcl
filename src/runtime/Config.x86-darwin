@@ -10,7 +10,7 @@
 # files for more information.
 
 CFLAGS = -g -Wall -O2 -fdollars-in-identifiers
-OS_SRC = bsd-os.c x86-bsd-os.c darwin-os.c x86-darwin-os.c ppc-darwin-dlshim.c x86-darwin-langinfo.c
+OS_SRC = bsd-os.c x86-bsd-os.c darwin-os.c x86-darwin-os.c darwin-dlshim.c darwin-langinfo.c
 OS_LIBS = -lSystem -lc -ldl
 OS_OBJS = x86-darwin-rospace.o
 
