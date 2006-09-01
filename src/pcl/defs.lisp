@@ -304,7 +304,7 @@
 
 (defclass standard-object (slot-object) ())
 
-(defclass funcallable-standard-object (standard-object function)
+(defclass funcallable-standard-object (function standard-object)
   ()
   (:metaclass funcallable-standard-class))
 

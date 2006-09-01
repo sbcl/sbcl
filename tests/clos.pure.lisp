@@ -49,3 +49,25 @@
 
 ;;; this one's user-observable
 (assert (typep #'(setf class-name) 'generic-function))
+
+;;; CLHS 1.4.4.5.  We could test for this by defining methods
+;;; (i.e. portably) but it's much easier using the MOP and
+;;; MAP-ALL-CLASSES.
+(flet ((standardized-class-p (c)
+         (find-symbol (symbol-name (class-name c)) "CL")))
+  (let (result)
+    (sb-pcl::map-all-classes
+     (lambda (c) (when (standardized-class-p c)
+                   (let* ((cpl (sb-mop:class-precedence-list c))
+                          (std (position (find-class 'standard-object) cpl))
+                          (str (position (find-class 'structure-object) cpl))
+                          (last (position-if
+                                 #'standardized-class-p (butlast cpl)
+                                 :from-end t)))
+                     (when (and std str)
+                       (push `(:and ,c) result))
+                     (when (and str (< str last))
+                       (push `(:str ,c) result))
+                     (when (and std (< std last))
+                       (push `(:std ,c) result))))))
+    (assert (null result))))

@@ -51,6 +51,22 @@ are:
 
 There is no record of what the second return value was meant to
 indicate, and apparently no clients for it.
+
+@item
+@tindex generic-function
+@tindex standard-generic-function
+@tindex funcallable-standard-object
+@tindex sb-mop:funcallable-standard-object
+@tindex standard-object
+@tindex function
+The direct superclasses of @code{sb-mop:funcallable-standard-object} are
+@code{(function standard-object)}, not @code{(standard-object function)}.
+
+This is to ensure that the @code{standard-object} class is the last of
+the standardized classes before @code{t} appearing in the class
+precedence list of @code{generic-function} and
+@code{standard-generic-function}, as required by section 1.4.4.5 of the
+ANSI specification.
   
 @item
 @findex ensure-generic-function
@@ -76,9 +92,9 @@ Where AMOP specifies @code{:declarations} as the keyword argument to
 @tindex function
 @findex sb-mop:class-prototype
 @findex class-prototype
-although SBCL obeys the requirement in AMOP for
-@code{validate-superclass} for @code{standard-class} and
-@code{funcallable-standard-class} to be compatible metaclasses, we
+although SBCL obeys the requirement in AMOP that
+@code{validate-superclass} should treat @code{standard-class} and
+@code{funcallable-standard-class} as compatible metaclasses, we
 impose an additional requirement at class finalization time: a class
 of metaclass @code{funcallable-standard-class} must have
 @code{function} in its superclasses, and a class of metaclass
@@ -87,14 +103,14 @@ of metaclass @code{funcallable-standard-class} must have
 @findex typep
 @findex class-of
 @findex subtypep
-At class finalization, a class prototype which is accessible by a
-standard mop function @code{sb-mop:class-prototype}.  The user can
-then ask whether this object is a @code{function} or not in several
-different ways: whether it is a function according to @code{typep};
-whether its @code{class-of} is @code{subtypep} @code{function}, or
-whether @code{function} appears in the superclasses of the class.  The
-additional consistency requirement comes from the desire to make all
-of these answers the same.
+After a class has been finalized, it is associated with a class
+prototype which is accessible by a standard mop function
+@code{sb-mop:class-prototype}.  The user can then ask whether this
+object is a @code{function} or not in several different ways: whether it
+is a function according to @code{typep}; whether its @code{class-of} is
+@code{subtypep} @code{function}, or whether @code{function} appears in
+the superclasses of the class.  The additional consistency requirement
+comes from the desire to make all of these answers the same.
 
 The following class definitions are bad, and will lead to errors
 either immediately or if an instance is created:
