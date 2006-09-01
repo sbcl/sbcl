@@ -2820,9 +2820,9 @@ core and return a descriptor to it."
       (when (eq t (dsd-raw-type slot))
         (format t "    lispobj ~A;~%" (cstring (dsd-name slot)))))
     (unless (oddp (+ (dd-length dd) (dd-raw-length dd)))
-      (format t "    long raw_slot_padding;~%"))
+      (format t "    lispobj raw_slot_padding;~%"))
     (dotimes (n (dd-raw-length dd))
-      (format t "    long raw~D;~%" (- (dd-raw-length dd) n 1)))
+      (format t "    lispobj raw~D;~%" (- (dd-raw-length dd) n 1)))
     (format t "};~2%")
     (format t "#endif /* LANGUAGE_ASSEMBLY */~2%")))
 
