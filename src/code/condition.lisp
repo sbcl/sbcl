@@ -835,10 +835,13 @@
      (format stream ", ")
      (destructuring-bind (type data) (cdr reference)
        (ecase type
+         (:readers "Readers for ~:(~A~) Metaobjects"
+                   (substitute #\  #\- (symbol-name data)))
          (:initialization
           (format stream "Initialization of ~:(~A~) Metaobjects"
                   (substitute #\  #\- (symbol-name data))))
          (:generic-function (format stream "Generic Function ~S" data))
+         (:function (format stream "Function ~S" data))
          (:section (format stream "Section ~{~D~^.~}" data)))))
     (:ansi-cl
      (format stream "The ANSI Standard")
