@@ -335,11 +335,6 @@
 
 ;;;; generic info environments
 
-;;; Note: the CACHE-NAME slot is deliberately not shared for
-;;; bootstrapping reasons. If we access with accessors for the exact
-;;; type, then the inline type check will win. If the inline check
-;;; didn't win, we would try to use the type system before it was
-;;; properly initialized.
 (defstruct (info-env (:constructor nil)
                      (:copier nil))
   ;; some string describing what is in this environment, for
@@ -434,57 +429,7 @@
 
 ) ; EVAL-WHEN
 
-;;;; INFO cache
 
-;;;; We use a hash cache to cache name X type => value for the current
-;;;; value of *INFO-ENVIRONMENT*. This is in addition to the
-;;;; per-environment caching of name => types.
-
-;;; The value of *INFO-ENVIRONMENT* that has cached values.
-;;; *INFO-ENVIRONMENT* should never be destructively modified, so if
-;;; it is EQ to this, then the cache is valid.
-(defvar *cached-info-environment*)
-(!cold-init-forms
-  (setf *cached-info-environment* nil))
-
-;;; the hash function used for the INFO cache
-#!-sb-fluid (declaim (inline info-cache-hash))
-(defun info-cache-hash (name type)
-  (logand
-    (the fixnum
-         (logxor (globaldb-sxhashoid name)
-                 (ash (the fixnum type) 7)))
-    #x3FF))
-
-(!cold-init-forms
-  (/show0 "before initialization of INFO hash cache"))
-(define-hash-cache info ((name eq) (type eq))
-  :values 2
-  :hash-function info-cache-hash
-  :hash-bits 10
-  :default (values nil :empty)
-  :init-wrapper !cold-init-forms)
-(!cold-init-forms
-  (/show0 "clearing INFO hash cache")
-  (info-cache-clear)
-  (/show0 "done clearing INFO hash cache"))
-
-;;; If the info cache is invalid, then clear it.
-#!-sb-fluid (declaim (inline clear-invalid-info-cache))
-(defun clear-invalid-info-cache ()
-  ;; Unless the cache is valid..
-  (unless (eq *info-environment* *cached-info-environment*)
-    (;; In the target Lisp, this should be done without interrupts,
-     ;; but in the host Lisp when cross-compiling, we don't need to
-     ;; sweat it, since no affected-by-GC hashes should be used when
-     ;; running under the host Lisp (since that's non-portable) and
-     ;; since only one thread should be used when running under the
-     ;; host Lisp (because multiple threads are non-portable too).
-     #-sb-xc-host without-interrupts
-     #+sb-xc-host progn
-      (info-cache-clear)
-      (setq *cached-info-environment* *info-environment*))))
-
 ;;;; compact info environments
 
 ;;; The upper limit on the size of the ENTRIES vector in a COMPACT-INFO-ENV.
@@ -513,12 +458,6 @@
 (defstruct (compact-info-env (:include info-env)
                              #-sb-xc-host (:pure :substructure)
                              (:copier nil))
-  ;; If this value is EQ to the name we want to look up, then the
-  ;; cache hit function can be called instead of the lookup function.
-  (cache-name 0)
-  ;; The index in ENTRIES for the CACHE-NAME, or NIL if that name has
-  ;; no entries.
-  (cache-index nil :type (or compact-info-entries-index null))
   ;; hashtable of the names in this environment. If a bucket is
   ;; unused, it is 0.
   (table (missing-arg) :type simple-vector)
@@ -540,12 +479,11 @@
 (def!constant compact-info-entry-last (ash 1 type-number-bits))
 
 ;;; Return the value of the type corresponding to NUMBER for the
-;;; currently cached name in ENV.
-#!-sb-fluid (declaim (inline compact-info-cache-hit))
-(defun compact-info-cache-hit (env number)
+;;; index INDEX in ENV.
+#!-sb-fluid (declaim (inline compact-info-lookup-index))
+(defun compact-info-lookup-index (env number index)
   (declare (type compact-info-env env) (type type-number number))
-  (let ((entries-info (compact-info-env-entries-info env))
-        (index (compact-info-env-cache-index env)))
+  (let ((entries-info (compact-info-env-entries-info env)))
     (if index
         (do ((index index (1+ index)))
             (nil)
@@ -558,9 +496,9 @@
               (return (values nil nil)))))
         (values nil nil))))
 
-;;; Encache NAME in the compact environment ENV. HASH is the
+;;; Look up NAME in the compact environment ENV. HASH is the
 ;;; GLOBALDB-SXHASHOID of NAME.
-(defun compact-info-lookup (env name hash)
+(defun compact-info-lookup (env name hash number)
   (declare (type compact-info-env env)
            (type (integer 0 #.sb!xc:most-positive-fixnum) hash))
   (let* ((table (compact-info-env-table env))
@@ -581,15 +519,13 @@
                       (when (eql entry 0)
                         (return nil))
                       (when (,test entry name)
-                        (return (aref (compact-info-env-index env)
-                                      probe)))))))
-      (setf (compact-info-env-cache-index env)
-            (if (symbolp name)
-                (lookup eq)
-                (lookup equal)))
-      (setf (compact-info-env-cache-name env) name)))
-
-  (values))
+                        (return (compact-info-lookup-index
+                                 env
+                                 number
+                                 (aref (compact-info-env-index env) probe))))))))
+      (if (symbolp name)
+          (lookup eq)
+          (lookup equal)))))
 
 ;;; the exact density (modulo rounding) of the hashtable in a compact
 ;;; info environment in names/bucket
@@ -699,12 +635,6 @@
 ;;; taking the GLOBALDB-SXHASHOID of the NAME modulo the table size.
 (defstruct (volatile-info-env (:include info-env)
                               (:copier nil))
-  ;; If this value is EQ to the name we want to look up, then the
-  ;; cache hit function can be called instead of the lookup function.
-  (cache-name 0)
-  ;; the alist translating type numbers to values for the currently
-  ;; cached name
-  (cache-types nil :type list)
   ;; vector of alists of alists of the form:
   ;;    ((Name . ((Type-Number . Value) ...) ...)
   (table (missing-arg) :type simple-vector)
@@ -714,33 +644,26 @@
   ;; the number of names at which we should grow the table and rehash
   (threshold 0 :type index))
 
-;;; Just like COMPACT-INFO-CACHE-HIT, only do it on a volatile environment.
-#!-sb-fluid (declaim (inline volatile-info-cache-hit))
-(defun volatile-info-cache-hit (env number)
-  (declare (type volatile-info-env env) (type type-number number))
-  (dolist (type (volatile-info-env-cache-types env) (values nil nil))
-    (when (eql (car type) number)
-      (return (values (cdr type) t)))))
-
 ;;; Just like COMPACT-INFO-LOOKUP, only do it on a volatile environment.
-(defun volatile-info-lookup (env name hash)
+(defun volatile-info-lookup (env name hash number)
   (declare (type volatile-info-env env)
            (type (integer 0 #.sb!xc:most-positive-fixnum) hash))
   (let ((table (volatile-info-env-table env)))
     (macrolet ((lookup (test)
                  `(dolist (entry (svref table (mod hash (length table))) ())
                     (when (,test (car entry) name)
-                      (return (cdr entry))))))
-      (setf (volatile-info-env-cache-types env)
-            (if (symbolp name)
-                (lookup eq)
-                (lookup equal)))
-      (setf (volatile-info-env-cache-name env) name)))
-  (values))
+                      (dolist (type (cdr entry))
+                        (when (eql (car type) number)
+                          (return-from volatile-info-lookup
+                            (values (cdr type) t))))
+                      (return-from volatile-info-lookup
+                        (values nil nil))))))
+      (if (symbolp name)
+          (lookup eq)
+          (lookup equal)))))
 
 ;;; Given a volatile environment ENV, bind TABLE-VAR the environment's table
-;;; and INDEX-VAR to the index of NAME's bucket in the table. We also flush
-;;; the cache so that things will be consistent if body modifies something.
+;;; and INDEX-VAR to the index of NAME's bucket in the table.
 (eval-when (:compile-toplevel :execute)
   (#+sb-xc-host cl:defmacro
    #-sb-xc-host sb!xc:defmacro
@@ -748,7 +671,6 @@
     (once-only ((n-name name)
                 (n-env env))
       `(progn
-         (setf (volatile-info-env-cache-name ,n-env) 0)
          (let* ((,table-var (volatile-info-env-table ,n-env))
                 (,index-var (mod (globaldb-sxhashoid ,n-name)
                                  (length ,table-var))))
@@ -784,9 +706,6 @@
   (let ((name (uncross name0)))
     (when (eql name 0)
       (error "0 is not a legal INFO name."))
-    ;; We don't enter the value in the cache because we don't know that this
-    ;; info-environment is part of *cached-info-environment*.
-    (info-cache-enter name type nil :empty)
     (with-info-bucket (table index name env)
       (let ((types (if (symbolp name)
                        (assoc name (svref table index) :test #'eq)
@@ -931,8 +850,6 @@
     whole))
 (defun clear-info-value (name type)
   (declare (type type-number type) (inline assoc))
-  (clear-invalid-info-cache)
-  (info-cache-enter name type nil :empty)
   (with-info-bucket (table index name (get-write-info-env))
     (let ((types (assoc name (svref table index) :test #'equal)))
       (when (and types
@@ -956,16 +873,10 @@
 
 ;;;; GET-INFO-VALUE
 
-;;; Check whether the name and type is in our cache, if so return it.
-;;; Otherwise, search for the value and encache it.
-;;;
-;;; Return the value from the first environment which has it defined,
-;;; or return the default if none does. We have a cache for the last
-;;; name looked up in each environment. We don't compute the hash
-;;; until the first time the cache misses. When the cache does miss,
-;;; we invalidate it before calling the lookup routine to eliminate
-;;; the possibility of the cache being partially updated if the lookup
-;;; is interrupted.
+;;; Return the value of NAME / TYPE from the first environment where
+;;; has it defined, or return the default if none does. We used to
+;;; do a lot of complicated caching here, but that was removed for
+;;; thread-safety reasons.
 (defun get-info-value (name0 type &optional (env-list nil env-list-p))
   (declare (type type-number type))
   ;; sanity check: If we have screwed up initialization somehow, then
@@ -975,44 +886,26 @@
   ;; sbcl-0.pre7.x.)
   (aver (aref *info-types* type))
   (let ((name (uncross name0)))
-    (flet ((lookup-ignoring-global-cache (env-list)
+    (flet ((lookup (env-list)
              (let ((hash nil))
                (dolist (env env-list
-                            (multiple-value-bind (val winp)
-                                (funcall (type-info-default
-                                          (svref *info-types* type))
-                                         name)
-                              (values val winp)))
-                 (macrolet ((frob (lookup cache slot)
+                        (multiple-value-bind (val winp)
+                            (funcall (type-info-default
+                                      (svref *info-types* type))
+                                     name)
+                          (values val winp)))
+                 (macrolet ((frob (lookup)
                               `(progn
-                                 (unless (eq name (,slot env))
-                                   (unless hash
-                                     (setq hash (globaldb-sxhashoid name)))
-                                   (setf (,slot env) 0)
-                                   (,lookup env name hash))
+                                 (setq hash (globaldb-sxhashoid name))
                                  (multiple-value-bind (value winp)
-                                     (,cache env type)
+                                     (,lookup env name hash type)
                                    (when winp (return (values value t)))))))
                    (etypecase env
-                     (volatile-info-env (frob
-                                         volatile-info-lookup
-                                         volatile-info-cache-hit
-                                         volatile-info-env-cache-name))
-                     (compact-info-env (frob
-                                        compact-info-lookup
-                                        compact-info-cache-hit
-                                        compact-info-env-cache-name))))))))
-      (cond (env-list-p
-             (lookup-ignoring-global-cache env-list))
-            (t
-             (clear-invalid-info-cache)
-             (multiple-value-bind (val winp) (info-cache-lookup name type)
-               (if (eq winp :empty)
-                   (multiple-value-bind (val winp)
-                       (lookup-ignoring-global-cache *info-environment*)
-                     (info-cache-enter name type val winp)
-                     (values val winp))
-                   (values val winp))))))))
+                     (volatile-info-env (frob volatile-info-lookup))
+                     (compact-info-env (frob compact-info-lookup))))))))
+      (if env-list-p
+          (lookup env-list)
+          (lookup *info-environment*)))))
 
 ;;;; definitions for function information
 
