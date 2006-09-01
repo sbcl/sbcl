@@ -4053,7 +4053,7 @@ preserve_context_registers (os_context_t *c)
     #error "preserve_context_registers needs to be tweaked for non-x86 Darwin"
 #endif
 #endif
-    for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {
+    for(ptr = ((void **)(c+1))-1; ptr>=(void **)c; ptr--) {
         preserve_pointer(*ptr);
     }
 }
@@ -4159,7 +4159,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 #else
             esp = (void **)((void *)&raise);
 #endif
-            for (ptr = (void **)th->control_stack_end; ptr > esp;  ptr--) {
+            for (ptr = ((void **)th->control_stack_end)-1; ptr > esp;  ptr--) {
                 preserve_pointer(*ptr);
             }
         }
