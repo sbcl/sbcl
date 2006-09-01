@@ -2418,15 +2418,10 @@ used for a COMPLEX component.~:@>"
           (wild1 (eq eltype1 *wild-type*))
           (wild2 (eq eltype2 *wild-type*))
           (e2 nil))
-     ;; This is possibly a bit more conservative then it needs to be:
-     ;; it seems that wild eltype in either should lead to wild eltype
-     ;; in result, but the rest of the type-system doesn't seem too
-     ;; happy about that. --NS 2006-08-23
-     (when (and (or (and wild1 wild2)
-                    (and (not (or wild1 wild2))
-                         (or (setf e2 (csubtypep eltype1 eltype2))
-                             (csubtypep eltype2 eltype1))))
-                (type= stype1 stype2))
+     (when (or wild1 wild2
+               (and (or (setf e2 (csubtypep eltype1 eltype2))
+                        (csubtypep eltype2 eltype1))
+                    (type= stype1 stype2)))
        (make-array-type
         :dimensions (cond ((or (eq dims1 '*) (eq dims2 '*))
                            '*)
@@ -2439,7 +2434,7 @@ used for a COMPLEX component.~:@>"
                            '*))
         :complexp (if (eq complexp1 complexp2) complexp1 :maybe)
         :element-type (if (or wild2 e2) eltype2 eltype1)
-        :specialized-element-type stype1))))
+        :specialized-element-type (if wild2 stype2 stype1)))))
 
 (!define-type-method (array :simple-intersection2) (type1 type2)
   (declare (type array-type type1 type2))

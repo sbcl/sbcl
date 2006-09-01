@@ -544,4 +544,11 @@
 (assert (not (typep #'print-object '(and standard-object sb-kernel:instance))))
 (assert (not (subtypep 'standard-object '(and standard-object sb-kernel:instance))))
 
+(assert-t-t
+ (subtypep '(or simple-array simple-string) '(or simple-string simple-array)))
+(assert-t-t
+ (subtypep '(or simple-string simple-array) '(or simple-array simple-string)))
+(assert-t-t
+ (subtypep '(or fixnum simple-string end-of-file parse-error fixnum vector)
+           '(or fixnum vector end-of-file parse-error fixnum simple-string)))
 ;;; success
