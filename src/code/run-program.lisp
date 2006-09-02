@@ -392,25 +392,52 @@ status slot."
 ;;; the master side of the pty, the file descriptor for the slave side
 ;;; of the pty, and the name of the tty device for the slave side.
 #-win32
-(defun find-a-pty ()
-  (dolist (char '(#\p #\q))
-    (dotimes (digit 16)
-      (let* ((master-name (coerce (format nil "/dev/pty~C~X" char digit) 'base-string))
-             (master-fd (sb-unix:unix-open master-name
-                                           sb-unix:o_rdwr
-                                           #o666)))
-        (when master-fd
-          (let* ((slave-name (coerce (format nil "/dev/tty~C~X" char digit) 'base-string))
-                 (slave-fd (sb-unix:unix-open slave-name
-                                              sb-unix:o_rdwr
-                                              #o666)))
-            (when slave-fd
-              (return-from find-a-pty
-                (values master-fd
-                        slave-fd
-                        slave-name)))
-            (sb-unix:unix-close master-fd))))))
-  (error "could not find a pty"))
+(progn
+  (define-alien-routine ptsname c-string (fd int))
+  (define-alien-routine grantpt boolean (fd int))
+  (define-alien-routine unlockpt boolean (fd int))
+
+  (defun find-a-pty ()
+    ;; First try to use the Unix98 pty api.
+    (let* ((master-name (coerce (format nil "/dev/ptmx") 'base-string))
+           (master-fd (sb-unix:unix-open master-name
+                                         sb-unix:o_rdwr
+                                         #o666)))
+      (when master-fd
+        (grantpt master-fd)
+        (unlockpt master-fd)
+        (let* ((slave-name (ptsname master-fd))
+               (slave-fd (sb-unix:unix-open slave-name
+                                            sb-unix:o_rdwr
+                                            #o666)))
+          (when slave-fd
+            (return-from find-a-pty
+              (values master-fd
+                      slave-fd
+                      slave-name)))
+          (sb-unix:unix-close master-fd))
+        (error "could not find a pty")))
+    ;; No dice, try using the old-school method.
+    (dolist (char '(#\p #\q))
+      (dotimes (digit 16)
+        (let* ((master-name (coerce (format nil "/dev/pty~C~X" char digit)
+                                    'base-string))
+               (master-fd (sb-unix:unix-open master-name
+                                             sb-unix:o_rdwr
+                                             #o666)))
+          (when master-fd
+            (let* ((slave-name (coerce (format nil "/dev/tty~C~X" char digit)
+                                       'base-string))
+                   (slave-fd (sb-unix:unix-open slave-name
+                                                sb-unix:o_rdwr
+                                                #o666)))
+              (when slave-fd
+                (return-from find-a-pty
+                  (values master-fd
+                          slave-fd
+                          slave-name)))
+              (sb-unix:unix-close master-fd))))))
+    (error "could not find a pty")))
 
 #-win32
 (defun open-pty (pty cookie)
