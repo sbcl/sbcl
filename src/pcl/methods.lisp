@@ -1243,7 +1243,8 @@
   (if (atom form)
       (default-test-converter form)
       (case (car form)
-        ((invoke-effective-method-function invoke-fast-method-call)
+        ((invoke-effective-method-function invoke-fast-method-call
+          invoke-effective-narrow-method-function)
          '.call.)
         (methods
          '.methods.)
@@ -1345,8 +1346,7 @@
           (get-fun1 `(lambda
                       ,arglist
                       ,@(unless function-p
-                          `((declare (ignore .pv-cell.
-                                             .next-method-call.))))
+                          `((declare (ignore .pv-cell. .next-method-call.))))
                       (locally (declare #.*optimize-speed*)
                                (let ((emf ,net))
                                  ,(make-emf-call metatypes applyp 'emf))))

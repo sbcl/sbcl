@@ -1388,4 +1388,14 @@
   (storage-condition (e)
     (error e)))
 
+;;; warnings due to step-insturmentation
+(defclass debug-test-class () ())
+(handler-case
+    (compile nil '(lambda ()
+                   (declare (optimize (debug 3)))
+                   (defmethod print-object ((x debug-test-class) s)
+                     (call-next-method))))
+  ((and (not style-warning) warning) (e)
+    (error e)))
+
 ;;; success

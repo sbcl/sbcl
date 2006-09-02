@@ -967,59 +967,70 @@ bootstrapping.
      (trace-emf-call ,emf ,restp (list ,@required-args+rest-arg))
      (invoke-fast-method-call ,emf ,@required-args+rest-arg)))
 
-(defmacro invoke-effective-method-function (emf-form restp
-                                            &rest required-args+rest-arg)
-  (unless (constantp restp)
-    (error "The RESTP argument is not constant."))
-  ;; FIXME: The RESTP handling here is confusing and maybe slightly
-  ;; broken if RESTP evaluates to a non-self-evaluating form. E.g. if
-  ;;   (INVOKE-EFFECTIVE-METHOD-FUNCTION EMF '(ERROR "gotcha") ...)
-  ;; then TRACE-EMF-CALL-CALL-INTERNAL might die on a gotcha error.
-  (setq restp (constant-form-value restp))
-  (with-unique-names (emf)
-    `(let ((,emf ,emf-form))
-      (trace-emf-call ,emf ,restp (list ,@required-args+rest-arg))
-      (cond ((typep ,emf 'fast-method-call)
-             (invoke-fast-method-call ,emf ,@required-args+rest-arg))
-            ;; "What," you may wonder, "do these next two clauses do?"
-            ;; In that case, you are not a PCL implementor, for they
-            ;; considered this to be self-documenting.:-| Or CSR, for
-            ;; that matter, since he can also figure it out by looking
-            ;; at it without breaking stride. For the rest of us,
-            ;; though: From what the code is doing with .SLOTS. and
-            ;; whatnot, evidently it's implementing SLOT-VALUEish and
-            ;; GET-SLOT-VALUEish things. Then we can reason backwards
-            ;; and conclude that setting EMF to a FIXNUM is an
-            ;; optimized way to represent these slot access operations.
-            ,@(when (and (null restp) (= 1 (length required-args+rest-arg)))
-                    `(((typep ,emf 'fixnum)
-                       (let* ((.slots. (get-slots-or-nil
-                                        ,(car required-args+rest-arg)))
-                              (value (when .slots. (clos-slots-ref .slots. ,emf))))
-                         (if (eq value +slot-unbound+)
-                             (slot-unbound-internal ,(car required-args+rest-arg)
-                                                    ,emf)
-                             value)))))
-            ,@(when (and (null restp) (= 2 (length required-args+rest-arg)))
-                    `(((typep ,emf 'fixnum)
-                       (let ((.new-value. ,(car required-args+rest-arg))
-                             (.slots. (get-slots-or-nil
-                                       ,(cadr required-args+rest-arg))))
-                         (when .slots.
-                           (setf (clos-slots-ref .slots. ,emf) .new-value.))))))
-            ;; (In cmucl-2.4.8 there was a commented-out third ,@(WHEN
-            ;; ...) clause here to handle SLOT-BOUNDish stuff. Since
-            ;; there was no explanation and presumably the code is 10+
-            ;; years stale, I simply deleted it. -- WHN)
-            (t
-             (etypecase ,emf
-               (method-call
-                (invoke-method-call ,emf ,restp ,@required-args+rest-arg))
-               (function
-                ,(if restp
-                     `(apply (the function ,emf) ,@required-args+rest-arg)
-                     `(funcall (the function ,emf)
-                               ,@required-args+rest-arg)))))))))
+(defun effective-method-optimized-slot-access-clause
+    (emf restp required-args+rest-arg)
+  ;; "What," you may wonder, "do these next two clauses do?" In that
+  ;; case, you are not a PCL implementor, for they considered this to
+  ;; be self-documenting.:-| Or CSR, for that matter, since he can
+  ;; also figure it out by looking at it without breaking stride. For
+  ;; the rest of us, though: From what the code is doing with .SLOTS.
+  ;; and whatnot, evidently it's implementing SLOT-VALUEish and
+  ;; GET-SLOT-VALUEish things. Then we can reason backwards and
+  ;; conclude that setting EMF to a FIXNUM is an optimized way to
+  ;; represent these slot access operations.
+  (when (not restp)
+    (let ((length (length required-args+rest-arg)))
+      (cond ((= 1 length)
+             `((fixnum
+                (let* ((.slots. (get-slots-or-nil
+                                 ,(car required-args+rest-arg)))
+                       (value (when .slots. (clos-slots-ref .slots. ,emf))))
+                  (if (eq value +slot-unbound+)
+                      (slot-unbound-internal ,(car required-args+rest-arg)
+                                             ,emf)
+                      value)))))
+            ((= 2 length)
+             `((fixnum
+                (let ((.new-value. ,(car required-args+rest-arg))
+                      (.slots. (get-slots-or-nil
+                                ,(cadr required-args+rest-arg))))
+                  (when .slots.
+                    (setf (clos-slots-ref .slots. ,emf) .new-value.)))))))
+      ;; (In cmucl-2.4.8 there was a commented-out third ,@(WHEN
+      ;; ...) clause here to handle SLOT-BOUNDish stuff. Since
+      ;; there was no explanation and presumably the code is 10+
+      ;; years stale, I simply deleted it. -- WHN)
+      )))
+
+;;; Before SBCL 0.9.16.7 instead of
+;;; INVOKE-NARROW-EFFECTIVE-METHOD-FUNCTION we passed a (THE (OR
+;;; FUNCTION METHOD-CALL FAST-METHOD-CALL) EMF) form as the EMF. Now,
+;;; to make less work for the compiler we take a path that doesn't
+;;; involve the slot-accessor clause (where EMF is a FIXNUM) at all.
+(macrolet ((def (name &optional narrow)
+             `(defmacro ,name (emf restp &rest required-args+rest-arg)
+                (unless (constantp restp)
+                  (error "The RESTP argument is not constant."))
+                (setq restp (constant-form-value restp))
+                (with-unique-names (emf-n)
+                  `(locally
+                       (declare (optimize (sb-c:insert-step-conditions 0)))
+                     (let ((,emf-n ,emf))
+                       (trace-emf-call ,emf-n ,restp (list ,@required-args+rest-arg))
+                       (etypecase ,emf-n
+                         (fast-method-call
+                          (invoke-fast-method-call ,emf-n ,@required-args+rest-arg))
+                         ,@,(unless narrow
+                              `(effective-method-optimized-slot-access-clause
+                                emf-n restp required-args+rest-arg))
+                         (method-call
+                          (invoke-method-call ,emf-n ,restp ,@required-args+rest-arg))
+                         (function
+                          ,(if restp
+                               `(apply ,emf-n ,@required-args+rest-arg)
+                            `(funcall ,emf-n ,@required-args+rest-arg))))))))))
+  (def invoke-effective-method-function nil)
+  (def invoke-narrow-effective-method-function t))
 
 (defun invoke-emf (emf args)
   (trace-emf-call emf t args)
@@ -1091,35 +1102,12 @@ bootstrapping.
      (apply emf args))))
 
 
-(defmacro fast-narrowed-emf (emf)
-  ;; INVOKE-EFFECTIVE-METHOD-FUNCTION has code in it to dispatch on
-  ;; the possibility that EMF might be of type FIXNUM (as an optimized
-  ;; representation of a slot accessor). But as far as I (WHN
-  ;; 2002-06-11) can tell, it's impossible for such a representation
-  ;; to end up as .NEXT-METHOD-CALL. By reassuring INVOKE-E-M-F that
-  ;; when called from this context it needn't worry about the FIXNUM
-  ;; case, we can keep those cases from being compiled, which is good
-  ;; both because it saves bytes and because it avoids annoying type
-  ;; mismatch compiler warnings.
-  ;;
-  ;; KLUDGE: In sbcl-0.7.4.29, the compiler's type system isn't smart
-  ;; enough about NOT and intersection types to benefit from a (NOT
-  ;; FIXNUM) declaration here. -- WHN 2002-06-12 (FIXME: maybe it is
-  ;; now... -- CSR, 2003-06-07)
-  ;;
-  ;; FIXME: Might the FUNCTION type be omittable here, leaving only
-  ;; METHOD-CALLs? Failing that, could this be documented somehow?
-  ;; (It'd be nice if the types involved could be understood without
-  ;; solving the halting problem.)
-  `(the (or function method-call fast-method-call)
-     ,emf))
-
 (defmacro fast-call-next-method-body ((args next-method-call rest-arg)
                                       method-name-declaration
                                       cnm-args)
   `(if ,next-method-call
-       ,(let ((call `(invoke-effective-method-function
-                      (fast-narrowed-emf ,next-method-call)
+       ,(let ((call `(invoke-narrow-effective-method-function
+                      ,next-method-call
                       ,(not (null rest-arg))
                       ,@args
                       ,@(when rest-arg `(,rest-arg)))))
@@ -1153,7 +1141,8 @@ bootstrapping.
              ,@body)
         `(flet (,@(when call-next-method-p
                         `((call-next-method (&rest cnm-args)
-                           (declare (muffle-conditions code-deletion-note))
+                            (declare (muffle-conditions code-deletion-note)
+                                     (optimize (sb-c:insert-step-conditions 0)))
                            ,@(if (safe-code-p env)
                                  `((%check-cnm-args cnm-args (list ,@args)
                                                     ',method-name-declaration))
@@ -1164,8 +1153,8 @@ bootstrapping.
                                                         ,method-name-declaration
                                                        cnm-args))))
                 ,@(when next-method-p-p
-                        `((next-method-p
-                           ()
+                        `((next-method-p ()
+                           (declare (optimize (sb-c:insert-step-conditions 0)))
                            (not (null ,next-method-call))))))
            (let ,rebindings
              ,@(when rebindings `((declare (ignorable ,@all-params))))
