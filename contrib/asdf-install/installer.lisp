@@ -254,29 +254,44 @@
     (when (> response 0)
       (elt *locations* (1- response)))))
 
+(defparameter *tar-program*
+  (or #+darwin "gnutar"
+      "tar"))
+
+(defun get-tar-directory (packagename)
+  (let* ((tar (with-output-to-string (o)
+                (or
+                 (sb-ext:run-program *tar-program*
+                                     (list "-tzf" (namestring packagename))
+                                     :output o
+                                     :search t
+                                     :wait t)
+                 (error "can't list archive"))))
+         (first-line (subseq tar 0 (position #\newline tar))))
+    (if (find #\/ first-line)
+        (subseq first-line 0 (position #\/ first-line))
+        first-line)))
+
+(defun untar-package (source packagename)
+  (with-output-to-string (o)
+    (or
+     (sb-ext:run-program *tar-program*
+                         (list "-C" (namestring source)
+                               "-xzvf" (namestring packagename))
+                         :output o
+                         :search t
+                         :wait t)
+     (error "can't untar"))))
+
 (defun install-package (source system packagename)
   "Returns a list of asdf system names for installed asdf systems"
   (ensure-directories-exist source)
-    (ensure-directories-exist system)
-  (let* ((tar
-          (with-output-to-string (o)
-            (or
-             (sb-ext:run-program #-darwin "tar"
-                                 #+darwin "gnutar"
-                                 (list "-C" (namestring source)
-                                       "-xzvf" (namestring packagename))
-                                 :output o
-                                 :search t
-                                 :wait t)
-             (error "can't untar"))))
-         (dummy (princ tar))
-         (pos-slash (position #\/ tar))
+  (ensure-directories-exist system)
+  (let* ((tdir (get-tar-directory packagename))
          (*default-pathname-defaults*
-          (merge-pathnames
-           (make-pathname :directory
-                          `(:relative ,(subseq tar 0 pos-slash)))
-           source)))
-    (declare (ignore dummy))
+          (merge-pathnames (make-pathname :directory `(:relative ,tdir))
+                           source)))
+    (princ (untar-package source packagename))
     (loop for asd in (directory
                       (make-pathname :name :wild :type "asd"))
           do (let ((target (merge-pathnames
