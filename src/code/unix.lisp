@@ -47,7 +47,7 @@
 
 ;;;; Lisp types used by syscalls
 
-(deftype unix-pathname () #!-win32 'simple-base-string #!+win32 'simple-string)
+(deftype unix-pathname () 'simple-string)
 (deftype unix-fd () `(integer 0 ,most-positive-fixnum))
 
 (deftype unix-file-mode () '(unsigned-byte 32))
@@ -848,7 +848,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 (defun unix-file-kind (name &optional check-for-links)
   #!+sb-doc
   "Return either :FILE, :DIRECTORY, :LINK, :SPECIAL, or NIL."
-  (declare (simple-base-string name))
+  (declare (simple-string name))
   (multiple-value-bind (res dev ino mode)
       (if check-for-links (unix-lstat name) (unix-stat name))
     (declare (type (or fixnum null) mode)
@@ -874,7 +874,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; paths have been converted to absolute paths, so we don't need to
 ;;; try to handle any more generality than that.
 (defun unix-resolve-links (pathname)
-  (declare (type simple-base-string pathname))
+  (declare (type simple-string pathname))
   ;; KLUDGE: The Win32 platform doesn't have symbolic links, so
   ;; short-cut this computation (and the check for being an absolute
   ;; unix pathname...)
@@ -914,7 +914,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
                                                         :from-end t)))
                                  (dir (subseq pathname 0 dir-len)))
                             (/noshow dir)
-                            (concatenate 'base-string dir link))
+                            (concatenate 'string dir link))
                           link))))
                 (if (unix-file-kind new-pathname)
                     (setf pathname new-pathname)
@@ -930,9 +930,9 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
             (push pathname previous-pathnames))))
 
 (defun unix-simplify-pathname (src)
-  (declare (type simple-base-string src))
+  (declare (type simple-string src))
   (let* ((src-len (length src))
-         (dst (make-string src-len :element-type 'base-char))
+         (dst (make-string src-len :element-type 'character))
          (dst-len 0)
          (dots 0)
          (last-slash nil))
@@ -1007,7 +1007,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
              (if prev-prev-slash
                  (setf dst-len (1+ prev-prev-slash))
                  (return-from unix-simplify-pathname
-                   (coerce "./" 'simple-base-string))))))))
+                   (coerce "./" 'simple-string))))))))
     (cond ((zerop dst-len)
            "./")
           ((= dst-len src-len)

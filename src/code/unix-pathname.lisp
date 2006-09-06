@@ -15,7 +15,7 @@
 ;;; separated subseq. The first value is true if absolute directories
 ;;; location.
 (defun split-at-slashes (namestr start end)
-  (declare (type simple-base-string namestr)
+  (declare (type simple-string namestr)
            (type index start end))
   (let ((absolute (and (/= start end)
                        (char= (schar namestr start) #\/))))
@@ -34,7 +34,7 @@
 (defun parse-unix-namestring (namestring start end)
   (declare (type simple-string namestring)
            (type index start end))
-  (setf namestring (coerce namestring 'simple-base-string))
+  (setf namestring (coerce namestring 'simple-string))
   (multiple-value-bind (absolute pieces)
       (split-at-slashes namestring start end)
     (multiple-value-bind (name type version)
@@ -88,7 +88,7 @@
 (defun parse-native-unix-namestring (namestring start end)
   (declare (type simple-string namestring)
            (type index start end))
-  (setf namestring (coerce namestring 'simple-base-string))
+  (setf namestring (coerce namestring 'simple-string))
   (multiple-value-bind (absolute ranges)
       (split-at-slashes namestring start end)
     (let* ((components (loop for ((start . end) . rest) on ranges
@@ -169,7 +169,7 @@
               (t
                (error "invalid pattern piece: ~S" piece))))))
        (apply #'concatenate
-              'simple-base-string
+              'simple-string
               (strings))))))
 
 (defun unparse-unix-directory-list (directory)
@@ -195,7 +195,7 @@
            (pieces "/"))
           (t
            (error "invalid directory component: ~S" dir)))))
-    (apply #'concatenate 'simple-base-string (pieces))))
+    (apply #'concatenate 'simple-string (pieces))))
 
 (defun unparse-unix-directory (pathname)
   (declare (type pathname pathname))
@@ -228,13 +228,13 @@
             (error "type component can't have a #\. inside: ~S" pathname)))
         (strings ".")
         (strings (unparse-unix-piece type))))
-    (apply #'concatenate 'simple-base-string (strings))))
+    (apply #'concatenate 'simple-string (strings))))
 
 (/show0 "filesys.lisp 406")
 
 (defun unparse-unix-namestring (pathname)
   (declare (type pathname pathname))
-  (concatenate 'simple-base-string
+  (concatenate 'simple-string
                (unparse-unix-directory pathname)
                (unparse-unix-file pathname)))
 
@@ -264,7 +264,7 @@
              (error "non-STRING type in NATIVE-NAMESTRING: ~S" name))
            (write-char #\. s)
            (write-string type s))))
-     'simple-base-string)))
+     'simple-string)))
 
 (defun unparse-unix-enough (pathname defaults)
   (declare (type pathname pathname defaults))
@@ -312,7 +312,7 @@
         (when type-needed
           (when (or (null pathname-type) (eq pathname-type :unspecific))
             (lose))
-          (when (typep pathname-type 'simple-base-string)
+          (when (typep pathname-type 'simple-string)
             (when (position #\. pathname-type)
               (error "type component can't have a #\. inside: ~S" pathname)))
           (strings ".")

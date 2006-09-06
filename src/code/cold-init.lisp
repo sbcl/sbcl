@@ -287,6 +287,7 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
 
 (defun reinit ()
   (setf *default-external-format* nil)
+  (setf sb!alien::*default-c-string-external-format* nil)
   (without-interrupts
     (without-gcing
         (os-cold-init-or-reinit)

@@ -36,11 +36,11 @@
 ;;;
 ;;;   Define external format: fd-stream
 ;;;
-(define-external-format/variable-width (:ucs-2le :ucs2le) nil
+(define-external-format/variable-width (:ucs-2le :ucs2le #!+win32 :ucs2 #!+win32 :ucs-2) nil
   2
   (if (< bits #x10000)
       (setf (sap-ref-16le sap tail) bits)
-      (stream-encoding-error-and-handle stream bits))
+      (external-format-encoding-error stream bits))
   2
   (code-char (sap-ref-16le sap head)))
 
@@ -48,7 +48,7 @@
   2
   (if (< bits #x10000)
       (setf (sap-ref-16be sap tail) bits)
-      (stream-encoding-error-and-handle stream bits))
+      (external-format-encoding-error stream bits))
   2
   (code-char (sap-ref-16be sap head)))
 
@@ -209,7 +209,7 @@
 
 (instantiate-octets-definition define-ucs-2->string)
 
-(pushnew '((:ucs-2le :ucs2le)
+(pushnew '((:ucs-2le :ucs2le #!+win32 :ucs2 #!+win32 :ucs-2)
            ucs-2le->string-aref string->ucs-2le)
          *external-format-functions*)
 

@@ -169,11 +169,11 @@
     (let ((cp437-byte (code->cp437-mapper bits)))
       (if cp437-byte
           (setf (sap-ref-8 sap tail) cp437-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp437->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp850->code-mapper code->cp850-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -344,11 +344,11 @@
     (let ((cp850-byte (code->cp850-mapper bits)))
       (if cp850-byte
           (setf (sap-ref-8 sap tail) cp850-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp850->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp852->code-mapper code->cp852-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -519,11 +519,11 @@
     (let ((cp852-byte (code->cp852-mapper bits)))
       (if cp852-byte
           (setf (sap-ref-8 sap tail) cp852-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp852->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp855->code-mapper code->cp855-mapper
   (#x80 #x0452) ; CYRILLIC SMALL LETTER DJE
@@ -694,11 +694,11 @@
     (let ((cp855-byte (code->cp855-mapper bits)))
       (if cp855-byte
           (setf (sap-ref-8 sap tail) cp855-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp855->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp857->code-mapper code->cp857-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -868,11 +868,11 @@
     (let ((cp857-byte (code->cp857-mapper bits)))
       (if cp857-byte
           (setf (sap-ref-8 sap tail) cp857-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp857->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp860->code-mapper code->cp860-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -1043,11 +1043,11 @@
     (let ((cp860-byte (code->cp860-mapper bits)))
       (if cp860-byte
           (setf (sap-ref-8 sap tail) cp860-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp860->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp861->code-mapper code->cp861-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -1218,11 +1218,11 @@
     (let ((cp861-byte (code->cp861-mapper bits)))
       (if cp861-byte
           (setf (sap-ref-8 sap tail) cp861-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp861->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp862->code-mapper code->cp862-mapper
   (#x80 #x05D0) ; HEBREW LETTER ALEF
@@ -1393,11 +1393,11 @@
     (let ((cp862-byte (code->cp862-mapper bits)))
       (if cp862-byte
           (setf (sap-ref-8 sap tail) cp862-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp862->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp863->code-mapper code->cp863-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -1568,11 +1568,11 @@
     (let ((cp863-byte (code->cp863-mapper bits)))
       (if cp863-byte
           (setf (sap-ref-8 sap tail) cp863-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp863->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp864->code-mapper code->cp864-mapper
   (#x80 #x00B0) ; DEGREE SIGN
@@ -1740,11 +1740,11 @@
     (let ((cp864-byte (code->cp864-mapper bits)))
       (if cp864-byte
           (setf (sap-ref-8 sap tail) cp864-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp864->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp865->code-mapper code->cp865-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -1915,11 +1915,11 @@
     (let ((cp865-byte (code->cp865-mapper bits)))
       (if cp865-byte
           (setf (sap-ref-8 sap tail) cp865-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp865->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp866->code-mapper code->cp866-mapper
   (#x80 #x0410) ; CYRILLIC CAPITAL LETTER A
@@ -2090,11 +2090,11 @@
     (let ((cp866-byte (code->cp866-mapper bits)))
       (if cp866-byte
           (setf (sap-ref-8 sap tail) cp866-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp866->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp869->code-mapper code->cp869-mapper
   (#x80 nil)
@@ -2265,11 +2265,11 @@
     (let ((cp869-byte (code->cp869-mapper bits)))
       (if cp869-byte
           (setf (sap-ref-8 sap tail) cp869-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp869->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp874->code-mapper code->cp874-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -2439,8 +2439,8 @@
     (let ((cp874-byte (code->cp874-mapper bits)))
       (if cp874-byte
           (setf (sap-ref-8 sap tail) cp874-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp874->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check

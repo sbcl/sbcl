@@ -283,15 +283,37 @@ types to declare that no useful value is returned.  Using
 return zero values.
 
 @item
-The foreign type specifier @code{sb-alien:c-string} is similar to
-@code{(* char)}, but is interpreted as a null-terminated string, and is
-automatically converted into a Lisp string when accessed; or if the
-pointer is C @code{NULL} or @code{0}, then accessing it gives Lisp
-@code{nil}.  Lisp strings of type @code{base-string} are stored with a
-trailing NUL termination, so no copying (either by the user or the
-implementation) is necessary when passing them to foreign code; strings
-of type @code{(simple-array character (*))} are copied by the
-implementation as required.
+The foreign type specifier @code{(sb-alien:c-string &key external-format
+element-type)} is similar to @code{(* char)}, but is interpreted as a
+null-terminated string, and is automatically converted into a Lisp
+string when accessed; or if the pointer is C @code{NULL} or @code{0},
+then accessing it gives Lisp @code{nil}.
+
+External format conversion is automatically done when Lisp strings are
+passed to foreign code, or when foreign strings are passed to Lisp code.
+If the type specifier has an explicit @code{external-format}, that
+external format will be used. Otherwise a default external format that
+has been determined at SBCL startup time based on the current locale
+settings will be used. For example, when the following alien routine is
+called, the Lisp string given as argument is converted to an
+@code{ebcdic} octet representation.
+
+@lisp
+(define-alien-routine test int (str (c-string :external-format :ebcdic-us)))
+@end lisp
+
+Lisp strings of type @code{base-string} are stored with a trailing NUL
+termination, so no copying (either by the user or the implementation) is
+necessary when passing them to foreign code, assuming that the
+@code{external-format} and @code{element-type} of the @code{c-string}
+type are compatible with the internal representation of the string. For
+an SBCL built with Unicode support that means an @code{external-format}
+of @code{:ascii} and an @code{element-type} of @code{base-char}. Without
+Unicode support the @code{external-format} can also be
+@code{:iso-8859-1}, and the @code{element-type} can also be
+@code{character}. If the @code{external-format} or @code{element-type}
+is not compatible, or the string is a @code{(simple-array character
+(*))}, this data is copied by the implementation as required.
 
 Assigning a Lisp string to a @code{c-string} structure field or
 variable stores the contents of the string to the memory already

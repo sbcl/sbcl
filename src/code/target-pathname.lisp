@@ -1302,7 +1302,7 @@ PARSE-NAMESTRING."
                              is not alphanumeric or hyphen:~%  ~S"
                  :args (list ch)
                  :namestring word :offset i))))
-    (coerce word 'base-string)))
+    (coerce word 'string))) ; why not simple-string?
 
 ;;; Given a logical host or string, return a logical host. If ERROR-P
 ;;; is NIL, then return NIL when no such host exists.

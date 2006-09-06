@@ -606,6 +606,11 @@ Teemu Kalvas:
   character database, restoring the FAST-READ-CHAR optimization and
   developing external format support.
 
+Yaroslav Kavenchuk:
+  He implemented several missing features and fixed many bugs in
+  the win32 port. He also worked on external-format support for
+  SB-ALIEN.
+
 Frederik Kuivinen:
   He showed how to implement the DEBUG-RETURN functionality.
 
@@ -673,6 +678,9 @@ William ("Bill") Newman:
   updating documentation, and even, for better or worse, getting
   rid of various functionality (e.g. the byte interpreter).
 
+NIIMI Satoshi:
+  He contributed a number of fixes to the FreeBSD port.
+
 Patrik Nordebo:
   He contributed to the port of SBCL to MacOS X, finding solutions for
   ABI and assembly syntax differences between Darwin and Linux.
@@ -683,6 +691,9 @@ Luís Oliveira:
 
 Scott Parish:
   He ported SBCL to OpenBSD-with-ELF.
+
+Timothy Ritchey:
+  He implemented SB-BSD-SOCKETS support for the win32 port.
 
 Kevin M. Rosenberg:
   He provided the ACL-style toplevel (sb-aclrepl contrib module), and

@@ -531,7 +531,7 @@ status slot."
 
 ;;; Is UNIX-FILENAME the name of a file that we can execute?
 (defun unix-filename-is-executable-p (unix-filename)
-  (let ((filename (coerce unix-filename 'base-string)))
+  (let ((filename (coerce unix-filename 'string)))
     (values (and (eq (sb-unix:unix-file-kind filename) :file)
                  #-win32
                  (sb-unix:unix-access filename sb-unix:x_ok)))))
@@ -839,7 +839,20 @@ Common Lisp Users Manual for details about the PROCESS structure.
         proc
         ;; It's friendly to allow the caller to pass any string
         ;; designator, but internally we'd like SIMPLE-STRINGs.
-        (simple-args (mapcar (lambda (x) (coerce x 'simple-string)) args)))
+        (simple-args
+          (mapcar
+            (lambda (x)
+              (coerce
+                ;; Apparently any spaces or double quotes in the arguments
+                ;; need to be escaped on win32.
+                #+win32
+                (if (position-if (lambda (c) (find c '(#\" #\Space))) x)
+                    (write-to-string x)
+                    x)
+                #-win32
+                x
+                'simple-string))
+            args)))
     (unwind-protect
          (let ((pfile
                 (if search

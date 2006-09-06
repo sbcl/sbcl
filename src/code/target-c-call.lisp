@@ -34,9 +34,20 @@
 (define-alien-type float single-float)
 (define-alien-type double double-float)
 
+(define-alien-type utf8-string (c-string :external-format :utf8))
+
 (define-alien-type-translator void ()
   (parse-alien-type '(values) (sb!kernel:make-null-lexenv)))
 
+
+(defun default-c-string-external-format ()
+  #!+sb-xc
+  :latin-1
+  #!-sb-xc
+  (or *default-c-string-external-format*
+      (setf *default-c-string-external-format*
+            (sb!impl::default-external-format))))
+
 ;;; FIXME: %NATURALIZE-C-STRING (and the UTF8 siblings below) would
 ;;; appear to be vulnerable to the lisp string moving from underneath
 ;;; them if the world undergoes a GC, possibly triggered by another
@@ -57,16 +68,21 @@
         (sb!kernel:copy-ub8-from-system-area sap 0 result 0 length)
         result))))
 
-(defun %naturalize-utf8-string (sap)
+(defun string-to-c-string (string external-format)
+  (declare (type simple-string string))
+  (locally
+      (declare (optimize (speed 3) (safety 0)))
+    (let ((func (sb!impl::get-external-format-function external-format 10)))
+      (unless func
+        (error "Undefined external-format ~A.~%" external-format))
+      (funcall (symbol-function func) string))))
+
+(defun c-string-to-string (sap external-format element-type)
   (declare (type system-area-pointer sap))
   (locally
-    (declare (optimize (speed 3) (safety 0)))
-    (let ((byte-length (do* ((offset 0 (1+ offset))
-                             (byte #1=(sap-ref-8 sap offset) #1#))
-                            ((zerop byte) offset))))
-      (handler-bind ((sb!impl::octet-decoding-error #'sb!impl::use-unicode-replacement-char))
-        (sb!impl::utf8->string-sap-ref-8 sap 0 byte-length)))))
+      (declare (optimize (speed 3) (safety 0)))
+    (let ((func (sb!impl::get-external-format-function external-format 9)))
+      (unless func
+        (error "Undefined external-format ~A.~%" external-format))
+      (funcall (symbol-function func) sap element-type))))
 
-(defun %deport-utf8-string (string)
-  (declare (type simple-string string))
-  (sb!impl::string->utf8 string 0 (length string) 1))

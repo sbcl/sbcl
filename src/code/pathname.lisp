@@ -52,7 +52,7 @@
                        (unparse-enough #'unparse-enough-namestring)
                        (unparse-directory-separator ";")
                        (customary-case :upper)))
-  (name "" :type simple-base-string)
+  (name "" :type simple-string)
   (translations nil :type list)
   (canon-transls nil :type list))
 

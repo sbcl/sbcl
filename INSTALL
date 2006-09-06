@@ -154,7 +154,8 @@ INSTALLING SBCL
                (pushnew x features))
              (disable (x)
                (setf features (remove x features))))
-        ;; Threading support, available on x86/x86-64 Linux only.
+        ;; Threading support, available only on x86/x86-64 Linux, x86 Solaris
+        ;; and x86 Mac OS X (experimental).
         (enable :sb-thread)))
 
   This is the preferred way because it lets local changes interact
@@ -241,11 +242,12 @@ INSTALLING SBCL
     NetBSD                  X
     Solaris                 X              X
     Tru64                            X
-    Darwin (Mac OS X)           X
+    Darwin (Mac OS X)       X   X
+    Windows                 X
 
     Some operating systems are more equal than others: most of the
-    development and testing is done on x86 Linux and *BSD, PPC Linux
-    and Mac OS X.
+    development and testing is done on x86/x86-64 Linux and x86/PPC
+    Mac OS X.
 
     If an underprivileged platform is important to you, you can help
     by e.g. testing during the monthly freeze periods, and most

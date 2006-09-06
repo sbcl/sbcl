@@ -1,5 +1,13 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
+  * incompatible change: External-format support for FFI calls.  The
+    SB-ALIEN:C-STRING no longer implies an ASCII
+    external-format. Instead the string is subject to external-format
+    conversion. Additionally return values of type SB-ALIEN:C-STRING
+    are by default of type (SIMPLE-ARRAY CHARACTER), not
+    SIMPLE-BASE-STRING. For an alien type that behaves like the old
+    SB-ALIEN:C-STRING type, use (SB-ALIEN:C-STRING :EXTERNAL-FORMAT
+    :ASCII :ELEMENT-TYPE BASE-CHAR).  (thanks to Yaroslav Kavenchuk)
   * incompatible change: SB-EXT package no longer contains the
     following unused symbols: *GC-NOTIFY-AFTER*, *GC-NOTIFY-BEFORE*,
     *GC-NOTIFY-STREAM*, *ERROR-PRINT-LENGTH*, *ERROR-PRINT-LEVEL*,
@@ -16,6 +24,8 @@ changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
     Slobodov)
   * bug fix: better detection of circularities in the file-compiler.
     (reported by Marco Monteiro)
+  * bug fix: the CL pathname functions now work with files that have
+    non-ASCII characters in their names (thanks to Yaroslav Kavenchuk)
   * bug fix: The :PTY argument for RUN-PROGRAM will now work on 
     systems with Unix98 pty semantics.
   * bug fix: ASDF-INSTALL will now work with bsd tar.
@@ -192,6 +202,8 @@ changes in sbcl-0.9.13 relative to sbcl-0.9.12:
     faster
   * optimization: added a limited bytecode compiler for simple toplevel
     forms, speeding up compilation and FASL loading
+  * bug fix: the statistical profiler now properly distinguishes anonymous
+    functions
 
 changes in sbcl-0.9.12 relative to sbcl-0.9.11:
   * minor incompatible change: in sbcl-0.9.11 (but not earlier

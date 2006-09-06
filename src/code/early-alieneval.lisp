@@ -26,3 +26,5 @@
 ;;;     Lisp idiom for C's return type "void" (which is likely
 ;;;     why it's set when when translating return values)
 (defvar *values-type-okay* nil)
+
+(defvar *default-c-string-external-format* nil)

@@ -55,9 +55,9 @@
   #!+sb-doc
   "Remove any occurrences of #\\ from the string because we've already
    checked for whatever they may have protected."
-  (declare (type simple-base-string namestr)
+  (declare (type simple-string namestr)
            (type index start end))
-  (let* ((result (make-string (- end start) :element-type 'base-char))
+  (let* ((result (make-string (- end start) :element-type 'character))
          (dst 0)
          (quoted nil))
     (do ((src start (1+ src)))
@@ -85,7 +85,7 @@
 (/show0 "filesys.lisp 86")
 
 (defun maybe-make-pattern (namestr start end)
-  (declare (type simple-base-string namestr)
+  (declare (type simple-string namestr)
            (type index start end))
   (if *ignore-wildcards*
       (subseq namestr start end)
@@ -158,7 +158,7 @@
 (/show0 "filesys.lisp 160")
 
 (defun extract-name-type-and-version (namestr start end)
-  (declare (type simple-base-string namestr)
+  (declare (type simple-string namestr)
            (type index start end))
   (let* ((last-dot (position #\. namestr :start (1+ start) :end end
                              :from-end t)))
@@ -239,9 +239,9 @@
                             (:relative ""))
                           ""))
            (devstring (if (and device (not (eq device :unspecific)))
-                          (concatenate 'simple-base-string (string device) (string #\:))
+                          (concatenate 'simple-string (string device) (string #\:))
                           ""))
-           (headstring (concatenate 'simple-base-string devstring dirstring)))
+           (headstring (concatenate 'simple-string devstring dirstring)))
       (if directory
           (%enumerate-directories headstring (rest directory) pathname
                                   verify-existence follow-links nil function)
@@ -274,10 +274,10 @@
         (let ((piece (car tail)))
           (etypecase piece
             (simple-string
-             (let ((head (concatenate 'base-string head piece)))
+             (let ((head (concatenate 'string head piece)))
                (with-directory-node-noted (head)
                  (%enumerate-directories
-                  (concatenate 'base-string head
+                  (concatenate 'string head
                                (host-unparse-directory-separator host))
                   (cdr tail) pathname
                   verify-existence follow-links
@@ -293,8 +293,8 @@
              (%enumerate-directories head (rest tail) pathname
                                      verify-existence follow-links
                                      nodes function)
-             (dolist (name (ignore-errors (directory-lispy-filenames head)))
-               (let ((subdir (concatenate 'base-string head name)))
+             (dolist (name (directory-lispy-filenames head))
+               (let ((subdir (concatenate 'string head name)))
                  (multiple-value-bind (res dev ino mode)
                      (unix-xstat subdir)
                    (declare (type (or fixnum null) mode))
@@ -305,14 +305,14 @@
                                           (eql (cdr dir) ino))
                                  (return t)))
                        (let ((nodes (cons (cons dev ino) nodes))
-                             (subdir (concatenate 'base-string subdir (host-unparse-directory-separator host))))
+                             (subdir (concatenate 'string subdir (host-unparse-directory-separator host))))
                          (%enumerate-directories subdir tail pathname
                                                  verify-existence follow-links
                                                  nodes function))))))))
             ((or pattern (member :wild))
              (dolist (name (directory-lispy-filenames head))
                (when (or (eq piece :wild) (pattern-matches piece name))
-                 (let ((subdir (concatenate 'base-string head name)))
+                 (let ((subdir (concatenate 'string head name)))
                    (multiple-value-bind (res dev ino mode)
                        (unix-xstat subdir)
                      (declare (type (or fixnum null) mode))
@@ -320,7 +320,7 @@
                                 (eql (logand mode sb!unix:s-ifmt)
                                      sb!unix:s-ifdir))
                        (let ((nodes (cons (cons dev ino) nodes))
-                             (subdir (concatenate 'base-string subdir (host-unparse-directory-separator host))))
+                             (subdir (concatenate 'string subdir (host-unparse-directory-separator host))))
                          (%enumerate-directories subdir (rest tail) pathname
                                                  verify-existence follow-links
                                                  nodes function))))))))
@@ -330,9 +330,9 @@
                     :pathname pathname
                     :format-control "~@<invalid use of :UP after :ABSOLUTE.~@:>"))
            (with-directory-node-removed (head)
-             (let ((head (concatenate 'base-string head "..")))
+             (let ((head (concatenate 'string head "..")))
                (with-directory-node-noted (head)
-                 (%enumerate-directories (concatenate 'base-string head (host-unparse-directory-separator host))
+                 (%enumerate-directories (concatenate 'string head (host-unparse-directory-separator host))
                                          (rest tail) pathname
                                          verify-existence follow-links
                                          nodes function)))))
@@ -355,7 +355,7 @@
     (/noshow0 "computed NAME, TYPE, and VERSION")
     (cond ((member name '(nil :unspecific))
            (/noshow0 "UNSPECIFIC, more or less")
-           (let ((directory (coerce directory 'base-string)))
+           (let ((directory (coerce directory 'string)))
              (when (or (not verify-existence)
                        (sb!unix:unix-file-kind directory))
                (funcall function directory))))
@@ -382,19 +382,19 @@
                           (components-match file-type type)
                           (components-match file-version version))
                  (funcall function
-                          (concatenate 'base-string
+                          (concatenate 'string
                                        directory
                                        complete-filename))))))
           (t
            (/noshow0 "default case")
-           (let ((file (concatenate 'base-string directory name)))
+           (let ((file (concatenate 'string directory name)))
              (/noshow "computed basic FILE")
              (unless (or (null type) (eq type :unspecific))
                (/noshow0 "tweaking FILE for more-or-less-:UNSPECIFIC case")
-               (setf file (concatenate 'base-string file "." type)))
+               (setf file (concatenate 'string file "." type)))
              (unless (member version '(nil :newest :wild :unspecific))
                (/noshow0 "tweaking FILE for more-or-less-:WILD case")
-               (setf file (concatenate 'base-string file "."
+               (setf file (concatenate 'string file "."
                                        (quick-integer-to-string version))))
              (/noshow0 "finished possibly tweaking FILE")
              (when (or (not verify-existence)
@@ -572,6 +572,7 @@
 
 ;;; (This is an ANSI Common Lisp function.)
 (defun user-homedir-pathname (&optional host)
+  #!+sb-doc
   "Return the home directory of the user as a pathname. If the HOME
 environment variable has been specified, the directory it designates
 is returned; otherwise obtains the home directory from the operating
@@ -848,7 +849,7 @@ system."
                                :device (pathname-device pathname)
                                :directory (subseq dir 0 i))))
                  (unless (probe-file newpath)
-                   (let ((namestring (coerce (namestring newpath) 'base-string)))
+                   (let ((namestring (coerce (namestring newpath) 'string)))
                      (when verbose
                        (format *standard-output*
                                "~&creating directory: ~A~%"

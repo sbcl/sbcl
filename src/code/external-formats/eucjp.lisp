@@ -13088,7 +13088,7 @@
         1))
   (let ((euc (ucs-to-eucjp bits)))
     (if (null euc)
-        (stream-encoding-error-and-handle stream byte)
+        (external-format-encoding-error stream byte)
         (ecase size
           (1 (setf (sap-ref-8 sap tail) euc))
           (2 (setf (sap-ref-8 sap tail) (ldb (byte 8 8) euc)

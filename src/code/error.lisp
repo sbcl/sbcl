@@ -124,6 +124,24 @@
                stream ':external-format (stream-external-format stream)
                octets)))))
 
+(define-condition c-string-encoding-error (character-encoding-error)
+  ((external-format :initarg :external-format :reader c-string-encoding-error-external-format))
+  (:report
+   (lambda (c s)
+     (format s "~@<c-string encoding error (:external-format ~S): ~2I~_~
+                  the character with code ~D cannot be encoded.~@:>"
+               (c-string-encoding-error-external-format c)
+               (character-encoding-error-code c)))))
+
+(define-condition c-string-decoding-error (character-decoding-error)
+  ((external-format :initarg :external-format :reader c-string-decoding-error-external-format))
+  (:report
+   (lambda (c s)
+     (format s "~@<c-string decoding error (:external-format ~S): ~2I~_~
+                  the octet sequence ~S cannot be decoded.~@:>"
+             (c-string-decoding-error-external-format c)
+             (character-decoding-error-octets c)))))
+
 (define-condition control-stack-exhausted (storage-condition)
   ()
   (:report

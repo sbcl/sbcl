@@ -12,7 +12,7 @@
 (in-package "SB!IMPL")
 
 (defun extract-device (namestr start end)
-  (declare (type simple-base-string namestr)
+  (declare (type simple-string namestr)
            (type index start end))
   (if (and (>= end (+ start 2))
            (alpha-char-p (char namestr start))
@@ -21,7 +21,7 @@
       (values nil start)))
 
 (defun split-at-slashes-and-backslashes (namestr start end)
-  (declare (type simple-base-string namestr)
+  (declare (type simple-string namestr)
            (type index start end))
   (let ((absolute (and (/= start end)
                        (or (char= (schar namestr start) #\/)
@@ -44,7 +44,7 @@
 (defun parse-win32-namestring (namestring start end)
   (declare (type simple-string namestring)
            (type index start end))
-  (setf namestring (coerce namestring 'simple-base-string))
+  (setf namestring (coerce namestring 'simple-string))
   (multiple-value-bind (device new-start)
       (extract-device namestring start end)
     (multiple-value-bind (absolute pieces)
@@ -100,7 +100,7 @@
 (defun parse-native-win32-namestring (namestring start end)
   (declare (type simple-string namestring)
            (type index start end))
-  (setf namestring (coerce namestring 'simple-base-string))
+  (setf namestring (coerce namestring 'simple-string))
   (multiple-value-bind (device new-start)
       (extract-device namestring start end)
     (multiple-value-bind (absolute ranges)
@@ -187,7 +187,7 @@
               (t
                (error "invalid pattern piece: ~S" piece))))))
        (apply #'concatenate
-              'simple-base-string
+              'simple-string
               (strings))))))
 
 (defun unparse-win32-directory-list (directory)
@@ -213,7 +213,7 @@
            (pieces "\\"))
           (t
            (error "invalid directory component: ~S" dir)))))
-    (apply #'concatenate 'simple-base-string (pieces))))
+    (apply #'concatenate 'simple-string (pieces))))
 
 (defun unparse-win32-directory (pathname)
   (declare (type pathname pathname))
@@ -246,11 +246,11 @@
             (error "type component can't have a #\. inside: ~S" pathname)))
         (strings ".")
         (strings (unparse-unix-piece type))))
-    (apply #'concatenate 'simple-base-string (strings))))
+    (apply #'concatenate 'simple-string (strings))))
 
 (defun unparse-win32-namestring (pathname)
   (declare (type pathname pathname))
-  (concatenate 'simple-base-string
+  (concatenate 'simple-string
                (unparse-win32-device pathname)
                (unparse-win32-directory pathname)
                (unparse-win32-file pathname)))
@@ -291,7 +291,7 @@
              (error "non-STRING type in NATIVE-NAMESTRING: ~S" name))
            (write-char #\. s)
            (write-string type s))))
-     'simple-base-string)))
+     'simple-string)))
 
 ;;; FIXME.
 (defun unparse-win32-enough (pathname defaults)
@@ -340,7 +340,7 @@
         (when type-needed
           (when (or (null pathname-type) (eq pathname-type :unspecific))
             (lose))
-          (when (typep pathname-type 'simple-base-string)
+          (when (typep pathname-type 'simple-string)
             (when (position #\. pathname-type)
               (error "type component can't have a #\. inside: ~S" pathname)))
           (strings ".")

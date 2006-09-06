@@ -169,11 +169,11 @@
     (let ((koi8-r-byte (code->koi8-r-mapper bits)))
       (if koi8-r-byte
           (setf (sap-ref-8 sap tail) koi8-r-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (koi8-r->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper koi8-u->code-mapper code->koi8-u-mapper
   (#x80 #x2500) ; BOX DRAWINGS LIGHT HORIZONTAL
@@ -344,11 +344,11 @@
     (let ((koi8-u-byte (code->koi8-u-mapper bits)))
       (if koi8-u-byte
           (setf (sap-ref-8 sap tail) koi8-u-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (koi8-u->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper x-mac-cyrillic->code-mapper code->x-mac-cyrillic-mapper
   (#x80 #x0410) ; CYRILLIC CAPITAL LETTER A
@@ -514,8 +514,8 @@
     (let ((x-mac-cyrillic-byte (code->x-mac-cyrillic-mapper bits)))
       (if x-mac-cyrillic-byte
           (setf (sap-ref-8 sap tail) x-mac-cyrillic-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (x-mac-cyrillic->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check

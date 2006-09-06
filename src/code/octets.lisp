@@ -644,7 +644,8 @@ one-past-the-end"
       (let ((external-format #!-win32 (intern (or (sb!alien:alien-funcall
                                                     (extern-alien
                                                       "nl_langinfo"
-                                                      (function c-string int))
+                                                      (function (c-string :external-format :latin-1)
+                                                                int))
                                                     sb!unix:codeset)
                                                   "LATIN-1")
                                               "KEYWORD")

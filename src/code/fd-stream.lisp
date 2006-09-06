@@ -140,6 +140,16 @@
          :stream stream
          :code code))
 
+(defun c-string-encoding-error (external-format code)
+  (error 'c-string-encoding-error
+         :external-format external-format
+         :code code))
+
+(defun c-string-decoding-error (external-format octets)
+  (error 'c-string-decoding-error
+         :external-format external-format
+         :octets octets))
+
 ;;; Returning true goes into end of file handling, false will enter another
 ;;; round of input buffer filling followed by re-entering character decode.
 (defun stream-decoding-error-and-handle (stream octet-count)
@@ -168,6 +178,16 @@
       :report (lambda (stream)
                 (format stream "~@<Skip output of this character.~@:>"))
       (throw 'output-nothing nil))))
+
+(defun external-format-encoding-error (stream code)
+  (if (streamp stream)
+    (stream-encoding-error-and-handle stream code)
+    (c-string-encoding-error stream code)))
+
+(defun external-format-decoding-error (stream octet-count)
+  (if (streamp stream)
+    (stream-decoding-error stream octet-count)
+    (c-string-decoding-error stream octet-count)))
 
 ;;; This is called by the server when we can write to the given file
 ;;; descriptor. Attempt to write the data again. If it worked, remove
@@ -552,13 +572,22 @@
   element-type, string input function name, character input function name,
   and string output function name.")
 
+(defun get-external-format (external-format)
+  (dolist (entry *external-formats*)
+    (when (member external-format (first entry))
+      (return entry))))
+
+(defun get-external-format-function (external-format index)
+  (let ((entry (get-external-format external-format)))
+    (when entry (nth index entry))))
+
 ;;; Find an output routine to use given the type and buffering. Return
 ;;; as multiple values the routine, the real type transfered, and the
 ;;; number of bytes per element.
 (defun pick-output-routine (type buffering &optional external-format)
   (when (subtypep type 'character)
-    (dolist (entry *external-formats*)
-      (when (member external-format (first entry))
+    (let ((entry (get-external-format external-format)))
+      (when entry
         (return-from pick-output-routine
           (values (symbol-function (nth (ecase buffering
                                           (:none 4)
@@ -1021,7 +1050,9 @@
          (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" (string name)))
          (in-function (symbolicate "FD-STREAM-READ-N-CHARACTERS/" name))
          (in-char-function (symbolicate "INPUT-CHAR/" name))
-         (size-function (symbolicate "BYTES-FOR-CHAR/" name)))
+         (size-function (symbolicate "BYTES-FOR-CHAR/" name))
+         (read-c-string-function (symbolicate "READ-FROM-C-STRING/" name))
+         (output-c-string-function (symbolicate "OUTPUT-TO-C-STRING/" name)))
     `(progn
       (defun ,size-function (byte)
         (declare (ignore byte))
@@ -1125,13 +1156,58 @@
       (def-input-routine ,in-char-function (character ,size sap head)
         (let ((byte (sap-ref-8 sap head)))
           ,in-expr))
+      (defun ,read-c-string-function (sap element-type)
+        (declare (type system-area-pointer sap)
+                 (type (member character base-char) element-type))
+        (locally
+            (declare (optimize (speed 3) (safety 0)))
+          (let* ((stream ,name)
+                 (length (loop for head of-type index upfrom 0 by ,size
+                            for count of-type index upto (1- ARRAY-DIMENSION-LIMIT)
+                            for byte = (sap-ref-8 sap head)
+                            for char of-type character = ,in-expr
+                            until (zerop (char-code char))
+                            finally (return count)))
+                 (string (make-string length :element-type element-type)))
+            (declare (ignorable stream)
+                     (type index length)
+                     (type string string))
+            (/show0 before-copy-loop)
+            (loop for head of-type index upfrom 0 by ,size
+               for index of-type index below length
+               for byte = (sap-ref-8 sap head)
+               for char of-type character = ,in-expr
+               do (setf (aref string index) char))
+            string))) ;; last loop rewrite to dotimes?
+        (defun ,output-c-string-function (string)
+          (declare (type simple-string string))
+          (locally
+              (declare (optimize (speed 3) (safety 0)))
+            (let* ((length (length string))
+                   (buffer (make-array (* (1+ length) ,size) :element-type '(unsigned-byte 8)))
+                   (sap (sb!sys:vector-sap buffer))
+                   (tail 0)
+                   (stream ,name))
+              (declare (type index length tail)
+                       (type system-area-pointer sap))
+              (dotimes (i length)
+                (let* ((byte (aref string i))
+                       (bits (char-code byte)))
+                  (declare (ignorable byte bits))
+                  ,out-expr)
+                (incf tail ,size))
+              (let* ((bits 0)
+                     (byte (code-char bits)))
+                (declare (ignorable bits byte))
+                ,out-expr)
+              buffer)))
       (setf *external-formats*
        (cons '(,external-format ,in-function ,in-char-function ,out-function
                ,@(mapcar #'(lambda (buffering)
                              (intern (format nil format (string buffering))))
                          '(:none :line :full))
                nil ; no resync-function
-               ,size-function)
+               ,size-function ,read-c-string-function ,output-c-string-function)
         *external-formats*)))))
 
 (defmacro define-external-format/variable-width
@@ -1143,7 +1219,9 @@
          (in-function (symbolicate "FD-STREAM-READ-N-CHARACTERS/" name))
          (in-char-function (symbolicate "INPUT-CHAR/" name))
          (resync-function (symbolicate "RESYNC/" name))
-         (size-function (symbolicate "BYTES-FOR-CHAR/" name)))
+         (size-function (symbolicate "BYTES-FOR-CHAR/" name))
+         (read-c-string-function (symbolicate "READ-FROM-C-STRING/" name))
+         (output-c-string-function (symbolicate "OUTPUT-TO-C-STRING/" name)))
     `(progn
       (defun ,size-function (byte)
         (declare (ignorable byte))
@@ -1293,13 +1371,90 @@
                             ,in-expr))
                         nil)
                 (return))))
+      (defun ,read-c-string-function (sap element-type)
+        (declare (type system-area-pointer sap))
+        (locally
+            (declare (optimize (speed 3) (safety 0)))
+          (let* ((stream ,name)
+                 (size 0) (head 0) (byte 0) (char nil)
+                 (decode-break-reason nil)
+                 (length (dotimes (count (1- ARRAY-DIMENSION-LIMIT) count)
+                           (setf decode-break-reason
+                                 (block decode-break-reason
+                                   (setf byte (sap-ref-8 sap head)
+                                         size ,in-size-expr
+                                         char ,in-expr)
+                                   (incf head size)
+                                   nil))
+                           (when decode-break-reason
+                             (c-string-decoding-error ,name decode-break-reason))
+                           (when (zerop (char-code char))
+                             (return count))))
+                 (string (make-string length :element-type element-type)))
+            (declare (ignorable stream)
+                     (type index head length) ;; size
+                     (type (unsigned-byte 8) byte)
+                     (type (or null character) char)
+                     (type string string))
+            (setf head 0)
+            (dotimes (index length string)
+              (setf decode-break-reason
+                    (block decode-break-reason
+                      (setf byte (sap-ref-8 sap head)
+                            size ,in-size-expr
+                            char ,in-expr)
+                      (incf head size)
+                      nil))
+              (when decode-break-reason
+                (c-string-decoding-error ,name decode-break-reason))
+              (setf (aref string index) char)))))
+
+      (defun ,output-c-string-function (string)
+        (declare (type simple-string string))
+        (locally
+            (declare (optimize (speed 3) (safety 0)))
+          (let* ((length (length string))
+                 (char-length (make-array (1+ length) :element-type 'index))
+                 (buffer-length
+                  (+ (loop for i of-type index below length
+                        for byte of-type character = (aref string i)
+                        for bits = (char-code byte)
+                        sum (setf (aref char-length i)
+                                  (the index ,out-size-expr)))
+                     (let* ((byte (code-char 0))
+                            (bits (char-code byte)))
+                       (declare (ignorable byte bits))
+                       (setf (aref char-length length)
+                             (the index ,out-size-expr)))))
+                 (tail 0)
+                 (buffer (make-array buffer-length :element-type '(unsigned-byte 8)))
+                 (sap (sb!sys:vector-sap buffer))
+                 stream)
+            (declare (type index length buffer-length tail)
+                     (type system-area-pointer sap)
+                     (type null stream)
+                     (ignorable stream))
+            (loop for i of-type index below length
+               for byte of-type character = (aref string i)
+               for bits = (char-code byte)
+               for size of-type index = (aref char-length i)
+               do (prog1
+                      ,out-expr
+                    (incf tail size)))
+            (let* ((bits 0)
+                   (byte (code-char bits))
+                   (size (aref char-length length)))
+              (declare (ignorable bits byte size))
+              ,out-expr)
+            buffer)))
+
       (setf *external-formats*
        (cons '(,external-format ,in-function ,in-char-function ,out-function
                ,@(mapcar #'(lambda (buffering)
                              (intern (format nil format (string buffering))))
                          '(:none :line :full))
                ,resync-function
-               ,size-function)
+               ,size-function ,read-c-string-function ,output-c-string-function)
         *external-formats*)))))
 
 ;;; Multiple names for the :ISO{,-}8859-* families are needed because on
@@ -1308,7 +1463,7 @@
 (define-external-format (:latin-1 :latin1 :iso-8859-1 :iso8859-1)
     1 t
   (if (>= bits 256)
-      (stream-encoding-error-and-handle stream bits)
+      (external-format-encoding-error stream bits)
       (setf (sap-ref-8 sap tail) bits))
   (code-char byte))
 
@@ -1316,7 +1471,7 @@
                          :iso-646 :iso-646-us :|646|)
     1 t
   (if (>= bits 128)
-      (stream-encoding-error-and-handle stream bits)
+      (external-format-encoding-error stream bits)
       (setf (sap-ref-8 sap tail) bits))
   (code-char byte))
 
@@ -1347,7 +1502,7 @@
   (define-external-format (:ebcdic-us :ibm-037 :ibm037)
       1 t
     (if (>= bits 256)
-        (stream-encoding-error-and-handle stream bits)
+        (external-format-encoding-error stream bits)
         (setf (sap-ref-8 sap tail) (aref reverse-table bits)))
     (aref table byte)))
 
@@ -1378,10 +1533,10 @@
           (if (< bits 256)
               (if (= bits (char-code (aref latin-9-table bits)))
                   bits
-                  (stream-encoding-error-and-handle stream byte))
+                  (external-format-encoding-error stream byte))
               (if (= (aref latin-9-reverse-1 (logand bits 15)) bits)
                   (aref latin-9-reverse-2 (logand bits 15))
-                  (stream-encoding-error-and-handle stream byte))))
+                  (external-format-encoding-error stream byte))))
     (aref latin-9-table byte)))
 
 (define-external-format/variable-width (:utf-8 :utf8) nil
@@ -1906,8 +2061,8 @@
 ;;; Pick a name to use for the backup file for the :IF-EXISTS
 ;;; :RENAME-AND-DELETE and :RENAME options.
 (defun pick-backup-name (name)
-  (declare (type simple-base-string name))
-  (concatenate 'simple-base-string name ".bak"))
+  (declare (type simple-string name))
+  (concatenate 'simple-string name ".bak"))
 
 ;;; Ensure that the given arg is one of the given list of valid
 ;;; things. Allow the user to fix any problems.

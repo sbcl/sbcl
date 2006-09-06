@@ -98,11 +98,11 @@
     (let ((iso-8859-2-byte (code->iso-8859-2-mapper bits)))
       (if iso-8859-2-byte
           (setf (sap-ref-8 sap tail) iso-8859-2-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (iso-8859-2->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-3->code-mapper code->iso-8859-3-mapper
   (#xA1 #x0126) ; LATIN CAPITAL LETTER H WITH STROKE
@@ -180,11 +180,11 @@
     (let ((iso-8859-3-byte (code->iso-8859-3-mapper bits)))
       (if iso-8859-3-byte
           (setf (sap-ref-8 sap tail) iso-8859-3-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (iso-8859-3->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-4->code-mapper code->iso-8859-4-mapper
   (#xA1 #x0104) ; LATIN CAPITAL LETTER A WITH OGONEK
@@ -277,11 +277,11 @@
     (let ((iso-8859-4-byte (code->iso-8859-4-mapper bits)))
       (if iso-8859-4-byte
           (setf (sap-ref-8 sap tail) iso-8859-4-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (iso-8859-4->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-5->code-mapper code->iso-8859-5-mapper
   (#xA1 #x0401) ; CYRILLIC CAPITAL LETTER IO
@@ -418,11 +418,11 @@
     (let ((iso-8859-5-byte (code->iso-8859-5-mapper bits)))
       (if iso-8859-5-byte
           (setf (sap-ref-8 sap tail) iso-8859-5-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (iso-8859-5->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-6->code-mapper code->iso-8859-6-mapper
   (#xA1 nil)
@@ -558,11 +558,11 @@
     (let ((iso-8859-6-byte (code->iso-8859-6-mapper bits)))
       (if iso-8859-6-byte
           (setf (sap-ref-8 sap tail) iso-8859-6-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (iso-8859-6->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-7->code-mapper code->iso-8859-7-mapper
   (#xA1 #x02BD) ; MODIFIER LETTER REVERSED COMMA
@@ -685,11 +685,11 @@
     (let ((iso-8859-7-byte (code->iso-8859-7-mapper bits)))
       (if iso-8859-7-byte
           (setf (sap-ref-8 sap tail) iso-8859-7-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (iso-8859-7->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-8->code-mapper code->iso-8859-8-mapper
   (#xA1 nil)
@@ -801,11 +801,11 @@
     (let ((iso-8859-8-byte (code->iso-8859-8-mapper bits)))
       (if iso-8859-8-byte
           (setf (sap-ref-8 sap tail) iso-8859-8-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (iso-8859-8->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-9->code-mapper code->iso-8859-9-mapper
   (#xD0 #x011E) ; LATIN CAPITAL LETTER G WITH BREVE
@@ -854,11 +854,11 @@
     (let ((iso-8859-9-byte (code->iso-8859-9-mapper bits)))
       (if iso-8859-9-byte
           (setf (sap-ref-8 sap tail) iso-8859-9-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (iso-8859-9->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-10->code-mapper code->iso-8859-10-mapper
   (#xA1 #x0104) ; LATIN CAPITAL LETTER A WITH OGONEK
@@ -947,11 +947,11 @@
     (let ((iso-8859-10-byte (code->iso-8859-10-mapper bits)))
       (if iso-8859-10-byte
           (setf (sap-ref-8 sap tail) iso-8859-10-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (iso-8859-10->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-11->code-mapper code->iso-8859-11-mapper
   (#xA1 #x0E01) ; THAI CHARACTER KO KAI
@@ -1089,11 +1089,11 @@
     (let ((iso-8859-11-byte (code->iso-8859-11-mapper bits)))
       (if iso-8859-11-byte
           (setf (sap-ref-8 sap tail) iso-8859-11-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (iso-8859-11->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-13->code-mapper code->iso-8859-13-mapper
   (#xA1 #x201D) ; RIGHT DOUBLE QUOTATION MARK
@@ -1192,11 +1192,11 @@
     (let ((iso-8859-13-byte (code->iso-8859-13-mapper bits)))
       (if iso-8859-13-byte
           (setf (sap-ref-8 sap tail) iso-8859-13-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (iso-8859-13->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-14->code-mapper code->iso-8859-14-mapper
   (#xA1 #x1E02) ; LATIN CAPITAL LETTER B WITH DOT ABOVE
@@ -1270,8 +1270,8 @@
     (let ((iso-8859-14-byte (code->iso-8859-14-mapper bits)))
       (if iso-8859-14-byte
           (setf (sap-ref-8 sap tail) iso-8859-14-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (iso-8859-14->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check

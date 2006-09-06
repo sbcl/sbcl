@@ -120,11 +120,11 @@
     (let ((cp1250-byte (code->cp1250-mapper bits)))
       (if cp1250-byte
           (setf (sap-ref-8 sap tail) cp1250-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp1250->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp1251->code-mapper code->cp1251-mapper
   (#x80 #x0402) ; CYRILLIC CAPITAL LETTER DJE
@@ -280,11 +280,11 @@
     (let ((cp1251-byte (code->cp1251-mapper bits)))
       (if cp1251-byte
           (setf (sap-ref-8 sap tail) cp1251-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp1251->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp1252->code-mapper code->cp1252-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -359,11 +359,11 @@
     (let ((cp1252-byte (code->cp1252-mapper bits)))
       (if cp1252-byte
           (setf (sap-ref-8 sap tail) cp1252-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp1252->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp1253->code-mapper code->cp1253-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -513,11 +513,11 @@
     (let ((cp1253-byte (code->cp1253-mapper bits)))
       (if cp1253-byte
           (setf (sap-ref-8 sap tail) cp1253-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp1253->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp1254->code-mapper code->cp1254-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -598,11 +598,11 @@
     (let ((cp1254-byte (code->cp1254-mapper bits)))
       (if cp1254-byte
           (setf (sap-ref-8 sap tail) cp1254-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp1254->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp1255->code-mapper code->cp1255-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -744,11 +744,11 @@
     (let ((cp1255-byte (code->cp1255-mapper bits)))
       (if cp1255-byte
           (setf (sap-ref-8 sap tail) cp1255-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp1255->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp1256->code-mapper code->cp1256-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -876,11 +876,11 @@
     (let ((cp1256-byte (code->cp1256-mapper bits)))
       (if cp1256-byte
           (setf (sap-ref-8 sap tail) cp1256-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp1256->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp1257->code-mapper code->cp1257-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -1010,11 +1010,11 @@
     (let ((cp1257-byte (code->cp1257-mapper bits)))
       (if cp1257-byte
           (setf (sap-ref-8 sap tail) cp1257-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp1257->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check
 
 (define-unibyte-mapper cp1258->code-mapper code->cp1258-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -1103,8 +1103,8 @@
     (let ((cp1258-byte (code->cp1258-mapper bits)))
       (if cp1258-byte
           (setf (sap-ref-8 sap tail) cp1258-byte)
-          (stream-encoding-error-and-handle stream bits)))
+          (external-format-encoding-error stream bits)))
     (let ((code (cp1258->code-mapper byte)))
       (if code
           (code-char code)
-          (stream-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))) ;; TODO -- error check

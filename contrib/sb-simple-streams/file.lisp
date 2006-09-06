@@ -115,8 +115,8 @@
 ;;; TODO: use this in src/code/fd-stream.lisp:fd-stream-misc-routine
 ;;; as well, snarf error reporting from there.
 (defun revert-file (filename original)
-  (declare (type simple-base-string filename)
-           (type (or simple-base-string null) original))
+  (declare (type simple-string filename)
+           (type (or simple-string null) original))
   ;; We can't do anything unless we know what file were
   ;; dealing with, and we don't want to do anything
   ;; strange unless we were writing to the file.
@@ -140,8 +140,8 @@
 ;;; TODO: use this in src/code/fd-stream.lisp:fd-stream-misc-routine
 ;;; as well, snarf error reporting from there.
 (defun delete-original (filename original)
-  (declare (type simple-base-string filename)
-           (type (or simple-base-string null) original))
+  (declare (type simple-string filename)
+           (type (or simple-string null) original))
   (when original
     (multiple-value-bind (okay err) (sb-unix:unix-unlink original)
       (unless okay
