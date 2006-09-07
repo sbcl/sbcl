@@ -5,9 +5,12 @@ set -e
 
 ensure_dirs ()
 {
+    OLD_IFS=$IFS
+    IFS=''
     for j in $*; do
-        test -d $j || mkdir -p $j
+         test -d "$j" || mkdir -p "$j"
     done;
+    IFS=$OLD_IFS
 }
 
 if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
@@ -20,9 +23,9 @@ else
     OLD_RUNTIME=sbcl.old
 fi
 INSTALL_ROOT=${INSTALL_ROOT-$DEFAULT_INSTALL_ROOT}
-MAN_DIR=${MAN_DIR-$INSTALL_ROOT/share/man}
-INFO_DIR=${INFO_DIR-$INSTALL_ROOT/share/info}
-DOC_DIR=${DOC_DIR-$INSTALL_ROOT/share/doc/sbcl}
+MAN_DIR=${MAN_DIR-"$INSTALL_ROOT"/share/man}
+INFO_DIR=${INFO_DIR-"$INSTALL_ROOT"/share/info}
+DOC_DIR=${DOC_DIR-"$INSTALL_ROOT"/share/doc/sbcl}
 
 # Does the environment look sane?
 if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
@@ -46,26 +49,26 @@ else
     exit 1
 fi
 
-SBCL_HOME=$INSTALL_ROOT/lib/sbcl
+SBCL_HOME="$INSTALL_ROOT"/lib/sbcl
 export SBCL_HOME INSTALL_ROOT
-ensure_dirs $BUILD_ROOT$INSTALL_ROOT $BUILD_ROOT$INSTALL_ROOT/bin \
-    $BUILD_ROOT$INSTALL_ROOT/lib  \
-    $BUILD_ROOT$MAN_DIR $BUILD_ROOT$MAN_DIR/man1 \
-    $BUILD_ROOT$INFO_DIR $BUILD_ROOT$DOC_DIR \
-    $BUILD_ROOT$DOC_DIR/html \
-    $BUILD_ROOT$SBCL_HOME \
-    $BUILD_ROOT$SBCL_HOME/site-systems
+ensure_dirs "$BUILD_ROOT$INSTALL_ROOT" "$BUILD_ROOT$INSTALL_ROOT"/bin \
+    "$BUILD_ROOT$INSTALL_ROOT"/lib  \
+    "$BUILD_ROOT$MAN_DIR" "$BUILD_ROOT$MAN_DIR"/man1 \
+    "$BUILD_ROOT$INFO_DIR" "$BUILD_ROOT$DOC_DIR" \
+    "$BUILD_ROOT$DOC_DIR"/html \
+    "$BUILD_ROOT$SBCL_HOME" \
+    "$BUILD_ROOT$SBCL_HOME"/site-systems
 
 # move old versions out of the way.  Safer than copying: don't want to
 # break any running instances that have these files mapped
-test -f $BUILD_ROOT$INSTALL_ROOT/bin/$RUNTIME && \
- mv $BUILD_ROOT$INSTALL_ROOT/bin/$RUNTIME \
-    $BUILD_ROOT$INSTALL_ROOT/bin/$OLD_RUNTIME
-test -f $BUILD_ROOT$SBCL_HOME/sbcl.core && \
-    mv $BUILD_ROOT$SBCL_HOME/sbcl.core $BUILD_ROOT$SBCL_HOME/sbcl.core.old
+test -f "$BUILD_ROOT$INSTALL_ROOT"/bin/$RUNTIME && \
+ mv "$BUILD_ROOT$INSTALL_ROOT"/bin/$RUNTIME \
+    "$BUILD_ROOT$INSTALL_ROOT"/bin/$OLD_RUNTIME
+test -f "$BUILD_ROOT$SBCL_HOME"/sbcl.core && \
+    mv "$BUILD_ROOT$SBCL_HOME"/sbcl.core "$BUILD_ROOT$SBCL_HOME"/sbcl.core.old
 
-cp src/runtime/$RUNTIME $BUILD_ROOT$INSTALL_ROOT/bin/
-cp output/sbcl.core $BUILD_ROOT$SBCL_HOME/sbcl.core
+cp src/runtime/$RUNTIME "$BUILD_ROOT$INSTALL_ROOT"/bin/
+cp output/sbcl.core "$BUILD_ROOT$SBCL_HOME"/sbcl.core
 
 # installing contrib
 
@@ -81,9 +84,9 @@ find_gnumake
 
 for i in contrib/*; do
     test -d $i && test -f $i/test-passed || continue;
-    INSTALL_DIR=$SBCL_HOME/`basename $i `
+    INSTALL_DIR="$SBCL_HOME"/`basename $i `
     export INSTALL_DIR
-    ensure_dirs $BUILD_ROOT$INSTALL_DIR && $GNUMAKE -C $i install
+    ensure_dirs "$BUILD_ROOT$INSTALL_DIR" && $GNUMAKE -C $i install
 done
 
 echo
@@ -105,14 +108,14 @@ echo
 echo "Documentation:"
 
 # man
-cp doc/sbcl.1 $BUILD_ROOT$MAN_DIR/man1/ && echo " man $BUILD_ROOT$MAN_DIR/man1/sbcl.1"
+cp doc/sbcl.1 "$BUILD_ROOT$MAN_DIR"/man1/ && echo " man $BUILD_ROOT$MAN_DIR/man1/sbcl.1"
 
 # info
 for info in doc/manual/*.info doc/manual/*.info-*
 do
-  cp $info $BUILD_ROOT$INFO_DIR/ \
+  cp $info "$BUILD_ROOT$INFO_DIR"/ \
       && echo -n " info $BUILD_ROOT$INFO_DIR/`basename $info` $BUILD_ROOT$INFO_DIR/dir" \
-      && ( install-info $BUILD_ROOT$INFO_DIR/`basename $info` $BUILD_ROOT$INFO_DIR/dir > /dev/null 2>&1 \
+      && ( install-info "$BUILD_ROOT$INFO_DIR"/`basename $info` "$BUILD_ROOT$INFO_DIR"/dir > /dev/null 2>&1 \
            || echo -n " (could not add to system catalog)" ) \
       && echo
 done
@@ -120,18 +123,18 @@ done
 # pdf
 for pdf in doc/manual/*.pdf
 do
-  cp $pdf $BUILD_ROOT$DOC_DIR/ \
+  cp $pdf "$BUILD_ROOT$DOC_DIR"/ \
       && echo " pdf $BUILD_ROOT$DOC_DIR/`basename $pdf`"
 done
 
 # html
 for html in doc/manual/sbcl doc/manual/asdf
 do
-  test -d $html && cp -R -L $html $BUILD_ROOT$DOC_DIR/html \
+  test -d $html && cp -R -L $html "$BUILD_ROOT$DOC_DIR"/html \
       && echo " html $BUILD_ROOT$DOC_DIR/html/`basename $html`/index.html"
 done
 
 for f in BUGS SUPPORT CREDITS COPYING NEWS
 do
-  cp $f $BUILD_ROOT$DOC_DIR/
+  cp $f "$BUILD_ROOT$DOC_DIR"/
 done

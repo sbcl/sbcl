@@ -29,4 +29,4 @@ test: all
 
 
 install: $(EXTRA_INSTALL_TARGETS)
-	tar cf - . | ( cd $(BUILD_ROOT)$(INSTALL_DIR) && tar xpvf - )
+	tar cf - . | ( cd "$(BUILD_ROOT)$(INSTALL_DIR)" && tar xpvf - )
