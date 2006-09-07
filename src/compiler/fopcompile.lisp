@@ -276,21 +276,36 @@
                      (fopcompile (cons 'progn (cdr args)) path for-value-p))
                    ;; Otherwise it must be an ordinary funcall.
                    (otherwise
-                    (fopcompile-constant operator t)
-                    (dolist (arg args)
-                      (fopcompile arg path t))
-                    (if for-value-p
-                        (sb!fasl::dump-fop 'sb!fasl::fop-funcall
-                                           *compile-object*)
-                        (sb!fasl::dump-fop 'sb!fasl::fop-funcall-for-effect
-                                           *compile-object*))
-                    (let ((n-args (length args)))
-                      ;; stub: FOP-FUNCALL isn't going to be usable
-                      ;; to compile more than this, since its count
-                      ;; is a single byte. Maybe we should just punt
-                      ;; to the ordinary compiler in that case?
-                      (aver (<= n-args 255))
-                      (sb!fasl::dump-byte n-args *compile-object*))))))))
+                    (cond
+                      ;; Special hack: there's already a fop for
+                      ;; find-undeleted-package-or-lose, so use it.
+                      ;; (We could theoretically do the same for
+                      ;; other operations, but I don't see any good
+                      ;; candidates in a quick read-through of
+                      ;; src/code/fop.lisp.)
+                      ((and (eq operator
+                                'sb!int:find-undeleted-package-or-lose)
+                            (= 1 (length args))
+                            for-value-p)
+                       (fopcompile (first args) path t)
+                       (sb!fasl::dump-fop 'sb!fasl::fop-package
+                                          *compile-object*))
+                      (t
+                       (fopcompile-constant operator t)
+                       (dolist (arg args)
+                         (fopcompile arg path t))
+                       (if for-value-p
+                           (sb!fasl::dump-fop 'sb!fasl::fop-funcall
+                                              *compile-object*)
+                           (sb!fasl::dump-fop 'sb!fasl::fop-funcall-for-effect
+                                              *compile-object*))
+                       (let ((n-args (length args)))
+                         ;; stub: FOP-FUNCALL isn't going to be usable
+                         ;; to compile more than this, since its count
+                         ;; is a single byte. Maybe we should just punt
+                         ;; to the ordinary compiler in that case?
+                         (aver (<= n-args 255))
+                         (sb!fasl::dump-byte n-args *compile-object*))))))))))
         (t
          (bug "looks unFOPCOMPILEable: ~S" form))))
 
