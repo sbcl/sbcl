@@ -146,7 +146,7 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
         /* the simple case first */
         os_vm_address_t real_addr;
         if (!(real_addr = VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE))) {
-            perror("VirtualAlloc");
+            fprintf(stderr, "VirtualAlloc: 0x%lx.\n", GetLastError());
             return 0;
         }
 
@@ -154,7 +154,7 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
     }
 
     if (!VirtualQuery(addr, &mem_info, sizeof mem_info)) {
-        perror("VirtualQuery");
+        fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
         return 0;
     }
 
@@ -166,7 +166,7 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
     }
 
     if (!VirtualAlloc(addr, len, (mem_info.State == MEM_RESERVE)? MEM_COMMIT: MEM_RESERVE, PAGE_EXECUTE_READWRITE)) {
-        perror("VirtualAlloc");
+        fprintf(stderr, "VirtualAlloc: 0x%lx.\n", GetLastError());
         return 0;
     }
 
@@ -192,7 +192,7 @@ void
 os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
     if (!VirtualFree(addr, len, MEM_DECOMMIT)) {
-        perror("VirtualFree");
+        fprintf(stderr, "VirtualFree: 0x%lx.\n", GetLastError());
     }
 }
 
@@ -212,11 +212,13 @@ os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 {
     os_vm_size_t count;
 
+#if 0
     fprintf(stderr, "os_map: %d, 0x%x, %p, 0x%x.\n", fd, offset, addr, len);
     fflush(stderr);
+#endif
 
     if (!VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE)) {
-        perror("VirtualAlloc");
+        fprintf(stderr, "VirtualAlloc: 0x%lx.\n", GetLastError());
         lose("os_map: VirtualAlloc failure");
     }
 
