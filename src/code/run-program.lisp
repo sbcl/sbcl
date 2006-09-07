@@ -845,12 +845,9 @@ Common Lisp Users Manual for details about the PROCESS structure.
               (coerce
                 ;; Apparently any spaces or double quotes in the arguments
                 ;; need to be escaped on win32.
-                #+win32
                 (if (position-if (lambda (c) (find c '(#\" #\Space))) x)
                     (write-to-string x)
                     x)
-                #-win32
-                x
                 'simple-string))
             args)))
     (unwind-protect

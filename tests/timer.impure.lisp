@@ -118,3 +118,13 @@
            (sb-ext:with-timeout 0.5
              (sleep 5)
              (assert nil))))))
+
+#+sb-thread
+(with-test (:name (:with-timeout :dead-thread))
+  (sb-thread:make-thread
+   (lambda ()
+     (let ((timer (make-timer (lambda ()))))
+       (schedule-timer timer 3)
+       (assert t))))
+  (sleep 6)
+  (assert t))

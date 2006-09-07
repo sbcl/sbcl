@@ -29,6 +29,10 @@ changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
   * bug fix: The :PTY argument for RUN-PROGRAM will now work on 
     systems with Unix98 pty semantics.
   * bug fix: ASDF-INSTALL will now work with bsd tar.
+  * bug fix: ASDF-INSTALL uses GNU tar on Solaris (thanks to Josip
+    Gracin).
+  * bug fix: timers expiring in dead threads no longer cause a
+    type-error (reported by Paul "Nonny Mouse"). 
 
 changes in sbcl-0.9.16 relative to sbcl-0.9.15:
   * feature: implemented the READER-METHOD-CLASS and

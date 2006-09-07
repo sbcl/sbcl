@@ -255,8 +255,9 @@
       (elt *locations* (1- response)))))
 
 (defparameter *tar-program*
-  (or #+darwin "gnutar"
-      "tar"))
+  #+darwin "gnutar"
+  #+sunos "gtar"
+  #-(or darwin sunos) "tar")
 
 (defun get-tar-directory (packagename)
   (let* ((tar (with-output-to-string (o)

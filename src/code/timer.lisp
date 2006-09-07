@@ -337,7 +337,8 @@ triggers."
            (handler-case
                (sb!thread:interrupt-thread thread function)
              (sb!thread:interrupt-thread-error (c)
-               (warn c)))))))
+               (declare (ignore c))
+               (warn "Timer ~S failed to interrupt thread ~S." timer thread)))))))
 
 ;; Called from the signal handler.
 (defun run-expired-timers ()
