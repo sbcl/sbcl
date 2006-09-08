@@ -1702,3 +1702,14 @@ WORKAROUND:
     VECTOR-POP: #() has length zero
   perhaps because CLISP has shuffled the clauses into an 
   ANSI-compliant order before proceeding.
+
+405: a TYPE-ERROR in MERGE-LETS exercised at DEBUG 3
+  In sbcl-0.9.16.21 on linux/86, compiling 
+    (declaim (optimize (debug 3)))
+    (defstruct foo bar)
+    (let ()
+      (flet ((i (x) (frob x (foo-bar foo))))
+        (i :five)))
+  causes a TYPE-ERROR 
+    The value NIL is not of type SB-C::PHYSENV.
+  in MERGE-LETS.

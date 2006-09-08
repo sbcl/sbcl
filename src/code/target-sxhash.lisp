@@ -159,7 +159,7 @@
 
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go
-  ;; fast, in case it is the bottleneck somwhere.  -- CSR, 2003-03-14
+  ;; fast, in case it is the bottleneck somewhere.  -- CSR, 2003-03-14
   (declare (optimize speed))
   (labels ((sxhash-number (x)
              (etypecase x
