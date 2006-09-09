@@ -333,7 +333,7 @@
         (when name-needed
           (unless pathname-name (lose))
           (when (and (null pathname-type)
-                     (typep pathname-name 'simple-base-string)
+                     (typep pathname-name 'simple-string)
                      (position #\. pathname-name :start 1))
             (error "too many dots in the name: ~S" pathname))
           (strings (unparse-unix-piece pathname-name)))
