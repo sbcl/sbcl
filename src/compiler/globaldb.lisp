@@ -758,7 +758,7 @@
   (&whole whole class type name &optional (env-list nil env-list-p))
   ;; Constant CLASS and TYPE is an overwhelmingly common special case,
   ;; and we can implement it much more efficiently than the general case.
-  (if (and (constantp class) (constantp type))
+  (if (and (keywordp class) (keywordp type))
       (let ((info (type-info-or-lose class type)))
         (with-unique-names (value foundp)
           `(multiple-value-bind (,value ,foundp)
@@ -768,6 +768,7 @@
              (declare (type ,(type-info-type info) ,value))
              (values ,value ,foundp))))
       whole))
+
 (defun (setf info) (new-value
                     class
                     type
@@ -786,37 +787,28 @@
                         tin
                         new-value)))
   new-value)
-;;; FIXME: We'd like to do this, but Python doesn't support
-;;; compiler macros and it's hard to change it so that it does.
-;;; It might make more sense to just convert INFO :FOO :BAR into
-;;; an ordinary function, so that instead of calling INFO :FOO :BAR
-;;; you call e.g. INFO%FOO%BAR. Then dynamic linking could be handled
-;;; by the ordinary Lisp mechanisms and we wouldn't have to maintain
-;;; all this cruft..
-#|
 #!-sb-fluid
-(progn
-  (define-compiler-macro (setf info) (&whole whole
+(define-compiler-macro (setf info) (&whole whole
                                       new-value
                                       class
                                       type
                                       name
                                       &optional (env-list nil env-list-p))
-    ;; Constant CLASS and TYPE is an overwhelmingly common special case, and we
-    ;; can resolve it much more efficiently than the general case.
-    (if (and (constantp class) (constantp type))
-        (let* ((info (type-info-or-lose class type))
-               (tin (type-info-number info)))
-          (if env-list-p
-              `(set-info-value ,name
-                               ,tin
-                               ,new-value
-                               (get-write-info-env ,env-list))
-              `(set-info-value ,name
-                               ,tin
-                               ,new-value)))
-        whole)))
-|#
+  ;; Constant CLASS and TYPE is an overwhelmingly common special case,
+  ;; and we can resolve it much more efficiently than the general
+  ;; case.
+  (if (and (keywordp class) (keywordp type))
+      (let* ((info (type-info-or-lose class type))
+             (tin (type-info-number info)))
+        (if env-list-p
+            `(set-info-value ,name
+                             ,tin
+                             ,new-value
+                             (get-write-info-env ,env-list))
+            `(set-info-value ,name
+                             ,tin
+                             ,new-value))))
+  whole)
 
 ;;; the maximum density of the hashtable in a volatile env (in
 ;;; names/bucket)
