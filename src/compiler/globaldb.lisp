@@ -789,13 +789,17 @@
   new-value)
 #!-sb-fluid
 (progn
+  ;; Not all xc hosts are happy about SETF compiler macros: CMUCL 19
+  ;; does not accept them at all, and older SBCLs give a full warning.
+  ;; So the easy thing is to hide this optimization from all xc hosts.
   #-sb-xc-host
   (define-compiler-macro (setf info) (&whole whole
                                              new-value
                                              class
                                              type
                                              name
-                                             &optional (env-list nil env-list-p))
+                                             &optional (env-list nil
+                                                                 env-list-p))
     ;; Constant CLASS and TYPE is an overwhelmingly common special case,
     ;; and we can resolve it much more efficiently than the general
     ;; case.
