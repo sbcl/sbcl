@@ -788,27 +788,29 @@
                         new-value)))
   new-value)
 #!-sb-fluid
-(define-compiler-macro (setf info) (&whole whole
-                                      new-value
-                                      class
-                                      type
-                                      name
-                                      &optional (env-list nil env-list-p))
-  ;; Constant CLASS and TYPE is an overwhelmingly common special case,
-  ;; and we can resolve it much more efficiently than the general
-  ;; case.
-  (if (and (keywordp class) (keywordp type))
-      (let* ((info (type-info-or-lose class type))
-             (tin (type-info-number info)))
-        (if env-list-p
-            `(set-info-value ,name
-                             ,tin
-                             ,new-value
-                             (get-write-info-env ,env-list))
-            `(set-info-value ,name
-                             ,tin
-                             ,new-value))))
-  whole)
+(progn
+  #-sb-xc-host
+  (define-compiler-macro (setf info) (&whole whole
+                                             new-value
+                                             class
+                                             type
+                                             name
+                                             &optional (env-list nil env-list-p))
+    ;; Constant CLASS and TYPE is an overwhelmingly common special case,
+    ;; and we can resolve it much more efficiently than the general
+    ;; case.
+    (if (and (keywordp class) (keywordp type))
+        (let* ((info (type-info-or-lose class type))
+               (tin (type-info-number info)))
+          (if env-list-p
+              `(set-info-value ,name
+                               ,tin
+                               ,new-value
+                               (get-write-info-env ,env-list))
+              `(set-info-value ,name
+                               ,tin
+                               ,new-value))))
+    whole))
 
 ;;; the maximum density of the hashtable in a volatile env (in
 ;;; names/bucket)
