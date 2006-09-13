@@ -654,6 +654,19 @@
 
 (format t "infodb test done~%")
 
+(with-test (:name (:backtrace))
+  ;; Printing backtraces from several threads at once used to hang the
+  ;; whole SBCL process (discovered by accident due to a timer.impure
+  ;; test misbehaving). The cause was that packages weren't even
+  ;; thread-safe for only doing FIND-SYMBOL, and while printing
+  ;; backtraces a loot of symbol lookups need to be done due to
+  ;; *PRINT-ESCAPE*.
+  (let* ((threads (loop repeat 10
+                        collect (sb-thread:make-thread
+                                 (lambda ()
+                                   (dotimes (i 1000)
+                                     (with-output-to-string (*debug-io*)
+                                       (sb-debug::backtrace 10))))))))
+    (wait-for-threads threads)))
 
-
-
+(format t "backtrace test done~%")

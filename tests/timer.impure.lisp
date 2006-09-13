@@ -13,6 +13,10 @@
 
 (use-package :test-util)
 
+(defmacro raises-timeout-p (&body body)
+  `(handler-case (progn (progn ,@body) nil)
+    (sb-ext:timeout () t)))
+
 (with-test (:name (:timer :relative))
   (let* ((has-run-p nil)
          (timer (make-timer (lambda () (setq has-run-p t))
@@ -84,10 +88,6 @@
     (sleep 2)
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
-(defmacro raises-timeout-p (&body body)
-  `(handler-case (progn (progn ,@body) nil)
-    (sb-ext:timeout () t)))
-
 (with-test (:name (:with-timeout :timeout))
   (assert (raises-timeout-p
            (sb-ext:with-timeout 0.2
@@ -110,14 +110,26 @@
             (sb-ext:with-timeout 2
               (sleep 2))))))
 
+(defun wait-for-threads (threads)
+  (loop while (some #'sb-thread:thread-alive-p threads) do (sleep 0.01)))
+
 #+sb-thread
 (with-test (:name (:with-timeout :many-at-the-same-time))
-  (loop repeat 10 do
-        (sb-thread:make-thread
-         (lambda ()
-           (sb-ext:with-timeout 0.5
-             (sleep 5)
-             (assert nil))))))
+  (let ((ok t))
+    (let ((threads (loop repeat 10 collect
+                         (sb-thread:make-thread
+                          (lambda ()
+                            (handler-case
+                                (sb-ext:with-timeout 0.5
+                                  (sleep 5)
+                                  (setf ok nil)
+                                  (format t "~%not ok~%"))
+                              (timeout ()
+                                )))))))
+      (assert (not (raises-timeout-p
+                    (sb-ext:with-timeout 20
+                      (wait-for-threads threads)))))
+      (assert ok))))
 
 #+sb-thread
 (with-test (:name (:with-timeout :dead-thread))

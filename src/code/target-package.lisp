@@ -694,8 +694,7 @@ error if any of PACKAGES is not a valid package designator."
                  (values symbol nil))))))))
 
 ;;; Check internal and external symbols, then scan down the list
-;;; of hashtables for inherited symbols. When an inherited symbol
-;;; is found pull that table to the beginning of the list.
+;;; of hashtables for inherited symbols.
 (defun find-symbol* (string length package)
   (declare (simple-string string)
            (type index length))
@@ -716,8 +715,20 @@ error if any of PACKAGES is not a valid package designator."
           ((null table) (values nil nil))
         (with-symbol (found symbol (car table) string length hash ehash)
           (when found
-            (unless (eq prev head)
-              (shiftf (cdr prev) (cdr table) (cdr head) table))
+            ;; At this point we used to move the table to the
+            ;; beginning of the list, probably on the theory that we'd
+            ;; soon be looking up further items there. Unfortunately
+            ;; that was very much non-thread safe. Since the failure
+            ;; mode was nasty (corruption of the package in a way
+            ;; which would make symbol lookups loop infinitely) and it
+            ;; would be triggered just by doing reads to a resource
+            ;; that users can't do their own locking on, that code has
+            ;; been removed. If we ever add locking to packages,
+            ;; resurrecting that code might make sense, even though it
+            ;; didn't seem to have much of an performance effect in
+            ;; normal use.
+            ;;
+            ;; -- JES, 2006-09-13
             (return-from find-symbol* (values symbol :inherited))))))))
 
 ;;; Similar to FIND-SYMBOL, but only looks for an external symbol.
