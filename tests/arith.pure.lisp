@@ -21,9 +21,9 @@
              `(progn
                (assert (= (,op 4 2) ,res1))
                (assert (= (,op 2 4) ,res2))
-               (assert (= (funcall (compile nil (lambda (x y) (,op x y))) 4 2)
+               (assert (= (funcall (compile nil '(lambda (x y) (,op x y))) 4 2)
                         ,res1))
-               (assert (= (funcall (compile nil (lambda (x y) (,op x y))) 2 4)
+               (assert (= (funcall (compile nil '(lambda (x y) (,op x y))) 2 4)
                         ,res2)))))
   (test + 6 6)
   (test - 2 -2)

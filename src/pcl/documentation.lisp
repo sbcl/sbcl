@@ -11,16 +11,22 @@
 ;;; FIXME: Lots of bare calls to INFO here could be handled
 ;;; more cleanly by calling the FDOCUMENTATION function instead.
 
+(defun fun-doc (x)
+  (etypecase x
+    (generic-function
+     (slot-value x '%documentation))
+    #+sb-eval
+    (sb-eval:interpreted-function
+     (sb-eval:interpreted-function-documentation x))
+    (function
+     (%fun-doc x))))
+
 ;;; functions, macros, and special forms
 (defmethod documentation ((x function) (doc-type (eql 't)))
-  (if (typep x 'generic-function)
-      (slot-value x '%documentation)
-      (%fun-doc x)))
+  (fun-doc x))
 
 (defmethod documentation ((x function) (doc-type (eql 'function)))
-  (if (typep x 'generic-function)
-      (slot-value x '%documentation)
-      (%fun-doc x)))
+  (fun-doc x))
 
 (defmethod documentation ((x list) (doc-type (eql 'function)))
   (and (legal-fun-name-p x)
@@ -41,22 +47,28 @@
 (defmethod documentation ((x symbol) (doc-type (eql 'setf)))
   (values (info :setf :documentation x)))
 
-(defmethod (setf documentation) (new-value (x function) (doc-type (eql 't)))
-  (if (typep x 'generic-function)
-      (setf (slot-value x '%documentation) new-value)
-      (let ((name (%fun-name x)))
-        (when (and name (typep name '(or symbol cons)))
-          (setf (info :function :documentation name) new-value))))
+(defun (setf fun-doc) (new-value x)
+  (etypecase x
+    (generic-function
+     (setf (slot-value x '%documentation) new-value))
+    #+sb-eval
+    (sb-eval:interpreted-function
+     (setf (sb-eval:interpreted-function-documentation x)
+           new-value))
+    (function
+     (let ((name (%fun-name x)))
+       (when (and name (typep name '(or symbol cons)))
+         (setf (info :function :documentation name) new-value)))))
   new-value)
 
-(defmethod (setf documentation)
-    (new-value (x function) (doc-type (eql 'function)))
-  (if (typep x 'generic-function)
-      (setf (slot-value x '%documentation) new-value)
-      (let ((name (%fun-name x)))
-        (when (and name (typep name '(or symbol cons)))
-          (setf (info :function :documentation name) new-value))))
-  new-value)
+
+(defmethod (setf documentation) (new-value (x function) (doc-type (eql 't)))
+  (setf (fun-doc x) new-value))
+
+(defmethod (setf documentation) (new-value
+                                 (x function)
+                                 (doc-type (eql 'function)))
+  (setf (fun-doc x) new-value))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'function)))
   (setf (info :function :documentation x) new-value))

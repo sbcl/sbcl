@@ -611,7 +611,10 @@
            (destructuring-bind (name . thing) var
              (declare (ignore name))
              (etypecase thing
-               (leaf nil)
+               ;; The evaluator will mark lexicals with :BOGUS when it
+               ;; translates an interpreter lexenv to a compiler
+               ;; lexenv.
+               ((or leaf #!+sb-eval (member :bogus)) nil)
                (cons (aver (eq (car thing) 'macro))
                      t)
                (heap-alien-info nil)))))

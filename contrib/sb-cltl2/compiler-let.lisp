@@ -29,3 +29,21 @@
                                          'compiler-let bindings walked-body)))))))
 
 (sb-walker::define-walker-template compiler-let walk-compiler-let)
+
+#+sb-eval
+(setf (getf sb-eval::*eval-dispatch-functions* 'compiler-let)
+      (lambda (form env)
+        (destructuring-bind (bindings &body body) (cdr form)
+          (loop for binding in bindings
+                if (atom binding)
+                collect binding into vars
+                and collect nil into values
+                else do (assert (proper-list-of-length-p binding 1 2))
+                and collect (first binding) into vars
+                and collect (eval (second binding)) into values
+                finally (return
+                          (let ((new-env (sb-eval::make-env
+                                          :parent env
+                                          :vars (sb-eval::special-bindings vars))))
+                            (progv vars values
+                              (sb-eval::eval-progn body new-env))))))))

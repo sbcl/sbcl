@@ -14,6 +14,11 @@
 ;;;; more information.
 
 (cl:in-package :cl-user)
+
+;;; The debugger doesn't have any native knowledge of the interpreter
+(when (eq sb-ext:*evaluator-mode* :interpret)
+  (sb-ext:quit :unix-status 104))
+
 
 ;;;; Check that we get debug arglists right.
 
@@ -38,7 +43,13 @@
     ;; happen to be the two case that I had my nose rubbed in when
     ;; debugging a GC problem caused by applying %SIMPLE-FUN-ARGLIST to
     ;; a closure. -- WHN 2001-06-05)
-    (t :unknown)))
+    (t
+     #+sb-eval
+     (if (typep fun 'sb-eval::interpreted-function)
+         (sb-eval::interpreted-function-lambda-list fun)
+         :unknown)
+     #-sb-eval
+     :unknown)))
 
 (defun zoop (zeep &key beep)
   blurp)

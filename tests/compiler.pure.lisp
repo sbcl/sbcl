@@ -13,6 +13,10 @@
 
 (cl:in-package :cl-user)
 
+;; The tests in this file assume that EVAL will use the compiler
+(when (eq sb-ext:*evaluator-mode* :interpret)
+  (invoke-restart 'run-tests::skip-file))
+
 ;;; Exercise a compiler bug (by crashing the compiler).
 ;;;
 ;;; This test code is from Douglas Crosher's simplified TICKLE-BUG

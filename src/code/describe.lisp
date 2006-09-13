@@ -191,9 +191,17 @@
       (%describe-fun-name name s (%simple-fun-type x))))
   (%describe-compiled-from (sb-kernel:fun-code-header x) s))
 
+(defun %describe-fun (x s &optional (kind :function) (name nil))
+  (etypecase x
+    #+sb-eval
+    (sb-eval:interpreted-function
+     (%describe-interpreted-fun x s kind name))
+    (function
+     (%describe-compiled-fun x s kind name))))
+
 ;;; Describe a function object. KIND and NAME provide some information
 ;;; about where the function came from.
-(defun %describe-fun (x s &optional (kind :function) (name nil))
+(defun %describe-compiled-fun (x s &optional (kind :function) (name nil))
   (declare (type function x))
   (declare (type stream s))
   (declare (type (member :macro :function) kind))
@@ -206,7 +214,7 @@
                      (format s "~S is a function." x))))
     (format s "~@:_~@<Its associated name (as in ~S) is ~2I~_~S.~:>"
             'function-lambda-expression
-            (%fun-name x))
+            (nth-value 2 (function-lambda-expression x)))
     (case (widetag-of x)
       (#.sb-vm:closure-header-widetag
        (%describe-fun-compiled (%closure-fun x) s kind name)
@@ -223,6 +231,46 @@
        (format s "~@:_It is an unknown type of funcallable instance."))
       (t
        (format s "~@:_It is an unknown type of function."))))
+  (terpri s))
+
+;; Describe an interpreted function.
+#+sb-eval
+(defun %describe-interpreted-fun (x s &optional (kind :function) (name nil))
+  (declare (type sb-eval:interpreted-function x))
+  (declare (type stream s))
+  (declare (type (member :macro :function) kind))
+  (fresh-line s)
+  (pprint-logical-block (s nil)
+    (ecase kind
+      (:macro (format s "Macro-function: ~S" x))
+      (:function (if name
+                     (format s "Function: ~S" x)
+                     (format s "~S is a function." x))))
+    (format s "~@:_~@<Its associated name (as in ~S) is ~2I~_~S.~:>"
+            'function-lambda-expression
+            (nth-value 2 (function-lambda-expression x)))
+    (format s "~&It is an interpreted function.~%")
+    (let ((args (sb-eval:interpreted-function-lambda-list x)))
+      (cond ((not args)
+             (write-string "There are no arguments." s))
+            (t
+             (format s "~&~@(The ~@[~A's ~]arguments are:~@:_~)" kind)
+             (write-string "  " s)
+             (let ((*print-pretty* t)
+                   (*print-escape* t)
+                   (*print-base* 10)
+                   (*print-radix* nil))
+               (pprint-logical-block (s nil)
+                 (pprint-indent :current 2)
+                 (format s "~A" args)))))
+      (format s "~&It was defined as: ")
+      (let ((*print-pretty* t)
+            (*print-escape* t)
+            (*print-base* 10)
+            (*print-radix* nil))
+        (pprint-logical-block (s nil)
+          (pprint-indent :current 2)
+          (format s "~A" (function-lambda-expression x))))))
   (terpri s))
 
 (defmethod describe-object ((x function) s)

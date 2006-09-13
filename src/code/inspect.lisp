@@ -205,19 +205,32 @@ evaluated expressions.
           (inspected-standard-object-elements object)))
 
 (defmethod inspected-parts ((object function))
-           (values (format nil "The object is a ~A named ~S.~%"
-                           (if (closurep object) 'closure 'function)
-                           (%fun-name object))
-                   t
-                   ;; Defined-from stuff used to be here. Someone took
-                   ;; it out. FIXME: We should make it easy to get
-                   ;; to DESCRIBE from the inspector.
-                   (list*
-                    (cons "Lambda-list" (%fun-lambda-list object))
-                    (cons "Ftype" (%fun-type object))
-                    (when (closurep object)
-                      (list
-                       (cons "Closed over values" (%closure-values object)))))))
+  (values (format nil "The object is a ~A named ~S.~%"
+                  (if (closurep object) 'closure 'function)
+                  (nth-value 2 (function-lambda-expression object)))
+          t
+          ;; Defined-from stuff used to be here. Someone took
+          ;; it out. FIXME: We should make it easy to get
+          ;; to DESCRIBE from the inspector.
+          (list*
+           (cons "Lambda-list" (%fun-lambda-list object))
+           (cons "Ftype" (%fun-type object))
+           (when (closurep object)
+             (list
+              (cons "Closed over values" (%closure-values object)))))))
+
+#+sb-eval
+(defmethod inspected-parts ((object sb-eval:interpreted-function))
+  (values (format nil "The object is an interpreted function named ~S.~%"
+                  (nth-value 2 (function-lambda-expression object)))
+          t
+          ;; Defined-from stuff used to be here. Someone took
+          ;; it out. FIXME: We should make it easy to get
+          ;; to DESCRIBE from the inspector.
+          (list
+           (cons "Lambda-list" (sb-eval:interpreted-function-lambda-list object))
+           (cons "Definition" (function-lambda-expression object))
+           (cons "Documentation" (sb-eval:interpreted-function-documentation object)))))
 
 (defmethod inspected-parts ((object vector))
   (values (format nil

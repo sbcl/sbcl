@@ -754,3 +754,6 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
     (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
         (sb!vm::symbol-global-value symbol)
         (sb!kernel:make-lisp-obj tl-val))))
+
+(defun sb!vm::locked-symbol-global-value-add (symbol-name delta)
+  (sb!vm::locked-symbol-global-value-add symbol-name delta))

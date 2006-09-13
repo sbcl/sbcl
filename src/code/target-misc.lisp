@@ -23,24 +23,33 @@
   to COMPILE otherwise, CLOSURE-P is non-NIL if the function's definition
   might have been enclosed in some non-null lexical environment, and
   NAME is some name (for debugging only) or NIL if there is no name."
-    (declare (type function fun))
-    (let* ((fun (%simple-fun-self fun))
-           (name (%fun-name fun))
-           (code (sb!di::fun-code-header fun))
-           (info (sb!kernel:%code-debug-info code)))
-      (if info
-        (let ((source (sb!c::debug-info-source info)))
-          (cond ((and (eq (sb!c::debug-source-from source) :lisp)
-                      (eq (sb!c::debug-source-function source) fun))
-                 (values (svref (sb!c::debug-source-name source) 0)
-                         nil
-                         name))
-                ((legal-fun-name-p name)
-                 (let ((exp (fun-name-inline-expansion name)))
-                   (values exp (not exp) name)))
-                (t
-                 (values nil t name))))
-        (values nil t name))))
+  (declare (type function fun))
+  (etypecase fun
+    #!+sb-eval
+    (sb!eval:interpreted-function
+     (let ((name (sb!eval:interpreted-function-name fun))
+           (lambda-list (sb!eval:interpreted-function-lambda-list fun))
+           (body (sb!eval:interpreted-function-body fun)))
+       (values `(lambda ,lambda-list ,@body)
+               t name)))
+    (function
+     (let* ((fun (%simple-fun-self fun))
+            (name (%fun-name fun))
+            (code (sb!di::fun-code-header fun))
+            (info (sb!kernel:%code-debug-info code)))
+       (if info
+           (let ((source (sb!c::debug-info-source info)))
+             (cond ((and (eq (sb!c::debug-source-from source) :lisp)
+                         (eq (sb!c::debug-source-function source) fun))
+                    (values (svref (sb!c::debug-source-name source) 0)
+                            nil
+                            name))
+                   ((legal-fun-name-p name)
+                    (let ((exp (fun-name-inline-expansion name)))
+                      (values exp (not exp) name)))
+                   (t
+                    (values nil t name))))
+           (values nil t name))))))
 
 (defun closurep (object)
   (= sb!vm:closure-header-widetag (widetag-of object)))

@@ -952,8 +952,8 @@ NIL is returned when no such class exists."
                                (:constructor make-standard-classoid)))
 ;;; a metaclass for miscellaneous PCL structure-like objects (at the
 ;;; moment, only CTOR objects).
-(def!struct (random-pcl-classoid (:include classoid)
-                                 (:constructor make-random-pcl-classoid)))
+(def!struct (static-classoid (:include classoid)
+                             (:constructor make-static-classoid)))
 
 ;;;; built-in classes
 

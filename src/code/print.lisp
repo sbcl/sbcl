@@ -358,10 +358,14 @@
             (default-structure-print object stream *current-level-in-print*))
            (t
             (write-string "#<INSTANCE but not STRUCTURE-OBJECT>" stream))))
+    (funcallable-instance
+     (cond
+       ((not (and (boundp '*print-object-is-disabled-p*)
+                  *print-object-is-disabled-p*))
+        (print-object object stream))
+       (t (output-fun object stream))))
     (function
-     (unless (and (funcallable-instance-p object)
-                  (printed-as-funcallable-standard-class object stream))
-       (output-fun object stream)))
+     (output-fun object stream))
     (symbol
      (output-symbol object stream))
     (number

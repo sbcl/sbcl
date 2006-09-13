@@ -485,6 +485,13 @@
  ;; trace table definitions from compiler/trace-table.lisp.
  ("src/compiler/dump")
 
+ ;; early-full-eval uses !DEFSTRUCT-WITH-ALTERNATE-METACLASS and
+ ;; DEF!METHOD.  It split out from the rest of full-eval because
+ ;; defstruct/metaclass fun makes it unslammable, and to define
+ ;; INTERPRETED-FUNCTION before it is used in compiler/main.
+ #!+sb-eval
+ ("src/code/early-full-eval" :not-host)
+
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
  ("src/code/source-location")
  ("src/compiler/target-main" :not-host)
@@ -687,6 +694,9 @@
  ;; DEFINE-CONDITION are defined and SB!DEBUG:*STACK-TOP-HINT* is
  ;; declared special.
  ("src/code/parse-defmacro-errors")
+
+ #!+sb-eval
+ ("src/code/full-eval"   :not-host) ; uses INFO, ARG-COUNT-ERROR
 
  ("src/code/bit-bash"    :not-host) ; needs %NEGATE from assembly/target/arith
 

@@ -161,6 +161,9 @@ fail_on_compiler_note $tmpfilename
 # test case from Rudi for some CLOS WARNINGness that shouldn't have
 # been there
 cat > $tmpfilename <<EOF
+    #+sb-eval (eval-when (:compile-toplevel)
+                (setf sb-ext:*evaluator-mode* :compile))
+
     (eval-when (:compile-toplevel :load-toplevel :execute)
       (defstruct buffer-state
         (output-index 0)))

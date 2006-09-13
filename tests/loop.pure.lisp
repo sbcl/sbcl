@@ -33,7 +33,8 @@
 ;;; a bug reported and fixed by Alexey Dejneka sbcl-devel 2001-10-05:
 ;;; The type declarations should apply, hence under Python's
 ;;; declarations-are-assertions rule, the code should signal a type
-;;; error.
+;;; error. (Except when running interpreted code)
+#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
 (assert (typep (nth-value 1
                           (ignore-errors
                             (funcall (lambda ()
@@ -177,6 +178,7 @@
   (setf (gethash 7 ht) 15)
   (assert (= (loop for v fixnum being each hash-key in ht sum v) 8))
   (assert (= (loop for v fixnum being each hash-value in ht sum v) 18))
+  #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
   (assert (raises-error? (loop for v float being each hash-value in ht sum v)
                          type-error)))
 

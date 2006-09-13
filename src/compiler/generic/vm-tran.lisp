@@ -19,7 +19,12 @@
 (define-source-transform long-float-p (x) `(double-float-p ,x))
 
 (define-source-transform compiled-function-p (x)
-  `(functionp ,x))
+  #!-sb-eval
+  `(functionp ,x)
+  #!+sb-eval
+  (once-only ((x x))
+    `(and (functionp ,x)
+          (not (sb!eval:interpreted-function-p ,x)))))
 
 (define-source-transform char-int (x)
   `(char-code ,x))

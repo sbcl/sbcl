@@ -11,18 +11,29 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(let ((*macroexpand-hook* (lambda (fun form env)
-                            (handler-bind ((error (lambda (c)
-                                                    (when (eq 'destructuring-bind (car form))
-                                                      (throw 'd-b-error c)))))
-                              (funcall fun form env)))))
-  (macrolet ((error-p (ll)
+(let ((*macroexpand-hook*
+       (compile nil
+                (lambda (fun form env)
+                  (handler-bind ((error (lambda (c)
+                                          (when (eq 'destructuring-bind (car form))
+                                            (throw 'd-b-error c)))))
+                    (funcall fun form env))))))
+  (macrolet ((maybe-funcall (&rest args)
+               ;; The evaluator will delay lambda-list checks until
+               ;; the lambda is actually called.
+               (if (eq sb-ext:*evaluator-mode* :interpret)
+                   `(funcall ,@args)
+                   `(progn ,@args)))
+             (error-p (ll)
                `(progn
-                  (multiple-value-bind (result error) (ignore-errors (eval `(lambda ,',ll 'ok)))
+                  (multiple-value-bind (result error)
+                      (ignore-errors (maybe-funcall (eval `(lambda ,',ll 'ok))))
                     (unless (and (not result) error)
                       (error "No error from lambda ~S." ',ll)))
                   (catch 'd-b-error
-                    (eval `(lambda (x) (destructuring-bind ,',ll x 'ok)))
+                    (maybe-funcall
+                     (eval `(lambda (x) (destructuring-bind ,',ll x 'ok)))
+                     nil)
                     (error "No error from d-b ~S." ',ll)))))
     (error-p (&aux (foo 1) &aux (bar 2)))
     (error-p (&aux (foo 1) &key bar))

@@ -110,8 +110,8 @@
   :slot-names (function-name class-name class initargs)
   :boa-constructor %make-ctor
   :superclass-name function
-  :metaclass-name random-pcl-classoid
-  :metaclass-constructor make-random-pcl-classoid
+  :metaclass-name static-classoid
+  :metaclass-constructor make-static-classoid
   :dd-type funcallable-structure
   :runtime-type-checks-p nil)
 

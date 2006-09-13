@@ -121,8 +121,9 @@
   (maplist (lambda (sublist)
              (let ((option-name (first (pop sublist))))
                (when (member option-name sublist :key #'first)
-                 (error "Multiple ~S options in DEFCLASS ~S."
-                        option-name class-name))))
+                 (error 'simple-program-error
+                        :format-control "Multiple ~S options in DEFCLASS ~S."
+                        :format-arguments (list option-name class-name)))))
            options)
   (let (metaclass
         default-initargs
@@ -135,9 +136,10 @@
           (:metaclass
            (let ((maybe-metaclass (second option)))
              (unless (and maybe-metaclass (legal-class-name-p maybe-metaclass))
-               (error "~@<The value of the :metaclass option (~S) ~
+               (error 'simple-program-error
+                      :format-control "~@<The value of the :metaclass option (~S) ~
                          is not a legal class name.~:@>"
-                      maybe-metaclass))
+                      :format-arguments (list maybe-metaclass)))
              (setf metaclass maybe-metaclass)))
           (:default-initargs
            (let (initargs arg-names)

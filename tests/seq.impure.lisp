@@ -990,6 +990,8 @@
                      bashed-dst)
              (return-from test-copy-bashing nil))))))))
 
+;; Too slow for the interpreter
+#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
 (loop for i = 1 then (* i 2) do
      ;; the bare '32' here is fairly arbitrary; '8' provides a good
      ;; range of lengths over which to fill and copy, which should tease

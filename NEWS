@@ -18,6 +18,10 @@ changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
     class-precedence-lists of GENERIC-FUNCTION and
     STANDARD-GENERIC-FUNCTION comply with the requirement of ANSI
     1.4.4.5.
+  * new feature: Add a version of evaluator that uses an interpreter instead
+    of the compiler. EVAL still uses the compiler by default, to switch it
+    to use the interpreter, set the value of the variable 
+    SB-EXT:*EVALUATOR-MODE* to :INTERPRET.
   * bug fix: ENOUGH-NAMESTRING on pathnames with no name and a pattern
     for a type now works.
   * bug fix: loading of default sysinit file works. (thanks to Leonid
@@ -28,6 +32,8 @@ changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
     non-ASCII characters in their names (thanks to Yaroslav Kavenchuk)
   * bug fix: The :PTY argument for RUN-PROGRAM will now work on 
     systems with Unix98 pty semantics.
+  * bug fix: arguments to RUN-PROGRAM are escaped correctly on win32
+    (thanks to Yaroslav Kavenchuk)
   * bug fix: ASDF-INSTALL will now work with bsd tar.
   * bug fix: ASDF-INSTALL uses GNU tar on Solaris (thanks to Josip
     Gracin).

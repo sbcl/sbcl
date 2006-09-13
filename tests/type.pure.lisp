@@ -237,6 +237,10 @@
 ;;; Test derivation of LOG{AND,IOR,XOR} bounds for unsigned arguments.
 ;;;
 ;;; Fear the Loop of Doom!
+;;;
+;;; (In fact, this is such a fearsome loop that executing it with the
+;;; evaluator would take ages... Disable it under those circumstances.)
+#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
 (let* ((bits 5)
        (size (ash 1 bits)))
   (flet ((brute-force (a b c d op minimize)

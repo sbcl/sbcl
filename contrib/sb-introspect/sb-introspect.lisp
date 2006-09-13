@@ -318,6 +318,11 @@ If an unsupported TYPE is requested, the function will return NIL.
                        (sb-pcl::unparse-specializers
                         (sb-mop:method-specializers object)))))
        source))
+    #+sb-eval
+    (sb-eval:interpreted-function
+     (let ((source (translate-source-location
+                    (sb-eval:interpreted-function-source-location object))))
+       source))
     (function
      (cond ((struct-accessor-p object)
             (find-definition-source

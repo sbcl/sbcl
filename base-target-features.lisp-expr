@@ -194,6 +194,11 @@
  ;; character set.
  :sb-unicode
 
+ ;; Support for a full evaluator that can execute all the CL special
+ ;; forms, as opposed to the traditional SBCL evaluator which called
+ ;; COMPILE for everything complicated.
+ :sb-eval
+
  ;; Record source location information for variables, classes, conditions,
  ;; packages, etc. Gives much better information on M-. in Slime, but
  ;; increases core size by about 100kB.

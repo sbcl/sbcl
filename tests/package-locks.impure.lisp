@@ -294,11 +294,17 @@
                        (setf (test:function) 1)))
 
     ;; ftype
+    ;;
+    ;; The interpreter doesn't do anything with ftype declarations
+    #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
     (test:function . (locally
                          (declare (ftype function test:function))
                        (cons t t)))
 
     ;; type
+    ;;
+    ;; Nor with type declarations
+    #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
     (test:num . (locally
                     (declare (type fixnum test:num))
                   (cons t t)))
@@ -309,6 +315,7 @@
                         (cons t t)))
 
     ;; declare ftype
+    #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
     (test:numfun . (locally
                        (declare (ftype (function (fixnum) fixnum) test:numfun))
                      (cons t t)))))
@@ -468,6 +475,8 @@
 (defmethod pcl-type-declaration-method-bug ((test:*special* stream))
   test:*special*)
 (assert (eq *terminal-io* (pcl-type-declaration-method-bug *terminal-io*)))
+
+#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
 (assert (raises-error?
          (eval
           '(defmethod pcl-type-declaration-method-bug ((test:*special* stream))

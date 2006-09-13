@@ -885,8 +885,9 @@ one."
                            ,function
                            (or (gethash ',specifier *alien-callback-wrappers*)
                                (setf (gethash ',specifier *alien-callback-wrappers*)
-                                     ,(alien-callback-lisp-wrapper-lambda
-                                       specifier result-type argument-types env))))
+                                     (compile nil
+                                              ',(alien-callback-lisp-wrapper-lambda
+                                                 specifier result-type argument-types env)))))
       ',(parse-alien-type specifier env))))
 
 (defun alien-callback-p (alien)

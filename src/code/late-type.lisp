@@ -2659,7 +2659,7 @@ used for a COMPLEX component.~:@>"
 ;;; mechanically unparsed.
 (!define-type-method (intersection :unparse) (type)
   (declare (type ctype type))
-  (or (find type '(ratio keyword) :key #'specifier-type :test #'type=)
+  (or (find type '(ratio keyword compiled-function) :key #'specifier-type :test #'type=)
       `(and ,@(mapcar #'type-specifier (intersection-type-types type)))))
 
 ;;; shared machinery for type equality: true if every type in the set

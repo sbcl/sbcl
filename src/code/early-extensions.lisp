@@ -1207,3 +1207,13 @@
           (*print-level* (or (true *print-level*) 6))
           (*print-length* (or (true *print-length*) 12)))
       (funcall function))))
+
+;;; Default evaluator mode (interpeter / compiler)
+
+(declaim (type (member :compile #!+sb-eval :interpret) *evaluator-mode*))
+(defparameter *evaluator-mode* :compile
+  #!+sb-doc
+  "Toggle between different evaluator implementations. If set to :COMPILE,
+an implementation of EVAL that calls the compiler will be used. If set
+to :INTERPRET, an interpreter will be used.")
+

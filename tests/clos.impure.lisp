@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "assertoid.lisp")
-
 (defpackage "CLOS-IMPURE"
   (:use "CL" "ASSERTOID" "TEST-UTIL"))
 (in-package "CLOS-IMPURE")
@@ -654,6 +652,7 @@
 (assert (= (bug222 t) 1))
 
 ;;; also, a test case to guard against bogus environment hacking:
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setq bug222-b 3))
 ;;; this should at the least compile:
@@ -664,8 +663,10 @@
 ;;; and it would be nice (though not specified by ANSI) if the answer
 ;;; were as follows:
 (let ((x (make-string-output-stream)))
-  ;; not specified by ANSI
-  (assert (= (bug222-b t x) 3))
+  (let ((value (bug222-b t x)))
+    ;; not specified by ANSI
+    #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
+    (assert (= value 3)))
   ;; specified.
   (assert (char= (char (get-output-stream-string x) 0) #\1)))
 

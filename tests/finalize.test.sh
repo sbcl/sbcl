@@ -16,15 +16,15 @@ ${SBCL:-sbcl} <<EOF > /dev/null &
   (declare (ignore _))
   nil)
 
-(let ((junk (mapcar (lambda (_)
-                      (declare (ignore _))
-                      (let ((x (gensym)))
-                          (finalize x (lambda ()
-                                        ;; cons in finalizer
-                                        (setf *tmp* (make-list 10000))
-                                        (incf *count*)))
-                          x))
-                     (make-list 10000))))
+(let ((junk (mapcar (compile nil '(lambda (_)
+                                   (declare (ignore _))
+                                   (let ((x (gensym)))
+                                     (finalize x (lambda ()
+                                                   ;; cons in finalizer
+                                                   (setf *tmp* (make-list 10000))
+                                                   (incf *count*)))
+                                     x)))
+                    (make-list 10000))))
     (setf junk (foo junk))
     (foo junk))
 

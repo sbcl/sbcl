@@ -19,7 +19,10 @@
 ;;; somewhat bogus, but the requirement is clear.)
 (defstruct person age (name 007 :type string)) ; not an error until 007 used
 (make-person :name "James") ; not an error, 007 not used
+
+#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
 (assert (raises-error? (make-person) type-error))
+#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
 (assert (raises-error? (setf (person-name (make-person :name "Q")) 1)
                        type-error))
 
@@ -43,6 +46,8 @@
   (assert (eql (boa-saux-c s) 5)))
                                         ; these two checks should be
                                         ; kept separated
+
+#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
 (let ((s (make-boa-saux)))
   (locally (declare (optimize (safety 0))
                     (inline boa-saux-a))
@@ -577,7 +582,9 @@
 (assert (not (vector-struct-p nil)))
 (assert (not (vector-struct-p #())))
 
+
 ;;; bug 3d: type safety with redefined type constraints on slots
+#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
 (macrolet
     ((test (type)
        (let* ((base-name (intern (format nil "bug3d-~A" type)))

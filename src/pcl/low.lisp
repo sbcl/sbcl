@@ -178,16 +178,18 @@
   (declare (special *boot-state* *the-class-standard-generic-function*))
   (when (valid-function-name-p fun)
     (setq fun (fdefinition fun)))
-  (when (funcallable-instance-p fun)
-    ;; HACK
-    (case (classoid-name (classoid-of fun))
-      (%method-function (setf (%method-function-name fun) new-name))
-      (t ;; KLUDGE: probably a generic function...
-       (if (if (eq *boot-state* 'complete)
-               (typep fun 'generic-function)
-               (eq (class-of fun) *the-class-standard-generic-function*))
-           (setf (%funcallable-instance-info fun 2) new-name)
-           (bug "unanticipated function type")))))
+  (typecase fun
+    (%method-function (setf (%method-function-name fun) new-name))
+    #+sb-eval
+    (sb-eval:interpreted-function
+     (setf (sb-eval:interpreted-function-name fun) new-name))
+    (funcallable-instance ;; KLUDGE: probably a generic function...
+     (cond ((if (eq *boot-state* 'complete)
+                (typep fun 'generic-function)
+                (eq (class-of fun) *the-class-standard-generic-function*))
+            (setf (%funcallable-instance-info fun 2) new-name))
+           (t
+            (bug "unanticipated function type")))))
   ;; Fixup name-to-function mappings in cases where the function
   ;; hasn't been defined by DEFUN.  (FIXME: is this right?  This logic
   ;; comes from CMUCL).  -- CSR, 2004-12-31
@@ -364,8 +366,8 @@
   :slot-names (fast-function name)
   :boa-constructor %make-method-function
   :superclass-name function
-  :metaclass-name random-pcl-classoid
-  :metaclass-constructor make-random-pcl-classoid
+  :metaclass-name static-classoid
+  :metaclass-constructor make-static-classoid
   :dd-type funcallable-structure)
 
 ;;; WITH-PCL-LOCK is used around some forms that were previously

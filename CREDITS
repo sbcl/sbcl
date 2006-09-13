@@ -559,7 +559,8 @@ Paul Dietz:
 Brian Downing:
   He fixed the linker problems for building SBCL on Mac OS X.  He
   found and fixed the cause of backtraces failing for undefined
-  functions and assembly routines.
+  functions and assembly routines. He wrote the core of SBCL's 
+  alternative interpreter-based EVAL.
 
 Miles Egan:
   He creates binary packages of SBCL releases for Red Hat and other
@@ -597,6 +598,12 @@ Matthias Hoelzl:
 
 Daisuke Homma:
   He added support for SunOS on x86 processors.
+
+ITA Software:
+  They hired Juho Snellman as a consultant to work on improvements to 
+  SBCL, to be released into the public domain. The work they've funded
+  includes faster compilation speeds, the interpreter-based evaluator
+  and the IR2-based single-stepper.
 
 Espen S Johnsen:
   He provided an ANSI-compliant version of CHANGE-CLASS for PCL.
@@ -735,12 +742,11 @@ Nikodemus Siivola:
   besides.
 
 Juho Snellman:
-  He provided several performance enhancements, including a better hash
-  function on strings, removal of unneccessary bounds checks, and
-  multiple improvements to performance of common operations on
-  bignums.  He ported and enhanced the statistical profiler written by
-  Gerd Moellmann for CMU CL.  He completed the work on the x86-64 port
-  of SBCL.
+  He provided a number of bug fixes and performance enhancements to
+  the compiler, the standard library functions, and to the garbage
+  collector. He ported and enhanced the statistical profiler written
+  by Gerd Moellmann for CMU CL. He completed the work on the x86-64
+  port of SBCL.
 
 Brian Spilsbury:
   He wrote Unicode-capable versions of SBCL's character, string, and

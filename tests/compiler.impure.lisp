@@ -15,6 +15,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(when (eq sb-ext:*evaluator-mode* :interpret)
+  (sb-ext:quit :unix-status 104))
+
 (load "test-util.lisp")
 (load "assertoid.lisp")
 (use-package "TEST-UTIL")

@@ -11,6 +11,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(when (eq sb-ext:*evaluator-mode* :interpret)
+  (sb-ext:quit :unix-status 104))
+
 (setq sb-c::*check-consistency* t)
 
 (defmacro defun-with-dx (name arglist &body body)

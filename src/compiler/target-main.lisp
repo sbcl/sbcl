@@ -94,9 +94,15 @@
 
 (defun compile-in-lexenv (name definition lexenv)
   (multiple-value-bind (compiled-definition warnings-p failure-p)
-      (if (compiled-function-p definition)
-          (values definition nil nil)
-          (actually-compile name definition lexenv))
+      (cond
+        #!+sb-eval
+        ((sb!eval:interpreted-function-p definition)
+         (multiple-value-bind (definition lexenv)
+             (sb!eval:prepare-for-compile definition)
+           (actually-compile name definition lexenv)))
+        ((compiled-function-p definition)
+         (values definition nil nil))
+        (t (actually-compile name definition lexenv)))
     (cond (name
            (if (and (symbolp name)
                     (macro-function name))

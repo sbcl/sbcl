@@ -224,7 +224,11 @@
   #+nil (setf (%fun-name def) name)
 
   (when doc
-    (setf (fdocumentation name 'function) doc))
+    (setf (fdocumentation name 'function) doc)
+    #!+sb-eval
+    (when (typep def 'sb!eval:interpreted-function)
+      (setf (sb!eval:interpreted-function-documentation def)
+            doc)))
   name)
 
 ;;;; DEFVAR and DEFPARAMETER

@@ -739,6 +739,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; external-format support
                "OCTETS-TO-STRING" "STRING-TO-OCTETS"
 
+               ;; Whether to use the interpreter or the compiler for EVAL
+               "*EVALUATOR-MODE*"
+
                ;; timer
                "TIMER" "MAKE-TIMER" "TIMER-NAME" "TIMER-SCHEDULED-P"
                "SCHEDULE-TIMER" "UNSCHEDULE-TIMER" "LIST-ALL-TIMERS"))
@@ -1033,6 +1036,7 @@ retained, possibly temporariliy, because it might be used internally."
                "LOOKS-LIKE-NAME-OF-SPECIAL-VAR-P"
                "POSITIVE-PRIMEP"
                "EVAL-IN-LEXENV"
+               "SIMPLE-EVAL-IN-LEXENV"
                "DEBUG-NAMIFY"
                "FORCE" "DELAY" "PROMISE-READY-P"
                "FIND-RESTART-OR-CONTROL-ERROR"
@@ -1532,7 +1536,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "FIND-CLASSOID-CELL" "EXTRACT-FUN-TYPE"
                "FUNCALLABLE-STRUCTURE-CLASSOID" "%RANDOM-DOUBLE-FLOAT"
                #!+long-float "%RANDOM-LONG-FLOAT"
-               "%RANDOM-SINGLE-FLOAT" "RANDOM-PCL-CLASSOID"
+               "%RANDOM-SINGLE-FLOAT" "STATIC-CLASSOID"
                "%FUNCALLABLE-INSTANCE-INFO" "RANDOM-CHUNK" "BIG-RANDOM-CHUNK"
                "MAKE-FUNCALLABLE-STRUCTURE-CLASSOID"
                "LAYOUT-CLOS-HASH-MAX" "CLASSOID-CELL-NAME"
@@ -1544,7 +1548,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "BASIC-STRUCTURE-CLASSOID" "CLASSOID-CELL-CLASSOID"
                "FUNCALLABLE-STRUCTURE-CLASSOID-P" "REGISTER-LAYOUT"
                "FUNCALLABLE-INSTANCE" "RANDOM-FIXNUM-MAX"
-               "MAKE-RANDOM-PCL-CLASSOID" "INSTANCE-LAMBDA"
+               "MAKE-STATIC-CLASSOID" "INSTANCE-LAMBDA"
                "%FUNCALLABLE-INSTANCE-LEXENV" "%MAKE-SYMBOL"
                "%FUNCALLABLE-INSTANCE-FUN" "SYMBOL-HASH"
 
@@ -2343,6 +2347,26 @@ structure representations"
                ;; package, but aren't used in SBCL.
                ;;"NESTED-WALK-FORM" "MACROEXPAND-ALL"
                ))
+
+   #!+sb-eval
+   #s(sb-cold:package-data
+      :name "SB!EVAL"
+      :doc "internal: the evaluator implementation used to execute code without compiling it."
+      :use ("CL" "SB!KERNEL" "SB!EXT")
+      :export ("INTERPRETED-FUNCTION"
+               "INTERPRETED-FUNCTION-P"
+               "INTERPRETED-FUNCTION-NAME"
+               "INTERPRETED-FUNCTION-LAMBDA-LIST"
+               "INTERPRETED-FUNCTION-DOCUMENTATION"
+               "INTERPRETED-FUNCTION-BODY"
+               "INTERPRETED-FUNCTION-SOURCE-LOCATION"
+               "EVAL-IN-ENVIRONMENT"
+               "MAKE-NULL-ENVIRONMENT"
+               "EVAL-IN-NATIVE-ENVIRONMENT"
+               "PREPARE-FOR-COMPILE"
+               "COUNT-EVAL-CALLS"
+               "*EVAL-LEVEL*"
+               "*EVAL-CALLS*"))
 
    #!+win32
    #s(sb-cold:package-data
