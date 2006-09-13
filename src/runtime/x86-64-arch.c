@@ -122,21 +122,21 @@ arch_internal_error_arguments(os_context_t *context)
 boolean
 arch_pseudo_atomic_atomic(os_context_t *context)
 {
-    return SymbolValue(PSEUDO_ATOMIC_ATOMIC,arch_os_get_current_thread());
+    return get_pseudo_atomic_atomic(arch_os_get_current_thread());
 }
 
 void
 arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),
-                   arch_os_get_current_thread());
+    struct thread *thread = arch_os_get_current_thread();
+    set_pseudo_atomic_interrupted(thread);
 }
 
 void
 arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),
-                   arch_os_get_current_thread());
+    struct thread *thread = arch_os_get_current_thread();
+    clear_pseudo_atomic_interrupted(thread);
 }
 
 /*

@@ -166,8 +166,7 @@
    '(*alien-stack*
 
      ;; interrupt handling
-     *pseudo-atomic-atomic*
-     *pseudo-atomic-interrupted*
+     *pseudo-atomic-bits*
 
      #!+sb-thread *stop-for-gc-pending*
 

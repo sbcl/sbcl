@@ -1223,7 +1223,13 @@ core and return a descriptor to it."
                 offset-wanted))))
     ;; Establish the value of T.
     (let ((t-symbol (cold-intern t)))
-      (cold-set t-symbol t-symbol))))
+      (cold-set t-symbol t-symbol))
+    ;; Establish the value of *PSEUDO-ATOMIC-BITS* so that the
+    ;; allocation sequences that expect it to be zero upon entrance
+    ;; actually find it to be so.
+    #!+(or x86-64 x86)
+    (let ((p-a-a-symbol (cold-intern 'sb!kernel:*pseudo-atomic-bits*)))
+      (cold-set p-a-a-symbol (make-fixnum-descriptor 0)))))
 
 ;;; a helper function for FINISH-SYMBOLS: Return a cold alist suitable
 ;;; to be stored in *!INITIAL-LAYOUTS*.

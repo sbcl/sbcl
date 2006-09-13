@@ -25,8 +25,7 @@
 ;;; specials initialized by !COLD-INIT
 
 ;;; FIXME: These could be converted to DEFVARs.
-(declaim (special #!+(or x86 x86-64) *pseudo-atomic-atomic*
-                  #!+(or x86 x86-64) *pseudo-atomic-interrupted*
+(declaim (special #!+(or x86 x86-64) *pseudo-atomic-bits*
                   sb!unix::*interrupts-enabled*
                   sb!unix::*interrupt-pending*
                   *type-system-initialized*))

@@ -319,7 +319,8 @@
                       (lambda ()
                         (princ ".") (force-output)
                         (assert (thread-alive-p *current-thread*))
-                        (assert (zerop SB-KERNEL:*PSEUDO-ATOMIC-ATOMIC*)))))
+                        (assert
+                         (not (logbitp 0 SB-KERNEL:*PSEUDO-ATOMIC-BITS*))))))
   (terminate-thread c)
   (wait-for-threads (list c)))
 

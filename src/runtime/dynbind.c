@@ -18,6 +18,7 @@
 #include "globals.h"
 #include "dynbind.h"
 #include "thread.h"
+#include "pseudo-atomic.h"
 #include "genesis/symbol.h"
 #include "genesis/binding.h"
 #include "genesis/thread.h"
@@ -43,8 +44,8 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
         if(!sym->tls_index) {
             lispobj *tls_index_lock=
                 &((struct symbol *)native_pointer(TLS_INDEX_LOCK))->value;
-            SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
-            SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);
+            clear_pseudo_atomic_interrupted(th);
+            set_pseudo_atomic_atomic(th);
             get_spinlock(tls_index_lock,(long)th);
             if(!sym->tls_index) {
                 sym->tls_index=SymbolValue(FREE_TLS_INDEX,0);
@@ -52,8 +53,8 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
                                make_fixnum(fixnum_value(sym->tls_index)+1),0);
             }
             release_spinlock(tls_index_lock);
-            SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
-            if (fixnum_value(SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th)))
+            clear_pseudo_atomic_atomic(th);
+            if (get_pseudo_atomic_interrupted(th))
                 do_pending_interrupt();
         }
     }

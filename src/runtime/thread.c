@@ -332,8 +332,7 @@ create_thread_struct(lispobj initial_function) {
         STATIC_TLS_INIT(CONTROL_STACK_END,control_stack_end);
         STATIC_TLS_INIT(ALIEN_STACK,alien_stack_pointer);
 #if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
-        STATIC_TLS_INIT(PSEUDO_ATOMIC_ATOMIC,pseudo_atomic_atomic);
-        STATIC_TLS_INIT(PSEUDO_ATOMIC_INTERRUPTED,pseudo_atomic_interrupted);
+        STATIC_TLS_INIT(PSEUDO_ATOMIC_BITS,pseudo_atomic_bits);
 #endif
 #undef STATIC_TLS_INIT
     }
@@ -357,8 +356,7 @@ create_thread_struct(lispobj initial_function) {
     th->alien_stack_pointer=((void *)th->alien_stack_start);
 #endif
 #if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
-    th->pseudo_atomic_interrupted=0;
-    th->pseudo_atomic_atomic=0;
+    th->pseudo_atomic_bits=0;
 #endif
 #ifdef LISP_FEATURE_GENCGC
     gc_set_region_empty(&th->alloc_region);
@@ -377,8 +375,7 @@ create_thread_struct(lispobj initial_function) {
 #if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
     SetSymbolValue(BINDING_STACK_POINTER,(lispobj)th->binding_stack_pointer,th);
     SetSymbolValue(ALIEN_STACK,(lispobj)th->alien_stack_pointer,th);
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC,(lispobj)th->pseudo_atomic_atomic,th);
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th->pseudo_atomic_interrupted,th);
+    SetSymbolValue(PSEUDO_ATOMIC_BITS,(lispobj)th->pseudo_atomic_bits,th);
 #else
     current_binding_stack_pointer=th->binding_stack_pointer;
     current_control_stack_pointer=th->control_stack_start;
