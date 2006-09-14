@@ -333,7 +333,8 @@
               `((setf (structure-classoid-constructor (find-classoid ',name))
                       #',def-con))))))))
 
-;;; shared logic for CL:DEFSTRUCT and SB!XC:DEFSTRUCT
+;;; shared logic for host macroexpansion for SB!XC:DEFSTRUCT and
+;;; cross-compiler macroexpansion for CL:DEFSTRUCT
 (defmacro !expander-for-defstruct (name-and-options
                                    slot-descriptions
                                    expanding-into-code-for-xc-host-p)
@@ -1158,7 +1159,7 @@
                                    (lambda (x)
                                      (sb!xc:typep x 'structure-classoid))
                                    (lambda (x)
-                                     (sb!xc:typep x (find-classoid class))))
+                                     (sb!xc:typep x (classoid-name (find-classoid class)))))
                                (fdefinition constructor)))
     (setf (classoid-direct-superclasses class)
           (case (dd-name info)
@@ -1550,6 +1551,47 @@
           (dd-length dd) (1+ (length slot-names))
           (dd-type dd) dd-type)
     dd))
+
+;;; make !DEFSTRUCT-WITH-ALTERNATE-METACLASS compilable by the host
+;;; lisp, installing the information we need to reason about the
+;;; structures (layouts and classoids).
+;;;
+;;; FIXME: we should share the parsing and the DD construction between
+;;; this and the cross-compiler version, but my brain was too small to
+;;; get that right.  -- CSR, 2006-09-14
+#+sb-xc-host
+(defmacro !defstruct-with-alternate-metaclass
+    (class-name &key
+                (slot-names (missing-arg))
+                (boa-constructor (missing-arg))
+                (superclass-name (missing-arg))
+                (metaclass-name (missing-arg))
+                (metaclass-constructor (missing-arg))
+                (dd-type (missing-arg))
+                predicate
+                (runtime-type-checks-p t))
+
+  (declare (type (and list (not null)) slot-names))
+  (declare (type (and symbol (not null))
+                 boa-constructor
+                 superclass-name
+                 metaclass-name
+                 metaclass-constructor))
+  (declare (type symbol predicate))
+  (declare (type (member structure funcallable-structure) dd-type))
+  (declare (ignore boa-constructor predicate runtime-type-checks))
+
+  (let* ((dd (make-dd-with-alternate-metaclass
+              :class-name class-name
+              :slot-names slot-names
+              :superclass-name superclass-name
+              :metaclass-name metaclass-name
+              :metaclass-constructor metaclass-constructor
+              :dd-type dd-type)))
+    `(progn
+
+      (eval-when (:compile-toplevel :load-toplevel :execute)
+        (%compiler-set-up-layout ',dd ',(inherits-for-structure dd))))))
 
 (sb!xc:defmacro !defstruct-with-alternate-metaclass
     (class-name &key

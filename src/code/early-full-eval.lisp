@@ -25,7 +25,7 @@
 ;; RECOMPILE restart doesn't work on it.  This is the main reason why
 ;; this stuff is split out into its own file.  Also, it lets the
 ;; INTERPRETED-FUNCTION type be declared before it is used in
-;; compiler/main.
+;; compiler/main and code/deftypes-for-target.
 (sb!kernel::!defstruct-with-alternate-metaclass
  interpreted-function
  :slot-names (name lambda-list env declarations documentation body source-location)
@@ -36,21 +36,23 @@
  :dd-type funcallable-structure
  :runtime-type-checks-p nil)
 
-(defun make-interpreted-function
-    (&key name lambda-list env declarations documentation body source-location)
-  (let ((function (%make-interpreted-function
-                   name lambda-list env declarations documentation body
-                   source-location)))
-    (setf (sb!kernel:funcallable-instance-fun function)
-          #'(lambda (&rest args)
-              (interpreted-apply function args)))
-    function))
+#-sb-xc-host
+(progn
+  (defun make-interpreted-function
+      (&key name lambda-list env declarations documentation body source-location)
+    (let ((function (%make-interpreted-function
+                     name lambda-list env declarations documentation body
+                     source-location)))
+      (setf (sb!kernel:funcallable-instance-fun function)
+            #'(lambda (&rest args)
+                (interpreted-apply function args)))
+      function))
 
-(defun interpreted-function-p (function)
-  (typep function 'interpreted-function))
+  (defun interpreted-function-p (function)
+    (typep function 'interpreted-function))
 
-(sb!int:def!method print-object ((obj interpreted-function) stream)
-  (print-unreadable-object (obj stream
-                            :identity (not (interpreted-function-name obj)))
-    (format stream "~A ~A" '#:interpreted-function
-            (interpreted-function-name obj))))
+  (sb!int:def!method print-object ((obj interpreted-function) stream)
+    (print-unreadable-object (obj stream
+                              :identity (not (interpreted-function-name obj)))
+      (format stream "~A ~A" '#:interpreted-function
+              (interpreted-function-name obj)))))

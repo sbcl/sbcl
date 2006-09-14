@@ -56,9 +56,6 @@
 
 (sb!xc:deftype bit () '(integer 0 1))
 
-(sb!xc:deftype compiled-function ()
-  '(and function #!+sb-eval (not sb!eval:interpreted-function)))
-
 (sb!xc:deftype atom () '(not cons))
 
 (sb!xc:deftype base-char ()

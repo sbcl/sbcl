@@ -420,9 +420,19 @@
  ;; CHECK-FUN-NAME defined in proclaim.lisp.
  ("src/code/force-delayed-defbangstructs")
 
+ ;; early-full-eval uses !DEFSTRUCT-WITH-ALTERNATE-METACLASS and
+ ;; DEF!METHOD.  It split out from the rest of full-eval because
+ ;; defstruct/metaclass fun makes it unslammable, and to define
+ ;; INTERPRETED-FUNCTION before it is used in compiler/main and in the
+ ;; definition of the COMPILED-FUNCTION type.
+ #!+sb-eval
+ ("src/code/early-full-eval")
+
  ("src/code/typep" :not-host)
 
  ("src/compiler/compiler-error")
+
+ ("src/code/late-deftypes-for-target")
 
  ("src/code/type-init")
  ;; Now that the type system is initialized, fix up UNKNOWN types that
@@ -484,13 +494,6 @@
  ;; Compiling this requires fop definitions from code/fop.lisp and
  ;; trace table definitions from compiler/trace-table.lisp.
  ("src/compiler/dump")
-
- ;; early-full-eval uses !DEFSTRUCT-WITH-ALTERNATE-METACLASS and
- ;; DEF!METHOD.  It split out from the rest of full-eval because
- ;; defstruct/metaclass fun makes it unslammable, and to define
- ;; INTERPRETED-FUNCTION before it is used in compiler/main.
- #!+sb-eval
- ("src/code/early-full-eval" :not-host)
 
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
  ("src/code/source-location")

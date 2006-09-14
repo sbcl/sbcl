@@ -551,4 +551,11 @@
 (assert-t-t
  (subtypep '(or fixnum simple-string end-of-file parse-error fixnum vector)
            '(or fixnum vector end-of-file parse-error fixnum simple-string)))
+
+#+sb-eval
+(assert-t-t
+ (subtypep '(and function (not compiled-function)
+             (not sb-eval:interpreted-function))
+           nil))
+
 ;;; success

@@ -950,8 +950,8 @@ NIL is returned when no such class exists."
 ;;; FUNCALLABLE-STANDARD-CLASS.
 (def!struct (standard-classoid (:include classoid)
                                (:constructor make-standard-classoid)))
-;;; a metaclass for miscellaneous PCL structure-like objects (at the
-;;; moment, only CTOR objects).
+;;; a metaclass for classes which aren't standardlike but will never
+;;; change either.
 (def!struct (static-classoid (:include classoid)
                              (:constructor make-static-classoid)))
 
