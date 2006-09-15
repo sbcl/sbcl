@@ -11,6 +11,9 @@
 
 (in-package :cl-user)
 
+(use-package :test-util)
+(use-package :assertoid)
+
 (defstruct foo)
 (defstruct bar x y)
 
@@ -255,5 +258,136 @@
                                       (declare (null x))
                                       (,fun x)))
                       nil))))
+
+;;; This test works reliably on non-conservative platforms and
+;;; somewhat reliably on conservative platforms with threads.
+#+(or (not (or x86 x86-64)) sb-thread)
+(progn
+
+(defparameter *ht* nil)
+
+(defvar *cons-here*)
+
+(defmacro alloc (&body body)
+  "Execute BODY and try to reduce the chance of leaking a conservative root."
+  #-sb-thread
+  `(multiple-value-prog1
+       (progn ,@body)
+     (loop repeat 20000 do (setq *cons-here* (cons nil nil)))
+     ;; KLUDGE: Clean the argument passing regs.
+     (apply #'take (loop repeat 36 collect #'cons)))
+  #+sb-thread
+  (let ((values (gensym))
+        (sem (gensym)))
+    `(let ((,sem (sb-thread::make-semaphore))
+           ,values)
+       (sb-thread:make-thread (lambda ()
+                                (setq ,values
+                                      (multiple-value-list (progn ,@body)))
+                                (sb-thread::signal-semaphore ,sem)))
+       (sb-thread::wait-on-semaphore ,sem)
+       (values-list ,values))))
+
+(with-test (:name (:hash-table :weakness :eql :numbers))
+  (flet ((random-number ()
+           (random 1000)))
+    (loop for weakness in '(nil :key :value :key-and-value :key-or-value) do
+          (let* ((ht (make-hash-table :weakness weakness))
+                 (n (alloc (loop repeat 1000
+                                 count (let ((key (random-number)))
+                                         (if (gethash key ht)
+                                             (setf (gethash key ht)
+                                                   (random-number))))))))
+            (gc :full t)
+            (gc :full t)
+            (assert (= n (hash-table-count ht)))))))
+
+(defun take (&rest args)
+  (declare (ignore args)))
+
+(defun add-removable-stuff (ht &key (n 100) (size 10))
+  (flet ((unique-object ()
+           (make-array size :fill-pointer 0)))
+    (loop for i below n do
+          (multiple-value-bind (key value)
+              (ecase (hash-table-weakness ht)
+                ((:key) (values (unique-object) i))
+                ((:value) (values i (unique-object)))
+                ((:key-and-value)
+                 (if (zerop (random 2))
+                     (values (unique-object) i)
+                     (values i (unique-object))))
+                ((:key-or-value)
+                 (values (unique-object) (unique-object))))
+            (setf (gethash key ht) value)))
+    (values)))
+
+(defun print-ht (ht &optional (stream t))
+  (format stream "Weakness: ~S~%" (sb-impl::hash-table-weakness ht))
+  (format stream "Table: ~S~%" (sb-impl::hash-table-table ht))
+  (format stream "Next: ~S~%" (sb-impl::hash-table-next-vector ht))
+  (format stream "Index: ~S~%" (sb-impl::hash-table-index-vector ht))
+  (format stream "Hash: ~S~%" (sb-impl::hash-table-hash-vector ht))
+  (force-output stream))
+
+(with-test (:name (:hash-table :weakness :removal))
+  (loop for test in '(eq eql equal equalp) do
+        (format t "test: ~A~%" test)
+        (loop for weakness in '(:key :value :key-and-value :key-or-value)
+              do
+              (format t "weakness: ~A~%" weakness)
+              (let ((ht (make-hash-table :test 'equal :weakness weakness)))
+                (alloc (add-removable-stuff ht :n 117 :size 1))
+                (loop for i upfrom 0
+                      do (format t "~A. count: ~A~%" i (hash-table-count ht))
+                      (force-output)
+                      until (zerop (hash-table-count ht))
+                      do
+                      (when (= i 10)
+                        (print-ht ht)
+                        #-(or x86 x86-64)
+                        (assert nil)
+                        ;; With conservative gc the test may not be
+                        ;; bullet-proof so it's not an outright
+                        ;; failure but a warning.
+                        #+(or x86 x86-64)
+                        (progn
+                          (warn "Weak hash removal test failed for weakness ~A"
+                                weakness)
+                          (return)))
+                      (gc :full t))))))
+
+(with-test (:name (:hash-table :weakness :string-interning))
+  (let ((ht (make-hash-table :test 'equal :weakness :key))
+        (s "a"))
+    (setf (gethash s ht) s)
+    (assert (eq (gethash s ht) s))
+    (assert (eq (gethash (copy-seq s) ht) s))))
+
+;;; see if hash_vector is not written when there is none ...
+(with-test (:name (:hash-table :weakness :eq))
+  (loop repeat 10 do
+        (let ((index (random 2000)))
+          (let ((first (+ most-positive-fixnum (mod (* index 31) 9)))
+                (n 50000))
+            (let ((hash-table (make-hash-table :weakness :key :test 'eq)))
+              (dotimes (i n)
+                (setf (gethash (+ first i) hash-table) i))
+              hash-table)))))
+
+;; used to crash in gc
+(with-test (:name (:hash-table :weakness :keep))
+  (loop repeat 2 do
+        (let ((h1 (make-hash-table :weakness :key :test #'equal))
+              (keep ()))
+          (loop for i from 0 to 1000
+                for key = i
+                for value = (make-array 10000 :fill-pointer 0)
+                do
+                (push value keep)
+                (setf (gethash key h1) value))
+          (sb-ext:gc :full t))))
+
+)
 
 ;;; success

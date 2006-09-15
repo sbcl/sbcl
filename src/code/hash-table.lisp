@@ -39,11 +39,13 @@
   (number-entries 0 :type index)
   ;; The Key-Value pair vector.
   (table (missing-arg) :type simple-vector)
-  ;; True if this is a weak hash table, meaning that key->value
-  ;; mappings will disappear if there are no other references to the
-  ;; key. Note: this only matters if the hash function indicates that
-  ;; the hashing is EQ based.
-  (weak-p nil :type (member t nil))
+  ;; This slot is used to link weak hash tables during GC. When the GC
+  ;; isn't running it is always NIL.
+  (next-weak-hash-table nil :type null)
+  ;; Non-NIL if this is some kind of weak hash table. For details see
+  ;; the docstring of MAKE-HASH-TABLE.
+  (weakness nil :type (member nil :key :value :key-or-value :key-and-value)
+            :read-only t)
   ;; Index into the next-vector, chaining together buckets that need
   ;; to be rehashed because their hashing is EQ based and the key has
   ;; been moved by the garbage collector.

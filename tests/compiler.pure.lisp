@@ -2130,12 +2130,12 @@
 
 ;;; overconfident primitive type computation leading to bogus type
 ;;; checking.
-(let* ((form1 '(lambda (x) 
-                (declare (type (and condition function) x)) 
+(let* ((form1 '(lambda (x)
+                (declare (type (and condition function) x))
                 x))
        (fun1 (compile nil form1))
-       (form2 '(lambda (x) 
-                (declare (type (and standard-object function) x)) 
+       (form2 '(lambda (x)
+                (declare (type (and standard-object function) x))
                 x))
        (fun2 (compile nil form2)))
   (assert (raises-error? (funcall fun1 (make-condition 'error))))

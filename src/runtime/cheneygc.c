@@ -222,10 +222,15 @@ collect_garbage(generation_index_t ignore)
 
     /* Scan the weak pointers. */
 #ifdef PRINTNOISE
+    printf("Scanning weak hash tables ...\n");
+#endif
+    scan_weak_hash_tables();
+
+    /* Scan the weak pointers. */
+#ifdef PRINTNOISE
     printf("Scanning weak pointers ...\n");
 #endif
     scan_weak_pointers();
-
 
     /* Flip spaces. */
 #ifdef PRINTNOISE
@@ -296,6 +301,7 @@ scavenge_newspace(void)
                 here,new_space_free_pointer); */
         next = new_space_free_pointer;
         scavenge(here, next - here);
+        scav_weak_hash_tables();
         here = next;
     }
     /* printf("done with newspace\n"); */
@@ -489,20 +495,6 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 }
 
 
-/* vector-like objects */
-
-static long
-scav_vector(lispobj *where, lispobj object)
-{
-    if (HeaderValue(object) == subtype_VectorValidHashing) {
-        *where =
-            (subtype_VectorMustRehash<<N_WIDETAG_BITS) | SIMPLE_VECTOR_WIDETAG;
-    }
-
-    return 1;
-}
-
-
 /* weak pointers */
 
 #define WEAK_POINTER_NWORDS \
@@ -561,7 +553,6 @@ void
 gc_init(void)
 {
     gc_init_tables();
-    scavtab[SIMPLE_VECTOR_WIDETAG] = scav_vector;
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
 }
 

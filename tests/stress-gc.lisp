@@ -29,6 +29,9 @@
 (defvar *reprs*)
 (declaim (type simple-vector *reprs*))
 
+(defun random-element (seq)
+  (elt seq (random (length seq))))
+
 (defun repr (i)
   (declare (type fixnum i))
   (let ((result (svref *reprs* (mod i (length *reprs*)))))
@@ -146,6 +149,23 @@
           |#
           hash-table))))
 
+(defun repr-weak-key-hash-table (index &optional (value nil value-p))
+  (let ((first (+ most-positive-fixnum (mod (* index 31) 9)))
+        (n 5))
+    (if value-p
+        (and (hash-table-p value)
+             (<= (hash-table-count value) n)
+             (dotimes (i n t)
+               (let ((x (gethash (+ i first) value)))
+                 (unless (or (null x) (= x i))
+                   (return nil)))))
+        (let ((hash-table (make-hash-table
+                           :weakness :key
+                           :test (random-element '(eq eql equal equalp)))))
+          (dotimes (i n)
+            (setf (gethash (+ first i) hash-table) i))
+          hash-table))))
+
 (defun repr-bignum (index &optional (value nil value-p))
   (let ((bignum (+ index 10000300020)))
     (if value-p
@@ -214,6 +234,7 @@
               #'repr-function
               #'repr-instance
               #'repr-eql-hash-table
+              #'repr-weak-key-hash-table
 #|
               #'repr-equal-hash-table
               #'repr-equalp-hash-table

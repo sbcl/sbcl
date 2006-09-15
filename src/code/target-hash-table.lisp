@@ -105,10 +105,10 @@
 (defconstant +min-hash-table-rehash-threshold+ (float 1/16 1.0))
 
 (defun make-hash-table (&key (test 'eql)
-                             (size +min-hash-table-size+)
-                             (rehash-size 1.5)
-                             (rehash-threshold 1)
-                             (weak-p nil))
+                        (size +min-hash-table-size+)
+                        (rehash-size 1.5)
+                        (rehash-threshold 1)
+                        (weakness nil))
   #!+sb-doc
   "Create and return a new hash table. The keywords are as follows:
      :TEST -- Indicates what kind of test to use.
@@ -122,13 +122,20 @@
        forcing a rehash. Can be any positive number <=1, with density
        approaching zero as the threshold approaches 0. Density 1 means an
        average of one entry per bucket.
-     :WEAK-P -- (This is an extension from CMU CL, not currently supported
-       in SBCL 0.6.6, but perhaps supported in a future version.) If T,
-       don't keep entries if the key would otherwise be garbage."
+     :WEAKNESS -- IF NIL (the default) it is a normal non-weak hash table.
+       If one of :KEY, :VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE it is a weak
+       hash table.
+       Depending on the type of weakness the lack of references to the
+       key and the value may allow for removal of the entry. If WEAKNESS
+       is :KEY and the key would otherwise be garbage the entry is eligible
+       for removal from the hash table. Similarly, if WEAKNESS is :VALUE
+       the life of an entry depends on its value's references. If WEAKNESS
+       is :KEY-AND-VALUE and either the key or the value would otherwise be
+       garbage the entry can be removed. If WEAKNESS is :KEY-OR-VALUE and
+       both the key and the value would otherwise be garbage the entry can
+       be removed."
   (declare (type (or function symbol) test))
   (declare (type unsigned-byte size))
-  (when weak-p
-    (error "stub: unsupported WEAK-P option"))
   (multiple-value-bind (test test-fun hash-fun)
       (cond ((or (eq test #'eq) (eq test 'eq))
              (values 'eq #'eq #'eq-hash))
@@ -143,8 +150,8 @@
              ;; Failing that, I'd like to rename it to
              ;; *USER-HASH-TABLE-TESTS*.
              (dolist (info *hash-table-tests*
-                           (error "unknown :TEST for MAKE-HASH-TABLE: ~S"
-                                  test))
+                      (error "unknown :TEST for MAKE-HASH-TABLE: ~S"
+                             test))
                (destructuring-bind (test-name test-fun hash-fun) info
                  (when (or (eq test test-name) (eq test test-fun))
                    (return (values test-name test-fun hash-fun)))))))
@@ -162,7 +169,7 @@
            ;; boxing.
            (rehash-threshold (max +min-hash-table-rehash-threshold+
                                   (float rehash-threshold 1.0)))
-           (size+1 (1+ size))           ; The first element is not usable.
+           (size+1 (1+ size))       ; The first element is not usable.
            ;; KLUDGE: The most natural way of expressing the below is
            ;; (round (/ (float size+1) rehash-threshold)), and indeed
            ;; it was expressed like that until 0.7.0. However,
@@ -181,8 +188,9 @@
                                      :element-type
                                      '(unsigned-byte #.sb!vm:n-word-bits)
                                      :initial-element 0))
-           ;; needs to be the same length as the KV vector
-           ;; (FIXME: really?  why doesn't the code agree?)
+           ;; Needs to be the half the length of the KV vector to link
+           ;; KV entries - mapped to indeces at 2i and 2i+1 -
+           ;; together.
            (next-vector (make-array size+1
                                     :element-type
                                     '(unsigned-byte #.sb!vm:n-word-bits)))
@@ -196,7 +204,7 @@
                    :rehash-threshold rehash-threshold
                    :rehash-trigger size
                    :table kv-vector
-                   :weak-p weak-p
+                   :weakness weakness
                    :index-vector index-vector
                    :next-vector next-vector
                    :hash-vector
@@ -244,9 +252,9 @@
       "Return the test HASH-TABLE was created with.")
 
 #!+sb-doc
-(setf (fdocumentation 'hash-table-weak-p 'function)
-      "Return T if HASH-TABLE will not keep entries for keys that would
-   otherwise be garbage, and NIL if it will.")
+(setf (fdocumentation 'hash-table-weakness 'function)
+      "Return the WEAKNESS of HASH-TABLE which is one of NIL, :KEY,
+:VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE.")
 
 ;;;; accessing functions
 
@@ -279,7 +287,7 @@
          (old-index-vector (hash-table-index-vector table))
          (new-length (almost-primify
                       (truncate (/ (float new-size)
-                                (hash-table-rehash-threshold table)))))
+                                   (hash-table-rehash-threshold table)))))
          (new-index-vector
           (make-array new-length
                       :element-type '(unsigned-byte #.sb!vm:n-word-bits)
@@ -288,6 +296,10 @@
 
     ;; Disable GC tricks on the OLD-KV-VECTOR.
     (set-header-data old-kv-vector sb!vm:vector-normal-subtype)
+
+    ;; Non-empty weak hash tables always need GC support.
+    (when (and (hash-table-weakness table) (plusp (hash-table-count table)))
+      (set-header-data new-kv-vector sb!vm:vector-valid-hashing-subtype))
 
     ;; FIXME: here and in several other places in the hash table code,
     ;; loops like this one are used when FILL or REPLACE would be
@@ -368,9 +380,11 @@
          (length (length index-vector)))
     (declare (type index size length))
 
-    ;; Disable GC tricks, they will be re-enabled during the re-hash
-    ;; if necesary.
-    (set-header-data kv-vector sb!vm:vector-normal-subtype)
+    ;; Non-empty weak hash tables always need GC support.
+    (unless (and (hash-table-weakness table) (plusp (hash-table-count table)))
+      ;; Disable GC tricks, they will be re-enabled during the re-hash
+      ;; if necessary.
+      (set-header-data kv-vector sb!vm:vector-normal-subtype))
 
     ;; Rehash all the entries.
     (setf (hash-table-next-free-kv table) 0)
@@ -536,7 +550,8 @@
                 (hash-vector (hash-table-hash-vector hash-table))
                 (test-fun (hash-table-test-fun hash-table)))
            (declare (type index index))
-
+           (when (hash-table-weakness hash-table)
+             (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype))
            (cond ((or eq-based (not hash-vector))
                   (when eq-based
                     (set-header-data kv-vector
@@ -682,7 +697,7 @@
       ;; Set up the free list, all free.
       (do ((i 1 (1+ i)))
           ((>= i (1- size)))
-          (setf (aref next-vector i) (1+ i)))
+        (setf (aref next-vector i) (1+ i)))
       (setf (aref next-vector (1- size)) 0)
       (setf (hash-table-next-free-kv hash-table) 1)
       (setf (hash-table-needing-rehash hash-table) 0)
@@ -717,8 +732,12 @@
       (let* ((kv-vector (hash-table-table hash-table))
              (key (aref kv-vector (* 2 i)))
              (value (aref kv-vector (1+ (* 2 i)))))
-        (unless (and (eq key +empty-ht-slot+)
-                     (eq value +empty-ht-slot+))
+        ;; We are running without locking or WITHOUT-GCING. For a weak
+        ;; :VALUE hash table it's possible that the GC hit after KEY
+        ;; was read and now the entry is gone. So check if either the
+        ;; key or the value is empty.
+        (unless (or (eq key +empty-ht-slot+)
+                    (eq value +empty-ht-slot+))
           (funcall fun key value))))))
 
 ;;;; methods on HASH-TABLE
@@ -726,16 +745,11 @@
 ;;; Return a list of keyword args and values to use for MAKE-HASH-TABLE
 ;;; when reconstructing HASH-TABLE.
 (defun %hash-table-ctor-args (hash-table)
-  (when (hash-table-weak-p hash-table)
-    ;; FIXME: This might actually work with no trouble, but as of
-    ;; sbcl-0.6.12.10 when this code was written, weak hash tables
-    ;; weren't working yet, so I couldn't test it. When weak hash
-    ;; tables are supported again, this should be fixed.
-    (error "can't dump weak hash tables readably")) ; defensive programming..
   `(:test             ',(hash-table-test             hash-table)
     :size             ',(hash-table-size             hash-table)
     :rehash-size      ',(hash-table-rehash-size      hash-table)
-    :rehash-threshold ',(hash-table-rehash-threshold hash-table)))
+    :rehash-threshold ',(hash-table-rehash-threshold hash-table)
+    :weakness         ',(hash-table-weakness         hash-table)))
 
 ;;; Return an association list representing the same data as HASH-TABLE.
 (defun %hash-table-alist (hash-table)

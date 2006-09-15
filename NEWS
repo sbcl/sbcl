@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
+  * feature: weak hash tables, see MAKE-HASH-TABLE documentation
   * incompatible change: External-format support for FFI calls.  The
     SB-ALIEN:C-STRING no longer implies an ASCII
     external-format. Instead the string is subject to external-format

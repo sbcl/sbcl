@@ -343,8 +343,7 @@
      sb!alien::*enter-alien-callback*
 
      ;; see comments in ../x86-64/parms.lisp
-     sb!pcl::..slot-unbound..
-     )))
+     sb!pcl::..slot-unbound..)))
 
 (defparameter *static-funs*
   '(length

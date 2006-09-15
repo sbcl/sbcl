@@ -92,9 +92,12 @@ extern lispobj (*transother[256])(lispobj object);
 extern long (*sizetab[256])(lispobj *where);
 
 extern struct weak_pointer *weak_pointers; /* in gc-common.c */
+extern struct hash_table *weak_hash_tables; /* in gc-common.c */
 
 extern void scavenge(lispobj *start, long n_words);
 extern void scavenge_interrupt_contexts(void);
+extern void scav_weak_hash_tables(void);
+extern void scan_weak_hash_tables(void);
 extern void scan_weak_pointers(void);
 
 lispobj  copy_large_unboxed_object(lispobj object, long nwords);
@@ -114,6 +117,12 @@ lispobj *gc_search_space(lispobj *start, size_t words, lispobj *pointer);
 #include "gencgc-internal.h"
 #else
 #include "cheneygc-internal.h"
+#endif
+
+#if N_WORD_BITS == 32
+# define SIMPLE_ARRAY_WORD_WIDETAG SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG
+#elif N_WORD_BITS == 64
+# define SIMPLE_ARRAY_WORD_WIDETAG SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
 #endif
 
 #endif /* _GC_INTERNAL_H_ */

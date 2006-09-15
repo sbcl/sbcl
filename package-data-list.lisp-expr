@@ -665,7 +665,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; weak pointers and finalization
                "CANCEL-FINALIZATION"
                "FINALIZE"
-               "HASH-TABLE-WEAK-P" "MAKE-WEAK-POINTER"
+               "HASH-TABLE-WEAKNESS" "MAKE-WEAK-POINTER"
                "WEAK-POINTER" "WEAK-POINTER-P" "WEAK-POINTER-VALUE"
 
                ;; If the user knows we're doing IEEE, he might reasonably

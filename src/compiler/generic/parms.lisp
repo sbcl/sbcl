@@ -53,4 +53,10 @@
     sb!unix::*interrupts-enabled*
     sb!unix::*interrupt-pending*
     *gc-inhibit*
-    *gc-pending*))
+    *gc-pending*
+
+    ;; hash table weaknesses
+    :key
+    :value
+    :key-and-value
+    :key-or-value))

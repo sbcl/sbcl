@@ -793,7 +793,7 @@
   (&key (:test callable) (:size unsigned-byte)
         (:rehash-size (or (integer 1) (float (1.0))))
         (:rehash-threshold (real 0 1))
-        (:weak-p t))
+        (:weakness (member nil :key :value :key-and-value :key-or-value)))
   hash-table
   (flushable unsafe))
 (defknown hash-table-p (t) boolean (movable foldable flushable))
