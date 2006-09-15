@@ -411,11 +411,12 @@
 ;;; Moellmann: CONVERT-MORE-CALL failed on the following call
 (assert (eq (eval '((lambda (&key) 'u) :allow-other-keys nil)) 'u))
 
-(raises-error? (multiple-value-bind (a b c)
-                   (eval '(truncate 3 4))
-                 (declare (integer c))
-                 (list a b c))
-               type-error)
+(assert
+ (raises-error? (multiple-value-bind (a b c)
+                    (eval '(truncate 3 4))
+                  (declare (integer c))
+                  (list a b c))
+                type-error))
 
 (assert (equal (multiple-value-list (the (values &rest integer)
                                       (eval '(values 3))))
@@ -2126,3 +2127,18 @@
                    (map-into (make-array (list (length val))
                                          :element-type '(unsigned-byte 8))
                              #'char-code val)))))
+
+;;; overconfident primitive type computation leading to bogus type
+;;; checking.
+(let* ((form1 '(lambda (x) 
+                (declare (type (and condition function) x)) 
+                x))
+       (fun1 (compile nil form1))
+       (form2 '(lambda (x) 
+                (declare (type (and standard-object function) x)) 
+                x))
+       (fun2 (compile nil form2)))
+  (assert (raises-error? (funcall fun1 (make-condition 'error))))
+  (assert (raises-error? (funcall fun1 fun1)))
+  (assert (raises-error? (funcall fun2 fun2)))
+  (assert (eq (funcall fun2 #'print-object) #'print-object)))
