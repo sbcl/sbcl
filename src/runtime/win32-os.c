@@ -677,6 +677,27 @@ void scratch(void)
     GetExitCodeProcess(0, 0);
     GetCurrentProcess();
     GetProcessTimes(0, 0, 0, 0, 0);
+    #ifndef LISP_FEATURE_SB_UNICODE
+      SetEnvironmentVariableA(0, 0);
+    #else
+      SetEnvironmentVariableW(0, 0);
+    #endif
+    #ifndef LISP_FEATURE_SB_UNICODE
+      GetVersionExA(0);
+    #else
+      GetVersionExW(0);
+    #endif
+    #ifndef LISP_FEATURE_SB_UNICODE
+      GetComputerNameA(0, 0);
+    #else
+      GetComputerNameW(0, 0);
+    #endif
+    #ifndef LISP_FEATURE_SB_UNICODE
+      SetCurrentDirectoryA(0);
+    #else
+      SetCurrentDirectoryW(0);
+    #endif
+    CloseHandle(0);
 }
 
 char *

@@ -158,6 +158,11 @@ main(int argc, char *argv[])
 
     defconstant ("ERROR_ENVVAR_NOT_FOUND", ERROR_ENVVAR_NOT_FOUND);
 
+    printf(";;; GetComputerName\n");
+
+    defconstant ("MAX_COMPUTERNAME_LENGTH", MAX_COMPUTERNAME_LENGTH);
+    defconstant ("ERROR_BUFFER_OVERFLOW", ERROR_BUFFER_OVERFLOW);
+
     printf(";;; Windows Types\n");
     DEFTYPE("int-ptr", INT_PTR);
     DEFTYPE("dword",   DWORD);

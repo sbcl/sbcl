@@ -24,8 +24,13 @@
   #!+sb-doc
   "Return a string describing version of the supporting software, or NIL
   if not available."
-  ;; FIXME: Implement.
-  nil)
+  (or *software-version*
+      (setf *software-version*
+	    (multiple-value-bind (MajorVersion MinorVersion BuildNumber PlatformId CSDVersion)
+		(sb!win32:get-version-ex)
+	      (declare (ignore PlatformId))
+	      (format nil (if (zerop (length CSDVersion)) "~A.~A.~A" "~A.~A.~A (~A)")
+		      MajorVersion MinorVersion BuildNumber CSDVersion)))))
 
 ;;; Return user time, system time, and number of page faults.
 (defun get-system-info ()

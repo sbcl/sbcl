@@ -2380,4 +2380,4 @@ SBCL itself"
                "INVALID-HANDLE" "MILLISLEEP" "PEEK-CONSOLE-INPUT"
                "PEEK-NAMED-PIPE" "READ-FILE" "WRITE-FILE"
 
-               "GET-PROCESS-TIMES")))
+               "GET-PROCESS-TIMES" "GET-VERSION-EX")))

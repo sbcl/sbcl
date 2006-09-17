@@ -18,13 +18,12 @@
 ;;; tries to untangle this someday for 64-bit Windows.
 ;;;
 ;;; FIXME: There used to be many more here, which are now groveled,
-;;; but TCHAR is a bit nasty as at the time grovel-headers runs
-;;; the unicodeness isn't conveniently known, and HANDLE... well,
-;;; groveling HANDLE makes it unsigned, which currently breaks the
+;;; but groveling HANDLE makes it unsigned, which currently breaks the
 ;;; build. --NS 2006-06-18
 (define-alien-type handle int-ptr)
-(define-alien-type tchar #!+sb-unicode (sb!alien:unsigned 16)
-                         #!-sb-unicode char)
+(define-alien-type system-string
+                   #!-sb-unicode c-string
+                   #!+sb-unicode (c-string :external-format :ucs-2))
 
 (defconstant default-environment-length 1024)
 
@@ -52,10 +51,6 @@
   (buffer c-string)
   (size dword)
   (arguments (* t)))
-
-(defun get-current-process ()
-  (alien-funcall
-   (extern-alien "GetCurrentProcess@0" (function long))))
 
 ;;;; File Handles
 
@@ -163,13 +158,13 @@
 (define-alien-routine ("Sleep@4" millisleep) void
   (milliseconds dword))
 
-#+sb-unicode
+#!+sb-unicode
 (progn
   (defvar *ansi-codepage* nil)
   (defvar *oem-codepage* nil)
   (defvar *codepage-to-external-format* (make-hash-table)))
 
-#+sb-unicode
+#!+sb-unicode
 (dolist
     (cp '(;;037       IBM EBCDIC - U.S./Canada
           (437 :CP437) ;; OEM - United States
@@ -212,8 +207,8 @@
           ;;1147      IBM EBCDIC - France (20297 + Euro symbol)
           ;;1148      IBM EBCDIC - International (500 + Euro symbol)
           ;;1149      IBM EBCDIC - Icelandic (20871 + Euro symbol)
-          ;;1200      Unicode UCS-2 Little-Endian (BMP of ISO 10646)
-          ;;1201      Unicode UCS-2 Big-Endian
+          (1200 :UCS-2LE)    ;; Unicode UCS-2 Little-Endian (BMP of ISO 10646)
+          (1201 :UCS-2BE)    ;; Unicode UCS-2 Big-Endian
           (1250 :CP1250)     ;; ANSI - Central European
           (1251 :CP1251)     ;; ANSI - Cyrillic
           (1252 :CP1252)     ;; ANSI - Latin I
@@ -360,163 +355,216 @@
                *codepage-to-external-format*)
       :latin-1))
 
-;;;; FIXME (rudi 2006-03-29): this should really be (octets-to-string
-;;;; :external-format :ucs2), except that we do not have an
-;;;; implementation of ucs2 yet.
-(defmacro ucs2->string (astr &optional size)
-  #!-sb-unicode
-  (declare (ignore size))
-  #!-sb-unicode
-  `(cast ,astr c-string)
-  #!+sb-unicode
-  (let ((str-len (or size `(do ((i 0 (1+ i))) ((zerop (deref ,astr i)) i)))))
-    `(let* ((l ,str-len)
-            (s (make-string l)))
-      (dotimes (i l) (setf (aref s i) (code-char (deref ,astr i))))
-      s)))
-
-(defmacro ucs2->string&free (astr &optional size)
-  `(prog1 (ucs2->string ,astr ,size) (free-alien ,astr)))
-
 (define-alien-routine ("LocalFree@4" local-free) void
   (lptr (* t)))
 
+(defmacro cast-and-free (value &key (type 'system-string)
+                                (free-function 'free-alien))
+  `(prog1 (cast ,value ,type)
+     (,free-function ,value)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defmacro with-funcname ((name description) &body body)
+  `(let
+     ((,name (etypecase ,description
+               (string ,description)
+               (cons (destructuring-bind (s &optional (l 0) c) ,description
+                       (format nil "~A~A~A" s
+                               (if c #-sb-unicode "A@" #+sb-unicode "W@" "@")
+                               l))))))
+     ,@body)))
+
+
+;;; FIXME: The various FOO-SYSCALL-BAR macros, and perhaps some other
+;;; macros in this file, are only used in this file, and could be
+;;; implemented using SB!XC:DEFMACRO wrapped in EVAL-WHEN.
+
+(defmacro syscall ((name ret-type &rest arg-types) success-form &rest args)
+  (with-funcname (sname name)
+    `(locally
+       (declare (optimize (sb!c::float-accuracy 0)))
+       (let ((result (alien-funcall
+                       (extern-alien ,sname
+                                     (function ,ret-type ,@arg-types))
+                       ,@args)))
+         (declare (ignorable result))
+         ,success-form))))
+
+;;; This is like SYSCALL, but if it fails, signal an error instead of
+;;; returning error codes. Should only be used for syscalls that will
+;;; never really get an error.
+(defmacro syscall* ((name &rest arg-types) success-form &rest args)
+  (with-funcname (sname name)
+    `(locally
+       (declare (optimize (sb!c::float-accuracy 0)))
+       (let ((result (alien-funcall
+                       (extern-alien ,sname (function bool ,@arg-types))
+                       ,@args)))
+         (when (zerop result)
+           (win32-error ,sname))
+         ,success-form))))
+
+(defmacro with-sysfun ((func name ret-type &rest arg-types) &body body)
+  (with-funcname (sname name)
+    `(with-alien ((,func (function ,ret-type ,@arg-types)
+                         :extern ,sname))
+       ,@body)))
+
+(defmacro void-syscall* ((name &rest arg-types) &rest args)
+  `(syscall* (,name ,@arg-types) (values t 0) ,@args))
+
 (defun get-last-error-message (err)
   "http://msdn.microsoft.com/library/default.asp?url=/library/en-us/debug/base/retrieving_the_last_error_code.asp"
-  (with-alien ((amsg (* tchar)))
-    (let ((nchars
-           (alien-funcall
-            (extern-alien #!+sb-unicode "FormatMessageW@28"
-                          #!-sb-unicode "FormatMessageA@28"
-                          (function dword dword dword dword dword
-                                    (* (* tchar)) dword dword))
-            (logior FORMAT_MESSAGE_ALLOCATE_BUFFER FORMAT_MESSAGE_FROM_SYSTEM)
-            0 err 0 (addr amsg) 0 0)))
-      (prog1 (ucs2->string amsg nchars)
-        (local-free amsg)))))
+  (with-alien ((amsg (* char)))
+    (syscall (("FormatMessage" 28 t)
+              dword dword dword dword dword (* (* char)) dword dword)
+             (cast-and-free amsg :free-function local-free)
+             (logior FORMAT_MESSAGE_ALLOCATE_BUFFER FORMAT_MESSAGE_FROM_SYSTEM)
+             0 err 0 (addr amsg) 0 0)))
 
-(defmacro win32-error (func-name)
-  `(let ((err-code (sb!win32::get-last-error)))
+(defmacro win32-error (func-name &optional err)
+  `(let ((err-code ,(or err `(get-last-error))))
+     (declare (type (unsigned-byte 32) err-code))
      (error "~%Win32 Error [~A] - ~A~%~A"
             ,func-name
             err-code
-            (sb!win32::get-last-error-message err-code))))
+            (get-last-error-message err-code))))
 
 (defun get-folder-pathname (csidl)
   "http://msdn.microsoft.com/library/en-us/shellcc/platform/shell/reference/functions/shgetfolderpath.asp"
-  (with-alien ((apath (* tchar) (make-alien tchar (1+ max_path))))
-    (alien-funcall
-     (extern-alien #!-sb-unicode "SHGetFolderPathA@20"
-                   #!+sb-unicode "SHGetFolderPathW@20"
-                   (function int handle int handle dword (* tchar)))
-     0 csidl 0 0 apath)
-    (parse-native-namestring
-     (concatenate 'string (ucs2->string&free apath) "\\"))))
+  (with-alien ((apath (* char) (make-alien char (1+ max_path))))
+    (syscall (("SHGetFolderPath" 20 t) int handle int handle dword (* char))
+             (parse-native-namestring
+               (concatenate 'string (cast-and-free apath) "\\"))
+             0 csidl 0 0 apath)))
 
 (defun sb!unix:posix-getcwd ()
-  (with-alien ((apath (* tchar) (make-alien tchar (1+ max_path)))
-               (afunc (function dword dword (* tchar))
-                      :extern
-                      #!-sb-unicode "GetCurrentDirectoryA@8"
-                      #!+sb-unicode "GetCurrentDirectoryW@8"))
-    (let ((ret (alien-funcall afunc (1+ max_path) apath)))
-      (when (zerop ret)
-        (win32-error "GetCurrentDirectory"))
-      (when (> ret (1+ max_path))
-        (free-alien apath)
-        (setf apath (make-alien tchar ret))
-        (alien-funcall afunc ret apath))
-      (ucs2->string&free apath ret))))
+  (with-alien ((apath (* char) (make-alien char (1+ max_path))))
+    (with-sysfun (afunc ("GetCurrentDirectory" 8 t) dword dword (* char))
+      (let ((ret (alien-funcall afunc (1+ max_path) apath)))
+        (when (zerop ret)
+          (win32-error "GetCurrentDirectory"))
+        (when (> ret (1+ max_path))
+          (free-alien apath)
+          (setf apath (make-alien char ret))
+          (alien-funcall afunc ret apath))
+        (cast-and-free apath)))))
 
 (defun sb!unix:unix-mkdir (name mode)
   (declare (type sb!unix:unix-pathname name)
            (type sb!unix:unix-file-mode mode)
            (ignore mode))
-  (let ((name-length (length name)))
-    (with-alien ((apath (* tchar) (make-alien tchar (1+ name-length))))
-      (dotimes (i name-length) (setf (deref apath i) (char-code (aref name i))))
-      (setf (deref apath name-length) 0)
-      (when (zerop (alien-funcall
-                    (extern-alien #!-sb-unicode "CreateDirectoryA@8"
-                                  #!+sb-unicode "CreateDirectoryW@8"
-                                  (function bool (* tchar) dword))
-                    apath 0))
-        (win32-error "CreateDirectory"))
-      (values t 0))))
+  (void-syscall* (("CreateDirectory" 8 t) system-string dword) name 0))
 
 (defun sb!unix:unix-rename (name1 name2)
   (declare (type sb!unix:unix-pathname name1 name2))
-  (let ((name-length1 (length name1))
-        (name-length2 (length name2)))
-    (with-alien ((apath1 (* tchar) (make-alien tchar (1+ name-length1)))
-                 (apath2 (* tchar) (make-alien tchar (1+ name-length2))))
-      (dotimes (i name-length1)
-        (setf (deref apath1 i) (char-code (aref name1 i))))
-      (setf (deref apath1 name-length1) 0)
-      (dotimes (i name-length2)
-        (setf (deref apath2 i) (char-code (aref name2 i))))
-      (setf (deref apath2 name-length2) 0)
-      (when (zerop (alien-funcall
-                    (extern-alien #!-sb-unicode "MoveFileA@8"
-                                  #!+sb-unicode "MoveFileW@8"
-                                  (function bool (* tchar) (* tchar)))
-                    apath1 apath2))
-        (win32-error "MoveFile"))
-      (values t 0))))
+  (void-syscall* (("MoveFile" 8 t) system-string system-string) name1 name2))
 
 (defun sb!unix::posix-getenv (name)
   (declare (type simple-string name))
-  (let ((name-length (length name)))
-    (with-alien ((aname (* tchar) (make-alien tchar (1+ name-length)))
-                 (aenv (* tchar) (make-alien tchar default-environment-length))
-                 (afunc (function dword (* tchar) (* tchar) dword)
-                        :extern
-                        #!-sb-unicode "GetEnvironmentVariableA@12"
-                        #!+sb-unicode "GetEnvironmentVariableW@12"))
-      (dotimes (i name-length)
-        (setf (deref aname i) (char-code (aref name i))))
-      (setf (deref aname name-length) 0)
-      (let ((ret (alien-funcall afunc aname aenv default-environment-length)))
+  (with-alien ((aenv (* char) (make-alien char default-environment-length)))
+    (with-sysfun (afunc ("GetEnvironmentVariable" 12 t)
+                        dword system-string (* char) dword)
+      (let ((ret (alien-funcall afunc name aenv default-environment-length)))
         (when (> ret default-environment-length)
           (free-alien aenv)
-          (setf aenv (make-alien tchar ret))
-          (alien-funcall afunc aname aenv ret))
+          (setf aenv (make-alien char ret))
+          (alien-funcall afunc name aenv ret))
         (if (> ret 0)
-            (ucs2->string&free aenv ret)
-            nil)))))
+            (cast-and-free aenv)
+            (free-alien aenv))))))
+
+;; GET-CURRENT-PROCESS
+;; The GetCurrentProcess function retrieves a pseudo handle for the current
+;; process.
+;;
+;; http://msdn.microsoft.com/library/en-us/dllproc/base/getcurrentprocess.asp
+(declaim (inline get-current-process))
+(define-alien-routine ("GetCurrentProcess@0" get-current-process) handle)
 
 ;;;; Process time information
 
-(define-alien-type nil
-    (struct filetime
-            (dw-low-datetime dword)
-            (dw-high-datetime dword)))
+;; FILETIME
+;; The FILETIME structure is a 64-bit value representing the number of
+;; 100-nanosecond intervals since January 1, 1601 (UTC).
+;;
+;; http://msdn.microsoft.com/library/en-us/sysinfo/base/filetime_str.asp?
+(define-alien-type FILETIME (sb!alien:unsigned 64))
 
 (defun get-process-times ()
-  (with-alien ((creation-time (struct filetime))
-               (exit-time (struct filetime))
-               (kernel-time (struct filetime))
-               (user-time (struct filetime)))
-    (let ((result (sb!alien:alien-funcall
-                   (extern-alien
-                    "GetProcessTimes@20"
-                    (function bool
-                              handle
-                              (* (struct filetime))
-                              (* (struct filetime))
-                              (* (struct filetime))
-                              (* (struct filetime))))
-                   (get-current-process)
-                   (addr creation-time)
-                   (addr exit-time)
-                   (addr kernel-time)
-                   (addr user-time))))
-      (if (zerop result)
-          (win32-error "GetProcessTimes")
-          (flet ((filetime-to-100-ns (time)
-                   (+ (ash (slot time 'dw-high-datetime) 32)
-                      (slot time 'dw-low-datetime))))
-            (values (filetime-to-100-ns creation-time)
-                    (filetime-to-100-ns exit-time)
-                    (filetime-to-100-ns kernel-time)
-                    (filetime-to-100-ns user-time)))))))
+  (with-alien ((creation-time filetime)
+               (exit-time filetime)
+               (kernel-time filetime)
+               (user-time filetime))
+    (syscall* (("GetProcessTimes" 20) handle (* filetime) (* filetime)
+                                             (* filetime) (* filetime))
+              (values creation-time
+                      exit-time
+                      kernel-time
+                      user-time)
+              (get-current-process)
+              (addr creation-time)
+              (addr exit-time)
+              (addr kernel-time)
+              (addr user-time))))
+
+;; SETENV
+;; The SetEnvironmentVariable function sets the contents of the specified
+;; environment variable for the current process.
+;;
+;; http://msdn.microsoft.com/library/en-us/dllproc/base/setenvironmentvariable.asp
+(defun setenv (name value)
+  (declare (type simple-string name value))
+  (void-syscall* (("SetEnvironmentVariable" 8 t) system-string system-string)
+                 name value))
+
+(defmacro c-sizeof (s)
+  "translate alien size (in bits) to c-size (in bytes)"
+  `(/ (alien-size ,s) 8))
+
+;; OSVERSIONINFO
+;; The OSVERSIONINFO data structure contains operating system version
+;; information. The information includes major and minor version numbers,
+;; a build number, a platform identifier, and descriptive text about
+;; the operating system. This structure is used with the GetVersionEx function.
+;;
+;; http://msdn.microsoft.com/library/en-us/sysinfo/base/osversioninfo_str.asp
+(define-alien-type nil
+  (struct OSVERSIONINFO
+    (dwOSVersionInfoSize dword)
+    (dwMajorVersion dword)
+    (dwMinorVersion dword)
+    (dwBuildNumber dword)
+    (dwPlatformId dword)
+    (szCSDVersion (array char #!-sb-unicode 128 #!+sb-unicode 256))))
+
+(defun get-version-ex ()
+  (with-alien ((info (struct OSVERSIONINFO)))
+    (setf (slot info 'dwOSVersionInfoSize) (c-sizeof (struct OSVERSIONINFO)))
+    (syscall* (("GetVersionEx" 4 t) (* (struct OSVERSIONINFO)))
+              (values (slot info 'dwMajorVersion)
+                      (slot info 'dwMinorVersion)
+                      (slot info 'dwBuildNumber)
+                      (slot info 'dwPlatformId)
+                      (cast (slot info 'szCSDVersion) system-string))
+              (addr info))))
+
+;; GET-COMPUTER-NAME
+;; The GetComputerName function retrieves the NetBIOS name of the local
+;; computer. This name is established at system startup, when the system
+;; reads it from the registry.
+;;
+;; http://msdn.microsoft.com/library/en-us/sysinfo/base/getcomputername.asp
+(declaim (ftype (function () simple-string) get-computer-name))
+(defun get-computer-name ()
+  (with-alien ((aname (* char) (make-alien char (1+ MAX_COMPUTERNAME_LENGTH)))
+               (length dword (1+ MAX_COMPUTERNAME_LENGTH)))
+    (with-sysfun (afunc ("GetComputerName" 8 t) bool (* char) (* dword))
+      (when (zerop (alien-funcall afunc aname (addr length)))
+        (let ((err (get-last-error)))
+          (unless (= err ERROR_BUFFER_OVERFLOW)
+            (win32-error "GetComputerName" err))
+          (free-alien aname)
+          (setf aname (make-alien char length))
+          (alien-funcall afunc aname (addr length))))
+      (cast-and-free aname))))
