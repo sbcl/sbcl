@@ -1257,34 +1257,19 @@
 
     DONE))
 
-;;; &MORE args are stored contiguously on the stack, starting
-;;; immediately at the context pointer. The context pointer is not
-;;; typed, so the lowtag is 0.
-(define-vop (more-arg)
-  (:translate %more-arg)
+(define-vop (more-kw-arg)
+  (:translate sb!c::%more-kw-arg)
   (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to :result)
-         (index :scs (any-reg) :target temp))
+  (:args (object :scs (descriptor-reg) :to (:result 1))
+         (index :scs (any-reg) :to (:result 1) :target keyword))
   (:arg-types * tagged-num)
-  (:temporary (:sc unsigned-reg :from (:argument 1) :to :result) temp)
-  (:results (value :scs (any-reg descriptor-reg)))
-  (:result-types *)
-  (:generator 5
-    (move temp index)
-    (inst neg temp)
-    (inst mov value (make-ea :qword :base object :index temp))))
-
-(define-vop (more-arg-c)
-  (:translate %more-arg)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
-  (:info index)
-  (:arg-types * (:constant (signed-byte 30)))
-  (:results (value :scs (any-reg descriptor-reg)))
-  (:result-types *)
+  (:results (value :scs (descriptor-reg any-reg))
+            (keyword :scs (descriptor-reg any-reg)))
+  (:result-types * *)
   (:generator 4
-   (inst mov value
-         (make-ea :qword :base object :disp (- (* index n-word-bytes))))))
+     (inst mov value (make-ea :qword :base object :index index))
+     (inst mov keyword (make-ea :qword :base object :index index
+                                :disp n-word-bytes))))))
 
 ;;; Turn more arg (context, count) into a list.
 (defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))

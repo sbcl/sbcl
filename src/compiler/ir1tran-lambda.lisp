@@ -537,6 +537,12 @@
         (arg-vals n-context)
         (arg-vals n-count))
 
+      ;; The reason for all the noise with
+      ;; STACK-GROWS-DOWNWARD-NOT-UPWARD is to enable generation of
+      ;; slightly more efficient code on x86oid processors.  (We can
+      ;; hoist the negation of the index outside the main parsing loop
+      ;; and take advantage of the base+index+displacement addressing
+      ;; mode on x86oids.)
       (when (optional-dispatch-keyp res)
         (let ((n-index (gensym "N-INDEX-"))
               (n-key (gensym "N-KEY-"))
@@ -547,8 +553,15 @@
                           (policy *lexenv* (zerop safety))))
               (found-allow-p nil))
 
-          (temps `(,n-index (1- ,n-count)) n-key n-value-temp)
-          (body `(declare (fixnum ,n-index) (ignorable ,n-key ,n-value-temp)))
+          (temps #!-stack-grows-downward-not-upward
+                 `(,n-index (1- ,n-count))
+                 #!+stack-grows-downward-not-upward
+                 `(,n-index (- (1- ,n-count)))
+                 #!-stack-grows-downward-not-upward n-value-temp
+                 #!-stack-grows-downward-not-upward n-key)
+          (body `(declare (fixnum ,n-index)
+                          #!-stack-grows-downward-not-upward
+                          (ignorable ,n-value-temp ,n-key)))
 
           (collect ((tests))
             (dolist (key keys)
@@ -589,6 +602,7 @@
                 (%odd-key-args-error)))
 
             (body
+             #!-stack-grows-downward-not-upward
              `(locally
                 (declare (optimize (safety 0)))
                 (loop
@@ -597,7 +611,16 @@
                   (decf ,n-index)
                   (setq ,n-key (%more-arg ,n-context ,n-index))
                   (decf ,n-index)
-                  (cond ,@(tests)))))
+                  (cond ,@(tests))))
+             #!+stack-grows-downward-not-upward
+             `(locally (declare (optimize (safety 0)))
+                (loop
+                  (when (plusp ,n-index) (return))
+                  (multiple-value-bind (,n-value-temp ,n-key)
+                      (%more-kw-arg ,n-context ,n-index)
+                    (declare (ignorable ,n-value-temp ,n-key))
+                    (incf ,n-index 2)
+                    (cond ,@(tests))))))
 
             (unless allowp
               (body `(when (and ,n-losep (not ,n-allowp))

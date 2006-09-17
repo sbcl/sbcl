@@ -1407,7 +1407,10 @@
 (defknown %special-unbind (t) t)
 (defknown %listify-rest-args (t index) list (flushable))
 (defknown %more-arg-context (t t) (values t index) (flushable))
+#!-stack-grows-downward-not-upward
 (defknown %more-arg (t index) t)
+#!+stack-grows-downward-not-upward
+(defknown %more-kw-arg (t index) (values t t))
 (defknown %more-arg-values (t index index) * (flushable))
 (defknown %verify-arg-count (index index) (values))
 (defknown %arg-count-error (t) nil)
