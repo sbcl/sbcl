@@ -183,8 +183,8 @@
 (define-source-transform 1+ (x) `(+ ,x 1))
 (define-source-transform 1- (x) `(- ,x 1))
 
-(define-source-transform oddp (x) `(not (zerop (logand ,x 1))))
-(define-source-transform evenp (x) `(zerop (logand ,x 1)))
+(define-source-transform oddp (x) `(logtest ,x 1))
+(define-source-transform evenp (x) `(not (logtest ,x 1)))
 
 ;;; Note that all the integer division functions are available for
 ;;; inline expansion.

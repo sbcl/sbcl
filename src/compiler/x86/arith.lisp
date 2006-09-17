@@ -1060,9 +1060,10 @@
                                      ,(symbolicate "FAST-CONDITIONAL" suffix))
                          (:translate logtest)
                          (:generator ,cost
-                          (inst test x ,(if (eq suffix '-c/fixnum)
-                                            '(fixnumize y)
-                                            'y))
+                          (emit-optimized-test-inst x
+                                                    ,(if (eq suffix '-c/fixnum)
+                                                         '(fixnumize y)
+                                                         'y))
                           (inst jmp (if not-p :e :ne) target)))))))
   (define-logtest-vops))
 

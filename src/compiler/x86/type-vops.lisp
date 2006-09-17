@@ -13,25 +13,8 @@
 
 ;;;; test generation utilities
 
-;;; Emit the most compact form of the test immediate instruction,
-;;; using an 8 bit test when the immediate is only 8 bits and the
-;;; value is one of the four low registers (eax, ebx, ecx, edx) or the
-;;; control stack.
 (defun generate-fixnum-test (value)
-  (let ((offset (tn-offset value)))
-    (cond ((and (sc-is value any-reg descriptor-reg)
-                (or (= offset eax-offset) (= offset ebx-offset)
-                    (= offset ecx-offset) (= offset edx-offset)))
-           (inst test (make-random-tn :kind :normal
-                                      :sc (sc-or-lose 'byte-reg)
-                                      :offset offset)
-                 3))
-          ((sc-is value control-stack)
-           (inst test (make-ea :byte :base ebp-tn
-                               :disp (- (* (1+ offset) n-word-bytes)))
-                 3))
-          (t
-           (inst test value 3)))))
+  (emit-optimized-test-inst value 3))
 
 (defun %test-fixnum (value target not-p)
   (generate-fixnum-test value)

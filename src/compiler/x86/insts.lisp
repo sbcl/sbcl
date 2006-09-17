@@ -1533,6 +1533,30 @@
              (t
               (error "bogus operands for TEST: ~S and ~S" this that)))))))
 
+;;; Emit the most compact form of the test immediate instruction,
+;;; using an 8 bit test when the immediate is only 8 bits and the
+;;; value is one of the four low registers (eax, ebx, ecx, edx) or the
+;;; control stack.
+(defun emit-optimized-test-inst (x y)
+  (typecase y
+    ((unsigned-byte 7)
+     (let ((offset (tn-offset x)))
+       (cond ((and (sc-is x any-reg descriptor-reg)
+                   (or (= offset eax-offset) (= offset ebx-offset)
+                       (= offset ecx-offset) (= offset edx-offset)))
+              (inst test (make-random-tn :kind :normal
+                                         :sc (sc-or-lose 'byte-reg)
+                                         :offset offset)
+                    y))
+             ((sc-is x control-stack)
+              (inst test (make-ea :byte :base ebp-tn
+                                  :disp (- (* (1+ offset) n-word-bytes)))
+                    y))
+             (t
+              (inst test x y)))))
+    (t
+     (inst test x y))))
+
 (define-instruction or (segment dst src)
   (:printer-list
    (arith-inst-printer-list #b001))
