@@ -370,7 +370,7 @@
                (string ,description)
                (cons (destructuring-bind (s &optional (l 0) c) ,description
                        (format nil "~A~A~A" s
-                               (if c #-sb-unicode "A@" #+sb-unicode "W@" "@")
+                               (if c #!-sb-unicode "A@" #!+sb-unicode "W@" "@")
                                l))))))
      ,@body)))
 
