@@ -124,7 +124,8 @@
   cerror
   breakpoint
   fun-end-breakpoint
-  single-step-breakpoint)
+  single-step-around
+  single-step-before)
 ;;; FIXME: It'd be nice to replace all the DEFENUMs with something like
 ;;;   (WITH-DEF-ENUM (:START 8)
 ;;;     (DEF-ENUM HALT-TRAP)
@@ -133,7 +134,7 @@
 ;;; for the benefit of anyone doing a lexical search for definitions
 ;;; of these symbols.
 
-(defenum (:prefix object-not- :suffix -trap :start 16)
+(defenum (:prefix object-not- :suffix -trap :start 24)
   list
   instance)
 

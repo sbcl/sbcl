@@ -43,7 +43,7 @@
 ;;;; number.
 
 (run "cc"
-     #+x86-64 "-fPIC"
+     #+(and linux (or x86-64 ppc)) "-fPIC"
      "stack-alignment-offset.c" "-o" "stack-alignment-offset")
 
 (defparameter *good-offset*
@@ -53,7 +53,7 @@
 ;;;; Build the tool again, this time as a shared object, and load it
 
 (run "cc" "stack-alignment-offset.c"
-     #+x86-64 "-fPIC"
+     #+(and linux (or x86-64 ppc)) "-fPIC"
      #+darwin "-bundle" #-darwin "-shared"
      "-o" "stack-alignment-offset.so")
 

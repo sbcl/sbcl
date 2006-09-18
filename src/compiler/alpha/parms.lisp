@@ -150,7 +150,12 @@
   cerror
   breakpoint
   fun-end-breakpoint
-  single-step-breakpoint)
+  single-step-breakpoint
+  ;; Stepper actually not implemented on Alpha, but these constants
+  ;; are still needed to avoid undefined variable warnings during sbcl
+  ;; build.
+  single-step-around
+  single-step-before)
 
 (defenum (:prefix trace-table-)
   normal

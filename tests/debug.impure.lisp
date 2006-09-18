@@ -159,8 +159,13 @@
 
   ;; bug 353: This test fails at least most of the time for x86/linux
   ;; ca. 0.8.20.16. -- WHN
-  (with-test (:name (:undefined-function :bug-356)
-              :fails-on '(or (and :x86 :linux) :alpha))
+  (with-test (:name (:undefined-function :bug-353)
+              ;; This used to have fewer :fails-on features pre-0.9.16.38,
+              ;; but it turns out that the bug was just being masked by
+              ;; the presence of the IR1 stepper instrumentation (and
+              ;; is thus again failing now that the instrumentation is
+              ;; no more).
+              :fails-on '(or :x86 :x86-64 :alpha))
     (assert (verify-backtrace
              (lambda () (test #'not-optimized))
              (list *undefined-function-frame*

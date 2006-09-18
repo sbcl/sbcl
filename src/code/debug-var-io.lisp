@@ -70,7 +70,9 @@
   (once-only ((len `(read-var-integer ,vec ,index)))
     (once-only ((res `(make-string ,len)))
       `(progn
-         (%byte-blt ,vec ,index ,res 0 ,len)
+         (loop for i from 0 below ,len
+               do (setf (aref ,res i)
+                        (code-char (aref ,vec (+ ,index i)))))
          (incf ,index ,len)
          ,res))))
 

@@ -1189,7 +1189,8 @@
   ;; if a call to a known global function, contains the FUN-INFO.
   (fun-info nil :type (or fun-info null))
   ;; some kind of information attached to this node by the back end
-  (info nil))
+  (info nil)
+  (step-info))
 
 ;;; The COMBINATION node represents all normal function calls,
 ;;; including FUNCALL. This is distinct from BASIC-COMBINATION so that

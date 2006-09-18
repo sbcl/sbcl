@@ -21,6 +21,7 @@
     sb!kernel::undefined-alien-function-error
     sb!kernel::memory-fault-error
     sb!di::handle-breakpoint
+    sb!di::handle-single-step-trap
     fdefinition-object
     #!+sb-thread sb!thread::run-interruption
     #!+win32 sb!kernel::handle-win32-exception))
@@ -54,6 +55,8 @@
     sb!unix::*interrupt-pending*
     *gc-inhibit*
     *gc-pending*
+    #!-sb-thread
+    *stepping*
 
     ;; hash table weaknesses
     :key

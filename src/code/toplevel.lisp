@@ -65,17 +65,6 @@ designator or a stream for the default userinit file, or NIL. If the function
 returns NIL, no userinit file is used unless one has been specified on the
 command-line.")
 
-;;;; stepping control
-(defvar *step*)
-(defvar *stepping*)
-(defvar *step-form-stack* nil
-  #!+sb-doc
-  "A place for single steppers to push information about
-STEP-FORM-CONDITIONS avaiting the corresponding
-STEP-VALUES-CONDITIONS. The system is guaranteed to empty the stack
-when stepping terminates, so that it remains in sync, but doesn't
-modify it in any other way: it is provided for implmentors of single
-steppers to maintain contextual information.")
 
 ;;;; miscellaneous utilities for working with with TOPLEVEL
 
@@ -581,24 +570,22 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
       ;; most CL specials (most critically *PACKAGE*).
       (with-rebound-io-syntax
           (handler-bind ((step-condition 'invoke-stepper))
-            (let ((*stepping* nil)
-                  (*step* nil))
-              (loop
+            (loop
                (/show0 "about to set up restarts in TOPLEVEL-REPL")
-                 ;; CLHS recommends that there should always be an
-                 ;; ABORT restart; we have this one here, and one per
-                 ;; debugger level.
-                 (with-simple-restart
-                     (abort "~@<Exit debugger, returning to top level.~@:>")
-                   (catch 'toplevel-catcher
-                     #!-win32 (sb!unix::reset-signal-mask)
-                     ;; In the event of a control-stack-exhausted-error, we
-                     ;; should have unwound enough stack by the time we get
-                     ;; here that this is now possible.
-                     #!-win32
-                     (sb!kernel::protect-control-stack-guard-page 1)
-                     (funcall repl-fun noprint)
-                     (critically-unreachable "after REPL"))))))))))
+               ;; CLHS recommends that there should always be an
+               ;; ABORT restart; we have this one here, and one per
+               ;; debugger level.
+               (with-simple-restart
+                   (abort "~@<Exit debugger, returning to top level.~@:>")
+                 (catch 'toplevel-catcher
+                   #!-win32 (sb!unix::reset-signal-mask)
+                   ;; In the event of a control-stack-exhausted-error, we
+                   ;; should have unwound enough stack by the time we get
+                   ;; here that this is now possible.
+                   #!-win32
+                   (sb!kernel::protect-control-stack-guard-page 1)
+                   (funcall repl-fun noprint)
+                   (critically-unreachable "after REPL")))))))))
 
 ;;; Our default REPL prompt is the minimal traditional one.
 (defun repl-prompt-fun (stream)
@@ -642,8 +629,7 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
                 (fresh-line)
                 (prin1 result)))))
      ;; If we started stepping in the debugger we want to stop now.
-     (setf *stepping* nil
-           *step* nil))))
+     (disable-stepping))))
 
 ;;; a convenient way to get into the assembly-level debugger
 (defun %halt ()

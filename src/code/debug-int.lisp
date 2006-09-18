@@ -466,12 +466,12 @@
            str)))
 
 (defstruct (compiled-code-location
-            (:include code-location)
-            (:constructor make-known-code-location
-                          (pc debug-fun %tlf-offset %form-number
-                              %live-set kind &aux (%unknown-p nil)))
-            (:constructor make-compiled-code-location (pc debug-fun))
-            (:copier nil))
+             (:include code-location)
+             (:constructor make-known-code-location
+                           (pc debug-fun %tlf-offset %form-number
+                               %live-set kind step-info &aux (%unknown-p nil)))
+             (:constructor make-compiled-code-location (pc debug-fun))
+             (:copier nil))
   ;; an index into DEBUG-FUN's component slot
   (pc nil :type index)
   ;; a bit-vector indexed by a variable's position in
@@ -480,7 +480,8 @@
   (%live-set :unparsed :type (or simple-bit-vector (member :unparsed)))
   ;; (unexported) To see SB!C::LOCATION-KIND, do
   ;; (SB!KERNEL:TYPE-EXPAND 'SB!C::LOCATION-KIND).
-  (kind :unparsed :type (or (member :unparsed) sb!c::location-kind)))
+  (kind :unparsed :type (or (member :unparsed) sb!c::location-kind))
+  (step-info :unparsed :type (or (member :unparsed :foo) simple-string)))
 
 ;;;; DEBUG-SOURCEs
 
@@ -541,9 +542,6 @@
 
 ;;;; (OR X86 X86-64) support
 
-#!+(or x86 x86-64)
-(progn
-
 (defun compute-lra-data-from-pc (pc)
   (declare (type system-area-pointer pc))
   (let ((component-ptr (component-ptr-from-pc pc)))
@@ -556,6 +554,9 @@
                             code-header-len)))
 ;        (format t "c-lra-fpc ~A ~A ~A~%" pc code pc-offset)
          (values pc-offset code)))))
+
+#!+(or x86 x86-64)
+(progn
 
 (defconstant sb!vm::nargs-offset #.sb!vm::ecx-offset)
 
@@ -1545,10 +1546,12 @@ register."
                                               (sb!c:read-var-integer blocks i)))
                               (form-number (sb!c:read-var-integer blocks i))
                               (live-set (sb!c:read-packed-bit-vector
-                                         live-set-len blocks i)))
+                                         live-set-len blocks i))
+                              (step-info (sb!c:read-var-string blocks i)))
                           (vector-push-extend (make-known-code-location
                                                pc debug-fun tlf-offset
-                                               form-number live-set kind)
+                                               form-number live-set kind
+                                               step-info)
                                               locations-buffer)
                           (setf last-pc pc))))
                      (block (make-compiled-debug-block
@@ -1866,6 +1869,8 @@ register."
                     (compiled-code-location-%live-set loc))
               (setf (compiled-code-location-kind code-location)
                     (compiled-code-location-kind loc))
+              (setf (compiled-code-location-step-info code-location)
+                    (compiled-code-location-step-info loc))
               (return-from fill-in-code-location t))))))))
 
 ;;;; operations on DEBUG-BLOCKs
@@ -3294,3 +3299,129 @@ register."
     ;; (There used to be more cases back before sbcl-0.7.0, when
     ;; we did special tricks to debug the IR1 interpreter.)
     ))
+
+
+;;;; Single-stepping
+
+;;; The single-stepper works by inserting conditional trap instructions
+;;; into the generated code (see src/compiler/*/call.lisp), currently:
+;;;
+;;;   1) Before the code generated for a function call that was
+;;;      translated to a VOP
+;;;   2) Just before the call instruction for a full call
+;;;
+;;; In both cases, the trap will only be executed if stepping has been
+;;; enabled, in which case it'll ultimately be handled by
+;;; HANDLE-SINGLE-STEP-TRAP, which will either signal a stepping condition,
+;;; or replace the function that's about to be called with a wrapper
+;;; which will signal the condition.
+
+(defun handle-single-step-trap (context-sap kind callee-register-offset)
+  (let ((context (sb!alien:sap-alien context-sap
+                                     (* os-context-t))))
+    ;; The following calls must get tail-call eliminated for
+    ;; *STEP-FRAME* to get set correctly.
+    (if (= kind single-step-before-trap)
+        (handle-single-step-before-trap context)
+        (handle-single-step-around-trap context callee-register-offset))))
+
+(defvar *step-frame* nil)
+
+(defun handle-single-step-before-trap (context)
+  (let ((step-info (single-step-info-from-context context)))
+    ;; If there was not enough debug information available, there's no
+    ;; sense in signaling the condition.
+    (when step-info
+      (let ((*step-frame* (frame-down (top-frame))))
+        ;; KLUDGE: Use the first non-foreign frame as the
+        ;; *STACK-TOP-HINT*. Getting the frame from the signal context
+        ;; would be cleaner, but SIGNAL-CONTEXT-FRAME doesn't seem
+        ;; seem to work very well currently.
+        (loop while *step-frame*
+              for dfun = (frame-debug-fun *step-frame*)
+              do (when (typep dfun 'compiled-debug-fun)
+                   (return))
+              do (setf *step-frame* (frame-down *step-frame*)))
+        (sb!impl::step-form step-info
+                            ;; We could theoretically store information in
+                            ;; the debug-info about to determine the
+                            ;; arguments here, but for now let's just pass
+                            ;; on it.
+                            :unknown)))))
+
+;;; This function will replace the fdefn / function that was in the
+;;; register at CALLEE-REGISTER-OFFSET with a wrapper function. To
+;;; ensure that the full call will use the wrapper instead of the
+;;; original, conditional trap must be emitted before the fdefn /
+;;; function is converted into a raw address.
+(defun handle-single-step-around-trap (context callee-register-offset)
+  ;; Fetch the function / fdefn we're about to call from the
+  ;; appropriate register.
+  (let* ((callee (sb!kernel::make-lisp-obj
+                  (context-register context callee-register-offset)))
+         (step-info (single-step-info-from-context context)))
+    ;; If there was not enough debug information available, there's no
+    ;; sense in signaling the condition.
+    (unless step-info
+      (return-from handle-single-step-around-trap))
+    (let* ((fun (lambda (&rest args)
+                  (flet ((call ()
+                           (apply (typecase callee
+                                    (fdefn (fdefn-fun callee))
+                                    (function callee))
+                                  args)))
+                    (let ((sb!impl::*step-out* :maybe))
+                      (unwind-protect
+                           ;; Signal a step condition
+                           (let* ((step-in
+                                   (let ((*step-frame* (frame-down (top-frame))))
+                                     (sb!impl::step-form step-info args))))
+                             ;; And proceed based on its return value.
+                             (if step-in
+                                 ;; If STEP-INTO was selected we pass
+                                 ;; the return values to STEP-VALUES which
+                                 ;; will show the return value.
+                                 (multiple-value-call #'sb!impl::step-values
+                                   step-info
+                                   (call))
+                                 ;; If STEP-NEXT or STEP-CONTINUE was
+                                 ;; selected we disable the stepper for
+                                 ;; the duration of the call.
+                                 (sb!impl::with-stepping-disabled
+                                   (call))))
+                        ;; If the use selected the STEP-OUT restart
+                        ;; somewhere during the call, resume stepping
+                        (when (eq sb!impl::*step-out* t)
+                          (sb!impl::enable-stepping)))))))
+           (new-callee (etypecase callee
+                         (fdefn
+                          (let ((fdefn (make-fdefn (gensym))))
+                            (setf (fdefn-fun fdefn) fun)
+                            fdefn))
+                         (function fun))))
+      ;; And then store the wrapper in the same place.
+      (setf (context-register context callee-register-offset)
+            (get-lisp-obj-address new-callee)))))
+
+;;; Given a signal context, fetch the step-info that's been stored in
+;;; the debug info at the trap point.
+(defun single-step-info-from-context (context)
+  (multiple-value-bind (pc-offset code)
+      (compute-lra-data-from-pc (context-pc context))
+    (let* ((debug-fun (debug-fun-from-pc code pc-offset))
+           (location (code-location-from-pc debug-fun
+                                            pc-offset
+                                            nil)))
+      (handler-case
+          (progn
+            (fill-in-code-location location)
+            (code-location-debug-source location)
+            (compiled-code-location-step-info location))
+        (debug-condition ()
+          nil)))))
+
+;;; Return the frame that triggered a single-step condition. Used to
+;;; provide a *STACK-TOP-HINT*.
+(defun find-stepped-frame ()
+  (or *step-frame*
+      (top-frame)))

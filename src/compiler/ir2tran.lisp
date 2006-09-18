@@ -21,6 +21,14 @@
     (vop move node block x y))
   (values))
 
+;;; Determine whether we should emit a single-stepper breakpoint
+;;; around a call / before a vop.
+(defun emit-step-p (node)
+  (if (and (policy node (> insert-step-conditions 1))
+           (typep node 'combination))
+      (combination-step-info node)
+      nil))
+
 ;;; If there is any CHECK-xxx template for TYPE, then return it,
 ;;; otherwise return NIL.
 (defun type-check-template (type)
@@ -665,6 +673,8 @@
             (when (and lvar (lvar-dynamic-extent lvar))
               (vop current-stack-pointer call block
                    (ir2-lvar-stack-pointer (lvar-info lvar))))
+            (when (emit-step-p call)
+              (vop sb!vm::step-instrument-before-vop call block))
             (if info-args
                 (emit-template call block template args r-refs info-args)
                 (emit-template call block template args r-refs))
@@ -949,11 +959,13 @@
           (vop* tail-call-named node block
                 (fun-tn old-fp return-pc pass-refs)
                 (nil)
-                nargs)
+                nargs
+                (emit-step-p node))
           (vop* tail-call node block
                 (fun-tn old-fp return-pc pass-refs)
                 (nil)
-                nargs))))
+                nargs
+                (emit-step-p node)))))
 
   (values))
 
@@ -993,9 +1005,9 @@
           (fun-lvar-tn node block (basic-combination-fun node))
         (if named
             (vop* call-named node block (fp fun-tn args) (loc-refs)
-                  arg-locs nargs nvals)
+                  arg-locs nargs nvals (emit-step-p node))
             (vop* call node block (fp fun-tn args) (loc-refs)
-                  arg-locs nargs nvals))
+                  arg-locs nargs nvals (emit-step-p node)))
         (move-lvar-result node block locs lvar))))
   (values))
 
@@ -1011,9 +1023,9 @@
           (fun-lvar-tn node block (basic-combination-fun node))
         (if named
             (vop* multiple-call-named node block (fp fun-tn args) (loc-refs)
-                  arg-locs nargs)
+                  arg-locs nargs (emit-step-p node))
             (vop* multiple-call node block (fp fun-tn args) (loc-refs)
-                  arg-locs nargs)))))
+                  arg-locs nargs (emit-step-p node))))))
   (values))
 
 ;;; stuff to check in PONDER-FULL-CALL
@@ -1292,11 +1304,13 @@
        ((and 2lvar
              (eq (ir2-lvar-kind 2lvar) :unknown))
         (vop* multiple-call-variable node block (start fun nil)
-              ((reference-tn-list (ir2-lvar-locs 2lvar) t))))
+              ((reference-tn-list (ir2-lvar-locs 2lvar) t))
+              (emit-step-p node)))
        (t
         (let ((locs (standard-result-tns lvar)))
           (vop* call-variable node block (start fun nil)
-                ((reference-tn-list locs t)) (length locs))
+                ((reference-tn-list locs t)) (length locs)
+                (emit-step-p node))
           (move-lvar-result node block locs lvar)))))))
 
 ;;; Reset the stack pointer to the start of the specified

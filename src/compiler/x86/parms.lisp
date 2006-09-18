@@ -270,7 +270,8 @@
   cerror
   breakpoint
   fun-end-breakpoint
-  single-step-breakpoint
+  single-step-around
+  single-step-before
   #!+win32 context-restore) ;; HACK: The Win32 exception handling system does wrong things with this.
 ;;; FIXME: It'd be nice to replace all the DEFENUMs with something like
 ;;;   (WITH-DEF-ENUM (:START 8)
@@ -280,7 +281,7 @@
 ;;; for the benefit of anyone doing a lexical search for definitions
 ;;; of these symbols.
 
-(defenum (:prefix object-not- :suffix -trap :start 16)
+(defenum (:prefix object-not- :suffix -trap :start 24)
   list
   instance)
 

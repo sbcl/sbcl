@@ -2709,7 +2709,11 @@
       (#.halt-trap
        (nt "halt trap"))
       (#.fun-end-breakpoint-trap
-       (nt "function end breakpoint trap")))))
+       (nt "function end breakpoint trap"))
+      (#.single-step-around-trap
+       (nt "single-step trap (around)"))
+      (#.single-step-before-trap
+       (nt "single-step trap (before)")))))
 
 (define-instruction break (segment code)
   (:declare (type (unsigned-byte 8) code))

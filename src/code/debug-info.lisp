@@ -60,10 +60,11 @@
 (defconstant-eqx compiled-debug-block-nsucc-byte (byte 2 0) #'equalp)
 (def!constant compiled-debug-block-elsewhere-p #b00000100)
 
-(defconstant-eqx compiled-code-location-kind-byte (byte 3 0) #'equalp)
+(defconstant-eqx compiled-code-location-kind-byte (byte 4 0) #'equalp)
 (defparameter *compiled-code-location-kinds*
   #(:unknown-return :known-return :internal-error :non-local-exit
-    :block-start :call-site :single-value-return :non-local-entry))
+    :block-start :call-site :single-value-return :non-local-entry
+    :step-before-vop))
 
 ;;;; DEBUG-FUN objects
 

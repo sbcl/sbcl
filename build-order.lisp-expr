@@ -501,7 +501,6 @@
  ("src/compiler/ir1tran")
  ("src/compiler/ir1tran-lambda")
  ("src/compiler/ir1-translators")
- ("src/compiler/ir1-step")
  ("src/compiler/ir1util")
  ("src/compiler/ir1report")
  ("src/compiler/ir1opt")
@@ -667,7 +666,10 @@
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
  ("src/code/alloc"             :not-host)
 
+ ("src/code/early-step")                  ; target-thread needs *STEP-OUT*
+
  ("src/code/target-thread"     :not-host)
+
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/gc"     :not-host)
  ("src/code/purify" :not-host)

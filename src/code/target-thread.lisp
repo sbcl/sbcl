@@ -156,12 +156,17 @@ in future versions."
         int (word unsigned-long) (n unsigned-long))))
 
 ;;; used by debug-int.lisp to access interrupt contexts
-#!-(and sb-fluid sb-thread) (declaim (inline sb!vm::current-thread-offset-sap))
+#!-(or sb-fluid sb-thread) (declaim (inline sb!vm::current-thread-offset-sap))
 #!-sb-thread
 (defun sb!vm::current-thread-offset-sap (n)
   (declare (type (unsigned-byte 27) n))
   (sap-ref-sap (alien-sap (extern-alien "all_threads" (* t)))
                (* n sb!vm:n-word-bytes)))
+
+#!+sb-thread
+(defun sb!vm::current-thread-offset-sap (n)
+  (declare (type (unsigned-byte 27) n))
+  (sb!vm::current-thread-offset-sap n))
 
 ;;;; spinlocks
 
@@ -607,6 +612,7 @@ returns the thread exits."
                   (sb!kernel::*restart-clusters* nil)
                   (sb!kernel::*handler-clusters* nil)
                   (sb!kernel::*condition-restarts* nil)
+                  (sb!impl::*step-out* nil)
                   ;; internal printer variables
                   (sb!impl::*previous-case* nil)
                   (sb!impl::*previous-readtable-case* nil)
@@ -757,3 +763,15 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 
 (defun sb!vm::locked-symbol-global-value-add (symbol-name delta)
   (sb!vm::locked-symbol-global-value-add symbol-name delta))
+
+;;; Stepping
+
+(defun thread-stepping ()
+  (sb!kernel:make-lisp-obj
+   (sap-ref-word (current-thread-sap)
+                 (* sb!vm::thread-stepping-slot sb!vm:n-word-bytes))))
+
+(defun (setf thread-stepping) (value)
+  (setf (sap-ref-word (current-thread-sap)
+                      (* sb!vm::thread-stepping-slot sb!vm:n-word-bytes))
+        (sb!kernel:get-lisp-obj-address value)))

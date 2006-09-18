@@ -623,11 +623,15 @@ default-value-8
      (:vop-var vop)
      (:info ,@(unless (or variable (eq return :tail)) '(arg-locs))
             ,@(unless variable '(nargs))
-            ,@(when (eq return :fixed) '(nvals)))
+            ,@(when (eq return :fixed) '(nvals))
+            step-instrumenting)
 
      (:ignore #!+gengc ,@(unless (eq return :tail) '(return-pc-pass))
               ,@(unless (or variable (eq return :tail)) '(arg-locs))
-              ,@(unless variable '(args)))
+              ,@(unless variable '(args))
+              ;; Step instrumentation for full calls not implemented yet.
+              ;; See the PPC backend for an example.
+              step-instrumenting)
 
      (:temporary (:sc descriptor-reg
                   :offset ocfp-offset
@@ -1231,3 +1235,12 @@ default-value-8
   (frob unknown-key-arg-error unknown-key-arg-error
     sb!c::%unknown-key-arg-error key)
   (frob nil-fun-returned-error nil-fun-returned-error nil fun))
+
+;;; Single-stepping
+
+(define-vop (step-instrument-before-vop)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 3
+    ;; Stub! See the PPC backend for an example.
+    (note-this-location vop :step-before-vop)))

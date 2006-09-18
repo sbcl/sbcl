@@ -120,9 +120,14 @@ Inspecting frames:
   SOURCE [n]     displays frame's source form with n levels of enclosing forms.
 
 Stepping:
-  STEP  Selects the CONTINUE restart if one exists and starts
+  START Selects the CONTINUE restart if one exists and starts
         single-stepping. Single stepping affects only code compiled with
         under high DEBUG optimization quality. See User Manual for details.
+  STEP  Steps into the current form.
+  NEXT  Steps over the current form.
+  OUT   Stops stepping temporarily, but resumes it when the topmost frame that
+        was stepped into returns.
+  STOP  Stops single-stepping.
 
 Function and macro commands:
  (SB-DEBUG:ARG n)
@@ -512,7 +517,6 @@ reset to ~S."
   (terpri stream))
 
 (defun %invoke-debugger (condition)
-
   (let ((*debug-condition* condition)
         (*debug-restarts* (compute-restarts condition))
         (*nested-debug-condition* nil))
@@ -522,7 +526,8 @@ reset to ~S."
         ;; when people redirect *ERROR-OUTPUT*, they could reasonably
         ;; expect to see error messages logged there, regardless of what
         ;; the debugger does afterwards.)
-        (%print-debugger-invocation-reason condition *error-output*)
+        (unless (typep condition 'step-condition)
+          (%print-debugger-invocation-reason condition *error-output*))
       (error (condition)
         (setf *nested-debug-condition* condition)
         (let ((ndc-type (type-of *nested-debug-condition*)))
@@ -697,6 +702,11 @@ reset to ~S."
 (defvar *debug-loop-fun* #'debug-loop-fun
   "a function taking no parameters that starts the low-level debug loop")
 
+;;; When the debugger is invoked due to a stepper condition, we don't
+;;; want to print the current frame before the first prompt for aesthetic
+;;; reasons.
+(defvar *suppress-frame-print* nil)
+
 ;;; This calls DEBUG-LOOP, performing some simple initializations
 ;;; before doing so. INVOKE-DEBUGGER calls this to actually get into
 ;;; the debugger. SB!KERNEL::ERROR-ERROR calls this in emergencies
@@ -708,7 +718,8 @@ reset to ~S."
         (*read-suppress* nil))
     (unless (typep *debug-condition* 'step-condition)
       (clear-input *debug-io*))
-    (funcall *debug-loop-fun*)))
+    (let ((*suppress-frame-print* (typep *debug-condition* 'step-condition)))
+      (funcall *debug-loop-fun*))))
 
 ;;;; DEBUG-LOOP
 
@@ -738,8 +749,11 @@ reset to ~S."
                       (princ condition *debug-io*)
                       (/show0 "handling d-c by THROWing DEBUG-LOOP-CATCHER")
                       (throw 'debug-loop-catcher nil))))
-      (terpri *debug-io*)
-      (print-frame-call *current-frame* *debug-io* :verbosity 2)
+      (cond (*suppress-frame-print*
+             (setf *suppress-frame-print* nil))
+            (t
+             (terpri *debug-io*)
+             (print-frame-call *current-frame* *debug-io* :verbosity 2)))
       (loop
        (catch 'debug-loop-catcher
          (handler-bind ((error (lambda (condition)
@@ -1311,15 +1325,41 @@ reset to ~S."
                                  (svref translations form-num)
                                  context))))
 
-;;; step to the next steppable form
-(!def-debug-command "STEP" ()
-  (let ((restart (find-restart 'continue *debug-condition*)))
-    (cond (restart
-           (setf *stepping* t
-                 *step* t)
+
+;;; start single-stepping
+(!def-debug-command "START" ()
+  (if (typep *debug-condition* 'step-condition)
+      (format *debug-io* "~&Already single-stepping.~%")
+      (let ((restart (find-restart 'continue *debug-condition*)))
+        (cond (restart
+               (sb!impl::enable-stepping)
+               (invoke-restart restart))
+              (t
+               (format *debug-io* "~&Non-continuable error, cannot start stepping.~%"))))))
+
+(defmacro def-step-command (command-name restart-name)
+  `(!def-debug-command ,command-name ()
+     (if (typep *debug-condition* 'step-condition)
+         (let ((restart (find-restart ',restart-name *debug-condition*)))
+           (aver restart)
            (invoke-restart restart))
-          (t
-           (format *debug-io* "~&Non-continuable error, cannot step.~%")))))
+         (format *debug-io* "~&Not currently single-stepping. (Use START to activate the single-stepper)~%"))))
+
+(def-step-command "STEP" step-into)
+(def-step-command "NEXT" step-next)
+(def-step-command "STOP" step-continue)
+
+(!def-debug-command-alias "S" "STEP")
+(!def-debug-command-alias "N" "NEXT")
+
+(!def-debug-command "OUT" ()
+  (if (typep *debug-condition* 'step-condition)
+      (if sb!impl::*step-out*
+          (let ((restart (find-restart 'step-out *debug-condition*)))
+            (aver restart)
+            (invoke-restart restart))
+          (format *debug-io* "~&OUT can only be used step out of frames that were originally stepped into with STEP.~%"))
+      (format *debug-io* "~&Not currently single-stepping. (Use START to activate the single-stepper)~%")))
 
 ;;; miscellaneous commands
 

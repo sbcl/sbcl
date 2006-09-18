@@ -399,6 +399,8 @@ create_thread_struct(lispobj initial_function) {
     }
     th->interrupt_data->pending_handler = 0;
     th->no_tls_value_marker=initial_function;
+
+    th->stepping = NIL;
     return th;
 }
 

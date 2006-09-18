@@ -20,7 +20,8 @@
 
 (deftype location-kind ()
   '(member :unknown-return :known-return :internal-error :non-local-exit
-           :block-start :call-site :single-value-return :non-local-entry))
+           :block-start :call-site :single-value-return :non-local-entry
+           :step-before-vop))
 
 ;;; The LOCATION-INFO structure holds the information what we need
 ;;; about locations which code generation decided were "interesting".
@@ -89,7 +90,7 @@
 ;;; are spilled.
 (defun dump-1-location (node block kind tlf-num label live var-locs vop)
   (declare (type node node) (type ir2-block block)
-           (type local-tn-bit-vector live)
+           (type (or null local-tn-bit-vector) live)
            (type (or label index) label)
            (type location-kind kind) (type (or index null) tlf-num)
            (type hash-table var-locs) (type (or vop null) vop))
@@ -109,9 +110,19 @@
       (write-var-integer (source-path-tlf-number path) *byte-buffer*))
     (write-var-integer (source-path-form-number path) *byte-buffer*))
 
-  (write-packed-bit-vector (compute-live-vars live node block var-locs vop)
-                           *byte-buffer*)
+  (if live
+      (write-packed-bit-vector (compute-live-vars live node block var-locs vop)
+                               *byte-buffer*)
+      (write-packed-bit-vector
+       (make-array (logandc2 (+ (hash-table-count var-locs) 7) 7)
+                   :initial-element 0
+                   :element-type 'bit)
+       *byte-buffer*))
 
+  (write-var-string (or (and (typep node 'combination)
+                             (combination-step-info node))
+                        "")
+                    *byte-buffer*)
   (values))
 
 ;;; Extract context info from a Location-Info structure and use it to

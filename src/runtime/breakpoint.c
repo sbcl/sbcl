@@ -185,3 +185,16 @@ void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
     return compute_pc(lra, fixnum_value(codeptr->constants[REAL_LRA_SLOT+1]));
 #endif
 }
+
+void
+handle_single_step_trap (os_context_t *context, int kind, int register_offset)
+{
+    fake_foreign_function_call(context);
+
+    funcall3(SymbolFunction(HANDLE_SINGLE_STEP_TRAP),
+             alloc_sap(context),
+             make_fixnum(kind),
+             make_fixnum(register_offset));
+
+    undo_fake_foreign_function_call(context);
+}

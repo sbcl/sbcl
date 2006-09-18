@@ -432,6 +432,16 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
                             sizeof(unsigned int));
             break;
 
+        case trap_SingleStepAround:
+        case trap_SingleStepBefore:
+            {
+                int register_offset = code >> 5 & 0x1f;
+
+                handle_single_step_trap(context, trap, register_offset);
+
+                arch_skip_instruction(context);
+                break;
+            }
         default:
             interrupt_handle_now(signal, code, context);
             break;

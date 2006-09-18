@@ -138,9 +138,14 @@
   cerror
   breakpoint
   fun-end-breakpoint
-  after-breakpoint)
+  after-breakpoint
+  ;; Stepper actually not implemented on Sparc, but these constants
+  ;; are still needed to avoid undefined variable warnings during sbcl
+  ;; build.
+  single-step-around
+  single-step-before)
 
-(defenum (:prefix object-not- :suffix -trap :start 16)
+(defenum (:prefix object-not- :suffix -trap :start 24)
   list
   instance)
 

@@ -1170,6 +1170,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 
 (define-condition step-condition ()
   ((form :initarg :form :reader step-condition-form))
+
   #!+sb-doc
   (:documentation "Common base class of single-stepping conditions.
 STEP-CONDITION-FORM holds a string representation of the form being
@@ -1180,8 +1181,18 @@ stepped."))
       "Form associated with the STEP-CONDITION.")
 
 (define-condition step-form-condition (step-condition)
-  ((source-path :initarg :source-path :reader step-condition-source-path)
-   (pathname :initarg :pathname :reader step-condition-pathname))
+  ((args :initarg :args :reader step-condition-args))
+  (:report
+   (lambda (condition stream)
+     (let ((*print-circle* t)
+           (*print-pretty* t)
+           (*print-readably* nil))
+       (format stream
+                 "Evaluating call:~%~<  ~@;~A~:>~%~
+                  ~:[With arguments:~%~{  ~S~%~}~;With unknown arguments~]~%"
+               (list (step-condition-form condition))
+               (eq (step-condition-args condition) :unknown)
+               (step-condition-args condition)))))
   #!+sb-doc
   (:documentation "Condition signalled by code compiled with
 single-stepping information when about to execute a form.
@@ -1214,14 +1225,6 @@ or the variable value associated with STEP-VARIABLE-CONDITION.")
 single-stepping information after executing a form.
 STEP-CONDITION-FORM holds the form, and STEP-CONDITION-RESULT holds
 the values returned by the form as a list. No associated restarts."))
-
-(define-condition step-variable-condition (step-result-condition)
-  ()
-  #!+sb-doc
-  (:documentation "Condition signalled by code compiled with
-single-stepping information when referencing a variable.
-STEP-CONDITION-FORM hold the symbol, and STEP-CONDITION-RESULT holds
-the value of the variable. No associated restarts."))
 
 
 ;;;; restart definitions

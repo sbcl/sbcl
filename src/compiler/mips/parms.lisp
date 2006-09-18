@@ -127,7 +127,12 @@
   unused
   pseudo-atomic
   object-not-list
-  object-not-instance)
+  object-not-instance
+  ;; Stepper actually not implemented on Mips, but these constants
+  ;; are still needed to avoid undefined variable warnings during sbcl
+  ;; build.
+  single-step-around
+  single-step-before)
 
 (defenum (:prefix trace-table-)
   normal

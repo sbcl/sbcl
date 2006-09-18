@@ -13,6 +13,8 @@ changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
     following unused symbols: *GC-NOTIFY-AFTER*, *GC-NOTIFY-BEFORE*,
     *GC-NOTIFY-STREAM*, *ERROR-PRINT-LENGTH*, *ERROR-PRINT-LEVEL*,
     *ERROR-PRINT-LINES*
+  * incompatible change: the single-stepper is no longer available 
+    on Alpha, Mips and Sparc platforms.
   * minor incompatible change: the direct superclasses of
     SB-MOP:FUNCALLABLE-STANDARD-OBJECT are (FUNCTION STANDARD-OBJECT),
     not (STANDARD-OBJECT FUNCTION).  This makes the
@@ -23,6 +25,10 @@ changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
     of the compiler. EVAL still uses the compiler by default, to switch it
     to use the interpreter, set the value of the variable 
     SB-EXT:*EVALUATOR-MODE* to :INTERPRET.
+  * minor incompatible change: the single-stepper REPL has been merged
+    with the normal debugger (see the "Stepping" heading of the debugger help
+    for more details). The debugger command STEP will no longer switch
+    to the single-stepper REPL. 
   * bug fix: ENOUGH-NAMESTRING on pathnames with no name and a pattern
     for a type now works.
   * bug fix: loading of default sysinit file works. (thanks to Leonid
@@ -38,6 +44,9 @@ changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
     Gracin).
   * bug fix: timers expiring in dead threads no longer cause a
     type-error (reported by Paul "Nonny Mouse"). 
+  * bug fix: thanks to more lightweight single-stepper instrumentation, 
+    code compiled with (DEBUG 3) will compile and execute significantly faster,
+    and will have more accurate type-inferencing than before
   * improvements to the win32 port (thanks to Yaroslav Kavenchuk):
     * bug fix: arguments to RUN-PROGRAM are escaped correctly
     * replace dummy implementations of CL:MACHINE-INSTANCE and 

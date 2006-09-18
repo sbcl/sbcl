@@ -144,9 +144,11 @@
   breakpoint
   fun-end-breakpoint
   after-breakpoint
-  fixnum-additive-overflow)
+  fixnum-additive-overflow
+  single-step-around
+  single-step-before)
 
-(defenum (:prefix object-not- :suffix -trap :start 16)
+(defenum (:prefix object-not- :suffix -trap :start 24)
   list
   instance)
 

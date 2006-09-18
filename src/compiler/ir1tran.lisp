@@ -487,9 +487,7 @@
     (ir1-error-bailout (start next result form)
       (let ((*current-path* (or (gethash form *source-paths*)
                                 (cons form *current-path*))))
-        (cond ((step-form-p form)
-               (ir1-convert-step start next result form))
-              ((atom form)
+        (cond ((atom form)
                (cond ((and (symbolp form) (not (keywordp form)))
                       (ir1-convert-var start next result form))
                      ((leaf-p form)
@@ -801,6 +799,22 @@
 
 ;;;; converting combinations
 
+;;; Does this form look like something that we should add single-stepping
+;;; instrumentation for?
+(defun step-form-p (form)
+  (flet ((step-symbol-p (symbol)
+           (not (member (symbol-package symbol)
+                        (load-time-value
+                         ;; KLUDGE: packages we're not interested in
+                         ;; stepping.
+                         (mapcar #'find-package '(sb!c sb!int sb!impl
+                                                  sb!kernel sb!pcl)))))))
+    (and *allow-instrumenting*
+         (policy *lexenv* (= insert-step-conditions 3))
+         (listp form)
+         (symbolp (car form))
+         (step-symbol-p (car form)))))
+
 ;;; Convert a function call where the function FUN is a LEAF. FORM is
 ;;; the source for the call. We return the COMBINATION node so that
 ;;; the caller can poke at it if it wants to.
@@ -810,7 +824,19 @@
   (let ((ctran (make-ctran))
         (fun-lvar (make-lvar)))
     (ir1-convert start ctran fun-lvar `(the (or function symbol) ,fun))
-    (ir1-convert-combination-args fun-lvar ctran next result (cdr form))))
+    (let ((combination
+           (ir1-convert-combination-args fun-lvar ctran next result (cdr form))))
+      (when (step-form-p form)
+        ;; Store a string representation of the form in the
+        ;; combination node. This will let the IR2 translator know
+        ;; that we want stepper instrumentation for this node. The
+        ;; string will be stored in the debug-info by DUMP-1-LOCATION.
+        (setf (combination-step-info combination)
+              (let ((*print-pretty* t)
+                    (*print-circle* t)
+                    (*print-readably* nil))
+                (prin1-to-string form))))
+      combination)))
 
 ;;; Convert the arguments to a call and make the COMBINATION
 ;;; node. FUN-LVAR yields the function to call. ARGS is the list of

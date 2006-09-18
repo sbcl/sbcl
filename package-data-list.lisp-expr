@@ -711,10 +711,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; stepping interface
                "STEP-CONDITION" "STEP-FORM-CONDITION"
                "STEP-VALUES-CONDITION" "STEP-VARIABLE-CONDITION"
-               "STEP-CONDITION-FORM" "STEP-CONDITION-SOURCE-PATH"
-               "STEP-CONDITION-PATHNAME" "STEP-CONDITION-RESULT"
+               "STEP-CONDITION-FORM" "STEP-CONDITION-RESULT"
                "STEP-CONTINUE" "STEP-NEXT" "STEP-INTO"
-               "*STEPPER-HOOK*"
+               "STEP-CONDITION-ARGS" "*STEPPER-HOOK*" "STEP-OUT"
 
                ;; RUN-PROGRAM is not only useful for users, but also
                ;; useful to implement parts of SBCL itself, so we're
@@ -2284,7 +2283,8 @@ structure representations"
                "SINGLE-FLOAT-WIDETAG" "SINGLE-FLOAT-VALUE-SLOT"
                "SINGLE-INT-CARG-REG-SC-NUMBER"
                "SINGLE-REG-SC-NUMBER" "SINGLE-STACK-SC-NUMBER"
-               "SINGLE-STEP-BREAKPOINT-TRAP"
+               "SINGLE-STEP-AROUND-TRAP"
+               "SINGLE-STEP-BEFORE-TRAP"
                "SINGLE-VALUE-RETURN-BYTE-OFFSET" "SLOT-DOCS"
                "SLOT-LENGTH" "SLOT-NAME" "SLOT-OFFSET" "SLOT-OPTIONS"
                "SLOT-REST-P" "*STATIC-FUNS*" "STATIC-FUN-OFFSET"

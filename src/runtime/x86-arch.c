@@ -107,6 +107,8 @@ void arch_skip_instruction(os_context_t *context)
 
         case trap_PendingInterrupt:
         case trap_Halt:
+        case trap_SingleStepAround:
+        case trap_SingleStepBefore:
             /* only needed to skip the Code */
             break;
 
@@ -302,6 +304,14 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
         --*os_context_pc_addr(context);
         *os_context_pc_addr(context) =
             (int)handle_fun_end_breakpoint(signal, info, context);
+        break;
+
+    case trap_SingleStepAround:
+    case trap_SingleStepBefore:
+        arch_skip_instruction(context);
+        /* On x86 the fdefn / function is always in EAX, so we pass 0
+         * as the register_offset. */
+        handle_single_step_trap(context, trap, 0);
         break;
 
     default:

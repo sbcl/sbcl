@@ -15,6 +15,32 @@
 
 (in-package "SB-IMPL") ; in warm SBCL
 
+(defun step-form (form args)
+  (restart-case
+      (signal 'step-form-condition
+              :form form
+              :args args)
+    (step-continue ()
+      :report "Resume normal execution"
+      (disable-stepping)
+      (setf *step-out* nil))
+    (step-out ()
+      :report "Resume stepping after returning from this function"
+      (disable-stepping)
+      (setf *step-out* t)
+      nil)
+    (step-next ()
+      :report "Step over call"
+      nil)
+    (step-into ()
+      :report "Step into call"
+      t)))
+
+(defun step-values (form &rest values)
+  (declare (dynamic-extent values))
+  (signal 'step-values-condition :form form :result values)
+  (values-list values))
+
 (defvar *step-help* "The following commands are available at the single
 stepper's prompt:
 
@@ -28,11 +54,6 @@ stepper's prompt:
 
 (defgeneric single-step (condition))
 
-(defmethod single-step ((condition step-variable-condition))
-  (format *debug-io* "; ~A => ~S~%"
-          (step-condition-form condition)
-          (step-condition-result condition)))
-
 (defmethod single-step ((condition step-values-condition))
   (let ((values (step-condition-result condition)))
     (format *debug-io* "; ~A => ~:[#<no value>~;~{~S~^, ~}~]~%"
@@ -40,25 +61,20 @@ stepper's prompt:
             values values)))
 
 (defmethod single-step ((condition step-form-condition))
-  (let ((form (step-condition-form condition)))
-    (loop
-     (format *debug-io* "; form ~A~%STEP] " form)
-     (finish-output *debug-io*)
-     (let ((line (read-line *debug-io*)))
-       (if (plusp (length line))
-           (case (char-upcase (schar line 0))
-             (#\B
-              (backtrace))
-             (#\Q
-              (abort condition))
-             (#\C
-              (step-continue condition))
-             (#\N
-              (step-next condition))
-             (#\S
-              (step-into condition))
-             (#\?
-              (write-line *step-help* *debug-io*))))))))
+  (let ((form (step-condition-form condition))
+        (args (step-condition-args condition)))
+    (let ((*print-circle* t)
+          (*print-pretty* t)
+          (*print-readably* nil))
+      (format *debug-io*
+              "; Evaluating call:~%~<; ~@;  ~A~:>~%~
+               ; ~:[With arguments:~%~<; ~@;~{  ~S~^~%~}~:>~;With unknown arguments~]~%"
+              (list form)
+              (eq args :unknown)
+              (list args)))
+    (finish-output *debug-io*)
+    (let ((*stack-top-hint* (sb-di::find-stepped-frame)))
+      (invoke-debugger condition))))
 
 (defvar *stepper-hook* 'single-step
   #+sb-doc "Customization hook for alternative single-steppers.
@@ -66,7 +82,8 @@ stepper's prompt:
 with the STEP-CONDITION as argument.")
 
 (defun invoke-stepper (condition)
-  (when (and *stepping* *stepper-hook*)
+  (when (and (stepping-enabled-p)
+             *stepper-hook*)
     (let ((hook *stepper-hook*)
           (*stepper-hook* nil))
       (funcall hook condition))))
@@ -77,9 +94,10 @@ with the STEP-CONDITION as argument.")
 outside the lexical scope of the form can be stepped into only if the
 functions in question have been compiled with sufficient DEBUG policy
 to be at least partially steppable."
-  `(let ((*stepping* t)
-         (*step* t))
-    (declare (optimize (sb-c:insert-step-conditions 0)))
-    (format t "Single stepping. Type ? for help.~%")
-    (locally (declare (optimize (sb-c:insert-step-conditions 3)))
-      ,form)))
+  `(locally
+       (declare (optimize (sb-c:insert-step-conditions 0)))
+     (format t "Single stepping. Type ? for help.~%")
+     (let ((*step-out* :maybe))
+       (with-stepping-enabled
+         (locally (declare (optimize (sb-c:insert-step-conditions 3)))
+           ,form)))))

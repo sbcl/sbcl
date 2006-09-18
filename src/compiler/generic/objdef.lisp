@@ -438,4 +438,5 @@
   #!+(or x86 x86-64) (pseudo-atomic-bits)
   (interrupt-data :c-type "struct interrupt_data *"
                   :length #!+alpha 2 #!-alpha 1)
+  (stepping)
   (interrupt-contexts :c-type "os_context_t *" :rest-p t))

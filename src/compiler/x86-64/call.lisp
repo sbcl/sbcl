@@ -725,7 +725,8 @@
                (:info
                ,@(unless (or variable (eq return :tail)) '(arg-locs))
                ,@(unless variable '(nargs))
-               ,@(when (eq return :fixed) '(nvals)))
+               ,@(when (eq return :fixed) '(nvals))
+               step-instrumenting)
 
                (:ignore
                ,@(unless (or variable (eq return :tail)) '(arg-locs))
@@ -858,6 +859,12 @@
 
                           (move rbp-tn new-fp) ; NB - now on new stack frame.
                           )))
+
+               (when step-instrumenting
+                 (emit-single-step-test)
+                 (inst jmp :eq DONE)
+                 (inst break single-step-around-trap))
+               DONE
 
                (note-this-location vop :call-site)
 
@@ -1397,3 +1404,37 @@
   (def unknown-key-arg-error unknown-key-arg-error
     sb!c::%unknown-key-arg-error key)
   (def nil-fun-returned-error nil-fun-returned-error nil fun))
+
+;;; Single-stepping
+
+(defun emit-single-step-test ()
+  ;; We use different ways of representing whether stepping is on on
+  ;; +SB-THREAD / -SB-THREAD: on +SB-THREAD, we use a slot in the
+  ;; thread structure. On -SB-THREAD we use the value of a static
+  ;; symbol. Things are done this way, since reading a thread-local
+  ;; slot from a symbol would require an extra register on +SB-THREAD,
+  ;; and reading a slot from a thread structure would require an extra
+  ;; register on -SB-THREAD. While this isn't critical for x86-64,
+  ;; it's more serious for x86.
+  #!+sb-thread
+  (inst cmp (make-ea :qword
+                     :base thread-base-tn
+                     :disp (* thread-stepping-slot n-word-bytes))
+        nil-value)
+  #!-sb-thread
+  (inst cmp (make-ea :qword
+                     :disp (+ nil-value (static-symbol-offset
+                                         'sb!impl::*stepping*)
+                              (* symbol-value-slot n-word-bytes)
+                              (- other-pointer-lowtag)))
+        nil-value))
+
+(define-vop (step-instrument-before-vop)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 3
+     (emit-single-step-test)
+     (inst jmp :eq DONE)
+     (inst break single-step-before-trap)
+     DONE
+     (note-this-location vop :step-before-vop)))
