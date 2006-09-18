@@ -1269,7 +1269,7 @@
   (:generator 4
      (inst mov value (make-ea :qword :base object :index index))
      (inst mov keyword (make-ea :qword :base object :index index
-                                :disp n-word-bytes))))))
+                                :disp n-word-bytes))))
 
 ;;; Turn more arg (context, count) into a list.
 (defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))

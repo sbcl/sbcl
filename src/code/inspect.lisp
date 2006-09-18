@@ -198,6 +198,12 @@ evaluated expressions.
           t
           (inspected-standard-object-elements object)))
 
+(defmethod inspected-parts ((object sb-mop:funcallable-standard-object))
+  (values (format nil "The object is a ~S of type ~S.~%"
+                  'sb-mop:funcallable-standard-object (type-of object))
+          t
+          (inspected-standard-object-elements object)))
+
 (defmethod inspected-parts ((object condition))
   (values (format nil "The object is a CONDITION of type ~S.~%"
                   (type-of object))
