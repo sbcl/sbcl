@@ -189,12 +189,22 @@ void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
 void
 handle_single_step_trap (os_context_t *context, int kind, int register_offset)
 {
+    lispobj context_sap;
+
+    /* Allocate the SAP object while the interrupts are still
+     * disabled. */
+    context_sap = alloc_sap(context);
+
     fake_foreign_function_call(context);
 
+#ifndef LISP_FEATURE_WIN32
+    thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+#endif
+
     funcall3(SymbolFunction(HANDLE_SINGLE_STEP_TRAP),
-             alloc_sap(context),
+             context_sap,
              make_fixnum(kind),
              make_fixnum(register_offset));
 
-    undo_fake_foreign_function_call(context);
+    undo_fake_foreign_function_call(context); /* blocks signals again */
 }
