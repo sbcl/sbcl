@@ -401,54 +401,108 @@
                       (optimize-slot-value-by-class-p class slot-name type))
               (cons parameter-or-nil (or class class-name)))))))))
 
+;;; Check whether the binding of the named variable is modified in the
+;;; method body.
+(defun parameter-modified-p (parameter-name env)
+  (let ((modified-variables (macroexpand '%parameter-binding-modified env)))
+    (memq parameter-name modified-variables)))
+
 (defun optimize-slot-value (slots sparameter form)
   (if sparameter
-      (destructuring-bind (ignore1 ignore2 slot-name-form) form
-        (declare (ignore ignore1 ignore2))
-        (let ((slot-name (eval slot-name-form)))
-          (optimize-instance-access slots :read sparameter slot-name nil)))
+      (let ((optimized-form
+             (destructuring-bind (ignore1 ignore2 slot-name-form) form
+               (declare (ignore ignore1 ignore2))
+               (let ((slot-name (eval slot-name-form)))
+                 (optimize-instance-access slots :read sparameter
+                                           slot-name nil)))))
+        ;; We don't return the optimized form directly, since there's
+        ;; still a chance that we'll find out later on that the
+        ;; optimization should not have been done, for example due to
+        ;; the walker encountering a SETQ on SPARAMETER later on in
+        ;; the body [ see for example clos.impure.lisp test with :name
+        ;; ((:setq :method-parameter) slot-value)) ]. Instead we defer
+        ;; the decision until the compiler macroexpands
+        ;; OPTIMIZED-SLOT-VALUE.
+        ;;
+        ;; Note that we must still call OPTIMIZE-INSTANCE-ACCESS at
+        ;; this point (instead of when expanding
+        ;; OPTIMIZED-SLOT-VALUE), since it mutates the structure of
+        ;; SLOTS. If that mutation isn't done while during the
+        ;; walking, MAKE-METHOD-LAMBDA-INTERNAL won't wrap a correct
+        ;; PV-BINDING form around the body, and compilation will fail.
+        ;; -- JES, 2006-09-18
+        `(optimized-slot-value ,form ,(car sparameter) ,optimized-form))
       `(accessor-slot-value ,@(cdr form))))
+
+(defmacro optimized-slot-value (form parameter-name optimized-form
+                                &environment env)
+  ;; Either use OPTIMIZED-FORM or fall back to the safe
+  ;; ACCESSOR-SLOT-VALUE.
+  (if (parameter-modified-p parameter-name env)
+      `(accessor-slot-value ,@(cdr form))
+      optimized-form))
 
 (defun optimize-set-slot-value (slots sparameter form)
   (if sparameter
-      (destructuring-bind (ignore1 ignore2 slot-name-form new-value) form
-        (declare (ignore ignore1 ignore2))
-        (let ((slot-name (eval slot-name-form)))
-          (optimize-instance-access slots
-                                    :write
-                                    sparameter
-                                    slot-name
-                                    new-value)))
+      (let ((optimized-form
+             (destructuring-bind (ignore1 ignore2 slot-name-form new-value) form
+               (declare (ignore ignore1 ignore2))
+               (let ((slot-name (eval slot-name-form)))
+                 (optimize-instance-access slots
+                                           :write
+                                           sparameter
+                                           slot-name
+                                           new-value)))))
+        ;; See OPTIMIZE-SLOT-VALUE
+        `(optimized-set-slot-value ,form ,(car sparameter) ,optimized-form))
       `(accessor-set-slot-value ,@(cdr form))))
+
+(defmacro optimized-set-slot-value (form parameter-name optimized-form
+                                    &environment env)
+  (if (parameter-modified-p parameter-name env)
+      `(accessor-set-slot-value ,@(cdr form))
+      optimized-form))
 
 (defun optimize-slot-boundp (slots sparameter form)
   (if sparameter
-      (destructuring-bind
-          ;; FIXME: In CMU CL ca. 19991205, this binding list had a
-          ;; fourth element in it, NEW-VALUE. It's hard to see how
-          ;; that could possibly be right, since SLOT-BOUNDP has no
-          ;; NEW-VALUE. Since it was causing a failure in building PCL
-          ;; for SBCL, so I changed it to match the definition of
-          ;; SLOT-BOUNDP (and also to match the list used in the
-          ;; similar OPTIMIZE-SLOT-VALUE, above). However, I'm weirded
-          ;; out by this, since this is old code which has worked for
-          ;; ages to build PCL for CMU CL, so it's hard to see why it
-          ;; should need a patch like this in order to build PCL for
-          ;; SBCL. I'd like to return to this and find a test case
-          ;; which exercises this function both in CMU CL, to see
-          ;; whether it's really a previously-unexercised bug or
-          ;; whether I've misunderstood something (and, presumably,
-          ;; patched it wrong).
-          (slot-boundp-symbol instance slot-name-form)
-          form
-        (declare (ignore slot-boundp-symbol instance))
-        (let ((slot-name (eval slot-name-form)))
-          (optimize-instance-access slots
-                                    :boundp
-                                    sparameter
-                                    slot-name
-                                    nil)))
+      (let ((optimized-form
+             (destructuring-bind
+                   ;; FIXME: In CMU CL ca. 19991205, this binding list
+                   ;; had a fourth element in it, NEW-VALUE. It's hard
+                   ;; to see how that could possibly be right, since
+                   ;; SLOT-BOUNDP has no NEW-VALUE. Since it was
+                   ;; causing a failure in building PCL for SBCL, so I
+                   ;; changed it to match the definition of
+                   ;; SLOT-BOUNDP (and also to match the list used in
+                   ;; the similar OPTIMIZE-SLOT-VALUE,
+                   ;; above). However, I'm weirded out by this, since
+                   ;; this is old code which has worked for ages to
+                   ;; build PCL for CMU CL, so it's hard to see why it
+                   ;; should need a patch like this in order to build
+                   ;; PCL for SBCL. I'd like to return to this and
+                   ;; find a test case which exercises this function
+                   ;; both in CMU CL, to see whether it's really a
+                   ;; previously-unexercised bug or whether I've
+                   ;; misunderstood something (and, presumably,
+                   ;; patched it wrong).
+                   (slot-boundp-symbol instance slot-name-form)
+                 form
+               (declare (ignore slot-boundp-symbol instance))
+               (let ((slot-name (eval slot-name-form)))
+                 (optimize-instance-access slots
+                                           :boundp
+                                           sparameter
+                                           slot-name
+                                           nil)))))
+        ;; See OPTIMIZE-SLOT-VALUE
+        `(optimized-slot-boundp ,form ,(car sparameter) ,optimized-form))
       `(accessor-slot-boundp ,@(cdr form))))
+
+(defmacro optimized-slot-boundp (form parameter-name optimized-form
+                                 &environment env)
+  (if (parameter-modified-p parameter-name env)
+      `(accessor-slot-boundp ,@(cdr form))
+      optimized-form))
 
 (defun optimize-reader (slots sparameter gf-name form)
   (if sparameter

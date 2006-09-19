@@ -47,6 +47,8 @@ changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
   * bug fix: thanks to more lightweight single-stepper instrumentation, 
     code compiled with (DEBUG 3) will compile and execute significantly faster,
     and will have more accurate type-inferencing than before
+  * bug fix: SLOT-VALUE optimizations are no longer done on method parameters
+    whose bindings are modified
   * improvements to the win32 port (thanks to Yaroslav Kavenchuk):
     * bug fix: arguments to RUN-PROGRAM are escaped correctly
     * replace dummy implementations of CL:MACHINE-INSTANCE and 

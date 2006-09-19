@@ -1393,9 +1393,8 @@
     (loop until (null x)
           do (incf result) (setq x (slot-value x 'cdroid)))
     result))
-(with-test (:name ((:setq :method-parameter) slot-value) :fails-on :sbcl)
+(with-test (:name ((:setq :method-parameter) slot-value))
   (assert (= (lengthoid (make-instance 'listoid)) 1))
-  (error "the failure mode is an infinite loop")
   (assert (= (lengthoid
               (make-instance 'listoid :cdroid
                              (make-instance 'listoid :cdroid

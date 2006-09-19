@@ -652,6 +652,11 @@ bootstrapping.
               ((:forthcoming-defclass-type)
                '(ignorable))))))))
 
+;;; For passing a list (groveled by the walker) of the required
+;;; parameters whose bindings are modified in the method body to the
+;;; optimized-slot-value* macros.
+(define-symbol-macro %parameter-binding-modified ())
+
 (defun make-method-lambda-internal (method-lambda &optional env)
   (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
     (error "The METHOD-LAMBDA argument to MAKE-METHOD-LAMBDA, ~S, ~
@@ -741,7 +746,8 @@ bootstrapping.
                                 (return nil))))))
           (multiple-value-bind
                 (walked-lambda call-next-method-p closurep
-                               next-method-p-p setq-p)
+                               next-method-p-p setq-p
+                               parameters-setqd)
               (walk-method-lambda method-lambda
                                   required-parameters
                                   env
@@ -758,9 +764,9 @@ bootstrapping.
                   (setq plist
                         `(,@(when slot-name-lists
                                   `(:slot-name-lists ,slot-name-lists))
-                          ,@(when call-list
-                                  `(:call-list ,call-list))
-                          ,@plist))
+                            ,@(when call-list
+                                    `(:call-list ,call-list))
+                            ,@plist))
                   (setq walked-lambda-body
                         `((pv-binding (,required-parameters
                                        ,slot-name-lists
@@ -768,7 +774,7 @@ bootstrapping.
                                         (intern-pv-table
                                          :slot-name-lists ',slot-name-lists
                                          :call-list ',call-list)))
-                           ,@walked-lambda-body)))))
+                            ,@walked-lambda-body)))))
               (when (and (memq '&key lambda-list)
                          (not (memq '&allow-other-keys lambda-list)))
                 (let ((aux (memq '&aux lambda-list)))
@@ -793,7 +799,14 @@ bootstrapping.
                                            :closurep ,closurep
                                            :applyp ,applyp)
                            ,@walked-declarations
-                           ,@walked-lambda-body))
+                           (locally
+                               (declare (disable-package-locks
+                                         %parameter-binding-modified))
+                             (symbol-macrolet ((%parameter-binding-modified
+                                                ',@parameters-setqd))
+                               (declare (enable-package-locks
+                                         %parameter-binding-modified))
+                               ,@walked-lambda-body))))
                       `(,@(when plist
                                 `(plist ,plist))
                           ,@(when documentation
@@ -1273,13 +1286,18 @@ bootstrapping.
           return tail))
 
 (defun walk-method-lambda (method-lambda required-parameters env slots calls)
-  (let ((call-next-method-p nil)   ; flag indicating that CALL-NEXT-METHOD
-                                   ; should be in the method definition
-        (closurep nil)             ; flag indicating that #'CALL-NEXT-METHOD
-                                   ; was seen in the body of a method
-        (next-method-p-p nil)      ; flag indicating that NEXT-METHOD-P
-                                   ; should be in the method definition
-        (setq-p nil))
+  (let (;; flag indicating that CALL-NEXT-METHOD should be in the
+        ;; method definition
+        (call-next-method-p nil)
+        ;; flag indicating that #'CALL-NEXT-METHOD was seen in the
+        ;; body of a method
+        (closurep nil)
+        ;; flag indicating that NEXT-METHOD-P should be in the method
+        ;; definition
+        (next-method-p-p nil)
+        ;; a list of all required parameters whose bindings might be
+        ;; modified in the method body.
+        (parameters-setqd nil))
     (flet ((walk-function (form context env)
              (cond ((not (eq context :eval)) form)
                    ;; FIXME: Jumping to a conclusion from the way it's used
@@ -1303,7 +1321,34 @@ bootstrapping.
                     ;; force method doesn't really cost much; a little
                     ;; loss of discrimination over IGNORED variables
                     ;; should be all.  -- CSR, 2004-07-01
-                    (setq setq-p t)
+                    ;;
+                    ;; As of 2006-09-18 modified parameter bindings
+                    ;; are now tracked with more granularity than just
+                    ;; one SETQ-P flag, in order to disable SLOT-VALUE
+                    ;; optimizations for parameters that are SETQd.
+                    ;; The old binary SETQ-P flag is still used for
+                    ;; all other purposes, since as noted above, the
+                    ;; extra cost is minimal. -- JES, 2006-09-18
+                    ;;
+                    ;; The walker will split (SETQ A 1 B 2) to
+                    ;; separate (SETQ A 1) and (SETQ B 2) forms, so we
+                    ;; only need to handle the simple case of SETQ
+                    ;; here.
+                    (let ((vars (if (eq (car form) 'setq)
+                                    (list (second form))
+                                    (second form))))
+                      (dolist (var vars)
+                        ;; Note that we don't need to check for
+                        ;; %VARIABLE-REBINDING declarations like is
+                        ;; done in CAN-OPTIMIZE-ACCESS1, since the
+                        ;; bindings that will have that declation will
+                        ;; never be SETQd.
+                        (when (var-declaration '%class var env)
+                          ;; If a parameter binding is shadowed by
+                          ;; another binding it won't have a %CLASS
+                          ;; declaration anymore, and this won't get
+                          ;; executed.
+                          (pushnew var parameters-setqd))))
                     form)
                    ((and (eq (car form) 'function)
                          (cond ((eq (cadr form) 'call-next-method)
@@ -1318,9 +1363,9 @@ bootstrapping.
                    ((and (memq (car form)
                                '(slot-value set-slot-value slot-boundp))
                          (constantp (caddr form)))
-                     (let ((parameter (can-optimize-access form
-                                                           required-parameters
-                                                           env)))
+                    (let ((parameter (can-optimize-access form
+                                                          required-parameters
+                                                          env)))
                       (let ((fun (ecase (car form)
                                    (slot-value #'optimize-slot-value)
                                    (set-slot-value #'optimize-set-slot-value)
@@ -1342,7 +1387,8 @@ bootstrapping.
                 call-next-method-p
                 closurep
                 next-method-p-p
-                setq-p)))))
+                (not (null parameters-setqd))
+                parameters-setqd)))))
 
 (defun generic-function-name-p (name)
   (and (legal-fun-name-p name)
