@@ -3332,16 +3332,21 @@ register."
     ;; If there was not enough debug information available, there's no
     ;; sense in signaling the condition.
     (when step-info
-      (let ((*step-frame* (frame-down (top-frame))))
-        ;; KLUDGE: Use the first non-foreign frame as the
-        ;; *STACK-TOP-HINT*. Getting the frame from the signal context
-        ;; would be cleaner, but SIGNAL-CONTEXT-FRAME doesn't seem
-        ;; seem to work very well currently.
-        (loop while *step-frame*
-              for dfun = (frame-debug-fun *step-frame*)
-              do (when (typep dfun 'compiled-debug-fun)
-                   (return))
-              do (setf *step-frame* (frame-down *step-frame*)))
+      (let ((*step-frame*
+             #+(or x86 x86-64)
+             (signal-context-frame (sb!alien::alien-sap context))
+             #-(or x86 x86-64)
+             ;; KLUDGE: Use the first non-foreign frame as the
+             ;; *STACK-TOP-HINT*. Getting the frame from the signal
+             ;; context as on x86 would be cleaner, but
+             ;; SIGNAL-CONTEXT-FRAME doesn't seem seem to work at all
+             ;; on non-x86.
+             (loop with frame = (frame-down (top-frame))
+                   while frame
+                   for dfun = (frame-debug-fun *step-frame*)
+                   do (when (typep dfun 'compiled-debug-fun)
+                        (return frame))
+                   do (setf *step-frame* (frame-down *step-frame*)))))
         (sb!impl::step-form step-info
                             ;; We could theoretically store information in
                             ;; the debug-info about to determine the

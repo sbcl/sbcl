@@ -149,7 +149,8 @@
                                      (dfun (sb-di::frame-debug-fun frame))
                                      (name (sb-di::debug-fun-name dfun)))
                                 (assert (equal name 'fib))
-                                (incf count)))))))
+                                (incf count)
+                                (invoke-restart 'step-next)))))))
     (step (fib 3))
     (assert (= count 6))))
 
@@ -161,20 +162,32 @@
                                 (backtrace)))))))
     (step (fib 3))))
 
-(handler-bind ((step-condition (lambda (c)
-                                 (funcall *stepper-hook* c))))
-  (with-test (:name :step-into)
-    (test-step-into))
-  (with-test (:name :step-next)
-    (test-step-next))
-  (with-test (:name :step-out)
-    (test-step-out))
-  (with-test (:name :step-start-from-break)
-    (test-step-start-from-break))
-  (with-test (:name :step-frame)
-    (test-step-frame))
-  (with-test (:name :step-backtrace)
+(with-test (:name :step-into)
+  (handler-bind ((step-condition (lambda (c)
+                                   (funcall *stepper-hook* c))))
+    (test-step-into)))
+
+(with-test (:name :step-next)
+  (handler-bind ((step-condition (lambda (c)
+                                   (funcall *stepper-hook* c))))
+      (test-step-next)))
+
+(with-test (:name :step-out)
+  (handler-bind ((step-condition (lambda (c)
+                                   (funcall *stepper-hook* c))))
+    (test-step-out)))
+
+(with-test (:name :step-start-from-break)
+  (handler-bind ((step-condition (lambda (c)
+                                   (funcall *stepper-hook* c))))
+    (test-step-start-from-break)))
+
+(with-test (:name :step-frame)
+  (handler-bind ((step-condition (lambda (c)
+                                   (funcall *stepper-hook* c))))
+    (test-step-frame)))
+
+(with-test (:name :step-backtrace)
+  (handler-bind ((step-condition (lambda (c)
+                                   (funcall *stepper-hook* c))))
     (test-step-backtrace)))
-
-
-
