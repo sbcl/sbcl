@@ -709,7 +709,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "WITH-TIMEOUT" "TIMEOUT"
 
                ;; stepping interface
-               "STEP-CONDITION" "STEP-FORM-CONDITION"
+               "STEP-CONDITION" "STEP-FORM-CONDITION" "STEP-FINISHED-CONDITION"
                "STEP-VALUES-CONDITION" "STEP-VARIABLE-CONDITION"
                "STEP-CONDITION-FORM" "STEP-CONDITION-RESULT"
                "STEP-CONTINUE" "STEP-NEXT" "STEP-INTO"

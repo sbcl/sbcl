@@ -41,6 +41,11 @@
   (signal 'step-values-condition :form form :result values)
   (values-list values))
 
+(defun step-finished ()
+  (restart-case
+      (signal 'step-finished-condition)
+    (continue ())))
+
 (defvar *step-help* "The following commands are available at the single
 stepper's prompt:
 
@@ -76,6 +81,10 @@ stepper's prompt:
     (let ((*stack-top-hint* (sb-di::find-stepped-frame)))
       (invoke-debugger condition))))
 
+;;; In the TTY debugger we're not interested in STEP returning
+(defmethod single-step ((condition step-finished-condition))
+  (values))
+
 (defvar *stepper-hook* 'single-step
   #+sb-doc "Customization hook for alternative single-steppers.
 *STEPPER-HOOK* is bound to NIL prior to calling the bound function
@@ -84,9 +93,10 @@ with the STEP-CONDITION as argument.")
 (defun invoke-stepper (condition)
   (when (and (stepping-enabled-p)
              *stepper-hook*)
-    (let ((hook *stepper-hook*)
-          (*stepper-hook* nil))
-      (funcall hook condition))))
+    (with-stepping-disabled
+      (let ((hook *stepper-hook*)
+            (*stepper-hook* nil))
+        (funcall hook condition)))))
 
 (defmacro step (form)
   #+sb-doc
@@ -95,9 +105,13 @@ outside the lexical scope of the form can be stepped into only if the
 functions in question have been compiled with sufficient DEBUG policy
 to be at least partially steppable."
   `(locally
-       (declare (optimize (sb-c:insert-step-conditions 0)))
+       (declare (optimize debug (sb-c:insert-step-conditions 0)))
      (format t "Single stepping. Type ? for help.~%")
      (let ((*step-out* :maybe))
-       (with-stepping-enabled
-         (locally (declare (optimize (sb-c:insert-step-conditions 3)))
-           ,form)))))
+       (unwind-protect
+            (with-stepping-enabled
+              (multiple-value-prog1
+                  (locally (declare (optimize (sb-c:insert-step-conditions 3)))
+                    ,form)
+                (step-finished)))))))
+

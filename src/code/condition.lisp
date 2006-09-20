@@ -1226,6 +1226,15 @@ single-stepping information after executing a form.
 STEP-CONDITION-FORM holds the form, and STEP-CONDITION-RESULT holds
 the values returned by the form as a list. No associated restarts."))
 
+(define-condition step-finished-condition (step-condition)
+  ()
+  (:report
+   (lambda (condition stream)
+     (declare (ignore condition))
+     (format stream "Returning from STEP")))
+  #!+sb-doc
+  (:documentation "Condition signaled when STEP returns."))
+
 
 ;;;; restart definitions
 
