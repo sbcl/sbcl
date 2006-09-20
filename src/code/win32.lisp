@@ -374,6 +374,8 @@
                                l))))))
      ,@body)))
 
+(defmacro make-system-buffer (x)
+ `(make-alien char #!+sb-unicode (ash ,x 1) #!-sb-unicode ,x))
 
 ;;; FIXME: The various FOO-SYSCALL-BAR macros, and perhaps some other
 ;;; macros in this file, are only used in this file, and could be
@@ -432,21 +434,21 @@
 
 (defun get-folder-pathname (csidl)
   "http://msdn.microsoft.com/library/en-us/shellcc/platform/shell/reference/functions/shgetfolderpath.asp"
-  (with-alien ((apath (* char) (make-alien char (1+ max_path))))
+  (with-alien ((apath (* char) (make-system-buffer (1+ max_path))))
     (syscall (("SHGetFolderPath" 20 t) int handle int handle dword (* char))
              (parse-native-namestring
                (concatenate 'string (cast-and-free apath) "\\"))
              0 csidl 0 0 apath)))
 
 (defun sb!unix:posix-getcwd ()
-  (with-alien ((apath (* char) (make-alien char (1+ max_path))))
+  (with-alien ((apath (* char) (make-system-buffer (1+ max_path))))
     (with-sysfun (afunc ("GetCurrentDirectory" 8 t) dword dword (* char))
       (let ((ret (alien-funcall afunc (1+ max_path) apath)))
         (when (zerop ret)
           (win32-error "GetCurrentDirectory"))
         (when (> ret (1+ max_path))
           (free-alien apath)
-          (setf apath (make-alien char ret))
+          (setf apath (make-system-buffer ret))
           (alien-funcall afunc ret apath))
         (cast-and-free apath)))))
 
@@ -462,13 +464,13 @@
 
 (defun sb!unix::posix-getenv (name)
   (declare (type simple-string name))
-  (with-alien ((aenv (* char) (make-alien char default-environment-length)))
+  (with-alien ((aenv (* char) (make-system-buffer default-environment-length)))
     (with-sysfun (afunc ("GetEnvironmentVariable" 12 t)
                         dword system-string (* char) dword)
       (let ((ret (alien-funcall afunc name aenv default-environment-length)))
         (when (> ret default-environment-length)
           (free-alien aenv)
-          (setf aenv (make-alien char ret))
+          (setf aenv (make-system-buffer ret))
           (alien-funcall afunc name aenv ret))
         (if (> ret 0)
             (cast-and-free aenv)
@@ -557,7 +559,7 @@
 ;; http://msdn.microsoft.com/library/en-us/sysinfo/base/getcomputername.asp
 (declaim (ftype (function () simple-string) get-computer-name))
 (defun get-computer-name ()
-  (with-alien ((aname (* char) (make-alien char (1+ MAX_COMPUTERNAME_LENGTH)))
+  (with-alien ((aname (* char) (make-system-buffer (1+ MAX_COMPUTERNAME_LENGTH)))
                (length dword (1+ MAX_COMPUTERNAME_LENGTH)))
     (with-sysfun (afunc ("GetComputerName" 8 t) bool (* char) (* dword))
       (when (zerop (alien-funcall afunc aname (addr length)))
@@ -565,6 +567,6 @@
           (unless (= err ERROR_BUFFER_OVERFLOW)
             (win32-error "GetComputerName" err))
           (free-alien aname)
-          (setf aname (make-alien char length))
+          (setf aname (make-system-buffer length))
           (alien-funcall afunc aname (addr length))))
       (cast-and-free aname))))

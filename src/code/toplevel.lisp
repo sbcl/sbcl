@@ -43,9 +43,9 @@
         (when sbcl-homedir
           (probe-file (merge-pathnames sbcl-homedir "sbclrc"))))
       #!+win32
-      (merge-pathnames (sb!win32::get-folder-pathname
-                        sb!win32::csidl_common_appdata)
-                       "\\sbcl\\sbclrc")
+      (merge-pathnames "sbcl\\sbclrc"
+                       (sb!win32::get-folder-pathname
+                        sb!win32::csidl_common_appdata))
       #!-win32
       "/etc/sbclrc"))
 
