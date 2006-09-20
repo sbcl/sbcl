@@ -1579,7 +1579,7 @@
                  metaclass-constructor))
   (declare (type symbol predicate))
   (declare (type (member structure funcallable-structure) dd-type))
-  (declare (ignore boa-constructor predicate runtime-type-checks))
+  (declare (ignore boa-constructor predicate runtime-type-checks-p))
 
   (let* ((dd (make-dd-with-alternate-metaclass
               :class-name class-name
