@@ -514,10 +514,10 @@
                   (setf (svref (ir2-block-local-tns block1)
                                (global-conflicts-number current))
                         nil)
-                  (setf (global-conflicts-number current) nil)
-                  (setf (tn-current-conflict tn) current))
+                  (setf (global-conflicts-number current) nil))
                  (t
                   (setf (sbit live-in (global-conflicts-number current)) 1)))
+               (setf (tn-current-conflict tn) current)
                (return)))))
         (:write)))
     did-something))
