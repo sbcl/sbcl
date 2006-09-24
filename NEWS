@@ -21,6 +21,9 @@ changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
     class-precedence-lists of GENERIC-FUNCTION and
     STANDARD-GENERIC-FUNCTION comply with the requirement of ANSI
     1.4.4.5.
+  * minor incompatible change: the default stream external format on
+    non-unicode SBCL is no longer detected from the locale, but is always
+    ISO-8859-1
   * new feature: Add a version of evaluator that uses an interpreter instead
     of the compiler. EVAL still uses the compiler by default, to switch it
     to use the interpreter, set the value of the variable 

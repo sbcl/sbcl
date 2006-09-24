@@ -5,12 +5,9 @@ set -e
 
 ensure_dirs ()
 {
-    OLD_IFS=$IFS
-    IFS=''
-    for j in $*; do
+    for j in "$@"; do
          test -d "$j" || mkdir -p "$j"
     done;
-    IFS=$OLD_IFS
 }
 
 if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then

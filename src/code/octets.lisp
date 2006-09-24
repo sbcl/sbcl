@@ -641,6 +641,12 @@ one-past-the-end"
 
 (defun default-external-format ()
   (or *default-external-format*
+      ;; On non-unicode, use iso-8859-1 instead of detecting it from
+      ;; the locale settings. Defaulting to an external-format which
+      ;; can represent characters that the CHARACTER type can't
+      ;; doesn't seem very sensible.
+      #!-sb-unicode
+      (setf *default-external-format* :latin-1)
       (let ((external-format #!-win32 (intern (or (sb!alien:alien-funcall
                                                     (extern-alien
                                                       "nl_langinfo"
@@ -649,15 +655,24 @@ one-past-the-end"
                                                     sb!unix:codeset)
                                                   "LATIN-1")
                                               "KEYWORD")
-                             #!+win32
-                               #!+sb-unicode (sb!win32::ansi-codepage)
-                               #!-sb-unicode :LATIN-1))
+                             #!+win32 (sb!win32::ansi-codepage)))
         (/show0 "cold-printing defaulted external-format:")
         #!+sb-show
         (cold-print external-format)
         (/show0 "matching to known aliases")
         (dolist (entry *external-formats*
                  (progn
+                   ;;; FIXME! This WARN would try to do printing
+                   ;;; before the streams have been initialized,
+                   ;;; causing an infinite erroring loop. We should
+                   ;;; either print it by calling to C, or delay the
+                   ;;; warning until later. Since we're in freeze
+                   ;;; right now, and the warning isn't really
+                   ;;; essential, I'm doing what's least likely to
+                   ;;; cause damage, and commenting it out. This
+                   ;;; should be revisited after 0.9.17. -- JES,
+                   ;;; 2006-09-21
+                   #+nil
                    (warn "Invalid external-format ~A; using LATIN-1"
                          external-format)
                    (setf external-format :latin-1)))
