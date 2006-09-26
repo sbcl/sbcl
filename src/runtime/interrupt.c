@@ -1189,7 +1189,7 @@ sigaction_nodefer_test_handler(int signal, siginfo_t *info, void *void_context)
     sigset_t empty, current;
     int i;
     sigemptyset(&empty);
-    sigprocmask(SIG_BLOCK, &empty, &current);
+    thread_sigmask(SIG_BLOCK, &empty, &current);
     /* There should be exactly two blocked signals: the two we added
      * to sa_mask when setting up the handler.  NetBSD doesn't block
      * the signal we're handling when SA_NODEFER is set; Linux before
@@ -1220,7 +1220,7 @@ see_if_sigaction_nodefer_works()
     {
         sigset_t empty;
         sigemptyset(&empty);
-        sigprocmask(SIG_SETMASK, &empty, 0);
+        thread_sigmask(SIG_SETMASK, &empty, 0);
     }
     kill(getpid(), SA_NODEFER_TEST_KILL_SIGNAL);
     while (sigaction_nodefer_works == -1);
