@@ -77,48 +77,7 @@
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
 (def!constant +fasl-file-version+ 70)
-;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
-;;; 38: (2003-01-05) changed names of internal SORT machinery
-;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
-;;;     DEFSTRUCT-SLOT-DESCRIPTION
-;;; 40: (2003-03-11) changed value of (SXHASH NIL)
-;;; 41: (2003-04-26) enforced binary incompatibility between +SB-THREAD
-;;;     and -SB-THREAD builds
-;;; 42: (2003-05-22) %NAME slot changed to NAME in
-;;;     DEFSTRUCT-SLOT-DESCRIPTION
-;;; 43: (2003-07-18) Something could easily have changed incompatibly in
-;;;     recent maintenance, e.g. from (VECTOR NIL)-as-string support.
-;;;     (And experimental results suggest that compatibility was broken
-;;;     between about 0.8.1.29 and 0.8.1.39.)
-;;; 44: (2003-08-25) various changes leading up to 0.8.3
-;;;     <dan`b> what happened this month to stalate the fasls?
-;;;     <Krystof_> I think I renumbered everything again
-;;;     <Krystof_> simple-array-unsigned-byte-7, probably
-;;;     <Krystof_> (thanks to pfdietz)
-;;; 45: (2003-10-02) I (WHN) incremented the version for the 0.8.4
-;;;     release because I couldn't immediately convince myself that
-;;;     .fasl files could never possibly ever refer to the SB-C
-;;;     CONTINUATION-related data types which were changed
-;;;     incompatibly in 0.8.3.62.
-;;; 46: (2003-11-11) Tim Daly, Jr. (and Christophe Rhodes) reported
-;;;     .fasl incompatibility on sbcl-devel 2003-11-09.
-;;; 47: (2003-11-30) Static variables were rearranged in 0.8.6.11.
-;;; 48: (2004-03-01) Renumbered all the widetags to allow for more
-;;;     microefficiency in sbcl-0.8.8.10
-;;; 49: (2004-05-04) Changed implementation of DEFFOO macros and the
-;;;     functions they expand to.
-;;; 50: (2004-05-20) Changed %COMPILER-DEFUN signature again.
-;;; 51: (2004-07-24) Package locks (SBCL 0.8.12.7) changed signature of
-;;;     %DEFPACKAGE.
-;;; 52: (2004-11-02) Merge of SB-UNICODE.
-;;; 53: (2005-02-22) Something introduced in SBCL 0.8.19.26 (give or take
-;;;     a couple of patches) invalidated some FFI-related fasls. Probably
-;;;     caused by "lazy alien resolution improvements".
-;;; 54: (2005-03-22) At least "0.8.20.6: Make FILE-STREAM and STRING-STREAM
-;;;     potential mixins in CLOS" and "0.8.20.21: Add immediate single-floats
-;;;     on x86-64."
-;;; 55: (2005-04-06) EXTERN-ALIEN-NAME logic moved from fixups to
-;;;     FIND-FOREIGN-SYMBOL-IN-TABLE &co.
+;;; (description of versions before 0.9.0.1 deleted in 0.9.17)
 ;;; 56: (2005-05-22) Something between 0.9.0.1 and 0.9.0.14. My money is
 ;;;     on 0.9.0.6 (MORE CASE CONSISTENCY).
 ;;; 57: (2005-06-12) Raw slot rearrangement in 0.9.1.38
