@@ -224,6 +224,7 @@ new_thread_trampoline(struct thread *th)
 {
     lispobj function;
     int result, lock_ret;
+
     FSHOW((stderr,"/creating thread %lu\n", thread_self()));
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
@@ -245,6 +246,9 @@ new_thread_trampoline(struct thread *th)
     gc_assert(lock_ret == 0);
 
     result = funcall0(function);
+
+    /* Block GC */
+    block_blockable_signals();
     th->state=STATE_DEAD;
 
     /* SIG_STOP_FOR_GC is blocked and GC might be waiting for this

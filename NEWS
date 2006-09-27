@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-0.9.18 (1.0.beta?) relative to sbcl-0.9.16:
+  * bug fix: two potential GC deadlocks affecting threaded builds.
+
 changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
   * feature: weak hash tables, see MAKE-HASH-TABLE documentation
   * incompatible change: External-format support for FFI calls.  The

@@ -57,10 +57,18 @@ in future versions."
 (defvar *all-threads* ())
 (defvar *all-threads-lock* (make-mutex :name "all threads lock"))
 
+(defmacro with-all-threads-lock (&body body)
+  #!-sb-thread
+  `(locally ,@body)
+  #!+sb-thread
+  `(without-interrupts
+     (with-mutex (*all-threads-lock*)
+       ,@body)))
+
 (defun list-all-threads ()
   #!+sb-doc
   "Return a list of the live threads."
-  (with-mutex (*all-threads-lock*)
+  (with-all-threads-lock
     (copy-list *all-threads*)))
 
 (declaim (inline current-thread-sap))
@@ -97,7 +105,7 @@ in future versions."
   (define-alien-routine "signal_interrupt_thread"
       integer (os-thread unsigned-long))
 
-  (define-alien-routine "block_blockable_signals"
+  (define-alien-routine "block_deferrable_signals"
       void)
 
   #!+sb-lutex
@@ -472,16 +480,22 @@ this semaphore, then N of them is woken up."
 ;;; Remove thread from its session, if it has one.
 #!+sb-thread
 (defun handle-thread-exit (thread)
-  (with-mutex (*all-threads-lock*)
-    (/show0 "HANDLING THREAD EXIT")
-    #!+sb-lutex
-    (when (thread-interruptions-lock thread)
-      (/show0 "FREEING MUTEX LUTEX")
-      (with-lutex-address (lutex (mutex-lutex (thread-interruptions-lock thread)))
-        (%lutex-destroy lutex)))
-    (setq *all-threads* (delete thread *all-threads*)))
-  (when *session*
-    (%delete-thread-from-session thread *session*)))
+  (/show0 "HANDLING THREAD EXIT")
+  ;; We're going down, can't handle interrupts sanely anymore.
+  ;; GC remains enabled.
+  (block-deferrable-signals)
+  ;; Lisp-side cleanup
+  (with-all-threads-lock
+    (setf (thread-%alive-p thread) nil)
+    (setf (thread-os-thread thread) nil)
+    (setq *all-threads* (delete thread *all-threads*))
+    (when *session*
+      (%delete-thread-from-session thread *session*)))
+  #!+sb-lutex
+  (when (thread-interruptions-lock thread)
+    (/show0 "FREEING MUTEX LUTEX")
+    (with-lutex-address (lutex (mutex-lutex (thread-interruptions-lock thread)))
+      (%lutex-destroy lutex))))
 
 (defun terminate-session ()
   #!+sb-doc
@@ -621,7 +635,7 @@ returns the thread exits."
                   (sb!impl::*internal-symbol-output-fun* nil)
                   (sb!impl::*descriptor-handlers* nil)) ; serve-event
               (setf (thread-os-thread thread) (current-thread-sap-id))
-              (with-mutex (*all-threads-lock*)
+              (with-all-threads-lock
                 (push thread *all-threads*))
               (with-session-lock (*session*)
                 (push thread (session-threads *session*)))
@@ -644,15 +658,7 @@ returns the thread exits."
                            ;; threads, it's time to enable signals
                            (sb!unix::reset-signal-mask)
                            (funcall real-function))
-                      ;; we're going down, can't handle
-                      ;; interrupts sanely anymore
-                      (let ((sb!impl::*gc-inhibit* t))
-                        (block-blockable-signals)
-                        (setf (thread-%alive-p thread) nil)
-                        (setf (thread-os-thread thread) nil)
-                        ;; and remove what can be the last
-                        ;; reference to this thread
-                        (handle-thread-exit thread)))))))
+                      (handle-thread-exit thread))))))
             (values))))
     ;; Keep INITIAL-FUNCTION pinned until the child thread is
     ;; initialized properly.

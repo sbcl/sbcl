@@ -670,3 +670,42 @@
     (wait-for-threads threads)))
 
 (format t "backtrace test done~%")
+
+(format t "~&starting gc deadlock test: WARNING: THIS TEST WILL HANG ON FAILURE!~%")
+
+(with-test (:name (:gc-deadlock))
+  ;; Prior to 0.9.16.46 thread exit potentially deadlocked the
+  ;; GC due to *all-threads-lock* and session lock. On earlier
+  ;; versions and at least on one specific box this test is good enough
+  ;; to catch that typically well before the 1500th iteration.
+  (loop
+     with i = 0
+     with n = 3000
+     while (< i n)
+     do
+       (incf i)
+       (when (zerop (mod i 100))
+         (write-char #\.)
+         (force-output))
+       (handler-case
+           (if (oddp i)
+               (sb-thread:make-thread
+                (lambda ()
+                  (sleep (random 0.001)))
+                :name (list :sleep i))
+               (sb-thread:make-thread
+                (lambda ()
+                  ;; KLUDGE: what we are doing here is explicit,
+                  ;; but the same can happen because of a regular
+                  ;; MAKE-THREAD or LIST-ALL-THREADS, and various
+                  ;; session functions.
+                  (sb-thread:with-mutex (sb-thread::*all-threads-lock*)
+                    (sb-thread::with-session-lock (sb-thread::*session*)
+                      (sb-ext:gc))))
+                :name (list :gc i)))
+         (error (e)
+           (format t "~%error creating thread ~D: ~A -- backing off for retry~%" i e)
+           (sleep 0.1)
+           (incf i)))))
+
+(format t "~&gc deadlock test done~%")

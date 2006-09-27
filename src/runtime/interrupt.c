@@ -186,6 +186,14 @@ block_blockable_signals(void)
 #endif
 }
 
+void
+block_deferrable_signals(void)
+{
+#ifndef LISP_FEATURE_WIN32
+    thread_sigmask(SIG_BLOCK, &deferrable_sigset, 0);
+#endif
+}
+
 
 /*
  * utility routines used by various signal handlers

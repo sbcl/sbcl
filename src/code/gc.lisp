@@ -139,8 +139,9 @@ and submit it as a patch."
 ;;;; GC hooks
 
 (defvar *after-gc-hooks* nil
-  "Called after each garbage collection. In a multithreaded
-environment these hooks may run in any thread.")
+  "Called after each garbage collection, except for garbage collections
+triggered during thread exits. In a multithreaded environment these hooks may
+run in any thread.")
 
 
 ;;;; internal GC
@@ -179,7 +180,7 @@ environment these hooks may run in any thread.")
   (sb!thread:make-mutex :name "GC lock") "ID of thread running SUB-GC")
 
 (defun sub-gc (&key (gen 0))
-  (unless (eq sb!thread:*current-thread*
+  (unless (eq sb!thread:*current-thread* 
               (sb!thread::mutex-value *already-in-gc*))
     ;; With gencgc, unless *GC-PENDING* every allocation in this
     ;; function triggers another gc, potentially exceeding maximum
@@ -216,12 +217,19 @@ environment these hooks may run in any thread.")
       ;;
       ;; Can that be avoided by having the finalizers and hooks run only
       ;; from the outermost SUB-GC?
-      (run-pending-finalizers)
-      (dolist (hook *after-gc-hooks*)
-        (handler-case
-            (funcall hook)
-          (error (c)
-            (warn "Error calling after GC hook ~S:~%  ~S" hook c)))))))
+      ;;
+      ;; KLUDGE: Don't run the hooks in GC's triggered by dying threads,
+      ;; so that user-code never runs with 
+      ;;   (thread-alive-p *current-thread*) => nil
+      ;; The long-term solution will be to keep a separate thread for
+      ;; finalizers and after-gc hooks.
+      (when (sb!thread:thread-alive-p sb!thread:*current-thread*)
+        (run-pending-finalizers)
+        (dolist (hook *after-gc-hooks*)
+          (handler-case
+              (funcall hook)
+            (error (c)
+              (warn "Error calling after-GC hook ~S:~% ~A" hook c))))))))
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)
