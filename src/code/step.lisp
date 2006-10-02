@@ -26,8 +26,12 @@
       (setf *step-out* nil))
     (step-out ()
       :report "Resume stepping after returning from this function"
-      (disable-stepping)
-      (setf *step-out* t)
+      (ecase *step-out*
+        ((nil)
+         (error "Can't STEP-OUT: No STEP-IN on the call-stack"))
+        ((t :maybe)
+         (disable-stepping)
+         (setf *step-out* t)))
       nil)
     (step-next ()
       :report "Step over call"
@@ -107,6 +111,7 @@ to be at least partially steppable."
   `(locally
        (declare (optimize debug (sb-c:insert-step-conditions 0)))
      (format t "Single stepping. Type ? for help.~%")
+     ;; Allow stepping out of the STEP form.
      (let ((*step-out* :maybe))
        (unwind-protect
             (with-stepping-enabled

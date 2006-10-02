@@ -3320,7 +3320,7 @@ register."
   (let ((context (sb!alien:sap-alien context-sap
                                      (* os-context-t))))
     ;; The following calls must get tail-call eliminated for
-    ;; *STEP-FRAME* to get set correctly.
+    ;; *STEP-FRAME* to get set correctly on non-x86.
     (if (= kind single-step-before-trap)
         (handle-single-step-before-trap context)
         (handle-single-step-around-trap context callee-register-offset))))
@@ -3375,29 +3375,33 @@ register."
                                     (fdefn (fdefn-fun callee))
                                     (function callee))
                                   args)))
-                    (let ((sb!impl::*step-out* :maybe))
-                      (unwind-protect
-                           ;; Signal a step condition
-                           (let* ((step-in
-                                   (let ((*step-frame* (frame-down (top-frame))))
-                                     (sb!impl::step-form step-info args))))
-                             ;; And proceed based on its return value.
-                             (if step-in
-                                 ;; If STEP-INTO was selected we pass
-                                 ;; the return values to STEP-VALUES which
-                                 ;; will show the return value.
+                    ;; Signal a step condition
+                    (let* ((step-in
+                            (let ((*step-frame* (frame-down (top-frame))))
+                              (sb!impl::step-form step-info args))))
+                      ;; And proceed based on its return value.
+                      (if step-in
+                          ;; STEP-INTO was selected. Use *STEP-OUT* to
+                          ;; let the stepper know that selecting the
+                          ;; STEP-OUT restart is valid inside this
+                          (let ((sb!impl::*step-out* :maybe))
+                            ;; Pass the return values of the call to
+                            ;; STEP-VALUES, which will signal a
+                            ;; condition with them in the VALUES slot.
+                            (unwind-protect
                                  (multiple-value-call #'sb!impl::step-values
                                    step-info
                                    (call))
-                                 ;; If STEP-NEXT or STEP-CONTINUE was
-                                 ;; selected we disable the stepper for
-                                 ;; the duration of the call.
-                                 (sb!impl::with-stepping-disabled
-                                   (call))))
-                        ;; If the use selected the STEP-OUT restart
-                        ;; somewhere during the call, resume stepping
-                        (when (eq sb!impl::*step-out* t)
-                          (sb!impl::enable-stepping)))))))
+                              ;; If the user selected the STEP-OUT
+                              ;; restart during the call, resume
+                              ;; stepping
+                              (when (eq sb!impl::*step-out* t)
+                                (sb!impl::enable-stepping))))
+                          ;; STEP-NEXT / CONTINUE / OUT selected:
+                          ;; Disable the stepper for the duration of
+                          ;; the call.
+                          (sb!impl::with-stepping-disabled
+                            (call)))))))
            (new-callee (etypecase callee
                          (fdefn
                           (let ((fdefn (make-fdefn (gensym))))

@@ -37,6 +37,17 @@
       (+ (fib-break (1- x))
          (fib-break (- x 2)))))
 
+(defun in ()
+  (declare (optimize debug))
+  (print 1)
+  (print 2)
+  (print 3)
+  (print 4))
+
+(defun out ()
+  (declare (optimize debug))
+  (in))
+
 (defun test-step-into ()
   (let* ((results nil)
          (expected '(("(< X 2)" :unknown)
@@ -162,32 +173,73 @@
                                 (backtrace)))))))
     (step (fib 3))))
 
+(defun test-step-next/2 ()
+  (let* ((results nil)
+         (expected '(("(IN)" ())
+                     ("(PRINT 1)" (1))
+                     ("(PRINT 2)" (2))
+                     ("(PRINT 3)" (3))
+                     ("(PRINT 4)" (4))))
+         (count 0)
+         (*stepper-hook* (lambda (condition)
+                           (typecase condition
+                             (step-form-condition
+                              (push (list (step-condition-form condition)
+                                          (step-condition-args condition))
+                                    results)
+                              (if (>= (incf count) 3)
+                                  (invoke-restart 'step-into)
+                                  (invoke-restart 'step-into)))))))
+    (step (out))
+    (assert (equal expected (reverse results)))))
+
+(defun test-step-out/2 ()
+  (let* ((results nil)
+         (expected '(("(IN)" ())
+                     ("(PRINT 1)" (1))
+                     ("(PRINT 2)" (2))))
+         (count 0)
+         (*stepper-hook* (lambda (condition)
+                           (typecase condition
+                             (step-form-condition
+                              (push (list (step-condition-form condition)
+                                          (step-condition-args condition))
+                                    results)
+                              (if (>= (incf count) 3)
+                                  (invoke-restart 'step-out)
+                                  (invoke-restart 'step-into)))))))
+    (step (out))
+    (assert (equal expected (reverse results)))))
+
 (with-test (:name :step-into)
-  (handler-bind ((step-condition (lambda (c)
-                                   (funcall *stepper-hook* c))))
+  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
     (test-step-into)))
 
 (with-test (:name :step-next)
-  (handler-bind ((step-condition (lambda (c)
-                                   (funcall *stepper-hook* c))))
+  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
       (test-step-next)))
 
 (with-test (:name :step-out)
-  (handler-bind ((step-condition (lambda (c)
-                                   (funcall *stepper-hook* c))))
+  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
     (test-step-out)))
 
 (with-test (:name :step-start-from-break)
-  (handler-bind ((step-condition (lambda (c)
-                                   (funcall *stepper-hook* c))))
+  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
     (test-step-start-from-break)))
 
 (with-test (:name :step-frame)
-  (handler-bind ((step-condition (lambda (c)
-                                   (funcall *stepper-hook* c))))
+  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
     (test-step-frame)))
 
 (with-test (:name :step-backtrace)
-  (handler-bind ((step-condition (lambda (c)
-                                   (funcall *stepper-hook* c))))
+  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
     (test-step-backtrace)))
+
+(with-test (:name :step-next/2)
+  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
+    (test-step-next/2)))
+
+(with-test (:name :step-out/2)
+  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
+    (test-step-out/2)))
+
