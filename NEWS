@@ -3,6 +3,8 @@ changes in sbcl-0.9.18 (1.0.beta?) relative to sbcl-0.9.16:
   * bug fix: two potential GC deadlocks affecting threaded builds.
   * bug fix: (TYPEP #\A '(NOT (MEMBER #\" #\{ #\:))) now correctly
     returns T (reported by Anton Kazennikov)
+  * bug fix: the STORE-VALUE restart of CHECK-TYPE works correctly
+    with non-variable places
 
 changes in sbcl-0.9.17 (0.9.99?) relative to sbcl-0.9.16:
   * feature: weak hash tables, see MAKE-HASH-TABLE documentation

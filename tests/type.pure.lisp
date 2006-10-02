@@ -364,3 +364,19 @@ ACTUAL ~D DERIVED ~D~%"
             (unless (member char chars)
               (assert (not (typep char type)))
               (assert (typep char not-type)))))))))
+
+(with-test (:name (:check-type :store-value :complex-place))
+  (let ((a (cons 0.0 2))
+        (handler-invoked nil))
+    (handler-bind ((error
+                    (lambda (c)
+                      (declare (ignore c))
+                      (assert (not handler-invoked))
+                      (setf handler-invoked t)
+                      (invoke-restart 'store-value 1))))
+      (check-type (car a) integer))
+    (assert (eql (car a) 1))))
+
+
+
+

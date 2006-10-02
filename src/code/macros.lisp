@@ -73,7 +73,7 @@ invoked. In that case it will store into PLACE and start over."
              ((typep ,place ',type))
           (setf ,place (check-type-error ',place ,place ',type ,type-string)))
         (let ((value (gensym)))
-          `(do ((,value ,place))
+          `(do ((,value ,place ,place))
                ((typep ,value ',type))
             (setf ,place
                   (check-type-error ',place ,value ',type ,type-string)))))))
