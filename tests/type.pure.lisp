@@ -257,6 +257,7 @@
         (let ((deriver (intern (format nil "~A-DERIVE-UNSIGNED-~:[HIGH~;LOW~]-BOUND"
                                        op minimize)
                                (find-package :sb-c))))
+          (format t "testing type derivation: ~A~%" deriver)
           (loop for a from 0 below size do
                 (loop for b from a below size do
                       (loop for c from 0 below size do
@@ -346,3 +347,20 @@ ACTUAL ~D DERIVED ~D~%"
 
 (assert (typep #p"" 'sb-kernel:instance))
 (assert (subtypep '(member #p"") 'sb-kernel:instance))
+
+(with-test (:name (:typep :character-set :negation))
+  (flet ((generate-chars ()
+           (loop repeat 100
+                 collect (code-char (random char-code-limit)))))
+    (dotimes (i 1000)
+      (let* ((chars (generate-chars))
+             (type `(member ,@chars))
+             (not-type `(not ,type)))
+        (dolist (char chars)
+          (assert (typep char type))
+          (assert (not (typep char not-type))))
+        (let ((other-chars (generate-chars)))
+          (dolist (char other-chars)
+            (unless (member char chars)
+              (assert (not (typep char type)))
+              (assert (typep char not-type)))))))))

@@ -3104,29 +3104,29 @@ used for a COMPLEX component.~:@>"
 (!define-type-method (character-set :negate) (type)
   (let ((pairs (character-set-type-pairs type)))
     (if (and (= (length pairs) 1)
-            (= (caar pairs) 0)
-            (= (cdar pairs) (1- sb!xc:char-code-limit)))
-       (make-negation-type :type type)
-       (let ((not-character
-              (make-negation-type
-               :type (make-character-set-type
-                      :pairs '((0 . #.(1- sb!xc:char-code-limit)))))))
-         (type-union
-          not-character
-          (make-character-set-type
-           :pairs (let (not-pairs)
-                    (when (> (caar pairs) 0)
-                      (push (cons 0 (1- (caar pairs))) not-pairs))
-                    (do* ((tail pairs (cdr tail))
-                          (high1 (cdar tail))
-                          (low2 (caadr tail)))
-                         ((null (cdr tail))
-                          (when (< (cdar tail) (1- sb!xc:char-code-limit))
-                            (push (cons (1+ (cdar tail))
-                                        (1- sb!xc:char-code-limit))
-                                  not-pairs))
-                          (nreverse not-pairs))
-                      (push (cons (1+ high1) (1- low2)) not-pairs)))))))))
+             (= (caar pairs) 0)
+             (= (cdar pairs) (1- sb!xc:char-code-limit)))
+        (make-negation-type :type type)
+        (let ((not-character
+               (make-negation-type
+                :type (make-character-set-type
+                       :pairs '((0 . #.(1- sb!xc:char-code-limit)))))))
+          (type-union
+           not-character
+           (make-character-set-type
+            :pairs (let (not-pairs)
+                     (when (> (caar pairs) 0)
+                       (push (cons 0 (1- (caar pairs))) not-pairs))
+                     (do* ((tail pairs (cdr tail))
+                           (high1 (cdar tail) (cdar tail))
+                           (low2 (caadr tail) (caadr tail)))
+                          ((null (cdr tail))
+                           (when (< (cdar tail) (1- sb!xc:char-code-limit))
+                             (push (cons (1+ (cdar tail))
+                                         (1- sb!xc:char-code-limit))
+                                   not-pairs))
+                           (nreverse not-pairs))
+                       (push (cons (1+ high1) (1- low2)) not-pairs)))))))))
 
 (!define-type-method (character-set :unparse) (type)
   (cond
