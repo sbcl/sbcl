@@ -180,7 +180,7 @@ run in any thread.")
   (sb!thread:make-mutex :name "GC lock") "ID of thread running SUB-GC")
 
 (defun sub-gc (&key (gen 0))
-  (unless (eq sb!thread:*current-thread* 
+  (unless (eq sb!thread:*current-thread*
               (sb!thread::mutex-value *already-in-gc*))
     ;; With gencgc, unless *GC-PENDING* every allocation in this
     ;; function triggers another gc, potentially exceeding maximum
@@ -219,7 +219,7 @@ run in any thread.")
       ;; from the outermost SUB-GC?
       ;;
       ;; KLUDGE: Don't run the hooks in GC's triggered by dying threads,
-      ;; so that user-code never runs with 
+      ;; so that user-code never runs with
       ;;   (thread-alive-p *current-thread*) => nil
       ;; The long-term solution will be to keep a separate thread for
       ;; finalizers and after-gc hooks.
