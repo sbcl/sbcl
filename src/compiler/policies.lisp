@@ -80,3 +80,10 @@
 (define-optimization-quality compute-debug-fun
     debug
   ("no" "minimal" "yes" "yes"))
+
+(define-optimization-quality preserve-single-use-debug-variables
+    (if (and (>= debug 2)
+             (< speed 3))
+        3
+        0)
+  ("no" "no" "no" "yes"))

@@ -1126,6 +1126,17 @@
             (ref (lvar-use (combination-fun call))))
         (change-ref-leaf ref new-fun)
         (setf (combination-kind call) :full)
+        ;; The internal variables of a transform are not going to be
+        ;; interesting to the debugger, so there's no sense in
+        ;; suppressing the substitution of variables with only one use
+        ;; (the extra variables can slow down constraint propagation).
+        (setf (combination-lexenv call)
+              (make-lexenv :default (combination-lexenv call)
+                           :policy (process-optimize-decl
+                                    '(optimize
+                                      (preserve-single-use-debug-variables 0))
+                                    (lexenv-policy
+                                     (combination-lexenv call)))))
         (locall-analyze-component *current-component*))))
   (values))
 
@@ -1505,6 +1516,9 @@
                            leaf var)))
                  t)))))
         ((and (null (rest (leaf-refs var)))
+              ;; Don't substitute single-ref variables on high-debug /
+              ;; low speed, to improve the debugging experience.
+              (policy call (< preserve-single-use-debug-variables 3))
               (substitute-single-use-lvar arg var)))
         (t
          (propagate-to-refs var (lvar-type arg))))))
