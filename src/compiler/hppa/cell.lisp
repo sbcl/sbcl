@@ -208,17 +208,11 @@
   funcallable-instance-info-offset fun-pointer-lowtag
   (descriptor-reg any-reg) * %funcallable-instance-info)
 
-(define-vop (funcallable-instance-lexenv cell-ref)
-  (:variant funcallable-instance-lexenv-slot fun-pointer-lowtag))
-
-
 (define-vop (closure-ref slot-ref)
   (:variant closure-info-offset fun-pointer-lowtag))
 
 (define-vop (closure-init slot-set)
   (:variant closure-info-offset fun-pointer-lowtag))
-
-
 
 ;;;; Value Cell hackery.
 

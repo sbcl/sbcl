@@ -1364,7 +1364,6 @@ pscav(lispobj *addr, long nwords, boolean constant)
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
               case CLOSURE_HEADER_WIDETAG:
-              case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
                 /* The function self pointer needs special care on the
                  * x86 because it is the real entry point. */
                 {

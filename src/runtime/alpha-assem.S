@@ -20,6 +20,7 @@
 #include "lispregs.h"
 #include "genesis/fdefn.h"
 #include "genesis/closure.h"
+#include "genesis/funcallable-instance.h"
 #include "genesis/simple-fun.h"
 #include "genesis/static-symbols.h"
 
@@ -296,6 +297,23 @@ closure_tramp= call_into_lisp_LRA_page+0x150
 	.globl	end_of_tramps
 end_of_tramps:
 
+	.text
+	.globl funcallable_instance_tramp
+	.align 2
+	.long SIMPLE_FUN_HEADER_WIDETAG
+funcallable_instance_tramp = . + 1
+	.long funcallable_instance_tramp
+	.long NIL
+	.long NIL
+	.long NIL
+	.long NIL
+
+	ldl reg_LEXENV, FUNCALLABLE_INSTANCE_FUNCTION_OFFSET(reg_LEXENV)
+	/* I think we don't actually need to use reg_CODE here, because
+	   $CODE is computed from $LIP in the function itself */
+	ldl reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV) 
+	addl reg_CODE, SIMPLE_FUN_CODE_OFFSET, reg_LIP
+	jmp reg_ZERO, (reg_LIP)
 
 /*
  * fun-end breakpoint magic.

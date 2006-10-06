@@ -15,13 +15,9 @@
 
 (macrolet ((def (name &optional (args '(x)))
              `(defun ,name ,args (,name ,@args))))
+  (def %caller-frame-and-pc ())
   (def %code-code-size)
   (def %code-debug-info)
   (def %code-entry-points)
-  (def %funcallable-instance-fun)
   (def %funcallable-instance-layout)
-  (def %funcallable-instance-lexenv)
-  (def %set-funcallable-instance-fun (fin new-val)))
-
-(defun %caller-frame-and-pc ()
-  (%caller-frame-and-pc))
+  (def %set-funcallable-instance-layout (x new-value)))

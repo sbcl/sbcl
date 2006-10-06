@@ -936,7 +936,7 @@
   :default
   #+sb-xc-host (specifier-type 'function)
   #-sb-xc-host (if (fboundp name)
-                   (extract-fun-type (fdefinition name))
+                   (specifier-type (sb!impl::%fun-type (fdefinition name)))
                    (specifier-type 'function)))
 
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type

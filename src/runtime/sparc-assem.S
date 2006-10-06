@@ -7,6 +7,7 @@
 #include "globals.h"
 #include "sbcl.h"
 #include "genesis/closure.h"
+#include "genesis/funcallable-instance.h"
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
 #include "genesis/simple-fun.h"	
@@ -242,7 +243,21 @@ closure_tramp = . + 1
 	jmp	reg_CODE+SIMPLE_FUN_CODE_OFFSET
 	nop
 
+	.global funcallable_instance_tramp
+	FUNCDEF(funcallable_instance_tramp)
+	.align 8
+	.word SIMPLE_FUN_HEADER_WIDETAG
+funcallable_instance_tramp = . + 1
+	.word funcallable_instance_tramp
+	.word NIL
+	.word NIL
+	.word NIL
+	.word NIL
 
+	ld	[reg_LEXENV+FUNCALLABLE_INSTANCE_FUNCTION_OFFSET], reg_LEXENV
+	ld	[reg_LEXENV+CLOSURE_FUN_OFFSET], reg_CODE
+	jmp	reg_CODE+SIMPLE_FUN_CODE_OFFSET
+	nop
 /*
  * Function-end breakpoint magic.
  */

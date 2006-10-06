@@ -3229,13 +3229,6 @@ print_ptr(lispobj *addr)
 }
 #endif
 
-#if defined(LISP_FEATURE_PPC)
-extern int closure_tramp;
-extern int undefined_tramp;
-#else
-extern int undefined_tramp;
-#endif
-
 static void
 verify_space(lispobj *start, size_t words)
 {
@@ -3290,14 +3283,7 @@ verify_space(lispobj *start, size_t words)
                 */
             } else {
                 /* Verify that it points to another valid space. */
-                if (!to_readonly_space && !to_static_space &&
-#if defined(LISP_FEATURE_PPC)
-                    !((thing == &closure_tramp) ||
-                      (thing == &undefined_tramp))
-#else
-                    thing != (unsigned long)&undefined_tramp
-#endif
-                    ) {
+                if (!to_readonly_space && !to_static_space) {
                     lose("Ptr %x @ %x sees junk.\n", thing, start);
                 }
             }

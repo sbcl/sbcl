@@ -17,6 +17,7 @@
 #include "validate.h"
 #include "sbcl.h"
 #include "genesis/closure.h"
+#include "genesis/funcallable-instance.h"
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
@@ -283,6 +284,17 @@ GNAME(closure_tramp):
 	jmp	*CLOSURE_FUN_OFFSET(%rax)
 	.size	GNAME(closure_tramp), .-GNAME(closure_tramp)
 
+	.text
+	.align	align_8byte,0x90
+	.global GNAME(funcallable_instance_tramp)
+	.type	GNAME(funcallable_instance_tramp),@function
+GNAME(funcallable_instance_tramp):
+	mov	FUNCALLABLE_INSTANCE_FUNCTION_OFFSET(%rax),%rax
+	/* KLUDGE: on this platform, whatever kind of function is in %rax
+	 * now, the first word of it contains the address to jump to. */
+	jmp	*CLOSURE_FUN_OFFSET(%rax)
+	.size	GNAME(funcallable_instance_tramp), .-GNAME(funcallable_instance_tramp)
+	
 /*
  * fun-end breakpoint magic
  */

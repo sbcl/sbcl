@@ -7,6 +7,7 @@
 #include "genesis/simple-fun.h"
 #include "genesis/fdefn.h"
 #include "genesis/closure.h"
+#include "genesis/funcallable-instance.h"
 #include "genesis/static-symbols.h"
 
 #ifdef LISP_FEATURE_DARWIN
@@ -515,18 +516,13 @@ lra:
 
 	GFUNCDEF(xundefined_tramp)
 	.globl CSYMBOL(undefined_tramp)
-	.byte 0,0,0,SIMPLE_FUN_HEADER_WIDETAG
-	.byte 18<<2
 CSYMBOL(undefined_tramp):	
-	.byte 0,0,48
-	.long CSYMBOL(undefined_tramp)
-	.long NIL
-	.long NIL
-	.long NIL
 	twllei reg_ZERO,trap_Cerror
 	.byte 4
 	.byte UNDEFINED_FUN_ERROR
 	.byte 254, sc_DescriptorReg+0x40, 1	/* 140?  sparc says sc_descriptorReg */
+	/* This stuff is for the continuable error.  I don't think there's
+	 * any support for it on the lisp side */
 	.align 2
 1:	lwz reg_CODE,FDEFN_RAW_ADDR_OFFSET(reg_FDEFN)
 	la reg_LIP,SIMPLE_FUN_CODE_OFFSET(reg_CODE)
@@ -539,15 +535,7 @@ CSYMBOL(undefined_tramp):
 
 	GFUNCDEF(xclosure_tramp)
 	.globl CSYMBOL(closure_tramp)
-	.byte 0,0,0,SIMPLE_FUN_HEADER_WIDETAG
-	.byte 18<<2
 CSYMBOL(closure_tramp):
-	.byte 0,0,24
-	.long CSYMBOL(closure_tramp)
-	.long NIL 
-	.long NIL
-	.long NIL
-	.long NIL
 	lwz reg_LEXENV,FDEFN_FUN_OFFSET(reg_FDEFN)
 	lwz reg_CODE,CLOSURE_FUN_OFFSET(reg_LEXENV)
 	la reg_LIP,SIMPLE_FUN_CODE_OFFSET(reg_CODE)
@@ -556,6 +544,22 @@ CSYMBOL(closure_tramp):
 
 	SET_SIZE(xclosure_tramp)
 
+	GFUNCDEF(xfuncallable_instance_tramp)
+	.globl CSYMBOL(funcallable_instance_tramp)
+	.long SIMPLE_FUN_HEADER_WIDETAG
+CSYMBOL(funcallable_instance_tramp) = . + 1
+	.long CSYMBOL(funcallable_instance_tramp)
+	.long NIL
+	.long NIL
+	.long NIL
+	.long NIL
+	lwz reg_LEXENV,FUNCALLABLE_INSTANCE_FUNCTION_OFFSET(reg_LEXENV)
+	lwz reg_FDEFN,CLOSURE_FUN_OFFSET(reg_LEXENV)
+	addi reg_LIP,reg_FDEFN,SIMPLE_FUN_CODE_OFFSET
+	mtctr reg_LIP
+	bctr
+	SET_SIZE(funcallable_instance_tramp)
+	
 	GFUNCDEF(fun_end_breakpoint_trap)
 	.long 0
 	SET_SIZE(fun_end_breakpoint_trap)

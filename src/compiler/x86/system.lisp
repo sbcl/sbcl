@@ -232,9 +232,6 @@
 (define-source-transform %closure-fun (closure)
   `(%simple-fun-self ,closure))
 
-(define-source-transform %funcallable-instance-fun (fin)
-  `(%simple-fun-self ,fin))
-
 (define-vop (%set-fun-self)
   (:policy :fast-safe)
   (:translate (setf %simple-fun-self))
@@ -249,20 +246,6 @@
                             fun-pointer-lowtag)))
     (storew temp function simple-fun-self-slot fun-pointer-lowtag)
     (move result new-self)))
-
-;;; KLUDGE: This seems to be some kind of weird override of the way
-;;; that the objdef.lisp code would ordinarily set up the slot
-;;; accessor. It's inherited from CMU CL, and it works, and naively
-;;; deleting it seemed to cause problems, but it's not obvious why
-;;; it's done this way. Any ideas? -- WHN 2001-08-02
-(defknown ((setf %funcallable-instance-fun)) (function function) function
-  (unsafe))
-;;; CMU CL comment:
-;;;   We would have really liked to use a source-transform for this, but
-;;;   they don't work with SETF functions.
-;;; FIXME: Can't we just use DEFSETF or something?
-(deftransform (setf %funcallable-instance-fun) ((value fin))
-  '(setf (%simple-fun-self fin) value))
 
 ;;;; other miscellaneous VOPs
 

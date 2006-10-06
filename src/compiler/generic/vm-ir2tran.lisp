@@ -33,7 +33,8 @@
     (move-lvar-result node block (list value-tn) (node-lvar node))))
 
 (defun emit-inits (node block name result lowtag inits args)
-  (let ((unbound-marker-tn nil))
+  (let ((unbound-marker-tn nil)
+        (funcallable-instance-tramp-tn nil))
     (dolist (init inits)
       (let ((kind (car init))
             (slot (cdr init)))
@@ -51,7 +52,15 @@
                             (vop make-unbound-marker node block tn)
                             tn))))
                (:null
-                (emit-constant nil)))
+                (emit-constant nil))
+               (:funcallable-instance-tramp
+                (or funcallable-instance-tramp-tn
+                    (setf funcallable-instance-tramp-tn
+                          (let ((tn (make-restricted-tn
+                                     nil
+                                     (sc-number-or-lose 'sb!vm::any-reg))))
+                            (vop make-funcallable-instance-tramp node block tn)
+                            tn)))))
              name slot lowtag))))
   (aver (null args)))
 
@@ -61,8 +70,7 @@
 (defoptimizer ir2-convert-fixed-allocation
               ((&rest args) node block name words type lowtag inits)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar
-                                        (list *backend-t-primitive-type*)))
+         (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
          (result (first locs)))
     (emit-fixed-alloc node block name words type lowtag result)
     (emit-inits node block name result lowtag inits args)
@@ -71,8 +79,7 @@
 (defoptimizer ir2-convert-variable-allocation
               ((extra &rest args) node block name words type lowtag inits)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar
-                                        (list *backend-t-primitive-type*)))
+         (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
          (result (first locs)))
     (if (constant-lvar-p extra)
         (let ((words (+ (lvar-value extra) words)))

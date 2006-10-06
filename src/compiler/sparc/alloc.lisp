@@ -143,7 +143,6 @@
                (inst or result fun-pointer-lowtag)))
         (inst li temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag))
         (storew temp result 0 fun-pointer-lowtag))
-      (storew result result closure-self-slot fun-pointer-lowtag)
       (storew function result closure-fun-slot fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
@@ -163,6 +162,12 @@
   (:results (result :scs (any-reg)))
   (:generator 1
     (inst li result unbound-marker-widetag)))
+
+(define-vop (make-funcallable-instance-tramp)
+  (:args)
+  (:results (result :scs (any-reg)))
+  (:generator 1
+    (inst li result (make-fixup "funcallable_instance_tramp" :foreign))))
 
 (define-vop (fixed-alloc)
   (:args)

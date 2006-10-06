@@ -2081,12 +2081,11 @@ gc_init_tables(void)
     scavtab[SIMPLE_FUN_HEADER_WIDETAG] = scav_fun_header;
     scavtab[RETURN_PC_HEADER_WIDETAG] = scav_return_pc_header;
 #endif
+    scavtab[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = scav_boxed;
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     scavtab[CLOSURE_HEADER_WIDETAG] = scav_closure_header;
-    scavtab[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = scav_closure_header;
 #else
     scavtab[CLOSURE_HEADER_WIDETAG] = scav_boxed;
-    scavtab[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = scav_boxed;
 #endif
     scavtab[VALUE_CELL_HEADER_WIDETAG] = scav_boxed;
     scavtab[SYMBOL_HEADER_WIDETAG] = scav_boxed;

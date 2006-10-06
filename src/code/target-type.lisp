@@ -143,10 +143,6 @@
   "Return the class of the supplied object, which may be any Lisp object, not
    just a CLOS STANDARD-OBJECT."
   (layout-classoid (layout-of object)))
-
-;;; Pull the type specifier out of a function object.
-(defun extract-fun-type (fun)
-  (specifier-type (%simple-fun-type (%closure-fun fun))))
 
 ;;;; miscellaneous interfaces
 
@@ -182,7 +178,7 @@
     (function
      (if (funcallable-instance-p x)
          (classoid-of x)
-         (extract-fun-type x)))
+         (specifier-type (sb!impl::%fun-type x))))
     (symbol
      (make-member-type :members (list x)))
     (number

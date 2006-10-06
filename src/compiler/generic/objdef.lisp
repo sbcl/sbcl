@@ -221,78 +221,15 @@
 (define-primitive-object (closure :lowtag fun-pointer-lowtag
                                   :widetag closure-header-widetag)
   (fun :init :arg :ref-trans %closure-fun)
-  ;; This SELF slot needs explanation.
-  ;;
-  ;; Ordinary closures did not need this slot before version 0.9.3.xx,
-  ;; as the closure object was already in some dedicated register --
-  ;; EAX/RAX on x86(-64), reg_LEXENV on register-rich platforms -- and
-  ;; consequently setting up the environment (from the INFO slot,
-  ;; below) was easy.
-  ;;
-  ;; However, it is not easy to support calling FUNCALLABLE-INSTANCEs
-  ;; in the same way; in a FUNCALLABLE-INSTANCE, there are
-  ;; conceptually two variable-length data areas: the closure
-  ;; environment, if any, and the slots of the instance.
-  ;;
-  ;; Until sbcl-0.9.3.xx, it was required that closures to be set as a
-  ;; FUNCALLABLE-INSTANCE-FUNCTION be defined using the magical
-  ;; keyword SB-KERNEL:INSTANCE-LAMBDA, rather than ordinary LAMBDA;
-  ;; this caused an extra indirection to be compiled into the closure
-  ;; code to load the closure from the FUNCALLABLE-INSTANCE-LEXENV
-  ;; slot before setting up the environment for the function body.
-  ;; Failure to obey this protocol yielded confusing error messages as
-  ;; either INSTANCE-LAMBDAs tried to dereference environments that
-  ;; weren't there, or ordinary LAMBDAs got hold of the LAYOUT and
-  ;; LEXENV slots of a FUNCALLABLE-INSTANCE.
-  ;;
-  ;; By adding this SELF slot, which is at the same offset in a
-  ;; regular CLOSURE as the LEXENV slot is in a FUNCALLABLE-INSTANCE,
-  ;; we enable the extra indirection (VOP FUNCALLABLE-INSTANCE-LEXENV,
-  ;; in src/compiler/ir2tran.lisp) to be compiled unconditionally
-  ;; (provided that we set this slot to the closure object itself).
-  ;; Relative to the code before, this adds a word to the space
-  ;; requirements of a closure, and one instruction (a memory fetch)
-  ;; to the body of a closure function.
-  ;;
-  ;; There are potentially other implementation strategies which would
-  ;; remove the need for this extra indirection in regular closures,
-  ;; such as setting up a trampoline for funcallable instances (though
-  ;; it was not clear to me that there are enough registers free in
-  ;; the x86 backend to permit this).  This indirection should not be
-  ;; too disastrous, given that for regular closures the fetch is from
-  ;; memory which is known to be active.
-  ;;
-  ;; CSR, 2005-08-05
-  (self) ; KLUDGE (see above comment)
   (info :rest-p t))
 
 (define-primitive-object (funcallable-instance
                           :lowtag fun-pointer-lowtag
                           :widetag funcallable-instance-header-widetag
                           :alloc-trans %make-funcallable-instance)
-  #!-(or x86 x86-64)
-  (fun
-   :ref-known (flushable) :ref-trans %funcallable-instance-fun
-   :set-known (unsafe) :set-trans (setf %funcallable-instance-fun))
-  #!+(or x86 x86-64)
-  (fun
-   :ref-known (flushable) :ref-trans %funcallable-instance-fun
-   ;; KLUDGE: There's no :SET-KNOWN or :SET-TRANS in this case.
-   ;; Instead, later in compiler/x86/system.lisp there's a separate
-   ;; DEFKNOWN for (SETF %FUNCALLABLE-INSTANCE-FUN), and a weird
-   ;; unexplained DEFTRANSFORM from (SETF %SIMPLE-FUN-INSTANCE-FUN)
-   ;; into (SETF %SIMPLE-FUN-SELF). The #!+X86 wrapped around this case
-   ;; is a literal translation of the old CMU CL implementation into
-   ;; the new world of sbcl-0.6.12.63, where multiple DEFKNOWNs for
-   ;; the same operator cause an error (instead of silently deleting
-   ;; all information associated with the old DEFKNOWN, as before).
-   ;; It's definitely not very clean, with too many #!+ conditionals and
-   ;; too little documentation, but I have more urgent things to
-   ;; clean up right now, so I've just left it as a literal
-   ;; translation without trying to fix it. -- WHN 2001-08-02
-   )
-  (lexenv :ref-known (flushable) :ref-trans %funcallable-instance-lexenv
-          :set-known (unsafe) :set-trans (setf %funcallable-instance-lexenv))
+  (trampoline :init :funcallable-instance-tramp)
+  (function :ref-known (flushable) :ref-trans %funcallable-instance-function
+            :set-known (unsafe) :set-trans (setf %funcallable-instance-function))
   (info :rest-p t))
 
 (define-primitive-object (value-cell :lowtag other-pointer-lowtag

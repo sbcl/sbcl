@@ -1,8 +1,24 @@
+/*
+ * very-low-level utilities for runtime support
+ */
+
+/*
+ * This software is part of the SBCL system. See the README file for
+ * more information.
+ *
+ * This software is derived from the CMU CL system, which was
+ * written at Carnegie Mellon University and released into the
+ * public domain. The software is in the public domain and is
+ * provided with absolutely no warranty. See the COPYING and CREDITS
+ * files for more information.
+ */
+
 #include "sbcl.h"
 #include "lispregs.h"
 #include "globals.h"
 #include "genesis/fdefn.h"
 #include "genesis/closure.h"
+#include "genesis/funcallable-instance.h"
 #include "genesis/return-pc.h"
 #include "genesis/simple-fun.h"
 #include "genesis/static-symbols.h"
@@ -403,6 +419,25 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
         addu	reg_LIP, reg_CODE, SIMPLE_FUN_CODE_OFFSET
         jr	reg_LIP
 	END(closure_tramp)
+
+/*
+ * The trampoline for funcallable instances
+ */
+	.globl funcallable_instance_tramp
+	.align	3
+	.word	SIMPLE_FUN_HEADER_WIDETAG
+funcallable_instance_tramp = . + 1
+	.word	funcallable_instance_tramp
+	.word	NIL
+	.word	NIL
+	.word	NIL
+	.word	NIL
+
+	lw	reg_LEXENV, FUNCALLABLE_INSTANCE_FUNCTION_OFFSET(reg_LEXENV)
+	lw	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
+	addu	reg_LIP, reg_CODE, SIMPLE_FUN_CODE_OFFSET
+	jr	reg_LIP
+	nop
 
 /*
  * Function-end breakpoint magic. This is truely magic, the code is
