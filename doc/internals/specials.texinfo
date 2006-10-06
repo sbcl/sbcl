@@ -52,4 +52,13 @@ garbage pointer.
 
 Furthermore, @code{BIND} must always write the value to the binding
 stack first and the symbol second because the symbol being non-zero
-means validity to @code{UNBIND-TO-HERE}.
+means validity to @code{UNBIND-TO-HERE}. For similar reasons
+@code{UNBIND} also zeroes the symbol first. But if it is interrupted
+by a signal that does an async unwind then @code{UNBIND-TO-HERE} can
+be triggered when the symbol is zeroed but the value is not. In this
+case @code{UNBIND-TO-HERE} must zero out the value to avoid leaving
+garbage around that may wreck the ship on the next @code{BIND}.
+
+In other words, the invariant is that the binding stack above bsp only
+contains zeros. This makes @code{BIND} safe in face of gc triggered at
+any point during its execution.

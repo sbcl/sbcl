@@ -8,6 +8,8 @@ changes in sbcl-0.9.18 (1.0.beta?) relative to sbcl-0.9.16:
   * bug fix: remove a race condition in the setting of
     funcallable-instance functions, this should make threaded CLOS
     code more stable against memory faults.
+  * bug fix: corruption of specials when unbinding is interrupted by an
+    asynchronous unwind (reported by Hannu Koivisto)
   * improvement: the debugger will now also display local variables that
     are only used once, for code compiled with a DEBUG optimization quality
     of 2 or higher.

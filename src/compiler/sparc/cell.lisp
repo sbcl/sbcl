@@ -167,8 +167,8 @@
     (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
     (loadw value bsp-tn (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
-    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
+    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (inst sub bsp-tn bsp-tn (* 2 n-word-bytes))))
 
 (define-vop (unbind-to-here)
@@ -190,10 +190,10 @@
       (inst b :eq skip)
       (loadw value bsp-tn (- binding-value-slot binding-size))
       (storew value symbol symbol-value-slot other-pointer-lowtag)
-      (storew zero-tn bsp-tn (- binding-value-slot binding-size))
       (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
       (emit-label skip)
+      (storew zero-tn bsp-tn (- binding-value-slot binding-size))
       (inst sub bsp-tn bsp-tn (* 2 n-word-bytes))
       (inst cmp where bsp-tn)
       (inst b :ne loop)

@@ -167,8 +167,8 @@
     (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
     (loadw value bsp-tn (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
-    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
+    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (inst addi (- (* binding-size n-word-bytes)) bsp-tn bsp-tn)))
 
 (define-vop (unbind-to-here)
@@ -182,10 +182,10 @@
     (inst comb := symbol zero-tn skip)
     (loadw value bsp-tn (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
-    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
     SKIP
+    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (inst addi (* -2 n-word-bytes) bsp-tn bsp-tn)
     (inst comb :<> where bsp-tn loop :nullify t)
     (loadw symbol bsp-tn (- binding-symbol-slot binding-size))

@@ -184,8 +184,8 @@
     (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
     (loadw value bsp-tn (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
-    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
+    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (inst addu bsp-tn bsp-tn (* -2 n-word-bytes))))
 
 
@@ -206,10 +206,10 @@
       (inst beq symbol zero-tn skip)
       (loadw value bsp-tn (- binding-value-slot binding-size))
       (storew value symbol symbol-value-slot other-pointer-lowtag)
-      (storew zero-tn bsp-tn (- binding-value-slot binding-size))
       (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
       (emit-label skip)
+      (storew zero-tn bsp-tn (- binding-value-slot binding-size))
       (inst addu bsp-tn bsp-tn (* -2 n-word-bytes))
       (inst bne where bsp-tn loop)
       (inst nop)

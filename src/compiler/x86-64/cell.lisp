@@ -353,8 +353,8 @@
     (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls-index)
           value)
 
-    (storew 0 bsp (- binding-value-slot binding-size))
     (storew 0 bsp (- binding-symbol-slot binding-size))
+    (storew 0 bsp (- binding-value-slot binding-size))
     (inst sub bsp (* binding-size n-word-bytes))
     (store-binding-stack-pointer bsp)))
 
@@ -366,8 +366,8 @@
     (loadw symbol bsp (- binding-symbol-slot binding-size))
     (loadw value bsp (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
-    (storew 0 bsp (- binding-value-slot binding-size))
     (storew 0 bsp (- binding-symbol-slot binding-size))
+    (storew 0 bsp (- binding-value-slot binding-size))
     (inst sub bsp (* binding-size n-word-bytes))
     (store-symbol-value bsp *binding-stack-pointer*)))
 
@@ -392,10 +392,10 @@
     #!+sb-thread
     (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls-index)
           value)
-    (storew 0 bsp (- binding-value-slot binding-size))
     (storew 0 bsp (- binding-symbol-slot binding-size))
 
     SKIP
+    (storew 0 bsp (- binding-value-slot binding-size))
     (inst sub bsp (* binding-size n-word-bytes))
     (inst cmp where bsp)
     (inst jmp :ne LOOP)

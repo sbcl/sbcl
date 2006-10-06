@@ -179,8 +179,8 @@
     (loadw value bsp-tn (- binding-value-slot binding-size))
     (#!+gengc storew-and-remember-slot #!-gengc storew
              value symbol symbol-value-slot other-pointer-lowtag)
-    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
+    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (inst subq bsp-tn (* 2 n-word-bytes) bsp-tn)))
 
 
@@ -203,10 +203,10 @@
       (inst beq symbol skip)
       (#!+gengc storew-and-remember-slot #!-gengc storew
                value symbol symbol-value-slot other-pointer-lowtag)
-      (storew zero-tn bsp-tn (- binding-value-slot binding-size))
       (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
       (emit-label skip)
+      (storew zero-tn bsp-tn (- binding-value-slot binding-size))
       (inst subq bsp-tn (* 2 n-word-bytes) bsp-tn)
       (inst cmpeq where bsp-tn temp)
       (inst beq temp loop)
