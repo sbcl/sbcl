@@ -364,14 +364,14 @@ GNAME(closure_tramp):
 
 	.text
 	.align	align_4byte,0x90
-	.global GNAME(funcallable_instance_tramp)
-	.type	GNAME(funcallable_instance_tramp),@function
+	.globl GNAME(funcallable_instance_tramp)
+	TYPE(GNAME(funcallable_instance_tramp))
 GNAME(funcallable_instance_tramp):
 	movl	FUNCALLABLE_INSTANCE_FUNCTION_OFFSET(%eax),%eax	
 	/* KLUDGE: on this platform, whatever kind of function is in %rax
 	 * now, the first word of it contains the address to jump to. */
 	jmp	*CLOSURE_FUN_OFFSET(%eax)
-	.size	GNAME(funcallable_instance_tramp), .-GNAME(funcallable_instance_tramp)
+	SIZE(GNAME(funcallable_instance_tramp))
 	
 /*
  * fun-end breakpoint magic
