@@ -1,0 +1,58 @@
+@node Funcallable Instances
+@comment  node-name,  next,  previous,  up
+@chapter Funcallable Instances
+
+@menu
+* Overview of Funcallable Instances::
+* Implementation of Funcallable Instances::
+@end menu
+
+@node Overview of Funcallable Instances
+@section Overview of Funcallable Instances
+
+Funcallable instances in SBCL are implemented as a subtype of
+@code{function}, and as such must be directly funcallable using the same
+calling sequence as ordinary functions and closure objects, which means
+reading the first word of the object after the header, and then jumping
+to it (with an offset on non-x86 platforms).  It must be possible to set
+the function of a funcallable instance, as CLOS (one user of funcallable
+instances) computes and sets the discriminating function for generic
+functions with @code{sb-mop:set-funcallable-instance-function}, and also
+allows the user to do the same.
+
+Additionally, although this functionality is not exported to the normal
+user, they must support an arbitrary number of slots definable with
+@code{!defstruct-with-alternate-metaclass}.  If generic functions were
+the only users of funcallable instances, then this might be less
+critical, but (as of SBCL 0.9.17) other users of funcallable instances
+are: the @code{ctor} make-instance optimization; the
+@code{method-function} funcallable instance which does the bookkeeping
+for fast method function optimization; and interpreted functions in the
+full evaluator.
+
+@node Implementation of Funcallable Instances
+@section Implementation of Funcallable Instances
+
+The first word after the header of a funcallable instance points to a
+dedicated trampoline function (known as
+@code{funcallable_instance_tramp} in SBCL 0.9.17) which is responsible
+for calling the funcallable instance function, kept in the second word
+after the header.  The remaining words of a funcallable instance are
+firstly the @code{layout}, and then the slots.
+
+The implementation of funcallable instances inherited from CMUCL
+differed in that there were two slots for the function: one for the
+underlying @code{simple-fun}, and one for the function itself (which is
+distinct from the @code{simple-fun} in the case of a closure.  This,
+coupled with an instruction in the prologue of a closure's function to
+fetch the function from the latter slot, allowed a trampolineless
+calling sequence for funcallable instances; however, drawbacks included
+the loss of object identity for the funcallable instance function (if a
+funcallable instance was set as the function of another, updates to the
+first would not be reflected in calls to the second) and, more
+importantly, a race condition in calling funcallable instances from one
+thread while setting its funcallable instance function in another.  The
+current implementation, described in the paragraph above, does not
+suffer from these problems (the function of a funcallable instance can
+be set atomically and retains its identity) at the cost of an additional
+layer of indirection.
