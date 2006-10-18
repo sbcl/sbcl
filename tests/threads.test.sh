@@ -14,7 +14,7 @@
 flag="condition-wait-sigcont.tmp"
 touch $flag
 
-../src/runtime/sbcl --core ../output/sbcl.core --load condition-wait-sigcont.lisp &
+$SBCL --load condition-wait-sigcont.lisp &
 sb_pid=$!
 
 while [ -f $flag ]; do sleep 1; done
