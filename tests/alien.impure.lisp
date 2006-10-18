@@ -163,4 +163,8 @@
                        (sb-alien:deref (sb-alien:slot a1 'u) 8)
                        (sb-alien:deref (sb-alien:slot a1 'u) 9)))))
 
+(handler-bind ((compiler-note (lambda (c)
+                                (error "bad note! ~A" c))))
+  (funcall (compile nil '(lambda () (sb-alien:make-alien sb-alien:int)))))
+
 ;;; success
