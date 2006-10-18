@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
-changes in sbcl-0.9.18 (1.0.beta?) relative to sbcl-0.9.16:
+changes in sbcl-0.9.18 (1.0.beta?) relative to sbcl-0.9.17:
+  * enhancement: SB-POSIX now supports cfsetispeed(3), cfsetospeed(3),
+    cfgetispeed(3), cfgetospeed(3), and related constants. (thanks to
+    Max-Gerd Retzlaff)
   * bug fix: two potential GC deadlocks affecting threaded builds.
   * bug fix: (TYPEP #\A '(NOT (MEMBER #\" #\{ #\:))) now correctly
     returns T (reported by Anton Kazennikov)

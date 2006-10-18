@@ -420,6 +420,9 @@
  (:integer b9600 "B9600" nil t)
  (:integer b19200 "B19200" nil t)
  (:integer b38400 "B38400" nil t)
+ (:integer b57600 "B57600" nil t)
+ (:integer b115200 "B115200" nil t)
+ (:integer b230400 "B230400" nil t)
 
  (:integer csize "CSIZE" nil t)
  (:integer cs5 "CS5" nil t)

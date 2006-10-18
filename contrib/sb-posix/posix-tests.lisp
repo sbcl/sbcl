@@ -431,3 +431,33 @@
   ;; make sure that we found something
   (not (sb-posix:getpwnam "root"))
   nil)
+
+#+nil
+;; Requires root or special group + plus a sensible thing on the port
+(deftest cfget/setispeed.1
+    (with-open-file (s "/dev/ttyS0")
+      (let* ((termios (sb-posix:tcgetattr s))
+             (old (sb-posix:cfgetispeed termios))
+             (new (if (= old sb-posix:b2400)
+                      sb-posix:b9600
+                      sb-posix:b2400)))
+        (sb-posix:cfsetispeed new termios)
+        (sb-posix:tcsetattr 0 sb-posix:tcsadrain termios)
+        (setf termios (sb-posix:tcgetattr s))
+        (= new (sb-posix:cfgetispeed termios))))
+  t)
+
+#+nil
+;; Requires root or special group + a sensible thing on the port
+(deftest cfget/setospeed.1
+    (with-open-file (s "/dev/ttyS0" :direction :output :if-exists :append)
+      (let* ((termios (sb-posix:tcgetattr s))
+             (old (sb-posix:cfgetospeed termios))
+             (new (if (= old sb-posix:b2400)
+                      sb-posix:b9600
+                      sb-posix:b2400)))
+        (sb-posix:cfsetospeed new termios)
+        (sb-posix:tcsetattr 0 sb-posix:tcsadrain termios)
+        (setf termios (sb-posix:tcgetattr 0))
+        (= new (sb-posix:cfgetospeed termios))))
+  t)

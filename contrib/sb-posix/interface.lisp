@@ -10,6 +10,7 @@
                collect (ldiff slotd (member :array-length slotd)))
         ,@options)
       (declaim (inline ,to-alien ,to-protocol))
+      (declaim (inline ,to-protocol ,to-alien))
       (defun ,to-protocol (alien &optional instance)
         (declare (type (sb-alien:alien (* ,alien-type)) alien)
                  (type (or null ,name) instance))
@@ -366,6 +367,7 @@
  (export 'tcsetattr :sb-posix)
  (declaim (inline tcsetattr))
  (defun tcsetattr (fd actions termios)
+   (declare (type termios termios))
    (with-alien-termios a-termios ()
      (termios-to-alien termios a-termios)
      (let ((fd (file-descriptor fd)))
@@ -380,6 +382,7 @@
  (export 'tcgetattr :sb-posix)
  (declaim (inline tcgetattr))
  (defun tcgetattr (fd &optional termios)
+   (declare (type (or null termios) termios))
    (with-alien-termios a-termios ()
      (let ((r (alien-funcall
                (extern-alien "tcgetattr"
@@ -389,7 +392,53 @@
        (when (minusp r)
          (syscall-error))
        (setf termios (alien-to-termios a-termios termios))))
-   termios))
+   termios)
+ (export 'cfsetispeed :sb-posix)
+ (declaim (inline cfsetispeed))
+ (defun cfsetispeed (speed &optional termios)
+   (declare (type (or null termios) termios))
+   (with-alien-termios a-termios ()
+     (let ((r (alien-funcall
+               (extern-alien "cfsetispeed"
+                             (function int (* alien-termios) speed-t))
+               a-termios
+               speed)))
+       (when (minusp r)
+         (syscall-error))
+       (setf termios (alien-to-termios a-termios termios))))
+   termios)
+ (export 'cfsetospeed :sb-posix)
+ (declaim (inline cfsetospeed))
+ (defun cfsetospeed (speed &optional termios)
+   (declare (type (or null termios) termios))
+   (with-alien-termios a-termios ()
+     (let ((r (alien-funcall
+               (extern-alien "cfsetospeed"
+                             (function int (* alien-termios) speed-t))
+               a-termios
+               speed)))
+       (when (minusp r)
+         (syscall-error))
+       (setf termios (alien-to-termios a-termios termios))))
+   termios)
+ (export 'cfgetispeed :sb-posix)
+ (declaim (inline cfgetispeed))
+ (defun cfgetispeed (termios)
+   (declare (type termios termios))
+   (with-alien-termios a-termios ()
+     (termios-to-alien termios a-termios)
+     (alien-funcall (extern-alien "cfgetispeed"
+                                  (function speed-t (* alien-termios)))
+                    a-termios)))
+ (export 'cfgetospeed :sb-posix)
+ (declaim (inline cfgetospeed))
+ (defun cfgetospeed (termios)
+   (declare (type termios termios))
+   (with-alien-termios a-termios ()
+     (termios-to-alien termios a-termios)
+     (alien-funcall (extern-alien "cfgetospeed"
+                                 (function speed-t (* alien-termios)))
+                    a-termios))))
 
 ;;; environment
 
