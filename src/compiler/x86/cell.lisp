@@ -86,16 +86,6 @@
 (define-vop (set cell-set)
   (:variant symbol-value-slot other-pointer-lowtag))
 
-;;; Do a cell ref with an error check for being unbound.
-;;; XXX stil used? I can't see where -dan
-(define-vop (checked-cell-ref)
-  (:args (object :scs (descriptor-reg) :target obj-temp))
-  (:results (value :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:temporary (:sc descriptor-reg :from (:argument 0)) obj-temp))
-
 ;;; With Symbol-Value, we check that the value isn't the trap object. So
 ;;; Symbol-Value of NIL is NIL.
 #!+sb-thread
