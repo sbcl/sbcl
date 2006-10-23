@@ -305,7 +305,6 @@
  ("src/compiler/policy")
  ("src/compiler/policies")
  ("src/code/typedefs")
- ("src/code/late-alieneval" :not-host) ; needs POLICY
 
  ;; ("src/code/defbangmacro" was here until sbcl-0.6.7.3.)
 

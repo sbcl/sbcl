@@ -213,6 +213,52 @@
 
 ;;;; allocation/deallocation of heap aliens
 
+(defmacro make-alien (type &optional size &environment env)
+  #!+sb-doc
+  "Allocate an alien of type TYPE and return an alien pointer to it. If SIZE
+is supplied, how it is interpreted depends on TYPE. If TYPE is an array type,
+SIZE is used as the first dimension for the allocated array. If TYPE is not an
+array, then SIZE is the number of elements to allocate. The memory is
+allocated using ``malloc'', so it can be passed to foreign functions which use
+``free''."
+  (let ((alien-type (if (alien-type-p type)
+                        type
+                        (parse-alien-type type env))))
+    (multiple-value-bind (size-expr element-type)
+        (if (alien-array-type-p alien-type)
+            (let ((dims (alien-array-type-dimensions alien-type)))
+              (cond
+                (size
+                 (unless dims
+                   (error
+                    "cannot override the size of zero-dimensional arrays"))
+                 (when (constantp size)
+                   (setf alien-type (copy-alien-array-type alien-type))
+                   (setf (alien-array-type-dimensions alien-type)
+                         (cons (constant-form-value size) (cdr dims)))))
+                (dims
+                 (setf size (car dims)))
+                (t
+                 (setf size 1)))
+              (values `(* ,size ,@(cdr dims))
+                      (alien-array-type-element-type alien-type)))
+            (values (or size 1) alien-type))
+      (let ((bits (alien-type-bits element-type))
+            (alignment (alien-type-alignment element-type)))
+        (unless bits
+          (error "The size of ~S is unknown."
+                 (unparse-alien-type element-type)))
+        (unless alignment
+          (error "The alignment of ~S is unknown."
+                 (unparse-alien-type element-type)))
+        ;; This is the one place where the %SAP-ALIEN note is quite
+        ;; undesirable, in most uses of MAKE-ALIEN the %SAP-ALIEN
+        ;; cannot be optimized away.
+        `(locally (declare (muffle-conditions compiler-note))
+           (%sap-alien (%make-alien (* ,(align-offset bits alignment)
+                                       ,size-expr))
+                       ',(make-alien-pointer-type :to alien-type)))))))
+
 ;;; Allocate a block of memory at least BITS bits long and return a
 ;;; system area pointer to it.
 #!-sb-fluid (declaim (inline %make-alien))
