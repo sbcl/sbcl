@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!UNIX")
+(in-package "SB!WIN32")
 
 ;;;
 ;;; An awful lot of this stuff is stubbed out for now. We basically
@@ -41,13 +41,40 @@
     (sb!thread:interrupt-thread (sb!thread::foreground-thread) #'break-it)))
 |#
 
-;;; Actual exception handler. We hit something the runtime doesn't
-;;; want to or know how to deal with (that is, not a sigtrap or gc
-;;; wp violation), so it calls us here.
+;;; Map Windows Exception code to condition names
+(defvar *exception-code-map*
+  (list
+   ;; Floating point exceptions
+   (cons +exception-flt-divide-by-zero+    'division-by-zero)
+   (cons +exception-flt-invalid-operation+ 'floating-point-invalid-operation)
+   (cons +exception-flt-underflow+         'floating-point-underflow)
+   (cons +exception-flt-overflow+          'floating-point-overflow)
+   (cons +exception-flt-inexact-result+    'floating-point-inexact)
+   (cons +exception-flt-denormal-operand+  'floating-point-exception)
+   (cons +exception-flt-stack-check+       'floating-point-exception)
+   (cons +exception-stack-overflow+        'sb!kernel::control-stack-exhausted)))
 
-(defun sb!kernel:handle-win32-exception (context exception-record)
-  (error "An exception occured! Context ~A, exception-record ~A."
-         context exception-record))
+(define-alien-type ()
+    (struct exception-record
+            (exception-code dword)
+            (exception-flags dword)
+            (exception-record system-area-pointer)
+            (exception-address system-area-pointer)
+            (number-parameters dword)
+            (exception-information system-area-pointer)))
+
+;;; Actual exception handler. We hit something the runtime doesn't
+;;; want to or know how to deal with (that is, not a sigtrap or gc wp
+;;; violation), so it calls us here.
+(defun sb!kernel:handle-win32-exception (context-sap exception-record-sap)
+  (let* ((record (deref (sap-alien exception-record-sap (* (struct exception-record)))))
+         (code (slot record 'exception-code))
+         (condition-name (cdr (assoc code *exception-code-map*)))
+         (sb!debug:*stack-top-hint* (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
+    (if condition-name
+        (error condition-name)
+        (error "An exception occurred in context ~S: ~S. (Exception code: ~S)" 
+               context-sap exception-record-sap code))))
 
 ;;;; etc.
 

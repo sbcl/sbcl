@@ -51,18 +51,18 @@
     printf("(define-alien-type " lispname " (%s %d))\n", (((foo=-1)<0) ? "sb!alien:signed" : "unsigned"), (8 * (sizeof foo))); }
 
 void
-defconstant(char* lisp_name, long unix_number)
+defconstant(char* lisp_name, unsigned long unix_number)
 {
-    printf("(defconstant %s %ld) ; #x%lx\n",
+    printf("(defconstant %s %lu) ; #x%lx\n",
            lisp_name, unix_number, unix_number);
 }
 
-void deferrno(char* lisp_name, long unix_number)
+void deferrno(char* lisp_name, unsigned long unix_number)
 {
     defconstant(lisp_name, unix_number);
 }
 
-void defsignal(char* lisp_name, long unix_number)
+void defsignal(char* lisp_name, unsigned long unix_number)
 {
     defconstant(lisp_name, unix_number);
 }
@@ -149,6 +149,16 @@ main(int argc, char *argv[])
     defconstant ("CSIDL_FLAG_CREATE", CSIDL_FLAG_CREATE);
     defconstant ("CSIDL_FLAG_MASK", CSIDL_FLAG_MASK);
 
+    printf(";;; Exception codes\n");
+    defconstant("+exception-flt-divide-by-zero+", EXCEPTION_FLT_DIVIDE_BY_ZERO);
+    defconstant("+exception-flt-invalid-operation+", EXCEPTION_FLT_INVALID_OPERATION);
+    defconstant("+exception-flt-underflow+", EXCEPTION_FLT_UNDERFLOW);
+    defconstant("+exception-flt-overflow+", EXCEPTION_FLT_OVERFLOW);
+    defconstant("+exception-flt-inexact-result+", EXCEPTION_FLT_INEXACT_RESULT);
+    defconstant("+exception-flt-denormal-operand+", EXCEPTION_FLT_DENORMAL_OPERAND);
+    defconstant("+exception-flt-stack-check+", EXCEPTION_FLT_STACK_CHECK);
+    defconstant("+exception-stack-overflow+", EXCEPTION_STACK_OVERFLOW);
+
     printf(";;; FormatMessage\n");
 
     defconstant ("FORMAT_MESSAGE_ALLOCATE_BUFFER", FORMAT_MESSAGE_ALLOCATE_BUFFER);
@@ -168,6 +178,7 @@ main(int argc, char *argv[])
     DEFTYPE("dword",   DWORD);
     DEFTYPE("bool",    BOOL);
     DEFTYPE("uint",    UINT);
+    DEFTYPE("ulong",   ULONG);
 
     /* FIXME: SB-UNIX and SB-WIN32 really need to be untangled. */
     printf("(in-package \"SB!UNIX\")\n\n");

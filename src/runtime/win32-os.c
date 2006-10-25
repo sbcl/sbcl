@@ -270,6 +270,12 @@ in_range_p(os_vm_address_t a, lispobj sbeg, size_t slen)
 }
 
 boolean
+is_linkage_table_addr(os_vm_address_t addr)
+{
+    return in_range_p(addr, LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_END);
+}
+
+boolean
 is_valid_lisp_addr(os_vm_address_t addr)
 {
     struct thread *th;
@@ -321,17 +327,16 @@ EXCEPTION_DISPOSITION sigtrap_emulator(CONTEXT *context,
                                        struct lisp_exception_frame *exception_frame)
 {
     if (*((char *)context->Eip + 1) == trap_ContextRestore) {
-        /*
-         * This is the cleanup for what is immediately below, and
+        /* This is the cleanup for what is immediately below, and
          * for the generic exception handling further below. We
          * have to memcpy() the original context (emulated sigtrap
-         * or normal exception) over our context and resume it.
-         */
+         * or normal exception) over our context and resume it. */
         memcpy(context, &exception_frame->context, sizeof(CONTEXT));
         return ExceptionContinueExecution;
 
-    } else { /* Not a trap_ContextRestore, must be a sigtrap. */
-        /* sigtrap_trampoline is defined in x86-assem.S. */
+    } else { 
+	/* Not a trap_ContextRestore, must be a sigtrap.
+	 * sigtrap_trampoline is defined in x86-assem.S. */
         extern void sigtrap_trampoline;
 
         /*
@@ -340,8 +345,7 @@ EXCEPTION_DISPOSITION sigtrap_emulator(CONTEXT *context,
          */
         context->Eip++;
 
-        /*
-         * We're not on an alternate stack like we would be in some
+        /* We're not on an alternate stack like we would be in some
          * other operating systems, and we don't want to risk leaking
          * any important resources if we throw out of the sigtrap
          * handler, so we need to copy off our context to a "safe"
@@ -359,9 +363,16 @@ EXCEPTION_DISPOSITION sigtrap_emulator(CONTEXT *context,
          * I can come up with for this, however, involves a stack
          * overflow occuring at just the wrong time (which makes one
          * wonder how stack overflow exceptions even happen, given
-         * that we don't switch stacks for exception processing...)
-         */
+         * that we don't switch stacks for exception processing...) */
         memcpy(&exception_frame->context, context, sizeof(CONTEXT));
+
+	/* FIXME: Why do we save the old EIP in EAX? The sigtrap_trampoline
+	 * pushes it into stack, but the sigtrap_wrapper where the trampoline
+	 * goes ignores it, and after the wrapper we hit the trap_ContextRestore,
+	 * which nukes the whole context with the original one? 
+	 *
+	 * Am I misreading this, or is the EAX here and in the
+	 * trampoline superfluous? --NS 20061024 */
         context->Eax = context->Eip;
         context->Eip = (unsigned long)&sigtrap_trampoline;
 
@@ -381,7 +392,6 @@ void sigtrap_wrapper(void)
      * wrappers. Once it is installed there, it can probably be
      * removed from here.
      */
-
     extern void sigtrap_handler(int signal, siginfo_t *info, void *context);
 
 /*     volatile struct { */
@@ -411,33 +421,30 @@ EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *exception_record,
 
     /* For EXCEPTION_ACCESS_VIOLATION only. */
     void *fault_address = (void *)exception_record->ExceptionInformation[1];
-
+    
     if (exception_record->ExceptionCode == EXCEPTION_BREAKPOINT) {
         /* Pick off sigtrap case first. */
         return sigtrap_emulator(context, exception_frame);
 
-    } else if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
-               (is_valid_lisp_addr(fault_address) ||
-                /* the linkage table does not contain valid lisp
-                 * objects, but is also committed on-demand here
-                 */
-                in_range_p(fault_address, LINKAGE_TABLE_SPACE_START,
-                           LINKAGE_TABLE_SPACE_END))) {
-        /* Pick off GC-related memory fault next. */
-        MEMORY_BASIC_INFORMATION mem_info;
-
-        if (!VirtualQuery(fault_address, &mem_info, sizeof mem_info)) {
-            fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
-            lose("handle_exception: VirtualQuery failure");
-        }
-
-        if (mem_info.State == MEM_RESERVE) {
-            /* First use new page, lets get some memory for it. */
-            if (!VirtualAlloc(mem_info.BaseAddress, os_vm_page_size,
-                              MEM_COMMIT, PAGE_EXECUTE_READWRITE)) {
-                fprintf(stderr, "VirtualAlloc: 0x%lx.\n", GetLastError());
+    } 
+    else if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
+	     (is_valid_lisp_addr(fault_address) || 
+	      is_linkage_table_addr(fault_address))) {
+	/* Pick off GC-related memory fault next. */
+	MEMORY_BASIC_INFORMATION mem_info;
+	
+	if (!VirtualQuery(fault_address, &mem_info, sizeof mem_info)) {
+	    fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
+	    lose("handle_exception: VirtualQuery failure");
+	}
+	
+	if (mem_info.State == MEM_RESERVE) {
+	    /* First use new page, lets get some memory for it. */
+	    if (!VirtualAlloc(mem_info.BaseAddress, os_vm_page_size,
+			      MEM_COMMIT, PAGE_EXECUTE_READWRITE)) {
+		fprintf(stderr, "VirtualAlloc: 0x%lx.\n", GetLastError());
                 lose("handle_exception: VirtualAlloc failure");
-
+		
             } else {
                 /*
                  * Now, if the page is supposedly write-protected and this
@@ -462,46 +469,49 @@ EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *exception_record,
 
         /* All else failed, drop through to the lisp-side exception handler. */
     }
-
+    
     /*
      * If we fall through to here then we need to either forward
      * the exception to the lisp-side exception handler if it's
      * set up, or drop to LDB.
      */
-
+    
     if (internal_errors_enabled) {
         /* exception_trampoline is defined in x86-assem.S. */
         extern void exception_trampoline;
 
-        /*
-         * We're making the somewhat arbitrary decision that
-         * having internal errors enabled means that lisp has
-         * sufficient marbles to be able to handle exceptions.
-         *
-         * Exceptions aren't supposed to happen during cold
-         * init or reinit anyway.
-         */
-
-        /*
+        /* We're making the somewhat arbitrary decision that having
+         * internal errors enabled means that lisp has sufficient
+         * marbles to be able to handle exceptions, but xceptions
+         * aren't supposed to happen during cold init or reinit
+         * anyway.
+	 *
          * We use the same mechanism as the sigtrap emulator above
          * with just a couple changes. We obviously use a different
          * trampoline and wrapper function, we kill out any live
          * floating point exceptions, and we save off the exception
-         * record as well as the context.
-         */
+         * record as well as the context. */
 
-        /* Save off context and exception information */
+	/* Save off context and exception information */
         memcpy(&exception_frame->context, context, sizeof(CONTEXT));
         memcpy(&exception_frame->exception, exception_record, sizeof(EXCEPTION_RECORD));
 
-        /* Set up to activate trampoline when we return */
+        /* Set up to activate trampoline when we return
+	 *
+	 * FIXME: Why do we save the old EIP in EAX? The
+	 * exception_trampoline pushes it into stack, but the wrapper
+	 * where the trampoline goes ignores it, and then the wrapper
+	 * unwinds from Lisp... WTF?
+	 *
+	 * Am I misreading this, or is the EAX here and in the
+	 * trampoline superfluous? --NS 20061024 */
         context->Eax = context->Eip;
         context->Eip = (unsigned long)&exception_trampoline;
 
         /* Make sure a floating-point trap doesn't kill us */
         context->FloatSave.StatusWord &= ~0x3f;
 
-        /* And return */
+        /* And return. */
         return ExceptionContinueExecution;
     }
 
@@ -549,8 +559,10 @@ void handle_win32_exception_wrapper(void)
     funcall2(SymbolFunction(HANDLE_WIN32_EXCEPTION), context_sap,
              exception_record_sap);
 
+    /* FIXME: These never happen, as the Lisp-side call is
+     * to an ERROR, which means we must do a non-local exit
+     */
     undo_fake_foreign_function_call(&context);
-
     memcpy(&frame->context, &context, sizeof(CONTEXT));
 }
 

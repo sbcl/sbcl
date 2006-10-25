@@ -2,6 +2,9 @@
 changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
   * improvement: floating point modes in effect are now saved in
     core, and restored on startup.
+  * improvements to the Windows port:
+    ** floating point exceptions are now reported correctly.
+    ** stack exhaustion detection works partially.
 
 changes in sbcl-0.9.18 (1.0.beta?) relative to sbcl-0.9.17:
   * enhancement: SB-POSIX now supports cfsetispeed(3), cfsetospeed(3),

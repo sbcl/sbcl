@@ -363,8 +363,8 @@
           (values "<error finding caller name -- trapped debug-condition>"
                   nil)))))
 
-(defun find-interrupted-name ()
-  (/show0 "entering FIND-INTERRUPTED-NAME")
+(defun find-interrupted-name-and-frame ()
+  (/show0 "entering FIND-INTERRUPTED-NAME-AND-FRAME")
   (if *finding-name*
       (values "<error finding interrupted name -- already finding name>" nil)
       (handler-case
@@ -418,7 +418,7 @@
          (%primitive sb!c:halt))
 
        (multiple-value-bind (name sb!debug:*stack-top-hint*)
-           (find-interrupted-name)
+           (find-interrupted-name-and-frame)
          (/show0 "back from FIND-INTERRUPTED-NAME")
          (let ((fp (int-sap (sb!vm:context-register alien-context
                                                     sb!vm::cfp-offset)))
