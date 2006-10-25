@@ -147,6 +147,7 @@ sufficiently motivated to do lengthy fixes."
       (funcall hook)))
   #!-win32 (when (fboundp 'cancel-finalization)
     (cancel-finalization sb!sys:*tty*))
+  (float-deinit)
   (profile-deinit)
   (debug-deinit)
   (foreign-deinit))

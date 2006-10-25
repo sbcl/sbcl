@@ -1588,12 +1588,16 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "!LATE-PROCLAIM-COLD-INIT" "!CLASS-FINALIZE"
                "!CONSTANTP-COLD-INIT"
 
+               "FLOAT-COLD-INIT-OR-REINIT"
                "GC-REINIT"
                "SIGNAL-COLD-INIT-OR-REINIT"
                "STREAM-COLD-INIT-OR-RESET"
 
                ;; Cleanups to run before saving a core
-               "DEBUG-DEINIT" "FOREIGN-DEINIT" "PROFILE-DEINIT"
+               "DEBUG-DEINIT" 
+               "FLOAT-DEINIT"
+               "FOREIGN-DEINIT" 
+               "PROFILE-DEINIT"
 
                ;; Note: These are out of lexicographical order
                ;; because in CMU CL they were defined as

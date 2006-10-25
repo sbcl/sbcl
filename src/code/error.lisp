@@ -171,3 +171,4 @@
    (lambda (condition stream)
      (declare (ignore condition))
      (format stream "memory fault"))))
+

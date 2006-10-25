@@ -228,14 +228,7 @@
   (/show0 "enabling internal errors")
   (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
 
-  ;; FIXME: This list of modes should be defined in one place and
-  ;; explicitly shared between here and REINIT.
-
-  ;; FIXME: For some unknown reason, NetBSD/x86 won't run with the
-  ;; :invalid trap enabled. That should be fixed, but not today...
-  ;; PEM -- April 5, 2004
-  (set-floating-point-modes
-   :traps '(:overflow #!-netbsd :invalid :divide-by-zero))
+  (show-and-call float-cold-init-or-reinit)
 
   (show-and-call !class-finalize)
 
@@ -297,17 +290,10 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
         (os-cold-init-or-reinit)
       (thread-init-or-reinit)
       (stream-reinit)
-      #!-win32 (signal-cold-init-or-reinit)
+      #!-win32
+      (signal-cold-init-or-reinit)
       (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
-      ;; PRINT seems not to like x86 NPX denormal floats like
-      ;; LEAST-NEGATIVE-SINGLE-FLOAT, so the :UNDERFLOW exceptions are
-      ;; disabled by default. Joe User can explicitly enable them if
-      ;; desired.
-      ;;
-      ;; see also comment at the previous SET-FLOATING-POINT-MODES
-      ;; call site.
-      (set-floating-point-modes
-       :traps '(:overflow #!-netbsd :invalid :divide-by-zero))))
+      (float-cold-init-or-reinit)))
   (gc-reinit)
   ;; make sure TIME works correctly from saved cores
   (setf *internal-real-time-base-seconds* nil)

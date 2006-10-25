@@ -55,44 +55,46 @@
   (defun (setf floating-point-modes) (new)
     (setf (floating-point-modes) new)))
 
-;;; This function sets options controlling the floating-point
-;;; hardware. If a keyword is not supplied, then the current value is
-;;; preserved. Possible keywords:
-;;; :TRAPS
-;;;    A list of the exception conditions that should cause traps.
-;;;    Possible exceptions are :UNDERFLOW, :OVERFLOW, :INEXACT, :INVALID,
-;;;    :DIVIDE-BY-ZERO, and on the X86 :DENORMALIZED-OPERAND.
-;;;
-;;;:ROUNDING-MODE
-;;;    The rounding mode to use when the result is not exact. Possible
-;;;    values are :NEAREST, :POSITIVE-INFINITY, :NEGATIVE-INFINITY and
-;;;    :ZERO.  Setting this away from :NEAREST is liable to upset SBCL's
-;;;    maths routines which depend on it.
-;;;
-;;;:CURRENT-EXCEPTIONS
-;;;:ACCRUED-EXCEPTIONS
-;;;    These arguments allow setting of the exception flags. The main
-;;;    use is setting the accrued exceptions to NIL to clear them.
-;;;
-;;;:FAST-MODE
-;;;    Set the hardware's \"fast mode\" flag, if any. When set, IEEE
-;;;    conformance or debuggability may be impaired. Some machines don't
-;;;    have this feature, and some SBCL ports don't implement it anyway
-;;;    -- in such cases the value is always NIL.
-;;;
-;;;:PRECISION (x86 only) :24-bit, :53-bit and :64-bit, for the
-;;;internal precision of the mantissa.
-;;;
-;;; GET-FLOATING-POINT-MODES may be used to find the floating point modes
-;;; currently in effect.    See cold-init.lisp for the list of initially
-;;; enabled traps
-
-(defun set-floating-point-modes (&key (traps nil traps-p)
-                                      (rounding-mode nil round-p)
-                                      (current-exceptions nil current-x-p)
-                                      (accrued-exceptions nil accrued-x-p)
-                                      (fast-mode nil fast-mode-p)
+(defun set-floating-point-modes (&key 
+                                 (traps nil traps-p)
+                                 (rounding-mode nil round-p)
+                                 (current-exceptions nil current-x-p)
+                                 (accrued-exceptions nil accrued-x-p)
+                                 (fast-mode nil fast-mode-p)
                                  #!+x86 (precision nil precisionp))
+  #!+sb-doc
+  "This function sets options controlling the floating-point
+hardware. If a keyword is not supplied, then the current value is
+preserved. Possible keywords:
+
+ :TRAPS
+   A list of the exception conditions that should cause traps.
+   Possible exceptions are :UNDERFLOW, :OVERFLOW, :INEXACT, :INVALID,
+  :DIVIDE-BY-ZERO, and on the X86 :DENORMALIZED-OPERAND.
+
+:ROUNDING-MODE
+   The rounding mode to use when the result is not exact. Possible
+   values are :NEAREST, :POSITIVE-INFINITY, :NEGATIVE-INFINITY and
+   :ZERO.  Setting this away from :NEAREST is liable to upset SBCL's
+   maths routines which depend on it.
+
+:CURRENT-EXCEPTIONS
+:ACCRUED-EXCEPTIONS
+   These arguments allow setting of the exception flags. The main
+   use is setting the accrued exceptions to NIL to clear them.
+
+:FAST-MODE
+   Set the hardware's \"fast mode\" flag, if any. When set, IEEE
+   conformance or debuggability may be impaired. Some machines don't
+   have this feature, and some SBCL ports don't implement it anyway
+   -- in such cases the value is always NIL.
+
+:PRECISION (x86 only) 
+  :24-bit, :53-bit and :64-bit, for the internal precision of the mantissa.
+
+GET-FLOATING-POINT-MODES may be used to find the floating point modes
+currently in effect. SAVE-LISP-AND-DIE preserves the floating point modes
+in effect." 
   (let ((modes (floating-point-modes)))
     (when traps-p
       (setf (ldb float-traps-byte modes) (float-trap-mask traps)))
@@ -117,16 +119,17 @@
                 (error "unknown precision mode: ~S" precision))))
     ;; FIXME: This apparently doesn't work on Darwin
     #!-darwin (setf (floating-point-modes) modes))
-
   (values))
 
-;;; This function returns a list representing the state of the floating
-;;; point modes. The list is in the same format as the &KEY arguments to
-;;; SET-FLOATING-POINT-MODES, i.e.
-;;;    (apply #'set-floating-point-modes (get-floating-point-modes))
-;;; sets the floating point modes to their current values (and thus is a
-;;; no-op).
 (defun get-floating-point-modes ()
+  #!+sb-doc
+  "This function returns a list representing the state of the floating
+point modes. The list is in the same format as the &KEY arguments to
+SET-FLOATING-POINT-MODES, i.e.
+   
+  (apply #'set-floating-point-modes (get-floating-point-modes))
+
+sets the floating point modes to their current values (and thus is a no-op)."
   (flet ((exc-keys (bits)
            (macrolet ((frob ()
                         `(collect ((res))
@@ -147,6 +150,24 @@
         #!+x86 ,(car (rassoc (ldb float-precision-control modes)
                              *precision-mode-alist*))))))
 
+;;; FIXME: For some unknown reason, NetBSD/x86 won't run with the
+;;; :INVALID trap enabled. That should be fixed, but not today...
+;;;
+;;; PRINT seems not to like x86 NPX denormal floats like
+;;; LEAST-NEGATIVE-SINGLE-FLOAT, so the :UNDERFLOW exceptions are
+;;; disabled by default. Joe User can explicitly enable them if
+;;; desired.
+(defvar *saved-floating-point-modes*
+  '(:traps (:overflow #!-netbsd :invalid :divide-by-zero)
+    :rounding-mode :nearest :current-exceptions nil
+    :accrued-exceptions nil :fast-mode nil :precision :53-bit))
+
+(defun float-cold-init-or-reinit ()
+  (apply #'set-floating-point-modes *saved-floating-point-modes*))
+
+(defun float-deinit ()
+  (setf *saved-floating-point-modes* (get-floating-point-modes)))
+
 ;;; Return true if any of the named traps are currently trapped, false
 ;;; otherwise.
 (defmacro current-float-trap (&rest traps)
@@ -154,6 +175,7 @@
                        (floating-point-modes)))))
 
 ;;; Signal the appropriate condition when we get a floating-point error.
+#!-win32
 (defun sigfpe-handler (signal info context)
   (declare (ignore signal info))
   (declare (type system-area-pointer context))
