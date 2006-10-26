@@ -160,7 +160,8 @@ sets the floating point modes to their current values (and thus is a no-op)."
 (defvar *saved-floating-point-modes*
   '(:traps (:overflow #!-netbsd :invalid :divide-by-zero)
     :rounding-mode :nearest :current-exceptions nil
-    :accrued-exceptions nil :fast-mode nil :precision :53-bit))
+    :accrued-exceptions nil :fast-mode nil
+    #!+x86 :precision #!+x86 :53-bit))
 
 (defun float-cold-init-or-reinit ()
   (apply #'set-floating-point-modes *saved-floating-point-modes*))
