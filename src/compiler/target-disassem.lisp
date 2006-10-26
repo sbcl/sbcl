@@ -1497,6 +1497,9 @@
 (defun valid-extended-function-designator-for-disassemble-p (thing)
   (cond ((legal-fun-name-p thing)
          (compiled-fun-or-lose (fdefinition thing) thing))
+        #!+sb-eval
+        ((sb!eval:interpreted-function-p thing)
+         (compile nil thing))
         ((functionp thing)
          thing)
         ((and (listp thing)

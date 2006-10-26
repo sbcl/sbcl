@@ -34,6 +34,19 @@
 
 (let ((x 1)) (defun disassemble-closure (y) (if y (setq x y) x)))
 (disassemble 'disassemble-closure)
+
+#+sb-eval
+(progn
+  ;; Nor should it fail on interpreted functions
+  (let ((sb-ext:*evaluator-mode* :interpret))
+    (eval `(defun disassemble-eval (x) x))
+    (disassemble 'disassemble-eval))
+
+  ;; disassemble-eval should still be an interpreted function.
+  ;; clhs disassemble: "(If that function is an interpreted function,
+  ;; it is first compiled but the result of this implicit compilation
+  ;; is not installed.)"
+  (assert (sb-eval:interpreted-function-p #'disassemble-eval)))
 
 ;;; support for DESCRIBE tests
 (defstruct to-be-described a b)
