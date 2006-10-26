@@ -334,9 +334,9 @@ EXCEPTION_DISPOSITION sigtrap_emulator(CONTEXT *context,
         memcpy(context, &exception_frame->context, sizeof(CONTEXT));
         return ExceptionContinueExecution;
 
-    } else { 
-	/* Not a trap_ContextRestore, must be a sigtrap.
-	 * sigtrap_trampoline is defined in x86-assem.S. */
+    } else {
+        /* Not a trap_ContextRestore, must be a sigtrap.
+         * sigtrap_trampoline is defined in x86-assem.S. */
         extern void sigtrap_trampoline;
 
         /*
@@ -366,13 +366,13 @@ EXCEPTION_DISPOSITION sigtrap_emulator(CONTEXT *context,
          * that we don't switch stacks for exception processing...) */
         memcpy(&exception_frame->context, context, sizeof(CONTEXT));
 
-	/* FIXME: Why do we save the old EIP in EAX? The sigtrap_trampoline
-	 * pushes it into stack, but the sigtrap_wrapper where the trampoline
-	 * goes ignores it, and after the wrapper we hit the trap_ContextRestore,
-	 * which nukes the whole context with the original one? 
-	 *
-	 * Am I misreading this, or is the EAX here and in the
-	 * trampoline superfluous? --NS 20061024 */
+        /* FIXME: Why do we save the old EIP in EAX? The sigtrap_trampoline
+         * pushes it into stack, but the sigtrap_wrapper where the trampoline
+         * goes ignores it, and after the wrapper we hit the trap_ContextRestore,
+         * which nukes the whole context with the original one?
+         *
+         * Am I misreading this, or is the EAX here and in the
+         * trampoline superfluous? --NS 20061024 */
         context->Eax = context->Eip;
         context->Eip = (unsigned long)&sigtrap_trampoline;
 
@@ -421,30 +421,30 @@ EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *exception_record,
 
     /* For EXCEPTION_ACCESS_VIOLATION only. */
     void *fault_address = (void *)exception_record->ExceptionInformation[1];
-    
+
     if (exception_record->ExceptionCode == EXCEPTION_BREAKPOINT) {
         /* Pick off sigtrap case first. */
         return sigtrap_emulator(context, exception_frame);
 
-    } 
+    }
     else if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
-	     (is_valid_lisp_addr(fault_address) || 
-	      is_linkage_table_addr(fault_address))) {
-	/* Pick off GC-related memory fault next. */
-	MEMORY_BASIC_INFORMATION mem_info;
-	
-	if (!VirtualQuery(fault_address, &mem_info, sizeof mem_info)) {
-	    fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
-	    lose("handle_exception: VirtualQuery failure");
-	}
-	
-	if (mem_info.State == MEM_RESERVE) {
-	    /* First use new page, lets get some memory for it. */
-	    if (!VirtualAlloc(mem_info.BaseAddress, os_vm_page_size,
-			      MEM_COMMIT, PAGE_EXECUTE_READWRITE)) {
-		fprintf(stderr, "VirtualAlloc: 0x%lx.\n", GetLastError());
+             (is_valid_lisp_addr(fault_address) ||
+              is_linkage_table_addr(fault_address))) {
+        /* Pick off GC-related memory fault next. */
+        MEMORY_BASIC_INFORMATION mem_info;
+
+        if (!VirtualQuery(fault_address, &mem_info, sizeof mem_info)) {
+            fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
+            lose("handle_exception: VirtualQuery failure");
+        }
+
+        if (mem_info.State == MEM_RESERVE) {
+            /* First use new page, lets get some memory for it. */
+            if (!VirtualAlloc(mem_info.BaseAddress, os_vm_page_size,
+                              MEM_COMMIT, PAGE_EXECUTE_READWRITE)) {
+                fprintf(stderr, "VirtualAlloc: 0x%lx.\n", GetLastError());
                 lose("handle_exception: VirtualAlloc failure");
-		
+
             } else {
                 /*
                  * Now, if the page is supposedly write-protected and this
@@ -469,13 +469,13 @@ EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *exception_record,
 
         /* All else failed, drop through to the lisp-side exception handler. */
     }
-    
+
     /*
      * If we fall through to here then we need to either forward
      * the exception to the lisp-side exception handler if it's
      * set up, or drop to LDB.
      */
-    
+
     if (internal_errors_enabled) {
         /* exception_trampoline is defined in x86-assem.S. */
         extern void exception_trampoline;
@@ -485,26 +485,26 @@ EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *exception_record,
          * marbles to be able to handle exceptions, but xceptions
          * aren't supposed to happen during cold init or reinit
          * anyway.
-	 *
+         *
          * We use the same mechanism as the sigtrap emulator above
          * with just a couple changes. We obviously use a different
          * trampoline and wrapper function, we kill out any live
          * floating point exceptions, and we save off the exception
          * record as well as the context. */
 
-	/* Save off context and exception information */
+        /* Save off context and exception information */
         memcpy(&exception_frame->context, context, sizeof(CONTEXT));
         memcpy(&exception_frame->exception, exception_record, sizeof(EXCEPTION_RECORD));
 
         /* Set up to activate trampoline when we return
-	 *
-	 * FIXME: Why do we save the old EIP in EAX? The
-	 * exception_trampoline pushes it into stack, but the wrapper
-	 * where the trampoline goes ignores it, and then the wrapper
-	 * unwinds from Lisp... WTF?
-	 *
-	 * Am I misreading this, or is the EAX here and in the
-	 * trampoline superfluous? --NS 20061024 */
+         *
+         * FIXME: Why do we save the old EIP in EAX? The
+         * exception_trampoline pushes it into stack, but the wrapper
+         * where the trampoline goes ignores it, and then the wrapper
+         * unwinds from Lisp... WTF?
+         *
+         * Am I misreading this, or is the EAX here and in the
+         * trampoline superfluous? --NS 20061024 */
         context->Eax = context->Eip;
         context->Eip = (unsigned long)&exception_trampoline;
 

@@ -55,7 +55,7 @@
   (defun (setf floating-point-modes) (new)
     (setf (floating-point-modes) new)))
 
-(defun set-floating-point-modes (&key 
+(defun set-floating-point-modes (&key
                                  (traps nil traps-p)
                                  (rounding-mode nil round-p)
                                  (current-exceptions nil current-x-p)
@@ -89,12 +89,12 @@ preserved. Possible keywords:
    have this feature, and some SBCL ports don't implement it anyway
    -- in such cases the value is always NIL.
 
-:PRECISION (x86 only) 
+:PRECISION (x86 only)
   :24-bit, :53-bit and :64-bit, for the internal precision of the mantissa.
 
 GET-FLOATING-POINT-MODES may be used to find the floating point modes
 currently in effect. SAVE-LISP-AND-DIE preserves the floating point modes
-in effect." 
+in effect."
   (let ((modes (floating-point-modes)))
     (when traps-p
       (setf (ldb float-traps-byte modes) (float-trap-mask traps)))
@@ -126,7 +126,7 @@ in effect."
   "This function returns a list representing the state of the floating
 point modes. The list is in the same format as the &KEY arguments to
 SET-FLOATING-POINT-MODES, i.e.
-   
+
   (apply #'set-floating-point-modes (get-floating-point-modes))
 
 sets the floating point modes to their current values (and thus is a no-op)."

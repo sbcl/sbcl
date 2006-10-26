@@ -1501,7 +1501,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "FDEFN-MAKUNBOUND" "OUTER-FDEFN"
                "%COERCE-CALLABLE-TO-FUN" "FUN-SUBTYPE"
                "*MAXIMUM-ERROR-DEPTH*" "%SET-SYMBOL-PLIST"
-               "INFINITE-ERROR-PROTECT" 
+               "INFINITE-ERROR-PROTECT"
                "FIND-CALLER-NAME-AND-FRAME"
                "FIND-INTERRUPTED-NAME-AND-FRAME"
                "%SET-SYMBOL-VALUE" "%SET-SYMBOL-PACKAGE"
@@ -1596,9 +1596,9 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "STREAM-COLD-INIT-OR-RESET"
 
                ;; Cleanups to run before saving a core
-               "DEBUG-DEINIT" 
+               "DEBUG-DEINIT"
                "FLOAT-DEINIT"
-               "FOREIGN-DEINIT" 
+               "FOREIGN-DEINIT"
                "PROFILE-DEINIT"
 
                ;; Note: These are out of lexicographical order

@@ -73,7 +73,7 @@
          (sb!debug:*stack-top-hint* (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
     (if condition-name
         (error condition-name)
-        (error "An exception occurred in context ~S: ~S. (Exception code: ~S)" 
+        (error "An exception occurred in context ~S: ~S. (Exception code: ~S)"
                context-sap exception-record-sap code))))
 
 ;;;; etc.
