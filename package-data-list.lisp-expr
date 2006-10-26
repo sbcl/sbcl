@@ -1592,6 +1592,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 
                "FLOAT-COLD-INIT-OR-REINIT"
                "GC-REINIT"
+               "TIME-REINIT"
                "SIGNAL-COLD-INIT-OR-REINIT"
                "STREAM-COLD-INIT-OR-RESET"
 
@@ -1948,6 +1949,8 @@ SB-KERNEL) have been undone, but probably more remain."
                ;; FIXME: STRUCTURE!OBJECT stuff probably belongs in SB!KERNEL.
                "STRUCTURE!OBJECT" "STRUCTURE!OBJECT-MAKE-LOAD-FORM"
                "SYSTEM-AREA-POINTER" "SYSTEM-AREA-POINTER-P"
+               "SYSTEM-INTERNAL-REAL-TIME"
+               "SYSTEM-INTERNAL-RUN-TIME"
                "UNDEFINED-FOREIGN-SYMBOLS-P"
                "UPDATE-LINKAGE-TABLE" "VECTOR-SAP"
                "WAIT-UNTIL-FD-USABLE" "WITH-ENABLED-INTERRUPTS"
@@ -2382,5 +2385,4 @@ SBCL itself"
                "HANDLE-CLEAR-INPUT" "HANDLE-LISTEN" "INT-PTR"
                "INVALID-HANDLE" "MILLISLEEP" "PEEK-CONSOLE-INPUT"
                "PEEK-NAMED-PIPE" "READ-FILE" "WRITE-FILE"
-
-               "GET-PROCESS-TIMES" "GET-VERSION-EX")))
+               "WITH-PROCESS-TIMES" "GET-VERSION-EX")))

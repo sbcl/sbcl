@@ -295,10 +295,8 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
       (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
       (float-cold-init-or-reinit)))
   (gc-reinit)
-  ;; make sure TIME works correctly from saved cores
-  (setf *internal-real-time-base-seconds* nil)
-  (setf *gc-run-time* 0)
   (foreign-reinit)
+  (time-reinit)
   ;; If the debugger was disabled in the saved core, we need to
   ;; re-disable ldb again.
   (when (eq *invoke-debugger-hook* 'sb!debug::debugger-disabled-hook)

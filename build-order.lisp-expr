@@ -215,6 +215,7 @@
  ("src/code/string"     :not-host)
  ("src/code/mipsstrops" :not-host)
 
+ ("src/code/early-time" :not-host)
  ("src/code/unix" :not-host)
  #!+win32 ("src/code/win32" :not-host)
  #!+mach  ("src/code/mach"     :not-host)

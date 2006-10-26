@@ -11,73 +11,25 @@
 
 (in-package "SB!IMPL")
 
-(defconstant sb!xc:internal-time-units-per-second 1000
-  #!+sb-doc
-  "The number of internal time units that fit into a second. See
-  GET-INTERNAL-REAL-TIME and GET-INTERNAL-RUN-TIME.")
+;;; Internal epoch, used as base for real-time.
+(declaim (unsigned-byte *internal-epoch*))
+(defvar *internal-epoch* 0)
 
-(defconstant micro-seconds-per-internal-time-unit
-  (/ 1000000 sb!xc:internal-time-units-per-second))
-
-(defconstant 100ns-per-internal-time-unit
-  (/ 10000000 internal-time-units-per-second))
-
-;;; The base number of seconds for our internal "epoch". We initialize
-;;; this to the time of the first call to GET-INTERNAL-REAL-TIME, and
-;;; then subtract this out of the result.
-(defvar *internal-real-time-base-seconds* nil)
-(declaim (type (or (unsigned-byte 32) null) *internal-real-time-base-seconds*))
+(defun time-reinit ()
+  (setf *internal-epoch* (system-internal-real-time)))
 
 (defun get-internal-real-time ()
   #!+sb-doc
-  "Return the real time in the internal time format. (See
-  INTERNAL-TIME-UNITS-PER-SECOND.) This is useful for finding elapsed time."
-  (multiple-value-bind (ignore seconds useconds) (sb!unix:unix-gettimeofday)
-    (declare (ignore ignore) (type (unsigned-byte 32) seconds useconds))
-    (let ((base *internal-real-time-base-seconds*)
-          (uint (truncate useconds
-                          micro-seconds-per-internal-time-unit)))
-      (declare (type (unsigned-byte 32) uint))
-      (cond (base
-             (+ (* (- seconds base)
-                   sb!xc:internal-time-units-per-second)
-                uint))
-            (t
-             (setq *internal-real-time-base-seconds* seconds)
-             uint)))))
+  "Return the real time (\"wallclock time\") since startup in the internal
+time format. (See INTERNAL-TIME-UNITS-PER-SECOND.)"
+  (- (system-internal-real-time) *internal-epoch*))
 
 (defun get-internal-run-time ()
   #!+sb-doc
-  "Return the run time in the internal time format. (See
-  INTERNAL-TIME-UNITS-PER-SECOND.) This is useful for finding CPU usage."
-  ;; FIXME: This is yet another creeping malaise: instead of #+/-win32
-  ;; conditionals things like these need to be split into wholly separate
-  ;; implementations of get-internal-run-time, probably one in
-  ;; unix.lisp and one in win32.lisp -- that however requires also
-  ;; cleaning up unix.lisp sufficiently to remove it from the Windows build.
-  #-win32
-  (multiple-value-bind (ignore utime-sec utime-usec stime-sec stime-usec)
-      (sb!unix:unix-fast-getrusage sb!unix:rusage_self)
-    (declare (ignore ignore)
-             (type (unsigned-byte 31) utime-sec stime-sec)
-             ;; (Classic CMU CL had these (MOD 1000000) instead, but
-             ;; at least in Linux 2.2.12, the type doesn't seem to be
-             ;; documented anywhere and the observed behavior is to
-             ;; sometimes return 1000000 exactly.)
-             (type (integer 0 1000000) utime-usec stime-usec))
-    (let ((result (+ (* (+ utime-sec stime-sec)
-                        sb!xc:internal-time-units-per-second)
-                     (floor (+ utime-usec
-                               stime-usec
-                               (floor micro-seconds-per-internal-time-unit 2))
-                            micro-seconds-per-internal-time-unit))))
-      result))
-  #!+win32
-  (multiple-value-bind
-        (creation-time exit-time kernel-time user-time)
-      (sb!win32:get-process-times)
-    (declare (ignore creation-time exit-time))
-    (values (floor (+ user-time kernel-time) 100ns-per-internal-time-unit))))
+  "Return the run time used by the process in the internal time format. (See
+INTERNAL-TIME-UNITS-PER-SECOND.) This is useful for finding CPU usage.
+Includes both \"system\" and \"user\" time."
+  (system-internal-run-time))
 
 ;;;; Encode and decode universal times.
 
@@ -145,8 +97,8 @@
 
 (defun get-universal-time ()
   #!+sb-doc
-  "Return a single integer for the current time of
-   day in universal time format."
+  "Return a single integer for the current time of day in universal time
+format."
   (multiple-value-bind (res secs) (sb!unix:unix-gettimeofday)
     (declare (ignore res))
     (+ secs unix-to-universal-time)))

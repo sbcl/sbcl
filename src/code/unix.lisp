@@ -1014,6 +1014,42 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
            dst)
           (t
            (subseq dst 0 dst-len)))))
+
+
+;;; UNIX specific code, that has been cleanly separated from the
+;;; Windows build.
+#!-win32
+(progn
+  (defconstant micro-seconds-per-internal-time-unit
+    (/ 1000000 sb!xc:internal-time-units-per-second))
+
+  (declaim (inline system-internal-real-time system-internal-run-time))
+  (defun system-internal-real-time ()
+    (multiple-value-bind (ignore seconds useconds) (unix-gettimeofday)
+      (declare (ignore ignore) (type (unsigned-byte 32) seconds useconds))
+      (let ((uint (truncate useconds
+                            micro-seconds-per-internal-time-unit)))
+        (declare (type (unsigned-byte 32) uint))
+        (+ (* seconds sb!xc:internal-time-units-per-second)
+           uint))))
+
+  (defun system-internal-run-time ()
+    (multiple-value-bind (ignore utime-sec utime-usec stime-sec stime-usec)
+        (unix-fast-getrusage rusage_self)
+      (declare (ignore ignore)
+               (type (unsigned-byte 31) utime-sec stime-sec)
+               ;; (Classic CMU CL had these (MOD 1000000) instead, but
+               ;; at least in Linux 2.2.12, the type doesn't seem to
+               ;; be documented anywhere and the observed behavior is
+               ;; to sometimes return 1000000 exactly.)
+               (type (integer 0 1000000) utime-usec stime-usec))
+      (let ((result (+ (* (+ utime-sec stime-sec)
+                          sb!xc:internal-time-units-per-second)
+                       (floor (+ utime-usec
+                                 stime-usec
+                                 (floor micro-seconds-per-internal-time-unit 2))
+                              micro-seconds-per-internal-time-unit))))
+        result))))
 
 ;;;; A magic constant for wait3().
 ;;;;
@@ -1066,3 +1102,4 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   `(progn
      ,@(loop for index upfrom 0 below (/ fd-setsize sb!vm:n-machine-word-bits)
          collect `(setf (deref (slot ,fd-set 'fds-bits) ,index) 0))))
+

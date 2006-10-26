@@ -486,6 +486,9 @@
 
 ;;;; Process time information
 
+(defconstant 100ns-per-internal-time-unit
+  (/ 10000000 sb!xc:internal-time-units-per-second))
+
 ;; FILETIME
 ;; The FILETIME structure is a 64-bit value representing the number of
 ;; 100-nanosecond intervals since January 1, 1601 (UTC).
@@ -493,22 +496,31 @@
 ;; http://msdn.microsoft.com/library/en-us/sysinfo/base/filetime_str.asp?
 (define-alien-type FILETIME (sb!alien:unsigned 64))
 
-(defun get-process-times ()
-  (with-alien ((creation-time filetime)
-               (exit-time filetime)
-               (kernel-time filetime)
-               (user-time filetime))
-    (syscall* (("GetProcessTimes" 20) handle (* filetime) (* filetime)
-                                             (* filetime) (* filetime))
-              (values creation-time
-                      exit-time
-                      kernel-time
-                      user-time)
-              (get-current-process)
-              (addr creation-time)
-              (addr exit-time)
-              (addr kernel-time)
-              (addr user-time))))
+(defmacro with-process-times ((creation-time exit-time kernel-time user-time)
+                              &body forms)
+  `(with-alien ((,creation-time filetime)
+                (,exit-time filetime)
+                (,kernel-time filetime)
+                (,user-time filetime))
+     (syscall* (("GetProcessTimes" 20) handle (* filetime) (* filetime)
+                (* filetime) (* filetime))
+               (progn ,@forms)
+               (get-current-process)
+               (addr ,creation-time)
+               (addr ,exit-time)
+               (addr ,kernel-time)
+               (addr ,user-time))))
+
+(declaim (inline system-internal-real-time system-internal-run-time))
+(defun system-internal-real-time ()
+  (with-alien ((system-time filetime))
+    (syscall (("GetSystemTimeAsFileTime" 4) void (* filetime))
+             (values (floor system-time 100ns-per-internal-time-unit))
+             (addr system-time))))
+
+(defun system-internal-run-time ()
+  (with-process-times (creation-time exit-time kernel-time user-time)
+    (values (floor (+ user-time kernel-time) 100ns-per-internal-time-unit))))
 
 ;; SETENV
 ;; The SetEnvironmentVariable function sets the contents of the specified

@@ -26,6 +26,7 @@
  * yet.
  */
 
+#include <malloc.h>
 #include <stdio.h>
 #include <sys/param.h>
 #include <sys/file.h>
@@ -629,87 +630,62 @@ char *dirname(char *path)
 
 void scratch(void)
 {
-    strerror(42);
-    asin(0);
-    acos(0);
-    sinh(0);
-    cosh(0);
-    hypot(0, 0);
-    write(0, 0, 0);
-    close(0);
-    #ifndef LISP_FEATURE_SB_UNICODE
-      MoveFileA(0,0);
-    #else
-      MoveFileW(0,0);
-    #endif
-    #ifndef LISP_FEATURE_SB_UNICODE
-      GetCurrentDirectoryA(0,0);
-    #else
-      GetCurrentDirectoryW(0,0);
-    #endif
-    dup(0);
-    LoadLibrary(0);
-    GetProcAddress(0, 0);
-    FreeLibrary(0);
-    #ifndef LISP_FEATURE_SB_UNICODE
-      CreateDirectoryA(0,0);
-    #else
-      CreateDirectoryW(0,0);
-    #endif
-    _pipe(0,0,0);
-    isatty(0);
-    access(0,0);
-    GetLastError();
-    FormatMessageA(0, 0, 0, 0, 0, 0, 0);
-    #ifdef LISP_FEATURE_SB_UNICODE
-      FormatMessageW(0, 0, 0, 0, 0, 0, 0);
-    #endif
-    _get_osfhandle(0);
-    ReadFile(0, 0, 0, 0, 0);
-    WriteFile(0, 0, 0, 0, 0);
-    PeekNamedPipe(0, 0, 0, 0, 0, 0);
+    CloseHandle(0);
     FlushConsoleInputBuffer(0);
-    PeekConsoleInput(0, 0, 0, 0);
-    Sleep(0);
-    #ifndef LISP_FEATURE_SB_UNICODE
-      SHGetFolderPathA(0, 0, 0, 0, 0);
-    #else
-      SHGetFolderPathW(0, 0, 0, 0, 0);
-    #endif
+    FormatMessageA(0, 0, 0, 0, 0, 0, 0);
+    FreeLibrary(0);
     GetACP();
-    GetOEMCP();
-    LocalFree(0);
-    #ifndef LISP_FEATURE_SB_UNICODE
-      GetEnvironmentVariableA(0, 0, 0);
-    #else
-      GetEnvironmentVariableW(0, 0, 0);
-    #endif
     GetConsoleCP();
     GetConsoleOutputCP();
-    GetExitCodeProcess(0, 0);
     GetCurrentProcess();
+    GetExitCodeProcess(0, 0);
+    GetLastError();
+    GetOEMCP();
+    GetProcAddress(0, 0);
     GetProcessTimes(0, 0, 0, 0, 0);
+    GetSystemTimeAsFileTime(0);
+    LoadLibrary(0);
+    LocalFree(0);
+    PeekConsoleInput(0, 0, 0, 0);
+    PeekNamedPipe(0, 0, 0, 0, 0, 0);
+    ReadFile(0, 0, 0, 0, 0);
+    Sleep(0);
+    WriteFile(0, 0, 0, 0, 0);
+    _get_osfhandle(0);
+    _pipe(0,0,0);
+    access(0,0);
+    acos(0);
+    asin(0);
+    close(0);
+    cosh(0);
+    dup(0);
+    hypot(0, 0);
+    isatty(0);
+    sinh(0);
+    strerror(42);
+    write(0, 0, 0);
     #ifndef LISP_FEATURE_SB_UNICODE
+      CreateDirectoryA(0,0);
+      GetComputerNameA(0, 0);
+      GetCurrentDirectoryA(0,0);
+      GetEnvironmentVariableA(0, 0, 0);
+      GetVersionExA(0);
+      MoveFileA(0,0);
+      SHGetFolderPathA(0, 0, 0, 0, 0);
+      SetCurrentDirectoryA(0);
       SetEnvironmentVariableA(0, 0);
     #else
+      CreateDirectoryW(0,0);
+      FormatMessageW(0, 0, 0, 0, 0, 0, 0);
+      GetComputerNameW(0, 0);
+      GetCurrentDirectoryW(0,0);
+      GetEnvironmentVariableW(0, 0, 0);
+      GetVersionExW(0);
+      MoveFileW(0,0);
+      SHGetFolderPathW(0, 0, 0, 0, 0);
+      SetCurrentDirectoryW(0);
       SetEnvironmentVariableW(0, 0);
     #endif
-    #ifndef LISP_FEATURE_SB_UNICODE
-      GetVersionExA(0);
-    #else
-      GetVersionExW(0);
-    #endif
-    #ifndef LISP_FEATURE_SB_UNICODE
-      GetComputerNameA(0, 0);
-    #else
-      GetComputerNameW(0, 0);
-    #endif
-    #ifndef LISP_FEATURE_SB_UNICODE
-      SetCurrentDirectoryA(0);
-    #else
-      SetCurrentDirectoryW(0);
-    #endif
-    CloseHandle(0);
 }
 
 char *

@@ -26,18 +26,18 @@
   if not available."
   (or *software-version*
       (setf *software-version*
-            (multiple-value-bind (MajorVersion MinorVersion BuildNumber PlatformId CSDVersion)
+            (multiple-value-bind
+                  (major-version minor-version build-number platform-id csd-version)
                 (sb!win32:get-version-ex)
-              (declare (ignore PlatformId))
-              (format nil (if (zerop (length CSDVersion)) "~A.~A.~A" "~A.~A.~A (~A)")
-                      MajorVersion MinorVersion BuildNumber CSDVersion)))))
+              (declare (ignore platform-id))
+              (format nil (if (zerop (length csd-version))
+                              "~A.~A.~A"
+                              "~A.~A.~A (~A)")
+                      major-version minor-version build-number csd-version)))))
 
 ;;; Return user time, system time, and number of page faults.
 (defun get-system-info ()
-  ;; FIXME: number of page faults is always zero
-  (multiple-value-bind (creation-time exit-time kernel-time user-time)
-      (sb!win32:get-process-times)
-    (declare (ignore creation-time exit-time))
+  (sb!win32:with-process-times (creation-time exit-time kernel-time user-time)
     (values (floor user-time 10) (floor kernel-time 10) 0)))
 
 ;;; Return the system page size.
