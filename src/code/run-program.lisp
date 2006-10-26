@@ -879,7 +879,7 @@ Common Lisp Users Manual for details about the PROCESS structure.
                                          (spawn pfile args-vec
                                                 stdin stdout stderr
                                                 (if wait 1 0)))))
-                            (when (< handle 0)
+                            (when (= handle -1)
                               (error "Couldn't spawn program: ~A" (strerror)))
                             (setf proc
                                   (if wait
