@@ -2142,3 +2142,10 @@
   (assert (raises-error? (funcall fun1 fun1)))
   (assert (raises-error? (funcall fun2 fun2)))
   (assert (eq (funcall fun2 #'print-object) #'print-object)))
+
+;;; LET* + VALUES declaration: while the declaration is a non-standard
+;;; and possibly a non-conforming extension, as long as we do support
+;;; it, we might as well get it right.
+;;; 
+;;; Bug reported by Kaersten Poeck on sbcl-devel 20061023.
+(compile nil '(lambda () (let* () (declare (values list)))))

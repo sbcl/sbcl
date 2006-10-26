@@ -643,7 +643,7 @@ form to reference any of the previous VARS."
       (multiple-value-bind (forms decls)
           (parse-body body :doc-string-allowed nil)
         (multiple-value-bind (vars values) (extract-let-vars bindings 'let*)
-          (processing-decls (decls vars nil start next post-binding-lexenv)
+          (processing-decls (decls vars nil next result post-binding-lexenv)
             (ir1-convert-aux-bindings start
                                       next
                                       result
