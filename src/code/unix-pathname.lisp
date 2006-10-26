@@ -318,3 +318,89 @@
           (strings ".")
           (strings (unparse-unix-piece pathname-type))))
       (apply #'concatenate 'simple-string (strings)))))
+
+(defun simplify-unix-namestring (src)
+  (declare (type simple-string src))
+  (let* ((src-len (length src))
+         (dst (make-string src-len :element-type 'character))
+         (dst-len 0)
+         (dots 0)
+         (last-slash nil))
+    (macrolet ((deposit (char)
+                 `(progn
+                    (setf (schar dst dst-len) ,char)
+                    (incf dst-len))))
+      (dotimes (src-index src-len)
+        (let ((char (schar src src-index)))
+          (cond ((char= char #\.)
+                 (when dots
+                   (incf dots))
+                 (deposit char))
+                ((char= char #\/)
+                 (case dots
+                   (0
+                    ;; either ``/...' or ``...//...'
+                    (unless last-slash
+                      (setf last-slash dst-len)
+                      (deposit char)))
+                   (1
+                    ;; either ``./...'' or ``..././...''
+                    (decf dst-len))
+                   (2
+                    ;; We've found ..
+                    (cond
+                      ((and last-slash (not (zerop last-slash)))
+                       ;; There is something before this ..
+                       (let ((prev-prev-slash
+                              (position #\/ dst :end last-slash :from-end t)))
+                         (cond ((and (= (+ (or prev-prev-slash 0) 2)
+                                        last-slash)
+                                     (char= (schar dst (- last-slash 2)) #\.)
+                                     (char= (schar dst (1- last-slash)) #\.))
+                                ;; The something before this .. is another ..
+                                (deposit char)
+                                (setf last-slash dst-len))
+                               (t
+                                ;; The something is some directory or other.
+                                (setf dst-len
+                                      (if prev-prev-slash
+                                          (1+ prev-prev-slash)
+                                          0))
+                                (setf last-slash prev-prev-slash)))))
+                      (t
+                       ;; There is nothing before this .., so we need to keep it
+                       (setf last-slash dst-len)
+                       (deposit char))))
+                   (t
+                    ;; something other than a dot between slashes
+                    (setf last-slash dst-len)
+                    (deposit char)))
+                 (setf dots 0))
+                (t
+                 (setf dots nil)
+                 (setf (schar dst dst-len) char)
+                 (incf dst-len))))))
+    (when (and last-slash (not (zerop last-slash)))
+      (case dots
+        (1
+         ;; We've got  ``foobar/.''
+         (decf dst-len))
+        (2
+         ;; We've got ``foobar/..''
+         (unless (and (>= last-slash 2)
+                      (char= (schar dst (1- last-slash)) #\.)
+                      (char= (schar dst (- last-slash 2)) #\.)
+                      (or (= last-slash 2)
+                          (char= (schar dst (- last-slash 3)) #\/)))
+           (let ((prev-prev-slash
+                  (position #\/ dst :end last-slash :from-end t)))
+             (if prev-prev-slash
+                 (setf dst-len (1+ prev-prev-slash))
+                 (return-from simplify-unix-namestring
+                   (coerce "./" 'simple-string))))))))
+    (cond ((zerop dst-len)
+           "./")
+          ((= dst-len src-len)
+           dst)
+          (t
+           (subseq dst 0 dst-len)))))

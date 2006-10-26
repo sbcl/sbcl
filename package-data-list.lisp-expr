@@ -778,8 +778,8 @@ Lisp extension proposal by David N. Gray"
       :name "SB!INT"
       :doc
       "private: miscellaneous unsupported extensions to the ANSI spec. Much of
-the stuff in here originated in CMU CL's EXTENSIONS package and is
-retained, possibly temporariliy, because it might be used internally."
+the stuff in here originated in CMU CL's EXTENSIONS package and is retained,
+possibly temporariliy, because it might be used internally."
       :use ("CL" "SB!ALIEN" "SB!GRAY" "SB!FASL" "SB!SYS")
       :export (;; lambda list keyword extensions
                "&MORE"
@@ -856,6 +856,7 @@ retained, possibly temporariliy, because it might be used internally."
                "PHYSICALIZE-PATHNAME"
                "SANE-DEFAULT-PATHNAME-DEFAULTS"
                "SBCL-HOMEDIR-PATHNAME"
+               "SIMPLIFY-NAMESTRING"
 
                ;; PCOUNTERs
                "FASTBIG-INCF-PCOUNTER-OR-FIXNUM"
@@ -2041,7 +2042,7 @@ no guarantees of interface stability."
                "UNIX-FILE-KIND" "UNIX-KILL" "CODESET"
                "TCSETPGRP" "FD-ZERO" "FD-CLR" "CHECK" "UNIX-RESOLVE-LINKS"
                "FD-SETSIZE" "TCGETPGRP" "UNIX-FAST-GETRUSAGE"
-               "UNIX-SIMPLIFY-PATHNAME" "UNIX-KILLPG"
+               "UNIX-KILLPG"
                "TIOCSIGSEND"
                "C-IFLAG" "C-LFLAG" "C-OFLAG"
                "C-CFLAG" "TCSAFLUSH" "C-CC" "SIOCSPGRP" "TERMIOS"

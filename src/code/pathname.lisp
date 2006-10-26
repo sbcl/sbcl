@@ -26,6 +26,7 @@
   (unparse-file (missing-arg) :type function)
   (unparse-enough (missing-arg) :type function)
   (unparse-directory-separator (missing-arg) :type simple-string)
+  (simplify-namestring (missing-arg) :type function)
   (customary-case (missing-arg) :type (member :upper :lower)))
 
 (def!method print-object ((host host) stream)
@@ -51,6 +52,7 @@
                        (unparse-file #'unparse-logical-file)
                        (unparse-enough #'unparse-enough-namestring)
                        (unparse-directory-separator ";")
+                       (simplify-namestring #'identity)
                        (customary-case :upper)))
   (name "" :type simple-string)
   (translations nil :type list)

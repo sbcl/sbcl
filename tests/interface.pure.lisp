@@ -57,10 +57,11 @@
 (assert (not (special-operator-p 'declare)))
 
 ;;; WITH-TIMEOUT should accept more than one form in its body.
-(handler-bind ((sb-ext:timeout #'continue))
-  (sb-ext:with-timeout 3
-    (sleep 2)
-    (sleep 2)))
+(with-test (:name :with-timeout-forms)
+  (handler-bind ((sb-ext:timeout #'continue))
+    (sb-ext:with-timeout 3
+      (sleep 2)
+      (sleep 2))))
 
 ;;; DOCUMENTATION should return nil, not signal slot-unbound
 (documentation 'fixnum 'type)

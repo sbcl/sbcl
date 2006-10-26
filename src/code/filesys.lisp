@@ -252,6 +252,8 @@
                                follow-links nodes function
                                &aux (host (pathname-host pathname)))
   (declare (simple-string head))
+  #!+win32
+  (setf follow-links nil)
   (macrolet ((unix-xstat (name)
                `(if follow-links
                     (sb!unix:unix-stat ,name)
@@ -302,6 +304,8 @@
                                        sb!unix:s-ifdir))
                      (unless (dolist (dir nodes nil)
                                (when (and (eql (car dir) dev)
+                                          #!+win32 ;; KLUDGE
+                                          (not (zerop ino))
                                           (eql (cdr dir) ino))
                                  (return t)))
                        (let ((nodes (cons (cons dev ino) nodes))
@@ -479,11 +483,11 @@
 (defun truename (pathname)
   #!+sb-doc
   "Return the pathname for the actual file described by PATHNAME.
-  An error of type FILE-ERROR is signalled if no such file exists,
-  or the pathname is wild.
+An error of type FILE-ERROR is signalled if no such file exists, or the
+pathname is wild.
 
-  Under Unix, the TRUENAME of a broken symlink is considered to be
-  the name of the broken symlink itself."
+Under Unix, the TRUENAME of a broken symlink is considered to be the name of
+the broken symlink itself."
   (let ((result (probe-file pathname)))
     (unless result
       (error 'simple-file-error
@@ -495,7 +499,7 @@
 (defun probe-file (pathname)
   #!+sb-doc
   "Return a pathname which is the truename of the file if it exists, or NIL
-  otherwise. An error of type FILE-ERROR is signaled if pathname is wild."
+otherwise. An error of type FILE-ERROR is signaled if pathname is wild."
   (let* ((defaulted-pathname (merge-pathnames
                               pathname
                               (sane-default-pathname-defaults)))
@@ -504,7 +508,9 @@
       (let ((trueishname (sb!unix:unix-resolve-links namestring)))
         (when trueishname
           (let* ((*ignore-wildcards* t)
-                 (name (sb!unix:unix-simplify-pathname trueishname)))
+                 (name (simplify-namestring 
+                        trueishname 
+                        (pathname-host defaulted-pathname))))
             (if (eq (sb!unix:unix-file-kind name) :directory)
                 ;; FIXME: this might work, but it's ugly.
                 (pathname (concatenate 'string name "/"))
@@ -811,8 +817,8 @@ system."
             ;; grounds that the implementation should have repeatable
             ;; behavior when possible.
             (sort (loop for name being each hash-key in truenames
-                        using (hash-value truename)
-                        collect (cons name truename))
+                     using (hash-value truename)
+                     collect (cons name truename))
                   #'string<
                   :key #'car))))
 

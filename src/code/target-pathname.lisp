@@ -27,6 +27,7 @@
                        (unparse-file #'unparse-unix-file)
                        (unparse-enough #'unparse-unix-enough)
                        (unparse-directory-separator "/")
+                       (simplify-namestring #'simplify-unix-namestring)
                        (customary-case :lower))))
 (defvar *unix-host* (make-unix-host))
 (defun make-unix-host-load-form (host)
@@ -45,8 +46,9 @@
                        (unparse-file #'unparse-win32-file)
                        (unparse-enough #'unparse-win32-enough)
                        (unparse-directory-separator "\\")
+                       (simplify-namestring #'simplify-win32-namestring)
                        (customary-case :upper))))
-(defvar *win32-host* (make-win32-host))
+(defparameter *win32-host* (make-win32-host))
 (defun make-win32-host-load-form (host)
   (declare (ignore host))
   '*win32-host*)
@@ -525,12 +527,10 @@ the operating system native pathname conventions."
                 (error "~S is not allowed as a directory component." piece))))
        (results)))
     (simple-string
-     `(:absolute
-       ,(maybe-diddle-case directory diddle-case)))
+     `(:absolute ,(maybe-diddle-case directory diddle-case)))
     (string
      `(:absolute
-       ,(maybe-diddle-case (coerce directory 'simple-string)
-                           diddle-case)))))
+       ,(maybe-diddle-case (coerce directory 'simple-string) diddle-case)))))
 
 (defun make-pathname (&key host
                            (device nil devp)
@@ -858,7 +858,8 @@ a host-structure or string."
      (let* ((end (%check-vector-sequence-bounds namestr start end)))
        (multiple-value-bind (new-host device directory file type version)
            (cond
-             (host (funcall (host-parse-native host) namestr start end))
+             (host 
+              (funcall (host-parse-native host) namestr start end))
              ((pathname-host defaults)
               (funcall (host-parse-native (pathname-host defaults))
                        namestr
@@ -1282,6 +1283,12 @@ PARSE-NAMESTRING."
 
 ;;;; utilities
 
+(defun simplify-namestring (namestring &optional host)
+  (funcall (host-simplify-namestring
+            (or host
+                (pathname-host (sane-default-pathname-defaults))))
+           namestring))
+
 ;;; Canonicalize a logical pathname word by uppercasing it checking that it
 ;;; contains only legal characters.
 (defun logical-word-or-lose (word)
@@ -1682,3 +1689,4 @@ PARSE-NAMESTRING."
       ;; FIXME: now that we have a SYS host that the system uses, it
       ;; might be cute to search in "SYS:TRANSLATIONS;<name>.LISP"
       (error "logical host ~S not found" host)))
+

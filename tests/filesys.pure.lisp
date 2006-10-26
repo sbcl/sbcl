@@ -32,7 +32,8 @@
   ;; We know a little bit about the structure of this result;
   ;; let's test to make sure that this test file is in it.
   (assert (find-if (lambda (pathname)
-                     (search "tests/filesys.pure.lisp"
+                     (search #-win32 "tests/filesys.pure.lisp"
+                             #+win32 "tests\\filesys.pure.lisp"
                              (namestring pathname)))
                    dir)))
 ;;; In sbcl-0.9.7 DIRECTORY failed on pathnames with character-set
@@ -85,34 +86,45 @@
 (assert (typep (nth-value 1 (ignore-errors (file-length *terminal-io*)))
                'type-error))
 
+;;; A few cases Windows does have enough marbles to pass right now
+#+win32
+(progn
+  (assert (equal "C:\\FOO" (native-namestring "C:\\FOO")))
+  (assert (equal "C:\\FOO" (native-namestring "C:/FOO")))
+  (assert (equal "C:\\FOO\\BAR" (native-namestring "C:\\FOO\\BAR")))
+  ;; FIXME: Other platforms don't do this: either fix Windows 
+  ;; so that it works even with the same logic others use, or
+  ;; make this official. (Currently just a kludge.)
+  (assert (equal "C:\\FOO\\BAR" (native-namestring "C:\\FOO\\BAR\\"))))
+
 ;;; Test for NATIVE-PATHNAME / NATIVE-NAMESTRING stuff
 ;;;
 ;;; given only safe characters in the namestring, NATIVE-PATHNAME will
 ;;; never error, and NATIVE-NAMESTRING on the result will return the
 ;;; original namestring.
-(let ((safe-chars
-       ;; for WIN32, we might want to remove #\: here
-       (coerce
-        (cons #\Newline
-              (loop for x from 32 to 127 collect (code-char x)))
-        'simple-base-string))
-      (tricky-sequences #("/../" "../" "/.." "." "/." "./" "/./"
-                          "[]" "*" "**" "/**" "**/" "/**/" "?"
-                          "\\*" "\\[]" "\\?" "\\*\\*" "*\\*")))
-  (loop repeat 1000
-        for length = (random 32)
-        for native-namestring = (coerce
-                                 (loop repeat length
-                                       collect
-                                       (char safe-chars
-                                             (random (length safe-chars))))
-                                 'simple-base-string)
-        for pathname = (native-pathname native-namestring)
-        for nnn = (native-namestring pathname)
-        do (assert (string= nnn native-namestring)))
-  (loop repeat 1000
-        for native-namestring = (with-output-to-string (s)
-                                  (loop
+(with-test (:name :random-native-namestrings) 
+  (let ((safe-chars
+        (coerce
+         (cons #\Newline
+               (loop for x from 32 to 127 collect (code-char x)))
+         'simple-base-string))
+       (tricky-sequences #("/../" "../" "/.." "." "/." "./" "/./"
+                           "[]" "*" "**" "/**" "**/" "/**/" "?"
+                           "\\*" "\\[]" "\\?" "\\*\\*" "*\\*")))
+   (loop repeat 1000
+      for length = (random 32)
+      for native-namestring = (coerce
+                               (loop repeat length
+                                  collect
+                                  (char safe-chars
+                                        (random (length safe-chars))))
+                               'simple-base-string)
+      for pathname = (native-pathname native-namestring)
+      for nnn = (native-namestring pathname)
+      do (assert (string= nnn native-namestring)))
+   (loop repeat 1000
+      for native-namestring = (with-output-to-string (s)
+                                (loop
                                    (let ((r (random 1.0)))
                                      (cond
                                        ((< r 1/20) (return))
@@ -126,6 +138,6 @@
                                                  (random
                                                   (length tricky-sequences)))
                                            s))))))
-        for pathname = (native-pathname native-namestring)
-        for nnn = (native-namestring pathname)
-        do (assert (string= nnn native-namestring))))
+      for pathname = (native-pathname native-namestring)
+      for tricky-nnn = (native-namestring pathname)
+      do (assert (string= tricky-nnn native-namestring)))))
