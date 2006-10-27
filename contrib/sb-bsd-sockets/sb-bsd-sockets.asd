@@ -11,7 +11,6 @@
     #+sb-building-contrib "SYS:CONTRIB;SB-BSD-SOCKETS;"
     :components ((:file "defpackage")
 		 (:file "split" :depends-on ("defpackage"))
-		 (:file "malloc" :depends-on ("defpackage"))
                  #+win32
 		 (:file "win32-lib")
 		 #-win32 (sb-grovel:grovel-constants-file
