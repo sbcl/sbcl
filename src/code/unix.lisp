@@ -907,7 +907,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
           (if (null link)
               (return pathname)
               (let ((new-pathname
-                     (simplify-namestring 
+                     (simplify-namestring
                       (if (relative-unix-pathname? link)
                           (let* ((dir-len (1+ (position #\/
                                                         pathname

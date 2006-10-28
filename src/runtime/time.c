@@ -27,12 +27,12 @@ void get_timezone(time_t when, int *secwest, boolean *dst)
     /* No _r versions on Windows, but the API documentation also
      * doesn't warn them about being non-reentrant... So here's
      * hoping they actually are -- once Windows grows threads
-     * this better be checked, though. 
+     * this better be checked, though.
      *
      * The Windows versions also don't support times before the
      * epoch, so we kludge it. */
-    if (when < 0) 
-	when = -when;
+    if (when < 0)
+        when = -when;
     ltm = *localtime(&when);
     gtm = *gmtime(&when);
 #else

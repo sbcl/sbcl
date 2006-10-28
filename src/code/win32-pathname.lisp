@@ -109,7 +109,7 @@
                                for piece = (subseq namestring start end)
                                collect (if (and (string= piece "..") rest)
                                            :up
-                                           piece)))             
+                                           piece)))
              (name-and-type
               (let* ((end (first (last components)))
                      (dot (position #\. end :from-end t)))
@@ -273,7 +273,7 @@
           (unless directory (go :done))
         :subdir
           (let ((piece (pop directory)))
-            (typecase piece  
+            (typecase piece
               ((member :up) (write-string ".." s))
               (string (write-string piece s))
               (t (error "ungood piece in NATIVE-NAMESTRING: ~S" piece)))
@@ -410,7 +410,7 @@
                 (t
                  (setf dots nil)
                  (setf (schar dst dst-len) char)
-                 (incf dst-len)))))      
+                 (incf dst-len)))))
       ;; ...finish off
       (when (and last-slash (not (zerop last-slash)))
         (case dots

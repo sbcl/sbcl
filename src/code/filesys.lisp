@@ -508,8 +508,8 @@ otherwise. An error of type FILE-ERROR is signaled if pathname is wild."
       (let ((trueishname (sb!unix:unix-resolve-links namestring)))
         (when trueishname
           (let* ((*ignore-wildcards* t)
-                 (name (simplify-namestring 
-                        trueishname 
+                 (name (simplify-namestring
+                        trueishname
                         (pathname-host defaulted-pathname))))
             (if (eq (sb!unix:unix-file-kind name) :directory)
                 ;; FIXME: this might work, but it's ugly.

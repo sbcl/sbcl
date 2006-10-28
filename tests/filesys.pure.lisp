@@ -92,7 +92,7 @@
   (assert (equal "C:\\FOO" (native-namestring "C:\\FOO")))
   (assert (equal "C:\\FOO" (native-namestring "C:/FOO")))
   (assert (equal "C:\\FOO\\BAR" (native-namestring "C:\\FOO\\BAR")))
-  ;; FIXME: Other platforms don't do this: either fix Windows 
+  ;; FIXME: Other platforms don't do this: either fix Windows
   ;; so that it works even with the same logic others use, or
   ;; make this official. (Currently just a kludge.)
   (assert (equal "C:\\FOO\\BAR" (native-namestring "C:\\FOO\\BAR\\"))))
@@ -102,7 +102,7 @@
 ;;; given only safe characters in the namestring, NATIVE-PATHNAME will
 ;;; never error, and NATIVE-NAMESTRING on the result will return the
 ;;; original namestring.
-(with-test (:name :random-native-namestrings) 
+(with-test (:name :random-native-namestrings)
   (let ((safe-chars
         (coerce
          (cons #\Newline

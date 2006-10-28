@@ -858,7 +858,7 @@ a host-structure or string."
      (let* ((end (%check-vector-sequence-bounds namestr start end)))
        (multiple-value-bind (new-host device directory file type version)
            (cond
-             (host 
+             (host
               (funcall (host-parse-native host) namestr start end))
              ((pathname-host defaults)
               (funcall (host-parse-native (pathname-host defaults))
