@@ -498,13 +498,15 @@
     (dump-byte 0 file))
   (dump-pop file))
 
-;;; Return T iff CONSTANT has not already been dumped. It's been
-;;; dumped if it's in the EQ table.
+;;; Return T iff CONSTANT has already been dumped. It's been dumped if
+;;; it's in the EQ table.
+;;;
+;;; Note: historically (1) the above comment was "T iff ... has not been dumped",
+;;; (2) the test was  was also true if the constant had been validated / was in
+;;; the valid objects table. This led to substructures occasionally skipping the
+;;; validation, and hence failing the "must have been validated" test.
 (defun fasl-constant-already-dumped-p (constant file)
-  (if (or (gethash constant (fasl-output-eq-table file))
-          (gethash constant (fasl-output-valid-structures file)))
-      t
-      nil))
+  (and (gethash constant (fasl-output-eq-table file)) t))
 
 ;;; Use HANDLE whenever we try to dump CONSTANT. HANDLE should have been
 ;;; returned earlier by FASL-DUMP-LOAD-TIME-VALUE-LAMBDA.

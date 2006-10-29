@@ -1713,3 +1713,13 @@ WORKAROUND:
   causes a TYPE-ERROR 
     The value NIL is not of type SB-C::PHYSENV.
   in MERGE-LETS.
+
+406: functional has external references -- failed aver
+ Given the following food in a single file
+  (eval-when (:compile-toplevel :load-toplevel :execute)
+    (defstruct foo3))
+  (defstruct bar
+    (foo #.(make-foo3)))
+ as of 0.9.18.11 the file compiler breaks on it:
+  failed AVER: "(NOT (FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P CLAMBDA))"
+ Defining the missing MAKE-LOAD-FORM method makes the error go away.

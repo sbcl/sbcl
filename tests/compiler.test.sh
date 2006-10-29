@@ -355,6 +355,22 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_compile $tmpfilename
 
+cat > $tmpfilename <<EOF
+(defstruct foo
+  (bar #p"/tmp/"))
+EOF
+expect_clean_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defstruct foox)
+  (defmethod make-load-form ((foo foox) &optional env)
+    `(make-foox)))
+(defstruct bar
+  (foo #.(make-foox)))
+EOF
+expect_clean_compile $tmpfilename
+
 rm $tmpfilename
 rm $compiled_tmpfilename
 

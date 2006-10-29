@@ -1795,8 +1795,6 @@ SPEED and COMPILATION-SPEED optimization values, and the
         (:ignore-it
          nil)
         (t
-         (when (fasl-constant-already-dumped-p constant *compile-object*)
-           (return-from emit-make-load-form nil))
          (let* ((name (write-to-string constant :level 1 :length 2))
                 (info (if init-form
                           (list constant name init-form)

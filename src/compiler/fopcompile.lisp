@@ -196,7 +196,11 @@
                       (declare (ignore init-form))
                       (case creation-form
                         (:sb-just-dump-it-normally
-                         (fasl-validate-structure constant *compile-object*)
+                         ;; FIXME: Why is this needed? If the constant
+                         ;; is deemed fopcompilable, then when we dump
+                         ;; it we bind *dump-only-valid-structures* to
+                         ;; NIL.
+                         (fasl-validate-structure value *compile-object*)
                          (dotimes (i (- (%instance-length value)
                                         (layout-n-untagged-slots
                                          (%instance-ref value 0))))
@@ -374,5 +378,9 @@
 
 (defun fopcompile-constant (form for-value-p)
   (when for-value-p
+    ;; FIXME: Without this binding the dumper chokes on unvalidated
+    ;; structures: CONSTANT-FOPCOMPILABLE-P validates the structure
+    ;; about to be dumped, not its load-form. Compare and contrast
+    ;; with EMIT-MAKE-LOAD-FORM.
     (let ((sb!fasl::*dump-only-valid-structures* nil))
       (dump-object form *compile-object*))))
