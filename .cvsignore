@@ -6,3 +6,4 @@ customize-target-features.lisp
 local-target-features.lisp-expr
 TAGS
 .svn
+.gdbinit
