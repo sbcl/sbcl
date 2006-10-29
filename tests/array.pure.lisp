@@ -209,3 +209,14 @@
                                  collect (logand 1 (funcall lf (aref v1 i) (aref v2 i))))
                            'bit-vector)
           do (assert (bit-vector-equal r1 r2)))))
+
+;;; CLHS, ADJUST-ARRAY: An error of type error is signaled if
+;;; fill-pointer is supplied and non-nil but array has no fill pointer.
+(assert (eq :good
+            (handler-case
+                (let ((array (make-array 12)))
+                  (assert (not (array-has-fill-pointer-p array)))
+                  (adjust-array array 12 :fill-pointer t)
+                  array)
+              (type-error ()
+                :good))))

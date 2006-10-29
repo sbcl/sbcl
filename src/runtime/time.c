@@ -32,7 +32,7 @@ void get_timezone(time_t when, int *secwest, boolean *dst)
      * The Windows versions also don't support times before the
      * epoch, so we kludge it. */
     if (when < 0)
-        when = -when;
+        when = 0;
     ltm = *localtime(&when);
     gtm = *gmtime(&when);
 #else

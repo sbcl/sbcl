@@ -365,7 +365,8 @@ cat > $tmpfilename <<EOF
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defstruct foox)
   (defmethod make-load-form ((foo foox) &optional env)
-    `(make-foox)))
+    (declare (ignore env))
+    '(make-foox)))
 (defstruct bar
   (foo #.(make-foox)))
 EOF

@@ -764,7 +764,11 @@ of specialized arrays is supported."
            (error "The number of dimensions not equal to rank of array."))
           ((not (subtypep element-type (array-element-type array)))
            (error "The new element type, ~S, is incompatible with old type."
-                  element-type)))
+                  element-type))
+          ((and fill-pointer (not (array-has-fill-pointer-p array)))
+           (error 'type-error
+                  :datum array
+                  :expected-type '(satisfies array-has-fill-pointer-p))))
     (let ((array-rank (length (the list dimensions))))
       (declare (fixnum array-rank))
       (unless (= array-rank 1)

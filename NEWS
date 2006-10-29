@@ -8,6 +8,9 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
     declaration in a LET* was fixed. (reported by Kaersten Poeck)
   * bug fix: file compiler no longer confuses validated and already
     dumped structurres. (reported by Kaersten Poeck)
+  * bug fix: ADJUST-ARRAY :FILL-POINTER T on an array without a
+    fill-pointer signals a type-error as required. (thanks to
+    Lars Brinkhoff)
   * improvements to the Windows port:
     ** floating point exceptions are now reported correctly.
     ** stack exhaustion detection works partially.
@@ -16,7 +19,8 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
        process.
     ** PROBE-FILE now simplifies pathnames correctly.
     ** DIRECTORY now works correctly with :WILD-INFERIORS.
-    ** (DECODE-UNIVERSAL-TIME 0) works.
+    ** DECODE-UNIVERSAL-TIME works on times before 00:00:00 January
+       1st 1970 (although time timezone data will be unreliable).
 
 changes in sbcl-0.9.18 (1.0.beta?) relative to sbcl-0.9.17:
   * enhancement: SB-POSIX now supports cfsetispeed(3), cfsetospeed(3),
