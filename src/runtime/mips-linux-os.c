@@ -20,12 +20,11 @@
 /* for cacheflush() */
 #include <sys/cachectl.h>
 
-/* for BD_CAUSE */
-#include <asm/mipsregs.h>
-
 #include "sbcl.h"
 #include "os.h"
 #include "arch.h"
+
+#define CAUSEF_BD (1 << 31)
 
 size_t os_vm_page_size;
 
