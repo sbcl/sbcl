@@ -4,6 +4,8 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
     core, and restored on startup.
   * improvement: GET-INTERNAL-REAL-TIME now reports the time since
     startup, not time since first call to GET-INTERNAL-REAL-TIME.
+  * improvement: SAVE-LISP-AND-DIE explicitly checks that multiple
+    threads are not running after *SAVE-HOOKS* have run.
   * bug fix: compiler bug triggered by a (non-standard) VALUES
     declaration in a LET* was fixed. (reported by Kaersten Poeck)
   * bug fix: file compiler no longer confuses validated and already

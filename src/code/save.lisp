@@ -85,19 +85,22 @@ The save/load process changes the values of some global variables:
     This is reinitialized to reflect the working directory where the
     saved core is loaded.
 
-Foreign objects loaded with SB-ALIEN:LOAD-SHARED-OBJECT are
-automatically reloaded on startup, but references to foreign symbols
-do not survive intact on all platforms: in this case a WARNING is
-signalled when saving the core. If no warning is signalled, then the
-foreign symbol references will remain intact. Platforms where this is
-currently the case are x86/FreeBSD, x86/Linux, x86/NetBSD,
-sparc/Linux, sparc/SunOS, and ppc/Darwin.
+Foreign objects loaded with SB-ALIEN:LOAD-SHARED-OBJECT are automatically
+reloaded on startup, but references to foreign symbols do not survive intact
+on all platforms: in this case a WARNING is signalled when saving the core. If
+no warning is signalled, then the foreign symbol references will remain
+intact. Platforms where this is currently the case are x86/FreeBSD, x86/Linux,
+x86/NetBSD, sparc/Linux, sparc/SunOS, and ppc/Darwin.
+
+On threaded platforms only a single thread may remain running after
+SB-EXT:*SAVE-HOOKS* have run. Applications using multiple threads can
+be SAVE-LISP-AND-DIE friendly by registering a save-hook that quits
+any additional threads, and an init-hook that restarts them.
 
 This implementation is not as polished and painless as you might like:
   * It corrupts the current Lisp image enough that the current process
     needs to be killed afterwards. This can be worked around by forking
     another process that saves the core.
-  * It will not work if multiple threads are in use.
   * There is absolutely no binary compatibility of core images between
     different runtime support programs. Even runtimes built from the same
     sources at different times are treated as incompatible for this
@@ -145,7 +148,10 @@ sufficiently motivated to do lengthy fixes."
   (dolist (hook *save-hooks*)
     (with-simple-restart (continue "Skip this save hook.")
       (funcall hook)))
-  #!-win32 (when (fboundp 'cancel-finalization)
+  (when (rest (sb!thread:list-all-threads))
+    (error "Cannot save core with multiple threads running."))
+  #!-win32
+  (when (fboundp 'cancel-finalization)
     (cancel-finalization sb!sys:*tty*))
   (float-deinit)
   (profile-deinit)
