@@ -47,6 +47,12 @@
   ;; it is first compiled but the result of this implicit compilation
   ;; is not installed.)"
   (assert (sb-eval:interpreted-function-p #'disassemble-eval)))
+
+;; nor should it fail on generic functions or other funcallable instances
+(defgeneric disassemble-generic (x))
+(disassemble 'disassemble-generic)
+(let ((fin (sb-mop:make-instance 'sb-mop:funcallable-standard-object)))
+  (disassemble fin))
 
 ;;; support for DESCRIBE tests
 (defstruct to-be-described a b)

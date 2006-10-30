@@ -280,7 +280,7 @@
 
 (defun fun-self (fun)
   (declare (type compiled-function fun))
-  (sb!kernel:%simple-fun-self fun))
+  (sb!kernel:%simple-fun-self (sb!kernel:%fun-fun fun)))
 
 (defun fun-code (fun)
   (declare (type compiled-function fun))
@@ -288,17 +288,11 @@
 
 (defun fun-next (fun)
   (declare (type compiled-function fun))
-  (sb!kernel:%simple-fun-next fun))
+  (sb!kernel:%simple-fun-next (sb!kernel:%fun-fun fun)))
 
 (defun fun-address (fun)
   (declare (type compiled-function fun))
-  (ecase (sb!kernel:widetag-of fun)
-    (#.sb!vm:simple-fun-header-widetag
-     (- (sb!kernel:get-lisp-obj-address fun) sb!vm:fun-pointer-lowtag))
-    (#.sb!vm:closure-header-widetag
-     (fun-address (sb!kernel:%closure-fun fun)))
-    (#.sb!vm:funcallable-instance-header-widetag
-     (fun-address (sb!kernel:funcallable-instance-fun fun)))))
+  (- (sb!kernel:get-lisp-obj-address (sb!kernel:%fun-fun fun)) sb!vm:fun-pointer-lowtag))
 
 ;;; the offset of FUNCTION from the start of its code-component's
 ;;; instruction area
