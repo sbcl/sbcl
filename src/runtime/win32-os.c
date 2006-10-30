@@ -50,13 +50,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <shlobj.h>
+#include <math.h>
 
 #include <excpt.h>
 
 #include "validate.h"
 #include "thread.h"
 size_t os_vm_page_size;
-
 
 #include "gc.h"
 #include "gencgc-internal.h"

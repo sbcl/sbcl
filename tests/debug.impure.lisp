@@ -172,10 +172,10 @@
                    (list '(flet not-optimized))
                    (list '(flet test) #'not-optimized))))))
 
-;;; Division by zero was a common error on PPC.  It depended on the
+;;; Division by zero was a common error on PPC. It depended on the
 ;;; return function either being before INTEGER-/-INTEGER in memory,
-;;; or more than MOST-POSITIVE-FIXNUM bytes ahead.  It also depends on
-;;; INTEGER-/-INTEGER calling SIGNED-TRUNCATE.  I believe Raymond Toy
+;;; or more than MOST-POSITIVE-FIXNUM bytes ahead. It also depends on
+;;; INTEGER-/-INTEGER calling SIGNED-TRUNCATE. I believe Raymond Toy
 ;;; says that the Sparc backend (at least for CMUCL) inlines this, so
 ;;; if SBCL does the same this test is probably not good for the
 ;;; Sparc.

@@ -22,6 +22,7 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
     ** DIRECTORY now works correctly with :WILD-INFERIORS.
     ** DECODE-UNIVERSAL-TIME works on times before 00:00:00 January
        1st 1970 (although time timezone data will be unreliable).
+    ** Hyperbolic functions TANH, ASINH, ACOSH, and ATANH work.
 
 changes in sbcl-0.9.18 (1.0.beta?) relative to sbcl-0.9.17:
   * enhancement: SB-POSIX now supports cfsetispeed(3), cfsetospeed(3),

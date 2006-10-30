@@ -76,10 +76,30 @@
 #!-x86 (def-math-rtn "atan2" 2)
 (def-math-rtn "sinh" 1)
 (def-math-rtn "cosh" 1)
-#!-win32(def-math-rtn "tanh" 1)
-#!-win32(def-math-rtn "asinh" 1)
-#!-win32(def-math-rtn "acosh" 1)
-#!-win32(def-math-rtn "atanh" 1)
+#!-win32
+(progn
+  (def-math-rtn "tanh" 1)
+  (def-math-rtn "asinh" 1)
+  (def-math-rtn "acosh" 1)
+  (def-math-rtn "atanh" 1))
+#!+win32
+(progn
+  (declaim (inline %tanh))
+  (defun %tanh (number)
+    (/ (%sinh number) (%cosh number)))
+  (declaim (inline %asinh))
+  (defun %asinh (number)
+    (log (+ number (sqrt (+ (* number number) 1.0d0))) #.(exp 1.0d0)))
+  (declaim (inline %acosh))
+  (defun %acosh (number)
+    (log (+ number (sqrt (- (* number number) 1.0d0))) #.(exp 1.0d0)))
+  (declaim (inline %atanh))
+  (defun %atanh (number)
+    (let ((ratio (/ (1+ number) (1- number))))
+      ;; Were we effectively zero?
+      (if (= ratio -1.0d0)
+          0.0d0
+          (/ (log ratio #.(exp 1.0d0)) 2.0d0)))))
 
 ;;; exponential and logarithmic
 #!-x86 (def-math-rtn "exp" 1)
