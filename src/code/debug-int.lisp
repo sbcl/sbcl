@@ -3317,8 +3317,7 @@ register."
 ;;; which will signal the condition.
 
 (defun handle-single-step-trap (context-sap kind callee-register-offset)
-  (let ((context (sb!alien:sap-alien context-sap
-                                     (* os-context-t))))
+  (let ((context (sb!alien:sap-alien context-sap (* os-context-t))))
     ;; The following calls must get tail-call eliminated for
     ;; *STEP-FRAME* to get set correctly on non-x86.
     (if (= kind single-step-before-trap)
@@ -3343,10 +3342,10 @@ register."
              ;; on non-x86.
              (loop with frame = (frame-down (top-frame))
                    while frame
-                   for dfun = (frame-debug-fun *step-frame*)
+                   for dfun = (frame-debug-fun frame)
                    do (when (typep dfun 'compiled-debug-fun)
                         (return frame))
-                   do (setf *step-frame* (frame-down *step-frame*)))))
+                   do (setf frame (frame-down frame)))))
         (sb!impl::step-form step-info
                             ;; We could theoretically store information in
                             ;; the debug-info about to determine the

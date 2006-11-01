@@ -618,11 +618,11 @@ default-value-8
      ,@(unless (or (eq return :tail) variable)
          '((:move-args :full-call)))
 
-     (:vop-var vop)
-     (:info ,@(unless (or variable (eq return :tail)) '(arg-locs))
-            ,@(unless variable '(nargs))
-            ,@(when (eq return :fixed) '(nvals))
-            step-instrumenting)
+    (:vop-var vop)
+    (:info ,@(unless (or variable (eq return :tail)) '(arg-locs))
+           ,@(unless variable '(nargs))
+           ,@(when (eq return :fixed) '(nvals))
+           step-instrumenting)
 
      (:ignore
       ,@(unless (or variable (eq return :tail)) '(arg-locs))
@@ -750,7 +750,7 @@ default-value-8
                 (insert-step-instrumenting (callable-tn)
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
-                     ;; Get the symbol-value of SB!IMPL::*STEPPING*
+                    ;; Get the symbol-value of SB!IMPL::*STEPPING*
                     (loadw stepping
                            null-tn
                            (+ symbol-value-slot
@@ -846,7 +846,6 @@ default-value-8
 
 (define-full-call call-variable nil :fixed t)
 (define-full-call multiple-call-variable nil :unknown t)
-
 
 ;;; Defined separately, since needs special code that BLT's the
 ;;; arguments down.

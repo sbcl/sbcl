@@ -50,17 +50,6 @@
       (signal 'step-finished-condition)
     (continue ())))
 
-(defvar *step-help* "The following commands are available at the single
-stepper's prompt:
-
- S: Step into the current expression.
- N: Evaluate the current expression without stepping.
- C: Evaluate to finish without stepping.
- Q: Abort evaluation.
- B: Backtrace.
- ?: Display this message.
-")
-
 (defgeneric single-step (condition))
 
 (defmethod single-step ((condition step-values-condition))
@@ -109,8 +98,7 @@ outside the lexical scope of the form can be stepped into only if the
 functions in question have been compiled with sufficient DEBUG policy
 to be at least partially steppable."
   `(locally
-       (declare (optimize debug (sb-c:insert-step-conditions 0)))
-     (format t "Single stepping. Type ? for help.~%")
+    (declare (optimize debug (sb-c:insert-step-conditions 0)))
      ;; Allow stepping out of the STEP form.
      (let ((*step-out* :maybe))
        (unwind-protect

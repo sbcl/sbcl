@@ -14,7 +14,8 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
     fill-pointer signals a type-error as required. (thanks to
     Lars Brinkhoff)
   * bug fix: disassemly of funcallable instances works.
-  * improvements to the Windows port:
+  * bug fix: single stepping on PPC.
+  * Improvements to the Windows port:
     ** floating point exceptions are now reported correctly.
     ** stack exhaustion detection works partially.
     ** more accurate GET-INTERNAL-REAL-TIME.
