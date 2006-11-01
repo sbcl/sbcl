@@ -26,12 +26,14 @@
 
 (defvar *cerror-called* nil)
 
+(define-condition cerror-break (error) ())
+
 (defun fib-break (x)
   (declare (optimize debug))
   (if (< x 2)
       (progn
         (unless *cerror-called*
-          (cerror "a" "b")
+          (cerror "a" 'cerror-break)
           (setf *cerror-called* t))
         1)
       (+ (fib-break (1- x))
@@ -144,7 +146,7 @@
                                     results)
                               (invoke-restart 'step-into))))))
     (setf *cerror-called* nil)
-    (handler-bind ((error
+    (handler-bind ((cerror-break
                     (lambda (c)
                       (sb-impl::enable-stepping)
                       (invoke-restart 'continue))))

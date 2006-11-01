@@ -515,7 +515,7 @@
 (sequence-bounding-indices-test
  (format t "~&/Function PARSE-NAMESTRING")
  (setf (fill-pointer string) 10)
- (setf (subseq string 0 10) 
+ (setf (subseq string 0 10)
        #-win32 "/dev/ /tmp"
        #+win32 "C:/   NUL")
  (setf (fill-pointer string) 5)
