@@ -204,7 +204,7 @@
   exit
 
   (move target catch)
-  (inst ba (make-fixup 'unwind :assembly-routine)))
-
-
-
+  ;; reuse catch
+  (inst lr catch (make-fixup 'unwind :assembly-routine))
+  (inst mtlr catch)
+  (inst blr))

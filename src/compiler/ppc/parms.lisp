@@ -92,8 +92,8 @@
 
 ;;; Where to put the different spaces.
 
-(def!constant read-only-space-start #x01000000)
-(def!constant read-only-space-end   #x04ff8000)
+(def!constant read-only-space-start #x04000000)
+(def!constant read-only-space-end   #x07ff8000)
 
 (def!constant static-space-start    #x08000000)
 (def!constant static-space-end      #x097fff00)

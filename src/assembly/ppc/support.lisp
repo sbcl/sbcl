@@ -14,11 +14,15 @@
 (!def-vm-support-routine generate-call-sequence (name style vop)
   (ecase style
     ((:raw :none)
-     (values
-      `((inst bla (make-fixup ',name :assembly-routine)))
-      `()))
+     (let ((jump (make-symbol "JUMP")))
+       (values
+        `((inst lr ,jump (make-fixup ',name :assembly-routine))
+          (inst mtlr ,jump)
+          (inst blrl))
+        `((:temporary (:sc any-reg) ,jump)))))
     (:full-call
      (let ((temp (make-symbol "TEMP"))
+           (jump (make-symbol "JUMP"))
            (nfp-save (make-symbol "NFP-SAVE"))
            (lra (make-symbol "LRA")))
        (values
@@ -28,23 +32,26 @@
               (store-stack-tn ,nfp-save cur-nfp))
             (inst compute-lra-from-code ,lra code-tn lra-label ,temp)
             (note-next-instruction ,vop :call-site)
-            (inst ba (make-fixup ',name :assembly-routine))
+            (inst lr ,jump (make-fixup ',name :assembly-routine))
+            (inst mtlr ,jump)
+            (inst blr)
             (emit-return-pc lra-label)
             (note-this-location ,vop :single-value-return)
             (without-scheduling ()
-                                (move csp-tn ocfp-tn)
-                                (inst nop))
+              (move csp-tn ocfp-tn)
+              (inst nop))
             (inst compute-code-from-lra code-tn code-tn
                   lra-label ,temp)
             (when cur-nfp
               (load-stack-tn cur-nfp ,nfp-save))))
         `((:temporary (:scs (non-descriptor-reg) :from (:eval 0) :to (:eval 1))
-           ,temp)
+                      ,temp)
           (:temporary (:sc descriptor-reg :offset lra-offset
-                       :from (:eval 0) :to (:eval 1))
-           ,lra)
+                           :from (:eval 0) :to (:eval 1))
+                      ,lra)
           (:temporary (:scs (control-stack) :offset nfp-save-offset)
-           ,nfp-save)
+                      ,nfp-save)
+          (:temporary (:sc any-reg) ,jump)
           (:save-p :compute-only)))))))
 
 (!def-vm-support-routine generate-return-sequence (style)

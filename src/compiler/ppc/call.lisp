@@ -855,33 +855,27 @@ default-value-8
    (function-arg :scs (descriptor-reg) :target lexenv)
    (old-fp-arg :scs (any-reg) :target old-fp)
    (lra-arg :scs (descriptor-reg) :target lra))
-
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 0)) args)
   (:temporary (:sc any-reg :offset lexenv-offset :from (:argument 1)) lexenv)
   (:temporary (:sc any-reg :offset ocfp-offset :from (:argument 2)) old-fp)
   (:temporary (:sc any-reg :offset lra-offset :from (:argument 3)) lra)
-
-
+  (:temporary (:sc any-reg) temp)
   (:vop-var vop)
-
   (:generator 75
-
     ;; Move these into the passing locations if they are not already there.
     (move args args-arg)
     (move lexenv function-arg)
     (move old-fp old-fp-arg)
     (move lra lra-arg)
-
-
     ;; Clear the number stack if anything is there.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (inst addi nsp-tn cur-nfp
               (- (bytes-needed-for-non-descriptor-stack-frame)
                  number-stack-displacement))))
-
-
-    (inst ba (make-fixup 'tail-call-variable :assembly-routine))))
+    (inst lr temp (make-fixup 'tail-call-variable :assembly-routine))
+    (inst mtlr temp)
+    (inst blr)))
 
 
 ;;;; Unknown values return:
@@ -977,17 +971,14 @@ default-value-8
    (lra-arg :scs (descriptor-reg) :to (:eval 1))
    (vals-arg :scs (any-reg) :target vals)
    (nvals-arg :scs (any-reg) :target nvals))
-
   (:temporary (:sc any-reg :offset nl1-offset :from (:argument 0)) old-fp)
   (:temporary (:sc descriptor-reg :offset lra-offset :from (:argument 1)) lra)
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 2)) vals)
   (:temporary (:sc any-reg :offset nargs-offset :from (:argument 3)) nvals)
   (:temporary (:sc descriptor-reg :offset a0-offset) a0)
   (:temporary (:scs (interior-reg)) lip)
-
-
+  (:temporary (:sc any-reg) temp)
   (:vop-var vop)
-
   (:generator 13
     (trace-table-entry trace-table-fun-epilogue)
     (let ((not-single (gen-label)))
@@ -997,24 +988,23 @@ default-value-8
           (inst addi nsp-tn cur-nfp
                 (- (bytes-needed-for-non-descriptor-stack-frame)
                    number-stack-displacement))))
-
       ;; Check for the single case.
       (inst cmpwi nvals-arg (fixnumize 1))
       (inst lwz a0 vals-arg 0)
       (inst bne not-single)
-
       ;; Return with one value.
       (move csp-tn cfp-tn)
       (move cfp-tn old-fp-arg)
       (lisp-return lra-arg lip :offset 2)
-
       ;; Nope, not the single case.
       (emit-label not-single)
       (move old-fp old-fp-arg)
       (move lra lra-arg)
       (move vals vals-arg)
       (move nvals nvals-arg)
-      (inst ba (make-fixup 'return-multiple :assembly-routine)))
+      (inst lr temp (make-fixup 'return-multiple :assembly-routine))
+      (inst mtlr temp)
+      (inst blr))
     (trace-table-entry trace-table-normal)))
 
 ;;;; XEP hackery:

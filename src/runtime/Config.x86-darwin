@@ -12,7 +12,6 @@
 CFLAGS = -g -Wall -O2 -fdollars-in-identifiers
 OS_SRC = bsd-os.c x86-bsd-os.c darwin-os.c x86-darwin-os.c darwin-dlshim.c darwin-langinfo.c
 OS_LIBS = -lSystem -lc -ldl
-OS_OBJS = x86-darwin-rospace.o
 
 CC = gcc
 
@@ -21,35 +20,9 @@ ARCH_SRC = x86-arch.c
 
 CPPFLAGS += -no-cpp-precomp
 
-# KLUDGE: in OS X 10.3, Apple started putting the heap right where we
-# expect our read-only space mapped. This hack causes the linker to
-# place a zero-fill-on-demand segment in the same place and size as
-# read-only-space, which is the only thing capable of keeping malloc
-# out of this range.
-LINKFLAGS += -dynamic `cat x86-darwin-link-flags` -twolevel_namespace -bind_at_load
-
 GC_SRC = gencgc.c
-
-OS_CLEAN_FILES += x86-darwin-mkrospace x86-darwin-fix-rospace x86-darwin-link-flags
-
-x86-darwin-mkrospace: x86-darwin-mkrospace.c
-	$(CC) -g -Wall -pedantic -o $@ $<
-
-x86-darwin-fix-rospace: x86-darwin-fix-rospace.c
-	$(CC) -g -Wall -pedantic -o $@ $<
-
-x86-darwin-rospace.o x86-darwin-link-flags: x86-darwin-mkrospace
-	./x86-darwin-mkrospace > x86-darwin-link-flags
 
 .PHONY: after-grovel-headers
 
-# Fix the sbcl runtime to avoid Panther placing the heap where
-# it wants read only space (in the first 32 megabytes, where it
-# can be absolute-branched to with BA.)  Must be done after 
-# grovel-headers, because Apple's nm is broken.
-after-grovel-headers: x86-darwin-fix-rospace
-	./x86-darwin-fix-rospace
-
-# Fortunatly make-target-1.sh does a make clean all the time.
-# Otherwise we would have to make sure that sbcl gets rebuilt without
-# the readonlyspace hack before groveling headers again.
+# Nothing to do.
+after-grovel-headers:
