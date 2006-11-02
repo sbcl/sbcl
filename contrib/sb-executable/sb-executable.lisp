@@ -37,8 +37,8 @@ exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type
 
 (defun make-executable (output-file fasls
                         &key (runtime-flags '("--disable-debugger"
-                                              "--userinit /dev/null"
-                                              "--sysinit /dev/null"))
+                                              "--no-userinit"
+                                              "--no-sysinit"))
                         initial-function)
   "Write an executable called OUTPUT-FILE which can be run from the shell, by 'linking' together code from FASLS.  Actually works by concatenating them and prepending a #! header"
   (with-open-file (out output-file
@@ -56,6 +56,7 @@ exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type
   (let* (;; FIXME: use OUT as the pathname designator
          (out-name (namestring (translate-logical-pathname output-file)))
          (prot (elt (multiple-value-list (sb-unix:unix-stat out-name)) 3)))
+    #-win32
     (if prot
         (sb-unix::void-syscall ("chmod" c-string int)
                                out-name

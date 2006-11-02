@@ -315,7 +315,7 @@
 ;; Note: _stat, _lstat, and _fstat for NetBSD are provided in
 ;; src/runtime/bsd-os.c.  See comments in that file
 ;; for an explanation. -- RMK 2006-10-15
-(define-stat-call #-(or win32 netbsd) "stat" #+(or win32 netbsd) "_stat" 
+(define-stat-call #-(or win32 netbsd) "stat" #+(or win32 netbsd) "_stat"
                   pathname filename
                   (function int c-string (* alien-stat)))
 
