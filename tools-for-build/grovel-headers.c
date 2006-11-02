@@ -354,14 +354,30 @@ main(int argc, char *argv[])
     defsignal("sigxcpu", SIGXCPU);
     defsignal("sigxfsz", SIGXFSZ);
 #endif
+
+   /* Floating point exception codes. Some of these
+    * are missing on Darwin. */
+#ifdef FPE_INTOVF
     defconstant("fpe-intovf", FPE_INTOVF);
+#else
+    defconstant("fpe-intovf", -1);
+#endif
+#ifdef FPE_INTDIV
     defconstant("fpe-intdiv", FPE_INTDIV);
+#else
+    defconstant("fpe-intdiv", -1);
+#endif
     defconstant("fpe-fltdiv", FPE_FLTDIV);
     defconstant("fpe-fltovf", FPE_FLTOVF);
     defconstant("fpe-fltund", FPE_FLTUND);
     defconstant("fpe-fltres", FPE_FLTRES);
     defconstant("fpe-fltinv", FPE_FLTINV);
+#ifdef FPE_FLTSUB
     defconstant("fpe-fltsub", FPE_FLTSUB);
+#else
+    defconstant("fpe-fltsub", -1);
+#endif
+
 #endif // _WIN32
     return 0;
 }
