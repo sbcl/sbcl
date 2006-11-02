@@ -312,11 +312,15 @@
               (syscall-error))
             (alien-to-stat a-stat stat)))))))
 
-(define-stat-call #-win32 "stat" #+win32 "_stat" pathname filename
+;; Note: _stat, _lstat, and _fstat for NetBSD are provided in
+;; src/runtime/bsd-os.c.  See comments in that file
+;; for an explanation. -- RMK 2006-10-15
+(define-stat-call #-(or win32 netbsd) "stat" #+(or win32 netbsd) "_stat" 
+                  pathname filename
                   (function int c-string (* alien-stat)))
 
 #-win32
-(define-stat-call "lstat" pathname filename
+(define-stat-call #-netbsd "lstat" #+netbsd "_lstat" pathname filename
                   (function int c-string (* alien-stat)))
 ;;; No symbolic links on Windows, so use stat
 #+win32
@@ -325,7 +329,8 @@
   (export (defun lstat (filename &optional stat)
             (if stat (stat filename stat) (stat filename)))))
 
-(define-stat-call #-win32 "fstat" #+win32 "_fstat" fd file-descriptor
+(define-stat-call #-(or win32 netbsd) "fstat" #+(or win32 netbsd) "_fstat"
+                  fd file-descriptor
                   (function int int (* alien-stat)))
 
 

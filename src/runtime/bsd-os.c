@@ -48,6 +48,7 @@ os_vm_size_t os_vm_page_size;
 #include <sys/resource.h>
 #include <sys/sysctl.h>
 #include <string.h>
+#include <sys/stat.h> /* For the stat-family wrappers. */
 
 static void netbsd_init();
 #endif /* __NetBSD__ */
@@ -311,6 +312,25 @@ The system may fail to start.\n",
                  strerror(errno));
     }
 }
+
+/* The stat() routines in NetBSD's C library are compatibility
+   wrappers for some very old version of the stat buffer structure.
+   Programs must be processed by the C toolchain in order to get an
+   up-to-date definition of the stat() routine.  These wrappers are
+   used only in sb-posix, as of 2006-10-15. -- RMK */
+int _stat(const char *path, struct stat *sb) {
+  return (stat(path, sb));
+}
+
+int _lstat(const char *path, struct stat *sb) {
+  return (lstat(path, sb));
+}
+
+int _fstat(int fd, struct stat *sb) {
+  return (fstat(fd, sb));
+}
+
+
 #endif /* __NetBSD__ */
 
 #ifdef __FreeBSD__
