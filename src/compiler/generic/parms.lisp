@@ -38,7 +38,6 @@
     ;; bignums.  -- WHN 2000-10-02
     *read-only-space-free-pointer*
     *static-space-free-pointer*
-    *initial-dynamic-space-free-pointer*
 
     ;; things needed for non-local-exit
     *current-catch-block*

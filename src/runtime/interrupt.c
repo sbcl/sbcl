@@ -822,7 +822,7 @@ gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
     else{
         void *badaddr=arch_get_bad_addr(signal,info,context);
         return (badaddr >= (void *)current_auto_gc_trigger &&
-                badaddr <((void *)current_dynamic_space + DYNAMIC_SPACE_SIZE));
+                badaddr <((void *)current_dynamic_space + dynamic_space_size));
     }
 }
 #endif

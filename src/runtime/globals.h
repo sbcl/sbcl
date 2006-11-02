@@ -22,7 +22,7 @@
 
 #ifndef LANGUAGE_ASSEMBLY
 extern int foreign_function_call_active;
-extern boolean stop_the_world;
+extern size_t dynamic_space_size;
 
 #ifdef LISP_FEATURE_WIN32
 #define ENVIRON _environ

@@ -19,7 +19,6 @@
                   *core-string*
                   *read-only-space-free-pointer*
                   sb!vm:*static-space-free-pointer*
-                  sb!vm:*initial-dynamic-space-free-pointer*
                   sb!vm::*current-catch-block*
                   sb!vm::*current-unwind-protect-block*
                   sb!vm::*alien-stack*

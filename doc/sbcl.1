@@ -265,6 +265,10 @@ custom core.) Note that if the Lisp core file is a user-created core
 file, it may run a nonstandard toplevel which does not recognize the
 standard toplevel options.
 .TP 3
+.B \-\-dynamic-space-size <megabytes>
+Size of the dynamic space reserved on startup in megabytes. Default value
+is platform dependent.
+.TP 3
 .B \-\-noinform
 Suppress the printing of any banner or other informational message at
 startup. (This makes it easier to write Lisp programs which work

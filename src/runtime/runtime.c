@@ -141,24 +141,26 @@ void
 print_help()
 {
     puts(
-"SBCL is a Common Lisp programming environment. Ordinarily you shouldn't\n\
-need command line options when you invoke it interactively: you can just\n\
-start it and work with the customary Lisp READ-EVAL-PRINT loop.\n\
+"Usage: sbcl [runtime-options] [toplevel-options] [user-options]\n\
+Common runtime options:\n\
+  --help                     Print this message and exit.\n\
+  --version                  Print version information and exit.\n\
+  --core <filename>          Use the specified core file instead of the default.\n\
+  --dynamic-space-size <MiB> Size of reserved dynamic space in megabytes.\n\
 \n\
-One option idiom which is sometimes useful interactively (e.g. when\n\
-exercising a test case for a bug report) is\n\
-  sbcl --no-sysinit --no-userinit\n\
-to keep SBCL from reading any initialization files at startup. And some\n\
-people like to suppress the default startup message:\n\
-  sbcl --noinform\n\
+Common toplevel options:\n\
+  --sysinit <filename>       System-wide init-file to use instead of default.\n\
+  --userinit <filename>      Per-user init-file to use instead of default.\n\
+  --no-sysinit               Inhibit processing of any system-wide init-file.\n\
+  --no-userinit              Inhibit processing of any per-user init-file.\n\
 \n\
-Other options can be useful when you're running SBCL noninteractively,\n\
-e.g. from a script, or if you have a strange system configuration, so\n\
-that SBCL can't by default find one of the files it needs. For\n\
-information on such options, see the sbcl(1) man page.\n\
+User options are not processed by SBCL. All runtime options must\n\
+appear before toplevel options, and all toplevel options must\n\
+appear before user options.\n\
 \n\
-More information on SBCL can be found on its man page, or at\n\
-<http://sbcl.sf.net/>.\n");
+For more information please refer to the SBCL User Manual, which\n\
+should be installed along with SBCL, and is also available from the\n\
+website <http://www.sbcl.org/>.\n");
 }
 
 void
@@ -235,14 +237,6 @@ main(int argc, char *argv[], char *envp[])
 
     setlocale(LC_ALL, "");
 
-    /* KLUDGE: os_vm_page_size is set by os_init(), and on some
-     * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so
-     * it must follow os_init(). -- WHN 2000-01-26 */
-    os_init(argv, envp);
-    arch_init();
-    gc_init();
-    validate();
-
     /* Parse our part of the command line (aka "runtime options"),
      * stripping out those options that we handle. */
     {
@@ -273,6 +267,14 @@ main(int argc, char *argv[], char *envp[])
                 /* As in "--help" case, I think this is expected. */
                 print_version();
                 exit(0);
+            } else if (0 == strcmp(arg, "--dynamic-space-size")) {
+                ++argi;
+                if (argi >= argc)
+                    lose("missing argument for --dynamic-space-size");
+                errno = 0;
+                dynamic_space_size = strtol(argv[argi++], 0, 0) << 20;
+                if (errno)
+                    lose("argument to --dynamic-space-size is not a number");
             } else if (0 == strcmp(arg, "--debug-environment")) {
                 int n = 0;
                 printf("; Commandline arguments:\n");
@@ -325,6 +327,17 @@ main(int argc, char *argv[], char *envp[])
             sbcl_argv[argj] = 0;
         }
     }
+
+    /* Align down to multiple of page_table page size */
+    dynamic_space_size = (dynamic_space_size/PAGE_BYTES) * PAGE_BYTES;
+
+    /* KLUDGE: os_vm_page_size is set by os_init(), and on some
+     * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so
+     * it must follow os_init(). -- WHN 2000-01-26 */
+    os_init(argv, envp);
+    arch_init();
+    gc_init();
+    validate();
 
     /* If no core file was specified, look for one. */
     if (!core) {

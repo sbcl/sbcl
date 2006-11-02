@@ -177,10 +177,10 @@ boolean is_valid_lisp_addr(os_vm_address_t addr)
     if(in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
        in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE) ||
 #ifdef LISP_FEATURE_GENCGC
-       in_range_p(addr, DYNAMIC_SPACE_START, DYNAMIC_SPACE_SIZE)
+       in_range_p(addr, DYNAMIC_SPACE_START  , dynamic_space_size)
 #else
-       in_range_p(addr, DYNAMIC_0_SPACE_START, DYNAMIC_SPACE_SIZE) ||
-       in_range_p(addr, DYNAMIC_1_SPACE_START, DYNAMIC_SPACE_SIZE)
+       in_range_p(addr, DYNAMIC_0_SPACE_START, dynamic_space_size) ||
+       in_range_p(addr, DYNAMIC_1_SPACE_START, dynamic_space_size)
 #endif
        )
         return 1;

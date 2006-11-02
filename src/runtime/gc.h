@@ -15,6 +15,15 @@
 
 #ifndef _GC_H_
 #define _GC_H_
+
+#include "sbcl.h"
+
+#ifdef LISP_FEATURE_GENCGC
+#define PAGE_BYTES GENCGC_PAGE_SIZE
+#else
+#define PAGE_BYTES 0x1000
+#endif
+
 typedef signed long page_index_t;
 typedef signed char generation_index_t;
 

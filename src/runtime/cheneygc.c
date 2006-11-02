@@ -241,7 +241,7 @@ collect_garbage(generation_index_t ignore)
      * RSS by zeroing the from_space or madvise(MADV_DONTNEED) or
      * similar os-dependent tricks here */
     os_zero((os_vm_address_t) from_space,
-            (os_vm_size_t) DYNAMIC_SPACE_SIZE);
+            (os_vm_size_t) dynamic_space_size);
 
     current_dynamic_space = new_space;
     dynamic_space_free_pointer = new_space_free_pointer;
@@ -589,7 +589,7 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
              (unsigned long)((os_vm_address_t)dynamic_space_free_pointer
                              - (os_vm_address_t)current_dynamic_space));
 
-    length = os_trunc_size_to_page(DYNAMIC_SPACE_SIZE - dynamic_usage);
+    length = os_trunc_size_to_page(dynamic_space_size - dynamic_usage);
     if (length < 0)
         lose("set_auto_gc_trigger: tried to set gc trigger too high! (0x%08lx)\n",
              (unsigned long)dynamic_usage);
@@ -612,7 +612,7 @@ void clear_auto_gc_trigger(void)
         return;
 
     addr = (os_vm_address_t)current_auto_gc_trigger;
-    length = DYNAMIC_SPACE_SIZE + (os_vm_address_t)current_dynamic_space - addr;
+    length = dynamic_space_size + (os_vm_address_t)current_dynamic_space - addr;
 
 #if defined(SUNOS) || defined(SOLARIS)
     /* don't want to force whole space into swapping mode... */

@@ -75,7 +75,7 @@ arch_get_bad_addr (int sig, siginfo_t *code, os_context_t *context)
     if ( (pc < READ_ONLY_SPACE_START ||
           pc >= READ_ONLY_SPACE_START+READ_ONLY_SPACE_SIZE) &&
          (pc < current_dynamic_space ||
-          pc >= current_dynamic_space + DYNAMIC_SPACE_SIZE))
+          pc >= current_dynamic_space + dynamic_space_size))
         return NULL;
 
     return context->uc_mcontext.sc_traparg_a0;

@@ -24,8 +24,6 @@
 #include "gencgc-alloc-region.h"
 #include "genesis/code.h"
 
-#define PAGE_BYTES GENCGC_PAGE_SIZE
-
 void gc_free_heap(void);
 inline page_index_t find_page_index(void *);
 inline void *page_address(page_index_t);
@@ -90,10 +88,8 @@ struct page {
 /* values for the page.allocated field */
 
 
-/* the number of pages needed for the dynamic space - rounding up */
-#define NUM_PAGES ((page_index_t) ((DYNAMIC_SPACE_SIZE+PAGE_BYTES-1)/PAGE_BYTES))
-
-extern struct page page_table[NUM_PAGES];
+extern unsigned page_table_pages;
+extern struct page *page_table;
 
 
 /* forward declarations */
@@ -116,7 +112,7 @@ space_matches_p(lispobj obj, generation_index_t space)
     page_index_t page_index=(void*)obj - (void *)DYNAMIC_SPACE_START;
     return ((page_index >= 0)
             && ((page_index =
-                 ((unsigned long)page_index)/PAGE_BYTES) < NUM_PAGES)
+                 ((unsigned long)page_index)/PAGE_BYTES) < page_table_pages)
             && (page_table[page_index].gen == space));
 }
 

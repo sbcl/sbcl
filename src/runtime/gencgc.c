@@ -24,6 +24,7 @@
  *   <ftp://ftp.cs.utexas.edu/pub/garbage/bigsurv.ps>.
  */
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
 #include <errno.h>
@@ -147,6 +148,8 @@ unsigned long bytes_allocated = 0;
 extern unsigned long bytes_consed_between_gcs; /* gc-common.c */
 unsigned long auto_gc_trigger = 0;
 
+size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
+
 /* the source and destination generations. These are set before a GC starts
  * scavenging. */
 generation_index_t from_space;
@@ -159,10 +162,11 @@ boolean gc_active_p = 0;
  * saving a core), don't scan the stack / mark pages dont_move. */
 static boolean conservative_stack = 1;
 
-/* An array of page structures is statically allocated.
+/* An array of page structures is allocated on gc initialization.
  * This helps quickly map between an address its page structure.
- * NUM_PAGES is set from the size of the dynamic space. */
-struct page page_table[NUM_PAGES];
+ * page_table_pages is set from the size of the dynamic space. */
+unsigned page_table_pages;
+struct page *page_table;
 
 /* To map addresses to page structures the address of the first page
  * is needed. */
@@ -184,7 +188,7 @@ find_page_index(void *addr)
 
     if (index >= 0) {
         index = ((unsigned long)index)/PAGE_BYTES;
-        if (index < NUM_PAGES)
+        if (index < page_table_pages)
             return (index);
     }
 
@@ -1115,11 +1119,11 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
     do {
         first_page = restart_page;
         if (large_p)
-            while ((first_page < NUM_PAGES)
+            while ((first_page < page_table_pages)
                    && (page_table[first_page].allocated != FREE_PAGE_FLAG))
                 first_page++;
         else
-            while (first_page < NUM_PAGES) {
+            while (first_page < page_table_pages) {
                 if(page_table[first_page].allocated == FREE_PAGE_FLAG)
                     break;
                 if((page_table[first_page].allocated ==
@@ -1134,7 +1138,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
                 first_page++;
             }
 
-        if (first_page >= NUM_PAGES)
+        if (first_page >= page_table_pages)
             gc_heap_exhausted_error_or_lose(0, nbytes);
 
         gc_assert(page_table[first_page].write_protected == 0);
@@ -1144,7 +1148,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
         num_pages = 1;
         while (((bytes_found < nbytes)
                 || (!large_p && (num_pages < 2)))
-               && (last_page < (NUM_PAGES-1))
+               && (last_page < (page_table_pages-1))
                && (page_table[last_page+1].allocated == FREE_PAGE_FLAG)) {
             last_page++;
             num_pages++;
@@ -1157,10 +1161,10 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
 
         gc_assert(bytes_found == region_size);
         restart_page = last_page + 1;
-    } while ((restart_page < NUM_PAGES) && (bytes_found < nbytes));
+    } while ((restart_page < page_table_pages) && (bytes_found < nbytes));
 
     /* Check for a failure */
-    if ((restart_page >= NUM_PAGES) && (bytes_found < nbytes))
+    if ((restart_page >= page_table_pages) && (bytes_found < nbytes))
         gc_heap_exhausted_error_or_lose(bytes_found, nbytes);
 
     *restart_page_ptr=first_page;
@@ -2809,7 +2813,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
 #define SC_GEN_CK 0
 #if SC_GEN_CK
     /* Clear the write_protected_cleared flags on all pages. */
-    for (i = 0; i < NUM_PAGES; i++)
+    for (i = 0; i < page_table_pages; i++)
         page_table[i].write_protected_cleared = 0;
 #endif
 
@@ -2863,7 +2867,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
 #if SC_GEN_CK
     /* Check that none of the write_protected pages in this generation
      * have been written to. */
-    for (i = 0; i < NUM_PAGES; i++) {
+    for (i = 0; i < page_table_pages; i++) {
         if ((page_table[i].allocation != FREE_PAGE_FLAG)
             && (page_table[i].bytes_used != 0)
             && (page_table[i].gen == generation)
@@ -3095,7 +3099,7 @@ scavenge_newspace_generation(generation_index_t generation)
 #if SC_NS_GEN_CK
     /* Check that none of the write_protected pages in this generation
      * have been written to. */
-    for (i = 0; i < NUM_PAGES; i++) {
+    for (i = 0; i < page_table_pages; i++) {
         if ((page_table[i].allocation != FREE_PAGE_FLAG)
             && (page_table[i].bytes_used != 0)
             && (page_table[i].gen == generation)
@@ -4317,7 +4321,7 @@ gc_free_heap(void)
     if (gencgc_verbose > 1)
         SHOW("entering gc_free_heap");
 
-    for (page = 0; page < NUM_PAGES; page++) {
+    for (page = 0; page < page_table_pages; page++) {
         /* Skip free pages which should already be zero filled. */
         if (page_table[page].allocated != FREE_PAGE_FLAG) {
             void *page_start, *addr;
@@ -4403,6 +4407,14 @@ gc_init(void)
 {
     page_index_t i;
 
+    /* Compute the number of pages needed for the dynamic space.
+     * Dynamic space size should be aligned on page size. */
+    page_table_pages = dynamic_space_size/PAGE_BYTES;
+    gc_assert(dynamic_space_size == page_table_pages*PAGE_BYTES);
+
+    page_table = calloc(page_table_pages, sizeof(struct page));
+    gc_assert(page_table);
+
     gc_init_tables();
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
     transother[SIMPLE_ARRAY_WIDETAG] = trans_boxed_large;
@@ -4416,7 +4428,7 @@ gc_init(void)
     heap_base = (void*)DYNAMIC_SPACE_START;
 
     /* Initialize each page structure. */
-    for (i = 0; i < NUM_PAGES; i++) {
+    for (i = 0; i < page_table_pages; i++) {
         /* Initialize all pages as free. */
         page_table[i].allocated = FREE_PAGE_FLAG;
         page_table[i].bytes_used = 0;

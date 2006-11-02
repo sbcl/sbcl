@@ -3240,10 +3240,6 @@ initially undefined function references:~2%")
                 (allocate-cold-descriptor *static*
                                           0
                                           sb!vm:even-fixnum-lowtag))
-      (cold-set 'sb!vm:*initial-dynamic-space-free-pointer*
-                (allocate-cold-descriptor *dynamic*
-                                          0
-                                          sb!vm:even-fixnum-lowtag))
       (/show "done setting free pointers")
 
       ;; Write results to files.

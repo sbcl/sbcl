@@ -1588,7 +1588,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
 #endif
 
     os_zero((os_vm_address_t) current_dynamic_space,
-            (os_vm_size_t) DYNAMIC_SPACE_SIZE);
+            (os_vm_size_t) dynamic_space_size);
 
     /* Zero the stack. Note that the stack is also zeroed by SUB-GC
      * calling SCRUB-CONTROL-STACK - this zeros the stack on the x86. */

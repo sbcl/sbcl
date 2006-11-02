@@ -61,10 +61,10 @@ validate(void)
     ensure_space( (lispobj *)READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
     ensure_space( (lispobj *)STATIC_SPACE_START   , STATIC_SPACE_SIZE);
 #ifdef LISP_FEATURE_GENCGC
-    ensure_space( (lispobj *)DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE);
+    ensure_space( (lispobj *)DYNAMIC_SPACE_START  , dynamic_space_size);
 #else
-    ensure_space( (lispobj *)DYNAMIC_0_SPACE_START  , DYNAMIC_SPACE_SIZE);
-    ensure_space( (lispobj *)DYNAMIC_1_SPACE_START  , DYNAMIC_SPACE_SIZE);
+    ensure_space( (lispobj *)DYNAMIC_0_SPACE_START, dynamic_space_size);
+    ensure_space( (lispobj *)DYNAMIC_1_SPACE_START, dynamic_space_size);
 #endif
 
 #ifdef LISP_FEATURE_LINKAGE_TABLE
