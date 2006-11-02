@@ -905,7 +905,14 @@
                    ((signed-byte 32) 4 sap head)
   (signed-sap-ref-32 sap head))
 
-
+#+#.(cl:if (cl:= sb!vm:n-word-bits 64) '(and) '(or))
+(progn
+  (def-input-routine input-unsigned-64bit-byte
+      ((unsigned-byte 64) 8 sap head)
+    (sap-ref-64 sap head))
+  (def-input-routine input-signed-64bit-byte
+      ((signed-byte 64) 8 sap head)
+    (signed-sap-ref-64 sap head)))
 
 ;;; Find an input routine to use given the type. Return as multiple
 ;;; values the routine, the real type transfered, and the number of
