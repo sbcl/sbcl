@@ -450,6 +450,24 @@
                            (fd-stream-obuf-tail stream))
         byte))
 
+#+#.(cl:if (cl:= sb!vm:n-word-bits 64) '(and) '(or))
+(progn
+  (def-output-routines ("OUTPUT-UNSIGNED-LONG-LONG-~A-BUFFERED"
+                        8
+                        nil
+                        (:none (unsigned-byte 64))
+                        (:full (unsigned-byte 64)))
+    (setf (sap-ref-64 (fd-stream-obuf-sap stream) (fd-stream-obuf-tail stream))
+          byte))
+  (def-output-routines ("OUTPUT-SIGNED-LONG-LONG-~A-BUFFERED"
+                        8
+                        nil
+                        (:none (signed-byte 64))
+                        (:full (signed-byte 64)))
+    (setf (signed-sap-ref-64 (fd-stream-obuf-sap stream)
+                             (fd-stream-obuf-tail stream))
+          byte)))
+
 ;;; Do the actual output. If there is space to buffer the string,
 ;;; buffer it. If the string would normally fit in the buffer, but
 ;;; doesn't because of other stuff in the buffer, flush the old noise

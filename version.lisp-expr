@@ -1,4 +1,4 @@
-';;; This is the master value for LISP-IMPLEMENTATION-VERSION. It's
+;;; This is the master value for LISP-IMPLEMENTATION-VERSION. It's
 ;;; separated into its own file here so that it's easy for
 ;;; text-munging make-ish or cvs-ish scripts to find and tweak it. For
 ;;; the convenience of such scripts, only a simple subset of Lisp
@@ -17,4 +17,4 @@
 ;;; checkins which aren't released. (And occasionally for internal
 ;;; versions, especially for internal versions off the main CVS
 ;;; branch, it gets hairier, e.g. "0.pre7.14.flaky4.13".)
-"0.9.18.24"
+"0.9.18.25"
