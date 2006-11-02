@@ -175,33 +175,27 @@ sets the floating point modes to their current values (and thus is a no-op)."
   `(not (zerop (logand ,(dpb (float-trap-mask traps) float-traps-byte 0)
                        (floating-point-modes)))))
 
+;;; SIGFPE code to floating-point error
+#!-win32
+(defparameter *sigfpe-code-error-alist*
+  (list (cons sb!unix::fpe-intovf 'floating-point-overflow)
+        (cons sb!unix::fpe-intdiv 'division-by-zero)
+        (cons sb!unix::fpe-fltdiv 'division-by-zero)
+        (cons sb!unix::fpe-fltovf 'floating-point-overflow)
+        (cons sb!unix::fpe-fltund 'floating-point-underflow)
+        (cons sb!unix::fpe-fltres 'floating-point-inexact)
+        (cons sb!unix::fpe-fltinv 'floating-point-invalid-operation)
+        (cons sb!unix::fpe-fltsub 'floating-point-exception)))
+
 ;;; Signal the appropriate condition when we get a floating-point error.
 #!-win32
 (defun sigfpe-handler (signal info context)
-  (declare (ignore signal info))
-  (declare (type system-area-pointer context))
-  (let* ((modes (context-floating-point-modes
-                 (sb!alien:sap-alien context (* os-context-t))))
-         (traps (logand (ldb float-exceptions-byte modes)
-                        (ldb float-traps-byte modes))))
+  (declare (ignore signal context))
+  (declare (type system-area-pointer info))
+  (let ((code (sb!unix::siginfo-code info)))
     (with-interrupts
-      (cond ((not (zerop (logand float-divide-by-zero-trap-bit traps)))
-             (error 'division-by-zero))
-            ((not (zerop (logand float-invalid-trap-bit traps)))
-             (error 'floating-point-invalid-operation))
-            ((not (zerop (logand float-overflow-trap-bit traps)))
-             (error 'floating-point-overflow))
-            ((not (zerop (logand float-underflow-trap-bit traps)))
-             (error 'floating-point-underflow))
-            ((not (zerop (logand float-inexact-trap-bit traps)))
-             (error 'floating-point-inexact))
-            #!+freebsd
-            ((zerop (ldb float-exceptions-byte modes))
-             ;; I can't tell what caused the exception!!
-             (error 'floating-point-exception
-                    :traps (getf (get-floating-point-modes) :traps)))
-            (t
-             (error 'floating-point-exception))))))
+        (error (or (cdr (assoc code *sigfpe-code-error-alist*))
+                   'floating-point-exception)))))
 
 ;;; Execute BODY with the floating point exceptions listed in TRAPS
 ;;; masked (disabled). TRAPS should be a list of possible exceptions

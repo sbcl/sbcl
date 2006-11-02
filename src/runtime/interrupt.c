@@ -1384,3 +1384,11 @@ interrupt_init()
     SHOW("returning from interrupt_init()");
 #endif
 }
+
+#ifndef LISP_FEATURE_WIN32
+int
+siginfo_code(siginfo_t *info)
+{
+    return info->si_code;
+}
+#endif

@@ -354,6 +354,14 @@ main(int argc, char *argv[])
     defsignal("sigxcpu", SIGXCPU);
     defsignal("sigxfsz", SIGXFSZ);
 #endif
+    defconstant("fpe-intovf", FPE_INTOVF);
+    defconstant("fpe-intdiv", FPE_INTDIV);
+    defconstant("fpe-fltdiv", FPE_FLTDIV);
+    defconstant("fpe-fltovf", FPE_FLTOVF);
+    defconstant("fpe-fltund", FPE_FLTUND);
+    defconstant("fpe-fltres", FPE_FLTRES);
+    defconstant("fpe-fltinv", FPE_FLTINV);
+    defconstant("fpe-fltsub", FPE_FLTSUB);
 #endif // _WIN32
     return 0;
 }

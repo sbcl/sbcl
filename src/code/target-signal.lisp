@@ -163,6 +163,10 @@
 
 ;;;; etc.
 
+;;; extract si_code from siginfo_t
+(sb!alien:define-alien-routine ("siginfo_code" siginfo-code) sb!alien:int
+  (info system-area-pointer))
+
 ;;; CMU CL comment:
 ;;;   Magically converted by the compiler into a break instruction.
 (defun receive-pending-interrupt ()
