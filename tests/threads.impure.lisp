@@ -765,3 +765,22 @@
             (wait-for-threads (list changer test))))))))
 
 (format t "~&funcallable-instance test done~%")
+
+(defun random-type (n)
+  `(integer ,(random n) ,(+ n (random n))))
+
+(defun subtypep-hash-cache-test ()
+  (dotimes (i 10000)
+    (let ((type1 (random-type 500))
+          (type2 (random-type 500)))
+      (let ((a (subtypep type1 type2)))
+        (dotimes (i 100)
+          (assert (eq (subtypep type1 type2) a))))))
+  (format t "ok~%")
+  (force-output))
+
+(with-test (:name '(:hash-cache :subtypep))
+  (dotimes (i 10)
+    (sb-thread:make-thread #'subtypep-hash-cache-test)))
+
+(format t "hash-cache tests done~%")

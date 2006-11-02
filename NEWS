@@ -15,6 +15,9 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
     Lars Brinkhoff)
   * bug fix: disassemly of funcallable instances works.
   * bug fix: single stepping on PPC.
+  * bug fix: fix thread-safety problems in the type system (generally 
+    manifesting as nonsensical errors like "STRING is a bad type specifier 
+    for sequences" or "The value 1 is not of type FIXNUM")
   * Improvements to the Windows port:
     ** floating point exceptions are now reported correctly.
     ** stack exhaustion detection works partially.

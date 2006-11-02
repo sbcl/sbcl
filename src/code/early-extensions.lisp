@@ -423,6 +423,17 @@
 ;;; its first arg, but need not return any particular value.
 ;;; TEST-FUNCTION may be any thing that can be placed in CAR position.
 ;;;
+;;; This code used to store all the arguments / return values directly
+;;; in the cache vector. This was both interrupt- and thread-unsafe, since
+;;; it was possible that *-CACHE-ENTER would scribble over a region of the
+;;; cache vector which *-CACHE-LOOKUP had only partially processed. Instead
+;;; we now store the contents of each cache bucket as a separate array, which
+;;; is stored in the appropriate cell in the cache vector. A new bucket array
+;;; is created every time *-CACHE-ENTER is called, and the old ones are never
+;;; modified. This means that *-CACHE-LOOKUP will always work with a set
+;;; of consistent data. The overhead caused by consing new buckets seems to
+;;; be insignificant on the grand scale of things. -- JES, 2006-11-02
+;;;
 ;;; NAME is used to define these functions:
 ;;; <name>-CACHE-LOOKUP Arg*
 ;;;   See whether there is an entry for the specified ARGs in the
@@ -452,12 +463,12 @@
                                   (values 1))
   (let* ((var-name (symbolicate "*" name "-CACHE-VECTOR*"))
          (nargs (length args))
-         (entry-size (+ nargs values))
          (size (ash 1 hash-bits))
-         (total-size (* entry-size size))
          (default-values (if (and (consp default) (eq (car default) 'values))
                              (cdr default)
                              (list default)))
+         (args-and-values (gensym))
+         (args-and-values-size (+ nargs values))
          (n-index (gensym))
          (n-cache (gensym)))
 
@@ -468,14 +479,16 @@
     (collect ((inlines)
               (forms)
               (inits)
-              (tests)
               (sets)
+              (tests)
               (arg-vars)
-              (values-indices)
+              (values-refs)
               (values-names))
       (dotimes (i values)
-        (values-indices `(+ ,n-index ,(+ nargs i)))
-        (values-names (gensym)))
+        (let ((name (gensym)))
+          (values-names name)
+          (values-refs `(svref ,args-and-values (+ ,nargs ,i)))
+          (sets `(setf (svref ,args-and-values (+ ,nargs ,i)) ,name))))
       (let ((n 0))
         (dolist (arg args)
           (unless (= (length arg) 2)
@@ -483,8 +496,8 @@
           (let ((arg-name (first arg))
                 (test (second arg)))
             (arg-vars arg-name)
-            (tests `(,test (svref ,n-cache (+ ,n-index ,n)) ,arg-name))
-            (sets `(setf (svref ,n-cache (+ ,n-index ,n)) ,arg-name)))
+            (tests `(,test (svref ,args-and-values ,n) ,arg-name))
+            (sets `(setf (svref ,args-and-values ,n) ,arg-name)))
           (incf n)))
 
       (when *profile-hash-cache*
@@ -502,12 +515,12 @@
          `(defun ,fun-name ,(arg-vars)
             ,@(when *profile-hash-cache*
                 `((incf ,(symbolicate  "*" name "-CACHE-PROBES*"))))
-            (let ((,n-index (* (,hash-function ,@(arg-vars)) ,entry-size))
-                  (,n-cache ,var-name))
-              (declare (type fixnum ,n-index))
-              (cond ((and ,@(tests))
-                     (values ,@(mapcar (lambda (x) `(svref ,n-cache ,x))
-                                       (values-indices))))
+            (let* ((,n-index (,hash-function ,@(arg-vars)))
+                   (,n-cache ,var-name)
+                   (,args-and-values (svref ,n-cache ,n-index)))
+              (cond ((and ,args-and-values
+                          ,@(tests))
+                     (values ,@(values-refs)))
                     (t
                      ,@(when *profile-hash-cache*
                          `((incf ,(symbolicate  "*" name "-CACHE-MISSES*"))))
@@ -517,41 +530,26 @@
         (inlines fun-name)
         (forms
          `(defun ,fun-name (,@(arg-vars) ,@(values-names))
-            (let ((,n-index (* (,hash-function ,@(arg-vars)) ,entry-size))
-                  (,n-cache ,var-name))
-              (declare (type fixnum ,n-index))
+            (let ((,n-index (,hash-function ,@(arg-vars)))
+                  (,n-cache ,var-name)
+                  (,args-and-values (make-array ,args-and-values-size)))
               ,@(sets)
-              ,@(mapcar (lambda (i val)
-                          `(setf (svref ,n-cache ,i) ,val))
-                        (values-indices)
-                        (values-names))
-              (values)))))
+              (setf (svref ,n-cache ,n-index) ,args-and-values))
+            (values))))
 
       (let ((fun-name (symbolicate name "-CACHE-CLEAR")))
         (forms
          `(defun ,fun-name ()
-            (do ((,n-index ,(- total-size entry-size) (- ,n-index ,entry-size))
-                 (,n-cache ,var-name))
-                ((minusp ,n-index))
-              (declare (type fixnum ,n-index))
-              ,@(collect ((arg-sets))
-                  (dotimes (i nargs)
-                    (arg-sets `(setf (svref ,n-cache (+ ,n-index ,i)) nil)))
-                  (arg-sets))
-              ,@(mapcar (lambda (i val)
-                          `(setf (svref ,n-cache ,i) ,val))
-                        (values-indices)
-                        default-values))
-            (values)))
+            (fill ,var-name nil)))
         (forms `(,fun-name)))
 
       (inits `(unless (boundp ',var-name)
-                (setq ,var-name (make-array ,total-size))))
+                (setq ,var-name (make-array ,size :initial-element nil))))
       #!+sb-show (inits `(setq *hash-caches-initialized-p* t))
 
       `(progn
          (defvar ,var-name)
-         (declaim (type (simple-vector ,total-size) ,var-name))
+         (declaim (type (simple-vector ,size) ,var-name))
          #!-sb-fluid (declaim (inline ,@(inlines)))
          (,init-wrapper ,@(inits))
          ,@(forms)
