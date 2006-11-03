@@ -4410,7 +4410,7 @@ gc_init(void)
     /* Compute the number of pages needed for the dynamic space.
      * Dynamic space size should be aligned on page size. */
     page_table_pages = dynamic_space_size/PAGE_BYTES;
-    gc_assert(dynamic_space_size == page_table_pages*PAGE_BYTES);
+    gc_assert(dynamic_space_size == (size_t) page_table_pages*PAGE_BYTES);
 
     page_table = calloc(page_table_pages, sizeof(struct page));
     gc_assert(page_table);
