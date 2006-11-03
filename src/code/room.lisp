@@ -193,16 +193,12 @@
                 (ecase (room-info-kind info)
                   (:vector 0)
                   (:string 1)))))
-    (declare (type (integer -3 3) shift))
     (round-to-dualword
      (+ (* vector-data-offset n-word-bytes)
-        (the fixnum
-             (if (minusp shift)
-                 (ash (the fixnum
-                           (+ len (the fixnum
-                                       (1- (the fixnum (ash 1 (- shift)))))))
-                      shift)
-                 (ash len shift)))))))
+        (if (minusp shift)
+            (ash (+ len (1- (ash 1 (- shift))))
+                 shift)
+            (ash len shift))))))
 
 ;;; Access to the GENCGC page table for better precision in
 ;;; MAP-ALLOCATED-OBJECTS
@@ -216,11 +212,7 @@
               (gen (signed 8))))
   (declaim (inline find-page-index))
   (define-alien-routine "find_page_index" long (index long))
-  (define-alien-variable "page_table"
-      (array (struct page)
-             #.(truncate (- dynamic-space-end
-                            dynamic-space-start)
-                         sb!vm:gencgc-page-size))))
+  (define-alien-variable "page_table" (* (struct page))))
 
 ;;; Iterate over all the objects allocated in SPACE, calling FUN with
 ;;; the object, the object's type code, and the object's total size in
@@ -231,7 +223,7 @@
   (without-gcing
    (multiple-value-bind (start end) (space-bounds space)
      (declare (type system-area-pointer start end))
-     (declare (optimize (speed 3) (safety 0)))
+     (declare (optimize (speed 3)))
      (let ((current start)
            #!+gencgc (skip-tests-until-addr 0))
        (labels ((maybe-finish-mapping ()
@@ -355,7 +347,7 @@
         (counts (make-array 256 :initial-element 0 :element-type 'fixnum)))
     (map-allocated-objects
      (lambda (obj type size)
-       (declare (fixnum size) (optimize (speed 3) (safety 0)) (ignore obj))
+       (declare (fixnum size) (optimize (speed 3)) (ignore obj))
        (incf (aref sizes type) size)
        (incf (aref counts type)))
      space)
@@ -494,7 +486,7 @@
              (type unsigned-byte total-bytes))
     (map-allocated-objects
      (lambda (obj type size)
-       (declare (fixnum size) (optimize (safety 0)))
+       (declare (fixnum size))
        (when (eql type code-header-widetag)
          (incf total-bytes size)
          (let ((words (truly-the fixnum (%code-code-size obj)))
@@ -523,7 +515,7 @@
       (declare (inline map-allocated-objects))
       (map-allocated-objects
        (lambda (obj type size)
-         (declare (fixnum size) (optimize (safety 0)))
+         (declare (fixnum size))
          (case type
            (#.code-header-widetag
             (let ((inst-words (truly-the fixnum (%code-code-size obj))))
@@ -593,7 +585,7 @@
     (declare (fixnum total-objects total-bytes))
     (map-allocated-objects
      (lambda (obj type size)
-       (declare (fixnum size) (optimize (speed 3) (safety 0)))
+       (declare (fixnum size) (optimize (speed 3)))
        (when (eql type instance-header-widetag)
          (incf total-objects)
          (incf total-bytes size)
@@ -664,7 +656,6 @@
                    (note-conses (cdr x)))))
         (map-allocated-objects
          (lambda (obj obj-type size)
-           (declare (optimize (safety 0)))
            (let ((addr (get-lisp-obj-address obj)))
              (when (>= addr start)
                (when (if count
@@ -745,7 +736,6 @@
     (let ((res ()))
       (map-allocated-objects
        (lambda (obj obj-type size)
-         (declare (optimize (safety 0)))
          (when (and (or (not type) (eql obj-type type))
                     (or (not smaller) (<= size smaller))
                     (or (not larger) (>= size larger))
@@ -765,7 +755,7 @@
              (funcall fun obj))))
     (map-allocated-objects
      (lambda (obj obj-type size)
-       (declare (optimize (safety 0)) (ignore obj-type size))
+       (declare (ignore obj-type size))
        (typecase obj
          (cons
           (when (or (eq (car obj) object)

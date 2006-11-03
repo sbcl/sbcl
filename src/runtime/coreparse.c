@@ -140,13 +140,13 @@ process_directory(int fd, u32 *ptr, int count, os_vm_offset_t file_offset)
 
         switch (id) {
         case DYNAMIC_CORE_SPACE_ID:
-	    if (len > dynamic_space_size) {
+            if (len > dynamic_space_size) {
                 fprintf(stderr,
                         "dynamic space too small for core: %ldKiB required, %ldKiB available.\n",
                         len >> 10,
                         (long)dynamic_space_size >> 10);
                 exit(1);
-            }		
+            }
 #ifdef LISP_FEATURE_GENCGC
             if (addr != (os_vm_address_t)DYNAMIC_SPACE_START) {
                 fprintf(stderr, "in core: 0x%lx; in runtime: 0x%lx \n",
@@ -161,8 +161,8 @@ process_directory(int fd, u32 *ptr, int count, os_vm_offset_t file_offset)
                         (long)DYNAMIC_0_SPACE_START,
                         (long)DYNAMIC_1_SPACE_START);
                 lose("warning: core/runtime address mismatch: DYNAMIC_SPACE_START\n");
-            }	    
-#endif	    
+            }
+#endif
 #if defined(ALLOCATION_POINTER)
             SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer,0);
 #else
