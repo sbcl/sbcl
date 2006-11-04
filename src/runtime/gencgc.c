@@ -148,8 +148,6 @@ unsigned long bytes_allocated = 0;
 extern unsigned long bytes_consed_between_gcs; /* gc-common.c */
 unsigned long auto_gc_trigger = 0;
 
-size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
-
 /* the source and destination generations. These are set before a GC starts
  * scavenging. */
 generation_index_t from_space;

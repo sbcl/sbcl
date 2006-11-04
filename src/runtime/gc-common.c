@@ -53,6 +53,8 @@
 #endif
 #endif
 
+size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
+
 inline static boolean
 forwarding_pointer_p(lispobj *pointer) {
     lispobj first_word=*pointer;
