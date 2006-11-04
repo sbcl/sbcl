@@ -183,7 +183,7 @@ options.
 Size of the dynamic space reserved on startup in megabytes. Default
 value is platform dependent.
 
-@Item --noinform
+@item --noinform
 Suppress the printing of any banner or other informational message at
 startup. This makes it easier to write Lisp programs which work
 cleanly in Unix pipelines. See also the @code{--noprint} and
