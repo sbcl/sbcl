@@ -139,15 +139,10 @@
   (format stream
           "~@[~&~@<It has nicknames ~2I~{~:_~S~^ ~}~:>~]"
           (package-nicknames package))
-  (let* ((internal (package-internal-symbols package))
-         (internal-count (- (package-hashtable-size internal)
-                            (package-hashtable-free internal)))
-         (external (package-external-symbols package))
-         (external-count (- (package-hashtable-size external)
-                            (package-hashtable-free external))))
-    (format stream
-            "~&It has ~S internal and ~S external symbols."
-            internal-count external-count))
+  (format stream
+          "~&It has ~S internal and ~S external symbols."
+          (package-internal-symbol-count package)
+          (package-external-symbol-count package))
   (flet (;; Turn a list of packages into something a human likes
          ;; to read.
          (humanize (package-list)
