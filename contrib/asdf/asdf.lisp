@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  1.101
+;;; This is asdf: Another System Definition Facility.  1.102
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -112,7 +112,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "1.101")
+(defvar *asdf-revision* (let* ((v "1.102")
                                (colon (or (position #\: v) -1))
                                (dot (position #\. v)))
                           (and v colon dot
@@ -1190,20 +1190,23 @@ output to *VERBOSE-OUT*.  Returns the shell's exit code."
           t))))
 
   (defun contrib-sysdef-search (system)
-    (let* ((name (coerce-name system))
-           (home (truename (sb-ext:posix-getenv "SBCL_HOME")))
-           (contrib (merge-pathnames
-                     (make-pathname :directory `(:relative ,name)
-                                    :name name
-                                    :type "asd"
-                                    :case :local
-                                    :version :newest)
-                     home)))
-      (probe-file contrib)))
+    (let ((home (sb-ext:posix-getenv "SBCL_HOME")))
+      (when home
+        (let* ((name (coerce-name system))
+               (home (truename home))
+               (contrib (merge-pathnames
+                         (make-pathname :directory `(:relative ,name)
+                                        :name name
+                                        :type "asd"
+                                        :case :local
+                                        :version :newest)
+                         home)))
+          (probe-file contrib)))))
 
   (pushnew
-   '(merge-pathnames "site-systems/"
-     (truename (sb-ext:posix-getenv "SBCL_HOME")))
+   '(let ((home (sb-ext:posix-getenv "SBCL_HOME")))
+      (when home
+        (merge-pathnames "site-systems/" (truename home))))
    *central-registry*)
 
   (pushnew
