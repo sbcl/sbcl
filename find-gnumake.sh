@@ -6,7 +6,7 @@ find_gnumake() {
   if [ "$GNUMAKE" != "" ] ; then
     # The user is evidently trying to tell us something.
     GNUMAKE="$GNUMAKE"
-  elif [ "GNU Make" = "`make -v | head -n 1 | cut -b 1-8`" ]; then
+  elif [ "GNU Make" = "`make -v 2>/dev/null | head -n 1 | cut -b 1-8`" ]; then
     GNUMAKE=make
   elif [ -x "`which gmake`" ] ; then
     # "gmake" is the preferred name in *BSD.
