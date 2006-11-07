@@ -16,12 +16,15 @@
 
 if [ -z "$1" ]
 then
-    sbclsystem=`pwd`/../../src/runtime/sbcl
-    sbclcore=`pwd`/../../output/sbcl.core
+    . ../../sbcl-pwd.sh
+    sbcl_pwd
+
+    sbclsystem=$SBCL_PWD/../../src/runtime/sbcl
+    sbclcore=$SBCL_PWD/../../output/sbcl.core
     if [ -e $sbclsystem ] && [ -e $sbclcore ]
     then
         SBCLRUNTIME="$sbclsystem --core $sbclcore"
-        SBCL_HOME=`pwd`/../../contrib/; export SBCL_HOME
+        SBCL_HOME=$SBCL_PWD/../../contrib/; export SBCL_HOME
         SBCL_BUILDING_CONTRIB="please asdf install your hook"; export SBCL_BUILDING_CONTRIB
     else
         SBCLRUNTIME="`which sbcl`"
@@ -30,7 +33,7 @@ else
     SBCLRUNTIME="$1"
 fi
 
-SBCL="$SBCLRUNTIME --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger"
+SBCL="$SBCLRUNTIME --noinform --no-sysinit --no-userinit --noprint --disable-debugger"
 
 # extract version and date
 VERSION=`$SBCL --eval '(write-line (lisp-implementation-version))' --eval '(sb-ext:quit)'`
