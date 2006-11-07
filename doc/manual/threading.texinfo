@@ -9,8 +9,9 @@ multiprocessing on machines that have more than one CPU, but it does
 not allow Lisp control of the scheduler.  This is found in the
 SB-THREAD package.
 
-This requires x86/x86-64 and Linux kernel 2.6 or systems with NPTL
-backports.
+This requires Linux (2.6+ or systems with NPTL backports) running on the
+x86 or x86-64 architecture, or SunOS (Solaris) on the x86.  Support for
+Darwin (Mac OS X) on the x86 is experimental.
 
 @menu
 * Threading basics::            
