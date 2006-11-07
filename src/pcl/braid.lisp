@@ -276,6 +276,7 @@
     (set-slot 'name name)
     (set-slot 'finalized-p t)
     (set-slot 'source source)
+    (set-slot 'safe-p nil)
     (set-slot '%type (if (eq class (find-class t))
                          t
                          ;; FIXME: Could this just be CLASS instead
@@ -369,6 +370,7 @@
       (set-val 'writers      (get-val :writers))
       (set-val 'allocation   :instance)
       (set-val '%type        (or (get-val :type) t))
+      (set-val '%type-check-function (get-val 'type-check-function))
       (set-val '%documentation (or (get-val :documentation) ""))
       (set-val '%class   class)
       (when effective-p

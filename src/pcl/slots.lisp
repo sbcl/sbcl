@@ -103,9 +103,23 @@
         (setf (slot-value-using-class class object slot-definition)
               new-value))))
 
-(define-compiler-macro set-slot-value (&whole form object slot-name new-value)
+;;; A version of SET-SLOT-VALUE for use in safe code, where we want to
+;;; check types when writing to slots:
+;;;   * Doesn't have an optimizing compiler-macro
+;;;   * Isn't special-cased in WALK-METHOD-LAMBDA
+(defun safe-set-slot-value (object slot-name new-value)
+  (set-slot-value object slot-name new-value))
+
+(define-compiler-macro set-slot-value (&whole form object slot-name new-value
+                                              &environment env)
   (if (and (constantp slot-name)
-           (interned-symbol-p (constant-form-value slot-name)))
+           (interned-symbol-p (constant-form-value slot-name))
+           ;; We can't use the ACCESSOR-SET-SLOT-VALUE path in safe
+           ;; code, since it'll use the global automatically generated
+           ;; accessor, which won't do typechecking. (SLOT-OBJECT
+           ;; won't have been compiled with SAFETY 3, so SAFE-P will
+           ;; be NIL in MAKE-STD-WRITER-METHOD-FUNCTION).
+           (not (safe-code-p env)))
       `(accessor-set-slot-value ,object ,slot-name ,new-value)
       form))
 
@@ -182,22 +196,29 @@
                       (object standard-object)
                       (slotd standard-effective-slot-definition))
   (check-obsolete-instance object)
-  (let ((location (slot-definition-location slotd)))
-    (typecase location
-      (fixnum
-       (cond ((std-instance-p object)
-              (setf (clos-slots-ref (std-instance-slots object) location)
-                    new-value))
-             ((fsc-instance-p object)
-              (setf (clos-slots-ref (fsc-instance-slots object) location)
-                    new-value))
-             (t (bug "unrecognized instance type in ~S"
-                     '(setf slot-value-using-class)))))
-      (cons
-       (setf (cdr location) new-value))
-      (t
-       (instance-structure-protocol-error slotd
-                                          '(setf slot-value-using-class))))))
+  (let ((location (slot-definition-location slotd))
+        (type-check-function
+         (when (safe-p class)
+           (slot-definition-type-check-function slotd))))
+    (flet ((check (new-value)
+             (when type-check-function
+               (funcall (the function type-check-function) new-value))
+             new-value))
+      (typecase location
+        (fixnum
+         (cond ((std-instance-p object)
+                (setf (clos-slots-ref (std-instance-slots object) location)
+                      (check new-value)))
+               ((fsc-instance-p object)
+                (setf (clos-slots-ref (fsc-instance-slots object) location)
+                      (check new-value)))
+                (t (bug "unrecognized instance type in ~S"
+                        '(setf slot-value-using-class)))))
+        (cons
+         (setf (cdr location) (check new-value)))
+        (t
+         (instance-structure-protocol-error
+          slotd '(setf slot-value-using-class)))))))
 
 (defmethod slot-boundp-using-class
            ((class std-class)

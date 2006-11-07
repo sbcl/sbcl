@@ -458,6 +458,9 @@
     :initarg :initargs
     :accessor slot-definition-initargs)
    (%type :initform t :initarg :type :accessor slot-definition-type)
+   (%type-check-function :initform nil
+                         :initarg type-check-function
+                         :accessor slot-definition-type-check-function)
    (%documentation
     :initform nil :initarg :documentation
     ;; KLUDGE: we need a reader for bootstrapping purposes, in
@@ -599,6 +602,12 @@
    (%documentation
     :initform nil
     :initarg :documentation)
+   ;; True if the class definition was compiled with a (SAFETY 3)
+   ;; optimization policy.
+   (safe-p
+    :initform nil
+    :initarg safe-p
+    :accessor safe-p)
    (finalized-p
     :initform nil
     :reader class-finalized-p)))

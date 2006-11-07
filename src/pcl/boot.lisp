@@ -1371,15 +1371,6 @@ bootstrapping.
                                    (set-slot-value #'optimize-set-slot-value)
                                    (slot-boundp #'optimize-slot-boundp))))
                         (funcall fun slots parameter form))))
-                   ((and (eq (car form) 'apply)
-                         (consp (cadr form))
-                         (eq (car (cadr form)) 'function)
-                         (generic-function-name-p (cadr (cadr form))))
-                    (optimize-generic-function-call
-                     form required-parameters env slots calls))
-                   ((generic-function-name-p (car form))
-                    (optimize-generic-function-call
-                     form required-parameters env slots calls))
                    (t form))))
 
       (let ((walked-lambda (walk-form method-lambda env #'walk-function)))

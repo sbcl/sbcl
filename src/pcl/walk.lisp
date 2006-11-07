@@ -293,6 +293,7 @@
 
 (defun var-globally-special-p (symbol)
   (eq (info :variable :kind symbol) :special))
+
 
 ;;;; handling of special forms
 
@@ -702,14 +703,15 @@
       (relist*
         form let/let* walked-bindings walked-body))))
 
-(defun walk-locally (form context env)
+(defun walk-locally (form context old-env)
   (declare (ignore context))
-  (let* ((locally (car form))
-         (body (cdr form))
-         (walked-body
-          (walk-declarations body #'walk-repeat-eval env)))
-    (relist*
-     form locally walked-body)))
+  (walker-environment-bind (new-env old-env)
+    (let* ((locally (car form))
+           (body (cdr form))
+           (walked-body
+            (walk-declarations body #'walk-repeat-eval new-env)))
+      (relist*
+       form locally walked-body))))
 
 (defun walk-multiple-value-setq (form context env)
   (let ((vars (cadr form)))
@@ -873,62 +875,65 @@
                (walk-tagbody-1 (cdr form) context env))))
 
 (defun walk-macrolet (form context old-env)
-  (walker-environment-bind (macro-env
-                            nil
-                            :walk-function (env-walk-function old-env))
-    (labels ((walk-definitions (definitions)
-               (and definitions
-                    (let ((definition (car definitions)))
-                      (recons definitions
-                              (relist* definition
-                                       (car definition)
-                                       (walk-arglist (cadr definition)
-                                                     context
-                                                     macro-env
-                                                     t)
-                                       (walk-declarations (cddr definition)
-                                                          #'walk-repeat-eval
-                                                          macro-env))
-                              (walk-definitions (cdr definitions)))))))
-      (with-new-definition-in-environment (new-env old-env form)
-        (relist* form
-                 (car form)
-                 (walk-definitions (cadr form))
-                 (walk-declarations (cddr form)
-                                    #'walk-repeat-eval
-                                    new-env))))))
+  (walker-environment-bind (old-env old-env)
+    (walker-environment-bind (macro-env
+                              nil
+                              :walk-function (env-walk-function old-env))
+      (labels ((walk-definitions (definitions)
+                 (and definitions
+                      (let ((definition (car definitions)))
+                        (recons definitions
+                                (relist* definition
+                                         (car definition)
+                                         (walk-arglist (cadr definition)
+                                                       context
+                                                       macro-env
+                                                       t)
+                                         (walk-declarations (cddr definition)
+                                                            #'walk-repeat-eval
+                                                            macro-env))
+                                (walk-definitions (cdr definitions)))))))
+        (with-new-definition-in-environment (new-env old-env form)
+          (relist* form
+                   (car form)
+                   (walk-definitions (cadr form))
+                   (walk-declarations (cddr form)
+                                      #'walk-repeat-eval
+                                      new-env)))))))
 
 (defun walk-flet (form context old-env)
-  (labels ((walk-definitions (definitions)
-             (if (null definitions)
-                 ()
-                 (recons definitions
-                         (walk-lambda (car definitions) context old-env)
-                         (walk-definitions (cdr definitions))))))
-    (recons form
-            (car form)
-            (recons (cdr form)
-                    (walk-definitions (cadr form))
-                    (with-new-definition-in-environment (new-env old-env form)
-                      (walk-declarations (cddr form)
-                                         #'walk-repeat-eval
-                                         new-env))))))
-
-(defun walk-labels (form context old-env)
-  (with-new-definition-in-environment (new-env old-env form)
+  (walker-environment-bind (old-env old-env)
     (labels ((walk-definitions (definitions)
                (if (null definitions)
                    ()
                    (recons definitions
-                           (walk-lambda (car definitions) context new-env)
+                           (walk-lambda (car definitions) context old-env)
                            (walk-definitions (cdr definitions))))))
       (recons form
               (car form)
               (recons (cdr form)
                       (walk-definitions (cadr form))
-                      (walk-declarations (cddr form)
-                                         #'walk-repeat-eval
-                                         new-env))))))
+                      (with-new-definition-in-environment (new-env old-env form)
+                        (walk-declarations (cddr form)
+                                           #'walk-repeat-eval
+                                           new-env)))))))
+
+(defun walk-labels (form context old-env)
+  (walker-environment-bind (old-env old-env)
+    (with-new-definition-in-environment (new-env old-env form)
+      (labels ((walk-definitions (definitions)
+                 (if (null definitions)
+                     ()
+                     (recons definitions
+                             (walk-lambda (car definitions) context new-env)
+                             (walk-definitions (cdr definitions))))))
+        (recons form
+                (car form)
+                (recons (cdr form)
+                        (walk-definitions (cadr form))
+                        (walk-declarations (cddr form)
+                                           #'walk-repeat-eval
+                                           new-env)))))))
 
 (defun walk-if (form context env)
   (destructuring-bind (if predicate arm1 &optional arm2) form

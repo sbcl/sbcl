@@ -51,11 +51,11 @@
 
 (defmethod make-reader-method-function ((class funcallable-standard-class)
                                         slot-name)
-  (make-std-reader-method-function (class-name class) slot-name))
+  (make-std-reader-method-function class slot-name))
 
 (defmethod make-writer-method-function ((class funcallable-standard-class)
                                         slot-name)
-  (make-std-writer-method-function (class-name class) slot-name))
+  (make-std-writer-method-function class slot-name))
 
 ;;;; See the comment about reader-function--std and writer-function--sdt.
 ;;;;

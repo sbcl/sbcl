@@ -192,28 +192,54 @@
 (defun make-optimized-std-writer-method-function
     (fsc-p slotd slot-name location)
   (declare #.*optimize-speed*)
-  (set-fun-name
-   (etypecase location
-     (fixnum (if fsc-p
-                 (lambda (nv instance)
-                   (check-obsolete-instance instance)
-                   (setf (clos-slots-ref (fsc-instance-slots instance)
-                                         location)
-                         nv))
-                 (lambda (nv instance)
-                   (check-obsolete-instance instance)
-                   (setf (clos-slots-ref (std-instance-slots instance)
-                                         location)
-                         nv))))
-     (cons (lambda (nv instance)
-             (check-obsolete-instance instance)
-             (setf (cdr location) nv)))
-     (null
-      (lambda (nv instance)
-        (declare (ignore nv))
-        (instance-structure-protocol-error slotd
-                                           '(setf slot-value-using-class)))))
-   `(writer ,slot-name)))
+  (let* ((safe-p (and slotd
+                      (slot-definition-class slotd)
+                      (safe-p (slot-definition-class slotd))))
+         (writer-fun (etypecase location
+                       (fixnum (if fsc-p
+                                   (lambda (nv instance)
+                                     (check-obsolete-instance instance)
+                                     (setf (clos-slots-ref (fsc-instance-slots instance)
+                                                           location)
+                                           nv))
+                                   (lambda (nv instance)
+                                     (check-obsolete-instance instance)
+                                     (setf (clos-slots-ref (std-instance-slots instance)
+                                                           location)
+                                           nv))))
+                       (cons (lambda (nv instance)
+                               (check-obsolete-instance instance)
+                               (setf (cdr location) nv)))
+                       (null
+                        (lambda (nv instance)
+                          (declare (ignore nv instance))
+                          (instance-structure-protocol-error
+                           slotd
+                           '(setf slot-value-using-class))))))
+         (checking-fun (lambda (new-value instance)
+                         (check-obsolete-instance instance)
+                         ;; If the SLOTD had a TYPE-CHECK-FUNCTION, call it.
+                         (let* (;; Note that this CLASS is not neccessarily
+                                ;; the SLOT-DEFINITION-CLASS of the
+                                ;; SLOTD passed to M-O-S-W-M-F, since it's
+                                ;; e.g. possible for a subclass to define
+                                ;; a slot of the same name but with no
+                                ;; accessors. So we need to fetch the SLOTD
+                                ;; when CHECKING-FUN is called, instead of
+                                ;; just closing over it.
+                                (class (class-of instance))
+                                (slotd (find-slot-definition class slot-name))
+                                (type-check-function
+                                 (when slotd
+                                   (slot-definition-type-check-function slotd))))
+                           (when type-check-function
+                             (funcall type-check-function new-value)))
+                         ;; Then call the real writer.
+                         (funcall writer-fun new-value instance))))
+    (set-fun-name (if safe-p
+                      checking-fun
+                      writer-fun)
+                  `(writer ,slot-name))))
 
 (defun make-optimized-std-boundp-method-function
     (fsc-p slotd slot-name location)
@@ -341,28 +367,42 @@
 (defun make-optimized-std-setf-slot-value-using-class-method-function
     (fsc-p slotd)
   (declare #.*optimize-speed*)
-  (let ((location (slot-definition-location slotd)))
-    (etypecase location
-      (fixnum
-       (if fsc-p
-           (lambda (nv class instance slotd)
-             (declare (ignore class slotd))
-             (check-obsolete-instance instance)
-             (setf (clos-slots-ref (fsc-instance-slots instance) location)
-                   nv))
-           (lambda (nv class instance slotd)
-             (declare (ignore class slotd))
-             (check-obsolete-instance instance)
-             (setf (clos-slots-ref (std-instance-slots instance) location)
-                   nv))))
-      (cons (lambda (nv class instance slotd)
-              (declare (ignore class slotd))
-              (check-obsolete-instance instance)
-              (setf (cdr location) nv)))
-      (null (lambda (nv class instance slotd)
-              (declare (ignore nv class instance))
-              (instance-structure-protocol-error
-               slotd '(setf slot-value-using-class)))))))
+  (let ((location (slot-definition-location slotd))
+        (type-check-function
+         (when (and slotd
+                    (slot-definition-class slotd)
+                    (safe-p (slot-definition-class slotd)))
+           (slot-definition-type-check-function slotd))))
+    (macrolet ((make-mf-lambda (&body body)
+                 `(lambda (nv class instance slotd)
+                    (declare (ignore class slotd))
+                    (check-obsolete-instance instance)
+                    ,@body))
+               (make-mf-lambdas (&body body)
+                 ;; Having separate lambdas for the NULL / not-NULL cases of
+                 ;; TYPE-CHECK-FUNCTION is done to avoid runtime overhead
+                 ;; for CLOS typechecking when it's not in use.
+                 `(if type-check-function
+                      (make-mf-lambda
+                       (funcall (the function type-check-function) nv)
+                       ,@body)
+                      (make-mf-lambda
+                       ,@body))))
+      (etypecase location
+        (fixnum
+         (if fsc-p
+             (make-mf-lambdas
+              (setf (clos-slots-ref (fsc-instance-slots instance) location)
+                    nv))
+             (make-mf-lambdas
+              (setf (clos-slots-ref (std-instance-slots instance) location)
+                    nv))))
+        (cons
+         (make-mf-lambdas (setf (cdr location) nv)))
+        (null (lambda (nv class instance slotd)
+                (declare (ignore nv class instance))
+                (instance-structure-protocol-error
+                 slotd '(setf slot-value-using-class))))))))
 
 (defun make-optimized-std-slot-boundp-using-class-method-function
     (fsc-p slotd)
@@ -404,7 +444,8 @@
                  (emf-funcall sdfun class instance slotd))))
      `(,name ,(class-name class) ,(slot-definition-name slotd)))))
 
-(defun make-std-reader-method-function (class-name slot-name)
+(defun make-std-reader-method-function (class-or-name slot-name)
+  (declare (ignore class-or-name))
   (let* ((initargs (copy-tree
                     (make-method-function
                      (lambda (instance)
@@ -418,21 +459,46 @@
           (list (list nil slot-name)))
     initargs))
 
-(defun make-std-writer-method-function (class-name slot-name)
-  (let* ((initargs (copy-tree
-                    (make-method-function
-                     (lambda (nv instance)
-                       (pv-binding1 (.pv. .calls.
-                                          (bug "Please report this")
-                                          (instance) (instance-slots))
-                         (instance-write-internal
-                          .pv. instance-slots 0 nv
-                          (setf (slot-value instance slot-name) nv))))))))
+(defun make-std-writer-method-function (class-or-name slot-name)
+  (let* ((class (when (eq *boot-state* 'complete)
+                  (if (typep class-or-name 'class)
+                      class-or-name
+                      (find-class class-or-name nil))))
+         (safe-p (and class
+                      (safe-p class)))
+         (check-fun (lambda (new-value instance)
+                      (let* ((class (class-of instance))
+                             (slotd (find-slot-definition class slot-name))
+                             (type-check-function
+                              (when slotd
+                                (slot-definition-type-check-function slotd))))
+                        (when type-check-function
+                          (funcall type-check-function new-value)))))
+         (initargs (copy-tree
+                    (if safe-p
+                        (make-method-function
+                         (lambda (nv instance)
+                           (funcall check-fun nv instance)
+                           (pv-binding1 (.pv. .calls.
+                                              (bug "Please report this")
+                                              (instance) (instance-slots))
+                             (instance-write-internal
+                              .pv. instance-slots 0 nv
+                              (setf (slot-value instance slot-name) nv)))))
+                        (make-method-function
+                         (lambda (nv instance)
+                           (pv-binding1 (.pv. .calls.
+                                              (bug "Please report this")
+                                              (instance) (instance-slots))
+                             (instance-write-internal
+                              .pv. instance-slots 0 nv
+                              (setf (slot-value instance slot-name) nv)))))))))
     (setf (getf (getf initargs 'plist) :slot-name-lists)
           (list nil (list nil slot-name)))
     initargs))
 
-(defun make-std-boundp-method-function (class-name slot-name)
+(defun make-std-boundp-method-function (class-or-name slot-name)
+  (declare (ignore class-or-name))
   (let* ((initargs (copy-tree
                     (make-method-function
                      (lambda (instance)

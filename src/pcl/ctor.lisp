@@ -107,7 +107,7 @@
 ;;; funcallable instance is set to it.
 ;;;
 (!defstruct-with-alternate-metaclass ctor
-  :slot-names (function-name class-name class initargs)
+  :slot-names (function-name class-name class initargs safe-p)
   :boa-constructor %make-ctor
   :superclass-name function
   :metaclass-name static-classoid
@@ -134,18 +134,18 @@
     (setf (%funcallable-instance-info ctor 1)
           (ctor-function-name ctor))))
 
-(defun make-ctor-function-name (class-name initargs)
-  (list* 'ctor class-name initargs))
+(defun make-ctor-function-name (class-name initargs safe-code-p)
+  (list* 'ctor class-name safe-code-p initargs))
 
 ;;; Keep this a separate function for testing.
-(defun ensure-ctor (function-name class-name initargs)
+(defun ensure-ctor (function-name class-name initargs safe-code-p)
   (unless (fboundp function-name)
-    (make-ctor function-name class-name initargs)))
+    (make-ctor function-name class-name initargs safe-code-p)))
 
 ;;; Keep this a separate function for testing.
-(defun make-ctor (function-name class-name initargs)
+(defun make-ctor (function-name class-name initargs safe-p)
   (without-package-locks ; for (setf symbol-function)
-   (let ((ctor (%make-ctor function-name class-name nil initargs)))
+   (let ((ctor (%make-ctor function-name class-name nil initargs safe-p)))
      (push ctor *all-ctors*)
      (setf (fdefinition function-name) ctor)
      (install-initial-constructor ctor :force-p t)
@@ -156,12 +156,12 @@
 ;;; Compile-Time Expansion of MAKE-INSTANCE *******
 ;;; ***********************************************
 
-(define-compiler-macro make-instance (&whole form &rest args)
+(define-compiler-macro make-instance (&whole form &rest args &environment env)
   (declare (ignore args))
-  (or (make-instance->constructor-call form)
+  (or (make-instance->constructor-call form (safe-code-p env))
       form))
 
-(defun make-instance->constructor-call (form)
+(defun make-instance->constructor-call (form safe-code-p)
   (destructuring-bind (fn class-name &rest args) form
     (declare (ignore fn))
     (flet (;;
@@ -201,7 +201,8 @@
                 finally
                   (return (values initargs value-forms)))
         (let* ((class-name (constant-form-value class-name))
-               (function-name (make-ctor-function-name class-name initargs)))
+               (function-name (make-ctor-function-name class-name initargs
+                                                       safe-code-p)))
           ;; Prevent compiler warnings for calling the ctor.
           (proclaim-as-fun-name function-name)
           (note-name-defined function-name :function)
@@ -215,7 +216,8 @@
           `(locally
                (declare (disable-package-locks ,function-name))
             (let ((.x. (load-time-value
-                        (ensure-ctor ',function-name ',class-name ',initargs))))
+                        (ensure-ctor ',function-name ',class-name ',initargs
+                                     ',safe-code-p))))
               (declare (ignore .x.))
               ;; ??? check if this is worth it.
               (declare
@@ -453,6 +455,15 @@
         finally
           (return (values around before (first primary) (reverse after)))))
 
+(defmacro with-type-checked ((type safe-p) &body body)
+  (if safe-p
+      ;; To handle FUNCTION types reasonable, we use SAFETY 3 and
+      ;; THE instead of e.g. CHECK-TYPE.
+      `(locally
+           (declare (optimize (safety 3)))
+         (the ,type (progn ,@body)))
+      `(progn ,@body)))
+
 ;;; Return as multiple values bindings for default initialization
 ;;; arguments, variable names, defaulting initargs and a body for
 ;;; initializing instance and class slots of an object costructed by
@@ -465,6 +476,7 @@
   (let* ((class (ctor-class ctor))
          (initargs (ctor-initargs ctor))
          (initkeys (plist-keys initargs))
+         (safe-p (ctor-safe-p ctor))
          (slot-vector
           (make-array (layout-length (class-wrapper class))
                       :initial-element nil))
@@ -484,14 +496,14 @@
                  ((integerp location)
                   (not (null (aref slot-vector location))))
                  (t (bug "Weird location in ~S" 'slot-init-forms))))
-             (class-init (location type val)
+             (class-init (location kind val type)
                (aver (consp location))
                (unless (initializedp location)
-                 (push (list location type val) class-inits)))
-             (instance-init (location type val)
+                 (push (list location kind val type) class-inits)))
+             (instance-init (location kind val type)
                (aver (integerp location))
                (unless (initializedp location)
-                 (setf (aref slot-vector location) (list type val))))
+                 (setf (aref slot-vector location) (list kind val type))))
              (default-init-var-name (i)
                (let ((ps #(.d0. .d1. .d2. .d3. .d4. .d5.)))
                  (if (array-in-bounds-p ps i)
@@ -505,16 +517,12 @@
       ;; Loop over supplied initargs and values and record which
       ;; instance and class slots they initialize.
       (loop for (key value) on initargs by #'cddr
-            as locations = (initarg-locations key) do
-              (if (constantp value)
-                  (dolist (location locations)
-                    (if (consp location)
-                        (class-init location 'constant value)
-                        (instance-init location 'constant value)))
-                  (dolist (location locations)
-                      (if (consp location)
-                          (class-init location 'param value)
-                          (instance-init location 'param value)))))
+            as kind = (if (constantp value) 'constant 'param)
+            as locations = (initarg-locations key)
+            do (loop for (location . type) in locations
+                     do (if (consp location)
+                            (class-init location kind value type)
+                            (instance-init location kind value type))))
       ;; Loop over default initargs of the class, recording
       ;; initializations of slots that have not been initialized
       ;; above.  Default initargs which are not in the supplied
@@ -523,27 +531,28 @@
       ;; if not actually used for initializing a slot.
       (loop for (key initform initfn) in default-initargs and i from 0
             unless (member key initkeys :test #'eq) do
-            (let* ((type (if (constantp initform) 'constant 'var))
-                   (init (if (eq type 'var) initfn initform)))
-              (ecase type
+            (let* ((kind (if (constantp initform) 'constant 'var))
+                   (init (if (eq kind 'var) initfn initform)))
+              (ecase kind
                 (constant
                  (push key defaulting-initargs)
                  (push initform defaulting-initargs))
                 (var
                  (push key defaulting-initargs)
                  (push (default-init-var-name i) defaulting-initargs)))
-              (when (eq type 'var)
+              (when (eq kind 'var)
                 (let ((init-var (default-init-var-name i)))
                   (setq init init-var)
                   (push (cons init-var initfn) default-inits)))
-              (dolist (location (initarg-locations key))
-                (if (consp location)
-                    (class-init location type init)
-                    (instance-init location type init)))))
+              (loop for (location . type) in (initarg-locations key)
+                    do (if (consp location)
+                           (class-init location kind init type)
+                           (instance-init location kind init type)))))
       ;; Loop over all slots of the class, filling in the rest from
       ;; slot initforms.
       (loop for slotd in (class-slots class)
             as location = (slot-definition-location slotd)
+            as type = (slot-definition-type slotd)
             as allocation = (slot-definition-allocation slotd)
             as initfn = (slot-definition-initfunction slotd)
             as initform = (slot-definition-initform slotd) do
@@ -551,54 +560,64 @@
                           (null initfn)
                           (initializedp location))
                 (if (constantp initform)
-                    (instance-init location 'initform initform)
-                    (instance-init location 'initform/initfn initfn))))
+                    (instance-init location 'initform initform type)
+                    (instance-init location 'initform/initfn initfn type))))
       ;; Generate the forms for initializing instance and class slots.
       (let ((instance-init-forms
              (loop for slot-entry across slot-vector and i from 0
-                   as (type value) = slot-entry collect
-                     (ecase type
+                   as (kind value type) = slot-entry collect
+                     (ecase kind
                        ((nil)
                         (unless before-method-p
                           `(setf (clos-slots-ref .slots. ,i) +slot-unbound+)))
                        ((param var)
-                        `(setf (clos-slots-ref .slots. ,i) ,value))
+                        `(setf (clos-slots-ref .slots. ,i)
+                               (with-type-checked (,type ,safe-p)
+                                   ,value)))
                        (initfn
-                        `(setf (clos-slots-ref .slots. ,i) (funcall ,value)))
+                        `(setf (clos-slots-ref .slots. ,i)
+                               (with-type-checked (,type ,safe-p)
+                                 (funcall ,value))))
                        (initform/initfn
                         (if before-method-p
                             `(when (eq (clos-slots-ref .slots. ,i)
                                        +slot-unbound+)
                                (setf (clos-slots-ref .slots. ,i)
-                                     (funcall ,value)))
+                                     (with-type-checked (,type ,safe-p)
+                                       (funcall ,value))))
                             `(setf (clos-slots-ref .slots. ,i)
-                                   (funcall ,value))))
+                                   (with-type-checked (,type ,safe-p)
+                                     (funcall ,value)))))
                        (initform
                         (if before-method-p
                             `(when (eq (clos-slots-ref .slots. ,i)
                                        +slot-unbound+)
                                (setf (clos-slots-ref .slots. ,i)
-                                     ',(constant-form-value value)))
+                                     (with-type-checked (,type ,safe-p)
+                                       ',(constant-form-value value))))
                             `(setf (clos-slots-ref .slots. ,i)
-                                   ',(constant-form-value value))))
+                                   (with-type-checked (,type ,safe-p)
+                                     ',(constant-form-value value)))))
                        (constant
                         `(setf (clos-slots-ref .slots. ,i)
-                               ',(constant-form-value value)))))))
+                               (with-type-checked (,type ,safe-p)
+                                 ',(constant-form-value value))))))))
         ;; we are not allowed to modify QUOTEd locations, so we can't
         ;; generate code like (setf (cdr ',location) arg).  Instead,
         ;; we have to do (setf (cdr .L0.) arg) and arrange for .L0. to
         ;; be bound to the location.
         (multiple-value-bind (names locations class-init-forms)
-            (loop for (location type value) in class-inits
+            (loop for (location kind value type) in class-inits
                   for i upfrom 0
                   for name = (location-var-name i)
                   collect name into names
                   collect location into locations
                   collect `(setf (cdr ,name)
-                                 ,(case type
-                                    (constant `',(constant-form-value value))
-                                    ((param var) `,value)
-                                    (initfn `(funcall ,value))))
+                                 (with-type-checked (,type ,safe-p)
+                                   ,(case kind
+                                          (constant `',(constant-form-value value))
+                                          ((param var) `,value)
+                                          (initfn `(funcall ,value)))))
                   into class-init-forms
                   finally (return (values names locations class-init-forms)))
           (multiple-value-bind (vars bindings)
@@ -612,15 +631,18 @@
                     `(,@(delete nil instance-init-forms)
                       ,@class-init-forms))))))))
 
-;;; Return an alist of lists (KEY LOCATION ...) telling, for each
-;;; key in INITKEYS, which locations the initarg initializes.
-;;; CLASS is the class of the instance being initialized.
+;;; Return an alist of lists (KEY (LOCATION . TYPE-SPECIFIER) ...)
+;;; telling, for each key in INITKEYS, which locations the initarg
+;;; initializes and the associated type with the location.  CLASS is
+;;; the class of the instance being initialized.
 (defun compute-initarg-locations (class initkeys)
   (loop with slots = (class-slots class)
         for key in initkeys collect
           (loop for slot in slots
                 if (memq key (slot-definition-initargs slot))
-                  collect (slot-definition-location slot) into locations
+                  collect (cons (slot-definition-location slot)
+                                (slot-definition-type slot))
+                          into locations
                 else
                   collect slot into remaining-slots
                 finally

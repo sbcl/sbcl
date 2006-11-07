@@ -72,7 +72,8 @@
                                 ',*readers-for-this-defclass*
                                 ',*writers-for-this-defclass*
                                 ',*slot-names-for-this-defclass*
-                                (sb-c:source-location)))))
+                                (sb-c:source-location)
+                                ',(safe-code-p env)))))
         (if defstruct-p
             (progn
               ;; FIXME: (YUK!) Why do we do this? Because in order
@@ -183,6 +184,7 @@
              (initargs ())
              (others ())
              (unsupplied (list nil))
+             (type t)
              (initform unsupplied))
         (check-slot-name-for-defclass name class-name env)
         (push name *slot-names-for-this-defclass*)
@@ -213,6 +215,8 @@
                (when (member key '(:initform :allocation :type :documentation))
                  (when (eq key :initform)
                    (setf initform val))
+                 (when (eq key :type)
+                   (setf type val))
                  (when (get-properties others (list key))
                    (error 'simple-program-error
                           :format-control "Duplicate slot option ~S for slot ~
@@ -225,8 +229,16 @@
             ((null head))
           (unless (cdr (second head))
             (setf (second head) (car (second head)))))
-        (let ((canon `(:name ',name :readers ',readers :writers ',writers
-                             :initargs ',initargs ',others)))
+        (let* ((type-check-function
+                (if (eq type t)
+                    nil
+                    `('type-check-function (lambda (value)
+                                             (declare (type ,type value))
+                                             value))))
+               (canon `(:name ',name :readers ',readers :writers ',writers
+                              :initargs ',initargs
+                              ,@type-check-function
+                              ',others)))
           (push (if (eq initform unsupplied)
                     `(list* ,@canon)
                     `(list* :initfunction ,(make-initfunction initform)
@@ -465,20 +477,23 @@
 
 (declaim (notinline load-defclass))
 (defun load-defclass (name metaclass supers canonical-slots canonical-options
-                      readers writers slot-names source-location)
+                      readers writers slot-names source-location safe-p)
+  ;; SAFE-P is used by REAL-LOAD-DEFCLASS, but can be ignored here, since
+  ;; during the bootstrap we won't have (SAFETY 3).
+  (declare (ignore safe-p))
   (%compiler-defclass name readers writers slot-names)
   (setq supers  (copy-tree supers)
         canonical-slots   (copy-tree canonical-slots)
         canonical-options (copy-tree canonical-options))
   (let ((ecd
-          (make-early-class-definition name
-                                       source-location
-                                       metaclass
-                                       supers
-                                       canonical-slots
-                                       canonical-options))
+         (make-early-class-definition name
+                                      source-location
+                                      metaclass
+                                      supers
+                                      canonical-slots
+                                      canonical-options))
         (existing
-          (find name *early-class-definitions* :key #'ecd-class-name)))
+         (find name *early-class-definitions* :key #'ecd-class-name)))
     (setq *early-class-definitions*
           (cons ecd (remove existing *early-class-definitions*)))
     ecd))

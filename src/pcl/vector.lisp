@@ -306,54 +306,6 @@
                     (setf (pvref pv i) (cdr map))))))
             (incf param))))))
 
-(defun maybe-expand-accessor-form (form required-parameters slots env)
-  (let* ((fname (car form))
-         #||(len (length form))||#
-         (gf (if (symbolp fname)
-                 (unencapsulated-fdefinition fname)
-                 (gdefinition fname))))
-    (macrolet ((maybe-optimize-reader ()
-                 `(let ((parameter
-                         (can-optimize-access1 (cadr form)
-                                               required-parameters env)))
-                   (when parameter
-                     (optimize-reader slots parameter gf-name form))))
-               (maybe-optimize-writer ()
-                 `(let ((parameter
-                         (can-optimize-access1 (caddr form)
-                                               required-parameters env)))
-                   (when parameter
-                     (optimize-writer slots parameter gf-name form)))))
-      (unless (and (consp (cadr form))
-                   (eq 'instance-accessor-parameter (caadr form)))
-        (when (and (eq *boot-state* 'complete)
-                   (generic-function-p gf))
-          (let ((methods (generic-function-methods gf)))
-            (when methods
-              (let* ((gf-name (generic-function-name gf))
-                     (arg-info (gf-arg-info gf))
-                     (metatypes (arg-info-metatypes arg-info))
-                     (nreq (length metatypes))
-                     (applyp (arg-info-applyp arg-info)))
-                (when (null applyp)
-                  (cond ((= nreq 1)
-                         (when (some #'standard-reader-method-p methods)
-                           (maybe-optimize-reader)))
-                        ((and (= nreq 2)
-                              (consp gf-name)
-                              (eq (car gf-name) 'setf))
-                         (when (some #'standard-writer-method-p methods)
-                           (maybe-optimize-writer)))))))))))))
-
-(defun optimize-generic-function-call (form
-                                       required-parameters
-                                       env
-                                       slots
-                                       calls)
-  (declare (ignore required-parameters env slots calls))
-  (or ; (optimize-reader ...)?
-      form))
-
 (defun can-optimize-access (form required-parameters env)
   (let ((type (ecase (car form)
                 (slot-value 'reader)
@@ -459,9 +411,16 @@
 
 (defmacro optimized-set-slot-value (form parameter-name optimized-form
                                     &environment env)
-  (if (parameter-modified-p parameter-name env)
-      `(accessor-set-slot-value ,@(cdr form))
-      optimized-form))
+  (cond ((safe-code-p env)
+         ;; Don't optimize slot value setting in safe code, since the
+         ;; optimized version will fail to catch some type errors
+         ;; (for example when a subclass declares a tighter type for
+         ;; the slot than a superclass).
+         `(safe-set-slot-value ,@(cdr form)))
+        ((parameter-modified-p parameter-name env)
+         `(accessor-set-slot-value ,@(cdr form)))
+        (t
+         optimized-form)))
 
 (defun optimize-slot-boundp (slots sparameter form)
   (if sparameter
@@ -503,18 +462,6 @@
   (if (parameter-modified-p parameter-name env)
       `(accessor-slot-boundp ,@(cdr form))
       optimized-form))
-
-(defun optimize-reader (slots sparameter gf-name form)
-  (if sparameter
-      (optimize-accessor-call slots :read sparameter gf-name nil)
-      form))
-
-(defun optimize-writer (slots sparameter gf-name form)
-  (if sparameter
-      (destructuring-bind (ignore1 ignore2 new-value) form
-        (declare (ignore ignore1 ignore2))
-        (optimize-accessor-call slots :write sparameter gf-name new-value))
-      form))
 
 ;;; The SLOTS argument is an alist, the CAR of each entry is the name
 ;;; of a required parameter to the function. The alist is in order, so
@@ -561,30 +508,6 @@
             (:boundp
              `(instance-boundp ,pv-offset-form ,parameter ,position
                                ',slot-name ',class)))))))
-
-(defun optimize-accessor-call (slots read/write sparameter gf-name new-value)
-  (let* ((class (if (consp sparameter) (cdr sparameter) *the-class-t*))
-         (parameter (if (consp sparameter) (car sparameter) sparameter))
-         (parameter-entry (assq parameter slots))
-         (name (case read/write
-                 (:read `(reader ,gf-name))
-                 (:write `(writer ,gf-name))))
-         (slot-entry      (assoc name (cdr parameter-entry) :test #'equal))
-         (position (posq parameter-entry slots))
-         (pv-offset-form (list 'pv-offset ''.PV-OFFSET.)))
-    (unless parameter-entry
-      (error "slot optimization bewilderment: O-A-C"))
-    (unless slot-entry
-      (setq slot-entry (list name))
-      (push slot-entry (cdr parameter-entry)))
-    (push pv-offset-form (cdr slot-entry))
-    (ecase read/write
-      (:read
-       `(instance-reader ,pv-offset-form ,parameter ,position ,gf-name ',class))
-      (:write
-       `(let ((.new-value. ,new-value))
-          (instance-writer ,pv-offset-form ,parameter ,position ,gf-name ',class
-                           .new-value.))))))
 
 (defvar *unspecific-arg* '..unspecific-arg..)
 
@@ -675,10 +598,10 @@
          (eq *boot-state* 'complete)
          (not (slot-accessor-std-p slotd type)))))
 
-(defmacro instance-read-internal (pv slots pv-offset default &optional type)
-  (unless (member type '(nil :instance :class :default))
-    (error "illegal type argument to ~S: ~S" 'instance-read-internal type))
-  (if (eq type :default)
+(defmacro instance-read-internal (pv slots pv-offset default &optional kind)
+  (unless (member kind '(nil :instance :class :default))
+    (error "illegal kind argument to ~S: ~S" 'instance-read-internal kind))
+  (if (eq kind :default)
       default
       (let* ((index (gensym))
              (value index))
@@ -696,11 +619,11 @@
                            ;; to shut it up.  (see also mail Rudi
                            ;; Schlatte sbcl-devel 2003-09-21) -- CSR,
                            ;; 2003-11-30
-                           ,@(when (or (null type) (eq type :instance))
+                           ,@(when (or (null kind) (eq kind :instance))
                                `((fixnum
                                   (and ,slots ; KLUDGE
                                    (clos-slots-ref ,slots ,index)))))
-                           ,@(when (or (null type) (eq type :class))
+                           ,@(when (or (null kind) (eq kind :class))
                                `((cons (cdr ,index))))
                            (t +slot-unbound+)))
             (if (eq ,value +slot-unbound+)
@@ -715,28 +638,21 @@
         ,(if (generate-fast-class-slot-access-p class slot-name)
              :class :instance))))
 
-(defmacro instance-reader (pv-offset parameter position gf-name class)
-  (declare (ignore class))
-  `(instance-read-internal .pv. ,(slot-vector-symbol position)
-    ,pv-offset
-    (,gf-name (instance-accessor-parameter ,parameter))
-    :instance))
-
 (defmacro instance-write-internal (pv slots pv-offset new-value default
-                                      &optional type)
-  (unless (member type '(nil :instance :class :default))
-    (error "illegal type argument to ~S: ~S" 'instance-write-internal type))
-  (if (eq type :default)
+                                      &optional kind)
+  (unless (member kind '(nil :instance :class :default))
+    (error "illegal kind argument to ~S: ~S" 'instance-write-internal kind))
+  (if (eq kind :default)
       default
       (let* ((index (gensym)))
         `(locally (declare #.*optimize-speed*)
           (let ((,index (pvref ,pv ,pv-offset)))
             (typecase ,index
-              ,@(when (or (null type) (eq type :instance))
+              ,@(when (or (null kind) (eq kind :instance))
                   `((fixnum (and ,slots
                              (setf (clos-slots-ref ,slots ,index)
                                    ,new-value)))))
-              ,@(when (or (null type) (eq type :class))
+              ,@(when (or (null kind) (eq kind :class))
                   `((cons (setf (cdr ,index) ,new-value))))
               (t ,default)))))))
 
@@ -754,37 +670,21 @@
         ,(if (generate-fast-class-slot-access-p class slot-name)
              :class :instance))))
 
-(defmacro instance-writer (pv-offset
-                           parameter
-                           position
-                           gf-name
-                           class
-                           new-value)
-  (declare (ignore class))
-  `(instance-write-internal .pv. ,(slot-vector-symbol position)
-    ,pv-offset ,new-value
-    (,(if (consp gf-name)
-          (get-setf-fun-name gf-name)
-          gf-name)
-     (instance-accessor-parameter ,parameter)
-     ,new-value)
-    :instance))
-
 (defmacro instance-boundp-internal (pv slots pv-offset default
-                                       &optional type)
-  (unless (member type '(nil :instance :class :default))
-    (error "illegal type argument to ~S: ~S" 'instance-boundp-internal type))
-  (if (eq type :default)
+                                       &optional kind)
+  (unless (member kind '(nil :instance :class :default))
+    (error "illegal kind argument to ~S: ~S" 'instance-boundp-internal kind))
+  (if (eq kind :default)
       default
       (let* ((index (gensym)))
         `(locally (declare #.*optimize-speed*)
           (let ((,index (pvref ,pv ,pv-offset)))
             (typecase ,index
-              ,@(when (or (null type) (eq type :instance))
+              ,@(when (or (null kind) (eq kind :instance))
                   `((fixnum (not (and ,slots
                                       (eq (clos-slots-ref ,slots ,index)
                                           +slot-unbound+))))))
-              ,@(when (or (null type) (eq type :class))
+              ,@(when (or (null kind) (eq kind :class))
                   `((cons (not (eq (cdr ,index) +slot-unbound+)))))
               (t ,default)))))))
 
@@ -1235,3 +1135,4 @@
         when snl
           collect w into result
         finally (return (if (cdr result) result (car result)))))
+

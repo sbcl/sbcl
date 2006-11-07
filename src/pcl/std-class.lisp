@@ -286,13 +286,14 @@
         (constantly (make-member-type :members (list (specializer-object specl))))))
 
 (defun real-load-defclass (name metaclass-name supers slots other
-                           readers writers slot-names source-location)
+                           readers writers slot-names source-location safe-p)
   (with-single-package-locked-error (:symbol name "defining ~S as a class")
     (%compiler-defclass name readers writers slot-names)
     (let ((res (apply #'ensure-class name :metaclass metaclass-name
                       :direct-superclasses supers
                       :direct-slots slots
                       :definition-source source-location
+                      'safe-p safe-p
                       other)))
       res)))
 
@@ -1036,6 +1037,7 @@
          (allocation nil)
          (allocation-class nil)
          (type t)
+         (type-check-function nil)
          (documentation nil)
          (documentationp nil)
          (namep  nil)
@@ -1061,6 +1063,15 @@
                 allocation-class (slot-definition-class slotd)
                 allocp t))
         (setq initargs (append (slot-definition-initargs slotd) initargs))
+        (let ((fun (slot-definition-type-check-function slotd)))
+          (when fun
+            (setf type-check-function
+                  (if type-check-function
+                      (let ((old-function type-check-function))
+                        (lambda (value)
+                          (funcall old-function value)
+                          (funcall fun value)))
+                      fun))))
         (let ((slotd-type (slot-definition-type slotd)))
           (setq type (cond
                        ((eq type t) slotd-type)
@@ -1077,6 +1088,7 @@
           :allocation allocation
           :allocation-class allocation-class
           :type type
+          'type-check-function type-check-function
           :class class
           :documentation documentation)))
 
@@ -1150,9 +1162,10 @@
   (let ((method (get-method generic-function () (list class) nil)))
     (when method (remove-method generic-function method))))
 
-;;; MAKE-READER-METHOD-FUNCTION and MAKE-WRITE-METHOD function are NOT
-;;; part of the standard protocol. They are however useful, PCL makes
-;;; use of them internally and documents them for PCL users.
+;;; MAKE-READER-METHOD-FUNCTION and MAKE-WRITER-METHOD-FUNCTION
+;;; function are NOT part of the standard protocol. They are however
+;;; useful; PCL makes use of them internally and documents them for
+;;; PCL users.  (FIXME: but SBCL certainly doesn't)
 ;;;
 ;;; *** This needs work to make type testing by the writer functions which
 ;;; *** do type testing faster. The idea would be to have one constructor
@@ -1164,13 +1177,13 @@
 ;;; *** defined for this metaclass a chance to run.
 
 (defmethod make-reader-method-function ((class slot-class) slot-name)
-  (make-std-reader-method-function (class-name class) slot-name))
+  (make-std-reader-method-function class slot-name))
 
 (defmethod make-writer-method-function ((class slot-class) slot-name)
-  (make-std-writer-method-function (class-name class) slot-name))
+  (make-std-writer-method-function class slot-name))
 
 (defmethod make-boundp-method-function ((class slot-class) slot-name)
-  (make-std-boundp-method-function (class-name class) slot-name))
+  (make-std-boundp-method-function class slot-name))
 
 (defmethod compatible-meta-class-change-p (class proto-new-class)
   (eq (class-of class) (class-of proto-new-class)))

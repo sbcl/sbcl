@@ -23,7 +23,7 @@
 ;;; A distilled test case from cmucl-imp for Kevin Rosenberg's
 ;;; hyperobject.  Fix from Gerd Moellmann.
 (defclass hyperobject-class (standard-class)
-  ((user-name :initarg :user-name :type string :initform nil
+  ((user-name :initarg :user-name :type (or null string) :initform nil
               :accessor user-name
               :documentation "User name for class")))
 

@@ -430,11 +430,11 @@
 ;;; confusing.
 (with-test (:name (:ctor :typep-function))
   (assert (eval '(typep (sb-pcl::ensure-ctor
-                         (list 'sb-pcl::ctor (gensym)) nil nil)
+                         (list 'sb-pcl::ctor (gensym)) nil nil nil)
                         'function))))
 (with-test (:name (:ctor :functionp))
   (assert (functionp (sb-pcl::ensure-ctor
-                      (list 'sb-pcl::ctor (gensym)) nil nil))))
+                      (list 'sb-pcl::ctor (gensym)) nil nil nil))))
 
 ;;; from PFD ansi-tests
 (let ((t1 '(cons (cons (cons (real -744833699 -744833699) cons)
