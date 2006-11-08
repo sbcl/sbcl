@@ -1,10 +1,9 @@
-
 * Mailing lists
 
 Your first recourse for support should probably be to the mailing list
   sbcl-help@lists.sourceforge.net
 
-Remember that the people answering your qwuestion are volunteers, so
+Remember that the people answering your question are volunteers, so
 you stand a much better chance of getting a good answer if you ask a
 good question: before sending mail, check
  
@@ -24,7 +23,6 @@ good question: before sending mail, check
 
     http://www.chiark.greenend.org.uk/~sgtatham/bugs.html
     http://www.catb.org/~esr/faqs/smart-questions.html
-
 
 * Consultants
 
@@ -53,6 +51,12 @@ PGP:       1024D/52D68DF2 : B36B 91C5 1835 DB9B FBAB  735B 84C5 E278 52D6 8DF2
 Expertise: Ports to new systems, optimizations of current platforms.  Library bug fixes or enhancements.
 Offerings: Custom programming.
 
+Name:      Nikodemus Siivola / Steel Bank Studio Ltd
+Email:     nikodemus@sb-studio.net
+PGP:       9B58 2337 94FF 912E 2658  C891 6D2A 6420 028F 7EC5
+Web:       http://www.sb-studio.net
+Expertise: General SBCL support and development.
+Offerings: Support and custom programming.
 
 [ If you provide SBCL-related services, please add your details to
 this file keeping alphabetical order by surname, following the
