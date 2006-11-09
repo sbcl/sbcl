@@ -149,6 +149,11 @@
     (declare (fixnum array-rank))
     (when (and displaced-index-offset (null displaced-to))
       (error "can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
+    (when (and displaced-to
+               (arrayp displaced-to)
+               (not (equal (array-element-type displaced-to)
+                           (upgraded-array-element-type element-type))))
+      (error "Array element type of :DISPLACED-TO array does not match specified element type"))
     (if (and simple (= array-rank 1))
         ;; it's a (SIMPLE-ARRAY * (*))
         (multiple-value-bind (type n-bits)

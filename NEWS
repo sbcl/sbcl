@@ -26,6 +26,8 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
     for sequences" or "The value 1 is not of type FIXNUM")
   * bug fix: version components are handled correctly in TRANSLATE-PATHNAME
     (reported by Josip Gracin)
+  * bug fix: an error is signaled for attempts to displace arrays with
+    incompatible element types (thanks to Mario Mommer)
   * Improvements to the Windows port:
     ** floating point exceptions are now reported correctly.
     ** stack exhaustion detection works partially.
