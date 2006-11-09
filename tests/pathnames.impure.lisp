@@ -410,4 +410,19 @@
 
 (enough-namestring #p".a*")
 
+
+(assert (eq 99
+            (pathname-version
+             (translate-pathname
+              (make-pathname :name "foo" :type "bar" :version 99)
+              (make-pathname :name :wild :type :wild :version :wild)
+              (make-pathname :name :wild :type :wild :version :wild)))))
+
+(assert (eq 99
+            (pathname-version
+             (translate-pathname
+              (make-pathname :name "foo" :type "bar" :version 99)
+              (make-pathname :name :wild :type :wild :version :wild)
+              (make-pathname :name :wild :type :wild :version nil)))))
+
 ;;;; success

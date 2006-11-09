@@ -1270,8 +1270,9 @@ PARSE-NAMESTRING."
                (frob %pathname-name)
                (frob %pathname-type)
                (if (eq from-host *unix-host*)
-                   (if (eq (%pathname-version to) :wild)
-                       (%pathname-version from)
+                   (if (or (eq (%pathname-version to) :wild)
+                           (eq (%pathname-version to) nil))
+                       (%pathname-version source)
                        (%pathname-version to))
                    (frob %pathname-version)))))))))
 
