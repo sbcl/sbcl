@@ -692,7 +692,11 @@
  #!+sb-unicode
  ("src/code/external-formats/enc-win" :not-host)
  #!+sb-unicode
- ("src/code/external-formats/eucjp" :not-host)
+ ("src/code/external-formats/mb-util" :not-host)
+ #!+sb-unicode
+ ("src/code/external-formats/enc-jpn-tbl" :not-host)
+ #!+sb-unicode
+ ("src/code/external-formats/enc-jpn" :not-host)
  #!+sb-unicode
  ("src/code/external-formats/ucs-2" :not-host)
 

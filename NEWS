@@ -14,6 +14,8 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
     POSIX platforms (thanks to NIIMI Satoshi)
   * improvement: SB-POSIX supports time(2), utime(2) and utimes(2)
     (thanks to Zach Beane)
+  * improvement: added support for the Shift-JIS external format.
+    (contributed by NIIMI Satoshi)
   * bug fix: compiler bug triggered by a (non-standard) VALUES
     declaration in a LET* was fixed. (reported by Kaersten Poeck)
   * bug fix: file compiler no longer confuses validated and already

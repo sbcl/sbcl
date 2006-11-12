@@ -191,7 +191,7 @@
           ;;870       IBM EBCDIC - Multilingual/ROECE (Latin-2)
           (874 :CP874) ;; ANSI/OEM - Thai (same as 28605, ISO 8859-15)
           ;;875       IBM EBCDIC - Modern Greek
-          ;;932       ANSI/OEM - Japanese, Shift-JIS
+          (932 :CP932)     ;; ANSI/OEM - Japanese, Shift-JIS
           ;;936       ANSI/OEM - Simplified Chinese (PRC, Singapore)
           ;;949       ANSI/OEM - Korean (Unified Hangul Code)
           ;;950       ANSI/OEM - Traditional Chinese (Taiwan; Hong Kong SAR, PRC)
