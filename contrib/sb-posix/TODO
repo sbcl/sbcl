@@ -28,8 +28,8 @@ settimeofday sgetmask shmat shmctl shmdt shmget shmop shutdown
 sigaction sigaltstack sigblock siggetmask sigmask signal sigpause
 sigpending sigprocmask sigreturn sigsetmask sigsuspend sigvec socket
 socketcall socketpair ssetmask statfs stime stty swapoff swapon
-syscalls sysctl sysfs sysinfo syslog time times
-ulimit umount uname ustat utime utimes vfork vhangup wait3
+syscalls sysctl sysfs sysinfo syslog times
+ulimit umount uname ustat vfork vhangup wait3
 wait4 write writev
 
 4) In the spec but not implemented: 

@@ -445,6 +445,59 @@
                                  (function speed-t (* alien-termios)))
                     a-termios))))
 
+
+#-win32
+(progn
+  (export 'time :sb-posix)
+  (defun time ()
+    (let ((result (alien-funcall (extern-alien "time"
+                                               (function time-t (* time-t)))
+                                 nil)))
+      (if (minusp result)
+          (syscall-error)
+          result)))
+  (export 'utime :sb-posix)
+  (defun utime (filename &optional access-time modification-time)
+    (let ((fun (extern-alien "utime" (function int c-string
+                                               (* alien-utimbuf))))
+          (name (filename filename)))
+      (if (not (and access-time modification-time))
+          (alien-funcall fun name nil)
+          (with-alien ((utimbuf (struct alien-utimbuf)))
+            (setf (slot utimbuf 'actime) (or access-time 0)
+                  (slot utimbuf 'modtime) (or modification-time 0))
+            (let ((result (alien-funcall fun name (alien-sap utimbuf))))
+              (if (minusp result)
+                  (syscall-error)
+                  result))))))
+  (export 'utimes :sb-posix)
+  (defun utimes (filename &optional access-time modification-time)
+    (flet ((seconds-and-useconds (time)
+             (multiple-value-bind (integer fractional)
+                 (cl:truncate time)
+               (values integer (cl:truncate (* fractional 1000000)))))
+           (maybe-syscall-error (value)
+             (if (minusp value)
+                 (syscall-error)
+                 value)))
+      (let ((fun (extern-alien "utimes" (function int c-string
+                                                  (* (array alien-timeval 2)))))
+            (name (filename filename)))
+        (if (not (and access-time modification-time))
+            (maybe-syscall-error (alien-funcall fun name nil))
+            (with-alien ((buf (array alien-timeval 2)))
+              (let ((actime (deref buf 0))
+                    (modtime (deref buf 1)))
+                (setf (values (slot actime 'sec)
+                              (slot actime 'usec))
+                      (seconds-and-useconds (or access-time 0))
+                      (values (slot modtime 'sec)
+                              (slot modtime 'usec))
+                      (seconds-and-useconds (or modification-time 0)))
+                (maybe-syscall-error (alien-funcall fun name
+                                                    (alien-sap buf))))))))))
+
+
 ;;; environment
 
 (export 'getenv :sb-posix)

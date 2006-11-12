@@ -461,3 +461,46 @@
         (setf termios (sb-posix:tcgetattr 0))
         (= new (sb-posix:cfgetospeed termios))))
   t)
+
+
+#-win32
+(deftest time.1
+    (plusp (sb-posix:time))
+  t)
+
+#-win32
+(deftest utime.1
+    (let ((file (merge-pathnames #p"utime.1" *test-directory*))
+          (atime (random (1- (expt 2 31))))
+          (mtime (random (1- (expt 2 31)))))
+      (with-open-file (stream file
+                       :direction :output
+                       :if-exists :supersede
+                       :if-does-not-exist :create)
+        (princ "Hello, utime" stream))
+      (sb-posix:utime file atime mtime)
+      (let* ((stat (sb-posix:stat file)))
+        (delete-file file)
+        (list (= (sb-posix:stat-atime stat) atime)
+              (= (sb-posix:stat-mtime stat) mtime))))
+  (t t))
+
+#-win32
+(deftest utimes.1
+    (let ((file (merge-pathnames #p"utimes.1" *test-directory*))
+          (atime (random (1- (expt 2 31))))
+          (mtime (random (1- (expt 2 31)))))
+      (with-open-file (stream file
+                       :direction :output
+                       :if-exists :supersede
+                       :if-does-not-exist :create)
+        (princ "Hello, utimes" stream))
+      (sb-posix:utime file atime mtime)
+      (let* ((stat (sb-posix:stat file)))
+        (delete-file file)
+        (list (= (sb-posix:stat-atime stat) atime)
+              (= (sb-posix:stat-mtime stat) mtime))))
+  (t t))
+
+
+

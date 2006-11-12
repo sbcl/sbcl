@@ -11,7 +11,9 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
   * improvement: writes to CLOS instance slots are type-checked in code
     compiled with (SAFETY 3)
   * improvement: floating-point exception handling should work on all
-    POSIX platforms (thanks to NIIMI Satoshi)  
+    POSIX platforms (thanks to NIIMI Satoshi)
+  * improvement: SB-POSIX supports time(2), utime(2) and utimes(2)
+    (thanks to Zach Beane)
   * bug fix: compiler bug triggered by a (non-standard) VALUES
     declaration in a LET* was fixed. (reported by Kaersten Poeck)
   * bug fix: file compiler no longer confuses validated and already

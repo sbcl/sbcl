@@ -1,5 +1,5 @@
 (defpackage :sb-posix (:use #:sb-alien #:cl)
-  (:shadow close open ftruncate truncate)
+  (:shadow close open ftruncate truncate time)
   (:export #:syscall-error #:syscall-errno
 
            ;; grovel structure accessors

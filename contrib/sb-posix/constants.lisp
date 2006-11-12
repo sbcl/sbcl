@@ -6,6 +6,7 @@
 (#||#
  "sys/types.h"
  "sys/stat.h"
+ #-win32 "utime.h"
  #-win32 "sys/socket.h"
  #-win32 "sys/un.h"
  #-win32 "netinet/in.h"
@@ -348,6 +349,18 @@
               (tcflag-t cflag "tcflag_t" "c_cflag")
               (tcflag-t lflag "tcflag_t" "c_lflag")
               ((array cc-t) cc "cc_t" "c_cc")))
+
+ ;; utime(), utimes()
+ #-win32
+ (:structure alien-utimbuf
+             ("struct utimbuf"
+              (time-t actime "time_t" "actime")
+              (time-t modtime "time_t" "modtime")))
+ #-win32
+ (:structure alien-timeval
+             ("struct timeval"
+              (long sec "long" "tv_sec")
+              (long usec "long" "tv_usec")))
 
  (:integer veof "VEOF" nil t)
  (:integer veol "VEOL" nil t)
