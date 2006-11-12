@@ -161,6 +161,13 @@ case "$sbcl_os" in
     linux)
         printf ' :elf' >> $ltf
         printf ' :linux' >> $ltf
+
+        # If you add other platforms here, don't forget to edit
+        # src/runtime/Config.foo-linux too.
+        if [ $sbcl_arch = "x86" ]; then
+            printf ' :largefile' >> $ltf
+        fi
+
         if [ $sbcl_arch = "x86-64" ]; then
             link_or_copy Config.x86_64-linux Config
         else

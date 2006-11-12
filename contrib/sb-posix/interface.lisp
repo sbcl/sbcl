@@ -83,8 +83,9 @@
 (define-call* "dup" int minusp (oldfd file-descriptor))
 (define-call* "dup2" int minusp (oldfd file-descriptor)
               (newfd file-descriptor))
-(define-call* "lseek" off-t minusp (fd file-descriptor) (offset off-t)
-              (whence int))
+(define-call* ("lseek" :largefile)
+    off-t minusp (fd file-descriptor) (offset off-t)
+    (whence int))
 (define-call* "mkdir" int minusp (pathname filename) (mode mode-t))
 (macrolet ((def (x)
                `(progn
@@ -123,7 +124,8 @@
   (define-call "fchown" int minusp (fd file-descriptor)
              (owner uid-t)  (group gid-t))
   (define-call "fdatasync" int minusp (fd file-descriptor))
-  (define-call "ftruncate" int minusp (fd file-descriptor) (length off-t))
+  (define-call ("ftruncate" :largefile)
+      int minusp (fd file-descriptor) (length off-t))
   (define-call "fsync" int minusp (fd file-descriptor))
   (define-call "lchown" int minusp (pathname filename)
                (owner uid-t)  (group gid-t))
@@ -131,7 +133,8 @@
   (define-call "mkfifo" int minusp (pathname filename) (mode mode-t))
   (define-call "symlink" int minusp (oldpath filename) (newpath filename))
   (define-call "sync" void never-fails)
-  (define-call "truncate" int minusp (pathname filename) (length off-t))
+  (define-call ("truncate" :largefile)
+      int minusp (pathname filename) (length off-t))
   ;; FIXME: Windows does have _mktemp, which has a slightlty different
   ;; interface
   (define-call "mkstemp" int minusp (template c-string))
@@ -238,7 +241,7 @@
 ;;; mmap, msync
 #-win32
 (progn
- (define-call "mmap" sb-sys:system-area-pointer
+ (define-call ("mmap" :largefile) sb-sys:system-area-pointer
    (lambda (res)
      (= (sb-sys:sap-int res) #.(1- (expt 2 sb-vm::n-machine-word-bits))))
    (addr sap-or-nil) (length unsigned) (prot unsigned)
@@ -305,7 +308,7 @@
         (declare (type (or null (sb-alien:alien (* alien-stat))) stat))
         (with-alien-stat a-stat ()
           (let ((r (alien-funcall
-                    (extern-alien ,name ,type)
+                    (extern-alien ,(real-c-name (list name :largefile)) ,type)
                     (,designator-fun ,arg)
                     a-stat)))
             (when (minusp r)
@@ -320,7 +323,8 @@
                   (function int c-string (* alien-stat)))
 
 #-win32
-(define-stat-call #-netbsd "lstat" #+netbsd "_lstat" pathname filename
+(define-stat-call #-netbsd "lstat" #+netbsd "_lstat"
+                  pathname filename
                   (function int c-string (* alien-stat)))
 ;;; No symbolic links on Windows, so use stat
 #+win32

@@ -249,6 +249,10 @@ main(int argc, char *argv[])
     defconstant("o_noctty",  O_NOCTTY);
     defconstant("o_trunc",   O_TRUNC);
     defconstant("o_append",  O_APPEND);
+#ifdef LISP_FEATURE_LARGEFILE
+    defconstant("o_largefile", O_LARGEFILE);
+#endif
+
     printf(";;;\n");
     defconstant("s-ifmt",  S_IFMT);
     defconstant("s-ififo", S_IFIFO);

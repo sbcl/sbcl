@@ -167,7 +167,10 @@ wrapped_readlink(char *path)
  *
  * Some motivated spark fixed MIPS. -- ths, 2005-10-06 */
 
-#ifdef LISP_FEATURE_MIPS
+#if defined (LISP_FEATURE_LARGEFILE)
+typedef dev_t ffi_dev_t;
+typedef off_t ffi_off_t;
+#elif defined(LISP_FEATURE_MIPS)
 typedef unsigned long ffi_dev_t; /* Linux/MIPS struct stat doesn't use dev_t */
 typedef off_t ffi_off_t;
 #else

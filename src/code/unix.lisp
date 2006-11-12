@@ -167,7 +167,12 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   (declare (type unix-pathname path)
            (type fixnum flags)
            (type unix-file-mode mode))
-  (int-syscall ("open" c-string int int) path (logior #!+win32 o_binary flags) mode))
+  (int-syscall ("open" c-string int int)
+               path
+               (logior #!+win32 o_binary
+                       #!+largefile o_largefile
+                       flags)
+               mode))
 
 ;;; UNIX-CLOSE accepts a file descriptor and attempts to close the file
 ;;; associated with it.
@@ -257,7 +262,9 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   "
   (declare (type unix-fd fd)
            (type (integer 0 2) whence))
-  (let ((result (alien-funcall (extern-alien "lseek" (function off-t int off-t int))
+  (let ((result (alien-funcall (extern-alien #!-largefile "lseek"
+                                             #!+largefile "lseek_largefile"
+                                             (function off-t int off-t int))
                  fd offset whence)))
     (if (minusp result )
         (values nil (get-errno))
@@ -614,23 +621,19 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; longer than 32 bits anyway, right?":-|
 (define-alien-type nil
   (struct wrapped_stat
-    #!-mips
-    (st-dev unsigned-int)              ; would be dev-t in a real stat
-    #!+mips
-    (st-dev unsigned-long)             ; this is _not_ a dev-t on mips
+    (st-dev #!-(or mips largefile) unsigned-int
+            #!+mips unsigned-long
+            #!+largefile dev-t)
     (st-ino ino-t)
     (st-mode mode-t)
     (st-nlink nlink-t)
     (st-uid uid-t)
     (st-gid gid-t)
-    #!-mips
-    (st-rdev unsigned-int)             ; would be dev-t in a real stat
-    #!+mips
-    (st-rdev unsigned-long)             ; this is _not_ a dev-t on mips
-    #!-mips
-    (st-size unsigned-int)              ; would be off-t in a real stat
-    #!+mips
-    (st-size off-t)
+    (st-rdev #!-(or mips largefile) unsigned-int
+             #!+mips unsigned-long
+             #!+largefile dev-t)
+    (st-size #!-(or mips largefile) unsigned-int
+             #!+(or mips largefile) off-t)
     (st-blksize unsigned-long)
     (st-blocks unsigned-long)
     (st-atime time-t)

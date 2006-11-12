@@ -185,9 +185,13 @@ code:
              filename tmp-c-source (constants-package component))
     (let ((code (sb-ext:process-exit-code
                  (sb-ext:run-program
-                  "gcc"
+                  (sb-ext:posix-getenv "CC")
                   (append
                    (split-cflags (sb-ext:posix-getenv "EXTRA_CFLAGS"))
+                   #+(and linux largefile)
+                   '("-D_LARGEFILE_SOURCE"
+                     "-D_LARGEFILE64_SOURCE"
+                     "-D_FILE_OFFSET_BITS=64")
                    (list "-o"
                          (namestring tmp-a-dot-out)
                          (namestring tmp-c-source)))

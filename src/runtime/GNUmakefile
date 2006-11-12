@@ -37,7 +37,7 @@ include Config
 
 
 COMMON_SRC = alloc.c backtrace.c breakpoint.c coreparse.c \
-	dynbind.c gc-common.c globals.c interr.c interrupt.c \
+	dynbind.c gc-common.c globals.c interr.c interrupt.c largefile.c \
 	monitor.c os-common.c parse.c print.c purify.c pthread-lutex.c \
 	regnames.c run-program.c runtime.c save.c search.c \
 	thread.c time.c util.c validate.c vars.c wrap.c	

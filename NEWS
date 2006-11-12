@@ -10,10 +10,12 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
     threads are not running after *SAVE-HOOKS* have run.
   * improvement: writes to CLOS instance slots are type-checked in code
     compiled with (SAFETY 3)
-  * improvement: floating-point exception handling should work on all
-    POSIX platforms (thanks to NIIMI Satoshi)
+  * improvement: floating-point exception handling on FreeBSD (thanks to
+    NIIMI Satoshi)
   * improvement: SB-POSIX supports time(2), utime(2) and utimes(2)
     (thanks to Zach Beane)
+  * improvement: support for files larger than 2GB for CL streams and SB-POSIX
+    on Linux/x86
   * improvement: added support for the Shift-JIS external format.
     (contributed by NIIMI Satoshi)
   * bug fix: compiler bug triggered by a (non-standard) VALUES

@@ -234,6 +234,16 @@
  ;; again, if anyone's sufficiently motivated.
  ; :long-float
 
+ ;; Some platforms don't use a 32-bit off_t by default, and thus can't
+ ;; handle files larger than 2GB. This feature will control whether
+ ;; we'll try to use platform-specific compilation options to enable a
+ ;; 64-bit off_t. The intent is for this feature to be automatically
+ ;; enabled by make-config.sh on platforms where it's needed and known
+ ;; to work, you shouldn't be enabling it manually. You might however
+ ;; want to disable it, if you need to pass file descriptors to
+ ;; foreign code that uses a 32-bit off_t.
+ ; :largefile
+
  ;;
  ;; miscellaneous notes on other things which could have special significance
  ;; in the *FEATURES* list

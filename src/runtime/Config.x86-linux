@@ -30,6 +30,11 @@ OS_SRC = linux-os.c x86-linux-os.c
 LINKFLAGS += -Wl,--export-dynamic
 OS_LIBS = -ldl
 
+CFLAGS += $(shell if grep LISP_FEATURE_LARGEFILE genesis/config.h \
+                      > /dev/null 2>&1; \
+                  then echo "-D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE \
+                             -D_FILE_OFFSET_BITS=64"; fi)
+
 OS_LIBS += $(shell if grep LISP_FEATURE_SB_THREAD genesis/config.h \
                       > /dev/null 2>&1; \
                    then echo "-lpthread"; fi)

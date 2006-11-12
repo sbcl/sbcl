@@ -17,9 +17,26 @@
   (null (sb-alien:sap-alien (sb-sys:int-sap 0) (* t)))
   ((alien (* t)) alien-pointer-to-anything-or-nil))
 
-(defun lisp-for-c-symbol (s)
-  (let ((root (if (eql #\_ (char s 0)) (subseq s 1) s)))
-    (intern (substitute #\- #\_ (string-upcase root)) :sb-posix)))
+(defun lisp-for-c-symbol (name)
+  (etypecase name
+    (list
+     (lisp-for-c-symbol (car name)))
+    (string
+     (let ((root (if (eql #\_ (char name 0)) (subseq name 1) name)))
+       (intern (substitute #\- #\_ (string-upcase root)) :sb-posix)))))
+
+(defun real-c-name (name)
+  (etypecase name
+    (list
+     (destructuring-bind (name &rest options) name
+
+       (cond #+largefile
+             ((member :largefile options)
+              (format nil "~a_largefile" name))
+             (t
+              name))))
+    (string
+     name)))
 
 (defmacro define-call-internally (lisp-name c-name return-type error-predicate
                                   &rest arguments)
@@ -50,11 +67,12 @@
       `(sb-int:style-warn "Didn't find definition for ~S" ,c-name)))
 
 (defmacro define-call (name return-type error-predicate &rest arguments)
-  (let ((lisp-name (lisp-for-c-symbol name)))
+  (let ((lisp-name (lisp-for-c-symbol name))
+        (real-c-name (real-c-name name)))
     `(progn
        (export ',lisp-name :sb-posix)
        (define-call-internally ,lisp-name
-           ,name
+           ,real-c-name
          ,return-type
          ,error-predicate
          ,@arguments))))
