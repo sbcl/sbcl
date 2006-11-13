@@ -379,10 +379,10 @@
         ;; Note that we must still call OPTIMIZE-INSTANCE-ACCESS at
         ;; this point (instead of when expanding
         ;; OPTIMIZED-SLOT-VALUE), since it mutates the structure of
-        ;; SLOTS. If that mutation isn't done while during the
-        ;; walking, MAKE-METHOD-LAMBDA-INTERNAL won't wrap a correct
-        ;; PV-BINDING form around the body, and compilation will fail.
-        ;; -- JES, 2006-09-18
+        ;; SLOTS. If that mutation isn't done during the walking,
+        ;; MAKE-METHOD-LAMBDA-INTERNAL won't wrap a correct PV-BINDING
+        ;; form around the body, and compilation will fail.  -- JES,
+        ;; 2006-09-18
         `(optimized-slot-value ,form ,(car sparameter) ,optimized-form))
       `(accessor-slot-value ,@(cdr form))))
 
@@ -508,60 +508,6 @@
             (:boundp
              `(instance-boundp ,pv-offset-form ,parameter ,position
                                ',slot-name ',class)))))))
-
-(defvar *unspecific-arg* '..unspecific-arg..)
-
-(defun optimize-gf-call-internal (form slots env)
-  (when (and (consp form)
-             (eq (car form) 'the))
-    (setq form (caddr form)))
-  (or (and (symbolp form)
-           (let* ((rebound? (caddr (var-declaration '%variable-rebinding
-                                                    form
-                                                    env)))
-                  (parameter-or-nil (car (assq (or rebound? form) slots))))
-             (when parameter-or-nil
-               (let* ((class-name (caddr (var-declaration 'class
-                                                          parameter-or-nil
-                                                          env))))
-                 (when (and class-name (not (eq class-name t)))
-                   (position parameter-or-nil slots :key #'car))))))
-      (if (constantp form)
-          (let ((form (constant-form-value form)))
-            (if (symbolp form)
-                form
-                *unspecific-arg*))
-          *unspecific-arg*)))
-
-(defun optimize-gf-call (slots calls gf-call-form nreq restp env)
-  (unless (eq (car gf-call-form) 'make-instance) ; XXX needs more work
-    (let* ((args (cdr gf-call-form))
-           (all-args-p (eq (car gf-call-form) 'make-instance))
-           (non-required-args (nthcdr nreq args))
-           (required-args (ldiff args non-required-args))
-           (call-spec (list (car gf-call-form) nreq restp
-                            (mapcar (lambda (form)
-                                      (optimize-gf-call-internal form slots env))
-                                    (if all-args-p
-                                        args
-                                        required-args))))
-           (call-entry (assoc call-spec calls :test #'equal))
-           (pv-offset-form (list 'pv-offset ''.PV-OFFSET.)))
-      (unless (some #'integerp
-                    (let ((spec-args (cdr call-spec)))
-                      (if all-args-p
-                          (ldiff spec-args (nthcdr nreq spec-args))
-                          spec-args)))
-        (return-from optimize-gf-call nil))
-      (unless call-entry
-        (setq call-entry (list call-spec))
-        (push call-entry (cdr calls)))
-      (push pv-offset-form (cdr call-entry))
-      (if (eq (car call-spec) 'make-instance)
-          `(funcall (pv-ref .pv. ,pv-offset-form) ,@(cdr gf-call-form))
-          `(let ((.emf. (pv-ref .pv. ,pv-offset-form)))
-            (invoke-effective-method-function .emf. ,restp
-             ,@required-args ,@(when restp `((list ,@non-required-args)))))))))
 
 (define-walker-template pv-offset) ; These forms get munged by mutate slots.
 (defmacro pv-offset (arg) arg)
@@ -1009,38 +955,88 @@
           (make-method-initargs-form-internal1
            initargs (cddr lmf) args lmf-params restp)))))
 
+(defun lambda-list-parameter-names (lambda-list)
+  ;; Given a valid lambda list, extract the parameter names.
+  (loop for x in lambda-list
+        with res = nil
+        do (unless (member x lambda-list-keywords)
+             (if (consp x)
+                 (let ((name (car x)))
+                   (if (consp name)
+                       ;; ... ((:BAR FOO) 1)
+                       (push (second name) res)
+                       ;; ... (FOO 1)
+                       (push name res))
+                   ;; ... (... 1 FOO-P)
+                   (let ((name-p (cddr x)))
+                     (when name-p
+                       (push (car name-p) res))))
+                 ;; ... FOO
+                 (push x res)))
+        finally (return res)))
+
 (defun make-method-initargs-form-internal1
     (initargs body req-args lmf-params restp)
-  (multiple-value-bind (outer-decls inner-decls body-sans-decls)
-      (split-declarations
-       body req-args (or (getf (cdr lmf-params) :call-next-method-p)
-                         (getf (cdr lmf-params) :setq-p)))
-    (let* ((rest-arg (when restp '.rest-arg.))
-           (args+rest-arg (if restp
-                              (append req-args (list rest-arg))
-                              req-args)))
-      `(list*
-        :function
-        (let* ((fmf (,(if (body-method-name body) 'named-lambda 'lambda)
-                     ,@(when (body-method-name body)
-                         ;; function name
-                         (list (cons 'fast-method (body-method-name body))))
-                     (.pv-cell. .next-method-call. ,@args+rest-arg) ; function args
-                     ;; body of the function
-                     (declare (ignorable .pv-cell. .next-method-call.)
-                              (disable-package-locks pv-env-environment))
-                     ,@outer-decls
-                     (symbol-macrolet ((pv-env-environment default))
-                         (fast-lexical-method-functions
-                          (,(car lmf-params) .next-method-call. ,req-args ,rest-arg
-                            ,@(cdddr lmf-params))
-                          ,@inner-decls
-                          ,@body-sans-decls))))
-              (mf (%make-method-function fmf nil)))
-          (set-funcallable-instance-function
-           mf (method-function-from-fast-function fmf ',(getf initargs 'plist)))
-          mf)
-        ',initargs))))
+  (let* (;; The lambda-list of the method, minus specifiers
+         (lambda-list (car lmf-params))
+         ;; Names of the parameters that will be in the outermost lambda-list
+         ;; (and whose bound declarations thus need to be in OUTER-DECLS).
+         (outer-parameters req-args)
+         ;; The lambda-list used by BIND-ARGS
+         (bind-list lambda-list)
+         (setq-p (getf (cdr lmf-params) :setq-p))
+         (call-next-method-p (getf (cdr lmf-params) :call-next-method-p)))
+    ;; Try to use the normal function call machinery instead of BIND-ARGS
+    ;; bindings the arguments, unless:
+    (unless (or ;; If all arguments are required, BIND-ARGS will be a no-op
+                ;; in any case.
+                (not restp)
+                ;; CALL-NEXT-METHOD wants to use BIND-ARGS, and needs a
+                ;; list of all non-required arguments.
+                call-next-method-p)
+      (setf ;; We don't want a binding for .REST-ARG.
+            restp nil
+            ;; Get all the parameters for declaration parsing
+            outer-parameters (lambda-list-parameter-names lambda-list)
+            ;; Ensure that BIND-ARGS won't do anything (since
+            ;; BIND-LIST won't contain any non-required parameters,
+            ;; and REQ-ARGS will be of an equal length). We still want
+            ;; to pass BIND-LIST to FAST-LEXICAL-METHOD-FUNCTIONS so
+            ;; that BIND-FAST-LEXICAL-METHOD-FUNCTIONS can take care
+            ;; of rebinding SETQd required arguments around the method
+            ;; body.
+            bind-list req-args))
+    (multiple-value-bind (outer-decls inner-decls body-sans-decls)
+        (split-declarations
+         body outer-parameters (or call-next-method-p setq-p))
+      (let* ((rest-arg (when restp
+                         '.rest-arg.))
+             (fmf-lambda-list (if rest-arg
+                                  (append req-args (list '&rest rest-arg))
+                                  lambda-list)))
+        `(list*
+          :function
+          (let* ((fmf (,(if (body-method-name body) 'named-lambda 'lambda)
+                        ,@(when (body-method-name body)
+                                ;; function name
+                                (list (cons 'fast-method (body-method-name body))))
+                        ;; The lambda-list of the FMF
+                        (.pv-cell. .next-method-call. ,@fmf-lambda-list)
+                        ;; body of the function
+                        (declare (ignorable .pv-cell. .next-method-call.)
+                                 (disable-package-locks pv-env-environment))
+                        ,@outer-decls
+                        (symbol-macrolet ((pv-env-environment default))
+                          (fast-lexical-method-functions
+                              (,bind-list .next-method-call. ,req-args ,rest-arg
+                                ,@(cdddr lmf-params))
+                            ,@inner-decls
+                            ,@body-sans-decls))))
+                 (mf (%make-method-function fmf nil)))
+            (set-funcallable-instance-function
+             mf (method-function-from-fast-function fmf ',(getf initargs 'plist)))
+            mf)
+          ',initargs)))))
 
 ;;; Use arrays and hash tables and the fngen stuff to make this much
 ;;; better. It doesn't really matter, though, because a function
@@ -1069,11 +1065,7 @@
                                          (method-function nm)
                                          nm)
                            :call-method-args (list nms)))))
-              (if restp
-                  (let* ((rest (nthcdr nreq method-args))
-                         (args (ldiff method-args rest)))
-                    (apply fmf pv-cell nmc (nconc args (list rest))))
-                  (apply fmf pv-cell nmc method-args)))))
+              (apply fmf pv-cell nmc method-args))))
     ;; FIXME: this looks dangerous.
     (let* ((fname (%fun-name fmf)))
       (when (and fname (eq (car fname) 'fast-method))

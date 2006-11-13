@@ -104,29 +104,26 @@
     (when (and (null *precompiling-lap*) *emit-function-p*)
       (return-from emit-default-only
         (emit-default-only-function metatypes applyp))))
-  (let* ((dlap-lambda-list (make-dlap-lambda-list metatypes applyp))
-         (args (remove '&rest dlap-lambda-list))
-         (restl (when applyp '(.lap-rest-arg.))))
+  (multiple-value-bind (lambda-list args rest-arg more-arg)
+      (make-dlap-lambda-list metatypes applyp)
     (generating-lisp '(emf)
-                     dlap-lambda-list
+                     lambda-list
                      `(invoke-effective-method-function emf
                                                         ,applyp
-                                                        ,@args
-                                                        ,@restl))))
+                                                        :required-args ,args
+                                                        :more-arg ,more-arg
+                                                        :rest-arg ,rest-arg))))
 
 ;;; --------------------------------
 
 (defun generating-lisp (closure-variables args form)
-  (let* ((rest (memq '&rest args))
-         (ldiff (and rest (ldiff args rest)))
-         (args (if rest (append ldiff '(&rest .lap-rest-arg.)) args))
-         (lambda `(lambda ,closure-variables
-                    ,@(when (member 'miss-fn closure-variables)
-                        `((declare (type function miss-fn))))
-                    #'(lambda ,args
-                        (let ()
-                          (declare #.*optimize-speed*)
-                          ,form)))))
+  (let ((lambda `(lambda ,closure-variables
+                   ,@(when (member 'miss-fn closure-variables)
+                           `((declare (type function miss-fn))))
+                   #'(lambda ,args
+                       (let ()
+                         (declare #.*optimize-speed*)
+                         ,form)))))
     (values (if *precompiling-lap*
                 `#',lambda
                 (compile nil lambda))
@@ -254,11 +251,13 @@
                                         cached-index-p
                                         class-slot-p))))
 
-(defun emit-miss (miss-fn args &optional applyp)
-  (let ((restl (when applyp '(.lap-rest-arg.))))
-    (if restl
-        `(apply ,miss-fn ,@args ,@restl)
-        `(funcall ,miss-fn ,@args ,@restl))))
+(defun emit-miss (miss-fn args applyp)
+  (if applyp
+      `(multiple-value-call ,miss-fn ,@args
+                            (sb-c::%more-arg-values .more-context.
+                                                    0
+                                                    .more-count.))
+      `(funcall ,miss-fn ,@args)))
 
 (defun emit-checking-or-caching (cached-emf-p return-value-p metatypes applyp)
   (unless *optimize-cache-functions-p*
@@ -266,19 +265,21 @@
       (return-from emit-checking-or-caching
         (emit-checking-or-caching-function
          cached-emf-p return-value-p metatypes applyp))))
-  (let* ((dlap-lambda-list (make-dlap-lambda-list metatypes applyp))
-         (args (remove '&rest dlap-lambda-list))
-         (restl (when applyp '(.lap-rest-arg.))))
+  (multiple-value-bind (lambda-list args rest-arg more-arg)
+      (make-dlap-lambda-list metatypes applyp)
     (generating-lisp
      `(cache ,@(unless cached-emf-p '(emf)) miss-fn)
-     dlap-lambda-list
+     lambda-list
      `(let (,@(when cached-emf-p '(emf)))
         ,(emit-dlap args
                     metatypes
                     (if return-value-p
                         (if cached-emf-p 'emf t)
                         `(invoke-effective-method-function
-                          emf ,applyp ,@args ,@restl))
+                          emf ,applyp
+                          :required-args ,args
+                          :more-arg ,more-arg
+                          :rest-arg ,rest-arg))
                     (emit-miss 'miss-fn args applyp)
                     (when cached-emf-p 'emf))))))
 

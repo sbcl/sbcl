@@ -433,7 +433,8 @@
 
 (defun get-accessor-from-svuc-method-function (class slotd sdfun name)
   (macrolet ((emf-funcall (emf &rest args)
-               `(invoke-effective-method-function ,emf nil ,@args)))
+               `(invoke-effective-method-function ,emf nil
+                                                  :required-args ,args)))
     (set-fun-name
      (case name
        (reader (lambda (instance)

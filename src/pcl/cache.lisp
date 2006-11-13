@@ -685,31 +685,37 @@
     (dotimes (i (length metatypes))
       (push (dfun-arg-symbol i) lambda-list))
     (when applyp
-      (push '&rest lambda-list)
-      (push '.dfun-rest-arg. lambda-list))
+      ;; Use &MORE arguments to avoid consing up an &REST list that we
+      ;; might not need at all. See MAKE-EMF-CALL and
+      ;; INVOKE-EFFECTIVE-METHOD-FUNCTION for the other pieces.
+      (push '&more lambda-list)
+      (push '.dfun-more-context. lambda-list)
+      (push '.dfun-more-count. lambda-list))
     (nreverse lambda-list)))
 
 (defun make-dlap-lambda-list (metatypes applyp)
-  (let ((lambda-list nil))
+  (let ((args nil)
+        (lambda-list nil))
     (dotimes (i (length metatypes))
+      (push (dfun-arg-symbol i) args)
       (push (dfun-arg-symbol i) lambda-list))
-    ;; FIXME: This is translated directly from the old PCL code.
-    ;; It didn't have a (PUSH '.DFUN-REST-ARG. LAMBDA-LIST) or
-    ;; something similar, so we don't either.  It's hard to see how
-    ;; this could be correct, since &REST wants an argument after
-    ;; it.  This function works correctly because the caller
-    ;; magically tacks on something after &REST.  The calling functions
-    ;; (in dlisp.lisp) should be fixed and this function rewritten.
-    ;; --njf 2001-12-20
     (when applyp
-      (push '&rest lambda-list))
-    (nreverse lambda-list)))
+      (push '&more lambda-list)
+      (push '.more-context. lambda-list)
+      (push '.more-count. lambda-list))
+    ;; Return the full lambda list, the required arguments, a form
+    ;; that will generate a rest-list, and a list of the &MORE
+    ;; parameters used.
+    (values (nreverse lambda-list)
+            (nreverse args)
+            (when applyp
+              '((sb-c::%listify-rest-args
+                 .more-context.
+                 (the (and unsigned-byte fixnum)
+                   .more-count.))))
+            (when applyp
+              '(.more-context. .more-count.)))))
 
-;; FIXME: The next two functions suffer from having a `.DFUN-REST-ARG.'
-;; in their lambda lists, but no corresponding `&REST' symbol.  We assume
-;; this should be the case by analogy with the previous two functions.
-;; It works, and I don't know why.  Check the calling functions and
-;; fix these too.  --njf 2001-12-20
 (defun make-emf-call (metatypes applyp fn-variable &optional emf-type)
   (let ((required
          (let ((required nil))
@@ -719,17 +725,29 @@
     `(,(if (eq emf-type 'fast-method-call)
            'invoke-effective-method-function-fast
            'invoke-effective-method-function)
-      ,fn-variable ,applyp ,@required ,@(when applyp `(.dfun-rest-arg.)))))
+       ,fn-variable
+       ,applyp
+       :required-args ,required
+       ;; INVOKE-EFFECTIVE-METHOD-FUNCTION will decide whether to use
+       ;; the :REST-ARG version or the :MORE-ARG version depending on
+       ;; the type of the EMF.
+       :rest-arg ,(if applyp
+                      ;; Creates a list from the &MORE arguments.
+                      '((sb-c::%listify-rest-args
+                         .dfun-more-context.
+                         (the (and unsigned-byte fixnum)
+                           .dfun-more-count.)))
+                      nil)
+       :more-arg ,(when applyp
+                    '(.dfun-more-context. .dfun-more-count.)))))
 
 (defun make-fast-method-call-lambda-list (metatypes applyp)
-  (let ((reversed-lambda-list nil))
-    (push '.pv-cell. reversed-lambda-list)
-    (push '.next-method-call. reversed-lambda-list)
-    (dotimes (i (length metatypes))
-      (push (dfun-arg-symbol i) reversed-lambda-list))
-    (when applyp
-      (push '.dfun-rest-arg. reversed-lambda-list))
-    (nreverse reversed-lambda-list)))
+  (let ((lambda-list (make-dfun-lambda-list metatypes applyp)))
+    ;; Reverse order
+    (push '.next-method-call. lambda-list)
+    (push '.pv-cell. lambda-list)
+    lambda-list))
+
 
 (defmacro with-local-cache-functions ((cache) &body body)
   `(let ((.cache. ,cache))

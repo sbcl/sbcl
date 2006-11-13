@@ -249,7 +249,11 @@
                    (dotimes (i (length metatypes) (nreverse req))
                      (push (dfun-arg-symbol i) req))))
                 (gf-args (if applyp
-                             `(list* ,@required .dfun-rest-arg.)
+                             `(list* ,@required
+                                     (sb-c::%listify-rest-args
+                                      .dfun-more-context.
+                                      (the (and (unsigned-byte fixnum))
+                                        .dfun-more-count.)))
                              `(list ,@required))))
            `(lambda ,ll
              (declare (ignore .pv-cell. .next-method-call.))
@@ -322,10 +326,11 @@
                  ,(make-emf-call metatypes applyp 'emf type))
                (list gensym))))
     (check-applicable-keywords
-     (values `(check-applicable-keywords
-               .dfun-rest-arg. .keyargs-start. .valid-keys.)
+     (values `(check-applicable-keywords .keyargs-start.
+                                         .valid-keys.
+                                         .dfun-more-context.
+                                         .dfun-more-count.)
              '(.keyargs-start. .valid-keys.)))
-
     (t
      (default-code-converter form))))
 
@@ -488,34 +493,41 @@
         (aver any-keyp)
         (values (if allowp t keys) nopt)))))
 
-(defun check-applicable-keywords (args start valid-keys)
+(defun check-applicable-keywords (start valid-keys more-context more-count)
   (let ((allow-other-keys-seen nil)
         (allow-other-keys nil)
-        (args (nthcdr start args)))
-    (collect ((invalid))
-      (loop
-       (when (null args)
-         (when (and (invalid) (not allow-other-keys))
-           (error 'simple-program-error
-                  :format-control "~@<invalid keyword argument~P: ~
+        (i start))
+    (declare (type index i more-count)
+             (optimize speed))
+    (flet ((current-value ()
+             (sb-c::%more-arg more-context i)))
+      (declare (inline current-value))
+      (collect ((invalid))
+        (loop
+           (when (>= i more-count)
+             (when (and (invalid) (not allow-other-keys))
+               (error 'simple-program-error
+                      :format-control "~@<invalid keyword argument~P: ~
                                    ~{~S~^, ~} (valid keys are ~{~S~^, ~}).~@:>"
-                  :format-arguments (list (length (invalid)) (invalid) valid-keys)))
-         (return))
-       (let ((key (pop args)))
-         (cond
-           ((not (symbolp key))
-            (error 'simple-program-error
-                   :format-control "~@<keyword argument not a symbol: ~S.~@:>"
-                   :format-arguments (list key)))
-           ((null args) (sb-c::%odd-key-args-error))
-           ((eq key :allow-other-keys)
-            ;; only the leftmost :ALLOW-OTHER-KEYS has any effect
-            (unless allow-other-keys-seen
-              (setq allow-other-keys-seen t
-                    allow-other-keys (car args))))
-           ((eq t valid-keys))
-           ((not (memq key valid-keys)) (invalid key))))
-       (pop args)))))
+                      :format-arguments (list (length (invalid)) (invalid) valid-keys)))
+             (return))
+           (let ((key (current-value)))
+             (incf i)
+             (cond
+               ((not (symbolp key))
+                (error 'simple-program-error
+                       :format-control "~@<keyword argument not a symbol: ~S.~@:>"
+                       :format-arguments (list key)))
+               ((= i more-count)
+                (sb-c::%odd-key-args-error))
+               ((eq key :allow-other-keys)
+                ;; only the leftmost :ALLOW-OTHER-KEYS has any effect
+                (unless allow-other-keys-seen
+                  (setq allow-other-keys-seen t
+                        allow-other-keys (current-value))))
+               ((eq t valid-keys))
+               ((not (memq key valid-keys)) (invalid key))))
+           (incf i))))))
 
 ;;;; the STANDARD method combination type. This is coded by hand
 ;;;; (rather than with DEFINE-METHOD-COMBINATION) for bootstrapping

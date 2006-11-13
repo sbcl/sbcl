@@ -1400,5 +1400,126 @@
                              (make-instance 'listoid :cdroid
                                             (make-instance 'listoid))))
              3)))
+
+
+
+;;;; Tests for argument parsing in fast-method-functions.
+
+(defvar *foo* 0)
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (symbol-value 'a) 'invalid))
+
+(defmacro test1 (lambda-list values args &key declarations cnm)
+  `(progn
+     (fmakunbound 'll-method)
+     (fmakunbound 'll-function)
+     (defmethod ll-method ,lambda-list
+       ,@declarations
+       ,@(when cnm
+           `((when nil (call-next-method))))
+       (list ,@values))
+     (defun ll-function ,lambda-list
+       ,@declarations
+       (list ,@values))
+     (dotimes (i 2)
+       (assert (equal (ll-method ,@args)
+                      (ll-function ,@args))))))
+
+(defmacro test (&rest args)
+  `(progn
+     (test1 ,@args :cnm nil)
+     (test1 ,@args :cnm t)))
+
+;; Just plain arguments
+
+(test (a) (a) (1))
+(test (a b c d e f g h i) (a b c d e f g h i) (1 2 3 4 5 6 7 8 9))
+
+(test (*foo*) (*foo* (symbol-value '*foo*)) (1))
+
+(test (a) (a (symbol-value 'a)) (1)
+      :declarations ((declare (special a))))
+
+;; Optionals
+
+(test (a &optional b c) (a b c) (1))
+(test (a &optional b c) (a b c) (1 2))
+(test (a &optional b c) (a b c) (1 2 3))
+
+(test (a &optional (b 'b b-p) (c 'c c-p)) (a b c b-p c-p) (1))
+(test (a &optional (b 'b b-p) (c 'c c-p)) (a b c b-p c-p) (1 2))
+(test (a &optional (b 'b b-p) (c 'c c-p)) (a b c b-p c-p) (1 2 3))
+
+(test (&optional *foo*) (*foo* (symbol-value '*foo*)) ())
+(test (&optional *foo*) (*foo* (symbol-value '*foo*)) (1))
+
+(test (&optional (*foo* 'z foo-p)) (*foo* (symbol-value '*foo*) foo-p) ())
+(test (&optional (*foo* 'z foo-p)) (*foo* (symbol-value '*foo*) foo-p) (1))
+
+(test (&optional a) (a (symbol-value 'a)) ()
+      :declarations ((declare (special a))))
+(test (&optional a) (a (symbol-value 'a)) (1)
+      :declarations ((declare (special a))))
+
+(test (&optional (a 'z a-p)) (a (symbol-value 'a) a-p) ()
+      :declarations ((declare (special a))))
+(test (&optional (a 'z a-p)) (a (symbol-value 'a) a-p) (1)
+      :declarations ((declare (special a))))
+
+(defparameter *count* 0)
+
+(test (&optional (a (incf *count*)) (b (incf *count*)))
+      (a b *count* (setf *count* 0))
+      ())
+
+;; Keywords with some &RESTs thrown in
+
+(dolist (args '((1)
+                (1 :b 2)
+                (1 :c 3)
+                (1 :b 2 :c 3)
+                (1 :c 3 :b 2)
+                (1 :c 3 :c 1 :b 2 :b 4)))
+  (eval `(test (a &key b c) (a b c) ,args))
+  (eval `(test (a &key (b 'b b-p) (c 'c c-p))
+               (a b c b-p c-p)
+               ,args))
+  (eval `(test (a &rest rest &key (b 'b b-p) (c 'c c-p))
+               (a b c b-p c-p rest)
+               ,args))
+  (eval `(test (a &rest *foo* &key (b 'b b-p) (c 'c c-p))
+               (a b c b-p c-p *foo* (symbol-value '*foo*))
+               ,args))
+  (eval `(test (a &rest *foo* &key (b 'b b-p) (c 'c c-p))
+               (a b c b-p c-p *foo* (symbol-value '*foo*))
+               ,args
+               :declarations ((declare (special b-p))))))
+
+(dolist (args '(()
+                (:*foo* 1)
+                (:*foo* 1 :*foo* 2)))
+  (eval `(test (&key *foo*) (*foo* (symbol-value '*foo*)) ,args))
+  (eval `(test (&key (*foo* 'z foo-p)) (*foo* (symbol-value '*foo*) foo-p)
+               ,args))
+  (eval `(test (&key ((:*foo* a) 'z foo-p)) (a (symbol-value 'a) foo-p)
+               ,args))
+  (eval `(test (&key ((:*foo* a) 'z foo-p)) (a (symbol-value 'a) foo-p)
+               ,args
+               :declarations ((declare (special a))))))
+
+(defparameter *count* 0)
+
+(test (&key (a (incf *count*)) (b (incf *count*)))
+      (a b *count* (setf *count* 0))
+      ())
+
+(test (&key a b &allow-other-keys) (a b) (:a 1 :b 2 :c 3))
+
+(defmethod clim-style-lambda-list-test (a b &optional c d &key x y)
+  (list a b c d x y))
+
+(clim-style-lambda-list-test 1 2)
+
 
 ;;;; success

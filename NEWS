@@ -34,6 +34,8 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
     (reported by Josip Gracin)
   * bug fix: an error is signaled for attempts to displace arrays with
     incompatible element types (thanks to Mario Mommer)
+  * optimization: method calls with &OPTIONAL or &KEY arguments are faster
+    and don't cause extra consing
   * Improvements to the Windows port:
     ** floating point exceptions are now reported correctly.
     ** stack exhaustion detection works partially.

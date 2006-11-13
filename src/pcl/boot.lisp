@@ -918,14 +918,42 @@ bootstrapping.
 
 #-sb-fluid (declaim (sb-ext:freeze-type fast-method-call))
 
-(defmacro fmc-funcall (fn pv-cell next-method-call &rest args)
-  `(funcall ,fn ,pv-cell ,next-method-call ,@args))
+;; The two variants of INVOKE-FAST-METHOD-CALL differ in how REST-ARGs
+;; are handled. The first one will get REST-ARG as a single list (as
+;; the last argument), and will thus need to use APPLY. The second one
+;; will get them as a &MORE argument, so we can pass the arguments
+;; directly with MULTIPLE-VALUE-CALL and %MORE-ARG-VALUES.
 
-(defmacro invoke-fast-method-call (method-call &rest required-args+rest-arg)
-  `(fmc-funcall (fast-method-call-function ,method-call)
-                (fast-method-call-pv-cell ,method-call)
-                (fast-method-call-next-method-call ,method-call)
-                ,@required-args+rest-arg))
+(defmacro invoke-fast-method-call (method-call restp &rest required-args+rest-arg)
+  `(,(if restp 'apply 'funcall) (fast-method-call-function ,method-call)
+                                (fast-method-call-pv-cell ,method-call)
+                                (fast-method-call-next-method-call ,method-call)
+                                ,@required-args+rest-arg))
+
+(defmacro invoke-fast-method-call/more (method-call
+                                        more-context
+                                        more-count
+                                        &rest required-args)
+  (macrolet ((generate-call (n)
+               ``(funcall (fast-method-call-function ,method-call)
+                          (fast-method-call-pv-cell ,method-call)
+                          (fast-method-call-next-method-call ,method-call)
+                          ,@required-args
+                          ,@(loop for x below ,n
+                                  collect `(sb-c::%more-arg ,more-context ,x)))))
+    ;; The cases with only small amounts of required arguments passed
+    ;; are probably very common, and special-casing speeds them up by
+    ;; a factor of 2 with very little effect on the other
+    ;; cases. Though it'd be nice to have the generic case be equally
+    ;; fast.
+    `(case ,more-count
+       (0 ,(generate-call 0))
+       (1 ,(generate-call 1))
+       (t (multiple-value-call (fast-method-call-function ,method-call)
+            (values (fast-method-call-pv-cell ,method-call))
+            (values (fast-method-call-next-method-call ,method-call))
+            ,@required-args
+            (sb-c::%more-arg-values ,more-context 0 ,more-count))))))
 
 (defstruct (fast-instance-boundp (:copier nil))
   (index 0 :type fixnum))
@@ -975,13 +1003,20 @@ bootstrapping.
        (trace-emf-call-internal ,emf ,format ,args))))
 
 (defmacro invoke-effective-method-function-fast
-    (emf restp &rest required-args+rest-arg)
+    (emf restp &key required-args rest-arg more-arg)
   `(progn
-     (trace-emf-call ,emf ,restp (list ,@required-args+rest-arg))
-     (invoke-fast-method-call ,emf ,@required-args+rest-arg)))
+     (trace-emf-call ,emf ,restp (list ,@required-args rest-arg))
+     ,(if more-arg
+          `(invoke-fast-method-call/more ,emf
+                                         ,@more-arg
+                                         ,@required-args)
+          `(invoke-fast-method-call ,emf
+                                    ,restp
+                                    ,@required-args
+                                    ,@rest-arg))))
 
 (defun effective-method-optimized-slot-access-clause
-    (emf restp required-args+rest-arg)
+    (emf restp required-args)
   ;; "What," you may wonder, "do these next two clauses do?" In that
   ;; case, you are not a PCL implementor, for they considered this to
   ;; be self-documenting.:-| Or CSR, for that matter, since he can
@@ -992,21 +1027,21 @@ bootstrapping.
   ;; conclude that setting EMF to a FIXNUM is an optimized way to
   ;; represent these slot access operations.
   (when (not restp)
-    (let ((length (length required-args+rest-arg)))
+    (let ((length (length required-args)))
       (cond ((= 1 length)
              `((fixnum
                 (let* ((.slots. (get-slots-or-nil
-                                 ,(car required-args+rest-arg)))
+                                 ,(car required-args)))
                        (value (when .slots. (clos-slots-ref .slots. ,emf))))
                   (if (eq value +slot-unbound+)
-                      (slot-unbound-internal ,(car required-args+rest-arg)
+                      (slot-unbound-internal ,(car required-args)
                                              ,emf)
                       value)))))
             ((= 2 length)
              `((fixnum
-                (let ((.new-value. ,(car required-args+rest-arg))
+                (let ((.new-value. ,(car required-args))
                       (.slots. (get-slots-or-nil
-                                ,(cadr required-args+rest-arg))))
+                                ,(cadr required-args))))
                   (when .slots.
                     (setf (clos-slots-ref .slots. ,emf) .new-value.)))))))
       ;; (In cmucl-2.4.8 there was a commented-out third ,@(WHEN
@@ -1021,7 +1056,7 @@ bootstrapping.
 ;;; to make less work for the compiler we take a path that doesn't
 ;;; involve the slot-accessor clause (where EMF is a FIXNUM) at all.
 (macrolet ((def (name &optional narrow)
-             `(defmacro ,name (emf restp &rest required-args+rest-arg)
+             `(defmacro ,name (emf restp &key required-args rest-arg more-arg)
                 (unless (constantp restp)
                   (error "The RESTP argument is not constant."))
                 (setq restp (constant-form-value restp))
@@ -1029,19 +1064,28 @@ bootstrapping.
                   `(locally
                        (declare (optimize (sb-c:insert-step-conditions 0)))
                      (let ((,emf-n ,emf))
-                       (trace-emf-call ,emf-n ,restp (list ,@required-args+rest-arg))
+                       (trace-emf-call ,emf-n ,restp (list ,@required-args ,@rest-arg))
                        (etypecase ,emf-n
                          (fast-method-call
-                          (invoke-fast-method-call ,emf-n ,@required-args+rest-arg))
+                          ,(if more-arg
+                               `(invoke-fast-method-call/more ,emf-n
+                                                              ,@more-arg
+                                                              ,@required-args)
+                               `(invoke-fast-method-call ,emf-n
+                                                         ,restp
+                                                         ,@required-args
+                                                         ,@rest-arg)))
                          ,@,(unless narrow
                               `(effective-method-optimized-slot-access-clause
-                                emf-n restp required-args+rest-arg))
+                                emf-n restp required-args))
                          (method-call
-                          (invoke-method-call ,emf-n ,restp ,@required-args+rest-arg))
+                          (invoke-method-call ,emf-n ,restp ,@required-args
+                                              ,@rest-arg))
                          (function
                           ,(if restp
-                               `(apply ,emf-n ,@required-args+rest-arg)
-                            `(funcall ,emf-n ,@required-args+rest-arg))))))))))
+                               `(apply ,emf-n ,@required-args ,@rest-arg)
+                               `(funcall ,emf-n ,@required-args
+                                         ,@rest-arg))))))))))
   (def invoke-effective-method-function nil)
   (def invoke-narrow-effective-method-function t))
 
@@ -1053,27 +1097,25 @@ bootstrapping.
             (restp (cdr arg-info))
             (nreq (car arg-info)))
        (if restp
-           (let* ((rest-args (nthcdr nreq args))
-                  (req-args (ldiff args rest-args)))
-             (apply (fast-method-call-function emf)
-                    (fast-method-call-pv-cell emf)
-                    (fast-method-call-next-method-call emf)
-                    (nconc req-args (list rest-args))))
+           (apply (fast-method-call-function emf)
+                  (fast-method-call-pv-cell emf)
+                  (fast-method-call-next-method-call emf)
+                  args)
            (cond ((null args)
                   (if (eql nreq 0)
-                      (invoke-fast-method-call emf)
+                      (invoke-fast-method-call emf nil)
                       (error 'simple-program-error
                              :format-control "invalid number of arguments: 0"
                              :format-arguments nil)))
                  ((null (cdr args))
                   (if (eql nreq 1)
-                      (invoke-fast-method-call emf (car args))
+                      (invoke-fast-method-call emf nil (car args))
                       (error 'simple-program-error
                              :format-control "invalid number of arguments: 1"
                              :format-arguments nil)))
                  ((null (cddr args))
                   (if (eql nreq 2)
-                      (invoke-fast-method-call emf (car args) (cadr args))
+                      (invoke-fast-method-call emf nil (car args) (cadr args))
                       (error 'simple-program-error
                              :format-control "invalid number of arguments: 2"
                              :format-arguments nil)))
@@ -1122,8 +1164,8 @@ bootstrapping.
        ,(let ((call `(invoke-narrow-effective-method-function
                       ,next-method-call
                       ,(not (null rest-arg))
-                      ,@args
-                      ,@(when rest-arg `(,rest-arg)))))
+                      :required-args ,args
+                      :rest-arg ,(when rest-arg (list rest-arg)))))
              `(if ,cnm-args
                   (bind-args ((,@args
                                ,@(when rest-arg
@@ -1229,7 +1271,7 @@ bootstrapping.
                                                       (pop ,args-tail)
                                                       ,(cadr var)))))
                                    (t
-                                    `((,(caddr var) ,args-tail)
+                                    `((,(caddr var) (not (null ,args-tail)))
                                       (,(car var) (if ,args-tail
                                                       (pop ,args-tail)
                                                       ,(cadr var)))))))
@@ -1259,7 +1301,7 @@ bootstrapping.
                                                (car var)))
                                  `((,key (get-key-arg-tail ',keyword
                                                            ,args-tail))
-                                   (,(caddr var) ,key)
+                                   (,(caddr var) (not (null,key)))
                                    (,variable (if ,key
                                                   (car ,key)
                                                   ,(cadr var))))))))
