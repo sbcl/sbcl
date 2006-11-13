@@ -115,7 +115,7 @@
   (:arg-types * positive-fixnum positive-fixnum)
   (:temporary (:sc any-reg :offset esi-offset :from (:argument 0)) src)
   (:temporary (:sc descriptor-reg :offset eax-offset) temp)
-  (:temporary (:sc unsigned-reg :offset ecx-offset) temp1)
+  (:temporary (:sc unsigned-reg :offset ecx-offset) loop-index)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
@@ -137,17 +137,18 @@
        (move count num)
        (inst sub count skip)))
 
-    (move temp1 count)
+    (move loop-index count)
     (inst mov start esp-tn)
     (inst jecxz done)  ; check for 0 count?
 
-    (inst shr temp1 word-shift) ; convert the fixnum to a count.
+    (inst sub esp-tn count)
+    (inst sub src count)
 
-    (inst std) ; move down the stack as more value are copied to the bottom.
     LOOP
-    (inst lods temp)
-    (inst push temp)
-    (inst loop loop)
+    (inst mov temp (make-ea :dword :base src :index loop-index))
+    (inst sub loop-index n-word-bytes)
+    (inst mov (make-ea :dword :base esp-tn :index loop-index) temp)
+    (inst jmp :nz LOOP)
 
     DONE
     ;; solaris requires DF being zero.

@@ -1236,24 +1236,33 @@
     ;; Save edi and esi register args.
     (inst push edi-tn)
     (inst push esi-tn)
+    (inst push ebx-tn)
     ;; Okay, we have pushed the register args. We can trash them
     ;; now.
-
-    ;; Initialize dst to be end of stack; skiping the values pushed
-    ;; above.
-    (inst lea edi-tn (make-ea :dword :base esp-tn :disp 8))
 
     ;; Initialize src to be end of args.
     (inst mov esi-tn ebp-tn)
     (inst sub esi-tn ebx-tn)
 
-    (inst shr ecx-tn word-shift)        ; make word count
-    ;; And copy the args.
-    (inst cld)                          ; auto-inc ESI and EDI.
-    (inst rep)
-    (inst movs :dword)
+    ;; We need to copy from downwards up to avoid overwriting some of
+    ;; the yet uncopied args. So we need to use EBX as the copy index
+    ;; and ECX as the loop counter, rather than using ECX for both.
+    (inst xor ebx-tn ebx-tn)
+
+    ;; We used to use REP MOVS here, but on modern x86 it performs
+    ;; much worse than an explicit loop for small blocks.
+    COPY-LOOP
+    (inst mov edi-tn (make-ea :dword :base esi-tn :index ebx-tn))
+    ;; The :DISP is to account for the registers saved on the stack
+    (inst mov (make-ea :dword :base esp-tn :disp (* 3 n-word-bytes)
+                       :index ebx-tn)
+          edi-tn)
+    (inst add ebx-tn n-word-bytes)
+    (inst sub ecx-tn n-word-bytes)
+    (inst jmp :nz COPY-LOOP)
 
     ;; So now we need to restore EDI and ESI.
+    (inst pop ebx-tn)
     (inst pop esi-tn)
     (inst pop edi-tn)
 
@@ -1315,6 +1324,19 @@
        (inst mov keyword (make-ea :dword :base object :index index
                                   :disp n-word-bytes))))))
 
+(define-vop (more-arg)
+    (:translate sb!c::%more-arg)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1))
+         (index :scs (any-reg) :to (:result 1) :target value))
+  (:arg-types * tagged-num)
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:result-types *)
+  (:generator 4
+    (move value index)
+    (inst neg value)
+    (inst mov value (make-ea :dword :base object :index value))))
+
 ;;; Turn more arg (context, count) into a list.
 (defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))
   t)
@@ -1345,8 +1367,6 @@
       (maybe-pseudo-atomic stack-allocate-p
        (allocation dst dst node stack-allocate-p)
        (inst lea dst (make-ea :byte :base dst :disp list-pointer-lowtag))
-       ;; Convert the count into a raw value, so that we can use the
-       ;; LOOP instruction.
        (inst shr ecx 2)
        ;; Set decrement mode (successive args at lower addresses)
        (inst std)
@@ -1365,7 +1385,8 @@
        (inst lods eax)
        (storew eax dst 0 list-pointer-lowtag)
        ;; Go back for more.
-       (inst loop loop)
+       (inst sub ecx 1)
+       (inst jmp :nz loop)
        ;; NIL out the last cons.
        (storew nil-value dst 1 list-pointer-lowtag))
       (emit-label done)

@@ -1148,25 +1148,10 @@
 
 ;;; Copy a &MORE arg from the argument area to the end of the current
 ;;; frame. FIXED is the number of non-&MORE arguments.
-;;;
-;;; The tricky part is doing this without trashing any of the calling
-;;; convention registers that are still needed. This vop is emitted
-;;; directly after the xep-allocate frame. That means the registers
-;;; are in use as follows:
-;;;
-;;;  RAX -- The lexenv.
-;;;  RBX -- Available.
-;;;  RCX -- The total number of arguments.
-;;;  RDX -- The first arg.
-;;;  RDI -- The second arg.
-;;;  RSI -- The third arg.
-;;;
-;;; So basically, we have one register available for our use: RBX.
-;;;
-;;; What we can do is push the other regs onto the stack, and then
-;;; restore their values by looking directly below where we put the
-;;; more-args.
 (define-vop (copy-more-arg)
+  (:temporary (:sc any-reg :offset r8-offset) copy-index)
+  (:temporary (:sc any-reg :offset r9-offset) source)
+  (:temporary (:sc descriptor-reg :offset r10-offset) temp)
   (:info fixed)
   (:generator 20
     ;; Avoid the copy if there are no more args.
@@ -1202,29 +1187,23 @@
            ;; Number to copy = nargs-fixed
            (inst sub rcx-tn (fixnumize fixed))))
 
-    ;; Save rdi and rsi register args.
-    (inst push rdi-tn)
-    (inst push rsi-tn)
-    ;; Okay, we have pushed the register args. We can trash them
-    ;; now.
+    ;; Initialize R8 to be the end of args.
+    (inst mov source rbp-tn)
+    (inst sub source rbx-tn)
 
-    ;; Initialize dst to be end of stack; skiping the values pushed
-    ;; above.
-    (inst lea rdi-tn (make-ea :qword :base rsp-tn :disp 16))
+    ;; We need to copy from downwards up to avoid overwriting some of
+    ;; the yet uncopied args. So we need to use R9 as the copy index
+    ;; and RCX as the loop counter, rather than using RCX for both.
+    (inst xor copy-index copy-index)
 
-    ;; Initialize src to be end of args.
-    (inst mov rsi-tn rbp-tn)
-    (inst sub rsi-tn rbx-tn)
-
-    (inst shr rcx-tn word-shift)        ; make word count
-    ;; And copy the args.
-    (inst cld)                          ; auto-inc RSI and RDI.
-    (inst rep)
-    (inst movs :qword)
-
-    ;; So now we need to restore RDI and RSI.
-    (inst pop rsi-tn)
-    (inst pop rdi-tn)
+    ;; We used to use REP MOVS here, but on modern x86 it performs
+    ;; much worse than an explicit loop for small blocks.
+    COPY-LOOP
+    (inst mov temp (make-ea :qword :base source :index copy-index))
+    (inst mov (make-ea :qword :base rsp-tn :index copy-index) temp)
+    (inst add copy-index n-word-bytes)
+    (inst sub rcx-tn n-word-bytes)
+    (inst jmp :nz COPY-LOOP)
 
     DO-REGS
 
@@ -1233,26 +1212,26 @@
 
     ;; Here: nargs>=1 && nargs>fixed
     (when (< fixed register-arg-count)
-          ;; Now we have to deposit any more args that showed up in
-          ;; registers.
-          (do ((i fixed))
-              ( nil )
-              ;; Store it relative to rbp
-              (inst mov (make-ea :qword :base rbp-tn
-                                 :disp (- (* n-word-bytes
-                                             (+ 1 (- i fixed)
-                                                (max 3 (sb-allocated-size 'stack))))))
-                    (nth i *register-arg-tns*))
+      ;; Now we have to deposit any more args that showed up in
+      ;; registers.
+      (do ((i fixed))
+          ( nil )
+        ;; Store it relative to rbp
+        (inst mov (make-ea :qword :base rbp-tn
+                           :disp (- (* n-word-bytes
+                                       (+ 1 (- i fixed)
+                                          (max 3 (sb-allocated-size 'stack))))))
+              (nth i *register-arg-tns*))
 
-              (incf i)
-              (when (>= i register-arg-count)
-                    (return))
+        (incf i)
+        (when (>= i register-arg-count)
+          (return))
 
-              ;; Don't deposit any more than there are.
-              (if (zerop i)
-                  (inst test rcx-tn rcx-tn)
-                (inst cmp rcx-tn (fixnumize i)))
-              (inst jmp :eq DONE)))
+        ;; Don't deposit any more than there are.
+        (if (zerop i)
+            (inst test rcx-tn rcx-tn)
+            (inst cmp rcx-tn (fixnumize i)))
+        (inst jmp :eq DONE)))
 
     (inst jmp DONE)
 
@@ -1277,6 +1256,19 @@
      (inst mov value (make-ea :qword :base object :index index))
      (inst mov keyword (make-ea :qword :base object :index index
                                 :disp n-word-bytes))))
+
+(define-vop (more-arg)
+    (:translate sb!c::%more-arg)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1))
+         (index :scs (any-reg) :to (:result 1) :target value))
+  (:arg-types * tagged-num)
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:result-types *)
+  (:generator 4
+    (move value index)
+    (inst neg value)
+    (inst mov value (make-ea :qword :base object :index value))))
 
 ;;; Turn more arg (context, count) into a list.
 (defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))
@@ -1308,8 +1300,6 @@
       (maybe-pseudo-atomic stack-allocate-p
        (allocation dst dst node stack-allocate-p)
        (inst lea dst (make-ea :byte :base dst :disp list-pointer-lowtag))
-       ;; Convert the count into a raw value, so that we can use the
-       ;; LOOP instruction.
        (inst shr rcx (1- n-lowtag-bits))
        ;; Set decrement mode (successive args at lower addresses)
        (inst std)
@@ -1328,7 +1318,8 @@
        (inst lods rax)
        (storew rax dst 0 list-pointer-lowtag)
        ;; Go back for more.
-       (inst loop loop)
+       (inst sub rcx 1)
+       (inst jmp :nz loop)
        ;; NIL out the last cons.
        (storew nil-value dst 1 list-pointer-lowtag))
       (emit-label done))))
