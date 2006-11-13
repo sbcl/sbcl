@@ -19,10 +19,11 @@ ARCH_SRC = ppc-arch.c
 OS_SRC = linux-os.c ppc-linux-os.c
 OS_LIBS = -ldl
 
-GC_SRC = $(shell if grep LISP_FEATURE_GENCGC genesis/config.h \
-                      > /dev/null 2>&1; \
-                   then echo "gencgc.c"; \
-                   else echo "cheneygc.c" ; fi)
+ifdef LISP_FEATURE_GENCGC
+  GC_SRC = "gencgc.c"
+else
+  GC_SRC = "cheneygc.c"
+endif
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers

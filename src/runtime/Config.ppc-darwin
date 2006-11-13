@@ -20,10 +20,11 @@ ARCH_SRC = ppc-arch.c
 
 CPPFLAGS += -no-cpp-precomp
 
-GC_SRC = $(shell if grep LISP_FEATURE_GENCGC genesis/config.h \
-                      > /dev/null 2>&1; \
-                   then echo "gencgc.c"; \
-                   else echo "cheneygc.c" ; fi)
+ifdef LISP_FEATURE_GENCGC
+  GC_SRC = "gencgc.c"
+else
+  GC_SRC = "cheneygc.c"
+endif
 
 .PHONY: after-grovel-headers
 

@@ -2599,6 +2599,15 @@ core and return a descriptor to it."
     (format t " *~@[ ~A~]~%" line))
   (format t " */~%"))
 
+(defun write-makefile-features ()
+  ;; propagating *SHEBANG-FEATURES* into the Makefiles
+  (dolist (shebang-feature-name (sort (mapcar #'symbol-name
+                                              sb-cold:*shebang-features*)
+                                      #'string<))
+    (format t
+            "LISP_FEATURE_~A=1~%"
+            (substitute #\_ #\- shebang-feature-name))))
+
 (defun write-config-h ()
   ;; propagating *SHEBANG-FEATURES* into C-level #define's
   (dolist (shebang-feature-name (sort (mapcar #'symbol-name
@@ -3264,11 +3273,11 @@ initially undefined function references:~2%")
                        (format t
                         "#endif /* SBCL_GENESIS_~A */~%"
                         (string-upcase ,name))))))
-      (when map-file-name
-        (with-open-file (*standard-output* map-file-name
-                                           :direction :output
-                                           :if-exists :supersede)
-          (write-map)))
+        (when map-file-name
+          (with-open-file (*standard-output* map-file-name
+                                             :direction :output
+                                             :if-exists :supersede)
+            (write-map)))
         (out-to "config" (write-config-h))
         (out-to "constants" (write-constants-h))
         (let ((structs (sort (copy-list sb!vm:*primitive-objects*) #'string<
@@ -3295,5 +3304,13 @@ initially undefined function references:~2%")
             (sb!kernel:layout-info (sb!kernel:find-layout class)))))
         (out-to "static-symbols" (write-static-symbols))
 
-      (when core-file-name
+        (let ((fn (format nil "~A/Makefile.features" c-header-dir-name)))
+          (ensure-directories-exist fn)
+          (with-open-file (*standard-output* fn :if-exists :supersede
+                                             :direction :output)
+            (write-makefile-features)))
+
+        (when core-file-name
           (write-initial-core-file core-file-name))))))
+
+

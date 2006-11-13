@@ -30,9 +30,9 @@ OS_SRC = linux-os.c x86-64-linux-os.c
 LINKFLAGS += -Wl,--export-dynamic
 OS_LIBS = -ldl
 
-OS_LIBS += $(shell if grep LISP_FEATURE_SB_THREAD genesis/config.h \
-                      > /dev/null 2>&1; \
-                   then echo "-lpthread"; fi)
+ifdef LISP_FEATURE_SB_THREAD
+  OS_LIBS += -lpthread
+endif
 
 CFLAGS += -fno-omit-frame-pointer
 

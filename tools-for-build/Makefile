@@ -7,6 +7,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+-include genesis/Makefile.features
 -include Config
 
 CPPFLAGS:=-I../src/runtime

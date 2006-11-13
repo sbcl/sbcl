@@ -27,6 +27,9 @@ CFLAGS = -g -Wall -O3
 ASFLAGS = $(CFLAGS)
 CPPFLAGS = -I.
 
+# Give make access to the target Lisp features.
+include genesis/Makefile.features
+
 # The Config file is the preferred place for tweaking options which
 # are appropriate for particular setups (OS, ARCH, whatever). Make a
 # Config-foo file for setup foo, then arrange for Config to be a
@@ -34,7 +37,6 @@ CPPFLAGS = -I.
 # Commonly used variables in Config are: ARCH_SRC, ASSEM_SRC, GC_SRC,
 # OS_SRC, OS_LIBS, OS_OBJS, OS_CLEAN_FILES
 include Config
-
 
 COMMON_SRC = alloc.c backtrace.c breakpoint.c coreparse.c \
 	dynbind.c gc-common.c globals.c interr.c interrupt.c largefile.c \
