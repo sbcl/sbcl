@@ -532,9 +532,11 @@
          (sap> control-stack-end x)
          (zerop (logand (sap-int x) #b11)))))
 
+(declaim (inline component-ptr-from-pc))
 (sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)
   (pc system-area-pointer))
 
+(declaim (inline component-from-component-ptr))
 (defun component-from-component-ptr (component-ptr)
   (declare (type system-area-pointer component-ptr))
   (make-lisp-obj (logior (sap-int component-ptr)
@@ -585,74 +587,64 @@
 ;;;
 ;;; XXX Should handle interrupted frames, both Lisp and C. At present
 ;;; it manages to find a fp trail, see linux hack below.
-(defun x86-call-context (fp &key (depth 0))
-  (declare (type system-area-pointer fp)
-           (fixnum depth))
-;;  (format t "*CC ~S ~S~%" fp depth)
-  (cond
-   ((not (control-stack-pointer-valid-p fp))
-    #+nil (format t "debug invalid fp ~S~%" fp)
-    nil)
-   (t
-    ;; Check the two possible frame pointers.
-    (let ((lisp-ocfp (sap-ref-sap fp (- (* (1+ ocfp-save-offset)
-                                           sb!vm::n-word-bytes))))
-          (lisp-ra (sap-ref-sap fp (- (* (1+ return-pc-save-offset)
-                                         sb!vm::n-word-bytes))))
-          (c-ocfp (sap-ref-sap fp (* 0 sb!vm:n-word-bytes)))
-          (c-ra (sap-ref-sap fp (* 1 sb!vm:n-word-bytes))))
-      #+nil (format t "  lisp-ocfp=~S~%  lisp-ra=~S~%  c-ocfp=~S~%  c-ra=~S~%"
-              lisp-ocfp lisp-ra c-ocfp c-ra)
-      (cond ((and (sap> lisp-ocfp fp) (control-stack-pointer-valid-p lisp-ocfp)
-                  (ra-pointer-valid-p lisp-ra)
-                  (sap> c-ocfp fp) (control-stack-pointer-valid-p c-ocfp)
-                  (ra-pointer-valid-p c-ra))
-             #+nil (format t
-                           "*C Both valid ~S ~S ~S ~S~%"
-                           lisp-ocfp lisp-ra c-ocfp c-ra)
-             ;; Look forward another step to check their validity.
-             (let ((lisp-path-fp (x86-call-context lisp-ocfp
-                                                   :depth (1+ depth)))
-                   (c-path-fp (x86-call-context c-ocfp :depth (1+ depth))))
-               (cond ((and lisp-path-fp c-path-fp)
-                       ;; Both still seem valid - choose the lisp frame.
-                       #+nil (when (zerop depth)
-                               (format t
-                                       "debug: both still valid ~S ~S ~S ~S~%"
-                                       lisp-ocfp lisp-ra c-ocfp c-ra))
-                      #!+freebsd
-                      (if (sap> lisp-ocfp c-ocfp)
-                        (values lisp-ra lisp-ocfp)
-                        (values c-ra c-ocfp))
-                       #!-freebsd
-                       (values lisp-ra lisp-ocfp))
-                     (lisp-path-fp
-                      ;; The lisp convention is looking good.
-                      #+nil (format t "*C lisp-ocfp ~S ~S~%" lisp-ocfp lisp-ra)
-                      (values lisp-ra lisp-ocfp))
-                     (c-path-fp
-                      ;; The C convention is looking good.
-                      #+nil (format t "*C c-ocfp ~S ~S~%" c-ocfp c-ra)
-                      (values c-ra c-ocfp))
-                     (t
-                      ;; Neither seems right?
-                      #+nil (format t "debug: no valid2 fp found ~S ~S~%"
-                                    lisp-ocfp c-ocfp)
-                      nil))))
-            ((and (sap> lisp-ocfp fp) (control-stack-pointer-valid-p lisp-ocfp)
-                  (ra-pointer-valid-p lisp-ra))
-             ;; The lisp convention is looking good.
-             #+nil (format t "*C lisp-ocfp ~S ~S~%" lisp-ocfp lisp-ra)
-             (values lisp-ra lisp-ocfp))
-            ((and (sap> c-ocfp fp) (control-stack-pointer-valid-p c-ocfp)
-                  #!-linux (ra-pointer-valid-p c-ra))
-             ;; The C convention is looking good.
-             #+nil (format t "*C c-ocfp ~S ~S~%" c-ocfp c-ra)
-             (values c-ra c-ocfp))
-            (t
-             #+nil (format t "debug: no valid fp found ~S ~S~%"
-                           lisp-ocfp c-ocfp)
-             nil))))))
+(declaim (maybe-inline x86-call-context))
+(defun x86-call-context (fp)
+  (declare (type system-area-pointer fp))
+  (labels ((fail ()
+             (values nil
+                     (int-sap 0)
+                     (int-sap 0)))
+           (handle (fp)
+             (cond
+               ((not (control-stack-pointer-valid-p fp))
+                (fail))
+               (t
+                ;; Check the two possible frame pointers.
+                (let ((lisp-ocfp (sap-ref-sap fp (- (* (1+ ocfp-save-offset)
+                                                       sb!vm::n-word-bytes))))
+                      (lisp-ra (sap-ref-sap fp (- (* (1+ return-pc-save-offset)
+                                                     sb!vm::n-word-bytes))))
+                      (c-ocfp (sap-ref-sap fp (* 0 sb!vm:n-word-bytes)))
+                      (c-ra (sap-ref-sap fp (* 1 sb!vm:n-word-bytes))))
+                  (cond ((and (sap> lisp-ocfp fp)
+                              (control-stack-pointer-valid-p lisp-ocfp)
+                              (ra-pointer-valid-p lisp-ra)
+                              (sap> c-ocfp fp)
+                              (control-stack-pointer-valid-p c-ocfp)
+                              (ra-pointer-valid-p c-ra))
+                         ;; Look forward another step to check their validity.
+                         (let ((lisp-ok (handle lisp-ocfp))
+                               (c-ok (handle c-ocfp)))
+                           (cond ((and lisp-ok c-ok)
+                                  ;; Both still seem valid - choose the lisp frame.
+                                  #!+freebsd
+                                  (if (sap> lisp-ocfp c-ocfp)
+                                      (values t lisp-ra lisp-ocfp)
+                                      (values t c-ra c-ocfp))
+                                  #!-freebsd
+                                  (values t lisp-ra lisp-ocfp))
+                                 (lisp-ok
+                                  ;; The lisp convention is looking good.
+                                  (values t lisp-ra lisp-ocfp))
+                                 (c-ok
+                                  ;; The C convention is looking good.
+                                  (values t c-ra c-ocfp))
+                                 (t
+                                  ;; Neither seems right?
+                                  (fail)))))
+                        ((and (sap> lisp-ocfp fp)
+                              (control-stack-pointer-valid-p lisp-ocfp)
+                              (ra-pointer-valid-p lisp-ra))
+                         ;; The lisp convention is looking good.
+                         (values t lisp-ra lisp-ocfp))
+                        ((and (sap> c-ocfp fp)
+                              (control-stack-pointer-valid-p c-ocfp)
+                              #!-linux (ra-pointer-valid-p c-ra))
+                         ;; The C convention is looking good.
+                         (values t c-ra c-ocfp))
+                        (t
+                         (fail))))))))
+    (handle fp)))
 
 ) ; #+x86 PROGN
 
@@ -706,8 +698,9 @@
                    (let ((fp (frame-pointer frame)))
                      (when (control-stack-pointer-valid-p fp)
                        #!+(or x86 x86-64)
-                       (multiple-value-bind (ra ofp) (x86-call-context fp)
-                         (and ra (compute-calling-frame ofp ra frame)))
+                       (multiple-value-bind (ok ra ofp) (x86-call-context fp)
+                         (and ok
+                              (compute-calling-frame ofp ra frame)))
                        #!-(or x86 x86-64)
                        (compute-calling-frame
                         #!-alpha

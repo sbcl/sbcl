@@ -112,6 +112,7 @@ if the symbol isn't found."
   #!+os-provides-dlopen
   (close-shared-objects))
 
+(declaim (maybe-inline sap-foreign-symbol))
 (defun sap-foreign-symbol (sap)
   (declare (ignorable sap))
   #-sb-xc-host

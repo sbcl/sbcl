@@ -229,194 +229,6 @@
             (setf (edge-vertex e) scc)))))
     (setf (graph-vertices graph)
           (topological-sort (nconc (sccs) (trivial))))))
-
-
-;;;; AA Trees
-
-;;; An AA tree is a red-black tree with the extra condition that left
-;;; children may not be red.  This condition simplifies the red-black
-;;; algorithm.  It eliminates half of the restructuring cases, and
-;;; simplifies the delete algorithm.
-
-(defstruct (aa-node (:conc-name aa-))
-  (left  nil :type (or null aa-node))
-  (right nil :type (or null aa-node))
-  (level   0 :type integer)
-  (data  nil :type t))
-
-(defvar *null-node*
-  (let ((node (make-aa-node)))
-    (setf (aa-left node) node)
-    (setf (aa-right node) node)
-    node))
-
-(defstruct aa-tree
-  (root *null-node* :type aa-node))
-
-(declaim (inline skew split rotate-with-left-child rotate-with-right-child))
-
-(defun rotate-with-left-child (k2)
-  (let ((k1 (aa-left k2)))
-    (setf (aa-left k2) (aa-right k1))
-    (setf (aa-right k1) k2)
-    k1))
-
-(defun rotate-with-right-child (k1)
-  (let ((k2 (aa-right k1)))
-    (setf (aa-right k1) (aa-left k2))
-    (setf (aa-left k2) k1)
-    k2))
-
-(defun skew (aa)
-  (if (= (aa-level (aa-left aa)) (aa-level aa))
-      (rotate-with-left-child aa)
-      aa))
-
-(defun split (aa)
-  (when (= (aa-level (aa-right (aa-right aa)))
-           (aa-level aa))
-    (setq aa (rotate-with-right-child aa))
-    (incf (aa-level aa)))
-  aa)
-
-(macrolet ((def (name () &body body)
-             (let ((name (sb-int::symbolicate 'aa- name)))
-               `(defun ,name (item tree &key
-                              (test-< #'<) (test-= #'=)
-                              (node-key #'identity) (item-key #'identity))
-                  (let ((.item-key. (funcall item-key item)))
-                    (flet ((item-< (node)
-                             (funcall test-< .item-key.
-                                      (funcall node-key (aa-data node))))
-                           (item-= (node)
-                             (funcall test-= .item-key.
-                                      (funcall node-key (aa-data node)))))
-                      (declare (inline item-< item-=))
-                      ,@body))))))
-
-  (def insert ()
-    (labels ((insert-into (aa)
-               (cond ((eq aa *null-node*)
-                      (setq aa (make-aa-node :data item
-                                             :left *null-node*
-                                             :right *null-node*)))
-                     ((item-= aa)
-                      (return-from insert-into aa))
-                     ((item-< aa)
-                      (setf (aa-left aa) (insert-into (aa-left aa))))
-                     (t
-                      (setf (aa-right aa) (insert-into (aa-right aa)))))
-               (split (skew aa))))
-      (setf (aa-tree-root tree)
-            (insert-into (aa-tree-root tree)))))
-
-  (def delete ()
-    (let ((deleted-node *null-node*)
-          (last-node nil))
-      (labels ((remove-from (aa)
-                 (unless (eq aa *null-node*)
-                   (setq last-node aa)
-                   (if (item-< aa)
-                       (setf (aa-left aa) (remove-from (aa-left aa)))
-                       (progn
-                         (setq deleted-node aa)
-                         (setf (aa-right aa) (remove-from (aa-right aa)))))
-                   (cond ((eq aa last-node)
-                          ;;
-                          ;; If at the bottom of the tree, and item
-                          ;; is present, delete it.
-                          (when (and (not (eq deleted-node *null-node*))
-                                     (item-= deleted-node))
-                            (setf (aa-data deleted-node) (aa-data aa))
-                            (setq deleted-node *null-node*)
-                            (setq aa (aa-right aa))))
-                         ;;
-                         ;; Otherwise not at bottom of tree; rebalance.
-                         ((or (< (aa-level (aa-left aa))
-                                 (1- (aa-level aa)))
-                              (< (aa-level (aa-right aa))
-                                 (1- (aa-level aa))))
-                          (decf (aa-level aa))
-                          (when (> (aa-level (aa-right aa)) (aa-level aa))
-                            (setf (aa-level (aa-right aa)) (aa-level aa)))
-                          (setq aa (skew aa))
-                          (setf (aa-right aa) (skew (aa-right aa)))
-                          (setf (aa-right (aa-right aa))
-                                (skew (aa-right (aa-right aa))))
-                          (setq aa (split aa))
-                          (setf (aa-right aa) (split (aa-right aa))))))
-                 aa))
-        (setf (aa-tree-root tree)
-              (remove-from (aa-tree-root tree))))))
-
-  (def find ()
-    (let ((current (aa-tree-root tree)))
-      (setf (aa-data *null-node*) item)
-      (loop
-         (cond ((eq current *null-node*)
-                (return (values nil nil)))
-               ((item-= current)
-                (return (values (aa-data current) t)))
-               ((item-< current)
-                (setq current (aa-left current)))
-               (t
-                (setq current (aa-right current))))))))
-
-
-;;;; Other Utilities
-
-;;; Sort the subsequence of Vec in the interval [From To] using
-;;; comparison function Test.  Assume each element to sort consists of
-;;; Element-Size array slots, and that the slot Key-Offset contains
-;;; the sort key.
-(defun qsort (vec &key (element-size 1) (key-offset 0)
-              (from 0) (to (- (length vec) element-size)))
-  (declare (type fixnum to from element-size key-offset))
-  (declare (type (simple-array address) vec))
-  (labels ((rotate (i j)
-             (declare (fixnum i j))
-             (loop repeat element-size
-                   for i from i and j from j do
-                     (rotatef (aref vec i) (aref vec j))))
-           (key (i)
-             (aref vec (+ i key-offset)))
-           (rec-sort (from to)
-             (declare (fixnum to from))
-             (when (> to from)
-               (let* ((mid (* element-size
-                              (round (+ (/ from element-size)
-                                        (/ to element-size))
-                                     2)))
-                      (i from)
-                      (j (+ to element-size))
-                      (p (key mid)))
-                 (declare (fixnum mid i j))
-                 (rotate mid from)
-                 (loop
-                    (loop do (incf i element-size)
-                          until (or (> i to)
-                                    ;; QSORT used to take a test
-                                    ;; parameter which was funcalled
-                                    ;; here. This caused some consing,
-                                    ;; which is problematic since
-                                    ;; QSORT is indirectly called in
-                                    ;; an after-gc-hook. So just
-                                    ;; hardcode >, which would've been
-                                    ;; used for the test anyway.
-                                    ;; --JES, 2004-07-09
-                                    (> p (key i))))
-                    (loop do (decf j element-size)
-                          until (or (<= j from)
-                                    ;; As above.
-                                    (> (key j) p)))
-                    (when (< j i) (return))
-                    (rotate i j))
-                 (rotate from j)
-                 (rec-sort from (- j element-size))
-                 (rec-sort i to)))))
-    (rec-sort from to)
-    vec))
-
 
 ;;;; The Profiler
 
@@ -508,12 +320,19 @@
   "Default number of samples taken.")
 (declaim (type sb-impl::index *max-samples*))
 
-(defconstant +sample-size+
+;; For every profiler event we store this many samples (frames 0-n on
+;; the call stack).
+(defconstant +sample-depth+
   #+(or x86 x86-64) 8
   #-(or x86 x86-64) 2)
 
+;; We store two elements for each sample. The debug-info of the sample
+;; and either its absolute PC or a PC offset, depending on the type of
+;; the debug-info.
+(defconstant +sample-size+ (* +sample-depth+ 2))
+
 (defvar *samples* nil)
-(declaim (type (or null (vector address)) *samples*))
+(declaim (type (or null simple-vector) *samples*))
 
 (defvar *samples-index* 0)
 (declaim (type sb-impl::index *samples-index*))
@@ -521,9 +340,6 @@
 (defvar *profiling* nil)
 (defvar *sampling* nil)
 (declaim (type boolean *profiling* *sampling*))
-
-(defvar *dynamic-space-code-info* ())
-(declaim (type list *dynamic-space-code-info*))
 
 (defvar *show-progress* nil)
 
@@ -554,65 +370,93 @@
   `(let ((*sampling* ,on))
      ,@body))
 
-(defun sort-samples (key-offset)
-  "Sort *Samples* using comparison Test.  Key must be one of
-   :Pc or :Return-Pc for sorting by pc or return pc."
-  (when (plusp *samples-index*)
-    (qsort *samples*
-           :from 0
-           :to (- *samples-index* +sample-size+)
-           :element-size +sample-size+
-           :key-offset key-offset)))
+;;; Return something serving as debug info for address PC.
+(declaim (inline debug-info))
+(defun debug-info (pc)
+  (declare (type system-area-pointer pc))
+  (let ((ptr (sb-di::component-ptr-from-pc pc)))
+    (cond ((sap= ptr (int-sap 0))
+           (let ((name (sap-foreign-symbol pc)))
+             (if name
+                 (values (format nil "foreign function ~a" name)
+                         (sap-int pc))
+                 (values nil (sap-int pc)))))
+          (t
+           (let* ((code (sb-di::component-from-component-ptr ptr))
+                  (code-header-len (* (sb-kernel:get-header-data code)
+                                      sb-vm:n-word-bytes))
+                  (pc-offset (- (sap-int pc)
+                                (- (sb-kernel:get-lisp-obj-address code)
+                                   sb-vm:other-pointer-lowtag)
+                                code-header-len))
+                  (df (sb-di::debug-fun-from-pc code pc-offset)))
+             (cond ((typep df 'sb-di::bogus-debug-fun)
+                    (values code (sap-int pc)))
+                   (df
+                    ;; The code component might be moved by the GC. Store
+                    ;; a PC offset, and reconstruct the data in
+                    ;; SAMPLE-PC-FROM-PC-OR-OFFSET.
+                    (values df pc-offset))
+                   (t
+                    (values nil 0))))))))
 
+(declaim (inline record))
 (defun record (pc)
-  (declare (type address pc))
-  (setf (aref *samples* *samples-index*) pc)
-  (incf *samples-index*))
+  (declare (type system-area-pointer pc))
+  (multiple-value-bind (info pc-or-offset)
+      (debug-info pc)
+    ;; For each sample, store the debug-info and the PC/offset into
+    ;; adjacent cells.
+    (setf (aref *samples* *samples-index*) info
+          (aref *samples* (1+ *samples-index*)) pc-or-offset))
+  (incf *samples-index* 2))
+
+;;; Ensure that only one thread at a time will be executing sigprof handler.
+(defvar *sigprof-handler-lock* (sb-thread:make-mutex :name "SIGPROF handler"))
 
 ;;; SIGPROF handler.  Record current PC and return address in
 ;;; *SAMPLES*.
 #+(or x86 x86-64)
 (defun sigprof-handler (signal code scp)
-  (declare (ignore signal code) (type system-area-pointer scp))
-  (sb-sys:with-interrupts
+  (declare (ignore signal code)
+           (optimize speed (space 0))
+           (type system-area-pointer scp))
+  (sb-sys:without-interrupts
     (when (and *sampling*
-               (< *samples-index* (length *samples*)))
+               *samples*
+               (< *samples-index* (length (the simple-vector *samples*))))
       (sb-sys:without-gcing
-        (locally (declare (optimize (inhibit-warnings 2)))
+        (sb-thread:with-mutex (*sigprof-handler-lock*)
           (with-alien ((scp (* os-context-t) :local scp))
-            ;; For some reason completely bogus small values for the
-            ;; frame pointer are returned every now and then, leading
-            ;; to segfaults. Try to avoid these cases.
-            ;;
-            ;; FIXME: Do a more thorough sanity check on ebp, or figure
-            ;; out why this is happening.
-            ;; -- JES, 2005-01-11
-            (when (< (sb-vm::context-register scp #.sb-vm::ebp-offset)
-                     4096)
-              (dotimes (i +sample-size+)
-                (record 0))
-              (return-from sigprof-handler nil))
             (let* ((pc-ptr (sb-vm:context-pc scp))
                    (fp (sb-vm::context-register scp #.sb-vm::ebp-offset)))
-              (record (sap-int pc-ptr))
+              ;; For some reason completely bogus small values for the
+              ;; frame pointer are returned every now and then, leading
+              ;; to segfaults. Try to avoid these cases.
+              ;;
+              ;; FIXME: Do a more thorough sanity check on ebp, or figure
+              ;; out why this is happening.
+              ;; -- JES, 2005-01-11
+              (when (< fp 4096)
+                (dotimes (i +sample-depth+)
+                  (record (int-sap 0)))
+                (return-from sigprof-handler nil))
               (let ((fp (int-sap fp))
-                    ra)
-                (dotimes (i (1- +sample-size+))
-                  (cond (fp
-                         (setf (values ra fp)
-                               (sb-di::x86-call-context fp :depth i))
-                         (record (if ra
-                                     (sap-int ra)
-                                     0)))
-                        (t
-                         (record 0))))))))))))
+                    (ok t))
+                (declare (type system-area-pointer fp pc-ptr))
+                (dotimes (i +sample-depth+)
+                  (record pc-ptr)
+                  (when ok
+                    (setf (values ok pc-ptr fp)
+                          (sb-di::x86-call-context fp)))))))))))
+  nil)
 
 ;; FIXME: On non-x86 platforms we don't yet walk the call stack deeper
 ;; than one level.
 #-(or x86 x86-64)
 (defun sigprof-handler (signal code scp)
   (declare (ignore signal code))
-  (sb-sys:with-interrupts
+  (sb-sys:without-interrupts
     (when (and *sampling*
                (< *samples-index* (length *samples*)))
       (sb-sys:without-gcing
@@ -623,17 +467,8 @@
                    (ra (sap-ref-word
                         (int-sap fp)
                         (* sb-vm::lra-save-offset sb-vm::n-word-bytes))))
-              (record (sap-int pc-ptr))
-              (record ra))))))))
-
-;;; Map function FN over code objects in dynamic-space.  FN is called
-;;; with two arguments, the object and its size in bytes.
-(defun map-dynamic-space-code (fn)
-  (flet ((call-if-code (obj obj-type size)
-           (declare (ignore obj-type))
-           (when (sb-kernel:code-component-p obj)
-             (funcall fn obj size))))
-    (sb-vm::map-allocated-objects #'call-if-code :dynamic)))
+              (record pc-ptr)
+              (record (int-sap ra)))))))))
 
 ;;; Return the start address of CODE.
 (defun code-start (code)
@@ -646,58 +481,6 @@
   (let* ((start (code-start code))
          (end (+ start (sb-kernel:%code-code-size code))))
     (values start end)))
-
-(defun record-dyninfo ()
-  (setf *dynamic-space-code-info* nil)
-  (flet ((record-address (code size)
-           (declare (ignore size))
-           (multiple-value-bind (start end)
-               (code-bounds code)
-             (push (make-dyninfo code start end)
-                   *dynamic-space-code-info*))))
-    (map-dynamic-space-code #'record-address)))
-
-(defun adjust-samples (offset)
-  (sort-samples offset)
-  (let ((sidx 0))
-    (declare (type sb-impl::index sidx))
-    (dolist (info *dynamic-space-code-info*)
-      (unless (= (dyninfo-new-start info) (dyninfo-start info))
-        (let ((pos (do ((i sidx (+ i +sample-size+)))
-                       ((= i *samples-index*) nil)
-                     (declare (type sb-impl::index i))
-                     (when (<= (dyninfo-start info)
-                               (aref *samples* (+ i offset))
-                               (dyninfo-end info))
-                       (return i)))))
-          (when pos
-            (setq sidx pos)
-            (loop with delta = (- (dyninfo-new-start info)
-                                  (dyninfo-start info))
-                  for j from sidx below *samples-index* by +sample-size+
-                  as pc = (aref *samples* (+ j offset))
-                  while (<= (dyninfo-start info) pc (dyninfo-end info)) do
-                    (incf (aref *samples* (+ j offset)) delta)
-                    (incf sidx +sample-size+))))))))
-
-;;; This runs from *AFTER-GC-HOOKS*.  Adjust *SAMPLES* for address
-;;; changes of dynamic-space code objects.
-(defun adjust-samples-for-address-changes ()
-  (sb-sys:without-gcing
-   (turn-off-sampling)
-   (setq *dynamic-space-code-info*
-         (sort *dynamic-space-code-info* #'> :key #'dyninfo-start))
-   (dolist (info *dynamic-space-code-info*)
-     (setf (dyninfo-new-start info)
-           (code-start (dyninfo-code info))))
-   (progn
-     (dotimes (i +sample-size+)
-       (adjust-samples i)))
-   (dolist (info *dynamic-space-code-info*)
-     (let ((size (- (dyninfo-end info) (dyninfo-start info))))
-       (setf (dyninfo-start info) (dyninfo-new-start info))
-       (setf (dyninfo-end info) (+ (dyninfo-new-start info) size))))
-   (turn-on-sampling)))
 
 (defmacro with-profiling ((&key (sample-interval '*sample-interval*)
                                 (max-samples '*max-samples*)
@@ -725,20 +508,22 @@
   `(let ((*sample-interval* ,sample-interval)
          (*max-samples* ,max-samples))
      ,@(when reset '((reset)))
-     (start-profiling)
-     (loop
-        (when (>= *samples-index* (length *samples*))
-          (return))
-        ,@(when show-progress
-            `((format t "~&===> ~d of ~d samples taken.~%"
-                      (/ *samples-index* +sample-size+)
-                      *max-samples*)))
-        (let ((.last-index. *samples-index*))
-          ,@body
-          (when (= .last-index. *samples-index*)
-            (warn "No sampling progress; possibly a profiler bug.")
-            (return))))
-     (stop-profiling)
+     (unwind-protect
+          (progn
+            (start-profiling)
+            (loop
+               (when (>= *samples-index* (length *samples*))
+                 (return))
+               ,@(when show-progress
+                       `((format t "~&===> ~d of ~d samples taken.~%"
+                                 (/ *samples-index* +sample-size+)
+                                 *max-samples*)))
+               (let ((.last-index. *samples-index*))
+                 ,@body
+                 (when (= .last-index. *samples-index*)
+                   (warn "No sampling progress; possibly a profiler bug.")
+                   (return)))))
+       (stop-profiling))
      ,@(when report-p `((report :type ,report)))))
 
 (defun start-profiling (&key (max-samples *max-samples*)
@@ -762,19 +547,9 @@
         (multiple-value-bind (secs rest)
             (truncate sample-interval)
           (values secs (truncate (* rest 1000000))))
-      (setq *samples* (make-array (* max-samples +sample-size+)
-                                  :element-type 'address))
+      (setq *samples* (make-array (* max-samples +sample-size+)))
       (setq *samples-index* 0)
       (setq *sampling* sampling)
-      ;; Disabled for now, since this was causing some problems with the
-      ;; sampling getting turned off completely. --JES, 2004-06-19
-      ;;
-      ;; BEFORE-GC-HOOKS have exceedingly bad interactions with
-      ;; threads.  -- CSR, 2004-06-21
-      ;;
-      ;; (pushnew 'turn-off-sampling *before-gc-hooks*)
-      (pushnew 'adjust-samples-for-address-changes *after-gc-hooks*)
-      (record-dyninfo)
       (sb-sys:enable-interrupt sb-unix:sigprof #'sigprof-handler)
       (unix-setitimer :profile secs usecs secs usecs)
       (setq *profiling* t)))
@@ -783,8 +558,6 @@
 (defun stop-profiling ()
   "Stop profiling if profiling."
   (when *profiling*
-    (setq *after-gc-hooks*
-          (delete 'adjust-samples-for-address-changes *after-gc-hooks*))
     (unix-setitimer :profile 0 0 0 0)
     ;; Even with the timer shut down we cannot be sure that there is
     ;; no undelivered sigprof. Besides, leaving the signal handler
@@ -797,63 +570,45 @@
   "Reset the profiler."
   (stop-profiling)
   (setq *sampling* nil)
-  (setq *dynamic-space-code-info* ())
   (setq *samples* nil)
   (setq *samples-index* 0)
   (values))
 
 ;;; Make a NODE for debug-info INFO.
 (defun make-node (info)
-  (typecase info
-    (sb-kernel::code-component
-     (multiple-value-bind (start end)
-         (code-bounds info)
-       (%make-node :name (or (sb-disassem::find-assembler-routine start)
-                             (format nil "~a" info))
-                   :start-pc start :end-pc end)))
-    (sb-di::compiled-debug-fun
-     (let* ((name (sb-di::debug-fun-name info))
-            (cdf (sb-di::compiled-debug-fun-compiler-debug-fun info))
-            (start-offset (sb-c::compiled-debug-fun-start-pc cdf))
-            (end-offset (sb-c::compiled-debug-fun-elsewhere-pc cdf))
-            (component (sb-di::compiled-debug-fun-component info))
-            (start-pc (code-start component)))
-       ;; Call graphs are mostly useless unless we somehow
-       ;; distinguish a gazillion different (LAMBDA ())'s.
-       (when (equal name '(lambda ()))
-         (setf name (format nil "Unknown component: #x~x" start-pc)))
-       (%make-node :name name
-                   :start-pc (+ start-pc start-offset)
-                   :end-pc (+ start-pc end-offset))))
-    (sb-di::debug-fun
-     (%make-node :name (sb-di::debug-fun-name info)))
-    (t
-     (%make-node :name (coerce info 'string)))))
-
-;;; Return something serving as debug info for address PC.  If we can
-;;; get something from SB-DI:DEBUG-FUNCTION-FROM-PC, return that.
-;;; Otherwise, if we can determine a code component, return that.
-;;; Otherwise return nil.
-(defun debug-info (pc)
-  (declare (type address pc))
-  (let ((ptr (sb-di::component-ptr-from-pc (int-sap pc))))
-    (cond ((sap= ptr (int-sap 0))
-           (let ((name (sap-foreign-symbol (int-sap pc))))
-             (when name
-               (format nil "foreign function ~a" name))))
-          (t
-           (let* ((code (sb-di::component-from-component-ptr ptr))
-                  (code-header-len (* (sb-kernel:get-header-data code)
-                                      sb-vm:n-word-bytes))
-                  (pc-offset (- pc
-                                (- (sb-kernel:get-lisp-obj-address code)
-                                   sb-vm:other-pointer-lowtag)
-                                code-header-len))
-                  (df (ignore-errors (sb-di::debug-fun-from-pc code
-                                                               pc-offset))))
-             (or df
-                 code))))))
-
+  (flet ((clean-name (name)
+           (if (and (consp name)
+                    (member (first name)
+                            '(sb-c::xep sb-c::tl-xep sb-c::&more-processor
+                              sb-c::hairy-arg-processor
+                              sb-c::&optional-processor)))
+               (second name)
+               name)))
+    (typecase info
+      (sb-kernel::code-component
+       (multiple-value-bind (start end)
+           (code-bounds info)
+         (%make-node :name (or (sb-disassem::find-assembler-routine start)
+                               (format nil "~a" info))
+                     :start-pc start :end-pc end)))
+      (sb-di::compiled-debug-fun
+       (let* ((name (sb-di::debug-fun-name info))
+              (cdf (sb-di::compiled-debug-fun-compiler-debug-fun info))
+              (start-offset (sb-c::compiled-debug-fun-start-pc cdf))
+              (end-offset (sb-c::compiled-debug-fun-elsewhere-pc cdf))
+              (component (sb-di::compiled-debug-fun-component info))
+              (start-pc (code-start component)))
+         ;; Call graphs are mostly useless unless we somehow
+         ;; distinguish a gazillion different (LAMBDA ())'s.
+         (when (equal name '(lambda ()))
+           (setf name (format nil "Unknown component: #x~x" start-pc)))
+         (%make-node :name (clean-name name)
+                     :start-pc (+ start-pc start-offset)
+                     :end-pc (+ start-pc end-offset))))
+      (sb-di::debug-fun
+       (%make-node :name (clean-name (sb-di::debug-fun-name info))))
+      (t
+       (%make-node :name (coerce info 'string))))))
 
 ;;; One function can have more than one COMPILED-DEBUG-FUNCTION with
 ;;; the same name.  Reduce the number of calls to Debug-Info by first
@@ -861,50 +616,30 @@
 ;;; tree, get debug info, and look for a node in a hash-table by
 ;;; function name.  If not found in the hash-table, make a new node.
 
-(defvar *node-tree*)
 (defvar *name->node*)
 
 (defmacro with-lookup-tables (() &body body)
-  `(let ((*node-tree* (make-aa-tree))
-         (*name->node* (make-hash-table :test 'equal)))
+  `(let ((*name->node* (make-hash-table :test 'equal)))
      ,@body))
-
-(defun tree-find (item)
-  (flet ((pc/node-= (pc node)
-           (<= (node-start-pc node) pc (node-end-pc node)))
-         (pc/node-< (pc node)
-           (< pc (node-start-pc node))))
-    (aa-find item *node-tree* :test-= #'pc/node-= :test-< #'pc/node-<)))
-
-(defun tree-insert (item)
-  (flet ((node/node-= (x y)
-           (<= (node-start-pc y) (node-start-pc x) (node-end-pc y)))
-         (node/node-< (x y)
-           (< (node-start-pc x) (node-start-pc y))))
-    (aa-insert item *node-tree* :test-= #'node/node-= :test-< #'node/node-<)))
 
 ;;; Find or make a new node for address PC.  Value is the NODE found
 ;;; or made; NIL if not enough information exists to make a NODE for
 ;;; PC.
-(defun lookup-node (pc)
-  (declare (type address pc))
-  (or (tree-find pc)
-      (let ((info (debug-info pc)))
-        (when info
-          (let* ((new (make-node info))
-                 (key (cons (node-name new)
-                            (node-start-pc new)))
-                 (found (gethash key *name->node*)))
-            (cond (found
-                   (setf (node-start-pc found)
-                         (min (node-start-pc found) (node-start-pc new)))
-                   (setf (node-end-pc found)
-                         (max (node-end-pc found) (node-end-pc new)))
-                   found)
-                  (t
-                   (setf (gethash key *name->node*) new)
-                   (tree-insert new)
-                   new)))))))
+(defun lookup-node (info)
+  (when info
+    (let* ((new (make-node info))
+           (key (cons (node-name new)
+                      (node-start-pc new)))
+           (found (gethash key *name->node*)))
+      (cond (found
+             (setf (node-start-pc found)
+                   (min (node-start-pc found) (node-start-pc new)))
+             (setf (node-end-pc found)
+                   (max (node-end-pc found) (node-end-pc new)))
+             found)
+            (t
+             (setf (gethash key *name->node*) new)
+             new)))))
 
 ;;; Return a list of all nodes created by LOOKUP-NODE.
 (defun collect-nodes ()
@@ -916,15 +651,9 @@
   (let ((elsewhere-count 0)
         visited-nodes)
     (with-lookup-tables ()
-      (loop for i below (1- *samples-index*) ;; by +sample-size+
-            as pc = (aref *samples* i)
-            as return-pc = (aref *samples* (1+ i))
-            as callee = (lookup-node pc)
-            as caller =
-              (when (and callee (/= return-pc +unknown-address+))
-                (let ((caller (lookup-node return-pc)))
-                  (when caller
-                    caller)))
+      (loop for i below (- *samples-index* 2) by 2
+            for callee = (lookup-node (aref *samples* i))
+            for caller = (lookup-node (aref *samples* (+ i 2)))
             do
             (when (and *show-progress* (plusp i))
               (cond ((zerop (mod i 1000))
@@ -1164,7 +893,7 @@
 
    Value of this function is a Call-Graph object representing the
    resulting call-graph."
-  (let ((graph (or call-graph (make-call-graph (1- +sample-size+)))))
+  (let ((graph (or call-graph (make-call-graph (1- +sample-depth+)))))
     (ecase type
       (:flat
        (print-flat graph :stream stream :max max :min-percent min-percent))
@@ -1175,6 +904,19 @@
 
 ;;; Interface to DISASSEMBLE
 
+(defun sample-pc-from-pc-or-offset (sample pc-or-offset)
+  (etypecase sample
+    ;; Assembly routines or foreign functions don't move around, so we've
+    ;; stored a raw PC
+    ((or sb-kernel:code-component string)
+     pc-or-offset)
+    ;; Lisp functions might move, so we've stored a offset from the
+    ;; start of the code component.
+    (sb-di::compiled-debug-fun
+     (let* ((component (sb-di::compiled-debug-fun-component sample))
+            (start-pc (code-start component)))
+       (+ start-pc pc-or-offset)))))
+
 (defun add-disassembly-profile-note (chunk stream dstate)
   (declare (ignore chunk stream))
   (unless (zerop *samples-index*)
@@ -1183,9 +925,11 @@
                 (sb-disassem:dstate-segment dstate))
                (sb-disassem::dstate-cur-offs dstate)))
            (samples (loop for x from 0 below *samples-index* by +sample-size+
-                          summing (if (= (aref *samples* x) location)
-                                      1
-                                      0))))
+                          for sample = (aref *samples* x)
+                          for pc-or-offset = (aref *samples* (1+ x))
+                          count (= location
+                                   (sample-pc-from-pc-or-offset sample
+                                                                pc-or-offset)))))
       (unless (zerop samples)
         (sb-disassem::note (format nil "~A/~A samples"
                                    samples (/ *samples-index* +sample-size+))
