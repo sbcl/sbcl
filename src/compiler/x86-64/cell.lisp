@@ -289,7 +289,7 @@
       (pseudo-atomic
        (emit-label get-tls-index-lock)
        (inst mov temp 1)
-       (inst xor rax rax)
+       (zeroize rax)
        (inst lock)
        (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*) temp)
        (inst jmp :ne get-tls-index-lock)

@@ -797,7 +797,7 @@
                                do (noise `(loadw ,name new-fp ,index)))
                               (noise))
                    '((if (zerop nargs)
-                         (inst xor rcx rcx)
+                         (zeroize rcx)
                        (inst mov rcx (fixnumize nargs)))))
                ,@(cond ((eq return :tail)
                         '(;; Python has figured out what frame we should
@@ -1032,7 +1032,7 @@
     ;; Establish the values pointer and values count.
     (move rbx rbp-tn)
     (if (zerop nvals)
-        (inst xor rcx rcx) ; smaller
+        (zeroize rcx) ; smaller
       (inst mov rcx (fixnumize nvals)))
     ;; Restore the frame pointer.
     (move rbp-tn old-fp)
@@ -1194,7 +1194,7 @@
     ;; We need to copy from downwards up to avoid overwriting some of
     ;; the yet uncopied args. So we need to use R9 as the copy index
     ;; and RCX as the loop counter, rather than using RCX for both.
-    (inst xor copy-index copy-index)
+    (zeroize copy-index)
 
     ;; We used to use REP MOVS here, but on modern x86 it performs
     ;; much worse than an explicit loop for small blocks.

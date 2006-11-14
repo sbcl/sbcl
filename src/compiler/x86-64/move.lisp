@@ -11,6 +11,17 @@
 
 (in-package "SB!VM")
 
+(defun zeroize (tn)
+  (let ((offset (tn-offset tn)))
+    ;; Using the 32-bit instruction accomplishes the same thing and is
+    ;; one byte shorter.
+    (if (<= offset edi-offset)
+        (let ((tn (make-random-tn :kind :normal
+                                  :sc (sc-or-lose 'dword-reg)
+                                  :offset offset)))
+          (inst xor tn tn))
+        (inst xor tn tn))))
+
 (define-move-fun (load-immediate 1) (vop x y)
   ((immediate)
    (any-reg descriptor-reg))
@@ -18,7 +29,7 @@
     (etypecase val
       (integer
        (if (zerop val)
-           (inst xor y y)
+           (zeroize y)
          (inst mov y (fixnumize val))))
       (symbol
        (load-symbol y val))
@@ -30,7 +41,7 @@
   ((immediate) (signed-reg unsigned-reg))
   (let ((val (tn-value x)))
     (if (zerop val)
-        (inst xor y y)
+        (zeroize y)
         (inst mov y val))))
 
 (define-move-fun (load-character 1) (vop x y)
@@ -80,7 +91,7 @@
           (etypecase val
             (integer
              (if (and (zerop val) (sc-is y any-reg descriptor-reg))
-                 (inst xor y y)
+                 (zeroize y)
                  (move-immediate y (fixnumize val) temp)))
             (symbol
              (inst mov y (+ nil-value (static-symbol-offset val))))
@@ -134,7 +145,7 @@
            (let ((val (tn-value x)))
              (etypecase val
                ((integer 0 0)
-                (inst xor y y))
+                (zeroize y))
                ((or (signed-byte 29) (unsigned-byte 29))
                 (inst mov y (fixnumize val)))
                (integer

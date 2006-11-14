@@ -124,7 +124,7 @@
     (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
     (storew type result 0 other-pointer-lowtag)
     (storew length result vector-length-slot other-pointer-lowtag)
-    (inst xor zero zero)
+    (zeroize zero)
     (inst rep)
     (inst stos zero)))
 

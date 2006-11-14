@@ -694,7 +694,7 @@
                       (inst shl result amount)
                       (inst shr result (- amount))))
                  (t (if (sc-is result unsigned-reg)
-                        (inst xor result result)
+                        (zeroize result)
                         (inst mov result 0))))))))
 
 (define-vop (fast-ash-left/signed=>signed)
@@ -786,7 +786,7 @@
     (inst neg ecx)
     (inst cmp ecx 63)
     (inst jmp :be OKAY)
-    (inst xor result result)
+    (zeroize result)
     (inst jmp DONE)
     OKAY
     (inst shr result :cl)
@@ -896,7 +896,7 @@
     (inst or ecx ecx)
     (inst jmp :ns POSITIVE)
     (inst neg ecx)
-    (inst xor zero zero)
+    (zeroize zero)
     (inst shr result :cl)
     (inst cmp ecx 63)
     (inst cmov :nbe result zero)
@@ -927,7 +927,7 @@
     (inst inc res)
     (inst jmp DONE)
     ZERO
-    (inst xor res res)
+    (zeroize res)
     DONE))
 
 (define-vop (unsigned-byte-64-len)
@@ -944,7 +944,7 @@
     (inst inc res)
     (inst jmp DONE)
     ZERO
-    (inst xor res res)
+    (zeroize res)
     DONE))
 
 (define-vop (unsigned-byte-64-count)
