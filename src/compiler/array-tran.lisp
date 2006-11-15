@@ -543,7 +543,7 @@
 ;;; compile-time or we are generating unsafe code, don't bother with
 ;;; the VOP.
 (deftransform %check-bound ((array dimension index) * * :node node)
-  (cond ((policy node (and (> speed safety) (= safety 0)))
+  (cond ((policy node (= insert-array-bounds-checks 0))
          'index)
         ((not (constant-lvar-p dimension))
          (give-up-ir1-transform))

@@ -36,6 +36,8 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
     incompatible element types (thanks to Mario Mommer)
   * optimization: method calls with &OPTIONAL or &KEY arguments are faster
     and don't cause extra consing
+  * optimization: MAP and MAP-INTO are significantly faster on vectors
+    whose elements types have been declared.
   * Improvements to the Windows port:
     ** floating point exceptions are now reported correctly.
     ** stack exhaustion detection works partially.

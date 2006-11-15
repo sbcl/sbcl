@@ -153,7 +153,8 @@
                        (tests `(endp ,index))))
                     ((csubtypep type (specifier-type 'vector))
                      (process-vector `(length ,seq-name))
-                     (places `(aref ,seq-name index)))
+                     (places `(locally (declare (optimize (insert-array-bounds-checks 0)))
+                                (aref ,seq-name index))))
                     (t
                      (give-up-ir1-transform
                       "can't determine sequence argument type"))))
@@ -261,7 +262,8 @@
          :result '(when (array-has-fill-pointer-p result)
                    (setf (fill-pointer result) index))
          :into 'result
-         :body '(setf (aref result index) funcall-result))
+         :body '(locally (declare (optimize (insert-array-bounds-checks 0)))
+                 (setf (aref result index) funcall-result)))
        result)))
 
 
