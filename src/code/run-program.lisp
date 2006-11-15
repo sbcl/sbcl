@@ -459,7 +459,9 @@ status slot."
                                      :dual-channel-p t)))))
 
 (defmacro round-bytes-to-words (n)
-  `(logand (the fixnum (+ (the fixnum ,n) 3)) (lognot 3)))
+  (let ((bytes-per-word (/ sb-vm:n-machine-word-bits sb-vm:n-byte-bits)))
+    `(logandc2 (the fixnum (+ (the fixnum ,n)
+                              (1- ,bytes-per-word))) (1- ,bytes-per-word))))
 
 (defun string-list-to-c-strvec (string-list)
   ;; Make a pass over STRING-LIST to calculate the amount of memory
@@ -467,7 +469,7 @@ status slot."
   (let ((string-bytes 0)
         ;; We need an extra for the null, and an extra 'cause exect
         ;; clobbers argv[-1].
-        (vec-bytes (* #.(/ sb-vm::n-machine-word-bits sb-vm::n-byte-bits)
+        (vec-bytes (* #.(/ sb-vm:n-machine-word-bits sb-vm:n-byte-bits)
                       (+ (length string-list) 2))))
     (declare (fixnum string-bytes vec-bytes))
     (dolist (s string-list)
@@ -477,7 +479,7 @@ status slot."
     (let* ((total-bytes (+ string-bytes vec-bytes))
            (vec-sap (sb-sys:allocate-system-memory total-bytes))
            (string-sap (sap+ vec-sap vec-bytes))
-           (i #.(/ sb-vm::n-machine-word-bits sb-vm::n-byte-bits)))
+           (i #.(/ sb-vm:n-machine-word-bits sb-vm:n-byte-bits)))
       (declare (type (and unsigned-byte fixnum) total-bytes i)
                (type sb-sys:system-area-pointer vec-sap string-sap))
       (dolist (s string-list)
@@ -493,11 +495,11 @@ status slot."
           ;; Blast the pointer to the string into place.
           (setf (sap-ref-sap vec-sap i) string-sap)
           (setf string-sap (sap+ string-sap (round-bytes-to-words (1+ n))))
-          (incf i #.(/ sb-vm::n-machine-word-bits sb-vm::n-byte-bits))))
+          (incf i #.(/ sb-vm:n-machine-word-bits sb-vm:n-byte-bits))))
       ;; Blast in the last null pointer.
       (setf (sap-ref-sap vec-sap i) (int-sap 0))
-      (values vec-sap (sap+ vec-sap #.(/ sb-vm::n-machine-word-bits
-                                         sb-vm::n-byte-bits))
+      (values vec-sap (sap+ vec-sap #.(/ sb-vm:n-machine-word-bits
+                                         sb-vm:n-byte-bits))
               total-bytes))))
 
 (defmacro with-c-strvec ((var str-list) &body body)
