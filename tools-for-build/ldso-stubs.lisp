@@ -285,6 +285,10 @@ ldso_stub__ ## fct: ;                  \\
                  #!+alpha
                  '("ieee_get_fp_control"
                    "ieee_set_fp_control")
+                 #!-win32
+                 '("ptsname"
+                   "grantpt"
+                   "unlockpt")
                  #!-darwin
                  '("dlclose"
                    "dlerror"
