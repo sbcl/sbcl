@@ -42,7 +42,7 @@ ftruncate_largefile(int fd, off_t length) {
 
 void*
 mmap_largefile(void *start, size_t length, int prot, int flags, int fd, off_t offset) {
-    mmap(start, length, prot, flags, fd, offset);
+    return mmap(start, length, prot, flags, fd, offset);
 }
 
 int
