@@ -73,7 +73,11 @@
 ;;; filesystem access
 (defmacro define-call* (name &rest arguments)
   #-win32 `(define-call ,name ,@arguments)
-  #+win32 `(define-call ,(concatenate 'string "_" name) ,@arguments))
+  #+win32 `(define-call ,(if (consp name)
+                             `(,(concatenate 'string "_" (car name))
+                                ,@(cdr name))
+                             (concatenate 'string "_" name))
+               ,@arguments))
 
 (define-call* "access" int minusp (pathname filename) (mode int))
 (define-call* "chdir" int minusp (pathname filename))
