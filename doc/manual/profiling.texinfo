@@ -3,20 +3,20 @@
 @chapter Profiling
 @cindex Profiling
 
-SBCL includes both an accurate profiler, that can collect statistics
+SBCL includes both a deterministic profiler, that can collect statistics
 on individual functions, and a more ``modern'' statistical profiler.
 
 Inlined functions do not appear in the results reported by either.
 
 @menu
-* Accurate Profiler::           
+* Deterministic Profiler::           
 * Statistical Profiler::        
 @end menu
 
-@node Accurate Profiler
+@node Deterministic Profiler
 @comment  node-name,  next,  previous,  up
-@section Accurate Profiler
-@cindex Profiling, accurate
+@section Deterministic Profiler
+@cindex Profiling, deterministic
 
 The package @code{sb-profile} provides a classic, per-function-call
 profiler.

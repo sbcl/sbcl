@@ -490,7 +490,8 @@ os_thread_t create_thread(lispobj initial_function) {
 
 /* Send the signo to os_thread, retry if the rt signal queue is
  * full. */
-static int kill_thread_safely(os_thread_t os_thread, int signo)
+int
+kill_thread_safely(os_thread_t os_thread, int signo)
 {
     int r;
     /* The man page does not mention EAGAIN as a valid return value

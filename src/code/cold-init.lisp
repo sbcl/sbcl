@@ -102,7 +102,8 @@
         *maximum-error-depth* 10
         *current-error-depth* 0
         *cold-init-complete-p* nil
-        *type-system-initialized* nil)
+        *type-system-initialized* nil
+        sb!vm:*alloc-signal* nil)
 
   ;; I'm not sure where eval is first called, so I put this first.
   #!+sb-eval

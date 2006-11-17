@@ -4597,6 +4597,25 @@ alloc(long nbytes)
         }
     }
     new_obj = gc_alloc_with_region(nbytes,0,region,0);
+
+#ifndef LISP_FEATURE_WIN32
+    lispobj alloc_signal = SymbolValue(ALLOC_SIGNAL,thread);
+
+    if ((alloc_signal & FIXNUM_TAG_MASK) == 0) {
+        if ((signed long) alloc_signal <= 0) {
+#ifdef LISP_FEATURE_SB_THREAD
+            kill_thread_safely(thread->os_thread, SIGPROF);
+#else
+            raise(SIGPROF);
+#endif
+        } else {
+            SetSymbolValue(ALLOC_SIGNAL,
+                           alloc_signal - (1 << N_FIXNUM_TAG_BITS),
+                           thread);
+        }
+    }
+#endif
+
     return (new_obj);
 }
 

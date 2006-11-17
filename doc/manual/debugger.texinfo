@@ -850,13 +850,9 @@ If @code{debug} is greater than both @code{speed} and @code{space},
 the command @command{return} can be used to continue execution by
 returning a value from the current stack frame.
 
-@item > (max 1 speed space compilation-speed)
-If @code{debug} is also at least 2, then the code is @emph{partially
-steppable}. If @code{debug} is 3, the code is @emph{fully steppable}.
-@xref{Single Stepping}, for details. Fully steppable code take
-exponentially longer to compile in some cases, and is significantly
-larger and slower; for partially steppable code the speed and space
-penalties are signigicantly smaller.
+@item > (max speed space compilation-speed)
+If @code{debug} is greater than all of @code{speed}, @code{space} and
+@code{compilation-speed} the code will be steppable (@pxref{Single Stepping}).
 
 @end table
 
@@ -945,11 +941,6 @@ proceed cases.
 Displays all the frames from the current to the bottom. Only shows
 @var{n} frames if specified. The printing is controlled by
 @code{*debug-print-variable-alist*}.
-@end deffn
-
-@deffn {Debugger Command} step
-Selects the @code{continue} restart if one exists and starts single stepping.
-@xref{Single Stepping}.
 @end deffn
 
 @c The new instrumentation based single stepper doesn't support
@@ -1125,23 +1116,32 @@ code, that can be invoked via the @code{step} macro, or from within
 the debugger. @xref{Debugger Policy Control}, for details on enabling
 stepping for compiled code.
 
-Compiled code can be unsteppable, partially steppable, or fully steppable.
+The following debugger commands are used for controlling single stepping.
 
-@table @strong
+@deffn {Debugger Command} start
+Selects the @code{continue} restart if one exists and starts single stepping.
+None of the other single stepping commands can be used before stepping has
+been started either by using @code{start} or by using the standard 
+@code{step} macro.
+@end deffn
 
-@item Unsteppable
-Single stepping is not possible.
+@deffn {Debugger Command} step
+Steps into the current form. Stepping will be resumed when the next
+form that has been compiled with stepper instrumentation is evaluated.
+@end deffn
 
-@item Partially steppable
-Single stepping is possible at sequential function call granularity:
-nested function calls cannot be stepped into, and no intermediate
-values are available.
+@deffn {Debugger Command} next
+Steps over the current form. Stepping will be disabled until evaluation of
+the form is complete.
+@end deffn
 
-@item Fully steppable
-Single stepping is possible at individual function call argument
-granularity, nested calls can be stepped into, and intermediate values
-are available.
+@deffn {Debugger Command} out
+Steps out of the current frame. Stepping will be disabled until the 
+topmost stack frame that had been stepped into returns.
+@end deffn
 
-@end table
+@deffn {Debugger Command} stop
+Stops the single stepper and resumes normal execution.
+@end deffn
 
 @include macro-common-lisp-step.texinfo

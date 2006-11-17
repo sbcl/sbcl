@@ -99,7 +99,7 @@
 
 (defpackage #:sb-sprof
   (:use #:cl #:sb-ext #:sb-unix #:sb-alien #:sb-sys)
-  (:export #:*sample-interval* #:*max-samples*
+  (:export #:*sample-interval* #:*max-samples* #:*alloc-interval*
            #:start-sampling #:stop-sampling #:with-sampling
            #:with-profiling #:start-profiling #:stop-profiling
            #:reset #:report))
@@ -244,8 +244,11 @@
 ;;; structures.
 (defstruct (call-graph (:include graph)
                        (:constructor %make-call-graph))
-  ;; the value of *Sample-Interval* at the time the graph was created
+  ;; the value of *SAMPLE-INTERVAL* or *ALLOC-INTERVAL* at the time
+  ;; the graph was created (depending on the current allocation mode)
   (sample-interval (sb-impl::missing-arg) :type number)
+  ;; the value of *SAMPLING-MODE* at the time the graph was created
+  (sampling-mode (sb-impl::missing-arg) :type (member :cpu :alloc))
   ;; number of samples taken
   (nsamples (sb-impl::missing-arg) :type sb-impl::index)
   ;; sample count for samples not in any function
@@ -262,15 +265,20 @@
   ;; gets label 1.  This is just for identification purposes in the
   ;; profiling report.
   (index 0 :type fixnum)
-  ;; start and end address of the function's code
-  (start-pc 0 :type address)
-  (end-pc 0 :type address)
+  ;; Start and end address of the function's code. Depending on the
+  ;; debug-info, this might be either as absolute addresses for things
+  ;; that won't move around in memory, or as relative offsets from
+  ;; some point for things that might move.
+  (start-pc-or-offset 0 :type address)
+  (end-pc-or-offset 0 :type address)
   ;; the name of the function
   (name nil :type t)
   ;; sample count for this function
   (count 0 :type fixnum)
   ;; count including time spent in functions called from this one
   (accrued-count 0 :type fixnum)
+  ;; the debug-info that this node was created from
+  (debug-info nil :type t)
   ;; list of NODEs for functions calling this one
   (callers () :type list))
 
@@ -285,16 +293,13 @@
   ;; number of times the call was sampled
   (count 1 :type sb-impl::index))
 
-;;; Info about a function in dynamic-space.  This is used to track
-;;; address changes of functions during GC.
-(defstruct (dyninfo (:constructor make-dyninfo (code start end)))
-  ;; component this info is for
-  (code (sb-impl::missing-arg) :type sb-kernel::code-component)
-  ;; current start and end address of the component
-  (start (sb-impl::missing-arg) :type address)
-  (end (sb-impl::missing-arg) :type address)
-  ;; new start address of the component, after GC.
-  (new-start 0 :type address))
+;;; Encapsulate all the information about a sampling run
+(defstruct (samples)
+  (vector (make-array (* *max-samples* +sample-size+)) :type simple-vector)
+  (index 0 :type sb-impl::index)
+  (mode *sampling-mode* :type (member :cpu :alloc))
+  (sample-interval *sample-interval* :type number)
+  (alloc-interval *alloc-interval* :type number))
 
 (defmethod print-object ((call-graph call-graph) stream)
   (print-unreadable-object (call-graph stream :type t :identity t)
@@ -312,9 +317,27 @@
 (deftype report-type ()
   '(member nil :flat :graph))
 
+(defvar *sampling-mode* :cpu
+  "Default sampling mode. :CPU for cpu profiling, :ALLOC for allocation
+profiling")
+(declaim (type (member :cpu :alloc) *sampling-mode*))
+
 (defvar *sample-interval* 0.01
   "Default number of seconds between samples.")
 (declaim (number *sample-interval*))
+
+(defvar *alloc-region-size*
+  #-gencgc
+  4096
+  ;; This hardcoded 2 matches the one in gc_find_freeish_pages. It's not
+  ;; really worth genesifying.
+  #+gencgc
+  (* 2 sb-vm:gencgc-page-size))
+(declaim (number *alloc-region-size*))
+
+(defvar *alloc-interval* 4
+  "Default number of allocation region openings between samples.")
+(declaim (number *alloc-interval*))
 
 (defvar *max-samples* 50000
   "Default number of samples taken.")
@@ -332,10 +355,7 @@
 (defconstant +sample-size+ (* +sample-depth+ 2))
 
 (defvar *samples* nil)
-(declaim (type (or null simple-vector) *samples*))
-
-(defvar *samples-index* 0)
-(declaim (type sb-impl::index *samples-index*))
+(declaim (type (or null samples) *samples*))
 
 (defvar *profiling* nil)
 (defvar *sampling* nil)
@@ -367,13 +387,15 @@
 
 (defmacro with-sampling ((&optional (on t)) &body body)
   "Evaluate body with statistical sampling turned on or off."
-  `(let ((*sampling* ,on))
+  `(let ((*sampling* ,on)
+         (sb-vm:*alloc-signal* sb-vm:*alloc-signal*))
      ,@body))
 
 ;;; Return something serving as debug info for address PC.
 (declaim (inline debug-info))
 (defun debug-info (pc)
-  (declare (type system-area-pointer pc))
+  (declare (type system-area-pointer pc)
+           (muffle-conditions compiler-note))
   (let ((ptr (sb-di::component-ptr-from-pc pc)))
     (cond ((sap= ptr (int-sap 0))
            (let ((name (sap-foreign-symbol pc)))
@@ -402,14 +424,16 @@
 
 (declaim (inline record))
 (defun record (pc)
-  (declare (type system-area-pointer pc))
+  (declare (type system-area-pointer pc)
+           (muffle-conditions compiler-note))
   (multiple-value-bind (info pc-or-offset)
       (debug-info pc)
     ;; For each sample, store the debug-info and the PC/offset into
     ;; adjacent cells.
-    (setf (aref *samples* *samples-index*) info
-          (aref *samples* (1+ *samples-index*)) pc-or-offset))
-  (incf *samples-index* 2))
+    (let ((vector (samples-vector *samples*)))
+      (setf (aref vector (samples-index *samples*)) info
+            (aref vector (1+ (samples-index *samples*))) pc-or-offset)))
+  (incf (samples-index *samples*) 2))
 
 ;;; Ensure that only one thread at a time will be executing sigprof handler.
 (defvar *sigprof-handler-lock* (sb-thread:make-mutex :name "SIGPROF handler"))
@@ -420,36 +444,43 @@
 (defun sigprof-handler (signal code scp)
   (declare (ignore signal code)
            (optimize speed (space 0))
+           (muffle-conditions compiler-note)
            (type system-area-pointer scp))
   (sb-sys:without-interrupts
-    (when (and *sampling*
-               *samples*
-               (< *samples-index* (length (the simple-vector *samples*))))
-      (sb-sys:without-gcing
-        (sb-thread:with-mutex (*sigprof-handler-lock*)
-          (with-alien ((scp (* os-context-t) :local scp))
-            (let* ((pc-ptr (sb-vm:context-pc scp))
-                   (fp (sb-vm::context-register scp #.sb-vm::ebp-offset)))
-              ;; For some reason completely bogus small values for the
-              ;; frame pointer are returned every now and then, leading
-              ;; to segfaults. Try to avoid these cases.
-              ;;
-              ;; FIXME: Do a more thorough sanity check on ebp, or figure
-              ;; out why this is happening.
-              ;; -- JES, 2005-01-11
-              (when (< fp 4096)
-                (dotimes (i +sample-depth+)
-                  (record (int-sap 0)))
-                (return-from sigprof-handler nil))
-              (let ((fp (int-sap fp))
-                    (ok t))
-                (declare (type system-area-pointer fp pc-ptr))
-                (dotimes (i +sample-depth+)
-                  (record pc-ptr)
-                  (when ok
-                    (setf (values ok pc-ptr fp)
-                          (sb-di::x86-call-context fp)))))))))))
-  nil)
+    (let ((sb-vm:*alloc-signal* nil))
+      (when (and *sampling*
+                 *samples*
+                 (< (samples-index *samples*)
+                    (length (samples-vector *samples*))))
+        (sb-sys:without-gcing
+          (sb-thread:with-mutex (*sigprof-handler-lock*)
+            (with-alien ((scp (* os-context-t) :local scp))
+              (let* ((pc-ptr (sb-vm:context-pc scp))
+                     (fp (sb-vm::context-register scp #.sb-vm::ebp-offset)))
+                ;; For some reason completely bogus small values for the
+                ;; frame pointer are returned every now and then, leading
+                ;; to segfaults. Try to avoid these cases.
+                ;;
+                ;; FIXME: Do a more thorough sanity check on ebp, or figure
+                ;; out why this is happening.
+                ;; -- JES, 2005-01-11
+                (when (< fp 4096)
+                  (dotimes (i +sample-depth+)
+                    (record (int-sap 0)))
+                  (return-from sigprof-handler nil))
+                (let ((fp (int-sap fp))
+                      (ok t))
+                  (declare (type system-area-pointer fp pc-ptr))
+                  (dotimes (i +sample-depth+)
+                    (record pc-ptr)
+                    (when ok
+                      (setf (values ok pc-ptr fp)
+                            (sb-di::x86-call-context fp)))))))))))
+    ;; Reset the allocation counter
+    (when (and sb-vm:*alloc-signal*
+               (<= sb-vm:*alloc-signal* 0))
+      (setf sb-vm:*alloc-signal* (1- *alloc-interval*)))
+    nil))
 
 ;; FIXME: On non-x86 platforms we don't yet walk the call stack deeper
 ;; than one level.
@@ -458,7 +489,7 @@
   (declare (ignore signal code))
   (sb-sys:without-interrupts
     (when (and *sampling*
-               (< *samples-index* (length *samples*)))
+               (< (samples-index *samples*) (length (samples-vector *samples*))))
       (sb-sys:without-gcing
         (with-alien ((scp (* os-context-t) :local scp))
           (locally (declare (optimize (inhibit-warnings 2)))
@@ -483,75 +514,119 @@
     (values start end)))
 
 (defmacro with-profiling ((&key (sample-interval '*sample-interval*)
+                                (alloc-interval '*alloc-interval*)
                                 (max-samples '*max-samples*)
                                 (reset nil)
+                                (mode '*sampling-mode*)
+                                (loop t)
                                 show-progress
                                 (report nil report-p))
                           &body body)
-  "Repeatedly evaluate Body with statistical profiling turned on.
+  "Repeatedly evaluate BODY with statistical profiling turned on.
+   In multi-threaded operation, only the thread in which WITH-PROFILING
+   was evaluated will be profiled by default. If you want to profile
+   multiple threads, invoke the profiler with START-PROFILING.
+
    The following keyword args are recognized:
 
-   :Sample-Interval <seconds>
-     Take a sample every <seconds> seconds.  Default is
-     *Sample-Interval*.
+   :SAMPLE-INTERVAL <n>
+     Take a sample every <n> seconds. Default is *SAMPLE-INTERVAL*.
 
-   :Max-Samples <max>
+   :ALLOC-INTERVAL <n>
+     Take a sample every time <n> allocation regions (approximately
+     8kB) have been allocated since the last sample. Default is
+     *ALLOC-INTERVAL*.
+
+   :MODE <mode>
+     If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run
+     the profiler in allocation profiling mode.
+
+   :MAX-SAMPLES <max>
      Repeat evaluating body until <max> samples are taken.
-     Default is *Max-Samples*.
+     Default is *MAX-SAMPLES*.
 
-   :Report <type>
-     If specified, call Report with :Type <type> at the end.
+   :REPORT <type>
+     If specified, call REPORT with :TYPE <type> at the end.
 
-   :Reset <bool>
-     It true, call Reset at the beginning."
+   :RESET <bool>
+     It true, call RESET at the beginning.
+
+   :LOOP <bool>
+     If true (the default) repeatedly evaluate BODY. If false, evaluate
+     if only once."
   (declare (type report-type report))
-  `(let ((*sample-interval* ,sample-interval)
-         (*max-samples* ,max-samples))
+  `(let* ((*sample-interval* ,sample-interval)
+          (*alloc-interval* ,alloc-interval)
+          (*sampling* nil)
+          (sb-vm:*alloc-signal* nil)
+          (*sampling-mode* ,mode)
+          (*max-samples* ,max-samples))
      ,@(when reset '((reset)))
      (unwind-protect
           (progn
             (start-profiling)
             (loop
-               (when (>= *samples-index* (length *samples*))
+               (when (>= (samples-index *samples*)
+                         (length (samples-vector *samples*)))
                  (return))
                ,@(when show-progress
                        `((format t "~&===> ~d of ~d samples taken.~%"
-                                 (/ *samples-index* +sample-size+)
+                                 (/ (samples-index *samples*) +sample-size+)
                                  *max-samples*)))
-               (let ((.last-index. *samples-index*))
+               (let ((.last-index. (samples-index *samples*)))
                  ,@body
-                 (when (= .last-index. *samples-index*)
+                 (when (= .last-index. (samples-index *samples*))
                    (warn "No sampling progress; possibly a profiler bug.")
-                   (return)))))
+                   (return)))
+               (unless ,loop
+                 (return))))
        (stop-profiling))
      ,@(when report-p `((report :type ,report)))))
 
 (defun start-profiling (&key (max-samples *max-samples*)
+                        (mode *sampling-mode*)
                         (sample-interval *sample-interval*)
+                        (alloc-interval *alloc-interval*)
                         (sampling t))
   "Start profiling statistically if not already profiling.
    The following keyword args are recognized:
 
-   :Sample-Interval <seconds>
-     Take a sample every <seconds> seconds.  Default is
-     *Sample-Interval*.
+   :SAMPLE-INTERVAL <n>
+     Take a sample every <n> seconds.  Default is *SAMPLE-INTERVAL*.
 
-   :Max-Samples <max>
-     Maximum number of samples.  Default is *Max-Samples*.
+   :ALLOC-INTERVAL <n>
+     Take a sample every time <n> allocation regions (approximately
+     8kB) have been allocated since the last sample. Default is
+     *ALLOC-INTERVAL*.
 
-   :Sampling <bool>
+   :MODE <mode>
+     If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run
+     the profiler in allocation profiling mode.
+
+   :MAX-SAMPLES <max>
+     Maximum number of samples.  Default is *MAX-SAMPLES*.
+
+   :SAMPLING <bool>
      If true, the default, start sampling right away.
-     If false, Start-Sampling can be used to turn sampling on."
+     If false, START-SAMPLING can be used to turn sampling on."
+  #-gencgc
+  (when (eq mode :alloc)
+    (error "Allocation profiling is only supported for builds using the generational garbage collector."))
   (unless *profiling*
     (multiple-value-bind (secs usecs)
         (multiple-value-bind (secs rest)
             (truncate sample-interval)
           (values secs (truncate (* rest 1000000))))
-      (setq *samples* (make-array (* max-samples +sample-size+)))
-      (setq *samples-index* 0)
-      (setq *sampling* sampling)
+      (setf *sampling-mode* mode
+            *max-samples* max-samples
+            *sampling* sampling
+            *samples* (make-samples))
       (sb-sys:enable-interrupt sb-unix:sigprof #'sigprof-handler)
-      (unix-setitimer :profile secs usecs secs usecs)
+      (if (eq mode :alloc)
+          (setf sb-vm:*alloc-signal* (1- alloc-interval))
+          (progn
+            (unix-setitimer :profile secs usecs secs usecs)
+            (setf sb-vm:*alloc-signal* nil)))
       (setq *profiling* t)))
   (values))
 
@@ -563,6 +638,7 @@
     ;; no undelivered sigprof. Besides, leaving the signal handler
     ;; installed won't hurt.
     (setq *sampling* nil)
+    (setq sb-vm:*alloc-signal* nil)
     (setq *profiling* nil))
   (values))
 
@@ -571,7 +647,6 @@
   (stop-profiling)
   (setq *sampling* nil)
   (setq *samples* nil)
-  (setq *samples-index* 0)
   (values))
 
 ;;; Make a NODE for debug-info INFO.
@@ -580,6 +655,8 @@
            (if (and (consp name)
                     (member (first name)
                             '(sb-c::xep sb-c::tl-xep sb-c::&more-processor
+                              sb-c::varargs-entry
+                              sb-c::top-level-form
                               sb-c::hairy-arg-processor
                               sb-c::&optional-processor)))
                (second name)
@@ -588,9 +665,13 @@
       (sb-kernel::code-component
        (multiple-value-bind (start end)
            (code-bounds info)
-         (%make-node :name (or (sb-disassem::find-assembler-routine start)
-                               (format nil "~a" info))
-                     :start-pc start :end-pc end)))
+         (values
+          (%make-node :name (or (sb-disassem::find-assembler-routine start)
+                                (format nil "~a" info))
+                      :debug-info info
+                      :start-pc-or-offset start
+                      :end-pc-or-offset end)
+          info)))
       (sb-di::compiled-debug-fun
        (let* ((name (sb-di::debug-fun-name info))
               (cdf (sb-di::compiled-debug-fun-compiler-debug-fun info))
@@ -602,13 +683,17 @@
          ;; distinguish a gazillion different (LAMBDA ())'s.
          (when (equal name '(lambda ()))
            (setf name (format nil "Unknown component: #x~x" start-pc)))
-         (%make-node :name (clean-name name)
-                     :start-pc (+ start-pc start-offset)
-                     :end-pc (+ start-pc end-offset))))
+         (values (%make-node :name (clean-name name)
+                             :debug-info info
+                             :start-pc-or-offset start-offset
+                             :end-pc-or-offset end-offset)
+                 component)))
       (sb-di::debug-fun
-       (%make-node :name (clean-name (sb-di::debug-fun-name info))))
+       (%make-node :name (clean-name (sb-di::debug-fun-name info))
+                   :debug-info info))
       (t
-       (%make-node :name (coerce info 'string))))))
+       (%make-node :name (coerce info 'string)
+                   :debug-info info)))))
 
 ;;; One function can have more than one COMPILED-DEBUG-FUNCTION with
 ;;; the same name.  Reduce the number of calls to Debug-Info by first
@@ -622,24 +707,25 @@
   `(let ((*name->node* (make-hash-table :test 'equal)))
      ,@body))
 
-;;; Find or make a new node for address PC.  Value is the NODE found
-;;; or made; NIL if not enough information exists to make a NODE for
-;;; PC.
+;;; Find or make a new node for INFO.  Value is the NODE found or
+;;; made; NIL if not enough information exists to make a NODE for INFO.
 (defun lookup-node (info)
   (when info
-    (let* ((new (make-node info))
-           (key (cons (node-name new)
-                      (node-start-pc new)))
-           (found (gethash key *name->node*)))
-      (cond (found
-             (setf (node-start-pc found)
-                   (min (node-start-pc found) (node-start-pc new)))
-             (setf (node-end-pc found)
-                   (max (node-end-pc found) (node-end-pc new)))
-             found)
-            (t
-             (setf (gethash key *name->node*) new)
-             new)))))
+    (multiple-value-bind (new key)
+        (make-node info)
+      (let* ((key (cons (node-name new) key))
+             (found (gethash key *name->node*)))
+        (cond (found
+               (setf (node-start-pc-or-offset found)
+                     (min (node-start-pc-or-offset found)
+                          (node-start-pc-or-offset new)))
+               (setf (node-end-pc-or-offset found)
+                     (max (node-end-pc-or-offset found)
+                          (node-end-pc-or-offset new)))
+               found)
+              (t
+               (setf (gethash key *name->node*) new)
+               new))))))
 
 ;;; Return a list of all nodes created by LOOKUP-NODE.
 (defun collect-nodes ()
@@ -651,9 +737,9 @@
   (let ((elsewhere-count 0)
         visited-nodes)
     (with-lookup-tables ()
-      (loop for i below (- *samples-index* 2) by 2
-            for callee = (lookup-node (aref *samples* i))
-            for caller = (lookup-node (aref *samples* (+ i 2)))
+      (loop for i below (- (samples-index *samples*) 2) by 2
+            for callee = (lookup-node (aref (samples-vector *samples*) i))
+            for caller = (lookup-node (aref (samples-vector *samples*) (+ i 2)))
             do
             (when (and *show-progress* (plusp i))
               (cond ((zerop (mod i 1000))
@@ -683,9 +769,13 @@
                         (push (make-call callee) (node-edges caller))))))))
       (let ((sorted-nodes (sort (collect-nodes) #'> :key #'node-count)))
         (loop for node in sorted-nodes and i from 1 do
-                (setf (node-index node) i))
-        (%make-call-graph :nsamples (/ *samples-index* +sample-size+)
-                          :sample-interval *sample-interval*
+              (setf (node-index node) i))
+        (%make-call-graph :nsamples (/ (samples-index *samples*) +sample-size+)
+                          :sample-interval (if (eq (samples-mode *samples*)
+                                                   :alloc)
+                                               (samples-alloc-interval *samples*)
+                                               (samples-sample-interval *samples*))
+                          :sampling-mode (samples-mode *samples*)
                           :elsewhere-count elsewhere-count
                           :vertices sorted-nodes)))))
 
@@ -727,9 +817,11 @@
     (setf (call-graph-flat-nodes call-graph)
           (copy-list (graph-vertices call-graph)))
     (show-progress "~&Finding cycles")
+    #+nil
     (reduce-call-graph call-graph)
     (show-progress "~&Propagating counts")
-    #+nil (compute-accrued-counts call-graph)
+    #+nil
+    (compute-accrued-counts call-graph)
     call-graph))
 
 
@@ -748,14 +840,25 @@
         (interval (call-graph-sample-interval call-graph))
         (ncycles (loop for v in (graph-vertices call-graph)
                        count (scc-p v))))
-    (format t "~2&Number of samples:   ~d~%~
+    (if (eq (call-graph-sampling-mode call-graph) :alloc)
+        (format t "~2&Number of samples:     ~d~%~
+                  Sample interval:       ~a regions (approximately ~a kB)~%~
+                  Total sampling amount: ~a regions (approximately ~a kB)~%~
+                  Number of cycles:      ~d~2%"
+                nsamples
+                interval
+                (truncate (* interval *alloc-region-size*) 1024)
+                (* nsamples interval)
+                (truncate (* nsamples interval *alloc-region-size*) 1024)
+                ncycles)
+        (format t "~2&Number of samples:   ~d~%~
                   Sample interval:     ~f seconds~%~
                   Total sampling time: ~f seconds~%~
                   Number of cycles:    ~d~2%"
-            nsamples
-            interval
-            (* nsamples interval)
-            ncycles)))
+                nsamples
+                interval
+                (* nsamples interval)
+                ncycles))))
 
 (defun print-flat (call-graph &key (stream *standard-output*) max
                    min-percent (print-header t))
@@ -769,7 +872,7 @@
                        0)))
     (when print-header
       (print-call-graph-header call-graph))
-    (format t "~&           Self        Cumul        Total~%")
+    (format t "~&           Self        Total        Cumul~%")
     (format t "~&  Nr  Count     %  Count     %  Count     % Function~%")
     (print-separator)
     (let ((elsewhere-count (call-graph-elsewhere-count call-graph))
@@ -832,7 +935,7 @@
              (format t "~&~6d ~5,1f ~11@t ~V@t  ~s [~d]~%"
                      count percent indent name index)))
       (format t "~&                               Callers~%")
-      (format t "~&                 Cumul.     Function~%")
+      (format t "~&                 Total.     Function~%")
       (format t "~& Count     %  Count     %      Callees~%")
       (do-vertices (node call-graph)
         (print-separator)
@@ -868,30 +971,30 @@
   "Report statistical profiling results.  The following keyword
    args are recognized:
 
-   :Type <type>
+   :TYPE <type>
       Specifies the type of report to generate.  If :FLAT, show
       flat report, if :GRAPH show a call graph and a flat report.
       If nil, don't print out a report.
 
-   :Stream <stream>
+   :STREAM <stream>
       Specify a stream to print the report on.  Default is
-      *Standard-Output*.
+      *STANDARD-OUTPUT*.
 
-   :Max <max>
+   :MAX <max>
       Don't show more than <max> entries in the flat report.
 
-   :Min-Percent <min-percent>
+   :MIN-PERCENT <min-percent>
       Don't show functions taking less than <min-percent> of the
       total time in the flat report.
 
-   :Show-Progress <bool>
+   :SHOW-PROGRESS <bool>
      If true, print progress messages while generating the call graph.
 
-   :Call-Graph <graph>
+   :CALL-GRAPH <graph>
      Print a report from <graph> instead of the latest profiling
      results.
 
-   Value of this function is a Call-Graph object representing the
+   Value of this function is a CALL-GRAPH object representing the
    resulting call-graph."
   (let ((graph (or call-graph (make-call-graph (1- +sample-depth+)))))
     (ecase type
@@ -919,20 +1022,23 @@
 
 (defun add-disassembly-profile-note (chunk stream dstate)
   (declare (ignore chunk stream))
-  (unless (zerop *samples-index*)
-    (let* ((location
-            (+ (sb-disassem::seg-virtual-location
-                (sb-disassem:dstate-segment dstate))
-               (sb-disassem::dstate-cur-offs dstate)))
-           (samples (loop for x from 0 below *samples-index* by +sample-size+
-                          for sample = (aref *samples* x)
-                          for pc-or-offset = (aref *samples* (1+ x))
+  (unless (zerop (samples-index *samples*))
+    (let* ((location (+ (sb-disassem::seg-virtual-location
+                         (sb-disassem:dstate-segment dstate))
+                        (sb-disassem::dstate-cur-offs dstate)))
+           (samples (loop with index = (samples-index *samples*)
+                          for x from 0 below index by +sample-size+
+                          for sample = (aref (samples-vector *samples*) x)
+                          for pc-or-offset = (aref (samples-vector *samples*)
+                                                   (1+ x))
+                          when sample
                           count (= location
                                    (sample-pc-from-pc-or-offset sample
                                                                 pc-or-offset)))))
       (unless (zerop samples)
         (sb-disassem::note (format nil "~A/~A samples"
-                                   samples (/ *samples-index* +sample-size+))
+                                   samples (/ (samples-index *samples*)
+                                              +sample-size+))
                            dstate)))))
 
 (pushnew 'add-disassembly-profile-note sb-disassem::*default-dstate-hooks*)

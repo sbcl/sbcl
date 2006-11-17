@@ -49,6 +49,7 @@
     *control-stack-end*
 
     ;; interrupt handling
+    *alloc-signal*
     *free-interrupt-context-index*
     sb!unix::*interrupts-enabled*
     sb!unix::*interrupt-pending*

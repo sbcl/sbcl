@@ -7,9 +7,97 @@ The @code{sb-sprof} module, loadable by
 provides an alternate profiler which works by taking samples of the
 program execution at regular intervals, instead of instrumenting
 functions like @code{sb-profile:profile} does. You might find
-@code{sb-sprof} more useful than accurate profiler when profiling
+@code{sb-sprof} more useful than the deterministic profiler when profiling
 functions in the @code{common-lisp}-package, SBCL internals, or code
 where the instrumenting overhead is excessive.
+
+@subsection Example Usage
+
+@lisp
+(require :sb-sprof)
+
+(declaim (optimize speed))
+
+(defun cpu-test (n)
+  (let ((a 0))
+    (dotimes (i (expt 2 n) a)
+      (setf a (logxor a
+                      (* i 5)
+                      (+ a i))))))
+
+;;;; CPU profiling
+
+;;; Take up to 1000 samples of running (CPU-TEST 26), and give a flat
+;;; table report at the end. Profiling will end one the body has been
+;;; evaluated once, whether or not 1000 samples have been taken.
+(sb-sprof:with-profiling (:max-samples 1000
+                          :report :flat
+                          :loop nil)
+  (cpu-test 26))
+
+;;; Take 1000 samples of running (CPU-TEST 24), and give a flat
+;;; table report at the end. The body will be re-evaluated in a loop
+;;; until 1000 samples have been taken. A sample count will be printed
+;;; after each iteration.
+(sb-sprof:with-profiling (:max-samples 1000
+                          :report :flat
+                          :loop t
+                          :show-progress t)
+  (cpu-test 24))
+  
+;;;; Allocation profiling 
+
+(defun foo (&rest args)
+  (mapcar (lambda (x) (float x 1d0)) args))
+
+(defun bar (n)
+  (declare (fixnum n))
+  (apply #'foo (loop repeat n collect n)))
+
+(sb-sprof:with-profiling (:max-samples 10000
+                          :mode :alloc 
+                          :report :flat)
+  (bar 1000))
+@end lisp
+
+@subsection Output
+
+The flat report format will show a table of all functions that the
+profiler encountered on the call stack during sampling, ordered by the
+number of samples taken while executing that function. 
+
+@lisp
+           Self        Total        Cumul
+  Nr  Count     %  Count     %  Count     % Function
+------------------------------------------------------------------------
+   1    165  38.3    165  38.3    165  38.3 SB-KERNEL:TWO-ARG-XOR
+   2    141  32.7    141  32.7    306  71.0 SB-VM::GENERIC-+
+   3     67  15.5    145  33.6    373  86.5 CPU-TEST-2
+@end lisp
+
+For each function, the table will show three absolute and relative
+sample counts. The Self column shows samples taken while directly
+executing that function. The Total column shows samples taken while
+executing that function or functions called from it (sampled to a 
+platform-specific depth). The Cumul column shows the sum of all
+Self columns up to and including that line in the table.
+
+The profiler also hooks into the disassembler such that instructions which
+have been sampled are annotated with their relative frequency of
+sampling.  This information is not stored across different sampling
+runs.
+
+@lisp
+;      6CF:       702E             JO L4              ; 6/242 samples
+;      6D1:       D1E3             SHL EBX, 1
+;      6D3:       702A             JO L4
+;      6D5: L2:   F6C303           TEST BL, 3         ; 2/242 samples
+;      6D8:       756D             JNE L8
+;      6DA:       8BC3             MOV EAX, EBX       ; 5/242 samples
+;      6DC: L3:   83F900           CMP ECX, 0         ; 4/242 samples
+@end lisp
+
+@subsection Platform support
 
 This module is known not to work consistently on the Alpha platform,
 for technical reasons related to the implementation of a machine
@@ -17,25 +105,14 @@ language idiom for marking sections of code to be treated as atomic by
 the garbage collector;  However, it should work on other platforms,
 and the deficiency on the Alpha will eventually be rectified.
 
-@subsection Example Usage
+Allocation profiling is only supported on SBCL builds that use 
+the generational garbage collector. Tracking of call stacks at a
+depth of more than two levels is only supported on x86 and x86-64.
 
-@lisp
-(require :sb-sprof)
-(sb-sprof:start-profiling)
+@subsection Macros
 
-(defvar *a* 0)
-(dotimes (i (expt 2 26))
-  (setf *a* (logxor *a* (* i 5)
-                    (+ *a* i))))
-
-(sb-sprof:stop-profiling)
-(sb-sprof:report)
-@end lisp
-
-The profiler hooks into the disassembler such that instructions which
-have been sampled are annotated with their relative frequency of
-sampling.  This information is not stored across different sampling
-runs. @c FIXME: maybe it should be?
+@include macro-sb-sprof-with-profiling.texinfo
+@include macro-sb-sprof-with-sampling.texinfo
 
 @subsection Functions
 
@@ -46,10 +123,6 @@ runs. @c FIXME: maybe it should be?
 @include fun-sb-sprof-start-profiling.texinfo
 
 @include fun-sb-sprof-stop-profiling.texinfo
-
-@subsection Macros
-
-@include macro-sb-sprof-with-profiling.texinfo
 
 @subsection Variables
 

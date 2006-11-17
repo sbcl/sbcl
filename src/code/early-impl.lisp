@@ -49,4 +49,5 @@
                   sb!vm::*fp-constant-l2e*
                   sb!vm::*fp-constant-lg2*
                   sb!vm::*fp-constant-ln2*
+                  sb!vm:*alloc-signal*
                   sb!pcl::..slot-unbound..))
