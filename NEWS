@@ -18,6 +18,8 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
     on Linux/x86
   * improvement: added support for the Shift-JIS external format.
     (contributed by NIIMI Satoshi)
+  * improvement: callbacks are supported on Linux/PPC.  (thanks to
+    Joshua Ross)
   * bug fix: compiler bug triggered by a (non-standard) VALUES
     declaration in a LET* was fixed. (reported by Kaersten Poeck)
   * bug fix: file compiler no longer confuses validated and already

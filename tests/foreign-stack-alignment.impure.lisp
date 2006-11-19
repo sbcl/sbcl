@@ -32,7 +32,7 @@
 
 (defvar *required-alignment*
   #+(and ppc darwin) 16
-  #+(and ppc linux) 16
+  #+(and ppc linux) 8
   #+x86-64 16
   #+mips 8
   #+x86 4

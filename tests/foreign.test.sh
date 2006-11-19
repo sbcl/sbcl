@@ -39,12 +39,62 @@ build_so() {
   ld $SO_FLAGS -o $1.so $1.o  
 }
 
-echo 'int summish(int x, int y) { return 1 + x + y; }' > $testfilestem.c
-echo 'int numberish = 42;' >> $testfilestem.c
-echo 'int nummish(int x) { return numberish + x; }' >> $testfilestem.c
-echo 'short negative_short() { return -1; }' >> $testfilestem.c
-echo 'int negative_int()     { return -2; }' >> $testfilestem.c
-echo 'long negative_long()   { return -3; }' >> $testfilestem.c
+cat > $testfilestem.c <<EOF
+int summish(int x, int y) { return 1 + x + y; }
+
+int numberish = 42;
+
+int nummish(int x) { return numberish + x; }
+
+short negative_short() { return -1; }
+int negative_int()     { return -2; }
+long negative_long()   { return -3; }
+
+long long powish(unsigned int x, unsigned int y) {
+  long long acc = 1;
+  long long xx = (long long) x;
+  for(; y != 1; y /= 2) {
+    if (y & 1) {
+      acc *= xx;
+      y -= 1;
+    }
+    xx *= xx;
+  }
+  return xx*acc;
+}
+
+float return9th(float f1, float f2, float f3, float f4, float f5, 
+		float f6, float f7, float f8, float f9, float f10, 
+		float f11, float f12) { 
+    return f9; 
+}
+
+double return9thd(double f1, double f2, double f3, double f4, double f5, 
+		  double f6, double f7, double f8, double f9, double f10,
+		  double f11, double f12) { 
+    return f9; 
+}
+
+int long_test8(int a1, int a2, int a3, int a4, int a5, 
+	       int a6, int a7, long long l1) { 
+    return (l1 == powish(2,34));
+}
+
+int long_test9(int a1, int a2, int a3, int a4, int a5, 
+	       int a6, int a7, long long l1, int a8) { 
+    return (l1 == powish(2,35));
+}
+
+int long_test2(int i1, int i2, int i3, int i4, int i5, int i6,
+	       int i7, int i8, int i9, long long l1, long long l2) {
+    return (l1 == (1 + powish(2,37)));
+}
+
+long long return_long_long() {
+    return powish(2,33);
+}
+EOF
+
 build_so $testfilestem
 
 echo 'int foo = 13;' > $testfilestem-b.c
@@ -84,6 +134,14 @@ cat > $testfilestem.def.lisp <<EOF
   (define-alien-routine "negative_int" int)
   (define-alien-routine "negative_long" long)
 
+  (define-alien-routine return9th float (input1 float) (input2 float) (input3 float) (input4 float) (input5 float) (input6 float) (input7 float) (input8 float) (input9 float) (input10 float) (input11 float) (input12 float))
+  (define-alien-routine return9thd double (f1 double) (f2 double) (f3 double) (f4 double) (f5 double) (f6 double) (f7 double) (f8 double) (f9 double) (f10 double) (f11 double) (f12 double))
+
+  (define-alien-routine long-test8 int (int1 int) (int2 int) (int3 int) (int4 int) (int5 int) (int6 int) (int7 int) (long1 (integer 64)))
+  (define-alien-routine long-test9 int (int1 int) (int2 int) (int3 int) (int4 int) (int5 int) (int6 int) (int7 int) (long1 (integer 64)) (int8 int))
+  (define-alien-routine long-test2 int (int1 int) (int2 int) (int3 int) (int4 int) (int5 int) (int6 int) (int7 int) (int8 int) (int9 int) (long1 (integer 64)) (long2 (integer 64)))
+  (define-alien-routine return-long-long (integer 64))
+
   ;; compiling this gets us the FOP-FOREIGN-DATAREF-FIXUP on
   ;; linkage-table ports
   (defvar *extern* (extern-alien "negative_short" short))
@@ -120,6 +178,14 @@ cat > $testfilestem.test.lisp <<EOF
   (assert (= -1 (negative-short)))
   (assert (= -2 (negative-int)))
   (assert (= -3 (negative-long)))
+
+  (assert (= 9.0s0 (return9th 1.0s0 2.0s0 3.0s0 4.0s0 5.0s0 6.0s0 7.0s0 8.0s0 9.0s0 10.0s0 11.0s0 12.0s0)))
+  (assert (= 9.0d0 (return9thd 1.0d0 2.0d0 3.0d0 4.0d0 5.0d0 6.0d0 7.0d0 8.0d0 9.0d0 10.0d0 11.0d0 12.0d0)))
+
+  (assert (= 1 (long-test8 1 2 3 4 5 6 7 (ash 1 34))))
+  (assert (= 1 (long-test9 1 2 3 4 5 6 7 (ash 1 35) 8)))
+  (assert (= 1 (long-test2 1 2 3 4 5 6 7 8 9 (+ 1 (ash 1 37)) 15)))
+  (assert (= (ash 1 33) (return-long-long)))
 
   (print :stage-1)
 
@@ -161,7 +227,7 @@ if [ $? = 52 ]; then
     true # nop
 else
     # we can't compile the test file. something's wrong.
-    rm $testfilestem.*
+    # rm $testfilestem.*
     echo test failed: $?
     exit 1
 fi

@@ -707,6 +707,10 @@ Kevin M. Rosenberg:
   a number of MOP-related bug reports.  He also creates the official
   Debian packages of SBCL.
 
+Joshua Ross:
+  He fixed some bugs relating to foreign calls and callbacks on the
+  Linux PowerPC platform.
+
 Christophe Rhodes:
   He ported SBCL to SPARC (based on the CMUCL backend), made various
   port-related and SPARC-related changes (like *BACKEND-SUBFEATURES*),
@@ -801,6 +805,7 @@ PRM  Pierre Mai
 MG   Gabor Melis
 WHN  William ("Bill") Newman
 CSR  Christophe Rhodes
+JRXR Joshua Ross
 THS  Thiemo Seufer
 NS   Nikodemus Siivola
 JES  Juho Snellman
