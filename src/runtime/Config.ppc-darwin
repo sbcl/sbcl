@@ -21,9 +21,9 @@ ARCH_SRC = ppc-arch.c
 CPPFLAGS += -no-cpp-precomp
 
 ifdef LISP_FEATURE_GENCGC
-  GC_SRC = "gencgc.c"
+  GC_SRC = gencgc.c
 else
-  GC_SRC = "cheneygc.c"
+  GC_SRC = cheneygc.c
 endif
 
 .PHONY: after-grovel-headers

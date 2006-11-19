@@ -20,9 +20,9 @@ OS_SRC = linux-os.c ppc-linux-os.c
 OS_LIBS = -ldl
 
 ifdef LISP_FEATURE_GENCGC
-  GC_SRC = "gencgc.c"
+  GC_SRC = gencgc.c
 else
-  GC_SRC = "cheneygc.c"
+  GC_SRC = cheneygc.c
 endif
 
 # Nothing to do for after-grovel-headers.
