@@ -1603,7 +1603,12 @@ bootstrapping.
     (if (and existing
              (eq *boot-state* 'complete)
              (null (generic-function-p existing)))
-        (generic-clobbers-function fun-name)
+        (restart-case
+            (generic-clobbers-function fun-name)
+          (replace ()
+            :report "Replace the function binding"
+            (fmakunbound fun-name)
+            (apply #'ensure-generic-function fun-name all-keys)))
         (apply #'ensure-generic-function-using-class
                existing fun-name all-keys))))
 
