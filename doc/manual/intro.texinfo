@@ -100,7 +100,7 @@ Streams}.
 streams} API proposed by Franz Inc. @xref{Simple Streams}.
 
 @item Profiling
-@code{sb-profile} is a exact per-function profiler. @xref{Accurate
+@code{sb-profile} is a exact per-function profiler. @xref{Deterministic
 Profiler}.
 
 @code{sb-sprof} is a statistical profiler, capable of call-graph
