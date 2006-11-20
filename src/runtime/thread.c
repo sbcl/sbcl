@@ -51,6 +51,11 @@
 #define QUEUE_FREEABLE_THREAD_STACKS
 #endif
 
+#ifdef LISP_FEATURE_FREEBSD
+#define CREATE_CLEANUP_THREAD
+#define LOCK_CREATE_THREAD
+#endif
+
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
 
 struct freeable_stack {
@@ -76,6 +81,9 @@ extern struct interrupt_data * global_interrupt_data;
 
 #ifdef LISP_FEATURE_SB_THREAD
 pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
+#ifdef LOCK_CREATE_THREAD
+static pthread_mutex_t create_thread_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 #endif
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
@@ -186,6 +194,45 @@ free_freeable_stacks() {
     }
 }
 
+#elif defined(CREATE_CLEANUP_THREAD)
+static void *
+cleanup_thread(void *arg)
+{
+    struct freeable_stack *freeable = arg;
+    pthread_t self = pthread_self();
+
+    FSHOW((stderr, "/cleaner thread(%p): joining %p\n",
+           self, freeable->os_thread));
+    gc_assert(pthread_join(freeable->os_thread, NULL) == 0);
+    FSHOW((stderr, "/cleaner thread(%p): free stack %p\n",
+           self, freeable->stack));
+    os_invalidate(freeable->stack, THREAD_STRUCT_SIZE);
+    free(freeable);
+
+    pthread_detach(self);
+
+    return NULL;
+}
+
+static void
+create_cleanup_thread(struct thread *thread_to_be_cleaned_up)
+{
+    pthread_t thread;
+    int result;
+
+    if (thread_to_be_cleaned_up) {
+        struct freeable_stack *freeable =
+            malloc(sizeof(struct freeable_stack));
+        gc_assert(freeable != NULL);
+        freeable->os_thread = thread_to_be_cleaned_up->os_thread;
+        freeable->stack =
+            (os_vm_address_t) thread_to_be_cleaned_up->control_stack_start;
+        result = pthread_create(&thread, NULL, cleanup_thread, freeable);
+        gc_assert(result == 0);
+        sched_yield();
+    }
+}
+        
 #else
 static void
 free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
@@ -267,6 +314,8 @@ new_thread_trampoline(struct thread *th)
 
 #ifdef QUEUE_FREEABLE_THREAD_STACKS
     queue_freeable_thread_stack(th);
+#elif defined(CREATE_CLEANUP_THREAD)
+    create_cleanup_thread(th);
 #else
     free_thread_stack_later(th);
 #endif
@@ -433,6 +482,11 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
 
     FSHOW_SIGNAL((stderr,"/create_os_thread: creating new thread\n"));
 
+#ifdef LOCK_CREATE_THREAD
+    retcode = pthread_mutex_lock(&create_thread_lock);
+    gc_assert(retcode == 0);
+    FSHOW_SIGNAL((stderr,"/create_os_thread: got lock\n"));
+#endif
     sigemptyset(&newset);
     /* Blocking deferrable signals is enough, no need to block
      * SIG_STOP_FOR_GC because the child process is not linked onto
@@ -466,6 +520,11 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     free_freeable_stacks();
 #endif
     thread_sigmask(SIG_SETMASK,&oldset,0);
+#ifdef LOCK_CREATE_THREAD
+    retcode = pthread_mutex_unlock(&create_thread_lock);
+    gc_assert(retcode == 0);
+    FSHOW_SIGNAL((stderr,"/create_os_thread: released lock\n"));
+#endif
     return r;
 }
 
@@ -536,6 +595,16 @@ void gc_stop_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
     int status, lock_ret;
+#ifdef LOCK_CREATE_THREAD
+    /* KLUDGE: Stopping the thread during pthread_create() causes deadlock
+     * on FreeBSD. */
+    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on create_thread_lock, thread=%lu\n",
+                  th->os_thread));
+    lock_ret = pthread_mutex_lock(&create_thread_lock);
+    gc_assert(lock_ret == 0);
+    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got create_thread_lock, thread=%lu\n",
+                  th->os_thread));
+#endif
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock, thread=%lu\n",
                   th->os_thread));
     /* keep threads from starting while the world is stopped. */
@@ -612,6 +681,10 @@ void gc_start_the_world()
 
     lock_ret = pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
+#ifdef LOCK_CREATE_THREAD
+    lock_ret = pthread_mutex_unlock(&create_thread_lock);
+    gc_assert(lock_ret == 0);
+#endif
 
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:end\n"));
 }

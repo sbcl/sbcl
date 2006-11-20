@@ -343,6 +343,8 @@
   (prev :c-type "struct lutex *" :length 1)
   (mutex :c-type "pthread_mutex_t *"
          :length 1)
+  (mutexattr :c-type "pthread_mutexattr_t *"
+             :length 1)
   (condition-variable :c-type "pthread_cond_t *"
                       :length 1))
 

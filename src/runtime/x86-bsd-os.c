@@ -150,7 +150,7 @@ int arch_os_thread_init(struct thread *thread) {
     }
     FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", n));
     sel =  LSEL(n, SEL_UPL);
-    __asm__ __volatile__ ("mov %0, %%fs" : : "r"(sel));
+    load_fs(sel);
 
     thread->tls_cookie=n;
     pthread_setspecific(specials,thread);

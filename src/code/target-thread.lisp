@@ -125,6 +125,9 @@ in future versions."
     (sb!alien:define-alien-routine ("lutex_lock" %lutex-lock)
         int (lutex unsigned-long))
 
+    (sb!alien:define-alien-routine ("lutex_trylock" %lutex-trylock)
+        int (lutex unsigned-long))
+
     (sb!alien:define-alien-routine ("lutex_unlock" %lutex-unlock)
         int (lutex unsigned-long))
 
@@ -254,11 +257,11 @@ until it is available"
       (format *debug-io* "Thread: ~A~%" *current-thread*)
       (sb!debug:backtrace most-positive-fixnum *debug-io*)
       (force-output *debug-io*))
-    ;; FIXME: sb-lutex and (not wait-p)
     #!+sb-lutex
-    (when wait-p
-      (with-lutex-address (lutex (mutex-lutex mutex))
-        (%lutex-lock lutex))
+    (when (zerop (with-lutex-address (lutex (mutex-lutex mutex))
+                   (if wait-p
+                       (%lutex-lock lutex)
+                       (%lutex-trylock lutex))))
       (setf (mutex-value mutex) new-value))
     #!-sb-lutex
     (let (old)

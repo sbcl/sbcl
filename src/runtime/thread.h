@@ -121,6 +121,16 @@ static inline struct thread *arch_os_get_current_thread() {
         sel.rpl = USER_PRIV;
         sel.ti = SEL_LDT;
         __asm__ __volatile__ ("movw %w0, %%fs" : : "r"(sel));
+#elif defined(LISP_FEATURE_FREEBSD) && defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_TLS)
+        struct thread *th = pthread_getspecific(specials);
+        unsigned int sel = LSEL(th->tls_cookie, SEL_UPL);
+        unsigned int fs = rfs();
+
+        /* Load FS only if it's necessary.  Modifying a selector
+         * causes privilege checking and it takes long time. */
+        if (fs != sel)
+            load_fs(sel);
+        return th;
 #endif
         __asm__ __volatile__ ("movl %%fs:%c1,%0" : "=r" (me)
                  : "i" (offsetof (struct thread,this)));

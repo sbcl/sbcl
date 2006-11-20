@@ -1,6 +1,11 @@
 #ifndef _X86_BSD_OS_H
 #define _X86_BSD_OS_H
 
+#ifdef LISP_FEATURE_FREEBSD
+#include <machine/segments.h>
+#include <machine/cpufunc.h>
+#endif
+
 static inline os_context_t *arch_os_get_context(void **void_context) {
     return (os_context_t *) *void_context;
 }

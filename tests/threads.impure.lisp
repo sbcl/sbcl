@@ -419,7 +419,9 @@
               (force-output)
               (sb-ext:quit :unix-status 1)))))))
 
-(let* ((nanosleep-errno (progn
+;; (nanosleep -1 0) does not fail on FreeBSD
+(let* (#-freebsd           
+       (nanosleep-errno (progn
                           (sb-unix:nanosleep -1 0)
                           (sb-unix::get-errno)))
        (open-errno (progn
@@ -428,6 +430,7 @@
                      (sb-unix::get-errno)))
        (threads
         (list
+         #-freebsd
          (exercise-syscall (lambda () (sb-unix:nanosleep -1 0)) nanosleep-errno)
          (exercise-syscall (lambda () (open "no-such-file"
                                             :if-does-not-exist nil))

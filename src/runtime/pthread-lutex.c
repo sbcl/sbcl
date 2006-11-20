@@ -15,6 +15,7 @@
 
 #if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
 
+#include <errno.h>
 #include <stdlib.h>
 
 #include "runtime.h"
@@ -55,10 +56,25 @@ lutex_init (tagged_lutex_t tagged_lutex)
     int ret;
     struct lutex *lutex = (struct lutex*) native_pointer(tagged_lutex);
 
+    lutex->mutexattr = malloc(sizeof(pthread_mutexattr_t));
+    lutex_assert(lutex->mutexattr != 0);
+
+    ret = pthread_mutexattr_init(lutex->mutexattr);
+    lutex_assert(ret == 0);
+
+    /* The default type of mutex is implementation dependent.
+     * We use PTHREAD_MUTEX_ERRORCHECK so that locking on mutexes
+     * locked by the same thread does not cause deadlocks. */
+    /* FIXME: pthread_mutexattr_settype is available on SUSv2 level
+     * implementations.  Can be used without checking? */
+    ret = pthread_mutexattr_settype(lutex->mutexattr,
+                                    PTHREAD_MUTEX_ERRORCHECK);
+    lutex_assert(ret == 0);
+
     lutex->mutex = malloc(sizeof(pthread_mutex_t));
     lutex_assert(lutex->mutex != 0);
 
-    ret = pthread_mutex_init(lutex->mutex, NULL);
+    ret = pthread_mutex_init(lutex->mutex, lutex->mutexattr);
     lutex_assert(ret == 0);
 
     lutex->condition_variable = malloc(sizeof(pthread_cond_t));
@@ -122,6 +138,24 @@ lutex_lock (tagged_lutex_t tagged_lutex)
     struct lutex *lutex = (struct lutex*) native_pointer(tagged_lutex);
 
     ret = thread_mutex_lock(lutex->mutex);
+    /* The mutex is locked by the same thread. */
+    if (ret == EDEADLK)
+        return ret;
+    lutex_assert(ret == 0);
+
+    return ret;
+}
+
+int
+lutex_trylock (tagged_lutex_t tagged_lutex)
+{
+    int ret = 0;
+    struct lutex *lutex = (struct lutex*) native_pointer(tagged_lutex);
+
+    ret = pthread_mutex_trylock(lutex->mutex);
+    /* The mutex is locked */
+    if (ret == EDEADLK || ret == EBUSY)
+        return ret;
     lutex_assert(ret == 0);
 
     return ret;
@@ -134,6 +168,10 @@ lutex_unlock (tagged_lutex_t tagged_lutex)
     struct lutex *lutex = (struct lutex*) native_pointer(tagged_lutex);
 
     ret = thread_mutex_unlock(lutex->mutex);
+    /* Unlocking unlocked mutex would occur as:
+     * (with-mutex (mutex) (cond-wait cond mutex)) */
+    if (ret == EPERM)
+        return ret;
     lutex_assert(ret == 0);
 
     return ret;
@@ -154,6 +192,12 @@ lutex_destroy (tagged_lutex_t tagged_lutex)
         pthread_mutex_destroy(lutex->mutex);
         free(lutex->mutex);
         lutex->mutex = NULL;
+    }
+
+    if (lutex->mutexattr) {
+        pthread_mutexattr_destroy(lutex->mutexattr);
+        free(lutex->mutexattr);
+        lutex->mutexattr = NULL;
     }
 
     return 0;
