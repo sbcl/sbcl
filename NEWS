@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
+  * improvement: experimental support for threading on FreeBSD/x86.
+    (thanks to NIIMI Satoshi)
   * improvement: runtime option --dynamic-space-size can be used
     to set the size of the dynamic space reserved on startup.
   * improvement: floating point modes in effect are now saved in

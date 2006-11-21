@@ -11,7 +11,7 @@ SB-THREAD package.
 
 This requires Linux (2.6+ or systems with NPTL backports) running on the
 x86 or x86-64 architecture, or SunOS (Solaris) on the x86.  Support for
-Darwin (Mac OS X) on the x86 is experimental.
+threading on Darwin (Mac OS X) and FreeBSD on the x86 is experimental.
 
 @menu
 * Threading basics::            
