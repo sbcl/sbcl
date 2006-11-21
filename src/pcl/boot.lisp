@@ -1600,22 +1600,21 @@ bootstrapping.
   (declare (ignore environment))
   (let ((existing (and (fboundp fun-name)
                        (gdefinition fun-name))))
-    (if (and existing
-             (eq *boot-state* 'complete)
-             (null (generic-function-p existing)))
-        (restart-case
-            (generic-clobbers-function fun-name)
-          (replace ()
-            :report "Replace the function binding"
-            (fmakunbound fun-name)
-            (apply #'ensure-generic-function fun-name all-keys)))
-        (apply #'ensure-generic-function-using-class
-               existing fun-name all-keys))))
+    (cond ((and existing
+                (eq *boot-state* 'complete)
+                (null (generic-function-p existing)))
+           (generic-clobbers-function fun-name)
+           (fmakunbound fun-name)
+           (apply #'ensure-generic-function fun-name all-keys))
+          (t
+           (apply #'ensure-generic-function-using-class
+                  existing fun-name all-keys)))))
 
 (defun generic-clobbers-function (fun-name)
-  (error 'simple-program-error
-         :format-control "~S already names an ordinary function or a macro."
-         :format-arguments (list fun-name)))
+  (cerror "Replace the function binding"
+          'simple-program-error
+          :format-control "~S already names an ordinary function or a macro."
+          :format-arguments (list fun-name)))
 
 (defvar *sgf-wrapper*
   (boot-make-wrapper (early-class-size 'standard-generic-function)
