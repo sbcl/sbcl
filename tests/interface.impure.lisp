@@ -53,6 +53,30 @@
 (disassemble 'disassemble-generic)
 (let ((fin (sb-mop:make-instance 'sb-mop:funcallable-standard-object)))
   (disassemble fin))
+
+;;; while we're at it, much the same applies to
+;;; FUNCTION-LAMBDA-EXPRESSION:
+(defun fle-fun (x) x)
+(function-lambda-expression #'fle-fun)
+
+(let ((x 1)) (defun fle-closure (y) (if y (setq x y) x)))
+(function-lambda-expression #'fle-closure)
+
+#+sb-eval
+(progn
+  ;; Nor should it fail on interpreted functions
+  (let ((sb-ext:*evaluator-mode* :interpret))
+    (eval `(defun fle-eval (x) x))
+    (function-lambda-expression #'fle-eval))
+
+  ;; fle-eval should still be an interpreted function.
+  (assert (sb-eval:interpreted-function-p #'fle-eval)))
+
+;; nor should it fail on generic functions or other funcallable instances
+(defgeneric fle-generic (x))
+(function-lambda-expression #'fle-generic)
+(let ((fin (sb-mop:make-instance 'sb-mop:funcallable-standard-object)))
+  (function-lambda-expression fin))
 
 ;;; support for DESCRIBE tests
 (defstruct to-be-described a b)
