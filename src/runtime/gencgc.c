@@ -4544,8 +4544,12 @@ alloc(long nbytes)
 #else
         &boxed_region;
 #endif
+#ifndef LISP_FEATURE_WIN32
+    lispobj alloc_signal;
+#endif
     void *new_obj;
     void *new_free_pointer;
+
     gc_assert(nbytes>0);
 
     /* Check for alignment allocation problems. */
@@ -4599,8 +4603,7 @@ alloc(long nbytes)
     new_obj = gc_alloc_with_region(nbytes,0,region,0);
 
 #ifndef LISP_FEATURE_WIN32
-    lispobj alloc_signal = SymbolValue(ALLOC_SIGNAL,thread);
-
+    alloc_signal = SymbolValue(ALLOC_SIGNAL,thread);
     if ((alloc_signal & FIXNUM_TAG_MASK) == 0) {
         if ((signed long) alloc_signal <= 0) {
 #ifdef LISP_FEATURE_SB_THREAD
