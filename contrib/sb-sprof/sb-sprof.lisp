@@ -1022,7 +1022,7 @@ profiling")
 
 (defun add-disassembly-profile-note (chunk stream dstate)
   (declare (ignore chunk stream))
-  (unless (zerop (samples-index *samples*))
+  (when *samples*
     (let* ((location (+ (sb-disassem::seg-virtual-location
                          (sb-disassem:dstate-segment dstate))
                         (sb-disassem::dstate-cur-offs dstate)))
