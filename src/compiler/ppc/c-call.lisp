@@ -63,7 +63,7 @@
 ;;;   a double.
 ;;;
 ;;; gcc does:
-;;; 
+;;;
 ;;;   Excess floats stored on the stack are stored as floats.
 ;;;
 ;;; We follow gcc.

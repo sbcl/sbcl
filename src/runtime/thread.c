@@ -232,7 +232,7 @@ create_cleanup_thread(struct thread *thread_to_be_cleaned_up)
         sched_yield();
     }
 }
-        
+
 #else
 static void
 free_thread_stack_later(struct thread *thread_to_be_cleaned_up)

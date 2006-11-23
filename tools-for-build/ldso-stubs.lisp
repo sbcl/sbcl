@@ -285,7 +285,11 @@ ldso_stub__ ## fct: ;                  \\
                  #!+alpha
                  '("ieee_get_fp_control"
                    "ieee_set_fp_control")
-                 #!-win32
+                 ;; FIXME: After 1.0 this should be made
+                 ;; #!-linkage-table, as we only need these stubs if
+                 ;; we don't have linkage-table. Done this way now to
+                 ;; cut down on the number of ports affected.
+                 #!-(or win32 darwin)
                  '("ptsname"
                    "grantpt"
                    "unlockpt")

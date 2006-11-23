@@ -420,7 +420,7 @@
               (sb-ext:quit :unix-status 1)))))))
 
 ;; (nanosleep -1 0) does not fail on FreeBSD
-(let* (#-freebsd           
+(let* (#-freebsd
        (nanosleep-errno (progn
                           (sb-unix:nanosleep -1 0)
                           (sb-unix::get-errno)))
