@@ -289,7 +289,7 @@ ldso_stub__ ## fct: ;                  \\
                  ;; #!-linkage-table, as we only need these stubs if
                  ;; we don't have linkage-table. Done this way now to
                  ;; cut down on the number of ports affected.
-                 #!-(or win32 darwin)
+                 #!-(or win32 darwin freebsd)
                  '("ptsname"
                    "grantpt"
                    "unlockpt")
