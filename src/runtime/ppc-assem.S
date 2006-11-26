@@ -516,11 +516,24 @@ lra:
 
 	GFUNCDEF(xundefined_tramp)
 	.globl CSYMBOL(undefined_tramp)
-CSYMBOL(undefined_tramp):	
+	.long	SIMPLE_FUN_HEADER_WIDETAG                         /* header */
+	.long	CSYMBOL(undefined_tramp) - SIMPLE_FUN_CODE_OFFSET /* self */
+	.long	NIL                                               /* next */
+	.long   NIL                                               /* name */
+	.long	NIL                                               /* arglist */
+	.long	NIL                                               /* type */
+CSYMBOL(undefined_tramp):
+	/* Point reg_CODE to the header and tag it as function, since
+	   the debugger regards a function pointer in reg_CODE which
+	   doesn't point to a code object as undefined function.  */
+	bcl 20,31,.+4                  /* get address of the next instruction */
+	mflr reg_CODE                  /* header is 7 words back from here */
+	addi reg_CODE,reg_CODE,-7*4+FUN_POINTER_LOWTAG
+	
 	twllei reg_ZERO,trap_Cerror
 	.byte 4
 	.byte UNDEFINED_FUN_ERROR
-	.byte 254, sc_DescriptorReg+0x40, 1	/* 140?  sparc says sc_descriptorReg */
+	.byte 254, sc_DescriptorReg+0x40, 1 /* 140?  sparc says sc_descriptorReg */
 	/* This stuff is for the continuable error.  I don't think there's
 	 * any support for it on the lisp side */
 	.align 2
