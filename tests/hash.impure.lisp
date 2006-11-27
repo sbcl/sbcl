@@ -288,6 +288,9 @@
        (sb-thread::wait-on-semaphore ,sem)
        (values-list ,values))))
 
+(defun take (&rest args)
+  (declare (ignore args)))
+
 (with-test (:name (:hash-table :weakness :eql :numbers))
   (flet ((random-number ()
            (random 1000)))
@@ -301,9 +304,6 @@
             (gc :full t)
             (gc :full t)
             (assert (= n (hash-table-count ht)))))))
-
-(defun take (&rest args)
-  (declare (ignore args)))
 
 (defun add-removable-stuff (ht &key (n 100) (size 10))
   (flet ((unique-object ()
