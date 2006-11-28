@@ -38,6 +38,8 @@ changes in sbcl-0.9.19 (1.0.0?) relative to sbcl-0.9.18:
     (reported by Josip Gracin)
   * bug fix: an error is signaled for attempts to displace arrays with
     incompatible element types (thanks to Mario Mommer)
+  * bug fix: more correct handling of wide characters in debug info
+    (bug reported by Attila Lendvai and fixed by Juho Snellman)
   * optimization: method calls with &OPTIONAL or &KEY arguments are faster
     and don't cause extra consing
   * optimization: MAP and MAP-INTO are significantly faster on vectors

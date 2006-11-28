@@ -72,8 +72,7 @@
       `(progn
          (loop for i from 0 below ,len
                do (setf (aref ,res i)
-                        (code-char (aref ,vec (+ ,index i)))))
-         (incf ,index ,len)
+                        (code-char (read-var-integer ,vec ,index))))
          ,res))))
 
 ;;; Write STRING into VEC (adjustable, with fill-pointer) represented
@@ -84,7 +83,7 @@
   (let ((len (length string)))
     (write-var-integer len vec)
     (dotimes (i len)
-      (vector-push-extend (char-code (schar string i)) vec)))
+      (write-var-integer (char-code (schar string i)) vec)))
   (values))
 
 ;;;; packed bit vectors
