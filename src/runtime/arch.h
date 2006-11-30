@@ -46,4 +46,9 @@ extern lispobj *component_ptr_from_pc(lispobj *pc);
 extern void fpu_save(void *);
 extern void fpu_restore(void *);
 
+#ifdef LISP_FEATURE_X86
+extern unsigned int * single_stepping;
+extern void restore_breakpoint_from_single_step(os_context_t * context);
+#endif
+
 #endif /* __ARCH_H__ */

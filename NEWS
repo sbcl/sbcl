@@ -2,6 +2,8 @@
 changes in sbcl-1.0.1 relative to sbcl-1.0:
   * bug fix: fix handling of non-ascii command-line arguments (thanks to
     Yaroslav Kavenchuk)
+  * bug fix: TRACE :ENCAPSULATE NIL (and function end breakpoints)
+    work on Windows.
 
 changes in sbcl-1.0 relative to sbcl-0.9.18:
   * improvement: experimental support for threading on FreeBSD/x86.

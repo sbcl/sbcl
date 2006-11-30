@@ -34,25 +34,41 @@
 ;;;
 ;;; This specific bit of functionality may well be implemented entirely
 ;;; in the runtime.
-#|
+#||
 (defun sigint-%break (format-string &rest format-arguments)
   (flet ((break-it ()
            (apply #'%break 'sigint format-string format-arguments)))
     (sb!thread:interrupt-thread (sb!thread::foreground-thread) #'break-it)))
-|#
+||#
 
-;;; Map Windows Exception code to condition names
+;;; Map Windows Exception code to condition names: symbols or strings
 (defvar *exception-code-map*
-  (list
-   ;; Floating point exceptions
-   (cons +exception-flt-divide-by-zero+    'division-by-zero)
-   (cons +exception-flt-invalid-operation+ 'floating-point-invalid-operation)
-   (cons +exception-flt-underflow+         'floating-point-underflow)
-   (cons +exception-flt-overflow+          'floating-point-overflow)
-   (cons +exception-flt-inexact-result+    'floating-point-inexact)
-   (cons +exception-flt-denormal-operand+  'floating-point-exception)
-   (cons +exception-flt-stack-check+       'floating-point-exception)
-   (cons +exception-stack-overflow+        'sb!kernel::control-stack-exhausted)))
+  (macrolet ((cons-name (symbol)
+               `(cons ,symbol ,(remove #\+ (substitute #\_ #\- (string symbol))))))
+    (list
+     ;; Floating point exceptions
+     (cons +exception-flt-divide-by-zero+    'division-by-zero)
+     (cons +exception-flt-invalid-operation+ 'floating-point-invalid-operation)
+     (cons +exception-flt-underflow+         'floating-point-underflow)
+     (cons +exception-flt-overflow+          'floating-point-overflow)
+     (cons +exception-flt-inexact-result+    'floating-point-inexact)
+     (cons +exception-flt-denormal-operand+  'floating-point-exception)
+     (cons +exception-flt-stack-check+       'floating-point-exception)
+     ;; Stack overflow
+     (cons +exception-stack-overflow+        'sb!kernel::control-stack-exhausted)
+     ;; Various
+     (cons-name +exception-single-step+)
+     (cons-name +exception-access-violation+)
+     (cons-name +exception-array-bounds-exceeded+)
+     (cons-name +exception-breakpoint+)
+     (cons-name +exception-datatype-misalignment+)
+     (cons-name +exception-illegal-instruction+)
+     (cons-name +exception-in-page-error+)
+     (cons-name +exception-int-divide-by-zero+)
+     (cons-name +exception-int-overflow+)
+     (cons-name +exception-invalid-disposition+)
+     (cons-name +exception-noncontinuable-exception+)
+     (cons-name +exception-priv-instruction+))))
 
 (define-alien-type ()
     (struct exception-record

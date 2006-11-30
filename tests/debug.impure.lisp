@@ -119,8 +119,9 @@
 
                         ;; Make sure the backtrace isn't stunted in
                         ;; any way.  (Depends on running in the main
-                        ;; thread.)
-                        (let ((end (last backtrace 2)))
+                        ;; thread.) FIXME: On Windows we get two
+                        ;; extra foreign frames below regular frames.
+                        (let ((end (last backtrace #-win32 2 #+win32 4)))
                           (unless (equal (caar end)
                                          (if *show-entry-point-details*
                                              '(sb-c::tl-xep sb-impl::toplevel-init)
@@ -433,3 +434,5 @@
   (loop while (sb-thread:thread-alive-p thread)))
 
 (disable-debugger)
+
+(write-line "/debug.impure.lisp done")

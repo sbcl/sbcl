@@ -209,34 +209,40 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 }
 
 void
+restore_breakpoint_from_single_step(os_context_t * context)
+{
+    /* fprintf(stderr,"* single step trap %x\n", single_stepping); */
+#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
+    /* Un-install single step helper instructions. */
+    *(single_stepping-3) = single_step_save1;
+    *(single_stepping-2) = single_step_save2;
+    *(single_stepping-1) = single_step_save3;
+#else
+    *context_eflags_addr(context) &= ~0x100;
+#endif
+    /* Re-install the breakpoint if possible. */
+    if (*os_context_pc_addr(context) == (int)single_stepping + 1) {
+	fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
+    } else {
+	*((char *)single_stepping) = BREAKPOINT_INST;       /* x86 INT3 */
+	*((char *)single_stepping+1) = trap_Breakpoint;
+    }
+    
+    single_stepping = NULL;
+    return;
+}
+
+void
 sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
     unsigned int trap;
 
 #ifndef LISP_FEATURE_WIN32
-    if (single_stepping && (signal==SIGTRAP))
-    {
-        /* fprintf(stderr,"* single step trap %x\n", single_stepping); */
-
-#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
-        /* Un-install single step helper instructions. */
-        *(single_stepping-3) = single_step_save1;
-        *(single_stepping-2) = single_step_save2;
-        *(single_stepping-1) = single_step_save3;
-#else
-        *context_eflags_addr(context) &= ~0x100;
-#endif
-        /* Re-install the breakpoint if possible. */
-        if (*os_context_pc_addr(context) == (int)single_stepping + 1) {
-            fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
-        } else {
-            *((char *)single_stepping) = BREAKPOINT_INST;       /* x86 INT3 */
-            *((char *)single_stepping+1) = trap_Breakpoint;
-        }
-
-        single_stepping = NULL;
-        return;
+    /* On Windows this is done in the SE handler. */
+    if (single_stepping && (signal==SIGTRAP)) {
+	restore_breakpoint_from_single_step(context);
+	return;
     }
 #endif
 

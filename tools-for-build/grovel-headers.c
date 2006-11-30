@@ -150,13 +150,25 @@ main(int argc, char *argv[])
     defconstant ("CSIDL_FLAG_MASK", CSIDL_FLAG_MASK);
 
     printf(";;; Exception codes\n");
-    defconstant("+exception-flt-divide-by-zero+", EXCEPTION_FLT_DIVIDE_BY_ZERO);
-    defconstant("+exception-flt-invalid-operation+", EXCEPTION_FLT_INVALID_OPERATION);
-    defconstant("+exception-flt-underflow+", EXCEPTION_FLT_UNDERFLOW);
-    defconstant("+exception-flt-overflow+", EXCEPTION_FLT_OVERFLOW);
-    defconstant("+exception-flt-inexact-result+", EXCEPTION_FLT_INEXACT_RESULT);
+    defconstant("+exception-access-violation+", EXCEPTION_ACCESS_VIOLATION);
+    defconstant("+exception-array-bounds-exceeded+", EXCEPTION_ARRAY_BOUNDS_EXCEEDED);
+    defconstant("+exception-breakpoint+", EXCEPTION_BREAKPOINT);
+    defconstant("+exception-datatype-misalignment+", EXCEPTION_DATATYPE_MISALIGNMENT);
     defconstant("+exception-flt-denormal-operand+", EXCEPTION_FLT_DENORMAL_OPERAND);
+    defconstant("+exception-flt-divide-by-zero+", EXCEPTION_FLT_DIVIDE_BY_ZERO);
+    defconstant("+exception-flt-inexact-result+", EXCEPTION_FLT_INEXACT_RESULT);
+    defconstant("+exception-flt-invalid-operation+", EXCEPTION_FLT_INVALID_OPERATION);
+    defconstant("+exception-flt-overflow+", EXCEPTION_FLT_OVERFLOW);
     defconstant("+exception-flt-stack-check+", EXCEPTION_FLT_STACK_CHECK);
+    defconstant("+exception-flt-underflow+", EXCEPTION_FLT_UNDERFLOW);
+    defconstant("+exception-illegal-instruction+", EXCEPTION_ILLEGAL_INSTRUCTION);
+    defconstant("+exception-in-page-error+", EXCEPTION_IN_PAGE_ERROR);
+    defconstant("+exception-int-divide-by-zero+", EXCEPTION_INT_DIVIDE_BY_ZERO);
+    defconstant("+exception-int-overflow+", EXCEPTION_INT_OVERFLOW);
+    defconstant("+exception-invalid-disposition+", EXCEPTION_INVALID_DISPOSITION);
+    defconstant("+exception-noncontinuable-exception+", EXCEPTION_NONCONTINUABLE_EXCEPTION);
+    defconstant("+exception-priv-instruction+", EXCEPTION_PRIV_INSTRUCTION);
+    defconstant("+exception-single-step+", EXCEPTION_SINGLE_STEP);
     defconstant("+exception-stack-overflow+", EXCEPTION_STACK_OVERFLOW);
 
     printf(";;; FormatMessage\n");

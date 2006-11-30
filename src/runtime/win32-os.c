@@ -334,8 +334,9 @@ extern boolean internal_errors_enabled;
  * unwinding in Lisp.
  */
 
-EXCEPTION_DISPOSITION sigtrap_emulator(CONTEXT *context,
-                                       struct lisp_exception_frame *exception_frame)
+EXCEPTION_DISPOSITION 
+sigtrap_emulator(CONTEXT *context,
+		 struct lisp_exception_frame *exception_frame)
 {
     if (*((char *)context->Eip + 1) == trap_ContextRestore) {
         /* This is the cleanup for what is immediately below, and
@@ -424,19 +425,26 @@ void sigtrap_wrapper(void)
 /*     set_seh_frame(handler.handler[0]); */
 }
 
-EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *exception_record,
-                                       struct lisp_exception_frame *exception_frame,
-                                       CONTEXT *context,
-                                       void *dc) /* FIXME: What's dc again? */
+EXCEPTION_DISPOSITION 
+handle_exception(EXCEPTION_RECORD *exception_record,
+		 struct lisp_exception_frame *exception_frame,
+		 CONTEXT *context,
+		 void *dc) /* FIXME: What's dc again? */
 {
-
     /* For EXCEPTION_ACCESS_VIOLATION only. */
     void *fault_address = (void *)exception_record->ExceptionInformation[1];
+
+    if (single_stepping && 
+	exception_record->ExceptionCode == EXCEPTION_SINGLE_STEP) {
+	/* We are doing a displaced instruction. At least function
+	 * end breakpoints uses this. */
+	restore_breakpoint_from_single_step(context);
+	return ExceptionContinueExecution;
+    }    
 
     if (exception_record->ExceptionCode == EXCEPTION_BREAKPOINT) {
         /* Pick off sigtrap case first. */
         return sigtrap_emulator(context, exception_frame);
-
     }
     else if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
              (is_valid_lisp_addr(fault_address) ||
