@@ -2,11 +2,11 @@
 set -e
 
 # Create a distribution containing the HTML versions of system
-# documentation. (make-doc.sh needs to be run first, in order to
+# documentation. (cd doc/manual && make needs to be run first, in order to
 # compile the doc sources into HTML.)
 
 b=${1:?missing base directory name argument}
-tar cf $b-html.tar \
+tar cf $b-documentation-html.tar \
     `find $b -name '*.htm*'` \
-    $b/COPYING $b/CREDITS $b/README \
+    $b/COPYING $b/CREDITS $b/README $b/SUPPORT \
     $b/pubring.pgp

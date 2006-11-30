@@ -13,6 +13,11 @@
 
 (defvar *indent-level* 0)
 
+(defvar *sbcl-source-root*
+  (truename 
+   (merge-pathnames (make-pathname :directory (list :relative :up))
+                    (make-pathname :name nil :type nil :defaults *load-truename*))))
+
 (defun print-xml (sexp &optional (stream *standard-output*))
   (destructuring-bind (tag &optional attributes &body children) sexp
     (when attributes (assert (evenp (length attributes))))
@@ -92,7 +97,7 @@
        string))
 
 (defun directory-id (name)
-  (id (format nil "Directory_~A" (enough-namestring name))))
+  (id (format nil "Directory_~A" (enough-namestring name *sbcl-source-root*))))
 
 (defun directory-names (pathname)
   (let ((name (car (last (pathname-directory pathname)))))
@@ -102,7 +107,7 @@
         (list "Name" name))))
 
 (defun file-id (pathname)
-  (id (format nil "File_~A" (enough-namestring pathname))))
+  (id (format nil "File_~A" (enough-namestring pathname *sbcl-source-root*))))
 
 (defparameter *ignored-directories* '("CVS" ".svn"))
 
@@ -134,7 +139,7 @@
 (defparameter *components* nil)
 
 (defun component-id (pathname)
-  (let ((id (id (format nil "Contrib_~A" (enough-namestring pathname)))))
+  (let ((id (id (format nil "Contrib_~A" (enough-namestring pathname *sbcl-source-root*)))))
     (push id *components*)
     id))
 
