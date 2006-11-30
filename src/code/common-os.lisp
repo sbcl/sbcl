@@ -17,9 +17,21 @@
   #!+sb-doc
   "The absolute pathname of the running SBCL core.")
 
+(sb!alien:define-alien-variable ("posix_argv" *native-posix-argv*) (* (* char)))
+(sb!alien:define-alien-variable ("core_string" *native-core-string*) (* char))
+
 ;;; if something ever needs to be done differently for one OS, then
 ;;; split out the different part into per-os functions.
 (defun os-cold-init-or-reinit ()
+  (/show0 "setting *CORE-STRING*")
+  (setf *core-string*
+        (sb!alien:cast *native-core-string* sb!alien:c-string))
+  (/show0 "setting *POSIX-ARGV*")
+  (setf sb!ext:*posix-argv*
+        (loop for i from 0
+              for arg = (sb!alien:deref *native-posix-argv* i)
+              until (sb!alien:null-alien arg)
+              collect (sb!alien:cast arg sb!alien:c-string)))
   (/show0 "entering OS-COLD-INIT-OR-REINIT")
   (setf *software-version* nil)
   (/show0 "setting *DEFAULT-PATHNAME-DEFAULTS*")

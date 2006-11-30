@@ -211,7 +211,10 @@ search_for_core ()
     return core;
 }
 
- 
+char **posix_argv;
+char *core_string;
+
+
 int
 main(int argc, char *argv[], char *envp[])
 {
@@ -404,15 +407,11 @@ main(int argc, char *argv[], char *envp[])
     wos_install_interrupt_handlers(&exception_frame);
 #endif
 
-    /* Pass core filename into Lisp */
-    SetSymbolValue(CORE_STRING, alloc_base_string(core),0);
-    SHOW("freeing core");
-    free(core);
-
-    /* Convert remaining argv values to something that Lisp can grok. */
-    SHOW("setting POSIX-ARGV symbol value");
-    SetSymbolValue(POSIX_ARGV, alloc_base_string_list(sbcl_argv),0);
-    free(sbcl_argv);
+    /* Pass core filename and the processed argv into Lisp. They'll
+     * need to be processed further there, to do locale conversion.
+     */
+    core_string = core;
+    posix_argv = sbcl_argv;
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n",
           (unsigned long)initial_function));
