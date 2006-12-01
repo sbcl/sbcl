@@ -966,29 +966,20 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
           (t
            (make-final-caching-dfun gf classes-list new-class)))))
 
-(defvar *accessor-miss-history* nil)
 
 (defun accessor-miss (gf new object dfun-info)
-  (let ((wrapper (wrapper-of object))
-        (previous-miss (assq gf *accessor-miss-history*)))
-    (when (eq wrapper (cdr previous-miss))
-      (error "~@<Vicious metacircle:  The computation of a ~
-              dfun of ~s for argument ~s uses the dfun being ~
-              computed.~@:>"
-             gf object))
-    (let* ((*accessor-miss-history* (acons gf wrapper *accessor-miss-history*))
-           (ostate (type-of dfun-info))
-           (otype (dfun-info-accessor-type dfun-info))
-           oindex ow0 ow1 cache
-           (args (ecase otype
-                   ((reader boundp) (list object))
-                   (writer (list new object)))))
-      (dfun-miss (gf args wrappers invalidp nemf ntype nindex)
-        ;; The following lexical functions change the state of the
-        ;; dfun to that which is their name.  They accept arguments
-        ;; which are the parameters of the new state, and get other
-        ;; information from the lexical variables bound above.
-        (flet ((two-class (index w0 w1)
+  (let* ((ostate (type-of dfun-info))
+         (otype (dfun-info-accessor-type dfun-info))
+         oindex ow0 ow1 cache
+         (args (ecase otype
+                 ((reader boundp) (list object))
+                 (writer (list new object)))))
+    (dfun-miss (gf args wrappers invalidp nemf ntype nindex)
+      ;; The following lexical functions change the state of the
+      ;; dfun to that which is their name.  They accept arguments
+      ;; which are the parameters of the new state, and get other
+      ;; information from the lexical variables bound above.
+      (flet ((two-class (index w0 w1)
                (when (zerop (random 2 *pcl-misc-random-state*))
                  (psetf w0 w1 w1 w0))
                (dfun-update gf
@@ -1051,7 +1042,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                   (setq cache (dfun-info-cache dfun-info))
                   (if (consp nindex)
                       (caching)
-                      (do-fill #'n-n)))))))))))
+                      (do-fill #'n-n))))))))))
 
 (defun checking-miss (generic-function args dfun-info)
   (let ((oemf (dfun-info-function dfun-info))

@@ -23,7 +23,7 @@ extern void handle_breakpoint(int signal, siginfo_t *info,
 extern void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
                                        os_context_t *context);
 
-extern void handle_single_step_trap(os_context_t *context, int kind, 
-				    int register_offset);
+extern void handle_single_step_trap(os_context_t *context, int kind,
+                                    int register_offset);
 
 #endif

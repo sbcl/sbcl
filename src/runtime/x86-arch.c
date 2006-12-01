@@ -222,12 +222,12 @@ restore_breakpoint_from_single_step(os_context_t * context)
 #endif
     /* Re-install the breakpoint if possible. */
     if (*os_context_pc_addr(context) == (int)single_stepping + 1) {
-	fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
+        fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
     } else {
-	*((char *)single_stepping) = BREAKPOINT_INST;       /* x86 INT3 */
-	*((char *)single_stepping+1) = trap_Breakpoint;
+        *((char *)single_stepping) = BREAKPOINT_INST;       /* x86 INT3 */
+        *((char *)single_stepping+1) = trap_Breakpoint;
     }
-    
+
     single_stepping = NULL;
     return;
 }
@@ -241,8 +241,8 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 #ifndef LISP_FEATURE_WIN32
     /* On Windows this is done in the SE handler. */
     if (single_stepping && (signal==SIGTRAP)) {
-	restore_breakpoint_from_single_step(context);
-	return;
+        restore_breakpoint_from_single_step(context);
+        return;
     }
 #endif
 

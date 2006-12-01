@@ -42,14 +42,14 @@
 #include "validate.h"
 size_t os_vm_page_size;
 
-int arch_os_thread_init(struct thread *thread) 
+int arch_os_thread_init(struct thread *thread)
 {
     {
         void *top_exception_frame;
         void *cur_stack_end;
         void *cur_stack_start;
-	MEMORY_BASIC_INFORMATION stack_memory;
-	
+        MEMORY_BASIC_INFORMATION stack_memory;
+
         asm volatile ("movl %%fs:0,%0": "=r" (top_exception_frame));
         asm volatile ("movl %%fs:4,%0": "=r" (cur_stack_end));
 
@@ -57,13 +57,13 @@ int arch_os_thread_init(struct thread *thread)
          * because that's only what currently has memory behind
          * it from being used, so do a quick VirtualQuery() and
          * grab the AllocationBase. -AB 2006/11/25
-	 */
+         */
 
-	if (!VirtualQuery(&stack_memory, &stack_memory, sizeof(stack_memory))) {
-	    fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
-	    lose("Could not query stack memory information.");
-	}
-	cur_stack_start = stack_memory.AllocationBase;
+        if (!VirtualQuery(&stack_memory, &stack_memory, sizeof(stack_memory))) {
+            fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
+            lose("Could not query stack memory information.");
+        }
+        cur_stack_start = stack_memory.AllocationBase;
 
         /* We use top_exception_frame rather than cur_stack_end to
          * elide the last few (boring) stack entries at the bottom of

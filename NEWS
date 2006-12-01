@@ -9,6 +9,8 @@ changes in sbcl-1.0.1 relative to sbcl-1.0:
   * bug fix: non-required arguments were not passed correctly when a method
     defined using DEFMETHOD was called from a mop-generated method using
     CALL-NEXT-METHOD (reported by Pascal Costanza)
+  * bug fix: recursion is now permitted in accessors through
+    SLOT-UNBOUND.  (reported by Pascal Costanza)
   * bug fix: an error was signaled at startup if the HOME environment 
     variable was defined, but had an empty value (reported by Peter Van Eynde)
   * optimization: loading generic functions no longer takes O(n^2) time,

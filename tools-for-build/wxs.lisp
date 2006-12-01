@@ -14,7 +14,7 @@
 (defvar *indent-level* 0)
 
 (defvar *sbcl-source-root*
-  (truename 
+  (truename
    (merge-pathnames (make-pathname :directory (list :relative :up))
                     (make-pathname :name nil :type nil :defaults *load-truename*))))
 
