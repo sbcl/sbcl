@@ -584,16 +584,18 @@ environment variable has been specified, the directory it designates
 is returned; otherwise obtains the home directory from the operating
 system."
   (declare (ignore host))
-  (parse-native-namestring
-   (ensure-trailing-slash
-    (if (posix-getenv "HOME")
-        (posix-getenv "HOME")
-        #!-win32
-        (sb!unix:uid-homedir (sb!unix:unix-getuid))
-        #!+win32
-        ;; Needs to bypass PARSE-NATIVE-NAMESTRING & ENSURE-TRAILING-SLASH
-        (return-from user-homedir-pathname
-          (sb!win32::get-folder-pathname sb!win32::csidl_profile))))))
+  (let ((env-home (posix-getenv "HOME")))
+    (parse-native-namestring
+     (ensure-trailing-slash
+      (if (and env-home
+               (not (equal env-home "")))
+          env-home
+          #!-win32
+          (sb!unix:uid-homedir (sb!unix:unix-getuid))
+          #!+win32
+          ;; Needs to bypass PARSE-NATIVE-NAMESTRING & ENSURE-TRAILING-SLASH
+          (return-from user-homedir-pathname
+            (sb!win32::get-folder-pathname sb!win32::csidl_profile)))))))
 
 (defun file-write-date (file)
   #!+sb-doc
