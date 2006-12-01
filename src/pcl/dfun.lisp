@@ -756,8 +756,16 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 (defvar *lazy-dfun-compute-p* t)
 (defvar *early-p* nil)
 
+;;; This variable is used for controlling the load-time effective
+;;; method precomputation: precomputation will only be done for emfs
+;;; with fewer than methods than this value. This value has
+;;; traditionally been NIL on SBCL (meaning that precomputation will
+;;; always be done) but that makes method loading O(n^2). Use a small
+;;; value for now, to flush out any possible problems that doing a
+;;; limited amount of precomputation might cause. If none appear, we
+;;; might change it to a larger value later. -- JES, 2006-12-01
 (declaim (type (or null unsigned-byte) *max-emf-precomputation-methods*))
-(defvar *max-emf-precomputation-methods* nil)
+(defvar *max-emf-precomputation-methods* 1)
 
 (defun finalize-specializers (gf)
   (let ((methods (generic-function-methods gf)))

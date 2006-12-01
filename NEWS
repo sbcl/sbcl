@@ -11,6 +11,9 @@ changes in sbcl-1.0.1 relative to sbcl-1.0:
     CALL-NEXT-METHOD (reported by Pascal Costanza)
   * bug fix: an error was signaled at startup if the HOME environment 
     variable was defined, but had an empty value (reported by Peter Van Eynde)
+  * optimization: loading generic functions no longer takes O(n^2) time,
+    proportional to the amount of methods in the generic function
+    (reported by Todd Sabin and Jeremy Brown)        
   * optimization: the FIND and POSITION family of sequence functions
     are significantly faster on arrays whose element types have been
     declared.
