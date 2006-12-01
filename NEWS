@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.1 relative to sbcl-1.0:
+  * improvement: sb-sprof traces call stacks to an arbitrary depth on
+    x86/x86-64, rather than the previous fixed depth of 8
   * bug fix: fix handling of non-ascii command-line arguments (thanks to
     Yaroslav Kavenchuk)
   * bug fix: TRACE :ENCAPSULATE NIL (and function end breakpoints)
