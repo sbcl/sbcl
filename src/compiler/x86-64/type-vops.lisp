@@ -190,7 +190,7 @@
   (:temporary (:sc unsigned-reg) tmp)
   (:generator 5
     (inst mov tmp value)
-    (inst shr tmp 61)
+    (inst shr tmp n-positive-fixnum-bits)
     (inst jmp (if not-p :nz :z) target)))
 
 ;;; A (SIGNED-BYTE 64) can be represented with either fixnum or a bignum with

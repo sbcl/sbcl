@@ -377,6 +377,13 @@ ACTUAL ~D DERIVED ~D~%"
       (check-type (car a) integer))
     (assert (eql (car a) 1))))
 
-
-
-
+;;; The VOP FIXNUMP/UNSIGNED-BYTE-64 was broken on x86-64, failing
+;;; the first ASSERT below. The second ASSERT takes care that the fix
+;;; doesn't overshoot the mark.
+(with-test (:name (:typep :fixnum-if-unsigned-byte))
+  (let ((f (compile nil
+                    (lambda (x)
+                      (declare (type (unsigned-byte #.sb-vm:n-word-bits) x))
+                      (typep x (quote fixnum))))))
+    (assert (not (funcall f (1+ most-positive-fixnum))))
+    (assert (funcall f most-positive-fixnum))))
