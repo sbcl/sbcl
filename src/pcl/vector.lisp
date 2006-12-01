@@ -1091,11 +1091,7 @@
                                    (method-function nm)
                                    nm)
                      :call-method-args (list nms)))))
-        (if restp
-            (let* ((rest (nthcdr nreq method-args))
-                   (args (ldiff method-args rest)))
-              (apply fmf pv-cell nmc (nconc args (list rest))))
-            (apply fmf pv-cell nmc method-args))))))
+        (apply fmf pv-cell nmc method-args)))))
 
 (defun get-pv-cell (method-args pv-table)
   (let ((pv-wrappers (pv-wrappers-from-all-args pv-table method-args)))
