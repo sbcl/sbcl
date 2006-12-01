@@ -972,7 +972,11 @@
                                 ,n-sequence ,start ,n-end)))
          (block ,block
            (macrolet ((maybe-return ()
-                        '(let ((,element (aref ,sequence ,index)))
+                        ;; WITH-ARRAY-DATA has already performed bounds
+                        ;; checking, so we can safely elide the checks
+                        ;; in the inner loop.
+                        '(let ((,element (locally (declare (optimize (insert-array-bounds-checks 0)))
+                                           (aref ,sequence ,index))))
                            (when ,done-p-expr
                              (return-from ,block
                                (values ,element

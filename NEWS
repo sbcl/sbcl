@@ -9,6 +9,9 @@ changes in sbcl-1.0.1 relative to sbcl-1.0:
   * bug fix: non-required arguments were not passed correctly when a method
     defined using DEFMETHOD was called from a mop-generated method using
     CALL-NEXT-METHOD (reported by Pascal Costanza)
+  * optimization: the FIND and POSITION family of sequence functions
+    are significantly faster on arrays whose element types have been
+    declared.
 
 changes in sbcl-1.0 relative to sbcl-0.9.18:
   * improvement: experimental support for threading on FreeBSD/x86.
