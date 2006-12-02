@@ -118,6 +118,11 @@ you deserve to lose.")
 (defmethod specializer-name ((specializer class))
   (class-name specializer))
 
+(defun ensure-class-precedence-list (class)
+  (unless (class-finalized-p class)
+    (finalize-inheritance class))
+  (class-precedence-list class))
+
 (defun specialized-lambda-list (method)
   ;; courtecy of AMOP p. 61
   (let* ((specializers (method-specializers method))
@@ -699,7 +704,7 @@ followed another tabulation label or a tabulation body."
       ;; class precedence list
       (format *texinfo-output* "Class precedence list: @code{~(~{@w{~A}~^, ~}~)}~%~%"
               (remove-if (lambda (class)  (hide-superclass-p name class))
-                         (mapcar #'class-name (class-precedence-list (find-class name)))))
+                         (mapcar #'class-name (ensure-class-precedence-list (find-class name)))))
       ;; slots
       (let ((slots (remove-if (lambda (slot) (hide-slot-p name slot))
                               (class-direct-slots (find-class name)))))
