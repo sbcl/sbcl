@@ -9,7 +9,7 @@
 
 (in-package "SB!IMPL")
 
-(defmacro-mundanely destructuring-bind (lambda-list expression &rest body)
+(defmacro-mundanely destructuring-bind (lambda-list expression &body body)
   #!+sb-doc
   "Bind the variables in LAMBDA-LIST to the corresponding values in the
 tree structure resulting from the evaluation of EXPRESSION."

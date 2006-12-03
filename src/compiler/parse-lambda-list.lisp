@@ -105,10 +105,12 @@
                (setq auxp t
                      state :aux))
               (t
-               ;; It could be argued that &WHOLE and friends would be just ordinary
-               ;; variables in an ordinary lambda-list, but since (1) it seem exceedingly
-               ;; unlikely that that was that the programmer actually ment (2) the spec
-               ;; can be interpreted as giving as licence to signal an error[*] we do.
+               ;; It could be argued that &WHOLE and friends would be
+               ;; just ordinary variables in an ordinary lambda-list,
+               ;; but since (1) that seem exceedingly to have been the
+               ;; programmers intent and (2) the spec can be
+               ;; interpreted as giving as licence to signal an
+               ;; error[*] that is what we do.
                ;;
                ;; [* All lambda list keywords used in the
                ;; implementation appear in LAMBDA-LIST-KEYWORDS. Each

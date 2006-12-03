@@ -307,7 +307,7 @@
               (cond ((null pathname-directory) '(:relative))
                     ((eq (car pathname-directory) :relative)
                      pathname-directory)
-                    ((and (> prefix-len 1)
+                    ((and (> prefix-len 0)
                           (>= (length pathname-directory) prefix-len)
                           (compare-component (subseq pathname-directory
                                                      0 prefix-len)

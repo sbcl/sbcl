@@ -16,6 +16,10 @@ changes in sbcl-1.0.1 relative to sbcl-1.0:
   * bug fix: non ordinary lambda-list keyword in ordinary lambda lists
     signal a PROGRAM-ERROR, not a BUG.
   * bug fix: SB-POSIX:READDIR works when built with large file support.
+  * bug fix: ENOUGH-NAMESTRING works relative to #p"/" as well. (thanks
+    to Marco Monteiro)
+  * enhancement: DESTRUCTURING-BIND lambda-list uses &BODY instead of &REST
+    for better automatic indentation support. (thanks to Matt Pillsbury)
   * optimization: loading generic functions no longer takes O(n^2) time,
     proportional to the amount of methods in the generic function
     (reported by Todd Sabin and Jeremy Brown)        

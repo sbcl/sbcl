@@ -425,4 +425,7 @@
               (make-pathname :name :wild :type :wild :version :wild)
               (make-pathname :name :wild :type :wild :version nil)))))
 
+;;; enough-namestring relative to root
+(assert (equal "foo" (enough-namestring "/foo" "/")))
+
 ;;;; success
