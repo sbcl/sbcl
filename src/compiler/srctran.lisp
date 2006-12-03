@@ -3726,7 +3726,6 @@
   #+sb-xc-host ; Only we should be using these
   (progn
     (def style-warn)
-    (def compiler-abort)
     (def compiler-error)
     (def compiler-warn)
     (def compiler-style-warn)

@@ -1543,7 +1543,7 @@
 (defknown policy-quality (policy symbol) policy-quality
           (flushable))
 
-(defknown (compiler-abort compiler-error) (string &rest t) nil ())
+(defknown compiler-error (t &rest t) nil ())
 (defknown (compiler-warn compiler-style-warn) (string &rest t) (values) ())
 (defknown (compiler-notify maybe-compiler-notify) ((or string symbol) &rest t)
   (values)
