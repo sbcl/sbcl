@@ -1403,7 +1403,7 @@
 
 ;;; program-error from bad lambda-list keyword
 (assert (eq :ok
-            (handler-case 
+            (handler-case
                 (funcall (lambda (&whole x)
                            (list &whole x)))
               (program-error ()

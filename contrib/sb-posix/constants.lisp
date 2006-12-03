@@ -253,7 +253,8 @@
 
  ;; opendir()
  (:structure dirent
-             ("struct dirent"
+             (#+(and linux largefile) "struct dirent64"
+              #-(and linux largefile) "struct dirent"
               (:c-string name "char *" "d_name"
                          :distrust-length #+sunos t #-sunos nil)) t)
 

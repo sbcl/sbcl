@@ -22,6 +22,7 @@
 
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <dirent.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
@@ -58,6 +59,11 @@ fstat_largefile(int filedes, struct stat *buf) {
 int
 lstat_largefile(const char *file_name, struct stat *buf) {
     return lstat(file_name, buf);
+}
+
+struct dirent64 *
+readdir_largefile(DIR *dir) {
+    return readdir(dir);
 }
 
 #endif

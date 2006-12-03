@@ -54,10 +54,10 @@
 (defparameter *cat-out* (make-synonym-stream '*cat-out-pipe*))
 
 (with-test (:name :run-program-cat-2)
-  (let ((cat (run-program "/bin/cat" nil :input *cat-in* :output *cat-out* 
+  (let ((cat (run-program "/bin/cat" nil :input *cat-in* :output *cat-out*
                           :wait nil)))
-    (dolist (test '("This is a test!" 
-                    "This is another test!" 
+    (dolist (test '("This is a test!"
+                    "This is another test!"
                     "This is the last test...."))
       (write-line test *cat-in*)
       (assert (equal test (read-line *cat-out*))))
@@ -65,7 +65,7 @@
 
 ;;; The above test used to use ed, but there were buffering issues: on some platforms
 ;;; buffering of stdin and stdout depends on their TTYness, and ed isn't sufficiently
-;;; agressive about flushing them. So, here's another test using :PTY. 
+;;; agressive about flushing them. So, here's another test using :PTY.
 
 (defparameter *tmpfile* "run-program-ed-test.tmp")
 
@@ -97,7 +97,7 @@
   *ed*)
 
 (unwind-protect
-     (with-test (:name :run-program-ed) 
+     (with-test (:name :run-program-ed)
        (assert-ed nil "4")
        (assert-ed ".s/bar/baz/g" "")
        (assert-ed "w" "4")

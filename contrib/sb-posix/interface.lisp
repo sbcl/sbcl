@@ -107,7 +107,7 @@
 (define-call* "rmdir" int minusp (pathname filename))
 (define-call* "unlink" int minusp (pathname filename))
 (define-call "opendir" (* t) null-alien (pathname filename))
-(define-call "readdir" (* dirent)
+(define-call ("readdir" :largefile) (* dirent)
   ;; readdir() has the worst error convention in the world.  It's just
   ;; too painful to support.  (return is NULL _and_ errno "unchanged"
   ;; is not an error, it's EOF).

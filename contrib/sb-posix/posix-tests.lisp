@@ -428,12 +428,15 @@
                         #'string<)
                   (sort (append '("." "..")
                                 (mapcar (lambda (p)
-                                          (enough-namestring p *current-directory*))
+                                          (let ((string (enough-namestring p *current-directory*)))
+                                            (if (pathname-name p)
+                                                string
+                                                (subseq string 0 (1- (length string))))))
                                         (directory (make-pathname
                                                     :name :wild
                                                     :type :wild
                                                     :defaults *current-directory*))))
-                        #'string<)) 
+                        #'string<))
         (sb-posix:closedir dir)))
   t)
 
