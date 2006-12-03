@@ -13,34 +13,28 @@
 
 (cl:in-package :cl-user)
 
-;; Actually there's no real side-effect here. (But see below.) The
-;; impurity we're avoiding is the sigchld handler that RUN-PROGRAM
-;; sets up, which interfers with the manual unix process control done
-;; by the test framework (sometimes the handler will manage to WAIT3 a
-;; process before run-tests WAITPIDs it).
+;; In addition to definitions lower down the impurity we're avoiding
+;; is the sigchld handler that RUN-PROGRAM sets up, which interfers
+;; with the manual unix process control done by the test framework
+;; (sometimes the handler will manage to WAIT3 a process before
+;; run-tests WAITPIDs it).
 
-(let* ((process (sb-ext:run-program "/bin/cat" '() :wait nil
-                                    :output :stream :input :stream))
-       (out (process-input process))
-       (in (process-output process)))
-  (unwind-protect
-       (loop for i from 0 to 255 do
-             (write-byte i out)
-             (force-output out)
-             (assert (= (read-byte in) i)))
-    (process-close process)))
+(with-test (:name :run-program-cat-1)
+  (let* ((process (sb-ext:run-program "/bin/cat" '() :wait nil
+                                      :output :stream :input :stream))
+         (out (process-input process))
+         (in (process-output process)))
+    (unwind-protect
+         (loop for i from 0 to 255 do
+              (write-byte i out)
+              (force-output out)
+              (assert (= (read-byte in) i)))
+      (process-close process))))
 
-;;; Test driving an external program (ed) through pipes wrapped in
+;;; Test driving an external program (cat) through pipes wrapped in
 ;;; composite streams.
 
 (require :sb-posix)
-
-(defvar *tmpfile* "run-program-ed-test.tmp")
-
-(with-open-file (f *tmpfile*
-                   :direction :output
-                   :if-exists :supersede)
-  (write-line "bar" f))
 
 (defun make-pipe ()
   (multiple-value-bind (in out) (sb-posix:pipe)
@@ -54,46 +48,61 @@
                                          :buffering :none :name "out")))
       (make-two-way-stream input output))))
 
-(defvar *in-pipe* (make-pipe))
-(defvar *in* (make-synonym-stream '*in-pipe*))
-(defvar *out-pipe* (make-pipe))
-(defvar *out* (make-synonym-stream '*out-pipe*))
+(defparameter *cat-in-pipe* (make-pipe))
+(defparameter *cat-in* (make-synonym-stream '*cat-in-pipe*))
+(defparameter *cat-out-pipe* (make-pipe))
+(defparameter *cat-out* (make-synonym-stream '*cat-out-pipe*))
 
-(defvar *ed*
-  (run-program "/bin/ed" (list *tmpfile*) :input *in* :output *out* :wait nil))
+(with-test (:name :run-program-cat-2)
+  (let ((cat (run-program "/bin/cat" nil :input *cat-in* :output *cat-out* 
+                          :wait nil)))
+    (dolist (test '("This is a test!" 
+                    "This is another test!" 
+                    "This is the last test...."))
+      (write-line test *cat-in*)
+      (assert (equal test (read-line *cat-out*))))
+    (process-close cat)))
 
-(defun real-input (stream)
-  (two-way-stream-input-stream (symbol-value (synonym-stream-symbol stream))))
+;;; The above test used to use ed, but there were buffering issues: on some platforms
+;;; buffering of stdin and stdout depends on their TTYness, and ed isn't sufficiently
+;;; agressive about flushing them. So, here's another test using :PTY. 
 
-(defun magic-read-line (stream)
-  ;; KLUDGE 1: The otherwise out :buffering :none is worth nothing,
-  (let ((input (real-input stream)))
-    (with-output-to-string (s)
-      ;; KLUDGE 2: Something funny going on with buffering, as plain
-      ;; READ-CHAR will hang here waiting for the newline, also
-      ;; -NO-HANG will return too early without the sleep.
-      ;;
-      ;; Shoot me now. --NS 2006-06-09
-      (loop for c = (progn (sleep 0.2) (read-char-no-hang input))
-         while (and c (not (eq #\newline c)))
-         do (write-char c s)))))
+(defparameter *tmpfile* "run-program-ed-test.tmp")
+
+(with-open-file (f *tmpfile*
+                   :direction :output
+                   :if-exists :supersede)
+  (write-line "bar" f))
+
+(defparameter *ed*
+  (run-program "/bin/ed" (list *tmpfile*) :wait nil :pty t))
+
+(defparameter *ed-pipe* (make-two-way-stream (process-pty *ed*) (process-pty *ed*)))
+(defparameter *ed-in* (make-synonym-stream '*ed-pipe*))
+(defparameter *ed-out* (make-synonym-stream '*ed-pipe*))
+
+(defun read-linish (stream)
+  (with-output-to-string (s)
+    (loop for c = (read-char stream)
+       while (and c (not (eq #\newline c)) (not (eq #\return c)))
+       do (write-char c s))))
 
 (defun assert-ed (command response)
   (when command
-    (write-line command *in*)
-    (force-output *in*))
-  (let ((got (magic-read-line *out*)))
+    (write-line command *ed-in*)
+    (force-output *ed-in*))
+  (let ((got (read-linish *ed-out*)))
     (unless (equal response got)
       (error "wanted ~S from ed, got ~S" response got)))
   *ed*)
 
-(assert-ed nil "4")
-(assert-ed ".s/bar/baz/g" "")
-(assert-ed "w" "4")
-(assert-ed "q" "")
-(process-wait *ed*)
-
-(with-open-file (f *tmpfile*)
-  (assert (equal "baz" (read-line f))))
-
-;(delete-file *tmp*)
+(unwind-protect
+     (with-test (:name :run-program-ed) 
+       (assert-ed nil "4")
+       (assert-ed ".s/bar/baz/g" "")
+       (assert-ed "w" "4")
+       (assert-ed "q" "")
+       (process-wait *ed*)
+       (with-open-file (f *tmpfile*)
+         (assert (equal "baz" (read-line f)))))
+  (delete-file *tmpfile*))

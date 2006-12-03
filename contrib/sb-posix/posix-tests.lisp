@@ -352,7 +352,6 @@
       (ignore-errors (delete-file pathname))))
   t)
 
-(defvar *test-directory* (merge-pathnames "test-lab/"))
 ;;; see comment in filename's designator definition, in macros.lisp
 (deftest filename-designator.1
   (let ((file (format nil "~A/[foo].txt" (namestring *test-directory*))))
@@ -418,6 +417,24 @@
                  do (return-from dir-loop nil)
                finally (return t)))
       (sb-posix:closedir dir)))
+  t)
+
+(deftest readdir/dirent-name
+    (let ((dir (sb-posix:opendir *current-directory*)))
+      (unwind-protect
+           (equal (sort (loop for entry = (sb-posix:readdir dir)
+                           until (sb-alien:null-alien entry)
+                           collect (sb-posix:dirent-name entry))
+                        #'string<)
+                  (sort (append '("." "..")
+                                (mapcar (lambda (p)
+                                          (enough-namestring p *current-directory*))
+                                        (directory (make-pathname
+                                                    :name :wild
+                                                    :type :wild
+                                                    :defaults *current-directory*))))
+                        #'string<)) 
+        (sb-posix:closedir dir)))
   t)
 
 #-win32
