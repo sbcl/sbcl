@@ -1401,4 +1401,19 @@
   ((and (not style-warning) warning) (e)
     (error e)))
 
+;;; program-error from bad lambda-list keyword
+(assert (eq :ok
+            (handler-case 
+                (funcall (lambda (&whole x)
+                           (list &whole x)))
+              (program-error ()
+                :ok))))
+(assert (eq :ok
+            (handler-case
+                (let ((*evaluator-mode* :interpret))
+                  (funcall (eval '(lambda (&whole x)
+                                   (list &whole x)))))
+              (program-error ()
+                :ok))))
+
 ;;; success

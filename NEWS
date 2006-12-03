@@ -13,6 +13,8 @@ changes in sbcl-1.0.1 relative to sbcl-1.0:
     SLOT-UNBOUND.  (reported by Pascal Costanza)
   * bug fix: an error was signaled at startup if the HOME environment 
     variable was defined, but had an empty value (reported by Peter Van Eynde)
+  * bug fix: non ordinary lambda-list keyword in ordinary lambda lists
+    signal a PROGRAM-ERROR, not a BUG.
   * optimization: loading generic functions no longer takes O(n^2) time,
     proportional to the amount of methods in the generic function
     (reported by Todd Sabin and Jeremy Brown)        

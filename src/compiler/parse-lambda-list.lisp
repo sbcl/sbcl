@@ -104,7 +104,21 @@
                  (compiler-error "multiple &AUX in lambda list: ~S" list))
                (setq auxp t
                      state :aux))
-              (t (bug "unknown LAMBDA-LIST-KEYWORD in lambda list: ~S." arg)))
+              (t 
+               ;; It could be argued that &WHOLE and friends would be just ordinary
+               ;; variables in an ordinary lambda-list, but since (1) it seem exceedingly
+               ;; unlikely that that was that the programmer actually ment (2) the spec 
+               ;; can be interpreted as giving as licence to signal an error[*] we do.
+               ;;
+               ;; [* All lambda list keywords used in the
+               ;; implementation appear in LAMBDA-LIST-KEYWORDS. Each
+               ;; member of a lambda list is either a parameter
+               ;; specifier ot a lambda list keyword. Ergo, symbols
+               ;; appearing in LAMBDA-LIST-KEYWORDS cannot be
+               ;; parameter specifiers.]
+               (compiler-error 'simple-program-error
+                               :format-control "Bad lambda list keyword ~S in: ~S"
+                               :format-arguments (list arg list))))
             (progn
               (when (symbolp arg)
                 (let ((name (symbol-name arg)))
@@ -144,12 +158,11 @@
 ;;; even if they could conceivably be legal in not-quite-a-lambda-list
 ;;; weirdosities
 (defun parse-lambda-list (lambda-list)
-
   ;; Classify parameters without checking their validity individually.
   (multiple-value-bind (required optional restp rest keyp keys allowp auxp aux
                         morep more-context more-count)
       (parse-lambda-list-like-thing lambda-list)
-
+    
     ;; Check validity of parameters.
     (flet ((need-symbol (x why)
              (unless (symbolp x)
