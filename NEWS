@@ -9,8 +9,6 @@ changes in sbcl-1.0.1 relative to sbcl-1.0:
     x86/x86-64, rather than the previous fixed depth of 8
   * bug fix: non-ascii command-line arguments are processed correctly 
     (thanks to Yaroslav Kavenchuk)
-  * bug fix: TRACE :ENCAPSULATE NIL (and function end breakpoints)
-    work on Windows.
   * bug fix: non-required arguments were not passed correctly when a method
     defined using DEFMETHOD was called from a mop-generated method using
     CALL-NEXT-METHOD (reported by Pascal Costanza)
@@ -31,6 +29,13 @@ changes in sbcl-1.0.1 relative to sbcl-1.0:
   * optimization: the FIND and POSITION family of sequence functions
     are significantly faster on arrays whose element types have been
     declared.
+  * improvements to the Windows port:
+    ** Intermittent heap corruption problems have been fixed. (thanks
+       to Alastair Bridgewater)
+    ** TRACE :ENCAPSULATE NIL (and function end breakpoints)
+       work on Windows.
+    ** Lisp is able to unwind foreing exception frames from alien
+       callbacks. (thanks to Alastair Bridgewater)
 
 changes in sbcl-1.0 relative to sbcl-0.9.18:
   * improvement: experimental support for threading on FreeBSD/x86.

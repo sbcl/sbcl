@@ -646,6 +646,8 @@ char *dirname(char *path)
 
 /* This is a manually-maintained version of ldso_stubs.S. */
 
+void __stdcall RtlUnwind(void *, void *, void *, void *); /* I don't have winternl.h */
+
 void scratch(void)
 {
     CloseHandle(0);
@@ -682,6 +684,7 @@ void scratch(void)
     sinh(0);
     strerror(42);
     write(0, 0, 0);
+    RtlUnwind(0, 0, 0, 0);
     #ifndef LISP_FEATURE_SB_UNICODE
       CreateDirectoryA(0,0);
       GetComputerNameA(0, 0);

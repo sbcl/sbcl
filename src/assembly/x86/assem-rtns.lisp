@@ -255,6 +255,21 @@
   ;; Important! Must save (and return) the arg 'block' for later use!!
   (move edx-tn block)
   (move block uwp)
+
+  ;; We need to check for Win32 exception frames before overwriting
+  ;; *C-U-P-B* (if the Win32 frames NLX, we need the UWP to still be
+  ;; live.)  As of this writing, we can't take a Win32 NLX across our
+  ;; frames, but the frame can NLX to another foreign frame that
+  ;; doesn't cross ours and then return normally, and if we drop the
+  ;; UWP beforehand then we just broke UWP semantics.
+  #!+win32
+  (assemble ()
+    (inst fs-segment-prefix)
+    (inst cmp block (make-ea :dword))
+    (inst jmp :le NO-WIN32-UNWIND)
+    (inst call WIN32-UNWIND)
+    NO-WIN32-UNWIND)
+
   ;; Set next unwind protect context.
   (loadw uwp uwp unwind-block-current-uwp-slot)
   ;; we're about to reload ebp anyway, so let's borrow it here as a
@@ -263,6 +278,16 @@
 
   DO-EXIT
 
+  ;; Same as above with *C-U-P-B*, except that this is for our target
+  ;; block, not a UWP.  Still need to check for Win32 exception frames.
+  #!+win32
+  (assemble ()
+    (inst fs-segment-prefix)
+    (inst cmp block (make-ea :dword))
+    (inst jmp :le NO-WIN32-UNWIND)
+    (inst call WIN32-UNWIND)
+    NO-WIN32-UNWIND)
+
   (loadw ebp-tn block unwind-block-current-cont-slot)
 
   ;; Uwp-entry expects some things in known locations so that they can
@@ -270,4 +295,74 @@
   ;; count in ecx-tn.
 
   (inst jmp (make-ea :byte :base block
-                     :disp (* unwind-block-entry-pc-slot n-word-bytes))))
+                     :disp (* unwind-block-entry-pc-slot n-word-bytes)))
+
+  #!+win32
+  WIN32-UNWIND
+  ;; At this point we need to call RtlUnwind@16 to clear up one or
+  ;; more Win32 exception frames on the stack.  This is an unusual FFI
+  ;; in that it kills most of the registers, and it returns to the
+  ;; address at [EBP+4].
+  #!+win32
+  (assemble ()
+    ;; Regs get clobbered by this process, so save the lot of them.
+    (inst pusha)
+
+    ;; Okay, our current unwind target is in BLOCK (EAX). All of our
+    ;; other regs are on the stack.  We need to find the first Win32
+    ;; exception frame that we -aren't- going to unwind.
+    (inst fs-segment-prefix)
+    (inst mov ecx-tn (make-ea :dword))
+    FIND-TARGET-FRAME
+    (inst cmp block ecx-tn)
+    (inst jmp :le FOUND-TARGET-FRAME)
+    (inst mov ecx-tn (make-ea :dword :base ecx-tn))
+    (inst jmp FIND-TARGET-FRAME)
+    FOUND-TARGET-FRAME
+
+    ;; This section copied from VOP CALL-OUT.
+    ;; Setup the NPX for C; all the FP registers need to be
+    ;; empty; pop them all.
+    (dotimes (i 8)
+      (inst fstp fr0-tn))
+
+    ;; I'm unlikely to ever forget this again.
+    (inst cld)
+
+    ;; Set up a bogus stack frame for RtlUnwind to pick its return
+    ;; address from.  (Yes, this is how RtlUnwind works.)
+    (inst push (make-fixup 'win32-unwind-tail :assembly-routine))
+    (inst push ebp-tn)
+    (inst mov ebp-tn esp-tn)
+
+    ;; Actually call out for the unwind.
+    (inst push 0)
+    (inst push 0)
+    (inst push 0)
+    (inst push ecx-tn)
+    (inst call (make-fixup "RtlUnwind@16" :foreign))))
+
+;; We want no VOP for this one and for it to only happen on Win32
+;; targets.  Hence the following disaster.
+#!+win32
+#-sb-assembling nil
+#+sb-assembling
+(define-assembly-routine
+    (win32-unwind-tail (:return-style :none))
+    ()
+
+    ;; The unwind returns here.  Had to use a VOP for this because
+    ;; PUSH won't accept a label as an argument.
+
+    ;; Clean up the bogus stack frame we pushed for the unwind.
+    (inst pop ebp-tn)
+    (inst pop esi-tn) ;; Random scratch register.
+
+    ;; This section based on VOP CALL-OUT.
+    ;; Restore the NPX for lisp; ensure no regs are empty
+    (dotimes (i 8)
+      (inst fldz))
+
+    ;; Restore our regs and pick up where we left off.
+    (inst popa)
+    (inst ret))

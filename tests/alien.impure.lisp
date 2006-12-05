@@ -167,4 +167,40 @@
                                 (error "bad note! ~A" c))))
   (funcall (compile nil '(lambda () (sb-alien:make-alien sb-alien:int)))))
 
+;;; Test case for unwinding an alien (Win32) exception frame
+;;;
+;;; The basic theory here is that failing to honor a win32
+;;; exception frame during stack unwinding breaks the chain.
+;;; "And if / You don't love me now / You will never love me
+;;; again / I can still hear you saying / You would never break
+;;; the chain."  If the chain is broken and another exception
+;;; occurs (such as an error trap caused by an OBJECT-NOT-TYPE
+;;; error), the system will kill our process.  No mercy, no
+;;; appeal. So, to check that we have done our job properly, we
+;;; need some way to put an exception frame on the stack and then
+;;; unwind through it, then trigger another exception.  (FUNCALL
+;;; 0) will suffice for the latter, and a simple test shows that
+;;; CallWindowProc() establishes a frame and calls a function
+;;; passed to it as an argument.
+#+win32
+(progn
+  (load-shared-object "USER32")
+  (assert 
+   (eq :ok
+       (handler-case
+           (tagbody
+              (alien-funcall
+               (extern-alien "CallWindowProcW"
+                             (function unsigned-int
+                                       (* (function int)) unsigned-int
+                                       unsigned-int unsigned-int unsigned-int))
+               (alien-sap
+                (sb-alien::alien-callback (function unsigned-int)
+                                          #'(lambda () (go up))))
+               0 0 0 0)
+            up
+              (funcall 0))
+         (error () 
+           :ok)))))
+
 ;;; success
