@@ -207,6 +207,11 @@
         :ref-trans %simple-fun-type
         :set-known (unsafe)
         :set-trans (setf %simple-fun-type))
+  (xrefs :init :null
+         :ref-trans %simple-fun-xrefs
+         :ref-known (flushable)
+         :set-trans (setf %simple-fun-xrefs)
+         :set-known ())
   ;; the SB!C::DEBUG-FUN object corresponding to this object, or NIL for none
   #+nil ; FIXME: doesn't work (gotcha, lowly maintenoid!) See notes on bug 137.
   (debug-fun :ref-known (flushable)

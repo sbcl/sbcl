@@ -90,10 +90,6 @@
            (lambda (,n-whole)
              (destructuring-bind ,lambda-list ,n-whole ,@body)))))
 
-(defmacro def-source-context (&rest rest)
-  (deprecation-warning 'def-source-context 'define-source-context)
-  `(define-source-context ,@rest))
-
 (define-source-context defstruct (name-or-options &rest slots)
   (declare (ignore slots))
   `(defstruct ,(if (consp name-or-options)

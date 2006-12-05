@@ -546,6 +546,11 @@
 
   (let* ((*component-being-compiled* component))
 
+    ;; Record xref information before optimization. This way the
+    ;; stored xref data reflects the real source as closely as
+    ;; possible.
+    (record-component-xrefs component)
+
     (ir1-phases component)
 
     (when *loop-analyze*
@@ -973,9 +978,10 @@
                          (apply #'ir1-convert-lambdalike
                                 definition
                                 (list :source-name name))))
+           (debug-name (debug-name 'tl-xep name))
            (fun (ir1-convert-lambda (make-xep-lambda-expression locall-fun)
                                     :source-name (or name '.anonymous.)
-                                    :debug-name (debug-name 'tl-xep  name))))
+                                    :debug-name debug-name)))
       (when name
         (assert-global-function-definition-type name locall-fun))
       (setf (functional-entry-fun fun) locall-fun

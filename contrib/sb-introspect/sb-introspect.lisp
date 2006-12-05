@@ -36,7 +36,12 @@
            "DEFINITION-SOURCE-PLIST"
            "DEFINITION-NOT-FOUND" "DEFINITION-NAME"
            "FIND-FUNCTION-CALLEES"
-           "FIND-FUNCTION-CALLERS"))
+           "FIND-FUNCTION-CALLERS"
+           "WHO-BINDS"
+           "WHO-CALLS"
+           "WHO-REFERENCES"
+           "WHO-SETS"
+           "WHO-MACROEXPANDS"))
 
 (in-package :sb-introspect)
 
@@ -508,5 +513,77 @@ constant pool."
                      (eq (sb-kernel:fdefn-fun constant)
                          function))
             (funcall fn obj))))))))
+
+;;; XREF facility
+
+(defun get-simple-fun (functoid)
+  (etypecase functoid
+    (sb-kernel::fdefn
+     (get-simple-fun (sb-vm::fdefn-fun functoid)))
+    ((or null sb-impl::funcallable-instance)
+     nil)
+    (function
+     (sb-kernel::%closure-fun functoid))))
+
+(defun collect-xref (kind-index wanted-name)
+  (let ((ret nil))
+    (dolist (env sb-c::*info-environment* ret)
+      ;; Loop through the infodb ...
+      (sb-c::do-info (env :class class :type type :name info-name
+                          :value value)
+        ;; ... looking for function or macro definitions
+        (when (and (eql class :function)
+                   (or (eql type :macro-function)
+                       (eql type :definition)))
+          ;; Get a simple-fun for the definition, and an xref array
+          ;; from the table if available.
+          (let* ((simple-fun (get-simple-fun value))
+                 (xrefs (when simple-fun
+                          (sb-vm::%simple-fun-xrefs simple-fun)))
+                 (array (when xrefs
+                          (aref xrefs kind-index))))
+            ;; Loop through the name/path xref entries in the table
+            (loop for i from 0 below (length array) by 2
+                  for xref-name = (aref array i)
+                  for xref-path = (aref array (1+ i))
+                  do (when (eql xref-name wanted-name)
+                       (let ((source-location
+                              (find-function-definition-source simple-fun)))
+                         ;; Use the more accurate source path from
+                         ;; the xref entry.
+                         (setf (definition-source-form-path source-location)
+                               xref-path)
+                         (push (cons info-name source-location)
+                               ret))))))))))
+
+(defun who-calls (function-name)
+  "Use the xref facility to search for source locations where the
+global function named FUNCTION-NAME is called. Returns a list of
+function name, definition-source pairs."
+  (collect-xref #.(position :calls sb-c::*xref-kinds*) function-name))
+
+(defun who-binds (symbol)
+  "Use the xref facility to search for source locations where the
+special variable SYMBOL is rebound. Returns a list of function name,
+definition-source pairs."
+  (collect-xref #.(position :binds sb-c::*xref-kinds*) symbol))
+
+(defun who-references (symbol)
+  "Use the xref facility to search for source locations where the
+special variable or constant SYMBOL is read. Returns a list of function
+name, definition-source pairs."
+  (collect-xref #.(position :references sb-c::*xref-kinds*) symbol))
+
+(defun who-sets (symbol)
+  "Use the xref facility to search for source locations where the
+special variable SYMBOL is written to. Returns a list of function name,
+definition-source pairs."
+  (collect-xref #.(position :sets sb-c::*xref-kinds*) symbol))
+
+(defun who-macroexpands (macro-name)
+  "Use the xref facility to search for source locations where the
+macro MACRO-NAME is expanded. Returns a list of function name,
+definition-source pairs."
+  (collect-xref #.(position :macroexpands sb-c::*xref-kinds*) macro-name))
 
 (provide 'sb-introspect)

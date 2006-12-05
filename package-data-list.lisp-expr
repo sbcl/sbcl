@@ -635,12 +635,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; and a mechanism for controlling same at compile time
                "MUFFLE-CONDITIONS" "UNMUFFLE-CONDITIONS"
 
-               ;; FIXME: This name doesn't match the DEFFOO - vs. -
-               ;; DEFINE-FOO convention used in the ANSI spec, and so
-               ;; was deprecated in sbcl-0.pre7, ca. 2001-12-12. After
-               ;; a year or so it can go away completely.
-               "DEF-SOURCE-CONTEXT"
-
                ;; extended declarations..
                "FREEZE-TYPE" "INHIBIT-WARNINGS"
                "MAYBE-INLINE"
@@ -1532,7 +1526,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "PROCLAIM-AS-FUN-NAME" "BECOME-DEFINED-FUN-NAME"
                "%NUMERATOR" "CLASSOID-TYPEP" "DSD-READ-ONLY"
                "DSD-DEFAULT" "LAYOUT-INHERITS" "DD-LENGTH"
-               "%CODE-ENTRY-POINTS" "%DENOMINATOR"
+               "%CODE-ENTRY-POINTS" "%DENOMINATOR" "%SIMPLE-FUN-XREFS"
 
                "STANDARD-CLASSOID" "CLASSOID-OF"
                "MAKE-STANDARD-CLASSOID" "CLASSOID-CELL-TYPEP"

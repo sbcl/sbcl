@@ -35,12 +35,18 @@
       (multiple-value-bind (new-body local-decs doc)
           (parse-defmacro lambda-list whole body name 'defmacro
                           :environment environment)
-        (let ((def `(lambda (,whole ,environment)
+        (let ((def `(#+sb-xc-host lambda
+                     ;; Use a named-lambda rather than a lambda so that
+                     ;; proper xref information can be stored. Use a
+                     ;; list-based name, since otherwise the compiler
+                     ;; will momentarily assume that it names a normal
+                     ;; function, and report spurious warnings about
+                     ;; redefinition a macro as a function, and then
+                     ;; vice versa.
+                     #-sb-xc-host #-sb-xc-host named-lambda (defmacro ,name)
+                     (,whole ,environment)
                       ,@local-decs
                       ,new-body))
-              ;; If we want to move over to list-style names
-              ;; [e.g. (DEFMACRO FOO), maybe to support some XREF-like
-              ;; functionality] here might be a good place to start.
               (debug-name (sb!c::debug-name 'macro-function name)))
           `(eval-when (:compile-toplevel :load-toplevel :execute)
              (sb!c::%defmacro ',name #',def ',lambda-list

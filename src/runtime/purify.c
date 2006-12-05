@@ -70,14 +70,6 @@ static long later_count = 0;
  #define SIMPLE_ARRAY_WORD_WIDETAG SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
 #endif
 
-/* FIXME: Shouldn't this be defined in sbcl.h?  See also notes in
- * cheneygc.c */
-
-#ifdef LISP_FEATURE_SPARC
-#define FUN_RAW_ADDR_OFFSET 0
-#else
-#define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - FUN_POINTER_LOWTAG)
-#endif
 
 static boolean
 forwarding_pointer_p(lispobj obj)

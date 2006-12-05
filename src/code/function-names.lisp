@@ -56,6 +56,24 @@ use as a BLOCK name in the function in question."
           (cons (unless (eq (car fun) 'setf)
                   (valid-function-name-p fun))))))))
 
+(defun macro-function-name (name)
+  (when (and (cdr name)
+             (consp (cdr name)))
+    (destructuring-bind (fun &rest rest) (cdr name)
+      (when (null rest)
+        (typecase fun
+          ;; (DEFMACRO FOO)
+          (symbol (values t fun))
+          ;; (DEFMACRO (SETF FOO))
+          (cons (when (eq (car fun) 'setf)
+                  (valid-function-name-p fun))))))))
+
+(define-function-name-syntax defmacro (name)
+  (macro-function-name name))
+
+(define-function-name-syntax macrolet (name)
+  (macro-function-name name))
+
 #-sb-xc-host
 (defun !function-names-cold-init ()
   (setf *valid-fun-names-alist* '#.*valid-fun-names-alist*))

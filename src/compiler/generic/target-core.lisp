@@ -30,6 +30,7 @@
       (setf (%simple-fun-name res) (entry-info-name entry-info))
       (setf (%simple-fun-arglist res) (entry-info-arguments entry-info))
       (setf (%simple-fun-type res) (entry-info-type entry-info))
+      (setf (%simple-fun-xrefs res) (entry-info-xref entry-info))
 
       (note-fun entry-info res object))))
 

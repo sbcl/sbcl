@@ -497,6 +497,7 @@
  ("src/compiler/dump")
 
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
+ ("src/compiler/xref")
  ("src/code/source-location")
  ("src/compiler/target-main" :not-host)
  ("src/compiler/ir1tran")

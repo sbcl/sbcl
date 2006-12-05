@@ -699,7 +699,9 @@
     (:macro
      (ir1-convert start next result
                   (careful-expand-macro (info :function :macro-function fun)
-                                        form)))
+                                        form))
+     (unless (policy *lexenv* (zerop store-xref-data))
+       (record-macroexpansion fun (ctran-block start) *current-path*)))
     ((nil :function)
      (ir1-convert-srctran start next result
                           (find-free-fun fun "shouldn't happen! (no-cmacro)")

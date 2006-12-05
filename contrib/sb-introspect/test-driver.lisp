@@ -72,5 +72,9 @@
 (assert (matchp-name :function 'cl-user::one 2))
 (sb-profile:unprofile cl-user::one)
 
+;;; Test the xref facility
+
+(load (merge-pathnames "xref-test.lisp" *load-pathname*))
+
 ;;; Unix success convention for exit codes
 (sb-ext:quit :unix-status 0)

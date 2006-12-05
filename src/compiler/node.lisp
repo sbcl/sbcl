@@ -246,7 +246,9 @@
   ;; entire initial component just to clear the flags.
   (flag nil)
   ;; some kind of info used by the back end
-  (info nil))
+  (info nil)
+  ;; what macroexpansions happened "in" this block, used for xref
+  (macroexpands nil :type list))
 (def!method print-object ((cblock cblock) stream)
   (print-unreadable-object (cblock stream :type t :identity t)
     (format stream "~W :START c~W"
@@ -851,7 +853,10 @@
   ;; sure that no closure is needed.
   (allocator nil :type (or null combination))
   ;; various rare miscellaneous info that drives code generation & stuff
-  (plist () :type list))
+  (plist () :type list)
+  ;; xref information for this functional (only used for functions with an
+  ;; XEP)
+  (xref () :type list))
 (defprinter (functional :identity t)
   %source-name
   %debug-name

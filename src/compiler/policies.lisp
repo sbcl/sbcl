@@ -91,3 +91,9 @@
 (define-optimization-quality insert-array-bounds-checks
     (if (= safety 0) 0 3)
   ("no" "yes" "yes" "yes"))
+
+(define-optimization-quality store-xref-data
+    (if (= space 3)
+        0
+        3)
+  ("no" "yes" "yes" "yes"))

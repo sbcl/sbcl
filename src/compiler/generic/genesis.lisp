@@ -2439,7 +2439,8 @@ core and return a descriptor to it."
     (write-wordindexed code slot value)))
 
 (define-cold-fop (fop-fun-entry)
-  (let* ((type (pop-stack))
+  (let* ((xrefs (pop-stack))
+         (type (pop-stack))
          (arglist (pop-stack))
          (name (pop-stack))
          (code-object (pop-stack))
@@ -2496,6 +2497,7 @@ core and return a descriptor to it."
     (write-wordindexed fn sb!vm:simple-fun-name-slot name)
     (write-wordindexed fn sb!vm:simple-fun-arglist-slot arglist)
     (write-wordindexed fn sb!vm:simple-fun-type-slot type)
+    (write-wordindexed fn sb!vm::simple-fun-xrefs-slot xrefs)
     fn))
 
 (define-cold-fop (fop-foreign-fixup)

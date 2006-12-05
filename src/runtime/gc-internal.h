@@ -16,6 +16,8 @@
 #ifndef _GC_INTERNAL_H_
 #define _GC_INTERNAL_H_
 
+#include <genesis/simple-fun.h>
+
 /* disabling gc assertions made no discernable difference to GC speed,
  * last I tried it - dan 2003.12.21 */
 #if 1
@@ -59,20 +61,10 @@ NWORDS(unsigned long x, unsigned long n_bits)
 
 /* FIXME: Shouldn't this be defined in sbcl.h? */
 
-/* FIXME (1) this could probably be defined using something like
- *  sizeof(lispobj)*floor(sizeof(struct simple_fun)/sizeof(lispobj))
- *    -  FUN_POINTER_LOWTAG
- * as I'm reasonably sure that simple_fun->code must always be the
- * last slot in the object
-
- * FIXME (2) it also appears in purify.c, and it has a different value
- * for SPARC users in that bit
- */
-
 #if defined(LISP_FEATURE_SPARC)
 #define FUN_RAW_ADDR_OFFSET 0
 #else
-#define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - FUN_POINTER_LOWTAG)
+#define FUN_RAW_ADDR_OFFSET (offsetof(struct simple_fun, code) - FUN_POINTER_LOWTAG)
 #endif
 
 /* values for the *_alloc_* parameters */

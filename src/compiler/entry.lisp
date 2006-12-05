@@ -43,6 +43,8 @@
     (setf (entry-info-offset info) (gen-label))
     (setf (entry-info-name info)
           (leaf-debug-name internal-fun))
+    (setf (entry-info-xref info)
+          (pack-xref-data (functional-xref internal-fun)))
     (when (policy bind (>= debug 1))
       (let ((args (functional-arg-documentation internal-fun)))
         (aver (not (eq args :unspecified)))
