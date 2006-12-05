@@ -164,7 +164,7 @@
   ;; 32-bit lispobjs).  In that case, this AND instruction is
   ;; unneccessary and could be removed.  If not, explain why.  -- CSR,
   ;; 2004-03-30
-  (inst and esp-tn #.(ldb (byte 32 0) (lognot lowtag-mask)))
+  (inst and esp-tn (lognot lowtag-mask))
   (aver (not (location= alloc-tn esp-tn)))
   (inst mov alloc-tn esp-tn)
   (values))
