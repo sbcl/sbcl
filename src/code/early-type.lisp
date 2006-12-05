@@ -530,11 +530,6 @@
            ((eq (info :type :kind spec) :instance)
             (find-classoid spec))
            ((typep spec 'classoid)
-            ;; There doesn't seem to be any way to translate
-            ;; (TYPEP SPEC 'BUILT-IN-CLASS) into something which can be
-            ;; executed on the host Common Lisp at cross-compilation time.
-            #+sb-xc-host (error
-                          "stub: (TYPEP SPEC 'BUILT-IN-CLASS) on xc host")
             (if (typep spec 'built-in-classoid)
                 (or (built-in-classoid-translation spec) spec)
                 spec))

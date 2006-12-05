@@ -1519,7 +1519,9 @@
       ;; FILE-STREAM and STRING-STREAM (as they have the same
       ;; layout-depthoid).  Is there any way we can provide a useful
       ;; error message?  -- CSR, 2005-05-03
-      (eq s *the-class-file-stream*) (eq s *the-class-string-stream*)))
+      (eq s *the-class-file-stream*) (eq s *the-class-string-stream*)
+      ;; TODO
+      (eq s *the-class-sequence*)))
 
 ;;; Some necessary methods for FORWARD-REFERENCED-CLASS
 (defmethod class-direct-slots ((class forward-referenced-class)) ())

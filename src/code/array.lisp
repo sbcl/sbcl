@@ -311,29 +311,6 @@ of specialized arrays is supported."
            (fill-data-vector data dimensions initial-contents)))
     data))
 
-(defun fill-data-vector (vector dimensions initial-contents)
-  (let ((index 0))
-    (labels ((frob (axis dims contents)
-               (cond ((null dims)
-                      (setf (aref vector index) contents)
-                      (incf index))
-                     (t
-                      (unless (typep contents 'sequence)
-                        (error "malformed :INITIAL-CONTENTS: ~S is not a ~
-                                sequence, but ~W more layer~:P needed."
-                               contents
-                               (- (length dimensions) axis)))
-                      (unless (= (length contents) (car dims))
-                        (error "malformed :INITIAL-CONTENTS: Dimension of ~
-                                axis ~W is ~W, but ~S is ~W long."
-                               axis (car dims) contents (length contents)))
-                      (if (listp contents)
-                          (dolist (content contents)
-                            (frob (1+ axis) (cdr dims) content))
-                          (dotimes (i (length contents))
-                            (frob (1+ axis) (cdr dims) (aref contents i))))))))
-      (frob 0 dimensions initial-contents))))
-
 (defun vector (&rest objects)
   #!+sb-doc
   "Construct a SIMPLE-VECTOR from the given objects."

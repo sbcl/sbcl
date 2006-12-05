@@ -54,6 +54,12 @@
 (assert (type= (specifier-type 'cons)
                (type-intersection (specifier-type 'sequence)
                                   (specifier-type '(or cons number)))))
+(assert (type= (specifier-type '(simple-array character (*)))
+               (type-intersection (specifier-type 'sequence)
+                                  (specifier-type '(simple-array character)))))
+(assert (type= (specifier-type 'list)
+               (type-intersection (specifier-type 'sequence)
+                                  (specifier-type 'list))))
 (assert (eql *empty-type*
              (type-intersection (specifier-type '(satisfies keywordp))
                                 *empty-type*)))
@@ -62,8 +68,10 @@
                (type-union (specifier-type 'cons) (specifier-type 'null))))
 (assert (type= (specifier-type 'list)
                (type-union (specifier-type 'null) (specifier-type 'cons))))
+#+nil ; not any more
 (assert (type= (specifier-type 'sequence)
                (type-union (specifier-type 'list) (specifier-type 'vector))))
+#+nil ; not any more
 (assert (type= (specifier-type 'sequence)
                (type-union (specifier-type 'vector) (specifier-type 'list))))
 (assert (type= (specifier-type 'list)
@@ -329,5 +337,7 @@
   (assert yes)
   (assert win))
 
+(assert (type= (specifier-type 'nil)
+               (specifier-type '(and symbol funcallable-instance))))
 
 (/show "done with tests/type.before-xc.lisp")

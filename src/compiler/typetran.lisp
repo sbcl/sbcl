@@ -24,8 +24,8 @@
 ;;;; predicates so complex that the only reasonable implentation is
 ;;;; via function call.
 ;;;;
-;;;; Some standard types (such as SEQUENCE) are best tested by letting
-;;;; the TYPEP source transform do its thing with the expansion. These
+;;;; Some standard types (such as ATOM) are best tested by letting the
+;;;; TYPEP source transform do its thing with the expansion. These
 ;;;; types (and corresponding predicates) are not maintained in this
 ;;;; association. In this case, there need not be any predicate
 ;;;; function unless it is required by the Common Lisp specification.
@@ -136,6 +136,7 @@
   (define-type-predicate numberp number)
   (define-type-predicate rationalp rational)
   (define-type-predicate realp real)
+  (define-type-predicate sequencep sequence)
   (define-type-predicate simple-bit-vector-p simple-bit-vector)
   (define-type-predicate simple-string-p simple-string)
   (define-type-predicate simple-vector-p simple-vector)

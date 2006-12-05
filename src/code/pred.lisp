@@ -23,6 +23,22 @@
       (and (complex-vector-p x)
            (do ((data (%array-data-vector x) (%array-data-vector data)))
                ((not (array-header-p data)) (simple-vector-p data))))))
+
+;;; Is X a SEQUENCE?  Harder than just (OR VECTOR LIST)
+(defun sequencep (x)
+  (or (listp x)
+      (vectorp x)
+      (let* ((slayout #.(info :type :compiler-layout 'sequence))
+             (depthoid #.(layout-depthoid (info :type :compiler-layout 'sequence)))
+             (layout (layout-of x)))
+        (when (layout-invalid layout)
+          (setq layout (update-object-layout-or-invalid x slayout)))
+        (if (eq layout slayout)
+            t
+            (let ((inherits (layout-inherits layout)))
+              (declare (optimize (safety 0)))
+              (and (> (length inherits) depthoid)
+                   (eq (svref inherits depthoid) slayout)))))))
 
 ;;;; primitive predicates. These must be supported directly by the
 ;;;; compiler.

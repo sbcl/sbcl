@@ -378,18 +378,32 @@
   `(labels ((,name ,(mapcar #'first binds) ,@body))
      (,name ,@(mapcar #'second binds))))
 
+(defun filter-dolist-declarations (decls)
+  (mapcar (lambda (decl)
+            `(declare ,@(remove-if
+                         (lambda (clause)
+                           (and (consp clause)
+                                (or (eq (car clause) 'type)
+                                    (eq (car clause) 'ignore))))
+                         (cdr decl))))
+          decls))
+
 ;;; just like DOLIST, but with one-dimensional arrays
-(defmacro dovector ((elt vector &optional result) &rest forms)
-  (let ((index (gensym))
-        (length (gensym))
-        (vec (gensym)))
-    `(let ((,vec ,vector))
-       (declare (type vector ,vec))
-       (do ((,index 0 (1+ ,index))
-            (,length (length ,vec)))
-           ((>= ,index ,length) ,result)
-         (let ((,elt (aref ,vec ,index)))
-           ,@forms)))))
+(defmacro dovector ((elt vector &optional result) &body body)
+  (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
+    (with-unique-names (index length vec)
+      `(let ((,vec ,vector))
+        (declare (type vector ,vec))
+        (do ((,index 0 (1+ ,index))
+             (,length (length ,vec)))
+            ((>= ,index ,length) (let ((,elt nil))
+                                   ,@(filter-dolist-declarations decls)
+                                   ,elt
+                                   ,result))
+          (let ((,elt (aref ,vec ,index)))
+            ,@decls
+            (tagbody
+               ,@forms)))))))
 
 ;;; Iterate over the entries in a HASH-TABLE.
 (defmacro dohash ((key-var value-var table &optional result) &body body)

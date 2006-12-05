@@ -19,57 +19,44 @@
 ;;; allows the compiler to make enough optimizations that it might be
 ;;; worth the (large) cost in space.
 (declaim (maybe-inline sort))
-(defun sort (sequence predicate &key key)
+(defun sort (sequence predicate &rest args &key key)
   #!+sb-doc
   "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
    ARG1 is to precede ARG2."
+  (declare (dynamic-extent args))
   (let ((predicate-fun (%coerce-callable-to-fun predicate)))
-    (typecase sequence
-      (list
-       (stable-sort-list sequence
-                         predicate-fun
-                         (if key (%coerce-callable-to-fun key) #'identity)))
-      (vector
-       (let ((key-fun-or-nil (and key (%coerce-callable-to-fun key))))
-         (with-array-data ((vector (the vector sequence))
-                           (start 0)
-                           (end (length sequence)))
-           (sort-vector vector start end predicate-fun key-fun-or-nil)))
-       sequence)
-      (t
-       (error 'simple-type-error
-              :datum sequence
-              :expected-type 'sequence
-              :format-control "~S is not a sequence."
-              :format-arguments (list sequence))))))
+    (seq-dispatch sequence
+      (stable-sort-list sequence
+                        predicate-fun
+                        (if key (%coerce-callable-to-fun key) #'identity))
+      (let ((key-fun-or-nil (and key (%coerce-callable-to-fun key))))
+        (with-array-data ((vector (the vector sequence))
+                          (start 0)
+                          (end (length sequence)))
+          (sort-vector vector start end predicate-fun key-fun-or-nil))
+        sequence)
+      (apply #'sb!sequence:sort sequence predicate args))))
 
 ;;;; stable sorting
-
-(defun stable-sort (sequence predicate &key key)
+(defun stable-sort (sequence predicate &rest args &key key)
   #!+sb-doc
   "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
    ARG1 is to precede ARG2."
+  (declare (dynamic-extent args))
   (let ((predicate-fun (%coerce-callable-to-fun predicate)))
-    (typecase sequence
-      (simple-vector
-       (stable-sort-simple-vector sequence
-                                  predicate-fun
-                                  (and key (%coerce-callable-to-fun key))))
-      (list
-       (stable-sort-list sequence
-                         predicate-fun
-                         (if key (%coerce-callable-to-fun key) #'identity)))
-      (vector
-       (stable-sort-vector sequence
-                           predicate-fun
-                           (and key (%coerce-callable-to-fun key))))
-      (t
-       (error 'simple-type-error
-              :datum sequence
-              :expected-type 'sequence
-              :format-control "~S is not a sequence."
-              :format-arguments (list sequence))))))
-  
+    (seq-dispatch sequence
+      (stable-sort-list sequence
+                        predicate-fun
+                        (if key (%coerce-callable-to-fun key) #'identity))
+      (if (typep sequence 'simple-vector)
+          (stable-sort-simple-vector sequence
+                                     predicate-fun
+                                     (and key (%coerce-callable-to-fun key)))
+          (stable-sort-vector sequence
+                              predicate-fun
+                              (and key (%coerce-callable-to-fun key))))
+      (apply #'sb!sequence:stable-sort sequence predicate args))))
+
 ;;; FUNCALL-USING-KEY saves us a function call sometimes.
 (eval-when (:compile-toplevel :execute)
   (sb!xc:defmacro funcall2-using-key (pred key one two)
@@ -420,8 +407,7 @@
               (vector-2 (coerce sequence2 'vector))
               (length-1 (length vector-1))
               (length-2 (length vector-2))
-              (result (make-sequence result-type
-                                     (+ length-1 length-2))))
+              (result (make-sequence result-type (+ length-1 length-2))))
          (declare (vector vector-1 vector-2)
                   (fixnum length-1 length-2))
          (if (and (simple-vector-p result)
@@ -431,4 +417,17 @@
                             result predicate key svref)
              (merge-vectors vector-1 length-1 vector-2 length-2
                             result predicate key aref))))
+      ((and (csubtypep type (specifier-type 'sequence))
+            (find-class result-type nil))
+       (let* ((vector-1 (coerce sequence1 'vector))
+              (vector-2 (coerce sequence2 'vector))
+              (length-1 (length vector-1))
+              (length-2 (length vector-2))
+              (temp (make-array (+ length-1 length-2)))
+              (result (make-sequence result-type (+ length-1 length-2))))
+         (declare (vector vector-1 vector-2) (fixnum length-1 length-2))
+         (merge-vectors vector-1 length-1 vector-2 length-2
+                        temp predicate key aref)
+         (replace result temp)
+         result))
       (t (bad-sequence-type-error result-type)))))

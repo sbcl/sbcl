@@ -16,7 +16,8 @@
                 (do* ((index 0 (1+ index))
                       (length (length (the ,(ecase src-type
                                               (:list 'list)
-                                              (:vector 'vector))
+                                              (:vector 'vector)
+                                              (:sequence 'sequence))
                                            object)))
                       (result ,result)
                       (in-object object))
@@ -25,13 +26,17 @@
                   (setf (,access result index)
                         ,(ecase src-type
                            (:list '(pop in-object))
-                           (:vector '(aref in-object index))))))))
+                           (:vector '(aref in-object index))
+                           (:sequence '(elt in-object index))))))))
 
   (def list-to-vector* (make-sequence type length)
     aref :list t)
 
   (def vector-to-vector* (make-sequence type length)
-    aref :vector t))
+    aref :vector t)
+
+  (def sequence-to-vector* (make-sequence type length)
+    aref :sequence t))
 
 (defun vector-to-list* (object)
   (let ((result (list nil))
@@ -120,34 +125,6 @@
          (coerce-error))
         ((csubtypep type (specifier-type 'character))
          (character object))
-        ((csubtypep type (specifier-type 'function))
-         (when (and (legal-fun-name-p object)
-                    (not (fboundp object)))
-           (error 'simple-type-error
-                  :datum object
-                  ;; FIXME: SATISFIES FBOUNDP is a kinda bizarre broken
-                  ;; type specifier, since the set of values it describes
-                  ;; isn't in general constant in time. Maybe we could
-                  ;; find a better way of expressing this error? (Maybe
-                  ;; with the UNDEFINED-FUNCTION condition?)
-                  :expected-type '(satisfies fboundp)
-               :format-control "~S isn't fbound."
-               :format-arguments (list object)))
-         (when (and (symbolp object)
-                    (sb!xc:macro-function object))
-           (error 'simple-type-error
-                  :datum object
-                  :expected-type '(not (satisfies sb!xc:macro-function))
-                  :format-control "~S is a macro."
-                  :format-arguments (list object)))
-         (when (and (symbolp object)
-                    (special-operator-p object))
-           (error 'simple-type-error
-                  :datum object
-                  :expected-type '(not (satisfies special-operator-p))
-                  :format-control "~S is a special operator."
-                  :format-arguments (list object)))
-         (eval `#',object))
         ((numberp object)
          (cond
            ((csubtypep type (specifier-type 'single-float))
@@ -230,15 +207,72 @@
                           (sequence-type-length-mismatch-error type length)))
                     (vector-to-list* object))))
                (t (sequence-type-too-hairy (type-specifier type))))
-             (coerce-error)))
+             (if (sequencep object)
+                 (cond
+                   ((type= type (specifier-type 'list))
+                    (sb!sequence:make-sequence-like
+                     nil (length object) :initial-contents object))
+                   ((type= type (specifier-type 'null))
+                    (if (= (length object) 0)
+                        'nil
+                        (sequence-type-length-mismatch-error type
+                                                             (length object))))
+                   ((cons-type-p type)
+                    (multiple-value-bind (min exactp)
+                        (sb!kernel::cons-type-length-info type)
+                      (let ((length (length object)))
+                        (if exactp
+                            (unless (= length min)
+                              (sequence-type-length-mismatch-error type length))
+                            (unless (>= length min)
+                              (sequence-type-length-mismatch-error type length)))
+                        (sb!sequence:make-sequence-like
+                         nil length :initial-contents object))))
+                   (t (sequence-type-too-hairy (type-specifier type))))
+                 (coerce-error))))
         ((csubtypep type (specifier-type 'vector))
          (typecase object
            ;; FOO-TO-VECTOR* go through MAKE-SEQUENCE, so length
            ;; errors are caught there. -- CSR, 2002-10-18
            (list (list-to-vector* object output-type-spec))
            (vector (vector-to-vector* object output-type-spec))
+           (sequence (sequence-to-vector* object output-type-spec))
            (t
             (coerce-error))))
+        ((and (csubtypep type (specifier-type 'sequence))
+              (find-class output-type-spec nil))
+         (let ((class (find-class output-type-spec)))
+           (sb!sequence:make-sequence-like
+            (sb!mop:class-prototype class)
+            (length object) :initial-contents object)))
+        ((csubtypep type (specifier-type 'function))
+         (when (and (legal-fun-name-p object)
+                    (not (fboundp object)))
+           (error 'simple-type-error
+                  :datum object
+                  ;; FIXME: SATISFIES FBOUNDP is a kinda bizarre broken
+                  ;; type specifier, since the set of values it describes
+                  ;; isn't in general constant in time. Maybe we could
+                  ;; find a better way of expressing this error? (Maybe
+                  ;; with the UNDEFINED-FUNCTION condition?)
+                  :expected-type '(satisfies fboundp)
+               :format-control "~S isn't fbound."
+               :format-arguments (list object)))
+         (when (and (symbolp object)
+                    (sb!xc:macro-function object))
+           (error 'simple-type-error
+                  :datum object
+                  :expected-type '(not (satisfies sb!xc:macro-function))
+                  :format-control "~S is a macro."
+                  :format-arguments (list object)))
+         (when (and (symbolp object)
+                    (special-operator-p object))
+           (error 'simple-type-error
+                  :datum object
+                  :expected-type '(not (satisfies special-operator-p))
+                  :format-control "~S is a special operator."
+                  :format-arguments (list object)))
+         (eval `#',object))
         (t
          (coerce-error))))))
 

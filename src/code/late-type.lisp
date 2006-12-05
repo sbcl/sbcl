@@ -1142,10 +1142,10 @@
   (aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (cond ((eq type2 *universal-type*)
          (values t t))
-        ((or (type-might-contain-other-types-p type1)
-             ;; some CONS types can conceal danger
-             (and (cons-type-p type1)
-                  (cons-type-might-be-empty-type type1)))
+        ;; some CONS types can conceal danger
+        ((and (cons-type-p type1) (cons-type-might-be-empty-type type1))
+         (values nil nil))
+        ((type-might-contain-other-types-p type1)
          ;; those types can be other types in disguise.  So we'd
          ;; better delegate.
          (invoke-complex-subtypep-arg1-method type1 type2))
@@ -1212,14 +1212,14 @@
      (typecase type1
        (structure-classoid *empty-type*)
        (classoid
-        (if (and (not (member type1 *non-instance-classoid-types*
-                              :key #'find-classoid))
-                 (find (classoid-layout (find-classoid 'function))
-                       (layout-inherits (classoid-layout type1))))
-            type1
-            (if (type= type1 (find-classoid 'function))
-                type2
-                nil)))
+        (if (member type1 *non-instance-classoid-types* :key #'find-classoid)
+            *empty-type*
+            (if (find (classoid-layout (find-classoid 'function))
+                      (layout-inherits (classoid-layout type1)))
+                type1
+                (if (type= type1 (find-classoid 'function))
+                    type2
+                    nil))))
        (fun-type nil)
        (t
         (if (or (type-might-contain-other-types-p type1)
@@ -2352,11 +2352,8 @@ used for a COMPLEX component.~:@>"
                           (array-type-specialized-element-type type2))
                    t)))))
 
-;;; FIXME: is this dead?
 (!define-superclasses array
-  ((base-string base-string)
-   (vector vector)
-   (array))
+  ((vector vector) (array))
   !cold-init-forms)
 
 (defun array-types-intersect (type1 type2)
@@ -3092,6 +3089,8 @@ used for a COMPLEX component.~:@>"
                  (type-intersection (cons-type-car-type type1)
                                     (cons-type-car-type type2))
                  cdr-int2)))))
+
+(!define-superclasses cons ((cons)) !cold-init-forms)
 
 ;;;; CHARACTER-SET types
 

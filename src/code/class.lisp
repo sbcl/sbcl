@@ -913,6 +913,22 @@ NIL is returned when no such class exists."
          ;; uncertain, since a subclass of both might be defined
          nil)))
 
+;;; KLUDGE: we need this for the special-case SEQUENCE type, which
+;;; (because of multiple inheritance with ARRAY for the VECTOR types)
+;;; doesn't have the nice hierarchical properties we want.  This is
+;;; basically DELEGATE-COMPLEX-INTERSECTION2 with a special-case for
+;;; SEQUENCE/ARRAY interactions.
+(!define-type-method (classoid :complex-intersection2) (type1 class2)
+  (cond
+    ((and (eq class2 (find-classoid 'sequence))
+          (array-type-p type1))
+     (type-intersection2 (specifier-type 'vector) type1))
+    (t
+     (let ((method (type-class-complex-intersection2 (type-class-info type1))))
+       (if (and method (not (eq method #'delegate-complex-intersection2)))
+           :call-other-method
+           (hierarchical-intersection2 type1 class2))))))
+
 ;;; KLUDGE: we need this to deal with the special-case INSTANCE and
 ;;; FUNCALLABLE-INSTANCE types (which used to be CLASSOIDs until CSR
 ;;; discovered that this was incompatible with the MOP class
@@ -1096,7 +1112,8 @@ NIL is returned when no such class exists."
       :inherits (array)
       :prototype-form (make-array nil))
      (sequence
-      :translation (or cons (member nil) vector))
+      :state :read-only
+      :depth 2)
      (vector
       :translation vector :codes (#.sb!vm:complex-vector-widetag)
       :direct-superclasses (array sequence)

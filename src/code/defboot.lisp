@@ -334,16 +334,6 @@
                 (declare (type unsigned-byte ,var))
                 ,@body)))))
 
-(defun filter-dolist-declarations (decls)
-  (mapcar (lambda (decl)
-            `(declare ,@(remove-if
-                         (lambda (clause)
-                           (and (consp clause)
-                                (or (eq (car clause) 'type)
-                                    (eq (car clause) 'ignore))))
-                         (cdr decl))))
-          decls))
-
 (defmacro-mundanely dolist ((var list &optional (result nil)) &body body)
   ;; We repeatedly bind the var instead of setting it so that we never
   ;; have to give the var an arbitrary value such as NIL (which might

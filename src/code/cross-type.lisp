@@ -162,6 +162,14 @@
              (target-type-is-in
               '(array simple-string simple-vector string vector))
              (values (typep host-object target-type) t))
+            (;; sequence is not guaranteed to be an exhaustive
+             ;; partition, but it includes at least lists and vectors.
+             (target-type-is-in '(sequence))
+             (if (or (vectorp host-object) (listp host-object))
+                 (values t t)
+                 (if (typep host-object target-type)
+                     (warn-and-give-up)
+                     (values nil t))))
             (;; general cases of vectors
              (and (not (hairy-type-p (values-specifier-type target-type)))
                   (sb!xc:subtypep target-type 'cl:vector))

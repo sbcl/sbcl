@@ -476,35 +476,25 @@
   (foldable unsafely-flushable call))
 
 ;;; unsafe for :INITIAL-VALUE...
-(defknown reduce (callable
-                  sequence
-                  &key
-                  (:from-end t)
-                  (:start index)
-                  (:end sequence-end)
-                  (:initial-value t)
-                  (:key callable))
+(defknown reduce (callable sequence &rest t &key (:from-end t) (:start index)
+                  (:end sequence-end) (:initial-value t) (:key callable))
   t
   (foldable flushable call unsafe))
 
-(defknown fill (sequence t &key (:start index) (:end sequence-end)) sequence
+(defknown fill (sequence t &rest t &key
+                         (:start index) (:end sequence-end)) sequence
   (unsafe)
   :derive-type #'result-type-first-arg
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
-(defknown replace (sequence
-                   sequence
-                   &key
-                   (:start1 index)
-                   (:end1 sequence-end)
-                   (:start2 index)
-                   (:end2 sequence-end))
+(defknown replace (sequence sequence &rest t &key (:start1 index)
+                   (:end1 sequence-end) (:start2 index) (:end2 sequence-end))
   sequence ()
   :derive-type #'result-type-first-arg
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
 (defknown remove
-  (t sequence &key (:from-end t) (:test callable)
+  (t sequence &rest t &key (:from-end t) (:test callable)
      (:test-not callable) (:start index) (:end sequence-end)
      (:count sequence-count) (:key callable))
   consed-sequence
@@ -512,7 +502,7 @@
   :derive-type (sequence-result-nth-arg 2))
 
 (defknown substitute
-  (t t sequence &key (:from-end t) (:test callable)
+  (t t sequence &rest t &key (:from-end t) (:test callable)
      (:test-not callable) (:start index) (:end sequence-end)
      (:count sequence-count) (:key callable))
   consed-sequence
@@ -520,21 +510,21 @@
   :derive-type (sequence-result-nth-arg 3))
 
 (defknown (remove-if remove-if-not)
-  (callable sequence &key (:from-end t) (:start index) (:end sequence-end)
-            (:count sequence-count) (:key callable))
+  (callable sequence &rest t &key (:from-end t) (:start index)
+            (:end sequence-end) (:count sequence-count) (:key callable))
   consed-sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 2))
 
 (defknown (substitute-if substitute-if-not)
-  (t callable sequence &key (:from-end t) (:start index) (:end sequence-end)
-     (:count sequence-count) (:key callable))
+  (t callable sequence &rest t &key (:from-end t) (:start index)
+     (:end sequence-end) (:count sequence-count) (:key callable))
   consed-sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 3))
 
 (defknown delete
-  (t sequence &key (:from-end t) (:test callable)
+  (t sequence &rest t &key (:from-end t) (:test callable)
      (:test-not callable) (:start index) (:end sequence-end)
      (:count sequence-count) (:key callable))
   sequence
@@ -543,7 +533,7 @@
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
 (defknown nsubstitute
-  (t t sequence &key (:from-end t) (:test callable)
+  (t t sequence &rest t &key (:from-end t) (:test callable)
      (:test-not callable) (:start index) (:end sequence-end)
      (:count sequence-count) (:key callable))
   sequence
@@ -552,82 +542,82 @@
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 3))
 
 (defknown (delete-if delete-if-not)
-  (callable sequence &key (:from-end t) (:start index) (:end sequence-end)
-            (:count sequence-count) (:key callable))
+  (callable sequence &rest t &key (:from-end t) (:start index)
+            (:end sequence-end) (:count sequence-count) (:key callable))
   sequence
   (flushable call important-result)
   :derive-type (sequence-result-nth-arg 2)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
 (defknown (nsubstitute-if nsubstitute-if-not)
-  (t callable sequence &key (:from-end t) (:start index) (:end sequence-end)
-     (:count sequence-count) (:key callable))
+  (t callable sequence &rest t &key (:from-end t) (:start index)
+     (:end sequence-end) (:count sequence-count) (:key callable))
   sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 3)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 3))
 
 (defknown remove-duplicates
-  (sequence &key (:test callable) (:test-not callable) (:start index)
+  (sequence &rest t &key (:test callable) (:test-not callable) (:start index)
             (:from-end t) (:end sequence-end) (:key callable))
   consed-sequence
   (unsafely-flushable call)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown delete-duplicates
-  (sequence &key (:test callable) (:test-not callable) (:start index)
+  (sequence &rest t &key (:test callable) (:test-not callable) (:start index)
             (:from-end t) (:end sequence-end) (:key callable))
   sequence
   (unsafely-flushable call important-result)
   :derive-type (sequence-result-nth-arg 1)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
-(defknown find (t sequence &key (:test callable) (:test-not callable)
-                  (:start index) (:from-end t) (:end sequence-end)
-                  (:key callable))
+(defknown find (t sequence &rest t &key (:test callable)
+                (:test-not callable) (:start index) (:from-end t)
+                (:end sequence-end) (:key callable))
   t
   (foldable flushable call))
 
 (defknown (find-if find-if-not)
-  (callable sequence &key (:from-end t) (:start index) (:end sequence-end)
-            (:key callable))
+  (callable sequence &rest t &key (:from-end t) (:start index)
+   (:end sequence-end) (:key callable))
   t
   (foldable flushable call))
 
-(defknown position (t sequence &key (:test callable) (:test-not callable)
-                      (:start index) (:from-end t) (:end sequence-end)
-                      (:key callable))
+(defknown position (t sequence &rest t &key (:test callable)
+                    (:test-not callable) (:start index) (:from-end t)
+                    (:end sequence-end) (:key callable))
   (or index null)
   (foldable flushable call))
 
 (defknown (position-if position-if-not)
-  (callable sequence &key (:from-end t) (:start index) (:end sequence-end)
-            (:key callable))
+  (callable sequence &rest t &key (:from-end t) (:start index)
+   (:end sequence-end) (:key callable))
   (or index null)
   (foldable flushable call))
 
-(defknown count (t sequence &key (:test callable) (:test-not callable)
-                      (:start index) (:from-end t) (:end sequence-end)
-                      (:key callable))
+(defknown count (t sequence &rest t &key
+                   (:test callable) (:test-not callable) (:start index)
+                   (:from-end t) (:end sequence-end) (:key callable))
   index
   (foldable flushable call))
 
 (defknown (count-if count-if-not)
-  (callable sequence &key (:from-end t) (:start index) (:end sequence-end)
-            (:key callable))
+  (callable sequence &rest t &key
+            (:from-end t) (:start index) (:end sequence-end) (:key callable))
   index
   (foldable flushable call))
 
 (defknown (mismatch search)
-  (sequence sequence &key (:from-end t) (:test callable) (:test-not callable)
-            (:start1 index) (:end1 sequence-end)
-            (:start2 index) (:end2 sequence-end)
-            (:key callable))
+  (sequence sequence &rest t &key (:from-end t) (:test callable)
+   (:test-not callable) (:start1 index) (:end1 sequence-end)
+   (:start2 index) (:end2 sequence-end) (:key callable))
   (or index null)
   (foldable flushable call))
 
 ;;; not FLUSHABLE, since vector sort guaranteed in-place...
-(defknown (stable-sort sort) (sequence callable &key (:key callable)) sequence
+(defknown (stable-sort sort) (sequence callable &rest t &key (:key callable))
+  sequence
   (call)
   :derive-type (sequence-result-nth-arg 1)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))

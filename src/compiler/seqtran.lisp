@@ -203,7 +203,7 @@
                                     'list)
                                    (t
                                     (give-up-ir1-transform
-                                     "can't determine result type")))))
+                                     "result type unsuitable")))))
       (cond ((and result-type-value (null seqs))
              ;; The consing arity-1 cases can be implemented
              ;; reasonably efficiently as function calls, and the cost
@@ -1083,7 +1083,8 @@
 (macrolet ((define-find-position (fun-name values-index)
              `(deftransform ,fun-name ((item sequence &key
                                              from-end (start 0) end
-                                             key test test-not))
+                                             key test test-not)
+                                       (t (or list vector) &rest t))
                 '(nth-value ,values-index
                             (%find-position item sequence
                                             from-end start
@@ -1097,7 +1098,8 @@
 (macrolet ((define-find-position-if (fun-name values-index)
              `(deftransform ,fun-name ((predicate sequence &key
                                                   from-end (start 0)
-                                                  end key))
+                                                  end key)
+                                       (t (or list vector) &rest t))
                 '(nth-value
                   ,values-index
                   (%find-position-if (%coerce-callable-to-fun predicate)
@@ -1130,7 +1132,8 @@
 (macrolet ((define-find-position-if-not (fun-name values-index)
                `(deftransform ,fun-name ((predicate sequence &key
                                           from-end (start 0)
-                                          end key))
+                                          end key)
+                                         (t (or list vector) &rest t))
                  '(nth-value
                    ,values-index
                    (%find-position-if-not (%coerce-callable-to-fun predicate)

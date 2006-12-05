@@ -59,6 +59,9 @@
   (rename-package package
                   (package-name package)
                   (cons "SB-C-CALL" (package-nicknames package))))
+
+(let ((package (find-package "SB-SEQUENCE")))
+  (rename-package package (package-name package) (list "SEQUENCE")))
 
 ;;;; compiling and loading more of the system
 
@@ -158,6 +161,9 @@
                 ;; lower-level hooks elsewhere in the code)
                 "SRC;PCL;GRAY-STREAMS-CLASS"
                 "SRC;PCL;GRAY-STREAMS"
+
+                ;; CLOS-level support for User-extensible sequences.
+                "SRC;PCL;SEQUENCE"
 
                 ;; other functionality not needed for cold init, moved
                 ;; to warm init to reduce peak memory requirement in

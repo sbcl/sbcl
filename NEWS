@@ -5,6 +5,11 @@ changes in sbcl-1.0.1 relative to sbcl-1.0:
     and special variables (who-binds, who-sets, who-references) for code
     compiled with (< SPACE 3). This information is available through the
     sb-introspect contrib.
+  * new feature: users may subclass SEQUENCE, and have instances of
+    these classes interoperate with standard Common Lisp functions if
+    a number of methods are defined.  (This feature is experimental
+    and the interface subject to change based on feedback from SBCL
+    users and the general community)
   * improvement: sb-sprof traces call stacks to an arbitrary depth on
     x86/x86-64, rather than the previous fixed depth of 8
   * bug fix: non-ascii command-line arguments are processed correctly 

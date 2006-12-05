@@ -1398,7 +1398,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "RUN-PENDING-FINALIZERS"
                "SCALE-DOUBLE-FLOAT"
                #!+long-float "SCALE-LONG-FLOAT"
-               "SCALE-SINGLE-FLOAT" "SEQUENCE-COUNT" "SEQUENCE-END"
+               "SCALE-SINGLE-FLOAT"
+               "SEQUENCEP" "SEQUENCE-COUNT" "SEQUENCE-END"
                "SEQUENCE-OF-CHECKED-LENGTH-GIVEN-TYPE"
                "SET-ARRAY-HEADER" "SET-HEADER-DATA" "SHIFT-TOWARDS-END"
                "SHIFT-TOWARDS-START" "SHRINK-VECTOR" "%SHRINK-VECTOR"
@@ -1863,6 +1864,37 @@ package is deprecated in favour of SB-MOP."
       :doc "public: the interface to the profiler"
       :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
       :export ("PROFILE" "REPORT" "RESET" "UNPROFILE"))
+
+   #s(sb-cold:package-data
+      :name "SB!SEQUENCE"
+      :doc "semi-public: implements something which might eventually
+be submitted as a CDR"
+      :use ()
+      :export ("DOSEQUENCE"
+
+               "MAKE-SEQUENCE-ITERATOR" "MAKE-SIMPLE-SEQUENCE-ITERATOR"
+
+               "ITERATOR-STEP" "ITERATOR-ENDP" "ITERATOR-ELEMENT"
+               "ITERATOR-INDEX" "ITERATOR-COPY"
+
+               "WITH-SEQUENCE-ITERATOR" "WITH-SEQUENCE-ITERATOR-FUNCTIONS"
+
+               "CANONIZE-TEST" "CANONIZE-KEY"
+
+               "LENGTH" "ELT"
+               "MAKE-SEQUENCE-LIKE" "ADJUST-SEQUENCE"
+
+               "COUNT" "COUNT-IF" "COUNT-IF-NOT"
+               "FIND" "FIND-IF" "FIND-IF-NOT"
+               "POSITION" "POSITION-IF" "POSITION-IF-NOT"
+               "SUBSEQ" "COPY-SEQ" "FILL"
+               "NSUBSTITUTE" "NSUBSTITUTE-IF" "NSUBSTITUTE-IF-NOT"
+               "SUBSTITUTE" "SUBSTITUTE-IF" "SUBSTITUTE-IF-NOT"
+               "REPLACE" "REVERSE" "NREVERSE" "REDUCE"
+               "MISMATCH" "SEARCH"
+               "DELETE" "DELETE-IF" "DELETE-IF-NOT"
+               "REMOVE" "REMOVE-IF" "REMOVE-IF-NOT"
+               "DELETE-DUPLICATES" "REMOVE-DUPLICATES" "SORT" "STABLE-SORT"))
 
    #s(sb-cold:package-data
       :name "SB!SYS"
