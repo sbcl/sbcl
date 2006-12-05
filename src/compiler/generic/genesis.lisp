@@ -2798,31 +2798,33 @@ core and return a descriptor to it."
 
 (defun write-primitive-object (obj)
   ;; writing primitive object layouts
-    (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
-      (format t
-              "struct ~A {~%"
-              (substitute #\_ #\-
-              (string-downcase (string (sb!vm:primitive-object-name obj)))))
-      (when (sb!vm:primitive-object-widetag obj)
-        (format t "    lispobj header;~%"))
-      (dolist (slot (sb!vm:primitive-object-slots obj))
-        (format t "    ~A ~A~@[[1]~];~%"
-        (getf (sb!vm:slot-options slot) :c-type "lispobj")
-        (substitute #\_ #\-
-                    (string-downcase (string (sb!vm:slot-name slot))))
-        (sb!vm:slot-rest-p slot)))
+  (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
+  (format t
+          "struct ~A {~%"
+          (substitute #\_ #\-
+                      (string-downcase (string (sb!vm:primitive-object-name obj)))))
+  (when (sb!vm:primitive-object-widetag obj)
+    (format t "    lispobj header;~%"))
+  (dolist (slot (sb!vm:primitive-object-slots obj))
+    (format t "    ~A ~A~@[[1]~];~%"
+            (getf (sb!vm:slot-options slot) :c-type "lispobj")
+            (substitute #\_ #\-
+                        (string-downcase (string (sb!vm:slot-name slot))))
+            (sb!vm:slot-rest-p slot)))
   (format t "};~2%")
-    (format t "#else /* LANGUAGE_ASSEMBLY */~2%")
-      (let ((name (sb!vm:primitive-object-name obj))
-      (lowtag (eval (sb!vm:primitive-object-lowtag obj))))
-        (when lowtag
-        (dolist (slot (sb!vm:primitive-object-slots obj))
-          (format t "#define ~A_~A_OFFSET ~D~%"
-                  (substitute #\_ #\- (string name))
-                  (substitute #\_ #\- (string (sb!vm:slot-name slot)))
-                  (- (* (sb!vm:slot-offset slot) sb!vm:n-word-bytes) lowtag)))
+  (format t "#else /* LANGUAGE_ASSEMBLY */~2%")
+  (format t "/* These offsets are SLOT-OFFSET * N-WORD-BYTES - LOWTAG~%")
+  (format t " * so they work directly on tagged addresses. */~2%")
+  (let ((name (sb!vm:primitive-object-name obj))
+        (lowtag (eval (sb!vm:primitive-object-lowtag obj))))
+    (when lowtag
+      (dolist (slot (sb!vm:primitive-object-slots obj))
+        (format t "#define ~A_~A_OFFSET ~D~%"
+                (substitute #\_ #\- (string name))
+                (substitute #\_ #\- (string (sb!vm:slot-name slot)))
+                (- (* (sb!vm:slot-offset slot) sb!vm:n-word-bytes) lowtag)))
       (terpri)))
-    (format t "#endif /* LANGUAGE_ASSEMBLY */~2%"))
+  (format t "#endif /* LANGUAGE_ASSEMBLY */~2%"))
 
 (defun write-structure-object (dd)
   (flet ((cstring (designator)

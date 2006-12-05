@@ -213,6 +213,7 @@ undefined_tramp = . + 1
         .word   NIL
         .word   NIL
         .word   NIL
+        .word   NIL
 
 	b	1f
         unimp   trap_Cerror
@@ -237,6 +238,7 @@ closure_tramp = . + 1
         .word   NIL
 	.word	NIL
 	.word	NIL
+	.word	NIL
 
 	ld	[reg_FDEFN+FDEFN_FUN_OFFSET], reg_LEXENV
 	ld	[reg_LEXENV+CLOSURE_FUN_OFFSET], reg_CODE
@@ -249,6 +251,7 @@ closure_tramp = . + 1
 	.word SIMPLE_FUN_HEADER_WIDETAG
 funcallable_instance_tramp = . + 1
 	.word funcallable_instance_tramp
+	.word NIL
 	.word NIL
 	.word NIL
 	.word NIL

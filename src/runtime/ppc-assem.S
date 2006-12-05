@@ -346,7 +346,7 @@ x:
 
 	/* Function is an indirect closure */
 	lwz reg_CODE,SIMPLE_FUN_SELF_OFFSET(reg_LEXENV)
-	addi reg_LIP,reg_CODE,6*4-FUN_POINTER_LOWTAG
+	addi reg_LIP,reg_CODE,SIMPLE_FUN_CODE_OFFSET
 	mtctr reg_LIP
 	slwi reg_NARGS,reg_NL2,2
 	bctr			
@@ -522,13 +522,14 @@ lra:
 	.long   NIL                                               /* name */
 	.long	NIL                                               /* arglist */
 	.long	NIL                                               /* type */
+	.long	NIL                                               /* xref */
 CSYMBOL(undefined_tramp):
 	/* Point reg_CODE to the header and tag it as function, since
 	   the debugger regards a function pointer in reg_CODE which
 	   doesn't point to a code object as undefined function.  */
 	bcl 20,31,.+4                  /* get address of the next instruction */
-	mflr reg_CODE                  /* header is 7 words back from here */
-	addi reg_CODE,reg_CODE,-7*4+FUN_POINTER_LOWTAG
+	mflr reg_CODE                  /* header 1 extra word back from here */
+	addi reg_CODE,reg_CODE,-(SIMPLE_FUN_CODE_OFFSET+4)
 	
 	twllei reg_ZERO,trap_Cerror
 	.byte 4
@@ -562,6 +563,7 @@ CSYMBOL(closure_tramp):
 	.long SIMPLE_FUN_HEADER_WIDETAG
 CSYMBOL(funcallable_instance_tramp) = . + 1
 	.long CSYMBOL(funcallable_instance_tramp)
+	.long NIL
 	.long NIL
 	.long NIL
 	.long NIL

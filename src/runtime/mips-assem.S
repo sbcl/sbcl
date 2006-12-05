@@ -374,13 +374,14 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	.word   NIL /* name */
 	.word	NIL /* arglist */
 	.word	NIL /* type */
+	.word	NIL /* xrefs */
 	LEAF(undefined_tramp)
 	/* Point reg_CODE to the header and tag it as function, since
 	   the debugger regards a function pointer in reg_CODE which
 	   doesn't point to a code object as undefined function.  */
 	lui	reg_CODE, %hi(undefined_tramp)
 	addiu	reg_CODE, %lo(undefined_tramp)
-	addiu	reg_CODE, - 24 + FUN_POINTER_LOWTAG
+	addiu	reg_CODE, -SIMPLE_FUN_CODE_OFFSET
 	.set	noreorder
 	b	1f
 	 break	0x0, trap_Cerror
@@ -413,6 +414,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	.word   NIL /* name */
 	.word	NIL /* arglist */
 	.word	NIL /* type */
+	.word	NIL /* xrefs */
 	LEAF(closure_tramp)
         lw	reg_LEXENV, FDEFN_FUN_OFFSET(reg_FDEFN)
         lw	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
@@ -428,6 +430,7 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	.word	SIMPLE_FUN_HEADER_WIDETAG
 funcallable_instance_tramp = . + 1
 	.word	funcallable_instance_tramp
+	.word	NIL
 	.word	NIL
 	.word	NIL
 	.word	NIL
