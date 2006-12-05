@@ -1363,7 +1363,7 @@
       ;; Check to see whether there are no args, and just return NIL if so.
       (inst mov result nil-value)
       (inst jecxz done)
-      (inst lea dst (make-ea :dword :index ecx :scale 2))
+      (inst lea dst (make-ea :dword :base ecx :index ecx))
       (maybe-pseudo-atomic stack-allocate-p
        (allocation dst dst node stack-allocate-p)
        (inst lea dst (make-ea :byte :base dst :disp list-pointer-lowtag))
