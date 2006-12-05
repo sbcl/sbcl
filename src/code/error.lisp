@@ -166,9 +166,7 @@
          (print-unreadable-object (condition stream))))))
 
 (define-condition memory-fault-error (error)
-  ()
+  ((address :initarg :address :reader memory-fault-error-address))
   (:report
    (lambda (condition stream)
-     (declare (ignore condition))
-     (format stream "memory fault"))))
-
+     (format stream "Memory fault in address #x~X" (memory-fault-error-address condition)))))

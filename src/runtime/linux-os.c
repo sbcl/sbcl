@@ -388,7 +388,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 #endif
         if (!handle_guard_page_triggered(context, addr))
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-            arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
+            lisp_memory_fault_error(context, addr);
 #else
             interrupt_handle_now(signal, info, context);
 #endif

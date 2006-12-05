@@ -207,7 +207,7 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
     if (!gencgc_handle_wp_violation(fault_addr))
         if(!handle_guard_page_triggered(context,fault_addr)) {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-            arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
+            lisp_memory_fault_error(context, fault_addr);
 #else
             if (!interrupt_maybe_gc_int(signal, siginfo, context)) {
                 interrupt_handle_now(signal, siginfo, context);

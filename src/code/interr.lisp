@@ -474,5 +474,8 @@
 (defun undefined-alien-function-error ()
   (error 'undefined-alien-function-error))
 
+(define-alien-variable current-memory-fault-address long)
+
 (defun memory-fault-error ()
-  (error 'memory-fault-error))
+  (error 'memory-fault-error
+         :address current-memory-fault-address))

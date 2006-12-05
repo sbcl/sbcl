@@ -1391,4 +1391,17 @@ siginfo_code(siginfo_t *info)
 {
     return info->si_code;
 }
+os_vm_address_t current_memory_fault_address;
+
+void
+lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
+{
+   /* FIXME: This is lossy: if we get another memory fault (eg. from
+    * another thread) before lisp has read this, we the information.
+    * However, since this is mostly informative, we'll live with that for
+    * now -- some address is better then no address in this case.
+    */
+    current_memory_fault_address = addr;
+    arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
+}
 #endif
