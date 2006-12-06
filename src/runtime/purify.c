@@ -802,7 +802,7 @@ ptrans_code(lispobj thing)
         ((struct simple_fun *)native_pointer(func))->self
             += FUN_RAW_ADDR_OFFSET;
 #endif
-        pscav_later(&((struct simple_fun *)native_pointer(func))->name, 3);
+        pscav_later(&((struct simple_fun *)native_pointer(func))->name, 4);
     }
 
     return result;
@@ -1134,7 +1134,7 @@ pscav_code(struct code*code)
         ((struct simple_fun *)native_pointer(func))->self
             += FUN_RAW_ADDR_OFFSET;
 #endif
-        pscav_later(&((struct simple_fun *)native_pointer(func))->name, 3);
+        pscav_later(&((struct simple_fun *)native_pointer(func))->name, 4);
     }
 
     return CEILING(nwords,2);
