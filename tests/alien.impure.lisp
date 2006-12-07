@@ -185,7 +185,7 @@
 #+win32
 (progn
   (load-shared-object "USER32")
-  (assert 
+  (assert
    (eq :ok
        (handler-case
            (tagbody
@@ -200,7 +200,7 @@
                0 0 0 0)
             up
               (funcall 0))
-         (error () 
+         (error ()
            :ok)))))
 
 ;;; success

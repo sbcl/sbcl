@@ -96,17 +96,25 @@
 (defmacro cache-vector-size (cache-vector)
   `(array-dimension (the simple-vector ,cache-vector) 0))
 
-(defun allocate-cache-vector (size)
-  (make-array size :adjustable nil))
-
 (defmacro cache-vector-lock-count (cache-vector)
   `(cache-vector-ref ,cache-vector 0))
 
 (defun flush-cache-vector-internal (cache-vector)
+  ;; FIXME: To my eye this PCL-LOCK implies we should be holding the
+  ;; lock whenever we play with any cache vector, which doesn't seem
+  ;; to be true. On the other hand that would be too expensive as
+  ;; well, since it would mean serialization across all GFs.
   (with-pcl-lock
     (fill (the simple-vector cache-vector) nil)
     (setf (cache-vector-lock-count cache-vector) 0))
   cache-vector)
+
+;;; Return an empty cache vector
+(defun get-cache-vector (size)
+  (declare (type (and unsigned-byte fixnum) size))
+  (let ((cv (make-array size :initial-element nil)))
+    (setf (cache-vector-lock-count cv) 0)
+    cv))
 
 (defmacro modify-cache (cache-vector &body body)
   `(with-pcl-lock
@@ -116,17 +124,24 @@
          (declare (fixnum old-count))
          (setf (cache-vector-lock-count ,cache-vector)
                (if (= old-count most-positive-fixnum)
-                   1 (the fixnum (1+ old-count))))))))
+                   1
+                   (1+ old-count)))))))
 
 (deftype field-type ()
   '(mod #.layout-clos-hash-length))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defun power-of-two-ceiling (x)
-  (declare (fixnum x))
-  ;;(expt 2 (ceiling (log x 2)))
-  (the fixnum (ash 1 (integer-length (1- x)))))
-) ; EVAL-WHEN
+  (declaim (ftype (function (fixnum) (values (and unsigned-byte fixnum) &optional))
+                  power-of-two-ceiling))
+  (defun power-of-two-ceiling (x)
+    ;; (expt 2 (ceiling (log x 2)))
+    (ash 1 (integer-length (1- x)))))
+
+;;; FIXME: We should probably keep just one of these -- or at least use just
+;;; one.
+(declaim (inline compute-line-size))
+(defun compute-line-size (x)
+  (power-of-two-ceiling x))
 
 (defconstant +nkeys-limit+ 256)
 
@@ -149,13 +164,6 @@
 
 (defmacro cache-lock-count (cache)
   `(cache-vector-lock-count (cache-vector ,cache)))
-
-;;; Return a cache that has had FLUSH-CACHE-VECTOR-INTERNAL called on
-;;; it. This returns a cache of exactly the size requested, it won't
-;;; ever return a larger cache.
-(defun get-cache-vector (size)
-  (flush-cache-vector-internal (make-array size)))
-
 
 ;;;; wrapper cache numbers
 
@@ -216,7 +224,6 @@
   `(%wrapper-instance-slots-layout ,wrapper))
 (defmacro wrapper-class-slots (wrapper)
   `(%wrapper-class-slots ,wrapper))
-(defmacro wrapper-cache-number-vector (x) x)
 
 ;;; This is called in BRAID when we are making wrappers for classes
 ;;; whose slots are not initialized yet, and which may be built-in
@@ -295,15 +302,11 @@
 ;;; comment explaining why the separation is valuable, or to collapse
 ;;; it into a single layer.
 ;;;
-;;; FIXME (?): These are logically inline functions, but they need to
-;;; be SETFable, and for now it seems not worth the trouble to DEFUN
-;;; both inline FOO and inline (SETF FOO) for each one instead of a
-;;; single macro. Perhaps the best thing would be to make them
-;;; immutable (since it seems sort of surprising and gross to be able
-;;; to modify hash values) so that they can become inline functions
-;;; with no muss or fuss. I (WHN) didn't do this only because I didn't
-;;; know whether any code anywhere depends on the values being
-;;; modified.
+;;; Second FIXME deleted from here. Setting the "hash" values is OK:
+;;; that's part of the magic we need to do to obsolete things. The
+;;; hash values are used as indexes to the cache vectors. Nikodemus
+;;; thinks both "layers" should go away, and we should just use the
+;;; LAYOUT-CLOS-HASH directly.
 (defmacro cache-number-vector-ref (cnv n)
   `(wrapper-cache-number-vector-ref ,cnv ,n))
 (defmacro wrapper-cache-number-vector-ref (wrapper n)
@@ -332,6 +335,7 @@
 (defun invalid-wrapper-p (wrapper)
   (not (null (layout-invalid wrapper))))
 
+;;; FIXME: This needs a lock
 (defvar *previous-nwrappers* (make-hash-table))
 
 (defun invalidate-wrapper (owrapper state nwrapper)
@@ -351,15 +355,14 @@
       (setf (cadr previous) nwrapper)
       (push previous new-previous))
 
-    (let ((ocnv (wrapper-cache-number-vector owrapper)))
-      (dotimes (i layout-clos-hash-length)
-        (setf (cache-number-vector-ref ocnv i) 0)))
+    (dotimes (i layout-clos-hash-length)
+      (setf (cache-number-vector-ref owrapper i) 0))
 
     (push (setf (layout-invalid owrapper) (list state nwrapper))
           new-previous)
 
-    (setf (gethash owrapper *previous-nwrappers*) ()
-          (gethash nwrapper *previous-nwrappers*) new-previous)))
+    (remhash owrapper *previous-nwrappers*)
+    (setf (gethash nwrapper *previous-nwrappers*) new-previous)))
 
 (defun check-wrapper-validity (instance)
   (let* ((owrapper (wrapper-of instance))
@@ -453,39 +456,30 @@
     (setf (cache-vector new-cache) new-vector)
     new-cache))
 
-(defun compute-line-size (x)
-  (power-of-two-ceiling x))
-
 (defun compute-cache-parameters (nkeys valuep nlines-or-cache-vector)
   ;;(declare (values cache-mask actual-size line-size nlines))
   (declare (fixnum nkeys))
   (if (= nkeys 1)
       (let* ((line-size (if valuep 2 1))
              (cache-size (if (typep nlines-or-cache-vector 'fixnum)
-                             (the fixnum
-                                  (* line-size
-                                     (the fixnum
-                                          (power-of-two-ceiling
-                                            nlines-or-cache-vector))))
+                             (* line-size
+                                (power-of-two-ceiling nlines-or-cache-vector))
                              (cache-vector-size nlines-or-cache-vector))))
-        (declare (fixnum line-size cache-size))
-        (values (logxor (the fixnum (1- cache-size)) (the fixnum (1- line-size)))
+        (declare (type (and unsigned-byte fixnum) line-size cache-size))
+        (values (logxor (1- cache-size) (1- line-size))
                 cache-size
                 line-size
-                (the (values fixnum t) (floor cache-size line-size))))
+                (floor cache-size line-size)))
       (let* ((line-size (power-of-two-ceiling (if valuep (1+ nkeys) nkeys)))
              (cache-size (if (typep nlines-or-cache-vector 'fixnum)
-                             (the fixnum
-                                  (* line-size
-                                     (the fixnum
-                                          (power-of-two-ceiling
-                                            nlines-or-cache-vector))))
+                             (* line-size
+                                (power-of-two-ceiling nlines-or-cache-vector))
                              (1- (cache-vector-size nlines-or-cache-vector)))))
         (declare (fixnum line-size cache-size))
-        (values (logxor (the fixnum (1- cache-size)) (the fixnum (1- line-size)))
-                (the fixnum (1+ cache-size))
+        (values (logxor (1- cache-size) (1- line-size))
+                (1+ cache-size)
                 line-size
-                (the (values fixnum t) (floor cache-size line-size))))))
+                (floor cache-size line-size)))))
 
 ;;; the various implementations of computing a primary cache location from
 ;;; wrappers. Because some implementations of this must run fast there are
@@ -500,12 +494,12 @@
 ;;; The basic functional version. This is used by the cache miss code to
 ;;; compute the primary location of an entry.
 (defun compute-primary-cache-location (field mask wrappers)
-
   (declare (type field-type field) (fixnum mask))
   (if (not (listp wrappers))
       (logand mask
               (the fixnum (wrapper-cache-number-vector-ref wrappers field)))
-      (let ((location 0) (i 0))
+      (let ((location 0)
+            (i 0))
         (declare (fixnum location i))
         (dolist (wrapper wrappers)
           ;; First add the cache number of this wrapper to location.
@@ -514,8 +508,7 @@
             (declare (fixnum wrapper-cache-number))
             (if (zerop wrapper-cache-number)
                 (return-from compute-primary-cache-location 0)
-                (setq location
-                      (the fixnum (+ location wrapper-cache-number)))))
+                (incf location wrapper-cache-number)))
           ;; Then, if we are working with lots of wrappers, deal with
           ;; the wrapper-cache-number-mask stuff.
           (when (and (not (zerop i))
@@ -523,7 +516,7 @@
             (setq location
                   (logand location wrapper-cache-number-mask)))
           (incf i))
-        (the fixnum (1+ (logand mask location))))))
+        (1+ (logand mask location)))))
 
 ;;; This version is called on a cache line. It fetches the wrappers
 ;;; from the cache line and determines the primary location. Various
@@ -549,13 +542,13 @@
       (let* ((wrapper (cache-vector-ref cache-vector (+ i from-location)))
              (wcn (wrapper-cache-number-vector-ref wrapper field)))
         (declare (fixnum wcn))
-        (setq result (+ result wcn)))
+        (incf result wcn))
       (when (and (not (zerop i))
                  (zerop (mod i wrapper-cache-number-adds-ok)))
         (setq result (logand result wrapper-cache-number-mask))))
     (if (= nkeys 1)
         (logand mask result)
-        (the fixnum (1+ (logand mask result))))))
+        (1+ (logand mask result)))))
 
 ;;;  NIL: means nothing so far, no actual arg info has NILs in the
 ;;;  metatype
@@ -755,7 +748,7 @@
      (labels ((cache () .cache.)
               (nkeys () (cache-nkeys .cache.))
               (line-size () (cache-line-size .cache.))
-              (vector () (cache-vector .cache.))
+              (c-vector () (cache-vector .cache.))
               (valuep () (cache-valuep .cache.))
               (nlines () (cache-nlines .cache.))
               (max-location () (cache-max-location .cache.))
@@ -816,9 +809,9 @@
               (location-wrappers (location) ; avoid multiplies caused by line-location
                 (declare (fixnum location))
                 (if (= (nkeys) 1)
-                    (cache-vector-ref (vector) location)
+                    (cache-vector-ref (c-vector) location)
                     (let ((list (make-list (nkeys)))
-                          (vector (vector)))
+                          (vector (c-vector)))
                       (declare (simple-vector vector))
                       (dotimes (i (nkeys) list)
                         (declare (fixnum i))
@@ -836,7 +829,7 @@
               ;;
               (location-matches-wrappers-p (loc wrappers) ; must not be reserved
                 (declare (fixnum loc))
-                (let ((cache-vector (vector)))
+                (let ((cache-vector (c-vector)))
                   (declare (simple-vector cache-vector))
                   (if (= (nkeys) 1)
                       (eq wrappers (cache-vector-ref cache-vector loc))
@@ -858,14 +851,14 @@
               (location-value (loc)
                 (declare (fixnum loc))
                 (and (valuep)
-                     (cache-vector-ref (vector) (+ loc (nkeys)))))
+                     (cache-vector-ref (c-vector) (+ loc (nkeys)))))
               ;;
               ;; Given a line number, return true IFF that line has data in
               ;; it.  The state of the wrappers stored in the line is not
               ;; checked.  An error is signalled if line is reserved.
               (line-full-p (line)
                 (when (line-reserved-p line) (error "Line is reserved."))
-                (not (null (cache-vector-ref (vector) (line-location line)))))
+                (not (null (cache-vector-ref (c-vector) (line-location line)))))
               ;;
               ;; Given a line number, return true IFF the line is full and
               ;; there are no invalid wrappers in the line, and the line's
@@ -879,7 +872,7 @@
               ;;
               (location-valid-p (loc wrappers)
                 (declare (fixnum loc))
-                (let ((cache-vector (vector))
+                (let ((cache-vector (c-vector))
                       (wrappers-mismatch-p (null wrappers)))
                   (declare (simple-vector cache-vector))
                   (dotimes (i (nkeys) wrappers-mismatch-p)
@@ -938,7 +931,7 @@
                 (declare (fixnum line))
                 (compute-primary-cache-location-from-location
                  (cache) (line-location line))))
-       (declare (ignorable #'cache #'nkeys #'line-size #'vector #'valuep
+       (declare (ignorable #'cache #'nkeys #'line-size #'c-vector #'valuep
                            #'nlines #'max-location #'limit-fn #'size
                            #'mask #'field #'overflow #'line-reserved-p
                            #'location-reserved-p #'line-location
@@ -1034,7 +1027,7 @@
         (unless (or (line-reserved-p i) (not (line-valid-p i nil)))
           (let ((value (funcall function (line-wrappers i) (line-value i))))
             (when set-p
-              (setf (cache-vector-ref (vector) (+ (line-location i) (nkeys)))
+              (setf (cache-vector-ref (c-vector) (+ (line-location i) (nkeys)))
                     value)))))
       (dolist (entry (overflow))
         (let ((value (funcall function (car entry) (cdr entry))))
@@ -1084,7 +1077,7 @@
             (when (line-reserved-p line)
               (error "attempt to fill a reserved line"))
             (let ((loc (line-location line))
-                  (cache-vector (vector)))
+                  (cache-vector (c-vector)))
               (declare (fixnum loc) (simple-vector cache-vector))
               (cond ((= (nkeys) 1)
                      (setf (cache-vector-ref cache-vector loc) wrappers)
@@ -1116,7 +1109,7 @@
                   (cache-overflow cache)))
           ;;(transfer-line from-cache-vector from-line cache-vector free)
           (let ((from-cache-vector (cache-vector from-cache))
-                (to-cache-vector (vector))
+                (to-cache-vector (c-vector))
                 (to-line free))
             (declare (fixnum to-line))
             (if (line-reserved-p to-line)
@@ -1246,7 +1239,7 @@
          ;;Copy from line to dline (dline is known to be free).
          (let ((from-loc (line-location line))
                (to-loc (line-location dline))
-               (cache-vector (vector)))
+               (cache-vector (c-vector)))
            (declare (fixnum from-loc to-loc) (simple-vector cache-vector))
            (modify-cache cache-vector
                          (dotimes-fixnum (i (line-size))
@@ -1264,4 +1257,3 @@
     ((1 2 4) 1)
     ((8 16)  4)
     (otherwise 6)))
-
