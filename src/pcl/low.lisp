@@ -67,7 +67,6 @@
                       ;; to find out, I just overrode the LAYOUT
                       ;; default here. -- WHN 19991204
                       (invalid nil))
-            (:conc-name %wrapper-)
             (:constructor make-wrapper-internal)
             (:copier nil))
   (instance-slots-layout nil :type list)

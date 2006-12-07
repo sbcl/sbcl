@@ -243,11 +243,7 @@
              (declare (ignorable #'%no-primary-method #'%invalid-qualifiers))
              ,effective-method)))
         (mc-args-p
-         (let* ((required
-                 ;; FIXME: Ick. Shared idiom, too, with stuff in cache.lisp
-                 (let (req)
-                   (dotimes (i (length metatypes) (nreverse req))
-                     (push (dfun-arg-symbol i) req))))
+         (let* ((required (make-dfun-required-args metatypes))
                 (gf-args (if applyp
                              `(list* ,@required
                                      (sb-c::%listify-rest-args

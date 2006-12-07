@@ -468,7 +468,7 @@
              (go ,miss-label))))
     (class
      (when slot (error "can't do a slot reg for this metatype"))
-     `(wrapper-of-macro ,argument))
+     `(wrapper-of ,argument))
     ((built-in-instance structure-instance)
      (when slot (error "can't do a slot reg for this metatype"))
      `(built-in-or-structure-wrapper

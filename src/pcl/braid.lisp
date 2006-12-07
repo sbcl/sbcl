@@ -516,16 +516,12 @@
                                        (cons name cpl)
                                        wrapper prototype))))))
 
-(defmacro wrapper-of-macro (x)
-  `(layout-of ,x))
-
-(defun class-of (x)
-  (wrapper-class* (wrapper-of-macro x)))
-
-;;; FIXME: We probably don't need both WRAPPER-OF and WRAPPER-OF-MACRO.
 #-sb-fluid (declaim (inline wrapper-of))
 (defun wrapper-of (x)
-  (wrapper-of-macro x))
+  (layout-of x))
+
+(defun class-of (x)
+  (wrapper-class* (wrapper-of x)))
 
 (defun eval-form (form)
   (lambda () (eval form)))

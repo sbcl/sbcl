@@ -124,14 +124,14 @@
          (declare (fixnum old-count))
          (setf (cache-vector-lock-count ,cache-vector)
                (if (= old-count most-positive-fixnum)
-                   1
+                   1 
                    (1+ old-count)))))))
 
 (deftype field-type ()
   '(mod #.layout-clos-hash-length))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (declaim (ftype (function (fixnum) (values (and unsigned-byte fixnum) &optional))
+  (declaim (ftype (function (fixnum) (values (and unsigned-byte fixnum) &optional)) 
                   power-of-two-ceiling))
   (defun power-of-two-ceiling (x)
     ;; (expt 2 (ceiling (log x 2)))
@@ -161,9 +161,6 @@
   (overflow nil :type list))
 
 #-sb-fluid (declaim (sb-ext:freeze-type cache))
-
-(defmacro cache-lock-count (cache)
-  `(cache-vector-lock-count (cache-vector ,cache)))
 
 ;;;; wrapper cache numbers
 
@@ -218,12 +215,6 @@
   `(classoid-pcl-class (layout-classoid ,wrapper)))
 (defmacro wrapper-no-of-instance-slots (wrapper)
   `(layout-length ,wrapper))
-
-;;; FIXME: Why are these macros?
-(defmacro wrapper-instance-slots-layout (wrapper)
-  `(%wrapper-instance-slots-layout ,wrapper))
-(defmacro wrapper-class-slots (wrapper)
-  `(%wrapper-class-slots ,wrapper))
 
 ;;; This is called in BRAID when we are making wrappers for classes
 ;;; whose slots are not initialized yet, and which may be built-in
@@ -357,7 +348,8 @@
 
     (dotimes (i layout-clos-hash-length)
       (setf (cache-number-vector-ref owrapper i) 0))
-
+    ;; FIXME: We could save a whopping cons by using (STATE . WRAPPER)
+    ;; instead
     (push (setf (layout-invalid owrapper) (list state nwrapper))
           new-previous)
 
@@ -461,20 +453,24 @@
   (declare (fixnum nkeys))
   (if (= nkeys 1)
       (let* ((line-size (if valuep 2 1))
-             (cache-size (if (typep nlines-or-cache-vector 'fixnum)
-                             (* line-size
-                                (power-of-two-ceiling nlines-or-cache-vector))
-                             (cache-vector-size nlines-or-cache-vector))))
+             (cache-size (etypecase nlines-or-cache-vector
+                           (fixnum
+                            (* line-size
+                               (power-of-two-ceiling nlines-or-cache-vector)))
+                           (vector
+                            (cache-vector-size nlines-or-cache-vector)))))
         (declare (type (and unsigned-byte fixnum) line-size cache-size))
         (values (logxor (1- cache-size) (1- line-size))
                 cache-size
                 line-size
                 (floor cache-size line-size)))
       (let* ((line-size (power-of-two-ceiling (if valuep (1+ nkeys) nkeys)))
-             (cache-size (if (typep nlines-or-cache-vector 'fixnum)
-                             (* line-size
-                                (power-of-two-ceiling nlines-or-cache-vector))
-                             (1- (cache-vector-size nlines-or-cache-vector)))))
+             (cache-size (etypecase nlines-or-cache-vector
+                           (fixnum
+                            (* line-size
+                                (power-of-two-ceiling nlines-or-cache-vector)))
+                           (vector
+                             (1- (cache-vector-size nlines-or-cache-vector))))))
         (declare (fixnum line-size cache-size))
         (values (logxor (1- cache-size) (1- line-size))
                 (1+ cache-size)
@@ -496,9 +492,9 @@
 (defun compute-primary-cache-location (field mask wrappers)
   (declare (type field-type field) (fixnum mask))
   (if (not (listp wrappers))
-      (logand mask
+      (logand mask 
               (the fixnum (wrapper-cache-number-vector-ref wrappers field)))
-      (let ((location 0)
+      (let ((location 0) 
             (i 0))
         (declare (fixnum location i))
         (dolist (wrapper wrappers)
@@ -541,7 +537,7 @@
     (dotimes-fixnum (i nkeys)
       (let* ((wrapper (cache-vector-ref cache-vector (+ i from-location)))
              (wcn (wrapper-cache-number-vector-ref wrapper field)))
-        (declare (fixnum wcn))
+        (declare (fixnum wcn))        
         (incf result wcn))
       (when (and (not (zerop i))
                  (zerop (mod i wrapper-cache-number-adds-ok)))
@@ -654,53 +650,51 @@
 ;;;; symbols because we don't capture any user code in the scope in which
 ;;;; these symbols are bound.
 
+(declaim (list *dfun-arg-symbols*))
 (defvar *dfun-arg-symbols* '(.ARG0. .ARG1. .ARG2. .ARG3.))
 
 (defun dfun-arg-symbol (arg-number)
-  (or (nth arg-number (the list *dfun-arg-symbols*))
+  (or (nth arg-number *dfun-arg-symbols*)
       (format-symbol *pcl-package* ".ARG~A." arg-number)))
 
+(declaim (list *slot-vector-symbols*))
 (defvar *slot-vector-symbols* '(.SLOTS0. .SLOTS1. .SLOTS2. .SLOTS3.))
 
 (defun slot-vector-symbol (arg-number)
-  (or (nth arg-number (the list *slot-vector-symbols*))
+  (or (nth arg-number *slot-vector-symbols*)
       (format-symbol *pcl-package* ".SLOTS~A." arg-number)))
 
-;; FIXME: There ought to be a good way to factor out the idiom:
-;;
-;; (dotimes (i (length metatypes))
-;;   (push (dfun-arg-symbol i) lambda-list))
-;;
-;; used in the following four functions into common code that we can
-;; declare inline or something.  --njf 2001-12-20
+(declaim (inline make-dfun-required-args))
+(defun make-dfun-required-args (metatypes)
+  ;; Micro-optimizations 'R Us
+  (labels ((rec (types i)
+             (declare (fixnum i))
+             (when types
+               (cons (dfun-arg-symbol i)
+                     (rec (cdr types) (1+ i))))))
+    (rec metatypes 0)))
+
 (defun make-dfun-lambda-list (metatypes applyp)
-  (let ((lambda-list nil))
-    (dotimes (i (length metatypes))
-      (push (dfun-arg-symbol i) lambda-list))
-    (when applyp
-      ;; Use &MORE arguments to avoid consing up an &REST list that we
-      ;; might not need at all. See MAKE-EMF-CALL and
-      ;; INVOKE-EFFECTIVE-METHOD-FUNCTION for the other pieces.
-      (push '&more lambda-list)
-      (push '.dfun-more-context. lambda-list)
-      (push '.dfun-more-count. lambda-list))
-    (nreverse lambda-list)))
+  (let ((required (make-dfun-required-args metatypes)))
+    (if applyp 
+        (nconc required
+               ;; Use &MORE arguments to avoid consing up an &REST list
+               ;; that we might not need at all. See MAKE-EMF-CALL and
+               ;; INVOKE-EFFECTIVE-METHOD-FUNCTION for the other
+               ;; pieces.
+               '(&more .dfun-more-context. .dfun-more-count.))
+      required)))
 
 (defun make-dlap-lambda-list (metatypes applyp)
-  (let ((args nil)
-        (lambda-list nil))
-    (dotimes (i (length metatypes))
-      (push (dfun-arg-symbol i) args)
-      (push (dfun-arg-symbol i) lambda-list))
-    (when applyp
-      (push '&more lambda-list)
-      (push '.more-context. lambda-list)
-      (push '.more-count. lambda-list))
+  (let* ((required (make-dfun-required-args metatypes))
+         (lambda-list (if applyp 
+                          (append required '(&more .more-context. .more-count.))
+                          required)))
     ;; Return the full lambda list, the required arguments, a form
     ;; that will generate a rest-list, and a list of the &MORE
     ;; parameters used.
-    (values (nreverse lambda-list)
-            (nreverse args)
+    (values lambda-list
+            required
             (when applyp
               '((sb-c::%listify-rest-args
                  .more-context.
@@ -710,11 +704,7 @@
               '(.more-context. .more-count.)))))
 
 (defun make-emf-call (metatypes applyp fn-variable &optional emf-type)
-  (let ((required
-         (let ((required nil))
-           (dotimes (i (length metatypes))
-             (push (dfun-arg-symbol i) required))
-           (nreverse required))))
+  (let ((required (make-dfun-required-args metatypes)))
     `(,(if (eq emf-type 'fast-method-call)
            'invoke-effective-method-function-fast
            'invoke-effective-method-function)
@@ -735,11 +725,8 @@
                     '(.dfun-more-context. .dfun-more-count.)))))
 
 (defun make-fast-method-call-lambda-list (metatypes applyp)
-  (let ((lambda-list (make-dfun-lambda-list metatypes applyp)))
-    ;; Reverse order
-    (push '.next-method-call. lambda-list)
-    (push '.pv-cell. lambda-list)
-    lambda-list))
+  (list* '.pv-cell. '.next-method-call.
+         (make-dfun-lambda-list metatypes applyp)))
 
 
 (defmacro with-local-cache-functions ((cache) &body body)
@@ -964,7 +951,6 @@
 (defun fill-cache (cache wrappers value)
   ;; FILL-CACHE won't return if WRAPPERS is nil, might as well check..
   (aver wrappers)
-
   (or (fill-cache-p nil cache wrappers value)
       (and (< (ceiling (* (cache-count cache) *cache-expand-threshold*))
               (if (= (cache-nkeys cache) 1)
@@ -1001,7 +987,6 @@
         (setq location (next-location location))))))
 
 (defun probe-cache (cache wrappers &optional default limit-fn)
-  ;;(declare (values value))
   (aver wrappers)
   (with-local-cache-functions (cache)
     (let* ((location (compute-primary-cache-location (field) (mask) wrappers))
@@ -1027,6 +1012,7 @@
         (unless (or (line-reserved-p i) (not (line-valid-p i nil)))
           (let ((value (funcall function (line-wrappers i) (line-value i))))
             (when set-p
+              ;; FIXME: Cache modification: should we not be holding a lock?
               (setf (cache-vector-ref (c-vector) (+ (line-location i) (nkeys)))
                     value)))))
       (dolist (entry (overflow))
@@ -1053,6 +1039,8 @@
           (return t))))))
 
 ;;; returns T or NIL
+;;;
+;;; FIXME: Deceptive name as this has side-effects.
 (defun fill-cache-p (forcep cache wrappers value)
   (with-local-cache-functions (cache)
     (let* ((location (compute-primary-cache-location (field) (mask) wrappers))
@@ -1071,7 +1059,7 @@
           (when (not emptyp)
             (push (cons (line-wrappers free) (line-value free))
                   (cache-overflow cache)))
-          ;;(fill-line free wrappers value)
+          ;; (fill-line free wrappers value)
           (let ((line free))
             (declare (fixnum line))
             (when (line-reserved-p line)
@@ -1079,6 +1067,8 @@
             (let ((loc (line-location line))
                   (cache-vector (c-vector)))
               (declare (fixnum loc) (simple-vector cache-vector))
+              ;; FIXME: Cache modifications: should we not be holding
+              ;; a lock?
               (cond ((= (nkeys) 1)
                      (setf (cache-vector-ref cache-vector loc) wrappers)
                      (when (valuep)
@@ -1094,6 +1084,7 @@
                              value))))
               (maybe-check-cache cache))))))))
 
+;;; FIXME: Deceptive name as this has side-effects
 (defun fill-cache-from-cache-p (forcep cache from-cache from-line)
   (declare (fixnum from-line))
   (with-local-cache-functions (cache)

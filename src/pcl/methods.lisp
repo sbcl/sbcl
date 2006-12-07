@@ -1526,7 +1526,7 @@
          (update-dfun gf dfun cache info))))))
 
 (defmethod (setf class-name) (new-value class)
-  (let ((classoid (%wrapper-classoid (class-wrapper class))))
+  (let ((classoid (wrapper-classoid (class-wrapper class))))
     (if (and new-value (symbolp new-value))
         (setf (classoid-name classoid) new-value)
         (setf (classoid-name classoid) nil)))

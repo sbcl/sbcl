@@ -863,21 +863,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (defvar *new-class* nil)
 
-(defvar *free-hash-tables* (mapcar #'list '(eq equal eql)))
-
-(defmacro with-hash-table ((table test) &body forms)
-  `(let* ((.free. (assoc ',test *free-hash-tables*))
-          (,table (if (cdr .free.)
-                      (pop (cdr .free.))
-                      (make-hash-table :test ',test))))
-     (multiple-value-prog1
-         (progn ,@forms)
-       (clrhash ,table)
-       (push ,table (cdr .free.)))))
-
-(defmacro with-eq-hash-table ((table) &body forms)
-  `(with-hash-table (,table eq) ,@forms))
-
 (defun final-accessor-dfun-type (gf)
   (let ((methods (if (early-gf-p gf)
                      (early-gf-methods gf)
@@ -915,7 +900,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
            'writer))))
 
 (defun make-final-accessor-dfun (gf type &optional classes-list new-class)
-  (with-eq-hash-table (table)
+  (let ((table (make-hash-table :test #'eq)))
     (multiple-value-bind (table all-index first second size no-class-slots-p)
         (make-accessor-table gf type table)
       (if table
@@ -1667,6 +1652,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                     root)))
     nil))
 
+;;; FIXME: Needs a lock.
 (defvar *effective-method-cache* (make-hash-table :test 'eq))
 
 (defun flush-effective-method-cache (generic-function)
