@@ -124,14 +124,14 @@
          (declare (fixnum old-count))
          (setf (cache-vector-lock-count ,cache-vector)
                (if (= old-count most-positive-fixnum)
-                   1 
+                   1
                    (1+ old-count)))))))
 
 (deftype field-type ()
   '(mod #.layout-clos-hash-length))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (declaim (ftype (function (fixnum) (values (and unsigned-byte fixnum) &optional)) 
+  (declaim (ftype (function (fixnum) (values (and unsigned-byte fixnum) &optional))
                   power-of-two-ceiling))
   (defun power-of-two-ceiling (x)
     ;; (expt 2 (ceiling (log x 2)))
@@ -492,9 +492,9 @@
 (defun compute-primary-cache-location (field mask wrappers)
   (declare (type field-type field) (fixnum mask))
   (if (not (listp wrappers))
-      (logand mask 
+      (logand mask
               (the fixnum (wrapper-cache-number-vector-ref wrappers field)))
-      (let ((location 0) 
+      (let ((location 0)
             (i 0))
         (declare (fixnum location i))
         (dolist (wrapper wrappers)
@@ -537,7 +537,7 @@
     (dotimes-fixnum (i nkeys)
       (let* ((wrapper (cache-vector-ref cache-vector (+ i from-location)))
              (wcn (wrapper-cache-number-vector-ref wrapper field)))
-        (declare (fixnum wcn))        
+        (declare (fixnum wcn))
         (incf result wcn))
       (when (and (not (zerop i))
                  (zerop (mod i wrapper-cache-number-adds-ok)))
@@ -676,7 +676,7 @@
 
 (defun make-dfun-lambda-list (metatypes applyp)
   (let ((required (make-dfun-required-args metatypes)))
-    (if applyp 
+    (if applyp
         (nconc required
                ;; Use &MORE arguments to avoid consing up an &REST list
                ;; that we might not need at all. See MAKE-EMF-CALL and
@@ -687,7 +687,7 @@
 
 (defun make-dlap-lambda-list (metatypes applyp)
   (let* ((required (make-dfun-required-args metatypes))
-         (lambda-list (if applyp 
+         (lambda-list (if applyp
                           (append required '(&more .more-context. .more-count.))
                           required)))
     ;; Return the full lambda list, the required arguments, a form
