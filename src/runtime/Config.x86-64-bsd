@@ -1,0 +1,25 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+# configuration stuff shared between various *BSD OSes
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+ASSEM_SRC = x86-64-assem.S
+ARCH_SRC = x86-64-arch.c
+
+OS_SRC = bsd-os.c x86-64-bsd-os.c
+OS_LIBS = # -ldl
+
+CFLAGS += -fno-omit-frame-pointer
+
+GC_SRC = gencgc.c
+
+# Nothing to do for after-grovel-headers.
+.PHONY: after-grovel-headers
+after-grovel-headers:

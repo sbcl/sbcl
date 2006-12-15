@@ -102,6 +102,7 @@ case `uname -m` in
     *86) guessed_sbcl_arch=x86 ;;
     i86pc) guessed_sbcl_arch=x86 ;;
     *x86_64) guessed_sbcl_arch=x86-64 ;;
+    amd64) guessed_sbcl_arch=x86-64 ;;
     [Aa]lpha) guessed_sbcl_arch=alpha ;;
     sparc*) guessed_sbcl_arch=sparc ;;
     sun*) guessed_sbcl_arch=sparc ;;

@@ -31,7 +31,6 @@ typedef vm_size_t os_vm_size_t;
 #endif
 typedef off_t os_vm_offset_t;
 typedef int os_vm_prot_t;
-typedef int os_context_register_t;
 
 #if defined __OpenBSD__
 /* name defined for compatibility between OpenBSD 3.1 sigaltstack(2) and

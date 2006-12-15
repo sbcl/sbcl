@@ -50,7 +50,7 @@ arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
  * want to get to, and on OS, which determines how we get to it.)
  */
 
-int *
+os_context_register_t *
 context_eflags_addr(os_context_t *context)
 {
 #if defined __linux__
@@ -61,7 +61,7 @@ context_eflags_addr(os_context_t *context)
      * instead. */
     return &context->uc_mcontext.gregs[17];
 #elif defined __FreeBSD__
-    return &context->uc_mcontext.mc_eflags;
+    return &context->uc_mcontext.mc_rflags;
 #elif defined __OpenBSD__
     return &context->sc_eflags;
 #else
@@ -106,7 +106,7 @@ void arch_skip_instruction(os_context_t *context)
             break;
 
         default:
-            fprintf(stderr,"[arch_skip_inst invalid code %d\n]\n",code);
+            fprintf(stderr,"[arch_skip_inst invalid code %ld\n]\n",code);
             break;
         }
 
@@ -166,6 +166,11 @@ arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 /* When single stepping, single_stepping holds the original instruction
  * PC location. */
 unsigned int *single_stepping = NULL;
+#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
+unsigned int  single_step_save1;
+unsigned int  single_step_save2;
+unsigned int  single_step_save3;
+#endif
 
 void
 arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
@@ -176,9 +181,24 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     *((char *)pc) = orig_inst & 0xff;
     *((char *)pc + 1) = (orig_inst & 0xff00) >> 8;
 
+#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
+    /* Install helper instructions for the single step:
+     * pushf; or [esp],0x100; popf. */
+    single_step_save1 = *(pc-3);
+    single_step_save2 = *(pc-2);
+    single_step_save3 = *(pc-1);
+    *(pc-3) = 0x9c909090;
+    *(pc-2) = 0x00240c81;
+    *(pc-1) = 0x9d000001;
+#else
     *context_eflags_addr(context) |= 0x100;
+#endif
 
     single_stepping = pc;
+
+#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
+    *os_context_pc_addr(context) = (os_context_register_t)((char *)pc - 9);
+#endif
 }
 
 
@@ -191,10 +211,17 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 
     if (single_stepping && (signal==SIGTRAP))
     {
+#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
+        /* Un-install single step helper instructions. */
+        *(single_stepping-3) = single_step_save1;
+        *(single_stepping-2) = single_step_save2;
+        *(single_stepping-1) = single_step_save3;
+#else
         *context_eflags_addr(context) ^= 0x100;
-
+#endif
         /* Re-install the breakpoint if possible. */
-        if (*os_context_pc_addr(context) == (int)single_stepping + 1) {
+        if ((char *)*os_context_pc_addr(context) ==
+            (char *)single_stepping + 1) {
             fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
         } else {
             *((char *)single_stepping) = BREAKPOINT_INST;       /* x86 INT3 */
@@ -216,7 +243,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
        single-stepping (as far as I can tell) this is somewhat moot,
        but it might be worth either moving this code up or deleting
        the single-stepping code entirely.  -- CSR, 2002-07-15 */
-#ifdef LISP_FEATURE_LINUX
+#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
 #endif
 
@@ -281,6 +308,56 @@ sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
     lose("fake_foreign_function_call fell through");
 }
 
+#ifdef X86_64_SIGFPE_FIXUP
+#define MXCSR_IE (0x01)         /* Invalid Operation */
+#define MXCSR_DE (0x02)         /* Denormal */
+#define MXCSR_ZE (0x04)         /* Devide-by-Zero */
+#define MXCSR_OE (0x08)         /* Overflow */
+#define MXCSR_UE (0x10)         /* Underflow */
+#define MXCSR_PE (0x20)         /* Precision */
+
+static inline int
+mxcsr_to_code(unsigned int mxcsr)
+{
+    /* Extract unmasked exception bits. */
+    mxcsr &= ~(mxcsr >> 7) & 0x3F;
+
+    /* This order is defined at "Intel 64 and IA-32 Architectures
+     * Software Developerfs Manual" Volume 1: "Basic Architecture",
+     * 4.9.2 "Floating-Point Exception Priority". */
+    if (mxcsr & MXCSR_IE)
+        return FPE_FLTINV;
+    else if (mxcsr & MXCSR_ZE)
+        return FPE_FLTDIV;
+    else if (mxcsr & MXCSR_DE)
+        return FPE_FLTUND;
+    else if (mxcsr & MXCSR_OE)
+        return FPE_FLTOVF;
+    else if (mxcsr & MXCSR_UE)
+        return FPE_FLTUND;
+    else if (mxcsr & MXCSR_PE)
+        return FPE_FLTRES;
+
+    return 0;
+}
+
+static void
+sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
+{
+    os_context_t *context = arch_os_get_context(&void_context);
+    unsigned int *mxcsr = arch_os_context_mxcsr_addr(context);
+
+    if (siginfo->si_code == 0) { /* XMM exception */
+        siginfo->si_code = mxcsr_to_code(*mxcsr);
+
+        /* Clear sticky exception flag. */
+        *mxcsr &= ~0x3F;
+    }
+
+    interrupt_handle_now(signal, siginfo, context);
+}
+#endif
+
 void
 arch_install_interrupt_handlers()
 {
@@ -298,6 +375,9 @@ arch_install_interrupt_handlers()
      * why.. -- WHN 2001-06-07 */
     undoably_install_low_level_interrupt_handler(SIGILL , sigill_handler);
     undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
+#ifdef X86_64_SIGFPE_FIXUP
+    undoably_install_low_level_interrupt_handler(SIGFPE, sigfpe_handler);
+#endif
 
     SHOW("returning from arch_install_interrupt_handlers()");
 }

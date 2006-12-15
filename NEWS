@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.1 relative to sbcl-1.0:
+  * new platform: FreeBSD/x86-64, including support for threading.
   * new feature: the compiler stores cross-referencing information
     abount function calls (who-calls), macroexpansion (who-macroexpands)
     and special variables (who-binds, who-sets, who-references) for code

@@ -584,7 +584,6 @@ run_deferred_handler(struct interrupt_data *data, void *v_context) {
      * pending handler before calling it. Trust the handler to finish
      * with the siginfo before enabling interrupts. */
     void (*pending_handler) (int, siginfo_t*, void*)=data->pending_handler;
-    os_context_t *context = arch_os_get_context(&v_context);
 
     data->pending_handler=0;
     (*pending_handler)(data->pending_signal,&(data->pending_info), v_context);

@@ -41,6 +41,9 @@
 #include <signal.h>
 /* #include <sys/sysinfo.h> */
 #include "validate.h"
+#if defined LISP_FEATURE_GENCGC
+#include "gencgc-internal.h"
+#endif
 
 os_vm_size_t os_vm_page_size;
 
@@ -55,7 +58,6 @@ static void netbsd_init();
 
 #ifdef __FreeBSD__
 #include <sys/sysctl.h>
-#include <osreldate.h>
 
 static void freebsd_init();
 #endif /* __FreeBSD__ */
@@ -71,23 +73,6 @@ os_init(char *argv[], char *envp[])
 #ifdef __FreeBSD__
     freebsd_init();
 #endif /* __FreeBSD__ */
-}
-
-int *os_context_pc_addr(os_context_t *context)
-{
-#if defined __FreeBSD__
-    return CONTEXT_ADDR_FROM_STEM(eip);
-#elif defined __OpenBSD__
-    return CONTEXT_ADDR_FROM_STEM(pc);
-#elif defined __NetBSD__
-    return CONTEXT_ADDR_FROM_STEM(EIP);
-#elif defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
-    return CONTEXT_ADDR_FROM_STEM(eip);
-#elif defined LISP_FEATURE_DARWIN
-    return &context->uc_mcontext->ss.srr0;
-#else
-#error unsupported BSD variant
-#endif
 }
 
 sigset_t *
@@ -172,9 +157,11 @@ is_valid_lisp_addr(os_vm_address_t addr)
        in_range_p(addr, DYNAMIC_SPACE_START  , dynamic_space_size))
         return 1;
     for_each_thread(th) {
-        if((th->control_stack_start <= addr) && (addr < th->control_stack_end))
+        if(((os_vm_address_t)th->control_stack_start <= addr) &&
+           (addr < (os_vm_address_t)th->control_stack_end))
             return 1;
-        if(in_range_p(addr, th->binding_stack_start, BINDING_STACK_SIZE))
+        if(in_range_p(addr, (lispobj)th->binding_stack_start,
+                      BINDING_STACK_SIZE))
             return 1;
     }
     return 0;
@@ -191,10 +178,20 @@ is_valid_lisp_addr(os_vm_address_t addr)
  * page fault on this OS.
  */
 static void
-memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
+memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context
+#if defined(LISP_FEATURE_FREEBSD) && defined(LISP_FEATURE_X86_64)
+/* FreeBSD/amd64 stores fault address only in undocumented 4th arg. */
+                     ,void *fault_addr
+#endif
+    )
 {
     os_context_t *context = arch_os_get_context(&void_context);
+#if defined(LISP_FEATURE_FREEBSD) && defined(LISP_FEATURE_X86_64)
+    /* KLUDGE: Store fault address into si_addr for compatibilities. */
+    siginfo->si_addr = fault_addr;
+#else
     void *fault_addr = arch_get_bad_addr(signal, siginfo, context);
+#endif
 
 #if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in memory_fault_handler\n",
@@ -202,7 +199,7 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
     os_restore_tls_segment_register(context);
 #endif
 
-    FSHOW((stderr, "Memory fault at: %p, PC: %x\n", fault_addr, *os_context_pc_addr(context)));
+    FSHOW((stderr, "Memory fault at: %p, PC: %p\n", fault_addr, *os_context_pc_addr(context)));
 
     if (!gencgc_handle_wp_violation(fault_addr))
         if(!handle_guard_page_triggered(context,fault_addr)) {
@@ -225,9 +222,15 @@ os_install_interrupt_handlers(void)
 {
     SHOW("os_install_interrupt_handlers()/bsd-os/defined(GENCGC)");
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
+#ifdef LISP_FEATURE_FREEBSD
+                                                 (__siginfohandler_t *)
+#endif
                                                  memory_fault_handler);
 #ifdef SIG_MEMORY_FAULT2
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT2,
+#ifdef LISP_FEATURE_FREEBSD
+                                                 (__siginfohandler_t *)
+#endif
                                                  memory_fault_handler);
 #endif
 
@@ -362,6 +365,8 @@ static void freebsd_init()
 #ifndef KERN_PROC_PATHNAME
 #define KERN_PROC_PATHNAME 12
 #endif
+
+extern int getosreldate(void);
 
 char *
 os_get_runtime_executable_path()

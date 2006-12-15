@@ -1,0 +1,26 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+include Config.x86-64-bsd
+
+ASSEM_SRC += ldso-stubs.S
+
+# Until sbcl-0.6.7.3, we used "LINKFLAGS+=-static" here, which
+# worked fine for most things, but LOAD-FOREIGN & friends require
+# dlopen() etc., which in turn depend on dynamic linking of the
+# runtime.
+LINKFLAGS += -dynamic -export-dynamic
+
+# use libthr (1:1 threading).  libpthread (m:n threading) does not work.
+ifdef LISP_FEATURE_SB_THREAD
+  #OS_LIBS += -lpthread
+  OS_LIBS += -lthr
+endif

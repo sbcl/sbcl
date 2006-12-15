@@ -107,7 +107,7 @@ lose:
 }
 
 static void
-process_directory(int fd, u32 *ptr, int count, os_vm_offset_t file_offset)
+process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
 {
     struct ndir_entry *entry;
 
