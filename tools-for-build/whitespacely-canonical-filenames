@@ -15,7 +15,11 @@ source_extensions='.lisp .lisp-expr .c .h'
 #   ?
 
 for source_extension in $source_extensions; do 
-    find . -name _darcs -prune -o \
-           -name '{arch}' -prune -o \
+    find . \( \
+            -name _darcs -o \
+            -name '{arch}' -o \
+            -name CVS -o \
+            -name .hg -o \
+            -name .svn \) -type d -prune -o \
            -name '*'$source_extension -print
 done

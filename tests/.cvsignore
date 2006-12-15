@@ -3,3 +3,4 @@ external-format-test.txt
 stack-alignment-offset
 test-status.lisp-expr
 run-program-ed-test.tmp
+threads-foreign.c

@@ -7,3 +7,4 @@ local-target-features.lisp-expr
 TAGS
 .svn
 .gdbinit
+.hg

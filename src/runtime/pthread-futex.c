@@ -174,7 +174,7 @@ futex_cleanup(void *p)
 {
     struct futex *futex = (struct futex *)p;
     int ret, count;
- 
+
     ret = pthread_mutex_lock(&futex_lock);
     futex_assert(ret == 0);
 
