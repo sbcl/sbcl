@@ -16,28 +16,44 @@
     ((open-p :initform t
              :accessor stream-open-p))
     #+sb-doc
-    (:documentation "the base class for all CLOS streams")))
+    (:documentation "the base class for all Gray streams")))
 
 ;;; Define the stream classes.
-(defclass fundamental-input-stream (fundamental-stream) nil)
+(defclass fundamental-input-stream (fundamental-stream) nil
+  #+sb-doc
+  (:documentation "a superclass of all Gray input streams"))
 
-(defclass fundamental-output-stream (fundamental-stream) nil)
+(defclass fundamental-output-stream (fundamental-stream) nil
+  #+sb-doc
+  (:documentation "a superclass of all Gray output streams"))
 
-(defclass fundamental-character-stream (fundamental-stream) nil)
+(defclass fundamental-character-stream (fundamental-stream) nil
+  #+sb-doc
+  (:documentation "a superclass of all Gray streams whose element-type is a subtype of character"))
 
-(defclass fundamental-binary-stream (fundamental-stream) nil)
+(defclass fundamental-binary-stream (fundamental-stream) nil
+  #+sb-doc
+  (:documentation "a superclass of all Gray streams whose element-type is a subtype of unsigned-byte or signed-byte"))
 
 (defclass fundamental-character-input-stream
-    (fundamental-input-stream fundamental-character-stream) nil)
+    (fundamental-input-stream fundamental-character-stream) nil
+  #+sb-doc
+  (:documentation "a superclass of all Gray input streams whose element-type is a subtype of character"))
 
 (defclass fundamental-character-output-stream
-    (fundamental-output-stream fundamental-character-stream) nil)
+    (fundamental-output-stream fundamental-character-stream) nil
+  #+sb-doc
+  (:documentation "a superclass of all Gray output streams whose element-type is a subtype of character"))
 
 (defclass fundamental-binary-input-stream
-    (fundamental-input-stream fundamental-binary-stream) nil)
+    (fundamental-input-stream fundamental-binary-stream) nil
+  #+sb-doc
+  (:documentation "a superclass of all Gray input streams whose element-type is a subtype of unsigned-byte or signed-byte"))
 
 (defclass fundamental-binary-output-stream
-    (fundamental-output-stream fundamental-binary-stream) nil)
+    (fundamental-output-stream fundamental-binary-stream) nil
+    #+sb-doc
+  (:documentation "a superclass of all Gray output streams whose element-type is a subtype of unsigned-byte or signed-byte"))
 
 ;;; This is not in the Gray stream proposal, so it is left here
 ;;; as example code.

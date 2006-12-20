@@ -46,29 +46,127 @@ fast path through @code{read-char}.
 @node Gray Streams
 @section Gray Streams
 
+
+The Gray Streams interface is a widely supported extension that
+provides for definition of CLOS-extensible stream classes.  Gray
+stream classes are implemented by adding methods to generic functions
+analogous to Common Lisp's standard I/O functions.  Instances of Gray
+stream classes may be used with any I/O operation where a non-Gray
+stream can, provided that all required methods have been implemented
+suitably.
+
+@menu
+* Gray Streams classes::
+* Methods common to all streams::
+* Input stream methods::
+* Output stream methods::
+* Binary stream methods::
+* Character input stream methods::
+* Character output stream methods::
+* Gray Streams examples::
+@end menu
+
+@node Gray Streams classes
+@subsection Gray Streams classes
+
+The defined Gray Stream classes are these:
+
 @include class-sb-gray-fundamental-stream.texinfo
-@include fun-sb-gray-stream-advance-to-column.texinfo
+@include class-sb-gray-fundamental-input-stream.texinfo
+
+@noindent
+The function input-stream-p will return true of any generalized
+instance of fundamental-input-stream.
+
+@include class-sb-gray-fundamental-output-stream.texinfo
+
+@noindent
+The function output-stream-p will return true of any generalized
+instance of fundamental-output-stream.
+
+@include class-sb-gray-fundamental-binary-stream.texinfo
+
+@noindent
+Note that instantiable subclasses of fundamental-binary-stream should
+provide (or inherit) an applicable method for the generic function
+stream-element-type.
+
+@include class-sb-gray-fundamental-character-stream.texinfo
+@include class-sb-gray-fundamental-binary-input-stream.texinfo
+@include class-sb-gray-fundamental-binary-output-stream.texinfo
+@include class-sb-gray-fundamental-character-input-stream.texinfo
+@include class-sb-gray-fundamental-character-output-stream.texinfo
+
+@node Methods common to all streams
+@subsection Methods common to all streams
+
+These generic functions can be specialized on any generalized instance
+of fundamental-stream.
+
+@include fun-common-lisp-stream-element-type.texinfo
+@include fun-common-lisp-close.texinfo
+
+
+
+
+@node Input stream methods
+@subsection Input stream methods
+
+These generic functions may be specialized on any generalized instance
+of fundamental-input-stream.
+
 @include fun-sb-gray-stream-clear-input.texinfo
-@include fun-sb-gray-stream-clear-output.texinfo
-@include fun-sb-gray-stream-finish-output.texinfo
-@include fun-sb-gray-stream-force-output.texinfo
-@include fun-sb-gray-stream-fresh-line.texinfo
-@include fun-sb-gray-stream-line-column.texinfo
-@include fun-sb-gray-stream-line-length.texinfo
-@include fun-sb-gray-stream-listen.texinfo
+@include fun-sb-gray-stream-read-sequence.texinfo
+
+@node Character input stream methods
+@subsection Character input stream methods
+
+These generic functions are used to implement subclasses of
+fundamental-input-stream:
+
 @include fun-sb-gray-stream-peek-char.texinfo
-@include fun-sb-gray-stream-read-byte.texinfo
 @include fun-sb-gray-stream-read-char-no-hang.texinfo
 @include fun-sb-gray-stream-read-char.texinfo
 @include fun-sb-gray-stream-read-line.texinfo
-@include fun-sb-gray-stream-read-sequence.texinfo
+@include fun-sb-gray-stream-listen.texinfo
+@include fun-sb-gray-stream-unread-char.texinfo
+
+@node Output stream methods
+@subsection Output stream methods
+
+These generic functions are used to implement subclasses of
+fundamental-output-stream:
+
+@include fun-sb-gray-stream-clear-output.texinfo
+@include fun-sb-gray-stream-finish-output.texinfo
+@include fun-sb-gray-stream-force-output.texinfo
+@include fun-sb-gray-stream-write-sequence.texinfo
+
+@node Binary stream methods
+@subsection Binary stream methods
+
+The following generic functions are available for subclasses of
+fundamental-binary-stream:
+
+@include fun-sb-gray-stream-read-byte.texinfo
+@include fun-sb-gray-stream-write-byte.texinfo
+
+@node Character output stream methods
+@subsection Character output stream methods
+
+These generic functions are used to implement subclasses of
+fundamental-character-output-stream:
+
+@include fun-sb-gray-stream-advance-to-column.texinfo
+@include fun-sb-gray-stream-fresh-line.texinfo
+@include fun-sb-gray-stream-line-column.texinfo
+@include fun-sb-gray-stream-line-length.texinfo
 @include fun-sb-gray-stream-start-line-p.texinfo
 @include fun-sb-gray-stream-terpri.texinfo
-@include fun-sb-gray-stream-unread-char.texinfo
-@include fun-sb-gray-stream-write-byte.texinfo
 @include fun-sb-gray-stream-write-char.texinfo
-@include fun-sb-gray-stream-write-sequence.texinfo
 @include fun-sb-gray-stream-write-string.texinfo
+
+@include gray-streams-examples.texinfo
 
 @node Simple Streams
 @comment  node-name,  next,  previous,  up
