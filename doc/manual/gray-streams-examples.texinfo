@@ -1,0 +1,238 @@
+@node Gray Streams examples
+@subsection Gray Streams examples
+
+@macro codew{stuff}
+@code{@w{\stuff\}}
+@end macro
+
+Below are two classes of stream that can be conveniently defined as
+wrappers for Common Lisp streams.  These are meant to serve as
+examples of minimal implementations of the protocols that must be
+followed when defining Gray streams.  Realistic uses of the Gray
+Streams API would implement the various methods that can do I/O in
+batches, such as @codew{stream-read-line}, @codew{stream-write-string},
+@codew{stream-read-sequence}, and @codew{stream-write-sequence}.
+
+
+@menu
+* Character counting input stream::
+* Output prefixing character stream::
+@end menu
+
+@node Character counting input stream
+@subsubsection  Character counting input stream
+
+It is occasionally handy for programs that process input files to
+count the number of characters and lines seen so far, and the number
+of characters seen on the current line, so that useful messages may be
+reported in case of parsing errors, etc.  Here is a character input
+stream class that keeps track of these counts.  Note that all
+character input streams must implement @codew{stream-read-char} and
+@codew{stream-unread-char}.
+
+@lisp
+@group
+(defclass wrapped-stream (fundamental-stream)
+  ((stream :initarg :stream :reader stream-of)))
+@end group
+
+@group
+(defmethod stream-element-type ((stream wrapped-stream))
+  (stream-element-type (stream-of stream)))
+@end group
+
+@group
+(defmethod close ((stream wrapped-stream) &key abort)
+  (close (stream-of stream) :abort abort))
+@end group
+
+@group
+(defclass wrapped-character-input-stream (wrapped-stream)
+  ())
+@end group
+
+@group
+(defmethod stream-read-char ((stream wrapped-character-input-stream))
+  (read-char (stream-of stream)))
+@end group
+
+@group
+(defmethod stream-unread-char ((stream wrapped-character-input-stream)
+                               char)
+  (unread-char char (stream-of stream)))
+@end group
+
+@group
+(defclass counting-character-input-stream
+    (wrapped-character-input-stream)
+  ((char-count :initform 1 :accessor char-count-of)
+   (line-count :initform 1 :accessor line-count-of)
+   (col-count :initform 1 :accessor col-count-of)
+   (prev-col-count :initform 1 :accessor prev-col-count-of)))
+@end group
+
+@group
+(defmethod stream-read-char ((stream counting-character-input-stream))
+  (with-accessors ((inner-stream stream-of) (chars char-count-of)
+                   (lines line-count-of) (cols col-count-of)
+                   (prev prev-col-count-of)) stream
+      (let ((char (call-next-method)))
+        (cond ((eql char :eof)
+               :eof)
+              ((char= char #\Newline)
+               (incf lines)
+               (incf chars)
+               (setf prev cols)
+               (setf cols 1)
+               char)
+              (t
+               (incf chars)
+               (incf cols)
+               char)))))
+@end group
+
+@group
+(defmethod stream-unread-char ((stream counting-character-input-stream)
+                               char)
+  (with-accessors ((inner-stream stream-of) (chars char-count-of)
+                   (lines line-count-of) (cols col-count-of)
+                   (prev prev-col-count-of)) stream
+      (cond ((char= char #\Newline)
+             (decf lines)
+             (decf chars)
+             (setf cols prev))
+            (t
+             (decf chars)
+             (decf cols)
+             char))
+      (call-next-method)))
+@end group
+@end lisp
+
+The default methods for @codew{stream-read-char-no-hang},
+@codew{stream-peek-char}, @codew{stream-listen},
+@codew{stream-clear-input}, @codew{stream-read-line}, and
+@codew{stream-read-sequence} should be sufficient (though the last two
+will probably be slower than methods that forwarded directly).
+
+Here's a sample use of this class:
+
+@lisp
+@group
+(with-input-from-string (input "1 2
+ 3 :foo  ")
+  (let ((counted-stream (make-instance 'counting-character-input-stream
+                         :stream input)))
+    (loop for thing = (read counted-stream) while thing
+       unless (numberp thing) do
+         (error "Non-number ~S (line ~D, column ~D)" thing
+                (line-count-of counted-stream)
+                (- (col-count-of counted-stream) 
+                   (length (format nil "~S" thing))))
+       end
+       do (print thing))))
+@end group
+@verbatim
+1 
+2 
+3
+Non-number :FOO (line 2, column 5)
+  [Condition of type SIMPLE-ERROR]
+@end verbatim
+@end lisp
+
+@node Output prefixing character stream
+@subsubsection Output prefixing character stream
+
+One use for a wrapped output stream might be to prefix each line of
+text with a timestamp, e.g., for a logging stream.  Here's a simple
+stream that does this, though without any fancy line-wrapping.  Note
+that all character output stream classes must implement
+@codew{stream-write-char} and @codew{stream-line-column}.
+
+@lisp
+@group
+(defclass wrapped-stream (fundamental-stream)
+  ((stream :initarg :stream :reader stream-of)))
+@end group
+
+@group
+(defmethod stream-element-type ((stream wrapped-stream))
+  (stream-element-type (stream-of stream)))
+@end group
+
+@group
+(defmethod close ((stream wrapped-stream) &key abort)
+  (close (stream-of stream) :abort abort))
+@end group
+
+@group
+(defclass wrapped-character-output-stream
+    (wrapped-stream fundamental-character-output-stream)
+  ((col-index :initform 0 :accessor col-index-of)))
+@end group
+
+@group
+(defmethod stream-line-column ((stream wrapped-character-output-stream))
+  (col-index-of stream))
+@end group
+
+@group
+(defmethod stream-write-char ((stream wrapped-character-output-stream)
+                              char)
+  (with-accessors ((inner-stream stream-of) (cols col-index-of)) stream
+    (write-char char inner-stream)
+    (if (char= char #\Newline)
+        (setf cols 0)
+        (incf cols))))
+@end group
+
+@group
+(defclass prefixed-character-output-stream
+    (wrapped-character-output-stream)
+  ((prefix :initarg :prefix :reader prefix-of)))
+@end group
+
+@group
+(defgeneric write-prefix (prefix stream)
+  (:method ((prefix string) stream) (write-string prefix stream))
+  (:method ((prefix function) stream) (funcall prefix stream)))
+@end group
+
+@group
+(defmethod stream-write-char ((stream prefixed-character-output-stream)
+                              char)
+  (with-accessors ((inner-stream stream-of) (cols col-index-of)
+                   (prefix prefix-of)) stream
+    (when (zerop cols)
+      (write-prefix prefix inner-stream))
+    (call-next-method)))
+@end group
+@end lisp
+
+As with the example input stream, this implements only the minimal
+protocol.  A production implementation should also provide methods for
+at least @codew{stream-write-line}, @codew{stream-write-sequence}.
+
+And here's a sample use of this class:
+
+@lisp
+@group
+(flet ((format-timestamp (stream)
+         (apply #'format stream "[~2@@*~2,' D:~1@@*~2,'0D:~0@@*~2,'0D] "
+                (multiple-value-list (get-decoded-time)))))
+  (let ((output (make-instance 'prefixed-character-output-stream
+                               :stream *standard-output*
+                               :prefix #'format-timestamp)))
+    (loop for string in '("abc" "def" "ghi") do
+         (write-line string output)
+         (sleep 1))))
+@end group
+@verbatim
+[ 0:30:05] abc
+[ 0:30:06] def
+[ 0:30:07] ghi
+NIL
+@end verbatim
+@end lisp
+@unmacro codew
