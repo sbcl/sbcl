@@ -118,6 +118,12 @@ os_context_lr_addr(os_context_t *context)
     return &context->uc_mcontext->ss.lr;
 }
 
+os_context_register_t *
+os_context_pc_addr(os_context_t *context)
+{
+    return &context->uc_mcontext->ss.srr0;
+}
+
 void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
