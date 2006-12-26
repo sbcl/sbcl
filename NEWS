@@ -41,7 +41,7 @@ changes in sbcl-1.0.1 relative to sbcl-1.0:
        to Alastair Bridgewater)
     ** TRACE :ENCAPSULATE NIL (and function end breakpoints)
        work on Windows.
-    ** Lisp is able to unwind foreing exception frames from alien
+    ** Lisp is able to unwind foreign exception frames from alien
        callbacks. (thanks to Alastair Bridgewater)
 
 changes in sbcl-1.0 relative to sbcl-0.9.18:
