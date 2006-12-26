@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.2 relative to sbcl-1.0.1:
+  * improvement: experimental support for mach exception handling on
+    x86/macos. requires building with :MACH-EXCEPTION-HANDLER feature
+    to use.
+
 changes in sbcl-1.0.1 relative to sbcl-1.0:
   * new platform: FreeBSD/x86-64, including support for threading.
   * new feature: the compiler stores cross-referencing information

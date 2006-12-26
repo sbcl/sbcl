@@ -87,7 +87,7 @@
 (define-call* "dup" int minusp (oldfd file-descriptor))
 (define-call* "dup2" int minusp (oldfd file-descriptor)
               (newfd file-descriptor))
-(define-call* ("lseek" :largefile)
+(define-call* ("lseek" :options :largefile)
     off-t minusp (fd file-descriptor) (offset off-t)
     (whence int))
 (define-call* "mkdir" int minusp (pathname filename) (mode mode-t))
@@ -107,7 +107,7 @@
 (define-call* "rmdir" int minusp (pathname filename))
 (define-call* "unlink" int minusp (pathname filename))
 (define-call "opendir" (* t) null-alien (pathname filename))
-(define-call ("readdir" :largefile) (* dirent)
+(define-call ("readdir" :options :largefile) (* dirent)
   ;; readdir() has the worst error convention in the world.  It's just
   ;; too painful to support.  (return is NULL _and_ errno "unchanged"
   ;; is not an error, it's EOF).
@@ -128,7 +128,7 @@
   (define-call "fchown" int minusp (fd file-descriptor)
              (owner uid-t)  (group gid-t))
   (define-call "fdatasync" int minusp (fd file-descriptor))
-  (define-call ("ftruncate" :largefile)
+  (define-call ("ftruncate" :options :largefile)
       int minusp (fd file-descriptor) (length off-t))
   (define-call "fsync" int minusp (fd file-descriptor))
   (define-call "lchown" int minusp (pathname filename)
@@ -137,7 +137,7 @@
   (define-call "mkfifo" int minusp (pathname filename) (mode mode-t))
   (define-call "symlink" int minusp (oldpath filename) (newpath filename))
   (define-call "sync" void never-fails)
-  (define-call ("truncate" :largefile)
+  (define-call ("truncate" :options :largefile)
       int minusp (pathname filename) (length off-t))
   ;; FIXME: Windows does have _mktemp, which has a slightlty different
   ;; interface
@@ -189,7 +189,25 @@
 
   ;; processes, signals
   (define-call "alarm" int never-fails (seconds unsigned))
+
+
+
+  #+mach-exception-handler
+  (progn
+    ;; FIXME this is a lie, of course this can fail, but there's no
+    ;; error handling here yet!
+    (define-call "setup_mach_exceptions" void never-fails)
+    (define-call ("posix_fork" :c-name "fork") pid-t minusp)
+    (defun fork ()
+      (let ((pid (posix-fork)))
+        (when (= pid 0)
+          (setup-mach-exceptions))
+        pid))
+    (export 'fork :sb-posix))
+
+  #-mach-exception-handler
   (define-call "fork" pid-t minusp)
+
   (define-call "getpgid" pid-t minusp (pid pid-t))
   (define-call "getppid" pid-t never-fails)
   (define-call "getpgrp" pid-t never-fails)
@@ -245,7 +263,7 @@
 ;;; mmap, msync
 #-win32
 (progn
- (define-call ("mmap" :largefile) sb-sys:system-area-pointer
+ (define-call ("mmap" :options :largefile) sb-sys:system-area-pointer
    (lambda (res)
      (= (sb-sys:sap-int res) #.(1- (expt 2 sb-vm::n-machine-word-bits))))
    (addr sap-or-nil) (length unsigned) (prot unsigned)
@@ -312,7 +330,7 @@
         (declare (type (or null (sb-alien:alien (* alien-stat))) stat))
         (with-alien-stat a-stat ()
           (let ((r (alien-funcall
-                    (extern-alien ,(real-c-name (list name :largefile)) ,type)
+                    (extern-alien ,(real-c-name (list name :options :largefile)) ,type)
                     (,designator-fun ,arg)
                     a-stat)))
             (when (minusp r)

@@ -95,3 +95,21 @@ protect_control_stack_return_guard_page(int protect_p) {
                os_vm_page_size,protect_p ?
                (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
 }
+
+/* these OOAO violations are here because with mach exception handlers
+ * we need to protect the stack guard pages from the mach exception
+ * handlers which run on a different thread, so we take a thread
+ * argument here. Too bad we don't have keywords args in C. */
+void
+protect_control_stack_guard_page_thread(int protect_p, struct thread *th) {
+    os_protect(CONTROL_STACK_GUARD_PAGE(th),
+               os_vm_page_size,protect_p ?
+               (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
+}
+
+void
+protect_control_stack_return_guard_page_thread(int protect_p, struct thread* th) {
+    os_protect(CONTROL_STACK_RETURN_GUARD_PAGE(th),
+               os_vm_page_size,protect_p ?
+               (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
+}

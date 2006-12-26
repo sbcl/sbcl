@@ -125,7 +125,7 @@ static sigset_t blockable_sigset;
 void
 check_blockables_blocked_or_lose()
 {
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32)
     /* Get the current sigmask, by blocking the empty set. */
     sigset_t empty,current;
     int i;

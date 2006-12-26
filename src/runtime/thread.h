@@ -144,6 +144,11 @@ static inline struct thread *arch_os_get_current_thread() {
 #endif
 }
 
+#if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
+#define THREAD_STRUCT_TO_EXCEPTION_PORT(th) ((mach_port_t) th)
+#define EXCEPTION_PORT_TO_THREAD_STRUCT(th) ((struct thread *) th)
+#endif
+
 #if defined(LISP_FEATURE_SB_THREAD)
 #define thread_self pthread_self
 #define thread_kill pthread_kill

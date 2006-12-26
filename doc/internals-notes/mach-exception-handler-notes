@@ -1,0 +1,254 @@
+
+MACH EXCEPTION HANDLER NOTES
+Cyrus Harmon, December 2007
+
+The goal of this work is to use make SBCL use mach exception handlers
+instead of so-called BSD-style signal handlers on Mac OS X. Cyrus
+Harmon and Alastair Bridgewater have been working on this.
+
+Mac OS X has a mach-based kernel that has its own API for things like
+threads and exception handling. Both mach exception handlers and
+BSD-style signal handlers are available for use by application
+programmers, but the signal handlers, which are implemented as a
+compatibility layer on top of mach exceptions, have some problems. The
+main problem for SBCL is that when using BSD-style signal handlers to
+respond to SIGSEGV for access to protected memory areas, we cannot use
+gdb to debug the process. This is problematic for SBCL which sets up,
+and reads and writes to, protected memory areas early and
+often. Additionally, threaded builds are seeing a number of problems
+with SIGILLs being thrown at odd times. It appears that these are
+coming from with the OS signal handling libraries directly, so
+debugging these is rather tricky, especially in the absence of a
+debugger. Thirdly, the protected memory accesses can, under certain
+settings, trigger the Mac OS X CrashReporter, either logging
+voluminous messages to a log file or, worse yet, triggering a
+user-intervention dialog.
+
+To address these three problems, we propose replacing the BSD-style
+signal handling facility with a mach exception handling
+facility. Preliminary tests with mach exceptions show that GDB is much
+happier when using mach exceptions to respond to access to protected
+memory. While mach exceptions probably won't directly fix the
+threading problems, they remove a potentially problematic section of
+code, the portion of the Mac OS X system library that deals with
+BSD-style signal handling emulation and delivery of those signals to
+multiple threads. Even if using mach exceptions in and of itself
+doesn't immediately fix the problem, it should me much easier to
+diagnose using a debugger. Finally, the CrashReporter problem appears
+to go away as well, as this arises from an unfortunate placement of
+the CrashReporting facility in the OS between the mach exception
+handling and the BSD-style signal emulation. By catching the mach
+exceptions ourselves, we avoid this problem.
+
+* Mach exception handling details and example
+
+Mach exceptions work by creating a thread that listens for mach
+exceptions. The (slightly under-documented) OS function mach_msg_server
+is passed the exc_server function and exc_server in turn calls our
+catch_exception_raise function when an appropriate exception is
+triggered. (Note that catch_exception_raise is called by exc_server
+directly by that name. I have no idea how to provide multiple such
+functions or to call this function by another name, but we should be
+OK with a a single exception handling function.)
+
+To set this up we perform the following steps:
+
+1. allocate a mach port for our exceptions.
+
+2. give the process the right to send and receive exceptions on this
+   port.
+
+3. create a new thread which calls mach_msg_server, providing
+   exc_server as an argument. exc_server in turn calls our
+   catch_exception_raise when an exception is raised.
+
+4. finally, each thread for which we would like exceptions to be
+   handled must register itself with the exception port by calling
+   thread_set_exception_ports with the appropriate port and exception
+   mask. Actually, it's a bit more involved than this in order to
+   support multiple threads. Please document this fully.
+
+* USE_MACH_EXCEPTION_HANDLER
+
+The conditional compilation directive USE_MACH_EXCEPTION_HANDLER is a
+flag to use mach exception handling. We should continue to support the
+BSD-style signal handling until long after we are convinced that the
+mach exception handling version works better.
+
+* Establishing the mach exception handler
+
+** x86-darwin-os.c
+
+A new function, darwin_init, is added which creates the mach exception
+handling thread and establishes the exception port. Currently the
+"main" thread sets its exception port here, but when we go to a
+multithreaded SBCL, we will need to do similarly for new threads in
+arch_os_thread_init. Note that even "non-threaded" SBCL builds will
+have two threads, one lisp thread and a mach exception handling
+thread.
+
+catch_exception_raise listens for EXC_BAD_ACCESS and
+EXC_BAD_INSTRUCTION (and EXC_BREAKPOINT if we were to use INT3 traps
+again instead of the SIGILL traps we've set up as a workaround to the
+broken INT3 traps). Analogous to the signal handling context, mach
+exceptions allow use to get the thread and exception state of the
+triggering thread. We build a "fake" signal context, similar to what
+would be seen if a SIGSEGV/SIGILL were triggered and pass this on to
+SBCL's memory_fault_handler (for SIGSEGV) or sigill_handler (for
+SIGILL). when the handlers return, we set the values of the
+thread_state using the values from the fake context, allowing the
+"signal handler" to modify the state of the calling thread.
+
+** x86-arch.c
+
+sigill_handler and sigtrap_handler are no longer installed as signal
+handlers using undoably_install_low_level_interrupt_handler. Instead
+sigill_handler is called directly by the mach exception handling
+catch_exception_raise. This means that sigill_handler can no longer be
+static void and it is changed to just void.
+
+** bsd-os.c
+
+memory_fault_error no longer installed using
+undoably_install_low_level_interrupt_handler and changed to not be
+static. darwin_init called.
+
+* Handling exceptions
+
+** interrupt.c
+
+The code for general purpose error handling, which is generally done
+by a trap instruction followed by an error opcode (although on Mac OS,
+we use UD2A instead of INT3 as INT3 trapping is unreliable and the
+sigill_handler in turn calls the sigtrap_handler). sigtrap_handler in
+turn calls functions like interrupt_internal_error that are found in
+interrupt.c.
+
+Using BSD-style signal handling, interrupt_internal_error calls into
+lisp via the lisp function INTERNAL-ERROR via funcall2 (the two
+argument form of funcall). Since we are executing the exception
+handler on the exception handling thread and we don't really want to
+be executing lisp code on the exception handlers thread, we want to
+return to the lisp thread as quickly as possible. With BSD-style
+signal handling, the signal handlers themselves call into lisp using
+funcallN. We can't do this as then we would be attempting to execute
+lisp code on the exception handling thread. This would be a bad thing
+in a multi-threaded lisp. Therefore, we borrow a trick from the
+interrupt handling code and hack the stack of the offending thread
+such that when the mach exception handling code returns, and returns
+control back to the offending thread, it first calls a lisp function,
+then (unless otherwise directed) returns control to the lisp
+thread. This allows us to run our lisp (or other) code on the
+offending thread's stack, but before the offending thread resumes
+where it left off. See the arrange_return_to_lisp_function for details
+on how this is done.
+
+arrange_return_to_lisp_function was modified to take an additional
+parameter specifying the number of additional arguments, and
+additional varargs, which are then placed on the stack in the
+call_into_lisp_tramp in x86-assem.S.
+
+The problem with this is that both the signal handling/mach exception
+handling code, on the one hand, and the lisp code expect access to the
+"context" for accessing the state of the thread at the time that the
+signal/exception was raised. This means that the old strategy was:
+
+offending thread
+  (operating system establishes signal context)
+  signal handler
+    lisp code
+  signal handler
+  (operating system restores state from signal context)
+offending thread
+
+and both the signal handler and the lisp code have the chance to
+examine and modify the signal context. Now the situation looks like
+this:
+
+offending thread
+ (operating system establishes thread_state)
+ mach_exception_handler
+   signal handler (which may arrange return to a lisp function)
+ mach_exception_handler
+ (operating system restores from thread_state)
+ (optionally, a lisp function is called here)
+offending thread
+
+So we need to figure out how to provide the lisp function with
+information about the context of the offending thread and allow the
+lisp code to alter this state and to restore that state prior to
+resuming control to the offending thread.
+
+There are, presumably, additional problems with exception masking and
+when threads are allowed to interrupt other threads or otherwise catch
+signals/exceptions, but we can defer those for the moment.
+
+* Providing a "context" for lisp functions called on returning from a
+mach exception handler
+
+Given the flow describe above, we need to expand the following step:
+
+ (optionally, a lisp function is called here)
+
+now it needs to look something like:
+
+0. offending thread triggers a mach exception
+
+1. (operating system establishes thread_state)
+
+2. enter mach_exception_handler
+
+  2a. signal handler (which may arrange return to a lisp function
+
+  2b. frob the offending threads stack, allocating a context on the
+      stack (if appropriate, or always?)
+
+3. exit mach_exception_handler
+
+4. (operating system restores from thread_state)
+
+6. with the context on the stack, transfer control to the lisp
+       function
+
+7. restore the thread state from the context which either returns
+   control to original location in the offending thread or to wherever
+   the error-handling code has modified the context to point to
+ 
+
+* x86-darwin-os.c (again)
+
+** call_c_function_in_context and signal_emulation_wrapper
+
+We arrange for a function to be a called by the offending the thread
+when the mach exception handler returns. Essentially we have our own
+BSD-style signal emulation library that calls memory_fault_handler,
+sigtrap_handler and sigill_handler, as appropriate. It does this by
+calling a function call_c_function_in_context which sets up the EIP of
+the thread context to call the specified C function, which the
+specified arguments. In this case, signal_emulation_wrapper which
+takes as arguments a thread_state, which is a copy of the thread state
+as it existed upon entry into catch_exception_raise, and an emulated
+signal and siginfo and the signal handling function that
+signal_emulation_wrapper is to call.
+
+signal_emulation_wrapper creates a BSD-style signal context and
+populates it from the values in the passed in thread_state. It calls
+the specified signal_handler, and then sets the values in the
+thread_state from the context and loads the address of the thread
+state to restore into eax and then traps with a special trap that the
+catch_exception_raise looks for, which then extracts the thread state
+from the trap exception's thread_state.eax.
+
+[MORE DETAILS TO FOLLOW]
+
+
+===== BUGS =====
+
+MEH1: on threaded macos builds, init.test.sh fails with a
+      memory-fault-error (NOTE: this is a threaded macos issue, not a
+      mach exception handler bug).
+
+MEH2: timer.impure lisp fails on mach-exception-handler builds
+
+MEH3: threads.impure lisp fails on mach-exception-handler builds
+

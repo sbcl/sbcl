@@ -28,13 +28,15 @@
 (defun real-c-name (name)
   (etypecase name
     (list
-     (destructuring-bind (name &rest options) name
-
-       (cond #+largefile
-             ((member :largefile options)
-              (format nil "~a_largefile" name))
-             (t
-              name))))
+     (destructuring-bind (name &key c-name options) name
+       (if c-name
+           c-name
+           (cond #+largefile
+                 ((or (eql options :largefile)
+                      (member :largefile options))
+                  (format nil "~a_largefile" name))
+                 (t
+                  name)))))
     (string
      name)))
 

@@ -25,6 +25,12 @@
 #include <sys/wait.h>
 #endif
 
+#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
+#include <mach/mach.h>
+#include <mach/mach_error.h>
+#include <mach/mach_types.h>
+#endif
+
 #include "runtime.h"
 #include "validate.h"           /* for CONTROL_STACK_SIZE etc */
 #include "alloc.h"
@@ -143,6 +149,7 @@ initial_thread_trampoline(struct thread *th)
 
 #ifdef QUEUE_FREEABLE_THREAD_STACKS
 
+static void
 queue_freeable_thread_stack(struct thread *thread_to_be_cleaned_up)
 {
      if (thread_to_be_cleaned_up) {
@@ -312,6 +319,17 @@ new_thread_trampoline(struct thread *th)
     os_invalidate((os_vm_address_t)th->interrupt_data,
                   (sizeof (struct interrupt_data)));
 
+#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
+    FSHOW((stderr, "Deallocating mach port %x\n", THREAD_STRUCT_TO_EXCEPTION_PORT(th)));
+    mach_port_move_member(mach_task_self(),
+                          THREAD_STRUCT_TO_EXCEPTION_PORT(th),
+                          MACH_PORT_NULL);
+    mach_port_deallocate(mach_task_self(),
+                         THREAD_STRUCT_TO_EXCEPTION_PORT(th));
+    mach_port_destroy(mach_task_self(),
+                      THREAD_STRUCT_TO_EXCEPTION_PORT(th));
+#endif
+
 #ifdef QUEUE_FREEABLE_THREAD_STACKS
     queue_freeable_thread_stack(th);
 #elif defined(CREATE_CLEANUP_THREAD)
@@ -461,9 +479,20 @@ create_thread_struct(lispobj initial_function) {
     return th;
 }
 
+#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
+mach_port_t setup_mach_exception_handling_thread();
+kern_return_t mach_thread_init(mach_port_t thread_exception_port);
+
+#endif
+
 void create_initial_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
     if(th) {
+#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
+        kern_return_t ret;
+
+        setup_mach_exception_handling_thread();
+#endif
         initial_thread_trampoline(th); /* no return */
     } else lose("can't create initial thread\n");
 }
@@ -520,6 +549,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
         }
         r=0;
     }
+
 #ifdef QUEUE_FREEABLE_THREAD_STACKS
     free_freeable_stacks();
 #endif

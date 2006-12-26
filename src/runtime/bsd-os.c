@@ -69,10 +69,9 @@ os_init(char *argv[], char *envp[])
 
 #ifdef __NetBSD__
     netbsd_init();
-#endif /* __NetBSD__ */
-#ifdef __FreeBSD__
+#elif defined(__FreeBSD__)
     freebsd_init();
-#endif /* __FreeBSD__ */
+#endif
 }
 
 sigset_t *
@@ -177,7 +176,8 @@ is_valid_lisp_addr(os_vm_address_t addr)
  * The GENCGC needs to be hooked into whatever signal is raised for
  * page fault on this OS.
  */
-static void
+
+void
 memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context
 #if defined(LISP_FEATURE_FREEBSD) && defined(LISP_FEATURE_X86_64)
 /* FreeBSD/amd64 stores fault address only in undocumented 4th arg. */
@@ -217,10 +217,21 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context
         }
 }
 
+#if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
+void
+mach_error_memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context) {
+    lose("Unhandled memory fault. Exiting.");
+}
+#endif
+
 void
 os_install_interrupt_handlers(void)
 {
     SHOW("os_install_interrupt_handlers()/bsd-os/defined(GENCGC)");
+#if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
+    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
+                                                 mach_error_memory_fault_handler);
+#else
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
 #ifdef LISP_FEATURE_FREEBSD
                                                  (__siginfohandler_t *)
@@ -233,6 +244,7 @@ os_install_interrupt_handlers(void)
 #endif
                                                  memory_fault_handler);
 #endif
+#endif
 
 #ifdef LISP_FEATURE_SB_THREAD
     undoably_install_low_level_interrupt_handler(SIG_INTERRUPT_THREAD,
@@ -244,7 +256,6 @@ os_install_interrupt_handlers(void)
                                                  sig_stop_for_gc_handler);
 #endif
 #endif
-
     SHOW("leaving os_install_interrupt_handlers()");
 }
 
