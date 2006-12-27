@@ -695,6 +695,10 @@
  #!+sb-unicode
  ("src/code/external-formats/mb-util" :not-host)
  #!+sb-unicode
+ ("src/code/external-formats/enc-cn-tbl" :not-host)
+ #!+sb-unicode
+ ("src/code/external-formats/enc-cn" :not-host)
+ #!+sb-unicode
  ("src/code/external-formats/enc-jpn-tbl" :not-host)
  #!+sb-unicode
  ("src/code/external-formats/enc-jpn" :not-host)
