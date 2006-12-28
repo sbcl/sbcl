@@ -1521,5 +1521,11 @@
 
 (clim-style-lambda-list-test 1 2)
 
+(setf *count* 0)
+
+(test (&aux (a (incf *count*)) (b (incf *count*)))
+      (a b *count* (setf *count* 0))
+      ())
+
 
 ;;;; success

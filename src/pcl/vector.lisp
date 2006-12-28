@@ -985,12 +985,13 @@
          ;; The lambda-list used by BIND-ARGS
          (bind-list lambda-list)
          (setq-p (getf (cdr lmf-params) :setq-p))
+         (auxp (member '&aux bind-list))
          (call-next-method-p (getf (cdr lmf-params) :call-next-method-p)))
     ;; Try to use the normal function call machinery instead of BIND-ARGS
-    ;; bindings the arguments, unless:
+    ;; binding the arguments, unless:
     (unless (or ;; If all arguments are required, BIND-ARGS will be a no-op
                 ;; in any case.
-                (not restp)
+                (and (not restp) (not auxp))
                 ;; CALL-NEXT-METHOD wants to use BIND-ARGS, and needs a
                 ;; list of all non-required arguments.
                 call-next-method-p)
@@ -1013,7 +1014,9 @@
                          '.rest-arg.))
              (fmf-lambda-list (if rest-arg
                                   (append req-args (list '&rest rest-arg))
-                                  lambda-list)))
+                                  (if call-next-method-p
+                                      req-args
+                                      lambda-list))))
         `(list*
           :function
           (let* ((fmf (,(if (body-method-name body) 'named-lambda 'lambda)
