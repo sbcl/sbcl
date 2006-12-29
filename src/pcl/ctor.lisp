@@ -390,6 +390,7 @@
            .instance.)
         `(let* ((.instance. (,allocation-function ,wrapper))
                 (.slots. (,slots-fetcher .instance.)))
+           (declare (ignorable .slots.))
            ,body
            .instance.))))
 
