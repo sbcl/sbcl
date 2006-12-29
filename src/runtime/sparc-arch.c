@@ -86,8 +86,12 @@ os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *contex
 
 void arch_skip_instruction(os_context_t *context)
 {
-    ((char *) *os_context_pc_addr(context)) = ((char *) *os_context_npc_addr(context));
-    ((char *) *os_context_npc_addr(context)) += 4;
+    *os_context_pc_addr(context) = *os_context_npc_addr(context);
+    /* Note that we're doing integer arithmetic here, not pointer. So
+     * the value that the return value of os_context_npc_addr() points
+     * to will be incremented by 4, not 16.
+     */
+    *os_context_npc_addr(context) += 4;
 }
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
