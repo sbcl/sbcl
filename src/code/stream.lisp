@@ -1778,6 +1778,15 @@
       ;; must be Gray streams FUNDAMENTAL-STREAM
       (stream-read-sequence stream seq start end)))
 
+(declaim (inline compatible-vector-and-stream-element-types-p))
+(defun compatible-vector-and-stream-element-types-p (vector stream)
+  (declare (type vector vector)
+           (type ansi-stream stream))
+  (or (and (typep vector '(simple-array (unsigned-byte 8) (*)))
+           (subtypep (stream-element-type stream) '(unsigned-byte 8)))
+      (and (typep vector '(simple-array (signed-byte 8) (*)))
+           (subtypep (stream-element-type stream) '(signed-byte 8)))))
+
 (defun ansi-stream-read-sequence (seq stream start %end)
   (declare (type sequence seq)
            (type ansi-stream stream)
@@ -1803,27 +1812,24 @@
              (setf (first rem) el)))))
       (vector
        (with-array-data ((data seq) (offset-start start) (offset-end end))
-         (typecase data
-           ((or (simple-array (unsigned-byte 8) (*))
-                (simple-array (signed-byte 8) (*)))
-            (let* ((numbytes (- end start))
-                   (bytes-read (read-n-bytes stream data offset-start
-                                             numbytes nil)))
-              (if (< bytes-read numbytes)
-                  (+ start bytes-read)
-                  end)))
-           (t
-            (let ((read-function
-                   (if (subtypep (stream-element-type stream) 'character)
-                       #'ansi-stream-read-char
-                       #'ansi-stream-read-byte)))
-              (do ((i offset-start (1+ i)))
-                  ((>= i offset-end) end)
-                (declare (type index i))
-                (let ((el (funcall read-function stream nil :eof nil)))
-                  (when (eq el :eof)
-                    (return (+ start (- i offset-start))))
-                  (setf (aref data i) el)))))))))))
+         (if (compatible-vector-and-stream-element-types-p data stream)
+             (let* ((numbytes (- end start))
+                    (bytes-read (read-n-bytes stream data offset-start
+                                              numbytes nil)))
+               (if (< bytes-read numbytes)
+                   (+ start bytes-read)
+                   end))
+             (let ((read-function
+                    (if (subtypep (stream-element-type stream) 'character)
+                        #'ansi-stream-read-char
+                        #'ansi-stream-read-byte)))
+               (do ((i offset-start (1+ i)))
+                   ((>= i offset-end) end)
+                 (declare (type index i))
+                 (let ((el (funcall read-function stream nil :eof nil)))
+                   (when (eq el :eof)
+                     (return (+ start (- i offset-start))))
+                   (setf (aref data i) el))))))))))
 
 ;;;; WRITE-SEQUENCE
 
@@ -1874,14 +1880,10 @@
                       ((>= i offset-end))
                     (declare (type index i))
                     (funcall write-function stream (aref data i))))))
-           (typecase data
-             ((or (simple-array (unsigned-byte 8) (*))
-                  (simple-array (signed-byte 8) (*)))
-              (if (fd-stream-p stream)
-                  (output-raw-bytes stream data offset-start offset-end)
-                  (output-seq-in-loop)))
-             (t
-              (output-seq-in-loop))))))))
+           (if (and (fd-stream-p stream)
+                    (compatible-vector-and-stream-element-types-p data stream))
+               (output-raw-bytes stream data offset-start offset-end)
+               (output-seq-in-loop)))))))
   seq)
 
 ;;;; etc.

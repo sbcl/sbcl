@@ -178,5 +178,141 @@
                               (by-out size byte) (by-out size nb))))))
     (delete-file file-name)))
 (loop for size from 2 to 40 do (bin-stream-test :size size :type 'signed-byte))
+
+;;; Check READ-SEQUENCE signals a TYPE-ERROR when the sequence can't
+;;; contain a stream element.
+;;;
+;;; These tests check READ-SEQUENCE correctness, not whether the fast
+;;; or slow paths are being taken for each element type.  To check the
+;;; fast or slow paths, trace ANSI-STREAM-READ-BYTE (slow path) and/or
+;;; READ-N-BYTES:
+;;;
+;;; (trace sb-impl::ansi-stream-read-byte sb-impl::read-n-bytes)
+;;;
+;;; The order should be ANSI-STREAM-READ-BYTE, READ-N-BYTES,
+;;; READ-N-BYTES, ANSI-STREAM-READ-BYTE, ANSI-STREAM-READ-BYTE.
+
+(let ((pathname "read-sequence.data"))
+
+  ;; Create the binary data.
+  (with-open-file (stream pathname
+                          :direction :output
+                          :if-exists :supersede
+                          :element-type '(unsigned-byte 8))
+    (write-byte 255 stream))
+
+  ;; Check the slow path for generic vectors.
+  (let ((sequence (make-array 1)))
+    (with-open-file (stream pathname
+                            :direction :input
+                            :element-type '(unsigned-byte 8))
+    (read-sequence sequence stream)
+    (assert (equalp sequence #(255)))))
+
+  ;; Check the fast path works for (UNSIGNED-BYTE 8) and (SIGNED-BYTE
+  ;; 8) vectors.
+  (let ((sequence (make-array 1 :element-type '(unsigned-byte 8))))
+    (with-open-file (stream pathname
+                            :direction :input
+                            :element-type '(unsigned-byte 8))
+      (read-sequence sequence stream)
+      (assert (equalp sequence #(255)))))
+
+  (let ((sequence (make-array 1 :element-type '(signed-byte 8))))
+    (with-open-file (stream pathname
+                            :direction :input
+                            :element-type '(signed-byte 8))
+    (read-sequence sequence stream)
+    (assert (equalp sequence #(-1)))))
+
+  ;; Check that a TYPE-ERROR is signalled for incompatible (sequence,
+  ;; stream) pairs.
+
+  (let ((sequence (make-array 1 :element-type '(signed-byte 8))))
+    (with-open-file (stream pathname
+                            :direction :input
+                            :element-type '(unsigned-byte 8))
+      (handler-case (progn
+                      (read-sequence sequence stream)
+                      (error "READ-SEQUENCE didn't signal an error"))
+        (type-error (condition)
+          (assert (= (type-error-datum condition) 255))
+          (assert (subtypep (type-error-expected-type condition)
+                            '(signed-byte 8)))))))
+
+  (let ((sequence (make-array 1 :element-type '(unsigned-byte 8))))
+    (with-open-file (stream pathname
+                            :direction :input
+                            :element-type '(signed-byte 8))
+      (handler-case (progn
+                      (read-sequence sequence stream)
+                      (error "READ-SEQUENCE didn't signal an error"))
+        (type-error (condition)
+          (assert (= (type-error-datum condition) -1))
+          (assert (subtypep (type-error-expected-type condition)
+                            '(unsigned-byte 8))))))))
+
+;;; Check WRITE-SEQUENCE signals a TYPE-ERROR when the stream can't
+;;; write a sequence element.
+;;;
+;;; These tests check WRITE-SEQUENCE correctness, not whether the fast
+;;; or slow paths are being taken for each element type.  See the
+;;; READ-SEQUENCE tests above for more information.
+;;;
+;;; (trace sb-impl::output-unsigned-byte-full-buffered sb-impl::output-signed-byte-full-buffered sb-impl::output-raw-bytes)
+
+(let ((pathname "write-sequence.data")
+      (generic-sequence (make-array 1 :initial-contents '(255)))
+      (unsigned-sequence (make-array 1
+                                     :element-type '(unsigned-byte 8)
+                                     :initial-contents '(255)))
+      (signed-sequence (make-array 1
+                                   :element-type '(signed-byte 8)
+                                   :initial-contents '(-1))))
+  ;; Check the slow path for generic vectors.
+  (with-open-file (stream pathname
+                           :direction :output
+                           :if-exists :supersede
+                           :element-type '(unsigned-byte 8))
+    (write-sequence generic-sequence stream))
+
+  ;; Check the fast path for unsigned and signed vectors.
+  (with-open-file (stream pathname
+                          :direction :output
+                          :if-exists :supersede
+                          :element-type '(unsigned-byte 8))
+    (write-sequence unsigned-sequence stream))
+
+  (with-open-file (stream pathname
+                          :direction :output
+                          :if-exists :supersede
+                          :element-type '(signed-byte 8))
+    (write-sequence signed-sequence stream))
+
+  ;; Check a TYPE-ERROR is signalled for unsigned and signed vectors
+  ;; which are incompatible with the stream element type.
+  (with-open-file (stream pathname
+                          :direction :output
+                          :if-exists :supersede
+                          :element-type '(signed-byte 8))
+    (handler-case (progn
+                    (write-sequence unsigned-sequence stream)
+                    (error "WRITE-SEQUENCE didn't signal an error"))
+      (type-error (condition)
+        (assert (= (type-error-datum condition) 255))
+        (assert (subtypep (type-error-expected-type condition)
+                          '(signed-byte 8))))))
+
+  (with-open-file (stream pathname
+                          :direction :output
+                          :if-exists :supersede
+                          :element-type '(unsigned-byte 8))
+    (handler-case (progn
+                    (write-sequence signed-sequence stream)
+                    (error "WRITE-SEQUENCE didn't signal an error"))
+      (type-error (condition)
+        (assert (= (type-error-datum condition) -1))
+        (assert (subtypep (type-error-expected-type condition)
+                          '(unsigned-byte 8)))))))
 
 ;;; success

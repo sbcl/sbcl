@@ -5,6 +5,11 @@ changes in sbcl-1.0.2 relative to sbcl-1.0.1:
     to use.
   * improvement: support for GBK external format.
     (thanks to Chun Tian (binghe))
+  * bug fix: an error is signaled for attempts to use READ-SEQUENCE
+    for a (SIGNED-BYTE 8) stream and (UNSIGNED-BYTE 8) vector, or vice versa.
+    (thanks to Tony Martinez)
+  * bug fix: the initforms for DEFMETHOD &AUX parameters are only
+    evaluated once (reported by Kevin Reid)
 
 changes in sbcl-1.0.1 relative to sbcl-1.0:
   * new platform: FreeBSD/x86-64, including support for threading.
