@@ -85,7 +85,8 @@
           (merge-pathnames
            (make-pathname :directory (list :relative filesys-name)
                           :name filesys-name)
-           (truename (posix-getenv "SBCL_HOME"))))
+           (truename (or (sbcl-homedir-pathname)
+                         (return-from module-provide-contrib nil)))))
          (fasl-path (merge-pathnames
                      (make-pathname :type *fasl-file-type*)
                      unadorned-path))
