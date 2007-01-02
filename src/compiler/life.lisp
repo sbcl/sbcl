@@ -934,9 +934,23 @@
       (setf (tn-global-conflicts tn) nil)))
 
   (values))
+
+;;; On high debug levels, for all variables that a lambda closes over
+;;; convert the TNs to :ENVIRONMENT TNs (in the physical environment
+;;; of that lambda). This way the debugger can display the variables.
+(defun maybe-environmentalize-closure-tns (component)
+  (dolist (lambda (component-lambdas component))
+    (when (policy lambda (>= debug 2))
+      (let ((physenv (lambda-physenv lambda)))
+        (dolist (closure-var (physenv-closure physenv))
+          (let ((tn (find-in-physenv closure-var physenv)))
+            (when (member (tn-kind tn) '(:normal :debug-environment))
+              (convert-to-environment-tn tn physenv))))))))
+
 
 (defun lifetime-analyze (component)
   (lifetime-pre-pass component)
+  (maybe-environmentalize-closure-tns component)
   (setup-environment-live-conflicts component)
   (lifetime-flow-analysis component)
   (lifetime-post-pass component)

@@ -332,9 +332,8 @@
 ;;; environment live and is an argument. If a :DEBUG-ENVIRONMENT TN,
 ;;; then we also exclude set variables, since the variable is not
 ;;; guaranteed to be live everywhere in that case.
-(defun dump-1-var (fun var tn id minimal buffer)
-  (declare (type lambda-var var) (type (or tn null) tn) (type index id)
-           (type clambda fun))
+(defun dump-1-var (var tn id minimal buffer)
+  (declare (type lambda-var var) (type (or tn null) tn) (type index id))
   (let* ((name (leaf-debug-name var))
          (save-tn (and tn (tn-save-tn tn)))
          (kind (and tn (tn-kind tn)))
@@ -348,8 +347,7 @@
                    (and (eq kind :debug-environment)
                         (null (basic-var-sets var))))
                (not (gethash tn (ir2-component-spilled-tns
-                                 (component-info *component-being-compiled*))))
-               (eq (lambda-var-home var) fun))
+                                 (component-info *component-being-compiled*)))))
       (setq flags (logior flags compiled-debug-var-environment-live)))
     (when save-tn
       (setq flags (logior flags compiled-debug-var-save-loc-p)))
@@ -409,7 +407,7 @@
                  (incf id))
                 (t
                  (setq id 0  prev-name name)))
-          (dump-1-var fun var (cdr x) id nil buffer)
+          (dump-1-var var (cdr x) id nil buffer)
           (setf (gethash var var-locs) i))
         (incf i))
       (coerce buffer 'simple-vector))))
@@ -420,7 +418,7 @@
   (declare (type clambda fun))
   (let ((buffer (make-array 0 :fill-pointer 0 :adjustable t)))
     (dolist (var (lambda-vars fun))
-      (dump-1-var fun var (leaf-info var) 0 t buffer))
+      (dump-1-var var (leaf-info var) 0 t buffer))
     (coerce buffer 'simple-vector)))
 
 ;;; Return VAR's relative position in the function's variables (determined
