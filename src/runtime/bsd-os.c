@@ -406,7 +406,20 @@ os_get_runtime_executable_path()
         return NULL;
     return copied_string(path);
 }
-#else /* Not DARWIN or FREEBSD */
+#elif defined(LISP_FEATURE_NETBSD)
+char *
+os_get_runtime_executable_path()
+{
+    struct stat sb;
+    char *path = strdup("/proc/curproc/file");
+    if (path && ((stat(path, &sb)) == 0))
+        return path;
+    else {
+        fprintf(stderr, "Couldn't stat /proc/curproc/file; is /proc mounted?\n");
+        return NULL;
+    }
+}
+#else /* Not DARWIN or FREEBSD or NETBSD */
 char *
 os_get_runtime_executable_path()
 {

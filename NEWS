@@ -7,6 +7,8 @@ changes in sbcl-1.0.2 relative to sbcl-1.0.1:
     (thanks to Chun Tian (binghe))
   * improvement: the debugger now displays variables that have been closed
     over, in code compiled with (DEBUG 2) or higher
+  * improvement: support for executable cores on NetBSD (thanks to 
+    Richard Kreuter)
   * bug fix: an error is signaled for attempts to use READ-SEQUENCE
     for a (SIGNED-BYTE 8) stream and (UNSIGNED-BYTE 8) vector, or vice versa.
     (thanks to Tony Martinez)
