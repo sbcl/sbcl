@@ -276,7 +276,7 @@
   (declare (type index size))
   (do ((count size (1- count))
        (result '() (cons initial-element result)))
-      ((zerop count) result)
+      ((<= count 0) result)
     (declare (type index count))))
 
 (defun append (&rest lists)
