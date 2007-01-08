@@ -225,6 +225,24 @@
     (read-sequence sequence stream)
     (assert (equalp sequence #(-1)))))
 
+  ;; A bivalent stream can be read to a unsigned-byte vector or a
+  ;; string
+
+  (let ((sequence (make-array 1 :element-type '(unsigned-byte 8))))
+    (with-open-file (stream pathname
+                            :direction :input
+                            :element-type :default)
+      (read-sequence sequence stream)
+      (assert (equalp sequence #(255)))))
+
+  (let ((sequence (make-array 1 :element-type 'character)))
+    (with-open-file (stream pathname
+                            :direction :input
+                            :external-format :latin-1
+                            :element-type :default)
+      (read-sequence sequence stream)
+      (assert (equalp sequence #(#.(code-char 255))))))
+
   ;; Check that a TYPE-ERROR is signalled for incompatible (sequence,
   ;; stream) pairs.
 
@@ -250,7 +268,22 @@
         (type-error (condition)
           (assert (= (type-error-datum condition) -1))
           (assert (subtypep (type-error-expected-type condition)
-                            '(unsigned-byte 8))))))))
+                            '(unsigned-byte 8)))))))
+
+  ;; Can't read a signed-byte from a bivalent stream
+
+  (let ((sequence (make-array 1 :element-type '(signed-byte 8))))
+    (with-open-file (stream pathname
+                            :direction :input
+                            :element-type :default)
+      (handler-case (progn
+                      (read-sequence sequence stream)
+                      (error "READ-SEQUENCE didn't signal an error"))
+        (type-error (condition)
+          (assert (= (type-error-datum condition) 255))
+          (assert (subtypep (type-error-expected-type condition)
+                            '(signed-byte 8))))))))
+
 
 ;;; Check WRITE-SEQUENCE signals a TYPE-ERROR when the stream can't
 ;;; write a sequence element.
@@ -263,6 +296,8 @@
 
 (let ((pathname "write-sequence.data")
       (generic-sequence (make-array 1 :initial-contents '(255)))
+      (string (make-array 1 :element-type 'character
+                          :initial-element (code-char 255)))
       (unsigned-sequence (make-array 1
                                      :element-type '(unsigned-byte 8)
                                      :initial-contents '(255)))
@@ -289,6 +324,21 @@
                           :element-type '(signed-byte 8))
     (write-sequence signed-sequence stream))
 
+  ;; Bivalent streams on unsigned-byte and strings
+
+  (with-open-file (stream pathname
+                          :direction :output
+                          :if-exists :supersede
+                          :element-type :default)
+    (write-sequence unsigned-sequence stream))
+
+  (with-open-file (stream pathname
+                          :direction :output
+                          :external-format :latin-1
+                          :if-exists :supersede
+                          :element-type :default)
+    (write-sequence string stream))
+
   ;; Check a TYPE-ERROR is signalled for unsigned and signed vectors
   ;; which are incompatible with the stream element type.
   (with-open-file (stream pathname
@@ -307,6 +357,18 @@
                           :direction :output
                           :if-exists :supersede
                           :element-type '(unsigned-byte 8))
+    (handler-case (progn
+                    (write-sequence signed-sequence stream)
+                    (error "WRITE-SEQUENCE didn't signal an error"))
+      (type-error (condition)
+        (assert (= (type-error-datum condition) -1))
+        (assert (subtypep (type-error-expected-type condition)
+                          '(unsigned-byte 8))))))
+
+  (with-open-file (stream pathname
+                          :direction :output
+                          :if-exists :supersede
+                          :element-type :default)
     (handler-case (progn
                     (write-sequence signed-sequence stream)
                     (error "WRITE-SEQUENCE didn't signal an error"))

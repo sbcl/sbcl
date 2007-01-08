@@ -1820,7 +1820,7 @@
                    (+ start bytes-read)
                    end))
              (let ((read-function
-                    (if (subtypep (stream-element-type stream) 'character)
+                    (if (subtypep (array-element-type data) 'character)
                         #'ansi-stream-read-char
                         #'ansi-stream-read-byte)))
                (do ((i offset-start (1+ i)))
@@ -1873,7 +1873,7 @@
          (labels
              ((output-seq-in-loop ()
                 (let ((write-function
-                       (if (subtypep (stream-element-type stream) 'character)
+                       (if (subtypep (array-element-type data) 'character)
                            (ansi-stream-out stream)
                            (ansi-stream-bout stream))))
                   (do ((i offset-start (1+ i)))
