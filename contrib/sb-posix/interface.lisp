@@ -126,7 +126,7 @@
   (define-call "fchdir" int minusp (fd file-descriptor))
   (define-call "fchmod" int minusp (fd file-descriptor) (mode mode-t))
   (define-call "fchown" int minusp (fd file-descriptor)
-             (owner uid-t)  (group gid-t))
+               (owner uid-t)  (group gid-t))
   (define-call "fdatasync" int minusp (fd file-descriptor))
   (define-call ("ftruncate" :options :largefile)
       int minusp (fd file-descriptor) (length off-t))
@@ -141,7 +141,24 @@
       int minusp (pathname filename) (length off-t))
   ;; FIXME: Windows does have _mktemp, which has a slightlty different
   ;; interface
-  (define-call "mkstemp" int minusp (template c-string))
+  (defun mkstemp (template)
+    ;; we are emulating sb-alien's charset conversion for strings
+    ;; here, to accommodate for the call-by-reference nature of
+    ;; mkstemp's template strings.
+    (let ((arg (sb-ext:string-to-octets
+                (filename template)
+                :external-format sb-alien::*default-c-string-external-format*)))
+      (sb-sys:with-pinned-objects (arg)
+        (let ((result (alien-funcall (extern-alien "mkstemp"
+                                                   (function int c-string))
+                                     (sap-alien (sb-alien::vector-sap arg)
+                                                (* char)))))
+          (when (minusp result)
+            (syscall-error))
+          (values result
+                  (sb-ext:octets-to-string
+                   arg
+                   :external-format sb-alien::*default-c-string-external-format*))))))
   (define-call-internally ioctl-without-arg "ioctl" int minusp
                           (fd file-descriptor) (cmd int))
   (define-call-internally ioctl-with-int-arg "ioctl" int minusp
