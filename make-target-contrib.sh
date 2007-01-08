@@ -65,9 +65,17 @@ do
       if $HEADER_HAS_BEEN_PRINTED; then
           echo > /dev/null
       else
-          echo "Failed contribs:"
+          cat <<EOF
+
+WARNING! Some of the contrib modules did not build succesfully or pass
+their self-tests. Failed contribs:"
+EOF
           HEADER_HAS_BEEN_PRINTED=true
       fi
       echo "  `basename $dir`"
   fi
 done
+
+if [ $HEADER_HAS_BEEN_PRINTED == true ]; then
+  exit 1
+fi

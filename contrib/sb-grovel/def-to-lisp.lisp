@@ -183,21 +183,26 @@ code:
     (terpri)
     (funcall (intern "C-CONSTANTS-EXTRACT" (find-package "SB-GROVEL"))
              filename tmp-c-source (constants-package component))
-    (let ((code (sb-ext:process-exit-code
-                 (sb-ext:run-program
-                  (sb-ext:posix-getenv "CC")
-                  (append
-                   (split-cflags (sb-ext:posix-getenv "EXTRA_CFLAGS"))
-                   #+(and linux largefile)
-                   '("-D_LARGEFILE_SOURCE"
+    (let* ((cc (or (sb-ext:posix-getenv "CC")
+                   ;; It might be nice to include a CONTINUE or
+                   ;; USE-VALUE restart here, but ASDF seems to insist
+                   ;; on handling the errors itself.
+                   (error "The CC environment variable has not been set in SB-GROVEL. Since this variable should always be set during the SBCL build process, this might indicate an SBCL with a broken contrib installation.")))
+           (code (sb-ext:process-exit-code
+                  (sb-ext:run-program
+                   cc
+                   (append
+                    (split-cflags (sb-ext:posix-getenv "EXTRA_CFLAGS"))
+                    #+(and linux largefile)
+                    '("-D_LARGEFILE_SOURCE"
                      "-D_LARGEFILE64_SOURCE"
-                     "-D_FILE_OFFSET_BITS=64")
-                   (list "-o"
+                      "-D_FILE_OFFSET_BITS=64")
+                    (list "-o"
                          (namestring tmp-a-dot-out)
                          (namestring tmp-c-source)))
-                  :search t
-                  :input nil
-                  :output *trace-output*))))
+                   :search t
+                   :input nil
+                   :output *trace-output*))))
       (unless (= code 0)
         (case (operation-on-failure op)
           (:warn (warn "~@<C compiler failure when performing ~A on ~A.~@:>"
