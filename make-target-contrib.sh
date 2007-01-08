@@ -49,11 +49,18 @@ find contrib/ \( -name '*.fasl' -o \
                  -name '*.O' \) \
   -print | xargs rm -f
 
+find output -name 'building-contrib.*' -print | xargs rm -f
+
 for i in contrib/*; do
     test -d $i && test -f $i/Makefile || continue;
     # export INSTALL_DIR=$SBCL_HOME/`basename $i `
     test -f $i/test-passed && rm $i/test-passed
-    $GNUMAKE -C $i test && touch $i/test-passed
+    # hack to get exit codes right.
+    if $GNUMAKE -C $i test 2>&1 && touch $i/test-passed ; then
+	:
+    else
+	exit $?
+    fi | tee output/building-contrib.`basename $i` 
 done
 
 # Sometimes people used to see the "No tests failed." output from the last

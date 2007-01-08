@@ -12,6 +12,7 @@ sbcl
 *.fns
 *.info
 *.info-1
+*.info-2
 *.ky
 *.log
 *.pg

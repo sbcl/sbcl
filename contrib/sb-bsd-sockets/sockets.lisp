@@ -20,7 +20,7 @@ protocol. Other values are used as-is.")
           :reader socket-type
           :documentation "Type of the socket: :STREAM or :DATAGRAM.")
    (stream))
-  (:documentation "Common base class of all sockets, not ment to be
+  (:documentation "Common base class of all sockets, not meant to be
 directly instantiated.")))
 
 (defmethod print-object ((object socket) stream)
