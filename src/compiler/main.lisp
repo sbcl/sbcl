@@ -975,9 +975,9 @@
           (debug-name 'initial-component name))
     (setf (component-kind component) :initial)
     (let* ((locall-fun (let ((*allow-instrumenting* t))
-                         (apply #'ir1-convert-lambdalike
-                                definition
-                                (list :source-name name))))
+                         (funcall #'ir1-convert-lambdalike
+                                  definition
+                                  :source-name name)))
            (debug-name (debug-name 'tl-xep name))
            (fun (ir1-convert-lambda (make-xep-lambda-expression locall-fun)
                                     :source-name (or name '.anonymous.)

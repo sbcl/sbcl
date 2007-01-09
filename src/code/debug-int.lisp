@@ -1114,6 +1114,48 @@ register."
                  (sap-ref-32 catch
                              (* sb!vm:catch-block-previous-catch-slot
                                 sb!vm:n-word-bytes)))))))
+
+;;; Modify the value of the OLD-TAG catches in FRAME to NEW-TAG
+(defun replace-frame-catch-tag (frame old-tag new-tag)
+  (let ((catch (descriptor-sap sb!vm:*current-catch-block*))
+        (fp (frame-pointer frame)))
+    (loop until (zerop (sap-int catch))
+          do (when (sap= fp
+                         #!-alpha
+                         (sap-ref-sap catch
+                                      (* sb!vm:catch-block-current-cont-slot
+                                         sb!vm:n-word-bytes))
+                         #!+alpha
+                         (int-sap
+                          (sap-ref-32 catch
+                                      (* sb!vm:catch-block-current-cont-slot
+                                         sb!vm:n-word-bytes))))
+               (let ((current-tag
+                      #!-(or x86 x86-64)
+                      (stack-ref catch sb!vm:catch-block-tag-slot)
+                      #!+(or x86 x86-64)
+                      (make-lisp-obj
+                       (sap-ref-word catch (* sb!vm:catch-block-tag-slot
+                                              sb!vm:n-word-bytes)))))
+                 (when (eq current-tag old-tag)
+                   #!-(or x86 x86-64)
+                   (setf (stack-ref catch sb!vm:catch-block-tag-slot) new-tag)
+                   #!+(or x86 x86-64)
+                   (setf (sap-ref-word catch (* sb!vm:catch-block-tag-slot
+                                                sb!vm:n-word-bytes))
+                         (get-lisp-obj-address new-tag)))))
+          do (setf catch
+                   #!-alpha
+                   (sap-ref-sap catch
+                                (* sb!vm:catch-block-previous-catch-slot
+                                   sb!vm:n-word-bytes))
+                   #!+alpha
+                   (int-sap
+                    (sap-ref-32 catch
+                                (* sb!vm:catch-block-previous-catch-slot
+                                   sb!vm:n-word-bytes)))))))
+
+
 
 ;;;; operations on DEBUG-FUNs
 

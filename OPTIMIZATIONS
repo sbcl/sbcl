@@ -403,3 +403,10 @@ comparison VOP receives an TN of the appropriate storage class.
 Obviously, it would be better if a) we only performed one MOV prior to
 all three comparisons or b) eliminated the necessity of the MOV(s)
 altogether.  The former option is probably easier than the latter.
+
+--------------------------------------------------------------------------------
+#37
+
+Dynamic extent allocation doesn't currently work for one-element lists,
+since there's a source transform from (LIST X) to (CONS X NIL).
+

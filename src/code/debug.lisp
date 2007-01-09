@@ -141,6 +141,11 @@ Other commands:
     current frame, if this frame was compiled with a sufficiently high
     DEBUG optimization quality.
 
+  RESTART-FRAME
+    Restart execution of the current frame, if this frame is for a
+    global function which was compiled with a sufficiently high
+    DEBUG optimization quality.
+
   SLURP
     Discard all pending input on *STANDARD-INPUT*. (This can be
     useful when the debugger was invoked to handle an error in
@@ -261,7 +266,7 @@ is how many frames to show."
       (sb!di:lambda-list-unavailable
        ()
        (make-unprintable-object "unavailable lambda list")))))
-(legal-fun-name-p '(lambda ()))
+
 (defvar *show-entry-point-details* nil)
 
 (defun clean-xep (name args)
@@ -1374,24 +1379,43 @@ reset to ~S."
 (!def-debug-command "SLURP" ()
   (loop while (read-char-no-hang *standard-input*)))
 
+(defun unwind-to-frame-and-call (frame thunk)
+  (let ((tag (gensym)))
+    (sb!di:replace-frame-catch-tag frame
+                                   'sb!c:debug-catch-tag
+                                   tag)
+    (throw tag thunk)))
+
 (!def-debug-command "RETURN" (&optional
                               (return (read-prompting-maybe
                                        "return: ")))
-  (let ((tag (find-if (lambda (x)
-                        (and (typep (car x) 'symbol)
-                             (not (symbol-package (car x)))
-                             (string= (car x) "SB-DEBUG-CATCH-TAG")))
-                      (sb!di::frame-catches *current-frame*))))
-    (if tag
-        (throw (car tag)
-          (funcall (sb!di:preprocess-for-eval
-                    return
-                    (sb!di:frame-code-location *current-frame*))
-                   *current-frame*))
-        (format *debug-io*
-                "~@<can't find a tag for this frame ~
+   (if (frame-has-debug-tag-p *current-frame*)
+       (let* ((code-location (sb!di:frame-code-location *current-frame*))
+              (values (multiple-value-list
+                       (funcall (sb!di:preprocess-for-eval return code-location)
+                                *current-frame*))))
+         (unwind-to-frame-and-call *current-frame* (lambda ()
+                                                     (values-list values))))
+       (format *debug-io*
+               "~@<can't find a tag for this frame ~
                  ~2I~_(hint: try increasing the DEBUG optimization quality ~
-                 and recompiling)~:@>"))))
+                 and recompiling)~:@>")))
+
+(!def-debug-command "RESTART-FRAME" ()
+  (if (frame-has-debug-tag-p *current-frame*)
+      (let* ((call-list (frame-call-as-list *current-frame*))
+             (fun (fdefinition (car call-list))))
+        (unwind-to-frame-and-call *current-frame*
+                                  (lambda ()
+                                    (apply fun (cdr call-list)))))
+      (format *debug-io*
+              "~@<can't find a tag for this frame ~
+                 ~2I~_(hint: try increasing the DEBUG optimization quality ~
+                 and recompiling)~:@>")))
+
+(defun frame-has-debug-tag-p (frame)
+  (find 'sb!c:debug-catch-tag (sb!di::frame-catches frame) :key #'car))
+
 
 ;;;; debug loop command utilities
 

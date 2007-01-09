@@ -885,7 +885,7 @@
 
 ;;; Convert a LAMBDA form into a LAMBDA leaf or an OPTIONAL-DISPATCH leaf.
 (defun ir1-convert-lambda (form &key (source-name '.anonymous.)
-                           debug-name)
+                           debug-name maybe-add-debug-catch)
   (unless (consp form)
     (compiler-error "A ~S was found when expecting a lambda expression:~%  ~S"
                     (type-of form)
@@ -906,14 +906,10 @@
       (binding* (((*lexenv* result-type post-binding-lexenv)
                   (process-decls decls (append aux-vars vars) nil
                                  :binding-form-p t))
-                 (forms (if (and *allow-instrumenting*
+                 (forms (if (and maybe-add-debug-catch
+                                 *allow-instrumenting*
                                  (policy *lexenv* (>= insert-debug-catch 2)))
-                            `((catch (locally
-                                         (declare (optimize (insert-step-conditions 0)))
-                                       ;; Using MAKE-SYMBOL would lead
-                                       ;; to recursive disaster.
-                                       (%make-symbol "SB-DEBUG-CATCH-TAG"))
-                                ,@forms))
+                            (wrap-forms-in-debug-catch forms)
                             forms))
                  (forms (if (eq result-type *wild-type*)
                             forms
@@ -935,6 +931,29 @@
         (setf (functional-arg-documentation res) (cadr form))
         res))))
 
+(defun wrap-forms-in-debug-catch (forms)
+  `( ;; Normally, we'll return from this block with the below RETURN-FROM.
+    (block
+        return-value-tag
+      ;; If DEBUG-CATCH-TAG is thrown (with a thunk as the value) the
+      ;; RETURN-FROM is elided and we funcall the thunk instead. That
+      ;; thunk might either return a value (for a RETURN-FROM-FRAME)
+      ;; or call this same function again (for a RESTART-FRAME).
+      ;; -- JES, 2007-01-09
+      (funcall
+       (the function
+         ;; Use a constant catch tag instead of consing a new one for every
+         ;; entry to this block. The uniquencess of the catch tags is
+         ;; ensured when the tag is throw by the debugger. It'll allocate a
+         ;; new tag, and modify the reference this tag in the proper
+         ;; catch-block structure to refer to that new tag. This
+         ;; significantly decreases the runtime cost of high debug levels.
+         ;;  -- JES, 2007-01-09
+         (catch 'debug-catch-tag
+           (return-from return-value-tag
+             (progn
+               ,@forms))))))))
+
 ;;; helper for LAMBDA-like things, to massage them into a form
 ;;; suitable for IR1-CONVERT-LAMBDA.
 (defun ir1-convert-lambdalike (thing
@@ -944,6 +963,7 @@
   (ecase (car thing)
     ((lambda)
      (ir1-convert-lambda thing
+                         :maybe-add-debug-catch t
                          :source-name source-name
                          :debug-name debug-name))
     ((instance-lambda)
@@ -957,6 +977,7 @@
        (if (legal-fun-name-p name)
            (let ((defined-fun-res (get-defined-fun name))
                  (res (ir1-convert-lambda lambda-expression
+                                          :maybe-add-debug-catch t
                                           :source-name name)))
              (assert-global-function-definition-type name res)
              (setf (defined-fun-functional defined-fun-res) res)
@@ -966,7 +987,9 @@
                   (policy ref (> recognize-self-calls 0)))
                 res defined-fun-res))
              res)
-           (ir1-convert-lambda lambda-expression :debug-name name))))
+           (ir1-convert-lambda lambda-expression
+                               :maybe-add-debug-catch t
+                               :debug-name name))))
     ((lambda-with-lexenv)
      (ir1-convert-inline-lambda thing
                                 :source-name source-name

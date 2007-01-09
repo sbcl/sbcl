@@ -902,13 +902,20 @@ useful for popping debug command loop levels or aborting to top level,
 as the case may be.
 @end deffn
 
-@deffn {Debugger Command} return @var{value}
+@deffn {Debugger Command} return @var{value} 
 Returns @var{value} from the current stack frame.  This command is
 available when the @code{debug} optimization quality is greater than
 both @code{speed} and @code{space}.  Care must be taken that the value
 is of the same type as SBCL expects the stack frame to return.
 @end deffn
 
+@deffn {Debugger Command} restart-frame
+Restarts execution of the current stack frame. This command is
+available when the @code{debug} optimization quality is greater than
+both @code{speed} and @code{space} and when the frame is for is a global
+function. If the function is redefined in the debugger before the frame
+is restarted, the new function will be used.
+@end deffn
 
 @node  Information Commands
 @comment  node-name,  next,  previous,  up

@@ -743,6 +743,7 @@ lexically apparent function definition in the enclosing environment."
       (let ((fvars (mapcar (lambda (n d)
                              (ir1-convert-lambda d
                                                  :source-name n
+                                                 :maybe-add-debug-catch t
                                                  :debug-name (debug-name 'flet n)))
                            names defs)))
         (processing-decls (decls nil fvars next result)
@@ -777,6 +778,7 @@ other."
                 (mapcar (lambda (name def)
                           (ir1-convert-lambda def
                                               :source-name name
+                                              :maybe-add-debug-catch t
                                               :debug-name (debug-name 'labels name)))
                         names defs))))
 
