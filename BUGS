@@ -1723,3 +1723,32 @@ WORKAROUND:
  as of 0.9.18.11 the file compiler breaks on it:
   failed AVER: "(NOT (FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P CLAMBDA))"
  Defining the missing MAKE-LOAD-FORM method makes the error go away.
+
+407: misoptimization of loop, COERCE 'FLOAT, and HANDLER-CASE for bignums
+  (reported by Ariel Badichi on sbcl-devel 2007-01-09)
+  407a: In sbcl-1.0.1 on Linux x86, 
+		(defun foo ()
+		  (loop for n from (expt 2 1024) do
+		        (handler-case
+		            (coerce n 'single-float)
+		          (simple-type-error ()
+		            (format t "Got here.~%")
+		            (return-from foo)))))
+		(foo)
+        causes an infinite loop, where handling the error would be expected.
+  407b: In sbcl-1.0.1 on Linux x86, 
+		(defun bar ()
+		  (loop for n from (expt 2 1024) do
+		        (handler-case
+		            (format t "~E~%" (coerce n 'single-float))
+		          (simple-type-error ()
+		            (format t "Got here.~%")
+		            (return-from bar)))))
+        fails to compile, with
+		Too large to be represented as a SINGLE-FLOAT: ...
+	from
+		0: ((LABELS SB-BIGNUM::CHECK-EXPONENT) ...)
+		1: ((LABELS SB-BIGNUM::FLOAT-FROM-BITS) ...)
+		2: (SB-KERNEL:%SINGLE-FLOAT ...)
+		3: (SB-C::BOUND-FUNC ...)
+		4: (SB-C::%SINGLE-FLOAT-DERIVE-TYPE-AUX ...)
