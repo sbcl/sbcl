@@ -913,39 +913,6 @@ GNAME(post_signal_tramp):
 	ret
 	SIZE(GNAME(post_signal_tramp))
 
-#ifdef LISP_FEATURE_WIN32
-	/*
-	 * This is part of the funky magic for exception handling on win32.
-	 * see sigtrap_emulator() in win32-os.c for details.
-	 */
-	.globl GNAME(sigtrap_trampoline)
-GNAME(sigtrap_trampoline):
-	pushl	%eax
-	pushl	%ebp
-	movl	%esp, %ebp
-	call	GNAME(sigtrap_wrapper)
-	pop	%eax
-	pop	%eax
-	TRAP
-	.byte 	trap_ContextRestore
-	hlt			# We should never return here.
-        
-	/*
-	 * This is part of the funky magic for exception handling on win32.
-	 * see handle_exception() in win32-os.c for details.
-	 */
-	.globl GNAME(exception_trampoline)
-GNAME(exception_trampoline):
-	pushl	%eax
-	pushl	%ebp
-	movl	%esp, %ebp
-	call	GNAME(handle_win32_exception_wrapper)
-	pop	%eax
-	pop	%eax
-	TRAP
-	.byte 	trap_ContextRestore
-	hlt			# We should never return here.
-#endif
 
         /* fast_bzero implementations and code to detect which implementation
          * to use.

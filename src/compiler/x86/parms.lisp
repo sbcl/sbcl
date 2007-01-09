@@ -271,8 +271,7 @@
   breakpoint
   fun-end-breakpoint
   single-step-around
-  single-step-before
-  #!+win32 context-restore) ;; HACK: The Win32 exception handling system does wrong things with this.
+  single-step-before)
 ;;; FIXME: It'd be nice to replace all the DEFENUMs with something like
 ;;;   (WITH-DEF-ENUM (:START 8)
 ;;;     (DEF-ENUM HALT-TRAP)

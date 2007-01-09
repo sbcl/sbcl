@@ -61,6 +61,7 @@
 #undef boolean
 
 #include <math.h>
+#include <float.h>
 
 #include <excpt.h>
 
@@ -96,6 +97,7 @@ static void set_seh_frame(void *frame)
     asm volatile ("movl %0,%%fs:0": : "r" (frame));
 }
 
+#if 0
 static struct lisp_exception_frame *find_our_seh_frame(void)
 {
     struct lisp_exception_frame *frame = get_seh_frame();
@@ -106,7 +108,6 @@ static struct lisp_exception_frame *find_our_seh_frame(void)
     return frame;
 }
 
-#if 0
 inline static void *get_stack_frame(void)
 {
     void* retval;
@@ -311,119 +312,9 @@ is_valid_lisp_addr(os_vm_address_t addr)
 extern boolean internal_errors_enabled;
 
 /*
- * FIXME: There is a potential problem with foreign code here.
- * If we are running foreign code instead of lisp code and an
- * exception occurs we arrange a call into Lisp. If the
- * foreign code has installed an exception handler, we run the
- * very great risk of throwing through their exception handler
- * without asking it to unwind. This is more a problem with
- * non-sigtrap (EXCEPTION_BREAKPOINT) exceptions, as they could
- * reasonably be expected to happen in foreign code. We need to
- * figure out the exception handler unwind semantics and adhere
- * to them (probably by abusing the Lisp unwind-protect system)
- * if we are going to handle this scenario correctly.
- *
  * A good explanation of the exception handling semantics is
  * http://win32assembly.online.fr/Exceptionhandling.html .
- * We will also need to handle this ourselves when foreign
- * code tries to unwind -us-.
- *
- * When unwinding through foreign code we should unwind the
- * Lisp stack to the entry from foreign code, then unwind the
- * foreign code stack to the entry from Lisp, then resume
- * unwinding in Lisp.
  */
-
-EXCEPTION_DISPOSITION
-sigtrap_emulator(CONTEXT *context,
-                 struct lisp_exception_frame *exception_frame)
-{
-    if (*((char *)context->Eip + 1) == trap_ContextRestore) {
-        /* This is the cleanup for what is immediately below, and
-         * for the generic exception handling further below. We
-         * have to memcpy() the original context (emulated sigtrap
-         * or normal exception) over our context and resume it. */
-        memcpy(context, &exception_frame->context, sizeof(CONTEXT));
-        return ExceptionContinueExecution;
-
-    } else {
-        /* Not a trap_ContextRestore, must be a sigtrap.
-         * sigtrap_trampoline is defined in x86-assem.S. */
-        extern void sigtrap_trampoline;
-
-        /*
-         * Unlike some other operating systems, Win32 leaves EIP
-         * pointing to the breakpoint instruction.
-         */
-        context->Eip++;
-
-        /* We're not on an alternate stack like we would be in some
-         * other operating systems, and we don't want to risk leaking
-         * any important resources if we throw out of the sigtrap
-         * handler, so we need to copy off our context to a "safe"
-         * place and then monkey with the return EIP to point to a
-         * trampoline which calls another function which copies the
-         * context out to a really-safe place and then calls the real
-         * sigtrap handler. When the real sigtrap handler returns, the
-         * trampoline then contains another breakpoint with a code of
-         * trap_ContextRestore (see above). Essentially the same
-         * mechanism is used by the generic exception path. There is
-         * a small window of opportunity between us copying the
-         * context to the "safe" place and the sigtrap wrapper copying
-         * it to the really-safe place (allocated in its stack frame)
-         * during which the context can be smashed. The only scenario
-         * I can come up with for this, however, involves a stack
-         * overflow occuring at just the wrong time (which makes one
-         * wonder how stack overflow exceptions even happen, given
-         * that we don't switch stacks for exception processing...) */
-        memcpy(&exception_frame->context, context, sizeof(CONTEXT));
-
-        /* FIXME: Why do we save the old EIP in EAX? The sigtrap_trampoline
-         * pushes it into stack, but the sigtrap_wrapper where the trampoline
-         * goes ignores it, and after the wrapper we hit the trap_ContextRestore,
-         * which nukes the whole context with the original one?
-         *
-         * Am I misreading this, or is the EAX here and in the
-         * trampoline superfluous? --NS 20061024 */
-        context->Eax = context->Eip;
-        context->Eip = (unsigned long)&sigtrap_trampoline;
-
-        /* and return */
-        return ExceptionContinueExecution;
-    }
-}
-
-void sigtrap_wrapper(void)
-{
-    /*
-     * This is the wrapper around the sigtrap handler called from
-     * the trampoline returned to from the function above.
-     *
-     * There actually is a point to some of the commented-out code
-     * in this function, although it really belongs to the callback
-     * wrappers. Once it is installed there, it can probably be
-     * removed from here.
-     */
-    extern void sigtrap_handler(int signal, siginfo_t *info, void *context);
-
-/*     volatile struct { */
-/*      void *handler[2]; */
-    CONTEXT context;
-/*     } handler; */
-
-    struct lisp_exception_frame *frame = find_our_seh_frame();
-
-/*     wos_install_interrupt_handlers(handler); */
-/*     handler.handler[0] = get_seh_frame(); */
-/*     handler.handler[1] = &handle_exception; */
-/*     set_seh_frame(&handler); */
-
-    memcpy(&context, &frame->context, sizeof(CONTEXT));
-    sigtrap_handler(0, NULL, &context);
-    memcpy(&frame->context, &context, sizeof(CONTEXT));
-
-/*     set_seh_frame(handler.handler[0]); */
-}
 
 EXCEPTION_DISPOSITION
 handle_exception(EXCEPTION_RECORD *exception_record,
@@ -444,7 +335,17 @@ handle_exception(EXCEPTION_RECORD *exception_record,
 
     if (exception_record->ExceptionCode == EXCEPTION_BREAKPOINT) {
         /* Pick off sigtrap case first. */
-        return sigtrap_emulator(context, exception_frame);
+
+	extern void sigtrap_handler(int signal, siginfo_t *info, void *context);
+        /*
+         * Unlike some other operating systems, Win32 leaves EIP
+         * pointing to the breakpoint instruction.
+         */
+        context->Eip++;
+
+	sigtrap_handler(0, NULL, context);
+
+	return ExceptionContinueExecution;
     }
     else if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
              (is_valid_lisp_addr(fault_address) ||
@@ -496,41 +397,35 @@ handle_exception(EXCEPTION_RECORD *exception_record,
      */
 
     if (internal_errors_enabled) {
-        /* exception_trampoline is defined in x86-assem.S. */
-        extern void exception_trampoline;
+	lispobj context_sap;
+	lispobj exception_record_sap;
 
         /* We're making the somewhat arbitrary decision that having
          * internal errors enabled means that lisp has sufficient
-         * marbles to be able to handle exceptions, but xceptions
+         * marbles to be able to handle exceptions, but exceptions
          * aren't supposed to happen during cold init or reinit
-         * anyway.
-         *
-         * We use the same mechanism as the sigtrap emulator above
-         * with just a couple changes. We obviously use a different
-         * trampoline and wrapper function, we kill out any live
-         * floating point exceptions, and we save off the exception
-         * record as well as the context. */
+         * anyway. */
 
-        /* Save off context and exception information */
-        memcpy(&exception_frame->context, context, sizeof(CONTEXT));
-        memcpy(&exception_frame->exception, exception_record, sizeof(EXCEPTION_RECORD));
+	fake_foreign_function_call(context);
 
-        /* Set up to activate trampoline when we return
-         *
-         * FIXME: Why do we save the old EIP in EAX? The
-         * exception_trampoline pushes it into stack, but the wrapper
-         * where the trampoline goes ignores it, and then the wrapper
-         * unwinds from Lisp... WTF?
-         *
-         * Am I misreading this, or is the EAX here and in the
-         * trampoline superfluous? --NS 20061024 */
-        context->Eax = context->Eip;
-        context->Eip = (unsigned long)&exception_trampoline;
+	/* Allocate the SAP objects while the "interrupts" are still
+	 * disabled. */
+	context_sap = alloc_sap(context);
+	exception_record_sap = alloc_sap(exception_record);
 
-        /* Make sure a floating-point trap doesn't kill us */
-        context->FloatSave.StatusWord &= ~0x3f;
+	/* The exception system doesn't automatically clear pending
+	 * exceptions, so we lose as soon as we execute any FP
+	 * instruction unless we do this first. */
+	_clearfp();
 
-        /* And return. */
+	/* Call into lisp to handle things. */
+	funcall2(SymbolFunction(HANDLE_WIN32_EXCEPTION), context_sap,
+		 exception_record_sap);
+
+	/* If Lisp doesn't nlx, we need to put things back. */
+	undo_fake_foreign_function_call(context);
+
+        /* FIXME: HANDLE-WIN32-EXCEPTION should be allowed to decline */
         return ExceptionContinueExecution;
     }
 
@@ -555,34 +450,6 @@ handle_exception(EXCEPTION_RECORD *exception_record,
 
     /* FIXME: WTF? How are we supposed to end up here? */
     return ExceptionContinueSearch;
-}
-
-void handle_win32_exception_wrapper(void)
-{
-    struct lisp_exception_frame *frame = find_our_seh_frame();
-    CONTEXT context;
-    EXCEPTION_RECORD exception_record;
-    lispobj context_sap;
-    lispobj exception_record_sap;
-
-    memcpy(&context, &frame->context, sizeof(CONTEXT));
-    memcpy(&exception_record, &frame->exception, sizeof(EXCEPTION_RECORD));
-
-    fake_foreign_function_call(&context);
-
-    /* Allocate the SAP objects while the "interrupts" are still
-     * disabled. */
-    context_sap = alloc_sap(&context);
-    exception_record_sap = alloc_sap(&exception_record);
-
-    funcall2(SymbolFunction(HANDLE_WIN32_EXCEPTION), context_sap,
-             exception_record_sap);
-
-    /* FIXME: These never happen, as the Lisp-side call is
-     * to an ERROR, which means we must do a non-local exit
-     */
-    undo_fake_foreign_function_call(&context);
-    memcpy(&frame->context, &context, sizeof(CONTEXT));
 }
 
 void
