@@ -197,4 +197,27 @@
 (test-eval t '(if (true) t (oops)))
 (test-eval nil '(if (not (if (false) t)) (oops)))
 
+;;; TAGBODY
+
+;;; As of SBCL 1.0.1.8, TAGBODY should not accept duplicate go tags,
+;;; yet choked on two duplicate tags.  Note that this test asserts a
+;;; failure.
+(with-test (:name :tagbody-dual-go-tags)
+  (progn
+    (defun tagbody-dual-go-tags ()
+      (restart-case
+          (handler-bind ((error (lambda (c)
+                                  (declare (ignore c))
+                                  (invoke-restart 'NOT-AN-ERROR))))
+            (tagbody :A :A) nil)
+        (NOT-AN-ERROR () t)))
+    (assert (tagbody-dual-go-tags))))
+
+;;; Ensure that NIL is a valid go tag.
+(with-test (:name :tagbody-nil-is-valid-tag)
+  (progn
+    (defun tagbody-nil-is-valid-tag ()
+      (tagbody (go NIL) NIL) t)
+    (assert (tagbody-nil-is-valid-tag))))
+
 ;;; success

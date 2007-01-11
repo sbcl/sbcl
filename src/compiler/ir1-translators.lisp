@@ -133,28 +133,31 @@ extent of the block."
 ;;; like (<tag> <form>* (go <next tag>)). That is, we break up the
 ;;; tagbody into segments of non-tag statements, and explicitly
 ;;; represent the drop-through with a GO. The first segment has a
-;;; dummy NIL tag, since it represents code before the first tag. The
+;;; dummy NIL tag, since it represents code before the first tag. Note
+;;; however that NIL may appear as the tag of an inner segment. The
 ;;; last segment (which may also be the first segment) ends in NIL
 ;;; rather than a GO.
 (defun parse-tagbody (body)
   (declare (list body))
-  (collect ((segments))
-    (let ((current (cons nil body)))
+  (collect ((tags)
+            (segments))
+    (let ((current body))
       (loop
-        (let ((tag-pos (position-if (complement #'listp) current :start 1)))
-          (unless tag-pos
-            (segments `(,@current nil))
-            (return))
-          (let ((tag (elt current tag-pos)))
-            (when (assoc tag (segments))
-              (compiler-error
-               "The tag ~S appears more than once in the tagbody."
-               tag))
-            (unless (or (symbolp tag) (integerp tag))
-              (compiler-error "~S is not a legal tagbody statement." tag))
-            (segments `(,@(subseq current 0 tag-pos) (go ,tag))))
-          (setq current (nthcdr tag-pos current)))))
-    (segments)))
+       (let ((next-segment (member-if #'atom current)))
+         (unless next-segment
+           (segments `(,@current nil))
+           (return))
+         (let ((tag (car next-segment)))
+           (when (member tag (tags))
+             (compiler-error
+              "The tag ~S appears more than once in a tagbody."
+              tag))
+           (unless (or (symbolp tag) (integerp tag))
+             (compiler-error "~S is not a legal go tag." tag))
+           (tags tag)
+           (segments `(,@(ldiff current next-segment) (go ,tag))))
+         (setq current (rest next-segment))))
+      (mapcar #'cons (cons nil (tags)) (segments)))))
 
 ;;; Set up the cleanup, emitting the entry node. Then make a block for
 ;;; each tag, building up the tag list for LEXENV-TAGS as we go.
@@ -1007,7 +1010,9 @@ due to normal completion or a non-local exit such as THROW)."
   (ir1-convert
    start next result
    (with-unique-names (cleanup-fun drop-thru-tag exit-tag next start count)
-     `(flet ((,cleanup-fun () ,@cleanup nil))
+     `(flet ((,cleanup-fun ()
+               ,@cleanup
+               nil))
         ;; FIXME: If we ever get DYNAMIC-EXTENT working, then
         ;; ,CLEANUP-FUN should probably be declared DYNAMIC-EXTENT,
         ;; and something can be done to make %ESCAPE-FUN have

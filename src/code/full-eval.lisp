@@ -893,7 +893,8 @@
          (do ((form body (cdr form)))
              ((null form) nil)
            (when (atom (car form))
-             ;; FIXME: detect duplicate tags
+             (when (assoc (car form) tags)
+               (ip-error "The tag :A appears more than once in a tagbody."))
              (push (cons (car form) (cdr form)) tags)
              (push (cons (car form) #'go-to-tag) (env-tags env)))))
        ;; And then evaluate the forms in the body, starting from the
