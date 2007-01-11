@@ -336,16 +336,16 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     if (exception_record->ExceptionCode == EXCEPTION_BREAKPOINT) {
         /* Pick off sigtrap case first. */
 
-	extern void sigtrap_handler(int signal, siginfo_t *info, void *context);
+        extern void sigtrap_handler(int signal, siginfo_t *info, void *context);
         /*
          * Unlike some other operating systems, Win32 leaves EIP
          * pointing to the breakpoint instruction.
          */
         context->Eip++;
 
-	sigtrap_handler(0, NULL, context);
+        sigtrap_handler(0, NULL, context);
 
-	return ExceptionContinueExecution;
+        return ExceptionContinueExecution;
     }
     else if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
              (is_valid_lisp_addr(fault_address) ||
@@ -397,8 +397,8 @@ handle_exception(EXCEPTION_RECORD *exception_record,
      */
 
     if (internal_errors_enabled) {
-	lispobj context_sap;
-	lispobj exception_record_sap;
+        lispobj context_sap;
+        lispobj exception_record_sap;
 
         /* We're making the somewhat arbitrary decision that having
          * internal errors enabled means that lisp has sufficient
@@ -406,24 +406,24 @@ handle_exception(EXCEPTION_RECORD *exception_record,
          * aren't supposed to happen during cold init or reinit
          * anyway. */
 
-	fake_foreign_function_call(context);
+        fake_foreign_function_call(context);
 
-	/* Allocate the SAP objects while the "interrupts" are still
-	 * disabled. */
-	context_sap = alloc_sap(context);
-	exception_record_sap = alloc_sap(exception_record);
+        /* Allocate the SAP objects while the "interrupts" are still
+         * disabled. */
+        context_sap = alloc_sap(context);
+        exception_record_sap = alloc_sap(exception_record);
 
-	/* The exception system doesn't automatically clear pending
-	 * exceptions, so we lose as soon as we execute any FP
-	 * instruction unless we do this first. */
-	_clearfp();
+        /* The exception system doesn't automatically clear pending
+         * exceptions, so we lose as soon as we execute any FP
+         * instruction unless we do this first. */
+        _clearfp();
 
-	/* Call into lisp to handle things. */
-	funcall2(SymbolFunction(HANDLE_WIN32_EXCEPTION), context_sap,
-		 exception_record_sap);
+        /* Call into lisp to handle things. */
+        funcall2(SymbolFunction(HANDLE_WIN32_EXCEPTION), context_sap,
+                 exception_record_sap);
 
-	/* If Lisp doesn't nlx, we need to put things back. */
-	undo_fake_foreign_function_call(context);
+        /* If Lisp doesn't nlx, we need to put things back. */
+        undo_fake_foreign_function_call(context);
 
         /* FIXME: HANDLE-WIN32-EXCEPTION should be allowed to decline */
         return ExceptionContinueExecution;
