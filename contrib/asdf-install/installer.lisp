@@ -13,7 +13,8 @@
         (merge-pathnames
          (make-pathname :directory `(:relative ,(pathname-name path)))
          (make-pathname :directory (pathname-directory path)
-                        :host (pathname-host path)))
+                        :host (pathname-host path)
+                        :device (pathname-device path)))
         path)))
 
 (defvar *sbcl-home* (directorify (posix-getenv "SBCL_HOME")))
