@@ -255,6 +255,7 @@
   (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-read-sequence (stream seq &optional start end)
+  #+sb-doc
   (:documentation
    "This is like CL:READ-SEQUENCE, but for Gray streams."))
 
@@ -465,6 +466,7 @@
       T)))
 
 (defgeneric stream-write-sequence (stream seq &optional start end)
+  #+sb-doc
   (:documentation
    "This is like CL:WRITE-SEQUENCE, but for Gray streams."))
 
@@ -541,6 +543,18 @@
                                   &optional (start 0) (end nil))
   (basic-io-type-stream-write-sequence stream seq start end
                                        #'stream-write-byte))
+
+(defgeneric stream-file-position (stream &optional position-spec)
+  #+sb-doc
+  (:documentation
+   "Used by FILE-POSITION. Returns or changes the current position within STREAM."))
+
+(defmethod stream-file-position ((stream ansi-stream) &optional position-spec)
+  (ansi-stream-file-position stream position-spec))
+
+(defmethod stream-file-position ((stream t) &optional position-spec)
+  (declare (ignore stream position-spec))
+  nil)
 
 
 ;;; This is not in the Gray stream proposal, so it is left here

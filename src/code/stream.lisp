@@ -176,9 +176,10 @@
                      (- +ansi-stream-in-buffer-length+
                         (ansi-stream-in-index stream)))))))))))
 
-
 (defun file-position (stream &optional position)
-  (ansi-stream-file-position stream position))
+  (if (ansi-stream-p stream)
+      (ansi-stream-file-position stream position)
+      (stream-file-position stream position)))
 
 ;;; This is a literal translation of the ANSI glossary entry "stream
 ;;; associated with a file".

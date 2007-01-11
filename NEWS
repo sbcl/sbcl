@@ -10,6 +10,9 @@ changes in sbcl-1.0.2 relative to sbcl-1.0.1:
   * improvement: support for executable cores on NetBSD (thanks to 
     Richard Kreuter)
   * new feature: added a RESTART-FRAME debugger command
+  * new feature: new generic function SB-GRAY:STREAM-FILE-POSITION can 
+    be used to provide an implementation for FILE-POSITION on Gray streams
+    (thanks to Eric Marsden)
   * optimization: the function call overhead in code compiled with 
     a high DEBUG optimization setting is significantly 
   * bug fix: an error is signaled for attempts to use READ-SEQUENCE

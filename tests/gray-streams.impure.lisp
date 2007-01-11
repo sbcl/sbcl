@@ -60,7 +60,8 @@
 
 (defclass character-output-stream (fundamental-character-output-stream)
   ((lisp-stream :initarg :lisp-stream
-                :accessor character-output-stream-lisp-stream)))
+                :accessor character-output-stream-lisp-stream)
+   (position :initform 42 :accessor character-output-stream-position)))
 
 (defclass character-input-stream (fundamental-character-input-stream)
   ((lisp-stream :initarg :lisp-stream
@@ -100,6 +101,11 @@
 
 (defmethod stream-clear-output ((stream character-output-stream))
   (clear-output (character-output-stream-lisp-stream stream)))
+
+(defmethod stream-file-position ((stream character-output-stream) &optional new-value)
+  (if new-value
+      (setf (character-output-stream-position stream) new-value)
+      (character-output-stream-position stream)))
 
 ;;;; example character input stream encapsulating a lisp-stream
 
@@ -271,3 +277,11 @@
                      ((eq byte :eof))
                    (write-byte byte our-bin-to-char-output))))
              test-string))))
+
+
+
+;;; Minimal test of file-position
+(let ((stream (make-instance 'character-output-stream)))
+  (assert (= (file-position stream) 42))
+  (assert (file-position stream 50))
+  (assert (= (file-position stream) 50)))

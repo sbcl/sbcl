@@ -105,7 +105,7 @@ of fundamental-stream.
 
 @include fun-common-lisp-stream-element-type.texinfo
 @include fun-common-lisp-close.texinfo
-
+@include fun-sb-gray-stream-file-position.texinfo
 
 
 
