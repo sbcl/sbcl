@@ -323,6 +323,16 @@
   (make-sc-offset (sc-number (tn-sc tn))
                   (tn-offset tn)))
 
+(defun lambda-ancestor-p (maybe-ancestor maybe-descendant)
+  (declare (type clambda maybe-ancestor)
+           (type (or clambda null) maybe-descendant))
+  (loop
+     (when (eq maybe-ancestor maybe-descendant)
+       (return t))
+     (setf maybe-descendant (lambda-parent maybe-descendant))
+     (when (null maybe-descendant)
+       (return nil))))
+
 ;;; Dump info to represent VAR's location being TN. ID is an integer
 ;;; that makes VAR's name unique in the function. BUFFER is the vector
 ;;; we stick the result in. If MINIMAL, we suppress name dumping, and
@@ -332,8 +342,9 @@
 ;;; environment live and is an argument. If a :DEBUG-ENVIRONMENT TN,
 ;;; then we also exclude set variables, since the variable is not
 ;;; guaranteed to be live everywhere in that case.
-(defun dump-1-var (var tn id minimal buffer)
-  (declare (type lambda-var var) (type (or tn null) tn) (type index id))
+(defun dump-1-var (fun var tn id minimal buffer)
+  (declare (type lambda-var var) (type (or tn null) tn) (type index id)
+           (type clambda fun))
   (let* ((name (leaf-debug-name var))
          (save-tn (and tn (tn-save-tn tn)))
          (kind (and tn (tn-kind tn)))
@@ -347,7 +358,8 @@
                    (and (eq kind :debug-environment)
                         (null (basic-var-sets var))))
                (not (gethash tn (ir2-component-spilled-tns
-                                 (component-info *component-being-compiled*)))))
+                                 (component-info *component-being-compiled*))))
+               (lambda-ancestor-p (lambda-var-home var) fun))
       (setq flags (logior flags compiled-debug-var-environment-live)))
     (when save-tn
       (setq flags (logior flags compiled-debug-var-save-loc-p)))
@@ -407,9 +419,9 @@
                  (incf id))
                 (t
                  (setq id 0  prev-name name)))
-          (dump-1-var var (cdr x) id nil buffer)
-          (setf (gethash var var-locs) i))
-        (incf i))
+          (dump-1-var fun var (cdr x) id nil buffer)
+          (setf (gethash var var-locs) i)
+          (incf i)))
       (coerce buffer 'simple-vector))))
 
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARS of
@@ -418,7 +430,7 @@
   (declare (type clambda fun))
   (let ((buffer (make-array 0 :fill-pointer 0 :adjustable t)))
     (dolist (var (lambda-vars fun))
-      (dump-1-var var (leaf-info var) 0 t buffer))
+      (dump-1-var fun var (leaf-info var) 0 t buffer))
     (coerce buffer 'simple-vector)))
 
 ;;; Return VAR's relative position in the function's variables (determined
