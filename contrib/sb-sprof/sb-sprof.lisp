@@ -634,7 +634,7 @@ e
                ,@(when show-progress
                        `((format t "~&===> ~d of ~d samples taken.~%"
                                  (samples-trace-count *samples*)
-                                 (samples-max-samples))))
+                                 (samples-max-samples *samples*))))
                (let ((.last-index. (samples-index *samples*)))
                  ,@body
                  (when (= .last-index. (samples-index *samples*))

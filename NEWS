@@ -17,6 +17,8 @@ changes in sbcl-1.0.2 relative to sbcl-1.0.1:
     (thanks to Tony Martinez)
   * bug fix: the initforms for DEFMETHOD &AUX parameters are only
     evaluated once (reported by Kevin Reid)
+  * bug fix: the :SHOW-PROGRESS keyword parameter to SB-SPROF:WITH-PROFILING
+    works again (thanks to Kilian Sprotte)
 
 changes in sbcl-1.0.1 relative to sbcl-1.0:
   * new platform: FreeBSD/x86-64, including support for threading.
