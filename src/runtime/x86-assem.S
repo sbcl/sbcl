@@ -274,6 +274,19 @@ Lstack:
 Ldone:	
 	/* Registers eax, ecx, edx, edi, and esi are now live. */
 
+#ifdef LISP_FEATURE_WIN32
+	/* Establish an SEH frame. */
+#ifdef LISP_FEATURE_SB_THREAD
+	/* FIXME: need to save BSP here. */
+#error need to save BSP here, but don't know how yet.
+#else
+	pushl	BINDING_STACK_POINTER + SYMBOL_VALUE_OFFSET
+#endif
+	pushl	$GNAME(exception_handler_wrapper)
+	pushl	%fs:0
+	movl	%esp, %fs:0
+#endif
+
 	/* Alloc new frame. */
 	mov	%esp,%ebx	# The current sp marks start of new frame.
 	push	%ebp		# fp in save location S0
@@ -288,6 +301,12 @@ Ldone:
 	mov	%ebx, %esp
 LsingleValue:
 	/* A singled value function returns here */
+
+#ifdef LISP_FEATURE_WIN32
+	/* Remove our SEH frame. */
+	popl	%fs:0
+	add	$8, %esp
+#endif
 
 /* Restore the stack, in case there was a stack change. */
 	popl	%esp		# c-sp
@@ -844,6 +863,43 @@ GNAME(alloc_overflow_edi):
         ret
         SIZE(GNAME(alloc_overflow_edi))
 
+
+#ifdef LISP_FEATURE_WIN32
+	/* The guts of the exception-handling system doesn't use
+	 * frame pointers, which manages to throw off backtraces
+	 * rather badly.  So here we grab the (known-good) EBP
+	 * and EIP from the exception context and use it to fake
+	 * up a stack frame which will skip over the system SEH
+	 * code. */
+	.align	align_4byte
+	.globl	GNAME(exception_handler_wrapper)
+	TYPE(GNAME(exception_handler_wrapper))
+GNAME(exception_handler_wrapper):
+	/* Context layout is: */
+	/* 7 dwords before FSA. (0x1c) */
+	/* 8 dwords and 0x50 bytes in the FSA. (0x70/0x8c) */
+	/* 4 dwords segregs. (0x10/0x9c) */
+	/* 6 dwords non-stack GPRs. (0x18/0xb4) */
+	/* EBP (at 0xb4) */
+	/* EIP (at 0xb8) */
+#define CONTEXT_EBP_OFFSET 0xb4
+#define CONTEXT_EIP_OFFSET 0xb8
+	/* some other stuff we don't care about. */
+	pushl	%ebp
+	movl	0x10(%esp), %ebp	/* context */
+	pushl	CONTEXT_EIP_OFFSET(%ebp)
+	pushl	CONTEXT_EBP_OFFSET(%ebp)
+	movl	%esp, %ebp
+	pushl	0x1c(%esp)
+	pushl	0x1c(%esp)
+	pushl	0x1c(%esp)
+	pushl	0x1c(%esp)
+	call	GNAME(handle_exception)
+	lea	8(%ebp), %esp
+	popl	%ebp
+	ret
+	SIZE(GNAME(exception_handler_wrapper))
+#endif
 
 #ifdef LISP_FEATURE_DARWIN
         .align align_4byte

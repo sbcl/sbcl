@@ -279,13 +279,17 @@
   (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
   (current-cont :c-type #!-alpha "lispobj *" #!+alpha "u32")
   #!-(or x86 x86-64) current-code
-  entry-pc)
+  entry-pc
+  #!+win32 next-seh-frame
+  #!+win32 seh-frame-handler)
 
 (define-primitive-object (catch-block)
   (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
   (current-cont :c-type #!-alpha "lispobj *" #!+alpha "u32")
   #!-(or x86 x86-64) current-code
   entry-pc
+  #!+win32 next-seh-frame
+  #!+win32 seh-frame-handler
   tag
   (previous-catch :c-type #!-alpha "struct catch_block *" #!+alpha "u32")
   size)

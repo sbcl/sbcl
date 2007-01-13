@@ -43,6 +43,7 @@
 #include "runtime.h"
 #include "alloc.h"
 #include "genesis/primitive-objects.h"
+#include "dynbind.h"
 
 #include <sys/types.h>
 #include <signal.h>
@@ -320,8 +321,18 @@ EXCEPTION_DISPOSITION
 handle_exception(EXCEPTION_RECORD *exception_record,
                  struct lisp_exception_frame *exception_frame,
                  CONTEXT *context,
-                 void *dc) /* FIXME: What's dc again? */
+                 void *dispatcher_context)
 {
+    if (exception_record->ExceptionFlags & (EH_UNWINDING | EH_EXIT_UNWIND)) {
+        /* If we're being unwound, be graceful about it. */
+
+        /* Undo any dynamic bindings. */
+        unbind_to_here(exception_frame->bindstack_pointer,
+                       arch_os_get_current_thread());
+
+        return ExceptionContinueSearch;
+    }
+
     /* For EXCEPTION_ACCESS_VIOLATION only. */
     void *fault_address = (void *)exception_record->ExceptionInformation[1];
 

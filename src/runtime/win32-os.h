@@ -43,6 +43,7 @@ typedef void *siginfo_t;
 struct lisp_exception_frame {
     struct lisp_exception_frame *next_frame;
     void *handler;
+    lispobj *bindstack_pointer;
 };
 
 void wos_install_interrupt_handlers(struct lisp_exception_frame *handler);
