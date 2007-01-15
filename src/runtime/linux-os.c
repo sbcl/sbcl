@@ -185,7 +185,12 @@ os_init(char *argv[], char *envp[])
             "LD_ASSUME_KERNEL\n");
     }
 #endif
-    os_vm_page_size = getpagesize();
+
+    /* Don't use getpagesize(), since it's not constant across Linux
+     * kernel versions on some architectures (for example PPC). FIXME:
+     * possibly the same should be done on other architectures too.
+     */
+    os_vm_page_size = BACKEND_PAGE_SIZE;
 
     /* KLUDGE: Disable memory randomization on new Linux kernels
      * by setting a personality flag and re-executing. (We need

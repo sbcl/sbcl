@@ -28,17 +28,12 @@
 ;;; general have our C runtime code running to ask, so instead we set
 ;;; it by hand. -- WHN 2001-04-15
 ;;;
-;;; Though note that POSIX specifies (as far as I can tell)
-;;;
-;;;   sysconf(_SC_PAGE_SIZE);
-;;;
-;;; as a portable way of retrieving this information; a call to this
-;;; could be made in grovel-headers (which, strictly speaking, would
-;;; no longer solely be grovelling headers), though the question of
-;;; how to make this information appear in GENESIS, which is built and
-;;; run from host-1 files (which are made before grovel-headers runs)
-;;; would remain.  -- CSR, 2002-09-01
-(setf *backend-page-size* 4096)
+;;; Actually any information that we can retrieve C-side would be
+;;; useless in SBCL, since it's possible for otherwise binary
+;;; compatible systems to return different values for getpagesize().
+;;; -- JES, 2007-01-06
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf *backend-page-size* 4096))
 ;;; comment from CMU CL:
 ;;;
 ;;;   in case we ever wanted to do this for Windows NT..
@@ -49,3 +44,7 @@
 ;;;   Effectively, the page size is 64K.
 ;;;
 ;;;   would be: (setf *backend-page-size* 65536)
+
+;;; The size in bytes of the GENCGC pages. Should be a multiple of the
+;;; architecture code size.
+(def!constant gencgc-page-size *backend-page-size*)

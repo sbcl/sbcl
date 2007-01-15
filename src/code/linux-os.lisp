@@ -45,7 +45,4 @@
 
 ;;; Return the system page size.
 (defun get-page-size ()
-  ;; probably should call getpagesize()
-  ;; FIXME: Or we could just get rid of this, since the uses of it look
-  ;; disposable.
-  4096)
+  sb!c:*backend-page-size*)

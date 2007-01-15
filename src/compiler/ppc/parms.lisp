@@ -24,11 +24,6 @@
 ;;; object
 (def!constant n-byte-bits 8)
 
-
-;;; The size in bytes of the GENCGC pages. Should be a multiple of the
-;;; architecture code size.
-(def!constant gencgc-page-size 4096)
-
 ;;; flags for the generational garbage collector
 (def!constant pseudo-atomic-interrupted-flag 1)
 (def!constant pseudo-atomic-flag 4)

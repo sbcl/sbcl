@@ -207,7 +207,14 @@
   (define-alien-type (struct page)
       (struct page
               (start long)
-              (bytes-used (unsigned 16))
+              ;; On platforms with small enough GC pages, this field
+              ;; will be a short. On platforms with larger ones, it'll
+              ;; be an int.
+              (bytes-used (unsigned
+                           #.(if (typep sb!vm:gencgc-page-size
+                                        '(unsigned-byte 16))
+                                 16
+                                 32)))
               (flags (unsigned 8))
               (gen (signed 8))))
   (declaim (inline find-page-index))

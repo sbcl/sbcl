@@ -2728,22 +2728,17 @@ core and return a descriptor to it."
             (setf prev-priority priority))
           (format t "#define ~A " name)
           (format t
-                  ;; KLUDGE: As of sbcl-0.6.7.14, we're dumping two
-                  ;; different kinds of values here, (1) small codes
-                  ;; and (2) machine addresses. The small codes can be
-                  ;; dumped as bare integer values. The large machine
-                  ;; addresses might cause problems if they're large
-                  ;; and represented as (signed) C integers, so we
-                  ;; want to force them to be unsigned. We do that by
-                  ;; wrapping them in the LISPOBJ macro. (We could do
-                  ;; it with a bare "(unsigned)" cast, except that
-                  ;; this header file is used not only in C files, but
-                  ;; also in assembly files, which don't understand
-                  ;; the cast syntax. The LISPOBJ macro goes away in
-                  ;; assembly files, but that shouldn't matter because
-                  ;; we don't do arithmetic on address constants in
-                  ;; assembly files. See? It really is a kludge..) --
-                  ;; WHN 2000-10-18
+                  ;; KLUDGE: We're dumping two different kinds of
+                  ;; values here, (1) small codes and (2) machine
+                  ;; addresses. The small codes can be dumped as bare
+                  ;; integer values. The large machine addresses might
+                  ;; cause problems if they're large and represented
+                  ;; as (signed) C integers, so we want to force them
+                  ;; to be unsigned by appending an U to the
+                  ;; literal. We can't dump all the values using the
+                  ;; literal-U syntax, since the assembler doesn't
+                  ;; support that syntax and some of the small
+                  ;; constants can be used in assembler files.
                   (let (;; cutoff for treatment as a small code
                         (cutoff (expt 2 16)))
                     (cond ((minusp value)
@@ -2751,7 +2746,7 @@ core and return a descriptor to it."
                           ((< value cutoff)
                            "~D")
                           (t
-                           "LISPOBJ(~DU)")))
+                           "~DU")))
                   value)
           (format t " /* 0x~X */~@[  /* ~A */~]~%" value doc))))
     (terpri))
@@ -2766,6 +2761,13 @@ core and return a descriptor to it."
           (format t "#define ~A ~D~%"
                   (substitute #\_ #\- (symbol-name (car current-error)))
                   i)))))
+  (terpri)
+
+  ;; I'm not really sure why this is in SB!C, since it seems
+  ;; conceptually like something that belongs to SB!VM. In any case,
+  ;; it's needed C-side.
+  (format t "#define BACKEND_PAGE_SIZE ~DU~%" sb!c:*backend-page-size*)
+
   (terpri)
 
   ;; FIXME: The SPARC has a PSEUDO-ATOMIC-TRAP that differs between

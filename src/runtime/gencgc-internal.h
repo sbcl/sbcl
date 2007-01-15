@@ -29,6 +29,15 @@ inline page_index_t find_page_index(void *);
 inline void *page_address(page_index_t);
 int gencgc_handle_wp_violation(void *);
 
+
+/* Note that this structure is also used from Lisp-side in
+ * src/code/room.lisp, and the Lisp-side structure layout is currently
+ * not groveled from C code but hardcoded. Any changes to the
+ * structure layout need to be also made there.
+ *
+ * FIXME: We should probably just define this structure in Lisp, and
+ * output the C version in genesis. -- JES, 2006-12-30.
+ */
 struct page {
     /* The name of this field is not well-chosen for its actual use.
      * This is the offset from the start of the page to the start
@@ -40,15 +49,11 @@ struct page {
      * than the actual bytes used for pages within the current
      * allocation regions. It should be 0 for all unallocated pages (not
      * hard to achieve).
-     *
-     * Currently declared as an unsigned short to make the struct size
-     * smaller. This means that GENCGC-PAGE-SIZE is constrained to fit
-     * inside a short.
      */
+#if PAGE_BYTES > USHRT_MAX
+    unsigned int bytes_used;
+#else
     unsigned short bytes_used;
-
-#if USHRT_MAX < PAGE_BYTES
-#error "PAGE_BYTES too large"
 #endif
 
     unsigned

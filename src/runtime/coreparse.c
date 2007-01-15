@@ -349,7 +349,16 @@ load_core_file(char *file, os_vm_offset_t file_offset)
                 size -= bytes_read;
                 while (bytes_read) {
                     bytes_read -= sizeof(long);
-                    page_table[offset++].first_object_offset = data[i++];
+                    /* Ignore all zeroes. The size of the page table
+                     * core entry was rounded up to os_vm_page_size
+                     * during the save, and might now have more
+                     * elements than the page table.
+                     */
+                    if (data[i]) {
+                        page_table[offset].first_object_offset = data[i];
+                    }
+                    i++;
+                    offset++;
                 }
             }
 
