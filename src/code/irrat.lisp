@@ -95,7 +95,7 @@
     (log (+ number (sqrt (- (* number number) 1.0d0))) #.(exp 1.0d0)))
   (declaim (inline %atanh))
   (defun %atanh (number)
-    (let ((ratio (/ (1+ number) (1- number))))
+    (let ((ratio (/ (+ 1 number) (- 1 number))))
       ;; Were we effectively zero?
       (if (= ratio -1.0d0)
           0.0d0

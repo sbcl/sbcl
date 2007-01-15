@@ -27,6 +27,7 @@ changes in sbcl-1.0.2 relative to sbcl-1.0.1:
   * bug fix: NIL can be used as a tagbody tag (thanks to Stephen Wilson)
   * bug fix: Win32 port can now handle foreign code unwinding Lisp
     stack frames from alien callbacks.
+  * bug fix: ATANH returned incorrect results on win32 (thanks to Pierre Mai)
 
 changes in sbcl-1.0.1 relative to sbcl-1.0:
   * new platform: FreeBSD/x86-64, including support for threading.

@@ -290,3 +290,8 @@
         (let ((x (random (ash 1 i))))
           (test x (test-logcount x))
           (test (- x) (test-logcount (- x))))))))
+
+;; 1.0 had a broken ATANH on win32
+(with-test (:name :atanh)
+  (assert (= (atanh 0.9d0) 1.4722194895832204d0)))
+
