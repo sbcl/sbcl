@@ -371,12 +371,6 @@
 
 ;;;; 3 arguments
 
-(defgeneric add-boundp-method (class generic-function slot-name))
-
-(defgeneric add-reader-method (class generic-function slot-name))
-
-(defgeneric add-writer-method (class generic-function slot-name))
-
 (defgeneric (setf class-slot-value) (nv class slot-name))
 
 ;;; CMUCL comment (from Gerd Moellmann/Pierre Mai, 2002-10-19):
@@ -414,6 +408,12 @@
 (defgeneric slot-value-using-class (class object slotd))
 
 ;;;; 4 arguments
+
+(defgeneric add-boundp-method (class generic-function slot-name slot-documentation))
+
+(defgeneric add-reader-method (class generic-function slot-name slot-documentation))
+
+(defgeneric add-writer-method (class generic-function slot-name slot-documentation))
 
 (defgeneric make-method-lambda (proto-generic-function
                                 proto-method

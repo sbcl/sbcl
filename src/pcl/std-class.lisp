@@ -697,7 +697,7 @@
   (fix-slot-accessors class dslotds 'remove))
 
 (defun fix-slot-accessors (class dslotds add/remove)
-  (flet ((fix (gfspec name r/w)
+  (flet ((fix (gfspec name r/w doc)
            (let ((gf (cond ((eq add/remove 'add)
                             (or (find-generic-function gfspec nil)
                                 (ensure-generic-function
@@ -709,17 +709,18 @@
              (when gf
                (case r/w
                  (r (if (eq add/remove 'add)
-                        (add-reader-method class gf name)
+                        (add-reader-method class gf name doc)
                         (remove-reader-method class gf)))
                  (w (if (eq add/remove 'add)
-                        (add-writer-method class gf name)
+                        (add-writer-method class gf name doc)
                         (remove-writer-method class gf))))))))
     (dolist (dslotd dslotds)
-      (let ((slot-name (slot-definition-name dslotd)))
+      (let ((slot-name (slot-definition-name dslotd))
+            (slot-doc (%slot-definition-documentation dslotd)))
         (dolist (r (slot-definition-readers dslotd))
-          (fix r slot-name 'r))
+          (fix r slot-name 'r slot-doc))
         (dolist (w (slot-definition-writers dslotd))
-          (fix w slot-name 'w))))))
+          (fix w slot-name 'w slot-doc))))))
 
 (defun add-direct-subclasses (class supers)
   (dolist (super supers)
@@ -1110,14 +1111,14 @@
   (declare (ignore direct-slot initargs))
   (find-class 'standard-reader-method))
 
-(defmethod add-reader-method ((class slot-class) generic-function slot-name)
+(defmethod add-reader-method ((class slot-class) generic-function slot-name slot-documentation)
   (add-method generic-function
               (make-a-method 'standard-reader-method
                              ()
                              (list (or (class-name class) 'object))
                              (list class)
                              (make-reader-method-function class slot-name)
-                             "automatically generated reader method"
+                             (or slot-documentation "automatically generated reader method")
                              :slot-name slot-name
                              :object-class class
                              :method-class-function #'reader-method-class)))
@@ -1126,19 +1127,19 @@
   (declare (ignore direct-slot initargs))
   (find-class 'standard-writer-method))
 
-(defmethod add-writer-method ((class slot-class) generic-function slot-name)
+(defmethod add-writer-method ((class slot-class) generic-function slot-name slot-documentation)
   (add-method generic-function
               (make-a-method 'standard-writer-method
                              ()
                              (list 'new-value (or (class-name class) 'object))
                              (list *the-class-t* class)
                              (make-writer-method-function class slot-name)
-                             "automatically generated writer method"
+                             (or slot-documentation "automatically generated writer method")
                              :slot-name slot-name
                              :object-class class
                              :method-class-function #'writer-method-class)))
 
-(defmethod add-boundp-method ((class slot-class) generic-function slot-name)
+(defmethod add-boundp-method ((class slot-class) generic-function slot-name slot-documentation)
   (add-method generic-function
               (make-a-method (constantly (find-class 'standard-boundp-method))
                              class
@@ -1146,7 +1147,7 @@
                              (list (or (class-name class) 'object))
                              (list class)
                              (make-boundp-method-function class slot-name)
-                             "automatically generated boundp method"
+                             (or slot-documentation "automatically generated boundp method")
                              slot-name)))
 
 (defmethod remove-reader-method ((class slot-class) generic-function)

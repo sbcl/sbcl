@@ -87,3 +87,17 @@
     (assert (raises-error? (funcall fun *foo*)))
     (assert (= 3 (b-of *foo*)))
     (assert (raises-error? (c-of *foo*)))))
+
+;; test that :documentation argument to slot specifiers are used as
+;; the docstrings of accessor methods.
+(defclass foo ()
+  ((a :reader a-of :documentation "docstring for A")
+   (b :writer set-b-of :documentation "docstring for B")
+   (c :accessor c :documentation  "docstring for C")))
+
+(flet ((doc (fun)
+         (documentation fun t)))
+  (assert (string= (doc (find-method #'a-of nil '((foo)))) "docstring for A"))
+  (assert (string= (doc (find-method #'set-b-of nil '(t (foo)))) "docstring for B"))
+  (assert (string= (doc (find-method #'c nil '((foo)))) "docstring for C"))
+  (assert (string= (doc (find-method #'(setf c) nil '(t (foo)))) "docstring for C")))
